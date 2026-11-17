@@ -1,0 +1,429 @@
+[
+ {
+  "at": "2026-11-17T15:35:46.670Z",
+  "by": "autopilot",
+  "cmd": "get",
+  "args": [
+   "get",
+   "change-143",
+   "--by",
+   "autopilot"
+  ],
+  "asOf": null
+ },
+ {
+  "at": "2026-11-17T15:35:46.698Z",
+  "by": "autopilot",
+  "cmd": "get",
+  "args": [
+   "get",
+   "finding-150",
+   "--by",
+   "autopilot"
+  ],
+  "asOf": null
+ },
+ {
+  "at": "2026-11-17T15:35:46.726Z",
+  "by": "autopilot",
+  "cmd": "get",
+  "args": [
+   "get",
+   "finding-147",
+   "--by",
+   "autopilot"
+  ],
+  "asOf": null
+ },
+ {
+  "at": "2026-11-17T15:35:46.759Z",
+  "by": "autopilot",
+  "cmd": "show",
+  "args": [
+   "show",
+   "--task",
+   "task-113",
+   "--by",
+   "autopilot"
+  ],
+  "asOf": null
+ },
+ {
+  "at": "2026-11-17T15:35:57.284Z",
+  "by": "autopilot",
+  "cmd": "find",
+  "args": [
+   "find",
+   "--text",
+   "6,144",
+   "--by",
+   "autopilot"
+  ],
+  "asOf": null
+ },
+ {
+  "at": "2026-11-17T15:35:57.321Z",
+  "by": "autopilot",
+  "cmd": "find",
+  "args": [
+   "find",
+   "--text",
+   "LIN-4458",
+   "--state",
+   "open",
+   "--by",
+   "autopilot"
+  ],
+  "asOf": null
+ },
+ {
+  "at": "2026-11-17T15:35:57.354Z",
+  "by": "autopilot",
+  "cmd": "find",
+  "args": [
+   "find",
+   "--text",
+   "FEEDBACK_ENTRY_KINDS",
+   "--by",
+   "autopilot"
+  ],
+  "asOf": null
+ },
+ {
+  "at": "2026-11-17T15:35:57.388Z",
+  "by": "autopilot",
+  "cmd": "find",
+  "args": [
+   "find",
+   "--text",
+   "rebase",
+   "--state",
+   "open",
+   "--by",
+   "autopilot"
+  ],
+  "asOf": null
+ },
+ {
+  "at": "2026-11-17T15:42:47.720Z",
+  "by": "autopilot",
+  "cmd": "show",
+  "args": [
+   "show",
+   "--task",
+   "task-113",
+   "--by",
+   "autopilot"
+  ],
+  "asOf": null
+ },
+ {
+  "at": "2026-11-17T15:42:54.532Z",
+  "by": "autopilot",
+  "cmd": "get",
+  "args": [
+   "get",
+   "finding-166",
+   "--by",
+   "autopilot"
+  ],
+  "asOf": null
+ },
+ {
+  "at": "2026-11-17T15:42:54.569Z",
+  "by": "autopilot",
+  "cmd": "get",
+  "args": [
+   "get",
+   "finding-167",
+   "--by",
+   "autopilot"
+  ],
+  "asOf": null
+ },
+ {
+  "at": "2026-11-17T15:42:54.602Z",
+  "by": "autopilot",
+  "cmd": "get",
+  "args": [
+   "get",
+   "change-143",
+   "--by",
+   "autopilot"
+  ],
+  "asOf": null
+ },
+ {
+  "at": "2026-11-17T15:42:54.641Z",
+  "by": "autopilot",
+  "cmd": "get",
+  "args": [
+   "get",
+   "change-172",
+   "--by",
+   "autopilot"
+  ],
+  "asOf": null
+ },
+ {
+  "at": "2026-11-17T15:42:54.678Z",
+  "by": "autopilot",
+  "cmd": "get",
+  "args": [
+   "get",
+   "run-154",
+   "--by",
+   "autopilot"
+  ],
+  "asOf": null
+ },
+ {
+  "at": "2026-11-17T15:42:54.713Z",
+  "by": "autopilot",
+  "cmd": "get",
+  "args": [
+   "get",
+   "run-169",
+   "--by",
+   "autopilot"
+  ],
+  "asOf": null
+ },
+ {
+  "at": "2026-11-17T15:42:54.750Z",
+  "by": "autopilot",
+  "cmd": "get",
+  "args": [
+   "get",
+   "finding-153",
+   "--by",
+   "autopilot"
+  ],
+  "asOf": null
+ },
+ {
+  "at": "2026-11-17T15:42:54.785Z",
+  "by": "autopilot",
+  "cmd": "get",
+  "args": [
+   "get",
+   "check-158",
+   "--by",
+   "autopilot"
+  ],
+  "asOf": null
+ },
+ {
+  "at": "2026-11-17T15:42:54.821Z",
+  "by": "autopilot",
+  "cmd": "get",
+  "args": [
+   "get",
+   "check-159",
+   "--by",
+   "autopilot"
+  ],
+  "asOf": null
+ },
+ {
+  "at": "2026-11-17T15:43:13.286Z",
+  "by": "autopilot",
+  "cmd": "find",
+  "args": [
+   "find",
+   "--text",
+   "2d02bb4a2",
+   "--by",
+   "autopilot"
+  ],
+  "asOf": null
+ },
+ {
+  "at": "2026-11-17T15:43:13.327Z",
+  "by": "autopilot",
+  "cmd": "get",
+  "args": [
+   "get",
+   "check-157",
+   "--by",
+   "autopilot"
+  ],
+  "asOf": null
+ },
+ {
+  "at": "2026-11-17T15:43:13.367Z",
+  "by": "autopilot",
+  "cmd": "find",
+  "args": [
+   "find",
+   "--text",
+   "live-wait",
+   "--state",
+   "open",
+   "--by",
+   "autopilot"
+  ],
+  "asOf": null
+ },
+ {
+  "at": "2026-11-17T15:43:13.410Z",
+  "by": "autopilot",
+  "cmd": "find",
+  "args": [
+   "find",
+   "--text",
+   "runFact",
+   "--state",
+   "open",
+   "--by",
+   "autopilot"
+  ],
+  "asOf": null
+ },
+ {
+  "at": "2026-11-17T15:43:13.453Z",
+  "by": "autopilot",
+  "cmd": "find",
+  "args": [
+   "find",
+   "--text",
+   "liveWait",
+   "--state",
+   "open",
+   "--by",
+   "autopilot"
+  ],
+  "asOf": null
+ },
+ {
+  "at": "2026-11-17T15:43:13.498Z",
+  "by": "autopilot",
+  "cmd": "find",
+  "args": [
+   "find",
+   "--text",
+   "re-review",
+   "--state",
+   "open",
+   "--by",
+   "autopilot"
+  ],
+  "asOf": null
+ },
+ {
+  "at": "2026-11-17T15:43:18.308Z",
+  "by": "autopilot",
+  "cmd": "get",
+  "args": [
+   "get",
+   "finding-64",
+   "--by",
+   "autopilot"
+  ],
+  "asOf": null
+ },
+ {
+  "at": "2026-11-17T15:43:18.356Z",
+  "by": "autopilot",
+  "cmd": "get",
+  "args": [
+   "get",
+   "finding-28",
+   "--by",
+   "autopilot"
+  ],
+  "asOf": null
+ },
+ {
+  "at": "2026-11-17T15:43:18.402Z",
+  "by": "autopilot",
+  "cmd": "get",
+  "args": [
+   "get",
+   "finding-81",
+   "--by",
+   "autopilot"
+  ],
+  "asOf": null
+ },
+ {
+  "at": "2026-11-17T15:43:18.444Z",
+  "by": "autopilot",
+  "cmd": "find",
+  "args": [
+   "find",
+   "--text",
+   "LIN-4459",
+   "--by",
+   "autopilot"
+  ],
+  "asOf": null
+ },
+ {
+  "at": "2026-11-17T15:43:18.487Z",
+  "by": "autopilot",
+  "cmd": "find",
+  "args": [
+   "find",
+   "--text",
+   "piece 4",
+   "--state",
+   "open",
+   "--by",
+   "autopilot"
+  ],
+  "asOf": null
+ },
+ {
+  "at": "2026-11-17T15:43:25.303Z",
+  "by": "autopilot",
+  "cmd": "get",
+  "args": [
+   "get",
+   "finding-139",
+   "--by",
+   "autopilot"
+  ],
+  "asOf": null
+ },
+ {
+  "at": "2026-11-17T15:43:25.343Z",
+  "by": "autopilot",
+  "cmd": "get",
+  "args": [
+   "get",
+   "finding-146",
+   "--by",
+   "autopilot"
+  ],
+  "asOf": null
+ },
+ {
+  "at": "2026-11-17T15:43:25.390Z",
+  "by": "autopilot",
+  "cmd": "find",
+  "args": [
+   "find",
+   "--text",
+   "recommendation-live-wait",
+   "--by",
+   "autopilot"
+  ],
+  "asOf": null
+ },
+ {
+  "at": "2026-11-17T15:43:25.431Z",
+  "by": "autopilot",
+  "cmd": "find",
+  "args": [
+   "find",
+   "--in",
+   "task-82",
+   "--state",
+   "open",
+   "--by",
+   "autopilot"
+  ],
+  "asOf": null
+ }
+]
