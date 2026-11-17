@@ -1,5 +1,5 @@
 {
- "next": 96,
+ "next": 97,
  "records": {
   "area-1": [
    {
@@ -2705,6 +2705,36 @@
     "at": "2026-11-13T14:14:18.000Z",
     "by": "leftover"
    }
+  ],
+  "verdict-96": [
+   {
+    "id": "verdict-96",
+    "kind": "verdict",
+    "state": "stands",
+    "fields": {
+     "of": "review",
+     "outcome": "approve-with-notes",
+     "reasoning": "Approve, conditional on close-out making the one named test fix and on LIN-4452 discharging the live-check ledger (post-deploy steps, not merge conditions). PR #2421 reviewed at head f9fa4a80c (base 4b5001ddf); merges cleanly onto main cfd152fa4, which touched none of its 22 files. CI green on that head; the region, seal, guard, readers, as-asked, marker-census and codec suites re-run locally, all green.\n\nScope: inside plan-54's places, plus two declared extras (the isHermeticTestToken consolidation, behaviour-identical at every call site and naming the Waiting entry it removes; a new docs/areas/providers.md). Departures recorded on LIN-4445: end line chosen by digest (decision-85), size in bytes (decision-86), round trip throws (decision-87), the empty-fence fix (decision-81), every getIssue asks for the property.\n\nRegression: codec rebuilds (LIN-3556..3570) and seal work (LIN-4352/4361/4362) intact; the only earlier decision changed is the empty codeBlock, whose D1 refusal reason (old renderer printed a split fence) no longer applies. D1 still refuses an empty-text, marked, blank-line or edge-newline codeBlock.\n\nGap analysis: items 1-6 all met. Done-when: met; 'D1's rich-content guard is unchanged' met in substance (no rich-content rule changed; only the empty-fence codec-shape rule, declared under Size of the move).\n\nMutation checks M1-M8 plus _toCanonicalIssue back to adfToMarkdown: every one red, each reverted. Probe of 16 further shapes through holdAsAsked then readDescription: all byte-exact, none tripped D1 or brought a new 422.\n\nClass: 'a provider whose stored form cannot give back the markdown it was handed' has one member, Jira; its remaining instance is createIssue (LIN-4451). Bulk search path is display-only and already homed (finding-91). Otherwise isolated.\n\nRollback: revert the squash commit. Written properties stay but nothing reads them; sealed descriptions read through adfToMarkdown as _End of…_, which splitAsAsked does not recognise, so those tickets fall back to the unsealed readers. No data loss."
+    },
+    "links": {
+     "on": [
+      "change-84@2",
+      "plan-54@2",
+      "decision-81@1",
+      "decision-85@1",
+      "decision-86@1",
+      "decision-87@1"
+     ],
+     "about": [
+      "task-60"
+     ]
+    },
+    "in": "task-60",
+    "v": 1,
+    "op": "add",
+    "at": "2026-11-13T15:12:26.000Z",
+    "by": "review"
+   }
   ]
  },
  "log": [
@@ -3877,6 +3907,31 @@
    "args": [
     "get",
     "plan-56",
+    "--by",
+    "review"
+   ],
+   "asOf": null
+  },
+  {
+   "at": "2026-11-17T15:25:00.004Z",
+   "by": "review",
+   "cmd": "get",
+   "args": [
+    "get",
+    "plan-55",
+    "--by",
+    "review"
+   ],
+   "asOf": null
+  },
+  {
+   "at": "2026-11-17T15:25:00.039Z",
+   "by": "review",
+   "cmd": "find",
+   "args": [
+    "find",
+    "--kind",
+    "verdict",
     "--by",
     "review"
    ],

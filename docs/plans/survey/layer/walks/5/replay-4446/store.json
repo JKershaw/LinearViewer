@@ -1167,6 +1167,59 @@
     "design"
    ],
    "asOf": null
+  },
+  {
+   "at": "2026-11-17T15:25:20.606Z",
+   "by": "design",
+   "cmd": "get",
+   "args": [
+    "get",
+    "run-27",
+    "--by",
+    "design"
+   ],
+   "asOf": null
+  },
+  {
+   "at": "2026-11-17T15:25:20.636Z",
+   "by": "design",
+   "cmd": "get",
+   "args": [
+    "get",
+    "finding-24",
+    "--by",
+    "design"
+   ],
+   "asOf": null
+  },
+  {
+   "at": "2026-11-17T15:25:20.664Z",
+   "by": "design",
+   "cmd": "find",
+   "args": [
+    "find",
+    "--kind",
+    "plan",
+    "--by",
+    "design"
+   ],
+   "asOf": null
+  },
+  {
+   "at": "2026-11-17T15:25:20.699Z",
+   "by": "design",
+   "cmd": "find",
+   "args": [
+    "find",
+    "--kind",
+    "lesson",
+    "--area",
+    "area-1",
+    "--by",
+    "design",
+    "--count"
+   ],
+   "asOf": null
   }
  ]
 }

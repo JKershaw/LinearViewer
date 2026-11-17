@@ -1,0 +1,24 @@
+# What is open and addressed to John, as of 2026-11-13T15:57:43Z (find --to John --state open)
+[
+  {
+    "id": "question-83",
+    "kind": "question",
+    "state": "open",
+    "fields": {
+      "asks": "Once the proxy refuses look-into's writes (LIN-4468), look-into can no longer post to Linear when a person asks. Should that exception be retired?",
+      "options": [
+        "Retire it: look-into reports in its session and a person posts the comment if they want it",
+        "Keep it: look-into is allowed one comment on its ticket instead of no writes"
+      ],
+      "recommended": "Retire it: look-into reports in its session and a person posts the comment if they want it",
+      "if-unanswered": "LIN-4468 can be built but not merged"
+    },
+    "links": {},
+    "in": "task-60",
+    "to": "John",
+    "v": 1,
+    "op": "add",
+    "at": "2026-11-13T15:55:54.652Z",
+    "by": "breakdown"
+  }
+]

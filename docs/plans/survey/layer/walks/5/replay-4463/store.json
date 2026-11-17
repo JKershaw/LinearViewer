@@ -1,5 +1,5 @@
 {
- "next": 33,
+ "next": 35,
  "records": {
   "area-1": [
    {
@@ -883,6 +883,67 @@
     "op": "add",
     "at": "2026-11-13T15:45:57.000Z",
     "by": "survey-place"
+   }
+  ],
+  "decision-33": [
+   {
+    "id": "decision-33",
+    "kind": "decision",
+    "state": "stands",
+    "fields": {
+     "scope": "task-16",
+     "answer": "Size of the move: just the task. Cuts: none.",
+     "why": "Views become modules one at a time under one shrinking, checked bridge, with the Waiting entries settled or explained; no survey finding binds beyond the ask, and the shared hub (`public/common.js`) shrinks only as converted views need it. Decided by the standing policy (John: \"Happy for it to be whatever size is natural\")."
+    },
+    "links": {
+     "on": [
+      "finding-29@2"
+     ],
+     "about": [
+      "task-16",
+      "finding-30"
+     ]
+    },
+    "in": "task-16",
+    "v": 1,
+    "op": "add",
+    "at": "2026-11-13T15:48:23.000Z",
+    "by": "scoping"
+   }
+  ],
+  "run-34": [
+   {
+    "id": "run-34",
+    "kind": "run",
+    "state": "open",
+    "fields": {
+     "stage": "scoping",
+     "account": "Sized LIN-4463 as just the task, no cuts, by the standing policy (decision-33): views go to modules one at a time under one shrinking, checked bridge; common.js shrinks only as converted views need it (finding-29). No survey finding binds beyond the ask. I did not act on finding-30 (defer four Waiting entries by name); it stays open, unplaced."
+    },
+    "links": {},
+    "in": "task-16",
+    "v": 1,
+    "op": "add",
+    "at": "2026-11-13T15:48:24.000Z",
+    "by": "scoping"
+   },
+   {
+    "id": "run-34",
+    "kind": "run",
+    "state": "done",
+    "fields": {
+     "stage": "scoping",
+     "account": "Sized LIN-4463 as just the task, no cuts, by the standing policy (decision-33): views go to modules one at a time under one shrinking, checked bridge; common.js shrinks only as converted views need it (finding-29). No survey finding binds beyond the ask. I did not act on finding-30 (defer four Waiting entries by name); it stays open, unplaced."
+    },
+    "links": {},
+    "in": "task-16",
+    "v": 2,
+    "op": "end",
+    "at": "2026-11-13T15:48:25.000Z",
+    "by": "scoping",
+    "ended": {
+     "reason": "sizing written as decision-33"
+    }
    }
   ]
  },
