@@ -4302,6 +4302,177 @@
     "pos": []
    },
    "asOf": null
+  },
+  {
+   "at": "2026-11-17T20:40:05.791Z",
+   "by": "blind-read",
+   "cmd": "get",
+   "args": {
+    "by": "blind-read",
+    "pos": [
+     "change-57"
+    ]
+   },
+   "asOf": null
+  },
+  {
+   "at": "2026-11-17T20:40:05.827Z",
+   "by": "blind-read",
+   "cmd": "find",
+   "args": {
+    "to": "blind-read",
+    "state": "open",
+    "by": "blind-read",
+    "pos": []
+   },
+   "asOf": null
+  },
+  {
+   "at": "2026-11-17T20:40:05.863Z",
+   "by": "blind-read",
+   "cmd": "find",
+   "args": {
+    "kind": "area",
+    "by": "blind-read",
+    "pos": []
+   },
+   "asOf": null
+  },
+  {
+   "at": "2026-11-17T20:40:05.901Z",
+   "by": "blind-read",
+   "cmd": "find",
+   "args": {
+    "kind": "verdict",
+    "in": "task-9",
+    "by": "blind-read",
+    "pos": []
+   },
+   "asOf": null
+  },
+  {
+   "at": "2026-11-17T20:40:16.487Z",
+   "by": "blind-read",
+   "cmd": "find",
+   "args": {
+    "to": "area-1",
+    "state": "open",
+    "by": "blind-read",
+    "pos": []
+   },
+   "asOf": null
+  },
+  {
+   "at": "2026-11-17T20:40:16.534Z",
+   "by": "blind-read",
+   "cmd": "find",
+   "args": {
+    "text": "ship-layout",
+    "by": "blind-read",
+    "pos": []
+   },
+   "asOf": null
+  },
+  {
+   "at": "2026-11-17T20:40:16.577Z",
+   "by": "blind-read",
+   "cmd": "find",
+   "args": {
+    "text": "ship-biscuit",
+    "by": "blind-read",
+    "pos": []
+   },
+   "asOf": null
+  },
+  {
+   "at": "2026-11-17T20:40:16.617Z",
+   "by": "blind-read",
+   "cmd": "find",
+   "args": {
+    "text": "ship.js",
+    "by": "blind-read",
+    "pos": []
+   },
+   "asOf": null
+  },
+  {
+   "at": "2026-11-17T20:40:16.658Z",
+   "by": "blind-read",
+   "cmd": "find",
+   "args": {
+    "text": "cost-format-global",
+    "by": "blind-read",
+    "pos": []
+   },
+   "asOf": null
+  },
+  {
+   "at": "2026-11-17T20:40:16.698Z",
+   "by": "blind-read",
+   "cmd": "find",
+   "args": {
+    "text": "shim",
+    "by": "blind-read",
+    "pos": []
+   },
+   "asOf": null
+  },
+  {
+   "at": "2026-11-17T20:40:16.745Z",
+   "by": "blind-read",
+   "cmd": "find",
+   "args": {
+    "text": "CostFormat",
+    "by": "blind-read",
+    "pos": []
+   },
+   "asOf": null
+  },
+  {
+   "at": "2026-11-17T20:40:16.789Z",
+   "by": "blind-read",
+   "cmd": "find",
+   "args": {
+    "text": "browser copy",
+    "by": "blind-read",
+    "pos": []
+   },
+   "asOf": null
+  },
+  {
+   "at": "2026-11-17T20:40:16.831Z",
+   "by": "blind-read",
+   "cmd": "find",
+   "args": {
+    "text": "TABLE",
+    "by": "blind-read",
+    "pos": []
+   },
+   "asOf": null
+  },
+  {
+   "at": "2026-11-17T20:40:21.537Z",
+   "by": "blind-read",
+   "cmd": "get",
+   "args": {
+    "by": "blind-read",
+    "pos": [
+     "finding-30"
+    ]
+   },
+   "asOf": null
+  },
+  {
+   "at": "2026-11-17T20:40:21.572Z",
+   "by": "blind-read",
+   "cmd": "get",
+   "args": {
+    "by": "blind-read",
+    "pos": [
+     "finding-11"
+    ]
+   },
+   "asOf": null
   }
  ]
 }

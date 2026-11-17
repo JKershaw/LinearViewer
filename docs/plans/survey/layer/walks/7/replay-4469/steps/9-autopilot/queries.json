@@ -1,0 +1,201 @@
+[
+ {
+  "at": "2026-11-17T20:26:30.645Z",
+  "by": "autopilot",
+  "cmd": "find",
+  "args": {
+   "text": "look-first",
+   "by": "autopilot",
+   "pos": []
+  },
+  "asOf": null
+ },
+ {
+  "at": "2026-11-17T20:26:30.684Z",
+  "by": "autopilot",
+  "cmd": "find",
+  "args": {
+   "to": "autopilot",
+   "state": "open",
+   "by": "autopilot",
+   "pos": []
+  },
+  "asOf": null
+ },
+ {
+  "at": "2026-11-17T20:26:30.719Z",
+  "by": "autopilot",
+  "cmd": "find",
+  "args": {
+   "text": "undersized",
+   "by": "autopilot",
+   "pos": []
+  },
+  "asOf": null
+ },
+ {
+  "at": "2026-11-17T20:26:30.757Z",
+  "by": "autopilot",
+  "cmd": "find",
+  "args": {
+   "kind": "task",
+   "by": "autopilot",
+   "pos": []
+  },
+  "asOf": null
+ },
+ {
+  "at": "2026-11-17T20:26:39.033Z",
+  "by": "autopilot",
+  "cmd": "find",
+  "args": {
+   "kind": "area",
+   "by": "autopilot",
+   "pos": []
+  },
+  "asOf": null
+ },
+ {
+  "at": "2026-11-17T20:26:39.070Z",
+  "by": "autopilot",
+  "cmd": "find",
+  "args": {
+   "path": "lib/recommendation-look-first.js",
+   "state": "open",
+   "by": "autopilot",
+   "pos": []
+  },
+  "asOf": null
+ },
+ {
+  "at": "2026-11-17T20:26:39.111Z",
+  "by": "autopilot",
+  "cmd": "find",
+  "args": {
+   "kind": "task",
+   "in": "task-108",
+   "by": "autopilot",
+   "pos": []
+  },
+  "asOf": null
+ },
+ {
+  "at": "2026-11-17T20:26:39.144Z",
+  "by": "autopilot",
+  "cmd": "find",
+  "args": {
+   "kind": "run",
+   "in": "task-131",
+   "by": "autopilot",
+   "pos": []
+  },
+  "asOf": null
+ },
+ {
+  "at": "2026-11-17T20:27:01.004Z",
+  "by": "autopilot",
+  "cmd": "find",
+  "args": {
+   "kind": "run",
+   "in": "task-131",
+   "by": "autopilot",
+   "pos": []
+  },
+  "asOf": null
+ },
+ {
+  "at": "2026-11-17T20:31:05.825Z",
+  "by": "autopilot",
+  "cmd": "get",
+  "args": {
+   "by": "autopilot",
+   "pos": [
+    "question-147"
+   ]
+  },
+  "asOf": null
+ },
+ {
+  "at": "2026-11-17T20:31:05.860Z",
+  "by": "autopilot",
+  "cmd": "find",
+  "args": {
+   "to": "autopilot",
+   "state": "open",
+   "by": "autopilot",
+   "pos": []
+  },
+  "asOf": null
+ },
+ {
+  "at": "2026-11-17T20:31:05.899Z",
+  "by": "autopilot",
+  "cmd": "find",
+  "args": {
+   "in": "task-131",
+   "kind": "question",
+   "by": "autopilot",
+   "pos": []
+  },
+  "asOf": null
+ },
+ {
+  "at": "2026-11-17T20:31:36.684Z",
+  "by": "autopilot",
+  "cmd": "get",
+  "args": {
+   "by": "autopilot",
+   "pos": [
+    "finding-153"
+   ]
+  },
+  "asOf": null
+ },
+ {
+  "at": "2026-11-17T20:31:36.724Z",
+  "by": "autopilot",
+  "cmd": "find",
+  "args": {
+   "in": "task-131",
+   "state": "open",
+   "by": "autopilot",
+   "pos": []
+  },
+  "asOf": null
+ },
+ {
+  "at": "2026-11-17T20:32:24.586Z",
+  "by": "autopilot",
+  "cmd": "find",
+  "args": {
+   "in": "task-131",
+   "state": "open",
+   "by": "autopilot",
+   "pos": []
+  },
+  "asOf": null
+ },
+ {
+  "at": "2026-11-17T20:39:16.594Z",
+  "by": "autopilot",
+  "cmd": "find",
+  "args": {
+   "text": "lin-4469-witness",
+   "by": "autopilot",
+   "pos": []
+  },
+  "asOf": null
+ },
+ {
+  "at": "2026-11-17T20:39:16.631Z",
+  "by": "autopilot",
+  "cmd": "find",
+  "args": {
+   "to": "autopilot",
+   "state": "open",
+   "by": "autopilot",
+   "pos": []
+  },
+  "asOf": null
+ }
+]
