@@ -244,6 +244,28 @@
     "op": "add",
     "at": "2026-11-13T22:29:42.000Z",
     "by": "Harbour"
+   },
+   {
+    "id": "lesson-10",
+    "kind": "lesson",
+    "state": "holds",
+    "fields": {
+     "says": "`lib/prompt-template-defs.js` cannot import what imports `lib/prompt-templates.js` (a cycle): shared words live in a leaf that imports only leaves (`area-registry-path.js`), as `lib/prompts/leftover-words.js` (LIN-4376) and `lib/prompts/autopilot-precedence.js` (never restate a rank; LIN-4382).",
+     "paths": [
+      "lib/prompt-template-defs.js",
+      "lib/prompt-templates.js",
+      "lib/prompts/leftover-words.js",
+      "lib/prompts/autopilot-precedence.js"
+     ],
+     "checked-at": "ca77a891e"
+    },
+    "links": {},
+    "in": "area-1",
+    "v": 2,
+    "op": "revise",
+    "at": "2026-11-13T23:27:11.000Z",
+    "by": "close-out",
+    "reason": "finding-153: leftover-words.js now imports lib/prompts/area-registry-path.js (05b592742, merged in ca77a891e); the docs Lesson in docs/areas/llm-and-prompts.md already says so."
    }
   ],
   "lesson-11": [
@@ -2865,6 +2887,37 @@
     "op": "add",
     "at": "2026-11-13T15:54:41.773Z",
     "by": "breakdown"
+   },
+   {
+    "id": "task-131",
+    "kind": "task",
+    "state": "done",
+    "fields": {
+     "ref": "LIN-4469",
+     "done-when": "Piece 5 of LIN-4448's plan (behaviour **E**). **Fewer rules restated as lists in prompt text.** This lands only after piece 3 (records) and piece 4 (proxy guard).\n\n**Approach**\n\n* Shrink only the **tracker-write clauses the guard now refuses**, in `ONE_COMMENT_MANDATE`, `NONE_MANDATE`, `BLIND_COMMENT_MANDATE` and `TICKET_FIELDS_MANDATE` (`lib/proxy-preamble.js`), down to what the stage is told about its token.\n* **Keep these in words** (review note 1): the code, branch and PR prohibitions, which have no code backstop because the runner's GitHub credential is outside the proxy, and the merge sentences (cut by ruling). Name them as kept, with the reason, in the change-log entry.\n* Look-into's \"unless the person asks\" clause is dropped only if John has ruled to retire it (the DECISION on LIN-4448, asked on piece 4). Otherwise it is reworded to match `one-comment`.\n* Each of these becomes one constant in `lib/prompts/leftover-words.js`: the docs-only notes-PR rule, the committed-tool wording (\"search the repo for a committed tool\"; the four wordings settle on **Stability's**), and the first-match area lookup. Also the retirement-line wording in this repository's docs (simple-dispatcher's copy stays named, and is its owner's).\n* Fold `CUT` and \"narrowing\" (`lib/prompts/stage-intent.js` / `lib/completion-signals.js`) into one vocabulary. If piece 3's record already settled it, say so.\n* The blind read's piloted sentence stays as piloted. Re-piloting is a person's run, and the Waiting entry says so.\n* **Re-pin once, together:** the 13 Periodical hashes, the router snapshots, `scripts/eval/meta-prompt.baseline.txt` and a lowered `FROZEN_TOTAL_BYTES`, with reasons in `scripts/prompt-template-change-log.md`.\n\n**Testing (witnesses)**\n\n* Real-context rendered bytes show a net fall across every kind, fresh and fix round.\n* The existing prompt tests pass.\n* A new test fails if a retired duplicate phrase appears in more than one template.\n\n**LIN-4350:** report what this piece found to LIN-4350 in a comment. Don't absorb that ticket: it spans two repos.\n\n**Collisions:** `lib/prompt-template-defs.js` and the budget test, after piece 3.\n\n**Retires:** the Waiting entries for the docs-only notes-PR rule, the committed-tool wording, the first-match lookup, `CUT` vs \"narrowing\", and the retirement line's restatement in this repo's docs. Also the tracker clauses in the four mandates.\n\n---\n\n**Parent:** LIN-4448 (LLM & prompts, left simpler). The full approved plan is the parent's description, section `## Implementation Plan`, and its amendments are in the parent's comment `### Plan Review Verdict` (72406236-9316-4004-98ee-70d8fba0cb09). The parent's `## As asked` block sets the scope.\n\nSession fit: fits one session\n\nPlan-review due: no — covered by LIN-4448's approving plan-review (comment 72406236-9316-4004-98ee-70d8fba0cb09, rev 1)\n\n**Grounding commits:** the plan was written at `JKershaw/LinearViewer` main `2bf788b6d` (surveys at `4b5001ddf`) and reviewed at `c205190fd`. The breakdown re-checked at `5dcf5bcda`. The only change since is LIN-4457 (#2424), and the one plan file it touches is the cost-read entry in `docs/architecture/source-map.md`.\n\n**Starting point:** the parent's approved plan. Follow it. Where the code shows it is wrong, change course, and say so in a comment on LIN-4448.\n\n**Every PR names what it retires** (the LIN-4414 rule). It edits the Waiting entries in `docs/areas/llm-and-prompts.md` that it settles. It respects that note's Lessons and leaves `docs/reviews/` reports unchanged.",
+     "paths": [
+      "lib/proxy-preamble.js",
+      "lib/prompts/leftover-words.js",
+      "lib/prompts/stage-intent.js",
+      "lib/completion-signals.js",
+      "lib/prompt-template-defs.js",
+      "tests/unit/prompt-size-budget.test.js",
+      "scripts/eval/meta-prompt.baseline.txt",
+      "scripts/prompt-template-change-log.md",
+      "docs/areas/llm-and-prompts.md"
+     ]
+    },
+    "links": {
+     "piece": "plan-117"
+    },
+    "in": "task-108",
+    "v": 2,
+    "op": "end",
+    "at": "2026-11-13T23:27:14.000Z",
+    "by": "close-out",
+    "ended": {
+     "reason": "PR #2447 merged as ca77a891e and deployed; LIN-4469 set Done 23:59:22. Deviations from plan-117, each recorded: committedSearch lives in lib/periodicals.js (LIN-4448 8933968d); the fold covers triage, survey-task, survey-place, blind-read (decision-157); look-into's exception retired, not reworded (decision-138). Open after it: check-155 (live 403s, John). LIN-4470 stays Todo; LIN-4350 stays open (findings reported in 25b09538)."
+    }
    }
   ],
   "decision-132": [
@@ -3188,6 +3241,54 @@
     "at": "2026-11-13T23:16:13.000Z",
     "by": "leftover",
     "reason": "Leftover tidies: leftover-words.js header names all its constants; lin-4467 witness header says it is kept as a ratchet (LIN-4469). CI green on 877f32cb4."
+   },
+   {
+    "id": "change-142",
+    "kind": "change",
+    "state": "open",
+    "fields": {
+     "ref": "https://github.com/JKershaw/LinearViewer/pull/2447",
+     "head": "3504108297a13149fa8d6b8c5edfe98ad9333b5c"
+    },
+    "links": {
+     "on": [
+      "plan-117@1",
+      "verdict-124@1",
+      "decision-138@1",
+      "decision-140@1"
+     ]
+    },
+    "in": "task-131",
+    "v": 4,
+    "op": "revise",
+    "at": "2026-11-13T23:27:01.000Z",
+    "by": "close-out",
+    "reason": "Close-out commits after the re-review approval, not re-reviewed: 534524f92 (review Fixes 1-2, blind-read fix-sized finds), cc7792e58 (stage-kinds intent lines declared, loop gone; Waiting entries for the larger finds), 350410829 (two Waiting entries re-filed under the area their first path maps to, after area-notes.test.js failed). CI green on the head (run 43529474068)."
+   },
+   {
+    "id": "change-142",
+    "kind": "change",
+    "state": "merged",
+    "fields": {
+     "ref": "https://github.com/JKershaw/LinearViewer/pull/2447",
+     "head": "3504108297a13149fa8d6b8c5edfe98ad9333b5c"
+    },
+    "links": {
+     "on": [
+      "plan-117@1",
+      "verdict-124@1",
+      "decision-138@1",
+      "decision-140@1"
+     ]
+    },
+    "in": "task-131",
+    "v": 5,
+    "op": "end",
+    "at": "2026-11-13T23:27:01.000Z",
+    "by": "close-out",
+    "ended": {
+     "reason": "Squash-merged as ca77a891e8e32f8132b9d3d0da0c860bfd0b213b, pinned with --match-head-commit 3504108297a1; deployed (harbour.cat footer b937237a4 -> ca77a891e); Tests on main green for the merge commit (run 43530212559). Close-out comment eb4829c5 on LIN-4469."
+    }
    }
   ],
   "finding-143": [
@@ -3745,6 +3846,29 @@
     "at": "2026-11-13T23:17:16.000Z",
     "by": "review",
     "reason": "Re-review at 05b592742: the import is at the module top and the docs Lesson is updated; only the lesson-10 revision on merge remains."
+   },
+   {
+    "id": "finding-153",
+    "kind": "finding",
+    "state": "done",
+    "fields": {
+     "says": "Fix 5 remainder: on merge, revise lesson-10 \"import-free leaf\" to \"a leaf that imports only leaves (`area-registry-path.js`)\". The import move is done at 05b592742 (it is at the top of `lib/prompts/leftover-words.js`) and the docs Lesson in `docs/areas/llm-and-prompts.md` is already updated; only the store lesson goes stale."
+    },
+    "links": {
+     "about": [
+      "change-142",
+      "lesson-10"
+     ]
+    },
+    "in": "task-131",
+    "to": "close-out",
+    "v": 3,
+    "op": "end",
+    "at": "2026-11-13T23:27:12.000Z",
+    "by": "close-out",
+    "ended": {
+     "reason": "lesson-10 revised to 'a leaf that imports only leaves (area-registry-path.js)' on merge (ca77a891e); source-map line fixed alongside (finding-176)."
+    }
    }
   ],
   "finding-154": [
@@ -3841,6 +3965,32 @@
     "at": "2026-11-13T23:17:15.000Z",
     "by": "review",
     "reason": "Re-review at 05b592742 adds the precondition that tells a real pass from an unrestricted mint, and the expected writes kind for each 403."
+   },
+   {
+    "id": "check-155",
+    "kind": "check",
+    "state": "open",
+    "fields": {
+     "what": "After deploy, confirm restricted dispatches carry a stamped token so the shrunk mandates are backed: a look-into token comment POST gets 403 from the stage gate; a triage token description PATCH gets 403.",
+     "why-person": "Needs a real dispatch on the deployed proxy; LIN-4468 notes a missing row mints stage-less (unrestricted), and CI cannot show what live rows carry. Not run at close-out: the deploy landed (ca77a891e), but the check means enqueueing real look-into and triage dispatches (agent runs that cost money); close-out token carries no dispatch grant and the proxy offers no other way to mint a stage-stamped token; a fabricated or stage-less token would mint unrestricted and prove nothing. CI covers lib/stage-writes.js and the proxy routes only in isolation.",
+     "how": "Dispatch a look-into and a triage on the deployed proxy (now at ca77a891e) and try each write with its token: the look-into comment POST must return 403 (none), the triage description PATCH 403 (ticket-fields). Distinguishing precondition: the token was minted from a dispatch whose stage row exists. A 2xx means a guarded clause is gone from the prompt with no backstop. Rollback: revert ca77a891e, which restores the words; no data shape changes."
+    },
+    "links": {
+     "about": [
+      "change-142"
+     ],
+     "on": [
+      "lesson-13@1",
+      "lesson-53@1"
+     ]
+    },
+    "in": "task-131",
+    "to": "John",
+    "v": 3,
+    "op": "revise",
+    "at": "2026-11-13T23:27:13.000Z",
+    "by": "close-out",
+    "reason": "Close-out: deploy has landed, so the check is now due; records why close-out did not run it and names the merge commit to revert (comment eb4829c5)."
    }
   ],
   "run-156": [
@@ -4385,6 +4535,29 @@
     "op": "add",
     "at": "2026-11-13T23:17:12.000Z",
     "by": "review"
+   },
+   {
+    "id": "finding-166",
+    "kind": "finding",
+    "state": "done",
+    "fields": {
+     "says": "Fix 1, before the merge: in `lib/periodicals.js` `generateSeamsTanglesPrompt`, first runReview bullet, drop the hand-typed `(no path is written here)` so it reads \"Find both by searching the repo for them, read how the tool is run\" (main's words). It folds nothing (it is not rendered through `committedSearch`, and main never had it) and is why seams-tangles and its autopilot form rise +24 (+26 parenthesis, +28 `committedSearch`, -30 `NOTES_PR`). Without it seams-tangles falls -2 and the total is 827520 -> 825278 (-2242). Then: re-pin both seams-tangles hashes in `tests/unit/lin-4313-periodical-prompt-bytes.test.js:94`; update the LIN-4469 change-log row (`scripts/prompt-template-change-log.md:635`) to the new figures, drop the \"Up\" clause, and make the ruling sentence \"four `work` kinds unchanged; `lin-4469-witness` withdrawn as moot\"; update the PR body's Measured and DECISION sections. `periodicals.js` is in no budgeted source ceiling, so FROZEN_TOTAL_BYTES is unaffected."
+    },
+    "links": {
+     "about": [
+      "change-142",
+      "question-159"
+     ]
+    },
+    "in": "task-131",
+    "to": "close-out",
+    "v": 2,
+    "op": "end",
+    "at": "2026-11-13T23:27:01.000Z",
+    "by": "close-out",
+    "ended": {
+     "reason": "534524f92: the hand-typed '(no path is written here)' is gone from Seams & Tangles' first runReview bullet; both seams-tangles hashes re-pinned in lin-4313-periodical-prompt-bytes.test.js; change-log row and PR body Measured/DECISION now say -2242, nothing rises, lin-4469-witness withdrawn as moot."
+    }
    }
   ],
   "finding-167": [
@@ -4406,6 +4579,28 @@
     "op": "add",
     "at": "2026-11-13T23:17:13.000Z",
     "by": "review"
+   },
+   {
+    "id": "finding-167",
+    "kind": "finding",
+    "state": "done",
+    "fields": {
+     "says": "Fix 2: in `tests/unit/prompt-size-budget.test.js:146`, delete the stray fragment \"(396821 -> 396571), the rest was unused headroom. \" from the FROZEN_TOTAL_BYTES comment. It follows \"...(396821 -> 396559), the rest was unused headroom.\" and matches no figure."
+    },
+    "links": {
+     "about": [
+      "change-142"
+     ]
+    },
+    "in": "task-131",
+    "to": "close-out",
+    "v": 2,
+    "op": "end",
+    "at": "2026-11-13T23:27:01.000Z",
+    "by": "close-out",
+    "ended": {
+     "reason": "534524f92: stray '(396821 -> 396571), the rest was unused headroom.' fragment deleted from prompt-size-budget.test.js."
+    }
    }
   ],
   "check-168": [
@@ -4429,6 +4624,30 @@
     "op": "add",
     "at": "2026-11-13T23:17:14.000Z",
     "by": "review"
+   },
+   {
+    "id": "check-168",
+    "kind": "check",
+    "state": "done",
+    "fields": {
+     "what": "Before the merge, after Fix 1 (finding-166): re-run a base-vs-head real-context render (base b937237a4): every stage kind in fresh and fix mode, each with its own writes preamble, and all 13 Periodicals in plain and autopilot form.",
+     "how": "Right: every render that carries folded text falls, seams-tangles shows -2, and the total is 827520 -> 825278 (-2242). Wrong: any non-work stage kind or Periodical that carries folded text at >= 0. The four work kinds and Stability, Recent Headwinds and Integration Surface Maturity stay equal: they carry no folded text."
+    },
+    "links": {
+     "about": [
+      "change-142",
+      "finding-166"
+     ]
+    },
+    "in": "task-131",
+    "to": "close-out",
+    "v": 2,
+    "op": "end",
+    "at": "2026-11-13T23:27:01.000Z",
+    "by": "close-out",
+    "ended": {
+     "reason": "Base b937237a4 vs head, 72 real-context renders (every stage kind fresh and fix with its writes preamble; 16 Periodicals plain and autopilot): total -2242, both seams-tangles -2, 58 fall, 14 equal (the four work kinds plus Stability, Recent Headwinds, Integration Surface Maturity, which carry no folded text). FROZEN_TOTAL_BYTES 396064 unchanged, below decision-140's 396575."
+    }
    }
   ],
   "verdict-169": [
@@ -4589,6 +4808,29 @@
     "op": "add",
     "at": "2026-11-13T23:22:28.000Z",
     "by": "blind-read"
+   },
+   {
+    "id": "finding-173",
+    "kind": "finding",
+    "state": "done",
+    "fields": {
+     "says": "`tests/unit/lin-4469-prompt-folds.test.js`: the describe says the folded spellings \"appear in no rendered prompt\", but each test asserts `where.length <= 1`, so a retired phrase left in one template or Periodical still passes. None renders anywhere at 877f32cb4. Fix: assert `where.length === 0` and drop \"at most one\" from the test name. (LIN-4469 blind read.)"
+    },
+    "links": {
+     "about": [
+      "change-142",
+      "area-1"
+     ]
+    },
+    "in": "task-131",
+    "to": "close-out",
+    "v": 2,
+    "op": "end",
+    "at": "2026-11-13T23:27:01.000Z",
+    "by": "close-out",
+    "ended": {
+     "reason": "534524f92: lin-4469-prompt-folds.test.js asserts zero occurrences of each retired phrase; test name drops 'at most one'."
+    }
    }
   ],
   "finding-174": [
@@ -4611,6 +4853,29 @@
     "op": "add",
     "at": "2026-11-13T23:22:29.000Z",
     "by": "blind-read"
+   },
+   {
+    "id": "finding-174",
+    "kind": "finding",
+    "state": "done",
+    "fields": {
+     "says": "`lib/periodicals.js`: `committedSearch` closes its own parenthesis, and Stability's bullet strips it again with `capitalised(committedSearch(...)).slice(0, -1)` to add its own \"; look beside ...)\". One caller undoes the helper's output shape, so changing the helper's wording silently breaks Stability. Fix: give `committedSearch` an optional tail for the parenthetical (e.g. `(what, more = '')` -> `(no path is written here${more})`) and drop the slice. (LIN-4469 blind read.)"
+    },
+    "links": {
+     "about": [
+      "change-142",
+      "finding-40"
+     ]
+    },
+    "in": "task-131",
+    "to": "close-out",
+    "v": 2,
+    "op": "end",
+    "at": "2026-11-13T23:27:01.000Z",
+    "by": "close-out",
+    "ended": {
+     "reason": "534524f92: committedSearch takes an optional 'more' tail inside its parenthesis; Stability passes its look-beside tail through it; the .slice(0, -1) is gone and Stability's hash is unchanged."
+    }
    }
   ],
   "finding-175": [
@@ -4633,6 +4898,29 @@
     "op": "add",
     "at": "2026-11-13T23:22:30.000Z",
     "by": "blind-read"
+   },
+   {
+    "id": "finding-175",
+    "kind": "finding",
+    "state": "done",
+    "fields": {
+     "says": "`tests/unit/lin-4313-periodical-prompt-bytes.test.js`: its LIN-4469 header says both Seams & Tangles bullets are built by `committedSearch`, but the first `runReview` bullet (`lib/periodicals.js` ~l.991) hand-types \"searching the repo for them (no path is written here)\". finding-166 drops the parenthetical but does not route the bullet through the helper, so the header stays wrong after it. Fix with finding-166: correct the header comment (or route that bullet through the helper and re-pin its hash). (LIN-4469 blind read.)"
+    },
+    "links": {
+     "about": [
+      "change-142",
+      "finding-166"
+     ]
+    },
+    "in": "task-131",
+    "to": "close-out",
+    "v": 2,
+    "op": "end",
+    "at": "2026-11-13T23:27:01.000Z",
+    "by": "close-out",
+    "ended": {
+     "reason": "534524f92: the lin-4313 header now says only the second Seams & Tangles bullet and Stability use committedSearch."
+    }
    }
   ],
   "finding-176": [
@@ -4656,6 +4944,30 @@
     "op": "add",
     "at": "2026-11-13T23:22:31.000Z",
     "by": "blind-read"
+   },
+   {
+    "id": "finding-176",
+    "kind": "finding",
+    "state": "done",
+    "fields": {
+     "says": "`docs/architecture/source-map.md` (unmapped; concerns `lib/prompts/leftover-words.js`): it still calls `leftover-words.js` \"A leaf that imports nothing\" and lists neither `areaLookup` nor `NOTES_PR`. At 877f32cb4 the file imports `area-registry-path.js` and exports both. Fix: update that one line, alongside finding-153's lesson-10 revision. (LIN-4469 blind read.)"
+    },
+    "links": {
+     "about": [
+      "change-142",
+      "finding-153",
+      "lesson-10"
+     ]
+    },
+    "in": "task-131",
+    "to": "close-out",
+    "v": 2,
+    "op": "end",
+    "at": "2026-11-13T23:27:01.000Z",
+    "by": "close-out",
+    "ended": {
+     "reason": "534524f92: docs/architecture/source-map.md says leftover-words.js exports NOTES_PR and areaLookup and imports lib/prompts/area-registry-path.js."
+    }
    }
   ],
   "finding-177": [
@@ -4677,6 +4989,28 @@
     "op": "add",
     "at": "2026-11-13T23:22:32.000Z",
     "by": "blind-read"
+   },
+   {
+    "id": "finding-177",
+    "kind": "finding",
+    "state": "done",
+    "fields": {
+     "says": "`lib/prompts/stage-kinds.js`: five records declare `intent: null`, then a loop at the bottom of the module overwrites `record.intent` on the exported objects, so the literal you read is not what the record holds and the header has to explain it. Fix: derive the reading-pass line in the `STAGE_INTENT` view (`lib/prompts/stage-intent.js`), or write it on each record, so records are not mutated after they are declared. (LIN-4469 blind read; landed in #2444, LIN-4467.)"
+    },
+    "links": {
+     "about": [
+      "finding-25"
+     ]
+    },
+    "in": "area-1",
+    "to": "area-1",
+    "v": 2,
+    "op": "end",
+    "at": "2026-11-13T23:27:01.000Z",
+    "by": "close-out",
+    "ended": {
+     "reason": "cc7792e58 (fixed by close-out though addressed to area-1): the six reading-pass records in lib/prompts/stage-kinds.js (look-into, context, retro, survey-task, survey-place, blind-read) declare their intent line; the loop that rewrote exported records is gone; 72 renders byte-identical; lin-4253-stage-traits.test.js still ties the line to writes. Merged in ca77a891e."
+    }
    }
   ],
   "finding-178": [
@@ -4758,6 +5092,48 @@
     "op": "add",
     "at": "2026-11-13T23:27:00.000Z",
     "by": "close-out"
+   },
+   {
+    "id": "run-181",
+    "kind": "run",
+    "state": "open",
+    "fields": {
+     "stage": "close-out",
+     "account": "Closed out LIN-4469. After the conditional re-review approval (042f607d) and the blind read (d96c0849) I made three commits nobody re-reviewed: 534524f92 (review Fixes 1-2; blind-read fix-sized finds: zero-occurrence test, committedSearch tail, lin-4313 header, source-map line), cc7792e58 (stage-kinds reading-pass intent lines declared, mutation loop gone; Waiting entries for the larger finds), 350410829 (re-filed two Waiting entries after area-notes.test.js failed). Re-ran the base-vs-head render: -2242, nothing rises. Merged #2447 as ca77a891e, deploy landed, main CI green. Did not run the live 403 checks (check-155, left to John). Larger blind-read finds stay as Waiting entries (finding-178, finding-179, finding-180), no tickets filed; survey completion criteria and simple-dispatcher copies (finding-42) left outside. Pruned the description to an Implemented stub."
+    },
+    "links": {
+     "on": [
+      "change-142@3"
+     ]
+    },
+    "in": "task-131",
+    "v": 2,
+    "op": "revise",
+    "at": "2026-11-13T23:27:15.000Z",
+    "by": "close-out",
+    "reason": "Account written after the work (opened with a placeholder)."
+   },
+   {
+    "id": "run-181",
+    "kind": "run",
+    "state": "done",
+    "fields": {
+     "stage": "close-out",
+     "account": "Closed out LIN-4469. After the conditional re-review approval (042f607d) and the blind read (d96c0849) I made three commits nobody re-reviewed: 534524f92 (review Fixes 1-2; blind-read fix-sized finds: zero-occurrence test, committedSearch tail, lin-4313 header, source-map line), cc7792e58 (stage-kinds reading-pass intent lines declared, mutation loop gone; Waiting entries for the larger finds), 350410829 (re-filed two Waiting entries after area-notes.test.js failed). Re-ran the base-vs-head render: -2242, nothing rises. Merged #2447 as ca77a891e, deploy landed, main CI green. Did not run the live 403 checks (check-155, left to John). Larger blind-read finds stay as Waiting entries (finding-178, finding-179, finding-180), no tickets filed; survey completion criteria and simple-dispatcher copies (finding-42) left outside. Pruned the description to an Implemented stub."
+    },
+    "links": {
+     "on": [
+      "change-142@3"
+     ]
+    },
+    "in": "task-131",
+    "v": 3,
+    "op": "end",
+    "at": "2026-11-13T23:27:16.000Z",
+    "by": "close-out",
+    "ended": {
+     "reason": "Close-out posted (LIN-4469 comment eb4829c5); PR #2447 merged; task-131 ended done."
+    }
    }
   ]
  },
