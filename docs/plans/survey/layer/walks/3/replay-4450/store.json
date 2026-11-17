@@ -4109,6 +4109,16 @@
     "kind": "task"
    },
    "returned": 4
+  },
+  {
+   "at": "2026-11-17T13:52:54.780Z",
+   "by": "Harbour",
+   "query": "show",
+   "args": {
+    "task": "task-60",
+    "asOf": null
+   },
+   "returned": 1
   }
  ],
  "hits": []

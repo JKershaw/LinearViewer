@@ -3718,6 +3718,44 @@
     "text": "Safari"
    },
    "returned": 0
+  },
+  {
+   "at": "2026-11-17T13:52:43.107Z",
+   "by": "review",
+   "query": "get",
+   "args": {
+    "id": "finding-99",
+    "asOf": null
+   },
+   "returned": 1
+  },
+  {
+   "at": "2026-11-17T13:52:43.145Z",
+   "by": "review",
+   "query": "find",
+   "args": {
+    "kind": "check"
+   },
+   "returned": 1
+  },
+  {
+   "at": "2026-11-17T13:52:43.205Z",
+   "by": "review",
+   "query": "find",
+   "args": {
+    "kind": "run"
+   },
+   "returned": 5
+  },
+  {
+   "at": "2026-11-17T13:52:47.573Z",
+   "by": "review",
+   "query": "get",
+   "args": {
+    "id": "check-86",
+    "asOf": null
+   },
+   "returned": 1
   }
  ],
  "hits": []

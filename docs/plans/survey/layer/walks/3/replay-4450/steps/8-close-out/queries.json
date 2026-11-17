@@ -1,0 +1,121 @@
+[
+ {
+  "at": "2026-11-17T13:50:49.064Z",
+  "by": "close-out",
+  "query": "show",
+  "args": {
+   "task": "task-60",
+   "asOf": null
+  },
+  "returned": 1
+ },
+ {
+  "at": "2026-11-17T13:50:49.123Z",
+  "by": "close-out",
+  "query": "get",
+  "args": {
+   "id": "change-82",
+   "asOf": null
+  },
+  "returned": 1
+ },
+ {
+  "at": "2026-11-17T13:50:54.299Z",
+  "by": "close-out",
+  "query": "show",
+  "args": {
+   "task": "task-60",
+   "asOf": null
+  },
+  "returned": 1
+ },
+ {
+  "at": "2026-11-17T13:51:21.031Z",
+  "by": "close-out",
+  "query": "get",
+  "args": {
+   "id": "check-69",
+   "asOf": null
+  },
+  "returned": 1
+ },
+ {
+  "at": "2026-11-17T13:51:21.067Z",
+  "by": "close-out",
+  "query": "get",
+  "args": {
+   "id": "finding-85",
+   "asOf": null
+  },
+  "returned": 1
+ },
+ {
+  "at": "2026-11-17T13:51:21.106Z",
+  "by": "close-out",
+  "query": "get",
+  "args": {
+   "id": "finding-86",
+   "asOf": null
+  },
+  "returned": 1
+ },
+ {
+  "at": "2026-11-17T13:51:21.143Z",
+  "by": "close-out",
+  "query": "get",
+  "args": {
+   "id": "check-95",
+   "asOf": null
+  },
+  "returned": 1
+ },
+ {
+  "at": "2026-11-17T13:51:21.182Z",
+  "by": "close-out",
+  "query": "get",
+  "args": {
+   "id": "check-96",
+   "asOf": null
+  },
+  "returned": 1
+ },
+ {
+  "at": "2026-11-17T13:51:21.222Z",
+  "by": "close-out",
+  "query": "get",
+  "args": {
+   "id": "check-97",
+   "asOf": null
+  },
+  "returned": 1
+ },
+ {
+  "at": "2026-11-17T13:51:21.263Z",
+  "by": "close-out",
+  "query": "get",
+  "args": {
+   "id": "finding-103",
+   "asOf": null
+  },
+  "returned": 1
+ },
+ {
+  "at": "2026-11-17T13:51:21.301Z",
+  "by": "close-out",
+  "query": "get",
+  "args": {
+   "id": "finding-77",
+   "asOf": null
+  },
+  "returned": 1
+ },
+ {
+  "at": "2026-11-17T13:51:21.338Z",
+  "by": "close-out",
+  "query": "find",
+  "args": {
+   "kind": "task"
+  },
+  "returned": 4
+ }
+]
