@@ -1,6 +1,6 @@
 {
  "retro": false,
- "next": 73,
+ "next": 79,
  "records": {
   "area-1": {
    "id": "area-1",
@@ -471,6 +471,19 @@
       "says": "Waiting 2: `lib/dispatch-leftover.js`: restates the follow-up target, halt modes and `NEVER_RAN` (also in `_releaseIfHeld`) beside their homes (`lib/workspace-halt.js`, `HALT_MODES`); a new halt mode would not stop a leftover. (Drift & Coherence Review, 10 Nov; `docs/reviews/drift-coherence-review-2026-11-10.md`.)"
      },
      "links": {}
+    },
+    {
+     "v": 2,
+     "op": "revise",
+     "at": "2026-11-13T15:05:16.000Z",
+     "by": "survey-place",
+     "to": "task-60",
+     "state": "open",
+     "fields": {
+      "says": "Waiting 2: `lib/dispatch-leftover.js`: restates the follow-up target, halt modes and `NEVER_RAN` (also in `_releaseIfHeld`) beside their homes (`lib/workspace-halt.js`, `HALT_MODES`); a new halt mode would not stop a leftover. (Drift & Coherence Review, 10 Nov; `docs/reviews/drift-coherence-review-2026-11-10.md`.)"
+     },
+     "links": {},
+     "reason": "Taken on by LIN-4455: decision-65 makes Waiting 2 this task's (plan piece 5); see finding-71 for the five NEVER_RAN spellings."
     }
    ]
   },
@@ -507,6 +520,19 @@
       "says": "Waiting 4: `lib/dispatch-store.js`: `releaseHeldWake` prepends `formatHeldWakeNote({status})`, so release picks leftover wording; `lin-4377` counts the spelling, not the dependency. (Operator, LIN-4377.)"
      },
      "links": {}
+    },
+    {
+     "v": 2,
+     "op": "revise",
+     "at": "2026-11-13T15:05:17.000Z",
+     "by": "survey-place",
+     "to": "task-60",
+     "state": "open",
+     "fields": {
+      "says": "Waiting 4: `lib/dispatch-store.js`: `releaseHeldWake` prepends `formatHeldWakeNote({status})`, so release picks leftover wording; `lin-4377` counts the spelling, not the dependency. (Operator, LIN-4377.)"
+     },
+     "links": {},
+     "reason": "Taken on by LIN-4455: decision-65 makes Waiting 4 this task's (plan piece 5); finding-66 carries how the release wording must reach releases."
     }
    ]
   },
@@ -633,6 +659,19 @@
       "says": "Waiting 11: `lib/dispatch-feedback-validation.js`: feedback kinds lack one declaration with their role: `PARKED_WAIT_SKIPPED_KINDS` (`lib/session-telemetry.js`), `FEEDBACK_ENTRY_KINDS`, `findWakeEvent`'s skip rule. (Survey tally: LIN-4240, 4239, 4233.)"
      },
      "links": {}
+    },
+    {
+     "v": 2,
+     "op": "revise",
+     "at": "2026-11-13T15:05:18.000Z",
+     "by": "survey-place",
+     "to": "task-60",
+     "state": "open",
+     "fields": {
+      "says": "Waiting 11: `lib/dispatch-feedback-validation.js`: feedback kinds lack one declaration with their role: `PARKED_WAIT_SKIPPED_KINDS` (`lib/session-telemetry.js`), `FEEDBACK_ENTRY_KINDS`, `findWakeEvent`'s skip rule. (Survey tally: LIN-4240, 4239, 4233.)"
+     },
+     "links": {},
+     "reason": "Taken on by LIN-4455: decision-65 makes Waiting 11 this task's (plan piece 5); finding-68 says findWakeEvent has no skip rule, so it is settled by recording that."
     }
    ]
   },
@@ -1626,6 +1665,23 @@
      "links": {
       "on": "plan-45@1"
      }
+    },
+    {
+     "v": 2,
+     "op": "revise",
+     "at": "2026-11-13T15:05:20.000Z",
+     "by": "survey-place",
+     "in": "task-60",
+     "to": "task-60",
+     "state": "open",
+     "fields": {
+      "what": "After deriving from the kinds table, `FEEDBACK_ENTRY_KINDS` equals today's list in the same order, and the runner allowlist does not gain `decision-answer` or `decision-withdrawal-reversed`.",
+      "how": "A unit test pinning `FEEDBACK_ENTRY_KINDS` against an exact literal list (order and membership), not against the derived value: `lib/prompts/runner-kickoff.js:61` renders the list into the runner prompt, and `runner-kickoff.test.js:191` compares against the same source, so a reorder changes prompt bytes and still passes there. It fails if a row is reordered or a non-allowlist kind is admitted."
+     },
+     "links": {
+      "on": "plan-45@1"
+     },
+     "reason": "Place survey: the existing runner-kickoff test compares against the same source, so it cannot catch a reorder; the pin must be a literal."
     }
    ]
   },
@@ -1648,6 +1704,23 @@
       "on": "plan-45@1",
       "about": "finding-19"
      }
+    },
+    {
+     "v": 2,
+     "op": "revise",
+     "at": "2026-11-13T15:05:19.000Z",
+     "by": "survey-place",
+     "in": "task-60",
+     "to": "task-60",
+     "state": "open",
+     "fields": {
+      "says": "`NEVER_RAN` has nothing to import from, and it is spelled five times, not three: `cancelled`/`expired` at `lib/dispatch-leftover.js:29`, `lib/dispatch-store.js:1906` (`_releaseIfHeld`) and `:1176`, plus `lib/observer-sweep.js:108` and `lib/task-page-loader.js:248`. Rewiring only the two consumers the plan names leaves three copies. One home must be created where neither side learns \"leftover\" (`lin-4377-store-knows-no-leftover`); `lib/dispatch-fields.js` is already imported by both. The other two owners are safe import-free leaves: `HALT_MODES` (`lib/workspace-halt.js`; the check becomes `HALT_MODES.includes`), and `followUpTarget(t) == null` (`lib/dispatch-targets.js`), which gives the same answer as `!RESUMABLE_TARGETS.has(t || \"cli\")` for null, empty string, unknown values and all four targets. `lib/dispatch-store.js:644` and `lib/runner-kit/runner.mjs` handle one halt mode on purpose; leave them. These are mechanical; do them last."
+     },
+     "links": {
+      "on": "plan-45@1",
+      "about": "finding-19"
+     },
+     "reason": "Place survey @ cfd152fa4 found two more NEVER_RAN spellings (observer-sweep, task-page-loader), checked the RESUMABLE_TARGETS equivalence case by case, and named the deliberate single-mode halt checks to leave alone."
     }
    ]
   },
@@ -1682,6 +1755,159 @@
      "links": {},
      "reason": "survey posted on LIN-4455",
      "stateReason": "survey posted on LIN-4455"
+    }
+   ]
+  },
+  "finding-73": {
+   "id": "finding-73",
+   "kind": "finding",
+   "versions": [
+    {
+     "v": 1,
+     "op": "add",
+     "at": "2026-11-13T15:05:21.000Z",
+     "by": "survey-place",
+     "in": "task-60",
+     "to": "design",
+     "state": "open",
+     "fields": {
+      "says": "Place survey @ cfd152fa4, for question-67: the cycle is nearer than the load-order chain it names. `lib/dispatch-feedback-validation.js:13` already imports its kind list (`FEEDBACK_ENTRY_KINDS`) from `lib/dispatch-store.js`, so the dependency points the wrong way; if the store then imports a table from validation, the two import each other. Recommend the leaf: `lib/dispatch-feedback-kinds.js`, importing nothing, read by validation, the store and `lib/session-telemetry.js`, with the store keeping its `FEEDBACK_ENTRY_KINDS` re-export so callers do not move."
+     },
+     "links": {
+      "on": "plan-45@1",
+      "about": "question-67"
+     }
+    }
+   ]
+  },
+  "finding-74": {
+   "id": "finding-74",
+   "kind": "finding",
+   "versions": [
+    {
+     "v": 1,
+     "op": "add",
+     "at": "2026-11-13T15:05:22.000Z",
+     "by": "survey-place",
+     "in": "task-60",
+     "to": "task-60",
+     "state": "open",
+     "fields": {
+      "says": "A fourth hand-written kind set the plan does not name: `DECISION_LIFECYCLE_STAMP_KINDS` (`lib/session-telemetry.js:60`) is another role set over feedback kinds, beside `PARKED_WAIT_SKIPPED_KINDS`, `FEEDBACK_ENTRY_KINDS` and the wake rule. Unless the `FEEDBACK_KINDS` table carries a stamp role and this set derives from it, it stays a copy after piece 5 and Waiting 11 is only partly settled. Cheap here: one more column and one more derived Set."
+     },
+     "links": {
+      "on": "plan-45@1",
+      "about": "finding-28"
+     }
+    }
+   ]
+  },
+  "finding-75": {
+   "id": "finding-75",
+   "kind": "finding",
+   "versions": [
+    {
+     "v": 1,
+     "op": "add",
+     "at": "2026-11-13T15:05:23.000Z",
+     "by": "survey-place",
+     "in": "task-60",
+     "to": "task-60",
+     "state": "open",
+     "fields": {
+      "says": "Wording to change with the code, since nothing fails if it goes stale: the area Lesson at `docs/areas/runs-and-dispatch.md:32` (lesson-10: `lin-4377-store-knows-no-leftover` \"counts the word\") and the docblocks at `lib/dispatch-store.js:3481` and `lib/dispatch-leftover.js:10`. Once the `lin-4377` witness forbids the `formatHeldWakeNote` import instead of counting the word, rewrite all three to say so (and revise lesson-10). The area Lessons are 4,269 bytes, so there is room."
+     },
+     "links": {
+      "on": "plan-45@1",
+      "about": "lesson-10"
+     }
+    }
+   ]
+  },
+  "finding-76": {
+   "id": "finding-76",
+   "kind": "finding",
+   "versions": [
+    {
+     "v": 1,
+     "op": "add",
+     "at": "2026-11-13T15:05:24.000Z",
+     "by": "survey-place",
+     "in": "area-1",
+     "to": "area-1",
+     "state": "open",
+     "fields": {
+      "says": "For Waiting 5 (finding-22), from LIN-4455's place survey @ cfd152fa4: after piece 5 the store takes leftover policy two ways, a per-request `wakeHook` for `addFeedback` and a late-bound setter for releases through `_archiveItem` -> `_releaseIfHeld` (finding-66). The better end is one late-bound held-wake policy serving both paths; that is the \"composable hooks\" Waiting 5 asks for. Not LIN-4455's: it should name this in its PR rather than add more setters."
+     },
+     "links": {
+      "on": "finding-66@1",
+      "about": "finding-22"
+     }
+    }
+   ]
+  },
+  "question-77": {
+   "id": "question-77",
+   "kind": "question",
+   "versions": [
+    {
+     "v": 1,
+     "op": "add",
+     "at": "2026-11-13T15:05:25.000Z",
+     "by": "survey-place",
+     "in": "area-1",
+     "to": "area-1",
+     "state": "open",
+     "fields": {
+      "asks": "Should `findWakeEvent` (`lib/dispatch-terminal.js:631`) ignore relay kinds (`tool`, `usage`, `resources`) when it picks the wake marker? Today it returns the last matching marker of any kind.",
+      "options": [
+       "Leave it: record that every kind may carry a wake (what LIN-4455 does, finding-68)",
+       "Skip relay kinds, with a cutover so pre-cutover rows are not recomputed"
+      ],
+      "recommended": "Leave it for now; changing it moves every wake reader (task-page-loader, run-view, digest-feedback, run-loop-state) and needs its own ticket.",
+      "if-unanswered": "Current behaviour stands, pinned by LIN-4455's wake-role column."
+     },
+     "links": {
+      "about": "finding-68"
+     }
+    }
+   ]
+  },
+  "run-78": {
+   "id": "run-78",
+   "kind": "run",
+   "versions": [
+    {
+     "v": 1,
+     "op": "add",
+     "at": "2026-11-13T15:05:26.000Z",
+     "by": "survey-place",
+     "in": "task-60",
+     "state": "open",
+     "fields": {
+      "stage": "survey-place",
+      "account": "Place survey of LIN-4455 @ cfd152fa4 (origin/main moved on from the grounding 4b5001ddf; nothing this piece touches changed in a way that matters). dispatch-leftover.js and dispatch-feedback-validation.js are tidy; dispatch-store.js is 4,530 lines but rules are moving to owners (LIN-4383). The survey-task records already carried the main plan mismatches (finding-66, 68, 69, 71, check-70, question-67), so I built on them: took Waiting 2, 4, 11 onto the task per decision-65; widened finding-71 to five NEVER_RAN spellings plus the safe-swap checks; corrected check-70 to pin a literal; added the nearer validation->store cycle for design (finding-73), the fourth kind set (finding-74) and the stale-wording follow-through (finding-75). Better-but-not-this-ticket went to area-1: one late-bound held-wake policy (finding-76) and whether findWakeEvent should skip relay kinds (question-77). Affordable here: leaf dispatch-feedback-kinds.js with a stamp role, all five NEVER_RAN rewired, an exact-order test, late-bound release wording with a stated default."
+     },
+     "links": {
+      "on": "plan-45@1"
+     }
+    },
+    {
+     "v": 2,
+     "op": "end",
+     "at": "2026-11-13T15:05:27.000Z",
+     "by": "survey-place",
+     "in": "task-60",
+     "state": "done",
+     "fields": {
+      "stage": "survey-place",
+      "account": "Place survey of LIN-4455 @ cfd152fa4 (origin/main moved on from the grounding 4b5001ddf; nothing this piece touches changed in a way that matters). dispatch-leftover.js and dispatch-feedback-validation.js are tidy; dispatch-store.js is 4,530 lines but rules are moving to owners (LIN-4383). The survey-task records already carried the main plan mismatches (finding-66, 68, 69, 71, check-70, question-67), so I built on them: took Waiting 2, 4, 11 onto the task per decision-65; widened finding-71 to five NEVER_RAN spellings plus the safe-swap checks; corrected check-70 to pin a literal; added the nearer validation->store cycle for design (finding-73), the fourth kind set (finding-74) and the stale-wording follow-through (finding-75). Better-but-not-this-ticket went to area-1: one late-bound held-wake policy (finding-76) and whether findWakeEvent should skip relay kinds (question-77). Affordable here: leaf dispatch-feedback-kinds.js with a stamp role, all five NEVER_RAN rewired, an exact-order test, late-bound release wording with a stated default."
+     },
+     "links": {
+      "on": "plan-45@1"
+     },
+     "reason": "Place survey posted on LIN-4455 at 15:05:16; records written.",
+     "stateReason": "Place survey posted on LIN-4455 at 15:05:16; records written."
     }
    ]
   }
@@ -1790,6 +2016,79 @@
   },
   {
    "at": "2026-11-17T13:42:43.367Z",
+   "by": "Harbour",
+   "query": "show",
+   "args": {
+    "task": "task-60",
+    "asOf": null
+   },
+   "returned": 1
+  },
+  {
+   "at": "2026-11-17T13:43:33.992Z",
+   "by": "survey-place",
+   "query": "find",
+   "args": {
+    "to": "task-60"
+   },
+   "returned": 5
+  },
+  {
+   "at": "2026-11-17T13:43:34.038Z",
+   "by": "survey-place",
+   "query": "find",
+   "args": {
+    "text": "NEVER_RAN"
+   },
+   "returned": 5
+  },
+  {
+   "at": "2026-11-17T13:43:34.077Z",
+   "by": "survey-place",
+   "query": "find",
+   "args": {
+    "text": "DECISION_LIFECYCLE"
+   },
+   "returned": 1
+  },
+  {
+   "at": "2026-11-17T13:43:34.114Z",
+   "by": "survey-place",
+   "query": "find",
+   "args": {
+    "text": "relay"
+   },
+   "returned": 0
+  },
+  {
+   "at": "2026-11-17T13:43:34.149Z",
+   "by": "survey-place",
+   "query": "find",
+   "args": {
+    "text": "runs-and-dispatch.md"
+   },
+   "returned": 2
+  },
+  {
+   "at": "2026-11-17T13:43:34.189Z",
+   "by": "survey-place",
+   "query": "find",
+   "args": {
+    "kind": "question"
+   },
+   "returned": 1
+  },
+  {
+   "at": "2026-11-17T13:43:34.221Z",
+   "by": "survey-place",
+   "query": "find",
+   "args": {
+    "text": "late-bound"
+   },
+   "returned": 0
+  },
+  {
+   "at": "2026-11-17T13:44:41.042Z",
    "by": "Harbour",
    "query": "show",
    "args": {

@@ -1,0 +1,104 @@
+[
+ {
+  "at": "2026-11-17T13:43:22.957Z",
+  "by": "survey-place",
+  "query": "find",
+  "args": {
+   "to": "task-28"
+  },
+  "returned": 5
+ },
+ {
+  "at": "2026-11-17T13:43:22.994Z",
+  "by": "survey-place",
+  "query": "find",
+  "args": {
+   "kind": "lesson"
+  },
+  "returned": 11
+ },
+ {
+  "at": "2026-11-17T13:43:23.039Z",
+  "by": "survey-place",
+  "query": "find",
+  "args": {
+   "text": "Waiting"
+  },
+  "returned": 14
+ },
+ {
+  "at": "2026-11-17T13:43:23.080Z",
+  "by": "survey-place",
+  "query": "find",
+  "args": {
+   "kind": "finding",
+   "text": "leaf"
+  },
+  "returned": 4
+ },
+ {
+  "at": "2026-11-17T13:43:28.085Z",
+  "by": "survey-place",
+  "query": "find",
+  "args": {
+   "text": "indent"
+  },
+  "returned": 1
+ },
+ {
+  "at": "2026-11-17T13:43:28.133Z",
+  "by": "survey-place",
+  "query": "find",
+  "args": {
+   "text": "slice"
+  },
+  "returned": 7
+ },
+ {
+  "at": "2026-11-17T13:43:28.178Z",
+  "by": "survey-place",
+  "query": "find",
+  "args": {
+   "text": "census"
+  },
+  "returned": 11
+ },
+ {
+  "at": "2026-11-17T13:43:28.218Z",
+  "by": "survey-place",
+  "query": "find",
+  "args": {
+   "text": "source-map"
+  },
+  "returned": 6
+ },
+ {
+  "at": "2026-11-17T13:43:28.255Z",
+  "by": "survey-place",
+  "query": "find",
+  "args": {
+   "text": "question-cards"
+  },
+  "returned": 2
+ },
+ {
+  "at": "2026-11-17T13:43:31.010Z",
+  "by": "survey-place",
+  "query": "get",
+  "args": {
+   "id": "decision-38",
+   "asOf": null
+  },
+  "returned": 1
+ },
+ {
+  "at": "2026-11-17T13:43:31.046Z",
+  "by": "survey-place",
+  "query": "get",
+  "args": {
+   "id": "run-88",
+   "asOf": null
+  },
+  "returned": 1
+ }
+]

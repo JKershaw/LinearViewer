@@ -1,6 +1,6 @@
 {
  "retro": false,
- "next": 82,
+ "next": 88,
  "records": {
   "area-1": {
    "id": "area-1",
@@ -1325,6 +1325,29 @@
      "links": {},
      "via": "plan-review",
      "reason": "Plan Review Verdict (comment 61e84035) notes 2, 3, 6 change this piece; the breakdown carries them into the child's slice. (rule 6 refuses plan-review revising design's piece; written by Harbour via plan-review.)"
+    },
+    {
+     "v": 3,
+     "op": "revise",
+     "at": "2026-11-13T14:07:01.000Z",
+     "by": "implementation",
+     "in": "task-53",
+     "state": "kept",
+     "fields": {
+      "says": "**Session 1: the seal (lands alone). As built in PR #2421 (head a98d042c6).** Witnesses are unit tests against `fake-client.js`, in `tests/unit/jira-as-asked-region.test.js` and the existing seal tests. Review notes 2, 3 and 6 are folded into the items below.\n\n1. A pure region module, `lib/providers/jira/as-asked-region.js`, reads and writes the block. It is the only module that knows both stores of the words: the ADF region and the issue property `harbour.asAsked = { v: 1, words, rendered }`. It imports `AS_ASKED_HEADING`, `AS_ASKED_END`, `splitAsAsked` and `sealAsAsked` from `lib/as-asked.js` and never retypes their spellings. `adf.js` stays import-free. The reader finds the region by nodes: an h2 whose text is the heading's text, then a paragraph whose plain text is the end sentence, regardless of marks.\n   * **The end line is chosen by digest, not by position.** The reader takes the end candidate whose region renders to the stored `rendered`; the writer takes the candidate whose interior renders to the words. (Was: the first end paragraph after the heading. That closes early when the words hold the end sentence as plain or `_…_` text, and serves the tail below the block; finding-66.) `hasMarkerLine` and `splitAsAsked` are unchanged, so Linear is unaffected.\n   * If the region's rendering matches `rendered`, it serves the exact `words`. If not, a human edited it in Jira, and it serves what the region renders now, behind canonical markers; the person's edit becomes the words, as on Linear.\n   * Without the end paragraph, or without the heading, there is no block. A property with no region is ignored.\n   * Witness: reader tests for kept, edited-in-Jira, edited-below-the-line, end line deleted, an end line re-marked (`_…_` or plain), the end sentence inside the words, `localId` attributes, and a stale property with no block.\n2. Comparison is on rendered content, never ADF hashes. `rendered` is a SHA-256 digest of the region's rendering, because it is only ever compared (review note 3). Witness: the `localId` case stays `kept`.\n3. Every description read in `index.js` goes through `readDescription`. **Every provider-side `client.getIssue` asks for the property** (review note 2), including the epic and parent reads and the write re-reads, not only the four description reads. The fake returns only the property keys requested, as real Jira does. The bulk path stays display only. Comment bodies keep direct `adfToMarkdown` (review note 6). Witness: a grep test that no description read bypasses the reader.\n4. `updateIssue` writes the property in the same PUT whenever the new description holds a block, with `words` from `splitAsAsked` of what it was handed. No block, no property. Witness: byte equality of `words` after filing, after a later write of what was read, after a `description/below` write, and after a human edit below the line.\n5. `descriptionRoundTrip` is a pure write-then-read through the same reader, property included, so `providerHoldsAsAsked` is true for Jira with no change to `lib/as-asked-seal.js` beyond its header. **It throws on a block that cannot be held** (too large, or the interior does not read back), and `providerHoldsAsAsked` treats a throw as \"cannot hold\", so the seal is skipped with the existing log line. (Was: report a non-kept read-back; same outcome, different path.) The Jira cases of the create-seal, dispatch-seal, readers and guard tests now pin \"sealed and kept\"; `sealForFiling`'s provider-skip branch is witnessed with a synthetic lossy round trip (finding-75).\n6. **Size guard: the serialized property, JSON escaping included, must be at most 32,768 UTF-8 bytes**, computed in one shared function in the region module that the round trip and `updateIssue` both call. (Was: \"about 32 KB\"; review note 3 and decision-63 said 32,768 characters. Atlassian's docs give bytes on some pages and characters on others, so the stricter reading is enforced: https://developer.atlassian.com/cloud/jira/platform/jira-entity-properties/ ; finding-71.) Over the limit the seal is skipped; an oversized `updateIssue` returns 422 naming the size, before any write. Witness: the size boundary and escaping tests.\n7. **Added: the empty fence is fixed in the codec** (decision-80, the tidy done first). An empty fenced code block now renders as the bare fence, not a blank line between two fences that the writer split apart, and the D1 write gate accepts an empty fence. A Harbour-written description holding one no longer refuses every later below-the-line write (findings 67, 68). Witness: the empty-fence regression and the codec fixed-point test.\n\n**Not shown by this piece:** whether live Jira keeps the rendered digest across an ordinary editor save below the block. If it does not, the reader serves the converted rendering and the words silently change. That is check-69 and session 3's live check (task-62, LIN-4452); no credential for John's site was available to this build.",
+      "paths": [
+       "lib/providers/jira/",
+       "lib/as-asked-seal.js",
+       "lib/as-asked.js",
+       "tests/unit/as-asked-create-seal.test.js",
+       "tests/unit/as-asked-dispatch-seal.test.js",
+       "tests/unit/as-asked-readers.test.js",
+       "tests/unit/jira-provider.test.js"
+      ],
+      "order": 1
+     },
+     "links": {},
+     "reason": "As built in PR #2421 (a98d042c6): end line chosen by digest (finding-66), size limit enforced in UTF-8 bytes of the serialized property (finding-71; decision-63 said characters), round trip throws instead of reporting non-kept, empty-fence codec fix added (decision-80), review notes 2, 3 and 6 folded in. Departures posted on LIN-4445 at 14:08."
     }
    ]
   },
@@ -1690,6 +1713,23 @@
      "links": {
       "on": "plan-54@2"
      }
+    },
+    {
+     "v": 2,
+     "op": "end",
+     "at": "2026-11-13T14:07:04.000Z",
+     "by": "implementation",
+     "in": "task-60",
+     "to": "task-60",
+     "state": "done",
+     "fields": {
+      "says": "Grounded at 4b5001ddf (origin/main unchanged; plan line numbers hold). The node rule and the markdown rule disagree on what counts as an end line. `hasMarkerLine`/`splitAsAsked` match only the end sentence wrapped exactly in `*…*`; plan item 1's ADF reader matches a paragraph whose plain text is the end sentence, whatever its marks. Words that contain that sentence plain or as `_…_` are sealed by `sealForFiling` (not a marker to it), then the node reader closes the region early, the digest misses, and the tail is served as below-the-line, silently. A markdown-level `checkAsAsked` won't catch it; the pure `descriptionRoundTrip` only will if it runs the same node reader. Decide up front: make `hasMarkerLine` catch the plain-text form too, or have the node rule take the LAST matching paragraph before non-region content. Add the witness."
+     },
+     "links": {
+      "on": "plan-54@2"
+     },
+     "reason": "Settled by decision-83: the end line is chosen by digest (reader: candidate whose region renders to rendered; writer: candidate whose interior renders to the words). Witness: the end-sentence-in-words reader tests in jira-as-asked-region.test.js, PR #2421.",
+     "stateReason": "Settled by decision-83: the end line is chosen by digest (reader: candidate whose region renders to rendered; writer: candidate whose interior renders to the words). Witness: the end-sentence-in-words reader tests in jira-as-asked-region.test.js, PR #2421."
     }
    ]
   },
@@ -1723,6 +1763,21 @@
      },
      "links": {},
      "reason": "Taken on by survey-place: task-60 is what makes Harbour write Jira descriptions, so it creates the harm (finding-68 already asks it to fix the codec or exclude the input); the header claim is retired with the codec fix."
+    },
+    {
+     "v": 3,
+     "op": "end",
+     "at": "2026-11-13T14:07:05.000Z",
+     "by": "implementation",
+     "in": "area-1",
+     "to": "task-60",
+     "state": "done",
+     "fields": {
+      "says": "`lib/providers/jira/adf.js` header claims the D1 gate never flags what the writer emits: false at 4b5001ddf. An empty fence (\"```\" then \"```\" on the next line) makes `markdownToAdf` emit an empty `codeBlock`; `adfHasUnrenderableContent` refuses it and `rt(rt(x)) !== rt(x)` (both observed). Once Harbour writes descriptions itself, such a ticket can never be written again: every later `description/below` 422s on D1 (D1 sees the whole document, block included). (Survey of LIN-4450.)"
+     },
+     "links": {},
+     "reason": "Fixed in the codec (decision-80): an empty fence now renders as the bare fence and the D1 gate accepts it, so a Harbour-written description no longer refuses later below-the-line writes. Witness: the empty-fence regression test, PR #2421. The adf.js header claim was not named in the PR's retirements; with the fix it reads true again.",
+     "stateReason": "Fixed in the codec (decision-80): an empty fence now renders as the bare fence and the D1 gate accepts it, so a Harbour-written description no longer refuses later below-the-line writes. Witness: the empty-fence regression test, PR #2421. The adf.js header claim was not named in the PR's retirements; with the fix it reads true again."
     }
    ]
   },
@@ -1845,6 +1900,23 @@
      "links": {
       "on": "plan-54@2"
      }
+    },
+    {
+     "v": 2,
+     "op": "end",
+     "at": "2026-11-13T14:07:06.000Z",
+     "by": "implementation",
+     "in": "task-60",
+     "to": "task-60",
+     "state": "done",
+     "fields": {
+      "says": "Size guard: Atlassian's entity-property limit reads as bytes or characters depending on the page. JSON escaping inflates `words`, so measure the serialized property string in the one shared size function, not the raw text."
+     },
+     "links": {
+      "on": "plan-54@2"
+     },
+     "reason": "Measured as UTF-8 bytes of the serialized property, JSON escaping included, in one shared function (decision-84). Witness: size boundary and escaping tests, PR #2421.",
+     "stateReason": "Measured as UTF-8 bytes of the serialized property, JSON escaping included, in one shared function (decision-84). Witness: size boundary and escaping tests, PR #2421."
     }
    ]
   },
@@ -1904,6 +1976,23 @@
      "links": {
       "on": "plan-54@2"
      }
+    },
+    {
+     "v": 2,
+     "op": "end",
+     "at": "2026-11-13T14:07:07.000Z",
+     "by": "implementation",
+     "in": "task-60",
+     "to": "task-60",
+     "state": "done",
+     "fields": {
+      "says": "Keep the region module the one place that knows both stores of the words (the ADF region and the `harbour.asAsked` property). Export `adf.js`'s private `plainText` (~line 340) for the end-paragraph test instead of writing a second ADF walker; render the region with `adfToMarkdown({type:'doc',content})`, not a new renderer; put the one shared size function (decision-63) there too. For review note 2, write one read-with-words helper beside the reader rather than threading `properties` through each call: of the 8 `client.getIssue` sites in `index.js`, four never read a description (703, 1018, 1076, and the pre-read at 1099). Grounded at 4b5001ddf."
+     },
+     "links": {
+      "on": "plan-54@2"
+     },
+     "reason": "Taken: lib/providers/jira/as-asked-region.js is the only module that knows both the ADF region and the property, and holds the shared size function. Review note 2 was taken as its broad rule (every provider-side getIssue asks for the property) rather than a read helper at the four description sites. Whether plainText was exported is not recorded in the PR or summary.",
+     "stateReason": "Taken: lib/providers/jira/as-asked-region.js is the only module that knows both the ADF region and the property, and holds the shared size function. Review note 2 was taken as its broad rule (every provider-side getIssue asks for the property) rather than a read helper at the four description sites. Whether plainText was exported is not recorded in the PR or summary."
     }
    ]
   },
@@ -1925,6 +2014,24 @@
      "links": {
       "on": "plan-54@2"
      }
+    },
+    {
+     "v": 2,
+     "op": "end",
+     "at": "2026-11-13T14:07:09.000Z",
+     "by": "implementation",
+     "in": "task-60",
+     "to": "task-60",
+     "state": "handed-on",
+     "fields": {
+      "says": "Claims that go stale when this lands, beyond the three the plan names (the headers of `lib/as-asked-seal.js` and `lib/as-asked.js`, the `descriptionRoundTrip` comment): `lib/dispatch-factory.js:1008`; `docs/architecture/source-map.md:216` (the Jira paragraph) and `:82` (the new region module needs a mention); `tests/unit/as-asked-guard.test.js`'s Jira block (345, 351), which will fail and so notices on its own; the docs won't. `docs/proxy-integration.md:2070` (agent-facing, 'Jira files unsealed') is already in task-61's retire list (plan-55 item 10). Name each in the PR's retirements or cite it as still true. Grounded at 4b5001ddf."
+     },
+     "links": {
+      "on": "plan-54@2"
+     },
+     "reason": "PR #2421 retires lib/as-asked-seal.js, lib/as-asked.js and descriptionRoundTrip claims, dispatch-factory's 'Jira today' note, docs/proxy-integration.md's 'Jira files unsealed' line and the guard tests' Jira pins. The two source-map.md lines are unnamed; finding-85 carries them to review.",
+     "stateReason": "PR #2421 retires lib/as-asked-seal.js, lib/as-asked.js and descriptionRoundTrip claims, dispatch-factory's 'Jira today' note, docs/proxy-integration.md's 'Jira files unsealed' line and the guard tests' Jira pins. The two source-map.md lines are unnamed; finding-85 carries them to review.",
+     "takeover": "finding-85"
     }
    ]
   },
@@ -1946,6 +2053,23 @@
      "links": {
       "on": "plan-54@2"
      }
+    },
+    {
+     "v": 2,
+     "op": "end",
+     "at": "2026-11-13T14:07:11.000Z",
+     "by": "implementation",
+     "in": "task-60",
+     "to": "task-60",
+     "state": "done",
+     "fields": {
+      "says": "After the flip, `sealForFiling`'s `reason: 'provider'` branch (`lib/as-asked-seal.js`) has no subject in production or tests: `tests/unit/as-asked-create-seal.test.js:207-227` uses Jira's round trip as the one provider that cannot hold the block. Keep the branch witnessed with a synthetic lossy round trip, or retire it on purpose and name it. `lib/as-asked.js`'s 'When the unsealed branches could go' drops 'Jira today', but the unsealed branches stay, for older tickets. Grounded at 4b5001ddf."
+     },
+     "links": {
+      "on": "plan-54@2"
+     },
+     "reason": "Kept witnessed: sealForFiling's provider-skip branch now uses a synthetic lossy round trip, since Jira holds the block (PR #2421). The unsealed branches stay for older tickets.",
+     "stateReason": "Kept witnessed: sealForFiling's provider-skip branch now uses a synthetic lossy round trip, since Jira holds the block (PR #2421). The unsealed branches stay for older tickets."
     }
    ]
   },
@@ -2156,6 +2280,171 @@
      },
      "reason": "size of the move set in the description",
      "stateReason": "size of the move set in the description"
+    }
+   ]
+  },
+  "change-82": {
+   "id": "change-82",
+   "kind": "change",
+   "versions": [
+    {
+     "v": 1,
+     "op": "add",
+     "at": "2026-11-13T14:07:00.000Z",
+     "by": "implementation",
+     "in": "task-60",
+     "state": "open",
+     "fields": {
+      "ref": "https://github.com/JKershaw/LinearViewer/pull/2421 (branch feat/lin-4450-jira-as-asked-seal)",
+      "head": "a98d042c6"
+     },
+     "links": {
+      "about": "plan-54"
+     }
+    }
+   ]
+  },
+  "decision-83": {
+   "id": "decision-83",
+   "kind": "decision",
+   "versions": [
+    {
+     "v": 1,
+     "op": "add",
+     "at": "2026-11-13T14:07:02.000Z",
+     "by": "implementation",
+     "in": "task-60",
+     "state": "stands",
+     "fields": {
+      "answer": "The Jira region reader chooses the end line by digest, not by position: it takes the end candidate whose region renders to the stored `rendered`, and the writer takes the candidate whose interior renders to the words. Neither of finding-66's two options: `hasMarkerLine` and `splitAsAsked` stay unchanged, and the node rule does not take the last matching paragraph.",
+      "why": "Words may hold the end sentence as plain or `_…_` text; position (first or last) can close the region at the wrong paragraph, while the digest identifies the paragraph the writer actually wrote. Leaving the markdown rule alone keeps Linear unaffected. Witnessed in tests/unit/jira-as-asked-region.test.js (PR #2421)."
+     },
+     "links": {
+      "on": "finding-66@1",
+      "about": "plan-54"
+     }
+    }
+   ]
+  },
+  "decision-84": {
+   "id": "decision-84",
+   "kind": "decision",
+   "versions": [
+    {
+     "v": 1,
+     "op": "add",
+     "at": "2026-11-13T14:07:03.000Z",
+     "by": "implementation",
+     "in": "task-60",
+     "state": "stands",
+     "fields": {
+      "answer": "The Jira entity-property limit is enforced as at most 32,768 UTF-8 bytes of the serialized `harbour.asAsked` property, JSON escaping included, in one shared size function. This replaces decision-63's \"32,768-character limit\".",
+      "why": "Atlassian's docs give the limit in bytes on some pages and characters on others (https://developer.atlassian.com/cloud/jira/platform/jira-entity-properties/); bytes of the serialized string is the stricter reading and covers escaping (finding-71). Witnessed by the size boundary and escaping tests in PR #2421."
+     },
+     "links": {
+      "on": "finding-71@1",
+      "about": "decision-63"
+     }
+    }
+   ]
+  },
+  "finding-85": {
+   "id": "finding-85",
+   "kind": "finding",
+   "versions": [
+    {
+     "v": 1,
+     "op": "add",
+     "at": "2026-11-13T14:07:08.000Z",
+     "by": "implementation",
+     "in": "task-60",
+     "to": "review",
+     "state": "open",
+     "fields": {
+      "says": "PR #2421 (LIN-4450) names its retirements but not two of finding-74's: `docs/architecture/source-map.md:216` (the Jira paragraph, which says Jira cannot hold the block) and `:82` (the new `lib/providers/jira/as-asked-region.js` needs a mention). Check whether the PR touched them; if not, they go stale on merge. Grounded at 4b5001ddf line numbers."
+     },
+     "links": {
+      "on": "change-82@1"
+     }
+    }
+   ]
+  },
+  "finding-86": {
+   "id": "finding-86",
+   "kind": "finding",
+   "versions": [
+    {
+     "v": 1,
+     "op": "add",
+     "at": "2026-11-13T14:07:10.000Z",
+     "by": "implementation",
+     "in": "task-60",
+     "to": "task-61",
+     "state": "open",
+     "fields": {
+      "says": "PR #2421 (LIN-4450) already retires the agent-facing \"Jira files unsealed\" line in `docs/proxy-integration.md` (~2070), which plan-55 item 10 lists for this task to retire. Once #2421 merges, drop it from your retire list, or confirm the line now reads true for create as well as dispatch."
+     },
+     "links": {}
+    }
+   ]
+  },
+  "run-87": {
+   "id": "run-87",
+   "kind": "run",
+   "versions": [
+    {
+     "v": 1,
+     "op": "add",
+     "at": "2026-11-13T14:07:12.000Z",
+     "by": "implementation",
+     "in": "task-60",
+     "state": "open",
+     "fields": {
+      "stage": "implementation",
+      "claims": [
+       "lib/providers/jira/",
+       "lib/as-asked-seal.js",
+       "lib/as-asked.js",
+       "lib/dispatch-factory.js",
+       "docs/proxy-integration.md",
+       "tests/unit/jira-as-asked-region.test.js",
+       "tests/unit/as-asked-create-seal.test.js",
+       "tests/unit/as-asked-dispatch-seal.test.js",
+       "tests/unit/as-asked-guard.test.js"
+      ],
+      "account": "Built LIN-4450 and opened PR #2421 (change-82, head a98d042c6): Jira holds the As asked words byte-exact in harbour.asAsked {v,words,rendered=SHA-256}, written in the same PUT, read and written only by lib/providers/jira/as-asked-region.js; every provider-side getIssue asks for the property; descriptionRoundTrip runs the same reader, so the seal flips for Jira with no logic change to as-asked-seal.js. Departures, now in plan-54 v3: end line by digest (decision-83, closes finding-66); size limit in UTF-8 bytes of the serialized property (decision-84, closes finding-71); round trip throws rather than reports non-kept; empty-fence codec fix (closes finding-67). Closed finding-73, 75; handed finding-74's unnamed source-map lines to review (finding-85); told task-61 the proxy-integration line is already retired (finding-86). Verified: full unit suite 25,320 (one census failure fixed), affected suites 874/874, CI unit, proxy-clock, 4 E2E shards and secret scan green. Not verified: live Jira (check-69, task-62/LIN-4452) — whether the digest survives an editor save below the block; if not, words silently become the rendering. Left open: finding-70 (search vs getIssue comparison not checked). Next: LIN-4451 blocked on merge."
+     },
+     "links": {
+      "on": "plan-54@3"
+     }
+    },
+    {
+     "v": 2,
+     "op": "end",
+     "at": "2026-11-13T14:07:13.000Z",
+     "by": "implementation",
+     "in": "task-60",
+     "state": "done",
+     "fields": {
+      "stage": "implementation",
+      "claims": [
+       "lib/providers/jira/",
+       "lib/as-asked-seal.js",
+       "lib/as-asked.js",
+       "lib/dispatch-factory.js",
+       "docs/proxy-integration.md",
+       "tests/unit/jira-as-asked-region.test.js",
+       "tests/unit/as-asked-create-seal.test.js",
+       "tests/unit/as-asked-dispatch-seal.test.js",
+       "tests/unit/as-asked-guard.test.js"
+      ],
+      "account": "Built LIN-4450 and opened PR #2421 (change-82, head a98d042c6): Jira holds the As asked words byte-exact in harbour.asAsked {v,words,rendered=SHA-256}, written in the same PUT, read and written only by lib/providers/jira/as-asked-region.js; every provider-side getIssue asks for the property; descriptionRoundTrip runs the same reader, so the seal flips for Jira with no logic change to as-asked-seal.js. Departures, now in plan-54 v3: end line by digest (decision-83, closes finding-66); size limit in UTF-8 bytes of the serialized property (decision-84, closes finding-71); round trip throws rather than reports non-kept; empty-fence codec fix (closes finding-67). Closed finding-73, 75; handed finding-74's unnamed source-map lines to review (finding-85); told task-61 the proxy-integration line is already retired (finding-86). Verified: full unit suite 25,320 (one census failure fixed), affected suites 874/874, CI unit, proxy-clock, 4 E2E shards and secret scan green. Not verified: live Jira (check-69, task-62/LIN-4452) — whether the digest survives an editor save below the block; if not, words silently become the rendering. Left open: finding-70 (search vs getIssue comparison not checked). Next: LIN-4451 blocked on merge."
+     },
+     "links": {
+      "on": "plan-54@3"
+     },
+     "reason": "PR #2421 opened; departures recorded on plan-54 v3",
+     "stateReason": "PR #2421 opened; departures recorded on plan-54 v3"
     }
    ]
   }
@@ -2568,6 +2857,26 @@
     "kind": "change"
    },
    "returned": 0
+  },
+  {
+   "at": "2026-11-17T13:43:35.566Z",
+   "by": "implementation",
+   "query": "get",
+   "args": {
+    "id": "plan-54",
+    "asOf": null
+   },
+   "returned": 1
+  },
+  {
+   "at": "2026-11-17T13:44:03.700Z",
+   "by": "implementation",
+   "query": "get",
+   "args": {
+    "id": "plan-54",
+    "asOf": null
+   },
+   "returned": 1
   }
  ],
  "hits": []

@@ -1,6 +1,6 @@
 {
  "retro": false,
- "next": 89,
+ "next": 95,
  "records": {
   "task-1": {
    "id": "task-1",
@@ -1441,6 +1441,20 @@
       "says": "`public/prompt-section.js`: the browser files reach their suites through `tests/unit/helpers/client-world.js`, which loads them as classic scripts through `vm`. The premise that a module-capable client loader is needed before a view can become a module is shown wrong by `tests/unit/workspace-kpis-module.test.js` (LIN-4471): a page module is tested by plain `import` over `tests/unit/helpers/import-world.js`. The remaining classic suites are counted by `tests/unit/classic-loader-census.test.js`. (LIN-4446; LIN-4471.)"
      },
      "links": {}
+    },
+    {
+     "v": 2,
+     "op": "revise",
+     "at": "2026-11-13T17:29:12.000Z",
+     "by": "survey-place",
+     "in": "area-49",
+     "to": "task-28",
+     "state": "open",
+     "fields": {
+      "says": "`public/prompt-section.js`: the browser files reach their suites through `tests/unit/helpers/client-world.js`, which loads them as classic scripts through `vm`. The premise that a module-capable client loader is needed before a view can become a module is shown wrong by `tests/unit/workspace-kpis-module.test.js` (LIN-4471): a page module is tested by plain `import` over `tests/unit/helpers/import-world.js`. The remaining classic suites are counted by `tests/unit/classic-loader-census.test.js`. (LIN-4446; LIN-4471.)"
+     },
+     "links": {},
+     "reason": "taken on: plan-10 piece 2 settles this Waiting entry (front-end-browser.md:65); LIN-4471 already rewrote it to say the premise is wrong, so deleting it in LIN-4472 finishes that job"
     }
    ]
   },
@@ -2094,6 +2108,22 @@
      "links": {
       "about": "finding-56"
      }
+    },
+    {
+     "v": 2,
+     "op": "revise",
+     "at": "2026-11-13T17:29:11.000Z",
+     "by": "survey-place",
+     "in": "task-28",
+     "to": "task-28",
+     "state": "open",
+     "fields": {
+      "says": "Minor, from the survey: the regex at `no-page-wide-label-listener:247` already tolerates `{ module }` entries, so plan review note 8's rerun there is low risk. Piece 1 already marked the module-capable-loader Waiting entry's premise wrong (finding-56), so deleting it here is tidying, not proof. Census expectation (corrected by the place survey @ 904719353): 102 falls by about 2, not 5–7. Only `task-page-client` and `task-timeline-client` leave the list (`close-out.js` is an exempt `runClassic` sibling). `task-page-question` (`:311`, `question-cards.js`), `lin-3975-proposal-refresh` (`:161`, `task-chat.js`), `lin-3975-task-run-links` and `lin-3975-summary-and-time` (`common.js` slices) still load other classic files, so they stay counted."
+     },
+     "links": {
+      "about": "finding-56"
+     },
+     "reason": "place survey counted which migrated suites still load another classic file"
     }
    ]
   },
@@ -2124,6 +2154,145 @@
      "fields": {
       "stage": "survey-task",
       "account": "Surveyed LIN-4472 at 17faa83f4, after piece 1 (#2431) merged. The conversion itself is easy; the difficulty is in four places: text-slicing and executing suites the plan does not list (finding-82), duplicates the plan's name search misses and that need a serving change to import (finding-83, question-84), importWorld giving less than loadWorld (finding-85), and no real browser exercising the page (check-86). First moves: 1. add named exports beside the IIFE; 2. move the five executing suites and the two parity tests to imports, green while the seam still exists; 3. remove the IIFE and the seam in a whitespace-only commit, re-anchoring the text slicers on names; 4. then SCRIPTS, the golden file and the census (expect 102 to fall by 5–7)."
+     },
+     "links": {},
+     "reason": "survey posted",
+     "stateReason": "survey posted"
+    }
+   ]
+  },
+  "finding-89": {
+   "id": "finding-89",
+   "kind": "finding",
+   "versions": [
+    {
+     "v": 1,
+     "op": "add",
+     "at": "2026-11-13T17:29:13.000Z",
+     "by": "survey-place",
+     "in": "task-28",
+     "to": "task-28",
+     "state": "open",
+     "fields": {
+      "says": "Place survey @ 904719353, on plan review note 7: `docs/architecture/source-map.md` describes the routes and the renderer, not `public/task-page.js`, so it probably needs no edit for this piece. Grep it for a line calling `task-page.js` classic before changing it; do not edit it just because the note names it."
+     },
+     "links": {
+      "about": "plan-10"
+     }
+    }
+   ]
+  },
+  "finding-90": {
+   "id": "finding-90",
+   "kind": "finding",
+   "versions": [
+    {
+     "v": 1,
+     "op": "add",
+     "at": "2026-11-13T17:29:14.000Z",
+     "by": "survey-place",
+     "in": "task-28",
+     "to": "task-28",
+     "state": "open",
+     "fields": {
+      "says": "Place survey @ 904719353, on the duplicates (finding-83, question-84): whichever option is taken, do not report \"no duplicates\" — the name-equality search finds only a coincidence (`init`). Say in the PR that `formatElapsed`/`fmtDuration` (pinned by `lin-3975-task-run-links:211`) and `relativeWords`/`relativeAgo` (pinned by `lin-3975-summary-and-time:57`) were found and left alone, and add a Waiting line in `docs/areas/front-end-browser.md` beside the `ship.js` \"lib side must become a leaf\" entry. Make `relativeWords` an export its twin test imports, not text it slices."
+     },
+     "links": {
+      "about": "question-84"
+     }
+    }
+   ]
+  },
+  "finding-91": {
+   "id": "finding-91",
+   "kind": "finding",
+   "versions": [
+    {
+     "v": 1,
+     "op": "add",
+     "at": "2026-11-13T17:29:15.000Z",
+     "by": "survey-place",
+     "in": "area-49",
+     "to": "area-49",
+     "state": "open",
+     "fields": {
+      "says": "Remedy for finding-83, not LIN-4472's (a serving change): one pure duration/relative-time leaf in `lib/`, on `SHARED_MODULES`, imported by `public/task-page.js`, so both client twins (`formatElapsed`, `relativeWords`) and both twin tests (`lin-3975-task-run-links:211`, `lin-3975-summary-and-time:57`) go away. (Place survey, LIN-4472 @ 904719353.)"
+     },
+     "links": {
+      "about": "finding-83"
+     }
+    }
+   ]
+  },
+  "finding-92": {
+   "id": "finding-92",
+   "kind": "finding",
+   "versions": [
+    {
+     "v": 1,
+     "op": "add",
+     "at": "2026-11-13T17:29:16.000Z",
+     "by": "survey-place",
+     "in": "area-49",
+     "to": "area-49",
+     "state": "open",
+     "fields": {
+      "says": "`tests/unit/task-page-question.test.js` (`:311`) still runs `public/question-cards.js` classically for its press test, which keeps it on the classic-loader census after `task-page.js` converts. Moving that press test to a suite of `question-cards.js`'s own would let it leave the census. (Place survey, LIN-4472 @ 904719353.)"
+     },
+     "links": {}
+    }
+   ]
+  },
+  "lesson-93": {
+   "id": "lesson-93",
+   "kind": "lesson",
+   "versions": [
+    {
+     "v": 1,
+     "op": "add",
+     "at": "2026-11-13T17:29:17.000Z",
+     "by": "survey-place",
+     "in": "area-49",
+     "state": "holds",
+     "fields": {
+      "says": "A test that cuts a browser script's source by an indented marker (`'  function init(doc) {'`, `'    function toggle(row) {'`) breaks on any re-indent, such as removing an IIFE to make a module: `indexOf` gives -1. Test an export instead, or anchor on a name with no leading whitespace. `lin-3975-task-run-control` and `lin-3975-summary-and-time` are the examples (LIN-4472).",
+      "paths": [
+       "tests/unit/lin-3975-task-run-control.test.js",
+       "tests/unit/lin-3975-summary-and-time.test.js"
+      ],
+      "checked-at": "904719353"
+     },
+     "links": {}
+    }
+   ]
+  },
+  "run-94": {
+   "id": "run-94",
+   "kind": "run",
+   "versions": [
+    {
+     "v": 1,
+     "op": "add",
+     "at": "2026-11-13T17:29:18.000Z",
+     "by": "survey-place",
+     "in": "task-28",
+     "state": "open",
+     "fields": {
+      "stage": "survey-place",
+      "account": "Surveyed the place for LIN-4472 at 904719353, after piece 1 merged. The conversion is mechanical: one IIFE, every cross-file read is window.X at call time, no globals assigned, one DOMContentLoaded listener; the golden diff is 7 identical tag lines. The survey-task findings already carried the unlisted executing and text-slicing suites (finding-82) and the misnamed duplicates (finding-83, question-84), so I built on them: corrected the census forecast to about 2, not 5-7 (finding-87 v2); took on the module-loader Waiting entry for this task (finding-56); told the builder source-map probably needs no edit (finding-89) and to name the duplicates in the PR with a Waiting line rather than report none (finding-90). Not this task: the shared duration leaf (finding-91) and splitting task-page-question (finding-92), to area-49; lesson-93 on indent-keyed source slices."
+     },
+     "links": {}
+    },
+    {
+     "v": 2,
+     "op": "end",
+     "at": "2026-11-13T17:29:19.000Z",
+     "by": "survey-place",
+     "in": "task-28",
+     "state": "done",
+     "fields": {
+      "stage": "survey-place",
+      "account": "Surveyed the place for LIN-4472 at 904719353, after piece 1 merged. The conversion is mechanical: one IIFE, every cross-file read is window.X at call time, no globals assigned, one DOMContentLoaded listener; the golden diff is 7 identical tag lines. The survey-task findings already carried the unlisted executing and text-slicing suites (finding-82) and the misnamed duplicates (finding-83, question-84), so I built on them: corrected the census forecast to about 2, not 5-7 (finding-87 v2); took on the module-loader Waiting entry for this task (finding-56); told the builder source-map probably needs no edit (finding-89) and to name the duplicates in the PR with a Waiting line rather than report none (finding-90). Not this task: the shared duration leaf (finding-91) and splitting task-page-question (finding-92), to area-49; lesson-93 on indent-keyed source slices."
      },
      "links": {},
      "reason": "survey posted",
@@ -2239,6 +2408,118 @@
   },
   {
    "at": "2026-11-17T13:42:47.302Z",
+   "by": "Harbour",
+   "query": "show",
+   "args": {
+    "task": "task-28",
+    "asOf": null
+   },
+   "returned": 1
+  },
+  {
+   "at": "2026-11-17T13:43:22.957Z",
+   "by": "survey-place",
+   "query": "find",
+   "args": {
+    "to": "task-28"
+   },
+   "returned": 5
+  },
+  {
+   "at": "2026-11-17T13:43:22.994Z",
+   "by": "survey-place",
+   "query": "find",
+   "args": {
+    "kind": "lesson"
+   },
+   "returned": 11
+  },
+  {
+   "at": "2026-11-17T13:43:23.039Z",
+   "by": "survey-place",
+   "query": "find",
+   "args": {
+    "text": "Waiting"
+   },
+   "returned": 14
+  },
+  {
+   "at": "2026-11-17T13:43:23.080Z",
+   "by": "survey-place",
+   "query": "find",
+   "args": {
+    "kind": "finding",
+    "text": "leaf"
+   },
+   "returned": 4
+  },
+  {
+   "at": "2026-11-17T13:43:28.085Z",
+   "by": "survey-place",
+   "query": "find",
+   "args": {
+    "text": "indent"
+   },
+   "returned": 1
+  },
+  {
+   "at": "2026-11-17T13:43:28.133Z",
+   "by": "survey-place",
+   "query": "find",
+   "args": {
+    "text": "slice"
+   },
+   "returned": 7
+  },
+  {
+   "at": "2026-11-17T13:43:28.178Z",
+   "by": "survey-place",
+   "query": "find",
+   "args": {
+    "text": "census"
+   },
+   "returned": 11
+  },
+  {
+   "at": "2026-11-17T13:43:28.218Z",
+   "by": "survey-place",
+   "query": "find",
+   "args": {
+    "text": "source-map"
+   },
+   "returned": 6
+  },
+  {
+   "at": "2026-11-17T13:43:28.255Z",
+   "by": "survey-place",
+   "query": "find",
+   "args": {
+    "text": "question-cards"
+   },
+   "returned": 2
+  },
+  {
+   "at": "2026-11-17T13:43:31.010Z",
+   "by": "survey-place",
+   "query": "get",
+   "args": {
+    "id": "decision-38",
+    "asOf": null
+   },
+   "returned": 1
+  },
+  {
+   "at": "2026-11-17T13:43:31.046Z",
+   "by": "survey-place",
+   "query": "get",
+   "args": {
+    "id": "run-88",
+    "asOf": null
+   },
+   "returned": 1
+  },
+  {
+   "at": "2026-11-17T13:44:32.294Z",
    "by": "Harbour",
    "query": "show",
    "args": {

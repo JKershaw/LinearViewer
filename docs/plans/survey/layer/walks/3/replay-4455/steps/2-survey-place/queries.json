@@ -1,0 +1,65 @@
+[
+ {
+  "at": "2026-11-17T13:43:33.992Z",
+  "by": "survey-place",
+  "query": "find",
+  "args": {
+   "to": "task-60"
+  },
+  "returned": 5
+ },
+ {
+  "at": "2026-11-17T13:43:34.038Z",
+  "by": "survey-place",
+  "query": "find",
+  "args": {
+   "text": "NEVER_RAN"
+  },
+  "returned": 5
+ },
+ {
+  "at": "2026-11-17T13:43:34.077Z",
+  "by": "survey-place",
+  "query": "find",
+  "args": {
+   "text": "DECISION_LIFECYCLE"
+  },
+  "returned": 1
+ },
+ {
+  "at": "2026-11-17T13:43:34.114Z",
+  "by": "survey-place",
+  "query": "find",
+  "args": {
+   "text": "relay"
+  },
+  "returned": 0
+ },
+ {
+  "at": "2026-11-17T13:43:34.149Z",
+  "by": "survey-place",
+  "query": "find",
+  "args": {
+   "text": "runs-and-dispatch.md"
+  },
+  "returned": 2
+ },
+ {
+  "at": "2026-11-17T13:43:34.189Z",
+  "by": "survey-place",
+  "query": "find",
+  "args": {
+   "kind": "question"
+  },
+  "returned": 1
+ },
+ {
+  "at": "2026-11-17T13:43:34.221Z",
+  "by": "survey-place",
+  "query": "find",
+  "args": {
+   "text": "late-bound"
+  },
+  "returned": 0
+ }
+]
