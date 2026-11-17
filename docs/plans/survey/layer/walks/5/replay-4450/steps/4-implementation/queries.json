@@ -1,0 +1,96 @@
+[
+ {
+  "at": "2026-11-17T15:20:51.593Z",
+  "by": "implementation",
+  "cmd": "show",
+  "args": [
+   "show",
+   "--task",
+   "task-60",
+   "--by",
+   "implementation"
+  ],
+  "asOf": null
+ },
+ {
+  "at": "2026-11-17T15:20:51.631Z",
+  "by": "implementation",
+  "cmd": "find",
+  "args": [
+   "find",
+   "--kind",
+   "change",
+   "--by",
+   "implementation"
+  ],
+  "asOf": null
+ },
+ {
+  "at": "2026-11-17T15:20:51.668Z",
+  "by": "implementation",
+  "cmd": "find",
+  "args": [
+   "find",
+   "--kind",
+   "check",
+   "--state",
+   "open",
+   "--by",
+   "implementation"
+  ],
+  "asOf": null
+ },
+ {
+  "at": "2026-11-17T15:20:56.553Z",
+  "by": "implementation",
+  "cmd": "find",
+  "args": [
+   "find",
+   "--kind",
+   "task",
+   "--in",
+   "task-53",
+   "--by",
+   "implementation"
+  ],
+  "asOf": null
+ },
+ {
+  "at": "2026-11-17T15:20:56.595Z",
+  "by": "implementation",
+  "cmd": "find",
+  "args": [
+   "find",
+   "--text",
+   "LIN-4452",
+   "--by",
+   "implementation"
+  ],
+  "asOf": null
+ },
+ {
+  "at": "2026-11-17T15:20:56.634Z",
+  "by": "implementation",
+  "cmd": "find",
+  "args": [
+   "find",
+   "--text",
+   "decision-65",
+   "--by",
+   "implementation"
+  ],
+  "asOf": null
+ },
+ {
+  "at": "2026-11-17T15:20:56.669Z",
+  "by": "implementation",
+  "cmd": "get",
+  "args": [
+   "get",
+   "decision-65",
+   "--by",
+   "implementation"
+  ],
+  "asOf": null
+ }
+]

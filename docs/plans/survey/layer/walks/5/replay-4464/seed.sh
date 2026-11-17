@@ -1,0 +1,556 @@
+#!/usr/bin/env bash
+# Recreates walks/5/replay-4464/store.json from empty (walk 5 model): the state of LIN-4448/LIN-4464 just before
+# LIN-4464's first stage (survey-task) was dispatched, 2026-11-13T15:56:30.374Z. Generated; see seed-log.md.
+set -euo pipefail
+HERE="$(cd "$(dirname "$0")" && pwd)"
+LAYER="$HERE/../model/layer.mjs"
+STORE="$HERE/store.json"
+rm -f "$STORE"
+L() { node "$LAYER" "$@" --store "$STORE"; }
+idof() { node -e 'let s="";process.stdin.on("data",d=>s+=d).on("end",()=>console.log(JSON.parse(s).id))'; }
+# substitute @@NAME@@ with the shell variable NAME (record ids captured earlier)
+sub() { local s="$1" v; for v in $(grep -o "@@[A-Z0-9_]*@@" <<<"$s" | sort -u | tr -d @); do s="${s//@@$v@@/${!v}}"; done; printf "%s" "$s"; }
+
+
+# Area: LLM & prompts (registry docs/areas/areas.json @ 5dcf5bcda, blob 1dc2ba701), by Harbour.
+# paths: the registry's pattern expanded to the 91 files it matches first at 5dcf5bcda, with lib/prompts/ as one entry.
+P=$(cat <<'J1'
+{"name":"LLM & prompts","paths":["lib/prompts/","lib/action-kind.js","lib/agent-turn.js","lib/as-asked.js","lib/audit.js","lib/bash-tool.js","lib/brief-cache.js","lib/brief.js","lib/call-budget.js","lib/catalog-rate.js","lib/chat-request.js","lib/chat-tools.js","lib/chat-transcript.js","lib/collective-characters-store.js","lib/collective-preset-defs.js","lib/collective-presets-store.js","lib/context-graph.js","lib/custom-prompts-store.js","lib/feedback-title.js","lib/file-pointer.js","lib/flight-companion-census-seed.js","lib/flight-companion-gate.js","lib/harbour-comments-store.js","lib/library-metadata.js","lib/library.js","lib/llm-call-log.js","lib/llm-jobs.js","lib/model-pricing.js","lib/model-routing-edit.js","lib/model-routing-harnesses.js","lib/model-routing-history.js","lib/model-routing-spend.js","lib/model-routing-store.js","lib/model-routing-summary.js","lib/model-routing-validate.js","lib/model-routing.js","lib/north-star-resolver.js","lib/openrouter-catalog.js","lib/openrouter.js","lib/periodicals.js","lib/prompt-contract.js","lib/prompt-formatters.js","lib/prompt-template-defs.js","lib/prompt-templates.js","lib/prompt-trace-store.js","lib/recap-cache.js","lib/recap.js","lib/recommend-recurse.js","lib/recommendation-blind-read.js","lib/recommendation-facts.js","lib/recommendation-input.js","lib/recommendation-live-wait.js","lib/recommendation-look-first.js","lib/report-history-store.js","lib/roadmap.js","lib/saved-chat-store.js","lib/scan-fingerprint.js","lib/scan.js","lib/ship-biscuit-history-store.js","lib/ship-biscuit.js","lib/should-mock-ai.js","lib/size-of-move.js","lib/stage-router.js","lib/yap-client.js"]}
+J1
+)
+P=$(sub "$P")
+AREA_LLM=$(L add area --by Harbour --at 2026-11-13T12:00:00Z "$P" | idof)
+# Lessons, docs/areas/llm-and-prompts.md @ 5dcf5bcda (blob b6b4c726d), verbatim, wrapped lines joined.
+P=$(cat <<'J2'
+{"in":"@@AREA_LLM@@","says":"Prompt size is frozen (`tests/unit/prompt-size-budget.test.js`): text grows only with its ticket and reason beside the ceiling and `FROZEN_TOTAL_BYTES`; old reasons go to \"Ceiling history\" in `scripts/prompt-template-change-log.md`.","paths":["tests/unit/prompt-size-budget.test.js","scripts/prompt-template-change-log.md"],"checked-at":"5dcf5bcda"}
+J2
+)
+P=$(sub "$P")
+LLM_LESSON1=$(L add lesson --by Harbour --at 2026-11-13T12:00:00Z "$P" | idof)
+P=$(cat <<'J3'
+{"in":"@@AREA_LLM@@","says":"Grounding lists in `lib/prompt-formatters.js` are shared (`WORK` serves several stages, `GROUNDING_NOTES` unknown kinds): give one stage its own list (LIN-4371).","paths":["lib/prompt-formatters.js"],"checked-at":"5dcf5bcda"}
+J3
+)
+P=$(sub "$P")
+LLM_LESSON2=$(L add lesson --by Harbour --at 2026-11-13T12:00:00Z "$P" | idof)
+P=$(cat <<'J4'
+{"in":"@@AREA_LLM@@","says":"Keep scoping and both Survey renders byte-identical unless a ticket is about them (replays compare them, LIN-4369).","paths":[],"checked-at":"5dcf5bcda"}
+J4
+)
+P=$(sub "$P")
+LLM_LESSON3=$(L add lesson --by Harbour --at 2026-11-13T12:00:00Z "$P" | idof)
+P=$(cat <<'J5'
+{"in":"@@AREA_LLM@@","says":"The Surveys get no area notes pointer: survey-place reads no shape reports, which feed the notes. Scoping cites its pointer in its final message; both share `AREA_NOTES_WHERE` (LIN-4346).","paths":[],"checked-at":"5dcf5bcda"}
+J5
+)
+P=$(sub "$P")
+LLM_LESSON4=$(L add lesson --by Harbour --at 2026-11-13T12:00:00Z "$P" | idof)
+P=$(cat <<'J6'
+{"in":"@@AREA_LLM@@","says":"`lib/prompt-template-defs.js` and the budget test change in almost every merge: rebase, then re-measure. Its fixture passes no context (the empty-context branch), so dropping one can raise a ceiling while real renders shrink (LIN-4393).","paths":["lib/prompt-template-defs.js"],"checked-at":"5dcf5bcda"}
+J6
+)
+P=$(sub "$P")
+LLM_LESSON5=$(L add lesson --by Harbour --at 2026-11-13T12:00:00Z "$P" | idof)
+P=$(cat <<'J7'
+{"in":"@@AREA_LLM@@","says":"The `## As asked` block's words have one owner, `lib/as-asked.js`: import its spellings, never retype the heading or end line (LIN-4362).","paths":["lib/as-asked.js"],"checked-at":"5dcf5bcda"}
+J7
+)
+P=$(sub "$P")
+LLM_LESSON6=$(L add lesson --by Harbour --at 2026-11-13T12:00:00Z "$P" | idof)
+P=$(cat <<'J8'
+{"in":"@@AREA_LLM@@","says":"`lib/prompt-template-defs.js` cannot import what imports `lib/prompt-templates.js` (a cycle): shared words live in an import-free leaf, as `lib/prompts/leftover-words.js` (LIN-4376) and `lib/prompts/autopilot-precedence.js` (never restate a rank; LIN-4382).","paths":["lib/prompt-template-defs.js","lib/prompt-templates.js","lib/prompts/leftover-words.js","lib/prompts/autopilot-precedence.js"],"checked-at":"5dcf5bcda"}
+J8
+)
+P=$(sub "$P")
+LLM_LESSON7=$(L add lesson --by Harbour --at 2026-11-13T12:00:00Z "$P" | idof)
+P=$(cat <<'J9'
+{"in":"@@AREA_LLM@@","says":"Prompt words banning a kind of how do not hold it (LIN-4369's replay: closing one channel moved it to the next). Hold the shape in code or a test (`SIZE_RECORD_SHAPE`, `lib/size-of-move.js`, arm 3) or hold the reader's side (arm 4).","paths":["lib/size-of-move.js"],"checked-at":"5dcf5bcda"}
+J9
+)
+P=$(sub "$P")
+LLM_LESSON8=$(L add lesson --by Harbour --at 2026-11-13T12:00:00Z "$P" | idof)
+P=$(cat <<'J10'
+{"in":"@@AREA_LLM@@","says":"A stage lead's first sentence is the selector's purpose line: changing it means new router snapshots, `scripts/eval/meta-prompt.baseline.txt` and routing ceiling (LIN-4369).","paths":["scripts/eval/meta-prompt.baseline.txt"],"checked-at":"5dcf5bcda"}
+J10
+)
+P=$(sub "$P")
+LLM_LESSON9=$(L add lesson --by Harbour --at 2026-11-13T12:00:00Z "$P" | idof)
+P=$(cat <<'J11'
+{"in":"@@AREA_LLM@@","says":"`lib/prompts/autopilot-precedence.js`: check real rows reach a server guard before prompt text bypasses it (LIN-4349). A scoped run's Periodical is opt-in by goal: no tail, no flag (LIN-4415).","paths":["lib/prompts/autopilot-precedence.js"],"checked-at":"5dcf5bcda"}
+J11
+)
+P=$(sub "$P")
+LLM_LESSON10=$(L add lesson --by Harbour --at 2026-11-13T12:00:00Z "$P" | idof)
+P=$(cat <<'J12'
+{"in":"@@AREA_LLM@@","says":"`lib/periodicals.js`: close-out merges a Periodical's PR and sets Done as for any task; give no Periodical its own merge rule: notes are prompt input (LIN-4390). The rule is retyped in five files; only a test links them.","paths":["lib/periodicals.js"],"checked-at":"5dcf5bcda"}
+J12
+)
+P=$(sub "$P")
+LLM_LESSON11=$(L add lesson --by Harbour --at 2026-11-13T12:00:00Z "$P" | idof)
+P=$(cat <<'J13'
+{"in":"@@AREA_LLM@@","says":"Model facts come from the OpenRouter catalog: add no model list or rate (LIN-4358); tests seed `tests/unit/helpers/pinned-catalog.js`.","paths":["tests/unit/helpers/pinned-catalog.js"],"checked-at":"5dcf5bcda"}
+J13
+)
+P=$(sub "$P")
+LLM_LESSON12=$(L add lesson --by Harbour --at 2026-11-13T12:00:00Z "$P" | idof)
+P=$(cat <<'J14'
+{"in":"@@AREA_LLM@@","says":"`lib/library.js` takes a shelf doc's summary by position (`firstParagraphAfterTitle`): a paper that opens with a figure keeps its alt text under 12 words, or the alt text becomes the summary; a rewritten first paragraph re-pins `tests/fixtures/library-doc-summaries.json` (LIN-4428).","paths":["lib/library.js","tests/fixtures/library-doc-summaries.json"],"checked-at":"5dcf5bcda"}
+J14
+)
+P=$(sub "$P")
+LLM_LESSON13=$(L add lesson --by Harbour --at 2026-11-13T12:00:00Z "$P" | idof)
+P=$(cat <<'J15'
+{"in":"@@AREA_LLM@@","says":"A blind reader's limits are instructions, not access: with the repository checked out it can still see commit subjects (`git worktree add` prints the head's) and area notes. Both slipped, harmlessly, in the LIN-4436 pilot. Code hands a blind stage SHAs and PR URLs, never a PR body or commit log.","paths":[],"checked-at":"5dcf5bcda"}
+J15
+)
+P=$(sub "$P")
+LLM_LESSON14=$(L add lesson --by Harbour --at 2026-11-13T12:00:00Z "$P" | idof)
+P=$(cat <<'J16'
+{"in":"@@AREA_LLM@@","says":"`lib/periodicals.js`: Stability defers to a repo's committed declaration of its measures and names none (LIN-4424): change Harbour's measures in `docs/reviews/stability-measures/README.md` and its script, never in the shared template; a test links the bullet's list to that README.","paths":["lib/periodicals.js","docs/reviews/stability-measures/README.md"],"checked-at":"5dcf5bcda"}
+J16
+)
+P=$(sub "$P")
+LLM_LESSON15=$(L add lesson --by Harbour --at 2026-11-13T12:00:00Z "$P" | idof)
+P=$(cat <<'J17'
+{"in":"@@AREA_LLM@@","says":"A new stage kind is a row in every table `tests/unit/stage-kind-tables.test.js` reads: add it, or list it there as out with the reason. A kind in `SPINE` (`lib/run-view.js`) also moves the run page's \"n of N\", the session and task-page goldens (`UPDATE_RENDER_SESSION_GOLDEN=1`, `UPDATE_RENDER_TASK_PAGE_GOLDEN=1`) and the E2E count pins; read the golden diff before accepting it (LIN-4437).","paths":["tests/unit/stage-kind-tables.test.js","lib/run-view.js"],"checked-at":"5dcf5bcda"}
+J17
+)
+P=$(sub "$P")
+LLM_LESSON16=$(L add lesson --by Harbour --at 2026-11-13T12:00:00Z "$P" | idof)
+P=$(cat <<'J18'
+{"in":"@@AREA_LLM@@","says":"`formatCiGateCheck` (`lib/prompt-formatters.js`) renders in implementation, review and close-out: a rule for one stage gets its own formatter beside it. Prove the others unchanged by rendering every kind, fresh and fix round, at HEAD and on the branch, not by the budget test, whose ceilings are caps (LIN-4441).","paths":["lib/prompt-formatters.js"],"checked-at":"5dcf5bcda"}
+J18
+)
+P=$(sub "$P")
+LLM_LESSON17=$(L add lesson --by Harbour --at 2026-11-13T12:00:00Z "$P" | idof)
+# Waiting entries, numbered by position in the note @ 5dcf5bcda.
+P=$(cat <<'J19'
+{"to":"@@AREA_LLM@@","says":"Waiting 1: `lib/recommendation-input.js`: the pinned-kind and in-app renders (`lib/dispatch-entrance.js`, `routes/proxy-compute.js` twice, `routes/workspace-api-prompts.js`) build context by hand: a new field must reach all five (LIN-4368 missed one; LIN-4393 leftovers.)"}
+J19
+)
+P=$(sub "$P")
+LLM_W1=$(L add finding --by Harbour --at 2026-11-13T12:00:00Z "$P" | idof)
+P=$(cat <<'J20'
+{"to":"@@AREA_LLM@@","says":"Waiting 2: `lib/size-of-move.js`: the built-in policy (`DECIDED_BY.policy`, err larger) may stand in for John's \"per task breakdown of options\"; its size words are unexplained. (John, LIN-4393.)"}
+J20
+)
+P=$(sub "$P")
+LLM_W2=$(L add finding --by Harbour --at 2026-11-13T12:00:00Z "$P" | idof)
+P=$(cat <<'J21'
+{"to":"@@AREA_LLM@@","says":"Waiting 3: `lib/prompts/stage-intent.js`: `CUT` writes the closing contract's token order (`DECISION:` before `BLOCKED:`) into a scope line beside `ASK`. Its \"cut\" and the plan-review and review \"narrowing\" (`lib/completion-signals.js`) name one thing; no test links them. (John, 8 Nov.)"}
+J21
+)
+P=$(sub "$P")
+LLM_W3=$(L add finding --by Harbour --at 2026-11-13T12:00:00Z "$P" | idof)
+P=$(cat <<'J22'
+{"to":"@@AREA_LLM@@","says":"Waiting 4: `lib/prompt-template-defs.js`: a stage kind is a row in ~fourteen parallel tables (`GROUNDING_BY_KIND`, ceilings, completion signals, labels…): fold them into one definition. (Survey tally, LIN-4248.)"}
+J22
+)
+P=$(sub "$P")
+LLM_W4=$(L add finding --by Harbour --at 2026-11-13T12:00:00Z "$P" | idof)
+P=$(cat <<'J23'
+{"to":"@@AREA_LLM@@","says":"Waiting 5: `lib/call-budget.js`: the budget rule is untested live on anthropic/claude-haiku-5.5; before moving a call there, replay LIN-4352's snapshot through `scripts/replay-brief.mjs`: block [2] WHOLE, four sections, finishReason=stop, any retry's reasoning bound accepted. REFUSED: change the rule first. (John, LIN-4358.)"}
+J23
+)
+P=$(sub "$P")
+LLM_W5=$(L add finding --by Harbour --at 2026-11-13T12:00:00Z "$P" | idof)
+P=$(cat <<'J24'
+{"to":"@@AREA_LLM@@","says":"Waiting 6: `lib/call-budget.js`: split: `resolveReasoningBudget`/`isReasoningModel` stay in `lib/openrouter.js`; tool hops and the routing pair get the budget, not the retry; `canReason` has test callers only. (Area reads CG/CH.)"}
+J24
+)
+P=$(sub "$P")
+LLM_W6=$(L add finding --by Harbour --at 2026-11-13T12:00:00Z "$P" | idof)
+P=$(cat <<'J25'
+{"to":"@@AREA_LLM@@","says":"Waiting 7: `lib/openrouter.js`: `SUGGESTED_MODEL_IDS` and `DISPATCH_MODEL_SUGGESTIONS` (`lib/model-routing-harnesses.js`) repeat ids by hand, unchecked; the first is also the cold-catalog fallback. (Area reads CG/CH.)"}
+J25
+)
+P=$(sub "$P")
+LLM_W7=$(L add finding --by Harbour --at 2026-11-13T12:00:00Z "$P" | idof)
+P=$(cat <<'J26'
+{"to":"@@AREA_LLM@@","says":"Waiting 8: `lib/periodicals.js`: `docs/areas/` is spelled in 26 lines across 11 code files (`lib/`, `routes/`, `public/`, `server.js`, `scripts/`), up from 17 in 10 at the 10 Nov reading, and two leaves now spell the directory: `REGISTRY_PATH` (`lib/prompts/area-registry-path.js`) and `NOTES_DIR` (`lib/prompts/area-note-format.js`, LIN-4420), neither derived from the other. Moving the notes means editing both leaves and the prose. (Drift & Coherence Review, 10 Nov; `docs/reviews/drift-coherence-review-2026-11-10.md`; count, Documentation Review; recounted, Drift & Coherence Review, 13 Nov.; `docs/reviews/drift-coherence-review-2026-11-13.md`.)"}
+J26
+)
+P=$(sub "$P")
+LLM_W8=$(L add finding --by Harbour --at 2026-11-13T12:00:00Z "$P" | idof)
+P=$(cat <<'J27'
+{"to":"@@AREA_LLM@@","says":"Waiting 9: `lib/recommendation-live-wait.js`: a read, not a claim: two different-kind calls racing on one ticket both pass; claim compare-and-set, like `claimHeldWake` (LIN-4392)."}
+J27
+)
+P=$(sub "$P")
+LLM_W9=$(L add finding --by Harbour --at 2026-11-13T12:00:00Z "$P" | idof)
+P=$(cat <<'J28'
+{"to":"@@AREA_LLM@@","says":"Waiting 10: `lib/recommendation-live-wait.js`: the live-stage refusal (`liveWaitRefusal`, 409 `STAGE_IN_FLIGHT`) is a Runs dispatch rule placed here by the `^lib/recommendation-` prefix. `lib/dispatch-entrance.js` (Runs) enforces it, `routes/workspace-api.js` (Web) imports it, `lib/proxy-instructions.js` (Agent API) takes its code, and the one run-state test it makes, `isLiveRun`, is in `lib/recent-runs.js` (Runs), so a change to what counts as live moves three areas. `lib/openrouter.js` (LLM) also routes on it, as the first code-settled route in `codeRouteOf`, so the wait is recommendation logic as well. A size of move: give the wait a Runs home. (Seams & Tangles, 13 Nov.; `docs/reviews/seams-tangles-review-2026-11-13-run12.md`.)"}
+J28
+)
+P=$(sub "$P")
+LLM_W10=$(L add finding --by Harbour --at 2026-11-13T12:00:00Z "$P" | idof)
+P=$(cat <<'J29'
+{"to":"@@AREA_LLM@@","says":"Waiting 11: `lib/periodicals.js`: two sizes of move: a ceiling for Periodical prompts (+18.8% in the window, 185,952 to 220,882 B; only a sha256 tripwire), and an index or series archive for `docs/reviews/` (109 top-level reports, 88 MB). (Documentation Review, 10 Nov.; `docs/reviews/documentation-review-2026-11-10.md`.)"}
+J29
+)
+P=$(sub "$P")
+LLM_W11=$(L add finding --by Harbour --at 2026-11-13T12:00:00Z "$P" | idof)
+P=$(cat <<'J30'
+{"to":"@@AREA_LLM@@","says":"Waiting 12: `lib/prompt-formatters.js`: eight stage kinds are told notes bind, yet `tests/unit/area-notes.test.js` checks shape only and close-out writes review-worded entries to main unreviewed: no content boundary on who adds a Lesson. (Security Review, 10 Nov.; `docs/reviews/security-review-2026-11-10.md`.)"}
+J30
+)
+P=$(sub "$P")
+LLM_W12=$(L add finding --by Harbour --at 2026-11-13T12:00:00Z "$P" | idof)
+P=$(cat <<'J31'
+{"to":"@@AREA_LLM@@","says":"Waiting 13: `lib/prompts/autopilot-kickoff.js`: a dispatch holder's `goal` is \"Goal from the human\" (ranked first), a periodical mint `note` \"the operator\" (`lib/periodicals.js`): attribute both to the minting token. (Security Review, 10 Nov.; `docs/reviews/security-review-2026-11-10.md`.)"}
+J31
+)
+P=$(sub "$P")
+LLM_W13=$(L add finding --by Harbour --at 2026-11-13T12:00:00Z "$P" | idof)
+P=$(cat <<'J32'
+{"to":"@@AREA_LLM@@","says":"Waiting 14: `lib/library.js`: summaries come from first-paragraph position, so an opening image's alt text can become the summary and every shelf rewrite churns `tests/fixtures/library-doc-summaries.json`; a `summary:` front-matter field would end both, but changes every doc's summary source. (Survey global, LIN-4428.)"}
+J32
+)
+P=$(sub "$P")
+LLM_W14=$(L add finding --by Harbour --at 2026-11-13T12:00:00Z "$P" | idof)
+P=$(cat <<'J33'
+{"to":"@@AREA_LLM@@","says":"Waiting 15: `lib/periodicals.js`: a reading's finding with no file in an area to cite goes to the closing comment, \"never in a ticket\", a live secret included, while `CONSEQUENCE_TEST` (`lib/prompts/leftover-words.js`) sends a find that touches safety to a ticket. The two rules in this area answer the live-secret case oppositely; having Periodicals render the gate needs John's ruling on that case first. (LIN-4401, LIN-4431.)"}
+J33
+)
+P=$(sub "$P")
+LLM_W15=$(L add finding --by Harbour --at 2026-11-13T12:00:00Z "$P" | idof)
+P=$(cat <<'J34'
+{"to":"@@AREA_LLM@@","says":"Waiting 16: `lib/prompts/leftover-words.js`: since `CONSEQUENCE_TEST` (LIN-4401), outside finds gather as Waiting entries in other areas' notes where tickets used to be filed. LIN-4414's one retirement per build drains only the areas a build touches, so rarely touched notes (other-features) will grow; their Waiting counts are the honest measure. (LIN-4431.)"}
+J34
+)
+P=$(sub "$P")
+LLM_W16=$(L add finding --by Harbour --at 2026-11-13T12:00:00Z "$P" | idof)
+P=$(cat <<'J35'
+{"to":"@@AREA_LLM@@","says":"Waiting 17: `lib/prompt-template-defs.js` (retrospective-audit Reporting) and `lib/periodicals.js` (`areaNotesRoutes`) each state the docs-only notes-PR rule in their own words; one shared constant in `lib/prompts/leftover-words.js` would make it one, at the cost of re-pinning the 13 Periodical prompt hashes. (LIN-4432.)"}
+J35
+)
+P=$(sub "$P")
+LLM_W17=$(L add finding --by Harbour --at 2026-11-13T12:00:00Z "$P" | idof)
+P=$(cat <<'J36'
+{"to":"@@AREA_LLM@@","says":"Waiting 18: `lib/prompts/leftover-words.js`: the first-match area lookup is spelled three ways: `CONSEQUENCE_TEST`'s \"first match wins\" parenthetical, `docs/areas/README.md` (\"take the first area with a pattern that matches its path\") and the blind-read prompt's own sentence (`lib/prompt-template-defs.js`, the `blind-read` template), which shipped as piloted (LIN-4437), so it was not retyped after the pilot. One constant in the leaf would make it one, at the cost of re-piloting that sentence. (LIN-4436 leftovers.)"}
+J36
+)
+P=$(sub "$P")
+LLM_W18=$(L add finding --by Harbour --at 2026-11-13T12:00:00Z "$P" | idof)
+P=$(cat <<'J37'
+{"to":"@@AREA_LLM@@","says":"Waiting 19: `lib/prompt-formatters.js`: `formatLocalTestRule` names this repo's runner command (`node scripts/run-unit-tests.mjs tests/unit/<files>`) in a template that also drives other repos, and `CLAUDE.md` spells the same rule; a repo-supplied test command would make the line right elsewhere and give it one spelling. (LIN-4441 leftovers.)"}
+J37
+)
+P=$(sub "$P")
+LLM_W19=$(L add finding --by Harbour --at 2026-11-13T12:00:00Z "$P" | idof)
+P=$(cat <<'J38'
+{"to":"@@AREA_LLM@@","says":"Waiting 20: `lib/periodicals.js`: \"search the repo for a committed tool (no path is written here) and run it\" is spelled four times: Drift & Coherence's census bullet, Seams & Tangles' two bullets and Stability's declaration bullet. One shared helper would make it one, at the cost of re-pinning those three templates' hashes. (LIN-4424 leftovers; Survey global.) The rule it answers, whether a review may run a tool the repo commits, is itself worded per template: Stability's run bullet says \"introducing no tooling beyond what the repo commits\", while Recent Headwinds (which reads the same rework and churn trajectory) and Drift & Coherence still say \"introducing no new tooling\", Code Quality says \"introduce no new tooling\", and Seams & Tangles allows committed tools in its own bullets. No `periodicalBullet` helper owns it; deciding it is one rule re-pins every template that states it. (LIN-4424 blind read.)"}
+J38
+)
+P=$(sub "$P")
+LLM_W20=$(L add finding --by Harbour --at 2026-11-13T12:00:00Z "$P" | idof)
+P=$(cat <<'J39'
+{"to":"@@AREA_LLM@@","says":"Waiting 21: `lib/model-routing-harnesses.js`: a dispatch record's `model` names the routed id (\"anthropic/claude-opus-4.8\" for the `opus` route), but the claude-code harness runs a Claude id by its family token (`isModelRunnableOn`, `CLAUDE_MAPPABLE_MODEL_FAMILIES`), and on blind-read dispatches d9bdf6d8, cced07ee and 0399b2e2 it ran `claude-opus-5-5`, so a record can misname the model that ran. Cost is already priced from the model the worker reports. Waiting: make the record carry the model the worker reports, or update the routed id. (LIN-4396 review.)"}
+J39
+)
+P=$(sub "$P")
+LLM_W21=$(L add finding --by Harbour --at 2026-11-13T12:00:00Z "$P" | idof)
+P=$(cat <<'J40'
+{"to":"@@AREA_LLM@@","says":"Waiting 22: `lib/prompts/blind-read-words.js`: its header says none retypes its words, but the kind is typed bare in `lib/recommendation-blind-read.js` (the run predicate and the dispatched step), `lib/pipeline-churn.js`, `lib/run-view.js` and `lib/run-closeout-state.js`, and has a second constant, `VIRTUAL_PROMPTS.BLIND_READ` (`lib/workflow-config.js`); `lib/completion-signals.js` types the heading (three times) and the verdict words instead of importing them. The route module does not import `BLIND_READ_KIND` at all, and `tests/unit/stage-kind-tables.test.js` checks presence, not these literals. LOW: a stored kind is rarely renamed; the leaf's claim is what is untrue. `lib/recommendation-blind-read.js` also redeclares `COMPLETED`. (Drift & Coherence Review, 13 Nov.; `docs/reviews/drift-coherence-review-2026-11-13.md`.)"}
+J40
+)
+P=$(sub "$P")
+LLM_W22=$(L add finding --by Harbour --at 2026-11-13T12:00:00Z "$P" | idof)
+P=$(cat <<'J41'
+{"to":"@@AREA_LLM@@","says":"Waiting 23: `lib/openrouter.js`: the four routes code settles (the live-stage wait, the review loop bound, the blind read, the look-first sequence) are listed by hand in about nine places, no test pins any copy, and two are already wrong: `docs/architecture/prompt-system.md` says \"four routes\" and then restates three, without the blind read, and `public/llms.txt` says the blind read is \"Sent by hand\", where its description (`lib/prompt-template-defs.js`) says code sends it. The templates sync test checks that the catalogue bullet exists, not its words. (Drift & Coherence Review, 13 Nov.; `docs/reviews/drift-coherence-review-2026-11-13.md`.)"}
+J41
+)
+P=$(sub "$P")
+LLM_W23=$(L add finding --by Harbour --at 2026-11-13T12:00:00Z "$P" | idof)
+P=$(cat <<'J42'
+{"to":"@@AREA_LLM@@","says":"Waiting 24: `lib/prompts/leftover-words.js`: the retirement line's words have one home and one checker (`lib/dispatch-leftover-answer.js`), but which entry to settle (the busiest touched area, else another) and the three forms are restated by hand in `docs/areas/README.md`, simple-dispatcher's docs/areas/README.md, `docs/proxy-integration.md` (with the refusal kinds) and `docs/architecture/dispatch-and-proxy.md`, and the verbatim guard reads only `lib/` and `routes/`. simple-dispatcher's README says a waiting entry also leaves when \"a follow-up is filed for it\", where this README says only when the consequence test sends it to a ticket. A cross-repo seam; simple-dispatcher's side is named here, not edited. (Drift & Coherence Review, 13 Nov.; `docs/reviews/drift-coherence-review-2026-11-13.md`.)"}
+J42
+)
+P=$(sub "$P")
+LLM_W24=$(L add finding --by Harbour --at 2026-11-13T12:00:00Z "$P" | idof)
+P=$(cat <<'J43'
+{"to":"@@AREA_LLM@@","says":"Waiting 25: `lib/prompts/area-note-format.js`: the one reading of a waiting entry in code does not hold what a cited path is; that rule is in the guard (`tests/unit/area-notes.test.js`, a listed extension), in `lib/dispatch-leftover-answer.js` (any one to six characters, its comment calling it the guard's rule) and in simple-dispatcher's guard. A retirement line can name a path the guard would not read as one. Borderline. (Drift & Coherence Review, 13 Nov.; `docs/reviews/drift-coherence-review-2026-11-13.md`.)"}
+J43
+)
+P=$(sub "$P")
+LLM_W25=$(L add finding --by Harbour --at 2026-11-13T12:00:00Z "$P" | idof)
+
+# Area: Front end: server-rendered pages (registry docs/areas/areas.json @ 5dcf5bcda, blob 1dc2ba701), by Harbour.
+# paths: the registry's pattern expanded to the 92 files it matches first at 5dcf5bcda, with lib/components/ as one entry.
+P=$(cat <<'J44'
+{"name":"Front end: server-rendered pages","paths":["lib/components/","lib/mask-secrets-in-html.js","lib/parse-landing.js","lib/question-card.js","lib/render-account-home.js","lib/render-audit.js","lib/render-collective.js","lib/render-custom-prompts.js","lib/render-dispatch.js","lib/render-effort-readout.js","lib/render-email-auth.js","lib/render-escalation-kpis.js","lib/render-flight-companion.js","lib/render-kpis.js","lib/render-landing.js","lib/render-legal.js","lib/render-library.js","lib/render-live-console.js","lib/render-observation.js","lib/render-pages.js","lib/render-passage-planner.js","lib/render-prompt-opts.js","lib/render-prompts.js","lib/render-proxy.js","lib/render-roadmap.js","lib/render-run-evidence.js","lib/render-run-steps.js","lib/render-runner-setup.js","lib/render-session.js","lib/render-settings-models.js","lib/render-settings-workspace.js","lib/render-settings-you.js","lib/render-settings.js","lib/render-ship-biscuit.js","lib/render-ship-journey.js","lib/render-ship.js","lib/render-styleguide.js","lib/render-swim.js","lib/render-swipe.js","lib/render-task-chat.js","lib/render-task-create.js","lib/render-task-edit.js","lib/render-task-page.js","lib/render-task-timeline.js","lib/render-templates.js","lib/render-workspace-kpis.js","lib/render.js","lib/security-headers.js","lib/settings-areas.js","lib/settings-copy-first-card.js","lib/ship-journey.js","lib/ship-layout.js","lib/swim-graph.js","lib/swim-lanes.js","lib/task-board-view.js","lib/task-page-href.js","lib/timeline-zoom.js","lib/tree.js"]}
+J44
+)
+P=$(sub "$P")
+AREA_FE=$(L add area --by Harbour --at 2026-11-13T12:00:00Z "$P" | idof)
+# Lessons, docs/areas/front-end-pages.md @ 5dcf5bcda (blob ae9c007e1), verbatim, wrapped lines joined.
+P=$(cat <<'J45'
+{"in":"@@AREA_FE@@","says":"A control a page renders per row (a select or input in each Settings row) needs its own accessible name: a `<label>`, `aria-label` or `aria-labelledby`. A placeholder or a visible word beside it is not enough. Settings › Models renders 86 unnamed controls, one set per job row (Design & Interface Review, 8 Nov 2026; `lib/render-settings.js`, `docs/reviews/design-interface-review-2026-11-08.md`).","paths":["lib/render-settings.js","docs/reviews/design-interface-review-2026-11-08.md"],"checked-at":"5dcf5bcda"}
+J45
+)
+P=$(sub "$P")
+FE_LESSON1=$(L add lesson --by Harbour --at 2026-11-13T12:00:00Z "$P" | idof)
+P=$(cat <<'J46'
+{"in":"@@AREA_FE@@","says":"The task page carries money (LIN-4405). A guest sees none: the guest route strips the timeline with `withoutSpend` (`lib/task-timeline.js`, a copy, since the page result is cached), and `lib/render-task-timeline.js` never puts a cost in an attribute. Any new figure on the page goes through the same strip, and the three-response guest test (`tests/unit/task-timeline-page.test.js`) is the gate.","paths":["lib/task-timeline.js","lib/render-task-timeline.js","tests/unit/task-timeline-page.test.js"],"checked-at":"5dcf5bcda"}
+J46
+)
+P=$(sub "$P")
+FE_LESSON2=$(L add lesson --by Harbour --at 2026-11-13T12:00:00Z "$P" | idof)
+P=$(cat <<'J47'
+{"in":"@@AREA_FE@@","says":"The task page's desktop grid (`public/task-page.css`, ≥1024px) places every child by `grid-area`. A new section needs its own area in both templates, or it renders at the top of the page (LIN-4405).","paths":["public/task-page.css"],"checked-at":"5dcf5bcda"}
+J47
+)
+P=$(sub "$P")
+FE_LESSON3=$(L add lesson --by Harbour --at 2026-11-13T12:00:00Z "$P" | idof)
+# Waiting entries, numbered by position in the note @ 5dcf5bcda.
+P=$(cat <<'J48'
+{"to":"@@AREA_FE@@","says":"Waiting 1: `lib/render-settings.js`: Settings › Models has 42 unnamed `select.harness-select`, 42 unnamed `input.dispatch-effort-input` (one per job row) and 2 unnamed `input.dispatch-preset-name-input` (WCAG 4.1.2). The other seven areas have none. Lighthouse on Settings ran on the sources area and missed this. (Design & Interface Review, 8 Nov 2026; `docs/reviews/design-interface-review-2026-11-08.md`.)"}
+J48
+)
+P=$(sub "$P")
+FE_W1=$(L add finding --by Harbour --at 2026-11-13T12:00:00Z "$P" | idof)
+P=$(cat <<'J49'
+{"to":"@@AREA_FE@@","says":"Waiting 2: `lib/render-pages.js`: the Jira site picker, `renderJiraSiteSelectPage`, overflows a 390px viewport by 52px and a 320px one by 122px. The native `select#jira-site-select` has its right edge at 442px. (Design & Interface Review, 8 Nov 2026; `docs/reviews/design-interface-review-2026-11-08.md`.)"}
+J49
+)
+P=$(sub "$P")
+FE_W2=$(L add finding --by Harbour --at 2026-11-13T12:00:00Z "$P" | idof)
+P=$(cat <<'J50'
+{"to":"@@AREA_FE@@","says":"Waiting 3: `lib/components/halt-controls.js`: in the `buttons` presentation (Dispatch) Pause, Stop and Resume compute to the same style, and the tone the component declares (red for Pause and Stop) is not applied. Stop stops running sessions. (Design & Interface Review, 8 Nov 2026; `docs/reviews/design-interface-review-2026-11-08.md`.)"}
+J50
+)
+P=$(sub "$P")
+FE_W3=$(L add finding --by Harbour --at 2026-11-13T12:00:00Z "$P" | idof)
+P=$(cat <<'J51'
+{"to":"@@AREA_FE@@","says":"Waiting 4: `lib/render-library.js`: every Library document renders two `<h1>` (the shell \"Harbour\" and the document title), 117 of 117. The index renders one. (Design & Interface Review, 8 Nov 2026; `docs/reviews/design-interface-review-2026-11-08.md`.)"}
+J51
+)
+P=$(sub "$P")
+FE_W4=$(L add finding --by Harbour --at 2026-11-13T12:00:00Z "$P" | idof)
+P=$(cat <<'J52'
+{"to":"@@AREA_FE@@","says":"Waiting 5: `lib/render-styleguide.js`: in dark theme the swatch captions under `.sg-value` show light-theme values (`#ffffff` for `--bg`, `#1a1a1a` for `--fg`) beside dark swatches. LIN-3957 and LIN-3960 are open on this page and do not cover it. (Design & Interface Review, 8 Nov 2026; `docs/reviews/design-interface-review-2026-11-08.md`.)"}
+J52
+)
+P=$(sub "$P")
+FE_W5=$(L add finding --by Harbour --at 2026-11-13T12:00:00Z "$P" | idof)
+P=$(cat <<'J53'
+{"to":"@@AREA_FE@@","says":"Waiting 6: `lib/mask-secrets-in-html.js`: on a Jira workspace `/t/` masks text after `lib/providers/jira/adf.js` has escaped every `_` to `\\_`, so underscore-bearing shapes (Resend, Harbour, Linear, GitHub, env-style) reach a guest unmasked; OpenRouter, Mongo, Atlassian and PEM still match. Strip CommonMark backslash escapes, with a position map, before matching. A seam: providers has no note. (Security Review, 10 Nov.; `docs/reviews/security-review-2026-11-10.md`.)"}
+J53
+)
+P=$(sub "$P")
+FE_W6=$(L add finding --by Harbour --at 2026-11-13T12:00:00Z "$P" | idof)
+P=$(cat <<'J54'
+{"to":"@@AREA_FE@@","says":"Waiting 7: `lib/components/navbar.js`: the workspace switcher's `+ Jira` goes to Jira OAuth `mode=new` (a new sign-in), and on a server with no Jira OAuth env it is not shown at all, although the Jira API-token path (no server config) works there. That path is only reachable from Settings › Sources inside a workspace, so a Jira team without OAuth consent has to find \"make a workspace, then Settings\" alone. (Onboarding & Cold-Start Review, 11 Nov.; `docs/reviews/onboarding-cold-start-review-2026-11-11.md`.)"}
+J54
+)
+P=$(sub "$P")
+FE_W7=$(L add finding --by Harbour --at 2026-11-13T12:00:00Z "$P" | idof)
+P=$(cat <<'J55'
+{"to":"@@AREA_FE@@","says":"Waiting 8: `lib/render-proxy.js`: the Proxy page header and hint say agents \"interact with Linear\" and its examples use `LIN-123`, on Local and Jira workspaces too. The onboarding guide sends every agent here. The copied prompt is already provider-correct (LIN-2370); the page copy around it is not. (Onboarding & Cold-Start Review, 11 Nov.; `docs/reviews/onboarding-cold-start-review-2026-11-11.md`.)"}
+J55
+)
+P=$(sub "$P")
+FE_W8=$(L add finding --by Harbour --at 2026-11-13T12:00:00Z "$P" | idof)
+P=$(cat <<'J56'
+{"to":"@@AREA_FE@@","says":"Waiting 9: `lib/render-runner-setup.js`: the runner page defines itself as working \"with no Simple Dispatcher\" and makes the two exclusive per workspace, but no page a newcomer reads says what Simple Dispatcher is or when a team would want it (an always-on host), and its queue token lives on the Dispatch page. A seam with the simple-dispatcher repo, whose README never names this page. (Onboarding & Cold-Start Review, 11 Nov.; `docs/reviews/onboarding-cold-start-review-2026-11-11.md`.)"}
+J56
+)
+P=$(sub "$P")
+FE_W9=$(L add finding --by Harbour --at 2026-11-13T12:00:00Z "$P" | idof)
+P=$(cat <<'J57'
+{"to":"@@AREA_FE@@","says":"Waiting 10: `lib/render-task-page.js`: the layout test's desktop check that both quiet offers (write a brief, write a recap) sit on one line is a one-shot `boundingBox` read after a reload; it fails first (10.25 px against 4) and passes on retry in 33 sampled green runs, so a real wrap would read as a flake. Wait for layout to settle or poll. (Test Coverage Gap Review, 11 Nov.; `docs/reviews/test-coverage-gap-2026-11-11.md`.)"}
+J57
+)
+P=$(sub "$P")
+FE_W10=$(L add finding --by Harbour --at 2026-11-13T12:00:00Z "$P" | idof)
+P=$(cat <<'J58'
+{"to":"@@AREA_FE@@","says":"Waiting 11: `lib/render-session.js`: the run page's `session-run-chat` link is missing on the first attempt and present on retry in 10 sampled green runs (no ticket); whether the link renders late or the seed lands late is unknown. (Test Coverage Gap Review, 11 Nov.; `docs/reviews/test-coverage-gap-2026-11-11.md`.)"}
+J58
+)
+P=$(sub "$P")
+FE_W11=$(L add finding --by Harbour --at 2026-11-13T12:00:00Z "$P" | idof)
+P=$(cat <<'J59'
+{"to":"@@AREA_FE@@","says":"Waiting 12: `lib/render-task-timeline.js`: picks a tick's bare style by restating the model's tick rule (`lib/task-timeline.js`: wake, resumed, or no records), and the legend's \"woken or resumed\" restates it again, though its header says it derives nothing. If the model ticks another role, the renderer styles it wrongly and the legend goes stale; the tick could carry its style. (Drift & Coherence Review, 13 Nov.; `docs/reviews/drift-coherence-review-2026-11-13.md`.)"}
+J59
+)
+P=$(sub "$P")
+FE_W12=$(L add finding --by Harbour --at 2026-11-13T12:00:00Z "$P" | idof)
+
+# Parent LIN-4448, filed 2026-11-13T12:08:14.585Z. asked = its ## As asked block, byte-exact.
+P=$(cat <<'J60'
+{"ref":"LIN-4448","asked":"**Repository:** JKershaw/LinearViewer (Harbour).\n\n**What this is for.** The tightest tangle in Harbour is between LLM & prompts and Runs & dispatch: the links between the two areas grew from 32 one way and 50 the other to 38 and 55 over batch 1 (Seams run 12). On this side:\n\n* the list of routes that code settles without asking a model is copied about nine times, and `docs/architecture/prompt-system.md` and `public/llms.txt` already describe it wrongly (Drift, row 154);\n* the blind read's name and heading are retyped outside the file that defines them (Drift, row 151);\n* batch 1 added rules to the prompts as text (the frozen prompt total rose about 21,000 bytes, to 378,915). John on that limit: \"That limit is to push against lists if rules. Worth knowing, but not hard and fast.\";\n* LIN-4350 asks to fold the rules together into plainer, more general instructions.\n\nThe safety pass (A5, LIN-4400) found two themes here: merge and read-only limits that exist only in prompt text (LIN-1242, LIN-1273, LIN-3417), and tokens inside prompt text (LIN-1372, LIN-1395, LIN-1408). Both are part of A12 (LIN-4416). The area's note holds 26 Waiting entries.\n\n**What we want.**\n\n* Each rule has one home; the copies are gone, and the docs say what the code does.\n* A limit that matters is held in code, not only in a prompt's words.\n* Fewer rules are restated as lists in prompt text.\n* The area's Waiting entries are settled, or each says why it can't be yet.\n* Each piece finishes one move and names what it retired; piece sizes vary, leaning larger.\n* The Runs & dispatch side of the seam is A13's.\n\n**Done when**\n\n* the cases above are settled, or John has ruled they can wait;\n* the safety tickets named above are closed in code for that reason, or John has ruled they can wait;\n* the area's Waiting entries are settled or say why not;\n* the area reads better in a blind read after this work than before it, by more than an untouched area read at the same times.\n\n**Every change names what it retires. Questions:** settle engineering questions yourself; only John's calls (product, money, authority, what to retire) go to him as rulings.\n\n*End of what was asked. Steps write below this line; nothing above it changes.*","done-when":"* the cases above are settled, or John has ruled they can wait;\n* the safety tickets named above are closed in code for that reason, or John has ruled they can wait;\n* the area's Waiting entries are settled or say why not;\n* the area reads better in a blind read after this work than before it, by more than an untouched area read at the same times.","paths":["docs/architecture/prompt-system.md","public/llms.txt"]}
+J60
+)
+P=$(sub "$P")
+PARENT=$(L add task --by John --via driving-session --at 2026-11-13T12:08:14.585Z "$P" | idof)
+
+# Scoping (dispatch 13:25:35): the size record in LIN-4448's description (snapshot 13:28:16 says "pending a ruling"),
+# and the ruling lin4448-safety-cuts it raised (raisedAt 13:28:06.963Z).
+P=$(cat <<'J61'
+{"in":"@@PARENT@@","answer":"**Size:** rebuild the area\n**Why:** Rebuilds the area around one definition per stage kind, from which routes, write limits, labels and docs derive, and has the proxy refuse writes a stage may not make; otherwise copies return and read-only stays words.\n**Cuts:**\n\n* \"the safety tickets named above are closed in code\": the merge limit (LIN-3417) stays with simple-dispatcher.\n* \"the safety tickets named above are closed in code\": the token tickets (LIN-1372, LIN-1395, LIN-1408) stay with the harness.\n  **Decided by:** pending a ruling","why":"Scoping's size record (## Size of the move in LIN-4448's description); the cuts wait on the ruling lin4448-safety-cuts.","scope":"@@PARENT@@"}
+J61
+)
+P=$(sub "$P")
+SIZE=$(L add decision --by scoping --at 2026-11-13T13:28:06.963Z "$P" | idof)
+P=$(cat <<'J62'
+{"in":"@@PARENT@@","to":"John","asks":"LIN-4448 cuts: should the merge limit (LIN-3417 and the merge half of LIN-1273) and the token tickets (LIN-1372, LIN-1395, LIN-1408) wait for A12 (LIN-4416) and simple-dispatcher instead of closing in code here?","options":["Agree both cuts: they wait for A12 and simple-dispatcher; LIN-4448 closes only the read-only limit, through the proxy's write guard","Keep the merge limit in LIN-4448's scope (needs work in simple-dispatcher)","Keep both in LIN-4448's scope"],"recommended":"Agree both cuts: they wait for A12 and simple-dispatcher; LIN-4448 closes only the read-only limit, through the proxy's write guard"}
+J62
+)
+P=$(sub "$P")
+Q_CUTS=$(L add question --by scoping --at 2026-11-13T13:28:06.963Z "$P" | idof)
+# John answers (comment 643eef60, 15:33:39.997Z; resolvedAt 15:33:40.054Z).
+P=$(cat <<'J63'
+{"in":"@@PARENT@@","answer":"Agree both cuts: they wait for A12 and simple-dispatcher; LIN-4448 closes only the read-only limit, through the proxy's write guard","why":"— Ruling recorded via Harbour","scope":"@@PARENT@@","links":{"answers":"@@Q_CUTS@@"}}
+J63
+)
+P=$(sub "$P")
+D_CUTS=$(L add decision --by John --via Harbour --at 2026-11-13T15:33:39.997Z "$P" | idof)
+L end "$Q_CUTS" answered "John chose defer (comment 643eef60)." --by John --via Harbour --at 2026-11-13T15:33:40.054Z >/dev/null
+# Scoping's resumed run (custom dispatch 15:33:40, last request 15:34:35) sets "Decided by: a ruling" (snapshot 15:34:51).
+P=$(cat <<'J64'
+{"answer":"**Size:** rebuild the area\n**Why:** Rebuilds the area around one definition per stage kind, from which routes, write limits, labels and docs derive, and has the proxy refuse writes a stage may not make; otherwise copies return and read-only stays words.\n**Cuts:**\n\n* \"the safety tickets named above are closed in code\": the merge limit (LIN-3417) stays with simple-dispatcher.\n* \"the safety tickets named above are closed in code\": the token tickets (LIN-1372, LIN-1395, LIN-1408) stay with the harness.\n  **Decided by:** a ruling"}
+J64
+)
+P=$(sub "$P")
+L revise "$SIZE" --by scoping --at 2026-11-13T15:34:35.299Z --reason "John ruled the cuts (comment 643eef60): Decided by: a ruling." "$P" >/dev/null
+
+# Plan (comment 6bc02d3f "### Plan written", 15:39:54.189Z), by design. order = landing step: 0; then 1/2/4; then 3; then 5; then 6.
+P=$(cat <<'J65'
+{"in":"@@PARENT@@","says":"Piece 0: baseline area read, first and alone, before anything lands. The LIN-4453 kit (`docs/plans/survey/area-read.md`, same frozen reader prompt) run on `llm-and-prompts` and on the control area `front-end-pages`; this area has no baseline yet (LIN-4453 recorded Runs and the control only). Repeated after the last piece (piece 6), to measure \"reads better in a blind read ... by more than an untouched area\".","paths":[],"order":1}
+J65
+)
+P=$(sub "$P")
+P0=$(L add plan --by design --at 2026-11-13T15:39:54.189Z "$P" | idof)
+P=$(cat <<'J66'
+{"in":"@@PARENT@@","says":"Piece 1 (behaviour A): one route list. `codeRouteOf` takes its order from one ordered `CODE_ROUTES` list; `skipLiveWait` still skips the first entry only; comments become a pointer to `CODE_ROUTES`. *Witness:* the route tests pass unchanged; a new test fails on a route without a prompt-trace name and pins `docs/architecture/prompt-system.md`, `docs/architecture/source-map.md` and the `blind-read` bullet in `public/llms.txt` (wrong at HEAD, \"Sent by hand\"). *Retires:* the hand-ordered chain and the comment copies; the Waiting entry on the four routes.","paths":["lib/openrouter.js","lib/stage-router.js","lib/recommendation-live-wait.js","lib/recommendation-blind-read.js","lib/recommendation-look-first.js","lib/dispatch-entrance.js","lib/recent-runs.js","CLAUDE.md","docs/architecture/prompt-system.md","docs/architecture/source-map.md","public/llms.txt"],"order":2}
+J66
+)
+P=$(sub "$P")
+P1=$(L add plan --by design --at 2026-11-13T15:39:54.189Z "$P" | idof)
+P=$(cat <<'J67'
+{"in":"@@PARENT@@","says":"Piece 2 (behaviour B): the blind read's words have one home. Nothing outside `lib/prompts/blind-read-words.js` and the template registry types the kind `'blind-read'` in a predicate or the heading `## Blind read`. *Witness:* a source-scan test with a short allow-list of table keys; rendered prompts byte-identical (the piloted sentence is not re-worded). `COMPLETED` in `recommendation-blind-read.js` is left to LIN-4447's move 3. *Retires:* the leaf's untrue header claim; the second constant.","paths":["lib/prompts/blind-read-words.js","lib/recommendation-blind-read.js","lib/pipeline-churn.js","lib/run-view.js","lib/run-closeout-state.js","lib/workflow-config.js","lib/completion-signals.js"],"order":2}
+J67
+)
+P=$(sub "$P")
+P2=$(L add plan --by design --at 2026-11-13T15:39:54.189Z "$P" | idof)
+P=$(cat <<'J68'
+{"in":"@@PARENT@@","says":"Piece 3 (behaviour C): one record per stage kind in an import-free leaf; `PROMPT_TEMPLATES`, `STAGE_LEADS`'s traits, `COMPLETION_SIGNALS`, `GROUNDING_BY_KIND`, `STAGE_LABELS` and the `route`/`writes` pins become views of it, deleted in the same piece. `SPINE`, `BUCKET_OF_KIND`, `FIRST_PASS_KINDS`, `OFF_SPINE_KINDS` stay (Runs'); byte ceilings stay in the budget test. *Witness:* every kind rendered with real context at HEAD and on the branch, byte-identical; the tables tests shrink; run-page goldens unchanged. *Retires:* those tables, the ~fourteen-tables Waiting entry (rewritten to name what stays) and the `llms.txt` catalogue's hand-copied bullets.","paths":["lib/prompt-template-defs.js","lib/prompt-formatters.js","lib/completion-signals.js","lib/run-view.js","public/llms.txt","tests/unit/stage-kind-tables.test.js","tests/unit/lin-4253-stage-traits.test.js"],"order":3}
+J68
+)
+P=$(sub "$P")
+P3=$(L add plan --by design --at 2026-11-13T15:39:54.189Z "$P" | idof)
+P=$(cat <<'J69'
+{"in":"@@PARENT@@","says":"Piece 4 (behaviour D): a reading stage cannot write what it may not. The bootstrap token is stamped at mint with its stage's `writes` (and, for one-comment values, the named ticket); the exchange copies both to the working token; `requireWriteScope` (`routes/proxy.js`) enforces them. `none` refused on every write mount; `one-comment`/`blind-comment` one comment on the named ticket; `ticket-fields` labels, priority, state, project and comment; `work` and unstamped tokens as today; an unknown value fails closed. *Witnesses:* 403s per mount for each value; a test over the router's registered write routes; every mint path passes `writes`. Preamble prose unchanged: guard first, words after.","paths":["lib/stage-writes.js","routes/proxy.js","lib/proxy-tokens.js","lib/dispatch-entrance.js","routes/workspace-api-feedback.js","lib/follow-up-dispatch.js","lib/wake-credential.js","lib/chat-tools.js","routes/dispatch.js"],"order":2}
+J69
+)
+P=$(sub "$P")
+P4=$(L add plan --by design --at 2026-11-13T15:39:54.189Z "$P" | idof)
+P=$(cat <<'J70'
+{"in":"@@PARENT@@","says":"Piece 5 (behaviour E), only after piece 4 has landed: fewer rules as prompt lists. `ONE_COMMENT_MANDATE`, `NONE_MANDATE`, `BLIND_COMMENT_MANDATE` and `TICKET_FIELDS_MANDATE` shrink to what the stage is told about its token (merge sentences stay, ruled); in one batch with one re-pin, the docs-only notes-PR rule, the committed-tool rule and the first-match lookup each become one constant in `lib/prompts/leftover-words.js` (the piloted blind-read sentence stays). *Witness:* rendered bytes fall net; no retired phrase in a second template. LIN-4350 stays its own ticket.","paths":["lib/proxy-preamble.js","lib/prompts/leftover-words.js","lib/prompt-template-defs.js","lib/periodicals.js","scripts/prompt-template-change-log.md","scripts/eval/meta-prompt.baseline.txt","tests/unit/prompt-size-budget.test.js"],"order":4}
+J70
+)
+P=$(sub "$P")
+P5=$(L add plan --by design --at 2026-11-13T15:39:54.189Z "$P" | idof)
+P=$(cat <<'J71'
+{"in":"@@PARENT@@","says":"Piece 6 (behaviour F): the Waiting entries. Every piece edits the entries it settles (the LIN-4414 rule); piece 6 settles the rest by the plan's table of the 25 entries (settled by pieces, small here, moves to Runs, needs John, safety finds to a ticket, stays with a reason), rewrites the Lessons the new structure replaces, and runs the closing area read. *Witness:* `tests/unit/area-notes.test.js` passes and the entry count falls from 25.","paths":["docs/areas/llm-and-prompts.md","lib/prompts/area-note-format.js","lib/dispatch-leftover-answer.js","lib/recommendation-input.js","lib/call-budget.js","lib/openrouter.js","lib/model-routing-harnesses.js"],"order":5}
+J71
+)
+P=$(sub "$P")
+P6=$(L add plan --by design --at 2026-11-13T15:39:54.189Z "$P" | idof)
+# The plan names where the work is expected.
+P=$(cat <<'J72'
+{"paths":["CLAUDE.md","docs/architecture/prompt-system.md","docs/architecture/source-map.md","docs/areas/llm-and-prompts.md","docs/plans/survey/area-read.md","lib/call-budget.js","lib/chat-tools.js","lib/completion-signals.js","lib/dispatch-entrance.js","lib/dispatch-leftover-answer.js","lib/follow-up-dispatch.js","lib/model-routing-harnesses.js","lib/openrouter.js","lib/periodicals.js","lib/pipeline-churn.js","lib/prompt-formatters.js","lib/prompt-template-defs.js","lib/prompts/area-note-format.js","lib/prompts/blind-read-words.js","lib/prompts/leftover-words.js","lib/proxy-preamble.js","lib/proxy-tokens.js","lib/recent-runs.js","lib/recommendation-blind-read.js","lib/recommendation-input.js","lib/recommendation-live-wait.js","lib/recommendation-look-first.js","lib/run-closeout-state.js","lib/run-view.js","lib/stage-router.js","lib/stage-writes.js","lib/wake-credential.js","lib/workflow-config.js","public/llms.txt","routes/dispatch.js","routes/proxy.js","routes/workspace-api-feedback.js","scripts/eval/meta-prompt.baseline.txt","scripts/prompt-template-change-log.md","tests/unit/lin-4253-stage-traits.test.js","tests/unit/prompt-size-budget.test.js","tests/unit/stage-kind-tables.test.js"]}
+J72
+)
+P=$(sub "$P")
+L revise "$PARENT" --by design --at 2026-11-13T15:39:54.189Z --reason "The Implementation Plan names the files each piece changes." "$P" >/dev/null
+
+# Plan review (15:49:32.648Z, comment 72406236 "### Plan Review Verdict"): Approve, rev 1, no blocking note. One verdict per piece.
+P=$(cat <<'J73'
+{"in":"@@PARENT@@","links":{"on":"@@P0@@@1"},"of":"plan-review","outcome":"approve","reasoning":"Approve (comment 72406236, rev 1). The causes it names are the real causes, the proxy guard reaches every dispatched agent's writes, and each gap can be fixed without changing what the plan decides; checked at `c205190fd`; 25 Waiting entries, not the ask's 26. Piece 0: the measurement can move: the kit's hash sample for `llm-and-prompts` at HEAD includes `lib/openrouter.js`, `lib/prompt-template-defs.js` and `lib/recommendation-live-wait.js`. Note 12: the control is not quite untouched: open PR #2424 (LIN-4457) adds two `aria-label`s to `lib/render-proxy.js`, in the control's 14-file sample. Record it in both area reads, and check open PRs against the control's sample again before the repeat read. Take this area's baseline and a fresh control read at one base commit, recorded in each report. The kit's fixed table is pinned to `4b5001ddf` and LIN-4447's areas."}
+J73
+)
+P=$(sub "$P")
+V_P0=$(L add verdict --by plan-review --at 2026-11-13T15:49:32.648Z "$P" | idof)
+P=$(cat <<'J74'
+{"in":"@@PARENT@@","links":{"on":"@@P1@@@1"},"of":"plan-review","outcome":"approve","reasoning":"Approve (comment 72406236, rev 1). The causes it names are the real causes, the proxy guard reaches every dispatched agent's writes, and each gap can be fixed without changing what the plan decides; checked at `c205190fd`; 25 Waiting entries, not the ask's 26. Piece 1: the route list matches `codeRouteOf` (`lib/openrouter.js:2108`). Note 7: it edits comments in Runs files `lib/recent-runs.js` and `lib/dispatch-entrance.js`; post the list on LIN-4447. Note 11: shares files with pieces 2, 3 and 4; whichever lands second rebases."}
+J74
+)
+P=$(sub "$P")
+V_P1=$(L add verdict --by plan-review --at 2026-11-13T15:49:32.648Z "$P" | idof)
+P=$(cat <<'J75'
+{"in":"@@PARENT@@","links":{"on":"@@P2@@@1"},"of":"plan-review","outcome":"approve","reasoning":"Approve (comment 72406236, rev 1). The causes it names are the real causes, the proxy guard reaches every dispatched agent's writes, and each gap can be fixed without changing what the plan decides; checked at `c205190fd`; 25 Waiting entries, not the ask's 26. Piece 2: note 7: it edits Runs files `lib/completion-signals.js`, `lib/run-closeout-state.js` and `lib/pipeline-churn.js`. Note 8: its scan will hit table keys and comments outside the six known sites; give the allow-list a rule for comments."}
+J75
+)
+P=$(sub "$P")
+V_P2=$(L add verdict --by plan-review --at 2026-11-13T15:49:32.648Z "$P" | idof)
+P=$(cat <<'J76'
+{"in":"@@PARENT@@","links":{"on":"@@P3@@@1"},"of":"plan-review","outcome":"approve","reasoning":"Approve (comment 72406236, rev 1). The causes it names are the real causes, the proxy guard reaches every dispatched agent's writes, and each gap can be fixed without changing what the plan decides; checked at `c205190fd`; 25 Waiting entries, not the ask's 26. Piece 3: note 8: enumerate the tables from `stage-kind-tables.test.js` (also `STAGE_INTENT`, `JOBS`, `VIRTUAL_PROMPTS`, the prompt contract, the proxy-instructions override list); \"the four that stay\" will be more than four. Note 7: making `COMPLETION_SIGNALS` a view changes Runs' sample for LIN-4447's after-read. Note 2: fix the triage template's \"labels, priority, assignee\" here or widen `stage-writes.js`."}
+J76
+)
+P=$(sub "$P")
+V_P3=$(L add verdict --by plan-review --at 2026-11-13T15:49:32.648Z "$P" | idof)
+P=$(cat <<'J77'
+{"in":"@@PARENT@@","links":{"on":"@@P4@@@1"},"of":"plan-review","outcome":"approve","reasoning":"Approve (comment 72406236, rev 1). The causes it names are the real causes, the proxy guard reaches every dispatched agent's writes, and each gap can be fixed without changing what the plan decides; checked at `c205190fd`; 25 Waiting entries, not the ask's 26. Piece 4: notes 2 to 6 and 10: refuse `ticket-fields` by field inside `PATCH /api/proxy/issues/:issueId`; let a source scan over mint callers find every path (`routes/collective.js`, `routes/task-chat.js`, `routes/flight-companion.js`, `lib/proxy-preamble.js` missing from the list); the stamp needs explicit handling in four places; compare tickets after normalising; the route-classification test checks `requireWriteScope` is in each write chain; look-into's \"unless the person asks\" becomes untrue, a ruling for John (recommend retire)."}
+J77
+)
+P=$(sub "$P")
+V_P4=$(L add verdict --by plan-review --at 2026-11-13T15:49:32.648Z "$P" | idof)
+P=$(cat <<'J78'
+{"in":"@@PARENT@@","links":{"on":"@@P5@@@1"},"of":"plan-review","outcome":"approve","reasoning":"Approve (comment 72406236, rev 1). The causes it names are the real causes, the proxy guard reaches every dispatched agent's writes, and each gap can be fixed without changing what the plan decides; checked at `c205190fd`; 25 Waiting entries, not the ask's 26. Piece 5: note 1: keep the git-side limits in words (code, branch and PR prohibitions have no code backstop); shrink only the tracker clauses the token now refuses, and name the kept ones in the change log."}
+J78
+)
+P=$(sub "$P")
+V_P5=$(L add verdict --by plan-review --at 2026-11-13T15:49:32.648Z "$P" | idof)
+P=$(cat <<'J79'
+{"in":"@@PARENT@@","links":{"on":"@@P6@@@1"},"of":"plan-review","outcome":"approve","reasoning":"Approve (comment 72406236, rev 1). The causes it names are the real causes, the proxy guard reaches every dispatched agent's writes, and each gap can be fixed without changing what the plan decides; checked at `c205190fd`; 25 Waiting entries, not the ask's 26. Piece 6: the Waiting table maps all 25 entries; note 9: do not close LIN-1273; comment on LIN-1273 and LIN-1242 (#1, #9) where the merge and Done half now sits."}
+J79
+)
+P=$(sub "$P")
+V_P6=$(L add verdict --by plan-review --at 2026-11-13T15:49:32.648Z "$P" | idof)
+
+# Breakdown (dispatch 15:51:03; summary comment 4b22eb22 at 15:55:35.944Z). LIN-4464 is its first subtask, created 15:54:40.300Z;
+# LIN-4465..4470 were created after it (LIN-4469 at 15:54:41.773Z), so no sibling is seeded.
+P=$(cat <<'J80'
+{"in":"@@PARENT@@","links":{"piece":"@@P0@@"},"ref":"LIN-4464","done-when":"LIN-4464 (piece 0, baseline area read): two reports are committed, `llm-and-prompts` and the control `front-end-pages`, both read at one recorded base commit at or after `5dcf5bcda` (so PR #2424's (LIN-4457) two `aria-label`s in `lib/render-proxy.js`, in the control's 14-file sample, sit inside the baseline), made with the LIN-4453 kit (`docs/plans/survey/area-read.md`) and its frozen reader prompt, unchanged, PR #2422 as the model; the kit's fixed table (pinned to `4b5001ddf` and LIN-4447's areas) is not reused. The contamination notes and the open PRs that touch either sample (at breakdown #2427, LIN-4455, and #2426, LIN-4456) are recorded in both reports, with the area's hash sample at the base, which should include `lib/openrouter.js`, `lib/prompt-template-defs.js` and `lib/recommendation-live-wait.js` (pieces 1, 3 and 5 change them). Nothing from pieces 1-6 has landed before it merges. Testing: the kit's own checks; docs-only PR. Retires no Waiting entry; fills the missing-baseline gap the plan names. Binding: follow the parent's approved plan, and where the code shows it wrong change course and say so on LIN-4448; the PR names what it retires, edits the Waiting entries in `docs/areas/llm-and-prompts.md` it settles, respects that note's Lessons and leaves `docs/reviews/` unchanged.","paths":["docs/plans/survey/area-read.md","docs/plans/survey/area-read-reports/","docs/areas/llm-and-prompts.md","lib/openrouter.js","lib/prompt-template-defs.js","lib/recommendation-live-wait.js","lib/render-proxy.js"]}
+J80
+)
+P=$(sub "$P")
+T4464=$(L add task --by breakdown --at 2026-11-13T15:54:40.300Z "$P" | idof)
+# Breakdown decisions about LIN-4464 (its description and the summary comment), in LIN-4464, resting on the approve verdict on piece 0.
+P=$(cat <<'J81'
+{"in":"@@T4464@@","links":{"on":"@@V_P0@@@1"},"answer":"Grounding commits: the plan was written at `JKershaw/LinearViewer` main `2bf788b6d` (surveys at `4b5001ddf`) and reviewed at `c205190fd`; the breakdown re-checked at `5dcf5bcda`. The plan stands; no re-plan.","why":"Staleness check at breakdown: since `2bf788b6d` and `c205190fd` only LIN-4457 (#2424) and LIN-4454 landed, and the one plan file they touch is the cost-read entry in `docs/architecture/source-map.md`; `codeRouteOf` is still at `lib/openrouter.js:2108`, `requireWriteScope` at `routes/proxy.js:609`, and there are 25 Waiting entries."}
+J81
+)
+P=$(sub "$P")
+D1=$(L add decision --by breakdown --at 2026-11-13T15:55:35.944Z "$P" | idof)
+P=$(cat <<'J82'
+{"in":"@@T4464@@","links":{"on":"@@V_P0@@@1"},"answer":"Session fit: fits one session. Plan-review due: no — covered by LIN-4448's approving plan-review (comment 72406236-9316-4004-98ee-70d8fba0cb09, rev 1).","why":"One session: a docs-only measurement, like LIN-4453's piece 0 (breakdown table)."}
+J82
+)
+P=$(sub "$P")
+D2=$(L add decision --by breakdown --at 2026-11-13T15:55:35.944Z "$P" | idof)
+P=$(cat <<'J83'
+{"in":"@@T4464@@","links":{"on":"@@V_P0@@@1"},"answer":"LIN-4464 is order 1, blocked by nothing; it blocks LIN-4465 (piece 1), LIN-4466 (piece 2) and LIN-4468 (piece 4).","why":"The baseline goes first and alone, so that nothing changes the area before it is read."}
+J83
+)
+P=$(sub "$P")
+D3=$(L add decision --by breakdown --at 2026-11-13T15:55:35.944Z "$P" | idof)
+# Breakdown's engineering call on the assignee policy (summary comment), in the parent; it binds pieces 3 and 4, not LIN-4464.
+P=$(cat <<'J84'
+{"in":"@@PARENT@@","links":{"about":["@@P3@@","@@P4@@"]},"answer":"Assignee policy: follow `lib/stage-writes.js`, which leaves assignee out of `ticket-fields`. LIN-4467 corrects the triage template's \"labels, priority, assignee\", and LIN-4468 refuses `assigneeId` under `ticket-fields`.","why":"A stamp may only narrow a token, and nothing asked to widen triage's writes (plan-review note 2)."}
+J84
+)
+P=$(sub "$P")
+D_ASSIGNEE=$(L add decision --by breakdown --at 2026-11-13T15:55:35.944Z "$P" | idof)
+# The ruling lin4448-lookinto-none, from the breakdown summary's DECISION line (raisedAt 15:55:54.652Z). Open at the moment.
+P=$(cat <<'J85'
+{"in":"@@PARENT@@","to":"John","asks":"Once the proxy refuses look-into's writes (LIN-4468), look-into can no longer post to Linear when a person asks. Should that exception be retired?","options":["Retire it: look-into reports in its session and a person posts the comment if they want it","Keep it: look-into is allowed one comment on its ticket instead of no writes"],"recommended":"Retire it: look-into reports in its session and a person posts the comment if they want it","if-unanswered":"LIN-4468 can be built but not merged"}
+J85
+)
+P=$(sub "$P")
+Q_LOOKINTO=$(L add question --by breakdown --at 2026-11-13T15:55:54.652Z "$P" | idof)
+
+echo "seeded: parent=$PARENT lin4464=$T4464 piece0=$P0 verdict_p0=$V_P0 area_llm=$AREA_LLM area_fe=$AREA_FE q_lookinto=$Q_LOOKINTO q_cuts=$Q_CUTS d_cuts=$D_CUTS size=$SIZE"
+# Count the records straight from the file (a query would log a read).
+node -e 'const s=require(process.argv[1]);console.log("records:",Object.keys(s.records).length,"versions:",Object.values(s.records).flat().length,"log:",s.log.length)' "$STORE"

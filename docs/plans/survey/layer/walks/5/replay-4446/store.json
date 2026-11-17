@@ -1,5 +1,5 @@
 {
- "next": 18,
+ "next": 26,
  "records": {
   "area-1": [
    {
@@ -360,6 +360,212 @@
     "at": "2026-11-13T13:12:16.000Z",
     "by": "survey-task"
    }
+  ],
+  "run-18": [
+   {
+    "id": "run-18",
+    "kind": "run",
+    "state": "open",
+    "fields": {
+     "stage": "survey-place",
+     "claims": [
+      "public/"
+     ]
+    },
+    "links": {},
+    "in": "task-9",
+    "v": 1,
+    "op": "add",
+    "at": "2026-11-13T13:15:10.000Z",
+    "by": "survey-place"
+   },
+   {
+    "id": "run-18",
+    "kind": "run",
+    "state": "open",
+    "fields": {
+     "stage": "survey-place",
+     "claims": [
+      "public/"
+     ],
+     "account": "Surveyed the place (area-1, public/) for LIN-4446 at 4b5001ddf and commented on the ticket. The place has stopped getting worse but is not getting better: 35k lines of classic scripts sharing through window globals, with common.js and swim.js as self-declared twins of lib modules. The real weight is the 126 vm-based test suites, which enforce no-imports as much as the browser does; a module-capable test loader must come before any view becomes a module, then common.js globals, then observation.js size (area findings). For the cost-format first slice: serve through the lib/vendor-assets.js allow-list, write the rule with its limits (leaf modules only, allow-list, vm loaders unchanged), list everything that names cost-format.js, and pin the shim ordering with a test. My observation.js comment count disagrees with finding-14; sent to review."
+    },
+    "links": {},
+    "in": "task-9",
+    "v": 2,
+    "op": "revise",
+    "at": "2026-11-13T13:15:18.000Z",
+    "by": "survey-place",
+    "reason": "account written"
+   },
+   {
+    "id": "run-18",
+    "kind": "run",
+    "state": "done",
+    "fields": {
+     "stage": "survey-place",
+     "claims": [
+      "public/"
+     ],
+     "account": "Surveyed the place (area-1, public/) for LIN-4446 at 4b5001ddf and commented on the ticket. The place has stopped getting worse but is not getting better: 35k lines of classic scripts sharing through window globals, with common.js and swim.js as self-declared twins of lib modules. The real weight is the 126 vm-based test suites, which enforce no-imports as much as the browser does; a module-capable test loader must come before any view becomes a module, then common.js globals, then observation.js size (area findings). For the cost-format first slice: serve through the lib/vendor-assets.js allow-list, write the rule with its limits (leaf modules only, allow-list, vm loaders unchanged), list everything that names cost-format.js, and pin the shim ordering with a test. My observation.js comment count disagrees with finding-14; sent to review."
+    },
+    "links": {},
+    "in": "task-9",
+    "v": 3,
+    "op": "end",
+    "at": "2026-11-13T13:15:19.000Z",
+    "by": "survey-place",
+    "ended": {
+     "reason": "survey written"
+    }
+   }
+  ],
+  "finding-19": [
+   {
+    "id": "finding-19",
+    "kind": "finding",
+    "state": "open",
+    "fields": {
+     "says": "State of the place (survey @ 4b5001ddf): `public/` is 79 files, 35,264 lines of JS, all classic scripts sharing through `window.*` globals in the order each `lib/render-*.js` lists in `scripts: [...]`. `common.js` (3,309 lines, 56 `window.` assignments) already calls itself the \"client twin\" of `lib/task-page-href.js`, `lib/timeline-zoom.js`, `lib/ship-layout.js` and `lib/prompt-formatters.js`; `swim.js` copies `lib/swim-lanes.js`. Growth 15.4k lines (1 Jul) → 29.1k (1 Oct) → 35.1k (9 Nov): about 1,200 a week in October, about 300 a week since 1 Nov; `observation.js` has held near 5,000 since mid-October. Stopped getting worse, not yet getting better. After cost-format, the next leaf twins of the same shape are `task-page-href` and `timeline-zoom` (zero imports)."
+    },
+    "links": {},
+    "in": "area-1",
+    "to": "area-1",
+    "v": 1,
+    "op": "add",
+    "at": "2026-11-13T13:15:11.000Z",
+    "by": "survey-place"
+   }
+  ],
+  "finding-20": [
+   {
+    "id": "finding-20",
+    "kind": "finding",
+    "state": "open",
+    "fields": {
+     "says": "The comment count in finding-14 does not match mine: I count 1,006 comment lines out of 4,679 non-blank in `public/observation.js` (mostly logic), against finding-14's ~1,985 of 5,019. Before judging \"lighter\" on logic and commentary counted separately, settle one counting method (blank lines, block vs line comments, JSDoc) and state it in the verdict. (Survey place @ 4b5001ddf.)"
+    },
+    "links": {
+     "about": [
+      "finding-14"
+     ]
+    },
+    "in": "task-9",
+    "to": "review",
+    "v": 1,
+    "op": "add",
+    "at": "2026-11-13T13:15:12.000Z",
+    "by": "survey-place"
+   }
+  ],
+  "finding-21": [
+   {
+    "id": "finding-21",
+    "kind": "finding",
+    "state": "open",
+    "fields": {
+     "says": "The weight sits in the tests: 126 unit suites by my count run `public/` scripts through `vm` (`tests/unit/helpers/client-world.js`, `loadWorld`), so the harness enforces \"no imports\" as much as the browser does, and converting a view to a module drags its whole suite family with it (the big move John warns of). Order for the work beyond LIN-4446's first slice: (1) a module-capable client-test loader (`vm.SourceTextModule` or equivalent), its own slice, before any view becomes a module; (2) then breaking up `common.js`'s globals; (3) then finding out why `observation.js` is as large as it is. The keepalive `statusCode` readers (finding-6) and `buildDispatchModelOptionDescriptors` (finding-5) belong to that work. (Survey place @ 4b5001ddf.)"
+    },
+    "links": {
+     "about": [
+      "finding-12",
+      "finding-13",
+      "finding-5",
+      "finding-6"
+     ]
+    },
+    "in": "area-1",
+    "to": "area-1",
+    "v": 1,
+    "op": "add",
+    "at": "2026-11-13T13:15:13.000Z",
+    "by": "survey-place"
+   }
+  ],
+  "finding-22": [
+   {
+    "id": "finding-22",
+    "kind": "finding",
+    "state": "open",
+    "fields": {
+     "says": "Where shared modules are served: not a second `express.static('lib')`, which would expose all server source. `lib/vendor-assets.js` is already a frozen URL→file allow-list that runs `statSync` at boot, so a missing file fails the boot. Extend it for shared modules and there stays one way to serve files from outside `public/`. CSP already admits same-origin modules. (Survey place @ 4b5001ddf.)"
+    },
+    "links": {
+     "about": [
+      "finding-11"
+     ]
+    },
+    "in": "task-9",
+    "to": "scoping",
+    "v": 1,
+    "op": "add",
+    "at": "2026-11-13T13:15:14.000Z",
+    "by": "survey-place"
+   }
+  ],
+  "finding-23": [
+   {
+    "id": "finding-23",
+    "kind": "finding",
+    "state": "open",
+    "fields": {
+     "says": "The rule's reading goes into `CLAUDE.md` with its limits, or it reads as a licence for the big move: (a) leaf modules only: serving single files works only for modules with no imports (`lib/cost-format.js`, `task-page-href.js`, `timeline-zoom.js` have none; `ship-layout`/`swim-lanes` import `providers/state-map.js`, `prompt-formatters` imports six); (b) served by allow-list, not by directory; (c) the `vm` loaders stay as they are until a view is converted. (Survey place @ 4b5001ddf.)"
+    },
+    "links": {
+     "about": [
+      "finding-16",
+      "finding-11"
+     ]
+    },
+    "in": "task-9",
+    "to": "scoping",
+    "v": 1,
+    "op": "add",
+    "at": "2026-11-13T13:15:15.000Z",
+    "by": "survey-place"
+   }
+  ],
+  "finding-24": [
+   {
+    "id": "finding-24",
+    "kind": "finding",
+    "state": "open",
+    "fields": {
+     "says": "What has to learn about the cost-format move: `tests/unit/cost-read-census.test.js` `FORMAT_ALLOW` names `public/cost-format.js` and goes stale silently (nothing fails on an extra entry), so remove it by hand; the two renderers that list `/cost-format.js` (`lib/render-flight-companion.js:400`, `lib/render-observation.js:366`); the `vm` suites that load it (`flight-companion-client`, `lin-3833-run-control`, `observation-scan-due`, `cost-read`); and the doc comment in `lib/cost-format.js` that names its \"browser twin\". (Survey place @ 4b5001ddf.)"
+    },
+    "links": {
+     "about": [
+      "finding-16"
+     ]
+    },
+    "in": "task-9",
+    "to": "implementation",
+    "v": 1,
+    "op": "add",
+    "at": "2026-11-13T13:15:16.000Z",
+    "by": "survey-place"
+   }
+  ],
+  "finding-25": [
+   {
+    "id": "finding-25",
+    "kind": "finding",
+    "state": "open",
+    "fields": {
+     "says": "A module shim that sets `window.CostFormat` runs deferred, after the classic scripts. That is safe only while every consumer reads the global inside a handler or render function, never at load. Pin that with a test, or a future eager read breaks with no warning. (Survey place @ 4b5001ddf.)"
+    },
+    "links": {
+     "about": [
+      "finding-16"
+     ]
+    },
+    "in": "task-9",
+    "to": "implementation",
+    "v": 1,
+    "op": "add",
+    "at": "2026-11-13T13:15:17.000Z",
+    "by": "survey-place"
+   }
   ]
  },
  "log": [
@@ -554,6 +760,58 @@
    "args": [
     "get",
     "area-1",
+    "--by",
+    "survey-place"
+   ],
+   "asOf": null
+  },
+  {
+   "at": "2026-11-17T15:22:37.306Z",
+   "by": "survey-place",
+   "cmd": "find",
+   "args": [
+    "find",
+    "--text",
+    "vendor-assets",
+    "--by",
+    "survey-place"
+   ],
+   "asOf": null
+  },
+  {
+   "at": "2026-11-17T15:22:37.340Z",
+   "by": "survey-place",
+   "cmd": "find",
+   "args": [
+    "find",
+    "--text",
+    "task-page-href",
+    "--by",
+    "survey-place"
+   ],
+   "asOf": null
+  },
+  {
+   "at": "2026-11-17T15:22:37.372Z",
+   "by": "survey-place",
+   "cmd": "find",
+   "args": [
+    "find",
+    "--text",
+    "SourceTextModule",
+    "--by",
+    "survey-place"
+   ],
+   "asOf": null
+  },
+  {
+   "at": "2026-11-17T15:23:03.249Z",
+   "by": "survey-place",
+   "cmd": "show",
+   "args": [
+    "show",
+    "--task",
+    "task-9",
     "--by",
     "survey-place"
    ],

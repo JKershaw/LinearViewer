@@ -1,5 +1,5 @@
 {
- "next": 90,
+ "next": 92,
  "records": {
   "area-1": [
    {
@@ -2275,6 +2275,30 @@
     "op": "add",
     "at": "2026-11-13T13:55:54.000Z",
     "by": "implementation"
+   },
+   {
+    "id": "change-84",
+    "kind": "change",
+    "state": "open",
+    "fields": {
+     "ref": "https://github.com/JKershaw/LinearViewer/pull/2421",
+     "head": "f9fa4a80ca19503bebbf5abd81dc83d3e86296b6"
+    },
+    "links": {
+     "on": [
+      "plan-54@2",
+      "decision-81@1"
+     ],
+     "about": [
+      "task-60"
+     ]
+    },
+    "in": "task-60",
+    "v": 2,
+    "op": "revise",
+    "at": "2026-11-13T14:14:11.000Z",
+    "by": "leftover",
+    "reason": "leftovers commit pushed; CI green on this head (one 'Unit tests (proxy, clock +400d)' rerun after the hosted runner lost contact; no test failed)"
    }
   ],
   "decision-85": [
@@ -2393,6 +2417,57 @@
     "op": "add",
     "at": "2026-11-13T13:56:06.000Z",
     "by": "implementation"
+   }
+  ],
+  "run-90": [
+   {
+    "id": "run-90",
+    "kind": "run",
+    "state": "open",
+    "fields": {
+     "stage": "leftover",
+     "claims": [
+      "lib/providers/jira/adf.js",
+      "lib/providers/jira/index.js",
+      "lib/providers/jira/fake-client.js",
+      "lib/as-asked.js",
+      "lib/should-mock-ai.js",
+      "routes/proxy-compute.js",
+      "routes/task-chat.js",
+      "routes/workspace-api-steps.js",
+      "server.js",
+      "docs/areas/providers.md",
+      "docs/areas/llm-and-prompts.md"
+     ],
+     "account": "pending"
+    },
+    "links": {},
+    "in": "task-60",
+    "v": 1,
+    "op": "add",
+    "at": "2026-11-13T14:14:10.000Z",
+    "by": "leftover"
+   }
+  ],
+  "finding-91": [
+   {
+    "id": "finding-91",
+    "kind": "finding",
+    "state": "open",
+    "fields": {
+     "says": "`lib/providers/jira/index.js`: the bulk reads (`fetchProjects`, and `fetchIssueContext`'s children through `searchAllIssues`) do not ask for `harbour.asAsked`. A sealed block therefore shows its converted rendering on the dashboard and in a parent's children, while single-issue reads serve the exact words. `POST /rest/api/3/search/jql` accepts `properties`, so asking for it there would make the bulk path exact too. No guard or cache compares the two reads today. (LIN-4450 leftovers; Waiting entry in docs/areas/providers.md.)"
+    },
+    "links": {
+     "about": [
+      "change-84"
+     ]
+    },
+    "in": "area-1",
+    "to": "area-1",
+    "v": 1,
+    "op": "add",
+    "at": "2026-11-13T14:14:12.000Z",
+    "by": "leftover"
    }
   ]
  },
@@ -3202,6 +3277,176 @@
     "decision-65",
     "--by",
     "implementation"
+   ],
+   "asOf": null
+  },
+  {
+   "at": "2026-11-17T15:22:46.815Z",
+   "by": "leftover",
+   "cmd": "show",
+   "args": [
+    "show",
+    "--task",
+    "task-60",
+    "--by",
+    "leftover"
+   ],
+   "asOf": null
+  },
+  {
+   "at": "2026-11-17T15:22:46.864Z",
+   "by": "leftover",
+   "cmd": "find",
+   "args": [
+    "find",
+    "--to",
+    "area-1",
+    "--by",
+    "leftover"
+   ],
+   "asOf": null
+  },
+  {
+   "at": "2026-11-17T15:22:46.906Z",
+   "by": "leftover",
+   "cmd": "find",
+   "args": [
+    "find",
+    "--area",
+    "area-2",
+    "--state",
+    "open",
+    "--by",
+    "leftover"
+   ],
+   "asOf": null
+  },
+  {
+   "at": "2026-11-17T15:22:50.687Z",
+   "by": "leftover",
+   "cmd": "show",
+   "args": [
+    "show",
+    "--task",
+    "task-60",
+    "--by",
+    "leftover"
+   ],
+   "asOf": null
+  },
+  {
+   "at": "2026-11-17T15:23:03.216Z",
+   "by": "leftover",
+   "cmd": "find",
+   "args": [
+    "find",
+    "--text",
+    "should-mock-ai",
+    "--by",
+    "leftover"
+   ],
+   "asOf": null
+  },
+  {
+   "at": "2026-11-17T15:23:03.252Z",
+   "by": "leftover",
+   "cmd": "find",
+   "args": [
+    "find",
+    "--text",
+    "isHermeticTestToken",
+    "--by",
+    "leftover"
+   ],
+   "asOf": null
+  },
+  {
+   "at": "2026-11-17T15:23:03.286Z",
+   "by": "leftover",
+   "cmd": "find",
+   "args": [
+    "find",
+    "--in",
+    "area-1",
+    "--by",
+    "leftover"
+   ],
+   "asOf": null
+  },
+  {
+   "at": "2026-11-17T15:23:03.319Z",
+   "by": "leftover",
+   "cmd": "find",
+   "args": [
+    "find",
+    "--in",
+    "area-2",
+    "--kind",
+    "lesson",
+    "--count",
+    "--by",
+    "leftover"
+   ],
+   "asOf": null
+  },
+  {
+   "at": "2026-11-17T15:23:03.352Z",
+   "by": "leftover",
+   "cmd": "get",
+   "args": [
+    "get",
+    "area-1",
+    "--by",
+    "leftover"
+   ],
+   "asOf": null
+  },
+  {
+   "at": "2026-11-17T15:23:03.397Z",
+   "by": "leftover",
+   "cmd": "find",
+   "args": [
+    "find",
+    "--text",
+    "harbour.asAsked",
+    "--by",
+    "leftover"
+   ],
+   "asOf": null
+  },
+  {
+   "at": "2026-11-17T15:23:09.855Z",
+   "by": "leftover",
+   "cmd": "get",
+   "args": [
+    "get",
+    "change-84",
+    "--by",
+    "leftover"
+   ],
+   "asOf": null
+  },
+  {
+   "at": "2026-11-17T15:23:09.890Z",
+   "by": "leftover",
+   "cmd": "get",
+   "args": [
+    "get",
+    "finding-70",
+    "--by",
+    "leftover"
+   ],
+   "asOf": null
+  },
+  {
+   "at": "2026-11-17T15:23:09.920Z",
+   "by": "leftover",
+   "cmd": "get",
+   "args": [
+    "get",
+    "finding-22",
+    "--by",
+    "leftover"
    ],
    "asOf": null
   }
