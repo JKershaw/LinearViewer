@@ -1,0 +1,117 @@
+[
+ {
+  "at": "2026-11-17T15:40:50.213Z",
+  "by": "close-out",
+  "cmd": "show",
+  "args": [
+   "show",
+   "--task",
+   "task-9",
+   "--by",
+   "close-out"
+  ],
+  "asOf": null
+ },
+ {
+  "at": "2026-11-17T15:40:55.466Z",
+  "by": "close-out",
+  "cmd": "get",
+  "args": [
+   "get",
+   "change-53",
+   "--by",
+   "close-out"
+  ],
+  "asOf": null
+ },
+ {
+  "at": "2026-11-17T15:40:55.513Z",
+  "by": "close-out",
+  "cmd": "find",
+  "args": [
+   "find",
+   "--in",
+   "area-1",
+   "--by",
+   "close-out"
+  ],
+  "asOf": null
+ },
+ {
+  "at": "2026-11-17T15:40:55.550Z",
+  "by": "close-out",
+  "cmd": "get",
+  "args": [
+   "get",
+   "run-62",
+   "--by",
+   "close-out"
+  ],
+  "asOf": null
+ },
+ {
+  "at": "2026-11-17T15:40:55.587Z",
+  "by": "close-out",
+  "cmd": "get",
+  "args": [
+   "get",
+   "run-59",
+   "--by",
+   "close-out"
+  ],
+  "asOf": null
+ },
+ {
+  "at": "2026-11-17T15:41:32.426Z",
+  "by": "close-out",
+  "cmd": "get",
+  "args": [
+   "get",
+   "check-17",
+   "--by",
+   "close-out"
+  ],
+  "asOf": null
+ },
+ {
+  "at": "2026-11-17T15:41:32.464Z",
+  "by": "close-out",
+  "cmd": "find",
+  "args": [
+   "find",
+   "--kind",
+   "run",
+   "--state",
+   "open",
+   "--by",
+   "close-out",
+   "--count"
+  ],
+  "asOf": null
+ },
+ {
+  "at": "2026-11-17T15:42:01.583Z",
+  "by": "close-out",
+  "cmd": "get",
+  "args": [
+   "get",
+   "check-69",
+   "--by",
+   "close-out"
+  ],
+  "asOf": null
+ },
+ {
+  "at": "2026-11-17T15:42:12.183Z",
+  "by": "close-out",
+  "cmd": "show",
+  "args": [
+   "show",
+   "--task",
+   "task-9",
+   "--by",
+   "close-out"
+  ],
+  "asOf": null
+ }
+]

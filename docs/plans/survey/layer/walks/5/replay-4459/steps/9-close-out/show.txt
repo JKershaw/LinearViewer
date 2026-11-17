@@ -1,0 +1,54 @@
+task-113 task v2 [done] by close-out
+decision-114 decision v2 [superseded] by undefined
+decision-115 decision v1 [stands] by undefined
+decision-116 decision v1 [stands] by undefined
+decision-117 decision v1 [stands] by undefined
+decision-118 decision v2 [superseded] by undefined
+run-123 run v2 [done] by undefined
+decision-124 decision v1 [stands] by undefined
+decision-125 decision v1 [stands] by undefined
+finding-126 finding v2 [done] to implementation by undefined
+finding-127 finding v2 [done] to implementation by undefined
+question-128 question v3 [answered] to implementation answered-by decision-144 by undefined
+finding-129 finding v2 [done] to implementation by undefined
+finding-130 finding v3 [done] to implementation by undefined
+finding-131 finding v2 [done] to implementation by undefined
+finding-132 finding v3 [done] to implementation by undefined
+finding-133 finding v2 [done] to implementation by undefined
+run-134 run v3 [done] by undefined
+decision-135 decision v1 [stands] by undefined
+finding-136 finding v2 [done] to implementation by undefined
+finding-137 finding v2 [done] to implementation by undefined
+finding-138 finding v2 [done] to implementation by undefined
+run-140 run v2 [done] by undefined
+decision-141 decision v1 [stands] by undefined
+run-142 run v3 [done] by undefined
+change-143 change v4 [merged] by undefined
+decision-144 decision v1 [stands] by undefined
+decision-145 decision v1 [stands] by undefined
+finding-147 finding v2 [done] to review by undefined
+question-148 question v2 [answered] to task-83 answered-by decision-171 by undefined
+run-149 run v2 [done] by undefined
+finding-150 finding v3 [done] to review by undefined
+question-151 question v3 [answered] to review answered-by decision-160 by undefined
+finding-152 finding v2 [done] to review by undefined
+finding-153 finding v2 [handed-on] to implementation by undefined
+run-154 run v2 [done] by undefined
+run-155 run v3 [done] by undefined
+check-156 check v2 [done] to close-out by undefined
+check-157 check v2 [done] to close-out by undefined
+check-158 check v2 [handed-on] to close-out by undefined
+check-159 check v2 [handed-on] to close-out by undefined
+decision-160 decision v1 [stands] STALE(on change-143@2, now @4) by undefined
+finding-161 finding v2 [done] to close-out by undefined
+verdict-162 verdict v1 [stands] STALE(on change-143@2, now @4; on decision-160@1, which is stale) by undefined
+run-163 run v2 [done] by undefined
+finding-164 finding v2 [done] to close-out by undefined
+finding-165 finding v2 [done] to close-out by undefined
+verdict-168 verdict v1 [stands] STALE(on change-143@2, now @4) by undefined
+run-169 run v2 [done] by undefined
+finding-170 finding v1 [open] to task-83 by undefined
+decision-171 decision v1 [stands] by undefined
+change-172 change v2 [merged] by undefined
+check-173 check v1 [open] to John by undefined
+check-174 check v1 [open] to John by undefined

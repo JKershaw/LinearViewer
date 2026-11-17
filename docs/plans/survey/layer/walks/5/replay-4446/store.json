@@ -1,5 +1,5 @@
 {
- "next": 69,
+ "next": 71,
  "records": {
   "area-1": [
    {
@@ -204,6 +204,31 @@
     "op": "link",
     "at": "2026-11-13T13:23:12.000Z",
     "by": "design"
+   },
+   {
+    "id": "task-9",
+    "kind": "task",
+    "state": "done",
+    "fields": {
+     "ref": "LIN-4446",
+     "asked": "**Repository:** JKershaw/LinearViewer (Harbour).\n\n**What this is for.** John: \"Side rail and other UI improvements are important purely because the current ones are just mostly the original ones and are due a bit of a sprinkling. But! The front end code is messy.\" And his gut: \"the UI issues trace back to one of my very first rules: no build step… it's the biggest target of the Theseus method… We don't need to tidy it all, but it's a perfect example where we can leave it better than we found it. Likely this will take a fair amount of hand holding.\"\n\nOn main (9 Nov), no browser file can import another, nine browser files restate logic the server already has, and the largest browser file is 5,019 lines.\n\nOn the views, John: \"Lots of light little views is ideal, but the cost of them has to be balanced… I'd be sad to get rid, but happy to tidy.\"\n\n**What we want.**\n\n* Browser code that shares rather than restates. There's still no build step and no framework: the rule stays, read as allowing the browser to import, as browsers do natively, and that reading goes into the project's own notes.\n* Taken in small slices, one view or one shared piece at a time. Each view is reworked only after finding out why it got so large, and comes out lighter.\n* Anything bigger that a slice spots is left out of it and goes into the area's note.\n* The side rail and the visual refresh come after, built on the cleaner code.\n* No view is retired unless John rules it.\n\nJohn expects agents to reach for big moves here: \"very likely to get agents trying really hard to do big things when we want small.\" So the size is John's call, and for this work it's small.\n\n**Done when** the reading of the rule is in the project's notes; the first slice has landed, sharing rather than restating, lighter than before and naming what it retired; and John has read the first slice's result before the next starts.\n\n**Every change names what it retires. Questions:** settle engineering questions yourself; only John's calls (product, money, authority, what to retire) go to him as rulings.",
+     "done-when": "the reading of the rule is in the project's notes; the first slice has landed, sharing rather than restating, lighter than before and naming what it retired; and John has read the first slice's result before the next starts.",
+     "paths": [
+      "public/",
+      "CLAUDE.md",
+      "docs/areas/front-end-browser.md"
+     ]
+    },
+    "links": {
+     "piece": "plan-28"
+    },
+    "v": 3,
+    "op": "end",
+    "at": "2026-11-13T15:15:13.000Z",
+    "by": "close-out",
+    "ended": {
+     "reason": "slice 1 merged (change-53, 92676b1fe) and deployed; rule reading in CLAUDE.md and docs/areas/front-end-browser.md; retirements named in PR #2423. John's read (check-17) is not recorded: close-out rules say a human-only post-deploy check does not hold the close, so it stays open to John and no next slice starts until he records it"
+    }
    }
   ],
   "run-10": [
@@ -602,6 +627,29 @@
     "at": "2026-11-13T15:07:33.000Z",
     "by": "review",
     "reason": "review's ledger: when and how John's read is settled, and that it does not gate the merge"
+   },
+   {
+    "id": "check-17",
+    "kind": "check",
+    "state": "open",
+    "fields": {
+     "what": "Read the first slice's result (the rule's reading in the notes, and the cost-format slice with what it retired) before the next slice starts.",
+     "why-person": "The done-when requires John's read, and the size of this work and what may be retired are his calls.",
+     "how": "Read the close-out comment on LIN-4446 (15:31) and PR #2423 body, then record your read as a comment on LIN-4446. No next slice is dispatched until that comment exists. Not run and not recorded at close-out: a human-only read after deploy does not hold the close, so the ticket closed with this left open."
+    },
+    "links": {
+     "about": [
+      "change-53",
+      "verdict-60"
+     ]
+    },
+    "in": "task-9",
+    "to": "John",
+    "v": 4,
+    "op": "revise",
+    "at": "2026-11-13T15:15:05.000Z",
+    "by": "close-out",
+    "reason": "merged and deployed (change-53 merged); close-out could not run the read and hands it to John directly"
    }
   ],
   "run-18": [
@@ -2856,6 +2904,64 @@
     "at": "2026-11-13T14:56:28.000Z",
     "by": "leftover",
     "reason": "purity rule spelled one way, as the guard enforces it, in the note and code; re-checked at the new head"
+   },
+   {
+    "id": "lesson-54",
+    "kind": "lesson",
+    "state": "holds",
+    "fields": {
+     "says": "No build step, no framework, still; the browser may import as browsers do natively. Limits: shared modules are leaves (imports nothing, names no browser or Node global, as the purity guard enforces); served one file at a time through the lib/vendor-assets.js allow-list, never a directory; classic views and the vm test loaders stay until a module-capable client test loader exists; a deferred module shim sets its global after classic scripts run, so no script may read a shared global during script execution, including through a callback a library runs synchronously (Chart.js ticks). The copies came from reading the rule as no sharing. (In docs/areas/front-end-browser.md Lessons, PR #2423.)",
+     "paths": [
+      "CLAUDE.md",
+      "docs/areas/front-end-browser.md",
+      "lib/vendor-assets.js",
+      "lib/cost-format.js"
+     ],
+     "checked-at": "92676b1fe (PR #2423 merged to main, deployed)"
+    },
+    "links": {
+     "on": [
+      "change-53@2",
+      "finding-11@3",
+      "finding-23@3",
+      "finding-34@2"
+     ]
+    },
+    "in": "area-1",
+    "v": 3,
+    "op": "revise",
+    "at": "2026-11-13T15:15:09.000Z",
+    "by": "close-out",
+    "reason": "PR #2423 merged and deployed; the Lessons text in docs/areas/front-end-browser.md went in unchanged"
+   },
+   {
+    "id": "lesson-54",
+    "kind": "lesson",
+    "state": "holds",
+    "fields": {
+     "says": "No build step, no framework, still; the browser may import as browsers do natively. Limits: shared modules are leaves (imports nothing, names no browser or Node global, as the purity guard enforces); served one file at a time through the lib/vendor-assets.js allow-list, never a directory; classic views and the vm test loaders stay until a module-capable client test loader exists; a deferred module shim sets its global after classic scripts run, so no script may read a shared global during script execution, including through a callback a library runs synchronously (Chart.js ticks). The copies came from reading the rule as no sharing. (In docs/areas/front-end-browser.md Lessons, PR #2423.)",
+     "paths": [
+      "CLAUDE.md",
+      "docs/areas/front-end-browser.md",
+      "lib/vendor-assets.js",
+      "lib/cost-format.js"
+     ],
+     "checked-at": "92676b1fe (PR #2423 merged to main, deployed)"
+    },
+    "links": {
+     "on": [
+      "change-53@4",
+      "finding-11@3",
+      "finding-23@3",
+      "finding-34@2"
+     ]
+    },
+    "in": "area-1",
+    "v": 4,
+    "op": "revise",
+    "at": "2026-11-13T15:15:11.000Z",
+    "by": "close-out",
+    "reason": "re-pinned to the merged change (head ad24a2102; the lesson text did not change after 1de016f52)"
    }
   ],
   "finding-55": [
@@ -2970,6 +3076,64 @@
     "op": "add",
     "at": "2026-11-13T14:56:29.000Z",
     "by": "leftover"
+   },
+   {
+    "id": "lesson-57",
+    "kind": "lesson",
+    "state": "holds",
+    "fields": {
+     "says": "A { module } entry in a lib/components/page.js scripts list runs after every classic script wherever it is listed, so its list position means nothing; do not assert position in a guard. Test the order in a vm seam with document.readyState = \"loading\" (tests/unit/helpers/client-world.js) instead.",
+     "paths": [
+      "lib/components/page.js",
+      "tests/unit/shared-modules.test.js",
+      "tests/unit/helpers/client-world.js",
+      "docs/areas/front-end-browser.md"
+     ],
+     "checked-at": "92676b1fe (PR #2423 merged to main, deployed)"
+    },
+    "links": {
+     "on": [
+      "change-53@2"
+     ],
+     "about": [
+      "lesson-54"
+     ]
+    },
+    "in": "area-1",
+    "v": 2,
+    "op": "revise",
+    "at": "2026-11-13T15:15:10.000Z",
+    "by": "close-out",
+    "reason": "PR #2423 merged and deployed; lesson unchanged"
+   },
+   {
+    "id": "lesson-57",
+    "kind": "lesson",
+    "state": "holds",
+    "fields": {
+     "says": "A { module } entry in a lib/components/page.js scripts list runs after every classic script wherever it is listed, so its list position means nothing; do not assert position in a guard. Test the order in a vm seam with document.readyState = \"loading\" (tests/unit/helpers/client-world.js) instead.",
+     "paths": [
+      "lib/components/page.js",
+      "tests/unit/shared-modules.test.js",
+      "tests/unit/helpers/client-world.js",
+      "docs/areas/front-end-browser.md"
+     ],
+     "checked-at": "92676b1fe (PR #2423 merged to main, deployed)"
+    },
+    "links": {
+     "on": [
+      "change-53@4"
+     ],
+     "about": [
+      "lesson-54"
+     ]
+    },
+    "in": "area-1",
+    "v": 3,
+    "op": "revise",
+    "at": "2026-11-13T15:15:12.000Z",
+    "by": "close-out",
+    "reason": "re-pinned to the merged change (head ad24a2102; lesson unchanged)"
    }
   ],
   "finding-58": [
@@ -3312,6 +3476,93 @@
     "v": 1,
     "op": "add",
     "at": "2026-11-13T15:14:59.000Z",
+    "by": "close-out"
+   },
+   {
+    "id": "run-68",
+    "kind": "run",
+    "state": "done",
+    "fields": {
+     "stage": "close-out",
+     "account": "Merged PR #2423 as squash 92676b1fe, pinned to head ad24a2102 (CI green on that exact head: unit, proxy/clock, e2e 1-4, secret scan, ci-success); deployed, harbour.cat footer shows 92676b1. Before merge I pushed ad24a2102: the two blind-read wording fixes (cost-format-consumers.test.js title/comment; cost-format.test.js false parity sentence and unused TABLE export), two area-note Waiting entries for the blind read larger items, and the review PR-body fix (swipe viewport retirement and witness, totals 35 files +790/-287, M8 mutation evidence). Live after deploy: /shared/cost-format.js byte-identical to lib/cost-format.js, JS type; /shared/nope.js, /lib/cost-format.js, /cost-format.js 404. Only Chromium has run; rollback is reverting 92676b1fe. John read (check-17) not run, not recorded: human-only, does not hold the close; no next slice until he records it. No tickets filed: nothing outside the area."
+    },
+    "links": {},
+    "in": "task-9",
+    "v": 2,
+    "op": "end",
+    "at": "2026-11-13T15:15:14.000Z",
+    "by": "close-out",
+    "ended": {
+     "reason": "close-out comment posted on LIN-4446 at 15:31; Implementation Plan section rewritten as implemented"
+    }
+   }
+  ],
+  "check-69": [
+   {
+    "id": "check-69",
+    "kind": "check",
+    "state": "open",
+    "fields": {
+     "what": "Live after deploy of 92676b1: /shared/cost-format.js is 200, application/javascript, byte-identical to lib/cost-format.js; /shared/nope.js, /lib/cost-format.js and /cost-format.js are 404; /cost-format-global.js is 200. Not re-run live: the priced Chart.js deferral (needs an authenticated workspace with priced lineages); the reviewer Chromium check pre-merge stands for it.",
+     "how": "curl against harbour.cat after the footer showed 92676b1"
+    },
+    "links": {
+     "on": [
+      "change-53@4"
+     ]
+    },
+    "in": "task-9",
+    "to": "task-9",
+    "v": 1,
+    "op": "add",
+    "at": "2026-11-13T15:15:06.000Z",
+    "by": "close-out"
+   },
+   {
+    "id": "check-69",
+    "kind": "check",
+    "state": "done",
+    "fields": {
+     "what": "Live after deploy of 92676b1: /shared/cost-format.js is 200, application/javascript, byte-identical to lib/cost-format.js; /shared/nope.js, /lib/cost-format.js and /cost-format.js are 404; /cost-format-global.js is 200. Not re-run live: the priced Chart.js deferral (needs an authenticated workspace with priced lineages); the reviewer Chromium check pre-merge stands for it.",
+     "how": "curl against harbour.cat after the footer showed 92676b1"
+    },
+    "links": {
+     "on": [
+      "change-53@4"
+     ]
+    },
+    "in": "task-9",
+    "to": "task-9",
+    "v": 2,
+    "op": "end",
+    "at": "2026-11-13T15:15:07.000Z",
+    "by": "close-out",
+    "ended": {
+     "reason": "ran after deploy; all as stated"
+    }
+   }
+  ],
+  "finding-70": [
+   {
+    "id": "finding-70",
+    "kind": "finding",
+    "state": "open",
+    "fields": {
+     "says": "PR #2423 has only run in Chromium (the reviewer real-browser check); behaviour of the module shim and the deferred workspace-kpis.js build in other browsers is unwitnessed. Named rollback: revert merge commit 92676b1fe; no migration or data-shape change. Accept the gap or ask for a non-Chromium check."
+    },
+    "links": {
+     "on": [
+      "change-53@4"
+     ],
+     "about": [
+      "verdict-60"
+     ]
+    },
+    "in": "task-9",
+    "to": "John",
+    "v": 1,
+    "op": "add",
+    "at": "2026-11-13T15:15:08.000Z",
     "by": "close-out"
    }
   ]
@@ -4885,6 +5136,123 @@
     "--by",
     "close-out",
     "--count"
+   ],
+   "asOf": null
+  },
+  {
+   "at": "2026-11-17T15:42:01.583Z",
+   "by": "close-out",
+   "cmd": "get",
+   "args": [
+    "get",
+    "check-69",
+    "--by",
+    "close-out"
+   ],
+   "asOf": null
+  },
+  {
+   "at": "2026-11-17T15:42:12.183Z",
+   "by": "close-out",
+   "cmd": "show",
+   "args": [
+    "show",
+    "--task",
+    "task-9",
+    "--by",
+    "close-out"
+   ],
+   "asOf": null
+  },
+  {
+   "at": "2026-11-17T15:43:01.112Z",
+   "by": "John",
+   "cmd": "show",
+   "args": [
+    "show",
+    "--task",
+    "task-9",
+    "--by",
+    "John"
+   ],
+   "asOf": null
+  },
+  {
+   "at": "2026-11-17T15:43:11.532Z",
+   "by": "John",
+   "cmd": "get",
+   "args": [
+    "get",
+    "task-9",
+    "--by",
+    "John"
+   ],
+   "asOf": null
+  },
+  {
+   "at": "2026-11-17T15:43:11.570Z",
+   "by": "John",
+   "cmd": "find",
+   "args": [
+    "find",
+    "--kind",
+    "question",
+    "--by",
+    "John"
+   ],
+   "asOf": null
+  },
+  {
+   "at": "2026-11-17T15:43:11.606Z",
+   "by": "John",
+   "cmd": "find",
+   "args": [
+    "find",
+    "--kind",
+    "area",
+    "--by",
+    "John"
+   ],
+   "asOf": null
+  },
+  {
+   "at": "2026-11-17T15:43:11.647Z",
+   "by": "John",
+   "cmd": "find",
+   "args": [
+    "find",
+    "--kind",
+    "decision",
+    "--by",
+    "John"
+   ],
+   "asOf": null
+  },
+  {
+   "at": "2026-11-17T15:43:11.709Z",
+   "by": "John",
+   "cmd": "find",
+   "args": [
+    "find",
+    "--text",
+    "bridge",
+    "--by",
+    "John"
+   ],
+   "asOf": null
+  },
+  {
+   "at": "2026-11-17T15:43:11.748Z",
+   "by": "John",
+   "cmd": "find",
+   "args": [
+    "find",
+    "--text",
+    "shim",
+    "--state",
+    "open",
+    "--by",
+    "John"
    ],
    "asOf": null
   }

@@ -1,0 +1,55 @@
+task-9 task v3 [done] by close-out
+run-10 run v3 [done] by undefined
+finding-11 finding v3 [handed-on] to design by undefined
+finding-12 finding v1 [open] to area-1 by undefined
+finding-13 finding v3 [handed-on] to design by undefined
+finding-14 finding v1 [open] to review by undefined
+finding-15 finding v2 [handed-on] to implementation by undefined
+finding-16 finding v4 [handed-on] to design by undefined
+check-17 check v4 [open] to John by undefined
+run-18 run v3 [done] by undefined
+finding-20 finding v1 [open] to review by undefined
+finding-22 finding v3 [handed-on] to design by undefined
+finding-23 finding v3 [handed-on] to design by undefined
+finding-24 finding v4 [handed-on] to implementation by undefined
+finding-25 finding v2 [handed-on] to implementation by undefined
+decision-26 decision v3 [stands] by undefined
+run-27 run v2 [done] by undefined
+plan-28 plan v13 [kept] STALE(on verdict-35@1, which is stale) by undefined
+finding-29 finding v2 [handed-on] to implementation by undefined
+check-30 check v2 [done] to plan-review by undefined
+finding-31 finding v2 [open] to review by undefined
+run-32 run v2 [done] by undefined
+run-33 run v2 [done] by undefined
+finding-34 finding v2 [handed-on] to design by undefined
+verdict-35 verdict v1 [stands] STALE(on plan-28@12, now @13) by undefined
+finding-36 finding v2 [handed-on] to implementation by undefined
+finding-37 finding v2 [handed-on] to implementation by undefined
+finding-38 finding v2 [handed-on] to implementation by undefined
+finding-39 finding v2 [handed-on] to implementation by undefined
+finding-40 finding v2 [handed-on] to implementation by undefined
+finding-41 finding v2 [handed-on] to implementation by undefined
+finding-42 finding v2 [handed-on] to implementation by undefined
+run-43 run v2 [done] by undefined
+verdict-44 verdict v1 [stands] STALE(on plan-28@13, which is stale) by undefined
+finding-45 finding v2 [done] to implementation by undefined
+finding-46 finding v2 [done] to implementation by undefined
+finding-47 finding v1 [open] STALE(on plan-28@13, which is stale) to implementation by undefined
+finding-48 finding v1 [open] STALE(on plan-28@13, which is stale) to implementation by undefined
+finding-49 finding v2 [done] to implementation by undefined
+finding-50 finding v1 [open] STALE(on plan-28@13, which is stale) to implementation by undefined
+run-51 run v2 [done] by undefined
+run-52 run v2 [done] by undefined
+change-53 change v4 [merged] by undefined
+finding-55 finding v2 [done] to review by undefined
+run-56 run v2 [done] by undefined
+run-59 run v2 [done] by undefined
+verdict-60 verdict v1 [stands] STALE(on change-53@2, now @4; on plan-28@13, which is stale) by undefined
+finding-61 finding v2 [done] to close-out by undefined
+run-62 run v2 [done] by undefined
+verdict-63 verdict v1 [stands] STALE(on change-53@2, now @4) by undefined
+finding-64 finding v2 [done] to close-out by undefined
+finding-65 finding v2 [done] to close-out by undefined
+run-68 run v2 [done] by undefined
+check-69 check v2 [done] to task-9 by undefined
+finding-70 finding v1 [open] to John by undefined

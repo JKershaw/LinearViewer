@@ -1,5 +1,5 @@
 {
- "next": 172,
+ "next": 175,
  "records": {
   "area-1": [
    {
@@ -2757,6 +2757,34 @@
     "op": "add",
     "at": "2026-11-13T14:01:57.719Z",
     "by": "breakdown"
+   },
+   {
+    "id": "task-113",
+    "kind": "task",
+    "state": "done",
+    "fields": {
+     "ref": "LIN-4459",
+     "asked": "",
+     "done-when": "LIN-4459 (piece 4): `lib/run-live-wait.js` holds `liveWaitOf`, `liveWaitRefusal`, `STAGE_IN_FLIGHT_CODE`, `newestLiveRun` and the live predicate `isLiveRun`; `lib/recommendation-live-wait.js` is deleted with no re-export or shim, and its importers (`lib/openrouter.js`, `lib/dispatch-entrance.js`, `routes/workspace-api.js`, `lib/proxy-instructions.js`, `lib/recommendation-blind-read.js`, `lib/recommendation-look-first.js`, `lib/recommendation-facts.js`) are updated; a stage parked `[pending]` whose lineage ends `[blocked]` or `[skipped]` is not live, its terminal resolved from the unfiltered lineage before `loadRecentRuns`/`stageRuns` filter and window it, using `resolveFollowUpRoot` (`lib/dispatch-store.js`) and `heldWakeHolderOf` (`lib/dispatch-leftover-hook.js`), with the callers (`recentRuns`, `loadRecentRuns`) handing the rows over; the claim compare-and-set note moves unchanged from the LLM area note to the Runs note. Retires the old module and `runFact`'s row-only read; settles Waiting 14 and the LLM-side entry on `recommendation-live-wait.js`, together with A14, removed from `docs/areas/runs-and-dispatch.md` and `docs/areas/llm-and-prompts.md` in the same change with Lessons under 6,144 bytes; the PR says what it retires. Witness: `lin-4392-live-stage-wait.test.js` extended with a `[pending]` stage whose terminal `[blocked]`/`[skipped]` sits on a follow-up or held-wake row that the filter drops, failing before the change and passing after it; a census that none of the names is spelled outside `lib/run-live-wait.js`; `area-map-placement` stays green. Before starting: ask LIN-4448 (A14) again to agree the move. Binding: no stored readiness, no GitHub or provider reads, never recompute stored pre-cutover history, never edit recorded prompt changelog text, the LLM & prompts side of the seam is LIN-4448's.",
+     "paths": [
+      "lib/run-live-wait.js",
+      "lib/recommendation-live-wait.js",
+      "lib/recent-runs.js",
+      "docs/areas/runs-and-dispatch.md",
+      "docs/areas/llm-and-prompts.md"
+     ]
+    },
+    "links": {
+     "piece": "plan-91"
+    },
+    "in": "task-82",
+    "v": 2,
+    "op": "end",
+    "at": "2026-11-13T17:05:18.000Z",
+    "by": "close-out",
+    "ended": {
+     "reason": "LIN-4459 Done: PR #2432 merged (c174185f6) and deployed (17faa83f4), with notes PR #2434 (5cf4f6aa2); review approve-with-notes (verdict-162) and blind read better (verdict-168); ledger discharged or handed on (check-173, check-174). Close-out comment 9584b81c; archive snapshot 299ad5e0 verified before pruning."
+    }
    }
   ],
   "decision-114": [
@@ -4671,6 +4699,32 @@
     "op": "add",
     "at": "2026-11-13T16:58:26.000Z",
     "by": "review"
+   },
+   {
+    "id": "check-158",
+    "kind": "check",
+    "state": "handed-on",
+    "fields": {
+     "what": "Cost of the behaviour change: every recommendation read (`codeRouteOf`, hit by autopilot and recommend-and-dispatch) now pays one batched `_lineageOf` read plus the stale-row self-heal writes of `recomputeLineageRows`. Same reads/writes the proxy list and Dispatch history already do, but CI does not measure latency or write volume. Monitor: the `console.error` \"Lineage recompute lost its compare-and-set …\" in `lib/dispatch-lineage-status.js`, with recommendation latency on the proxy route. Rollback: revert the PR #2432 merge commit (no schema change; heal writes are the derivation the list already persists).",
+     "why-person": "Only production traffic shows contention.",
+     "how": "Watch production logs and proxy-route latency after deploy; revert the merge commit if contention appears."
+    },
+    "links": {
+     "about": [
+      "change-143",
+      "decision-145"
+     ]
+    },
+    "in": "task-113",
+    "to": "close-out",
+    "v": 2,
+    "op": "end",
+    "at": "2026-11-13T17:05:15.000Z",
+    "by": "close-out",
+    "ended": {
+     "reason": "Monitor and rollback named on the close-out (9584b81c); spot-check latency taken, but the log monitor needs production log access, so it goes to John.",
+     "into": "check-173"
+    }
    }
   ],
   "check-159": [
@@ -4696,6 +4750,33 @@
     "op": "add",
     "at": "2026-11-13T16:58:27.000Z",
     "by": "review"
+   },
+   {
+    "id": "check-159",
+    "kind": "check",
+    "state": "handed-on",
+    "fields": {
+     "what": "After deploy: the witnesses build rows through the real store but set `rootItemId` by hand; production inheritance was confirmed by reading `lib/dispatch-factory.js:724` only. Find one ticket with a stage parked `[pending]` whose ci-wake `custom` or held-wake follow-up has since posted `[blocked]`/`[skipped]`; `GET /api/proxy/recommendation/<id>` must no longer answer \"wait\" naming that stage. If none exists yet, record \"not yet observed\", not discharged.",
+     "why-person": "Needs live production data, which no test here reads.",
+     "how": "GET /api/proxy/recommendation/<id> on a matching ticket after deploy."
+    },
+    "links": {
+     "about": [
+      "change-143",
+      "decision-144",
+      "decision-145"
+     ]
+    },
+    "in": "task-113",
+    "to": "close-out",
+    "v": 2,
+    "op": "end",
+    "at": "2026-11-13T17:05:17.000Z",
+    "by": "close-out",
+    "ended": {
+     "reason": "Not yet observed: no ticket had a parked stage with a blocked/skipped follow-up after the deploy; recorded as not discharged and handed to John.",
+     "into": "check-174"
+    }
    }
   ],
   "decision-160": [
@@ -4939,6 +5020,27 @@
     "op": "add",
     "at": "2026-11-13T17:02:28.000Z",
     "by": "blind-read"
+   },
+   {
+    "id": "finding-166",
+    "kind": "finding",
+    "state": "open",
+    "fields": {
+     "says": "`lib/run-live-wait.js` / `lib/recent-runs.js`: the run-outcome words have two homes. To avoid a cycle, `recent-runs.js` (`runFact`, which produces the outcomes) imports `QUEUED`/`RUNNING` from `run-live-wait.js`, the module that reads them, while `WAITING_ON_A_PERSON`, `'closed'` and `'aborted'` stay in `recent-runs.js`, and `lib/recommendation-look-first.js` still imports from there. One home (for example a leaf module of outcome words) means choosing where it lives and touches importers in llm-and-prompts, so it is larger than a fix. (Blind read of PR #2432, LIN-4459.)"
+    },
+    "links": {
+     "about": [
+      "change-143",
+      "finding-130",
+      "change-172"
+     ]
+    },
+    "in": "area-1",
+    "to": "area-1",
+    "v": 2,
+    "op": "link",
+    "at": "2026-11-13T17:05:12.000Z",
+    "by": "close-out"
    }
   ],
   "finding-167": [
@@ -4961,6 +5063,27 @@
     "op": "add",
     "at": "2026-11-13T17:02:29.000Z",
     "by": "blind-read"
+   },
+   {
+    "id": "finding-167",
+    "kind": "finding",
+    "state": "open",
+    "fields": {
+     "says": "`lib/recent-runs.js`: a parked stage whose lineage ended is dated by the park's timestamp, not the lineage's end, because the `withLineage` wire row carries no end time (the code comment admits this). It sorts too early in the selector's five, and can land on the wrong side of a \"since the latest review\" cut, such as `lib/recommendation-blind-read.js`'s count of ended reads. Fix: `listHistory` in `lib/dispatch-store.js` reports the lineage's end time; a store change, so larger. (Blind read of PR #2432, LIN-4459.)"
+    },
+    "links": {
+     "about": [
+      "change-143",
+      "finding-147",
+      "change-172"
+     ]
+    },
+    "in": "area-1",
+    "to": "area-1",
+    "v": 2,
+    "op": "link",
+    "at": "2026-11-13T17:05:13.000Z",
+    "by": "close-out"
    }
   ],
   "verdict-168": [
@@ -5004,6 +5127,24 @@
     "op": "add",
     "at": "2026-11-13T17:04:59.000Z",
     "by": "close-out"
+   },
+   {
+    "id": "run-169",
+    "kind": "run",
+    "state": "done",
+    "fields": {
+     "stage": "close-out",
+     "account": "Close-out of LIN-4459. Posted the runner-kickoff import change and the retired LLM entry on LIN-4448 (b564445b); no reply came, so I recorded that its 08c9c898 agreement covers an import-path-only change (prompt bytes unchanged) and merged. Fixed the blind read's two fix-sized finds in 2d02bb4a2 and added the FEEDBACK_ENTRY_KINDS re-export to the PR's Retires. CI green on exactly 2d02bb4a2 (run 43469455968), no rebase needed; merged as c174185f6, deployed (footer 17faa83f4). The blind read's two larger finds went in as Waiting entries via PR #2434 (5cf4f6aa2). The latency monitor (no log access) and the post-deploy real-world check (no qualifying ticket yet: not yet observed) are handed to John. Archive snapshot 299ad5e0 verified before pruning the description; LIN-4459 set Done; LIN-4447 stays open, LIN-4460 proceeds."
+    },
+    "links": {},
+    "in": "task-113",
+    "v": 2,
+    "op": "end",
+    "at": "2026-11-13T17:05:19.000Z",
+    "by": "close-out",
+    "ended": {
+     "reason": "close-out complete"
+    }
    }
   ],
   "finding-170": [
@@ -5057,6 +5198,102 @@
     "v": 1,
     "op": "add",
     "at": "2026-11-13T17:05:01.000Z",
+    "by": "close-out"
+   }
+  ],
+  "change-172": [
+   {
+    "id": "change-172",
+    "kind": "change",
+    "state": "open",
+    "fields": {
+     "ref": "PR #2434 (audit notes: two Waiting entries in docs/areas/runs-and-dispatch.md)",
+     "head": "5cf4f6aa2"
+    },
+    "links": {
+     "about": [
+      "change-143",
+      "finding-166",
+      "finding-167"
+     ]
+    },
+    "in": "task-113",
+    "v": 1,
+    "op": "add",
+    "at": "2026-11-13T17:05:10.000Z",
+    "by": "close-out"
+   },
+   {
+    "id": "change-172",
+    "kind": "change",
+    "state": "merged",
+    "fields": {
+     "ref": "PR #2434 (audit notes: two Waiting entries in docs/areas/runs-and-dispatch.md)",
+     "head": "5cf4f6aa2"
+    },
+    "links": {
+     "about": [
+      "change-143",
+      "finding-166",
+      "finding-167"
+     ]
+    },
+    "in": "task-113",
+    "v": 2,
+    "op": "end",
+    "at": "2026-11-13T17:05:11.000Z",
+    "by": "close-out",
+    "ended": {
+     "reason": "Merged as 5cf4f6aa2 (docs only); CI run 43472269603 green on its exact head; Lessons 5,400 B incl. headings, area-note tests 57/57."
+    }
+   }
+  ],
+  "check-173": [
+   {
+    "id": "check-173",
+    "kind": "check",
+    "state": "open",
+    "fields": {
+     "what": "After the PR #2432 deploy (merge c174185f6): watch for the console.error \"Lineage recompute lost its compare-and-set …\" (lib/dispatch-lineage-status.js) and recommendation latency on the proxy route; every recommendation read now pays one batched _lineageOf read plus recomputeLineageRows heal writes. Close-out could only spot-check: GET /issues/LIN-4458/recommend and /LIN-4460/recommend answered 200 in 4.5 s and 2.0 s, including the LLM call. The log monitor itself was not read (no log access). Rollback: revert merge commit c174185f6 (no schema change).",
+     "why-person": "Needs production log access and traffic over time; close-out has neither.",
+     "how": "Read production logs for the compare-and-set message and proxy-route latency; revert c174185f6 if contention appears."
+    },
+    "links": {
+     "about": [
+      "change-143",
+      "decision-145"
+     ]
+    },
+    "in": "task-113",
+    "to": "John",
+    "v": 1,
+    "op": "add",
+    "at": "2026-11-13T17:05:14.000Z",
+    "by": "close-out"
+   }
+  ],
+  "check-174": [
+   {
+    "id": "check-174",
+    "kind": "check",
+    "state": "open",
+    "fields": {
+     "what": "Not yet observed (post-deploy real-world check of PR #2432): when a ticket has a stage parked `[pending]` whose ci-wake `custom` or held-wake follow-up has posted `[blocked]`/`[skipped]`, GET its recommendation (`/recommend`, or `GET /api/proxy/recommendation/<id>`) and confirm it no longer answers a liveWait naming that stage. At close-out no ticket qualified: every taken dispatch after the deploy was `working` (LIN-4451, LIN-4459, LIN-4465, LIN-2537), none parked. Until then the real-store witnesses W1/W2 in lin-4392-live-stage-wait.test.js cover it, with rootItemId set by hand (inheritance read at lib/dispatch-factory.js:724 only). This does not hold the close.",
+     "why-person": "Needs a live ticket in the qualifying state, which does not exist yet.",
+     "how": "Next time a parked stage's follow-up blocks or skips, call the recommendation route on that ticket and record what it answers."
+    },
+    "links": {
+     "about": [
+      "change-143",
+      "decision-144",
+      "decision-145"
+     ]
+    },
+    "in": "task-113",
+    "to": "John",
+    "v": 1,
+    "op": "add",
+    "at": "2026-11-13T17:05:16.000Z",
     "by": "close-out"
    }
   ]
@@ -6340,6 +6577,212 @@
     "task-113",
     "--by",
     "close-out"
+   ],
+   "asOf": null
+  },
+  {
+   "at": "2026-11-17T15:42:47.720Z",
+   "by": "autopilot",
+   "cmd": "show",
+   "args": [
+    "show",
+    "--task",
+    "task-113",
+    "--by",
+    "autopilot"
+   ],
+   "asOf": null
+  },
+  {
+   "at": "2026-11-17T15:42:54.532Z",
+   "by": "autopilot",
+   "cmd": "get",
+   "args": [
+    "get",
+    "finding-166",
+    "--by",
+    "autopilot"
+   ],
+   "asOf": null
+  },
+  {
+   "at": "2026-11-17T15:42:54.569Z",
+   "by": "autopilot",
+   "cmd": "get",
+   "args": [
+    "get",
+    "finding-167",
+    "--by",
+    "autopilot"
+   ],
+   "asOf": null
+  },
+  {
+   "at": "2026-11-17T15:42:54.602Z",
+   "by": "autopilot",
+   "cmd": "get",
+   "args": [
+    "get",
+    "change-143",
+    "--by",
+    "autopilot"
+   ],
+   "asOf": null
+  },
+  {
+   "at": "2026-11-17T15:42:54.641Z",
+   "by": "autopilot",
+   "cmd": "get",
+   "args": [
+    "get",
+    "change-172",
+    "--by",
+    "autopilot"
+   ],
+   "asOf": null
+  },
+  {
+   "at": "2026-11-17T15:42:54.678Z",
+   "by": "autopilot",
+   "cmd": "get",
+   "args": [
+    "get",
+    "run-154",
+    "--by",
+    "autopilot"
+   ],
+   "asOf": null
+  },
+  {
+   "at": "2026-11-17T15:42:54.713Z",
+   "by": "autopilot",
+   "cmd": "get",
+   "args": [
+    "get",
+    "run-169",
+    "--by",
+    "autopilot"
+   ],
+   "asOf": null
+  },
+  {
+   "at": "2026-11-17T15:42:54.750Z",
+   "by": "autopilot",
+   "cmd": "get",
+   "args": [
+    "get",
+    "finding-153",
+    "--by",
+    "autopilot"
+   ],
+   "asOf": null
+  },
+  {
+   "at": "2026-11-17T15:42:54.785Z",
+   "by": "autopilot",
+   "cmd": "get",
+   "args": [
+    "get",
+    "check-158",
+    "--by",
+    "autopilot"
+   ],
+   "asOf": null
+  },
+  {
+   "at": "2026-11-17T15:42:54.821Z",
+   "by": "autopilot",
+   "cmd": "get",
+   "args": [
+    "get",
+    "check-159",
+    "--by",
+    "autopilot"
+   ],
+   "asOf": null
+  },
+  {
+   "at": "2026-11-17T15:43:13.286Z",
+   "by": "autopilot",
+   "cmd": "find",
+   "args": [
+    "find",
+    "--text",
+    "2d02bb4a2",
+    "--by",
+    "autopilot"
+   ],
+   "asOf": null
+  },
+  {
+   "at": "2026-11-17T15:43:13.327Z",
+   "by": "autopilot",
+   "cmd": "get",
+   "args": [
+    "get",
+    "check-157",
+    "--by",
+    "autopilot"
+   ],
+   "asOf": null
+  },
+  {
+   "at": "2026-11-17T15:43:13.367Z",
+   "by": "autopilot",
+   "cmd": "find",
+   "args": [
+    "find",
+    "--text",
+    "live-wait",
+    "--state",
+    "open",
+    "--by",
+    "autopilot"
+   ],
+   "asOf": null
+  },
+  {
+   "at": "2026-11-17T15:43:13.410Z",
+   "by": "autopilot",
+   "cmd": "find",
+   "args": [
+    "find",
+    "--text",
+    "runFact",
+    "--state",
+    "open",
+    "--by",
+    "autopilot"
+   ],
+   "asOf": null
+  },
+  {
+   "at": "2026-11-17T15:43:13.453Z",
+   "by": "autopilot",
+   "cmd": "find",
+   "args": [
+    "find",
+    "--text",
+    "liveWait",
+    "--state",
+    "open",
+    "--by",
+    "autopilot"
+   ],
+   "asOf": null
+  },
+  {
+   "at": "2026-11-17T15:43:13.498Z",
+   "by": "autopilot",
+   "cmd": "find",
+   "args": [
+    "find",
+    "--text",
+    "re-review",
+    "--state",
+    "open",
+    "--by",
+    "autopilot"
    ],
    "asOf": null
   }

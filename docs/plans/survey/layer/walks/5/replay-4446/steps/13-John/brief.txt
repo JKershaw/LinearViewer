@@ -1,0 +1,48 @@
+# What is open and addressed to John, as of 2026-11-13T15:39:21Z (find --to John --state open)
+[
+  {
+    "id": "check-17",
+    "kind": "check",
+    "state": "open",
+    "fields": {
+      "what": "Read the first slice's result (the rule's reading in the notes, and the cost-format slice with what it retired) before the next slice starts.",
+      "why-person": "The done-when requires John's read, and the size of this work and what may be retired are his calls.",
+      "how": "Read the close-out comment on LIN-4446 (15:31) and PR #2423 body, then record your read as a comment on LIN-4446. No next slice is dispatched until that comment exists. Not run and not recorded at close-out: a human-only read after deploy does not hold the close, so the ticket closed with this left open."
+    },
+    "links": {
+      "about": [
+        "change-53",
+        "verdict-60"
+      ]
+    },
+    "in": "task-9",
+    "to": "John",
+    "v": 4,
+    "op": "revise",
+    "at": "2026-11-13T15:15:05.000Z",
+    "by": "close-out",
+    "reason": "merged and deployed (change-53 merged); close-out could not run the read and hands it to John directly"
+  },
+  {
+    "id": "finding-70",
+    "kind": "finding",
+    "state": "open",
+    "fields": {
+      "says": "PR #2423 has only run in Chromium (the reviewer real-browser check); behaviour of the module shim and the deferred workspace-kpis.js build in other browsers is unwitnessed. Named rollback: revert merge commit 92676b1fe; no migration or data-shape change. Accept the gap or ask for a non-Chromium check."
+    },
+    "links": {
+      "on": [
+        "change-53@4"
+      ],
+      "about": [
+        "verdict-60"
+      ]
+    },
+    "in": "task-9",
+    "to": "John",
+    "v": 1,
+    "op": "add",
+    "at": "2026-11-13T15:15:08.000Z",
+    "by": "close-out"
+  }
+]
