@@ -2707,5 +2707,31 @@
    }
   ]
  },
- "log": []
+ "log": [
+  {
+   "at": "2026-11-17T15:33:31.612Z",
+   "by": "review",
+   "cmd": "show",
+   "args": [
+    "show",
+    "--task",
+    "task-60",
+    "--by",
+    "review"
+   ],
+   "asOf": null
+  },
+  {
+   "at": "2026-11-17T15:33:31.640Z",
+   "by": "review",
+   "cmd": "get",
+   "args": [
+    "get",
+    "change-84",
+    "--by",
+    "review"
+   ],
+   "asOf": null
+  }
+ ]
 }

@@ -4307,6 +4307,71 @@
     "John"
    ],
    "asOf": null
+  },
+  {
+   "at": "2026-11-17T15:33:05.128Z",
+   "by": "autopilot",
+   "cmd": "show",
+   "args": [
+    "show",
+    "--task",
+    "task-131",
+    "--by",
+    "autopilot"
+   ],
+   "asOf": null
+  },
+  {
+   "at": "2026-11-17T15:33:05.158Z",
+   "by": "autopilot",
+   "cmd": "get",
+   "args": [
+    "get",
+    "question-144",
+    "--by",
+    "autopilot"
+   ],
+   "asOf": null
+  },
+  {
+   "at": "2026-11-17T15:33:27.261Z",
+   "by": "autopilot",
+   "cmd": "find",
+   "args": [
+    "find",
+    "--text",
+    "every kind",
+    "--by",
+    "autopilot"
+   ],
+   "asOf": null
+  },
+  {
+   "at": "2026-11-17T15:33:27.295Z",
+   "by": "autopilot",
+   "cmd": "find",
+   "args": [
+    "find",
+    "--kind",
+    "question",
+    "--state",
+    "open",
+    "--by",
+    "autopilot"
+   ],
+   "asOf": null
+  },
+  {
+   "at": "2026-11-17T15:33:27.328Z",
+   "by": "autopilot",
+   "cmd": "get",
+   "args": [
+    "get",
+    "run-146",
+    "--by",
+    "autopilot"
+   ],
+   "asOf": null
   }
  ]
 }

@@ -3132,5 +3132,31 @@
    }
   ]
  },
- "log": []
+ "log": [
+  {
+   "at": "2026-11-17T15:33:35.064Z",
+   "by": "close-out",
+   "cmd": "show",
+   "args": [
+    "show",
+    "--task",
+    "task-60",
+    "--by",
+    "close-out"
+   ],
+   "asOf": null
+  },
+  {
+   "at": "2026-11-17T15:33:35.095Z",
+   "by": "close-out",
+   "cmd": "get",
+   "args": [
+    "get",
+    "change-84",
+    "--by",
+    "close-out"
+   ],
+   "asOf": null
+  }
+ ]
 }

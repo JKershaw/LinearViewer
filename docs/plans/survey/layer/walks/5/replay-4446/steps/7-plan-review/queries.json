@@ -1,0 +1,285 @@
+[
+ {
+  "at": "2026-11-17T15:27:03.179Z",
+  "by": "plan-review",
+  "cmd": "show",
+  "args": [
+   "show",
+   "--task",
+   "task-9",
+   "--by",
+   "plan-review"
+  ],
+  "asOf": null
+ },
+ {
+  "at": "2026-11-17T15:27:03.220Z",
+  "by": "plan-review",
+  "cmd": "find",
+  "args": [
+   "find",
+   "--area",
+   "area-1",
+   "--state",
+   "open",
+   "--by",
+   "plan-review"
+  ],
+  "asOf": null
+ },
+ {
+  "at": "2026-11-17T15:27:07.893Z",
+  "by": "plan-review",
+  "cmd": "get",
+  "args": [
+   "get",
+   "plan-28",
+   "--by",
+   "plan-review"
+  ],
+  "asOf": null
+ },
+ {
+  "at": "2026-11-17T15:27:07.936Z",
+  "by": "plan-review",
+  "cmd": "find",
+  "args": [
+   "find",
+   "--kind",
+   "verdict",
+   "--by",
+   "plan-review"
+  ],
+  "asOf": null
+ },
+ {
+  "at": "2026-11-17T15:27:07.971Z",
+  "by": "plan-review",
+  "cmd": "find",
+  "args": [
+   "find",
+   "--text",
+   "workspace-kpis",
+   "--by",
+   "plan-review"
+  ],
+  "asOf": null
+ },
+ {
+  "at": "2026-11-17T15:27:12.933Z",
+  "by": "plan-review",
+  "cmd": "get",
+  "args": [
+   "get",
+   "plan-28",
+   "--by",
+   "plan-review"
+  ],
+  "asOf": null
+ },
+ {
+  "at": "2026-11-17T15:27:12.973Z",
+  "by": "plan-review",
+  "cmd": "get",
+  "args": [
+   "get",
+   "finding-21",
+   "--by",
+   "plan-review"
+  ],
+  "asOf": null
+ },
+ {
+  "at": "2026-11-17T15:27:13.014Z",
+  "by": "plan-review",
+  "cmd": "get",
+  "args": [
+   "get",
+   "finding-16",
+   "--by",
+   "plan-review"
+  ],
+  "asOf": null
+ },
+ {
+  "at": "2026-11-17T15:28:04.549Z",
+  "by": "plan-review",
+  "cmd": "get",
+  "args": [
+   "get",
+   "finding-24",
+   "--by",
+   "plan-review"
+  ],
+  "asOf": null
+ },
+ {
+  "at": "2026-11-17T15:28:26.834Z",
+  "by": "plan-review",
+  "cmd": "brief",
+  "args": [
+   "brief",
+   "design",
+   "--task",
+   "task-9",
+   "--text",
+   "--by",
+   "plan-review"
+  ],
+  "asOf": null
+ },
+ {
+  "at": "2026-11-17T15:31:48.552Z",
+  "by": "plan-review",
+  "cmd": "show",
+  "args": [
+   "show",
+   "--task",
+   "task-9",
+   "--by",
+   "plan-review"
+  ],
+  "asOf": null
+ },
+ {
+  "at": "2026-11-17T15:32:02.726Z",
+  "by": "plan-review",
+  "cmd": "get",
+  "args": [
+   "get",
+   "verdict-35",
+   "--by",
+   "plan-review"
+  ],
+  "asOf": null
+ },
+ {
+  "at": "2026-11-17T15:32:02.762Z",
+  "by": "plan-review",
+  "cmd": "get",
+  "args": [
+   "get",
+   "finding-34",
+   "--by",
+   "plan-review"
+  ],
+  "asOf": null
+ },
+ {
+  "at": "2026-11-17T15:32:02.800Z",
+  "by": "plan-review",
+  "cmd": "get",
+  "args": [
+   "get",
+   "finding-40",
+   "--by",
+   "plan-review"
+  ],
+  "asOf": null
+ },
+ {
+  "at": "2026-11-17T15:32:02.834Z",
+  "by": "plan-review",
+  "cmd": "get",
+  "args": [
+   "get",
+   "finding-37",
+   "--by",
+   "plan-review"
+  ],
+  "asOf": null
+ },
+ {
+  "at": "2026-11-17T15:32:02.870Z",
+  "by": "plan-review",
+  "cmd": "get",
+  "args": [
+   "get",
+   "run-33",
+   "--by",
+   "plan-review"
+  ],
+  "asOf": null
+ },
+ {
+  "at": "2026-11-17T15:32:07.075Z",
+  "by": "plan-review",
+  "cmd": "find",
+  "args": [
+   "find",
+   "--text",
+   "other-features",
+   "--by",
+   "plan-review"
+  ],
+  "asOf": null
+ },
+ {
+  "at": "2026-11-17T15:32:07.121Z",
+  "by": "plan-review",
+  "cmd": "find",
+  "args": [
+   "find",
+   "--text",
+   "cost-format.test",
+   "--by",
+   "plan-review"
+  ],
+  "asOf": null
+ },
+ {
+  "at": "2026-11-17T15:32:07.160Z",
+  "by": "plan-review",
+  "cmd": "find",
+  "args": [
+   "find",
+   "--text",
+   "server.js",
+   "--by",
+   "plan-review"
+  ],
+  "asOf": null
+ },
+ {
+  "at": "2026-11-17T15:32:07.203Z",
+  "by": "plan-review",
+  "cmd": "find",
+  "args": [
+   "find",
+   "--text",
+   "prompt-section",
+   "--by",
+   "plan-review"
+  ],
+  "asOf": null
+ },
+ {
+  "at": "2026-11-17T15:32:07.244Z",
+  "by": "plan-review",
+  "cmd": "find",
+  "args": [
+   "find",
+   "--to",
+   "implementation",
+   "--state",
+   "open",
+   "--by",
+   "plan-review"
+  ],
+  "asOf": null
+ },
+ {
+  "at": "2026-11-17T15:32:59.068Z",
+  "by": "plan-review",
+  "cmd": "brief",
+  "args": [
+   "brief",
+   "implementation",
+   "--task",
+   "task-9",
+   "--by",
+   "plan-review"
+  ],
+  "asOf": null
+ }
+]

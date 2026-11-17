@@ -1,0 +1,96 @@
+[
+ {
+  "at": "2026-11-17T15:31:48.809Z",
+  "by": "leftover",
+  "cmd": "show",
+  "args": [
+   "show",
+   "--task",
+   "task-78",
+   "--by",
+   "leftover"
+  ],
+  "asOf": null
+ },
+ {
+  "at": "2026-11-17T15:32:05.236Z",
+  "by": "leftover",
+  "cmd": "get",
+  "args": [
+   "--by",
+   "leftover",
+   "get",
+   "change-103"
+  ],
+  "asOf": null
+ },
+ {
+  "at": "2026-11-17T15:32:05.270Z",
+  "by": "leftover",
+  "cmd": "get",
+  "args": [
+   "--by",
+   "leftover",
+   "get",
+   "finding-97"
+  ],
+  "asOf": null
+ },
+ {
+  "at": "2026-11-17T15:32:05.301Z",
+  "by": "leftover",
+  "cmd": "find",
+  "args": [
+   "--by",
+   "leftover",
+   "find",
+   "--text",
+   "adoption"
+  ],
+  "asOf": null
+ },
+ {
+  "at": "2026-11-17T15:32:05.334Z",
+  "by": "leftover",
+  "cmd": "find",
+  "args": [
+   "--by",
+   "leftover",
+   "find",
+   "--text",
+   "Lessons",
+   "--count"
+  ],
+  "asOf": null
+ },
+ {
+  "at": "2026-11-17T15:32:05.367Z",
+  "by": "leftover",
+  "cmd": "find",
+  "args": [
+   "--by",
+   "leftover",
+   "find",
+   "--to",
+   "John",
+   "--state",
+   "open"
+  ],
+  "asOf": null
+ },
+ {
+  "at": "2026-11-17T15:32:05.401Z",
+  "by": "leftover",
+  "cmd": "find",
+  "args": [
+   "--by",
+   "leftover",
+   "find",
+   "--kind",
+   "run",
+   "--in",
+   "task-78"
+  ],
+  "asOf": null
+ }
+]

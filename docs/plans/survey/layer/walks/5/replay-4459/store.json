@@ -1,5 +1,5 @@
 {
- "next": 143,
+ "next": 149,
  "records": {
   "area-1": [
    {
@@ -3113,6 +3113,34 @@
     "at": "2026-11-13T16:26:32.000Z",
     "by": "survey-place",
     "reason": "survey-place: recommends an answer, unwitnessed (comment 1999d0b1)"
+   },
+   {
+    "id": "question-128",
+    "kind": "question",
+    "state": "answered",
+    "fields": {
+     "asks": "Does a held-wake holder share the parked stage's `rootItemId`? If not, that is the one case that really needs `heldWakeHolderOf`; if so, the lineage read covers every terminal the witness names.",
+     "options": [
+      "Yes: the lineage read by rootItemId covers held-wake holders",
+      "No: held-wake holders need heldWakeHolderOf beside the lineage read"
+     ],
+     "if-unanswered": "Build the witness with a real held-wake holder row (real heldWakeFor) so the answer shows in the test.",
+     "recommended": "Yes: the factory's inheritance suggests a ci-wake `custom` continuation carries the holder's `rootItemId`. Not yet witnessed: the new failing test should pin that case before the lineage read relies on it."
+    },
+    "links": {
+     "about": [
+      "plan-91"
+     ]
+    },
+    "in": "task-113",
+    "to": "implementation",
+    "v": 3,
+    "op": "end",
+    "at": "2026-11-13T16:33:24.000Z",
+    "by": "implementation",
+    "ended": {
+     "reason": "answered by decision-144 (witnessed with real store writes)"
+    }
    }
   ],
   "finding-129": [
@@ -3510,6 +3538,146 @@
     "v": 1,
     "op": "add",
     "at": "2026-11-13T16:33:20.000Z",
+    "by": "implementation"
+   }
+  ],
+  "change-143": [
+   {
+    "id": "change-143",
+    "kind": "change",
+    "state": "open",
+    "fields": {
+     "ref": "PR #2432 (branch feat/lin-4459-run-live-wait)",
+     "head": "e9a3cb324"
+    },
+    "links": {},
+    "in": "task-113",
+    "v": 1,
+    "op": "add",
+    "at": "2026-11-13T16:33:21.000Z",
+    "by": "implementation"
+   }
+  ],
+  "decision-144": [
+   {
+    "id": "decision-144",
+    "kind": "decision",
+    "state": "stands",
+    "fields": {
+     "answer": "Yes: the lineage read by rootItemId covers held-wake holders",
+     "why": "Witnessed with real store writes: a ci-wake `custom` follow-up and a held-wake `leftover` holder both carry the parked stage's `rootItemId` and entry tags, so no `heldWakeHolderOf` call is needed beside the lineage read."
+    },
+    "links": {
+     "answers": "question-128",
+     "about": [
+      "plan-91"
+     ]
+    },
+    "in": "task-113",
+    "v": 1,
+    "op": "add",
+    "at": "2026-11-13T16:33:22.000Z",
+    "by": "implementation"
+   }
+  ],
+  "decision-145": [
+   {
+    "id": "decision-145",
+    "kind": "decision",
+    "state": "stands",
+    "fields": {
+     "answer": "Departure from plan-91 piece 4: a parked stage's terminal is read from the store's shared lineage, `listHistory({ withLineage: true })` giving each row the wire outcome from `deriveLineageFields` through one batched lineage read over the page's anchors, not from `resolveFollowUpRoot`/`heldWakeHolderOf`. Scope kept to the plan: only a stage parked `[pending]` on its own row is judged by its lineage (blocked, skipped or a terminal word ends it); a parked stage whose lineage ends done/failed/aborted is also not live, a no-op in practice since those already reach the closed stamp.",
+     "why": "Both helpers are async per-row store walks that go up from a follow-up, while a parked stage needs its descendants; `recentRuns`/`stageRuns` are pure and synchronous; a second walk would be a second definition of what ended. Validated with real store writes first (decision-144). Recorded on LIN-4447 (comment d3553049); PR #2432."
+    },
+    "links": {
+     "on": [
+      "plan-91@2",
+      "decision-144@1"
+     ],
+     "about": [
+      "finding-126",
+      "finding-127",
+      "finding-136",
+      "finding-137",
+      "task-113",
+      "task-82"
+     ]
+    },
+    "in": "task-113",
+    "v": 1,
+    "op": "add",
+    "at": "2026-11-13T16:33:23.000Z",
+    "by": "implementation"
+   }
+  ],
+  "finding-146": [
+   {
+    "id": "finding-146",
+    "kind": "finding",
+    "state": "open",
+    "fields": {
+     "says": "A stage that is not parked `[pending]` and whose follow-up posts `[blocked]` still reads running and holds the live-stage wait. LIN-4459 kept this out of scope (only a parked stage is judged by its lineage); it is a separate rule and needs a decision on whether a blocked follow-up should release an unparked stage. Posted on LIN-4447 (comment d3553049)."
+    },
+    "links": {
+     "about": [
+      "decision-145",
+      "area-1"
+     ]
+    },
+    "in": "task-82",
+    "to": "John",
+    "v": 1,
+    "op": "add",
+    "at": "2026-11-13T16:33:25.000Z",
+    "by": "implementation"
+   }
+  ],
+  "finding-147": [
+   {
+    "id": "finding-147",
+    "kind": "finding",
+    "state": "open",
+    "fields": {
+     "says": "PR #2432 (e9a3cb324) consequences to check, not changed in scope: selector lines and look-first's \"newest run waiting on a person\" off-switch now see the lineage's end; a parked blind read whose lineage ends counts as an ended read; a stage ended by its lineage is dated by its park, because the wire row does not carry the lineage's end time. Witness: W1 and W2 in the live-wait tests failed before the change (`running`) and pass after; the three live-wait files (126 tests) and 65 related files (2073 tests) pass locally; CI run 43465308840 green on e9a3cb324 (unit, unit proxy +400d, E2E 1-4, secret scan, ci-success)."
+    },
+    "links": {
+     "about": [
+      "change-143",
+      "decision-145"
+     ]
+    },
+    "in": "task-113",
+    "to": "review",
+    "v": 1,
+    "op": "add",
+    "at": "2026-11-13T16:33:26.000Z",
+    "by": "implementation"
+   }
+  ],
+  "question-148": [
+   {
+    "id": "question-148",
+    "kind": "question",
+    "state": "open",
+    "fields": {
+     "asks": "LIN-4459 (piece 4) is built in PR #2432: on your side `lib/openrouter.js`, `lib/proxy-instructions.js`, `lib/recommendation-blind-read.js`, `lib/recommendation-facts.js` and `lib/recommendation-look-first.js` change only import or comment text; the code-route list in `openrouter.js` is untouched; in `docs/areas/llm-and-prompts.md` the two live-wait entries leave and the claim compare-and-set note moves to the Runs note unchanged. Do you still agree before the PR merges? (Renewed ask, LIN-4448 comment 0510ffe0; posted with the PR, not before building.)",
+     "options": [
+      "agree",
+      "a different boundary"
+     ],
+     "if-unanswered": "The move stands on decision-119's agreement; the PR waits for a reply on LIN-4459 or LIN-4447 before merging."
+    },
+    "links": {
+     "about": [
+      "decision-119",
+      "change-143"
+     ]
+    },
+    "in": "task-113",
+    "to": "task-83",
+    "v": 1,
+    "op": "add",
+    "at": "2026-11-13T16:33:27.000Z",
     "by": "implementation"
    }
   ]
@@ -4070,6 +4238,21 @@
     "find",
     "--kind",
     "run",
+    "--in",
+    "task-113",
+    "--by",
+    "implementation"
+   ],
+   "asOf": null
+  },
+  {
+   "at": "2026-11-17T15:33:15.706Z",
+   "by": "implementation",
+   "cmd": "find",
+   "args": [
+    "find",
+    "--kind",
+    "decision",
     "--in",
     "task-113",
     "--by",
