@@ -1,0 +1,232 @@
+[
+ {
+  "at": "2026-11-17T14:53:15.487Z",
+  "by": "blind-read",
+  "q": [
+   "show",
+   "--task",
+   "task-60",
+   "--by",
+   "blind-read"
+  ]
+ },
+ {
+  "at": "2026-11-17T14:53:15.532Z",
+  "by": "blind-read",
+  "q": [
+   "find",
+   "--in",
+   "area-1",
+   "--state",
+   "open",
+   "--by",
+   "blind-read"
+  ]
+ },
+ {
+  "at": "2026-11-17T14:53:19.629Z",
+  "by": "blind-read",
+  "q": [
+   "find",
+   "--to",
+   "area-1",
+   "--state",
+   "open",
+   "--by",
+   "blind-read"
+  ]
+ },
+ {
+  "at": "2026-11-17T14:53:19.675Z",
+  "by": "blind-read",
+  "q": [
+   "find",
+   "--to",
+   "area-1",
+   "--state",
+   "open",
+   "--by",
+   "blind-read"
+  ]
+ },
+ {
+  "at": "2026-11-17T14:53:23.699Z",
+  "by": "blind-read",
+  "q": [
+   "get",
+   "finding-22",
+   "--by",
+   "blind-read"
+  ]
+ },
+ {
+  "at": "2026-11-17T14:53:23.736Z",
+  "by": "blind-read",
+  "q": [
+   "get",
+   "question-75",
+   "--by",
+   "blind-read"
+  ]
+ },
+ {
+  "at": "2026-11-17T14:53:23.771Z",
+  "by": "blind-read",
+  "q": [
+   "get",
+   "finding-69",
+   "--by",
+   "blind-read"
+  ]
+ },
+ {
+  "at": "2026-11-17T14:53:23.799Z",
+  "by": "blind-read",
+  "q": [
+   "get",
+   "finding-70",
+   "--by",
+   "blind-read"
+  ]
+ },
+ {
+  "at": "2026-11-17T14:53:23.832Z",
+  "by": "blind-read",
+  "q": [
+   "get",
+   "finding-72",
+   "--by",
+   "blind-read"
+  ]
+ },
+ {
+  "at": "2026-11-17T14:53:23.864Z",
+  "by": "blind-read",
+  "q": [
+   "get",
+   "change-80",
+   "--by",
+   "blind-read"
+  ]
+ },
+ {
+  "at": "2026-11-17T14:53:29.353Z",
+  "by": "blind-read",
+  "q": [
+   "find",
+   "--text",
+   "lastWakeEntry",
+   "--by",
+   "blind-read"
+  ]
+ },
+ {
+  "at": "2026-11-17T14:53:29.398Z",
+  "by": "blind-read",
+  "q": [
+   "find",
+   "--text",
+   "run-view",
+   "--by",
+   "blind-read"
+  ]
+ },
+ {
+  "at": "2026-11-17T14:53:29.437Z",
+  "by": "blind-read",
+  "q": [
+   "find",
+   "--text",
+   "runner-kickoff",
+   "--by",
+   "blind-read"
+  ]
+ },
+ {
+  "at": "2026-11-17T14:53:29.472Z",
+  "by": "blind-read",
+  "q": [
+   "find",
+   "--text",
+   "mayCarryWake",
+   "--by",
+   "blind-read"
+  ]
+ },
+ {
+  "at": "2026-11-17T14:53:29.523Z",
+  "by": "blind-read",
+  "q": [
+   "find",
+   "--text",
+   "setHeldWakeReleaseNote",
+   "--by",
+   "blind-read"
+  ]
+ },
+ {
+  "at": "2026-11-17T14:53:29.571Z",
+  "by": "blind-read",
+  "q": [
+   "find",
+   "--text",
+   "re-export",
+   "--by",
+   "blind-read"
+  ]
+ },
+ {
+  "at": "2026-11-17T14:53:29.619Z",
+  "by": "blind-read",
+  "q": [
+   "find",
+   "--text",
+   "?.",
+   "--by",
+   "blind-read"
+  ]
+ },
+ {
+  "at": "2026-11-17T14:53:29.657Z",
+  "by": "blind-read",
+  "q": [
+   "find",
+   "--kind",
+   "area",
+   "--by",
+   "blind-read"
+  ]
+ },
+ {
+  "at": "2026-11-17T14:53:29.695Z",
+  "by": "blind-read",
+  "q": [
+   "find",
+   "--to",
+   "blind-read",
+   "--by",
+   "blind-read"
+  ]
+ },
+ {
+  "at": "2026-11-17T14:53:29.729Z",
+  "by": "blind-read",
+  "q": [
+   "get",
+   "finding-74",
+   "--by",
+   "blind-read"
+  ]
+ },
+ {
+  "at": "2026-11-17T14:53:41.123Z",
+  "by": "blind-read",
+  "q": [
+   "find",
+   "--kind",
+   "task",
+   "--by",
+   "blind-read"
+  ]
+ }
+]

@@ -1,5 +1,5 @@
 {
- "next": 76,
+ "next": 77,
  "records": {
   "task-1": [
    {
@@ -1853,6 +1853,33 @@
     "at": "2026-11-13T17:54:22.000Z",
     "via": "Harbour"
    }
+  ],
+  "run-76": [
+   {
+    "id": "run-76",
+    "kind": "run",
+    "in": "task-28",
+    "stage": "leftover",
+    "claims": [
+     "lib/time-words.js",
+     "lib/render-run-steps.js",
+     "lib/task-page-loader.js",
+     "tests/unit/lin-4472-time-words.test.js",
+     "docs/architecture/source-map.md",
+     "docs/areas/front-end-browser.md",
+     "docs/areas/front-end-pages.md",
+     "tests/e2e/task-page.spec.js"
+    ],
+    "account": "Leftovers on LIN-4472 (PR #2436). Tidied the old import paths: every server caller of fmtDuration/relativeAgo imports lib/time-words.js, the re-exports in render-run-steps.js and task-page-loader.js are gone, and the identity test is now a guard over lib/, routes/, server.js (decision-70); re-adding one re-export as a mutation made the guard fail. Fixed comments the change made untrue (time-words.js header, source-map.md). Noted the three classic browser copies in the browser area Waiting entry (finding-73, revised with the names). Added the importWorld lesson to the browser area note. Retired the front-end-pages Waiting entry on the layout test desktop check of the quiet offers: task-page.spec.js now polls the offset; 5/5 locally with retries off. CI green on head ffa70b78.",
+    "links": {
+     "on": "decision-70@1"
+    },
+    "state": "open",
+    "v": 1,
+    "op": "add",
+    "by": "leftover",
+    "at": "2026-11-13T17:50:41.000Z"
+   }
   ]
  },
  "log": [
@@ -2594,6 +2621,111 @@
     "area-49",
     "--state",
     "open",
+    "--by",
+    "leftover"
+   ]
+  },
+  {
+   "at": "2026-11-17T14:54:08.554Z",
+   "by": "leftover",
+   "q": [
+    "show",
+    "--task",
+    "task-28",
+    "--by",
+    "leftover"
+   ]
+  },
+  {
+   "at": "2026-11-17T14:54:08.588Z",
+   "by": "leftover",
+   "q": [
+    "find",
+    "--kind",
+    "area",
+    "--by",
+    "leftover"
+   ]
+  },
+  {
+   "at": "2026-11-17T14:54:14.742Z",
+   "by": "leftover",
+   "q": [
+    "get",
+    "decision-70",
+    "--by",
+    "leftover"
+   ]
+  },
+  {
+   "at": "2026-11-17T14:54:14.785Z",
+   "by": "leftover",
+   "q": [
+    "get",
+    "change-69",
+    "--by",
+    "leftover"
+   ]
+  },
+  {
+   "at": "2026-11-17T14:54:14.823Z",
+   "by": "leftover",
+   "q": [
+    "get",
+    "run-68",
+    "--by",
+    "leftover"
+   ]
+  },
+  {
+   "at": "2026-11-17T14:54:14.858Z",
+   "by": "leftover",
+   "q": [
+    "find",
+    "--text",
+    "quiet offer",
+    "--by",
+    "leftover"
+   ]
+  },
+  {
+   "at": "2026-11-17T14:54:14.894Z",
+   "by": "leftover",
+   "q": [
+    "find",
+    "--kind",
+    "lesson",
+    "--by",
+    "leftover"
+   ]
+  },
+  {
+   "at": "2026-11-17T14:54:14.928Z",
+   "by": "leftover",
+   "q": [
+    "find",
+    "--text",
+    "importWorld",
+    "--by",
+    "leftover"
+   ]
+  },
+  {
+   "at": "2026-11-17T14:54:36.212Z",
+   "by": "leftover",
+   "q": [
+    "get",
+    "finding-53",
+    "--by",
+    "leftover"
+   ]
+  },
+  {
+   "at": "2026-11-17T14:54:36.247Z",
+   "by": "leftover",
+   "q": [
+    "get",
+    "finding-73",
     "--by",
     "leftover"
    ]

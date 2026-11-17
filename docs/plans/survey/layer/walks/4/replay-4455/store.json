@@ -1,5 +1,5 @@
 {
- "next": 100,
+ "next": 101,
  "records": {
   "area-1": [
    {
@@ -498,6 +498,19 @@
     "by": "implementation",
     "at": "2026-11-13T15:10:02.000Z",
     "reason": "LIN-4455 added the second policy surface finding-74 warned of"
+   },
+   {
+    "id": "finding-22",
+    "kind": "finding",
+    "to": "area-1",
+    "says": "Waiting 5: `lib/dispatch-store.js`: `addFeedback` takes one `wakeHook`; a second held-wake feature first needs composable hooks. (Operator, LIN-4377.) Since LIN-4455 (PR #2427) the store takes held-wake policy two ways: the per-request `wakeHook` for feedback and the late-bound `setHeldWakeReleaseNote` for releases with no request. One composable held-wake policy should unify both; the setter's docblock names this entry. Blind read of #2427: in production both channels carry the same function from `createLeftoverStep` (`lib/dispatch-leftover-hook.js`), so `releaseHeldWake`'s `releaseNote` option, `_releaseNoteFor`'s precedence and `hook.releaseNote` are a second path to a value the store already holds; and building the step now mutates the store as a hidden side effect. A redesign of how the store takes held-wake policy, not a fix.",
+    "links": {},
+    "state": "open",
+    "v": 3,
+    "op": "revise",
+    "by": "blind-read",
+    "at": "2026-11-13T15:54:38.000Z",
+    "reason": "blind read of PR #2427: the two channels carry one value in production, and building the step mutates the store"
    }
   ],
   "finding-23": [
@@ -2185,6 +2198,21 @@
     "op": "add",
     "by": "blind-read",
     "at": "2026-11-13T15:54:33.000Z"
+   },
+   {
+    "id": "run-95",
+    "kind": "run",
+    "in": "task-60",
+    "stage": "blind-read",
+    "account": "Blind-read PR #2427 at c95b9f139 against c205190fd (comment on LIN-4455, 15:56:30). Verdict better: one owner each for the feedback kinds (leaf table replaces the allowlist, parked-wait relays and four stamp copies), NEVER_RAN (seven restatements), HALT_MODES and followUpTarget, and the store no longer picks the leftover wording, all census-guarded. Worse, smaller: release wording reaches the store two ways via a factory that mutates the store when built, and a mayCarryWake column true on every row that run-view contradicts. Two fix-sized items to leftover, the two larger ones to the area (the two-channel one folded into Waiting 5), one outside-area import to the parent for the prompts side. Closed nothing.",
+    "links": {},
+    "state": "done",
+    "v": 2,
+    "op": "end",
+    "by": "blind-read",
+    "at": "2026-11-13T15:54:40.000Z",
+    "stateReason": "blind read posted on LIN-4455 (15:56:30); verdict-96 better",
+    "reason": "blind read posted on LIN-4455 (15:56:30); verdict-96 better"
    }
   ],
   "verdict-96": [
@@ -2254,6 +2282,23 @@
     "op": "add",
     "by": "blind-read",
     "at": "2026-11-13T15:54:37.000Z"
+   }
+  ],
+  "finding-100": [
+   {
+    "id": "finding-100",
+    "kind": "finding",
+    "in": "task-60",
+    "to": "task-39",
+    "says": "Outside the area (llm-and-prompts, A14 / LIN-4448 side): `lib/prompts/runner-kickoff.js` still imports `FEEDBACK_ENTRY_KINDS` from `../dispatch-store.js`, the only importer of the store's new re-export shim (`export { FEEDBACK_ENTRY_KINDS } from './dispatch-feedback-kinds.js'`); the kinds module's docblock describes this as \"through the store's re-export\". Importing from the leaf would let the store drop the shim and keep the prompt module off the store's import graph.",
+    "links": {
+     "about": "decision-81"
+    },
+    "state": "open",
+    "v": 1,
+    "op": "add",
+    "by": "blind-read",
+    "at": "2026-11-13T15:54:39.000Z"
    }
   ]
  },
