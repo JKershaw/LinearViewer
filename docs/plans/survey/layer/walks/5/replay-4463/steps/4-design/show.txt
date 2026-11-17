@@ -1,0 +1,27 @@
+task-16 task v2 [open] by design
+run-17 run v3 [done] by undefined
+finding-18 finding v2 [done] to design by undefined
+question-19 question v2 [answered] to design answered-by decision-31 by undefined
+finding-20 finding v2 [handed-on] to design by undefined
+finding-21 finding v2 [declined] to design by undefined
+finding-22 finding v2 [handed-on] to scoping by undefined
+finding-23 finding v2 [done] to design by undefined
+finding-24 finding v2 [handed-on] to breakdown by undefined
+run-25 run v4 [done] by undefined
+finding-26 finding v2 [done] to design by undefined
+finding-27 finding v2 [handed-on] to design by undefined
+finding-28 finding v2 [handed-on] to Harbour by undefined
+finding-29 finding v3 [handed-on] to breakdown by undefined
+finding-30 finding v1 [open] to scoping by undefined
+decision-31 decision v1 [stands] by undefined
+check-32 check v2 [open] to implementation by undefined
+decision-33 decision v1 [stands] by undefined
+run-34 run v2 [done] by undefined
+run-35 run v2 [done] by undefined
+decision-36 decision v1 [stands] by undefined
+decision-37 decision v1 [stands] by undefined
+decision-38 decision v1 [stands] by undefined
+plan-39 plan v1 [kept] by undefined
+plan-40 plan v1 [kept] by undefined
+check-41 check v1 [open] to review by undefined
+check-42 check v1 [open] to implementation by undefined

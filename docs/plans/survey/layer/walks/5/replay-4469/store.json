@@ -1,5 +1,5 @@
 {
- "next": 146,
+ "next": 147,
  "records": {
   "area-1": [
    {
@@ -3180,6 +3180,23 @@
     "at": "2026-11-13T22:39:29.000Z",
     "by": "implementation"
    }
+  ],
+  "run-146": [
+   {
+    "id": "run-146",
+    "kind": "run",
+    "state": "open",
+    "fields": {
+     "stage": "autopilot",
+     "account": "At 22:39Z recommend-and-dispatch on LIN-4469 (piece 5) sent implementation directly (dispatch b86c4a78). The ticket had only As asked and Current: no size record, plan, PR or earlier run, so the look-first sequence (survey-task, survey-place, scoping) that ran on pieces 0 to 4 did not run. I did not override or abort: piece 5s plan is approved at the parent (verdict-124) and review has caught real gaps on every earlier piece. Recorded the skip as raw material for the look-first rule (to LLM & prompts, which holds lib/recommendation-look-first.js) and asked review to watch PR #2447 for a move of the wrong size. Posted as a comment on LIN-4448 (cea38032)."
+    },
+    "links": {},
+    "in": "task-131",
+    "v": 1,
+    "op": "add",
+    "at": "2026-11-13T22:39:49.000Z",
+    "by": "autopilot"
+   }
   ]
  },
  "log": [
@@ -3443,6 +3460,173 @@
     "task-131",
     "--by",
     "implementation"
+   ],
+   "asOf": null
+  },
+  {
+   "at": "2026-11-17T15:28:07.045Z",
+   "by": "autopilot",
+   "cmd": "show",
+   "args": [
+    "show",
+    "--task",
+    "task-131",
+    "--by",
+    "autopilot"
+   ],
+   "asOf": null
+  },
+  {
+   "at": "2026-11-17T15:28:07.073Z",
+   "by": "autopilot",
+   "cmd": "find",
+   "args": [
+    "find",
+    "--kind",
+    "run",
+    "--in",
+    "task-131",
+    "--by",
+    "autopilot"
+   ],
+   "asOf": null
+  },
+  {
+   "at": "2026-11-17T15:28:07.100Z",
+   "by": "autopilot",
+   "cmd": "find",
+   "args": [
+    "find",
+    "--text",
+    "look-first",
+    "--by",
+    "autopilot"
+   ],
+   "asOf": null
+  },
+  {
+   "at": "2026-11-17T15:28:21.265Z",
+   "by": "autopilot",
+   "cmd": "find",
+   "args": [
+    "find",
+    "--path",
+    "lib/recommendation-look-first.js",
+    "--kind",
+    "area",
+    "--by",
+    "autopilot"
+   ],
+   "asOf": null
+  },
+  {
+   "at": "2026-11-17T15:28:21.309Z",
+   "by": "autopilot",
+   "cmd": "get",
+   "args": [
+    "get",
+    "change-142",
+    "--by",
+    "autopilot"
+   ],
+   "asOf": null
+  },
+  {
+   "at": "2026-11-17T15:28:21.346Z",
+   "by": "autopilot",
+   "cmd": "find",
+   "args": [
+    "find",
+    "--kind",
+    "check",
+    "--in",
+    "task-131",
+    "--by",
+    "autopilot"
+   ],
+   "asOf": null
+  },
+  {
+   "at": "2026-11-17T15:28:21.383Z",
+   "by": "autopilot",
+   "cmd": "find",
+   "args": [
+    "find",
+    "--text",
+    "look-first",
+    "--kind",
+    "lesson",
+    "--by",
+    "autopilot"
+   ],
+   "asOf": null
+  },
+  {
+   "at": "2026-11-17T15:28:24.406Z",
+   "by": "autopilot",
+   "cmd": "get",
+   "args": [
+    "get",
+    "area-1",
+    "--by",
+    "autopilot"
+   ],
+   "asOf": null
+  },
+  {
+   "at": "2026-11-17T15:28:24.444Z",
+   "by": "autopilot",
+   "cmd": "get",
+   "args": [
+    "get",
+    "area-65",
+    "--by",
+    "autopilot"
+   ],
+   "asOf": null
+  },
+  {
+   "at": "2026-11-17T15:28:24.484Z",
+   "by": "autopilot",
+   "cmd": "find",
+   "args": [
+    "find",
+    "--text",
+    "look-first",
+    "--by",
+    "autopilot",
+    "--count"
+   ],
+   "asOf": null
+  },
+  {
+   "at": "2026-11-17T15:28:24.525Z",
+   "by": "autopilot",
+   "cmd": "find",
+   "args": [
+    "find",
+    "--text",
+    "survey-task",
+    "--kind",
+    "finding",
+    "--state",
+    "open",
+    "--by",
+    "autopilot",
+    "--count"
+   ],
+   "asOf": null
+  },
+  {
+   "at": "2026-11-17T15:28:29.057Z",
+   "by": "autopilot",
+   "cmd": "find",
+   "args": [
+    "find",
+    "--text",
+    "look-first",
+    "--by",
+    "autopilot"
    ],
    "asOf": null
   }

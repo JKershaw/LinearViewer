@@ -1,5 +1,5 @@
 {
- "next": 94,
+ "next": 98,
  "records": {
   "area-1": [
    {
@@ -1888,6 +1888,26 @@
     "op": "add",
     "at": "2026-11-13T15:56:33.000Z",
     "by": "survey-task"
+   },
+   {
+    "id": "finding-85",
+    "kind": "finding",
+    "state": "open",
+    "fields": {
+     "says": "The kit cannot be used fully unchanged: `docs/plans/survey/area-read.md` names Runs as the work area, posts to LIN-4447 under `@ 4b5001ddf` headings and writes the verdict as D = Δ(Runs) − Δ(control). The salt and N=14 carry over; the area, base, target ticket and verdict wording do not. Editing the kit breaks its blob pin (kit `cbec2d848`, reader prompt `ef1c2ca91`, both unchanged at `e8e92d50a`) for LIN-4462's after-read, so leave the file alone and record them in each report's header: area, base `e8e92d50a` (origin/main, the #2426/LIN-4456 merge, after `5dcf5bcda`), target LIN-4448, verdict mapping, the byte-imbalance limit, the full contamination list, `areas.json` blob `1dc2ba701` (no change to either sample), the LLM note blob `b6b4c726d` (25 Waiting entries). Order: fix the base at `e8e92d50a` even if main moves, provided none of pieces 1–6 has landed; write the header before running any reader; then four fresh passes."
+    },
+    "links": {
+     "about": [
+      "plan-64"
+     ]
+    },
+    "in": "task-78",
+    "to": "implementation",
+    "v": 2,
+    "op": "revise",
+    "at": "2026-11-13T15:59:42.000Z",
+    "by": "survey-place",
+    "reason": "Base moved: main is now e8e92d50a (#2426 merged); kit and prompt blobs re-checked unchanged"
    }
   ],
   "finding-86": [
@@ -1910,6 +1930,27 @@
     "op": "add",
     "at": "2026-11-13T15:56:34.000Z",
     "by": "survey-task"
+   },
+   {
+    "id": "finding-86",
+    "kind": "finding",
+    "state": "open",
+    "fields": {
+     "says": "The pairing is not balanced the way the kit claims. The kit chose N=14 for a 3.4% byte gap (Runs vs control); at `e8e92d50a` the samples are 380,459 B for llm-and-prompts (14 of 91 files) and 206,545 B for front-end-pages (14 of 92), 1.84×. `lib/prompt-template-defs.js` (120,531 B) and `lib/openrouter.js` (103,188 B) are 59% of the LLM sample, so K3/K4 will mostly score those two files; each pass takes about 395 KB (sample plus the 14,838 B note), nearly twice the bundle size that forced the kit's file-path delivery, and the noise guard (≥1.0 apart) is more likely to trip. N is frozen: record the gap as a known limit in both reports, don't fix it. The kit's Known limits 1–2 flip here: all three planned files (`openrouter`, `prompt-template-defs`, `recommendation-live-wait`) are sampled (ranks 1, 5, 8), so the read is sensitive to the work but mostly measures two files. Do not copy kit limits 1–2; they would state the opposite of what is true."
+    },
+    "links": {
+     "about": [
+      "plan-64",
+      "plan-70"
+     ]
+    },
+    "in": "task-78",
+    "to": "implementation",
+    "v": 2,
+    "op": "revise",
+    "at": "2026-11-13T15:59:43.000Z",
+    "by": "survey-place",
+    "reason": "Survey-place: confirmed at e8e92d50a; adds the bundle-size comparison and that the kit's Known limits 1-2 invert for this area"
    }
   ],
   "finding-87": [
@@ -1932,6 +1973,27 @@
     "op": "add",
     "at": "2026-11-13T15:56:35.000Z",
     "by": "survey-task"
+   },
+   {
+    "id": "finding-87",
+    "kind": "finding",
+    "state": "open",
+    "fields": {
+     "says": "The control has more contamination than the ticket says. Three of its 14 sample files changed since `4b5001ddf`: `lib/render-proxy.js` (812d9adbb, #2424, as noted), and `lib/render-swipe.js` and `lib/render-task-page.js` from #2423 (LIN-4446), which the ticket does not mention; `render-task-page.js` is also one of LIN-4453's four tracked files. The control's note changed too: `front-end-pages.md` went from 6,404 B to 5,825 B (blob `ae9c007e1`), Waiting entries 14 to 12. All of it falls inside this baseline (base `e8e92d50a`), so the pair holds; record all of it in both reports. This control read's M scores will not match LIN-4453's baseline. Because the salt is unchanged, the control paths match LIN-4453's, so this read is a free midpoint for LIN-4453: note that, don't claim it."
+    },
+    "links": {
+     "about": [
+      "verdict-71@1",
+      "area-44"
+     ]
+    },
+    "in": "task-78",
+    "to": "implementation",
+    "v": 2,
+    "op": "revise",
+    "at": "2026-11-13T15:59:44.000Z",
+    "by": "survey-place",
+    "reason": "Base moved to e8e92d50a; adds the free-midpoint note for LIN-4453"
    }
   ],
   "finding-88": [
@@ -1953,6 +2015,26 @@
     "op": "add",
     "at": "2026-11-13T15:56:36.000Z",
     "by": "survey-task"
+   },
+   {
+    "id": "finding-88",
+    "kind": "finding",
+    "state": "open",
+    "fields": {
+     "says": "Open PRs at `e8e92d50a`: #2426 (LIN-4456) has merged and is the base. #2427 (LIN-4455) and the eleven other open PRs touch neither sample (28 files). Record that in both reports. Write PRs as `#2427`, never full URLs: a report posted as a comment that names a full PR URL joins the ticket's landing, because `landingPrUrls` skips only blind reads and survey reports (Runs Waiting entry, LIN-4453 leftover)."
+    },
+    "links": {
+     "about": [
+      "task-78"
+     ]
+    },
+    "in": "task-78",
+    "to": "implementation",
+    "v": 2,
+    "op": "revise",
+    "at": "2026-11-13T15:59:45.000Z",
+    "by": "survey-place",
+    "reason": "Re-checked at e8e92d50a: #2426 merged; 13 open PRs, none touch either sample; landingPrUrls reason made exact"
    }
   ],
   "finding-89": [
@@ -1974,6 +2056,26 @@
     "op": "add",
     "at": "2026-11-13T15:56:37.000Z",
     "by": "survey-task"
+   },
+   {
+    "id": "finding-89",
+    "kind": "finding",
+    "state": "open",
+    "fields": {
+     "says": "Smaller traps: (1) \"frozen prompt\" in the done-when means the kit's reader prompt, not the parent's 378,915 B prompt budget. (2) The reader prompt's K2 examples are about Runs (close-out, PRs per task, dispatch model); they are frozen, so note it in both reports; Δ is still sound, but do not compare absolute scores across areas. (3) Commit the reports as `docs/plans/survey/area-read-reports/{llm-and-prompts,front-end-pages}-e8e92d50a.md`, as in #2422. (4) If you also post them as comments, use the `## Area read:` heading, not `## Blind read` (422)."
+    },
+    "links": {
+     "about": [
+      "plan-64"
+     ]
+    },
+    "in": "task-78",
+    "to": "implementation",
+    "v": 2,
+    "op": "revise",
+    "at": "2026-11-13T15:59:46.000Z",
+    "by": "survey-place",
+    "reason": "Report names follow the new base e8e92d50a; K2 note made explicit"
    }
   ],
   "decision-90": [
@@ -2078,6 +2180,108 @@
     "ended": {
      "reason": "Ruling applied to LIN-4468 and LIN-4469; nothing left open from it."
     }
+   }
+  ],
+  "run-94": [
+   {
+    "id": "run-94",
+    "kind": "run",
+    "state": "open",
+    "fields": {
+     "stage": "survey-place",
+     "account": "Surveyed where LIN-4464 lands, at e8e92d50a (#2426 merge, after 5dcf5bcda; kit and prompt blobs unchanged). The kit is frozen but written as a one-off for Runs: only the snippet and prompt take parameters, so copying the method-as-run file and swapping Runs for LLM would leave a second method copy whose limits state the opposite of what is true here. Recommended one short addendum citing the kit by blob, listing only what differs, with full fields in each report. Confirmed the byte gap and flipped limits, the control drift, six unsampled control files that import openrouter.js, and that no open PR touches either sample. Revised the survey-task findings to the new base; added three findings; closed nothing."
+    },
+    "links": {},
+    "in": "task-78",
+    "v": 1,
+    "op": "add",
+    "at": "2026-11-13T15:59:41.000Z",
+    "by": "survey-place"
+   },
+   {
+    "id": "run-94",
+    "kind": "run",
+    "state": "done",
+    "fields": {
+     "stage": "survey-place",
+     "account": "Surveyed where LIN-4464 lands, at e8e92d50a (#2426 merge, after 5dcf5bcda; kit and prompt blobs unchanged). The kit is frozen but written as a one-off for Runs: only the snippet and prompt take parameters, so copying the method-as-run file and swapping Runs for LLM would leave a second method copy whose limits state the opposite of what is true here. Recommended one short addendum citing the kit by blob, listing only what differs, with full fields in each report. Confirmed the byte gap and flipped limits, the control drift, six unsampled control files that import openrouter.js, and that no open PR touches either sample. Revised the survey-task findings to the new base; added three findings; closed nothing."
+    },
+    "links": {},
+    "in": "task-78",
+    "v": 2,
+    "op": "end",
+    "at": "2026-11-13T15:59:50.000Z",
+    "by": "survey-place",
+    "ended": {
+     "reason": "Survey-place posted on LIN-4464; five findings revised to base e8e92d50a, three added; nothing closed"
+    }
+   }
+  ],
+  "finding-95": [
+   {
+    "id": "finding-95",
+    "kind": "finding",
+    "state": "open",
+    "fields": {
+     "says": "Where it lands: in `docs/plans/survey/` (the kit, the method-as-run addendum, `area-read-reports/`). The kit is frozen but written as a one-off: its table, its headings (`@ 4b5001ddf`, \"comment on LIN-4447\"), its verdict (Δ Runs − Δ control) and its Known limits all name Runs; only the snippet and the prompt take parameters. This is its second use. Do not copy `area-read-method-as-run.md` and swap Runs for LLM: that leaves a second copy of the method beside a kit whose words do not fit this read. Instead write one short addendum that cites the kit by blob (`cbec2d848`, prompt `ef1c2ca91`) and lists only what differs: base, area, byte gap, flipped limits, the six-file import table and the control's three moved files. Full recorded fields go in each report, as in #2422."
+    },
+    "links": {
+     "about": [
+      "plan-64"
+     ],
+     "on": [
+      "finding-85@2"
+     ]
+    },
+    "in": "task-78",
+    "to": "implementation",
+    "v": 1,
+    "op": "add",
+    "at": "2026-11-13T15:59:47.000Z",
+    "by": "survey-place"
+   }
+  ],
+  "finding-96": [
+   {
+    "id": "finding-96",
+    "kind": "finding",
+    "state": "open",
+    "fields": {
+     "says": "Control files the work imports: six unsampled front-end files import `lib/openrouter.js`, which piece 1 (LIN-4465) changes: `render-settings-models`, `render-roadmap`, `components/model-change-lines`, `render-settings`, `render-landing`, `components/decision-panel`. Record their blobs at the base in both reports, as the kit does for its four tracked files, so the repeat read can tell whether the control moved because of this work."
+    },
+    "links": {
+     "about": [
+      "area-44",
+      "task-78"
+     ]
+    },
+    "in": "task-78",
+    "to": "implementation",
+    "v": 1,
+    "op": "add",
+    "at": "2026-11-13T15:59:48.000Z",
+    "by": "survey-place"
+   }
+  ],
+  "finding-97": [
+   {
+    "id": "finding-97",
+    "kind": "finding",
+    "state": "open",
+    "fields": {
+     "says": "Not this task's: the area-read kit is a one-off that now needs a per-read addendum each use (Runs, then LLM; the piece-6 repeat read would need a third). Better: a parameterised kit under a new name, with base, area, N and salt as inputs and a per-read Known limits section; keep `area-read.md` frozen for its blob pin. Also add an area-read kind to the comment classifier (LIN-4458), so `landingPrUrls` skips area-read comments as it does blind reads and survey reports."
+    },
+    "links": {
+     "about": [
+      "plan-64"
+     ]
+    },
+    "in": "task-78",
+    "to": "task-60",
+    "v": 1,
+    "op": "add",
+    "at": "2026-11-13T15:59:49.000Z",
+    "by": "survey-place"
    }
   ]
  },

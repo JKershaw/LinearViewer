@@ -1,5 +1,5 @@
 {
- "next": 35,
+ "next": 44,
  "records": {
   "area-1": [
    {
@@ -150,6 +150,21 @@
     "op": "add",
     "at": "2026-11-08T12:57:59.000Z",
     "by": "Harbour"
+   },
+   {
+    "id": "finding-8",
+    "kind": "finding",
+    "state": "open",
+    "fields": {
+     "says": "`public/brief.js`: its `postBrief`/`errorText` block is identical to `postRecap`/`errorText` in `public/recap.js`, and the check for a `statusCode` inside a keepalive 200 body is written four times (also `public/scan.js` and `public/observation.js`). It can be written once only after `scan.js`, `recap.js`, `observation.js` and `brief.js` are modules that import one reader; none converts in task-16, so it stays Waiting. (Area reads CG/CH, 8 Nov, on LIN-4358; disposition from task-16 design.)"
+    },
+    "links": {},
+    "to": "area-1",
+    "v": 2,
+    "op": "revise",
+    "at": "2026-11-13T15:51:35.000Z",
+    "by": "design",
+    "reason": "task-16 design: what unlocks it changes; one reader needs all four files as modules, not a common.js global"
    }
   ],
   "finding-9": [
@@ -166,6 +181,26 @@
     "op": "add",
     "at": "2026-11-13T15:22:55.000Z",
     "by": "Harbour"
+   },
+   {
+    "id": "finding-9",
+    "kind": "finding",
+    "state": "open",
+    "fields": {
+     "says": "`public/common.js`: exported globals, and the \"client twins\" of `lib/task-page-href.js`, `lib/timeline-zoom.js`, `lib/ship-layout.js` and `lib/prompt-formatters.js`. Each twin retires when its last classic consumer converts, never through a bridge. `timeline-zoom` and `task-page-href` are leaves (no imports), so they go first once a consumer page is a module; the last two import other modules, so serving a single file will not do for them. Its `TERMINAL_TYPES` mirror of `lib/providers/models.js` (no imports) is another leaf candidate; the stale comment saying `public/` cannot import it is fixed in task-16 piece 1. (LIN-4446 plan and leftover; disposition from task-16 design.)"
+    },
+    "links": {
+     "about": [
+      "decision-37",
+      "plan-39"
+     ]
+    },
+    "to": "area-1",
+    "v": 2,
+    "op": "revise",
+    "at": "2026-11-13T15:51:36.000Z",
+    "by": "design",
+    "reason": "task-16 design: twins retire with their last classic consumer, not through a bridge; the comment fix is scheduled in piece 1"
    }
   ],
   "finding-10": [
@@ -319,6 +354,26 @@
     "at": "2026-11-13T15:39:22.240Z",
     "by": "John",
     "via": "driving-session"
+   },
+   {
+    "id": "task-16",
+    "kind": "task",
+    "state": "open",
+    "fields": {
+     "ref": "LIN-4463",
+     "asked": "**Repository:** JKershaw/LinearViewer (Harbour).\n\n**What this is for.** John: \"the UI issues trace back to one of my very first rules: no build step… it's the biggest target of the Theseus method… We don't need to tidy it all, but it's a perfect example where we can leave it better than we found it.\" The first slice (LIN-4446) served a pure server file to the browser at `/shared/` and retired the browser's copy. Its blind read found the cost: a bridge turns the shared file back into a global, with a load-timing rule that four files explain and nothing checks, and a second shared file would need a second bridge. On the direction, John: \"I feel there's a sensible engineering approach, that a skilled developer would take… Excellent, that sounds like a great solution.\" Today the browser area has 44 script files that share through globals, `public/common.js` is 3,309 lines and `public/observation.js` 5,019, over 100 unit test files load browser scripts as classic scripts, and the area's note holds 10 Waiting entries.\n\n**What we want.**\n\n* Pages become ES modules that import what they share, as browsers do natively. Still no build step and no framework.\n* Shared logic is imported, not restated: each converted view drops its copies.\n* A bridge back to a global is only a temporary ramp for pages not yet converted: one at most, and visibly shrinking.\n* The tests get simpler as views convert, not more elaborate.\n* Taken one view at a time, each piece finishing one move and naming what it retired. John on size: \"Happy for it to be whatever size is natural.\"\n* No view is retired unless John rules it. The side rail and the visual refresh (LIN-4342, LIN-4343) come after, on the cleaner code.\n\n**Done when**\n\n* the slice 1 bridge is gone, or the only one left and shrinking under a check;\n* the area's Waiting entries are settled, or say why not;\n* the area reads better in a blind read after this work than before it, by more than an untouched area read at the same times.\n\n**Every change names what it retires. Questions:** settle engineering questions yourself; only John's calls (product, money, authority, what to retire) go to him as rulings.\n\n*End of what was asked. Steps write below this line; nothing above it changes.*",
+     "done-when": "* the slice 1 bridge is gone, or the only one left and shrinking under a check;\n* the area's Waiting entries are settled, or say why not;\n* the area reads better in a blind read after this work than before it, by more than an untouched area read at the same times.",
+     "paths": [
+      "public/"
+     ]
+    },
+    "links": {
+     "piece": "plan-39"
+    },
+    "v": 2,
+    "op": "link",
+    "at": "2026-11-13T15:51:30.000Z",
+    "by": "design"
    }
   ],
   "run-17": [
@@ -400,6 +455,29 @@
     "op": "add",
     "at": "2026-11-13T15:42:14.000Z",
     "by": "survey-task"
+   },
+   {
+    "id": "finding-18",
+    "kind": "finding",
+    "state": "done",
+    "fields": {
+     "says": "The real hub is `public/common.js`, not the slice 1 bridge (survey at c205190fd). It sets 51 `window.*` globals and 29 renderers load it first; a view cannot import from it while it stays classic. Making it a module in one go pushes all 51 globals through the one allowed bridge and changes their timing on 28 unconverted pages, since module scripts run after every classic script (the `window.CostFormat` trap). So \"one view at a time\" means one view plus a step into the hub, and the single bridge ends up carrying common.js, not cost-format. Watch for \"one bridge\" being read as \"one bridge per module\"."
+    },
+    "links": {
+     "about": [
+      "finding-9",
+      "lesson-5"
+     ]
+    },
+    "in": "task-16",
+    "to": "design",
+    "v": 2,
+    "op": "end",
+    "at": "2026-11-13T15:51:37.000Z",
+    "by": "design",
+    "ended": {
+     "reason": "taken into decision-36 and decision-37: one bridge, not one per module, and common.js is not routed through it (finding-26's correction holds: classic globals need no bridge into a module); pieces 1-2 add no bridge name"
+    }
    }
   ],
   "question-19": [
@@ -467,6 +545,30 @@
     "op": "add",
     "at": "2026-11-13T15:42:16.000Z",
     "by": "survey-task"
+   },
+   {
+    "id": "finding-20",
+    "kind": "finding",
+    "state": "handed-on",
+    "fields": {
+     "says": "The test seam breaks rather than carries over. 64 suites load browser scripts through `tests/unit/helpers/client-world.js` (a classic `vm` sandbox), and 85 `world.run` calls reach script-scope `let` bindings; module scope removes those, so each becomes an export or goes. I question the \"module-capable client test loader\" the area asks for: `package.json` is already `\"type\": \"module\"`, so Node can `import` `public/*.js` directly with a fake-DOM global, provided a module does not touch `document` at load. A `vm.SourceTextModule` loader (behind an experimental flag) is the elaborate road the task says not to take."
+    },
+    "links": {
+     "about": [
+      "finding-12",
+      "lesson-4"
+     ]
+    },
+    "in": "task-16",
+    "to": "design",
+    "v": 2,
+    "op": "end",
+    "at": "2026-11-13T15:51:38.000Z",
+    "by": "design",
+    "ended": {
+     "reason": "adopted in decision-38 (native import with the fake DOM, no vm module loader); piece 2 carries the migration and settles the loader Waiting entry",
+     "into": "plan-40"
+    }
    }
   ],
   "finding-21": [
@@ -489,6 +591,29 @@
     "op": "add",
     "at": "2026-11-13T15:42:18.000Z",
     "by": "survey-task"
+   },
+   {
+    "id": "finding-21",
+    "kind": "finding",
+    "state": "declined",
+    "fields": {
+     "says": "Replace `public/cost-format-global.js` with one general bridge file whose global list is the explicit ramp for pages not yet converted, plus a ratchet check that the list can only shrink. That is the design call the area entry asked for (one shim per module, a general shim, or module consumers): a general shim, so no second shim and guard is written, and the list is the visible measure of \"one bridge, shrinking\". Note it will end up carrying common.js's globals (finding-18)."
+    },
+    "links": {
+     "about": [
+      "finding-10",
+      "finding-18"
+     ]
+    },
+    "in": "task-16",
+    "to": "design",
+    "v": 2,
+    "op": "end",
+    "at": "2026-11-13T15:51:39.000Z",
+    "by": "design",
+    "ended": {
+     "reason": "the general shim is set aside: decision-37 keeps the one existing bridge with no new names, never bridges a second module, and keeps the shrink-only check this finding asked for"
+    }
    }
   ],
   "finding-22": [
@@ -558,6 +683,28 @@
     "op": "add",
     "at": "2026-11-13T15:42:21.000Z",
     "by": "survey-task"
+   },
+   {
+    "id": "finding-23",
+    "kind": "finding",
+    "state": "done",
+    "fields": {
+     "says": "Symptom vs cause: the no-build rule is the stated target, but the pain reads as `public/common.js` being a 3,309-line pool of globals and \"client twins\". Modules are the tool for that, not the fix by themselves: converting files without splitting common.js by concern just moves the pool."
+    },
+    "links": {
+     "about": [
+      "finding-18"
+     ]
+    },
+    "in": "task-16",
+    "to": "design",
+    "v": 2,
+    "op": "end",
+    "at": "2026-11-13T15:51:40.000Z",
+    "by": "design",
+    "ended": {
+     "reason": "answered in decision-36: modules are the tool and common.js is split by concern only when a converted view needs shared logic with no import path; these pieces neither relocate nor grow the pool"
+    }
    }
   ],
   "finding-24": [
@@ -716,6 +863,31 @@
     "op": "add",
     "at": "2026-11-13T15:45:46.000Z",
     "by": "survey-place"
+   },
+   {
+    "id": "finding-26",
+    "kind": "finding",
+    "state": "done",
+    "fields": {
+     "says": "Convert top down, not leaves first (survey of `public/` at c205190fd). The area already shares three ways: about 50 `window.X` globals from `public/common.js` (loaded by 29 renderers); `module.exports` scaffolding in `question-cards.js`, `home-placement.js` and `close-out.js`; and `/shared/` plus its bridge, which has a test twin, `tests/fixtures/browser-cost-format.js`. Converting a leaf like `home-placement.js` or `question-cards.js` first adds a fourth way and a second bridge: their consumers (`app.js:816`, `prompt-section.js:1030`) are classic scripts reading `window.*`, and modules run after every classic script. A page's entry script (`app.js`, `task-page.js`) made a module runs after `common.js`, so it can read any classic global safely and import whatever has been extracted. A leaf becomes a module only once all its consumers are modules; then the one bridge can only shrink. This corrects finding-18's 'the single bridge ends up carrying common.js': classic globals need no bridge into a module, only module-to-classic does. Context: `public/` is 44 files / 35,245 lines, up from 39 / 31,909 a month ago and 35 / 20,274 three months ago (`common.js` 1,795 to 3,309, `observation.js` 1,309 to 5,019); bigger fast, but the rules got better (one fake DOM and `loadWorld` under a census check, a leaf-purity check, an allow-list instead of a served directory)."
+    },
+    "links": {
+     "about": [
+      "finding-18",
+      "finding-21",
+      "finding-24",
+      "lesson-5"
+     ]
+    },
+    "in": "task-16",
+    "to": "design",
+    "v": 2,
+    "op": "end",
+    "at": "2026-11-13T15:51:41.000Z",
+    "by": "design",
+    "ended": {
+     "reason": "adopted: decision-36 converts top down, page entry first"
+    }
    }
   ],
   "finding-27": [
@@ -739,6 +911,31 @@
     "op": "add",
     "at": "2026-11-13T15:45:47.000Z",
     "by": "survey-place"
+   },
+   {
+    "id": "finding-27",
+    "kind": "finding",
+    "state": "handed-on",
+    "fields": {
+     "says": "What must learn about the move to modules: the 29 renderer `SCRIPTS` lists; `tests/unit/shared-modules.test.js`, which hard-codes the shim, `'window.CostFormat'` and four consumers; the fixture twin `tests/fixtures/browser-cost-format.js`; the area lesson-4 line 'Views and the `vm` test loaders stay classic', which turns false with the first converted page; and about 20 tests that grep `public/` source as text, some asserting classic shapes. Of the 89 `world.run` accesses, those reaching script-scope `let`s become exports or go."
+    },
+    "links": {
+     "about": [
+      "lesson-4",
+      "finding-10",
+      "finding-20"
+     ]
+    },
+    "in": "task-16",
+    "to": "design",
+    "v": 2,
+    "op": "end",
+    "at": "2026-11-13T15:51:42.000Z",
+    "by": "design",
+    "ended": {
+     "reason": "piece 1 carries shared-modules.test.js, the fixture twin and the lesson-4 rewrite; piece 2 carries the world.run probes and loadWorld suites; the text-grepping tests are caught by witnesses 9-10",
+     "into": "plan-39"
+    }
    }
   ],
   "finding-28": [
@@ -760,6 +957,29 @@
     "op": "add",
     "at": "2026-11-13T15:45:48.000Z",
     "by": "survey-place"
+   },
+   {
+    "id": "finding-28",
+    "kind": "finding",
+    "state": "handed-on",
+    "fields": {
+     "says": "`areas.json` maps `^public/` to the front end but gives a served `lib/` leaf (one in `SHARED_MODULES`, now `lib/cost-format.js`) no front-end home, and nothing notices. As more leaves are served from `lib/`, browser code lands outside area-1's paths."
+    },
+    "links": {
+     "about": [
+      "area-1"
+     ]
+    },
+    "in": "task-16",
+    "to": "Harbour",
+    "v": 2,
+    "op": "end",
+    "at": "2026-11-13T15:51:43.000Z",
+    "by": "design",
+    "ended": {
+     "reason": "piece 1 witness 7 gives each SHARED_MODULES file a front-end area in areas.json and checks it",
+     "into": "plan-39"
+    }
    }
   ],
   "finding-29": [
@@ -809,6 +1029,34 @@
     "op": "link",
     "at": "2026-11-13T15:45:58.000Z",
     "by": "survey-place"
+   },
+   {
+    "id": "finding-29",
+    "kind": "finding",
+    "state": "handed-on",
+    "fields": {
+     "says": "Order at this task's cost (replaces finding-24's leaf-first step): convert one page entry, top down (finding-26). In that piece retire `public/cost-format-global.js`, its test twin `tests/fixtures/browser-cost-format.js`, and the `module.exports` blocks of what that page imports; rewrite lesson-4's stale 'views stay classic' line; add a shrink-only check over the single bridge's names (finding-21). Extract `common.js` by concern only as a converted page needs it: escape and format first, then the timeline maths that twins `lib/timeline-zoom.js`. The `ship-layout` and `prompt-formatters` twins need their `lib` side made a leaf first (finding-9, finding-11)."
+    },
+    "links": {
+     "about": [
+      "finding-24",
+      "finding-21",
+      "finding-9",
+      "finding-11",
+      "finding-26",
+      "decision-31"
+     ]
+    },
+    "in": "task-16",
+    "to": "breakdown",
+    "v": 3,
+    "op": "end",
+    "at": "2026-11-13T15:51:44.000Z",
+    "by": "design",
+    "ended": {
+     "reason": "the order now lives in the plan pieces; corrected: piece 1 converts workspace-kpis.js, not a whole page entry, and does not retire cost-format-global.js or its test twin (three classic consumers remain; they go when the bridge empties, finding-43)",
+     "into": "plan-39"
+    }
    }
   ],
   "finding-30": [
@@ -883,6 +1131,29 @@
     "op": "add",
     "at": "2026-11-13T15:45:57.000Z",
     "by": "survey-place"
+   },
+   {
+    "id": "check-32",
+    "kind": "check",
+    "state": "open",
+    "fields": {
+     "what": "`public/` stays flat and every relative import in it resolves: no script in a subdirectory, so `'../lib/…'` keeps resolving to `/lib/…` in the browser and in Node; and every `import` in a `public/*.js` is `./x.js` of an existing public file or `../lib/x.js` of a `SHARED_MODULES` value.",
+     "why-person": "The specifier scheme in decision-31 breaks silently if a view moves into a subfolder; nothing else would notice.",
+     "how": "A unit test (acorn, already a dependency) that lists `public/**/*.js` and fails on any path with a directory below `public/`, and parses each top-level file's imports. Synthetic failures: a nested `.js`, an import of an unlisted lib file, a bare specifier, an absolute `/shared/…` specifier. Lands in piece 1 (witness 5)."
+    },
+    "links": {
+     "about": [
+      "decision-31",
+      "plan-39"
+     ]
+    },
+    "in": "task-16",
+    "to": "implementation",
+    "v": 2,
+    "op": "revise",
+    "at": "2026-11-13T15:51:31.000Z",
+    "by": "design",
+    "reason": "design widens it to the imports themselves: flatness alone does not stop an import of an unlisted lib file or a stale /shared/ specifier"
    }
   ],
   "decision-33": [
@@ -944,6 +1215,273 @@
     "ended": {
      "reason": "sizing written as decision-33"
     }
+   }
+  ],
+  "run-35": [
+   {
+    "id": "run-35",
+    "kind": "run",
+    "state": "open",
+    "fields": {
+     "stage": "design",
+     "account": "Planned task-16 from source at c205190fd (main 5dcf5bcda; the only later commit, a merge, touches none of the named files). Two pieces, top down: piece 1 re-keys SHARED_MODULES to /lib/, converts workspace-kpis.js to a module and adds the flat/import check, the bridge inventory check and a front-end home for served lib leaves; piece 2 converts task-page.js and moves its suites to plain imports under a loader census. Engineering calls settled as decisions: top-down order and the two-piece boundary, one bridge with no new names (the general shim declined), native import with the fake DOM (no vm module loader). Of the ten Waiting entries, two are settled by the pieces (bridge, loader) and eight stay with a reason; two of those were rewritten. Needs multiple sessions; plan-review due, and witness 2 (allow-list leak) wants a reader who is not the builder."
+    },
+    "links": {},
+    "in": "task-16",
+    "v": 1,
+    "op": "add",
+    "at": "2026-11-13T15:51:24.000Z",
+    "by": "design"
+   },
+   {
+    "id": "run-35",
+    "kind": "run",
+    "state": "done",
+    "fields": {
+     "stage": "design",
+     "account": "Planned task-16 from source at c205190fd (main 5dcf5bcda; the only later commit, a merge, touches none of the named files). Two pieces, top down: piece 1 re-keys SHARED_MODULES to /lib/, converts workspace-kpis.js to a module and adds the flat/import check, the bridge inventory check and a front-end home for served lib leaves; piece 2 converts task-page.js and moves its suites to plain imports under a loader census. Engineering calls settled as decisions: top-down order and the two-piece boundary, one bridge with no new names (the general shim declined), native import with the fake DOM (no vm module loader). Of the ten Waiting entries, two are settled by the pieces (bridge, loader) and eight stay with a reason; two of those were rewritten. Needs multiple sessions; plan-review due, and witness 2 (allow-list leak) wants a reader who is not the builder."
+    },
+    "links": {},
+    "in": "task-16",
+    "v": 2,
+    "op": "end",
+    "at": "2026-11-13T15:51:45.000Z",
+    "by": "design",
+    "ended": {
+     "reason": "plan written: plan-39, plan-40; decisions 36-38"
+    }
+   }
+  ],
+  "decision-36": [
+   {
+    "id": "decision-36",
+    "kind": "decision",
+    "state": "stands",
+    "fields": {
+     "scope": "task-16",
+     "answer": "Convert top down, a page entry before the files it uses, in two pieces: piece 1 the foundation with the smallest real consumer, `public/workspace-kpis.js`; piece 2 one real page, `public/task-page.js`. `app.js` is set aside (11 renderers load it, each with its own classic page script after it, so making it a module changes when it runs on all 11 at once). Nothing is extracted from `public/common.js` in these pieces: a converted page reads classic globals as today, and extraction happens only when a view needs shared logic with no import path (escape/format first, then the timeline maths). The other views follow as their own tickets by the same recipe; no view is retired.",
+     "why": "A page entry made a module runs after every classic script, so it reads `common.js` globals safely and the leaves it imports lose classic consumers one page at a time; a leaf converted first needs a bridge (read in `lib/components/page.js`, which emits `{ module }` as a deferred `<script type=\"module\">`). `workspace-kpis.js` proves the specifier scheme on a real page; `task-page.js` is the last script of one renderer (`lib/render-task-page.js`), reads classic globals only through `typeof window.X` guards and reads no `window.CostFormat`, so it converts without touching the bridge. Two pieces is the ask's own grain (\"one view at a time\", \"whatever size is natural\"), not a cut; if John reads it as \"convert every view in this ticket\", the answer is follow-up tickets by the same recipe, not a different plan."
+    },
+    "links": {
+     "on": [
+      "finding-26@1",
+      "decision-33@1"
+     ],
+     "about": [
+      "finding-18",
+      "finding-23",
+      "finding-29"
+     ]
+    },
+    "in": "task-16",
+    "v": 1,
+    "op": "add",
+    "at": "2026-11-13T15:51:25.000Z",
+    "by": "design"
+   }
+  ],
+  "decision-37": [
+   {
+    "id": "decision-37",
+    "kind": "decision",
+    "state": "stands",
+    "fields": {
+     "scope": "task-16",
+     "answer": "One bridge, no new names, no general shim. `public/cost-format-global.js` keeps its name and its one name (`window.CostFormat`) until its last classic consumer converts, then it is deleted with `tests/fixtures/browser-cost-format.js`. A second shared module is never bridged: its twin stays until its last classic consumer is a module. A shrink-only inventory check (a declared `BRIDGED` list, with a `file -> witnessing test` table of classic consumers) replaces the hard-coded shim, `'window.CostFormat'` string and four consumers in `tests/unit/shared-modules.test.js`.",
+     "why": "Classic globals need no bridge into a module, only module-to-classic does (finding-26), so the bridge never has to carry `common.js` and the \"one shim per module\" question goes away instead of being answered with a general shim. Renaming a file that is going away touches six renderers for nothing. The check fails on a new name, on a declared name with no classic consumer left, and on an undeclared classic reader (its message states the DOMContentLoaded timing rule and names the witness), so \"one bridge, shrinking\" is checked, not remembered."
+    },
+    "links": {
+     "on": [
+      "finding-26@1"
+     ],
+     "about": [
+      "finding-21",
+      "finding-10",
+      "finding-18",
+      "lesson-5"
+     ]
+    },
+    "in": "task-16",
+    "v": 1,
+    "op": "add",
+    "at": "2026-11-13T15:51:26.000Z",
+    "by": "design"
+   }
+  ],
+  "decision-38": [
+   {
+    "id": "decision-38",
+    "kind": "decision",
+    "state": "stands",
+    "fields": {
+     "scope": "task-16",
+     "answer": "Test a converted view by native Node `import()` with the existing fake DOM installed on `globalThis`, through a small import helper beside `tests/unit/helpers/client-world.js` (fresh page module by query-string cache-bust; pure lib leaves stay cached). No `vm.SourceTextModule` loader. `loadWorld` is not touched, so the 64 classic suites run unchanged; a census check counts suites naming a script in `loadWorld`'s `scripts` and fails if the count rises. A `world.run` probe of a script-scope `let` becomes an export or goes.",
+     "why": "`package.json` is `\"type\": \"module\"`, so a plain import works once `globalThis.document` is the fake's, provided a module touches `document` at load only to register listeners (the page scripts already work that way). The `vm` module loader is flag-gated and exists only to keep script-scope probes that module scope makes meaningless. This shows the Waiting entry's premise (a module-capable loader is needed first) wrong; piece 2's converted suites are the proof."
+    },
+    "links": {
+     "on": [
+      "finding-20@1",
+      "decision-31@1"
+     ],
+     "about": [
+      "finding-12",
+      "lesson-4"
+     ]
+    },
+    "in": "task-16",
+    "v": 1,
+    "op": "add",
+    "at": "2026-11-13T15:51:27.000Z",
+    "by": "design"
+   }
+  ],
+  "plan-39": [
+   {
+    "id": "plan-39",
+    "kind": "plan",
+    "state": "kept",
+    "fields": {
+     "order": 1,
+     "paths": [
+      "lib/vendor-assets.js",
+      "public/workspace-kpis.js",
+      "lib/render-workspace-kpis.js",
+      "public/cost-format-global.js",
+      "public/common.js",
+      "tests/unit/shared-modules.test.js",
+      "tests/unit/workspace-kpis-cost-order.test.js",
+      "tests/unit/area-map-placement.test.js",
+      "areas.json",
+      "docs/areas/front-end-browser.md",
+      "tests/e2e/workspace-kpis.spec.js"
+     ],
+     "says": "Piece 1, the foundation and the smallest real consumer (lands first, blocks piece 2). Re-key `SHARED_MODULES` from `/shared/` to `/lib/<name>.js` (same allow-list, one file per entry; `/lib/` is a namespace, never a directory mount; `/shared/` retired, not aliased). Convert `public/workspace-kpis.js` to a module importing `formatUsd` from `'../lib/cost-format.js'`; drop its `/cost-format-global.js` entry in `lib/render-workspace-kpis.js`; the bridge keeps three consumers (`flight-companion.js`, `observation.js`, `prompt-section.js`) and its import becomes `'../lib/cost-format.js'`. Witnesses (each fails before, passes after): (1) `/lib/cost-format.js` 200 with JS type and exact bytes, express-stack and real-server blocks; (2) `/lib/vendor-assets.js`, `/lib/render.js`, `/lib/../server.js`, `/lib/%2e%2e/server.js`, `/lib/` and old `/shared/cost-format.js` are real 404s, not the app shell; (3) a plain-`import()` test of the page with the fake DOM, a `Chart` stub and `window.__WORKSPACE_KPI_DATA__` reads tick and tooltip labels, no `window.CostFormat`, no readyState setup; (4) `tests/e2e/workspace-kpis.spec.js` cost-axis check (~line 209) rerun on the converted page; (5) flat + import check (acorn): no `.js` below `public/` top level, every import is `./x.js` of a public file or `../lib/x.js` of a `SHARED_MODULES` value, with synthetic failures (nested file, unlisted lib, bare specifier, absolute `/shared/`); (6) bridge inventory check per the bridge decision, with synthetic add-a-name, remove-last-consumer, unregistered-consumer cases; (7) every `SHARED_MODULES` value maps to a front-end area in `areas.json`, pinned in `area-map-placement.test.js` (read its pins first, LIN-3829); (8) `workspace-kpis-cost-order.test.js` replaced by (3); (10) no `/shared/` string left in `lib/`, `public/`, `tests/`, `docs/areas/`, `CLAUDE.md`, no `module.exports`/`typeof module` in the converted file. Retires: the `/shared/` URL; the hard-coded shim/consumer assertions; `workspace-kpis.js` as a `window.CostFormat` reader with its DOMContentLoaded-for-the-global workaround and comment; `workspace-kpis-cost-order.test.js`; the renderer's bridge entry. Also: rewrite the stale lesson-4 line (\"views and the `vm` loaders stay classic\") in `docs/areas/front-end-browser.md` into the new rules (top down, relative specifiers, flat `public/`, no new bridge names, a twin retires with its last classic consumer, test by import), keeping leaf purity, allow-list only and the timing rule; Lessons stays under 6,144 bytes (2,114 now); touch `CLAUDE.md` line 43 only if it points at the old loader limit. Delete the bridge Waiting entry (settled). Comment-only fix in `public/common.js` (\"`public/` cannot import it\", `TERMINAL_TYPES`). Likeliest break: execution order, since the page moves from before to after `common.js`/`app.js`; it reads only `__WORKSPACE_KPI_DATA__`, `HarbourCharts` and `Chart`, so no change is expected; witnesses 3 and 4 watch it."
+    },
+    "links": {
+     "on": [
+      "decision-36@1",
+      "decision-37@1",
+      "decision-38@1",
+      "decision-31@1"
+     ],
+     "about": [
+      "finding-9",
+      "finding-10",
+      "finding-28",
+      "lesson-4",
+      "check-32"
+     ]
+    },
+    "in": "task-16",
+    "v": 1,
+    "op": "add",
+    "at": "2026-11-13T15:51:28.000Z",
+    "by": "design"
+   }
+  ],
+  "plan-40": [
+   {
+    "id": "plan-40",
+    "kind": "plan",
+    "state": "kept",
+    "fields": {
+     "order": 2,
+     "paths": [
+      "public/task-page.js",
+      "lib/render-task-page.js",
+      "tests/unit/helpers/",
+      "tests/unit/task-page-client.test.js",
+      "tests/unit/render-task-page-golden.test.js",
+      "tests/fixtures/render-task-page-golden.json",
+      "docs/areas/front-end-browser.md"
+     ],
+     "says": "Piece 2, one real page top down (lands second, blocked by piece 1: it uses the specifier rule, the flat check and the corrected lesson). Convert `public/task-page.js` to a module with named exports in place of its `module.exports` block; its `SCRIPTS` entry in `lib/render-task-page.js` becomes `{ module: '/task-page.js' }`. It is the last script in that list, so its DOMContentLoaded listener stays registered after `common.js`'s and the run control's. Add the import helper beside `client-world.js` if piece 1 has not. Witnesses: (8) the suites that run `task-page.js` through `loadWorld(... module.exports)` (find with `grep -ln \"'task-page.js'\" tests/unit/*.js` filtered to `loadWorld`; `task-page-client.test.js` is one) import its named exports; a census check in the manner of `tests/unit/fake-dom-census.test.js` records today's count of suites naming a script in `loadWorld`'s `scripts` and fails if it rises; (9) the golden render test changes only for the one script tag, any other diff is a bug; existing `task-page-*` and `lin-4405` timeline suites pass, migrated to imports; (10) no `module.exports`/`typeof module` in `task-page.js`; the import helper's own test shows two fresh imports share no state. Retires: the `typeof module` seam in `task-page.js`; the `loadWorld`-plus-`window.module.exports` pattern in the task-page suites; any helper `task-page.js` restates that `common.js` exposes or a lib leaf exports (read the global or import; nothing is added to the bridge). Settles and deletes the module-capable-loader Waiting entry by showing its premise wrong. Not touched: the other ten `module.exports` files; `close-out.js` is shared by the task page and `session.js`, so it cannot convert with either alone. Likeliest breaks: module semantics (strict, no top-level globals, `this` undefined; unwrapping the IIFE to export names could change a reference) and the test seam (a module evaluates once per URL; `world.run` probes of script-scope `let`s become exports or go)."
+    },
+    "links": {
+     "on": [
+      "decision-36@1",
+      "decision-38@1",
+      "decision-31@1"
+     ],
+     "about": [
+      "finding-12",
+      "finding-20",
+      "lesson-2"
+     ]
+    },
+    "in": "task-16",
+    "v": 1,
+    "op": "add",
+    "at": "2026-11-13T15:51:29.000Z",
+    "by": "design"
+   }
+  ],
+  "check-41": [
+   {
+    "id": "check-41",
+    "kind": "check",
+    "state": "open",
+    "fields": {
+     "what": "Nothing under `/lib/` is served except the `SHARED_MODULES` files, and `/shared/` is gone: `/lib/vendor-assets.js`, `/lib/render.js`, `/lib/../server.js`, `/lib/%2e%2e/server.js`, `/lib/` and `/shared/cost-format.js` are real 404s, not the app shell with 200.",
+     "why-person": "Piece 1 moves a served-URL namespace next to the CSP serving path; a mistake in the allow-list leaks server source, so this witness needs a reader who is not the builder.",
+     "how": "Read witness 2 in `tests/unit/shared-modules.test.js` (express-stack and real-server blocks) and the route in `lib/vendor-assets.js`; confirm each case asserts status 404 and not a 200 shell."
+    },
+    "links": {
+     "about": [
+      "plan-39"
+     ]
+    },
+    "in": "task-16",
+    "to": "review",
+    "v": 1,
+    "op": "add",
+    "at": "2026-11-13T15:51:32.000Z",
+    "by": "design"
+   }
+  ],
+  "check-42": [
+   {
+    "id": "check-42",
+    "kind": "check",
+    "state": "open",
+    "fields": {
+     "what": "The browser witness for piece 1 (MIME, CSP, `/lib/` path and module order) is the existing `tests/e2e/workspace-kpis.spec.js` cost-axis check rerun on the converted page; if Playwright cannot run in the building session, say so and leave it to CI. Do not mark it passed.",
+     "why-person": "Module order and CSP are runtime behaviour; a unit import under Node does not exercise them, and an inspection-only pass is how a runtime claim ships unwitnessed.",
+     "how": "Run `npx playwright test tests/e2e/workspace-kpis.spec.js` and paste the result, or record the waiver with the CI run that will carry it."
+    },
+    "links": {
+     "about": [
+      "plan-39"
+     ]
+    },
+    "in": "task-16",
+    "to": "implementation",
+    "v": 1,
+    "op": "add",
+    "at": "2026-11-13T15:51:33.000Z",
+    "by": "design"
+   }
+  ],
+  "finding-43": [
+   {
+    "id": "finding-43",
+    "kind": "finding",
+    "state": "open",
+    "fields": {
+     "says": "After task-16 the next views, in order, each its own ticket by the same recipe (top down, import, name what it retires): `public/flight-companion.js`, then `public/observation.js` (each removes a `window.CostFormat` consumer, and the bridge inventory check makes the shrink visible), then the `public/prompt-section.js` chain (`task-page.js` already a module; `app.js` and `swipe.js` follow), which empties the bridge so `public/cost-format-global.js` is deleted and `tests/fixtures/browser-cost-format.js` goes with it. `close-out.js` (task page and `session.js`) converts only once both are modules. No view is retired."
+    },
+    "links": {
+     "about": [
+      "decision-36",
+      "decision-37"
+     ]
+    },
+    "in": "area-1",
+    "to": "area-1",
+    "v": 1,
+    "op": "add",
+    "at": "2026-11-13T15:51:34.000Z",
+    "by": "design"
    }
   ]
  },
@@ -1724,6 +2262,19 @@
     "workspace-kpis",
     "--by",
     "design"
+   ],
+   "asOf": null
+  },
+  {
+   "at": "2026-11-17T15:28:12.563Z",
+   "by": "plan-review",
+   "cmd": "brief",
+   "args": [
+    "brief",
+    "plan-review",
+    "--task",
+    "task-16",
+    "--text"
    ],
    "asOf": null
   }

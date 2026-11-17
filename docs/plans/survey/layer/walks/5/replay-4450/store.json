@@ -1,5 +1,5 @@
 {
- "next": 108,
+ "next": 109,
  "records": {
   "area-1": [
    {
@@ -2390,6 +2390,83 @@
     "at": "2026-11-13T14:14:11.000Z",
     "by": "leftover",
     "reason": "leftovers commit pushed; CI green on this head (one 'Unit tests (proxy, clock +400d)' rerun after the hosted runner lost contact; no test failed)"
+   },
+   {
+    "id": "change-84",
+    "kind": "change",
+    "state": "open",
+    "fields": {
+     "ref": "https://github.com/JKershaw/LinearViewer/pull/2421",
+     "head": "26299c9b0e"
+    },
+    "links": {
+     "on": [
+      "plan-54@2",
+      "decision-81@1"
+     ],
+     "about": [
+      "task-60"
+     ]
+    },
+    "in": "task-60",
+    "v": 3,
+    "op": "revise",
+    "at": "2026-11-13T15:21:58.000Z",
+    "by": "close-out",
+    "reason": "close-out commit 26299c9b0 pushed after the approval (review's named test fix, blind read's three fixes, stale isTestToken citations); not re-read by review; ci-success green on this head"
+   },
+   {
+    "id": "change-84",
+    "kind": "change",
+    "state": "merged",
+    "fields": {
+     "ref": "https://github.com/JKershaw/LinearViewer/pull/2421",
+     "head": "26299c9b0e"
+    },
+    "links": {
+     "on": [
+      "plan-54@2",
+      "decision-81@1"
+     ],
+     "about": [
+      "task-60"
+     ]
+    },
+    "in": "task-60",
+    "v": 4,
+    "op": "end",
+    "at": "2026-11-13T15:21:59.000Z",
+    "by": "close-out",
+    "ended": {
+     "reason": "squash commit 2bf788b6da71c82db6a1d84b361da98ef9cdedbb, pinned to head 26299c9b0 (the commit CI passed on). Deployed: harbour.cat footer shows 2bf788b6d (15:39 UTC); Tests on main green for it. Rollback: revert the squash commit (verdict-96)."
+    }
+   },
+   {
+    "id": "change-84",
+    "kind": "change",
+    "state": "merged",
+    "fields": {
+     "ref": "https://github.com/JKershaw/LinearViewer/pull/2421",
+     "head": "26299c9b0c6ecb57edd029f49578282224f6d31e"
+    },
+    "links": {
+     "on": [
+      "plan-54@2",
+      "decision-81@1"
+     ],
+     "about": [
+      "task-60"
+     ]
+    },
+    "in": "task-60",
+    "v": 5,
+    "op": "revise",
+    "at": "2026-11-13T15:22:00.000Z",
+    "by": "close-out",
+    "ended": {
+     "reason": "squash commit 2bf788b6da71c82db6a1d84b361da98ef9cdedbb, pinned to head 26299c9b0 (the commit CI passed on). Deployed: harbour.cat footer shows 2bf788b6d (15:39 UTC); Tests on main green for it. Rollback: revert the squash commit (verdict-96)."
+    },
+    "reason": "correct my mistyped head (v3 had 26299c9b0e); full SHA of the merged head"
    }
   ],
   "decision-85": [
@@ -2854,6 +2931,32 @@
     "op": "add",
     "at": "2026-11-13T15:12:27.000Z",
     "by": "review"
+   },
+   {
+    "id": "finding-97",
+    "kind": "finding",
+    "state": "done",
+    "fields": {
+     "says": "Fix for close-out (the one condition of verdict-96): in tests/unit/jira-as-asked-region.test.js, test 'an oversized body is not sealed…' (~line 262), capture console.log during the sealForFiling call and assert exactly one line equal to `[as-asked] seal skipped: provider jira cannot hold the block (test)`. Today it asserts filed unsealed and verbatim but not 'with the log line', which plan-54 item 6's witness names."
+    },
+    "links": {
+     "on": [
+      "change-84@2"
+     ],
+     "about": [
+      "plan-54",
+      "verdict-96"
+     ]
+    },
+    "in": "task-60",
+    "to": "close-out",
+    "v": 2,
+    "op": "end",
+    "at": "2026-11-13T15:22:01.000Z",
+    "by": "close-out",
+    "ended": {
+     "reason": "made in close-out commit 26299c9b0: the oversize test now captures console.log and asserts exactly one line, '[as-asked] seal skipped: provider jira cannot hold the block (test)'. Checked it bites: changing the logged wording turns it red; reverted."
+    }
    }
   ],
   "check-98": [
@@ -2961,6 +3064,30 @@
     "op": "add",
     "at": "2026-11-13T15:12:33.000Z",
     "by": "review"
+   },
+   {
+    "id": "finding-101",
+    "kind": "finding",
+    "state": "open",
+    "fields": {
+     "says": "From the review of change-84: (1) createIssue is the one remaining Jira instance of 'a stored form that cannot give back the markdown it was handed'; it must write through holdAsAsked in lib/providers/jira/as-asked-region.js, the one place that computes the property and its size (decision-86), not a second writer or size check. (2) plan-55 item 10's retire list is partly done by change-84: the 'Jira is skipped' claims in the as-asked-seal.js and as-asked.js headers and the descriptionRoundTrip comment, lib/dispatch-factory.js, and the docs/proxy-integration.md 'Jira files unsealed' line are already retired; drop them, re-run the repeatable search. (3) LIN-4451 is blocked until change-84 merges; merging unblocks it."
+    },
+    "links": {
+     "on": [
+      "change-84@2",
+      "verdict-96@1"
+     ],
+     "about": [
+      "plan-55",
+      "change-84"
+     ]
+    },
+    "in": "task-60",
+    "to": "task-61",
+    "v": 2,
+    "op": "link",
+    "at": "2026-11-13T15:22:06.000Z",
+    "by": "close-out"
    }
   ],
   "run-102": [
@@ -3087,6 +3214,28 @@
     "op": "add",
     "at": "2026-11-13T15:18:49.000Z",
     "by": "blind-read"
+   },
+   {
+    "id": "finding-105",
+    "kind": "finding",
+    "state": "done",
+    "fields": {
+     "says": "Fix-sized (blind read of change-84): routes/workspace-api-audit.js lines 35-36 still write `process.env.NODE_ENV === 'test' && (workspace.accessToken === 'test-token' || …)` inline. The sweep moved every sibling copy onto isHermeticTestToken and missed this one. Fix: `isHermeticTestToken(workspace.accessToken) || (process.env.NODE_ENV === 'test' && workspace.provider === 'local')`. It keeps its own predicate, as its comment asks."
+    },
+    "links": {
+     "about": [
+      "change-84"
+     ]
+    },
+    "in": "task-60",
+    "to": "close-out",
+    "v": 2,
+    "op": "end",
+    "at": "2026-11-13T15:22:02.000Z",
+    "by": "close-out",
+    "ended": {
+     "reason": "commit 26299c9b0: routes/workspace-api-audit.js now reads isHermeticTestToken(workspace.accessToken) || (NODE_ENV==='test' && workspace.provider==='local'); same predicate as before, local-provider alternative kept."
+    }
    }
   ],
   "finding-106": [
@@ -3108,6 +3257,28 @@
     "op": "add",
     "at": "2026-11-13T15:18:50.000Z",
     "by": "blind-read"
+   },
+   {
+    "id": "finding-106",
+    "kind": "finding",
+    "state": "done",
+    "fields": {
+     "says": "Fix-sized (blind read of change-84): in routes/workspace-api-steps.js, isTestToken is now a one-line second name for isHermeticTestToken(workspace.accessToken). Fix: have its callers (workspace-api-issue-read.js, workspace-api-issue-write.js, workspace-api-prompts.js) import the helper directly and drop the alias."
+    },
+    "links": {
+     "about": [
+      "change-84"
+     ]
+    },
+    "in": "task-60",
+    "to": "close-out",
+    "v": 2,
+    "op": "end",
+    "at": "2026-11-13T15:22:03.000Z",
+    "by": "close-out",
+    "ended": {
+     "reason": "commit 26299c9b0: isTestToken removed from routes/workspace-api-steps.js; workspace-api.js (a caller the finding did not list), -prompts.js, -issue-read.js, -issue-write.js and the steps file itself call isHermeticTestToken(workspace.accessToken) directly. The stale citations this made (steps header comments, docs/architecture/source-map.md line 42) fixed too."
+    }
    }
   ],
   "finding-107": [
@@ -3129,6 +3300,53 @@
     "op": "add",
     "at": "2026-11-13T15:18:51.000Z",
     "by": "blind-read"
+   },
+   {
+    "id": "finding-107",
+    "kind": "finding",
+    "state": "done",
+    "fields": {
+     "says": "Fix-sized (blind read of change-84): tests/unit/jira-as-asked-region.test.js, the test at line 291 \"no longer claim that Jira is skipped\", only checks that three phrases are missing from two comment headers (lib/as-asked-seal.js, lib/as-asked.js). It says nothing about behaviour; as-asked-create-seal.test.js already checks that Jira holds the block. Fix: delete it."
+    },
+    "links": {
+     "about": [
+      "change-84"
+     ]
+    },
+    "in": "task-60",
+    "to": "close-out",
+    "v": 2,
+    "op": "end",
+    "at": "2026-11-13T15:22:04.000Z",
+    "by": "close-out",
+    "ended": {
+     "reason": "commit 26299c9b0: deleted the test 'no longer claim that Jira is skipped'; behaviour stays covered by as-asked-create-seal. Full unit suite 25,319/25,319 locally (25,320 less this test)."
+    }
+   }
+  ],
+  "finding-108": [
+   {
+    "id": "finding-108",
+    "kind": "finding",
+    "state": "open",
+    "fields": {
+     "says": "LIN-4451 is unblocked: change-84 (PR #2421) merged as 2bf788b6d and is deployed, so finding-101 point (3) is discharged. Build createIssue on main at or after 2bf788b6d; holdAsAsked and the shared size function are there. Note finding-101 rests on change-84@2; the later head (26299c9b0) changed only tests and the test-token predicate, not the Jira region code it names."
+    },
+    "links": {
+     "on": [
+      "change-84@5"
+     ],
+     "about": [
+      "finding-101",
+      "task-61"
+     ]
+    },
+    "in": "task-60",
+    "to": "task-61",
+    "v": 1,
+    "op": "add",
+    "at": "2026-11-13T15:22:05.000Z",
+    "by": "close-out"
    }
   ]
  },

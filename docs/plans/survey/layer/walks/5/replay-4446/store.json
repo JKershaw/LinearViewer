@@ -1,5 +1,5 @@
 {
- "next": 36,
+ "next": 43,
  "records": {
   "area-1": [
    {
@@ -816,6 +816,26 @@
     "at": "2026-11-13T13:23:07.000Z",
     "by": "design",
     "reason": "design's grep: five renderers list /cost-format.js, not two; adds the golden, the fixture seam and the doc places"
+   },
+   {
+    "id": "finding-24",
+    "kind": "finding",
+    "state": "open",
+    "fields": {
+     "says": "What has to learn about the cost-format move: `tests/unit/cost-read-census.test.js` `FORMAT_ALLOW` names `public/cost-format.js`, plus its header comment and failure-message text, and goes stale silently (nothing fails on an extra entry), so remove them by hand; six renderers list `/cost-format.js`, not two: `lib/render.js:384` (Home, backlog and landing, the busiest page; it also lists `/prompt-section.js`), `lib/render-flight-companion.js`, `lib/render-observation.js`, `lib/render-swipe.js`, `lib/render-task-page.js`, `lib/render-workspace-kpis.js` (render.js, swipe and task-page load `prompt-section.js`, which reads `window.CostFormat`; left out, those pages 404 the script and throw on the first cost); `tests/fixtures/render-task-page-golden.json` embeds the script tags (regenerate, read the diff); `tests/fixtures/browser-cost-format.js` reads `public/cost-format.js` for `lin-3833-run-control` and `flight-companion-client` (keep its name and `loadCostFormat(sandbox)`, back it with the real lib file, and those suites don't change); `observation-scan-due.test.js` lists `'cost-format.js'` in `loadWorld` (switch to `loadCostFormat`); `cost-read.test.js` imports only the lib file (confirm it needs nothing); the doc comment in `lib/cost-format.js` that names its \"browser twin\"; `docs/architecture/source-map.md` (run the docs anchor resolver). Find them all again after building with `grep -rIn \"cost-format\\|CostFormat\"` outside node_modules, .git and dated docs. (Survey place @ 4b5001ddf; renderers, golden and fixture added by design's grep; lib/render.js added by plan-review.)"
+    },
+    "links": {
+     "about": [
+      "finding-16"
+     ]
+    },
+    "in": "task-9",
+    "to": "implementation",
+    "v": 3,
+    "op": "revise",
+    "at": "2026-11-13T14:23:49.000Z",
+    "by": "plan-review",
+    "reason": "six renderers, not five: lib/render.js:384 also lists /cost-format.js and /prompt-section.js (plan-review)"
    }
   ],
   "finding-25": [
@@ -1537,6 +1557,30 @@
     "op": "add",
     "at": "2026-11-13T13:23:09.000Z",
     "by": "design"
+   },
+   {
+    "id": "check-30",
+    "kind": "check",
+    "state": "done",
+    "fields": {
+     "what": "Before anything is built, check plan-28's purity rule for shared modules (leaf only: no imports, no Node built-ins, no top-level window/document/process/require) and that no `window.CostFormat` consumer reads the global at load, since the shim runs deferred.",
+     "why-person": "It touches what the server publishes to the web and a census that guards cost formatting, and it sets a pattern (SHARED_MODULES, module script entries, the shim) the next slices will copy.",
+     "how": "Read plan-28 against `lib/vendor-assets.js`, `lib/cost-format.js` and the four consumers (`public/flight-companion.js`, `public/observation.js`, `public/prompt-section.js`, `public/workspace-kpis.js`)."
+    },
+    "links": {
+     "about": [
+      "plan-28"
+     ]
+    },
+    "in": "task-9",
+    "to": "plan-review",
+    "v": 2,
+    "op": "end",
+    "at": "2026-11-13T14:23:57.000Z",
+    "by": "plan-review",
+    "ended": {
+     "reason": "Checked: the purity rule holds and lib/cost-format.js is a leaf; three consumers read window.CostFormat only after DOMContentLoaded, but workspace-kpis.js reads it at load via Chart.js tick callbacks: finding-34, verdict-35 request-changes"
+    }
    }
   ],
   "finding-31": [
@@ -1632,6 +1676,24 @@
     "op": "add",
     "at": "2026-11-13T14:23:46.000Z",
     "by": "plan-review"
+   },
+   {
+    "id": "run-33",
+    "kind": "run",
+    "state": "done",
+    "fields": {
+     "stage": "plan-review",
+     "account": "Reviewed plan-28@12 at HEAD 4b5001ddf (still origin/main). Verdict: request changes, one blocker. public/workspace-kpis.js draws the cost chart at top level; Chart.js 4.5.1 runs update() in its constructor and calls the y-axis ticks.callback, which reads window.CostFormat while the script first runs, before the deferred module shim. No witness in the plan sees it (the vm test returns early without Chart; the e2e never has priced cost). The rest checked sound: allow-list serving, CSP, the leaf purity of lib/cost-format.js, renderPage entries, golden update path, area-note Lessons room. Eight builder notes, not blocking: a sixth renderer, both list shapes, CLAUDE.md at its budget, stale consumer comments, comment-blind purity guard, 404 through the full app, a sync fixture, the counting method."
+    },
+    "links": {},
+    "in": "task-9",
+    "v": 2,
+    "op": "end",
+    "at": "2026-11-13T14:23:58.000Z",
+    "by": "plan-review",
+    "ended": {
+     "reason": "plan review posted: request changes, one blocker"
+    }
    }
   ],
   "finding-34": [
@@ -1683,6 +1745,177 @@
     "v": 1,
     "op": "add",
     "at": "2026-11-13T14:23:48.000Z",
+    "by": "plan-review"
+   }
+  ],
+  "finding-36": [
+   {
+    "id": "finding-36",
+    "kind": "finding",
+    "state": "open",
+    "fields": {
+     "says": "The page-has-shim guard (plan-28 witness: every lib/ scripts list naming a window.CostFormat consumer also lists the shim as {module}) must read both list shapes: `lib/render-task-page.js:82` declares `const SCRIPTS = [...]`, not `scripts: [...]`. Parse both or the guard misses the task page."
+    },
+    "links": {
+     "about": [
+      "plan-28"
+     ],
+     "on": [
+      "plan-28@12"
+     ]
+    },
+    "in": "task-9",
+    "to": "implementation",
+    "v": 1,
+    "op": "add",
+    "at": "2026-11-13T14:23:50.000Z",
+    "by": "plan-review"
+   }
+  ],
+  "finding-37": [
+   {
+    "id": "finding-37",
+    "kind": "finding",
+    "state": "open",
+    "fields": {
+     "says": "CLAUDE.md is full: 110 of 110 lines, 11,950 of 12,000 bytes, enforced by `tests/unit/claude-md-line-budget.test.js`. plan-28 step 1 cannot add the rule reading as new lines. Change the existing \"Keep it minimal - no frameworks, no build step\" line in place to a short reading plus a pointer to `docs/areas/front-end-browser.md`, and put the limits in the area note Lessons. If even that goes over, trim elsewhere in the same commit and say what was cut."
+    },
+    "links": {
+     "about": [
+      "plan-28"
+     ],
+     "on": [
+      "plan-28@12"
+     ]
+    },
+    "in": "task-9",
+    "to": "implementation",
+    "v": 1,
+    "op": "add",
+    "at": "2026-11-13T14:23:51.000Z",
+    "by": "plan-review"
+   }
+  ],
+  "finding-38": [
+   {
+    "id": "finding-38",
+    "kind": "finding",
+    "state": "open",
+    "fields": {
+     "says": "plan-28 says the consumers need no change, but their comments become false: `public/flight-companion.js:419-426` (\"restated here rather than imported … no module graph to lib/\", names public/cost-format.js), `public/observation.js:3975-3976, 3989` (same), `public/prompt-section.js:1505` (names public/cost-format.js). Point them at the shim and drop the \"no module graph\" reasoning where it now misleads. Count these edits as comments, not removed logic."
+    },
+    "links": {
+     "about": [
+      "plan-28"
+     ],
+     "on": [
+      "plan-28@12"
+     ]
+    },
+    "in": "task-9",
+    "to": "implementation",
+    "v": 1,
+    "op": "add",
+    "at": "2026-11-13T14:23:52.000Z",
+    "by": "plan-review"
+   }
+  ],
+  "finding-39": [
+   {
+    "id": "finding-39",
+    "kind": "finding",
+    "state": "open",
+    "fields": {
+     "says": "The SHARED_MODULES purity guard must not trip on comments: the new `lib/cost-format.js` header will mention the browser. Match top-level window|document|process|require in code, not comment text, and prove it with the synthetic bad module plan-28 already names."
+    },
+    "links": {
+     "about": [
+      "plan-28"
+     ],
+     "on": [
+      "plan-28@12"
+     ]
+    },
+    "in": "task-9",
+    "to": "implementation",
+    "v": 1,
+    "op": "add",
+    "at": "2026-11-13T14:23:53.000Z",
+    "by": "plan-review"
+   }
+  ],
+  "finding-40": [
+   {
+    "id": "finding-40",
+    "kind": "finding",
+    "state": "open",
+    "fields": {
+     "says": "404 witness: unknown /shared/* and /lib/cost-format.js fall through to express.static(public) and then the app routes. Assert a real 404 through the full server.js app, not only the bare router, so a catch-all route cannot turn it into a 200 HTML page."
+    },
+    "links": {
+     "about": [
+      "plan-28"
+     ],
+     "on": [
+      "plan-28@12"
+     ]
+    },
+    "in": "task-9",
+    "to": "implementation",
+    "v": 1,
+    "op": "add",
+    "at": "2026-11-13T14:23:54.000Z",
+    "by": "plan-review"
+   }
+  ],
+  "finding-41": [
+   {
+    "id": "finding-41",
+    "kind": "finding",
+    "state": "open",
+    "fields": {
+     "says": "`loadCostFormat(sandbox)` in `tests/fixtures/browser-cost-format.js` can stay synchronous: import `formatUsd` statically at the top and assign `sandbox.window.CostFormat = { formatUsd }`. It returns plain strings, so sharing it across vm contexts is safe. `COST_FORMAT_SRC` has no other importers and can go."
+    },
+    "links": {
+     "about": [
+      "plan-28"
+     ],
+     "on": [
+      "plan-28@12",
+      "finding-24@3"
+     ]
+    },
+    "in": "task-9",
+    "to": "implementation",
+    "v": 1,
+    "op": "add",
+    "at": "2026-11-13T14:23:55.000Z",
+    "by": "plan-review"
+   }
+  ],
+  "finding-42": [
+   {
+    "id": "finding-42",
+    "kind": "finding",
+    "state": "open",
+    "fields": {
+     "says": "observation.js counts in the area note Waiting entry: keep plan-28 method (lines starting with *, // or /*, out of non-blank lines; 1,985 of 4,679 per finding-31) and say that finding-20 1,006 used a different method, rather than presenting the two figures side by side."
+    },
+    "links": {
+     "about": [
+      "plan-28"
+     ],
+     "on": [
+      "plan-28@12",
+      "finding-31@2",
+      "finding-20@1"
+     ]
+    },
+    "in": "task-9",
+    "to": "implementation",
+    "v": 1,
+    "op": "add",
+    "at": "2026-11-13T14:23:56.000Z",
     "by": "plan-review"
    }
   ]
@@ -2232,6 +2465,33 @@
    "args": [
     "get",
     "finding-16",
+    "--by",
+    "plan-review"
+   ],
+   "asOf": null
+  },
+  {
+   "at": "2026-11-17T15:28:04.549Z",
+   "by": "plan-review",
+   "cmd": "get",
+   "args": [
+    "get",
+    "finding-24",
+    "--by",
+    "plan-review"
+   ],
+   "asOf": null
+  },
+  {
+   "at": "2026-11-17T15:28:26.834Z",
+   "by": "plan-review",
+   "cmd": "brief",
+   "args": [
+    "brief",
+    "design",
+    "--task",
+    "task-9",
+    "--text",
     "--by",
     "plan-review"
    ],
