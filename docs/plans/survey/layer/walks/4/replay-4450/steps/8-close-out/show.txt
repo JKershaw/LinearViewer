@@ -1,0 +1,34 @@
+task-60 task v2 [done] by close-out
+decision-63 decision v1 [stands] by breakdown
+question-66 question v3 [answered] to implementation answered-by decision-86 by implementation
+finding-67 finding v2 [done] to implementation by implementation
+check-68 check v2 [handed-on] to implementation by implementation
+finding-69 finding v2 [done] to implementation by leftover
+finding-70 finding v2 [done] to implementation by implementation
+run-71 run v2 [done] by survey-task
+run-72 run v3 [done] by survey-place
+finding-73 finding v2 [done] to implementation by implementation
+finding-74 finding v2 [done] to implementation by implementation
+finding-75 finding v2 [done] to implementation by implementation
+finding-76 finding v2 [handed-on] to implementation by implementation
+finding-77 finding v2 [done] to implementation by implementation
+decision-81 decision v1 [stands] by scoping
+decision-82 decision v1 [stands] by scoping
+run-83 run v2 [done] by scoping
+run-84 run v2 [done] by implementation
+change-85 change v4 [merged] by close-out
+decision-86 decision v1 [stands] by implementation
+decision-87 decision v1 [stands] by implementation
+decision-88 decision v1 [stands] by implementation
+finding-89 finding v1 [open] to review by implementation
+run-92 run v3 [done] by leftover
+finding-97 finding v2 [done] to review by review
+verdict-98 verdict v1 [stands] STALE by review
+finding-99 finding v2 [done] to close-out by close-out
+run-102 run v2 [done] by review
+verdict-103 verdict v1 [stands] STALE by blind-read
+finding-104 finding v2 [done] to close-out by close-out
+finding-105 finding v2 [done] to close-out by close-out
+finding-106 finding v2 [done] to close-out by close-out
+run-108 run v2 [done] by blind-read
+run-110 run v2 [done] by close-out

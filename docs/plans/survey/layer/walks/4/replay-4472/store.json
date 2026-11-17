@@ -1,5 +1,5 @@
 {
- "next": 79,
+ "next": 86,
  "records": {
   "task-1": [
    {
@@ -1794,6 +1794,23 @@
     "op": "add",
     "by": "implementation",
     "at": "2026-11-13T17:33:20.000Z"
+   },
+   {
+    "id": "finding-71",
+    "kind": "finding",
+    "in": "task-28",
+    "to": "review",
+    "says": "Behaviour change: `fmtDuration(Infinity)` is now `null`; the page's old `formatElapsed(Infinity)` returned `\"Infinityh\"` (checked in git). No page path passes a non-finite span: `tickClocks` skips unparsed starts, and `Date.now()` minus a parsed start is finite. `tests/unit/lin-4472-time-words.test.js` pins the new value. Also: `shareTime(doc, value, now)` takes an optional `now`, defaulting to the same `new Date()` that `relativeAgo` uses.",
+    "links": {
+     "about": "change-69@1"
+    },
+    "state": "done",
+    "v": 2,
+    "op": "end",
+    "by": "review",
+    "at": "2026-11-13T18:01:44.000Z",
+    "stateReason": "Reviewed: the Infinity edge is unreachable from the page (unparsed starts are skipped) and pinned by lin-4472-time-words; the page behaves as before. Recorded in verdict-80.",
+    "reason": "Reviewed: the Infinity edge is unreachable from the page (unparsed starts are skipped) and pinned by lin-4472-time-words; the page behaves as before. Recorded in verdict-80."
    }
   ],
   "finding-72": [
@@ -1811,6 +1828,24 @@
     "op": "add",
     "by": "implementation",
     "at": "2026-11-13T17:33:21.000Z"
+   },
+   {
+    "id": "finding-72",
+    "kind": "finding",
+    "in": "task-28",
+    "to": "review",
+    "says": "Known shortfall against review note 2 (\"each migrated suite reads shorter\"): the migrated suites shrink by only 3 to 9 lines (task-page-client 707 to 700, task-timeline-client 256 to 250, task-page-question 344 to 341, proposal-refresh 247 to 242, summary-and-time 372 to 369, task-run-links 228 to 219, the last only after its clock test moved into `lin-4472-time-words.test.js`; it first grew by 4). `lin-3975-task-run-control` and `lin-3975-chat-fold` were re-anchored, not shortened. The added complexity is `tests/unit/helpers/task-page-world.js` (36 lines), shared by three suites, which the census cannot see.",
+    "links": {
+     "about": "change-69@1"
+    },
+    "state": "handed-on",
+    "v": 2,
+    "op": "end",
+    "by": "review",
+    "at": "2026-11-13T18:01:45.000Z",
+    "stateReason": "Confirmed in part: every migrated suite is shorter except lin-3975-task-run-links, which is 232 lines on head ffa70b78 (not 219 as stated; the clock-test move is not on head). The fix goes to close-out as F1.",
+    "into": "finding-81",
+    "reason": "Confirmed in part: every migrated suite is shorter except lin-3975-task-run-links, which is 232 lines on head ffa70b78 (not 219 as stated; the clock-test move is not on head). The fix goes to close-out as F1."
    }
   ],
   "finding-73": [
@@ -1844,6 +1879,22 @@
     "by": "leftover",
     "at": "2026-11-13T17:50:43.000Z",
     "reason": "Leftover named each copy and its difference (live-console has no hour rung) in the Waiting entry"
+   },
+   {
+    "id": "finding-73",
+    "kind": "finding",
+    "in": "area-49",
+    "to": "area-49",
+    "says": "Not this task's: classic browser copies of `fmtDuration`/`relativeAgo` remain beside the new owner `lib/time-words.js`: `public/session.js` `formatElapsed` and `public/observation.js` `formatRuntime` restate `fmtDuration`, and `public/live-console.js` `fmtDuration(s)` spells the rule a second way (no hour rung). They sit outside the `lin-4472-time-words` guard (which scans only server code) and are listed in the browser area's Waiting entry; each retires when its view converts and imports `/lib/time-words.js` (LIN-4472, PR #2436). Not copies, so not to be folded in: `lib/task-timeline.js` `gapWords` (adds a day rung, rounds to minutes) and `live-console.js` `describeSpan` (\"47 minutes\", \"2 hours\") are deliberately different wordings (review of PR #2436).",
+    "links": {
+     "about": "decision-66@1"
+    },
+    "state": "open",
+    "v": 3,
+    "op": "revise",
+    "by": "review",
+    "at": "2026-11-13T18:01:47.000Z",
+    "reason": "Review checked the class: confirmed the three copies and added the two look-alikes that are not copies"
    }
   ],
   "finding-74": [
@@ -1975,6 +2026,160 @@
     "op": "add",
     "by": "leftover",
     "at": "2026-11-13T17:50:45.000Z"
+   },
+   {
+    "id": "finding-78",
+    "kind": "finding",
+    "in": "task-28",
+    "to": "review",
+    "says": "Outside the task's paths: the leftover pass retires the `docs/areas/front-end-pages.md` Waiting entry \"`lib/render-task-page.js`: the layout test's desktop check that both quiet offers…\". `tests/e2e/task-page.spec.js` now polls the offers' offset (`expect.poll`) instead of reading it once; 5/5 passes locally with retries off, and E2E shards 1-4 are green on head ffa70b78. Also corrected comments the change made untrue: the `lib/time-words.js` header and `docs/architecture/source-map.md` (render-run-steps exports, time-words entry) no longer say the server re-exports.",
+    "links": {
+     "about": "change-69@2"
+    },
+    "state": "done",
+    "v": 2,
+    "op": "end",
+    "by": "review",
+    "at": "2026-11-13T18:01:46.000Z",
+    "stateReason": "Checked: the diff removes the front-end-pages quiet-offers Waiting entry and the expect.poll change is small and settled by that retirement; the corrected comments match the code. Not a finding.",
+    "reason": "Checked: the diff removes the front-end-pages quiet-offers Waiting entry and the expect.poll change is small and settled by that retirement; the corrected comments match the code. Not a finding."
+   }
+  ],
+  "run-79": [
+   {
+    "id": "run-79",
+    "kind": "run",
+    "in": "task-28",
+    "stage": "review",
+    "account": "Reviewed PR #2436 at head ffa70b78 (base 5cf4f6aa2, nothing stale; CI green). Diffed task-page.js ignoring whitespace: IIFE and typeof-module seam gone, one import from ../lib/time-words.js, one named export block, listener guard unchanged. Golden word diff is exactly 7 type=\"module\" additions. lib/time-words.js is the old server functions byte for byte, allow-listed and served. Ran 30 targeted suites: 557 pass, 0 fail. Nine mutations, each caught by the test that claims it, including a real-browser e2e catch of a broken module import. Regression check via git log: clean. Caching: HTML no-store, task-page.js revalidated by ETag. Sibling copies are outside and already on the area Waiting list; gapWords and describeSpan are different wordings, not copies. Every sentence of the ask met except: run-links grew 228 to 232 (F1), PR body stale (F2), two nits (F3). Verdict approve with notes, conditional on close-out making F1-F3 and running the two post-deploy checks.",
+    "links": {},
+    "state": "open",
+    "v": 1,
+    "op": "add",
+    "by": "review",
+    "at": "2026-11-13T18:01:37.000Z"
+   },
+   {
+    "id": "run-79",
+    "kind": "run",
+    "in": "task-28",
+    "stage": "review",
+    "account": "Reviewed PR #2436 at head ffa70b78 (base 5cf4f6aa2, nothing stale; CI green). Diffed task-page.js ignoring whitespace: IIFE and typeof-module seam gone, one import from ../lib/time-words.js, one named export block, listener guard unchanged. Golden word diff is exactly 7 type=\"module\" additions. lib/time-words.js is the old server functions byte for byte, allow-listed and served. Ran 30 targeted suites: 557 pass, 0 fail. Nine mutations, each caught by the test that claims it, including a real-browser e2e catch of a broken module import. Regression check via git log: clean. Caching: HTML no-store, task-page.js revalidated by ETag. Sibling copies are outside and already on the area Waiting list; gapWords and describeSpan are different wordings, not copies. Every sentence of the ask met except: run-links grew 228 to 232 (F1), PR body stale (F2), two nits (F3). Verdict approve with notes, conditional on close-out making F1-F3 and running the two post-deploy checks.",
+    "links": {},
+    "state": "done",
+    "v": 2,
+    "op": "end",
+    "by": "review",
+    "at": "2026-11-13T18:01:48.000Z",
+    "stateReason": "Review written: verdict-80 (approve with notes), F1-F3 and two post-deploy checks to close-out",
+    "reason": "Review written: verdict-80 (approve with notes), F1-F3 and two post-deploy checks to close-out"
+   }
+  ],
+  "verdict-80": [
+   {
+    "id": "verdict-80",
+    "kind": "verdict",
+    "in": "task-28",
+    "of": "review",
+    "outcome": "approve-with-notes",
+    "reasoning": "Approve, conditional on close-out discharging the ledger: make F1-F3 before the merge and re-check CI on the new head, then run the two post-deploy checks. The conversion is exactly what was asked (IIFE and seam gone, named exports, SCRIPTS entry a module, golden diff only the 7 module tags, nothing added to the bridge, listener still one and last). The served leaf follows John's ruling (decision-75). 557/557 targeted tests pass on head; nine mutations each went red in the test that claims them. The one shortfall against the ask is that lin-3975-task-run-links reads longer (228 to 232), fixed by F1. The fmtDuration(Infinity) edge (finding-71) cannot be reached from the page and is pinned.",
+    "links": {
+     "on": "change-69@2"
+    },
+    "state": "stands",
+    "v": 1,
+    "op": "add",
+    "by": "review",
+    "at": "2026-11-13T18:01:38.000Z"
+   }
+  ],
+  "finding-81": [
+   {
+    "id": "finding-81",
+    "kind": "finding",
+    "in": "task-28",
+    "to": "close-out",
+    "says": "F1. `tests/unit/lin-3975-task-run-links.test.js` must read shorter; at head ffa70b78 it is 232 lines (base 228), because the old 4-line vm parity test became a behaviour test. Move the test `the page's running clock paints fmtDuration's words for every span it can show` (`:211-221`) into `tests/unit/lin-4472-time-words.test.js` inside its `describe`, and change that file's import to `import { shareTime, tickClocks } from '../../public/task-page.js';`. In run-links delete the now-unused imports of `createFakeDom` and `tickClocks`, and change the header bullet at `:10` to say the server's running suffix is fmtDuration's words and the page's clock is pinned in `lin-4472-time-words.test.js`. Tried: run-links becomes 218 lines, both suites pass (24/24), and the moved test still fails when `tickClocks` stops calling `fmtDuration`. Note: finding-72 reports run-links at 219 after this move, but the move is not on head ffa70b78.",
+    "links": {
+     "about": "change-69@2"
+    },
+    "state": "open",
+    "v": 1,
+    "op": "add",
+    "by": "review",
+    "at": "2026-11-13T18:01:39.000Z"
+   }
+  ],
+  "finding-82": [
+   {
+    "id": "finding-82",
+    "kind": "finding",
+    "in": "task-28",
+    "to": "close-out",
+    "says": "F2. The PR #2436 body is stale since `ffa70b782`: its \"What changed\" bullet says `render-run-steps.js` and `task-page-loader.js` \"re-export them, so no caller changed\". Change it to say every server caller imports `lib/time-words.js` and a guard in `lin-4472-time-words.test.js` forbids re-exports. Update the run-links row of the \"shorter\" table after F1.",
+    "links": {
+     "about": "change-69@2"
+    },
+    "state": "open",
+    "v": 1,
+    "op": "add",
+    "by": "review",
+    "at": "2026-11-13T18:01:40.000Z"
+   }
+  ],
+  "finding-83": [
+   {
+    "id": "finding-83",
+    "kind": "finding",
+    "in": "task-28",
+    "to": "close-out",
+    "says": "F3. Nits in `tests/unit/task-page-client.test.js`: remove the unused `(t)` parameter on `a guest share state URL reports gone`, and the extra blank line left just after the imports where `load()` was removed.",
+    "links": {
+     "about": "change-69@2"
+    },
+    "state": "open",
+    "v": 1,
+    "op": "add",
+    "by": "review",
+    "at": "2026-11-13T18:01:41.000Z"
+   }
+  ],
+  "check-84": [
+   {
+    "id": "check-84",
+    "kind": "check",
+    "in": "task-28",
+    "to": "close-out",
+    "what": "After the deploy, the task page behaves as before in Safari and Firefox (CI's Playwright runs Chromium only; no `projects` in `playwright.config.js`). A module script at the root must import `../lib/time-words.js` under `script-src 'self'`.",
+    "why-person": "CI cannot prove a non-Chromium browser loads the module; only a real browser on the deployed site can.",
+    "how": "Open a live owner task page with a running stage in Safari and in Firefox. Right if `/task-page.js` and `/lib/time-words.js` both return 200 with a JavaScript MIME type, the console shows no error or CSP refusal, the stage clock reads `in progress · Xm` and ticks, and the share list shows \"N minutes ago\". Wrong if the clock stays at its server text and the console shows a module or MIME error. Rollback: revert the squash commit of #2436; nothing is persisted and no third party consumes it.",
+    "links": {
+     "about": "change-69@2"
+    },
+    "state": "open",
+    "v": 1,
+    "op": "add",
+    "by": "review",
+    "at": "2026-11-13T18:01:42.000Z"
+   }
+  ],
+  "check-85": [
+   {
+    "id": "check-85",
+    "kind": "check",
+    "in": "task-28",
+    "to": "close-out",
+    "what": "Acceptance: merged and verified on its own after piece 1.",
+    "why-person": "Only the deployed site shows the merged page working on its own.",
+    "how": "On the deployed site, load one owner task page and one guest share page (`/t/<token>`). Right if the poll repaints the header without a reload and there is no `pageerror`. Rollback: revert the squash commit of #2436.",
+    "links": {
+     "about": "change-69@2"
+    },
+    "state": "open",
+    "v": 1,
+    "op": "add",
+    "by": "review",
+    "at": "2026-11-13T18:01:43.000Z"
    }
   ]
  },

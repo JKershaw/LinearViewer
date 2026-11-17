@@ -1,5 +1,5 @@
 {
- "next": 109,
+ "next": 111,
  "records": {
   "area-1": [
    {
@@ -1309,6 +1309,32 @@
     "op": "add",
     "by": "breakdown",
     "at": "2026-11-13T13:43:57.706Z"
+   },
+   {
+    "id": "task-60",
+    "kind": "task",
+    "in": "task-53",
+    "asked": "",
+    "done-when": "All of the above pass on `fake-client.js`. Jira's `descriptionRoundTrip` holds sealed words byte-exact, D1's rich-content guard is unchanged, and the PR names what it retires (the \"Jira skipped/unsealed\" seal claims in code headers). Note that once this lands, the first-dispatch seal begins sealing Jira-native tickets on live sites. That is expected: it is logged on failure, and dispatch continues.",
+    "paths": [
+     "lib/providers/jira/",
+     "lib/as-asked-seal.js",
+     "lib/as-asked.js",
+     "tests/unit/as-asked-create-seal.test.js",
+     "tests/unit/as-asked-dispatch-seal.test.js",
+     "tests/unit/as-asked-readers.test.js",
+     "tests/unit/jira-provider.test.js"
+    ],
+    "links": {
+     "piece": "plan-54"
+    },
+    "state": "done",
+    "v": 2,
+    "op": "end",
+    "by": "close-out",
+    "at": "2026-11-13T15:22:05.000Z",
+    "stateReason": "Closed out: PR 2421 merged at 2bf788b6d and deployed; review's gap analysis stands (every Done-when item met on the fake; one declared departure, the empty-fence codec shape, judged consistent with D1 unchanged). The four close-out findings fixed in 26299c9b0; ci-success green. Live checks stay with task-62 (LIN-4452); task-61 (LIN-4451) unblocked; parent task-53 stays open.",
+    "reason": "Closed out: PR 2421 merged at 2bf788b6d and deployed; review's gap analysis stands (every Done-when item met on the fake; one declared departure, the empty-fence codec shape, judged consistent with D1 unchanged). The four close-out findings fixed in 26299c9b0; ci-success green. Live checks stay with task-62 (LIN-4452); task-61 (LIN-4451) unblocked; parent task-53 stays open."
    }
   ],
   "task-61": [
@@ -2108,6 +2134,39 @@
     "by": "leftover",
     "at": "2026-11-13T14:14:11.000Z",
     "reason": "Leftovers commit pushed to PR 2421; CI green on this head (the 'Unit tests (proxy, clock +400d)' job rerun once after GitHub's hosted runner lost contact; no test failed)"
+   },
+   {
+    "id": "change-85",
+    "kind": "change",
+    "in": "task-60",
+    "ref": "https://github.com/JKershaw/LinearViewer/pull/2421",
+    "head": "26299c9b0c6ecb57edd029f49578282224f6d31e",
+    "links": {
+     "about": "plan-54"
+    },
+    "state": "open",
+    "v": 3,
+    "op": "revise",
+    "by": "close-out",
+    "at": "2026-11-13T15:22:02.000Z",
+    "reason": "Close-out commit 26299c9b0 (the four close-out fixes); ci-success green on this head (Unit tests, proxy clock +400d, E2E 1-4/4, secret scan)"
+   },
+   {
+    "id": "change-85",
+    "kind": "change",
+    "in": "task-60",
+    "ref": "https://github.com/JKershaw/LinearViewer/pull/2421",
+    "head": "26299c9b0c6ecb57edd029f49578282224f6d31e",
+    "links": {
+     "about": "plan-54"
+    },
+    "state": "merged",
+    "v": 4,
+    "op": "end",
+    "by": "close-out",
+    "at": "2026-11-13T15:22:03.000Z",
+    "stateReason": "Squash-merged as 2bf788b6da71c82db6a1d84b361da98ef9cdedbb, pinned to head 26299c9b0 (the commit CI passed on). Deployed: harbour.cat footer shows 2bf788b6d (checked 15:39 UTC) and the Tests run on main for it completed green. Rollback: revert the squash commit (verdict-98); no data loss.",
+    "reason": "Squash-merged as 2bf788b6da71c82db6a1d84b361da98ef9cdedbb, pinned to head 26299c9b0 (the commit CI passed on). Deployed: harbour.cat footer shows 2bf788b6d (checked 15:39 UTC) and the Tests run on main for it completed green. Rollback: revert the squash commit (verdict-98); no data loss."
    }
   ],
   "decision-86": [
@@ -2468,6 +2527,23 @@
     "op": "add",
     "by": "review",
     "at": "2026-11-13T15:12:27.000Z"
+   },
+   {
+    "id": "finding-99",
+    "kind": "finding",
+    "in": "task-60",
+    "to": "close-out",
+    "says": "Fix before close: `tests/unit/jira-as-asked-region.test.js`, test \"an oversized body is not sealed…\" (~line 262) asserts the body was filed unsealed and verbatim but not \"with the log line\" (plan-54 item 6 witness). Capture `console.log` during the `sealForFiling` call and assert exactly one line equal to `[as-asked] seal skipped: provider jira cannot hold the block (test)`.",
+    "links": {
+     "about": "change-85@2"
+    },
+    "state": "done",
+    "v": 2,
+    "op": "end",
+    "by": "close-out",
+    "at": "2026-11-13T15:21:58.000Z",
+    "stateReason": "Fixed in commit 26299c9b0 on PR 2421: the oversize test now captures console.log during sealForFiling and asserts exactly one line, '[as-asked] seal skipped: provider jira cannot hold the block (test)'. Checked it bites: changing the logged wording turns it red; reverted.",
+    "reason": "Fixed in commit 26299c9b0 on PR 2421: the oversize test now captures console.log during sealForFiling and asserts exactly one line, '[as-asked] seal skipped: provider jira cannot hold the block (test)'. Checked it bites: changing the logged wording turns it red; reverted."
    }
   ],
   "check-100": [
@@ -2569,6 +2645,23 @@
     "op": "add",
     "by": "blind-read",
     "at": "2026-11-13T15:18:48.000Z"
+   },
+   {
+    "id": "finding-104",
+    "kind": "finding",
+    "in": "task-60",
+    "to": "close-out",
+    "links": {
+     "about": "change-85"
+    },
+    "says": "`routes/workspace-api-audit.js` lines 35-36 still write `process.env.NODE_ENV === 'test' && (workspace.accessToken === 'test-token' || …)` inline. PR 2421's sweep moved every sibling copy onto `isHermeticTestToken` and missed this one. Fix: `isHermeticTestToken(workspace.accessToken) || (process.env.NODE_ENV === 'test' && workspace.provider === 'local')`. It keeps its own predicate, as its comment asks; only the token half uses the helper. (Blind read at f9fa4a80c.)",
+    "state": "done",
+    "v": 2,
+    "op": "end",
+    "by": "close-out",
+    "at": "2026-11-13T15:21:59.000Z",
+    "stateReason": "Fixed in commit 26299c9b0: routes/workspace-api-audit.js now reads isHermeticTestToken(workspace.accessToken) || (NODE_ENV==='test' && workspace.provider==='local'). Same predicate as before, local-provider alternative kept.",
+    "reason": "Fixed in commit 26299c9b0: routes/workspace-api-audit.js now reads isHermeticTestToken(workspace.accessToken) || (NODE_ENV==='test' && workspace.provider==='local'). Same predicate as before, local-provider alternative kept."
    }
   ],
   "finding-105": [
@@ -2586,6 +2679,23 @@
     "op": "add",
     "by": "blind-read",
     "at": "2026-11-13T15:18:49.000Z"
+   },
+   {
+    "id": "finding-105",
+    "kind": "finding",
+    "in": "task-60",
+    "to": "close-out",
+    "links": {
+     "about": "change-85"
+    },
+    "says": "`routes/workspace-api-steps.js`: `isTestToken` is now a one-line second name for `isHermeticTestToken(workspace.accessToken)`. Fix: have its callers (`routes/workspace-api-issue-read.js`, `routes/workspace-api-issue-write.js`, `routes/workspace-api-prompts.js`) import the helper directly and drop the alias. (Blind read at f9fa4a80c.)",
+    "state": "done",
+    "v": 2,
+    "op": "end",
+    "by": "close-out",
+    "at": "2026-11-13T15:22:00.000Z",
+    "stateReason": "Fixed in commit 26299c9b0: isTestToken removed from routes/workspace-api-steps.js; workspace-api.js, -prompts.js, -issue-read.js, -issue-write.js and the steps file itself call isHermeticTestToken(workspace.accessToken) directly. The stale citations this made (steps header comments, docs/architecture/source-map.md line 42) fixed in the same commit.",
+    "reason": "Fixed in commit 26299c9b0: isTestToken removed from routes/workspace-api-steps.js; workspace-api.js, -prompts.js, -issue-read.js, -issue-write.js and the steps file itself call isHermeticTestToken(workspace.accessToken) directly. The stale citations this made (steps header comments, docs/architecture/source-map.md line 42) fixed in the same commit."
    }
   ],
   "finding-106": [
@@ -2603,6 +2713,23 @@
     "op": "add",
     "by": "blind-read",
     "at": "2026-11-13T15:18:50.000Z"
+   },
+   {
+    "id": "finding-106",
+    "kind": "finding",
+    "in": "task-60",
+    "to": "close-out",
+    "links": {
+     "about": "change-85"
+    },
+    "says": "`tests/unit/jira-as-asked-region.test.js` line ~291, \"no longer claim that Jira is skipped\", only checks that three phrases are missing from two comment headers (`lib/as-asked-seal.js`, `lib/as-asked.js`). It says nothing about behaviour; `as-asked-create-seal.test.js` already checks that Jira holds the block. Fix: delete it. (Blind read at f9fa4a80c.)",
+    "state": "done",
+    "v": 2,
+    "op": "end",
+    "by": "close-out",
+    "at": "2026-11-13T15:22:01.000Z",
+    "stateReason": "Deleted in commit 26299c9b0: the 'no longer claim that Jira is skipped' test is gone; the behaviour stays covered by as-asked-create-seal. Full unit suite 25,319/25,319 locally.",
+    "reason": "Deleted in commit 26299c9b0: the 'no longer claim that Jira is skipped' test is gone; the behaviour stays covered by as-asked-create-seal. Full unit suite 25,319/25,319 locally."
    }
   ],
   "question-107": [
@@ -2655,6 +2782,59 @@
     "at": "2026-11-13T15:18:54.000Z",
     "stateReason": "Blind read comment posted on LIN-4450",
     "reason": "Blind read comment posted on LIN-4450"
+   }
+  ],
+  "finding-109": [
+   {
+    "id": "finding-109",
+    "kind": "finding",
+    "in": "task-62",
+    "to": "task-62",
+    "says": "PR 2421 is merged (2bf788b6d) and deployed (harbour.cat footer, 15:39 UTC), so the post-deploy live checks check-90 (property PUT/GET round trip; digest surviving a Jira editor save below the block) and check-100 (first dispatch of a never-dispatched Jira-native ticket) are now runnable. LIN-4450 close-out did not run them: no build session holds a credential for John Jira. They did not hold the close; recorded on PR 2421 comment 15:40:38. Run them here, or park as a handoff to John per the Done-when.",
+    "links": {
+     "about": "change-85@4"
+    },
+    "state": "open",
+    "v": 1,
+    "op": "add",
+    "by": "close-out",
+    "at": "2026-11-13T15:22:04.000Z"
+   }
+  ],
+  "run-110": [
+   {
+    "id": "run-110",
+    "kind": "run",
+    "in": "task-60",
+    "stage": "close-out",
+    "account": "Closed out LIN-4450. Pinned the merge to head 26299c9b0 (ci-success green), squash commit 2bf788b6d, deployed (harbour.cat footer 15:39). Discharged review ledger and blind-read items in one commit: oversize test now asserts the one seal-skipped log line (checked it bites), workspace-api-audit.js token half on isHermeticTestToken, isTestToken alias dropped with its stale citations (steps header, source-map.md:42), header-phrase test deleted. Full unit suite 25,319/25,319. Three live post-deploy checks not run (no credential for John Jira): owned by LIN-4452 (task-62, check-90/check-100), noted on the PR. Batch reads not asking for harbour.asAsked: homed in providers.md Waiting, no ticket (question-107 left open to Providers). Description archived and pruned; LIN-4451 unblocked.",
+    "links": {
+     "on": "verdict-98@1",
+     "about": "change-85"
+    },
+    "state": "open",
+    "v": 1,
+    "op": "add",
+    "by": "close-out",
+    "at": "2026-11-13T15:22:06.000Z"
+   },
+   {
+    "id": "run-110",
+    "kind": "run",
+    "in": "task-60",
+    "stage": "close-out",
+    "account": "Closed out LIN-4450. Pinned the merge to head 26299c9b0 (ci-success green), squash commit 2bf788b6d, deployed (harbour.cat footer 15:39). Discharged review ledger and blind-read items in one commit: oversize test now asserts the one seal-skipped log line (checked it bites), workspace-api-audit.js token half on isHermeticTestToken, isTestToken alias dropped with its stale citations (steps header, source-map.md:42), header-phrase test deleted. Full unit suite 25,319/25,319. Three live post-deploy checks not run (no credential for John Jira): owned by LIN-4452 (task-62, check-90/check-100), noted on the PR. Batch reads not asking for harbour.asAsked: homed in providers.md Waiting, no ticket (question-107 left open to Providers). Description archived and pruned; LIN-4451 unblocked.",
+    "links": {
+     "on": "verdict-98@1",
+     "about": "change-85"
+    },
+    "state": "done",
+    "v": 2,
+    "op": "end",
+    "by": "close-out",
+    "at": "2026-11-13T15:22:07.000Z",
+    "stateReason": "Close-out complete",
+    "reason": "Close-out complete"
    }
   ]
  },
@@ -3694,6 +3874,36 @@
     "batch",
     "--state",
     "open",
+    "--by",
+    "close-out"
+   ]
+  },
+  {
+   "at": "2026-11-17T14:56:12.884Z",
+   "by": "close-out",
+   "q": [
+    "get",
+    "question-107",
+    "--by",
+    "close-out"
+   ]
+  },
+  {
+   "at": "2026-11-17T14:56:12.927Z",
+   "by": "close-out",
+   "q": [
+    "get",
+    "check-100",
+    "--by",
+    "close-out"
+   ]
+  },
+  {
+   "at": "2026-11-17T14:56:12.966Z",
+   "by": "close-out",
+   "q": [
+    "get",
+    "finding-78",
     "--by",
     "close-out"
    ]
