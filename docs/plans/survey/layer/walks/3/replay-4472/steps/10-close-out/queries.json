@@ -1,0 +1,101 @@
+[
+ {
+  "at": "2026-11-17T13:55:37.386Z",
+  "by": "close-out",
+  "query": "show",
+  "args": {
+   "task": "task-28",
+   "asOf": null
+  },
+  "returned": 1
+ },
+ {
+  "at": "2026-11-17T13:55:46.784Z",
+  "by": "close-out",
+  "query": "get",
+  "args": {
+   "id": "change-97",
+   "asOf": null
+  },
+  "returned": 1
+ },
+ {
+  "at": "2026-11-17T13:55:46.819Z",
+  "by": "close-out",
+  "query": "get",
+  "args": {
+   "id": "finding-119",
+   "asOf": null
+  },
+  "returned": 1
+ },
+ {
+  "at": "2026-11-17T13:55:46.851Z",
+  "by": "close-out",
+  "query": "get",
+  "args": {
+   "id": "finding-99",
+   "asOf": null
+  },
+  "returned": 1
+ },
+ {
+  "at": "2026-11-17T13:55:46.886Z",
+  "by": "close-out",
+  "query": "get",
+  "args": {
+   "id": "finding-105",
+   "asOf": null
+  },
+  "returned": 1
+ },
+ {
+  "at": "2026-11-17T13:55:46.923Z",
+  "by": "close-out",
+  "query": "get",
+  "args": {
+   "id": "check-112",
+   "asOf": null
+  },
+  "returned": 1
+ },
+ {
+  "at": "2026-11-17T13:55:46.960Z",
+  "by": "close-out",
+  "query": "get",
+  "args": {
+   "id": "check-113",
+   "asOf": null
+  },
+  "returned": 1
+ },
+ {
+  "at": "2026-11-17T13:55:46.993Z",
+  "by": "close-out",
+  "query": "get",
+  "args": {
+   "id": "finding-104",
+   "asOf": null
+  },
+  "returned": 1
+ },
+ {
+  "at": "2026-11-17T13:55:47.028Z",
+  "by": "close-out",
+  "query": "get",
+  "args": {
+   "id": "question-84",
+   "asOf": null
+  },
+  "returned": 1
+ },
+ {
+  "at": "2026-11-17T13:56:15.569Z",
+  "by": "close-out",
+  "query": "find",
+  "args": {
+   "kind": "area"
+  },
+  "returned": 2
+ }
+]

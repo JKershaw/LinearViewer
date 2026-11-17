@@ -4662,6 +4662,16 @@
     "kind": "area"
    },
    "returned": 2
+  },
+  {
+   "at": "2026-11-17T13:57:23.511Z",
+   "by": "Harbour",
+   "query": "show",
+   "args": {
+    "task": "task-28",
+    "asOf": null
+   },
+   "returned": 1
   }
  ],
  "hits": []
