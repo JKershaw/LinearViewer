@@ -1,0 +1,8 @@
+1-survey-task: run-66 given 4059 chars
+2-survey-place: run-72 given 3415 chars
+3-scoping: run-82 given 451 chars
+4-implementation: run-83 given 7685 chars
+5-leftover: run-90 given 10967 chars
+6-review: run-102 given 11062 chars
+7-blind-read: run-103 given 2718 chars
+8-close-out: run-109 given 4522 chars

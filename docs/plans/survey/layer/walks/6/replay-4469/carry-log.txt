@@ -1,0 +1,10 @@
+1-implementation: run-141 given 3954 chars
+2-autopilot: run-146 given 655 chars
+3-review: run-156 given 11174 chars
+5-autopilot: run-158 given 2972 chars
+6-implementation: run-161 given 5436 chars
+7-leftover: run-162 given 1752 chars
+8-review: run-165 given 10315 chars
+9-autopilot: run-170 given 309 chars
+10-blind-read: run-171 given 5103 chars
+11-close-out: run-181 given 6699 chars
