@@ -44,7 +44,7 @@
 | 17 | S3: no one types the count | **Failed** | Every actor counted by hand and typed it (26, 25, 22). No counts view was built, and `find` has no as-of, so "how many at 10:00" can't be asked (break 4) |
 | 18 | S4: ids fine, the double claim unseen | **Held** | Session B found A only by looking; A never learned of B (break 5) |
 | 19 | S5: the pile grows | **Held** | 11 open to John; near-repeats linked only because the sixth run looked; nothing ends them |
-| 20 | S6: every record has a home | **Held, with a cost** | Through a stretched `change`. But a check to John (placeholders still in the text) reached no reader, the task closed over it, and the newsletter went out with the placeholders (break 7) |
+| 20 | S6: every record has a home | **Held, with a cost** | Through a stretched `change`. But a check to John (placeholders still in the text) reached no reader, the task closed over it, and in the scene the newsletter went out with the placeholders (break 7; S6 is an invented scene, not a real task, corrected 17 Nov) |
 
 ## Breaks, each with why
 

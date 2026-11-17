@@ -45,8 +45,8 @@ The ticket keeps every word a stage wrote; the store keeps what the stage chose 
 | 7 | LIN-4463: pieces, verdicts, children | **Half** | Two pieces, one verdict on both, children with `ref` and `piece`. But a parent links one piece, so plan-review's brief showed one of two; breakdown had to move records into the children for their briefs to see them |
 | 8 | LIN-4446: plan revised after review | **Half** | Notes became findings, the second plan took them in and ended them, the second verdict rests on the new version. But the first verdict couldn't be superseded, and stale spread over the task |
 | 9 | LIN-4469: implementation twice around a review | **Half** | The review's fixes went to close-out and were ended. The first review's real outcome ("Needs Discussion") couldn't be recorded. After the ruling's withdrawal, the autopilot's "merge waits on question-159" stays unflagged: it links the question `about`, not `on` |
-| 10 | LIN-4459: asks on silence stay open | **Different** | Close-out closed the ask as answered by LIN-4448's earlier standing agreement (decision-119), which the store held and the ticket's silence hid |
-| 11 | LIN-4464: the read has no home | **Failed, happily** | The report landed as a PR, a `change`. And the store let the blind read see that the real blind read had judged the wrong base; the autopilot confirmed it and told close-out not to apply those fixes |
+| 10 | LIN-4459: asks on silence stay open | **Different** | Close-out closed the ask as answered by LIN-4448's earlier standing agreement (decision-119), which the real close-out had already cited (`replay-4459/real/9-close-out.md:12`); the store held it too, but did not find it (corrected 17 Nov) |
+| 11 | LIN-4464: the read has no home | **Failed, happily** | The report landed as a PR, a `change`. The real autopilot had already found that the blind read judged the wrong base (`replay-4464/real/10-autopilot.md:7`), and the store recorded it; the store did not catch it (corrected 17 Nov) |
 | 12 | The store reader answers more questions right | **Failed** | 20 right against 27 |
 | 13 | The store reader uses fewer tokens | **Failed** | About the same; more calls |
 
@@ -65,6 +65,6 @@ The ticket keeps every word a stage wrote; the store keeps what the stage chose 
 
 ## Is the store holding, and is it far better? [my reading]
 
-- **It holds:** every task shape found homes for what happened; decisions and approvals read back as reliably as from the ticket; ownership across tasks works; it caught things the ticket hides (the wrong base, an ask already answered by an earlier agreement).
+- **It holds:** every task shape found homes for what happened; decisions and approvals read back as reliably as from the ticket; ownership across tasks works; it held what the stages found (the wrong base, an ask already answered by an earlier agreement), though both were in the stages' real outputs too, so the store did not catch them (corrected 17 Nov).
 - **It is not yet far better** by John's bar. A stage starting from the store knows its situation slightly less well than one starting from the ticket, because the store is only as complete as what stages write, and round 5's shape stopped them routing some of it.
 - **What would change that** is small, and none of it is workflow: let any record carry a `to`; make stale apply only to verdicts and decisions, directly, on content revisions; let verdicts be superseded and take Harbour's outcomes; show a parent's pieces; carry blindness into queries; let a decision's scope be an area; and keep each stage's own words as its run's account so nothing is lost, with the brief carrying the previous stage's account in full. Then run the same comparison again.

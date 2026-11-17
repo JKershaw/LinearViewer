@@ -1,6 +1,6 @@
 # Walk 6 results: the comparison done fairly, and across a lane
 
-*17 Nov. Round 6 page (walk 5's shape faults fixed), model built fresh (279 lines; test passes). Walk 5's stores carried over, each run given the stage's own words as its account (`carry.mjs`; all 40 runs found). Eight points: walk 5's six stage starts, and two lane points at the close of LIN-4459 (lane LIN-4447) and LIN-4469 (lane LIN-4448). Three readers per point, each fresh, each answering the same six questions; one grader per point against a key written from the full history. Counts [checked, `compare/*/grade*.md`]; readings [my reading].*
+*17 Nov. Round 6 page (walk 5's shape faults fixed), model built fresh (279 lines; test passes). Walk 5's stores carried over, each run given the stage's own words as its account (`carry.mjs`; all 40 runs found). Eight points: walk 5's six stage starts, and two lane points at the close of LIN-4459 (lane LIN-4447) and LIN-4469 (lane LIN-4448). Three readers per point, each answering the same six questions; the store and ticket-plus-facts readers were fresh, but at the six stage starts the ticket reader's answers, the keys and the questions are walk 5's, reused (corrected 17 Nov, checked with `cmp`); one grader per point against a key written from the full history. Counts [checked, `compare/*/grade*.md`]; readings [my reading].*
 
 ## The readers
 
@@ -26,12 +26,9 @@ Walk 5's store reader, on the six stage starts without the stages' words: 20 rig
 4. **Stale is now quiet** [checked]: at most one flag per brief, each a verdict or decision on a version that moved. Approvals against the current head were answered right by all three readers nearly every time.
 5. **Expectations** (`expect.md`): 1 failed (23 against 27), 2 held, 3 failed (the ticket reader was ahead across a lane too), 4 held (the store reader reads a fifth to a sixth as much at the lane points), but reading less bought no accuracy.
 
-## What this means for the idea [my reading]
+## What this means for the idea
 
-- **As a replacement for the ticket as what agents read:** the evidence says no. The store is as good only where stages record and close everything; the ticket keeps everything without anyone having to. This is not a test artefact any more: with the stages' own words in the store, it still trails.
-- **What the store does do that the ticket doesn't:** every record has an owner and a state that code can read; counts and approvals against the current head are computed, not copied; briefs stay a fixed size as the history grows; an answer, a withdrawal or an override lands once and everything resting on it can be flagged. Those are benefits to **Harbour's code** (gates, counts, views, what to wake) and to cost, not to an agent's understanding.
-- **So the honest shape** is smaller than the design page: keep the text as what agents read, and keep a small typed layer beside it for what code must track (who owns an open item, open or ended, which version a judgement rests on, counts), written by the same stages. That is roughly what Harbour's rulings and PR state already are. Whether that layer is worth building is a different question from the one walks 1–6 set out to answer, and it is John's.
-- **The leaks** the traces showed (notes growing, counts drifting, things with no home) still need an answer. The store showed it can hold those without growing; what these walks show is that a long text is not what confuses a capable reader. If the leak is real, it is in what gets written and kept (lists, rules, unended items), not in where.
+*Corrected 17 Nov.* This section first read the reading comparison as a verdict on the design ("the evidence says no"). The comparison measured reading, not whether the structure holds the data, and is set aside (log, "John on walk 6: back to the point"). What walk 6 shows about the design is point 4 above: stale is now quiet. Round 6's write side is untested, since no stage wrote through it here.
 
 ## Artefacts, noted
 
