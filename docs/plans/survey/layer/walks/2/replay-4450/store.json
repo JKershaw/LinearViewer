@@ -1,17 +1,17 @@
 {
  "retro": false,
- "seq": 124,
+ "seq": 131,
  "count": {
   "area": 4,
   "lesson": 22,
-  "finding": 47,
+  "finding": 48,
   "task": 4,
   "decision": 12,
   "plan": 3,
-  "verdict": 3,
-  "run": 5,
+  "verdict": 4,
+  "run": 6,
   "question": 1,
-  "check": 1,
+  "check": 4,
   "change": 1
  },
  "records": {
@@ -2947,6 +2947,183 @@
     "fields": {
      "says": "lib/providers/jira/index.js: the bulk reads (fetchProjects, and fetchIssueContext children through searchAllIssues) do not ask for harbour.asAsked, so a sealed block shows its converted rendering on the dashboard and in a parent children list while single-issue reads serve the exact words. POST /rest/api/3/search/jql accepts properties, so asking there would make the bulk path exact too. No guard or cache compares the two today (LIN-4450 leftovers)."
     }
+   }
+  ],
+  "verdict-4": [
+   {
+    "id": "verdict-4",
+    "kind": "verdict",
+    "v": 1,
+    "seq": 125,
+    "at": "2026-11-13T15:18:12.000Z",
+    "by": "review",
+    "op": "add",
+    "in": "task-2",
+    "state": "stands",
+    "links": [
+     {
+      "type": "on",
+      "to": "change-1",
+      "v": 2
+     },
+     {
+      "type": "about",
+      "to": "plan-1"
+     }
+    ],
+    "fields": {
+     "of": "review",
+     "outcome": "approve-with-notes",
+     "reasoning": "PR #2421 at head f9fa4a80ca19503bebbf5abd81dc83d3e86296b6 (base 4b5001ddf; merges cleanly onto origin/main cfd152fa4, which touched none of its 22 files). CI green on that head; seal/codec suites re-run locally green. Every item of the plan piece is met: one region module importing the as-asked spellings; every description read through readDescription and all 9 provider getIssue calls pass AS_ASKED_READ; updateIssue writes the property in the same PUT; descriptionRoundTrip pure via holdAsAsked+readDescription; UTF-8 byte size guard at 32,768 with 422 and no write; client/fake property shape. Departures (end line by digest, bytes, throwing round trip, empty-fence tidy, every getIssue asks) are recorded on LIN-4445. The empty-fence change is a codec-shape rule, not a rich-content rule, so D1 rich-content guard unchanged holds in substance. Extras declared: isHermeticTestToken consolidation (behaviour-identical) and docs/areas/providers.md. No regressions to codec (LIN-3556..3570) or seal (LIN-4352/4361/4362) work. Ten mutations each went red; 16 extra shapes held byte-exact. Class is Jira-only; createIssue is LIN-4451 scope. Notes: one close-out test fix; three live checks are post-deploy (LIN-4452), not merge conditions. Rollback: revert the squash commit; written properties are ignored and sealed descriptions fall back to the unsealed readers, no data loss. Merging unblocks LIN-4451."
+    }
+   }
+  ],
+  "finding-48": [
+   {
+    "id": "finding-48",
+    "kind": "finding",
+    "v": 1,
+    "seq": 126,
+    "at": "2026-11-13T15:18:13.000Z",
+    "by": "review",
+    "op": "add",
+    "in": "task-2",
+    "to": "close-out",
+    "state": "open",
+    "links": [
+     {
+      "type": "about",
+      "to": "change-1"
+     }
+    ],
+    "fields": {
+     "says": "Pin the log line in the oversize witness. tests/unit/jira-as-asked-region.test.js, test \"an oversized body is not sealed…\" (~line 262): capture console.log during the sealForFiling call and assert exactly one line equal to `[as-asked] seal skipped: provider jira cannot hold the block (test)`. Today it asserts filed unsealed and verbatim but not the log line the plan names."
+    }
+   }
+  ],
+  "check-2": [
+   {
+    "id": "check-2",
+    "kind": "check",
+    "v": 1,
+    "seq": 127,
+    "at": "2026-11-13T15:18:14.000Z",
+    "by": "review",
+    "op": "add",
+    "in": "task-2",
+    "to": "John",
+    "state": "open",
+    "links": [
+     {
+      "type": "about",
+      "to": "change-1"
+     }
+    ],
+    "fields": {
+     "what": "Live Jira keeps the harbour.asAsked property: PUT /rest/api/3/issue/{key} with properties:[{key:harbour.asAsked,value}] and GET ?properties=harbour.asAsked returns it.",
+     "why-person": "Needs a credential for John's Jira site; no build session has one, and the fake is built to the expected shape but never reaches Atlassian.",
+     "how": "After deploy (LIN-4452): one sealed updateIssue on John's site, then re-read. Right: properties[harbour.asAsked].words byte-equal to the words written. Wrong: properties key absent (the PUT dropped it; fall back to a separate PUT /issue/{key}/properties/harbour.asAsked)."
+    }
+   }
+  ],
+  "check-3": [
+   {
+    "id": "check-3",
+    "kind": "check",
+    "v": 1,
+    "seq": 128,
+    "at": "2026-11-13T15:18:15.000Z",
+    "by": "review",
+    "op": "add",
+    "in": "task-2",
+    "to": "John",
+    "state": "open",
+    "links": [
+     {
+      "type": "about",
+      "to": "change-1"
+     }
+    ],
+    "fields": {
+     "what": "Live Jira editor keeps the region rendering (so the digest) when a line below the block is edited and saved.",
+     "why-person": "Needs John's live Jira and its own editor; the fake never normalises ADF, so only a live save can show it. If it fails, every sealed issue silently serves converted words (*em* -> _em_).",
+     "how": "After deploy (LIN-4452, plan-review note 1): file a lossy body (`* a`, `*em*`, trailing spaces, `3.`), edit one line below the block in Jira's editor, save, re-read. Right: words byte-equal to what was filed and digest(region) === property.rendered. Wrong: words equal adfToMarkdown(markdownToAdf(words))."
+    }
+   }
+  ],
+  "check-4": [
+   {
+    "id": "check-4",
+    "kind": "check",
+    "v": 1,
+    "seq": 129,
+    "at": "2026-11-13T15:18:16.000Z",
+    "by": "review",
+    "op": "add",
+    "in": "task-2",
+    "to": "John",
+    "state": "open",
+    "links": [
+     {
+      "type": "about",
+      "to": "change-1"
+     }
+    ],
+    "fields": {
+     "what": "First dispatch of a never-dispatched Jira-native ticket on John's site seals through updateIssue once this is live.",
+     "why-person": "Runs against John's real Jira, already in use by people, and touches a ticket a human wrote.",
+     "how": "After deploy (LIN-4452): dispatch one never-dispatched Jira-native ticket. Right (dispatch row enqueued in both): the ticket shows the formatted As asked block with no seal-skipped line, or a ticket carrying mentions/emoji/panels logs the existing D1 refusal line. Wrong: dispatch fails, or the block is written but reads back converted."
+    }
+   }
+  ],
+  "run-6": [
+   {
+    "id": "run-6",
+    "kind": "run",
+    "v": 1,
+    "seq": 130,
+    "at": "2026-11-13T15:18:17.000Z",
+    "by": "review",
+    "op": "add",
+    "in": "task-2",
+    "state": "open",
+    "links": [],
+    "fields": {
+     "stage": "review",
+     "claims": [
+      "verdict-4",
+      "finding-48",
+      "check-2",
+      "check-3",
+      "check-4"
+     ],
+     "account": "Reviewed PR #2421 at f9fa4a80c against plan-1 v3 session 1. CI green; seal/codec suites re-run locally; scope within plan paths plus two declared extras; departures recorded on LIN-4445; regression check on adf.js/index.js/as-asked-seal.js/fake-client.js clean; gap analysis met item by item; ten mutations red; 16-shape probe byte-exact; class is Jira-only (createIssue in LIN-4451). Verdict approve-with-notes: one close-out test fix (finding-48) and three post-deploy live checks to John (check-2..4, owned by LIN-4452). Could not tell from ids alone whether check-1 (to John) or findings 41-43 (to close-out) already cover these, so no same-as was written. Closed nothing: no open record was addressed to review."
+    }
+   },
+   {
+    "id": "run-6",
+    "kind": "run",
+    "v": 2,
+    "seq": 131,
+    "at": "2026-11-13T15:18:18.000Z",
+    "by": "review",
+    "op": "end",
+    "in": "task-2",
+    "state": "done",
+    "links": [],
+    "fields": {
+     "stage": "review",
+     "claims": [
+      "verdict-4",
+      "finding-48",
+      "check-2",
+      "check-3",
+      "check-4"
+     ],
+     "account": "Reviewed PR #2421 at f9fa4a80c against plan-1 v3 session 1. CI green; seal/codec suites re-run locally; scope within plan paths plus two declared extras; departures recorded on LIN-4445; regression check on adf.js/index.js/as-asked-seal.js/fake-client.js clean; gap analysis met item by item; ten mutations red; 16-shape probe byte-exact; class is Jira-only (createIssue in LIN-4451). Verdict approve-with-notes: one close-out test fix (finding-48) and three post-deploy live checks to John (check-2..4, owned by LIN-4452). Could not tell from ids alone whether check-1 (to John) or findings 41-43 (to close-out) already cover these, so no same-as was written. Closed nothing: no open record was addressed to review."
+    },
+    "note": "Review written: verdict-4, finding-48, check-2..4.",
+    "reason": "Review written: verdict-4, finding-48, check-2..4."
    }
   ]
  },

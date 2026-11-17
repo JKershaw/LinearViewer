@@ -1,0 +1,12 @@
+{
+ "ok": true,
+ "retro": false,
+ "problems": [],
+ "stale": [
+  {
+   "id": "verdict-1",
+   "kind": "verdict",
+   "stale": "plan-1@2 now at v3"
+  }
+ ]
+}
