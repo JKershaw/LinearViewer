@@ -1,5 +1,5 @@
 {
- "next": 88,
+ "next": 90,
  "records": {
   "area-1": [
    {
@@ -2224,6 +2224,32 @@
     "op": "add",
     "at": "2026-11-13T13:55:50.000Z",
     "by": "implementation"
+   },
+   {
+    "id": "run-83",
+    "kind": "run",
+    "state": "done",
+    "fields": {
+     "stage": "implementation",
+     "claims": [
+      "lib/providers/jira/",
+      "lib/as-asked-seal.js",
+      "lib/as-asked.js",
+      "lib/dispatch-factory.js",
+      "docs/proxy-integration.md",
+      "tests/unit/"
+     ],
+     "account": "Built session 1 of LIN-4445 as LIN-4450, PR #2421 (commit a98d042c6): shape B, plan-54 items 1-6 with review notes 2, 3, 6. Exact words live in the issue property harbour.asAsked {v:1, words, rendered}, rendered a SHA-256 digest, written in the same PUT as the description; reader and writer in lib/providers/jira/as-asked-region.js; every description read goes through it and every provider-side getIssue asks for the property; descriptionRoundTrip is a pure write-then-read through the same reader, so Jira holds the seal with no change to lib/as-asked-seal.js. Also fixed the empty fence in the codec (decision-81). Departures: end line chosen by digest (question-67), size limit in UTF-8 bytes of the serialized property, round trip throws on an unholdable block. Verified: full unit suite (25,320; census failure fixed), new tests/unit/jira-as-asked-region.test.js, PR CI green. Not verified: no live check on John Jira; whether Jira keeps the rendered digest across an editor save below the block is open (task-62, check-69). Merge left to review and orchestrator."
+    },
+    "links": {},
+    "in": "task-60",
+    "v": 2,
+    "op": "end",
+    "at": "2026-11-13T13:56:07.000Z",
+    "by": "implementation",
+    "ended": {
+     "reason": "PR #2421 open for review; live check left to task-62"
+    }
    }
   ],
   "change-84": [
@@ -2322,6 +2348,50 @@
     "v": 1,
     "op": "add",
     "at": "2026-11-13T13:55:58.000Z",
+    "by": "implementation"
+   }
+  ],
+  "finding-88": [
+   {
+    "id": "finding-88",
+    "kind": "finding",
+    "state": "open",
+    "fields": {
+     "says": "PR #2421 (change-84) already retires the docs/proxy-integration.md \"Jira files unsealed\" line, so drop it from plan-55 item 10 retire list. LIN-4451 is blocked until change-84 merges."
+    },
+    "links": {
+     "about": [
+      "change-84",
+      "plan-55"
+     ]
+    },
+    "in": "task-60",
+    "to": "task-61",
+    "v": 1,
+    "op": "add",
+    "at": "2026-11-13T13:56:05.000Z",
+    "by": "implementation"
+   }
+  ],
+  "finding-89": [
+   {
+    "id": "finding-89",
+    "kind": "finding",
+    "state": "open",
+    "fields": {
+     "says": "Main open risk after change-84: nothing shows that Jira keeps the rendered digest across an ordinary editor save below the block (no credential for John Jira in this build). If Jira normalises the stored ADF, the reader falls back to the rendering and the words quietly become the converted text. The live check must be able to fail on this."
+    },
+    "links": {
+     "about": [
+      "change-84",
+      "check-69"
+     ]
+    },
+    "in": "task-60",
+    "to": "task-62",
+    "v": 1,
+    "op": "add",
+    "at": "2026-11-13T13:56:06.000Z",
     "by": "implementation"
    }
   ]

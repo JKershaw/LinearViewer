@@ -1,0 +1,50 @@
+brief for survey-place on task-16 as of 2026-11-13T15:45:43.901Z
+1. task task-16 (ref LIN-4463)
+  done-when: * the slice 1 bridge is gone, or the only one left and shrinking under a check;
+* the area's Waiting entries are settled, or say why not;
+* the area reads better in a blind read after this work than before it, by more than an untouched area read at the same times.
+  paths: public/
+  asked (task-16):
+**Repository:** JKershaw/LinearViewer (Harbour).
+
+**What this is for.** John: "the UI issues trace back to one of my very first rules: no build step… it's the biggest target of the Theseus method… We don't need to tidy it all, but it's a perfect example where we can leave it better than we found it." The first slice (LIN-4446) served a pure server file to the browser at `/shared/` and retired the browser's copy. Its blind read found the cost: a bridge turns the shared file back into a global, with a load-timing rule that four files explain and nothing checks, and a second shared file would need a second bridge. On the direction, John: "I feel there's a sensible engineering approach, that a skilled developer would take… Excellent, that sounds like a great solution." Today the browser area has 44 script files that share through globals, `public/common.js` is 3,309 lines and `public/observation.js` 5,019, over 100 unit test files load browser scripts as classic scripts, and the area's note holds 10 Waiting entries.
+
+**What we want.**
+
+* Pages become ES modules that import what they share, as browsers do natively. Still no build step and no framework.
+* Shared logic is imported, not restated: each converted view drops its copies.
+* A bridge back to a global is only a temporary ramp for pages not yet converted: one at most, and visibly shrinking.
+* The tests get simpler as views convert, not more elaborate.
+* Taken one view at a time, each piece finishing one move and naming what it retired. John on size: "Happy for it to be whatever size is natural."
+* No view is retired unless John rules it. The side rail and the visual refresh (LIN-4342, LIN-4343) come after, on the cleaner code.
+
+**Done when**
+
+* the slice 1 bridge is gone, or the only one left and shrinking under a check;
+* the area's Waiting entries are settled, or say why not;
+* the area reads better in a blind read after this work than before it, by more than an untouched area read at the same times.
+
+**Every change names what it retires. Questions:** settle engineering questions yourself; only John's calls (product, money, authority, what to retire) go to him as rulings.
+
+*End of what was asked. Steps write below this line; nothing above it changes.*
+2. plan piece:
+  none
+3. addressed to you:
+  none
+4. what stands:
+  none
+5. areas:
+  area-1 Front end: browser code (8 open)
+6. open runs sharing paths:
+  none
+7. index:
+  lesson-2 lesson: A page script's second request keeps the poll's discipline: coalesce every reason into one fetch per window, and stop when the poll stops (hidden tab, 401, revoked link). `createTimelineRefresher` (`public/task-page.js`, LIN-4405) is the pattern; a running chip changes the poll's track about once a minute, so "fetch when it changes" alone repeats. Done reads once more first (`finish`): the poll that says done carries the last change, and stopping drops it.
+  lesson-4 lesson: The no-build-step rule (`CLAUDE.md`) allows browser sharing, not only forbids it (LIN-4446). The browser may import natively, and the restated copies came from reading the rule as "no sharing" (`docs/papers/harbour/the-second-copy.md` §9–10). Limits: a shared module is a leaf (it imports nothing and names no browser or Node global, as `tests/unit/shared-modules.test.js` checks), served only through the explicit `SHARED_MODULES` allow-list in `lib/vendor-assets.js`, never by directory. Views and the `vm` test loaders stay classic until a module-capable client test loader exists. A consumer reads a shared global only from a handler or a callback that runs after DOMContentLoaded, never during script execution: Chart.js calls scale tick callbacks synchronously, which is why `public/workspace-kpis.js` builds on DOMContentLoaded. A slice retires the restated copy and its parity check in the same change, not later.
+  finding-18 finding to design: The real hub is `public/common.js`, not the slice 1 bridge (survey at c205190fd). It sets 51 `window.*` globals and 29 renderers load it first; a view cannot import from it while it stays classic. Making it a module in one go pushes all 51 globals through the one allowed bridge and changes their timing on 28 unconverted pages, since module scripts run after every classic script (the `window.CostFormat` trap). So "one view at a time" means one view plus a step into the hub, and the single bridge ends up carrying common.js, not cost-format. Watch for "one bridge" being read as "one bridge per module".
+  question-19 question to design: Which import specifier scheme do page modules use? Settle it before any view converts. `cost-format-global.js` imports `'/shared/cost-format.js'`, which Node resolves from the filesystem root, so a test cannot import a page module that uses it. This one choice decides whether "the tests get simpler" can hold.
+  finding-20 finding to design: The test seam breaks rather than carries over. 64 suites load browser scripts through `tests/unit/helpers/client-world.js` (a classic `vm` sandbox), and 85 `world.run` calls reach script-scope `let` bindings; module scope removes those, so each becomes an export or goes. I question the "module-capable client test loader" the area asks for: `package.json` is already `"type": "module"`, so Node can `import` `public/*.js` directly with a fake-DOM global, provided a module does not touch `document` at load. A `vm.SourceTextModule` loader (behind an experimental flag) is the elaborate road the task says not to take.
+  finding-21 finding to design: Replace `public/cost-format-global.js` with one general bridge file whose global list is the explicit ramp for pages not yet converted, plus a ratchet check that the list can only shrink. That is the design call the area entry asked for (one shim per module, a general shim, or module consumers): a general shim, so no second shim and guard is written, and the list is the visible measure of "one bridge, shrinking". Note it will end up carrying common.js's globals (finding-18).
+  finding-22 finding to scoping: Three of the area's Waiting entries have nothing to do with modules: the `llms.txt` drift (finding-14), the no-AI "Next step" spinner (finding-15) and app.js's whole-page `DOMParser` (finding-6). They are real but outside this work. Close them separately or name them out of scope; folding them in makes the slices bigger without making the area cleaner.
+  finding-23 finding to design: Symptom vs cause: the no-build rule is the stated target, but the pain reads as `public/common.js` being a 3,309-line pool of globals and "client twins". Modules are the tool for that, not the fix by themselves: converting files without splitting common.js by concern just moves the pool.
+  finding-24 finding to breakdown: Suggested order. (1) One design piece before any view converts: settle the specifier scheme (question-19) and prove it with one page-module test that is a plain `import`; replace the bridge with one general bridge plus a shrink-only ratchet (finding-21). (2) Then the first view: a small one that already wants exports. Eleven files carry `typeof module … module.exports` dual exports; `question-cards.js`, `home-placement.js` and `close-out.js` are small. Convert it, rewrite its tests as imports, name what it retired. (3) The leaf twins `lib/task-page-href.js`, `lib/timeline-zoom.js` and `lib/providers/models.js` import nothing, so they are cheap retirements once the bridge is general; `ship-layout` and `prompt-formatters` import other modules and still cannot be served as single files. (4) `public/observation.js` (5,019 lines, about 40% comments by LIN-4446's count) and `public/common.js` last; why observation.js is that size is a separate question from making it a module.
+-- carries {"asked":1,"piece":0,"addressed":0,"stands":0,"areas":1,"runs":0,"index":9}; 8133 bytes

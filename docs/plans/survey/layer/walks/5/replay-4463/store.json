@@ -674,6 +674,32 @@
     "task-16"
    ],
    "asOf": null
+  },
+  {
+   "at": "2026-11-17T15:22:23.452Z",
+   "by": "survey-place",
+   "cmd": "show",
+   "args": [
+    "show",
+    "--task",
+    "task-16",
+    "--by",
+    "survey-place"
+   ],
+   "asOf": null
+  },
+  {
+   "at": "2026-11-17T15:22:23.483Z",
+   "by": "survey-place",
+   "cmd": "find",
+   "args": [
+    "find",
+    "--area",
+    "area-1",
+    "--by",
+    "survey-place"
+   ],
+   "asOf": null
   }
  ]
 }

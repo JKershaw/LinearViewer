@@ -1,0 +1,138 @@
+[
+ {
+  "at": "2026-11-17T15:20:42.840Z",
+  "by": "survey-task",
+  "cmd": "show",
+  "args": [
+   "show",
+   "--task",
+   "task-16",
+   "--by",
+   "survey-task"
+  ],
+  "asOf": null
+ },
+ {
+  "at": "2026-11-17T15:20:42.869Z",
+  "by": "survey-task",
+  "cmd": "find",
+  "args": [
+   "find",
+   "--area",
+   "area-1",
+   "--state",
+   "open",
+   "--by",
+   "survey-task"
+  ],
+  "asOf": null
+ },
+ {
+  "at": "2026-11-17T15:20:46.608Z",
+  "by": "survey-task",
+  "cmd": "find",
+  "args": [
+   "find",
+   "--in",
+   "area-1",
+   "--by",
+   "survey-task"
+  ],
+  "asOf": null
+ },
+ {
+  "at": "2026-11-17T15:20:51.366Z",
+  "by": "survey-task",
+  "cmd": "get",
+  "args": [
+   "get",
+   "area-1",
+   "--by",
+   "survey-task"
+  ],
+  "asOf": null
+ },
+ {
+  "at": "2026-11-17T15:20:51.401Z",
+  "by": "survey-task",
+  "cmd": "find",
+  "args": [
+   "find",
+   "--state",
+   "open",
+   "--count",
+   "--by",
+   "survey-task"
+  ],
+  "asOf": null
+ },
+ {
+  "at": "2026-11-17T15:20:51.433Z",
+  "by": "survey-task",
+  "cmd": "find",
+  "args": [
+   "find",
+   "--state",
+   "holds",
+   "--count",
+   "--by",
+   "survey-task"
+  ],
+  "asOf": null
+ },
+ {
+  "at": "2026-11-17T15:20:51.461Z",
+  "by": "survey-task",
+  "cmd": "find",
+  "args": [
+   "find",
+   "--state",
+   "kept",
+   "--count",
+   "--by",
+   "survey-task"
+  ],
+  "asOf": null
+ },
+ {
+  "at": "2026-11-17T15:20:51.492Z",
+  "by": "survey-task",
+  "cmd": "find",
+  "args": [
+   "find",
+   "--state",
+   "open",
+   "--by",
+   "survey-task"
+  ],
+  "asOf": null
+ },
+ {
+  "at": "2026-11-17T15:20:56.389Z",
+  "by": "survey-task",
+  "cmd": "find",
+  "args": [
+   "find",
+   "--to",
+   "area-1",
+   "--state",
+   "open",
+   "--by",
+   "survey-task"
+  ],
+  "asOf": null
+ },
+ {
+  "at": "2026-11-17T15:21:53.140Z",
+  "by": "survey-task",
+  "cmd": "show",
+  "args": [
+   "--by",
+   "survey-task",
+   "show",
+   "--task",
+   "task-16"
+  ],
+  "asOf": null
+ }
+]
