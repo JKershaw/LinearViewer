@@ -1,0 +1,66 @@
+{
+  "task": {
+    "fields": ["asked", "done-when", "parent"],
+    "required": ["done-when"],
+    "fixed": ["asked"],
+    "to": null,
+    "ends": ["done", "declined"]
+  },
+  "plan": {
+    "fields": ["pieces"],
+    "required": ["pieces"],
+    "to": null,
+    "ends": ["kept", "superseded"],
+    "live": ["kept"]
+  },
+  "finding": {
+    "fields": ["says", "about"],
+    "required": ["says"],
+    "to": ["stage", "task", "area", "John"],
+    "handoff": true,
+    "ends": ["done", "declined", "handed-on"],
+    "endTarget": ["handed-on"]
+  },
+  "check": {
+    "fields": ["what", "why-person", "how"],
+    "required": ["what", "how"],
+    "to": ["John", "operator"],
+    "handoff": true,
+    "ends": ["done", "declined"]
+  },
+  "question": {
+    "fields": ["asks", "options", "recommended", "if-unanswered"],
+    "required": ["asks"],
+    "to": ["decider"],
+    "handoff": true,
+    "ends": ["answered", "withdrawn", "shelved"]
+  },
+  "decision": {
+    "fields": ["answer", "basis", "why"],
+    "required": ["answer", "basis"],
+    "to": null,
+    "ends": ["stands", "superseded", "withdrawn"],
+    "live": ["stands"]
+  },
+  "verdict": {
+    "fields": ["outcome", "on"],
+    "required": ["outcome", "on"],
+    "values": { "outcome": ["pass", "fail"] },
+    "to": null,
+    "ends": ["stands", "stale"],
+    "live": ["stands"]
+  },
+  "lesson": {
+    "fields": ["says", "about", "checked-at"],
+    "required": ["says", "about"],
+    "to": ["area"],
+    "ends": ["holds", "superseded", "disproved"],
+    "live": ["holds"]
+  },
+  "area": {
+    "fields": ["name", "paths"],
+    "required": ["name"],
+    "to": null,
+    "ends": ["retired"]
+  }
+}
