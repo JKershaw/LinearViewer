@@ -1,6 +1,6 @@
 {
  "retro": false,
- "next": 91,
+ "next": 96,
  "records": {
   "area-1": {
    "id": "area-1",
@@ -2418,6 +2418,23 @@
      "links": {
       "on": "change-82@1"
      }
+    },
+    {
+     "v": 2,
+     "op": "end",
+     "at": "2026-11-13T15:54:03.000Z",
+     "by": "review",
+     "in": "task-60",
+     "to": "review",
+     "state": "done",
+     "fields": {
+      "says": "PR #2427, what the tests cover only partly: (a) one existing test re-pointed, `tests/unit/decision-lifecycle-stamp-drift.test.js`: its copy-sync assertions now check against the table (trio still against the exact literal; `lib/` readers must import the set and spell no stamp literal; \"declared once\" = zero literals in `session-telemetry.js`); no assertion dropped. (b) The browser copies of the stamp kinds in `public/dispatch.js` and `public/session.js` stay (browser scripts cannot import `lib/`); the drift test pins both to the table. (c) The remint refusal in `routes/dispatch.js` now asks `NEVER_RAN`, but every refusal there returns the same 403 and the next check refuses such a row as `not-taker`, so only the log reason differs; only the census covers it. (d) The intentional one-mode sites (the store's stopped-run gate, `lib/runner-kit/runner.mjs`) are unchanged and exempt from the census. (e) Behaviour edge: decision-87."
+     },
+     "links": {
+      "on": "change-82@1"
+     },
+     "reason": "Reviewed each item: (a) drift test re-pointed with no assertion dropped; (b) browser copies intentional, pinned by the drift test (mutation dropping a kind from public/session.js: 1 red); (c) remint refusal tests the same two statuses as the old literal, discharged; (d) one-mode sites intentional, not unhandled siblings; (e) decision-87 edge carried as check-94 to John. See verdict-90.",
+     "stateReason": "Reviewed each item: (a) drift test re-pointed with no assertion dropped; (b) browser copies intentional, pinned by the drift test (mutation dropping a kind from public/session.js: 1 red); (c) remint refusal tests the same two statuses as the old literal, discharged; (d) one-mode sites intentional, not unhandled siblings; (e) decision-87 edge carried as check-94 to John. See verdict-90."
     }
    ]
   },
@@ -2454,6 +2471,128 @@
      "links": {
       "on": "change-82@2"
      }
+    }
+   ]
+  },
+  "finding-91": {
+   "id": "finding-91",
+   "kind": "finding",
+   "versions": [
+    {
+     "v": 1,
+     "op": "add",
+     "at": "2026-11-13T15:53:59.000Z",
+     "by": "review",
+     "in": "task-60",
+     "to": "close-out",
+     "state": "open",
+     "fields": {
+      "says": "Before the merge of PR #2427: add one sentence to the setHeldWakeReleaseNote docblock (lib/dispatch-store.js, the \"Not done here, on purpose\" paragraph): stores built outside server.js (account erasure, scripts/) bind no wording and release with UNBOUND_HELD_WAKE_RELEASE_NOTE, by design. Why: lib/account-erasure.js:590 (cancelRows -> removeItem) builds a bare DispatchQueueStore, so an erasure that cancels a queued leftover holder now releases with \"The step holding this wake did not run…\" instead of the leftover wording. It degrades the same way it already does without a credential provisioner; binding those stores is not needed, only saying so."
+     },
+     "links": {
+      "on": "change-82@2",
+      "about": "decision-85"
+     }
+    }
+   ]
+  },
+  "finding-92": {
+   "id": "finding-92",
+   "kind": "finding",
+   "versions": [
+    {
+     "v": 1,
+     "op": "add",
+     "at": "2026-11-13T15:54:00.000Z",
+     "by": "review",
+     "in": "task-60",
+     "to": "close-out",
+     "state": "open",
+     "fields": {
+      "says": "Before the merge of PR #2427: confirm ci-success is green on the exact commit that merges; update the branch if GitHub requires it. CI ran on base c205190fd; origin/main is now 5dcf5bcda (LIN-4457 landed). Review merged locally and the unit suite passed 25,457/25,457, but that is not CI and covers no E2E."
+     },
+     "links": {
+      "on": "change-82@2"
+     }
+    }
+   ]
+  },
+  "finding-93": {
+   "id": "finding-93",
+   "kind": "finding",
+   "versions": [
+    {
+     "v": 1,
+     "op": "add",
+     "at": "2026-11-13T15:54:01.000Z",
+     "by": "review",
+     "in": "task-60",
+     "to": "close-out",
+     "state": "open",
+     "fields": {
+      "says": "Before the merge of PR #2427: confirm the builder's ### Leftovers comment has landed on LIN-4455 and that its Retires: line names the Waiting entries this diff removes (2, 4, 11). At review it was not on the ticket; only the PR body's \"What this retires\" named them."
+     },
+     "links": {
+      "on": "change-82@2"
+     }
+    }
+   ]
+  },
+  "check-94": {
+   "id": "check-94",
+   "kind": "check",
+   "versions": [
+    {
+     "v": 1,
+     "op": "add",
+     "at": "2026-11-13T15:54:02.000Z",
+     "by": "review",
+     "in": "task-60",
+     "to": "John",
+     "state": "open",
+     "fields": {
+      "what": "After the deploy of PR #2427, watch production logs for the line [leftover] skipped reason=target-not-resumable.",
+      "why-person": "Only rows already stored with a non-string follow-up target (0 or false) can hit the new fail-closed path, and CI cannot see production rows; the logs are on John's host.",
+      "how": "Grep the deployed server log for that line over the days after deploy. Any hit means a stored row had a falsy non-string target and no leftover was queued for it, matching followUpTarget everywhere else (LIN-3677). No rollback needed."
+     },
+     "links": {
+      "on": "change-82@2",
+      "about": "decision-87"
+     }
+    }
+   ]
+  },
+  "run-95": {
+   "id": "run-95",
+   "kind": "run",
+   "versions": [
+    {
+     "v": 1,
+     "op": "add",
+     "at": "2026-11-13T15:54:04.000Z",
+     "by": "review",
+     "in": "task-60",
+     "state": "open",
+     "fields": {
+      "stage": "review",
+      "account": "Reviewed PR #2427 (head c95b9f139) against LIN-4455 and plan-45 piece 5. CI green; merged locally onto origin/main 5dcf5bcda, unit suite 25,457/25,457. Every ask clause met, three recorded departures (NEVER_RAN home, late-bound release wording, leaf kinds table). Nine mutations each turned the suite red; regression and class checks clean. Verdict-90 approve-with-notes, conditional on close-out discharging three pre-merge items (finding-91 docblock sentence, finding-92 ci-success on the merging commit, finding-93 Leftovers comment with Retires 2,4,11); one post-deploy log watch to John (check-94). Ended finding-89."
+     },
+     "links": {}
+    },
+    {
+     "v": 2,
+     "op": "end",
+     "at": "2026-11-13T15:54:05.000Z",
+     "by": "review",
+     "in": "task-60",
+     "state": "done",
+     "fields": {
+      "stage": "review",
+      "account": "Reviewed PR #2427 (head c95b9f139) against LIN-4455 and plan-45 piece 5. CI green; merged locally onto origin/main 5dcf5bcda, unit suite 25,457/25,457. Every ask clause met, three recorded departures (NEVER_RAN home, late-bound release wording, leaf kinds table). Nine mutations each turned the suite red; regression and class checks clean. Verdict-90 approve-with-notes, conditional on close-out discharging three pre-merge items (finding-91 docblock sentence, finding-92 ci-success on the merging commit, finding-93 Leftovers comment with Retires 2,4,11); one post-deploy log watch to John (check-94). Ended finding-89."
+     },
+     "links": {},
+     "reason": "Review written",
+     "stateReason": "Review written"
     }
    ]
   }
@@ -2903,6 +3042,110 @@
     "asOf": null
    },
    "returned": 1
+  },
+  {
+   "at": "2026-11-17T13:50:23.955Z",
+   "by": "Harbour",
+   "query": "show",
+   "args": {
+    "task": "task-60",
+    "asOf": null
+   },
+   "returned": 1
+  },
+  {
+   "at": "2026-11-17T13:50:36.369Z",
+   "by": "blind-read",
+   "query": "find",
+   "args": {
+    "kind": "area"
+   },
+   "returned": 1
+  },
+  {
+   "at": "2026-11-17T13:50:36.407Z",
+   "by": "blind-read",
+   "query": "find",
+   "args": {
+    "kind": "change"
+   },
+   "returned": 1
+  },
+  {
+   "at": "2026-11-17T13:50:36.442Z",
+   "by": "blind-read",
+   "query": "find",
+   "args": {
+    "text": "mayCarryWake"
+   },
+   "returned": 3
+  },
+  {
+   "at": "2026-11-17T13:50:36.483Z",
+   "by": "blind-read",
+   "query": "find",
+   "args": {
+    "text": "runner-kickoff"
+   },
+   "returned": 2
+  },
+  {
+   "at": "2026-11-17T13:50:42.603Z",
+   "by": "blind-read",
+   "query": "find",
+   "args": {
+    "kind": "task"
+   },
+   "returned": 3
+  },
+  {
+   "at": "2026-11-17T13:50:42.656Z",
+   "by": "blind-read",
+   "query": "get",
+   "args": {
+    "id": "finding-76",
+    "asOf": null
+   },
+   "returned": 1
+  },
+  {
+   "at": "2026-11-17T13:50:42.702Z",
+   "by": "blind-read",
+   "query": "get",
+   "args": {
+    "id": "finding-22",
+    "asOf": null
+   },
+   "returned": 1
+  },
+  {
+   "at": "2026-11-17T13:50:42.742Z",
+   "by": "blind-read",
+   "query": "get",
+   "args": {
+    "id": "finding-68",
+    "asOf": null
+   },
+   "returned": 1
+  },
+  {
+   "at": "2026-11-17T13:50:42.783Z",
+   "by": "blind-read",
+   "query": "get",
+   "args": {
+    "id": "finding-66",
+    "asOf": null
+   },
+   "returned": 1
+  },
+  {
+   "at": "2026-11-17T13:50:42.823Z",
+   "by": "blind-read",
+   "query": "find",
+   "args": {
+    "text": "run-view"
+   },
+   "returned": 2
   }
  ],
  "hits": []

@@ -1,6 +1,6 @@
 {
  "retro": false,
- "next": 103,
+ "next": 104,
  "records": {
   "task-1": {
    "id": "task-1",
@@ -2184,6 +2184,30 @@
       "about": "finding-83"
      },
      "reason": "Scoping raised this as an operator ruling (Harbour ruling lin4472-served-leaf): it overrides decision-32's no-serving-change line, so it is John's call, not the builder's; scoping recommends the opposite of the survey's option 1."
+    },
+    {
+     "v": 3,
+     "op": "end",
+     "at": "2026-11-13T17:54:22.000Z",
+     "by": "layer",
+     "in": "task-28",
+     "to": "John",
+     "state": "answered",
+     "fields": {
+      "asks": "LIN-4472 Session-fit line (decision-32) says no serving change. Scoping recommends first extracting one small served lib leaf for duration and relative-time wording (finding-83: relativeWords/relativeAgo, formatElapsed/fmtDuration), so the task page drops its two restated copies. Is that allowed?",
+      "options": [
+       "Yes: extract the served leaf first, and the page drops both copies",
+       "No: leave both copies, add a Waiting entry, and record it as a cut"
+      ],
+      "recommended": "Yes: extract the served leaf first, and the page drops both copies",
+      "if-unanswered": "Extract. Record the answer on LIN-4463."
+     },
+     "links": {
+      "on": "decision-32@1",
+      "about": "finding-83"
+     },
+     "reason": "answered by decision-103",
+     "stateReason": "answered by decision-103"
     }
    ]
   },
@@ -2829,6 +2853,27 @@
      "stateReason": "PR #2436 opened; records written"
     }
    ]
+  },
+  "decision-103": {
+   "id": "decision-103",
+   "kind": "decision",
+   "versions": [
+    {
+     "v": 1,
+     "op": "add",
+     "at": "2026-11-13T17:54:22.000Z",
+     "by": "John",
+     "in": "task-28",
+     "state": "stands",
+     "fields": {
+      "answer": "Yes: extract the served leaf first, and the page drops both copies",
+      "why": "John ruled on the Harbour ruling lin4472-served-leaf: allow the served-leaf extraction ahead of decision-32 no-serving-change line."
+     },
+     "links": {
+      "answers": "question-84"
+     }
+    }
+   ]
   }
  },
  "queries": [
@@ -3317,6 +3362,66 @@
    "args": {
     "to": "John",
     "state": "open"
+   },
+   "returned": 1
+  },
+  {
+   "at": "2026-11-17T13:49:49.142Z",
+   "by": "John",
+   "query": "get",
+   "args": {
+    "id": "question-84",
+    "asOf": null
+   },
+   "returned": 1
+  },
+  {
+   "at": "2026-11-17T13:49:49.177Z",
+   "by": "John",
+   "query": "show",
+   "args": {
+    "task": "task-28",
+    "asOf": null
+   },
+   "returned": 1
+  },
+  {
+   "at": "2026-11-17T13:50:07.355Z",
+   "by": "John",
+   "query": "show",
+   "args": {
+    "task": "task-28",
+    "asOf": "2026-11-13T17:54:21Z"
+   },
+   "returned": 1
+  },
+  {
+   "at": "2026-11-17T13:50:07.402Z",
+   "by": "John",
+   "query": "get",
+   "args": {
+    "id": "verdict-25",
+    "asOf": null
+   },
+   "returned": 1
+  },
+  {
+   "at": "2026-11-17T13:50:35.405Z",
+   "by": "Harbour",
+   "query": "show",
+   "args": {
+    "task": "task-28",
+    "asOf": null
+   },
+   "returned": 1
+  },
+  {
+   "at": "2026-11-17T13:50:49.664Z",
+   "by": "Harbour",
+   "query": "show",
+   "args": {
+    "task": "task-28",
+    "asOf": null
    },
    "returned": 1
   }

@@ -1,0 +1,23 @@
+task-28 task v1 [open] by breakdown
+decision-32 decision v1 [stands] STALE by breakdown
+decision-33 decision v1 [stands] STALE by breakdown
+decision-34 decision v1 [stands] STALE by breakdown
+decision-35 decision v1 [stands] STALE by breakdown
+decision-36 decision v1 [stands] STALE by breakdown
+finding-82 finding v2 [done] to task-28 by implementation
+question-84 question v3 [answered] STALE to John by layer
+finding-85 finding v2 [done] to task-28 by implementation
+check-86 check v2 [done] to task-28 by implementation
+finding-87 finding v3 [done] to task-28 by implementation
+run-88 run v2 [done] by survey-task
+finding-89 finding v2 [done] to task-28 by implementation
+finding-90 finding v2 [done] to task-28 by implementation
+run-94 run v2 [done] by survey-place
+decision-95 decision v1 [stands] STALE by scoping
+run-96 run v2 [done] by scoping
+change-97 change v2 [open] by implementation
+decision-98 decision v3 [stands] STALE by implementation
+finding-100 finding v2 [open] to review by implementation
+finding-101 finding v1 [open] to review by implementation
+run-102 run v2 [done] by implementation
+decision-103 decision v1 [stands] by John

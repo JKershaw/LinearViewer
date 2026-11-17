@@ -1,0 +1,143 @@
+[
+ {
+  "at": "2026-11-17T13:48:44.422Z",
+  "by": "blind-read",
+  "query": "find",
+  "args": {
+   "kind": "area"
+  },
+  "returned": 3
+ },
+ {
+  "at": "2026-11-17T13:48:48.307Z",
+  "by": "blind-read",
+  "query": "find",
+  "args": {
+   "kind": "area"
+  },
+  "returned": 3
+ },
+ {
+  "at": "2026-11-17T13:48:48.344Z",
+  "by": "blind-read",
+  "query": "find",
+  "args": {
+   "path": "routes/workspace-api-audit.js"
+  },
+  "returned": 0
+ },
+ {
+  "at": "2026-11-17T13:48:52.915Z",
+  "by": "blind-read",
+  "query": "find",
+  "args": {
+   "text": "web-routes"
+  },
+  "returned": 0
+ },
+ {
+  "at": "2026-11-17T13:48:52.956Z",
+  "by": "blind-read",
+  "query": "find",
+  "args": {
+   "text": "isHermeticTestToken"
+  },
+  "returned": 3
+ },
+ {
+  "at": "2026-11-17T13:48:52.997Z",
+  "by": "blind-read",
+  "query": "find",
+  "args": {
+   "text": "searchIssues"
+  },
+  "returned": 0
+ },
+ {
+  "at": "2026-11-17T13:49:02.497Z",
+  "by": "blind-read",
+  "query": "get",
+  "args": {
+   "id": "finding-22",
+   "asOf": null
+  },
+  "returned": 1
+ },
+ {
+  "at": "2026-11-17T13:49:02.532Z",
+  "by": "blind-read",
+  "query": "show",
+  "args": {
+   "task": "task-60",
+   "asOf": null
+  },
+  "returned": 1
+ },
+ {
+  "at": "2026-11-17T13:49:08.302Z",
+  "by": "blind-read",
+  "query": "get",
+  "args": {
+   "id": "finding-70",
+   "asOf": null
+  },
+  "returned": 1
+ },
+ {
+  "at": "2026-11-17T13:49:08.352Z",
+  "by": "blind-read",
+  "query": "find",
+  "args": {
+   "text": "display"
+  },
+  "returned": 4
+ },
+ {
+  "at": "2026-11-17T13:49:12.937Z",
+  "by": "blind-read",
+  "query": "get",
+  "args": {
+   "id": "finding-77",
+   "asOf": null
+  },
+  "returned": 1
+ },
+ {
+  "at": "2026-11-17T13:49:12.974Z",
+  "by": "blind-read",
+  "query": "get",
+  "args": {
+   "id": "change-82",
+   "asOf": null
+  },
+  "returned": 1
+ },
+ {
+  "at": "2026-11-17T13:49:13.013Z",
+  "by": "blind-read",
+  "query": "find",
+  "args": {
+   "text": "workspace-api-audit"
+  },
+  "returned": 1
+ },
+ {
+  "at": "2026-11-17T13:49:13.050Z",
+  "by": "blind-read",
+  "query": "find",
+  "args": {
+   "text": "no longer claim"
+  },
+  "returned": 0
+ },
+ {
+  "at": "2026-11-17T13:50:05.034Z",
+  "by": "blind-read",
+  "query": "get",
+  "args": {
+   "id": "run-104",
+   "asOf": null
+  },
+  "returned": 1
+ }
+]

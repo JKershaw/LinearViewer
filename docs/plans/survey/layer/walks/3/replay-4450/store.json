@@ -1,6 +1,6 @@
 {
  "retro": false,
- "next": 103,
+ "next": 105,
  "records": {
   "area-1": {
    "id": "area-1",
@@ -2845,6 +2845,61 @@
      }
     }
    ]
+  },
+  "finding-103": {
+   "id": "finding-103",
+   "kind": "finding",
+   "versions": [
+    {
+     "v": 1,
+     "op": "add",
+     "at": "2026-11-13T15:21:26.000Z",
+     "by": "blind-read",
+     "in": "task-60",
+     "to": "area-1",
+     "state": "open",
+     "fields": {
+      "says": "Adds to finding-77 (blind read of PR #2421 at `f9fa4a80c`): the split is now pinned by `tests/unit/jira-as-asked-region.test.js:166`, and touches `fetchProjects`/`fetchIssues` (~line 769) and `fetchIssueContext`'s `children` (~line 897) in `lib/providers/jira/index.js`, against `fetchIssueFields`, `fetchIssueContext().issue` and `issueDescription`, which serve the exact words. Closing it is a decision with a second option beside finding-77's: document that batch descriptions do not carry the exact words, instead of asking `/search/jql` for up to 32 KB of property per issue per dashboard batch."
+     },
+     "links": {
+      "about": "finding-77"
+     }
+    }
+   ]
+  },
+  "run-104": {
+   "id": "run-104",
+   "kind": "run",
+   "versions": [
+    {
+     "v": 1,
+     "op": "add",
+     "at": "2026-11-13T15:21:27.000Z",
+     "by": "blind-read",
+     "in": "task-60",
+     "state": "open",
+     "fields": {
+      "stage": "blind-read",
+      "account": "Read PR #2421 (LIN-4450) cold at f9fa4a80c against 4b5001ddf and judged it better (verdict-99, on change-82): Jira's description read and write have one owner, the seal check runs the same reader, and the test-token predicate copies fold onto isHermeticTestToken. Three fix-sized items to close-out: the missed inline predicate in routes/workspace-api-audit.js (finding-100), the isTestToken alias (finding-101), and a header-phrase test with no behaviour (finding-102). The larger one, batch reads serving converted words while single reads serve exact ones, was already carried by finding-77 to area-1; I could not revise it (rule 6), so finding-103 adds the pinning test, call sites and a document-it option about it. Nothing outside the areas. The routes files have no area in the layer, so their findings go to close-out by stage."
+     },
+     "links": {}
+    },
+    {
+     "v": 2,
+     "op": "end",
+     "at": "2026-11-13T15:21:28.000Z",
+     "by": "blind-read",
+     "in": "task-60",
+     "state": "done",
+     "fields": {
+      "stage": "blind-read",
+      "account": "Read PR #2421 (LIN-4450) cold at f9fa4a80c against 4b5001ddf and judged it better (verdict-99, on change-82): Jira's description read and write have one owner, the seal check runs the same reader, and the test-token predicate copies fold onto isHermeticTestToken. Three fix-sized items to close-out: the missed inline predicate in routes/workspace-api-audit.js (finding-100), the isTestToken alias (finding-101), and a header-phrase test with no behaviour (finding-102). The larger one, batch reads serving converted words while single reads serve exact ones, was already carried by finding-77 to area-1; I could not revise it (rule 6), so finding-103 adds the pinning test, call sites and a document-it option about it. Nothing outside the areas. The routes files have no area in the layer, so their findings go to close-out by stage."
+     },
+     "links": {},
+     "reason": "Blind read posted on LIN-4450",
+     "stateReason": "Blind read posted on LIN-4450"
+    }
+   ]
   }
  },
  "queries": [
@@ -3660,6 +3715,46 @@
     "text": "no longer claim"
    },
    "returned": 0
+  },
+  {
+   "at": "2026-11-17T13:50:05.034Z",
+   "by": "blind-read",
+   "query": "get",
+   "args": {
+    "id": "run-104",
+    "asOf": null
+   },
+   "returned": 1
+  },
+  {
+   "at": "2026-11-17T13:50:35.172Z",
+   "by": "Harbour",
+   "query": "show",
+   "args": {
+    "task": "task-60",
+    "asOf": null
+   },
+   "returned": 1
+  },
+  {
+   "at": "2026-11-17T13:50:49.064Z",
+   "by": "close-out",
+   "query": "show",
+   "args": {
+    "task": "task-60",
+    "asOf": null
+   },
+   "returned": 1
+  },
+  {
+   "at": "2026-11-17T13:50:49.123Z",
+   "by": "close-out",
+   "query": "get",
+   "args": {
+    "id": "change-82",
+    "asOf": null
+   },
+   "returned": 1
   }
  ],
  "hits": []
