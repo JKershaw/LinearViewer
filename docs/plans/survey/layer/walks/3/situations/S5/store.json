@@ -1,0 +1,705 @@
+{
+ "retro": false,
+ "next": 19,
+ "records": {
+  "area-1": {
+   "id": "area-1",
+   "kind": "area",
+   "versions": [
+    {
+     "v": 1,
+     "op": "add",
+     "at": "2026-11-13T09:00:00.000Z",
+     "by": "Harbour",
+     "state": "kept",
+     "fields": {
+      "name": "lighthouse research",
+      "paths": [
+       "studies/",
+       "reads/",
+       "proposals.md"
+      ]
+     },
+     "links": {}
+    }
+   ]
+  },
+  "run-2": {
+   "id": "run-2",
+   "kind": "run",
+   "versions": [
+    {
+     "v": 1,
+     "op": "add",
+     "at": "2026-11-14T09:00:00.000Z",
+     "by": "survey-place",
+     "in": "area-1",
+     "state": "open",
+     "fields": {
+      "stage": "survey-place",
+      "claims": [
+       "reads/2026-11-14.md"
+      ],
+      "account": "Weekly read 14 Nov; two proposals to the keeper."
+     },
+     "links": {}
+    },
+    {
+     "v": 2,
+     "op": "end",
+     "at": "2026-11-14T09:03:00.000Z",
+     "by": "survey-place",
+     "in": "area-1",
+     "state": "done",
+     "fields": {
+      "stage": "survey-place",
+      "claims": [
+       "reads/2026-11-14.md"
+      ],
+      "account": "Weekly read 14 Nov; two proposals to the keeper."
+     },
+     "links": {},
+     "reason": "read written; proposals finding-3, finding-4",
+     "stateReason": "read written; proposals finding-3, finding-4"
+    }
+   ]
+  },
+  "finding-3": {
+   "id": "finding-3",
+   "kind": "finding",
+   "versions": [
+    {
+     "v": 1,
+     "op": "add",
+     "at": "2026-11-14T09:01:00.000Z",
+     "by": "survey-place",
+     "in": "area-1",
+     "to": "John",
+     "state": "open",
+     "fields": {
+      "says": "Flag stale sources in the weekly read: any study citing data older than 90 days gets a stale marker."
+     },
+     "links": {}
+    }
+   ]
+  },
+  "finding-4": {
+   "id": "finding-4",
+   "kind": "finding",
+   "versions": [
+    {
+     "v": 1,
+     "op": "add",
+     "at": "2026-11-14T09:02:00.000Z",
+     "by": "survey-place",
+     "in": "area-1",
+     "to": "John",
+     "state": "open",
+     "fields": {
+      "says": "Mark studies whose underlying data is more than three months old, so the weekly read shows freshness at a glance."
+     },
+     "links": {}
+    },
+    {
+     "v": 2,
+     "op": "link",
+     "at": "2026-11-19T09:01:00.000Z",
+     "by": "survey-place",
+     "in": "area-1",
+     "to": "John",
+     "state": "open",
+     "fields": {
+      "says": "Mark studies whose underlying data is more than three months old, so the weekly read shows freshness at a glance."
+     },
+     "links": {
+      "same-as": "finding-3"
+     }
+    }
+   ]
+  },
+  "run-5": {
+   "id": "run-5",
+   "kind": "run",
+   "versions": [
+    {
+     "v": 1,
+     "op": "add",
+     "at": "2026-11-15T09:00:00.000Z",
+     "by": "survey-place",
+     "in": "area-1",
+     "state": "open",
+     "fields": {
+      "stage": "survey-place",
+      "claims": [
+       "reads/2026-11-15.md"
+      ],
+      "account": "Weekly read 15 Nov; two proposals to the keeper."
+     },
+     "links": {}
+    },
+    {
+     "v": 2,
+     "op": "end",
+     "at": "2026-11-15T09:03:00.000Z",
+     "by": "survey-place",
+     "in": "area-1",
+     "state": "done",
+     "fields": {
+      "stage": "survey-place",
+      "claims": [
+       "reads/2026-11-15.md"
+      ],
+      "account": "Weekly read 15 Nov; two proposals to the keeper."
+     },
+     "links": {},
+     "reason": "read written; proposals finding-6, finding-7",
+     "stateReason": "read written; proposals finding-6, finding-7"
+    }
+   ]
+  },
+  "finding-6": {
+   "id": "finding-6",
+   "kind": "finding",
+   "versions": [
+    {
+     "v": 1,
+     "op": "add",
+     "at": "2026-11-15T09:01:00.000Z",
+     "by": "survey-place",
+     "in": "area-1",
+     "to": "John",
+     "state": "open",
+     "fields": {
+      "says": "Cap each weekly read at the five most-changed studies; link the rest underneath."
+     },
+     "links": {}
+    }
+   ]
+  },
+  "finding-7": {
+   "id": "finding-7",
+   "kind": "finding",
+   "versions": [
+    {
+     "v": 1,
+     "op": "add",
+     "at": "2026-11-15T09:02:00.000Z",
+     "by": "survey-place",
+     "in": "area-1",
+     "to": "John",
+     "state": "open",
+     "fields": {
+      "says": "Add a freshness check to the weekly read so out-of-date sources are visible."
+     },
+     "links": {}
+    },
+    {
+     "v": 2,
+     "op": "link",
+     "at": "2026-11-19T09:01:00.000Z",
+     "by": "survey-place",
+     "in": "area-1",
+     "to": "John",
+     "state": "open",
+     "fields": {
+      "says": "Add a freshness check to the weekly read so out-of-date sources are visible."
+     },
+     "links": {
+      "same-as": "finding-3"
+     }
+    }
+   ]
+  },
+  "run-8": {
+   "id": "run-8",
+   "kind": "run",
+   "versions": [
+    {
+     "v": 1,
+     "op": "add",
+     "at": "2026-11-16T09:00:00.000Z",
+     "by": "survey-place",
+     "in": "area-1",
+     "state": "open",
+     "fields": {
+      "stage": "survey-place",
+      "claims": [
+       "reads/2026-11-16.md"
+      ],
+      "account": "Weekly read 16 Nov; two proposals to the keeper."
+     },
+     "links": {}
+    },
+    {
+     "v": 2,
+     "op": "end",
+     "at": "2026-11-16T09:03:00.000Z",
+     "by": "survey-place",
+     "in": "area-1",
+     "state": "done",
+     "fields": {
+      "stage": "survey-place",
+      "claims": [
+       "reads/2026-11-16.md"
+      ],
+      "account": "Weekly read 16 Nov; two proposals to the keeper."
+     },
+     "links": {},
+     "reason": "read written; proposals finding-9, finding-10",
+     "stateReason": "read written; proposals finding-9, finding-10"
+    }
+   ]
+  },
+  "finding-9": {
+   "id": "finding-9",
+   "kind": "finding",
+   "versions": [
+    {
+     "v": 1,
+     "op": "add",
+     "at": "2026-11-16T09:01:00.000Z",
+     "by": "survey-place",
+     "in": "area-1",
+     "to": "John",
+     "state": "open",
+     "fields": {
+      "says": "Record which questions each study answered, so the weekly read can say what moved."
+     },
+     "links": {}
+    }
+   ]
+  },
+  "finding-10": {
+   "id": "finding-10",
+   "kind": "finding",
+   "versions": [
+    {
+     "v": 1,
+     "op": "add",
+     "at": "2026-11-16T09:02:00.000Z",
+     "by": "survey-place",
+     "in": "area-1",
+     "to": "John",
+     "state": "open",
+     "fields": {
+      "says": "Limit the weekly read to the top five studies by change and list the remainder as links."
+     },
+     "links": {}
+    },
+    {
+     "v": 2,
+     "op": "link",
+     "at": "2026-11-19T09:01:00.000Z",
+     "by": "survey-place",
+     "in": "area-1",
+     "to": "John",
+     "state": "open",
+     "fields": {
+      "says": "Limit the weekly read to the top five studies by change and list the remainder as links."
+     },
+     "links": {
+      "same-as": "finding-6"
+     }
+    }
+   ]
+  },
+  "run-11": {
+   "id": "run-11",
+   "kind": "run",
+   "versions": [
+    {
+     "v": 1,
+     "op": "add",
+     "at": "2026-11-17T09:00:00.000Z",
+     "by": "survey-place",
+     "in": "area-1",
+     "state": "open",
+     "fields": {
+      "stage": "survey-place",
+      "claims": [
+       "reads/2026-11-17.md"
+      ],
+      "account": "Weekly read 17 Nov; two proposals to the keeper."
+     },
+     "links": {}
+    },
+    {
+     "v": 2,
+     "op": "end",
+     "at": "2026-11-17T09:03:00.000Z",
+     "by": "survey-place",
+     "in": "area-1",
+     "state": "done",
+     "fields": {
+      "stage": "survey-place",
+      "claims": [
+       "reads/2026-11-17.md"
+      ],
+      "account": "Weekly read 17 Nov; two proposals to the keeper."
+     },
+     "links": {},
+     "reason": "read written; proposals finding-12, finding-13",
+     "stateReason": "read written; proposals finding-12, finding-13"
+    }
+   ]
+  },
+  "finding-12": {
+   "id": "finding-12",
+   "kind": "finding",
+   "versions": [
+    {
+     "v": 1,
+     "op": "add",
+     "at": "2026-11-17T09:01:00.000Z",
+     "by": "survey-place",
+     "in": "area-1",
+     "to": "John",
+     "state": "open",
+     "fields": {
+      "says": "Retire studies untouched for eight weeks into an archive section of the weekly read."
+     },
+     "links": {}
+    }
+   ]
+  },
+  "finding-13": {
+   "id": "finding-13",
+   "kind": "finding",
+   "versions": [
+    {
+     "v": 1,
+     "op": "add",
+     "at": "2026-11-17T09:02:00.000Z",
+     "by": "survey-place",
+     "in": "area-1",
+     "to": "John",
+     "state": "open",
+     "fields": {
+      "says": "Track the questions each study addresses so the weekly read reports progress per question."
+     },
+     "links": {}
+    },
+    {
+     "v": 2,
+     "op": "link",
+     "at": "2026-11-19T09:01:00.000Z",
+     "by": "survey-place",
+     "in": "area-1",
+     "to": "John",
+     "state": "open",
+     "fields": {
+      "says": "Track the questions each study addresses so the weekly read reports progress per question."
+     },
+     "links": {
+      "same-as": "finding-9"
+     }
+    }
+   ]
+  },
+  "run-14": {
+   "id": "run-14",
+   "kind": "run",
+   "versions": [
+    {
+     "v": 1,
+     "op": "add",
+     "at": "2026-11-18T09:00:00.000Z",
+     "by": "survey-place",
+     "in": "area-1",
+     "state": "open",
+     "fields": {
+      "stage": "survey-place",
+      "claims": [
+       "reads/2026-11-18.md"
+      ],
+      "account": "Weekly read 18 Nov; two proposals to the keeper."
+     },
+     "links": {}
+    },
+    {
+     "v": 2,
+     "op": "end",
+     "at": "2026-11-18T09:03:00.000Z",
+     "by": "survey-place",
+     "in": "area-1",
+     "state": "done",
+     "fields": {
+      "stage": "survey-place",
+      "claims": [
+       "reads/2026-11-18.md"
+      ],
+      "account": "Weekly read 18 Nov; two proposals to the keeper."
+     },
+     "links": {},
+     "reason": "read written; proposals finding-15, finding-16",
+     "stateReason": "read written; proposals finding-15, finding-16"
+    }
+   ]
+  },
+  "finding-15": {
+   "id": "finding-15",
+   "kind": "finding",
+   "versions": [
+    {
+     "v": 1,
+     "op": "add",
+     "at": "2026-11-18T09:01:00.000Z",
+     "by": "survey-place",
+     "in": "area-1",
+     "to": "John",
+     "state": "open",
+     "fields": {
+      "says": "Number studies from one counter file so two runs cannot allocate the same study id."
+     },
+     "links": {}
+    }
+   ]
+  },
+  "finding-16": {
+   "id": "finding-16",
+   "kind": "finding",
+   "versions": [
+    {
+     "v": 1,
+     "op": "add",
+     "at": "2026-11-18T09:02:00.000Z",
+     "by": "survey-place",
+     "in": "area-1",
+     "to": "John",
+     "state": "open",
+     "fields": {
+      "says": "Move studies nobody has updated in two months to an archive list."
+     },
+     "links": {}
+    },
+    {
+     "v": 2,
+     "op": "link",
+     "at": "2026-11-19T09:01:00.000Z",
+     "by": "survey-place",
+     "in": "area-1",
+     "to": "John",
+     "state": "open",
+     "fields": {
+      "says": "Move studies nobody has updated in two months to an archive list."
+     },
+     "links": {
+      "same-as": "finding-12"
+     }
+    }
+   ]
+  },
+  "run-17": {
+   "id": "run-17",
+   "kind": "run",
+   "versions": [
+    {
+     "v": 1,
+     "op": "add",
+     "at": "2026-11-19T09:00:00.000Z",
+     "by": "survey-place",
+     "in": "area-1",
+     "state": "open",
+     "fields": {
+      "stage": "survey-place",
+      "claims": [
+       "reads/2026-11-19.md"
+      ],
+      "account": "Weekly read 19 Nov. Ten proposals open to the keeper, none answered since 14 Nov; five are restatements of earlier ones. Linked each to its original and asked the keeper once instead of proposing more."
+     },
+     "links": {}
+    },
+    {
+     "v": 2,
+     "op": "end",
+     "at": "2026-11-19T09:03:00.000Z",
+     "by": "survey-place",
+     "in": "area-1",
+     "state": "done",
+     "fields": {
+      "stage": "survey-place",
+      "claims": [
+       "reads/2026-11-19.md"
+      ],
+      "account": "Weekly read 19 Nov. Ten proposals open to the keeper, none answered since 14 Nov; five are restatements of earlier ones. Linked each to its original and asked the keeper once instead of proposing more."
+     },
+     "links": {},
+     "reason": "read written; repeats linked; question-18 to the keeper",
+     "stateReason": "read written; repeats linked; question-18 to the keeper"
+    }
+   ]
+  },
+  "question-18": {
+   "id": "question-18",
+   "kind": "question",
+   "versions": [
+    {
+     "v": 1,
+     "op": "add",
+     "at": "2026-11-19T09:02:00.000Z",
+     "by": "survey-place",
+     "in": "area-1",
+     "to": "John",
+     "state": "open",
+     "fields": {
+      "asks": "Ten proposals to you are open since 14-18 Nov, none answered; five restate earlier ones (linked same-as). Which should stand?",
+      "options": [
+       "take finding-3, finding-6, finding-9, finding-12, finding-15; decline the five repeats",
+       "decline all and start fresh",
+       "leave them open"
+      ],
+      "recommended": "take the five originals; decline the five repeats",
+      "if-unanswered": "they stay open; nothing in the record expires them"
+     },
+     "links": {}
+    }
+   ]
+  }
+ },
+ "queries": [
+  {
+   "at": "2026-11-17T13:34:33.783Z",
+   "by": "survey-place",
+   "query": "find",
+   "args": {
+    "kind": "finding",
+    "to": "John",
+    "state": "open"
+   },
+   "returned": 0
+  },
+  {
+   "at": "2026-11-17T13:34:34.042Z",
+   "by": "survey-place",
+   "query": "find",
+   "args": {
+    "kind": "finding",
+    "to": "John",
+    "state": "open"
+   },
+   "returned": 2
+  },
+  {
+   "at": "2026-11-17T13:34:34.322Z",
+   "by": "survey-place",
+   "query": "find",
+   "args": {
+    "kind": "finding",
+    "to": "John",
+    "state": "open"
+   },
+   "returned": 4
+  },
+  {
+   "at": "2026-11-17T13:34:34.629Z",
+   "by": "survey-place",
+   "query": "find",
+   "args": {
+    "kind": "finding",
+    "to": "John",
+    "state": "open"
+   },
+   "returned": 6
+  },
+  {
+   "at": "2026-11-17T13:34:34.883Z",
+   "by": "survey-place",
+   "query": "find",
+   "args": {
+    "kind": "finding",
+    "to": "John",
+    "state": "open"
+   },
+   "returned": 8
+  },
+  {
+   "at": "2026-11-17T13:34:35.139Z",
+   "by": "John",
+   "query": "find",
+   "args": {
+    "to": "John",
+    "state": "open"
+   },
+   "returned": 10
+  },
+  {
+   "at": "2026-11-17T13:34:35.178Z",
+   "by": "survey-place",
+   "query": "find",
+   "args": {
+    "kind": "finding",
+    "to": "John",
+    "state": "open"
+   },
+   "returned": 10
+  },
+  {
+   "at": "2026-11-17T13:34:35.225Z",
+   "by": "survey-place",
+   "query": "find",
+   "args": {
+    "kind": "finding",
+    "to": "John",
+    "state": "open",
+    "text": "freshness"
+   },
+   "returned": 2
+  },
+  {
+   "at": "2026-11-17T13:34:35.268Z",
+   "by": "survey-place",
+   "query": "find",
+   "args": {
+    "kind": "finding",
+    "to": "John",
+    "state": "open",
+    "text": "five"
+   },
+   "returned": 2
+  },
+  {
+   "at": "2026-11-17T13:34:35.298Z",
+   "by": "survey-place",
+   "query": "find",
+   "args": {
+    "kind": "finding",
+    "to": "John",
+    "state": "open",
+    "text": "archive"
+   },
+   "returned": 2
+  },
+  {
+   "at": "2026-11-17T13:34:35.331Z",
+   "by": "survey-place",
+   "query": "find",
+   "args": {
+    "kind": "finding",
+    "to": "John",
+    "state": "open",
+    "text": "questions"
+   },
+   "returned": 2
+  },
+  {
+   "at": "2026-11-17T13:34:35.829Z",
+   "by": "Harbour",
+   "query": "find",
+   "args": {
+    "to": "John",
+    "state": "open"
+   },
+   "returned": 11
+  },
+  {
+   "at": "2026-11-17T13:34:35.864Z",
+   "by": "Harbour",
+   "query": "find",
+   "args": {
+    "state": "done"
+   },
+   "returned": 6
+  }
+ ],
+ "hits": []
+}

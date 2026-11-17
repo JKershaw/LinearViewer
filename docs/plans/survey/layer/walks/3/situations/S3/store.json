@@ -1,0 +1,1202 @@
+{
+ "retro": false,
+ "next": 44,
+ "records": {
+  "area-1": {
+   "id": "area-1",
+   "kind": "area",
+   "versions": [
+    {
+     "v": 1,
+     "op": "add",
+     "at": "2026-11-13T09:00:00.000Z",
+     "by": "Harbour",
+     "state": "kept",
+     "fields": {
+      "name": "Waiting",
+      "paths": [
+       "lib/waiting/"
+      ]
+     },
+     "links": {}
+    }
+   ]
+  },
+  "finding-2": {
+   "id": "finding-2",
+   "kind": "finding",
+   "versions": [
+    {
+     "v": 1,
+     "op": "add",
+     "at": "2026-11-13T09:00:00.000Z",
+     "by": "Harbour",
+     "in": "area-1",
+     "to": "area-1",
+     "state": "open",
+     "fields": {
+      "says": "Waiting item 1 is stale in the Waiting view"
+     },
+     "links": {}
+    },
+    {
+     "v": 2,
+     "op": "end",
+     "at": "2026-11-13T12:00:00.000Z",
+     "by": "implementation",
+     "in": "area-1",
+     "to": "area-1",
+     "state": "done",
+     "fields": {
+      "says": "Waiting item 1 is stale in the Waiting view"
+     },
+     "links": {},
+     "reason": "settled by change-34 (PR #101)",
+     "stateReason": "settled by change-34 (PR #101)"
+    }
+   ]
+  },
+  "finding-3": {
+   "id": "finding-3",
+   "kind": "finding",
+   "versions": [
+    {
+     "v": 1,
+     "op": "add",
+     "at": "2026-11-13T09:00:00.000Z",
+     "by": "Harbour",
+     "in": "area-1",
+     "to": "area-1",
+     "state": "open",
+     "fields": {
+      "says": "Waiting item 2 is stale in the Waiting view"
+     },
+     "links": {}
+    },
+    {
+     "v": 2,
+     "op": "end",
+     "at": "2026-11-13T15:00:00.000Z",
+     "by": "implementation",
+     "in": "area-1",
+     "to": "area-1",
+     "state": "done",
+     "fields": {
+      "says": "Waiting item 2 is stale in the Waiting view"
+     },
+     "links": {},
+     "reason": "settled by change-38 (PR #102)",
+     "stateReason": "settled by change-38 (PR #102)"
+    }
+   ]
+  },
+  "finding-4": {
+   "id": "finding-4",
+   "kind": "finding",
+   "versions": [
+    {
+     "v": 1,
+     "op": "add",
+     "at": "2026-11-13T09:00:00.000Z",
+     "by": "Harbour",
+     "in": "area-1",
+     "to": "area-1",
+     "state": "open",
+     "fields": {
+      "says": "Waiting item 3 is stale in the Waiting view"
+     },
+     "links": {}
+    },
+    {
+     "v": 2,
+     "op": "end",
+     "at": "2026-11-13T15:00:00.000Z",
+     "by": "implementation",
+     "in": "area-1",
+     "to": "area-1",
+     "state": "done",
+     "fields": {
+      "says": "Waiting item 3 is stale in the Waiting view"
+     },
+     "links": {},
+     "reason": "settled by change-38 (PR #102)",
+     "stateReason": "settled by change-38 (PR #102)"
+    }
+   ]
+  },
+  "finding-5": {
+   "id": "finding-5",
+   "kind": "finding",
+   "versions": [
+    {
+     "v": 1,
+     "op": "add",
+     "at": "2026-11-13T09:00:00.000Z",
+     "by": "Harbour",
+     "in": "area-1",
+     "to": "area-1",
+     "state": "open",
+     "fields": {
+      "says": "Waiting item 4 is stale in the Waiting view"
+     },
+     "links": {}
+    },
+    {
+     "v": 2,
+     "op": "end",
+     "at": "2026-11-13T16:00:00.000Z",
+     "by": "implementation",
+     "in": "area-1",
+     "to": "area-1",
+     "state": "done",
+     "fields": {
+      "says": "Waiting item 4 is stale in the Waiting view"
+     },
+     "links": {},
+     "reason": "settled by change-40 (PR #103)",
+     "stateReason": "settled by change-40 (PR #103)"
+    }
+   ]
+  },
+  "finding-6": {
+   "id": "finding-6",
+   "kind": "finding",
+   "versions": [
+    {
+     "v": 1,
+     "op": "add",
+     "at": "2026-11-13T09:00:00.000Z",
+     "by": "Harbour",
+     "in": "area-1",
+     "to": "area-1",
+     "state": "open",
+     "fields": {
+      "says": "Waiting item 5 is stale in the Waiting view"
+     },
+     "links": {}
+    }
+   ]
+  },
+  "finding-7": {
+   "id": "finding-7",
+   "kind": "finding",
+   "versions": [
+    {
+     "v": 1,
+     "op": "add",
+     "at": "2026-11-13T09:00:00.000Z",
+     "by": "Harbour",
+     "in": "area-1",
+     "to": "area-1",
+     "state": "open",
+     "fields": {
+      "says": "Waiting item 6 is stale in the Waiting view"
+     },
+     "links": {}
+    }
+   ]
+  },
+  "finding-8": {
+   "id": "finding-8",
+   "kind": "finding",
+   "versions": [
+    {
+     "v": 1,
+     "op": "add",
+     "at": "2026-11-13T09:00:00.000Z",
+     "by": "Harbour",
+     "in": "area-1",
+     "to": "area-1",
+     "state": "open",
+     "fields": {
+      "says": "Waiting item 7 is stale in the Waiting view"
+     },
+     "links": {}
+    }
+   ]
+  },
+  "finding-9": {
+   "id": "finding-9",
+   "kind": "finding",
+   "versions": [
+    {
+     "v": 1,
+     "op": "add",
+     "at": "2026-11-13T09:00:00.000Z",
+     "by": "Harbour",
+     "in": "area-1",
+     "to": "area-1",
+     "state": "open",
+     "fields": {
+      "says": "Waiting item 8 is stale in the Waiting view"
+     },
+     "links": {}
+    }
+   ]
+  },
+  "finding-10": {
+   "id": "finding-10",
+   "kind": "finding",
+   "versions": [
+    {
+     "v": 1,
+     "op": "add",
+     "at": "2026-11-13T09:00:00.000Z",
+     "by": "Harbour",
+     "in": "area-1",
+     "to": "area-1",
+     "state": "open",
+     "fields": {
+      "says": "Waiting item 9 is stale in the Waiting view"
+     },
+     "links": {}
+    }
+   ]
+  },
+  "finding-11": {
+   "id": "finding-11",
+   "kind": "finding",
+   "versions": [
+    {
+     "v": 1,
+     "op": "add",
+     "at": "2026-11-13T09:00:00.000Z",
+     "by": "Harbour",
+     "in": "area-1",
+     "to": "area-1",
+     "state": "open",
+     "fields": {
+      "says": "Waiting item 10 is stale in the Waiting view"
+     },
+     "links": {}
+    }
+   ]
+  },
+  "finding-12": {
+   "id": "finding-12",
+   "kind": "finding",
+   "versions": [
+    {
+     "v": 1,
+     "op": "add",
+     "at": "2026-11-13T09:00:00.000Z",
+     "by": "Harbour",
+     "in": "area-1",
+     "to": "area-1",
+     "state": "open",
+     "fields": {
+      "says": "Waiting item 11 is stale in the Waiting view"
+     },
+     "links": {}
+    }
+   ]
+  },
+  "finding-13": {
+   "id": "finding-13",
+   "kind": "finding",
+   "versions": [
+    {
+     "v": 1,
+     "op": "add",
+     "at": "2026-11-13T09:00:00.000Z",
+     "by": "Harbour",
+     "in": "area-1",
+     "to": "area-1",
+     "state": "open",
+     "fields": {
+      "says": "Waiting item 12 is stale in the Waiting view"
+     },
+     "links": {}
+    }
+   ]
+  },
+  "finding-14": {
+   "id": "finding-14",
+   "kind": "finding",
+   "versions": [
+    {
+     "v": 1,
+     "op": "add",
+     "at": "2026-11-13T09:00:00.000Z",
+     "by": "Harbour",
+     "in": "area-1",
+     "to": "area-1",
+     "state": "open",
+     "fields": {
+      "says": "Waiting item 13 is stale in the Waiting view"
+     },
+     "links": {}
+    }
+   ]
+  },
+  "finding-15": {
+   "id": "finding-15",
+   "kind": "finding",
+   "versions": [
+    {
+     "v": 1,
+     "op": "add",
+     "at": "2026-11-13T09:00:00.000Z",
+     "by": "Harbour",
+     "in": "area-1",
+     "to": "area-1",
+     "state": "open",
+     "fields": {
+      "says": "Waiting item 14 is stale in the Waiting view"
+     },
+     "links": {}
+    }
+   ]
+  },
+  "finding-16": {
+   "id": "finding-16",
+   "kind": "finding",
+   "versions": [
+    {
+     "v": 1,
+     "op": "add",
+     "at": "2026-11-13T09:00:00.000Z",
+     "by": "Harbour",
+     "in": "area-1",
+     "to": "area-1",
+     "state": "open",
+     "fields": {
+      "says": "Waiting item 15 is stale in the Waiting view"
+     },
+     "links": {}
+    }
+   ]
+  },
+  "finding-17": {
+   "id": "finding-17",
+   "kind": "finding",
+   "versions": [
+    {
+     "v": 1,
+     "op": "add",
+     "at": "2026-11-13T09:00:00.000Z",
+     "by": "Harbour",
+     "in": "area-1",
+     "to": "area-1",
+     "state": "open",
+     "fields": {
+      "says": "Waiting item 16 is stale in the Waiting view"
+     },
+     "links": {}
+    }
+   ]
+  },
+  "finding-18": {
+   "id": "finding-18",
+   "kind": "finding",
+   "versions": [
+    {
+     "v": 1,
+     "op": "add",
+     "at": "2026-11-13T09:00:00.000Z",
+     "by": "Harbour",
+     "in": "area-1",
+     "to": "area-1",
+     "state": "open",
+     "fields": {
+      "says": "Waiting item 17 is stale in the Waiting view"
+     },
+     "links": {}
+    }
+   ]
+  },
+  "finding-19": {
+   "id": "finding-19",
+   "kind": "finding",
+   "versions": [
+    {
+     "v": 1,
+     "op": "add",
+     "at": "2026-11-13T09:00:00.000Z",
+     "by": "Harbour",
+     "in": "area-1",
+     "to": "area-1",
+     "state": "open",
+     "fields": {
+      "says": "Waiting item 18 is stale in the Waiting view"
+     },
+     "links": {}
+    }
+   ]
+  },
+  "finding-20": {
+   "id": "finding-20",
+   "kind": "finding",
+   "versions": [
+    {
+     "v": 1,
+     "op": "add",
+     "at": "2026-11-13T09:00:00.000Z",
+     "by": "Harbour",
+     "in": "area-1",
+     "to": "area-1",
+     "state": "open",
+     "fields": {
+      "says": "Waiting item 19 is stale in the Waiting view"
+     },
+     "links": {}
+    }
+   ]
+  },
+  "finding-21": {
+   "id": "finding-21",
+   "kind": "finding",
+   "versions": [
+    {
+     "v": 1,
+     "op": "add",
+     "at": "2026-11-13T09:00:00.000Z",
+     "by": "Harbour",
+     "in": "area-1",
+     "to": "area-1",
+     "state": "open",
+     "fields": {
+      "says": "Waiting item 20 is stale in the Waiting view"
+     },
+     "links": {}
+    }
+   ]
+  },
+  "finding-22": {
+   "id": "finding-22",
+   "kind": "finding",
+   "versions": [
+    {
+     "v": 1,
+     "op": "add",
+     "at": "2026-11-13T09:00:00.000Z",
+     "by": "Harbour",
+     "in": "area-1",
+     "to": "area-1",
+     "state": "open",
+     "fields": {
+      "says": "Waiting item 21 is stale in the Waiting view"
+     },
+     "links": {}
+    }
+   ]
+  },
+  "finding-23": {
+   "id": "finding-23",
+   "kind": "finding",
+   "versions": [
+    {
+     "v": 1,
+     "op": "add",
+     "at": "2026-11-13T09:00:00.000Z",
+     "by": "Harbour",
+     "in": "area-1",
+     "to": "area-1",
+     "state": "open",
+     "fields": {
+      "says": "Waiting item 22 is stale in the Waiting view"
+     },
+     "links": {}
+    }
+   ]
+  },
+  "finding-24": {
+   "id": "finding-24",
+   "kind": "finding",
+   "versions": [
+    {
+     "v": 1,
+     "op": "add",
+     "at": "2026-11-13T09:00:00.000Z",
+     "by": "Harbour",
+     "in": "area-1",
+     "to": "area-1",
+     "state": "open",
+     "fields": {
+      "says": "Waiting item 23 is stale in the Waiting view"
+     },
+     "links": {}
+    }
+   ]
+  },
+  "finding-25": {
+   "id": "finding-25",
+   "kind": "finding",
+   "versions": [
+    {
+     "v": 1,
+     "op": "add",
+     "at": "2026-11-13T09:00:00.000Z",
+     "by": "Harbour",
+     "in": "area-1",
+     "to": "area-1",
+     "state": "open",
+     "fields": {
+      "says": "Waiting item 24 is stale in the Waiting view"
+     },
+     "links": {}
+    }
+   ]
+  },
+  "finding-26": {
+   "id": "finding-26",
+   "kind": "finding",
+   "versions": [
+    {
+     "v": 1,
+     "op": "add",
+     "at": "2026-11-13T09:00:00.000Z",
+     "by": "Harbour",
+     "in": "area-1",
+     "to": "area-1",
+     "state": "open",
+     "fields": {
+      "says": "Waiting item 25 is stale in the Waiting view"
+     },
+     "links": {}
+    }
+   ]
+  },
+  "finding-27": {
+   "id": "finding-27",
+   "kind": "finding",
+   "versions": [
+    {
+     "v": 1,
+     "op": "add",
+     "at": "2026-11-13T09:00:00.000Z",
+     "by": "Harbour",
+     "in": "area-1",
+     "to": "area-1",
+     "state": "open",
+     "fields": {
+      "says": "Waiting item 26 is stale in the Waiting view"
+     },
+     "links": {}
+    }
+   ]
+  },
+  "task-28": {
+   "id": "task-28",
+   "kind": "task",
+   "versions": [
+    {
+     "v": 1,
+     "op": "add",
+     "at": "2026-11-13T10:00:00.000Z",
+     "by": "John",
+     "in": "area-1",
+     "state": "open",
+     "fields": {
+      "asked": "Clear the Waiting backlog: the 26 open findings addressed to Waiting (area-1).",
+      "done-when": "No open finding is addressed to area-1.",
+      "paths": [
+       "lib/waiting/"
+      ]
+     },
+     "links": {}
+    },
+    {
+     "v": 2,
+     "op": "link",
+     "at": "2026-11-13T11:00:00.000Z",
+     "by": "breakdown",
+     "in": "area-1",
+     "state": "open",
+     "fields": {
+      "asked": "Clear the Waiting backlog: the 26 open findings addressed to Waiting (area-1).",
+      "done-when": "No open finding is addressed to area-1.",
+      "paths": [
+       "lib/waiting/"
+      ]
+     },
+     "links": {
+      "piece": "plan-29"
+     }
+    }
+   ]
+  },
+  "plan-29": {
+   "id": "plan-29",
+   "kind": "plan",
+   "versions": [
+    {
+     "v": 1,
+     "op": "add",
+     "at": "2026-11-13T11:00:00.000Z",
+     "by": "breakdown",
+     "in": "task-28",
+     "state": "kept",
+     "fields": {
+      "says": "Three child builds by sub-path: queue, render, notify; each ends the area-1 findings its change settles.",
+      "paths": [
+       "lib/waiting/"
+      ],
+      "order": 1
+     },
+     "links": {}
+    }
+   ]
+  },
+  "task-30": {
+   "id": "task-30",
+   "kind": "task",
+   "versions": [
+    {
+     "v": 1,
+     "op": "add",
+     "at": "2026-11-13T11:00:00.000Z",
+     "by": "breakdown",
+     "in": "task-28",
+     "state": "open",
+     "fields": {
+      "done-when": "The area-1 findings under lib/waiting/queue/ are settled.",
+      "paths": [
+       "lib/waiting/queue/"
+      ]
+     },
+     "links": {}
+    }
+   ]
+  },
+  "task-31": {
+   "id": "task-31",
+   "kind": "task",
+   "versions": [
+    {
+     "v": 1,
+     "op": "add",
+     "at": "2026-11-13T11:00:00.000Z",
+     "by": "breakdown",
+     "in": "task-28",
+     "state": "open",
+     "fields": {
+      "done-when": "The area-1 findings under lib/waiting/render/ are settled.",
+      "paths": [
+       "lib/waiting/render/"
+      ]
+     },
+     "links": {}
+    }
+   ]
+  },
+  "task-32": {
+   "id": "task-32",
+   "kind": "task",
+   "versions": [
+    {
+     "v": 1,
+     "op": "add",
+     "at": "2026-11-13T11:00:00.000Z",
+     "by": "breakdown",
+     "in": "task-28",
+     "state": "open",
+     "fields": {
+      "done-when": "The area-1 findings under lib/waiting/notify/ are settled.",
+      "paths": [
+       "lib/waiting/notify/"
+      ]
+     },
+     "links": {}
+    }
+   ]
+  },
+  "run-33": {
+   "id": "run-33",
+   "kind": "run",
+   "versions": [
+    {
+     "v": 1,
+     "op": "add",
+     "at": "2026-11-13T11:00:00.000Z",
+     "by": "breakdown",
+     "in": "task-28",
+     "state": "open",
+     "fields": {
+      "stage": "breakdown",
+      "claims": [
+       "lib/waiting/"
+      ],
+      "account": "Split into task-30/31/32 by sub-path."
+     },
+     "links": {}
+    },
+    {
+     "v": 2,
+     "op": "end",
+     "at": "2026-11-13T11:00:00.000Z",
+     "by": "breakdown",
+     "in": "task-28",
+     "state": "done",
+     "fields": {
+      "stage": "breakdown",
+      "claims": [
+       "lib/waiting/"
+      ],
+      "account": "Split into task-30/31/32 by sub-path."
+     },
+     "links": {},
+     "reason": "session ended",
+     "stateReason": "session ended"
+    }
+   ]
+  },
+  "change-34": {
+   "id": "change-34",
+   "kind": "change",
+   "versions": [
+    {
+     "v": 1,
+     "op": "add",
+     "at": "2026-11-13T12:00:00.000Z",
+     "by": "implementation",
+     "in": "task-30",
+     "state": "open",
+     "fields": {
+      "ref": "PR #101",
+      "head": "a101"
+     },
+     "links": {}
+    }
+   ]
+  },
+  "run-35": {
+   "id": "run-35",
+   "kind": "run",
+   "versions": [
+    {
+     "v": 1,
+     "op": "add",
+     "at": "2026-11-13T12:00:00.000Z",
+     "by": "implementation",
+     "in": "task-30",
+     "state": "open",
+     "fields": {
+      "stage": "implementation",
+      "claims": [
+       "lib/waiting/queue/"
+      ],
+      "account": "PR #101 fixes Waiting item 1; ended finding-2."
+     },
+     "links": {}
+    },
+    {
+     "v": 2,
+     "op": "end",
+     "at": "2026-11-13T12:00:00.000Z",
+     "by": "implementation",
+     "in": "task-30",
+     "state": "done",
+     "fields": {
+      "stage": "implementation",
+      "claims": [
+       "lib/waiting/queue/"
+      ],
+      "account": "PR #101 fixes Waiting item 1; ended finding-2."
+     },
+     "links": {},
+     "reason": "session ended",
+     "stateReason": "session ended"
+    }
+   ]
+  },
+  "verdict-36": {
+   "id": "verdict-36",
+   "kind": "verdict",
+   "versions": [
+    {
+     "v": 1,
+     "op": "add",
+     "at": "2026-11-13T13:00:00.000Z",
+     "by": "plan-review",
+     "in": "task-28",
+     "state": "stands",
+     "fields": {
+      "of": "plan-review",
+      "outcome": "approve-with-notes",
+      "reasoning": "The three slices cover area-1. Scope now: 25 open findings to area-1 (find, 13:00). The ask says 26: right at 10:00; finding-2 ended at 12:00."
+     },
+     "links": {
+      "on": "plan-29@1"
+     }
+    }
+   ]
+  },
+  "run-37": {
+   "id": "run-37",
+   "kind": "run",
+   "versions": [
+    {
+     "v": 1,
+     "op": "add",
+     "at": "2026-11-13T13:00:00.000Z",
+     "by": "plan-review",
+     "in": "task-28",
+     "state": "open",
+     "fields": {
+      "stage": "plan-review",
+      "account": "Approved plan-29 with notes (verdict-36)."
+     },
+     "links": {}
+    },
+    {
+     "v": 2,
+     "op": "end",
+     "at": "2026-11-13T13:00:00.000Z",
+     "by": "plan-review",
+     "in": "task-28",
+     "state": "done",
+     "fields": {
+      "stage": "plan-review",
+      "account": "Approved plan-29 with notes (verdict-36)."
+     },
+     "links": {},
+     "reason": "session ended",
+     "stateReason": "session ended"
+    }
+   ]
+  },
+  "change-38": {
+   "id": "change-38",
+   "kind": "change",
+   "versions": [
+    {
+     "v": 1,
+     "op": "add",
+     "at": "2026-11-13T15:00:00.000Z",
+     "by": "implementation",
+     "in": "task-31",
+     "state": "open",
+     "fields": {
+      "ref": "PR #102",
+      "head": "b102"
+     },
+     "links": {}
+    }
+   ]
+  },
+  "run-39": {
+   "id": "run-39",
+   "kind": "run",
+   "versions": [
+    {
+     "v": 1,
+     "op": "add",
+     "at": "2026-11-13T15:00:00.000Z",
+     "by": "implementation",
+     "in": "task-31",
+     "state": "open",
+     "fields": {
+      "stage": "implementation",
+      "claims": [
+       "lib/waiting/render/"
+      ],
+      "account": "PR #102 fixes Waiting items 2-3; ended finding-3, finding-4."
+     },
+     "links": {}
+    },
+    {
+     "v": 2,
+     "op": "end",
+     "at": "2026-11-13T15:00:00.000Z",
+     "by": "implementation",
+     "in": "task-31",
+     "state": "done",
+     "fields": {
+      "stage": "implementation",
+      "claims": [
+       "lib/waiting/render/"
+      ],
+      "account": "PR #102 fixes Waiting items 2-3; ended finding-3, finding-4."
+     },
+     "links": {},
+     "reason": "session ended",
+     "stateReason": "session ended"
+    }
+   ]
+  },
+  "change-40": {
+   "id": "change-40",
+   "kind": "change",
+   "versions": [
+    {
+     "v": 1,
+     "op": "add",
+     "at": "2026-11-13T16:00:00.000Z",
+     "by": "implementation",
+     "in": "task-32",
+     "state": "open",
+     "fields": {
+      "ref": "PR #103",
+      "head": "c103"
+     },
+     "links": {}
+    }
+   ]
+  },
+  "run-41": {
+   "id": "run-41",
+   "kind": "run",
+   "versions": [
+    {
+     "v": 1,
+     "op": "add",
+     "at": "2026-11-13T16:00:00.000Z",
+     "by": "implementation",
+     "in": "task-32",
+     "state": "open",
+     "fields": {
+      "stage": "implementation",
+      "claims": [
+       "lib/waiting/notify/"
+      ],
+      "account": "PR #103 fixes Waiting item 4; ended finding-5."
+     },
+     "links": {}
+    },
+    {
+     "v": 2,
+     "op": "end",
+     "at": "2026-11-13T16:00:00.000Z",
+     "by": "implementation",
+     "in": "task-32",
+     "state": "done",
+     "fields": {
+      "stage": "implementation",
+      "claims": [
+       "lib/waiting/notify/"
+      ],
+      "account": "PR #103 fixes Waiting item 4; ended finding-5."
+     },
+     "links": {},
+     "reason": "session ended",
+     "stateReason": "session ended"
+    }
+   ]
+  },
+  "verdict-42": {
+   "id": "verdict-42",
+   "kind": "verdict",
+   "versions": [
+    {
+     "v": 1,
+     "op": "add",
+     "at": "2026-11-13T17:00:00.000Z",
+     "by": "review",
+     "in": "task-32",
+     "state": "stands",
+     "fields": {
+      "of": "review",
+      "outcome": "approve",
+      "reasoning": "PR #103 settles Waiting item 4 (finding-5). On scope: 22 findings to area-1 are open now; the ask's 26 was right at 10:00, since 4 ended after it (finding-2 12:00, finding-3 and finding-4 15:00, finding-5 16:00)."
+     },
+     "links": {
+      "on": "change-40@1"
+     }
+    }
+   ]
+  },
+  "run-43": {
+   "id": "run-43",
+   "kind": "run",
+   "versions": [
+    {
+     "v": 1,
+     "op": "add",
+     "at": "2026-11-13T17:00:00.000Z",
+     "by": "review",
+     "in": "task-32",
+     "state": "open",
+     "fields": {
+      "stage": "review",
+      "account": "Approved change-40 (verdict-42)."
+     },
+     "links": {}
+    },
+    {
+     "v": 2,
+     "op": "end",
+     "at": "2026-11-13T17:00:00.000Z",
+     "by": "review",
+     "in": "task-32",
+     "state": "done",
+     "fields": {
+      "stage": "review",
+      "account": "Approved change-40 (verdict-42)."
+     },
+     "links": {},
+     "reason": "session ended",
+     "stateReason": "session ended"
+    }
+   ]
+  }
+ },
+ "queries": [
+  {
+   "at": "2026-11-17T13:34:47.615Z",
+   "by": "Harbour",
+   "query": "find",
+   "args": {
+    "kind": "finding",
+    "to": "area-1"
+   },
+   "returned": 26
+  },
+  {
+   "at": "2026-11-17T13:34:47.649Z",
+   "by": "John",
+   "query": "find",
+   "args": {
+    "kind": "finding",
+    "to": "area-1",
+    "state": "open"
+   },
+   "returned": 26
+  },
+  {
+   "at": "2026-11-17T13:34:47.987Z",
+   "by": "implementation",
+   "query": "find",
+   "args": {
+    "kind": "finding",
+    "to": "area-1",
+    "state": "open"
+   },
+   "returned": 26
+  },
+  {
+   "at": "2026-11-17T13:34:48.022Z",
+   "by": "implementation",
+   "query": "find",
+   "args": {
+    "kind": "finding",
+    "path": "lib/waiting/queue/",
+    "to": "area-1"
+   },
+   "returned": 0
+  },
+  {
+   "at": "2026-11-17T13:34:48.212Z",
+   "by": "plan-review",
+   "query": "find",
+   "args": {
+    "kind": "finding",
+    "to": "area-1",
+    "state": "open"
+   },
+   "returned": 25
+  },
+  {
+   "at": "2026-11-17T13:34:48.245Z",
+   "by": "plan-review",
+   "query": "find",
+   "args": {
+    "kind": "finding",
+    "to": "area-1"
+   },
+   "returned": 26
+  },
+  {
+   "at": "2026-11-17T13:34:48.400Z",
+   "by": "implementation",
+   "query": "find",
+   "args": {
+    "kind": "finding",
+    "to": "area-1",
+    "state": "open"
+   },
+   "returned": 25
+  },
+  {
+   "at": "2026-11-17T13:34:48.637Z",
+   "by": "implementation",
+   "query": "find",
+   "args": {
+    "kind": "finding",
+    "to": "area-1",
+    "state": "open"
+   },
+   "returned": 23
+  },
+  {
+   "at": "2026-11-17T13:34:48.814Z",
+   "by": "review",
+   "query": "find",
+   "args": {
+    "kind": "finding",
+    "to": "area-1",
+    "state": "open"
+   },
+   "returned": 22
+  },
+  {
+   "at": "2026-11-17T13:34:48.846Z",
+   "by": "review",
+   "query": "find",
+   "args": {
+    "kind": "finding",
+    "to": "area-1",
+    "state": "open"
+   },
+   "returned": 22
+  },
+  {
+   "at": "2026-11-17T13:34:48.876Z",
+   "by": "review",
+   "query": "find",
+   "args": {
+    "kind": "finding",
+    "to": "area-1"
+   },
+   "returned": 26
+  },
+  {
+   "at": "2026-11-17T13:34:48.919Z",
+   "by": "review",
+   "query": "get",
+   "args": {
+    "id": "finding-2",
+    "asOf": "2026-11-13T10:00:00Z"
+   },
+   "returned": 1
+  },
+  {
+   "at": "2026-11-17T13:34:49.108Z",
+   "by": "John",
+   "query": "find",
+   "args": {
+    "text": "26"
+   },
+   "returned": 4
+  },
+  {
+   "at": "2026-11-17T13:34:49.142Z",
+   "by": "John",
+   "query": "find",
+   "args": {
+    "text": "25"
+   },
+   "returned": 2
+  },
+  {
+   "at": "2026-11-17T13:34:49.183Z",
+   "by": "John",
+   "query": "find",
+   "args": {
+    "text": "22"
+   },
+   "returned": 2
+  },
+  {
+   "at": "2026-11-17T13:34:49.219Z",
+   "by": "John",
+   "query": "show",
+   "args": {
+    "task": "task-28",
+    "asOf": null
+   },
+   "returned": 1
+  }
+ ],
+ "hits": []
+}
