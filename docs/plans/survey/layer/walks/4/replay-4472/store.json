@@ -1,5 +1,5 @@
 {
- "next": 63,
+ "next": 66,
  "records": {
   "task-1": [
    {
@@ -1124,6 +1124,31 @@
     "by": "survey-place",
     "at": "2026-11-13T17:26:46.000Z",
     "reason": "survey-place at 904719353 agrees and adds how to record it: PR wording and a Waiting line"
+   },
+   {
+    "id": "question-52",
+    "kind": "question",
+    "in": "task-28",
+    "to": "implementation",
+    "links": {
+     "about": "decision-32@1"
+    },
+    "asks": "The plan's duplicate-helper search (function names equal to a `common.js` global or a lib export) finds nothing in `task-page.js`, but there are two real duplicates: `relativeWords` (`:366`) is `relativeAgo` (`lib/task-page-loader.js:614`) line for line, and `formatElapsed` (`:302`) is pinned by a parity test to `fmtDuration` (`lib/render-run-steps.js:258`). Neither lib file is a leaf (22 and 4 imports), so importing either means extracting a leaf, adding a `SHARED_MODULES` entry and an `areas.json` owner: a serving change, which Session fit (decision-32) rules out. Which way? Decide up front and record it on LIN-4463.",
+    "options": [
+     "export both from task-page.js, turn the parity tests into plain imports, and name the leaf extraction as the next piece",
+     "extract the leaves now (a serving change, outside this piece's session fit)",
+     "leave them as they are, unnamed"
+    ],
+    "recommended": "Export both, turn the parity tests into plain imports, and name the extraction as the next piece. In the PR, say the duplicates were found and left alone (never 'no duplicates'), and add a Waiting line in `docs/areas/front-end-browser.md` next to the `ship.js` \"lib side must become a leaf\" entry.",
+    "if-unanswered": "The duplicates stay and the piece's 'names what it retired' misses them.",
+    "state": "handed-on",
+    "v": 3,
+    "op": "end",
+    "by": "scoping",
+    "at": "2026-11-13T17:29:47.000Z",
+    "stateReason": "Scoping took this up and raised the serving-change part to John as a ruling (question-63); its recommendation differs: extract the leaf first rather than export and defer",
+    "into": "question-63",
+    "reason": "Scoping took this up and raised the serving-change part to John as a ruling (question-63); its recommendation differs: extract the leaf first rather than export and defer"
    }
   ],
   "finding-53": [
@@ -1330,6 +1355,77 @@
     "at": "2026-11-13T17:26:54.000Z",
     "stateReason": "Survey posted on LIN-4472 at 17:29:11",
     "reason": "Survey posted on LIN-4472 at 17:29:11"
+   }
+  ],
+  "question-63": [
+   {
+    "id": "question-63",
+    "kind": "question",
+    "in": "task-28",
+    "to": "John",
+    "asks": "LIN-4472's Session-fit line says 'no serving change'. Scoping recommends first extracting one small served lib leaf for duration and relative-time wording, so the task page drops its two restated copies (`formatElapsed` = `fmtDuration`, `relativeWords` = `relativeAgo`). Is that allowed? The answer is recorded on LIN-4463.",
+    "options": [
+     "extract: yes, extract the served leaf first, and the page drops both copies",
+     "leave: no, leave both copies, add a Waiting entry, and record it as a cut"
+    ],
+    "recommended": "extract",
+    "if-unanswered": "extract",
+    "links": {
+     "about": "decision-32@1"
+    },
+    "state": "open",
+    "v": 1,
+    "op": "add",
+    "by": "scoping",
+    "at": "2026-11-13T17:29:46.000Z"
+   }
+  ],
+  "decision-64": [
+   {
+    "id": "decision-64",
+    "kind": "decision",
+    "in": "task-28",
+    "scope": "task-28",
+    "answer": "Size: consolidate the decision this task touches. Cuts: none. Decided by the standing policy.",
+    "why": "Converts the task page to a module with its suites as imports, and first gives the duration and relative-time wording one served home that server and page both import, so this view drops its two restated copies. The serving change this needs is put to John (question-63), with extract as the default if unanswered.",
+    "links": {
+     "about": "question-63@1"
+    },
+    "state": "stands",
+    "v": 1,
+    "op": "add",
+    "by": "scoping",
+    "at": "2026-11-13T17:29:48.000Z"
+   }
+  ],
+  "run-65": [
+   {
+    "id": "run-65",
+    "kind": "run",
+    "in": "task-28",
+    "stage": "scoping",
+    "account": "Sized LIN-4472 as consolidate, no cuts, by the standing policy: convert the task page to a module with its suites as imports, and first extract one served lib leaf for duration and relative-time wording so the page drops its two restated copies (formatElapsed, relativeWords). That contradicts the breakdown's no-serving-change session fit, so I raised it to John as a ruling (question-63), recommending and defaulting to extract. question-52 handed on into it.",
+    "links": {},
+    "state": "open",
+    "v": 1,
+    "op": "add",
+    "by": "scoping",
+    "at": "2026-11-13T17:29:49.000Z"
+   },
+   {
+    "id": "run-65",
+    "kind": "run",
+    "in": "task-28",
+    "stage": "scoping",
+    "account": "Sized LIN-4472 as consolidate, no cuts, by the standing policy: convert the task page to a module with its suites as imports, and first extract one served lib leaf for duration and relative-time wording so the page drops its two restated copies (formatElapsed, relativeWords). That contradicts the breakdown's no-serving-change session fit, so I raised it to John as a ruling (question-63), recommending and defaulting to extract. question-52 handed on into it.",
+    "links": {},
+    "state": "done",
+    "v": 2,
+    "op": "end",
+    "by": "scoping",
+    "at": "2026-11-13T17:29:50.000Z",
+    "stateReason": "Size recorded and ruling raised",
+    "reason": "Size recorded and ruling raised"
    }
   ]
  },

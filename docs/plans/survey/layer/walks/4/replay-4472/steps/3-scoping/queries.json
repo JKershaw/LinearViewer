@@ -1,0 +1,49 @@
+[
+ {
+  "at": "2026-11-17T14:48:45.804Z",
+  "by": "scoping",
+  "q": [
+   "show",
+   "--task",
+   "task-28",
+   "--by",
+   "scoping"
+  ]
+ },
+ {
+  "at": "2026-11-17T14:48:45.837Z",
+  "by": "scoping",
+  "q": [
+   "get",
+   "question-52",
+   "--by",
+   "scoping"
+  ]
+ },
+ {
+  "at": "2026-11-17T14:48:45.873Z",
+  "by": "scoping",
+  "q": [
+   "find",
+   "--to",
+   "area-49",
+   "--state",
+   "open",
+   "--by",
+   "scoping"
+  ]
+ },
+ {
+  "at": "2026-11-17T14:48:45.922Z",
+  "by": "scoping",
+  "q": [
+   "find",
+   "--kind",
+   "decision",
+   "--text",
+   "serving",
+   "--by",
+   "scoping"
+  ]
+ }
+]

@@ -1,0 +1,89 @@
+[
+ {
+  "at": "2026-11-17T14:47:55.446Z",
+  "by": "scoping",
+  "q": [
+   "show",
+   "--task",
+   "task-60",
+   "--by",
+   "scoping"
+  ]
+ },
+ {
+  "at": "2026-11-17T14:47:55.476Z",
+  "by": "scoping",
+  "q": [
+   "get",
+   "task-60",
+   "--by",
+   "scoping"
+  ]
+ },
+ {
+  "at": "2026-11-17T14:48:01.018Z",
+  "by": "scoping",
+  "q": [
+   "show",
+   "--task",
+   "task-60",
+   "--by",
+   "scoping"
+  ]
+ },
+ {
+  "at": "2026-11-17T14:48:01.061Z",
+  "by": "scoping",
+  "q": [
+   "find",
+   "--kind",
+   "run",
+   "--by",
+   "scoping"
+  ]
+ },
+ {
+  "at": "2026-11-17T14:48:04.707Z",
+  "by": "scoping",
+  "q": [
+   "find",
+   "--text",
+   "standing policy",
+   "--by",
+   "scoping"
+  ]
+ },
+ {
+  "at": "2026-11-17T14:48:04.744Z",
+  "by": "scoping",
+  "q": [
+   "find",
+   "--text",
+   "consolidate",
+   "--by",
+   "scoping"
+  ]
+ },
+ {
+  "at": "2026-11-17T14:48:04.781Z",
+  "by": "scoping",
+  "q": [
+   "find",
+   "--text",
+   "size of the move",
+   "--by",
+   "scoping"
+  ]
+ },
+ {
+  "at": "2026-11-17T14:48:04.814Z",
+  "by": "scoping",
+  "q": [
+   "find",
+   "--text",
+   "DECISION_LIFECYCLE",
+   "--by",
+   "scoping"
+  ]
+ }
+]
