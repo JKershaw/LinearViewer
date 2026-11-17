@@ -1,5 +1,5 @@
 {
- "next": 44,
+ "next": 52,
  "records": {
   "area-1": [
    {
@@ -2321,6 +2321,219 @@
      "reason": "plan-28 revised to answer verdict-35 and written to the ticket; plan-review due: no"
     }
    }
+  ],
+  "verdict-44": [
+   {
+    "id": "verdict-44",
+    "kind": "verdict",
+    "state": "stands",
+    "fields": {
+     "of": "plan-review",
+     "outcome": "approve-with-notes",
+     "reasoning": "Approve plan-28@13; ready for implementation. The blocker (finding-34) is fixed at its cause: workspace-kpis.js initialises on DOMContentLoaded, after the module shim. Its only CostFormat reads are the tooltip and tick callbacks (workspace-kpis.js:134,138) inside the charts.draw(cost) config; no unit test loads workspace-kpis.js today, and render-workspace-kpis.test.js:154 pins a script order that does not include /cost-format.js, so neither breaks. The restated rule (never read during script execution, including via a callback a library runs synchronously) is right. Builder notes finding-36 to 42 are folded in as written, each checked in source. Also sound: every browser call passes no options or {fine:true}, so the lib destructuring matches the browser copy; public/ is filed by ^public/ in docs/areas/areas.json, so the shim needs no area pattern; the acorn sweeps parse as module first, so a shim with import passes; server.js:1227-1228 mounts the vendor router just before express.static(public). Meets the ask: rule reading in the notes (step 1), one shared piece retiring public/cost-format.js and its parity test, names what it retires and stops for John (step 8); the only narrowing, no view reworked, is John size ruling (decision-26). Grounded at 4b5001ddf = origin/main, no commits since 12:08. Six non-blocking builder notes follow as findings to implementation."
+    },
+    "links": {
+     "on": [
+      "plan-28@13",
+      "finding-34@2",
+      "decision-26@3"
+     ],
+     "about": [
+      "plan-28"
+     ]
+    },
+    "in": "task-9",
+    "v": 1,
+    "op": "add",
+    "at": "2026-11-13T14:31:08.000Z",
+    "by": "plan-review"
+   }
+  ],
+  "finding-45": [
+   {
+    "id": "finding-45",
+    "kind": "finding",
+    "state": "open",
+    "fields": {
+     "says": "The 404 witness through the full server.js app (plan-28) needs a real server: server.js calls app.listen on import (line 4674) and exports no app, so a unit test cannot import it, and a hand-built router stack like vendor-assets.test.js:91 is not the full app. Either put the two 404 assertions (/shared/nope.js, /lib/cost-format.js) in the Playwright check, which runs the real server, or spawn server.js as tests/unit/lin-619-session-secret.test.js:159 does."
+    },
+    "links": {
+     "about": [
+      "plan-28"
+     ],
+     "on": [
+      "plan-28@13",
+      "finding-40@2"
+     ]
+    },
+    "in": "task-9",
+    "to": "implementation",
+    "v": 1,
+    "op": "add",
+    "at": "2026-11-13T14:31:09.000Z",
+    "by": "plan-review"
+   }
+  ],
+  "finding-46": [
+   {
+    "id": "finding-46",
+    "kind": "finding",
+    "state": "open",
+    "fields": {
+     "says": "Make the workspace-kpis Chart-stub ordering test fail for the right reason. charts.draw returns null before new Chart when there is no #chart-cost element (public/chart-helpers.js:103-104), the same trap as the typeof Chart guard. Put a <canvas id=\"chart-cost\"> in the fake document; seed the whole daily shape the IIFE walks first (days, dispatches, autopilotRuns, agentActions, done, doneTotal, runsByKind); stub getComputedStyle or HarbourCharts, since chart-helpers.js:18 calls getComputedStyle at load. When confirming it fails on today code, assert the error is the CostFormat TypeError, not a hole in the seed."
+    },
+    "links": {
+     "about": [
+      "plan-28"
+     ],
+     "on": [
+      "plan-28@13",
+      "finding-34@2"
+     ]
+    },
+    "in": "task-9",
+    "to": "implementation",
+    "v": 1,
+    "op": "add",
+    "at": "2026-11-13T14:31:10.000Z",
+    "by": "plan-review"
+   }
+  ],
+  "finding-47": [
+   {
+    "id": "finding-47",
+    "kind": "finding",
+    "state": "open",
+    "fields": {
+     "says": "Correction to why prompt-section.js is safe (finding-34 and plan-28 (d) say after a fetch): a fetch started during parsing can resolve before a two-file module graph loads, so that is no guarantee. The real one: every PromptSection.init caller runs at DOMContentLoaded or later: task-page.js:926 on DOMContentLoaded; app.js:2321 init() on DOMContentLoaded, Home prompt mounts after user-triggered fetches via bindHomeFolds; swipe.js:857 when the user opens the prompts section. Use that reason in the corrected comment at prompt-section.js:1505, and drive that consumer witness through init and a resolved decision-panel fetch."
+    },
+    "links": {
+     "about": [
+      "plan-28"
+     ],
+     "on": [
+      "plan-28@13",
+      "finding-34@2",
+      "finding-38@2"
+     ]
+    },
+    "in": "task-9",
+    "to": "implementation",
+    "v": 1,
+    "op": "add",
+    "at": "2026-11-13T14:31:11.000Z",
+    "by": "plan-review"
+   }
+  ],
+  "finding-48": [
+   {
+    "id": "finding-48",
+    "kind": "finding",
+    "state": "open",
+    "fields": {
+     "says": "tests/unit/cost-format.test.js does not exist yet: step 5 moves the parity file server-side assertions into it, so create it. The parity file export const TABLE has no importers, so deleting the file strands nothing."
+    },
+    "links": {
+     "about": [
+      "plan-28"
+     ],
+     "on": [
+      "plan-28@13",
+      "finding-29@2"
+     ]
+    },
+    "in": "task-9",
+    "to": "implementation",
+    "v": 1,
+    "op": "add",
+    "at": "2026-11-13T14:31:12.000Z",
+    "by": "plan-review"
+   }
+  ],
+  "finding-49": [
+   {
+    "id": "finding-49",
+    "kind": "finding",
+    "state": "open",
+    "fields": {
+     "says": "One live hit missing from plan-28 places: docs/areas/other-features.md:14, the Waiting entry saying lib/cost-format.js is still in the catch-all. Still true, but once the file is served add a few words (also served as /shared/cost-format.js, so a leaf) so the next reader does not move it without seeing that constraint. The other new grep hits are server-side import ... from ./cost-format.js lines in lib/*: not places, no change."
+    },
+    "links": {
+     "about": [
+      "plan-28"
+     ],
+     "on": [
+      "plan-28@13",
+      "finding-24@4"
+     ]
+    },
+    "in": "task-9",
+    "to": "implementation",
+    "v": 1,
+    "op": "add",
+    "at": "2026-11-13T14:31:13.000Z",
+    "by": "plan-review"
+   }
+  ],
+  "finding-50": [
+   {
+    "id": "finding-50",
+    "kind": "finding",
+    "state": "open",
+    "fields": {
+     "says": "CLAUDE.md will need trimming: 50 bytes spare, and any reading plus a pointer to docs/areas/front-end-browser.md is longer than the 46 bytes of today Keep it minimal - no frameworks, no build step. Expect step 1 trim clause to apply, and name the cut text in the PR as planned."
+    },
+    "links": {
+     "about": [
+      "plan-28"
+     ],
+     "on": [
+      "plan-28@13",
+      "finding-37@2"
+     ]
+    },
+    "in": "task-9",
+    "to": "implementation",
+    "v": 1,
+    "op": "add",
+    "at": "2026-11-13T14:31:14.000Z",
+    "by": "plan-review"
+   }
+  ],
+  "run-51": [
+   {
+    "id": "run-51",
+    "kind": "run",
+    "state": "open",
+    "fields": {
+     "stage": "plan-review",
+     "account": "Re-reviewed plan-28@13 at 4b5001ddf (still origin/main; no commits since 12:08). Approve with notes (verdict-44). The blocker from my last review, finding-34, is fixed at its cause: workspace-kpis.js now initialises on DOMContentLoaded, after the module shim; its only CostFormat reads are the tick and tooltip callbacks at lines 134/138, and no existing test is broken by the deferral. Earlier builder notes 36-42 are folded in and each checked in source. Six new notes, none blocking (finding-45 to 50): the full-app 404 witness needs a real server; the Chart-stub test needs a canvas, full seed and getComputedStyle stub to fail for the right reason; prompt-section is safe because every init caller runs at DOMContentLoaded or later, not because of a fetch; cost-format.test.js must be created; docs/areas/other-features.md:14 is a missed place; CLAUDE.md will need trimming. Ready for implementation. verdict-35 left standing: the store has no superseded end for a verdict, and withdrawn would misstate it."
+    },
+    "links": {},
+    "in": "task-9",
+    "v": 1,
+    "op": "add",
+    "at": "2026-11-13T14:31:15.000Z",
+    "by": "plan-review"
+   },
+   {
+    "id": "run-51",
+    "kind": "run",
+    "state": "done",
+    "fields": {
+     "stage": "plan-review",
+     "account": "Re-reviewed plan-28@13 at 4b5001ddf (still origin/main; no commits since 12:08). Approve with notes (verdict-44). The blocker from my last review, finding-34, is fixed at its cause: workspace-kpis.js now initialises on DOMContentLoaded, after the module shim; its only CostFormat reads are the tick and tooltip callbacks at lines 134/138, and no existing test is broken by the deferral. Earlier builder notes 36-42 are folded in and each checked in source. Six new notes, none blocking (finding-45 to 50): the full-app 404 witness needs a real server; the Chart-stub test needs a canvas, full seed and getComputedStyle stub to fail for the right reason; prompt-section is safe because every init caller runs at DOMContentLoaded or later, not because of a fetch; cost-format.test.js must be created; docs/areas/other-features.md:14 is a missed place; CLAUDE.md will need trimming. Ready for implementation. verdict-35 left standing: the store has no superseded end for a verdict, and withdrawn would misstate it."
+    },
+    "links": {},
+    "in": "task-9",
+    "v": 2,
+    "op": "end",
+    "at": "2026-11-13T14:31:16.000Z",
+    "by": "plan-review",
+    "ended": {
+     "reason": "plan review posted: approve with notes, six non-blocking builder notes"
+    }
+   }
   ]
  },
  "log": [
@@ -3161,6 +3374,20 @@
     "implementation",
     "--state",
     "open",
+    "--by",
+    "plan-review"
+   ],
+   "asOf": null
+  },
+  {
+   "at": "2026-11-17T15:32:59.068Z",
+   "by": "plan-review",
+   "cmd": "brief",
+   "args": [
+    "brief",
+    "implementation",
+    "--task",
+    "task-9",
     "--by",
     "plan-review"
    ],

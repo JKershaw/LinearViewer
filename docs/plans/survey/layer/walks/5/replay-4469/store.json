@@ -1,5 +1,5 @@
 {
- "next": 157,
+ "next": 158,
  "records": {
   "area-1": [
    {
@@ -3162,6 +3162,27 @@
     "op": "link",
     "at": "2026-11-13T22:59:40.000Z",
     "by": "review"
+   },
+   {
+    "id": "finding-143",
+    "kind": "finding",
+    "state": "open",
+    "fields": {
+     "says": "`lib/prompt-template-defs.js` restates tracker clauses the proxy write guard (LIN-4468) now refuses outside the four mandates LIN-4469 names: survey-task ~975, survey-place ~994, blind-read ~1065 (\"Do not change code, branches, pull requests, tickets or Linear/tracker state\") and triage ~268 (\"do not rewrite the task description ... do not create follow-up tasks or subtasks\", which ticket-fields refuses; the scope rule there stays). Lower value: `lib/prompts/stage-kinds.js` 534/559 survey completion criteria. Recommendation: shrink them to the code, branch and PR words; that moves those renders and ceilings. Waits on question-144: on fold, implementation does it; on accept, it becomes a Waiting entry (LIN-4469)."
+    },
+    "links": {
+     "about": [
+      "question-144"
+     ]
+    },
+    "in": "task-131",
+    "to": "implementation",
+    "v": 4,
+    "op": "revise",
+    "at": "2026-11-13T23:03:17.000Z",
+    "by": "John",
+    "via": "Harbour",
+    "reason": "John ruled fold (decision-157): implementation shrinks these clauses, as the finding says on fold"
    }
   ],
   "question-144": [
@@ -3217,6 +3238,36 @@
     "at": "2026-11-13T22:59:38.000Z",
     "by": "review",
     "reason": "review measured buildProxyContextPreamble branch vs main: 7 of the 11 kinds fall; triage line 268 is the same class"
+   },
+   {
+    "id": "question-144",
+    "kind": "question",
+    "state": "answered",
+    "fields": {
+     "asks": "LIN-4469 PR #2447: accept two cuts to the ask, or fold? Corrected by review: (1) In real context the dispatched prompt includes the proxy preamble, which falls per writes kind: none -74 (look-into, retro), one-comment -23 (context, survey-task, survey-place), blind-comment -24 (blind-read), ticket-fields -67 (triage), work 0. So only 4 kinds stay byte-identical (blocked, breakdown, close-out, retrospective-audit, all work, carrying no folded text), not 11. (2) The guarded tracker clause is left unfolded in survey-task, survey-place and blind-read (lib/prompt-template-defs.js ~975/994/1065) and also in triage (~268: do not rewrite the description, do not create follow-up tasks or subtasks), which question v1 did not name.",
+     "options": [
+      "accept: the 4 work kinds cannot fall; leave the template clauses unfolded and record them as a Waiting entry in docs/areas/llm-and-prompts.md",
+      "fold: shrink the clauses at ~268/975/994/1065 to the code, branch and PR words too; back to implementation, re-pin ceilings and a lower FROZEN_TOTAL_BYTES"
+     ],
+     "recommended": "fold: it is small and is the parent aim; accept the 4 work kinds as unable to fall",
+     "if-unanswered": "hold the merge; the PR cannot be approved until this is answered"
+    },
+    "links": {
+     "about": [
+      "change-142",
+      "finding-143"
+     ]
+    },
+    "in": "task-131",
+    "to": "John",
+    "v": 3,
+    "op": "end",
+    "at": "2026-11-13T23:03:16.000Z",
+    "by": "John",
+    "ended": {
+     "reason": "John ruled fold (ruling lin-4469-cuts); decision-157"
+    },
+    "via": "Harbour"
    }
   ],
   "finding-145": [
@@ -3541,6 +3592,34 @@
     "ended": {
      "reason": "review posted (Needs Discussion), records written"
     }
+   }
+  ],
+  "decision-157": [
+   {
+    "id": "decision-157",
+    "kind": "decision",
+    "state": "stands",
+    "fields": {
+     "scope": "task-131",
+     "answer": "fold: shrink the clauses at ~268/975/994/1065 to the code, branch and PR words too; back to implementation, re-pin ceilings and a lower FROZEN_TOTAL_BYTES",
+     "why": "Ruling lin-4469-cuts, recorded via Harbour. Comment on LIN-4469 (62f57ef4): \"Fold the guarded clause in survey-task, survey-place and blind-read templates too.\" The comment names three templates; the option chosen also covers triage ~268."
+    },
+    "links": {
+     "answers": "question-144",
+     "on": [
+      "question-144@2"
+     ],
+     "about": [
+      "change-142",
+      "finding-143"
+     ]
+    },
+    "in": "task-131",
+    "v": 1,
+    "op": "add",
+    "at": "2026-11-13T23:03:15.000Z",
+    "by": "John",
+    "via": "Harbour"
    }
   ]
  },
@@ -4187,6 +4266,45 @@
     "decision",
     "--in",
     "task-131"
+   ],
+   "asOf": null
+  },
+  {
+   "at": "2026-11-17T15:32:08.693Z",
+   "by": "John",
+   "cmd": "get",
+   "args": [
+    "--by",
+    "John",
+    "get",
+    "decision-137"
+   ],
+   "asOf": null
+  },
+  {
+   "at": "2026-11-17T15:32:08.721Z",
+   "by": "John",
+   "cmd": "get",
+   "args": [
+    "--by",
+    "John",
+    "get",
+    "decision-111"
+   ],
+   "asOf": null
+  },
+  {
+   "at": "2026-11-17T15:32:33.210Z",
+   "by": "John",
+   "cmd": "find",
+   "args": [
+    "find",
+    "--to",
+    "John",
+    "--state",
+    "open",
+    "--by",
+    "John"
    ],
    "asOf": null
   }

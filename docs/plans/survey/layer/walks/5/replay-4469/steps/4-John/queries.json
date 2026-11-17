@@ -1,0 +1,93 @@
+[
+ {
+  "at": "2026-11-17T15:32:05.050Z",
+  "by": "John",
+  "cmd": "show",
+  "args": [
+   "--by",
+   "John",
+   "show",
+   "--task",
+   "task-131"
+  ],
+  "asOf": null
+ },
+ {
+  "at": "2026-11-17T15:32:05.101Z",
+  "by": "John",
+  "cmd": "get",
+  "args": [
+   "--by",
+   "John",
+   "get",
+   "finding-143"
+  ],
+  "asOf": null
+ },
+ {
+  "at": "2026-11-17T15:32:05.133Z",
+  "by": "John",
+  "cmd": "get",
+  "args": [
+   "--by",
+   "John",
+   "get",
+   "change-142"
+  ],
+  "asOf": null
+ },
+ {
+  "at": "2026-11-17T15:32:05.166Z",
+  "by": "John",
+  "cmd": "find",
+  "args": [
+   "--by",
+   "John",
+   "find",
+   "--kind",
+   "decision",
+   "--in",
+   "task-131"
+  ],
+  "asOf": null
+ },
+ {
+  "at": "2026-11-17T15:32:08.693Z",
+  "by": "John",
+  "cmd": "get",
+  "args": [
+   "--by",
+   "John",
+   "get",
+   "decision-137"
+  ],
+  "asOf": null
+ },
+ {
+  "at": "2026-11-17T15:32:08.721Z",
+  "by": "John",
+  "cmd": "get",
+  "args": [
+   "--by",
+   "John",
+   "get",
+   "decision-111"
+  ],
+  "asOf": null
+ },
+ {
+  "at": "2026-11-17T15:32:33.210Z",
+  "by": "John",
+  "cmd": "find",
+  "args": [
+   "find",
+   "--to",
+   "John",
+   "--state",
+   "open",
+   "--by",
+   "John"
+  ],
+  "asOf": null
+ }
+]

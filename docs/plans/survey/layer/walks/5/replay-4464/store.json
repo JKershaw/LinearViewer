@@ -1,5 +1,5 @@
 {
- "next": 108,
+ "next": 111,
  "records": {
   "area-1": [
    {
@@ -2419,6 +2419,26 @@
     "op": "add",
     "at": "2026-11-13T15:59:49.000Z",
     "by": "survey-place"
+   },
+   {
+    "id": "finding-97",
+    "kind": "finding",
+    "state": "open",
+    "fields": {
+     "says": "Not this task's: the area-read kit is a one-off that now needs a per-read addendum each use (Runs, then LLM; the piece-6 repeat read would need a third). After #2430 the method is spelled across three files: the frozen kit `docs/plans/survey/area-read.md`, `docs/plans/survey/area-read-method-as-run.md` and `docs/plans/survey/area-read-adoption-e8e92d50a.md`. They are unmapped `docs/plans/` files with no code file to cite, so no area note can hold this. Better: a parameterised kit under a new name, with base, area, N and salt as inputs and a per-read Known limits section; keep `area-read.md` frozen for its blob pin. Also add an area-read kind to the comment classifier (LIN-4458), so `landingPrUrls` skips area-read comments as it does blind reads and survey reports."
+    },
+    "links": {
+     "about": [
+      "plan-64"
+     ]
+    },
+    "in": "task-78",
+    "to": "task-60",
+    "v": 2,
+    "op": "revise",
+    "at": "2026-11-13T16:17:33.000Z",
+    "by": "leftover",
+    "reason": "Leftover: the method now spans three files after #2430, and no area note can hold the point (unmapped docs/plans/ files); still outside LIN-4464"
    }
   ],
   "run-98": [
@@ -2565,6 +2585,26 @@
     "op": "add",
     "at": "2026-11-13T16:06:03.000Z",
     "by": "implementation"
+   },
+   {
+    "id": "change-103",
+    "kind": "change",
+    "state": "open",
+    "fields": {
+     "ref": "#2430",
+     "head": "444b58246"
+    },
+    "links": {
+     "about": [
+      "task-78"
+     ]
+    },
+    "in": "task-78",
+    "v": 2,
+    "op": "revise",
+    "at": "2026-11-13T16:17:31.000Z",
+    "by": "leftover",
+    "reason": "Leftover tidy commit 444b58246f37ce4796b181e9b0e21843fce29eee (adoption record figures); CI green on it: CI success plus all seven jobs"
    }
   ],
   "finding-104": [
@@ -2686,6 +2726,98 @@
     "ended": {
      "reason": "Baseline read done; PR #2430 up, CI green"
     }
+   }
+  ],
+  "run-108": [
+   {
+    "id": "run-108",
+    "kind": "run",
+    "state": "open",
+    "fields": {
+     "stage": "leftover",
+     "claims": [
+      "docs/plans/survey/area-read-adoption-e8e92d50a.md"
+     ],
+     "account": "Leftover pass on LIN-4464 in the implementation session. Tidied the adoption record: it quoted the kit Lessons figures (1,012 and 4,257 B) beside the LLM and control notes, so 4,257 B read as an LLM figure; it is the Runs note at 4b5001ddf, and the line now says which pair the figures belong to (444b58246, PR #2430 head, CI green). Added the three-file spread of the method to finding-97 for task-60. Added no lesson to either area note and retired no Waiting entry, since both notes are measured blobs the reports pin. Closed nothing; finding-96, 105 and 106 stay open."
+    },
+    "links": {},
+    "in": "task-78",
+    "v": 1,
+    "op": "add",
+    "at": "2026-11-13T16:17:30.000Z",
+    "by": "leftover"
+   },
+   {
+    "id": "run-108",
+    "kind": "run",
+    "state": "done",
+    "fields": {
+     "stage": "leftover",
+     "claims": [
+      "docs/plans/survey/area-read-adoption-e8e92d50a.md"
+     ],
+     "account": "Leftover pass on LIN-4464 in the implementation session. Tidied the adoption record: it quoted the kit Lessons figures (1,012 and 4,257 B) beside the LLM and control notes, so 4,257 B read as an LLM figure; it is the Runs note at 4b5001ddf, and the line now says which pair the figures belong to (444b58246, PR #2430 head, CI green). Added the three-file spread of the method to finding-97 for task-60. Added no lesson to either area note and retired no Waiting entry, since both notes are measured blobs the reports pin. Closed nothing; finding-96, 105 and 106 stay open."
+    },
+    "links": {},
+    "in": "task-78",
+    "v": 2,
+    "op": "end",
+    "at": "2026-11-13T16:17:35.000Z",
+    "by": "leftover",
+    "ended": {
+     "reason": "Leftover posted on LIN-4464: one tidy commit (444b58246), finding-97 extended, no lesson, retires none"
+    }
+   }
+  ],
+  "finding-109": [
+   {
+    "id": "finding-109",
+    "kind": "finding",
+    "state": "open",
+    "fields": {
+     "says": "Tidied after implementation, new commit on #2430 to check: `docs/plans/survey/area-read-adoption-e8e92d50a.md` quoted the kit Lessons figures (1,012 and 4,257 B) beside the LLM and control notes, so 4,257 B read as an LLM figure. It is the Runs note at `4b5001ddf`. The line now says which pair the figures belong to (`444b58246`). No score, sample or blob in the reports changed."
+    },
+    "links": {
+     "about": [
+      "change-103"
+     ],
+     "on": [
+      "change-103@2",
+      "finding-104@1"
+     ]
+    },
+    "in": "task-78",
+    "to": "review",
+    "v": 1,
+    "op": "add",
+    "at": "2026-11-13T16:17:32.000Z",
+    "by": "leftover"
+   }
+  ],
+  "decision-110": [
+   {
+    "id": "decision-110",
+    "kind": "decision",
+    "state": "stands",
+    "fields": {
+     "scope": "task-78",
+     "answer": "No lesson added to either area note, and no Waiting entry retired by #2430.",
+     "why": "`docs/areas/llm-and-prompts.md` is the baseline's measured note (blob `b6b4c726d`) and `docs/areas/front-end-pages.md` the control's, so an edit to either moves the note blob the reports pin. The PR touches only unmapped `docs/plans/survey/` files; the done-when says this piece retires no Waiting entry; settling an LLM & prompts entry would land piece 1-6 work before the baseline merges, and settling a front-end-pages entry would move the control."
+    },
+    "links": {
+     "on": [
+      "finding-85@3",
+      "decision-100@1"
+     ],
+     "about": [
+      "change-103"
+     ]
+    },
+    "in": "task-78",
+    "v": 1,
+    "op": "add",
+    "at": "2026-11-13T16:17:34.000Z",
+    "by": "leftover"
    }
   ]
  },
