@@ -1,5 +1,5 @@
 {
- "next": 82,
+ "next": 84,
  "records": {
   "area-1": [
    {
@@ -1747,6 +1747,55 @@
     "op": "add",
     "by": "scoping",
     "at": "2026-11-13T13:52:11.000Z"
+   }
+  ],
+  "decision-82": [
+   {
+    "id": "decision-82",
+    "kind": "decision",
+    "in": "task-60",
+    "answer": "Of finding-67's two options, fix the codec (and the false adf.js header claim), not exclude the input: an empty fence in the words must no longer make markdownToAdf emit a codeBlock that D1 refuses. Done first, as the tidy before the seal, so the planned fixed-point test holds on that input too.",
+    "why": "Excluding the input would leave a ticket whose description refuses every later write below the line, the very write the seal exists to allow. Recorded in the Size of the move section on LIN-4450 (decision-81).",
+    "scope": "task-60",
+    "links": {
+     "about": "finding-67",
+     "on": "finding-67@1"
+    },
+    "state": "stands",
+    "v": 1,
+    "op": "add",
+    "by": "scoping",
+    "at": "2026-11-13T13:52:12.000Z"
+   }
+  ],
+  "run-83": [
+   {
+    "id": "run-83",
+    "kind": "run",
+    "in": "task-60",
+    "stage": "scoping",
+    "account": "Scoped LIN-4450 and added a Size of the move section to its description: a small tidy, cuts none, decided by the standing policy. The move is plan-54 session 1 as broken down (Jira holds the words byte-exact in harbour.asAsked), plus one tidy done first: fix the codec so an empty fence no longer files a description D1 refuses on every later below-the-line write (finding-67, decision-82). Left open for implementation: question-66, finding-67 (the codec fix itself), check-68, findings 69, 70, 73-77.",
+    "links": {},
+    "state": "open",
+    "v": 1,
+    "op": "add",
+    "by": "scoping",
+    "at": "2026-11-13T13:52:13.000Z"
+   },
+   {
+    "id": "run-83",
+    "kind": "run",
+    "in": "task-60",
+    "stage": "scoping",
+    "account": "Scoped LIN-4450 and added a Size of the move section to its description: a small tidy, cuts none, decided by the standing policy. The move is plan-54 session 1 as broken down (Jira holds the words byte-exact in harbour.asAsked), plus one tidy done first: fix the codec so an empty fence no longer files a description D1 refuses on every later below-the-line write (finding-67, decision-82). Left open for implementation: question-66, finding-67 (the codec fix itself), check-68, findings 69, 70, 73-77.",
+    "links": {},
+    "state": "done",
+    "v": 2,
+    "op": "end",
+    "by": "scoping",
+    "at": "2026-11-13T13:52:14.000Z",
+    "stateReason": "Size of the move added to LIN-4450 description",
+    "reason": "Size of the move added to LIN-4450 description"
    }
   ]
  },
