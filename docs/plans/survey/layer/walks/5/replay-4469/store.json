@@ -1,5 +1,5 @@
 {
- "next": 181,
+ "next": 182,
  "records": {
   "area-1": [
    {
@@ -4738,6 +4738,27 @@
     "at": "2026-11-13T23:22:35.000Z",
     "by": "blind-read"
    }
+  ],
+  "run-181": [
+   {
+    "id": "run-181",
+    "kind": "run",
+    "state": "open",
+    "fields": {
+     "stage": "close-out",
+     "account": "pending"
+    },
+    "links": {
+     "on": [
+      "change-142@3"
+     ]
+    },
+    "in": "task-131",
+    "v": 1,
+    "op": "add",
+    "at": "2026-11-13T23:27:00.000Z",
+    "by": "close-out"
+   }
   ]
  },
  "log": [
@@ -6617,6 +6638,54 @@
     "finding-26",
     "--by",
     "close-out"
+   ],
+   "asOf": null
+  },
+  {
+   "at": "2026-11-17T15:44:48.077Z",
+   "by": "close-out",
+   "cmd": "find",
+   "args": [
+    "find",
+    "--text",
+    "simple-dispatcher",
+    "--state",
+    "open",
+    "--by",
+    "close-out"
+   ],
+   "asOf": null
+  },
+  {
+   "at": "2026-11-17T15:44:48.120Z",
+   "by": "close-out",
+   "cmd": "find",
+   "args": [
+    "find",
+    "--text",
+    "LIN-4470",
+    "--kind",
+    "task",
+    "--by",
+    "close-out"
+   ],
+   "asOf": null
+  },
+  {
+   "at": "2026-11-17T15:44:48.166Z",
+   "by": "close-out",
+   "cmd": "find",
+   "args": [
+    "find",
+    "--text",
+    "Waiting entr",
+    "--state",
+    "open",
+    "--area",
+    "area-1",
+    "--by",
+    "close-out",
+    "--count"
    ],
    "asOf": null
   }
