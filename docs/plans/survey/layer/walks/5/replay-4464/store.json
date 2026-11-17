@@ -1810,5 +1810,19 @@
    }
   ]
  },
- "log": []
+ "log": [
+  {
+   "at": "2026-11-17T15:24:03.724Z",
+   "by": "survey-task",
+   "cmd": "show",
+   "args": [
+    "show",
+    "--task",
+    "task-78",
+    "--by",
+    "survey-task"
+   ],
+   "asOf": null
+  }
+ ]
 }

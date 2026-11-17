@@ -1,5 +1,5 @@
 {
- "next": 25,
+ "next": 33,
  "records": {
   "area-1": [
    {
@@ -422,6 +422,29 @@
     "op": "add",
     "at": "2026-11-13T15:42:15.000Z",
     "by": "survey-task"
+   },
+   {
+    "id": "question-19",
+    "kind": "question",
+    "state": "answered",
+    "fields": {
+     "asks": "Which import specifier scheme do page modules use? Settle it before any view converts. `cost-format-global.js` imports `'/shared/cost-format.js'`, which Node resolves from the filesystem root, so a test cannot import a page module that uses it. This one choice decides whether \"the tests get simpler\" can hold.",
+     "options": [
+      "An import map (an inline `<script type=\"importmap\">`, which needs a CSP hash; `lib/components/page.js` already has `scriptBodyHash`) paired with `package.json` `\"imports\"` for Node",
+      "Relative specifiers, with a URL layout that matches the repo"
+     ],
+     "if-unanswered": "No view can convert with a page-module test that is a plain `import`, and the test seam grows instead of shrinking."
+    },
+    "links": {},
+    "in": "task-16",
+    "to": "design",
+    "v": 2,
+    "op": "end",
+    "at": "2026-11-13T15:45:56.000Z",
+    "by": "survey-place",
+    "ended": {
+     "reason": "settled by decision-31: /lib/ keying with flat public/ and relative specifiers"
+    }
    }
   ],
   "finding-20": [
@@ -489,6 +512,31 @@
     "op": "add",
     "at": "2026-11-13T15:42:20.000Z",
     "by": "survey-task"
+   },
+   {
+    "id": "finding-22",
+    "kind": "finding",
+    "state": "handed-on",
+    "fields": {
+     "says": "Three of the area's Waiting entries have nothing to do with modules: the `llms.txt` drift (finding-14), the no-AI \"Next step\" spinner (finding-15) and app.js's whole-page `DOMParser` (finding-6). They are real but outside this work. Close them separately or name them out of scope; folding them in makes the slices bigger without making the area cleaner."
+    },
+    "links": {
+     "about": [
+      "finding-6",
+      "finding-14",
+      "finding-15"
+     ]
+    },
+    "in": "task-16",
+    "to": "scoping",
+    "v": 2,
+    "op": "end",
+    "at": "2026-11-13T15:45:52.000Z",
+    "by": "survey-place",
+    "ended": {
+     "reason": "finding-30 carries its three deferrals plus observation.js's size",
+     "into": "finding-30"
+    }
    }
   ],
   "finding-23": [
@@ -535,6 +583,306 @@
     "op": "add",
     "at": "2026-11-13T15:42:22.000Z",
     "by": "survey-task"
+   },
+   {
+    "id": "finding-24",
+    "kind": "finding",
+    "state": "handed-on",
+    "fields": {
+     "says": "Suggested order. (1) One design piece before any view converts: settle the specifier scheme (question-19) and prove it with one page-module test that is a plain `import`; replace the bridge with one general bridge plus a shrink-only ratchet (finding-21). (2) Then the first view: a small one that already wants exports. Eleven files carry `typeof module … module.exports` dual exports; `question-cards.js`, `home-placement.js` and `close-out.js` are small. Convert it, rewrite its tests as imports, name what it retired. (3) The leaf twins `lib/task-page-href.js`, `lib/timeline-zoom.js` and `lib/providers/models.js` import nothing, so they are cheap retirements once the bridge is general; `ship-layout` and `prompt-formatters` import other modules and still cannot be served as single files. (4) `public/observation.js` (5,019 lines, about 40% comments by LIN-4446's count) and `public/common.js` last; why observation.js is that size is a separate question from making it a module."
+    },
+    "links": {
+     "about": [
+      "question-19",
+      "finding-21",
+      "finding-9",
+      "finding-11",
+      "finding-13"
+     ]
+    },
+    "in": "task-16",
+    "to": "breakdown",
+    "v": 2,
+    "op": "end",
+    "at": "2026-11-13T15:45:50.000Z",
+    "by": "survey-place",
+    "ended": {
+     "reason": "its order is carried by finding-29, which replaces its leaf-first step with a top-down page entry",
+     "into": "finding-29"
+    }
+   }
+  ],
+  "run-25": [
+   {
+    "id": "run-25",
+    "kind": "run",
+    "state": "open",
+    "fields": {
+     "stage": "survey-place",
+     "claims": [
+      "public/"
+     ],
+     "account": "pending"
+    },
+    "links": {},
+    "in": "task-16",
+    "v": 1,
+    "op": "add",
+    "at": "2026-11-13T15:45:45.000Z",
+    "by": "survey-place"
+   },
+   {
+    "id": "run-25",
+    "kind": "run",
+    "state": "open",
+    "fields": {
+     "stage": "survey-place",
+     "claims": [
+      "public/"
+     ],
+     "account": "Surveyed public/ at c205190fd (posted on LIN-4463). Main point: convert top down, a page entry first, not leaves first; leaf-first adds a fourth sharing way and a second bridge, top-down lets the one bridge only shrink (finding-26, correcting finding-18). Settled the specifier: /lib/ keying, flat public/, '../lib/' imports (undefined, answers question-19), with a flatness check (undefined). Listed what must learn (finding-27) and the areas.json gap (finding-28). Order for breakdown in finding-29 (takes over finding-24); four Waiting entries deferred by name (finding-30, takes over finding-22). Wrote no code."
+    },
+    "links": {},
+    "in": "task-16",
+    "v": 2,
+    "op": "revise",
+    "at": "2026-11-13T15:45:53.000Z",
+    "by": "survey-place",
+    "reason": "account written"
+   },
+   {
+    "id": "run-25",
+    "kind": "run",
+    "state": "done",
+    "fields": {
+     "stage": "survey-place",
+     "claims": [
+      "public/"
+     ],
+     "account": "Surveyed public/ at c205190fd (posted on LIN-4463). Main point: convert top down, a page entry first, not leaves first; leaf-first adds a fourth sharing way and a second bridge, top-down lets the one bridge only shrink (finding-26, correcting finding-18). Settled the specifier: /lib/ keying, flat public/, '../lib/' imports (undefined, answers question-19), with a flatness check (undefined). Listed what must learn (finding-27) and the areas.json gap (finding-28). Order for breakdown in finding-29 (takes over finding-24); four Waiting entries deferred by name (finding-30, takes over finding-22). Wrote no code."
+    },
+    "links": {},
+    "in": "task-16",
+    "v": 3,
+    "op": "end",
+    "at": "2026-11-13T15:45:54.000Z",
+    "by": "survey-place",
+    "ended": {
+     "reason": "survey posted on LIN-4463"
+    }
+   },
+   {
+    "id": "run-25",
+    "kind": "run",
+    "state": "done",
+    "fields": {
+     "stage": "survey-place",
+     "claims": [
+      "public/"
+     ],
+     "account": "Surveyed public/ at c205190fd (posted on LIN-4463). Main point: convert top down, a page entry first, not leaves first; leaf-first adds a fourth sharing way and a second bridge, top-down lets the one bridge only shrink (finding-26, correcting finding-18). Settled the specifier: /lib/ keying, flat public/, '../lib/' imports (decision-31, answers question-19), with a flatness check (check-32). Listed what must learn (finding-27) and the areas.json gap (finding-28). Order for breakdown in finding-29 (takes over finding-24); four Waiting entries deferred by name (finding-30, takes over finding-22). Wrote no code."
+    },
+    "links": {},
+    "in": "task-16",
+    "v": 4,
+    "op": "revise",
+    "at": "2026-11-13T15:45:59.000Z",
+    "by": "survey-place",
+    "ended": {
+     "reason": "survey posted on LIN-4463"
+    },
+    "reason": "decision and check ids filled in after the decision was first refused"
+   }
+  ],
+  "finding-26": [
+   {
+    "id": "finding-26",
+    "kind": "finding",
+    "state": "open",
+    "fields": {
+     "says": "Convert top down, not leaves first (survey of `public/` at c205190fd). The area already shares three ways: about 50 `window.X` globals from `public/common.js` (loaded by 29 renderers); `module.exports` scaffolding in `question-cards.js`, `home-placement.js` and `close-out.js`; and `/shared/` plus its bridge, which has a test twin, `tests/fixtures/browser-cost-format.js`. Converting a leaf like `home-placement.js` or `question-cards.js` first adds a fourth way and a second bridge: their consumers (`app.js:816`, `prompt-section.js:1030`) are classic scripts reading `window.*`, and modules run after every classic script. A page's entry script (`app.js`, `task-page.js`) made a module runs after `common.js`, so it can read any classic global safely and import whatever has been extracted. A leaf becomes a module only once all its consumers are modules; then the one bridge can only shrink. This corrects finding-18's 'the single bridge ends up carrying common.js': classic globals need no bridge into a module, only module-to-classic does. Context: `public/` is 44 files / 35,245 lines, up from 39 / 31,909 a month ago and 35 / 20,274 three months ago (`common.js` 1,795 to 3,309, `observation.js` 1,309 to 5,019); bigger fast, but the rules got better (one fake DOM and `loadWorld` under a census check, a leaf-purity check, an allow-list instead of a served directory)."
+    },
+    "links": {
+     "about": [
+      "finding-18",
+      "finding-21",
+      "finding-24",
+      "lesson-5"
+     ]
+    },
+    "in": "task-16",
+    "to": "design",
+    "v": 1,
+    "op": "add",
+    "at": "2026-11-13T15:45:46.000Z",
+    "by": "survey-place"
+   }
+  ],
+  "finding-27": [
+   {
+    "id": "finding-27",
+    "kind": "finding",
+    "state": "open",
+    "fields": {
+     "says": "What must learn about the move to modules: the 29 renderer `SCRIPTS` lists; `tests/unit/shared-modules.test.js`, which hard-codes the shim, `'window.CostFormat'` and four consumers; the fixture twin `tests/fixtures/browser-cost-format.js`; the area lesson-4 line 'Views and the `vm` test loaders stay classic', which turns false with the first converted page; and about 20 tests that grep `public/` source as text, some asserting classic shapes. Of the 89 `world.run` accesses, those reaching script-scope `let`s become exports or go."
+    },
+    "links": {
+     "about": [
+      "lesson-4",
+      "finding-10",
+      "finding-20"
+     ]
+    },
+    "in": "task-16",
+    "to": "design",
+    "v": 1,
+    "op": "add",
+    "at": "2026-11-13T15:45:47.000Z",
+    "by": "survey-place"
+   }
+  ],
+  "finding-28": [
+   {
+    "id": "finding-28",
+    "kind": "finding",
+    "state": "open",
+    "fields": {
+     "says": "`areas.json` maps `^public/` to the front end but gives a served `lib/` leaf (one in `SHARED_MODULES`, now `lib/cost-format.js`) no front-end home, and nothing notices. As more leaves are served from `lib/`, browser code lands outside area-1's paths."
+    },
+    "links": {
+     "about": [
+      "area-1"
+     ]
+    },
+    "in": "task-16",
+    "to": "Harbour",
+    "v": 1,
+    "op": "add",
+    "at": "2026-11-13T15:45:48.000Z",
+    "by": "survey-place"
+   }
+  ],
+  "finding-29": [
+   {
+    "id": "finding-29",
+    "kind": "finding",
+    "state": "open",
+    "fields": {
+     "says": "Order at this task's cost (replaces finding-24's leaf-first step): convert one page entry, top down (finding-26). In that piece retire `public/cost-format-global.js`, its test twin `tests/fixtures/browser-cost-format.js`, and the `module.exports` blocks of what that page imports; rewrite lesson-4's stale 'views stay classic' line; add a shrink-only check over the single bridge's names (finding-21). Extract `common.js` by concern only as a converted page needs it: escape and format first, then the timeline maths that twins `lib/timeline-zoom.js`. The `ship-layout` and `prompt-formatters` twins need their `lib` side made a leaf first (finding-9, finding-11)."
+    },
+    "links": {
+     "about": [
+      "finding-24",
+      "finding-21",
+      "finding-9",
+      "finding-11",
+      "finding-26"
+     ]
+    },
+    "in": "task-16",
+    "to": "breakdown",
+    "v": 1,
+    "op": "add",
+    "at": "2026-11-13T15:45:49.000Z",
+    "by": "survey-place"
+   },
+   {
+    "id": "finding-29",
+    "kind": "finding",
+    "state": "open",
+    "fields": {
+     "says": "Order at this task's cost (replaces finding-24's leaf-first step): convert one page entry, top down (finding-26). In that piece retire `public/cost-format-global.js`, its test twin `tests/fixtures/browser-cost-format.js`, and the `module.exports` blocks of what that page imports; rewrite lesson-4's stale 'views stay classic' line; add a shrink-only check over the single bridge's names (finding-21). Extract `common.js` by concern only as a converted page needs it: escape and format first, then the timeline maths that twins `lib/timeline-zoom.js`. The `ship-layout` and `prompt-formatters` twins need their `lib` side made a leaf first (finding-9, finding-11)."
+    },
+    "links": {
+     "about": [
+      "finding-24",
+      "finding-21",
+      "finding-9",
+      "finding-11",
+      "finding-26",
+      "decision-31"
+     ]
+    },
+    "in": "task-16",
+    "to": "breakdown",
+    "v": 2,
+    "op": "link",
+    "at": "2026-11-13T15:45:58.000Z",
+    "by": "survey-place"
+   }
+  ],
+  "finding-30": [
+   {
+    "id": "finding-30",
+    "kind": "finding",
+    "state": "open",
+    "fields": {
+     "says": "Defer four of the area's Waiting entries by name rather than fold them in: `observation.js`'s size (finding-13; find out why first), `app.js`'s whole-page `DOMParser` (finding-6), the `llms.txt` drift (finding-14) and the no-AI Next-step spinner (finding-15). Better still, but not this task's."
+    },
+    "links": {
+     "about": [
+      "finding-22",
+      "finding-6",
+      "finding-13",
+      "finding-14",
+      "finding-15"
+     ]
+    },
+    "in": "task-16",
+    "to": "scoping",
+    "v": 1,
+    "op": "add",
+    "at": "2026-11-13T15:45:51.000Z",
+    "by": "survey-place"
+   }
+  ],
+  "decision-31": [
+   {
+    "id": "decision-31",
+    "kind": "decision",
+    "state": "stands",
+    "fields": {
+     "scope": "task-16",
+     "answer": "Key `SHARED_MODULES` (`lib/vendor-assets.js`) at `/lib/cost-format.js` instead of `/shared/…`, keep views flat in `public/`, and import as `'../lib/cost-format.js'`.",
+     "why": "That relative specifier resolves the same in the browser (clamped at root to `/lib/…`) and in Node, since `package.json` is `\"type\": \"module\"`, so tests use a plain `import`. It needs no import map and no CSP hash. It holds only while `public/` stays flat (see the check). For design to build on; supersede it if the design piece finds otherwise."
+    },
+    "links": {
+     "answers": "question-19",
+     "on": [
+      "finding-20@1"
+     ],
+     "about": [
+      "lesson-4"
+     ]
+    },
+    "in": "task-16",
+    "v": 1,
+    "op": "add",
+    "at": "2026-11-13T15:45:55.000Z",
+    "by": "survey-place"
+   }
+  ],
+  "check-32": [
+   {
+    "id": "check-32",
+    "kind": "check",
+    "state": "open",
+    "fields": {
+     "what": "`public/` stays flat: no script in a subdirectory, so `'../lib/…'` keeps resolving to `/lib/…` in the browser and in Node.",
+     "why-person": "The specifier scheme in decision-31 breaks silently if a view moves into a subfolder; nothing else would notice.",
+     "how": "A unit test that lists `public/**/*.js` and fails on any path with a directory below `public/`."
+    },
+    "links": {
+     "about": [
+      "decision-31"
+     ]
+    },
+    "in": "task-16",
+    "to": "implementation",
+    "v": 1,
+    "op": "add",
+    "at": "2026-11-13T15:45:57.000Z",
+    "by": "survey-place"
    }
   ]
  },
@@ -841,6 +1189,43 @@
     "open",
     "--path",
     "public/",
+    "--by",
+    "survey-place"
+   ],
+   "asOf": null
+  },
+  {
+   "at": "2026-11-17T15:23:52.297Z",
+   "by": "survey-place",
+   "cmd": "get",
+   "args": [
+    "get",
+    "run-25",
+    "--by",
+    "survey-place"
+   ],
+   "asOf": null
+  },
+  {
+   "at": "2026-11-17T15:23:52.329Z",
+   "by": "survey-place",
+   "cmd": "get",
+   "args": [
+    "get",
+    "finding-29",
+    "--by",
+    "survey-place"
+   ],
+   "asOf": null
+  },
+  {
+   "at": "2026-11-17T15:24:05.127Z",
+   "by": "survey-place",
+   "cmd": "show",
+   "args": [
+    "show",
+    "--task",
+    "task-16",
     "--by",
     "survey-place"
    ],

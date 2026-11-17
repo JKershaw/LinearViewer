@@ -1,5 +1,5 @@
 {
- "next": 92,
+ "next": 96,
  "records": {
   "area-1": [
    {
@@ -611,6 +611,24 @@
     "op": "add",
     "at": "2026-11-13T12:01:48.021Z",
     "by": "Harbour"
+   },
+   {
+    "id": "finding-22",
+    "kind": "finding",
+    "state": "done",
+    "fields": {
+     "says": "`lib/should-mock-ai.js`: `isHermeticTestToken` is a third test-token check beside `isTestToken` (`routes/workspace-api-steps.js`) and inline `isTestMode` in `routes/proxy-compute.js` and `routes/task-chat.js`. (LIN-4347.)"
+    },
+    "links": {},
+    "in": "area-2",
+    "to": "area-2",
+    "v": 2,
+    "op": "end",
+    "at": "2026-11-13T14:14:19.000Z",
+    "by": "leftover",
+    "ended": {
+     "reason": "Retired in change-84's leftovers commit: the inline test-token checks in routes/proxy-compute.js, routes/task-chat.js, routes/workspace-api-steps.js (isTestToken) and server.js now call isHermeticTestToken; the expression is identical, so behaviour is unchanged. The Waiting entry is removed from docs/areas/llm-and-prompts.md."
+    }
    }
   ],
   "finding-23": [
@@ -1778,6 +1796,29 @@
     "op": "add",
     "at": "2026-11-13T13:45:00.000Z",
     "by": "survey-task"
+   },
+   {
+    "id": "finding-70",
+    "kind": "finding",
+    "state": "handed-on",
+    "fields": {
+     "says": "The bulk search path stays display-only, so one issue reads differently through search than through `getIssue` (converted words vs exact words). Check that no cache or guard compares the two reads; or take review note 2's option and pass `properties` on `POST /search/jql` too."
+    },
+    "links": {
+     "about": [
+      "plan-54"
+     ]
+    },
+    "in": "task-60",
+    "to": "implementation",
+    "v": 2,
+    "op": "end",
+    "at": "2026-11-13T14:14:13.000Z",
+    "by": "leftover",
+    "ended": {
+     "reason": "Checked: no guard or cache compares the search read with the getIssue read today. The remaining option (pass properties on POST /search/jql so the bulk path is exact) is not this task's; it is carried as an area-1 Waiting entry.",
+     "into": "finding-91"
+    }
    }
   ],
   "finding-71": [
@@ -1879,6 +1920,29 @@
     "op": "add",
     "at": "2026-11-13T13:47:57.000Z",
     "by": "survey-place"
+   },
+   {
+    "id": "finding-73",
+    "kind": "finding",
+    "state": "handed-on",
+    "fields": {
+     "says": "Shape B keeps two stores of the words (the ADF region and `harbour.asAsked`, a digest choosing between them); it stays safe only while the region module is the one place that knows both. So don't grow a second ADF walker: the reader needs a paragraph's plain text, and `adf.js` already has `plainText` (~line 340, private at 4b5001ddf): export it, don't retype it (exporting keeps `adf.js` import-free). Render the region with `adfToMarkdown({type:'doc',content})`, not a new renderer. Put the one shared size function (finding-71) in the region module too."
+    },
+    "links": {
+     "about": [
+      "plan-54"
+     ]
+    },
+    "in": "task-60",
+    "to": "implementation",
+    "v": 2,
+    "op": "end",
+    "at": "2026-11-13T14:14:15.000Z",
+    "by": "leftover",
+    "ended": {
+     "reason": "Done in change-84: the region module reuses adf.js's plainText (now exported; the adf.js header names it as the fourth export, tidied in leftovers), renders with adfToMarkdown, and holds the one size function. The standing rule (one module knows both stores) is now lesson-92.",
+     "into": "lesson-92"
+    }
    }
   ],
   "finding-74": [
@@ -2447,6 +2511,66 @@
     "op": "add",
     "at": "2026-11-13T14:14:10.000Z",
     "by": "leftover"
+   },
+   {
+    "id": "run-90",
+    "kind": "run",
+    "state": "open",
+    "fields": {
+     "stage": "leftover",
+     "claims": [
+      "lib/providers/jira/adf.js",
+      "lib/providers/jira/index.js",
+      "lib/providers/jira/fake-client.js",
+      "lib/as-asked.js",
+      "lib/should-mock-ai.js",
+      "routes/proxy-compute.js",
+      "routes/task-chat.js",
+      "routes/workspace-api-steps.js",
+      "server.js",
+      "docs/areas/providers.md",
+      "docs/areas/llm-and-prompts.md"
+     ],
+     "account": "Leftovers on PR #2421 (change-84, head f9fa4a80c, CI green after one runner-loss rerun). Tidied four comments the seal made untrue or incomplete: adf.js header (fourth export, plainText, used by the region module), issueDescription comment in index.js (now readDescription + holdAsAsked), fake-client.js seed-shape comment (_properties seed, properties read/write), lib/as-asked.js Who uses what (names the Jira region module). Noted in a new docs/areas/providers.md: four Lessons (lesson-92..95) and one Waiting entry (finding-91: bulk Jira reads do not ask for harbour.asAsked; no guard or cache compares the two reads). Retired the llm-and-prompts Waiting entry finding-22: inline test-token checks now call isHermeticTestToken, behaviour unchanged. Left open: check-69 and finding-89 (live check, no credential), finding-79 and finding-80 (area-1, beyond this task)."
+    },
+    "links": {},
+    "in": "task-60",
+    "v": 2,
+    "op": "revise",
+    "at": "2026-11-13T14:14:20.000Z",
+    "by": "leftover",
+    "reason": "account written at end of run"
+   },
+   {
+    "id": "run-90",
+    "kind": "run",
+    "state": "done",
+    "fields": {
+     "stage": "leftover",
+     "claims": [
+      "lib/providers/jira/adf.js",
+      "lib/providers/jira/index.js",
+      "lib/providers/jira/fake-client.js",
+      "lib/as-asked.js",
+      "lib/should-mock-ai.js",
+      "routes/proxy-compute.js",
+      "routes/task-chat.js",
+      "routes/workspace-api-steps.js",
+      "server.js",
+      "docs/areas/providers.md",
+      "docs/areas/llm-and-prompts.md"
+     ],
+     "account": "Leftovers on PR #2421 (change-84, head f9fa4a80c, CI green after one runner-loss rerun). Tidied four comments the seal made untrue or incomplete: adf.js header (fourth export, plainText, used by the region module), issueDescription comment in index.js (now readDescription + holdAsAsked), fake-client.js seed-shape comment (_properties seed, properties read/write), lib/as-asked.js Who uses what (names the Jira region module). Noted in a new docs/areas/providers.md: four Lessons (lesson-92..95) and one Waiting entry (finding-91: bulk Jira reads do not ask for harbour.asAsked; no guard or cache compares the two reads). Retired the llm-and-prompts Waiting entry finding-22: inline test-token checks now call isHermeticTestToken, behaviour unchanged. Left open: check-69 and finding-89 (live check, no credential), finding-79 and finding-80 (area-1, beyond this task)."
+    },
+    "links": {},
+    "in": "task-60",
+    "v": 3,
+    "op": "end",
+    "at": "2026-11-13T14:14:21.000Z",
+    "by": "leftover",
+    "ended": {
+     "reason": "leftovers comment posted on LIN-4450; leftovers commit on PR #2421"
+    }
    }
   ],
   "finding-91": [
@@ -2467,6 +2591,118 @@
     "v": 1,
     "op": "add",
     "at": "2026-11-13T14:14:12.000Z",
+    "by": "leftover"
+   }
+  ],
+  "lesson-92": [
+   {
+    "id": "lesson-92",
+    "kind": "lesson",
+    "state": "holds",
+    "fields": {
+     "says": "A Jira description has one reader and one writer: `readDescription` and `holdAsAsked` in `lib/providers/jira/as-asked-region.js`. They are the only code that knows the ADF region and the `harbour.asAsked` entity property, and every provider-side `getIssue` passes `AS_ASKED_READ`. Shape B keeps the words in two places, the region and the property, and that is safe only while one module knows both. A new description read that calls `adfToMarkdown` directly serves converted words and breaks the seal silently; `tests/unit/jira-as-asked-region.test.js` fails on it. (LIN-4450.)",
+     "paths": [
+      "lib/providers/jira/as-asked-region.js",
+      "lib/providers/jira/index.js",
+      "tests/unit/jira-as-asked-region.test.js"
+     ],
+     "checked-at": "f9fa4a80ca19503bebbf5abd81dc83d3e86296b6"
+    },
+    "links": {
+     "on": [
+      "change-84@2"
+     ],
+     "about": [
+      "finding-73"
+     ]
+    },
+    "in": "area-1",
+    "v": 1,
+    "op": "add",
+    "at": "2026-11-13T14:14:14.000Z",
+    "by": "leftover"
+   }
+  ],
+  "lesson-93": [
+   {
+    "id": "lesson-93",
+    "kind": "lesson",
+    "state": "holds",
+    "fields": {
+     "says": "Decide whether the words are kept by comparing renderings, never ADF. Jira stamps `localId` and similar attributes on ordinary saves, and `adfToMarkdown` ignores them; a hash of the ADF would read every human save as an edit. (LIN-4450.)",
+     "paths": [
+      "lib/providers/jira/as-asked-region.js"
+     ],
+     "checked-at": "f9fa4a80ca19503bebbf5abd81dc83d3e86296b6"
+    },
+    "links": {
+     "on": [
+      "change-84@2",
+      "plan-54@2"
+     ]
+    },
+    "in": "area-1",
+    "v": 1,
+    "op": "add",
+    "at": "2026-11-13T14:14:16.000Z",
+    "by": "leftover"
+   }
+  ],
+  "lesson-94": [
+   {
+    "id": "lesson-94",
+    "kind": "lesson",
+    "state": "holds",
+    "fields": {
+     "says": "The region reader accepts an end line whatever its marks, which is looser than `splitAsAsked`. It stays safe because `descriptionRoundTrip` runs the same reader the reads do, so a block the reader would misplace is refused at filing. Keep the seal's check and the reads on one reader. (LIN-4450, Survey open-0.)",
+     "paths": [
+      "lib/providers/jira/as-asked-region.js",
+      "lib/providers/jira/index.js"
+     ],
+     "checked-at": "f9fa4a80ca19503bebbf5abd81dc83d3e86296b6"
+    },
+    "links": {
+     "on": [
+      "change-84@2",
+      "decision-85@1"
+     ],
+     "about": [
+      "question-67",
+      "finding-75"
+     ]
+    },
+    "in": "area-1",
+    "v": 1,
+    "op": "add",
+    "at": "2026-11-13T14:14:17.000Z",
+    "by": "leftover"
+   }
+  ],
+  "lesson-95": [
+   {
+    "id": "lesson-95",
+    "kind": "lesson",
+    "state": "holds",
+    "fields": {
+     "says": "The Jira fake proves only the provider's own logic. It stores whatever it is handed and never normalises ADF, so it cannot show whether live Jira keeps a region's rendering. A claim about live behaviour needs a live check. (LIN-4450; the live check is LIN-4452.)",
+     "paths": [
+      "lib/providers/jira/fake-client.js"
+     ],
+     "checked-at": "f9fa4a80ca19503bebbf5abd81dc83d3e86296b6"
+    },
+    "links": {
+     "on": [
+      "change-84@2"
+     ],
+     "about": [
+      "check-69",
+      "finding-89"
+     ]
+    },
+    "in": "area-1",
+    "v": 1,
+    "op": "add",
+    "at": "2026-11-13T14:14:18.000Z",
     "by": "leftover"
    }
   ]
