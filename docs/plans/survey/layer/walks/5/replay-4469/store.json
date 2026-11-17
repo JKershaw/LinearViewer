@@ -1,5 +1,5 @@
 {
- "next": 158,
+ "next": 161,
  "records": {
   "area-1": [
    {
@@ -3621,6 +3621,120 @@
     "by": "John",
     "via": "Harbour"
    }
+  ],
+  "run-158": [
+   {
+    "id": "run-158",
+    "kind": "run",
+    "state": "open",
+    "fields": {
+     "stage": "autopilot",
+     "account": "Woken after review (Needs Discussion) on PR #2447 and John's fold ruling (decision-157). Settled the engineering side and set the next build step; left John only the witness sentence. Draft follows on end."
+    },
+    "links": {},
+    "in": "task-131",
+    "v": 1,
+    "op": "add",
+    "at": "2026-11-13T23:05:06.000Z",
+    "by": "autopilot"
+   },
+   {
+    "id": "run-158",
+    "kind": "run",
+    "state": "open",
+    "fields": {
+     "stage": "autopilot",
+     "account": "Woken after review (Needs Discussion) on PR #2447. Review had shown the lin-4469-cuts ruling misstated a fact (11 kinds byte-identical; in real context only the 4 work kinds are). I treated the fold of the guarded tracker clauses in survey-task, survey-place, blind-read and triage as engineering inside the class the ticket bounds (LIN-2825/LIN-3006), keeping the code, branch and PR words, and set the next build step: fold and re-pin lower, review Fixes 1-5, a Leftovers answer with a Retires line, corrected figures (decision-160). Left John one question: whether the 4 work kinds staying identical meets \"a net fall across every kind\" (question-159, ruling lin-4469-witness); merge waits on it. Posted on LIN-4469 (fab0cf08). The store already held John's fold (decision-157), so I rest on it rather than restate it."
+    },
+    "links": {},
+    "in": "task-131",
+    "v": 2,
+    "op": "revise",
+    "at": "2026-11-13T23:05:09.000Z",
+    "by": "autopilot",
+    "reason": "account written at close"
+   },
+   {
+    "id": "run-158",
+    "kind": "run",
+    "state": "done",
+    "fields": {
+     "stage": "autopilot",
+     "account": "Woken after review (Needs Discussion) on PR #2447. Review had shown the lin-4469-cuts ruling misstated a fact (11 kinds byte-identical; in real context only the 4 work kinds are). I treated the fold of the guarded tracker clauses in survey-task, survey-place, blind-read and triage as engineering inside the class the ticket bounds (LIN-2825/LIN-3006), keeping the code, branch and PR words, and set the next build step: fold and re-pin lower, review Fixes 1-5, a Leftovers answer with a Retires line, corrected figures (decision-160). Left John one question: whether the 4 work kinds staying identical meets \"a net fall across every kind\" (question-159, ruling lin-4469-witness); merge waits on it. Posted on LIN-4469 (fab0cf08). The store already held John's fold (decision-157), so I rest on it rather than restate it."
+    },
+    "links": {},
+    "in": "task-131",
+    "v": 3,
+    "op": "end",
+    "at": "2026-11-13T23:05:10.000Z",
+    "by": "autopilot",
+    "ended": {
+     "reason": "Next build step set (decision-160); witness question raised to John (question-159)"
+    }
+   }
+  ],
+  "question-159": [
+   {
+    "id": "question-159",
+    "kind": "question",
+    "state": "open",
+    "fields": {
+     "asks": "LIN-4469 asks for a net rendered-byte fall across every kind. Four work kinds (blocked, breakdown, close-out, retrospective-audit) carry none of the folded text, so they stay byte-identical in real context; the other kinds fall. Accept that as meeting the ask? (Ruling lin-4469-witness; the fold itself is decision-157.)",
+     "options": [
+      "accept: the witness holds for every kind that carries folded text; the four work kinds cannot fall",
+      "require: a fall for all four; fold more text out of those kinds' prompts"
+     ],
+     "recommended": "accept",
+     "if-unanswered": "The cut stays unagreed: the build fixes continue, but PR #2447 does not merge"
+    },
+    "links": {
+     "about": [
+      "change-142",
+      "question-144"
+     ],
+     "on": [
+      "decision-157@1"
+     ]
+    },
+    "in": "task-131",
+    "to": "John",
+    "v": 1,
+    "op": "add",
+    "at": "2026-11-13T23:05:07.000Z",
+    "by": "autopilot"
+   }
+  ],
+  "decision-160": [
+   {
+    "id": "decision-160",
+    "kind": "decision",
+    "state": "stands",
+    "fields": {
+     "answer": "Next build step on PR #2447: (a) the fold decision-157 rules: shrink the tracker-write clauses in `lib/prompt-template-defs.js` ~975 (survey-task), ~994 (survey-place), ~1065 (blind-read) and ~268 (triage: its scope rule stays, its write clauses go) to the code, branch and PR words, which stay because nothing backs them in code; re-pin the ceilings and `FROZEN_TOTAL_BYTES` once more, lower (finding-143); (b) review's Fixes 1 to 5 (finding-149 to finding-153); (c) a `### Leftovers` answer with a `Retires:` line naming an entry the diff removes (finding-154); (d) the corrected figure (4 work kinds identical, not 11) in the PR's decision text, the change-log row and the LIN-4350 comment (finding-150). Merge waits on question-159 only.",
+     "why": "Same idiom as the class this ticket bounds (tracker-write prose the guard now refuses); under John's standing rule (LIN-2825, amended by LIN-3006) an item of the same class is inside whether or not the plan listed it. The ask's \"shrink only\" is read as: touch only what the guard backs. Builder and reviewer both recommend it, and John ruled fold. Posted on LIN-4469 (comment fab0cf08)."
+    },
+    "links": {
+     "on": [
+      "decision-157@1"
+     ],
+     "about": [
+      "change-142",
+      "finding-143",
+      "finding-149",
+      "finding-150",
+      "finding-151",
+      "finding-152",
+      "finding-153",
+      "finding-154",
+      "question-159"
+     ]
+    },
+    "in": "task-131",
+    "v": 1,
+    "op": "add",
+    "at": "2026-11-13T23:05:08.000Z",
+    "by": "autopilot"
+   }
   ]
  },
  "log": [
@@ -4370,6 +4484,19 @@
     "run-146",
     "--by",
     "autopilot"
+   ],
+   "asOf": null
+  },
+  {
+   "at": "2026-11-17T15:33:59.956Z",
+   "by": "implementation",
+   "cmd": "brief",
+   "args": [
+    "brief",
+    "implementation",
+    "--task",
+    "task-131",
+    "--text"
    ],
    "asOf": null
   }

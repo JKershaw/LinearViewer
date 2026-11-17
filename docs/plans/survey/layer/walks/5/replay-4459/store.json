@@ -632,6 +632,23 @@
     "op": "add",
     "at": "2026-11-13T12:00:00.000Z",
     "by": "Harbour"
+   },
+   {
+    "id": "finding-28",
+    "kind": "finding",
+    "state": "done",
+    "fields": {
+     "says": "`lib/recent-runs.js`: `runFact` reads only the row's feedback: a stage parked `[pending]` whose lineage ends `[blocked]` or `[skipped]` reads `running` and holds the live-stage wait until aborted. (LIN-4392.)"
+    },
+    "links": {},
+    "to": "area-1",
+    "v": 2,
+    "op": "end",
+    "at": "2026-11-13T16:33:29.000Z",
+    "by": "implementation",
+    "ended": {
+     "reason": "settled in PR #2432 (e9a3cb324): runFact reads a parked stage's lineage outcome via listHistory withLineage; Waiting entry removed from docs/areas/runs-and-dispatch.md; awaits merge"
+    }
    }
   ],
   "finding-29": [
@@ -1337,6 +1354,21 @@
     "op": "add",
     "at": "2026-11-13T12:00:00.000Z",
     "by": "Harbour"
+   },
+   {
+    "id": "finding-64",
+    "kind": "finding",
+    "state": "open",
+    "fields": {
+     "says": "`lib/recommendation-live-wait.js`: a read, not a claim: two different-kind calls racing on one ticket both pass; claim compare-and-set, like `claimHeldWake` (LIN-4392)."
+    },
+    "links": {},
+    "to": "area-1",
+    "v": 2,
+    "op": "revise",
+    "at": "2026-11-13T16:33:28.000Z",
+    "by": "implementation",
+    "reason": "claim compare-and-set note moved unchanged from the LLM & prompts note to the Runs note with the live-stage wait (PR #2432; agreed in decision-119)"
    }
   ],
   "finding-65": [
@@ -1353,6 +1385,23 @@
     "op": "add",
     "at": "2026-11-13T12:00:00.000Z",
     "by": "Harbour"
+   },
+   {
+    "id": "finding-65",
+    "kind": "finding",
+    "state": "done",
+    "fields": {
+     "says": "`lib/recommendation-live-wait.js`: the live-stage refusal (`liveWaitRefusal`, 409 `STAGE_IN_FLIGHT`) is a Runs dispatch rule placed here by the `^lib/recommendation-` prefix. `lib/dispatch-entrance.js` (Runs) enforces it, `routes/workspace-api.js` (Web) imports it, `lib/proxy-instructions.js` (Agent API) takes its code, and the one run-state test it makes, `isLiveRun`, is in `lib/recent-runs.js` (Runs), so a change to what counts as live moves three areas. `lib/openrouter.js` (LLM) also routes on it, as the first code-settled route in `codeRouteOf`, so the wait is recommendation logic as well. A size of move: give the wait a Runs home. (Seams & Tangles, 13 Nov.; `docs/reviews/seams-tangles-review-2026-11-13-run12.md`.)"
+    },
+    "links": {},
+    "to": "area-38",
+    "v": 2,
+    "op": "end",
+    "at": "2026-11-13T16:33:30.000Z",
+    "by": "implementation",
+    "ended": {
+     "reason": "settled in PR #2432: the wait has its Runs home in lib/run-live-wait.js; lib/recommendation-live-wait.js deleted, no shim; entry removed from docs/areas/llm-and-prompts.md (LIN-4448 agreed, decision-119)"
+    }
    }
   ],
   "finding-66": [
@@ -3039,6 +3088,29 @@
     "op": "add",
     "at": "2026-11-13T16:23:24.000Z",
     "by": "survey-task"
+   },
+   {
+    "id": "finding-126",
+    "kind": "finding",
+    "state": "done",
+    "fields": {
+     "says": "The lineage helpers named in done-when cannot do the job as written. `resolveFollowUpRoot` and `heldWakeHolderOf` are async store methods in `lib/dispatch-store.js` (~3230, ~3437) that do their own history reads; `heldWakeHolderOf` is not in `lib/dispatch-leftover-hook.js`, which only calls it. `stageRuns`/`recentRuns` are pure and synchronous and tests feed them hand-built rows, so \"callers hand the rows over\" cannot reach either helper. Both walk UP from a follow-up to its root, while a parked stage needs the terminal of its DESCENDANTS. Calling them per row would add store reads to `codeRouteOf`, which every recommendation surface goes through."
+    },
+    "links": {
+     "about": [
+      "plan-91",
+      "finding-28"
+     ]
+    },
+    "in": "task-113",
+    "to": "implementation",
+    "v": 2,
+    "op": "end",
+    "at": "2026-11-13T16:33:31.000Z",
+    "by": "implementation",
+    "ended": {
+     "reason": "acted on: lineage read adopted in place of the helper walks, departure recorded in decision-145 and on LIN-4447 (d3553049)"
+    }
    }
   ],
   "finding-127": [
@@ -3061,6 +3133,29 @@
     "op": "add",
     "at": "2026-11-13T16:23:25.000Z",
     "by": "survey-task"
+   },
+   {
+    "id": "finding-127",
+    "kind": "finding",
+    "state": "done",
+    "fields": {
+     "says": "The store may already answer this. `deriveLineageFields`/`mergeLineageFeedback` merge a lineage's feedback by `rootItemId`, and `listHistory({withLineage})` returns each row's wire `outcome` through `wireStatusOf` (`dispatch-store.js` ~2120); `blocked` already maps to `WAITING_ON_A_PERSON`, which is not live. So the fix may be that `runFact` prefers the lineage outcome. Deeper: `recent-runs` derives its own per-row outcome beside the store's one wire word (LIN-2122), two readers of one fact, which is what LIN-4447 exists to remove. Order: (after asking LIN-4448 again) write the failing witness from real store rows, then check whether `deriveLineageFields` already returns `skipped`/`blocked` for the parked stage; if it does, comment on LIN-4447 to change course to the lineage read; do the mechanical move after."
+    },
+    "links": {
+     "about": [
+      "plan-91",
+      "finding-28"
+     ]
+    },
+    "in": "task-113",
+    "to": "implementation",
+    "v": 2,
+    "op": "end",
+    "at": "2026-11-13T16:33:32.000Z",
+    "by": "implementation",
+    "ended": {
+     "reason": "acted on: lineage read adopted in place of the helper walks, departure recorded in decision-145 and on LIN-4447 (d3553049)"
+    }
    }
   ],
   "question-128": [
@@ -3162,6 +3257,28 @@
     "op": "add",
     "at": "2026-11-13T16:23:27.000Z",
     "by": "survey-task"
+   },
+   {
+    "id": "finding-129",
+    "kind": "finding",
+    "state": "done",
+    "fields": {
+     "says": "\"Pending\" means two things. In `runFact`, `r.status === 'pending'` is a QUEUE row, which has no lineage; the ticket's `[pending]` is a park marker on a TAKEN row (`derivePendingPark`). The witness in `lin-4392-live-stage-wait.test.js` must be a taken row with `[pending]` feedback, plus a ci-wake `custom` continuation and a held-wake holder with real `rootItemId`/`followUpTo`/`heldWakeFor`, or it can pass for the wrong reason."
+    },
+    "links": {
+     "about": [
+      "task-113"
+     ]
+    },
+    "in": "task-113",
+    "to": "implementation",
+    "v": 2,
+    "op": "end",
+    "at": "2026-11-13T16:33:35.000Z",
+    "by": "implementation",
+    "ended": {
+     "reason": "witness built from real store writes: a taken row parked [pending], with a ci-wake custom follow-up and a held-wake leftover holder carrying its rootItemId (W1, W2: running before, pass after)"
+    }
    }
   ],
   "finding-130": [
@@ -3224,6 +3341,28 @@
     "op": "add",
     "at": "2026-11-13T16:23:29.000Z",
     "by": "survey-task"
+   },
+   {
+    "id": "finding-131",
+    "kind": "finding",
+    "state": "done",
+    "fields": {
+     "says": "The done-when importer list is wrong. `lib/recommendation-blind-read.js` imports `isLiveRun` from `recent-runs`, not the old module; `lib/recommendation-facts.js` and `lib/recommendation-look-first.js` only name it in comments. Three unlisted tests import the old path (lin-4370, lin-4392, lin-4437), and `lin-4392`:432 checks the import line with a regex."
+    },
+    "links": {
+     "about": [
+      "task-113"
+     ]
+    },
+    "in": "task-113",
+    "to": "implementation",
+    "v": 2,
+    "op": "end",
+    "at": "2026-11-13T16:33:36.000Z",
+    "by": "implementation",
+    "ended": {
+     "reason": "importers updated as found: openrouter, proxy-instructions, recommendation-blind-read, recommendation-facts and recommendation-look-first change only import or comment text (PR #2432)"
+    }
    }
   ],
   "finding-132": [
@@ -3289,6 +3428,29 @@
     "op": "add",
     "at": "2026-11-13T16:23:31.000Z",
     "by": "survey-task"
+   },
+   {
+    "id": "finding-133",
+    "kind": "finding",
+    "state": "done",
+    "fields": {
+     "says": "`docs/areas/llm-and-prompts.md:84-86` holds both the claim compare-and-set note (moves unchanged to the Runs note) and the LLM-side entry on `recommendation-live-wait.js` (settled with A14)."
+    },
+    "links": {
+     "about": [
+      "finding-64",
+      "finding-65"
+     ]
+    },
+    "in": "task-113",
+    "to": "implementation",
+    "v": 2,
+    "op": "end",
+    "at": "2026-11-13T16:33:37.000Z",
+    "by": "implementation",
+    "ended": {
+     "reason": "both entries handled in PR #2432: claim compare-and-set note moved unchanged to the Runs note (finding-64 re-addressed), the LLM-side live-wait entries removed (finding-65 ended)"
+    }
    }
   ],
   "run-134": [
@@ -3386,6 +3548,29 @@
     "op": "add",
     "at": "2026-11-13T16:26:30.000Z",
     "by": "survey-place"
+   },
+   {
+    "id": "finding-136",
+    "kind": "finding",
+    "state": "done",
+    "fields": {
+     "says": "Wiring the named walks in gives lineage a third reading. `recentRuns(rows)` has no production caller, so \"callers hand the rows over\" reaches only `loadRecentRuns`, where per-row `resolveFollowUpRoot`/`heldWakeHolderOf` (async, one row at a time; `heldWakeHolderOf` is on `DispatchStore`, `lib/dispatch-store.js:3437`) means N+1 reads and a new definition of \"what ended\". If the plan's walk is kept anyway, say on LIN-4447 why the shared derivation could not serve."
+    },
+    "links": {
+     "about": [
+      "finding-126",
+      "plan-91"
+     ]
+    },
+    "in": "task-113",
+    "to": "implementation",
+    "v": 2,
+    "op": "end",
+    "at": "2026-11-13T16:33:33.000Z",
+    "by": "implementation",
+    "ended": {
+     "reason": "acted on: lineage read adopted in place of the helper walks, departure recorded in decision-145 and on LIN-4447 (d3553049)"
+    }
    }
   ],
   "finding-137": [
@@ -3409,6 +3594,30 @@
     "op": "add",
     "at": "2026-11-13T16:26:31.000Z",
     "by": "survey-place"
+   },
+   {
+    "id": "finding-137",
+    "kind": "finding",
+    "state": "done",
+    "fields": {
+     "says": "Read the lineage through the one derivation that already exists, and retire `runFact`'s row-only read for good. `deriveLineageFields` (`lib/dispatch-lineage-status.js:91`, \"the one derivation of lineage status\") merges sibling feedback by `rootItemId`; the Dispatch page, the proxy list (`wireStatusOf`) and the duplicate guard (`lineageEndedIds`, `lib/dispatch-store.js:405`) all read it, and `_readHistory` already offers `withLineage` (one batched `_lineageOf` read). Asking `listHistory` for `withLineage: true` lets `runFact` read the lineage outcome, so the wait, the duplicate guard and the Dispatch page agree on one word with no new walk; lineage `blocked` maps to waiting on a person exactly as the row's own `blocked` does today. Why exactly these two outcomes hold the wait: `lib/lineage-closure.js` stamps `closed` (which `runFact` already treats as not live) when a lineage ends done/failed/aborted; `isLineageClosingTerminal` leaves out `skipped`, and `[blocked]` is a pause."
+    },
+    "links": {
+     "about": [
+      "finding-127",
+      "finding-126",
+      "plan-91"
+     ]
+    },
+    "in": "task-113",
+    "to": "implementation",
+    "v": 2,
+    "op": "end",
+    "at": "2026-11-13T16:33:34.000Z",
+    "by": "implementation",
+    "ended": {
+     "reason": "acted on: lineage read adopted in place of the helper walks, departure recorded in decision-145 and on LIN-4447 (d3553049)"
+    }
    }
   ],
   "finding-138": [
@@ -3539,6 +3748,54 @@
     "op": "add",
     "at": "2026-11-13T16:33:20.000Z",
     "by": "implementation"
+   },
+   {
+    "id": "run-142",
+    "kind": "run",
+    "state": "open",
+    "fields": {
+     "stage": "implementation",
+     "claims": [
+      "lib/run-live-wait.js",
+      "lib/recommendation-live-wait.js",
+      "lib/recent-runs.js",
+      "docs/areas/runs-and-dispatch.md",
+      "docs/areas/llm-and-prompts.md"
+     ],
+     "account": "Built LIN-4459 piece 4 as PR #2432 (e9a3cb324 on origin/main 0092d8d9e). The live-stage wait moves to lib/run-live-wait.js and lib/recommendation-live-wait.js is deleted with no shim. A stage parked [pending] now takes its lineage end (blocked, skipped or a terminal word) through the store's shared lineage read (listHistory withLineage / deriveLineageFields), not the plan's helper walks; departure recorded on LIN-4447 (decision-145). Checked first with real store writes that ci-wake and held-wake rows share the root (decision-144). W1/W2 failed before, pass after; CI green. Area notes: runFact Waiting entry settled, LLM-side live-wait entries left, claim CAS note moved. Renewed the ask to LIN-4448 alongside the PR (question-148). Left for John: unparked stages blocked by a follow-up still hold the wait (finding-146)."
+    },
+    "links": {},
+    "in": "task-113",
+    "v": 2,
+    "op": "revise",
+    "at": "2026-11-13T16:33:38.000Z",
+    "by": "implementation",
+    "reason": "account at end of run"
+   },
+   {
+    "id": "run-142",
+    "kind": "run",
+    "state": "done",
+    "fields": {
+     "stage": "implementation",
+     "claims": [
+      "lib/run-live-wait.js",
+      "lib/recommendation-live-wait.js",
+      "lib/recent-runs.js",
+      "docs/areas/runs-and-dispatch.md",
+      "docs/areas/llm-and-prompts.md"
+     ],
+     "account": "Built LIN-4459 piece 4 as PR #2432 (e9a3cb324 on origin/main 0092d8d9e). The live-stage wait moves to lib/run-live-wait.js and lib/recommendation-live-wait.js is deleted with no shim. A stage parked [pending] now takes its lineage end (blocked, skipped or a terminal word) through the store's shared lineage read (listHistory withLineage / deriveLineageFields), not the plan's helper walks; departure recorded on LIN-4447 (decision-145). Checked first with real store writes that ci-wake and held-wake rows share the root (decision-144). W1/W2 failed before, pass after; CI green. Area notes: runFact Waiting entry settled, LLM-side live-wait entries left, claim CAS note moved. Renewed the ask to LIN-4448 alongside the PR (question-148). Left for John: unparked stages blocked by a follow-up still hold the wait (finding-146)."
+    },
+    "links": {},
+    "in": "task-113",
+    "v": 3,
+    "op": "end",
+    "at": "2026-11-13T16:33:39.000Z",
+    "by": "implementation",
+    "ended": {
+     "reason": "PR #2432 open, CI green; merge is for review and the orchestrator"
+    }
    }
   ],
   "change-143": [
@@ -4257,6 +4514,100 @@
     "task-113",
     "--by",
     "implementation"
+   ],
+   "asOf": null
+  },
+  {
+   "at": "2026-11-17T15:34:26.421Z",
+   "by": "leftover",
+   "cmd": "show",
+   "args": [
+    "show",
+    "--task",
+    "task-113",
+    "--by",
+    "leftover"
+   ],
+   "asOf": null
+  },
+  {
+   "at": "2026-11-17T15:34:26.460Z",
+   "by": "leftover",
+   "cmd": "get",
+   "args": [
+    "get",
+    "change-143",
+    "--by",
+    "leftover"
+   ],
+   "asOf": null
+  },
+  {
+   "at": "2026-11-17T15:34:30.652Z",
+   "by": "leftover",
+   "cmd": "find",
+   "args": [
+    "find",
+    "--text",
+    "FEEDBACK_ENTRY_KINDS",
+    "--by",
+    "leftover"
+   ],
+   "asOf": null
+  },
+  {
+   "at": "2026-11-17T15:34:30.681Z",
+   "by": "leftover",
+   "cmd": "find",
+   "args": [
+    "find",
+    "--kind",
+    "lesson",
+    "--text",
+    "lineage",
+    "--by",
+    "leftover"
+   ],
+   "asOf": null
+  },
+  {
+   "at": "2026-11-17T15:34:30.709Z",
+   "by": "leftover",
+   "cmd": "find",
+   "args": [
+    "find",
+    "--text",
+    "runner-kickoff",
+    "--by",
+    "leftover"
+   ],
+   "asOf": null
+  },
+  {
+   "at": "2026-11-17T15:34:30.739Z",
+   "by": "leftover",
+   "cmd": "find",
+   "args": [
+    "find",
+    "--text",
+    "PARKED_LINEAGE",
+    "--by",
+    "leftover"
+   ],
+   "asOf": null
+  },
+  {
+   "at": "2026-11-17T15:34:30.766Z",
+   "by": "leftover",
+   "cmd": "find",
+   "args": [
+    "find",
+    "--text",
+    "withLineage",
+    "--kind",
+    "lesson",
+    "--by",
+    "leftover"
    ],
    "asOf": null
   }

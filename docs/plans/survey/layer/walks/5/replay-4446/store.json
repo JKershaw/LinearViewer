@@ -1,5 +1,5 @@
 {
- "next": 52,
+ "next": 53,
  "records": {
   "area-1": [
    {
@@ -2534,6 +2534,23 @@
      "reason": "plan review posted: approve with notes, six non-blocking builder notes"
     }
    }
+  ],
+  "run-52": [
+   {
+    "id": "run-52",
+    "kind": "run",
+    "state": "open",
+    "fields": {
+     "stage": "implementation",
+     "account": "Built plan-28@13 as PR #2423 (branch feat/lin-4446-shared-cost-format, 24de9abc9). The no-build-step rule reading is in CLAUDE.md and the front-end-browser area note Lessons. lib/cost-format.js is the one formatter, served as /shared/cost-format.js; public/cost-format.js (34 lines) and its parity test are retired, the browser copy is now a 12-line module shim. public/workspace-kpis.js builds on DOMContentLoaded so the chart tick callback never reads the formatter during script load. Evidence: the KPI ordering witness fails on the old code with the formatter TypeError; mutation checks, a real-browser check and the real-server 404s pass; full unit suite 25,300 tests, 0 failures; CI green (unit, proxy, E2E shards, secret scan). No view reworked or retired; cuts to the ask: none. Gaps named in the PR: serving tests not run against HEAD; chart ordering not covered by e2e. Next slice waits for John (check-17)."
+    },
+    "links": {},
+    "in": "task-9",
+    "v": 1,
+    "op": "add",
+    "at": "2026-11-13T14:36:50.000Z",
+    "by": "implementation"
+   }
   ]
  },
  "log": [
@@ -3390,6 +3407,117 @@
     "task-9",
     "--by",
     "plan-review"
+   ],
+   "asOf": null
+  },
+  {
+   "at": "2026-11-17T15:33:37.434Z",
+   "by": "implementation",
+   "cmd": "show",
+   "args": [
+    "show",
+    "--task",
+    "task-9",
+    "--by",
+    "implementation"
+   ],
+   "asOf": null
+  },
+  {
+   "at": "2026-11-17T15:33:43.864Z",
+   "by": "implementation",
+   "cmd": "find",
+   "args": [
+    "--by",
+    "implementation",
+    "find",
+    "--to",
+    "implementation",
+    "--state",
+    "open"
+   ],
+   "asOf": null
+  },
+  {
+   "at": "2026-11-17T15:33:43.899Z",
+   "by": "implementation",
+   "cmd": "find",
+   "args": [
+    "--by",
+    "implementation",
+    "find",
+    "--area",
+    "area-1",
+    "--state",
+    "open"
+   ],
+   "asOf": null
+  },
+  {
+   "at": "2026-11-17T15:33:43.933Z",
+   "by": "implementation",
+   "cmd": "find",
+   "args": [
+    "--by",
+    "implementation",
+    "find",
+    "--kind",
+    "change"
+   ],
+   "asOf": null
+  },
+  {
+   "at": "2026-11-17T15:33:43.971Z",
+   "by": "implementation",
+   "cmd": "find",
+   "args": [
+    "--by",
+    "implementation",
+    "find",
+    "--kind",
+    "lesson",
+    "--area",
+    "area-1"
+   ],
+   "asOf": null
+  },
+  {
+   "at": "2026-11-17T15:33:44.014Z",
+   "by": "implementation",
+   "cmd": "get",
+   "args": [
+    "--by",
+    "implementation",
+    "get",
+    "area-1"
+   ],
+   "asOf": null
+  },
+  {
+   "at": "2026-11-17T15:33:48.223Z",
+   "by": "implementation",
+   "cmd": "find",
+   "args": [
+    "--by",
+    "implementation",
+    "find",
+    "--in",
+    "area-1",
+    "--state",
+    "open"
+   ],
+   "asOf": null
+  },
+  {
+   "at": "2026-11-17T15:33:48.264Z",
+   "by": "implementation",
+   "cmd": "find",
+   "args": [
+    "--by",
+    "implementation",
+    "find",
+    "--to",
+    "area-1"
    ],
    "asOf": null
   }

@@ -2732,6 +2732,145 @@
     "review"
    ],
    "asOf": null
+  },
+  {
+   "at": "2026-11-17T15:33:35.740Z",
+   "by": "review",
+   "cmd": "find",
+   "args": [
+    "find",
+    "--to",
+    "review",
+    "--by",
+    "review"
+   ],
+   "asOf": null
+  },
+  {
+   "at": "2026-11-17T15:33:35.767Z",
+   "by": "review",
+   "cmd": "find",
+   "args": [
+    "find",
+    "--kind",
+    "verdict",
+    "--by",
+    "review"
+   ],
+   "asOf": null
+  },
+  {
+   "at": "2026-11-17T15:33:35.796Z",
+   "by": "review",
+   "cmd": "find",
+   "args": [
+    "find",
+    "--text",
+    "departure",
+    "--by",
+    "review"
+   ],
+   "asOf": null
+  },
+  {
+   "at": "2026-11-17T15:33:35.826Z",
+   "by": "review",
+   "cmd": "find",
+   "args": [
+    "find",
+    "--text",
+    "D1",
+    "--by",
+    "review"
+   ],
+   "asOf": null
+  },
+  {
+   "at": "2026-11-17T15:33:35.854Z",
+   "by": "review",
+   "cmd": "get",
+   "args": [
+    "get",
+    "finding-70",
+    "--by",
+    "review"
+   ],
+   "asOf": null
+  },
+  {
+   "at": "2026-11-17T15:33:35.882Z",
+   "by": "review",
+   "cmd": "get",
+   "args": [
+    "get",
+    "finding-73",
+    "--by",
+    "review"
+   ],
+   "asOf": null
+  },
+  {
+   "at": "2026-11-17T15:33:35.910Z",
+   "by": "review",
+   "cmd": "get",
+   "args": [
+    "get",
+    "finding-74",
+    "--by",
+    "review"
+   ],
+   "asOf": null
+  },
+  {
+   "at": "2026-11-17T15:33:35.936Z",
+   "by": "review",
+   "cmd": "get",
+   "args": [
+    "get",
+    "run-90",
+    "--by",
+    "review"
+   ],
+   "asOf": null
+  },
+  {
+   "at": "2026-11-17T15:33:35.963Z",
+   "by": "review",
+   "cmd": "get",
+   "args": [
+    "get",
+    "run-83",
+    "--by",
+    "review"
+   ],
+   "asOf": null
+  },
+  {
+   "at": "2026-11-17T15:33:43.718Z",
+   "by": "review",
+   "cmd": "get",
+   "args": [
+    "get",
+    "finding-91",
+    "--by",
+    "review"
+   ],
+   "asOf": null
+  },
+  {
+   "at": "2026-11-17T15:33:43.750Z",
+   "by": "review",
+   "cmd": "find",
+   "args": [
+    "find",
+    "--state",
+    "open",
+    "--in",
+    "task-60",
+    "--by",
+    "review"
+   ],
+   "asOf": null
   }
  ]
 }
