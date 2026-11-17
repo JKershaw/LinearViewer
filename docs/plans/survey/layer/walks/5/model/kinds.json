@@ -1,0 +1,29 @@
+{
+  "kinds": {
+    "task":     { "fields": { "asked": "string", "done-when": "string", "paths": "strings", "ref": "string" }, "start": "open", "ends": ["done", "declined"], "line": "done-when" },
+    "plan":     { "fields": { "says": "string", "paths": "strings", "order": "number" }, "start": "kept", "ends": ["superseded"], "line": "says" },
+    "finding":  { "fields": { "says": "string" }, "start": "open", "ends": ["done", "declined", "handed-on"], "handoff": true, "line": "says" },
+    "check":    { "fields": { "what": "string", "why-person": "string", "how": "string" }, "start": "open", "ends": ["done", "declined", "handed-on"], "handoff": true, "line": "what" },
+    "question": { "fields": { "asks": "string", "options": "strings", "recommended": "string", "if-unanswered": "string" }, "start": "open", "ends": ["answered", "withdrawn", "handed-on"], "handoff": true, "line": "asks" },
+    "decision": { "fields": { "answer": "string", "why": "string", "scope": "task" }, "start": "stands", "ends": ["superseded", "withdrawn"], "line": "answer" },
+    "verdict":  { "fields": { "of": "verdict-of", "outcome": "string", "reasoning": "string" }, "start": "stands", "ends": ["withdrawn"], "line": "outcome" },
+    "lesson":   { "fields": { "says": "string", "paths": "strings", "checked-at": "string" }, "start": "holds", "ends": ["superseded", "disproved"], "line": "says" },
+    "area":     { "fields": { "name": "string", "paths": "strings" }, "start": "kept", "ends": ["retired"], "line": "name" },
+    "change":   { "fields": { "ref": "string", "head": "string" }, "start": "open", "ends": ["merged", "abandoned"], "line": "ref" },
+    "run":      { "fields": { "stage": "string", "claims": "strings", "account": "string" }, "start": "open", "ends": ["done"], "line": "stage" }
+  },
+  "outcomes": {
+    "plan-review": ["approve", "approve-with-notes", "request-changes"],
+    "review": ["approve", "approve-with-notes", "request-changes"],
+    "blind-read": ["better", "same", "worse"]
+  },
+  "links": {
+    "about": { "list": true },
+    "on": { "list": true },
+    "answers": { "from": "decision", "to": "question" },
+    "piece": { "from": "task", "to": "plan" },
+    "same-as": { "list": true }
+  },
+  "takeover": ["handed-on", "superseded"],
+  "staleEnds": ["superseded", "withdrawn", "abandoned", "disproved"]
+}
