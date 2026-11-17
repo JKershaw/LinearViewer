@@ -37,7 +37,7 @@
 - **Walk 3:** the scope matched, but much of it tested enforcement rules John never asked for. The session admitted "the drift was mine" (log.md:4284).
 - **Walk 4:** yes: does the store hold and route the information [reading].
 - **Walk 5:** the wider range, yes. The quiz was the session's reading of "far better", and John rejected it (log.md:4292).
-- **Walk 6:** no. It wrote nothing through the new shape, and it tested reading rather than whether the structure holds the data, as John said (log.md:4296).
+- **Walk 6:** no. Nothing was written through the new shape; it tested reading, not whether the structure holds the data (log.md:4296).
 
 ## 5. Claims the records do not support
 
