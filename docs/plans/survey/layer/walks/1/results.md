@@ -8,17 +8,17 @@
 - **Fill:** 45 records (88 versions), 87 writes, re-runnable from empty (`fill/fill.sh`, byte-identical on a second run, the fill says). No refusals, no rule hits [checked: `check` and `hits` on the store].
 - **Read-out:** each stage's brief as of its dispatch time, beside what it could read on the tracker then [checked, by script]:
 
-| Stage | Tracker text (lower bound) | Brief | Open things carried | Addressed to it |
-|---|---|---|---|---|
-| survey-task | 57,039 | 4,753 | 4 | 0 |
-| survey-place | 61,029 | 5,322 | 7 | 2 |
-| scoping | 64,375 | 9,273 | 16 | 8 |
-| implementation | 64,375 | 9,845 | 17 | 8 |
-| review | 69,876 | 8,435 | 14 | 1 |
-| blind-read | 80,869 | 8,188 | 15 | 0 |
-| close-out | 83,518 | 10,820 | 20 | 5 |
+| Stage | Child ticket as the stage saw it (snapshot) | Child plus all parent text so far | Brief | Open things carried | Addressed to it |
+|---|---|---|---|---|---|
+| survey-task | 5,424 | 57,039 | 4,753 | 4 | 0 |
+| survey-place | 9,414 | 61,029 | 5,322 | 7 | 2 |
+| scoping | 12,760 | 64,375 | 9,273 | 16 | 8 |
+| implementation | 13,082 | 64,375 | 9,845 | 17 | 8 |
+| review | 16,214 | 69,876 | 8,435 | 14 | 1 |
+| blind-read | 29,856 | 80,869 | 8,188 | 15 | 0 |
+| close-out | 29,856 | 83,518 | 10,820 | 20 | 5 |
 
-  Characters. The tracker figure misses LIN-4450's pre-prune description, and neither side includes the diff or the repository. "Open" is inflated: decisions and lessons are written open and stay so (break 7).
+  Characters. *Corrected 17 Nov:* I first gave only the right-hand figure, as a lower bound. Harbour's ticket snapshots (captured about 30 s after each dispatch, `LIN-4450-snapshots.json`) give what the child ticket held at each stage's start. A stage also read the places its ask points to in the parent, so what it really started with lies between the two columns. Neither side includes the diff or the repository. "Open" is inflated: decisions and lessons are written open and stay so (break 7).
 
 ## Against the expectations (`expect.md`, `46e6b66`)
 
@@ -33,7 +33,7 @@
 | 7 | Rule 2 doesn't hit; departures on the plan | **Held** | Implementation's departures became plan v3 |
 | 8 | Rule 4 shows the after-approval fixes | **Failed** | The PR head did move after review and blind read (the store links three heads), and nothing went stale: the PR isn't a record (break 3). Rule 4 fired somewhere unexpected instead (break 4) |
 | 9 | No hits from rules 3, 5, 6 | **Held** | |
-| 10 | Briefs carry much less than the tracker text | **Held** | 8–16% of the characters (table) |
+| 10 | Briefs carry much less than the tracker text | **Held in part** | Against the child ticket alone, about the same at survey-task (4,753 against 5,424) and a third by close-out (10,820 against 29,856); against child plus all parent text, 8–16%. *Corrected 17 Nov: I first reported only the 8–16%* |
 | 11 | At least one brief lacks something its stage used | **Held, but not where predicted** | No brief carries the person's words: the child's `asked` is empty by design, and the parent's ask (with John's "settle engineering questions yourself") never reaches LIN-4450's stages (break 5). Whether the build used design reasoning beyond its plan piece: can't tell |
 | 12 | Review and close-out link the PR, don't hold it | **Held** | |
 | 13 | 20–40% of addressees guessed | **Failed** | 20 of 22 hand-offs (the fill says). The stages write for "the builder" or per area and almost never say who must act or decide |
@@ -56,7 +56,7 @@
 ## Better than today? (a and b)
 
 *[my reading, from one task]*
-- **Better:** one finding where the tickets have four to six retellings; the departures on the plan instead of beside it; open checks as records with an addressee; each stage's brief about a tenth of the tracker text; and one thing the tickets hide (below).
+- **Better:** one finding where the tickets have four to six retellings; the departures on the plan instead of beside it; open checks as records with an addressee; each stage's brief from about the size of its child ticket at the start to a third of it by close-out (a tenth, counting the parent text); and one thing the tickets hide (below).
 - **Worse or no better:** the person's words drop out of the child's brief (5); the area pull adds load (6); verdicts lose their reasoning (1).
 - **Untested:** who writes, waking, and anything to do with lanes.
 

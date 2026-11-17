@@ -129,7 +129,7 @@ Closed records are left out. Each brief reports what it carries (open things, ho
 
 ## 5. Walks
 
-**Walk 1** (done): LIN-4450 filled in after the fact (`walks/1/results.md`). The shapes held a real task; briefs were 8–16% of the tracker text; seven breaks, folded in above.
+**Walk 1** (done): LIN-4450 filled in after the fact (`walks/1/results.md`). The shapes held a real task; briefs ran from about the size of the child ticket at the first stage to a third of it at close-out; seven breaks, folded in above.
 
 **Walk 2: stages replayed one at a time.**
 - **Seed.** The parent's part (its ask, plan pieces, plan review, breakdown, the child task) is filled in after the fact by one agent, in retro mode, up to the child's first stage.
