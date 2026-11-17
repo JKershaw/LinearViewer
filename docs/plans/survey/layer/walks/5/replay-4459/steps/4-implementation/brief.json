@@ -1,0 +1,559 @@
+{
+ "actor": "implementation",
+ "asOf": "2026-11-13T16:33:18.146Z",
+ "task": {
+  "id": "task-113",
+  "ref": "LIN-4459",
+  "done-when": "LIN-4459 (piece 4): `lib/run-live-wait.js` holds `liveWaitOf`, `liveWaitRefusal`, `STAGE_IN_FLIGHT_CODE`, `newestLiveRun` and the live predicate `isLiveRun`; `lib/recommendation-live-wait.js` is deleted with no re-export or shim, and its importers (`lib/openrouter.js`, `lib/dispatch-entrance.js`, `routes/workspace-api.js`, `lib/proxy-instructions.js`, `lib/recommendation-blind-read.js`, `lib/recommendation-look-first.js`, `lib/recommendation-facts.js`) are updated; a stage parked `[pending]` whose lineage ends `[blocked]` or `[skipped]` is not live, its terminal resolved from the unfiltered lineage before `loadRecentRuns`/`stageRuns` filter and window it, using `resolveFollowUpRoot` (`lib/dispatch-store.js`) and `heldWakeHolderOf` (`lib/dispatch-leftover-hook.js`), with the callers (`recentRuns`, `loadRecentRuns`) handing the rows over; the claim compare-and-set note moves unchanged from the LLM area note to the Runs note. Retires the old module and `runFact`'s row-only read; settles Waiting 14 and the LLM-side entry on `recommendation-live-wait.js`, together with A14, removed from `docs/areas/runs-and-dispatch.md` and `docs/areas/llm-and-prompts.md` in the same change with Lessons under 6,144 bytes; the PR says what it retires. Witness: `lin-4392-live-stage-wait.test.js` extended with a `[pending]` stage whose terminal `[blocked]`/`[skipped]` sits on a follow-up or held-wake row that the filter drops, failing before the change and passing after it; a census that none of the names is spelled outside `lib/run-live-wait.js`; `area-map-placement` stays green. Before starting: ask LIN-4448 (A14) again to agree the move. Binding: no stored readiness, no GitHub or provider reads, never recompute stored pre-cutover history, never edit recorded prompt changelog text, the LLM & prompts side of the seam is LIN-4448's.",
+  "paths": [
+   "lib/run-live-wait.js",
+   "lib/recommendation-live-wait.js",
+   "lib/recent-runs.js",
+   "docs/areas/runs-and-dispatch.md",
+   "docs/areas/llm-and-prompts.md"
+  ]
+ },
+ "asked": [
+  {
+   "id": "task-113",
+   "asked": ""
+  },
+  {
+   "id": "task-82",
+   "asked": "**Repository:** JKershaw/LinearViewer (Harbour).\n\n**What this is for.** John: \"we've not been applying quite the right force to bend the curve… now want to run both real work, and some real tidies.\" The Drift & Coherence and Seams & Tangles reviews of 13 Nov found this area carrying rules written in two places that disagree. Batch 1 added several of them:\n\n* Harbour can mark a task Done on a person's check before its blind read, while another check refuses that same task, and a read is then sent to a ticket that's already Done (Drift run 7, `close-out-gate-precedence-split`). John's ruling: \"if I choose to do something, Harbour is a passenger. This reflects that for many real projects, they're unlikely to be exclusively changed via Harbour.\"\n* Two pieces of code decide which PRs belong to a task, and they disagree about agent notes, so a blind read can be offered over a PR no review covered (Seams run 12, §3.0a).\n* The task timeline decides which model a dispatch used by its own rule, separate from the one the cost figures use (Drift, row 150).\n* The check that makes a stage wait while another is live is a runs rule, but it lives with the prompts (Seams, P-LW1).\n\nThe area's note holds 20 Waiting entries, and `lib/dispatch-store.js` is 4,530 lines. Seams also tried moving files between areas three ways, and none made the tangle smaller.\n\n**What we want.**\n\n* Each rule in the area has one home, and the copies are gone.\n* When a person acts, Harbour follows, and that rule is written once.\n* The area's Waiting entries are settled, or each says why it can't be yet.\n* Each piece finishes one move and names what it retired. John: \"I'd be happy to run a small variety, erring larger, to see\", so piece sizes vary, leaning larger.\n* The LLM & prompts side of the seam is A14's.\n\n**Done when**\n\n* the cases above are settled, or John has ruled they can wait;\n* the area's Waiting entries are settled or say why not;\n* the area reads better in a blind read after this work than before it, by more than an untouched area read at the same times.\n\n**Every change names what it retires. Questions:** settle engineering questions yourself; only John's calls (product, money, authority, what to retire) go to him as rulings.\n\n*End of what was asked. Steps write below this line; nothing above it changes.*"
+  }
+ ],
+ "piece": {
+  "id": "plan-91",
+  "kind": "plan",
+  "state": "kept",
+  "fields": {
+   "says": "**Piece 4 (medium): the live-stage wait gets a Runs home.** `lib/run-live-wait.js` holds `liveWaitOf`, `liveWaitRefusal`, `STAGE_IN_FLIGHT_CODE`, `newestLiveRun` and the live predicate (`isLiveRun`); `lib/recommendation-live-wait.js` is deleted, with no re-export, and the importers listed above are updated. Behaviour change in the same move: a stage parked `[pending]` whose lineage ends `[blocked]` or `[skipped]` is not live (today `runFact` reads only the row, so it holds the wait until aborted). `isLiveRun` is a predicate over a run fact's `outcome`, and `runFact(r, aborted)` (`lib/recent-runs.js:66`) sees one row at a time, so the fix is to pass it the lineage's rows and read the terminal through the existing follow-up and held-wake lineage helpers; its two callers (`recentRuns`, `loadRecentRuns`) hand the rows over. The claim compare-and-set note moves from the LLM note to the Runs note unchanged. *Retires:* the old module (no re-export; the census uses the four real names) and `runFact`'s row-only read. *Settles Waiting:* 14, and the LLM-side entry with A14. *Witness:* extend `lin-4392-live-stage-wait.test.js` with the `[pending]`-then-`[blocked]` lineage (fails before, passes after) and a census that nothing outside `lib/run-live-wait.js` spells the wait. Keep `area-map-placement` green; `run-live-wait.js` already matches Runs by its `run-` prefix.",
+   "paths": [
+    "lib/run-live-wait.js",
+    "lib/recommendation-live-wait.js",
+    "lib/recent-runs.js"
+   ],
+   "order": 3
+  },
+  "links": {},
+  "in": "task-82",
+  "v": 2,
+  "op": "revise",
+  "at": "2026-11-13T13:53:21.272Z",
+  "by": "design",
+  "reason": "Plan revision 2 (comment 84a944a9): piece 4 uses the real names and the lineage rows reach runFact (plan-review builder note 5)."
+ },
+ "replaced": [],
+ "addressed": [
+  {
+   "id": "finding-126",
+   "kind": "finding",
+   "state": "open",
+   "fields": {
+    "says": "The lineage helpers named in done-when cannot do the job as written. `resolveFollowUpRoot` and `heldWakeHolderOf` are async store methods in `lib/dispatch-store.js` (~3230, ~3437) that do their own history reads; `heldWakeHolderOf` is not in `lib/dispatch-leftover-hook.js`, which only calls it. `stageRuns`/`recentRuns` are pure and synchronous and tests feed them hand-built rows, so \"callers hand the rows over\" cannot reach either helper. Both walk UP from a follow-up to its root, while a parked stage needs the terminal of its DESCENDANTS. Calling them per row would add store reads to `codeRouteOf`, which every recommendation surface goes through."
+   },
+   "links": {
+    "about": [
+     "plan-91",
+     "finding-28"
+    ]
+   },
+   "in": "task-113",
+   "to": "implementation",
+   "v": 1,
+   "op": "add",
+   "at": "2026-11-13T16:23:24.000Z",
+   "by": "survey-task"
+  },
+  {
+   "id": "finding-127",
+   "kind": "finding",
+   "state": "open",
+   "fields": {
+    "says": "The store may already answer this. `deriveLineageFields`/`mergeLineageFeedback` merge a lineage's feedback by `rootItemId`, and `listHistory({withLineage})` returns each row's wire `outcome` through `wireStatusOf` (`dispatch-store.js` ~2120); `blocked` already maps to `WAITING_ON_A_PERSON`, which is not live. So the fix may be that `runFact` prefers the lineage outcome. Deeper: `recent-runs` derives its own per-row outcome beside the store's one wire word (LIN-2122), two readers of one fact, which is what LIN-4447 exists to remove. Order: (after asking LIN-4448 again) write the failing witness from real store rows, then check whether `deriveLineageFields` already returns `skipped`/`blocked` for the parked stage; if it does, comment on LIN-4447 to change course to the lineage read; do the mechanical move after."
+   },
+   "links": {
+    "about": [
+     "plan-91",
+     "finding-28"
+    ]
+   },
+   "in": "task-113",
+   "to": "implementation",
+   "v": 1,
+   "op": "add",
+   "at": "2026-11-13T16:23:25.000Z",
+   "by": "survey-task"
+  },
+  {
+   "id": "question-128",
+   "kind": "question",
+   "state": "open",
+   "fields": {
+    "asks": "Does a held-wake holder share the parked stage's `rootItemId`? If not, that is the one case that really needs `heldWakeHolderOf`; if so, the lineage read covers every terminal the witness names.",
+    "options": [
+     "Yes: the lineage read by rootItemId covers held-wake holders",
+     "No: held-wake holders need heldWakeHolderOf beside the lineage read"
+    ],
+    "if-unanswered": "Build the witness with a real held-wake holder row (real heldWakeFor) so the answer shows in the test.",
+    "recommended": "Yes: the factory's inheritance suggests a ci-wake `custom` continuation carries the holder's `rootItemId`. Not yet witnessed: the new failing test should pin that case before the lineage read relies on it."
+   },
+   "links": {
+    "about": [
+     "plan-91"
+    ]
+   },
+   "in": "task-113",
+   "to": "implementation",
+   "v": 2,
+   "op": "revise",
+   "at": "2026-11-13T16:26:32.000Z",
+   "by": "survey-place",
+   "reason": "survey-place: recommends an answer, unwitnessed (comment 1999d0b1)"
+  },
+  {
+   "id": "finding-129",
+   "kind": "finding",
+   "state": "open",
+   "fields": {
+    "says": "\"Pending\" means two things. In `runFact`, `r.status === 'pending'` is a QUEUE row, which has no lineage; the ticket's `[pending]` is a park marker on a TAKEN row (`derivePendingPark`). The witness in `lin-4392-live-stage-wait.test.js` must be a taken row with `[pending]` feedback, plus a ci-wake `custom` continuation and a held-wake holder with real `rootItemId`/`followUpTo`/`heldWakeFor`, or it can pass for the wrong reason."
+   },
+   "links": {
+    "about": [
+     "task-113"
+    ]
+   },
+   "in": "task-113",
+   "to": "implementation",
+   "v": 1,
+   "op": "add",
+   "at": "2026-11-13T16:23:27.000Z",
+   "by": "survey-task"
+  },
+  {
+   "id": "finding-130",
+   "kind": "finding",
+   "state": "open",
+   "fields": {
+    "says": "Moving `isLiveRun` to `lib/run-live-wait.js` creates an import cycle: `formatRecentRuns` (`lib/recent-runs.js:139`) uses it, and `run-live-wait.js` would import `QUEUED`/`RUNNING` from `lib/recent-runs.js`. `lib/recommendation-blind-read.js:47` also imports it from `recent-runs.js`. Two ways out: `QUEUED`/`RUNNING` move with it, or `isLiveRun` stays in `recent-runs.js` (which then departs from done-when and should be said on the PR)."
+   },
+   "links": {
+    "about": [
+     "plan-91"
+    ]
+   },
+   "in": "task-113",
+   "to": "implementation",
+   "v": 2,
+   "op": "revise",
+   "at": "2026-11-13T16:26:33.000Z",
+   "by": "survey-place",
+   "reason": "survey-place: adds line refs and the two ways out (comment 1999d0b1)"
+  },
+  {
+   "id": "finding-131",
+   "kind": "finding",
+   "state": "open",
+   "fields": {
+    "says": "The done-when importer list is wrong. `lib/recommendation-blind-read.js` imports `isLiveRun` from `recent-runs`, not the old module; `lib/recommendation-facts.js` and `lib/recommendation-look-first.js` only name it in comments. Three unlisted tests import the old path (lin-4370, lin-4392, lin-4437), and `lin-4392`:432 checks the import line with a regex."
+   },
+   "links": {
+    "about": [
+     "task-113"
+    ]
+   },
+   "in": "task-113",
+   "to": "implementation",
+   "v": 1,
+   "op": "add",
+   "at": "2026-11-13T16:23:29.000Z",
+   "by": "survey-task"
+  },
+  {
+   "id": "finding-132",
+   "kind": "finding",
+   "state": "open",
+   "fields": {
+    "says": "The census says \"four names\" but lists five, and importers must spell the names they import, so as written it cannot pass. A useful census checks that each name is *defined* only in `lib/run-live-wait.js`, and that `recommendation-live-wait` appears nowhere in code or tests. `scripts/prompt-template-change-log.md:188` names the old path and is recorded changelog text that may not be edited (binding): limit the census to `lib/`, `routes/`, `tests/` and `docs/areas/`."
+   },
+   "links": {
+    "about": [
+     "plan-91",
+     "task-113"
+    ]
+   },
+   "in": "task-113",
+   "to": "implementation",
+   "v": 2,
+   "op": "revise",
+   "at": "2026-11-13T16:26:34.000Z",
+   "by": "survey-place",
+   "reason": "survey-place: replaces the guessed meaning with a census that can pass (comment 1999d0b1)"
+  },
+  {
+   "id": "finding-133",
+   "kind": "finding",
+   "state": "open",
+   "fields": {
+    "says": "`docs/areas/llm-and-prompts.md:84-86` holds both the claim compare-and-set note (moves unchanged to the Runs note) and the LLM-side entry on `recommendation-live-wait.js` (settled with A14)."
+   },
+   "links": {
+    "about": [
+     "finding-64",
+     "finding-65"
+    ]
+   },
+   "in": "task-113",
+   "to": "implementation",
+   "v": 1,
+   "op": "add",
+   "at": "2026-11-13T16:23:31.000Z",
+   "by": "survey-task"
+  },
+  {
+   "id": "finding-136",
+   "kind": "finding",
+   "state": "open",
+   "fields": {
+    "says": "Wiring the named walks in gives lineage a third reading. `recentRuns(rows)` has no production caller, so \"callers hand the rows over\" reaches only `loadRecentRuns`, where per-row `resolveFollowUpRoot`/`heldWakeHolderOf` (async, one row at a time; `heldWakeHolderOf` is on `DispatchStore`, `lib/dispatch-store.js:3437`) means N+1 reads and a new definition of \"what ended\". If the plan's walk is kept anyway, say on LIN-4447 why the shared derivation could not serve."
+   },
+   "links": {
+    "about": [
+     "finding-126",
+     "plan-91"
+    ]
+   },
+   "in": "task-113",
+   "to": "implementation",
+   "v": 1,
+   "op": "add",
+   "at": "2026-11-13T16:26:30.000Z",
+   "by": "survey-place"
+  },
+  {
+   "id": "finding-137",
+   "kind": "finding",
+   "state": "open",
+   "fields": {
+    "says": "Read the lineage through the one derivation that already exists, and retire `runFact`'s row-only read for good. `deriveLineageFields` (`lib/dispatch-lineage-status.js:91`, \"the one derivation of lineage status\") merges sibling feedback by `rootItemId`; the Dispatch page, the proxy list (`wireStatusOf`) and the duplicate guard (`lineageEndedIds`, `lib/dispatch-store.js:405`) all read it, and `_readHistory` already offers `withLineage` (one batched `_lineageOf` read). Asking `listHistory` for `withLineage: true` lets `runFact` read the lineage outcome, so the wait, the duplicate guard and the Dispatch page agree on one word with no new walk; lineage `blocked` maps to waiting on a person exactly as the row's own `blocked` does today. Why exactly these two outcomes hold the wait: `lib/lineage-closure.js` stamps `closed` (which `runFact` already treats as not live) when a lineage ends done/failed/aborted; `isLineageClosingTerminal` leaves out `skipped`, and `[blocked]` is a pause."
+   },
+   "links": {
+    "about": [
+     "finding-127",
+     "finding-126",
+     "plan-91"
+    ]
+   },
+   "in": "task-113",
+   "to": "implementation",
+   "v": 1,
+   "op": "add",
+   "at": "2026-11-13T16:26:31.000Z",
+   "by": "survey-place"
+  },
+  {
+   "id": "finding-138",
+   "kind": "finding",
+   "state": "open",
+   "fields": {
+    "says": "Prose naming the old module fails silently when it moves (tests and imports fail loudly): `docs/architecture/source-map.md:225`, `docs/architecture/prompt-system.md`, `agent-api.md:52`, `docs/areas/llm-and-prompts.md:84-86,154`, and the docblocks at `lib/openrouter.js:2066` and `lib/dispatch-entrance.js:1726`. Update them in the same change; leave `scripts/prompt-template-change-log.md` as it is."
+   },
+   "links": {
+    "about": [
+     "finding-131",
+     "plan-91"
+    ]
+   },
+   "in": "task-113",
+   "to": "implementation",
+   "v": 1,
+   "op": "add",
+   "at": "2026-11-13T16:26:35.000Z",
+   "by": "survey-place"
+  }
+ ],
+ "stands": [
+  {
+   "id": "verdict-102",
+   "kind": "verdict",
+   "state": "stands",
+   "fields": {
+    "of": "plan-review",
+    "outcome": "approve",
+    "reasoning": "Approve (comment 12619798, plan rev 2). B1 is answered and holds; all three Done-when clauses are met by the pieces, with the 20 Waiting entries mapped. Piece 4: builder note 5, hand runFact the lineage before it is filtered."
+   },
+   "links": {
+    "on": [
+     "plan-91@2"
+    ]
+   },
+   "in": "task-82",
+   "v": 1,
+   "op": "add",
+   "at": "2026-11-13T13:57:37.874Z",
+   "by": "plan-review"
+  },
+  {
+   "id": "decision-115",
+   "kind": "decision",
+   "state": "stands",
+   "fields": {
+    "answer": "Session fit: fits one session (medium). Plan-review due: no, covered by LIN-4447's approving plan-review (comment 12619798, rev 2).",
+    "why": "The approved plan sizes piece 4 medium; the parent's plan review approved it."
+   },
+   "links": {
+    "on": [
+     "verdict-102@1"
+    ]
+   },
+   "in": "task-113",
+   "v": 1,
+   "op": "add",
+   "at": "2026-11-13T14:02:31.309Z",
+   "by": "breakdown"
+  },
+  {
+   "id": "decision-116",
+   "kind": "decision",
+   "state": "stands",
+   "fields": {
+    "answer": "LIN-4459 is blocked by LIN-4454, LIN-4455, LIN-4456 and LIN-4457, in order step 3 beside LIN-4458. Ask LIN-4448 first.",
+    "why": "2 and 4 wait on all of 3/5/6/7. The plan orders them that way, and the work overlaps: 4's lineage helpers live in `dispatch-store.js`, which 5 edits."
+   },
+   "links": {
+    "on": [
+     "verdict-102@1"
+    ],
+    "about": [
+     "task-108",
+     "task-109",
+     "task-110",
+     "task-111"
+    ]
+   },
+   "in": "task-113",
+   "v": 1,
+   "op": "add",
+   "at": "2026-11-13T14:02:31.309Z",
+   "by": "breakdown"
+  },
+  {
+   "id": "decision-117",
+   "kind": "decision",
+   "state": "stands",
+   "fields": {
+    "answer": "LIN-4459 blocks LIN-4460 (piece 1).",
+    "why": "1 waits on both 2 and 4. It consumes `readTrail`, and `blindReadStep` imports the live-wait module that 4 moves."
+   },
+   "links": {
+    "on": [
+     "verdict-102@1"
+    ]
+   },
+   "in": "task-113",
+   "v": 1,
+   "op": "add",
+   "at": "2026-11-13T14:02:31.309Z",
+   "by": "breakdown"
+  },
+  {
+   "id": "decision-119",
+   "kind": "decision",
+   "state": "stands",
+   "fields": {
+    "answer": "agree",
+    "why": "## Reply from LIN-4448 (LLM & prompts): agree to all three seam moves\n\nChecked against main 2bf788b6d.\n\n1. **One comment classifier in lib/run-trail.js: agree.** No fallback needed.\n2. **Live-stage wait to lib/run-live-wait.js, old file deleted, no shim: agree.** Our CODE_ROUTES list (LIN-4448 piece 1) imports liveWaitOf from wherever it lives when it lands. Whichever of us lands second changes only the import path. The claim compare-and-set Waiting entry moves to your note unchanged.\n3. **blindReadStep reads closeOutDecision().waitsOn/followsPerson: agree.** The file stays ours. LIN-4448 piece 2 leaves its COMPLETED redeclaration alone, so that retires with your piece 1.\n\nCode-route ownership stays here: CODE_ROUTES is the one list and Runs adds no copy. The only edit LIN-4448 makes in a Runs file is the STAGE_LABELS literal in lib/run-view.js (piece 3, derived from the stage-kind record); rebase on that if your pieces touch it.\n\n## Correction from LIN-4448 (LLM & prompts): the full list of Runs files our pieces edit\n\nThis corrects our reply of 15:39 (comment 08c9c898). That reply said the only Runs file LIN-4448 edits is the `STAGE_LABELS` literal in `lib/run-view.js`. That was wrong. By first match in `docs/areas/areas.json`, these files are `runs-and-dispatch` too. Checked at main `5dcf5bcda`.\n\n| LIN-4448 subtask | Runs files it edits | Collides with |\n|---|---|---|\n| LIN-4465 (piece 1, `CODE_ROUTES`) | comments in `lib/recent-runs.js` and `lib/dispatch-entrance.js` | **LIN-4459** (`recent-runs.js`) |\n| LIN-4466 (piece 2, blind-read identifiers) | `lib/completion-signals.js`, `lib/run-closeout-state.js`, `lib/pipeline-churn.js`, `lib/run-view.js`; also `lib/wall-clock-summary.js` and `lib/run-ledger.js`, where the scan hits | **LIN-4460** (`run-closeout-state.js`); **PR #2427 / LIN-4455** (`run-view.js`, `wall-clock-summary.js`) |\n| LIN-4467 (piece 3, stage-kind records) | the `STAGE_LABELS` literal in `lib/run-view.js`; **`COMPLETION_SIGNALS` becomes a view of our record** | PR #2427 (`run-view.js`). This also **changes Runs' read sample for LIN-4462**: every consumer of `COMPLETION_SIGNALS` is a prompt, so the content belongs with us, but your after-read should know. |\n| LIN-4468 (piece 4, proxy write guard) | `lib/dispatch-entrance.js`, `lib/follow-up-dispatch.js`, `routes/dispatch.js`, `lib/wake-credential.js` (each mint path passes its stage's `writes`) | PR #2427 (`routes/dispatch.js`) |\n\nEvery rebase is mechanical: whichever lands second rebases. We don't touch the runner or `lib/dispatch-store.js`, and Runs' run-behaviour tables (`SPINE`, `BUCKET_OF_KIND`, `FIRST_PASS_KINDS`, `OFF_SPINE_KINDS`) stay yours, with their tests. Also, `lib/stage-writes.js` (where piece 4 puts the one allowance table) is registered to `other-features`, not to either of our areas.\n\nThe three seam moves are agreed as before. Nothing here changes them.\n"
+   },
+   "links": {
+    "answers": "question-86",
+    "about": [
+     "plan-89",
+     "plan-91",
+     "plan-88"
+    ]
+   },
+   "in": "task-82",
+   "v": 2,
+   "op": "revise",
+   "at": "2026-11-13T15:55:15.496Z",
+   "by": "breakdown",
+   "reason": "Corrects the reply (comment 097a3442): LIN-4448 edits more Runs files than STAGE_LABELS; LIN-4465 collides with LIN-4459 on lib/recent-runs.js. The seam moves stay agreed."
+  },
+  {
+   "id": "decision-120",
+   "kind": "decision",
+   "state": "stands",
+   "fields": {
+    "answer": "Accept: no new GitHub reads on the recommend path or ladder lane; add the fact later if a stuck case shows up",
+    "why": "Ruling lin4447-recommend-path-outside-merge, recorded via Harbour (comment 90c9f8a4).",
+    "scope": "task-82"
+   },
+   "links": {
+    "answers": "question-97"
+   },
+   "in": "task-82",
+   "v": 1,
+   "op": "add",
+   "at": "2026-11-13T15:33:37.554Z",
+   "by": "John",
+   "via": "harbour-ruling"
+  },
+  {
+   "id": "decision-121",
+   "kind": "decision",
+   "state": "stands",
+   "fields": {
+    "answer": "Both: a person's Done and an outside merge",
+    "why": "Ruling lin4447-r1-passenger-scope, recorded via Harbour (comment cf8f5ed6).",
+    "scope": "task-82"
+   },
+   "links": {
+    "answers": "question-85"
+   },
+   "in": "task-82",
+   "v": 1,
+   "op": "add",
+   "at": "2026-11-13T15:33:38.870Z",
+   "by": "John",
+   "via": "harbour-ruling"
+  },
+  {
+   "id": "decision-122",
+   "kind": "decision",
+   "state": "stands",
+   "fields": {
+    "answer": "Yes, change both repos so the copies are gone",
+    "why": "Ruling lin4447-sd-scope, recorded via Harbour (comment 830a4864).",
+    "scope": "task-82"
+   },
+   "links": {
+    "answers": "question-84"
+   },
+   "in": "task-82",
+   "v": 1,
+   "op": "add",
+   "at": "2026-11-13T15:33:41.552Z",
+   "by": "John",
+   "via": "harbour-ruling"
+  },
+  {
+   "id": "decision-124",
+   "kind": "decision",
+   "state": "stands",
+   "fields": {
+    "answer": "Grounding commit is now origin/main 0092d8d9e, 20 commits and 118 files after 4b5001ddf; the approved slice still stands as the target, but positional references to the area notes no longer hold.",
+    "why": "Survey staleness check at 16:25: origin/main 0092d8d9e, not 4b5001ddf as decision-114 says. \"Waiting 14\" by position is now a close-out entry; Lessons in docs/areas/runs-and-dispatch.md is 5,195 bytes (budget 6,144)."
+   },
+   "links": {
+    "on": [
+     "verdict-102@1"
+    ]
+   },
+   "in": "task-113",
+   "v": 1,
+   "op": "add",
+   "at": "2026-11-13T16:23:20.000Z",
+   "by": "survey-task"
+  },
+  {
+   "id": "decision-125",
+   "kind": "decision",
+   "state": "stands",
+   "fields": {
+    "answer": "The Waiting entry LIN-4459 settles is the `runFact` row-only-read entry (finding-28), now at `docs/areas/runs-and-dispatch.md:89`; find it by its text, not as \"Waiting 14\".",
+    "why": "At 0092d8d9e the 14th Waiting entry by position is a close-out entry, not the runFact one the plan meant."
+   },
+   "links": {
+    "about": [
+     "finding-28"
+    ],
+    "on": [
+     "verdict-102@1"
+    ]
+   },
+   "in": "task-113",
+   "v": 1,
+   "op": "add",
+   "at": "2026-11-13T16:23:22.000Z",
+   "by": "survey-task"
+  },
+  {
+   "id": "decision-135",
+   "kind": "decision",
+   "state": "stands",
+   "fields": {
+    "answer": "The place is unchanged since grounding: none of the 20 commits to 0092d8d9e touch `lib/recent-runs.js` or `lib/recommendation-live-wait.js`. The move itself is clean (the old module is 80 lines with a good docblock; its only import is `isLiveRun` from `lib/recent-runs.js`, a 141-line pure module). The risk sits in the behaviour change, not the move.",
+    "why": "Survey global at 0092d8d9e (comment 1999d0b1); only the area notes moved, which decision-125 already covers."
+   },
+   "links": {
+    "on": [
+     "decision-124@1"
+    ],
+    "about": [
+     "task-113"
+    ]
+   },
+   "in": "task-113",
+   "v": 1,
+   "op": "add",
+   "at": "2026-11-13T16:26:29.000Z",
+   "by": "survey-place"
+  },
+  {
+   "id": "decision-141",
+   "kind": "decision",
+   "state": "stands",
+   "fields": {
+    "answer": "Size: just the task. Cuts: none. Decided by the standing policy.",
+    "why": "Moves the live-stage wait to its runs home and has a stage read its outcome from its whole lineage, so a parked stage whose follow-up blocked or skipped stops holding the ticket; no survey finding binds a larger move.",
+    "scope": "task-113"
+   },
+   "links": {
+    "on": [
+     "plan-91@2",
+     "decision-124@1",
+     "decision-135@1"
+    ],
+    "about": [
+     "task-113"
+    ]
+   },
+   "in": "task-113",
+   "v": 1,
+   "op": "add",
+   "at": "2026-11-13T16:29:55.000Z",
+   "by": "scoping"
+  }
+ ],
+ "areas": [
+  {
+   "id": "area-1",
+   "name": "Runs & dispatch",
+   "open": 19
+  },
+  {
+   "id": "area-38",
+   "name": "LLM & prompts",
+   "open": 26
+  }
+ ],
+ "runs": [],
+ "index": [
+  {
+   "id": "lesson-11",
+   "kind": "lesson",
+   "line": "A feedback-entry kind is one row in `FEEDBACK_KINDS` (`lib/dispatch-feedback-kinds.js`) that declares every role; readers filter the table, and its row order is the runner prompt's bytes. A shared constant is imported from its owner (`HALT_MODES`, `followUpTarget`, `NEVER_RAN` in `lib/dispatch-terminal.js`). The decision-stamp set had four copies in `lib/`; the LIN-4455 censuses (`lin-4455-feedback-kinds-table`, `lin-4455-constants-owners`) fail on a new one."
+  }
+ ],
+ "carries": {
+  "asked": 2,
+  "piece": 1,
+  "addressed": 11,
+  "stands": 12,
+  "areas": 2,
+  "runs": 0,
+  "index": 1
+ },
+ "bytes": 20775
+}

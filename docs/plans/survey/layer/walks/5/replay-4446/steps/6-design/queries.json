@@ -1,0 +1,234 @@
+[
+ {
+  "at": "2026-11-17T15:24:52.924Z",
+  "by": "design",
+  "cmd": "show",
+  "args": [
+   "show",
+   "--task",
+   "task-9",
+   "--by",
+   "design"
+  ],
+  "asOf": null
+ },
+ {
+  "at": "2026-11-17T15:24:52.962Z",
+  "by": "design",
+  "cmd": "find",
+  "args": [
+   "find",
+   "--area",
+   "area-1",
+   "--state",
+   "open",
+   "--by",
+   "design"
+  ],
+  "asOf": null
+ },
+ {
+  "at": "2026-11-17T15:25:20.606Z",
+  "by": "design",
+  "cmd": "get",
+  "args": [
+   "get",
+   "run-27",
+   "--by",
+   "design"
+  ],
+  "asOf": null
+ },
+ {
+  "at": "2026-11-17T15:25:20.636Z",
+  "by": "design",
+  "cmd": "get",
+  "args": [
+   "get",
+   "finding-24",
+   "--by",
+   "design"
+  ],
+  "asOf": null
+ },
+ {
+  "at": "2026-11-17T15:25:20.664Z",
+  "by": "design",
+  "cmd": "find",
+  "args": [
+   "find",
+   "--kind",
+   "plan",
+   "--by",
+   "design"
+  ],
+  "asOf": null
+ },
+ {
+  "at": "2026-11-17T15:25:20.699Z",
+  "by": "design",
+  "cmd": "find",
+  "args": [
+   "find",
+   "--kind",
+   "lesson",
+   "--area",
+   "area-1",
+   "--by",
+   "design",
+   "--count"
+  ],
+  "asOf": null
+ },
+ {
+  "at": "2026-11-17T15:26:14.737Z",
+  "by": "design",
+  "cmd": "get",
+  "args": [
+   "get",
+   "plan-28",
+   "--by",
+   "design"
+  ],
+  "asOf": null
+ },
+ {
+  "at": "2026-11-17T15:26:32.332Z",
+  "by": "design",
+  "cmd": "show",
+  "args": [
+   "show",
+   "--task",
+   "task-9",
+   "--by",
+   "design"
+  ],
+  "asOf": null
+ },
+ {
+  "at": "2026-11-17T15:29:06.519Z",
+  "by": "design",
+  "cmd": "show",
+  "args": [
+   "show",
+   "--task",
+   "task-9",
+   "--by",
+   "design"
+  ],
+  "asOf": null
+ },
+ {
+  "at": "2026-11-17T15:29:12.444Z",
+  "by": "design",
+  "cmd": "get",
+  "args": [
+   "get",
+   "plan-28",
+   "--by",
+   "design"
+  ],
+  "asOf": null
+ },
+ {
+  "at": "2026-11-17T15:29:12.474Z",
+  "by": "design",
+  "cmd": "get",
+  "args": [
+   "get",
+   "finding-24",
+   "--by",
+   "design"
+  ],
+  "asOf": null
+ },
+ {
+  "at": "2026-11-17T15:29:38.452Z",
+  "by": "design",
+  "cmd": "get",
+  "args": [
+   "get",
+   "finding-21",
+   "--by",
+   "design"
+  ],
+  "asOf": null
+ },
+ {
+  "at": "2026-11-17T15:29:38.495Z",
+  "by": "design",
+  "cmd": "get",
+  "args": [
+   "get",
+   "finding-16",
+   "--by",
+   "design"
+  ],
+  "asOf": null
+ },
+ {
+  "at": "2026-11-17T15:29:38.532Z",
+  "by": "design",
+  "cmd": "get",
+  "args": [
+   "get",
+   "finding-34",
+   "--by",
+   "design"
+  ],
+  "asOf": null
+ },
+ {
+  "at": "2026-11-17T15:29:38.575Z",
+  "by": "design",
+  "cmd": "get",
+  "args": [
+   "get",
+   "verdict-35",
+   "--by",
+   "design"
+  ],
+  "asOf": null
+ },
+ {
+  "at": "2026-11-17T15:29:38.622Z",
+  "by": "design",
+  "cmd": "get",
+  "args": [
+   "get",
+   "run-32",
+   "--by",
+   "design"
+  ],
+  "asOf": null
+ },
+ {
+  "at": "2026-11-17T15:30:48.237Z",
+  "by": "design",
+  "cmd": "brief",
+  "args": [
+   "brief",
+   "implementation",
+   "--task",
+   "task-9",
+   "--by",
+   "design",
+   "--text"
+  ],
+  "asOf": null
+ },
+ {
+  "at": "2026-11-17T15:30:48.274Z",
+  "by": "design",
+  "cmd": "brief",
+  "args": [
+   "brief",
+   "implementation",
+   "--task",
+   "task-9",
+   "--by",
+   "design"
+  ],
+  "asOf": null
+ }
+]

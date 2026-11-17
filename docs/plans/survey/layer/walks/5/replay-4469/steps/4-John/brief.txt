@@ -1,0 +1,107 @@
+# What is open and addressed to John, as of 2026-11-13T23:03:14Z (find --to John --state open)
+[
+  {
+    "id": "question-110",
+    "kind": "question",
+    "state": "open",
+    "fields": {
+      "asks": "LIN-4448 cuts: should the merge limit (LIN-3417 and the merge half of LIN-1273) and the token tickets (LIN-1372, LIN-1395, LIN-1408) wait for A12 (LIN-4416) and simple-dispatcher instead of closing in code here?",
+      "options": [
+        "Agree both cuts: they wait for A12 and simple-dispatcher; LIN-4448 closes only the read-only limit, through the proxy's write guard",
+        "Keep the merge limit in LIN-4448's scope (needs work in simple-dispatcher)",
+        "Keep both in LIN-4448's scope"
+      ],
+      "recommended": "Agree both cuts: they wait for A12 and simple-dispatcher; LIN-4448 closes only the read-only limit, through the proxy's write guard"
+    },
+    "links": {},
+    "in": "task-108",
+    "to": "John",
+    "v": 1,
+    "op": "add",
+    "at": "2026-11-13T13:28:06.963Z",
+    "by": "scoping",
+    "answered": {
+      "id": "decision-111",
+      "v": 1,
+      "answer": "Agree both cuts: they wait for A12 and simple-dispatcher; LIN-4448 closes only the read-only limit, through the proxy's write guard"
+    }
+  },
+  {
+    "id": "question-136",
+    "kind": "question",
+    "state": "open",
+    "fields": {
+      "asks": "Once the proxy refuses look-into's writes (LIN-4468), look-into can no longer post to Linear when a person asks. Should that exception be retired?",
+      "options": [
+        "Retire it: look-into reports in its session and a person posts the comment if they want it",
+        "Keep it: look-into is allowed one comment on its ticket instead of no writes"
+      ],
+      "recommended": "Retire it: look-into reports in its session and a person posts the comment if they want it",
+      "if-unanswered": "LIN-4468 can be built but not merged"
+    },
+    "links": {},
+    "in": "task-108",
+    "to": "John",
+    "v": 1,
+    "op": "add",
+    "at": "2026-11-13T15:55:54.652Z",
+    "by": "breakdown",
+    "answered": {
+      "id": "decision-137",
+      "v": 1,
+      "answer": "Retire it: look-into reports in its session and a person posts the comment if they want it"
+    }
+  },
+  {
+    "id": "question-144",
+    "kind": "question",
+    "state": "open",
+    "fields": {
+      "asks": "LIN-4469 PR #2447: accept two cuts to the ask, or fold? Corrected by review: (1) In real context the dispatched prompt includes the proxy preamble, which falls per writes kind: none -74 (look-into, retro), one-comment -23 (context, survey-task, survey-place), blind-comment -24 (blind-read), ticket-fields -67 (triage), work 0. So only 4 kinds stay byte-identical (blocked, breakdown, close-out, retrospective-audit, all work, carrying no folded text), not 11. (2) The guarded tracker clause is left unfolded in survey-task, survey-place and blind-read (lib/prompt-template-defs.js ~975/994/1065) and also in triage (~268: do not rewrite the description, do not create follow-up tasks or subtasks), which question v1 did not name.",
+      "options": [
+        "accept: the 4 work kinds cannot fall; leave the template clauses unfolded and record them as a Waiting entry in docs/areas/llm-and-prompts.md",
+        "fold: shrink the clauses at ~268/975/994/1065 to the code, branch and PR words too; back to implementation, re-pin ceilings and a lower FROZEN_TOTAL_BYTES"
+      ],
+      "recommended": "fold: it is small and is the parent aim; accept the 4 work kinds as unable to fall",
+      "if-unanswered": "hold the merge; the PR cannot be approved until this is answered"
+    },
+    "links": {
+      "about": [
+        "change-142",
+        "finding-143"
+      ]
+    },
+    "in": "task-131",
+    "to": "John",
+    "v": 2,
+    "op": "revise",
+    "at": "2026-11-13T22:59:38.000Z",
+    "by": "review",
+    "reason": "review measured buildProxyContextPreamble branch vs main: 7 of the 11 kinds fall; triage line 268 is the same class"
+  },
+  {
+    "id": "check-155",
+    "kind": "check",
+    "state": "open",
+    "fields": {
+      "what": "After deploy, confirm restricted dispatches carry a stamped token so the shrunk mandates are backed: a look-into token comment POST gets 403 from the stage gate; a triage token description PATCH gets 403.",
+      "why-person": "Needs a real dispatch on the deployed proxy; LIN-4468 notes a missing row mints stage-less (unrestricted), and CI cannot show what live rows carry.",
+      "how": "Dispatch a look-into and a triage after deploy and try each write with its token. Rollback: revert the PR #2447 merge commit, which restores the words."
+    },
+    "links": {
+      "about": [
+        "change-142"
+      ],
+      "on": [
+        "lesson-13@1",
+        "lesson-53@1"
+      ]
+    },
+    "in": "task-131",
+    "to": "John",
+    "v": 1,
+    "op": "add",
+    "at": "2026-11-13T22:59:47.000Z",
+    "by": "review"
+  }
+]

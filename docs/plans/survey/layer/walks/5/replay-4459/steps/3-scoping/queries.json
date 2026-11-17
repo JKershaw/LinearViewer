@@ -1,0 +1,55 @@
+[
+ {
+  "at": "2026-11-17T15:31:25.017Z",
+  "by": "scoping",
+  "cmd": "show",
+  "args": [
+   "show",
+   "--task",
+   "task-113",
+   "--by",
+   "scoping"
+  ],
+  "asOf": null
+ },
+ {
+  "at": "2026-11-17T15:31:28.444Z",
+  "by": "scoping",
+  "cmd": "find",
+  "args": [
+   "find",
+   "--text",
+   "standing policy",
+   "--by",
+   "scoping"
+  ],
+  "asOf": null
+ },
+ {
+  "at": "2026-11-17T15:31:28.475Z",
+  "by": "scoping",
+  "cmd": "find",
+  "args": [
+   "find",
+   "--kind",
+   "run",
+   "--text",
+   "scoping",
+   "--by",
+   "scoping"
+  ],
+  "asOf": null
+ },
+ {
+  "at": "2026-11-17T15:31:28.506Z",
+  "by": "scoping",
+  "cmd": "get",
+  "args": [
+   "get",
+   "run-134",
+   "--by",
+   "scoping"
+  ],
+  "asOf": null
+ }
+]
