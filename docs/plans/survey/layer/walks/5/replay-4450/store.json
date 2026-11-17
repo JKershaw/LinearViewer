@@ -3685,6 +3685,202 @@
     "leftover"
    ],
    "asOf": null
+  },
+  {
+   "at": "2026-11-17T15:24:30.504Z",
+   "by": "review",
+   "cmd": "show",
+   "args": [
+    "show",
+    "--task",
+    "task-60",
+    "--by",
+    "review"
+   ],
+   "asOf": null
+  },
+  {
+   "at": "2026-11-17T15:24:33.414Z",
+   "by": "review",
+   "cmd": "get",
+   "args": [
+    "get",
+    "change-84",
+    "--by",
+    "review"
+   ],
+   "asOf": null
+  },
+  {
+   "at": "2026-11-17T15:24:33.444Z",
+   "by": "review",
+   "cmd": "get",
+   "args": [
+    "get",
+    "finding-89",
+    "--by",
+    "review"
+   ],
+   "asOf": null
+  },
+  {
+   "at": "2026-11-17T15:24:33.474Z",
+   "by": "review",
+   "cmd": "get",
+   "args": [
+    "get",
+    "check-69",
+    "--by",
+    "review"
+   ],
+   "asOf": null
+  },
+  {
+   "at": "2026-11-17T15:24:33.509Z",
+   "by": "review",
+   "cmd": "find",
+   "args": [
+    "find",
+    "--in",
+    "task-53",
+    "--kind",
+    "task",
+    "--by",
+    "review"
+   ],
+   "asOf": null
+  },
+  {
+   "at": "2026-11-17T15:24:33.539Z",
+   "by": "review",
+   "cmd": "find",
+   "args": [
+    "find",
+    "--kind",
+    "lesson",
+    "--text",
+    "fake",
+    "--by",
+    "review"
+   ],
+   "asOf": null
+  },
+  {
+   "at": "2026-11-17T15:24:37.929Z",
+   "by": "review",
+   "cmd": "find",
+   "args": [
+    "find",
+    "--to",
+    "review",
+    "--by",
+    "review"
+   ],
+   "asOf": null
+  },
+  {
+   "at": "2026-11-17T15:24:37.970Z",
+   "by": "review",
+   "cmd": "find",
+   "args": [
+    "find",
+    "--to",
+    "close-out",
+    "--by",
+    "review"
+   ],
+   "asOf": null
+  },
+  {
+   "at": "2026-11-17T15:24:38.015Z",
+   "by": "review",
+   "cmd": "find",
+   "args": [
+    "find",
+    "--to",
+    "task-62",
+    "--by",
+    "review"
+   ],
+   "asOf": null
+  },
+  {
+   "at": "2026-11-17T15:24:38.061Z",
+   "by": "review",
+   "cmd": "find",
+   "args": [
+    "find",
+    "--in",
+    "task-62",
+    "--by",
+    "review"
+   ],
+   "asOf": null
+  },
+  {
+   "at": "2026-11-17T15:24:38.107Z",
+   "by": "review",
+   "cmd": "find",
+   "args": [
+    "find",
+    "--in",
+    "task-53",
+    "--kind",
+    "check",
+    "--by",
+    "review"
+   ],
+   "asOf": null
+  },
+  {
+   "at": "2026-11-17T15:24:38.152Z",
+   "by": "review",
+   "cmd": "find",
+   "args": [
+    "find",
+    "--text",
+    "rollback",
+    "--by",
+    "review"
+   ],
+   "asOf": null
+  },
+  {
+   "at": "2026-11-17T15:24:38.190Z",
+   "by": "review",
+   "cmd": "find",
+   "args": [
+    "find",
+    "--text",
+    "properties",
+    "--by",
+    "review"
+   ],
+   "asOf": null
+  },
+  {
+   "at": "2026-11-17T15:24:41.740Z",
+   "by": "review",
+   "cmd": "get",
+   "args": [
+    "get",
+    "finding-91",
+    "--by",
+    "review"
+   ],
+   "asOf": null
+  },
+  {
+   "at": "2026-11-17T15:24:41.783Z",
+   "by": "review",
+   "cmd": "get",
+   "args": [
+    "get",
+    "plan-56",
+    "--by",
+    "review"
+   ],
+   "asOf": null
   }
  ]
 }

@@ -1230,6 +1230,46 @@
     "survey-place"
    ],
    "asOf": null
+  },
+  {
+   "at": "2026-11-17T15:24:50.709Z",
+   "by": "scoping",
+   "cmd": "show",
+   "args": [
+    "show",
+    "--task",
+    "task-16",
+    "--by",
+    "scoping"
+   ],
+   "asOf": null
+  },
+  {
+   "at": "2026-11-17T15:24:50.746Z",
+   "by": "scoping",
+   "cmd": "find",
+   "args": [
+    "find",
+    "--kind",
+    "decision",
+    "--text",
+    "size",
+    "--by",
+    "scoping"
+   ],
+   "asOf": null
+  },
+  {
+   "at": "2026-11-17T15:24:50.781Z",
+   "by": "scoping",
+   "cmd": "get",
+   "args": [
+    "get",
+    "finding-30",
+    "--by",
+    "scoping"
+   ],
+   "asOf": null
   }
  ]
 }

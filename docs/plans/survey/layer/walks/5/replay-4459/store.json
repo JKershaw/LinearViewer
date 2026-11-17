@@ -1,5 +1,5 @@
 {
- "next": 108,
+ "next": 123,
  "records": {
   "area-1": [
    {
@@ -1649,6 +1649,31 @@
     "op": "add",
     "at": "2026-11-13T13:26:41.331Z",
     "by": "scoping"
+   },
+   {
+    "id": "question-84",
+    "kind": "question",
+    "state": "answered",
+    "fields": {
+     "asks": "LIN-4447: are the simple-dispatcher halves of the copied rules (sessionPrs, columnProblems, transcript fold) in scope? The size record assumes yes.",
+     "options": [
+      "Yes, change both repos so the copies are gone",
+      "No, LinearViewer only; record 'the copies are gone' as a cut and leave those Waiting entries explaining why"
+     ],
+     "recommended": "Yes, change both repos so the copies are gone",
+     "if-unanswered": "keep the size record as written, with simple-dispatcher in scope"
+    },
+    "links": {},
+    "in": "task-82",
+    "to": "John",
+    "v": 2,
+    "op": "end",
+    "at": "2026-11-13T15:33:41.603Z",
+    "by": "John",
+    "ended": {
+     "reason": "Answered by John (comment 830a4864)."
+    },
+    "via": "harbour-ruling"
    }
   ],
   "question-85": [
@@ -1671,6 +1696,30 @@
     "op": "add",
     "at": "2026-11-13T13:32:55.976Z",
     "by": "design"
+   },
+   {
+    "id": "question-85",
+    "kind": "question",
+    "state": "answered",
+    "fields": {
+     "asks": "LIN-4447 R1: Does 'Harbour is a passenger' cover both a person marking the ticket Done and a merge made outside Harbour? If so, no blind read is routed and Harbour's gate stands aside for that landing. Piece 1 waits on this.",
+     "options": [
+      "Both: a person's Done and an outside merge",
+      "Only a person marking Done"
+     ],
+     "recommended": "Both: a person's Done and an outside merge"
+    },
+    "links": {},
+    "in": "task-82",
+    "to": "John",
+    "v": 2,
+    "op": "end",
+    "at": "2026-11-13T15:33:38.912Z",
+    "by": "John",
+    "ended": {
+     "reason": "Answered by John (comment cf8f5ed6)."
+    },
+    "via": "harbour-ruling"
    }
   ],
   "question-86": [
@@ -1694,6 +1743,29 @@
     "at": "2026-11-13T13:36:44.276Z",
     "by": "Harbour",
     "via": "blocked"
+   },
+   {
+    "id": "question-86",
+    "kind": "question",
+    "state": "answered",
+    "fields": {
+     "asks": "## From LIN-4447 (Runs & dispatch): three proposed seam moves, for your reply\n\nLIN-4447's design (comment \"Design: LIN-4447 @ 4b5001ddf\") moves three things across our shared seam. Its pieces 2 and 4 wait on your agreement, so here are the moves, each with the reason it lands on the Runs side. Please reply on LIN-4447 with **agree**, or with the boundary you want instead. That ticket's other pieces don't wait on this.\n\n1. **One comment classifier, home in `lib/run-trail.js` (Runs).** `commentKindOf(body)` would hold close-out, review summary, blind read, survey, audit report and agent note. At the moment these are split between `lib/run-ledger.js` and `lib/recommendation-facts.js`. `recommendation-facts.js` would import `isAgentNote`, `isRuling`, `isPersonComment` and `isAuditReport` from there. `isLandingEvidence` and `auditAfterLandingCloseOut`'s private notes-PR set would retire into `readTrail(...).landing`/`workAfterReview`. **Fallback if you'd rather own it:** the classifier stays in `recommendation-facts.js` and Runs imports it. Either way there is one classifier, not two.\n2. **The live-stage wait moves to `lib/run-live-wait.js`.** It takes `liveWaitOf`, `liveWaitRefusal` and `STAGE_IN_FLIGHT` from `lib/recommendation-live-wait.js`, and `isLiveRun` from `recent-runs.js`. The old file is deleted with no re-export shim. Callers in your area (`openrouter.js`, `proxy-instructions.js`) change their import path only. This settles your note's Waiting entry \"`recommendation-live-wait.js`: the live-stage refusal … is a Runs dispatch rule\" (Seams, 13 Nov). Your note's claim compare-and-set entry moves to the Runs note unchanged.\n3. **`blindReadStep` (`lib/recommendation-blind-read.js`) reads the shared close-out decision.** It would use `closeOutDecision().waitsOn`/`followsPerson` and drop its own `isTerminalState`/`COMPLETED` test, which retires your \"`COMPLETED` redeclared\" Waiting clause. The file stays yours. Only the rule it applies moves to Runs. This is LIN-4447 piece 1, which also waits on John's R1.\n\nYour hand-maintained code-route lists (`openrouter.js`, about nine copies) stay yours. LIN-4447 adds no copy of them.\n",
+     "options": [
+      "agree",
+      "the boundary you want instead"
+     ],
+     "if-unanswered": "Its pieces 2 and 4 wait on your agreement. That ticket's other pieces don't wait on this."
+    },
+    "links": {},
+    "in": "task-82",
+    "to": "task-83",
+    "v": 2,
+    "op": "end",
+    "at": "2026-11-13T15:39:53.858Z",
+    "by": "design",
+    "ended": {
+     "reason": "LIN-4448 replied agree to all three seam moves (comment 08c9c898 on LIN-4447)."
+    }
    }
   ],
   "plan-87": [
@@ -1761,6 +1833,30 @@
     "at": "2026-11-13T13:53:21.272Z",
     "by": "design",
     "reason": "Answers plan-review B1 (comment e452fe3a): per-surface inputs named, unknown means not known merged, ticket state only for advice."
+   },
+   {
+    "id": "plan-88",
+    "kind": "plan",
+    "state": "kept",
+    "fields": {
+     "says": "Piece 1 (larger): one close-out decision. `closeOutDecision({ trail, prStatuses, stopAt, runnerReady, actor, ticketState })` and `CLOSE_OUT_REASONS` in `lib/run-closeout-state.js`, answering `{ status, reason, refuses, setDone, waitsOn, routesRead, followsPerson }`. Enforcement uses only the trail and URL-keyed PR statuses (gate stands aside only when every landing PR reads merged; missing or unreadable means not known merged, the gate holds); `ticketState` feeds only the advice `routesRead`, asked by `blindReadStep`. No new GitHub or provider read. Settles Waiting 17, 18, 20 (plan numbering). *Hold:* none. R1 is answered \"both\", and the limit above is accepted, so piece 1 merges on its own review like any other piece.",
+     "paths": [
+      "lib/run-closeout-state.js",
+      "lib/close-out-readiness.js",
+      "routes/workspace-api-run-evidence.js",
+      "lib/recommendation-blind-read.js",
+      "lib/run-evidence.js",
+      "lib/close-out-merges.js"
+     ],
+     "order": 4
+    },
+    "links": {},
+    "in": "task-82",
+    "v": 3,
+    "op": "revise",
+    "at": "2026-11-13T15:34:58.141Z",
+    "by": "design",
+    "reason": "Rulings recorded in the plan (comment 9bfb9aa5): R1 both, sd-scope in scope, recommend-path limit accepted; the R1 merge hold on piece 1 is removed."
    }
   ],
   "plan-89": [
@@ -1982,6 +2078,31 @@
     "op": "add",
     "at": "2026-11-13T13:53:31.293Z",
     "by": "design"
+   },
+   {
+    "id": "question-97",
+    "kind": "question",
+    "state": "answered",
+    "fields": {
+     "asks": "LIN-4447: the ask says \"When a person acts, Harbour follows, and that rule is written once.\" The plan writes the rule once and follows an outside merge wherever a surface already reads the PR. The recommend path (`blindReadStep`) and the ladder guard lane make no PR read, so they follow a person's Done but not an outside merge on a ticket still In Progress, and the recommend path may route one blind read over a merged landing. Accept this, or add a PR read there?",
+     "options": [
+      "Accept: no new GitHub reads on the recommend path or ladder lane; add the fact later if a stuck case shows up",
+      "Add a PR read on the recommend path and ladder lane (costs PR-state budget and token resolution there)"
+     ],
+     "recommended": "Accept: no new GitHub reads on the recommend path or ladder lane; add the fact later if a stuck case shows up",
+     "if-unanswered": "Piece 1 is built as planned but its PR stays unmerged. Pieces 0, 3, 5, 6, 7, then 2 and 4, proceed."
+    },
+    "links": {},
+    "in": "task-82",
+    "to": "John",
+    "v": 2,
+    "op": "end",
+    "at": "2026-11-13T15:33:37.598Z",
+    "by": "John",
+    "ended": {
+     "reason": "Answered by John (comment 90c9f8a4)."
+    },
+    "via": "harbour-ruling"
    }
   ],
   "verdict-98": [
@@ -2201,6 +2322,497 @@
     "op": "add",
     "at": "2026-11-13T14:01:50.000Z",
     "by": "breakdown"
+   },
+   {
+    "id": "task-107",
+    "kind": "task",
+    "state": "done",
+    "fields": {
+     "ref": "LIN-4453",
+     "asked": "",
+     "done-when": "LIN-4453 (piece 0, paired area reads before): both `## Area read` reports (Runs & dispatch and the control `front-end-pages`) and the committed rubric are on LIN-4447 before any implementation piece merges. Retires nothing (a measurement).",
+     "paths": []
+    },
+    "links": {
+     "piece": "plan-87"
+    },
+    "in": "task-82",
+    "v": 2,
+    "op": "end",
+    "at": "2026-11-13T14:56:00.000Z",
+    "by": "Harbour",
+    "ended": {
+     "reason": "Piece 0 baseline recorded: both ## Area read reports and the rubric on LIN-4447 (14:24Z); baseline commit cfd152fa4 on origin/main. Completion time approximate."
+    }
+   }
+  ],
+  "task-108": [
+   {
+    "id": "task-108",
+    "kind": "task",
+    "state": "open",
+    "fields": {
+     "ref": "LIN-4454",
+     "asked": "",
+     "done-when": "LIN-4454 (piece 3, model attribution): `dispatchesOf` in `lib/cost-read.js` carries the fold's `last.model` and timeline rows read it. Retires `dispatchModelOf` and its ranking, and the Lesson clause that names it; settles Waiting 19 (plan numbering). Witness: the Drift case as a test (lane and row name the same model; with nothing priced, both name the latest). One session (small).",
+     "paths": [
+      "lib/cost-read.js",
+      "lib/task-timeline.js"
+     ]
+    },
+    "links": {
+     "piece": "plan-90"
+    },
+    "in": "task-82",
+    "v": 1,
+    "op": "add",
+    "at": "2026-11-13T14:01:53.000Z",
+    "by": "breakdown"
+   },
+   {
+    "id": "task-108",
+    "kind": "task",
+    "state": "done",
+    "fields": {
+     "ref": "LIN-4454",
+     "asked": "",
+     "done-when": "LIN-4454 (piece 3, model attribution): `dispatchesOf` in `lib/cost-read.js` carries the fold's `last.model` and timeline rows read it. Retires `dispatchModelOf` and its ranking, and the Lesson clause that names it; settles Waiting 19 (plan numbering). Witness: the Drift case as a test (lane and row name the same model; with nothing priced, both name the latest). One session (small).",
+     "paths": [
+      "lib/cost-read.js",
+      "lib/task-timeline.js"
+     ]
+    },
+    "links": {
+     "piece": "plan-90"
+    },
+    "in": "task-82",
+    "v": 2,
+    "op": "end",
+    "at": "2026-11-13T15:39:20.000Z",
+    "by": "Harbour",
+    "ended": {
+     "reason": "LIN-4454 landed (PR #2425 on main c205190fd); Done before LIN-4459's dispatch. Completion time approximate."
+    }
+   }
+  ],
+  "task-109": [
+   {
+    "id": "task-109",
+    "kind": "task",
+    "state": "open",
+    "fields": {
+     "ref": "LIN-4455",
+     "asked": "",
+     "done-when": "LIN-4455 (piece 5): `lib/dispatch-leftover.js` and `_releaseIfHeld` / `releaseHeldWake` in `lib/dispatch-store.js` import halt modes, `NEVER_RAN` and the follow-up target from their owners instead of restating them; `wakeHook.releaseNote` supplies the release wording, so the store no longer calls `formatHeldWakeNote` and stops owning that wording; one `FEEDBACK_KINDS` table in `lib/dispatch-feedback-validation.js` carries each kind's roles, and `PARKED_WAIT_SKIPPED_KINDS`, `FEEDBACK_ENTRY_KINDS` and `findWakeEvent`'s skip rule derive from it. Retires the restated constants, the store's ownership of the release wording and the three hand-written kind sets; settles Waiting 2, 4, 11, removed from `docs/areas/runs-and-dispatch.md` in the same change with Lessons under 6,144 bytes; the PR says what it retires. Witness: a test that iterates `HALT_MODES` and shows every mode stops a leftover, and the `lin-4377` test counting the import, not the spelling. Binding: no stored readiness, no GitHub or provider reads, never recompute pre-cutover history, the LLM & prompts side is LIN-4448's.",
+     "paths": [
+      "lib/dispatch-leftover.js",
+      "lib/dispatch-store.js",
+      "lib/dispatch-feedback-validation.js",
+      "docs/areas/runs-and-dispatch.md"
+     ]
+    },
+    "links": {
+     "piece": "plan-92"
+    },
+    "in": "task-82",
+    "v": 1,
+    "op": "add",
+    "at": "2026-11-13T14:01:56.140Z",
+    "by": "breakdown"
+   },
+   {
+    "id": "task-109",
+    "kind": "task",
+    "state": "done",
+    "fields": {
+     "ref": "LIN-4455",
+     "asked": "",
+     "done-when": "LIN-4455 (piece 5): `lib/dispatch-leftover.js` and `_releaseIfHeld` / `releaseHeldWake` in `lib/dispatch-store.js` import halt modes, `NEVER_RAN` and the follow-up target from their owners instead of restating them; `wakeHook.releaseNote` supplies the release wording, so the store no longer calls `formatHeldWakeNote` and stops owning that wording; one `FEEDBACK_KINDS` table in `lib/dispatch-feedback-validation.js` carries each kind's roles, and `PARKED_WAIT_SKIPPED_KINDS`, `FEEDBACK_ENTRY_KINDS` and `findWakeEvent`'s skip rule derive from it. Retires the restated constants, the store's ownership of the release wording and the three hand-written kind sets; settles Waiting 2, 4, 11, removed from `docs/areas/runs-and-dispatch.md` in the same change with Lessons under 6,144 bytes; the PR says what it retires. Witness: a test that iterates `HALT_MODES` and shows every mode stops a leftover, and the `lin-4377` test counting the import, not the spelling. Binding: no stored readiness, no GitHub or provider reads, never recompute pre-cutover history, the LLM & prompts side is LIN-4448's.",
+     "paths": [
+      "lib/dispatch-leftover.js",
+      "lib/dispatch-store.js",
+      "lib/dispatch-feedback-validation.js",
+      "docs/areas/runs-and-dispatch.md"
+     ]
+    },
+    "links": {
+     "piece": "plan-92"
+    },
+    "in": "task-82",
+    "v": 2,
+    "op": "end",
+    "at": "2026-11-13T16:09:25.000Z",
+    "by": "Harbour",
+    "ended": {
+     "reason": "LIN-4455 landed (PR #2427 merged 192e1f81f); Done before LIN-4459's dispatch. Completion time approximate."
+    }
+   }
+  ],
+  "task-110": [
+   {
+    "id": "task-110",
+    "kind": "task",
+    "state": "open",
+    "fields": {
+     "ref": "LIN-4456",
+     "asked": "",
+     "done-when": "LIN-4456 (piece 6, hermetic transport): a provider declares the capability `testTransport` where its transport is swapped, and `lib/dispatch-factory.js` skips access when `provider.testTransport && isHermeticTestToken(token)`. Retires the `provider.name === 'linear'` test and the \"this is not a capability\" comment; settles Waiting 8 (plan numbering). One session (small).",
+     "paths": [
+      "lib/dispatch-factory.js",
+      "routes/test.js",
+      "tests/fixtures/hermetic-linear.js"
+     ]
+    },
+    "links": {
+     "piece": "plan-93"
+    },
+    "in": "task-82",
+    "v": 1,
+    "op": "add",
+    "at": "2026-11-13T14:01:56.600Z",
+    "by": "breakdown"
+   },
+   {
+    "id": "task-110",
+    "kind": "task",
+    "state": "done",
+    "fields": {
+     "ref": "LIN-4456",
+     "asked": "",
+     "done-when": "LIN-4456 (piece 6, hermetic transport): a provider declares the capability `testTransport` where its transport is swapped, and `lib/dispatch-factory.js` skips access when `provider.testTransport && isHermeticTestToken(token)`. Retires the `provider.name === 'linear'` test and the \"this is not a capability\" comment; settles Waiting 8 (plan numbering). One session (small).",
+     "paths": [
+      "lib/dispatch-factory.js",
+      "routes/test.js",
+      "tests/fixtures/hermetic-linear.js"
+     ]
+    },
+    "links": {
+     "piece": "plan-93"
+    },
+    "in": "task-82",
+    "v": 2,
+    "op": "end",
+    "at": "2026-11-13T16:19:20.000Z",
+    "by": "Harbour",
+    "ended": {
+     "reason": "LIN-4456 landed (notes PR #2428 on main 0092d8d9e); Done before LIN-4459's dispatch. Completion time approximate."
+    }
+   }
+  ],
+  "task-111": [
+   {
+    "id": "task-111",
+    "kind": "task",
+    "state": "open",
+    "fields": {
+     "ref": "LIN-4457",
+     "asked": "",
+     "done-when": "LIN-4457 (piece 7, cost-call reads): `readCalls` and `callsSurfaceOf` move to `lib/cost-read-calls.js`, with a Runs pattern in `docs/areas/areas.json` in the same change. Retires the two functions' place in `lib/cost-read.js`; settles Waiting 9 (plan numbering). Witness: `area-map-placement.test.js` pins the new file to Runs. One session (small).",
+     "paths": [
+      "lib/cost-read.js",
+      "lib/cost-read-calls.js",
+      "docs/areas/areas.json"
+     ]
+    },
+    "links": {
+     "piece": "plan-94"
+    },
+    "in": "task-82",
+    "v": 1,
+    "op": "add",
+    "at": "2026-11-13T14:01:57.000Z",
+    "by": "breakdown"
+   },
+   {
+    "id": "task-111",
+    "kind": "task",
+    "state": "done",
+    "fields": {
+     "ref": "LIN-4457",
+     "asked": "",
+     "done-when": "LIN-4457 (piece 7, cost-call reads): `readCalls` and `callsSurfaceOf` move to `lib/cost-read-calls.js`, with a Runs pattern in `docs/areas/areas.json` in the same change. Retires the two functions' place in `lib/cost-read.js`; settles Waiting 9 (plan numbering). Witness: `area-map-placement.test.js` pins the new file to Runs. One session (small).",
+     "paths": [
+      "lib/cost-read.js",
+      "lib/cost-read-calls.js",
+      "docs/areas/areas.json"
+     ]
+    },
+    "links": {
+     "piece": "plan-94"
+    },
+    "in": "task-82",
+    "v": 2,
+    "op": "end",
+    "at": "2026-11-13T15:49:16.000Z",
+    "by": "Harbour",
+    "ended": {
+     "reason": "LIN-4457 landed (PR #2424 merged 5dcf5bcda); Done before LIN-4459's dispatch. Completion time approximate."
+    }
+   }
+  ],
+  "task-112": [
+   {
+    "id": "task-112",
+    "kind": "task",
+    "state": "open",
+    "fields": {
+     "ref": "LIN-4458",
+     "asked": "",
+     "done-when": "LIN-4458 (piece 2, one trail pass and one comment classifier): `lib/run-trail.js` holds `commentKindOf` and `readTrail(comments)`; the landing is the PRs first cited after the anchor. Settles Waiting 15 (row 15 kept as a why-not) and 16 (plan numbering). Blocked by LIN-4454 to LIN-4457. One session (larger). Ask LIN-4448 first.",
+     "paths": [
+      "lib/run-trail.js",
+      "lib/run-ledger.js",
+      "lib/recommendation-facts.js",
+      "lib/run-evidence.js",
+      "scripts/stability-measures-blind.mjs"
+     ]
+    },
+    "links": {
+     "piece": "plan-89"
+    },
+    "in": "task-82",
+    "v": 1,
+    "op": "add",
+    "at": "2026-11-13T14:01:57.400Z",
+    "by": "breakdown"
+   }
+  ],
+  "task-113": [
+   {
+    "id": "task-113",
+    "kind": "task",
+    "state": "open",
+    "fields": {
+     "ref": "LIN-4459",
+     "asked": "",
+     "done-when": "LIN-4459 (piece 4): `lib/run-live-wait.js` holds `liveWaitOf`, `liveWaitRefusal`, `STAGE_IN_FLIGHT_CODE`, `newestLiveRun` and the live predicate `isLiveRun`; `lib/recommendation-live-wait.js` is deleted with no re-export or shim, and its importers (`lib/openrouter.js`, `lib/dispatch-entrance.js`, `routes/workspace-api.js`, `lib/proxy-instructions.js`, `lib/recommendation-blind-read.js`, `lib/recommendation-look-first.js`, `lib/recommendation-facts.js`) are updated; a stage parked `[pending]` whose lineage ends `[blocked]` or `[skipped]` is not live, its terminal resolved from the unfiltered lineage before `loadRecentRuns`/`stageRuns` filter and window it, using `resolveFollowUpRoot` (`lib/dispatch-store.js`) and `heldWakeHolderOf` (`lib/dispatch-leftover-hook.js`), with the callers (`recentRuns`, `loadRecentRuns`) handing the rows over; the claim compare-and-set note moves unchanged from the LLM area note to the Runs note. Retires the old module and `runFact`'s row-only read; settles Waiting 14 and the LLM-side entry on `recommendation-live-wait.js`, together with A14, removed from `docs/areas/runs-and-dispatch.md` and `docs/areas/llm-and-prompts.md` in the same change with Lessons under 6,144 bytes; the PR says what it retires. Witness: `lin-4392-live-stage-wait.test.js` extended with a `[pending]` stage whose terminal `[blocked]`/`[skipped]` sits on a follow-up or held-wake row that the filter drops, failing before the change and passing after it; a census that none of the names is spelled outside `lib/run-live-wait.js`; `area-map-placement` stays green. Before starting: ask LIN-4448 (A14) again to agree the move. Binding: no stored readiness, no GitHub or provider reads, never recompute stored pre-cutover history, never edit recorded prompt changelog text, the LLM & prompts side of the seam is LIN-4448's.",
+     "paths": [
+      "lib/run-live-wait.js",
+      "lib/recommendation-live-wait.js",
+      "lib/recent-runs.js",
+      "docs/areas/runs-and-dispatch.md",
+      "docs/areas/llm-and-prompts.md"
+     ]
+    },
+    "links": {
+     "piece": "plan-91"
+    },
+    "in": "task-82",
+    "v": 1,
+    "op": "add",
+    "at": "2026-11-13T14:01:57.719Z",
+    "by": "breakdown"
+   }
+  ],
+  "decision-114": [
+   {
+    "id": "decision-114",
+    "kind": "decision",
+    "state": "stands",
+    "fields": {
+     "answer": "Grounding commit origin/main 4b5001ddf; the plan needs no re-planning, and LIN-4459 carries piece 4's slice as approved.",
+     "why": "Staleness check at breakdown: origin/main still 4b5001ddf, git log 4b5001ddf..origin/main empty, nothing under lib, routes, tests, scripts or docs/areas changed since filing; spot checks hold (dispatch-store.js still 4,530 lines)."
+    },
+    "links": {
+     "on": [
+      "verdict-102@1"
+     ]
+    },
+    "in": "task-113",
+    "v": 1,
+    "op": "add",
+    "at": "2026-11-13T14:02:31.309Z",
+    "by": "breakdown"
+   }
+  ],
+  "decision-115": [
+   {
+    "id": "decision-115",
+    "kind": "decision",
+    "state": "stands",
+    "fields": {
+     "answer": "Session fit: fits one session (medium). Plan-review due: no, covered by LIN-4447's approving plan-review (comment 12619798, rev 2).",
+     "why": "The approved plan sizes piece 4 medium; the parent's plan review approved it."
+    },
+    "links": {
+     "on": [
+      "verdict-102@1"
+     ]
+    },
+    "in": "task-113",
+    "v": 1,
+    "op": "add",
+    "at": "2026-11-13T14:02:31.309Z",
+    "by": "breakdown"
+   }
+  ],
+  "decision-116": [
+   {
+    "id": "decision-116",
+    "kind": "decision",
+    "state": "stands",
+    "fields": {
+     "answer": "LIN-4459 is blocked by LIN-4454, LIN-4455, LIN-4456 and LIN-4457, in order step 3 beside LIN-4458. Ask LIN-4448 first.",
+     "why": "2 and 4 wait on all of 3/5/6/7. The plan orders them that way, and the work overlaps: 4's lineage helpers live in `dispatch-store.js`, which 5 edits."
+    },
+    "links": {
+     "on": [
+      "verdict-102@1"
+     ],
+     "about": [
+      "task-108",
+      "task-109",
+      "task-110",
+      "task-111"
+     ]
+    },
+    "in": "task-113",
+    "v": 1,
+    "op": "add",
+    "at": "2026-11-13T14:02:31.309Z",
+    "by": "breakdown"
+   }
+  ],
+  "decision-117": [
+   {
+    "id": "decision-117",
+    "kind": "decision",
+    "state": "stands",
+    "fields": {
+     "answer": "LIN-4459 blocks LIN-4460 (piece 1).",
+     "why": "1 waits on both 2 and 4. It consumes `readTrail`, and `blindReadStep` imports the live-wait module that 4 moves."
+    },
+    "links": {
+     "on": [
+      "verdict-102@1"
+     ]
+    },
+    "in": "task-113",
+    "v": 1,
+    "op": "add",
+    "at": "2026-11-13T14:02:31.309Z",
+    "by": "breakdown"
+   }
+  ],
+  "decision-118": [
+   {
+    "id": "decision-118",
+    "kind": "decision",
+    "state": "stands",
+    "fields": {
+     "answer": "Waiting 14 is LIN-4459's to settle.",
+     "why": "Waiting accounting is unchanged from the plan."
+    },
+    "links": {
+     "on": [
+      "verdict-102@1"
+     ]
+    },
+    "in": "task-113",
+    "v": 1,
+    "op": "add",
+    "at": "2026-11-13T14:02:31.309Z",
+    "by": "breakdown"
+   }
+  ],
+  "decision-119": [
+   {
+    "id": "decision-119",
+    "kind": "decision",
+    "state": "stands",
+    "fields": {
+     "answer": "agree",
+     "why": "## Reply from LIN-4448 (LLM & prompts): agree to all three seam moves\n\nChecked against main 2bf788b6d.\n\n1. **One comment classifier in lib/run-trail.js: agree.** No fallback needed.\n2. **Live-stage wait to lib/run-live-wait.js, old file deleted, no shim: agree.** Our CODE_ROUTES list (LIN-4448 piece 1) imports liveWaitOf from wherever it lives when it lands. Whichever of us lands second changes only the import path. The claim compare-and-set Waiting entry moves to your note unchanged.\n3. **blindReadStep reads closeOutDecision().waitsOn/followsPerson: agree.** The file stays ours. LIN-4448 piece 2 leaves its COMPLETED redeclaration alone, so that retires with your piece 1.\n\nCode-route ownership stays here: CODE_ROUTES is the one list and Runs adds no copy. The only edit LIN-4448 makes in a Runs file is the STAGE_LABELS literal in lib/run-view.js (piece 3, derived from the stage-kind record); rebase on that if your pieces touch it."
+    },
+    "links": {
+     "answers": "question-86"
+    },
+    "in": "task-82",
+    "v": 1,
+    "op": "add",
+    "at": "2026-11-13T15:39:53.858Z",
+    "by": "design"
+   },
+   {
+    "id": "decision-119",
+    "kind": "decision",
+    "state": "stands",
+    "fields": {
+     "answer": "agree",
+     "why": "## Reply from LIN-4448 (LLM & prompts): agree to all three seam moves\n\nChecked against main 2bf788b6d.\n\n1. **One comment classifier in lib/run-trail.js: agree.** No fallback needed.\n2. **Live-stage wait to lib/run-live-wait.js, old file deleted, no shim: agree.** Our CODE_ROUTES list (LIN-4448 piece 1) imports liveWaitOf from wherever it lives when it lands. Whichever of us lands second changes only the import path. The claim compare-and-set Waiting entry moves to your note unchanged.\n3. **blindReadStep reads closeOutDecision().waitsOn/followsPerson: agree.** The file stays ours. LIN-4448 piece 2 leaves its COMPLETED redeclaration alone, so that retires with your piece 1.\n\nCode-route ownership stays here: CODE_ROUTES is the one list and Runs adds no copy. The only edit LIN-4448 makes in a Runs file is the STAGE_LABELS literal in lib/run-view.js (piece 3, derived from the stage-kind record); rebase on that if your pieces touch it.\n\n## Correction from LIN-4448 (LLM & prompts): the full list of Runs files our pieces edit\n\nThis corrects our reply of 15:39 (comment 08c9c898). That reply said the only Runs file LIN-4448 edits is the `STAGE_LABELS` literal in `lib/run-view.js`. That was wrong. By first match in `docs/areas/areas.json`, these files are `runs-and-dispatch` too. Checked at main `5dcf5bcda`.\n\n| LIN-4448 subtask | Runs files it edits | Collides with |\n|---|---|---|\n| LIN-4465 (piece 1, `CODE_ROUTES`) | comments in `lib/recent-runs.js` and `lib/dispatch-entrance.js` | **LIN-4459** (`recent-runs.js`) |\n| LIN-4466 (piece 2, blind-read identifiers) | `lib/completion-signals.js`, `lib/run-closeout-state.js`, `lib/pipeline-churn.js`, `lib/run-view.js`; also `lib/wall-clock-summary.js` and `lib/run-ledger.js`, where the scan hits | **LIN-4460** (`run-closeout-state.js`); **PR #2427 / LIN-4455** (`run-view.js`, `wall-clock-summary.js`) |\n| LIN-4467 (piece 3, stage-kind records) | the `STAGE_LABELS` literal in `lib/run-view.js`; **`COMPLETION_SIGNALS` becomes a view of our record** | PR #2427 (`run-view.js`). This also **changes Runs' read sample for LIN-4462**: every consumer of `COMPLETION_SIGNALS` is a prompt, so the content belongs with us, but your after-read should know. |\n| LIN-4468 (piece 4, proxy write guard) | `lib/dispatch-entrance.js`, `lib/follow-up-dispatch.js`, `routes/dispatch.js`, `lib/wake-credential.js` (each mint path passes its stage's `writes`) | PR #2427 (`routes/dispatch.js`) |\n\nEvery rebase is mechanical: whichever lands second rebases. We don't touch the runner or `lib/dispatch-store.js`, and Runs' run-behaviour tables (`SPINE`, `BUCKET_OF_KIND`, `FIRST_PASS_KINDS`, `OFF_SPINE_KINDS`) stay yours, with their tests. Also, `lib/stage-writes.js` (where piece 4 puts the one allowance table) is registered to `other-features`, not to either of our areas.\n\nThe three seam moves are agreed as before. Nothing here changes them.\n"
+    },
+    "links": {
+     "answers": "question-86"
+    },
+    "in": "task-82",
+    "v": 2,
+    "op": "revise",
+    "at": "2026-11-13T15:55:15.496Z",
+    "by": "breakdown",
+    "reason": "Corrects the reply (comment 097a3442): LIN-4448 edits more Runs files than STAGE_LABELS; LIN-4465 collides with LIN-4459 on lib/recent-runs.js. The seam moves stay agreed."
+   }
+  ],
+  "decision-120": [
+   {
+    "id": "decision-120",
+    "kind": "decision",
+    "state": "stands",
+    "fields": {
+     "answer": "Accept: no new GitHub reads on the recommend path or ladder lane; add the fact later if a stuck case shows up",
+     "why": "Ruling lin4447-recommend-path-outside-merge, recorded via Harbour (comment 90c9f8a4).",
+     "scope": "task-82"
+    },
+    "links": {
+     "answers": "question-97"
+    },
+    "in": "task-82",
+    "v": 1,
+    "op": "add",
+    "at": "2026-11-13T15:33:37.554Z",
+    "by": "John",
+    "via": "harbour-ruling"
+   }
+  ],
+  "decision-121": [
+   {
+    "id": "decision-121",
+    "kind": "decision",
+    "state": "stands",
+    "fields": {
+     "answer": "Both: a person's Done and an outside merge",
+     "why": "Ruling lin4447-r1-passenger-scope, recorded via Harbour (comment cf8f5ed6).",
+     "scope": "task-82"
+    },
+    "links": {
+     "answers": "question-85"
+    },
+    "in": "task-82",
+    "v": 1,
+    "op": "add",
+    "at": "2026-11-13T15:33:38.870Z",
+    "by": "John",
+    "via": "harbour-ruling"
+   }
+  ],
+  "decision-122": [
+   {
+    "id": "decision-122",
+    "kind": "decision",
+    "state": "stands",
+    "fields": {
+     "answer": "Yes, change both repos so the copies are gone",
+     "why": "Ruling lin4447-sd-scope, recorded via Harbour (comment 830a4864).",
+     "scope": "task-82"
+    },
+    "links": {
+     "answers": "question-84"
+    },
+    "in": "task-82",
+    "v": 1,
+    "op": "add",
+    "at": "2026-11-13T15:33:41.552Z",
+    "by": "John",
+    "via": "harbour-ruling"
    }
   ]
  },

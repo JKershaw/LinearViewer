@@ -1139,6 +1139,34 @@
     "scoping"
    ],
    "asOf": null
+  },
+  {
+   "at": "2026-11-17T15:24:52.924Z",
+   "by": "design",
+   "cmd": "show",
+   "args": [
+    "show",
+    "--task",
+    "task-9",
+    "--by",
+    "design"
+   ],
+   "asOf": null
+  },
+  {
+   "at": "2026-11-17T15:24:52.962Z",
+   "by": "design",
+   "cmd": "find",
+   "args": [
+    "find",
+    "--area",
+    "area-1",
+    "--state",
+    "open",
+    "--by",
+    "design"
+   ],
+   "asOf": null
   }
  ]
 }

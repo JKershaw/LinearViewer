@@ -1,0 +1,95 @@
+[
+ {
+  "at": "2026-11-17T15:23:36.024Z",
+  "by": "scoping",
+  "cmd": "show",
+  "args": [
+   "show",
+   "--task",
+   "task-9",
+   "--by",
+   "scoping"
+  ],
+  "asOf": null
+ },
+ {
+  "at": "2026-11-17T15:23:36.059Z",
+  "by": "scoping",
+  "cmd": "find",
+  "args": [
+   "find",
+   "--kind",
+   "decision",
+   "--by",
+   "scoping"
+  ],
+  "asOf": null
+ },
+ {
+  "at": "2026-11-17T15:23:36.091Z",
+  "by": "scoping",
+  "cmd": "find",
+  "args": [
+   "find",
+   "--kind",
+   "run",
+   "--in",
+   "task-9",
+   "--by",
+   "scoping"
+  ],
+  "asOf": null
+ },
+ {
+  "at": "2026-11-17T15:24:02.425Z",
+  "by": "scoping",
+  "cmd": "show",
+  "args": [
+   "show",
+   "--task",
+   "task-9",
+   "--by",
+   "scoping"
+  ],
+  "asOf": null
+ },
+ {
+  "at": "2026-11-17T15:24:09.564Z",
+  "by": "scoping",
+  "cmd": "show",
+  "args": [
+   "show",
+   "--task",
+   "task-9",
+   "--by",
+   "scoping"
+  ],
+  "asOf": null
+ },
+ {
+  "at": "2026-11-17T15:24:12.014Z",
+  "by": "scoping",
+  "cmd": "show",
+  "args": [
+   "show",
+   "--task",
+   "task-9",
+   "--by",
+   "scoping"
+  ],
+  "asOf": null
+ },
+ {
+  "at": "2026-11-17T15:24:19.157Z",
+  "by": "scoping",
+  "cmd": "show",
+  "args": [
+   "show",
+   "--task",
+   "task-9",
+   "--by",
+   "scoping"
+  ],
+  "asOf": null
+ }
+]

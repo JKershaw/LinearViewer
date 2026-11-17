@@ -1,5 +1,5 @@
 {
- "next": 139,
+ "next": 141,
  "records": {
   "area-1": [
    {
@@ -2597,6 +2597,27 @@
     "op": "add",
     "at": "2026-11-13T15:54:40.600Z",
     "by": "breakdown"
+   },
+   {
+    "id": "task-127",
+    "kind": "task",
+    "state": "done",
+    "fields": {
+     "ref": "LIN-4465",
+     "done-when": "LLM & prompts: one ordered CODE_ROUTES list that codeRouteOf iterates (piece 1)",
+     "paths": []
+    },
+    "links": {
+     "piece": "plan-113"
+    },
+    "in": "task-108",
+    "v": 2,
+    "op": "end",
+    "at": "2026-11-13T19:44:59.000Z",
+    "by": "close-out",
+    "ended": {
+     "reason": "Piece 1: PR #2433 merged as e666c4b60. Time is the merge commit's."
+    }
    }
   ],
   "task-128": [
@@ -2617,6 +2638,27 @@
     "op": "add",
     "at": "2026-11-13T15:54:40.900Z",
     "by": "breakdown"
+   },
+   {
+    "id": "task-128",
+    "kind": "task",
+    "state": "done",
+    "fields": {
+     "ref": "LIN-4466",
+     "done-when": "LLM & prompts: blind read's kind and heading from one leaf (piece 2)",
+     "paths": []
+    },
+    "links": {
+     "piece": "plan-114"
+    },
+    "in": "task-108",
+    "v": 2,
+    "op": "end",
+    "at": "2026-11-13T20:42:28.000Z",
+    "by": "close-out",
+    "ended": {
+     "reason": "Piece 2: PR #2441 merged as dc12ca51b. Time is the merge commit's."
+    }
    }
   ],
   "task-129": [
@@ -2637,6 +2679,27 @@
     "op": "add",
     "at": "2026-11-13T15:54:41.200Z",
     "by": "breakdown"
+   },
+   {
+    "id": "task-129",
+    "kind": "task",
+    "state": "done",
+    "fields": {
+     "ref": "LIN-4467",
+     "done-when": "LLM & prompts: one record per stage kind, tables become views (piece 3)",
+     "paths": []
+    },
+    "links": {
+     "piece": "plan-115"
+    },
+    "in": "task-108",
+    "v": 2,
+    "op": "end",
+    "at": "2026-11-13T21:58:11.000Z",
+    "by": "close-out",
+    "ended": {
+     "reason": "Piece 3: PR #2444 merged as 8fea3869f. Time is the merge commit's."
+    }
    }
   ],
   "task-130": [
@@ -2657,6 +2720,27 @@
     "op": "add",
     "at": "2026-11-13T15:54:41.500Z",
     "by": "breakdown"
+   },
+   {
+    "id": "task-130",
+    "kind": "task",
+    "state": "done",
+    "fields": {
+     "ref": "LIN-4468",
+     "done-when": "LLM & prompts: proxy refuses writes outside the stage's allowance (piece 4)",
+     "paths": []
+    },
+    "links": {
+     "piece": "plan-116"
+    },
+    "in": "task-108",
+    "v": 2,
+    "op": "end",
+    "at": "2026-11-13T22:29:42.000Z",
+    "by": "close-out",
+    "ended": {
+     "reason": "Piece 4: PR #2443 merged as b937237a4. Time is the merge commit's."
+    }
    }
   ],
   "task-131": [
@@ -2840,6 +2924,45 @@
     "op": "add",
     "at": "2026-11-13T15:58:14.076Z",
     "by": "breakdown"
+   }
+  ],
+  "verdict-139": [
+   {
+    "id": "verdict-139",
+    "kind": "verdict",
+    "state": "stands",
+    "fields": {
+     "of": "review",
+     "outcome": "request-changes",
+     "reasoning": "Request Changes. The parent isn't ready to close: four of the seven pieces haven't started, and one is waiting for close-out. This is not a design problem. The approved plan stands, and the next action is to keep descending into the children. In order: `close-out` on LIN-4466 (already sent), then `implementation` on LIN-4468 (it can start now, independently), then LIN-4467 once #2441 merges, then LIN-4469, then LIN-4470. After that, run review on the parent again.\n\n### What CI Did Not Prove\n- **Inside** (bounded class: prompt-only limits; LIN-1273/LIN-1242 read-only scope). The proxy write guard does not exist yet. Settle it **before the parent closes** by landing LIN-4468, with tests showing a forbidden write returns 403 on real preamble endpoints. That includes triage's description PATCH under `ticket-fields`, and a comment POST to a ticket other than the stamped one under `one-comment`.\n- **Inside** (bounded class: stage-kind tables, docs drift row 154). `public/llms.txt` and `docs/architecture/prompt-system.md` still describe routes and stages independently of the code. Settle it **before the parent closes** through LIN-4467, by generating the catalogue from the record and keeping the real-context fresh and fix renders byte-identical.\n- **Inside** (bounded class: rules as prompt lists). There is no net reduction in rendered bytes yet. Settle it **before the parent closes** through LIN-4469, with the re-pin showing lower `FROZEN_TOTAL_BYTES` and the reasons recorded in `scripts/prompt-template-change-log.md`.\n- **Inside** (Waiting entries + the blind-read measurement in Done when). Settle it **before the parent closes** through LIN-4470. Every retained entry must name its blocker or owner. The repeat `llm-and-prompts` read must beat the `front-end-pages` control, with intervening changes to either sample accounted for.\n- **Inside** (piece 2). #2441 is not merged and still has one open ledger item on LIN-4466. Settle it through the close-out already dispatched to LIN-4466."
+    },
+    "links": {
+     "on": [
+      "task-108@2"
+     ]
+    },
+    "in": "task-108",
+    "v": 1,
+    "op": "add",
+    "at": "2026-11-13T20:34:06.118Z",
+    "by": "review"
+   }
+  ],
+  "decision-140": [
+   {
+    "id": "decision-140",
+    "kind": "decision",
+    "state": "stands",
+    "fields": {
+     "answer": "## Condition on LIN-4467's budget raise, for piece 5\n\nIt was accepted on one condition that falls on this piece: **LIN-4469 must show a net rendered-byte reduction and lower `FROZEN_TOTAL_BYTES` below 396575** (the figure the settlement named), with the reduction measured on rendered prompts, not on source moved out of measured files. John on the limit: \"That limit is to push against lists of rules. Worth knowing, but not hard and fast.\"",
+     "why": "LIN-4467 (PR https://github.com/JKershaw/LinearViewer/pull/2444) raises `FROZEN_TOTAL_BYTES` in `tests/unit/prompt-size-budget.test.js` from 378915 to 396884 (396575 at review, plus a net +309 at close-out for deriving the reading-pass lines). It is re-accounting, not growth: the text moved into the newly budgeted `lib/prompts/stage-kinds.js` from files the total did not cover, and all 80 rendered prompts are byte-identical.\n\nNamed monitor: `tests/unit/prompt-size-budget.test.js` fails on any growth past the ceiling. Only this piece landing can show the reduction.\n\nThe record's source ceiling (`lib/prompts/stage-kinds.js`, 43348) is part of what to lower if wording moves out of it. `lib/prompt-template-defs.js` and the budget test are shared with this piece; LIN-4467 lands first.\n"
+    },
+    "links": {},
+    "in": "task-131",
+    "v": 1,
+    "op": "add",
+    "at": "2026-11-13T21:49:17.132Z",
+    "by": "autopilot"
    }
   ]
  },
