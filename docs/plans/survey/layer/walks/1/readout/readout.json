@@ -1,0 +1,116 @@
+[
+ {
+  "stage": "survey-task",
+  "at": "2026-11-13T13:44:54.296Z",
+  "trackerChars": 57039,
+  "briefChars": 4753,
+  "open": 4,
+  "instructions": 0,
+  "records": {
+   "task": 1,
+   "plan": 1,
+   "decision": 1,
+   "lesson": 2,
+   "finding": 1
+  }
+ },
+ {
+  "stage": "survey-place",
+  "at": "2026-11-13T13:47:54.628Z",
+  "trackerChars": 61029,
+  "briefChars": 5322,
+  "open": 7,
+  "instructions": 2,
+  "records": {
+   "task": 1,
+   "plan": 1,
+   "finding": 3,
+   "decision": 1,
+   "lesson": 2,
+   "check": 1
+  }
+ },
+ {
+  "stage": "scoping",
+  "at": "2026-11-13T13:52:09.214Z",
+  "trackerChars": 64375,
+  "briefChars": 9273,
+  "open": 16,
+  "instructions": 8,
+  "records": {
+   "task": 1,
+   "plan": 1,
+   "question": 1,
+   "finding": 11,
+   "decision": 1,
+   "lesson": 2,
+   "check": 1
+  }
+ },
+ {
+  "stage": "implementation",
+  "at": "2026-11-13T13:55:48.569Z",
+  "trackerChars": 64375,
+  "briefChars": 9845,
+  "open": 17,
+  "instructions": 8,
+  "records": {
+   "task": 1,
+   "plan": 1,
+   "question": 1,
+   "finding": 11,
+   "decision": 2,
+   "lesson": 2,
+   "check": 1
+  }
+ },
+ {
+  "stage": "review",
+  "at": "2026-11-13T15:12:24.573Z",
+  "trackerChars": 69876,
+  "briefChars": 8435,
+  "open": 14,
+  "instructions": 1,
+  "records": {
+   "task": 1,
+   "plan": 1,
+   "finding": 4,
+   "decision": 3,
+   "lesson": 6,
+   "check": 1
+  }
+ },
+ {
+  "stage": "blind-read",
+  "at": "2026-11-13T15:18:45.249Z",
+  "trackerChars": 80869,
+  "briefChars": 8188,
+  "open": 15,
+  "instructions": 0,
+  "records": {
+   "task": 1,
+   "plan": 1,
+   "decision": 3,
+   "lesson": 6,
+   "finding": 3,
+   "check": 3
+  }
+ },
+ {
+  "stage": "close-out",
+  "at": "2026-11-13T15:21:56.087Z",
+  "trackerChars": 83518,
+  "briefChars": 10820,
+  "open": 20,
+  "instructions": 5,
+  "records": {
+   "task": 1,
+   "plan": 1,
+   "finding": 7,
+   "question": 1,
+   "decision": 3,
+   "lesson": 6,
+   "check": 3
+  }
+ }
+]
