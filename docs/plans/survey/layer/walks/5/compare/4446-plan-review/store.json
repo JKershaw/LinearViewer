@@ -2323,5 +2323,80 @@
    }
   ]
  },
- "log": []
+ "log": [
+  {
+   "at": "2026-11-17T15:39:45.283Z",
+   "by": "plan-review",
+   "cmd": "show",
+   "args": [
+    "show",
+    "--task",
+    "task-9",
+    "--by",
+    "plan-review"
+   ],
+   "asOf": null
+  },
+  {
+   "at": "2026-11-17T15:39:45.314Z",
+   "by": "plan-review",
+   "cmd": "find",
+   "args": [
+    "find",
+    "--to",
+    "plan-review",
+    "--by",
+    "plan-review"
+   ],
+   "asOf": null
+  },
+  {
+   "at": "2026-11-17T15:39:50.341Z",
+   "by": "plan-review",
+   "cmd": "get",
+   "args": [
+    "get",
+    "verdict-35",
+    "--by",
+    "plan-review"
+   ],
+   "asOf": null
+  },
+  {
+   "at": "2026-11-17T15:39:50.369Z",
+   "by": "plan-review",
+   "cmd": "get",
+   "args": [
+    "get",
+    "finding-34",
+    "--by",
+    "plan-review"
+   ],
+   "asOf": null
+  },
+  {
+   "at": "2026-11-17T15:39:50.409Z",
+   "by": "plan-review",
+   "cmd": "get",
+   "args": [
+    "get",
+    "finding-36",
+    "--by",
+    "plan-review"
+   ],
+   "asOf": null
+  },
+  {
+   "at": "2026-11-17T15:39:50.443Z",
+   "by": "plan-review",
+   "cmd": "get",
+   "args": [
+    "get",
+    "finding-37",
+    "--by",
+    "plan-review"
+   ],
+   "asOf": null
+  }
+ ]
 }

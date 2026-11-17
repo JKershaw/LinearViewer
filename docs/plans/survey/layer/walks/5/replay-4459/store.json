@@ -1,5 +1,5 @@
 {
- "next": 163,
+ "next": 169,
  "records": {
   "area-1": [
    {
@@ -4659,6 +4659,153 @@
     "op": "add",
     "at": "2026-11-13T16:58:40.000Z",
     "by": "review"
+   }
+  ],
+  "run-163": [
+   {
+    "id": "run-163",
+    "kind": "run",
+    "state": "open",
+    "fields": {
+     "stage": "blind-read",
+     "account": "Blind read of PR #2432 at 7424cfb8f against 0092d8d9e, posted on LIN-4459 (comment 16376a3c). Verdict better: FEEDBACK_ENTRY_KINDS has one home in lib/dispatch-feedback-kinds.js now that the store re-export is gone; the live-wait predicate lives in lib/run-live-wait.js with no cycle and a census; a parked stage whose lineage ended no longer holds its ticket, proved by real-store tests in lin-4392. Worse side: the run-outcome words now have two homes. Two fix-sized items (a garbled test header comment with a stale citation; the blocked-to-WAITING_ON_A_PERSON mapping written twice in runFact) and two larger ones (one home for the outcome words; listHistory reporting the lineage end time). Nothing outside the area; nothing for LIN-4447 or LIN-4448; description unchanged."
+    },
+    "links": {},
+    "in": "task-113",
+    "v": 1,
+    "op": "add",
+    "at": "2026-11-13T17:02:25.000Z",
+    "by": "blind-read"
+   },
+   {
+    "id": "run-163",
+    "kind": "run",
+    "state": "done",
+    "fields": {
+     "stage": "blind-read",
+     "account": "Blind read of PR #2432 at 7424cfb8f against 0092d8d9e, posted on LIN-4459 (comment 16376a3c). Verdict better: FEEDBACK_ENTRY_KINDS has one home in lib/dispatch-feedback-kinds.js now that the store re-export is gone; the live-wait predicate lives in lib/run-live-wait.js with no cycle and a census; a parked stage whose lineage ended no longer holds its ticket, proved by real-store tests in lin-4392. Worse side: the run-outcome words now have two homes. Two fix-sized items (a garbled test header comment with a stale citation; the blocked-to-WAITING_ON_A_PERSON mapping written twice in runFact) and two larger ones (one home for the outcome words; listHistory reporting the lineage end time). Nothing outside the area; nothing for LIN-4447 or LIN-4448; description unchanged."
+    },
+    "links": {},
+    "in": "task-113",
+    "v": 2,
+    "op": "end",
+    "at": "2026-11-13T17:02:31.000Z",
+    "by": "blind-read",
+    "ended": {
+     "reason": "blind read posted (comment 16376a3c); verdict-168 and findings 164-167 written"
+    }
+   }
+  ],
+  "finding-164": [
+   {
+    "id": "finding-164",
+    "kind": "finding",
+    "state": "open",
+    "fields": {
+     "says": "Fix-sized, PR #2432 at 7424cfb8f: `tests/unit/session-run-transcript-entries.test.js` header comment now reads \"(lib/dispatch-feedback-kinds.js; then —\", which is garbled, and the same sentence still cites \"lib/dispatch-store.js:95\" for why `decision-answer` is excluded, though that explanation now lives in `lib/dispatch-feedback-kinds.js`. Fix: reword the parenthesis and point the citation at `lib/dispatch-feedback-kinds.js`, with no line number."
+    },
+    "links": {
+     "about": [
+      "change-143"
+     ]
+    },
+    "in": "task-113",
+    "to": "close-out",
+    "v": 1,
+    "op": "add",
+    "at": "2026-11-13T17:02:26.000Z",
+    "by": "blind-read"
+   }
+  ],
+  "finding-165": [
+   {
+    "id": "finding-165",
+    "kind": "finding",
+    "state": "open",
+    "fields": {
+     "says": "Fix-sized, PR #2432 at 7424cfb8f: `runFact` (`lib/recent-runs.js`) translates the wire word `blocked` into `WAITING_ON_A_PERSON` in two places, the own-row branch and the new parked-lineage branch (`r.outcome === 'blocked' ? WAITING_ON_A_PERSON : r.outcome`). Fix: one small local mapping both branches use."
+    },
+    "links": {
+     "about": [
+      "change-143"
+     ]
+    },
+    "in": "task-113",
+    "to": "close-out",
+    "v": 1,
+    "op": "add",
+    "at": "2026-11-13T17:02:27.000Z",
+    "by": "blind-read"
+   }
+  ],
+  "finding-166": [
+   {
+    "id": "finding-166",
+    "kind": "finding",
+    "state": "open",
+    "fields": {
+     "says": "`lib/run-live-wait.js` / `lib/recent-runs.js`: the run-outcome words have two homes. To avoid a cycle, `recent-runs.js` (`runFact`, which produces the outcomes) imports `QUEUED`/`RUNNING` from `run-live-wait.js`, the module that reads them, while `WAITING_ON_A_PERSON`, `'closed'` and `'aborted'` stay in `recent-runs.js`, and `lib/recommendation-look-first.js` still imports from there. One home (for example a leaf module of outcome words) means choosing where it lives and touches importers in llm-and-prompts, so it is larger than a fix. (Blind read of PR #2432, LIN-4459.)"
+    },
+    "links": {
+     "about": [
+      "change-143",
+      "finding-130"
+     ]
+    },
+    "in": "area-1",
+    "to": "area-1",
+    "v": 1,
+    "op": "add",
+    "at": "2026-11-13T17:02:28.000Z",
+    "by": "blind-read"
+   }
+  ],
+  "finding-167": [
+   {
+    "id": "finding-167",
+    "kind": "finding",
+    "state": "open",
+    "fields": {
+     "says": "`lib/recent-runs.js`: a parked stage whose lineage ended is dated by the park's timestamp, not the lineage's end, because the `withLineage` wire row carries no end time (the code comment admits this). It sorts too early in the selector's five, and can land on the wrong side of a \"since the latest review\" cut, such as `lib/recommendation-blind-read.js`'s count of ended reads. Fix: `listHistory` in `lib/dispatch-store.js` reports the lineage's end time; a store change, so larger. (Blind read of PR #2432, LIN-4459.)"
+    },
+    "links": {
+     "about": [
+      "change-143",
+      "finding-147"
+     ]
+    },
+    "in": "area-1",
+    "to": "area-1",
+    "v": 1,
+    "op": "add",
+    "at": "2026-11-13T17:02:29.000Z",
+    "by": "blind-read"
+   }
+  ],
+  "verdict-168": [
+   {
+    "id": "verdict-168",
+    "kind": "verdict",
+    "state": "stands",
+    "fields": {
+     "of": "blind-read",
+     "outcome": "better",
+     "reasoning": "Better (LIN-4459 comment 16376a3c), read PR #2432 at 7424cfb8f against 0092d8d9e. Two things get one home: `FEEDBACK_ENTRY_KINDS` comes only from `lib/dispatch-feedback-kinds.js` (the `lib/dispatch-store.js` re-export is gone, every importer moved), and the live-wait predicate is in `lib/run-live-wait.js`, with no import cycle and a census test. A parked stage whose lineage has ended no longer holds its ticket, proved by real-store tests in `tests/unit/lin-4392-live-stage-wait.test.js`. Worse side: the run-outcome words are split between `lib/run-live-wait.js` (QUEUED/RUNNING) and `lib/recent-runs.js` (waiting on a person, closed, aborted), finding-166. Fix-sized: finding-164, finding-165. Larger: finding-166, finding-167. Outside the area: none."
+    },
+    "links": {
+     "on": [
+      "change-143@2"
+     ],
+     "about": [
+      "task-113",
+      "area-1"
+     ]
+    },
+    "in": "task-113",
+    "v": 1,
+    "op": "add",
+    "at": "2026-11-13T17:02:30.000Z",
+    "by": "blind-read"
    }
   ]
  },
