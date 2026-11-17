@@ -1,0 +1,967 @@
+### SEED (Harbour, 2026-11-13T16:00:00Z)
+{
+  "id": "area-1",
+  "kind": "area",
+  "name": "Runs & dispatch",
+  "paths": [
+    "lib/dispatch/"
+  ],
+  "links": {},
+  "state": "kept",
+  "v": 1,
+  "op": "add",
+  "by": "Harbour",
+  "at": "2026-11-13T16:00:00.000Z"
+}
+
+{
+  "id": "area-2",
+  "kind": "area",
+  "name": "LLM & prompts",
+  "paths": [
+    "lib/llm/"
+  ],
+  "links": {},
+  "state": "kept",
+  "v": 1,
+  "op": "add",
+  "by": "Harbour",
+  "at": "2026-11-13T16:00:00.000Z"
+}
+
+{
+  "id": "task-3",
+  "kind": "task",
+  "asked": "LIN-4447 Runs & dispatch lane",
+  "paths": [
+    "lib/dispatch/"
+  ],
+  "links": {},
+  "state": "open",
+  "v": 1,
+  "op": "add",
+  "by": "Harbour",
+  "at": "2026-11-13T16:00:00.000Z"
+}
+
+{
+  "id": "task-4",
+  "kind": "task",
+  "asked": "LIN-4448 LLM & prompts lane",
+  "paths": [
+    "lib/llm/"
+  ],
+  "links": {},
+  "state": "open",
+  "v": 1,
+  "op": "add",
+  "by": "Harbour",
+  "at": "2026-11-13T16:00:00.000Z"
+}
+
+{
+  "id": "task-5",
+  "kind": "task",
+  "in": "task-3",
+  "asked": "LIN-4458 classifier home and run census",
+  "paths": [
+    "lib/dispatch/census/"
+  ],
+  "links": {},
+  "state": "open",
+  "v": 1,
+  "op": "add",
+  "by": "Harbour",
+  "at": "2026-11-13T16:00:00.000Z"
+}
+
+{
+  "id": "task-6",
+  "kind": "task",
+  "in": "task-3",
+  "asked": "LIN-4459 live-wait move",
+  "paths": [
+    "lib/dispatch/live-wait/"
+  ],
+  "links": {},
+  "state": "open",
+  "v": 1,
+  "op": "add",
+  "by": "Harbour",
+  "at": "2026-11-13T16:00:00.000Z"
+}
+
+{
+  "id": "task-3",
+  "kind": "task",
+  "asked": "LIN-4447 Runs & dispatch lane",
+  "paths": [
+    "lib/dispatch/"
+  ],
+  "links": {
+    "about": "area-1"
+  },
+  "state": "open",
+  "v": 2,
+  "op": "link",
+  "by": "Harbour",
+  "at": "2026-11-13T16:00:00.000Z"
+}
+
+{
+  "id": "task-4",
+  "kind": "task",
+  "asked": "LIN-4448 LLM & prompts lane",
+  "paths": [
+    "lib/llm/"
+  ],
+  "links": {
+    "about": "area-2"
+  },
+  "state": "open",
+  "v": 2,
+  "op": "link",
+  "by": "Harbour",
+  "at": "2026-11-13T16:00:00.000Z"
+}
+
+### 1. LIN-4458 build session (2026-11-13T16:42:00Z): brief
+# Brief for implementation on task-5 as of 2026-11-13T16:42:00.000Z
+
+## 1. The person's words
+task-5: LIN-4458 classifier home and run census
+task-3: LIN-4447 Runs & dispatch lane
+
+## 2. Its plan piece
+(none)
+
+## 3. Addressed to it
+(none)
+
+## 4. What stands about this task
+(none)
+
+## 5. Its areas
+area-1 Runs & dispatch (0 open addressed to it)
+
+## 6. Open runs of other tasks sharing a path
+(none)
+
+## 7. Index of what else is known
+(none)
+
+-- carries {"words":2,"piece":0,"addressed":0,"stands":0,"areas":1,"runs":0,"index":0}; 442 bytes
+
+### 1. lookup: where is LIN-4448's lane?
+[
+  {
+    "id": "task-4",
+    "kind": "task",
+    "asked": "LIN-4448 LLM & prompts lane",
+    "paths": [
+      "lib/llm/"
+    ],
+    "links": {
+      "about": "area-2"
+    },
+    "state": "open",
+    "v": 2,
+    "op": "link",
+    "by": "Harbour",
+    "at": "2026-11-13T16:00:00.000Z"
+  }
+]
+
+{
+  "id": "run-7",
+  "kind": "run",
+  "in": "task-5",
+  "stage": "implementation",
+  "claims": [
+    "lib/dispatch/census/"
+  ],
+  "links": {},
+  "state": "open",
+  "v": 1,
+  "op": "add",
+  "by": "implementation",
+  "at": "2026-11-13T16:42:00.000Z",
+  "via": "LIN-4458 build"
+}
+
+{
+  "id": "decision-8",
+  "kind": "decision",
+  "in": "task-5",
+  "answer": "Census boundary: count runs dispatched from lib/dispatch/ only; classifier-only LLM calls stay outside the census",
+  "why": "The census measures dispatch, not model use",
+  "scope": "task-5",
+  "links": {},
+  "state": "stands",
+  "v": 1,
+  "op": "add",
+  "by": "implementation",
+  "at": "2026-11-13T16:42:00.000Z",
+  "via": "LIN-4458 build"
+}
+
+{
+  "id": "question-9",
+  "kind": "question",
+  "in": "task-5",
+  "to": "task-4",
+  "asks": "Is the census boundary drawn right for the LLM & prompts lane? Tell me on LIN-4458 if you want it drawn differently.",
+  "options": [
+    "keep as drawn",
+    "redraw"
+  ],
+  "recommended": "keep as drawn",
+  "if-unanswered": "LIN-4458 keeps the boundary as drawn (decision-8)",
+  "links": {
+    "on": "decision-8@1",
+    "about": "area-2"
+  },
+  "state": "open",
+  "v": 1,
+  "op": "add",
+  "by": "implementation",
+  "at": "2026-11-13T16:42:00.000Z",
+  "via": "LIN-4458 build"
+}
+
+### 2. LIN-4459 session (2026-11-13T16:42:00Z): brief
+# Brief for implementation on task-6 as of 2026-11-13T16:42:00.000Z
+
+## 1. The person's words
+task-6: LIN-4459 live-wait move
+task-3: LIN-4447 Runs & dispatch lane
+
+## 2. Its plan piece
+(none)
+
+## 3. Addressed to it
+(none)
+
+## 4. What stands about this task
+(none)
+
+## 5. Its areas
+area-1 Runs & dispatch (0 open addressed to it)
+
+## 6. Open runs of other tasks sharing a path
+(none)
+
+## 7. Index of what else is known
+(none)
+
+-- carries {"words":2,"piece":0,"addressed":0,"stands":0,"areas":1,"runs":0,"index":0}; 426 bytes
+
+[
+  {
+    "id": "task-4",
+    "kind": "task",
+    "asked": "LIN-4448 LLM & prompts lane",
+    "paths": [
+      "lib/llm/"
+    ],
+    "links": {
+      "about": "area-2"
+    },
+    "state": "open",
+    "v": 2,
+    "op": "link",
+    "by": "Harbour",
+    "at": "2026-11-13T16:00:00.000Z"
+  }
+]
+
+{
+  "id": "run-10",
+  "kind": "run",
+  "in": "task-6",
+  "stage": "implementation",
+  "claims": [
+    "lib/dispatch/live-wait/",
+    "lib/llm/registry"
+  ],
+  "links": {},
+  "state": "open",
+  "v": 1,
+  "op": "add",
+  "by": "implementation",
+  "at": "2026-11-13T16:42:00.000Z",
+  "via": "LIN-4459 session"
+}
+
+{
+  "id": "change-11",
+  "kind": "change",
+  "in": "task-6",
+  "ref": "PR #2432",
+  "head": "a1b2c3d",
+  "links": {},
+  "state": "open",
+  "v": 1,
+  "op": "add",
+  "by": "implementation",
+  "at": "2026-11-13T16:42:00.000Z",
+  "via": "LIN-4459 session"
+}
+
+{
+  "id": "question-12",
+  "kind": "question",
+  "in": "task-6",
+  "to": "task-4",
+  "asks": "Do you agree the live-wait move (PR #2432)?",
+  "options": [
+    "agree",
+    "object"
+  ],
+  "recommended": "agree",
+  "if-unanswered": "LIN-4459 proceeds with the move",
+  "links": {
+    "on": "change-11@1",
+    "about": "area-2"
+  },
+  "state": "open",
+  "v": 1,
+  "op": "add",
+  "by": "implementation",
+  "at": "2026-11-13T16:42:00.000Z",
+  "via": "LIN-4459 session"
+}
+
+{
+  "id": "run-7",
+  "kind": "run",
+  "in": "task-5",
+  "stage": "implementation",
+  "claims": [
+    "lib/dispatch/census/"
+  ],
+  "links": {},
+  "state": "done",
+  "v": 2,
+  "op": "end",
+  "by": "implementation",
+  "at": "2026-11-13T16:50:00.000Z",
+  "stateReason": "asked LIN-4448 lane (question-9); boundary kept as drawn unless told otherwise",
+  "via": "LIN-4458 build",
+  "reason": "asked LIN-4448 lane (question-9); boundary kept as drawn unless told otherwise"
+}
+
+### 3. LIN-4448 autopilot wakes (2026-11-13T17:00:00Z): brief
+# Brief for autopilot on task-4 as of 2026-11-13T17:00:00.000Z
+
+## 1. The person's words
+task-4: LIN-4448 LLM & prompts lane
+
+## 2. Its plan piece
+(none)
+
+## 3. Addressed to it
+question-9@1 question (open) to task-4 on decision-8@1
+  asks: Is the census boundary drawn right for the LLM & prompts lane? Tell me on LIN-4458 if you want it drawn differently.
+  options: keep as drawn, redraw
+  recommended: keep as drawn
+  if-unanswered: LIN-4458 keeps the boundary as drawn (decision-8)
+question-12@1 question (open) to task-4 on change-11@1
+  asks: Do you agree the live-wait move (PR #2432)?
+  options: agree, object
+  recommended: agree
+  if-unanswered: LIN-4459 proceeds with the move
+
+## 4. What stands about this task
+(none)
+
+## 5. Its areas
+area-2 LLM & prompts (0 open addressed to it)
+
+## 6. Open runs of other tasks sharing a path
+run-10 in task-6 by implementation claims lib/dispatch/live-wait/, lib/llm/registry
+
+## 7. Index of what else is known
+(none)
+
+-- carries {"words":1,"piece":0,"addressed":2,"stands":0,"areas":1,"runs":1,"index":0}; 966 bytes
+
+[
+  {
+    "id": "question-9",
+    "kind": "question",
+    "in": "task-5",
+    "to": "task-4",
+    "asks": "Is the census boundary drawn right for the LLM & prompts lane? Tell me on LIN-4458 if you want it drawn differently.",
+    "options": [
+      "keep as drawn",
+      "redraw"
+    ],
+    "recommended": "keep as drawn",
+    "if-unanswered": "LIN-4458 keeps the boundary as drawn (decision-8)",
+    "links": {
+      "on": "decision-8@1",
+      "about": "area-2"
+    },
+    "state": "open",
+    "v": 1,
+    "op": "add",
+    "by": "implementation",
+    "at": "2026-11-13T16:42:00.000Z",
+    "via": "LIN-4458 build"
+  },
+  {
+    "id": "question-12",
+    "kind": "question",
+    "in": "task-6",
+    "to": "task-4",
+    "asks": "Do you agree the live-wait move (PR #2432)?",
+    "options": [
+      "agree",
+      "object"
+    ],
+    "recommended": "agree",
+    "if-unanswered": "LIN-4459 proceeds with the move",
+    "links": {
+      "on": "change-11@1",
+      "about": "area-2"
+    },
+    "state": "open",
+    "v": 1,
+    "op": "add",
+    "by": "implementation",
+    "at": "2026-11-13T16:42:00.000Z",
+    "via": "LIN-4459 session"
+  }
+]
+
+### 4. LIN-4459 session (2026-11-13T17:06:00Z): brief
+# Brief for implementation on task-6 as of 2026-11-13T17:06:00.000Z
+
+## 1. The person's words
+task-6: LIN-4459 live-wait move
+task-3: LIN-4447 Runs & dispatch lane
+
+## 2. Its plan piece
+(none)
+
+## 3. Addressed to it
+(none)
+
+## 4. What stands about this task
+(none)
+
+## 5. Its areas
+area-1 Runs & dispatch (0 open addressed to it)
+
+## 6. Open runs of other tasks sharing a path
+(none)
+
+## 7. Index of what else is known
+run-10 run - implementation
+change-11 change - PR #2432
+question-12 question task-4 Do you agree the live-wait move (PR #2432)?
+
+-- carries {"words":2,"piece":0,"addressed":0,"stands":0,"areas":1,"runs":0,"index":3}; 547 bytes
+
+### 4. lookup: any answer to question-12?
+{
+  "id": "question-12",
+  "kind": "question",
+  "in": "task-6",
+  "to": "task-4",
+  "asks": "Do you agree the live-wait move (PR #2432)?",
+  "options": [
+    "agree",
+    "object"
+  ],
+  "recommended": "agree",
+  "if-unanswered": "LIN-4459 proceeds with the move",
+  "links": {
+    "on": "change-11@1",
+    "about": "area-2"
+  },
+  "state": "open",
+  "v": 1,
+  "op": "add",
+  "by": "implementation",
+  "at": "2026-11-13T16:42:00.000Z",
+  "via": "LIN-4459 session",
+  "versions": [
+    {
+      "id": "question-12",
+      "kind": "question",
+      "in": "task-6",
+      "to": "task-4",
+      "asks": "Do you agree the live-wait move (PR #2432)?",
+      "options": [
+        "agree",
+        "object"
+      ],
+      "recommended": "agree",
+      "if-unanswered": "LIN-4459 proceeds with the move",
+      "links": {
+        "on": "change-11@1",
+        "about": "area-2"
+      },
+      "state": "open",
+      "v": 1,
+      "op": "add",
+      "by": "implementation",
+      "at": "2026-11-13T16:42:00.000Z",
+      "via": "LIN-4459 session"
+    }
+  ]
+}
+
+{
+  "id": "change-11",
+  "kind": "change",
+  "in": "task-6",
+  "ref": "PR #2432",
+  "head": "e4f5a6b",
+  "links": {},
+  "state": "open",
+  "v": 2,
+  "op": "revise",
+  "by": "implementation",
+  "at": "2026-11-13T17:06:00.000Z",
+  "via": "LIN-4459 session",
+  "reason": "import change in lib/llm/ and one retired LLM entry"
+}
+
+{
+  "id": "question-13",
+  "kind": "question",
+  "in": "task-6",
+  "to": "task-4",
+  "asks": "PR #2432 now also changes an import in lib/llm/ and retires one LLM entry. Unless you say otherwise, proceeding to merge.",
+  "if-unanswered": "LIN-4459 merges PR #2432",
+  "links": {
+    "on": "change-11@2",
+    "about": "area-2"
+  },
+  "state": "open",
+  "v": 1,
+  "op": "add",
+  "by": "implementation",
+  "at": "2026-11-13T17:06:00.000Z",
+  "via": "LIN-4459 session"
+}
+
+{
+  "id": "change-11",
+  "kind": "change",
+  "in": "task-6",
+  "ref": "PR #2432",
+  "head": "e4f5a6b",
+  "links": {},
+  "state": "merged",
+  "v": 3,
+  "op": "end",
+  "by": "implementation",
+  "at": "2026-11-13T17:06:00.000Z",
+  "stateReason": "merged on silence: question-12 and question-13 unanswered",
+  "via": "LIN-4459 session",
+  "reason": "merged on silence: question-12 and question-13 unanswered"
+}
+
+{
+  "id": "run-10",
+  "kind": "run",
+  "in": "task-6",
+  "stage": "implementation",
+  "claims": [
+    "lib/dispatch/live-wait/",
+    "lib/llm/registry"
+  ],
+  "links": {},
+  "state": "done",
+  "v": 2,
+  "op": "end",
+  "by": "implementation",
+  "at": "2026-11-13T17:06:00.000Z",
+  "stateReason": "PR #2432 merged",
+  "via": "LIN-4459 session",
+  "reason": "PR #2432 merged"
+}
+
+### 3. LIN-4448 autopilot wakes (2026-11-13T20:00:00Z): brief
+# Brief for autopilot on task-4 as of 2026-11-13T20:00:00.000Z
+
+## 1. The person's words
+task-4: LIN-4448 LLM & prompts lane
+
+## 2. Its plan piece
+(none)
+
+## 3. Addressed to it
+question-9@1 question (open) to task-4 on decision-8@1
+  asks: Is the census boundary drawn right for the LLM & prompts lane? Tell me on LIN-4458 if you want it drawn differently.
+  options: keep as drawn, redraw
+  recommended: keep as drawn
+  if-unanswered: LIN-4458 keeps the boundary as drawn (decision-8)
+question-12@1 question (open) to task-4 on change-11@1 STALE
+  asks: Do you agree the live-wait move (PR #2432)?
+  options: agree, object
+  recommended: agree
+  if-unanswered: LIN-4459 proceeds with the move
+question-13@1 question (open) to task-4 on change-11@2
+  asks: PR #2432 now also changes an import in lib/llm/ and retires one LLM entry. Unless you say otherwise, proceeding to merge.
+  if-unanswered: LIN-4459 merges PR #2432
+
+## 4. What stands about this task
+(none)
+
+## 5. Its areas
+area-2 LLM & prompts (0 open addressed to it)
+
+## 6. Open runs of other tasks sharing a path
+(none)
+
+## 7. Index of what else is known
+(none)
+
+-- carries {"words":1,"piece":0,"addressed":3,"stands":0,"areas":1,"runs":0,"index":0}; 1122 bytes
+
+[
+  {
+    "id": "question-9",
+    "kind": "question",
+    "in": "task-5",
+    "to": "task-4",
+    "asks": "Is the census boundary drawn right for the LLM & prompts lane? Tell me on LIN-4458 if you want it drawn differently.",
+    "options": [
+      "keep as drawn",
+      "redraw"
+    ],
+    "recommended": "keep as drawn",
+    "if-unanswered": "LIN-4458 keeps the boundary as drawn (decision-8)",
+    "links": {
+      "on": "decision-8@1",
+      "about": "area-2"
+    },
+    "state": "open",
+    "v": 1,
+    "op": "add",
+    "by": "implementation",
+    "at": "2026-11-13T16:42:00.000Z",
+    "via": "LIN-4458 build"
+  },
+  {
+    "id": "question-12",
+    "kind": "question",
+    "in": "task-6",
+    "to": "task-4",
+    "asks": "Do you agree the live-wait move (PR #2432)?",
+    "options": [
+      "agree",
+      "object"
+    ],
+    "recommended": "agree",
+    "if-unanswered": "LIN-4459 proceeds with the move",
+    "links": {
+      "on": "change-11@1",
+      "about": "area-2"
+    },
+    "state": "open",
+    "v": 1,
+    "op": "add",
+    "by": "implementation",
+    "at": "2026-11-13T16:42:00.000Z",
+    "via": "LIN-4459 session",
+    "stale": true
+  },
+  {
+    "id": "question-13",
+    "kind": "question",
+    "in": "task-6",
+    "to": "task-4",
+    "asks": "PR #2432 now also changes an import in lib/llm/ and retires one LLM entry. Unless you say otherwise, proceeding to merge.",
+    "if-unanswered": "LIN-4459 merges PR #2432",
+    "links": {
+      "on": "change-11@2",
+      "about": "area-2"
+    },
+    "state": "open",
+    "v": 1,
+    "op": "add",
+    "by": "implementation",
+    "at": "2026-11-13T17:06:00.000Z",
+    "via": "LIN-4459 session"
+  }
+]
+
+### 3. LIN-4448 autopilot wakes (2026-11-13T23:00:00Z): brief
+# Brief for autopilot on task-4 as of 2026-11-13T23:00:00.000Z
+
+## 1. The person's words
+task-4: LIN-4448 LLM & prompts lane
+
+## 2. Its plan piece
+(none)
+
+## 3. Addressed to it
+question-9@1 question (open) to task-4 on decision-8@1
+  asks: Is the census boundary drawn right for the LLM & prompts lane? Tell me on LIN-4458 if you want it drawn differently.
+  options: keep as drawn, redraw
+  recommended: keep as drawn
+  if-unanswered: LIN-4458 keeps the boundary as drawn (decision-8)
+question-12@1 question (open) to task-4 on change-11@1 STALE
+  asks: Do you agree the live-wait move (PR #2432)?
+  options: agree, object
+  recommended: agree
+  if-unanswered: LIN-4459 proceeds with the move
+question-13@1 question (open) to task-4 on change-11@2
+  asks: PR #2432 now also changes an import in lib/llm/ and retires one LLM entry. Unless you say otherwise, proceeding to merge.
+  if-unanswered: LIN-4459 merges PR #2432
+
+## 4. What stands about this task
+(none)
+
+## 5. Its areas
+area-2 LLM & prompts (0 open addressed to it)
+
+## 6. Open runs of other tasks sharing a path
+(none)
+
+## 7. Index of what else is known
+(none)
+
+-- carries {"words":1,"piece":0,"addressed":3,"stands":0,"areas":1,"runs":0,"index":0}; 1122 bytes
+
+[
+  {
+    "id": "question-9",
+    "kind": "question",
+    "in": "task-5",
+    "to": "task-4",
+    "asks": "Is the census boundary drawn right for the LLM & prompts lane? Tell me on LIN-4458 if you want it drawn differently.",
+    "options": [
+      "keep as drawn",
+      "redraw"
+    ],
+    "recommended": "keep as drawn",
+    "if-unanswered": "LIN-4458 keeps the boundary as drawn (decision-8)",
+    "links": {
+      "on": "decision-8@1",
+      "about": "area-2"
+    },
+    "state": "open",
+    "v": 1,
+    "op": "add",
+    "by": "implementation",
+    "at": "2026-11-13T16:42:00.000Z",
+    "via": "LIN-4458 build"
+  },
+  {
+    "id": "question-12",
+    "kind": "question",
+    "in": "task-6",
+    "to": "task-4",
+    "asks": "Do you agree the live-wait move (PR #2432)?",
+    "options": [
+      "agree",
+      "object"
+    ],
+    "recommended": "agree",
+    "if-unanswered": "LIN-4459 proceeds with the move",
+    "links": {
+      "on": "change-11@1",
+      "about": "area-2"
+    },
+    "state": "open",
+    "v": 1,
+    "op": "add",
+    "by": "implementation",
+    "at": "2026-11-13T16:42:00.000Z",
+    "via": "LIN-4459 session",
+    "stale": true
+  },
+  {
+    "id": "question-13",
+    "kind": "question",
+    "in": "task-6",
+    "to": "task-4",
+    "asks": "PR #2432 now also changes an import in lib/llm/ and retires one LLM entry. Unless you say otherwise, proceeding to merge.",
+    "if-unanswered": "LIN-4459 merges PR #2432",
+    "links": {
+      "on": "change-11@2",
+      "about": "area-2"
+    },
+    "state": "open",
+    "v": 1,
+    "op": "add",
+    "by": "implementation",
+    "at": "2026-11-13T17:06:00.000Z",
+    "via": "LIN-4459 session"
+  }
+]
+
+### AFTER: what the record says (23:30)
+[
+  {
+    "id": "question-9",
+    "kind": "question",
+    "in": "task-5",
+    "to": "task-4",
+    "asks": "Is the census boundary drawn right for the LLM & prompts lane? Tell me on LIN-4458 if you want it drawn differently.",
+    "options": [
+      "keep as drawn",
+      "redraw"
+    ],
+    "recommended": "keep as drawn",
+    "if-unanswered": "LIN-4458 keeps the boundary as drawn (decision-8)",
+    "links": {
+      "on": "decision-8@1",
+      "about": "area-2"
+    },
+    "state": "open",
+    "v": 1,
+    "op": "add",
+    "by": "implementation",
+    "at": "2026-11-13T16:42:00.000Z",
+    "via": "LIN-4458 build"
+  },
+  {
+    "id": "question-12",
+    "kind": "question",
+    "in": "task-6",
+    "to": "task-4",
+    "asks": "Do you agree the live-wait move (PR #2432)?",
+    "options": [
+      "agree",
+      "object"
+    ],
+    "recommended": "agree",
+    "if-unanswered": "LIN-4459 proceeds with the move",
+    "links": {
+      "on": "change-11@1",
+      "about": "area-2"
+    },
+    "state": "open",
+    "v": 1,
+    "op": "add",
+    "by": "implementation",
+    "at": "2026-11-13T16:42:00.000Z",
+    "via": "LIN-4459 session",
+    "stale": true
+  },
+  {
+    "id": "question-13",
+    "kind": "question",
+    "in": "task-6",
+    "to": "task-4",
+    "asks": "PR #2432 now also changes an import in lib/llm/ and retires one LLM entry. Unless you say otherwise, proceeding to merge.",
+    "if-unanswered": "LIN-4459 merges PR #2432",
+    "links": {
+      "on": "change-11@2",
+      "about": "area-2"
+    },
+    "state": "open",
+    "v": 1,
+    "op": "add",
+    "by": "implementation",
+    "at": "2026-11-13T17:06:00.000Z",
+    "via": "LIN-4459 session"
+  }
+]
+
+{
+  "task": {
+    "id": "task-6",
+    "kind": "task",
+    "in": "task-3",
+    "asked": "LIN-4459 live-wait move",
+    "paths": [
+      "lib/dispatch/live-wait/"
+    ],
+    "links": {},
+    "state": "open",
+    "v": 1,
+    "op": "add",
+    "by": "Harbour",
+    "at": "2026-11-13T16:00:00.000Z"
+  },
+  "records": [
+    {
+      "id": "run-10",
+      "kind": "run",
+      "in": "task-6",
+      "stage": "implementation",
+      "claims": [
+        "lib/dispatch/live-wait/",
+        "lib/llm/registry"
+      ],
+      "links": {},
+      "state": "done",
+      "v": 2,
+      "op": "end",
+      "by": "implementation",
+      "at": "2026-11-13T17:06:00.000Z",
+      "stateReason": "PR #2432 merged",
+      "via": "LIN-4459 session",
+      "reason": "PR #2432 merged"
+    },
+    {
+      "id": "change-11",
+      "kind": "change",
+      "in": "task-6",
+      "ref": "PR #2432",
+      "head": "e4f5a6b",
+      "links": {},
+      "state": "merged",
+      "v": 3,
+      "op": "end",
+      "by": "implementation",
+      "at": "2026-11-13T17:06:00.000Z",
+      "stateReason": "merged on silence: question-12 and question-13 unanswered",
+      "via": "LIN-4459 session",
+      "reason": "merged on silence: question-12 and question-13 unanswered"
+    },
+    {
+      "id": "question-12",
+      "kind": "question",
+      "in": "task-6",
+      "to": "task-4",
+      "asks": "Do you agree the live-wait move (PR #2432)?",
+      "options": [
+        "agree",
+        "object"
+      ],
+      "recommended": "agree",
+      "if-unanswered": "LIN-4459 proceeds with the move",
+      "links": {
+        "on": "change-11@1",
+        "about": "area-2"
+      },
+      "state": "open",
+      "v": 1,
+      "op": "add",
+      "by": "implementation",
+      "at": "2026-11-13T16:42:00.000Z",
+      "via": "LIN-4459 session",
+      "stale": true
+    },
+    {
+      "id": "question-13",
+      "kind": "question",
+      "in": "task-6",
+      "to": "task-4",
+      "asks": "PR #2432 now also changes an import in lib/llm/ and retires one LLM entry. Unless you say otherwise, proceeding to merge.",
+      "if-unanswered": "LIN-4459 merges PR #2432",
+      "links": {
+        "on": "change-11@2",
+        "about": "area-2"
+      },
+      "state": "open",
+      "v": 1,
+      "op": "add",
+      "by": "implementation",
+      "at": "2026-11-13T17:06:00.000Z",
+      "via": "LIN-4459 session"
+    }
+  ],
+  "overlap": []
+}
+

@@ -1,0 +1,24 @@
+# Brief for session-b on task-1 as of 2026-11-14T09:05:00.000Z
+
+## 1. The person's words
+task-1: Do the weekly read for Lighthouse.
+
+## 2. Its plan piece
+(none)
+
+## 3. Addressed to it
+(none)
+
+## 4. What stands about this task
+(none)
+
+## 5. Its areas
+(none)
+
+## 6. Open runs of other tasks sharing a path
+(none)
+
+## 7. Index of what else is known
+task-3 task - Write the next study.
+
+-- carries {"words":1,"piece":0,"addressed":0,"stands":0,"areas":0,"runs":0,"index":1}; 382 bytes

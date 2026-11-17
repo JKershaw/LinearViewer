@@ -1,0 +1,13 @@
+{
+  "id": "change-7",
+  "kind": "change",
+  "in": "task-3",
+  "ref": "studies/LH051.md",
+  "head": "LH051 by session-b (09:45)",
+  "links": {},
+  "state": "open",
+  "v": 1,
+  "op": "add",
+  "by": "session-b",
+  "at": "2026-11-14T09:45:00.000Z"
+}

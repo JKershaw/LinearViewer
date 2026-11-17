@@ -1,5 +1,5 @@
 {
- "next": 72,
+ "next": 77,
  "records": {
   "area-1": [
    {
@@ -1371,6 +1371,23 @@
     "op": "add",
     "by": "survey-task",
     "at": "2026-11-13T14:58:33.000Z"
+   },
+   {
+    "id": "finding-70",
+    "kind": "finding",
+    "in": "task-60",
+    "to": "implementation",
+    "says": "Prompt seam: `lib/prompts/runner-kickoff.js:61` (A14 / LIN-4448's side) renders `FEEDBACK_ENTRY_KINDS` into the runner prompt in its current order. `runner-kickoff.test.js:191` compares against the same source, so a reorder changes the prompt bytes and still passes: pin the exact literal order in a test. The table also needs rows for kinds deliberately not on the allowlist (`decision-answer`, `decision-withdrawal-reversed`), and a stamp role: `DECISION_LIFECYCLE_STAMP_KINDS` (`lib/session-telemetry.js:60`) is a fourth hand-written role set, and without a stamp role in the table it stays a copy. Without those rows a roles column quietly widens what the runner may post.",
+    "links": {
+     "about": "finding-28",
+     "on": "task-60@1"
+    },
+    "state": "open",
+    "v": 2,
+    "op": "revise",
+    "by": "survey-place",
+    "at": "2026-11-13T15:02:55.000Z",
+    "reason": "survey-place: the existing test does not catch a reorder (it reads the same source); DECISION_LIFECYCLE_STAMP_KINDS is a fourth kind set needing a stamp role"
    }
   ],
   "finding-71": [
@@ -1389,6 +1406,129 @@
     "op": "add",
     "by": "survey-task",
     "at": "2026-11-13T14:58:34.000Z"
+   },
+   {
+    "id": "finding-71",
+    "kind": "finding",
+    "in": "task-60",
+    "to": "implementation",
+    "says": "`NEVER_RAN` has no owner to import from: `'cancelled'`/`'expired'` is spelled five times: `lib/dispatch-leftover.js:29`, `lib/dispatch-store.js:1906` and `:1176`, `lib/observer-sweep.js:108`, `lib/task-page-loader.js:248`. Rewiring only the two named consumers leaves three behind; rewire all five. Create one home where neither side learns \"leftover\" (`lin-4377-store-knows-no-leftover`); `lib/dispatch-fields.js` is already imported by both. The other two owners are safe import-free leaves: `HALT_MODES` (`lib/workspace-halt.js`; the check becomes `HALT_MODES.includes`), and `followUpTarget(t) == null` (`lib/dispatch-targets.js`), equivalent to `!RESUMABLE_TARGETS.has(t || 'cli')` for null, `''`, unknown values and all four targets. `lib/dispatch-store.js:644` and `lib/runner-kit/runner.mjs` handle one halt mode on purpose; leave them. Constants last: they are mechanical.",
+    "links": {
+     "about": "finding-19",
+     "on": "task-60@1"
+    },
+    "state": "open",
+    "v": 2,
+    "op": "revise",
+    "by": "survey-place",
+    "at": "2026-11-13T15:02:56.000Z",
+    "reason": "survey-place: two more NEVER_RAN spellings (observer-sweep.js:108, task-page-loader.js:248); single-mode halt sites to leave alone"
+   }
+  ],
+  "finding-72": [
+   {
+    "id": "finding-72",
+    "kind": "finding",
+    "in": "task-60",
+    "to": "task-39",
+    "says": "A second reason for question-68's leaf: `lib/dispatch-feedback-validation.js:13` imports its kind list from the store, so the dependency already points the wrong way. Putting the `FEEDBACK_KINDS` table in validation means the store imports validation for a table validation now imports from the store: a direct cycle, not only the TDZ risk through `dispatch-validation.js`. A leaf `lib/dispatch-feedback-kinds.js` that imports nothing, with the store keeping its re-export, removes both.",
+    "links": {
+     "about": "question-68",
+     "on": "plan-45@1"
+    },
+    "state": "open",
+    "v": 1,
+    "op": "add",
+    "by": "survey-place",
+    "at": "2026-11-13T15:02:57.000Z"
+   }
+  ],
+  "finding-73": [
+   {
+    "id": "finding-73",
+    "kind": "finding",
+    "in": "task-60",
+    "to": "implementation",
+    "says": "Wording to change with the code, since nothing fails if it goes stale: the area Lesson at `docs/areas/runs-and-dispatch.md:32` (lesson-10, \"counts the word\") and the docblocks at `lib/dispatch-store.js:3481` and `lib/dispatch-leftover.js:10`. The rewritten `lin-4377` witness should forbid the `formatHeldWakeNote` import in the store, not count the word. Lessons are 4,269 of 6,144 bytes, so there is room.",
+    "links": {
+     "about": "lesson-10",
+     "on": "task-60@1"
+    },
+    "state": "open",
+    "v": 1,
+    "op": "add",
+    "by": "survey-place",
+    "at": "2026-11-13T15:02:58.000Z"
+   }
+  ],
+  "finding-74": [
+   {
+    "id": "finding-74",
+    "kind": "finding",
+    "in": "task-60",
+    "to": "implementation",
+    "says": "Done the obvious way, finding-67's late-bound release wording leaves the store taking leftover policy two ways: a hook per request for feedback (`addFeedback`'s `wakeHook`) and late-bound setters for releases. One late-bound held-wake policy for both paths is Waiting 5 (finding-22, \"composable hooks\"), not this ticket's: name it in the PR as what is left, rather than adding more setters.",
+    "links": {
+     "about": "finding-22",
+     "on": "task-60@1"
+    },
+    "state": "open",
+    "v": 1,
+    "op": "add",
+    "by": "survey-place",
+    "at": "2026-11-13T15:02:59.000Z"
+   }
+  ],
+  "question-75": [
+   {
+    "id": "question-75",
+    "kind": "question",
+    "in": "task-60",
+    "to": "area-1",
+    "asks": "Should `findWakeEvent` (`lib/dispatch-terminal.js:631`) ignore relay kinds (`tool`, `usage`, `resources`) when picking the wake marker? Today it matches messages by regex and ignores `kind`; piece 5 records that as-is (finding-69). Changing it changes wake behaviour across every wake reader, so it is not LIN-4455's.",
+    "options": [
+     "keep: any kind may carry a wake, as piece 5's table column records",
+     "skip relay kinds (tool, usage, resources)"
+    ],
+    "if-unanswered": "findWakeEvent keeps matching any kind, as piece 5 records",
+    "links": {
+     "about": "finding-69"
+    },
+    "state": "open",
+    "v": 1,
+    "op": "add",
+    "by": "survey-place",
+    "at": "2026-11-13T15:03:00.000Z"
+   }
+  ],
+  "run-76": [
+   {
+    "id": "run-76",
+    "kind": "run",
+    "in": "task-60",
+    "stage": "survey-place",
+    "account": "Surveyed where LIN-4455 lands at cfd152fa4 (origin/main past the 4b5001ddf grounding; nothing this piece touches changed). dispatch-leftover.js and dispatch-feedback-validation.js are tidy; dispatch-store.js is 4,530 lines with 58 commits since 1 Oct, rules moving to owners (LIN-4383), so the trend is good. Most of what I found the task survey already held (finding-67 release wording, finding-69 findWakeEvent, question-68 leaf). I corrected two: finding-70 (the kickoff test reads the same source, so pin the literal order; DECISION_LIFECYCLE_STAMP_KINDS is a fourth set, add a stamp role) and finding-71 (five NEVER_RAN spellings, not three; leave the single-mode halt sites). Added: finding-72 to task-39 (validation imports kinds from the store, so the table there is a direct cycle), finding-73 (stale Lesson/docblocks, witness forbids the import), finding-74 (two-way policy is Waiting 5's; name it in the PR), question-75 to the area (relay kinds in findWakeEvent). Affordable here: a leaf kinds module with a stamp role, all five NEVER_RAN rewired, an exact-order test, late-bound release wording with a stated default. Closed nothing.",
+    "links": {},
+    "state": "open",
+    "v": 1,
+    "op": "add",
+    "by": "survey-place",
+    "at": "2026-11-13T15:03:01.000Z"
+   },
+   {
+    "id": "run-76",
+    "kind": "run",
+    "in": "task-60",
+    "stage": "survey-place",
+    "account": "Surveyed where LIN-4455 lands at cfd152fa4 (origin/main past the 4b5001ddf grounding; nothing this piece touches changed). dispatch-leftover.js and dispatch-feedback-validation.js are tidy; dispatch-store.js is 4,530 lines with 58 commits since 1 Oct, rules moving to owners (LIN-4383), so the trend is good. Most of what I found the task survey already held (finding-67 release wording, finding-69 findWakeEvent, question-68 leaf). I corrected two: finding-70 (the kickoff test reads the same source, so pin the literal order; DECISION_LIFECYCLE_STAMP_KINDS is a fourth set, add a stamp role) and finding-71 (five NEVER_RAN spellings, not three; leave the single-mode halt sites). Added: finding-72 to task-39 (validation imports kinds from the store, so the table there is a direct cycle), finding-73 (stale Lesson/docblocks, witness forbids the import), finding-74 (two-way policy is Waiting 5's; name it in the PR), question-75 to the area (relay kinds in findWakeEvent). Affordable here: a leaf kinds module with a stamp role, all five NEVER_RAN rewired, an exact-order test, late-bound release wording with a stated default. Closed nothing.",
+    "links": {},
+    "state": "done",
+    "v": 2,
+    "op": "end",
+    "by": "survey-place",
+    "at": "2026-11-13T15:03:02.000Z",
+    "stateReason": "survey posted on LIN-4455",
+    "reason": "survey posted on LIN-4455"
    }
   ]
  },

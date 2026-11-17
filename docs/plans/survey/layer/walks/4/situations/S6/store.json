@@ -1,5 +1,5 @@
 {
- "next": 8,
+ "next": 13,
  "records": {
   "area-1": [
    {
@@ -156,12 +156,146 @@
     "op": "add",
     "by": "survey-task",
     "at": "2026-11-13T10:00:00.000Z"
+   },
+   {
+    "id": "finding-7",
+    "kind": "finding",
+    "in": "task-3",
+    "to": "implementation",
+    "says": "Write newsletter/march.md, under 400 words, phone-first: short paragraphs, three headed items (lesson-2). No repo: save it as a file. The facts are not in the store; asked John (question-5). Until answered, put visible [TBC: ...] placeholders, never invented facts.",
+    "links": {
+     "on": "lesson-2@1"
+    },
+    "state": "done",
+    "v": 2,
+    "op": "end",
+    "by": "implementation",
+    "at": "2026-11-13T11:00:00.000Z",
+    "stateReason": "draft written, under 400 words, facts left as [TBC] per question-5",
+    "reason": "draft written, under 400 words, facts left as [TBC] per question-5"
+   }
+  ],
+  "run-8": [
+   {
+    "id": "run-8",
+    "kind": "run",
+    "in": "task-3",
+    "stage": "implementation",
+    "claims": [
+     "newsletter/march.md"
+    ],
+    "links": {},
+    "state": "open",
+    "v": 1,
+    "op": "add",
+    "by": "implementation",
+    "at": "2026-11-13T11:00:00.000Z"
+   },
+   {
+    "id": "run-8",
+    "kind": "run",
+    "in": "task-3",
+    "stage": "implementation",
+    "claims": [
+     "newsletter/march.md"
+    ],
+    "links": {},
+    "state": "done",
+    "v": 2,
+    "op": "end",
+    "by": "implementation",
+    "at": "2026-11-13T11:00:00.000Z",
+    "stateReason": "draft saved",
+    "reason": "draft saved"
+   }
+  ],
+  "change-9": [
+   {
+    "id": "change-9",
+    "kind": "change",
+    "in": "task-3",
+    "ref": "file:newsletter/march.md",
+    "head": "sha256:afcc54e0dee8",
+    "links": {
+     "on": "task-3@2"
+    },
+    "state": "open",
+    "v": 1,
+    "op": "add",
+    "by": "implementation",
+    "at": "2026-11-13T11:00:00.000Z"
+   }
+  ],
+  "run-10": [
+   {
+    "id": "run-10",
+    "kind": "run",
+    "in": "task-3",
+    "stage": "review",
+    "claims": [],
+    "links": {},
+    "state": "open",
+    "v": 1,
+    "op": "add",
+    "by": "review",
+    "at": "2026-11-13T13:00:00.000Z"
+   },
+   {
+    "id": "run-10",
+    "kind": "run",
+    "in": "task-3",
+    "stage": "review",
+    "claims": [],
+    "links": {},
+    "state": "done",
+    "v": 2,
+    "op": "end",
+    "by": "review",
+    "at": "2026-11-13T13:00:00.000Z",
+    "stateReason": "verdict written",
+    "reason": "verdict written"
+   }
+  ],
+  "verdict-11": [
+   {
+    "id": "verdict-11",
+    "kind": "verdict",
+    "in": "task-3",
+    "of": "review",
+    "outcome": "request-changes",
+    "reasoning": "Head sha256:afcc54e0dee8 (118 words) is right for phones and under 400 words (lesson-2), and the three items are in place. But none of the three facts is filled: 12 [TBC] markers, waiting on question-5. Fails done-when; must not be sent as is. Only the [TBC] text should change.",
+    "links": {
+     "on": "change-9@1"
+    },
+    "state": "stands",
+    "v": 1,
+    "op": "add",
+    "by": "review",
+    "at": "2026-11-13T13:00:00.000Z"
+   }
+  ],
+  "finding-12": [
+   {
+    "id": "finding-12",
+    "kind": "finding",
+    "in": "task-3",
+    "to": "implementation",
+    "says": "When question-5 is answered, fill the [TBC] markers from the answer and save a new head; change nothing else. Review then judges the new head.",
+    "links": {
+     "on": "change-9@1",
+     "about": "question-5"
+    },
+    "state": "open",
+    "v": 1,
+    "op": "add",
+    "by": "review",
+    "at": "2026-11-13T13:00:00.000Z"
    }
   ]
  },
  "log": [
   {
-   "at": "2026-11-17T14:46:50.018Z",
+   "at": "2026-11-17T14:47:28.998Z",
    "by": "survey-task",
    "q": [
     "brief",
@@ -174,7 +308,7 @@
    ]
   },
   {
-   "at": "2026-11-17T14:46:50.046Z",
+   "at": "2026-11-17T14:47:29.031Z",
    "by": "survey-task",
    "q": [
     "find",
@@ -187,7 +321,7 @@
    ]
   },
   {
-   "at": "2026-11-17T14:46:55.384Z",
+   "at": "2026-11-17T14:47:29.309Z",
    "by": "implementation",
    "q": [
     "brief",
@@ -200,7 +334,19 @@
    ]
   },
   {
-   "at": "2026-11-17T14:46:55.412Z",
+   "at": "2026-11-17T14:47:29.341Z",
+   "by": "implementation",
+   "q": [
+    "get",
+    "task-3",
+    "--by",
+    "implementation",
+    "--as-of",
+    "2026-11-13T11:00:00Z"
+   ]
+  },
+  {
+   "at": "2026-11-17T14:47:29.373Z",
    "by": "implementation",
    "q": [
     "get",
@@ -209,6 +355,71 @@
     "implementation",
     "--as-of",
     "2026-11-13T11:00:00Z"
+   ]
+  },
+  {
+   "at": "2026-11-17T14:47:29.564Z",
+   "by": "review",
+   "q": [
+    "brief",
+    "review",
+    "--task",
+    "task-3",
+    "--as-of",
+    "2026-11-13T13:00:00Z",
+    "--text"
+   ]
+  },
+  {
+   "at": "2026-11-17T14:47:29.600Z",
+   "by": "review",
+   "q": [
+    "get",
+    "change-9",
+    "--by",
+    "review",
+    "--as-of",
+    "2026-11-13T13:00:00Z"
+   ]
+  },
+  {
+   "at": "2026-11-17T14:47:29.631Z",
+   "by": "review",
+   "q": [
+    "get",
+    "task-3",
+    "--by",
+    "review",
+    "--as-of",
+    "2026-11-13T13:00:00Z"
+   ]
+  },
+  {
+   "at": "2026-11-17T14:47:29.800Z",
+   "by": "close-out",
+   "q": [
+    "brief",
+    "close-out",
+    "--task",
+    "task-3",
+    "--as-of",
+    "2026-11-13T15:00:00Z",
+    "--text"
+   ]
+  },
+  {
+   "at": "2026-11-17T14:47:29.840Z",
+   "by": "close-out",
+   "q": [
+    "find",
+    "--to",
+    "close-out",
+    "--state",
+    "open",
+    "--by",
+    "close-out",
+    "--as-of",
+    "2026-11-13T15:00:00Z"
    ]
   }
  ]

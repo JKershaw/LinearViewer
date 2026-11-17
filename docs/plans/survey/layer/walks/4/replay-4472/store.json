@@ -1442,6 +1442,49 @@
     "--by",
     "survey-place"
    ]
+  },
+  {
+   "at": "2026-11-17T14:47:19.173Z",
+   "by": "survey-place",
+   "q": [
+    "show",
+    "--task",
+    "task-28",
+    "--by",
+    "survey-place"
+   ]
+  },
+  {
+   "at": "2026-11-17T14:47:19.221Z",
+   "by": "survey-place",
+   "q": [
+    "get",
+    "area-49",
+    "--by",
+    "survey-place"
+   ]
+  },
+  {
+   "at": "2026-11-17T14:47:19.256Z",
+   "by": "survey-place",
+   "q": [
+    "find",
+    "--text",
+    "leaf",
+    "--by",
+    "survey-place"
+   ]
+  },
+  {
+   "at": "2026-11-17T14:47:19.292Z",
+   "by": "survey-place",
+   "q": [
+    "find",
+    "--text",
+    "census",
+    "--by",
+    "survey-place"
+   ]
   }
  ]
 }

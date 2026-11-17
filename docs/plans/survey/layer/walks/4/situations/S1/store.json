@@ -1,5 +1,5 @@
 {
- "next": 7,
+ "next": 14,
  "records": {
   "area-1": [
    {
@@ -130,11 +130,219 @@
     "by": "Harbour",
     "at": "2026-11-13T16:00:00.000Z"
    }
+  ],
+  "run-7": [
+   {
+    "id": "run-7",
+    "kind": "run",
+    "in": "task-5",
+    "stage": "implementation",
+    "claims": [
+     "lib/dispatch/census/"
+    ],
+    "links": {},
+    "state": "open",
+    "v": 1,
+    "op": "add",
+    "by": "implementation",
+    "at": "2026-11-13T16:42:00.000Z",
+    "via": "LIN-4458 build"
+   },
+   {
+    "id": "run-7",
+    "kind": "run",
+    "in": "task-5",
+    "stage": "implementation",
+    "claims": [
+     "lib/dispatch/census/"
+    ],
+    "links": {},
+    "state": "done",
+    "v": 2,
+    "op": "end",
+    "by": "implementation",
+    "at": "2026-11-13T16:50:00.000Z",
+    "stateReason": "asked LIN-4448 lane (question-9); boundary kept as drawn unless told otherwise",
+    "via": "LIN-4458 build",
+    "reason": "asked LIN-4448 lane (question-9); boundary kept as drawn unless told otherwise"
+   }
+  ],
+  "decision-8": [
+   {
+    "id": "decision-8",
+    "kind": "decision",
+    "in": "task-5",
+    "answer": "Census boundary: count runs dispatched from lib/dispatch/ only; classifier-only LLM calls stay outside the census",
+    "why": "The census measures dispatch, not model use",
+    "scope": "task-5",
+    "links": {},
+    "state": "stands",
+    "v": 1,
+    "op": "add",
+    "by": "implementation",
+    "at": "2026-11-13T16:42:00.000Z",
+    "via": "LIN-4458 build"
+   }
+  ],
+  "question-9": [
+   {
+    "id": "question-9",
+    "kind": "question",
+    "in": "task-5",
+    "to": "task-4",
+    "asks": "Is the census boundary drawn right for the LLM & prompts lane? Tell me on LIN-4458 if you want it drawn differently.",
+    "options": [
+     "keep as drawn",
+     "redraw"
+    ],
+    "recommended": "keep as drawn",
+    "if-unanswered": "LIN-4458 keeps the boundary as drawn (decision-8)",
+    "links": {
+     "on": "decision-8@1",
+     "about": "area-2"
+    },
+    "state": "open",
+    "v": 1,
+    "op": "add",
+    "by": "implementation",
+    "at": "2026-11-13T16:42:00.000Z",
+    "via": "LIN-4458 build"
+   }
+  ],
+  "run-10": [
+   {
+    "id": "run-10",
+    "kind": "run",
+    "in": "task-6",
+    "stage": "implementation",
+    "claims": [
+     "lib/dispatch/live-wait/",
+     "lib/llm/registry"
+    ],
+    "links": {},
+    "state": "open",
+    "v": 1,
+    "op": "add",
+    "by": "implementation",
+    "at": "2026-11-13T16:42:00.000Z",
+    "via": "LIN-4459 session"
+   },
+   {
+    "id": "run-10",
+    "kind": "run",
+    "in": "task-6",
+    "stage": "implementation",
+    "claims": [
+     "lib/dispatch/live-wait/",
+     "lib/llm/registry"
+    ],
+    "links": {},
+    "state": "done",
+    "v": 2,
+    "op": "end",
+    "by": "implementation",
+    "at": "2026-11-13T17:06:00.000Z",
+    "stateReason": "PR #2432 merged",
+    "via": "LIN-4459 session",
+    "reason": "PR #2432 merged"
+   }
+  ],
+  "change-11": [
+   {
+    "id": "change-11",
+    "kind": "change",
+    "in": "task-6",
+    "ref": "PR #2432",
+    "head": "a1b2c3d",
+    "links": {},
+    "state": "open",
+    "v": 1,
+    "op": "add",
+    "by": "implementation",
+    "at": "2026-11-13T16:42:00.000Z",
+    "via": "LIN-4459 session"
+   },
+   {
+    "id": "change-11",
+    "kind": "change",
+    "in": "task-6",
+    "ref": "PR #2432",
+    "head": "e4f5a6b",
+    "links": {},
+    "state": "open",
+    "v": 2,
+    "op": "revise",
+    "by": "implementation",
+    "at": "2026-11-13T17:06:00.000Z",
+    "via": "LIN-4459 session",
+    "reason": "import change in lib/llm/ and one retired LLM entry"
+   },
+   {
+    "id": "change-11",
+    "kind": "change",
+    "in": "task-6",
+    "ref": "PR #2432",
+    "head": "e4f5a6b",
+    "links": {},
+    "state": "merged",
+    "v": 3,
+    "op": "end",
+    "by": "implementation",
+    "at": "2026-11-13T17:06:00.000Z",
+    "stateReason": "merged on silence: question-12 and question-13 unanswered",
+    "via": "LIN-4459 session",
+    "reason": "merged on silence: question-12 and question-13 unanswered"
+   }
+  ],
+  "question-12": [
+   {
+    "id": "question-12",
+    "kind": "question",
+    "in": "task-6",
+    "to": "task-4",
+    "asks": "Do you agree the live-wait move (PR #2432)?",
+    "options": [
+     "agree",
+     "object"
+    ],
+    "recommended": "agree",
+    "if-unanswered": "LIN-4459 proceeds with the move",
+    "links": {
+     "on": "change-11@1",
+     "about": "area-2"
+    },
+    "state": "open",
+    "v": 1,
+    "op": "add",
+    "by": "implementation",
+    "at": "2026-11-13T16:42:00.000Z",
+    "via": "LIN-4459 session"
+   }
+  ],
+  "question-13": [
+   {
+    "id": "question-13",
+    "kind": "question",
+    "in": "task-6",
+    "to": "task-4",
+    "asks": "PR #2432 now also changes an import in lib/llm/ and retires one LLM entry. Unless you say otherwise, proceeding to merge.",
+    "if-unanswered": "LIN-4459 merges PR #2432",
+    "links": {
+     "on": "change-11@2",
+     "about": "area-2"
+    },
+    "state": "open",
+    "v": 1,
+    "op": "add",
+    "by": "implementation",
+    "at": "2026-11-13T17:06:00.000Z",
+    "via": "LIN-4459 session"
+   }
   ]
  },
  "log": [
   {
-   "at": "2026-11-17T14:46:02.586Z",
+   "at": "2026-11-17T14:47:23.493Z",
    "by": "implementation",
    "q": [
     "brief",
@@ -144,6 +352,196 @@
     "--as-of",
     "2026-11-13T16:42:00Z",
     "--text"
+   ]
+  },
+  {
+   "at": "2026-11-17T14:47:23.516Z",
+   "by": "implementation",
+   "q": [
+    "find",
+    "--kind",
+    "task",
+    "--text",
+    "LIN-4448",
+    "--by",
+    "implementation",
+    "--via",
+    "LIN-4458 build",
+    "--as-of",
+    "2026-11-13T16:42:00Z"
+   ]
+  },
+  {
+   "at": "2026-11-17T14:47:23.636Z",
+   "by": "implementation",
+   "q": [
+    "brief",
+    "implementation",
+    "--task",
+    "task-6",
+    "--as-of",
+    "2026-11-13T16:42:00Z",
+    "--text"
+   ]
+  },
+  {
+   "at": "2026-11-17T14:47:23.667Z",
+   "by": "implementation",
+   "q": [
+    "find",
+    "--kind",
+    "task",
+    "--text",
+    "LIN-4448",
+    "--by",
+    "implementation",
+    "--via",
+    "LIN-4459 session",
+    "--as-of",
+    "2026-11-13T16:42:00Z"
+   ]
+  },
+  {
+   "at": "2026-11-17T14:47:23.832Z",
+   "by": "autopilot",
+   "q": [
+    "brief",
+    "autopilot",
+    "--task",
+    "task-4",
+    "--as-of",
+    "2026-11-13T17:00:00Z",
+    "--text"
+   ]
+  },
+  {
+   "at": "2026-11-17T14:47:23.863Z",
+   "by": "autopilot",
+   "q": [
+    "find",
+    "--to",
+    "task-4",
+    "--state",
+    "open",
+    "--by",
+    "autopilot",
+    "--via",
+    "LIN-4448 autopilot",
+    "--as-of",
+    "2026-11-13T17:00:00Z"
+   ]
+  },
+  {
+   "at": "2026-11-17T14:47:23.901Z",
+   "by": "implementation",
+   "q": [
+    "brief",
+    "implementation",
+    "--task",
+    "task-6",
+    "--as-of",
+    "2026-11-13T17:06:00Z",
+    "--text"
+   ]
+  },
+  {
+   "at": "2026-11-17T14:47:23.943Z",
+   "by": "implementation",
+   "q": [
+    "get",
+    "question-12",
+    "--by",
+    "implementation",
+    "--via",
+    "LIN-4459 session",
+    "--as-of",
+    "2026-11-13T17:06:00Z"
+   ]
+  },
+  {
+   "at": "2026-11-17T14:47:24.112Z",
+   "by": "autopilot",
+   "q": [
+    "brief",
+    "autopilot",
+    "--task",
+    "task-4",
+    "--as-of",
+    "2026-11-13T20:00:00Z",
+    "--text"
+   ]
+  },
+  {
+   "at": "2026-11-17T14:47:24.142Z",
+   "by": "autopilot",
+   "q": [
+    "find",
+    "--to",
+    "task-4",
+    "--state",
+    "open",
+    "--by",
+    "autopilot",
+    "--via",
+    "LIN-4448 autopilot",
+    "--as-of",
+    "2026-11-13T20:00:00Z"
+   ]
+  },
+  {
+   "at": "2026-11-17T14:47:24.171Z",
+   "by": "autopilot",
+   "q": [
+    "brief",
+    "autopilot",
+    "--task",
+    "task-4",
+    "--as-of",
+    "2026-11-13T23:00:00Z",
+    "--text"
+   ]
+  },
+  {
+   "at": "2026-11-17T14:47:24.200Z",
+   "by": "autopilot",
+   "q": [
+    "find",
+    "--to",
+    "task-4",
+    "--state",
+    "open",
+    "--by",
+    "autopilot",
+    "--via",
+    "LIN-4448 autopilot",
+    "--as-of",
+    "2026-11-13T23:00:00Z"
+   ]
+  },
+  {
+   "at": "2026-11-17T14:47:24.228Z",
+   "by": "John",
+   "q": [
+    "find",
+    "--to",
+    "task-4",
+    "--by",
+    "John",
+    "--as-of",
+    "2026-11-13T23:30:00Z"
+   ]
+  },
+  {
+   "at": "2026-11-17T14:47:24.261Z",
+   "by": "John",
+   "q": [
+    "show",
+    "--task",
+    "task-6",
+    "--by",
+    "John",
+    "--as-of",
+    "2026-11-13T23:30:00Z"
    ]
   }
  ]

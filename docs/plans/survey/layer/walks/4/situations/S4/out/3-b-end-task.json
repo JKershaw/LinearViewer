@@ -1,0 +1,18 @@
+{
+  "id": "task-3",
+  "kind": "task",
+  "in": "task-1",
+  "asked": "Write the next study.",
+  "done-when": "The next study is written under studies/.",
+  "paths": [
+    "studies/"
+  ],
+  "links": {},
+  "state": "done",
+  "v": 3,
+  "op": "end",
+  "by": "session-b",
+  "at": "2026-11-14T09:46:00.000Z",
+  "stateReason": "LH051 written",
+  "reason": "LH051 written"
+}

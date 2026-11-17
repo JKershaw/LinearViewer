@@ -1,0 +1,16 @@
+{
+  "id": "run-5",
+  "kind": "run",
+  "in": "task-3",
+  "stage": "weekly-read",
+  "claims": [
+    "studies/LH051.md"
+  ],
+  "account": "session-b",
+  "links": {},
+  "state": "open",
+  "v": 1,
+  "op": "add",
+  "by": "session-b",
+  "at": "2026-11-14T09:06:00.000Z"
+}

@@ -1,0 +1,58 @@
+{
+  "task": {
+    "id": "task-3",
+    "kind": "task",
+    "in": "task-1",
+    "asked": "Write the next study.",
+    "done-when": "The next study is written under studies/.",
+    "paths": [
+      "studies/"
+    ],
+    "links": {},
+    "state": "open",
+    "v": 1,
+    "op": "add",
+    "by": "Lighthouse",
+    "at": "2026-11-14T08:00:00.000Z"
+  },
+  "records": [
+    {
+      "id": "run-4",
+      "kind": "run",
+      "in": "task-3",
+      "stage": "weekly-read",
+      "claims": [
+        "studies/LH051.md"
+      ],
+      "account": "session-a",
+      "links": {},
+      "state": "open",
+      "v": 1,
+      "op": "add",
+      "by": "session-a",
+      "at": "2026-11-14T09:01:00.000Z"
+    },
+    {
+      "id": "run-5",
+      "kind": "run",
+      "in": "task-3",
+      "stage": "weekly-read",
+      "claims": [
+        "studies/LH051.md"
+      ],
+      "account": "session-b",
+      "links": {},
+      "state": "open",
+      "v": 1,
+      "op": "add",
+      "by": "session-b",
+      "at": "2026-11-14T09:06:00.000Z"
+    }
+  ],
+  "overlap": [
+    [
+      "run-4",
+      "run-5"
+    ]
+  ]
+}
