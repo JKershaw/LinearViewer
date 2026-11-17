@@ -4116,6 +4116,233 @@
     ]
    },
    "asOf": null
+  },
+  {
+   "at": "2026-11-17T20:34:19.189Z",
+   "by": "blind-read",
+   "cmd": "show",
+   "args": {
+    "task": "task-60",
+    "by": "blind-read",
+    "pos": []
+   },
+   "asOf": null
+  },
+  {
+   "at": "2026-11-17T20:34:19.230Z",
+   "by": "blind-read",
+   "cmd": "find",
+   "args": {
+    "kind": "area",
+    "by": "blind-read",
+    "pos": []
+   },
+   "asOf": null
+  },
+  {
+   "at": "2026-11-17T20:34:22.702Z",
+   "by": "blind-read",
+   "cmd": "get",
+   "args": {
+    "by": "blind-read",
+    "pos": [
+     "change-84"
+    ]
+   },
+   "asOf": null
+  },
+  {
+   "at": "2026-11-17T20:34:22.734Z",
+   "by": "blind-read",
+   "cmd": "find",
+   "args": {
+    "kind": "area",
+    "by": "blind-read",
+    "pos": []
+   },
+   "asOf": null
+  },
+  {
+   "at": "2026-11-17T20:34:22.766Z",
+   "by": "blind-read",
+   "cmd": "find",
+   "args": {
+    "kind": "verdict",
+    "in": "task-60",
+    "by": "blind-read",
+    "pos": []
+   },
+   "asOf": null
+  },
+  {
+   "at": "2026-11-17T20:34:26.918Z",
+   "by": "blind-read",
+   "cmd": "find",
+   "args": {
+    "kind": "area",
+    "path": "routes/workspace-api-audit.js",
+    "by": "blind-read",
+    "pos": []
+   },
+   "asOf": null
+  },
+  {
+   "at": "2026-11-17T20:34:26.959Z",
+   "by": "blind-read",
+   "cmd": "find",
+   "args": {
+    "kind": "area",
+    "text": "web",
+    "by": "blind-read",
+    "pos": []
+   },
+   "asOf": null
+  },
+  {
+   "at": "2026-11-17T20:34:29.720Z",
+   "by": "blind-read",
+   "cmd": "find",
+   "args": {
+    "kind": "area",
+    "by": "blind-read",
+    "pos": []
+   },
+   "asOf": null
+  },
+  {
+   "at": "2026-11-17T20:34:29.759Z",
+   "by": "blind-read",
+   "cmd": "find",
+   "args": {
+    "path": "routes/",
+    "by": "blind-read",
+    "count": true,
+    "pos": []
+   },
+   "asOf": null
+  },
+  {
+   "at": "2026-11-17T20:34:38.128Z",
+   "by": "blind-read",
+   "cmd": "find",
+   "args": {
+    "text": "bulk",
+    "by": "blind-read",
+    "pos": []
+   },
+   "asOf": null
+  },
+  {
+   "at": "2026-11-17T20:34:38.171Z",
+   "by": "blind-read",
+   "cmd": "find",
+   "args": {
+    "text": "searchIssues",
+    "by": "blind-read",
+    "pos": []
+   },
+   "asOf": null
+  },
+  {
+   "at": "2026-11-17T20:34:38.214Z",
+   "by": "blind-read",
+   "cmd": "find",
+   "args": {
+    "text": "search/jql",
+    "by": "blind-read",
+    "pos": []
+   },
+   "asOf": null
+  },
+  {
+   "at": "2026-11-17T20:34:38.250Z",
+   "by": "blind-read",
+   "cmd": "find",
+   "args": {
+    "text": "isHermeticTestToken",
+    "by": "blind-read",
+    "pos": []
+   },
+   "asOf": null
+  },
+  {
+   "at": "2026-11-17T20:34:38.289Z",
+   "by": "blind-read",
+   "cmd": "find",
+   "args": {
+    "text": "workspace-api-audit",
+    "by": "blind-read",
+    "pos": []
+   },
+   "asOf": null
+  },
+  {
+   "at": "2026-11-17T20:34:38.331Z",
+   "by": "blind-read",
+   "cmd": "find",
+   "args": {
+    "text": "isTestToken",
+    "by": "blind-read",
+    "pos": []
+   },
+   "asOf": null
+  },
+  {
+   "at": "2026-11-17T20:34:38.367Z",
+   "by": "blind-read",
+   "cmd": "find",
+   "args": {
+    "text": "no longer claim",
+    "by": "blind-read",
+    "pos": []
+   },
+   "asOf": null
+  },
+  {
+   "at": "2026-11-17T20:34:38.402Z",
+   "by": "blind-read",
+   "cmd": "find",
+   "args": {
+    "text": "batch",
+    "by": "blind-read",
+    "pos": []
+   },
+   "asOf": null
+  },
+  {
+   "at": "2026-11-17T20:34:38.439Z",
+   "by": "blind-read",
+   "cmd": "find",
+   "args": {
+    "path": "routes/",
+    "by": "blind-read",
+    "pos": []
+   },
+   "asOf": null
+  },
+  {
+   "at": "2026-11-17T20:34:41.681Z",
+   "by": "blind-read",
+   "cmd": "get",
+   "args": {
+    "by": "blind-read",
+    "pos": [
+     "finding-79"
+    ]
+   },
+   "asOf": null
+  },
+  {
+   "at": "2026-11-17T20:34:41.717Z",
+   "by": "blind-read",
+   "cmd": "get",
+   "args": {
+    "by": "blind-read",
+    "pos": [
+     "finding-99"
+    ]
+   },
+   "asOf": null
   }
  ]
 }

@@ -1,0 +1,442 @@
+[
+ {
+  "at": "2026-11-17T20:29:28.442Z",
+  "by": "plan-review",
+  "cmd": "find",
+  "args": {
+   "to": "plan-review",
+   "state": "open",
+   "by": "plan-review",
+   "pos": []
+  },
+  "asOf": null
+ },
+ {
+  "at": "2026-11-17T20:29:28.484Z",
+  "by": "plan-review",
+  "cmd": "find",
+  "args": {
+   "area": "area-1",
+   "state": "open",
+   "by": "plan-review",
+   "pos": []
+  },
+  "asOf": null
+ },
+ {
+  "at": "2026-11-17T20:29:28.517Z",
+  "by": "plan-review",
+  "cmd": "get",
+  "args": {
+   "by": "plan-review",
+   "pos": [
+    "check-22"
+   ]
+  },
+  "asOf": null
+ },
+ {
+  "at": "2026-11-17T20:29:28.553Z",
+  "by": "plan-review",
+  "cmd": "get",
+  "args": {
+   "by": "plan-review",
+   "pos": [
+    "plan-28"
+   ]
+  },
+  "asOf": null
+ },
+ {
+  "at": "2026-11-17T20:29:34.059Z",
+  "by": "plan-review",
+  "cmd": "show",
+  "args": {
+   "task": "task-9",
+   "by": "plan-review",
+   "pos": []
+  },
+  "asOf": null
+ },
+ {
+  "at": "2026-11-17T20:29:34.097Z",
+  "by": "plan-review",
+  "cmd": "find",
+  "args": {
+   "text": "workspace-kpis",
+   "by": "plan-review",
+   "pos": []
+  },
+  "asOf": null
+ },
+ {
+  "at": "2026-11-17T20:29:48.289Z",
+  "by": "plan-review",
+  "cmd": "get",
+  "args": {
+   "by": "plan-review",
+   "pos": [
+    "check-32"
+   ]
+  },
+  "asOf": null
+ },
+ {
+  "at": "2026-11-17T20:29:48.326Z",
+  "by": "plan-review",
+  "cmd": "get",
+  "args": {
+   "by": "plan-review",
+   "pos": [
+    "check-33"
+   ]
+  },
+  "asOf": null
+ },
+ {
+  "at": "2026-11-17T20:29:48.363Z",
+  "by": "plan-review",
+  "cmd": "get",
+  "args": {
+   "by": "plan-review",
+   "pos": [
+    "check-13"
+   ]
+  },
+  "asOf": null
+ },
+ {
+  "at": "2026-11-17T20:29:48.408Z",
+  "by": "plan-review",
+  "cmd": "find",
+  "args": {
+   "kind": "verdict",
+   "by": "plan-review",
+   "pos": []
+  },
+  "asOf": null
+ },
+ {
+  "at": "2026-11-17T20:29:48.457Z",
+  "by": "plan-review",
+  "cmd": "find",
+  "args": {
+   "text": "render.js",
+   "by": "plan-review",
+   "pos": []
+  },
+  "asOf": null
+ },
+ {
+  "at": "2026-11-17T20:33:02.703Z",
+  "by": "plan-review",
+  "cmd": "find",
+  "args": {
+   "to": "plan-review",
+   "state": "open",
+   "by": "plan-review",
+   "pos": []
+  },
+  "asOf": null
+ },
+ {
+  "at": "2026-11-17T20:33:02.743Z",
+  "by": "plan-review",
+  "cmd": "show",
+  "args": {
+   "task": "task-9",
+   "by": "plan-review",
+   "pos": []
+  },
+  "asOf": null
+ },
+ {
+  "at": "2026-11-17T20:33:06.796Z",
+  "by": "plan-review",
+  "cmd": "get",
+  "args": {
+   "by": "plan-review",
+   "pos": [
+    "finding-36"
+   ]
+  },
+  "asOf": null
+ },
+ {
+  "at": "2026-11-17T20:33:06.861Z",
+  "by": "plan-review",
+  "cmd": "get",
+  "args": {
+   "by": "plan-review",
+   "pos": [
+    "finding-37"
+   ]
+  },
+  "asOf": null
+ },
+ {
+  "at": "2026-11-17T20:33:06.920Z",
+  "by": "plan-review",
+  "cmd": "get",
+  "args": {
+   "by": "plan-review",
+   "pos": [
+    "finding-38"
+   ]
+  },
+  "asOf": null
+ },
+ {
+  "at": "2026-11-17T20:33:06.980Z",
+  "by": "plan-review",
+  "cmd": "get",
+  "args": {
+   "by": "plan-review",
+   "pos": [
+    "finding-39"
+   ]
+  },
+  "asOf": null
+ },
+ {
+  "at": "2026-11-17T20:33:07.040Z",
+  "by": "plan-review",
+  "cmd": "get",
+  "args": {
+   "by": "plan-review",
+   "pos": [
+    "finding-40"
+   ]
+  },
+  "asOf": null
+ },
+ {
+  "at": "2026-11-17T20:33:07.098Z",
+  "by": "plan-review",
+  "cmd": "get",
+  "args": {
+   "by": "plan-review",
+   "pos": [
+    "finding-41"
+   ]
+  },
+  "asOf": null
+ },
+ {
+  "at": "2026-11-17T20:33:07.150Z",
+  "by": "plan-review",
+  "cmd": "get",
+  "args": {
+   "by": "plan-review",
+   "pos": [
+    "finding-42"
+   ]
+  },
+  "asOf": null
+ },
+ {
+  "at": "2026-11-17T20:33:07.196Z",
+  "by": "plan-review",
+  "cmd": "get",
+  "args": {
+   "by": "plan-review",
+   "pos": [
+    "finding-43"
+   ]
+  },
+  "asOf": null
+ },
+ {
+  "at": "2026-11-17T20:33:07.247Z",
+  "by": "plan-review",
+  "cmd": "get",
+  "args": {
+   "by": "plan-review",
+   "pos": [
+    "finding-44"
+   ]
+  },
+  "asOf": null
+ },
+ {
+  "at": "2026-11-17T20:33:07.294Z",
+  "by": "plan-review",
+  "cmd": "get",
+  "args": {
+   "by": "plan-review",
+   "pos": [
+    "plan-28"
+   ]
+  },
+  "asOf": null
+ },
+ {
+  "at": "2026-11-17T20:33:10.452Z",
+  "by": "plan-review",
+  "cmd": "get",
+  "args": {
+   "by": "plan-review",
+   "pos": [
+    "finding-36"
+   ]
+  },
+  "asOf": null
+ },
+ {
+  "at": "2026-11-17T20:33:10.504Z",
+  "by": "plan-review",
+  "cmd": "get",
+  "args": {
+   "by": "plan-review",
+   "pos": [
+    "finding-37"
+   ]
+  },
+  "asOf": null
+ },
+ {
+  "at": "2026-11-17T20:33:10.558Z",
+  "by": "plan-review",
+  "cmd": "get",
+  "args": {
+   "by": "plan-review",
+   "pos": [
+    "finding-41"
+   ]
+  },
+  "asOf": null
+ },
+ {
+  "at": "2026-11-17T20:33:10.606Z",
+  "by": "plan-review",
+  "cmd": "get",
+  "args": {
+   "by": "plan-review",
+   "pos": [
+    "finding-42"
+   ]
+  },
+  "asOf": null
+ },
+ {
+  "at": "2026-11-17T20:33:10.653Z",
+  "by": "plan-review",
+  "cmd": "get",
+  "args": {
+   "by": "plan-review",
+   "pos": [
+    "check-22"
+   ]
+  },
+  "asOf": null
+ },
+ {
+  "at": "2026-11-17T20:33:10.698Z",
+  "by": "plan-review",
+  "cmd": "get",
+  "args": {
+   "by": "plan-review",
+   "pos": [
+    "check-32"
+   ]
+  },
+  "asOf": null
+ },
+ {
+  "at": "2026-11-17T20:33:10.740Z",
+  "by": "plan-review",
+  "cmd": "get",
+  "args": {
+   "by": "plan-review",
+   "pos": [
+    "verdict-45"
+   ]
+  },
+  "asOf": null
+ },
+ {
+  "at": "2026-11-17T20:33:10.791Z",
+  "by": "plan-review",
+  "cmd": "get",
+  "args": {
+   "by": "plan-review",
+   "pos": [
+    "run-35"
+   ]
+  },
+  "asOf": null
+ },
+ {
+  "at": "2026-11-17T20:33:20.031Z",
+  "by": "plan-review",
+  "cmd": "get",
+  "args": {
+   "by": "plan-review",
+   "pos": [
+    "check-22"
+   ]
+  },
+  "asOf": null
+ },
+ {
+  "at": "2026-11-17T20:33:20.066Z",
+  "by": "plan-review",
+  "cmd": "find",
+  "args": {
+   "text": "other-features",
+   "by": "plan-review",
+   "count": true,
+   "pos": []
+  },
+  "asOf": null
+ },
+ {
+  "at": "2026-11-17T20:33:20.108Z",
+  "by": "plan-review",
+  "cmd": "find",
+  "args": {
+   "kind": "finding",
+   "text": "server.js",
+   "state": "open",
+   "by": "plan-review",
+   "pos": []
+  },
+  "asOf": null
+ },
+ {
+  "at": "2026-11-17T20:33:42.907Z",
+  "by": "plan-review",
+  "cmd": "get",
+  "args": {
+   "by": "plan-review",
+   "pos": [
+    "verdict-49"
+   ]
+  },
+  "asOf": null
+ },
+ {
+  "at": "2026-11-17T20:33:58.236Z",
+  "by": "plan-review",
+  "cmd": "get",
+  "args": {
+   "by": "plan-review",
+   "pos": [
+    "finding-39"
+   ]
+  },
+  "asOf": null
+ },
+ {
+  "at": "2026-11-17T20:34:03.523Z",
+  "by": "plan-review",
+  "cmd": "get",
+  "args": {
+   "by": "plan-review",
+   "pos": [
+    "check-22"
+   ]
+  },
+  "asOf": null
+ }
+]
