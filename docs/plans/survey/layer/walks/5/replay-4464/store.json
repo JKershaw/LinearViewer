@@ -2398,6 +2398,29 @@
     "op": "add",
     "at": "2026-11-13T15:59:48.000Z",
     "by": "survey-place"
+   },
+   {
+    "id": "finding-96",
+    "kind": "finding",
+    "state": "done",
+    "fields": {
+     "says": "Control files the work imports: six unsampled front-end files import `lib/openrouter.js`, which piece 1 (LIN-4465) changes: `render-settings-models`, `render-roadmap`, `components/model-change-lines`, `render-settings`, `render-landing`, `components/decision-panel`. Record their blobs at the base in both reports, as the kit does for its four tracked files, so the repeat read can tell whether the control moved because of this work."
+    },
+    "links": {
+     "about": [
+      "area-44",
+      "task-78"
+     ]
+    },
+    "in": "task-78",
+    "to": "implementation",
+    "v": 2,
+    "op": "end",
+    "at": "2026-11-13T16:26:10.000Z",
+    "by": "review",
+    "ended": {
+     "reason": "Recorded in the reports; review checked the importer set at e8e92d50a: the six unsampled files plus render-settings-you are complete, render-pages.js and settings-areas.js only name /auth/openrouter in strings (verdict-115)."
+    }
    }
   ],
   "finding-97": [
@@ -2734,6 +2757,28 @@
     "op": "add",
     "at": "2026-11-13T16:06:06.000Z",
     "by": "implementation"
+   },
+   {
+    "id": "finding-106",
+    "kind": "finding",
+    "state": "done",
+    "fields": {
+     "says": "Contamination: every counted reader pass read only its own bundle, except one Front-end (control) pass that ran a Bash `grep` of its own header lines. Recorded in the control report; the pass is counted, not discarded. Judge whether that is acceptable."
+    },
+    "links": {
+     "about": [
+      "change-103"
+     ]
+    },
+    "in": "task-78",
+    "to": "review",
+    "v": 2,
+    "op": "end",
+    "at": "2026-11-13T16:26:08.000Z",
+    "by": "review",
+    "ended": {
+     "reason": "Acceptable, counted: Front-end Pass B ran one Bash grep -n \"^=== \" on its own inputs file, read nothing outside its bundle, and its scores equal Pass A (3.3 / 3.5), so dropping it would not change the control baseline. The report records the deviation openly; the after-read keeps readers to Read only, as the report says (verdict-115)."
+    }
    }
   ],
   "run-107": [
@@ -2835,6 +2880,32 @@
     "op": "add",
     "at": "2026-11-13T16:17:32.000Z",
     "by": "leftover"
+   },
+   {
+    "id": "finding-109",
+    "kind": "finding",
+    "state": "done",
+    "fields": {
+     "says": "Tidied after implementation, new commit on #2430 to check: `docs/plans/survey/area-read-adoption-e8e92d50a.md` quoted the kit Lessons figures (1,012 and 4,257 B) beside the LLM and control notes, so 4,257 B read as an LLM figure. It is the Runs note at `4b5001ddf`. The line now says which pair the figures belong to (`444b58246`). No score, sample or blob in the reports changed."
+    },
+    "links": {
+     "about": [
+      "change-103"
+     ],
+     "on": [
+      "change-103@2",
+      "finding-104@1"
+     ]
+    },
+    "in": "task-78",
+    "to": "review",
+    "v": 2,
+    "op": "end",
+    "at": "2026-11-13T16:26:09.000Z",
+    "by": "review",
+    "ended": {
+     "reason": "Checked commit 444b58246 on #2430: the adoption record line now names the Runs/control pair for 1,012 and 4,257 B; review re-ran samples, byte totals and blobs and none changed (verdict-115)."
+    }
    }
   ],
   "decision-110": [
@@ -2878,6 +2949,40 @@
     "op": "add",
     "at": "2026-11-13T16:26:01.000Z",
     "by": "review"
+   },
+   {
+    "id": "run-111",
+    "kind": "run",
+    "state": "open",
+    "fields": {
+     "stage": "review",
+     "account": "Reviewed #2430 at head 444b58246 (CI green, mergeable). I re-ran the kit snippet at e8e92d50a and re-checked blobs, the control-movement table, the openrouter importers, and that no piece 1-6 commit or sampled-file change is on main. Done-when met except the LLM report names no control moves (fix 1); the when-checked lines went stale as #2427 and #2428 merged (fix 2). Judged the Pass B grep acceptable. Approve with notes; close-out makes both fixes and runs the pre-merge check. No rulings, no DECISION raised."
+    },
+    "links": {},
+    "in": "task-78",
+    "v": 2,
+    "op": "revise",
+    "at": "2026-11-13T16:26:11.000Z",
+    "by": "review",
+    "reason": "account written at end of review"
+   },
+   {
+    "id": "run-111",
+    "kind": "run",
+    "state": "done",
+    "fields": {
+     "stage": "review",
+     "account": "Reviewed #2430 at head 444b58246 (CI green, mergeable). I re-ran the kit snippet at e8e92d50a and re-checked blobs, the control-movement table, the openrouter importers, and that no piece 1-6 commit or sampled-file change is on main. Done-when met except the LLM report names no control moves (fix 1); the when-checked lines went stale as #2427 and #2428 merged (fix 2). Judged the Pass B grep acceptable. Approve with notes; close-out makes both fixes and runs the pre-merge check. No rulings, no DECISION raised."
+    },
+    "links": {},
+    "in": "task-78",
+    "v": 3,
+    "op": "end",
+    "at": "2026-11-13T16:26:12.000Z",
+    "by": "review",
+    "ended": {
+     "reason": "review posted on LIN-4464; next action close-out"
+    }
    }
   ],
   "finding-112": [

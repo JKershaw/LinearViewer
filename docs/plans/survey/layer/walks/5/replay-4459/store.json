@@ -1,5 +1,5 @@
 {
- "next": 149,
+ "next": 151,
  "records": {
   "area-1": [
    {
@@ -268,6 +268,27 @@
     "op": "add",
     "at": "2026-11-13T12:00:00.000Z",
     "by": "Harbour"
+   },
+   {
+    "id": "lesson-8",
+    "kind": "lesson",
+    "state": "holds",
+    "fields": {
+     "says": "Any session can park `[pending]` on CI and finish on a ci-wake `custom` row (`lib/ci-wake-sweep.js`). A rule keyed on the producing kind misses that ending: read the lineage. For one follow-up, walk up (`heldWakeHolderOf`, `resolveFollowUpRoot`); over a ticket's runs, read it batched (`listHistory({ withLineage: true })`, as `loadRecentRuns` does), never with a walk per row. LIN-4373 covered eligibility, not the held wake's terminals.",
+     "paths": [
+      "lib/ci-wake-sweep.js",
+      "lib/recent-runs.js",
+      "lib/dispatch-store.js"
+     ],
+     "checked-at": "7424cfb8f (PR #2432 head)"
+    },
+    "links": {},
+    "in": "area-1",
+    "v": 2,
+    "op": "revise",
+    "at": "2026-11-13T16:48:24.000Z",
+    "by": "leftover",
+    "reason": "LIN-4459 leftover: the Runs note lesson now says read the lineage batched over a ticket's runs, never a walk per row"
    }
   ],
   "lesson-9": [
@@ -1658,6 +1679,23 @@
     "op": "add",
     "at": "2026-11-13T16:09:25.000Z",
     "by": "Harbour"
+   },
+   {
+    "id": "finding-81",
+    "kind": "finding",
+    "state": "done",
+    "fields": {
+     "says": "`lib/prompts/runner-kickoff.js`: imports `FEEDBACK_ENTRY_KINDS` from the store (`lib/dispatch-store.js`), the only importer of the store's re-export of it (`export { FEEDBACK_ENTRY_KINDS } from './dispatch-feedback-kinds.js'`). Importing from the leaf `lib/dispatch-feedback-kinds.js` would let the store drop the shim and keep the prompt module off the store's import graph. The runner prompt bytes and the kinds' exact order must not change. (LIN-4455 blind read.)"
+    },
+    "links": {},
+    "to": "area-38",
+    "v": 2,
+    "op": "end",
+    "at": "2026-11-13T16:48:25.000Z",
+    "by": "leftover",
+    "ended": {
+     "reason": "Retired in PR #2432 (head 7424cfb8f, LIN-4459 leftover): lib/prompts/runner-kickoff.js imports FEEDBACK_ENTRY_KINDS from the leaf lib/dispatch-feedback-kinds.js, the store drops its re-export, tests import the leaf; kinds and order unchanged; the entry leaves docs/areas/llm-and-prompts.md."
+    }
    }
   ],
   "task-82": [
@@ -3813,6 +3851,22 @@
     "op": "add",
     "at": "2026-11-13T16:33:21.000Z",
     "by": "implementation"
+   },
+   {
+    "id": "change-143",
+    "kind": "change",
+    "state": "open",
+    "fields": {
+     "ref": "PR #2432 (branch feat/lin-4459-run-live-wait)",
+     "head": "7424cfb8f"
+    },
+    "links": {},
+    "in": "task-113",
+    "v": 2,
+    "op": "revise",
+    "at": "2026-11-13T16:48:23.000Z",
+    "by": "leftover",
+    "reason": "leftover tidies pushed; head 7424cfb8fa42f28b303138c76f20cbb6cb74b5f2, CI green (unit, unit proxy, E2E 1-4, secret scan, ci-success)"
    }
   ],
   "decision-144": [
@@ -3936,6 +3990,64 @@
     "op": "add",
     "at": "2026-11-13T16:33:27.000Z",
     "by": "implementation"
+   }
+  ],
+  "run-149": [
+   {
+    "id": "run-149",
+    "kind": "run",
+    "state": "open",
+    "fields": {
+     "stage": "leftover",
+     "account": "Follow-up of the implementation session on PR #2432. Tidied leftovers from the build: PARKED_LINEAGE_ENDS in lib/recent-runs.js now built from LINEAGE_TERMINAL_STATUSES plus blocked instead of restating the words; stageRuns docblock names the parked case; withLineage comments in lib/dispatch-store.js name loadRecentRuns as a second caller; the new live-wait witnesses renamed off W1/W2 and listed in the test header. The Runs lineage lesson now says read the lineage batched over a ticket's runs, never a walk per row. Retired the LLM-note entry on runner-kickoff importing FEEDBACK_ENTRY_KINDS from the store (finding-81): it imports the leaf, the store drops the re-export, kinds and order unchanged. New head 7424cfb8f, CI green. Nothing posted on LIN-4447 or LIN-4448; description unchanged."
+    },
+    "links": {},
+    "in": "task-113",
+    "v": 1,
+    "op": "add",
+    "at": "2026-11-13T16:48:22.000Z",
+    "by": "leftover"
+   },
+   {
+    "id": "run-149",
+    "kind": "run",
+    "state": "done",
+    "fields": {
+     "stage": "leftover",
+     "account": "Follow-up of the implementation session on PR #2432. Tidied leftovers from the build: PARKED_LINEAGE_ENDS in lib/recent-runs.js now built from LINEAGE_TERMINAL_STATUSES plus blocked instead of restating the words; stageRuns docblock names the parked case; withLineage comments in lib/dispatch-store.js name loadRecentRuns as a second caller; the new live-wait witnesses renamed off W1/W2 and listed in the test header. The Runs lineage lesson now says read the lineage batched over a ticket's runs, never a walk per row. Retired the LLM-note entry on runner-kickoff importing FEEDBACK_ENTRY_KINDS from the store (finding-81): it imports the leaf, the store drops the re-export, kinds and order unchanged. New head 7424cfb8f, CI green. Nothing posted on LIN-4447 or LIN-4448; description unchanged."
+    },
+    "links": {},
+    "in": "task-113",
+    "v": 2,
+    "op": "end",
+    "at": "2026-11-13T16:48:27.000Z",
+    "by": "leftover",
+    "ended": {
+     "reason": "leftover tidies pushed to PR #2432 and reported on LIN-4459 (comment 497f439c)"
+    }
+   }
+  ],
+  "finding-150": [
+   {
+    "id": "finding-150",
+    "kind": "finding",
+    "state": "open",
+    "fields": {
+     "says": "PR #2432 leftover tidies, now at head 7424cfb8f (CI green: unit, unit proxy, E2E 1-4, secret scan, ci-success): `PARKED_LINEAGE_ENDS` (`lib/recent-runs.js`) is built from `LINEAGE_TERMINAL_STATUSES` (`lib/dispatch-lineage-status.js`) plus `blocked` instead of restating the words; `stageRuns`' docblock names the parked case; the `withLineage` comments in `lib/dispatch-store.js` name `loadRecentRuns` as a second caller; the new live-wait witnesses no longer reuse the file's W1/W2 names and are listed in its header. Also retires the LLM-note entry on `lib/prompts/runner-kickoff.js` importing `FEEDBACK_ENTRY_KINDS` from the store (finding-81): the prompt imports the leaf, the store drops its re-export. That edits a prompt module on LIN-4448's side without asking them; check the runner prompt bytes and kind order are unchanged."
+    },
+    "links": {
+     "about": [
+      "change-143",
+      "finding-81",
+      "finding-147"
+     ]
+    },
+    "in": "task-113",
+    "to": "review",
+    "v": 1,
+    "op": "add",
+    "at": "2026-11-13T16:48:26.000Z",
+    "by": "leftover"
    }
   ]
  },
