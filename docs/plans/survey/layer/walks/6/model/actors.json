@@ -1,4 +1,4 @@
 {
-  "actors": ["design", "plan-review", "breakdown", "survey-task", "survey-place", "scoping", "implementation", "leftover", "review", "blind-read", "close-out", "autopilot", "john", "harbour"],
+  "actors": ["design", "plan-review", "breakdown", "survey-task", "survey-place", "scoping", "implementation", "leftover", "review", "blind-read", "close-out", "autopilot", "John", "Harbour"],
   "blind": ["blind-read"]
 }
