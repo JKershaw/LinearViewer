@@ -67,7 +67,7 @@ John: "a small minimal MVP, and we take it for a walk and see a) if it's better 
 | `check` | A verification needing the person's systems | `what`, `why-person`, `how`; `to` | open → done, declined, handed-on |
 | `question` | A call waiting on a decider | `asks`, `options`, `recommended`, `if-unanswered`; `to` | open → answered, withdrawn, handed-on |
 | `decision` | What was decided and why, including a person's standing direction | `answer`, `why`, `scope` (optional: a task, covering it and every task under it; or an area, covering every task whose paths overlap it) | stands → superseded, withdrawn |
-| `verdict` | A judgement `on` one version of a plan piece or change | `of` (plan-review, review, blind-read), `outcome` from that judgement's set, `reasoning` | stands → superseded, withdrawn |
+| `verdict` | A judgement `on` one version of a plan piece or change | `judgement` (which one: plan-review, review, blind-read), `outcome` from that judgement's set, `reasoning` | stands → superseded, withdrawn |
 | `lesson` | A lasting truth about the code, `in` an area | `says`, `paths`, `checked-at` (the commit it was last true at) | holds → superseded, disproved |
 | `area` | A place in the code | `name`, `paths` | kept → retired |
 | `change` | A handle on the work product: a PR, commit range or saved file; each new head is a new version | `ref`, `head` | open → merged, abandoned |
@@ -79,7 +79,7 @@ John: "a small minimal MVP, and we take it for a walk and see a) if it's better 
 
 **Paths overlap** when one is a prefix of the other on whole segments (`lib/a` overlaps `lib/a/b.js`, not `lib/ab`). Every view and brief part that matches paths uses this.
 
-**Actors** are declared in `actors.json`: the names that may appear in `by` and `to`. For Harbour: its stages (design, plan-review, breakdown, survey-task, survey-place, scoping, implementation, leftover, review, blind-read, close-out), the autopilot, John, and Harbour itself (the system). An actor may be marked `blind`: its brief and its queries leave out verdicts other than its own (in Harbour, blind-read, which judges the work without the review's view). Another project declares its own. Any actor may write any kind and end any record; which ones it should is its prompt's business and Harbour's.
+**Actors** are declared in `actors.json`: the names that may appear in `by` and `to`. For Harbour: its stages (design, plan-review, breakdown, survey-task, survey-place, scoping, implementation, leftover, review, blind-read, close-out), the autopilot, John, and Harbour itself (the system). An actor may be marked `blind`: its brief and its queries leave out verdicts other than its own, and the accounts of runs by stages that write verdicts (in Harbour, blind-read, which judges the work without the review's view). Another project declares its own. Any actor may write any kind and end any record; which ones it should is its prompt's business and Harbour's.
 
 ### 3.3 What a write checks
 
@@ -96,6 +96,7 @@ Only shape, so a malformed record can't enter:
 - **Stale:** a verdict or decision, not ended, one of whose `on` links points to a version after which its target's content was revised (a change to its fields; not to its `to`, `in` or links), or to a target ended superseded, withdrawn, abandoned or disproved. Only direct links count. Shown as a flag that says which link moved and how (e.g. "on change-5@1, now @2").
 - **Counts:** any `find` can return its count instead of its records, as of any time.
 - **Overlap:** open runs whose `claims` share a path.
+- **Under an ended task:** open records `in` or `to` a task that has ended. They reach its parent's brief (part 3); for a task with no parent, `find` shows them.
 
 ### 3.5 Reading: a brief, then queries
 
@@ -104,12 +105,12 @@ John: "previously an agent essentially got the brief, but then the ability to fi
 **A brief** is what an actor working on a task is given:
 1. **The task and the person's words:** the task's id, `ref`, `done-when` and `paths`; then the `asked` of the task and of each ancestor, verbatim.
 2. **Its plan:** the current version of the task's `piece` (if superseded, the record that took over); for a task with no piece, every plan `in` it that is kept.
-3. **Addressed to it, in full:** open records `in` this task whose `to` is this actor; open records anywhere whose `to` is this task; and open records `in` this task addressed to a stage whose run on this task has ended (left behind).
+3. **Addressed to it, in full:** open records `in` this task whose `to` is this actor; open records anywhere whose `to` is this task; open records `in` this task addressed to a stage whose run on this task has ended (left behind); and open records under a child task that has ended.
 4. **What stands about this task:** verdicts (unless the actor is blind) and decisions `in` the task, or `about` or `on` its piece or its change, each with the version it rests on and the stale flag. An ancestor's decisions appear when `about` or `on` this task's piece, or when they carry a `scope` that covers it.
 5. **Its areas:** each area whose paths overlap the task's, by id and name, with the number of open records addressed to it, so the actor can address the place and look up what is waiting there.
 6. **Open runs,** other than the actor's own on this task, whose claims share a path with this task.
 7. **An index of what else is known:** every other open record `in` the task, and every lesson whose paths overlap the task's, one line each: id, kind, to, and the first line of what it says.
-8. **The previous stage's account, in full:** the `account` of the latest ended run in this task by another actor.
+8. **The previous stage:** one line pointing to the latest ended run in this task by another actor: its id, stage and the first line of its account. The account itself, the stage's words in full, is read with `get`.
 
 Ended records are left out. Each brief reports what it carries and its size in bytes of text.
 
@@ -131,9 +132,7 @@ Ended records are left out. Each brief reports what it carries and its size in b
 
 ## 5. Walks
 
-Walks 1–4 are in `walks/1/`–`walks/4/`. What they established: everything that happened had a home; stages replaying their real outputs addressed their own records well (no walk ran stages doing new work); retelling stops when stages can look things up; briefs stop growing with the ticket's history; and with only shape checked, corrections replace instead of piling and stale shows only the real signal [checked, results files].
-
-**Walk 6** carried walk 5's stores onto the round 6 model and showed stale is now quiet; its reading comparison measured reading, not whether the structure holds the data, and is set aside. No stage has yet written through round 6: a `to` on a decision or verdict, a verdict superseded, "needs-discussion", an area scope and blindness in queries are untested.
+Walks 1–7 are in `walks/1/`–`walks/7/`. What they established: everything that happened had a home; retelling stops when stages can look things up; briefs stop growing with the ticket's history; with only shape checked, corrections replace instead of piling and stale shows only the real signal [checked, results files]. Walk 7 had stages write through this model on three tasks (32 steps): every hand-off was addressed by its writer and reached its reader, judgements were superseded rather than stacked, rulings were answered or withdrawn and ended, and what was open at each end was owned; the only refusals were malformed writes. It also filled in a project that is not Harbour (Yap) after the fact, with no refusals. Every walk replayed what stages really did; none did new work through the store. The comparison of a ticket reader with a store reader (walks 5–6) measured reading, not whether the structure holds the data, and is set aside.
 
 - **The question:** is everything that happened stored, addressed, ended or rightly open; could each stage find what it needed?
 - **A break,** each with why: something with no home; a hand-off to no reader; a thing retold that should be one record; something a stage needed that neither its brief nor a query gave it; a write refused that was right, or accepted that was malformed.
