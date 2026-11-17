@@ -1,0 +1,53 @@
+undefined undefined vundefined [undefined] by undefined
+task-131 task v2 [done] by close-out
+decision-132 decision v1 [stands] by breakdown
+decision-133 decision v1 [stands] by breakdown
+decision-134 decision v1 [stands] by breakdown
+decision-135 decision v1 [stands] by breakdown
+decision-138 decision v1 [stands] by breakdown
+decision-140 decision v1 [stands] by autopilot
+run-141 run v2 [done] by implementation
+change-142 change v7 [merged] to close-out by close-out
+decision-143 decision v4 [stands] by implementation
+decision-144 decision v1 [stands] by implementation
+decision-145 decision v3 [superseded] by implementation
+finding-146 finding v3 [handed-on] to task-131 by autopilot
+question-147 question v3 [answered] to John answered-by decision-160 by John
+finding-148 finding v1 [open] to area-1 by autopilot
+check-149 check v2 [handed-on] to review by close-out
+run-150 run v2 [done] by autopilot
+run-151 run v2 [done] by review
+verdict-152 verdict v2 [superseded] by review
+finding-153 finding v3 [done] to implementation by implementation
+finding-154 finding v3 [done] to implementation by review
+finding-155 finding v3 [done] to implementation by implementation
+finding-156 finding v3 [done] to implementation by implementation
+finding-157 finding v3 [done] to implementation by review
+check-158 check v3 [open] to John by close-out
+check-159 check v2 [done] to leftover by leftover
+decision-160 decision v1 [stands] to implementation by John
+decision-161 decision v1 [stands] to implementation by autopilot
+question-162 question v3 [withdrawn] to John by review
+finding-163 finding v2 [done] to implementation by implementation
+run-164 run v2 [done] by autopilot
+run-165 run v2 [done] by implementation
+decision-166 decision v2 [superseded] by close-out
+finding-167 finding v2 [done] to review by review
+finding-168 finding v2 [done] to review by review
+run-169 run v2 [done] by leftover
+decision-170 decision v1 [stands] by leftover
+run-172 run v2 [done] by review
+verdict-173 verdict v1 [stands] STALE(on change-142@3, now @6) by review
+finding-174 finding v2 [done] to close-out by close-out
+finding-175 finding v2 [done] to close-out by close-out
+check-176 check v2 [done] to close-out by close-out
+run-177 run v2 [done] by autopilot
+decision-178 decision v1 [stands] by autopilot
+finding-179 finding v2 [done] to close-out by close-out
+finding-180 finding v2 [done] to close-out by close-out
+finding-181 finding v2 [done] to close-out by close-out
+finding-182 finding v2 [done] to close-out by close-out
+run-187 run v2 [done] by blind-read
+verdict-188 verdict v1 [stands] STALE(on change-142@5, now @6) to close-out by blind-read
+decision-189 decision v1 [stands] by close-out
+run-191 run v2 [done] by close-out

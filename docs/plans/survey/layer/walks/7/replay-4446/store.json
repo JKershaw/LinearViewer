@@ -5085,6 +5085,134 @@
     "pos": []
    },
    "asOf": null
+  },
+  {
+   "at": "2026-11-17T20:43:42.093Z",
+   "by": "John",
+   "cmd": "show",
+   "args": {
+    "task": "task-9",
+    "by": "John",
+    "pos": []
+   },
+   "asOf": null
+  },
+  {
+   "at": "2026-11-17T20:43:42.139Z",
+   "by": "John",
+   "cmd": "find",
+   "args": {
+    "to": "John",
+    "state": "open",
+    "by": "John",
+    "pos": []
+   },
+   "asOf": null
+  },
+  {
+   "at": "2026-11-17T20:43:46.412Z",
+   "by": "John",
+   "cmd": "show",
+   "args": {
+    "task": "task-9",
+    "by": "John",
+    "pos": []
+   },
+   "asOf": null
+  },
+  {
+   "at": "2026-11-17T20:43:58.104Z",
+   "by": "John",
+   "cmd": "get",
+   "args": {
+    "by": "John",
+    "pos": [
+     "task-9"
+    ]
+   },
+   "asOf": null
+  },
+  {
+   "at": "2026-11-17T20:43:58.142Z",
+   "by": "John",
+   "cmd": "get",
+   "args": {
+    "by": "John",
+    "pos": [
+     "decision-29"
+    ]
+   },
+   "asOf": null
+  },
+  {
+   "at": "2026-11-17T20:43:58.183Z",
+   "by": "John",
+   "cmd": "get",
+   "args": {
+    "by": "John",
+    "pos": [
+     "finding-67"
+    ]
+   },
+   "asOf": null
+  },
+  {
+   "at": "2026-11-17T20:43:58.226Z",
+   "by": "John",
+   "cmd": "get",
+   "args": {
+    "by": "John",
+    "pos": [
+     "decision-74"
+    ]
+   },
+   "asOf": null
+  },
+  {
+   "at": "2026-11-17T20:43:58.273Z",
+   "by": "John",
+   "cmd": "get",
+   "args": {
+    "by": "John",
+    "pos": [
+     "check-63"
+    ]
+   },
+   "asOf": null
+  },
+  {
+   "at": "2026-11-17T20:43:58.311Z",
+   "by": "John",
+   "cmd": "get",
+   "args": {
+    "by": "John",
+    "pos": [
+     "decision-26"
+    ]
+   },
+   "asOf": null
+  },
+  {
+   "at": "2026-11-17T20:43:58.350Z",
+   "by": "John",
+   "cmd": "find",
+   "args": {
+    "kind": "area",
+    "by": "John",
+    "pos": []
+   },
+   "asOf": null
+  },
+  {
+   "at": "2026-11-17T20:43:58.388Z",
+   "by": "John",
+   "cmd": "find",
+   "args": {
+    "kind": "task",
+    "by": "John",
+    "pos": []
+   },
+   "asOf": null
   }
  ]
 }

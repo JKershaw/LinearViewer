@@ -1,0 +1,269 @@
+[
+ {
+  "at": "2026-11-17T20:42:33.203Z",
+  "by": "close-out",
+  "cmd": "show",
+  "args": {
+   "task": "task-131",
+   "by": "close-out",
+   "pos": []
+  },
+  "asOf": null
+ },
+ {
+  "at": "2026-11-17T20:42:37.272Z",
+  "by": "close-out",
+  "cmd": "get",
+  "args": {
+   "by": "close-out",
+   "pos": [
+    "finding-183"
+   ]
+  },
+  "asOf": null
+ },
+ {
+  "at": "2026-11-17T20:42:37.310Z",
+  "by": "close-out",
+  "cmd": "get",
+  "args": {
+   "by": "close-out",
+   "pos": [
+    "finding-184"
+   ]
+  },
+  "asOf": null
+ },
+ {
+  "at": "2026-11-17T20:42:37.345Z",
+  "by": "close-out",
+  "cmd": "get",
+  "args": {
+   "by": "close-out",
+   "pos": [
+    "finding-185"
+   ]
+  },
+  "asOf": null
+ },
+ {
+  "at": "2026-11-17T20:42:37.381Z",
+  "by": "close-out",
+  "cmd": "get",
+  "args": {
+   "by": "close-out",
+   "pos": [
+    "finding-186"
+   ]
+  },
+  "asOf": null
+ },
+ {
+  "at": "2026-11-17T20:42:37.420Z",
+  "by": "close-out",
+  "cmd": "get",
+  "args": {
+   "by": "close-out",
+   "pos": [
+    "change-142"
+   ]
+  },
+  "asOf": null
+ },
+ {
+  "at": "2026-11-17T20:42:37.456Z",
+  "by": "close-out",
+  "cmd": "get",
+  "args": {
+   "by": "close-out",
+   "pos": [
+    "check-149"
+   ]
+  },
+  "asOf": null
+ },
+ {
+  "at": "2026-11-17T20:42:37.490Z",
+  "by": "close-out",
+  "cmd": "get",
+  "args": {
+   "by": "close-out",
+   "pos": [
+    "check-158"
+   ]
+  },
+  "asOf": null
+ },
+ {
+  "at": "2026-11-17T20:42:37.530Z",
+  "by": "close-out",
+  "cmd": "get",
+  "args": {
+   "by": "close-out",
+   "pos": [
+    "finding-148"
+   ]
+  },
+  "asOf": null
+ },
+ {
+  "at": "2026-11-17T20:42:37.566Z",
+  "by": "close-out",
+  "cmd": "get",
+  "args": {
+   "by": "close-out",
+   "pos": [
+    "task-131"
+   ]
+  },
+  "asOf": null
+ },
+ {
+  "at": "2026-11-17T20:42:37.600Z",
+  "by": "close-out",
+  "cmd": "find",
+  "args": {
+   "to": "close-out",
+   "state": "open",
+   "by": "close-out",
+   "pos": []
+  },
+  "asOf": null
+ },
+ {
+  "at": "2026-11-17T20:43:07.917Z",
+  "by": "close-out",
+  "cmd": "find",
+  "args": {
+   "text": "area-notes",
+   "by": "close-out",
+   "pos": []
+  },
+  "asOf": null
+ },
+ {
+  "at": "2026-11-17T20:43:07.962Z",
+  "by": "close-out",
+  "cmd": "find",
+  "args": {
+   "text": "first path",
+   "by": "close-out",
+   "pos": []
+  },
+  "asOf": null
+ },
+ {
+  "at": "2026-11-17T20:43:08.004Z",
+  "by": "close-out",
+  "cmd": "find",
+  "args": {
+   "text": "retirement-line",
+   "by": "close-out",
+   "pos": []
+  },
+  "asOf": null
+ },
+ {
+  "at": "2026-11-17T20:43:08.048Z",
+  "by": "close-out",
+  "cmd": "find",
+  "args": {
+   "text": "retirement line",
+   "by": "close-out",
+   "pos": []
+  },
+  "asOf": null
+ },
+ {
+  "at": "2026-11-17T20:43:08.103Z",
+  "by": "close-out",
+  "cmd": "find",
+  "args": {
+   "text": "completion criteria",
+   "by": "close-out",
+   "pos": []
+  },
+  "asOf": null
+ },
+ {
+  "at": "2026-11-17T20:43:08.157Z",
+  "by": "close-out",
+  "cmd": "find",
+  "args": {
+   "text": "simple-dispatcher's",
+   "by": "close-out",
+   "pos": []
+  },
+  "asOf": null
+ },
+ {
+  "at": "2026-11-17T20:43:08.212Z",
+  "by": "close-out",
+  "cmd": "find",
+  "args": {
+   "text": "dispatch grant",
+   "by": "close-out",
+   "pos": []
+  },
+  "asOf": null
+ },
+ {
+  "at": "2026-11-17T20:43:08.257Z",
+  "by": "close-out",
+  "cmd": "find",
+  "args": {
+   "text": "3504108",
+   "by": "close-out",
+   "pos": []
+  },
+  "asOf": null
+ },
+ {
+  "at": "2026-11-17T20:43:14.278Z",
+  "by": "close-out",
+  "cmd": "get",
+  "args": {
+   "by": "close-out",
+   "pos": [
+    "lesson-171"
+   ]
+  },
+  "asOf": null
+ },
+ {
+  "at": "2026-11-17T20:43:14.326Z",
+  "by": "close-out",
+  "cmd": "get",
+  "args": {
+   "by": "close-out",
+   "pos": [
+    "decision-166"
+   ]
+  },
+  "asOf": null
+ },
+ {
+  "at": "2026-11-17T20:43:14.369Z",
+  "by": "close-out",
+  "cmd": "get",
+  "args": {
+   "by": "close-out",
+   "pos": [
+    "area-65"
+   ]
+  },
+  "asOf": null
+ },
+ {
+  "at": "2026-11-17T20:44:08.750Z",
+  "by": "close-out",
+  "cmd": "find",
+  "args": {
+   "to": "close-out",
+   "state": "open",
+   "by": "close-out",
+   "pos": []
+  },
+  "asOf": null
+ }
+]
