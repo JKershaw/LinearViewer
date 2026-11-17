@@ -147,5 +147,5 @@ Walks 1–7 are in `walks/1/`–`walks/7/`. What they established: everything th
 
 - John's words for this step: log, "17 Nov" (this branch).
 - The frame: `shapes` §6. The needs and causes: `picture` §6–7. The catalogue and the avenues: `avenues`. Everything placed: `mapping`. What Harbour already has: `existing`.
-- Traces: `trace-2026-11-15/` (peaceful-euler). Walks: `walks/1/`–`walks/6/`; an independent review of 2–17 Nov in `review-2026-11-17/`.
+- Traces: `trace-2026-11-15/` (peaceful-euler). Walks: `walks/1/`–`walks/7/`; an independent review of 2–17 Nov in `review-2026-11-17/`.
 - Papers: `steering-text.md`, `coherence-as-it-grows.md`, `between-the-sessions.md`, `nothing-fights-its-shape.md` (main).
