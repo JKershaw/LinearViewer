@@ -31,7 +31,7 @@
 4. **A record addressed to an ended task has no reader.** *Why:* nothing shows open records `to` or `in` a task that has ended.
 5. **A `to` on a standing record (plan, verdict, decision) isn't in "addressed to you".** *Why:* part 3 lists open records only. Here each still reached its reader through parts 2 and 4.
 
-**Listed, not scored:** the model silently ignores unknown options (`--to`, `--links` on the command line instead of in the JSON); a satisfied decision has no "fulfilled" end; walk 7's ticket readers of walk 6 are not involved here.
+**Listed, not scored:** the model silently ignores unknown options (`--to`, `--links` on the command line instead of in the JSON); a satisfied decision has no "fulfilled" end.
 
 ## What it says [my reading]
 
