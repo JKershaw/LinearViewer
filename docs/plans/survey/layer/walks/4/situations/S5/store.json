@@ -110,6 +110,30 @@
     "op": "add",
     "by": "run",
     "at": "2026-11-14T09:02:00.000Z"
+   },
+   {
+    "id": "question-4",
+    "kind": "question",
+    "in": "task-2",
+    "to": "John",
+    "asks": "Cache the dependency install step in the build so repeat builds skip it.",
+    "options": [
+     "adopt",
+     "decline"
+    ],
+    "recommended": "adopt",
+    "if-unanswered": "If John has not answered by 2026-11-19, withdraw it: the change is not made.",
+    "links": {
+     "about": "area-1"
+    },
+    "state": "handed-on",
+    "v": 2,
+    "op": "end",
+    "by": "run",
+    "at": "2026-11-15T09:04:00.000Z",
+    "stateReason": "restated with a refinement as question-9",
+    "into": "question-9",
+    "reason": "restated with a refinement as question-9"
    }
   ],
   "question-5": [
@@ -133,6 +157,30 @@
     "op": "add",
     "by": "run",
     "at": "2026-11-14T09:03:00.000Z"
+   },
+   {
+    "id": "question-5",
+    "kind": "question",
+    "in": "task-2",
+    "to": "John",
+    "asks": "Add a link checker to the docs build that fails on broken internal links.",
+    "options": [
+     "adopt",
+     "decline"
+    ],
+    "recommended": "adopt",
+    "if-unanswered": "If John has not answered by 2026-11-19, withdraw it: the change is not made.",
+    "links": {
+     "about": "area-1"
+    },
+    "state": "handed-on",
+    "v": 2,
+    "op": "end",
+    "by": "run",
+    "at": "2026-11-16T09:04:00.000Z",
+    "stateReason": "restated with a refinement as question-13",
+    "into": "question-13",
+    "reason": "restated with a refinement as question-13"
    }
   ],
   "task-6": [
@@ -226,6 +274,30 @@
     "op": "add",
     "by": "run",
     "at": "2026-11-15T09:02:00.000Z"
+   },
+   {
+    "id": "question-8",
+    "kind": "question",
+    "in": "task-6",
+    "to": "John",
+    "asks": "Split build/config.yml into one file per section.",
+    "options": [
+     "adopt",
+     "decline"
+    ],
+    "recommended": "adopt",
+    "if-unanswered": "If John has not answered by 2026-11-20, withdraw it: the change is not made.",
+    "links": {
+     "about": "area-1"
+    },
+    "state": "handed-on",
+    "v": 2,
+    "op": "end",
+    "by": "run",
+    "at": "2026-11-17T09:04:00.000Z",
+    "stateReason": "restated with a refinement as question-17",
+    "into": "question-17",
+    "reason": "restated with a refinement as question-17"
    }
   ],
   "question-9": [
@@ -250,6 +322,31 @@
     "op": "add",
     "by": "run",
     "at": "2026-11-15T09:03:00.000Z"
+   },
+   {
+    "id": "question-9",
+    "kind": "question",
+    "in": "task-6",
+    "to": "John",
+    "asks": "Reuse one dependency cache across all build jobs, not per job.",
+    "options": [
+     "adopt",
+     "decline"
+    ],
+    "recommended": "adopt",
+    "if-unanswered": "If John has not answered by 2026-11-19, withdraw it: the change is not made. (Keeps the date of question-4, which it restates.)",
+    "links": {
+     "about": "area-1",
+     "same-as": "question-4"
+    },
+    "state": "handed-on",
+    "v": 2,
+    "op": "end",
+    "by": "run",
+    "at": "2026-11-18T09:04:00.000Z",
+    "stateReason": "restated with a refinement as question-21",
+    "into": "question-21",
+    "reason": "restated with a refinement as question-21"
    }
   ],
   "task-10": [
@@ -747,7 +844,7 @@
  },
  "log": [
   {
-   "at": "2026-11-17T14:47:53.642Z",
+   "at": "2026-11-17T14:48:10.601Z",
    "by": "run",
    "q": [
     "brief",
@@ -760,7 +857,7 @@
    ]
   },
   {
-   "at": "2026-11-17T14:47:53.674Z",
+   "at": "2026-11-17T14:48:10.630Z",
    "by": "run",
    "q": [
     "find",
@@ -775,7 +872,7 @@
    ]
   },
   {
-   "at": "2026-11-17T14:47:53.929Z",
+   "at": "2026-11-17T14:48:10.871Z",
    "by": "run",
    "q": [
     "brief",
@@ -788,7 +885,7 @@
    ]
   },
   {
-   "at": "2026-11-17T14:47:53.964Z",
+   "at": "2026-11-17T14:48:10.900Z",
    "by": "run",
    "q": [
     "find",
@@ -803,7 +900,7 @@
    ]
   },
   {
-   "at": "2026-11-17T14:47:54.271Z",
+   "at": "2026-11-17T14:48:11.187Z",
    "by": "run",
    "q": [
     "brief",
@@ -816,7 +913,7 @@
    ]
   },
   {
-   "at": "2026-11-17T14:47:54.312Z",
+   "at": "2026-11-17T14:48:11.221Z",
    "by": "run",
    "q": [
     "find",
@@ -831,7 +928,7 @@
    ]
   },
   {
-   "at": "2026-11-17T14:47:54.615Z",
+   "at": "2026-11-17T14:48:11.568Z",
    "by": "run",
    "q": [
     "brief",
@@ -844,7 +941,7 @@
    ]
   },
   {
-   "at": "2026-11-17T14:47:54.642Z",
+   "at": "2026-11-17T14:48:11.598Z",
    "by": "run",
    "q": [
     "find",
@@ -859,7 +956,7 @@
    ]
   },
   {
-   "at": "2026-11-17T14:47:54.910Z",
+   "at": "2026-11-17T14:48:11.918Z",
    "by": "run",
    "q": [
     "brief",
@@ -872,7 +969,7 @@
    ]
   },
   {
-   "at": "2026-11-17T14:47:54.937Z",
+   "at": "2026-11-17T14:48:11.947Z",
    "by": "run",
    "q": [
     "find",
@@ -887,7 +984,7 @@
    ]
   },
   {
-   "at": "2026-11-17T14:47:55.167Z",
+   "at": "2026-11-17T14:48:12.199Z",
    "by": "John",
    "q": [
     "find",
@@ -902,7 +999,7 @@
    ]
   },
   {
-   "at": "2026-11-17T14:47:55.229Z",
+   "at": "2026-11-17T14:48:12.279Z",
    "by": "run",
    "q": [
     "brief",
@@ -915,7 +1012,7 @@
    ]
   },
   {
-   "at": "2026-11-17T14:47:55.260Z",
+   "at": "2026-11-17T14:48:12.311Z",
    "by": "run",
    "q": [
     "find",
@@ -930,7 +1027,7 @@
    ]
   },
   {
-   "at": "2026-11-17T14:47:55.493Z",
+   "at": "2026-11-17T14:48:12.591Z",
    "by": "John",
    "q": [
     "find",
@@ -945,7 +1042,7 @@
    ]
   },
   {
-   "at": "2026-11-17T14:47:55.521Z",
+   "at": "2026-11-17T14:48:12.626Z",
    "by": "John",
    "q": [
     "find",
@@ -959,7 +1056,7 @@
    ]
   },
   {
-   "at": "2026-11-17T14:47:55.550Z",
+   "at": "2026-11-17T14:48:12.657Z",
    "by": "John",
    "q": [
     "find",

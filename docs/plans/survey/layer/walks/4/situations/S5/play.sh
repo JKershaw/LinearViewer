@@ -31,7 +31,7 @@ propose() { # day minute asks lapse-date -> id
 restate() { # day minute asks lapse-date earlier-id -> new id; hands the earlier one on into it
   local new
   new=$(W add question "{\"in\":\"$TASK\",\"to\":\"John\",\"asks\":\"$3\",\"options\":[\"adopt\",\"decline\"],\"recommended\":\"adopt\",\"if-unanswered\":\"If John has not answered by $4, withdraw it: the change is not made. (Keeps the date of $5, which it restates.)\",\"links\":{\"about\":\"$AREA\",\"same-as\":\"$5\"}}" --by run --at 2026-11-${1}T09:${2}:00Z)
-  W end "$5" handed-on "restated with a refinement as $new" --into "$new" --by run --at 2026-11-${1}T09:$(( 10#$2 + 1 )):00Z >/dev/null
+  W end "$5" handed-on "restated with a refinement as $new" --into "$new" --by run --at 2026-11-${1}T09:$(printf %02d $(( 10#$2 + 1 ))):00Z >/dev/null
   echo "$new"
 }
 end_run() { # day
@@ -83,4 +83,4 @@ R find --to John --state open --as-of 2026-11-19T12:00:00Z --by John
 R find --to John --as-of 2026-11-19T12:00:00Z --count --by John
 R find --to John --state open --as-of 2026-11-19T12:00:00Z --count --by John
 echo "ids: area=$AREA P1=$P1 P2=$P2 P3=$P3 P4=$P4 P5=$P5 P6=$P6 P7=$P7 P8=$P8 P9=$P9 P10=$P10 P11=$P11" | tee -a play.log
-grep -n refused play.log || echo "no refusals" | tee -a play.log
+grep -nE "refused|usage" play.log || echo "no refusals or usage errors" | tee -a play.log

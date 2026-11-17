@@ -1915,6 +1915,50 @@
     "--by",
     "scoping"
    ]
+  },
+  {
+   "at": "2026-11-17T14:48:04.707Z",
+   "by": "scoping",
+   "q": [
+    "find",
+    "--text",
+    "standing policy",
+    "--by",
+    "scoping"
+   ]
+  },
+  {
+   "at": "2026-11-17T14:48:04.744Z",
+   "by": "scoping",
+   "q": [
+    "find",
+    "--text",
+    "consolidate",
+    "--by",
+    "scoping"
+   ]
+  },
+  {
+   "at": "2026-11-17T14:48:04.781Z",
+   "by": "scoping",
+   "q": [
+    "find",
+    "--text",
+    "size of the move",
+    "--by",
+    "scoping"
+   ]
+  },
+  {
+   "at": "2026-11-17T14:48:04.814Z",
+   "by": "scoping",
+   "q": [
+    "find",
+    "--text",
+    "DECISION_LIFECYCLE",
+    "--by",
+    "scoping"
+   ]
   }
  ]
 }

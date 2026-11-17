@@ -2030,6 +2030,40 @@
     "--by",
     "survey-place"
    ]
+  },
+  {
+   "at": "2026-11-17T14:48:05.922Z",
+   "by": "scoping",
+   "q": [
+    "show",
+    "--task",
+    "task-60",
+    "--by",
+    "scoping"
+   ]
+  },
+  {
+   "at": "2026-11-17T14:48:05.951Z",
+   "by": "scoping",
+   "q": [
+    "get",
+    "finding-67",
+    "--by",
+    "scoping"
+   ]
+  },
+  {
+   "at": "2026-11-17T14:48:05.981Z",
+   "by": "scoping",
+   "q": [
+    "find",
+    "--in",
+    "task-60",
+    "--kind",
+    "decision",
+    "--by",
+    "scoping"
+   ]
   }
  ]
 }

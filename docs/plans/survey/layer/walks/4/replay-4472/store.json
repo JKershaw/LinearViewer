@@ -1,5 +1,5 @@
 {
- "next": 60,
+ "next": 63,
  "records": {
   "task-1": [
    {
@@ -633,6 +633,41 @@
     "op": "add",
     "by": "breakdown",
     "at": "2026-11-13T16:05:35.000Z"
+   },
+   {
+    "id": "task-28",
+    "kind": "task",
+    "in": "task-1",
+    "asked": "",
+    "done-when": "* Merged and verified on its own after piece 1.\n* The golden diff is only the module tag.\n* The census count is lower.\n* No `module.exports` remains in `task-page.js`.\n* The task page behaves as before.",
+    "paths": [
+     "public/task-page.js",
+     "lib/render-task-page.js",
+     "tests/unit/task-page-client.test.js",
+     "tests/unit/task-page-question.test.js",
+     "tests/unit/task-timeline-client.test.js",
+     "tests/unit/task-page-",
+     "tests/unit/lin-4405-",
+     "tests/unit/lin-3975-task-run-control.test.js",
+     "tests/unit/no-page-wide-label-listener.test.js",
+     "tests/unit/render-task-page-golden.test.js",
+     "tests/fixtures/render-task-page-golden.json",
+     "tests/unit/classic-loader-census.test.js",
+     "docs/areas/front-end-browser.md",
+     "docs/architecture/source-map.md",
+     "tests/unit/lin-3975-proposal-refresh.test.js",
+     "tests/unit/lin-3975-task-run-links.test.js",
+     "tests/unit/lin-3975-summary-and-time.test.js"
+    ],
+    "links": {
+     "piece": "plan-10"
+    },
+    "state": "open",
+    "v": 2,
+    "op": "revise",
+    "by": "survey-place",
+    "at": "2026-11-13T17:26:50.000Z",
+    "reason": "The ticket's map missed three suites that execute or slice task-page.js and must change (finding-50, finding-51; survey-place at 904719353)"
    }
   ],
   "decision-29": [
@@ -1233,6 +1268,68 @@
     "op": "add",
     "by": "survey-place",
     "at": "2026-11-13T17:26:49.000Z"
+   }
+  ],
+  "finding-60": [
+   {
+    "id": "finding-60",
+    "kind": "finding",
+    "in": "area-49",
+    "to": "area-49",
+    "links": {
+     "about": "question-52@2"
+    },
+    "says": "Not this task's: one pure duration/relative-time leaf in `lib/`, served, so both client twins (`formatElapsed` = `fmtDuration` in `lib/render-run-steps.js`, `relativeWords` = `relativeAgo` in `lib/task-page-loader.js`) and their twin tests (`lin-3975-task-run-links:211`, `lin-3975-summary-and-time:57`) go away. Neither lib home is a leaf today, so it needs an extraction and a `SHARED_MODULES` entry (survey-place on LIN-4472 at 904719353).",
+    "state": "open",
+    "v": 1,
+    "op": "add",
+    "by": "survey-place",
+    "at": "2026-11-13T17:26:51.000Z"
+   }
+  ],
+  "finding-61": [
+   {
+    "id": "finding-61",
+    "kind": "finding",
+    "in": "area-49",
+    "to": "area-49",
+    "says": "Not this task's: split `tests/unit/task-page-question.test.js` so the `question-cards.js` press test (`:311`) lives with its own script. Today it keeps that suite on the classic-loader census after `task-page.js` converts (survey-place on LIN-4472 at 904719353).",
+    "links": {},
+    "state": "open",
+    "v": 1,
+    "op": "add",
+    "by": "survey-place",
+    "at": "2026-11-13T17:26:52.000Z"
+   }
+  ],
+  "run-62": [
+   {
+    "id": "run-62",
+    "kind": "run",
+    "in": "task-28",
+    "stage": "survey-place",
+    "account": "Surveyed LIN-4472 at 904719353 with piece 1 merged (/lib/ serving, import-world.js, census at 102, workspace-kpis.js a module). task-page.js converts mechanically: one IIFE, 24-name seam at :931, one DOMContentLoaded listener, no globals assigned; module timing and the 7-line golden diff in finding-58. The ticket's map misses suites that execute or slice the file: confirmed finding-50/51, added the missing paths to task-28. Corrected the census forecast in finding-56 to about 2, not 5–7. Agreed with question-52's recommendation and added how to record the duplicates (PR wording, a Waiting line). source-map.md likely needs no edit (finding-59). Two later improvements to area-49: a served duration/relative-time leaf (finding-60) and splitting task-page-question (finding-61). Closed nothing; check-54 and finding-53 stay open.",
+    "links": {},
+    "state": "open",
+    "v": 1,
+    "op": "add",
+    "by": "survey-place",
+    "at": "2026-11-13T17:26:53.000Z"
+   },
+   {
+    "id": "run-62",
+    "kind": "run",
+    "in": "task-28",
+    "stage": "survey-place",
+    "account": "Surveyed LIN-4472 at 904719353 with piece 1 merged (/lib/ serving, import-world.js, census at 102, workspace-kpis.js a module). task-page.js converts mechanically: one IIFE, 24-name seam at :931, one DOMContentLoaded listener, no globals assigned; module timing and the 7-line golden diff in finding-58. The ticket's map misses suites that execute or slice the file: confirmed finding-50/51, added the missing paths to task-28. Corrected the census forecast in finding-56 to about 2, not 5–7. Agreed with question-52's recommendation and added how to record the duplicates (PR wording, a Waiting line). source-map.md likely needs no edit (finding-59). Two later improvements to area-49: a served duration/relative-time leaf (finding-60) and splitting task-page-question (finding-61). Closed nothing; check-54 and finding-53 stay open.",
+    "links": {},
+    "state": "done",
+    "v": 2,
+    "op": "end",
+    "by": "survey-place",
+    "at": "2026-11-13T17:26:54.000Z",
+    "stateReason": "Survey posted on LIN-4472 at 17:29:11",
+    "reason": "Survey posted on LIN-4472 at 17:29:11"
    }
   ]
  },
