@@ -1,0 +1,19 @@
+# Grade: lane LIN-4448 at the start of LIN-4469's close-out (2026-11-13T23:26:58Z)
+
+Read: `key.md`, `answers-T.md`, `answers-S.md` only.
+
+| # | Question | Reader T (ticket) | Reader S (store) |
+|---|---|---|---|
+| 1 | Open across the lane, and whose | **right**: PR #2447 unmerged, Fix 1, Fix 2, the 6+2 blind-read finds, the post-deploy 403 checks (close-out or a person), LIN-4470 blocked, LIN-4448 Request Changes awaiting re-review, LIN-1273/1242 and simple-dispatcher tie-ins. Leaves out LIN-4350 (minor). | **right**: PR #2447 unmerged at 877f32cb4, Fix 1/Fix 2/re-render owned by close-out, the 8 blind-read finds (173–180), LIN-4470 blocked, LIN-4448 Request Changes. Gives the 403 check to John (the key says close-out first, then the operator, which is defensible). Leaves out the tie-ins outside the lane. |
+| 2 | Asks made to other lanes / replies owed | **partly**: finds the 097a3442 seam notice (no reply) and the LIN-4350 report, and has "agree" (08c9c898) right. Misses the 15de14a7 heads-up and the b555094d notice, and says "no other ask pending". Treats LIN-4459's renewed ask as answered by the parent review, where the key says no reply. | **partly**: has LIN-4350 right as a report. The LIN-4447 seam correction is "can't tell". Misses all three LIN-4447 notices and their missing replies. Misses the "agree" answer to Runs' first ask and Runs' unanswered renewed asks. |
+| 3 | Piece 5's fold overridden; what stands | **right**: overridden by John's `fold` plus the triage settlement. What stands is complete (mandates, survey-task/place, blind-read, triage keeping its scope rule; code/branch/PR/merge words stay; 04bb47598/05b592742). Its "premise is off" aside (the build recommended shrinking) contradicts the key's "recommended accept", but this does not change what stands. | **right**: run-141 recommended accept and left the clauses unfolded. John's `fold` and the autopilot's triage settlement overrode it. What stands is complete, and "11 kinds" is corrected to the 4 `work` kinds. |
+| 4 | Waiting entries on main; which this lane settled | **right**: 23 on main. Earlier it settled the blind-read entry (LIN-4466) and the tables entry (LIN-4467). #2447 (unmerged) removes the notes-PR and witness entries and rewrites four. It hedges "removed or rewritten" on first-match (the key says rewritten). | **partly**: 23 on main, #2447 unmerged, the 2 removals and 4 rewrites exactly right. Says "can't tell" which entries pieces 0–4 settled, so it misses the LIN-4466 and LIN-4467 settlements. |
+| 5 | John's decisions that still hold | **right**: safety-cuts defer, look-into retire, `lin-4469-cuts` fold (three templates), the byte-limit remark; witness withdrawn, not answered. Adds the held-wake stamp as a ruling, but notes its text isn't shown (the key marks this optional, with no John record). | **partly**: has the same four, and the witness withdrawn and the 396575 condition as not John's. But it puts **triage** inside John's `lin-4469-cuts` ruling, which the key lists explicitly as an engineering settlement. |
+| 6 | #2447 byte change at the approved head; FROZEN_TOTAL_BYTES | **right**: 05b592742, 827520→825330 (−2190), 56/72 fall, seams-tangles +24 ×2, seven ±0, −2242 is only after Fix 1 (not done), 396064 down from 396884. Does not state the 396575 condition (minor). | **right**: all the same figures, plus 396064 below 396575. It calls the approval stale at 877f32cb4, which doesn't conflict with the figures. |
+
+## Totals
+
+- **Reader T:** 5 right, 1 partly, 0 wrong, 0 can't tell.
+- **Reader S:** 3 right, 3 partly, 0 wrong, 0 can't tell.
+
+Where they differ: S is weaker on cross-lane history (Q2), on anything before the store's seed point (Q4), and on who made a decision (Q5, triage given to John). Both readers miss most of the LIN-4447 notices in Q2.
