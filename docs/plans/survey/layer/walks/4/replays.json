@@ -1,0 +1,5 @@
+{
+  "replay-4450": { "snaps": "../1/material/LIN-4450-snapshots.json", "task": "task-60" },
+  "replay-4472": { "snaps": "../2/material/LIN-4472-snapshots.json", "task": "task-28" },
+  "replay-4455": { "snaps": "../2/material/LIN-4455-snapshots.json", "task": "task-60" }
+}

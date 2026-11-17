@@ -1,5 +1,5 @@
 #!/usr/bin/env bash
-# Recreates walks/3/replay-4455/store.json from empty: the state of LIN-4447/LIN-4455 just before
+# Recreates walks/4/replay-4455/store.json from empty (walk 4 model): the state of LIN-4447/LIN-4455 just before
 # LIN-4455's first stage (survey-task) was dispatched, 2026-11-13T14:58:27Z. Generated; see seed-log.md.
 set -euo pipefail
 HERE="$(cd "$(dirname "$0")" && pwd)"
@@ -308,19 +308,17 @@ J48
 P=$(sub "$P")
 P8=$(L add plan --by design --at 2026-11-13T13:40:00Z "$P" | idof)
 
-# The plan names where the work is expected. A design revise of the task is refused (rule 6, see seed-log.md);
-# nearest acceptable: Harbour (seeds) revises it, relayed via design.
-# Refused: L revise "$PARENT" '{"paths":[...]}' --reason ... --by design --task "$PARENT"
+# The plan names where the work is expected.
 P=$(cat <<'J49'
 {"paths": ["docs/areas/areas.json", "docs/areas/llm-and-prompts.md", "docs/areas/runs-and-dispatch.md", "lib/close-out-merges.js", "lib/close-out-readiness.js", "lib/cost-read-calls.js", "lib/cost-read.js", "lib/dispatch-factory.js", "lib/dispatch-feedback-validation.js", "lib/dispatch-leftover.js", "lib/dispatch-store.js", "lib/dispatch-wake.js", "lib/recent-runs.js", "lib/recommendation-blind-read.js", "lib/recommendation-facts.js", "lib/recommendation-live-wait.js", "lib/run-closeout-state.js", "lib/run-evidence.js", "lib/run-ledger.js", "lib/run-live-wait.js", "lib/run-trail.js", "lib/runner-kit/", "lib/session-summary.js", "lib/task-timeline.js", "routes/test.js", "routes/workspace-api-run-evidence.js", "scripts/stability-measures-blind.mjs", "tests/fixtures/hermetic-linear.js"]}
 J49
 )
 P=$(sub "$P")
-L revise "$PARENT" --by Harbour --via design --at 2026-11-13T13:40:00Z --reason "The Implementation Plan names the files each piece changes (plan rev 1)." "$P" >/dev/null
+L revise "$PARENT" --by design --at 2026-11-13T13:40:00Z --reason "The Implementation Plan names the files each piece changes (plan rev 1)." "$P" >/dev/null
 
 # Plan review round 1 (13:46:36, comment e452fe3a): request-changes, blocking B1 on piece 1 only.
 P=$(cat <<'J50'
-{"in": "@@PARENT@@", "links": {"on": "@@P1@@"}, "of": "plan-review", "outcome": "request-changes", "reasoning": "Request Changes (comment e452fe3a). B1: closeOutDecision's inputs (the ticket's state, whether the landing is merged) are not held by two to four of its six surfaces, and the plan does not say where each gets them or what the decision answers when one is unknown; built as written the surfaces split on an outside merge. Pieces 3, 6 and 7 hold as written; pieces 0, 3, 5, 6 and 7 don't depend on B1."}
+{"in": "@@PARENT@@", "links": {"on": "@@P1@@@1"}, "of": "plan-review", "outcome": "request-changes", "reasoning": "Request Changes (comment e452fe3a). B1: closeOutDecision's inputs (the ticket's state, whether the landing is merged) are not held by two to four of its six surfaces, and the plan does not say where each gets them or what the decision answers when one is unknown; built as written the surfaces split on an outside merge. Pieces 3, 6 and 7 hold as written; pieces 0, 3, 5, 6 and 7 don't depend on B1."}
 J50
 )
 P=$(sub "$P")
@@ -334,55 +332,55 @@ P=$(sub "$P")
 L revise "$P1" --by design --at 2026-11-13T13:53:21.272Z --reason "Answers plan-review B1 (comment e452fe3a): per-surface inputs named, unknown means not known merged, ticket state only for advice." "$P" >/dev/null
 # Plan review round 2 (13:57:37, comment 12619798): Approve, over every piece at its current version.
 P=$(cat <<'J52'
-{"in": "@@PARENT@@", "links": {"on": "@@P0@@"}, "of": "plan-review", "outcome": "approve", "reasoning": "Approve (comment 12619798, plan rev 2). B1 is answered and holds; all three Done-when clauses are met by the pieces, with the 20 Waiting entries mapped. Piece 0 and its repeat cover \"reads better ... by more than an untouched area\"."}
+{"in": "@@PARENT@@", "links": {"on": "@@P0@@@1"}, "of": "plan-review", "outcome": "approve", "reasoning": "Approve (comment 12619798, plan rev 2). B1 is answered and holds; all three Done-when clauses are met by the pieces, with the 20 Waiting entries mapped. Piece 0 and its repeat cover \"reads better ... by more than an untouched area\"."}
 J52
 )
 P=$(sub "$P")
 V_P0=$(L add verdict --by plan-review --at 2026-11-13T13:57:37.874Z "$P" | idof)
 P=$(cat <<'J53'
-{"in": "@@PARENT@@", "links": {"on": "@@P1@@"}, "of": "plan-review", "outcome": "approve", "reasoning": "Approve (comment 12619798, plan rev 2). B1 is answered and holds; all three Done-when clauses are met by the pieces, with the 20 Waiting entries mapped. Piece 1: enforcement reads only facts each surface has; unknown means the gate holds. Builder notes 1-4 and 6 concern it (ruling wording, the loosening property, the unmerged-PR set, readTrail fields, press-route order)."}
+{"in": "@@PARENT@@", "links": {"on": "@@P1@@@2"}, "of": "plan-review", "outcome": "approve", "reasoning": "Approve (comment 12619798, plan rev 2). B1 is answered and holds; all three Done-when clauses are met by the pieces, with the 20 Waiting entries mapped. Piece 1: enforcement reads only facts each surface has; unknown means the gate holds. Builder notes 1-4 and 6 concern it (ruling wording, the loosening property, the unmerged-PR set, readTrail fields, press-route order)."}
 J53
 )
 P=$(sub "$P")
 V_P1=$(L add verdict --by plan-review --at 2026-11-13T13:57:37.874Z "$P" | idof)
 P=$(cat <<'J54'
-{"in": "@@PARENT@@", "links": {"on": "@@P2@@"}, "of": "plan-review", "outcome": "approve", "reasoning": "Approve (comment 12619798, plan rev 2). B1 is answered and holds; all three Done-when clauses are met by the pieces, with the 20 Waiting entries mapped. Piece 2: no note this round beyond its seam with piece 1 (readTrail supplies closeOutAfterReview/workAfterReview)."}
+{"in": "@@PARENT@@", "links": {"on": "@@P2@@@1"}, "of": "plan-review", "outcome": "approve", "reasoning": "Approve (comment 12619798, plan rev 2). B1 is answered and holds; all three Done-when clauses are met by the pieces, with the 20 Waiting entries mapped. Piece 2: no note this round beyond its seam with piece 1 (readTrail supplies closeOutAfterReview/workAfterReview)."}
 J54
 )
 P=$(sub "$P")
 V_P2=$(L add verdict --by plan-review --at 2026-11-13T13:57:37.874Z "$P" | idof)
 P=$(cat <<'J55'
-{"in": "@@PARENT@@", "links": {"on": "@@P3@@"}, "of": "plan-review", "outcome": "approve", "reasoning": "Approve (comment 12619798, plan rev 2). B1 is answered and holds; all three Done-when clauses are met by the pieces, with the 20 Waiting entries mapped. Piece 3 holds as last time."}
+{"in": "@@PARENT@@", "links": {"on": "@@P3@@@1"}, "of": "plan-review", "outcome": "approve", "reasoning": "Approve (comment 12619798, plan rev 2). B1 is answered and holds; all three Done-when clauses are met by the pieces, with the 20 Waiting entries mapped. Piece 3 holds as last time."}
 J55
 )
 P=$(sub "$P")
 V_P3=$(L add verdict --by plan-review --at 2026-11-13T13:57:37.874Z "$P" | idof)
 P=$(cat <<'J56'
-{"in": "@@PARENT@@", "links": {"on": "@@P4@@"}, "of": "plan-review", "outcome": "approve", "reasoning": "Approve (comment 12619798, plan rev 2). B1 is answered and holds; all three Done-when clauses are met by the pieces, with the 20 Waiting entries mapped. Piece 4: builder note 5, hand runFact the lineage before it is filtered."}
+{"in": "@@PARENT@@", "links": {"on": "@@P4@@@1"}, "of": "plan-review", "outcome": "approve", "reasoning": "Approve (comment 12619798, plan rev 2). B1 is answered and holds; all three Done-when clauses are met by the pieces, with the 20 Waiting entries mapped. Piece 4: builder note 5, hand runFact the lineage before it is filtered."}
 J56
 )
 P=$(sub "$P")
 V_P4=$(L add verdict --by plan-review --at 2026-11-13T13:57:37.874Z "$P" | idof)
 P=$(cat <<'J57'
-{"in": "@@PARENT@@", "links": {"on": "@@P5@@"}, "of": "plan-review", "outcome": "approve", "reasoning": "Approve (comment 12619798, plan rev 2). B1 is answered and holds; all three Done-when clauses are met by the pieces, with the 20 Waiting entries mapped. Piece 5: no note in either round; round 1 said it does not depend on B1. Settles Waiting 2, 4, 11."}
+{"in": "@@PARENT@@", "links": {"on": "@@P5@@@1"}, "of": "plan-review", "outcome": "approve", "reasoning": "Approve (comment 12619798, plan rev 2). B1 is answered and holds; all three Done-when clauses are met by the pieces, with the 20 Waiting entries mapped. Piece 5: no note in either round; round 1 said it does not depend on B1. Settles Waiting 2, 4, 11."}
 J57
 )
 P=$(sub "$P")
 V_P5=$(L add verdict --by plan-review --at 2026-11-13T13:57:37.874Z "$P" | idof)
 P=$(cat <<'J58'
-{"in": "@@PARENT@@", "links": {"on": "@@P6@@"}, "of": "plan-review", "outcome": "approve", "reasoning": "Approve (comment 12619798, plan rev 2). B1 is answered and holds; all three Done-when clauses are met by the pieces, with the 20 Waiting entries mapped. Piece 6 holds; its capability approach matches dispatch-factory.js:925-934."}
+{"in": "@@PARENT@@", "links": {"on": "@@P6@@@1"}, "of": "plan-review", "outcome": "approve", "reasoning": "Approve (comment 12619798, plan rev 2). B1 is answered and holds; all three Done-when clauses are met by the pieces, with the 20 Waiting entries mapped. Piece 6 holds; its capability approach matches dispatch-factory.js:925-934."}
 J58
 )
 P=$(sub "$P")
 V_P6=$(L add verdict --by plan-review --at 2026-11-13T13:57:37.874Z "$P" | idof)
 P=$(cat <<'J59'
-{"in": "@@PARENT@@", "links": {"on": "@@P7@@"}, "of": "plan-review", "outcome": "approve", "reasoning": "Approve (comment 12619798, plan rev 2). B1 is answered and holds; all three Done-when clauses are met by the pieces, with the 20 Waiting entries mapped. Piece 7 holds as last time."}
+{"in": "@@PARENT@@", "links": {"on": "@@P7@@@1"}, "of": "plan-review", "outcome": "approve", "reasoning": "Approve (comment 12619798, plan rev 2). B1 is answered and holds; all three Done-when clauses are met by the pieces, with the 20 Waiting entries mapped. Piece 7 holds as last time."}
 J59
 )
 P=$(sub "$P")
 V_P7=$(L add verdict --by plan-review --at 2026-11-13T13:57:37.874Z "$P" | idof)
 P=$(cat <<'J60'
-{"in": "@@PARENT@@", "links": {"on": "@@P8@@"}, "of": "plan-review", "outcome": "approve", "reasoning": "Approve (comment 12619798, plan rev 2). B1 is answered and holds; all three Done-when clauses are met by the pieces, with the 20 Waiting entries mapped. Piece 8 keeps simple-dispatcher in scope, matching lin4447-sd-scope."}
+{"in": "@@PARENT@@", "links": {"on": "@@P8@@@1"}, "of": "plan-review", "outcome": "approve", "reasoning": "Approve (comment 12619798, plan rev 2). B1 is answered and holds; all three Done-when clauses are met by the pieces, with the 20 Waiting entries mapped. Piece 8 keeps simple-dispatcher in scope, matching lin4447-sd-scope."}
 J60
 )
 P=$(sub "$P")
@@ -403,31 +401,31 @@ P=$(sub "$P")
 T4455=$(L add task --by breakdown --at 2026-11-13T14:01:56.140Z "$P" | idof)
 # Breakdown decisions about LIN-4455, in LIN-4455, resting on the approve verdict on piece 5.
 P=$(cat <<'J63'
-{"in": "@@T4455@@", "links": {"on": "@@V_P5@@"}, "answer": "Grounding commit origin/main 4b5001ddf; the plan needs no re-planning, and LIN-4455 carries piece 5's slice as approved, naming `releaseHeldWake` beside `_releaseIfHeld` in `lib/dispatch-store.js`.", "why": "Staleness check at breakdown: origin/main still 4b5001ddf, git log 4b5001ddf..origin/main empty, nothing under lib, routes, tests, scripts or docs/areas changed since filing; spot checks hold (dispatch-store.js still 4,530 lines)."}
+{"in": "@@T4455@@", "links": {"on": "@@V_P5@@@1"}, "answer": "Grounding commit origin/main 4b5001ddf; the plan needs no re-planning, and LIN-4455 carries piece 5's slice as approved, naming `releaseHeldWake` beside `_releaseIfHeld` in `lib/dispatch-store.js`.", "why": "Staleness check at breakdown: origin/main still 4b5001ddf, git log 4b5001ddf..origin/main empty, nothing under lib, routes, tests, scripts or docs/areas changed since filing; spot checks hold (dispatch-store.js still 4,530 lines)."}
 J63
 )
 P=$(sub "$P")
 D1=$(L add decision --by breakdown --at 2026-11-13T14:02:31.309Z "$P" | idof)
 P=$(cat <<'J64'
-{"in": "@@T4455@@", "links": {"on": "@@V_P5@@"}, "answer": "Session fit: one session (medium). Plan-review due: no, covered by LIN-4447's approving plan-review (comment 12619798, rev 2).", "why": "The approved plan sizes piece 5 medium and lists it among pieces that run alone; the parent's plan review approved it."}
+{"in": "@@T4455@@", "links": {"on": "@@V_P5@@@1"}, "answer": "Session fit: one session (medium). Plan-review due: no, covered by LIN-4447's approving plan-review (comment 12619798, rev 2).", "why": "The approved plan sizes piece 5 medium and lists it among pieces that run alone; the parent's plan review approved it."}
 J64
 )
 P=$(sub "$P")
 D2=$(L add decision --by breakdown --at 2026-11-13T14:02:31.309Z "$P" | idof)
 P=$(cat <<'J65'
-{"in": "@@T4455@@", "links": {"on": "@@V_P5@@", "about": "@@T4453@@"}, "answer": "LIN-4455 is blocked by LIN-4453 (piece 0), in order step 2 beside LIN-4454, LIN-4456 and LIN-4457.", "why": "The graph follows the plan's landing order, 0 then 3/5/6/7 then 2/4 then 1 then 8 then 0, literally; no implementation PR merges before piece 0's reports and rubric are on the ticket."}
+{"in": "@@T4455@@", "links": {"on": "@@V_P5@@@1", "about": "@@T4453@@"}, "answer": "LIN-4455 is blocked by LIN-4453 (piece 0), in order step 2 beside LIN-4454, LIN-4456 and LIN-4457.", "why": "The graph follows the plan's landing order, 0 then 3/5/6/7 then 2/4 then 1 then 8 then 0, literally; no implementation PR merges before piece 0's reports and rubric are on the ticket."}
 J65
 )
 P=$(sub "$P")
 D3=$(L add decision --by breakdown --at 2026-11-13T14:02:31.309Z "$P" | idof)
 P=$(cat <<'J66'
-{"in": "@@T4455@@", "links": {"on": "@@V_P5@@"}, "answer": "LIN-4455 blocks LIN-4458 (piece 2) and LIN-4459 (piece 4).", "why": "2 and 4 wait on all of 3/5/6/7: the plan orders them that way, and the work overlaps (piece 4's lineage helpers live in dispatch-store.js, which piece 5 edits)."}
+{"in": "@@T4455@@", "links": {"on": "@@V_P5@@@1"}, "answer": "LIN-4455 blocks LIN-4458 (piece 2) and LIN-4459 (piece 4).", "why": "2 and 4 wait on all of 3/5/6/7: the plan orders them that way, and the work overlaps (piece 4's lineage helpers live in dispatch-store.js, which piece 5 edits)."}
 J66
 )
 P=$(sub "$P")
 D4=$(L add decision --by breakdown --at 2026-11-13T14:02:31.309Z "$P" | idof)
 P=$(cat <<'J67'
-{"in": "@@T4455@@", "links": {"on": "@@V_P5@@"}, "answer": "Waiting 2, 4 and 11 are LIN-4455's to settle.", "why": "Waiting accounting unchanged from the plan."}
+{"in": "@@T4455@@", "links": {"on": "@@V_P5@@@1"}, "answer": "Waiting 2, 4 and 11 are LIN-4455's to settle.", "why": "Waiting accounting unchanged from the plan."}
 J67
 )
 P=$(sub "$P")
@@ -438,4 +436,5 @@ D5=$(L add decision --by breakdown --at 2026-11-13T14:02:31.309Z "$P" | idof)
 L end "$T4453" done "Piece 0 baseline recorded: both ## Area read reports and the rubric on LIN-4447 (14:24Z); baseline commit cfd152fa4 on origin/main. Completion time approximate." --by Harbour --at 2026-11-13T14:56:00Z >/dev/null
 
 echo "seeded: parent=$PARENT lin4455=$T4455 piece5=$P5 lin4453=$T4453 piece0=$P0 waiting2=$W2 waiting4=$W4 waiting11=$W11 area=$AREA verdict_p5=$V_P5"
-node "$LAYER" check --store "$STORE"
+# The walk 4 model has no `check` command; count the records straight from the file (a query would log a read).
+node -e 'const s=require(process.argv[1]);console.log("records:",Object.keys(s.records).length)' "$STORE"
