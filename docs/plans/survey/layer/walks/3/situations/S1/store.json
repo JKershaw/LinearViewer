@@ -1,0 +1,452 @@
+{
+ "retro": false,
+ "next": 17,
+ "records": {
+  "area-1": {
+   "id": "area-1",
+   "kind": "area",
+   "versions": [
+    {
+     "v": 1,
+     "op": "add",
+     "at": "2026-11-13T09:00:00.000Z",
+     "by": "Harbour",
+     "state": "kept",
+     "fields": {
+      "name": "Runs & dispatch",
+      "paths": [
+       "lib/runs/"
+      ]
+     },
+     "links": {}
+    }
+   ]
+  },
+  "area-2": {
+   "id": "area-2",
+   "kind": "area",
+   "versions": [
+    {
+     "v": 1,
+     "op": "add",
+     "at": "2026-11-13T09:00:00.000Z",
+     "by": "Harbour",
+     "state": "kept",
+     "fields": {
+      "name": "LLM & prompts",
+      "paths": [
+       "lib/llm/"
+      ]
+     },
+     "links": {}
+    }
+   ]
+  },
+  "task-3": {
+   "id": "task-3",
+   "kind": "task",
+   "versions": [
+    {
+     "v": 1,
+     "op": "add",
+     "at": "2026-11-13T09:01:00.000Z",
+     "by": "John",
+     "state": "open",
+     "fields": {
+      "asked": "LIN-4447 Runs & dispatch lane",
+      "paths": [
+       "lib/runs/"
+      ]
+     },
+     "links": {}
+    }
+   ]
+  },
+  "task-4": {
+   "id": "task-4",
+   "kind": "task",
+   "versions": [
+    {
+     "v": 1,
+     "op": "add",
+     "at": "2026-11-13T09:02:00.000Z",
+     "by": "breakdown",
+     "in": "task-3",
+     "state": "open",
+     "fields": {
+      "asked": "",
+      "done-when": "LIN-4458: the run census is built",
+      "paths": [
+       "lib/runs/census/"
+      ]
+     },
+     "links": {}
+    }
+   ]
+  },
+  "task-5": {
+   "id": "task-5",
+   "kind": "task",
+   "versions": [
+    {
+     "v": 1,
+     "op": "add",
+     "at": "2026-11-13T09:02:00.000Z",
+     "by": "breakdown",
+     "in": "task-3",
+     "state": "open",
+     "fields": {
+      "asked": "",
+      "done-when": "LIN-4459: the live-wait move lands",
+      "paths": [
+       "lib/runs/live-wait/"
+      ]
+     },
+     "links": {}
+    }
+   ]
+  },
+  "task-6": {
+   "id": "task-6",
+   "kind": "task",
+   "versions": [
+    {
+     "v": 1,
+     "op": "add",
+     "at": "2026-11-13T09:03:00.000Z",
+     "by": "John",
+     "state": "open",
+     "fields": {
+      "asked": "LIN-4448 LLM & prompts lane",
+      "paths": [
+       "lib/llm/"
+      ]
+     },
+     "links": {}
+    }
+   ]
+  },
+  "run-7": {
+   "id": "run-7",
+   "kind": "run",
+   "versions": [
+    {
+     "v": 1,
+     "op": "add",
+     "at": "2026-11-13T16:42:00.000Z",
+     "by": "implementation",
+     "in": "task-4",
+     "state": "open",
+     "fields": {
+      "stage": "implementation",
+      "claims": [
+       "lib/runs/census/"
+      ],
+      "account": "Drew the census boundary; asked the LLM lane whether it is drawn right."
+     },
+     "links": {}
+    }
+   ]
+  },
+  "finding-8": {
+   "id": "finding-8",
+   "kind": "finding",
+   "versions": [
+    {
+     "v": 1,
+     "op": "add",
+     "at": "2026-11-13T16:42:00.000Z",
+     "by": "implementation",
+     "in": "task-4",
+     "to": "task-6",
+     "state": "open",
+     "fields": {
+      "says": "From LIN-4458: is the census boundary drawn right? Tell me on LIN-4458 if you want it drawn differently; if no answer, I keep it as drawn."
+     },
+     "links": {}
+    }
+   ]
+  },
+  "decision-9": {
+   "id": "decision-9",
+   "kind": "decision",
+   "versions": [
+    {
+     "v": 1,
+     "op": "add",
+     "at": "2026-11-13T16:42:00.000Z",
+     "by": "implementation",
+     "in": "task-4",
+     "state": "stands",
+     "fields": {
+      "answer": "Census boundary as drawn",
+      "why": "Drawn by the build; asked the LLM lane in finding-8; kept unless it says otherwise."
+     },
+     "links": {
+      "about": "finding-8"
+     }
+    }
+   ]
+  },
+  "run-10": {
+   "id": "run-10",
+   "kind": "run",
+   "versions": [
+    {
+     "v": 1,
+     "op": "add",
+     "at": "2026-11-13T16:42:00.000Z",
+     "by": "implementation",
+     "in": "task-5",
+     "state": "open",
+     "fields": {
+      "stage": "implementation",
+      "claims": [
+       "lib/runs/live-wait/"
+      ],
+      "account": "Live-wait move in PR #2432; asked the LLM lane to agree it."
+     },
+     "links": {}
+    },
+    {
+     "v": 2,
+     "op": "end",
+     "at": "2026-11-13T17:07:00.000Z",
+     "by": "implementation",
+     "in": "task-5",
+     "state": "done",
+     "fields": {
+      "stage": "implementation",
+      "claims": [
+       "lib/runs/live-wait/"
+      ],
+      "account": "Live-wait move in PR #2432; asked the LLM lane to agree it."
+     },
+     "links": {},
+     "reason": "merged",
+     "stateReason": "merged"
+    }
+   ]
+  },
+  "change-11": {
+   "id": "change-11",
+   "kind": "change",
+   "versions": [
+    {
+     "v": 1,
+     "op": "add",
+     "at": "2026-11-13T16:42:00.000Z",
+     "by": "implementation",
+     "in": "task-5",
+     "state": "open",
+     "fields": {
+      "ref": "PR #2432",
+      "head": "a1"
+     },
+     "links": {}
+    },
+    {
+     "v": 2,
+     "op": "end",
+     "at": "2026-11-13T17:06:00.000Z",
+     "by": "implementation",
+     "in": "task-5",
+     "state": "merged",
+     "fields": {
+      "ref": "PR #2432",
+      "head": "a1"
+     },
+     "links": {},
+     "reason": "PR #2432 merged",
+     "stateReason": "PR #2432 merged"
+    }
+   ]
+  },
+  "finding-12": {
+   "id": "finding-12",
+   "kind": "finding",
+   "versions": [
+    {
+     "v": 1,
+     "op": "add",
+     "at": "2026-11-13T16:42:00.000Z",
+     "by": "implementation",
+     "in": "task-5",
+     "to": "task-6",
+     "state": "open",
+     "fields": {
+      "says": "From LIN-4459: please agree the live-wait move (PR #2432)."
+     },
+     "links": {
+      "about": "change-11"
+     }
+    }
+   ]
+  },
+  "run-13": {
+   "id": "run-13",
+   "kind": "run",
+   "versions": [
+    {
+     "v": 1,
+     "op": "add",
+     "at": "2026-11-13T17:00:00.000Z",
+     "by": "breakdown",
+     "in": "task-6",
+     "state": "open",
+     "fields": {
+      "stage": "breakdown",
+      "account": "Autopilot wake 17:00. Two findings addressed to the lane (finding-8, finding-12), both from the Runs lane. Read; not answered this wake."
+     },
+     "links": {}
+    },
+    {
+     "v": 2,
+     "op": "end",
+     "at": "2026-11-13T17:01:00.000Z",
+     "by": "breakdown",
+     "in": "task-6",
+     "state": "done",
+     "fields": {
+      "stage": "breakdown",
+      "account": "Autopilot wake 17:00. Two findings addressed to the lane (finding-8, finding-12), both from the Runs lane. Read; not answered this wake."
+     },
+     "links": {},
+     "reason": "wake over",
+     "stateReason": "wake over"
+    }
+   ]
+  },
+  "decision-14": {
+   "id": "decision-14",
+   "kind": "decision",
+   "versions": [
+    {
+     "v": 1,
+     "op": "add",
+     "at": "2026-11-13T17:06:00.000Z",
+     "by": "implementation",
+     "in": "task-5",
+     "state": "stands",
+     "fields": {
+      "answer": "Proceed to merge PR #2432",
+      "why": "Unless you say otherwise ... proceeding to merge. No reply to finding-12."
+     },
+     "links": {
+      "about": "finding-12"
+     }
+    }
+   ]
+  },
+  "run-15": {
+   "id": "run-15",
+   "kind": "run",
+   "versions": [
+    {
+     "v": 1,
+     "op": "add",
+     "at": "2026-11-13T20:00:00.000Z",
+     "by": "breakdown",
+     "in": "task-6",
+     "state": "open",
+     "fields": {
+      "stage": "breakdown",
+      "account": "Autopilot wake 20:00. Same two findings to the lane, still open. Not answered."
+     },
+     "links": {}
+    },
+    {
+     "v": 2,
+     "op": "end",
+     "at": "2026-11-13T20:01:00.000Z",
+     "by": "breakdown",
+     "in": "task-6",
+     "state": "done",
+     "fields": {
+      "stage": "breakdown",
+      "account": "Autopilot wake 20:00. Same two findings to the lane, still open. Not answered."
+     },
+     "links": {},
+     "reason": "wake over",
+     "stateReason": "wake over"
+    }
+   ]
+  },
+  "run-16": {
+   "id": "run-16",
+   "kind": "run",
+   "versions": [
+    {
+     "v": 1,
+     "op": "add",
+     "at": "2026-11-13T23:00:00.000Z",
+     "by": "breakdown",
+     "in": "task-6",
+     "state": "open",
+     "fields": {
+      "stage": "breakdown",
+      "account": "Autopilot wake 23:00. Same two findings to the lane, still open. Not answered."
+     },
+     "links": {}
+    },
+    {
+     "v": 2,
+     "op": "end",
+     "at": "2026-11-13T23:01:00.000Z",
+     "by": "breakdown",
+     "in": "task-6",
+     "state": "done",
+     "fields": {
+      "stage": "breakdown",
+      "account": "Autopilot wake 23:00. Same two findings to the lane, still open. Not answered."
+     },
+     "links": {},
+     "reason": "wake over",
+     "stateReason": "wake over"
+    }
+   ]
+  }
+ },
+ "queries": [
+  {
+   "at": "2026-11-17T13:34:36.714Z",
+   "by": "implementation",
+   "query": "get",
+   "args": {
+    "id": "finding-12",
+    "asOf": null
+   },
+   "returned": 1
+  },
+  {
+   "at": "2026-11-17T13:34:37.050Z",
+   "by": "John",
+   "query": "find",
+   "args": {
+    "to": "task-6"
+   },
+   "returned": 2
+  },
+  {
+   "at": "2026-11-17T13:34:37.083Z",
+   "by": "John",
+   "query": "show",
+   "args": {
+    "task": "task-3",
+    "asOf": null
+   },
+   "returned": 1
+  },
+  {
+   "at": "2026-11-17T13:34:37.118Z",
+   "by": "John",
+   "query": "show",
+   "args": {
+    "task": "task-5",
+    "asOf": null
+   },
+   "returned": 1
+  }
+ ],
+ "hits": []
+}

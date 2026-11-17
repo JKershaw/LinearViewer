@@ -1,0 +1,203 @@
+{
+ "retro": false,
+ "next": 6,
+ "records": {
+  "task-1": {
+   "id": "task-1",
+   "kind": "task",
+   "versions": [
+    {
+     "v": 1,
+     "op": "add",
+     "at": "2026-11-13T09:00:00.000Z",
+     "by": "John",
+     "state": "open",
+     "fields": {
+      "asked": "LIN-4448 LLM & prompts lane",
+      "paths": [
+       "lib/llm/"
+      ]
+     },
+     "links": {}
+    }
+   ]
+  },
+  "task-2": {
+   "id": "task-2",
+   "kind": "task",
+   "versions": [
+    {
+     "v": 1,
+     "op": "add",
+     "at": "2026-11-13T09:01:00.000Z",
+     "by": "breakdown",
+     "in": "task-1",
+     "state": "open",
+     "fields": {
+      "asked": "",
+      "done-when": "LIN-4469: change merged with its witness",
+      "paths": [
+       "lib/llm/witness/"
+      ]
+     },
+     "links": {}
+    }
+   ]
+  },
+  "change-3": {
+   "id": "change-3",
+   "kind": "change",
+   "versions": [
+    {
+     "v": 1,
+     "op": "add",
+     "at": "2026-11-13T09:02:00.000Z",
+     "by": "Harbour",
+     "in": "task-2",
+     "state": "open",
+     "fields": {
+      "ref": "LIN-4469 PR",
+      "head": "h1"
+     },
+     "links": {}
+    }
+   ]
+  },
+  "question-4": {
+   "id": "question-4",
+   "kind": "question",
+   "versions": [
+    {
+     "v": 1,
+     "op": "add",
+     "at": "2026-11-13T22:50:00.000Z",
+     "by": "Harbour",
+     "via": "autopilot",
+     "in": "task-2",
+     "to": "John",
+     "state": "open",
+     "fields": {
+      "asks": "May the LIN-4469 merge go ahead without the witness?",
+      "options": [
+       "yes, merge without it",
+       "no, wait for the witness"
+      ],
+      "recommended": "no, wait for the witness",
+      "if-unanswered": "merge waits"
+     },
+     "links": {
+      "about": "change-3"
+     }
+    },
+    {
+     "v": 2,
+     "op": "end",
+     "at": "2026-11-13T23:40:00.000Z",
+     "by": "Harbour",
+     "via": "autopilot",
+     "in": "task-2",
+     "to": "John",
+     "state": "withdrawn",
+     "fields": {
+      "asks": "May the LIN-4469 merge go ahead without the witness?",
+      "options": [
+       "yes, merge without it",
+       "no, wait for the witness"
+      ],
+      "recommended": "no, wait for the witness",
+      "if-unanswered": "merge waits"
+     },
+     "links": {
+      "about": "change-3"
+     },
+     "reason": "no longer needed",
+     "stateReason": "no longer needed"
+    }
+   ]
+  },
+  "decision-5": {
+   "id": "decision-5",
+   "kind": "decision",
+   "versions": [
+    {
+     "v": 1,
+     "op": "add",
+     "at": "2026-11-13T23:11:00.000Z",
+     "by": "implementation",
+     "in": "task-2",
+     "state": "stands",
+     "fields": {
+      "answer": "Merge of change-3 waits on question-4 (the witness ruling)",
+      "why": "question-4 to John asks whether the merge may go ahead without the witness; until it is answered, merge is gated."
+     },
+     "links": {
+      "on": "question-4@1",
+      "about": "change-3"
+     }
+    }
+   ]
+  }
+ },
+ "queries": [
+  {
+   "at": "2026-11-17T13:34:37.383Z",
+   "by": "Harbour",
+   "query": "show",
+   "args": {
+    "task": "task-2",
+    "asOf": "2026-11-13T22:50Z"
+   },
+   "returned": 1
+  },
+  {
+   "at": "2026-11-17T13:34:37.466Z",
+   "by": "implementation",
+   "query": "get",
+   "args": {
+    "id": "question-4",
+    "asOf": null
+   },
+   "returned": 1
+  },
+  {
+   "at": "2026-11-17T13:34:37.553Z",
+   "by": "Harbour",
+   "query": "show",
+   "args": {
+    "task": "task-2",
+    "asOf": "2026-11-13T23:40Z"
+   },
+   "returned": 1
+  },
+  {
+   "at": "2026-11-17T13:34:37.638Z",
+   "by": "John",
+   "query": "show",
+   "args": {
+    "task": "task-1",
+    "asOf": "2026-11-14T09:00Z"
+   },
+   "returned": 1
+  },
+  {
+   "at": "2026-11-17T13:34:37.675Z",
+   "by": "John",
+   "query": "show",
+   "args": {
+    "task": "task-2",
+    "asOf": "2026-11-14T09:00Z"
+   },
+   "returned": 1
+  },
+  {
+   "at": "2026-11-17T13:34:37.704Z",
+   "by": "John",
+   "query": "find",
+   "args": {
+    "text": "gate"
+   },
+   "returned": 1
+  }
+ ],
+ "hits": []
+}
