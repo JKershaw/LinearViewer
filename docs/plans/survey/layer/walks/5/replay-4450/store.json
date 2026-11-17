@@ -1784,6 +1784,60 @@
     "survey-task"
    ],
    "asOf": null
+  },
+  {
+   "at": "2026-11-17T15:16:18.985Z",
+   "by": "survey-task",
+   "cmd": "get",
+   "args": [
+    "get",
+    "decision-65",
+    "--by",
+    "survey-task"
+   ],
+   "asOf": null
+  },
+  {
+   "at": "2026-11-17T15:16:19.019Z",
+   "by": "survey-task",
+   "cmd": "get",
+   "args": [
+    "get",
+    "lesson-9",
+    "--by",
+    "survey-task"
+   ],
+   "asOf": null
+  },
+  {
+   "at": "2026-11-17T15:16:19.064Z",
+   "by": "survey-task",
+   "cmd": "find",
+   "args": [
+    "find",
+    "--kind",
+    "lesson",
+    "--text",
+    "adf",
+    "--by",
+    "survey-task"
+   ],
+   "asOf": null
+  },
+  {
+   "at": "2026-11-17T15:16:19.098Z",
+   "by": "survey-task",
+   "cmd": "find",
+   "args": [
+    "find",
+    "--area",
+    "area-1",
+    "--kind",
+    "lesson",
+    "--by",
+    "survey-task"
+   ],
+   "asOf": null
   }
  ]
 }
