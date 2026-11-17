@@ -131,7 +131,7 @@ The model has no waking. An addressee finds what is open for it when its brief i
 - a size decided "by the standing policy";
 - fixes after approval that nobody re-read.
 
-**Material.** The ticket and its comments (LIN-4450 and the parts of LIN-4445 it points to), PR #2421, and Harbour's run records, as the trace read them through Harbour's read-only proxy and GitHub. On 17 Nov the proxy reset the connection; access is checked before the walk starts. The trace itself is not given to the filler, so that the walk tests the material, not the trace's reading of it.
+**Material.** The ticket and its comments (LIN-4450 and the parts of LIN-4445 it points to), PR #2421, and Harbour's run records, read through Harbour's read-only workspace proxy (harbour.cat) and GitHub, and saved in `walks/1/material/` so every step works from the same copy. The proxy has no endpoint for task snapshots, so LIN-4450's description before close-out pruned it is missing, as it was for the trace. The trace itself is not given to the filler, so that the walk tests the material, not the trace's reading of it.
 
 **Steps.**
 1. Expectations committed (`walks/1/expect.md`).
@@ -155,7 +155,6 @@ More finished tasks filled the same way: the other five traces and Lighthouse. M
 ## 6. Open
 
 - **John's:** the four catalogue choices and the avenue (`avenues` §1, §6). The model takes the choices provisionally (3.2) and lives in one store with checked calls, roughly avenue A, because a model has to live somewhere and that is the simplest to build. John has not ruled on either; he expects them to settle as we iterate. Rebuilding each round keeps both cheap to change.
-- **Access** to the ticket material for walk 1 (5.1).
 - **Not yet designed:** waking (3.5); how the tracker shows records; how agents meet the calls in motion.
 
 ## 7. Sources
