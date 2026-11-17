@@ -1,5 +1,5 @@
 {
- "next": 26,
+ "next": 27,
  "records": {
   "area-1": [
    {
@@ -541,6 +541,30 @@
      "says": "Before any `public/` view becomes a module, a module-capable client-test loader (`vm.SourceTextModule` or equivalent) has to exist, as its own slice: 126 unit suites run `public/` scripts through `vm` (`tests/unit/helpers/client-world.js`, `loadWorld`), so the harness enforces 'no imports' as much as the browser does and converting a view drags its whole suite family along. After it: breaking up `common.js`'s globals (finding-11) and finding out why `observation.js` is ~5,000 lines; the keepalive `statusCode` readers (finding-6) and `buildDispatchModelOptionDescriptors` (finding-5) belong to that work. Place census (9 Nov): 79 files, 35,264 JS lines; growth ~1,200 lines/week in October, ~300 since 1 Nov. Left out of LIN-4446 (place survey, 13 Nov)."
     }
    }
+  ],
+  "decision-26": [
+   {
+    "id": "decision-26",
+    "kind": "decision",
+    "v": 1,
+    "op": "add",
+    "at": "2026-11-13T13:18:44.775Z",
+    "by": "scoping",
+    "in": "task-9",
+    "state": "stands",
+    "links": {
+     "about": [
+      "task-9",
+      "finding-15",
+      "finding-24"
+     ]
+    },
+    "fields": {
+     "answer": "Size of the move: just the task. The rule's reading goes into the notes and one cost formatter is shared with the browser, retiring its restated copy and parity check, then a pause for John. Cuts: none.",
+     "why": "Decided by a ruling: John ruled the size small (task asked: \"the size is John's call, and for this work it's small\"), and no Survey finding must come first.",
+     "scope": "task-9"
+    }
+   }
   ]
  },
  "log": [
@@ -794,6 +818,75 @@
     "kind": "run",
     "state": "open",
     "by": "survey-place",
+    "pos": []
+   },
+   "asOf": null
+  },
+  {
+   "at": "2026-11-17T20:26:10.561Z",
+   "by": "scoping",
+   "cmd": "find",
+   "args": {
+    "to": "scoping",
+    "state": "open",
+    "by": "scoping",
+    "pos": []
+   },
+   "asOf": null
+  },
+  {
+   "at": "2026-11-17T20:26:10.592Z",
+   "by": "scoping",
+   "cmd": "find",
+   "args": {
+    "kind": "question",
+    "by": "scoping",
+    "pos": []
+   },
+   "asOf": null
+  },
+  {
+   "at": "2026-11-17T20:26:10.620Z",
+   "by": "scoping",
+   "cmd": "find",
+   "args": {
+    "kind": "decision",
+    "by": "scoping",
+    "pos": []
+   },
+   "asOf": null
+  },
+  {
+   "at": "2026-11-17T20:26:10.654Z",
+   "by": "scoping",
+   "cmd": "show",
+   "args": {
+    "task": "task-9",
+    "by": "scoping",
+    "pos": []
+   },
+   "asOf": null
+  },
+  {
+   "at": "2026-11-17T20:26:17.712Z",
+   "by": "scoping",
+   "cmd": "find",
+   "args": {
+    "kind": "run",
+    "in": "task-9",
+    "by": "scoping",
+    "pos": []
+   },
+   "asOf": null
+  },
+  {
+   "at": "2026-11-17T20:26:17.746Z",
+   "by": "scoping",
+   "cmd": "find",
+   "args": {
+    "area": "area-1",
+    "state": "open",
+    "by": "scoping",
     "pos": []
    },
    "asOf": null
