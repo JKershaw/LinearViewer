@@ -1,0 +1,284 @@
+[
+ {
+  "at": "2026-11-17T14:45:22.678Z",
+  "by": "survey-task",
+  "q": [
+   "show",
+   "--task",
+   "task-28",
+   "--by",
+   "survey-task"
+  ]
+ },
+ {
+  "at": "2026-11-17T14:45:22.710Z",
+  "by": "survey-task",
+  "q": [
+   "get",
+   "task-28",
+   "--by",
+   "survey-task"
+  ]
+ },
+ {
+  "at": "2026-11-17T14:45:28.460Z",
+  "by": "survey-task",
+  "q": [
+   "find",
+   "--in",
+   "task-1",
+   "--by",
+   "survey-task"
+  ]
+ },
+ {
+  "at": "2026-11-17T14:45:28.504Z",
+  "by": "survey-task",
+  "q": [
+   "find",
+   "--in",
+   "area-49",
+   "--count",
+   "--by",
+   "survey-task"
+  ]
+ },
+ {
+  "at": "2026-11-17T14:45:28.536Z",
+  "by": "survey-task",
+  "q": [
+   "find",
+   "--to",
+   "area-49",
+   "--by",
+   "survey-task"
+  ]
+ },
+ {
+  "at": "2026-11-17T14:45:28.567Z",
+  "by": "survey-task",
+  "q": [
+   "find",
+   "--kind",
+   "task",
+   "--by",
+   "survey-task"
+  ]
+ },
+ {
+  "at": "2026-11-17T14:45:34.770Z",
+  "by": "survey-task",
+  "q": [
+   "show",
+   "--task",
+   "task-27",
+   "--by",
+   "survey-task"
+  ]
+ },
+ {
+  "at": "2026-11-17T14:45:34.812Z",
+  "by": "survey-task",
+  "q": [
+   "get",
+   "question-3",
+   "--by",
+   "survey-task"
+  ]
+ },
+ {
+  "at": "2026-11-17T14:45:34.844Z",
+  "by": "survey-task",
+  "q": [
+   "get",
+   "question-6",
+   "--by",
+   "survey-task"
+  ]
+ },
+ {
+  "at": "2026-11-17T14:45:34.878Z",
+  "by": "survey-task",
+  "q": [
+   "get",
+   "decision-15",
+   "--by",
+   "survey-task"
+  ]
+ },
+ {
+  "at": "2026-11-17T14:45:34.910Z",
+  "by": "survey-task",
+  "q": [
+   "get",
+   "decision-20",
+   "--by",
+   "survey-task"
+  ]
+ },
+ {
+  "at": "2026-11-17T14:45:40.178Z",
+  "by": "survey-task",
+  "q": [
+   "find",
+   "--text",
+   "relativeWords",
+   "--by",
+   "survey-task"
+  ]
+ },
+ {
+  "at": "2026-11-17T14:45:40.221Z",
+  "by": "survey-task",
+  "q": [
+   "find",
+   "--text",
+   "relativeAgo",
+   "--by",
+   "survey-task"
+  ]
+ },
+ {
+  "at": "2026-11-17T14:45:40.256Z",
+  "by": "survey-task",
+  "q": [
+   "find",
+   "--text",
+   "fmtDuration",
+   "--by",
+   "survey-task"
+  ]
+ },
+ {
+  "at": "2026-11-17T14:45:40.287Z",
+  "by": "survey-task",
+  "q": [
+   "find",
+   "--text",
+   "formatElapsed",
+   "--by",
+   "survey-task"
+  ]
+ },
+ {
+  "at": "2026-11-17T14:45:40.317Z",
+  "by": "survey-task",
+  "q": [
+   "find",
+   "--text",
+   "importWorld",
+   "--by",
+   "survey-task"
+  ]
+ },
+ {
+  "at": "2026-11-17T14:45:40.356Z",
+  "by": "survey-task",
+  "q": [
+   "find",
+   "--text",
+   "import-world",
+   "--by",
+   "survey-task"
+  ]
+ },
+ {
+  "at": "2026-11-17T14:45:40.387Z",
+  "by": "survey-task",
+  "q": [
+   "find",
+   "--text",
+   "task-page.spec",
+   "--by",
+   "survey-task"
+  ]
+ },
+ {
+  "at": "2026-11-17T14:45:40.419Z",
+  "by": "survey-task",
+  "q": [
+   "find",
+   "--text",
+   "lin-3975",
+   "--by",
+   "survey-task"
+  ]
+ },
+ {
+  "at": "2026-11-17T14:45:40.452Z",
+  "by": "survey-task",
+  "q": [
+   "find",
+   "--text",
+   "SHARED_MODULES",
+   "--by",
+   "survey-task"
+  ]
+ },
+ {
+  "at": "2026-11-17T14:45:40.484Z",
+  "by": "survey-task",
+  "q": [
+   "find",
+   "--text",
+   "e2e",
+   "--by",
+   "survey-task"
+  ]
+ },
+ {
+  "at": "2026-11-17T14:45:40.513Z",
+  "by": "survey-task",
+  "q": [
+   "find",
+   "--kind",
+   "finding",
+   "--count",
+   "--by",
+   "survey-task"
+  ]
+ },
+ {
+  "at": "2026-11-17T14:45:40.539Z",
+  "by": "survey-task",
+  "q": [
+   "find",
+   "--kind",
+   "check",
+   "--count",
+   "--by",
+   "survey-task"
+  ]
+ },
+ {
+  "at": "2026-11-17T14:45:40.567Z",
+  "by": "survey-task",
+  "q": [
+   "find",
+   "--kind",
+   "run",
+   "--by",
+   "survey-task"
+  ]
+ },
+ {
+  "at": "2026-11-17T14:45:56.174Z",
+  "by": "survey-task",
+  "q": [
+   "get",
+   "change-48",
+   "--by",
+   "survey-task"
+  ]
+ },
+ {
+  "at": "2026-11-17T14:45:56.213Z",
+  "by": "survey-task",
+  "q": [
+   "get",
+   "plan-10",
+   "--by",
+   "survey-task"
+  ]
+ }
+]

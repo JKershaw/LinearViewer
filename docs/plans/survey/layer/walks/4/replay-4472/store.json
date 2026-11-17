@@ -1,5 +1,5 @@
 {
- "next": 50,
+ "next": 58,
  "records": {
   "task-1": [
    {
@@ -993,6 +993,160 @@
     "by": "Harbour",
     "at": "2026-11-13T17:22:00.000Z"
    }
+  ],
+  "finding-50": [
+   {
+    "id": "finding-50",
+    "kind": "finding",
+    "in": "task-28",
+    "to": "implementation",
+    "links": {
+     "about": "plan-10@2"
+    },
+    "says": "Tests that read `task-page.js` as text depend on the IIFE's indentation. Unwrapping the IIFE moves every line out two spaces, and these tests slice the source at strings that include the indent: `lin-3975-task-run-control:588` (`'  function init(doc) {'`), `lin-3975-summary-and-time:59/162/263`, `lin-3975-chat-fold:142`. Re-anchor them on names, not indentation. Only the first is in the plan's list (survey at 17faa83f4).",
+    "state": "open",
+    "v": 1,
+    "op": "add",
+    "by": "survey-task",
+    "at": "2026-11-13T17:22:40.000Z"
+   }
+  ],
+  "finding-51": [
+   {
+    "id": "finding-51",
+    "kind": "finding",
+    "in": "task-28",
+    "to": "implementation",
+    "links": {
+     "about": "plan-10@2"
+    },
+    "says": "Two more suites run `task-page.js` and are not in the plan's list: `lin-3975-proposal-refresh:232` (`loadWorld` + `module.exports`) and `lin-3975-task-run-links:213`, which calls `vm.runInNewContext` on the raw source and will throw a SyntaxError on the first `export`. Both must move to imports with the others (survey at 17faa83f4).",
+    "state": "open",
+    "v": 1,
+    "op": "add",
+    "by": "survey-task",
+    "at": "2026-11-13T17:22:41.000Z"
+   }
+  ],
+  "question-52": [
+   {
+    "id": "question-52",
+    "kind": "question",
+    "in": "task-28",
+    "to": "implementation",
+    "links": {
+     "about": "decision-32@1"
+    },
+    "asks": "The plan's duplicate-helper search (function names equal to a `common.js` global or a lib export) finds nothing in `task-page.js`, but there are two real duplicates: `relativeWords` (`:366`) is `relativeAgo` (`lib/task-page-loader.js:614`) line for line, and `formatElapsed` (`:302`) is pinned by a parity test to `fmtDuration` (`lib/render-run-steps.js:258`). Neither lib file is a leaf (22 and 4 imports), so importing either means extracting a leaf, adding a `SHARED_MODULES` entry and an `areas.json` owner: a serving change, which Session fit (decision-32) rules out. Which way? Decide up front and record it on LIN-4463.",
+    "options": [
+     "export both from task-page.js, turn the parity tests into plain imports, and name the leaf extraction as the next piece",
+     "extract the leaves now (a serving change, outside this piece's session fit)",
+     "leave them as they are, unnamed"
+    ],
+    "recommended": "Export both, turn the parity tests into plain imports, and name the extraction as the next piece.",
+    "if-unanswered": "The duplicates stay and the piece's 'names what it retired' misses them.",
+    "state": "open",
+    "v": 1,
+    "op": "add",
+    "by": "survey-task",
+    "at": "2026-11-13T17:22:42.000Z"
+   }
+  ],
+  "finding-53": [
+   {
+    "id": "finding-53",
+    "kind": "finding",
+    "in": "task-28",
+    "to": "implementation",
+    "links": {
+     "on": "change-48@2"
+    },
+    "says": "`importWorld` (piece 1, `import-world.js`) sets up less than `loadWorld`, and that works against \"shorter\". `loadWorld` provides a stub `fetch`, a sync `requestAnimationFrame`, `navigator.clipboard` and unref'd timers; `importWorld` uses Node's real global: without `timers` a poller's `setTimeout` is real, `navigator` is Node 25's own with no clipboard (share copy, `:397`), and every page test needs `restore()`. To keep suites short: most exports are pure (`pollDelay`, `cadenceStatus`, `createOpenMemory`, `formatElapsed`, `proposalsUrlOf`…). Keep the `typeof document` guard and a static import needs no world at all, which removes `exportsOf()` (`task-page-client:28`, `task-timeline-client:26`). Only the DOMContentLoaded suites need `importWorld`.",
+    "state": "open",
+    "v": 1,
+    "op": "add",
+    "by": "survey-task",
+    "at": "2026-11-13T17:22:43.000Z"
+   }
+  ],
+  "check-54": [
+   {
+    "id": "check-54",
+    "kind": "check",
+    "in": "task-28",
+    "to": "implementation",
+    "what": "Run `tests/e2e/task-page.spec.js` and `tests/e2e/task-timeline.spec.js` against the converted page, or say that CI carries them.",
+    "why-person": "No real browser exercises this page in the plan's witnesses. The golden diff (7 tags) and Node imports cannot show MIME, CSP or execution order, and the Done-when says the task page behaves as before.",
+    "how": "Playwright run of the two specs after `SCRIPTS` switches to `{ module: '/task-page.js' }`; paste the output or cite the CI job.",
+    "links": {},
+    "state": "open",
+    "v": 1,
+    "op": "add",
+    "by": "survey-task",
+    "at": "2026-11-13T17:22:44.000Z"
+   }
+  ],
+  "finding-55": [
+   {
+    "id": "finding-55",
+    "kind": "finding",
+    "in": "task-28",
+    "to": "implementation",
+    "links": {
+     "about": "plan-10@2"
+    },
+    "says": "Minor: the regex at `no-page-wide-label-listener:247` already tolerates `{ module }` entries, so it needs a rerun, not a change. Piece 1 already marked the module-capable-loader Waiting entry's premise wrong, so deleting it in this piece is just tidying.",
+    "state": "open",
+    "v": 1,
+    "op": "add",
+    "by": "survey-task",
+    "at": "2026-11-13T17:22:45.000Z"
+   }
+  ],
+  "finding-56": [
+   {
+    "id": "finding-56",
+    "kind": "finding",
+    "in": "task-28",
+    "to": "implementation",
+    "says": "First moves: 1. Add named exports beside the IIFE. 2. Move the five executing suites and the two parity tests to imports, green while the seam still exists. 3. Remove the IIFE and the seam in a whitespace-only commit, re-anchoring the text slicers on names. 4. Then `SCRIPTS`, the golden file, and the census (102 after piece 1), which should fall by 5–7 depending on whether `task-page-question` still loads `question-cards.js` classically.",
+    "links": {},
+    "state": "open",
+    "v": 1,
+    "op": "add",
+    "by": "survey-task",
+    "at": "2026-11-13T17:22:46.000Z"
+   }
+  ],
+  "run-57": [
+   {
+    "id": "run-57",
+    "kind": "run",
+    "in": "task-28",
+    "stage": "survey-task",
+    "account": "Surveyed LIN-4472 (piece 2, task-page.js to a module) at 17faa83f4, after piece 1 (#2431) merged with import-world.js, the census at 102 and the rewritten Waiting entry. The conversion is easy; the difficulty is in four places, each written to implementation: text-slicing tests pinned to the IIFE indent and two executing suites missing from the plan (finding-50, finding-51); two real duplicate helpers the plan's name search misses, whose import needs a serving change Session fit rules out (question-52, recommend export now, extract next); importWorld sets up less than loadWorld, so prefer static imports of the pure exports (finding-53); no real browser witness, so run the two e2e specs (check-54). Minor notes in finding-55, first moves in finding-56. Closed nothing: the Waiting entry and plan-review notes are carried by existing decisions.",
+    "links": {},
+    "state": "open",
+    "v": 1,
+    "op": "add",
+    "by": "survey-task",
+    "at": "2026-11-13T17:22:47.000Z"
+   },
+   {
+    "id": "run-57",
+    "kind": "run",
+    "in": "task-28",
+    "stage": "survey-task",
+    "account": "Surveyed LIN-4472 (piece 2, task-page.js to a module) at 17faa83f4, after piece 1 (#2431) merged with import-world.js, the census at 102 and the rewritten Waiting entry. The conversion is easy; the difficulty is in four places, each written to implementation: text-slicing tests pinned to the IIFE indent and two executing suites missing from the plan (finding-50, finding-51); two real duplicate helpers the plan's name search misses, whose import needs a serving change Session fit rules out (question-52, recommend export now, extract next); importWorld sets up less than loadWorld, so prefer static imports of the pure exports (finding-53); no real browser witness, so run the two e2e specs (check-54). Minor notes in finding-55, first moves in finding-56. Closed nothing: the Waiting entry and plan-review notes are carried by existing decisions.",
+    "links": {},
+    "state": "done",
+    "v": 2,
+    "op": "end",
+    "by": "survey-task",
+    "at": "2026-11-13T17:22:48.000Z",
+    "stateReason": "Survey posted on LIN-4472 at 17:25:51",
+    "reason": "Survey posted on LIN-4472 at 17:25:51"
+   }
   ]
  },
  "log": [
@@ -1276,6 +1430,17 @@
     "plan-10",
     "--by",
     "survey-task"
+   ]
+  },
+  {
+   "at": "2026-11-17T14:46:55.604Z",
+   "by": "survey-place",
+   "q": [
+    "show",
+    "--task",
+    "task-28",
+    "--by",
+    "survey-place"
    ]
   }
  ]

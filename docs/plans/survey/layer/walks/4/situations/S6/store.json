@@ -1,0 +1,215 @@
+{
+ "next": 8,
+ "records": {
+  "area-1": [
+   {
+    "id": "area-1",
+    "kind": "area",
+    "name": "newsletter",
+    "paths": [
+     "newsletter/"
+    ],
+    "links": {},
+    "state": "kept",
+    "v": 1,
+    "op": "add",
+    "by": "Harbour",
+    "at": "2026-11-13T09:00:00.000Z"
+   }
+  ],
+  "lesson-2": [
+   {
+    "id": "lesson-2",
+    "kind": "lesson",
+    "in": "area-1",
+    "says": "members read on phones; keep it under 400 words",
+    "paths": [
+     "newsletter/"
+    ],
+    "links": {},
+    "state": "holds",
+    "v": 1,
+    "op": "add",
+    "by": "Harbour",
+    "at": "2026-11-13T09:00:00.000Z"
+   }
+  ],
+  "task-3": [
+   {
+    "id": "task-3",
+    "kind": "task",
+    "in": "area-1",
+    "asked": "Write the March newsletter: the AGM date, the new treasurer, and the spring fixtures",
+    "paths": [
+     "newsletter/"
+    ],
+    "links": {},
+    "state": "open",
+    "v": 1,
+    "op": "add",
+    "by": "Harbour",
+    "at": "2026-11-13T09:01:00.000Z",
+    "via": "John"
+   },
+   {
+    "id": "task-3",
+    "kind": "task",
+    "in": "area-1",
+    "asked": "Write the March newsletter: the AGM date, the new treasurer, and the spring fixtures",
+    "paths": [
+     "newsletter/"
+    ],
+    "links": {},
+    "state": "open",
+    "v": 2,
+    "op": "revise",
+    "by": "survey-task",
+    "at": "2026-11-13T10:00:00.000Z",
+    "done-when": "newsletter/march.md, under 400 words, gives the AGM date, the new treasurer and the spring fixtures, and has been sent to members",
+    "reason": "survey: what done means for a newsletter"
+   }
+  ],
+  "run-4": [
+   {
+    "id": "run-4",
+    "kind": "run",
+    "in": "task-3",
+    "stage": "survey-task",
+    "claims": [],
+    "links": {},
+    "state": "open",
+    "v": 1,
+    "op": "add",
+    "by": "survey-task",
+    "at": "2026-11-13T10:00:00.000Z"
+   },
+   {
+    "id": "run-4",
+    "kind": "run",
+    "in": "task-3",
+    "stage": "survey-task",
+    "claims": [],
+    "links": {},
+    "state": "done",
+    "v": 2,
+    "op": "end",
+    "by": "survey-task",
+    "at": "2026-11-13T10:00:00.000Z",
+    "stateReason": "survey written",
+    "reason": "survey written"
+   }
+  ],
+  "question-5": [
+   {
+    "id": "question-5",
+    "kind": "question",
+    "in": "task-3",
+    "to": "John",
+    "asks": "The store holds none of the three facts. What is the AGM date (and venue/time), who is the new treasurer, and what are the spring fixtures (date, opponent, home/away)?",
+    "if-unanswered": "implementation writes visible [TBC] placeholders; it is not sent until filled",
+    "links": {
+     "about": "task-3"
+    },
+    "state": "open",
+    "v": 1,
+    "op": "add",
+    "by": "survey-task",
+    "at": "2026-11-13T10:00:00.000Z"
+   }
+  ],
+  "question-6": [
+   {
+    "id": "question-6",
+    "kind": "question",
+    "in": "task-3",
+    "to": "John",
+    "asks": "How is the newsletter sent, and to whom?",
+    "options": [
+     "email to the members list",
+     "post in the club group chat",
+     "print for the clubhouse"
+    ],
+    "recommended": "email to the members list",
+    "if-unanswered": "close-out holds the send",
+    "links": {
+     "about": "task-3"
+    },
+    "state": "open",
+    "v": 1,
+    "op": "add",
+    "by": "survey-task",
+    "at": "2026-11-13T10:00:00.000Z"
+   }
+  ],
+  "finding-7": [
+   {
+    "id": "finding-7",
+    "kind": "finding",
+    "in": "task-3",
+    "to": "implementation",
+    "says": "Write newsletter/march.md, under 400 words, phone-first: short paragraphs, three headed items (lesson-2). No repo: save it as a file. The facts are not in the store; asked John (question-5). Until answered, put visible [TBC: ...] placeholders, never invented facts.",
+    "links": {
+     "on": "lesson-2@1"
+    },
+    "state": "open",
+    "v": 1,
+    "op": "add",
+    "by": "survey-task",
+    "at": "2026-11-13T10:00:00.000Z"
+   }
+  ]
+ },
+ "log": [
+  {
+   "at": "2026-11-17T14:46:50.018Z",
+   "by": "survey-task",
+   "q": [
+    "brief",
+    "survey-task",
+    "--task",
+    "task-3",
+    "--as-of",
+    "2026-11-13T10:00:00Z",
+    "--text"
+   ]
+  },
+  {
+   "at": "2026-11-17T14:46:50.046Z",
+   "by": "survey-task",
+   "q": [
+    "find",
+    "--in",
+    "area-1",
+    "--by",
+    "survey-task",
+    "--as-of",
+    "2026-11-13T10:00:00Z"
+   ]
+  },
+  {
+   "at": "2026-11-17T14:46:55.384Z",
+   "by": "implementation",
+   "q": [
+    "brief",
+    "implementation",
+    "--task",
+    "task-3",
+    "--as-of",
+    "2026-11-13T11:00:00Z",
+    "--text"
+   ]
+  },
+  {
+   "at": "2026-11-17T14:46:55.412Z",
+   "by": "implementation",
+   "q": [
+    "get",
+    "question-5",
+    "--by",
+    "implementation",
+    "--as-of",
+    "2026-11-13T11:00:00Z"
+   ]
+  }
+ ]
+}

@@ -1524,6 +1524,214 @@
     "--by",
     "survey-task"
    ]
+  },
+  {
+   "at": "2026-11-17T14:46:05.591Z",
+   "by": "survey-place",
+   "q": [
+    "show",
+    "--task",
+    "task-60",
+    "--by",
+    "survey-place"
+   ]
+  },
+  {
+   "at": "2026-11-17T14:46:05.631Z",
+   "by": "survey-place",
+   "q": [
+    "get",
+    "finding-67",
+    "--by",
+    "survey-place"
+   ]
+  },
+  {
+   "at": "2026-11-17T14:46:05.663Z",
+   "by": "survey-place",
+   "q": [
+    "get",
+    "question-68",
+    "--by",
+    "survey-place"
+   ]
+  },
+  {
+   "at": "2026-11-17T14:46:05.694Z",
+   "by": "survey-place",
+   "q": [
+    "get",
+    "finding-69",
+    "--by",
+    "survey-place"
+   ]
+  },
+  {
+   "at": "2026-11-17T14:46:05.728Z",
+   "by": "survey-place",
+   "q": [
+    "get",
+    "finding-70",
+    "--by",
+    "survey-place"
+   ]
+  },
+  {
+   "at": "2026-11-17T14:46:05.761Z",
+   "by": "survey-place",
+   "q": [
+    "get",
+    "finding-71",
+    "--by",
+    "survey-place"
+   ]
+  },
+  {
+   "at": "2026-11-17T14:46:10.155Z",
+   "by": "survey-place",
+   "q": [
+    "find",
+    "--in",
+    "area-1",
+    "--state",
+    "open",
+    "--by",
+    "survey-place"
+   ]
+  },
+  {
+   "at": "2026-11-17T14:46:10.187Z",
+   "by": "survey-place",
+   "q": [
+    "get",
+    "area-1",
+    "--by",
+    "survey-place"
+   ]
+  },
+  {
+   "at": "2026-11-17T14:46:13.775Z",
+   "by": "survey-place",
+   "q": [
+    "find",
+    "--to",
+    "area-1",
+    "--state",
+    "open",
+    "--by",
+    "survey-place"
+   ]
+  },
+  {
+   "at": "2026-11-17T14:46:13.809Z",
+   "by": "survey-place",
+   "q": [
+    "find",
+    "--to",
+    "area-1",
+    "--state",
+    "open",
+    "--by",
+    "survey-place"
+   ]
+  },
+  {
+   "at": "2026-11-17T14:46:52.326Z",
+   "by": "survey-place",
+   "q": [
+    "find",
+    "--text",
+    "relay",
+    "--by",
+    "survey-place"
+   ]
+  },
+  {
+   "at": "2026-11-17T14:46:52.368Z",
+   "by": "survey-place",
+   "q": [
+    "find",
+    "--text",
+    "observer-sweep",
+    "--by",
+    "survey-place"
+   ]
+  },
+  {
+   "at": "2026-11-17T14:46:52.404Z",
+   "by": "survey-place",
+   "q": [
+    "find",
+    "--text",
+    "task-page-loader",
+    "--by",
+    "survey-place"
+   ]
+  },
+  {
+   "at": "2026-11-17T14:46:52.450Z",
+   "by": "survey-place",
+   "q": [
+    "find",
+    "--text",
+    "DECISION_LIFECYCLE_STAMP",
+    "--by",
+    "survey-place"
+   ]
+  },
+  {
+   "at": "2026-11-17T14:46:52.513Z",
+   "by": "survey-place",
+   "q": [
+    "find",
+    "--text",
+    "runner-kickoff",
+    "--by",
+    "survey-place"
+   ]
+  },
+  {
+   "at": "2026-11-17T14:46:52.561Z",
+   "by": "survey-place",
+   "q": [
+    "find",
+    "--text",
+    "counts the word",
+    "--by",
+    "survey-place"
+   ]
+  },
+  {
+   "at": "2026-11-17T14:46:52.612Z",
+   "by": "survey-place",
+   "q": [
+    "find",
+    "--text",
+    "setWakeCredentialProvisionerFactory",
+    "--by",
+    "survey-place"
+   ]
+  },
+  {
+   "at": "2026-11-17T14:46:52.645Z",
+   "by": "survey-place",
+   "q": [
+    "find",
+    "--text",
+    "dispatch-feedback-kinds",
+    "--by",
+    "survey-place"
+   ]
+  },
+  {
+   "at": "2026-11-17T14:46:52.678Z",
+   "by": "survey-place",
+   "q": [
+    "get",
+    "lesson-10",
+    "--by",
+    "survey-place"
+   ]
   }
  ]
 }

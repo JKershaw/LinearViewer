@@ -1,5 +1,5 @@
 {
- "next": 3,
+ "next": 34,
  "records": {
   "area-1": [
    {
@@ -23,7 +23,127 @@
     "kind": "finding",
     "in": "area-1",
     "to": "area-1",
-    "says": "Finding 1",
+    "says": "Open finding 1 in lib/dispatch",
+    "links": {},
+    "state": "open",
+    "v": 1,
+    "op": "add",
+    "by": "Harbour",
+    "at": "2026-11-13T08:00:00.000Z"
+   },
+   {
+    "id": "finding-2",
+    "kind": "finding",
+    "in": "area-1",
+    "to": "area-1",
+    "says": "Open finding 1 in lib/dispatch",
+    "links": {},
+    "state": "done",
+    "v": 2,
+    "op": "end",
+    "by": "implementation",
+    "at": "2026-11-13T12:30:00.000Z",
+    "stateReason": "fixed by run-29 on task-28",
+    "reason": "fixed by run-29 on task-28"
+   }
+  ],
+  "finding-3": [
+   {
+    "id": "finding-3",
+    "kind": "finding",
+    "in": "area-1",
+    "to": "area-1",
+    "says": "Open finding 2 in lib/dispatch",
+    "links": {},
+    "state": "open",
+    "v": 1,
+    "op": "add",
+    "by": "Harbour",
+    "at": "2026-11-13T08:00:00.000Z"
+   },
+   {
+    "id": "finding-3",
+    "kind": "finding",
+    "in": "area-1",
+    "to": "area-1",
+    "says": "Open finding 2 in lib/dispatch",
+    "links": {},
+    "state": "done",
+    "v": 2,
+    "op": "end",
+    "by": "implementation",
+    "at": "2026-11-13T15:30:00.000Z",
+    "stateReason": "fixed by run-31 on task-28",
+    "reason": "fixed by run-31 on task-28"
+   }
+  ],
+  "finding-4": [
+   {
+    "id": "finding-4",
+    "kind": "finding",
+    "in": "area-1",
+    "to": "area-1",
+    "says": "Open finding 3 in lib/dispatch",
+    "links": {},
+    "state": "open",
+    "v": 1,
+    "op": "add",
+    "by": "Harbour",
+    "at": "2026-11-13T08:00:00.000Z"
+   },
+   {
+    "id": "finding-4",
+    "kind": "finding",
+    "in": "area-1",
+    "to": "area-1",
+    "says": "Open finding 3 in lib/dispatch",
+    "links": {},
+    "state": "done",
+    "v": 2,
+    "op": "end",
+    "by": "implementation",
+    "at": "2026-11-13T15:30:00.000Z",
+    "stateReason": "fixed by run-31 on task-28",
+    "reason": "fixed by run-31 on task-28"
+   }
+  ],
+  "finding-5": [
+   {
+    "id": "finding-5",
+    "kind": "finding",
+    "in": "area-1",
+    "to": "area-1",
+    "says": "Open finding 4 in lib/dispatch",
+    "links": {},
+    "state": "open",
+    "v": 1,
+    "op": "add",
+    "by": "Harbour",
+    "at": "2026-11-13T08:00:00.000Z"
+   },
+   {
+    "id": "finding-5",
+    "kind": "finding",
+    "in": "area-1",
+    "to": "area-1",
+    "says": "Open finding 4 in lib/dispatch",
+    "links": {},
+    "state": "done",
+    "v": 2,
+    "op": "end",
+    "by": "implementation",
+    "at": "2026-11-13T16:30:00.000Z",
+    "stateReason": "fixed by run-32 on task-28",
+    "reason": "fixed by run-32 on task-28"
+   }
+  ],
+  "finding-6": [
+   {
+    "id": "finding-6",
+    "kind": "finding",
+    "in": "area-1",
+    "to": "area-1",
+    "says": "Open finding 5 in lib/dispatch",
     "links": {},
     "state": "open",
     "v": 1,
@@ -31,7 +151,812 @@
     "by": "Harbour",
     "at": "2026-11-13T08:00:00.000Z"
    }
+  ],
+  "finding-7": [
+   {
+    "id": "finding-7",
+    "kind": "finding",
+    "in": "area-1",
+    "to": "area-1",
+    "says": "Open finding 6 in lib/dispatch",
+    "links": {},
+    "state": "open",
+    "v": 1,
+    "op": "add",
+    "by": "Harbour",
+    "at": "2026-11-13T08:00:00.000Z"
+   }
+  ],
+  "finding-8": [
+   {
+    "id": "finding-8",
+    "kind": "finding",
+    "in": "area-1",
+    "to": "area-1",
+    "says": "Open finding 7 in lib/dispatch",
+    "links": {},
+    "state": "open",
+    "v": 1,
+    "op": "add",
+    "by": "Harbour",
+    "at": "2026-11-13T08:00:00.000Z"
+   }
+  ],
+  "finding-9": [
+   {
+    "id": "finding-9",
+    "kind": "finding",
+    "in": "area-1",
+    "to": "area-1",
+    "says": "Open finding 8 in lib/dispatch",
+    "links": {},
+    "state": "open",
+    "v": 1,
+    "op": "add",
+    "by": "Harbour",
+    "at": "2026-11-13T08:00:00.000Z"
+   }
+  ],
+  "finding-10": [
+   {
+    "id": "finding-10",
+    "kind": "finding",
+    "in": "area-1",
+    "to": "area-1",
+    "says": "Open finding 9 in lib/dispatch",
+    "links": {},
+    "state": "open",
+    "v": 1,
+    "op": "add",
+    "by": "Harbour",
+    "at": "2026-11-13T08:00:00.000Z"
+   }
+  ],
+  "finding-11": [
+   {
+    "id": "finding-11",
+    "kind": "finding",
+    "in": "area-1",
+    "to": "area-1",
+    "says": "Open finding 10 in lib/dispatch",
+    "links": {},
+    "state": "open",
+    "v": 1,
+    "op": "add",
+    "by": "Harbour",
+    "at": "2026-11-13T08:00:00.000Z"
+   }
+  ],
+  "finding-12": [
+   {
+    "id": "finding-12",
+    "kind": "finding",
+    "in": "area-1",
+    "to": "area-1",
+    "says": "Open finding 11 in lib/dispatch",
+    "links": {},
+    "state": "open",
+    "v": 1,
+    "op": "add",
+    "by": "Harbour",
+    "at": "2026-11-13T08:00:00.000Z"
+   }
+  ],
+  "finding-13": [
+   {
+    "id": "finding-13",
+    "kind": "finding",
+    "in": "area-1",
+    "to": "area-1",
+    "says": "Open finding 12 in lib/dispatch",
+    "links": {},
+    "state": "open",
+    "v": 1,
+    "op": "add",
+    "by": "Harbour",
+    "at": "2026-11-13T08:00:00.000Z"
+   }
+  ],
+  "finding-14": [
+   {
+    "id": "finding-14",
+    "kind": "finding",
+    "in": "area-1",
+    "to": "area-1",
+    "says": "Open finding 13 in lib/dispatch",
+    "links": {},
+    "state": "open",
+    "v": 1,
+    "op": "add",
+    "by": "Harbour",
+    "at": "2026-11-13T08:00:00.000Z"
+   }
+  ],
+  "finding-15": [
+   {
+    "id": "finding-15",
+    "kind": "finding",
+    "in": "area-1",
+    "to": "area-1",
+    "says": "Open finding 14 in lib/dispatch",
+    "links": {},
+    "state": "open",
+    "v": 1,
+    "op": "add",
+    "by": "Harbour",
+    "at": "2026-11-13T08:00:00.000Z"
+   }
+  ],
+  "finding-16": [
+   {
+    "id": "finding-16",
+    "kind": "finding",
+    "in": "area-1",
+    "to": "area-1",
+    "says": "Open finding 15 in lib/dispatch",
+    "links": {},
+    "state": "open",
+    "v": 1,
+    "op": "add",
+    "by": "Harbour",
+    "at": "2026-11-13T08:00:00.000Z"
+   }
+  ],
+  "finding-17": [
+   {
+    "id": "finding-17",
+    "kind": "finding",
+    "in": "area-1",
+    "to": "area-1",
+    "says": "Open finding 16 in lib/dispatch",
+    "links": {},
+    "state": "open",
+    "v": 1,
+    "op": "add",
+    "by": "Harbour",
+    "at": "2026-11-13T08:00:00.000Z"
+   }
+  ],
+  "finding-18": [
+   {
+    "id": "finding-18",
+    "kind": "finding",
+    "in": "area-1",
+    "to": "area-1",
+    "says": "Open finding 17 in lib/dispatch",
+    "links": {},
+    "state": "open",
+    "v": 1,
+    "op": "add",
+    "by": "Harbour",
+    "at": "2026-11-13T08:00:00.000Z"
+   }
+  ],
+  "finding-19": [
+   {
+    "id": "finding-19",
+    "kind": "finding",
+    "in": "area-1",
+    "to": "area-1",
+    "says": "Open finding 18 in lib/dispatch",
+    "links": {},
+    "state": "open",
+    "v": 1,
+    "op": "add",
+    "by": "Harbour",
+    "at": "2026-11-13T08:00:00.000Z"
+   }
+  ],
+  "finding-20": [
+   {
+    "id": "finding-20",
+    "kind": "finding",
+    "in": "area-1",
+    "to": "area-1",
+    "says": "Open finding 19 in lib/dispatch",
+    "links": {},
+    "state": "open",
+    "v": 1,
+    "op": "add",
+    "by": "Harbour",
+    "at": "2026-11-13T08:00:00.000Z"
+   }
+  ],
+  "finding-21": [
+   {
+    "id": "finding-21",
+    "kind": "finding",
+    "in": "area-1",
+    "to": "area-1",
+    "says": "Open finding 20 in lib/dispatch",
+    "links": {},
+    "state": "open",
+    "v": 1,
+    "op": "add",
+    "by": "Harbour",
+    "at": "2026-11-13T08:00:00.000Z"
+   }
+  ],
+  "finding-22": [
+   {
+    "id": "finding-22",
+    "kind": "finding",
+    "in": "area-1",
+    "to": "area-1",
+    "says": "Open finding 21 in lib/dispatch",
+    "links": {},
+    "state": "open",
+    "v": 1,
+    "op": "add",
+    "by": "Harbour",
+    "at": "2026-11-13T08:00:00.000Z"
+   }
+  ],
+  "finding-23": [
+   {
+    "id": "finding-23",
+    "kind": "finding",
+    "in": "area-1",
+    "to": "area-1",
+    "says": "Open finding 22 in lib/dispatch",
+    "links": {},
+    "state": "open",
+    "v": 1,
+    "op": "add",
+    "by": "Harbour",
+    "at": "2026-11-13T08:00:00.000Z"
+   }
+  ],
+  "finding-24": [
+   {
+    "id": "finding-24",
+    "kind": "finding",
+    "in": "area-1",
+    "to": "area-1",
+    "says": "Open finding 23 in lib/dispatch",
+    "links": {},
+    "state": "open",
+    "v": 1,
+    "op": "add",
+    "by": "Harbour",
+    "at": "2026-11-13T08:00:00.000Z"
+   }
+  ],
+  "finding-25": [
+   {
+    "id": "finding-25",
+    "kind": "finding",
+    "in": "area-1",
+    "to": "area-1",
+    "says": "Open finding 24 in lib/dispatch",
+    "links": {},
+    "state": "open",
+    "v": 1,
+    "op": "add",
+    "by": "Harbour",
+    "at": "2026-11-13T08:00:00.000Z"
+   }
+  ],
+  "finding-26": [
+   {
+    "id": "finding-26",
+    "kind": "finding",
+    "in": "area-1",
+    "to": "area-1",
+    "says": "Open finding 25 in lib/dispatch",
+    "links": {},
+    "state": "open",
+    "v": 1,
+    "op": "add",
+    "by": "Harbour",
+    "at": "2026-11-13T08:00:00.000Z"
+   }
+  ],
+  "finding-27": [
+   {
+    "id": "finding-27",
+    "kind": "finding",
+    "in": "area-1",
+    "to": "area-1",
+    "says": "Open finding 26 in lib/dispatch",
+    "links": {},
+    "state": "open",
+    "v": 1,
+    "op": "add",
+    "by": "Harbour",
+    "at": "2026-11-13T08:00:00.000Z"
+   }
+  ],
+  "task-28": [
+   {
+    "id": "task-28",
+    "kind": "task",
+    "in": "area-1",
+    "asked": "Clear the open findings addressed to area runs-dispatch (area-1). Scope is the live set: find --to area-1 --state open.",
+    "done-when": "find --to area-1 --state open --count returns 0",
+    "paths": [
+     "lib/dispatch"
+    ],
+    "links": {},
+    "state": "open",
+    "v": 1,
+    "op": "add",
+    "by": "John",
+    "at": "2026-11-13T10:00:00.000Z"
+   }
+  ],
+  "run-29": [
+   {
+    "id": "run-29",
+    "kind": "run",
+    "in": "task-28",
+    "stage": "implementation",
+    "claims": [
+     "lib/dispatch"
+    ],
+    "links": {},
+    "state": "open",
+    "v": 1,
+    "op": "add",
+    "by": "implementation",
+    "at": "2026-11-13T12:00:00.000Z"
+   },
+   {
+    "id": "run-29",
+    "kind": "run",
+    "in": "task-28",
+    "stage": "implementation",
+    "claims": [
+     "lib/dispatch"
+    ],
+    "links": {
+     "about": "task-28@1"
+    },
+    "state": "open",
+    "v": 2,
+    "op": "link",
+    "by": "implementation",
+    "at": "2026-11-13T12:40:00.000Z"
+   },
+   {
+    "id": "run-29",
+    "kind": "run",
+    "in": "task-28",
+    "stage": "implementation",
+    "claims": [
+     "lib/dispatch"
+    ],
+    "links": {
+     "about": "task-28@1"
+    },
+    "state": "done",
+    "v": 3,
+    "op": "end",
+    "by": "implementation",
+    "at": "2026-11-13T12:45:00.000Z",
+    "stateReason": "ended 1 finding(s)",
+    "reason": "ended 1 finding(s)"
+   }
+  ],
+  "verdict-30": [
+   {
+    "id": "verdict-30",
+    "kind": "verdict",
+    "in": "task-28",
+    "of": "plan-review",
+    "outcome": "approve-with-notes",
+    "reasoning": "No plan piece exists; the scope is the ask itself. Scope is stated as a live query, so it needs no recount: the area line in the brief is the number. Note: no plan was written before building started.",
+    "links": {
+     "on": "task-28@1"
+    },
+    "state": "stands",
+    "v": 1,
+    "op": "add",
+    "by": "plan-review",
+    "at": "2026-11-13T13:10:00.000Z"
+   }
+  ],
+  "run-31": [
+   {
+    "id": "run-31",
+    "kind": "run",
+    "in": "task-28",
+    "stage": "implementation",
+    "claims": [
+     "lib/dispatch"
+    ],
+    "links": {},
+    "state": "open",
+    "v": 1,
+    "op": "add",
+    "by": "implementation",
+    "at": "2026-11-13T15:00:00.000Z"
+   },
+   {
+    "id": "run-31",
+    "kind": "run",
+    "in": "task-28",
+    "stage": "implementation",
+    "claims": [
+     "lib/dispatch"
+    ],
+    "links": {
+     "about": "task-28@1"
+    },
+    "state": "open",
+    "v": 2,
+    "op": "link",
+    "by": "implementation",
+    "at": "2026-11-13T15:40:00.000Z"
+   },
+   {
+    "id": "run-31",
+    "kind": "run",
+    "in": "task-28",
+    "stage": "implementation",
+    "claims": [
+     "lib/dispatch"
+    ],
+    "links": {
+     "about": "task-28@1"
+    },
+    "state": "done",
+    "v": 3,
+    "op": "end",
+    "by": "implementation",
+    "at": "2026-11-13T15:45:00.000Z",
+    "stateReason": "ended 2 finding(s)",
+    "reason": "ended 2 finding(s)"
+   }
+  ],
+  "run-32": [
+   {
+    "id": "run-32",
+    "kind": "run",
+    "in": "task-28",
+    "stage": "implementation",
+    "claims": [
+     "lib/dispatch"
+    ],
+    "links": {},
+    "state": "open",
+    "v": 1,
+    "op": "add",
+    "by": "implementation",
+    "at": "2026-11-13T16:00:00.000Z"
+   },
+   {
+    "id": "run-32",
+    "kind": "run",
+    "in": "task-28",
+    "stage": "implementation",
+    "claims": [
+     "lib/dispatch"
+    ],
+    "links": {
+     "about": "task-28@1"
+    },
+    "state": "open",
+    "v": 2,
+    "op": "link",
+    "by": "implementation",
+    "at": "2026-11-13T16:40:00.000Z"
+   },
+   {
+    "id": "run-32",
+    "kind": "run",
+    "in": "task-28",
+    "stage": "implementation",
+    "claims": [
+     "lib/dispatch"
+    ],
+    "links": {
+     "about": "task-28@1"
+    },
+    "state": "done",
+    "v": 3,
+    "op": "end",
+    "by": "implementation",
+    "at": "2026-11-13T16:45:00.000Z",
+    "stateReason": "ended 1 finding(s)",
+    "reason": "ended 1 finding(s)"
+   }
+  ],
+  "verdict-33": [
+   {
+    "id": "verdict-33",
+    "kind": "verdict",
+    "in": "task-28",
+    "of": "review",
+    "outcome": "request-changes",
+    "reasoning": "The ask states its scope as a query, not a number, so there is no figure to be wrong. Re-running that query as of 10:00 and as of now gives both numbers from the store; the difference is exactly the findings ended done by the three runs in this task. Work is partial: open findings addressed to area-1 remain, so done-when is not met.",
+    "links": {
+     "on": "task-28@1"
+    },
+    "state": "stands",
+    "v": 1,
+    "op": "add",
+    "by": "review",
+    "at": "2026-11-13T17:10:00.000Z"
+   }
   ]
  },
- "log": []
+ "log": [
+  {
+   "at": "2026-11-17T14:46:51.644Z",
+   "by": "Harbour",
+   "q": [
+    "find",
+    "--to",
+    "area-1",
+    "--state",
+    "open",
+    "--count",
+    "--by",
+    "Harbour",
+    "--as-of",
+    "2026-11-13T08:00:00Z"
+   ]
+  },
+  {
+   "at": "2026-11-17T14:46:51.683Z",
+   "by": "John",
+   "q": [
+    "find",
+    "--to",
+    "John",
+    "--state",
+    "open",
+    "--by",
+    "John",
+    "--as-of",
+    "2026-11-13T10:00:00Z"
+   ]
+  },
+  {
+   "at": "2026-11-17T14:46:51.712Z",
+   "by": "John",
+   "q": [
+    "find",
+    "--to",
+    "area-1",
+    "--state",
+    "open",
+    "--count",
+    "--by",
+    "John",
+    "--as-of",
+    "2026-11-13T10:00:00Z"
+   ]
+  },
+  {
+   "at": "2026-11-17T14:46:51.739Z",
+   "by": "John",
+   "q": [
+    "find",
+    "--area",
+    "area-1",
+    "--state",
+    "open",
+    "--count",
+    "--by",
+    "John",
+    "--as-of",
+    "2026-11-13T10:00:00Z"
+   ]
+  },
+  {
+   "at": "2026-11-17T14:46:51.800Z",
+   "by": "implementation",
+   "q": [
+    "brief",
+    "implementation",
+    "--task",
+    "task-28",
+    "--as-of",
+    "2026-11-13T12:00:00Z",
+    "--text"
+   ]
+  },
+  {
+   "at": "2026-11-17T14:46:51.860Z",
+   "by": "implementation",
+   "q": [
+    "find",
+    "--to",
+    "area-1",
+    "--state",
+    "open",
+    "--by",
+    "implementation",
+    "--as-of",
+    "2026-11-13T12:00:00Z"
+   ]
+  },
+  {
+   "at": "2026-11-17T14:46:51.995Z",
+   "by": "plan-review",
+   "q": [
+    "brief",
+    "plan-review",
+    "--task",
+    "task-28",
+    "--as-of",
+    "2026-11-13T13:00:00Z",
+    "--text"
+   ]
+  },
+  {
+   "at": "2026-11-17T14:46:52.024Z",
+   "by": "plan-review",
+   "q": [
+    "find",
+    "--kind",
+    "plan",
+    "--in",
+    "task-28",
+    "--by",
+    "plan-review",
+    "--as-of",
+    "2026-11-13T13:00:00Z"
+   ]
+  },
+  {
+   "at": "2026-11-17T14:46:52.079Z",
+   "by": "implementation",
+   "q": [
+    "brief",
+    "implementation",
+    "--task",
+    "task-28",
+    "--as-of",
+    "2026-11-13T15:00:00Z",
+    "--text"
+   ]
+  },
+  {
+   "at": "2026-11-17T14:46:52.150Z",
+   "by": "implementation",
+   "q": [
+    "find",
+    "--to",
+    "area-1",
+    "--state",
+    "open",
+    "--by",
+    "implementation",
+    "--as-of",
+    "2026-11-13T15:00:00Z"
+   ]
+  },
+  {
+   "at": "2026-11-17T14:46:52.294Z",
+   "by": "implementation",
+   "q": [
+    "brief",
+    "implementation",
+    "--task",
+    "task-28",
+    "--as-of",
+    "2026-11-13T16:00:00Z",
+    "--text"
+   ]
+  },
+  {
+   "at": "2026-11-17T14:46:52.356Z",
+   "by": "implementation",
+   "q": [
+    "find",
+    "--to",
+    "area-1",
+    "--state",
+    "open",
+    "--by",
+    "implementation",
+    "--as-of",
+    "2026-11-13T16:00:00Z"
+   ]
+  },
+  {
+   "at": "2026-11-17T14:46:52.482Z",
+   "by": "review",
+   "q": [
+    "brief",
+    "review",
+    "--task",
+    "task-28",
+    "--as-of",
+    "2026-11-13T17:00:00Z",
+    "--text"
+   ]
+  },
+  {
+   "at": "2026-11-17T14:46:52.511Z",
+   "by": "review",
+   "q": [
+    "get",
+    "task-28@1",
+    "--by",
+    "review",
+    "--as-of",
+    "2026-11-13T17:00:00Z"
+   ]
+  },
+  {
+   "at": "2026-11-17T14:46:52.538Z",
+   "by": "review",
+   "q": [
+    "find",
+    "--to",
+    "area-1",
+    "--state",
+    "open",
+    "--count",
+    "--by",
+    "review",
+    "--as-of",
+    "2026-11-13T10:00:00Z"
+   ]
+  },
+  {
+   "at": "2026-11-17T14:46:52.568Z",
+   "by": "review",
+   "q": [
+    "find",
+    "--to",
+    "area-1",
+    "--state",
+    "open",
+    "--count",
+    "--by",
+    "review",
+    "--as-of",
+    "2026-11-13T13:00:00Z"
+   ]
+  },
+  {
+   "at": "2026-11-17T14:46:52.599Z",
+   "by": "review",
+   "q": [
+    "find",
+    "--to",
+    "area-1",
+    "--state",
+    "open",
+    "--count",
+    "--by",
+    "review",
+    "--as-of",
+    "2026-11-13T17:00:00Z"
+   ]
+  },
+  {
+   "at": "2026-11-17T14:46:52.627Z",
+   "by": "review",
+   "q": [
+    "find",
+    "--to",
+    "area-1",
+    "--state",
+    "done",
+    "--by",
+    "review",
+    "--as-of",
+    "2026-11-13T17:00:00Z"
+   ]
+  },
+  {
+   "at": "2026-11-17T14:46:52.657Z",
+   "by": "review",
+   "q": [
+    "show",
+    "--task",
+    "task-28",
+    "--by",
+    "review",
+    "--as-of",
+    "2026-11-13T17:00:00Z"
+   ]
+  }
+ ]
 }

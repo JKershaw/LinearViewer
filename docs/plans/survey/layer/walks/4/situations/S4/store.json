@@ -1,0 +1,165 @@
+{
+ "next": 5,
+ "records": {
+  "task-1": [
+   {
+    "id": "task-1",
+    "kind": "task",
+    "asked": "Do the weekly read for Lighthouse.",
+    "done-when": "This week's read is done and its study is written.",
+    "links": {},
+    "state": "open",
+    "v": 1,
+    "op": "add",
+    "by": "Lighthouse",
+    "at": "2026-11-14T08:00:00.000Z"
+   }
+  ],
+  "area-2": [
+   {
+    "id": "area-2",
+    "kind": "area",
+    "name": "studies",
+    "paths": [
+     "studies/"
+    ],
+    "links": {},
+    "state": "kept",
+    "v": 1,
+    "op": "add",
+    "by": "Lighthouse",
+    "at": "2026-11-14T08:00:00.000Z"
+   }
+  ],
+  "task-3": [
+   {
+    "id": "task-3",
+    "kind": "task",
+    "in": "task-1",
+    "asked": "Write the next study.",
+    "done-when": "The next study is written under studies/.",
+    "paths": [
+     "studies/"
+    ],
+    "links": {},
+    "state": "open",
+    "v": 1,
+    "op": "add",
+    "by": "Lighthouse",
+    "at": "2026-11-14T08:00:00.000Z"
+   }
+  ],
+  "run-4": [
+   {
+    "id": "run-4",
+    "kind": "run",
+    "in": "task-3",
+    "stage": "weekly-read",
+    "claims": [
+     "studies/"
+    ],
+    "account": "session-a",
+    "links": {},
+    "state": "open",
+    "v": 1,
+    "op": "add",
+    "by": "session-a",
+    "at": "2026-11-14T09:01:00.000Z"
+   }
+  ]
+ },
+ "log": [
+  {
+   "at": "2026-11-17T14:46:11.384Z",
+   "by": "session-a",
+   "q": [
+    "brief",
+    "session-a",
+    "--task",
+    "task-1",
+    "--as-of",
+    "2026-11-14T09:00:00Z",
+    "--text"
+   ]
+  },
+  {
+   "at": "2026-11-17T14:46:11.411Z",
+   "by": "session-a",
+   "q": [
+    "brief",
+    "session-a",
+    "--task",
+    "task-3",
+    "--as-of",
+    "2026-11-14T09:00:00Z",
+    "--text"
+   ]
+  },
+  {
+   "at": "2026-11-17T14:46:22.868Z",
+   "by": "session-a",
+   "q": [
+    "get",
+    "task-3",
+    "--by",
+    "session-a",
+    "--as-of",
+    "2026-11-14T09:00:00Z"
+   ]
+  },
+  {
+   "at": "2026-11-17T14:46:22.949Z",
+   "by": "session-b",
+   "q": [
+    "brief",
+    "session-b",
+    "--task",
+    "task-1",
+    "--as-of",
+    "2026-11-14T09:05:00Z",
+    "--text"
+   ]
+  },
+  {
+   "at": "2026-11-17T14:46:22.986Z",
+   "by": "session-b",
+   "q": [
+    "brief",
+    "session-b",
+    "--task",
+    "task-3",
+    "--as-of",
+    "2026-11-14T09:05:00Z",
+    "--text"
+   ]
+  },
+  {
+   "at": "2026-11-17T14:46:23.027Z",
+   "by": "session-b",
+   "q": [
+    "find",
+    "--area",
+    "area-2",
+    "--state",
+    "open",
+    "--by",
+    "session-b",
+    "--as-of",
+    "2026-11-14T09:05:00Z"
+   ]
+  },
+  {
+   "at": "2026-11-17T14:46:23.059Z",
+   "by": "session-b",
+   "q": [
+    "show",
+    "--task",
+    "task-3",
+    "--by",
+    "session-b",
+    "--as-of",
+    "2026-11-14T09:05:00Z"
+   ]
+  }
+ ]
+}

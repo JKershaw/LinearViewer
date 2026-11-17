@@ -1,0 +1,287 @@
+{
+ "next": 6,
+ "records": {
+  "task-1": [
+   {
+    "id": "task-1",
+    "kind": "task",
+    "asked": "LIN-4448 LLM & prompts",
+    "links": {},
+    "state": "open",
+    "v": 1,
+    "op": "add",
+    "by": "Harbour",
+    "at": "2026-11-13T22:00:00.000Z"
+   }
+  ],
+  "task-2": [
+   {
+    "id": "task-2",
+    "kind": "task",
+    "in": "task-1",
+    "asked": "LIN-4469",
+    "links": {},
+    "state": "open",
+    "v": 1,
+    "op": "add",
+    "by": "Harbour",
+    "at": "2026-11-13T22:00:00.000Z"
+   }
+  ],
+  "change-3": [
+   {
+    "id": "change-3",
+    "kind": "change",
+    "in": "task-2",
+    "ref": "LIN-4469 change",
+    "head": "h1",
+    "links": {},
+    "state": "open",
+    "v": 1,
+    "op": "add",
+    "by": "Harbour",
+    "at": "2026-11-13T22:00:00.000Z"
+   }
+  ],
+  "question-4": [
+   {
+    "id": "question-4",
+    "kind": "question",
+    "in": "task-2",
+    "to": "John",
+    "asks": "May the merge of LIN-4469 go ahead without the witness (lin-4469-witness)?",
+    "options": [
+     "merge without witness",
+     "wait for witness"
+    ],
+    "if-unanswered": "merge waits",
+    "links": {
+     "about": "change-3"
+    },
+    "state": "open",
+    "v": 1,
+    "op": "add",
+    "by": "autopilot",
+    "at": "2026-11-13T22:50:00.000Z"
+   },
+   {
+    "id": "question-4",
+    "kind": "question",
+    "in": "task-2",
+    "to": "John",
+    "asks": "May the merge of LIN-4469 go ahead without the witness (lin-4469-witness)?",
+    "options": [
+     "merge without witness",
+     "wait for witness"
+    ],
+    "if-unanswered": "merge waits",
+    "links": {
+     "about": "change-3"
+    },
+    "state": "withdrawn",
+    "v": 2,
+    "op": "end",
+    "by": "autopilot",
+    "at": "2026-11-13T23:40:00.000Z",
+    "stateReason": "withdrawn by the autopilot",
+    "reason": "withdrawn by the autopilot"
+   }
+  ],
+  "finding-5": [
+   {
+    "id": "finding-5",
+    "kind": "finding",
+    "in": "task-2",
+    "to": "autopilot",
+    "says": "Merge of LIN-4469 waits on question-4 (may it merge without the witness?); do not merge until it is answered.",
+    "links": {
+     "on": "question-4@1",
+     "about": "change-3"
+    },
+    "state": "open",
+    "v": 1,
+    "op": "add",
+    "by": "implementation",
+    "at": "2026-11-13T23:11:00.000Z"
+   },
+   {
+    "id": "finding-5",
+    "kind": "finding",
+    "in": "task-2",
+    "to": "autopilot",
+    "says": "Merge of LIN-4469 waits on question-4 (may it merge without the witness?); do not merge until it is answered.",
+    "links": {
+     "on": "question-4@1",
+     "about": "change-3"
+    },
+    "state": "declined",
+    "v": 2,
+    "op": "end",
+    "by": "autopilot",
+    "at": "2026-11-13T23:40:30.000Z",
+    "stateReason": "premise gone: question-4 withdrawn at 23:40, merge no longer waits on it",
+    "reason": "premise gone: question-4 withdrawn at 23:40, merge no longer waits on it"
+   }
+  ]
+ },
+ "log": [
+  {
+   "at": "2026-11-17T14:46:06.832Z",
+   "by": "autopilot",
+   "q": [
+    "brief",
+    "autopilot",
+    "--task",
+    "task-2",
+    "--as-of",
+    "2026-11-13T22:50:00Z",
+    "--text"
+   ]
+  },
+  {
+   "at": "2026-11-17T14:46:11.304Z",
+   "by": "implementation",
+   "q": [
+    "brief",
+    "implementation",
+    "--task",
+    "task-2",
+    "--as-of",
+    "2026-11-13T23:11:00Z",
+    "--text"
+   ]
+  },
+  {
+   "at": "2026-11-17T14:46:16.727Z",
+   "by": "implementation",
+   "q": [
+    "get",
+    "question-4",
+    "--by",
+    "implementation",
+    "--as-of",
+    "2026-11-13T23:11:00Z"
+   ]
+  },
+  {
+   "at": "2026-11-17T14:46:16.791Z",
+   "by": "autopilot",
+   "q": [
+    "brief",
+    "autopilot",
+    "--task",
+    "task-2",
+    "--as-of",
+    "2026-11-13T23:40:00Z",
+    "--text"
+   ]
+  },
+  {
+   "at": "2026-11-17T14:46:27.349Z",
+   "by": "autopilot",
+   "q": [
+    "brief",
+    "autopilot",
+    "--task",
+    "task-2",
+    "--as-of",
+    "2026-11-13T23:40:10Z",
+    "--text"
+   ]
+  },
+  {
+   "at": "2026-11-17T14:46:27.379Z",
+   "by": "autopilot",
+   "q": [
+    "get",
+    "finding-5",
+    "--by",
+    "autopilot",
+    "--as-of",
+    "2026-11-13T23:40:10Z"
+   ]
+  },
+  {
+   "at": "2026-11-17T14:46:35.767Z",
+   "by": "autopilot",
+   "q": [
+    "brief",
+    "autopilot",
+    "--task",
+    "task-1",
+    "--as-of",
+    "2026-11-14T09:00:00Z",
+    "--text"
+   ]
+  },
+  {
+   "at": "2026-11-17T14:46:35.806Z",
+   "by": "John",
+   "q": [
+    "find",
+    "--to",
+    "John",
+    "--state",
+    "open",
+    "--by",
+    "John",
+    "--as-of",
+    "2026-11-14T09:00:00Z"
+   ]
+  },
+  {
+   "at": "2026-11-17T14:46:35.848Z",
+   "by": "John",
+   "q": [
+    "show",
+    "--task",
+    "task-1",
+    "--by",
+    "John",
+    "--as-of",
+    "2026-11-14T09:00:00Z"
+   ]
+  },
+  {
+   "at": "2026-11-17T14:46:40.169Z",
+   "by": "John",
+   "q": [
+    "find",
+    "--in",
+    "task-2",
+    "--state",
+    "open",
+    "--by",
+    "John",
+    "--as-of",
+    "2026-11-14T09:00:00Z"
+   ]
+  },
+  {
+   "at": "2026-11-17T14:46:40.204Z",
+   "by": "John",
+   "q": [
+    "find",
+    "--text",
+    "waits",
+    "--by",
+    "John",
+    "--as-of",
+    "2026-11-14T09:00:00Z"
+   ]
+  },
+  {
+   "at": "2026-11-17T14:46:40.238Z",
+   "by": "John",
+   "q": [
+    "show",
+    "--task",
+    "task-2",
+    "--by",
+    "John",
+    "--as-of",
+    "2026-11-14T09:00:00Z"
+   ]
+  }
+ ]
+}

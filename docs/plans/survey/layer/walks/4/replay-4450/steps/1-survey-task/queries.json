@@ -1,0 +1,135 @@
+[
+ {
+  "at": "2026-11-17T14:45:06.295Z",
+  "by": "survey-task",
+  "q": [
+   "show",
+   "--task",
+   "task-60",
+   "--by",
+   "survey-task"
+  ]
+ },
+ {
+  "at": "2026-11-17T14:45:06.337Z",
+  "by": "survey-task",
+  "q": [
+   "find",
+   "--in",
+   "task-60",
+   "--by",
+   "survey-task"
+  ]
+ },
+ {
+  "at": "2026-11-17T14:45:06.381Z",
+  "by": "survey-task",
+  "q": [
+   "find",
+   "--text",
+   "hasMarkerLine",
+   "--by",
+   "survey-task"
+  ]
+ },
+ {
+  "at": "2026-11-17T14:45:06.415Z",
+  "by": "survey-task",
+  "q": [
+   "find",
+   "--text",
+   "codeBlock",
+   "--by",
+   "survey-task"
+  ]
+ },
+ {
+  "at": "2026-11-17T14:45:06.443Z",
+  "by": "survey-task",
+  "q": [
+   "find",
+   "--text",
+   "live",
+   "--in",
+   "task-53",
+   "--by",
+   "survey-task"
+  ]
+ },
+ {
+  "at": "2026-11-17T14:45:13.057Z",
+  "by": "survey-task",
+  "q": [
+   "get",
+   "task-53",
+   "--by",
+   "survey-task"
+  ]
+ },
+ {
+  "at": "2026-11-17T14:45:13.090Z",
+  "by": "survey-task",
+  "q": [
+   "find",
+   "--text",
+   "D1",
+   "--by",
+   "survey-task"
+  ]
+ },
+ {
+  "at": "2026-11-17T14:45:13.135Z",
+  "by": "survey-task",
+  "q": [
+   "find",
+   "--text",
+   "LIN-2019",
+   "--by",
+   "survey-task"
+  ]
+ },
+ {
+  "at": "2026-11-17T14:45:13.174Z",
+  "by": "survey-task",
+  "q": [
+   "find",
+   "--text",
+   "adfHasUnrenderable",
+   "--by",
+   "survey-task"
+  ]
+ },
+ {
+  "at": "2026-11-17T14:45:13.207Z",
+  "by": "survey-task",
+  "q": [
+   "find",
+   "--text",
+   "digest",
+   "--by",
+   "survey-task"
+  ]
+ },
+ {
+  "at": "2026-11-17T14:45:13.241Z",
+  "by": "survey-task",
+  "q": [
+   "find",
+   "--text",
+   "32768",
+   "--by",
+   "survey-task"
+  ]
+ },
+ {
+  "at": "2026-11-17T14:45:13.279Z",
+  "by": "survey-task",
+  "q": [
+   "find",
+   "--text",
+   "bulk",
+   "--by",
+   "survey-task"
+  ]
+ }
+]
