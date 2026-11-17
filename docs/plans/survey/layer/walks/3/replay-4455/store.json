@@ -1,6 +1,6 @@
 {
  "retro": false,
- "next": 90,
+ "next": 91,
  "records": {
   "area-1": {
    "id": "area-1",
@@ -2420,6 +2420,42 @@
      }
     }
    ]
+  },
+  "verdict-90": {
+   "id": "verdict-90",
+   "kind": "verdict",
+   "versions": [
+    {
+     "v": 1,
+     "op": "add",
+     "at": "2026-11-13T15:53:58.000Z",
+     "by": "review",
+     "in": "task-60",
+     "state": "stands",
+     "fields": {
+      "of": "review",
+      "outcome": "approve-with-notes",
+      "reasoning": "Approve, conditional on close-out discharging the ledger (findings to close-out). PR #2427 at head c95b9f139 (base c205190fd): CI green, all 8 checks; merged locally into origin/main 5dcf5bcda (LIN-4457 landed since base) it merges cleanly and the full unit suite passes 25,457/25,457. Against the ask: dispatch-leftover and _releaseIfHeld/releaseHeldWake import HALT_MODES, followUpTarget and NEVER_RAN from owners (NEVER_RAN newly homed in dispatch-terminal, decision-84; scope grew to seven spellings per decision-79); release wording via wakeHook.releaseNote plus late-bound setHeldWakeReleaseNote, store neither imports nor names formatHeldWakeNote, AST witness pins it (decision-85); FEEDBACK_KINDS in leaf dispatch-feedback-kinds.js, findWakeEvent met by mayCarryWake (decisions 83, 86). Departures recorded on LIN-4447 (2f488272, 055a6035). Waiting 2, 4, 11 are the three removed (note at 4b5001ddf); stale 'counts the word' Lesson corrected; Lessons 5,195 bytes < 6,144. Witnesses present (HALT_MODES iteration §5; lin-4377 acorn walk with self-check). Bindings hold: no GitHub/provider reads, nothing stored recomputed, lib/prompts/ untouched. Mutation checks (LIN-2274), all reverted: drain in HALT_MODES 2 red; swap status/recap rows 2 red; drop releaseNote 1 red; setHeldWakeReleaseNote no-op 5 red; createLeftoverStep stops binding 2 red; NEVER_RAN loses expired 7 red; tool mayCarryWake false 1 red; restated targets 3 red; drop kind from public/session.js 1 red. Regression: git log -30 on changed lib/ files, nothing undone; LIN-4383/4377 rule enforced harder. Class 'shared constant restated beside its owner': no other lib/ or routes/ spelling remains; browser copies and one-mode sites are intentional."
+     },
+     "links": {}
+    },
+    {
+     "v": 2,
+     "op": "link",
+     "at": "2026-11-13T15:53:58.000Z",
+     "by": "review",
+     "in": "task-60",
+     "state": "stands",
+     "fields": {
+      "of": "review",
+      "outcome": "approve-with-notes",
+      "reasoning": "Approve, conditional on close-out discharging the ledger (findings to close-out). PR #2427 at head c95b9f139 (base c205190fd): CI green, all 8 checks; merged locally into origin/main 5dcf5bcda (LIN-4457 landed since base) it merges cleanly and the full unit suite passes 25,457/25,457. Against the ask: dispatch-leftover and _releaseIfHeld/releaseHeldWake import HALT_MODES, followUpTarget and NEVER_RAN from owners (NEVER_RAN newly homed in dispatch-terminal, decision-84; scope grew to seven spellings per decision-79); release wording via wakeHook.releaseNote plus late-bound setHeldWakeReleaseNote, store neither imports nor names formatHeldWakeNote, AST witness pins it (decision-85); FEEDBACK_KINDS in leaf dispatch-feedback-kinds.js, findWakeEvent met by mayCarryWake (decisions 83, 86). Departures recorded on LIN-4447 (2f488272, 055a6035). Waiting 2, 4, 11 are the three removed (note at 4b5001ddf); stale 'counts the word' Lesson corrected; Lessons 5,195 bytes < 6,144. Witnesses present (HALT_MODES iteration §5; lin-4377 acorn walk with self-check). Bindings hold: no GitHub/provider reads, nothing stored recomputed, lib/prompts/ untouched. Mutation checks (LIN-2274), all reverted: drain in HALT_MODES 2 red; swap status/recap rows 2 red; drop releaseNote 1 red; setHeldWakeReleaseNote no-op 5 red; createLeftoverStep stops binding 2 red; NEVER_RAN loses expired 7 red; tool mayCarryWake false 1 red; restated targets 3 red; drop kind from public/session.js 1 red. Regression: git log -30 on changed lib/ files, nothing undone; LIN-4383/4377 rule enforced harder. Class 'shared constant restated beside its owner': no other lib/ or routes/ spelling remains; browser copies and one-mode sites are intentional."
+     },
+     "links": {
+      "on": "change-82@2"
+     }
+    }
+   ]
   }
  },
  "queries": [
@@ -2777,6 +2813,93 @@
    "query": "show",
    "args": {
     "task": "task-60",
+    "asOf": null
+   },
+   "returned": 1
+  },
+  {
+   "at": "2026-11-17T13:49:12.585Z",
+   "by": "review",
+   "query": "get",
+   "args": {
+    "id": "change-82",
+    "asOf": null
+   },
+   "returned": 1
+  },
+  {
+   "at": "2026-11-17T13:49:12.618Z",
+   "by": "review",
+   "query": "get",
+   "args": {
+    "id": "finding-89",
+    "asOf": null
+   },
+   "returned": 1
+  },
+  {
+   "at": "2026-11-17T13:49:12.651Z",
+   "by": "review",
+   "query": "find",
+   "args": {
+    "to": "review",
+    "state": "open"
+   },
+   "returned": 1
+  },
+  {
+   "at": "2026-11-17T13:49:12.683Z",
+   "by": "review",
+   "query": "find",
+   "args": {
+    "to": "task-60"
+   },
+   "returned": 10
+  },
+  {
+   "at": "2026-11-17T13:49:18.345Z",
+   "by": "review",
+   "query": "find",
+   "args": {
+    "to": "close-out",
+    "state": "open"
+   },
+   "returned": 0
+  },
+  {
+   "at": "2026-11-17T13:49:18.391Z",
+   "by": "review",
+   "query": "find",
+   "args": {
+    "to": "John",
+    "state": "open"
+   },
+   "returned": 0
+  },
+  {
+   "at": "2026-11-17T13:49:18.444Z",
+   "by": "review",
+   "query": "find",
+   "args": {
+    "kind": "verdict"
+   },
+   "returned": 10
+  },
+  {
+   "at": "2026-11-17T13:49:18.492Z",
+   "by": "review",
+   "query": "find",
+   "args": {
+    "text": "erasure"
+   },
+   "returned": 0
+  },
+  {
+   "at": "2026-11-17T13:49:37.476Z",
+   "by": "review",
+   "query": "get",
+   "args": {
+    "id": "verdict-90",
     "asOf": null
    },
    "returned": 1

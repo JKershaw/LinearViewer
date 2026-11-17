@@ -1,6 +1,6 @@
 {
  "retro": false,
- "next": 99,
+ "next": 103,
  "records": {
   "area-1": {
    "id": "area-1",
@@ -2760,6 +2760,91 @@
      "stateReason": "review posted on LIN-4450"
     }
    ]
+  },
+  "verdict-99": {
+   "id": "verdict-99",
+   "kind": "verdict",
+   "versions": [
+    {
+     "v": 1,
+     "op": "add",
+     "at": "2026-11-13T15:21:22.000Z",
+     "by": "blind-read",
+     "in": "task-60",
+     "state": "stands",
+     "fields": {
+      "of": "blind-read",
+      "outcome": "better",
+      "reasoning": "Better. Read PR #2421 cold at `f9fa4a80c` against `4b5001ddf` (the change record still names `a98d042c6`). It gives Jira's description read and write a single owner (`lib/providers/jira/as-asked-region.js`: `readDescription`/`holdAsAsked`), and `descriptionRoundTrip` now runs that same pair, so the seal decision and the write cannot disagree. It also folds the inline copies of the test-token predicate onto `isHermeticTestToken` (`routes/proxy-compute.js`, `server.js`, `routes/task-chat.js`, `routes/workspace-api-steps.js`). On the worse side, a Jira issue's `description` now depends on which read produced it: the batch path in `lib/providers/jira/index.js` serves the converted words, the single-issue reads the exact ones (carried by finding-77 to area-1). Three fix-sized items go to close-out; nothing outside the areas."
+     },
+     "links": {
+      "on": "change-82@1"
+     }
+    }
+   ]
+  },
+  "finding-100": {
+   "id": "finding-100",
+   "kind": "finding",
+   "versions": [
+    {
+     "v": 1,
+     "op": "add",
+     "at": "2026-11-13T15:21:23.000Z",
+     "by": "blind-read",
+     "in": "task-60",
+     "to": "close-out",
+     "state": "open",
+     "fields": {
+      "says": "Fix before merge (blind read of PR #2421 at `f9fa4a80c`): `routes/workspace-api-audit.js` lines 35-36 still write `process.env.NODE_ENV === 'test' && (workspace.accessToken === 'test-token' || …)` inline; the sweep moved every sibling copy onto `isHermeticTestToken` and missed this one. Fix: `isHermeticTestToken(workspace.accessToken) || (process.env.NODE_ENV === 'test' && workspace.provider === 'local')`. It keeps its own predicate, as its comment asks; only the token half uses the helper."
+     },
+     "links": {
+      "on": "change-82@1"
+     }
+    }
+   ]
+  },
+  "finding-101": {
+   "id": "finding-101",
+   "kind": "finding",
+   "versions": [
+    {
+     "v": 1,
+     "op": "add",
+     "at": "2026-11-13T15:21:24.000Z",
+     "by": "blind-read",
+     "in": "task-60",
+     "to": "close-out",
+     "state": "open",
+     "fields": {
+      "says": "Fix before merge (blind read of PR #2421 at `f9fa4a80c`): `routes/workspace-api-steps.js`'s `isTestToken` is now a one-line second name for `isHermeticTestToken(workspace.accessToken)`. Have its callers (`routes/workspace-api-issue-read.js`, `routes/workspace-api-issue-write.js`, `routes/workspace-api-prompts.js`) import the helper directly and drop the alias."
+     },
+     "links": {
+      "on": "change-82@1"
+     }
+    }
+   ]
+  },
+  "finding-102": {
+   "id": "finding-102",
+   "kind": "finding",
+   "versions": [
+    {
+     "v": 1,
+     "op": "add",
+     "at": "2026-11-13T15:21:25.000Z",
+     "by": "blind-read",
+     "in": "task-60",
+     "to": "close-out",
+     "state": "open",
+     "fields": {
+      "says": "Fix before merge (blind read of PR #2421 at `f9fa4a80c`): in `tests/unit/jira-as-asked-region.test.js`, the test at ~line 291, \"no longer claim that Jira is skipped\", only checks that three phrases are missing from the comment headers of `lib/as-asked-seal.js` and `lib/as-asked.js`. It pins no behaviour; `tests/unit/as-asked-create-seal.test.js` already checks that Jira holds the block. Delete it."
+     },
+     "links": {
+      "on": "change-82@1"
+     }
+    }
+   ]
   }
  },
  "queries": [
@@ -3537,6 +3622,44 @@
     "text": "display"
    },
    "returned": 4
+  },
+  {
+   "at": "2026-11-17T13:49:12.937Z",
+   "by": "blind-read",
+   "query": "get",
+   "args": {
+    "id": "finding-77",
+    "asOf": null
+   },
+   "returned": 1
+  },
+  {
+   "at": "2026-11-17T13:49:12.974Z",
+   "by": "blind-read",
+   "query": "get",
+   "args": {
+    "id": "change-82",
+    "asOf": null
+   },
+   "returned": 1
+  },
+  {
+   "at": "2026-11-17T13:49:13.013Z",
+   "by": "blind-read",
+   "query": "find",
+   "args": {
+    "text": "workspace-api-audit"
+   },
+   "returned": 1
+  },
+  {
+   "at": "2026-11-17T13:49:13.050Z",
+   "by": "blind-read",
+   "query": "find",
+   "args": {
+    "text": "no longer claim"
+   },
+   "returned": 0
   }
  ],
  "hits": []

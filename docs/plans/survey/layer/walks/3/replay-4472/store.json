@@ -3299,6 +3299,26 @@
     "asOf": null
    },
    "returned": 1
+  },
+  {
+   "at": "2026-11-17T13:49:27.903Z",
+   "by": "Harbour",
+   "query": "show",
+   "args": {
+    "task": "task-28",
+    "asOf": null
+   },
+   "returned": 1
+  },
+  {
+   "at": "2026-11-17T13:49:41.496Z",
+   "by": "John",
+   "query": "find",
+   "args": {
+    "to": "John",
+    "state": "open"
+   },
+   "returned": 1
   }
  ],
  "hits": []
