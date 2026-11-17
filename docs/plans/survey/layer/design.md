@@ -56,7 +56,11 @@ John: "a small minimal MVP, and we take it for a walk and see a) if it's better 
 
 ### 3.2 Kinds
 
-*Provisional, for John to correct before the first build. These are `avenues` §1's catalogue with his four open choices taken one way, because a model can't be built without taking them some way: `ask` folded into `question`/`finding`; who-is-working as a view of `run`; measure left out (3.1); all five candidates in. For each choice, the walk reports what happened under it and what the other way would have done, so it informs the choice rather than settling it.*
+*Provisional. These are `avenues` §1's catalogue with John's four open choices taken one way, because a model can't be built without taking them some way: `ask` folded into `question`/`finding`; who-is-working as a view of `run`; measure left out (3.1); all five candidates in. For each choice, the walk reports what happened under it and what the other way would have done, so it informs the choice rather than settling it. John: "It feels like all these details will come out in the wash, as we iterate." [checked, 17 Nov]*
+
+*Kinds are data, not code: one generic record plus `kinds.json`. So a kind costs a line of declarations, not a branch of the program. In motion, a stage is given only the few kinds it writes.*
+
+*Walk 1 builds the first nine. `run` and `setting` stay on paper: walk 1's run rows stay outside as Harbour's own records, and the size policy is a decision whose basis is `policy`. The walk reports where it missed them.*
 
 | Kind | Holds | Own fields | `to` | Ends |
 |---|---|---|---|---|
@@ -92,7 +96,7 @@ In motion, each is a refusal at write time. In a retro walk the history already 
   - open checks, by state only.
 
   Closed records are left out. What it carries is reported: how many open things, and how many of them are instructions, alongside its size. Size is reported, never a test: the aim is load, not length (§1).
-- **Views** are computed the same way: John's page (everything open addressed to him), counts (never typed), who is working (live runs), and a task's whole record (for the outside reader, need 5).
+- **Views** are computed the same way: John's page (everything open addressed to him), counts (never typed), who is working (live runs), and a task's whole record (for the outside reader, need 5). Not built for walk 1.
 - **Harbour's code** reads fields directly; it never parses a brief.
 - **The tracker** is not designed yet (§6).
 
@@ -104,14 +108,13 @@ The model has no waking. An addressee finds what is open for it when its brief i
 
 *A fresh subagent builds the model from this section and §3 only, in a new folder `walks/<n>/model/`. Nothing else is given. It is thrown away after its round.*
 
-- **Form.** Node, ES modules, no dependencies. One declarations file (`kinds.json`, the kinds, fields, ends and addressees of §3.2); one program (`layer.mjs`); one store file (JSON, every record with its versions). Small: a few hundred lines is a ceiling, not a target.
+- **Form.** Node, ES modules, no dependencies. One declarations file (`kinds.json`, the kinds built this round, with their fields, ends and addressees from §3.2); one program (`layer.mjs`); one store file (JSON, every record with its versions). As small as it can be.
 - **Commands** (CLI, JSON in and out):
   - `add <kind>` with fields: checked against `kinds.json`; refusal names the field or the rule.
   - `revise <id>` with changed fields and a reason: a new version.
   - `end <id> <state> <reason>`.
   - `link <id> <type> <id>`.
   - `brief <reader> --task <id> [--as-of <time>]`: §3.4, as JSON and as plain text, with its size.
-  - `view <john | counts | working | task <id>> [--as-of <time>]`.
   - `check`: validates the whole store against §3.2 and §3.3 and lists every failure.
 - **Time.** Every write takes an optional `--at`, so a finished task can be filled in its own order and read as of any moment.
 - **Retro mode.** A store opened with `--retro` logs rule hits (3.3) instead of refusing; `hits` lists them.
@@ -151,7 +154,7 @@ More finished tasks filled the same way: the other five traces and Lighthouse. M
 
 ## 6. Open
 
-- **John's:** the four catalogue choices and the avenue (`avenues` §1, §6). The model takes the choices provisionally (3.2) and lives in one store with checked calls, roughly avenue A, because a model has to live somewhere and that is the simplest to build. John has not agreed either; he corrects them before the first build. Rebuilding each round keeps both cheap to change.
+- **John's:** the four catalogue choices and the avenue (`avenues` §1, §6). The model takes the choices provisionally (3.2) and lives in one store with checked calls, roughly avenue A, because a model has to live somewhere and that is the simplest to build. John has not ruled on either; he expects them to settle as we iterate. Rebuilding each round keeps both cheap to change.
 - **Access** to the ticket material for walk 1 (5.1).
 - **Not yet designed:** waking (3.5); how the tracker shows records; how agents meet the calls in motion.
 
