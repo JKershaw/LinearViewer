@@ -1,0 +1,45 @@
+task-28 task v3 [done] by close-out
+decision-32 decision v2 [stands] by autopilot
+decision-33 decision v1 [stands] by breakdown
+decision-34 decision v1 [stands] by breakdown
+decision-35 decision v1 [stands] by breakdown
+decision-36 decision v1 [stands] by breakdown
+finding-50 finding v3 [done] to implementation by implementation
+finding-51 finding v2 [done] to implementation by implementation
+question-52 question v3 [handed-on] to implementation by scoping
+finding-53 finding v2 [done] to implementation by implementation
+check-54 check v2 [done] to implementation by implementation
+finding-55 finding v2 [done] to implementation by implementation
+finding-56 finding v3 [done] to implementation by implementation
+run-57 run v2 [done] by survey-task
+finding-58 finding v2 [done] to implementation by implementation
+finding-59 finding v2 [declined] to implementation by implementation
+run-62 run v2 [done] by survey-place
+question-63 question v2 [answered] to John answered-by decision-66 by autopilot
+decision-64 decision v1 [stands] by scoping
+run-65 run v2 [done] by scoping
+decision-66 decision v1 [stands] by autopilot
+run-67 run v2 [done] by autopilot
+run-68 run v2 [done] by implementation
+change-69 change v4 [merged] by close-out
+decision-70 decision v1 [stands] by implementation
+finding-71 finding v2 [done] to review by review
+finding-72 finding v2 [handed-on] to review by review
+decision-75 decision v1 [stands] by John
+run-76 run v2 [done] by leftover
+finding-78 finding v2 [done] to review by review
+run-79 run v2 [done] by review
+verdict-80 verdict v1 [stands] STALE by review
+finding-81 finding v2 [done] to close-out by close-out
+finding-82 finding v2 [done] to close-out by close-out
+finding-83 finding v2 [done] to close-out by close-out
+check-84 check v2 [handed-on] to close-out by close-out
+check-85 check v2 [open] to John by close-out
+run-86 run v2 [done] by blind-read
+verdict-87 verdict v1 [stands] STALE by blind-read
+finding-88 finding v2 [done] to close-out by close-out
+finding-89 finding v2 [done] to close-out by close-out
+finding-90 finding v2 [done] to close-out by close-out
+finding-91 finding v2 [open] to task-1 by close-out
+check-92 check v1 [open] to John by close-out
+run-93 run v2 [done] by close-out

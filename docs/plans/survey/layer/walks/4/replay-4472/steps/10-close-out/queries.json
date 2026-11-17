@@ -1,0 +1,147 @@
+[
+ {
+  "at": "2026-11-17T14:58:26.429Z",
+  "by": "close-out",
+  "q": [
+   "show",
+   "--task",
+   "task-28",
+   "--by",
+   "close-out"
+  ]
+ },
+ {
+  "at": "2026-11-17T14:58:31.275Z",
+  "by": "close-out",
+  "q": [
+   "show",
+   "--task",
+   "task-28",
+   "--by",
+   "close-out"
+  ]
+ },
+ {
+  "at": "2026-11-17T14:58:37.006Z",
+  "by": "close-out",
+  "q": [
+   "get",
+   "change-69",
+   "--by",
+   "close-out"
+  ]
+ },
+ {
+  "at": "2026-11-17T14:58:37.037Z",
+  "by": "close-out",
+  "q": [
+   "get",
+   "finding-72",
+   "--by",
+   "close-out"
+  ]
+ },
+ {
+  "at": "2026-11-17T14:58:37.070Z",
+  "by": "close-out",
+  "q": [
+   "get",
+   "finding-73",
+   "--by",
+   "close-out"
+  ]
+ },
+ {
+  "at": "2026-11-17T14:58:37.103Z",
+  "by": "close-out",
+  "q": [
+   "get",
+   "finding-91",
+   "--by",
+   "close-out"
+  ]
+ },
+ {
+  "at": "2026-11-17T14:58:37.132Z",
+  "by": "close-out",
+  "q": [
+   "find",
+   "--to",
+   "area-49",
+   "--state",
+   "open",
+   "--by",
+   "close-out"
+  ]
+ },
+ {
+  "at": "2026-11-17T14:58:37.179Z",
+  "by": "close-out",
+  "q": [
+   "get",
+   "area-49",
+   "--by",
+   "close-out"
+  ]
+ },
+ {
+  "at": "2026-11-17T14:58:37.232Z",
+  "by": "close-out",
+  "q": [
+   "find",
+   "--text",
+   "fmtWhen",
+   "--by",
+   "close-out"
+  ]
+ },
+ {
+  "at": "2026-11-17T14:58:50.646Z",
+  "by": "close-out",
+  "q": [
+   "find",
+   "--kind",
+   "area",
+   "--by",
+   "close-out"
+  ]
+ },
+ {
+  "at": "2026-11-17T14:58:50.682Z",
+  "by": "close-out",
+  "q": [
+   "find",
+   "--kind",
+   "run",
+   "--in",
+   "task-28",
+   "--by",
+   "close-out",
+   "--count"
+  ]
+ },
+ {
+  "at": "2026-11-17T14:58:50.713Z",
+  "by": "close-out",
+  "q": [
+   "get",
+   "task-1",
+   "--by",
+   "close-out"
+  ]
+ },
+ {
+  "at": "2026-11-17T14:59:35.231Z",
+  "by": "close-out",
+  "q": [
+   "find",
+   "--to",
+   "close-out",
+   "--state",
+   "open",
+   "--by",
+   "close-out",
+   "--count"
+  ]
+ }
+]

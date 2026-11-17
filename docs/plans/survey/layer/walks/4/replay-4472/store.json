@@ -1,5 +1,5 @@
 {
- "next": 92,
+ "next": 94,
  "records": {
   "task-1": [
    {
@@ -668,6 +668,42 @@
     "by": "survey-place",
     "at": "2026-11-13T17:26:50.000Z",
     "reason": "The ticket's map missed three suites that execute or slice task-page.js and must change (finding-50, finding-51; survey-place at 904719353)"
+   },
+   {
+    "id": "task-28",
+    "kind": "task",
+    "in": "task-1",
+    "asked": "",
+    "done-when": "* Merged and verified on its own after piece 1.\n* The golden diff is only the module tag.\n* The census count is lower.\n* No `module.exports` remains in `task-page.js`.\n* The task page behaves as before.",
+    "paths": [
+     "public/task-page.js",
+     "lib/render-task-page.js",
+     "tests/unit/task-page-client.test.js",
+     "tests/unit/task-page-question.test.js",
+     "tests/unit/task-timeline-client.test.js",
+     "tests/unit/task-page-",
+     "tests/unit/lin-4405-",
+     "tests/unit/lin-3975-task-run-control.test.js",
+     "tests/unit/no-page-wide-label-listener.test.js",
+     "tests/unit/render-task-page-golden.test.js",
+     "tests/fixtures/render-task-page-golden.json",
+     "tests/unit/classic-loader-census.test.js",
+     "docs/areas/front-end-browser.md",
+     "docs/architecture/source-map.md",
+     "tests/unit/lin-3975-proposal-refresh.test.js",
+     "tests/unit/lin-3975-task-run-links.test.js",
+     "tests/unit/lin-3975-summary-and-time.test.js"
+    ],
+    "links": {
+     "piece": "plan-10"
+    },
+    "state": "done",
+    "v": 3,
+    "op": "end",
+    "by": "close-out",
+    "at": "2026-11-13T18:11:34.000Z",
+    "stateReason": "PR #2436 merged (0cf05ce8f) and deployed after piece 1; golden diff is the seven module tags only; census 102 -> 100; no module.exports in public/task-page.js; CI green on the merged head. 'Behaves as before' is witnessed in Chromium by CI; the Safari/Firefox and live owner/guest poll checks were not run and stay open to John (check-92, check-85). Parent task-1 stays open: its blind-read comparison and remaining Waiting entries are not settled by this piece",
+    "reason": "PR #2436 merged (0cf05ce8f) and deployed after piece 1; golden diff is the seven module tags only; census 102 -> 100; no module.exports in public/task-page.js; CI green on the merged head. 'Behaves as before' is witnessed in Chromium by CI; the Safari/Firefox and live owner/guest poll checks were not run and stay open to John (check-92, check-85). Parent task-1 stays open: its blind-read comparison and remaining Waiting entries are not settled by this piece"
    }
   ],
   "decision-29": [
@@ -1759,6 +1795,35 @@
     "at": "2026-11-13T17:50:42.000Z",
     "head": "ffa70b7821e9859a403e043e1ea55d588b67ac73",
     "reason": "Head after leftover commits (import paths, comments, e2e poll); CI green on it: CI success, both unit jobs, E2E shards 1-4, secret scan"
+   },
+   {
+    "id": "change-69",
+    "kind": "change",
+    "in": "task-28",
+    "ref": "PR #2436 (closes LIN-4472, piece 2 of LIN-4463)",
+    "links": {},
+    "state": "open",
+    "v": 3,
+    "op": "revise",
+    "by": "close-out",
+    "at": "2026-11-13T18:11:22.000Z",
+    "head": "a6492a9840e31798fbbc4a2854e544d466f3ed2f",
+    "reason": "Close-out head: F1-F3 and blind-read fixes (a81f9673e), runs-and-dispatch Waiting entry (ac2f0e07a), merge of main after #2435 made the PR conflicting (a6492a984; one conflict in docs/areas/runs-and-dispatch.md, both sides appended Waiting entries, kept both). CI green on this exact head (run 43482176002): CI success, Unit tests, Unit tests (proxy, clock +400d), E2E shards 1-4, Secret scan"
+   },
+   {
+    "id": "change-69",
+    "kind": "change",
+    "in": "task-28",
+    "ref": "PR #2436 (closes LIN-4472, piece 2 of LIN-4463)",
+    "links": {},
+    "state": "merged",
+    "v": 4,
+    "op": "end",
+    "by": "close-out",
+    "at": "2026-11-13T18:11:30.000Z",
+    "head": "a6492a9840e31798fbbc4a2854e544d466f3ed2f",
+    "stateReason": "Squash-merged as 0cf05ce8f5234277e5aecde1800f50f652131e33, pinned to head a6492a984. Deployed: the production footer shows 0cf05ce8f5234277e5aecde1800f50f652131e33. Local run of the touched suites on the merged tree: 618/618",
+    "reason": "Squash-merged as 0cf05ce8f5234277e5aecde1800f50f652131e33, pinned to head a6492a984. Deployed: the production footer shows 0cf05ce8f5234277e5aecde1800f50f652131e33. Local run of the touched suites on the merged tree: 618/618"
    }
   ],
   "decision-70": [
@@ -2124,6 +2189,23 @@
     "op": "add",
     "by": "review",
     "at": "2026-11-13T18:01:39.000Z"
+   },
+   {
+    "id": "finding-81",
+    "kind": "finding",
+    "in": "task-28",
+    "to": "close-out",
+    "says": "F1. `tests/unit/lin-3975-task-run-links.test.js` must read shorter; at head ffa70b78 it is 232 lines (base 228), because the old 4-line vm parity test became a behaviour test. Move the test `the page's running clock paints fmtDuration's words for every span it can show` (`:211-221`) into `tests/unit/lin-4472-time-words.test.js` inside its `describe`, and change that file's import to `import { shareTime, tickClocks } from '../../public/task-page.js';`. In run-links delete the now-unused imports of `createFakeDom` and `tickClocks`, and change the header bullet at `:10` to say the server's running suffix is fmtDuration's words and the page's clock is pinned in `lin-4472-time-words.test.js`. Tried: run-links becomes 218 lines, both suites pass (24/24), and the moved test still fails when `tickClocks` stops calling `fmtDuration`. Note: finding-72 reports run-links at 219 after this move, but the move is not on head ffa70b78.",
+    "links": {
+     "about": "change-69@2"
+    },
+    "state": "done",
+    "v": 2,
+    "op": "end",
+    "by": "close-out",
+    "at": "2026-11-13T18:11:23.000Z",
+    "stateReason": "Made in a81f9673e: the running-clock test moved from lin-3975-task-run-links into lin-4472-time-words (imports tickClocks there), run-links' unused createFakeDom/tickClocks imports removed, header bullet updated. run-links is 219 lines against a 228-line base (review measured 218 with a one-line header; this one is two lines). CI green on a81f9673e and on merged head a6492a984",
+    "reason": "Made in a81f9673e: the running-clock test moved from lin-3975-task-run-links into lin-4472-time-words (imports tickClocks there), run-links' unused createFakeDom/tickClocks imports removed, header bullet updated. run-links is 219 lines against a 228-line base (review measured 218 with a one-line header; this one is two lines). CI green on a81f9673e and on merged head a6492a984"
    }
   ],
   "finding-82": [
@@ -2141,6 +2223,23 @@
     "op": "add",
     "by": "review",
     "at": "2026-11-13T18:01:40.000Z"
+   },
+   {
+    "id": "finding-82",
+    "kind": "finding",
+    "in": "task-28",
+    "to": "close-out",
+    "says": "F2. The PR #2436 body is stale since `ffa70b782`: its \"What changed\" bullet says `render-run-steps.js` and `task-page-loader.js` \"re-export them, so no caller changed\". Change it to say every server caller imports `lib/time-words.js` and a guard in `lin-4472-time-words.test.js` forbids re-exports. Update the run-links row of the \"shorter\" table after F1.",
+    "links": {
+     "about": "change-69@2"
+    },
+    "state": "done",
+    "v": 2,
+    "op": "end",
+    "by": "close-out",
+    "at": "2026-11-13T18:11:25.000Z",
+    "stateReason": "PR #2436 body rewritten at a81f9673e: every server caller imports lib/time-words.js directly and a guard in lin-4472-time-words.test.js forbids re-exports; the suite-length table updated after F1, all migrated suites now shorter",
+    "reason": "PR #2436 body rewritten at a81f9673e: every server caller imports lib/time-words.js directly and a guard in lin-4472-time-words.test.js forbids re-exports; the suite-length table updated after F1, all migrated suites now shorter"
    }
   ],
   "finding-83": [
@@ -2158,6 +2257,23 @@
     "op": "add",
     "by": "review",
     "at": "2026-11-13T18:01:41.000Z"
+   },
+   {
+    "id": "finding-83",
+    "kind": "finding",
+    "in": "task-28",
+    "to": "close-out",
+    "says": "F3. Nits in `tests/unit/task-page-client.test.js`: remove the unused `(t)` parameter on `a guest share state URL reports gone`, and the extra blank line left just after the imports where `load()` was removed.",
+    "links": {
+     "about": "change-69@2"
+    },
+    "state": "done",
+    "v": 2,
+    "op": "end",
+    "by": "close-out",
+    "at": "2026-11-13T18:11:24.000Z",
+    "stateReason": "Made in a81f9673e: unused (t) parameter removed from 'a guest share state URL reports gone' and the extra blank line after the imports in task-page-client.test.js removed",
+    "reason": "Made in a81f9673e: unused (t) parameter removed from 'a guest share state URL reports gone' and the extra blank line after the imports in task-page-client.test.js removed"
    }
   ],
   "check-84": [
@@ -2177,6 +2293,26 @@
     "op": "add",
     "by": "review",
     "at": "2026-11-13T18:01:42.000Z"
+   },
+   {
+    "id": "check-84",
+    "kind": "check",
+    "in": "task-28",
+    "to": "close-out",
+    "what": "After the deploy, the task page behaves as before in Safari and Firefox (CI's Playwright runs Chromium only; no `projects` in `playwright.config.js`). A module script at the root must import `../lib/time-words.js` under `script-src 'self'`.",
+    "why-person": "CI cannot prove a non-Chromium browser loads the module; only a real browser on the deployed site can.",
+    "how": "Open a live owner task page with a running stage in Safari and in Firefox. Right if `/task-page.js` and `/lib/time-words.js` both return 200 with a JavaScript MIME type, the console shows no error or CSP refusal, the stage clock reads `in progress · Xm` and ticks, and the share list shows \"N minutes ago\". Wrong if the clock stays at its server text and the console shows a module or MIME error. Rollback: revert the squash commit of #2436; nothing is persisted and no third party consumes it.",
+    "links": {
+     "about": "change-69@2"
+    },
+    "state": "handed-on",
+    "v": 2,
+    "op": "end",
+    "by": "close-out",
+    "at": "2026-11-13T18:11:32.000Z",
+    "stateReason": "Server half settled after deploy (/task-page.js and /lib/time-words.js 200 as application/javascript; the page imports the leaf). The Safari/Firefox half was not run (no signed-in session or those browsers here); it goes to John as check-92",
+    "into": "check-92",
+    "reason": "Server half settled after deploy (/task-page.js and /lib/time-words.js 200 as application/javascript; the page imports the leaf). The Safari/Firefox half was not run (no signed-in session or those browsers here); it goes to John as check-92"
    }
   ],
   "check-85": [
@@ -2196,6 +2332,24 @@
     "op": "add",
     "by": "review",
     "at": "2026-11-13T18:01:43.000Z"
+   },
+   {
+    "id": "check-85",
+    "kind": "check",
+    "in": "task-28",
+    "to": "John",
+    "what": "Acceptance: merged and verified on its own after piece 1.",
+    "why-person": "Only the deployed site shows the merged page working on its own.",
+    "how": "On the deployed site (footer 0cf05ce8f5234277e5aecde1800f50f652131e33), load one owner task page and one guest share page (`/t/<token>`). Right if the poll repaints the header without a reload and there is no `pageerror`. Rollback: revert squash commit 0cf05ce8f of #2436. Not run by close-out: no signed-in session here; also recorded on PR #2436 (comment 6861738662).",
+    "links": {
+     "about": "change-69@2"
+    },
+    "state": "open",
+    "v": 2,
+    "op": "revise",
+    "by": "close-out",
+    "at": "2026-11-13T18:11:33.000Z",
+    "reason": "Merged and deployed; close-out could not run it (no signed-in session), so it goes to John as the operator"
    }
   ],
   "run-86": [
@@ -2261,6 +2415,23 @@
     "op": "add",
     "by": "blind-read",
     "at": "2026-11-13T18:08:00.000Z"
+   },
+   {
+    "id": "finding-88",
+    "kind": "finding",
+    "in": "task-28",
+    "to": "close-out",
+    "says": "Blind read, fix-sized: in `public/task-page.js` the comment on the export block (lines 903-904) says the page \"starts from DOMContentLoaded, below\", but that listener is above it. It also says \"nothing here reads or writes a global\", but `init` reads `window.api`, `window.BriefSection`, `window.CloseOut`, `window.PromptSection`, `window.initLocalTimes` and others. Fix: say \"above\", and \"the module writes no global\".",
+    "links": {
+     "about": "change-69@2"
+    },
+    "state": "done",
+    "v": 2,
+    "op": "end",
+    "by": "close-out",
+    "at": "2026-11-13T18:11:26.000Z",
+    "stateReason": "Made in a81f9673e: the export-block comment in public/task-page.js now says the DOMContentLoaded listener is above and that the module writes no global",
+    "reason": "Made in a81f9673e: the export-block comment in public/task-page.js now says the DOMContentLoaded listener is above and that the module writes no global"
    }
   ],
   "finding-89": [
@@ -2278,6 +2449,23 @@
     "op": "add",
     "by": "blind-read",
     "at": "2026-11-13T18:08:01.000Z"
+   },
+   {
+    "id": "finding-89",
+    "kind": "finding",
+    "in": "task-28",
+    "to": "close-out",
+    "says": "Blind read, fix-sized: the `lib/time-words.js` header (lines 10-11) and its `docs/architecture/source-map.md` entry say the words exist \"once\" and that \"a second copy has nowhere to hide\". The guard in `tests/unit/lin-4472-time-words.test.js` only walks `lib/`, `routes/` and `server.js`, so the copies under `public/` (finding-73) pass it. Fix: narrow both texts to \"every server caller\", or add `public/` to the walk and list the known copies as exceptions.",
+    "links": {
+     "about": "decision-70@1"
+    },
+    "state": "done",
+    "v": 2,
+    "op": "end",
+    "by": "close-out",
+    "at": "2026-11-13T18:11:27.000Z",
+    "stateReason": "Narrowed, in a81f9673e: the lib/time-words.js header and its docs/architecture/source-map.md entry now say 'every server caller' (the guard scans lib/, routes/, server.js). The public/ copies stay outside the guard and are carried by finding-73 and the browser area's Waiting entry",
+    "reason": "Narrowed, in a81f9673e: the lib/time-words.js header and its docs/architecture/source-map.md entry now say 'every server caller' (the guard scans lib/, routes/, server.js). The public/ copies stay outside the guard and are carried by finding-73 and the browser area's Waiting entry"
    }
   ],
   "finding-90": [
@@ -2295,6 +2483,23 @@
     "op": "add",
     "by": "blind-read",
     "at": "2026-11-13T18:08:02.000Z"
+   },
+   {
+    "id": "finding-90",
+    "kind": "finding",
+    "in": "task-28",
+    "to": "close-out",
+    "says": "Blind read, fix-sized: in `tests/unit/lin-3975-summary-and-time.test.js` the test \"share list's words are the server's relativeAgo words\" now compares `shareTime`'s text with `relativeAgo`, which `shareTime` itself calls. It no longer checks two copies against each other, and `tests/unit/lin-4472-time-words.test.js` already has the same `shareTime` test. Fix: drop one of the two, or retitle it as a wiring check.",
+    "links": {
+     "about": "change-69@2"
+    },
+    "state": "done",
+    "v": 2,
+    "op": "end",
+    "by": "close-out",
+    "at": "2026-11-13T18:11:28.000Z",
+    "stateReason": "Retitled in a81f9673e as a wiring check and kept: it checks the share list is wired to relativeAgo, not a duplicate of the exact-words test in lin-4472-time-words",
+    "reason": "Retitled in a81f9673e as a wiring check and kept: it checks the share list is wired to relativeAgo, not a duplicate of the exact-words test in lin-4472-time-words"
    }
   ],
   "finding-91": [
@@ -2312,6 +2517,75 @@
     "op": "add",
     "by": "blind-read",
     "at": "2026-11-13T18:08:04.000Z"
+   },
+   {
+    "id": "finding-91",
+    "kind": "finding",
+    "in": "task-28",
+    "to": "task-1",
+    "says": "Blind read, larger, outside the browser area: `fmtWhen`, the third moment formatter, stays in `lib/task-page-loader.js` (runs-and-dispatch). So `lib/components/time.js` and `lib/render-task-timeline.js` still import a page-formatting helper from a runs-and-dispatch module, the same tangle PR #2436 removed for `relativeAgo`. Moving it into `lib/time-words.js` is a decision about whether that leaf also owns absolute UTC stamps, and it touches about five importers. Recorded by close-out as a Waiting entry in `docs/areas/runs-and-dispatch.md` (ac2f0e07a, merged with PR #2436); not ticketed.",
+    "links": {
+     "about": "decision-70@1"
+    },
+    "state": "open",
+    "v": 2,
+    "op": "revise",
+    "by": "close-out",
+    "at": "2026-11-13T18:11:29.000Z",
+    "reason": "Close-out recorded it in the runs-and-dispatch area note; no area record exists for runs-and-dispatch, so it stays open to the parent"
+   }
+  ],
+  "check-92": [
+   {
+    "id": "check-92",
+    "kind": "check",
+    "in": "task-28",
+    "to": "John",
+    "what": "The deployed task page behaves as before in Safari and Firefox (CI Playwright is Chromium only). Already settled from here after deploy: `/task-page.js` and `/lib/time-words.js` return 200 as `application/javascript`, and the served page imports the leaf. Not run: the in-browser half.",
+    "why-person": "Needs a signed-in session in real Safari and Firefox on the deployed site; close-out had neither.",
+    "how": "Open a live owner task page with a running stage in Safari and in Firefox. Right if the console shows no module, MIME or CSP error, the stage clock reads `in progress · Xm` and ticks, and the share list shows \"N minutes ago\". Wrong if the clock stays at its server text and the console shows a module or MIME error. Rollback: revert squash commit 0cf05ce8f; nothing is persisted and no third party consumes it.",
+    "links": {
+     "about": "change-69@4"
+    },
+    "state": "open",
+    "v": 1,
+    "op": "add",
+    "by": "close-out",
+    "at": "2026-11-13T18:11:31.000Z"
+   }
+  ],
+  "run-93": [
+   {
+    "id": "run-93",
+    "kind": "run",
+    "in": "task-28",
+    "stage": "close-out",
+    "account": "Closed out LIN-4472. Made the review ledger after the approval in a81f9673e: F1 (running-clock test moved into lin-4472-time-words; run-links 219 lines vs 228 base), F2 (PR body rewritten), F3 (task-page-client nits), and the three fix-sized blind-read finds (export comment, time-words and source-map narrowed to every server caller, share-list test retitled as a wiring check). Recorded the fmtWhen ownership find as a runs-and-dispatch Waiting entry (ac2f0e07a). Merged main after #2435 made the PR conflicting (a6492a984, kept both appended Waiting entries). CI green on that exact head (run 43482176002); 618/618 touched suites locally. Squash-merged as 0cf05ce8f; production footer shows it. After deploy /task-page.js and /lib/time-words.js serve 200 as application/javascript. Not run: Safari/Firefox and live owner/guest polling, no signed-in session here; handed to John. Archived and pruned the description; LIN-4463 stays In Progress; no gate tickets.",
+    "links": {
+     "on": "verdict-80@1"
+    },
+    "state": "open",
+    "v": 1,
+    "op": "add",
+    "by": "close-out",
+    "at": "2026-11-13T18:11:35.000Z"
+   },
+   {
+    "id": "run-93",
+    "kind": "run",
+    "in": "task-28",
+    "stage": "close-out",
+    "account": "Closed out LIN-4472. Made the review ledger after the approval in a81f9673e: F1 (running-clock test moved into lin-4472-time-words; run-links 219 lines vs 228 base), F2 (PR body rewritten), F3 (task-page-client nits), and the three fix-sized blind-read finds (export comment, time-words and source-map narrowed to every server caller, share-list test retitled as a wiring check). Recorded the fmtWhen ownership find as a runs-and-dispatch Waiting entry (ac2f0e07a). Merged main after #2435 made the PR conflicting (a6492a984, kept both appended Waiting entries). CI green on that exact head (run 43482176002); 618/618 touched suites locally. Squash-merged as 0cf05ce8f; production footer shows it. After deploy /task-page.js and /lib/time-words.js serve 200 as application/javascript. Not run: Safari/Firefox and live owner/guest polling, no signed-in session here; handed to John. Archived and pruned the description; LIN-4463 stays In Progress; no gate tickets.",
+    "links": {
+     "on": "verdict-80@1"
+    },
+    "state": "done",
+    "v": 2,
+    "op": "end",
+    "by": "close-out",
+    "at": "2026-11-13T18:11:36.000Z",
+    "stateReason": "Close-out complete",
+    "reason": "Close-out complete"
    }
   ]
  },
@@ -3605,6 +3879,20 @@
     "task-1",
     "--by",
     "close-out"
+   ]
+  },
+  {
+   "at": "2026-11-17T14:59:35.231Z",
+   "by": "close-out",
+   "q": [
+    "find",
+    "--to",
+    "close-out",
+    "--state",
+    "open",
+    "--by",
+    "close-out",
+    "--count"
    ]
   }
  ]
