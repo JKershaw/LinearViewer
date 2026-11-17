@@ -3525,6 +3525,35 @@
     "run-56"
    ],
    "asOf": null
+  },
+  {
+   "at": "2026-11-17T16:59:19.483Z",
+   "by": "close-out",
+   "cmd": "get",
+   "args": [
+    "run-52"
+   ],
+   "asOf": null
+  },
+  {
+   "at": "2026-11-17T16:59:19.529Z",
+   "by": "close-out",
+   "cmd": "find",
+   "args": [
+    "--to=John"
+   ],
+   "asOf": null
+  },
+  {
+   "at": "2026-11-17T16:59:19.581Z",
+   "by": "close-out",
+   "cmd": "find",
+   "args": [
+    "--in=area-1",
+    "--state=open",
+    "--count"
+   ],
+   "asOf": null
   }
  ]
 }

@@ -4976,6 +4976,105 @@
     "--kind=task"
    ],
    "asOf": null
+  },
+  {
+   "at": "2026-11-17T16:59:17.943Z",
+   "by": "close-out",
+   "cmd": "show",
+   "args": [
+    "--task=task-131"
+   ],
+   "asOf": null
+  },
+  {
+   "at": "2026-11-17T16:59:23.582Z",
+   "by": "close-out",
+   "cmd": "show",
+   "args": [
+    "--task=task-108"
+   ],
+   "asOf": null
+  },
+  {
+   "at": "2026-11-17T16:59:23.622Z",
+   "by": "close-out",
+   "cmd": "show",
+   "args": [
+    "--task=task-108"
+   ],
+   "asOf": null
+  },
+  {
+   "at": "2026-11-17T16:59:30.976Z",
+   "by": "close-out",
+   "cmd": "show",
+   "args": [
+    "--task=task-126"
+   ],
+   "asOf": null
+  },
+  {
+   "at": "2026-11-17T16:59:31.014Z",
+   "by": "close-out",
+   "cmd": "show",
+   "args": [
+    "--task=task-127"
+   ],
+   "asOf": null
+  },
+  {
+   "at": "2026-11-17T16:59:31.057Z",
+   "by": "close-out",
+   "cmd": "show",
+   "args": [
+    "--task=task-128"
+   ],
+   "asOf": null
+  },
+  {
+   "at": "2026-11-17T16:59:31.103Z",
+   "by": "close-out",
+   "cmd": "show",
+   "args": [
+    "--task=task-129"
+   ],
+   "asOf": null
+  },
+  {
+   "at": "2026-11-17T16:59:31.144Z",
+   "by": "close-out",
+   "cmd": "show",
+   "args": [
+    "--task=task-130"
+   ],
+   "asOf": null
+  },
+  {
+   "at": "2026-11-17T16:59:31.188Z",
+   "by": "close-out",
+   "cmd": "find",
+   "args": [
+    "--text=LIN-4470"
+   ],
+   "asOf": null
+  },
+  {
+   "at": "2026-11-17T16:59:42.392Z",
+   "by": "close-out",
+   "cmd": "find",
+   "args": [
+    "--kind=question"
+   ],
+   "asOf": null
+  },
+  {
+   "at": "2026-11-17T16:59:42.434Z",
+   "by": "close-out",
+   "cmd": "find",
+   "args": [
+    "--to=john"
+   ],
+   "asOf": null
   }
  ]
 }

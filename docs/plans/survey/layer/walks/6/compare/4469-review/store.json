@@ -4453,6 +4453,62 @@
     "question-144"
    ],
    "asOf": null
+  },
+  {
+   "at": "2026-11-17T16:59:23.400Z",
+   "by": "review",
+   "cmd": "find",
+   "args": [
+    "--kind=verdict"
+   ],
+   "asOf": null
+  },
+  {
+   "at": "2026-11-17T16:59:23.445Z",
+   "by": "review",
+   "cmd": "find",
+   "args": [
+    "--text=396"
+   ],
+   "asOf": null
+  },
+  {
+   "at": "2026-11-17T16:59:23.489Z",
+   "by": "review",
+   "cmd": "get",
+   "args": [
+    "finding-143"
+   ],
+   "asOf": null
+  },
+  {
+   "at": "2026-11-17T16:59:29.651Z",
+   "by": "review",
+   "cmd": "find",
+   "args": [
+    "--to=review",
+    "--state=open"
+   ],
+   "asOf": null
+  },
+  {
+   "at": "2026-11-17T16:59:29.681Z",
+   "by": "review",
+   "cmd": "find",
+   "args": [
+    "--in=task-131",
+    "--state=open"
+   ],
+   "asOf": null
+  },
+  {
+   "at": "2026-11-17T16:59:29.718Z",
+   "by": "review",
+   "cmd": "get",
+   "args": [
+    "run-156"
+   ],
+   "asOf": null
   }
  ]
 }
