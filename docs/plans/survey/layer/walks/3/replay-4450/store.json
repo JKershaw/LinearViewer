@@ -2877,6 +2877,73 @@
     "asOf": null
    },
    "returned": 1
+  },
+  {
+   "at": "2026-11-17T13:45:12.397Z",
+   "by": "Harbour",
+   "query": "show",
+   "args": {
+    "task": "task-60",
+    "asOf": null
+   },
+   "returned": 1
+  },
+  {
+   "at": "2026-11-17T13:45:24.489Z",
+   "by": "leftover",
+   "query": "get",
+   "args": {
+    "id": "change-82",
+    "asOf": null
+   },
+   "returned": 1
+  },
+  {
+   "at": "2026-11-17T13:45:24.533Z",
+   "by": "leftover",
+   "query": "get",
+   "args": {
+    "id": "finding-70",
+    "asOf": null
+   },
+   "returned": 1
+  },
+  {
+   "at": "2026-11-17T13:45:24.579Z",
+   "by": "leftover",
+   "query": "find",
+   "args": {
+    "kind": "lesson",
+    "area": "area-1"
+   },
+   "returned": 0
+  },
+  {
+   "at": "2026-11-17T13:45:24.619Z",
+   "by": "leftover",
+   "query": "find",
+   "args": {
+    "area": "area-2"
+   },
+   "returned": 43
+  },
+  {
+   "at": "2026-11-17T13:45:28.090Z",
+   "by": "leftover",
+   "query": "find",
+   "args": {
+    "area": "area-2"
+   },
+   "returned": 43
+  },
+  {
+   "at": "2026-11-17T13:45:28.143Z",
+   "by": "leftover",
+   "query": "find",
+   "args": {
+    "area": "area-1"
+   },
+   "returned": 4
   }
  ],
  "hits": []

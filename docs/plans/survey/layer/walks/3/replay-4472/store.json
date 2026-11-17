@@ -1,6 +1,6 @@
 {
  "retro": false,
- "next": 95,
+ "next": 97,
  "records": {
   "task-1": {
    "id": "task-1",
@@ -2044,6 +2044,29 @@
       "on": "decision-32@1",
       "about": "finding-83"
      }
+    },
+    {
+     "v": 2,
+     "op": "revise",
+     "at": "2026-11-13T17:32:21.000Z",
+     "by": "scoping",
+     "in": "task-28",
+     "to": "John",
+     "state": "open",
+     "fields": {
+      "asks": "LIN-4472 Session-fit line (decision-32) says no serving change. Scoping recommends first extracting one small served lib leaf for duration and relative-time wording (finding-83: relativeWords/relativeAgo, formatElapsed/fmtDuration), so the task page drops its two restated copies. Is that allowed?",
+      "options": [
+       "Yes: extract the served leaf first, and the page drops both copies",
+       "No: leave both copies, add a Waiting entry, and record it as a cut"
+      ],
+      "recommended": "Yes: extract the served leaf first, and the page drops both copies",
+      "if-unanswered": "Extract. Record the answer on LIN-4463."
+     },
+     "links": {
+      "on": "decision-32@1",
+      "about": "finding-83"
+     },
+     "reason": "Scoping raised this as an operator ruling (Harbour ruling lin4472-served-leaf): it overrides decision-32's no-serving-change line, so it is John's call, not the builder's; scoping recommends the opposite of the survey's option 1."
     }
    ]
   },
@@ -2297,6 +2320,62 @@
      "links": {},
      "reason": "survey posted",
      "stateReason": "survey posted"
+    }
+   ]
+  },
+  "decision-95": {
+   "id": "decision-95",
+   "kind": "decision",
+   "versions": [
+    {
+     "v": 1,
+     "op": "add",
+     "at": "2026-11-13T17:32:22.000Z",
+     "by": "scoping",
+     "in": "task-28",
+     "state": "stands",
+     "fields": {
+      "answer": "Size: consolidate the decision this task touches. Cuts: none. Decided by: the standing policy.",
+      "why": "Converts the task page to a module with its suites as imports, and first gives the duration and relative-time wording one served home that server and page both import, so this view drops its two restated copies. Rests on the served-leaf ruling (question-84); if John answers leave, both copies stay with a Waiting entry and that becomes a cut."
+     },
+     "links": {
+      "on": "question-84@2",
+      "about": "plan-10"
+     }
+    }
+   ]
+  },
+  "run-96": {
+   "id": "run-96",
+   "kind": "run",
+   "versions": [
+    {
+     "v": 1,
+     "op": "add",
+     "at": "2026-11-13T17:32:23.000Z",
+     "by": "scoping",
+     "in": "task-28",
+     "state": "open",
+     "fields": {
+      "stage": "scoping",
+      "account": "Sized LIN-4472 as consolidate-the-decision: convert the task page to a module with its suites as imports, and first extract one served lib leaf for the duration and relative-time wording so the page drops its two restated copies (finding-83). That contradicts the breakdown session-fit line (decision-32, no serving change), so I raised it to John as a ruling (question-84 revised and re-addressed; recommended extract; if unanswered, extract and record on LIN-4463). Cuts none, decided by the standing policy (decision-95). Left the survey findings and check-86 open for the builder."
+     },
+     "links": {}
+    },
+    {
+     "v": 2,
+     "op": "end",
+     "at": "2026-11-13T17:32:24.000Z",
+     "by": "scoping",
+     "in": "task-28",
+     "state": "done",
+     "fields": {
+      "stage": "scoping",
+      "account": "Sized LIN-4472 as consolidate-the-decision: convert the task page to a module with its suites as imports, and first extract one served lib leaf for the duration and relative-time wording so the page drops its two restated copies (finding-83). That contradicts the breakdown session-fit line (decision-32, no serving change), so I raised it to John as a ruling (question-84 revised and re-addressed; recommended extract; if unanswered, extract and record on LIN-4463). Cuts none, decided by the standing policy (decision-95). Left the survey findings and check-86 open for the builder."
+     },
+     "links": {},
+     "reason": "Scoping complete: size set, ruling raised to John.",
+     "stateReason": "Scoping complete: size set, ruling raised to John."
     }
    ]
   }

@@ -1,6 +1,6 @@
 {
  "retro": false,
- "next": 79,
+ "next": 81,
  "records": {
   "area-1": {
    "id": "area-1",
@@ -1908,6 +1908,62 @@
      },
      "reason": "Place survey posted on LIN-4455 at 15:05:16; records written.",
      "stateReason": "Place survey posted on LIN-4455 at 15:05:16; records written."
+    }
+   ]
+  },
+  "decision-79": {
+   "id": "decision-79",
+   "kind": "decision",
+   "versions": [
+    {
+     "v": 1,
+     "op": "add",
+     "at": "2026-11-13T15:08:30.000Z",
+     "by": "scoping",
+     "in": "task-60",
+     "state": "stands",
+     "fields": {
+      "answer": "Size of the move: consolidate the decision this task touches. Cuts: none. Deliver piece 5, and also make every reader of the never-ran statuses (all five `NEVER_RAN` spellings, finding-71) and of the decision-stamp feedback kinds (`DECISION_LIFECYCLE_STAMP_KINDS`, finding-74) take them from the one owner, beyond the two consumers and three kind sets the plan names.",
+      "why": "Leaving those copies would keep the restated rules this piece retires, and Waiting 2 and 11 would be only partly settled. Rests on finding-71 and finding-74 (the layer takes one `on`; finding-74 is linked `about`). Decided by the standing policy (size by the decision touched), not by John."
+     },
+     "links": {
+      "on": "finding-71@2",
+      "about": "finding-74"
+     }
+    }
+   ]
+  },
+  "run-80": {
+   "id": "run-80",
+   "kind": "run",
+   "versions": [
+    {
+     "v": 1,
+     "op": "add",
+     "at": "2026-11-13T15:08:31.000Z",
+     "by": "scoping",
+     "in": "task-60",
+     "state": "open",
+     "fields": {
+      "stage": "scoping",
+      "account": "Set the size of the move for LIN-4455 before the build: consolidate the decision this task touches, no cuts (decision-79). Beyond piece 5 as planned, every reader of the never-ran statuses and of the decision-stamp feedback kinds takes them from one owner, because the survey found five NEVER_RAN spellings and a fourth kind set the plan missed; leaving them would keep the copies this piece retires. Decided by the standing policy. Wrote it into the LIN-4455 description. Left all survey findings and check-70 open for implementation."
+     },
+     "links": {}
+    },
+    {
+     "v": 2,
+     "op": "end",
+     "at": "2026-11-13T15:08:32.000Z",
+     "by": "scoping",
+     "in": "task-60",
+     "state": "done",
+     "fields": {
+      "stage": "scoping",
+      "account": "Set the size of the move for LIN-4455 before the build: consolidate the decision this task touches, no cuts (decision-79). Beyond piece 5 as planned, every reader of the never-ran statuses and of the decision-stamp feedback kinds takes them from one owner, because the survey found five NEVER_RAN spellings and a fourth kind set the plan missed; leaving them would keep the copies this piece retires. Decided by the standing policy. Wrote it into the LIN-4455 description. Left all survey findings and check-70 open for implementation."
+     },
+     "links": {},
+     "reason": "size set, decision-79 written",
+     "stateReason": "size set, decision-79 written"
     }
    ]
   }

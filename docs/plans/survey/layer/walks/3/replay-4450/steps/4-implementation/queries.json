@@ -1,0 +1,99 @@
+[
+ {
+  "at": "2026-11-17T13:42:38.301Z",
+  "by": "implementation",
+  "query": "show",
+  "args": {
+   "task": "task-60",
+   "asOf": null
+  },
+  "returned": 1
+ },
+ {
+  "at": "2026-11-17T13:42:42.301Z",
+  "by": "implementation",
+  "query": "find",
+  "args": {
+   "kind": "task"
+  },
+  "returned": 4
+ },
+ {
+  "at": "2026-11-17T13:42:42.339Z",
+  "by": "implementation",
+  "query": "get",
+  "args": {
+   "id": "plan-56",
+   "asOf": null
+  },
+  "returned": 1
+ },
+ {
+  "at": "2026-11-17T13:42:42.373Z",
+  "by": "implementation",
+  "query": "find",
+  "args": {
+   "text": "4452"
+  },
+  "returned": 1
+ },
+ {
+  "at": "2026-11-17T13:42:46.931Z",
+  "by": "implementation",
+  "query": "get",
+  "args": {
+   "id": "finding-67",
+   "asOf": null
+  },
+  "returned": 1
+ },
+ {
+  "at": "2026-11-17T13:42:46.965Z",
+  "by": "implementation",
+  "query": "get",
+  "args": {
+   "id": "finding-76",
+   "asOf": null
+  },
+  "returned": 1
+ },
+ {
+  "at": "2026-11-17T13:42:47.004Z",
+  "by": "implementation",
+  "query": "get",
+  "args": {
+   "id": "finding-77",
+   "asOf": null
+  },
+  "returned": 1
+ },
+ {
+  "at": "2026-11-17T13:42:47.039Z",
+  "by": "implementation",
+  "query": "find",
+  "args": {
+   "kind": "change"
+  },
+  "returned": 0
+ },
+ {
+  "at": "2026-11-17T13:43:35.566Z",
+  "by": "implementation",
+  "query": "get",
+  "args": {
+   "id": "plan-54",
+   "asOf": null
+  },
+  "returned": 1
+ },
+ {
+  "at": "2026-11-17T13:44:03.700Z",
+  "by": "implementation",
+  "query": "get",
+  "args": {
+   "id": "plan-54",
+   "asOf": null
+  },
+  "returned": 1
+ }
+]
