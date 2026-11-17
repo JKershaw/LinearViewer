@@ -3189,6 +3189,16 @@
     "path": "lib/providers/"
    },
    "returned": 1
+  },
+  {
+   "at": "2026-11-17T13:47:01.118Z",
+   "by": "Harbour",
+   "query": "show",
+   "args": {
+    "task": "task-60",
+    "asOf": null
+   },
+   "returned": 1
   }
  ],
  "hits": []

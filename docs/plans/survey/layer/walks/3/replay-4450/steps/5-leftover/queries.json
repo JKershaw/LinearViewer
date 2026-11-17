@@ -1,0 +1,139 @@
+[
+ {
+  "at": "2026-11-17T13:45:24.489Z",
+  "by": "leftover",
+  "query": "get",
+  "args": {
+   "id": "change-82",
+   "asOf": null
+  },
+  "returned": 1
+ },
+ {
+  "at": "2026-11-17T13:45:24.533Z",
+  "by": "leftover",
+  "query": "get",
+  "args": {
+   "id": "finding-70",
+   "asOf": null
+  },
+  "returned": 1
+ },
+ {
+  "at": "2026-11-17T13:45:24.579Z",
+  "by": "leftover",
+  "query": "find",
+  "args": {
+   "kind": "lesson",
+   "area": "area-1"
+  },
+  "returned": 0
+ },
+ {
+  "at": "2026-11-17T13:45:24.619Z",
+  "by": "leftover",
+  "query": "find",
+  "args": {
+   "area": "area-2"
+  },
+  "returned": 43
+ },
+ {
+  "at": "2026-11-17T13:45:28.090Z",
+  "by": "leftover",
+  "query": "find",
+  "args": {
+   "area": "area-2"
+  },
+  "returned": 43
+ },
+ {
+  "at": "2026-11-17T13:45:28.143Z",
+  "by": "leftover",
+  "query": "find",
+  "args": {
+   "area": "area-1"
+  },
+  "returned": 4
+ },
+ {
+  "at": "2026-11-17T13:45:51.011Z",
+  "by": "leftover",
+  "query": "get",
+  "args": {
+   "id": "finding-77",
+   "asOf": null
+  },
+  "returned": 1
+ },
+ {
+  "at": "2026-11-17T13:45:51.048Z",
+  "by": "leftover",
+  "query": "get",
+  "args": {
+   "id": "finding-22",
+   "asOf": null
+  },
+  "returned": 1
+ },
+ {
+  "at": "2026-11-17T13:45:51.088Z",
+  "by": "leftover",
+  "query": "get",
+  "args": {
+   "id": "finding-70",
+   "asOf": null
+  },
+  "returned": 1
+ },
+ {
+  "at": "2026-11-17T13:45:51.127Z",
+  "by": "leftover",
+  "query": "get",
+  "args": {
+   "id": "finding-76",
+   "asOf": null
+  },
+  "returned": 1
+ },
+ {
+  "at": "2026-11-17T13:45:51.173Z",
+  "by": "leftover",
+  "query": "get",
+  "args": {
+   "id": "finding-78",
+   "asOf": null
+  },
+  "returned": 1
+ },
+ {
+  "at": "2026-11-17T13:45:51.213Z",
+  "by": "leftover",
+  "query": "find",
+  "args": {
+   "kind": "lesson",
+   "area": "area-1"
+  },
+  "returned": 0
+ },
+ {
+  "at": "2026-11-17T13:45:51.246Z",
+  "by": "leftover",
+  "query": "find",
+  "args": {
+   "kind": "lesson",
+   "text": "jira"
+  },
+  "returned": 0
+ },
+ {
+  "at": "2026-11-17T13:45:51.288Z",
+  "by": "leftover",
+  "query": "find",
+  "args": {
+   "kind": "lesson",
+   "path": "lib/providers/"
+  },
+  "returned": 1
+ }
+]
