@@ -16,7 +16,7 @@ Nothing else on disk. You may look things up in the store as much as you like, t
 - Records your work closed: end them, with the reason. What another record now carries: end it `handed-on` with `--into` that record. Something you correct: revise it, or supersede it with `--into` the new one. Leave open what you did not close. Records left addressed to a stage that has already run are yours to deal with if they fall to you.
 - Before writing something that may already exist, look it up (`find`, `get`, `show`) and revise or link to it rather than writing it again.
 - Your run: `add run` with `{"in":"TASK","stage":"STAGE","account":"<what you really wrote, in full, verbatim>"}`; end it `done`. (STAGE `John`: no run.)
-- Store: `--store REPLAY/store.json`. Every write: `--by STAGE --at <time>`, starting at START, one second per write, in order. Every query: `--by STAGE`.
+- Store: prefix every call with `LAYER_STORE=REPLAY/store.json` (e.g. `LAYER_STORE=REPLAY/store.json node /home/user/LinearViewer/docs/plans/survey/layer/walks/7/model/layer.mjs find --to STAGE --state open --by STAGE`); there is no `--store` option. Every write: `--by STAGE --at <time>`, starting at START, one second per write, in order. Every query: `--by STAGE`.
 - If a write is refused, read why and correct it; if what you meant was right and the store won't take it, leave it out and note it.
 
 **Then write** `REPLAY/steps/STEP/notes.md`, under 250 words:

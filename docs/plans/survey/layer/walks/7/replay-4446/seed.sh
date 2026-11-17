@@ -5,11 +5,11 @@
 set -euo pipefail
 HERE="$(cd "$(dirname "$0")" && pwd)"
 LAYER="$HERE/../model/layer.mjs"
-STORE="$HERE/store.json"
+STORE="$HERE/store.json"; export LAYER_STORE="$STORE"
 rm -f "$STORE"
 # w <layer args...>: run a write, fail on refusal, print the record id.
 sub() { local s="$1" v; while [[ "$s" =~ @@([A-Z0-9_]+)@@ ]]; do v="${BASH_REMATCH[1]}"; s="${s//@@$v@@/${!v}}"; done; printf '%s' "$s"; }
-w() { local a=() x out; for x in "$@"; do a+=("$(sub "$x")"); done; set -- "${a[@]}"; out=$(node "$LAYER" "$@" --store "$STORE") || { echo "REFUSED: $*" >&2; echo "$out" >&2; exit 1; }
+w() { local a=() x out; for x in "$@"; do a+=("$(sub "$x")"); done; set -- "${a[@]}"; out=$(node "$LAYER" "$@") || { echo "REFUSED: $*" >&2; echo "$out" >&2; exit 1; }
       printf '%s' "$out" | node -e 'let s="";process.stdin.on("data",d=>s+=d).on("end",()=>console.log(JSON.parse(s).id))'; }
 
 # ---- The one area LIN-4446's paths fall in (public/ -> front-end-browser; CLAUDE.md and docs/areas/ match no area),

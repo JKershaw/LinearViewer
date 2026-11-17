@@ -7,7 +7,7 @@ const here = (p) => new URL(p, import.meta.url).pathname;
 const [rd, mode, n, actor, task, asOf] = process.argv.slice(2);
 const dir = here(`${rd}/steps/${n}-${actor}/`); mkdirSync(dir, { recursive: true });
 const store = here(`${rd}/store.json`);
-const layer = (...a) => execFileSync('node', [here('model/layer.mjs'), ...a, '--store', store], { encoding: 'utf8' });
+const layer = (...a) => execFileSync('node', [here('model/layer.mjs'), ...a], { encoding: 'utf8', env: { ...process.env, LAYER_STORE: store } });
 if (mode === 'before') {
   const b = JSON.parse(layer('brief', actor, '--task', task, ...(asOf ? ['--as-of', asOf] : [])));
   const t = layer('brief', actor, '--task', task, ...(asOf ? ['--as-of', asOf] : []), '--text');
@@ -18,7 +18,7 @@ if (mode === 'before') {
 } else {
   const s = JSON.parse(layer('show', '--task', task, '--by', 'Harbour'));
   const st0 = JSON.parse(readFileSync(store, 'utf8')); if (st0.log.at(-1)?.by === 'Harbour') st0.log.pop(); writeFileSync(store, JSON.stringify(st0, null, 1));
-  const lines = [s.task, ...s.records].map(r => `${r.id} ${r.kind} v${r.v} [${r.state}]${r.stale ? ' STALE(' + [].concat(r.stale).join('; ') + ')' : ''}${r.to ? ' to ' + r.to : ''}${r.answered ? ' answered-by ' + r.answered.id : ''} by ${r.by}`);
+  const lines = [s.task, ...s.records].map(r => `${r.id} ${r.kind} v${r.v} [${r.state}]${r.stale ? ' STALE(' + [].concat(r.stale).join('; ') + ')' : ''}${r.to ? ' to ' + r.to : ''}${r.answeredBy ? ' answered-by ' + r.answeredBy.id : ''} by ${r.by}`);
   writeFileSync(dir + 'show.txt', lines.join('\n') + '\n' + ((s.overlap || []).length ? 'overlap: ' + JSON.stringify(s.overlap) + '\n' : ''));
   const st = JSON.parse(readFileSync(store, 'utf8'));
   const q = st.log.filter(x => x.by === actor);
