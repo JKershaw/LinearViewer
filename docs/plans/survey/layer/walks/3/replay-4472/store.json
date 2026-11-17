@@ -1,6 +1,6 @@
 {
  "retro": false,
- "next": 115,
+ "next": 116,
  "records": {
   "task-1": {
    "id": "task-1",
@@ -3232,6 +3232,28 @@
      }
     }
    ]
+  },
+  "verdict-115": {
+   "id": "verdict-115",
+   "kind": "verdict",
+   "versions": [
+    {
+     "v": 1,
+     "op": "add",
+     "at": "2026-11-13T18:10:45.000Z",
+     "by": "blind-read",
+     "in": "task-28",
+     "state": "stands",
+     "fields": {
+      "of": "blind-read",
+      "outcome": "better",
+      "reasoning": "Better. Read PR #2436 cold at `ffa70b782` against `5cf4f6aa2` (change-97 records head a6492a984; see finding-104). It gives the duration and relative-time words one owner, `lib/time-words.js`. That deletes the copies in `public/task-page.js` (`formatElapsed`, `relativeWords`) and the source-slicing `vm` parity tests around them, unhooks the renderers from `lib/render-run-steps.js` and `lib/components/time.js` from the loader for these words, and makes `public/task-page.js` a real module whose suites import its exports. Worse side: it claims the words now exist \"once\", but `public/session.js` and `public/observation.js` still carry the same duration algorithm, and the new guard can't see them because it only scans server files (the copies themselves are already on area-49: finding-99, finding-105; the overclaim is a fix-sized finding to close-out). A comment in `public/task-page.js` is wrong. Fix-sized items go to close-out; `fmtWhen` left in the loader goes to area-50. Outside the area: none."
+     },
+     "links": {
+      "on": "change-97@2"
+     }
+    }
+   ]
   }
  },
  "queries": [
@@ -4034,6 +4056,117 @@
     "asOf": null
    },
    "returned": 1
+  },
+  {
+   "at": "2026-11-17T13:54:12.241Z",
+   "by": "blind-read",
+   "query": "get",
+   "args": {
+    "id": "change-97",
+    "asOf": null
+   },
+   "returned": 1
+  },
+  {
+   "at": "2026-11-17T13:54:12.276Z",
+   "by": "blind-read",
+   "query": "get",
+   "args": {
+    "id": "finding-99",
+    "asOf": null
+   },
+   "returned": 1
+  },
+  {
+   "at": "2026-11-17T13:54:12.307Z",
+   "by": "blind-read",
+   "query": "get",
+   "args": {
+    "id": "finding-105",
+    "asOf": null
+   },
+   "returned": 1
+  },
+  {
+   "at": "2026-11-17T13:54:17.572Z",
+   "by": "blind-read",
+   "query": "find",
+   "args": {
+    "text": "fmtWhen"
+   },
+   "returned": 0
+  },
+  {
+   "at": "2026-11-17T13:54:17.616Z",
+   "by": "blind-read",
+   "query": "find",
+   "args": {
+    "text": "nothing here reads"
+   },
+   "returned": 0
+  },
+  {
+   "at": "2026-11-17T13:54:17.657Z",
+   "by": "blind-read",
+   "query": "find",
+   "args": {
+    "text": "summary-and-time"
+   },
+   "returned": 7
+  },
+  {
+   "at": "2026-11-17T13:54:17.711Z",
+   "by": "blind-read",
+   "query": "find",
+   "args": {
+    "text": "once"
+   },
+   "returned": 5
+  },
+  {
+   "at": "2026-11-17T13:54:17.759Z",
+   "by": "blind-read",
+   "query": "find",
+   "args": {
+    "text": "time.js"
+   },
+   "returned": 0
+  },
+  {
+   "at": "2026-11-17T13:54:17.807Z",
+   "by": "blind-read",
+   "query": "find",
+   "args": {
+    "kind": "area"
+   },
+   "returned": 2
+  },
+  {
+   "at": "2026-11-17T13:54:22.287Z",
+   "by": "blind-read",
+   "query": "find",
+   "args": {
+    "kind": "area"
+   },
+   "returned": 2
+  },
+  {
+   "at": "2026-11-17T13:54:22.323Z",
+   "by": "blind-read",
+   "query": "find",
+   "args": {
+    "path": "lib/task-page-loader.js"
+   },
+   "returned": 3
+  },
+  {
+   "at": "2026-11-17T13:54:22.360Z",
+   "by": "blind-read",
+   "query": "find",
+   "args": {
+    "kind": "verdict"
+   },
+   "returned": 3
   }
  ],
  "hits": []

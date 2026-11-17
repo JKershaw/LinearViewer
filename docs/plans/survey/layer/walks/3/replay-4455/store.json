@@ -1,6 +1,6 @@
 {
  "retro": false,
- "next": 107,
+ "next": 108,
  "records": {
   "area-1": {
    "id": "area-1",
@@ -2796,6 +2796,35 @@
       "account": "Posted ### Leftovers on LIN-4455 (16:02:31). Retires: dispatch-leftover.js restating the follow-up target, halt modes and NEVER_RAN. Waiting 2, 4, 11 settled and removed from the area note by PR #2427 (finding-19/21/28 were already ended done by an earlier stage; not re-ended). Left on purpose and written into area notes on the PR branch: mayCarryWake true on every row vs lastWakeEntry skipping stamps, a new Waiting entry in runs-and-dispatch (finding-99 carries it); the two held-wake release channels, already Waiting 5 (finding-22, finding-76, finding-100), named in the setter docblock; runner-kickoff importing FEEDBACK_ENTRY_KINDS via the store re-export, a Waiting entry in llm-and-prompts (finding-101; no layer id for that area); browser stamp-kind copies stay, pinned by the drift test (finding-89). Brought the layer lessons up to the PR (finding-88): revised lesson-10, added the feedback-kinds/constants-owners lesson. Told close-out the Leftovers comment landed (finding-93)."
      },
      "links": {}
+    },
+    {
+     "v": 2,
+     "op": "revise",
+     "at": "2026-11-13T16:02:07.000Z",
+     "by": "leftover",
+     "in": "task-60",
+     "state": "open",
+     "fields": {
+      "stage": "leftover",
+      "account": "Posted ### Leftovers on LIN-4455 (16:02:31). Retires: dispatch-leftover.js restating the follow-up target, halt modes and NEVER_RAN. Waiting 2, 4, 11 settled and removed from the area note by PR #2427 (finding-19/21/28 were already ended done by an earlier stage; not re-ended). Left on purpose, in area notes on the PR branch: mayCarryWake true on every row vs lastWakeEntry skipping stamps, a new Waiting entry in runs-and-dispatch (finding-99 carries it; my revise to say so was refused); the two held-wake release channels, already Waiting 5 (finding-22, finding-76, finding-100), named in the setter docblock; runner-kickoff importing FEEDBACK_ENTRY_KINDS via the store re-export, a Waiting entry in llm-and-prompts (finding-101; that area has no layer id, so it stays to area-1); browser stamp-kind copies stay, pinned by the drift test (finding-89). Lessons brought up to the PR (finding-88, ended): lesson-104 added; lesson-105 replaces lesson-10, which I may not end, so finding-106 asks area-1 to end it. finding-107 tells close-out the Leftovers comment landed (finding-93) and the head moved."
+     },
+     "links": {},
+     "reason": "account final: record ids and refusals"
+    },
+    {
+     "v": 3,
+     "op": "end",
+     "at": "2026-11-13T16:02:08.000Z",
+     "by": "leftover",
+     "in": "task-60",
+     "state": "done",
+     "fields": {
+      "stage": "leftover",
+      "account": "Posted ### Leftovers on LIN-4455 (16:02:31). Retires: dispatch-leftover.js restating the follow-up target, halt modes and NEVER_RAN. Waiting 2, 4, 11 settled and removed from the area note by PR #2427 (finding-19/21/28 were already ended done by an earlier stage; not re-ended). Left on purpose, in area notes on the PR branch: mayCarryWake true on every row vs lastWakeEntry skipping stamps, a new Waiting entry in runs-and-dispatch (finding-99 carries it; my revise to say so was refused); the two held-wake release channels, already Waiting 5 (finding-22, finding-76, finding-100), named in the setter docblock; runner-kickoff importing FEEDBACK_ENTRY_KINDS via the store re-export, a Waiting entry in llm-and-prompts (finding-101; that area has no layer id, so it stays to area-1); browser stamp-kind copies stay, pinned by the drift test (finding-89). Lessons brought up to the PR (finding-88, ended): lesson-104 added; lesson-105 replaces lesson-10, which I may not end, so finding-106 asks area-1 to end it. finding-107 tells close-out the Leftovers comment landed (finding-93) and the head moved."
+     },
+     "links": {},
+     "reason": "Leftovers posted; lessons written; leftovers placed or noted.",
+     "stateReason": "Leftovers posted; lessons written; leftovers placed or noted."
     }
    ]
   },
@@ -2870,6 +2899,28 @@
      "links": {
       "on": "lesson-105@1",
       "about": "lesson-10"
+     }
+    }
+   ]
+  },
+  "finding-107": {
+   "id": "finding-107",
+   "kind": "finding",
+   "versions": [
+    {
+     "v": 1,
+     "op": "add",
+     "at": "2026-11-13T16:02:06.000Z",
+     "by": "leftover",
+     "in": "task-60",
+     "to": "close-out",
+     "state": "open",
+     "fields": {
+      "says": "For finding-93: the ### Leftovers comment is on LIN-4455 (16:02:31). Its Retires: line names Waiting 2 (`lib/dispatch-leftover.js` restating the follow-up target, halt modes and `NEVER_RAN`); the next line names Waiting 2, 4 and 11 as settled and removed from `docs/areas/runs-and-dispatch.md` by PR #2427. It also says two new Waiting entries went into area notes on the PR branch after review and blind read: `mayCarryWake` vs `lastWakeEntry` (runs-and-dispatch, finding-99) and runner-kickoff's import via the store re-export (llm-and-prompts, finding-101). That moves the head past c95b9f139 (docs only), so finding-92's ci-success check is on the head that includes them."
+     },
+     "links": {
+      "on": "change-82@2",
+      "about": "finding-93"
      }
     }
    ]
@@ -3785,6 +3836,16 @@
    "query": "get",
    "args": {
     "id": "finding-99",
+    "asOf": null
+   },
+   "returned": 1
+  },
+  {
+   "at": "2026-11-17T13:54:42.236Z",
+   "by": "Harbour",
+   "query": "show",
+   "args": {
+    "task": "task-60",
     "asOf": null
    },
    "returned": 1

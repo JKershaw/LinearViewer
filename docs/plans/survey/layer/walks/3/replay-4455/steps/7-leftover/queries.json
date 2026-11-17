@@ -1,0 +1,299 @@
+[
+ {
+  "at": "2026-11-17T13:52:36.657Z",
+  "by": "leftover",
+  "query": "get",
+  "args": {
+   "id": "lesson-10",
+   "asOf": null
+  },
+  "returned": 1
+ },
+ {
+  "at": "2026-11-17T13:52:36.688Z",
+  "by": "leftover",
+  "query": "get",
+  "args": {
+   "id": "finding-88",
+   "asOf": null
+  },
+  "returned": 1
+ },
+ {
+  "at": "2026-11-17T13:52:36.720Z",
+  "by": "leftover",
+  "query": "find",
+  "args": {
+   "area": "area-1",
+   "state": "open"
+  },
+  "returned": 23
+ },
+ {
+  "at": "2026-11-17T13:52:43.324Z",
+  "by": "leftover",
+  "query": "get",
+  "args": {
+   "id": "finding-19",
+   "asOf": null
+  },
+  "returned": 1
+ },
+ {
+  "at": "2026-11-17T13:52:43.379Z",
+  "by": "leftover",
+  "query": "get",
+  "args": {
+   "id": "finding-21",
+   "asOf": null
+  },
+  "returned": 1
+ },
+ {
+  "at": "2026-11-17T13:52:43.421Z",
+  "by": "leftover",
+  "query": "get",
+  "args": {
+   "id": "finding-28",
+   "asOf": null
+  },
+  "returned": 1
+ },
+ {
+  "at": "2026-11-17T13:52:43.465Z",
+  "by": "leftover",
+  "query": "get",
+  "args": {
+   "id": "finding-76",
+   "asOf": null
+  },
+  "returned": 1
+ },
+ {
+  "at": "2026-11-17T13:52:43.508Z",
+  "by": "leftover",
+  "query": "get",
+  "args": {
+   "id": "finding-66",
+   "asOf": null
+  },
+  "returned": 1
+ },
+ {
+  "at": "2026-11-17T13:52:43.551Z",
+  "by": "leftover",
+  "query": "get",
+  "args": {
+   "id": "finding-68",
+   "asOf": null
+  },
+  "returned": 1
+ },
+ {
+  "at": "2026-11-17T13:52:43.595Z",
+  "by": "leftover",
+  "query": "get",
+  "args": {
+   "id": "finding-71",
+   "asOf": null
+  },
+  "returned": 1
+ },
+ {
+  "at": "2026-11-17T13:52:43.633Z",
+  "by": "leftover",
+  "query": "get",
+  "args": {
+   "id": "finding-74",
+   "asOf": null
+  },
+  "returned": 1
+ },
+ {
+  "at": "2026-11-17T13:52:43.671Z",
+  "by": "leftover",
+  "query": "get",
+  "args": {
+   "id": "question-67",
+   "asOf": null
+  },
+  "returned": 1
+ },
+ {
+  "at": "2026-11-17T13:52:43.708Z",
+  "by": "leftover",
+  "query": "find",
+  "args": {
+   "text": "mayCarryWake"
+  },
+  "returned": 6
+ },
+ {
+  "at": "2026-11-17T13:52:43.744Z",
+  "by": "leftover",
+  "query": "find",
+  "args": {
+   "text": "runner-kickoff"
+  },
+  "returned": 4
+ },
+ {
+  "at": "2026-11-17T13:52:43.783Z",
+  "by": "leftover",
+  "query": "find",
+  "args": {
+   "kind": "area"
+  },
+  "returned": 1
+ },
+ {
+  "at": "2026-11-17T13:52:49.462Z",
+  "by": "leftover",
+  "query": "get",
+  "args": {
+   "id": "finding-76",
+   "asOf": null
+  },
+  "returned": 1
+ },
+ {
+  "at": "2026-11-17T13:52:49.501Z",
+  "by": "leftover",
+  "query": "get",
+  "args": {
+   "id": "finding-89",
+   "asOf": null
+  },
+  "returned": 1
+ },
+ {
+  "at": "2026-11-17T13:52:49.539Z",
+  "by": "leftover",
+  "query": "get",
+  "args": {
+   "id": "finding-91",
+   "asOf": null
+  },
+  "returned": 1
+ },
+ {
+  "at": "2026-11-17T13:52:49.576Z",
+  "by": "leftover",
+  "query": "get",
+  "args": {
+   "id": "finding-92",
+   "asOf": null
+  },
+  "returned": 1
+ },
+ {
+  "at": "2026-11-17T13:52:49.619Z",
+  "by": "leftover",
+  "query": "get",
+  "args": {
+   "id": "finding-93",
+   "asOf": null
+  },
+  "returned": 1
+ },
+ {
+  "at": "2026-11-17T13:52:49.657Z",
+  "by": "leftover",
+  "query": "get",
+  "args": {
+   "id": "finding-97",
+   "asOf": null
+  },
+  "returned": 1
+ },
+ {
+  "at": "2026-11-17T13:52:49.698Z",
+  "by": "leftover",
+  "query": "get",
+  "args": {
+   "id": "finding-98",
+   "asOf": null
+  },
+  "returned": 1
+ },
+ {
+  "at": "2026-11-17T13:52:49.735Z",
+  "by": "leftover",
+  "query": "get",
+  "args": {
+   "id": "finding-99",
+   "asOf": null
+  },
+  "returned": 1
+ },
+ {
+  "at": "2026-11-17T13:52:49.773Z",
+  "by": "leftover",
+  "query": "get",
+  "args": {
+   "id": "finding-100",
+   "asOf": null
+  },
+  "returned": 1
+ },
+ {
+  "at": "2026-11-17T13:52:49.815Z",
+  "by": "leftover",
+  "query": "get",
+  "args": {
+   "id": "finding-101",
+   "asOf": null
+  },
+  "returned": 1
+ },
+ {
+  "at": "2026-11-17T13:52:49.851Z",
+  "by": "leftover",
+  "query": "get",
+  "args": {
+   "id": "run-102",
+   "asOf": null
+  },
+  "returned": 1
+ },
+ {
+  "at": "2026-11-17T13:52:49.888Z",
+  "by": "leftover",
+  "query": "get",
+  "args": {
+   "id": "check-94",
+   "asOf": null
+  },
+  "returned": 1
+ },
+ {
+  "at": "2026-11-17T13:52:49.940Z",
+  "by": "leftover",
+  "query": "get",
+  "args": {
+   "id": "lesson-11",
+   "asOf": null
+  },
+  "returned": 1
+ },
+ {
+  "at": "2026-11-17T13:52:49.979Z",
+  "by": "leftover",
+  "query": "get",
+  "args": {
+   "id": "lesson-12",
+   "asOf": null
+  },
+  "returned": 1
+ },
+ {
+  "at": "2026-11-17T13:54:04.038Z",
+  "by": "leftover",
+  "query": "get",
+  "args": {
+   "id": "finding-99",
+   "asOf": null
+  },
+  "returned": 1
+ }
+]
