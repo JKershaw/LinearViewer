@@ -2527,6 +2527,54 @@
     "asOf": null
    },
    "returned": 1
+  },
+  {
+   "at": "2026-11-17T13:44:56.354Z",
+   "by": "scoping",
+   "query": "get",
+   "args": {
+    "id": "finding-83",
+    "asOf": null
+   },
+   "returned": 1
+  },
+  {
+   "at": "2026-11-17T13:44:56.388Z",
+   "by": "scoping",
+   "query": "get",
+   "args": {
+    "id": "question-84",
+    "asOf": null
+   },
+   "returned": 1
+  },
+  {
+   "at": "2026-11-17T13:44:56.428Z",
+   "by": "scoping",
+   "query": "find",
+   "args": {
+    "to": "scoping"
+   },
+   "returned": 0
+  },
+  {
+   "at": "2026-11-17T13:44:56.467Z",
+   "by": "scoping",
+   "query": "find",
+   "args": {
+    "text": "leaf"
+   },
+   "returned": 15
+  },
+  {
+   "at": "2026-11-17T13:44:56.507Z",
+   "by": "scoping",
+   "query": "find",
+   "args": {
+    "kind": "decision",
+    "text": "size"
+   },
+   "returned": 4
   }
  ],
  "hits": []
