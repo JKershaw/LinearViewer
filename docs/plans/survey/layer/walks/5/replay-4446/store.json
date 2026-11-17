@@ -1,5 +1,5 @@
 {
- "next": 71,
+ "next": 72,
  "records": {
   "area-1": [
    {
@@ -650,6 +650,32 @@
     "at": "2026-11-13T15:15:05.000Z",
     "by": "close-out",
     "reason": "merged and deployed (change-53 merged); close-out could not run the read and hands it to John directly"
+   },
+   {
+    "id": "check-17",
+    "kind": "check",
+    "state": "done",
+    "fields": {
+     "what": "Read the first slice's result (the rule's reading in the notes, and the cost-format slice with what it retired) before the next slice starts.",
+     "why-person": "The done-when requires John's read, and the size of this work and what may be retired are his calls.",
+     "how": "Read the close-out comment on LIN-4446 (15:31) and PR #2423 body, then record your read as a comment on LIN-4446. No next slice is dispatched until that comment exists. Not run and not recorded at close-out: a human-only read after deploy does not hold the close, so the ticket closed with this left open."
+    },
+    "links": {
+     "about": [
+      "change-53",
+      "verdict-60"
+     ]
+    },
+    "in": "task-9",
+    "to": "John",
+    "v": 5,
+    "op": "end",
+    "at": "2026-11-13T15:39:25.000Z",
+    "by": "John",
+    "ended": {
+     "reason": "John read slice 1 and recorded it as a comment on LIN-4446 at 15:39:21: KPI page looks fine, /shared/ is right; direction for the next slices in decision-71"
+    },
+    "via": "driving-session"
    }
   ],
   "run-18": [
@@ -3439,6 +3465,31 @@
     "op": "add",
     "at": "2026-11-13T15:12:11.000Z",
     "by": "blind-read"
+   },
+   {
+    "id": "finding-66",
+    "kind": "finding",
+    "state": "handed-on",
+    "fields": {
+     "says": "public/cost-format-global.js: the module-to-global bridge is specific to one module. The guard in tests/unit/shared-modules.test.js hard-codes the SHIM constant, the window.CostFormat string and the list of four consumers. The DOMContentLoaded-only rule is restated in public/flight-companion.js, public/observation.js, public/prompt-section.js and public/workspace-kpis.js and witnessed per consumer, but no check covers a new consumer: a fifth trips only the hard-coded list, with no hint about the timing rule, and a second shared module would need a second shim and a second guard. Larger than a fix: needs a design decision on how classic pages take shared modules (one shim per module, a general shim, or consumers becoming modules). (Blind read of PR #2423 @ 1de016f52.)"
+    },
+    "links": {
+     "about": [
+      "change-53",
+      "lesson-54"
+     ]
+    },
+    "in": "area-1",
+    "to": "area-1",
+    "v": 2,
+    "op": "end",
+    "at": "2026-11-13T15:39:24.000Z",
+    "by": "John",
+    "ended": {
+     "reason": "John chose consumers becoming modules, with any bridge a temporary ramp that shrinks; decision-71 carries the direction and rests on this finding",
+     "into": "decision-71"
+    },
+    "via": "driving-session"
    }
   ],
   "finding-67": [
@@ -3564,6 +3615,35 @@
     "op": "add",
     "at": "2026-11-13T15:15:08.000Z",
     "by": "close-out"
+   }
+  ],
+  "decision-71": [
+   {
+    "id": "decision-71",
+    "kind": "decision",
+    "state": "stands",
+    "fields": {
+     "answer": "Direction for the next front-end slices: pages become ES modules that import shared code directly, one view at a time. A module-to-global bridge (like public/cost-format-global.js) is only a temporary ramp that visibly shrinks, never the pattern for the next shared module. Serving pure shared files at /shared/ stays. The next slices run that way, as a tidy task.",
+     "why": "John ruled it after reading slice 1 (LIN-4446 comment, 15:39:21, relayed by the driving agent with his approval): the KPI page looks fine and /shared/ is right, but \"the per-module bridge back to a global should not become the pattern\". Answers the design choice finding-66 left open (one shim per module, a general shim, or consumers becoming modules): consumers becoming modules."
+    },
+    "links": {
+     "on": [
+      "change-53@4",
+      "finding-66@1",
+      "lesson-54@4"
+     ],
+     "about": [
+      "task-9",
+      "finding-12",
+      "finding-21"
+     ]
+    },
+    "in": "area-1",
+    "v": 1,
+    "op": "add",
+    "at": "2026-11-13T15:39:23.000Z",
+    "by": "John",
+    "via": "driving-session"
    }
   ]
  },
@@ -5249,6 +5329,58 @@
     "find",
     "--text",
     "shim",
+    "--state",
+    "open",
+    "--by",
+    "John"
+   ],
+   "asOf": null
+  },
+  {
+   "at": "2026-11-17T15:43:24.010Z",
+   "by": "John",
+   "cmd": "get",
+   "args": [
+    "get",
+    "lesson-54",
+    "--by",
+    "John"
+   ],
+   "asOf": null
+  },
+  {
+   "at": "2026-11-17T15:43:24.051Z",
+   "by": "John",
+   "cmd": "find",
+   "args": [
+    "find",
+    "--in",
+    "area-1",
+    "--by",
+    "John"
+   ],
+   "asOf": null
+  },
+  {
+   "at": "2026-11-17T15:43:24.092Z",
+   "by": "John",
+   "cmd": "get",
+   "args": [
+    "get",
+    "verdict-60",
+    "--by",
+    "John"
+   ],
+   "asOf": null
+  },
+  {
+   "at": "2026-11-17T15:43:52.528Z",
+   "by": "John",
+   "cmd": "find",
+   "args": [
+    "find",
+    "--to",
+    "John",
     "--state",
     "open",
     "--by",

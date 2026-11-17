@@ -1,5 +1,5 @@
 {
- "next": 175,
+ "next": 177,
  "records": {
   "area-1": [
    {
@@ -5296,6 +5296,100 @@
     "at": "2026-11-13T17:05:16.000Z",
     "by": "close-out"
    }
+  ],
+  "check-175": [
+   {
+    "id": "check-175",
+    "kind": "check",
+    "state": "open",
+    "fields": {
+     "what": "PR #2432 merged (c174185f6) at head 2d02bb4a2, but review approved 7424cfb8f: the post-approval fix commit 2d02bb4a2 (close-out fixing the blind read's finding-164 and finding-165: 6 changed lines in lib/recent-runs.js plus a test header comment, and the Retires bullet of finding-161) was not re-reviewed. CI run 43469455968 is green on exactly 2d02bb4a2. Close-out says so; nothing in the pipeline will review it now that LIN-4459 is Done.",
+     "why-person": "The task is Done and no stage runs on it again, so only John can decide whether a merged, unreviewed tail needs a post-merge read or is accepted as is.",
+     "how": "Read the diff 7424cfb8f..2d02bb4a2 on PR #2432 and either accept it or ask for a post-merge review of those lines."
+    },
+    "links": {
+     "about": [
+      "change-143",
+      "finding-164",
+      "finding-165"
+     ],
+     "on": [
+      "verdict-162@1",
+      "change-143@4"
+     ]
+    },
+    "in": "task-113",
+    "to": "John",
+    "v": 1,
+    "op": "add",
+    "at": "2026-11-13T17:30:21.000Z",
+    "by": "autopilot"
+   }
+  ],
+  "run-176": [
+   {
+    "id": "run-176",
+    "kind": "run",
+    "state": "open",
+    "fields": {
+     "stage": "autopilot",
+     "account": "Autopilot wake after close-out (session 140b8bff). Verified the step trail by reading each artifact: survey-task, survey-place, scoping, implementation (PR #2432), review (approve-with-notes), blind-read (better), close-out (merged c174185f6, LIN-4459 Done). Evidence: PR #2432 merged 17:12:49Z, CI green on the merge commit on main and on the PR head 2d02bb4a2; notes PR #2434 holds the two larger blind-read finds as Waiting entries, Lessons 5,400 B. I did not merge or close by hand. Deviation: I sent implementation as one recommend-and-dispatch step rather than warm beats, because the stage was already live when I looked. Posted the piece-4 summary on LIN-4447 (15a858eb: merged, LIN-4448 fallback used per decision-171, departure in decision-145, no rebase needed per check-157, larger finds in finding-166/167) and the run summary on LIN-4459 (db487b6a). Left open: the unreviewed fix commit 2d02bb4a2 (check-175, to John) and LIN-4448's silence (finding-170 stays open to task-83). LIN-4459 description unchanged."
+    },
+    "links": {
+     "on": [
+      "change-143@4",
+      "change-172@2",
+      "verdict-162@1",
+      "verdict-168@1",
+      "decision-171@1",
+      "check-157@2"
+     ],
+     "about": [
+      "check-175",
+      "finding-170",
+      "finding-166",
+      "finding-167"
+     ]
+    },
+    "in": "task-113",
+    "v": 1,
+    "op": "add",
+    "at": "2026-11-13T17:30:22.000Z",
+    "by": "autopilot"
+   },
+   {
+    "id": "run-176",
+    "kind": "run",
+    "state": "done",
+    "fields": {
+     "stage": "autopilot",
+     "account": "Autopilot wake after close-out (session 140b8bff). Verified the step trail by reading each artifact: survey-task, survey-place, scoping, implementation (PR #2432), review (approve-with-notes), blind-read (better), close-out (merged c174185f6, LIN-4459 Done). Evidence: PR #2432 merged 17:12:49Z, CI green on the merge commit on main and on the PR head 2d02bb4a2; notes PR #2434 holds the two larger blind-read finds as Waiting entries, Lessons 5,400 B. I did not merge or close by hand. Deviation: I sent implementation as one recommend-and-dispatch step rather than warm beats, because the stage was already live when I looked. Posted the piece-4 summary on LIN-4447 (15a858eb: merged, LIN-4448 fallback used per decision-171, departure in decision-145, no rebase needed per check-157, larger finds in finding-166/167) and the run summary on LIN-4459 (db487b6a). Left open: the unreviewed fix commit 2d02bb4a2 (check-175, to John) and LIN-4448's silence (finding-170 stays open to task-83). LIN-4459 description unchanged."
+    },
+    "links": {
+     "on": [
+      "change-143@4",
+      "change-172@2",
+      "verdict-162@1",
+      "verdict-168@1",
+      "decision-171@1",
+      "check-157@2"
+     ],
+     "about": [
+      "check-175",
+      "finding-170",
+      "finding-166",
+      "finding-167"
+     ]
+    },
+    "in": "task-113",
+    "v": 2,
+    "op": "end",
+    "at": "2026-11-13T17:30:23.000Z",
+    "by": "autopilot",
+    "ended": {
+     "reason": "run summary written; nothing left to step on LIN-4459"
+    }
+   }
   ]
  },
  "log": [
@@ -6779,6 +6873,122 @@
     "find",
     "--text",
     "re-review",
+    "--state",
+    "open",
+    "--by",
+    "autopilot"
+   ],
+   "asOf": null
+  },
+  {
+   "at": "2026-11-17T15:43:18.308Z",
+   "by": "autopilot",
+   "cmd": "get",
+   "args": [
+    "get",
+    "finding-64",
+    "--by",
+    "autopilot"
+   ],
+   "asOf": null
+  },
+  {
+   "at": "2026-11-17T15:43:18.356Z",
+   "by": "autopilot",
+   "cmd": "get",
+   "args": [
+    "get",
+    "finding-28",
+    "--by",
+    "autopilot"
+   ],
+   "asOf": null
+  },
+  {
+   "at": "2026-11-17T15:43:18.402Z",
+   "by": "autopilot",
+   "cmd": "get",
+   "args": [
+    "get",
+    "finding-81",
+    "--by",
+    "autopilot"
+   ],
+   "asOf": null
+  },
+  {
+   "at": "2026-11-17T15:43:18.444Z",
+   "by": "autopilot",
+   "cmd": "find",
+   "args": [
+    "find",
+    "--text",
+    "LIN-4459",
+    "--by",
+    "autopilot"
+   ],
+   "asOf": null
+  },
+  {
+   "at": "2026-11-17T15:43:18.487Z",
+   "by": "autopilot",
+   "cmd": "find",
+   "args": [
+    "find",
+    "--text",
+    "piece 4",
+    "--state",
+    "open",
+    "--by",
+    "autopilot"
+   ],
+   "asOf": null
+  },
+  {
+   "at": "2026-11-17T15:43:25.303Z",
+   "by": "autopilot",
+   "cmd": "get",
+   "args": [
+    "get",
+    "finding-139",
+    "--by",
+    "autopilot"
+   ],
+   "asOf": null
+  },
+  {
+   "at": "2026-11-17T15:43:25.343Z",
+   "by": "autopilot",
+   "cmd": "get",
+   "args": [
+    "get",
+    "finding-146",
+    "--by",
+    "autopilot"
+   ],
+   "asOf": null
+  },
+  {
+   "at": "2026-11-17T15:43:25.390Z",
+   "by": "autopilot",
+   "cmd": "find",
+   "args": [
+    "find",
+    "--text",
+    "recommendation-live-wait",
+    "--by",
+    "autopilot"
+   ],
+   "asOf": null
+  },
+  {
+   "at": "2026-11-17T15:43:25.431Z",
+   "by": "autopilot",
+   "cmd": "find",
+   "args": [
+    "find",
+    "--in",
+    "task-82",
     "--state",
     "open",
     "--by",

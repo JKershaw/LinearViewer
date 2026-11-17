@@ -1,5 +1,5 @@
 {
- "next": 171,
+ "next": 181,
  "records": {
   "area-1": [
    {
@@ -4507,6 +4507,237 @@
      "reason": "Withdrawal recorded; nothing else to step"
     }
    }
+  ],
+  "run-171": [
+   {
+    "id": "run-171",
+    "kind": "run",
+    "state": "open",
+    "fields": {
+     "stage": "blind-read",
+     "account": "Blind read of LLM & prompts after PR #2444 (a9b216d88 vs b8e2a0aad) and PR #2447 (877f32cb4 vs b937237a4). Verdict better: about eight parallel per-kind tables became one record per kind in lib/prompts/stage-kinds.js, VIRTUAL_PROMPTS went, review-bound reasons moved beside the bound, and three hand-typed clauses became NOTES_PR, areaLookup and committedSearch. Worse: a sha256 witness every wording change regenerates, a fold one caller undoes with .slice(0, -1), and a retired-phrase test that lets one copy stay. Six fix-sized and two larger findings; nothing outside the area. Posted as comment d96c0849 on LIN-4469."
+    },
+    "links": {},
+    "in": "task-131",
+    "v": 1,
+    "op": "add",
+    "at": "2026-11-13T23:22:26.000Z",
+    "by": "blind-read"
+   },
+   {
+    "id": "run-171",
+    "kind": "run",
+    "state": "done",
+    "fields": {
+     "stage": "blind-read",
+     "account": "Blind read of LLM & prompts after PR #2444 (a9b216d88 vs b8e2a0aad) and PR #2447 (877f32cb4 vs b937237a4). Verdict better: about eight parallel per-kind tables became one record per kind in lib/prompts/stage-kinds.js, VIRTUAL_PROMPTS went, review-bound reasons moved beside the bound, and three hand-typed clauses became NOTES_PR, areaLookup and committedSearch. Worse: a sha256 witness every wording change regenerates, a fold one caller undoes with .slice(0, -1), and a retired-phrase test that lets one copy stay. Six fix-sized and two larger findings; nothing outside the area. Posted as comment d96c0849 on LIN-4469."
+    },
+    "links": {},
+    "in": "task-131",
+    "v": 2,
+    "op": "end",
+    "at": "2026-11-13T23:22:36.000Z",
+    "by": "blind-read",
+    "ended": {
+     "reason": "Blind read posted (LIN-4469 comment d96c0849); verdict-172 and findings 173-180 written"
+    }
+   }
+  ],
+  "verdict-172": [
+   {
+    "id": "verdict-172",
+    "kind": "verdict",
+    "state": "stands",
+    "fields": {
+     "of": "blind-read",
+     "outcome": "better",
+     "reasoning": "Blind read (LIN-4469 comment d96c0849) of PR #2444 at a9b216d88 against b8e2a0aad and PR #2447 at 877f32cb4 against b937237a4. Better: #2444 replaces about eight parallel per-kind tables (template traits, STAGE_LEADS, COMPLETION_SIGNALS, STAGE_INTENT, GROUNDING_BY_KIND, STAGE_LABELS, the contract lines, the llms.txt catalogue, the override verb list) with one record per kind in lib/prompts/stage-kinds.js, deletes VIRTUAL_PROMPTS (lib/workflow-config.js) and moves the review-bound reasons next to the bound (lib/recommendation-facts.js); #2447 replaces hand-typed copies of three clauses with NOTES_PR, areaLookup and committedSearch. Worse: a sha256 render/table witness every later wording change must regenerate (tests/fixtures/lin-4467-witness.json), a fold one caller undoes with .slice(0, -1) (lib/periodicals.js), and a retired-phrase test that still lets a phrase stay in one prompt (tests/unit/lin-4469-prompt-folds.test.js). Outside the area: none."
+    },
+    "links": {
+     "on": [
+      "change-142@3"
+     ],
+     "about": [
+      "area-1",
+      "task-108"
+     ]
+    },
+    "in": "task-131",
+    "v": 1,
+    "op": "add",
+    "at": "2026-11-13T23:22:27.000Z",
+    "by": "blind-read"
+   }
+  ],
+  "finding-173": [
+   {
+    "id": "finding-173",
+    "kind": "finding",
+    "state": "open",
+    "fields": {
+     "says": "`tests/unit/lin-4469-prompt-folds.test.js`: the describe says the folded spellings \"appear in no rendered prompt\", but each test asserts `where.length <= 1`, so a retired phrase left in one template or Periodical still passes. None renders anywhere at 877f32cb4. Fix: assert `where.length === 0` and drop \"at most one\" from the test name. (LIN-4469 blind read.)"
+    },
+    "links": {
+     "about": [
+      "change-142",
+      "area-1"
+     ]
+    },
+    "in": "task-131",
+    "to": "close-out",
+    "v": 1,
+    "op": "add",
+    "at": "2026-11-13T23:22:28.000Z",
+    "by": "blind-read"
+   }
+  ],
+  "finding-174": [
+   {
+    "id": "finding-174",
+    "kind": "finding",
+    "state": "open",
+    "fields": {
+     "says": "`lib/periodicals.js`: `committedSearch` closes its own parenthesis, and Stability's bullet strips it again with `capitalised(committedSearch(...)).slice(0, -1)` to add its own \"; look beside ...)\". One caller undoes the helper's output shape, so changing the helper's wording silently breaks Stability. Fix: give `committedSearch` an optional tail for the parenthetical (e.g. `(what, more = '')` -> `(no path is written here${more})`) and drop the slice. (LIN-4469 blind read.)"
+    },
+    "links": {
+     "about": [
+      "change-142",
+      "finding-40"
+     ]
+    },
+    "in": "task-131",
+    "to": "close-out",
+    "v": 1,
+    "op": "add",
+    "at": "2026-11-13T23:22:29.000Z",
+    "by": "blind-read"
+   }
+  ],
+  "finding-175": [
+   {
+    "id": "finding-175",
+    "kind": "finding",
+    "state": "open",
+    "fields": {
+     "says": "`tests/unit/lin-4313-periodical-prompt-bytes.test.js`: its LIN-4469 header says both Seams & Tangles bullets are built by `committedSearch`, but the first `runReview` bullet (`lib/periodicals.js` ~l.991) hand-types \"searching the repo for them (no path is written here)\". finding-166 drops the parenthetical but does not route the bullet through the helper, so the header stays wrong after it. Fix with finding-166: correct the header comment (or route that bullet through the helper and re-pin its hash). (LIN-4469 blind read.)"
+    },
+    "links": {
+     "about": [
+      "change-142",
+      "finding-166"
+     ]
+    },
+    "in": "task-131",
+    "to": "close-out",
+    "v": 1,
+    "op": "add",
+    "at": "2026-11-13T23:22:30.000Z",
+    "by": "blind-read"
+   }
+  ],
+  "finding-176": [
+   {
+    "id": "finding-176",
+    "kind": "finding",
+    "state": "open",
+    "fields": {
+     "says": "`docs/architecture/source-map.md` (unmapped; concerns `lib/prompts/leftover-words.js`): it still calls `leftover-words.js` \"A leaf that imports nothing\" and lists neither `areaLookup` nor `NOTES_PR`. At 877f32cb4 the file imports `area-registry-path.js` and exports both. Fix: update that one line, alongside finding-153's lesson-10 revision. (LIN-4469 blind read.)"
+    },
+    "links": {
+     "about": [
+      "change-142",
+      "finding-153",
+      "lesson-10"
+     ]
+    },
+    "in": "task-131",
+    "to": "close-out",
+    "v": 1,
+    "op": "add",
+    "at": "2026-11-13T23:22:31.000Z",
+    "by": "blind-read"
+   }
+  ],
+  "finding-177": [
+   {
+    "id": "finding-177",
+    "kind": "finding",
+    "state": "open",
+    "fields": {
+     "says": "`lib/prompts/stage-kinds.js`: five records declare `intent: null`, then a loop at the bottom of the module overwrites `record.intent` on the exported objects, so the literal you read is not what the record holds and the header has to explain it. Fix: derive the reading-pass line in the `STAGE_INTENT` view (`lib/prompts/stage-intent.js`), or write it on each record, so records are not mutated after they are declared. (LIN-4469 blind read; landed in #2444, LIN-4467.)"
+    },
+    "links": {
+     "about": [
+      "finding-25"
+     ]
+    },
+    "in": "area-1",
+    "to": "area-1",
+    "v": 1,
+    "op": "add",
+    "at": "2026-11-13T23:22:32.000Z",
+    "by": "blind-read"
+   }
+  ],
+  "finding-178": [
+   {
+    "id": "finding-178",
+    "kind": "finding",
+    "state": "open",
+    "fields": {
+     "says": "`lib/completion-signals.js`: now a view of the stage-kind record, but it keeps six exports no file under `lib/`, `routes/` or `server.js` calls (`hasSignals`, `getDefinedSignalTypes`, `getSignal`, `assessCompletion`, `getBlockers`, `formatSignalsForPrompt`). `hasSignals`'s null branch is unreachable, and the header still says \"simplified 3-label system\". Fix: delete the unused helpers (and tests of them only), leaving `COMPLETION_SIGNALS`. (LIN-4469 blind read.)"
+    },
+    "links": {},
+    "in": "area-65",
+    "to": "area-65",
+    "v": 1,
+    "op": "add",
+    "at": "2026-11-13T23:22:33.000Z",
+    "by": "blind-read"
+   }
+  ],
+  "finding-179": [
+   {
+    "id": "finding-179",
+    "kind": "finding",
+    "state": "open",
+    "fields": {
+     "says": "`tests/fixtures/lin-4467-witness.json` with `tests/unit/lin-4467-stage-kind-witness.test.js`: decision-163 keeps it as a ratchet for its real-context renders. Its per-table hashes (e.g. `COMPLETION_SIGNALS`) pin views that `lin-4467-stage-kind-record.test.js` already ties to the record by construction, a hash failure says something changed but never what, #2447 already churns 106 lines of it, and `lin-4469-prompt-folds.test.js` now imports its `MODES`. Decide whether to trim it to the renders only (keeping the ratchet decision-163 chose). A test-suite decision, larger than a fix. (LIN-4469 blind read.)"
+    },
+    "links": {
+     "about": [
+      "decision-163",
+      "lesson-164"
+     ]
+    },
+    "in": "area-1",
+    "to": "area-1",
+    "v": 1,
+    "op": "add",
+    "at": "2026-11-13T23:22:34.000Z",
+    "by": "blind-read"
+   }
+  ],
+  "finding-180": [
+   {
+    "id": "finding-180",
+    "kind": "finding",
+    "state": "open",
+    "fields": {
+     "says": "`lib/run-view.js`: `STEP_KIND_WORDS` copies six labels from `STAGE_LABELS` through a hand-typed kind list; every other kind falls back to `stepKindWord`'s capitalised form, so one kind gets two display words (`stageLabel('look-into')` is \"Look into\", `stepKindWord('look-into')` is \"Look-into\"), and a new kind must be added to that list by hand. Larger: choosing one display word per kind changes visible labels on the run page and settings (`lib/render-session.js`, `lib/render-settings.js`). (LIN-4469 blind read.)"
+    },
+    "links": {
+     "about": [
+      "finding-25"
+     ]
+    },
+    "in": "area-65",
+    "to": "area-65",
+    "v": 1,
+    "op": "add",
+    "at": "2026-11-13T23:22:35.000Z",
+    "by": "blind-read"
+   }
   ]
  },
  "log": [
@@ -6241,6 +6472,19 @@
     "open",
     "--by",
     "blind-read"
+   ],
+   "asOf": null
+  },
+  {
+   "at": "2026-11-17T15:44:18.704Z",
+   "by": "close-out",
+   "cmd": "show",
+   "args": [
+    "show",
+    "--task",
+    "task-131",
+    "--by",
+    "close-out"
    ],
    "asOf": null
   }

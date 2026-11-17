@@ -1,0 +1,42 @@
+task-131 task v1 [open] by breakdown
+decision-132 decision v1 [stands] by undefined
+decision-133 decision v1 [stands] by undefined
+decision-134 decision v1 [stands] by undefined
+decision-135 decision v1 [stands] by undefined
+decision-138 decision v1 [stands] by undefined
+decision-140 decision v1 [stands] by undefined
+run-141 run v2 [done] by undefined
+change-142 change v3 [open] by undefined
+finding-143 finding v5 [done] to implementation by undefined
+question-144 question v3 [answered] to John answered-by decision-157 by undefined
+finding-145 finding v2 [done] to review by undefined
+run-146 run v2 [done] by undefined
+finding-147 finding v1 [open] to area-1 by undefined
+check-148 check v1 [open] to review by undefined
+finding-149 finding v3 [done] to close-out by undefined
+finding-150 finding v2 [done] to close-out by undefined
+finding-151 finding v2 [done] to close-out by undefined
+finding-152 finding v2 [done] to close-out by undefined
+finding-153 finding v2 [open] to close-out by undefined
+finding-154 finding v2 [done] to leftover by undefined
+check-155 check v2 [open] to John by undefined
+run-156 run v2 [done] by undefined
+decision-157 decision v1 [stands] by undefined
+run-158 run v3 [done] by undefined
+question-159 question v3 [withdrawn] to John by undefined
+decision-160 decision v1 [stands] by undefined
+run-161 run v2 [done] by undefined
+run-162 run v5 [done] by undefined
+decision-163 decision v1 [stands] by undefined
+run-165 run v2 [done] by undefined
+finding-166 finding v1 [open] to close-out by undefined
+finding-167 finding v1 [open] to close-out by undefined
+check-168 check v1 [open] to close-out by undefined
+verdict-169 verdict v1 [stands] STALE(on change-142@2, now @3) by undefined
+run-170 run v2 [done] by undefined
+run-171 run v2 [done] by undefined
+verdict-172 verdict v1 [stands] by undefined
+finding-173 finding v1 [open] to close-out by undefined
+finding-174 finding v1 [open] to close-out by undefined
+finding-175 finding v1 [open] to close-out by undefined
+finding-176 finding v1 [open] to close-out by undefined
