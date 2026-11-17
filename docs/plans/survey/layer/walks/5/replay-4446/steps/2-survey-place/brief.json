@@ -1,0 +1,91 @@
+{
+ "actor": "survey-place",
+ "asOf": "2026-11-13T13:15:07.717Z",
+ "task": {
+  "id": "task-9",
+  "ref": "LIN-4446",
+  "done-when": "the reading of the rule is in the project's notes; the first slice has landed, sharing rather than restating, lighter than before and naming what it retired; and John has read the first slice's result before the next starts.",
+  "paths": [
+   "public/",
+   "CLAUDE.md",
+   "docs/areas/front-end-browser.md"
+  ]
+ },
+ "asked": [
+  {
+   "id": "task-9",
+   "asked": "**Repository:** JKershaw/LinearViewer (Harbour).\n\n**What this is for.** John: \"Side rail and other UI improvements are important purely because the current ones are just mostly the original ones and are due a bit of a sprinkling. But! The front end code is messy.\" And his gut: \"the UI issues trace back to one of my very first rules: no build step… it's the biggest target of the Theseus method… We don't need to tidy it all, but it's a perfect example where we can leave it better than we found it. Likely this will take a fair amount of hand holding.\"\n\nOn main (9 Nov), no browser file can import another, nine browser files restate logic the server already has, and the largest browser file is 5,019 lines.\n\nOn the views, John: \"Lots of light little views is ideal, but the cost of them has to be balanced… I'd be sad to get rid, but happy to tidy.\"\n\n**What we want.**\n\n* Browser code that shares rather than restates. There's still no build step and no framework: the rule stays, read as allowing the browser to import, as browsers do natively, and that reading goes into the project's own notes.\n* Taken in small slices, one view or one shared piece at a time. Each view is reworked only after finding out why it got so large, and comes out lighter.\n* Anything bigger that a slice spots is left out of it and goes into the area's note.\n* The side rail and the visual refresh come after, built on the cleaner code.\n* No view is retired unless John rules it.\n\nJohn expects agents to reach for big moves here: \"very likely to get agents trying really hard to do big things when we want small.\" So the size is John's call, and for this work it's small.\n\n**Done when** the reading of the rule is in the project's notes; the first slice has landed, sharing rather than restating, lighter than before and naming what it retired; and John has read the first slice's result before the next starts.\n\n**Every change names what it retires. Questions:** settle engineering questions yourself; only John's calls (product, money, authority, what to retire) go to him as rulings."
+  }
+ ],
+ "piece": null,
+ "replaced": [],
+ "addressed": [],
+ "stands": [],
+ "areas": [
+  {
+   "id": "area-1",
+   "name": "Front end: browser code",
+   "open": 6
+  }
+ ],
+ "runs": [],
+ "index": [
+  {
+   "id": "lesson-2",
+   "kind": "lesson",
+   "line": "A page script's second request keeps the poll's discipline: coalesce every reason into one fetch per window, and stop when the poll stops (hidden tab, 401, revoked link). `createTimelineRefresher` (`public/task-page.js`, LIN-4405) is the pattern; a running chip changes the poll's track about once a minute, so \"fetch when it changes\" alone repeats. Done reads once more first (`finish`): the poll that says done carries the last change, and stopping drops it."
+  },
+  {
+   "id": "finding-11",
+   "kind": "finding",
+   "to": "scoping",
+   "line": "\"Allow the browser to import\" does not turn imports on: `server.js:1228` serves only `public/`, so the server modules a browser file restates (`lib/cost-format.js` etc.) have no URL. Sharing needs a served place for pure modules that both `lib/` and the browser import, plus a written rule for it (no Node built-ins, no DOM at load), or someone will import a module that pulls in `node:fs`. CSP `script-src 'self'` already allows module scripts loaded from a file. (Survey @ 4b5001ddf.)"
+  },
+  {
+   "id": "finding-12",
+   "kind": "finding",
+   "to": "area-1",
+   "line": "Every page is classic scripts talking through globals: `lib/components/page.js` writes ordered `<script src>` tags, and files read `window.X` and top-level bindings from `public/common.js` (3,309 lines, on 29 pages). A classic script cannot use static `import`; making a view `type=\"module\"` makes it deferred, strict and module-scoped, so its globals vanish for later scripts. \"One view at a time\" is blocked until what views read from `common.js` is reachable another way. Bigger than a slice: kept out of LIN-4446's first slice, as is view size. (Survey @ 4b5001ddf.)"
+  },
+  {
+   "id": "finding-13",
+   "kind": "finding",
+   "to": "scoping",
+   "line": "The unit harness assumes classic scripts: 130 test files load `public/*.js` through `vm` (`tests/unit/helpers/client-world.js`, plus `runInNewContext` in the parity tests); none use `vm.SourceTextModule`. A browser file that gains an `import` line breaks all of them. That cost is not in the ticket; a slice must keep the files it touches loadable by the vm suites or give them a module path. (Survey @ 4b5001ddf.)"
+  },
+  {
+   "id": "finding-14",
+   "kind": "finding",
+   "to": "review",
+   "line": "\"Lighter\" is easy to fake: about 1,985 of `public/observation.js`'s 5,019 lines are comments (ticket history, retuning stories), and 1,456 of `public/common.js`'s 3,309. Cutting comments passes a line count without sharing anything. Judge \"lighter\" and the why-so-large check (68 commits on `observation.js`) on logic and commentary counted separately. (Survey @ 4b5001ddf.)"
+  },
+  {
+   "id": "finding-15",
+   "kind": "finding",
+   "to": "implementation",
+   "line": "The ticket is a symptom the repo already names: `docs/papers/harbour/the-second-copy.md` §9–10 traces the copies to the no-build-step rule read as \"no sharing\", shows that parity tests and helpers nobody was required to adopt kept the copies alive, and that only deleting the old copy ever finished a consolidation. A slice that adds a shared module but keeps the old copy or its parity test repeats that pattern: delete both in the same change. (Survey @ 4b5001ddf.)"
+  },
+  {
+   "id": "finding-16",
+   "kind": "finding",
+   "to": "scoping",
+   "line": "What to do first. (1) Write the reading of the rule (no build step, no framework; the browser may import natively) into `CLAUDE.md:43` and `docs/areas/front-end-browser.md`. (2) First slice: cost-format. `lib/cost-format.js` (46 lines, no imports) becomes the one served shared module and stays importable by `lib/render-*.js`. Retires `public/cost-format.js` (a self-declared \"restatement\") and `tests/unit/cost-format-parity.test.js`. Its 4 consumers (`flight-companion`, `prompt-section`, `observation`, `workspace-kpis`) call `window.CostFormat` only inside handlers and render functions, never at load, so a small module shim that sets `window.CostFormat` runs early enough (module scripts run before `DOMContentLoaded`) and no view has to become a module yet. Update `tests/unit/cost-read-census.test.js:85` and the vm suites that name `cost-format.js`. This settles where shared modules are served, the purity rule and the test path on a pure function before any view is touched; view size and `common.js` globals stay out (see the area finding)."
+  },
+  {
+   "id": "check-17",
+   "kind": "check",
+   "to": "John",
+   "line": "Read the first slice's result (the rule's reading in the notes, and the cost-format slice with what it retired) before the next slice starts."
+  }
+ ],
+ "carries": {
+  "asked": 1,
+  "piece": 0,
+  "addressed": 0,
+  "stands": 0,
+  "areas": 1,
+  "runs": 0,
+  "index": 8
+ },
+ "bytes": 6881
+}

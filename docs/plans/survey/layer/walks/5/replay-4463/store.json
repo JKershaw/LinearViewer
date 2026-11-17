@@ -1,5 +1,5 @@
 {
- "next": 17,
+ "next": 25,
  "records": {
   "area-1": [
    {
@@ -182,6 +182,24 @@
     "op": "add",
     "at": "2026-11-13T15:22:55.000Z",
     "by": "Harbour"
+   },
+   {
+    "id": "finding-10",
+    "kind": "finding",
+    "state": "handed-on",
+    "fields": {
+     "says": "`public/cost-format-global.js`: the module-to-global bridge is specific to one module. `tests/unit/shared-modules.test.js` hard-codes the shim, the `'window.CostFormat'` string and the four consumers, and the DOMContentLoaded-only rule is restated in four files and witnessed per consumer, but no check covers a new consumer: a fifth trips only the hard-coded list, with no hint of the timing rule. A second shared module needs a second shim and guard. Needs a design call first: one shim per module, a general shim, or consumers that are modules. (LIN-4446 blind read.)"
+    },
+    "links": {},
+    "to": "area-1",
+    "v": 2,
+    "op": "end",
+    "at": "2026-11-13T15:42:19.000Z",
+    "by": "survey-task",
+    "ended": {
+     "reason": "task-16 carries the bridge design call; finding-21 proposes a general bridge with a shrink-only ratchet",
+     "into": "finding-21"
+    }
    }
   ],
   "finding-11": [
@@ -214,6 +232,24 @@
     "op": "add",
     "at": "2026-11-13T15:22:55.000Z",
     "by": "Harbour"
+   },
+   {
+    "id": "finding-12",
+    "kind": "finding",
+    "state": "handed-on",
+    "fields": {
+     "says": "`public/prompt-section.js`: the browser files reach their suites through `tests/unit/helpers/client-world.js`, which loads them as classic scripts through `vm`. A module-capable client test loader is needed before any view becomes a module, since `lib/components/page.js` emits classic tags. (LIN-4446.)"
+    },
+    "links": {},
+    "to": "area-1",
+    "v": 2,
+    "op": "end",
+    "at": "2026-11-13T15:42:17.000Z",
+    "by": "survey-task",
+    "ended": {
+     "reason": "task-16 carries the test seam now; finding-20 restates it and questions the separate loader",
+     "into": "finding-20"
+    }
    }
   ],
   "finding-13": [
@@ -283,6 +319,222 @@
     "at": "2026-11-13T15:39:22.240Z",
     "by": "John",
     "via": "driving-session"
+   }
+  ],
+  "run-17": [
+   {
+    "id": "run-17",
+    "kind": "run",
+    "state": "open",
+    "fields": {
+     "stage": "survey-task",
+     "claims": [
+      "public/"
+     ]
+    },
+    "links": {},
+    "in": "task-16",
+    "v": 1,
+    "op": "add",
+    "at": "2026-11-13T15:42:13.000Z",
+    "by": "survey-task"
+   },
+   {
+    "id": "run-17",
+    "kind": "run",
+    "state": "open",
+    "fields": {
+     "stage": "survey-task",
+     "claims": [
+      "public/"
+     ],
+     "account": "Surveyed LIN-4463 at c205190fd. The hard part is public/common.js (51 globals, 29 renderers), not the bridge: the one allowed bridge will end up carrying it. Two things must be settled before any view converts: the import specifier scheme (question-19) and a general bridge with a shrink-only ratchet (finding-21, taking over finding-10). The vm test seam breaks under modules; I argue for plain Node imports over a new loader (finding-20, taking over finding-12). Three Waiting entries are out of scope (finding-22, to scoping). Suggested order for breakdown in finding-24. Wrote no code."
+    },
+    "links": {},
+    "in": "task-16",
+    "v": 2,
+    "op": "revise",
+    "at": "2026-11-13T15:42:23.000Z",
+    "by": "survey-task",
+    "reason": "account written"
+   },
+   {
+    "id": "run-17",
+    "kind": "run",
+    "state": "done",
+    "fields": {
+     "stage": "survey-task",
+     "claims": [
+      "public/"
+     ],
+     "account": "Surveyed LIN-4463 at c205190fd. The hard part is public/common.js (51 globals, 29 renderers), not the bridge: the one allowed bridge will end up carrying it. Two things must be settled before any view converts: the import specifier scheme (question-19) and a general bridge with a shrink-only ratchet (finding-21, taking over finding-10). The vm test seam breaks under modules; I argue for plain Node imports over a new loader (finding-20, taking over finding-12). Three Waiting entries are out of scope (finding-22, to scoping). Suggested order for breakdown in finding-24. Wrote no code."
+    },
+    "links": {},
+    "in": "task-16",
+    "v": 3,
+    "op": "end",
+    "at": "2026-11-13T15:42:24.000Z",
+    "by": "survey-task",
+    "ended": {
+     "reason": "survey posted on LIN-4463"
+    }
+   }
+  ],
+  "finding-18": [
+   {
+    "id": "finding-18",
+    "kind": "finding",
+    "state": "open",
+    "fields": {
+     "says": "The real hub is `public/common.js`, not the slice 1 bridge (survey at c205190fd). It sets 51 `window.*` globals and 29 renderers load it first; a view cannot import from it while it stays classic. Making it a module in one go pushes all 51 globals through the one allowed bridge and changes their timing on 28 unconverted pages, since module scripts run after every classic script (the `window.CostFormat` trap). So \"one view at a time\" means one view plus a step into the hub, and the single bridge ends up carrying common.js, not cost-format. Watch for \"one bridge\" being read as \"one bridge per module\"."
+    },
+    "links": {
+     "about": [
+      "finding-9",
+      "lesson-5"
+     ]
+    },
+    "in": "task-16",
+    "to": "design",
+    "v": 1,
+    "op": "add",
+    "at": "2026-11-13T15:42:14.000Z",
+    "by": "survey-task"
+   }
+  ],
+  "question-19": [
+   {
+    "id": "question-19",
+    "kind": "question",
+    "state": "open",
+    "fields": {
+     "asks": "Which import specifier scheme do page modules use? Settle it before any view converts. `cost-format-global.js` imports `'/shared/cost-format.js'`, which Node resolves from the filesystem root, so a test cannot import a page module that uses it. This one choice decides whether \"the tests get simpler\" can hold.",
+     "options": [
+      "An import map (an inline `<script type=\"importmap\">`, which needs a CSP hash; `lib/components/page.js` already has `scriptBodyHash`) paired with `package.json` `\"imports\"` for Node",
+      "Relative specifiers, with a URL layout that matches the repo"
+     ],
+     "if-unanswered": "No view can convert with a page-module test that is a plain `import`, and the test seam grows instead of shrinking."
+    },
+    "links": {},
+    "in": "task-16",
+    "to": "design",
+    "v": 1,
+    "op": "add",
+    "at": "2026-11-13T15:42:15.000Z",
+    "by": "survey-task"
+   }
+  ],
+  "finding-20": [
+   {
+    "id": "finding-20",
+    "kind": "finding",
+    "state": "open",
+    "fields": {
+     "says": "The test seam breaks rather than carries over. 64 suites load browser scripts through `tests/unit/helpers/client-world.js` (a classic `vm` sandbox), and 85 `world.run` calls reach script-scope `let` bindings; module scope removes those, so each becomes an export or goes. I question the \"module-capable client test loader\" the area asks for: `package.json` is already `\"type\": \"module\"`, so Node can `import` `public/*.js` directly with a fake-DOM global, provided a module does not touch `document` at load. A `vm.SourceTextModule` loader (behind an experimental flag) is the elaborate road the task says not to take."
+    },
+    "links": {
+     "about": [
+      "finding-12",
+      "lesson-4"
+     ]
+    },
+    "in": "task-16",
+    "to": "design",
+    "v": 1,
+    "op": "add",
+    "at": "2026-11-13T15:42:16.000Z",
+    "by": "survey-task"
+   }
+  ],
+  "finding-21": [
+   {
+    "id": "finding-21",
+    "kind": "finding",
+    "state": "open",
+    "fields": {
+     "says": "Replace `public/cost-format-global.js` with one general bridge file whose global list is the explicit ramp for pages not yet converted, plus a ratchet check that the list can only shrink. That is the design call the area entry asked for (one shim per module, a general shim, or module consumers): a general shim, so no second shim and guard is written, and the list is the visible measure of \"one bridge, shrinking\". Note it will end up carrying common.js's globals (finding-18)."
+    },
+    "links": {
+     "about": [
+      "finding-10",
+      "finding-18"
+     ]
+    },
+    "in": "task-16",
+    "to": "design",
+    "v": 1,
+    "op": "add",
+    "at": "2026-11-13T15:42:18.000Z",
+    "by": "survey-task"
+   }
+  ],
+  "finding-22": [
+   {
+    "id": "finding-22",
+    "kind": "finding",
+    "state": "open",
+    "fields": {
+     "says": "Three of the area's Waiting entries have nothing to do with modules: the `llms.txt` drift (finding-14), the no-AI \"Next step\" spinner (finding-15) and app.js's whole-page `DOMParser` (finding-6). They are real but outside this work. Close them separately or name them out of scope; folding them in makes the slices bigger without making the area cleaner."
+    },
+    "links": {
+     "about": [
+      "finding-6",
+      "finding-14",
+      "finding-15"
+     ]
+    },
+    "in": "task-16",
+    "to": "scoping",
+    "v": 1,
+    "op": "add",
+    "at": "2026-11-13T15:42:20.000Z",
+    "by": "survey-task"
+   }
+  ],
+  "finding-23": [
+   {
+    "id": "finding-23",
+    "kind": "finding",
+    "state": "open",
+    "fields": {
+     "says": "Symptom vs cause: the no-build rule is the stated target, but the pain reads as `public/common.js` being a 3,309-line pool of globals and \"client twins\". Modules are the tool for that, not the fix by themselves: converting files without splitting common.js by concern just moves the pool."
+    },
+    "links": {
+     "about": [
+      "finding-18"
+     ]
+    },
+    "in": "task-16",
+    "to": "design",
+    "v": 1,
+    "op": "add",
+    "at": "2026-11-13T15:42:21.000Z",
+    "by": "survey-task"
+   }
+  ],
+  "finding-24": [
+   {
+    "id": "finding-24",
+    "kind": "finding",
+    "state": "open",
+    "fields": {
+     "says": "Suggested order. (1) One design piece before any view converts: settle the specifier scheme (question-19) and prove it with one page-module test that is a plain `import`; replace the bridge with one general bridge plus a shrink-only ratchet (finding-21). (2) Then the first view: a small one that already wants exports. Eleven files carry `typeof module … module.exports` dual exports; `question-cards.js`, `home-placement.js` and `close-out.js` are small. Convert it, rewrite its tests as imports, name what it retired. (3) The leaf twins `lib/task-page-href.js`, `lib/timeline-zoom.js` and `lib/providers/models.js` import nothing, so they are cheap retirements once the bridge is general; `ship-layout` and `prompt-formatters` import other modules and still cannot be served as single files. (4) `public/observation.js` (5,019 lines, about 40% comments by LIN-4446's count) and `public/common.js` last; why observation.js is that size is a separate question from making it a module."
+    },
+    "links": {
+     "about": [
+      "question-19",
+      "finding-21",
+      "finding-9",
+      "finding-11",
+      "finding-13"
+     ]
+    },
+    "in": "task-16",
+    "to": "breakdown",
+    "v": 1,
+    "op": "add",
+    "at": "2026-11-13T15:42:22.000Z",
+    "by": "survey-task"
    }
   ]
  },
@@ -392,6 +644,34 @@
     "open",
     "--by",
     "survey-task"
+   ],
+   "asOf": null
+  },
+  {
+   "at": "2026-11-17T15:20:56.389Z",
+   "by": "survey-task",
+   "cmd": "find",
+   "args": [
+    "find",
+    "--to",
+    "area-1",
+    "--state",
+    "open",
+    "--by",
+    "survey-task"
+   ],
+   "asOf": null
+  },
+  {
+   "at": "2026-11-17T15:21:53.140Z",
+   "by": "survey-task",
+   "cmd": "show",
+   "args": [
+    "--by",
+    "survey-task",
+    "show",
+    "--task",
+    "task-16"
    ],
    "asOf": null
   }

@@ -1,0 +1,160 @@
+[
+ {
+  "at": "2026-11-17T15:20:51.371Z",
+  "by": "survey-task",
+  "cmd": "show",
+  "args": [
+   "show",
+   "--task",
+   "task-9",
+   "--by",
+   "survey-task"
+  ],
+  "asOf": null
+ },
+ {
+  "at": "2026-11-17T15:20:51.414Z",
+  "by": "survey-task",
+  "cmd": "find",
+  "args": [
+   "find",
+   "--area",
+   "area-1",
+   "--by",
+   "survey-task"
+  ],
+  "asOf": null
+ },
+ {
+  "at": "2026-11-17T15:20:51.453Z",
+  "by": "survey-task",
+  "cmd": "get",
+  "args": [
+   "get",
+   "area-1",
+   "--by",
+   "survey-task"
+  ],
+  "asOf": null
+ },
+ {
+  "at": "2026-11-17T15:20:55.612Z",
+  "by": "survey-task",
+  "cmd": "find",
+  "args": [
+   "find",
+   "--text",
+   "cost-format",
+   "--by",
+   "survey-task"
+  ],
+  "asOf": null
+ },
+ {
+  "at": "2026-11-17T15:20:55.654Z",
+  "by": "survey-task",
+  "cmd": "find",
+  "args": [
+   "find",
+   "--text",
+   "build step",
+   "--by",
+   "survey-task"
+  ],
+  "asOf": null
+ },
+ {
+  "at": "2026-11-17T15:20:55.688Z",
+  "by": "survey-task",
+  "cmd": "find",
+  "args": [
+   "find",
+   "--text",
+   "common.js",
+   "--by",
+   "survey-task"
+  ],
+  "asOf": null
+ },
+ {
+  "at": "2026-11-17T15:20:55.722Z",
+  "by": "survey-task",
+  "cmd": "find",
+  "args": [
+   "find",
+   "--text",
+   "restate",
+   "--by",
+   "survey-task"
+  ],
+  "asOf": null
+ },
+ {
+  "at": "2026-11-17T15:20:55.759Z",
+  "by": "survey-task",
+  "cmd": "find",
+  "args": [
+   "find",
+   "--text",
+   "import",
+   "--by",
+   "survey-task"
+  ],
+  "asOf": null
+ },
+ {
+  "at": "2026-11-17T15:20:55.794Z",
+  "by": "survey-task",
+  "cmd": "find",
+  "args": [
+   "find",
+   "--text",
+   "parity",
+   "--by",
+   "survey-task"
+  ],
+  "asOf": null
+ },
+ {
+  "at": "2026-11-17T15:20:55.833Z",
+  "by": "survey-task",
+  "cmd": "find",
+  "args": [
+   "find",
+   "--kind",
+   "run",
+   "--state",
+   "open",
+   "--path",
+   "public/",
+   "--by",
+   "survey-task"
+  ],
+  "asOf": null
+ },
+ {
+  "at": "2026-11-17T15:20:55.866Z",
+  "by": "survey-task",
+  "cmd": "find",
+  "args": [
+   "find",
+   "--count",
+   "--by",
+   "survey-task"
+  ],
+  "asOf": null
+ },
+ {
+  "at": "2026-11-17T15:21:33.713Z",
+  "by": "survey-task",
+  "cmd": "show",
+  "args": [
+   "show",
+   "--task",
+   "task-9",
+   "--by",
+   "survey-task"
+  ],
+  "asOf": null
+ }
+]

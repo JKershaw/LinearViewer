@@ -1,5 +1,5 @@
 {
- "next": 10,
+ "next": 18,
  "records": {
   "area-1": [
    {
@@ -167,6 +167,199 @@
     "by": "John",
     "via": "driving-session"
    }
+  ],
+  "run-10": [
+   {
+    "id": "run-10",
+    "kind": "run",
+    "state": "open",
+    "fields": {
+     "stage": "survey-task",
+     "claims": [
+      "public/",
+      "CLAUDE.md",
+      "docs/areas/front-end-browser.md"
+     ]
+    },
+    "links": {},
+    "in": "task-9",
+    "v": 1,
+    "op": "add",
+    "at": "2026-11-13T13:12:09.000Z",
+    "by": "survey-task"
+   },
+   {
+    "id": "run-10",
+    "kind": "run",
+    "state": "open",
+    "fields": {
+     "stage": "survey-task",
+     "claims": [
+      "public/",
+      "CLAUDE.md",
+      "docs/areas/front-end-browser.md"
+     ],
+     "account": "Surveyed LIN-4446 at 4b5001ddf and commented on the ticket. Five reasons it will be hard: imports are not on (server serves only public/, no served place or purity rule for shared modules); pages are classic scripts sharing globals via common.js, so a view cannot become a module alone; 130 vm-based unit tests assume classic scripts; \"lighter\" can be faked by cutting comments; the-second-copy paper shows only deleting the old copy finishes a consolidation. Proposed: write the rule's reading into CLAUDE.md and the area doc, then cost-format as first slice (lib/cost-format.js served and shared, a window.CostFormat shim, retire public/cost-format.js and its parity test). common.js globals and view size go to the area. John's read of slice one as a real pause."
+    },
+    "links": {},
+    "in": "task-9",
+    "v": 2,
+    "op": "revise",
+    "at": "2026-11-13T13:12:17.000Z",
+    "by": "survey-task",
+    "reason": "account"
+   },
+   {
+    "id": "run-10",
+    "kind": "run",
+    "state": "done",
+    "fields": {
+     "stage": "survey-task",
+     "claims": [
+      "public/",
+      "CLAUDE.md",
+      "docs/areas/front-end-browser.md"
+     ],
+     "account": "Surveyed LIN-4446 at 4b5001ddf and commented on the ticket. Five reasons it will be hard: imports are not on (server serves only public/, no served place or purity rule for shared modules); pages are classic scripts sharing globals via common.js, so a view cannot become a module alone; 130 vm-based unit tests assume classic scripts; \"lighter\" can be faked by cutting comments; the-second-copy paper shows only deleting the old copy finishes a consolidation. Proposed: write the rule's reading into CLAUDE.md and the area doc, then cost-format as first slice (lib/cost-format.js served and shared, a window.CostFormat shim, retire public/cost-format.js and its parity test). common.js globals and view size go to the area. John's read of slice one as a real pause."
+    },
+    "links": {},
+    "in": "task-9",
+    "v": 3,
+    "op": "end",
+    "at": "2026-11-13T13:12:18.000Z",
+    "by": "survey-task",
+    "ended": {
+     "reason": "survey written"
+    }
+   }
+  ],
+  "finding-11": [
+   {
+    "id": "finding-11",
+    "kind": "finding",
+    "state": "open",
+    "fields": {
+     "says": "\"Allow the browser to import\" does not turn imports on: `server.js:1228` serves only `public/`, so the server modules a browser file restates (`lib/cost-format.js` etc.) have no URL. Sharing needs a served place for pure modules that both `lib/` and the browser import, plus a written rule for it (no Node built-ins, no DOM at load), or someone will import a module that pulls in `node:fs`. CSP `script-src 'self'` already allows module scripts loaded from a file. (Survey @ 4b5001ddf.)"
+    },
+    "links": {},
+    "in": "task-9",
+    "to": "scoping",
+    "v": 1,
+    "op": "add",
+    "at": "2026-11-13T13:12:10.000Z",
+    "by": "survey-task"
+   }
+  ],
+  "finding-12": [
+   {
+    "id": "finding-12",
+    "kind": "finding",
+    "state": "open",
+    "fields": {
+     "says": "Every page is classic scripts talking through globals: `lib/components/page.js` writes ordered `<script src>` tags, and files read `window.X` and top-level bindings from `public/common.js` (3,309 lines, on 29 pages). A classic script cannot use static `import`; making a view `type=\"module\"` makes it deferred, strict and module-scoped, so its globals vanish for later scripts. \"One view at a time\" is blocked until what views read from `common.js` is reachable another way. Bigger than a slice: kept out of LIN-4446's first slice, as is view size. (Survey @ 4b5001ddf.)"
+    },
+    "links": {},
+    "in": "task-9",
+    "to": "area-1",
+    "v": 1,
+    "op": "add",
+    "at": "2026-11-13T13:12:11.000Z",
+    "by": "survey-task"
+   }
+  ],
+  "finding-13": [
+   {
+    "id": "finding-13",
+    "kind": "finding",
+    "state": "open",
+    "fields": {
+     "says": "The unit harness assumes classic scripts: 130 test files load `public/*.js` through `vm` (`tests/unit/helpers/client-world.js`, plus `runInNewContext` in the parity tests); none use `vm.SourceTextModule`. A browser file that gains an `import` line breaks all of them. That cost is not in the ticket; a slice must keep the files it touches loadable by the vm suites or give them a module path. (Survey @ 4b5001ddf.)"
+    },
+    "links": {},
+    "in": "task-9",
+    "to": "scoping",
+    "v": 1,
+    "op": "add",
+    "at": "2026-11-13T13:12:12.000Z",
+    "by": "survey-task"
+   }
+  ],
+  "finding-14": [
+   {
+    "id": "finding-14",
+    "kind": "finding",
+    "state": "open",
+    "fields": {
+     "says": "\"Lighter\" is easy to fake: about 1,985 of `public/observation.js`'s 5,019 lines are comments (ticket history, retuning stories), and 1,456 of `public/common.js`'s 3,309. Cutting comments passes a line count without sharing anything. Judge \"lighter\" and the why-so-large check (68 commits on `observation.js`) on logic and commentary counted separately. (Survey @ 4b5001ddf.)"
+    },
+    "links": {},
+    "in": "task-9",
+    "to": "review",
+    "v": 1,
+    "op": "add",
+    "at": "2026-11-13T13:12:13.000Z",
+    "by": "survey-task"
+   }
+  ],
+  "finding-15": [
+   {
+    "id": "finding-15",
+    "kind": "finding",
+    "state": "open",
+    "fields": {
+     "says": "The ticket is a symptom the repo already names: `docs/papers/harbour/the-second-copy.md` §9–10 traces the copies to the no-build-step rule read as \"no sharing\", shows that parity tests and helpers nobody was required to adopt kept the copies alive, and that only deleting the old copy ever finished a consolidation. A slice that adds a shared module but keeps the old copy or its parity test repeats that pattern: delete both in the same change. (Survey @ 4b5001ddf.)"
+    },
+    "links": {},
+    "in": "task-9",
+    "to": "implementation",
+    "v": 1,
+    "op": "add",
+    "at": "2026-11-13T13:12:14.000Z",
+    "by": "survey-task"
+   }
+  ],
+  "finding-16": [
+   {
+    "id": "finding-16",
+    "kind": "finding",
+    "state": "open",
+    "fields": {
+     "says": "What to do first. (1) Write the reading of the rule (no build step, no framework; the browser may import natively) into `CLAUDE.md:43` and `docs/areas/front-end-browser.md`. (2) First slice: cost-format. `lib/cost-format.js` (46 lines, no imports) becomes the one served shared module and stays importable by `lib/render-*.js`. Retires `public/cost-format.js` (a self-declared \"restatement\") and `tests/unit/cost-format-parity.test.js`. Its 4 consumers (`flight-companion`, `prompt-section`, `observation`, `workspace-kpis`) call `window.CostFormat` only inside handlers and render functions, never at load, so a small module shim that sets `window.CostFormat` runs early enough (module scripts run before `DOMContentLoaded`) and no view has to become a module yet. Update `tests/unit/cost-read-census.test.js:85` and the vm suites that name `cost-format.js`. This settles where shared modules are served, the purity rule and the test path on a pure function before any view is touched; view size and `common.js` globals stay out (see the area finding)."
+    },
+    "links": {
+     "on": [
+      "finding-11@1",
+      "finding-12@1",
+      "finding-13@1",
+      "finding-15@1"
+     ]
+    },
+    "in": "task-9",
+    "to": "scoping",
+    "v": 1,
+    "op": "add",
+    "at": "2026-11-13T13:12:15.000Z",
+    "by": "survey-task"
+   }
+  ],
+  "check-17": [
+   {
+    "id": "check-17",
+    "kind": "check",
+    "state": "open",
+    "fields": {
+     "what": "Read the first slice's result (the rule's reading in the notes, and the cost-format slice with what it retired) before the next slice starts.",
+     "why-person": "The done-when requires John's read, and the size of this work and what may be retired are his calls.",
+     "how": "Schedule it as a real pause after the first slice lands: nothing in the next slice is dispatched until John has read it."
+    },
+    "links": {},
+    "in": "task-9",
+    "to": "John",
+    "v": 1,
+    "op": "add",
+    "at": "2026-11-13T13:12:16.000Z",
+    "by": "survey-task"
+   }
   ]
  },
  "log": [
@@ -203,6 +396,126 @@
    "args": [
     "get",
     "area-1",
+    "--by",
+    "survey-task"
+   ],
+   "asOf": null
+  },
+  {
+   "at": "2026-11-17T15:20:55.612Z",
+   "by": "survey-task",
+   "cmd": "find",
+   "args": [
+    "find",
+    "--text",
+    "cost-format",
+    "--by",
+    "survey-task"
+   ],
+   "asOf": null
+  },
+  {
+   "at": "2026-11-17T15:20:55.654Z",
+   "by": "survey-task",
+   "cmd": "find",
+   "args": [
+    "find",
+    "--text",
+    "build step",
+    "--by",
+    "survey-task"
+   ],
+   "asOf": null
+  },
+  {
+   "at": "2026-11-17T15:20:55.688Z",
+   "by": "survey-task",
+   "cmd": "find",
+   "args": [
+    "find",
+    "--text",
+    "common.js",
+    "--by",
+    "survey-task"
+   ],
+   "asOf": null
+  },
+  {
+   "at": "2026-11-17T15:20:55.722Z",
+   "by": "survey-task",
+   "cmd": "find",
+   "args": [
+    "find",
+    "--text",
+    "restate",
+    "--by",
+    "survey-task"
+   ],
+   "asOf": null
+  },
+  {
+   "at": "2026-11-17T15:20:55.759Z",
+   "by": "survey-task",
+   "cmd": "find",
+   "args": [
+    "find",
+    "--text",
+    "import",
+    "--by",
+    "survey-task"
+   ],
+   "asOf": null
+  },
+  {
+   "at": "2026-11-17T15:20:55.794Z",
+   "by": "survey-task",
+   "cmd": "find",
+   "args": [
+    "find",
+    "--text",
+    "parity",
+    "--by",
+    "survey-task"
+   ],
+   "asOf": null
+  },
+  {
+   "at": "2026-11-17T15:20:55.833Z",
+   "by": "survey-task",
+   "cmd": "find",
+   "args": [
+    "find",
+    "--kind",
+    "run",
+    "--state",
+    "open",
+    "--path",
+    "public/",
+    "--by",
+    "survey-task"
+   ],
+   "asOf": null
+  },
+  {
+   "at": "2026-11-17T15:20:55.866Z",
+   "by": "survey-task",
+   "cmd": "find",
+   "args": [
+    "find",
+    "--count",
+    "--by",
+    "survey-task"
+   ],
+   "asOf": null
+  },
+  {
+   "at": "2026-11-17T15:21:33.713Z",
+   "by": "survey-task",
+   "cmd": "show",
+   "args": [
+    "show",
+    "--task",
+    "task-9",
     "--by",
     "survey-task"
    ],
