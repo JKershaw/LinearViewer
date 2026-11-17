@@ -1,0 +1,187 @@
+{
+ "stage": "survey-task",
+ "task": "task-60",
+ "asOf": "2026-11-13T14:58:27.991Z",
+ "words": [
+  {
+   "task": "task-60",
+   "asked": ""
+  },
+  {
+   "task": "task-39",
+   "asked": "**Repository:** JKershaw/LinearViewer (Harbour).\n\n**What this is for.** John: \"we've not been applying quite the right force to bend the curve… now want to run both real work, and some real tidies.\" The Drift & Coherence and Seams & Tangles reviews of 13 Nov found this area carrying rules written in two places that disagree. Batch 1 added several of them:\n\n* Harbour can mark a task Done on a person's check before its blind read, while another check refuses that same task, and a read is then sent to a ticket that's already Done (Drift run 7, `close-out-gate-precedence-split`). John's ruling: \"if I choose to do something, Harbour is a passenger. This reflects that for many real projects, they're unlikely to be exclusively changed via Harbour.\"\n* Two pieces of code decide which PRs belong to a task, and they disagree about agent notes, so a blind read can be offered over a PR no review covered (Seams run 12, §3.0a).\n* The task timeline decides which model a dispatch used by its own rule, separate from the one the cost figures use (Drift, row 150).\n* The check that makes a stage wait while another is live is a runs rule, but it lives with the prompts (Seams, P-LW1).\n\nThe area's note holds 20 Waiting entries, and `lib/dispatch-store.js` is 4,530 lines. Seams also tried moving files between areas three ways, and none made the tangle smaller.\n\n**What we want.**\n\n* Each rule in the area has one home, and the copies are gone.\n* When a person acts, Harbour follows, and that rule is written once.\n* The area's Waiting entries are settled, or each says why it can't be yet.\n* Each piece finishes one move and names what it retired. John: \"I'd be happy to run a small variety, erring larger, to see\", so piece sizes vary, leaning larger.\n* The LLM & prompts side of the seam is A14's.\n\n**Done when**\n\n* the cases above are settled, or John has ruled they can wait;\n* the area's Waiting entries are settled or say why not;\n* the area reads better in a blind read after this work than before it, by more than an untouched area read at the same times.\n\n**Every change names what it retires. Questions:** settle engineering questions yourself; only John's calls (product, money, authority, what to retire) go to him as rulings.\n\n*End of what was asked. Steps write below this line; nothing above it changes.*"
+  }
+ ],
+ "piece": {
+  "id": "plan-45",
+  "kind": "plan",
+  "v": 1,
+  "op": "add",
+  "at": "2026-11-13T13:40:00.000Z",
+  "by": "design",
+  "in": "task-39",
+  "state": "kept",
+  "fields": {
+   "says": "Piece 5 (medium): one declaration for each restated constant. `lib/dispatch-leftover.js` and `_releaseIfHeld` import halt modes, `NEVER_RAN` and the follow-up target from their owners; `wakeHook.releaseNote` supplies the release wording so the store no longer calls `formatHeldWakeNote`; one `FEEDBACK_KINDS` table in `lib/dispatch-feedback-validation.js` carries each kind's roles, and `PARKED_WAIT_SKIPPED_KINDS`, `FEEDBACK_ENTRY_KINDS` and `findWakeEvent`'s skip rule derive from it. *Retires:* the restated constants and the three hand-written kind sets. *Settles Waiting:* 2, 4, 11. *Witness:* a test that iterates `HALT_MODES` and shows every one stops a leftover (so a newly added mode is caught), and `lin-4377` counting the import, not the spelling.",
+   "paths": [
+    "lib/dispatch-leftover.js",
+    "lib/dispatch-store.js",
+    "lib/dispatch-feedback-validation.js"
+   ],
+   "order": 2
+  },
+  "links": {},
+  "stale": false
+ },
+ "addressed": [],
+ "stands": [
+  {
+   "id": "verdict-55",
+   "kind": "verdict",
+   "v": 1,
+   "op": "add",
+   "at": "2026-11-13T13:57:37.874Z",
+   "by": "plan-review",
+   "in": "task-39",
+   "state": "stands",
+   "fields": {
+    "of": "plan-review",
+    "outcome": "approve",
+    "reasoning": "Approve (comment 12619798, plan rev 2). B1 is answered and holds; all three Done-when clauses are met by the pieces, with the 20 Waiting entries mapped. Piece 5: no note in either round; round 1 said it does not depend on B1. Settles Waiting 2, 4, 11."
+   },
+   "links": {
+    "on": "plan-45@1"
+   },
+   "stale": false
+  },
+  {
+   "id": "decision-61",
+   "kind": "decision",
+   "v": 1,
+   "op": "add",
+   "at": "2026-11-13T14:02:31.309Z",
+   "by": "breakdown",
+   "in": "task-60",
+   "state": "stands",
+   "fields": {
+    "answer": "Grounding commit origin/main 4b5001ddf; the plan needs no re-planning, and LIN-4455 carries piece 5's slice as approved, naming `releaseHeldWake` beside `_releaseIfHeld` in `lib/dispatch-store.js`.",
+    "why": "Staleness check at breakdown: origin/main still 4b5001ddf, git log 4b5001ddf..origin/main empty, nothing under lib, routes, tests, scripts or docs/areas changed since filing; spot checks hold (dispatch-store.js still 4,530 lines)."
+   },
+   "links": {
+    "on": "verdict-55@1"
+   },
+   "stale": false
+  },
+  {
+   "id": "decision-62",
+   "kind": "decision",
+   "v": 1,
+   "op": "add",
+   "at": "2026-11-13T14:02:31.309Z",
+   "by": "breakdown",
+   "in": "task-60",
+   "state": "stands",
+   "fields": {
+    "answer": "Session fit: one session (medium). Plan-review due: no, covered by LIN-4447's approving plan-review (comment 12619798, rev 2).",
+    "why": "The approved plan sizes piece 5 medium and lists it among pieces that run alone; the parent's plan review approved it."
+   },
+   "links": {
+    "on": "verdict-55@1"
+   },
+   "stale": false
+  },
+  {
+   "id": "decision-63",
+   "kind": "decision",
+   "v": 1,
+   "op": "add",
+   "at": "2026-11-13T14:02:31.309Z",
+   "by": "breakdown",
+   "in": "task-60",
+   "state": "stands",
+   "fields": {
+    "answer": "LIN-4455 is blocked by LIN-4453 (piece 0), in order step 2 beside LIN-4454, LIN-4456 and LIN-4457.",
+    "why": "The graph follows the plan's landing order, 0 then 3/5/6/7 then 2/4 then 1 then 8 then 0, literally; no implementation PR merges before piece 0's reports and rubric are on the ticket."
+   },
+   "links": {
+    "on": "verdict-55@1",
+    "about": "task-59"
+   },
+   "stale": false
+  },
+  {
+   "id": "decision-64",
+   "kind": "decision",
+   "v": 1,
+   "op": "add",
+   "at": "2026-11-13T14:02:31.309Z",
+   "by": "breakdown",
+   "in": "task-60",
+   "state": "stands",
+   "fields": {
+    "answer": "LIN-4455 blocks LIN-4458 (piece 2) and LIN-4459 (piece 4).",
+    "why": "2 and 4 wait on all of 3/5/6/7: the plan orders them that way, and the work overlaps (piece 4's lineage helpers live in dispatch-store.js, which piece 5 edits)."
+   },
+   "links": {
+    "on": "verdict-55@1"
+   },
+   "stale": false
+  },
+  {
+   "id": "decision-65",
+   "kind": "decision",
+   "v": 1,
+   "op": "add",
+   "at": "2026-11-13T14:02:31.309Z",
+   "by": "breakdown",
+   "in": "task-60",
+   "state": "stands",
+   "fields": {
+    "answer": "Waiting 2, 4 and 11 are LIN-4455's to settle.",
+    "why": "Waiting accounting unchanged from the plan."
+   },
+   "links": {
+    "on": "verdict-55@1"
+   },
+   "stale": false
+  }
+ ],
+ "areas": [
+  {
+   "id": "area-1",
+   "name": "Runs & dispatch"
+  }
+ ],
+ "index": [
+  {
+   "id": "lesson-3",
+   "kind": "lesson",
+   "to": null,
+   "says": "Every exit from the queue except a take archives through `_archiveItem` (`lib/dispatch-store.js`); a new exit must archive through it too."
+  },
+  {
+   "id": "lesson-4",
+   "kind": "lesson",
+   "to": null,
+   "says": "The wake path is `_planWake` (decide) then `_deliverWake` (deliver) in `lib/dispatch-store.js`, shared by `addFeedback` and the held-wake release (LIN-4373). Its guards (LIN-1059, 1165, 1357, 2297, 4080, 4166) run in an order that matters: change the pair whole, keep the wake suites passing, and update the two census pins (`lin-3134-declared-mint-census`, `lin-4080-addItem-census`) if the write moves."
+  },
+  {
+   "id": "lesson-10",
+   "kind": "lesson",
+   "to": null,
+   "says": "The store knows no leftovers (LIN-4383). It holds a parent wake by `heldWakeFor` (LIN-4373), released by the holder's terminal or `_archiveItem` under the build's guard key, so it wakes once. Leftover wording lives in `lib/dispatch-leftover-hook.js`; a new held-wake feature brings a hook (`lin-4377-store-knows-no-leftover` counts the word)."
+  }
+ ],
+ "carries": {
+  "words": 2,
+  "piece": 1,
+  "addressed": 0,
+  "stands": 6,
+  "areas": 1,
+  "index": 3
+ },
+ "size": {
+  "jsonBytes": 7587,
+  "textBytes": 6749
+ }
+}

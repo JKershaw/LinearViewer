@@ -1,0 +1,93 @@
+[
+ {
+  "at": "2026-11-17T13:39:20.681Z",
+  "by": "survey-place",
+  "query": "find",
+  "args": {
+   "area": "area-1"
+  },
+  "returned": 1
+ },
+ {
+  "at": "2026-11-17T13:39:20.716Z",
+  "by": "survey-place",
+  "query": "find",
+  "args": {
+   "text": "D1"
+  },
+  "returned": 5
+ },
+ {
+  "at": "2026-11-17T13:39:20.748Z",
+  "by": "survey-place",
+  "query": "find",
+  "args": {
+   "text": "search"
+  },
+  "returned": 6
+ },
+ {
+  "at": "2026-11-17T13:39:20.779Z",
+  "by": "survey-place",
+  "query": "find",
+  "args": {
+   "text": "plainText"
+  },
+  "returned": 0
+ },
+ {
+  "at": "2026-11-17T13:39:20.810Z",
+  "by": "survey-place",
+  "query": "find",
+  "args": {
+   "kind": "run"
+  },
+  "returned": 1
+ },
+ {
+  "at": "2026-11-17T13:39:35.605Z",
+  "by": "survey-place",
+  "query": "find",
+  "args": {
+   "kind": "task"
+  },
+  "returned": 4
+ },
+ {
+  "at": "2026-11-17T13:39:35.646Z",
+  "by": "survey-place",
+  "query": "find",
+  "args": {
+   "kind": "area"
+  },
+  "returned": 3
+ },
+ {
+  "at": "2026-11-17T13:39:35.678Z",
+  "by": "survey-place",
+  "query": "find",
+  "args": {
+   "text": "normalis"
+  },
+  "returned": 2
+ },
+ {
+  "at": "2026-11-17T13:39:35.720Z",
+  "by": "survey-place",
+  "query": "find",
+  "args": {
+   "text": "source-map"
+  },
+  "returned": 0
+ },
+ {
+  "at": "2026-11-17T13:39:35.757Z",
+  "by": "survey-place",
+  "query": "find",
+  "args": {
+   "kind": "finding",
+   "text": "provider"
+  },
+  "returned": 1
+ }
+]

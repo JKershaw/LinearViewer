@@ -1,6 +1,6 @@
 {
  "retro": false,
- "next": 73,
+ "next": 80,
  "records": {
   "area-1": {
    "id": "area-1",
@@ -1709,6 +1709,20 @@
       "says": "`lib/providers/jira/adf.js` header claims the D1 gate never flags what the writer emits: false at 4b5001ddf. An empty fence (\"```\" then \"```\" on the next line) makes `markdownToAdf` emit an empty `codeBlock`; `adfHasUnrenderableContent` refuses it and `rt(rt(x)) !== rt(x)` (both observed). Once Harbour writes descriptions itself, such a ticket can never be written again: every later `description/below` 422s on D1 (D1 sees the whole document, block included). (Survey of LIN-4450.)"
      },
      "links": {}
+    },
+    {
+     "v": 2,
+     "op": "revise",
+     "at": "2026-11-13T13:51:36.000Z",
+     "by": "survey-place",
+     "in": "area-1",
+     "to": "task-60",
+     "state": "open",
+     "fields": {
+      "says": "`lib/providers/jira/adf.js` header claims the D1 gate never flags what the writer emits: false at 4b5001ddf. An empty fence (\"```\" then \"```\" on the next line) makes `markdownToAdf` emit an empty `codeBlock`; `adfHasUnrenderableContent` refuses it and `rt(rt(x)) !== rt(x)` (both observed). Once Harbour writes descriptions itself, such a ticket can never be written again: every later `description/below` 422s on D1 (D1 sees the whole document, block included). (Survey of LIN-4450.)"
+     },
+     "links": {},
+     "reason": "Taken on by survey-place: task-60 is what makes Harbour write Jira descriptions, so it creates the harm (finding-68 already asks it to fix the codec or exclude the input); the header claim is retired with the codec fix."
     }
    ]
   },
@@ -1844,6 +1858,178 @@
      "fields": {
       "stage": "survey-task",
       "account": "Surveyed LIN-4450 at 4b5001ddf (origin/main unchanged, so plan-54's line numbers hold: _toCanonicalIssue 484, fetchIssueContext 863/873, issueDescription 1049, descriptionRoundTrip 1064, updateIssue re-read 1267). Ran the codec against the plan's witness inputs (seal, markdownToAdf, adfToMarkdown). Three findings: the ADF node rule and hasMarkerLine/splitAsAsked disagree on end lines (finding-66, task-60); adf.js's 'D1 never flags writer output' claim is false for an empty fence (finding-67, area-1) so the fixed-point test needs a deliberate fix-or-exclude (finding-68, task-60); and Done-when proves nothing on live Jira, where the rendering digest may not survive ordinary saves, so a 15-minute live probe should come before code (check-69, John; session 3 checks it only after the build). Smaller: search vs getIssue divergence (finding-70), measure the serialized property for the size limit (finding-71). Nothing addressed to me to close."
+     },
+     "links": {
+      "on": "plan-54@2"
+     },
+     "reason": "survey posted",
+     "stateReason": "survey posted"
+    }
+   ]
+  },
+  "finding-73": {
+   "id": "finding-73",
+   "kind": "finding",
+   "versions": [
+    {
+     "v": 1,
+     "op": "add",
+     "at": "2026-11-13T13:51:37.000Z",
+     "by": "survey-place",
+     "in": "task-60",
+     "to": "task-60",
+     "state": "open",
+     "fields": {
+      "says": "Keep the region module the one place that knows both stores of the words (the ADF region and the `harbour.asAsked` property). Export `adf.js`'s private `plainText` (~line 340) for the end-paragraph test instead of writing a second ADF walker; render the region with `adfToMarkdown({type:'doc',content})`, not a new renderer; put the one shared size function (decision-63) there too. For review note 2, write one read-with-words helper beside the reader rather than threading `properties` through each call: of the 8 `client.getIssue` sites in `index.js`, four never read a description (703, 1018, 1076, and the pre-read at 1099). Grounded at 4b5001ddf."
+     },
+     "links": {
+      "on": "plan-54@2"
+     }
+    }
+   ]
+  },
+  "finding-74": {
+   "id": "finding-74",
+   "kind": "finding",
+   "versions": [
+    {
+     "v": 1,
+     "op": "add",
+     "at": "2026-11-13T13:51:38.000Z",
+     "by": "survey-place",
+     "in": "task-60",
+     "to": "task-60",
+     "state": "open",
+     "fields": {
+      "says": "Claims that go stale when this lands, beyond the three the plan names (the headers of `lib/as-asked-seal.js` and `lib/as-asked.js`, the `descriptionRoundTrip` comment): `lib/dispatch-factory.js:1008`; `docs/architecture/source-map.md:216` (the Jira paragraph) and `:82` (the new region module needs a mention); `tests/unit/as-asked-guard.test.js`'s Jira block (345, 351), which will fail and so notices on its own; the docs won't. `docs/proxy-integration.md:2070` (agent-facing, 'Jira files unsealed') is already in task-61's retire list (plan-55 item 10). Name each in the PR's retirements or cite it as still true. Grounded at 4b5001ddf."
+     },
+     "links": {
+      "on": "plan-54@2"
+     }
+    }
+   ]
+  },
+  "finding-75": {
+   "id": "finding-75",
+   "kind": "finding",
+   "versions": [
+    {
+     "v": 1,
+     "op": "add",
+     "at": "2026-11-13T13:51:39.000Z",
+     "by": "survey-place",
+     "in": "task-60",
+     "to": "task-60",
+     "state": "open",
+     "fields": {
+      "says": "After the flip, `sealForFiling`'s `reason: 'provider'` branch (`lib/as-asked-seal.js`) has no subject in production or tests: `tests/unit/as-asked-create-seal.test.js:207-227` uses Jira's round trip as the one provider that cannot hold the block. Keep the branch witnessed with a synthetic lossy round trip, or retire it on purpose and name it. `lib/as-asked.js`'s 'When the unsealed branches could go' drops 'Jira today', but the unsealed branches stay, for older tickets. Grounded at 4b5001ddf."
+     },
+     "links": {
+      "on": "plan-54@2"
+     }
+    }
+   ]
+  },
+  "finding-76": {
+   "id": "finding-76",
+   "kind": "finding",
+   "versions": [
+    {
+     "v": 1,
+     "op": "add",
+     "at": "2026-11-13T13:51:40.000Z",
+     "by": "survey-place",
+     "in": "area-1",
+     "to": "area-1",
+     "state": "open",
+     "fields": {
+      "says": "`lib/providers/jira/adf.js`: once LIN-4450 lands, the first-dispatch seal writes Jira-native tickets back through `updateIssue`. D1 refuses any ticket holding a mention, emoji or panel (common) and logs once per first dispatch; task-60's Done-when accepts that, and widening D1's vocabulary is plan-56 item 13's Waiting entry. The quieter half has no home: tickets that pass get their ADF normalised by the round trip, and their sealed words become `adfToMarkdown`'s escaped rendering, not what the person typed. The codec's lossiness, deeper than the seal task. (Survey of LIN-4450, 4b5001ddf.)"
+     },
+     "links": {
+      "about": "plan-56"
+     }
+    }
+   ]
+  },
+  "finding-77": {
+   "id": "finding-77",
+   "kind": "finding",
+   "versions": [
+    {
+     "v": 1,
+     "op": "add",
+     "at": "2026-11-13T13:51:41.000Z",
+     "by": "survey-place",
+     "in": "area-1",
+     "to": "area-1",
+     "state": "open",
+     "fields": {
+      "says": "`lib/providers/jira/index.js`: the bulk path could pass `properties` to `POST /rest/api/3/search/jql` (it accepts them), so the dashboard shows the exact sealed words and search stops reading an issue differently from `getIssue` (finding-70). Optional in plan review note 2; not in task-60's slice (decision-63). (Survey of LIN-4450.)"
+     },
+     "links": {
+      "about": "finding-70"
+     }
+    }
+   ]
+  },
+  "finding-78": {
+   "id": "finding-78",
+   "kind": "finding",
+   "versions": [
+    {
+     "v": 1,
+     "op": "add",
+     "at": "2026-11-13T13:51:42.000Z",
+     "by": "survey-place",
+     "in": "area-1",
+     "to": "area-1",
+     "state": "open",
+     "fields": {
+      "says": "`lib/providers/jira/index.js` (1,478 lines at 4b5001ddf) is mostly history comments; its header and `docs/architecture/source-map.md`'s Jira paragraph carry more history than guidance. Trim to what holds now. (Survey of LIN-4450.)"
+     },
+     "links": {}
+    }
+   ]
+  },
+  "run-79": {
+   "id": "run-79",
+   "kind": "run",
+   "versions": [
+    {
+     "v": 1,
+     "op": "add",
+     "at": "2026-11-13T13:51:43.000Z",
+     "by": "survey-place",
+     "in": "task-60",
+     "state": "open",
+     "fields": {
+      "stage": "survey-place",
+      "claims": [
+       "lib/providers/jira/",
+       "lib/as-asked-seal.js",
+       "lib/as-asked.js"
+      ],
+      "account": "Surveyed the place for LIN-4450 at 4b5001ddf (the grounding commit). The area is improving: `adf.js` is quiet since LIN-3570 and `lib/as-asked*.js` was just tidied toward one owner (LIN-4360/61/62); `index.js` is 1,478 lines, mostly history. Probed the codec on the witness shapes (`* a`, `*em*`, `***x***`, `3.` lists, a fence with a blank line, `a\\n\\n\\n\\nb`, trailing spaces): none tripped D1 and `adfToMarkdown∘markdownToAdf` reached a fixed point on all. That does not cover the empty fence, which finding-67 observed failing, so I do not claim D1 never blocks Harbour-written blocks. Took on finding-67 from area-1: this task is what makes Harbour write Jira descriptions, and finding-68 already asks it to fix-or-exclude. For task-60: one region module owning both stores, export `plainText`, one read helper, size function there (finding-73); stale claims beyond the plan's three (finding-74); the provider branch left without a subject (finding-75). The reader accepting more than the writer refuses is finding-66; nothing to add. For area-1: live Jira-native tickets normalised into escaped words (finding-76), bulk search could fetch `properties` (finding-77), comment weight (finding-78). Dropped my earlier note that `fetchIssueFields` is missing from the plan's list: plan-54 v2 names it. Nothing addressed to me to close."
+     },
+     "links": {
+      "on": "plan-54@2"
+     }
+    },
+    {
+     "v": 2,
+     "op": "end",
+     "at": "2026-11-13T13:51:44.000Z",
+     "by": "survey-place",
+     "in": "task-60",
+     "state": "done",
+     "fields": {
+      "stage": "survey-place",
+      "claims": [
+       "lib/providers/jira/",
+       "lib/as-asked-seal.js",
+       "lib/as-asked.js"
+      ],
+      "account": "Surveyed the place for LIN-4450 at 4b5001ddf (the grounding commit). The area is improving: `adf.js` is quiet since LIN-3570 and `lib/as-asked*.js` was just tidied toward one owner (LIN-4360/61/62); `index.js` is 1,478 lines, mostly history. Probed the codec on the witness shapes (`* a`, `*em*`, `***x***`, `3.` lists, a fence with a blank line, `a\\n\\n\\n\\nb`, trailing spaces): none tripped D1 and `adfToMarkdown∘markdownToAdf` reached a fixed point on all. That does not cover the empty fence, which finding-67 observed failing, so I do not claim D1 never blocks Harbour-written blocks. Took on finding-67 from area-1: this task is what makes Harbour write Jira descriptions, and finding-68 already asks it to fix-or-exclude. For task-60: one region module owning both stores, export `plainText`, one read helper, size function there (finding-73); stale claims beyond the plan's three (finding-74); the provider branch left without a subject (finding-75). The reader accepting more than the writer refuses is finding-66; nothing to add. For area-1: live Jira-native tickets normalised into escaped words (finding-76), bulk search could fetch `properties` (finding-77), comment weight (finding-78). Dropped my earlier note that `fetchIssueFields` is missing from the plan's list: plan-54 v2 names it. Nothing addressed to me to close."
      },
      "links": {
       "on": "plan-54@2"
@@ -1994,6 +2180,107 @@
   },
   {
    "at": "2026-11-17T13:38:33.110Z",
+   "by": "Harbour",
+   "query": "show",
+   "args": {
+    "task": "task-60",
+    "asOf": null
+   },
+   "returned": 1
+  },
+  {
+   "at": "2026-11-17T13:39:20.681Z",
+   "by": "survey-place",
+   "query": "find",
+   "args": {
+    "area": "area-1"
+   },
+   "returned": 1
+  },
+  {
+   "at": "2026-11-17T13:39:20.716Z",
+   "by": "survey-place",
+   "query": "find",
+   "args": {
+    "text": "D1"
+   },
+   "returned": 5
+  },
+  {
+   "at": "2026-11-17T13:39:20.748Z",
+   "by": "survey-place",
+   "query": "find",
+   "args": {
+    "text": "search"
+   },
+   "returned": 6
+  },
+  {
+   "at": "2026-11-17T13:39:20.779Z",
+   "by": "survey-place",
+   "query": "find",
+   "args": {
+    "text": "plainText"
+   },
+   "returned": 0
+  },
+  {
+   "at": "2026-11-17T13:39:20.810Z",
+   "by": "survey-place",
+   "query": "find",
+   "args": {
+    "kind": "run"
+   },
+   "returned": 1
+  },
+  {
+   "at": "2026-11-17T13:39:35.605Z",
+   "by": "survey-place",
+   "query": "find",
+   "args": {
+    "kind": "task"
+   },
+   "returned": 4
+  },
+  {
+   "at": "2026-11-17T13:39:35.646Z",
+   "by": "survey-place",
+   "query": "find",
+   "args": {
+    "kind": "area"
+   },
+   "returned": 3
+  },
+  {
+   "at": "2026-11-17T13:39:35.678Z",
+   "by": "survey-place",
+   "query": "find",
+   "args": {
+    "text": "normalis"
+   },
+   "returned": 2
+  },
+  {
+   "at": "2026-11-17T13:39:35.720Z",
+   "by": "survey-place",
+   "query": "find",
+   "args": {
+    "text": "source-map"
+   },
+   "returned": 0
+  },
+  {
+   "at": "2026-11-17T13:39:35.757Z",
+   "by": "survey-place",
+   "query": "find",
+   "args": {
+    "kind": "finding",
+    "text": "provider"
+   },
+   "returned": 1
+  },
+  {
+   "at": "2026-11-17T13:41:02.883Z",
    "by": "Harbour",
    "query": "show",
    "args": {

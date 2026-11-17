@@ -1,0 +1,12 @@
+task-60 task v1 [open] by breakdown
+decision-63 decision v1 [stands] by breakdown
+finding-66 finding v1 [open] to task-60 by survey-task
+finding-68 finding v2 [open] to task-60 by survey-task
+check-69 check v1 [open] to John by survey-task
+finding-70 finding v1 [open] to task-60 by survey-task
+finding-71 finding v1 [open] to task-60 by survey-task
+run-72 run v2 [done] by survey-task
+finding-73 finding v1 [open] to task-60 by survey-place
+finding-74 finding v1 [open] to task-60 by survey-place
+finding-75 finding v1 [open] to task-60 by survey-place
+run-79 run v2 [done] by survey-place
