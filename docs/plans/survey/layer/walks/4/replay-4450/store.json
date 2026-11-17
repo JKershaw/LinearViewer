@@ -3520,6 +3520,183 @@
     "--by",
     "blind-read"
    ]
+  },
+  {
+   "at": "2026-11-17T14:55:40.810Z",
+   "by": "close-out",
+   "q": [
+    "show",
+    "--task",
+    "task-60",
+    "--by",
+    "close-out"
+   ]
+  },
+  {
+   "at": "2026-11-17T14:55:40.853Z",
+   "by": "close-out",
+   "q": [
+    "get",
+    "change-85",
+    "--by",
+    "close-out"
+   ]
+  },
+  {
+   "at": "2026-11-17T14:55:44.590Z",
+   "by": "close-out",
+   "q": [
+    "show",
+    "--task",
+    "task-60",
+    "--by",
+    "close-out"
+   ]
+  },
+  {
+   "at": "2026-11-17T14:55:49.358Z",
+   "by": "close-out",
+   "q": [
+    "get",
+    "finding-89",
+    "--by",
+    "close-out"
+   ]
+  },
+  {
+   "at": "2026-11-17T14:55:49.397Z",
+   "by": "close-out",
+   "q": [
+    "get",
+    "finding-76",
+    "--by",
+    "close-out"
+   ]
+  },
+  {
+   "at": "2026-11-17T14:55:49.432Z",
+   "by": "close-out",
+   "q": [
+    "get",
+    "check-68",
+    "--by",
+    "close-out"
+   ]
+  },
+  {
+   "at": "2026-11-17T14:55:49.469Z",
+   "by": "close-out",
+   "q": [
+    "get",
+    "finding-97",
+    "--by",
+    "close-out"
+   ]
+  },
+  {
+   "at": "2026-11-17T14:55:49.506Z",
+   "by": "close-out",
+   "q": [
+    "get",
+    "task-62",
+    "--by",
+    "close-out"
+   ]
+  },
+  {
+   "at": "2026-11-17T14:55:49.545Z",
+   "by": "close-out",
+   "q": [
+    "get",
+    "task-61",
+    "--by",
+    "close-out"
+   ]
+  },
+  {
+   "at": "2026-11-17T14:55:49.581Z",
+   "by": "close-out",
+   "q": [
+    "get",
+    "task-60",
+    "--by",
+    "close-out"
+   ]
+  },
+  {
+   "at": "2026-11-17T14:55:54.019Z",
+   "by": "close-out",
+   "q": [
+    "get",
+    "check-90",
+    "--by",
+    "close-out"
+   ]
+  },
+  {
+   "at": "2026-11-17T14:55:54.053Z",
+   "by": "close-out",
+   "q": [
+    "find",
+    "--to",
+    "close-out",
+    "--state",
+    "open",
+    "--by",
+    "close-out"
+   ]
+  },
+  {
+   "at": "2026-11-17T14:55:54.108Z",
+   "by": "close-out",
+   "q": [
+    "find",
+    "--to",
+    "area-1",
+    "--state",
+    "open",
+    "--by",
+    "close-out"
+   ]
+  },
+  {
+   "at": "2026-11-17T14:55:54.141Z",
+   "by": "close-out",
+   "q": [
+    "find",
+    "--to",
+    "task-62",
+    "--state",
+    "open",
+    "--by",
+    "close-out"
+   ]
+  },
+  {
+   "at": "2026-11-17T14:55:54.178Z",
+   "by": "close-out",
+   "q": [
+    "find",
+    "--text",
+    "4452",
+    "--state",
+    "open",
+    "--by",
+    "close-out"
+   ]
+  },
+  {
+   "at": "2026-11-17T14:55:54.210Z",
+   "by": "close-out",
+   "q": [
+    "find",
+    "--text",
+    "batch",
+    "--state",
+    "open",
+    "--by",
+    "close-out"
+   ]
   }
  ]
 }

@@ -1,0 +1,162 @@
+[
+ {
+  "at": "2026-11-17T14:54:57.545Z",
+  "by": "leftover",
+  "q": [
+   "find",
+   "--kind",
+   "area",
+   "--by",
+   "leftover"
+  ]
+ },
+ {
+  "at": "2026-11-17T14:54:57.586Z",
+  "by": "leftover",
+  "q": [
+   "find",
+   "--text",
+   "wakeHook",
+   "--by",
+   "leftover"
+  ]
+ },
+ {
+  "at": "2026-11-17T14:54:57.617Z",
+  "by": "leftover",
+  "q": [
+   "find",
+   "--to",
+   "leftover",
+   "--by",
+   "leftover"
+  ]
+ },
+ {
+  "at": "2026-11-17T14:54:57.647Z",
+  "by": "leftover",
+  "q": [
+   "show",
+   "--task",
+   "task-60",
+   "--by",
+   "leftover"
+  ]
+ },
+ {
+  "at": "2026-11-17T14:55:04.499Z",
+  "by": "leftover",
+  "q": [
+   "find",
+   "--text",
+   "Waiting 2:",
+   "--by",
+   "leftover"
+  ]
+ },
+ {
+  "at": "2026-11-17T14:55:04.534Z",
+  "by": "leftover",
+  "q": [
+   "find",
+   "--text",
+   "Waiting 4:",
+   "--by",
+   "leftover"
+  ]
+ },
+ {
+  "at": "2026-11-17T14:55:04.570Z",
+  "by": "leftover",
+  "q": [
+   "find",
+   "--text",
+   "Waiting 11:",
+   "--by",
+   "leftover"
+  ]
+ },
+ {
+  "at": "2026-11-17T14:55:04.607Z",
+  "by": "leftover",
+  "q": [
+   "find",
+   "--text",
+   "LIN-4448",
+   "--by",
+   "leftover"
+  ]
+ },
+ {
+  "at": "2026-11-17T14:55:04.640Z",
+  "by": "leftover",
+  "q": [
+   "find",
+   "--text",
+   "mayCarryWake",
+   "--by",
+   "leftover"
+  ]
+ },
+ {
+  "at": "2026-11-17T14:55:04.676Z",
+  "by": "leftover",
+  "q": [
+   "find",
+   "--text",
+   "Waiting entry",
+   "--by",
+   "leftover"
+  ]
+ },
+ {
+  "at": "2026-11-17T14:55:13.510Z",
+  "by": "leftover",
+  "q": [
+   "get",
+   "finding-19",
+   "--by",
+   "leftover"
+  ]
+ },
+ {
+  "at": "2026-11-17T14:55:13.550Z",
+  "by": "leftover",
+  "q": [
+   "get",
+   "finding-21",
+   "--by",
+   "leftover"
+  ]
+ },
+ {
+  "at": "2026-11-17T14:55:13.612Z",
+  "by": "leftover",
+  "q": [
+   "get",
+   "finding-28",
+   "--by",
+   "leftover"
+  ]
+ },
+ {
+  "at": "2026-11-17T14:55:23.348Z",
+  "by": "leftover",
+  "q": [
+   "get",
+   "finding-99",
+   "--by",
+   "leftover"
+  ]
+ },
+ {
+  "at": "2026-11-17T14:55:23.393Z",
+  "by": "leftover",
+  "q": [
+   "get",
+   "finding-100",
+   "--by",
+   "leftover"
+  ]
+ }
+]

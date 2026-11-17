@@ -2825,6 +2825,137 @@
     "--by",
     "leftover"
    ]
+  },
+  {
+   "at": "2026-11-17T14:55:39.718Z",
+   "by": "review",
+   "q": [
+    "show",
+    "--task",
+    "task-28",
+    "--by",
+    "review"
+   ]
+  },
+  {
+   "at": "2026-11-17T14:55:39.760Z",
+   "by": "review",
+   "q": [
+    "get",
+    "change-69",
+    "--by",
+    "review"
+   ]
+  },
+  {
+   "at": "2026-11-17T14:55:39.793Z",
+   "by": "review",
+   "q": [
+    "get",
+    "finding-72",
+    "--by",
+    "review"
+   ]
+  },
+  {
+   "at": "2026-11-17T14:55:48.699Z",
+   "by": "review",
+   "q": [
+    "show",
+    "--task",
+    "task-28",
+    "--by",
+    "review"
+   ]
+  },
+  {
+   "at": "2026-11-17T14:55:48.743Z",
+   "by": "review",
+   "q": [
+    "find",
+    "--in",
+    "area-49",
+    "--state",
+    "open",
+    "--by",
+    "review"
+   ]
+  },
+  {
+   "at": "2026-11-17T14:55:53.566Z",
+   "by": "review",
+   "q": [
+    "get",
+    "finding-73",
+    "--by",
+    "review"
+   ]
+  },
+  {
+   "at": "2026-11-17T14:55:53.606Z",
+   "by": "review",
+   "q": [
+    "get",
+    "run-76",
+    "--by",
+    "review"
+   ]
+  },
+  {
+   "at": "2026-11-17T14:55:53.640Z",
+   "by": "review",
+   "q": [
+    "get",
+    "run-68",
+    "--by",
+    "review"
+   ]
+  },
+  {
+   "at": "2026-11-17T14:55:53.679Z",
+   "by": "review",
+   "q": [
+    "get",
+    "finding-71",
+    "--by",
+    "review"
+   ]
+  },
+  {
+   "at": "2026-11-17T14:55:53.717Z",
+   "by": "review",
+   "q": [
+    "get",
+    "finding-78",
+    "--by",
+    "review"
+   ]
+  },
+  {
+   "at": "2026-11-17T14:55:53.750Z",
+   "by": "review",
+   "q": [
+    "find",
+    "--kind",
+    "verdict",
+    "--in",
+    "task-28",
+    "--by",
+    "review"
+   ]
+  },
+  {
+   "at": "2026-11-17T14:55:53.777Z",
+   "by": "review",
+   "q": [
+    "find",
+    "--kind",
+    "check",
+    "--to",
+    "close-out",
+    "--by",
+    "review"
+   ]
   }
  ]
 }
