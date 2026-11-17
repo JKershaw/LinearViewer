@@ -1,5 +1,5 @@
 {
- "next": 179,
+ "next": 189,
  "records": {
   "area-1": [
    {
@@ -4850,6 +4850,242 @@
      "scope": "task-131",
      "answer": "Ruling lin-4469-witness withdrawn by the autopilot at 23:17:16 (wake ad1b1a6d), not answered: \"Moot: John answered lin-4469-cuts with fold, and the net fall for kinds carrying no folded text needs no ruling. The folds are built and CI is green.\" The four `work` kinds staying byte-identical needs no fall; merge no longer waits on John for this.",
      "why": "The autopilot's own withdrawal reason (question-162 was ended withdrawn by review at 23:17:22 from the Linear row). Replaces decision-161's closing line \"Merge waits on the witness ruling (lin-4469-witness)\" and decision-166's \"which gates merge\". The reason does not mention seams-tangles +24; that rise is carried by finding-174 / check-176 (close-out, before the merge)."
+    }
+   }
+  ],
+  "finding-179": [
+   {
+    "id": "finding-179",
+    "kind": "finding",
+    "v": 1,
+    "op": "add",
+    "at": "2026-11-13T23:22:26.766Z",
+    "by": "blind-read",
+    "in": "task-131",
+    "to": "close-out",
+    "state": "open",
+    "links": {
+     "about": [
+      "change-142",
+      "decision-144"
+     ]
+    },
+    "fields": {
+     "says": "`tests/unit/lin-4469-prompt-folds.test.js`: the describe says the folded spellings \"appear in no rendered prompt\", but each test asserts `where.length <= 1`, so a retired phrase left in one template or Periodical still passes. None renders anywhere at `877f32cb4`, so assert `where.length === 0` and drop \"at most one\" from the test name. (Blind read, LIN-4469 comment d96c0849.)"
+    }
+   }
+  ],
+  "finding-180": [
+   {
+    "id": "finding-180",
+    "kind": "finding",
+    "v": 1,
+    "op": "add",
+    "at": "2026-11-13T23:22:27.766Z",
+    "by": "blind-read",
+    "in": "task-131",
+    "to": "close-out",
+    "state": "open",
+    "links": {
+     "about": [
+      "change-142",
+      "finding-40"
+     ]
+    },
+    "fields": {
+     "says": "`lib/periodicals.js`: `committedSearch` closes its own parenthesis, and Stability's bullet strips it again with `capitalised(committedSearch(...)).slice(0, -1)` to add \"; look beside …)\". One caller undoes the helper's output shape, so a change to the helper's wording silently breaks Stability. Fix: give `committedSearch` an optional tail (e.g. `(what, more = '')` -> `(no path is written here${more})`) and drop the slice. (Blind read, d96c0849.)"
+    }
+   }
+  ],
+  "finding-181": [
+   {
+    "id": "finding-181",
+    "kind": "finding",
+    "v": 1,
+    "op": "add",
+    "at": "2026-11-13T23:22:28.766Z",
+    "by": "blind-read",
+    "in": "task-131",
+    "to": "close-out",
+    "state": "open",
+    "links": {
+     "about": [
+      "change-142",
+      "finding-174"
+     ]
+    },
+    "fields": {
+     "says": "`tests/unit/lin-4313-periodical-prompt-bytes.test.js`: its LIN-4469 header says both Seams & Tangles bullets are built by `committedSearch`, but the first `runReview` bullet (`lib/periodicals.js` ~l.991) is hand-typed. Fix: correct the comment, or route that bullet through the helper and re-pin its hash. finding-174 restores main's hand-typed wording, which leaves the comment still wrong. (Blind read, d96c0849.)"
+    }
+   }
+  ],
+  "finding-182": [
+   {
+    "id": "finding-182",
+    "kind": "finding",
+    "v": 1,
+    "op": "add",
+    "at": "2026-11-13T23:22:29.766Z",
+    "by": "blind-read",
+    "in": "task-131",
+    "to": "close-out",
+    "state": "open",
+    "links": {
+     "about": [
+      "change-142",
+      "decision-144"
+     ]
+    },
+    "fields": {
+     "says": "`docs/architecture/source-map.md` (unmapped; concerns `lib/prompts/leftover-words.js`): still calls `leftover-words.js` \"A leaf that imports nothing\" and doesn't list `areaLookup` or `NOTES_PR`; at `877f32cb4` it imports `area-registry-path.js` and exports both. Fix: update that one line. (Blind read, d96c0849.)"
+    }
+   }
+  ],
+  "finding-183": [
+   {
+    "id": "finding-183",
+    "kind": "finding",
+    "v": 1,
+    "op": "add",
+    "at": "2026-11-13T23:22:30.766Z",
+    "by": "blind-read",
+    "to": "area-1",
+    "state": "open",
+    "links": {
+     "about": [
+      "task-129",
+      "lesson-19"
+     ]
+    },
+    "fields": {
+     "says": "`lib/prompts/stage-kinds.js`: five records declare `intent: null`, then a loop at the bottom of the module overwrites `record.intent` on the exported objects, so the literal read is not what the record holds and the header has to explain it. Fix: derive the reading-pass line in the `STAGE_INTENT` view (`lib/prompts/stage-intent.js`), or write it on each record, so records are not mutated after declaration. Fix-sized. (Blind read of #2444, LIN-4469 comment d96c0849.)"
+    }
+   }
+  ],
+  "finding-184": [
+   {
+    "id": "finding-184",
+    "kind": "finding",
+    "v": 1,
+    "op": "add",
+    "at": "2026-11-13T23:22:31.766Z",
+    "by": "blind-read",
+    "to": "area-65",
+    "state": "open",
+    "links": {
+     "about": [
+      "task-129"
+     ]
+    },
+    "fields": {
+     "says": "`lib/completion-signals.js`: now a view of the stage-kind record, but keeps six exports no file under `lib/`, `routes/` or `server.js` calls (`hasSignals`, `getDefinedSignalTypes`, `getSignal`, `assessCompletion`, `getBlockers`, `formatSignalsForPrompt`); `hasSignals`'s null branch is unreachable and the header still says \"simplified 3-label system\". Fix: delete the unused helpers (and tests of them only), leaving `COMPLETION_SIGNALS`. Fix-sized. (Blind read, d96c0849.)"
+    }
+   }
+  ],
+  "finding-185": [
+   {
+    "id": "finding-185",
+    "kind": "finding",
+    "v": 1,
+    "op": "add",
+    "at": "2026-11-13T23:22:32.766Z",
+    "by": "blind-read",
+    "to": "area-1",
+    "state": "open",
+    "links": {
+     "about": [
+      "decision-170",
+      "lesson-171",
+      "task-129",
+      "change-142"
+     ]
+    },
+    "fields": {
+     "says": "`tests/fixtures/lin-4467-witness.json` with `tests/unit/lin-4467-stage-kind-witness.test.js`: a sha256 for 40 real-context renders and each per-kind table, so every prompt wording change regenerates it beside the byte ceilings and change log (#2447 churns 106 lines of it). A hash failure says something changed, never what. The table hashes (e.g. `COMPLETION_SIGNALS`) pin views `lin-4467-stage-kind-record.test.js` already ties to the record by construction, and `lin-4469-prompt-folds.test.js` now imports its `MODES`. Larger: keep, trim (renders only) or fold into `prompt-size-budget.test.js` is a test-suite decision; it reopens decision-170 (keep as a permanent ratchet). (Blind read, d96c0849.)"
+    }
+   }
+  ],
+  "finding-186": [
+   {
+    "id": "finding-186",
+    "kind": "finding",
+    "v": 1,
+    "op": "add",
+    "at": "2026-11-13T23:22:33.766Z",
+    "by": "blind-read",
+    "to": "area-65",
+    "state": "open",
+    "links": {
+     "about": [
+      "finding-25",
+      "finding-44",
+      "task-129"
+     ]
+    },
+    "fields": {
+     "says": "`lib/run-view.js`: `STEP_KIND_WORDS` copies six labels from `STAGE_LABELS` through a hand-typed kind list; other kinds fall back to `stepKindWord`'s capitalised form, so one kind gets two display words (`stageLabel('look-into')` \"Look into\" vs `stepKindWord('look-into')` \"Look-into\"), and a new kind must be added by hand. Larger: one display word per kind changes visible labels on the run page and settings (`lib/render-session.js`, `lib/render-settings.js`). (Blind read, d96c0849.)"
+    }
+   }
+  ],
+  "run-187": [
+   {
+    "id": "run-187",
+    "kind": "run",
+    "v": 1,
+    "op": "add",
+    "at": "2026-11-13T23:22:34.766Z",
+    "by": "blind-read",
+    "in": "task-131",
+    "state": "open",
+    "links": {},
+    "fields": {
+     "stage": "blind-read",
+     "account": "# What this stage really wrote\n\nDescription: unchanged.\n\n## Comment on LIN-4469 at 23:26:25 (id d96c0849)\n\n## Blind read\nVerdict: better. Better: #2444 replaces about eight parallel per-kind tables (template traits, `STAGE_LEADS`, `COMPLETION_SIGNALS`, `STAGE_INTENT`, `GROUNDING_BY_KIND`, `STAGE_LABELS`, the contract lines, the `llms.txt` catalogue, the override verb list) with one record per kind in `lib/prompts/stage-kinds.js`, deletes `VIRTUAL_PROMPTS` (`lib/workflow-config.js`) and moves the review-bound reasons next to the bound (`lib/recommendation-facts.js`), and #2447 replaces hand-typed copies of three clauses with `NOTES_PR`, `areaLookup` and `committedSearch`. Worse: both PRs leave a sha256 render/table witness that every later wording change has to regenerate (`tests/fixtures/lin-4467-witness.json`), a fold that one caller undoes with `.slice(0, -1)` (`lib/periodicals.js`), and a \"retired phrase\" test that still lets a phrase stay in one prompt (`tests/unit/lin-4469-prompt-folds.test.js`).\n\nRead: https://github.com/JKershaw/LinearViewer/pull/2444, https://github.com/JKershaw/LinearViewer/pull/2447 at `a9b216d88` against `b8e2a0aad`, and at `877f32cb4` against `b937237a4`.\n\n### Inside the area, fix-sized\n- `tests/unit/lin-4469-prompt-folds.test.js` (llm-and-prompts): the describe says the folded spellings \"appear in no rendered prompt\", but each test asserts `where.length <= 1`, so a retired phrase left in one template or Periodical still passes. None of them renders anywhere at `877f32cb4`, so the fix is to assert `where.length === 0` and drop \"at most one\" from the test name.\n- `lib/periodicals.js` (llm-and-prompts): `committedSearch` closes its own parenthesis, and Stability's bullet strips it again with `capitalised(committedSearch(...)).slice(0, -1)` so it can add its own \"; look beside …)\". The helper's output shape is undone by one caller, so changing the helper's wording silently breaks Stability. Fix: give `committedSearch` an optional tail for the parenthetical (e.g. `(what, more = '')` → `(no path is written here${more})`) and drop the slice.\n- `tests/unit/lin-4313-periodical-prompt-bytes.test.js` (llm-and-prompts; concerns `lib/periodicals.js`): its LIN-4469 header says both Seams & Tangles bullets are built by `committedSearch`, but the first `runReview` bullet (`lib/periodicals.js` ~l.991) still hand-types \"searching the repo for them (no path is written here)\". Fix: correct the comment, or route that bullet through the helper and re-pin its hash.\n- `docs/architecture/source-map.md` (unmapped; concerns `lib/prompts/leftover-words.js`, llm-and-prompts): it still calls `leftover-words.js` \"A leaf that imports nothing\" and doesn't list `areaLookup` or `NOTES_PR`. At `877f32cb4` the file imports `area-registry-path.js` and exports both. Fix: update that one line.\n- `lib/prompts/stage-kinds.js` (llm-and-prompts): five records declare `intent: null`, then a loop at the bottom of the module overwrites `record.intent` on the exported objects. The literal you read is not what the record holds, and the header has to explain it. Fix: derive the reading-pass line in the `STAGE_INTENT` view (`lib/prompts/stage-intent.js`), or write it on each record, so the records aren't mutated after they're declared.\n- `lib/completion-signals.js` (runs-and-dispatch): the module is now a view, but it keeps six exports that no file under `lib/`, `routes/` or `server.js` calls (`hasSignals`, `getDefinedSignalTypes`, `getSignal`, `assessCompletion`, `getBlockers`, `formatSignalsForPrompt`). `hasSignals`'s null branch can no longer be reached, and the header still says \"simplified 3-label system\". Fix: delete the unused helpers (and any tests of them only), leaving `COMPLETION_SIGNALS`.\n\n### Inside the area, larger\n- `tests/fixtures/lin-4467-witness.json` with `tests/unit/lin-4467-stage-kind-witness.test.js` (llm-and-prompts): the fixture holds a sha256 for 40 real-context renders and for each per-kind table, so every prompt wording change now regenerates it alongside the byte ceilings and the change log (#2447 already churns 106 lines of it). A hash failure says that something changed but never what. The table hashes (e.g. `COMPLETION_SIGNALS`) now pin views that `lin-4467-stage-kind-record.test.js` already ties to the record by construction, and `lin-4469-prompt-folds.test.js` now imports its `MODES`, which ties more tests to it. It's larger because keeping, trimming (renders only) or folding it into `prompt-size-budget.test.js` is a decision about the test suite.\n- `lib/run-view.js` (runs-and-dispatch): `STEP_KIND_WORDS` copies six labels from `STAGE_LABELS` through a hand-typed kind list. Every other kind falls back to `stepKindWord`'s capitalised form, so one kind gets two display words (`stageLabel('look-into')` is \"Look into\", `stepKindWord('look-into')` is \"Look-into\"), and a new kind has to be added to that list by hand. It's larger because choosing one display word per kind changes visible labels on the run page and settings (`lib/render-session.js`, `lib/render-settings.js`).\n\n### Outside the area\nNone.\n"
+    }
+   },
+   {
+    "id": "run-187",
+    "kind": "run",
+    "v": 2,
+    "op": "end",
+    "at": "2026-11-13T23:22:35.766Z",
+    "by": "blind-read",
+    "in": "task-131",
+    "state": "done",
+    "ended": {
+     "reason": "Blind read posted on LIN-4469 (d96c0849): better; eight findings addressed"
+    },
+    "links": {},
+    "fields": {
+     "stage": "blind-read",
+     "account": "# What this stage really wrote\n\nDescription: unchanged.\n\n## Comment on LIN-4469 at 23:26:25 (id d96c0849)\n\n## Blind read\nVerdict: better. Better: #2444 replaces about eight parallel per-kind tables (template traits, `STAGE_LEADS`, `COMPLETION_SIGNALS`, `STAGE_INTENT`, `GROUNDING_BY_KIND`, `STAGE_LABELS`, the contract lines, the `llms.txt` catalogue, the override verb list) with one record per kind in `lib/prompts/stage-kinds.js`, deletes `VIRTUAL_PROMPTS` (`lib/workflow-config.js`) and moves the review-bound reasons next to the bound (`lib/recommendation-facts.js`), and #2447 replaces hand-typed copies of three clauses with `NOTES_PR`, `areaLookup` and `committedSearch`. Worse: both PRs leave a sha256 render/table witness that every later wording change has to regenerate (`tests/fixtures/lin-4467-witness.json`), a fold that one caller undoes with `.slice(0, -1)` (`lib/periodicals.js`), and a \"retired phrase\" test that still lets a phrase stay in one prompt (`tests/unit/lin-4469-prompt-folds.test.js`).\n\nRead: https://github.com/JKershaw/LinearViewer/pull/2444, https://github.com/JKershaw/LinearViewer/pull/2447 at `a9b216d88` against `b8e2a0aad`, and at `877f32cb4` against `b937237a4`.\n\n### Inside the area, fix-sized\n- `tests/unit/lin-4469-prompt-folds.test.js` (llm-and-prompts): the describe says the folded spellings \"appear in no rendered prompt\", but each test asserts `where.length <= 1`, so a retired phrase left in one template or Periodical still passes. None of them renders anywhere at `877f32cb4`, so the fix is to assert `where.length === 0` and drop \"at most one\" from the test name.\n- `lib/periodicals.js` (llm-and-prompts): `committedSearch` closes its own parenthesis, and Stability's bullet strips it again with `capitalised(committedSearch(...)).slice(0, -1)` so it can add its own \"; look beside …)\". The helper's output shape is undone by one caller, so changing the helper's wording silently breaks Stability. Fix: give `committedSearch` an optional tail for the parenthetical (e.g. `(what, more = '')` → `(no path is written here${more})`) and drop the slice.\n- `tests/unit/lin-4313-periodical-prompt-bytes.test.js` (llm-and-prompts; concerns `lib/periodicals.js`): its LIN-4469 header says both Seams & Tangles bullets are built by `committedSearch`, but the first `runReview` bullet (`lib/periodicals.js` ~l.991) still hand-types \"searching the repo for them (no path is written here)\". Fix: correct the comment, or route that bullet through the helper and re-pin its hash.\n- `docs/architecture/source-map.md` (unmapped; concerns `lib/prompts/leftover-words.js`, llm-and-prompts): it still calls `leftover-words.js` \"A leaf that imports nothing\" and doesn't list `areaLookup` or `NOTES_PR`. At `877f32cb4` the file imports `area-registry-path.js` and exports both. Fix: update that one line.\n- `lib/prompts/stage-kinds.js` (llm-and-prompts): five records declare `intent: null`, then a loop at the bottom of the module overwrites `record.intent` on the exported objects. The literal you read is not what the record holds, and the header has to explain it. Fix: derive the reading-pass line in the `STAGE_INTENT` view (`lib/prompts/stage-intent.js`), or write it on each record, so the records aren't mutated after they're declared.\n- `lib/completion-signals.js` (runs-and-dispatch): the module is now a view, but it keeps six exports that no file under `lib/`, `routes/` or `server.js` calls (`hasSignals`, `getDefinedSignalTypes`, `getSignal`, `assessCompletion`, `getBlockers`, `formatSignalsForPrompt`). `hasSignals`'s null branch can no longer be reached, and the header still says \"simplified 3-label system\". Fix: delete the unused helpers (and any tests of them only), leaving `COMPLETION_SIGNALS`.\n\n### Inside the area, larger\n- `tests/fixtures/lin-4467-witness.json` with `tests/unit/lin-4467-stage-kind-witness.test.js` (llm-and-prompts): the fixture holds a sha256 for 40 real-context renders and for each per-kind table, so every prompt wording change now regenerates it alongside the byte ceilings and the change log (#2447 already churns 106 lines of it). A hash failure says that something changed but never what. The table hashes (e.g. `COMPLETION_SIGNALS`) now pin views that `lin-4467-stage-kind-record.test.js` already ties to the record by construction, and `lin-4469-prompt-folds.test.js` now imports its `MODES`, which ties more tests to it. It's larger because keeping, trimming (renders only) or folding it into `prompt-size-budget.test.js` is a decision about the test suite.\n- `lib/run-view.js` (runs-and-dispatch): `STEP_KIND_WORDS` copies six labels from `STAGE_LABELS` through a hand-typed kind list. Every other kind falls back to `stepKindWord`'s capitalised form, so one kind gets two display words (`stageLabel('look-into')` is \"Look into\", `stepKindWord('look-into')` is \"Look-into\"), and a new kind has to be added to that list by hand. It's larger because choosing one display word per kind changes visible labels on the run page and settings (`lib/render-session.js`, `lib/render-settings.js`).\n\n### Outside the area\nNone.\n"
+    }
+   }
+  ],
+  "verdict-188": [
+   {
+    "id": "verdict-188",
+    "kind": "verdict",
+    "v": 1,
+    "op": "add",
+    "at": "2026-11-13T23:22:36.766Z",
+    "by": "blind-read",
+    "in": "task-131",
+    "to": "close-out",
+    "state": "stands",
+    "links": {
+     "on": [
+      "change-142@5",
+      "task-129@2"
+     ],
+     "about": [
+      "area-1"
+     ]
+    },
+    "fields": {
+     "of": "blind-read",
+     "outcome": "better",
+     "reasoning": "What was read: area-1 (LLM & prompts) after PR #2444 (LIN-4467, at a9b216d88 against b8e2a0aad) and PR #2447 (LIN-4469, at 877f32cb4 against b937237a4). Better: #2444 replaces about eight parallel per-kind tables (template traits, STAGE_LEADS, COMPLETION_SIGNALS, STAGE_INTENT, GROUNDING_BY_KIND, STAGE_LABELS, the contract lines, the llms.txt catalogue, the override verb list) with one record per kind in lib/prompts/stage-kinds.js, deletes VIRTUAL_PROMPTS (lib/workflow-config.js) and moves the review-bound reasons next to the bound (lib/recommendation-facts.js); #2447 replaces hand-typed copies of three clauses with NOTES_PR, areaLookup and committedSearch. Worse: a sha256 render/table witness every later wording change must regenerate (tests/fixtures/lin-4467-witness.json, finding-185), a fold one caller undoes with .slice(0, -1) (lib/periodicals.js, finding-180), and a \"retired phrase\" test that still lets a phrase stay in one prompt (tests/unit/lin-4469-prompt-folds.test.js, finding-179). Findings: finding-179..186. Outside the area: none. Posted on LIN-4469, comment d96c0849, 23:26:25."
     }
    }
   ]
