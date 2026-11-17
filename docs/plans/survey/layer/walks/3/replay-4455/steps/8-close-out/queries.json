@@ -1,0 +1,132 @@
+[
+ {
+  "at": "2026-11-17T13:54:56.748Z",
+  "by": "close-out",
+  "query": "get",
+  "args": {
+   "id": "change-82",
+   "asOf": null
+  },
+  "returned": 1
+ },
+ {
+  "at": "2026-11-17T13:54:56.788Z",
+  "by": "close-out",
+  "query": "get",
+  "args": {
+   "id": "check-94",
+   "asOf": null
+  },
+  "returned": 1
+ },
+ {
+  "at": "2026-11-17T13:54:56.820Z",
+  "by": "close-out",
+  "query": "show",
+  "args": {
+   "task": "task-60",
+   "asOf": null
+  },
+  "returned": 1
+ },
+ {
+  "at": "2026-11-17T13:55:00.503Z",
+  "by": "close-out",
+  "query": "show",
+  "args": {
+   "task": "task-60",
+   "asOf": null
+  },
+  "returned": 1
+ },
+ {
+  "at": "2026-11-17T13:55:06.814Z",
+  "by": "close-out",
+  "query": "get",
+  "args": {
+   "id": "finding-99",
+   "asOf": null
+  },
+  "returned": 1
+ },
+ {
+  "at": "2026-11-17T13:55:06.855Z",
+  "by": "close-out",
+  "query": "get",
+  "args": {
+   "id": "finding-100",
+   "asOf": null
+  },
+  "returned": 1
+ },
+ {
+  "at": "2026-11-17T13:55:06.899Z",
+  "by": "close-out",
+  "query": "get",
+  "args": {
+   "id": "finding-101",
+   "asOf": null
+  },
+  "returned": 1
+ },
+ {
+  "at": "2026-11-17T13:55:06.944Z",
+  "by": "close-out",
+  "query": "get",
+  "args": {
+   "id": "finding-73",
+   "asOf": null
+  },
+  "returned": 1
+ },
+ {
+  "at": "2026-11-17T13:55:06.988Z",
+  "by": "close-out",
+  "query": "get",
+  "args": {
+   "id": "finding-76",
+   "asOf": null
+  },
+  "returned": 1
+ },
+ {
+  "at": "2026-11-17T13:55:07.030Z",
+  "by": "close-out",
+  "query": "get",
+  "args": {
+   "id": "finding-22",
+   "asOf": null
+  },
+  "returned": 1
+ },
+ {
+  "at": "2026-11-17T13:56:06.230Z",
+  "by": "close-out",
+  "query": "get",
+  "args": {
+   "id": "verdict-90",
+   "asOf": null
+  },
+  "returned": 1
+ },
+ {
+  "at": "2026-11-17T13:56:06.264Z",
+  "by": "close-out",
+  "query": "get",
+  "args": {
+   "id": "verdict-96",
+   "asOf": null
+  },
+  "returned": 1
+ },
+ {
+  "at": "2026-11-17T13:56:06.300Z",
+  "by": "close-out",
+  "query": "get",
+  "args": {
+   "id": "check-94",
+   "asOf": null
+  },
+  "returned": 1
+ }
+]

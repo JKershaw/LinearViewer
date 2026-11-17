@@ -1,6 +1,6 @@
 {
  "retro": false,
- "next": 108,
+ "next": 109,
  "records": {
   "area-1": {
    "id": "area-1",
@@ -1507,6 +1507,29 @@
      "links": {
       "piece": "plan-45"
      }
+    },
+    {
+     "v": 2,
+     "op": "end",
+     "at": "2026-11-13T16:16:43.000Z",
+     "by": "close-out",
+     "in": "task-39",
+     "state": "done",
+     "fields": {
+      "asked": "",
+      "done-when": "LIN-4455 (piece 5): `lib/dispatch-leftover.js` and `_releaseIfHeld` / `releaseHeldWake` in `lib/dispatch-store.js` import halt modes, `NEVER_RAN` and the follow-up target from their owners instead of restating them; `wakeHook.releaseNote` supplies the release wording, so the store no longer calls `formatHeldWakeNote` and stops owning that wording; one `FEEDBACK_KINDS` table in `lib/dispatch-feedback-validation.js` carries each kind's roles, and `PARKED_WAIT_SKIPPED_KINDS`, `FEEDBACK_ENTRY_KINDS` and `findWakeEvent`'s skip rule derive from it. Retires the restated constants, the store's ownership of the release wording and the three hand-written kind sets; settles Waiting 2, 4, 11, removed from `docs/areas/runs-and-dispatch.md` in the same change with Lessons under 6,144 bytes; the PR says what it retires. Witness: a test that iterates `HALT_MODES` and shows every mode stops a leftover, and the `lin-4377` test counting the import, not the spelling. Binding: no stored readiness, no GitHub or provider reads, never recompute pre-cutover history, the LLM & prompts side is LIN-4448's.",
+      "paths": [
+       "lib/dispatch-leftover.js",
+       "lib/dispatch-store.js",
+       "lib/dispatch-feedback-validation.js",
+       "docs/areas/runs-and-dispatch.md"
+      ]
+     },
+     "links": {
+      "piece": "plan-45"
+     },
+     "reason": "LIN-4455 Done: PR #2427 merged as 192e1f81f (head f78b61898) and deployed; ci-success green on the merged head; Waiting 2, 4, 11 settled; review and blind-read notes fixed; larger finds are Waiting entries (finding-99, 100, 101 to area-1). Open: check-94 to John (production-log watch, not run here).",
+     "stateReason": "LIN-4455 Done: PR #2427 merged as 192e1f81f (head f78b61898) and deployed; ci-success green on the merged head; Waiting 2, 4, 11 settled; review and blind-read notes fixed; larger finds are Waiting entries (finding-99, 100, 101 to area-1). Open: check-94 to John (production-log watch, not run here)."
     }
    ]
   },
@@ -1955,6 +1978,24 @@
       "on": "plan-45@1",
       "about": "question-67"
      }
+    },
+    {
+     "v": 2,
+     "op": "end",
+     "at": "2026-11-13T16:16:40.000Z",
+     "by": "close-out",
+     "in": "task-60",
+     "to": "design",
+     "state": "done",
+     "fields": {
+      "says": "Place survey @ cfd152fa4, for question-67: the cycle is nearer than the load-order chain it names. `lib/dispatch-feedback-validation.js:13` already imports its kind list (`FEEDBACK_ENTRY_KINDS`) from `lib/dispatch-store.js`, so the dependency points the wrong way; if the store then imports a table from validation, the two import each other. Recommend the leaf: `lib/dispatch-feedback-kinds.js`, importing nothing, read by validation, the store and `lib/session-telemetry.js`, with the store keeping its `FEEDBACK_ENTRY_KINDS` re-export so callers do not move."
+     },
+     "links": {
+      "on": "plan-45@1",
+      "about": "question-67"
+     },
+     "reason": "Taken: decision-83 homed FEEDBACK_KINDS in the import-free leaf lib/dispatch-feedback-kinds.js this finding recommended, answering question-67; merged in PR #2427 (192e1f81f). Nothing left for design.",
+     "stateReason": "Taken: decision-83 homed FEEDBACK_KINDS in the import-free leaf lib/dispatch-feedback-kinds.js this finding recommended, answering question-67; merged in PR #2427 (192e1f81f). Nothing left for design."
     }
    ]
   },
@@ -2544,6 +2585,24 @@
       "on": "change-82@2",
       "about": "decision-85"
      }
+    },
+    {
+     "v": 2,
+     "op": "end",
+     "at": "2026-11-13T16:16:32.000Z",
+     "by": "close-out",
+     "in": "task-60",
+     "to": "close-out",
+     "state": "done",
+     "fields": {
+      "says": "Before the merge of PR #2427: add one sentence to the setHeldWakeReleaseNote docblock (lib/dispatch-store.js, the \"Not done here, on purpose\" paragraph): stores built outside server.js (account erasure, scripts/) bind no wording and release with UNBOUND_HELD_WAKE_RELEASE_NOTE, by design. Why: lib/account-erasure.js:590 (cancelRows -> removeItem) builds a bare DispatchQueueStore, so an erasure that cancels a queued leftover holder now releases with \"The step holding this wake did not run…\" instead of the leftover wording. It degrades the same way it already does without a credential provisioner; binding those stores is not needed, only saying so."
+     },
+     "links": {
+      "on": "change-82@2",
+      "about": "decision-85"
+     },
+     "reason": "Added in e52a8b273: a paragraph in the setHeldWakeReleaseNote docblock (lib/dispatch-store.js) saying stores built outside server.js (account erasure, scripts/) release with UNBOUND_HELD_WAKE_RELEASE_NOTE by design. Merged in 192e1f81f.",
+     "stateReason": "Added in e52a8b273: a paragraph in the setHeldWakeReleaseNote docblock (lib/dispatch-store.js) saying stores built outside server.js (account erasure, scripts/) release with UNBOUND_HELD_WAKE_RELEASE_NOTE by design. Merged in 192e1f81f."
     }
    ]
   },
@@ -2565,6 +2624,23 @@
      "links": {
       "on": "change-82@2"
      }
+    },
+    {
+     "v": 2,
+     "op": "end",
+     "at": "2026-11-13T16:16:33.000Z",
+     "by": "close-out",
+     "in": "task-60",
+     "to": "close-out",
+     "state": "done",
+     "fields": {
+      "says": "Before the merge of PR #2427: confirm ci-success is green on the exact commit that merges; update the branch if GitHub requires it. CI ran on base c205190fd; origin/main is now 5dcf5bcda (LIN-4457 landed). Review merged locally and the unit suite passed 25,457/25,457, but that is not CI and covers no E2E."
+     },
+     "links": {
+      "on": "change-82@2"
+     },
+     "reason": "ci-success green on the exact merging head f78b61898, run 43458642312 (8 of 8: Unit tests, Unit tests (proxy, clock +400d), E2E 1-4/4, Secret scan, CI success). Branch updated with origin/main 5dcf5bcda in e52a8b273 first; full unit suite 25,457/25,457 on the merged tree locally. origin/main then moved to e8e92d50a (LIN-4456); GitHub reported the PR CLEAN, so merged without a second update.",
+     "stateReason": "ci-success green on the exact merging head f78b61898, run 43458642312 (8 of 8: Unit tests, Unit tests (proxy, clock +400d), E2E 1-4/4, Secret scan, CI success). Branch updated with origin/main 5dcf5bcda in e52a8b273 first; full unit suite 25,457/25,457 on the merged tree locally. origin/main then moved to e8e92d50a (LIN-4456); GitHub reported the PR CLEAN, so merged without a second update."
     }
    ]
   },
@@ -2586,6 +2662,23 @@
      "links": {
       "on": "change-82@2"
      }
+    },
+    {
+     "v": 2,
+     "op": "end",
+     "at": "2026-11-13T16:16:34.000Z",
+     "by": "close-out",
+     "in": "task-60",
+     "to": "close-out",
+     "state": "done",
+     "fields": {
+      "says": "Before the merge of PR #2427: confirm the builder's ### Leftovers comment has landed on LIN-4455 and that its Retires: line names the Waiting entries this diff removes (2, 4, 11). At review it was not on the ticket; only the PR body's \"What this retires\" named them."
+     },
+     "links": {
+      "on": "change-82@2"
+     },
+     "reason": "The ### Leftovers comment is on LIN-4455 (e119199c), its Retires: line naming the settled Waiting 2, 4 and 11 (confirmed by finding-107).",
+     "stateReason": "The ### Leftovers comment is on LIN-4455 (e119199c), its Retires: line naming the settled Waiting 2, 4 and 11 (confirmed by finding-107)."
     }
    ]
   },
@@ -2608,6 +2701,43 @@
      },
      "links": {
       "on": "change-82@2",
+      "about": "decision-87"
+     }
+    },
+    {
+     "v": 2,
+     "op": "revise",
+     "at": "2026-11-13T16:16:38.000Z",
+     "by": "close-out",
+     "in": "task-60",
+     "to": "John",
+     "state": "open",
+     "fields": {
+      "what": "After the deploy of PR #2427, watch production logs for the line [leftover] skipped reason=target-not-resumable.",
+      "why-person": "Only rows already stored with a non-string follow-up target (0 or false) can hit the new fail-closed path, and CI cannot see production rows; the logs are on John's host.",
+      "how": "Grep the deployed server log for [leftover] skipped reason=target-not-resumable over the first day after 192e1f81f (deployed; the harbour.cat footer shows it). Any hit is a stored row with a falsy non-string follow-up target (0 or false) for which no leftover was queued, matching followUpTarget everywhere else (LIN-3677). No rollback needed. Not run at close-out: close-out has no access to production logs."
+     },
+     "links": {
+      "on": "change-82@2",
+      "about": "decision-87"
+     },
+     "reason": "PR #2427 merged and deployed as 192e1f81f; close-out could not run this (no production log access), so it stays open to John with the deployed commit and window named."
+    },
+    {
+     "v": 3,
+     "op": "link",
+     "at": "2026-11-13T16:16:39.000Z",
+     "by": "close-out",
+     "in": "task-60",
+     "to": "John",
+     "state": "open",
+     "fields": {
+      "what": "After the deploy of PR #2427, watch production logs for the line [leftover] skipped reason=target-not-resumable.",
+      "why-person": "Only rows already stored with a non-string follow-up target (0 or false) can hit the new fail-closed path, and CI cannot see production rows; the logs are on John's host.",
+      "how": "Grep the deployed server log for [leftover] skipped reason=target-not-resumable over the first day after 192e1f81f (deployed; the harbour.cat footer shows it). Any hit is a stored row with a falsy non-string follow-up target (0 or false) for which no leftover was queued, matching followUpTarget everywhere else (LIN-3677). No rollback needed. Not run at close-out: close-out has no access to production logs."
+     },
+     "links": {
+      "on": "change-82@4",
       "about": "decision-87"
      }
     }
@@ -2688,6 +2818,24 @@
       "on": "change-82@2",
       "about": "verdict-96"
      }
+    },
+    {
+     "v": 2,
+     "op": "end",
+     "at": "2026-11-13T16:16:36.000Z",
+     "by": "close-out",
+     "in": "task-60",
+     "to": "close-out",
+     "state": "done",
+     "fields": {
+      "says": "Blind read of PR #2427 @ c95b9f139, fix-sized: floating comments left where constants were removed. `lib/run-view.js`: the block \"A waiting scan skips the decision-lifecycle stamp kinds…\" (above `lastWakeEntry`) sat on the deleted `DECISION_STAMP_KINDS`; it now heads nothing and repeats the `lastWakeEntry` docblock below it. Same in `lib/session-telemetry.js` (\"LIN-4240: `PARKED_WAIT_SKIPPED_KINDS`…\") and `lib/wall-clock-summary.js` (\"LIN-3037 (Surface 11)…\"). Fix: fold each into the docblock of the function that uses the set, or delete it."
+     },
+     "links": {
+      "on": "change-82@2",
+      "about": "verdict-96"
+     },
+     "reason": "Fixed in e52a8b273: each floating comment folded into the docblock of the code that uses the set: lib/run-view.js (lastWakeEntry), lib/session-telemetry.js (_isNonStateEntry), lib/wall-clock-summary.js (the touchedCi use site). Merged in 192e1f81f.",
+     "stateReason": "Fixed in e52a8b273: each floating comment folded into the docblock of the code that uses the set: lib/run-view.js (lastWakeEntry), lib/session-telemetry.js (_isNonStateEntry), lib/wall-clock-summary.js (the touchedCi use site). Merged in 192e1f81f."
     }
    ]
   },
@@ -2710,6 +2858,24 @@
       "on": "change-82@2",
       "about": "verdict-96"
      }
+    },
+    {
+     "v": 2,
+     "op": "end",
+     "at": "2026-11-13T16:16:37.000Z",
+     "by": "close-out",
+     "in": "task-60",
+     "to": "close-out",
+     "state": "done",
+     "fields": {
+      "says": "Blind read of PR #2427 @ c95b9f139, fix-sized: `lib/dispatch-leftover-hook.js` calls `dispatchStore.setHeldWakeReleaseNote?.(releaseNote)` with optional chaining, though its `@param` lists `setHeldWakeReleaseNote` as a required store dependency. A store or stub without the method silently keeps the \"step holding this wake\" fallback wording instead of failing. Fix: call it without `?.` (and give any test stub the method), or say in the `@param` that it is optional."
+     },
+     "links": {
+      "on": "change-82@2",
+      "about": "verdict-96"
+     },
+     "reason": "Fixed in e52a8b273: lib/dispatch-leftover-hook.js calls dispatchStore.setHeldWakeReleaseNote(releaseNote) without ?., matching its required @param; every test that builds a step still passes, so no stub needed the method. Merged in 192e1f81f.",
+     "stateReason": "Fixed in e52a8b273: lib/dispatch-leftover-hook.js calls dispatchStore.setHeldWakeReleaseNote(releaseNote) without ?., matching its required @param; every test that builds a step still passes, so no stub needed the method. Merged in 192e1f81f."
     }
    ]
   },
@@ -2955,6 +3121,58 @@
       "on": "change-82@2",
       "about": "finding-93"
      }
+    },
+    {
+     "v": 2,
+     "op": "end",
+     "at": "2026-11-13T16:16:35.000Z",
+     "by": "close-out",
+     "in": "task-60",
+     "to": "close-out",
+     "state": "done",
+     "fields": {
+      "says": "For finding-93: the ### Leftovers comment is on LIN-4455 (16:02:31). Its Retires: line names Waiting 2 (`lib/dispatch-leftover.js` restating the follow-up target, halt modes and `NEVER_RAN`); the next line names Waiting 2, 4 and 11 as settled and removed from `docs/areas/runs-and-dispatch.md` by PR #2427. It also says two new Waiting entries went into area notes on the PR branch after review and blind read: `mayCarryWake` vs `lastWakeEntry` (runs-and-dispatch, finding-99) and runner-kickoff's import via the store re-export (llm-and-prompts, finding-101). That moves the head past c95b9f139 (docs only), so finding-92's ci-success check is on the head that includes them."
+     },
+     "links": {
+      "on": "change-82@2",
+      "about": "finding-93"
+     },
+     "reason": "Taken: finding-93 ended on it; the head it says moved (f78b61898, the area-note Waiting entries) is the head CI ran green on and the one merged, so finding-92 is discharged on it.",
+     "stateReason": "Taken: finding-93 ended on it; the head it says moved (f78b61898, the area-note Waiting entries) is the head CI ran green on and the one merged, so finding-92 is discharged on it."
+    }
+   ]
+  },
+  "run-108": {
+   "id": "run-108",
+   "kind": "run",
+   "versions": [
+    {
+     "v": 1,
+     "op": "add",
+     "at": "2026-11-13T16:16:41.000Z",
+     "by": "close-out",
+     "in": "task-60",
+     "state": "open",
+     "fields": {
+      "stage": "close-out",
+      "account": "Merged PR #2427 as 192e1f81f, pinned to head f78b61898, and saw it deployed (harbour.cat footer). Before merging: merged origin/main 5dcf5bcda into the branch (e52a8b273) and made the three fix-sized notes (docblock sentence on unbound stores, folded floating comments in run-view/session-telemetry/wall-clock-summary, setHeldWakeReleaseNote called directly); f78b61898 wrote the blind read's larger and outside finds as Waiting entries (mayCarryWake vs lastWakeEntry in runs-and-dispatch; runner-kickoff via the store re-export in llm-and-prompts; two release channels already Waiting 5). Unit suite 25,457/25,457 on the merged tree; ci-success 8/8 on f78b61898; main moved to e8e92d50a but GitHub said CLEAN. Leftovers comment e119199c names Waiting 2, 4, 11. Not run: the production-log watch for target-not-resumable (no log access), left open to John as check-94. No follow-up tickets, no rulings. LIN-4455 Done."
+     },
+     "links": {}
+    },
+    {
+     "v": 2,
+     "op": "end",
+     "at": "2026-11-13T16:16:42.000Z",
+     "by": "close-out",
+     "in": "task-60",
+     "state": "done",
+     "fields": {
+      "stage": "close-out",
+      "account": "Merged PR #2427 as 192e1f81f, pinned to head f78b61898, and saw it deployed (harbour.cat footer). Before merging: merged origin/main 5dcf5bcda into the branch (e52a8b273) and made the three fix-sized notes (docblock sentence on unbound stores, folded floating comments in run-view/session-telemetry/wall-clock-summary, setHeldWakeReleaseNote called directly); f78b61898 wrote the blind read's larger and outside finds as Waiting entries (mayCarryWake vs lastWakeEntry in runs-and-dispatch; runner-kickoff via the store re-export in llm-and-prompts; two release channels already Waiting 5). Unit suite 25,457/25,457 on the merged tree; ci-success 8/8 on f78b61898; main moved to e8e92d50a but GitHub said CLEAN. Leftovers comment e119199c names Waiting 2, 4, 11. Not run: the production-log watch for target-not-resumable (no log access), left open to John as check-94. No follow-up tickets, no rulings. LIN-4455 Done."
+     },
+     "links": {},
+     "reason": "Close-out finished: PR merged and deployed, ledger discharged, one check open to John.",
+     "stateReason": "Close-out finished: PR merged and deployed, ledger discharged, one check open to John."
     }
    ]
   }
@@ -3979,6 +4197,56 @@
    "query": "get",
    "args": {
     "id": "finding-22",
+    "asOf": null
+   },
+   "returned": 1
+  },
+  {
+   "at": "2026-11-17T13:56:06.230Z",
+   "by": "close-out",
+   "query": "get",
+   "args": {
+    "id": "verdict-90",
+    "asOf": null
+   },
+   "returned": 1
+  },
+  {
+   "at": "2026-11-17T13:56:06.264Z",
+   "by": "close-out",
+   "query": "get",
+   "args": {
+    "id": "verdict-96",
+    "asOf": null
+   },
+   "returned": 1
+  },
+  {
+   "at": "2026-11-17T13:56:06.300Z",
+   "by": "close-out",
+   "query": "get",
+   "args": {
+    "id": "check-94",
+    "asOf": null
+   },
+   "returned": 1
+  },
+  {
+   "at": "2026-11-17T13:56:28.712Z",
+   "by": "Harbour",
+   "query": "show",
+   "args": {
+    "task": "task-60",
+    "asOf": null
+   },
+   "returned": 1
+  },
+  {
+   "at": "2026-11-17T13:56:40.635Z",
+   "by": "Harbour",
+   "query": "show",
+   "args": {
+    "task": "task-60",
     "asOf": null
    },
    "returned": 1
