@@ -1,5 +1,5 @@
 {
- "next": 82,
+ "next": 84,
  "records": {
   "area-1": [
    {
@@ -1946,6 +1946,64 @@
      "account": "# What this stage really wrote\n\n## Comment on LIN-4450 at 13:51:36\n\n## Survey global: LIN-4450 @ 4b5001ddf\n\n(= the grounding commit.)\n\n**Where it lands.** `lib/providers/jira/index.js` is 1,478 lines, mostly history comments. `adf.js` is the codec: rebuilt clean-room, quiet since LIN-3570. `lib/as-asked*.js` was just tidied toward one owner (LIN-4360/61/62). The area is getting better. I probed the witness shapes (`* a`, `*em*`, `***x***`, `3.` lists, a fence with a blank line, `a\\n\\n\\n\\nb`, trailing spaces). `markdownToAdf`'s output never trips D1, and `adfToMarkdown∘markdownToAdf` reaches a fixed point on all of them. So D1 won't block Harbour-written blocks.\n\n**What the obvious way does**\n- **Two stores of the words.** Shape B accepts this: the ADF region plus the property, with a digest deciding between them. It stays safe only while the region module is the one place that knows about both.\n- **A second ADF walker.** The reader needs a paragraph's plain text. `adf.js` already has `plainText` (~340), but it is private. Export it rather than retype it. Render the region with `adfToMarkdown({type:'doc',content})`, not a new renderer.\n- **The reader accepts more than the writer refuses.** \"Whatever its marks\" means a plain paragraph of the end sentence in the words ends the region early, and `hasMarkerLine` doesn't refuse that. This is safe only if `descriptionRoundTrip` runs through *the same reader*: then the filing reads non-kept and goes in unsealed. Worth one witness.\n- **Scatter.** There are 8 `getIssue` sites. Four never read a description: 703, 1018, 1076, and the pre-read at 1099. `fetchIssueFields` (818) feeds `_toCanonicalIssue` but isn't in the plan's list. Write one read-with-words helper beside the reader, not `properties` threaded through each call.\n- **What has to learn, beyond the three headers named:**\n  - `dispatch-factory.js:1008`\n  - `docs/proxy-integration.md:2070`: agent-facing, says Jira files unsealed\n  - `docs/architecture/source-map.md:216` and `:82` (the new module needs a mention)\n  - `as-asked-guard.test.js`, whose Jira block (345, 351) will fail, so it notices. The docs won't.\n- **A branch left without a witness.** `as-asked-create-seal.test.js:207-227` uses Jira's round trip as *the* provider that cannot hold the block. After the flip, `sealForFiling`'s `reason: 'provider'` branch has no subject in production or in tests. Witness it with a synthetic lossy round trip, or retire it on purpose. `as-asked.js`'s \"When the unsealed branches could go\" drops \"Jira today\", but stays permanent because of older tickets.\n\n**Better, at a cost this task can carry:** export `plainText`, add one read helper, put the size function in the region module, retire every claim listed above, and keep the provider branch witnessed.\n\n**Better still, not this task's**\n- **Live Jira-native tickets.** The first-dispatch seal writes back through `updateIssue`. D1 refuses any ticket that holds a mention, emoji or panel (common), and logs it once per first dispatch. Tickets that pass get their ADF normalised, and their \"words\" become the escaped rendering. That is the codec's lossiness showing, which is deeper than this task.\n- **The bulk search path** could ask for `properties` (`search/jql` accepts it), so the dashboard would show exact words.\n- **Comment weight.** `index.js`'s header and source-map's jira paragraph carry more history than guidance.\n\n"
     }
    }
+  ],
+  "decision-82": [
+   {
+    "id": "decision-82",
+    "kind": "decision",
+    "v": 1,
+    "op": "add",
+    "at": "2026-11-13T13:52:10.214Z",
+    "by": "scoping",
+    "in": "task-60",
+    "state": "stands",
+    "links": {
+     "answers": "question-68",
+     "about": [
+      "plan-54"
+     ]
+    },
+    "fields": {
+     "answer": "Scoping (added to LIN-4450 description by 13:56): Size of the move: a small tidy. Why: Jira holds the person’s words byte-exact, plus one tidy done first: an empty fenced code block in the words no longer files a description that refuses every later write below the line, which the seal exists to allow. Cuts: none.\nOn question-68: the empty-fence case is in this task and is done first, before the seal. The output calls it a tidy (pointing to option 1, fix the codec) but does not name the mechanism, so the question stays open to implementation for that choice.",
+     "why": "Decided by the standing policy (scoping’s own words). Nothing is cut from plan-54 or decision-63’s breakdown row; the only addition is the empty-fence tidy, ordered first.",
+     "scope": "task-60"
+    }
+   }
+  ],
+  "run-83": [
+   {
+    "id": "run-83",
+    "kind": "run",
+    "v": 1,
+    "op": "add",
+    "at": "2026-11-13T13:52:11.214Z",
+    "by": "scoping",
+    "in": "task-60",
+    "state": "open",
+    "links": {},
+    "fields": {
+     "stage": "scoping",
+     "account": "# What this stage really wrote\n\n## Added to LIN-4450 description by 13:56 (diff between the snapshots before and after scoping)\n\n## Size of the move\n\n**Size:** a small tidy\n**Why:** Jira holds the person's words byte-exact, plus one tidy done first: an empty fenced code block in the words no longer files a description that refuses every later write below the line, which the seal exists to allow.\n**Cuts:** none\n**Decided by:** the standing policy\n\n"
+    }
+   },
+   {
+    "id": "run-83",
+    "kind": "run",
+    "v": 2,
+    "op": "end",
+    "at": "2026-11-13T13:52:12.214Z",
+    "by": "scoping",
+    "in": "task-60",
+    "state": "done",
+    "ended": {
+     "reason": "Scoping sized LIN-4450 (small tidy, no cuts, empty-fence tidy first); recorded as decision-82"
+    },
+    "links": {},
+    "fields": {
+     "stage": "scoping",
+     "account": "# What this stage really wrote\n\n## Added to LIN-4450 description by 13:56 (diff between the snapshots before and after scoping)\n\n## Size of the move\n\n**Size:** a small tidy\n**Why:** Jira holds the person's words byte-exact, plus one tidy done first: an empty fenced code block in the words no longer files a description that refuses every later write below the line, which the seal exists to allow.\n**Cuts:** none\n**Decided by:** the standing policy\n\n"
+    }
+   }
   ]
  },
  "log": [
@@ -2231,6 +2289,90 @@
     "pos": [
      "finding-44"
     ]
+   },
+   "asOf": null
+  },
+  {
+   "at": "2026-11-17T20:27:31.166Z",
+   "by": "scoping",
+   "cmd": "find",
+   "args": {
+    "to": "scoping",
+    "state": "open",
+    "by": "scoping",
+    "pos": []
+   },
+   "asOf": null
+  },
+  {
+   "at": "2026-11-17T20:27:31.199Z",
+   "by": "scoping",
+   "cmd": "get",
+   "args": {
+    "by": "scoping",
+    "pos": [
+     "question-68"
+    ]
+   },
+   "asOf": null
+  },
+  {
+   "at": "2026-11-17T20:27:31.233Z",
+   "by": "scoping",
+   "cmd": "find",
+   "args": {
+    "kind": "decision",
+    "in": "task-60",
+    "by": "scoping",
+    "pos": []
+   },
+   "asOf": null
+  },
+  {
+   "at": "2026-11-17T20:27:31.263Z",
+   "by": "scoping",
+   "cmd": "find",
+   "args": {
+    "kind": "run",
+    "in": "task-60",
+    "by": "scoping",
+    "pos": []
+   },
+   "asOf": null
+  },
+  {
+   "at": "2026-11-17T20:27:31.299Z",
+   "by": "scoping",
+   "cmd": "get",
+   "args": {
+    "by": "scoping",
+    "pos": [
+     "task-60"
+    ]
+   },
+   "asOf": null
+  },
+  {
+   "at": "2026-11-17T20:27:57.789Z",
+   "by": "scoping",
+   "cmd": "get",
+   "args": {
+    "by": "scoping",
+    "pos": [
+     "question-68"
+    ]
+   },
+   "asOf": null
+  },
+  {
+   "at": "2026-11-17T20:28:01.483Z",
+   "by": "scoping",
+   "cmd": "find",
+   "args": {
+    "kind": "question",
+    "in": "task-60",
+    "by": "scoping",
+    "pos": []
    },
    "asOf": null
   }

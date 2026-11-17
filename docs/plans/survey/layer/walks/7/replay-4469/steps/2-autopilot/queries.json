@@ -1,0 +1,106 @@
+[
+ {
+  "at": "2026-11-17T20:26:30.645Z",
+  "by": "autopilot",
+  "cmd": "find",
+  "args": {
+   "text": "look-first",
+   "by": "autopilot",
+   "pos": []
+  },
+  "asOf": null
+ },
+ {
+  "at": "2026-11-17T20:26:30.684Z",
+  "by": "autopilot",
+  "cmd": "find",
+  "args": {
+   "to": "autopilot",
+   "state": "open",
+   "by": "autopilot",
+   "pos": []
+  },
+  "asOf": null
+ },
+ {
+  "at": "2026-11-17T20:26:30.719Z",
+  "by": "autopilot",
+  "cmd": "find",
+  "args": {
+   "text": "undersized",
+   "by": "autopilot",
+   "pos": []
+  },
+  "asOf": null
+ },
+ {
+  "at": "2026-11-17T20:26:30.757Z",
+  "by": "autopilot",
+  "cmd": "find",
+  "args": {
+   "kind": "task",
+   "by": "autopilot",
+   "pos": []
+  },
+  "asOf": null
+ },
+ {
+  "at": "2026-11-17T20:26:39.033Z",
+  "by": "autopilot",
+  "cmd": "find",
+  "args": {
+   "kind": "area",
+   "by": "autopilot",
+   "pos": []
+  },
+  "asOf": null
+ },
+ {
+  "at": "2026-11-17T20:26:39.070Z",
+  "by": "autopilot",
+  "cmd": "find",
+  "args": {
+   "path": "lib/recommendation-look-first.js",
+   "state": "open",
+   "by": "autopilot",
+   "pos": []
+  },
+  "asOf": null
+ },
+ {
+  "at": "2026-11-17T20:26:39.111Z",
+  "by": "autopilot",
+  "cmd": "find",
+  "args": {
+   "kind": "task",
+   "in": "task-108",
+   "by": "autopilot",
+   "pos": []
+  },
+  "asOf": null
+ },
+ {
+  "at": "2026-11-17T20:26:39.144Z",
+  "by": "autopilot",
+  "cmd": "find",
+  "args": {
+   "kind": "run",
+   "in": "task-131",
+   "by": "autopilot",
+   "pos": []
+  },
+  "asOf": null
+ },
+ {
+  "at": "2026-11-17T20:27:01.004Z",
+  "by": "autopilot",
+  "cmd": "find",
+  "args": {
+   "kind": "run",
+   "in": "task-131",
+   "by": "autopilot",
+   "pos": []
+  },
+  "asOf": null
+ }
+]
