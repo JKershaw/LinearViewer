@@ -1,5 +1,5 @@
 {
- "next": 86,
+ "next": 92,
  "records": {
   "task-1": [
    {
@@ -1895,6 +1895,22 @@
     "by": "review",
     "at": "2026-11-13T18:01:47.000Z",
     "reason": "Review checked the class: confirmed the three copies and added the two look-alikes that are not copies"
+   },
+   {
+    "id": "finding-73",
+    "kind": "finding",
+    "in": "area-49",
+    "to": "area-49",
+    "says": "Not this task's: classic browser copies of `fmtDuration`/`relativeAgo` remain beside the new owner `lib/time-words.js`: `public/session.js` `formatElapsed` and `public/observation.js` `formatRuntime` restate `fmtDuration`, and `public/live-console.js` `fmtDuration(s)` spells the rule a second way (no hour rung). They sit outside the `lin-4472-time-words` guard (which scans only server code) and are listed in the browser area's Waiting entry; each retires when its view converts and imports `/lib/time-words.js` (LIN-4472, PR #2436). Not copies, so not to be folded in: `lib/task-timeline.js` `gapWords` (adds a day rung, rounds to minutes) and `live-console.js` `describeSpan` (\"47 minutes\", \"2 hours\") are deliberately different wordings (review of PR #2436). Blind read of PR #2436: the copies are at `public/session.js:257` (`formatElapsed`) and `public/observation.js:517` (`formatRuntime`), line for line, so the run page and the observation cards can drift from the task page. Adopting the leaf is larger than a fix: `public/session.js` is a classic IIFE with a `module.exports` test seam, so it means converting it to a module as this change did for `task-page.js` and moving its classic-loader suites with it, which changes how the run page loads.",
+    "links": {
+     "about": "decision-66@1"
+    },
+    "state": "open",
+    "v": 4,
+    "op": "revise",
+    "by": "blind-read",
+    "at": "2026-11-13T18:08:03.000Z",
+    "reason": "Blind read adds the copies' line numbers and why adopting the leaf is a view conversion, not a fix"
    }
   ],
   "finding-74": [
@@ -2180,6 +2196,122 @@
     "op": "add",
     "by": "review",
     "at": "2026-11-13T18:01:43.000Z"
+   }
+  ],
+  "run-86": [
+   {
+    "id": "run-86",
+    "kind": "run",
+    "in": "task-28",
+    "stage": "blind-read",
+    "account": "Blind read of PR #2436 at ffa70b782 against 5cf4f6aa2. Verdict better: duration and relative-time words have one owner, lib/time-words.js; the task page drops its copies and the source-slicing vm parity tests; the renderers and lib/components/time.js stop reaching into run-steps/loader for these words; task-page.js is a real module whose suites import its exports. Worse side: the leaf claims the words exist once, but session.js and observation.js still carry the algorithm outside the server-only guard, and a comment in task-page.js is wrong. Three fix-sized findings to close-out, one larger one folded into finding-73, one cross-area one (fmtWhen) to the parent.",
+    "links": {},
+    "state": "open",
+    "v": 1,
+    "op": "add",
+    "by": "blind-read",
+    "at": "2026-11-13T18:07:58.000Z"
+   },
+   {
+    "id": "run-86",
+    "kind": "run",
+    "in": "task-28",
+    "stage": "blind-read",
+    "account": "Blind read of PR #2436 at ffa70b782 against 5cf4f6aa2. Verdict better: duration and relative-time words have one owner, lib/time-words.js; the task page drops its copies and the source-slicing vm parity tests; the renderers and lib/components/time.js stop reaching into run-steps/loader for these words; task-page.js is a real module whose suites import its exports. Worse side: the leaf claims the words exist once, but session.js and observation.js still carry the algorithm outside the server-only guard, and a comment in task-page.js is wrong. Three fix-sized findings to close-out, one larger one folded into finding-73, one cross-area one (fmtWhen) to the parent.",
+    "links": {},
+    "state": "done",
+    "v": 2,
+    "op": "end",
+    "by": "blind-read",
+    "at": "2026-11-13T18:08:05.000Z",
+    "stateReason": "Blind read posted on LIN-4472: verdict-87 better; findings 88-90 to close-out, finding-73 revised, finding-91 to the parent",
+    "reason": "Blind read posted on LIN-4472: verdict-87 better; findings 88-90 to close-out, finding-73 revised, finding-91 to the parent"
+   }
+  ],
+  "verdict-87": [
+   {
+    "id": "verdict-87",
+    "kind": "verdict",
+    "in": "task-28",
+    "of": "blind-read",
+    "outcome": "better",
+    "reasoning": "Better. It gives the duration and relative-time words one owner, `lib/time-words.js`. That deletes the copies in `public/task-page.js` (`formatElapsed`, `relativeWords`) and the source-slicing `vm` parity tests around them, unhooks the renderers from `lib/render-run-steps.js` and `lib/components/time.js` from the loader for these words, and makes `public/task-page.js` a real module whose suites import its exports. On the worse side, it claims the words now exist \"once\", but `public/session.js` and `public/observation.js` still carry the same duration algorithm, and the new guard cannot see them because it only scans server files. A comment in `public/task-page.js` is also wrong. Read PR #2436 at `ffa70b782` against `5cf4f6aa2`.",
+    "links": {
+     "on": "change-69@2"
+    },
+    "state": "stands",
+    "v": 1,
+    "op": "add",
+    "by": "blind-read",
+    "at": "2026-11-13T18:07:59.000Z"
+   }
+  ],
+  "finding-88": [
+   {
+    "id": "finding-88",
+    "kind": "finding",
+    "in": "task-28",
+    "to": "close-out",
+    "says": "Blind read, fix-sized: in `public/task-page.js` the comment on the export block (lines 903-904) says the page \"starts from DOMContentLoaded, below\", but that listener is above it. It also says \"nothing here reads or writes a global\", but `init` reads `window.api`, `window.BriefSection`, `window.CloseOut`, `window.PromptSection`, `window.initLocalTimes` and others. Fix: say \"above\", and \"the module writes no global\".",
+    "links": {
+     "about": "change-69@2"
+    },
+    "state": "open",
+    "v": 1,
+    "op": "add",
+    "by": "blind-read",
+    "at": "2026-11-13T18:08:00.000Z"
+   }
+  ],
+  "finding-89": [
+   {
+    "id": "finding-89",
+    "kind": "finding",
+    "in": "task-28",
+    "to": "close-out",
+    "says": "Blind read, fix-sized: the `lib/time-words.js` header (lines 10-11) and its `docs/architecture/source-map.md` entry say the words exist \"once\" and that \"a second copy has nowhere to hide\". The guard in `tests/unit/lin-4472-time-words.test.js` only walks `lib/`, `routes/` and `server.js`, so the copies under `public/` (finding-73) pass it. Fix: narrow both texts to \"every server caller\", or add `public/` to the walk and list the known copies as exceptions.",
+    "links": {
+     "about": "decision-70@1"
+    },
+    "state": "open",
+    "v": 1,
+    "op": "add",
+    "by": "blind-read",
+    "at": "2026-11-13T18:08:01.000Z"
+   }
+  ],
+  "finding-90": [
+   {
+    "id": "finding-90",
+    "kind": "finding",
+    "in": "task-28",
+    "to": "close-out",
+    "says": "Blind read, fix-sized: in `tests/unit/lin-3975-summary-and-time.test.js` the test \"share list's words are the server's relativeAgo words\" now compares `shareTime`'s text with `relativeAgo`, which `shareTime` itself calls. It no longer checks two copies against each other, and `tests/unit/lin-4472-time-words.test.js` already has the same `shareTime` test. Fix: drop one of the two, or retitle it as a wiring check.",
+    "links": {
+     "about": "change-69@2"
+    },
+    "state": "open",
+    "v": 1,
+    "op": "add",
+    "by": "blind-read",
+    "at": "2026-11-13T18:08:02.000Z"
+   }
+  ],
+  "finding-91": [
+   {
+    "id": "finding-91",
+    "kind": "finding",
+    "in": "task-28",
+    "to": "task-1",
+    "says": "Blind read, larger, outside the browser area: `fmtWhen`, the third moment formatter, stays in `lib/task-page-loader.js` (runs-and-dispatch). So `lib/components/time.js` and `lib/render-task-timeline.js` still import a page-formatting helper from a runs-and-dispatch module, the same tangle PR #2436 removed for `relativeAgo`. Moving it into `lib/time-words.js` is a decision about whether that leaf also owns absolute UTC stamps, and it touches about five importers.",
+    "links": {
+     "about": "decision-70@1"
+    },
+    "state": "open",
+    "v": 1,
+    "op": "add",
+    "by": "blind-read",
+    "at": "2026-11-13T18:08:04.000Z"
    }
   ]
  },
@@ -3226,6 +3358,122 @@
     "area",
     "--by",
     "blind-read"
+   ]
+  },
+  {
+   "at": "2026-11-17T14:57:25.339Z",
+   "by": "blind-read",
+   "q": [
+    "find",
+    "--text",
+    "nowhere to hide",
+    "--by",
+    "blind-read"
+   ]
+  },
+  {
+   "at": "2026-11-17T14:57:25.388Z",
+   "by": "blind-read",
+   "q": [
+    "find",
+    "--text",
+    "fmtWhen",
+    "--by",
+    "blind-read"
+   ]
+  },
+  {
+   "at": "2026-11-17T14:57:25.427Z",
+   "by": "blind-read",
+   "q": [
+    "find",
+    "--text",
+    "reads or writes a global",
+    "--by",
+    "blind-read"
+   ]
+  },
+  {
+   "at": "2026-11-17T14:57:25.467Z",
+   "by": "blind-read",
+   "q": [
+    "find",
+    "--text",
+    "summary-and-time",
+    "--by",
+    "blind-read"
+   ]
+  },
+  {
+   "at": "2026-11-17T14:57:25.517Z",
+   "by": "blind-read",
+   "q": [
+    "find",
+    "--text",
+    "blind",
+    "--by",
+    "blind-read"
+   ]
+  },
+  {
+   "at": "2026-11-17T14:57:25.556Z",
+   "by": "blind-read",
+   "q": [
+    "find",
+    "--text",
+    "once",
+    "--by",
+    "blind-read"
+   ]
+  },
+  {
+   "at": "2026-11-17T14:57:25.590Z",
+   "by": "blind-read",
+   "q": [
+    "get",
+    "finding-72",
+    "--by",
+    "blind-read"
+   ]
+  },
+  {
+   "at": "2026-11-17T14:57:29.740Z",
+   "by": "blind-read",
+   "q": [
+    "get",
+    "decision-11",
+    "--by",
+    "blind-read"
+   ]
+  },
+  {
+   "at": "2026-11-17T14:57:29.780Z",
+   "by": "blind-read",
+   "q": [
+    "get",
+    "decision-39",
+    "--by",
+    "blind-read"
+   ]
+  },
+  {
+   "at": "2026-11-17T14:57:29.812Z",
+   "by": "blind-read",
+   "q": [
+    "get",
+    "finding-60",
+    "--by",
+    "blind-read"
+   ]
+  },
+  {
+   "at": "2026-11-17T14:57:53.989Z",
+   "by": "blind-read",
+   "q": [
+    "--by",
+    "blind-read",
+    "get",
+    "finding-73"
    ]
   }
  ]

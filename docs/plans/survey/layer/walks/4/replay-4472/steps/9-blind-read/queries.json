@@ -1,0 +1,184 @@
+[
+ {
+  "at": "2026-11-17T14:57:06.079Z",
+  "by": "blind-read",
+  "q": [
+   "show",
+   "--task",
+   "task-28",
+   "--by",
+   "blind-read"
+  ]
+ },
+ {
+  "at": "2026-11-17T14:57:06.111Z",
+  "by": "blind-read",
+  "q": [
+   "get",
+   "change-69",
+   "--by",
+   "blind-read"
+  ]
+ },
+ {
+  "at": "2026-11-17T14:57:06.148Z",
+  "by": "blind-read",
+  "q": [
+   "find",
+   "--in",
+   "area-49",
+   "--by",
+   "blind-read",
+   "--state",
+   "open"
+  ]
+ },
+ {
+  "at": "2026-11-17T14:57:06.184Z",
+  "by": "blind-read",
+  "q": [
+   "get",
+   "area-49",
+   "--by",
+   "blind-read"
+  ]
+ },
+ {
+  "at": "2026-11-17T14:57:12.370Z",
+  "by": "blind-read",
+  "q": [
+   "show",
+   "--task",
+   "task-28",
+   "--by",
+   "blind-read"
+  ]
+ },
+ {
+  "at": "2026-11-17T14:57:12.442Z",
+  "by": "blind-read",
+  "q": [
+   "find",
+   "--kind",
+   "area",
+   "--by",
+   "blind-read"
+  ]
+ },
+ {
+  "at": "2026-11-17T14:57:25.339Z",
+  "by": "blind-read",
+  "q": [
+   "find",
+   "--text",
+   "nowhere to hide",
+   "--by",
+   "blind-read"
+  ]
+ },
+ {
+  "at": "2026-11-17T14:57:25.388Z",
+  "by": "blind-read",
+  "q": [
+   "find",
+   "--text",
+   "fmtWhen",
+   "--by",
+   "blind-read"
+  ]
+ },
+ {
+  "at": "2026-11-17T14:57:25.427Z",
+  "by": "blind-read",
+  "q": [
+   "find",
+   "--text",
+   "reads or writes a global",
+   "--by",
+   "blind-read"
+  ]
+ },
+ {
+  "at": "2026-11-17T14:57:25.467Z",
+  "by": "blind-read",
+  "q": [
+   "find",
+   "--text",
+   "summary-and-time",
+   "--by",
+   "blind-read"
+  ]
+ },
+ {
+  "at": "2026-11-17T14:57:25.517Z",
+  "by": "blind-read",
+  "q": [
+   "find",
+   "--text",
+   "blind",
+   "--by",
+   "blind-read"
+  ]
+ },
+ {
+  "at": "2026-11-17T14:57:25.556Z",
+  "by": "blind-read",
+  "q": [
+   "find",
+   "--text",
+   "once",
+   "--by",
+   "blind-read"
+  ]
+ },
+ {
+  "at": "2026-11-17T14:57:25.590Z",
+  "by": "blind-read",
+  "q": [
+   "get",
+   "finding-72",
+   "--by",
+   "blind-read"
+  ]
+ },
+ {
+  "at": "2026-11-17T14:57:29.740Z",
+  "by": "blind-read",
+  "q": [
+   "get",
+   "decision-11",
+   "--by",
+   "blind-read"
+  ]
+ },
+ {
+  "at": "2026-11-17T14:57:29.780Z",
+  "by": "blind-read",
+  "q": [
+   "get",
+   "decision-39",
+   "--by",
+   "blind-read"
+  ]
+ },
+ {
+  "at": "2026-11-17T14:57:29.812Z",
+  "by": "blind-read",
+  "q": [
+   "get",
+   "finding-60",
+   "--by",
+   "blind-read"
+  ]
+ },
+ {
+  "at": "2026-11-17T14:57:53.989Z",
+  "by": "blind-read",
+  "q": [
+   "--by",
+   "blind-read",
+   "get",
+   "finding-73"
+  ]
+ }
+]

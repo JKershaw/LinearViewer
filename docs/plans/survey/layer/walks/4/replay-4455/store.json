@@ -1,5 +1,5 @@
 {
- "next": 105,
+ "next": 106,
  "records": {
   "area-1": [
    {
@@ -2599,6 +2599,23 @@
     "by": "close-out",
     "at": "2026-11-13T16:03:11.000Z"
    }
+  ],
+  "run-105": [
+   {
+    "id": "run-105",
+    "kind": "run",
+    "in": "task-60",
+    "stage": "autopilot",
+    "links": {
+     "on": "change-80@3"
+    },
+    "account": "Stepped LIN-4455 through survey-task, survey-place, scoping, implementation (five warm beats in one session, ROOT 7b0e3f56: 6b0f86eec, a95009bf8, 97676d8c5, 8fc331a0f, then PR #2427), review (conditional approve, 9 of 9 mutations caught), blind-read (better) and close-out, judging each on evidence before the next. Outcome: done and verified. I read for myself that PR #2427 is MERGED on main as 192e1f81f, all 8 CI checks are SUCCESS on the merged head f78b61898 (ci-success included), LIN-4455 is Done, and the Leftovers and close-out comments exist. Retires the restated NEVER_RAN, HALT_MODES and follow-up-target constants, the store's ownership of the release wording and the hand-written kind sets; Waiting 2, 4, 11 settled. Left: the post-deploy log check is John's (check-103) and does not hold the close; the larger finds are area Waiting entries, not tickets (finding-22, finding-99, finding-100); LIN-4458 and LIN-4459 are now unblocked (decision-64) and open for their own pieces. No rulings raised or needed. Beat 2 re-pointed one existing test (decision-lifecycle-stamp-drift) at the table with no assertion dropped; I read it as non-weakening and review confirmed it (finding-88). Wrote nothing else: every other thing my summary says was already in the store.",
+    "state": "open",
+    "v": 1,
+    "op": "add",
+    "by": "autopilot",
+    "at": "2026-11-13T16:17:49.000Z"
+   }
   ]
  },
  "log": [
@@ -3903,6 +3920,109 @@
     "open",
     "--by",
     "close-out"
+   ]
+  },
+  {
+   "at": "2026-11-17T14:57:44.090Z",
+   "by": "autopilot",
+   "q": [
+    "show",
+    "--task",
+    "task-60",
+    "--by",
+    "autopilot"
+   ]
+  },
+  {
+   "at": "2026-11-17T14:57:56.281Z",
+   "by": "autopilot",
+   "q": [
+    "get",
+    "finding-74",
+    "--by",
+    "autopilot"
+   ]
+  },
+  {
+   "at": "2026-11-17T14:57:56.309Z",
+   "by": "autopilot",
+   "q": [
+    "find",
+    "--text",
+    "composable",
+    "--by",
+    "autopilot"
+   ]
+  },
+  {
+   "at": "2026-11-17T14:58:01.896Z",
+   "by": "autopilot",
+   "q": [
+    "find",
+    "--to",
+    "autopilot",
+    "--by",
+    "autopilot"
+   ]
+  },
+  {
+   "at": "2026-11-17T14:58:01.932Z",
+   "by": "autopilot",
+   "q": [
+    "find",
+    "--text",
+    "LIN-4458",
+    "--by",
+    "autopilot"
+   ]
+  },
+  {
+   "at": "2026-11-17T14:58:01.973Z",
+   "by": "autopilot",
+   "q": [
+    "find",
+    "--kind",
+    "task",
+    "--text",
+    "LIN-4459",
+    "--by",
+    "autopilot"
+   ]
+  },
+  {
+   "at": "2026-11-17T14:58:02.012Z",
+   "by": "autopilot",
+   "q": [
+    "find",
+    "--kind",
+    "run",
+    "--text",
+    "autopilot",
+    "--by",
+    "autopilot"
+   ]
+  },
+  {
+   "at": "2026-11-17T14:58:06.833Z",
+   "by": "autopilot",
+   "q": [
+    "find",
+    "--kind",
+    "task",
+    "--in",
+    "task-39",
+    "--by",
+    "autopilot"
+   ]
+  },
+  {
+   "at": "2026-11-17T14:58:06.873Z",
+   "by": "autopilot",
+   "q": [
+    "get",
+    "run-102",
+    "--by",
+    "autopilot"
    ]
   }
  ]
