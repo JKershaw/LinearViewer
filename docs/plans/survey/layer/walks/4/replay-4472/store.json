@@ -3161,6 +3161,72 @@
     "--by",
     "review"
    ]
+  },
+  {
+   "at": "2026-11-17T14:57:06.079Z",
+   "by": "blind-read",
+   "q": [
+    "show",
+    "--task",
+    "task-28",
+    "--by",
+    "blind-read"
+   ]
+  },
+  {
+   "at": "2026-11-17T14:57:06.111Z",
+   "by": "blind-read",
+   "q": [
+    "get",
+    "change-69",
+    "--by",
+    "blind-read"
+   ]
+  },
+  {
+   "at": "2026-11-17T14:57:06.148Z",
+   "by": "blind-read",
+   "q": [
+    "find",
+    "--in",
+    "area-49",
+    "--by",
+    "blind-read",
+    "--state",
+    "open"
+   ]
+  },
+  {
+   "at": "2026-11-17T14:57:06.184Z",
+   "by": "blind-read",
+   "q": [
+    "get",
+    "area-49",
+    "--by",
+    "blind-read"
+   ]
+  },
+  {
+   "at": "2026-11-17T14:57:12.370Z",
+   "by": "blind-read",
+   "q": [
+    "show",
+    "--task",
+    "task-28",
+    "--by",
+    "blind-read"
+   ]
+  },
+  {
+   "at": "2026-11-17T14:57:12.442Z",
+   "by": "blind-read",
+   "q": [
+    "find",
+    "--kind",
+    "area",
+    "--by",
+    "blind-read"
+   ]
   }
  ]
 }
