@@ -1,5 +1,5 @@
 {
- "next": 95,
+ "next": 100,
  "records": {
   "area-1": [
    {
@@ -2171,6 +2171,90 @@
     "by": "review",
     "at": "2026-11-13T15:48:54.000Z"
    }
+  ],
+  "run-95": [
+   {
+    "id": "run-95",
+    "kind": "run",
+    "in": "task-60",
+    "stage": "blind-read",
+    "account": "Blind-read PR #2427 at c95b9f139 against c205190fd (comment on LIN-4455, 15:56:30). Verdict better: one owner each for the feedback kinds (leaf table replaces the allowlist, parked-wait relays and four stamp copies), NEVER_RAN (seven restatements), HALT_MODES and followUpTarget, and the store no longer picks the leftover wording, all census-guarded. Worse, smaller: release wording reaches the store two ways via a factory that mutates the store when built, and a mayCarryWake column true on every row that run-view contradicts. Two fix-sized items to leftover, the two larger ones to the area (the two-channel one folded into Waiting 5), one outside-area import to the parent for the prompts side. Closed nothing.",
+    "links": {},
+    "state": "open",
+    "v": 1,
+    "op": "add",
+    "by": "blind-read",
+    "at": "2026-11-13T15:54:33.000Z"
+   }
+  ],
+  "verdict-96": [
+   {
+    "id": "verdict-96",
+    "kind": "verdict",
+    "in": "task-60",
+    "of": "blind-read",
+    "outcome": "better",
+    "reasoning": "Better (comment on LIN-4455, 15:56:30; PR #2427 at c95b9f139 against c205190fd). It gives scattered decisions one owner each: `lib/dispatch-feedback-kinds.js` replaces the runner allowlist, the parked-wait relays and four decision-stamp copies (`lib/session-telemetry.js`, `lib/wall-clock-summary.js`, `lib/run-view.js`, `lib/digest-feedback.js`); `NEVER_RAN` in `lib/dispatch-terminal.js` replaces seven cancelled/expired restatements; `HALT_MODES` and `followUpTarget` replace the leftover step private copies; the store no longer picks the leftover wording. All guarded by census tests. Made worse, smaller: the held-wake release wording reaches the store by two channels, from a factory that mutates the store as it is built; and a `mayCarryWake` column true for every row that `lib/run-view.js` contradicts.",
+    "links": {
+     "on": "change-80@1"
+    },
+    "state": "stands",
+    "v": 1,
+    "op": "add",
+    "by": "blind-read",
+    "at": "2026-11-13T15:54:34.000Z"
+   }
+  ],
+  "finding-97": [
+   {
+    "id": "finding-97",
+    "kind": "finding",
+    "in": "task-60",
+    "to": "leftover",
+    "says": "Fix-sized, runs-and-dispatch: floating comments left where PR #2427 removed constants. `lib/run-view.js`: the block \"A waiting scan skips the decision-lifecycle stamp kinds…\" (above `lastWakeEntry`) sat on the deleted `DECISION_STAMP_KINDS`; it now heads nothing and repeats the `lastWakeEntry` docblock. Same in `lib/session-telemetry.js` (\"LIN-4240: `PARKED_WAIT_SKIPPED_KINDS`…\") and `lib/wall-clock-summary.js` (\"LIN-3037 (Surface 11)…\"). Fix: fold each into the docblock of the function that uses the set, or delete it.",
+    "links": {
+     "about": "change-80"
+    },
+    "state": "open",
+    "v": 1,
+    "op": "add",
+    "by": "blind-read",
+    "at": "2026-11-13T15:54:35.000Z"
+   }
+  ],
+  "finding-98": [
+   {
+    "id": "finding-98",
+    "kind": "finding",
+    "in": "task-60",
+    "to": "leftover",
+    "says": "Fix-sized, runs-and-dispatch: `lib/dispatch-leftover-hook.js` calls `dispatchStore.setHeldWakeReleaseNote?.(releaseNote)` with optional chaining, though its `@param` lists `setHeldWakeReleaseNote` as a required store dependency. A store or stub without the method silently keeps the \"step holding this wake\" fallback wording instead of failing. Fix: call it without `?.` (and give any test stub the method), or say in the `@param` that it is optional.",
+    "links": {
+     "about": "change-80"
+    },
+    "state": "open",
+    "v": 1,
+    "op": "add",
+    "by": "blind-read",
+    "at": "2026-11-13T15:54:36.000Z"
+   }
+  ],
+  "finding-99": [
+   {
+    "id": "finding-99",
+    "kind": "finding",
+    "in": "task-60",
+    "to": "area-1",
+    "says": "Larger, runs-and-dispatch: `mayCarryWake` in `lib/dispatch-feedback-kinds.js` is true on every row and `feedbackKindMayCarryWake` returns true for unknown kinds, so the new check in `findWakeEvent` (`lib/dispatch-terminal.js`) can never skip anything, and the kinds-table test \"findWakeEvent finds a marker exactly when its kind may carry a wake\" never exercises the false branch. The column also contradicts another wake reader: `lastWakeEntry` in `lib/run-view.js` skips decision-stamp kinds as \"never a wake marker\", while the table says they may carry one. Two wake scans disagree about stamps, and the column that could own the answer only records today's `findWakeEvent` behaviour (decision-84). Removing the column, or making it true to both readers, means deciding whether `findWakeEvent` should skip stamps (as well as the relay kinds question-75 asks about), which changes wake minting.",
+    "links": {
+     "about": "question-75"
+    },
+    "state": "open",
+    "v": 1,
+    "op": "add",
+    "by": "blind-read",
+    "at": "2026-11-13T15:54:37.000Z"
+   }
   ]
  },
  "log": [
@@ -2958,6 +3042,236 @@
     "account-erasure",
     "--by",
     "review"
+   ]
+  },
+  {
+   "at": "2026-11-17T14:53:15.487Z",
+   "by": "blind-read",
+   "q": [
+    "show",
+    "--task",
+    "task-60",
+    "--by",
+    "blind-read"
+   ]
+  },
+  {
+   "at": "2026-11-17T14:53:15.532Z",
+   "by": "blind-read",
+   "q": [
+    "find",
+    "--in",
+    "area-1",
+    "--state",
+    "open",
+    "--by",
+    "blind-read"
+   ]
+  },
+  {
+   "at": "2026-11-17T14:53:19.629Z",
+   "by": "blind-read",
+   "q": [
+    "find",
+    "--to",
+    "area-1",
+    "--state",
+    "open",
+    "--by",
+    "blind-read"
+   ]
+  },
+  {
+   "at": "2026-11-17T14:53:19.675Z",
+   "by": "blind-read",
+   "q": [
+    "find",
+    "--to",
+    "area-1",
+    "--state",
+    "open",
+    "--by",
+    "blind-read"
+   ]
+  },
+  {
+   "at": "2026-11-17T14:53:23.699Z",
+   "by": "blind-read",
+   "q": [
+    "get",
+    "finding-22",
+    "--by",
+    "blind-read"
+   ]
+  },
+  {
+   "at": "2026-11-17T14:53:23.736Z",
+   "by": "blind-read",
+   "q": [
+    "get",
+    "question-75",
+    "--by",
+    "blind-read"
+   ]
+  },
+  {
+   "at": "2026-11-17T14:53:23.771Z",
+   "by": "blind-read",
+   "q": [
+    "get",
+    "finding-69",
+    "--by",
+    "blind-read"
+   ]
+  },
+  {
+   "at": "2026-11-17T14:53:23.799Z",
+   "by": "blind-read",
+   "q": [
+    "get",
+    "finding-70",
+    "--by",
+    "blind-read"
+   ]
+  },
+  {
+   "at": "2026-11-17T14:53:23.832Z",
+   "by": "blind-read",
+   "q": [
+    "get",
+    "finding-72",
+    "--by",
+    "blind-read"
+   ]
+  },
+  {
+   "at": "2026-11-17T14:53:23.864Z",
+   "by": "blind-read",
+   "q": [
+    "get",
+    "change-80",
+    "--by",
+    "blind-read"
+   ]
+  },
+  {
+   "at": "2026-11-17T14:53:29.353Z",
+   "by": "blind-read",
+   "q": [
+    "find",
+    "--text",
+    "lastWakeEntry",
+    "--by",
+    "blind-read"
+   ]
+  },
+  {
+   "at": "2026-11-17T14:53:29.398Z",
+   "by": "blind-read",
+   "q": [
+    "find",
+    "--text",
+    "run-view",
+    "--by",
+    "blind-read"
+   ]
+  },
+  {
+   "at": "2026-11-17T14:53:29.437Z",
+   "by": "blind-read",
+   "q": [
+    "find",
+    "--text",
+    "runner-kickoff",
+    "--by",
+    "blind-read"
+   ]
+  },
+  {
+   "at": "2026-11-17T14:53:29.472Z",
+   "by": "blind-read",
+   "q": [
+    "find",
+    "--text",
+    "mayCarryWake",
+    "--by",
+    "blind-read"
+   ]
+  },
+  {
+   "at": "2026-11-17T14:53:29.523Z",
+   "by": "blind-read",
+   "q": [
+    "find",
+    "--text",
+    "setHeldWakeReleaseNote",
+    "--by",
+    "blind-read"
+   ]
+  },
+  {
+   "at": "2026-11-17T14:53:29.571Z",
+   "by": "blind-read",
+   "q": [
+    "find",
+    "--text",
+    "re-export",
+    "--by",
+    "blind-read"
+   ]
+  },
+  {
+   "at": "2026-11-17T14:53:29.619Z",
+   "by": "blind-read",
+   "q": [
+    "find",
+    "--text",
+    "?.",
+    "--by",
+    "blind-read"
+   ]
+  },
+  {
+   "at": "2026-11-17T14:53:29.657Z",
+   "by": "blind-read",
+   "q": [
+    "find",
+    "--kind",
+    "area",
+    "--by",
+    "blind-read"
+   ]
+  },
+  {
+   "at": "2026-11-17T14:53:29.695Z",
+   "by": "blind-read",
+   "q": [
+    "find",
+    "--to",
+    "blind-read",
+    "--by",
+    "blind-read"
+   ]
+  },
+  {
+   "at": "2026-11-17T14:53:29.729Z",
+   "by": "blind-read",
+   "q": [
+    "get",
+    "finding-74",
+    "--by",
+    "blind-read"
+   ]
+  },
+  {
+   "at": "2026-11-17T14:53:41.123Z",
+   "by": "blind-read",
+   "q": [
+    "find",
+    "--kind",
+    "task",
+    "--by",
+    "blind-read"
    ]
   }
  ]

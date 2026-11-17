@@ -1,5 +1,5 @@
 {
- "next": 75,
+ "next": 76,
  "records": {
   "task-1": [
    {
@@ -1832,6 +1832,27 @@
     "by": "implementation",
     "at": "2026-11-13T17:33:23.000Z"
    }
+  ],
+  "decision-75": [
+   {
+    "id": "decision-75",
+    "kind": "decision",
+    "in": "task-28",
+    "scope": "task-28",
+    "answer": "Yes: extract the served leaf first, and the page drops both copies.",
+    "why": "John chose the extract option of question-63, the recommended one. This confirms autopilot's decision-66 as John's own ruling, so the Session-fit line 'no serving change' no longer stands in the way.",
+    "links": {
+     "answers": "question-63",
+     "on": "question-63@1",
+     "same-as": "decision-66"
+    },
+    "state": "stands",
+    "v": 1,
+    "op": "add",
+    "by": "John",
+    "at": "2026-11-13T17:54:22.000Z",
+    "via": "Harbour"
+   }
   ]
  },
  "log": [
@@ -2484,6 +2505,97 @@
     "served leaf",
     "--by",
     "John"
+   ]
+  },
+  {
+   "at": "2026-11-17T14:53:17.444Z",
+   "by": "John",
+   "q": [
+    "get",
+    "decision-66",
+    "--by",
+    "John"
+   ]
+  },
+  {
+   "at": "2026-11-17T14:53:17.479Z",
+   "by": "John",
+   "q": [
+    "get",
+    "task-28",
+    "--by",
+    "John"
+   ]
+  },
+  {
+   "at": "2026-11-17T14:53:17.514Z",
+   "by": "John",
+   "q": [
+    "find",
+    "--text",
+    "LIN-4463",
+    "--kind",
+    "task",
+    "--by",
+    "John"
+   ]
+  },
+  {
+   "at": "2026-11-17T14:53:17.546Z",
+   "by": "John",
+   "q": [
+    "find",
+    "--to",
+    "John",
+    "--by",
+    "John"
+   ]
+  },
+  {
+   "at": "2026-11-17T14:53:30.868Z",
+   "by": "John",
+   "q": [
+    "find",
+    "--text",
+    "LIN-4463",
+    "--count",
+    "--by",
+    "John"
+   ]
+  },
+  {
+   "at": "2026-11-17T14:53:30.899Z",
+   "by": "John",
+   "q": [
+    "find",
+    "--text",
+    "LIN-4463",
+    "--by",
+    "John"
+   ]
+  },
+  {
+   "at": "2026-11-17T14:54:03.217Z",
+   "by": "leftover",
+   "q": [
+    "show",
+    "--task",
+    "task-28",
+    "--by",
+    "leftover"
+   ]
+  },
+  {
+   "at": "2026-11-17T14:54:03.251Z",
+   "by": "leftover",
+   "q": [
+    "find",
+    "--to",
+    "area-49",
+    "--state",
+    "open",
+    "--by",
+    "leftover"
    ]
   }
  ]

@@ -1,5 +1,5 @@
 {
- "next": 98,
+ "next": 103,
  "records": {
   "area-1": [
    {
@@ -2182,6 +2182,22 @@
     "op": "add",
     "by": "implementation",
     "at": "2026-11-13T13:56:04.000Z"
+   },
+   {
+    "id": "check-90",
+    "kind": "check",
+    "in": "task-62",
+    "to": "task-62",
+    "what": "On John Jira, after PR 2421 (change-85): does the region rendering, and so the stored SHA-256 rendered digest, survive an ordinary editor save below the block? Include the witness shapes (* a bullets, *em*, ***x***, a fence with a blank line, trailing spaces) and words holding the end sentence plain.",
+    "why-person": "This build had no credential, so nothing shows Jira keeps the digest. If the editor normalises the stored ADF, the reader serves the converted rendering and the exact-words promise fails silently, with no log line. The fake cannot show it. The check must be able to fail (review note 1, LIN-4445).",
+    "how": "After the deploy, as one sealed `updateIssue` on John Jira (review of PR 2421 sharpened the pass/fail). 1. Property round trip: PUT a sealed description with `properties: [{key:\"harbour.asAsked\", value}]` in the same body, then GET `?properties=harbour.asAsked`. Right: the re-read `properties[\"harbour.asAsked\"].words` is byte-equal to the words written. An absent `properties` key means the PUT dropped it. 2. Digest survives an editor save: file a lossy body (`* a`, `*em*`, trailing spaces, `3.`, plus the shapes above), edit one line below the block in Jira own editor and save, re-read. Right: words byte-equal to what was filed and the digest-match branch taken (`digest(region) === property.rendered`). Wrong: words equal `adfToMarkdown(markdownToAdf(words))`. If it shifts, the digest must be taken over a normalised rendering: a design change, recorded on task-53. Without a credential, park it as a handoff to John.",
+    "links": {},
+    "state": "open",
+    "v": 2,
+    "op": "revise",
+    "by": "review",
+    "at": "2026-11-13T15:12:28.000Z",
+    "reason": "Review of PR 2421 at f9fa4a80c: added the property round trip and explicit right/wrong conditions"
    }
   ],
   "finding-91": [
@@ -2381,6 +2397,125 @@
     "op": "add",
     "by": "leftover",
     "at": "2026-11-13T14:14:19.000Z"
+   },
+   {
+    "id": "finding-97",
+    "kind": "finding",
+    "in": "task-60",
+    "to": "review",
+    "says": "PR 2421 leftovers commit (head f9fa4a80c) to check: four comments the seal made untrue or incomplete were tidied: `lib/providers/jira/adf.js` header (the region module now reaches the codec too, through a fourth export `plainText`); `issueDescription`'s comment in `lib/providers/jira/index.js` (the append/replace lane now goes through `readDescription` and `holdAsAsked`, not ADF to markdown to `markdownToAdf`); `lib/providers/jira/fake-client.js` seed-shape comment (documents the `_properties` seed and `properties` read and write); `lib/as-asked.js` \"Who uses what\" (names the Jira region module for `sealAsAsked`, `splitAsAsked` and the marker spellings). It also adds `docs/areas/providers.md` (four Lessons, one Waiting entry) and retires the llm-and-prompts Waiting entry for `lib/should-mock-ai.js`: the inline test-token checks in `routes/proxy-compute.js`, `routes/task-chat.js`, `routes/workspace-api-steps.js` and `server.js` now call `isHermeticTestToken` with an identical expression, so behaviour should be unchanged; `routes/workspace-api-audit.js` keeps its own predicate on purpose.",
+    "links": {
+     "about": "change-85"
+    },
+    "state": "done",
+    "v": 2,
+    "op": "end",
+    "by": "review",
+    "at": "2026-11-13T15:12:31.000Z",
+    "stateReason": "Checked in review at f9fa4a80c: the comment tidies and the plainText export are in scope; the isHermeticTestToken swap is behaviour-identical at every call site and workspace-api-audit.js keeps a different predicate on purpose; providers.md is declared",
+    "reason": "Checked in review at f9fa4a80c: the comment tidies and the plainText export are in scope; the isHermeticTestToken swap is behaviour-identical at every call site and workspace-api-audit.js keeps a different predicate on purpose; providers.md is declared"
+   }
+  ],
+  "verdict-98": [
+   {
+    "id": "verdict-98",
+    "kind": "verdict",
+    "in": "task-60",
+    "of": "review",
+    "outcome": "approve-with-notes",
+    "reasoning": "**Verdict:** Approve, conditional on close-out discharging the ledger. PR 2421 at head f9fa4a80c (base 4b5001ddf) merges cleanly onto main cfd152fa4, which has touched none of its 22 files; CI green, and the seal suites re-run locally green (jira-as-asked-region 39/39, create-seal, dispatch-seal, guard, readers, as-asked, marker-census, adf-codec).\n\n**Against plan-54 session 1:** items 1-6 all met. One reader (`readDescription`) for every description read; all 9 provider-side `getIssue` calls pass `AS_ASKED_READ`; `updateIssue` writes the property in the same PUT; `descriptionRoundTrip` is `holdAsAsked` then `readDescription`; one size function (`holdAsAsked`), 32,768 UTF-8 bytes of the serialized property, oversize files unsealed verbatim and `updateIssue` 422s before any write. Departures (decision-82, -86, -87, -88, every getIssue) are recorded on LIN-4445. The two extras are declared: the `isHermeticTestToken` consolidation is behaviour-identical at every call site (`routes/workspace-api-audit.js:35` is a different predicate, also matching `provider==='local'`, so not a sibling), and `docs/areas/providers.md` is new.\n\n**Done-when:** all met on the fake. \"D1's rich-content guard is unchanged\": met in substance. No rich-content rule changed; the one change is the codec-shape rule for an empty fence, whose refusal reason (old renderer printed a fence the writer tore apart) no longer applies; `adfHasUnrenderableContent` still refuses the other degenerate codeBlocks.\n\n**Regression:** git log -30 on adf.js, index.js, as-asked-seal.js, fake-client.js: codec rebuilds (LIN-3556/3557/3561/3564/3565/3570) and seal work (LIN-4352/4361/4362) intact; nothing reverted.\n\n**Mutations** (all reverted, tree clean): reader ignores property, writer property null, issueDescription and updateIssue re-read drop AS_ASKED_READ, size guard off, empty-fence render reverted, reader/writer take first end only, updateIssue never sends property, _toCanonicalIssue back to adfToMarkdown: all red. Probe of 16 further shapes through holdAsAsked then readDescription: all byte-exact, no D1 trip, no new 422.\n\n**Class:** a provider whose stored form cannot give back the markdown it was handed; Jira is the only member. Remaining instance is `createIssue` (LIN-4451, task-61). Bulk search stays display-only by the ask, homed in providers.md's Waiting entry. Otherwise isolated.\n\n**Not merge conditions:** one test fix for close-out; three post-deploy live checks owned by LIN-4452 (task-62), since no build session holds a credential for John's site.\n\n**Rollback:** revert PR 2421's squash commit. Written properties stay but nothing reads them; sealed descriptions read through adfToMarkdown as `_End of…_`, which splitAsAsked does not recognise, so those tickets fall back to the unsealed readers. No data loss.",
+    "links": {
+     "on": "change-85@2",
+     "about": "task-60"
+    },
+    "state": "stands",
+    "v": 1,
+    "op": "add",
+    "by": "review",
+    "at": "2026-11-13T15:12:26.000Z"
+   }
+  ],
+  "finding-99": [
+   {
+    "id": "finding-99",
+    "kind": "finding",
+    "in": "task-60",
+    "to": "close-out",
+    "says": "Fix before close: `tests/unit/jira-as-asked-region.test.js`, test \"an oversized body is not sealed…\" (~line 262) asserts the body was filed unsealed and verbatim but not \"with the log line\" (plan-54 item 6 witness). Capture `console.log` during the `sealForFiling` call and assert exactly one line equal to `[as-asked] seal skipped: provider jira cannot hold the block (test)`.",
+    "links": {
+     "about": "change-85@2"
+    },
+    "state": "open",
+    "v": 1,
+    "op": "add",
+    "by": "review",
+    "at": "2026-11-13T15:12:27.000Z"
+   }
+  ],
+  "check-100": [
+   {
+    "id": "check-100",
+    "kind": "check",
+    "in": "task-62",
+    "to": "task-62",
+    "what": "After PR 2421 deploys: the first dispatch of a never-dispatched Jira-native ticket on John Jira writes the As asked block through `updateIssue`.",
+    "why-person": "Once the seal is live, every first dispatch of a Jira-native ticket starts sealing (task-60 Done-when note). No test reaches Atlassian, so only a live dispatch shows the dispatch still enqueues and the block lands or is refused cleanly.",
+    "how": "Dispatch one never-dispatched Jira-native ticket. Right is either outcome, with the dispatch row enqueued in both: the ticket shows the formatted block with no \"seal skipped\" line, or a ticket carrying mentions/emoji/panels logs the existing D1 refusal line. Anything else (no enqueue, a 422, a reformatted body) is wrong.",
+    "links": {
+     "about": "change-85@2"
+    },
+    "state": "open",
+    "v": 1,
+    "op": "add",
+    "by": "review",
+    "at": "2026-11-13T15:12:29.000Z"
+   }
+  ],
+  "finding-101": [
+   {
+    "id": "finding-101",
+    "kind": "finding",
+    "in": "task-61",
+    "to": "task-61",
+    "says": "`createIssue` is the remaining Jira instance of the class (a provider whose stored form cannot give back the markdown it was handed). It must call the same `holdAsAsked` as `descriptionRoundTrip` and `updateIssue` (PR 2421), so the seal check, the 32,768-byte size guard and the 422 cannot disagree, and its re-read must pass `AS_ASKED_READ` like every provider-side `getIssue`.",
+    "links": {
+     "about": "change-85@2"
+    },
+    "state": "open",
+    "v": 1,
+    "op": "add",
+    "by": "review",
+    "at": "2026-11-13T15:12:30.000Z"
+   }
+  ],
+  "run-102": [
+   {
+    "id": "run-102",
+    "kind": "run",
+    "in": "task-60",
+    "stage": "review",
+    "account": "Reviewed PR 2421 (change-85) at f9fa4a80c against plan-54 session 1: clean merge onto cfd152fa4, CI green, seal suites re-run locally green. Every item of As asked met; departures recorded on LIN-4445; the empty-fence change is consistent with D1 rich-content guard unchanged. Ten mutations all red; 16 probe shapes held byte-exact. Verdict approve-with-notes (verdict-98), conditional on close-out: one test fix (finding-99, oversize log line). Sharpened the live check check-90 and added check-100 (first Jira-native dispatch) for LIN-4452; told task-61 createIssue must go through holdAsAsked (finding-101). Closed finding-97. Did not check docs/architecture/source-map.md, so finding-89 stays open.",
+    "links": {},
+    "state": "open",
+    "v": 1,
+    "op": "add",
+    "by": "review",
+    "at": "2026-11-13T15:12:32.000Z"
+   },
+   {
+    "id": "run-102",
+    "kind": "run",
+    "in": "task-60",
+    "stage": "review",
+    "account": "Reviewed PR 2421 (change-85) at f9fa4a80c against plan-54 session 1: clean merge onto cfd152fa4, CI green, seal suites re-run locally green. Every item of As asked met; departures recorded on LIN-4445; the empty-fence change is consistent with D1 rich-content guard unchanged. Ten mutations all red; 16 probe shapes held byte-exact. Verdict approve-with-notes (verdict-98), conditional on close-out: one test fix (finding-99, oversize log line). Sharpened the live check check-90 and added check-100 (first Jira-native dispatch) for LIN-4452; told task-61 createIssue must go through holdAsAsked (finding-101). Closed finding-97. Did not check docs/architecture/source-map.md, so finding-89 stays open.",
+    "links": {},
+    "state": "done",
+    "v": 2,
+    "op": "end",
+    "by": "review",
+    "at": "2026-11-13T15:12:33.000Z",
+    "stateReason": "Review posted",
+    "reason": "Review posted"
    }
   ]
  },
