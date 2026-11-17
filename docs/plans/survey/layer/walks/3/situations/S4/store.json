@@ -1,0 +1,269 @@
+{
+ "retro": false,
+ "next": 9,
+ "records": {
+  "area-1": {
+   "id": "area-1",
+   "kind": "area",
+   "versions": [
+    {
+     "v": 1,
+     "op": "add",
+     "at": "2026-11-13T08:00:00.000Z",
+     "by": "Harbour",
+     "state": "kept",
+     "fields": {
+      "name": "studies",
+      "paths": [
+       "studies/"
+      ]
+     },
+     "links": {}
+    }
+   ]
+  },
+  "task-2": {
+   "id": "task-2",
+   "kind": "task",
+   "versions": [
+    {
+     "v": 1,
+     "op": "add",
+     "at": "2026-11-13T08:00:00.000Z",
+     "by": "John",
+     "in": "area-1",
+     "state": "open",
+     "fields": {
+      "asked": "The weekly read.",
+      "paths": [
+       "studies/"
+      ]
+     },
+     "links": {}
+    }
+   ]
+  },
+  "finding-3": {
+   "id": "finding-3",
+   "kind": "finding",
+   "versions": [
+    {
+     "v": 1,
+     "op": "add",
+     "at": "2026-11-13T08:00:00.000Z",
+     "by": "Harbour",
+     "in": "task-2",
+     "to": "task-2",
+     "state": "open",
+     "fields": {
+      "says": "Due: write the next study."
+     },
+     "links": {}
+    },
+    {
+     "v": 2,
+     "op": "end",
+     "at": "2026-11-13T09:30:00.000Z",
+     "by": "implementation",
+     "in": "task-2",
+     "to": "task-2",
+     "state": "done",
+     "fields": {
+      "says": "Due: write the next study."
+     },
+     "links": {},
+     "reason": "written as LH051 (change-7)",
+     "stateReason": "written as LH051 (change-7)"
+    }
+   ]
+  },
+  "run-4": {
+   "id": "run-4",
+   "kind": "run",
+   "versions": [
+    {
+     "v": 1,
+     "op": "add",
+     "at": "2026-11-13T09:00:00.000Z",
+     "by": "implementation",
+     "in": "task-2",
+     "state": "open",
+     "fields": {
+      "stage": "implementation",
+      "claims": [
+       "studies/LH051.md"
+      ],
+      "account": "Session A: weekly read; writing the next study, LH051."
+     },
+     "links": {}
+    },
+    {
+     "v": 2,
+     "op": "end",
+     "at": "2026-11-13T09:30:00.000Z",
+     "by": "implementation",
+     "in": "task-2",
+     "state": "done",
+     "fields": {
+      "stage": "implementation",
+      "claims": [
+       "studies/LH051.md"
+      ],
+      "account": "Session A: weekly read; writing the next study, LH051."
+     },
+     "links": {},
+     "reason": "LH051 written (change-7)",
+     "stateReason": "LH051 written (change-7)"
+    }
+   ]
+  },
+  "run-5": {
+   "id": "run-5",
+   "kind": "run",
+   "versions": [
+    {
+     "v": 1,
+     "op": "add",
+     "at": "2026-11-13T09:05:00.000Z",
+     "by": "implementation",
+     "in": "task-2",
+     "state": "open",
+     "fields": {
+      "stage": "implementation",
+      "claims": [
+       "studies/LH052.md"
+      ],
+      "account": "Session B: weekly read; run-4 already claims LH051, so writing the next study as LH052."
+     },
+     "links": {}
+    },
+    {
+     "v": 2,
+     "op": "end",
+     "at": "2026-11-13T09:35:00.000Z",
+     "by": "implementation",
+     "in": "task-2",
+     "state": "done",
+     "fields": {
+      "stage": "implementation",
+      "claims": [
+       "studies/LH052.md"
+      ],
+      "account": "Session B: weekly read; run-4 already claims LH051, so writing the next study as LH052."
+     },
+     "links": {},
+     "reason": "LH052 written (change-8); finding-3 was already ended by another run",
+     "stateReason": "LH052 written (change-8); finding-3 was already ended by another run"
+    }
+   ]
+  },
+  "finding-6": {
+   "id": "finding-6",
+   "kind": "finding",
+   "versions": [
+    {
+     "v": 1,
+     "op": "add",
+     "at": "2026-11-13T09:05:00.000Z",
+     "by": "implementation",
+     "in": "task-2",
+     "to": "John",
+     "state": "open",
+     "fields": {
+      "says": "Two sessions are on the weekly read: run-4 (since 09:00) claims the due study as LH051; run-5 writes LH052. One study may be redundant."
+     },
+     "links": {}
+    }
+   ]
+  },
+  "change-7": {
+   "id": "change-7",
+   "kind": "change",
+   "versions": [
+    {
+     "v": 1,
+     "op": "add",
+     "at": "2026-11-13T09:30:00.000Z",
+     "by": "implementation",
+     "in": "task-2",
+     "state": "open",
+     "fields": {
+      "ref": "studies/LH051.md",
+      "head": "a051"
+     },
+     "links": {}
+    }
+   ]
+  },
+  "change-8": {
+   "id": "change-8",
+   "kind": "change",
+   "versions": [
+    {
+     "v": 1,
+     "op": "add",
+     "at": "2026-11-13T09:35:00.000Z",
+     "by": "implementation",
+     "in": "task-2",
+     "state": "open",
+     "fields": {
+      "ref": "studies/LH052.md",
+      "head": "b052"
+     },
+     "links": {}
+    }
+   ]
+  }
+ },
+ "queries": [
+  {
+   "at": "2026-11-17T13:35:57.129Z",
+   "by": "implementation",
+   "query": "find",
+   "args": {
+    "path": "studies/"
+   },
+   "returned": 2
+  },
+  {
+   "at": "2026-11-17T13:35:57.254Z",
+   "by": "implementation",
+   "query": "find",
+   "args": {
+    "path": "studies/"
+   },
+   "returned": 3
+  },
+  {
+   "at": "2026-11-17T13:35:57.290Z",
+   "by": "implementation",
+   "query": "get",
+   "args": {
+    "id": "run-4",
+    "asOf": null
+   },
+   "returned": 1
+  },
+  {
+   "at": "2026-11-17T13:35:57.591Z",
+   "by": "John",
+   "query": "show",
+   "args": {
+    "task": "task-2",
+    "asOf": null
+   },
+   "returned": 1
+  },
+  {
+   "at": "2026-11-17T13:35:57.635Z",
+   "by": "John",
+   "query": "find",
+   "args": {
+    "to": "John",
+    "state": "open"
+   },
+   "returned": 1
+  }
+ ],
+ "hits": []
+}
