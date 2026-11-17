@@ -21,3 +21,8 @@ The approved plan is split into its two pieces. Plan review Approve: comment `73
 
 **What follows (not created here; one ticket each, by the same recipe):** `flight-companion.js`, then `observation.js`, then the `prompt-section.js` chain (`app.js`, `swipe.js`). After the last of these, the bridge and `tests/fixtures/browser-cost-format.js` are deleted.
 
+
+## Subtasks it created (titles from LIN-4463.json's children; their descriptions and creation times are not in the material)
+
+- LIN-4471: Front-end modules piece 1: /lib/ serving, bridge and import checks, workspace KPIs as a module
+- LIN-4472: Front-end modules piece 2: task page as a module, its suites as imports
