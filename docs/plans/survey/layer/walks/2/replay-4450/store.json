@@ -1,15 +1,15 @@
 {
  "retro": false,
- "seq": 114,
+ "seq": 124,
  "count": {
-  "area": 3,
-  "lesson": 18,
-  "finding": 46,
+  "area": 4,
+  "lesson": 22,
+  "finding": 47,
   "task": 4,
   "decision": 12,
   "plan": 3,
   "verdict": 3,
-  "run": 4,
+  "run": 5,
   "question": 1,
   "check": 1,
   "change": 1
@@ -2025,6 +2025,29 @@
     "fields": {
      "says": "The bulk search path stays display-only, so one issue reads differently through search than through getIssue. Check that no cache or guard compares the two."
     }
+   },
+   {
+    "id": "finding-33",
+    "kind": "finding",
+    "v": 2,
+    "seq": 122,
+    "at": "2026-11-13T15:11:37.000Z",
+    "by": "leftover",
+    "op": "end",
+    "in": "task-2",
+    "to": "implementation",
+    "state": "done",
+    "links": [
+     {
+      "type": "about",
+      "to": "plan-1"
+     }
+    ],
+    "fields": {
+     "says": "The bulk search path stays display-only, so one issue reads differently through search than through getIssue. Check that no cache or guard compares the two."
+    },
+    "note": "Checked in the leftovers: no guard or cache compares the bulk search reading with getIssue; the remaining gap (bulk reads not asking for harbour.asAsked) is recorded for the providers area as a finding.",
+    "reason": "Checked in the leftovers: no guard or cache compares the bulk search reading with getIssue; the remaining gap (bulk reads not asking for harbour.asAsked) is recorded for the providers area as a finding."
    }
   ],
   "finding-34": [
@@ -2539,6 +2562,28 @@
      "ref": "https://github.com/JKershaw/LinearViewer/pull/2421",
      "head": "a98d042c6"
     }
+   },
+   {
+    "id": "change-1",
+    "kind": "change",
+    "v": 2,
+    "seq": 123,
+    "at": "2026-11-13T15:11:38.000Z",
+    "by": "leftover",
+    "op": "revise",
+    "in": "task-2",
+    "state": "open",
+    "links": [
+     {
+      "type": "about",
+      "to": "plan-1"
+     }
+    ],
+    "fields": {
+     "ref": "https://github.com/JKershaw/LinearViewer/pull/2421",
+     "head": "f9fa4a80ca19503bebbf5abd81dc83d3e86296b6"
+    },
+    "note": "Leftovers commit moved the PR head; CI green on it."
    }
   ],
   "decision-12": [
@@ -2708,6 +2753,200 @@
     },
     "note": "PR #2421 opened; departures, findings and handoffs recorded.",
     "reason": "PR #2421 opened; departures, findings and handoffs recorded."
+   }
+  ],
+  "run-5": [
+   {
+    "id": "run-5",
+    "kind": "run",
+    "v": 1,
+    "seq": 115,
+    "at": "2026-11-13T15:11:30.000Z",
+    "by": "leftover",
+    "op": "add",
+    "in": "task-2",
+    "state": "open",
+    "links": [
+     {
+      "type": "about",
+      "to": "change-1"
+     }
+    ],
+    "fields": {
+     "stage": "leftover",
+     "account": "Given the implementation brief (no leftover stage exists). Tidied four comments the seal made untrue: adf.js header (fourth export plainText, reached by the region module), index.js issueDescription comment (now readDescription/holdAsAsked), fake-client.js seed shape (_properties seed, properties read/write), lib/as-asked.js Who-uses-what (names the Jira region module). Noted for providers: bulk Jira reads (fetchProjects, fetchIssueContext children) do not ask for harbour.asAsked, so they show the rendering while single reads serve exact words; no guard or cache compares the two (settles finding-33). Opened a providers area note with four lessons. Retired the llm-and-prompts Waiting entry on lib/should-mock-ai.js: inline test-token checks in routes/proxy-compute.js, routes/task-chat.js, routes/workspace-api-steps.js and server.js now call isHermeticTestToken, behaviour unchanged. PR #2421 head f9fa4a80ca19503bebbf5abd81dc83d3e86296b6, CI green (one runner-loss rerun, no test failed)."
+    }
+   },
+   {
+    "id": "run-5",
+    "kind": "run",
+    "v": 2,
+    "seq": 124,
+    "at": "2026-11-13T15:11:39.000Z",
+    "by": "leftover",
+    "op": "end",
+    "in": "task-2",
+    "state": "done",
+    "links": [
+     {
+      "type": "about",
+      "to": "change-1"
+     }
+    ],
+    "fields": {
+     "stage": "leftover",
+     "account": "Given the implementation brief (no leftover stage exists). Tidied four comments the seal made untrue: adf.js header (fourth export plainText, reached by the region module), index.js issueDescription comment (now readDescription/holdAsAsked), fake-client.js seed shape (_properties seed, properties read/write), lib/as-asked.js Who-uses-what (names the Jira region module). Noted for providers: bulk Jira reads (fetchProjects, fetchIssueContext children) do not ask for harbour.asAsked, so they show the rendering while single reads serve exact words; no guard or cache compares the two (settles finding-33). Opened a providers area note with four lessons. Retired the llm-and-prompts Waiting entry on lib/should-mock-ai.js: inline test-token checks in routes/proxy-compute.js, routes/task-chat.js, routes/workspace-api-steps.js and server.js now call isHermeticTestToken, behaviour unchanged. PR #2421 head f9fa4a80ca19503bebbf5abd81dc83d3e86296b6, CI green (one runner-loss rerun, no test failed)."
+    },
+    "note": "Leftovers done: four comments tidied, providers area opened with four lessons and one finding, finding-33 ended, change-1 head revised.",
+    "reason": "Leftovers done: four comments tidied, providers area opened with four lessons and one finding, finding-33 ended, change-1 head revised."
+   }
+  ],
+  "area-4": [
+   {
+    "id": "area-4",
+    "kind": "area",
+    "v": 1,
+    "seq": 116,
+    "at": "2026-11-13T15:11:31.000Z",
+    "by": "leftover",
+    "op": "add",
+    "state": "kept",
+    "links": [],
+    "fields": {
+     "name": "providers",
+     "paths": [
+      "lib/providers/"
+     ]
+    }
+   }
+  ],
+  "lesson-19": [
+   {
+    "id": "lesson-19",
+    "kind": "lesson",
+    "v": 1,
+    "seq": 117,
+    "at": "2026-11-13T15:11:32.000Z",
+    "by": "leftover",
+    "op": "add",
+    "in": "area-4",
+    "state": "holds",
+    "links": [
+     {
+      "type": "about",
+      "to": "change-1"
+     }
+    ],
+    "fields": {
+     "says": "A Jira description has one reader and one writer: readDescription and holdAsAsked in lib/providers/jira/as-asked-region.js, the only code that knows both the ADF region and the harbour.asAsked property; every provider-side getIssue passes AS_ASKED_READ. A new description read that calls adfToMarkdown directly serves converted words and silently breaks the seal; tests/unit/jira-as-asked-region.test.js fails on it (LIN-4450).",
+     "paths": [
+      "lib/providers/jira/as-asked-region.js",
+      "lib/providers/jira/index.js"
+     ],
+     "checked-at": "f9fa4a80c"
+    }
+   }
+  ],
+  "lesson-20": [
+   {
+    "id": "lesson-20",
+    "kind": "lesson",
+    "v": 1,
+    "seq": 118,
+    "at": "2026-11-13T15:11:33.000Z",
+    "by": "leftover",
+    "op": "add",
+    "in": "area-4",
+    "state": "holds",
+    "links": [
+     {
+      "type": "about",
+      "to": "change-1"
+     }
+    ],
+    "fields": {
+     "says": "Decide whether the words are kept by comparing renderings, never ADF: Jira stamps localId and similar attributes on ordinary saves and adfToMarkdown ignores them, so an ADF hash would read every human save as an edit (LIN-4450).",
+     "paths": [
+      "lib/providers/jira/as-asked-region.js"
+     ],
+     "checked-at": "f9fa4a80c"
+    }
+   }
+  ],
+  "lesson-21": [
+   {
+    "id": "lesson-21",
+    "kind": "lesson",
+    "v": 1,
+    "seq": 119,
+    "at": "2026-11-13T15:11:34.000Z",
+    "by": "leftover",
+    "op": "add",
+    "in": "area-4",
+    "state": "holds",
+    "links": [
+     {
+      "type": "about",
+      "to": "change-1"
+     }
+    ],
+    "fields": {
+     "says": "The region reader accepts an end line whatever its marks, looser than splitAsAsked. It is safe only because descriptionRoundTrip runs the same reader the reads do, so a block the reader would misplace is refused at filing. Keep the seal check and the reads on one reader (LIN-4450).",
+     "paths": [
+      "lib/providers/jira/as-asked-region.js",
+      "lib/providers/jira/index.js"
+     ],
+     "checked-at": "f9fa4a80c"
+    }
+   }
+  ],
+  "lesson-22": [
+   {
+    "id": "lesson-22",
+    "kind": "lesson",
+    "v": 1,
+    "seq": 120,
+    "at": "2026-11-13T15:11:35.000Z",
+    "by": "leftover",
+    "op": "add",
+    "in": "area-4",
+    "state": "holds",
+    "links": [
+     {
+      "type": "about",
+      "to": "change-1"
+     }
+    ],
+    "fields": {
+     "says": "The Jira fake proves only the provider logic: it stores what it is handed and never normalises ADF, so it cannot show whether live Jira keeps a region rendering. A claim about live behaviour needs a live check (LIN-4450; live check is LIN-4452).",
+     "paths": [
+      "lib/providers/jira/fake-client.js"
+     ],
+     "checked-at": "f9fa4a80c"
+    }
+   }
+  ],
+  "finding-47": [
+   {
+    "id": "finding-47",
+    "kind": "finding",
+    "v": 1,
+    "seq": 121,
+    "at": "2026-11-13T15:11:36.000Z",
+    "by": "leftover",
+    "op": "add",
+    "in": "area-4",
+    "to": "area-4",
+    "state": "open",
+    "links": [
+     {
+      "type": "about",
+      "to": "finding-33"
+     }
+    ],
+    "fields": {
+     "says": "lib/providers/jira/index.js: the bulk reads (fetchProjects, and fetchIssueContext children through searchAllIssues) do not ask for harbour.asAsked, so a sealed block shows its converted rendering on the dashboard and in a parent children list while single-issue reads serve the exact words. POST /rest/api/3/search/jql accepts properties, so asking there would make the bulk path exact too. No guard or cache compares the two today (LIN-4450 leftovers)."
+    }
    }
   ]
  },
