@@ -1,5 +1,5 @@
 {
- "next": 68,
+ "next": 75,
  "records": {
   "task-1": [
    {
@@ -1076,6 +1076,23 @@
     "by": "survey-place",
     "at": "2026-11-13T17:26:47.000Z",
     "reason": "survey-place at 904719353 confirms, adds the toggle marker and the export-not-slice fix"
+   },
+   {
+    "id": "finding-50",
+    "kind": "finding",
+    "in": "task-28",
+    "to": "implementation",
+    "links": {
+     "about": "plan-10@2"
+    },
+    "says": "Tests that read `task-page.js` as text depend on the IIFE's indentation. Unwrapping the IIFE moves every line out two spaces, and these tests slice the source at strings that include the indent: `lin-3975-task-run-control:588` (`'  function init(doc) {'`, and `'    function toggle(row) {'` near `:587`), `lin-3975-summary-and-time:59/162/263` (`'  function relativeWords(value) {'`), `lin-3975-chat-fold:142`. After dedenting, `indexOf` returns -1, so \"rerun them\" is not enough: rewrite them. Re-anchor them on names, not indentation; better, make `relativeWords` an export the twin test imports instead of a text slice. Only the first is in the plan's list (survey at 17faa83f4; confirmed by survey-place at 904719353).",
+    "state": "done",
+    "v": 3,
+    "op": "end",
+    "by": "implementation",
+    "at": "2026-11-13T17:33:24.000Z",
+    "stateReason": "Re-anchored the three indentation-keyed probes (run-control, summary-and-time, chat-fold) on 'function init(doc) {' / 'function toggle(row) {'; the relativeWords slice is replaced by a test of the exported shareTime (PR #2436)",
+    "reason": "Re-anchored the three indentation-keyed probes (run-control, summary-and-time, chat-fold) on 'function init(doc) {' / 'function toggle(row) {'; the relativeWords slice is replaced by a test of the exported shareTime (PR #2436)"
    }
   ],
   "finding-51": [
@@ -1093,6 +1110,23 @@
     "op": "add",
     "by": "survey-task",
     "at": "2026-11-13T17:22:41.000Z"
+   },
+   {
+    "id": "finding-51",
+    "kind": "finding",
+    "in": "task-28",
+    "to": "implementation",
+    "links": {
+     "about": "plan-10@2"
+    },
+    "says": "Two more suites run `task-page.js` and are not in the plan's list: `lin-3975-proposal-refresh:232` (`loadWorld` + `module.exports`) and `lin-3975-task-run-links:213`, which calls `vm.runInNewContext` on the raw source and will throw a SyntaxError on the first `export`. Both must move to imports with the others (survey at 17faa83f4).",
+    "state": "done",
+    "v": 2,
+    "op": "end",
+    "by": "implementation",
+    "at": "2026-11-13T17:33:25.000Z",
+    "stateReason": "lin-3975-proposal-refresh's URL helper and lin-3975-task-run-links' vm run now import the module (9/9 and 20/20 green, PR #2436)",
+    "reason": "lin-3975-proposal-refresh's URL helper and lin-3975-task-run-links' vm run now import the module (9/9 and 20/20 green, PR #2436)"
    }
   ],
   "question-52": [
@@ -1182,6 +1216,23 @@
     "op": "add",
     "by": "survey-task",
     "at": "2026-11-13T17:22:43.000Z"
+   },
+   {
+    "id": "finding-53",
+    "kind": "finding",
+    "in": "task-28",
+    "to": "implementation",
+    "links": {
+     "on": "change-48@2"
+    },
+    "says": "`importWorld` (piece 1, `import-world.js`) sets up less than `loadWorld`, and that works against \"shorter\". `loadWorld` provides a stub `fetch`, a sync `requestAnimationFrame`, `navigator.clipboard` and unref'd timers; `importWorld` uses Node's real global: without `timers` a poller's `setTimeout` is real, `navigator` is Node 25's own with no clipboard (share copy, `:397`), and every page test needs `restore()`. To keep suites short: most exports are pure (`pollDelay`, `cadenceStatus`, `createOpenMemory`, `formatElapsed`, `proposalsUrlOf`…). Keep the `typeof document` guard and a static import needs no world at all, which removes `exportsOf()` (`task-page-client:28`, `task-timeline-client:26`). Only the DOMContentLoaded suites need `importWorld`.",
+    "state": "done",
+    "v": 2,
+    "op": "end",
+    "by": "implementation",
+    "at": "2026-11-13T17:33:26.000Z",
+    "stateReason": "Followed: pure rules are plain static imports with no world; only init-driven tests use tests/unit/helpers/task-page-world.js (36 lines), which gives importWorld the page's stub defaults and a fresh instance per test (PR #2436)",
+    "reason": "Followed: pure rules are plain static imports with no world; only init-driven tests use tests/unit/helpers/task-page-world.js (36 lines), which gives importWorld the page's stub defaults and a fresh instance per test (PR #2436)"
    }
   ],
   "check-54": [
@@ -1199,6 +1250,23 @@
     "op": "add",
     "by": "survey-task",
     "at": "2026-11-13T17:22:44.000Z"
+   },
+   {
+    "id": "check-54",
+    "kind": "check",
+    "in": "task-28",
+    "to": "implementation",
+    "what": "Run `tests/e2e/task-page.spec.js` and `tests/e2e/task-timeline.spec.js` against the converted page, or say that CI carries them.",
+    "why-person": "No real browser exercises this page in the plan's witnesses. The golden diff (7 tags) and Node imports cannot show MIME, CSP or execution order, and the Done-when says the task page behaves as before.",
+    "how": "Playwright run of the two specs after `SCRIPTS` switches to `{ module: '/task-page.js' }`; paste the output or cite the CI job.",
+    "links": {},
+    "state": "done",
+    "v": 2,
+    "op": "end",
+    "by": "implementation",
+    "at": "2026-11-13T17:33:27.000Z",
+    "stateReason": "npx playwright test tests/e2e/task-page.spec.js tests/e2e/task-timeline.spec.js: 18 passed locally on the converted page; CI E2E shards 1-4 pass on the final commit of PR #2436",
+    "reason": "npx playwright test tests/e2e/task-page.spec.js tests/e2e/task-timeline.spec.js: 18 passed locally on the converted page; CI E2E shards 1-4 pass on the final commit of PR #2436"
    }
   ],
   "finding-55": [
@@ -1216,6 +1284,23 @@
     "op": "add",
     "by": "survey-task",
     "at": "2026-11-13T17:22:45.000Z"
+   },
+   {
+    "id": "finding-55",
+    "kind": "finding",
+    "in": "task-28",
+    "to": "implementation",
+    "links": {
+     "about": "plan-10@2"
+    },
+    "says": "Minor: the regex at `no-page-wide-label-listener:247` already tolerates `{ module }` entries, so it needs a rerun, not a change. Piece 1 already marked the module-capable-loader Waiting entry's premise wrong, so deleting it in this piece is just tidying.",
+    "state": "done",
+    "v": 2,
+    "op": "end",
+    "by": "implementation",
+    "at": "2026-11-13T17:33:28.000Z",
+    "stateReason": "Label-listener regex rerun, unchanged; module-capable-loader Waiting entry deleted from docs/areas/front-end-browser.md (PR #2436)",
+    "reason": "Label-listener regex rerun, unchanged; module-capable-loader Waiting entry deleted from docs/areas/front-end-browser.md (PR #2436)"
    }
   ],
   "finding-56": [
@@ -1245,6 +1330,21 @@
     "by": "survey-place",
     "at": "2026-11-13T17:26:45.000Z",
     "reason": "Census forecast corrected: survey-place at 904719353 counted which migrated suites still load other classic files"
+   },
+   {
+    "id": "finding-56",
+    "kind": "finding",
+    "in": "task-28",
+    "to": "implementation",
+    "says": "First moves: 1. Add named exports beside the IIFE. 2. Move the five executing suites and the two parity tests to imports, green while the seam still exists. 3. Remove the IIFE and the seam in a whitespace-only commit, re-anchoring the text slicers on names. 4. Then `SCRIPTS`, the golden file, and the census (102 after piece 1). Expect the census to fall by about 2, not 5–7: only `task-page-client` and `task-timeline-client` leave the list (`close-out.js` is an exempt `runClassic` sibling). `task-page-question` (`:311`, `question-cards.js`), `lin-3975-proposal-refresh` (`:161`, `task-chat.js`), `lin-3975-task-run-links` and `lin-3975-summary-and-time` (`common.js` slices) still load other classic files, so they stay listed (survey-place at 904719353).",
+    "links": {},
+    "state": "done",
+    "v": 3,
+    "op": "end",
+    "by": "implementation",
+    "at": "2026-11-13T17:33:29.000Z",
+    "stateReason": "Moves followed; census 102 to 100 as forecast: only task-page-client and task-timeline-client left CLASSIC_LOADER_SUITES (PR #2436)",
+    "reason": "Moves followed; census 102 to 100 as forecast: only task-page-client and task-timeline-client left CLASSIC_LOADER_SUITES (PR #2436)"
    }
   ],
   "run-57": [
@@ -1292,6 +1392,23 @@
     "op": "add",
     "by": "survey-place",
     "at": "2026-11-13T17:26:48.000Z"
+   },
+   {
+    "id": "finding-58",
+    "kind": "finding",
+    "in": "task-28",
+    "to": "implementation",
+    "links": {
+     "about": "plan-10@2"
+    },
+    "says": "Moving `task-page.js` (the last entry in `SCRIPTS`) to a module changes timing, but harmlessly: a module runs after the classic scripts and before `DOMContentLoaded`, so the `:925` listener still registers after `common.js`'s and the run control's. Every cross-file read is `window.X` at call time and the file assigns no globals, so the conversion is mechanical. Expected golden diff: 7 identical tag lines, one per case; anything else is a bug (witness 9). Read at 904719353, with piece 1 merged.",
+    "state": "done",
+    "v": 2,
+    "op": "end",
+    "by": "implementation",
+    "at": "2026-11-13T17:33:30.000Z",
+    "stateReason": "Confirmed: golden fixture diff is the seven script tags only (7 insertions, 7 deletions); listener order unchanged; no window.* writes (PR #2436)",
+    "reason": "Confirmed: golden fixture diff is the seven script tags only (7 insertions, 7 deletions); listener order unchanged; no window.* writes (PR #2436)"
    }
   ],
   "finding-59": [
@@ -1309,6 +1426,23 @@
     "op": "add",
     "by": "survey-place",
     "at": "2026-11-13T17:26:49.000Z"
+   },
+   {
+    "id": "finding-59",
+    "kind": "finding",
+    "in": "task-28",
+    "to": "implementation",
+    "links": {
+     "about": "plan-10@2"
+    },
+    "says": "Review note 7 (update the source-map lines that call `task-page.js` classic) probably needs no edit: `docs/architecture/source-map.md` describes the task page's routes and renderer, not `public/task-page.js`. Check it and say so in the PR instead of editing it for the sake of it (survey-place at 904719353).",
+    "state": "declined",
+    "v": 2,
+    "op": "end",
+    "by": "implementation",
+    "at": "2026-11-13T17:33:31.000Z",
+    "stateReason": "Edited source-map.md anyway: it gains a time-words.js entry for the new leaf and now describes task-page.js as a module (PR #2436)",
+    "reason": "Edited source-map.md anyway: it gains a time-words.js entry for the new leaf and now describes task-page.js as a module (PR #2436)"
    }
   ],
   "finding-60": [
@@ -1533,6 +1667,170 @@
     "at": "2026-11-13T17:33:04.000Z",
     "stateReason": "Question settled and recorded",
     "reason": "Question settled and recorded"
+   }
+  ],
+  "run-68": [
+   {
+    "id": "run-68",
+    "kind": "run",
+    "in": "task-28",
+    "stage": "implementation",
+    "claims": [
+     "public/task-page.js",
+     "lib/render-task-page.js",
+     "lib/time-words.js",
+     "lib/render-run-steps.js",
+     "lib/task-page-loader.js",
+     "tests/unit/task-page-",
+     "tests/unit/task-timeline-client.test.js",
+     "tests/unit/lin-3975-",
+     "tests/unit/lin-4472-time-words.test.js",
+     "tests/unit/helpers/task-page-world.js",
+     "tests/unit/classic-loader-census.test.js",
+     "tests/unit/render-task-page-golden.test.js",
+     "tests/fixtures/render-task-page-golden.json",
+     "docs/areas/front-end-browser.md",
+     "docs/architecture/source-map.md"
+    ],
+    "account": "Converted public/task-page.js to an ES module (PR #2436): IIFE and the typeof-module seam replaced by named exports, SCRIPTS entry now { module: \"/task-page.js\" }, golden diff the seven script tags only. Per decision-66 I extracted lib/time-words.js as a served /lib/ leaf; the page imports fmtDuration and relativeAgo and drops formatElapsed and relativeWords, and every server caller imports the leaf directly under a guard. The five executing suites and the two parity tests now import the module (pure rules statically, init-driven tests through a 36-line task-page-world.js on importWorld); the three indentation-keyed probes re-anchor on names. Census 102 to 100, as finding-56 forecast. Deleted the module-capable-loader Waiting entry; source-map.md now calls task-page.js a module and lists time-words.js. Witnesses: each migrated suite green, a mutation of fmtDuration caught by two suites, grep clean, the two e2e specs 18 passed locally, CI green on the final commit. Closed all eight records addressed to me (finding-59 declined: I did edit the source map). Wrote the leaf-home decision, two notes to review (fmtDuration(Infinity) is now null; suite-length shortfall) and two leftovers to area-49.",
+    "links": {},
+    "state": "open",
+    "v": 1,
+    "op": "add",
+    "by": "implementation",
+    "at": "2026-11-13T17:33:17.000Z"
+   },
+   {
+    "id": "run-68",
+    "kind": "run",
+    "in": "task-28",
+    "stage": "implementation",
+    "claims": [
+     "public/task-page.js",
+     "lib/render-task-page.js",
+     "lib/time-words.js",
+     "lib/render-run-steps.js",
+     "lib/task-page-loader.js",
+     "tests/unit/task-page-",
+     "tests/unit/task-timeline-client.test.js",
+     "tests/unit/lin-3975-",
+     "tests/unit/lin-4472-time-words.test.js",
+     "tests/unit/helpers/task-page-world.js",
+     "tests/unit/classic-loader-census.test.js",
+     "tests/unit/render-task-page-golden.test.js",
+     "tests/fixtures/render-task-page-golden.json",
+     "docs/areas/front-end-browser.md",
+     "docs/architecture/source-map.md"
+    ],
+    "account": "Converted public/task-page.js to an ES module (PR #2436): IIFE and the typeof-module seam replaced by named exports, SCRIPTS entry now { module: \"/task-page.js\" }, golden diff the seven script tags only. Per decision-66 I extracted lib/time-words.js as a served /lib/ leaf; the page imports fmtDuration and relativeAgo and drops formatElapsed and relativeWords, and every server caller imports the leaf directly under a guard. The five executing suites and the two parity tests now import the module (pure rules statically, init-driven tests through a 36-line task-page-world.js on importWorld); the three indentation-keyed probes re-anchor on names. Census 102 to 100, as finding-56 forecast. Deleted the module-capable-loader Waiting entry; source-map.md now calls task-page.js a module and lists time-words.js. Witnesses: each migrated suite green, a mutation of fmtDuration caught by two suites, grep clean, the two e2e specs 18 passed locally, CI green on the final commit. Closed all eight records addressed to me (finding-59 declined: I did edit the source map). Wrote the leaf-home decision, two notes to review (fmtDuration(Infinity) is now null; suite-length shortfall) and two leftovers to area-49.",
+    "links": {},
+    "state": "done",
+    "v": 2,
+    "op": "end",
+    "by": "implementation",
+    "at": "2026-11-13T17:33:32.000Z",
+    "stateReason": "PR #2436 opened 17:44; summary posted on LIN-4472 at 17:50:29; CI green on the final commit",
+    "reason": "PR #2436 opened 17:44; summary posted on LIN-4472 at 17:50:29; CI green on the final commit"
+   }
+  ],
+  "change-69": [
+   {
+    "id": "change-69",
+    "kind": "change",
+    "in": "task-28",
+    "ref": "PR #2436 (closes LIN-4472, piece 2 of LIN-4463)",
+    "links": {},
+    "state": "open",
+    "v": 1,
+    "op": "add",
+    "by": "implementation",
+    "at": "2026-11-13T17:33:18.000Z"
+   }
+  ],
+  "decision-70": [
+   {
+    "id": "decision-70",
+    "kind": "decision",
+    "in": "task-28",
+    "scope": "task-28",
+    "answer": "`fmtDuration` and `relativeAgo` have one home, `lib/time-words.js`, allow-listed at `/lib/time-words.js` and mapped to `front-end-pages`. Every server caller imports it directly: `lib/render-run-steps.js` and `lib/task-page-loader.js` no longer re-export either name, and a guard in `lin-4472-time-words.test.js` (scanning `lib/`, `routes/`, `server.js`) fails if a server module defines or re-exports them again. The classic browser copies stay outside the guard.",
+    "why": "Carries out decision-66 without leaving the old homes as pass-through re-exports, so the leaf is the only definition the server can reach; the guard keeps it that way. Recorded on LIN-4463 as `lin4472-served-leaf`.",
+    "links": {
+     "on": "decision-66@1"
+    },
+    "state": "stands",
+    "v": 1,
+    "op": "add",
+    "by": "implementation",
+    "at": "2026-11-13T17:33:19.000Z"
+   }
+  ],
+  "finding-71": [
+   {
+    "id": "finding-71",
+    "kind": "finding",
+    "in": "task-28",
+    "to": "review",
+    "says": "Behaviour change: `fmtDuration(Infinity)` is now `null`; the page's old `formatElapsed(Infinity)` returned `\"Infinityh\"` (checked in git). No page path passes a non-finite span: `tickClocks` skips unparsed starts, and `Date.now()` minus a parsed start is finite. `tests/unit/lin-4472-time-words.test.js` pins the new value. Also: `shareTime(doc, value, now)` takes an optional `now`, defaulting to the same `new Date()` that `relativeAgo` uses.",
+    "links": {
+     "about": "change-69@1"
+    },
+    "state": "open",
+    "v": 1,
+    "op": "add",
+    "by": "implementation",
+    "at": "2026-11-13T17:33:20.000Z"
+   }
+  ],
+  "finding-72": [
+   {
+    "id": "finding-72",
+    "kind": "finding",
+    "in": "task-28",
+    "to": "review",
+    "says": "Known shortfall against review note 2 (\"each migrated suite reads shorter\"): the migrated suites shrink by only 3 to 9 lines (task-page-client 707 to 700, task-timeline-client 256 to 250, task-page-question 344 to 341, proposal-refresh 247 to 242, summary-and-time 372 to 369, task-run-links 228 to 219, the last only after its clock test moved into `lin-4472-time-words.test.js`; it first grew by 4). `lin-3975-task-run-control` and `lin-3975-chat-fold` were re-anchored, not shortened. The added complexity is `tests/unit/helpers/task-page-world.js` (36 lines), shared by three suites, which the census cannot see.",
+    "links": {
+     "about": "change-69@1"
+    },
+    "state": "open",
+    "v": 1,
+    "op": "add",
+    "by": "implementation",
+    "at": "2026-11-13T17:33:21.000Z"
+   }
+  ],
+  "finding-73": [
+   {
+    "id": "finding-73",
+    "kind": "finding",
+    "in": "area-49",
+    "to": "area-49",
+    "says": "Not this task's: classic browser copies of `fmtDuration`/`relativeAgo` remain in `public/session.js`, `public/observation.js` and `public/live-console.js`. They sit outside the `lin-4472-time-words` guard (which scans only server code) and are listed in the browser area's Waiting entry; each retires when its view converts and imports `/lib/time-words.js` (LIN-4472, PR #2436).",
+    "links": {
+     "about": "decision-66@1"
+    },
+    "state": "open",
+    "v": 1,
+    "op": "add",
+    "by": "implementation",
+    "at": "2026-11-13T17:33:22.000Z"
+   }
+  ],
+  "finding-74": [
+   {
+    "id": "finding-74",
+    "kind": "finding",
+    "in": "area-49",
+    "to": "area-49",
+    "says": "Not this task's: `lin-3975-proposal-refresh` still runs `task-chat.js` through `loadWorld` (`:161`), so it stays on the classic-loader census after `task-page.js` converted; it leaves when `task-chat.js` becomes a module or the test moves beside it. Same shape as `task-page-question` and `question-cards.js` (finding-61) (LIN-4472, PR #2436).",
+    "links": {
+     "about": "finding-61@1"
+    },
+    "state": "open",
+    "v": 1,
+    "op": "add",
+    "by": "implementation",
+    "at": "2026-11-13T17:33:23.000Z"
    }
   ]
  },

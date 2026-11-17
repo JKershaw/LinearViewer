@@ -1,5 +1,5 @@
 {
- "next": 92,
+ "next": 98,
  "records": {
   "area-1": [
    {
@@ -567,6 +567,21 @@
     "op": "add",
     "by": "Harbour",
     "at": "2026-11-13T12:01:48.021Z"
+   },
+   {
+    "id": "finding-22",
+    "kind": "finding",
+    "in": "area-2",
+    "to": "area-2",
+    "says": "`lib/should-mock-ai.js`: `isHermeticTestToken` is a third test-token check beside `isTestToken` (`routes/workspace-api-steps.js`) and inline `isTestMode` in `routes/proxy-compute.js` and `routes/task-chat.js`. (LIN-4347.)",
+    "links": {},
+    "state": "done",
+    "v": 2,
+    "op": "end",
+    "by": "leftover",
+    "at": "2026-11-13T14:14:12.000Z",
+    "stateReason": "Retired in PR 2421's leftovers commit (head f9fa4a80c): the inline test-token checks in routes/proxy-compute.js, routes/task-chat.js, routes/workspace-api-steps.js (isTestToken) and server.js now call isHermeticTestToken; the expression is identical, so behaviour is unchanged. Waiting entry removed from docs/areas/llm-and-prompts.md. routes/workspace-api-audit.js keeps its own predicate on purpose (its comment says why).",
+    "reason": "Retired in PR 2421's leftovers commit (head f9fa4a80c): the inline test-token checks in routes/proxy-compute.js, routes/task-chat.js, routes/workspace-api-steps.js (isTestToken) and server.js now call isHermeticTestToken; the expression is identical, so behaviour is unchanged. Waiting entry removed from docs/areas/llm-and-prompts.md. routes/workspace-api-audit.js keeps its own predicate on purpose (its comment says why)."
    }
   ],
   "finding-23": [
@@ -1563,6 +1578,23 @@
     "op": "add",
     "by": "survey-task",
     "at": "2026-11-13T13:44:59.000Z"
+   },
+   {
+    "id": "finding-69",
+    "kind": "finding",
+    "in": "task-60",
+    "to": "implementation",
+    "says": "The bulk search path stays display-only (plan-54 item 3), so one issue reads differently through search than through `getIssue`. Check that no cache or guard compares the two reads.",
+    "links": {
+     "about": "plan-54"
+    },
+    "state": "done",
+    "v": 2,
+    "op": "end",
+    "by": "leftover",
+    "at": "2026-11-13T14:14:13.000Z",
+    "stateReason": "Checked at leftovers: no guard or cache in lib/providers/jira/index.js compares the bulk read with the getIssue read today. The divergence itself (bulk reads fetchProjects and fetchIssueContext children do not ask for harbour.asAsked) stays open as finding-79 and a Waiting entry in docs/areas/providers.md.",
+    "reason": "Checked at leftovers: no guard or cache in lib/providers/jira/index.js compares the bulk read with the getIssue read today. The divergence itself (bulk reads fetchProjects and fetchIssueContext children do not ask for harbour.asAsked) stays open as finding-79 and a Waiting entry in docs/areas/providers.md."
    }
   ],
   "finding-70": [
@@ -1876,6 +1908,22 @@
     "op": "add",
     "by": "survey-place",
     "at": "2026-11-13T13:48:04.000Z"
+   },
+   {
+    "id": "finding-79",
+    "kind": "finding",
+    "in": "area-1",
+    "to": "area-1",
+    "says": "Not LIN-4450 work: the Jira bulk reads in `lib/providers/jira/index.js` (`fetchProjects`, and `fetchIssueContext`'s children through `searchAllIssues`) do not ask for `harbour.asAsked`. A sealed block therefore shows its converted rendering on the dashboard and in a parent's children, while single-issue reads serve the exact words. `POST /rest/api/3/search/jql` accepts `properties`, so asking for it there would make the bulk path exact too. No guard or cache compares the two reads today. Held as a Waiting entry in `docs/areas/providers.md` (PR 2421).",
+    "links": {
+     "about": "finding-69"
+    },
+    "state": "open",
+    "v": 2,
+    "op": "revise",
+    "by": "leftover",
+    "at": "2026-11-13T14:14:14.000Z",
+    "reason": "Leftovers confirmed the divergence after PR 2421, named the two bulk reads, and noted it in docs/areas/providers.md Waiting"
    }
   ],
   "finding-80": [
@@ -2026,6 +2074,22 @@
     "op": "add",
     "by": "implementation",
     "at": "2026-11-13T13:55:51.000Z"
+   },
+   {
+    "id": "change-85",
+    "kind": "change",
+    "in": "task-60",
+    "ref": "https://github.com/JKershaw/LinearViewer/pull/2421",
+    "head": "f9fa4a80ca19503bebbf5abd81dc83d3e86296b6",
+    "links": {
+     "about": "plan-54"
+    },
+    "state": "open",
+    "v": 2,
+    "op": "revise",
+    "by": "leftover",
+    "at": "2026-11-13T14:14:11.000Z",
+    "reason": "Leftovers commit pushed to PR 2421; CI green on this head (the 'Unit tests (proxy, clock +400d)' job rerun once after GitHub's hosted runner lost contact; no test failed)"
    }
   ],
   "decision-86": [
@@ -2135,6 +2199,188 @@
     "op": "add",
     "by": "implementation",
     "at": "2026-11-13T13:56:06.000Z"
+   }
+  ],
+  "run-92": [
+   {
+    "id": "run-92",
+    "kind": "run",
+    "in": "task-60",
+    "stage": "leftover",
+    "claims": [
+     "lib/providers/jira/adf.js",
+     "lib/providers/jira/index.js",
+     "lib/providers/jira/fake-client.js",
+     "lib/as-asked.js",
+     "routes/proxy-compute.js",
+     "routes/task-chat.js",
+     "routes/workspace-api-steps.js",
+     "server.js",
+     "docs/areas/providers.md",
+     "docs/areas/llm-and-prompts.md"
+    ],
+    "account": "pending",
+    "links": {},
+    "state": "open",
+    "v": 1,
+    "op": "add",
+    "by": "leftover",
+    "at": "2026-11-13T14:14:10.000Z"
+   },
+   {
+    "id": "run-92",
+    "kind": "run",
+    "in": "task-60",
+    "stage": "leftover",
+    "claims": [
+     "lib/providers/jira/adf.js",
+     "lib/providers/jira/index.js",
+     "lib/providers/jira/fake-client.js",
+     "lib/as-asked.js",
+     "routes/proxy-compute.js",
+     "routes/task-chat.js",
+     "routes/workspace-api-steps.js",
+     "server.js",
+     "docs/areas/providers.md",
+     "docs/areas/llm-and-prompts.md"
+    ],
+    "account": "Leftovers for LIN-4450 on PR 2421, pushed as one commit (head f9fa4a80c, CI green; one runner-lost job rerun, no test failed). Tidied four comments the seal made untrue: adf.js header (fourth export plainText), issueDescription comment in jira/index.js, fake-client seed-shape comment (properties), and lib/as-asked.js Who uses what (names the Jira region module). Noted the bulk Jira reads (fetchProjects, fetchIssueContext children) that do not ask for harbour.asAsked as a Waiting entry in a new docs/areas/providers.md, with four Lessons from the change; no guard or cache compares the two reads. Retired the llm-and-prompts isHermeticTestToken entry: four inline test-token checks now call it, behaviour unchanged. Posted the Leftovers comment on LIN-4450.",
+    "links": {},
+    "state": "open",
+    "v": 2,
+    "op": "revise",
+    "by": "leftover",
+    "at": "2026-11-13T14:14:20.000Z",
+    "reason": "account written"
+   },
+   {
+    "id": "run-92",
+    "kind": "run",
+    "in": "task-60",
+    "stage": "leftover",
+    "claims": [
+     "lib/providers/jira/adf.js",
+     "lib/providers/jira/index.js",
+     "lib/providers/jira/fake-client.js",
+     "lib/as-asked.js",
+     "routes/proxy-compute.js",
+     "routes/task-chat.js",
+     "routes/workspace-api-steps.js",
+     "server.js",
+     "docs/areas/providers.md",
+     "docs/areas/llm-and-prompts.md"
+    ],
+    "account": "Leftovers for LIN-4450 on PR 2421, pushed as one commit (head f9fa4a80c, CI green; one runner-lost job rerun, no test failed). Tidied four comments the seal made untrue: adf.js header (fourth export plainText), issueDescription comment in jira/index.js, fake-client seed-shape comment (properties), and lib/as-asked.js Who uses what (names the Jira region module). Noted the bulk Jira reads (fetchProjects, fetchIssueContext children) that do not ask for harbour.asAsked as a Waiting entry in a new docs/areas/providers.md, with four Lessons from the change; no guard or cache compares the two reads. Retired the llm-and-prompts isHermeticTestToken entry: four inline test-token checks now call it, behaviour unchanged. Posted the Leftovers comment on LIN-4450.",
+    "links": {},
+    "state": "done",
+    "v": 3,
+    "op": "end",
+    "by": "leftover",
+    "at": "2026-11-13T14:14:21.000Z",
+    "stateReason": "Leftovers commit pushed to PR 2421 and Leftovers comment posted on LIN-4450",
+    "reason": "Leftovers commit pushed to PR 2421 and Leftovers comment posted on LIN-4450"
+   }
+  ],
+  "lesson-93": [
+   {
+    "id": "lesson-93",
+    "kind": "lesson",
+    "in": "area-1",
+    "says": "A Jira description has one reader and one writer: `readDescription` and `holdAsAsked` in `lib/providers/jira/as-asked-region.js`. They are the only code that knows the ADF region and the `harbour.asAsked` entity property, and every provider-side `getIssue` passes `AS_ASKED_READ`. Shape B keeps the words in two places, the region and the property, safe only while one module knows both. A new description read that calls `adfToMarkdown` directly serves converted words and breaks the seal silently; `tests/unit/jira-as-asked-region.test.js` fails on it. (LIN-4450.)",
+    "paths": [
+     "lib/providers/jira/as-asked-region.js",
+     "lib/providers/jira/index.js",
+     "tests/unit/jira-as-asked-region.test.js"
+    ],
+    "checked-at": "f9fa4a80c",
+    "links": {
+     "about": "change-85"
+    },
+    "state": "holds",
+    "v": 1,
+    "op": "add",
+    "by": "leftover",
+    "at": "2026-11-13T14:14:15.000Z"
+   }
+  ],
+  "lesson-94": [
+   {
+    "id": "lesson-94",
+    "kind": "lesson",
+    "in": "area-1",
+    "says": "Decide whether the words are kept by comparing renderings, never ADF. Jira stamps `localId` and similar attributes on ordinary saves, and `adfToMarkdown` ignores them; a hash of the ADF would read every human save as an edit. (LIN-4450.)",
+    "paths": [
+     "lib/providers/jira/as-asked-region.js",
+     "lib/providers/jira/adf.js"
+    ],
+    "checked-at": "f9fa4a80c",
+    "links": {
+     "about": "change-85"
+    },
+    "state": "holds",
+    "v": 1,
+    "op": "add",
+    "by": "leftover",
+    "at": "2026-11-13T14:14:16.000Z"
+   }
+  ],
+  "lesson-95": [
+   {
+    "id": "lesson-95",
+    "kind": "lesson",
+    "in": "area-1",
+    "says": "The Jira region reader accepts an end line whatever its marks, looser than `splitAsAsked`. It stays safe because `descriptionRoundTrip` runs the same reader the reads do, so a block the reader would misplace is refused at filing. Keep the seal's check and the reads on one reader. (LIN-4450, Survey open-0.)",
+    "paths": [
+     "lib/providers/jira/as-asked-region.js",
+     "lib/providers/jira/index.js",
+     "lib/as-asked.js"
+    ],
+    "checked-at": "f9fa4a80c",
+    "links": {
+     "about": "decision-86"
+    },
+    "state": "holds",
+    "v": 1,
+    "op": "add",
+    "by": "leftover",
+    "at": "2026-11-13T14:14:17.000Z"
+   }
+  ],
+  "lesson-96": [
+   {
+    "id": "lesson-96",
+    "kind": "lesson",
+    "in": "area-1",
+    "says": "The Jira fake proves only the provider's own logic. It stores whatever it is handed and never normalises ADF, so it cannot show whether live Jira keeps a region's rendering. A claim about live behaviour needs a live check. (LIN-4450; the live check is LIN-4452.)",
+    "paths": [
+     "lib/providers/jira/fake-client.js"
+    ],
+    "checked-at": "f9fa4a80c",
+    "links": {
+     "about": "check-90"
+    },
+    "state": "holds",
+    "v": 1,
+    "op": "add",
+    "by": "leftover",
+    "at": "2026-11-13T14:14:18.000Z"
+   }
+  ],
+  "finding-97": [
+   {
+    "id": "finding-97",
+    "kind": "finding",
+    "in": "task-60",
+    "to": "review",
+    "says": "PR 2421 leftovers commit (head f9fa4a80c) to check: four comments the seal made untrue or incomplete were tidied: `lib/providers/jira/adf.js` header (the region module now reaches the codec too, through a fourth export `plainText`); `issueDescription`'s comment in `lib/providers/jira/index.js` (the append/replace lane now goes through `readDescription` and `holdAsAsked`, not ADF to markdown to `markdownToAdf`); `lib/providers/jira/fake-client.js` seed-shape comment (documents the `_properties` seed and `properties` read and write); `lib/as-asked.js` \"Who uses what\" (names the Jira region module for `sealAsAsked`, `splitAsAsked` and the marker spellings). It also adds `docs/areas/providers.md` (four Lessons, one Waiting entry) and retires the llm-and-prompts Waiting entry for `lib/should-mock-ai.js`: the inline test-token checks in `routes/proxy-compute.js`, `routes/task-chat.js`, `routes/workspace-api-steps.js` and `server.js` now call `isHermeticTestToken` with an identical expression, so behaviour should be unchanged; `routes/workspace-api-audit.js` keeps its own predicate on purpose.",
+    "links": {
+     "about": "change-85"
+    },
+    "state": "open",
+    "v": 1,
+    "op": "add",
+    "by": "leftover",
+    "at": "2026-11-13T14:14:19.000Z"
    }
   ]
  },
@@ -2665,6 +2911,51 @@
     "--by",
     "leftover",
     "--count"
+   ]
+  },
+  {
+   "at": "2026-11-17T14:52:29.154Z",
+   "by": "review",
+   "q": [
+    "show",
+    "--task",
+    "task-60",
+    "--by",
+    "review"
+   ]
+  },
+  {
+   "at": "2026-11-17T14:52:29.205Z",
+   "by": "review",
+   "q": [
+    "get",
+    "change-85",
+    "--by",
+    "review"
+   ]
+  },
+  {
+   "at": "2026-11-17T14:52:29.252Z",
+   "by": "review",
+   "q": [
+    "find",
+    "--in",
+    "task-60",
+    "--kind",
+    "check",
+    "--by",
+    "review"
+   ]
+  },
+  {
+   "at": "2026-11-17T14:52:29.297Z",
+   "by": "review",
+   "q": [
+    "find",
+    "--to",
+    "close-out",
+    "--by",
+    "review"
    ]
   }
  ]

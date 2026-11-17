@@ -1,5 +1,5 @@
 {
- "next": 89,
+ "next": 91,
  "records": {
   "area-1": [
    {
@@ -2027,6 +2027,39 @@
     "by": "implementation",
     "at": "2026-11-13T15:10:13.000Z"
    }
+  ],
+  "run-89": [
+   {
+    "id": "run-89",
+    "kind": "run",
+    "in": "task-60",
+    "stage": "review",
+    "account": "Reviewed PR #2427 at head c95b9f139 (base c205190fd). CI green on the head, all 8 checks; merged locally into origin/main 5dcf5bcda (LIN-4457 landed since) and the full unit suite passed 25,457/25,457. Every done-when clause is met; three departures (NEVER_RAN in dispatch-terminal, the leaf kinds module, findWakeEvent met by a column) are recorded on LIN-4447. Nine mutations each went red, including the prompt-order swap (so the literal order is pinned, finding-88 (2)) and the browser stamp copy (drift test). Regression check on git log -30 clean; no unhandled sibling of the class. Verdict: approve, conditional on close-out discharging four checks: a docblock sentence on the unbound release wording, ci-success on the exact merge commit, the Leftovers comment naming Waiting 2, 4, 11, and a post-deploy watch on target-not-resumable. Did not check the finding-73 docblocks (finding-88 (3)).",
+    "links": {},
+    "state": "open",
+    "v": 1,
+    "op": "add",
+    "by": "review",
+    "at": "2026-11-13T15:48:49.000Z"
+   }
+  ],
+  "verdict-90": [
+   {
+    "id": "verdict-90",
+    "kind": "verdict",
+    "in": "task-60",
+    "links": {
+     "on": "change-80@1"
+    },
+    "of": "review",
+    "outcome": "approve",
+    "reasoning": "Approve, conditional on close-out discharging the four checks addressed to it (comment on LIN-4455, 15:53:58). PR #2427 at c95b9f139: CI green, all 8 checks; also merges cleanly into origin/main 5dcf5bcda and the full unit suite there passed 25,457/25,457 (local, not CI, no E2E). Every done-when clause met: HALT_MODES, followUpTarget and NEVER_RAN imported from owners (all seven spellings, as decision-77 allows); the store neither imports nor names formatHeldWakeNote (AST witness); one FEEDBACK_KINDS table drives the allowlist, the parked-wait relay set and four lib/ stamp copies; findWakeEvent met by the mayCarryWake column. Departures decision-81, -82, -83, -84 recorded on LIN-4447 (055a6035, 2f488272) and hold. Waiting #2, #4, #11 are the three removed from the note at 4b5001ddf; Lessons 5,195 of 6,144 bytes. Both witnesses present (kinds-and-constants characterization section 5; lin-4377 acorn walk with self-check). Binding constraints hold: no GitHub/provider reads, nothing recomputed, lib/prompts/ untouched, runner prompt order pinned by an exact literal. Mutations, each reverted, each red: drain added to HALT_MODES with the old pair restated (2), status/recap rows swapped (2), releaseNote dropped from _applyWakeHook (1), setHeldWakeReleaseNote a no-op (5), createLeftoverStep stops binding (2), NEVER_RAN loses expired (7), tool mayCarryWake false (1), follow-up targets restated (3), a kind dropped from the public/session.js copy (1, drift test). Regression: git log -30 on the changed lib/ files undoes no fix and re-applies no revert; LIN-4383/LIN-4377 now enforced harder. Class (a shared constant restated beside its owner): no other lib/ or routes/ spelling remains; the browser copies, the one-mode halt sites and the remint refusal (decision-87) are deliberate, and the remint refusal tests the same two statuses as the old literal, so discharged. Target 0/false now refused (decision-86) matches followUpTarget everywhere else (LIN-3677).",
+    "state": "stands",
+    "v": 1,
+    "op": "add",
+    "by": "review",
+    "at": "2026-11-13T15:48:50.000Z"
+   }
   ]
  },
  "log": [
@@ -2680,6 +2713,140 @@
     "question-68",
     "--by",
     "implementation"
+   ]
+  },
+  {
+   "at": "2026-11-17T14:51:33.449Z",
+   "by": "review",
+   "q": [
+    "show",
+    "--task",
+    "task-60",
+    "--by",
+    "review"
+   ]
+  },
+  {
+   "at": "2026-11-17T14:51:36.088Z",
+   "by": "review",
+   "q": [
+    "show",
+    "--task",
+    "task-60",
+    "--by",
+    "review"
+   ]
+  },
+  {
+   "at": "2026-11-17T14:51:36.118Z",
+   "by": "review",
+   "q": [
+    "get",
+    "finding-88",
+    "--by",
+    "review"
+   ]
+  },
+  {
+   "at": "2026-11-17T14:51:36.146Z",
+   "by": "review",
+   "q": [
+    "get",
+    "change-80",
+    "--by",
+    "review"
+   ]
+  },
+  {
+   "at": "2026-11-17T14:51:51.845Z",
+   "by": "review",
+   "q": [
+    "find",
+    "--kind",
+    "check",
+    "--by",
+    "review"
+   ]
+  },
+  {
+   "at": "2026-11-17T14:51:51.890Z",
+   "by": "review",
+   "q": [
+    "find",
+    "--to",
+    "close-out",
+    "--state",
+    "open",
+    "--by",
+    "review"
+   ]
+  },
+  {
+   "at": "2026-11-17T14:51:51.924Z",
+   "by": "review",
+   "q": [
+    "find",
+    "--kind",
+    "verdict",
+    "--in",
+    "task-60",
+    "--by",
+    "review"
+   ]
+  },
+  {
+   "at": "2026-11-17T14:51:55.008Z",
+   "by": "review",
+   "q": [
+    "find",
+    "--text",
+    "ci-success",
+    "--by",
+    "review"
+   ]
+  },
+  {
+   "at": "2026-11-17T14:51:55.040Z",
+   "by": "review",
+   "q": [
+    "find",
+    "--text",
+    "Leftovers",
+    "--by",
+    "review"
+   ]
+  },
+  {
+   "at": "2026-11-17T14:51:55.071Z",
+   "by": "review",
+   "q": [
+    "find",
+    "--text",
+    "target-not-resumable",
+    "--by",
+    "review"
+   ]
+  },
+  {
+   "at": "2026-11-17T14:51:55.105Z",
+   "by": "review",
+   "q": [
+    "find",
+    "--text",
+    "UNBOUND_HELD",
+    "--by",
+    "review"
+   ]
+  },
+  {
+   "at": "2026-11-17T14:51:55.137Z",
+   "by": "review",
+   "q": [
+    "find",
+    "--text",
+    "account-erasure",
+    "--by",
+    "review"
    ]
   }
  ]

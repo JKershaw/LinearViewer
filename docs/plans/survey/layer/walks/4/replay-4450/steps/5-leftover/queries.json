@@ -1,0 +1,99 @@
+[
+ {
+  "at": "2026-11-17T14:50:58.748Z",
+  "by": "leftover",
+  "q": [
+   "show",
+   "--task",
+   "task-60",
+   "--by",
+   "leftover"
+  ]
+ },
+ {
+  "at": "2026-11-17T14:50:58.781Z",
+  "by": "leftover",
+  "q": [
+   "get",
+   "finding-69",
+   "--by",
+   "leftover"
+  ]
+ },
+ {
+  "at": "2026-11-17T14:50:58.820Z",
+  "by": "leftover",
+  "q": [
+   "get",
+   "finding-89",
+   "--by",
+   "leftover"
+  ]
+ },
+ {
+  "at": "2026-11-17T14:50:58.853Z",
+  "by": "leftover",
+  "q": [
+   "get",
+   "change-85",
+   "--by",
+   "leftover"
+  ]
+ },
+ {
+  "at": "2026-11-17T14:50:58.884Z",
+  "by": "leftover",
+  "q": [
+   "get",
+   "area-1",
+   "--by",
+   "leftover"
+  ]
+ },
+ {
+  "at": "2026-11-17T14:50:58.914Z",
+  "by": "leftover",
+  "q": [
+   "get",
+   "area-2",
+   "--by",
+   "leftover"
+  ]
+ },
+ {
+  "at": "2026-11-17T14:50:58.956Z",
+  "by": "leftover",
+  "q": [
+   "get",
+   "lesson-47",
+   "--by",
+   "leftover"
+  ]
+ },
+ {
+  "at": "2026-11-17T14:51:18.861Z",
+  "by": "leftover",
+  "q": [
+   "find",
+   "--in",
+   "area-1",
+   "--by",
+   "leftover",
+   "--count"
+  ]
+ },
+ {
+  "at": "2026-11-17T14:51:18.896Z",
+  "by": "leftover",
+  "q": [
+   "find",
+   "--kind",
+   "lesson",
+   "--text",
+   "Jira",
+   "--by",
+   "leftover",
+   "--count"
+  ]
+ }
+]

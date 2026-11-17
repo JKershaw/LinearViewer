@@ -6,7 +6,7 @@ You are playing one stage of an AI software pipeline, in a replay. The real work
 1. Your brief, everything the system gave you: `REPLAY/steps/STEP/brief.txt`
 2. What you really wrote in this session, from the history: `REPLAY/real/STEP.md`
 3. How to use the store: `/home/user/LinearViewer/docs/plans/survey/layer/walks/4/model/BUILD-NOTES.md`, and `kinds.json` beside it.
-Nothing else on disk. You may look things up in the store itself, as much as you like.
+Nothing else on disk. You may look things up in the store itself, as much as you like, through `layer.mjs` only (never open `store.json` directly; added after step 5 of LIN-4450 did).
 
 **Your instruction (the only one):** write what you found as records, each addressed to whoever must act; end what you closed; link what you built on; put your own account in your run.
 
