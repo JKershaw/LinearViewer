@@ -52,7 +52,7 @@ John: "a small minimal MVP, and we take it for a walk and see a) if it's better 
 | `at` | When each version was written |
 | `state` | The kind's starting state or one of its ends, with a `reason`. `handed-on` and `superseded` name the record that takes over |
 | `to` | The addressee, required on the hand-off kinds (finding, check, question) and on no other: a declared actor, or a task or area record |
-| `links` | `about` (its subject), `on` (the exact version it rests on, `id@v`; required on a verdict), `answers` (a decision to its question), `piece` (a task to its plan piece), `same-as` |
+| `links` | `about` (its subjects), `on` (the exact versions it rests on, `id@v`; required on a verdict), `answers` (a decision to its question), `piece` (a task to its plan piece), `same-as`. Each type holds a list, except `answers` and `piece`, which hold one |
 | versions | Every write (add, revise, end, link) is a new version with its `by`, `at` and, for a revise, its `reason`; earlier versions are kept. Any record can be read as of a time, or at a version. Any record may be revised, ended or not |
 
 ### 3.2 Kinds and actors
@@ -61,7 +61,7 @@ John: "a small minimal MVP, and we take it for a walk and see a) if it's better 
 
 | Kind | Holds | Own fields | Starts → ends |
 |---|---|---|---|
-| `task` | The order | `asked` (the person's words, fixed once written; a child task has none), `done-when`, `paths` | open → done, declined |
+| `task` | The order | `asked` (the person's words, fixed once written; a child task has none), `done-when`, `paths`, `ref` (the tracker's id for it, if any) | open → done, declined |
 | `plan` | One piece of how a task will be done; a parent's plan is its pieces | `says`, `paths`, `order` | kept → superseded |
 | `finding` | Something someone must act on | `says`; `to` | open → done, declined, handed-on |
 | `check` | A verification needing the person's systems | `what`, `why-person`, `how`; `to` | open → done, declined, handed-on |
@@ -79,7 +79,7 @@ John: "a small minimal MVP, and we take it for a walk and see a) if it's better 
 
 **Paths overlap** when one is a prefix of the other. Every view and brief part that matches paths uses this.
 
-**Actors** are declared in `actors.json`: the names that may appear in `by` and `to`. For Harbour: its stages (design, plan-review, breakdown, survey-task, survey-place, scoping, implementation, leftover, review, blind-read, close-out), the autopilot, John, and Harbour itself (the system). Another project declares its own. Any actor may write any kind and end any record; which ones it should is its prompt's business and Harbour's.
+**Actors** are declared in `actors.json`: the names that may appear in `by` and `to`. For Harbour: its stages (design, plan-review, breakdown, survey-task, survey-place, scoping, implementation, leftover, review, blind-read, close-out), the autopilot, John, and Harbour itself (the system). An actor may be marked `blind`: its brief leaves out verdicts (in Harbour, blind-read, which judges the work without the review's view). Another project declares its own. Any actor may write any kind and end any record; which ones it should is its prompt's business and Harbour's.
 
 ### 3.3 What a write checks
 
@@ -93,7 +93,7 @@ Only shape, so a malformed record can't enter:
 
 - **Open for a reader:** open records whose `to` is that actor, task or area.
 - **Answered:** a question with a standing decision that `answers` it shows that decision beside it, whether or not its state has been ended yet.
-- **Stale:** a record that is not ended and whose `on` link points to a version revised since, to a record superseded, withdrawn or abandoned, or to a record that is itself stale. Ending well (done, merged, answered) makes nothing stale. Shown as a flag.
+- **Stale:** a record that is not ended and one of whose `on` links points to a version revised since, to a record superseded, withdrawn or abandoned, or to a record that is itself stale. Ending well (done, merged, answered) makes nothing stale. Shown as a flag that says which link moved and how (e.g. "on change-5@1, now @2").
 - **Counts:** any `find` can return its count instead of its records, as of any time.
 - **Overlap:** open runs whose `claims` share a path.
 
@@ -102,12 +102,12 @@ Only shape, so a malformed record can't enter:
 John: "previously an agent essentially got the brief, but then the ability to find much more information … we now have this rich data layer for it to find key bits of information, maybe research things if it wants" [checked, log "17 Nov"]. So the brief is small, deterministic and says what exists; the stage looks up the rest.
 
 **A brief** is what an actor working on a task is given:
-1. **The person's words:** the `asked` of the task and of each ancestor, verbatim.
+1. **The task and the person's words:** the task's id, `ref`, `done-when` and `paths`; then the `asked` of the task and of each ancestor, verbatim.
 2. **Its plan piece:** the current version, through the task's `piece` link.
 3. **Addressed to it, in full:** open records `in` this task whose `to` is this actor, and open records anywhere whose `to` is this task.
-4. **What stands about this task:** verdicts and decisions `in` the task, or `about` or `on` its piece or its change, each with the version it rests on and the stale flag. An ancestor's decisions appear when `about` or `on` this task's piece, or when they carry a `scope` that covers it; a sibling's never.
+4. **What stands about this task:** verdicts (unless the actor is blind) and decisions `in` the task, or `about` or `on` its piece or its change, each with the version it rests on and the stale flag. An ancestor's decisions appear when `about` or `on` this task's piece, or when they carry a `scope` that covers it; a sibling's never.
 5. **Its areas:** each area whose paths overlap the task's, by id and name, with the number of open records addressed to it, so the actor can address the place and look up what is waiting there.
-6. **Open runs** of other tasks whose claims share a path with this task.
+6. **Open runs** by other actors, on any task, whose claims share a path with this task.
 7. **An index of what else is known:** every other open record `in` the task, and every lesson whose paths overlap the task's, one line each: id, kind, to, and the first line of what it says.
 
 Ended records are left out. Each brief reports what it carries and its size in bytes of text.
@@ -129,12 +129,20 @@ Ended records are left out. Each brief reports what it carries and its size in b
 
 ## 5. Walks
 
-Walks 1–3 are in `walks/1/`–`walks/3/`. What they established about storing and finding: everything that happened had a home; written after the fact, 20 of 22 addressees had to be guessed, while stages writing live chose them unprompted; retelling stops when stages can look things up; briefs stop growing with the ticket's history [checked, results files]. None of these rested on the rules earlier rounds put on who may write or close [my reading]; walk 4 re-runs them without.
+Walks 1–4 are in `walks/1/`–`walks/4/`. What they established: everything that happened had a home; stages writing live address their own records well (written after the fact, 20 of 22 addressees had to be guessed); retelling stops when stages can look things up; briefs stop growing with the ticket's history; and a store that checks only shape lost nothing against one with rules on who may write or close, while corrections replaced instead of piling and stale showed only the real signal [checked, results files].
 
-**Walk 4: walk 3 again, on this model.** The same three task replays (LIN-4450, LIN-4472, LIN-4455), from the same real outputs and parent state, and the same six scenes (`walks/3/situations/scenes.md`).
-- **The question:** is everything that happened stored, addressed, ended or rightly open, and could each stage find what it needed?
+**Walk 5: more kinds of task, and a comparison with today.** John: "try out a wider range of tasks", and the design is settled only once it is "simple enough to use, and working far better than the existing solutions" [checked, log "17 Nov"].
+- **Replays,** as walk 4, each stage a fresh agent with its brief, its real output and the store:
+  - LIN-4450 again, the control;
+  - LIN-4463's own stages up to its breakdown (survey, scoping, plan, plan-review, breakdown: a parent planning and splitting);
+  - LIN-4446 (one task through plan, plan-review, a second plan and plan-review, then the build);
+  - LIN-4469 (implementation twice around a review, and a ruling raised and withdrawn);
+  - LIN-4459 (a build that asks another lane and merges on silence);
+  - LIN-4464 (an area read: a report, no PR).
+- **The comparison,** on three of these tasks at two stages each: two fresh readers answer the same questions a stage must answer to do its job (what is addressed to it, what is still open and whose, what was decided and whether it still holds, whether an approval covers the current work, a count). One reader gets the ticket and its parent as they stood then, which is roughly what Harbour gives a stage today; the other gets the brief and the store. A third agent, who wrote the questions from the full history, marks both. Right answers and what each reader used are reported, not scored.
+- **The question:** is everything that happened stored, addressed, ended or rightly open; could each stage find what it needed; and does a stage reading the store know its situation better than one reading the ticket?
 - **A break,** each with why: something with no home; a hand-off to no reader; a thing retold that should be one record; something a stage needed that neither its brief nor a query gave it; a write refused that was right, or accepted that was malformed.
-- **Listed, not scored** (John: "we don't need to worry too much about where the mistakes are coming from" if deterministic code or a full implementation will absorb them) [checked, log "17 Nov"]: the model's rough edges.
+- **Listed, not scored** (John: "we don't need to worry too much about where the mistakes are coming from" if deterministic code or a full implementation will absorb them) [checked, log "17 Nov"]: the model's rough edges, and Harbour's standing rules, which live in its prompts and code.
 
 ## 6. Open
 
@@ -145,5 +153,5 @@ Walks 1–3 are in `walks/1/`–`walks/3/`. What they established about storing 
 
 - John's words for this step: log, "17 Nov" (this branch).
 - The frame: `shapes` §6. The needs and causes: `picture` §6–7. The catalogue and the avenues: `avenues`. Everything placed: `mapping`. What Harbour already has: `existing`.
-- Traces: `trace-2026-11-15/` (peaceful-euler). Walks: `walks/1/`–`walks/3/`.
+- Traces: `trace-2026-11-15/` (peaceful-euler). Walks: `walks/1/`–`walks/5/`.
 - Papers: `steering-text.md`, `coherence-as-it-grows.md`, `between-the-sessions.md`, `nothing-fights-its-shape.md` (main).
