@@ -1,0 +1,159 @@
+[
+ {
+  "at": "2026-11-17T15:36:50.585Z",
+  "by": "review",
+  "cmd": "show",
+  "args": [
+   "show",
+   "--task",
+   "task-113",
+   "--by",
+   "review"
+  ],
+  "asOf": null
+ },
+ {
+  "at": "2026-11-17T15:36:50.621Z",
+  "by": "review",
+  "cmd": "get",
+  "args": [
+   "get",
+   "change-143",
+   "--by",
+   "review"
+  ],
+  "asOf": null
+ },
+ {
+  "at": "2026-11-17T15:36:50.653Z",
+  "by": "review",
+  "cmd": "find",
+  "args": [
+   "find",
+   "--to",
+   "review",
+   "--state",
+   "open",
+   "--by",
+   "review"
+  ],
+  "asOf": null
+ },
+ {
+  "at": "2026-11-17T15:36:56.404Z",
+  "by": "review",
+  "cmd": "get",
+  "args": [
+   "get",
+   "finding-81",
+   "--by",
+   "review"
+  ],
+  "asOf": null
+ },
+ {
+  "at": "2026-11-17T15:36:56.439Z",
+  "by": "review",
+  "cmd": "get",
+  "args": [
+   "get",
+   "question-148",
+   "--by",
+   "review"
+  ],
+  "asOf": null
+ },
+ {
+  "at": "2026-11-17T15:36:56.473Z",
+  "by": "review",
+  "cmd": "get",
+  "args": [
+   "get",
+   "finding-28",
+   "--by",
+   "review"
+  ],
+  "asOf": null
+ },
+ {
+  "at": "2026-11-17T15:36:56.507Z",
+  "by": "review",
+  "cmd": "get",
+  "args": [
+   "get",
+   "run-154",
+   "--by",
+   "review"
+  ],
+  "asOf": null
+ },
+ {
+  "at": "2026-11-17T15:36:56.541Z",
+  "by": "review",
+  "cmd": "find",
+  "args": [
+   "find",
+   "--to",
+   "close-out",
+   "--state",
+   "open",
+   "--by",
+   "review"
+  ],
+  "asOf": null
+ },
+ {
+  "at": "2026-11-17T15:36:56.575Z",
+  "by": "review",
+  "cmd": "find",
+  "args": [
+   "find",
+   "--to",
+   "task-83",
+   "--state",
+   "open",
+   "--by",
+   "review"
+  ],
+  "asOf": null
+ },
+ {
+  "at": "2026-11-17T15:36:56.608Z",
+  "by": "review",
+  "cmd": "find",
+  "args": [
+   "find",
+   "--kind",
+   "verdict",
+   "--in",
+   "task-113",
+   "--by",
+   "review"
+  ],
+  "asOf": null
+ },
+ {
+  "at": "2026-11-17T15:38:04.784Z",
+  "by": "review",
+  "cmd": "get",
+  "args": [
+   "get",
+   "question-151",
+   "--by",
+   "review"
+  ],
+  "asOf": null
+ },
+ {
+  "at": "2026-11-17T15:38:04.816Z",
+  "by": "review",
+  "cmd": "get",
+  "args": [
+   "get",
+   "verdict-162",
+   "--by",
+   "review"
+  ],
+  "asOf": null
+ }
+]

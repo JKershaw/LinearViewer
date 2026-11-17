@@ -1,5 +1,5 @@
 {
- "next": 127,
+ "next": 128,
  "records": {
   "area-1": [
    {
@@ -3362,6 +3362,28 @@
      "reason": "measurement note posted on LIN-4464; findings 124 and 125 written"
     }
    }
+  ],
+  "run-127": [
+   {
+    "id": "run-127",
+    "kind": "run",
+    "state": "open",
+    "fields": {
+     "stage": "close-out",
+     "account": "Made review's two fixes on #2430 (8237ec317: the LLM report's Control moved bullet names render-proxy/#2424, render-swipe and render-task-page/#2423 and the control note 971d4bf6c->ae9c007e1; dated At merge lines in adoption section 3 and the LLM report's Open PRs bullet), fixed my own count error (bc89fb61e, twelve->eleven) and recorded two PRs opened after the baseline check (17900065c): #2432 (LIN-4459) is open and touches the sampled lib/openrouter.js and the LLM note; #2429 (LIN-4451) touches the control note; #2431 touches neither. Ran check-114 immediately before merging: no LIN-4465..4470 commit on main, none of the 28 sampled paths in git diff e8e92d50a..origin/main (main 0092d8d9e), open-PR set unchanged. CI success plus all seven jobs green on 17900065c (run 43465388521). Merged #2430 at 2aab32bf0 with --match-head-commit 17900065c; checked on origin/main that the three files and both fixes landed (diff from 0092d8d9e is those three files, 367 insertions). Applied no blind-read fixes: its worse verdict compared against a later diverged main, so its finds are about LIN-4455's merged code, not this docs-only PR; filed nothing from it. No deploy, monitor or rollback (docs only). Set LIN-4464 Done, added an Implemented stub to the description (snapshot 16:32:38 holds the prior one; nothing to prune). The method spread over three files went to John in the close-out comment; it is outside this task and is already carried by finding-97."
+    },
+    "links": {
+     "on": [
+      "verdict-115@1",
+      "finding-124@1"
+     ]
+    },
+    "in": "task-78",
+    "v": 1,
+    "op": "add",
+    "at": "2026-11-13T16:32:23.000Z",
+    "by": "close-out"
+   }
   ]
  },
  "log": [
@@ -4559,6 +4581,123 @@
     "open",
     "--by",
     "autopilot"
+   ],
+   "asOf": null
+  },
+  {
+   "at": "2026-11-17T15:38:16.728Z",
+   "by": "close-out",
+   "cmd": "show",
+   "args": [
+    "show",
+    "--task",
+    "task-78",
+    "--by",
+    "close-out"
+   ],
+   "asOf": null
+  },
+  {
+   "at": "2026-11-17T15:38:16.761Z",
+   "by": "close-out",
+   "cmd": "get",
+   "args": [
+    "get",
+    "change-103",
+    "--by",
+    "close-out"
+   ],
+   "asOf": null
+  },
+  {
+   "at": "2026-11-17T15:38:16.801Z",
+   "by": "close-out",
+   "cmd": "find",
+   "args": [
+    "find",
+    "--kind",
+    "run",
+    "--in",
+    "task-78",
+    "--by",
+    "close-out"
+   ],
+   "asOf": null
+  },
+  {
+   "at": "2026-11-17T15:38:21.390Z",
+   "by": "close-out",
+   "cmd": "show",
+   "args": [
+    "show",
+    "--task",
+    "task-78",
+    "--by",
+    "close-out"
+   ],
+   "asOf": null
+  },
+  {
+   "at": "2026-11-17T15:38:21.440Z",
+   "by": "close-out",
+   "cmd": "get",
+   "args": [
+    "get",
+    "change-103",
+    "--by",
+    "close-out"
+   ],
+   "asOf": null
+  },
+  {
+   "at": "2026-11-17T15:38:37.991Z",
+   "by": "close-out",
+   "cmd": "get",
+   "args": [
+    "get",
+    "finding-105",
+    "--by",
+    "close-out"
+   ],
+   "asOf": null
+  },
+  {
+   "at": "2026-11-17T15:38:38.030Z",
+   "by": "close-out",
+   "cmd": "get",
+   "args": [
+    "get",
+    "run-126",
+    "--by",
+    "close-out"
+   ],
+   "asOf": null
+  },
+  {
+   "at": "2026-11-17T15:38:38.071Z",
+   "by": "close-out",
+   "cmd": "find",
+   "args": [
+    "find",
+    "--text",
+    "2432",
+    "--by",
+    "close-out",
+    "--count"
+   ],
+   "asOf": null
+  },
+  {
+   "at": "2026-11-17T15:38:38.109Z",
+   "by": "close-out",
+   "cmd": "find",
+   "args": [
+    "find",
+    "--text",
+    "LIN-4459",
+    "--by",
+    "close-out",
+    "--count"
    ],
    "asOf": null
   }

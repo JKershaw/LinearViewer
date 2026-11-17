@@ -1,5 +1,5 @@
 {
- "next": 59,
+ "next": 62,
  "records": {
   "area-1": [
    {
@@ -579,6 +579,29 @@
     "op": "link",
     "at": "2026-11-13T14:36:56.000Z",
     "by": "implementation"
+   },
+   {
+    "id": "check-17",
+    "kind": "check",
+    "state": "open",
+    "fields": {
+     "what": "Read the first slice's result (the rule's reading in the notes, and the cost-format slice with what it retired) before the next slice starts.",
+     "why-person": "The done-when requires John's read, and the size of this work and what may be retired are his calls.",
+     "how": "After merge and deploy, before the ticket closes: close-out asks John to read the result (review's comment on LIN-4446 plus PR #2423's body) and records his read as a comment on LIN-4446 before marking Done. No next slice is dispatched until then. Not a merge condition: merging is what 'the first slice has landed' asks for."
+    },
+    "links": {
+     "about": [
+      "change-53",
+      "verdict-60"
+     ]
+    },
+    "in": "task-9",
+    "to": "John",
+    "v": 3,
+    "op": "revise",
+    "at": "2026-11-13T15:07:33.000Z",
+    "by": "review",
+    "reason": "review's ledger: when and how John's read is settled, and that it does not gate the merge"
    }
   ],
   "run-18": [
@@ -2811,6 +2834,31 @@
     "op": "add",
     "at": "2026-11-13T14:36:53.000Z",
     "by": "implementation"
+   },
+   {
+    "id": "finding-55",
+    "kind": "finding",
+    "state": "done",
+    "fields": {
+     "says": "Gaps in PR #2423, recorded as waivers rather than covered: (1) the serving tests (/shared/cost-format.js 200, JavaScript type, exact bytes; the 404s) were not re-run against the final HEAD 24de9abc9; (2) the workspace-kpis Chart.js ordering fix has no e2e witness, only the unit Chart-stub test that fails on the old code with the formatter TypeError. Re-run the serving tests at HEAD before approving."
+    },
+    "links": {
+     "on": [
+      "change-53@1"
+     ],
+     "about": [
+      "change-53"
+     ]
+    },
+    "in": "task-9",
+    "to": "review",
+    "v": 2,
+    "op": "end",
+    "at": "2026-11-13T15:07:34.000Z",
+    "by": "review",
+    "ended": {
+     "reason": "both gaps settled at 1de016f52 (verdict-60): serving suites re-run (shared-modules, vendor-assets pass) and the mutation express.static('lib') turns the spawned-server 404 witness red; the Chart.js ordering fix witnessed in real Chromium with Chart.js 4.5.1 and the real CSP (head draws $ ticks, main throws the formatUsd TypeError)"
+    }
    }
   ],
   "run-56": [
@@ -2897,6 +2945,94 @@
     "op": "add",
     "at": "2026-11-13T14:56:31.000Z",
     "by": "leftover"
+   }
+  ],
+  "run-59": [
+   {
+    "id": "run-59",
+    "kind": "run",
+    "state": "open",
+    "fields": {
+     "stage": "review",
+     "account": "Reviewed PR #2423 at 1de016f52 (slice 24de9abc9 + leftovers) against origin/main cfd152fa4: no commits on any diff file since 12:08, mergeable, CI green. Diff matches plan-28 place for place; the one addition (swipe viewport, render-swipe.js drops user-scalable=no, with a test) is the leftover-step retirement LIN-4414 requires, not an overrun, but the PR body omits it. Ran 13 focused suites, 461/461. Eight mutations, each turns a guard red, reverted (incl. serving lib/ as a directory, which turns the spawned-server 404 witness red, settling finding-55 (1)). Real Chromium + Chart.js 4.5.1 + real CSP on a priced KPI page: head draws $ ticks with no errors, main workspace-kpis.js throws the formatUsd TypeError, settling finding-55 (2). Sibling restatements all already Waiting in the area note. Verdict approve-with-notes: one PR-body fix for close-out; John read (check-17) settles after merge, before Done."
+    },
+    "links": {},
+    "in": "task-9",
+    "v": 1,
+    "op": "add",
+    "at": "2026-11-13T15:07:30.000Z",
+    "by": "review"
+   },
+   {
+    "id": "run-59",
+    "kind": "run",
+    "state": "done",
+    "fields": {
+     "stage": "review",
+     "account": "Reviewed PR #2423 at 1de016f52 (slice 24de9abc9 + leftovers) against origin/main cfd152fa4: no commits on any diff file since 12:08, mergeable, CI green. Diff matches plan-28 place for place; the one addition (swipe viewport, render-swipe.js drops user-scalable=no, with a test) is the leftover-step retirement LIN-4414 requires, not an overrun, but the PR body omits it. Ran 13 focused suites, 461/461. Eight mutations, each turns a guard red, reverted (incl. serving lib/ as a directory, which turns the spawned-server 404 witness red, settling finding-55 (1)). Real Chromium + Chart.js 4.5.1 + real CSP on a priced KPI page: head draws $ ticks with no errors, main workspace-kpis.js throws the formatUsd TypeError, settling finding-55 (2). Sibling restatements all already Waiting in the area note. Verdict approve-with-notes: one PR-body fix for close-out; John read (check-17) settles after merge, before Done."
+    },
+    "links": {},
+    "in": "task-9",
+    "v": 2,
+    "op": "end",
+    "at": "2026-11-13T15:07:35.000Z",
+    "by": "review",
+    "ended": {
+     "reason": "review posted on LIN-4446 at 15:11; verdict-60 approve-with-notes"
+    }
+   }
+  ],
+  "verdict-60": [
+   {
+    "id": "verdict-60",
+    "kind": "verdict",
+    "state": "stands",
+    "fields": {
+     "of": "review",
+     "outcome": "approve-with-notes",
+     "reasoning": "Approve PR #2423 at 1de016f52, conditional on close-out discharging the ledger (PR-body fix, John's read). Staleness: git log since 12:08:10 on every diff file is empty; the one main commit since the base (cfd152fa4, LIN-4453) is docs-only; MERGEABLE; CI green (unit, proxy/clock, e2e 1-4, secret scan, ci-success). Scope: matches plan-28's places one for one, plus plan-review note 5 (docs/areas/other-features.md); the swipe viewport fix is the leftover step's sanctioned retirement (docs/areas/README.md 'One home for each leftover', LIN-4414), Retires: names the front-end-pages Waiting entry and the diff removes it; no ruling needed. Regression: git log -6 on the touched files shows nothing reverted; LIN-4179's guarantees (one formatter, unknown never $0.00, no hand-made $...toFixed) hold; VENDOR_ASSETS unchanged and still mounted just before express.static(public). Witnesses: 13 focused suites 461/461 at 1de016f; 8 mutations each red then reverted (kpis wrap removed; shim dropped from render-task-page SCRIPTS; shim as classic string; top-level CostFormat reads in observation, prompt-section, flight-companion; node:fs import in lib/cost-format.js; express.static('lib') -> '/lib/cost-format.js should be a real 404, got 200'). Real browser (the one claim CI cannot reach, e2e cannot price a lineage): priced renderWorkspaceKpisPage behind real securityHeaders CSP and the shared router, Chromium + Chart.js 4.5.1: head ticks $0.00...$1.40, no page/console/CSP errors; main's workspace-kpis.js throws 'Cannot read properties of undefined (reading formatUsd)', ticks null. Test level right. Class: sibling restatements (common.js twins of task-page-href, timeline-zoom, ship-layout, prompt-formatters; TERMINAL_TYPES; buildDispatchModelOptionDescriptors; keepalive statusCode) are outside John's size ruling and already Waiting in the area note. Meets the ask sentence by sentence: lib/cost-format.js is the only formatUsd; no build step, native module, reading in CLAUDE.md:43 and the area Lessons; one shared piece; no view reworked (John's ruling, decision-26), none retired; retirements named (public/cost-format.js 34 lines, cost-format-parity.test.js 74); lighter: the 34-line IIFE becomes a 12-line shim (3 lines of code), totals rise only through tests. Non-Chromium untested; rollback is reverting the merge commit."
+    },
+    "links": {
+     "on": [
+      "change-53@2",
+      "plan-28@13",
+      "decision-26@3"
+     ],
+     "about": [
+      "change-53",
+      "finding-55"
+     ]
+    },
+    "in": "task-9",
+    "v": 1,
+    "op": "add",
+    "at": "2026-11-13T15:07:31.000Z",
+    "by": "review"
+   }
+  ],
+  "finding-61": [
+   {
+    "id": "finding-61",
+    "kind": "finding",
+    "state": "open",
+    "fields": {
+     "says": "Before merge, PR #2423's body is stale after 1de016f52. Under 'What changed' add: 'Leftover-step retirement (LIN-4414): the swipe page now takes the shared default viewport (lib/render-swipe.js drops user-scalable=no; witness tests/unit/render-swipe.test.js), retiring the docs/areas/front-end-pages.md Waiting entry lib/render-swipe.js: the viewport meta is user-scalable=no.' Replace 'Total: 30 files, +747 / -280' with what gh pr view 2423 --json additions,deletions,changedFiles gives on the merged head (35 files at 1de016f). In 'Not covered', replace 'The serving tests were not run against HEAD' with 'Reviewer's mutation (serving lib/ as a directory) turns the spawned-server 404 witness red.'"
+    },
+    "links": {
+     "on": [
+      "change-53@2"
+     ],
+     "about": [
+      "change-53",
+      "verdict-60"
+     ]
+    },
+    "in": "task-9",
+    "to": "close-out",
+    "v": 1,
+    "op": "add",
+    "at": "2026-11-13T15:07:32.000Z",
+    "by": "review"
    }
   ]
  },
@@ -4220,6 +4356,19 @@
     "--kind",
     "verdict",
     "--in",
+    "task-9",
+    "--by",
+    "review"
+   ],
+   "asOf": null
+  },
+  {
+   "at": "2026-11-17T15:38:51.476Z",
+   "by": "review",
+   "cmd": "show",
+   "args": [
+    "show",
+    "--task",
     "task-9",
     "--by",
     "review"

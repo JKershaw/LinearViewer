@@ -1,0 +1,215 @@
+[
+ {
+  "at": "2026-11-17T15:37:13.984Z",
+  "by": "leftover",
+  "cmd": "show",
+  "args": [
+   "show",
+   "--task",
+   "task-131",
+   "--by",
+   "leftover"
+  ],
+  "asOf": null
+ },
+ {
+  "at": "2026-11-17T15:37:17.954Z",
+  "by": "leftover",
+  "cmd": "get",
+  "args": [
+   "get",
+   "finding-154",
+   "--by",
+   "leftover"
+  ],
+  "asOf": null
+ },
+ {
+  "at": "2026-11-17T15:37:17.984Z",
+  "by": "leftover",
+  "cmd": "get",
+  "args": [
+   "get",
+   "change-142",
+   "--by",
+   "leftover"
+  ],
+  "asOf": null
+ },
+ {
+  "at": "2026-11-17T15:37:18.019Z",
+  "by": "leftover",
+  "cmd": "get",
+  "args": [
+   "get",
+   "run-161",
+   "--by",
+   "leftover"
+  ],
+  "asOf": null
+ },
+ {
+  "at": "2026-11-17T15:37:18.054Z",
+  "by": "leftover",
+  "cmd": "find",
+  "args": [
+   "find",
+   "--text",
+   "witness",
+   "--by",
+   "leftover"
+  ],
+  "asOf": null
+ },
+ {
+  "at": "2026-11-17T15:37:18.093Z",
+  "by": "leftover",
+  "cmd": "find",
+  "args": [
+   "find",
+   "--text",
+   "simple-dispatcher",
+   "--state",
+   "open",
+   "--by",
+   "leftover"
+  ],
+  "asOf": null
+ },
+ {
+  "at": "2026-11-17T15:37:21.889Z",
+  "by": "leftover",
+  "cmd": "get",
+  "args": [
+   "get",
+   "change-142",
+   "--by",
+   "leftover"
+  ],
+  "asOf": null
+ },
+ {
+  "at": "2026-11-17T15:37:21.929Z",
+  "by": "leftover",
+  "cmd": "get",
+  "args": [
+   "get",
+   "run-161",
+   "--by",
+   "leftover"
+  ],
+  "asOf": null
+ },
+ {
+  "at": "2026-11-17T15:37:21.964Z",
+  "by": "leftover",
+  "cmd": "find",
+  "args": [
+   "find",
+   "--text",
+   "witness",
+   "--by",
+   "leftover"
+  ],
+  "asOf": null
+ },
+ {
+  "at": "2026-11-17T15:37:28.844Z",
+  "by": "leftover",
+  "cmd": "get",
+  "args": [
+   "get",
+   "finding-26",
+   "--by",
+   "leftover"
+  ],
+  "asOf": null
+ },
+ {
+  "at": "2026-11-17T15:37:28.881Z",
+  "by": "leftover",
+  "cmd": "get",
+  "args": [
+   "get",
+   "finding-154@2",
+   "--by",
+   "leftover"
+  ],
+  "asOf": null
+ },
+ {
+  "at": "2026-11-17T15:37:28.916Z",
+  "by": "leftover",
+  "cmd": "find",
+  "args": [
+   "find",
+   "--in",
+   "area-1",
+   "--text",
+   "retirement",
+   "--by",
+   "leftover"
+  ],
+  "asOf": null
+ },
+ {
+  "at": "2026-11-17T15:37:28.957Z",
+  "by": "leftover",
+  "cmd": "find",
+  "args": [
+   "find",
+   "--kind",
+   "lesson",
+   "--in",
+   "area-1",
+   "--by",
+   "leftover"
+  ],
+  "asOf": null
+ },
+ {
+  "at": "2026-11-17T15:37:33.270Z",
+  "by": "leftover",
+  "cmd": "find",
+  "args": [
+   "find",
+   "--text",
+   "simple-dispatcher",
+   "--to",
+   "area-1",
+   "--by",
+   "leftover"
+  ],
+  "asOf": null
+ },
+ {
+  "at": "2026-11-17T15:37:33.318Z",
+  "by": "leftover",
+  "cmd": "find",
+  "args": [
+   "find",
+   "--text",
+   "Retires",
+   "--to",
+   "area-1",
+   "--by",
+   "leftover"
+  ],
+  "asOf": null
+ },
+ {
+  "at": "2026-11-17T15:37:33.360Z",
+  "by": "leftover",
+  "cmd": "find",
+  "args": [
+   "find",
+   "--text",
+   "notes-PR",
+   "--to",
+   "area-1",
+   "--by",
+   "leftover"
+  ],
+  "asOf": null
+ }
+]
