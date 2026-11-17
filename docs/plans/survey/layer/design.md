@@ -51,7 +51,7 @@ John: "a small minimal MVP, and we take it for a walk and see a) if it's better 
 | `by` | Who wrote it: a declared actor (3.2); `via` if relayed |
 | `at` | When each version was written |
 | `state` | The kind's starting state or one of its ends, with a `reason`. `handed-on` and `superseded` name the record that takes over |
-| `to` | The addressee, required on the hand-off kinds (finding, check, question) and on no other: a declared actor, or a task or area record |
+| `to` | Who must act on it next: a declared actor, or a task or area record. Required on the hand-off kinds (finding, check, question); optional on every other kind |
 | `links` | `about` (its subjects), `on` (the exact versions it rests on, `id@v`; required on a verdict), `answers` (a decision to its question), `piece` (a task to its plan piece), `same-as`. Each type holds a list, except `answers` and `piece`, which hold one |
 | versions | Every write (add, revise, end, link) is a new version with its `by`, `at` and, for a revise, its `reason`; earlier versions are kept. Any record can be read as of a time, or at a version. Any record may be revised except a task's `asked` |
 
@@ -66,26 +66,26 @@ John: "a small minimal MVP, and we take it for a walk and see a) if it's better 
 | `finding` | Something someone must act on | `says`; `to` | open → done, declined, handed-on |
 | `check` | A verification needing the person's systems | `what`, `why-person`, `how`; `to` | open → done, declined, handed-on |
 | `question` | A call waiting on a decider | `asks`, `options`, `recommended`, `if-unanswered`; `to` | open → answered, withdrawn, handed-on |
-| `decision` | What was decided and why, including a person's standing direction | `answer`, `why`, `scope` (optional: a task id; the decision covers that task and every task under it) | stands → superseded, withdrawn |
-| `verdict` | A judgement `on` one version of a plan piece or change | `of` (plan-review, review, blind-read), `outcome` from that judgement's set, `reasoning` | stands → withdrawn |
+| `decision` | What was decided and why, including a person's standing direction | `answer`, `why`, `scope` (optional: a task, covering it and every task under it; or an area, covering every task whose paths overlap it) | stands → superseded, withdrawn |
+| `verdict` | A judgement `on` one version of a plan piece or change | `of` (plan-review, review, blind-read), `outcome` from that judgement's set, `reasoning` | stands → superseded, withdrawn |
 | `lesson` | A lasting truth about the code, `in` an area | `says`, `paths`, `checked-at` (the commit it was last true at) | holds → superseded, disproved |
 | `area` | A place in the code | `name`, `paths` | kept → retired |
 | `change` | A handle on the work product: a PR, commit range or saved file; each new head is a new version | `ref`, `head` | open → merged, abandoned |
-| `run` | One actor's session, `in` its task | `stage`, `claims` (paths it expects to touch), `account` (its own summary) | open → done |
+| `run` | One actor's session, `in` its task | `stage`, `claims` (paths it expects to touch), `account` (what it wrote for people, in full: its own words, as it would post them) | open → done |
 
-**Outcome sets:** plan-review and review: approve, approve-with-notes, request-changes. Blind-read: better, same, worse.
+**Outcome sets:** plan-review and review: approve, approve-with-notes, request-changes, needs-discussion. Blind-read: better, same, worse.
 
 **Open** records are those in state `open` (task, finding, check, question, change, run). The other kinds start in a standing state (kept, stands, holds).
 
 **Paths overlap** when one is a prefix of the other on whole segments (`lib/a` overlaps `lib/a/b.js`, not `lib/ab`). Every view and brief part that matches paths uses this.
 
-**Actors** are declared in `actors.json`: the names that may appear in `by` and `to`. For Harbour: its stages (design, plan-review, breakdown, survey-task, survey-place, scoping, implementation, leftover, review, blind-read, close-out), the autopilot, John, and Harbour itself (the system). An actor may be marked `blind`: its brief leaves out verdicts other than its own (in Harbour, blind-read, which judges the work without the review's view). Another project declares its own. Any actor may write any kind and end any record; which ones it should is its prompt's business and Harbour's.
+**Actors** are declared in `actors.json`: the names that may appear in `by` and `to`. For Harbour: its stages (design, plan-review, breakdown, survey-task, survey-place, scoping, implementation, leftover, review, blind-read, close-out), the autopilot, John, and Harbour itself (the system). An actor may be marked `blind`: its brief and its queries leave out verdicts other than its own (in Harbour, blind-read, which judges the work without the review's view). Another project declares its own. Any actor may write any kind and end any record; which ones it should is its prompt's business and Harbour's.
 
 ### 3.3 What a write checks
 
 Only shape, so a malformed record can't enter:
 - the kind is declared; every field belongs to it and has its type; a verdict's outcome is in its set; a task's `asked` doesn't change once written;
-- `by` is a declared actor; the hand-off kinds (finding, check, question) have a `to` that is a declared actor or a task or area record, and no other kind has one;
+- `by` is a declared actor; a `to`, where present, is a declared actor or a task or area record, and the hand-off kinds (finding, check, question) must have one;
 - `in` is a task or area; every link resolves; a verdict has an `on`; `answers` and `piece` join the kinds named above;
 - a state change goes to one of the kind's ends with a reason; `handed-on` and `superseded` name the record that takes over.
 
@@ -93,7 +93,7 @@ Only shape, so a malformed record can't enter:
 
 - **Open for a reader:** open records whose `to` is that actor, task or area.
 - **Answered:** a question with a standing decision that `answers` it shows that decision beside it, whether or not its state has been ended yet.
-- **Stale:** a record that is not ended and one of whose `on` links points to a version after which its target was revised, or to a target ended superseded, withdrawn, abandoned or disproved, or to a target that is itself stale. Ending or linking a target makes nothing stale. Shown as a flag that says which link moved and how (e.g. "on change-5@1, now @2").
+- **Stale:** a verdict or decision, not ended, one of whose `on` links points to a version after which its target's content was revised (a change to its fields; not to its `to`, `in` or links), or to a target ended superseded, withdrawn, abandoned or disproved. Only direct links count. Shown as a flag that says which link moved and how (e.g. "on change-5@1, now @2").
 - **Counts:** any `find` can return its count instead of its records, as of any time.
 - **Overlap:** open runs whose `claims` share a path.
 
@@ -103,12 +103,13 @@ John: "previously an agent essentially got the brief, but then the ability to fi
 
 **A brief** is what an actor working on a task is given:
 1. **The task and the person's words:** the task's id, `ref`, `done-when` and `paths`; then the `asked` of the task and of each ancestor, verbatim.
-2. **Its plan piece:** the current version, through the task's `piece` link; if the piece was superseded, the record that took over.
-3. **Addressed to it, in full:** open records `in` this task whose `to` is this actor, and open records anywhere whose `to` is this task.
+2. **Its plan:** the current version of the task's `piece` (if superseded, the record that took over); for a task with no piece, every plan `in` it that is kept.
+3. **Addressed to it, in full:** open records `in` this task whose `to` is this actor; open records anywhere whose `to` is this task; and open records `in` this task addressed to a stage whose run on this task has ended (left behind).
 4. **What stands about this task:** verdicts (unless the actor is blind) and decisions `in` the task, or `about` or `on` its piece or its change, each with the version it rests on and the stale flag. An ancestor's decisions appear when `about` or `on` this task's piece, or when they carry a `scope` that covers it.
 5. **Its areas:** each area whose paths overlap the task's, by id and name, with the number of open records addressed to it, so the actor can address the place and look up what is waiting there.
 6. **Open runs,** other than the actor's own on this task, whose claims share a path with this task.
 7. **An index of what else is known:** every other open record `in` the task, and every lesson whose paths overlap the task's, one line each: id, kind, to, and the first line of what it says.
+8. **The previous stage's account, in full:** the `account` of the latest ended run in this task by another actor.
 
 Ended records are left out. Each brief reports what it carries and its size in bytes of text.
 
@@ -121,6 +122,7 @@ Ended records are left out. Each brief reports what it carries and its size in b
 *A fresh subagent builds the model from §3 and this section only, in `walks/<n>/model/`. Nothing else is given. It is thrown away after its round.*
 
 - **Form.** Node, ES modules, no dependencies. `kinds.json`, `actors.json`, `layer.mjs`, and one JSON store holding every record's versions and the query log. As small as it can be.
+- **Store format,** so stores carry from one build to the next: `{next, records: {<id>: [<version>, …]}, log: [{at, by, cmd, args, asOf}]}`; each version is a full snapshot `{id, kind, v, op, at, by, via?, reason?, in?, to?, state, ended?: {reason, into?}, links: {<type>: <value or list>}, fields: {…}}`.
 - **Commands** (CLI; JSON in and out; exit 0 ok, 1 usage, 2 refused with the reason):
   - Writes: `add <kind> '<json>'` (fields plus `in`, `to`, `links`), `revise <id> '<json>' --reason <r>`, `end <id> <state> <reason> [--into <id>]` (the record that takes over), `link <id> <type> <id[@v]>`. Each takes `--by <actor>`, and optionally `--via <name>` and `--at <time>`, so a finished task can be written in its own order.
   - `brief <actor> --task <id> [--as-of <time>] [--text]`: §3.5, with what it carries and its size.
@@ -131,15 +133,10 @@ Ended records are left out. Each brief reports what it carries and its size in b
 
 Walks 1–4 are in `walks/1/`–`walks/4/`. What they established: everything that happened had a home; stages writing live address their own records well; retelling stops when stages can look things up; briefs stop growing with the ticket's history; and with only shape checked, corrections replace instead of piling and stale shows only the real signal [checked, results files].
 
-**Walk 5: more kinds of task, and a comparison with today.** John: "try out a wider range of tasks", and the design is settled only once it is "simple enough to use, and working far better than the existing solutions" [checked, log "17 Nov"].
-- **Replays,** as walk 4, each stage a fresh agent with its brief, its real output and the store:
-  - LIN-4450 again, the control;
-  - LIN-4463's own stages up to its breakdown (survey, scoping, plan, plan-review, breakdown: a parent planning and splitting);
-  - LIN-4446 (one task through plan, plan-review, a second plan and plan-review, then the build);
-  - LIN-4469 (implementation twice around a review, and a ruling raised and withdrawn);
-  - LIN-4459 (a build that asks another lane and merges on silence);
-  - LIN-4464 (an area read: a report, no PR).
-- **The comparison,** on three of these tasks at two stages each: two fresh readers answer the same questions a stage must answer to do its job (what is addressed to it, what is still open and whose, what was decided and whether it still holds, whether an approval covers the current work, a count). One reader gets the ticket and its parent as they stood then, which is roughly what Harbour gives a stage today; the other gets the brief and the store. A third agent, who wrote the questions from the full history, marks both. Right answers and what each reader used are reported, not scored.
+**Walk 6: the comparison, done fairly, and where tickets fail.** John: the design is settled once it is "simple enough to use, and working far better than the existing solutions", and "if it was a bad test, why didn't you just run a good test?" [checked, log "17 Nov"]. Walk 5's comparison read a store converted from the ticket against the ticket, at one moment in one task (`walks/5/results.md`).
+- **Same words, two forms:** walk 5's six stores carried onto this model, each run given the stage's own words as its account, so the store holds everything the ticket holds; the same six questions asked again of a store reader.
+- **Across a lane:** at the end of LIN-4459 and LIN-4469, questions about the lane and the area (what is open across the siblings, which asks went unanswered, which decisions were overridden, how many waiting entries stand): one reader with the child ticket, the parent ticket and the area notes as they stood; one with the brief and the store.
+- **Marked** against the full history by a third agent, as in walk 5.
 - **The question:** is everything that happened stored, addressed, ended or rightly open; could each stage find what it needed; and does a stage reading the store know its situation better than one reading the ticket?
 - **A break,** each with why: something with no home; a hand-off to no reader; a thing retold that should be one record; something a stage needed that neither its brief nor a query gave it; a write refused that was right, or accepted that was malformed.
 - **Listed, not scored** (John: "we don't need to worry too much about where the mistakes are coming from" if deterministic code or a full implementation will absorb them) [checked, log "17 Nov"]: the model's rough edges, and Harbour's standing rules, which live in its prompts and code.
