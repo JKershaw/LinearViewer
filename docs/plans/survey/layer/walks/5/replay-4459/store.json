@@ -1,5 +1,5 @@
 {
- "next": 169,
+ "next": 172,
  "records": {
   "area-1": [
    {
@@ -3935,6 +3935,40 @@
     "at": "2026-11-13T16:48:23.000Z",
     "by": "leftover",
     "reason": "leftover tidies pushed; head 7424cfb8fa42f28b303138c76f20cbb6cb74b5f2, CI green (unit, unit proxy, E2E 1-4, secret scan, ci-success)"
+   },
+   {
+    "id": "change-143",
+    "kind": "change",
+    "state": "open",
+    "fields": {
+     "ref": "PR #2432 (branch feat/lin-4459-run-live-wait)",
+     "head": "2d02bb4a21b4e1cd2212d250cc36d523c34395a1"
+    },
+    "links": {},
+    "in": "task-113",
+    "v": 3,
+    "op": "revise",
+    "at": "2026-11-13T17:05:04.000Z",
+    "by": "close-out",
+    "reason": "close-out fixes pushed after approval (not re-reviewed): one local outcomeOf mapping in runFact; transcript-entries test header reworded"
+   },
+   {
+    "id": "change-143",
+    "kind": "change",
+    "state": "merged",
+    "fields": {
+     "ref": "PR #2432 (branch feat/lin-4459-run-live-wait)",
+     "head": "2d02bb4a21b4e1cd2212d250cc36d523c34395a1"
+    },
+    "links": {},
+    "in": "task-113",
+    "v": 4,
+    "op": "end",
+    "at": "2026-11-13T17:05:09.000Z",
+    "by": "close-out",
+    "ended": {
+     "reason": "Merged as c174185f6 at head 2d02bb4a2; deployed (harbour.cat footer 17faa83f4 contains the merge)."
+    }
    }
   ],
   "decision-144": [
@@ -4081,6 +4115,34 @@
     "op": "add",
     "at": "2026-11-13T16:33:27.000Z",
     "by": "implementation"
+   },
+   {
+    "id": "question-148",
+    "kind": "question",
+    "state": "answered",
+    "fields": {
+     "asks": "LIN-4459 (piece 4) is built in PR #2432: on your side `lib/openrouter.js`, `lib/proxy-instructions.js`, `lib/recommendation-blind-read.js`, `lib/recommendation-facts.js` and `lib/recommendation-look-first.js` change only import or comment text; the code-route list in `openrouter.js` is untouched; in `docs/areas/llm-and-prompts.md` the two live-wait entries leave and the claim compare-and-set note moves to the Runs note unchanged. Do you still agree before the PR merges? (Renewed ask, LIN-4448 comment 0510ffe0; posted with the PR, not before building.)",
+     "options": [
+      "agree",
+      "a different boundary"
+     ],
+     "if-unanswered": "The move stands on decision-119's agreement; the PR waits for a reply on LIN-4459 or LIN-4447 before merging."
+    },
+    "links": {
+     "about": [
+      "decision-119",
+      "change-143"
+     ]
+    },
+    "in": "task-113",
+    "to": "task-83",
+    "v": 2,
+    "op": "end",
+    "at": "2026-11-13T17:05:02.000Z",
+    "by": "close-out",
+    "ended": {
+     "reason": "No reply before merge; settled by decision-171 on the standing agreement (decision-119, 08c9c898). PR #2432 merged as c174185f6."
+    }
    }
   ],
   "run-149": [
@@ -4510,6 +4572,32 @@
     "op": "add",
     "at": "2026-11-13T16:58:23.000Z",
     "by": "review"
+   },
+   {
+    "id": "check-156",
+    "kind": "check",
+    "state": "done",
+    "fields": {
+     "what": "Before merge: LIN-4448 has not answered the renewed ask (question-148, comment 0510ffe0, posted after the build), and that ask does not mention the `runner-kickoff.js` import change or the LLM-note entry it retires. Post that addition on LIN-4448; then either a LIN-4448 reply confirms, or record that 08c9c898 (\"agree… no shim… whichever of us lands second changes only the import path\", decision-119) already covers the move and that the runner-kickoff change touches only an import path, prompt bytes unchanged (`runner-kickoff.test.js`).",
+     "why-person": "Needs LIN-4448's reply, or a recorded judgement that the standing agreement covers it; CI cannot give either.",
+     "how": "Comment on LIN-4448; read its reply or record the fallback on LIN-4459."
+    },
+    "links": {
+     "about": [
+      "question-148",
+      "decision-119",
+      "change-143"
+     ]
+    },
+    "in": "task-113",
+    "to": "close-out",
+    "v": 2,
+    "op": "end",
+    "at": "2026-11-13T17:05:03.000Z",
+    "by": "close-out",
+    "ended": {
+     "reason": "Addition posted on LIN-4448 (b564445b, finding-170); no reply came, fallback recorded on LIN-4459 close-out (9584b81c) as decision-171: 08c9c898 covers an import-path-only change, prompt bytes unchanged."
+    }
    }
   ],
   "check-157": [
@@ -4534,6 +4622,31 @@
     "op": "add",
     "at": "2026-11-13T16:58:24.000Z",
     "by": "review"
+   },
+   {
+    "id": "check-157",
+    "kind": "check",
+    "state": "done",
+    "fields": {
+     "what": "Before merge: CI ran on base 0092d8d9e. If LIN-4458 (piece 2) or LIN-4465 (edits comments in `lib/recent-runs.js`, per decision-119) lands first, PR #2432 must rebase. Require CI green on the exact commit merged, with lin-4392's LIN-4459 describe block green. A local merge with origin/main 2aab32bf0 passed 333/333.",
+     "why-person": "Depends on merge order, which is only known at merge time.",
+     "how": "Read the CI run on the merge commit's head SHA."
+    },
+    "links": {
+     "about": [
+      "change-143",
+      "finding-153"
+     ]
+    },
+    "in": "task-113",
+    "to": "close-out",
+    "v": 2,
+    "op": "end",
+    "at": "2026-11-13T17:05:08.000Z",
+    "by": "close-out",
+    "ended": {
+     "reason": "No rebase needed: neither LIN-4458 nor LIN-4465 had touched lib/recent-runs.js; main 2aab32bf0 was docs-only ahead of the base. CI run 43469455968 green on exactly 2d02bb4a2 (unit, unit proxy +400d, E2E 1-4, secret scan, ci-success), lin-4392's LIN-4459 block passing."
+    }
    }
   ],
   "check-158": [
@@ -4632,6 +4745,30 @@
     "op": "add",
     "at": "2026-11-13T16:58:38.000Z",
     "by": "review"
+   },
+   {
+    "id": "finding-161",
+    "kind": "finding",
+    "state": "done",
+    "fields": {
+     "says": "Fix before merge, PR #2432 body `## Retires`: add a bullet: \"The store's `FEEDBACK_ENTRY_KINDS` re-export (`lib/dispatch-store.js`). `lib/prompts/runner-kickoff.js` and the tests import it from the leaf `lib/dispatch-feedback-kinds.js`; the `tests/unit/lin-4455-feedback-kinds-table.test.js` assertion now pins that the store does not re-export it. This settles the LLM & prompts Waiting entry from LIN-4455's blind read.\""
+    },
+    "links": {
+     "about": [
+      "change-143",
+      "decision-160",
+      "finding-81"
+     ]
+    },
+    "in": "task-113",
+    "to": "close-out",
+    "v": 2,
+    "op": "end",
+    "at": "2026-11-13T17:05:07.000Z",
+    "by": "close-out",
+    "ended": {
+     "reason": "PR #2432 body ## Retires now names the FEEDBACK_ENTRY_KINDS re-export, the eight repointed importers, the changed LIN-4455 assertion and the settled LLM Waiting entry; a Close-out changes section lists 2d02bb4a2."
+    }
    }
   ],
   "verdict-162": [
@@ -4715,6 +4852,28 @@
     "op": "add",
     "at": "2026-11-13T17:02:26.000Z",
     "by": "blind-read"
+   },
+   {
+    "id": "finding-164",
+    "kind": "finding",
+    "state": "done",
+    "fields": {
+     "says": "Fix-sized, PR #2432 at 7424cfb8f: `tests/unit/session-run-transcript-entries.test.js` header comment now reads \"(lib/dispatch-feedback-kinds.js; then —\", which is garbled, and the same sentence still cites \"lib/dispatch-store.js:95\" for why `decision-answer` is excluded, though that explanation now lives in `lib/dispatch-feedback-kinds.js`. Fix: reword the parenthesis and point the citation at `lib/dispatch-feedback-kinds.js`, with no line number."
+    },
+    "links": {
+     "about": [
+      "change-143"
+     ]
+    },
+    "in": "task-113",
+    "to": "close-out",
+    "v": 2,
+    "op": "end",
+    "at": "2026-11-13T17:05:05.000Z",
+    "by": "close-out",
+    "ended": {
+     "reason": "Fixed in 2d02bb4a2: header parenthesis reworded, citation points at lib/dispatch-feedback-kinds.js with no line number."
+    }
    }
   ],
   "finding-165": [
@@ -4736,6 +4895,28 @@
     "op": "add",
     "at": "2026-11-13T17:02:27.000Z",
     "by": "blind-read"
+   },
+   {
+    "id": "finding-165",
+    "kind": "finding",
+    "state": "done",
+    "fields": {
+     "says": "Fix-sized, PR #2432 at 7424cfb8f: `runFact` (`lib/recent-runs.js`) translates the wire word `blocked` into `WAITING_ON_A_PERSON` in two places, the own-row branch and the new parked-lineage branch (`r.outcome === 'blocked' ? WAITING_ON_A_PERSON : r.outcome`). Fix: one small local mapping both branches use."
+    },
+    "links": {
+     "about": [
+      "change-143"
+     ]
+    },
+    "in": "task-113",
+    "to": "close-out",
+    "v": 2,
+    "op": "end",
+    "at": "2026-11-13T17:05:06.000Z",
+    "by": "close-out",
+    "ended": {
+     "reason": "Fixed in 2d02bb4a2: runFact maps blocked to WAITING_ON_A_PERSON through one local outcomeOf used by both branches."
+    }
    }
   ],
   "finding-166": [
@@ -4806,6 +4987,77 @@
     "op": "add",
     "at": "2026-11-13T17:02:30.000Z",
     "by": "blind-read"
+   }
+  ],
+  "run-169": [
+   {
+    "id": "run-169",
+    "kind": "run",
+    "state": "open",
+    "fields": {
+     "stage": "close-out",
+     "account": "Close-out of LIN-4459. Posted the runner-kickoff import change and the retired LLM entry on LIN-4448 (b564445b); no reply came, so I recorded that its 08c9c898 agreement covers an import-path-only change (prompt bytes unchanged) and merged. Fixed the blind read's two fix-sized finds in 2d02bb4a2 and added the FEEDBACK_ENTRY_KINDS re-export to the PR's Retires. CI green on exactly 2d02bb4a2 (run 43469455968), no rebase needed; merged as c174185f6, deployed (footer 17faa83f4). The blind read's two larger finds went in as Waiting entries via PR #2434 (5cf4f6aa2). The latency monitor (no log access) and the post-deploy real-world check (no qualifying ticket yet: not yet observed) are handed to John. Archive snapshot 299ad5e0 verified before pruning the description; LIN-4459 set Done; LIN-4447 stays open, LIN-4460 proceeds."
+    },
+    "links": {},
+    "in": "task-113",
+    "v": 1,
+    "op": "add",
+    "at": "2026-11-13T17:04:59.000Z",
+    "by": "close-out"
+   }
+  ],
+  "finding-170": [
+   {
+    "id": "finding-170",
+    "kind": "finding",
+    "state": "open",
+    "fields": {
+     "says": "LIN-4459 (PR #2432) also touches your side beyond the renewed ask (question-148): `lib/prompts/runner-kickoff.js` changes only its import, taking `FEEDBACK_ENTRY_KINDS` from the leaf `lib/dispatch-feedback-kinds.js` because the store drops its re-export; kinds, order and prompt bytes are unchanged (`runner-kickoff.test.js` and the LIN-4455 table test pass). In `docs/areas/llm-and-prompts.md` the entry opening \"`lib/prompts/runner-kickoff.js`: imports `FEEDBACK_ENTRY_KINDS` from the store\" (finding-81) is retired. Recorded as covered by your 08c9c898 agreement (decision-119); if you disagree, say so on LIN-4459. (Posted on LIN-4448, comment b564445b.)"
+    },
+    "links": {
+     "about": [
+      "change-143",
+      "finding-81",
+      "question-148"
+     ],
+     "on": [
+      "decision-119@2"
+     ]
+    },
+    "in": "task-113",
+    "to": "task-83",
+    "v": 1,
+    "op": "add",
+    "at": "2026-11-13T17:05:00.000Z",
+    "by": "close-out"
+   }
+  ],
+  "decision-171": [
+   {
+    "id": "decision-171",
+    "kind": "decision",
+    "state": "stands",
+    "fields": {
+     "scope": "task-113",
+     "answer": "LIN-4448 coordination is covered by its standing agreement: PR #2432 merges without a fresh reply.",
+     "why": "No LIN-4448 reply came to the renewed ask (0510ffe0) or to the addition (b564445b, finding-170) before the merge. Its comment 08c9c898 on LIN-4447 (decision-119) agreed the move with no shim and that \"whichever of us lands second changes only the import path\"; the only change in LLM & prompts code is import or comment text, and kinds, order and runner prompt bytes are unchanged (`runner-kickoff.test.js`, LIN-4455 table test, green in CI run 43469455968). This is the fallback check-156 named."
+    },
+    "links": {
+     "answers": "question-148",
+     "on": [
+      "decision-119@2"
+     ],
+     "about": [
+      "change-143",
+      "finding-170",
+      "check-156"
+     ]
+    },
+    "in": "task-113",
+    "v": 1,
+    "op": "add",
+    "at": "2026-11-13T17:05:01.000Z",
+    "by": "close-out"
    }
   ]
  },
@@ -6071,6 +6323,21 @@
     "find",
     "--text",
     "liveOnAnchor",
+    "--by",
+    "close-out"
+   ],
+   "asOf": null
+  },
+  {
+   "at": "2026-11-17T15:41:37.169Z",
+   "by": "close-out",
+   "cmd": "find",
+   "args": [
+    "find",
+    "--kind",
+    "finding",
+    "--in",
+    "task-113",
     "--by",
     "close-out"
    ],

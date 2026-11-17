@@ -1,5 +1,5 @@
 {
- "next": 170,
+ "next": 171,
  "records": {
   "area-1": [
    {
@@ -4461,6 +4461,51 @@
     "op": "add",
     "at": "2026-11-13T23:17:20.000Z",
     "by": "review"
+   }
+  ],
+  "run-170": [
+   {
+    "id": "run-170",
+    "kind": "run",
+    "state": "open",
+    "fields": {
+     "stage": "autopilot",
+     "account": "Woken at 23:16 (wake ad1b1a6d). Withdrew ruling lin-4469-witness (question-159) at 23:17:16 as moot: John answered lin-4469-cuts with fold (decision-157), and a net fall for kinds that carry no folded text needs no ruling; the folds are built and CI is green. Review had already ended question-159 withdrawn citing this withdrawal, so I did not end it again. The +24 seams-tangles half is review's finding-166 for close-out, not a ruling."
+    },
+    "links": {
+     "about": [
+      "question-159",
+      "change-142"
+     ]
+    },
+    "in": "task-131",
+    "v": 1,
+    "op": "add",
+    "at": "2026-11-13T23:17:18.000Z",
+    "by": "autopilot"
+   },
+   {
+    "id": "run-170",
+    "kind": "run",
+    "state": "done",
+    "fields": {
+     "stage": "autopilot",
+     "account": "Woken at 23:16 (wake ad1b1a6d). Withdrew ruling lin-4469-witness (question-159) at 23:17:16 as moot: John answered lin-4469-cuts with fold (decision-157), and a net fall for kinds that carry no folded text needs no ruling; the folds are built and CI is green. Review had already ended question-159 withdrawn citing this withdrawal, so I did not end it again. The +24 seams-tangles half is review's finding-166 for close-out, not a ruling."
+    },
+    "links": {
+     "about": [
+      "question-159",
+      "change-142"
+     ]
+    },
+    "in": "task-131",
+    "v": 2,
+    "op": "end",
+    "at": "2026-11-13T23:17:19.000Z",
+    "by": "autopilot",
+    "ended": {
+     "reason": "Withdrawal recorded; nothing else to step"
+    }
    }
   ]
  },

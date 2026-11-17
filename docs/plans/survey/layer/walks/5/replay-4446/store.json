@@ -1,5 +1,5 @@
 {
- "next": 68,
+ "next": 69,
  "records": {
   "area-1": [
    {
@@ -2751,6 +2751,52 @@
     "at": "2026-11-13T14:56:27.000Z",
     "by": "leftover",
     "reason": "leftover tidy commits pushed to PR #2423; CI green at the new head"
+   },
+   {
+    "id": "change-53",
+    "kind": "change",
+    "state": "open",
+    "fields": {
+     "ref": "PR #2423 (JKershaw/LinearViewer, branch feat/lin-4446-shared-cost-format): LIN-4446 slice 1. Shares lib/cost-format.js with the browser as /shared/cost-format.js through a 12-line module shim; retires public/cost-format.js (34 lines) and tests/unit/cost-format-parity.test.js; public/workspace-kpis.js now builds on DOMContentLoaded; rule reading in CLAUDE.md and docs/areas/front-end-browser.md Lessons. No view reworked or retired.",
+     "head": "ad24a2102f0aa0fac4ec5ccbbe5075d660b8b67b"
+    },
+    "links": {
+     "on": [
+      "plan-28@13",
+      "verdict-44@1",
+      "decision-26@3"
+     ]
+    },
+    "in": "task-9",
+    "v": 3,
+    "op": "revise",
+    "at": "2026-11-13T15:15:00.000Z",
+    "by": "close-out",
+    "reason": "close-out commit ad24a2102 on the PR branch: test wording fixes (finding-64, finding-65) and two area-note Waiting entries; no logic change; CI green at this head"
+   },
+   {
+    "id": "change-53",
+    "kind": "change",
+    "state": "merged",
+    "fields": {
+     "ref": "PR #2423 (JKershaw/LinearViewer, branch feat/lin-4446-shared-cost-format): LIN-4446 slice 1. Shares lib/cost-format.js with the browser as /shared/cost-format.js through a 12-line module shim; retires public/cost-format.js (34 lines) and tests/unit/cost-format-parity.test.js; public/workspace-kpis.js now builds on DOMContentLoaded; rule reading in CLAUDE.md and docs/areas/front-end-browser.md Lessons. No view reworked or retired.",
+     "head": "ad24a2102f0aa0fac4ec5ccbbe5075d660b8b67b"
+    },
+    "links": {
+     "on": [
+      "plan-28@13",
+      "verdict-44@1",
+      "decision-26@3"
+     ]
+    },
+    "in": "task-9",
+    "v": 4,
+    "op": "end",
+    "at": "2026-11-13T15:15:01.000Z",
+    "by": "close-out",
+    "ended": {
+     "reason": "squash-merged as 92676b1febeb5407878d69b5e7a8f166a9371777 with --match-head-commit ad24a2102; deployed, harbour.cat footer shows 92676b1"
+    }
    }
   ],
   "lesson-54": [
@@ -3033,6 +3079,32 @@
     "op": "add",
     "at": "2026-11-13T15:07:32.000Z",
     "by": "review"
+   },
+   {
+    "id": "finding-61",
+    "kind": "finding",
+    "state": "done",
+    "fields": {
+     "says": "Before merge, PR #2423's body is stale after 1de016f52. Under 'What changed' add: 'Leftover-step retirement (LIN-4414): the swipe page now takes the shared default viewport (lib/render-swipe.js drops user-scalable=no; witness tests/unit/render-swipe.test.js), retiring the docs/areas/front-end-pages.md Waiting entry lib/render-swipe.js: the viewport meta is user-scalable=no.' Replace 'Total: 30 files, +747 / -280' with what gh pr view 2423 --json additions,deletions,changedFiles gives on the merged head (35 files at 1de016f). In 'Not covered', replace 'The serving tests were not run against HEAD' with 'Reviewer's mutation (serving lib/ as a directory) turns the spawned-server 404 witness red.'"
+    },
+    "links": {
+     "on": [
+      "change-53@2"
+     ],
+     "about": [
+      "change-53",
+      "verdict-60"
+     ]
+    },
+    "in": "task-9",
+    "to": "close-out",
+    "v": 2,
+    "op": "end",
+    "at": "2026-11-13T15:15:02.000Z",
+    "by": "close-out",
+    "ended": {
+     "reason": "PR #2423 body updated before merge: names the swipe viewport retirement and its witness tests/unit/render-swipe.test.js; totals now 35 files, +790 / -287; serving-tests gap replaced with the reviewer M8 mutation evidence"
+    }
    }
   ],
   "run-62": [
@@ -3114,6 +3186,28 @@
     "op": "add",
     "at": "2026-11-13T15:12:09.000Z",
     "by": "blind-read"
+   },
+   {
+    "id": "finding-64",
+    "kind": "finding",
+    "state": "done",
+    "fields": {
+     "says": "tests/unit/cost-format-consumers.test.js (concerns public/flight-companion.js): the test title \"formatCost gives the browser copy's words\" and its comment \"The browser copy's fine mode\" name the browser copy PR #2423 deleted. Reword them to \"the shared formatter's words\". Fix-sized, before merge."
+    },
+    "links": {
+     "about": [
+      "change-53"
+     ]
+    },
+    "in": "task-9",
+    "to": "close-out",
+    "v": 2,
+    "op": "end",
+    "at": "2026-11-13T15:15:03.000Z",
+    "by": "close-out",
+    "ended": {
+     "reason": "fixed in ad24a2102: title and comment now say the shared formatter's words"
+    }
    }
   ],
   "finding-65": [
@@ -3136,6 +3230,29 @@
     "op": "add",
     "at": "2026-11-13T15:12:10.000Z",
     "by": "blind-read"
+   },
+   {
+    "id": "finding-65",
+    "kind": "finding",
+    "state": "done",
+    "fields": {
+     "says": "tests/unit/cost-format.test.js (concerns lib/cost-format.js): a new file, but its header says \"The browser-copy parity comparison it used to carry is retired\"; it never carried that comparison. It also keeps export const TABLE, which nothing imports, left over from the deleted parity test. Drop the sentence and the export. Fix-sized, before merge."
+    },
+    "links": {
+     "about": [
+      "change-53",
+      "finding-48"
+     ]
+    },
+    "in": "task-9",
+    "to": "close-out",
+    "v": 2,
+    "op": "end",
+    "at": "2026-11-13T15:15:04.000Z",
+    "by": "close-out",
+    "ended": {
+     "reason": "fixed in ad24a2102: false parity-comparison sentence removed, export dropped from TABLE"
+    }
    }
   ],
   "finding-66": [
@@ -3179,6 +3296,23 @@
     "op": "add",
     "at": "2026-11-13T15:12:12.000Z",
     "by": "blind-read"
+   }
+  ],
+  "run-68": [
+   {
+    "id": "run-68",
+    "kind": "run",
+    "state": "open",
+    "fields": {
+     "stage": "close-out",
+     "account": "Merged PR #2423 as squash 92676b1fe, pinned to head ad24a2102 (CI green on that exact head: unit, proxy/clock, e2e 1-4, secret scan, ci-success); deployed, harbour.cat footer shows 92676b1. Before merge I pushed ad24a2102: the two blind-read wording fixes (cost-format-consumers.test.js title/comment; cost-format.test.js false parity sentence and unused TABLE export), two area-note Waiting entries for the blind read larger items, and the review PR-body fix (swipe viewport retirement and witness, totals 35 files +790/-287, M8 mutation evidence). Live after deploy: /shared/cost-format.js byte-identical to lib/cost-format.js, JS type; /shared/nope.js, /lib/cost-format.js, /cost-format.js 404. Only Chromium has run; rollback is reverting 92676b1fe. John read (check-17) not run, not recorded: human-only, does not hold the close; no next slice until he records it. No tickets filed: nothing outside the area."
+    },
+    "links": {},
+    "in": "task-9",
+    "v": 1,
+    "op": "add",
+    "at": "2026-11-13T15:14:59.000Z",
+    "by": "close-out"
    }
   ]
  },
@@ -4723,6 +4857,34 @@
     "run-59",
     "--by",
     "close-out"
+   ],
+   "asOf": null
+  },
+  {
+   "at": "2026-11-17T15:41:32.426Z",
+   "by": "close-out",
+   "cmd": "get",
+   "args": [
+    "get",
+    "check-17",
+    "--by",
+    "close-out"
+   ],
+   "asOf": null
+  },
+  {
+   "at": "2026-11-17T15:41:32.464Z",
+   "by": "close-out",
+   "cmd": "find",
+   "args": [
+    "find",
+    "--kind",
+    "run",
+    "--state",
+    "open",
+    "--by",
+    "close-out",
+    "--count"
    ],
    "asOf": null
   }

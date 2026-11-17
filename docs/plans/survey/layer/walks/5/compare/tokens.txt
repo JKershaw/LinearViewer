@@ -4,3 +4,5 @@
 4450-close-out S 96034 tokens 9 tools 46s
 4446-plan-review T 83994 tokens 4 tools 25s
 4446-plan-review S 91203 tokens 6 tools 39s
+4446-close-out T 93591 tokens 4 tools 33s
+4469-review T 103544 tokens 5 tools 43s
