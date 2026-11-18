@@ -1,1 +1,84 @@
-{"next":1,"records":{},"log":[]}
+{
+  "next": 5,
+  "records": {
+    "plan-1": [
+      {
+        "id": "plan-1",
+        "kind": "plan",
+        "v": 1,
+        "op": "add",
+        "at": "2026-04-22T20:33:00.000Z",
+        "by": "yap-docs",
+        "state": "kept",
+        "links": {},
+        "fields": {
+          "says": "TODO, ordered, each item unblocks the next. v0.1.0 prove the core loop: items 1-9 shipped; 10 Release v0.1.0 (publish to npm, deploy yap.jkershaw.com) is the next step for the maintainer. Between releases: 11 use it for real for a week or two, noting but not adding features; 12 re-read PHILOSOPHY.md and cut. Housekeeping: split server.ts into server.ts + auth.ts; structured logging later. v0.5.0 profiles: 13-15 whois/set_profile, tests, release. v1.0.0 fill out the vision: 16 reactive agent runtime (yap agent --config, OpenRouter), 17 CLI client, 18 web agent creator (in-process agent if OPENROUTER_KEY), 19 BYOK OAuth, 20 abuse guards, 21 observability polish (maybe a small who's here sidebar), 22 release v1.0.0. Never: anything on the will-not-add list; easy-not-used features; premature abstractions."
+        }
+      }
+    ],
+    "decision-2": [
+      {
+        "id": "decision-2",
+        "kind": "decision",
+        "v": 1,
+        "op": "add",
+        "at": "2026-04-22T20:33:00.000Z",
+        "by": "yap-docs",
+        "state": "stands",
+        "links": {},
+        "fields": {
+          "answer": "yap is a broker, not a framework: the server stays dumb (channels, buffers, nicks, profiles, mentions, nothing else); anything a client could do by polling and saying belongs in a client; the channel is the bus and the transcript is the log; ephemeral by default; presence inferred, not tracked.",
+          "why": "Minimalism is load-bearing: every cut exists because the alternative makes yap harder to understand in one sitting. Will not add: persistent storage, accounts/auth beyond channel passwords, server-side orchestration, rich media, threads/reactions/edits, federation, plugins, history search, server-side agent memory.",
+          "scope": "project"
+        }
+      }
+    ],
+    "decision-3": [
+      {
+        "id": "decision-3",
+        "kind": "decision",
+        "v": 1,
+        "op": "add",
+        "at": "2026-04-22T20:33:00.000Z",
+        "by": "yap-docs",
+        "state": "stands",
+        "links": {},
+        "fields": {
+          "answer": "Rejected or reframed: moderation roles -> optional YAP_ADMIN_TOKEN with POST /admin/purge and /admin/block, curl-only; server settings page -> env vars, the README is the settings UI; plugin system -> reactive agents out of process; server-side user settings -> client cookies/localStorage; agent/MCP indicator -> client icon for nicks with a whois description; custom formatting rules -> client rendering.",
+          "why": "Each real need fits a client concern, a reactive agent or an env var; if a request resists that reframe it might belong in yap. Most do not.",
+          "scope": "project"
+        }
+      }
+    ],
+    "decision-4": [
+      {
+        "id": "decision-4",
+        "kind": "decision",
+        "v": 1,
+        "op": "add",
+        "at": "2026-04-22T20:33:00.000Z",
+        "by": "yap-docs",
+        "state": "stands",
+        "links": {},
+        "fields": {
+          "answer": "Ship a reactive agent runtime in the yap package as yap agent (listen -> LLM -> say, config JSON, OpenRouter or direct provider); when an agent is created via the web UI on a server with OPENROUTER_KEY, run the same runtime in-process on the server.",
+          "why": "design.md Reactive agent runtime section and TODO items 16 and 18 (v1.0.0).",
+          "scope": "project"
+        }
+      }
+    ]
+  },
+  "log": [
+    {
+      "at": "2026-11-18T10:03:42.848Z",
+      "by": "recorder",
+      "cmd": "find",
+      "args": [
+        "--count",
+        "--by",
+        "recorder"
+      ],
+      "asOf": null
+    }
+  ]
+}

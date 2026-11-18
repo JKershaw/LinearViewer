@@ -1,5 +1,5 @@
 {
-  "next": 144,
+  "next": 146,
   "records": {
     "lesson-1": [
       {
@@ -2714,6 +2714,79 @@
           "says": "Look-first did not run on LIN-4469 (piece 5): at 22:39Z recommend-and-dispatch sent `implementation` directly (dispatch b86c4a78), though the ticket held only `## As asked` and `## Current`, with no size record, plan, PR or earlier run. The survey-task, survey-place, scoping sequence (`lib/recommendation-look-first.js`) ran on pieces 0 to 4. Not overridden or aborted: the plan is approved at the parent (verdict-121) and breakdown sized the piece (decision-130), but that size lives on the parent, not the ticket. Raw material for the look-first rule: either it should treat an approved-parent piece as sized, or it misfired here. Posted on LIN-4448 (comment cea38032)."
         }
       }
+    ],
+    "check-144": [
+      {
+        "id": "check-144",
+        "kind": "check",
+        "v": 1,
+        "op": "add",
+        "at": "2026-11-13T22:39:52.874Z",
+        "by": "autopilot",
+        "in": "task-128",
+        "to": "review",
+        "state": "open",
+        "links": {},
+        "fields": {
+          "what": "Whether piece 5 (PR #2447) is an undersized or oversized move: it went straight to implementation with no survey-task, survey-place or scoping run on the ticket (the look-first sequence that ran on pieces 0 to 4).",
+          "how": "Compare the PR against the parent plan (plan-114, verdict-121 note 1) and breakdown's one-session fit (decision-130); note any move the plan named that the PR left out, or work it took beyond piece 5."
+        }
+      },
+      {
+        "id": "check-144",
+        "kind": "check",
+        "v": 2,
+        "op": "link",
+        "at": "2026-11-13T22:39:53.874Z",
+        "by": "autopilot",
+        "in": "task-128",
+        "to": "review",
+        "state": "open",
+        "links": {
+          "about": [
+            "change-138"
+          ]
+        },
+        "fields": {
+          "what": "Whether piece 5 (PR #2447) is an undersized or oversized move: it went straight to implementation with no survey-task, survey-place or scoping run on the ticket (the look-first sequence that ran on pieces 0 to 4).",
+          "how": "Compare the PR against the parent plan (plan-114, verdict-121 note 1) and breakdown's one-session fit (decision-130); note any move the plan named that the PR left out, or work it took beyond piece 5."
+        }
+      }
+    ],
+    "run-145": [
+      {
+        "id": "run-145",
+        "kind": "run",
+        "v": 1,
+        "op": "add",
+        "at": "2026-11-13T22:39:54.874Z",
+        "by": "autopilot",
+        "in": "task-128",
+        "state": "open",
+        "links": {},
+        "fields": {
+          "stage": "autopilot",
+          "account": "# What this stage really wrote\n\n## Comment on LIN-4448 (the parent) at 22:39:47 (id cea38032)\n\nAutopilot note: at 22:39Z recommend-and-dispatch on LIN-4469 (piece 5) sent `implementation` directly (dispatch b86c4a78). The ticket has only `## As asked` and `## Current`, with no size record, plan, PR or earlier run, so the look-first sequence (survey-task, survey-place, scoping) that ran on pieces 0 to 4 did not run. I did not override or abort: piece 5's plan is approved at the parent and review has caught real gaps on every earlier piece. Recorded as raw material for the look-first rule. Watch piece 5's review for an undersized or oversized move.\n"
+        }
+      },
+      {
+        "id": "run-145",
+        "kind": "run",
+        "v": 2,
+        "op": "end",
+        "at": "2026-11-13T22:39:55.874Z",
+        "by": "autopilot",
+        "in": "task-128",
+        "state": "done",
+        "ended": {
+          "reason": "Autopilot note on LIN-4448 recorded: finding-143 (project), check-144 (review)"
+        },
+        "links": {},
+        "fields": {
+          "stage": "autopilot",
+          "account": "# What this stage really wrote\n\n## Comment on LIN-4448 (the parent) at 22:39:47 (id cea38032)\n\nAutopilot note: at 22:39Z recommend-and-dispatch on LIN-4469 (piece 5) sent `implementation` directly (dispatch b86c4a78). The ticket has only `## As asked` and `## Current`, with no size record, plan, PR or earlier run, so the look-first sequence (survey-task, survey-place, scoping) that ran on pieces 0 to 4 did not run. I did not override or abort: piece 5's plan is approved at the parent and review has caught real gaps on every earlier piece. Recorded as raw material for the look-first rule. Watch piece 5's review for an undersized or oversized move.\n"
+        }
+      }
     ]
   },
   "log": [
@@ -3124,6 +3197,40 @@
         "look",
         "--by",
         "autopilot"
+      ],
+      "asOf": null
+    },
+    {
+      "at": "2026-11-18T10:04:04.545Z",
+      "by": "review",
+      "cmd": "show",
+      "args": [
+        "--task",
+        "task-128",
+        "--by",
+        "review"
+      ],
+      "asOf": null
+    },
+    {
+      "at": "2026-11-18T10:04:04.593Z",
+      "by": "review",
+      "cmd": "get",
+      "args": [
+        "finding-41",
+        "--by",
+        "review"
+      ],
+      "asOf": null
+    },
+    {
+      "at": "2026-11-18T10:04:04.640Z",
+      "by": "review",
+      "cmd": "get",
+      "args": [
+        "question-139",
+        "--by",
+        "review"
       ],
       "asOf": null
     }
