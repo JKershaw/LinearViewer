@@ -1,0 +1,105 @@
+[
+ {
+  "at": "2026-11-18T10:23:55.210Z",
+  "by": "John",
+  "cmd": "show",
+  "args": [
+   "--task",
+   "task-8",
+   "--by",
+   "John"
+  ],
+  "asOf": null
+ },
+ {
+  "at": "2026-11-18T10:23:55.257Z",
+  "by": "John",
+  "cmd": "find",
+  "args": [
+   "--to",
+   "John",
+   "--state",
+   "open",
+   "--by",
+   "John"
+  ],
+  "asOf": null
+ },
+ {
+  "at": "2026-11-18T10:23:59.821Z",
+  "by": "John",
+  "cmd": "show",
+  "args": [
+   "--task",
+   "task-8",
+   "--by",
+   "John"
+  ],
+  "asOf": null
+ },
+ {
+  "at": "2026-11-18T10:24:09.702Z",
+  "by": "John",
+  "cmd": "find",
+  "args": [
+   "--to",
+   "John",
+   "--state",
+   "open",
+   "--by",
+   "John"
+  ],
+  "asOf": null
+ },
+ {
+  "at": "2026-11-18T10:24:09.741Z",
+  "by": "John",
+  "cmd": "find",
+  "args": [
+   "--kind",
+   "task",
+   "--by",
+   "John"
+  ],
+  "asOf": null
+ },
+ {
+  "at": "2026-11-18T10:24:09.782Z",
+  "by": "John",
+  "cmd": "find",
+  "args": [
+   "--kind",
+   "lesson",
+   "--by",
+   "John"
+  ],
+  "asOf": null
+ },
+ {
+  "at": "2026-11-18T10:24:09.818Z",
+  "by": "John",
+  "cmd": "find",
+  "args": [
+   "--kind",
+   "decision",
+   "--by",
+   "John"
+  ],
+  "asOf": null
+ },
+ {
+  "at": "2026-11-18T10:24:52.212Z",
+  "by": "John",
+  "cmd": "find",
+  "args": [
+   "--to",
+   "John",
+   "--state",
+   "open",
+   "--by",
+   "John",
+   "--count"
+  ],
+  "asOf": null
+ }
+]
