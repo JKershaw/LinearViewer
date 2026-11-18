@@ -4306,3 +4306,9 @@ John: "I'd suggest we compact this session and it becomes a sort of driver for t
 **17 Nov, late: design revised after walk 7,** at John's go-ahead, for his review: brief part 8 is a one-line pointer to the previous run (its words stay in the run, read with `get`); `blind` also leaves out the accounts of runs by stages that write verdicts; the verdict's `of` is now `judgement`; a new view shows open records under an ended task, and they reach the parent's brief. §5 now says what walks 1–7 established.
 
 **18 Nov: design approved.** John approved `layer/design.md` with no further notes. Next: a short integration design on paper, then build through Harbour's own loop one route per slice (hand-offs first), then real work, starting with the parked work (seven safety findings, LIN-4416, LIN-4210, paused lanes LIN-4441, LIN-4445, LIN-4463). Recorded in `journey.md`; John compacts next.
+
+## 18 Nov — Step 1 begins: the integration design
+
+- **Method asked for and given:** the design's own discipline aimed at Harbour's code (expectations first, fresh readers who cite, one page revised in place, break and drift readers, John last), with each slice following consolidate-then-rebuild: census, one authority, callers switched, old route deleted, replay.
+- **Plan:** `integration/plan.md`. John: "This reads well, but there rules you've added, such as no new tangles, which we may find over complicate our designs. When we find a Knott, mess, or tangle, we will either decide to tidy before, or after, or accept as a small price to pay for a stronger Harbour (and tidying up later us cheap enough). Use your lists and subagents, and let's proceed." The plan now has no blanket tangle rule: each knot is listed with John's call (tidy before, after, or accept). Retiring the old route in the same move stays the default, not a rule; a kept path is named with when it goes.
+- **Expectations** committed before the census: `integration/expect.md`.

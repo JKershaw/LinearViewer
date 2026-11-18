@@ -1,6 +1,6 @@
 # Plan: from the approved layer to an integration design
 
-*Drafted 18 Nov for John to correct. Marks as on `situation.md`. Short names as in `layer/design.md`; `existing` is on `claude/peaceful-euler-thz7ct` at `fff543172`, taken at main `6f6c5d2`, which is still main's head [checked].*
+*Agreed by John on 18 Nov, with one correction: no blanket rule against tangles; each knot is called as tidy before, tidy after, or accept. Marks as on `situation.md`. Short names as in `layer/design.md`; `existing` is on `claude/peaceful-euler-thz7ct` at `fff543172`, taken at main `6f6c5d2`, which is still main's head [checked].*
 
 ## The step
 
@@ -8,7 +8,7 @@ Step 1 of three (journey, "Since"): an integration design on paper that says how
 
 ## What the design must answer
 
-1. **Where the store lives.** One collection keyed by kind, on the local store's pattern (`existing` §"The general structure"). It is an area of its own: prompts and runs read it, and it reads neither of them. The tightest knot is already between LLM & prompts and Runs & dispatch (gate 13 Nov, line 18) [checked].
+1. **Where the store lives.** One collection keyed by kind, on the local store's pattern (`existing` §"The general structure"), and which areas read it.
 2. **How agents reach it.** Proxy endpoints that mirror the model's commands, beside `proxy-reads`, `proxy-writes` and `proxy-rulings`. This includes who the writer is: the model takes `--by`, whereas a proxy token already knows its dispatch.
 3. **How a stage gets its brief.** Built in code from records and fed to `generatePrompt`, within the "one path" invariant and the frozen prompt size. This covers what it replaces in `formatIssueContext` and `lib/brief.js`.
 4. **Runs and verdicts.** How dispatch rows and run records relate, and what replaces each consumer of the comment classifier.
@@ -25,9 +25,9 @@ Step 1 of three (journey, "Since"): an integration design on paper that says how
     - what is deleted in the same PR;
     - the test or recorded run that proves it;
     - the reading taken before it lands;
-    - its effect on tangles.
+    - any knot, mess or tangle it meets or makes, and whether John chooses to tidy before, tidy after, or accept it as a small price for a stronger Harbour (John, 18 Nov: tidying later is cheap enough).
 
-    Each slice must leave Harbour whole if the next one never lands. There are no switches and no second paths (`how-process-changes-land.md`: 21 switches and 19 old paths kept, 9 of 27 changes half-finished) [checked].
+    Each slice leaves Harbour whole if the next one never lands. The default is to retire the old route in the same move, since history shows kept paths stay (`how-process-changes-land.md`: 21 switches and 19 old paths kept, 9 of 27 changes half-finished) [checked]. Where a slice keeps one for a while, the design says so and says when it goes.
 
 ## How
 
@@ -62,7 +62,7 @@ The draft is short and revised in place, with the same marks. It answers the ten
 - **Paper walk.** Walk 7's three tasks (LIN-4450, LIN-4446 and LIN-4469) are traced step by step through the integration. For each write: the endpoint and the module. For each brief: the code that builds it and its size against the budget. For each hand-off: what wakes. For each step: what page shows it.
   - One parked safety finding is traced from today's notes to a record and on to its reader.
   - Each step is marked changed, unchanged or worse.
-- **Tangles.** The imports the design would add are drawn against the baseline. It must add no edge between LLM & prompts and Runs & dispatch.
+- **Tangles.** The imports the design would add are drawn against the baseline, so each knot it meets or makes is visible for John to call: tidy before, tidy after, or accept.
 - **A break reader.** This is a fresh reader given the layer design, the integration design and the census, but not my drafts or reasoning. It looks for:
   - a route left running twice;
   - a caller not switched;
@@ -93,8 +93,8 @@ The draft is short and revised in place, with the same marks. It answers the ten
 ## When it stops
 
 - **The census stops** when every row of E1–E15 that it covers has been followed to its callers.
-- **I stop and bring it to John** if a route can't be retired in one slice, or if the census finds the layer would have to sit inside the knot.
-- **If the paper walk shows a step that is worse, or the break reader finds a route left running twice,** the design is revised once. If it still doesn't hold, I stop and ask.
+- **A route that can't be retired in one slice** is drawn as two, with the in-between state said plainly.
+- **If the paper walk shows a step that is worse, or the break reader finds a route left running twice by accident,** the design is revised once. If it still doesn't hold, I stop and ask.
 - **The step ends** when John has read and corrected the design.
 
 ## Not in this plan
