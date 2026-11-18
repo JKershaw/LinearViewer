@@ -1,0 +1,1 @@
+Step 9 briefed as of 23:17:26.417Z and started at 23:17:27.417Z, after review's last write (its one-second-per-write times ran past the autopilot's real start, 23:17:16.781Z). Same handling as walk 7.
