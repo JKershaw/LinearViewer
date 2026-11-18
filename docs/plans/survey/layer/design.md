@@ -1,4 +1,6 @@
-# The layer: design (work in progress)
+# The layer: design
+
+*Approved by John on 18 Nov, with no further notes, after walk 7. Changes from here go through the integration design and real work.*
 
 *Started 17 Nov at John's request (log, "17 Nov"). Revised in place each round; git keeps its history, the log keeps why, and each walk's results live in `walks/`. Marks are as on `situation.md`: [checked], [reported], [my reading], [guess]; "[checked wording]" means the words were checked, not the claim. Lines with no mark are design, mine until John corrects it.*
 
