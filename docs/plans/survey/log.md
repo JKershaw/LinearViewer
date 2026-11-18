@@ -4329,3 +4329,10 @@ John: "I'd suggest we compact this session and it becomes a sort of driver for t
   - The safety entries become seven tasks.
 - **For John:** `integration/design.md` §11.
 - **Cost:** nine subagent readings (five census, paper walk, break, drift, recheck), at 131k to 254k tokens each, about 1.9M in all. That's two more readings than the plan's seven.
+
+## 18 Nov — John's answers on the integration design, one at a time
+
+- **Provider sync:** "Agreed, the sync is follow up." It comes out of the design (§7), and question 2 on the tracker's direction folds into it.
+- **Parked work:** "The parked work will be the first work we run through the upgraded Harbour. Unless they'd be useful to run as a sanity check after each slice lands? After slice 4 sounds good. I'm the only user so there's no pressure or rush."
+  - My answer to the sanity-check idea: no. The parked work is worth most as one clean read against the baselines after slice 4. Each slice already has its own witness, and the task that builds the next slice is its first real use.
+  - Recorded in design §11.

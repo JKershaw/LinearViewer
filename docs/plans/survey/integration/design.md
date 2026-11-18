@@ -110,7 +110,7 @@
   - A ticket's words become the task's `asked` (§2).
   - Closing a ticket ends its task (C2-27).
   - From slice 4, agents post nothing to the tracker but Harbour's marked summaries. So any unmarked comment is a person's, and becomes a `finding` `by` that person, `to` the task. Before slice 4, agents post as the person (`lib/run-trail.js:216-220`) [checked], so comments can't be told apart. They stay in the kept ticket section (recheck 2).
-- **Which direction the sync leads in,** with the tracker as backup or Harbour holding the primary copy, is John's call (§11).
+- **Provider sync is a follow-up,** not part of this design (John, 18 Nov). Making Harbour hold the primary copy, with Linear, Jira and GitHub syncing behind it, would rework the providers. It gets its own design after the slices land, likely alongside the Jira work.
 
 ## 8. Pages for people
 
@@ -158,8 +158,8 @@ Each slice is built as a Harbour task through Harbour's own loop. That task runs
 
 ## 11. For John
 
-1. **When does the parked work run:** after slice 1, or after all the slices? It is read against the 13–14 Nov baselines and reported, never gating.
-2. **The tracker:** a backup in summary with Harbour holding the primary copy (§7), or the other way round?
+1. **Decided (18 Nov):** the parked work runs after slice 4, as the first work through the upgraded Harbour. It is read against the 13–14 Nov baselines, reported and never gating. John: "I'm the only user so there's no pressure or rush."
+2. **Decided (18 Nov):** provider sync is a follow-up (§7).
 3. **Four small changes to the approved layer:**
    - part 5 lists every area while a task has no paths (§3);
    - the question kind gains `on-answer`, keeping today's three effects (§5);
