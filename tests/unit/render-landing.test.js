@@ -16,7 +16,7 @@ const __dirname = dirname(fileURLToPath(import.meta.url));
 
 // LIN-980: the bespoke Harbour showcase landing. These lock the composition
 // contract — the top area, the fake-data glimpses of real surfaces, the distinct
-// Harbour OS section, D's shared nav — and that the fake project-tree is gone.
+// Lighthouse section, D's shared nav — and that the fake project-tree is gone.
 
 test('renders a complete is-landing document on the shared shell', () => {
   const html = renderLandingPage({ deployInfo: {}, githubEnabled: true });
@@ -51,7 +51,7 @@ test('drops the shared top bar on the homepage — the hero is the sole sign-in 
 
 test('features fake-data glimpses of real surfaces', () => {
   const html = renderLandingPage({});
-  for (const id of ['landing-loop', 'landing-observation', 'landing-swim', 'landing-prompt', 'landing-try', 'landing-providers', 'landing-os']) {
+  for (const id of ['landing-loop', 'landing-observation', 'landing-swim', 'landing-prompt', 'landing-try', 'landing-providers', 'landing-lighthouse']) {
     assert.match(html, new RegExp(`data-testid="${id}"`), `has ${id}`);
   }
   // Observation glimpse mirrors the real run-status vocabulary.
@@ -62,24 +62,54 @@ test('features fake-data glimpses of real surfaces', () => {
   assert.match(html, /lx-swim-block/);
 });
 
-test('has a distinct Harbour OS section linking os.harbour.cat', () => {
+// LIN-4487: the Harbour OS band is replaced by a Lighthouse band. These pin the
+// new band's identity and link, and that nothing on the public `/` still names
+// Harbour OS or points at os.harbour.cat.
+test('has a distinct Lighthouse section linking lighthouse.harbour.cat', () => {
   const html = renderLandingPage({});
-  assert.match(html, /data-testid="landing-os"/);
-  assert.match(html, /Harbour OS/);
-  assert.match(html, /href="https:\/\/os\.harbour\.cat"/);
+  assert.match(html, /data-testid="landing-lighthouse"/);
+  assert.match(html, /<h2 id="lx-lighthouse-h" class="lx-section__title">Lighthouse<\/h2>/);
+  assert.match(html, /<a class="btn btn--primary" href="https:\/\/lighthouse\.harbour\.cat" data-testid="landing-lighthouse-link">/);
+});
+
+test('the Lighthouse band replaces Harbour OS on the public landing (LIN-4487)', () => {
+  const html = renderLandingPage({});
+  assert.ok(!html.includes('Harbour OS'), 'no Harbour OS wording on /');
+  assert.ok(!html.includes('os.harbour.cat'), 'no os.harbour.cat link on /');
+  assert.ok(!html.includes('landing-os'), 'no landing-os test id on /');
+  assert.ok(!html.includes('lx-os'), 'no lx-os class on /');
+});
+
+test('the Lighthouse band has no glimpse, dispatch or target wording (LIN-4487)', () => {
+  const html = renderLandingPage({});
+  const start = html.indexOf('data-testid="landing-lighthouse"');
+  const end = html.indexOf('</section>', start);
+  const band = html.slice(start, end);
+  assert.ok(start > 0 && end > start, 'band located');
+  assert.ok(!band.includes('role="img"'), 'no glimpse block in the band');
+  assert.doesNotMatch(band, /dispatch/i);
+  assert.doesNotMatch(band, /target/i);
 });
 
 test('has an archive section linking the latest Harbour Archive edition', () => {
   const html = renderLandingPage({});
   assert.match(html, /data-testid="landing-archive"/);
   assert.match(html, /href="\/archive\/2"/);
-  // Placed at the end of the showcase, after the Harbour OS section.
-  assert.ok(html.indexOf('data-testid="landing-os"') < html.indexOf('data-testid="landing-archive"'));
+  // Placed at the end of the showcase, after the Lighthouse section.
+  assert.ok(html.indexOf('data-testid="landing-lighthouse"') < html.indexOf('data-testid="landing-archive"'));
 });
 
 // LIN-3345: the Library section — the homepage's discoverability link into the
 // Library. It lists the catalogued documents (LIN-3980 moved the Archive item
 // out of it); the section sits immediately above the Archive section.
+test('places the Lighthouse band after the providers strip and before the Library (LIN-4487)', () => {
+  const html = renderLandingPage({});
+  const providersIdx = html.indexOf('data-testid="landing-providers"');
+  const lighthouseIdx = html.indexOf('data-testid="landing-lighthouse"');
+  const libIdx = html.indexOf('data-testid="landing-library"');
+  assert.ok(providersIdx < lighthouseIdx && lighthouseIdx < libIdx, 'providers < lighthouse < library');
+});
+
 test('has a Library section above the Archive, driven by START_HERE', () => {
   const html = renderLandingPage({});
   const libIdx = html.indexOf('data-testid="landing-library"');
@@ -195,7 +225,7 @@ test('the plain definition is on the landing, under the tagline', () => {
 test('glimpses carry no model ids, no calendar years and no hand-typed stage words (LIN-3980)', () => {
   const html = renderLandingPage({});
   const glimpses = [...html.matchAll(/role="img"[\s\S]*?<\/section>/g)].map((m) => m[0]);
-  assert.equal(glimpses.length, 4, 'observation, swim, prompt and Harbour OS glimpses');
+  assert.equal(glimpses.length, 3, 'observation, swim and prompt glimpses (the Lighthouse band has none, LIN-4487)');
   for (const g of glimpses) {
     assert.doesNotMatch(g, /claude-[a-z0-9.-]+/);
     assert.doesNotMatch(g, /\b20\d{2}\b/);

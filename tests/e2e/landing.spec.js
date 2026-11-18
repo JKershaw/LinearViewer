@@ -107,7 +107,7 @@ test.describe('Landing Page (bespoke showcase)', () => {
 
   test('shows the showcase sections', async ({ page }) => {
     await page.goto('/');
-    for (const id of ['landing-loop', 'landing-observation', 'landing-swim', 'landing-prompt', 'landing-try', 'landing-providers', 'landing-os']) {
+    for (const id of ['landing-loop', 'landing-observation', 'landing-swim', 'landing-prompt', 'landing-try', 'landing-providers', 'landing-lighthouse']) {
       await expect(page.locator(`[data-testid="${id}"]`)).toBeVisible();
     }
   });
@@ -141,13 +141,15 @@ test.describe('Landing Page (bespoke showcase)', () => {
     await expect(obs.locator('.lx-run').first()).toBeVisible();
   });
 
-  test('Harbour OS is a distinct bottom section linking os.harbour.cat', async ({ page }) => {
+  test('Lighthouse is a distinct band linking lighthouse.harbour.cat (LIN-4487)', async ({ page }) => {
     await page.goto('/');
-    const os = page.locator('[data-testid="landing-os"]');
-    await expect(os).toBeVisible();
-    await expect(os.locator('.lx-section__title')).toHaveText('Harbour OS');
-    const osLink = os.locator('a[href="https://os.harbour.cat"]');
-    await expect(osLink).toBeVisible();
+    const lighthouse = page.locator('[data-testid="landing-lighthouse"]');
+    await expect(lighthouse).toBeVisible();
+    await expect(lighthouse.locator('.lx-section__title')).toHaveText('Lighthouse');
+    const lighthouseLink = lighthouse.locator('a[href="https://lighthouse.harbour.cat"]');
+    await expect(lighthouseLink).toBeVisible();
+    // The public landing no longer names Harbour OS or links os.harbour.cat.
+    await expect(page.locator('a[href="https://os.harbour.cat"]')).toHaveCount(0);
   });
 
   test('footer shows cross-view navigation and the GitHub link', async ({ page }) => {

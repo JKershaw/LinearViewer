@@ -274,7 +274,7 @@
   color: var(--amber-dim);
 }
 
-/* ---- Terminal glimpse (grounded prompt + Harbour OS) --------------------- */
+/* ---- Terminal glimpse (grounded prompt + dispatched session) ------------ */
 .lx-terminal {
   padding: 0;
 }
@@ -384,51 +384,29 @@
   color: var(--muted);
 }
 
-/* ---- Harbour OS section (distinct bottom band) --------------------------- */
+/* ---- Lighthouse band (LIN-4487) ------------------------------------------ */
+/* A distinct bottom band, boxed like the card it replaced. Single column at
+   every width: the band has no glimpse beside its copy. */
 /* Mobile-first spacing (LIN-1508); the wider top gap returns at ≥760px. */
-.lx-os {
+.lx-lighthouse {
   margin-top: 3.5rem;
   margin-bottom: 2.5rem;
 }
 
-.lx-os__inner {
+.lx-lighthouse__inner {
   padding: var(--space-5) var(--space-4);
   border: 1px solid var(--brand);
   border-radius: var(--radius-lg);
   background:
     linear-gradient(180deg, var(--teal-soft), transparent 60%),
     var(--card);
-  display: grid;
-  grid-template-columns: 1fr;
-  gap: var(--space-4);
-  align-items: center;
 }
 
-.lx-os__lead {
+.lx-lighthouse__lead {
   max-width: 52ch;
 }
 
-/* Heading row: the "Harbour OS" title with its experimental badge beside it.
-   The badge is a SIBLING of the <h2>, never inside it, so the title text stays
-   exactly "Harbour OS" (name kept in full — badge, not rename; LIN-1508). */
-.lx-os__heading {
-  display: flex;
-  align-items: center;
-  flex-wrap: wrap;
-  gap: var(--space-2);
-}
-
-/* Experimental status badge — the shared neutral `.status-pill--tag` chip
-   re-tinted amber so "experimental" reads as a visible caution marker. Amber
-   tokens are AA-safe in both themes, so this stays dark-safe (LIN-1508). */
-.lx-os__badge {
-  color: var(--amber-dim);
-  border-color: color-mix(in srgb, var(--amber) 40%, var(--line));
-  letter-spacing: 0.04em;
-  text-transform: lowercase;
-}
-
-.lx-eyebrow--os {
+.lx-eyebrow--lighthouse {
   color: var(--brand);
 }
 
@@ -436,10 +414,6 @@
    itself is the shared .btn / .btn--primary, not a landing-only style (LIN-3980). */
 .lx-actions {
   margin-top: var(--space-4);
-}
-
-.lx-os__glimpse {
-  background: var(--raised);
 }
 
 /* ---- Library (LIN-3345) -------------------------------------------------- */
@@ -492,7 +466,7 @@
     margin: 4.5rem 0;
   }
 
-  .lx-os {
+  .lx-lighthouse {
     margin-top: 5.5rem;
     margin-bottom: 3rem;
   }
@@ -524,8 +498,7 @@
     font-size: 2rem;
   }
 
-  .lx-os__inner {
-    grid-template-columns: 1fr 1fr;
+  .lx-lighthouse__inner {
     padding: 3rem;
   }
 }
