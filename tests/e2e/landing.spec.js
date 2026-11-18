@@ -3,7 +3,7 @@ import { test, expect } from '@playwright/test';
 // LIN-980 (UI audit G): the unauthenticated home page is a bespoke Harbour
 // showcase — a Harbour-focused top area, fake-data glimpses of real surfaces
 // (observation feed, swim board, grounded prompt), a providers strip, and a
-// distinct Harbour OS section — composed on D's shared header nav and the shared
+// distinct Lighthouse section — composed on D's shared header nav and the shared
 // design system. It is NO LONGER rendered through render.js's project-tree
 // renderer (the old landing was marketing copy dressed as a fake projects tree).
 

@@ -274,7 +274,7 @@
   color: var(--amber-dim);
 }
 
-/* ---- Terminal glimpse (grounded prompt + dispatched session) ------------ */
+/* ---- Terminal frame (grounded-prompt glimpse + agent prompt block) ------- */
 .lx-terminal {
   padding: 0;
 }
