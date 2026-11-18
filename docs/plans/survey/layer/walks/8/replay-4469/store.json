@@ -2442,5 +2442,317 @@
       }
     ]
   },
-  "log": []
+  "log": [
+    {
+      "at": "2026-11-18T10:00:41.223Z",
+      "by": "implementation",
+      "cmd": "show",
+      "args": [
+        "--task",
+        "task-128",
+        "--by",
+        "implementation"
+      ],
+      "asOf": null
+    },
+    {
+      "at": "2026-11-18T10:00:41.254Z",
+      "by": "implementation",
+      "cmd": "find",
+      "args": [
+        "--to",
+        "implementation",
+        "--state",
+        "open",
+        "--by",
+        "implementation"
+      ],
+      "asOf": null
+    },
+    {
+      "at": "2026-11-18T10:00:41.285Z",
+      "by": "implementation",
+      "cmd": "find",
+      "args": [
+        "--to",
+        "task-128",
+        "--state",
+        "open",
+        "--by",
+        "implementation"
+      ],
+      "asOf": null
+    },
+    {
+      "at": "2026-11-18T10:00:41.318Z",
+      "by": "implementation",
+      "cmd": "find",
+      "args": [
+        "--text",
+        "LIN-4350",
+        "--by",
+        "implementation"
+      ],
+      "asOf": null
+    },
+    {
+      "at": "2026-11-18T10:00:41.355Z",
+      "by": "implementation",
+      "cmd": "find",
+      "args": [
+        "--kind",
+        "task",
+        "--text",
+        "4350",
+        "--by",
+        "implementation"
+      ],
+      "asOf": null
+    },
+    {
+      "at": "2026-11-18T10:00:47.195Z",
+      "by": "implementation",
+      "cmd": "find",
+      "args": [
+        "--state",
+        "open",
+        "--text",
+        "notes-PR",
+        "--by",
+        "implementation"
+      ],
+      "asOf": null
+    },
+    {
+      "at": "2026-11-18T10:00:47.243Z",
+      "by": "implementation",
+      "cmd": "find",
+      "args": [
+        "--state",
+        "open",
+        "--text",
+        "notes PR",
+        "--by",
+        "implementation"
+      ],
+      "asOf": null
+    },
+    {
+      "at": "2026-11-18T10:00:47.295Z",
+      "by": "implementation",
+      "cmd": "find",
+      "args": [
+        "--state",
+        "open",
+        "--text",
+        "committed tool",
+        "--by",
+        "implementation"
+      ],
+      "asOf": null
+    },
+    {
+      "at": "2026-11-18T10:00:47.347Z",
+      "by": "implementation",
+      "cmd": "find",
+      "args": [
+        "--state",
+        "open",
+        "--text",
+        "first-match",
+        "--by",
+        "implementation"
+      ],
+      "asOf": null
+    },
+    {
+      "at": "2026-11-18T10:00:47.390Z",
+      "by": "implementation",
+      "cmd": "find",
+      "args": [
+        "--state",
+        "open",
+        "--text",
+        "narrowing",
+        "--by",
+        "implementation"
+      ],
+      "asOf": null
+    },
+    {
+      "at": "2026-11-18T10:00:47.438Z",
+      "by": "implementation",
+      "cmd": "find",
+      "args": [
+        "--state",
+        "open",
+        "--text",
+        "retirement line",
+        "--by",
+        "implementation"
+      ],
+      "asOf": null
+    },
+    {
+      "at": "2026-11-18T10:00:47.485Z",
+      "by": "implementation",
+      "cmd": "find",
+      "args": [
+        "--state",
+        "open",
+        "--text",
+        "4469",
+        "--by",
+        "implementation"
+      ],
+      "asOf": null
+    },
+    {
+      "at": "2026-11-18T10:00:47.528Z",
+      "by": "implementation",
+      "cmd": "find",
+      "args": [
+        "--state",
+        "open",
+        "--text",
+        "proxy-preamble",
+        "--by",
+        "implementation"
+      ],
+      "asOf": null
+    },
+    {
+      "at": "2026-11-18T10:00:47.579Z",
+      "by": "implementation",
+      "cmd": "find",
+      "args": [
+        "--state",
+        "open",
+        "--text",
+        "look-into",
+        "--by",
+        "implementation"
+      ],
+      "asOf": null
+    },
+    {
+      "at": "2026-11-18T10:00:47.625Z",
+      "by": "implementation",
+      "cmd": "find",
+      "args": [
+        "--state",
+        "open",
+        "--text",
+        "FROZEN_TOTAL",
+        "--by",
+        "implementation"
+      ],
+      "asOf": null
+    },
+    {
+      "at": "2026-11-18T10:00:47.661Z",
+      "by": "implementation",
+      "cmd": "find",
+      "args": [
+        "--state",
+        "open",
+        "--text",
+        "4350",
+        "--by",
+        "implementation"
+      ],
+      "asOf": null
+    },
+    {
+      "at": "2026-11-18T10:00:47.699Z",
+      "by": "implementation",
+      "cmd": "find",
+      "args": [
+        "--state",
+        "open",
+        "--text",
+        "Waiting",
+        "--by",
+        "implementation"
+      ],
+      "asOf": null
+    },
+    {
+      "at": "2026-11-18T10:00:53.446Z",
+      "by": "implementation",
+      "cmd": "get",
+      "args": [
+        "finding-36",
+        "--by",
+        "implementation"
+      ],
+      "asOf": null
+    },
+    {
+      "at": "2026-11-18T10:00:53.493Z",
+      "by": "implementation",
+      "cmd": "get",
+      "args": [
+        "finding-39",
+        "--by",
+        "implementation"
+      ],
+      "asOf": null
+    },
+    {
+      "at": "2026-11-18T10:00:53.541Z",
+      "by": "implementation",
+      "cmd": "get",
+      "args": [
+        "finding-37",
+        "--by",
+        "implementation"
+      ],
+      "asOf": null
+    },
+    {
+      "at": "2026-11-18T10:00:53.581Z",
+      "by": "implementation",
+      "cmd": "get",
+      "args": [
+        "finding-23",
+        "--by",
+        "implementation"
+      ],
+      "asOf": null
+    },
+    {
+      "at": "2026-11-18T10:00:53.631Z",
+      "by": "implementation",
+      "cmd": "get",
+      "args": [
+        "finding-41",
+        "--by",
+        "implementation"
+      ],
+      "asOf": null
+    },
+    {
+      "at": "2026-11-18T10:00:53.672Z",
+      "by": "implementation",
+      "cmd": "get",
+      "args": [
+        "finding-25",
+        "--by",
+        "implementation"
+      ],
+      "asOf": null
+    },
+    {
+      "at": "2026-11-18T10:00:53.753Z",
+      "by": "implementation",
+      "cmd": "get",
+      "args": [
+        "question-133",
+        "--by",
+        "implementation"
+      ],
+      "asOf": null
+    }
+  ]
 }
