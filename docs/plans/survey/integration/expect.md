@@ -42,3 +42,23 @@
 - A walk 7 step that the integrated Harbour handles worse than the model did.
 - A slice that leaves Harbour broken if the next one never lands.
 - A design that needs a new mechanism where one already exists (`existing`), or that inherits one of the five routes to avoid (classifier, `Retires:` conveyor and notes, snapshots keyed to ticket text, answers as comments, rulings keyed by loop) without saying when it goes.
+
+## Read against the census and checks (added after, 18 Nov)
+
+- **Held:**
+  - Waiting is Markdown, with code only counting it; `Retires:` is its only reader in code (C1).
+  - The rulings route is the widest, with several keyings side by side (C2: nine).
+  - The classifier has 5–15 consumers (C3: 15).
+  - Dispatch rows lack path claims, and nothing ties a verdict to its version except prose (C3).
+  - The copy-down and the prune are prompt text (C4).
+  - All wakes are follow-ups to an item, with none sideways (C5).
+  - Proxy routes sit beside each other on one token model (C5).
+  - Rulings became their own slice. The verdict slice was not the in-between case; the brief's ticket section was.
+- **Not held:**
+  - **"Not run" lives only in template text.** In fact it's a parsed ledger (C1).
+  - **Run proposals are the main addressed hand-off.** In fact the rulings are John's to-do list (C1).
+  - **Answers are posted by one function.** They are, but a stamp holds them as well (C2).
+  - **`formatIssueContext` feeds `generatePrompt`.** In fact the brief door carries the plan, and stage prompts carry no ticket text (C4).
+  - **A token knows its dispatch.** It doesn't (C5), and `by` needed a run id (design §2).
+  - **The brief swap is the riskiest slice.** The identity of the writer and the in-between brief were.
+- **Failure tests:** every census row is placed (`checks/completeness.mjs`), and every slice leaves Harbour whole (§10). The paper walk's 15 worse steps each have an answer in draft 2 (`checks/answers.md`). The walk was not re-run.

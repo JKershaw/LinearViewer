@@ -4312,3 +4312,20 @@ John: "I'd suggest we compact this session and it becomes a sort of driver for t
 - **Method asked for and given:** the design's own discipline aimed at Harbour's code (expectations first, fresh readers who cite, one page revised in place, break and drift readers, John last), with each slice following consolidate-then-rebuild: census, one authority, callers switched, old route deleted, replay.
 - **Plan:** `integration/plan.md`. John: "This reads well, but there rules you've added, such as no new tangles, which we may find over complicate our designs. When we find a Knott, mess, or tangle, we will either decide to tidy before, or after, or accept as a small price to pay for a stronger Harbour (and tidying up later us cheap enough). Use your lists and subagents, and let's proceed." The plan now has no blanket tangle rule: each knot is listed with John's call (tidy before, after, or accept). Retiring the old route in the same move stays the default, not a rule; a kept path is named with when it goes.
 - **Expectations** committed before the census: `integration/expect.md`.
+
+## 18 Nov — Integration design drafted and checked
+
+- **Census:** five read-only readers at main `6f6c5d2` (`integration/census/C1–C5`, 263 sites), each spot-checked by me against the code. The seams baseline is in the same folder: LLM & prompts ⇄ Runs & dispatch at 39/60.
+- **Draft 1,** then three checks (`integration/checks/`):
+  - a paper walk of walk 7's three tasks and one safety entry: 5 unchanged, 12 changed, 15 worse;
+  - a break reader: 17 breaks;
+  - a drift reader: 11 drifts. The main ones: a per-stage write gate on records, one resume rule John never asked for, and `john` hard-coded.
+- **Draft 2** answered each find (`checks/answers.md`). A recheck gave 43 answered, 13 partly, 1 not, and 9 new breaks, mostly about who wrote a record. Each is fixed in place. The paper walk was not re-run.
+- **The main design facts that came out of it:**
+  - `by` comes from a run id named on each write, tied to the token's dispatch lineage, because simple-dispatcher keeps a held session on its first token.
+  - The brief keeps today's ticket section until slice 4.
+  - The plan moves before verdicts.
+  - simple-dispatcher's `DECISION:` is kept as transport.
+  - The safety entries become seven tasks.
+- **For John:** `integration/design.md` §11.
+- **Cost:** nine subagent readings (five census, paper walk, break, drift, recheck), at 131k to 254k tokens each, about 1.9M in all. That's two more readings than the plan's seven.
