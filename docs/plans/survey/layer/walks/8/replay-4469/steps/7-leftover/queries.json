@@ -1,0 +1,148 @@
+[
+ {
+  "at": "2026-11-18T10:12:32.289Z",
+  "by": "leftover",
+  "cmd": "find",
+  "args": [
+   "--to",
+   "leftover",
+   "--state",
+   "open",
+   "--by",
+   "leftover"
+  ],
+  "asOf": null
+ },
+ {
+  "at": "2026-11-18T10:12:32.321Z",
+  "by": "leftover",
+  "cmd": "get",
+  "args": [
+   "change-138",
+   "--by",
+   "leftover"
+  ],
+  "asOf": null
+ },
+ {
+  "at": "2026-11-18T10:12:32.351Z",
+  "by": "leftover",
+  "cmd": "get",
+  "args": [
+   "run-160",
+   "--by",
+   "leftover"
+  ],
+  "asOf": null
+ },
+ {
+  "at": "2026-11-18T10:12:40.352Z",
+  "by": "leftover",
+  "cmd": "find",
+  "args": [
+   "--text",
+   "witness",
+   "--by",
+   "leftover"
+  ],
+  "asOf": null
+ },
+ {
+  "at": "2026-11-18T10:12:40.410Z",
+  "by": "leftover",
+  "cmd": "find",
+  "args": [
+   "--text",
+   "ratchet",
+   "--by",
+   "leftover"
+  ],
+  "asOf": null
+ },
+ {
+  "at": "2026-11-18T10:12:40.458Z",
+  "by": "leftover",
+  "cmd": "find",
+  "args": [
+   "--text",
+   "simple-dispatcher",
+   "--by",
+   "leftover"
+  ],
+  "asOf": null
+ },
+ {
+  "at": "2026-11-18T10:12:40.514Z",
+  "by": "leftover",
+  "cmd": "find",
+  "args": [
+   "--text",
+   "retirement-line",
+   "--by",
+   "leftover"
+  ],
+  "asOf": null
+ },
+ {
+  "at": "2026-11-18T10:12:40.567Z",
+  "by": "leftover",
+  "cmd": "find",
+  "args": [
+   "--text",
+   "Three constants",
+   "--by",
+   "leftover"
+  ],
+  "asOf": null
+ },
+ {
+  "at": "2026-11-18T10:12:57.902Z",
+  "by": "leftover",
+  "cmd": "get",
+  "args": [
+   "finding-25",
+   "--by",
+   "leftover"
+  ],
+  "asOf": null
+ },
+ {
+  "at": "2026-11-18T10:12:57.944Z",
+  "by": "leftover",
+  "cmd": "find",
+  "args": [
+   "--kind",
+   "lesson",
+   "--text",
+   "witness",
+   "--by",
+   "leftover"
+  ],
+  "asOf": null
+ },
+ {
+  "at": "2026-11-18T10:12:57.986Z",
+  "by": "leftover",
+  "cmd": "find",
+  "args": [
+   "--kind",
+   "lesson",
+   "--text",
+   "leaf",
+   "--by",
+   "leftover"
+  ],
+  "asOf": null
+ },
+ {
+  "at": "2026-11-18T10:12:58.033Z",
+  "by": "leftover",
+  "cmd": "get",
+  "args": [
+   "finding-152",
+   "--by",
+   "leftover"
+  ],
+  "asOf": null
+ }
+]
