@@ -1,0 +1,178 @@
+[
+ {
+  "at": "2026-11-18T10:11:27.881Z",
+  "by": "blind-read",
+  "cmd": "get",
+  "args": [
+   "change-80",
+   "--by",
+   "blind-read"
+  ],
+  "asOf": null
+ },
+ {
+  "at": "2026-11-18T10:11:27.918Z",
+  "by": "blind-read",
+  "cmd": "get",
+  "args": [
+   "run-93",
+   "--by",
+   "blind-read"
+  ],
+  "asOf": null
+ },
+ {
+  "at": "2026-11-18T10:11:27.964Z",
+  "by": "blind-read",
+  "cmd": "find",
+  "args": [
+   "--to",
+   "blind-read",
+   "--state",
+   "open",
+   "--by",
+   "blind-read"
+  ],
+  "asOf": null
+ },
+ {
+  "at": "2026-11-18T10:11:28.000Z",
+  "by": "blind-read",
+  "cmd": "show",
+  "args": [
+   "--task",
+   "task-57",
+   "--by",
+   "blind-read"
+  ],
+  "asOf": null
+ },
+ {
+  "at": "2026-11-18T10:11:34.927Z",
+  "by": "blind-read",
+  "cmd": "get",
+  "args": [
+   "finding-67",
+   "--by",
+   "blind-read"
+  ],
+  "asOf": null
+ },
+ {
+  "at": "2026-11-18T10:11:34.970Z",
+  "by": "blind-read",
+  "cmd": "find",
+  "args": [
+   "--text",
+   "isHermeticTestToken",
+   "--by",
+   "blind-read"
+  ],
+  "asOf": null
+ },
+ {
+  "at": "2026-11-18T10:11:35.012Z",
+  "by": "blind-read",
+  "cmd": "find",
+  "args": [
+   "--text",
+   "test-token",
+   "--by",
+   "blind-read"
+  ],
+  "asOf": null
+ },
+ {
+  "at": "2026-11-18T10:11:35.061Z",
+  "by": "blind-read",
+  "cmd": "find",
+  "args": [
+   "--text",
+   "searchIssues",
+   "--by",
+   "blind-read"
+  ],
+  "asOf": null
+ },
+ {
+  "at": "2026-11-18T10:11:35.115Z",
+  "by": "blind-read",
+  "cmd": "find",
+  "args": [
+   "--text",
+   "batch",
+   "--by",
+   "blind-read"
+  ],
+  "asOf": null
+ },
+ {
+  "at": "2026-11-18T10:11:35.162Z",
+  "by": "blind-read",
+  "cmd": "find",
+  "args": [
+   "--text",
+   "bulk",
+   "--by",
+   "blind-read"
+  ],
+  "asOf": null
+ },
+ {
+  "at": "2026-11-18T10:11:35.210Z",
+  "by": "blind-read",
+  "cmd": "find",
+  "args": [
+   "--text",
+   "workspace-api-audit",
+   "--by",
+   "blind-read"
+  ],
+  "asOf": null
+ },
+ {
+  "at": "2026-11-18T10:11:35.254Z",
+  "by": "blind-read",
+  "cmd": "find",
+  "args": [
+   "--text",
+   "isTestToken",
+   "--by",
+   "blind-read"
+  ],
+  "asOf": null
+ },
+ {
+  "at": "2026-11-18T10:11:39.115Z",
+  "by": "blind-read",
+  "cmd": "get",
+  "args": [
+   "finding-76",
+   "--by",
+   "blind-read"
+  ],
+  "asOf": null
+ },
+ {
+  "at": "2026-11-18T10:11:39.154Z",
+  "by": "blind-read",
+  "cmd": "get",
+  "args": [
+   "finding-20",
+   "--by",
+   "blind-read"
+  ],
+  "asOf": null
+ },
+ {
+  "at": "2026-11-18T10:11:39.189Z",
+  "by": "blind-read",
+  "cmd": "get",
+  "args": [
+   "run-89",
+   "--by",
+   "blind-read"
+  ],
+  "asOf": null
+ }
+]
