@@ -1,5 +1,5 @@
 {
-  "next": 81,
+  "next": 83,
   "records": {
     "lesson-1": [
       {
@@ -1686,6 +1686,60 @@
         "fields": {
           "ref": "https://github.com/JKershaw/LinearViewer/pull/2421 (branch feat/lin-4450-jira-as-asked-seal)",
           "head": "a98d042c6"
+        }
+      }
+    ],
+    "decision-81": [
+      {
+        "id": "decision-81",
+        "kind": "decision",
+        "v": 1,
+        "op": "add",
+        "at": "2026-11-13T13:55:50.569Z",
+        "by": "implementation",
+        "in": "task-57",
+        "to": "review",
+        "state": "stands",
+        "links": {
+          "about": [
+            "plan-51",
+            "finding-64",
+            "finding-65",
+            "finding-68",
+            "finding-72",
+            "decision-60",
+            "decision-79"
+          ]
+        },
+        "fields": {
+          "scope": "task-57",
+          "answer": "Built as plan-51 (shape B, items 1-6) with five departures, each reasoned in the code (change-80): (1) End line chosen by digest, not position: the reader takes the end candidate whose region renders to the stored `rendered`; the writer takes the candidate whose interior renders to the words. `hasMarkerLine`/`splitAsAsked` unchanged, so Linear is unaffected. (2) Size limit: the serialized property (JSON escaping included) must be at most 32,768 UTF-8 bytes, the stricter of Atlassian's two readings; over it the seal is skipped and an oversized `updateIssue` returns 422 naming the size, with no write. (3) `descriptionRoundTrip` throws on a block it cannot hold (too large, or interior does not read back); `providerHoldsAsAsked` treats a throw as cannot-hold, so the seal is skipped with the existing log line, the same outcome as the plan's non-kept read-back. (4) Empty fenced code block fixed in the codec: it now renders as the bare fence and the write gate accepts an empty fence. (5) Every provider-side `getIssue` asks for `harbour.asAsked`, including epic and parent reads; the fake returns only requested keys, as real Jira does. `rendered` is a SHA-256 digest; reader and writer live in `lib/providers/jira/as-asked-region.js`.",
+          "why": "Departure comment on LIN-4445, 14:08:01. (1) answers finding-64: the plan's first-end-paragraph rule closes early when the words hold the end sentence plain or as `_..._`. (2) answers finding-68. (3) keeps `lib/as-asked-seal.js` unchanged. (4) is decision-79's tidy, settling finding-65. (5) is review note 2 / decision-60 / finding-72."
+        }
+      }
+    ],
+    "check-82": [
+      {
+        "id": "check-82",
+        "kind": "check",
+        "v": 1,
+        "op": "add",
+        "at": "2026-11-13T13:55:51.569Z",
+        "by": "implementation",
+        "in": "task-57",
+        "to": "task-59",
+        "state": "open",
+        "links": {
+          "about": [
+            "change-80",
+            "plan-53",
+            "plan-51"
+          ]
+        },
+        "fields": {
+          "what": "Live, on John's Jira, against change-80 (PR #2421): does the site keep the region's rendered digest (`rendered`, SHA-256 of `adfToMarkdown(region)`) across an ordinary Jira editor save below the block, and does it accept `properties` in the same edit (and create) body?",
+          "why-person": "The main open risk of LIN-4450. No credential for John's Jira was available to the build, so everything is proven only on `fake-client.js`. If Jira normalises the stored ADF on save, the reader serves the converted rendering and the words quietly become the converted text (`*em*` -> `_em_`, `* a` -> `- a`): the exact-words promise fails silently. The check has to be able to fail (review note 1, LIN-4445).",
+          "how": "1. File (or PUT) a sealed description holding the witness inputs (`* a`, `*em*`, `***x***`, a fence with a blank line, trailing spaces) with `properties: [{key:'harbour.asAsked', ...}]` in the same body. 2. GET with `?properties=harbour.asAsked`; expect kept. 3. Edit a line below the block in Jira's editor and save. 4. GET again and confirm the read is still kept (diff `adfToMarkdown(region)` if not). If the edit body rejects `properties`, plan-53's fallback (separate PUT, `PartialWriteError`) applies; if the digest shifts, the digest must be over a normalised rendering, a design change to record on LIN-4445 (task-50). Without a credential, park as a handoff to John: what to run, what to paste back."
         }
       }
     ]
