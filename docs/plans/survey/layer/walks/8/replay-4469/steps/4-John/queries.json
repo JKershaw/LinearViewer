@@ -1,0 +1,129 @@
+[
+ {
+  "at": "2026-11-18T10:07:04.200Z",
+  "by": "John",
+  "cmd": "find",
+  "args": [
+   "--to",
+   "John",
+   "--state",
+   "open",
+   "--by",
+   "John"
+  ],
+  "asOf": null
+ },
+ {
+  "at": "2026-11-18T10:07:04.235Z",
+  "by": "John",
+  "cmd": "show",
+  "args": [
+   "--task",
+   "task-128",
+   "--by",
+   "John"
+  ],
+  "asOf": null
+ },
+ {
+  "at": "2026-11-18T10:07:08.145Z",
+  "by": "John",
+  "cmd": "show",
+  "args": [
+   "--task",
+   "task-128",
+   "--by",
+   "John"
+  ],
+  "asOf": null
+ },
+ {
+  "at": "2026-11-18T10:07:12.349Z",
+  "by": "John",
+  "cmd": "get",
+  "args": [
+   "question-139",
+   "--by",
+   "John"
+  ],
+  "asOf": null
+ },
+ {
+  "at": "2026-11-18T10:07:12.391Z",
+  "by": "John",
+  "cmd": "get",
+  "args": [
+   "finding-153",
+   "--by",
+   "John"
+  ],
+  "asOf": null
+ },
+ {
+  "at": "2026-11-18T10:07:12.437Z",
+  "by": "John",
+  "cmd": "find",
+  "args": [
+   "--kind",
+   "decision",
+   "--text",
+   "fold",
+   "--by",
+   "John"
+  ],
+  "asOf": null
+ },
+ {
+  "at": "2026-11-18T10:07:31.857Z",
+  "by": "John",
+  "cmd": "find",
+  "args": [
+   "--to",
+   "John",
+   "--state",
+   "open",
+   "--by",
+   "John"
+  ],
+  "asOf": null
+ },
+ {
+  "at": "2026-11-18T10:07:31.910Z",
+  "by": "John",
+  "cmd": "find",
+  "args": [
+   "--to",
+   "implementation",
+   "--state",
+   "open",
+   "--in",
+   "task-128",
+   "--by",
+   "John",
+   "--count"
+  ],
+  "asOf": null
+ },
+ {
+  "at": "2026-11-18T10:07:35.999Z",
+  "by": "John",
+  "cmd": "get",
+  "args": [
+   "question-133",
+   "--by",
+   "John"
+  ],
+  "asOf": null
+ },
+ {
+  "at": "2026-11-18T10:07:36.037Z",
+  "by": "John",
+  "cmd": "get",
+  "args": [
+   "decision-135",
+   "--by",
+   "John"
+  ],
+  "asOf": null
+ }
+]
