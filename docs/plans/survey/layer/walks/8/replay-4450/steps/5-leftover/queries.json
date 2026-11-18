@@ -1,0 +1,251 @@
+[
+ {
+  "at": "2026-11-18T10:07:41.770Z",
+  "by": "leftover",
+  "cmd": "get",
+  "args": [
+   "finding-67",
+   "--by",
+   "leftover"
+  ],
+  "asOf": null
+ },
+ {
+  "at": "2026-11-18T10:07:41.803Z",
+  "by": "leftover",
+  "cmd": "get",
+  "args": [
+   "change-80",
+   "--by",
+   "leftover"
+  ],
+  "asOf": null
+ },
+ {
+  "at": "2026-11-18T10:07:41.846Z",
+  "by": "leftover",
+  "cmd": "find",
+  "args": [
+   "--to",
+   "leftover",
+   "--state",
+   "open",
+   "--by",
+   "leftover"
+  ],
+  "asOf": null
+ },
+ {
+  "at": "2026-11-18T10:07:41.888Z",
+  "by": "leftover",
+  "cmd": "find",
+  "args": [
+   "--to",
+   "task-57",
+   "--state",
+   "open",
+   "--by",
+   "leftover"
+  ],
+  "asOf": null
+ },
+ {
+  "at": "2026-11-18T10:07:47.870Z",
+  "by": "leftover",
+  "cmd": "find",
+  "args": [
+   "--text",
+   "isHermeticTestToken",
+   "--by",
+   "leftover"
+  ],
+  "asOf": null
+ },
+ {
+  "at": "2026-11-18T10:07:47.919Z",
+  "by": "leftover",
+  "cmd": "find",
+  "args": [
+   "--text",
+   "should-mock-ai",
+   "--by",
+   "leftover"
+  ],
+  "asOf": null
+ },
+ {
+  "at": "2026-11-18T10:07:47.974Z",
+  "by": "leftover",
+  "cmd": "find",
+  "args": [
+   "--text",
+   "isTestToken",
+   "--by",
+   "leftover"
+  ],
+  "asOf": null
+ },
+ {
+  "at": "2026-11-18T10:07:48.031Z",
+  "by": "leftover",
+  "cmd": "find",
+  "args": [
+   "--text",
+   "test-token",
+   "--by",
+   "leftover"
+  ],
+  "asOf": null
+ },
+ {
+  "at": "2026-11-18T10:07:48.084Z",
+  "by": "leftover",
+  "cmd": "find",
+  "args": [
+   "--kind",
+   "lesson",
+   "--text",
+   "Jira",
+   "--by",
+   "leftover"
+  ],
+  "asOf": null
+ },
+ {
+  "at": "2026-11-18T10:07:48.127Z",
+  "by": "leftover",
+  "cmd": "find",
+  "args": [
+   "--kind",
+   "lesson",
+   "--text",
+   "asAsked",
+   "--by",
+   "leftover"
+  ],
+  "asOf": null
+ },
+ {
+  "at": "2026-11-18T10:07:48.162Z",
+  "by": "leftover",
+  "cmd": "find",
+  "args": [
+   "--kind",
+   "lesson",
+   "--text",
+   "localId",
+   "--by",
+   "leftover"
+  ],
+  "asOf": null
+ },
+ {
+  "at": "2026-11-18T10:07:48.204Z",
+  "by": "leftover",
+  "cmd": "find",
+  "args": [
+   "--kind",
+   "lesson",
+   "--text",
+   "fake",
+   "--by",
+   "leftover"
+  ],
+  "asOf": null
+ },
+ {
+  "at": "2026-11-18T10:07:48.240Z",
+  "by": "leftover",
+  "cmd": "find",
+  "args": [
+   "--kind",
+   "lesson",
+   "--text",
+   "bulk",
+   "--by",
+   "leftover"
+  ],
+  "asOf": null
+ },
+ {
+  "at": "2026-11-18T10:07:48.281Z",
+  "by": "leftover",
+  "cmd": "find",
+  "args": [
+   "--kind",
+   "lesson",
+   "--text",
+   "providers.md",
+   "--by",
+   "leftover"
+  ],
+  "asOf": null
+ },
+ {
+  "at": "2026-11-18T10:08:01.325Z",
+  "by": "leftover",
+  "cmd": "find",
+  "args": [
+   "--state",
+   "open",
+   "--text",
+   "bulk",
+   "--by",
+   "leftover"
+  ],
+  "asOf": null
+ },
+ {
+  "at": "2026-11-18T10:08:01.371Z",
+  "by": "leftover",
+  "cmd": "find",
+  "args": [
+   "--state",
+   "open",
+   "--text",
+   "search/jql",
+   "--by",
+   "leftover"
+  ],
+  "asOf": null
+ },
+ {
+  "at": "2026-11-18T10:08:01.406Z",
+  "by": "leftover",
+  "cmd": "find",
+  "args": [
+   "--state",
+   "open",
+   "--text",
+   "fetchProjects",
+   "--by",
+   "leftover"
+  ],
+  "asOf": null
+ },
+ {
+  "at": "2026-11-18T10:08:01.440Z",
+  "by": "leftover",
+  "cmd": "find",
+  "args": [
+   "--state",
+   "open",
+   "--text",
+   "Jira",
+   "--by",
+   "leftover"
+  ],
+  "asOf": null
+ },
+ {
+  "at": "2026-11-18T10:08:04.318Z",
+  "by": "leftover",
+  "cmd": "get",
+  "args": [
+   "finding-76",
+   "--by",
+   "leftover"
+  ],
+  "asOf": null
+ }
+]
