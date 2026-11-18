@@ -1,0 +1,36 @@
+task-57 task v2 [done] by close-out
+decision-60 decision v1 [stands] by breakdown
+run-63 run v2 [done] by survey-task
+finding-64 finding v4 [done] to task-57 by implementation
+finding-65 finding v3 [done] to task-57 by implementation
+check-66 check v5 [handed-on] to task-57 by implementation
+finding-67 finding v3 [done] to task-57 by leftover
+finding-68 finding v4 [done] to task-57 by implementation
+run-69 run v2 [done] by survey-place
+finding-70 finding v2 [done] to task-57 by implementation
+finding-71 finding v2 [done] to task-57 by implementation
+finding-72 finding v2 [done] to task-57 by implementation
+finding-73 finding v4 [done] to close-out by close-out
+finding-74 finding v2 [done] to task-57 by implementation
+run-78 run v2 [done] by scoping
+decision-79 decision v1 [stands] to implementation by scoping
+change-80 change v5 [merged] to close-out by close-out
+decision-81 decision v1 [stands] to review by implementation
+check-82 check v3 [open] to task-59 by close-out
+finding-83 finding v3 [open] to task-58 by close-out
+run-84 run v2 [done] by implementation
+lesson-85 lesson v1 [holds] by leftover
+lesson-86 lesson v1 [holds] by leftover
+lesson-87 lesson v1 [holds] by leftover
+lesson-88 lesson v1 [holds] by leftover
+run-89 run v2 [done] by leftover
+verdict-90 verdict v2 [stands] STALE(on change-80@3, now @5) to close-out by review
+finding-91 finding v2 [done] to close-out by close-out
+check-92 check v2 [open] to task-59 by close-out
+run-93 run v2 [done] by review
+verdict-94 verdict v1 [stands] STALE(on change-80@3, now @5) to close-out by blind-read
+finding-95 finding v2 [done] to close-out by close-out
+finding-96 finding v2 [done] to close-out by close-out
+finding-97 finding v2 [done] to close-out by close-out
+run-99 run v2 [done] by blind-read
+run-100 run v5 [done] by close-out
