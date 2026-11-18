@@ -1,6 +1,6 @@
 # The layer in Harbour: integration design
 
-*Draft 2, 18 Nov, for John to correct. It follows `integration/plan.md` and rests on the census in `census/C1–C5` (main at `6f6c5d2`), whose row ids (C1-12 and so on) are cited here. The approved design is `layer/design.md`. It is called "the layer" below, with its sections given as §3.1 and so on. Draft 1 was checked by a paper walk, a break reader and a drift reader (`checks/`). This draft answers each of their finds; `checks/answers.md` maps every find to its line here. Every census row is placed in `checks/placement.md`, and `checks/completeness.mjs` confirms it. Marks are as on `situation.md`. Lines with no mark are design, mine until John corrects them.*
+*Draft 2 with the recheck's fixes (`checks/recheck.md`), 18 Nov, for John to correct. It follows `integration/plan.md` and rests on the census in `census/C1–C5` (main at `6f6c5d2`), whose row ids (C1-12 and so on) are cited here. The approved design is `layer/design.md`. It is called "the layer" below, with its sections given as §3.1 and so on. Draft 1 was checked by a paper walk, a break reader and a drift reader (`checks/`). This draft answers each of their finds; `checks/answers.md` maps every find to its line here. Every census row is placed in `checks/placement.md`, and `checks/completeness.mjs` confirms it. Marks are as on `situation.md`. Lines with no mark are design, mine until John corrects them.*
 
 ## 0. What the census and the checks changed
 
@@ -19,7 +19,12 @@
   - `lib/records/brief.js` builds the brief and its text (§3.5).
   - `lib/records-store.js` reads and writes the collection, built once in `server.js` (C5-D03).
 - **How they're built.** They are written fresh from §3, with walk 7's model as a reference, not the source. The model's 16 checks become their contract tests.
-- **Actors are data, from the place that already declares them.** For Harbour, they are its stage kinds (`PROMPT_TEMPLATES`, 20 kinds, `lib/prompts/stage-kinds.js`) [checked], plus `autopilot`, `harbour`, and each person who belongs to the workspace, named as `person:<accountId>`. Another project supplies its own list, as §3.2 says. "John" in the layer is the workspace owner's person actor (`getWorkspaceOwnerAccountId`).
+- **Actors are data, from the place that already declares them.** For Harbour, they are:
+  - its 20 stage kinds (`PROMPT_TEMPLATES`, `lib/prompts/stage-kinds.js`) [checked];
+  - `leftover`, `autopilot` and `harbour`;
+  - each person who belongs to the workspace, named as `person:<accountId>`.
+
+  `blind-read` is marked `blind` in `kinds.json`. `harbour` writes but is never a `to`. Another project supplies its own list, as §3.2 says. "John" in the layer is the workspace owner's person actor (`getWorkspaceOwnerAccountId`). *The list grows from the layer's 14 names, read from code rather than `actors.json`. Flagged for John (§11).*
 - **Who imports Records:** Agent API (proxy), Runs & dispatch, LLM & prompts (the selector's facts) and the pages. Records imports only Platform. So each slice adds one-way edges into a leaf area and no new mutual pair; the tightest pair, LLM & prompts ⇄ Runs & dispatch at 39/60, is untouched (`census/seams-6f6c5d2.json`) [checked]. The knots to call are in §10.
 
 ## 2. How agents reach it: the proxy
@@ -31,33 +36,44 @@
   A refused shape returns 422 with the reason. simple-dispatcher forwards any `/api/proxy/*` path, so it needs no change (break-read, "Checked and held") [checked].
 - **Open to every token that may write.** The record routes add no per-stage allowance: any actor may write any kind, as §3.2 says. Today's restricted stamps keep limiting ticket writes, as they do now (C5-C06).
 - **Who wrote it is bookkeeping in code.**
-  - A dispatch's id is allocated before its prompt is finalised, which reverses today's order (`lib/dispatch-factory.js:14-20`) [checked]. The preamble then names the run: "your run: <id>".
-  - A signalled follow-up carries its own prompt, so its own id (`sd:dispatcher.js:371`) [checked].
-  - A write sends `run: <id>`. Harbour checks that row is live and in the token's workspace, and takes `by` from that row's stage. It uses the resolution that already exists: the row's own kind, or for a wake, custom resume or leftover, the parent's stage (`stampForWakeParent`, `stampForFollowUp`, `lib/item-stage-stamp.js`) [checked].
-  - A write with no run, from a person's copy token or the UI, is `by` the token's or session's account: `person:<accountId>`.
+  - Every place that makes a dispatch row with a prompt allocates the row's id before the prompt is finalised. Today the id is made inside `addItem` (`lib/dispatch-store.js:755`), after the prompt (`lib/dispatch-factory.js:14-20`) [checked]. The places are the dispatch factory and the wake builder (`lib/dispatch-wake.js:85-102`, `lib/wake-credential.js`) [checked].
+  - The preamble names the run: "your run: <id>". The id is also recorded on the bootstrap token at mint, and the working token inherits it through `parentTokenId`.
+  - A signalled follow-up carries its own prompt, and so its own id, into the held session (`sd:dispatcher.js:371`, `sd:hook.js:1212-1215`) [checked].
+  - Writes and queries send `run: <id>`. Harbour accepts it only if that run's record is open and its row is in the same dispatch lineage as the token's row. A session's follow-ups and wakes stay in one lineage (`rootItemId`). So a stage can't write as a stage in another session (recheck 1).
+  - `by` is that row's stage, as an actor: its kind, or `leftover` for the leftover row.
+  - A wake or custom resume doesn't start a new run. It continues the run of the session it resumes, found through `resolveFollowUpRoot`, as `stampForWakeParent` already walks (`lib/item-stage-stamp.js:51-55`) [checked]. That avoids a short run per wake (recheck 4, 9).
+  - A dispatch token that names no run is refused. Only a token with no dispatch writes with no run: a person's copy token, or the UI. Those write `by` the account: `person:<accountId>`.
   - `via` is kept only for real relays: an import or a scan.
-- **Tasks are found or made by tracker id.** A `to` or `in` naming a ticket (for example `LIN-4451`) resolves to its task record. If the ticket has none yet, Harbour creates one from the tracker: `ref`, `asked`, and `in` the parent's task when the ticket has a parent. A hand-off to a sibling not yet dispatched therefore lands (paper walk B5).
+  - Queries are logged with the run or account that asked, as the layer's §3.5 says.
+- **Tasks are found or made by tracker id.** A `to` or `in` naming a ticket (for example `LIN-4451`) resolves to its task record. If an open ticket has none yet, Harbour creates one from the tracker: `ref`, plus `in` the parent's task (made the same way, up the ticket's own tree).
+  - Only a ticket with no parent gets `asked`. A child has its piece, as the layer says (§3.2).
+  - A closed ticket is refused with the reason.
+  - A hand-off to a sibling not yet dispatched therefore lands (paper walk B5).
 
 ## 3. How a stage gets its brief
 
-- **The door stays.** The preamble's "Start from the distilled brief: GET …/brief/<id>" is kept (C4-34). Behind it, the brief is built from records (§3.5, parts 1–8) for the calling run's actor. Its header names the caller's own run, so the stage can revise its claims (paper walk B12).
-- **"From the ticket", kept until slice 4.** While verdicts, plan comments and answers still live in ticket text, the brief ends with today's distilled brief, built by the same model, cache and code (C4-35, C4-37). The prompt keeps its "read the description and comment thread" line (C4-31). This is the one path kept on purpose. It goes in slice 4, when the last of those carriers has moved. Then:
+- **The door stays.** The preamble's "Start from the distilled brief: GET …/brief/<id>?run=<run>" is kept (C4-34), with the run added. Behind it, the brief is built from records (§3.5, parts 1–8) for that run's actor. Its header names the run, so the stage can revise its claims (paper walk B12, recheck 6).
+- **"From the ticket", kept until slice 4.** While verdicts, plan comments and answers still live in ticket text, the brief ends with today's distilled brief, built by the same model and cache (C4-35, C4-37). The prompt keeps its "read the description and comment thread" line (C4-31).
+  - It changes in two ways, so it doesn't repeat what records hold (recheck 5): it skips comments carrying Harbour's mark (§7), and drops its quote of the ask, which part 1 holds. From slice 2 it also skips the description's plan section.
+  - Until slice 4, a stage may still meet a thing twice: as a record, and in the ticket thread it is told to read. Records are the source, and the prompt says so.
+  - This is the one path kept on purpose, a temporary ninth part beside the layer's eight. *Flagged for John (§11).* It goes in slice 4, when the last of those carriers has moved. Then:
   - the brief cache, the `formatIssueContext` input to it, and the chat tools' cache reads switch to the records brief (C4-44, `lib/chat-tools.js:290-297`) [checked];
   - the recap becomes `show --task` rendered short.
-- **The blind read keeps having no brief** (`lib/proxy-preamble.js:270-276`) [checked]. Its prompt is given the change record's id to judge. It writes its verdict and findings through the record routes. The layer's `blind` flag hides others' verdicts and judges' accounts from its queries (§3.2).
+- **The blind read keeps having no brief** (`lib/proxy-preamble.js:270-276`) [checked]. Its prompt is given the change record's id to judge, and tells it, as today, to read nothing about the task. It writes its verdict and findings through the record routes. Its queries carry its run, so the store knows it is the `blind` actor and hides others' verdicts and judges' accounts (§3.2). As today, its other reads are limited by its prompt, not by a guard (recheck BR5).
 - **When a task has no `paths` yet,** part 5 lists every area of the workspace with its open count: 13 lines for Harbour. The first stage that names files (survey-task, scoping or plan) sets the task's `paths`, and its prompt says so. *This adds to the layer's part 5. Flagged for John (§11).*
 - **Size.** The brief's bytes are reported against walk 7's per slice, never gated. The frozen prompt-size test (C4-48) stays.
 
 ## 4. Runs, changes and verdicts
 
 - **Run records.**
-  - Harbour adds a `run` when a stage row is taken (C3-45). Wake, custom resume and leftover rows take their resolved stage (§2). Its id is kept on the dispatch row as `runRecordId`, so the engine row points at the record and the record needs no engine field.
+  - Harbour adds a `run` when a stage row or leftover row is taken (C3-45). Wakes and custom resumes continue the run they resume (§2). The run's id is kept on the dispatch row as `runRecordId`, so the engine row points at the record and the record needs no engine field.
   - On a terminal marker (C3-47), Harbour ends the run `done`, with the marker as its reason (`completed`, `failed`, `aborted`). `[skipped]` ends nothing.
   - The `account` is the run's final text, already sent as `assistant-text` chunks (C3-58).
   - The dispatch row stays the engine's queue, lineage, wake and cost state. The run record is what readers read.
 - **Change records.**
   - The implementation stage adds a `change` (`ref` the PR, `head`).
-  - Before any verdict is written `on` a change, the record route reads the PR's live head through the existing status read (C3-09) and revises `head` if it moved. A verdict therefore rests on the head it judged, and a stale flag that shows later is real (paper walk B6).
+  - A verdict on a change names the head sha its judge read, as the review does today (C3-28). The route first revises the change's `head` to that sha if the record lags, and pins `on` to it. Then it refreshes `head` from the PR's live head through the existing status read (`readPrStatuses`, `lib/close-out-readiness.js:30-45`) [checked]. A push the judge never saw then shows as stale, and nothing is blessed unseen (paper walk B6, recheck 3).
+  - An unreadable PR is left as it is, as close-out leaves it today (`:43-44`) [checked].
   - Harbour ends the change `merged` when it records the merge (C1-29).
 - **Verdict records** (`judgement`, `outcome`, `reasoning`, `on` the change or plan piece).
   - Harbour's rule that a blind read names exactly the landing changes stays in Harbour's route, as now (`routes/proxy-writes.js:773-787`) [checked]. It is checked against the task's open changes. It is workflow, so it is not part of the store's check.
@@ -92,8 +108,8 @@
   - The selector, scan and the kept ticket section skip Harbour's mark, so nothing reads the summaries back (break-read 12).
 - **Inward.**
   - A ticket's words become the task's `asked` (§2).
-  - A person's later comment becomes a `finding` `by` that person, `to` the task, when Harbour next reads the ticket.
   - Closing a ticket ends its task (C2-27).
+  - From slice 4, agents post nothing to the tracker but Harbour's marked summaries. So any unmarked comment is a person's, and becomes a `finding` `by` that person, `to` the task. Before slice 4, agents post as the person (`lib/run-trail.js:216-220`) [checked], so comments can't be told apart. They stay in the kept ticket section (recheck 2).
 - **Which direction the sync leads in,** with the tracker as backup or Harbour holding the primary copy, is John's call (§11).
 
 ## 8. Pages for people
@@ -123,7 +139,11 @@ The fleet is paused [checked: journey].
 
 ## 10. The slices
 
-Each slice is built as a Harbour task through Harbour's own loop. So each slice's first real use is the task that builds the next one, running on the slices already landed. The witness is the test or recorded run that proves a slice works. Readings report and never gate (§2 of the layer).
+Each slice is built as a Harbour task through Harbour's own loop. That task runs on the Harbour already deployed, and its own slice takes effect only when it merges and deploys. So each slice's first real use is the task that builds the next one.
+- Each slice's prompts tell stages which kinds to write. In slice 1 that's findings, checks, and the task's paths. Surveys keep a one-line comment for look-first until slice 3 (C3-14).
+- The witness is the test or recorded run that proves a slice works.
+- Readings report and never gate (§2 of the layer).
+- A workspace with several repositories gets one set of areas. That stays open until Yap.
 
 | Slice | Moves | Retires in the same move | Witness | Reading before | Knot |
 |---|---|---|---|---|---|
@@ -140,9 +160,19 @@ Each slice is built as a Harbour task through Harbour's own loop. So each slice'
 
 1. **When does the parked work run:** after slice 1, or after all the slices? It is read against the 13–14 Nov baselines and reported, never gating.
 2. **The tracker:** a backup in summary with Harbour holding the primary copy (§7), or the other way round?
-3. **Two small additions to the approved layer:**
+3. **Four small changes to the approved layer:**
    - part 5 lists every area while a task has no paths (§3);
-   - the question kind gains `on-answer`, keeping today's three effects (§5).
+   - the question kind gains `on-answer`, keeping today's three effects (§5);
+   - the actor list comes from Harbour's stage kinds plus people, not a hand-kept file (§1);
+   - a temporary ninth brief part, the ticket section, until slice 4 (§3).
 4. **Rulings as their own slice 4,** rather than inside hand-offs as the journey had it. The census shows 50 sites (C2).
 5. **Slice 6:** build it, or wait until hand-offs show the need.
-6. **Knots:** each slice adds only one-way edges into Records, and no new pair. My call is to accept them all, with nothing to tidy first.
+6. **Knots.** Records imports nothing back, so none of these makes a new pair, and none changes code inside today's tightest pair beyond its reads. My call is to accept them all, with nothing to tidy first.
+
+   | Slice | Edges into Records |
+   |---|---|
+   | 1 | Proxy, Runs & dispatch, LLM & prompts (the selector's counts), and Front end (pages) |
+   | 2–5 | Only more files along those same four edges |
+   | 6 | One edge out of Records, into Runs, for the wake call |
+
+   Slice 6 is the only edge out of Records, and it would make Records ⇄ Runs a new pair unless the wake call is passed in rather than imported. My call is to pass it in.

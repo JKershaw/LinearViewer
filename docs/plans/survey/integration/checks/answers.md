@@ -68,3 +68,24 @@
 | 11 | Length | Appendix moved to `placement.md`; §0 cut |
 | Missing | Real work as the test; building on a half-switched Harbour; safety as tasks; Yap | §11.1; §10's opening; §9; §1 (another project supplies its actors) |
 | Questions | 11.1–11.3 weren't John's | Dropped or decided. John's questions now: parked work timing, tracker direction, the two additions, rulings order, slice 6, knots |
+
+## Recheck of draft 2 (`recheck.md`), answered in place
+
+| # | Find | Fix in design.md |
+|---|---|---|
+| New 1 | Run id checked only for liveness and workspace; dispatch token with no run | §2: run must be open and in the token's dispatch lineage (id recorded on the bootstrap); a dispatch token with no run is refused |
+| New 2 | Agents post as the person, so inward comments misattribute | §7: inward comments start at slice 4, when only marked summaries come from agents |
+| New 3 | Head refresh before the verdict blesses unseen pushes | §4: judge names the head it read; pin to it; refresh after, so stale shows |
+| New 4 | Wake rows name no run | §2: the wake builder allocates early too; wakes continue the resumed run |
+| New 5 | Things arrive twice until slice 4 | §3: the kept section skips marked comments, drops the ask quote, and from slice 2 the plan section; the remaining overlap is named |
+| New 6 | The brief can't know its caller | §3: `?run=` on the door; queries carry the run |
+| New 7 | Find-or-make: closed tickets, child `asked` | §2: open tickets only; only parentless tasks get `asked` |
+| New 8 | "Live" undefined | §2: the run's record is open (ended only by terminal markers) |
+| New 9 | Run flood from wakes | §2, §4: wakes and custom resumes don't start runs |
+| Unflagged | Actor list; child `asked`; query log; ninth part; `on` set by Harbour | All four now flagged in §11.3 or fixed (child `asked` §2; query log §2; `on` from the judge §4) |
+| BR5 | Blind read's queries | §3: queries carry its run, so `blind` applies |
+| BR9 | Multi-repo | §10: stated open until Yap |
+| B11 | `to: harbour` | §1: `harbour` is never a `to` |
+| Q1 | Kinds per slice in the design | §10 |
+| Half-switched build | §10: a building task runs on what is deployed; its slice takes effect at merge |
+| Knot cost (N) | §11.6: edges per slice and what they cost; slice 6's edge is passed in, not imported |
