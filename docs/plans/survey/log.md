@@ -4336,3 +4336,4 @@ John: "I'd suggest we compact this session and it becomes a sort of driver for t
 - **Parked work:** "The parked work will be the first work we run through the upgraded Harbour. Unless they'd be useful to run as a sanity check after each slice lands? After slice 4 sounds good. I'm the only user so there's no pressure or rush."
   - My answer to the sanity-check idea: no. The parked work is worth most as one clean read against the baselines after slice 4. Each slice already has its own witness, and the task that builds the next slice is its first real use.
   - Recorded in design §11.
+- **The temporary ticket section in the brief until slice 4:** "That's fine. A little temporary scaffolding is ok." Accepted (design §11.3).

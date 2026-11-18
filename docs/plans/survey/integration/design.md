@@ -164,7 +164,7 @@ Each slice is built as a Harbour task through Harbour's own loop. That task runs
    - part 5 lists every area while a task has no paths (§3);
    - the question kind gains `on-answer`, keeping today's three effects (§5);
    - the actor list comes from Harbour's stage kinds plus people, not a hand-kept file (§1);
-   - a temporary ninth brief part, the ticket section, until slice 4 (§3).
+   - a temporary ninth brief part, the ticket section, until slice 4 (§3). **Accepted** (John, 18 Nov: "That's fine. A little temporary scaffolding is ok.")
 4. **Rulings as their own slice 4,** rather than inside hand-offs as the journey had it. The census shows 50 sites (C2).
 5. **Slice 6:** build it, or wait until hand-offs show the need.
 6. **Knots.** Records imports nothing back, so none of these makes a new pair, and none changes code inside today's tightest pair beyond its reads. My call is to accept them all, with nothing to tidy first.
