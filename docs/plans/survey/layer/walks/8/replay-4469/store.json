@@ -1,5 +1,5 @@
 {
-  "next": 158,
+  "next": 160,
   "records": {
     "lesson-1": [
       {
@@ -3049,6 +3049,28 @@
         "fields": {
           "says": "Fix 1 (PR #2447, before the merge): the retirement-line restatement in this repo's docs is claimed retired but not edited. In docs/areas/README.md:72-77 replace \"That line has three forms, spelled in `lib/prompts/leftover-words.js` (`RETIRES_LABEL`, `RETIRES_NONE`): the settled entry's ... why it is larger than a fix.\" with \"Its forms are spelled once, in `lib/prompts/leftover-words.js` (`RETIRES_LABEL`, `RETIRES_NONE`).\" In docs/architecture/dispatch-and-proxy.md:127 replace \"carries exactly one `Retires:` line: the settled entry's file and opening words, `none, no waiting entry`, or `none, nothing fix-sized` with ... than a fix (words in `lib/prompts/leftover-words.js`)\" with \"carries exactly one `Retires:` line, in one of the forms `lib/prompts/leftover-words.js` spells\". Keep docs/proxy-integration.md's refusal table (API contract). Then make the Waiting entry in docs/areas/llm-and-prompts.md true (it says \"This repo's docs now say what the code does ... (LIN-4469)\", citing pointers that predate the PR): drop it, or keep only the simple-dispatcher half. Check: neither file spells \"no waiting entry\" or \"nothing fix-sized\" any more. This repo's half of finding-41 closes with it."
         }
+      },
+      {
+        "id": "finding-148",
+        "kind": "finding",
+        "v": 2,
+        "op": "revise",
+        "at": "2026-11-13T23:05:13.316Z",
+        "by": "autopilot",
+        "reason": "Autopilot (LIN-4469 comment fab0cf08) puts the review's Fixes 1 to 5 in the next build step, which goes to implementation for the fold (decision-156, decision-157)",
+        "in": "task-128",
+        "to": "implementation",
+        "state": "open",
+        "links": {
+          "about": [
+            "check-141",
+            "finding-41",
+            "change-138"
+          ]
+        },
+        "fields": {
+          "says": "Fix 1 (PR #2447, before the merge): the retirement-line restatement in this repo's docs is claimed retired but not edited. In docs/areas/README.md:72-77 replace \"That line has three forms, spelled in `lib/prompts/leftover-words.js` (`RETIRES_LABEL`, `RETIRES_NONE`): the settled entry's ... why it is larger than a fix.\" with \"Its forms are spelled once, in `lib/prompts/leftover-words.js` (`RETIRES_LABEL`, `RETIRES_NONE`).\" In docs/architecture/dispatch-and-proxy.md:127 replace \"carries exactly one `Retires:` line: the settled entry's file and opening words, `none, no waiting entry`, or `none, nothing fix-sized` with ... than a fix (words in `lib/prompts/leftover-words.js`)\" with \"carries exactly one `Retires:` line, in one of the forms `lib/prompts/leftover-words.js` spells\". Keep docs/proxy-integration.md's refusal table (API contract). Then make the Waiting entry in docs/areas/llm-and-prompts.md true (it says \"This repo's docs now say what the code does ... (LIN-4469)\", citing pointers that predate the PR): drop it, or keep only the simple-dispatcher half. Check: neither file spells \"no waiting entry\" or \"nothing fix-sized\" any more. This repo's half of finding-41 closes with it."
+        }
       }
     ],
     "finding-149": [
@@ -3061,6 +3083,27 @@
         "by": "review",
         "in": "task-128",
         "to": "close-out",
+        "state": "open",
+        "links": {
+          "about": [
+            "question-139",
+            "finding-140"
+          ]
+        },
+        "fields": {
+          "says": "Fix 2 (PR #2447, before the merge): correct the \"eleven unchanged\" figure in the PR's DECISION 1, in the change-log row in scripts/prompt-template-change-log.md if it repeats it, and in a reply to the LIN-4350 comment eeb740b0. In real context only the four work kinds (blocked, breakdown, close-out, retrospective-audit) are byte-identical; per writes: none -74, one-comment -23, blind-comment -24, ticket-fields -67, work 0."
+        }
+      },
+      {
+        "id": "finding-149",
+        "kind": "finding",
+        "v": 2,
+        "op": "revise",
+        "at": "2026-11-13T23:05:14.316Z",
+        "by": "autopilot",
+        "reason": "Autopilot (LIN-4469 comment fab0cf08) puts the review's Fixes 1 to 5 in the next build step, which goes to implementation for the fold (decision-156, decision-157)",
+        "in": "task-128",
+        "to": "implementation",
         "state": "open",
         "links": {
           "about": [
@@ -3093,6 +3136,27 @@
         "fields": {
           "says": "Fix 3 (before the merge): post one line on LIN-4448 recording the change of course: the committed-tool clause lives in lib/periodicals.js (committedSearch), not lib/prompts/leftover-words.js, because all four call sites are Periodical bullets. The ticket asks that a change of course be said on LIN-4448; no comment there does."
         }
+      },
+      {
+        "id": "finding-150",
+        "kind": "finding",
+        "v": 2,
+        "op": "revise",
+        "at": "2026-11-13T23:05:15.316Z",
+        "by": "autopilot",
+        "reason": "Autopilot (LIN-4469 comment fab0cf08) puts the review's Fixes 1 to 5 in the next build step, which goes to implementation for the fold (decision-156, decision-157)",
+        "in": "task-128",
+        "to": "implementation",
+        "state": "open",
+        "links": {
+          "about": [
+            "finding-39",
+            "plan-114"
+          ]
+        },
+        "fields": {
+          "says": "Fix 3 (before the merge): post one line on LIN-4448 recording the change of course: the committed-tool clause lives in lib/periodicals.js (committedSearch), not lib/prompts/leftover-words.js, because all four call sites are Periodical bullets. The ticket asks that a change of course be said on LIN-4448; no comment there does."
+        }
       }
     ],
     "finding-151": [
@@ -3114,6 +3178,26 @@
         "fields": {
           "says": "Fix 4 (before the merge): add the old change-coupling spelling 'search the repo for a committed change-coupling tool (it reads' to RETIRED in tests/unit/lin-4469-prompt-folds.test.js. Review mutation M3 (restoring that spelling) stays green in the new test; only the lin-4313 hash pin catches it, because RETIRED lists one folded committed-tool spelling, not all. Check: restoring it turns the new test red."
         }
+      },
+      {
+        "id": "finding-151",
+        "kind": "finding",
+        "v": 2,
+        "op": "revise",
+        "at": "2026-11-13T23:05:16.316Z",
+        "by": "autopilot",
+        "reason": "Autopilot (LIN-4469 comment fab0cf08) puts the review's Fixes 1 to 5 in the next build step, which goes to implementation for the fold (decision-156, decision-157)",
+        "in": "task-128",
+        "to": "implementation",
+        "state": "open",
+        "links": {
+          "about": [
+            "finding-140"
+          ]
+        },
+        "fields": {
+          "says": "Fix 4 (before the merge): add the old change-coupling spelling 'search the repo for a committed change-coupling tool (it reads' to RETIRED in tests/unit/lin-4469-prompt-folds.test.js. Review mutation M3 (restoring that spelling) stays green in the new test; only the lin-4313 hash pin catches it, because RETIRED lists one folded committed-tool spelling, not all. Check: restoring it turns the new test red."
+        }
       }
     ],
     "finding-152": [
@@ -3126,6 +3210,26 @@
         "by": "review",
         "in": "task-128",
         "to": "close-out",
+        "state": "open",
+        "links": {
+          "about": [
+            "lesson-9"
+          ]
+        },
+        "fields": {
+          "says": "Fix 5 (before the merge): lib/prompts/leftover-words.js now imports area-registry-path.js (itself import-free, so the leaf property holds in substance), and the import sits mid-file at line 37. Move it to the top of the module, and update the area Lesson \"import-free leaf\" (docs/areas/llm-and-prompts.md; lesson-9 here) to \"a leaf that imports only leaves (area-registry-path.js)\"."
+        }
+      },
+      {
+        "id": "finding-152",
+        "kind": "finding",
+        "v": 2,
+        "op": "revise",
+        "at": "2026-11-13T23:05:17.316Z",
+        "by": "autopilot",
+        "reason": "Autopilot (LIN-4469 comment fab0cf08) puts the review's Fixes 1 to 5 in the next build step, which goes to implementation for the fold (decision-156, decision-157)",
+        "in": "task-128",
+        "to": "implementation",
         "state": "open",
         "links": {
           "about": [
@@ -3192,6 +3296,26 @@
         "by": "review",
         "in": "task-128",
         "to": "leftover",
+        "state": "open",
+        "links": {
+          "about": [
+            "change-138"
+          ]
+        },
+        "fields": {
+          "says": "No builder ### Leftovers answer with a Retires: line is on LIN-4469, so the gate-format check has nothing to check against. Before the merge: post the leftover answer, its Retires: line naming a Waiting entry this diff removes. The PR body's ## Retires names notes-PR, committed-tool, first-match and CUT, which the diff does remove or rewrite; the retirement-line entry is claimed but not done until Fix 1 lands."
+        }
+      },
+      {
+        "id": "finding-154",
+        "kind": "finding",
+        "v": 2,
+        "op": "revise",
+        "at": "2026-11-13T23:05:18.316Z",
+        "by": "autopilot",
+        "reason": "Autopilot (LIN-4469 comment fab0cf08) puts the builder's ### Leftovers answer with a Retires: line in the next build step (item c), which goes to implementation",
+        "in": "task-128",
+        "to": "implementation",
         "state": "open",
         "links": {
           "about": [
@@ -3269,6 +3393,208 @@
           "scope": "task-128",
           "answer": "Engineering settlement (autopilot, LIN-4469 comment fab0cf08): fold the guarded tracker-write clauses in all four sibling places in lib/prompt-template-defs.js: 975 (survey-task), 994 (survey-place), 1065 (blind-read) and 268 (triage: its scope rule stays, its write clauses go). Keep the code, branch and PR prohibitions in words (no code backstop), as in the four mandates. Then re-pin the ceilings and FROZEN_TOTAL_BYTES once more, lower than 396559.",
           "why": "Same idiom as the class this ticket bounds (tracker-write prose the guard now refuses); under John's standing rule (LIN-2825, amended by LIN-3006) an item of the same class is inside whether or not the plan listed it. The ask's \"shrink only\" is read as: touch only what the guard backs. Extends decision-156, whose words name only survey-task, survey-place and blind-read, to triage 268 as an engineering call. Builder and reviewer both recommend the fold."
+        }
+      },
+      {
+        "id": "decision-157",
+        "kind": "decision",
+        "v": 2,
+        "op": "link",
+        "at": "2026-11-13T23:05:07.316Z",
+        "by": "autopilot",
+        "in": "task-128",
+        "to": "implementation",
+        "state": "stands",
+        "links": {
+          "about": [
+            "decision-156"
+          ]
+        },
+        "fields": {
+          "scope": "task-128",
+          "answer": "Engineering settlement (autopilot, LIN-4469 comment fab0cf08): fold the guarded tracker-write clauses in all four sibling places in lib/prompt-template-defs.js: 975 (survey-task), 994 (survey-place), 1065 (blind-read) and 268 (triage: its scope rule stays, its write clauses go). Keep the code, branch and PR prohibitions in words (no code backstop), as in the four mandates. Then re-pin the ceilings and FROZEN_TOTAL_BYTES once more, lower than 396559.",
+          "why": "Same idiom as the class this ticket bounds (tracker-write prose the guard now refuses); under John's standing rule (LIN-2825, amended by LIN-3006) an item of the same class is inside whether or not the plan listed it. The ask's \"shrink only\" is read as: touch only what the guard backs. Extends decision-156, whose words name only survey-task, survey-place and blind-read, to triage 268 as an engineering call. Builder and reviewer both recommend the fold."
+        }
+      },
+      {
+        "id": "decision-157",
+        "kind": "decision",
+        "v": 3,
+        "op": "link",
+        "at": "2026-11-13T23:05:08.316Z",
+        "by": "autopilot",
+        "in": "task-128",
+        "to": "implementation",
+        "state": "stands",
+        "links": {
+          "about": [
+            "decision-156",
+            "verdict-147"
+          ]
+        },
+        "fields": {
+          "scope": "task-128",
+          "answer": "Engineering settlement (autopilot, LIN-4469 comment fab0cf08): fold the guarded tracker-write clauses in all four sibling places in lib/prompt-template-defs.js: 975 (survey-task), 994 (survey-place), 1065 (blind-read) and 268 (triage: its scope rule stays, its write clauses go). Keep the code, branch and PR prohibitions in words (no code backstop), as in the four mandates. Then re-pin the ceilings and FROZEN_TOTAL_BYTES once more, lower than 396559.",
+          "why": "Same idiom as the class this ticket bounds (tracker-write prose the guard now refuses); under John's standing rule (LIN-2825, amended by LIN-3006) an item of the same class is inside whether or not the plan listed it. The ask's \"shrink only\" is read as: touch only what the guard backs. Extends decision-156, whose words name only survey-task, survey-place and blind-read, to triage 268 as an engineering call. Builder and reviewer both recommend the fold."
+        }
+      },
+      {
+        "id": "decision-157",
+        "kind": "decision",
+        "v": 4,
+        "op": "link",
+        "at": "2026-11-13T23:05:09.316Z",
+        "by": "autopilot",
+        "in": "task-128",
+        "to": "implementation",
+        "state": "stands",
+        "links": {
+          "about": [
+            "decision-156",
+            "verdict-147",
+            "decision-137"
+          ]
+        },
+        "fields": {
+          "scope": "task-128",
+          "answer": "Engineering settlement (autopilot, LIN-4469 comment fab0cf08): fold the guarded tracker-write clauses in all four sibling places in lib/prompt-template-defs.js: 975 (survey-task), 994 (survey-place), 1065 (blind-read) and 268 (triage: its scope rule stays, its write clauses go). Keep the code, branch and PR prohibitions in words (no code backstop), as in the four mandates. Then re-pin the ceilings and FROZEN_TOTAL_BYTES once more, lower than 396559.",
+          "why": "Same idiom as the class this ticket bounds (tracker-write prose the guard now refuses); under John's standing rule (LIN-2825, amended by LIN-3006) an item of the same class is inside whether or not the plan listed it. The ask's \"shrink only\" is read as: touch only what the guard backs. Extends decision-156, whose words name only survey-task, survey-place and blind-read, to triage 268 as an engineering call. Builder and reviewer both recommend the fold."
+        }
+      }
+    ],
+    "question-158": [
+      {
+        "id": "question-158",
+        "kind": "question",
+        "v": 1,
+        "op": "add",
+        "at": "2026-11-13T23:05:06.316Z",
+        "by": "autopilot",
+        "in": "task-128",
+        "to": "John",
+        "state": "open",
+        "links": {},
+        "fields": {
+          "asks": "Ruling lin-4469-witness (raised on LIN-4448, record on LIN-4469; replaces lin-4469-cuts with the corrected figures): LIN-4469 asks for a net rendered-byte fall across every kind. Four work kinds (blocked, breakdown, close-out, retrospective-audit) carry none of the folded text, so they stay byte-identical in real context; the other kinds fall (look-into and retro -74; context, survey-task, survey-place -23; blind-read -24; triage -67). Accept that as meeting the ask?",
+          "options": [
+            "accept: the witness holds for every kind that carries folded text; the four work kinds cannot fall",
+            "require: a fall for all four; fold more text out of those kinds' prompts"
+          ],
+          "recommended": "accept",
+          "if-unanswered": "The cut stays unagreed: the build fixes continue, but PR #2447 does not merge. On an answer the session resumes and records it on LIN-4469."
+        }
+      },
+      {
+        "id": "question-158",
+        "kind": "question",
+        "v": 2,
+        "op": "link",
+        "at": "2026-11-13T23:05:10.316Z",
+        "by": "autopilot",
+        "in": "task-128",
+        "to": "John",
+        "state": "open",
+        "links": {
+          "about": [
+            "task-128"
+          ]
+        },
+        "fields": {
+          "asks": "Ruling lin-4469-witness (raised on LIN-4448, record on LIN-4469; replaces lin-4469-cuts with the corrected figures): LIN-4469 asks for a net rendered-byte fall across every kind. Four work kinds (blocked, breakdown, close-out, retrospective-audit) carry none of the folded text, so they stay byte-identical in real context; the other kinds fall (look-into and retro -74; context, survey-task, survey-place -23; blind-read -24; triage -67). Accept that as meeting the ask?",
+          "options": [
+            "accept: the witness holds for every kind that carries folded text; the four work kinds cannot fall",
+            "require: a fall for all four; fold more text out of those kinds' prompts"
+          ],
+          "recommended": "accept",
+          "if-unanswered": "The cut stays unagreed: the build fixes continue, but PR #2447 does not merge. On an answer the session resumes and records it on LIN-4469."
+        }
+      },
+      {
+        "id": "question-158",
+        "kind": "question",
+        "v": 3,
+        "op": "link",
+        "at": "2026-11-13T23:05:11.316Z",
+        "by": "autopilot",
+        "in": "task-128",
+        "to": "John",
+        "state": "open",
+        "links": {
+          "about": [
+            "task-128",
+            "question-139"
+          ]
+        },
+        "fields": {
+          "asks": "Ruling lin-4469-witness (raised on LIN-4448, record on LIN-4469; replaces lin-4469-cuts with the corrected figures): LIN-4469 asks for a net rendered-byte fall across every kind. Four work kinds (blocked, breakdown, close-out, retrospective-audit) carry none of the folded text, so they stay byte-identical in real context; the other kinds fall (look-into and retro -74; context, survey-task, survey-place -23; blind-read -24; triage -67). Accept that as meeting the ask?",
+          "options": [
+            "accept: the witness holds for every kind that carries folded text; the four work kinds cannot fall",
+            "require: a fall for all four; fold more text out of those kinds' prompts"
+          ],
+          "recommended": "accept",
+          "if-unanswered": "The cut stays unagreed: the build fixes continue, but PR #2447 does not merge. On an answer the session resumes and records it on LIN-4469."
+        }
+      },
+      {
+        "id": "question-158",
+        "kind": "question",
+        "v": 4,
+        "op": "link",
+        "at": "2026-11-13T23:05:12.316Z",
+        "by": "autopilot",
+        "in": "task-128",
+        "to": "John",
+        "state": "open",
+        "links": {
+          "about": [
+            "task-128",
+            "question-139",
+            "change-138"
+          ]
+        },
+        "fields": {
+          "asks": "Ruling lin-4469-witness (raised on LIN-4448, record on LIN-4469; replaces lin-4469-cuts with the corrected figures): LIN-4469 asks for a net rendered-byte fall across every kind. Four work kinds (blocked, breakdown, close-out, retrospective-audit) carry none of the folded text, so they stay byte-identical in real context; the other kinds fall (look-into and retro -74; context, survey-task, survey-place -23; blind-read -24; triage -67). Accept that as meeting the ask?",
+          "options": [
+            "accept: the witness holds for every kind that carries folded text; the four work kinds cannot fall",
+            "require: a fall for all four; fold more text out of those kinds' prompts"
+          ],
+          "recommended": "accept",
+          "if-unanswered": "The cut stays unagreed: the build fixes continue, but PR #2447 does not merge. On an answer the session resumes and records it on LIN-4469."
+        }
+      }
+    ],
+    "run-159": [
+      {
+        "id": "run-159",
+        "kind": "run",
+        "v": 1,
+        "op": "add",
+        "at": "2026-11-13T23:05:19.316Z",
+        "by": "autopilot",
+        "in": "task-128",
+        "state": "open",
+        "links": {},
+        "fields": {
+          "stage": "autopilot",
+          "account": "# What this stage really wrote\n\nWritten in the autopilot's wake 1df3249b (dispatched 23:04:17.401). The ruling's `raisedAt` is null in the material; the comment below says it was raised by 23:05:04.\n\n## Comment on LIN-4469 at 23:05:04 (id fab0cf08)\n\n### Engineering settlement for LIN-4469, and a corrected ruling (autopilot)\n\nThe review (Needs Discussion) found that the open ruling `lin-4469-cuts` states a wrong fact: it says 11 kinds are byte-identical. Measured in real context (preamble included), only the four `work` kinds (blocked, breakdown, close-out, retrospective-audit) are identical; look-into and retro fall 74, context, survey-task and survey-place 23, blind-read 24, triage 67. The ruling is replaced by a one-question version with the corrected figures (`lin-4469-witness`).\n\n**Settled here (engineering, no ruling needed): fold the tracker-write clauses in the four sibling places.** `lib/prompt-template-defs.js` lines 975 (survey-task), 994 (survey-place), 1065 (blind-read) and 268 (triage; its scope rule stays, its write clauses go). They are the same idiom as the class this ticket bounds, tracker-write prose the guard now refuses, and under John's standing rule (LIN-2825, amended by LIN-3006) an item of the same class is inside whether or not the plan listed it. The ask's \"shrink only\" is read as: touch only what the guard backs. So the code, branch and PR prohibitions stay in words (no backstop), as in the four mandates. Both the builder and the reviewer recommend this.\n\n**For the next build step:** (a) the fold above, with ceilings and `FROZEN_TOTAL_BYTES` re-pinned once more and a lower total; (b) the review's Fixes 1 to 5; (c) a `### Leftovers` answer with a `Retires:` line naming an entry the diff removes; (d) the corrected figures in the PR's decision text, the change-log row and the LIN-4350 comment.\n\n**Still John's:** only the witness sentence, \"a net fall across every kind\", which cannot hold for the four `work` kinds because they carry none of the folded text. Merge waits on that answer.\n\n## Ruling raised on LIN-4448 (lin-4469-witness, to John, on_answer resume, record_on LIN-4469)\n\n```json\n{\n \"decision_id\": \"lin-4469-witness\",\n \"question\": \"LIN-4469 asks for a net rendered-byte fall across every kind. Four work kinds (blocked, breakdown, close-out, retrospective-audit) carry none of the folded text, so they stay byte-identical in real context; the other kinds fall. Accept that as meeting the ask?\",\n \"options\": [\n  {\n   \"id\": \"accept\",\n   \"label\": \"Accept: the witness holds for every kind that carries folded text; the four work kinds cannot fall\"\n  },\n  {\n   \"id\": \"require\",\n   \"label\": \"Require a fall for all four: fold more text out of those kinds' prompts\"\n  }\n ],\n \"recommended\": \"accept\",\n \"free_text\": true,\n \"if_unanswered\": {\n  \"summary\": \"The cut stays unagreed: the build fixes continue, but PR #2447 does not merge\"\n },\n \"on_answer\": {\n  \"effect\": \"resume\",\n  \"record_on\": \"LIN-4469\"\n }\n}\n```\n"
+        }
+      },
+      {
+        "id": "run-159",
+        "kind": "run",
+        "v": 2,
+        "op": "end",
+        "at": "2026-11-13T23:05:20.316Z",
+        "by": "autopilot",
+        "in": "task-128",
+        "state": "done",
+        "ended": {
+          "reason": "Settlement comment fab0cf08 posted on LIN-4469; ruling lin-4469-witness raised on LIN-4448"
+        },
+        "links": {},
+        "fields": {
+          "stage": "autopilot",
+          "account": "# What this stage really wrote\n\nWritten in the autopilot's wake 1df3249b (dispatched 23:04:17.401). The ruling's `raisedAt` is null in the material; the comment below says it was raised by 23:05:04.\n\n## Comment on LIN-4469 at 23:05:04 (id fab0cf08)\n\n### Engineering settlement for LIN-4469, and a corrected ruling (autopilot)\n\nThe review (Needs Discussion) found that the open ruling `lin-4469-cuts` states a wrong fact: it says 11 kinds are byte-identical. Measured in real context (preamble included), only the four `work` kinds (blocked, breakdown, close-out, retrospective-audit) are identical; look-into and retro fall 74, context, survey-task and survey-place 23, blind-read 24, triage 67. The ruling is replaced by a one-question version with the corrected figures (`lin-4469-witness`).\n\n**Settled here (engineering, no ruling needed): fold the tracker-write clauses in the four sibling places.** `lib/prompt-template-defs.js` lines 975 (survey-task), 994 (survey-place), 1065 (blind-read) and 268 (triage; its scope rule stays, its write clauses go). They are the same idiom as the class this ticket bounds, tracker-write prose the guard now refuses, and under John's standing rule (LIN-2825, amended by LIN-3006) an item of the same class is inside whether or not the plan listed it. The ask's \"shrink only\" is read as: touch only what the guard backs. So the code, branch and PR prohibitions stay in words (no backstop), as in the four mandates. Both the builder and the reviewer recommend this.\n\n**For the next build step:** (a) the fold above, with ceilings and `FROZEN_TOTAL_BYTES` re-pinned once more and a lower total; (b) the review's Fixes 1 to 5; (c) a `### Leftovers` answer with a `Retires:` line naming an entry the diff removes; (d) the corrected figures in the PR's decision text, the change-log row and the LIN-4350 comment.\n\n**Still John's:** only the witness sentence, \"a net fall across every kind\", which cannot hold for the four `work` kinds because they carry none of the folded text. Merge waits on that answer.\n\n## Ruling raised on LIN-4448 (lin-4469-witness, to John, on_answer resume, record_on LIN-4469)\n\n```json\n{\n \"decision_id\": \"lin-4469-witness\",\n \"question\": \"LIN-4469 asks for a net rendered-byte fall across every kind. Four work kinds (blocked, breakdown, close-out, retrospective-audit) carry none of the folded text, so they stay byte-identical in real context; the other kinds fall. Accept that as meeting the ask?\",\n \"options\": [\n  {\n   \"id\": \"accept\",\n   \"label\": \"Accept: the witness holds for every kind that carries folded text; the four work kinds cannot fall\"\n  },\n  {\n   \"id\": \"require\",\n   \"label\": \"Require a fall for all four: fold more text out of those kinds' prompts\"\n  }\n ],\n \"recommended\": \"accept\",\n \"free_text\": true,\n \"if_unanswered\": {\n  \"summary\": \"The cut stays unagreed: the build fixes continue, but PR #2447 does not merge\"\n },\n \"on_answer\": {\n  \"effect\": \"resume\",\n  \"record_on\": \"LIN-4469\"\n }\n}\n```\n"
         }
       }
     ]
@@ -4189,6 +4515,105 @@
         "open",
         "--by",
         "autopilot"
+      ],
+      "asOf": null
+    },
+    {
+      "at": "2026-11-18T10:10:01.442Z",
+      "by": "implementation",
+      "cmd": "get",
+      "args": [
+        "change-138",
+        "--by",
+        "implementation"
+      ],
+      "asOf": null
+    },
+    {
+      "at": "2026-11-18T10:10:01.481Z",
+      "by": "implementation",
+      "cmd": "get",
+      "args": [
+        "finding-41",
+        "--by",
+        "implementation"
+      ],
+      "asOf": null
+    },
+    {
+      "at": "2026-11-18T10:10:01.520Z",
+      "by": "implementation",
+      "cmd": "get",
+      "args": [
+        "finding-39",
+        "--by",
+        "implementation"
+      ],
+      "asOf": null
+    },
+    {
+      "at": "2026-11-18T10:10:01.555Z",
+      "by": "implementation",
+      "cmd": "get",
+      "args": [
+        "check-141",
+        "--by",
+        "implementation"
+      ],
+      "asOf": null
+    },
+    {
+      "at": "2026-11-18T10:10:01.593Z",
+      "by": "implementation",
+      "cmd": "get",
+      "args": [
+        "question-139",
+        "--by",
+        "implementation"
+      ],
+      "asOf": null
+    },
+    {
+      "at": "2026-11-18T10:10:01.626Z",
+      "by": "implementation",
+      "cmd": "get",
+      "args": [
+        "finding-140",
+        "--by",
+        "implementation"
+      ],
+      "asOf": null
+    },
+    {
+      "at": "2026-11-18T10:10:01.661Z",
+      "by": "implementation",
+      "cmd": "get",
+      "args": [
+        "finding-152",
+        "--by",
+        "implementation"
+      ],
+      "asOf": null
+    },
+    {
+      "at": "2026-11-18T10:10:01.703Z",
+      "by": "implementation",
+      "cmd": "get",
+      "args": [
+        "finding-154",
+        "--by",
+        "implementation"
+      ],
+      "asOf": null
+    },
+    {
+      "at": "2026-11-18T10:10:01.745Z",
+      "by": "implementation",
+      "cmd": "get",
+      "args": [
+        "question-158",
+        "--by",
+        "implementation"
       ],
       "asOf": null
     }

@@ -1,0 +1,181 @@
+[
+ {
+  "at": "2026-11-18T10:07:47.875Z",
+  "by": "plan-review",
+  "cmd": "find",
+  "args": [
+   "--to",
+   "plan-review",
+   "--state",
+   "open",
+   "--by",
+   "plan-review"
+  ],
+  "asOf": null
+ },
+ {
+  "at": "2026-11-18T10:07:47.925Z",
+  "by": "plan-review",
+  "cmd": "find",
+  "args": [
+   "--kind",
+   "verdict",
+   "--in",
+   "task-8",
+   "--by",
+   "plan-review"
+  ],
+  "asOf": null
+ },
+ {
+  "at": "2026-11-18T10:07:47.966Z",
+  "by": "plan-review",
+  "cmd": "get",
+  "args": [
+   "check-19",
+   "--by",
+   "plan-review"
+  ],
+  "asOf": null
+ },
+ {
+  "at": "2026-11-18T10:07:48.009Z",
+  "by": "plan-review",
+  "cmd": "get",
+  "args": [
+   "run-38",
+   "--by",
+   "plan-review"
+  ],
+  "asOf": null
+ },
+ {
+  "at": "2026-11-18T10:08:09.353Z",
+  "by": "plan-review",
+  "cmd": "get",
+  "args": [
+   "check-31",
+   "--by",
+   "plan-review"
+  ],
+  "asOf": null
+ },
+ {
+  "at": "2026-11-18T10:08:09.388Z",
+  "by": "plan-review",
+  "cmd": "get",
+  "args": [
+   "check-32",
+   "--by",
+   "plan-review"
+  ],
+  "asOf": null
+ },
+ {
+  "at": "2026-11-18T10:08:09.430Z",
+  "by": "plan-review",
+  "cmd": "get",
+  "args": [
+   "check-33",
+   "--by",
+   "plan-review"
+  ],
+  "asOf": null
+ },
+ {
+  "at": "2026-11-18T10:08:09.470Z",
+  "by": "plan-review",
+  "cmd": "get",
+  "args": [
+   "check-34",
+   "--by",
+   "plan-review"
+  ],
+  "asOf": null
+ },
+ {
+  "at": "2026-11-18T10:08:09.511Z",
+  "by": "plan-review",
+  "cmd": "get",
+  "args": [
+   "check-35",
+   "--by",
+   "plan-review"
+  ],
+  "asOf": null
+ },
+ {
+  "at": "2026-11-18T10:08:09.555Z",
+  "by": "plan-review",
+  "cmd": "get",
+  "args": [
+   "check-36",
+   "--by",
+   "plan-review"
+  ],
+  "asOf": null
+ },
+ {
+  "at": "2026-11-18T10:08:09.598Z",
+  "by": "plan-review",
+  "cmd": "get",
+  "args": [
+   "finding-14",
+   "--by",
+   "plan-review"
+  ],
+  "asOf": null
+ },
+ {
+  "at": "2026-11-18T10:08:09.641Z",
+  "by": "plan-review",
+  "cmd": "get",
+  "args": [
+   "finding-30",
+   "--by",
+   "plan-review"
+  ],
+  "asOf": null
+ },
+ {
+  "at": "2026-11-18T10:08:09.679Z",
+  "by": "plan-review",
+  "cmd": "find",
+  "args": [
+   "--to",
+   "project",
+   "--state",
+   "open",
+   "--by",
+   "plan-review"
+  ],
+  "asOf": null
+ },
+ {
+  "at": "2026-11-18T10:08:09.715Z",
+  "by": "plan-review",
+  "cmd": "find",
+  "args": [
+   "--kind",
+   "lesson",
+   "--by",
+   "plan-review"
+  ],
+  "asOf": null
+ },
+ {
+  "at": "2026-11-18T10:09:21.226Z",
+  "by": "plan-review",
+  "cmd": "find",
+  "args": [
+   "--to",
+   "plan-review",
+   "--state",
+   "open",
+   "--by",
+   "plan-review",
+   "--count"
+  ],
+  "asOf": null
+ }
+]

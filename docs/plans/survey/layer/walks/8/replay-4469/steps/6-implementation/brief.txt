@@ -1,0 +1,176 @@
+# Brief for implementation on task-128 as of 2026-11-13T23:05:16.936Z
+## 1. The task and the person's words
+task-128 ref LIN-4469 | done when: Piece 5 of LIN-4448's plan (behaviour **E**). **Fewer rules restated as lists in prompt text.** This lands only after piece 3 (records) and piece 4 (proxy guard).
+
+**Approach**
+
+* Shrink only the **tracker-write clauses the guard now refuses**, in `ONE_COMMENT_MANDATE`, `NONE_MANDATE`, `BLIND_COMMENT_MANDATE` and `TICKET_FIELDS_MANDATE` (`lib/proxy-preamble.js`), down to what the stage is told about its token.
+* **Keep these in words** (review note 1): the code, branch and PR prohibitions, which have no code backstop because the runner's GitHub credential is outside the proxy, and the merge sentences (cut by ruling). Name them as kept, with the reason, in the change-log entry.
+* Look-into's "unless the person asks" clause is dropped only if John has ruled to retire it (the DECISION on LIN-4448, asked on piece 4). Otherwise it is reworded to match `one-comment`.
+* Each of these becomes one constant in `lib/prompts/leftover-words.js`: the docs-only notes-PR rule, the committed-tool wording ("search the repo for a committed tool"; the four wordings settle on **Stability's**), and the first-match area lookup. Also the retirement-line wording in this repository's docs (simple-dispatcher's copy stays named, and is its owner's).
+* Fold `CUT` and "narrowing" (`lib/prompts/stage-intent.js` / `lib/completion-signals.js`) into one vocabulary. If piece 3's record already settled it, say so.
+* The blind read's piloted sentence stays as piloted. Re-piloting is a person's run, and the Waiting entry says so.
+* **Re-pin once, together:** the 13 Periodical hashes, the router snapshots, `scripts/eval/meta-prompt.baseline.txt` and a lowered `FROZEN_TOTAL_BYTES`, with reasons in `scripts/prompt-template-change-log.md`.
+
+**Testing (witnesses)**
+
+* Real-context rendered bytes show a net fall across every kind, fresh and fix round.
+* The existing prompt tests pass.
+* A new test fails if a retired duplicate phrase appears in more than one template.
+
+**LIN-4350:** report what this piece found to LIN-4350 in a comment. Don't absorb that ticket: it spans two repos.
+
+**Collisions:** `lib/prompt-template-defs.js` and the budget test, after piece 3.
+
+**Retires:** the Waiting entries for the docs-only notes-PR rule, the committed-tool wording, the first-match lookup, `CUT` vs "narrowing", and the retirement line's restatement in this repo's docs. Also the tracker clauses in the four mandates.
+
+---
+
+**Parent:** LIN-4448 (LLM & prompts, left simpler). The full approved plan is the parent's description, section `## Implementation Plan`, and its amendments are in the parent's comment `### Plan Review Verdict` (72406236-9316-4004-98ee-70d8fba0cb09). The parent's `## As asked` block sets the scope.
+
+Session fit: fits one session
+
+Plan-review due: no — covered by LIN-4448's approving plan-review (comment 72406236-9316-4004-98ee-70d8fba0cb09, rev 1)
+
+**Grounding commits:** the plan was written at `JKershaw/LinearViewer` main `2bf788b6d` (surveys at `4b5001ddf`) and reviewed at `c205190fd`. The breakdown re-checked at `5dcf5bcda`. The only change since is LIN-4457 (#2424), and the one plan file it touches is the cost-read entry in `docs/architecture/source-map.md`.
+
+**Starting point:** the parent's approved plan. Follow it. Where the code shows it is wrong, change course, and say so in a comment on LIN-4448.
+
+**Every PR names what it retires** (the LIN-4414 rule). It edits the Waiting entries in `docs/areas/llm-and-prompts.md` that it settles. It respects that note's Lessons and leaves `docs/reviews/` reports unchanged.
+asked (task-105): **Repository:** JKershaw/LinearViewer (Harbour).
+
+**What this is for.** The tightest tangle in Harbour is between LLM & prompts and Runs & dispatch: the links between the two areas grew from 32 one way and 50 the other to 38 and 55 over batch 1 (Seams run 12). On this side:
+
+* the list of routes that code settles without asking a model is copied about nine times, and `docs/architecture/prompt-system.md` and `public/llms.txt` already describe it wrongly (Drift, row 154);
+* the blind read's name and heading are retyped outside the file that defines them (Drift, row 151);
+* batch 1 added rules to the prompts as text (the frozen prompt total rose about 21,000 bytes, to 378,915). John on that limit: "That limit is to push against lists if rules. Worth knowing, but not hard and fast.";
+* LIN-4350 asks to fold the rules together into plainer, more general instructions.
+
+The safety pass (A5, LIN-4400) found two themes here: merge and read-only limits that exist only in prompt text (LIN-1242, LIN-1273, LIN-3417), and tokens inside prompt text (LIN-1372, LIN-1395, LIN-1408). Both are part of A12 (LIN-4416). The area's note holds 26 Waiting entries.
+
+**What we want.**
+
+* Each rule has one home; the copies are gone, and the docs say what the code does.
+* A limit that matters is held in code, not only in a prompt's words.
+* Fewer rules are restated as lists in prompt text.
+* The area's Waiting entries are settled, or each says why it can't be yet.
+* Each piece finishes one move and names what it retired; piece sizes vary, leaning larger.
+* The Runs & dispatch side of the seam is A13's.
+
+**Done when**
+
+* the cases above are settled, or John has ruled they can wait;
+* the safety tickets named above are closed in code for that reason, or John has ruled they can wait;
+* the area's Waiting entries are settled or say why not;
+* the area reads better in a blind read after this work than before it, by more than an untouched area read at the same times.
+
+**Every change names what it retires. Questions:** settle engineering questions yourself; only John's calls (product, money, authority, what to retire) go to him as rulings.
+
+*End of what was asked. Steps write below this line; nothing above it changes.*
+## 2. Its plan
+plan-114@1 plan [kept] by design at 2026-11-13T15:39:54.189Z
+  says: Piece 5: **E. Fewer rules as prompt lists (piece 5), only after D has landed.** With the guard in place, `ONE_COMMENT_MANDATE`, `NONE_MANDATE`, `BLIND_COMMENT_MANDATE` and `TICKET_FIELDS_MANDATE` shrink to what the stage is told about its token; the merge sentences stay (cut, ruled). In one batch, with one re-pin of the 13 Periodical hashes, router snapshots, `scripts/eval/meta-prompt.baseline.txt` and `FROZEN_TOTAL_BYTES` (lowered with reasons in `scripts/prompt-template-change-log.md`): the docs-only notes-PR rule, the "search the repo for a committed tool" rule (the four wordings settle on Stability's) and the first-match area lookup each become one constant in `lib/prompts/leftover-words.js` (the blind read's piloted sentence stays as piloted: re-piloting is a person's run; the entry says so). *Witness:* the rendered-bytes check shows a net fall; the existing prompt tests pass; a test that none of the retired phrases still appears in a second template. LIN-4350 stays its own ticket (it spans both repos and waits for this one's siblings): this piece takes only the folds the guard and the shared constants make safe, and records for LIN-4350 what it found.
+  order: 4
+## 3. Addressed to you
+finding-148@2 finding [open] to implementation by autopilot at 2026-11-13T23:05:13.316Z
+  says: Fix 1 (PR #2447, before the merge): the retirement-line restatement in this repo's docs is claimed retired but not edited. In docs/areas/README.md:72-77 replace "That line has three forms, spelled in `lib/prompts/leftover-words.js` (`RETIRES_LABEL`, `RETIRES_NONE`): the settled entry's ... why it is larger than a fix." with "Its forms are spelled once, in `lib/prompts/leftover-words.js` (`RETIRES_LABEL`, `RETIRES_NONE`)." In docs/architecture/dispatch-and-proxy.md:127 replace "carries exactly one `Retires:` line: the settled entry's file and opening words, `none, no waiting entry`, or `none, nothing fix-sized` with ... than a fix (words in `lib/prompts/leftover-words.js`)" with "carries exactly one `Retires:` line, in one of the forms `lib/prompts/leftover-words.js` spells". Keep docs/proxy-integration.md's refusal table (API contract). Then make the Waiting entry in docs/areas/llm-and-prompts.md true (it says "This repo's docs now say what the code does ... (LIN-4469)", citing pointers that predate the PR): drop it, or keep only the simple-dispatcher half. Check: neither file spells "no waiting entry" or "nothing fix-sized" any more. This repo's half of finding-41 closes with it.
+  about -> check-141, finding-41, change-138
+finding-149@2 finding [open] to implementation by autopilot at 2026-11-13T23:05:14.316Z
+  says: Fix 2 (PR #2447, before the merge): correct the "eleven unchanged" figure in the PR's DECISION 1, in the change-log row in scripts/prompt-template-change-log.md if it repeats it, and in a reply to the LIN-4350 comment eeb740b0. In real context only the four work kinds (blocked, breakdown, close-out, retrospective-audit) are byte-identical; per writes: none -74, one-comment -23, blind-comment -24, ticket-fields -67, work 0.
+  about -> question-139, finding-140
+finding-150@2 finding [open] to implementation by autopilot at 2026-11-13T23:05:15.316Z
+  says: Fix 3 (before the merge): post one line on LIN-4448 recording the change of course: the committed-tool clause lives in lib/periodicals.js (committedSearch), not lib/prompts/leftover-words.js, because all four call sites are Periodical bullets. The ticket asks that a change of course be said on LIN-4448; no comment there does.
+  about -> finding-39, plan-114
+finding-151@2 finding [open] to implementation by autopilot at 2026-11-13T23:05:16.316Z
+  says: Fix 4 (before the merge): add the old change-coupling spelling 'search the repo for a committed change-coupling tool (it reads' to RETIRED in tests/unit/lin-4469-prompt-folds.test.js. Review mutation M3 (restoring that spelling) stays green in the new test; only the lin-4313 hash pin catches it, because RETIRED lists one folded committed-tool spelling, not all. Check: restoring it turns the new test red.
+  about -> finding-140
+## 4. What stands about this task
+decision-106@2 decision [stands] by scoping at 2026-11-13T15:34:51.926Z
+  scope: task-105
+  answer: **Size:** rebuild the area
+  why: **Why:** Rebuilds the area around one definition per stage kind, from which routes, write limits, labels and docs derive, and has the proxy refuse writes a stage may not make; otherwise copies return and read-only stays words.
+**Cuts:**
+
+* "the safety tickets named above are closed in code": the merge limit (LIN-3417) stays with simple-dispatcher.
+* "the safety tickets named above are closed in code": the token tickets (LIN-1372, LIN-1395, LIN-1408) stay with the harness.
+  **Decided by:** a ruling
+decision-108@1 decision [stands] by John via Harbour at 2026-11-13T15:33:39.997Z
+  scope: task-105
+  answer: Agree both cuts: they wait for A12 and simple-dispatcher; LIN-4448 closes only the read-only limit, through the proxy's write guard
+  why: Ruling lin4448-safety-cuts, recorded via Harbour.
+  answers -> question-107
+verdict-121@1 verdict [stands] by plan-review at 2026-11-13T15:49:32.648Z
+  judgement: plan-review
+  outcome: approve
+  reasoning: Approve (comment 72406236). The causes it names are the real causes, the proxy guard reaches every dispatched agent's writes, and each gap below can be fixed without changing what the plan decides.
+
+1. **Piece 5: keep the git-side limits in words.** The proxy guard holds tracker writes only. "Do not change code, branches, pull requests" in `ONE_COMMENT_MANDATE`, `BLIND_COMMENT_MANDATE`, `NONE_MANDATE` and `TICKET_FIELDS_MANDATE` has no code backstop: the runner's GitHub credential is outside the proxy, and that half sits with simple-dispatcher like merge. Shrink only the tracker clauses the token now refuses. Keep the code, branch and PR prohibitions, as you keep the merge sentences, and name them in the change log entry as kept, with the reason.
+
+10. **Piece 4 makes look-into's "post nothing to Linear unless the person asks" untrue.** A `none` token refuses every write, and the token cannot know a person asked. Dropping that allowance is a "what to retire" call, so ask John as a ruling on piece 4's PR. My recommendation is to retire it: look-into reports in its session, and a person can post the comment themselves. Then piece 5 drops the clause.
+  on -> plan-114@1
+decision-129@1 decision [stands] by breakdown at 2026-11-13T15:55:35.944Z
+  answer: Grounding commit origin/main `5dcf5bcda`; the plan stands, so no re-plan was needed.
+  why: `origin/main` is `5dcf5bcda`. Since the plan's `2bf788b6d` and the review's `c205190fd`, only LIN-4457 (#2424) and LIN-4454 landed. The only plan file they touch is the cost-read entry in `docs/architecture/source-map.md`. The anchors still hold: `codeRouteOf` is at `lib/openrouter.js:2108`, `requireWriteScope` is at `routes/proxy.js:609`, and there are 25 Waiting entries. The plan stands, so no re-plan was needed.
+  on -> verdict-121@1
+decision-130@1 decision [stands] by breakdown at 2026-11-13T15:55:35.944Z
+  answer: Session fit: fits one session. Plan-review due: no — covered by LIN-4448's approving plan-review (comment 72406236-9316-4004-98ee-70d8fba0cb09, rev 1)
+  why: | 4 | LIN-4469 | 5: prompt folds, one re-pin | 4467, 4468 | one session: one batch, one re-pin |
+  on -> verdict-121@1
+decision-131@1 decision [stands] by breakdown at 2026-11-13T15:55:35.944Z
+  answer: LIN-4469 is blocked by LIN-4467 (piece 3) and LIN-4468 (piece 4).
+  why: The baseline goes first and alone, so that nothing changes the area before it is read. 1, 2 and 4 then run in parallel: their files mostly don't overlap, and the shared ones (`recommendation-blind-read.js`, `dispatch-entrance.js`) rebase. 3 needs 1 and 2. 5 needs 3 and 4: the guard comes before the words, and both 3 and 5 touch `prompt-template-defs.js` and the budget test. 6 comes last, and 5 covers the rest transitively.
+  on -> verdict-121@1
+  about -> task-126, task-127
+decision-132@1 decision [stands] by breakdown at 2026-11-13T15:55:35.944Z
+  answer: LIN-4469 blocks LIN-4470 (piece 6).
+  why: The baseline goes first and alone, so that nothing changes the area before it is read. 1, 2 and 4 then run in parallel: their files mostly don't overlap, and the shared ones (`recommendation-blind-read.js`, `dispatch-entrance.js`) rebase. 3 needs 1 and 2. 5 needs 3 and 4: the guard comes before the words, and both 3 and 5 touch `prompt-template-defs.js` and the budget test. 6 comes last, and 5 covers the rest transitively.
+  on -> verdict-121@1
+decision-134@1 decision [stands] by John via Harbour at 2026-11-13T15:57:43.409Z
+  scope: task-105
+  answer: Retire it: look-into reports in its session and a person posts the comment if they want it
+  why: Ruling lin4448-lookinto-none, recorded via Harbour.
+  answers -> question-133
+decision-135@1 decision [stands] by breakdown at 2026-11-13T15:58:14.076Z
+  answer: **Ruling answered (John, 13 Nov, LIN-4448 comment bdcd3128):** retire look-into's "post nothing to Linear unless the person asks" exception.
+  why: This piece **drops that clause** from look-into's prompt; the `one-comment` rewording option in the section above no longer applies. Record the retirement, citing the ruling, in `scripts/prompt-template-change-log.md` and in the PR's retirement line.
+  on -> decision-134@1
+decision-137@1 decision [stands] by autopilot at 2026-11-13T21:49:17.132Z
+  answer: ## Condition on LIN-4467's budget raise, for piece 5
+
+It was accepted on one condition that falls on this piece: **LIN-4469 must show a net rendered-byte reduction and lower `FROZEN_TOTAL_BYTES` below 396575** (the figure the settlement named), with the reduction measured on rendered prompts, not on source moved out of measured files. John on the limit: "That limit is to push against lists of rules. Worth knowing, but not hard and fast."
+  why: LIN-4467 (PR https://github.com/JKershaw/LinearViewer/pull/2444) raises `FROZEN_TOTAL_BYTES` in `tests/unit/prompt-size-budget.test.js` from 378915 to 396884 (396575 at review, plus a net +309 at close-out for deriving the reading-pass lines). It is re-accounting, not growth: the text moved into the newly budgeted `lib/prompts/stage-kinds.js` from files the total did not cover, and all 80 rendered prompts are byte-identical.
+
+Named monitor: `tests/unit/prompt-size-budget.test.js` fails on any growth past the ceiling. Only this piece landing can show the reduction.
+
+The record's source ceiling (`lib/prompts/stage-kinds.js`, 43348) is part of what to lower if wording moves out of it. `lib/prompt-template-defs.js` and the budget test are shared with this piece; LIN-4467 lands first.
+
+verdict-147@1 verdict [stands] to John by review at 2026-11-13T22:59:38.197Z
+  judgement: review
+  outcome: needs-discussion
+  reasoning: Needs Discussion (LIN-4469 comment 39207a24). PR #2447 at head 3533f37c2 (contains origin/main b937237a4). CI green on 3533f37c2; local prompt suites (lin-4469, prompt-size-budget, prompt-templates, lin-4313, lin-4467) 468 pass, 0 fail. Met: the four-mandate shrink (lib/proxy-preamble.js:185-197; every dropped clause has a LIN-4468 backstop in lib/stage-writes.js); code/branch/PR words and merge sentences kept and named; look-into exception dropped per decision-135 (retro loses it too, via NONE_MANDATE); NOTES_PR and areaLookup in the leaf; CUT/narrowing folded; blind read piloted sentence pinned by the new test; re-pin once with FROZEN_TOTAL_BYTES 396884 -> 396559, below decision-137's 396575 (ceilings summed 396821 on main, fall 262 = 204 rendered + 58 source; 63 was unused headroom); router snapshots and meta-prompt baseline unchanged is consistent with no stage lead's first sentence changing (lesson-11). Met in part: the committed-tool clause went to committedSearch in lib/periodicals.js:14, not the leaf (defensible: all four call sites are there), but no change-of-course comment on LIN-4448; the retirement-line restatement in this repo's docs is claimed retired but not edited; the witness "net fall across every kind" rests on the open ruling lin-4469-cuts (question-139), whose facts are wrong: in real context (proxy preamble) none -74, one-comment -23, blind-comment -24, ticket-fields -67, work 0, so only blocked, breakdown, close-out and retrospective-audit are byte-identical, not 11; the new test misses the old change-coupling spelling (mutation M3 stays green; only the lin-4313 hash pin catches it). No builder ### Leftovers comment with a Retires: line on LIN-4469. Regression check clean (LIN-4424's Stability sentence renders byte-identical). Settle before the merge: John answers question-139 (review recommends fold), then the fixes. Rollback: revert the merge commit.
+  on -> change-138@1
+  about -> plan-114, decision-135, decision-137, question-139, lesson-11
+decision-156@1 decision [stands] to implementation by John via Harbour at 2026-11-13T23:03:15.769Z
+  scope: task-128
+  answer: Ruling lin-4469-cuts answered (John, 13 Nov 23:03:14, LIN-4469 comment 62f57ef4, via Harbour): option `fold`. "Fold the guarded clause in survey-task, survey-place and blind-read templates too".
+  why: Not accepted as a cut: PR #2447 goes back to implementation to fold the guarded tracker clause in the read-only templates (lib/prompt-template-defs.js ~975/994/1065), re-pin the ceilings and lower FROZEN_TOTAL_BYTES again (decision-137). The words John answered name survey-task, survey-place and blind-read only; triage line 268, added in review's revision of the question, is not named in them.
+  answers -> question-139
+  about -> change-138, verdict-147
+decision-157@4 decision [stands] to implementation by autopilot at 2026-11-13T23:05:09.316Z
+  scope: task-128
+  answer: Engineering settlement (autopilot, LIN-4469 comment fab0cf08): fold the guarded tracker-write clauses in all four sibling places in lib/prompt-template-defs.js: 975 (survey-task), 994 (survey-place), 1065 (blind-read) and 268 (triage: its scope rule stays, its write clauses go). Keep the code, branch and PR prohibitions in words (no code backstop), as in the four mandates. Then re-pin the ceilings and FROZEN_TOTAL_BYTES once more, lower than 396559.
+  why: Same idiom as the class this ticket bounds (tracker-write prose the guard now refuses); under John's standing rule (LIN-2825, amended by LIN-3006) an item of the same class is inside whether or not the plan listed it. The ask's "shrink only" is read as: touch only what the guard backs. Extends decision-156, whose words name only survey-task, survey-place and blind-read, to triage 268 as an engineering call. Builder and reviewer both recommend the fold.
+  about -> decision-156, verdict-147, decision-137
+## 5. The project
+55 open addressed to project (find --to project --text <words>); 48 lessons hold (find --kind lesson --text <words>)
+## 6. Other open runs
+(none)
+## 7. Index of what else is known
+change-138 change to close-out: https://github.com/JKershaw/LinearViewer/pull/2447 (branch feat/lin-4469-prompt-folds)
+finding-143 finding to project: Look-first did not run on LIN-4469 (piece 5): at 22:39Z recommend-and-dispatch sent `implementation` directly (dispatch b86c4a78), though the ticket held only `## As asked` and `## Current`, with no size record, plan, PR or earlier run. The survey-task, survey-place, scoping sequence (`lib/recommendation-look-first.js`) ran on pieces 0 to 4. Not overridden or aborted: the plan is approved at the parent (verdict-121) and breakdown sized the piece (decision-130), but that size lives on the parent, not the ticket. Raw material for the look-first rule: either it should treat an approved-parent piece as sized, or it misfired here. Posted on LIN-4448 (comment cea38032).
+finding-152 finding to close-out: Fix 5 (before the merge): lib/prompts/leftover-words.js now imports area-registry-path.js (itself import-free, so the leaf property holds in substance), and the import sits mid-file at line 37. Move it to the top of the module, and update the area Lesson "import-free leaf" (docs/areas/llm-and-prompts.md; lesson-9 here) to "a leaf that imports only leaves (area-registry-path.js)".
+finding-154 finding to leftover: No builder ### Leftovers answer with a Retires: line is on LIN-4469, so the gate-format check has nothing to check against. Before the merge: post the leftover answer, its Retires: line naming a Waiting entry this diff removes. The PR body's ## Retires names notes-PR, committed-tool, first-match and CUT, which the diff does remove or rewrite; the retirement-line entry is claimed but not done until Fix 1 lands.
+check-155 check to John: After the deploy of PR #2447: the mandate shrink holds only if every restricted dispatch carries a stamped token (lesson-12, LIN-4349); LIN-4468 notes that a missing row mints stage-less, which means unrestricted.
+question-158 question to John: Ruling lin-4469-witness (raised on LIN-4448, record on LIN-4469; replaces lin-4469-cuts with the corrected figures): LIN-4469 asks for a net rendered-byte fall across every kind. Four work kinds (blocked, breakdown, close-out, retrospective-audit) carry none of the folded text, so they stay byte-identical in real context; the other kinds fall (look-into and retro -74; context, survey-task, survey-place -23; blind-read -24; triage -67). Accept that as meeting the ask?
+## 8. The previous stage
+run-146 review: # What this stage really wrote (in full: get run-146)
