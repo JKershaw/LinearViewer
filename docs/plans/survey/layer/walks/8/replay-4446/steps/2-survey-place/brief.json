@@ -1,0 +1,91 @@
+{
+ "actor": "survey-place",
+ "task": "task-8",
+ "asOf": "2026-11-13T13:15:07.717Z",
+ "carries": {
+  "asked": 1,
+  "plan": 0,
+  "addressed": 0,
+  "stands": 0,
+  "projectOpen": 5,
+  "lessons": 2,
+  "runs": 0,
+  "index": 7,
+  "previous": 1
+ },
+ "bytes": 6490,
+ "parts": {
+  "task": {
+   "id": "task-8",
+   "ref": "LIN-4446",
+   "done-when": "the reading of the rule is in the project's notes; the first slice has landed, sharing rather than restating, lighter than before and naming what it retired; and John has read the first slice's result before the next starts.",
+   "asked": [
+    {
+     "task": "task-8",
+     "asked": "**Repository:** JKershaw/LinearViewer (Harbour).\n\n**What this is for.** John: \"Side rail and other UI improvements are important purely because the current ones are just mostly the original ones and are due a bit of a sprinkling. But! The front end code is messy.\" And his gut: \"the UI issues trace back to one of my very first rules: no build step… it's the biggest target of the Theseus method… We don't need to tidy it all, but it's a perfect example where we can leave it better than we found it. Likely this will take a fair amount of hand holding.\"\n\nOn main (9 Nov), no browser file can import another, nine browser files restate logic the server already has, and the largest browser file is 5,019 lines.\n\nOn the views, John: \"Lots of light little views is ideal, but the cost of them has to be balanced… I'd be sad to get rid, but happy to tidy.\"\n\n**What we want.**\n\n* Browser code that shares rather than restates. There's still no build step and no framework: the rule stays, read as allowing the browser to import, as browsers do natively, and that reading goes into the project's own notes.\n* Taken in small slices, one view or one shared piece at a time. Each view is reworked only after finding out why it got so large, and comes out lighter.\n* Anything bigger that a slice spots is left out of it and goes into the area's note.\n* The side rail and the visual refresh come after, built on the cleaner code.\n* No view is retired unless John rules it.\n\nJohn expects agents to reach for big moves here: \"very likely to get agents trying really hard to do big things when we want small.\" So the size is John's call, and for this work it's small.\n\n**Done when** the reading of the rule is in the project's notes; the first slice has landed, sharing rather than restating, lighter than before and naming what it retired; and John has read the first slice's result before the next starts.\n\n**Every change names what it retires. Questions:** settle engineering questions yourself; only John's calls (product, money, authority, what to retire) go to him as rulings."
+    }
+   ]
+  },
+  "plan": [],
+  "addressed": [],
+  "stands": [],
+  "project": {
+   "open": 5,
+   "lessons": 2,
+   "lookup": [
+    "find --to project --text <words>",
+    "find --kind lesson --text <words>"
+   ]
+  },
+  "runs": [],
+  "index": [
+   {
+    "id": "finding-9",
+    "kind": "finding",
+    "to": "design",
+    "says": "Survey LIN-4446 @ 4b5001ddf, hard 1: \"allow the browser to import\" does not turn imports on. `server.js:1228` serves only `public/`, so the server modules a browser file restates (`lib/cost-format.js` etc.) have no URL. Sharing needs a served place for pure modules that both `lib/` and the browser import, plus a rule for it (no Node built-ins, no DOM at load); without the rule someone will import a module that pulls in `node:fs`. CSP `script-src 'self'` already allows module scripts loaded from a file."
+   },
+   {
+    "id": "finding-10",
+    "kind": "finding",
+    "to": "design",
+    "says": "Survey LIN-4446 @ 4b5001ddf, hard 2: every page is classic scripts talking through globals. `lib/components/page.js` writes ordered `<script src>` tags; files read `window.X` and top-level bindings from `public/common.js` (3,309 lines, on 29 pages). A classic script can't use static `import`; making a view `type=\"module\"` makes it deferred, strict and module-scoped, so its globals vanish for later scripts. \"One view at a time\" is blocked until what views read from `common.js` is reachable another way. Keep this out of the first slice; it goes into the area note (`docs/areas/front-end-browser.md`)."
+   },
+   {
+    "id": "finding-11",
+    "kind": "finding",
+    "to": "design",
+    "says": "Survey LIN-4446 @ 4b5001ddf, hard 3: the test harness assumes classic scripts. 130 unit test files load `public/*.js` through `vm` (`tests/unit/helpers/client-world.js`, plus `runInNewContext` in the parity tests); none use `vm.SourceTextModule`. A browser file that gains an `import` line breaks all of them. That cost is not in the ticket."
+   },
+   {
+    "id": "finding-12",
+    "kind": "finding",
+    "to": "design",
+    "says": "Survey LIN-4446 @ 4b5001ddf, hard 4: \"lighter\" is easy to fake. About 1,985 of `public/observation.js`'s 5,019 lines are comments (ticket history, retuning stories), and 1,456 of `public/common.js`'s 3,309. Cutting comments passes a line count without sharing anything. The why-so-large check (68 commits on `observation.js`) should count logic and commentary separately, and \"lighter\" be judged on logic."
+   },
+   {
+    "id": "finding-13",
+    "kind": "finding",
+    "to": "design",
+    "says": "Survey LIN-4446 @ 4b5001ddf, hard 5: the ticket is a symptom and the repo already says so. `docs/papers/harbour/the-second-copy.md` §9–10 traces the copies to the no-build-step rule read as \"no sharing\": parity tests and helpers nobody was required to adopt kept the copies alive, and only deleting the old copy ever finished a consolidation. A slice that adds a shared module and keeps the old copy or its parity test repeats that pattern."
+   },
+   {
+    "id": "finding-14",
+    "kind": "finding",
+    "to": "design",
+    "says": "Survey LIN-4446 @ 4b5001ddf, recommended first move: write the reading of the rule (browser may import natively; still no build step, no framework) into `CLAUDE.md:43` and `docs/areas/front-end-browser.md`, then take cost-format as the first slice: `lib/cost-format.js` (46 lines, no imports) becomes the one served shared module, still importable by `lib/render-*.js`; retire `public/cost-format.js` (a self-declared \"restatement\") and `tests/unit/cost-format-parity.test.js`. Its 4 consumers (`flight-companion`, `prompt-section`, `observation`, `workspace-kpis`) call `window.CostFormat` only inside handlers/render functions, never at load, so a small module shim setting `window.CostFormat` runs early enough (module scripts run before `DOMContentLoaded`) and no view becomes a module yet. Update `tests/unit/cost-read-census.test.js:85` and the vm suites that name `cost-format.js`. This settles where shared modules are served, the purity rule and the test path on a pure function before any view is touched; view size and `common.js`'s globals stay out of the slice."
+   },
+   {
+    "id": "check-15",
+    "kind": "check",
+    "to": "John",
+    "says": "John reads the first slice's result before the next slice starts."
+   }
+  ],
+  "previous": {
+   "id": "run-16",
+   "stage": "survey-task",
+   "account": "# What this stage really wrote"
+  }
+ }
+}

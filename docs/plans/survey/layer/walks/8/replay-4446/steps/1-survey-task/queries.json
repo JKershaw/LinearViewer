@@ -1,0 +1,40 @@
+[
+ {
+  "at": "2026-11-18T10:00:36.927Z",
+  "by": "survey-task",
+  "cmd": "find",
+  "args": [
+   "--to",
+   "project",
+   "--state",
+   "open",
+   "--by",
+   "survey-task"
+  ],
+  "asOf": null
+ },
+ {
+  "at": "2026-11-18T10:00:36.957Z",
+  "by": "survey-task",
+  "cmd": "find",
+  "args": [
+   "--kind",
+   "lesson",
+   "--by",
+   "survey-task"
+  ],
+  "asOf": null
+ },
+ {
+  "at": "2026-11-18T10:00:36.985Z",
+  "by": "survey-task",
+  "cmd": "show",
+  "args": [
+   "--task",
+   "task-8",
+   "--by",
+   "survey-task"
+  ],
+  "asOf": null
+ }
+]

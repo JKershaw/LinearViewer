@@ -1,5 +1,5 @@
 {
-  "next": 9,
+  "next": 17,
   "records": {
     "lesson-1": [
       {
@@ -130,6 +130,201 @@
           "done-when": "the reading of the rule is in the project's notes; the first slice has landed, sharing rather than restating, lighter than before and naming what it retired; and John has read the first slice's result before the next starts."
         }
       }
+    ],
+    "finding-9": [
+      {
+        "id": "finding-9",
+        "kind": "finding",
+        "v": 1,
+        "op": "add",
+        "at": "2026-11-13T13:12:08.528Z",
+        "by": "survey-task",
+        "in": "task-8",
+        "to": "design",
+        "state": "open",
+        "links": {},
+        "fields": {
+          "says": "Survey LIN-4446 @ 4b5001ddf, hard 1: \"allow the browser to import\" does not turn imports on. `server.js:1228` serves only `public/`, so the server modules a browser file restates (`lib/cost-format.js` etc.) have no URL. Sharing needs a served place for pure modules that both `lib/` and the browser import, plus a rule for it (no Node built-ins, no DOM at load); without the rule someone will import a module that pulls in `node:fs`. CSP `script-src 'self'` already allows module scripts loaded from a file."
+        }
+      }
+    ],
+    "finding-10": [
+      {
+        "id": "finding-10",
+        "kind": "finding",
+        "v": 1,
+        "op": "add",
+        "at": "2026-11-13T13:12:09.528Z",
+        "by": "survey-task",
+        "in": "task-8",
+        "to": "design",
+        "state": "open",
+        "links": {},
+        "fields": {
+          "says": "Survey LIN-4446 @ 4b5001ddf, hard 2: every page is classic scripts talking through globals. `lib/components/page.js` writes ordered `<script src>` tags; files read `window.X` and top-level bindings from `public/common.js` (3,309 lines, on 29 pages). A classic script can't use static `import`; making a view `type=\"module\"` makes it deferred, strict and module-scoped, so its globals vanish for later scripts. \"One view at a time\" is blocked until what views read from `common.js` is reachable another way. Keep this out of the first slice; it goes into the area note (`docs/areas/front-end-browser.md`)."
+        }
+      }
+    ],
+    "finding-11": [
+      {
+        "id": "finding-11",
+        "kind": "finding",
+        "v": 1,
+        "op": "add",
+        "at": "2026-11-13T13:12:10.528Z",
+        "by": "survey-task",
+        "in": "task-8",
+        "to": "design",
+        "state": "open",
+        "links": {},
+        "fields": {
+          "says": "Survey LIN-4446 @ 4b5001ddf, hard 3: the test harness assumes classic scripts. 130 unit test files load `public/*.js` through `vm` (`tests/unit/helpers/client-world.js`, plus `runInNewContext` in the parity tests); none use `vm.SourceTextModule`. A browser file that gains an `import` line breaks all of them. That cost is not in the ticket."
+        }
+      }
+    ],
+    "finding-12": [
+      {
+        "id": "finding-12",
+        "kind": "finding",
+        "v": 1,
+        "op": "add",
+        "at": "2026-11-13T13:12:11.528Z",
+        "by": "survey-task",
+        "in": "task-8",
+        "to": "design",
+        "state": "open",
+        "links": {},
+        "fields": {
+          "says": "Survey LIN-4446 @ 4b5001ddf, hard 4: \"lighter\" is easy to fake. About 1,985 of `public/observation.js`'s 5,019 lines are comments (ticket history, retuning stories), and 1,456 of `public/common.js`'s 3,309. Cutting comments passes a line count without sharing anything. The why-so-large check (68 commits on `observation.js`) should count logic and commentary separately, and \"lighter\" be judged on logic."
+        }
+      }
+    ],
+    "finding-13": [
+      {
+        "id": "finding-13",
+        "kind": "finding",
+        "v": 1,
+        "op": "add",
+        "at": "2026-11-13T13:12:12.528Z",
+        "by": "survey-task",
+        "in": "task-8",
+        "to": "design",
+        "state": "open",
+        "links": {},
+        "fields": {
+          "says": "Survey LIN-4446 @ 4b5001ddf, hard 5: the ticket is a symptom and the repo already says so. `docs/papers/harbour/the-second-copy.md` §9–10 traces the copies to the no-build-step rule read as \"no sharing\": parity tests and helpers nobody was required to adopt kept the copies alive, and only deleting the old copy ever finished a consolidation. A slice that adds a shared module and keeps the old copy or its parity test repeats that pattern."
+        }
+      },
+      {
+        "id": "finding-13",
+        "kind": "finding",
+        "v": 2,
+        "op": "link",
+        "at": "2026-11-13T13:12:15.528Z",
+        "by": "survey-task",
+        "in": "task-8",
+        "to": "design",
+        "state": "open",
+        "links": {
+          "about": [
+            "finding-4"
+          ]
+        },
+        "fields": {
+          "says": "Survey LIN-4446 @ 4b5001ddf, hard 5: the ticket is a symptom and the repo already says so. `docs/papers/harbour/the-second-copy.md` §9–10 traces the copies to the no-build-step rule read as \"no sharing\": parity tests and helpers nobody was required to adopt kept the copies alive, and only deleting the old copy ever finished a consolidation. A slice that adds a shared module and keeps the old copy or its parity test repeats that pattern."
+        }
+      },
+      {
+        "id": "finding-13",
+        "kind": "finding",
+        "v": 3,
+        "op": "link",
+        "at": "2026-11-13T13:12:16.528Z",
+        "by": "survey-task",
+        "in": "task-8",
+        "to": "design",
+        "state": "open",
+        "links": {
+          "about": [
+            "finding-4",
+            "finding-5"
+          ]
+        },
+        "fields": {
+          "says": "Survey LIN-4446 @ 4b5001ddf, hard 5: the ticket is a symptom and the repo already says so. `docs/papers/harbour/the-second-copy.md` §9–10 traces the copies to the no-build-step rule read as \"no sharing\": parity tests and helpers nobody was required to adopt kept the copies alive, and only deleting the old copy ever finished a consolidation. A slice that adds a shared module and keeps the old copy or its parity test repeats that pattern."
+        }
+      }
+    ],
+    "finding-14": [
+      {
+        "id": "finding-14",
+        "kind": "finding",
+        "v": 1,
+        "op": "add",
+        "at": "2026-11-13T13:12:13.528Z",
+        "by": "survey-task",
+        "in": "task-8",
+        "to": "design",
+        "state": "open",
+        "links": {},
+        "fields": {
+          "says": "Survey LIN-4446 @ 4b5001ddf, recommended first move: write the reading of the rule (browser may import natively; still no build step, no framework) into `CLAUDE.md:43` and `docs/areas/front-end-browser.md`, then take cost-format as the first slice: `lib/cost-format.js` (46 lines, no imports) becomes the one served shared module, still importable by `lib/render-*.js`; retire `public/cost-format.js` (a self-declared \"restatement\") and `tests/unit/cost-format-parity.test.js`. Its 4 consumers (`flight-companion`, `prompt-section`, `observation`, `workspace-kpis`) call `window.CostFormat` only inside handlers/render functions, never at load, so a small module shim setting `window.CostFormat` runs early enough (module scripts run before `DOMContentLoaded`) and no view becomes a module yet. Update `tests/unit/cost-read-census.test.js:85` and the vm suites that name `cost-format.js`. This settles where shared modules are served, the purity rule and the test path on a pure function before any view is touched; view size and `common.js`'s globals stay out of the slice."
+        }
+      }
+    ],
+    "check-15": [
+      {
+        "id": "check-15",
+        "kind": "check",
+        "v": 1,
+        "op": "add",
+        "at": "2026-11-13T13:12:14.528Z",
+        "by": "survey-task",
+        "in": "task-8",
+        "to": "John",
+        "state": "open",
+        "links": {},
+        "fields": {
+          "what": "John reads the first slice's result before the next slice starts.",
+          "why-person": "The done-when requires John's read, and slice size is John's call for this work (\"agents trying really hard to do big things when we want small\").",
+          "how": "Schedule it as a real pause after the first slice lands: show what it shares, what it retired, and logic-vs-commentary size before/after; no second slice is started until John has read it."
+        }
+      }
+    ],
+    "run-16": [
+      {
+        "id": "run-16",
+        "kind": "run",
+        "v": 1,
+        "op": "add",
+        "at": "2026-11-13T13:12:17.528Z",
+        "by": "survey-task",
+        "in": "task-8",
+        "state": "open",
+        "links": {},
+        "fields": {
+          "stage": "survey-task",
+          "account": "# What this stage really wrote\n\n## Comment on LIN-4446 at 13:14:03\n\n## Survey open-0: LIN-4446 @ 4b5001ddf\n\n**Why this will be hard**\n\n1. **\"Allow the browser to import\" doesn't turn imports on.** `server.js:1228` serves only `public/`, so the server modules a browser file restates (`lib/cost-format.js` etc.) have no URL. Sharing needs a served place for pure modules that both `lib/` and the browser import, plus a rule for it (no Node built-ins, no DOM at load). Without the rule, someone will import a module that pulls in `node:fs`. CSP `script-src 'self'` already allows module scripts loaded from a file.\n\n2. **Every page is classic scripts talking through globals.** `lib/components/page.js` writes ordered `<script src>` tags, and files read `window.X` and top-level bindings from `common.js` (3,309 lines, on 29 pages). A classic script can't use static `import`. Making a view `type=\"module\"` makes it deferred, strict and module-scoped, so its globals vanish for later scripts. \"One view at a time\" is blocked until what views read from `common.js` is reachable another way.\n\n3. **The test harness assumes classic scripts.** 130 unit test files load `public/*.js` through `vm` (`tests/unit/helpers/client-world.js`, plus `runInNewContext` in the parity tests). None use `vm.SourceTextModule`. A browser file that gains an `import` line breaks all of them. That cost isn't in the ticket.\n\n4. **\"Lighter\" is easy to fake.** About 1,985 of `observation.js`'s 5,019 lines are comments (ticket history, retuning stories), and 1,456 of `common.js`'s 3,309. Cutting comments passes a line count without sharing anything. The why-so-large check (68 commits on `observation.js`) should count logic and commentary separately.\n\n5. **The ticket is a symptom, and the repo already says so.** `docs/papers/harbour/the-second-copy.md` §9–10 traces the copies to the no-build-step rule read as \"no sharing\". It shows that parity tests and helpers nobody was required to adopt kept the copies alive, and that only deleting the old copy ever finished a consolidation. A slice that adds a shared module and keeps the old copy or its parity test repeats that pattern.\n\n**What I'd do first**\n\nWrite the reading of the rule into `CLAUDE.md:43` and `docs/areas/front-end-browser.md`, then take **cost-format** as the first slice:\n- `lib/cost-format.js` (46 lines, no imports) becomes the one served shared module and stays importable by `lib/render-*.js`.\n- **Retire** `public/cost-format.js` (a self-declared \"restatement\") and `tests/unit/cost-format-parity.test.js`.\n- Its 4 consumers (`flight-companion`, `prompt-section`, `observation`, `workspace-kpis`) call `window.CostFormat` only inside handlers and render functions, never at load. A small module shim that sets `window.CostFormat` therefore runs early enough (module scripts run before `DOMContentLoaded`), and no view has to become a module yet.\n- Update `cost-read-census.test.js:85` and the vm suites that name `cost-format.js`.\n\nThis settles where shared modules are served, the purity rule and the test path on a pure function before any view is touched. View size and `common.js`'s globals stay out of the slice and go into the area note. John's read of the first slice should be scheduled as a real pause.\n\n"
+        }
+      },
+      {
+        "id": "run-16",
+        "kind": "run",
+        "v": 2,
+        "op": "end",
+        "at": "2026-11-13T13:12:18.528Z",
+        "by": "survey-task",
+        "in": "task-8",
+        "state": "done",
+        "ended": {
+          "reason": "survey posted on LIN-4446; findings addressed to design, read-pause check to John"
+        },
+        "links": {},
+        "fields": {
+          "stage": "survey-task",
+          "account": "# What this stage really wrote\n\n## Comment on LIN-4446 at 13:14:03\n\n## Survey open-0: LIN-4446 @ 4b5001ddf\n\n**Why this will be hard**\n\n1. **\"Allow the browser to import\" doesn't turn imports on.** `server.js:1228` serves only `public/`, so the server modules a browser file restates (`lib/cost-format.js` etc.) have no URL. Sharing needs a served place for pure modules that both `lib/` and the browser import, plus a rule for it (no Node built-ins, no DOM at load). Without the rule, someone will import a module that pulls in `node:fs`. CSP `script-src 'self'` already allows module scripts loaded from a file.\n\n2. **Every page is classic scripts talking through globals.** `lib/components/page.js` writes ordered `<script src>` tags, and files read `window.X` and top-level bindings from `common.js` (3,309 lines, on 29 pages). A classic script can't use static `import`. Making a view `type=\"module\"` makes it deferred, strict and module-scoped, so its globals vanish for later scripts. \"One view at a time\" is blocked until what views read from `common.js` is reachable another way.\n\n3. **The test harness assumes classic scripts.** 130 unit test files load `public/*.js` through `vm` (`tests/unit/helpers/client-world.js`, plus `runInNewContext` in the parity tests). None use `vm.SourceTextModule`. A browser file that gains an `import` line breaks all of them. That cost isn't in the ticket.\n\n4. **\"Lighter\" is easy to fake.** About 1,985 of `observation.js`'s 5,019 lines are comments (ticket history, retuning stories), and 1,456 of `common.js`'s 3,309. Cutting comments passes a line count without sharing anything. The why-so-large check (68 commits on `observation.js`) should count logic and commentary separately.\n\n5. **The ticket is a symptom, and the repo already says so.** `docs/papers/harbour/the-second-copy.md` §9–10 traces the copies to the no-build-step rule read as \"no sharing\". It shows that parity tests and helpers nobody was required to adopt kept the copies alive, and that only deleting the old copy ever finished a consolidation. A slice that adds a shared module and keeps the old copy or its parity test repeats that pattern.\n\n**What I'd do first**\n\nWrite the reading of the rule into `CLAUDE.md:43` and `docs/areas/front-end-browser.md`, then take **cost-format** as the first slice:\n- `lib/cost-format.js` (46 lines, no imports) becomes the one served shared module and stays importable by `lib/render-*.js`.\n- **Retire** `public/cost-format.js` (a self-declared \"restatement\") and `tests/unit/cost-format-parity.test.js`.\n- Its 4 consumers (`flight-companion`, `prompt-section`, `observation`, `workspace-kpis`) call `window.CostFormat` only inside handlers and render functions, never at load. A small module shim that sets `window.CostFormat` therefore runs early enough (module scripts run before `DOMContentLoaded`), and no view has to become a module yet.\n- Update `cost-read-census.test.js:85` and the vm suites that name `cost-format.js`.\n\nThis settles where shared modules are served, the purity rule and the test path on a pure function before any view is touched. View size and `common.js`'s globals stay out of the slice and go into the area note. John's read of the first slice should be scheduled as a real pause.\n\n"
+        }
+      }
     ]
   },
   "log": [
@@ -168,6 +363,44 @@
         "task-8",
         "--by",
         "survey-task"
+      ],
+      "asOf": null
+    },
+    {
+      "at": "2026-11-18T10:01:42.510Z",
+      "by": "survey-place",
+      "cmd": "find",
+      "args": [
+        "--to",
+        "project",
+        "--state",
+        "open",
+        "--by",
+        "survey-place"
+      ],
+      "asOf": null
+    },
+    {
+      "at": "2026-11-18T10:01:42.546Z",
+      "by": "survey-place",
+      "cmd": "find",
+      "args": [
+        "--kind",
+        "lesson",
+        "--by",
+        "survey-place"
+      ],
+      "asOf": null
+    },
+    {
+      "at": "2026-11-18T10:01:42.583Z",
+      "by": "survey-place",
+      "cmd": "show",
+      "args": [
+        "--task",
+        "task-8",
+        "--by",
+        "survey-place"
       ],
       "asOf": null
     }
