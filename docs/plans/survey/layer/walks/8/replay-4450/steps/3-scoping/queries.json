@@ -1,0 +1,187 @@
+[
+ {
+  "at": "2026-11-18T10:04:36.030Z",
+  "by": "scoping",
+  "cmd": "show",
+  "args": [
+   "--task",
+   "task-57",
+   "--by",
+   "scoping"
+  ],
+  "asOf": null
+ },
+ {
+  "at": "2026-11-18T10:04:36.064Z",
+  "by": "scoping",
+  "cmd": "find",
+  "args": [
+   "--kind",
+   "decision",
+   "--text",
+   "size",
+   "--by",
+   "scoping"
+  ],
+  "asOf": null
+ },
+ {
+  "at": "2026-11-18T10:04:36.096Z",
+  "by": "scoping",
+  "cmd": "find",
+  "args": [
+   "--kind",
+   "lesson",
+   "--text",
+   "tidy",
+   "--by",
+   "scoping"
+  ],
+  "asOf": null
+ },
+ {
+  "at": "2026-11-18T10:04:36.135Z",
+  "by": "scoping",
+  "cmd": "find",
+  "args": [
+   "--to",
+   "scoping",
+   "--state",
+   "open",
+   "--by",
+   "scoping"
+  ],
+  "asOf": null
+ },
+ {
+  "at": "2026-11-18T10:04:36.165Z",
+  "by": "scoping",
+  "cmd": "get",
+  "args": [
+   "run-69",
+   "--by",
+   "scoping"
+  ],
+  "asOf": null
+ },
+ {
+  "at": "2026-11-18T10:04:41.856Z",
+  "by": "scoping",
+  "cmd": "find",
+  "args": [
+   "--kind",
+   "lesson",
+   "--text",
+   "policy",
+   "--by",
+   "scoping"
+  ],
+  "asOf": null
+ },
+ {
+  "at": "2026-11-18T10:04:41.901Z",
+  "by": "scoping",
+  "cmd": "find",
+  "args": [
+   "--to",
+   "project",
+   "--state",
+   "open",
+   "--text",
+   "policy",
+   "--by",
+   "scoping"
+  ],
+  "asOf": null
+ },
+ {
+  "at": "2026-11-18T10:04:41.935Z",
+  "by": "scoping",
+  "cmd": "find",
+  "args": [
+   "--kind",
+   "lesson",
+   "--text",
+   "size",
+   "--by",
+   "scoping"
+  ],
+  "asOf": null
+ },
+ {
+  "at": "2026-11-18T10:04:41.978Z",
+  "by": "scoping",
+  "cmd": "find",
+  "args": [
+   "--to",
+   "project",
+   "--state",
+   "open",
+   "--text",
+   "size",
+   "--by",
+   "scoping"
+  ],
+  "asOf": null
+ },
+ {
+  "at": "2026-11-18T10:04:42.017Z",
+  "by": "scoping",
+  "cmd": "find",
+  "args": [
+   "--kind",
+   "lesson",
+   "--text",
+   "scop",
+   "--by",
+   "scoping"
+  ],
+  "asOf": null
+ },
+ {
+  "at": "2026-11-18T10:04:42.053Z",
+  "by": "scoping",
+  "cmd": "find",
+  "args": [
+   "--to",
+   "project",
+   "--state",
+   "open",
+   "--text",
+   "scop",
+   "--by",
+   "scoping"
+  ],
+  "asOf": null
+ },
+ {
+  "at": "2026-11-18T10:04:42.096Z",
+  "by": "scoping",
+  "cmd": "find",
+  "args": [
+   "--kind",
+   "lesson",
+   "--text",
+   "cut",
+   "--by",
+   "scoping"
+  ],
+  "asOf": null
+ },
+ {
+  "at": "2026-11-18T10:04:42.136Z",
+  "by": "scoping",
+  "cmd": "find",
+  "args": [
+   "--to",
+   "project",
+   "--state",
+   "open",
+   "--text",
+   "cut",
+   "--by",
+   "scoping"
+  ],
+  "asOf": null
+ }
+]

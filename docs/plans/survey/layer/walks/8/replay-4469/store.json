@@ -3233,6 +3233,263 @@
         "review"
       ],
       "asOf": null
+    },
+    {
+      "at": "2026-11-18T10:04:11.073Z",
+      "by": "review",
+      "cmd": "find",
+      "args": [
+        "--kind",
+        "lesson",
+        "--text",
+        "LIN-4349",
+        "--by",
+        "review"
+      ],
+      "asOf": null
+    },
+    {
+      "at": "2026-11-18T10:04:11.125Z",
+      "by": "review",
+      "cmd": "find",
+      "args": [
+        "--kind",
+        "lesson",
+        "--text",
+        "LIN-4376",
+        "--by",
+        "review"
+      ],
+      "asOf": null
+    },
+    {
+      "at": "2026-11-18T10:04:11.173Z",
+      "by": "review",
+      "cmd": "find",
+      "args": [
+        "--kind",
+        "lesson",
+        "--text",
+        "LIN-4369",
+        "--by",
+        "review"
+      ],
+      "asOf": null
+    },
+    {
+      "at": "2026-11-18T10:04:11.225Z",
+      "by": "review",
+      "cmd": "find",
+      "args": [
+        "--kind",
+        "lesson",
+        "--text",
+        "import-free",
+        "--by",
+        "review"
+      ],
+      "asOf": null
+    },
+    {
+      "at": "2026-11-18T10:04:11.267Z",
+      "by": "review",
+      "cmd": "find",
+      "args": [
+        "--state",
+        "open",
+        "--text",
+        "Retires:",
+        "--by",
+        "review"
+      ],
+      "asOf": null
+    },
+    {
+      "at": "2026-11-18T10:04:11.311Z",
+      "by": "review",
+      "cmd": "find",
+      "args": [
+        "--state",
+        "open",
+        "--text",
+        "Leftovers",
+        "--by",
+        "review"
+      ],
+      "asOf": null
+    },
+    {
+      "at": "2026-11-18T10:04:11.361Z",
+      "by": "review",
+      "cmd": "find",
+      "args": [
+        "--state",
+        "open",
+        "--text",
+        "tracker clause",
+        "--by",
+        "review"
+      ],
+      "asOf": null
+    },
+    {
+      "at": "2026-11-18T10:04:11.413Z",
+      "by": "review",
+      "cmd": "find",
+      "args": [
+        "--state",
+        "open",
+        "--text",
+        "triage",
+        "--by",
+        "review"
+      ],
+      "asOf": null
+    },
+    {
+      "at": "2026-11-18T10:04:11.463Z",
+      "by": "review",
+      "cmd": "find",
+      "args": [
+        "--state",
+        "open",
+        "--text",
+        "committed-tool",
+        "--by",
+        "review"
+      ],
+      "asOf": null
+    },
+    {
+      "at": "2026-11-18T10:04:11.517Z",
+      "by": "review",
+      "cmd": "find",
+      "args": [
+        "--state",
+        "open",
+        "--text",
+        "change-coupling",
+        "--by",
+        "review"
+      ],
+      "asOf": null
+    },
+    {
+      "at": "2026-11-18T10:04:11.566Z",
+      "by": "review",
+      "cmd": "find",
+      "args": [
+        "--state",
+        "open",
+        "--text",
+        "lin-4469",
+        "--by",
+        "review"
+      ],
+      "asOf": null
+    },
+    {
+      "at": "2026-11-18T10:04:11.619Z",
+      "by": "review",
+      "cmd": "find",
+      "args": [
+        "--state",
+        "open",
+        "--text",
+        "LIN-4469",
+        "--by",
+        "review"
+      ],
+      "asOf": null
+    },
+    {
+      "at": "2026-11-18T10:04:11.669Z",
+      "by": "review",
+      "cmd": "find",
+      "args": [
+        "--state",
+        "open",
+        "--text",
+        "LIN-4350",
+        "--by",
+        "review"
+      ],
+      "asOf": null
+    },
+    {
+      "at": "2026-11-18T10:04:11.717Z",
+      "by": "review",
+      "cmd": "find",
+      "args": [
+        "--state",
+        "open",
+        "--text",
+        "stage-less",
+        "--by",
+        "review"
+      ],
+      "asOf": null
+    },
+    {
+      "at": "2026-11-18T10:04:15.743Z",
+      "by": "review",
+      "cmd": "get",
+      "args": [
+        "finding-37",
+        "--by",
+        "review"
+      ],
+      "asOf": null
+    },
+    {
+      "at": "2026-11-18T10:04:15.783Z",
+      "by": "review",
+      "cmd": "get",
+      "args": [
+        "finding-39",
+        "--by",
+        "review"
+      ],
+      "asOf": null
+    },
+    {
+      "at": "2026-11-18T10:04:15.822Z",
+      "by": "review",
+      "cmd": "get",
+      "args": [
+        "finding-25",
+        "--by",
+        "review"
+      ],
+      "asOf": null
+    },
+    {
+      "at": "2026-11-18T10:04:15.861Z",
+      "by": "review",
+      "cmd": "find",
+      "args": [
+        "--kind",
+        "verdict",
+        "--in",
+        "task-128",
+        "--by",
+        "review"
+      ],
+      "asOf": null
+    },
+    {
+      "at": "2026-11-18T10:04:15.893Z",
+      "by": "review",
+      "cmd": "find",
+      "args": [
+        "--to",
+        "review",
+        "--state",
+        "open",
+        "--by",
+        "review"
+      ],
+      "asOf": null
     }
   ]
 }

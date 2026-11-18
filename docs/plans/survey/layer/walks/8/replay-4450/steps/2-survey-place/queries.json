@@ -1,0 +1,380 @@
+[
+ {
+  "at": "2026-11-18T10:02:13.346Z",
+  "by": "survey-place",
+  "cmd": "get",
+  "args": [
+   "run-63",
+   "--by",
+   "survey-place"
+  ],
+  "asOf": null
+ },
+ {
+  "at": "2026-11-18T10:02:13.384Z",
+  "by": "survey-place",
+  "cmd": "find",
+  "args": [
+   "--to",
+   "survey-place",
+   "--state",
+   "open",
+   "--by",
+   "survey-place"
+  ],
+  "asOf": null
+ },
+ {
+  "at": "2026-11-18T10:02:13.414Z",
+  "by": "survey-place",
+  "cmd": "show",
+  "args": [
+   "--task",
+   "task-57",
+   "--by",
+   "survey-place"
+  ],
+  "asOf": null
+ },
+ {
+  "at": "2026-11-18T10:02:20.519Z",
+  "by": "survey-place",
+  "cmd": "find",
+  "args": [
+   "--to",
+   "project",
+   "--state",
+   "open",
+   "--text",
+   "jira",
+   "--by",
+   "survey-place"
+  ],
+  "asOf": null
+ },
+ {
+  "at": "2026-11-18T10:02:20.552Z",
+  "by": "survey-place",
+  "cmd": "find",
+  "args": [
+   "--to",
+   "project",
+   "--state",
+   "open",
+   "--text",
+   "Jira",
+   "--by",
+   "survey-place"
+  ],
+  "asOf": null
+ },
+ {
+  "at": "2026-11-18T10:02:20.588Z",
+  "by": "survey-place",
+  "cmd": "find",
+  "args": [
+   "--to",
+   "project",
+   "--state",
+   "open",
+   "--text",
+   "adf",
+   "--by",
+   "survey-place"
+  ],
+  "asOf": null
+ },
+ {
+  "at": "2026-11-18T10:02:20.622Z",
+  "by": "survey-place",
+  "cmd": "find",
+  "args": [
+   "--to",
+   "project",
+   "--state",
+   "open",
+   "--text",
+   "source-map",
+   "--by",
+   "survey-place"
+  ],
+  "asOf": null
+ },
+ {
+  "at": "2026-11-18T10:02:20.667Z",
+  "by": "survey-place",
+  "cmd": "find",
+  "args": [
+   "--to",
+   "project",
+   "--state",
+   "open",
+   "--text",
+   "proxy-integration",
+   "--by",
+   "survey-place"
+  ],
+  "asOf": null
+ },
+ {
+  "at": "2026-11-18T10:02:20.714Z",
+  "by": "survey-place",
+  "cmd": "find",
+  "args": [
+   "--to",
+   "project",
+   "--state",
+   "open",
+   "--text",
+   "plainText",
+   "--by",
+   "survey-place"
+  ],
+  "asOf": null
+ },
+ {
+  "at": "2026-11-18T10:02:20.756Z",
+  "by": "survey-place",
+  "cmd": "find",
+  "args": [
+   "--to",
+   "project",
+   "--state",
+   "open",
+   "--text",
+   "search/jql",
+   "--by",
+   "survey-place"
+  ],
+  "asOf": null
+ },
+ {
+  "at": "2026-11-18T10:02:20.796Z",
+  "by": "survey-place",
+  "cmd": "find",
+  "args": [
+   "--to",
+   "project",
+   "--state",
+   "open",
+   "--text",
+   "sealForFiling",
+   "--by",
+   "survey-place"
+  ],
+  "asOf": null
+ },
+ {
+  "at": "2026-11-18T10:02:20.835Z",
+  "by": "survey-place",
+  "cmd": "find",
+  "args": [
+   "--to",
+   "project",
+   "--state",
+   "open",
+   "--text",
+   "D1",
+   "--by",
+   "survey-place"
+  ],
+  "asOf": null
+ },
+ {
+  "at": "2026-11-18T10:02:20.869Z",
+  "by": "survey-place",
+  "cmd": "find",
+  "args": [
+   "--to",
+   "project",
+   "--state",
+   "open",
+   "--text",
+   "first-dispatch",
+   "--by",
+   "survey-place"
+  ],
+  "asOf": null
+ },
+ {
+  "at": "2026-11-18T10:02:20.903Z",
+  "by": "survey-place",
+  "cmd": "find",
+  "args": [
+   "--to",
+   "project",
+   "--state",
+   "open",
+   "--text",
+   "codec",
+   "--by",
+   "survey-place"
+  ],
+  "asOf": null
+ },
+ {
+  "at": "2026-11-18T10:02:20.937Z",
+  "by": "survey-place",
+  "cmd": "find",
+  "args": [
+   "--kind",
+   "lesson",
+   "--text",
+   "jira",
+   "--by",
+   "survey-place"
+  ],
+  "asOf": null
+ },
+ {
+  "at": "2026-11-18T10:02:20.970Z",
+  "by": "survey-place",
+  "cmd": "find",
+  "args": [
+   "--kind",
+   "lesson",
+   "--text",
+   "Jira",
+   "--by",
+   "survey-place"
+  ],
+  "asOf": null
+ },
+ {
+  "at": "2026-11-18T10:02:21.004Z",
+  "by": "survey-place",
+  "cmd": "find",
+  "args": [
+   "--kind",
+   "lesson",
+   "--text",
+   "adf",
+   "--by",
+   "survey-place"
+  ],
+  "asOf": null
+ },
+ {
+  "at": "2026-11-18T10:02:21.047Z",
+  "by": "survey-place",
+  "cmd": "find",
+  "args": [
+   "--kind",
+   "lesson",
+   "--text",
+   "source-map",
+   "--by",
+   "survey-place"
+  ],
+  "asOf": null
+ },
+ {
+  "at": "2026-11-18T10:02:21.089Z",
+  "by": "survey-place",
+  "cmd": "find",
+  "args": [
+   "--kind",
+   "lesson",
+   "--text",
+   "comment",
+   "--by",
+   "survey-place"
+  ],
+  "asOf": null
+ },
+ {
+  "at": "2026-11-18T10:02:21.122Z",
+  "by": "survey-place",
+  "cmd": "find",
+  "args": [
+   "--kind",
+   "lesson",
+   "--text",
+   "helper",
+   "--by",
+   "survey-place"
+  ],
+  "asOf": null
+ },
+ {
+  "at": "2026-11-18T10:02:26.303Z",
+  "by": "survey-place",
+  "cmd": "find",
+  "args": [
+   "--to",
+   "project",
+   "--state",
+   "open",
+   "--by",
+   "survey-place"
+  ],
+  "asOf": null
+ },
+ {
+  "at": "2026-11-18T10:02:26.339Z",
+  "by": "survey-place",
+  "cmd": "find",
+  "args": [
+   "--in",
+   "task-50",
+   "--by",
+   "survey-place"
+  ],
+  "asOf": null
+ },
+ {
+  "at": "2026-11-18T10:02:31.487Z",
+  "by": "survey-place",
+  "cmd": "get",
+  "args": [
+   "finding-49",
+   "--by",
+   "survey-place"
+  ],
+  "asOf": null
+ },
+ {
+  "at": "2026-11-18T10:02:31.527Z",
+  "by": "survey-place",
+  "cmd": "get",
+  "args": [
+   "plan-52",
+   "--by",
+   "survey-place"
+  ],
+  "asOf": null
+ },
+ {
+  "at": "2026-11-18T10:02:31.590Z",
+  "by": "survey-place",
+  "cmd": "get",
+  "args": [
+   "plan-53",
+   "--by",
+   "survey-place"
+  ],
+  "asOf": null
+ },
+ {
+  "at": "2026-11-18T10:02:31.638Z",
+  "by": "survey-place",
+  "cmd": "get",
+  "args": [
+   "task-58",
+   "--by",
+   "survey-place"
+  ],
+  "asOf": null
+ },
+ {
+  "at": "2026-11-18T10:02:31.682Z",
+  "by": "survey-place",
+  "cmd": "get",
+  "args": [
+   "task-59",
+   "--by",
+   "survey-place"
+  ],
+  "asOf": null
+ }
+]

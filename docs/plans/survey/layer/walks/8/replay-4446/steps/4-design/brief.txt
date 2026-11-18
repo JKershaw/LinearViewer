@@ -1,0 +1,66 @@
+# Brief for design on task-8 as of 2026-11-13T13:23:04.310Z
+## 1. The task and the person's words
+task-8 ref LIN-4446 | done when: the reading of the rule is in the project's notes; the first slice has landed, sharing rather than restating, lighter than before and naming what it retired; and John has read the first slice's result before the next starts.
+asked (task-8): **Repository:** JKershaw/LinearViewer (Harbour).
+
+**What this is for.** John: "Side rail and other UI improvements are important purely because the current ones are just mostly the original ones and are due a bit of a sprinkling. But! The front end code is messy." And his gut: "the UI issues trace back to one of my very first rules: no build step… it's the biggest target of the Theseus method… We don't need to tidy it all, but it's a perfect example where we can leave it better than we found it. Likely this will take a fair amount of hand holding."
+
+On main (9 Nov), no browser file can import another, nine browser files restate logic the server already has, and the largest browser file is 5,019 lines.
+
+On the views, John: "Lots of light little views is ideal, but the cost of them has to be balanced… I'd be sad to get rid, but happy to tidy."
+
+**What we want.**
+
+* Browser code that shares rather than restates. There's still no build step and no framework: the rule stays, read as allowing the browser to import, as browsers do natively, and that reading goes into the project's own notes.
+* Taken in small slices, one view or one shared piece at a time. Each view is reworked only after finding out why it got so large, and comes out lighter.
+* Anything bigger that a slice spots is left out of it and goes into the area's note.
+* The side rail and the visual refresh come after, built on the cleaner code.
+* No view is retired unless John rules it.
+
+John expects agents to reach for big moves here: "very likely to get agents trying really hard to do big things when we want small." So the size is John's call, and for this work it's small.
+
+**Done when** the reading of the rule is in the project's notes; the first slice has landed, sharing rather than restating, lighter than before and naming what it retired; and John has read the first slice's result before the next starts.
+
+**Every change names what it retires. Questions:** settle engineering questions yourself; only John's calls (product, money, authority, what to retire) go to him as rulings.
+## 2. Its plan
+(none)
+## 3. Addressed to you
+finding-9@1 finding [open] to design by survey-task at 2026-11-13T13:12:08.528Z
+  says: Survey LIN-4446 @ 4b5001ddf, hard 1: "allow the browser to import" does not turn imports on. `server.js:1228` serves only `public/`, so the server modules a browser file restates (`lib/cost-format.js` etc.) have no URL. Sharing needs a served place for pure modules that both `lib/` and the browser import, plus a rule for it (no Node built-ins, no DOM at load); without the rule someone will import a module that pulls in `node:fs`. CSP `script-src 'self'` already allows module scripts loaded from a file.
+finding-10@1 finding [open] to design by survey-task at 2026-11-13T13:12:09.528Z
+  says: Survey LIN-4446 @ 4b5001ddf, hard 2: every page is classic scripts talking through globals. `lib/components/page.js` writes ordered `<script src>` tags; files read `window.X` and top-level bindings from `public/common.js` (3,309 lines, on 29 pages). A classic script can't use static `import`; making a view `type="module"` makes it deferred, strict and module-scoped, so its globals vanish for later scripts. "One view at a time" is blocked until what views read from `common.js` is reachable another way. Keep this out of the first slice; it goes into the area note (`docs/areas/front-end-browser.md`).
+finding-11@1 finding [open] to design by survey-task at 2026-11-13T13:12:10.528Z
+  says: Survey LIN-4446 @ 4b5001ddf, hard 3: the test harness assumes classic scripts. 130 unit test files load `public/*.js` through `vm` (`tests/unit/helpers/client-world.js`, plus `runInNewContext` in the parity tests); none use `vm.SourceTextModule`. A browser file that gains an `import` line breaks all of them. That cost is not in the ticket.
+finding-12@1 finding [open] to design by survey-task at 2026-11-13T13:12:11.528Z
+  says: Survey LIN-4446 @ 4b5001ddf, hard 4: "lighter" is easy to fake. About 1,985 of `public/observation.js`'s 5,019 lines are comments (ticket history, retuning stories), and 1,456 of `public/common.js`'s 3,309. Cutting comments passes a line count without sharing anything. The why-so-large check (68 commits on `observation.js`) should count logic and commentary separately, and "lighter" be judged on logic.
+finding-13@3 finding [open] to design by survey-task at 2026-11-13T13:12:16.528Z
+  says: Survey LIN-4446 @ 4b5001ddf, hard 5: the ticket is a symptom and the repo already says so. `docs/papers/harbour/the-second-copy.md` §9–10 traces the copies to the no-build-step rule read as "no sharing": parity tests and helpers nobody was required to adopt kept the copies alive, and only deleting the old copy ever finished a consolidation. A slice that adds a shared module and keeps the old copy or its parity test repeats that pattern.
+  about -> finding-4, finding-5
+finding-14@1 finding [open] to design by survey-task at 2026-11-13T13:12:13.528Z
+  says: Survey LIN-4446 @ 4b5001ddf, recommended first move: write the reading of the rule (browser may import natively; still no build step, no framework) into `CLAUDE.md:43` and `docs/areas/front-end-browser.md`, then take cost-format as the first slice: `lib/cost-format.js` (46 lines, no imports) becomes the one served shared module, still importable by `lib/render-*.js`; retire `public/cost-format.js` (a self-declared "restatement") and `tests/unit/cost-format-parity.test.js`. Its 4 consumers (`flight-companion`, `prompt-section`, `observation`, `workspace-kpis`) call `window.CostFormat` only inside handlers/render functions, never at load, so a small module shim setting `window.CostFormat` runs early enough (module scripts run before `DOMContentLoaded`) and no view becomes a module yet. Update `tests/unit/cost-read-census.test.js:85` and the vm suites that name `cost-format.js`. This settles where shared modules are served, the purity rule and the test path on a pure function before any view is touched; view size and `common.js`'s globals stay out of the slice.
+finding-17@3 finding [open] to design by survey-place at 2026-11-13T13:15:11.217Z
+  says: Survey place LIN-4446 @ 4b5001ddf: the rule note needs its limits, or it invites the big move. (1) Leaf modules only: `lib/cost-format.js`, `task-page-href.js`, `timeline-zoom.js` have zero imports and can be served as single files; `ship-layout`/`swim-lanes` import `providers/state-map.js` and `prompt-formatters` imports six modules, so they cannot. (2) Served by allow-list, not by directory: a second `express.static("lib")` would expose all server source; extend `lib/vendor-assets.js` (frozen URL→file allow-list, `statSync` at boot so a missing file fails the boot) so there stays one way to serve files from outside `public/`. (3) The `vm` loaders stay as they are until a view is converted. Put all three in `CLAUDE.md` with the reading of the rule.
+  about -> finding-9, finding-14
+finding-18@2 finding [open] to design by survey-place at 2026-11-13T13:15:13.217Z
+  says: Survey place LIN-4446 @ 4b5001ddf: what the cost-format slice must also touch, beyond finding-14s list. `tests/unit/cost-read-census.test.js` `FORMAT_ALLOW` names `public/cost-format.js` and goes stale silently (nothing fails on an extra entry). The two renderers that list `/cost-format.js`: `lib/render-flight-companion.js:400` and `lib/render-observation.js:366`. The `vm` suites that load it: `flight-companion-client`, `lin-3833-run-control`, `observation-scan-due`, `cost-read`. The doc comment in `lib/cost-format.js` that names its "browser twin". Retire `public/cost-format.js` and `cost-format-parity.test.js` together. The CSP already admits same-origin modules.
+  about -> finding-14
+finding-22@3 finding [open] to design by survey-place at 2026-11-13T13:15:24.217Z
+  says: Survey place LIN-4446 @ 4b5001ddf: counts disagree with survey-task. `public/observation.js` has 1,006 comment lines out of 4,679 non-blank (mostly logic), held at about 5,000 lines since mid-October; finding-12 says about 1,985 of 5,019 lines are comments. Unit suites running `public/` through `vm`: 126 here, 130 in finding-11. Recount with one stated method before the why-so-large check or a "lighter" judgement relies on either; the point stands that lighter is judged on logic, but trimming comments in `observation.js` would buy less than finding-12 implies.
+  about -> finding-12, finding-11
+## 4. What stands about this task
+decision-24@3 decision [stands] to design by scoping at 2026-11-13T13:18:46.775Z
+  scope: task-8
+  answer: Size of the move: just the task. The reading of the rule (browser may import natively; still no build step, no framework) goes into the project notes, and one cost formatter (lib/cost-format.js) is shared with the browser, retiring its restated copy public/cost-format.js and tests/unit/cost-format-parity.test.js; then a pause for John to read the result before any next slice. Cuts: none.
+  why: Decided by a ruling: John ruled the size small in the task ("the size is John's call, and for this work it's small"), and no Survey finding must come first. Written to LIN-4446 description by 13:22.
+  about -> finding-14, check-15
+## 5. The project
+7 open addressed to project (find --to project --text <words>); 2 lessons hold (find --kind lesson --text <words>)
+## 6. Other open runs
+(none)
+## 7. Index of what else is known
+check-15 check to John: John reads the first slice's result before the next slice starts.
+check-19 check to implementation: A test pins that every consumer of `window.CostFormat` (`flight-companion`, `prompt-section`, `observation`, `workspace-kpis`) reads it inside a handler or render function, never at load.
+finding-20 finding to project: Survey place LIN-4446 @ 4b5001ddf, the place: `public/` is 79 files, 35,264 lines of JS, all classic scripts sharing through `window.*` in the order each `lib/render-*.js` lists `scripts: [...]`. Growth 15.4k lines (1 Jul) → 29.1k (1 Oct) → 35.1k (9 Nov): about 1,200 lines/week in October, about 300 since 1 Nov; it has stopped getting worse but is not getting better. `public/common.js` (56 `window.` assignments) calls itself the "client twin" of `lib/task-page-href.js`, `lib/timeline-zoom.js`, `lib/ship-layout.js` and `lib/prompt-formatters.js`; `public/swim.js` copies `lib/swim-lanes.js`. After cost-format, `task-page-href` and `timeline-zoom` are the next leaf twins of the same shape (one slice each); `ship-layout`, `swim-lanes` and `prompt-formatters` are not leaves and wait for a transitive-serving answer.
+finding-21 finding to project: Survey place LIN-4446 @ 4b5001ddf, not this task: the `vm` harness (`tests/unit/helpers/client-world.js`, `loadWorld`; 126 suites) enforces "no imports" as much as the browser does: a file that becomes a module with static `import` no longer runs in it, and converting a view drags its whole suite family along. A module-capable client-test loader (`vm.SourceTextModule` or equivalent) has to exist before any view becomes a module, and is its own slice. After it: breaking up `common.js`s globals, then finding out why `observation.js` is as large as it is. The keepalive `statusCode` readers (finding-5) and `buildDispatchModelOptionDescriptors` (finding-4) belong to that work.
+## 8. The previous stage
+run-25 scoping: # What this stage really wrote (in full: get run-25)

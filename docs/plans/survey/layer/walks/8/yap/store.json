@@ -1,5 +1,5 @@
 {
-  "next": 5,
+  "next": 42,
   "records": {
     "plan-1": [
       {
@@ -10,6 +10,23 @@
         "at": "2026-04-22T20:33:00.000Z",
         "by": "yap-docs",
         "state": "kept",
+        "links": {},
+        "fields": {
+          "says": "TODO, ordered, each item unblocks the next. v0.1.0 prove the core loop: items 1-9 shipped; 10 Release v0.1.0 (publish to npm, deploy yap.jkershaw.com) is the next step for the maintainer. Between releases: 11 use it for real for a week or two, noting but not adding features; 12 re-read PHILOSOPHY.md and cut. Housekeeping: split server.ts into server.ts + auth.ts; structured logging later. v0.5.0 profiles: 13-15 whois/set_profile, tests, release. v1.0.0 fill out the vision: 16 reactive agent runtime (yap agent --config, OpenRouter), 17 CLI client, 18 web agent creator (in-process agent if OPENROUTER_KEY), 19 BYOK OAuth, 20 abuse guards, 21 observability polish (maybe a small who's here sidebar), 22 release v1.0.0. Never: anything on the will-not-add list; easy-not-used features; premature abstractions."
+        }
+      },
+      {
+        "id": "plan-1",
+        "kind": "plan",
+        "v": 2,
+        "op": "end",
+        "at": "2026-04-23T07:46:01.000Z",
+        "by": "yap-docs",
+        "state": "superseded",
+        "ended": {
+          "reason": "686f48f (07:19, split v1.0 into v0.2-v0.7) and 069deab (07:46, rescope v0.2.0 to documented integration), both outside the thread; the intermediate state after 686f48f is not in the material.",
+          "into": "plan-22"
+        },
         "links": {},
         "fields": {
           "says": "TODO, ordered, each item unblocks the next. v0.1.0 prove the core loop: items 1-9 shipped; 10 Release v0.1.0 (publish to npm, deploy yap.jkershaw.com) is the next step for the maintainer. Between releases: 11 use it for real for a week or two, noting but not adding features; 12 re-read PHILOSOPHY.md and cut. Housekeeping: split server.ts into server.ts + auth.ts; structured logging later. v0.5.0 profiles: 13-15 whois/set_profile, tests, release. v1.0.0 fill out the vision: 16 reactive agent runtime (yap agent --config, OpenRouter), 17 CLI client, 18 web agent creator (in-process agent if OPENROUTER_KEY), 19 BYOK OAuth, 20 abuse guards, 21 observability polish (maybe a small who's here sidebar), 22 release v1.0.0. Never: anything on the will-not-add list; easy-not-used features; premature abstractions."
@@ -65,6 +82,1188 @@
           "why": "design.md Reactive agent runtime section and TODO items 16 and 18 (v1.0.0).",
           "scope": "project"
         }
+      },
+      {
+        "id": "decision-4",
+        "kind": "decision",
+        "v": 2,
+        "op": "end",
+        "at": "2026-04-23T07:46:01.000Z",
+        "by": "yap-docs",
+        "state": "superseded",
+        "ended": {
+          "reason": "069deab (PR #18, outside the thread) moved the bundled runtime to rejected-ideas.md, added the Runtimes live out-of-tree principle and AGENTS.md.",
+          "into": "decision-23"
+        },
+        "links": {},
+        "fields": {
+          "answer": "Ship a reactive agent runtime in the yap package as yap agent (listen -> LLM -> say, config JSON, OpenRouter or direct provider); when an agent is created via the web UI on a server with OPENROUTER_KEY, run the same runtime in-process on the server.",
+          "why": "design.md Reactive agent runtime section and TODO items 16 and 18 (v1.0.0).",
+          "scope": "project"
+        }
+      }
+    ],
+    "task-5": [
+      {
+        "id": "task-5",
+        "kind": "task",
+        "v": 1,
+        "op": "add",
+        "at": "2026-04-22T20:52:07.000Z",
+        "by": "recorder",
+        "state": "open",
+        "links": {},
+        "fields": {
+          "ref": "claude/add-chat-connection-pgLc6"
+        }
+      },
+      {
+        "id": "task-5",
+        "kind": "task",
+        "v": 2,
+        "op": "end",
+        "at": "2026-04-22T21:20:26.000Z",
+        "by": "recorder",
+        "state": "done",
+        "ended": {
+          "reason": "PR #13 (change-7) merged at 20:53:44; the same branch was merged again as PR #14 at 21:20:26 (outside this thread, not recorded)."
+        },
+        "links": {},
+        "fields": {
+          "ref": "claude/add-chat-connection-pgLc6"
+        }
+      }
+    ],
+    "run-6": [
+      {
+        "id": "run-6",
+        "kind": "run",
+        "v": 1,
+        "op": "add",
+        "at": "2026-04-22T20:52:07.000Z",
+        "by": "claude-pgLc6",
+        "in": "task-5",
+        "state": "open",
+        "links": {},
+        "fields": {
+          "account": "Improve mobile UX: auto-grow textarea, safe areas, touch targets, font hierarchy\n\n- Replace single-line input with auto-growing textarea (Enter sends, Shift+Enter newlines)\n- Add viewport-fit=cover + env(safe-area-inset-*) padding for iPhone notch/home bar\n- Fix iOS Safari auto-zoom by enforcing 16px font-size on inputs in mobile breakpoint\n- Use 100dvh to handle virtual keyboard layout changes\n- Set min-height: 44px on buttons for comfortable touch targets\n- Switch message text (.msg) to system sans-serif for a friendlier reading experience\n  while keeping monospace for nicks, timestamps, and chrome\n- Add enterkeyhint=\"send\", autocorrect, autocapitalize, spellcheck to textarea\n- Add align-items: flex-end to say-form so button stays bottom-aligned as textarea grows\n\nhttps://claude.ai/code/session_01NHYy6dvJAsuWFDXQaYLtjd\n(Later on the same branch, outside this thread: ba31a8e \"Add auto-reconnect, session resume, and client-side message cache\".)"
+        }
+      },
+      {
+        "id": "run-6",
+        "kind": "run",
+        "v": 2,
+        "op": "end",
+        "at": "2026-04-22T21:18:00.000Z",
+        "by": "claude-pgLc6",
+        "in": "task-5",
+        "state": "done",
+        "ended": {
+          "reason": "Last commit by this session in the material is ba31a8e at 21:18 on the same branch (outside this thread; merged as PR #14 at 21:20:26)."
+        },
+        "links": {},
+        "fields": {
+          "account": "Improve mobile UX: auto-grow textarea, safe areas, touch targets, font hierarchy\n\n- Replace single-line input with auto-growing textarea (Enter sends, Shift+Enter newlines)\n- Add viewport-fit=cover + env(safe-area-inset-*) padding for iPhone notch/home bar\n- Fix iOS Safari auto-zoom by enforcing 16px font-size on inputs in mobile breakpoint\n- Use 100dvh to handle virtual keyboard layout changes\n- Set min-height: 44px on buttons for comfortable touch targets\n- Switch message text (.msg) to system sans-serif for a friendlier reading experience\n  while keeping monospace for nicks, timestamps, and chrome\n- Add enterkeyhint=\"send\", autocorrect, autocapitalize, spellcheck to textarea\n- Add align-items: flex-end to say-form so button stays bottom-aligned as textarea grows\n\nhttps://claude.ai/code/session_01NHYy6dvJAsuWFDXQaYLtjd\n(Later on the same branch, outside this thread: ba31a8e \"Add auto-reconnect, session resume, and client-side message cache\".)"
+        }
+      }
+    ],
+    "change-7": [
+      {
+        "id": "change-7",
+        "kind": "change",
+        "v": 1,
+        "op": "add",
+        "at": "2026-04-22T20:52:07.000Z",
+        "by": "claude-pgLc6",
+        "in": "task-5",
+        "state": "open",
+        "links": {},
+        "fields": {
+          "ref": "PR #13",
+          "head": "0538d1c"
+        }
+      },
+      {
+        "id": "change-7",
+        "kind": "change",
+        "v": 2,
+        "op": "end",
+        "at": "2026-04-22T20:53:44.000Z",
+        "by": "john",
+        "in": "task-5",
+        "state": "merged",
+        "ended": {
+          "reason": "Merged by john as 0046799 ('Merge pull request #13 … Improve mobile UX with textarea input and safe area support'), 1 min 37 s after the commit; no PR review text in the material (API 403)."
+        },
+        "links": {},
+        "fields": {
+          "ref": "PR #13",
+          "head": "0538d1c"
+        }
+      }
+    ],
+    "decision-8": [
+      {
+        "id": "decision-8",
+        "kind": "decision",
+        "v": 1,
+        "op": "add",
+        "at": "2026-04-22T20:52:07.000Z",
+        "by": "claude-pgLc6",
+        "in": "task-5",
+        "state": "stands",
+        "links": {
+          "about": [
+            "change-7"
+          ]
+        },
+        "fields": {
+          "answer": "The message input is an auto-growing textarea: Enter sends, Shift+Enter inserts a newline; the say button stays bottom-aligned as it grows; enterkeyhint=send, autocorrect, autocapitalize, spellcheck.",
+          "why": "Replaces the single-line input (0538d1c).",
+          "scope": "project"
+        }
+      }
+    ],
+    "decision-9": [
+      {
+        "id": "decision-9",
+        "kind": "decision",
+        "v": 1,
+        "op": "add",
+        "at": "2026-04-22T20:52:07.000Z",
+        "by": "claude-pgLc6",
+        "in": "task-5",
+        "state": "stands",
+        "links": {
+          "about": [
+            "change-7"
+          ]
+        },
+        "fields": {
+          "answer": "Size html/body with 100dvh to handle virtual keyboard layout changes.",
+          "why": "0538d1c: use 100dvh so the layout follows the virtual keyboard.",
+          "scope": "project"
+        }
+      },
+      {
+        "id": "decision-9",
+        "kind": "decision",
+        "v": 2,
+        "op": "end",
+        "at": "2026-04-23T08:12:32.000Z",
+        "by": "claude-WiOoe",
+        "in": "task-5",
+        "state": "superseded",
+        "ended": {
+          "reason": "72395ae replaces height: 100dvh with var(--app-height, 100dvh), driven by visualViewport.",
+          "into": "decision-41"
+        },
+        "links": {
+          "about": [
+            "change-7"
+          ]
+        },
+        "fields": {
+          "answer": "Size html/body with 100dvh to handle virtual keyboard layout changes.",
+          "why": "0538d1c: use 100dvh so the layout follows the virtual keyboard.",
+          "scope": "project"
+        }
+      }
+    ],
+    "decision-10": [
+      {
+        "id": "decision-10",
+        "kind": "decision",
+        "v": 1,
+        "op": "add",
+        "at": "2026-04-22T20:52:07.000Z",
+        "by": "claude-pgLc6",
+        "in": "task-5",
+        "state": "stands",
+        "links": {
+          "about": [
+            "change-7"
+          ]
+        },
+        "fields": {
+          "answer": "On mobile, buttons (leave, join, say) and the say textarea get min-height: 44px.",
+          "why": "Comfortable touch targets (0538d1c).",
+          "scope": "project"
+        }
+      },
+      {
+        "id": "decision-10",
+        "kind": "decision",
+        "v": 2,
+        "op": "end",
+        "at": "2026-04-23T07:52:59.000Z",
+        "by": "claude-2mB8v",
+        "in": "task-5",
+        "state": "superseded",
+        "ended": {
+          "reason": "fa2bad4 removes min-height: 44px from the header leave and here buttons; the rule now lives in decision-34.",
+          "into": "decision-34"
+        },
+        "links": {
+          "about": [
+            "change-7"
+          ]
+        },
+        "fields": {
+          "answer": "On mobile, buttons (leave, join, say) and the say textarea get min-height: 44px.",
+          "why": "Comfortable touch targets (0538d1c).",
+          "scope": "project"
+        }
+      }
+    ],
+    "decision-11": [
+      {
+        "id": "decision-11",
+        "kind": "decision",
+        "v": 1,
+        "op": "add",
+        "at": "2026-04-22T20:52:07.000Z",
+        "by": "claude-pgLc6",
+        "in": "task-5",
+        "state": "stands",
+        "links": {
+          "about": [
+            "change-7"
+          ]
+        },
+        "fields": {
+          "answer": "Message text (.msg) and the textarea use the system sans-serif; nicks, timestamps and chrome stay monospace.",
+          "why": "A friendlier reading experience (0538d1c).",
+          "scope": "project"
+        }
+      }
+    ],
+    "decision-12": [
+      {
+        "id": "decision-12",
+        "kind": "decision",
+        "v": 1,
+        "op": "add",
+        "at": "2026-04-22T20:52:07.000Z",
+        "by": "claude-pgLc6",
+        "in": "task-5",
+        "state": "stands",
+        "links": {
+          "about": [
+            "change-7"
+          ]
+        },
+        "fields": {
+          "answer": "viewport-fit=cover, with env(safe-area-inset-top/bottom) padding on the chat header and the say form.",
+          "why": "iPhone notch and home bar (0538d1c).",
+          "scope": "project"
+        }
+      }
+    ],
+    "lesson-13": [
+      {
+        "id": "lesson-13",
+        "kind": "lesson",
+        "v": 1,
+        "op": "add",
+        "at": "2026-04-22T20:52:07.000Z",
+        "by": "claude-pgLc6",
+        "state": "holds",
+        "links": {
+          "about": [
+            "change-7"
+          ]
+        },
+        "fields": {
+          "says": "iOS Safari auto-zooms on focus when an input's font-size is under 16px; the mobile breakpoint forces 16px on the join input and say textarea.",
+          "checked-at": "stated in 0538d1c; no device run in the material"
+        }
+      }
+    ],
+    "task-14": [
+      {
+        "id": "task-14",
+        "kind": "task",
+        "v": 1,
+        "op": "add",
+        "at": "2026-04-23T07:32:13.000Z",
+        "by": "recorder",
+        "state": "open",
+        "links": {},
+        "fields": {
+          "ref": "claude/fix-mobile-channel-members-fTjhR"
+        }
+      },
+      {
+        "id": "task-14",
+        "kind": "task",
+        "v": 2,
+        "op": "end",
+        "at": "2026-04-23T07:44:50.000Z",
+        "by": "recorder",
+        "state": "done",
+        "ended": {
+          "reason": "PR #16 (change-16) merged at 07:44:50."
+        },
+        "links": {},
+        "fields": {
+          "ref": "claude/fix-mobile-channel-members-fTjhR"
+        }
+      }
+    ],
+    "run-15": [
+      {
+        "id": "run-15",
+        "kind": "run",
+        "v": 1,
+        "op": "add",
+        "at": "2026-04-23T07:32:13.000Z",
+        "by": "claude-fTjhR",
+        "in": "task-14",
+        "state": "open",
+        "links": {},
+        "fields": {
+          "account": "Show who's here on mobile via a slide-in drawer\n\nThe mobile media query hid #who-panel entirely, so phone users had no\nway to see channel members. Add a \"here\" button to the chat header that\ntoggles the existing panel as a right-edge drawer on mobile; desktop\nkeeps the always-visible sidebar. Escape closes the drawer.\n\nAdd e2e screenshots for the mobile who drawer\n\nCaptures the new \"N here\" header button in its resting state and the\nslide-in drawer fully open, at the phone viewport, so the new UI can be\neyeballed alongside the rest of the screenshot set.\n\nhttps://claude.ai/code/session_01Kvg7m5hacw7tYqUVSv52R6"
+        }
+      },
+      {
+        "id": "run-15",
+        "kind": "run",
+        "v": 2,
+        "op": "end",
+        "at": "2026-04-23T07:42:44.000Z",
+        "by": "claude-fTjhR",
+        "in": "task-14",
+        "state": "done",
+        "ended": {
+          "reason": "Last commit by this session: 3aa81b5."
+        },
+        "links": {},
+        "fields": {
+          "account": "Show who's here on mobile via a slide-in drawer\n\nThe mobile media query hid #who-panel entirely, so phone users had no\nway to see channel members. Add a \"here\" button to the chat header that\ntoggles the existing panel as a right-edge drawer on mobile; desktop\nkeeps the always-visible sidebar. Escape closes the drawer.\n\nAdd e2e screenshots for the mobile who drawer\n\nCaptures the new \"N here\" header button in its resting state and the\nslide-in drawer fully open, at the phone viewport, so the new UI can be\neyeballed alongside the rest of the screenshot set.\n\nhttps://claude.ai/code/session_01Kvg7m5hacw7tYqUVSv52R6"
+        }
+      }
+    ],
+    "change-16": [
+      {
+        "id": "change-16",
+        "kind": "change",
+        "v": 1,
+        "op": "add",
+        "at": "2026-04-23T07:32:13.000Z",
+        "by": "claude-fTjhR",
+        "in": "task-14",
+        "state": "open",
+        "links": {},
+        "fields": {
+          "ref": "PR #16",
+          "head": "906b8ea"
+        }
+      },
+      {
+        "id": "change-16",
+        "kind": "change",
+        "v": 2,
+        "op": "revise",
+        "at": "2026-04-23T07:42:44.000Z",
+        "by": "claude-fTjhR",
+        "reason": "new head: 3aa81b5 adds e2e screenshots for the mobile who drawer (test code only, no image files)",
+        "in": "task-14",
+        "state": "open",
+        "links": {},
+        "fields": {
+          "ref": "PR #16",
+          "head": "3aa81b5"
+        }
+      },
+      {
+        "id": "change-16",
+        "kind": "change",
+        "v": 3,
+        "op": "end",
+        "at": "2026-04-23T07:44:50.000Z",
+        "by": "john",
+        "in": "task-14",
+        "state": "merged",
+        "ended": {
+          "reason": "Merged by john as 3ebd17d ('Add mobile who-panel drawer with toggle button'), 2 min after the last commit; no PR review text in the material."
+        },
+        "links": {},
+        "fields": {
+          "ref": "PR #16",
+          "head": "3aa81b5"
+        }
+      }
+    ],
+    "finding-17": [
+      {
+        "id": "finding-17",
+        "kind": "finding",
+        "v": 1,
+        "op": "add",
+        "at": "2026-04-23T07:32:13.000Z",
+        "by": "claude-fTjhR",
+        "in": "task-14",
+        "to": "task-14",
+        "state": "open",
+        "links": {},
+        "fields": {
+          "says": "The mobile media query hid #who-panel entirely, so phone users had no way to see channel members."
+        }
+      },
+      {
+        "id": "finding-17",
+        "kind": "finding",
+        "v": 2,
+        "op": "end",
+        "at": "2026-04-23T07:32:13.000Z",
+        "by": "claude-fTjhR",
+        "in": "task-14",
+        "to": "task-14",
+        "state": "done",
+        "ended": {
+          "reason": "906b8ea (change-16 head) adds the here toggle and drawer; see decision-18."
+        },
+        "links": {},
+        "fields": {
+          "says": "The mobile media query hid #who-panel entirely, so phone users had no way to see channel members."
+        }
+      }
+    ],
+    "decision-18": [
+      {
+        "id": "decision-18",
+        "kind": "decision",
+        "v": 1,
+        "op": "add",
+        "at": "2026-04-23T07:32:13.000Z",
+        "by": "claude-fTjhR",
+        "in": "task-14",
+        "state": "stands",
+        "links": {
+          "on": [
+            "finding-17@1"
+          ],
+          "about": [
+            "change-16"
+          ]
+        },
+        "fields": {
+          "answer": "On mobile the who panel is a right-edge slide-in drawer inside .chat-body (not covering header or input row), toggled by an \"N here\" header button with aria-expanded; desktop keeps the always-visible sidebar; Escape closes the drawer; leaving closes it and resets the count.",
+          "why": "Reuses the existing panel instead of hiding it (906b8ea).",
+          "scope": "project"
+        }
+      }
+    ],
+    "lesson-19": [
+      {
+        "id": "lesson-19",
+        "kind": "lesson",
+        "v": 1,
+        "op": "add",
+        "at": "2026-04-23T07:42:44.000Z",
+        "by": "claude-fTjhR",
+        "state": "holds",
+        "links": {
+          "about": [
+            "change-16"
+          ]
+        },
+        "fields": {
+          "says": "A Playwright fullPage screenshot widens past the phone viewport when an off-screen position:absolute drawer exists; capture viewport-only.",
+          "checked-at": "test comment in 3aa81b5"
+        }
+      }
+    ],
+    "lesson-20": [
+      {
+        "id": "lesson-20",
+        "kind": "lesson",
+        "v": 1,
+        "op": "add",
+        "at": "2026-04-23T07:42:44.000Z",
+        "by": "claude-fTjhR",
+        "state": "holds",
+        "links": {
+          "about": [
+            "change-16"
+          ]
+        },
+        "fields": {
+          "says": "The web UI refreshes the who list every 10 s, so a test that adds members via the API must allow up to one full interval (the spec waits 15 s for the count).",
+          "checked-at": "test comment in 3aa81b5"
+        }
+      }
+    ],
+    "check-21": [
+      {
+        "id": "check-21",
+        "kind": "check",
+        "v": 1,
+        "op": "add",
+        "at": "2026-04-23T07:42:44.000Z",
+        "by": "claude-fTjhR",
+        "in": "task-14",
+        "to": "john",
+        "state": "open",
+        "links": {
+          "about": [
+            "change-16"
+          ]
+        },
+        "fields": {
+          "what": "Eyeball 10-chat-mobile-who-closed.png and 11-chat-mobile-who-open.png (390x844, dark) alongside the rest of the screenshot set.",
+          "why-person": "The spec only waits for the count and the open transform; whether the drawer and the N here button look right is a visual call.",
+          "how": "Run the e2e screenshot spec; the images are not committed."
+        }
+      }
+    ],
+    "plan-22": [
+      {
+        "id": "plan-22",
+        "kind": "plan",
+        "v": 1,
+        "op": "add",
+        "at": "2026-04-23T07:46:01.000Z",
+        "by": "yap-docs",
+        "state": "kept",
+        "links": {},
+        "fields": {
+          "says": "TODO as of 592cf39. v0.1.0 unchanged (10 Release v0.1.0 still the next step for the maintainer). 12 Re-read PHILOSOPHY.md: this gate repeats between every minor release. v0.2.0 agent integration, documented: 13 write AGENTS.md, 14 Agents section in README, 15 pointer from /llms.txt, 16 seed yap-agents (planner, a deterministic dice/echo, claude-code), 17 release; no new code in yap beyond docs. v0.3.0 CLI client (18-20). v0.4.0 profiles (21-24, incl. document the set_profile startup pattern). v0.5.0 web agent creator producing a downloadable config for a yap-agents agent; server-hosted execution deferred by default (25-29). v0.6.0 BYOK OAuth, only if v0.5 ships server-hosted execution (30-32). v0.7.0 abuse guards, observability polish (maybe a small who's here sidebar), admin endpoints behind YAP_ADMIN_TOKEN (33-36). v1.0.0: no new features, release when lived with (37)."
+        }
+      }
+    ],
+    "decision-23": [
+      {
+        "id": "decision-23",
+        "kind": "decision",
+        "v": 1,
+        "op": "add",
+        "at": "2026-04-23T07:46:01.000Z",
+        "by": "yap-docs",
+        "state": "stands",
+        "links": {
+          "on": [
+            "decision-2@1"
+          ]
+        },
+        "fields": {
+          "answer": "Runtimes live out-of-tree: yap bundles no agent runtime. Authors write against the HTTP or MCP surface (documented in AGENTS.md, HTTP-first, MCP equal-footed) or pick a ready-made agent from the sibling yap-agents repo; server-hosted execution is deferred by default.",
+          "why": "A bundled runtime biases the project toward one agent shape (LLM + system prompt + JSON config) and turns feature requests into framework drift; it is the plugin-system drift with a friendlier name. Out-of-tree agents actively demonstrate that agents are clients.",
+          "scope": "project"
+        }
+      }
+    ],
+    "task-24": [
+      {
+        "id": "task-24",
+        "kind": "task",
+        "v": 1,
+        "op": "add",
+        "at": "2026-04-23T07:48:31.000Z",
+        "by": "recorder",
+        "state": "open",
+        "links": {},
+        "fields": {
+          "ref": "claude/fix-mobile-keyboard-overlap-7xpoy"
+        }
+      },
+      {
+        "id": "task-24",
+        "kind": "task",
+        "v": 2,
+        "op": "end",
+        "at": "2026-04-23T07:48:50.000Z",
+        "by": "recorder",
+        "state": "done",
+        "ended": {
+          "reason": "PR #17 (change-26) merged at 07:48:50."
+        },
+        "links": {},
+        "fields": {
+          "ref": "claude/fix-mobile-keyboard-overlap-7xpoy"
+        }
+      }
+    ],
+    "run-25": [
+      {
+        "id": "run-25",
+        "kind": "run",
+        "v": 1,
+        "op": "add",
+        "at": "2026-04-23T07:48:31.000Z",
+        "by": "claude-7xpoy",
+        "in": "task-24",
+        "state": "open",
+        "links": {},
+        "fields": {
+          "account": "Keep chat header visible when mobile keyboard opens\n\nAdd interactive-widget=resizes-content to the viewport meta so Chromium\nmobile browsers shrink the layout viewport (and 100dvh) when the virtual\nkeyboard appears. The flex column then recomputes instead of the page\nscrolling up to reveal the focused textarea, which was pushing the\nchannel header off the top of the screen."
+        }
+      },
+      {
+        "id": "run-25",
+        "kind": "run",
+        "v": 2,
+        "op": "end",
+        "at": "2026-04-23T07:48:31.000Z",
+        "by": "claude-7xpoy",
+        "in": "task-24",
+        "state": "done",
+        "ended": {
+          "reason": "Single commit 06b4711."
+        },
+        "links": {},
+        "fields": {
+          "account": "Keep chat header visible when mobile keyboard opens\n\nAdd interactive-widget=resizes-content to the viewport meta so Chromium\nmobile browsers shrink the layout viewport (and 100dvh) when the virtual\nkeyboard appears. The flex column then recomputes instead of the page\nscrolling up to reveal the focused textarea, which was pushing the\nchannel header off the top of the screen."
+        }
+      }
+    ],
+    "change-26": [
+      {
+        "id": "change-26",
+        "kind": "change",
+        "v": 1,
+        "op": "add",
+        "at": "2026-04-23T07:48:31.000Z",
+        "by": "claude-7xpoy",
+        "in": "task-24",
+        "state": "open",
+        "links": {},
+        "fields": {
+          "ref": "PR #17",
+          "head": "06b4711"
+        }
+      },
+      {
+        "id": "change-26",
+        "kind": "change",
+        "v": 2,
+        "op": "end",
+        "at": "2026-04-23T07:48:50.000Z",
+        "by": "john",
+        "in": "task-24",
+        "state": "merged",
+        "ended": {
+          "reason": "Merged by john as c9cbf83 ('Add interactive-widget viewport meta tag for better mobile UX'), 19 s after the commit; no PR review text in the material."
+        },
+        "links": {},
+        "fields": {
+          "ref": "PR #17",
+          "head": "06b4711"
+        }
+      }
+    ],
+    "finding-27": [
+      {
+        "id": "finding-27",
+        "kind": "finding",
+        "v": 1,
+        "op": "add",
+        "at": "2026-04-23T07:48:31.000Z",
+        "by": "claude-7xpoy",
+        "in": "task-24",
+        "to": "task-24",
+        "state": "open",
+        "links": {
+          "about": [
+            "decision-9"
+          ]
+        },
+        "fields": {
+          "says": "When the virtual keyboard opens, the page scrolls up to reveal the focused textarea, pushing the channel header off the top of the screen."
+        }
+      },
+      {
+        "id": "finding-27",
+        "kind": "finding",
+        "v": 2,
+        "op": "end",
+        "at": "2026-04-23T07:48:31.000Z",
+        "by": "claude-7xpoy",
+        "in": "task-24",
+        "to": "task-24",
+        "state": "done",
+        "ended": {
+          "reason": "06b4711 (change change-26) adds interactive-widget=resizes-content; see decision-29."
+        },
+        "links": {
+          "about": [
+            "decision-9"
+          ]
+        },
+        "fields": {
+          "says": "When the virtual keyboard opens, the page scrolls up to reveal the focused textarea, pushing the channel header off the top of the screen."
+        }
+      }
+    ],
+    "lesson-28": [
+      {
+        "id": "lesson-28",
+        "kind": "lesson",
+        "v": 1,
+        "op": "add",
+        "at": "2026-04-23T07:48:31.000Z",
+        "by": "claude-7xpoy",
+        "state": "holds",
+        "links": {
+          "about": [
+            "change-26"
+          ]
+        },
+        "fields": {
+          "says": "Without interactive-widget=resizes-content in the viewport meta, Chromium mobile browsers scroll the page to reveal a focused input instead of shrinking the layout viewport (and 100dvh) when the keyboard appears.",
+          "checked-at": "stated in 06b4711; no device run in the material"
+        }
+      }
+    ],
+    "decision-29": [
+      {
+        "id": "decision-29",
+        "kind": "decision",
+        "v": 1,
+        "op": "add",
+        "at": "2026-04-23T07:48:31.000Z",
+        "by": "claude-7xpoy",
+        "in": "task-24",
+        "state": "stands",
+        "links": {
+          "on": [
+            "finding-27@1",
+            "lesson-28@1"
+          ],
+          "about": [
+            "change-26",
+            "decision-9"
+          ]
+        },
+        "fields": {
+          "answer": "The viewport meta carries interactive-widget=resizes-content, so the flex column recomputes when the keyboard opens and the chat header stays visible.",
+          "why": "Chromium mobile shrinks the layout viewport and 100dvh instead of scrolling the page (06b4711).",
+          "scope": "project"
+        }
+      }
+    ],
+    "task-30": [
+      {
+        "id": "task-30",
+        "kind": "task",
+        "v": 1,
+        "op": "add",
+        "at": "2026-04-23T07:52:59.000Z",
+        "by": "recorder",
+        "state": "open",
+        "links": {},
+        "fields": {
+          "ref": "claude/mobile-topbar-cleanup-2mB8v"
+        }
+      },
+      {
+        "id": "task-30",
+        "kind": "task",
+        "v": 2,
+        "op": "end",
+        "at": "2026-04-23T08:03:54.000Z",
+        "by": "recorder",
+        "state": "done",
+        "ended": {
+          "reason": "PR #19 (change-32) merged at 08:03:54."
+        },
+        "links": {},
+        "fields": {
+          "ref": "claude/mobile-topbar-cleanup-2mB8v"
+        }
+      }
+    ],
+    "run-31": [
+      {
+        "id": "run-31",
+        "kind": "run",
+        "v": 1,
+        "op": "add",
+        "at": "2026-04-23T07:52:59.000Z",
+        "by": "claude-2mB8v",
+        "in": "task-30",
+        "state": "open",
+        "links": {},
+        "fields": {
+          "account": "Tidy up the mobile top bar\n\nDrop the borders and backgrounds from the \"here\" and \"leave\" buttons on\nmobile and trim the header padding, so the top bar takes less vertical\nspace. Tap targets are preserved via button padding.\n\nAlign mobile send button height with the input\n\nDropped the textarea's vertical padding so its intrinsic height no\nlonger exceeds the 44px min-height, leaving the send button and input\nat the same height."
+        }
+      },
+      {
+        "id": "run-31",
+        "kind": "run",
+        "v": 2,
+        "op": "end",
+        "at": "2026-04-23T08:03:02.000Z",
+        "by": "claude-2mB8v",
+        "in": "task-30",
+        "state": "done",
+        "ended": {
+          "reason": "Last commit by this session: 7184a34."
+        },
+        "links": {},
+        "fields": {
+          "account": "Tidy up the mobile top bar\n\nDrop the borders and backgrounds from the \"here\" and \"leave\" buttons on\nmobile and trim the header padding, so the top bar takes less vertical\nspace. Tap targets are preserved via button padding.\n\nAlign mobile send button height with the input\n\nDropped the textarea's vertical padding so its intrinsic height no\nlonger exceeds the 44px min-height, leaving the send button and input\nat the same height."
+        }
+      }
+    ],
+    "change-32": [
+      {
+        "id": "change-32",
+        "kind": "change",
+        "v": 1,
+        "op": "add",
+        "at": "2026-04-23T07:52:59.000Z",
+        "by": "claude-2mB8v",
+        "in": "task-30",
+        "state": "open",
+        "links": {},
+        "fields": {
+          "ref": "PR #19",
+          "head": "fa2bad4"
+        }
+      },
+      {
+        "id": "change-32",
+        "kind": "change",
+        "v": 2,
+        "op": "revise",
+        "at": "2026-04-23T08:03:02.000Z",
+        "by": "claude-2mB8v",
+        "reason": "new head: 7184a34 aligns the mobile send button height with the input",
+        "in": "task-30",
+        "state": "open",
+        "links": {},
+        "fields": {
+          "ref": "PR #19",
+          "head": "7184a34"
+        }
+      },
+      {
+        "id": "change-32",
+        "kind": "change",
+        "v": 3,
+        "op": "end",
+        "at": "2026-04-23T08:03:54.000Z",
+        "by": "john",
+        "in": "task-30",
+        "state": "merged",
+        "ended": {
+          "reason": "Merged by john as 456f01c, 52 s after the last commit; its title is the branch default 'Claude/mobile topbar cleanup 2m b8v'; no PR review text in the material."
+        },
+        "links": {},
+        "fields": {
+          "ref": "PR #19",
+          "head": "7184a34"
+        }
+      }
+    ],
+    "finding-33": [
+      {
+        "id": "finding-33",
+        "kind": "finding",
+        "v": 1,
+        "op": "add",
+        "at": "2026-04-23T07:52:59.000Z",
+        "by": "claude-2mB8v",
+        "in": "task-30",
+        "to": "task-30",
+        "state": "open",
+        "links": {
+          "about": [
+            "decision-10",
+            "decision-18"
+          ]
+        },
+        "fields": {
+          "says": "The mobile top bar takes too much vertical space: bordered, backgrounded here and leave buttons and 0.55rem header padding."
+        }
+      },
+      {
+        "id": "finding-33",
+        "kind": "finding",
+        "v": 2,
+        "op": "end",
+        "at": "2026-04-23T07:52:59.000Z",
+        "by": "claude-2mB8v",
+        "in": "task-30",
+        "to": "task-30",
+        "state": "done",
+        "ended": {
+          "reason": "fa2bad4 (change change-32) strips the header buttons and trims padding; see decision-34."
+        },
+        "links": {
+          "about": [
+            "decision-10",
+            "decision-18"
+          ]
+        },
+        "fields": {
+          "says": "The mobile top bar takes too much vertical space: bordered, backgrounded here and leave buttons and 0.55rem header padding."
+        }
+      }
+    ],
+    "decision-34": [
+      {
+        "id": "decision-34",
+        "kind": "decision",
+        "v": 1,
+        "op": "add",
+        "at": "2026-04-23T07:52:59.000Z",
+        "by": "claude-2mB8v",
+        "in": "task-30",
+        "state": "stands",
+        "links": {
+          "on": [
+            "finding-33@1"
+          ],
+          "about": [
+            "change-32",
+            "decision-18"
+          ]
+        },
+        "fields": {
+          "answer": "On mobile the join and say buttons and the say textarea keep min-height: 44px; the header leave and here buttons drop min-height, border and background and keep a usable tap target through 0.5rem padding; header padding is 0.3rem 0.5rem plus the top safe-area inset.",
+          "why": "A compact top bar with tap targets preserved via padding (fa2bad4).",
+          "scope": "project"
+        }
+      }
+    ],
+    "finding-35": [
+      {
+        "id": "finding-35",
+        "kind": "finding",
+        "v": 1,
+        "op": "add",
+        "at": "2026-04-23T08:03:02.000Z",
+        "by": "claude-2mB8v",
+        "in": "task-30",
+        "to": "task-30",
+        "state": "open",
+        "links": {
+          "about": [
+            "change-7",
+            "decision-34"
+          ]
+        },
+        "fields": {
+          "says": "On mobile the say textarea stood taller than the send button: its 0.7rem vertical padding (from 0538d1c) made its intrinsic height exceed the 44px min-height."
+        }
+      },
+      {
+        "id": "finding-35",
+        "kind": "finding",
+        "v": 2,
+        "op": "end",
+        "at": "2026-04-23T08:03:02.000Z",
+        "by": "claude-2mB8v",
+        "in": "task-30",
+        "to": "task-30",
+        "state": "done",
+        "ended": {
+          "reason": "7184a34 drops the textarea padding to 0.5rem 0.75rem so min-height wins and the textarea and send button line up."
+        },
+        "links": {
+          "about": [
+            "change-7",
+            "decision-34"
+          ]
+        },
+        "fields": {
+          "says": "On mobile the say textarea stood taller than the send button: its 0.7rem vertical padding (from 0538d1c) made its intrinsic height exceed the 44px min-height."
+        }
+      }
+    ],
+    "task-36": [
+      {
+        "id": "task-36",
+        "kind": "task",
+        "v": 1,
+        "op": "add",
+        "at": "2026-04-23T08:12:32.000Z",
+        "by": "recorder",
+        "state": "open",
+        "links": {},
+        "fields": {
+          "ref": "claude/fix-mobile-keyboard-space-WiOoe"
+        }
+      },
+      {
+        "id": "task-36",
+        "kind": "task",
+        "v": 2,
+        "op": "end",
+        "at": "2026-04-23T08:12:58.000Z",
+        "by": "recorder",
+        "state": "done",
+        "ended": {
+          "reason": "PR #20 (change-38) merged at 08:12:58."
+        },
+        "links": {},
+        "fields": {
+          "ref": "claude/fix-mobile-keyboard-space-WiOoe"
+        }
+      }
+    ],
+    "run-37": [
+      {
+        "id": "run-37",
+        "kind": "run",
+        "v": 1,
+        "op": "add",
+        "at": "2026-04-23T08:12:32.000Z",
+        "by": "claude-WiOoe",
+        "in": "task-36",
+        "state": "open",
+        "links": {},
+        "fields": {
+          "account": "Fix stale dvh after mobile keyboard dismisses\n\nSizing body with 100dvh leaves a blank strip under the input row on\nSafari and some Chromium states: after the virtual keyboard retracts,\nthe browser doesn't always recompute the dvh value, so the page stays\nsized to \"viewport minus keyboard\" while the actual visible viewport is\nfull-height again.\n\nDrive the body height from visualViewport.height via a CSS custom\nproperty. visualViewport fires a resize event on every keyboard\nshow/hide, URL-bar show/hide, and orientation change, so the layout\ntracks the actually-visible area reliably.\n\nhttps://claude.ai/code/session_0162VbmbQuRzSmC4CN6Witsq"
+        }
+      },
+      {
+        "id": "run-37",
+        "kind": "run",
+        "v": 2,
+        "op": "end",
+        "at": "2026-04-23T08:12:32.000Z",
+        "by": "claude-WiOoe",
+        "in": "task-36",
+        "state": "done",
+        "ended": {
+          "reason": "Single commit 72395ae."
+        },
+        "links": {},
+        "fields": {
+          "account": "Fix stale dvh after mobile keyboard dismisses\n\nSizing body with 100dvh leaves a blank strip under the input row on\nSafari and some Chromium states: after the virtual keyboard retracts,\nthe browser doesn't always recompute the dvh value, so the page stays\nsized to \"viewport minus keyboard\" while the actual visible viewport is\nfull-height again.\n\nDrive the body height from visualViewport.height via a CSS custom\nproperty. visualViewport fires a resize event on every keyboard\nshow/hide, URL-bar show/hide, and orientation change, so the layout\ntracks the actually-visible area reliably.\n\nhttps://claude.ai/code/session_0162VbmbQuRzSmC4CN6Witsq"
+        }
+      }
+    ],
+    "change-38": [
+      {
+        "id": "change-38",
+        "kind": "change",
+        "v": 1,
+        "op": "add",
+        "at": "2026-04-23T08:12:32.000Z",
+        "by": "claude-WiOoe",
+        "in": "task-36",
+        "state": "open",
+        "links": {},
+        "fields": {
+          "ref": "PR #20",
+          "head": "72395ae"
+        }
+      },
+      {
+        "id": "change-38",
+        "kind": "change",
+        "v": 2,
+        "op": "end",
+        "at": "2026-04-23T08:12:58.000Z",
+        "by": "john",
+        "in": "task-36",
+        "state": "merged",
+        "ended": {
+          "reason": "Merged by john as 592cf39 ('Fix mobile viewport height handling with visualViewport API'), 26 s after the commit; no PR review text in the material."
+        },
+        "links": {},
+        "fields": {
+          "ref": "PR #20",
+          "head": "72395ae"
+        }
+      }
+    ],
+    "finding-39": [
+      {
+        "id": "finding-39",
+        "kind": "finding",
+        "v": 1,
+        "op": "add",
+        "at": "2026-04-23T08:12:32.000Z",
+        "by": "claude-WiOoe",
+        "in": "task-36",
+        "to": "task-36",
+        "state": "open",
+        "links": {
+          "about": [
+            "decision-9",
+            "decision-29"
+          ]
+        },
+        "fields": {
+          "says": "Sizing body with 100dvh leaves a blank strip under the input row on Safari and some Chromium states: after the keyboard retracts the browser does not always recompute dvh, so the page stays sized to viewport minus keyboard."
+        }
+      },
+      {
+        "id": "finding-39",
+        "kind": "finding",
+        "v": 2,
+        "op": "end",
+        "at": "2026-04-23T08:12:32.000Z",
+        "by": "claude-WiOoe",
+        "in": "task-36",
+        "to": "task-36",
+        "state": "done",
+        "ended": {
+          "reason": "72395ae (change change-38) drives body height from visualViewport; see decision-41."
+        },
+        "links": {
+          "about": [
+            "decision-9",
+            "decision-29"
+          ]
+        },
+        "fields": {
+          "says": "Sizing body with 100dvh leaves a blank strip under the input row on Safari and some Chromium states: after the keyboard retracts the browser does not always recompute dvh, so the page stays sized to viewport minus keyboard."
+        }
+      }
+    ],
+    "lesson-40": [
+      {
+        "id": "lesson-40",
+        "kind": "lesson",
+        "v": 1,
+        "op": "add",
+        "at": "2026-04-23T08:12:32.000Z",
+        "by": "claude-WiOoe",
+        "state": "holds",
+        "links": {
+          "about": [
+            "change-38",
+            "lesson-28"
+          ]
+        },
+        "fields": {
+          "says": "After the virtual keyboard retracts, Safari and some Chromium states do not always recompute 100dvh; visualViewport fires resize on every keyboard show/hide, URL-bar show/hide and orientation change.",
+          "checked-at": "stated in 72395ae; no device run in the material"
+        }
+      }
+    ],
+    "decision-41": [
+      {
+        "id": "decision-41",
+        "kind": "decision",
+        "v": 1,
+        "op": "add",
+        "at": "2026-04-23T08:12:32.000Z",
+        "by": "claude-WiOoe",
+        "in": "task-36",
+        "state": "stands",
+        "links": {
+          "on": [
+            "finding-39@1",
+            "lesson-40@1"
+          ],
+          "about": [
+            "change-38",
+            "decision-29"
+          ]
+        },
+        "fields": {
+          "answer": "Body height is driven from visualViewport.height (falling back to innerHeight) through the --app-height custom property, updated on visualViewport resize, window resize and orientationchange; CSS falls back to 100dvh, then 100%.",
+          "why": "dvh goes stale after the keyboard retracts; visualViewport tracks the actually-visible area (72395ae).",
+          "scope": "project"
+        }
       }
     ]
   },
@@ -75,6 +1274,108 @@
       "cmd": "find",
       "args": [
         "--count",
+        "--by",
+        "recorder"
+      ],
+      "asOf": null
+    },
+    {
+      "at": "2026-11-18T10:04:07.445Z",
+      "by": "recorder",
+      "cmd": "find",
+      "args": [
+        "--kind",
+        "task",
+        "--text",
+        "pgLc6",
+        "--by",
+        "recorder"
+      ],
+      "asOf": null
+    },
+    {
+      "at": "2026-11-18T10:04:07.888Z",
+      "by": "recorder",
+      "cmd": "find",
+      "args": [
+        "--kind",
+        "lesson",
+        "--text",
+        "zoom",
+        "--by",
+        "recorder"
+      ],
+      "asOf": null
+    },
+    {
+      "at": "2026-11-18T10:04:24.040Z",
+      "by": "recorder",
+      "cmd": "find",
+      "args": [
+        "--text",
+        "who",
+        "--by",
+        "recorder"
+      ],
+      "asOf": null
+    },
+    {
+      "at": "2026-11-18T10:04:34.442Z",
+      "by": "recorder",
+      "cmd": "find",
+      "args": [
+        "--kind",
+        "lesson",
+        "--text",
+        "screenshot",
+        "--by",
+        "recorder"
+      ],
+      "asOf": null
+    },
+    {
+      "at": "2026-11-18T10:04:44.190Z",
+      "by": "recorder",
+      "cmd": "find",
+      "args": [
+        "--text",
+        "runtime",
+        "--by",
+        "recorder"
+      ],
+      "asOf": null
+    },
+    {
+      "at": "2026-11-18T10:04:55.038Z",
+      "by": "recorder",
+      "cmd": "find",
+      "args": [
+        "--text",
+        "keyboard",
+        "--by",
+        "recorder"
+      ],
+      "asOf": null
+    },
+    {
+      "at": "2026-11-18T10:05:04.516Z",
+      "by": "recorder",
+      "cmd": "find",
+      "args": [
+        "--text",
+        "44px",
+        "--by",
+        "recorder"
+      ],
+      "asOf": null
+    },
+    {
+      "at": "2026-11-18T10:05:24.600Z",
+      "by": "recorder",
+      "cmd": "find",
+      "args": [
+        "--text",
+        "dvh",
         "--by",
         "recorder"
       ],
