@@ -385,15 +385,12 @@
 }
 
 /* ---- Lighthouse band (LIN-4487) ------------------------------------------ */
-/* A distinct bottom band, boxed like the card it replaced. Single column at
-   every width: the band has no glimpse beside its copy. */
+/* A distinct boxed band after the providers strip, before the Library. Single
+   column at every width: the band has no glimpse beside its copy. */
 /* Mobile-first spacing (LIN-1508); the wider top gap returns at ≥760px. */
 .lx-lighthouse {
   margin-top: 3.5rem;
   margin-bottom: 2.5rem;
-}
-
-.lx-lighthouse__inner {
   padding: var(--space-5) var(--space-4);
   border: 1px solid var(--brand);
   border-radius: var(--radius-lg);
@@ -469,6 +466,7 @@
   .lx-lighthouse {
     margin-top: 5.5rem;
     margin-bottom: 3rem;
+    padding: 3rem;
   }
 
   .lx-steps {
@@ -496,10 +494,6 @@
 
   .lx-section__title {
     font-size: 2rem;
-  }
-
-  .lx-lighthouse__inner {
-    padding: 3rem;
   }
 }
 

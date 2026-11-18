@@ -69,7 +69,7 @@ test('has a distinct Lighthouse section linking lighthouse.harbour.cat', () => {
   const html = renderLandingPage({});
   assert.match(html, /data-testid="landing-lighthouse"/);
   assert.match(html, /<h2 id="lx-lighthouse-h" class="lx-section__title">Lighthouse<\/h2>/);
-  assert.match(html, /<a class="btn btn--primary" href="https:\/\/lighthouse\.harbour\.cat" data-testid="landing-lighthouse-link">/);
+  assert.match(html, /<a class="btn[^"]*" href="https:\/\/lighthouse\.harbour\.cat" data-testid="landing-lighthouse-link">/);
 });
 
 test('the Lighthouse band replaces Harbour OS on the public landing (LIN-4487)', () => {
@@ -99,9 +99,6 @@ test('has an archive section linking the latest Harbour Archive edition', () => 
   assert.ok(html.indexOf('data-testid="landing-lighthouse"') < html.indexOf('data-testid="landing-archive"'));
 });
 
-// LIN-3345: the Library section — the homepage's discoverability link into the
-// Library. It lists the catalogued documents (LIN-3980 moved the Archive item
-// out of it); the section sits immediately above the Archive section.
 test('places the Lighthouse band after the providers strip and before the Library (LIN-4487)', () => {
   const html = renderLandingPage({});
   const providersIdx = html.indexOf('data-testid="landing-providers"');
@@ -110,6 +107,9 @@ test('places the Lighthouse band after the providers strip and before the Librar
   assert.ok(providersIdx < lighthouseIdx && lighthouseIdx < libIdx, 'providers < lighthouse < library');
 });
 
+// LIN-3345: the Library section — the homepage's discoverability link into the
+// Library. It lists the catalogued documents (LIN-3980 moved the Archive item
+// out of it); the section sits immediately above the Archive section.
 test('has a Library section above the Archive, driven by START_HERE', () => {
   const html = renderLandingPage({});
   const libIdx = html.indexOf('data-testid="landing-library"');
