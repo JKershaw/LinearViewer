@@ -1,0 +1,65 @@
+task-8 task v3 [done] by close-out
+finding-9 finding v2 [handed-on] to design by design
+finding-10 finding v2 [handed-on] to design by design
+finding-11 finding v2 [handed-on] to design by design
+finding-12 finding v2 [handed-on] to design by design
+finding-13 finding v4 [handed-on] to design by design
+finding-14 finding v2 [handed-on] to design by design
+check-15 check v2 [open] to John by close-out
+run-16 run v2 [done] by survey-task
+finding-17 finding v4 [handed-on] to design by design
+finding-18 finding v4 [handed-on] to design by design
+check-19 check v6 [done] to implementation by implementation
+finding-20 finding v1 [open] to project by survey-place
+finding-21 finding v5 [open] to project by survey-place
+finding-22 finding v4 [handed-on] to design by design
+run-23 run v2 [done] by survey-place
+decision-24 decision v3 [stands] to design by scoping
+run-25 run v2 [done] by scoping
+plan-26 plan v6 [kept] to implementation by design
+decision-27 decision v4 [stands] to implementation by design
+decision-28 decision v5 [stands] to implementation by design
+decision-29 decision v3 [stands] to implementation by design
+finding-30 finding v4 [open] to project by design
+check-31 check v4 [handed-on] to implementation by implementation
+check-32 check v3 [handed-on] to implementation by implementation
+check-33 check v3 [handed-on] to implementation by implementation
+check-34 check v3 [done] to implementation by implementation
+check-35 check v3 [handed-on] to implementation by implementation
+check-36 check v4 [handed-on] to implementation by implementation
+check-37 check v3 [done] to plan-review by plan-review
+run-38 run v2 [done] by design
+verdict-39 verdict v2 [superseded] to design by plan-review
+finding-40 finding v2 [done] to design by design
+finding-41 finding v2 [handed-on] to implementation by design
+finding-42 finding v2 [handed-on] to implementation by design
+finding-43 finding v2 [handed-on] to implementation by design
+run-44 run v2 [done] by plan-review
+run-45 run v2 [done] by design
+verdict-46 verdict v1 [stands] to implementation by plan-review
+finding-47 finding v2 [handed-on] to implementation by implementation
+finding-48 finding v2 [handed-on] to implementation by implementation
+finding-49 finding v2 [handed-on] to implementation by implementation
+finding-50 finding v2 [handed-on] to implementation by implementation
+run-51 run v2 [done] by plan-review
+change-52 change v5 [merged] to close-out by close-out
+check-53 check v2 [done] to review by review
+check-54 check v2 [done] to review by review
+finding-55 finding v4 [open] to John by close-out
+run-56 run v2 [done] by implementation
+run-57 run v3 [done] by leftover
+finding-58 finding v3 [done] to review by review
+finding-60 finding v2 [open] to project by leftover
+finding-61 finding v2 [open] to project by leftover
+run-62 run v2 [done] by review
+verdict-63 verdict v1 [stands] STALE(on change-52@2, now @5) to close-out by review
+finding-64 finding v2 [done] to close-out by close-out
+check-65 check v2 [handed-on] to close-out by close-out
+finding-66 finding v2 [open] to project by close-out
+verdict-67 verdict v1 [stands] STALE(on change-52@3, now @5) to John by blind-read
+finding-68 finding v2 [done] to close-out by close-out
+finding-69 finding v2 [done] to close-out by close-out
+finding-70 finding v1 [open] to project by blind-read
+finding-71 finding v1 [open] to project by blind-read
+run-72 run v2 [done] by blind-read
+run-73 run v5 [done] by close-out
