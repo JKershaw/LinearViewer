@@ -1,5 +1,5 @@
 {
-  "next": 42,
+  "next": 44,
   "records": {
     "plan-1": [
       {
@@ -841,6 +841,32 @@
           "why": "Chromium mobile shrinks the layout viewport and 100dvh instead of scrolling the page (06b4711).",
           "scope": "project"
         }
+      },
+      {
+        "id": "decision-29",
+        "kind": "decision",
+        "v": 2,
+        "op": "link",
+        "at": "2026-11-18T10:05:38.152Z",
+        "by": "recorder",
+        "in": "task-24",
+        "state": "stands",
+        "links": {
+          "on": [
+            "finding-27@1",
+            "lesson-28@1",
+            "decision-9@1"
+          ],
+          "about": [
+            "change-26",
+            "decision-9"
+          ]
+        },
+        "fields": {
+          "answer": "The viewport meta carries interactive-widget=resizes-content, so the flex column recomputes when the keyboard opens and the chat header stays visible.",
+          "why": "Chromium mobile shrinks the layout viewport and 100dvh instead of scrolling the page (06b4711).",
+          "scope": "project"
+        }
       }
     ],
     "task-30": [
@@ -1265,6 +1291,50 @@
           "scope": "project"
         }
       }
+    ],
+    "finding-42": [
+      {
+        "id": "finding-42",
+        "kind": "finding",
+        "v": 1,
+        "op": "add",
+        "at": "2026-11-18T10:05:38.286Z",
+        "by": "recorder",
+        "to": "project",
+        "state": "open",
+        "links": {
+          "about": [
+            "decision-23",
+            "decision-4"
+          ]
+        },
+        "fields": {
+          "says": "design.md still describes a reactive agent runtime shipped in the yap package (yap agent) and server-hosted agents run in-process when OPENROUTER_KEY is set; 069deab rejected the bundled runtime and deferred server-hosted execution but did not change design.md (unchanged from 7d29890 to 72395ae)."
+        }
+      }
+    ],
+    "question-43": [
+      {
+        "id": "question-43",
+        "kind": "question",
+        "v": 1,
+        "op": "add",
+        "at": "2026-11-18T10:05:38.327Z",
+        "by": "recorder",
+        "to": "john",
+        "state": "open",
+        "links": {},
+        "fields": {
+          "asks": "What did you ask each of the five sessions, and did any of PRs #13, #16, #17, #19, #20 carry a description, comment or review?",
+          "options": [
+            "Fetch PR metadata with authenticated GitHub access",
+            "Write the asks from memory",
+            "Leave the tasks without asked"
+          ],
+          "recommended": "Fetch PR metadata with authenticated GitHub access (the anonymous request got 403)",
+          "if-unanswered": "The five tasks stay without asked or done-when, refs are branch names, and each merge is the only record of approval."
+        }
+      }
     ]
   },
   "log": [
@@ -1376,6 +1446,110 @@
       "args": [
         "--text",
         "dvh",
+        "--by",
+        "recorder"
+      ],
+      "asOf": null
+    },
+    {
+      "at": "2026-11-18T10:05:38.203Z",
+      "by": "recorder",
+      "cmd": "find",
+      "args": [
+        "--to",
+        "project",
+        "--by",
+        "recorder"
+      ],
+      "asOf": null
+    },
+    {
+      "at": "2026-11-18T10:05:38.249Z",
+      "by": "recorder",
+      "cmd": "find",
+      "args": [
+        "--text",
+        "design.md",
+        "--by",
+        "recorder"
+      ],
+      "asOf": null
+    },
+    {
+      "at": "2026-11-18T10:05:46.971Z",
+      "by": "recorder",
+      "cmd": "find",
+      "args": [
+        "--by",
+        "recorder"
+      ],
+      "asOf": null
+    },
+    {
+      "at": "2026-11-18T10:05:47.017Z",
+      "by": "recorder",
+      "cmd": "find",
+      "args": [
+        "--by",
+        "recorder"
+      ],
+      "asOf": null
+    },
+    {
+      "at": "2026-11-18T10:05:50.890Z",
+      "by": "recorder",
+      "cmd": "show",
+      "args": [
+        "--task",
+        "task-5",
+        "--by",
+        "recorder"
+      ],
+      "asOf": null
+    },
+    {
+      "at": "2026-11-18T10:05:50.921Z",
+      "by": "recorder",
+      "cmd": "show",
+      "args": [
+        "--task",
+        "task-14",
+        "--by",
+        "recorder"
+      ],
+      "asOf": null
+    },
+    {
+      "at": "2026-11-18T10:05:50.954Z",
+      "by": "recorder",
+      "cmd": "show",
+      "args": [
+        "--task",
+        "task-24",
+        "--by",
+        "recorder"
+      ],
+      "asOf": null
+    },
+    {
+      "at": "2026-11-18T10:05:50.992Z",
+      "by": "recorder",
+      "cmd": "show",
+      "args": [
+        "--task",
+        "task-30",
+        "--by",
+        "recorder"
+      ],
+      "asOf": null
+    },
+    {
+      "at": "2026-11-18T10:05:51.021Z",
+      "by": "recorder",
+      "cmd": "show",
+      "args": [
+        "--task",
+        "task-36",
         "--by",
         "recorder"
       ],

@@ -1,0 +1,106 @@
+{
+  "task": {
+    "id": "task-24",
+    "kind": "task",
+    "v": 2,
+    "op": "end",
+    "at": "2026-04-23T07:48:50.000Z",
+    "by": "recorder",
+    "state": "done",
+    "ended": {
+      "reason": "PR #17 (change-26) merged at 07:48:50."
+    },
+    "links": {},
+    "fields": {
+      "ref": "claude/fix-mobile-keyboard-overlap-7xpoy"
+    }
+  },
+  "records": [
+    {
+      "id": "run-25",
+      "kind": "run",
+      "v": 2,
+      "op": "end",
+      "at": "2026-04-23T07:48:31.000Z",
+      "by": "claude-7xpoy",
+      "in": "task-24",
+      "state": "done",
+      "ended": {
+        "reason": "Single commit 06b4711."
+      },
+      "links": {},
+      "fields": {
+        "account": "Keep chat header visible when mobile keyboard opens\n\nAdd interactive-widget=resizes-content to the viewport meta so Chromium\nmobile browsers shrink the layout viewport (and 100dvh) when the virtual\nkeyboard appears. The flex column then recomputes instead of the page\nscrolling up to reveal the focused textarea, which was pushing the\nchannel header off the top of the screen."
+      }
+    },
+    {
+      "id": "change-26",
+      "kind": "change",
+      "v": 2,
+      "op": "end",
+      "at": "2026-04-23T07:48:50.000Z",
+      "by": "john",
+      "in": "task-24",
+      "state": "merged",
+      "ended": {
+        "reason": "Merged by john as c9cbf83 ('Add interactive-widget viewport meta tag for better mobile UX'), 19 s after the commit; no PR review text in the material."
+      },
+      "links": {},
+      "fields": {
+        "ref": "PR #17",
+        "head": "06b4711"
+      }
+    },
+    {
+      "id": "finding-27",
+      "kind": "finding",
+      "v": 2,
+      "op": "end",
+      "at": "2026-04-23T07:48:31.000Z",
+      "by": "claude-7xpoy",
+      "in": "task-24",
+      "to": "task-24",
+      "state": "done",
+      "ended": {
+        "reason": "06b4711 (change change-26) adds interactive-widget=resizes-content; see decision-29."
+      },
+      "links": {
+        "about": [
+          "decision-9"
+        ]
+      },
+      "fields": {
+        "says": "When the virtual keyboard opens, the page scrolls up to reveal the focused textarea, pushing the channel header off the top of the screen."
+      }
+    },
+    {
+      "id": "decision-29",
+      "kind": "decision",
+      "v": 2,
+      "op": "link",
+      "at": "2026-11-18T10:05:38.152Z",
+      "by": "recorder",
+      "in": "task-24",
+      "state": "stands",
+      "links": {
+        "on": [
+          "finding-27@1",
+          "lesson-28@1",
+          "decision-9@1"
+        ],
+        "about": [
+          "change-26",
+          "decision-9"
+        ]
+      },
+      "fields": {
+        "answer": "The viewport meta carries interactive-widget=resizes-content, so the flex column recomputes when the keyboard opens and the chat header stays visible.",
+        "why": "Chromium mobile shrinks the layout viewport and 100dvh instead of scrolling the page (06b4711).",
+        "scope": "project"
+      },
+      "stale": [
+        "on decision-9@1, now superseded"
+      ]
+    }
+  ]
+}

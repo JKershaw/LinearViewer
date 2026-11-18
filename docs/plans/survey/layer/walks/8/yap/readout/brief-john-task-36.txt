@@ -1,0 +1,69 @@
+# Brief for john on task-36 as of 2026-11-18T10:05:51.055Z
+## 1. The task and the person's words
+task-36 ref claude/fix-mobile-keyboard-space-WiOoe
+## 2. Its plan
+(none)
+## 3. Addressed to you
+(none)
+## 4. What stands about this task
+decision-2@1 decision [stands] by yap-docs at 2026-04-22T20:33:00.000Z
+  answer: yap is a broker, not a framework: the server stays dumb (channels, buffers, nicks, profiles, mentions, nothing else); anything a client could do by polling and saying belongs in a client; the channel is the bus and the transcript is the log; ephemeral by default; presence inferred, not tracked.
+  why: Minimalism is load-bearing: every cut exists because the alternative makes yap harder to understand in one sitting. Will not add: persistent storage, accounts/auth beyond channel passwords, server-side orchestration, rich media, threads/reactions/edits, federation, plugins, history search, server-side agent memory.
+  scope: project
+decision-3@1 decision [stands] by yap-docs at 2026-04-22T20:33:00.000Z
+  answer: Rejected or reframed: moderation roles -> optional YAP_ADMIN_TOKEN with POST /admin/purge and /admin/block, curl-only; server settings page -> env vars, the README is the settings UI; plugin system -> reactive agents out of process; server-side user settings -> client cookies/localStorage; agent/MCP indicator -> client icon for nicks with a whois description; custom formatting rules -> client rendering.
+  why: Each real need fits a client concern, a reactive agent or an env var; if a request resists that reframe it might belong in yap. Most do not.
+  scope: project
+decision-8@1 decision [stands] by claude-pgLc6 at 2026-04-22T20:52:07.000Z
+  answer: The message input is an auto-growing textarea: Enter sends, Shift+Enter inserts a newline; the say button stays bottom-aligned as it grows; enterkeyhint=send, autocorrect, autocapitalize, spellcheck.
+  why: Replaces the single-line input (0538d1c).
+  scope: project
+  about -> change-7
+decision-11@1 decision [stands] by claude-pgLc6 at 2026-04-22T20:52:07.000Z
+  answer: Message text (.msg) and the textarea use the system sans-serif; nicks, timestamps and chrome stay monospace.
+  why: A friendlier reading experience (0538d1c).
+  scope: project
+  about -> change-7
+decision-12@1 decision [stands] by claude-pgLc6 at 2026-04-22T20:52:07.000Z
+  answer: viewport-fit=cover, with env(safe-area-inset-top/bottom) padding on the chat header and the say form.
+  why: iPhone notch and home bar (0538d1c).
+  scope: project
+  about -> change-7
+decision-18@1 decision [stands] by claude-fTjhR at 2026-04-23T07:32:13.000Z
+  answer: On mobile the who panel is a right-edge slide-in drawer inside .chat-body (not covering header or input row), toggled by an "N here" header button with aria-expanded; desktop keeps the always-visible sidebar; Escape closes the drawer; leaving closes it and resets the count.
+  why: Reuses the existing panel instead of hiding it (906b8ea).
+  scope: project
+  on -> finding-17@1
+  about -> change-16
+decision-23@1 decision [stands] by yap-docs at 2026-04-23T07:46:01.000Z
+  answer: Runtimes live out-of-tree: yap bundles no agent runtime. Authors write against the HTTP or MCP surface (documented in AGENTS.md, HTTP-first, MCP equal-footed) or pick a ready-made agent from the sibling yap-agents repo; server-hosted execution is deferred by default.
+  why: A bundled runtime biases the project toward one agent shape (LLM + system prompt + JSON config) and turns feature requests into framework drift; it is the plugin-system drift with a friendlier name. Out-of-tree agents actively demonstrate that agents are clients.
+  scope: project
+  on -> decision-2@1
+decision-29@2 decision [stands] by recorder at 2026-11-18T10:05:38.152Z
+  answer: The viewport meta carries interactive-widget=resizes-content, so the flex column recomputes when the keyboard opens and the chat header stays visible.
+  why: Chromium mobile shrinks the layout viewport and 100dvh instead of scrolling the page (06b4711).
+  scope: project
+  on -> finding-27@1, lesson-28@1, decision-9@1
+  about -> change-26, decision-9
+  STALE on decision-9@1, now superseded
+decision-34@1 decision [stands] by claude-2mB8v at 2026-04-23T07:52:59.000Z
+  answer: On mobile the join and say buttons and the say textarea keep min-height: 44px; the header leave and here buttons drop min-height, border and background and keep a usable tap target through 0.5rem padding; header padding is 0.3rem 0.5rem plus the top safe-area inset.
+  why: A compact top bar with tap targets preserved via padding (fa2bad4).
+  scope: project
+  on -> finding-33@1
+  about -> change-32, decision-18
+decision-41@1 decision [stands] by claude-WiOoe at 2026-04-23T08:12:32.000Z
+  answer: Body height is driven from visualViewport.height (falling back to innerHeight) through the --app-height custom property, updated on visualViewport resize, window resize and orientationchange; CSS falls back to 100dvh, then 100%.
+  why: dvh goes stale after the keyboard retracts; visualViewport tracks the actually-visible area (72395ae).
+  scope: project
+  on -> finding-39@1, lesson-40@1
+  about -> change-38, decision-29
+## 5. The project
+1 open addressed to project (find --to project --text <words>); 5 lessons hold (find --kind lesson --text <words>)
+## 6. Other open runs
+(none)
+## 7. Index of what else is known
+(none)
+## 8. The previous stage
+run-37 claude-WiOoe: Fix stale dvh after mobile keyboard dismisses (in full: get run-37)

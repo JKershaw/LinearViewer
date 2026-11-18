@@ -1,0 +1,118 @@
+{
+  "task": {
+    "id": "task-14",
+    "kind": "task",
+    "v": 2,
+    "op": "end",
+    "at": "2026-04-23T07:44:50.000Z",
+    "by": "recorder",
+    "state": "done",
+    "ended": {
+      "reason": "PR #16 (change-16) merged at 07:44:50."
+    },
+    "links": {},
+    "fields": {
+      "ref": "claude/fix-mobile-channel-members-fTjhR"
+    }
+  },
+  "records": [
+    {
+      "id": "run-15",
+      "kind": "run",
+      "v": 2,
+      "op": "end",
+      "at": "2026-04-23T07:42:44.000Z",
+      "by": "claude-fTjhR",
+      "in": "task-14",
+      "state": "done",
+      "ended": {
+        "reason": "Last commit by this session: 3aa81b5."
+      },
+      "links": {},
+      "fields": {
+        "account": "Show who's here on mobile via a slide-in drawer\n\nThe mobile media query hid #who-panel entirely, so phone users had no\nway to see channel members. Add a \"here\" button to the chat header that\ntoggles the existing panel as a right-edge drawer on mobile; desktop\nkeeps the always-visible sidebar. Escape closes the drawer.\n\nAdd e2e screenshots for the mobile who drawer\n\nCaptures the new \"N here\" header button in its resting state and the\nslide-in drawer fully open, at the phone viewport, so the new UI can be\neyeballed alongside the rest of the screenshot set.\n\nhttps://claude.ai/code/session_01Kvg7m5hacw7tYqUVSv52R6"
+      }
+    },
+    {
+      "id": "change-16",
+      "kind": "change",
+      "v": 3,
+      "op": "end",
+      "at": "2026-04-23T07:44:50.000Z",
+      "by": "john",
+      "in": "task-14",
+      "state": "merged",
+      "ended": {
+        "reason": "Merged by john as 3ebd17d ('Add mobile who-panel drawer with toggle button'), 2 min after the last commit; no PR review text in the material."
+      },
+      "links": {},
+      "fields": {
+        "ref": "PR #16",
+        "head": "3aa81b5"
+      }
+    },
+    {
+      "id": "finding-17",
+      "kind": "finding",
+      "v": 2,
+      "op": "end",
+      "at": "2026-04-23T07:32:13.000Z",
+      "by": "claude-fTjhR",
+      "in": "task-14",
+      "to": "task-14",
+      "state": "done",
+      "ended": {
+        "reason": "906b8ea (change-16 head) adds the here toggle and drawer; see decision-18."
+      },
+      "links": {},
+      "fields": {
+        "says": "The mobile media query hid #who-panel entirely, so phone users had no way to see channel members."
+      }
+    },
+    {
+      "id": "decision-18",
+      "kind": "decision",
+      "v": 1,
+      "op": "add",
+      "at": "2026-04-23T07:32:13.000Z",
+      "by": "claude-fTjhR",
+      "in": "task-14",
+      "state": "stands",
+      "links": {
+        "on": [
+          "finding-17@1"
+        ],
+        "about": [
+          "change-16"
+        ]
+      },
+      "fields": {
+        "answer": "On mobile the who panel is a right-edge slide-in drawer inside .chat-body (not covering header or input row), toggled by an \"N here\" header button with aria-expanded; desktop keeps the always-visible sidebar; Escape closes the drawer; leaving closes it and resets the count.",
+        "why": "Reuses the existing panel instead of hiding it (906b8ea).",
+        "scope": "project"
+      }
+    },
+    {
+      "id": "check-21",
+      "kind": "check",
+      "v": 1,
+      "op": "add",
+      "at": "2026-04-23T07:42:44.000Z",
+      "by": "claude-fTjhR",
+      "in": "task-14",
+      "to": "john",
+      "state": "open",
+      "links": {
+        "about": [
+          "change-16"
+        ]
+      },
+      "fields": {
+        "what": "Eyeball 10-chat-mobile-who-closed.png and 11-chat-mobile-who-open.png (390x844, dark) alongside the rest of the screenshot set.",
+        "why-person": "The spec only waits for the count and the open transform; whether the drawer and the N here button look right is a visual call.",
+        "how": "Run the e2e screenshot spec; the images are not committed."
+      },
+      "underEnded": "task-14"
+    }
+  ]
+}

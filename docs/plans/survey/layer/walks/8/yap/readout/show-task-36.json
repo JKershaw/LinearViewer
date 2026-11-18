@@ -1,0 +1,103 @@
+{
+  "task": {
+    "id": "task-36",
+    "kind": "task",
+    "v": 2,
+    "op": "end",
+    "at": "2026-04-23T08:12:58.000Z",
+    "by": "recorder",
+    "state": "done",
+    "ended": {
+      "reason": "PR #20 (change-38) merged at 08:12:58."
+    },
+    "links": {},
+    "fields": {
+      "ref": "claude/fix-mobile-keyboard-space-WiOoe"
+    }
+  },
+  "records": [
+    {
+      "id": "run-37",
+      "kind": "run",
+      "v": 2,
+      "op": "end",
+      "at": "2026-04-23T08:12:32.000Z",
+      "by": "claude-WiOoe",
+      "in": "task-36",
+      "state": "done",
+      "ended": {
+        "reason": "Single commit 72395ae."
+      },
+      "links": {},
+      "fields": {
+        "account": "Fix stale dvh after mobile keyboard dismisses\n\nSizing body with 100dvh leaves a blank strip under the input row on\nSafari and some Chromium states: after the virtual keyboard retracts,\nthe browser doesn't always recompute the dvh value, so the page stays\nsized to \"viewport minus keyboard\" while the actual visible viewport is\nfull-height again.\n\nDrive the body height from visualViewport.height via a CSS custom\nproperty. visualViewport fires a resize event on every keyboard\nshow/hide, URL-bar show/hide, and orientation change, so the layout\ntracks the actually-visible area reliably.\n\nhttps://claude.ai/code/session_0162VbmbQuRzSmC4CN6Witsq"
+      }
+    },
+    {
+      "id": "change-38",
+      "kind": "change",
+      "v": 2,
+      "op": "end",
+      "at": "2026-04-23T08:12:58.000Z",
+      "by": "john",
+      "in": "task-36",
+      "state": "merged",
+      "ended": {
+        "reason": "Merged by john as 592cf39 ('Fix mobile viewport height handling with visualViewport API'), 26 s after the commit; no PR review text in the material."
+      },
+      "links": {},
+      "fields": {
+        "ref": "PR #20",
+        "head": "72395ae"
+      }
+    },
+    {
+      "id": "finding-39",
+      "kind": "finding",
+      "v": 2,
+      "op": "end",
+      "at": "2026-04-23T08:12:32.000Z",
+      "by": "claude-WiOoe",
+      "in": "task-36",
+      "to": "task-36",
+      "state": "done",
+      "ended": {
+        "reason": "72395ae (change change-38) drives body height from visualViewport; see decision-41."
+      },
+      "links": {
+        "about": [
+          "decision-9",
+          "decision-29"
+        ]
+      },
+      "fields": {
+        "says": "Sizing body with 100dvh leaves a blank strip under the input row on Safari and some Chromium states: after the keyboard retracts the browser does not always recompute dvh, so the page stays sized to viewport minus keyboard."
+      }
+    },
+    {
+      "id": "decision-41",
+      "kind": "decision",
+      "v": 1,
+      "op": "add",
+      "at": "2026-04-23T08:12:32.000Z",
+      "by": "claude-WiOoe",
+      "in": "task-36",
+      "state": "stands",
+      "links": {
+        "on": [
+          "finding-39@1",
+          "lesson-40@1"
+        ],
+        "about": [
+          "change-38",
+          "decision-29"
+        ]
+      },
+      "fields": {
+        "answer": "Body height is driven from visualViewport.height (falling back to innerHeight) through the --app-height custom property, updated on visualViewport resize, window resize and orientationchange; CSS falls back to 100dvh, then 100%.",
+        "why": "dvh goes stale after the keyboard retracts; visualViewport tracks the actually-visible area (72395ae).",
+        "scope": "project"
+      }
+    }
+  ]
+}

@@ -1,0 +1,163 @@
+{
+  "task": {
+    "id": "task-5",
+    "kind": "task",
+    "v": 2,
+    "op": "end",
+    "at": "2026-04-22T21:20:26.000Z",
+    "by": "recorder",
+    "state": "done",
+    "ended": {
+      "reason": "PR #13 (change-7) merged at 20:53:44; the same branch was merged again as PR #14 at 21:20:26 (outside this thread, not recorded)."
+    },
+    "links": {},
+    "fields": {
+      "ref": "claude/add-chat-connection-pgLc6"
+    }
+  },
+  "records": [
+    {
+      "id": "run-6",
+      "kind": "run",
+      "v": 2,
+      "op": "end",
+      "at": "2026-04-22T21:18:00.000Z",
+      "by": "claude-pgLc6",
+      "in": "task-5",
+      "state": "done",
+      "ended": {
+        "reason": "Last commit by this session in the material is ba31a8e at 21:18 on the same branch (outside this thread; merged as PR #14 at 21:20:26)."
+      },
+      "links": {},
+      "fields": {
+        "account": "Improve mobile UX: auto-grow textarea, safe areas, touch targets, font hierarchy\n\n- Replace single-line input with auto-growing textarea (Enter sends, Shift+Enter newlines)\n- Add viewport-fit=cover + env(safe-area-inset-*) padding for iPhone notch/home bar\n- Fix iOS Safari auto-zoom by enforcing 16px font-size on inputs in mobile breakpoint\n- Use 100dvh to handle virtual keyboard layout changes\n- Set min-height: 44px on buttons for comfortable touch targets\n- Switch message text (.msg) to system sans-serif for a friendlier reading experience\n  while keeping monospace for nicks, timestamps, and chrome\n- Add enterkeyhint=\"send\", autocorrect, autocapitalize, spellcheck to textarea\n- Add align-items: flex-end to say-form so button stays bottom-aligned as textarea grows\n\nhttps://claude.ai/code/session_01NHYy6dvJAsuWFDXQaYLtjd\n(Later on the same branch, outside this thread: ba31a8e \"Add auto-reconnect, session resume, and client-side message cache\".)"
+      }
+    },
+    {
+      "id": "change-7",
+      "kind": "change",
+      "v": 2,
+      "op": "end",
+      "at": "2026-04-22T20:53:44.000Z",
+      "by": "john",
+      "in": "task-5",
+      "state": "merged",
+      "ended": {
+        "reason": "Merged by john as 0046799 ('Merge pull request #13 … Improve mobile UX with textarea input and safe area support'), 1 min 37 s after the commit; no PR review text in the material (API 403)."
+      },
+      "links": {},
+      "fields": {
+        "ref": "PR #13",
+        "head": "0538d1c"
+      }
+    },
+    {
+      "id": "decision-8",
+      "kind": "decision",
+      "v": 1,
+      "op": "add",
+      "at": "2026-04-22T20:52:07.000Z",
+      "by": "claude-pgLc6",
+      "in": "task-5",
+      "state": "stands",
+      "links": {
+        "about": [
+          "change-7"
+        ]
+      },
+      "fields": {
+        "answer": "The message input is an auto-growing textarea: Enter sends, Shift+Enter inserts a newline; the say button stays bottom-aligned as it grows; enterkeyhint=send, autocorrect, autocapitalize, spellcheck.",
+        "why": "Replaces the single-line input (0538d1c).",
+        "scope": "project"
+      }
+    },
+    {
+      "id": "decision-9",
+      "kind": "decision",
+      "v": 2,
+      "op": "end",
+      "at": "2026-04-23T08:12:32.000Z",
+      "by": "claude-WiOoe",
+      "in": "task-5",
+      "state": "superseded",
+      "ended": {
+        "reason": "72395ae replaces height: 100dvh with var(--app-height, 100dvh), driven by visualViewport.",
+        "into": "decision-41"
+      },
+      "links": {
+        "about": [
+          "change-7"
+        ]
+      },
+      "fields": {
+        "answer": "Size html/body with 100dvh to handle virtual keyboard layout changes.",
+        "why": "0538d1c: use 100dvh so the layout follows the virtual keyboard.",
+        "scope": "project"
+      }
+    },
+    {
+      "id": "decision-10",
+      "kind": "decision",
+      "v": 2,
+      "op": "end",
+      "at": "2026-04-23T07:52:59.000Z",
+      "by": "claude-2mB8v",
+      "in": "task-5",
+      "state": "superseded",
+      "ended": {
+        "reason": "fa2bad4 removes min-height: 44px from the header leave and here buttons; the rule now lives in decision-34.",
+        "into": "decision-34"
+      },
+      "links": {
+        "about": [
+          "change-7"
+        ]
+      },
+      "fields": {
+        "answer": "On mobile, buttons (leave, join, say) and the say textarea get min-height: 44px.",
+        "why": "Comfortable touch targets (0538d1c).",
+        "scope": "project"
+      }
+    },
+    {
+      "id": "decision-11",
+      "kind": "decision",
+      "v": 1,
+      "op": "add",
+      "at": "2026-04-22T20:52:07.000Z",
+      "by": "claude-pgLc6",
+      "in": "task-5",
+      "state": "stands",
+      "links": {
+        "about": [
+          "change-7"
+        ]
+      },
+      "fields": {
+        "answer": "Message text (.msg) and the textarea use the system sans-serif; nicks, timestamps and chrome stay monospace.",
+        "why": "A friendlier reading experience (0538d1c).",
+        "scope": "project"
+      }
+    },
+    {
+      "id": "decision-12",
+      "kind": "decision",
+      "v": 1,
+      "op": "add",
+      "at": "2026-04-22T20:52:07.000Z",
+      "by": "claude-pgLc6",
+      "in": "task-5",
+      "state": "stands",
+      "links": {
+        "about": [
+          "change-7"
+        ]
+      },
+      "fields": {
+        "answer": "viewport-fit=cover, with env(safe-area-inset-top/bottom) padding on the chat header and the say form.",
+        "why": "iPhone notch and home bar (0538d1c).",
+        "scope": "project"
+      }
+    }
+  ]
+}
