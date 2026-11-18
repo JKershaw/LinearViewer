@@ -1,0 +1,34 @@
+task-128 task v1 [open] by breakdown
+decision-129 decision v1 [stands] by breakdown
+decision-130 decision v1 [stands] by breakdown
+decision-131 decision v1 [stands] by breakdown
+decision-132 decision v1 [stands] by breakdown
+decision-135 decision v1 [stands] by breakdown
+decision-137 decision v1 [stands] by autopilot
+change-138 change v3 [open] to review by implementation
+question-139 question v3 [answered] to John by John
+finding-140 finding v2 [done] to review by review
+check-141 check v2 [done] to review by review
+run-142 run v2 [done] by implementation
+finding-143 finding v4 [open] to project by autopilot
+check-144 check v3 [done] to review by review
+run-145 run v2 [done] by autopilot
+run-146 run v2 [done] by review
+verdict-147 verdict v1 [stands] STALE(on change-138@1, now @3) to John by review
+finding-148 finding v3 [done] to implementation by implementation
+finding-149 finding v3 [done] to implementation by implementation
+finding-150 finding v3 [done] to implementation by implementation
+finding-151 finding v3 [done] to implementation by implementation
+finding-152 finding v4 [open] to close-out by implementation
+finding-153 finding v2 [declined] to close-out by John
+finding-154 finding v3 [done] to implementation by implementation
+check-155 check v1 [open] to John by review
+decision-156 decision v1 [stands] to implementation by John
+decision-157 decision v4 [stands] to implementation by autopilot
+question-158 question v5 [open] to John by implementation
+run-159 run v2 [done] by autopilot
+run-160 run v2 [done] by implementation
+finding-161 finding v4 [open] to review by implementation
+check-162 check v2 [open] to John by implementation
+check-163 check v3 [open] to review by implementation
+finding-164 finding v2 [open] to project by implementation

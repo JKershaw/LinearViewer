@@ -1,5 +1,5 @@
 {
-  "next": 95,
+  "next": 100,
   "records": {
     "lesson-1": [
       {
@@ -1876,6 +1876,29 @@
         "fields": {
           "says": "Jira provider: the bulk reads (`fetchProjects`, and `fetchIssueContext`'s children through `searchAllIssues`) do not ask for `harbour.asAsked`, so a sealed block shows its converted rendering on the dashboard and in a parent's children while single-issue reads serve the exact words. `POST /rest/api/3/search/jql` accepts `properties`; asking for `harbour.asAsked` there would make the bulk path exact too. No guard or cache compares the two today (checked at leftover, PR #2421 head f9fa4a80). Now also the Waiting entry in `docs/areas/providers.md`. Not LIN-4450's (plan-51 item 3 keeps bulk display-only; plan review note 2 calls it optional). (Survey place, LIN-4450 @ 4b5001ddf; LIN-4450 leftovers.)"
         }
+      },
+      {
+        "id": "finding-76",
+        "kind": "finding",
+        "v": 3,
+        "op": "end",
+        "at": "2026-11-13T15:18:51.249Z",
+        "by": "blind-read",
+        "to": "project",
+        "state": "handed-on",
+        "ended": {
+          "reason": "Blind read (PR #2421 at f9fa4a80c) found the same bulk/single-issue split and framed closing it as a decision; question-98 carries the gap, its two options and the pinning test (jira-as-asked-region.test.js:166).",
+          "into": "question-98"
+        },
+        "links": {
+          "about": [
+            "plan-51",
+            "finding-67"
+          ]
+        },
+        "fields": {
+          "says": "Jira provider: the bulk reads (`fetchProjects`, and `fetchIssueContext`'s children through `searchAllIssues`) do not ask for `harbour.asAsked`, so a sealed block shows its converted rendering on the dashboard and in a parent's children while single-issue reads serve the exact words. `POST /rest/api/3/search/jql` accepts `properties`; asking for `harbour.asAsked` there would make the bulk path exact too. No guard or cache compares the two today (checked at leftover, PR #2421 head f9fa4a80). Now also the Waiting entry in `docs/areas/providers.md`. Not LIN-4450's (plan-51 item 3 keeps bulk display-only; plan review note 2 calls it optional). (Survey place, LIN-4450 @ 4b5001ddf; LIN-4450 leftovers.)"
+        }
       }
     ],
     "finding-77": [
@@ -2454,6 +2477,133 @@
           "judgement": "blind-read",
           "outcome": "better",
           "reasoning": "Blind read of PR #2421 at f9fa4a80c against 4b5001ddf (comment on LIN-4450, 15:21:22). Better: Jira's description read and write get a single owner (`lib/providers/jira/as-asked-region.js`: `readDescription`/`holdAsAsked`), and `descriptionRoundTrip` runs that same pair, so the seal decision and the write can't disagree. Ten inline copies of the test-token predicate fold onto `isHermeticTestToken` (`routes/proxy-compute.js`, `server.js`, `routes/task-chat.js`, `routes/workspace-api-steps.js`). Worse side: a Jira issue's `description` now depends on which read produced it (batch path serves converted words, single-issue reads the exact ones). Fix-sized: three findings to close-out. Larger: one question to project. Outside the area: none."
+        }
+      }
+    ],
+    "finding-95": [
+      {
+        "id": "finding-95",
+        "kind": "finding",
+        "v": 1,
+        "op": "add",
+        "at": "2026-11-13T15:18:47.249Z",
+        "by": "blind-read",
+        "in": "task-57",
+        "to": "close-out",
+        "state": "open",
+        "links": {
+          "about": [
+            "change-80",
+            "finding-20"
+          ]
+        },
+        "fields": {
+          "says": "Blind-read fix for close-out (PR #2421, head f9fa4a80c; web-routes): `routes/workspace-api-audit.js` lines 35–36 still write `process.env.NODE_ENV === 'test' && (workspace.accessToken === 'test-token' || …)` inline; the sweep moved every sibling copy onto `isHermeticTestToken` and missed this one. Fix: `isHermeticTestToken(workspace.accessToken) || (process.env.NODE_ENV === 'test' && workspace.provider === 'local')`. It keeps its own local-provider predicate, as its comment asks."
+        }
+      }
+    ],
+    "finding-96": [
+      {
+        "id": "finding-96",
+        "kind": "finding",
+        "v": 1,
+        "op": "add",
+        "at": "2026-11-13T15:18:48.249Z",
+        "by": "blind-read",
+        "in": "task-57",
+        "to": "close-out",
+        "state": "open",
+        "links": {
+          "about": [
+            "change-80",
+            "finding-20"
+          ]
+        },
+        "fields": {
+          "says": "Blind-read fix for close-out (PR #2421, head f9fa4a80c; web-routes): in `routes/workspace-api-steps.js`, `isTestToken` is now a one-line second name for `isHermeticTestToken(workspace.accessToken)`. Fix: have its callers (`workspace-api-issue-read.js`, `workspace-api-issue-write.js`, `workspace-api-prompts.js`) import the helper directly and drop the alias."
+        }
+      }
+    ],
+    "finding-97": [
+      {
+        "id": "finding-97",
+        "kind": "finding",
+        "v": 1,
+        "op": "add",
+        "at": "2026-11-13T15:18:49.249Z",
+        "by": "blind-read",
+        "in": "task-57",
+        "to": "close-out",
+        "state": "open",
+        "links": {
+          "about": [
+            "change-80"
+          ]
+        },
+        "fields": {
+          "says": "Blind-read fix for close-out (PR #2421, head f9fa4a80c; other-features for `lib/as-asked-seal.js`, llm-and-prompts for `lib/as-asked.js`): `tests/unit/jira-as-asked-region.test.js` line 291, \"no longer claim that Jira is skipped\", only checks that three phrases are missing from two comment headers. It says nothing about behaviour; `as-asked-create-seal.test.js` already checks that Jira holds the block. Fix: delete it."
+        }
+      }
+    ],
+    "question-98": [
+      {
+        "id": "question-98",
+        "kind": "question",
+        "v": 1,
+        "op": "add",
+        "at": "2026-11-13T15:18:50.249Z",
+        "by": "blind-read",
+        "to": "project",
+        "state": "open",
+        "links": {
+          "about": [
+            "change-80",
+            "plan-51",
+            "finding-76"
+          ]
+        },
+        "fields": {
+          "asks": "Jira provider (providers area; blind read of PR #2421 at f9fa4a80c): should a Jira issue's `description` be exact on every read, or only on single-issue reads? `client.searchIssues` never asks for `harbour.asAsked`, so the issues `fetchProjects`/`fetchIssues` (`lib/providers/jira/index.js` ~769) and `fetchIssueContext`'s `children` (~897) build through `_toCanonicalIssue` come back with the ADF rendering behind canonical markers, while `fetchIssueFields`, `fetchIssueContext().issue` and `issueDescription` return the exact property words for the same issue. `tests/unit/jira-as-asked-region.test.js:166` pins this split. Carries finding-76 (leftover's note of the same gap, also the Waiting entry in `docs/areas/providers.md`; `POST /rest/api/3/search/jql` accepts `properties`).",
+          "options": [
+            "Every dashboard batch asks `/search/jql` for `harbour.asAsked` (up to 32 KB per issue).",
+            "Batch descriptions are documented as not carrying the exact words."
+          ],
+          "if-unanswered": "The split stays as built: bulk reads are display-only (plan-51 item 3), and single-issue reads serve the exact words."
+        }
+      }
+    ],
+    "run-99": [
+      {
+        "id": "run-99",
+        "kind": "run",
+        "v": 1,
+        "op": "add",
+        "at": "2026-11-13T15:18:52.249Z",
+        "by": "blind-read",
+        "in": "task-57",
+        "state": "open",
+        "links": {},
+        "fields": {
+          "stage": "blind-read",
+          "account": "# What this stage really wrote\n\n## Comment on LIN-4450 at 15:21:22\n\n## Blind read\nVerdict: better. It gives Jira's description read and write a single owner (`lib/providers/jira/as-asked-region.js`: `readDescription`/`holdAsAsked`, and `descriptionRoundTrip` now runs that same pair, so the seal decision and the write can't disagree). It also folds ten inline copies of the test-token predicate onto `isHermeticTestToken` (`routes/proxy-compute.js`, `server.js`, `routes/task-chat.js`, `routes/workspace-api-steps.js`). On the worse side, a Jira issue's `description` now depends on which read produced it: the batch path in `lib/providers/jira/index.js` serves the converted words and the single-issue reads serve the exact ones.\n\nRead: https://github.com/JKershaw/LinearViewer/pull/2421 at `f9fa4a80c` against `4b5001ddf`.\n\n### Inside the area, fix-sized\n- `routes/workspace-api-audit.js` (web-routes): lines 35–36 still write `process.env.NODE_ENV === 'test' && (workspace.accessToken === 'test-token' || …)` inline. The sweep moved every sibling copy onto `isHermeticTestToken` and missed this one. Fix: `isHermeticTestToken(workspace.accessToken) || (process.env.NODE_ENV === 'test' && workspace.provider === 'local')`. It keeps its own predicate, as its comment asks.\n- `routes/workspace-api-steps.js` (web-routes): `isTestToken` is now a one-line second name for `isHermeticTestToken(workspace.accessToken)`. Fix: have its callers (`workspace-api-issue-read.js`, `workspace-api-issue-write.js`, `workspace-api-prompts.js`) import the helper directly and drop the alias.\n- `tests/unit/jira-as-asked-region.test.js` (other-features, for `lib/as-asked-seal.js`; and llm-and-prompts, for `lib/as-asked.js`): the test at line 291, \"no longer claim that Jira is skipped\", only checks that three phrases are missing from two comment headers. It says nothing about behaviour; `as-asked-create-seal.test.js` already checks that Jira holds the block. Fix: delete it.\n\n### Inside the area, larger\n- `lib/providers/jira/index.js` (providers): `client.searchIssues` never asks for `harbour.asAsked`. So the issues that `fetchProjects`/`fetchIssues` (line ~769) and `fetchIssueContext`'s `children` (line ~897) build through `_toCanonicalIssue` come back with the ADF rendering behind canonical markers. `fetchIssueFields`, `fetchIssueContext().issue` and `issueDescription` return the exact property words for the same issue. `jira-as-asked-region.test.js:166` pins this split. It is larger than a fix because closing it is a decision: either every dashboard batch asks `/search/jql` for properties (up to 32 KB per issue), or batch descriptions are documented as not carrying the exact words.\n\n### Outside the area\nNone."
+        }
+      },
+      {
+        "id": "run-99",
+        "kind": "run",
+        "v": 2,
+        "op": "end",
+        "at": "2026-11-13T15:18:53.249Z",
+        "by": "blind-read",
+        "in": "task-57",
+        "state": "done",
+        "ended": {
+          "reason": "Blind read posted on LIN-4450 (15:21:22): better on change-80@3 (verdict-94); three fix-sized findings to close-out (finding-95, -96, -97); the batch/single-issue description split raised as question-98 to project, carrying finding-76 (handed on)."
+        },
+        "links": {},
+        "fields": {
+          "stage": "blind-read",
+          "account": "# What this stage really wrote\n\n## Comment on LIN-4450 at 15:21:22\n\n## Blind read\nVerdict: better. It gives Jira's description read and write a single owner (`lib/providers/jira/as-asked-region.js`: `readDescription`/`holdAsAsked`, and `descriptionRoundTrip` now runs that same pair, so the seal decision and the write can't disagree). It also folds ten inline copies of the test-token predicate onto `isHermeticTestToken` (`routes/proxy-compute.js`, `server.js`, `routes/task-chat.js`, `routes/workspace-api-steps.js`). On the worse side, a Jira issue's `description` now depends on which read produced it: the batch path in `lib/providers/jira/index.js` serves the converted words and the single-issue reads serve the exact ones.\n\nRead: https://github.com/JKershaw/LinearViewer/pull/2421 at `f9fa4a80c` against `4b5001ddf`.\n\n### Inside the area, fix-sized\n- `routes/workspace-api-audit.js` (web-routes): lines 35–36 still write `process.env.NODE_ENV === 'test' && (workspace.accessToken === 'test-token' || …)` inline. The sweep moved every sibling copy onto `isHermeticTestToken` and missed this one. Fix: `isHermeticTestToken(workspace.accessToken) || (process.env.NODE_ENV === 'test' && workspace.provider === 'local')`. It keeps its own predicate, as its comment asks.\n- `routes/workspace-api-steps.js` (web-routes): `isTestToken` is now a one-line second name for `isHermeticTestToken(workspace.accessToken)`. Fix: have its callers (`workspace-api-issue-read.js`, `workspace-api-issue-write.js`, `workspace-api-prompts.js`) import the helper directly and drop the alias.\n- `tests/unit/jira-as-asked-region.test.js` (other-features, for `lib/as-asked-seal.js`; and llm-and-prompts, for `lib/as-asked.js`): the test at line 291, \"no longer claim that Jira is skipped\", only checks that three phrases are missing from two comment headers. It says nothing about behaviour; `as-asked-create-seal.test.js` already checks that Jira holds the block. Fix: delete it.\n\n### Inside the area, larger\n- `lib/providers/jira/index.js` (providers): `client.searchIssues` never asks for `harbour.asAsked`. So the issues that `fetchProjects`/`fetchIssues` (line ~769) and `fetchIssueContext`'s `children` (line ~897) build through `_toCanonicalIssue` come back with the ADF rendering behind canonical markers. `fetchIssueFields`, `fetchIssueContext().issue` and `issueDescription` return the exact property words for the same issue. `jira-as-asked-region.test.js:166` pins this split. It is larger than a fix because closing it is a decision: either every dashboard batch asks `/search/jql` for properties (up to 32 KB per issue), or batch descriptions are documented as not carrying the exact words.\n\n### Outside the area\nNone."
         }
       }
     ]
