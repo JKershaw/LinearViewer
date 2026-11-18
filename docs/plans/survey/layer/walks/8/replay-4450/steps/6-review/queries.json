@@ -1,0 +1,183 @@
+[
+ {
+  "at": "2026-11-18T10:09:13.557Z",
+  "by": "review",
+  "cmd": "find",
+  "args": [
+   "--to",
+   "review",
+   "--state",
+   "open",
+   "--by",
+   "review"
+  ],
+  "asOf": null
+ },
+ {
+  "at": "2026-11-18T10:09:13.609Z",
+  "by": "review",
+  "cmd": "show",
+  "args": [
+   "--task",
+   "task-57",
+   "--by",
+   "review"
+  ],
+  "asOf": null
+ },
+ {
+  "at": "2026-11-18T10:09:13.657Z",
+  "by": "review",
+  "cmd": "get",
+  "args": [
+   "run-89",
+   "--by",
+   "review"
+  ],
+  "asOf": null
+ },
+ {
+  "at": "2026-11-18T10:09:34.039Z",
+  "by": "review",
+  "cmd": "find",
+  "args": [
+   "--in",
+   "task-57",
+   "--state",
+   "open",
+   "--by",
+   "review"
+  ],
+  "asOf": null
+ },
+ {
+  "at": "2026-11-18T10:09:34.086Z",
+  "by": "review",
+  "cmd": "get",
+  "args": [
+   "check-82",
+   "--by",
+   "review"
+  ],
+  "asOf": null
+ },
+ {
+  "at": "2026-11-18T10:09:34.124Z",
+  "by": "review",
+  "cmd": "find",
+  "args": [
+   "--kind",
+   "task",
+   "--by",
+   "review"
+  ],
+  "asOf": null
+ },
+ {
+  "at": "2026-11-18T10:09:34.169Z",
+  "by": "review",
+  "cmd": "find",
+  "args": [
+   "--kind",
+   "verdict",
+   "--in",
+   "task-57",
+   "--by",
+   "review"
+  ],
+  "asOf": null
+ },
+ {
+  "at": "2026-11-18T10:09:40.127Z",
+  "by": "review",
+  "cmd": "find",
+  "args": [
+   "--text",
+   "first dispatch",
+   "--by",
+   "review"
+  ],
+  "asOf": null
+ },
+ {
+  "at": "2026-11-18T10:09:40.172Z",
+  "by": "review",
+  "cmd": "find",
+  "args": [
+   "--text",
+   "Jira-native",
+   "--by",
+   "review"
+  ],
+  "asOf": null
+ },
+ {
+  "at": "2026-11-18T10:09:40.223Z",
+  "by": "review",
+  "cmd": "find",
+  "args": [
+   "--text",
+   "rollback",
+   "--by",
+   "review"
+  ],
+  "asOf": null
+ },
+ {
+  "at": "2026-11-18T10:09:40.265Z",
+  "by": "review",
+  "cmd": "find",
+  "args": [
+   "--text",
+   "log line",
+   "--by",
+   "review"
+  ],
+  "asOf": null
+ },
+ {
+  "at": "2026-11-18T10:09:40.307Z",
+  "by": "review",
+  "cmd": "show",
+  "args": [
+   "--task",
+   "task-59",
+   "--by",
+   "review"
+  ],
+  "asOf": null
+ },
+ {
+  "at": "2026-11-18T10:09:43.499Z",
+  "by": "review",
+  "cmd": "get",
+  "args": [
+   "finding-75",
+   "--by",
+   "review"
+  ],
+  "asOf": null
+ },
+ {
+  "at": "2026-11-18T10:10:36.112Z",
+  "by": "review",
+  "cmd": "get",
+  "args": [
+   "verdict-90",
+   "--by",
+   "review"
+  ],
+  "asOf": null
+ },
+ {
+  "at": "2026-11-18T10:10:36.195Z",
+  "by": "review",
+  "cmd": "get",
+  "args": [
+   "verdict-90",
+   "--by",
+   "review"
+  ],
+  "asOf": null
+ }
+]

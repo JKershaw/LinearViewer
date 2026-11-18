@@ -1,5 +1,5 @@
 {
-  "next": 161,
+  "next": 165,
   "records": {
     "lesson-1": [
       {
@@ -720,6 +720,21 @@
         "links": {},
         "fields": {
           "says": "`lib/prompts/leftover-words.js`: the retirement line's words have one home and one checker (`lib/dispatch-leftover-answer.js`), but which entry to settle (the busiest touched area, else another) and the three forms are restated by hand in `docs/areas/README.md`, simple-dispatcher's docs/areas/README.md, `docs/proxy-integration.md` (with the refusal kinds) and `docs/architecture/dispatch-and-proxy.md`, and the verbatim guard reads only `lib/` and `routes/`. simple-dispatcher's README says a waiting entry also leaves when \"a follow-up is filed for it\", where this README says only when the consequence test sends it to a ticket. A cross-repo seam; simple-dispatcher's side is named here, not edited. (Drift & Coherence Review, 13 Nov.; `docs/reviews/drift-coherence-review-2026-11-13.md`.)"
+        }
+      },
+      {
+        "id": "finding-41",
+        "kind": "finding",
+        "v": 2,
+        "op": "revise",
+        "at": "2026-11-13T23:05:19.936Z",
+        "by": "implementation",
+        "reason": "narrowed by LIN-4469 (PR #2447, head 05b592742): this repo's half folded (finding-148); only simple-dispatcher's half remains",
+        "to": "project",
+        "state": "open",
+        "links": {},
+        "fields": {
+          "says": "simple-dispatcher's README and its docs/areas/README.md still restate the retirement line's forms by hand, and simple-dispatcher's README says a waiting entry also leaves when \"a follow-up is filed for it\", where Harbour's docs/areas/README.md says only when the consequence test sends it to a ticket. Harbour's own copies (docs/areas/README.md, docs/architecture/dispatch-and-proxy.md) now point to lib/prompts/leftover-words.js (LIN-4469, PR #2447); docs/proxy-integration.md keeps its refusal table as API contract. A cross-repo seam: simple-dispatcher's side is its owner's, named in the llm-and-prompts Waiting entry, not edited. (Drift & Coherence Review, 13 Nov.; docs/reviews/drift-coherence-review-2026-11-13.md.)"
         }
       }
     ],
@@ -2578,6 +2593,29 @@
           "ref": "https://github.com/JKershaw/LinearViewer/pull/2447 (branch feat/lin-4469-prompt-folds)",
           "head": "3533f37c2"
         }
+      },
+      {
+        "id": "change-138",
+        "kind": "change",
+        "v": 3,
+        "op": "revise",
+        "at": "2026-11-13T23:05:27.936Z",
+        "by": "implementation",
+        "reason": "New head 05b592742 (04bb47598 by the resumed first implementation: survey-task, survey-place, blind-read folds; 05b592742 by this dispatch: triage fold, retirement-line docs, RETIRED spelling, re-pin to FROZEN_TOTAL_BYTES 396064). CI green (run 43525065043). Back to review; merge still waits on question-158",
+        "in": "task-128",
+        "to": "review",
+        "state": "open",
+        "links": {
+          "about": [
+            "plan-114",
+            "decision-135",
+            "decision-137"
+          ]
+        },
+        "fields": {
+          "ref": "https://github.com/JKershaw/LinearViewer/pull/2447 (branch feat/lin-4469-prompt-folds)",
+          "head": "05b592742"
+        }
       }
     ],
     "question-139": [
@@ -3071,6 +3109,30 @@
         "fields": {
           "says": "Fix 1 (PR #2447, before the merge): the retirement-line restatement in this repo's docs is claimed retired but not edited. In docs/areas/README.md:72-77 replace \"That line has three forms, spelled in `lib/prompts/leftover-words.js` (`RETIRES_LABEL`, `RETIRES_NONE`): the settled entry's ... why it is larger than a fix.\" with \"Its forms are spelled once, in `lib/prompts/leftover-words.js` (`RETIRES_LABEL`, `RETIRES_NONE`).\" In docs/architecture/dispatch-and-proxy.md:127 replace \"carries exactly one `Retires:` line: the settled entry's file and opening words, `none, no waiting entry`, or `none, nothing fix-sized` with ... than a fix (words in `lib/prompts/leftover-words.js`)\" with \"carries exactly one `Retires:` line, in one of the forms `lib/prompts/leftover-words.js` spells\". Keep docs/proxy-integration.md's refusal table (API contract). Then make the Waiting entry in docs/areas/llm-and-prompts.md true (it says \"This repo's docs now say what the code does ... (LIN-4469)\", citing pointers that predate the PR): drop it, or keep only the simple-dispatcher half. Check: neither file spells \"no waiting entry\" or \"nothing fix-sized\" any more. This repo's half of finding-41 closes with it."
         }
+      },
+      {
+        "id": "finding-148",
+        "kind": "finding",
+        "v": 3,
+        "op": "end",
+        "at": "2026-11-13T23:05:18.936Z",
+        "by": "implementation",
+        "in": "task-128",
+        "to": "implementation",
+        "state": "done",
+        "ended": {
+          "reason": "Fixed on PR #2447 (head 05b592742, this dispatch, LIN-4469 comments bbc2b1c7 and a8749d0b): docs/areas/README.md and docs/architecture/dispatch-and-proxy.md now point to the retirement-line words in lib/prompts/leftover-words.js (RETIRES_LABEL / RETIRES_NONE); docs/proxy-integration.md's refusal table kept. The llm-and-prompts Waiting entry now names only simple-dispatcher's copy (its owner's, not edited). This repo's half of finding-41 closes; finding-41 is narrowed to the simple-dispatcher half."
+        },
+        "links": {
+          "about": [
+            "check-141",
+            "finding-41",
+            "change-138"
+          ]
+        },
+        "fields": {
+          "says": "Fix 1 (PR #2447, before the merge): the retirement-line restatement in this repo's docs is claimed retired but not edited. In docs/areas/README.md:72-77 replace \"That line has three forms, spelled in `lib/prompts/leftover-words.js` (`RETIRES_LABEL`, `RETIRES_NONE`): the settled entry's ... why it is larger than a fix.\" with \"Its forms are spelled once, in `lib/prompts/leftover-words.js` (`RETIRES_LABEL`, `RETIRES_NONE`).\" In docs/architecture/dispatch-and-proxy.md:127 replace \"carries exactly one `Retires:` line: the settled entry's file and opening words, `none, no waiting entry`, or `none, nothing fix-sized` with ... than a fix (words in `lib/prompts/leftover-words.js`)\" with \"carries exactly one `Retires:` line, in one of the forms `lib/prompts/leftover-words.js` spells\". Keep docs/proxy-integration.md's refusal table (API contract). Then make the Waiting entry in docs/areas/llm-and-prompts.md true (it says \"This repo's docs now say what the code does ... (LIN-4469)\", citing pointers that predate the PR): drop it, or keep only the simple-dispatcher half. Check: neither file spells \"no waiting entry\" or \"nothing fix-sized\" any more. This repo's half of finding-41 closes with it."
+        }
       }
     ],
     "finding-149": [
@@ -3105,6 +3167,29 @@
         "in": "task-128",
         "to": "implementation",
         "state": "open",
+        "links": {
+          "about": [
+            "question-139",
+            "finding-140"
+          ]
+        },
+        "fields": {
+          "says": "Fix 2 (PR #2447, before the merge): correct the \"eleven unchanged\" figure in the PR's DECISION 1, in the change-log row in scripts/prompt-template-change-log.md if it repeats it, and in a reply to the LIN-4350 comment eeb740b0. In real context only the four work kinds (blocked, breakdown, close-out, retrospective-audit) are byte-identical; per writes: none -74, one-comment -23, blind-comment -24, ticket-fields -67, work 0."
+        }
+      },
+      {
+        "id": "finding-149",
+        "kind": "finding",
+        "v": 3,
+        "op": "end",
+        "at": "2026-11-13T23:05:20.936Z",
+        "by": "implementation",
+        "in": "task-128",
+        "to": "implementation",
+        "state": "done",
+        "ended": {
+          "reason": "This dispatch's comments (8933968d on LIN-4448, a8749d0b on LIN-4469) and the PR's DECISION section carry the corrected figures: only the four work kinds (blocked, breakdown, close-out, retrospective-audit) are byte-identical in real context. A corrected LIN-4350 comment exists (cited later as 25b09538) but its text and the change-log row are not in the material; check-163 asks review to read both."
+        },
         "links": {
           "about": [
             "question-139",
@@ -3157,6 +3242,29 @@
         "fields": {
           "says": "Fix 3 (before the merge): post one line on LIN-4448 recording the change of course: the committed-tool clause lives in lib/periodicals.js (committedSearch), not lib/prompts/leftover-words.js, because all four call sites are Periodical bullets. The ticket asks that a change of course be said on LIN-4448; no comment there does."
         }
+      },
+      {
+        "id": "finding-150",
+        "kind": "finding",
+        "v": 3,
+        "op": "end",
+        "at": "2026-11-13T23:05:21.936Z",
+        "by": "implementation",
+        "in": "task-128",
+        "to": "implementation",
+        "state": "done",
+        "ended": {
+          "reason": "Posted on LIN-4448 (comment 8933968d): committedSearch lives in lib/periodicals.js, not lib/prompts/leftover-words.js, because every call site is a Periodical bullet; Stability's wording is the one spelling."
+        },
+        "links": {
+          "about": [
+            "finding-39",
+            "plan-114"
+          ]
+        },
+        "fields": {
+          "says": "Fix 3 (before the merge): post one line on LIN-4448 recording the change of course: the committed-tool clause lives in lib/periodicals.js (committedSearch), not lib/prompts/leftover-words.js, because all four call sites are Periodical bullets. The ticket asks that a change of course be said on LIN-4448; no comment there does."
+        }
       }
     ],
     "finding-151": [
@@ -3198,6 +3306,28 @@
         "fields": {
           "says": "Fix 4 (before the merge): add the old change-coupling spelling 'search the repo for a committed change-coupling tool (it reads' to RETIRED in tests/unit/lin-4469-prompt-folds.test.js. Review mutation M3 (restoring that spelling) stays green in the new test; only the lin-4313 hash pin catches it, because RETIRED lists one folded committed-tool spelling, not all. Check: restoring it turns the new test red."
         }
+      },
+      {
+        "id": "finding-151",
+        "kind": "finding",
+        "v": 3,
+        "op": "end",
+        "at": "2026-11-13T23:05:22.936Z",
+        "by": "implementation",
+        "in": "task-128",
+        "to": "implementation",
+        "state": "done",
+        "ended": {
+          "reason": "On PR #2447 head 05b592742: the old committed change-coupling spelling is on RETIRED in tests/unit/lin-4469-prompt-folds.test.js, mutation-checked (restoring it turns the test red) (LIN-4469 comments bbc2b1c7, a8749d0b)."
+        },
+        "links": {
+          "about": [
+            "finding-140"
+          ]
+        },
+        "fields": {
+          "says": "Fix 4 (before the merge): add the old change-coupling spelling 'search the repo for a committed change-coupling tool (it reads' to RETIRED in tests/unit/lin-4469-prompt-folds.test.js. Review mutation M3 (restoring that spelling) stays green in the new test; only the lin-4313 hash pin catches it, because RETIRED lists one folded committed-tool spelling, not all. Check: restoring it turns the new test red."
+        }
       }
     ],
     "finding-152": [
@@ -3230,6 +3360,46 @@
         "reason": "Autopilot (LIN-4469 comment fab0cf08) puts the review's Fixes 1 to 5 in the next build step, which goes to implementation for the fold (decision-156, decision-157)",
         "in": "task-128",
         "to": "implementation",
+        "state": "open",
+        "links": {
+          "about": [
+            "lesson-9"
+          ]
+        },
+        "fields": {
+          "says": "Fix 5 (before the merge): lib/prompts/leftover-words.js now imports area-registry-path.js (itself import-free, so the leaf property holds in substance), and the import sits mid-file at line 37. Move it to the top of the module, and update the area Lesson \"import-free leaf\" (docs/areas/llm-and-prompts.md; lesson-9 here) to \"a leaf that imports only leaves (area-registry-path.js)\"."
+        }
+      },
+      {
+        "id": "finding-152",
+        "kind": "finding",
+        "v": 3,
+        "op": "revise",
+        "at": "2026-11-13T23:05:23.936Z",
+        "by": "implementation",
+        "reason": "Not done in this pass: none of LIN-4469's comments in this window reports moving the area-registry-path.js import or updating the import-free-leaf Lesson. Returned to close-out, where review first sent it",
+        "in": "task-128",
+        "to": "implementation",
+        "state": "open",
+        "links": {
+          "about": [
+            "lesson-9"
+          ]
+        },
+        "fields": {
+          "says": "Fix 5 (before the merge): lib/prompts/leftover-words.js now imports area-registry-path.js (itself import-free, so the leaf property holds in substance), and the import sits mid-file at line 37. Move it to the top of the module, and update the area Lesson \"import-free leaf\" (docs/areas/llm-and-prompts.md; lesson-9 here) to \"a leaf that imports only leaves (area-registry-path.js)\"."
+        }
+      },
+      {
+        "id": "finding-152",
+        "kind": "finding",
+        "v": 4,
+        "op": "revise",
+        "at": "2026-11-13T23:05:24.936Z",
+        "by": "implementation",
+        "reason": "Readdressed to close-out (the previous version's to was left unchanged by mistake): not done in this pass",
+        "in": "task-128",
+        "to": "close-out",
         "state": "open",
         "links": {
           "about": [
@@ -3317,6 +3487,28 @@
         "in": "task-128",
         "to": "implementation",
         "state": "open",
+        "links": {
+          "about": [
+            "change-138"
+          ]
+        },
+        "fields": {
+          "says": "No builder ### Leftovers answer with a Retires: line is on LIN-4469, so the gate-format check has nothing to check against. Before the merge: post the leftover answer, its Retires: line naming a Waiting entry this diff removes. The PR body's ## Retires names notes-PR, committed-tool, first-match and CUT, which the diff does remove or rewrite; the retirement-line entry is claimed but not done until Fix 1 lands."
+        }
+      },
+      {
+        "id": "finding-154",
+        "kind": "finding",
+        "v": 3,
+        "op": "end",
+        "at": "2026-11-13T23:05:25.936Z",
+        "by": "implementation",
+        "in": "task-128",
+        "to": "implementation",
+        "state": "done",
+        "ended": {
+          "reason": "Posted: builder ### Leftovers on LIN-4469 (comment bbc2b1c7) with one Retires: line naming the docs-only notes-PR Waiting entry, which PR #2447 removes from docs/areas/llm-and-prompts.md (both statements now render NOTES_PR)."
+        },
         "links": {
           "about": [
             "change-138"
@@ -3561,6 +3753,34 @@
           "recommended": "accept",
           "if-unanswered": "The cut stays unagreed: the build fixes continue, but PR #2447 does not merge. On an answer the session resumes and records it on LIN-4469."
         }
+      },
+      {
+        "id": "question-158",
+        "kind": "question",
+        "v": 5,
+        "op": "revise",
+        "at": "2026-11-13T23:05:26.936Z",
+        "by": "implementation",
+        "reason": "Implementation (LIN-4469 comments 8933968d, a8749d0b) measured a second exception the question omitted, seams-tangles +24, and put it on this same ruling in the PR's DECISION section",
+        "in": "task-128",
+        "to": "John",
+        "state": "open",
+        "links": {
+          "about": [
+            "task-128",
+            "question-139",
+            "change-138"
+          ]
+        },
+        "fields": {
+          "asks": "Ruling lin-4469-witness (raised on LIN-4448, record on LIN-4469; replaces lin-4469-cuts with the corrected figures): LIN-4469 asks for a net rendered-byte fall across every kind. At PR #2447 head 05b592742, real-context renders with proxy preambles fall 827520 -> 825330 bytes (-2190) overall. Two exceptions: the four work kinds (blocked, breakdown, close-out, retrospective-audit) carry none of the folded text and stay byte-identical, and seams-tangles rises +24 from the one committed-tool wording (Stability's). The other kinds fall (look-into and retro -74; context, survey-task, survey-place -23; blind-read -24; triage -67). Accept that as meeting the ask?",
+          "options": [
+            "accept: the witness holds for every kind that carries folded text; the four work kinds cannot fall, and seams-tangles' +24 is the price of one committed-tool spelling",
+            "require: a fall for every kind; fold more text out of the four work kinds' prompts and shorten seams-tangles' wording"
+          ],
+          "recommended": "accept",
+          "if-unanswered": "The cut stays unagreed: the build fixes continue, but PR #2447 does not merge. On an answer the session resumes and records it on LIN-4469."
+        }
       }
     ],
     "run-159": [
@@ -3612,6 +3832,236 @@
         "fields": {
           "stage": "implementation",
           "account": "# What this stage really wrote\n\nDescription: unchanged (snapshots 23:05:33 and 23:17:28 match). Two implementation sessions wrote in this window: this dispatch (c66a3141, 23:05:16.936) and the first implementation's resume on John's answer (custom ac074b22, dispatched 23:03:14.946, a follow-up of b86c4a78), which ran alongside it until 23:16:13 and wrote commit `04bb47598`. Each comment is marked with its writer, inferred from what it says: ec59bd26 disowns commit `05b592742`, which the other three report as this pass's work.\n\n## Comment on LIN-4469 at 23:11:39 (id bbc2b1c7) (this dispatch)\n\n### Leftovers\nRetires: `lib/prompt-template-defs.js`: (retrospective-audit Reporting) and `lib/periodicals.js` (`areaNotesRoutes`) each state the docs-only notes-PR rule in their own words; both now render `NOTES_PR` (`lib/prompts/leftover-words.js`). The entry is removed from `docs/areas/llm-and-prompts.md` on PR #2447.\n\nEdges left, read against the diff:\n- Fix-sized, fixed on the PR branch: the retirement line's restatement in `docs/areas/README.md` and `docs/architecture/dispatch-and-proxy.md` (now `RETIRES_LABEL` / `RETIRES_NONE`); triage's guarded clauses; the committed-tool spelling in the RETIRED test list.\n- Outside this area, a note entry: simple-dispatcher's README and its `docs/areas/README.md` still restate the retirement-line forms and the \"follow-up is filed\" exit. Its owner's; named in the llm-and-prompts entry, not edited.\n- Not a ticket: no find breaks behaviour, blocks work or touches safety.\n\n## Comment on LIN-4448 (the parent) at 23:11:46 (id 8933968d) (this dispatch; it says the ruling `lin-4469-witness` gates merge)\n\n## LIN-4469 (piece 5): course changes and one deviation, PR #2447\n\nHead `05b592742`. Scope and measurement as recorded on the PR.\n\n- **Deviation from the plan:** `committedSearch` lives in `lib/periodicals.js`, not in the shared leaf `lib/prompts/leftover-words.js`. Every call site is a Periodical bullet, so the helper stays beside them. Stability's wording is the one spelling.\n- **Scope taken on:** triage's guard-refused clauses, and the same clause in survey-task, survey-place and the blind read's read-only line (`04bb47598`, on John's ruling). Triage keeps its scope rule and \"findings stay observations\".\n- **Re-pin:** `FROZEN_TOTAL_BYTES` 396064 (396884 on main), exactly the ceilings' sum. Real-context renders with proxy preambles fall 827520 → 825330 bytes (−2190). Exceptions: the four `work` kinds (blocked, breakdown, close-out, retrospective-audit) are byte-identical, and `seams-tangles` rises +24 from the committed-tool wording. Both are on John's replacement witness ruling `lin-4469-witness`, which gates merge.\n- **Not verified:** the post-deploy 403 checks (a look-into token's comment POST, a triage token's description PATCH). Not claimed. Rollback is reverting PR #2447's merge commit.\n\n## Comment on LIN-4469 at 23:15:58 (id a8749d0b) (this dispatch)\n\n## LIN-4469 (piece 5): PR and status\n\nPR: https://github.com/JKershaw/LinearViewer/pull/2447 (branch `feat/lin-4469-prompt-folds`), head `05b592742`.\n\n**CI on the head:** green. Unit tests, Unit tests (proxy, clock +400d), E2E shards 1–4, Secret scan and `ci-success` all pass (run 43525065043).\n\n**Done in this pass:** triage's guard-refused clauses folded; the retirement-line forms in `docs/areas/README.md` and `docs/architecture/dispatch-and-proxy.md` now point to `leftover-words.js`; the old committed change-coupling spelling is on the retired list (mutation-checked); re-pin to `FROZEN_TOTAL_BYTES` 396064 (equal to the ceilings' sum); witness regenerated.\n\n**Measured:** real-context renders with proxy preambles, PR base to head: 827520 → 825330 bytes (−2190). Exceptions: the four `work` kinds are byte-identical, and `seams-tangles` is +24.\n\n**Open before merge:** John's ruling `lin-4469-witness` on the four `work` kinds and the +24 (see the PR's DECISION section).\n\n**Not verified:** the post-deploy 403 checks (look-into comment POST, triage description PATCH). Rollback is reverting the PR's merge commit.\n\n## Comment on LIN-4469 at 23:16:04 (id ec59bd26) (the resumed first implementation, custom ac074b22)\n\n## Follow-up on PR #2447 (John's ruling on the second DECISION)\n\n- Commit 04bb47598: survey-task, survey-place and the blind read's read-only line drop the tracker clause the guard refuses (\"tickets or Linear state\" / \"tickets or tracker state\"). \"code, branches or pull requests\" stays in words. The blind read's piloted fixture takes the same one-line change; the pilot itself was not re-run.\n- Ceilings: survey-task −23, survey-place −23, blind-read −24, prompt-template-defs.js source −70. `FROZEN_TOTAL_BYTES` 396559 → 396419.\n- Another commit is on the branch, 05b592742 (KulchoAI): triage drops the description-rewrite and subtask clauses, the docs point to the retirement-line words, and the test's RETIRED list gains the committed change-coupling spelling. I did not author it; CI covers it.\n- CI on 05b592742: `CI success` green, with unit tests, unit tests (proxy, clock +400d), 4 E2E shards and secret scan all passing.\n- Still open for John: the first DECISION (accept the net fall for the eight kinds with no folded text: blocked, breakdown, close-out, look-into, triage, context, retro, retrospective-audit). They remain byte-identical.\n\n## Not in the material\n\nThe corrected LIN-4350 comment (cited by review as `25b09538`); its text is not in the material.\n"
+        }
+      },
+      {
+        "id": "run-160",
+        "kind": "run",
+        "v": 2,
+        "op": "end",
+        "at": "2026-11-13T23:05:39.936Z",
+        "by": "implementation",
+        "in": "task-128",
+        "state": "done",
+        "ended": {
+          "reason": "Recorded: Fixes 1-4 and the Leftovers answer done (findings 148-151, 154 ended); finding-41 narrowed; Fix 5 returned to close-out; question-158 and change-138 revised; witnesses, two checks and a concurrency finding added."
+        },
+        "links": {},
+        "fields": {
+          "stage": "implementation",
+          "account": "# What this stage really wrote\n\nDescription: unchanged (snapshots 23:05:33 and 23:17:28 match). Two implementation sessions wrote in this window: this dispatch (c66a3141, 23:05:16.936) and the first implementation's resume on John's answer (custom ac074b22, dispatched 23:03:14.946, a follow-up of b86c4a78), which ran alongside it until 23:16:13 and wrote commit `04bb47598`. Each comment is marked with its writer, inferred from what it says: ec59bd26 disowns commit `05b592742`, which the other three report as this pass's work.\n\n## Comment on LIN-4469 at 23:11:39 (id bbc2b1c7) (this dispatch)\n\n### Leftovers\nRetires: `lib/prompt-template-defs.js`: (retrospective-audit Reporting) and `lib/periodicals.js` (`areaNotesRoutes`) each state the docs-only notes-PR rule in their own words; both now render `NOTES_PR` (`lib/prompts/leftover-words.js`). The entry is removed from `docs/areas/llm-and-prompts.md` on PR #2447.\n\nEdges left, read against the diff:\n- Fix-sized, fixed on the PR branch: the retirement line's restatement in `docs/areas/README.md` and `docs/architecture/dispatch-and-proxy.md` (now `RETIRES_LABEL` / `RETIRES_NONE`); triage's guarded clauses; the committed-tool spelling in the RETIRED test list.\n- Outside this area, a note entry: simple-dispatcher's README and its `docs/areas/README.md` still restate the retirement-line forms and the \"follow-up is filed\" exit. Its owner's; named in the llm-and-prompts entry, not edited.\n- Not a ticket: no find breaks behaviour, blocks work or touches safety.\n\n## Comment on LIN-4448 (the parent) at 23:11:46 (id 8933968d) (this dispatch; it says the ruling `lin-4469-witness` gates merge)\n\n## LIN-4469 (piece 5): course changes and one deviation, PR #2447\n\nHead `05b592742`. Scope and measurement as recorded on the PR.\n\n- **Deviation from the plan:** `committedSearch` lives in `lib/periodicals.js`, not in the shared leaf `lib/prompts/leftover-words.js`. Every call site is a Periodical bullet, so the helper stays beside them. Stability's wording is the one spelling.\n- **Scope taken on:** triage's guard-refused clauses, and the same clause in survey-task, survey-place and the blind read's read-only line (`04bb47598`, on John's ruling). Triage keeps its scope rule and \"findings stay observations\".\n- **Re-pin:** `FROZEN_TOTAL_BYTES` 396064 (396884 on main), exactly the ceilings' sum. Real-context renders with proxy preambles fall 827520 → 825330 bytes (−2190). Exceptions: the four `work` kinds (blocked, breakdown, close-out, retrospective-audit) are byte-identical, and `seams-tangles` rises +24 from the committed-tool wording. Both are on John's replacement witness ruling `lin-4469-witness`, which gates merge.\n- **Not verified:** the post-deploy 403 checks (a look-into token's comment POST, a triage token's description PATCH). Not claimed. Rollback is reverting PR #2447's merge commit.\n\n## Comment on LIN-4469 at 23:15:58 (id a8749d0b) (this dispatch)\n\n## LIN-4469 (piece 5): PR and status\n\nPR: https://github.com/JKershaw/LinearViewer/pull/2447 (branch `feat/lin-4469-prompt-folds`), head `05b592742`.\n\n**CI on the head:** green. Unit tests, Unit tests (proxy, clock +400d), E2E shards 1–4, Secret scan and `ci-success` all pass (run 43525065043).\n\n**Done in this pass:** triage's guard-refused clauses folded; the retirement-line forms in `docs/areas/README.md` and `docs/architecture/dispatch-and-proxy.md` now point to `leftover-words.js`; the old committed change-coupling spelling is on the retired list (mutation-checked); re-pin to `FROZEN_TOTAL_BYTES` 396064 (equal to the ceilings' sum); witness regenerated.\n\n**Measured:** real-context renders with proxy preambles, PR base to head: 827520 → 825330 bytes (−2190). Exceptions: the four `work` kinds are byte-identical, and `seams-tangles` is +24.\n\n**Open before merge:** John's ruling `lin-4469-witness` on the four `work` kinds and the +24 (see the PR's DECISION section).\n\n**Not verified:** the post-deploy 403 checks (look-into comment POST, triage description PATCH). Rollback is reverting the PR's merge commit.\n\n## Comment on LIN-4469 at 23:16:04 (id ec59bd26) (the resumed first implementation, custom ac074b22)\n\n## Follow-up on PR #2447 (John's ruling on the second DECISION)\n\n- Commit 04bb47598: survey-task, survey-place and the blind read's read-only line drop the tracker clause the guard refuses (\"tickets or Linear state\" / \"tickets or tracker state\"). \"code, branches or pull requests\" stays in words. The blind read's piloted fixture takes the same one-line change; the pilot itself was not re-run.\n- Ceilings: survey-task −23, survey-place −23, blind-read −24, prompt-template-defs.js source −70. `FROZEN_TOTAL_BYTES` 396559 → 396419.\n- Another commit is on the branch, 05b592742 (KulchoAI): triage drops the description-rewrite and subtask clauses, the docs point to the retirement-line words, and the test's RETIRED list gains the committed change-coupling spelling. I did not author it; CI covers it.\n- CI on 05b592742: `CI success` green, with unit tests, unit tests (proxy, clock +400d), 4 E2E shards and secret scan all passing.\n- Still open for John: the first DECISION (accept the net fall for the eight kinds with no folded text: blocked, breakdown, close-out, look-into, triage, context, retro, retrospective-audit). They remain byte-identical.\n\n## Not in the material\n\nThe corrected LIN-4350 comment (cited by review as `25b09538`); its text is not in the material.\n"
+        }
+      }
+    ],
+    "finding-161": [
+      {
+        "id": "finding-161",
+        "kind": "finding",
+        "v": 1,
+        "op": "add",
+        "at": "2026-11-13T23:05:28.936Z",
+        "by": "implementation",
+        "in": "task-128",
+        "to": "review",
+        "state": "open",
+        "links": {},
+        "fields": {
+          "says": "Witnesses for PR #2447 at head 05b592742, to check against decision-137, decision-156 and decision-157. Folded: triage's guard-refused clauses (description rewrite, subtasks; its scope rule and \"findings stay observations\" kept), and the tracker clause in survey-task, survey-place and the blind read's read-only line (04bb47598); \"code, branches or pull requests\" stays in words. The blind read's piloted fixture takes the same one-line change; the pilot was not re-run. Re-pin: FROZEN_TOTAL_BYTES 396884 (main) -> 396064, exactly the ceilings' sum and below decision-137's 396575 (the resumed session had 396559 -> 396419 at 04bb47598). Real-context renders with proxy preambles, base to head: 827520 -> 825330 (-2190); exceptions: four work kinds byte-identical, seams-tangles +24 (both on question-158). CI green on 05b592742 (run 43525065043: unit, unit proxy clock +400d, E2E 1-4, secret scan, ci-success). Not verified: the post-deploy 403 checks (check-162)."
+        }
+      },
+      {
+        "id": "finding-161",
+        "kind": "finding",
+        "v": 2,
+        "op": "link",
+        "at": "2026-11-13T23:05:29.936Z",
+        "by": "implementation",
+        "in": "task-128",
+        "to": "review",
+        "state": "open",
+        "links": {
+          "about": [
+            "change-138"
+          ]
+        },
+        "fields": {
+          "says": "Witnesses for PR #2447 at head 05b592742, to check against decision-137, decision-156 and decision-157. Folded: triage's guard-refused clauses (description rewrite, subtasks; its scope rule and \"findings stay observations\" kept), and the tracker clause in survey-task, survey-place and the blind read's read-only line (04bb47598); \"code, branches or pull requests\" stays in words. The blind read's piloted fixture takes the same one-line change; the pilot was not re-run. Re-pin: FROZEN_TOTAL_BYTES 396884 (main) -> 396064, exactly the ceilings' sum and below decision-137's 396575 (the resumed session had 396559 -> 396419 at 04bb47598). Real-context renders with proxy preambles, base to head: 827520 -> 825330 (-2190); exceptions: four work kinds byte-identical, seams-tangles +24 (both on question-158). CI green on 05b592742 (run 43525065043: unit, unit proxy clock +400d, E2E 1-4, secret scan, ci-success). Not verified: the post-deploy 403 checks (check-162)."
+        }
+      },
+      {
+        "id": "finding-161",
+        "kind": "finding",
+        "v": 3,
+        "op": "link",
+        "at": "2026-11-13T23:05:30.936Z",
+        "by": "implementation",
+        "in": "task-128",
+        "to": "review",
+        "state": "open",
+        "links": {
+          "about": [
+            "change-138",
+            "decision-137"
+          ]
+        },
+        "fields": {
+          "says": "Witnesses for PR #2447 at head 05b592742, to check against decision-137, decision-156 and decision-157. Folded: triage's guard-refused clauses (description rewrite, subtasks; its scope rule and \"findings stay observations\" kept), and the tracker clause in survey-task, survey-place and the blind read's read-only line (04bb47598); \"code, branches or pull requests\" stays in words. The blind read's piloted fixture takes the same one-line change; the pilot was not re-run. Re-pin: FROZEN_TOTAL_BYTES 396884 (main) -> 396064, exactly the ceilings' sum and below decision-137's 396575 (the resumed session had 396559 -> 396419 at 04bb47598). Real-context renders with proxy preambles, base to head: 827520 -> 825330 (-2190); exceptions: four work kinds byte-identical, seams-tangles +24 (both on question-158). CI green on 05b592742 (run 43525065043: unit, unit proxy clock +400d, E2E 1-4, secret scan, ci-success). Not verified: the post-deploy 403 checks (check-162)."
+        }
+      },
+      {
+        "id": "finding-161",
+        "kind": "finding",
+        "v": 4,
+        "op": "link",
+        "at": "2026-11-13T23:05:31.936Z",
+        "by": "implementation",
+        "in": "task-128",
+        "to": "review",
+        "state": "open",
+        "links": {
+          "about": [
+            "change-138",
+            "decision-137",
+            "decision-157"
+          ]
+        },
+        "fields": {
+          "says": "Witnesses for PR #2447 at head 05b592742, to check against decision-137, decision-156 and decision-157. Folded: triage's guard-refused clauses (description rewrite, subtasks; its scope rule and \"findings stay observations\" kept), and the tracker clause in survey-task, survey-place and the blind read's read-only line (04bb47598); \"code, branches or pull requests\" stays in words. The blind read's piloted fixture takes the same one-line change; the pilot was not re-run. Re-pin: FROZEN_TOTAL_BYTES 396884 (main) -> 396064, exactly the ceilings' sum and below decision-137's 396575 (the resumed session had 396559 -> 396419 at 04bb47598). Real-context renders with proxy preambles, base to head: 827520 -> 825330 (-2190); exceptions: four work kinds byte-identical, seams-tangles +24 (both on question-158). CI green on 05b592742 (run 43525065043: unit, unit proxy clock +400d, E2E 1-4, secret scan, ci-success). Not verified: the post-deploy 403 checks (check-162)."
+        }
+      }
+    ],
+    "check-162": [
+      {
+        "id": "check-162",
+        "kind": "check",
+        "v": 1,
+        "op": "add",
+        "at": "2026-11-13T23:05:32.936Z",
+        "by": "implementation",
+        "in": "task-128",
+        "to": "John",
+        "state": "open",
+        "links": {},
+        "fields": {
+          "what": "After the deploy of PR #2447: the shrunk mandates rely on the proxy refusing what the words no longer forbid. A look-into (none) token's comment POST and a triage (ticket-fields) token's description PATCH must each return 403.",
+          "why-person": "Needs the deployed proxy and real stage-stamped tokens; no session in this task can mint them, and implementation did not claim it.",
+          "how": "After deploy, dispatch or mint a look-into token and a triage token, try each write through the proxy, and record the status codes on LIN-4469. Rollback: revert PR #2447's merge commit."
+        }
+      },
+      {
+        "id": "check-162",
+        "kind": "check",
+        "v": 2,
+        "op": "link",
+        "at": "2026-11-13T23:05:33.936Z",
+        "by": "implementation",
+        "in": "task-128",
+        "to": "John",
+        "state": "open",
+        "links": {
+          "about": [
+            "check-155"
+          ]
+        },
+        "fields": {
+          "what": "After the deploy of PR #2447: the shrunk mandates rely on the proxy refusing what the words no longer forbid. A look-into (none) token's comment POST and a triage (ticket-fields) token's description PATCH must each return 403.",
+          "why-person": "Needs the deployed proxy and real stage-stamped tokens; no session in this task can mint them, and implementation did not claim it.",
+          "how": "After deploy, dispatch or mint a look-into token and a triage token, try each write through the proxy, and record the status codes on LIN-4469. Rollback: revert PR #2447's merge commit."
+        }
+      }
+    ],
+    "check-163": [
+      {
+        "id": "check-163",
+        "kind": "check",
+        "v": 1,
+        "op": "add",
+        "at": "2026-11-13T23:05:34.936Z",
+        "by": "implementation",
+        "in": "task-128",
+        "to": "review",
+        "state": "open",
+        "links": {},
+        "fields": {
+          "what": "Whether the rest of Fix 2 (finding-149) landed: the change-log row in scripts/prompt-template-change-log.md and the LIN-4350 reply (cited as 25b09538) carry the corrected figure (four work kinds byte-identical, seams-tangles +24), and whether the ticket still shows a wrong one. The resumed first implementation's comment ec59bd26 on LIN-4469 says eight kinds (blocked, breakdown, close-out, look-into, triage, context, retro, retrospective-audit) remain byte-identical; look-into, triage, context and retro fall in real context.",
+          "how": "Read the change-log row and comment 25b09538 at head 05b592742; if ec59bd26's figure stands uncorrected, post one correcting line on LIN-4469 before John answers question-158."
+        }
+      },
+      {
+        "id": "check-163",
+        "kind": "check",
+        "v": 2,
+        "op": "link",
+        "at": "2026-11-13T23:05:35.936Z",
+        "by": "implementation",
+        "in": "task-128",
+        "to": "review",
+        "state": "open",
+        "links": {
+          "about": [
+            "finding-149"
+          ]
+        },
+        "fields": {
+          "what": "Whether the rest of Fix 2 (finding-149) landed: the change-log row in scripts/prompt-template-change-log.md and the LIN-4350 reply (cited as 25b09538) carry the corrected figure (four work kinds byte-identical, seams-tangles +24), and whether the ticket still shows a wrong one. The resumed first implementation's comment ec59bd26 on LIN-4469 says eight kinds (blocked, breakdown, close-out, look-into, triage, context, retro, retrospective-audit) remain byte-identical; look-into, triage, context and retro fall in real context.",
+          "how": "Read the change-log row and comment 25b09538 at head 05b592742; if ec59bd26's figure stands uncorrected, post one correcting line on LIN-4469 before John answers question-158."
+        }
+      },
+      {
+        "id": "check-163",
+        "kind": "check",
+        "v": 3,
+        "op": "link",
+        "at": "2026-11-13T23:05:36.936Z",
+        "by": "implementation",
+        "in": "task-128",
+        "to": "review",
+        "state": "open",
+        "links": {
+          "about": [
+            "finding-149",
+            "question-158"
+          ]
+        },
+        "fields": {
+          "what": "Whether the rest of Fix 2 (finding-149) landed: the change-log row in scripts/prompt-template-change-log.md and the LIN-4350 reply (cited as 25b09538) carry the corrected figure (four work kinds byte-identical, seams-tangles +24), and whether the ticket still shows a wrong one. The resumed first implementation's comment ec59bd26 on LIN-4469 says eight kinds (blocked, breakdown, close-out, look-into, triage, context, retro, retrospective-audit) remain byte-identical; look-into, triage, context and retro fall in real context.",
+          "how": "Read the change-log row and comment 25b09538 at head 05b592742; if ec59bd26's figure stands uncorrected, post one correcting line on LIN-4469 before John answers question-158."
+        }
+      }
+    ],
+    "finding-164": [
+      {
+        "id": "finding-164",
+        "kind": "finding",
+        "v": 1,
+        "op": "add",
+        "at": "2026-11-13T23:05:37.936Z",
+        "by": "implementation",
+        "in": "task-128",
+        "to": "project",
+        "state": "open",
+        "links": {},
+        "fields": {
+          "says": "Two implementation sessions wrote to LIN-4469 and PR #2447's branch at once: John's answer to lin-4469-cuts resumed the first implementation (custom ac074b22, a follow-up of b86c4a78, dispatched 23:03:14.946), and autopilot dispatched a fresh implementation (c66a3141, 23:05:16.936) for the same fold and fixes. They ran together until 23:16:13; the resumed session wrote 04bb47598 and disowned the other's 05b592742 (comment ec59bd26), and the two posted conflicting byte-identical counts (eight kinds vs four). No harm landed (CI green on the joint head), but resume-on-answer and a new dispatch do not see each other. Raw material for the dispatch rule: one build session per ticket at a time."
+        }
+      },
+      {
+        "id": "finding-164",
+        "kind": "finding",
+        "v": 2,
+        "op": "link",
+        "at": "2026-11-13T23:05:38.936Z",
+        "by": "implementation",
+        "in": "task-128",
+        "to": "project",
+        "state": "open",
+        "links": {
+          "about": [
+            "finding-143"
+          ]
+        },
+        "fields": {
+          "says": "Two implementation sessions wrote to LIN-4469 and PR #2447's branch at once: John's answer to lin-4469-cuts resumed the first implementation (custom ac074b22, a follow-up of b86c4a78, dispatched 23:03:14.946), and autopilot dispatched a fresh implementation (c66a3141, 23:05:16.936) for the same fold and fixes. They ran together until 23:16:13; the resumed session wrote 04bb47598 and disowned the other's 05b592742 (comment ec59bd26), and the two posted conflicting byte-identical counts (eight kinds vs four). No harm landed (CI green on the joint head), but resume-on-answer and a new dispatch do not see each other. Raw material for the dispatch rule: one build session per ticket at a time."
         }
       }
     ]
@@ -4732,6 +5182,17 @@
       "args": [
         "--text",
         "alongside",
+        "--by",
+        "implementation"
+      ],
+      "asOf": null
+    },
+    {
+      "at": "2026-11-18T10:11:31.825Z",
+      "by": "implementation",
+      "cmd": "get",
+      "args": [
+        "change-138",
         "--by",
         "implementation"
       ],

@@ -1,0 +1,316 @@
+[
+ {
+  "at": "2026-11-18T10:04:29.025Z",
+  "by": "design",
+  "cmd": "show",
+  "args": [
+   "--task",
+   "task-8",
+   "--by",
+   "design"
+  ],
+  "asOf": null
+ },
+ {
+  "at": "2026-11-18T10:04:29.066Z",
+  "by": "design",
+  "cmd": "find",
+  "args": [
+   "--to",
+   "project",
+   "--state",
+   "open",
+   "--by",
+   "design"
+  ],
+  "asOf": null
+ },
+ {
+  "at": "2026-11-18T10:04:29.105Z",
+  "by": "design",
+  "cmd": "find",
+  "args": [
+   "--kind",
+   "lesson",
+   "--by",
+   "design"
+  ],
+  "asOf": null
+ },
+ {
+  "at": "2026-11-18T10:04:34.067Z",
+  "by": "design",
+  "cmd": "get",
+  "args": [
+   "check-15",
+   "--by",
+   "design"
+  ],
+  "asOf": null
+ },
+ {
+  "at": "2026-11-18T10:04:34.110Z",
+  "by": "design",
+  "cmd": "get",
+  "args": [
+   "check-19",
+   "--by",
+   "design"
+  ],
+  "asOf": null
+ },
+ {
+  "at": "2026-11-18T10:04:34.154Z",
+  "by": "design",
+  "cmd": "get",
+  "args": [
+   "decision-24",
+   "--by",
+   "design"
+  ],
+  "asOf": null
+ },
+ {
+  "at": "2026-11-18T10:04:34.195Z",
+  "by": "design",
+  "cmd": "get",
+  "args": [
+   "task-8",
+   "--by",
+   "design"
+  ],
+  "asOf": null
+ },
+ {
+  "at": "2026-11-18T10:04:34.245Z",
+  "by": "design",
+  "cmd": "find",
+  "args": [
+   "--kind",
+   "plan",
+   "--by",
+   "design"
+  ],
+  "asOf": null
+ },
+ {
+  "at": "2026-11-18T10:05:18.392Z",
+  "by": "design",
+  "cmd": "find",
+  "args": [
+   "--to",
+   "plan-review",
+   "--by",
+   "design"
+  ],
+  "asOf": null
+ },
+ {
+  "at": "2026-11-18T10:05:18.429Z",
+  "by": "design",
+  "cmd": "find",
+  "args": [
+   "--to",
+   "implementation",
+   "--state",
+   "open",
+   "--by",
+   "design"
+  ],
+  "asOf": null
+ },
+ {
+  "at": "2026-11-18T10:06:40.203Z",
+  "by": "design",
+  "cmd": "find",
+  "args": [
+   "--to",
+   "design",
+   "--state",
+   "open",
+   "--by",
+   "design"
+  ],
+  "asOf": null
+ },
+ {
+  "at": "2026-11-18T10:10:02.201Z",
+  "by": "design",
+  "cmd": "show",
+  "args": [
+   "--task",
+   "task-8",
+   "--by",
+   "design"
+  ],
+  "asOf": null
+ },
+ {
+  "at": "2026-11-18T10:10:07.607Z",
+  "by": "design",
+  "cmd": "get",
+  "args": [
+   "run-44",
+   "--by",
+   "design"
+  ],
+  "asOf": null
+ },
+ {
+  "at": "2026-11-18T10:10:07.654Z",
+  "by": "design",
+  "cmd": "get",
+  "args": [
+   "check-19",
+   "--by",
+   "design"
+  ],
+  "asOf": null
+ },
+ {
+  "at": "2026-11-18T10:10:07.701Z",
+  "by": "design",
+  "cmd": "get",
+  "args": [
+   "check-31",
+   "--by",
+   "design"
+  ],
+  "asOf": null
+ },
+ {
+  "at": "2026-11-18T10:10:07.752Z",
+  "by": "design",
+  "cmd": "get",
+  "args": [
+   "check-32",
+   "--by",
+   "design"
+  ],
+  "asOf": null
+ },
+ {
+  "at": "2026-11-18T10:10:07.793Z",
+  "by": "design",
+  "cmd": "get",
+  "args": [
+   "check-33",
+   "--by",
+   "design"
+  ],
+  "asOf": null
+ },
+ {
+  "at": "2026-11-18T10:10:07.838Z",
+  "by": "design",
+  "cmd": "get",
+  "args": [
+   "check-34",
+   "--by",
+   "design"
+  ],
+  "asOf": null
+ },
+ {
+  "at": "2026-11-18T10:10:07.881Z",
+  "by": "design",
+  "cmd": "get",
+  "args": [
+   "check-35",
+   "--by",
+   "design"
+  ],
+  "asOf": null
+ },
+ {
+  "at": "2026-11-18T10:10:07.919Z",
+  "by": "design",
+  "cmd": "get",
+  "args": [
+   "check-36",
+   "--by",
+   "design"
+  ],
+  "asOf": null
+ },
+ {
+  "at": "2026-11-18T10:10:07.960Z",
+  "by": "design",
+  "cmd": "get",
+  "args": [
+   "check-15",
+   "--by",
+   "design"
+  ],
+  "asOf": null
+ },
+ {
+  "at": "2026-11-18T10:10:08.003Z",
+  "by": "design",
+  "cmd": "get",
+  "args": [
+   "decision-24",
+   "--by",
+   "design"
+  ],
+  "asOf": null
+ },
+ {
+  "at": "2026-11-18T10:10:08.044Z",
+  "by": "design",
+  "cmd": "get",
+  "args": [
+   "decision-27",
+   "--by",
+   "design"
+  ],
+  "asOf": null
+ },
+ {
+  "at": "2026-11-18T10:10:08.083Z",
+  "by": "design",
+  "cmd": "get",
+  "args": [
+   "decision-28",
+   "--by",
+   "design"
+  ],
+  "asOf": null
+ },
+ {
+  "at": "2026-11-18T10:10:08.124Z",
+  "by": "design",
+  "cmd": "get",
+  "args": [
+   "finding-30",
+   "--by",
+   "design"
+  ],
+  "asOf": null
+ },
+ {
+  "at": "2026-11-18T10:11:15.221Z",
+  "by": "design",
+  "cmd": "find",
+  "args": [
+   "--to",
+   "design",
+   "--state",
+   "open",
+   "--by",
+   "design"
+  ],
+  "asOf": null
+ },
+ {
+  "at": "2026-11-18T10:11:15.256Z",
+  "by": "design",
+  "cmd": "get",
+  "args": [
+   "verdict-39",
+   "--by",
+   "design"
+  ],
+  "asOf": null
+ }
+]
