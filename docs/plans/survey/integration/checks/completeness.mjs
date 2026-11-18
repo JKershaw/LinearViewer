@@ -1,4 +1,4 @@
-// Every census row (C1–C5 site tables) must be placed in design.md Appendix A.
+// Every census row (C1–C5 site tables) must be placed in checks/placement.md.
 // Usage: node completeness.mjs  (run from this folder)  → prints missing ids, exit 1 if any.
 import { readFileSync, readdirSync } from 'node:fs';
 const dir = new URL('../', import.meta.url);
@@ -7,8 +7,7 @@ const ids = new Map();
 for (const f of census) for (const m of readFileSync(new URL(`census/${f}`, dir), 'utf8').matchAll(/^\| (C\d-[A-D]?\d{2}) \|/gm)) {
   const [c] = m[1].split('-'); (ids.get(c) || ids.set(c, new Set()).get(c)).add(m[1]);
 }
-const design = readFileSync(new URL('design.md', dir), 'utf8');
-const appendix = design.slice(design.indexOf('## Appendix A'));
+const appendix = readFileSync(new URL('checks/placement.md', dir), 'utf8');
 const missing = [];
 for (const [c, set] of ids) {
   // C5 rows carry a letter (A05); C1–C4 rows are bare numbers. The section runs from its bold heading to the next.
