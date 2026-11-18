@@ -1,5 +1,5 @@
 {
-  "next": 69,
+  "next": 70,
   "records": {
     "lesson-1": [
       {
@@ -1383,6 +1383,23 @@
           "says": "Survey @ 4b5001ddf: Atlassian's entity-property limit reads as bytes or characters depending on the page (decision-60 records 32,768 characters). JSON escaping inflates `words`, so the one shared size function should measure the serialized property string."
         }
       }
+    ],
+    "run-69": [
+      {
+        "id": "run-69",
+        "kind": "run",
+        "v": 1,
+        "op": "add",
+        "at": "2026-11-13T13:47:55.628Z",
+        "by": "survey-place",
+        "in": "task-57",
+        "state": "open",
+        "links": {},
+        "fields": {
+          "stage": "survey-place",
+          "account": "# What this stage really wrote\n\n## Comment on LIN-4450 at 13:51:36\n\n## Survey global: LIN-4450 @ 4b5001ddf\n\n(= the grounding commit.)\n\n**Where it lands.** `lib/providers/jira/index.js` is 1,478 lines, mostly history comments. `adf.js` is the codec: rebuilt clean-room, quiet since LIN-3570. `lib/as-asked*.js` was just tidied toward one owner (LIN-4360/61/62). The area is getting better. I probed the witness shapes (`* a`, `*em*`, `***x***`, `3.` lists, a fence with a blank line, `a\\n\\n\\n\\nb`, trailing spaces). `markdownToAdf`'s output never trips D1, and `adfToMarkdown∘markdownToAdf` reaches a fixed point on all of them. So D1 won't block Harbour-written blocks.\n\n**What the obvious way does**\n- **Two stores of the words.** Shape B accepts this: the ADF region plus the property, with a digest deciding between them. It stays safe only while the region module is the one place that knows about both.\n- **A second ADF walker.** The reader needs a paragraph's plain text. `adf.js` already has `plainText` (~340), but it is private. Export it rather than retype it. Render the region with `adfToMarkdown({type:'doc',content})`, not a new renderer.\n- **The reader accepts more than the writer refuses.** \"Whatever its marks\" means a plain paragraph of the end sentence in the words ends the region early, and `hasMarkerLine` doesn't refuse that. This is safe only if `descriptionRoundTrip` runs through *the same reader*: then the filing reads non-kept and goes in unsealed. Worth one witness.\n- **Scatter.** There are 8 `getIssue` sites. Four never read a description: 703, 1018, 1076, and the pre-read at 1099. `fetchIssueFields` (818) feeds `_toCanonicalIssue` but isn't in the plan's list. Write one read-with-words helper beside the reader, not `properties` threaded through each call.\n- **What has to learn, beyond the three headers named:**\n  - `dispatch-factory.js:1008`\n  - `docs/proxy-integration.md:2070`: agent-facing, says Jira files unsealed\n  - `docs/architecture/source-map.md:216` and `:82` (the new module needs a mention)\n  - `as-asked-guard.test.js`, whose Jira block (345, 351) will fail, so it notices. The docs won't.\n- **A branch left without a witness.** `as-asked-create-seal.test.js:207-227` uses Jira's round trip as *the* provider that cannot hold the block. After the flip, `sealForFiling`'s `reason: 'provider'` branch has no subject in production or in tests. Witness it with a synthetic lossy round trip, or retire it on purpose. `as-asked.js`'s \"When the unsealed branches could go\" drops \"Jira today\", but stays permanent because of older tickets.\n\n**Better, at a cost this task can carry:** export `plainText`, add one read helper, put the size function in the region module, retire every claim listed above, and keep the provider branch witnessed.\n\n**Better still, not this task's**\n- **Live Jira-native tickets.** The first-dispatch seal writes back through `updateIssue`. D1 refuses any ticket that holds a mention, emoji or panel (common), and logs it once per first dispatch. Tickets that pass get their ADF normalised, and their \"words\" become the escaped rendering. That is the codec's lossiness showing, which is deeper than this task.\n- **The bulk search path** could ask for `properties` (`search/jql` accepts it), so the dashboard would show exact words.\n- **Comment weight.** `index.js`'s header and source-map's jira paragraph carry more history than guidance.\n\n"
+        }
+      }
     ]
   },
   "log": [
@@ -1606,6 +1623,384 @@
         "--by",
         "survey-task",
         "--count"
+      ],
+      "asOf": null
+    },
+    {
+      "at": "2026-11-18T10:02:13.346Z",
+      "by": "survey-place",
+      "cmd": "get",
+      "args": [
+        "run-63",
+        "--by",
+        "survey-place"
+      ],
+      "asOf": null
+    },
+    {
+      "at": "2026-11-18T10:02:13.384Z",
+      "by": "survey-place",
+      "cmd": "find",
+      "args": [
+        "--to",
+        "survey-place",
+        "--state",
+        "open",
+        "--by",
+        "survey-place"
+      ],
+      "asOf": null
+    },
+    {
+      "at": "2026-11-18T10:02:13.414Z",
+      "by": "survey-place",
+      "cmd": "show",
+      "args": [
+        "--task",
+        "task-57",
+        "--by",
+        "survey-place"
+      ],
+      "asOf": null
+    },
+    {
+      "at": "2026-11-18T10:02:20.519Z",
+      "by": "survey-place",
+      "cmd": "find",
+      "args": [
+        "--to",
+        "project",
+        "--state",
+        "open",
+        "--text",
+        "jira",
+        "--by",
+        "survey-place"
+      ],
+      "asOf": null
+    },
+    {
+      "at": "2026-11-18T10:02:20.552Z",
+      "by": "survey-place",
+      "cmd": "find",
+      "args": [
+        "--to",
+        "project",
+        "--state",
+        "open",
+        "--text",
+        "Jira",
+        "--by",
+        "survey-place"
+      ],
+      "asOf": null
+    },
+    {
+      "at": "2026-11-18T10:02:20.588Z",
+      "by": "survey-place",
+      "cmd": "find",
+      "args": [
+        "--to",
+        "project",
+        "--state",
+        "open",
+        "--text",
+        "adf",
+        "--by",
+        "survey-place"
+      ],
+      "asOf": null
+    },
+    {
+      "at": "2026-11-18T10:02:20.622Z",
+      "by": "survey-place",
+      "cmd": "find",
+      "args": [
+        "--to",
+        "project",
+        "--state",
+        "open",
+        "--text",
+        "source-map",
+        "--by",
+        "survey-place"
+      ],
+      "asOf": null
+    },
+    {
+      "at": "2026-11-18T10:02:20.667Z",
+      "by": "survey-place",
+      "cmd": "find",
+      "args": [
+        "--to",
+        "project",
+        "--state",
+        "open",
+        "--text",
+        "proxy-integration",
+        "--by",
+        "survey-place"
+      ],
+      "asOf": null
+    },
+    {
+      "at": "2026-11-18T10:02:20.714Z",
+      "by": "survey-place",
+      "cmd": "find",
+      "args": [
+        "--to",
+        "project",
+        "--state",
+        "open",
+        "--text",
+        "plainText",
+        "--by",
+        "survey-place"
+      ],
+      "asOf": null
+    },
+    {
+      "at": "2026-11-18T10:02:20.756Z",
+      "by": "survey-place",
+      "cmd": "find",
+      "args": [
+        "--to",
+        "project",
+        "--state",
+        "open",
+        "--text",
+        "search/jql",
+        "--by",
+        "survey-place"
+      ],
+      "asOf": null
+    },
+    {
+      "at": "2026-11-18T10:02:20.796Z",
+      "by": "survey-place",
+      "cmd": "find",
+      "args": [
+        "--to",
+        "project",
+        "--state",
+        "open",
+        "--text",
+        "sealForFiling",
+        "--by",
+        "survey-place"
+      ],
+      "asOf": null
+    },
+    {
+      "at": "2026-11-18T10:02:20.835Z",
+      "by": "survey-place",
+      "cmd": "find",
+      "args": [
+        "--to",
+        "project",
+        "--state",
+        "open",
+        "--text",
+        "D1",
+        "--by",
+        "survey-place"
+      ],
+      "asOf": null
+    },
+    {
+      "at": "2026-11-18T10:02:20.869Z",
+      "by": "survey-place",
+      "cmd": "find",
+      "args": [
+        "--to",
+        "project",
+        "--state",
+        "open",
+        "--text",
+        "first-dispatch",
+        "--by",
+        "survey-place"
+      ],
+      "asOf": null
+    },
+    {
+      "at": "2026-11-18T10:02:20.903Z",
+      "by": "survey-place",
+      "cmd": "find",
+      "args": [
+        "--to",
+        "project",
+        "--state",
+        "open",
+        "--text",
+        "codec",
+        "--by",
+        "survey-place"
+      ],
+      "asOf": null
+    },
+    {
+      "at": "2026-11-18T10:02:20.937Z",
+      "by": "survey-place",
+      "cmd": "find",
+      "args": [
+        "--kind",
+        "lesson",
+        "--text",
+        "jira",
+        "--by",
+        "survey-place"
+      ],
+      "asOf": null
+    },
+    {
+      "at": "2026-11-18T10:02:20.970Z",
+      "by": "survey-place",
+      "cmd": "find",
+      "args": [
+        "--kind",
+        "lesson",
+        "--text",
+        "Jira",
+        "--by",
+        "survey-place"
+      ],
+      "asOf": null
+    },
+    {
+      "at": "2026-11-18T10:02:21.004Z",
+      "by": "survey-place",
+      "cmd": "find",
+      "args": [
+        "--kind",
+        "lesson",
+        "--text",
+        "adf",
+        "--by",
+        "survey-place"
+      ],
+      "asOf": null
+    },
+    {
+      "at": "2026-11-18T10:02:21.047Z",
+      "by": "survey-place",
+      "cmd": "find",
+      "args": [
+        "--kind",
+        "lesson",
+        "--text",
+        "source-map",
+        "--by",
+        "survey-place"
+      ],
+      "asOf": null
+    },
+    {
+      "at": "2026-11-18T10:02:21.089Z",
+      "by": "survey-place",
+      "cmd": "find",
+      "args": [
+        "--kind",
+        "lesson",
+        "--text",
+        "comment",
+        "--by",
+        "survey-place"
+      ],
+      "asOf": null
+    },
+    {
+      "at": "2026-11-18T10:02:21.122Z",
+      "by": "survey-place",
+      "cmd": "find",
+      "args": [
+        "--kind",
+        "lesson",
+        "--text",
+        "helper",
+        "--by",
+        "survey-place"
+      ],
+      "asOf": null
+    },
+    {
+      "at": "2026-11-18T10:02:26.303Z",
+      "by": "survey-place",
+      "cmd": "find",
+      "args": [
+        "--to",
+        "project",
+        "--state",
+        "open",
+        "--by",
+        "survey-place"
+      ],
+      "asOf": null
+    },
+    {
+      "at": "2026-11-18T10:02:26.339Z",
+      "by": "survey-place",
+      "cmd": "find",
+      "args": [
+        "--in",
+        "task-50",
+        "--by",
+        "survey-place"
+      ],
+      "asOf": null
+    },
+    {
+      "at": "2026-11-18T10:02:31.487Z",
+      "by": "survey-place",
+      "cmd": "get",
+      "args": [
+        "finding-49",
+        "--by",
+        "survey-place"
+      ],
+      "asOf": null
+    },
+    {
+      "at": "2026-11-18T10:02:31.527Z",
+      "by": "survey-place",
+      "cmd": "get",
+      "args": [
+        "plan-52",
+        "--by",
+        "survey-place"
+      ],
+      "asOf": null
+    },
+    {
+      "at": "2026-11-18T10:02:31.590Z",
+      "by": "survey-place",
+      "cmd": "get",
+      "args": [
+        "plan-53",
+        "--by",
+        "survey-place"
+      ],
+      "asOf": null
+    },
+    {
+      "at": "2026-11-18T10:02:31.638Z",
+      "by": "survey-place",
+      "cmd": "get",
+      "args": [
+        "task-58",
+        "--by",
+        "survey-place"
+      ],
+      "asOf": null
+    },
+    {
+      "at": "2026-11-18T10:02:31.682Z",
+      "by": "survey-place",
+      "cmd": "get",
+      "args": [
+        "task-59",
+        "--by",
+        "survey-place"
       ],
       "asOf": null
     }

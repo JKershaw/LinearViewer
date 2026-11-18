@@ -1,0 +1,55 @@
+[
+ {
+  "at": "2026-11-18T10:01:42.510Z",
+  "by": "survey-place",
+  "cmd": "find",
+  "args": [
+   "--to",
+   "project",
+   "--state",
+   "open",
+   "--by",
+   "survey-place"
+  ],
+  "asOf": null
+ },
+ {
+  "at": "2026-11-18T10:01:42.546Z",
+  "by": "survey-place",
+  "cmd": "find",
+  "args": [
+   "--kind",
+   "lesson",
+   "--by",
+   "survey-place"
+  ],
+  "asOf": null
+ },
+ {
+  "at": "2026-11-18T10:01:42.583Z",
+  "by": "survey-place",
+  "cmd": "show",
+  "args": [
+   "--task",
+   "task-8",
+   "--by",
+   "survey-place"
+  ],
+  "asOf": null
+ },
+ {
+  "at": "2026-11-18T10:02:44.105Z",
+  "by": "survey-place",
+  "cmd": "find",
+  "args": [
+   "--in",
+   "task-8",
+   "--state",
+   "open",
+   "--count",
+   "--by",
+   "survey-place"
+  ],
+  "asOf": null
+ }
+]

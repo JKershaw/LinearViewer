@@ -1,5 +1,5 @@
 {
-  "next": 138,
+  "next": 144,
   "records": {
     "lesson-1": [
       {
@@ -367,6 +367,24 @@
         "fields": {
           "says": "`lib/prompts/stage-kinds.js`: `CUT` writes the closing contract's token order (`DECISION:` before `BLOCKED:`) into a scope line beside `ASK`. Its \"cut\" and the plan-review and review \"narrowing\" (`lib/completion-signals.js`) name one thing; no test links them. (John, 8 Nov.)"
         }
+      },
+      {
+        "id": "finding-23",
+        "kind": "finding",
+        "v": 2,
+        "op": "end",
+        "at": "2026-11-13T22:39:26.494Z",
+        "by": "implementation",
+        "to": "project",
+        "state": "done",
+        "ended": {
+          "reason": "PR #2447: plan-review and review verdicts now say \"cut\", one vocabulary with CUT; CUT's token order in its scope line was kept on purpose.",
+          "into": "change-138"
+        },
+        "links": {},
+        "fields": {
+          "says": "`lib/prompts/stage-kinds.js`: `CUT` writes the closing contract's token order (`DECISION:` before `BLOCKED:`) into a scope line beside `ASK`. Its \"cut\" and the plan-review and review \"narrowing\" (`lib/completion-signals.js`) name one thing; no test links them. (John, 8 Nov.)"
+        }
       }
     ],
     "finding-24": [
@@ -575,6 +593,24 @@
         "fields": {
           "says": "`lib/prompt-template-defs.js` (retrospective-audit Reporting) and `lib/periodicals.js` (`areaNotesRoutes`) each state the docs-only notes-PR rule in their own words; one shared constant in `lib/prompts/leftover-words.js` would make it one, at the cost of re-pinning the 13 Periodical prompt hashes. (LIN-4432.)"
         }
+      },
+      {
+        "id": "finding-36",
+        "kind": "finding",
+        "v": 2,
+        "op": "end",
+        "at": "2026-11-13T22:39:23.494Z",
+        "by": "implementation",
+        "to": "project",
+        "state": "done",
+        "ended": {
+          "reason": "PR #2447: the docs-only notes-PR rule is one constant, NOTES_PR in lib/prompts/leftover-words.js, used by the Periodical readings and retrospective-audit; Periodical hashes re-pinned.",
+          "into": "change-138"
+        },
+        "links": {},
+        "fields": {
+          "says": "`lib/prompt-template-defs.js` (retrospective-audit Reporting) and `lib/periodicals.js` (`areaNotesRoutes`) each state the docs-only notes-PR rule in their own words; one shared constant in `lib/prompts/leftover-words.js` would make it one, at the cost of re-pinning the 13 Periodical prompt hashes. (LIN-4432.)"
+        }
       }
     ],
     "finding-37": [
@@ -590,6 +626,21 @@
         "links": {},
         "fields": {
           "says": "`lib/prompts/leftover-words.js`: the first-match area lookup is spelled three ways: `CONSEQUENCE_TEST`'s \"first match wins\" parenthetical, `docs/areas/README.md` (\"take the first area with a pattern that matches its path\") and the blind-read prompt's own sentence (`lib/prompt-template-defs.js`, the `blind-read` template), which shipped as piloted (LIN-4437), so it was not retyped after the pilot. One constant in the leaf would make it one, at the cost of re-piloting that sentence. (LIN-4436 leftovers.)"
+        }
+      },
+      {
+        "id": "finding-37",
+        "kind": "finding",
+        "v": 2,
+        "op": "revise",
+        "at": "2026-11-13T22:39:25.494Z",
+        "by": "implementation",
+        "reason": "narrowed by LIN-4469 (PR #2447): only the piloted blind-read sentence remains",
+        "to": "project",
+        "state": "open",
+        "links": {},
+        "fields": {
+          "says": "`lib/prompts/leftover-words.js`: the first-match area lookup is now one constant, `areaLookup` (LIN-4469, PR #2447), except the blind-read prompt's own sentence (`lib/prompt-template-defs.js`, `blind-read` template), which stays as piloted (LIN-4437). Folding it in needs a re-pilot, which is a person's run, not a stage's. (LIN-4436 leftovers.)"
         }
       }
     ],
@@ -622,6 +673,21 @@
         "links": {},
         "fields": {
           "says": "`lib/periodicals.js`: \"search the repo for a committed tool (no path is written here) and run it\" is spelled four times: Drift & Coherence's census bullet, Seams & Tangles' two bullets and Stability's declaration bullet. One shared helper would make it one, at the cost of re-pinning those three templates' hashes. (LIN-4424 leftovers; Survey global.) The rule it answers, whether a review may run a tool the repo commits, is itself worded per template: Stability's run bullet says \"introducing no tooling beyond what the repo commits\", while Recent Headwinds (which reads the same rework and churn trajectory) and Drift & Coherence still say \"introducing no new tooling\", Code Quality says \"introduce no new tooling\", and Seams & Tangles allows committed tools in its own bullets. No `periodicalBullet` helper owns it; deciding it is one rule re-pins every template that states it. (LIN-4424 blind read.)"
+        }
+      },
+      {
+        "id": "finding-39",
+        "kind": "finding",
+        "v": 2,
+        "op": "revise",
+        "at": "2026-11-13T22:39:24.494Z",
+        "by": "implementation",
+        "reason": "narrowed by LIN-4469 (PR #2447): spelling settled, policy wording kept",
+        "to": "project",
+        "state": "open",
+        "links": {},
+        "fields": {
+          "says": "`lib/periodicals.js`: the four spellings of \"search the repo for a committed tool\" are now one (`committedSearch`, Stability's wording; LIN-4469, PR #2447). What remains is the policy it answers, whether a review may run a tool the repo commits, which is still worded per template: Stability says \"introducing no tooling beyond what the repo commits\", Recent Headwinds and Drift & Coherence \"introducing no new tooling\", Code Quality \"introduce no new tooling\", and Seams & Tangles allows committed tools in its own bullets. LIN-4469 kept it on purpose (a policy, not a spelling); deciding it as one rule re-pins every template that states it. (LIN-4424 blind read.)"
         }
       }
     ],
@@ -2440,6 +2506,214 @@
           "why": "LIN-4467 (PR https://github.com/JKershaw/LinearViewer/pull/2444) raises `FROZEN_TOTAL_BYTES` in `tests/unit/prompt-size-budget.test.js` from 378915 to 396884 (396575 at review, plus a net +309 at close-out for deriving the reading-pass lines). It is re-accounting, not growth: the text moved into the newly budgeted `lib/prompts/stage-kinds.js` from files the total did not cover, and all 80 rendered prompts are byte-identical.\n\nNamed monitor: `tests/unit/prompt-size-budget.test.js` fails on any growth past the ceiling. Only this piece landing can show the reduction.\n\nThe record's source ceiling (`lib/prompts/stage-kinds.js`, 43348) is part of what to lower if wording moves out of it. `lib/prompt-template-defs.js` and the budget test are shared with this piece; LIN-4467 lands first.\n"
         }
       }
+    ],
+    "change-138": [
+      {
+        "id": "change-138",
+        "kind": "change",
+        "v": 1,
+        "op": "add",
+        "at": "2026-11-13T22:39:19.494Z",
+        "by": "implementation",
+        "in": "task-128",
+        "to": "review",
+        "state": "open",
+        "links": {
+          "about": [
+            "plan-114",
+            "decision-135",
+            "decision-137"
+          ]
+        },
+        "fields": {
+          "ref": "https://github.com/JKershaw/LinearViewer/pull/2447 (branch feat/lin-4469-prompt-folds)",
+          "head": "3533f37c2"
+        }
+      }
+    ],
+    "question-139": [
+      {
+        "id": "question-139",
+        "kind": "question",
+        "v": 1,
+        "op": "add",
+        "at": "2026-11-13T22:39:20.494Z",
+        "by": "implementation",
+        "in": "task-128",
+        "to": "John",
+        "state": "open",
+        "links": {
+          "about": [
+            "task-128"
+          ]
+        },
+        "fields": {
+          "asks": "LIN-4469 PR #2447: accept two cuts to the ask? (ruling lin-4469-cuts) 1. \"A net fall across every kind\" is not met for 11 kinds (blocked, breakdown, close-out, look-into, triage, context, survey-task, survey-place, blind-read, retro, retrospective-audit): they render none of the folded text, so they are byte-identical. 2. `lib/prompt-template-defs.js` lines 975, 994 and 1065 restate the guarded tracker clause in the read-only templates (survey-task, survey-place, blind-read); they sit outside the four mandates this piece names, so they were left unfolded.",
+          "options": [
+            "Accept: net fall on rendered prompts that carry folded rules; 11 kinds byte-identical",
+            "Fold the guarded clause in survey-task, survey-place and blind-read templates too"
+          ],
+          "recommended": "Accept: net fall on rendered prompts that carry folded rules; 11 kinds byte-identical (and, separately, shrink the three read-only template clauses to the code, branch and PR words, as the mandates now do)",
+          "if-unanswered": "hold: PR #2447 waits; on an answer the session resumes and records it on LIN-4469"
+        }
+      }
+    ],
+    "finding-140": [
+      {
+        "id": "finding-140",
+        "kind": "finding",
+        "v": 1,
+        "op": "add",
+        "at": "2026-11-13T22:39:21.494Z",
+        "by": "implementation",
+        "in": "task-128",
+        "to": "review",
+        "state": "open",
+        "links": {
+          "about": [
+            "decision-137",
+            "plan-114",
+            "verdict-121"
+          ]
+        },
+        "fields": {
+          "says": "Witnesses for PR #2447 to check against the plan and decision-137. FROZEN_TOTAL_BYTES 396884 -> 396559 (equal to the ceilings' sum; below the 396575 condition). Rendered prompts carrying a folded rule fall: bug, design, implementation, plan, research, scoping, spike -24 each; review -30; plan-review -6 (rendered ceilings -204); the other 11 kinds are byte-identical (see the open question to John). Source ceilings: prompt-template-defs.js -70, prompt-formatters.js +24, stage-kinds.js -12. Re-pinned: 13 Periodical hashes, the LIN-4467 witness, nine template ceilings, two source ceilings. Departure from the plan: the meta-prompt baseline and router snapshots did not change, so they were not re-pinned. New test tests/unit/lin-4469-prompt-folds.test.js (retired spellings in no rendered prompt; guarded clauses absent from every preamble), mutation-checked to fail when the retired clause is restored. CI success green. Kept in words on purpose: code/branch/PR prohibitions (no code backstop) and merge sentences (cut by ruling); the blind read's piloted area sentence (LIN-4437); the committed-tool policy wording; CUT's token order in its scope line."
+        }
+      }
+    ],
+    "check-141": [
+      {
+        "id": "check-141",
+        "kind": "check",
+        "v": 1,
+        "op": "add",
+        "at": "2026-11-13T22:39:22.494Z",
+        "by": "implementation",
+        "in": "task-128",
+        "to": "review",
+        "state": "open",
+        "links": {
+          "about": [
+            "finding-41"
+          ]
+        },
+        "fields": {
+          "what": "Whether PR #2447 folds the retirement-line wording in this repository's docs into one constant, as the task's done-when asks (simple-dispatcher's copy stays named).",
+          "how": "Read the PR diff for docs/areas/README.md, docs/proxy-integration.md and docs/architecture/dispatch-and-proxy.md; the implementation summary does not mention the retirement line, and finding-41 is still open."
+        }
+      }
+    ],
+    "run-142": [
+      {
+        "id": "run-142",
+        "kind": "run",
+        "v": 1,
+        "op": "add",
+        "at": "2026-11-13T22:39:27.494Z",
+        "by": "implementation",
+        "in": "task-128",
+        "state": "open",
+        "links": {},
+        "fields": {
+          "stage": "implementation",
+          "account": "# What this stage really wrote\n\nState: LIN-4469 moved Todo to In Progress (the 22:59:50 snapshot). Description: unchanged (snapshots 22:39:30 and 22:59:50 match).\n\n## Comment on LIN-4469 at 22:58:22 (id cc7fbe5d)\n\n## Implementation summary (LIN-4469, piece 5)\n\nPR: https://github.com/JKershaw/LinearViewer/pull/2447 (branch `feat/lin-4469-prompt-folds`, commit 3533f37c2). CI: `CI success` green, with unit tests, unit tests (proxy, clock +400d), 4 E2E shards and secret scan all passing.\n\n**Done**\n- Four mandates in `lib/proxy-preamble.js` drop the tracker clauses the guard refuses. The code, branch and PR prohibitions stay in words (no code backstop), and so do the merge sentences (cut by ruling).\n- Look-into's \"post nothing to Linear unless the person asks\" exception retired, per John's ruling (LIN-4448 comment bdcd3128).\n- Shared constants in `lib/prompts/leftover-words.js`: `areaLookup` and `NOTES_PR`. Periodical readings and retrospective-audit use them. Stability's wording settles the four committed-tool spellings (`committedSearch`, `lib/periodicals.js`).\n- \"narrowing\" becomes \"cut\" in the plan-review and review verdicts.\n- Re-pin: 13 Periodical hashes, LIN-4467 witness, nine template ceilings, two source ceilings. `FROZEN_TOTAL_BYTES` 396884 → 396559 (equal to the ceilings' sum, below the 396575 target). The meta-prompt baseline and router snapshots didn't change, so they were not re-pinned.\n- New test `tests/unit/lin-4469-prompt-folds.test.js`: retired spellings appear in no rendered prompt, and the guarded clauses are absent from every preamble. A mutation check confirmed it fails when the retired clause is restored.\n- Change log row and ceiling history added in `scripts/prompt-template-change-log.md`. Waiting entries settled or narrowed in `docs/areas/llm-and-prompts.md`.\n\n**Measured**\n- Rendered prompts that carry a folded rule fall: bug, design, implementation, plan, research, scoping, spike −24 each; review −30; plan-review −6 (rendered ceilings −204).\n- Source ceilings: prompt-template-defs.js −70, prompt-formatters.js +24, stage-kinds.js −12.\n\n**DECISION (for John, on PR #2447)**\n1. \"A net fall across every kind\" is not met for 11 kinds: blocked, breakdown, close-out, look-into, triage, context, survey-task, survey-place, blind-read, retro, retrospective-audit. They render none of the folded text, so they are byte-identical. Recommendation: accept the net fall as measured on the rendered prompts that carry the folded rules.\n2. `lib/prompt-template-defs.js` lines 975, 994 and 1065 restate the guarded tracker clause in the read-only templates (survey-task, survey-place, blind-read). They sit outside the four mandates this piece names, so they are not folded. Recommendation: shrink them to the code, branch and PR words, as the mandates now do.\n\n**Kept on purpose:** the blind read's own area sentence (piloted, LIN-4437); the committed-tool policy wording (a policy, not a spelling); CUT's token order in its scope line.\n\nLIN-4350 findings posted as a comment there.\n\n## Ruling raised at 22:58:35 (lin-4469-cuts, to John), the session's closing lines\n\nBLOCKED: Piece 5 is implemented, tested and CI-green on PR #2447, but two cuts to the ask are not agreed until John rules on them. The unfolded template clauses in `lib/prompt-template-defs.js` (lines 975, 994, 1065) are a third, separate gap I left unfolded.\nDECISION: {\"decision_id\":\"lin-4469-cuts\",\"question\":\"LIN-4469 PR #2447: accept two cuts to the ask?\",\"options\":[{\"id\":\"accept\",\"label\":\"Accept: net fall on rendered prompts that carry folded rules; 11 kinds byte-identical\"},{\"id\":\"fold\",\"label\":\"Fold the guarded clause in survey-task, survey-place and blind-read templates too\"}],\"recommended\":\"accept\",\"free_text\":true,\"if_unanswered\":{\"effect\":\"hold\"},\"on_answer\":{\"effect\":\"resume\",\"record_on\":\"LIN-4469\"}}\n\n## Not in the material\n\nA findings comment on LIN-4350 (cited by review as `eeb740b0`); its text is not in the material.\n"
+        }
+      },
+      {
+        "id": "run-142",
+        "kind": "run",
+        "v": 2,
+        "op": "end",
+        "at": "2026-11-13T22:39:28.494Z",
+        "by": "implementation",
+        "in": "task-128",
+        "state": "done",
+        "ended": {
+          "reason": "Piece 5 implemented on PR #2447, CI green; held on ruling lin-4469-cuts (question-139)."
+        },
+        "links": {},
+        "fields": {
+          "stage": "implementation",
+          "account": "# What this stage really wrote\n\nState: LIN-4469 moved Todo to In Progress (the 22:59:50 snapshot). Description: unchanged (snapshots 22:39:30 and 22:59:50 match).\n\n## Comment on LIN-4469 at 22:58:22 (id cc7fbe5d)\n\n## Implementation summary (LIN-4469, piece 5)\n\nPR: https://github.com/JKershaw/LinearViewer/pull/2447 (branch `feat/lin-4469-prompt-folds`, commit 3533f37c2). CI: `CI success` green, with unit tests, unit tests (proxy, clock +400d), 4 E2E shards and secret scan all passing.\n\n**Done**\n- Four mandates in `lib/proxy-preamble.js` drop the tracker clauses the guard refuses. The code, branch and PR prohibitions stay in words (no code backstop), and so do the merge sentences (cut by ruling).\n- Look-into's \"post nothing to Linear unless the person asks\" exception retired, per John's ruling (LIN-4448 comment bdcd3128).\n- Shared constants in `lib/prompts/leftover-words.js`: `areaLookup` and `NOTES_PR`. Periodical readings and retrospective-audit use them. Stability's wording settles the four committed-tool spellings (`committedSearch`, `lib/periodicals.js`).\n- \"narrowing\" becomes \"cut\" in the plan-review and review verdicts.\n- Re-pin: 13 Periodical hashes, LIN-4467 witness, nine template ceilings, two source ceilings. `FROZEN_TOTAL_BYTES` 396884 → 396559 (equal to the ceilings' sum, below the 396575 target). The meta-prompt baseline and router snapshots didn't change, so they were not re-pinned.\n- New test `tests/unit/lin-4469-prompt-folds.test.js`: retired spellings appear in no rendered prompt, and the guarded clauses are absent from every preamble. A mutation check confirmed it fails when the retired clause is restored.\n- Change log row and ceiling history added in `scripts/prompt-template-change-log.md`. Waiting entries settled or narrowed in `docs/areas/llm-and-prompts.md`.\n\n**Measured**\n- Rendered prompts that carry a folded rule fall: bug, design, implementation, plan, research, scoping, spike −24 each; review −30; plan-review −6 (rendered ceilings −204).\n- Source ceilings: prompt-template-defs.js −70, prompt-formatters.js +24, stage-kinds.js −12.\n\n**DECISION (for John, on PR #2447)**\n1. \"A net fall across every kind\" is not met for 11 kinds: blocked, breakdown, close-out, look-into, triage, context, survey-task, survey-place, blind-read, retro, retrospective-audit. They render none of the folded text, so they are byte-identical. Recommendation: accept the net fall as measured on the rendered prompts that carry the folded rules.\n2. `lib/prompt-template-defs.js` lines 975, 994 and 1065 restate the guarded tracker clause in the read-only templates (survey-task, survey-place, blind-read). They sit outside the four mandates this piece names, so they are not folded. Recommendation: shrink them to the code, branch and PR words, as the mandates now do.\n\n**Kept on purpose:** the blind read's own area sentence (piloted, LIN-4437); the committed-tool policy wording (a policy, not a spelling); CUT's token order in its scope line.\n\nLIN-4350 findings posted as a comment there.\n\n## Ruling raised at 22:58:35 (lin-4469-cuts, to John), the session's closing lines\n\nBLOCKED: Piece 5 is implemented, tested and CI-green on PR #2447, but two cuts to the ask are not agreed until John rules on them. The unfolded template clauses in `lib/prompt-template-defs.js` (lines 975, 994, 1065) are a third, separate gap I left unfolded.\nDECISION: {\"decision_id\":\"lin-4469-cuts\",\"question\":\"LIN-4469 PR #2447: accept two cuts to the ask?\",\"options\":[{\"id\":\"accept\",\"label\":\"Accept: net fall on rendered prompts that carry folded rules; 11 kinds byte-identical\"},{\"id\":\"fold\",\"label\":\"Fold the guarded clause in survey-task, survey-place and blind-read templates too\"}],\"recommended\":\"accept\",\"free_text\":true,\"if_unanswered\":{\"effect\":\"hold\"},\"on_answer\":{\"effect\":\"resume\",\"record_on\":\"LIN-4469\"}}\n\n## Not in the material\n\nA findings comment on LIN-4350 (cited by review as `eeb740b0`); its text is not in the material.\n"
+        }
+      }
+    ],
+    "finding-143": [
+      {
+        "id": "finding-143",
+        "kind": "finding",
+        "v": 1,
+        "op": "add",
+        "at": "2026-11-13T22:39:48.874Z",
+        "by": "autopilot",
+        "in": "task-128",
+        "to": "project",
+        "state": "open",
+        "links": {},
+        "fields": {
+          "says": "Look-first did not run on LIN-4469 (piece 5): at 22:39Z recommend-and-dispatch sent `implementation` directly (dispatch b86c4a78), though the ticket held only `## As asked` and `## Current`, with no size record, plan, PR or earlier run. The survey-task, survey-place, scoping sequence (`lib/recommendation-look-first.js`) ran on pieces 0 to 4. Not overridden or aborted: the plan is approved at the parent (verdict-121) and breakdown sized the piece (decision-130), but that size lives on the parent, not the ticket. Raw material for the look-first rule: either it should treat an approved-parent piece as sized, or it misfired here. Posted on LIN-4448 (comment cea38032)."
+        }
+      },
+      {
+        "id": "finding-143",
+        "kind": "finding",
+        "v": 2,
+        "op": "link",
+        "at": "2026-11-13T22:39:49.874Z",
+        "by": "autopilot",
+        "in": "task-128",
+        "to": "project",
+        "state": "open",
+        "links": {
+          "about": [
+            "task-128"
+          ]
+        },
+        "fields": {
+          "says": "Look-first did not run on LIN-4469 (piece 5): at 22:39Z recommend-and-dispatch sent `implementation` directly (dispatch b86c4a78), though the ticket held only `## As asked` and `## Current`, with no size record, plan, PR or earlier run. The survey-task, survey-place, scoping sequence (`lib/recommendation-look-first.js`) ran on pieces 0 to 4. Not overridden or aborted: the plan is approved at the parent (verdict-121) and breakdown sized the piece (decision-130), but that size lives on the parent, not the ticket. Raw material for the look-first rule: either it should treat an approved-parent piece as sized, or it misfired here. Posted on LIN-4448 (comment cea38032)."
+        }
+      },
+      {
+        "id": "finding-143",
+        "kind": "finding",
+        "v": 3,
+        "op": "link",
+        "at": "2026-11-13T22:39:50.874Z",
+        "by": "autopilot",
+        "in": "task-128",
+        "to": "project",
+        "state": "open",
+        "links": {
+          "about": [
+            "task-128",
+            "decision-130"
+          ]
+        },
+        "fields": {
+          "says": "Look-first did not run on LIN-4469 (piece 5): at 22:39Z recommend-and-dispatch sent `implementation` directly (dispatch b86c4a78), though the ticket held only `## As asked` and `## Current`, with no size record, plan, PR or earlier run. The survey-task, survey-place, scoping sequence (`lib/recommendation-look-first.js`) ran on pieces 0 to 4. Not overridden or aborted: the plan is approved at the parent (verdict-121) and breakdown sized the piece (decision-130), but that size lives on the parent, not the ticket. Raw material for the look-first rule: either it should treat an approved-parent piece as sized, or it misfired here. Posted on LIN-4448 (comment cea38032)."
+        }
+      },
+      {
+        "id": "finding-143",
+        "kind": "finding",
+        "v": 4,
+        "op": "link",
+        "at": "2026-11-13T22:39:51.874Z",
+        "by": "autopilot",
+        "in": "task-128",
+        "to": "project",
+        "state": "open",
+        "links": {
+          "about": [
+            "task-128",
+            "decision-130",
+            "finding-59"
+          ]
+        },
+        "fields": {
+          "says": "Look-first did not run on LIN-4469 (piece 5): at 22:39Z recommend-and-dispatch sent `implementation` directly (dispatch b86c4a78), though the ticket held only `## As asked` and `## Current`, with no size record, plan, PR or earlier run. The survey-task, survey-place, scoping sequence (`lib/recommendation-look-first.js`) ran on pieces 0 to 4. Not overridden or aborted: the plan is approved at the parent (verdict-121) and breakdown sized the piece (decision-130), but that size lives on the parent, not the ticket. Raw material for the look-first rule: either it should treat an approved-parent piece as sized, or it misfired here. Posted on LIN-4448 (comment cea38032)."
+        }
+      }
     ]
   },
   "log": [
@@ -2751,6 +3025,105 @@
         "question-133",
         "--by",
         "implementation"
+      ],
+      "asOf": null
+    },
+    {
+      "at": "2026-11-18T10:02:23.465Z",
+      "by": "autopilot",
+      "cmd": "show",
+      "args": [
+        "--task",
+        "task-128",
+        "--by",
+        "autopilot"
+      ],
+      "asOf": null
+    },
+    {
+      "at": "2026-11-18T10:02:29.465Z",
+      "by": "autopilot",
+      "cmd": "find",
+      "args": [
+        "--text",
+        "look-first",
+        "--by",
+        "autopilot"
+      ],
+      "asOf": null
+    },
+    {
+      "at": "2026-11-18T10:02:29.523Z",
+      "by": "autopilot",
+      "cmd": "find",
+      "args": [
+        "--text",
+        "look first",
+        "--by",
+        "autopilot"
+      ],
+      "asOf": null
+    },
+    {
+      "at": "2026-11-18T10:02:29.573Z",
+      "by": "autopilot",
+      "cmd": "find",
+      "args": [
+        "--text",
+        "recommend-and-dispatch",
+        "--by",
+        "autopilot"
+      ],
+      "asOf": null
+    },
+    {
+      "at": "2026-11-18T10:02:29.629Z",
+      "by": "autopilot",
+      "cmd": "find",
+      "args": [
+        "--text",
+        "survey-task",
+        "--by",
+        "autopilot"
+      ],
+      "asOf": null
+    },
+    {
+      "at": "2026-11-18T10:02:29.682Z",
+      "by": "autopilot",
+      "cmd": "find",
+      "args": [
+        "--to",
+        "autopilot",
+        "--state",
+        "open",
+        "--by",
+        "autopilot"
+      ],
+      "asOf": null
+    },
+    {
+      "at": "2026-11-18T10:02:33.996Z",
+      "by": "autopilot",
+      "cmd": "get",
+      "args": [
+        "finding-59",
+        "--by",
+        "autopilot"
+      ],
+      "asOf": null
+    },
+    {
+      "at": "2026-11-18T10:02:34.036Z",
+      "by": "autopilot",
+      "cmd": "find",
+      "args": [
+        "--kind",
+        "lesson",
+        "--text",
+        "look",
+        "--by",
+        "autopilot"
       ],
       "asOf": null
     }
