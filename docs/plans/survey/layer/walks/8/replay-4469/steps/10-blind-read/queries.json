@@ -1,0 +1,413 @@
+[
+ {
+  "at": "2026-11-18T10:18:06.569Z",
+  "by": "blind-read",
+  "cmd": "get",
+  "args": [
+   "change-138",
+   "--by",
+   "blind-read"
+  ],
+  "asOf": null
+ },
+ {
+  "at": "2026-11-18T10:18:06.611Z",
+  "by": "blind-read",
+  "cmd": "find",
+  "args": [
+   "--kind",
+   "change",
+   "--text",
+   "2444",
+   "--by",
+   "blind-read"
+  ],
+  "asOf": null
+ },
+ {
+  "at": "2026-11-18T10:18:06.650Z",
+  "by": "blind-read",
+  "cmd": "find",
+  "args": [
+   "--to",
+   "blind-read",
+   "--state",
+   "open",
+   "--by",
+   "blind-read"
+  ],
+  "asOf": null
+ },
+ {
+  "at": "2026-11-18T10:18:06.698Z",
+  "by": "blind-read",
+  "cmd": "find",
+  "args": [
+   "--kind",
+   "verdict",
+   "--by",
+   "blind-read"
+  ],
+  "asOf": null
+ },
+ {
+  "at": "2026-11-18T10:18:13.220Z",
+  "by": "blind-read",
+  "cmd": "find",
+  "args": [
+   "--kind",
+   "change",
+   "--by",
+   "blind-read"
+  ],
+  "asOf": null
+ },
+ {
+  "at": "2026-11-18T10:18:13.277Z",
+  "by": "blind-read",
+  "cmd": "find",
+  "args": [
+   "--kind",
+   "run",
+   "--text",
+   "blind",
+   "--by",
+   "blind-read"
+  ],
+  "asOf": null
+ },
+ {
+  "at": "2026-11-18T10:18:18.006Z",
+  "by": "blind-read",
+  "cmd": "show",
+  "args": [
+   "--task",
+   "task-127",
+   "--by",
+   "blind-read"
+  ],
+  "asOf": null
+ },
+ {
+  "at": "2026-11-18T10:18:18.060Z",
+  "by": "blind-read",
+  "cmd": "show",
+  "args": [
+   "--task",
+   "task-105",
+   "--by",
+   "blind-read"
+  ],
+  "asOf": null
+ },
+ {
+  "at": "2026-11-18T10:18:22.987Z",
+  "by": "blind-read",
+  "cmd": "show",
+  "args": [
+   "--task",
+   "task-126",
+   "--by",
+   "blind-read"
+  ],
+  "asOf": null
+ },
+ {
+  "at": "2026-11-18T10:18:23.036Z",
+  "by": "blind-read",
+  "cmd": "find",
+  "args": [
+   "--state",
+   "open",
+   "--text",
+   "witness",
+   "--by",
+   "blind-read"
+  ],
+  "asOf": null
+ },
+ {
+  "at": "2026-11-18T10:18:23.082Z",
+  "by": "blind-read",
+  "cmd": "find",
+  "args": [
+   "--state",
+   "open",
+   "--text",
+   "completion-signals",
+   "--by",
+   "blind-read"
+  ],
+  "asOf": null
+ },
+ {
+  "at": "2026-11-18T10:18:23.132Z",
+  "by": "blind-read",
+  "cmd": "find",
+  "args": [
+   "--state",
+   "open",
+   "--text",
+   "run-view",
+   "--by",
+   "blind-read"
+  ],
+  "asOf": null
+ },
+ {
+  "at": "2026-11-18T10:18:23.179Z",
+  "by": "blind-read",
+  "cmd": "find",
+  "args": [
+   "--state",
+   "open",
+   "--text",
+   "STEP_KIND",
+   "--by",
+   "blind-read"
+  ],
+  "asOf": null
+ },
+ {
+  "at": "2026-11-18T10:18:23.221Z",
+  "by": "blind-read",
+  "cmd": "find",
+  "args": [
+   "--state",
+   "open",
+   "--text",
+   "source-map",
+   "--by",
+   "blind-read"
+  ],
+  "asOf": null
+ },
+ {
+  "at": "2026-11-18T10:18:23.267Z",
+  "by": "blind-read",
+  "cmd": "find",
+  "args": [
+   "--state",
+   "open",
+   "--text",
+   "leftover-words",
+   "--by",
+   "blind-read"
+  ],
+  "asOf": null
+ },
+ {
+  "at": "2026-11-18T10:18:23.315Z",
+  "by": "blind-read",
+  "cmd": "find",
+  "args": [
+   "--state",
+   "open",
+   "--text",
+   "committedSearch",
+   "--by",
+   "blind-read"
+  ],
+  "asOf": null
+ },
+ {
+  "at": "2026-11-18T10:18:23.364Z",
+  "by": "blind-read",
+  "cmd": "find",
+  "args": [
+   "--state",
+   "open",
+   "--text",
+   "stage-kinds",
+   "--by",
+   "blind-read"
+  ],
+  "asOf": null
+ },
+ {
+  "at": "2026-11-18T10:18:31.312Z",
+  "by": "blind-read",
+  "cmd": "get",
+  "args": [
+   "finding-24",
+   "--by",
+   "blind-read"
+  ],
+  "asOf": null
+ },
+ {
+  "at": "2026-11-18T10:18:31.365Z",
+  "by": "blind-read",
+  "cmd": "get",
+  "args": [
+   "finding-43",
+   "--by",
+   "blind-read"
+  ],
+  "asOf": null
+ },
+ {
+  "at": "2026-11-18T10:18:31.419Z",
+  "by": "blind-read",
+  "cmd": "get",
+  "args": [
+   "finding-37",
+   "--by",
+   "blind-read"
+  ],
+  "asOf": null
+ },
+ {
+  "at": "2026-11-18T10:18:31.469Z",
+  "by": "blind-read",
+  "cmd": "get",
+  "args": [
+   "finding-39",
+   "--by",
+   "blind-read"
+  ],
+  "asOf": null
+ },
+ {
+  "at": "2026-11-18T10:18:31.522Z",
+  "by": "blind-read",
+  "cmd": "find",
+  "args": [
+   "--text",
+   "intent: null",
+   "--by",
+   "blind-read"
+  ],
+  "asOf": null
+ },
+ {
+  "at": "2026-11-18T10:18:31.573Z",
+  "by": "blind-read",
+  "cmd": "find",
+  "args": [
+   "--text",
+   "hasSignals",
+   "--by",
+   "blind-read"
+  ],
+  "asOf": null
+ },
+ {
+  "at": "2026-11-18T10:18:31.627Z",
+  "by": "blind-read",
+  "cmd": "find",
+  "args": [
+   "--text",
+   "slice(0, -1)",
+   "--by",
+   "blind-read"
+  ],
+  "asOf": null
+ },
+ {
+  "at": "2026-11-18T10:18:31.669Z",
+  "by": "blind-read",
+  "cmd": "find",
+  "args": [
+   "--text",
+   "lin-4467-witness",
+   "--by",
+   "blind-read"
+  ],
+  "asOf": null
+ },
+ {
+  "at": "2026-11-18T10:18:31.719Z",
+  "by": "blind-read",
+  "cmd": "find",
+  "args": [
+   "--text",
+   "Look into",
+   "--by",
+   "blind-read"
+  ],
+  "asOf": null
+ },
+ {
+  "at": "2026-11-18T10:18:31.770Z",
+  "by": "blind-read",
+  "cmd": "find",
+  "args": [
+   "--text",
+   "prompt-folds",
+   "--by",
+   "blind-read"
+  ],
+  "asOf": null
+ },
+ {
+  "at": "2026-11-18T10:18:31.821Z",
+  "by": "blind-read",
+  "cmd": "find",
+  "args": [
+   "--text",
+   "at most one",
+   "--by",
+   "blind-read"
+  ],
+  "asOf": null
+ },
+ {
+  "at": "2026-11-18T10:18:35.917Z",
+  "by": "blind-read",
+  "cmd": "get",
+  "args": [
+   "finding-25",
+   "--by",
+   "blind-read"
+  ],
+  "asOf": null
+ },
+ {
+  "at": "2026-11-18T10:18:35.969Z",
+  "by": "blind-read",
+  "cmd": "get",
+  "args": [
+   "lesson-166",
+   "--by",
+   "blind-read"
+  ],
+  "asOf": null
+ },
+ {
+  "at": "2026-11-18T10:18:36.018Z",
+  "by": "blind-read",
+  "cmd": "get",
+  "args": [
+   "finding-151",
+   "--by",
+   "blind-read"
+  ],
+  "asOf": null
+ },
+ {
+  "at": "2026-11-18T10:18:36.070Z",
+  "by": "blind-read",
+  "cmd": "get",
+  "args": [
+   "finding-140",
+   "--by",
+   "blind-read"
+  ],
+  "asOf": null
+ },
+ {
+  "at": "2026-11-18T10:18:36.117Z",
+  "by": "blind-read",
+  "cmd": "find",
+  "args": [
+   "--kind",
+   "lesson",
+   "--text",
+   "blind",
+   "--by",
+   "blind-read"
+  ],
+  "asOf": null
+ }
+]
