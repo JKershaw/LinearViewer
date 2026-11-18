@@ -1,0 +1,58 @@
+#!/usr/bin/env bash
+# Seed for walk 5, replay-4446: the store just before LIN-4446's first stage (survey-task, 2026-11-13T13:12:07.028Z).
+# Generated from walks/5/material (LIN-4446.json, LIN-4446-snapshots.json) and docs/areas/ at 4b5001ddf
+# (the commit both surveys name). LIN-4446 is top-level: no parent, no plan pieces, no siblings. Recreates store.json from empty.
+set -euo pipefail
+HERE="$(cd "$(dirname "$0")" && pwd)"
+LAYER="$HERE/../model/layer.mjs"
+STORE="$HERE/store.json"; export LAYER_STORE="$STORE"
+rm -f "$STORE"
+# w <layer args...>: run a write, fail on refusal, print the record id.
+sub() { local s="$1" v; while [[ "$s" =~ @@([A-Z0-9_]+)@@ ]]; do v="${BASH_REMATCH[1]}"; s="${s//@@$v@@/${!v}}"; done; printf '%s' "$s"; }
+w() { local a=() x out; for x in "$@"; do a+=("$(sub "$x")"); done; set -- "${a[@]}"; out=$(node "$LAYER" "$@") || { echo "REFUSED: $*" >&2; echo "$out" >&2; exit 1; }
+      printf '%s' "$out" | node -e 'let s="";process.stdin.on("data",d=>s+=d).on("end",()=>console.log(JSON.parse(s).id))'; }
+
+# ---- The one area LIN-4446's paths fall in (public/ -> front-end-browser; CLAUDE.md and docs/areas/ match no area),
+# ---- as docs/areas/front-end-browser.md stood at 4b5001ddf (commit time 12:01:48Z), by Harbour. Wrapped lines joined.
+# area front-end-browser (registry: docs/areas/areas.json, match ^public/)
+A_FRONT_END_BROWSER=project
+w add lesson --by Harbour --at 2026-11-13T12:01:48.001Z "$(cat <<'JSON'
+{"says":"A page script's second request keeps the poll's discipline: coalesce every reason into one fetch per window, and stop when the poll stops (hidden tab, 401, revoked link). `createTimelineRefresher` (`public/task-page.js`, LIN-4405) is the pattern; a running chip changes the poll's track about once a minute, so \"fetch when it changes\" alone repeats. Done reads once more first (`finish`): the poll that says done carries the last change, and stopping drops it.","checked-at":"4b5001ddf"}
+JSON
+)" >/dev/null
+w add lesson --by Harbour --at 2026-11-13T12:01:48.002Z "$(cat <<'JSON'
+{"says":"Task-page CSS is phone-first at `min-width: 600px` (only the listed breakpoints pass `tests/unit/ui-authorities.test.js`), with `--font-size-*` tokens and no new mono selector (`tests/unit/lin-4107-type-sizes.test.js`).","checked-at":"4b5001ddf"}
+JSON
+)" >/dev/null
+# its ## Waiting entries, each a finding to the area
+W1=$(w add finding --by Harbour --at 2026-11-13T12:01:48.003Z "$(cat <<'JSON'
+{"to":"@@A_FRONT_END_BROWSER@@","says":"`public/app.js`: Home's Running and Up next are refreshed by parsing a whole page with `DOMParser` (LIN-4243). Waiting on you is drawn as a server fragment by the page's own function (LIN-4242); doing the same for the other sections would mean the client never parses a whole page. (Survey tally: LIN-4243.)"}
+JSON
+)")
+W2=$(w add finding --by Harbour --at 2026-11-13T12:01:48.004Z "$(cat <<'JSON'
+{"to":"@@A_FRONT_END_BROWSER@@","says":"`public/common.js`: `buildDispatchModelOptionDescriptors` repeats the merge rule of `buildModelOptions` (`lib/openrouter-catalog.js`), since the browser has no build step. The lists are not copied (they come from `window.__HARNESS_MODELS__` and the catalog over the wire); only the rule is. The endpoint could send merged options instead. (LIN-4358.)"}
+JSON
+)")
+W3=$(w add finding --by Harbour --at 2026-11-13T12:01:48.005Z "$(cat <<'JSON'
+{"to":"@@A_FRONT_END_BROWSER@@","says":"`public/brief.js`: its `postBrief`/`errorText` block is identical to `postRecap`/`errorText` in `public/recap.js`, and the check for a `statusCode` inside a keepalive 200 body is now written four times (also `public/scan.js` and `public/observation.js`). One shared reader in `public/common.js`. (Area reads CG/CH, 8 Nov, on LIN-4358.)"}
+JSON
+)")
+W4=$(w add finding --by Harbour --at 2026-11-13T12:01:48.006Z "$(cat <<'JSON'
+{"to":"@@A_FRONT_END_BROWSER@@","says":"`public/llms.txt`: its H11 names the unscoped `/api/recommend/status`, which is now only a legacy redirect (`routes/legacy-redirects.js`), and its view list omits `projects` and the flag-gated `live-console` (`lib/components/view-nav.js`). The browser guide is otherwise sound: its endpoints and selectors resolve. (Documentation Review, 10 Nov.; `docs/reviews/documentation-review-2026-11-10.md`.)"}
+JSON
+)")
+W5=$(w add finding --by Harbour --at 2026-11-13T12:01:48.007Z "$(cat <<'JSON'
+{"to":"@@A_FRONT_END_BROWSER@@","says":"`public/prompt-section.js`: on a server with no AI (`aiState: \"unconfigured\"`, a self-host with no OpenRouter key) the run control still offers Next step. Pressing it gets a 503 from the recommend stream, and \"AI Recommend · generating…\" / \"Loading…\" spin with no message, while Run to PR works beside it. Offer only what the server can do, or say why it can't. (Onboarding & Cold-Start Review, 11 Nov.; `docs/reviews/onboarding-cold-start-review-2026-11-11.md`.)"}
+JSON
+)")
+
+# ---- The task LIN-4446, asked by John (createdAt 12:08:10.414Z, two seconds after LIN-4445 from the same driving session).
+# asked: the ## As asked block byte-exact, without its heading and end line. done-when: its Done when sentence.
+# paths: what the ask names (browser code, the project's notes, the area's note); the ticket itself lists none.
+T_4446=$(w add task --by John --via driving-session --at 2026-11-13T12:08:10.414Z "$(cat <<'JSON'
+{"ref":"LIN-4446","asked":"**Repository:** JKershaw/LinearViewer (Harbour).\n\n**What this is for.** John: \"Side rail and other UI improvements are important purely because the current ones are just mostly the original ones and are due a bit of a sprinkling. But! The front end code is messy.\" And his gut: \"the UI issues trace back to one of my very first rules: no build step… it's the biggest target of the Theseus method… We don't need to tidy it all, but it's a perfect example where we can leave it better than we found it. Likely this will take a fair amount of hand holding.\"\n\nOn main (9 Nov), no browser file can import another, nine browser files restate logic the server already has, and the largest browser file is 5,019 lines.\n\nOn the views, John: \"Lots of light little views is ideal, but the cost of them has to be balanced… I'd be sad to get rid, but happy to tidy.\"\n\n**What we want.**\n\n* Browser code that shares rather than restates. There's still no build step and no framework: the rule stays, read as allowing the browser to import, as browsers do natively, and that reading goes into the project's own notes.\n* Taken in small slices, one view or one shared piece at a time. Each view is reworked only after finding out why it got so large, and comes out lighter.\n* Anything bigger that a slice spots is left out of it and goes into the area's note.\n* The side rail and the visual refresh come after, built on the cleaner code.\n* No view is retired unless John rules it.\n\nJohn expects agents to reach for big moves here: \"very likely to get agents trying really hard to do big things when we want small.\" So the size is John's call, and for this work it's small.\n\n**Done when** the reading of the rule is in the project's notes; the first slice has landed, sharing rather than restating, lighter than before and naming what it retired; and John has read the first slice's result before the next starts.\n\n**Every change names what it retires. Questions:** settle engineering questions yourself; only John's calls (product, money, authority, what to retire) go to him as rulings.","done-when":"the reading of the rule is in the project's notes; the first slice has landed, sharing rather than restating, lighter than before and naming what it retired; and John has read the first slice's result before the next starts."}
+JSON
+)")
+
+echo "task LIN-4446 $T_4446  area front-end-browser $A_FRONT_END_BROWSER  waiting $W1 $W2 $W3 $W4 $W5"
+node -e 'const s=require(process.argv[1]);const r=Object.values(s.records);console.log(`records ${r.length}, versions ${r.flat().length}, next ${s.next}, log ${s.log.length}, last write ${r.flat().map(x=>x.at).sort().at(-1)}`)' "$STORE"
