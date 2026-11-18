@@ -1,0 +1,153 @@
+[
+ {
+  "at": "2026-11-18T10:20:02.006Z",
+  "by": "blind-read",
+  "cmd": "show",
+  "args": [
+   "--task",
+   "task-8",
+   "--by",
+   "blind-read"
+  ],
+  "asOf": null
+ },
+ {
+  "at": "2026-11-18T10:20:06.954Z",
+  "by": "blind-read",
+  "cmd": "get",
+  "args": [
+   "change-52",
+   "--by",
+   "blind-read"
+  ],
+  "asOf": null
+ },
+ {
+  "at": "2026-11-18T10:20:06.989Z",
+  "by": "blind-read",
+  "cmd": "find",
+  "args": [
+   "--state",
+   "open",
+   "--text",
+   "ship",
+   "--by",
+   "blind-read"
+  ],
+  "asOf": null
+ },
+ {
+  "at": "2026-11-18T10:20:07.042Z",
+  "by": "blind-read",
+  "cmd": "find",
+  "args": [
+   "--state",
+   "open",
+   "--text",
+   "shim",
+   "--by",
+   "blind-read"
+  ],
+  "asOf": null
+ },
+ {
+  "at": "2026-11-18T10:20:07.092Z",
+  "by": "blind-read",
+  "cmd": "find",
+  "args": [
+   "--state",
+   "open",
+   "--text",
+   "CostFormat",
+   "--by",
+   "blind-read"
+  ],
+  "asOf": null
+ },
+ {
+  "at": "2026-11-18T10:20:07.155Z",
+  "by": "blind-read",
+  "cmd": "find",
+  "args": [
+   "--state",
+   "open",
+   "--text",
+   "cost-format.test",
+   "--by",
+   "blind-read"
+  ],
+  "asOf": null
+ },
+ {
+  "at": "2026-11-18T10:20:07.203Z",
+  "by": "blind-read",
+  "cmd": "find",
+  "args": [
+   "--state",
+   "open",
+   "--text",
+   "browser copy",
+   "--by",
+   "blind-read"
+  ],
+  "asOf": null
+ },
+ {
+  "at": "2026-11-18T10:20:07.255Z",
+  "by": "blind-read",
+  "cmd": "find",
+  "args": [
+   "--kind",
+   "lesson",
+   "--by",
+   "blind-read"
+  ],
+  "asOf": null
+ },
+ {
+  "at": "2026-11-18T10:20:17.289Z",
+  "by": "blind-read",
+  "cmd": "find",
+  "args": [
+   "--kind",
+   "verdict",
+   "--by",
+   "blind-read"
+  ],
+  "asOf": null
+ },
+ {
+  "at": "2026-11-18T10:20:17.323Z",
+  "by": "blind-read",
+  "cmd": "find",
+  "args": [
+   "--to",
+   "blind-read",
+   "--by",
+   "blind-read"
+  ],
+  "asOf": null
+ },
+ {
+  "at": "2026-11-18T10:20:17.369Z",
+  "by": "blind-read",
+  "cmd": "get",
+  "args": [
+   "finding-20",
+   "--by",
+   "blind-read"
+  ],
+  "asOf": null
+ },
+ {
+  "at": "2026-11-18T10:20:17.412Z",
+  "by": "blind-read",
+  "cmd": "get",
+  "args": [
+   "lesson-59",
+   "--by",
+   "blind-read"
+  ],
+  "asOf": null
+ }
+]
