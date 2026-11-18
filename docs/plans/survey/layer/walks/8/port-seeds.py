@@ -11,11 +11,13 @@ for r in ['replay-4450', 'replay-4446', 'replay-4469']:
     # a revise that only set a task's paths has nothing left to write: drop it
     s, k3 = re.subn(r'P=\$\(cat <<\'(J\d+)\'\n\{"paths": [^\n]*\}\n\1\n\)\nP=\$\(sub "\$P"\)\nL revise [^\n]*\n', '', s)
     if k3: print(r, 'dropped paths-only revises', k3)
+    s = s.replace('@@PARENT@@@2', '@@PARENT@@@1')  # 4469: the parent's v2 was the dropped paths-only revise
     s = re.sub(r'"in": *"@@A_[A-Z_]+@@", *', '', s)
     s = re.sub(r', *"in": *"@@A_[A-Z_]+@@"', '', s)
     for f in ('paths', 'claims'):
         s = re.sub(r'"%s": *\[[^\]]*\], *' % f, '', s)
         s = re.sub(r', *"%s": *\[[^\]]*\]' % f, '', s)
+    s = re.sub(r'"of": *"(plan-review|review|blind-read)"', r'"judgement": "\1"', s)  # walk 7 fix: of -> judgement
     s = s.replace('walks/7', 'walks/8')
     s = s.replace('# Seed for walk 4', '# Ported to walk 8 by port-seeds.py (no areas, no paths, area addressees -> project). Seed for walk 4', 1)
     left = re.findall(r'add area|"paths"|"claims"|"in": *"@@A_', s)
