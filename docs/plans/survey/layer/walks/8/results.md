@@ -14,7 +14,7 @@
 
 | # | Prediction | Result | Why |
 |---|---|---|---|
-| 1 | Only malformed writes refused, fewer than 6 | **Half** | Every refusal was malformed, but there were 23 of them, against 6 in walk 7. All but two are one mistake: `about`, `on` or `answers` put beside the fields instead of under `links` (the other two are a verdict sent without `on`). Every agent fixed it on the next try. This build's usage notes never show `links` in a write example; walk 7's did [checked: both `BUILD-NOTES.md`]. It's about how intuitive the calls are, not the structure |
+| 1 | Only malformed writes refused, fewer than 6 | **Half** | Every refusal was malformed, but there were 23 of them by the stages' reports, against 6 in walk 7. 19 are one mistake: `about`, `on` or `answers` put beside the fields instead of under `links`. Three are a verdict sent without `on`, and one followed from those. Every agent fixed it on the next try. This build's usage notes never show `links` in a write example; walk 7's did [checked: both `BUILD-NOTES.md`]. It's about how intuitive the calls are, not the structure |
 | 2 | Area writes go to `project`, nothing invented | **Held** | No stage invented a place or tried to write paths. Finds about the code beyond the task went `to: project` throughout |
 | 3 | Project records get read and acted on | **Held, in every task** | 4450: leftover ended a project finding its commit settled (finding-20), and the blind read handed one into its question (finding-76). 4446: survey linked to project findings instead of restating them; leftover revised finding-4. 4469: implementation ended two project findings its PR settled (finding-36, finding-23); leftover found finding-25 by text search and ended it into a lesson. But see "The project pile" |
 | 4 | Late briefs 30–50% smaller | **Split** | 4450: 13–55% smaller. 4469: 12–42% smaller. 4446: smaller to step 3, then 15–72% *larger*. Its design stage put the whole 16 KB plan in the plan record (walk 7's: a 6 KB summary), and part 2 carries the current plan in full to every later stage |
@@ -37,7 +37,7 @@
 
    That's Harbour's workflow, not the store's. The store makes it countable, and the leftover step ending one project record per build is the existing equivalent. The integration design should name who owns it, and report the count per slice.
 5. **The API needs a review, as you said.** The evidence from this walk:
-   - **Links beside fields:** 21 of the 23 refusals. Accept them as top-level keys, or say where they go in the error and the example.
+   - **Links beside fields:** 19 of the 23 refusals. Accept them as top-level keys, or say where they go in the error and the example.
    - **Version bumps:** a readdress bumps the version, so a reviewer re-pinned a verdict it didn't need to (stale counts content changes only).
    - **Ended records:** they're left out of the brief, so an autopilot had to search for a question that had just been withdrawn.
    - **`approve` or `approve-with-notes`:** stages were unsure which to use when an approval came with notes.
