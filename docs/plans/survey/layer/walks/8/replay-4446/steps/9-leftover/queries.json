@@ -1,0 +1,174 @@
+[
+ {
+  "at": "2026-11-18T10:15:54.813Z",
+  "by": "leftover",
+  "cmd": "find",
+  "args": [
+   "--to",
+   "leftover",
+   "--state",
+   "open",
+   "--by",
+   "leftover"
+  ],
+  "asOf": null
+ },
+ {
+  "at": "2026-11-18T10:15:54.866Z",
+  "by": "leftover",
+  "cmd": "find",
+  "args": [
+   "--to",
+   "project",
+   "--state",
+   "open",
+   "--by",
+   "leftover"
+  ],
+  "asOf": null
+ },
+ {
+  "at": "2026-11-18T10:15:54.902Z",
+  "by": "leftover",
+  "cmd": "find",
+  "args": [
+   "--kind",
+   "lesson",
+   "--by",
+   "leftover"
+  ],
+  "asOf": null
+ },
+ {
+  "at": "2026-11-18T10:15:54.949Z",
+  "by": "leftover",
+  "cmd": "get",
+  "args": [
+   "change-52",
+   "--by",
+   "leftover"
+  ],
+  "asOf": null
+ },
+ {
+  "at": "2026-11-18T10:16:03.192Z",
+  "by": "leftover",
+  "cmd": "find",
+  "args": [
+   "--text",
+   "TERMINAL_TYPES",
+   "--by",
+   "leftover"
+  ],
+  "asOf": null
+ },
+ {
+  "at": "2026-11-18T10:16:03.240Z",
+  "by": "leftover",
+  "cmd": "find",
+  "args": [
+   "--text",
+   "viewport",
+   "--by",
+   "leftover"
+  ],
+  "asOf": null
+ },
+ {
+  "at": "2026-11-18T10:16:03.279Z",
+  "by": "leftover",
+  "cmd": "find",
+  "args": [
+   "--text",
+   "swipe",
+   "--by",
+   "leftover"
+  ],
+  "asOf": null
+ },
+ {
+  "at": "2026-11-18T10:16:03.320Z",
+  "by": "leftover",
+  "cmd": "find",
+  "args": [
+   "--text",
+   "vendor-assets",
+   "--by",
+   "leftover"
+  ],
+  "asOf": null
+ },
+ {
+  "at": "2026-11-18T10:16:03.369Z",
+  "by": "leftover",
+  "cmd": "find",
+  "args": [
+   "--text",
+   "module }",
+   "--by",
+   "leftover"
+  ],
+  "asOf": null
+ },
+ {
+  "at": "2026-11-18T10:16:03.413Z",
+  "by": "leftover",
+  "cmd": "find",
+  "args": [
+   "--text",
+   "readyState",
+   "--by",
+   "leftover"
+  ],
+  "asOf": null
+ },
+ {
+  "at": "2026-11-18T10:16:03.454Z",
+  "by": "leftover",
+  "cmd": "find",
+  "args": [
+   "--text",
+   "platform-and-plumbing",
+   "--by",
+   "leftover"
+  ],
+  "asOf": null
+ },
+ {
+  "at": "2026-11-18T10:16:08.296Z",
+  "by": "leftover",
+  "cmd": "show",
+  "args": [
+   "--task",
+   "task-8",
+   "--by",
+   "leftover"
+  ],
+  "asOf": null
+ },
+ {
+  "at": "2026-11-18T10:16:08.348Z",
+  "by": "leftover",
+  "cmd": "find",
+  "args": [
+   "--to",
+   "implementation",
+   "--state",
+   "open",
+   "--by",
+   "leftover"
+  ],
+  "asOf": null
+ },
+ {
+  "at": "2026-11-18T10:16:53.312Z",
+  "by": "leftover",
+  "cmd": "get",
+  "args": [
+   "finding-55",
+   "--by",
+   "leftover"
+  ],
+  "asOf": null
+ }
+]
