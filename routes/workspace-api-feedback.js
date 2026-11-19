@@ -284,9 +284,11 @@ export function registerFeedbackRoutes(router, { workspaceFromUrl, freeTierStore
         harness: overrides.harness,
         // LIN-4251: the stage's `writes`, resolved from the kind the factory dispatches (`triage`:
         // ticket-fields). Without it this entrance kept the work block's PR mandate.
-        finalizePrompt: (harness, kind) => attachProxyContext({
+        // LIN-4492: triage is a stage kind, so its row starts a run and the factory names it here.
+        finalizePrompt: (harness, kind, { runRecordId = null } = {}) => attachProxyContext({
           ...feedbackProxyContext({ workspace, issue, baseUrl, session, harness, prompt: basePrompt, label: 'feedback-triage' }),
-          writes: stageWrites(kind)
+          writes: stageWrites(kind),
+          runRecordId
         }),
         fields: {
           promptName: 'Triage',

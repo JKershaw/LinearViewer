@@ -11,6 +11,7 @@
  * are pinned in tests/unit/file-pointer.test.js.
  */
 import { test, describe } from 'node:test';
+import { withAutopilotSessionHeading } from '../../lib/run-identity.js';
 import assert from 'node:assert/strict';
 import { createDispatchItem, FILE_POINTER_PILOT_ENV, isFilePointerPilotEnabled } from '../../lib/dispatch-factory.js';
 import { FILE_POINTER_MARKER } from '../../lib/file-pointer.js';
@@ -35,9 +36,11 @@ function captureLogs() {
 function pilotStore({ counts = [0, 0], findRecent = null, omitCount = false } = {}) {
   const state = { countCalls: 0, addItemCalls: 0, addItemArg: null };
   const store = {
-    async addItem(urlKey, item) {
+    async addItem(urlKey, item, trusted) {
       state.addItemCalls++;
       state.addItemArg = item;
+      // LIN-4492: the factory's trusted id, which the kickoff's own id block names.
+      state.addItemTrusted = trusted;
       return { _id: 'item-1', ...item };
     }
   };
@@ -116,7 +119,10 @@ describe('file-pointer seam — flag and eligibility', () => {
         fields: { promptName: kind, issueIdentifier: 'LIN-1' }
       }));
       assert.equal(state.countCalls, 0, `${kind} must not consume an ordinal`);
-      assert.equal(state.addItemArg.prompt, 'BODY');
+      // LIN-4492: a fresh autopilot kickoff's id block is appended by the factory after the pilot, so the
+      // body is the same as before and the block is exactly the one the store used to append.
+      const expected = kind === 'autopilot' ? withAutopilotSessionHeading('BODY', state.addItemTrusted.id) : 'BODY';
+      assert.equal(state.addItemArg.prompt, expected);
     }
   });
 

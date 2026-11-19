@@ -120,8 +120,9 @@ describe('LIN-3136 M1 — a kickoff declares [dispatch] for its child', () => {
 
       assert.equal(w.spy.grant.length, 1, 'one declared mint');
       assert.equal(w.spy.plain.length, 0, 'no grant-less mint');
+      // LIN-4492: every dispatch mint names its origin; an autopilot kickoff starts no run, so no runRecordId key.
       assert.deepEqual(w.spy.grant[0], {
-        urlKey: 'acme', workspaceId: WS, ownerAccountId: OWNER, grants: ['dispatch'], label: 'kickoff-bootstrap', profile: 'worker'
+        urlKey: 'acme', workspaceId: WS, ownerAccountId: OWNER, grants: ['dispatch'], label: 'kickoff-bootstrap', profile: 'worker', origin: 'dispatch'
       });
       assert.equal(item.grantDeclaration.site, 'M1');
       assert.deepEqual(item.grantDeclaration.grants, ['dispatch']);

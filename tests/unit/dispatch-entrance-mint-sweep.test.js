@@ -188,8 +188,9 @@ async function makeWorld() {
   };
 }
 
+// LIN-4492: every dispatch mint names its origin. These rows start no run (no runRecordId key).
 const grantlessCreate = (label, createdBy) => ({
-  kind: 'bootstrap', scope: 'readWrite', label, ttl: BOOTSTRAP_TOKEN_TTL_SECONDS, createdBy
+  kind: 'bootstrap', scope: 'readWrite', label, ttl: BOOTSTRAP_TOKEN_TTL_SECONDS, createdBy, origin: 'dispatch'
 });
 
 // ── the follow-up arms: 3 x proxy-dispatch, 1 x session, attach and pbt ────
@@ -197,14 +198,16 @@ const grantlessCreate = (label, createdBy) => ({
 const DISPATCH = '/api/proxy/dispatch';
 const RECOMMEND = '/api/proxy/recommend-and-dispatch';
 const ARMS = [
-  { id: 'proxy POST /dispatch (pbt)', run: (w, followUpTo) => w.viaProxy(DISPATCH, { prompt: 'next beat', issueIdentifier: 'TEST-1', target: 'cli', followUpTo }) },
-  { id: 'proxy POST /dispatch (attach)', run: (w, followUpTo) => w.viaProxy(DISPATCH, { prompt: 'next beat', issueIdentifier: 'TEST-1', target: 'cli', followUpTo, appendProxyContext: true, harness: 'claude-code' }) },
-  { id: 'recommend-and-dispatch override arm (pbt)', run: (w, followUpTo) => w.viaProxy(RECOMMEND, { issueIdentifier: 'TEST-1', kind: 'implementation', followUpTo }) },
-  { id: 'recommend-and-dispatch override arm (attach)', run: (w, followUpTo) => w.viaProxy(RECOMMEND, { issueIdentifier: 'TEST-1', kind: 'implementation', followUpTo, appendProxyContext: true, harness: 'claude-code' }) },
-  { id: 'recommend-and-dispatch LLM arm (pbt)', run: (w, followUpTo) => w.viaProxy(RECOMMEND, { issueIdentifier: 'TEST-1', followUpTo }) },
-  { id: 'recommend-and-dispatch LLM arm (attach)', run: (w, followUpTo) => w.viaProxy(RECOMMEND, { issueIdentifier: 'TEST-1', followUpTo, appendProxyContext: true, harness: 'claude-code' }) },
-  { id: 'session POST (pbt)', run: (w, followUpTo) => w.viaSession({ prompt: 'next beat', followUpTo, target: 'cli', harness: 'claude-code' }) },
-  { id: 'session POST (attach)', run: (w, followUpTo) => w.viaSession({ prompt: 'next beat', issueIdentifier: 'TEST-7', followUpTo, target: 'cli', attachProxy: true, harness: 'claude-code' }) }
+  // `runs`: the arm's follow-up row starts a run of its own (a stage kind), so it names its own id as runRecordId.
+  // A custom follow-up (no kind) belongs to the run it resumes; the seeded parent starts none, so it names none.
+  { id: 'proxy POST /dispatch (pbt)', runs: false, run: (w, followUpTo) => w.viaProxy(DISPATCH, { prompt: 'next beat', issueIdentifier: 'TEST-1', target: 'cli', followUpTo }) },
+  { id: 'proxy POST /dispatch (attach)', runs: false, run: (w, followUpTo) => w.viaProxy(DISPATCH, { prompt: 'next beat', issueIdentifier: 'TEST-1', target: 'cli', followUpTo, appendProxyContext: true, harness: 'claude-code' }) },
+  { id: 'recommend-and-dispatch override arm (pbt)', runs: true, run: (w, followUpTo) => w.viaProxy(RECOMMEND, { issueIdentifier: 'TEST-1', kind: 'implementation', followUpTo }) },
+  { id: 'recommend-and-dispatch override arm (attach)', runs: true, run: (w, followUpTo) => w.viaProxy(RECOMMEND, { issueIdentifier: 'TEST-1', kind: 'implementation', followUpTo, appendProxyContext: true, harness: 'claude-code' }) },
+  { id: 'recommend-and-dispatch LLM arm (pbt)', runs: true, run: (w, followUpTo) => w.viaProxy(RECOMMEND, { issueIdentifier: 'TEST-1', followUpTo }) },
+  { id: 'recommend-and-dispatch LLM arm (attach)', runs: true, run: (w, followUpTo) => w.viaProxy(RECOMMEND, { issueIdentifier: 'TEST-1', followUpTo, appendProxyContext: true, harness: 'claude-code' }) },
+  { id: 'session POST (pbt)', runs: false, run: (w, followUpTo) => w.viaSession({ prompt: 'next beat', followUpTo, target: 'cli', harness: 'claude-code' }) },
+  { id: 'session POST (attach)', runs: false, run: (w, followUpTo) => w.viaSession({ prompt: 'next beat', issueIdentifier: 'TEST-7', followUpTo, target: 'cli', attachProxy: true, harness: 'claude-code' }) }
 ];
 
 describe('LIN-3601 mint sweep — World N (no declaration record)', () => {
@@ -214,7 +217,7 @@ describe('LIN-3601 mint sweep — World N (no declaration record)', () => {
     const res = await w.viaProxy('/api/proxy/autopilot/kickoff', { goal: 'walk the stack', target: 'cli' });
     assert.equal(res.status, 201, res.text);
     assert.deepEqual(w.grants(), [{
-      urlKey: URL_KEY, workspaceId: POSTER_WORKSPACE, ownerAccountId: POSTER, grants: ['dispatch'], label: 'kickoff-bootstrap', profile: 'worker'
+      urlKey: URL_KEY, workspaceId: POSTER_WORKSPACE, ownerAccountId: POSTER, grants: ['dispatch'], label: 'kickoff-bootstrap', profile: 'worker', origin: 'dispatch'
     }]);
     assert.deepEqual(w.plains(), []);
   });
@@ -225,7 +228,7 @@ describe('LIN-3601 mint sweep — World N (no declaration record)', () => {
     const res = await w.viaSession({ prompt: 'Run the autopilot on LIN-1.', promptName: 'Autopilot', kind: 'autopilot', issueIdentifier: 'LIN-1', attachProxy: true, target: 'cli', harness: 'claude-code' });
     assert.equal(res.status, 201, res.text);
     assert.deepEqual(w.grants(), [{
-      urlKey: URL_KEY, workspaceId: POSTER_WORKSPACE, ownerAccountId: POSTER, grants: ['dispatch'], label: 'dispatch-bootstrap', profile: 'worker'
+      urlKey: URL_KEY, workspaceId: POSTER_WORKSPACE, ownerAccountId: POSTER, grants: ['dispatch'], label: 'dispatch-bootstrap', profile: 'worker', origin: 'dispatch'
     }]);
     assert.deepEqual(w.plains(), []);
   });
@@ -284,7 +287,7 @@ describe('LIN-3601 mint sweep — World N (no declaration record)', () => {
       assert.equal(res.status, 201, res.text);
       assert.deepEqual(w.grants(), []);
       assert.deepEqual(w.plains(), [{ urlKey: URL_KEY, opts: grantlessCreate('refire-broker', RECORDED_OWNER) }]);
-      assert.deepEqual(Object.keys(w.plains()[0].opts), ['kind', 'scope', 'label', 'ttl', 'createdBy']);
+      assert.deepEqual(Object.keys(w.plains()[0].opts), ['kind', 'scope', 'label', 'ttl', 'createdBy', 'origin']);
     });
   }
 });
@@ -298,8 +301,12 @@ describe('LIN-3601 mint sweep — World R (a record present; owner and workspace
       const res = await arm.run(w, parent);
       assert.equal(res.status, 201, res.text);
       assert.deepEqual(w.plains(), [], 'a declared resume never mints plain');
+      // The row's id is the 201's `id` (proxy lanes) or `item.id` (session lane); a run-starting arm names it as runRecordId.
+      const rowId = res.body.id ?? res.body.item?.id;
+      assert.equal(typeof rowId, 'string');
       assert.deepEqual(w.grants(), [{
-        urlKey: URL_KEY, workspaceId: RECORDED_WORKSPACE, ownerAccountId: RECORDED_OWNER, grants: ['take'], label: 'dispatch-bootstrap', profile: 'worker'
+        urlKey: URL_KEY, workspaceId: RECORDED_WORKSPACE, ownerAccountId: RECORDED_OWNER, grants: ['take'], label: 'dispatch-bootstrap', profile: 'worker', origin: 'dispatch',
+        ...(arm.runs ? { runRecordId: rowId } : {})
       }]);
       assert.notEqual(w.grants()[0].ownerAccountId, POSTER, 'never the poster');
       assert.notEqual(w.grants()[0].workspaceId, POSTER_WORKSPACE, 'never the poster\'s workspace');
@@ -314,7 +321,7 @@ describe('LIN-3601 mint sweep — World R (a record present; owner and workspace
     assert.equal(res.status, 201, res.text);
     assert.deepEqual(w.plains(), []);
     assert.deepEqual(w.grants(), [{
-      urlKey: URL_KEY, workspaceId: RECORDED_WORKSPACE, ownerAccountId: RECORDED_OWNER, grants: ['dispatch'], label: 'refire-broker', profile: 'worker'
+      urlKey: URL_KEY, workspaceId: RECORDED_WORKSPACE, ownerAccountId: RECORDED_OWNER, grants: ['dispatch'], label: 'refire-broker', profile: 'worker', origin: 'dispatch'
     }]);
     assert.deepEqual(w.lookups(), [[URL_KEY, id], [URL_KEY, id]], 'the route\'s read and the helper\'s re-read');
   });

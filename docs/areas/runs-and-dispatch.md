@@ -5,8 +5,8 @@ Area notes for `runs-and-dispatch` in the registry. Format and rules: README.md.
 ## Lessons
 
 - A run-row field that is always present with a default is one entry in `RUN_FIELDS`
-  (`lib/dispatch-fields.js`). A sparse field stays a conditional spread in `addItem` and
-  `_archiveItem`, so other rows keep their key sets byte-identical. Six fields were once
+  (`lib/dispatch-fields.js`). A sparse field stays a conditional spread in `addItem`, `_archiveItem` and both
+  projections (`_formatItem`, `_formatHistoryItem`, as `runRecordId` is, LIN-4492), so other rows keep their key sets byte-identical. Six fields were once
   dropped on one hop of four.
 - Every exit from the queue except a take archives through `_archiveItem` (`lib/dispatch-store.js`);
   a new exit must archive through it too.
@@ -195,3 +195,7 @@ Area notes for `runs-and-dispatch` in the registry. Format and rules: README.md.
 - `lib/dispatch-feedback-kinds.js`: its header says the runner prompt renders the kinds through the store's re-export and
   that the store imports the table. The store does neither (its own comment says so) and `lib/prompts/runner-kickoff.js`
   imports the leaf. A header fix. (Drift & Coherence Review, 14 Nov.; `docs/reviews/drift-coherence-review-2026-11-14.md`.)
+- `lib/dispatch-store.js`: a wake row takes its parent's run (`runRecordId`) only on the provisioned path, where
+  `_deliverWake` reads the parent's status; a wake with no provisioner wired carries none. Every production wake is
+  provisioned, so nothing is wrong today. Reading the parent outside that block adds a read to the wake path, whose guard
+  order is pinned. (LIN-4492 leftover.)

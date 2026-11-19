@@ -29,6 +29,7 @@ import assert from 'node:assert/strict';
 import crypto from 'node:crypto';
 import express from 'express';
 import { DispatchQueueStore } from '../../lib/dispatch-store.js';
+import { createDispatchItem } from '../../lib/dispatch-factory.js';
 import { DispatchStoreFault } from '../../lib/errors.js';
 import { ProxyTokenStore, BOOTSTRAP_TOKEN_TTL_SECONDS } from '../../lib/proxy-tokens.js';
 import { createMockCollection } from '../fixtures/mock-collection.js';
@@ -68,12 +69,15 @@ const TOKENS = {
 };
 
 // Exactly today's inline mint options (routes/dispatch.js broker route).
+// LIN-4492: every dispatch mint names its origin. The refire rows here start no run (autopilot kickoffs,
+// or no row at all), so the mint carries no runRecordId key.
 const grantlessOpts = (createdBy) => ({
   kind: 'bootstrap',
   scope: 'readWrite',
   label: 'refire-broker',
   ttl: BOOTSTRAP_TOKEN_TTL_SECONDS,
-  createdBy
+  createdBy,
+  origin: 'dispatch'
 });
 
 // ─────────────────────────────────────────────────────────────────────────────
@@ -267,7 +271,8 @@ function assertDeclared(res, world, id, why) {
     ownerAccountId: RECORD.ownerAccountId,
     grants: RECORD.grants,
     label: 'refire-broker',
-    profile: 'worker'
+    profile: 'worker',
+    origin: 'dispatch'
   }, `${why}: minted from the recorded owner/workspace/grants, worker profile`);
   // Two reads, both keyed by the token's urlKey and the body id: the route's own
   // (to branch and gate B1/B2) and the helper's re-read, from which it mints.
@@ -871,5 +876,54 @@ describe('LIN-4468 — refire witness: a restricted row\'s re-minted token canno
     const working = await world.tokenStore.exchangeBootstrapToken(res.body.token);
     const refused = await postComment(proxyAppOver(world), working.token, 'LIN-9');
     assert.equal(refused.status, 403, JSON.stringify(refused.body));
+  });
+});
+
+// ─────────────────────────────────────────────────────────────────────────────
+// LIN-4492 close-out: the refired row's RUN rides on the broker mint (behavioural, run-bearing source row)
+// ─────────────────────────────────────────────────────────────────────────────
+//
+// Every case above refires a run-less row (an autopilot kickoff), so a broker that dropped the run
+// (`runRecordId: null`, or `stampFromRow` returning no run) stayed green. These rows HAVE a run: a stage
+// row dispatched through the factory carries its own id as `runRecordId`.
+
+describe('LIN-4492 — the refire broker mint carries the refired row\'s run', () => {
+  /** A stage row dispatched through the factory (so it has `runRecordId === its _id`), then taken. */
+  async function seedStageRow(world) {
+    const item = await createDispatchItem({
+      store: world.store, urlKey: URL_KEY, kind: 'implementation', prompt: 'build it', applyDefaultHarness: false,
+      fields: { promptName: 'implementation', issueIdentifier: 'LIN-9', harness: 'claude-code' }
+    });
+    assert.equal(item.runRecordId, item._id, 'seed: a stage row\'s run is its own id');
+    const taken = await world.store.takeItem(item._id, URL_KEY, TAKER_LABEL, null);
+    assert.ok(taken, 'seed: row taken');
+    return item._id;
+  }
+
+  test('plain refire (no declaration): createToken options carry origin dispatch and the row\'s run', async () => {
+    const world = makeWorld();
+    const id = await seedStageRow(world);
+    resetSpy(world);
+    const res = await call(buildApp(world), 'owner-token', { itemId: id });
+    assert.equal(res.status, 201, JSON.stringify(res.body));
+    assert.equal(world.spy.plain.length, 1, 'one plain mint');
+    assert.equal(world.spy.plain[0].opts.origin, 'dispatch');
+    assert.equal(world.spy.plain[0].opts.runRecordId, id, 'the refired row\'s run, read through getItemStatus');
+    const stored = world.tokenCollection._docs[0];
+    assert.equal(stored.runRecordId, id, 'and it is persisted on the bootstrap token');
+  });
+
+  test('declared refire: the grant mint carries origin dispatch and the row\'s run', async () => {
+    const world = makeWorld();
+    const id = await seedTaken(world, { record: RECORD, patch: null });
+    // The declared row is an autopilot seed with no run; give it one the way the factory would (its own id).
+    const doc = world.historyCollection._docs.find(d => d._id === id);
+    doc.runRecordId = id;
+    resetSpy(world);
+    const res = await call(buildApp(world), 'owner-token', { itemId: id });
+    assert.equal(res.status, 201, JSON.stringify(res.body));
+    assert.equal(world.spy.grant.length, 1, 'one grant mint');
+    assert.equal(world.spy.grant[0].origin, 'dispatch');
+    assert.equal(world.spy.grant[0].runRecordId, id, 'the refired row\'s run');
   });
 });

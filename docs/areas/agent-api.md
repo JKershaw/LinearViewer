@@ -47,6 +47,14 @@ Area notes for `agent-api` in the registry. Format and rules: README.md.
   reason in `tests/unit/dispatch-entrance-mint-sweep.test.js`. The refire broker minted unrestricted
   tokens for read-only rows because its mint was a bare `createToken`, which no helper-name search
   finds (LIN-4468).
+- A proxy token records its `origin` and, for a dispatch token, its `runRecordId`, set at mint and copied once by the
+  exchange (LIN-4492). A person's mint goes through `personMint()` (`lib/stage-writes.js`), which the census pins to the tokens
+  page and the test seams; a bare `origin: 'person'` is ignored. Find every mint by its call (`tests/unit/lin-4492-mint-census.test.js`):
+  a helper-name search misses a bare `createToken`, which is how LIN-4468 found its gap. A new mint fails the census until it is listed.
+  An owner-issued runner or agent grant copy is a `person` credential: it acts as the owner, so a record written with it is filed as
+  `person:<owner>` by design. `lib/run-lineage.js` `writerOf` is the pure refusal check; no route calls it until the records routes (LIN-4493).
+- The dispatch factory allocates a row's id before its prompt is finalized (LIN-4492, `lib/dispatch-factory.js`). The prompt and every
+  credential minted for the row name it; `addItem` takes that id only as its trusted third argument, never from a body field.
 
 ## Waiting
 
@@ -101,3 +109,7 @@ Area notes for `agent-api` in the registry. Format and rules: README.md.
 - `routes/proxy-writes.js`: the `updateIssue` handler destructures nine body fields and `ISSUE_PATCH_FIELDS`
   (`lib/stage-writes.js`) lists the same nine; only a comment and a source test keep them in step. One list would
   mean reshaping the handler's field-by-field conversion. Not scheduled; no ticket takes it. (LIN-4448 blind read.)
+- `lib/proxy-preamble.js`: its mint sites are classified twice, by helper name in the LIN-3134 tables
+  (`tests/unit/lin-3134-declared-mint-census.test.js`, `tests/unit/lin-3134-followup-sites.test.js`) and by call, with
+  origin and run, in `tests/unit/lin-4492-mint-census.test.js`. One census with a column per classification would replace
+  them; that reshapes three test files. (LIN-4492 Survey global and leftover.)

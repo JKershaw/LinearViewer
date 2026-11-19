@@ -271,12 +271,15 @@ describe('LIN-3135 — no itemId: byte-identical grant-less mint', () => {
       assert.deepEqual(res.body, { token: 'minted-bootstrap', expiresAt: '2026-07-20T00:00:00.000Z' });
       assert.equal(captured.length, 1);
       assert.equal(captured[0].urlKey, 'acme');
+      // LIN-4492: every dispatch mint names its origin; with no itemId there is no row,
+      // so no run is named and no runRecordId key is present.
       assert.deepEqual(captured[0].options, {
         kind: 'bootstrap',
         scope: 'readWrite',
         label: 'refire-broker',
         ttl: 172800,
-        createdBy
+        createdBy,
+        origin: 'dispatch'
       });
     });
   }

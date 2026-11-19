@@ -102,7 +102,7 @@ describe('S3 — no record plain path', () => {
     const result = await provisionResumeCredential({ proxyTokenStore: store, dispatchStore: { getGrantDeclaration: async () => ({ state: 'none' }) }, urlKey: 'acme', baseUrl: 'https://h', prompt: 'p', label: 'dispatch-bootstrap', harness: 'claude-code', createdBy: 'u1', followUpTo: 'row-1' });
     assert.deepEqual(result, { prompt: 'p', bootstrapToken: 'plain-tok', grantDeclaration: null });
     const call = store.calls[0];
-    assert.deepEqual(call.opts, { kind: 'bootstrap', scope: 'readWrite', label: 'dispatch-bootstrap', ttl: 48 * 60 * 60, createdBy: 'u1' });
+    assert.deepEqual(call.opts, { kind: 'bootstrap', scope: 'readWrite', label: 'dispatch-bootstrap', ttl: 48 * 60 * 60, createdBy: 'u1', origin: 'dispatch' });
   });
 
   test('mint:false with no record returns bootstrapToken null, no mint', async () => {
@@ -267,7 +267,8 @@ describe('S3 — attach mode (full argument parity, finding 3)', () => {
   const LABEL = 'custom-attach-label';
   const mkStore = (calls) => ({ createToken: async (urlKey, opts) => { calls.push({ urlKey, opts }); return { token: 'plain-tok' }; } });
   // Today's exact plain createToken args for these cells (H9, review 1 finding 3).
-  const PLAIN_OPTS = { kind: 'bootstrap', scope: 'readWrite', label: LABEL, ttl: 48 * 60 * 60, createdBy: 'u1' };
+  // LIN-4492: every dispatch mint names its origin; these resumes name no run (no runRecordId key).
+  const PLAIN_OPTS = { kind: 'bootstrap', scope: 'readWrite', label: LABEL, ttl: 48 * 60 * 60, createdBy: 'u1', origin: 'dispatch' };
 
   test('the providerUi fixture is capability-bearing (renders differently from null)', async () => {
     const withUi = await attachProxyContext({
@@ -359,7 +360,7 @@ describe('S3 — attach mode (full argument parity, finding 3)', () => {
     assert.equal(store.calls[0].label, LABEL, 'the declared attach mint carries the passed label');
     assert.deepEqual(store.calls[0], {
       urlKey: 'acme', workspaceId: 'ws-1', ownerAccountId: 'account-A',
-      grants: ['dispatch'], label: LABEL, profile: 'worker'
+      grants: ['dispatch'], label: LABEL, profile: 'worker', origin: 'dispatch'
     });
     assert.deepEqual(store.calls[0], store.calls[1], 'the helper\'s grant mint equals the direct attachProxyContext call');
   });
@@ -431,7 +432,7 @@ describe('S3 — attach mode (full argument parity, finding 3)', () => {
     assert.equal(store.calls[0].label, 'wake-bootstrap', 'the declared pbt mint carries the passed label');
     assert.deepEqual(store.calls[0], {
       urlKey: 'acme', workspaceId: 'ws-1', ownerAccountId: 'account-A',
-      grants: ['dispatch'], label: 'wake-bootstrap', profile: 'worker'
+      grants: ['dispatch'], label: 'wake-bootstrap', profile: 'worker', origin: 'dispatch'
     });
   });
 });

@@ -2,9 +2,9 @@
  * Unit tests for the autopilot session self-stamp (LIN-599).
  *
  * An autopilot run must forward its own dispatch id as `sessionId` on the worker
- * dispatches it spawns (LIN-591), but the id is minted inside addItem — after the
- * kickoff prompt was built. addItem closes that gap by appending a self-reference
- * block naming `doc._id` to the prompt, gated on `kind === 'autopilot'` with no
+ * dispatches it spawns (LIN-591). Since LIN-4492 the factory (createDispatchItem) allocates the row id before
+ * the prompt is finalized and appends the self-reference block naming it (`kickoffHeadingFor`,
+ * lib/run-identity.js); addItem no longer rewrites prompts. The block is gated on `kind === 'autopilot'` with no
  * `followUpTo` (LIN-4025: a follow-up is not a run root). These tests pin that the
  * block carries the minted id, that it reaches the consumer through the poll/take
  * seam, and that every other kind is left byte-identical.
@@ -17,6 +17,13 @@ import assert from 'node:assert/strict';
 import { DispatchQueueStore } from '../../lib/dispatch-store.js';
 import { buildWakeFollowUp } from '../../lib/dispatch-wake.js';
 import { createMockCollection } from '../fixtures/mock-collection.js';
+import { createDispatchItem } from '../../lib/dispatch-factory.js';
+
+// LIN-4492: the kickoff's own id block is appended by the factory (lib/run-identity.js), before the row is
+// written, so a fresh autopilot kickoff is dispatched through createDispatchItem, not addItem.
+function dispatchKickoff(store, prompt, fields = {}) {
+  return createDispatchItem({ store, urlKey: 'acme', kind: 'autopilot', prompt, fields: { promptName: 'Autopilot', ...fields } });
+}
 
 // Drain the fire-and-forget microtask the onWrite hook schedules.
 const drain = () => new Promise(resolve => setImmediate(resolve));
@@ -28,13 +35,10 @@ function makeStore() {
   });
 }
 
-test('addItem embeds the minted dispatch id into an autopilot prompt', async () => {
+test('a dispatched autopilot kickoff embeds its minted dispatch id into its prompt', async () => {
   const store = makeStore();
 
-  const doc = await store.addItem('acme', {
-    prompt: 'You are Autopilot. Walk the stack.',
-    kind: 'autopilot'
-  });
+  const doc = await dispatchKickoff(store, 'You are Autopilot. Walk the stack.', {});
 
   // The original body is preserved...
   assert.ok(doc.prompt.includes('You are Autopilot. Walk the stack.'));
@@ -47,7 +51,7 @@ test('addItem embeds the minted dispatch id into an autopilot prompt', async () 
 test('the appended id is the actual minted UUID, available to forward', async () => {
   const store = makeStore();
 
-  const doc = await store.addItem('acme', { prompt: 'kickoff', kind: 'autopilot' });
+  const doc = await dispatchKickoff(store, 'kickoff', {});
 
   // The id surfaced in the prompt is exactly the doc's own id — i.e. what the
   // autopilot would stamp as sessionId on every worker dispatch it spawns.
@@ -60,10 +64,7 @@ test('the appended block explicitly overrides any earlier-mentioned session id (
   const store = makeStore();
   const standalonePlaceholder = '11111111-1111-1111-1111-111111111111';
 
-  const doc = await store.addItem('acme', {
-    prompt: `You are Autopilot. Your session id is \`${standalonePlaceholder}\`, unless dispatched through the queue.`,
-    kind: 'autopilot'
-  });
+  const doc = await dispatchKickoff(store, `You are Autopilot. Your session id is \`${standalonePlaceholder}\`, unless dispatched through the queue.`);
 
   // Both ids are present (the earlier placeholder in the original body, the real
   // minted id in the appended block)...
@@ -89,7 +90,7 @@ test('non-autopilot kinds are left byte-identical', async () => {
 
 test('the appended id reaches the consumer through the poll/take seam', async () => {
   const store = makeStore();
-  const created = await store.addItem('acme', { prompt: 'kickoff', kind: 'autopilot' });
+  const created = await dispatchKickoff(store, 'kickoff', {});
 
   // Poll (listItems → _formatItem) hands the amended prompt to the consumer.
   const [polled] = await store.pollAvailable('acme');
@@ -102,7 +103,7 @@ test('the appended id reaches the consumer through the poll/take seam', async ()
 
 test('a worker dispatch carrying the forwarded sessionId is stored untouched', async () => {
   const store = makeStore();
-  const autopilot = await store.addItem('acme', { prompt: 'kickoff', kind: 'autopilot' });
+  const autopilot = await dispatchKickoff(store, 'kickoff', {});
 
   // The autopilot now spawns a worker, stamping its own id as sessionId. That
   // worker is an ordinary (non-autopilot) dispatch — its prompt is not amended,
@@ -130,11 +131,7 @@ const blockIds = prompt =>
 
 test('LIN-4025: a note to a running autopilot wakes its later workers back to the autopilot', async () => {
   const store = makeStore();
-  const kickoff = await store.addItem('acme', {
-    prompt: 'You are Autopilot. Walk the stack.',
-    kind: 'autopilot',
-    issueIdentifier: 'LIN-4024'
-  });
+  const kickoff = await dispatchKickoff(store, 'You are Autopilot. Walk the stack.', { issueIdentifier: 'LIN-4024' });
   // The autopilot takes its kickoff and starts running.
   const running = await store.takeItem(kickoff._id, 'acme', 'token-a');
 
@@ -161,7 +158,7 @@ test('LIN-4025: a note to a running autopilot wakes its later workers back to th
 
 test('LIN-4025: a note to a running autopilot is stored and delivered byte-identical', async () => {
   const store = makeStore();
-  const kickoff = await store.addItem('acme', { prompt: 'kickoff', kind: 'autopilot' });
+  const kickoff = await dispatchKickoff(store, 'kickoff', {});
   await store.takeItem(kickoff._id, 'acme', 'token-a');
 
   const prompt = 'Also check the staging deploy before you wrap up.';
@@ -181,18 +178,18 @@ test('LIN-4025: a note to a running autopilot is stored and delivered byte-ident
 test('LIN-4025: a fresh autopilot kickoff still gets its own id block, including a child run', async () => {
   const store = makeStore();
 
-  const plain = await store.addItem('acme', { prompt: 'kickoff', kind: 'autopilot' });
+  const plain = await dispatchKickoff(store, 'kickoff', {});
   assert.deepEqual(blockIds(plain.prompt), [plain._id]);
 
   // A child run carries its parent's sessionId but no followUpTo: still a run root.
-  const child = await store.addItem('acme', { prompt: 'child kickoff', kind: 'autopilot', sessionId: 'parent-run-1' });
+  const child = await dispatchKickoff(store, 'child kickoff', { sessionId: 'parent-run-1' });
   assert.deepEqual(blockIds(child.prompt), [child._id]);
 });
 
 test('LIN-4025: a note to a taken autopilot notifies the feed under the autopilot, not the note', async () => {
   const calls = [];
   const store = new DispatchQueueStore({ collection: createMockCollection(), historyCollection: createMockCollection(), onWrite: p => calls.push(p) });
-  const kickoff = await store.addItem('acme', { prompt: 'kickoff', kind: 'autopilot', issueIdentifier: 'LIN-4024' });
+  const kickoff = await dispatchKickoff(store, 'kickoff', { issueIdentifier: 'LIN-4024' });
   await store.takeItem(kickoff._id, 'acme', 'token-a');
   calls.length = 0;
 
@@ -204,7 +201,7 @@ test('LIN-4025: a note to a taken autopilot notifies the feed under the autopilo
 test('LIN-4025: a note whose target is still queued notifies nothing under the note', async () => {
   const calls = [];
   const store = new DispatchQueueStore({ collection: createMockCollection(), historyCollection: createMockCollection(), onWrite: p => calls.push(p) });
-  const kickoff = await store.addItem('acme', { prompt: 'kickoff', kind: 'autopilot', issueIdentifier: 'LIN-4024' });
+  const kickoff = await dispatchKickoff(store, 'kickoff', { issueIdentifier: 'LIN-4024' });
   calls.length = 0;
 
   // The kickoff is not taken yet, so the note resolves to itself: no notify.

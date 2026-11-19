@@ -336,7 +336,9 @@ async function viaChat(world, parentId) {
 }
 
 // `family` selects the refusal table; `plainCreatedBy` is the leaf mint's
-// `createdBy` (today's value at that site).
+// `createdBy` (today's value at that site). LIN-4492: `runs` is true when the branch's new row starts a
+// run (a stage kind: the recommend-and-dispatch arms pick `implementation`), so its mints name the row's
+// own id as runRecordId. A custom follow-up (no kind) of a parent that starts no run names none.
 const BRANCHES = [
   { id: 'B1', name: 'proxy-dispatch POST /dispatch (pbt)', mode: 'pbt', family: 'proxy', plainCreatedBy: POSTER,
     run: (w, followUpTo, extra = {}) => viaProxy(w, DISPATCH, { prompt: 'next beat', issueIdentifier: 'TEST-1', target: 'cli', followUpTo, ...extra }) },
@@ -344,15 +346,15 @@ const BRANCHES = [
     brief: 'TEST-1', providerLine: 'currently backed by Linear',
     run: (w, followUpTo, extra = {}) => viaProxy(w, DISPATCH, { prompt: 'next beat', issueIdentifier: 'TEST-1', target: 'cli', followUpTo, appendProxyContext: true, harness: 'claude-code', ...extra }),
     runDefault: (w, followUpTo) => viaProxy(w, DISPATCH, { prompt: 'next beat', issueIdentifier: 'TEST-1', target: 'cli', followUpTo }) },
-  { id: 'B2', name: 'recommend-and-dispatch override arm (pbt)', mode: 'pbt', family: 'proxy', plainCreatedBy: POSTER,
+  { id: 'B2', runs: true, name: 'recommend-and-dispatch override arm (pbt)', mode: 'pbt', family: 'proxy', plainCreatedBy: POSTER,
     run: (w, followUpTo, extra = {}) => viaProxy(w, RECOMMEND, { issueIdentifier: 'TEST-1', kind: 'implementation', followUpTo, ...extra }) },
-  { id: 'A2', name: 'recommend-and-dispatch override arm (attach)', mode: 'attach', family: 'proxy', plainCreatedBy: POSTER,
+  { id: 'A2', runs: true, name: 'recommend-and-dispatch override arm (attach)', mode: 'attach', family: 'proxy', plainCreatedBy: POSTER,
     brief: 'TEST-1', providerLine: 'currently backed by Linear',
     run: (w, followUpTo, extra = {}) => viaProxy(w, RECOMMEND, { issueIdentifier: 'TEST-1', kind: 'implementation', followUpTo, appendProxyContext: true, harness: 'claude-code', ...extra }),
     runDefault: (w, followUpTo) => viaProxy(w, RECOMMEND, { issueIdentifier: 'TEST-1', kind: 'implementation', followUpTo }) },
-  { id: 'B3', name: 'recommend-and-dispatch LLM arm (pbt)', mode: 'pbt', family: 'proxy', plainCreatedBy: POSTER,
+  { id: 'B3', runs: true, name: 'recommend-and-dispatch LLM arm (pbt)', mode: 'pbt', family: 'proxy', plainCreatedBy: POSTER,
     run: (w, followUpTo, extra = {}) => viaProxy(w, RECOMMEND, { issueIdentifier: 'TEST-1', followUpTo, ...extra }) },
-  { id: 'A3', name: 'recommend-and-dispatch LLM arm (attach)', mode: 'attach', family: 'proxy', plainCreatedBy: POSTER,
+  { id: 'A3', runs: true, name: 'recommend-and-dispatch LLM arm (attach)', mode: 'attach', family: 'proxy', plainCreatedBy: POSTER,
     // Test-mode descent: TEST-1 defers to its open child TEST-2, so the
     // brief must name the descended terminal identifier, not the posted one.
     brief: 'TEST-2', providerLine: 'currently backed by Linear',
@@ -383,14 +385,16 @@ function assertNothingEnqueued(world, out) {
   assert.equal(world.spy.plain.length, 0, 'no plain mint attempted');
 }
 
-function assertDeclaredMint(world, out, label = 'dispatch-bootstrap') {
+function assertDeclaredMint(world, out, { label = 'dispatch-bootstrap', runs = false } = {}) {
   assert.equal(out.ok, true, `expected success, got ${JSON.stringify(out)}`);
   assert.equal(world.spy.plain.length, 0,
     `a declared resume never mints plain; saw ${JSON.stringify(world.spy.plain)} and grant mints ${JSON.stringify(world.spy.grant)}; row grantDeclaration=${JSON.stringify(rowById(world, out.itemId)?.grantDeclaration ?? null)}`);
   assert.equal(world.spy.grant.length, 1, 'exactly one grant mint');
+  // LIN-4492: every dispatch mint names its origin; a run-starting row names its own id (the 201's id).
   assert.deepEqual(world.spy.grant[0], {
     urlKey: URL_KEY, workspaceId: RECORDED_WORKSPACE, ownerAccountId: RECORDED_OWNER,
-    grants: ['dispatch'], label, profile: 'worker'
+    grants: ['dispatch'], label, profile: 'worker', origin: 'dispatch',
+    ...(runs ? { runRecordId: out.itemId } : {})
   });
   assert.notEqual(world.spy.grant[0].ownerAccountId, POSTER, 'never the poster');
   assert.notEqual(world.spy.grant[0].workspaceId, POSTER_WORKSPACE, 'never the poster\'s workspace');
@@ -408,13 +412,16 @@ function assertDeclaredMint(world, out, label = 'dispatch-bootstrap') {
   return { row, issued };
 }
 
-function assertPlainMint(world, out, createdBy) {
+function assertPlainMint(world, out, createdBy, { runs = false } = {}) {
   assert.equal(out.ok, true, `expected success, got ${JSON.stringify(out)}`);
   assert.equal(world.spy.grant.length, 0, 'a leaf resume never mints a grant');
   assert.equal(world.spy.plain.length, 1, 'exactly one plain mint');
   assert.deepEqual(world.spy.plain[0], {
     urlKey: URL_KEY,
-    opts: { kind: 'bootstrap', scope: 'readWrite', label: 'dispatch-bootstrap', ttl: BOOTSTRAP_TOKEN_TTL_SECONDS, createdBy }
+    opts: {
+      kind: 'bootstrap', scope: 'readWrite', label: 'dispatch-bootstrap', ttl: BOOTSTRAP_TOKEN_TTL_SECONDS, createdBy, origin: 'dispatch',
+      ...(runs ? { runRecordId: out.itemId } : {})
+    }
   });
   const issued = world.spy.issued[0].token;
   assert.deepEqual(tokenDoc(world, issued).grants, [], 'grant-less even though the poster holds dispatch');
@@ -502,7 +509,7 @@ for (const branch of BRANCHES) {
       const world = await makeWorld();
       const parentId = await seedParent(world, { record: RECORD });
       const out = await branch.run(world, parentId);
-      const { row, issued } = assertDeclaredMint(world, out);
+      const { row, issued } = assertDeclaredMint(world, out, { runs: branch.runs });
       assert.equal(row.bootstrapToken, issued, 'MCP: the grant token travels as the field');
       if (branch.mode === 'attach') {
         assert.ok(row.prompt.includes(PROXY_MARKER), 'attach appends the block');
@@ -517,7 +524,7 @@ for (const branch of BRANCHES) {
       const world = await makeWorld();
       const parentId = await seedParent(world, { record: null });
       const out = await branch.run(world, parentId);
-      const { row, issued } = assertPlainMint(world, out, branch.plainCreatedBy);
+      const { row, issued } = assertPlainMint(world, out, branch.plainCreatedBy, { runs: branch.runs });
       assert.equal(row.bootstrapToken, issued);
       if (branch.mode === 'attach') {
         assert.ok(row.prompt.includes(PROXY_MARKER));
@@ -569,7 +576,7 @@ for (const branch of ATTACH_BRANCHES) {
       const world = await makeWorld();
       const parentId = await seedParent(world, { record: RECORD });
       const out = await branch.run(world, parentId, { harness: 'opencode' });
-      const { row, issued } = assertDeclaredMint(world, out);
+      const { row, issued } = assertDeclaredMint(world, out, { runs: branch.runs });
       assert.ok(row.prompt.includes(PROXY_MARKER));
       assert.ok(row.prompt.includes(issued), 'prose embeds the grant token');
       assert.strictEqual(row.bootstrapToken, null, 'one credential, one channel');
@@ -580,7 +587,7 @@ for (const branch of ATTACH_BRANCHES) {
       const world = await makeWorld();
       const parentId = await seedParent(world, { record: null });
       const out = await branch.run(world, parentId, { harness: 'opencode' });
-      const { row, issued } = assertPlainMint(world, out, branch.plainCreatedBy);
+      const { row, issued } = assertPlainMint(world, out, branch.plainCreatedBy, { runs: branch.runs });
       assert.ok(row.prompt.includes(issued));
       assert.strictEqual(row.bootstrapToken, null);
       assertBriefAndProvider(branch, row.prompt, { mcp: false });
@@ -590,13 +597,13 @@ for (const branch of ATTACH_BRANCHES) {
       const world = await makeWorld();
       const parentId = await seedParent(world, { record: RECORD });
       const first = await branch.run(world, parentId);
-      assertDeclaredMint(world, first);
+      assertDeclaredMint(world, first, { runs: branch.runs });
 
       world.spy.grant.length = 0;
       world.spy.plain.length = 0;
       world.spy.issued.length = 0;
       const second = await branch.runDefault(world, first.itemId);
-      const { row } = assertDeclaredMint(world, second);
+      const { row } = assertDeclaredMint(world, second, { runs: branch.runs });
       assert.ok(!row.prompt.includes(PROXY_MARKER), 'the default follow-up suppresses the prose (LIN-805)');
     });
   });

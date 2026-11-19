@@ -78,7 +78,8 @@ describe('S2 — empty declaredGrants keeps the existing path', () => {
     const store = { createToken: async (urlKey, opts) => { calls.push({ urlKey, opts }); return { token: 'plain' }; } };
     const token = await provisionBootstrapToken({ proxyTokenStore: store, urlKey: 'acme', baseUrl: 'https://h', createdBy: 'u1' });
     assert.equal(token, 'plain');
-    assert.deepEqual(calls[0].opts, { kind: 'bootstrap', scope: 'readWrite', label: 'dispatch-bootstrap', ttl: 48 * 60 * 60, createdBy: 'u1' });
+    // LIN-4492: every dispatch mint names its origin; no run is passed here, so no runRecordId key.
+    assert.deepEqual(calls[0].opts, { kind: 'bootstrap', scope: 'readWrite', label: 'dispatch-bootstrap', ttl: 48 * 60 * 60, createdBy: 'u1', origin: 'dispatch' });
   });
 
   test('an explicit empty array and an omitted arg behave identically', async () => {
@@ -111,7 +112,8 @@ describe('S2 — declared mint', () => {
       ownerAccountId: 'account-A',
       grants: ['dispatch'],
       label: 'dispatch-bootstrap',
-      profile: 'worker'
+      profile: 'worker',
+      origin: 'dispatch'
     });
     assert.equal(result.token, TOKEN);
     assert.deepEqual(Object.keys(result.grantDeclaration), ['grants', 'ownerAccountId', 'workspaceId', 'profile', 'site', 'declaredAt']);
