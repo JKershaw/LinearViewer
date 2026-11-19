@@ -4514,3 +4514,9 @@ John asked whether he can dismiss the 14 queued rows. From a subagent's code rea
 - **LIN-4495:** survey-task 18:36, survey-place 18:39, scoping 18:42, implementation 0f294a8d from 18:46. Normal order.
 - **Queues:** 8 wakes queued again (expected). No rulings.
 - **Next check-in at 19:25.** At the cutover: what retires and what's kept behind a fallback, the run-ledger exports, and whether main can still brief and dispatch after merge.
+
+### 19 Nov, 19:27: the cutover is still building; hourly check-ins overnight
+
+- **LIN-4495:** implementation 0f294a8d (Haiku, effort high) has run since 18:46. At its 19:23 heartbeat it had made 569 tool calls, nearly all Bash. There's no branch or PR yet, so what it retires can't be read. Main is at 4f6fe01a2. LIN-4496: Todo. No rulings.
+- **The autopilot:** still in its long turn; 8 wakes queued.
+- **Check-in timing:** updating a scheduled task needs John's manual approval, which is why the 18:49 reschedule waited until 19:22. With John's approval, an hourly recurring check-in now runs (trigger trig_01XCTpQoZb2V1vqMFvzXKStm, at :27 past each hour). It's written to recover after a container reset by reading `journey.md` and this log first. It stays read-only on Harbour, and anything that needs action waits for John.
