@@ -15,9 +15,8 @@ Area notes for `runs-and-dispatch` in the registry. Format and rules: README.md.
   2297, 4080, 4166) run in an order that matters: change the pair whole, keep the wake suites
   passing, and update the two census pins (`lin-3134-declared-mint-census`,
   `lin-4080-addItem-census`) if the write moves.
-- "This run's PR" is the session's own report: `prUrlOfFeedback` (`lib/dispatch-wake.js`) takes a
-  PR on a report line before the `[done]` `url`, which older runners filled by mention count
-  (LIN-4375).
+- "This run's PR": `prUrlOfFeedback` takes a report line's PR before the `[done]` `url` (LIN-4375). Only a done
+  implementation row owns it, via `terminalPrUrlOfFeedback` (LIN-4497): other rows name siblings; detail reads merge follow-ups.
 - Two `[done]` posts can reach a decide-then-enqueue at once, so "no row yet" is no guard: claim
   first, compare-and-set on the row (`claimHeldWake`). LIN-4373 relied on the read and queued two
   leftover rows (LIN-4375).
@@ -196,3 +195,9 @@ Area notes for `runs-and-dispatch` in the registry. Format and rules: README.md.
   `_deliverWake` reads the parent's status; a wake with no provisioner wired carries none. Every production wake is
   provisioned, so nothing is wrong today. Reading the parent outside that block adds a read to the wake path, whose guard
   order is pinned. (LIN-4492 leftover.)
+- `lib/dispatch-wake.js`: a build's PR is read two ways. The look-first gate reads it bounded at the row's terminal
+  entry (`terminalPrUrlOfFeedback`, through `lib/recent-runs.js`), while the held-wake readers call `prUrlOfFeedback` on
+  the whole feedback: `lineagePrUrl` (`lib/dispatch-leftover.js`), the outcome wake in `lib/dispatch-leftover-hook.js` and
+  the release note in `lib/dispatch-store.js`. An `[evidence]` entry after `[done]` that names a sibling's PR can then be
+  the PR a wake note names, when the `DONE:` line carries no URL. Moving them onto the bounded read changes wake prompts
+  and the PR the leftover step is given, each pinned by the wake suites, so it needs its own witnesses. (LIN-4497 leftovers.)

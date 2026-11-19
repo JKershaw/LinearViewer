@@ -28,6 +28,8 @@
  *   - LIN-4398: a gate-marked Periodical review's sequence is scoping alone (the Surveys are
  *     skipped, never described as attempted); its unmarked twin and the manual `kind` override
  *     are unchanged.
+ *   - LIN-4497: the PR gate reads this ticket's own done implementation run (`pr`), not comment
+ *     URLs: a sibling's PR quoted on a fresh leaf leaves survey-task; the terminal bound holds.
  *
  * Run with: node --test tests/unit/lin-4370-look-first-route.test.js
  */
@@ -44,7 +46,8 @@ import { getRecommendation, getRecommendationStream, setFetchImpl, setPromptTrac
 import { generatePrompt, PROMPT_TEMPLATES, deriveDispatchKind } from '../../lib/prompt-templates.js';
 import { SURVEY_HEADINGS } from '../../lib/prompts/survey-words.js';
 import { sealAsAsked } from '../../lib/as-asked.js';
-import { stageRuns } from '../../lib/recent-runs.js';
+import { stageRuns, recentRuns } from '../../lib/recent-runs.js';
+import { BLIND_READ_KIND } from '../../lib/prompts/blind-read-words.js';
 import { buildRouterPrompt } from '../../lib/stage-router.js';
 import { buildBriefMessages } from '../../lib/brief.js';
 import { createProxyRoutes } from '../../routes/proxy.js';
@@ -206,7 +209,8 @@ describe('when the route is off', () => {
   test('a plan, a PR, a size record, children, no As-asked block, completed or canceled, an open blocker, a waiting run, unknown runs', () => {
     asOff(leaf({ description: `${ASKED}\n\n## Implementation Plan\n\nThe plan.` }), ctx(), 'has a plan');
     asOff(leaf(), ctx([comment('10:00', '## Plan\n\nThe plan in a comment.')]), 'has a plan');
-    asOff(leaf(), ctx([comment('10:00', 'Landed: https://github.com/o/r/pull/7')]), 'has a PR');
+    // LIN-4497: the gate reads the implementation run's own PR, not a comment's URL (see the LIN-4497 block).
+    asOff(leaf(), ctx([], stageRuns([{ id: 'im0', kind: 'implementation', status: 'taken', dispatchedAt: T('10:00'), feedback: [{ message: '[done] Built.', url: 'https://github.com/o/r/pull/7', timestamp: T('10:20') }] }])), 'has its own PR');
     asOff(leaf({ description: ASKED + RECORD() }), ctx(), 'size recorded');
     asOff(leaf({ description: ASKED + RECORD('pending a ruling') }), ctx(), 'size recorded');
     asOff(leaf(), ctx([], [], { children: [{ identifier: 'T-2', state: OPEN }] }), 'not a leaf');
@@ -744,5 +748,104 @@ describe('LIN-4398: a gate-marked Periodical review skips the two Surveys and st
     const { status, body } = await request(proxyApp({ items }), '/api/proxy/recommend-and-dispatch', { method: 'POST', body: { issueIdentifier: 'LF-P2', kind: 'survey-task' } });
     assert.equal(status, 201, JSON.stringify(body));
     assert.equal(items[0].kind, 'survey-task');
+  });
+});
+
+// LIN-4497: the PR gate reads this ticket's own implementation run, not the PR URLs in its comments.
+// Fixtures: the sibling PRs are the incident's (LIN-4492 #2464, LIN-4438's #2413, LIN-4467's #2444);
+// the note texts are the incident's headings with the bodies shortened, as the check notes quote them.
+describe('LIN-4497: the PR gate reads this ticket\'s own implementation run, not comment URLs', () => {
+  const PR = (n) => `https://github.com/JKershaw/LinearViewer/pull/${n}`;
+  const TS = (hm, ss = '00') => `2026-11-19T${hm}:${ss}.000Z`;
+  const impl = (id, dispatched, feedback, extra = {}) => ({ id, kind: 'implementation', status: 'taken', dispatchedAt: dispatched, feedback, ...extra });
+  const entry = (hm, message, extra = {}) => ({ message, timestamp: TS(hm), ...extra });
+  const implFact = (runs) => runs.find(r => r.stage === 'implementation');
+
+  // The three incident notes, each on a fresh leaf (LIN-4493 13:37, LIN-4439 21:16, LIN-4469 21:49).
+  const INCIDENT_NOTES = [
+    ['LIN-4493', T('13:37'), '## Rule from LIN-4492 close-out: which run a follow-up belongs to\n\nA follow-up goes to the run that owns its PR, ' + PR(2464) + '.'],
+    ['LIN-4439', T('21:16'), `**Unblocked: LIN-4438 is Done.** The close-out gate is live: ${PR(2413)}`],
+    ['LIN-4469', T('21:49'), `## Condition on LIN-4467's budget raise, for piece 5 (PR ${PR(2444)})`]
+  ];
+
+  test('the 19 Nov shape, and the two earlier ones: a fresh leaf whose comment quotes another ticket\'s PR gets survey-task', () => {
+    for (const [who, at, body] of INCIDENT_NOTES) {
+      const context = ctx([comment(at.slice(11, 16), body)], stageRuns([]));
+      assert.equal(lookFirstOff(leaf(), context), null, `${who}: a sibling's PR in a comment does not stand the route aside`);
+      assert.equal(stepOf(leaf(), context), 'survey-task', who);
+    }
+  });
+
+  test('a sibling close-out note posted after survey-task gives survey-place (the mid-sequence case a time boundary would miss)', () => {
+    const runs = stageRuns([{ id: 'st1', kind: 'survey-task', status: 'taken', dispatchedAt: T('10:00'), feedback: [entry('10:20', '[done] Surveyed the task.')] }]);
+    const sibling = comment('10:30', INCIDENT_NOTES[0][2]);
+    assert.equal(stepOf(leaf(), ctx([surveyTask('10:20'), sibling], runs)), 'survey-place');
+  });
+
+  test('a ticket whose own implementation run reported its PR gets no look-first step', () => {
+    const runs = stageRuns([impl('im1', TS('10:00'), [
+      entry('10:01', '[working] started'),
+      entry('10:20', `DONE: built it, PR ${PR(2465)}`),
+      entry('10:21', '[done] Built it.', { url: PR(2465) })
+    ])]);
+    assert.equal(implFact(runs).pr, PR(2465));
+    assert.equal(lookFirstOff(leaf(), ctx([], runs)), 'has its own PR');
+    assert.equal(lookFirstStep(leaf(), ctx([], runs)), null);
+  });
+
+  test('the terminal bound: a DONE line naming only "PR #2465", then trailing foreign evidence, still reads #2465', () => {
+    const feedback = [
+      entry('10:01', '[working] started'),
+      entry('10:10', `[evidence] Read the LIN-4492 close-out ${PR(2464)} and the fixture ${PR(7)}`),
+      entry('10:20', 'DONE: built the change; PR #2465'),
+      entry('10:21', '[done] Built it and opened the PR.', { url: PR(2465) }),
+      entry('10:30', `[evidence] A sibling's note: ${PR(2464)}`),
+      entry('10:31', `[evidence] Another sibling: ${PR(2412)}`)
+    ];
+    assert.equal(implFact(stageRuns([impl('im2', TS('10:00'), feedback)])).pr, PR(2465));
+  });
+
+  test('a parked row whose lineage ended done reads its own stored feedback (no terminal entry of its own)', () => {
+    const row = impl('im3', TS('10:00'), [
+      entry('10:15', `DONE: opened ${PR(2466)}`),
+      entry('10:16', '[pending] parked on CI')
+    ], { outcome: 'done' });
+    const fact = implFact(stageRuns([row]));
+    assert.equal(fact.outcome, 'done');
+    assert.equal(fact.pr, PR(2466));
+  });
+
+  test('aborted, failed and running implementation rows acquire no pr, even with a sibling PR in their feedback', () => {
+    const foreign = entry('10:10', `[evidence] Sibling close-out ${PR(2464)}`);
+    const aborted = stageRuns([impl('ab', TS('10:00'), [foreign, entry('10:20', '[aborted] Stopped by the person.')])]);
+    const failed = stageRuns([impl('fa', TS('10:00'), [foreign, entry('10:20', `[failed] Could not build, see ${PR(2464)}`)])]);
+    const running = stageRuns([impl('ru', TS('10:00'), [foreign, entry('10:11', '[working] still going')])]);
+    assert.equal(implFact(aborted).outcome, 'aborted');
+    assert.equal(implFact(failed).outcome, 'failed');
+    assert.equal(implFact(running).outcome, 'running');
+    for (const runs of [aborted, failed, running]) assert.equal('pr' in implFact(runs), false, implFact(runs).outcome);
+    // Aborted and failed, with no other blocking signal, still get survey-task.
+    assert.equal(stepOf(leaf(), ctx([], aborted)), 'survey-task');
+    assert.equal(stepOf(leaf(), ctx([], failed)), 'survey-task');
+  });
+
+  test('only implementation facts carry pr: scoping, blind-read and survey-task rows naming a PR keep their key sets, and the selector slice is unchanged', () => {
+    const naming = [entry('10:20', `[done] Result, see ${PR(2464)}`)];
+    const rows = [
+      { id: 'sc', kind: 'scoping', status: 'taken', dispatchedAt: TS('10:00'), feedback: naming },
+      { id: 'br', kind: BLIND_READ_KIND, status: 'taken', dispatchedAt: TS('10:30'), feedback: naming },
+      { id: 'st', kind: 'survey-task', status: 'taken', dispatchedAt: TS('10:40'), feedback: naming }
+    ];
+    for (const fact of stageRuns(rows)) {
+      assert.deepEqual(Object.keys(fact).sort(), ['at', 'dispatchedAt', 'id', 'outcome', 'stage'], fact.stage);
+    }
+    assert.deepEqual(recentRuns(rows).map(r => Object.keys(r).sort()), [['at', 'outcome', 'stage'], ['at', 'outcome', 'stage']]);
+  });
+
+  test('the hand-pasted cut (accepted by ruling, LIN-4497 15:39): a comment with a PR URL and no implementation run gets survey-task', () => {
+    // A PR opened by hand outside Harbour and pasted into a comment is not this ticket's own by this gate.
+    // The Surveys and scoping run on such a ticket; no comment rule can tell a pasted own PR from a sibling's.
+    const pasted = comment('10:00', `Landed by hand: ${PR(2470)}`);
+    assert.equal(stepOf(leaf(), ctx([pasted], [])), 'survey-task');
   });
 });
