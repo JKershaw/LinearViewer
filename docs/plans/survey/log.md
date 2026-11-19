@@ -4406,3 +4406,27 @@ John read the doc copy (with the leaks table, the before-and-after drawing and a
 **Look-first fix filed and launched (19 Nov, ~15:10 UTC).** A subagent established the check's intent and history (`integration/checks/lin-4493-intent.md`): the plan and PR checks are meant to leave in-flight tickets alone; PR #2370 accepted the any-PR-link match expecting the selector as fallback, but the selector is never offered the Surveys. It fired 3 times in 80 first dispatches since 8 Nov (LIN-4439, LIN-4469, LIN-4493), each from a sibling's note quoting that sibling's PR. One other lead had a real case (LIN-4399: a foreign PR made the blind read stand aside before close-out; harm unknown), left out of the fix. Filed as LIN-4497 from `integration/fix-look-first.md` and launched on its own (autopilot `df03bb30`). LIN-4493 restarted properly after the 14:27 note (surveys 14:28 and 14:32, scoping 14:37, building 14:41). When LIN-4497 lands, tell the slice 1 autopilot the workaround is no longer needed. The earlier draft `integration/fix-trail-facts.md` is superseded. John asked me to keep my context clean and not do things that need guessing.
 
 **Peer colleague, first exchange (19 Nov, ~15:40 UTC).** John set up a room (yap, `#harbour-peer`; ring buffer, no persistence) with a read-only colleague from another model family. I posted the LIN-4493 explanation with evidence and unknowns. The colleague independently ran the routing modules on LIN-4493's ask and the 13:37 comment at `079f0b6ff`: with the note, `has a PR` and all code routes null; with only the PR URL replaced by "PR 2464", survey-task. Corrections accepted: call it a reproduced defect and best-supported incident explanation, not a proven production trace (plain POST /dispatch can carry a caller-supplied promptName, and runs-unknown isn't excluded without the trace); 3/80 is a bounded sample (LIN-4250..LIN-4505), not a Harbour-wide rate; the queued wake rows stay unknown. Next peer checkpoint: LIN-4497's plan/PR review (does stored feedback really carry this ticket's PR, incl. ci-wake/custom continuation and prUrlOfFeedback's fallback).
+
+### 19 Nov, 16:14: check-in after compaction, and the colleague's calibration
+
+- **Re-read after compaction.** A fresh reader checked `journey.md` against the log from 18 Nov, the designs, the readings and the checks. Its gaps and one correction (no brief baseline exists for 13–14 Nov) were added to `journey.md`.
+- **Check-in at 16:14, proxy GETs through a subagent.**
+  - **LIN-4493:**
+    - the fix-round build 5f77b308 (Haiku, 15:23–16:05) picked up link-account partway through;
+    - review a09e3fc8 approved at 16:10, conditional on four close-out fixes, with the PAT name test needed before merge;
+    - blind read 6c641ed4 said "same";
+    - PR #2465 is open at 76743c78d, CI green.
+  - **LIN-4497:**
+    - build d81c6e08 (Haiku) finished at 16:10;
+    - PR #2466 is open at b73b8ce, CI green;
+    - review cc72ddad has been running since 16:10.
+  - **LIN-4494..4496:** Todo, with 0 dispatches.
+  - **Rulings:** none open.
+  - **Watch item, mine:** since its 14:15 message, the slice 1 autopilot has sent only heartbeats. Five wake rows on LIN-4493 sit queued. Not shown to be a failure. Bring it to John only if it stalls.
+- **Open-blocker question, closed.** The colleague found that the operating manual (`docs/autopilot-operating-manual.md:370-373`) says to hold a dependent until its blocker is done, and the rows comply. No action unless a piece actually dispatches early.
+- **The colleague's role, calibrated by John and the colleague** (room messages 12, 15, 17):
+  - Harbour does code review, so the colleague doesn't review PRs.
+  - The room is for consequential uncertainty, where a second reading could change the action, the scope or the confidence. It is not for certifying status lines.
+  - An exchange that ends "no further action" is a success.
+  - Keep reports to John short, and don't pass routine uncertainty on to him.
+- The next check-in is at 16:50.
