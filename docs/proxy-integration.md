@@ -2913,6 +2913,23 @@ Read scope is enough. `state` defaults to `open`; `limit` defaults to 200 (max 1
 - A confirming tick only refreshes `lastSeenAt` (and merges new victims); `startedAt`/`firedAt` are set once and never move, including across a clear→reopen (`reopenCount`).
 - **A3 dilution (stated, accepted for v1):** `dispatcher-silent` reads token `lastUsedAt` poll recency, which `validateToken` bumps on *every* proxy call — so a runner that stopped polling but still calls the proxy can mask silence (a false negative). The consumer heartbeat (LIN-1952) does not touch `lastUsedAt` (LIN-3647: the heartbeat routes validate with `touch: false`), so it is not part of this dilution; the remainder is a separate decision (LIN-2883 per-machine poll, or a later `lastPollOkAt` read).
 
+### Records (LIN-4493)
+
+The records store is the hand-off layer: findings, questions, verdicts, decisions, lessons, changes, plans and
+tasks, each addressed (`to`) and each with a state that someone ends. Routes live in `routes/proxy-records.js`:
+
+- `POST /api/proxy/records` (add), `POST /api/proxy/records/:id/{revise,end,link}`, behind `requireWriteScope('recordWrite')`.
+  `recordWrite` is allowed to every stamp (lib/stage-writes.js).
+- `GET /api/proxy/records/:id[@v]`, `GET /api/proxy/records?…` (find, with `count`), `GET /api/proxy/tasks/:id/records` (show).
+
+Who a write is filed as is never read from the body (`by`). It comes from the credential: a person's credential
+files as `person:<accountId>`; a dispatch credential files as the stage of the run it names (`"run": "<id>"`), and
+is refused with a reason when it names no run, a run that ended, or a run in another dispatch lineage
+(lib/run-lineage.js `writerOf`). A credential minted before run identity (no `origin`) is refused.
+
+A blind-read token (`blind-comment`) may not read records. The records reads log who asked (`records-query-log`,
+90-day expiry, swept by the hourly cleanup). The full call shapes are in `lib/proxy-instructions.js` (Records).
+
 ## Error Handling
 
 | Status | Error | Description |

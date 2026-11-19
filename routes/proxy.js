@@ -38,6 +38,10 @@ import { BYTE_IDENTICAL_ESCALATION_THRESHOLD } from '../lib/rejected-credentials
 import { SENTINEL_EXPIRY_FLOOR_MS } from '../lib/credential-diagnostics.js';
 import { STAGE_PROVIDER_LANE, STAGE_PROXY_TOKEN } from '../lib/proxy-events.js';
 import { requireWriteScope } from '../lib/stage-write-gate.js';
+import { createProxyRecordsRoutes } from './proxy-records.js';
+import { askedText } from '../lib/as-asked.js';
+import { flattenIssue as flattenRecordsIssue } from '../lib/proxy-wire.js';
+import { STAGE_KINDS } from '../lib/prompts/stage-kinds.js';
 import { requireGrant } from '../lib/require-grant.js';
 import { graphqlErrorExtra, graphqlErrorDetail, declaredProviderDisplayName, upstreamErrorStatus } from '../lib/proxy-graphql-errors.js';
 import { deriveTerminalStatus, deriveLifecycleStatus, deriveCompletedAt, harvestAbortedTargets, feedbackWithHarvestedAbort, mergeLineageFeedback } from '../lib/dispatch-terminal.js';
@@ -475,7 +479,7 @@ async function fetchWithTimeout(workFn, ms) {
  *   workspace selects it, and via this injection.
  * @returns {Router} Express router with proxy routes
  */
-export function createProxyRoutes({ proxyTokenStore, proxyEventStore, agentStatusStore, recapCacheStore, briefCacheStore, taskSnapshotStore, dispatchQueueStore, dispatchTokenStore = null, closeOutEventsStore = null, llmCallLogStore, taskDecisionsStore = null, shelvedRulingsStore = null, dismissalSuggestionsStore = null, harbourCommentsStore = null, sessionsFeedCache = null, workspaceFromUrl, resolveWorkspaceAccess, getWorkspaceOpenRouterKey, getWorkspaceNorthStar, getNorthStarDocVersionForWorkspace = null, reportHistoryStore, workspacePreferencesStore, dispatchPresetsStore, freeTierStore, accountStore = null, provider: injectedProvider = null, rejectedCredentialRegistry = null, observerStateStore, flightCompanionChatClient = undefined, flightCompanionCreateToolCatalog = undefined, savedChatStore = null, workspaceHaltStore = null, workspaceOwnerCheck = null, modelRoutingStore = null, livenessAlarmStore = null, onTicketWrite = null, recordPipelineMerge = null, consumerHeartbeatStore = null, requestUsageStore = null, requestUsageLoader = null, leftoverStep = null }) {
+export function createProxyRoutes({ proxyTokenStore, proxyEventStore, agentStatusStore, recapCacheStore, briefCacheStore, taskSnapshotStore, dispatchQueueStore, dispatchTokenStore = null, closeOutEventsStore = null, llmCallLogStore, taskDecisionsStore = null, shelvedRulingsStore = null, dismissalSuggestionsStore = null, harbourCommentsStore = null, sessionsFeedCache = null, workspaceFromUrl, resolveWorkspaceAccess, getWorkspaceOpenRouterKey, getWorkspaceNorthStar, getNorthStarDocVersionForWorkspace = null, reportHistoryStore, workspacePreferencesStore, dispatchPresetsStore, freeTierStore, accountStore = null, provider: injectedProvider = null, rejectedCredentialRegistry = null, observerStateStore, flightCompanionChatClient = undefined, flightCompanionCreateToolCatalog = undefined, savedChatStore = null, workspaceHaltStore = null, workspaceOwnerCheck = null, modelRoutingStore = null, livenessAlarmStore = null, onTicketWrite = null, recordPipelineMerge = null, consumerHeartbeatStore = null, requestUsageStore = null, requestUsageLoader = null, leftoverStep = null, recordsStore = null, listRecordPeople = undefined }) {
   const router = Router();
 
   /**
@@ -603,6 +607,9 @@ export function createProxyRoutes({ proxyTokenStore, proxyEventStore, agentStatu
       // LIN-4468: the stage's write allowance and its one ticket (null when unstamped, unrestricted).
       req.proxyWrites = result.writes ?? null;
       req.proxyWritesTarget = result.writesTarget ?? null;
+      // LIN-4492/LIN-4493: who minted the credential and the run it carries (copied once at the exchange).
+      req.proxyOrigin = result.origin ?? null;
+      req.proxyRunRecordId = result.runRecordId ?? null;
       next();
     } catch (err) {
       // LIN-3699: reachable now that the store rethrows a failure instead of
@@ -1354,6 +1361,16 @@ export function createProxyRoutes({ proxyTokenStore, proxyEventStore, agentStatu
   router.use(createReadRoutes({ proxyLimiter, authenticateProxyToken, resolveProviderAccess, denyIfUnsupported, logEvent, workspaceUnavailable, graphqlErrorStatus, proxyEventStore, consumerHeartbeatStore }));
 
   // Group E writes (LIN-679 Stage 3b / LIN-2537): extracted to
+  // LIN-4493: the records routes (routes/proxy-records.js). The tracker read for a ticket id is the same
+  // provider read the proxy's issue route makes, under the same access resolution.
+  const readRecordsTicket = async (req, ref) => {
+    const access = await resolveProviderAccess(req.proxyUrlKey, req.proxyCreatedBy, req);
+    if (!access?.token || !access?.provider) throw new Error(`tracker unavailable: ${access?.reason || 'no access'}`);
+    const issue = await access.provider.issueDetail(access.token, ref);
+    return issue ? flattenRecordsIssue(issue) : null;
+  };
+  router.use(createProxyRecordsRoutes({ recordsStore, proxyLimiter, authenticateProxyToken, requireWriteScope, logEvent, readTicket: readRecordsTicket, askedText, stageKinds: Object.keys(STAGE_KINDS), listPeople: listRecordPeople }));
+
   // routes/proxy-writes.js, mounted at its original position.
   router.use(createProxyWriteRoutes({ onTicketWrite, recordPipelineMerge, proxyLimiter, commentDedupe, commentDedupeGenerations, authenticateProxyToken, requireWriteScope, resolveProviderAccess, denyIfUnsupported, denyIfMissingRead, workspaceUnavailable, graphqlErrorStatus, writeRejected, resolveTeamInput, resolveStateInput, resolveProjectInput, resolveLabelInput, refResolutionFailed, partialWriteFailed, logEvent, harbourCommentsStore }));
 
