@@ -1,6 +1,6 @@
 # The layer: design
 
-*Approved by John on 18 Nov after walk 7. Revised the same day: the integration work found that its path matching (task, area, lesson and run paths, and the brief parts built on them) works only on a codebase laid out like Harbour's (`integration/checks/repo-assumptions.md`). Removed, not patched. Walk 8 tested the revision; after it (19 Nov), `blind`, `check`, `same-as`, the lesson's `checked-at` and the `approve-with-notes` outcome were removed, and the plan goes in full only to the actor it is addressed to (`walks/8/results.md`). Later on 19 Nov, with John: no hand-kept actor list; the product supplies its readers (§3.2). John: "removal is the process"; his approval means "this design looks good to me, and we can proceed", not that it is set in stone.*
+*Approved by John on 18 Nov after walk 7. Revised the same day: the integration work found that its path matching (task, area, lesson and run paths, and the brief parts built on them) works only on a codebase laid out like Harbour's (`integration/checks/repo-assumptions.md`). Removed, not patched. Walk 8 tested the revision; after it (19 Nov), `blind`, `check`, `same-as`, the lesson's `checked-at` and the `approve-with-notes` outcome were removed, and the plan goes in full only to the actor it is addressed to (`walks/8/results.md`). Later on 19 Nov, with John: no hand-kept actor list; the product supplies its readers (§3.2). The API review added two clarifications: any end may name what took over, and links only add (`integration/checks/api-review.md`). John: "removal is the process"; his approval means "this design looks good to me, and we can proceed", not that it is set in stone.*
 
 *Started 17 Nov at John's request (log, "17 Nov"). Revised in place each round; git keeps its history, the log keeps why, and each walk's results live in `walks/`. Marks are as on `situation.md`: [checked], [reported], [my reading], [guess]; "[checked wording]" means the words were checked, not the claim. Lines with no mark are design, mine until John corrects it.*
 
@@ -54,7 +54,7 @@ John: "a small minimal MVP, and we take it for a walk and see a) if it's better 
 | `at` | When each version was written |
 | `state` | The kind's starting state or one of its ends, with a `reason`. `handed-on` and `superseded` name the record that takes over |
 | `to` | Who must act on it next: an actor, a task record, or `project` (whoever works in this project next). Required on the hand-off kinds (finding, question); optional on every other kind |
-| `links` | `about` (its subjects), `on` (the exact versions it rests on, `id@v`; required on a verdict), `answers` (a decision to its question), `piece` (a task to its plan piece). Each type holds a list, except `answers` and `piece`, which hold one |
+| `links` | `about` (its subjects), `on` (the exact versions it rests on, `id@v`; required on a verdict), `answers` (a decision to its question), `piece` (a task to its plan piece). Each type holds a list, except `answers` and `piece`, which hold one. Links only add: a revise that names links adds them |
 | versions | Every write (add, revise, end, link) is a new version with its `by`, `at` and, for a revise, its `reason`; earlier versions are kept. Any record can be read as of a time, or at a version. Any record may be revised except a task's `asked` |
 
 ### 3.2 Kinds and actors
@@ -85,7 +85,7 @@ Only shape, so a malformed record can't enter:
 - the kind is declared; every field belongs to it and has its type; a verdict's outcome is in its set; a task's `asked` doesn't change once written;
 - `by`, unless the product fills it, is an actor; a `to`, where present, is an actor, a task record or `project`, and the hand-off kinds (finding, question) must have one. A miss is refused with the names that would work;
 - `in`, where present, is a task; every link resolves; a verdict has an `on`; `answers` and `piece` join the kinds named above;
-- a state change goes to one of the kind's ends with a reason; `handed-on` and `superseded` name the record that takes over.
+- a state change goes to one of the kind's ends with a reason; `handed-on` and `superseded` name the record that takes over, and any other end may (a question `answered` into its decision).
 
 ### 3.4 Views, computed when read
 

@@ -34,6 +34,11 @@
   - reads: `GET /records/:id[@v]`, `GET /records?…&asOf=` (find, with count) and `GET /tasks/:id/records` (show).
 
   A refused shape returns 422 with the reason. simple-dispatcher forwards any `/api/proxy/*` path, so it needs no change (break-read, "Checked and held") [checked].
+- **The body, for agents** (`checks/api-review.md`). Input encoding only; the store holds what the layer's §3 says.
+  - A write is flat JSON: `{"kind":"finding","in":"LIN-4451","to":"review","says":"…","how":"…","about":"change-5","run":"<id>"}`. Links may sit beside the fields or under `links`, as one id or a list. `in` and `to` take task ids or ticket ids.
+  - `on` takes a bare id, pinned to that record's current version; a change is pinned to the head its judge read (§4).
+  - Ending a record already in that end returns it unchanged.
+  - A refusal (422) names every problem in one response, each with what would work: the kind's fields, or which kind a field belongs to; the valid outcomes or ends; the `to` names.
 - **Open to every token that may write.** The record routes add no per-stage allowance: any actor may write any kind, as §3.2 says. Today's restricted stamps keep limiting ticket writes, as they do now (C5-C06).
 - **Who wrote it is bookkeeping in code.**
   - Every place that makes a dispatch row with a prompt allocates the row's id before the prompt is finalised. Today the id is made inside `addItem` (`lib/dispatch-store.js:755`), after the prompt (`lib/dispatch-factory.js:14-20`) [checked]. The places are the dispatch factory and the wake builder (`lib/dispatch-wake.js:85-102`, `lib/wake-credential.js`) [checked].
