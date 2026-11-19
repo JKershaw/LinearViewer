@@ -1,7 +1,8 @@
 /**
- * LIN-4493 (piece 2): the records routes over HTTP, in process. The router (routes/proxy-records.js) is mounted on
- * an Express app behind a stand-in credential middleware that sets the same request fields authenticateProxyToken
- * sets (proxyOrigin, proxyRunRecordId, proxyCreatedBy, proxyWrites, proxyTokenScope). The stage write gate
+ * LIN-4493 (piece 2): the records routes over HTTP, in process. The router (routes/proxy-records.js) is mounted by
+ * tests/helpers/records-route-harness.js, behind a stand-in credential middleware that sets the same request fields
+ * authenticateProxyToken sets (proxyOrigin, proxyRunRecordId, proxyCreatedBy, proxyWrites, proxyTokenScope) from the
+ * bearer token's name. The stage write gate
  * (lib/stage-write-gate.js) is the real one, and the store is the real store on a MangoDB engine.
  *
  * Witnesses (the piece's own list): a stage credential writes, reads and ends through the proxy, filed by its run;
@@ -25,7 +26,6 @@ const harness = createMangoTmpdir('lin-4493-routes-');
 let rh;
 let db;
 let store;
-let base;
 let tokens;
 let tickets;
 let people;
@@ -34,9 +34,9 @@ let calls;
 before(() => harness.connect());
 after(() => harness.close());
 
-/** The stand-in for authenticateProxyToken: it sets the fields the real one sets, from `tokens[name]`. */
+/** The stand-in for authenticateProxyToken: it sets the fields the real one sets, from `tokens[name]` (the bearer token is the name). */
 function credential(req, res, next) {
-  const name = req.get('x-test-token');
+  const name = (req.get('authorization') || '').replace(/^Bearer /, '');
   const t = tokens[name];
   if (!t) return res.status(401).json({ error: 'Invalid, expired, or consumed token' });
   req.proxyUrlKey = URL_KEY;
@@ -69,7 +69,6 @@ beforeEach(async () => {
   });
   store = rh.store;
   db = rh.db;
-  base = rh.base;
   tokens = {
     john: { origin: 'person', createdBy: 'acc-john', writes: null },
     impl: { origin: 'dispatch', runRecordId: 'row-impl', writes: 'implementation' },
@@ -90,17 +89,8 @@ afterEach(async () => {
   rh = null;
 });
 
-async function call(method, path, token, body) {
-  const headers = { 'x-test-token': token };
-  if (body !== undefined) headers['content-type'] = 'application/json';
-  const res = await fetch(base + path, { method, headers, body: body === undefined ? undefined : JSON.stringify(body) });
-  const text = await res.text();
-  let json = null;
-  try { json = JSON.parse(text); } catch { json = text; }
-  return { status: res.status, body: json };
-}
-const post = (path, token, body) => call('POST', path, token, body);
-const get = (path, token) => call('GET', path, token);
+const post = (path, token, body) => rh.post(path, token, body);
+const get = (path, token) => rh.get(path, token);
 
 describe('a stage credential writes, reads and ends through the proxy, filed by its run', () => {
   test('a finding names its run and is filed as the run\'s stage, not as a person', async () => {
