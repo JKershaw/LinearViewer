@@ -17,6 +17,7 @@
 import { createHash } from 'node:crypto';
 import { Router } from 'express';
 import { isValidIssueId } from '../lib/workspace.js';
+import { taskPageHref } from '../lib/task-page-href.js';
 import { jsonError } from '../lib/errors.js';
 import { createRecordWrites } from '../lib/records/writes.js';
 import { ADDABLE, SUPERSEDABLE } from '../lib/render-task-records.js';
@@ -60,7 +61,7 @@ export function createTaskRecordsRoutes({ workspaceFromUrl, recordsStore, accoun
     listPeople,
   });
 
-  const backTo = (urlKey, identifier, query = '') => `/workspace/${encodeURIComponent(urlKey)}/task/${encodeURIComponent(identifier)}${query}#task-records`;
+  const backTo = (urlKey, identifier, query = '') => `${taskPageHref({ urlKey, identifier })}${query}#task-records`;
   const refusedTo = (urlKey, identifier, problems) => backTo(urlKey, identifier, `?records_refused=${encodeURIComponent(problems[0]?.message || 'refused').slice(0, 300)}`);
 
   /** Owner or member only: a signed-in session with a person to write as. Anything else is a 403, never a write. */
