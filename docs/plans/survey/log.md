@@ -4584,3 +4584,19 @@ Option (a): the reader's removal goes into the slice 2 draft. It's recorded in `
   - LIN-2422 db3ff324
 - **Then:** a reminder in 25 minutes reads their outcomes and marks LIN-4495 Done when all six are terminal. If the gate refuses, I record why. Verdicts on the paused lanes (LIN-4463, LIN-4441) wait for John.
 - **Left for John:** the signed-in task-page and log check (finding-0cc5a636) needs a signed-in page and server logs, so it stays a morning follow-up. The `isEmptyStatement` defect (finding-76683071) stays on the carry list.
+
+### 19 Nov, 22:32: John approves running on overnight, slice by slice
+
+The hourly check-in (trig_01XCTpQoZb2V1vqMFvzXKStm) is now a drive. When a slice lands, it:
+1. takes the after readings (brief size from the next slice's live stages, without regenerating);
+2. drafts the next slice from `tickets.md`, the carry list and what the slice left;
+3. has a fresh subagent check the draft against the designs at 92838c5cf;
+4. files it under LIN-4490;
+5. launches an autopilot with slice 1's goal lines.
+
+**Limits:**
+- It stops at the end of slice 4. The parked work waits for John.
+- It never steers by hand, merges, reverts, or dispatches the parked work.
+- It stops for John on: a ruling for him, a broken main, a skipped stage, a retired route kept alive, the safety tasks moving, or work outside the design.
+
+**Change from the earlier agreement:** each slice was to be drafted for John to correct before filing. Tonight, John's go-ahead replaces that review.
