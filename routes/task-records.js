@@ -11,11 +11,15 @@
  * answers 303 back to the task page's Records section, and a refusal carries its first problem in `records_refused`.
  * A guest has no session account and gets no route (the guest route is /t/:token, which never reaches here).
  *
+ * The first write on a ticket with no task record makes that task here, through the pipeline's `ensureTickets` (a page
+ * GET never does): the body names the ticket, the pipeline reads it through the session's own tracker binding
+ * (`readSessionTicket`) and makes its task, and the record is filed under it. A second write finds that task.
+ *
  * Supersede is two writes: the new record, then the end of the old one into it. The new record's id is derived from the
  * old one's, so a retry after a failed end finds the record it already made and does not make a second.
  */
 import { Router } from 'express';
-import { isValidIssueId } from '../lib/workspace.js';
+import { isValidIssueId, resolveIssueBinding } from '../lib/workspace.js';
 import { taskPageHref } from '../lib/task-page-href.js';
 import { jsonError } from '../lib/errors.js';
 import { createRecordWrites } from '../lib/records/writes.js';
@@ -41,18 +45,32 @@ export async function personWriterOf(req, accountStore) {
 const trimmed = (x) => (typeof x === 'string' ? x.trim() : '');
 
 /**
+ * The tracker read for a session write (the ticket's identifier, title, description, state and parent), through the
+ * workspace's own active binding, the same one the task page reads its ticket through (routes/task-page.js). A read
+ * that fails throws, and the pipeline names the ticket as unreadable: nothing is guessed at.
+ */
+export async function readSessionTicket(req, ref) {
+  const { provider, callScope } = resolveIssueBinding(req.workspace, null);
+  const context = await provider.fetchRecommendationContext(callScope, ref, { noDescend: true });
+  return context?.issue ?? null;
+}
+
+/**
  * @param {Object} deps
  * @param {Function} deps.workspaceFromUrl - the workspace middleware (lib/workspace.js)
  * @param {import('../lib/records-store.js').RecordsStore} deps.recordsStore
  * @param {{resolveCanonicalAccountId: Function}} [deps.accountStore]
  * @param {(urlKey: string) => Promise<{accountId: string, name: string}[]>} [deps.listPeople]
+ * @param {(req: object, ref: string) => Promise<object|null>} [deps.readTicket] - the tracker read a ticket's first write
+ *   needs; the session's own binding (`readSessionTicket`) when omitted
  */
-export function createTaskRecordsRoutes({ workspaceFromUrl, recordsStore, accountStore = null, listPeople = async () => [] }) {
+export function createTaskRecordsRoutes({ workspaceFromUrl, recordsStore, accountStore = null, listPeople = async () => [], readTicket = readSessionTicket }) {
   if (!recordsStore) throw new Error('task records routes: recordsStore is required');
   const router = Router();
   const writes = createRecordWrites({
     recordsStore,
     isTerminalState,
+    readTicket,
     askedText: () => '',
     stageKinds: Object.keys(STAGE_KINDS),
     listPeople,
@@ -75,13 +93,12 @@ export function createTaskRecordsRoutes({ workspaceFromUrl, recordsStore, accoun
     const writer = await writerOrRefuse(req, res);
     if (!writer) return undefined;
     try {
-      const taskId = await recordsStore.taskForTicket(urlKey, identifier);
-      if (!taskId) return res.redirect(303, backTo(urlKey, identifier, '?records_refused=This+task+has+no+records+yet'));
       const kind = trimmed(req.body?.kind);
       const field = ADDABLE[kind];
       if (!field) return res.redirect(303, refusedTo(urlKey, identifier, [{ message: 'a record on a task is a finding or a question' }]));
-      const input = { in: taskId, [field]: trimmed(req.body?.text), ...(trimmed(req.body?.to) ? { to: trimmed(req.body.to) } : {}) };
-      const result = await writes.add({ urlKey, kind, input, by: writer.by, run: writer.run });
+      // `in` names the ticket: the pipeline makes its task on the first write, or finds the one it has.
+      const input = { in: identifier, [field]: trimmed(req.body?.text), ...(trimmed(req.body?.to) ? { to: trimmed(req.body.to) } : {}) };
+      const result = await writes.add({ ctx: req, urlKey, kind, input, by: writer.by, run: writer.run });
       if (result.problems) return res.redirect(303, refusedTo(urlKey, identifier, result.problems));
       return res.redirect(303, backTo(urlKey, identifier));
     } catch (err) {
@@ -97,10 +114,8 @@ export function createTaskRecordsRoutes({ workspaceFromUrl, recordsStore, accoun
     const writer = await writerOrRefuse(req, res);
     if (!writer) return undefined;
     try {
-      const taskId = await recordsStore.taskForTicket(urlKey, identifier);
-      if (!taskId) return res.redirect(303, backTo(urlKey, identifier, '?records_refused=This+task+has+no+records+yet'));
       const doneWhen = trimmed(req.body?.['done-when']);
-      const result = await writes.add({ urlKey, kind: 'task', input: { in: taskId, 'done-when': doneWhen }, by: writer.by, run: writer.run });
+      const result = await writes.add({ ctx: req, urlKey, kind: 'task', input: { in: identifier, 'done-when': doneWhen }, by: writer.by, run: writer.run });
       if (result.problems) return res.redirect(303, refusedTo(urlKey, identifier, result.problems));
       return res.redirect(303, backTo(urlKey, identifier));
     } catch (err) {

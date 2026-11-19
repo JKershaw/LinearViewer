@@ -62,6 +62,7 @@ export { isTerminalLoop, sessionIsTerminal, enrichLoop };
 import { createSessionsFeedCache } from '../lib/sessions-feed-cache.js';
 import { createTaskDoneCache } from '../lib/task-done-cache.js';
 import { requestFeatureFlags } from '../lib/run-controls.js';
+import { runRecordIdFor } from '../lib/run-identity.js';
 import { collectAgentTokenIds, foldCredentialIndex } from '../lib/credential-state.js';
 import { findAnchorLoop } from '../lib/session-summary.js';
 import { NON_SESSION_TARGETS } from '../lib/dispatch-targets.js';
@@ -251,14 +252,23 @@ function resolveDeps(deps) {
  * @returns {Router}
  */
 /**
- * LIN-4494: the account of the session's latest ended run, from the records store. Reads the run records named by the
- * session's loops (a loop's id is its dispatch row's id, and a stage row starts its own run under that id).
+ * LIN-4494: the account of the session's latest ended run, from the records store. Mapped session -> row -> run: each
+ * loop's id is its dispatch row's id, and the row names its run (lib/run-identity.js `runRecordIdFor`): a row that starts
+ * a run is its own run, and a follow-up or wake row belongs to the run it resumes (its `runRecordId`). A session made only
+ * of follow-up rows therefore reads the run those rows carry on, not nothing.
+ * @param {object} recordsStore
+ * @param {(urlKey: string, id: string) => Promise<object|null>} readRow - the dispatch history row by id (its `_id`, `kind`
+ *   and `runRecordId`), as lib/dispatch-store.js `rowForRunRecords` reads it
  * @returns {Promise<string|null>}
  */
-export async function readRunAccount(recordsStore, urlKey, session) {
-  const ids = [...new Set((Array.isArray(session?.loops) ? session.loops : []).map((l) => l?.loopId).filter(Boolean))];
-  if (!ids.length) return null;
-  const versions = await recordsStore.versionsOf(urlKey, ids);
+export async function readRunAccount(recordsStore, readRow, urlKey, session) {
+  if (!recordsStore || typeof readRow !== 'function') return null;
+  const loopIds = [...new Set((Array.isArray(session?.loops) ? session.loops : []).map((l) => l?.loopId).filter(Boolean))];
+  if (!loopIds.length) return null;
+  const rows = await Promise.all(loopIds.map((id) => readRow(urlKey, id).catch(() => null)));
+  const runIds = [...new Set(rows.filter(Boolean).map((row) => runRecordIdFor({ kind: row.kind ?? null, id: String(row._id), resumedRunRecordId: row.runRecordId ?? null })).filter(Boolean))];
+  if (!runIds.length) return null;
+  const versions = await recordsStore.versionsOf(urlKey, runIds);
   const latest = versions
     .filter((v) => v.kind === 'run' && v.state !== 'open' && typeof v.fields?.account === 'string' && v.fields.account)
     .sort((a, b) => (a.at < b.at ? 1 : a.at > b.at ? -1 : 0))[0];
@@ -469,7 +479,7 @@ export function createDashboardRoutes(deps) {
 
       // LIN-4494: the run's account (its final assistant text, lib/run-records.js), read from the run records of this
       // session's own rows. A follow-up row's run is the run it resumes, which this read does not follow: no account then.
-      const runAccount = recordsStore ? await readRunAccount(recordsStore, workspace.urlKey, session) : null;
+      const runAccount = recordsStore ? await readRunAccount(recordsStore, (urlKey, id) => dispatchQueueStore.rowForRunRecords(urlKey, id), workspace.urlKey, session) : null;
       const html = renderSessionPage(
         { session, sessionId, issueContext, waiting, waitingMessage, producerLoopId, decision, decisionCase, decisions: sessionDecisions, producer, urlKey: workspace.urlKey, canReply, sessionTerminal, credentialByToken, anchorIssueTitle, runView, proposals, runEvidence, runParagraph, runAccount },
         pageOptions

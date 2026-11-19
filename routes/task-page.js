@@ -122,14 +122,14 @@ export function createTaskPageRoutes({ workspaceFromUrl, getOpenRouterSource, ge
     return status === 'owner' ? 'owner' : 'member';
   };
 
-  // LIN-4494: the Records section for a signed-in owner or member. Stored facts only: the page never makes a task (a ticket
-  // with no task record has no records, and its section offers no forms until one exists). A guest never reaches this
-  // (the guest route is /t/:token and passes no records).
+  // LIN-4494: the Records section for a signed-in owner or member. Stored facts only: the page GET never makes a task. A
+  // ticket with no task record has no records, but its forms are offered: the first write on it makes the task, through
+  // the checked POST (routes/task-records.js). A guest never reaches this (the guest route is /t/:token and passes no records).
   const recordsOf = async (req, urlKey, identifier) => {
     if (!recordsStore || !req.session?.accountId) return null;
     const taskId = await recordsStore.taskForTicket(urlKey, identifier);
     const views = taskId ? await recordsStore.viewsOf(urlKey, await recordsStore.find(urlKey, { inRef: taskId })) : [];
-    return { views, canAct: taskId !== null, refused: queryValue(req.query.records_refused) || null };
+    return { views, canAct: true, refused: queryValue(req.query.records_refused) || null };
   };
 
   router.get('/workspace/:urlKey/task/:identifier', workspaceFromUrl, async (req, res) => {

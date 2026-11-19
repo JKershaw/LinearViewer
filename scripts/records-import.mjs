@@ -108,6 +108,7 @@ async function main() {
       console.log(`\nParked-ticket manifest (${manifestPath})`);
       console.log(`records: ${manifestReport.created} created, ${manifestReport.existing} already there, ${manifestReport.wouldCreate} to create, ${manifestReport.refused.length} refused`);
       for (const r of manifestReport.refused) console.log(`  refused ${r.id}: ${r.problems.map((p) => p.message).join('; ')}`);
+      for (const c of manifestReport.conflicts) console.log(`  conflict ${c.ticket}: already claimed for ${c.claimedBy}; ${c.skipped} manifest item(s) skipped, not written under ${c.wanted}`);
     }
   } finally {
     if (dbClient.close) await dbClient.close();

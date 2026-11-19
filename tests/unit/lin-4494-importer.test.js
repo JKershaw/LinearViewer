@@ -175,4 +175,26 @@ describe('the parked-ticket manifest', () => {
     assert.equal(await store.taskForTicket(URL_KEY, 'LIN-4416'), null, 'no record under the other id, so no claim is read as held');
     assert.equal(await store.claimTicket(URL_KEY, 'LIN-4416', ticketTaskIdOf('LIN-4416')), 'task-other0001');
   });
+
+  test('a ticket claimed for another task is named as a conflict and its items are skipped, with no orphan written; a dry run reports the same', async () => {
+    // A task already holds LIN-4416's claim (LIN-4494 review: the manifest must not hang findings under an unreachable task).
+    await store.claimTicket(URL_KEY, 'LIN-4416', 'task-other0001');
+    const manifest = {
+      tickets: [
+        { ticket: 'LIN-4416', title: 'claimed elsewhere', findings: [{ says: 'a hand-off for 4416', to: 'project' }] },
+        { ticket: 'LIN-4210', title: 'free', findings: [{ says: 'a hand-off for 4210', to: 'project' }] },
+      ],
+    };
+    const dry = await applyManifest({ writes, recordsStore: store, urlKey: URL_KEY, apply: false, manifest });
+    assert.deepEqual(dry.conflicts.map((c) => [c.ticket, c.claimedBy, c.skipped]), [['LIN-4416', 'task-other0001', 2]]);
+    assert.equal((await store.find(URL_KEY, {})).length, 0, 'the dry run writes nothing');
+
+    const report = await applyManifest({ writes, recordsStore: store, urlKey: URL_KEY, apply: true, manifest });
+    assert.equal(report.conflicts.length, 1);
+    assert.equal(report.refused.length, 0);
+    assert.equal(await store.current(URL_KEY, ticketTaskIdOf('LIN-4416')), null, 'no task made for the claimed ticket');
+    assert.equal((await store.find(URL_KEY, { inRef: ticketTaskIdOf('LIN-4416') })).length, 0, 'no orphan finding under it');
+    assert.equal(await store.taskForTicket(URL_KEY, 'LIN-4210'), ticketTaskIdOf('LIN-4210'), 'the other ticket is written as usual');
+    assert.equal((await store.find(URL_KEY, { inRef: ticketTaskIdOf('LIN-4210') })).length, 1);
+  });
 });

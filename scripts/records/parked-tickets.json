@@ -93,6 +93,12 @@
           "how": "Make PATCH refuse a non-UUID parentId as create does. No ticket is cited in the comment.",
           "to": "project",
           "source": "comment 3fb9098b (LIN-4451 piece 2)"
+        },
+        {
+          "says": "The PUT fallback for the harbour.asAsked property is still open: it is built only if the live check shows Jira drops the property on the confirmation re-read, and it waits on property-1.json from that check.",
+          "how": "Build the PUT fallback only on a dropped or changed property in the live check's evidence; the guard in createIssue already refuses the create. Trigger named in the LIN-4452 leftovers comment.",
+          "to": "project",
+          "source": "comment b92a0030 (LIN-4452 leftovers, 'Still open')"
         }
       ],
       "notes": "Ruling d1459aad (epic placement and the 409 gate are required) is answered and folded into the live-check finding, not listed separately. The Waiting entries in docs/areas/providers.md (D1 vocabulary, holds-verbatim capability) are left out as area-note homes. The description's Done-when is checked only by the live run. Hand-offs to John are addressed to project with \"For John:\" in their words: a person is addressed by account id, and this manifest holds none. Hand-offs to John are addressed to project with \"For John:\" in their words: a person is addressed by account id, and this manifest holds none."

@@ -102,7 +102,7 @@ import { createOnTicketWrite } from './lib/ticket-close-closer.js'
 import { ShelvedRulingsStore } from './lib/shelved-rulings-store.js'
 import { RecordsStore, RECORDS_COLLECTION, REFS_COLLECTION, QUERY_LOG_COLLECTION } from './lib/records-store.js'
 import { createRunRecords } from './lib/run-records.js'
-import { createListWorkspacePeople } from './lib/workspace-people.js'
+import { createListWorkspacePeople, storedNameOf } from './lib/workspace-people.js'
 import { createTaskRecordsRoutes } from './routes/task-records.js'
 import { createProjectPageRoutes } from './routes/project-page.js'
 import { DismissalSuggestionsStore } from './lib/dismissal-suggestions-store.js'
@@ -3514,6 +3514,21 @@ async function resolveTeamSelection(req, workspace) {
   return { teamId };
 }
 
+// LIN-4494: the workspace's people (lib/workspace-people.js), read by the signed-in person's canonical account. Used by
+// resolveAssigneeSelection's `me` name; a failed read is logged and falls through to the provider's viewer.
+const listWorkspacePeople = createListWorkspacePeople({ workspaceStore, accountStore, accountWorkspaceStore })
+async function storedPersonNameOf(req) {
+  try {
+    return await storedNameOf({ accountId: req.session.accountId, urlKey: req.workspace.urlKey }, {
+      listPeople: listWorkspacePeople,
+      canonicalAccountId: (accountId) => accountStore.resolveCanonicalAccountId(accountId),
+    });
+  } catch (err) {
+    console.error('workspace people read failed resolving ?assignee=me:', err?.message || err);
+    return null;
+  }
+}
+
 /**
  * Resolve the assignee filter for a workspace-scoped request (LIN-2526).
  *
@@ -3547,6 +3562,12 @@ async function resolveAssigneeSelection(req, provider, scope) {
   if (rawAssignee === 'me') {
     if (!provider.supports('viewer')) {
       return { selectedAssignee: 'all', resolvedAssigneeName: null };
+    }
+    // LIN-4494: the signed-in person's name as the workspace shows it (lib/workspace-people.js) comes before the provider's
+    // viewer, so Home and the other filtered pages read one name. An account with no stored name falls through to the viewer.
+    if (req.session?.accountId) {
+      const stored = await storedPersonNameOf(req);
+      if (stored) return { selectedAssignee: 'me', resolvedAssigneeName: stored };
     }
     try {
       const viewer = await provider.viewer(scope);

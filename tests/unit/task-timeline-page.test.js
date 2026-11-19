@@ -317,3 +317,63 @@ describe('the guest: no dollars in any of the three responses', () => {
     }
   });
 });
+
+// LIN-4494 (the guest witness, LIN-4491 review): a real record on the shared ticket, in a real store, reaches none of the
+// guest's three responses. The store is seeded and read back first, so the absence below is not a missing record.
+describe('the guest: a real record on the shared ticket reaches none of the three responses (LIN-4494)', () => {
+  const harness = createMangoTmpdir('lin-4494-guest-');
+  before(() => harness.connect());
+  after(() => harness.close());
+
+  const WORDS_ON_RECORD = 'GUEST-MUST-NOT-SEE this finding about the footer';
+  const shareRecord = { _id: 'share-records', tokenHash: 'hash', urlKey: 'acme', workspaceId: 'ws-1', ownerAccountId: 'acct-1', issueIdentifier: 'LIN-50', issueId: ISSUE_UUID, source: 'linear', createdAt: NOW, revokedAt: null };
+
+  test('the store holds the record; /t/:token, /t/:token/state and /t/:token/timeline carry none of its words', async () => {
+    const db = harness.freshDb();
+    const { RecordsStore, RECORDS_COLLECTION, REFS_COLLECTION, QUERY_LOG_COLLECTION } = await import('../../lib/records-store.js');
+    const { INDEX_SPECS } = await import('../../lib/db-indexes.js');
+    for (const collection of [RECORDS_COLLECTION, REFS_COLLECTION]) {
+      for (const spec of INDEX_SPECS.filter((x) => x.collection === collection && x.options?.unique)) await db.collection(collection).createIndex(spec.keySpec, spec.options);
+    }
+    const records = new RecordsStore({ records: db.collection(RECORDS_COLLECTION), refs: db.collection(REFS_COLLECTION), queryLog: db.collection(QUERY_LOG_COLLECTION) });
+    const task = await records.ensureTask('acme', { identifier: 'LIN-50', asked: 'Build the task page', closed: false, closedReason: null }, { by: 'person:acct-1' });
+    await records.add('acme', { kind: 'finding', state: 'open', fields: { says: WORDS_ON_RECORD, how: 'a test' }, links: {}, in: task.id, to: 'project' }, { by: 'implementation' });
+    const seeded = await records.viewsOf('acme', await records.find('acme', { inRef: task.id }));
+    assert.equal(seeded.length, 1, 'the record is really there');
+
+    const pageModel = {
+      identifier: 'LIN-50', title: 'Build the task page', issueId: ISSUE_UUID, tracker: null, status: 'done', sentence: 'Merged.',
+      live: false, sessions: [], stages: [], brief: null, recap: null, evidence: null, details: null, timeline: pricedTimeline(),
+    };
+    const loader = {
+      async loadTaskPage() { return { model: pageModel, taskState: null }; },
+      async loadTaskState() { return { model: { ...pageModel, timeline: undefined }, taskState: { state: 'done' }, incomplete: null }; },
+    };
+    const timelineFragment = createTimelineFragmentReader({ loadTaskState: (a) => loader.loadTaskState(a), readTaskTimeline: async () => pricedTimeline(), now: () => NOW });
+    const app = express();
+    app.use(createTaskShareRoutes({
+      taskShareStore: { async getByToken() { return shareRecord; } },
+      loader,
+      workspaceFromUrl: (req, res, next) => next(),
+      workspaceOwnerCheck: async () => ({ status: 'owner' }),
+      guestAccess: async () => ({ provider: {}, callScope: 'tok' }),
+      now: () => NOW,
+      timelineFragment,
+    }));
+    const server = await new Promise((resolve) => { const s = app.listen(0, '127.0.0.1', () => resolve(s)); });
+    const base = `http://127.0.0.1:${server.address().port}`;
+    try {
+      const page = await (await fetch(`${base}/t/${TOKEN}`)).text();
+      const state = await (await fetch(`${base}/t/${TOKEN}/state`)).text();
+      const timeline = await (await fetch(`${base}/t/${TOKEN}/timeline`)).text();
+      assert.match(page, /Sessions on one clock/, 'the guest page did render');
+      assert.equal(page.includes('GUEST-MUST-NOT-SEE'), false, '/t/:token');
+      assert.equal(state.includes('GUEST-MUST-NOT-SEE'), false, '/t/:token/state');
+      assert.equal(timeline.includes('GUEST-MUST-NOT-SEE'), false, '/t/:token/timeline');
+      assert.doesNotMatch(page, /data-testid="task-records"/);
+    } finally {
+      server.closeAllConnections();
+      await new Promise((r) => server.close(r));
+    }
+  });
+});

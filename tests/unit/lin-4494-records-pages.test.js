@@ -21,10 +21,15 @@ import { renderTaskPage } from '../../lib/render-task-page.js';
 import { renderWaitingSection } from '../../lib/waiting-section.js';
 import { createWaitingStanding } from '../../lib/home-row-states.js';
 import { renderRunAccount } from '../../lib/render-session.js';
-import { readRunAccount } from '../../routes/dashboard.js';
+import { readRunAccount, createDashboardRoutes as createDashboardRoutesUnplumbed } from '../../routes/dashboard.js';
+import { withDefaults, NO_REQUEST_RECORDS } from '../fixtures/request-usage-loader.js';
+import { InMemoryRunSummaryCacheStore } from '../../lib/run-summary-cache.js';
+import { InMemorySessionSummaryCacheStore } from '../../lib/session-summary-cache.js';
 import { renderProjectPage } from '../../lib/render-project-page.js';
+import { createTaskPageRoutes } from '../../routes/task-page.js';
 
 const URL_KEY = 'lin-4494-workspace';
+const createDashboardRoutesUnplumbed_withDefaults = (deps) => withDefaults(createDashboardRoutesUnplumbed, 0, { requestUsageLoader: NO_REQUEST_RECORDS })(deps);
 const ACCOUNT = 'acc-john';
 const TICKET = 'LIN-4460';
 const harness = createMangoTmpdir('lin-4494-pages-');
@@ -74,12 +79,16 @@ async function serve(router) {
   return base;
 }
 
+/** The tracker's words for a ticket, as the session's binding reads them (a stand-in: no tracker is called). */
+const readTicket = async (_ctx, ref) => (ref === 'LIN-NOPE' ? null : { identifier: ref, description: 'The person asked for this.', state: { type: 'started', name: 'In Progress' }, parent: null });
+
 const pagesRoutes = () => {
   const deps = {
     workspaceFromUrl: session,
     recordsStore: store,
     accountStore: { resolveCanonicalAccountId: async (id) => id },
     listPeople: people,
+    readTicket,
   };
   return [
     createTaskRecordsRoutes(deps),
@@ -94,8 +103,8 @@ async function makeTicketTask(ticket = TICKET) {
 }
 
 /** Add a record through the store's own add (the test's fixture, not a writer under test). */
-async function addFinding(says, extra = {}) {
-  return store.add(URL_KEY, { kind: 'finding', state: 'open', fields: { says, how: 'a test' }, links: {}, to: 'project', ...extra }, { by: 'implementation' });
+async function addFinding(says, extra = {}, at = undefined) {
+  return store.add(URL_KEY, { kind: 'finding', state: 'open', fields: { says, how: 'a test' }, links: {}, to: 'project', ...extra }, { by: 'implementation', ...(at ? { at } : {}) });
 }
 
 describe('the task page: the Records section', () => {
@@ -142,6 +151,42 @@ describe('the task page: the Records section', () => {
   });
 });
 
+describe('the task page for a ticket with no task record yet', () => {
+  test('a signed-in member gets the add forms; a page GET makes no task, the first POST does', async () => {
+    const loader = {
+      async loadTaskPage() {
+        return { model: { identifier: TICKET, title: 'Footer', issueId: null, tracker: null, status: 'open', sentence: 'x', live: false, sessions: [], stages: [], brief: null, recap: null, evidence: null, details: null }, taskState: null };
+      },
+    };
+    const app = express();
+    app.use(express.urlencoded({ extended: false }));
+    app.use(createTaskPageRoutes({
+      workspaceFromUrl: session, getOpenRouterSource: () => null, getDeployInfo: () => ({}), loader,
+      workspaceOwnerCheck: async () => ({ status: 'member' }), recordsStore: store, now: () => new Date(),
+    }));
+    app.use(createTaskRecordsRoutes({ workspaceFromUrl: session, recordsStore: store, accountStore: { resolveCanonicalAccountId: async (id) => id }, listPeople: people, readTicket }));
+    server = await new Promise((resolve) => { const s = app.listen(0, '127.0.0.1', () => resolve(s)); });
+    base = `http://127.0.0.1:${server.address().port}`;
+
+    const page = await fetch(`${base}/workspace/${URL_KEY}/task/${TICKET}`);
+    const html = await page.text();
+    assert.equal(page.status, 200, 'the task page renders');
+    assert.match(html, /data-testid="task-record-add-form"/, 'the add form is offered before the task exists');
+    assert.match(html, /data-testid="task-record-child-form"/, 'and the child-task form');
+    assert.equal(await store.taskForTicket(URL_KEY, TICKET), null, 'a page GET makes no task');
+    assert.equal((await store.find(URL_KEY, { kind: 'task' })).length, 0);
+
+    const add = await fetch(`${base}/workspace/${URL_KEY}/task/${TICKET}/records`, {
+      method: 'POST', redirect: 'manual', headers: { 'content-type': 'application/x-www-form-urlencoded' },
+      body: new URLSearchParams({ kind: 'question', text: 'who owns the footer?', to: 'project' }),
+    });
+    assert.equal(add.status, 303);
+    assert.ok(await store.taskForTicket(URL_KEY, TICKET), 'the first write made the ticket task');
+    const after = await (await fetch(`${base}/workspace/${URL_KEY}/task/${TICKET}`)).text();
+    assert.match(after, /who owns the footer\?/, 'the record is on the page after the write');
+  });
+});
+
 describe('the session writes: a signed-in person, filed by their account', () => {
   test('add a finding on the task, end it, add a child task, and refuse what the check refuses', async () => {
     const taskId = await makeTicketTask();
@@ -182,6 +227,57 @@ describe('the session writes: a signed-in person, filed by their account', () =>
     assert.equal(kids[0].fields['done-when'], 'the count is right on Home');
   });
 
+  test('the first write on a ticket with no task record makes exactly one task for it, and its finding under it', async () => {
+    assert.equal(await store.taskForTicket(URL_KEY, TICKET), null, 'no task before the first write');
+    await serve(pagesRoutes()[0]);
+    const add = () => fetch(`${base}/workspace/${URL_KEY}/task/${TICKET}/records`, {
+      method: 'POST', redirect: 'manual', headers: { 'content-type': 'application/x-www-form-urlencoded' },
+      body: new URLSearchParams({ kind: 'finding', text: 'first ever record on this ticket', to: 'project' }),
+    });
+    const res = await add();
+    assert.equal(res.status, 303);
+    assert.doesNotMatch(decodeURIComponent(res.headers.get('location')), /records_refused=/, 'the write is accepted, not refused');
+    const taskId = await store.taskForTicket(URL_KEY, TICKET);
+    assert.ok(taskId, 'the ticket now has its task');
+    const task = await store.current(URL_KEY, taskId);
+    assert.equal(task.fields.ref, TICKET, 'the task is the ticket\'s, by ref');
+    assert.equal((await store.find(URL_KEY, { kind: 'task' })).length, 1, 'exactly one task');
+    const found = await store.find(URL_KEY, { kind: 'finding', inRef: taskId });
+    assert.deepEqual(found.map((f) => f.fields.says), ['first ever record on this ticket']);
+    assert.equal(found[0].by, `person:${ACCOUNT}`);
+    // A second write finds the task it already has: still one task.
+    assert.equal((await add()).status, 303);
+    assert.equal((await store.find(URL_KEY, { kind: 'task' })).length, 1, 'a second write makes no second task');
+  });
+
+  test('the first child task on a ticket with no task record makes the ticket task, then the child under it', async () => {
+    assert.equal(await store.taskForTicket(URL_KEY, TICKET), null);
+    await serve(pagesRoutes()[0]);
+    const res = await fetch(`${base}/workspace/${URL_KEY}/task/${TICKET}/records/child`, {
+      method: 'POST', redirect: 'manual', headers: { 'content-type': 'application/x-www-form-urlencoded' },
+      body: new URLSearchParams({ 'done-when': 'the first child is done' }),
+    });
+    assert.equal(res.status, 303);
+    const taskId = await store.taskForTicket(URL_KEY, TICKET);
+    assert.ok(taskId, 'the ticket task was made for the child');
+    const kids = await store.find(URL_KEY, { kind: 'task', inRef: taskId });
+    assert.equal(kids.length, 1, 'the child task sits under the ticket task');
+    assert.equal(kids[0].fields['done-when'], 'the first child is done');
+    assert.equal((await store.find(URL_KEY, { kind: 'task' })).length, 2, 'the ticket task and its one child');
+  });
+
+  test('a ticket the tracker cannot read is refused by name, and makes no task', async () => {
+    await serve(pagesRoutes()[0]);
+    const res = await fetch(`${base}/workspace/${URL_KEY}/task/LIN-NOPE/records`, {
+      method: 'POST', redirect: 'manual', headers: { 'content-type': 'application/x-www-form-urlencoded' },
+      body: new URLSearchParams({ kind: 'finding', text: 'nobody can read this ticket', to: 'project' }),
+    });
+    assert.equal(res.status, 303);
+    assert.match(decodeURIComponent(res.headers.get('location')), /records_refused=.*LIN-NOPE/, 'the refusal names the ticket');
+    assert.equal(await store.taskForTicket(URL_KEY, 'LIN-NOPE'), null);
+    assert.equal((await store.find(URL_KEY, { kind: 'task' })).length, 0);
+  });
+
   test('supersede ends the old record into a new one, and a retry makes no second record', async () => {
     const taskId = await makeTicketTask();
     const old = await store.add(URL_KEY, { kind: 'lesson', state: 'holds', fields: { says: 'the footer reads the run count' }, links: {}, in: taskId }, { by: 'implementation' });
@@ -213,15 +309,17 @@ describe('the session writes: a signed-in person, filed by their account', () =>
 
 describe('the project page', () => {
   test('numbers the backlog oldest first, and lists only open records addressed to the project', async () => {
-    await addFinding('first, oldest', { });
-    await new Promise((r) => setTimeout(r, 5));
-    await addFinding('second');
+    // Inserted newest-first, with explicit times: the order must come from `at`, not from insertion order.
+    await addFinding('second', {}, '2026-11-19T12:00:00.000Z');
+    await addFinding('first, oldest', {}, '2026-11-19T10:00:00.000Z');
     await store.add(URL_KEY, { kind: 'finding', state: 'open', fields: { says: 'to a stage' }, links: {}, to: 'implementation' }, { by: 'review' });
     await serve(pagesRoutes()[1]);
     const html = await (await fetch(`${base}/workspace/${URL_KEY}/project`)).text();
     const numbers = [...html.matchAll(/data-testid="backlog-number">(\d+)\./g)].map((m) => m[1]);
     assert.deepEqual(numbers, ['1', '2']);
-    assert.match(html, /first, oldest/);
+    const itemWith = (words) => html.split('<li ').find((chunk) => chunk.includes(words)) || '';
+    assert.match(itemWith('first, oldest'), /data-number="1"/, 'number 1 is the oldest record');
+    assert.match(itemWith('>second<'), /data-number="2"/, 'the newer record is number 2');
     assert.doesNotMatch(html, /to a stage/);
   });
 
@@ -297,15 +395,65 @@ describe("Home's Waiting on you: the person's open records, owner only", () => {
   });
 });
 
+/** A dispatch history row as the session route reads it: its id, its kind, and the run it resumes (if a follow-up). */
+const historyRow = (id, extra = {}) => ({ _id: id, id, sessionId: null, kind: 'implementation', issueIdentifier: TICKET, issueTitle: 'Footer', prompt: 'p', dispatchedAt: '2026-11-19T10:00:00.000Z', resolvedAt: '2026-11-19T10:01:00.000Z', status: 'taken', feedback: [], ...extra });
+
 describe('the session page: the run account', () => {
   test('the account is the latest ended run record of the session loops, and draws as plain text', async () => {
     await store.openRun(URL_KEY, { id: 'row-stage-1', stage: 'implementation', lineage: 'row-stage-1', at: '2026-11-19T10:00:00.000Z' });
     await store.endRun(URL_KEY, 'row-stage-1', { state: 'done', account: 'Shipped <b>the</b> footer.', at: '2026-11-19T10:05:00.000Z' });
-    const account = await readRunAccount(store, URL_KEY, { loops: [{ loopId: 'row-stage-1' }, { loopId: 'row-unknown' }] });
+    const rows = { 'row-stage-1': historyRow('row-stage-1') };
+    const readRow = async (_urlKey, id) => rows[id] ?? null;
+    const account = await readRunAccount(store, readRow, URL_KEY, { loops: [{ loopId: 'row-stage-1' }, { loopId: 'row-unknown' }] });
     assert.equal(account, 'Shipped <b>the</b> footer.');
     assert.match(renderRunAccount(account), /Shipped &lt;b&gt;the&lt;\/b&gt; footer\./, 'escaped, never markup');
     assert.equal(renderRunAccount(null), '');
-    assert.equal(await readRunAccount(store, URL_KEY, { loops: [] }), null);
+    assert.equal(await readRunAccount(store, readRow, URL_KEY, { loops: [] }), null);
+  });
+
+  test('a follow-up row reads the run it resumes: session -> row -> run, through the row\'s runRecordId', async () => {
+    await store.openRun(URL_KEY, { id: 'row-origin', stage: 'implementation', lineage: 'row-origin', at: '2026-11-19T10:00:00.000Z' });
+    await store.endRun(URL_KEY, 'row-origin', { state: 'done', account: 'The run said this.', at: '2026-11-19T10:05:00.000Z' });
+    const rows = { 'row-follow': historyRow('row-follow', { kind: 'custom', runRecordId: 'row-origin' }) };
+    const readRow = async (_urlKey, id) => rows[id] ?? null;
+    assert.equal(await readRunAccount(store, readRow, URL_KEY, { loops: [{ loopId: 'row-follow' }] }), 'The run said this.');
+  });
+
+  test('a session made only of a follow-up row shows the run account through the real session route', async () => {
+    await store.openRun(URL_KEY, { id: 'row-origin', stage: 'implementation', lineage: 'row-origin', at: '2026-11-19T10:00:00.000Z' });
+    await store.endRun(URL_KEY, 'row-origin', { state: 'done', account: 'Shipped the footer on the follow-up path.', at: '2026-11-19T10:05:00.000Z' });
+    const follow = historyRow('row-follow', { kind: 'custom', sessionId: 'sess-follow', runRecordId: 'row-origin' });
+    const origin = historyRow('row-origin', { sessionId: 'sess-origin' });
+    const items = { live: [], history: [origin, follow] };
+    const app = express();
+    app.use(createDashboardRoutesUnplumbed_withDefaults({
+      workspaceFromUrl: (req, res, next) => { req.session = { features: {}, workspaces: [{ urlKey: URL_KEY, name: 'Acme' }] }; req.workspace = { urlKey: URL_KEY }; next(); },
+      dispatchQueueStore: {
+        async getItemStatus(_urlKey, id) { return items.history.find((i) => i.id === id) || null; },
+        async listItems() { return []; },
+        async listHistory(_urlKey, opts = {}) { return { items: items.history.filter((i) => !opts.sessionId || i.sessionId === opts.sessionId) }; },
+        async rowForRunRecords(_urlKey, id) { return items.history.find((i) => i._id === id) || null; },
+      },
+      agentStatusStore: { async listStatus() { return { items: [] }; } },
+      recordsStore: store,
+      observationSessionsStore: null,
+      runSummaryCacheStore: new InMemoryRunSummaryCacheStore(),
+      sessionSummaryCacheStore: new InMemorySessionSummaryCacheStore(),
+      briefCacheStore: { async get() { return null; } },
+      recapCacheStore: { async get() { return null; } },
+      freeTierStore: { async tryUse() { return { allowed: true }; } },
+      getWorkspaceAccessToken: async () => 'token',
+      fetchIssueContext: async () => ({}),
+      fetchWorkspaceIssues: async () => [],
+      getOpenRouterSource: () => 'env',
+      getDeployInfo: () => ({}),
+    }));
+    server = await new Promise((resolve) => { const s = app.listen(0, '127.0.0.1', () => resolve(s)); });
+    base = `http://127.0.0.1:${server.address().port}`;
+    const res = await fetch(`${base}/workspace/${URL_KEY}/observation/session/sess-follow`);
+    const html = await res.text();
+    assert.equal(res.status, 200, 'the session page rendered');
+    assert.match(html, /Shipped the footer on the follow-up path\./, 'the follow-up-only session shows its run account');
   });
 
   test('the session page places the account section in its header block (wiring read from the renderer source)', async () => {
