@@ -181,3 +181,20 @@ A fresh reader checked this page against the log from 18 Nov, the designs, the r
   - "two steps forward, one step back";
   - retiring the old route in the same move is the default, and a kept path says when it goes;
   - real work is the test, so no more walks.
+
+## 19 Nov, evening: piece 2 and the fix landed; the colleague experiment ended
+
+- **Slice 1 pieces:**
+  - LIN-4493 merged at 16:24 (PR #2465).
+  - LIN-4497, the look-first fix, merged at 16:37 (PR #2466). The slice 1 autopilot was told the workaround is no longer needed, but that note sat queued and was later removed. Harmless, since sending the look-first steps by name is the normal order anyway.
+  - LIN-4494 ran its surveys and scoping first, opened PR #2467, and has been in review since 17:34.
+  - Follow-up ticket for the other places that read sibling PRs: LIN-4498 (Backlog).
+- **Queued wakes:** they go to an autopilot only between its turns. 20fdf661 has stayed in one turn since 14:28, so 14 rows piled up. John removed them (safe). This counts as evidence for slice 6.
+- **John signed in again** for the person-addressing check. Whether his name was stored isn't shown yet.
+- **The Yap peer colleague is dropped** (room reliability). What it gave while it ran:
+  - an independent reproduction of the routing defect;
+  - tighter wording;
+  - one stale claim caught;
+  - the open-blocker worry closed with evidence;
+  - and the calibration: bring a second view only where it could change the action, and keep reports to John short.
+- **Next:** check-ins via the scheduled reminder; at LIN-4495, check that the run-ledger exports really are retired; when slice 1 lands, take the after readings, then draft slice 2.

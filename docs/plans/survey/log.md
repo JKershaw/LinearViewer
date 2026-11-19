@@ -4476,3 +4476,11 @@ John asked whether he can dismiss the 14 queued rows. From a subagent's code rea
 - **No bulk option:** the rows go one at a time.
 
 - John removed all 14 rows (~17:12). The slice 1 autopilot keeps running; next look at 17:35.
+
+### 19 Nov, 17:36: LIN-4494 in review; the Yap experiment ended
+
+- **LIN-4494, build 1a471c63 (Haiku):** opened PR #2467 at 17:05. CI was red on one link-guard test, then green at 17:16 on b47355c. It then waited on a background watch that had expired. The runner's own check asked it whether it was finished (simple-dispatcher `hook.js:1563-1570`; watch drop after 30 min, `config.js:62-71`), and it reported DONE at 17:34:32 with 26,232 of 26,232 unit tests passing. No one stepped in.
+- **After it:** review f0f8fa09 started at 17:34:51, and the leftover row b2ff7059 at 17:34:35 (sender unstamped; unknown). LIN-4495 is still Todo. No rulings, no queued rows.
+- **The build's own notes:** Home's assignee lookup wasn't moved, and the importer hasn't been run on production. The production run is piece 5's job.
+- **The Yap peer-colleague experiment ended** (John, ~17:36): the room had reliability problems. John's view is that explaining the work out loud helped a little. The listener is stopped, and there are no more posts to the room. One lesson for any later peer room: an untagged post doesn't notify the other party.
+- Next check-in at 18:10.
