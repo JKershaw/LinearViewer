@@ -9,7 +9,7 @@
  */
 process.env.NODE_ENV = 'test';
 
-import { FINDINGS_NONE } from '../../lib/close-out-findings.js';
+import { FINDINGS_NONE, findingsRead, findingsNotRead } from '../../lib/close-out-findings.js';
 import { test, describe } from 'node:test';
 import assert from 'node:assert/strict';
 import { installHermeticLinearTransport } from '../fixtures/hermetic-linear.js';
@@ -112,6 +112,29 @@ describe('LIN-3634: session close-out readiness stage', () => {
     assert.equal(res.body.reason, 'head-moved');
     assert.equal(res.body.state.status, 'not-ready');
     assert.equal(getInsertCount(), 0, 'a refusal spends no row');
+  });
+
+  // LIN-4495: an open finding to close-out is what close-out exists to end, so it never refuses the close-out
+  // dispatch (the guard and the press read the same state). Readiness and Done stay held by the decision.
+  test('LIN-4495: an open finding to close-out admits close-out on both lanes; the head and blind-read refusals stand', async () => {
+    for (const stopAt of ['pr', null]) {
+      for (const openFindings of [findingsRead(['finding-1']), findingsNotRead('store down')]) {
+        const { store } = makeStore();
+        const seam = makeSeam({ stopAt, statuses: { 41: openStatus(41, REVIEWED) } });
+        seam.openFindings = openFindings;
+        const res = await post(buildApp(store, seam), CLOSE_OUT);
+        assert.equal(res.status, 201, `${stopAt} ${openFindings.state}: ${JSON.stringify(res.body)}`);
+      }
+    }
+    // Still refused: the head moved, and no blind read on record (both refusals are not about findings).
+    const moved = makeSeam({ statuses: { 41: openStatus(41, MOVED) } });
+    moved.openFindings = findingsRead(['finding-1']);
+    assert.equal((await post(buildApp(makeStore().store, moved), CLOSE_OUT)).body.reason, 'head-moved');
+    const unread = makeSeam({ comments: NO_READ, statuses: { 41: openStatus(41, REVIEWED) } });
+    unread.openFindings = findingsRead(['finding-1']);
+    const refused = await post(buildApp(makeStore().store, unread), CLOSE_OUT);
+    assert.equal(refused.status, 409, JSON.stringify(refused.body));
+    assert.equal(refused.body.reason, 'blind-read-missing');
   });
 
   test('promptName alone (no kind) and a display-cased promptName are close-outs too', async () => {

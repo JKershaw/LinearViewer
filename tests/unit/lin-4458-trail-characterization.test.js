@@ -235,6 +235,8 @@ describe('the owner\'s Done check: the same trail through the check route', () =
       workspaceFromUrl: (req, res, next) => next(),
       closeOutEventsStore: new CloseOutEventsStore({ collection }),
       closeOut: {
+        // LIN-4495: a store that answered "none open" (an unmeasured reading holds Done, so the seam says what it read).
+        openFindings: FINDINGS_NONE,
         resolveProvider: () => ({ provider: { async fetchIssueComments() { return comments; } }, callScope: 'scope' }),
         readPrStatus: async ({ number }) => { calls.reads.push(number); return statuses[number]; },
         isStopAtRun: async () => 'pr',

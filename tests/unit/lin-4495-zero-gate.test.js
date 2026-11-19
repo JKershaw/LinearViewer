@@ -75,7 +75,16 @@ describe('zero-gate: the decision reads the finding reading', () => {
     assert.equal(d.status, CLOSE_OUT_STATUS.NOT_READY);
     assert.equal(d.reason, CLOSE_OUT_REASON.OPEN_FINDINGS);
     assert.match(d.message, /1 open finding to close-out/);
-    assert.equal(d.refuses, CLOSE_OUT_REASON.OPEN_FINDINGS);
+    // Readiness is held, but the dispatch is not refused: close-out is the stage that ends the finding (LIN-4495 review).
+    assert.equal(d.refuses, null);
+  });
+
+  test('an open finding holds Done even on a merged landing; ending it lets the person\'s check set Done', () => {
+    const merged = new Map([[PR1, { ...openPr, state: 'closed', merged: true }]]);
+    const withMerged = (open) => closeOutDecision({ trail: readTrail(TRAIL), prStatuses: merged, stopAt: 'pr', runnerReady: true, actor: 'person', openFindings: open });
+    assert.equal(withMerged(findingsRead(['finding-aaaaaaaa'])).setDone, false);
+    assert.equal(withMerged(findingsNotRead('store down')).setDone, false);
+    assert.equal(withMerged(FINDINGS_NONE).setDone, true);
   });
 
   test('a finding not read is not ready: never a zero', () => {
@@ -105,7 +114,7 @@ describe('zero-gate: the decision reads the finding reading', () => {
   test('the copy names the three readings and never reads a hold as zero', () => {
     assert.equal(findingsCopy(findingsRead([])), 'no open findings to close-out');
     assert.match(findingsCopy(findingsNotRead('x')), /not read/);
-    assert.match(findingsCopy(findingsLegacy([])), /not measured/);
+    assert.match(findingsCopy(findingsLegacy([])), /not measured: re-run `review` to record its findings/);
     assert.equal(findingsHold(findingsRead([])), false);
     assert.equal(findingsHold(findingsNotRead('x')), true);
     assert.equal(findingsHold(findingsLegacy([])), true);

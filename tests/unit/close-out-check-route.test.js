@@ -8,7 +8,7 @@
 // handler: the person-session-only rule, R1's four Done bounds, the multi-PR
 // partial merge, idempotency and the retried Done write.
 
-import { FINDINGS_NONE } from '../../lib/close-out-findings.js';
+import { FINDINGS_NONE, findingsRead } from '../../lib/close-out-findings.js';
 import { test, describe, before, after } from 'node:test';
 import assert from 'node:assert/strict';
 import { createWorkspaceApiRoutes } from '../../routes/workspace-api.js';
@@ -64,6 +64,7 @@ function makeRouter({
   markDone = null,
   dispatchQueueStore = undefined,
   resolveProvider = null,
+  openFindings = FINDINGS_NONE,
 } = {}) {
   const collection = harness.freshDb().collection('close-out-events');
   const store = new CloseOutEventsStore({ collection });
@@ -73,7 +74,7 @@ function makeRouter({
     closeOutEventsStore: store,
     dispatchQueueStore,
     closeOut: {
-      openFindings: FINDINGS_NONE, resolveProvider: resolveProvider || (() => ({ provider: fakeProvider({ comments }), callScope: 'scope' })),
+      openFindings, resolveProvider: resolveProvider || (() => ({ provider: fakeProvider({ comments }), callScope: 'scope' })),
       readPrStatus: readPrStatus || (async ({ number }) => statuses[number] || unknownStatus(number)),
       isStopAtRun: isStopAtRun || (async () => 'pr'),
       runnerReady,
@@ -494,6 +495,22 @@ describe('POST /api/run-evidence/:issueIdentifier/check', () => {
 });
 
 describe('POST /api/run-evidence/:issueIdentifier/close-out-press', () => {
+  // LIN-4495: the press asks the dispatch lane's question, so an open finding to close-out (which close-out itself
+  // ends) admits the press; the press records the open count it read, never zero by default.
+  test('LIN-4495: an open finding to close-out admits the press and stamps the count it read', async () => {
+    const built = makeRouter({
+      comments: [comment(PR_A, '2026-07-01T00:00:00.000Z'), comment(reviewBody(), '2026-07-02T00:00:00.000Z'), readOf(PR_A)],
+      statuses: { 41: openStatus(41) },
+      openFindings: findingsRead(['finding-1']),
+    });
+    const res = await press(built, baseReq({ body: { prUrl: PR_A, headSha: 'aaaaaaa', dispatchId: 'd-9' } }));
+    assert.equal(res.statusCode, 201, JSON.stringify(res.jsonBody));
+    const stored = await rows(built.collection);
+    assert.equal(stored.length, 1);
+    assert.equal(stored[0].openFindings.state, 'read');
+    assert.equal(stored[0].openFindings.count, 1);
+  });
+
   test('records a press with its dispatchId', async () => {
     const built = makeRouter();
     const res = await press(built);

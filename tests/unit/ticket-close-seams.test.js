@@ -1,3 +1,4 @@
+import { FINDINGS_NONE } from '../../lib/close-out-findings.js';
 /**
  * LIN-3366: the four ticket-write seams that call the closer.
  *   1. PATCH /api/proxy/issues/:id            (routes/proxy-writes.js)
@@ -208,6 +209,8 @@ describe('seam 3: close-out check Done write', () => {
       closeOutEventsStore: new CloseOutEventsStore({ collection }),
       onTicketWrite,
       closeOut: {
+        // LIN-4495: a store that answered "none open" (an unmeasured reading holds Done, so the seam says what it read).
+        openFindings: FINDINGS_NONE,
         resolveProvider: () => ({ provider, callScope: 'scope' }),
         readPrStatus: async () => merged, isStopAtRun: async () => 'pr', runnerReady: () => true,
         ...(withMarkDone ? { markDone: withMarkDone } : {})
