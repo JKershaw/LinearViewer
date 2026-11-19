@@ -24,6 +24,11 @@ are injected by their callers (routes/proxy.js, server.js).
   lineage's terminal status or `aborted`. A `handed-on` closure ends nothing: the successor carries the run on.
   The hooks are in lib/dispatch-store.js (`takeItem`, `addFeedback`, `_closeRows`, `stampBookkeeping`), and each
   is witnessed through the real store in tests/unit/lin-4493-run-lifecycle.test.js.
+- A person is addressed by the name the tracker shows them, and that name is stored on the account's identity at sign-in
+  (`identity.name`, from the viewer's display name, the GitHub login, or the Jira display name; lib/account-session.js
+  `establishAccount`). The one reader is lib/workspace-people.js (a member with a named identity on the workspace's
+  provider, canonical accounts only). An account that signed in before the name was stored has none until its next
+  sign-in, so it cannot be addressed until then; the refusal names the people who can be.
 - Reads are by the indexed fields. A write reads only the records it names (`versionsOf`, `lookup`), and a find
   picks candidates by `{urlKey, kind, state, to}` or `{urlKey, in}` and reduces each to its current version
   (`find`). A write's body is checked as a dry run before any ticket is made, so a refused body makes no task.
@@ -40,10 +45,6 @@ are injected by their callers (routes/proxy.js, server.js).
 
 ## Waiting
 
-- Person addressing: `to` and `by` name `person:<accountId>`, and a person's name resolves through an injected
-  workspace-person reader that does not exist yet (nothing maps a tracker assignee name to an account). Until the
-  mapping is settled on LIN-4491, a name or a `person:` id is refused with the names that work, and no person is
-  listed among them. Cites `lib/records/check.js` (`resolveTo`) and `routes/proxy-records.js` (the injected `listPeople`).
 - The brief still reads the workspace's whole history (`snapshots`, `index`, `currentAt`) to compose its parts. It is
   pure and correct at this size, and piece 4 wires it behind the brief route; the change then is to read the parts
   through `find` and `lookup`. Cites `lib/records-store.js` and `lib/records/brief.js`.
