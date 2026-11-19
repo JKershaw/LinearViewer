@@ -13,7 +13,7 @@
   - 26: the ledger item parse. Its verdict half goes in slice 3.
   - 34: the blind-read classes.
 - **Change in slice 1:**
-  - 12–14: the leftover stage ends one finding.
+  - 12–14: the leftover step stays; it no longer settles an entry from the backlog.
   - 23–25: the prompts write findings, with `how` for a verification.
   - 28–32: counts and pages read records.
   - 37: an ask is a finding to the parent.
@@ -73,7 +73,7 @@
   - 50: tests, replaced in each slice.
 
 **C5 (lessons, areas, wakes, the proxy, stores)**
-- **Slice 1:** A05 (the Waiting parse), A07, A09, A10, A12 and A21 (counts). The Waiting halves of A08, A11 and A15; A08's settling of one entry becomes the leftover step working one `project` record.
+- **Slice 1:** A05 (the Waiting parse), A07, A09, A10, A12 and A21 (counts). The Waiting halves of A08, A11 and A15; A08's settling of one entry goes; the backlog is John's, from the project page.
 - **Slice 5:** A01, A03, A06, A13, A14 and A16–A18. The Lessons halves of A08, A11 and A15. A04's prompt readers.
 - **Keep:**
   - A02, A19 and A20: `areas.json` stays as the code-shape kit's and the tests' map of Harbour's own source. It is not imported; the layer has no areas. A04 keeps spelling its path for those readers.

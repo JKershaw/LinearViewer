@@ -4382,3 +4382,5 @@ Draft 3 removes what the layer dropped: area records and their import, task and 
 **John's questions, 5 (19 Nov).** The knots are accepted as a tax, with nothing tidied first: make it work, then make it good. Rulings get a Theseus after slice 4, on what slice 4 leaves.
 
 **John's questions, 6 (19 Nov).** The blind read stays prompt-only, as today. Slice 3's readings count its queries beyond its change from the query log; it may not need to be watertight to do its job.
+
+**John's questions, 7 (19 Nov).** The project pile is a backlog. No task has to finish it: the leftover step no longer settles one entry per build, stages end only what their own work settled, and the project page surfaces the backlog, numbered, for John to act on when he chooses, by hand or with a separate Harbour process. All seven questions answered.
