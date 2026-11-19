@@ -92,3 +92,12 @@ On your first question, the record shows finished tasks going from spiralling to
   3. The API review (how intuitive the record calls are for agents) before or during slice 1.
   4. Then build, slice by slice; the parked work runs after slice 4.
 - **Housekeeping:** the harbour.cat token expired on 19 Nov; a new one is needed before real work.
+
+## 19 Nov: integration design agreed
+
+- **Draft 3** brought the integration design into line with the trimmed layer; a fresh recheck found nine more places out of line, all fixed.
+- **John's seven questions,** answered one at a time, each removing something or deferring a guard until a reading shows the need: no `on-answer`; no actor list (`to` checked against what Harbour can brief); rulings their own slice 4; slice 6 waits on slice 1's count; knots accepted as a tax ("make it work, then make it good"); the blind read stays prompt-only, measured in slice 3; the project pile is a backlog John acts on.
+- **The API review** (agents' own notes from walks 7–8): links accepted flat, a bare `on` pinned to the current version, an idempotent end, every problem named in one refusal; two layer clarifications (any end may name what took over; links only add).
+- **Colour.** John asked for the context that makes the asks easy to follow: a leaks table from the traces, a before-and-after drawing, a scene per slice. The same goes into each slice's ticket.
+- **Agreed** by John on 19 Nov (doc: https://claude.ai/artifact/62y2rpauvpedF8NRS4FqYh). Step 1 is done.
+- **Next, in order:** the documents to main by pull request; a fresh harbour.cat token; slice 1 filed as a Harbour task under a parent, with its why and scene; each later slice filed as the one before lands; the parked work after slice 4.

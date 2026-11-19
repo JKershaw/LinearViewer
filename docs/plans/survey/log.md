@@ -4390,3 +4390,7 @@ Draft 3 removes what the layer dropped: area records and their import, task and 
 **Draft 3 to John as a doc (19 Nov):** https://claude.ai/artifact/62y2rpauvpedF8NRS4FqYh, a copy of `integration/design.md` with §11 as a table of the ten decisions. The repository file stays the source.
 
 **Colour for the design (19 Nov).** John found the doc technical and missing the context that makes the asks easy to follow. Added, in the doc and in `integration/design.md`: a "Why" section (a before-and-after drawing in the doc; a table of ten leaks, each with its real moment from the 15 Nov traces or the census and the slice that fixes it; why old routes go in the same move, figures checked against `how-process-changes-land.md`), a before-and-after scene per slice with its walk 8 moment, and why the run matters for `by`.
+
+## 19 Nov — Step 1 done: the integration design agreed
+
+John read the doc copy (with the leaks table, the before-and-after drawing and a scene per slice) and agreed it. Step 1, an integration design on paper, is done. Next: the documents to main by pull request so the slice tasks' agents can read them, a fresh harbour.cat token, then slice 1 filed as a Harbour task under a parent, each later slice filed as the one before lands.
