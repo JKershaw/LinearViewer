@@ -202,7 +202,7 @@ export function streamMockFixture(res, mockIssue) {
  * @param {Object} [options.closeOut] - LIN-3248 test seam for the check/press routes: optional `{ resolveProvider, readPrStatus, githubFetch, isStopAtRun, runnerReady, markDone }` overrides
  * @returns {Router} Express router
  */
-export function createWorkspaceApiRoutes({ workspaceFromUrl, freeTierStore, getOpenRouterSource, userPreferencesStore, workspacePreferencesStore, customPromptsStore, recapCacheStore, briefCacheStore, reportHistoryStore, dispatchQueueStore, agentStatusStore, promptTraceStore, proxyTokenStore, taskDecisionsStore, harbourCommentsStore = null, sessionsFeedCache = null, ownerCredentialStore = null, adoptConnectionCredential = null, accountStore = null, runEvidence = null, closeOutEventsStore = null, closeOut = null, workspaceOwnerCheck = null, onTicketWrite = null, recordPipelineMerge = null, installationTokenFor = null, loadTaskState = null }) {
+export function createWorkspaceApiRoutes({ workspaceFromUrl, freeTierStore, getOpenRouterSource, userPreferencesStore, workspacePreferencesStore, customPromptsStore, recapCacheStore, briefCacheStore, reportHistoryStore, dispatchQueueStore, agentStatusStore, promptTraceStore, proxyTokenStore, taskDecisionsStore, harbourCommentsStore = null, sessionsFeedCache = null, ownerCredentialStore = null, adoptConnectionCredential = null, accountStore = null, runEvidence = null, closeOutEventsStore = null, closeOut = null, workspaceOwnerCheck = null, onTicketWrite = null, recordPipelineMerge = null, installationTokenFor = null, loadTaskState = null, recordsStore = null }) {
   const router = Router();
 
   // The test-token DATA mock charges the free tier on its own (the AI-gate above it is
@@ -902,7 +902,7 @@ export function createWorkspaceApiRoutes({ workspaceFromUrl, freeTierStore, getO
   });
 
   // The run-evidence and close-out routes (LIN-3894): registered on this router, here, so the route table's order is unchanged.
-  registerRunEvidenceRoutes(router, { workspaceFromUrl, dispatchQueueStore, runEvidence, closeOutEventsStore, closeOut, onTicketWrite, installationTokenFor });
+  registerRunEvidenceRoutes(router, { workspaceFromUrl, dispatchQueueStore, runEvidence, closeOutEventsStore, closeOut, onTicketWrite, installationTokenFor, recordsStore });
 
   // Roadmap API endpoints (LIN-2246: extracted to workspace-api-roadmap.js).
   // Mounted at this same position in the registration sequence it previously

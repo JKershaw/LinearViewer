@@ -282,7 +282,7 @@ const queryText = (value) => (typeof value === 'string' && value.trim() ? value 
  *   closed with OWNER_CHECK_UNAVAILABLE. Never consulted on the verify path.
  * @returns {Router} Express router with dispatch routes
  */
-export function createDispatchRoutes({ dispatchQueueStore, dispatchTokenStore, workspaceFromUrl, userPreferencesStore, harbourFeedbackTokenStore, workspacePreferencesStore, dispatchPresetsStore, proxyTokenStore, provider: injectedProvider = null, getWorkspaceAccessToken = null, fetchIssueContext = null, workspaceHaltStore = null, haltReadTimeoutMs = POLL_HALT_READ_TIMEOUT_MS, sessionsFeedCache = null, workspaceOwnerCheck = null, taskModeStore = null, freeTierStore = null, accountStore = null, consumerHeartbeatStore = null, closeOut = null, installationTokenFor = null, requestUsageStore = null, requestUsageLoader = null, leftoverStep = null }) {
+export function createDispatchRoutes({ dispatchQueueStore, dispatchTokenStore, workspaceFromUrl, userPreferencesStore, harbourFeedbackTokenStore, workspacePreferencesStore, dispatchPresetsStore, proxyTokenStore, provider: injectedProvider = null, getWorkspaceAccessToken = null, fetchIssueContext = null, workspaceHaltStore = null, haltReadTimeoutMs = POLL_HALT_READ_TIMEOUT_MS, sessionsFeedCache = null, workspaceOwnerCheck = null, taskModeStore = null, freeTierStore = null, accountStore = null, consumerHeartbeatStore = null, closeOut = null, installationTokenFor = null, requestUsageStore = null, requestUsageLoader = null, leftoverStep = null, recordsStore = null }) {
   const router = Router();
 
   // =========================================================================
@@ -488,6 +488,8 @@ export function createDispatchRoutes({ dispatchQueueStore, dispatchTokenStore, w
       closeOut,
       // LIN-3285: the owner's installation token for the close-out guard's PR reads.
       installationTokenFor,
+      // LIN-4495: the records store, for the open findings to close-out the guard reads.
+      recordsStore,
       // LIN-3383: the owner gate is this route's (it runs in the authority at the one point it
       // must: after the body's shape checks, before every read and write).
       ownerGate: (target) => refuseNonOwner(req, res, target),

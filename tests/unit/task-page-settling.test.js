@@ -9,6 +9,7 @@
  *
  * Run with: node --test tests/unit/task-page-settling.test.js
  */
+import { FINDINGS_NONE } from '../../lib/close-out-findings.js';
 import { test, describe } from 'node:test';
 import assert from 'node:assert/strict';
 import { createTaskPageLoader } from '../../lib/task-page-loader.js';
@@ -85,7 +86,7 @@ function makeLoader({ ctx, brief = null, recap = null, events = [], loops = [loo
     briefCacheStore: { async get() { return brief; } },
     recapCacheStore: { async get() { return recap; } },
     closeOutEventsStore: { async listForIssue() { return events; } },
-    readRunEvidence: (args) => readRunEvidence({ ...args, readPrStatus: async () => MERGED_PR }),
+    readRunEvidence: (args) => readRunEvidence({ openFindings: FINDINGS_NONE, ...args, readPrStatus: async () => MERGED_PR }),
     prStateStore: null,
     readTaskRunFacts: async () => ({ stopAt, variant: 'standard' }),
     enrichLoop,

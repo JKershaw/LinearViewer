@@ -9,6 +9,7 @@
 //
 // Run with: node --test tests/unit/authenticated-pr-reads.test.js
 
+import { FINDINGS_NONE } from '../../lib/close-out-findings.js';
 import { test, describe, beforeEach, before } from 'node:test';
 import assert from 'node:assert/strict';
 import {
@@ -288,22 +289,22 @@ describe('readRunEvidence default reader (run page / run-evidence route path)', 
 
   test('threads the token and urlKey into the default fail-open reader', async () => {
     const stub = githubStub();
-    const model = await readRunEvidence({ ...base, callScope: GH_SCOPE, urlKey: 'ws-a', githubFetch: stub });
+    const model = await readRunEvidence({ openFindings: FINDINGS_NONE, ...base, callScope: GH_SCOPE, urlKey: 'ws-a', githubFetch: stub });
     assert.equal(model.state.pr.state, 'open');
   });
 
   test('without a urlKey it reads anonymously rather than tripping the scope-key guard', async () => {
     const stub = githubStub();
-    const model = await readRunEvidence({ ...base, callScope: GH_SCOPE, githubFetch: stub });
+    const model = await readRunEvidence({ openFindings: FINDINGS_NONE, ...base, callScope: GH_SCOPE, githubFetch: stub });
     assert.equal(model.closeOut.status, 'unknown');
     assert.ok(stub.calls.every(c => !c.headers.Authorization));
   });
 
   test('copy flag: a readable PR with no checks is read:true; unreadable is read:false', async () => {
-    const readable = await readRunEvidence({ ...base, callScope: GH_SCOPE, urlKey: 'ws-a', githubFetch: githubStub({ checkRuns: [] }) });
+    const readable = await readRunEvidence({ openFindings: FINDINGS_NONE, ...base, callScope: GH_SCOPE, urlKey: 'ws-a', githubFetch: githubStub({ checkRuns: [] }) });
     assert.equal(readable.evidence.checked.now.state, 'unknown');
     assert.equal(readable.evidence.checked.now.read, true);
-    const unreadable = await readRunEvidence({ ...base, callScope: 'lin', urlKey: 'ws-a', githubFetch: githubStub() });
+    const unreadable = await readRunEvidence({ openFindings: FINDINGS_NONE, ...base, callScope: 'lin', urlKey: 'ws-a', githubFetch: githubStub() });
     assert.equal(unreadable.evidence.checked.now.read, false);
   });
 });

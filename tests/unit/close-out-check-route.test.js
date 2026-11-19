@@ -8,6 +8,7 @@
 // handler: the person-session-only rule, R1's four Done bounds, the multi-PR
 // partial merge, idempotency and the retried Done write.
 
+import { FINDINGS_NONE } from '../../lib/close-out-findings.js';
 import { test, describe, before, after } from 'node:test';
 import assert from 'node:assert/strict';
 import { createWorkspaceApiRoutes } from '../../routes/workspace-api.js';
@@ -72,7 +73,7 @@ function makeRouter({
     closeOutEventsStore: store,
     dispatchQueueStore,
     closeOut: {
-      resolveProvider: resolveProvider || (() => ({ provider: fakeProvider({ comments }), callScope: 'scope' })),
+      openFindings: FINDINGS_NONE, resolveProvider: resolveProvider || (() => ({ provider: fakeProvider({ comments }), callScope: 'scope' })),
       readPrStatus: readPrStatus || (async ({ number }) => statuses[number] || unknownStatus(number)),
       isStopAtRun: isStopAtRun || (async () => 'pr'),
       runnerReady,
@@ -103,7 +104,7 @@ function makeDefaultMarkDoneRouter({ throwOnUpdate = false } = {}) {
     workspaceFromUrl: (req, res, next) => next(),
     closeOutEventsStore: store,
     closeOut: {
-      resolveProvider: () => ({ provider, callScope: 'scope' }),
+      openFindings: FINDINGS_NONE, resolveProvider: () => ({ provider, callScope: 'scope' }),
       readPrStatus: async ({ number }) => (number === 41 ? mergedStatus(41) : unknownStatus(number)),
       isStopAtRun: async () => 'pr',
       runnerReady: () => true,
@@ -207,7 +208,9 @@ describe('POST /api/run-evidence/:issueIdentifier/check', () => {
     assert.equal(stored[0].by, 'person');
     assert.equal(stored[0].prUrl, PR_A);
     assert.equal(stored[0].merged, true);
-    assert.deepEqual(stored[0].openItems, { inside: 1, outside: 0, unknown: 0, total: 1 });
+    // LIN-4495: the stamp is the open findings to close-out as read (none here), not the ledger's items.
+    assert.deepEqual(stored[0].openFindings, { state: 'read', count: 0 });
+    assert.deepEqual(stored[0].openItems, { inside: 0, outside: 0, unknown: 0, total: 0 });
   });
 
   test('R1 bound: the PR is not merged → no Done, nothing recorded', async () => {
@@ -420,7 +423,7 @@ describe('POST /api/run-evidence/:issueIdentifier/check', () => {
       dispatchQueueStore: queueStore,
       closeOutEventsStore: store,
       closeOut: {
-        resolveProvider: () => ({ provider: fakeProvider({ comments: [comment(PR_A, '2026-07-01T00:00:00.000Z'), comment(reviewBody(), '2026-07-02T00:00:00.000Z'), readOf(PR_A)] }), callScope: 'scope' }),
+        openFindings: FINDINGS_NONE, resolveProvider: () => ({ provider: fakeProvider({ comments: [comment(PR_A, '2026-07-01T00:00:00.000Z'), comment(reviewBody(), '2026-07-02T00:00:00.000Z'), readOf(PR_A)] }), callScope: 'scope' }),
         readPrStatus: async ({ number }) => mergedStatus(number),
         runnerReady: () => true,
         markDone: async () => { calls.markDone += 1; },
@@ -475,7 +478,7 @@ describe('POST /api/run-evidence/:issueIdentifier/check', () => {
       dispatchQueueStore: queueStore,
       closeOutEventsStore: store,
       closeOut: {
-        resolveProvider: () => ({ provider: fakeProvider({ comments: [comment(PR_A, '2026-07-01T00:00:00.000Z'), comment(reviewBody(), '2026-07-02T00:00:00.000Z'), readOf(PR_A)] }), callScope: 'scope' }),
+        openFindings: FINDINGS_NONE, resolveProvider: () => ({ provider: fakeProvider({ comments: [comment(PR_A, '2026-07-01T00:00:00.000Z'), comment(reviewBody(), '2026-07-02T00:00:00.000Z'), readOf(PR_A)] }), callScope: 'scope' }),
         readPrStatus: async ({ number }) => mergedStatus(number),
         runnerReady: () => true,
         markDone: async () => { calls.markDone += 1; },
@@ -639,7 +642,7 @@ describe('LIN-3657: close-out-press on a head-moved close-out', () => {
     const counts = { provider: 0, pr: 0 };
     const built = makeRouter({
       comments,
-      resolveProvider: () => { counts.provider += 1; return { provider: fakeProvider({ comments }), callScope: 'scope' }; },
+      openFindings: FINDINGS_NONE, resolveProvider: () => { counts.provider += 1; return { provider: fakeProvider({ comments }), callScope: 'scope' }; },
       readPrStatus: async ({ number }) => { counts.pr += 1; return openStatus(number, MOVED); },
     });
     await built.collection.insertOne({
@@ -671,7 +674,7 @@ describe('LIN-3657: close-out-press on a head-moved close-out', () => {
       const seen = [];
       const built = makeRouter({
         comments, statuses: movedStatuses, dispatchQueueStore: queueStore,
-        resolveProvider: (_workspace, source) => { seen.push(source ?? null); return { provider: fakeProvider({ comments }), callScope: 'scope' }; },
+        openFindings: FINDINGS_NONE, resolveProvider: (_workspace, source) => { seen.push(source ?? null); return { provider: fakeProvider({ comments }), callScope: 'scope' }; },
       });
       return { built, seen, id: added._id };
     }

@@ -93,7 +93,7 @@ describe('CloseOutEventsStore.record', () => {
     const doc = await store.record(personMerge());
     const [stored] = await db.collection('close-out-events').find({}).toArray();
     assert.deepStrictEqual(Object.keys(stored).sort(), [
-      '_id', 'accountId', 'at', 'by', 'dispatchId', 'doneAt', 'doneError', 'headSha', 'issueId', 'issueIdentifier', 'merged', 'openItems', 'prMergedAt', 'prOpenedAt', 'prUrl', 'urlKey'
+      '_id', 'accountId', 'at', 'by', 'dispatchId', 'doneAt', 'doneError', 'headSha', 'issueId', 'issueIdentifier', 'merged', 'openFindings', 'openItems', 'prMergedAt', 'prOpenedAt', 'prUrl', 'urlKey'
     ]);
     assert.strictEqual(stored.prOpenedAt, null);
     assert.strictEqual(stored.prMergedAt, null);

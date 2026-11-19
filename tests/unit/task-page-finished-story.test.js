@@ -11,6 +11,7 @@
  *
  * Run with: node --test tests/unit/task-page-finished-story.test.js
  */
+import { FINDINGS_NONE } from '../../lib/close-out-findings.js';
 import { test, describe } from 'node:test';
 import assert from 'node:assert/strict';
 import { createTaskPageLoader } from '../../lib/task-page-loader.js';
@@ -90,7 +91,7 @@ function makeLoader({ ctx, brief = null, recap = null, events = [], loops = [loo
     briefCacheStore: { async get() { return brief; } },
     recapCacheStore: { async get() { return recap; } },
     closeOutEventsStore: { async listForIssue() { return events; } },
-    readRunEvidence: (args) => readRunEvidence({ ...args, readPrStatus: async () => MERGED_PR }),
+    readRunEvidence: (args) => readRunEvidence({ openFindings: FINDINGS_NONE, ...args, readPrStatus: async () => MERGED_PR }),
     prStateStore: null,
     readTaskRunFacts: async () => ({ stopAt, variant: 'standard' }),
     enrichLoop,
@@ -343,7 +344,7 @@ describe('B4 owner load: a press merge reads as a close-out merge (review F1)', 
 
 describe('deriveCloseOutState: a merged PR reads the same for every viewer (LIN-3426)', () => {
   const merged = { readable: true, state: 'closed', merged: true, head: { sha: 'a' } };
-  const run = (owner) => deriveCloseOutState({ prs: [{ url: PR_URL, repo: 'acme/app', number: 41 }], prStatuses: new Map([[PR_URL, merged]]), landingPrs: [PR_URL], review: null, owner, stopAt: 'pr' });
+  const run = (owner) => deriveCloseOutState({ openFindings: FINDINGS_NONE, prs: [{ url: PR_URL, repo: 'acme/app', number: 41 }], prStatuses: new Map([[PR_URL, merged]]), landingPrs: [PR_URL], review: null, owner, stopAt: 'pr' });
   test('owner and guest get the same merged message and no merger flag', () => {
     const { owner: _o1, ...asOwner } = run(true);
     const { owner: _o2, ...asGuest } = run(false);

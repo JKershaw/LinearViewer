@@ -19,6 +19,7 @@
  */
 process.env.NODE_ENV = 'test';
 
+import { FINDINGS_NONE } from '../../lib/close-out-findings.js';
 import { test, describe } from 'node:test';
 import assert from 'node:assert/strict';
 import { installHermeticLinearTransport } from '../fixtures/hermetic-linear.js';
@@ -85,7 +86,7 @@ function buildSessionApp(store) {
     // LIN-3634: case 5 is a stop-at-PR close-out, so it reaches the readiness chain.
     // No PR url → not head-moved → admitted; without this it would fall through to
     // the real tracker read and only the hermetic transport's refusal would admit it.
-    closeOut: { resolveProvider: () => ({ provider: { async fetchIssueComments() { return []; } }, callScope: 'scope' }) }
+    closeOut: { openFindings: FINDINGS_NONE, resolveProvider: () => ({ provider: { async fetchIssueComments() { return []; } }, callScope: 'scope' }) }
   }));
   return app;
 }

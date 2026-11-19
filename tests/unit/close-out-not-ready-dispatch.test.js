@@ -9,6 +9,7 @@
  */
 process.env.NODE_ENV = 'test';
 
+import { FINDINGS_NONE } from '../../lib/close-out-findings.js';
 import { test, describe } from 'node:test';
 import assert from 'node:assert/strict';
 import { installHermeticLinearTransport } from '../fixtures/hermetic-linear.js';
@@ -47,7 +48,7 @@ function makeSeam({ comments = COMMENTS, statuses = { 41: openStatus(41, MOVED) 
   const calls = { resolveProvider: 0, fetchIssueComments: 0, readPrStatus: 0 };
   return {
     calls,
-    resolveProvider: () => {
+    openFindings: FINDINGS_NONE, resolveProvider: () => {
       calls.resolveProvider += 1;
       return {
         provider: { async fetchIssueComments() { calls.fetchIssueComments += 1; if (throwComments) throw new Error('boom'); return comments; } },
@@ -314,7 +315,7 @@ describe('LIN-3634: the guard reads uncached (F2)', () => {
     return { ok: true, status: 200, json: async () => body, text: async () => JSON.stringify(body), headers: new Headers() };
   };
   const seamWith = (heads) => ({
-    resolveProvider: () => ({ provider: { async fetchIssueComments() { return COMMENTS; } }, callScope: 'scope' }),
+    openFindings: FINDINGS_NONE, resolveProvider: () => ({ provider: { async fetchIssueComments() { return COMMENTS; } }, callScope: 'scope' }),
     isStopAtRun: async () => 'pr',
     githubFetch: githubFor(heads)
   });
@@ -328,7 +329,7 @@ describe('LIN-3634: the guard reads uncached (F2)', () => {
     const filled = await readPrStatusFailOpen({ repo: 'acme/widget', number: 41, doFetch: seam.githubFetch });
     assert.equal(filled.readable, true, JSON.stringify(filled));
     heads.current = MOVED;
-    const state = await closeOutNotReady({ workspace, issueIdentifier: 'LIN-1', seam });
+    const state = await closeOutNotReady({ openFindings: FINDINGS_NONE, workspace, issueIdentifier: 'LIN-1', seam });
     assert.equal(state?.reason, 'head-moved');
     clearFailOpenPrStatus();
   });
@@ -337,7 +338,7 @@ describe('LIN-3634: the guard reads uncached (F2)', () => {
     clearFailOpenPrStatus();
     const { readPrStatusFailOpen } = await import('../../lib/github-pr-status.js');
     await readPrStatusFailOpen({ repo: 'acme/widget', number: 41, doFetch: async () => { throw new Error('rate limited'); } });
-    const state = await closeOutNotReady({ workspace, issueIdentifier: 'LIN-1', seam: seamWith({ current: MOVED }) });
+    const state = await closeOutNotReady({ openFindings: FINDINGS_NONE, workspace, issueIdentifier: 'LIN-1', seam: seamWith({ current: MOVED }) });
     assert.equal(state?.reason, 'head-moved');
     clearFailOpenPrStatus();
   });

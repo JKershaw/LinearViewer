@@ -14,6 +14,7 @@
  */
 process.env.NODE_ENV = 'test';
 
+import { FINDINGS_NONE } from '../../lib/close-out-findings.js';
 import { test, describe } from 'node:test';
 import assert from 'node:assert/strict';
 import { readFileSync, readdirSync, statSync } from 'node:fs';
@@ -69,15 +70,17 @@ async function surfaces(comments, { shape = 'full', issue = STARTED, merged = []
   const readOne = (url) => (shape === 'unreadable' ? statusOf.unreadable()
     : (merged.includes(prOf(url).number) ? statusOf.merged(url) : statusOf.open(url, movedHead ? MOVED : REVIEWED)));
   const box = await readRunEvidence({
+    openFindings: FINDINGS_NONE,
     issueIdentifier: 'LIN-1', comments, readPrStatus: async ({ repo, number }) => readOne(`https://github.com/${repo}/pull/${number}`),
     stopAt: 'pr', runnerReady: true, viewerIsOwner: true,
   });
   const check = await readCloseOutChain({
+    openFindings: FINDINGS_NONE,
     workspace: WORKSPACE, issueIdentifier: 'LIN-1', seam: seamFor(comments, readOne, 'pr'), stopAt: 'pr',
     runnerReady: true, owner: true, actor: CLOSE_OUT_ACTOR.PERSON, prStatusCache: new Map(),
   });
-  const stopAtGuard = await closeOutNotReady({ workspace: WORKSPACE, issueIdentifier: 'LIN-1', seam: seamFor(comments, readOne, 'pr') });
-  const ladderGuard = await closeOutNotReady({ workspace: WORKSPACE, issueIdentifier: 'LIN-1', seam: seamFor(comments, readOne, null) });
+  const stopAtGuard = await closeOutNotReady({ openFindings: FINDINGS_NONE, workspace: WORKSPACE, issueIdentifier: 'LIN-1', seam: seamFor(comments, readOne, 'pr') });
+  const ladderGuard = await closeOutNotReady({ openFindings: FINDINGS_NONE, workspace: WORKSPACE, issueIdentifier: 'LIN-1', seam: seamFor(comments, readOne, null) });
   const step = blindReadStep({ state: issue }, { comments, allRuns: [] });
   return {
     box: box.closeOut,
@@ -202,11 +205,12 @@ describe('dropping a fact never moves the passenger fact or the gate the wrong w
   for (const row of SYNTHETIC.filter(r => r.name.startsWith('approved'))) {
     test(`${row.name}: an unreadable or missing status never turns followsPerson into 'merged' or clears waitsOn`, () => {
       const trail = readTrail(row.comments);
-      const full = closeOutDecision({ trail, prStatuses: new Map(trail.landing.map(u => [u, statusOf.merged(u)])), actor: 'person' });
-      const dropped = closeOutDecision({ trail, prStatuses: new Map(trail.landing.map(u => [u, statusOf.unreadable()])), actor: 'person' });
-      const unread = closeOutDecision({ trail, prStatuses: new Map(), actor: 'person' });
+      const full = closeOutDecision({ openFindings: FINDINGS_NONE, trail, prStatuses: new Map(trail.landing.map(u => [u, statusOf.merged(u)])), actor: 'person' });
+      const dropped = closeOutDecision({ openFindings: FINDINGS_NONE, trail, prStatuses: new Map(trail.landing.map(u => [u, statusOf.unreadable()])), actor: 'person' });
+      const unread = closeOutDecision({ openFindings: FINDINGS_NONE, trail, prStatuses: new Map(), actor: 'person' });
       // An unreadable status that still carries a merged flag (review F1): the flag is not evidence.
       const unreadableMerged = closeOutDecision({
+        openFindings: FINDINGS_NONE,
         trail, actor: 'person',
         prStatuses: new Map(trail.landing.map(u => [u, { readable: false, state: 'closed', merged: true }])),
       });
@@ -223,7 +227,7 @@ describe('dropping a fact never moves the passenger fact or the gate the wrong w
 });
 
 describe('the decision\'s rules, one per named case', () => {
-  const merged = (comments) => closeOutDecision({ trail: readTrail(comments), prStatuses: new Map([[PR1, statusOf.merged(PR1)]]), stopAt: 'pr', runnerReady: true, actor: CLOSE_OUT_ACTOR.PERSON });
+  const merged = (comments) => closeOutDecision({ openFindings: FINDINGS_NONE, trail: readTrail(comments), prStatuses: new Map([[PR1, statusOf.merged(PR1)]]), stopAt: 'pr', runnerReady: true, actor: CLOSE_OUT_ACTOR.PERSON });
 
   test('a person\'s check on a merged, approved, unread landing sets Done, and the stop-at lane stands aside', async () => {
     const comments = [summary(1), review(2)];
@@ -247,7 +251,7 @@ describe('the decision\'s rules, one per named case', () => {
   });
 
   test('a person\'s check without an approving review sets no Done', () => {
-    const decision = closeOutDecision({ trail: readTrail([summary(1), review(2, 'Request Changes')]), prStatuses: new Map([[PR1, statusOf.merged(PR1)]]), actor: CLOSE_OUT_ACTOR.PERSON });
+    const decision = closeOutDecision({ openFindings: FINDINGS_NONE, trail: readTrail([summary(1), review(2, 'Request Changes')]), prStatuses: new Map([[PR1, statusOf.merged(PR1)]]), actor: CLOSE_OUT_ACTOR.PERSON });
     assert.equal(decision.setDone, false);
   });
 
@@ -255,22 +259,22 @@ describe('the decision\'s rules, one per named case', () => {
     const comments = [summary(1), review(2), read(3, PR1)];
     const statuses = new Map([[PR1, statusOf.open(PR1, MOVED)]]);
     for (const actor of [CLOSE_OUT_ACTOR.PERSON, CLOSE_OUT_ACTOR.HARBOUR]) {
-      const decision = closeOutDecision({ trail: readTrail(comments), prStatuses: statuses, stopAt: 'pr', runnerReady: true, actor });
+      const decision = closeOutDecision({ openFindings: FINDINGS_NONE, trail: readTrail(comments), prStatuses: statuses, stopAt: 'pr', runnerReady: true, actor });
       assert.equal(decision.refuses, 'head-moved', actor);
       assert.equal(decision.setDone, false, actor);
     }
   });
 
   test('an unreadable PR keeps the blind-read gate in place, but unreadability alone never refuses', () => {
-    const unreadBlind = closeOutDecision({ trail: readTrail([summary(1), review(2)]), prStatuses: new Map([[PR1, statusOf.unreadable()]]), stopAt: 'pr', runnerReady: true });
+    const unreadBlind = closeOutDecision({ openFindings: FINDINGS_NONE, trail: readTrail([summary(1), review(2)]), prStatuses: new Map([[PR1, statusOf.unreadable()]]), stopAt: 'pr', runnerReady: true });
     assert.equal(unreadBlind.refuses, 'blind-read-missing', 'the gate still holds');
-    const unreadRead = closeOutDecision({ trail: readTrail([summary(1), review(2), read(3, PR1)]), prStatuses: new Map([[PR1, statusOf.unreadable()]]), stopAt: 'pr', runnerReady: true });
+    const unreadRead = closeOutDecision({ openFindings: FINDINGS_NONE, trail: readTrail([summary(1), review(2), read(3, PR1)]), prStatuses: new Map([[PR1, statusOf.unreadable()]]), stopAt: 'pr', runnerReady: true });
     assert.equal(unreadRead.refuses, null, 'a read on record, the unreadable PR alone refuses nothing');
     assert.equal(unreadRead.status, CLOSE_OUT_STATUS.UNKNOWN);
   });
 
   test('Harbour never sets Done, even on a merged, approved landing with nothing else open', () => {
-    const decision = closeOutDecision({ trail: readTrail([summary(1), review(2), read(3, PR1)]), prStatuses: new Map([[PR1, statusOf.merged(PR1)]]), actor: CLOSE_OUT_ACTOR.HARBOUR });
+    const decision = closeOutDecision({ openFindings: FINDINGS_NONE, trail: readTrail([summary(1), review(2), read(3, PR1)]), prStatuses: new Map([[PR1, statusOf.merged(PR1)]]), actor: CLOSE_OUT_ACTOR.HARBOUR });
     assert.equal(decision.setDone, false);
     assert.equal(decision.status, CLOSE_OUT_STATUS.MERGED);
   });
@@ -278,7 +282,7 @@ describe('the decision\'s rules, one per named case', () => {
   test('the empty-landing witness: no PR on the landing is no merged evidence, so no merge, no Done and no stand-aside', () => {
     const trail = readTrail([c(1, 'Implementation done, CI green.'), review(2, 'Approve', 'the change')]);
     assert.deepEqual(trail.landing, [], 'the landing is empty');
-    const decision = closeOutDecision({ trail, prStatuses: new Map(), actor: CLOSE_OUT_ACTOR.PERSON });
+    const decision = closeOutDecision({ openFindings: FINDINGS_NONE, trail, prStatuses: new Map(), actor: CLOSE_OUT_ACTOR.PERSON });
     assert.equal(decision.status, CLOSE_OUT_STATUS.NO_PR);
     assert.equal(decision.setDone, false);
     assert.equal(decision.followsPerson, null, 'an empty landing is not merged');
@@ -287,9 +291,9 @@ describe('the decision\'s rules, one per named case', () => {
 
   test('a ticket\'s state never reaches enforcement: Done, Canceled and In Progress answer the same for refuses and setDone', () => {
     const trail = readTrail([summary(1), review(2)]);
-    const base = closeOutDecision({ trail, prStatuses: new Map([[PR1, statusOf.open(PR1)]]), stopAt: 'pr', runnerReady: true, actor: CLOSE_OUT_ACTOR.PERSON });
+    const base = closeOutDecision({ openFindings: FINDINGS_NONE, trail, prStatuses: new Map([[PR1, statusOf.open(PR1)]]), stopAt: 'pr', runnerReady: true, actor: CLOSE_OUT_ACTOR.PERSON });
     for (const ticketState of ['completed', 'canceled', 'started', null]) {
-      const d = closeOutDecision({ trail, prStatuses: new Map([[PR1, statusOf.open(PR1)]]), stopAt: 'pr', runnerReady: true, actor: CLOSE_OUT_ACTOR.PERSON, ticketState });
+      const d = closeOutDecision({ openFindings: FINDINGS_NONE, trail, prStatuses: new Map([[PR1, statusOf.open(PR1)]]), stopAt: 'pr', runnerReady: true, actor: CLOSE_OUT_ACTOR.PERSON, ticketState });
       assert.equal(d.refuses, base.refuses, `refuses, ${ticketState}`);
       assert.equal(d.setDone, base.setDone, `setDone, ${ticketState}`);
       assert.equal(d.waitsOn, base.waitsOn, `waitsOn, ${ticketState}`);
@@ -298,14 +302,14 @@ describe('the decision\'s rules, one per named case', () => {
 
   test('a landing PR cited outside the landing is not read by the decision (LIN-4458: the landing decides)', () => {
     const trail = readTrail([summary(1), review(2), read(3, PR1)]);
-    const d = closeOutDecision({ trail, prStatuses: new Map([[PR1, statusOf.merged(PR1)], [PR2, statusOf.open(PR2)]]), actor: CLOSE_OUT_ACTOR.PERSON });
+    const d = closeOutDecision({ openFindings: FINDINGS_NONE, trail, prStatuses: new Map([[PR1, statusOf.merged(PR1)], [PR2, statusOf.open(PR2)]]), actor: CLOSE_OUT_ACTOR.PERSON });
     assert.equal(d.setDone, true, 'an open PR2 outside the landing does not withhold Done');
   });
 
   test('the reasons come in precedence order, frozen, each with its copy', () => {
     assert.ok(Object.isFrozen(CLOSE_OUT_REASONS));
     assert.deepEqual(CLOSE_OUT_REASONS.map(r => r.reason), [
-      'blind-read-missing', 'pr-unreadable', 'pr-not-open', 'multiple-prs', 'head-moved',
+      'blind-read-missing', 'pr-unreadable', 'pr-not-open', 'multiple-prs', 'head-moved', 'open-findings',
       'not-stop-at-run', 'review-not-approve', 'runner-not-set-up',
     ]);
     for (const r of CLOSE_OUT_REASONS) assert.equal(typeof r.message, 'function', r.reason);

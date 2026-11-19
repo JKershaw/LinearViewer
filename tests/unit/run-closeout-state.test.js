@@ -8,6 +8,7 @@
  * not-ready → "○ set up ›", no PR) and every bound of the R1 Done predicate —
  * one case per bound that withholds Done.
  */
+import { FINDINGS_NONE } from '../../lib/close-out-findings.js';
 import { test, describe } from 'node:test';
 import assert from 'node:assert';
 import {
@@ -48,11 +49,11 @@ const derive = (input) => {
   const review = input.review && !explicit && input.review.blindRead === undefined
     ? { ...input.review, blindRead: { prs: landing } }
     : input.review;
-  return deriveCloseOutState({ ...input, landingPrs: landing, review, prStatuses: byUrl(input.prs, input.prStatuses) });
+  return deriveCloseOutState({ openFindings: FINDINGS_NONE, ...input, landingPrs: landing, review, prStatuses: byUrl(input.prs, input.prStatuses) });
 };
 // The decision's setDone for a set of statuses: the landing is the statuses' own PRs (LIN-4458).
 const setsDone = ({ statuses, landing = [...statuses.keys()], review = approve(), actor = 'person' }) =>
-  closeOutDecision({ trail: { review, landing }, prStatuses: statuses, actor }).setDone;
+  closeOutDecision({ openFindings: FINDINGS_NONE, trail: { review, landing }, prStatuses: statuses, actor }).setDone;
 
 // The PR-shape table below runs with the blind-read gate off (no landing PR, LIN-4438); the gate's
 // own cases are in the describe at the end.
@@ -469,8 +470,8 @@ describe('closeOutDecision: setDone — one test per bound that withholds Done (
   });
 
   test('a list lined up by position is refused, not read (LIN-4458)', () => {
-    assert.throws(() => closeOutDecision({ trail: { review: approve(), landing: [A] }, prStatuses: [mergedStatus()], actor: 'person' }), TypeError);
-    assert.throws(() => deriveCloseOutState({ prs: [pr(41)], prStatuses: [openStatus()], landingPrs: [] }), TypeError);
+    assert.throws(() => closeOutDecision({ openFindings: FINDINGS_NONE, trail: { review: approve(), landing: [A] }, prStatuses: [mergedStatus()], actor: 'person' }), TypeError);
+    assert.throws(() => deriveCloseOutState({ openFindings: FINDINGS_NONE, prs: [pr(41)], prStatuses: [openStatus()], landingPrs: [] }), TypeError);
   });
 });
 
@@ -493,7 +494,7 @@ describe('LIN-4438: closeOutWaitsOn and the blind-read gate in the box state', (
 
   test('a missing landing fails loudly, in the predicate and in deriveCloseOutState', () => {
     assert.throws(() => closeOutWaitsOn(approve(), undefined), TypeError);
-    assert.throws(() => deriveCloseOutState({ prs: [pr(41)], prStatuses: new Map([[pr(41).url, openStatus()]]), review: approve(), runnerReady: true, owner: true, stopAt: 'pr' }), TypeError);
+    assert.throws(() => deriveCloseOutState({ openFindings: FINDINGS_NONE, prs: [pr(41)], prStatuses: new Map([[pr(41).url, openStatus()]]), review: approve(), runnerReady: true, owner: true, stopAt: 'pr' }), TypeError);
   });
 
   const gateArgs = (over = {}) => ({

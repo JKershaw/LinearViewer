@@ -8,6 +8,7 @@
  *     did before the loader split (the split's request-free halves were removed
  *     by LIN-3325; the owner page path is pinned here).
  */
+import { FINDINGS_NONE } from '../../lib/close-out-findings.js';
 import { test, describe, before } from 'node:test';
 import assert from 'node:assert/strict';
 import { readRunEvidence } from '../../lib/run-evidence.js';
@@ -45,13 +46,13 @@ const unreadable = async () => ({ readable: false, state: 'unknown', reason: 'st
 
 describe('readRunEvidence: viewerIsOwner defaults to false', () => {
   test('flag omitted → closeOut.owner === false', async () => {
-    const model = await readRunEvidence({ issueIdentifier: 'LIN-1', provider: countingProvider(), callScope: 's', readPrStatus: unreadable });
+    const model = await readRunEvidence({ openFindings: FINDINGS_NONE, issueIdentifier: 'LIN-1', provider: countingProvider(), callScope: 's', readPrStatus: unreadable });
     assert.equal(model.closeOut.owner, false);
   });
 
   test('explicit true and false are honoured', async () => {
-    const owner = await readRunEvidence({ issueIdentifier: 'LIN-1', provider: countingProvider(), callScope: 's', readPrStatus: unreadable, viewerIsOwner: true });
-    const guest = await readRunEvidence({ issueIdentifier: 'LIN-1', provider: countingProvider(), callScope: 's', readPrStatus: unreadable, viewerIsOwner: false });
+    const owner = await readRunEvidence({ openFindings: FINDINGS_NONE, issueIdentifier: 'LIN-1', provider: countingProvider(), callScope: 's', readPrStatus: unreadable, viewerIsOwner: true });
+    const guest = await readRunEvidence({ openFindings: FINDINGS_NONE, issueIdentifier: 'LIN-1', provider: countingProvider(), callScope: 's', readPrStatus: unreadable, viewerIsOwner: false });
     assert.equal(owner.closeOut.owner, true);
     assert.equal(guest.closeOut.owner, false);
   });
@@ -176,7 +177,7 @@ describe('run page owner path (routes/dashboard.js)', () => {
 describe('readRunEvidence: optional comments (LIN-3329)', () => {
   test('comments supplied → no fetchIssueComments; the model is built from them', async () => {
     const provider = countingProvider({ comments: [] });
-    const model = await readRunEvidence({ issueIdentifier: 'LIN-1', provider, callScope: 's', readPrStatus: unreadable, comments: [comment(`opened ${PR_A}`)] });
+    const model = await readRunEvidence({ openFindings: FINDINGS_NONE, issueIdentifier: 'LIN-1', provider, callScope: 's', readPrStatus: unreadable, comments: [comment(`opened ${PR_A}`)] });
     assert.equal(provider.counts.comments, 0, 'the supplied comments were used');
     assert.equal(model.state.pr.url, PR_A);
     assert.equal(model.closeOut.owner, false, 'the viewerIsOwner default is untouched');
@@ -184,14 +185,14 @@ describe('readRunEvidence: optional comments (LIN-3329)', () => {
 
   test('comments omitted → fetched exactly once, as before', async () => {
     const provider = countingProvider();
-    const model = await readRunEvidence({ issueIdentifier: 'LIN-1', provider, callScope: 's', readPrStatus: unreadable });
+    const model = await readRunEvidence({ openFindings: FINDINGS_NONE, issueIdentifier: 'LIN-1', provider, callScope: 's', readPrStatus: unreadable });
     assert.equal(provider.counts.comments, 1);
     assert.equal(model.state.pr.url, PR_A);
   });
 
   test('an empty supplied list is respected (no fetch, no PR)', async () => {
     const provider = countingProvider();
-    const model = await readRunEvidence({ issueIdentifier: 'LIN-1', provider, callScope: 's', readPrStatus: unreadable, comments: [] });
+    const model = await readRunEvidence({ openFindings: FINDINGS_NONE, issueIdentifier: 'LIN-1', provider, callScope: 's', readPrStatus: unreadable, comments: [] });
     assert.equal(provider.counts.comments, 0);
     assert.equal(model.closeOut.status, 'no-pr');
   });

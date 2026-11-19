@@ -16,6 +16,7 @@
  */
 process.env.NODE_ENV = 'test';
 
+import { FINDINGS_NONE } from '../../lib/close-out-findings.js';
 import { test, describe } from 'node:test';
 import assert from 'node:assert/strict';
 import { readFileSync } from 'node:fs';
@@ -272,24 +273,24 @@ describe('the ledger carries the read', () => {
     assert.equal(Object.hasOwn(readRunLedger(trail), 'blindRead'), false);
   });
   test('buildRunEvidence carries it, and the fragment shows the verdict and reason, or none on record', () => {
-    const model = buildRunEvidence({ comments: trail, issueIdentifier: 'LIN-1' });
+    const model = buildRunEvidence({ openFindings: FINDINGS_NONE, comments: trail, issueIdentifier: 'LIN-1' });
     assert.equal(model.ledger.blindRead.verdict, 'same');
     assert.equal(model.evidence.checked.blindRead.verdict, 'same');
     const html = renderRunEvidence(model);
     assert.match(html, /data-testid="run-evidence-checked-blind-read-verdict">same</);
     assert.match(html, /one owner/);
-    assert.match(renderRunEvidence(buildRunEvidence({ comments: [summary(1), review(2)], issueIdentifier: 'LIN-1' })), /no blind read on record/);
+    assert.match(renderRunEvidence(buildRunEvidence({ openFindings: FINDINGS_NONE, comments: [summary(1), review(2)], issueIdentifier: 'LIN-1' })), /no blind read on record/);
   });
   test('a precomputed ledger brings its own read', () => {
     const ledger = { ...readRunLedger(trail), blindRead: readTrail(trail).review.blindRead };
-    assert.equal(buildRunEvidence({ comments: [], ledger, issueIdentifier: 'LIN-1' }).evidence.checked.blindRead.verdict, 'same');
+    assert.equal(buildRunEvidence({ openFindings: FINDINGS_NONE, comments: [], ledger, issueIdentifier: 'LIN-1' }).evidence.checked.blindRead.verdict, 'same');
   });
   test('a precomputed ledger with no blindRead key reads the read after ITS review, not the whole trail (LIN-4438)', () => {
     const older = [read1(1, [PR], 'worse'), summary(2), review(3)];
     const ledger = readRunLedger(older);
-    assert.equal(buildRunEvidence({ comments: older, ledger, issueIdentifier: 'LIN-1' }).evidence.checked.blindRead, null, 'review in the comments');
-    assert.equal(buildRunEvidence({ comments: [older[0]], ledger, issueIdentifier: 'LIN-1' }).evidence.checked.blindRead, null, 'placed by the ledger time');
-    assert.equal(buildRunEvidence({ comments: [...older, read1(4, [PR], 'same')], ledger, issueIdentifier: 'LIN-1' }).evidence.checked.blindRead.verdict, 'same');
+    assert.equal(buildRunEvidence({ openFindings: FINDINGS_NONE, comments: older, ledger, issueIdentifier: 'LIN-1' }).evidence.checked.blindRead, null, 'review in the comments');
+    assert.equal(buildRunEvidence({ openFindings: FINDINGS_NONE, comments: [older[0]], ledger, issueIdentifier: 'LIN-1' }).evidence.checked.blindRead, null, 'placed by the ledger time');
+    assert.equal(buildRunEvidence({ openFindings: FINDINGS_NONE, comments: [...older, read1(4, [PR], 'same')], ledger, issueIdentifier: 'LIN-1' }).evidence.checked.blindRead.verdict, 'same');
   });
 });
 
