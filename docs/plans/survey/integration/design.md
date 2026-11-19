@@ -2,6 +2,27 @@
 
 *Draft 3, 19 Nov: brought into line with the layer as revised on 18–19 Nov, which dropped areas, paths, `blind`, `check`, `same-as`, `checked-at` and `approve-with-notes` (log, "18–19 Nov"); what changed is in §0. Draft 2 carried the recheck's fixes (`checks/recheck.md`), 18 Nov. For John to correct. It follows `integration/plan.md` and rests on the census in `census/C1–C5` (main at `6f6c5d2`), whose row ids (C1-12 and so on) are cited here. The approved design is `layer/design.md`. It is called "the layer" below, with its sections given as §3.1 and so on. Draft 1 was checked by a paper walk, a break reader and a drift reader (`checks/`). This draft answers each of their finds; `checks/answers.md` maps every find to its line here. Every census row is placed in `checks/placement.md`, and `checks/completeness.mjs` confirms it. Marks are as on `situation.md`. Lines with no mark are design, mine until John corrects them.*
 
+## Why: what leaks today, and what each slice fixes
+
+Today Harbour's stages pass free text appended to tickets, comments and area notes. Text written with no end grows, every reading is a fresh parse that can drift, and with no addressee every reader is handed the whole history. The layer gives each hand-off a writer, an addressee, a state and an end, so it reaches one reader and stops when it's done. (The doc copy draws this as a before and after.)
+
+The moments below are from the 15 Nov traces (`picture` §2, peaceful-euler) and the census; each slice exists to stop one of them.
+
+| Leak | What happened | Fixed by |
+|---|---|---|
+| Out, into notes | Larger finds go to an area note's Waiting list, where they stop. The notes grew from 10.6 KB to 88.8 KB in six days; 111 Waiting entries are open; seven safety findings sat only in notes | Slice 1: a find is a record addressed to someone, or to the project backlog |
+| Out, to the person | Trace 4: the same items went "to the person" two days running, and stopped in a closing comment both times | Slice 1: a finding `to: John` shows on his pages until he ends it |
+| Out of reach | A check that needed John's systems passed through six places in trace 1 and nine comments in trace 3, "recorded as not run" each time | Slice 1: one finding with `how`, addressed to John |
+| Across | Trace 6: three asks from another lane, posted on LIN-4448's parent, got no reply; the lane went ahead on silence | Slice 1: an ask is a finding to the task, in that task's next brief |
+| Down | The breakdown copies the plan's files, approach and tests into each child; wrong premises arrived this way in traces 2, 3 and 5 | Slice 2: a child reads its piece of the plan, and a correction is a new version every reader sees |
+| Up | The parent's plan is never edited; corrections pile beside it. A copied count read 26, 25, 23, 22 and 12 (trace 6), and the prune removed the plan seven children pointed to | Slice 2: one plan record, revised in place, every version kept |
+| Judgements guessed from prose | 15 places read comments to guess which one is a verdict, and on which commit (C3) | Slice 3: a verdict is a record pinned to the head its judge read; a later push shows as stale |
+| One ruling, nine keys | The same ruling is keyed by loop, task, session, row, shelf, browser, comment, size text and stamp (C2) | Slice 4: a question record, answered by a decision record |
+| Retold at every step | Each stage restated the ones before; in trace 5 a concern went round a loop and gained a claim no source supports | Every slice: the brief carries what is addressed to you, an index of the rest, and `get` |
+| Broadcast | In trace 1, each of seven sessions began by caching 63,000 to 97,000 tokens | The brief: what is addressed to the reader in full, the rest as one line each |
+
+**Why each slice deletes the old route in the same move:** 9 of the 27 process changes since June are still half-finished, and the process code holds 21 switches that keep an old path or leave a new one off, and 19 old paths kept beside new ones (`docs/papers/harbour/how-process-changes-land.md:20-24`) [checked]. Kept paths stay.
+
 ## 0. What the census and the checks changed
 
 - **The brief already has one door.** Stage prompts carry no ticket text. They point the worker at `GET /api/proxy/brief/<id>`, and the plan reaches the worker only there (C4-31, C4-34) [checked].
@@ -40,7 +61,7 @@
   - Ending a record already in that end returns it unchanged.
   - A refusal (422) names every problem in one response, each with what would work: the kind's fields, or which kind a field belongs to; the valid outcomes or ends; the `to` names.
 - **Open to every token that may write.** The record routes add no per-stage allowance: any actor may write any kind, as §3.2 says. Today's restricted stamps keep limiting ticket writes, as they do now (C5-C06).
-- **Who wrote it is bookkeeping in code.**
+- **Who wrote it is bookkeeping in code.** Why it matters: a build's held session also runs its leftover step, on the same token; without the run, the leftover's findings would be filed as implementation's.
   - Every place that makes a dispatch row with a prompt allocates the row's id before the prompt is finalised. Today the id is made inside `addItem` (`lib/dispatch-store.js:755`), after the prompt (`lib/dispatch-factory.js:14-20`) [checked]. The places are the dispatch factory and the wake builder (`lib/dispatch-wake.js:85-102`, `lib/wake-credential.js`) [checked].
   - The preamble names the run: "your run: <id>". The id is also recorded on the bootstrap token at mint, and the working token inherits it through `parentTokenId`.
   - A signalled follow-up carries its own prompt, and so its own id, into the held session (`sd:dispatcher.js:371`, `sd:hook.js:1212-1215`) [checked].
@@ -151,6 +172,14 @@ Each slice is built as a Harbour task through Harbour's own loop. That task runs
 - Each slice's prompts tell stages which kinds to write. In slice 1 that's findings, with `how` when the finding is a verification to run. Surveys keep a one-line comment for look-first until slice 3 (C3-14).
 - The witness is the test or recorded run that proves a slice works.
 - Readings report and never gate (§2 of the layer).
+
+### Each slice, in practice
+
+1. **Hand-offs.** *Today:* the review lists outside finds in a ledger comment; close-out reads it and writes them into an area note's Waiting list; a later leftover must name one in a `Retires:` line, or it sits. *After:* the review writes a finding `to: close-out`, or `to: project`; close-out sees it in full in its brief and ends it when done. In walk 8 (LIN-4450), a leftover ended a project finding its own commit had settled.
+2. **The plan.** *Today:* the breakdown copies the plan into each child's description; a correction lands as a comment on the parent, and the children keep the old text. *After:* each child points at its piece; a correction is a new version of that piece. In walk 8 (LIN-4446), the first plan-review verdict showed stale on the revised plan and cleared when it was superseded.
+3. **Verdicts.** *Today:* close-out and the selector read comments and guess which one is the verdict, and on which commit. *After:* the review writes a verdict pinned to the change's head. In walk 8 (LIN-4469), a commit pushed after the review, which no review saw, showed as stale, as the real reviewer had said.
+4. **Rulings.** *Today:* an agent's `DECISION:` becomes a ruling keyed nine ways, and John's answer is posted as a comment. *After:* the same marker becomes a question to John; his answer is a decision record, and the session resumes as it does now.
+5. **Lessons.** *Today:* lessons live in the area notes, and prompts are told to read the notes. *After:* a lesson is a project record; every brief says how many hold and how to search them.
 
 | Slice | Moves | Retires in the same move | Witness | Reading before | Knot |
 |---|---|---|---|---|---|
