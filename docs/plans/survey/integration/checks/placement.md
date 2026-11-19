@@ -78,7 +78,7 @@
 - **Keep:**
   - A02, A19 and A20: `areas.json` stays as the code-shape kit's and the tests' map of Harbour's own source. It is not imported; the layer has no areas. A04 keeps spelling its path for those readers.
   - B01–B09, B13 and B15: engine.
-  - B14: kept; slice 6 replaces its use for hand-offs.
+  - B14: kept; slice 6, if it is ever filed, replaces its use for hand-offs.
   - C01–C13: the proxy. C01, C06 and C10 gain the record routes; C07's mint follows the id allocated early.
   - D01–D05: the pattern the store uses.
-- **Slice 4:** B10–B12. B10, the browser resume, is kept and carries out `on-answer`.
+- **Slice 4:** B10–B12. B10, the browser resume, is kept and carries out the effect held on the feedback item.
