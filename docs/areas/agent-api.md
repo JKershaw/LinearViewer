@@ -107,3 +107,7 @@ Area notes for `agent-api` in the registry. Format and rules: README.md.
 - `routes/proxy-writes.js`: the `updateIssue` handler destructures nine body fields and `ISSUE_PATCH_FIELDS`
   (`lib/stage-writes.js`) lists the same nine; only a comment and a source test keep them in step. One list would
   mean reshaping the handler's field-by-field conversion. Not scheduled; no ticket takes it. (LIN-4448 blind read.)
+- `lib/proxy-preamble.js`: its mint sites are classified twice, by helper name in the LIN-3134 tables
+  (`tests/unit/lin-3134-declared-mint-census.test.js`, `tests/unit/lin-3134-followup-sites.test.js`) and by call, with
+  origin and run, in `tests/unit/lin-4492-mint-census.test.js`. One census with a column per classification would replace
+  them; that reshapes three test files. (LIN-4492 Survey global and leftover.)
