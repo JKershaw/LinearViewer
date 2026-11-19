@@ -27,8 +27,8 @@
 import { Router } from 'express';
 import { jsonError } from '../lib/errors.js';
 import { writerOf, WRITER_REFUSAL } from '../lib/run-lineage.js';
-import { TOKEN_ORIGIN } from '../lib/stage-writes.js';
-import { RecordsVersionConflict, RecordsNotFound, looksLikeTicket } from '../lib/records-store.js';
+import { TOKEN_ORIGIN, WRITES } from '../lib/stage-writes.js';
+import { RecordsVersionConflict, RecordsNotFound, looksLikeTicket, MAX_TICKET_DEPTH } from '../lib/records-store.js';
 import { checkAdd, checkRevise, checkEnd, checkLink, refusalOf, splitRef, KINDS } from '../lib/records/check.js';
 import { isTerminalState } from '../lib/providers/state-map.js';
 
@@ -71,9 +71,10 @@ function linkValuesIn(input) {
 }
 
 /**
- * Every reference a body names that may be a ticket (in, to, and the link values). A record id can have a ticket's
- * shape (`finding-12345678`, a run id such as `row-12345`), so checkWrite drops the references that name an existing
- * record before any is read as a ticket (LIN-4493 leftovers): a reference that exists never reaches the tracker.
+ * Every reference a body names that may be a ticket (in, to, and the link values). `looksLikeTicket` takes an
+ * upper-case team key and a number only, so a lower-case record id (`finding-12345678`) is never one. The guard stays
+ * as a second line: checkWrite drops the references that name an existing record before any is read as a ticket
+ * (LIN-4493 leftovers), so a reference that exists never reaches the tracker.
  */
 function ticketRefsIn(input) {
   const refs = new Set();
@@ -139,7 +140,7 @@ export function createProxyRecordsRoutes({ recordsStore, proxyLimiter, authentic
       closedReason: closed ? (state.name || (issue.trashed ? 'Trashed' : null)) : null
     };
     const parentRef = issue.parent?.identifier;
-    if (parentRef && depth < 12) info.parent = await ticketInfo(req, parentRef, depth + 1);
+    if (parentRef && depth < MAX_TICKET_DEPTH) info.parent = await ticketInfo(req, parentRef, depth + 1);
     return info;
   }
 
@@ -322,7 +323,7 @@ export function createProxyRecordsRoutes({ recordsStore, proxyLimiter, authentic
 
   /** The read gate: an identified credential, and not a blind read (its only read is its ticket, LIN-4437). */
   function readable(req, res, endpoint) {
-    if (req.proxyWrites === 'blind-comment') {
+    if (req.proxyWrites === WRITES.BLIND_COMMENT) {
       reply(req, res, endpoint, 403, { error: "a blind read may not read records: its only read is the change it judges, given by its prompt (LIN-4437)" });
       return false;
     }

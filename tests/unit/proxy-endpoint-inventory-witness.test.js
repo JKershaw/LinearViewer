@@ -533,9 +533,10 @@ const ROWS = [
     note: 'clears an already-unset halt — BASE_DEPS() default workspaceHaltStore.clearWorkspaceHalt is a harmless no-op',
     run: () => call(buildApp({ workspaceOwnerCheck: async () => ({ status: 'owner' }) }), 'DELETE', '/api/proxy/dispatch/halt'),  // LIN-3409: owner-gated
   },
-  // --- Group R: records (LIN-4493, routes/proxy-records.js). BASE_DEPS() passes no recordsStore, so a body that
-  // gets past the shape check, or a read of a credential that names an origin, reaches a null store: a 500 with
-  // the store's own error body, never a crash. A body that is not a JSON object is refused before the store.
+  // --- Group R: records (LIN-4493, routes/proxy-records.js). BASE_DEPS() passes no recordsStore and its credential
+  // names no origin, so these rows stop before the store: a body that is not a JSON object is refused 400, and a
+  // read by the origin-less credential is refused 403. What a credential that does name an origin reaches is
+  // tested with a real store in lin-4493-records-routes, not here.
   {
     group: 'R', method: 'POST', url: '/api/proxy/records', expect: 400,
     note: 'a body that is not a JSON object is refused before any credential or store is read (routes/proxy-records.js)',

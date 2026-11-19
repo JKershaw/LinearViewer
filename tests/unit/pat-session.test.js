@@ -30,7 +30,7 @@ class FakeLinearProvider extends ProviderInterface {
     return { id: 'org-1', name: 'Acme', urlKey: 'acme' };
   }
   async fetchViewer() {
-    return { id: 'viewer-1' };
+    return this.viewer ?? { id: 'viewer-1' };
   }
 }
 
@@ -49,12 +49,14 @@ describe('createEnsurePATSession', () => {
   let dbDir;
   let counter = 0;
   let savedPat;
+  let fakeLinear;
 
   before(async () => {
     dbDir = mkdtempSync(join(tmpdir(), 'pat-session-'));
     dbClient = new MangoClient(dbDir);
     await dbClient.connect();
-    registerProvider(new FakeLinearProvider());
+    fakeLinear = new FakeLinearProvider();
+    registerProvider(fakeLinear);
   });
 
   after(async () => {
@@ -68,6 +70,7 @@ describe('createEnsurePATSession', () => {
   });
 
   afterEach(() => {
+    if (fakeLinear) fakeLinear.viewer = undefined;
     if (savedPat === undefined) delete process.env.LINEAR_ACCESS_TOKEN;
     else process.env.LINEAR_ACCESS_TOKEN = savedPat;
   });
@@ -116,6 +119,22 @@ describe('createEnsurePATSession', () => {
     assert.strictEqual(req.session.linearUserId, undefined);
     // LIN-1329: the account seam ran for real.
     assert.ok(req.session.accountId, 'session.accountId set by establishAccount');
+  });
+
+  // LIN-4493 (decision 4, John's link-account ruling): a record's `to` can name a
+  // person by the name the workspace shows, so every tracker sign-in stores the
+  // viewer's display name on the identity. The PAT path is one of them.
+  test('LIN-4493: the PAT sign-in stores the viewer name on the linear identity', async () => {
+    fakeLinear.viewer = { id: 'viewer-9', name: 'Pat Viewer' };
+    const stores = freshStores();
+    const { req, res } = makeReqRes();
+    await createEnsurePATSession(stores)(req, res, () => {});
+
+    assert.ok(req.session.accountId, 'the account was established');
+    const account = await stores.accountStore.getAccount(req.session.accountId);
+    const identity = account.identities.find(i => i.provider === 'linear' && i.scope === 'viewer-9');
+    assert.ok(identity, 'the linear identity was stored under the viewer id');
+    assert.strictEqual(identity.name, 'Pat Viewer');
   });
 
   describe('LIN-3382: the workspace key comes from the one resolver', () => {

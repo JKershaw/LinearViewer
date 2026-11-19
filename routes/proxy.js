@@ -1360,7 +1360,6 @@ export function createProxyRoutes({ proxyTokenStore, proxyEventStore, agentStatu
   // routes/proxy-reads.js, mounted at its original position.
   router.use(createReadRoutes({ proxyLimiter, authenticateProxyToken, resolveProviderAccess, denyIfUnsupported, logEvent, workspaceUnavailable, graphqlErrorStatus, proxyEventStore, consumerHeartbeatStore }));
 
-  // Group E writes (LIN-679 Stage 3b / LIN-2537): extracted to
   // LIN-4493: the records routes (routes/proxy-records.js). The tracker read for a ticket id is the same
   // provider read the proxy's issue route makes, under the same access resolution.
   const readRecordsTicket = async (req, ref) => {
@@ -1371,6 +1370,7 @@ export function createProxyRoutes({ proxyTokenStore, proxyEventStore, agentStatu
   };
   router.use(createProxyRecordsRoutes({ recordsStore, proxyLimiter, authenticateProxyToken, requireWriteScope, logEvent, readTicket: readRecordsTicket, askedText, stageKinds: Object.keys(STAGE_KINDS), listPeople: listRecordPeople }));
 
+  // Group E writes (LIN-679 Stage 3b / LIN-2537): extracted to
   // routes/proxy-writes.js, mounted at its original position.
   router.use(createProxyWriteRoutes({ onTicketWrite, recordPipelineMerge, proxyLimiter, commentDedupe, commentDedupeGenerations, authenticateProxyToken, requireWriteScope, resolveProviderAccess, denyIfUnsupported, denyIfMissingRead, workspaceUnavailable, graphqlErrorStatus, writeRejected, resolveTeamInput, resolveStateInput, resolveProjectInput, resolveLabelInput, refResolutionFailed, partialWriteFailed, logEvent, harbourCommentsStore }));
 

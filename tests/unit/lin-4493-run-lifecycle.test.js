@@ -32,7 +32,7 @@ beforeEach(async () => {
   await db.collection(RECORDS_COLLECTION).createIndex({ urlKey: 1, id: 1, v: 1 }, { unique: true });
   records = new RecordsStore({ records: db.collection(RECORDS_COLLECTION), refs: db.collection(REFS_COLLECTION), queryLog: db.collection(QUERY_LOG_COLLECTION) });
   dispatch = new DispatchQueueStore({ collection: db.collection('dispatch-queue'), historyCollection: db.collection('dispatch-history') });
-  dispatch.runRecords = createRunRecords({ recordsStore: records, readRow: (urlKey, id) => dispatch._rowForRunRecords(urlKey, id) });
+  dispatch.runRecords = createRunRecords({ recordsStore: records, readRow: (urlKey, id) => dispatch.rowForRunRecords(urlKey, id) });
 });
 
 /** A queued dispatch row as the factory writes one (only the fields the take, feedback and closers read). */
