@@ -4600,3 +4600,5 @@ The hourly check-in (trig_01XCTpQoZb2V1vqMFvzXKStm) is now a drive. When a slice
 - It stops for John on: a ruling for him, a broken main, a skipped stage, a retired route kept alive, the safety tasks moving, or work outside the design.
 
 **Change from the earlier agreement:** each slice was to be drafted for John to correct before filing. Tonight, John's go-ahead replaces that review.
+
+- **22:34, John:** close-out checks that only need more runs are handled by running them, as for LIN-4495. Checks that need his sign-in, and agents' extra caution, wait for morning. If anything goes sideways I may pause (abort the autopilot or hold the next slice). The hourly drive prompt is updated to match. Only John can answer a ruling, so a run paused on one waits until morning even when the work is done.
