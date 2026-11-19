@@ -127,7 +127,7 @@ async function submit(app, urlKey, payload, { contentType = 'text/plain' } = {})
 
 function capturingDispatchStore() {
   const items = [];
-  return { items, addItem: async (urlKey, item) => { items.push({ urlKey, item }); return { _id: 'd1', ...item }; } };
+  return { items, addItem: async (urlKey, item, trusted) => { items.push({ urlKey, item, trusted }); return { _id: 'd1', ...item }; } };
 }
 
 describe('feedback submit (LIN-635)', () => {
@@ -309,6 +309,42 @@ describe('feedback submit (LIN-635)', () => {
     assert.strictEqual(item.harness, 'claude-code');
     assert.strictEqual(item.bootstrapToken, 'rw-tok-triage');
     assert.doesNotMatch(item.prompt, /Authorization: Bearer rw-tok-triage/);
+  });
+
+  test("action:'triage' mints its credential with origin dispatch and the created row's id as its run (LIN-4492)", async () => {
+    const { provider } = makeFakeProvider();
+    const dispatch = capturingDispatchStore();
+    const proxyTokenStore = fakeProxyTokenStore('rw-tok-triage-run');
+    const app = buildApp({ provider, dispatchQueueStore: dispatch, proxyTokenStore });
+
+    const { status } = await submit(app, 'acme', { message: 'triage me', action: 'triage' });
+
+    assert.strictEqual(status, 201);
+    assert.strictEqual(dispatch.items.length, 1);
+    const rowId = dispatch.items[0].trusted?.id;
+    assert.ok(rowId, 'the factory allocated the row id and handed it to addItem');
+    assert.strictEqual(dispatch.items[0].trusted.runRecordId, rowId, 'a triage row starts its own run');
+    // The credential, asserted at the mint boundary, not through the prompt text.
+    assert.strictEqual(proxyTokenStore.calls.length, 1, 'one plain mint for the triage run');
+    assert.strictEqual(proxyTokenStore.calls[0].options.label, 'feedback-triage');
+    assert.strictEqual(proxyTokenStore.calls[0].options.origin, 'dispatch');
+    assert.strictEqual(proxyTokenStore.calls[0].options.runRecordId, rowId, 'the token names the created row as its run');
+  });
+
+  test("action:'autopilot' mints with origin dispatch and NO runRecordId key: a kickoff starts no run (LIN-4492)", async () => {
+    const { provider } = makeFakeProvider();
+    const dispatch = capturingDispatchStore();
+    const proxyTokenStore = fakeProxyTokenStore('rw-tok-auto-norun');
+    const app = buildApp({ provider, dispatchQueueStore: dispatch, proxyTokenStore });
+
+    const { status } = await submit(app, 'acme', { message: 'run this end to end', action: 'autopilot' });
+
+    assert.strictEqual(status, 201);
+    assert.strictEqual(proxyTokenStore.grantCalls.length, 1);
+    assert.strictEqual(proxyTokenStore.grantCalls[0].label, 'feedback-autopilot');
+    assert.strictEqual(proxyTokenStore.grantCalls[0].origin, 'dispatch');
+    assert.ok(!('runRecordId' in proxyTokenStore.grantCalls[0]), 'no run key on a kickoff\'s credential');
+    assert.ok(!dispatch.items[0].trusted?.runRecordId, 'and the row carries no run either');
   });
 
   test("action:'autopilot' enqueues a scoped autopilot run with the feedback-origin brief", async () => {

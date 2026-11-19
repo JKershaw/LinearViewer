@@ -1539,7 +1539,7 @@ export function createDispatchRoutes({ dispatchQueueStore, dispatchTokenStore, w
         ttl: BOOTSTRAP_TOKEN_TTL_SECONDS,
         createdBy: req.dispatchTokenOwner,
         // LIN-4492: a runner's broker token is a dispatch credential; it names the refired row's run (none for an
-        // itemId-less refire, which records writes then refuse).
+        // itemId-less refire, which `writerOf` will refuse once the records routes wire it: LIN-4493).
         ...dispatchMintOptions({ writes: stamp.writes, writesTarget: stamp.writesTarget, runRecordId: stamp.runRecordId })
       });
     } catch (err) {

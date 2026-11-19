@@ -23,6 +23,7 @@ import { createProxyRunnerRoutes } from '../../routes/proxy-runner.js';
 import { ProxyTokenStore } from '../../lib/proxy-tokens.js';
 import { DispatchTokenStore } from '../../lib/dispatch-tokens.js';
 import { enqueueFollowUp } from '../../lib/follow-up-dispatch.js';
+import { createDispatchItem } from '../../lib/dispatch-factory.js';
 import { createLeftoverStep } from '../../lib/dispatch-leftover-hook.js';
 import { buildHeldWakeProvisionerFactory } from '../../lib/wake-credential.js';
 import { BASE_DEPS, buildApp, call, makeFakeProvider } from './lib/proxy-fake-deps.js';
@@ -305,5 +306,52 @@ describe('LIN-4468 — a held wake\'s release takes the RESUMED parent\'s stage 
     assert.equal(outcome.token, null, 'no token');
     assert.match(outcome.reason, /wake parent unresolvable/);
     assert.deepEqual(minted, [], 'no bootstrap was minted');
+  });
+});
+
+describe('LIN-4492 — a wake carries the RESUMED parent\'s run (credential at the mint boundary, row through getItemStatus)', () => {
+  /** A parent stage row dispatched THROUGH THE FACTORY, so it has `runRecordId === its _id`; then taken. */
+  async function seedFactoryParent(world, { kind = 'implementation', issueIdentifier = 'LIN-9' } = {}) {
+    const parent = await createDispatchItem({
+      store: world.store, urlKey: URL_KEY, kind, prompt: 'parent work', applyDefaultHarness: false,
+      fields: { promptName: kind, issueIdentifier, harness: 'claude-code', dispatchedBy: OWNER }
+    });
+    assert.equal(parent.runRecordId, parent._id, 'seed: the factory gave the stage row its own id as its run');
+    await world.store.takeItem(parent._id, URL_KEY, 'orchestrator');
+    return parent._id;
+  }
+
+  test('a child\'s [done] wakes the parent: the wake mint carries origin dispatch and the PARENT\'s run, and so does the wake row', async () => {
+    const world = await makeWorld();
+    const minted = [];
+    const realCreate = world.tokenStore.createToken.bind(world.tokenStore);
+    world.tokenStore.createToken = async (urlKey, options) => { minted.push(options); return realCreate(urlKey, options); };
+    const realGrant = world.tokenStore.mintGrantBootstrap.bind(world.tokenStore);
+    world.tokenStore.mintGrantBootstrap = async (args) => { minted.push(args); return realGrant(args); };
+
+    const parentId = await seedFactoryParent(world);
+    const childId = await seedChild(world, parentId, { kind: 'survey-task', route: 'dispatch' });
+    const childRow = [...world.collection._docs, ...world.historyCollection._docs].find(d => d._id === childId);
+    assert.ok(!childRow.runRecordId, 'seed: the reporting child has no run of its own, so a run on the wake can only be the parent\'s');
+
+    const provision = buildHeldWakeProvisionerFactory({
+      proxyTokenStore: world.tokenStore, baseUrl: 'http://127.0.0.1', store: world.store
+    })({ urlKey: URL_KEY, createdBy: OWNER, itemId: childId });
+    const written = await world.store.addFeedback(childId, URL_KEY, { message: '[done] surveyed' }, 'consumer', provision);
+    assert.ok(written, 'the feedback write landed (the consumer took the child)');
+
+    assert.equal(minted.length, 1, 'exactly one wake credential was minted');
+    assert.equal(minted[0].origin, 'dispatch');
+    assert.equal(minted[0].runRecordId, parentId, 'the wake credential names the run it resumes');
+
+    const wake = wakeFor(world, parentId);
+    const status = await world.store.getItemStatus(URL_KEY, wake._id);
+    assert.equal(status.runRecordId, parentId, 'the wake row, read back through getItemStatus, carries the parent\'s run');
+
+    // And the exchanged working token the woken session actually holds.
+    const working = await world.tokenStore.exchangeBootstrapToken(wake.bootstrapToken);
+    const validated = await world.tokenStore.validateToken(working.token);
+    assert.equal(validated.origin, 'dispatch');
+    assert.equal(validated.runRecordId, parentId);
   });
 });

@@ -51,6 +51,8 @@ Area notes for `agent-api` in the registry. Format and rules: README.md.
   exchange (LIN-4492). A person's mint goes through `personMint()` (`lib/stage-writes.js`), which the census pins to the tokens
   page and the test seams; a bare `origin: 'person'` is ignored. Find every mint by its call (`tests/unit/lin-4492-mint-census.test.js`):
   a helper-name search misses a bare `createToken`, which is how LIN-4468 found its gap. A new mint fails the census until it is listed.
+  An owner-issued runner or agent grant copy is a `person` credential: it acts as the owner, so a record written with it is filed as
+  `person:<owner>` by design. `lib/run-lineage.js` `writerOf` is the pure refusal check; no route calls it until the records routes (LIN-4493).
 - The dispatch factory allocates a row's id before its prompt is finalized (LIN-4492, `lib/dispatch-factory.js`). The prompt and every
   credential minted for the row name it; `addItem` takes that id only as its trusted third argument, never from a body field.
 

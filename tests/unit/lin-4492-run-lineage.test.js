@@ -59,6 +59,19 @@ describe('LIN-4492: every refusal names its cause, and none is filed as a person
     assert.deepEqual(r, { ok: false, reason: WRITER_REFUSAL.TOKEN_RUN_UNKNOWN });
   });
 
+  test('a token run row that is not the run the credential carries is refused (token-run-unknown)', () => {
+    // A piece-2 caller that read the wrong token row must not pass the lineage check on that row's lineage.
+    const r = writerOf({ credential: BUILD_CREDENTIAL, tokenRun: REVIEW_ELSEWHERE, namedRun: REVIEW_ELSEWHERE, namedRunGiven: true });
+    assert.deepEqual(r, { ok: false, reason: WRITER_REFUSAL.TOKEN_RUN_UNKNOWN });
+  });
+
+  test('a build credential naming a person\'s id resolves to no run: run-not-found, never person attribution', () => {
+    // A person id is not a run row, so the caller's lookup finds nothing (namedRun null, but a run was named).
+    const r = writerOf({ credential: BUILD_CREDENTIAL, tokenRun: BUILD, namedRun: null, namedRunGiven: true });
+    assert.deepEqual(r, { ok: false, reason: WRITER_REFUSAL.RUN_NOT_FOUND });
+    assert.ok(!('by' in r), 'nothing is filed, and nothing as person:');
+  });
+
   test('a dispatch write that names no run is refused', () => {
     const r = writerOf({ credential: BUILD_CREDENTIAL, tokenRun: BUILD, namedRun: null, namedRunGiven: false });
     assert.deepEqual(r, { ok: false, reason: WRITER_REFUSAL.RUN_NOT_NAMED });

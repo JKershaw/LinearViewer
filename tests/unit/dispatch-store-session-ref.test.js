@@ -2,9 +2,9 @@
  * Unit tests for the autopilot session self-stamp (LIN-599).
  *
  * An autopilot run must forward its own dispatch id as `sessionId` on the worker
- * dispatches it spawns (LIN-591), but the id is minted inside addItem — after the
- * kickoff prompt was built. addItem closes that gap by appending a self-reference
- * block naming `doc._id` to the prompt, gated on `kind === 'autopilot'` with no
+ * dispatches it spawns (LIN-591). Since LIN-4492 the factory (createDispatchItem) allocates the row id before
+ * the prompt is finalized and appends the self-reference block naming it (`kickoffHeadingFor`,
+ * lib/run-identity.js); addItem no longer rewrites prompts. The block is gated on `kind === 'autopilot'` with no
  * `followUpTo` (LIN-4025: a follow-up is not a run root). These tests pin that the
  * block carries the minted id, that it reaches the consumer through the poll/take
  * seam, and that every other kind is left byte-identical.
