@@ -4520,3 +4520,22 @@ John asked whether he can dismiss the 14 queued rows. From a subagent's code rea
 - **LIN-4495:** implementation 0f294a8d (Haiku, effort high) has run since 18:46. At its 19:23 heartbeat it had made 569 tool calls, nearly all Bash. There's no branch or PR yet, so what it retires can't be read. Main is at 4f6fe01a2. LIN-4496: Todo. No rulings.
 - **The autopilot:** still in its long turn; 8 wakes queued.
 - **Check-in timing:** updating a scheduled task needs John's manual approval, which is why the 18:49 reschedule waited until 19:22. With John's approval, an hourly recurring check-in now runs (trigger trig_01XCTpQoZb2V1vqMFvzXKStm, at :27 past each hour). It's written to recover after a container reset by reading `journey.md` and this log first. It stays read-only on Harbour, and anything that needs action waits for John.
+
+### 19 Nov, 20:29: the cutover has a PR; review asked for changes
+
+- **Implementation 0f294a8d** (Haiku, 18:46–20:14, about 970 tool calls) opened PR #2468 at 19:40. CI was red on three E2E shards and a pinned-argument unit test, then green on cf0fee224. Leftover f868f8f1 (Opus, 20:14–20:24) pushed tidy-ups as 509a40ca3 and recorded one project finding.
+- **Review 2b44aa20** (Opus, 20:14–20:20): Request Changes.
+  - Blocker: close-out can't be dispatched while findings addressed to it are open, so it could never run to clear them. Reproduced.
+  - Nine smaller fixes, including an untested brief route, a 127-byte rise in the frozen prompt-size total, and the PR body missing its required lists.
+  - Rework 4e9ca286 (Haiku) from 20:20.
+- **What the code retires** (shown on the branch):
+  - the Waiting lists are removed, with the reader kept frozen for the one-off import only;
+  - `Retires:` is removed;
+  - the ledger parse is removed, with old reviews held as "not measured";
+  - the blind read's "three classes" (census C1-34) are gone. What `lib/run-ledger.js` keeps is the heading pattern, a verdict/section-only `parseRunLedger`, PR URL helpers, a sort and the blind-read shape check.
+  - No actor list, areas or who-may-write rules came back.
+- **Watch items, mine (no action):**
+  - the kept Waiting reader names no end. Its natural end is LIN-4496's live import, so check that it goes or gets dated by then;
+  - the prompt-size ceiling was raised, not held. Check its reason is recorded beside it;
+  - a duplicate launch: the rework started while the leftover session was still live on the same branch, about 4 minutes of overlap.
+- **Status:** LIN-4496 Todo. No rulings. 10 wakes queued.
