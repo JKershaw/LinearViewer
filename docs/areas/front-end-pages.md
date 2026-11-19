@@ -64,3 +64,5 @@ Area notes for `front-end-pages` in the registry. Format and rules: README.md.
   The two converted module pages word one moment two ways ("5 minutes ago" on the task page, "5m ago" on Observation).
   One wording across Settings, Home, KPIs and the browser pages is a size of move (visible copy and goldens change), not a
   tidy; the untrue claims are a fix. (Drift & Coherence Review, 14 Nov.; `docs/reviews/drift-coherence-review-2026-11-14.md`.)
+- `lib/render-task-records.js`: supersede from the task page covers lessons and decisions only (SUPERSEDABLE: the kinds
+  whose ends include `superseded`).

@@ -130,3 +130,5 @@ Area notes for `front-end-browser` in the registry. Format and rules: README.md.
   `init(doc)`, or state declared unconditionally with the wiring guarded in one place. Keep the missing-mount
   behaviour. Larger than a fix for a 2,200-line file; do it with the next change to this file. (LIN-4463 piece 3
   blind read.)
+- `public/question-cards.js`: the Home records are drawn on the page load only. The live refresh (`GET .../api/home-waiting`)
+  merges ruling cards (`mergeWaitingCards`), so a record added after the load shows at the next reload.

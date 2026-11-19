@@ -28,3 +28,5 @@ Area notes for `web-routes` in the registry. Format and rules: README.md.
   picks its env defaults by provider name (`feedbackEnvDefault`, `jira`) instead of a provider
   declaration. One create pipeline with one resolver and one refuse-or-drop rule would make it one
   rule. (LIN-4451 Survey global; leftovers.)
+- `routes/dashboard.js`: a session's run account (`readRunAccount`) reads only the run records of the session's own loops
+  (a loop's id is its row's id). A follow-up row's account is on the run it resumes, which the read does not follow.

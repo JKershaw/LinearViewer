@@ -1,0 +1,54 @@
+# Waiting fixture
+
+Copied from docs/areas/front-end-pages.md at bf2d1575f (LIN-4494): the ## Waiting section only, for the importer test on a shallow checkout.
+
+## Waiting
+- `lib/render-settings.js`: Settings › Models has 42 unnamed `select.harness-select`, 42 unnamed `input.dispatch-effort-input` (one per job row) and 2 unnamed `input.dispatch-preset-name-input` (WCAG 4.1.2). The other seven areas have none. Lighthouse on Settings ran on the sources area and missed this. (Design & Interface Review, 8 Nov 2026; `docs/reviews/design-interface-review-2026-11-08.md`.)
+- `lib/render-pages.js`: the Jira site picker, `renderJiraSiteSelectPage`, overflows a 390px viewport by 52px and a 320px one by 122px. The native `select#jira-site-select` has its right edge at 442px. (Design & Interface Review, 8 Nov 2026; `docs/reviews/design-interface-review-2026-11-08.md`.)
+- `lib/components/halt-controls.js`: in the `buttons` presentation (Dispatch) Pause, Stop and Resume compute to the same style, and the tone the component declares (red for Pause and Stop) is not applied. Stop stops running sessions. (Design & Interface Review, 8 Nov 2026; `docs/reviews/design-interface-review-2026-11-08.md`.)
+- `lib/render-library.js`: every Library document renders two `<h1>` (the shell "Harbour" and the document title), 117 of 117. The index renders one. (Design & Interface Review, 8 Nov 2026; `docs/reviews/design-interface-review-2026-11-08.md`.)
+- `lib/render-styleguide.js`: in dark theme the swatch captions under `.sg-value` show light-theme values (`#ffffff` for `--bg`, `#1a1a1a` for `--fg`) beside dark swatches. LIN-3957 and LIN-3960 are open on this page and do not cover it. (Design & Interface Review, 8 Nov 2026; `docs/reviews/design-interface-review-2026-11-08.md`.)
+- `lib/mask-secrets-in-html.js`: on a Jira workspace `/t/` masks text after `lib/providers/jira/adf.js` has escaped every `_` to `\_`, so underscore-bearing shapes (Resend, Harbour, Linear, GitHub, env-style) reach a guest unmasked; OpenRouter, Mongo, Atlassian and PEM still match. Strip CommonMark backslash escapes, with a position map, before matching. A seam with Providers (`lib/providers/jira/adf.js`; its note, `docs/areas/providers.md`, has no mask entry). (Security Review, 10 Nov.; `docs/reviews/security-review-2026-11-10.md`.)
+- `lib/components/navbar.js`: the workspace switcher's `+ Jira` goes to Jira OAuth `mode=new` (a new
+  sign-in), and on a server with no Jira OAuth env it is not shown at all, although the Jira API-token
+  path (no server config) works there. That path is only reachable from Settings › Sources inside a
+  workspace, so a Jira team without OAuth consent has to find "make a workspace, then Settings" alone.
+  (Onboarding & Cold-Start Review, 11 Nov.; `docs/reviews/onboarding-cold-start-review-2026-11-11.md`.)
+- `lib/render-runner-setup.js`: the runner page defines itself as working "with no Simple Dispatcher"
+  and makes the two exclusive per workspace, but no page a newcomer reads says what Simple Dispatcher
+  is or when a team would want it (an always-on host), and its queue token lives on the Dispatch page.
+  A seam with the simple-dispatcher repo, whose README never names this page. (Onboarding &
+  Cold-Start Review, 11 Nov.; `docs/reviews/onboarding-cold-start-review-2026-11-11.md`.)
+- `lib/render-session.js`: the run page's `session-run-chat` link is missing on the first attempt
+  and present on retry in 10 sampled green runs (no ticket); whether the link renders late or
+  the seed lands late is unknown. (Test Coverage Gap Review, 11 Nov.; `docs/reviews/test-coverage-gap-2026-11-11.md`.)
+- `lib/render-task-timeline.js`: picks a tick's bare style by restating the model's tick rule
+  (`lib/task-timeline.js`: wake, resumed, or no records), and the legend's "woken or resumed" restates
+  it again, though its header says it derives nothing. If the model ticks another role, the renderer
+  styles it wrongly and the legend goes stale; the tick could carry its style. (Drift & Coherence Review, 13 Nov.; `docs/reviews/drift-coherence-review-2026-11-13.md`.)
+- `lib/render.js`: the external deep-link "+ Add task" branch has no in-tree provider since LIN-4451
+  (Jira was the last; GitHub Projects has no create affordance at all). The `getCreateTaskUrl`
+  overrides on Linear, GitHub, Local and Jira now only gate `ui.write`. Folding that gate into
+  `inlineCreate` would retire four overrides, the branch, its byte pin (`tests/unit/render.test.js`),
+  the `public/llms.txt` sentence and the decoupling guard in `tests/unit/providers.test.js`: larger
+  than a fix. (LIN-4451 leftovers.)
+- `lib/render-task-create.js`: on Jira, "+ Add task" under an epic opens `/task/new?projectId=<epic>`,
+  but Jira's `createFields()` has no `projectId`, so `routes/task-create.js` ignores it and the epic is
+  dropped silently; the task files in the chosen project with no epic. Either declare `projectId` in
+  `createFields()` (the provider already sets the epic from it, but the form then needs an epic or project
+  control scoped by team) or stop passing the parameter: a separate design decision, not a line edit.
+  (LIN-4451 review.)
+- `lib/components/view-nav.js`: the docs that describe the view tiers disagree with it. `docs/view-tiers.md` names the
+  first-class root view "dashboard" where the route key is projects (label "tasks"), and it and
+  `docs/architecture/views.md` list proxy among the flagged power-user views although the header switcher always shows
+  it. Rewrite the tier lists from `getViewNavLinks` and `DISPLAY_LABELS`. (LIN-4463 blind read.)
+- `lib/time-words.js`: says it is the one home for relative-time words on the server and the task page. Its test
+  (`tests/unit/lin-4472-time-words.test.js`) and the source map say so too, and `lib/components/time.js` says every
+  other surface uses `relativeAgo`. Three more formatters word the same moment: `formatRelativeTime` (`lib/render.js`,
+  "25m ago", then "yesterday"; Settings, Home and the KPI pages), `window.relativeTime` (`public/common.js`, read bare by
+  the Observation module, Live Console, Proxy and Dispatch) and `formatGeneratedAge` (`public/prompt-section.js`, which
+  rounds where the others floor). Byte-identical `formatDuration` copies sit in `lib/render-escalation-kpis.js` and
+  `lib/render-effort-readout.js`. The guard keys on the names `fmtDuration` and `relativeAgo`, so it sees none of these.
+  The two converted module pages word one moment two ways ("5 minutes ago" on the task page, "5m ago" on Observation).
+  One wording across Settings, Home, KPIs and the browser pages is a size of move (visible copy and goldens change), not a
+  tidy; the untrue claims are a fix. (Drift & Coherence Review, 14 Nov.; `docs/reviews/drift-coherence-review-2026-11-14.md`.)

@@ -134,6 +134,7 @@ const DEP_DEFAULTS = {
   // page — the page route must never generate. Default null → the slot renders
   // empty, the same graceful degrade as the other unwired page caches.
   runParagraphStore: () => null,
+  recordsStore: () => null,
   // Brief/recap caches are per-issue (keyed by issue UUID); the per-session page
   // (LIN-1003) joins them onto a session by distinct loop.issueId. They are NOT
   // otherwise reachable in this router — the observation feed never reads issue
@@ -249,6 +250,21 @@ function resolveDeps(deps) {
  * @param {Object}   [deps.shelvedRulingsStore]    - shelved-rulings store (LIN-1727), threaded into /api/dashboard/rulings
  * @returns {Router}
  */
+/**
+ * LIN-4494: the account of the session's latest ended run, from the records store. Reads the run records named by the
+ * session's loops (a loop's id is its dispatch row's id, and a stage row starts its own run under that id).
+ * @returns {Promise<string|null>}
+ */
+export async function readRunAccount(recordsStore, urlKey, session) {
+  const ids = [...new Set((Array.isArray(session?.loops) ? session.loops : []).map((l) => l?.loopId).filter(Boolean))];
+  if (!ids.length) return null;
+  const versions = await recordsStore.versionsOf(urlKey, ids);
+  const latest = versions
+    .filter((v) => v.kind === 'run' && v.state !== 'open' && typeof v.fields?.account === 'string' && v.fields.account)
+    .sort((a, b) => (a.at < b.at ? 1 : a.at > b.at ? -1 : 0))[0];
+  return latest ? latest.fields.account : null;
+}
+
 export function createDashboardRoutes(deps) {
   const resolved = resolveDeps(deps);
   // The names the run-page block below reads, under the names it reads them.
@@ -257,6 +273,7 @@ export function createDashboardRoutes(deps) {
     dispatchQueueStore,
     agentStatusStore,
     runParagraphStore,
+    recordsStore,
     briefCacheStore,
     recapCacheStore,
     proxyEventStore,
@@ -450,8 +467,11 @@ export function createDashboardRoutes(deps) {
         case: lastAssistantText ? [lastAssistantText] : []
       } : null;
 
+      // LIN-4494: the run's account (its final assistant text, lib/run-records.js), read from the run records of this
+      // session's own rows. A follow-up row's run is the run it resumes, which this read does not follow: no account then.
+      const runAccount = recordsStore ? await readRunAccount(recordsStore, workspace.urlKey, session) : null;
       const html = renderSessionPage(
-        { session, sessionId, issueContext, waiting, waitingMessage, producerLoopId, decision, decisionCase, decisions: sessionDecisions, producer, urlKey: workspace.urlKey, canReply, sessionTerminal, credentialByToken, anchorIssueTitle, runView, proposals, runEvidence, runParagraph },
+        { session, sessionId, issueContext, waiting, waitingMessage, producerLoopId, decision, decisionCase, decisions: sessionDecisions, producer, urlKey: workspace.urlKey, canReply, sessionTerminal, credentialByToken, anchorIssueTitle, runView, proposals, runEvidence, runParagraph, runAccount },
         pageOptions
       );
       res.send(html);

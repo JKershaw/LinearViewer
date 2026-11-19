@@ -1,0 +1,128 @@
+{
+  "_about": "LIN-4494 parked-ticket manifest. Hand-written; each ticket's task and findings are cited to the ticket comment or description they come from.",
+  "tickets": [
+    {
+      "ticket": "LIN-4416",
+      "title": "The safety problems the backlog pass confirmed are closed in code, through the loop",
+      "asked": "**Repository:** JKershaw/LinearViewer (Harbour), and JKershaw/simple-dispatcher where a theme reaches it.\n\n**What this is for.** The backlog pass (A5, LIN-4400) found 134 open tickets with confirmed safety or blocking problems. Most recur in a few themes: merge and read-only limits that exist only in prompt text; tokens inside prompt text; tracker text that can be forged (LIN-3386, LIN-3387, LIN-3402); and tokens that members can mint (LIN-4215). LIN-2576 (the report gate runs on only one route) has topped a Periodical's findings five times. A small outside team will soon hand Harbour real work, and the north star says secure defaults assume hostile input. John: \"Agreed on the safety - a code collection of tasks to run through the improved loop. Alongside the other work we identified as best to work on.\"\n\n**What we want.** The confirmed problems are closed in code, as a collection of tasks run through the loop alongside the other work after the switch.\n\n**Done when** each confirmed problem is fixed in code and its ticket closed for that reason, or John has ruled it can wait.\n\n**Every change names what it retires. Questions:** settle engineering questions yourself; only John's calls (product, money, authority, what to retire) go to him as rulings.",
+      "done_when": "Each confirmed problem is fixed in code and its ticket closed for that reason, or John has ruled it can wait.",
+      "findings": [
+        {
+          "says": "Unbounded Lesson content: stage-added Lessons have no content boundary. Area notes bind eight stage kinds, but the note test checks shape only, and close-out writes review-worded entries to main unreviewed.",
+          "how": "Establish a content boundary for stage-added Lessons; tests/unit/area-notes.test.js checks note shape only. Security Review, 10 Nov.",
+          "to": "project",
+          "source": "comment 080f7d5d"
+        },
+        {
+          "says": "Misattributed token input: a dispatch holder's goal renders as 'Goal from the human' (lib/prompts/autopilot-kickoff.js), and a periodical mint's note as 'the operator' (lib/periodicals.js). Both should name the minting token.",
+          "how": "Change both attribution labels to the minting token. Security Review, 10 Nov.",
+          "to": "project",
+          "source": "comment 080f7d5d"
+        }
+      ],
+      "notes": "One comment (routed from LIN-4470, 14 Nov) and the description; the brief (19 Nov) still lists both findings as open. The two entries were removed from docs/areas/llm-and-prompts.md, which the comment says is removal, not a fix."
+    },
+    {
+      "ticket": "LIN-4210",
+      "title": "Halt poll on a cold cache: decide what 'no halt' means when the store read fails (needs John's ruling, LIN-3024)",
+      "asked": "",
+      "done_when": "Once John rules, one place decides the poll's answer for an unreadable store, both consumers read that answer, and the old fallback copies are deleted.",
+      "findings": [
+        {
+          "says": "For John: Needs John's ruling (LIN-3024): when the halt store read fails on a cold cache, should the poll fail closed for a stop it has seen, or keep the null-on-cold-cache fallback pinned as a contract row?",
+          "how": "John rules. Then the poll distinguishes 'unset' from 'unknown' or pins the default, both consumers (kit haltAction, SD halt wiring) read it, and tests live in tests/unit/workspace-halt-store.test.js.",
+          "to": "project",
+          "source": "description"
+        }
+      ],
+      "notes": "The ticket has no '## As asked' block, no comments, and no 'Done when' line; done_when is taken from its Acceptance list. The 'Unvalidated idea' in the description is an option, not a decision, so it is not listed as a separate finding. Hand-offs to John are addressed to project with \"For John:\" in their words: a person is addressed by account id, and this manifest holds none."
+    },
+    {
+      "ticket": "LIN-4441",
+      "title": "Cut the time tasks spend waiting on tests: CI runs the full suite once in parallel, workers stop duplicating it locally",
+      "asked": "Repository: JKershaw/LinearViewer.\n\n## Why\n\nAbout a third of a code task's working time is spent waiting on tests. That figure comes from 38 tasks and 333 worker dispatches (7–12 Nov), set against 600 PR CI runs:\n\n* **Waiting on CI: 28%** of worker time. The median task waits about 24 min, across three CI waits: implementation, leftover and close-out.\n* **Local full unit-suite runs: 10–13%.** That is about one run per implementation dispatch, at roughly 4–6 min each.\n\nMost of that is duplication, not added assurance:\n\n* CI's unit job runs the full unit suite twice, one pass after the other, at about 4 min each. That makes it the critical path, at about 8.5 min per run; no E2E shard takes more than about 5.5 min.\n* Workers then run the same suite again locally before pushing. Merging is gated on `ci-success`, so the local run adds no quality. It only finds a failure sooner.\n* One unit test, \"without acorn\" in the code-shape kit, fails on the runner machine every time because of its folder layout. In 8 of the 38 tasks a worker stopped to prove it also fails on main.\n\nA subset of tests isn't the answer for code changes. An affected-tests selection over the last 60 merged PRs still needed about 82% of the suite's time, because about 990 of 1,254 unit test files reach the server. It would have caught 10 of 10 recent CI unit failures, so a subset is safe; it just isn't faster. LIN-4125 (2 Nov) reached the same pre-push conclusion, but its rule never reached the implementation template.\n\n## What's wanted\n\n1. **CI gives the same proof in less time.** Every check CI runs today still runs, but a PR's run finishes in roughly the time of its slowest single job, not the sum of the two unit passes.\n2. **Workers stop running the full unit suite locally as a matter of routine.** Before pushing, a worker runs the tests that bear on its change, and CI is the full proof. This is said once, where the implementation stage gets its instructions, so it stops being re-decided per task.\n3. **A local unit run is green on main on the runner machine,** so a red result means the change broke something.\n\n## Done when\n\n* A PR's CI wall time drops clearly below today's \\~8.5 min median, with no check removed or weakened.\n* New implementation trails show targeted local runs and CI as the full check, with no routine local full-suite run.\n* The \"without acorn\" test passes on the runner machine, or is fixed so it no longer depends on where the temp folder sits.\n* A re-measure on a fresh sample of tasks shows how much the test-wait share fell from about a third.\n\n## Out of scope\n\n* Building a test-selection tool for code changes. The evidence says it would save about a minute a run.\n* Changing which tests exist, or loosening any of them.",
+      "done_when": "PR CI wall time drops clearly below the ~8.5 min median with no check removed; implementation trails show targeted local runs; the 'without acorn' test passes on the runner; a fresh-sample re-measure shows the test-wait share fell.",
+      "findings": [
+        {
+          "says": "Workers follow the local-test rule after deploy is not yet evidenced: read the trails of the first 5+ implementation dispatches after the merge, plus leftover and close-out, for a full-suite run before a push.",
+          "how": "Read the dispatch trails in the window after merge. A full-suite command before push, with CI present and no stated reason, is a miss; the next action would then be implementation on this ticket.",
+          "to": "close-out",
+          "source": "comment 9c1053b2 (ledger item 2)"
+        },
+        {
+          "says": "Post-merge main wall time is not yet shown: after deploy, the main-run median should be clearly below about 8.5 min. Pre-merge, the last 200 successful main runs had a median of 8.38 min.",
+          "how": "Run node scripts/measure-ci-wall.mjs --since <merge date> after deploy. Rollback: revert the 936dcddee workflow split.",
+          "to": "close-out",
+          "source": "comment 9c1053b2 (ledger item 4)"
+        },
+        {
+          "says": "For John: The re-measure of the test-wait share cannot run: no committed script reproduces the 7-12 Nov baseline (28% CI wait, 10-13% local runs). John to say who produced it and where its inputs are, or agree to drop that bullet.",
+          "how": "Supply the original method and inputs, or rule the Done-when bullet dropped (only John can). The method now committed in scripts/measure-ci-wall.mjs is the fallback.",
+          "to": "project",
+          "source": "comment 9c1053b2 (ledger item 3); comment bf890e7d"
+        }
+      ],
+      "notes": "Still In Progress after merge (e3a3268a1); the close-out comment holds it open for these ledger items. Ledger items 1 and 5 are discharged. The formatLocalTestRule repo-command edge is a Waiting entry in docs/areas/llm-and-prompts.md and is left out here to avoid double-counting. Hand-offs to John are addressed to project with \"For John:\" in their words: a person is addressed by account id, and this manifest holds none."
+    },
+    {
+      "ticket": "LIN-4445",
+      "title": "The loop works on Jira: Harbour can create Jira issues, and Jira can hold a task's sealed words",
+      "asked": "**Repository:** JKershaw/LinearViewer (Harbour).\n\n**What this is for.** The first outside test will be a small team on Jira who already use agents and are looking to have agents build their product. John has used Harbour on Jira for a few weeks: \"it's mostly fine except for the gaps that you've identified.\" The gaps:\n\n* Harbour can't create a Jira issue, so on Jira the loop can't file a task with the person's words sealed, mint a Periodical, or file what a task's last step files;\n* Jira can't yet hold the block that keeps the person's words exactly as asked.\n\n**What we want.** On a Jira-backed workspace, the loop does what it does on Linear: a task can be filed with the person's words sealed, a Periodical can be minted, and a task's last step can file what it files. It's checked on John's own Jira, which is already in real use.\n\n**Done when** on John's Jira a task filed through Harbour keeps the person's words sealed, a Periodical mints, and a task's last step can file.\n\n**Every change names what it retires. Questions:** settle engineering questions yourself; only John's calls (product, money, authority, what to retire) go to him as rulings.",
+      "done_when": "On John's Jira, a task filed through Harbour keeps the person's words sealed, a Periodical mints, and a task's last step can file.",
+      "findings": [
+        {
+          "says": "For John: Run the LIN-4452 live-check runbook on John's own Jira, including the epic placement and 409 Done-gate steps, and paste the evidence back. Nothing is proved on a live site until then.",
+          "how": "Runbook comment f495ca4b, steps 0-7. If Jira drops harbour.asAsked on a create (PARTIAL_WRITE, failed 'property'), the separate PUT fallback is the next change and needs property-1.json.",
+          "to": "project",
+          "source": "comment d52aaac6 (hand-back); runbook comment f495ca4b ; ruling comment d1459aad"
+        },
+        {
+          "says": "For John: Open for John: a Jira screenshot is still refused with 422, since Jira has no uploadFile and an attachment needs an issue first. Jira feedback with no FEEDBACK_ default files to the first Jira project.",
+          "how": "John decides both: whether Jira screenshots are in scope, and whether Jira feedback should have a default project.",
+          "to": "project",
+          "source": "comment 3fb9098b (LIN-4451 piece 2)"
+        },
+        {
+          "says": "Display-only Jira rendering bugs, filed as LIN-4473 (still Backlog): a fenced code block with a blank line splits into fragments, and an ordered list's start number is lost (3. shows as 1.).",
+          "how": "Fix in the markdownToAdf codec. The sealed words stay byte-exact in the harbour.asAsked property, so this affects display only.",
+          "to": "project",
+          "source": "comment b92a0030 (LIN-4452 leftovers)"
+        },
+        {
+          "says": "PATCH still drops a non-UUID parentId silently. The comment calls this a follow-up; create now refuses it with a 400.",
+          "how": "Make PATCH refuse a non-UUID parentId as create does. No ticket is cited in the comment.",
+          "to": "project",
+          "source": "comment 3fb9098b (LIN-4451 piece 2)"
+        }
+      ],
+      "notes": "Ruling d1459aad (epic placement and the 409 gate are required) is answered and folded into the live-check finding, not listed separately. The Waiting entries in docs/areas/providers.md (D1 vocabulary, holds-verbatim capability) are left out as area-note homes. The description's Done-when is checked only by the live run. Hand-offs to John are addressed to project with \"For John:\" in their words: a person is addressed by account id, and this manifest holds none. Hand-offs to John are addressed to project with \"For John:\" in their words: a person is addressed by account id, and this manifest holds none."
+    },
+    {
+      "ticket": "LIN-4463",
+      "title": "The front end, left simpler: pages become modules that import what they share, one view at a time",
+      "asked": "**Repository:** JKershaw/LinearViewer (Harbour).\n\n**What this is for.** John: \"the UI issues trace back to one of my very first rules: no build step… it's the biggest target of the Theseus method… We don't need to tidy it all, but it's a perfect example where we can leave it better than we found it.\" The first slice (LIN-4446) served a pure server file to the browser at `/shared/` and retired the browser's copy. Its blind read found the cost: a bridge turns the shared file back into a global, with a load-timing rule that four files explain and nothing checks, and a second shared file would need a second bridge. On the direction, John: \"I feel there's a sensible engineering approach, that a skilled developer would take… Excellent, that sounds like a great solution.\" Today the browser area has 44 script files that share through globals, `public/common.js` is 3,309 lines and `public/observation.js` 5,019, over 100 unit test files load browser scripts as classic scripts, and the area's note holds 10 Waiting entries.\n\n**What we want.**\n\n* Pages become ES modules that import what they share, as browsers do natively. Still no build step and no framework.\n* Shared logic is imported, not restated: each converted view drops its copies.\n* A bridge back to a global is only a temporary ramp for pages not yet converted: one at most, and visibly shrinking.\n* The tests get simpler as views convert, not more elaborate.\n* Taken one view at a time, each piece finishing one move and naming what it retired. John on size: \"Happy for it to be whatever size is natural.\"\n* No view is retired unless John rules it. The side rail and the visual refresh (LIN-4342, LIN-4343) come after, on the cleaner code.\n\n**Done when**\n\n* the slice 1 bridge is gone, or the only one left and shrinking under a check;\n* the area's Waiting entries are settled, or say why not;\n* the area reads better in a blind read after this work than before it, by more than an untouched area read at the same times.\n\n**Every change names what it retires. Questions:** settle engineering questions yourself; only John's calls (product, money, authority, what to retire) go to him as rulings.",
+      "done_when": "The slice-1 bridge is gone or the only one left and shrinking under a check; the area's Waiting entries are settled or say why not; the area reads better in a blind read than an untouched control area.",
+      "findings": [
+        {
+          "says": "Piece 5 is not done: convert the public/prompt-section.js chain (app.js, swipe.js), then delete public/cost-format-global.js and tests/fixtures/browser-cost-format.js. Done-when 1 needs it.",
+          "how": "The bridge-inventory test shrinks to zero classic readers, then both files are deleted. Close-out's next action is implementation.",
+          "to": "implementation",
+          "source": "comment 5f70e262 (close-out, piece 4); description 'Scope after piece 3'"
+        },
+        {
+          "says": "For John: Done-when 3 waits on John's pass figure for the changed-code paired blind read. The frozen +0.5 threshold stands, and the deciding read will not run until he sets the figure.",
+          "how": "John sets the pass figure. Then run the paired read on the files the lane changed, with an untouched control area, as comment db14ecf4 directs.",
+          "to": "project",
+          "source": "comment 5f70e262 (close-out, piece 4); comment db14ecf4 ; comment 78e450ea"
+        },
+        {
+          "says": "Post-deploy browser checks not run, needing a signed-in operator: Observation, task pages, /t/<token> polling, a priced KPI chart and flight companion in Safari and Firefox, with no console, CSP or module-MIME errors.",
+          "how": "Open each page on the deployed build in Safari and Firefox and check the listed behaviour. Rollbacks are listed in comment 5f70e262 (6348e57) and the earlier close-outs.",
+          "to": "project",
+          "source": "comment 5f70e262 (ledger, carried from pieces 1-3); comment f1bbb463"
+        }
+      ],
+      "notes": "Comment 19 (blocked check) says nothing waits on a person, but the later close-out (5f70e262) says Done-when 3 waits on John's pass figure; the later comment is followed. Pieces 1-4 are merged and the ticket stays In Progress. The 'larger' blind-read item and the other Waiting entries sit in docs/areas/front-end-browser.md and are left out. Hand-offs to John are addressed to project with \"For John:\" in their words: a person is addressed by account id, and this manifest holds none."
+    }
+  ]
+}

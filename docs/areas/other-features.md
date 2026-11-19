@@ -48,3 +48,9 @@ Area notes for `other-features` in the registry. Format and rules: README.md.
   preamble's "adding a value means" checklist does not name it, so a new value without a row answers 500, not 403. The
   mandates and this header say "one comment", while the gate allows the `createComment` operation any number of times.
   (Drift & Coherence Review, 14 Nov.; `docs/reviews/drift-coherence-review-2026-11-14.md`.)
+- `lib/home-row-states.js`: the Home count and badge count rulings only, so records to a person are not in "N waiting on
+  you" (LIN-4494's open question, decided here; `lib/waiting-section.js` draws the records beside the rulings).
+- `lib/home-pipeline.js`: Home's assignee lookup is still a second reader of workspace membership. It moves onto
+  `lib/workspace-people.js` with a batched member read (LIN-4494's remaining work, not done in piece 3).
+- `lib/home-row-states.js`: records addressed to members other than the owner have no Home destination; Home is owner-only
+  in this slice (LIN-4494).

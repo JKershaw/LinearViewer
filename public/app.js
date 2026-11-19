@@ -827,7 +827,8 @@ function createDeskPlacement({ main, countLine, live, searchResults, searchInput
 // hidden while either holds, so one never overwrites the other (clearing a search does not un-hide an empty section).
 function syncWaitingSection(section) {
   if (!section) return
-  const empty = !section.querySelector('.waiting-card')
+  // LIN-4494: a person's record is a reason to show the section too (`.waiting-record`, drawn on the page load).
+  const empty = !section.querySelector('.waiting-card, .waiting-record')
   section.classList.toggle('hidden', empty || section.dataset.searchHidden === 'true')
 }
 
