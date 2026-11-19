@@ -4609,3 +4609,14 @@ The hourly check-in (trig_01XCTpQoZb2V1vqMFvzXKStm) is now a drive. When a slice
   3. send the paused autopilot a note (followUpTo the kickoff id, queueIfBusy) so it carries on. A held session takes a note at once, as the 14:27 note showed.
 
   The ruling stays open for John to tidy in the morning. The hourly drive prompt is updated to match.
+
+### 19 Nov, 22:58: LIN-4495 Done; slice 1 moves to piece 5
+
+- **The six re-reviews** (dispatched 22:28) all finished by 22:36. Verdicts are in the carry list:
+  - 4 Request Changes, 2 conditional Approves;
+  - each posted a "## Review" comment;
+  - none started follow-on work.
+  - They wait for John, LIN-4463 and LIN-4441 especially.
+- **The ruling** was answered at 22:28:27, and the autopilot resumed at 22:28:30. It then blocked again, waiting on LIN-4495's Done.
+- **I marked LIN-4495 Done** (PATCH stateId done, 200) and sent the autopilot a note (9798e64f) to carry on with LIN-4496.
+- **Caveat:** the Done gate read "none open" partly because of the `isEmptyStatement` defect (finding-76683071). That defect is on the carry list.

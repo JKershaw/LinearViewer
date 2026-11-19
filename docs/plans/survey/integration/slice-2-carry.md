@@ -22,6 +22,17 @@ The ruling `lin4495-postdeploy-gate` (21:47, 19 Nov) was answered "accept" on my
    - Fix it before relying on the gate for older tickets.
    - Check whether it touches LIN-4496.
 
+## The six re-review verdicts (22:28–22:36, 19 Nov; John's to act on)
+
+- LIN-4463: Request Changes. It waits for John to restart the paused lane.
+- LIN-4452: Approve, conditional on John's live Jira check.
+- LIN-4441 (paused lane): Request Changes, back to implementation.
+- LIN-4028: Request Changes. PR #2185 conflicts with main.
+- LIN-3357: Request Changes. The ticket stays parked.
+- LIN-2422: Approve, conditional. John's hold still blocks the merge.
+
+No follow-on dispatches were made. LIN-4495 was marked Done at 22:58.
+
 ## How tidies like this are handled
 
 A judgement call, not a rule (John, 19 Nov). Tidying as we go, a small standalone task, or waiting until the end can each be right, depending on the case. Keeping the running slice going matters most. John expects much of this to sort itself out once the upgrade is done.
