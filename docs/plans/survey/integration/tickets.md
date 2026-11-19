@@ -1,6 +1,6 @@
 # Tickets: the layer in Harbour
 
-*Drafted 19 Nov for John to read before anything is filed. Same shape as `asks.md`. The design is agreed (`integration/design.md`, cited here at `claude/cool-rubin-6acj5j@92838c5cf`). The parent and slice 1 are filed together; each later slice is drafted and filed as the one before lands, from what that slice really left. Not filed yet.*
+*Drafted 19 Nov; John read them ("That all sounds great") and both were filed the same day, sealed by Harbour: the parent as LIN-4490, slice 1 as LIN-4491 under it, both in Backlog, nothing dispatched. Same shape as `asks.md`. The design is agreed (`integration/design.md`, cited here at `claude/cool-rubin-6acj5j@92838c5cf`). The parent and slice 1 are filed together; each later slice is drafted and filed as the one before lands, from what that slice really left.*
 
 ## P. The parent
 
