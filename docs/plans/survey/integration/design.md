@@ -90,7 +90,7 @@
   - `to` the owner, or a deciding stage.
 
   A withdrawal ends it. No other repository changes.
-- **The question keeps today's per-answer effect** (resume, record or dispatch, C2 "Resume"), as a field `on-answer`. *This adds to the layer's question kind. Flagged for John (§11).*
+- **What an answer sets off stays Harbour's** (resume, record or dispatch, C2 "Resume"). It is already held on the feedback item that raised the question (C2-09). The answer route finds it through the question's `about` link to the asking run, and uses `record` when no run asked (scan rulings). The question kind is unchanged (John, 19 Nov: "Easy to add later if it's a gap worth closing").
 - **An answer is a `decision` record** (`by: person:<accountId>`, `answers` the question), and the question ends `answered`.
   - The browser's existing resume carries out the effect, unchanged (C5-B10).
   - Harbour's answer route refuses a question that has already ended, which keeps the 409 (C2-13). That's a rule in the route, not in the store.
@@ -164,10 +164,10 @@ Each slice is built as a Harbour task through Harbour's own loop. That task runs
 1. **Decided (18 Nov):** the parked work runs after slice 4, as the first work through the upgraded Harbour. It is read against the 13–14 Nov baselines, reported and never gating. John: "I'm the only user so there's no pressure or rush."
 2. **Decided (18 Nov):** provider sync is a follow-up (§7).
 3. **Small changes to the approved layer:**
-   - the question kind gains `on-answer`, keeping today's three effects (§5);
    - the actor list comes from Harbour's stage kinds plus people, not a hand-kept file (§1);
    - a temporary ninth brief part, the ticket section, until slice 4 (§3). **Accepted** (John, 18 Nov: "That's fine. A little temporary scaffolding is ok.")
    - *Withdrawn in draft 3:* part 5 listing every area while a task had no paths. Areas are gone.
+   - *Withdrawn (John, 19 Nov):* an `on-answer` field on the question kind. What an answer sets off stays on Harbour's feedback item (§5).
 4. **Rulings as their own slice 4,** rather than inside hand-offs as the journey had it. The census shows 50 sites (C2).
 5. **Slice 6:** build it, or wait until hand-offs show the need.
 6. **Knots.** Records imports nothing back, so none of these makes a new pair, and none changes code inside today's tightest pair beyond its reads. My call is to accept them all, with nothing to tidy first.
