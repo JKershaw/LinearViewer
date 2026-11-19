@@ -114,3 +114,38 @@ On your first question, the record shows finished tasks going from spiralling to
   5. when slice 1 lands, draft slice 2 for John, then file it.
 - **Token:** working token in the scratchpad (`harbour-token`), expires 21 Nov 10:11 UTC; never printed.
 - **Next:** compact; then the readings, then the kickoff.
+
+## 19 Nov, afternoon: slice 1 under way, a routing fix, and a peer colleague
+
+- **Slice 1 (LIN-4491)**, autopilot `20fdf661`, launched 11:59 UTC on default models. The before readings are in `integration/readings/slice-1-before.md`. The plan was approved after one revision and broken into five chained pieces:
+  1. LIN-4492: run ids, plus the design pages to main. Merged at 13:43 as PR #2464; deploy healthy.
+  2. LIN-4493: the records store and its routes. Building; PR #2465 is in a fix round after review asked for changes.
+  3. LIN-4494: the pages and the Waiting importer.
+  4. LIN-4495: the cutover, where the Waiting lists, `Retires:` and the ledger parse go.
+  5. LIN-4496: the walk-8 replays, the readings and the live import.
+  - John answered the LIN-4493 ruling with **link-account**: store the tracker user id on the account, with one workspace-people reader.
+- **The routing defect.** LIN-4493's first build skipped its surveys and scoping. A sibling's close-out note quoted that sibling's PR link, and look-first counts any PR link in any comment as the ticket being in progress (`lib/recommendation-look-first.js`, `lib/recommendation-facts.js`). The selector is never offered the Surveys, so the ticket could not get them back.
+  - It was reproduced independently by the peer colleague. It's the best-supported explanation of the incident, not a proven trace.
+  - It happened 3 times in a bounded sample of 80 tickets since 8 Nov.
+  - Notes: `integration/checks/lin-4493-skip.md`, `lin-4493-rca.md`, `lin-4493-intent.md`.
+  - John aborted the bad build. The slice 1 autopilot got a note with a workaround: send the three look-first steps by name whenever a piece's comments hold a PR link. LIN-4493 then ran its surveys and scoping properly.
+- **The fix, LIN-4497**, filed from `integration/fix-look-first.md` and run on its own autopilot `df03bb30`. Only a ticket's own PR counts.
+  - John accepted the ruling to cut hand-opened PRs that are only pasted into a comment.
+  - Plan review approved at 15:47; the build started at 15:47.
+  - **When it lands, tell the slice 1 autopilot the workaround is no longer needed**: a follow-up note with `followUpTo` set to its kickoff id and `queueIfBusy`.
+- **The peer colleague** is a read-only agent from another model family in John's yap room `#harbour-peer`, at https://yap-yap.up.railway.app.
+  - I post as **Claude-builder** through the plain HTTP API (`scratchpad/yap/llms.txt`): `say`, `poll`, `history` and `listen`.
+  - `scratchpad/yap/watch.sh`, run in the background, exits when someone tags @Claude-builder, which wakes the session. Restart it after each tag.
+  - The room keeps only the last 200 messages and has no persistence, so anything that matters goes in the log.
+  - Bring the colleague in at decision points and with consequential claims, giving it the evidence and not just the conclusion. Its silence never blocks.
+  - **Next checkpoint:** LIN-4497's PR review, which it expects to be tagged on with the PR and head. Its open question: whether stored feedback proves a PR is this ticket's own. The plan restricts this to finished build runs; the paused-then-finished case and the case of a finished run with no PR of its own are declared gaps.
+- **Recap for John:** https://claude.ai/artifact/VuxF7ZT1Y3nH9ez7RpQhWU (doc `ea249a7a-7368-4518-b3b1-2b3bf7b513d5`, body `dcb475e7-0b56`). Update it at each check-in with "Where we are now", the Links table states and a Timeline row.
+- **Working rules John set today**, which add to "Methods that have worked":
+  - follow Harbour's normal process strictly;
+  - do every reading through subagents and keep my own context clean;
+  - check against the rows before relaying anything;
+  - label each claim shown, not shown or unknown;
+  - don't do unnecessary things that need guessing;
+  - don't hand John raw data walls.
+- **Still open:** the four `wake` rows on LIN-4493 that sit `queued` (unknown; no action); old Sep–Nov stale rows (housekeeping, untouched); the LIN-4399 blind-read lead (harm unknown).
+- **Next:** the scheduled check-in (about 16:12) reads LIN-4493 and LIN-4497 through a subagent, tags the colleague if LIN-4497's PR is up, and updates the recap. Then follow slice 1 piece by piece; when it lands, take the after readings and draft slice 2 for John.
