@@ -23,6 +23,16 @@ describe('code-shape area map placement (LIN-3729)', () => {
     assert.strictEqual(areaOf('lib/task-cost-read.js'), 'Runs & dispatch');
   });
 
+  // LIN-4493 (piece 2): the records leaf is its own area, ahead of the ^lib/ catch-all. Its proxy router stays in
+  // Agent API by first match, and the run lifecycle seam stays in Runs & dispatch by its run- pattern.
+  test('the records leaf lands in its own Records area; its router and the run seam stay where they were', () => {
+    for (const path of ['lib/records/kinds.json', 'lib/records/check.js', 'lib/records/views.js', 'lib/records/brief.js', 'lib/records-store.js']) {
+      assert.strictEqual(areaOf(path), 'Records', path);
+    }
+    assert.strictEqual(areaOf('routes/proxy-records.js'), 'Agent API (proxy)');
+    assert.strictEqual(areaOf('lib/run-records.js'), 'Runs & dispatch');
+  });
+
   test('the three relabelled files land in their owning areas', () => {
     assert.strictEqual(areaOf('lib/proxy-fetch.js'), 'Platform & plumbing');
     assert.strictEqual(areaOf('lib/openrouter-key-resolver.js'), 'Auth, accounts & workspaces');

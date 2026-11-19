@@ -58,20 +58,21 @@ describe('LIN-4468 — the allowance table (lib/stage-writes.js)', () => {
     assert.equal(new Set(STAGE_WRITE_OPS).size, STAGE_WRITE_OPS.length);
   });
 
-  test('none refuses every operation', () => {
-    for (const op of STAGE_WRITE_OPS) assert.equal(stageWriteAllows('none', op), false, `none refuses ${op}`);
+  // LIN-4493: recordWrite is the one operation every stamp may perform (any actor may write any record kind).
+  test('none refuses every ticket operation, and allows only recordWrite (LIN-4493)', () => {
+    for (const op of STAGE_WRITE_OPS) assert.equal(stageWriteAllows('none', op), op === 'recordWrite', `none ${op}`);
   });
 
   for (const writes of ['one-comment', 'blind-comment']) {
-    test(`${writes} allows one comment and nothing else`, () => {
+    test(`${writes} allows one comment and recordWrite, and nothing else`, () => {
       for (const op of STAGE_WRITE_OPS) {
-        assert.equal(stageWriteAllows(writes, op), op === 'createComment', `${writes} ${op}`);
+        assert.equal(stageWriteAllows(writes, op), op === 'createComment' || op === 'recordWrite', `${writes} ${op}`);
       }
     });
   }
 
   test('ticket-fields allows the triage operations, and no description, create or relation write', () => {
-    const allowed = ['updateIssue', 'createComment', 'addLabel', 'removeLabel'];
+    const allowed = ['updateIssue', 'createComment', 'addLabel', 'removeLabel', 'recordWrite'];
     for (const op of STAGE_WRITE_OPS) {
       assert.equal(stageWriteAllows('ticket-fields', op), allowed.includes(op), `ticket-fields ${op}`);
     }
@@ -102,7 +103,7 @@ describe('LIN-4468 — the allowance table (lib/stage-writes.js)', () => {
     assert.equal(normalizeWritesStamp(42), WRITES.NONE);
     assert.equal(normalizeWritesStamp(null), null);
     assert.equal(normalizeWritesStamp(undefined), null);
-    for (const op of STAGE_WRITE_OPS) assert.equal(stageWriteAllows('constructor', op), false, `unknown ${op}`);
+    for (const op of STAGE_WRITE_OPS) assert.equal(stageWriteAllows('constructor', op), op === 'recordWrite', `unknown ${op}`);
   });
 
   test('only a stamp other than unstamped and work narrows anything', () => {
@@ -281,6 +282,11 @@ const CENSUS = [
   { m: 'POST', p: '/api/proxy/dispatch', kind: 'scoped', op: 'dispatch' },
   { m: 'POST', p: '/api/proxy/recommend-and-dispatch', kind: 'scoped', op: 'dispatch' },
   { m: 'POST', p: '/api/proxy/periodicals/:id/mint', kind: 'scoped', op: 'periodicalMint' },
+  // LIN-4493: the records routes (routes/proxy-records.js). Any actor may write any kind, so every stamp is allowed.
+  { m: 'POST', p: '/api/proxy/records', kind: 'scoped', op: 'recordWrite' },
+  { m: 'POST', p: '/api/proxy/records/:id/revise', kind: 'scoped', op: 'recordWrite' },
+  { m: 'POST', p: '/api/proxy/records/:id/end', kind: 'scoped', op: 'recordWrite' },
+  { m: 'POST', p: '/api/proxy/records/:id/link', kind: 'scoped', op: 'recordWrite' },
   // Runner writes: grant-gated at the mount, the stage allowance named on each route
   { m: 'POST', p: '/api/proxy/runner/heartbeat', kind: 'gated', op: 'runnerHeartbeat' },
   { m: 'POST', p: '/api/proxy/runner/take/:id', kind: 'gated', op: 'runnerTake' },
@@ -418,7 +424,8 @@ function fill(path) {
   return path.replace(/:(\w+)/g, (_, name) => values[name] ?? crypto.randomUUID());
 }
 
-const STAGE_WRITE_ROUTES = CENSUS.filter(c => c.kind === 'scoped' || c.kind === 'gated');
+// LIN-4493: recordWrite is allowed to every stamp, so the records routes are tested apart (below), not as refused.
+const STAGE_WRITE_ROUTES = CENSUS.filter(c => (c.kind === 'scoped' || c.kind === 'gated') && c.op !== 'recordWrite');
 
 describe('LIN-4468 — over HTTP: a none token is refused by every write mount', () => {
   for (const row of STAGE_WRITE_ROUTES) {
@@ -430,6 +437,19 @@ describe('LIN-4468 — over HTTP: a none token is refused by every write mount',
       assert.deepEqual(calls.createComment, []);
       assert.deepEqual(calls.updateIssue, []);
       assert.deepEqual(calls.createIssue, []);
+    });
+  }
+});
+
+describe('LIN-4493 — over HTTP: a none token may write a record (recordWrite is allowed to every stamp)', () => {
+  for (const row of CENSUS.filter(c => c.op === 'recordWrite')) {
+    test(`${row.m} ${row.p} passes the stage gate for a none token`, async () => {
+      const { app } = stageApp({ writes: 'none', writesTarget: 'LIN-9' });
+      const res = await call(app, row.m, fill(row.p), { body: { kind: 'lesson', says: 'x' } });
+      // The gate let it through: the refusal that answers is the writer's (this token carries no origin, so it
+      // predates run identity), not the stage allowance's.
+      assert.equal(res.status, 403, JSON.stringify(res.body));
+      assert.equal(res.body?.reason, 'predates-run-identity', JSON.stringify(res.body));
     });
   }
 });

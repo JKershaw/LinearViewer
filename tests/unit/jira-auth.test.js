@@ -210,6 +210,7 @@ describe('routes/jira-auth.js', () => {
       assert.deepEqual(account.identities, [{
         provider: 'jira', scope: 'jira-acct-1',
         credentials: { email: 'ada@acme.com', displayName: 'Ada Lovelace' },
+        name: 'Ada Lovelace',
       }])
       const workspaces = await accountWorkspaceStore.listWorkspacesForAccount(session.accountId)
       assert.deepEqual(workspaces, ['ws-1'])

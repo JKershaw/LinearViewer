@@ -100,6 +100,9 @@ import { TaskSnapshotStore } from './lib/task-snapshot-store.js'
 import { TaskDecisionsStore } from './lib/task-decisions-store.js'
 import { createOnTicketWrite } from './lib/ticket-close-closer.js'
 import { ShelvedRulingsStore } from './lib/shelved-rulings-store.js'
+import { RecordsStore, RECORDS_COLLECTION, REFS_COLLECTION, QUERY_LOG_COLLECTION } from './lib/records-store.js'
+import { createRunRecords } from './lib/run-records.js'
+import { createListWorkspacePeople } from './lib/workspace-people.js'
 import { DismissalSuggestionsStore } from './lib/dismissal-suggestions-store.js'
 import { HarbourCommentsStore } from './lib/harbour-comments-store.js'
 import { SavedChatStore } from './lib/saved-chat-store.js'
@@ -670,6 +673,15 @@ const dismissalSuggestionsCollection = db.collection('dismissal-suggestions')
 const shelvedRulingsStore = new ShelvedRulingsStore({
   collection: shelvedRulingsCollection
 })
+// LIN-4493: the records store (lib/records-store.js) behind /api/proxy/records. Versions are kept, so the
+// unique version index (lib/db-indexes.js) is what makes a concurrent write of one version a conflict.
+const recordsStore = new RecordsStore({
+  records: db.collection(RECORDS_COLLECTION),
+  refs: db.collection(REFS_COLLECTION),
+  queryLog: db.collection(QUERY_LOG_COLLECTION)
+})
+// The run lifecycle seam: a run opens when its row is taken and ends on its terminal marker (lib/run-records.js).
+dispatchQueueStore.runRecords = createRunRecords({ recordsStore, readRow: (urlKey, id) => dispatchQueueStore.rowForRunRecords(urlKey, id) })
 // LIN-2444: proposed dismissals — a view annotation on a ruling, never an
 // answer to it. Separate collection from shelved-rulings because the two are
 // different acts with different lifecycles (a shelve defers a decision the
@@ -3279,7 +3291,9 @@ const recordPipelineMerge = createPipelineMergeRecorder({
   installationTokenFor,
   resolveWorkspaceId: createSessionWorkspaceIdResolver({ sessionsCollection })
 })
-app.use(createProxyRoutes({ proxyTokenStore, proxyEventStore, agentStatusStore, recapCacheStore, briefCacheStore, taskSnapshotStore, dispatchQueueStore, dispatchTokenStore, closeOutEventsStore, llmCallLogStore, taskDecisionsStore, shelvedRulingsStore, dismissalSuggestionsStore, harbourCommentsStore, sessionsFeedCache, workspaceFromUrl, resolveWorkspaceAccess, getWorkspaceOpenRouterKey, getWorkspaceNorthStar, getNorthStarDocVersionForWorkspace, reportHistoryStore, workspacePreferencesStore, dispatchPresetsStore, freeTierStore, accountStore, rejectedCredentialRegistry, observerStateStore, savedChatStore, workspaceHaltStore, workspaceOwnerCheck, modelRoutingStore, livenessAlarmStore, onTicketWrite, recordPipelineMerge, consumerHeartbeatStore, requestUsageStore, requestUsageLoader, leftoverStep }))
+// LIN-4493 (John's ruling, link-account): listRecordPeople is the people a record can be addressed to, read from the
+// names the tracker sign-in stored on each account's identity (lib/workspace-people.js).
+app.use(createProxyRoutes({ proxyTokenStore, proxyEventStore, agentStatusStore, recapCacheStore, briefCacheStore, taskSnapshotStore, dispatchQueueStore, dispatchTokenStore, closeOutEventsStore, llmCallLogStore, taskDecisionsStore, shelvedRulingsStore, dismissalSuggestionsStore, harbourCommentsStore, recordsStore, listRecordPeople: createListWorkspacePeople({ workspaceStore, accountStore, accountWorkspaceStore }), sessionsFeedCache, workspaceFromUrl, resolveWorkspaceAccess, getWorkspaceOpenRouterKey, getWorkspaceNorthStar, getNorthStarDocVersionForWorkspace, reportHistoryStore, workspacePreferencesStore, dispatchPresetsStore, freeTierStore, accountStore, rejectedCredentialRegistry, observerStateStore, savedChatStore, workspaceHaltStore, workspaceOwnerCheck, modelRoutingStore, livenessAlarmStore, onTicketWrite, recordPipelineMerge, consumerHeartbeatStore, requestUsageStore, requestUsageLoader, leftoverStep }))
 
 // LIN-3098 S3: the runner kit (lib/runner-kit/*.mjs), public, for the served
 // runner prompt to fetch and verify against its sha256 pins (routes/runner-kit.js).
@@ -4705,7 +4719,8 @@ const server = app.listen(PORT, () => {
     observerStateStore,
     observerShadowLogStore,
     sessionStore,
-    consumerHeartbeatStore
+    consumerHeartbeatStore,
+    recordsStore
   })
   cleanupTimer = setInterval(runHourlyCleanup, CLEANUP_INTERVAL_MS)
 })

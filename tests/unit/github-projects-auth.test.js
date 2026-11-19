@@ -729,7 +729,7 @@ describe('GitHub Projects auth routes', () => {
     assert.ok(session.accountId, 'session.accountId set by establishAccount');
     const account = await accountStore.getAccount(session.accountId);
     assert.ok(account, 'account was actually persisted');
-    assert.deepEqual(account.identities, [{ provider: 'github', scope: 'human-42', credentials: { login: 'octocat' } }]);
+    assert.deepEqual(account.identities, [{ provider: 'github', scope: 'human-42', credentials: { login: 'octocat' }, name: 'octocat' }]);
     const workspaces = await accountWorkspaceStore.listWorkspacesForAccount(session.accountId);
     assert.deepEqual(workspaces, ['github:42']);
   });

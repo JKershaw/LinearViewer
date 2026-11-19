@@ -275,7 +275,7 @@ export function createAuthRoutes({ userPreferencesStore, provider, accountStore,
         // session.accountId takes establishAccount's `else if (session.accountId)`
         // branch, linking (linear, viewer.id_org2) onto the current account and
         // binding it to the new workspace. The seam is reused INLINE, UNMODIFIED.
-        const established = await establishAccount(req.session, accountStore, accountWorkspaceStore, 'linear', String(viewer.id), {}, workspace.id)
+        const established = await establishAccount(req.session, accountStore, accountWorkspaceStore, 'linear', String(viewer.id), {}, workspace.id, { name: viewer.name ?? null })
         if (!established.ok) {
           // Strict conflict (LIN-1326, no auto-merge — unless confirmed, LIN-2233):
           // the 2nd org's identity is already owned by a DIFFERENT account. Nothing
@@ -421,7 +421,7 @@ export function createAuthRoutes({ userPreferencesStore, provider, accountStore,
               return res.status(400).send(html)
             }
 
-            const established = await establishAccount(req.session, accountStore, accountWorkspaceStore, 'linear', String(viewer.id), {}, workspace.id)
+            const established = await establishAccount(req.session, accountStore, accountWorkspaceStore, 'linear', String(viewer.id), {}, workspace.id, { name: viewer.name ?? null })
             if (!established.ok) {
               // LIN-2233 (L2.2): don't leak the arriving (unconfirmed) workspace's
               // live token into session.workspaces — restore it, same discipline

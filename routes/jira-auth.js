@@ -293,7 +293,8 @@ export function createJiraAuthRoutes({ provider, accountStore, accountWorkspaceS
     // let two humans sharing a site false-conflict).
     const established = await establishAccount(
       req.session, accountStore, accountWorkspaceStore, 'jira', myself.accountId,
-      { email: myself.emailAddress, displayName: myself.displayName }, workspace.id
+      { email: myself.emailAddress, displayName: myself.displayName }, workspace.id,
+      { name: myself.displayName ?? null }
     )
     if (!established.ok) {
       if (!established.conflict) clearUnresolvableAccountSession(req.session)
@@ -630,7 +631,8 @@ export function createJiraAuthRoutes({ provider, accountStore, accountWorkspaceS
     const stagingAccountId = req.session.accountId
     const established = await establishAccount(
       req.session, accountStore, accountWorkspaceStore, 'jira', myself.accountId,
-      { email: myself.emailAddress, displayName: myself.displayName }, workspace.id
+      { email: myself.emailAddress, displayName: myself.displayName }, workspace.id,
+      { name: myself.displayName ?? null }
     )
     if (!established.ok) {
       // LIN-2340, and read the next sentence before trusting the ticket: the
@@ -842,7 +844,8 @@ export function createJiraAuthRoutes({ provider, accountStore, accountWorkspaceS
     if (existing) {
       const established = await establishAccount(
         req.session, accountStore, accountWorkspaceStore, 'jira', myself.accountId,
-        { email: myself.emailAddress, displayName: myself.displayName }, existing.id
+        { email: myself.emailAddress, displayName: myself.displayName }, existing.id,
+        { name: myself.displayName ?? null }
       )
       if (!established.ok) {
         // The one 409 that runs no regenerate — the session, and the carried
@@ -934,7 +937,8 @@ export function createJiraAuthRoutes({ provider, accountStore, accountWorkspaceS
 
               const established = await establishAccount(
                 req.session, accountStore, accountWorkspaceStore, 'jira', myself.accountId,
-                { email: myself.emailAddress, displayName: myself.displayName }, workspace.id
+                { email: myself.emailAddress, displayName: myself.displayName }, workspace.id,
+                { name: myself.displayName ?? null }
               )
               if (!established.ok) {
                 // LIN-2304: route this conflict through the shared merge-offer

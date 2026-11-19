@@ -130,6 +130,23 @@ describe('routes/auth.js — Linear OAuth callback', () => {
     assert.ok(session.accountId, 'session.accountId set by establishAccount');
   });
 
+  // LIN-4493 (John's ruling, link-account): the Linear viewer's display name is stored on the identity at sign-in, so
+  // a record can be addressed to the person by the name the workspace shows (lib/workspace-people.js).
+  test('callback stores the Linear viewer\'s name on the identity (LIN-4493)', async () => {
+    const provider = { ...fakeProvider(), fetchViewer: async () => ({ id: 'viewer-1', name: 'Viewer One' }) };
+    const { accountStore, accountWorkspaceStore, ownerCredentialStore } = freshAccountStores();
+    const router = createAuthRoutes({ ...withResolver(), provider, accountStore, accountWorkspaceStore, ownerCredentialStore });
+    const handler = getHandler(router, 'get', '/auth/callback');
+    const session = makeSession({ oauthState: 'real' });
+
+    await handler({ query: { code: 'good-code', state: 'real' }, session }, makeRes());
+
+    const account = await accountStore.getAccount(session.accountId);
+    const identity = account.identities.find((i) => i.provider === 'linear');
+    assert.equal(identity.scope, 'viewer-1');
+    assert.equal(identity.name, 'Viewer One');
+  });
+
   test('a returning user (fresh session, previously-seen viewer.id) lands on their EXISTING account, not a new one', async () => {
     const stores = freshAccountStores();
     const router = createAuthRoutes({ ...withResolver(), provider: fakeProvider(), ...stores });

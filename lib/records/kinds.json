@@ -1,0 +1,166 @@
+{
+  "_about": "LIN-4493 (layer slice 1). The record shape, written once: every kind's fields, starting state and ends (layer design §3.2), the outcome sets (§3.2), the link types (§3.1), and the ends that name a record that takes over (§3.3). Pure data: check.js, views.js and brief.js read it, and nothing else spells a kind out. Field types: string, number, list (of strings), scope (a task id or 'project').",
+  "kinds": {
+    "task": {
+      "fields": {
+        "asked": "string",
+        "done-when": "string",
+        "ref": "string"
+      },
+      "start": "open",
+      "ends": [
+        "done",
+        "declined"
+      ]
+    },
+    "plan": {
+      "fields": {
+        "says": "string",
+        "order": "number"
+      },
+      "start": "kept",
+      "ends": [
+        "superseded"
+      ]
+    },
+    "finding": {
+      "fields": {
+        "says": "string",
+        "how": "string"
+      },
+      "start": "open",
+      "ends": [
+        "done",
+        "declined",
+        "handed-on"
+      ],
+      "needsTo": true
+    },
+    "question": {
+      "fields": {
+        "asks": "string",
+        "options": "list",
+        "recommended": "string",
+        "if-unanswered": "string"
+      },
+      "start": "open",
+      "ends": [
+        "answered",
+        "withdrawn",
+        "handed-on"
+      ],
+      "needsTo": true
+    },
+    "decision": {
+      "fields": {
+        "answer": "string",
+        "why": "string",
+        "scope": "scope"
+      },
+      "start": "stands",
+      "ends": [
+        "superseded",
+        "withdrawn"
+      ]
+    },
+    "verdict": {
+      "fields": {
+        "judgement": "string",
+        "outcome": "string",
+        "reasoning": "string"
+      },
+      "start": "stands",
+      "ends": [
+        "superseded",
+        "withdrawn"
+      ],
+      "needsOn": true
+    },
+    "lesson": {
+      "fields": {
+        "says": "string"
+      },
+      "start": "holds",
+      "ends": [
+        "superseded",
+        "disproved"
+      ]
+    },
+    "change": {
+      "fields": {
+        "ref": "string",
+        "head": "string"
+      },
+      "start": "open",
+      "ends": [
+        "merged",
+        "abandoned"
+      ]
+    },
+    "run": {
+      "fields": {
+        "stage": "string",
+        "account": "string"
+      },
+      "start": "open",
+      "ends": [
+        "done",
+        "failed",
+        "aborted"
+      ],
+      "harbourOnly": true
+    }
+  },
+  "outcomes": {
+    "plan-review": [
+      "approve",
+      "request-changes",
+      "needs-discussion"
+    ],
+    "review": [
+      "approve",
+      "request-changes",
+      "needs-discussion"
+    ],
+    "blind-read": [
+      "better",
+      "same",
+      "worse"
+    ]
+  },
+  "links": {
+    "about": {
+      "list": true
+    },
+    "on": {
+      "list": true,
+      "versioned": true
+    },
+    "answers": {
+      "from": "decision",
+      "target": "question"
+    },
+    "piece": {
+      "from": "task",
+      "target": "plan"
+    }
+  },
+  "takeover": [
+    "handed-on",
+    "superseded"
+  ],
+  "staleEnds": [
+    "superseded",
+    "withdrawn",
+    "abandoned",
+    "disproved"
+  ],
+  "addressees": {
+    "project": "project",
+    "leftover": "leftover"
+  },
+  "addressee_notes": {
+    "project": "whoever works in this project next; the backlog reads it",
+    "leftover": "the leftover step of the task (a stage kind is named by STAGE_KINDS, not here)"
+  }
+}

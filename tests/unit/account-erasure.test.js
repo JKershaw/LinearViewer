@@ -127,13 +127,14 @@ describe('INVENTORY completeness (Done-when 5)', () => {
   });
 
   // LIN-4198 adds one INDEX_SPECS collection (the per-request usage store): 56 -> 57.
+  // LIN-4493 moves the bound 59 -> 62: records, records-refs and records-query-log (their INVENTORY rows, lib/account-erasure.js).
   // LIN-4234 moves the bound 57 -> 59: usage-snapshot-intake (its INVENTORY row, added here) and `shares`
   // (lib/drop-shares-collection.js, retired, already a `leave` row). `shares` enters because the derived
   // universe reads every `*_COLLECTION` constant under lib/, and it was the one INVENTORY name the old guard
   // could not see. Bump only when a collection is added, with its ticket here, never to make a drift pass.
-  test('the universe is the 59 names the derived rule gives (funnel-events retired by LIN-3632 is not in it)', () => {
+  test('the universe is the 62 names the derived rule gives (funnel-events retired by LIN-3632 is not in it)', () => {
     const universe = collectionUniverse();
-    assert.strictEqual(universe.size, 59);
+    assert.strictEqual(universe.size, 62);
     assert.ok(!universe.has('funnel-events'));
     assert.ok(!INVENTORY.some((r) => r.collection === 'funnel-events'), 'LIN-3632: no lib module may name the retired collection');
   });
@@ -216,7 +217,8 @@ function anonymisedCopy(doc, row) {
       const parts = f.path.split('.');
       let cur = copy;
       for (let i = 0; i < parts.length - 1; i++) cur = cur[parts[i]];
-      cur[parts[parts.length - 1]] = ERASED_ACCOUNT_ID;
+      // LIN-4493: a person-ref field keeps its `person:` form around the erased id.
+      cur[parts[parts.length - 1]] = f.kind === 'person-ref' ? `person:${ERASED_ACCOUNT_ID}` : ERASED_ACCOUNT_ID;
     }
   }
   return copy;
@@ -550,6 +552,8 @@ describe('classification: owned alone only without any foreign sighting', () => 
       } else {
         const doc = { _id: 'injected', urlKey: 'acme' };
         if (f.kind === 'array') { const [head, ...rest] = f.path.split('.'); doc[head] = [{ [rest.join('.')]: BYSTANDER.accountId }]; }
+        // LIN-4493: a person-ref field holds `person:<accountId>`, as the records store writes it.
+        else if (f.kind === 'person-ref') doc[f.path] = `person:${BYSTANDER.accountId}`;
         else if (f.path.includes('.')) { const [a, b] = f.path.split('.'); doc[a] = { [b]: BYSTANDER.accountId }; }
         else doc[f.path] = BYSTANDER.accountId;
         await db.collection(f.collection).insertOne(doc);

@@ -88,7 +88,10 @@ export const URLKEY_SOURCES = Object.freeze([
     'workspace-change-log',
     // LIN-4234. Both carry a top-level urlKey (lib/request-usage-store.js, lib/usage-snapshot-intake.js), so the
     // no-holder count reads them with distinct('urlKey'). Neither holds an account field: not in ACTOR_SOURCES.
-    'request-usage', 'usage-snapshot-intake'
+    'request-usage', 'usage-snapshot-intake',
+    // LIN-4493. Each version, ticket claim and query-log row carries a top-level urlKey (lib/records-store.js). `by`/`to`
+    // hold stage names as well as person refs, so none is in ACTOR_SOURCES; person refs are erased by lib/account-erasure.js.
+    'records', 'records-refs', 'records-query-log'
   ].map(collection => ({ collection, shape: 'field', field: 'urlKey' })),
   { collection: 'local-issues', shape: 'field', field: 'scope' },
   { collection: 'workspace-halt', shape: 'id' },
