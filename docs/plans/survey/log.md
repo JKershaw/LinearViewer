@@ -4571,3 +4571,16 @@ Option (a): the reader's removal goes into the slice 2 draft. It's recorded in `
   - accept records the items as follow-ups and moves on to LIN-4496.
 - **Follow-ups** are listed in `integration/slice-2-carry.md`: the six re-reviews, the task-page and log check, and the `isEmptyStatement` defect (finding-76683071).
 - **Close-out's other checks, shown:** the /records query is clean, and briefs without a run id are the same size as before.
+
+### 19 Nov, ~22:00: John hands me the LIN-4495 ask; proposal changed to you-run
+
+- **What John meant:** close the ruling out, and I handle the ask myself (I hold a dispatch grant). So I replaced my "accept" proposal with **you-run** (suggest-answer, 201).
+- **Re-reviews dispatched on John's go-ahead**, kind review by override, no session:
+  - LIN-4463 0ff2aa68
+  - LIN-4452 44f8155b
+  - LIN-4441 55c06edd
+  - LIN-4028 ccafc9b7
+  - LIN-3357 29b57914
+  - LIN-2422 db3ff324
+- **Then:** a reminder in 25 minutes reads their outcomes and marks LIN-4495 Done when all six are terminal. If the gate refuses, I record why. Verdicts on the paused lanes (LIN-4463, LIN-4441) wait for John.
+- **Left for John:** the signed-in task-page and log check (finding-0cc5a636) needs a signed-in page and server logs, so it stays a morning follow-up. The `isEmptyStatement` defect (finding-76683071) stays on the carry list.
