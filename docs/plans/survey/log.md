@@ -4466,3 +4466,11 @@ John asked why about 14 dispatches sit queued. From a read-only subagent:
 - **What happens next:** when the turn ends, the rows are delivered oldest first, one turn each. Unclaimed rows expire after 24 h. If the session is cancelled, they fail.
 - **Before today:** 0 queued rows; the old leftovers sit as taken (21) and blocked (155).
 - **Bearing on the plan:** this is the wake problem slice 6 exists for. Slice 1's count decides whether slice 6 is built, so these 14 rows count as evidence for it. No action now.
+
+### 19 Nov, ~17:10: dismissing the queued rows
+
+John asked whether he can dismiss the 14 queued rows. From a subagent's code read on origin/main, the answer is **safe**.
+- **How:** "remove" on the dispatch page or the nav-badge queue popover calls `DELETE …/api/dispatch/:id` (`routes/dispatch.js:1003-1028`). The row is archived as cancelled (`lib/dispatch-store.js:1553-1571`).
+- **No effect on the running autopilot:** a session is cancelled only by an abort item (simple-dispatcher `dispatcher.js:430-435`), and a removed row is never taken.
+- **No re-creation:** wakes come only from child feedback, at most once per child (`dispatch-store.js:3793-3804`). Whether a planned "reconciliation sweep" (`dispatch-wake.js:180`) exists is unknown.
+- **No bulk option:** the rows go one at a time.
