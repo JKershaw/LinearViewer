@@ -4430,3 +4430,24 @@ John read the doc copy (with the leaks table, the before-and-after drawing and a
   - An exchange that ends "no further action" is a success.
   - Keep reports to John short, and don't pass routine uncertainty on to him.
 - The next check-in is at 16:50.
+
+### 19 Nov, 16:52: piece 2 and the look-first fix merged; workaround withdrawn
+
+- **LIN-4493.** Close-out 44f5ee0e (sonnet, 16:14–16:33) made all four review fixes:
+  - the PAT name test, commit 235ed1929, seen red without the name line;
+  - the PR's Retires section;
+  - lines on LIN-4491 and LIN-4495.
+  - PR #2465 merged at 16:24 as a475c464f. CI on main is green, and it's deployed.
+- **Two checks not run:**
+  - a live sign-in check: John signs in again so his name is stored, then a finding addressed to him should give a 201. Who sends that finding isn't recorded.
+  - an operator query-log check, which LIN-4496 picks up.
+  - Both are recorded in close-out comment 343c50b5 (16:32:40).
+- **LIN-4497.** Review cc72ddad approved, with conditions: a header fix, a live-store check, and a ticket for the remaining sibling-PR readers, filed as LIN-4498 (Backlog, not dispatched). Then:
+  - blind read 52224610;
+  - close-out 2c0efe2d;
+  - PR #2466 merged at 16:37 as 2024de6, CI green, deployed.
+  - Its autopilot df03bb30 is done.
+  - Whether the live-store check ran is unknown.
+- **LIN-4494.** survey-task, survey-place and scoping ran 16:33–16:44, before implementation 1a471c63 (Haiku, from 16:45). That is the normal sequence. The workaround wasn't needed here (no PR link was involved).
+- **The note to the slice 1 autopilot** (dispatch a6ffcb33, queued): the workaround is no longer needed; route the remaining pieces normally.
+- Rulings: none open. The next check-in is at 17:35.
