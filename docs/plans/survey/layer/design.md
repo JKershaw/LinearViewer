@@ -1,6 +1,6 @@
 # The layer: design
 
-*Approved by John on 18 Nov after walk 7. Revised the same day: the integration work found that its path matching (task, area, lesson and run paths, and the brief parts built on them) works only on a codebase laid out like Harbour's (`integration/checks/repo-assumptions.md`). Removed, not patched. Walk 8 tested the revision; after it (19 Nov), `blind`, `check`, `same-as`, the lesson's `checked-at` and the `approve-with-notes` outcome were removed, and the plan goes in full only to the actor it is addressed to (`walks/8/results.md`). John: "removal is the process"; his approval means "this design looks good to me, and we can proceed", not that it is set in stone.*
+*Approved by John on 18 Nov after walk 7. Revised the same day: the integration work found that its path matching (task, area, lesson and run paths, and the brief parts built on them) works only on a codebase laid out like Harbour's (`integration/checks/repo-assumptions.md`). Removed, not patched. Walk 8 tested the revision; after it (19 Nov), `blind`, `check`, `same-as`, the lesson's `checked-at` and the `approve-with-notes` outcome were removed, and the plan goes in full only to the actor it is addressed to (`walks/8/results.md`). Later on 19 Nov, with John: no hand-kept actor list; the product supplies its readers (§3.2). John: "removal is the process"; his approval means "this design looks good to me, and we can proceed", not that it is set in stone.*
 
 *Started 17 Nov at John's request (log, "17 Nov"). Revised in place each round; git keeps its history, the log keeps why, and each walk's results live in `walks/`. Marks are as on `situation.md`: [checked], [reported], [my reading], [guess]; "[checked wording]" means the words were checked, not the claim. Lines with no mark are design, mine until John corrects it.*
 
@@ -50,10 +50,10 @@ John: "a small minimal MVP, and we take it for a walk and see a) if it's better 
 | `id` | Allocated by the store, stable, never a position |
 | `kind` | One of the declared kinds (3.2); fields are checked against it |
 | `in` | The task it belongs to. A child task is `in` its parent. A record with no `in` belongs to the project as a whole |
-| `by` | Who wrote it: a declared actor (3.2); `via` if relayed |
+| `by` | Who wrote it: an actor (3.2); `via` if relayed |
 | `at` | When each version was written |
 | `state` | The kind's starting state or one of its ends, with a `reason`. `handed-on` and `superseded` name the record that takes over |
-| `to` | Who must act on it next: a declared actor, a task record, or `project` (whoever works in this project next). Required on the hand-off kinds (finding, question); optional on every other kind |
+| `to` | Who must act on it next: an actor, a task record, or `project` (whoever works in this project next). Required on the hand-off kinds (finding, question); optional on every other kind |
 | `links` | `about` (its subjects), `on` (the exact versions it rests on, `id@v`; required on a verdict), `answers` (a decision to its question), `piece` (a task to its plan piece). Each type holds a list, except `answers` and `piece`, which hold one |
 | versions | Every write (add, revise, end, link) is a new version with its `by`, `at` and, for a revise, its `reason`; earlier versions are kept. Any record can be read as of a time, or at a version. Any record may be revised except a task's `asked` |
 
@@ -77,13 +77,13 @@ John: "a small minimal MVP, and we take it for a walk and see a) if it's better 
 
 **Open** records are those in state `open` (task, finding, question, change, run). The other kinds start in a standing state (kept, stands, holds).
 
-**Actors** are declared in `actors.json`: the names that may appear in `by` and `to`. For Harbour: its stages (design, plan-review, breakdown, survey-task, survey-place, scoping, implementation, leftover, review, blind-read, close-out), the autopilot, John, and Harbour itself (the system). Blindness (a judge that must not see another's judgement) is not the store's: retold judgements turn up in run reasons and revised findings, so filtering kinds can't hide them (walks 7–8). Harbour gives such a stage no brief and limits what it may read. These are the loop's actors, the same whatever codebase it works on; a different product using the layer would declare its own. Any actor may write any kind and end any record; which ones it should is its prompt's business and Harbour's.
+**Actors** are the readers the product can brief: the names that may appear in `by` and `to`. The product supplies them from what it already declares; the store keeps no list of its own. A `to` matters because a hand-off to no reader is lost; a `by` the product fills from the session needs no check. For Harbour: the stages it runs, the leftover step, the autopilot, Harbour itself, and each person in the workspace, named as the workspace shows them (John, 19 Nov). Blindness (a judge that must not see another's judgement) is not the store's: retold judgements turn up in run reasons and revised findings, so filtering kinds can't hide them (walks 7–8). Harbour gives such a stage no brief and limits what it may read. These are the loop's actors, the same whatever codebase it works on; a different product using the layer would supply its own. Any actor may write any kind and end any record; which ones it should is its prompt's business and Harbour's.
 
 ### 3.3 What a write checks
 
 Only shape, so a malformed record can't enter:
 - the kind is declared; every field belongs to it and has its type; a verdict's outcome is in its set; a task's `asked` doesn't change once written;
-- `by` is a declared actor; a `to`, where present, is a declared actor, a task record or `project`, and the hand-off kinds (finding, question) must have one;
+- `by`, unless the product fills it, is an actor; a `to`, where present, is an actor, a task record or `project`, and the hand-off kinds (finding, question) must have one. A miss is refused with the names that would work;
 - `in`, where present, is a task; every link resolves; a verdict has an `on`; `answers` and `piece` join the kinds named above;
 - a state change goes to one of the kind's ends with a reason; `handed-on` and `superseded` name the record that takes over.
 
@@ -119,7 +119,7 @@ Ended records are left out. Each brief reports what it carries and its size in b
 
 *A fresh subagent builds the model from §3 and this section only, in `walks/<n>/model/`. Nothing else is given. It is thrown away after its round.*
 
-- **Form.** Node, ES modules, no dependencies. `kinds.json`, `actors.json`, `layer.mjs`, and one JSON store holding every record's versions and the query log. As small as it can be.
+- **Form.** Node, ES modules, no dependencies. `kinds.json`, `actors.json` (the model has no product to ask, so it lists its readers), `layer.mjs`, and one JSON store holding every record's versions and the query log. As small as it can be.
 - **Store format,** so stores carry from one build to the next: `{next, records: {<id>: [<version>, …]}, log: [{at, by, cmd, args, asOf}]}`; each version is a full snapshot `{id, kind, v, op, at, by, via?, reason?, in?, to?, state, ended?: {reason, into?}, links: {<type>: <value or list>}, fields: {…}}`.
 - **Commands** (CLI; JSON in and out; exit 0 ok, 1 usage, 2 refused with the reason):
   - Writes: `add <kind> '<json>'` (fields plus `in`, `to`, `links`), `revise <id> '<json>' --reason <r>`, `end <id> <state> <reason> [--into <id>]` (the record that takes over), `link <id> <type> <id[@v]>`. Each takes `--by <actor>`, and optionally `--via <name>` and `--at <time>`, so a finished task can be written in its own order.

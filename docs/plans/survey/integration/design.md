@@ -20,12 +20,11 @@
   - `lib/records/brief.js` builds the brief and its text (§3.5).
   - `lib/records-store.js` reads and writes the collection, built once in `server.js` (C5-D03).
 - **How they're built.** They are written fresh from §3, with the round 9 model (`layer/walks/9/model/`) as a reference, not the source. Its test (52 cases) becomes their contract tests.
-- **Actors are data, from the place that already declares them.** For Harbour, they are:
-  - its 20 stage kinds (`PROMPT_TEMPLATES`, `lib/prompts/stage-kinds.js`) [checked];
-  - `leftover`, `autopilot` and `harbour`;
-  - each person who belongs to the workspace, named as `person:<accountId>`.
-
-- **`project` is the workspace.** The store is partitioned by workspace, so the `project` addressee, part 5's counts, part 6's open runs and the leftover step's pile each span one workspace. A workspace holding several codebases shares one pile; that stays open until Yap. Another project supplies its own list, as §3.2 says. "John" in the layer is the workspace owner's person actor (`getWorkspaceOwnerAccountId`). *The list grows from the layer's 14 names, read from code rather than `actors.json`. Flagged for John (§11).*
+- **No actor list is kept** (John, 19 Nov). What the names are for decides what is checked:
+  - `by` is filled by code from the run (§2), or is the signed-in person, so no write can get it wrong and it is not checked.
+  - `to` must name a reader Harbour can brief, or the hand-off is lost. Harbour checks it at the write against what it already declares: a task, `project`, one of its 20 stage kinds (`lib/prompts/stage-kinds.js`) [checked] or `leftover`, or a person in the workspace. Writers name a person as the workspace shows them ("John"); Harbour stores their account, `person:<accountId>`.
+  - A miss is refused with the names that would work. A new stage needs no second edit. Renaming a stage strands open records to the old name, so a rename carries a one-off migration.
+- **`project` is the workspace.** The store is partitioned by workspace, so the `project` addressee, part 5's counts, part 6's open runs and the leftover step's pile each span one workspace. A workspace holding several codebases shares one pile; that stays open until Yap.
 - **Who imports Records:** Agent API (proxy), Runs & dispatch, LLM & prompts (the selector's facts) and the pages. Records imports only Platform. So each slice adds one-way edges into a leaf area and no new mutual pair; the tightest pair, LLM & prompts ⇄ Runs & dispatch at 39/60, is untouched (`census/seams-6f6c5d2.json`) [checked]. The knots to call are in §10.
 
 ## 2. How agents reach it: the proxy
@@ -164,7 +163,7 @@ Each slice is built as a Harbour task through Harbour's own loop. That task runs
 1. **Decided (18 Nov):** the parked work runs after slice 4, as the first work through the upgraded Harbour. It is read against the 13–14 Nov baselines, reported and never gating. John: "I'm the only user so there's no pressure or rush."
 2. **Decided (18 Nov):** provider sync is a follow-up (§7).
 3. **Small changes to the approved layer:**
-   - the actor list comes from Harbour's stage kinds plus people, not a hand-kept file (§1);
+   - **Agreed (John, 19 Nov):** no actor list; `by` comes from code, and `to` is checked against what Harbour can brief, people named as the workspace shows them (§1). The layer page now says so (§3.1–3.3).
    - a temporary ninth brief part, the ticket section, until slice 4 (§3). **Accepted** (John, 18 Nov: "That's fine. A little temporary scaffolding is ok.")
    - *Withdrawn in draft 3:* part 5 listing every area while a task had no paths. Areas are gone.
    - *Withdrawn (John, 19 Nov):* an `on-answer` field on the question kind. What an answer sets off stays on Harbour's feedback item (§5).
