@@ -40,7 +40,7 @@ such as function names, have neither, so they are never read as paths. In code t
 
 ## Where a hand-off goes
 
-LIN-4495 retired the `## Waiting` lists. An outside find, a leftover, a check that needs a person, and an ask to a parent
+LIN-4495 retired the Waiting lists. An outside find, a leftover, a check that needs a person, and an ask to a parent
 or a sibling are now **records**, written through the proxy (`POST /api/proxy/records`) and read in the brief of the
 task or the project they name. The rule is written once, in `lib/prompts/handoff-words.js` (the hand-off protocol), and
 `lib/prompts/leftover-words.js` says where a leftover goes. A note is never where a find waits: a Lesson is the only
@@ -55,7 +55,7 @@ of `docs/plans/survey/` stays as frozen research.
 
 1. a note's file name is not an area's slug;
 2. a path a note cites does not exist;
-3. a note has a `## Waiting` section (retired by LIN-4495; a find is a record);
+3. a note has a Waiting section (retired by LIN-4495; a find is a record);
 4. a note's `## Lessons` section is over 6144 bytes. Keep Lessons short enough to read
    before every change: prune lessons that no longer bind;
 5. this README does not state that 6144-byte Lessons cap (the guard reads its own

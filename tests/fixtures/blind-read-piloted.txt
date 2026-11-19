@@ -19,8 +19,8 @@ You are reading one change blind, before it merges. Not whether it does its job:
 
 **Sort each find into exactly one class:**
 - Inside the change's area and fix-sized: fixed on the PR branch.
-- Inside the area but larger: a `## Waiting` entry in that area's `docs/areas/<slug>.md`.
-- Outside the area: a `## Waiting` entry in its note, or a ticket the consequence test sends.
+- Inside the area but larger: a finding to close-out on the task, `to: close-out` (the hand-off protocol says how).
+- Outside the area: a finding to the project, or a ticket the consequence test sends.
 
 You only sort; someone else acts on each class. Fix-sized means one sitting on this branch could fix it without changing the change's design: a few lines in one or two files, and no new decision. Anything that needs a decision, a new design or several areas is larger.
 
