@@ -3514,13 +3514,12 @@ async function resolveTeamSelection(req, workspace) {
   return { teamId };
 }
 
-// LIN-4494: the workspace's people (lib/workspace-people.js), read by the signed-in person's canonical account. Used by
-// resolveAssigneeSelection's `me` name; a failed read is logged and falls through to the provider's viewer.
-const listWorkspacePeople = createListWorkspacePeople({ workspaceStore, accountStore, accountWorkspaceStore })
+// LIN-4494: the signed-in person's name as the workspace shows it (lib/workspace-people.js), read by their canonical account.
+// Used by resolveAssigneeSelection's `me` name; a failed read is logged and falls through to the provider's viewer.
 async function storedPersonNameOf(req) {
   try {
     return await storedNameOf({ accountId: req.session.accountId, urlKey: req.workspace.urlKey }, {
-      listPeople: listWorkspacePeople,
+      listPeople: createListWorkspacePeople({ workspaceStore, accountStore, accountWorkspaceStore }),
       canonicalAccountId: (accountId) => accountStore.resolveCanonicalAccountId(accountId),
     });
   } catch (err) {

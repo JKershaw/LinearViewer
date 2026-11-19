@@ -317,6 +317,8 @@ h1 .task-ident { font-size: inherit; }
 .task-record-noticket { color: var(--muted); font-style: italic; }
 .task-record-form { display: flex; flex-wrap: wrap; gap: var(--space-2); align-items: flex-end; margin-top: var(--space-1); }
 .task-record-form label { display: grid; gap: 2px; font-size: var(--font-size-sm); color: var(--muted); }
+/* Form controls take the type scale, not the browser's default control size (LIN-4107: the token sizes only). */
+.task-record-form input, .task-record-form select, .task-record-form button { font: inherit; }
 .task-records-refused { color: var(--amber); }
 .task-records-none { color: var(--muted); }
 

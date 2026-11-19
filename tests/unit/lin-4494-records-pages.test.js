@@ -396,7 +396,7 @@ describe("Home's Waiting on you: the person's open records, owner only", () => {
 });
 
 /** A dispatch history row as the session route reads it: its id, its kind, and the run it resumes (if a follow-up). */
-const historyRow = (id, extra = {}) => ({ _id: id, id, sessionId: null, kind: 'implementation', issueIdentifier: TICKET, issueTitle: 'Footer', prompt: 'p', dispatchedAt: '2026-11-19T10:00:00.000Z', resolvedAt: '2026-11-19T10:01:00.000Z', status: 'taken', feedback: [], ...extra });
+const historyRow = (id, extra = {}) => ({ _id: id, id, sessionId: null, kind: 'implementation', issueIdentifier: TICKET, issueTitle: 'Footer', prompt: 'p', dispatchedAt: new Date().toISOString(), resolvedAt: new Date().toISOString(), status: 'taken', feedback: [], ...extra });
 
 describe('the session page: the run account', () => {
   test('the account is the latest ended run record of the session loops, and draws as plain text', async () => {
@@ -420,8 +420,8 @@ describe('the session page: the run account', () => {
   });
 
   test('a session made only of a follow-up row shows the run account through the real session route', async () => {
-    await store.openRun(URL_KEY, { id: 'row-origin', stage: 'implementation', lineage: 'row-origin', at: '2026-11-19T10:00:00.000Z' });
-    await store.endRun(URL_KEY, 'row-origin', { state: 'done', account: 'Shipped the footer on the follow-up path.', at: '2026-11-19T10:05:00.000Z' });
+    await store.openRun(URL_KEY, { id: 'row-origin', stage: 'implementation', lineage: 'row-origin', at: new Date(Date.now() - 60_000).toISOString() });
+    await store.endRun(URL_KEY, 'row-origin', { state: 'done', account: 'Shipped the footer on the follow-up path.', at: new Date().toISOString() });
     const follow = historyRow('row-follow', { kind: 'custom', sessionId: 'sess-follow', runRecordId: 'row-origin' });
     const origin = historyRow('row-origin', { sessionId: 'sess-origin' });
     const items = { live: [], history: [origin, follow] };
