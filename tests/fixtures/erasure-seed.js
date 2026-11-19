@@ -146,6 +146,9 @@ export function buildErasureSeed(inventory, { person = PERSON, bystander = BYSTA
           if (f.kind === 'array') {
             const [head, ...rest] = f.path.split('.');
             doc[head] = [{ [rest.join('.')]: account, at: AT, maxTasks: 3 }];
+          } else if (f.kind === 'person-ref') {
+            // LIN-4493: a `person:<accountId>` string (records `by`/`to`), as the store writes it.
+            setPath(doc, f.path, `person:${account}`);
           } else {
             setPath(doc, f.path, account);
           }

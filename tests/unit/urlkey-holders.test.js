@@ -169,6 +169,9 @@ const COLLECTION_CLASSES = {
   'model-routing': 'C', 'model-routing-log': 'C', 'model-routing-presets': 'BC',
   // LIN-3846: urlKey field; actor.id may be a token label, so not an actor source.
   'workspace-change-log': 'C',
+  // LIN-4493: records (lib/records-store.js) and its ticket claims and query log, each keyed by urlKey. Class C, not B:
+  // `by`/`to` hold stage names as well as person refs.
+  'records': 'C', 'records-refs': 'C', 'records-query-log': 'C',
   // LIN-4234: both carry a top-level urlKey and were in neither this table nor URLKEY_SOURCES before, so the
   // no-holder count could not see them. request-usage: one document per model request (lib/request-usage-store.js).
   // usage-snapshot-intake: one counter document per workspace per UTC day (lib/usage-snapshot-intake.js).

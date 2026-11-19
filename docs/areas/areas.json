@@ -90,6 +90,13 @@
       ]
     },
     {
+      "name": "Records",
+      "slug": "records",
+      "match": [
+        "^lib/records/|^lib/records-store\\.js$"
+      ]
+    },
+    {
       "name": "Other features",
       "slug": "other-features",
       "match": [

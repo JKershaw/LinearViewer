@@ -533,6 +533,46 @@ const ROWS = [
     note: 'clears an already-unset halt — BASE_DEPS() default workspaceHaltStore.clearWorkspaceHalt is a harmless no-op',
     run: () => call(buildApp({ workspaceOwnerCheck: async () => ({ status: 'owner' }) }), 'DELETE', '/api/proxy/dispatch/halt'),  // LIN-3409: owner-gated
   },
+  // --- Group R: records (LIN-4493, routes/proxy-records.js). BASE_DEPS() passes no recordsStore and its credential
+  // names no origin, so these rows stop before the store: a body that is not a JSON object is refused 400, and a
+  // read by the origin-less credential is refused 403. What a credential that does name an origin reaches is
+  // tested with a real store in lin-4493-records-routes, not here.
+  {
+    group: 'R', method: 'POST', url: '/api/proxy/records', expect: 400,
+    note: 'a body that is not a JSON object is refused before any credential or store is read (routes/proxy-records.js)',
+    run: () => call(buildApp(), 'POST', '/api/proxy/records', { body: [] }),
+  },
+  {
+    group: 'R', method: 'POST', url: '/api/proxy/records/:id/revise', expect: 400,
+    note: 'same shape refusal, before the store',
+    run: () => call(buildApp(), 'POST', '/api/proxy/records/finding-abc/revise', { body: [] }),
+  },
+  {
+    group: 'R', method: 'POST', url: '/api/proxy/records/:id/end', expect: 400,
+    note: 'same shape refusal, before the store',
+    run: () => call(buildApp(), 'POST', '/api/proxy/records/finding-abc/end', { body: [] }),
+  },
+  {
+    group: 'R', method: 'POST', url: '/api/proxy/records/:id/link', expect: 400,
+    note: 'same shape refusal, before the store',
+    run: () => call(buildApp(), 'POST', '/api/proxy/records/finding-abc/link', { body: [] }),
+  },
+  {
+    group: 'R', method: 'GET', url: '/api/proxy/records/:id', expect: 403,
+    note: 'the BASE_DEPS credential names no origin, so it predates run identity and reads no records',
+    expectBody: { error: 'this credential predates run identity; mint a new one' },
+    run: () => call(buildApp(), 'GET', '/api/proxy/records/finding-abc'),
+  },
+  {
+    group: 'R', method: 'GET', url: '/api/proxy/records', expect: 403,
+    note: 'as above: no origin, no record reads',
+    run: () => call(buildApp(), 'GET', '/api/proxy/records'),
+  },
+  {
+    group: 'R', method: 'GET', url: '/api/proxy/tasks/:id/records', expect: 403,
+    note: 'as above: no origin, no record reads',
+    run: () => call(buildApp(), 'GET', '/api/proxy/tasks/task-abc/records'),
+  },
   // --- Group M: model routing (LIN-3854, routes/proxy-model-routing.js) ---
   {
     group: 'M', method: 'GET', url: '/api/proxy/model-routing', expect: 200,
