@@ -147,7 +147,7 @@ describe('library catalog', () => {
     for (const doc of [...catalog.papers, ...catalog.listed]) {
       assert.equal(doc.summary, before[doc.slug], `${doc.slug}: summary unchanged`);
     }
-    assert.equal(catalog.essays.length, 18, 'eighteen essays (LIN-4485 adds nothing-fights-its-shape, LIN-4484 adds notes-across-the-border, LIN-4486 adds every-choice-was-right-at-the-time, LIN-4489 adds the-city-that-builds-itself)');
+    assert.equal(catalog.essays.length, 19, 'nineteen essays (LIN-4485 adds nothing-fights-its-shape, LIN-4484 adds notes-across-the-border, LIN-4486 adds every-choice-was-right-at-the-time, LIN-4489 adds the-city-that-builds-itself, then after-the-peak)');
     for (const doc of catalog.essays) {
       assert.notEqual(doc.summary, before[doc.slug], `${doc.slug}: no longer the italic subtitle`);
     }
