@@ -4602,3 +4602,10 @@ The hourly check-in (trig_01XCTpQoZb2V1vqMFvzXKStm) is now a drive. When a slice
 **Change from the earlier agreement:** each slice was to be drafted for John to correct before filing. Tonight, John's go-ahead replaces that review.
 
 - **22:34, John:** close-out checks that only need more runs are handled by running them, as for LIN-4495. Checks that need his sign-in, and agents' extra caution, wait for morning. If anything goes sideways I may pause (abort the autopilot or hold the next slice). The hourly drive prompt is updated to match. Only John can answer a ruling, so a run paused on one waits until morning even when the work is done.
+
+- **22:37, John:** don't lose overnight progress to rulings he isn't needed for. A ruling that isn't his call (product, money, authority, what to retire, the parked work, outside the design) gets settled by the driver:
+  1. do the work;
+  2. suggest-answer on the ruling;
+  3. send the paused autopilot a note (followUpTo the kickoff id, queueIfBusy) so it carries on. A held session takes a note at once, as the 14:27 note showed.
+
+  The ruling stays open for John to tidy in the morning. The hourly drive prompt is updated to match.
