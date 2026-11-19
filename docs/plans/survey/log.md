@@ -4500,3 +4500,17 @@ John asked whether he can dismiss the 14 queued rows. From a subagent's code rea
 - **Blind read 396cc539:** running since 18:12.
 - **Watch item, mine:** leftover b2ff7059 (Opus, 17:34) said DONE at 17:46 but posted no done marker, so the row still shows as running. It also pushed fac1392eb, which includes a Jira site-picker fix on phones. That looks outside piece 3's scope. Check at close-out whether it stayed in the PR. No action now.
 - **Status:** LIN-4495 Todo. No rulings. 3 wakes queued again (expected; the autopilot is still in its 14:28 turn). Next check-in at 18:45.
+
+### 19 Nov, 18:48: LIN-4494 merged; LIN-4495 (cutover) building
+
+*Written at 19:22, after a worker restart lost the first attempt.*
+
+- **LIN-4494:**
+  - blind read 396cc539 (18:12–18:15) said "same";
+  - close-out 4c54cbfb (18:16–18:36) made all 7 re-review fixes, which were not re-reviewed;
+  - PR #2467 merged at 18:28 as 4f6fe01a2, CI on main green at 18:34, deployed. Done.
+- **The Jira site-picker fix:** it stayed in the PR (8 lines in `public/style.css`, plus its Waiting entry removed). Review allowed it on condition that "Retires" said so, and the PR now does. Chop; John didn't need to be asked.
+- **Leftover b2ff7059** still shows taken, as does the 14:27 custom row 6dffce9f, which carries the autopilot's turn.
+- **LIN-4495:** survey-task 18:36, survey-place 18:39, scoping 18:42, implementation 0f294a8d from 18:46. Normal order.
+- **Queues:** 8 wakes queued again (expected). No rulings.
+- **Next check-in at 19:25.** At the cutover: what retires and what's kept behind a fallback, the run-ledger exports, and whether main can still brief and dispatch after merge.
