@@ -4474,3 +4474,5 @@ John asked whether he can dismiss the 14 queued rows. From a subagent's code rea
 - **No effect on the running autopilot:** a session is cancelled only by an abort item (simple-dispatcher `dispatcher.js:430-435`), and a removed row is never taken.
 - **No re-creation:** wakes come only from child feedback, at most once per child (`dispatch-store.js:3793-3804`). Whether a planned "reconciliation sweep" (`dispatch-wake.js:180`) exists is unknown.
 - **No bulk option:** the rows go one at a time.
+
+- John removed all 14 rows (~17:12). The slice 1 autopilot keeps running; next look at 17:35.
