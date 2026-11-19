@@ -14,22 +14,17 @@
  */
 import { describe, test, before, after, beforeEach, afterEach } from 'node:test';
 import assert from 'node:assert/strict';
-import express from 'express';
 import { createMangoTmpdir } from '../fixtures/mango-tmpdir.js';
-import { RecordsStore, RECORDS_COLLECTION, REFS_COLLECTION, QUERY_LOG_COLLECTION } from '../../lib/records-store.js';
-import { INDEX_SPECS } from '../../lib/db-indexes.js';
-import { createProxyRecordsRoutes } from '../../routes/proxy-records.js';
-import { requireWriteScope } from '../../lib/stage-write-gate.js';
+import { createRecordsRouteHarness } from '../helpers/records-route-harness.js';
+import { RECORDS_COLLECTION, QUERY_LOG_COLLECTION } from '../../lib/records-store.js';
 import { READ_WRITE } from '../../lib/proxy-scopes.js';
-import { askedText } from '../../lib/as-asked.js';
-import { STAGE_KINDS } from '../../lib/prompts/stage-kinds.js';
 import { createRunRecords } from '../../lib/run-records.js';
 
 const URL_KEY = 'routes-test-workspace';
 const harness = createMangoTmpdir('lin-4493-routes-');
+let rh;
 let db;
 let store;
-let server;
 let base;
 let tokens;
 let tickets;
@@ -37,12 +32,6 @@ let people;
 let calls;
 
 before(() => harness.connect());
-afterEach(async () => {
-  if (!server) return;
-  server.closeAllConnections();
-  await new Promise((resolve) => server.close(resolve));
-  server = null;
-});
 after(() => harness.close());
 
 /** The stand-in for authenticateProxyToken: it sets the fields the real one sets, from `tokens[name]`. */
@@ -59,14 +48,9 @@ function credential(req, res, next) {
   next();
 }
 
+// The store, the routes and the app come from tests/helpers/records-route-harness.js (LIN-4496): one real-store harness
+// for the piece-2 route tests and the walk-8 replay. This file keeps its own stand-in credential, above.
 beforeEach(async () => {
-  db = harness.freshDb();
-  for (const collection of [RECORDS_COLLECTION, REFS_COLLECTION]) {
-    for (const spec of INDEX_SPECS.filter((x) => x.collection === collection && x.options?.unique)) {
-      await db.collection(collection).createIndex(spec.keySpec, spec.options);
-    }
-  }
-  store = new RecordsStore({ records: db.collection(RECORDS_COLLECTION), refs: db.collection(REFS_COLLECTION), queryLog: db.collection(QUERY_LOG_COLLECTION) });
   tickets = new Map([
     ['LIN-4451', { identifier: 'LIN-4451', title: 'Footer', description: 'Make the footer show runs left.\n\n## As asked\n\nThe person\'s words.\n\n*End of what was asked. Steps write below this line; nothing above it changes.*\n\n## Steps\nbelow', state: { name: 'In Progress', type: 'started' }, parent: null }],
     ['LIN-4452', { identifier: 'LIN-4452', title: 'Sibling', description: 'Not yet dispatched.', state: { name: 'Todo', type: 'unstarted' }, parent: { identifier: 'LIN-4450' } }],
@@ -75,22 +59,17 @@ beforeEach(async () => {
   ]);
   people = [{ accountId: 'acc-john', name: 'John' }];
   calls = { ticketReads: [] };
-  const routes = createProxyRecordsRoutes({
-    recordsStore: store,
-    proxyLimiter: (req, res, next) => next(),
-    authenticateProxyToken: credential,
-    requireWriteScope,
-    logEvent: () => {},
-    readTicket: async (_req, ref) => { calls.ticketReads.push(ref); return tickets.get(ref) ?? null; },
-    askedText,
-    stageKinds: Object.keys(STAGE_KINDS),
-    listPeople: async () => people
+  rh = await createRecordsRouteHarness({
+    harness,
+    urlKey: URL_KEY,
+    tickets,
+    people,
+    authenticate: credential,
+    readTicket: async (_req, ref) => { calls.ticketReads.push(ref); return tickets.get(ref) ?? null; }
   });
-  const app = express();
-  app.use(express.json());
-  app.use(routes);
-  await new Promise((resolve) => { server = app.listen(0, '127.0.0.1', resolve); });
-  base = `http://127.0.0.1:${server.address().port}`;
+  store = rh.store;
+  db = rh.db;
+  base = rh.base;
   tokens = {
     john: { origin: 'person', createdBy: 'acc-john', writes: null },
     impl: { origin: 'dispatch', runRecordId: 'row-impl', writes: 'implementation' },
@@ -105,6 +84,10 @@ beforeEach(async () => {
   await store.openRun(URL_KEY, { id: 'row-left', stage: 'leftover', lineage: 'row-root', at: '2026-11-19T10:00:01.000Z' });
   await store.openRun(URL_KEY, { id: 'row-other', stage: 'review', lineage: 'row-elsewhere', at: '2026-11-19T10:00:02.000Z' });
   await store.openRun(URL_KEY, { id: 'row-blind', stage: 'blind-read', lineage: 'row-blind', at: '2026-11-19T10:00:03.000Z' });
+});
+afterEach(async () => {
+  if (rh) await rh.close();
+  rh = null;
 });
 
 async function call(method, path, token, body) {

@@ -11,6 +11,8 @@
  *     words as history, and rewriting them would falsify the record;
  *   - tests/fixtures/records-import/ is the frozen import baseline at bf2d1575f: the pre-cutover notes the one-off
  *     import reads, which keep their Waiting sections by design;
+ *   - tests/fixtures/walk-8/ is walk 8's store, ported to today's kinds (LIN-4496): the historical records the replay writes
+ *     through the proxy, quoting the retired words as the walk wrote them;
  *   - the census's own test files are under tests/unit/, which is not a census root.
  * Matching is by symbol and by heading, not by bare word: "Waiting" alone is never retired (Home's "Waiting on you"
  * and lib/recommendation-look-first.js's wait on a live run are different things), and `## Waiting` matches anywhere,
@@ -61,6 +63,7 @@ export const EXCLUDED_PREFIXES = Object.freeze({
   'docs/plans/': 'plans and designs of record: the LIN-4491 design quotes the retired words it retires',
   'docs/reviews/': 'dated review records, including the stability readings from before the cutover',
   'tests/fixtures/records-import/': 'the frozen import baseline at bf2d1575f: pre-cutover notes the one-off import reads, which keep their Waiting sections by design',
+  'tests/fixtures/walk-8/': 'the walk-8 stores (LIN-4496), ported to today\'s kinds: the historical records the replay writes through the proxy, and their retired words (Retires: lines, the retired flags) are the walk\'s record, as the walk wrote them',
 });
 
 /**

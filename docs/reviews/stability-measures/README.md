@@ -259,8 +259,30 @@ about 5.7 minutes, gave byte-identical JSON and identical tables, with every tra
 unreadable. Both runs were on one day, so they cannot show tracker drift across days, and both were in one
 environment.
 
+## The records rows and the held-run reading (LIN-4496)
+
+Three rows read the records store, the one place hand-offs live (LIN-4491): `records.openToProject` (open findings and
+questions addressed to the project), `records.openToStage` (open ones addressed to a stage kind), and `records.sitTime`
+(the median age in hours of the open hand-offs at the reading's time). A missing store is not measured; no open
+hand-off is not measured too, because a median of nothing is not zero. `recordsRows` in
+`scripts/stability-measures-core.mjs` builds them.
+
+The held-run reading (`heldRunReading`, `heldRunRow`) asks whether a hand-off waits on a run that is held. A held run
+is a dispatch row with `heldWakeFor` and no `heldWakeClaimedAt` stamp. For each open hand-off addressed to a held run's
+stage or task, it reads how long the hand-off sat before a reader first read it: the first query-log entry at or after
+it was opened that names its task or the record, by someone other than the measuring reader (so the reading does not
+count its own reads). A hand-off no reader has read by the reading's time is censored there, and is not counted as
+read. The reading names its window and its sample sizes (`held`, `addressed`, `read`, `censored`). It decides whether
+wakes are built (slice 6); it gates nothing. Query-log entries expire after 90 days, so the sit-time reading has to be
+taken before the first entries are gone.
+
+These rows are not among the five measures, and `buildReading` does not print them yet: the stability tool reads git
+and the tracker, not the records store. Their inputs come from the production store, which only the deployed Harbour
+has, so a reading of them is taken there and reported on the parent ticket.
+
 ## What this retires
 
+- **Reading `## Waiting` from the notes for commits after the cutover.** LIN-4495 retired the lists, so the `waiting.*` rows read `not measured` from there on. The records rows above are the reading that replaces them (LIN-4496).
 - **Copying or writing measuring scripts into each run's evidence folder.** The review runs the committed script and
   saves its output. Frozen evidence folders and published reports stay as they are, because reports cite them.
 - **The per-day rows of `project-velocity-trajectory`** (LV and SD). The next report closes both ledger rows as

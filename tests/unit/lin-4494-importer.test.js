@@ -49,7 +49,7 @@ beforeEach(async () => {
     recordsStore: store,
     isTerminalState,
     stageKinds: Object.keys(STAGE_KINDS),
-    listPeople: async () => [],
+    listPeople: async () => [{ accountId: 'acc-john', name: 'John' }],
   });
 });
 
@@ -152,7 +152,8 @@ describe('the parked-ticket manifest', () => {
     for (const t of manifest.tickets) {
       for (const f of t.findings) {
         assert.ok(f.says && f.says.length <= 600, `${t.ticket}: says is a sentence`);
-        assert.ok(f.to === 'project' || Object.keys(STAGE_KINDS).includes(f.to), `${t.ticket}: to ${f.to} is a reader`);
+        // LIN-4496: a hand-off to John names him as the workspace shows him; the production dry run confirms that name.
+        assert.ok(f.to === 'project' || Object.keys(STAGE_KINDS).includes(f.to) || f.to === 'John', `${t.ticket}: to ${f.to} is a reader`);
       }
     }
   });
