@@ -127,9 +127,15 @@ export function createTaskPageRoutes({ workspaceFromUrl, getOpenRouterSource, ge
   // the checked POST (routes/task-records.js). A guest never reaches this (the guest route is /t/:token and passes no records).
   const recordsOf = async (req, urlKey, identifier) => {
     if (!recordsStore || !req.session?.accountId) return null;
-    const taskId = await recordsStore.taskForTicket(urlKey, identifier);
-    const views = taskId ? await recordsStore.viewsOf(urlKey, await recordsStore.find(urlKey, { inRef: taskId })) : [];
-    return { views, canAct: true, refused: queryValue(req.query.records_refused) || null };
+    // A records-store failure costs the Records section only (null: none drawn), never the whole task page.
+    try {
+      const taskId = await recordsStore.taskForTicket(urlKey, identifier);
+      const views = taskId ? await recordsStore.viewsOf(urlKey, await recordsStore.find(urlKey, { inRef: taskId })) : [];
+      return { views, canAct: true, refused: queryValue(req.query.records_refused) || null };
+    } catch (err) {
+      console.error('Task page records error:', err?.message || err);
+      return null;
+    }
   };
 
   router.get('/workspace/:urlKey/task/:identifier', workspaceFromUrl, async (req, res) => {

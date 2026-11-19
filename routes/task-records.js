@@ -4,7 +4,7 @@
  *   POST /workspace/:urlKey/task/:identifier/records        add a finding or question on this task (kind, text, to)
  *   POST /workspace/:urlKey/task/:identifier/records/child  add a child task under this task (done-when)
  *   POST /workspace/:urlKey/records/:id/end                 end an open record (state, reason, into)
- *   POST /workspace/:urlKey/records/:id/supersede           supersede an open finding or question with new words
+ *   POST /workspace/:urlKey/records/:id/supersede           supersede an open lesson or decision with new words
  *
  * Every write goes through the one checked pipeline (lib/records/writes.js) with `by` = `person:<canonical account>`,
  * read from the session, never from the body. Forms post plainly (no script needed): a written or refused write

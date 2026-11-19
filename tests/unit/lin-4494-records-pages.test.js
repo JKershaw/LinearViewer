@@ -8,7 +8,7 @@
  * safe) and declines a finding; Home's Waiting on you carries the person's open records for an owner only; the session
  * page shows the run's account.
  */
-import { describe, test, before, after, beforeEach, afterEach } from 'node:test';
+import { describe, test, before, after, beforeEach, afterEach, mock } from 'node:test';
 import assert from 'node:assert/strict';
 import express from 'express';
 import { createMangoTmpdir } from '../fixtures/mango-tmpdir.js';
@@ -187,6 +187,56 @@ describe('the task page for a ticket with no task record yet', () => {
   });
 });
 
+describe('a records-store failure costs the records, not the page', () => {
+  test('the task page still renders, with no Records section, when the records read throws', async () => {
+    const loader = {
+      async loadTaskPage() {
+        return { model: { identifier: TICKET, title: 'Footer', issueId: null, tracker: null, status: 'open', sentence: 'x', live: false, sessions: [], stages: [], brief: null, recap: null, evidence: null, details: null }, taskState: null };
+      },
+    };
+    const broken = { taskForTicket: async () => { throw new Error('records down'); } };
+    const app = express();
+    app.use(createTaskPageRoutes({
+      workspaceFromUrl: session, getOpenRouterSource: () => null, getDeployInfo: () => ({}), loader,
+      workspaceOwnerCheck: async () => ({ status: 'member' }), recordsStore: broken, now: () => new Date(),
+    }));
+    server = await new Promise((resolve) => { const s = app.listen(0, '127.0.0.1', () => resolve(s)); });
+    base = `http://127.0.0.1:${server.address().port}`;
+    const quiet = mock.method(console, 'error', () => {});
+    try {
+      const page = await fetch(`${base}/workspace/${URL_KEY}/task/${TICKET}`);
+      const html = await page.text();
+      assert.equal(page.status, 200);
+      assert.doesNotMatch(html, /data-testid="task-records"/);
+      assert.match(html, /Footer/, 'the task itself is drawn');
+    } finally {
+      quiet.mock.restore();
+    }
+  });
+
+  test("Home's waiting standing keeps its rulings and loops when the records read throws", async () => {
+    const loops = [{ loopId: 'l1' }];
+    const standing = createWaitingStanding({
+      getLoopsForWorkspace: async () => loops,
+      dispatchStore: {}, agentStatusStore: {}, enrichLoop: (l) => l,
+      taskDecisionsStore: { listUnansweredForWorkspaces: async () => [], listNewestScanPerTask: async () => ({}) },
+      shelvedRulingsStore: { listForWorkspaces: async () => [] },
+      recordsStore: { find: async () => { throw new Error('records down'); } },
+    });
+    const out = await standing({ urlKey: URL_KEY, accountId: ACCOUNT });
+    assert.deepEqual(out.records, []);
+    assert.ok(out.ruling, 'the ruling standing is still there');
+    const brokenCanonical = createWaitingStanding({
+      getLoopsForWorkspace: async () => [],
+      dispatchStore: {}, agentStatusStore: {}, enrichLoop: (l) => l,
+      taskDecisionsStore: { listUnansweredForWorkspaces: async () => [], listNewestScanPerTask: async () => ({}) },
+      shelvedRulingsStore: { listForWorkspaces: async () => [] },
+      recordsStore: store, canonicalAccountId: async () => { throw new Error('accounts down'); },
+    });
+    assert.deepEqual((await brokenCanonical({ urlKey: URL_KEY, accountId: ACCOUNT })).records, []);
+  });
+});
+
 describe('the session writes: a signed-in person, filed by their account', () => {
   test('add a finding on the task, end it, add a child task, and refuse what the check refuses', async () => {
     const taskId = await makeTicketTask();
@@ -309,17 +359,20 @@ describe('the session writes: a signed-in person, filed by their account', () =>
 
 describe('the project page', () => {
   test('numbers the backlog oldest first, and lists only open records addressed to the project', async () => {
-    // Inserted newest-first, with explicit times: the order must come from `at`, not from insertion order.
+    // Inserted out of order (neither oldest-first nor newest-first), with explicit times: the order must come from `at`,
+    // and the middle insertion keeps both a reversed sort and no sort from passing.
+    await addFinding('middle', {}, '2026-11-19T11:00:00.000Z');
     await addFinding('second', {}, '2026-11-19T12:00:00.000Z');
     await addFinding('first, oldest', {}, '2026-11-19T10:00:00.000Z');
     await store.add(URL_KEY, { kind: 'finding', state: 'open', fields: { says: 'to a stage' }, links: {}, to: 'implementation' }, { by: 'review' });
     await serve(pagesRoutes()[1]);
     const html = await (await fetch(`${base}/workspace/${URL_KEY}/project`)).text();
     const numbers = [...html.matchAll(/data-testid="backlog-number">(\d+)\./g)].map((m) => m[1]);
-    assert.deepEqual(numbers, ['1', '2']);
+    assert.deepEqual(numbers, ['1', '2', '3']);
     const itemWith = (words) => html.split('<li ').find((chunk) => chunk.includes(words)) || '';
-    assert.match(itemWith('first, oldest'), /data-number="1"/, 'number 1 is the oldest record');
-    assert.match(itemWith('>second<'), /data-number="2"/, 'the newer record is number 2');
+    assert.match(itemWith('>first, oldest<'), /data-number="1"/, 'number 1 is the oldest record');
+    assert.match(itemWith('>middle<'), /data-number="2"/, 'number 2 is the middle one');
+    assert.match(itemWith('>second<'), /data-number="3"/, 'number 3 is the newest');
     assert.doesNotMatch(html, /to a stage/);
   });
 
@@ -352,6 +405,12 @@ describe('the project page', () => {
     const after = await store.current(URL_KEY, finding.id);
     assert.equal(after.state, 'declined');
     assert.equal(after.ended.reason, 'out of scope');
+  });
+
+  test('a backlog cut short says so, and one that is not says nothing', () => {
+    const items = [{ id: 'finding-1', kind: 'finding', state: 'open', fields: { says: 'x' }, by: 'implementation', at: 'now', number: 1, to: 'project' }];
+    assert.match(renderProjectPage({ urlKey: URL_KEY, items, cut: 7, canAct: false }, {}), /data-testid="project-backlog-cut">… and 7 more/);
+    assert.doesNotMatch(renderProjectPage({ urlKey: URL_KEY, items, cut: 0, canAct: false }, {}), /project-backlog-cut/);
   });
 
   test('the page renders its actions for a signed-in person only', () => {

@@ -57,8 +57,9 @@ routes/proxy-records.js, routes/task-records.js, routes/project-page.js, server.
 - Addressing a person needs the account id or the name the tracker shows, and a name read from the tracker often differs
   from how a note writes it. A manifest or note that writes "John" will be refused with the names that work; the
   parked-ticket manifest addresses John as `project` with "For John:" in the words, and says so in its notes.
-- A page never makes a task. The task page reads its task record by the ticket's claim (`taskForTicket`) and offers no
-  forms until one exists; the project page's actions and the proxy are the writers that make tasks.
+- A page GET never makes a task. The task page reads its task record by the ticket's claim (`taskForTicket`) and offers
+  its add and child-task forms before one exists; the first write through the checked pipeline makes the task
+  (routes/task-records.js sends `in: <ticket>`). The project page's actions and the proxy make tasks the same way.
 - The importer reads the notes from a git ref given on the command line (never a default: piece 4 deletes the sections),
   and its tests read committed fixtures, since CI checks out at depth 1 (tests/fixtures/records-import/). It reads each
   note with the guard's own reader (`parseNote`, `citedPaths` from lib/prompts/area-note-format.js, injected), so an

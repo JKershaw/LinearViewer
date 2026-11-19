@@ -351,6 +351,10 @@
     "disposition": "delegated",
     "to": "lib/connection-credential.js::tokens"
   },
+  "server.js::listWorkspacePeople": {
+    "disposition": "not-state",
+    "why": "Its factory keeps no empty Map, Set or WeakMap of its own (census scan, factory-level)."
+  },
   "server.js::readTaskTimeline": {
     "disposition": "not-state",
     "why": "Its factory keeps no empty Map, Set or WeakMap of its own (census scan, factory-level)."

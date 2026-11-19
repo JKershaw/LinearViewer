@@ -50,10 +50,12 @@ export function createProjectPageRoutes({ workspaceFromUrl, getDeployInfo, getOp
       const oldestFirst = [...open].sort((a, b) => (a.at < b.at ? -1 : a.at > b.at ? 1 : 0));
       const views = await recordsStore.viewsOf(urlKey, oldestFirst.slice(0, BACKLOG_LIMIT));
       const items = views.map((view, i) => ({ ...view, number: i + 1 }));
+      const cut = Math.max(0, oldestFirst.length - BACKLOG_LIMIT);
       const featureFlags = await requestFeatureFlags(req);
       const html = renderProjectPage({
         urlKey,
         items,
+        cut,
         canAct: Boolean(req.session?.accountId),
         refused: typeof req.query.refused === 'string' ? req.query.refused.slice(0, 300) : null,
       }, {

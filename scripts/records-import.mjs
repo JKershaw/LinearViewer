@@ -97,7 +97,7 @@ async function main() {
     const writes = createRecordWrites({ recordsStore, isTerminalState, stageKinds: Object.keys(STAGE_KINDS), listPeople });
 
     console.log(`${apply ? 'APPLY' : 'DRY RUN'}: workspace ${urlKey}; notes from ${ref ? `git ref ${ref}` : dir}`);
-    const notesReport = await applyWrites({ writes, recordsStore, urlKey, apply, items: waitingItems(plan, { ref }) });
+    const notesReport = await applyWrites({ writes, recordsStore, urlKey, apply, items: waitingItems(plan, { ref: plan.ref }) });
     console.log('\nWaiting entries');
     printPlan(plan, notesReport);
 

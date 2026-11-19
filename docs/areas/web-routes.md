@@ -28,5 +28,9 @@ Area notes for `web-routes` in the registry. Format and rules: README.md.
   picks its env defaults by provider name (`feedbackEnvDefault`, `jira`) instead of a provider
   declaration. One create pipeline with one resolver and one refuse-or-drop rule would make it one
   rule. (LIN-4451 Survey global; leftovers.)
-- `routes/dashboard.js`: a session's run account (`readRunAccount`) reads only the run records of the session's own loops
-  (a loop's id is its row's id). A follow-up row's account is on the run it resumes, which the read does not follow.
+- `routes/task-records.js`: the address `person:<canonical account>` is worked out in three places with different failure
+  rules. `personWriterOf` (here, imported by `routes/project-page.js`) falls back to the raw account id when canonical
+  resolution throws; Home's reader (`createWaitingStanding`, `lib/home-row-states.js`) throws, and now reads nothing;
+  `storedNameOf` (`lib/workspace-people.js`) does a third lookup. A person's records can be filed under an address Home
+  never reads. One owner in `lib/` needs a decision on where it lives (auth or workspace-people) and which failure rule
+  wins, across three areas. (LIN-4494 blind read.)

@@ -52,3 +52,6 @@ Area notes for `other-features` in the registry. Format and rules: README.md.
   you" (LIN-4494's open question, decided here; `lib/waiting-section.js` draws the records beside the rulings).
 - `lib/home-row-states.js`: records addressed to members other than the owner have no Home destination; Home is owner-only
   in this slice (LIN-4494).
+- `lib/waiting-section.js`: the person's records are read only when `runControls` is on (`homeRowStates` reads them with the
+  rulings), so an owner with no runner key never sees records that have nothing to do with runs. Moving them out of the
+  rulings path changes the section's design, not a few lines. (LIN-4494 blind read.)

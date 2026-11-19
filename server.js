@@ -3295,7 +3295,10 @@ const recordPipelineMerge = createPipelineMergeRecorder({
 })
 // LIN-4493 (John's ruling, link-account): listRecordPeople is the people a record can be addressed to, read from the
 // names the tracker sign-in stored on each account's identity (lib/workspace-people.js).
-app.use(createProxyRoutes({ proxyTokenStore, proxyEventStore, agentStatusStore, recapCacheStore, briefCacheStore, taskSnapshotStore, dispatchQueueStore, dispatchTokenStore, closeOutEventsStore, llmCallLogStore, taskDecisionsStore, shelvedRulingsStore, dismissalSuggestionsStore, harbourCommentsStore, recordsStore, listRecordPeople: createListWorkspacePeople({ workspaceStore, accountStore, accountWorkspaceStore }), sessionsFeedCache, workspaceFromUrl, resolveWorkspaceAccess, getWorkspaceOpenRouterKey, getWorkspaceNorthStar, getNorthStarDocVersionForWorkspace, reportHistoryStore, workspacePreferencesStore, dispatchPresetsStore, freeTierStore, accountStore, rejectedCredentialRegistry, observerStateStore, savedChatStore, workspaceHaltStore, workspaceOwnerCheck, modelRoutingStore, livenessAlarmStore, onTicketWrite, recordPipelineMerge, consumerHeartbeatStore, requestUsageStore, requestUsageLoader, leftoverStep }))
+// LIN-4494: one reader, built once, for the proxy, the task and project pages, Home's Waiting section and `?assignee=me`.
+const listWorkspacePeople = createListWorkspacePeople({ workspaceStore, accountStore, accountWorkspaceStore })
+const canonicalAccountIdOf = (accountId) => accountStore.resolveCanonicalAccountId(accountId)
+app.use(createProxyRoutes({ proxyTokenStore, proxyEventStore, agentStatusStore, recapCacheStore, briefCacheStore, taskSnapshotStore, dispatchQueueStore, dispatchTokenStore, closeOutEventsStore, llmCallLogStore, taskDecisionsStore, shelvedRulingsStore, dismissalSuggestionsStore, harbourCommentsStore, recordsStore, listRecordPeople: listWorkspacePeople, sessionsFeedCache, workspaceFromUrl, resolveWorkspaceAccess, getWorkspaceOpenRouterKey, getWorkspaceNorthStar, getNorthStarDocVersionForWorkspace, reportHistoryStore, workspacePreferencesStore, dispatchPresetsStore, freeTierStore, accountStore, rejectedCredentialRegistry, observerStateStore, savedChatStore, workspaceHaltStore, workspaceOwnerCheck, modelRoutingStore, livenessAlarmStore, onTicketWrite, recordPipelineMerge, consumerHeartbeatStore, requestUsageStore, requestUsageLoader, leftoverStep }))
 
 // LIN-3098 S3: the runner kit (lib/runner-kit/*.mjs), public, for the served
 // runner prompt to fetch and verify against its sha256 pins (routes/runner-kit.js).
@@ -3384,7 +3387,7 @@ const taskPageLoader = createTaskPageLoader({ dispatchStore: dispatchQueueStore,
 const waitingStanding = createWaitingStanding({
   getLoopsForWorkspace, dispatchStore: dispatchQueueStore, agentStatusStore, taskDecisionsStore, shelvedRulingsStore, enrichLoop,
   // LIN-4494: the person's open records ride on the same section (lib/home-row-states.js), canonical account first.
-  recordsStore, canonicalAccountId: (accountId) => accountStore.resolveCanonicalAccountId(accountId),
+  recordsStore, canonicalAccountId: canonicalAccountIdOf,
 })
 const homeRowStates = createHomeRowStates({
   getLoopsForWorkspace, dispatchStore: dispatchQueueStore, agentStatusStore, taskDecisionsStore, shelvedRulingsStore, enrichLoop, deriveSessionWaiting,
@@ -3416,8 +3419,8 @@ app.use(createTaskPageRoutes({
 
 // LIN-4494 (piece 3): a signed-in person's record writes from the task page, and the project page (its backlog and
 // the two actions on it). Both write through the one checked pipeline (lib/records/writes.js), filed by the session's account.
-app.use(createTaskRecordsRoutes({ workspaceFromUrl, recordsStore, accountStore, listPeople: createListWorkspacePeople({ workspaceStore, accountStore, accountWorkspaceStore }) }))
-app.use(createProjectPageRoutes({ workspaceFromUrl, getDeployInfo, getOpenRouterSource, recordsStore, accountStore, listPeople: createListWorkspacePeople({ workspaceStore, accountStore, accountWorkspaceStore }) }))
+app.use(createTaskRecordsRoutes({ workspaceFromUrl, recordsStore, accountStore, listPeople: listWorkspacePeople }))
+app.use(createProjectPageRoutes({ workspaceFromUrl, getDeployInfo, getOpenRouterSource, recordsStore, accountStore, listPeople: listWorkspacePeople }))
 
 // Mount the task share routes (LIN-3330) — the owner mint/list/revoke controls
 // and the PUBLIC guest page at `/t/:token` (+ its stored-data `/t/:token/state`).
@@ -3519,8 +3522,8 @@ async function resolveTeamSelection(req, workspace) {
 async function storedPersonNameOf(req) {
   try {
     return await storedNameOf({ accountId: req.session.accountId, urlKey: req.workspace.urlKey }, {
-      listPeople: createListWorkspacePeople({ workspaceStore, accountStore, accountWorkspaceStore }),
-      canonicalAccountId: (accountId) => accountStore.resolveCanonicalAccountId(accountId),
+      listPeople: listWorkspacePeople,
+      canonicalAccountId: canonicalAccountIdOf,
     });
   } catch (err) {
     console.error('workspace people read failed resolving ?assignee=me:', err?.message || err);

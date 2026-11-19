@@ -230,28 +230,6 @@ function resolveDeps(deps) {
 }
 
 /**
- * @param {Object} deps
- * @param {Function} deps.workspaceFromUrl        - middleware: session + req.workspace
- * @param {Object}   deps.dispatchQueueStore       - dispatch store (listItems/listHistory)
- * @param {Object}   deps.agentStatusStore             - agent status store
- * @param {Object}   [deps.observationSessionsStore]   - durable materialized sessions read-model (LIN-623); when present the feed reads it instead of replaying logs. Null ⇒ live path (byte-identical legacy behaviour).
- * @param {Object}   [deps.observationMaterializer]    - materializer used to backfill a workspace on a read-miss (LIN-623)
- * @param {Object}   deps.runSummaryCacheStore     - run-summary cache store
- * @param {Object}   deps.sessionSummaryCacheStore - session-summary cache store (LIN-592)
- * @param {Object}   [deps.runParagraphStore]      - durable run-paragraph store (LIN-3253); the run page READS it only and never generates. Default null → no paragraph renders.
- * @param {Object}   deps.freeTierStore            - free-tier usage store (rate limit)
- * @param {Function} deps.getWorkspaceAccessToken  - (urlKey) → token (lazy hydration only)
- * @param {Function} deps.fetchIssueContext        - (token, identifier) → issue context (lazy hydration)
- * @param {Function} deps.fetchWorkspaceIssues     - (workspace) → canonical issue set (session-context; LIN-593)
- * @param {Function} deps.getOpenRouterSource      - (req) → 'oauth'|'env'|'free'|null
- * @param {Function} deps.getDeployInfo            - () → deploy metadata
- * @param {number}   [deps.recentLimit=120]        - cap on terminal runs returned by /loops
- * @param {Object}   [deps.sessionsFeedCache]      - short-TTL SWR cache for the /sessions feed (LIN-617)
- * @param {Object}   [deps.taskDecisionsStore]     - scan-produced task decisions store (LIN-2215), threaded into /api/dashboard/rulings
- * @param {Object}   [deps.shelvedRulingsStore]    - shelved-rulings store (LIN-1727), threaded into /api/dashboard/rulings
- * @returns {Router}
- */
-/**
  * LIN-4494: the account of the session's latest ended run, from the records store. Mapped session -> row -> run: each
  * loop's id is its dispatch row's id, and the row names its run (lib/run-identity.js `runRecordIdFor`): a row that starts
  * a run is its own run, and a follow-up or wake row belongs to the run it resumes (its `runRecordId`). A session made only
@@ -275,6 +253,28 @@ export async function readRunAccount(recordsStore, readRow, urlKey, session) {
   return latest ? latest.fields.account : null;
 }
 
+/**
+ * @param {Object} deps
+ * @param {Function} deps.workspaceFromUrl        - middleware: session + req.workspace
+ * @param {Object}   deps.dispatchQueueStore       - dispatch store (listItems/listHistory)
+ * @param {Object}   deps.agentStatusStore             - agent status store
+ * @param {Object}   [deps.observationSessionsStore]   - durable materialized sessions read-model (LIN-623); when present the feed reads it instead of replaying logs. Null ⇒ live path (byte-identical legacy behaviour).
+ * @param {Object}   [deps.observationMaterializer]    - materializer used to backfill a workspace on a read-miss (LIN-623)
+ * @param {Object}   deps.runSummaryCacheStore     - run-summary cache store
+ * @param {Object}   deps.sessionSummaryCacheStore - session-summary cache store (LIN-592)
+ * @param {Object}   [deps.runParagraphStore]      - durable run-paragraph store (LIN-3253); the run page READS it only and never generates. Default null → no paragraph renders.
+ * @param {Object}   deps.freeTierStore            - free-tier usage store (rate limit)
+ * @param {Function} deps.getWorkspaceAccessToken  - (urlKey) → token (lazy hydration only)
+ * @param {Function} deps.fetchIssueContext        - (token, identifier) → issue context (lazy hydration)
+ * @param {Function} deps.fetchWorkspaceIssues     - (workspace) → canonical issue set (session-context; LIN-593)
+ * @param {Function} deps.getOpenRouterSource      - (req) → 'oauth'|'env'|'free'|null
+ * @param {Function} deps.getDeployInfo            - () → deploy metadata
+ * @param {number}   [deps.recentLimit=120]        - cap on terminal runs returned by /loops
+ * @param {Object}   [deps.sessionsFeedCache]      - short-TTL SWR cache for the /sessions feed (LIN-617)
+ * @param {Object}   [deps.taskDecisionsStore]     - scan-produced task decisions store (LIN-2215), threaded into /api/dashboard/rulings
+ * @param {Object}   [deps.shelvedRulingsStore]    - shelved-rulings store (LIN-1727), threaded into /api/dashboard/rulings
+ * @returns {Router}
+ */
 export function createDashboardRoutes(deps) {
   const resolved = resolveDeps(deps);
   // The names the run-page block below reads, under the names it reads them.
@@ -478,7 +478,7 @@ export function createDashboardRoutes(deps) {
       } : null;
 
       // LIN-4494: the run's account (its final assistant text, lib/run-records.js), read from the run records of this
-      // session's own rows. A follow-up row's run is the run it resumes, which this read does not follow: no account then.
+      // session's own rows. A follow-up or wake row reads the run it resumes (`readRunAccount`, via `runRecordIdFor`).
       const runAccount = recordsStore ? await readRunAccount(recordsStore, (urlKey, id) => dispatchQueueStore.rowForRunRecords(urlKey, id), workspace.urlKey, session) : null;
       const html = renderSessionPage(
         { session, sessionId, issueContext, waiting, waitingMessage, producerLoopId, decision, decisionCase, decisions: sessionDecisions, producer, urlKey: workspace.urlKey, canReply, sessionTerminal, credentialByToken, anchorIssueTitle, runView, proposals, runEvidence, runParagraph, runAccount },
