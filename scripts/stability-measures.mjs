@@ -5,8 +5,9 @@
 //          [--reference <file> | --as-reference <label>]
 //   → JSON on stdout; the ordered opening table on stderr.
 // Reads: git objects of <repo> (lines through the code-shape kit's counter, first-parent churn), `gh` for CI runs (run
-// from <repo>, so its GitHub remote decides the repository). The Waiting rows are `not measured` since LIN-4495 retired
-// the lists. Every read that fails becomes `not measured: <reason>` in its row; nothing is zero-filled.
+// from <repo>, so its GitHub remote decides the repository). The Waiting rows count the lists at a pre-cutover commit
+// (LIN-4495 retired them: a commit whose notes carry no Waiting section is `not measured`). Every read that fails
+// becomes `not measured: <reason>` in its row; nothing is zero-filled.
 // --api (default $HARBOUR_LOCAL_BASE/api/proxy) is the workspace proxy for finished tasks, speed, cost and tickets
 // minted (scripts/stability-measures-tracker.mjs: paced, honours 429 Retry-After). Finished tasks may have landed
 // before base, so the landings of the --lookback-days (default 3) before base are read for their tickets too. The same
@@ -30,7 +31,8 @@ import {
   DEFAULT_EXCLUDE, UsageError, commitDateOf, compileScope, emitJson, git, listBlobs, loadCore, parseArgs, readBlobs, readCommit,
   resolveCommit, runCli,
 } from './code-shape/code-shape-lib.mjs';
-import { NOTES_DIR } from '../lib/prompts/area-note-format.js';
+import { NOTES_DIR, isNoteFile } from '../lib/prompts/area-note-format.js';
+import { countFrozenWaiting } from '../lib/records/waiting-import.js';
 import {
   NO_REFERENCE_KEYS, NO_REFERENCE_ROWS, SCOPE_INCLUDE, buildReading, churnRow, ciRow, formatTable, linesRow, noReferenceReading,
   notMeasured, parseLandingLog, parseNumstat, referencesFrom, waitingRows,
@@ -44,10 +46,15 @@ const LANDING_FORMAT = '--format=%H%x1f%cI%x1f%s%x1f%b%x1e';
 const GH_LIMIT = 1000;
 const NO_API = 'no --api given and HARBOUR_LOCAL_BASE unset';
 
-// LIN-4495: the Waiting lists are retired, so the notes no longer hold a waiting count. A source that has no Waiting list
-// is `not measured` with its reason, never a zero (the cutover removed the source; a zero would read as a fall).
-const WAITING_RETIRED = 'the area notes\' Waiting lists were retired in LIN-4495; the backlog is the project\'s records';
-const waitingAt = () => { throw new Error(WAITING_RETIRED); };
+// The Waiting count of the notes at one commit: the frozen reader (lib/records/waiting-import.js), kept for the windows
+// that predate LIN-4495. A commit whose notes carry no Waiting section throws its reason: `not measured`, never zero.
+const waitingAt = (repo, sha) => {
+  const entries = listBlobs(repo, sha).filter((e) => e.path.startsWith(`${NOTES_DIR}/`) && !e.path.slice(NOTES_DIR.length + 1).includes('/'));
+  const byPath = readBlobs(repo, entries);
+  const reading = countFrozenWaiting(Object.fromEntries(Object.entries(byPath).map(([p, text]) => [p.slice(NOTES_DIR.length + 1), text])), { isNoteFile });
+  if ('reason' in reading) throw new Error(reading.reason);
+  return reading.count;
+};
 
 const tryCount = (fn) => { try { return { count: fn() }; } catch (e) { return { reason: firstLine(e) }; } };
 

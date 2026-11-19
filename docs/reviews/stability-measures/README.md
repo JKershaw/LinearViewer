@@ -49,12 +49,13 @@ Net production lines lead, with code and comments counted apart.
 - `ci`: the median minutes (`updatedAt − startedAt`) of successful `test.yml` runs on `main` whose head sha is a
   window landing. Unit: one run per landing. Source: `gh`. Defined in `scripts/stability-measures-core.mjs`
   (`ciRow`) and `scripts/stability-measures.mjs` (the listing).
-- `waiting.harbour`, `waiting.runner`, `waiting.total`: **not measured since LIN-4495.** The cutover retired the area
-  notes' Waiting lists (a find is a records finding now, and the backlog is the project's records), so the source is
-  gone and each row reads `not measured` with that reason, never 0. Before LIN-4495 they counted the bullets under
-  each note's Waiting heading at base and head (the readings below are from then). The records rows that replace
-  them (open to project, open to a stage, sit time) are LIN-4496's. Defined in `scripts/stability-measures.mjs`
-  (`waitingAt`).
+- `waiting.harbour`, `waiting.runner`, `waiting.total`: the bullets under each area note's `## Waiting` heading at base and
+  head, read by the frozen reader `countFrozenWaiting` (`lib/records/waiting-import.js`), which keeps the pre-cutover
+  shape for historical windows. A commit with no notes directory reads 0. A commit whose notes carry no `## Waiting`
+  section (every note after LIN-4495 retired the lists) reads `not measured` with that reason, never 0, so a window
+  that spans the cutover shows the gap rather than a fall. The readings below are from before LIN-4495. The records
+  rows that replace them (open to project, open to a stage, sit time) are LIN-4496's. Defined in
+  `scripts/stability-measures.mjs` (`waitingAt`).
 - `minted`: tickets minted per landing, an **ID-span estimate**: the highest issue number created at or before
   head's commit time, minus the same at base, over the window's landings. The span counts trashed and missing
   numbers. Unit: landing. Source: the tracker. Defined in `scripts/stability-measures-core.mjs` (`idSpanSearch`,

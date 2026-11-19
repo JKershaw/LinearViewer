@@ -392,7 +392,7 @@ describe('D. companion instruments', () => {
     // plan-review verdict comment on an issue the `plan` step never ran on.
     const reviewed = run([source('s', DONE, {
       description: 'Fix the thing.',
-      comments: [{ id: 'c1', body: '## Review\nCheck #4: does it fit one session? Yes.\n\n### What CI Did Not Prove\n- x', createdAt: DONE }],
+      comments: [{ id: 'c1', body: '## Review — LIN-1\nCheck #4: does it fit one session? Yes.\n\n### Verdict\nApprove', createdAt: DONE }],
     })]);
     assert.equal(reviewed.planScoped.denominator, 0, 'a plan-review comment is not evidence the plan step ran');
     assert.equal(reviewed.diagnostics.pctWithReviewLedger, 1, 'while the ledger marker DOES still read comments — that is where review posts it');
@@ -442,10 +442,10 @@ describe('D. companion instruments', () => {
 
     // Both overridable patterns are affected — the class is exactly two, and
     // they are fixed together.
-    const ledger = { comments: [{ id: 'c', body: '### What CI Did Not Prove\n- x', createdAt: DONE }] };
+    const ledger = { comments: [{ id: 'c', body: '## Review — LIN-1\n- x', createdAt: DONE }] };
     const ledgered = run(
       [source('s1', DONE, ledger), source('s2', DONE, ledger), source('s3', DONE, ledger)],
-      { reviewLedgerMarker: /### What CI Did Not Prove/g },
+      { reviewLedgerMarker: /^##\s*Review\s+—\s+\S+/gm },
     );
     assert.equal(ledgered.diagnostics.pctWithReviewLedger, 1, 'a /g review-ledger override must not alternate either');
   });
@@ -662,7 +662,9 @@ describe('F. clock-freedom, loudness and __internal', () => {
     assert.equal(hasPlanMarker({ description: '## Implementation Plan (LIN-1)' }), true);
     assert.equal(hasPlanMarker({ description: 'no marker here' }), false);
     assert.equal(hasPlanMarker({ description: '', comments: [{ body: 'fits one session' }] }), false, 'F2: comments are not a plan-marker surface');
-    assert.equal(hasReviewLedger({ comments: [{ body: '### What CI Did Not Prove\n- x' }] }), true);
+    assert.equal(hasReviewLedger({ comments: [{ body: '## Review — LIN-1\n- x' }] }), true);
+    // LIN-4495: the retired heading no longer marks a review; a post-cutover review's title does.
+    assert.equal(hasReviewLedger({ comments: [{ body: '### What CI Did Not Prove\n- x' }] }), false);
     assert.equal(hasReviewLedger({ description: '' }), false);
     assert.equal(textOf({ description: 'a', comments: [{ body: 'b' }] }), 'a\nb');
     assert.equal(descriptionOf({ description: 'a', comments: [{ body: 'b' }] }), 'a', 'the narrow surface reads no further');
