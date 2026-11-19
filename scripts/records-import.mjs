@@ -23,6 +23,7 @@ import { MangoClient } from '@jkershaw/mangodb';
 import { RecordsStore, RECORDS_COLLECTION, REFS_COLLECTION, QUERY_LOG_COLLECTION } from '../lib/records-store.js';
 import { ensureIndexes } from '../lib/db-indexes.js';
 import { planImport } from '../lib/records/waiting-import.js';
+import { parseNote, citedPaths } from '../lib/prompts/area-note-format.js';
 import { applyWrites, waitingItems, applyManifest } from '../lib/records/import-apply.js';
 import { createRecordWrites } from '../lib/records/writes.js';
 import { isTerminalState } from '../lib/providers/state-map.js';
@@ -62,7 +63,7 @@ function printPlan(plan, report) {
   console.log(`bullets: ${plan.totals.bullets}; entries: ${plan.totals.entries} (findings ${plan.totals.findings}; security ${plan.totals.security} across ${plan.totals.securityNotes} notes); malformed: ${plan.totals.malformed}`);
   for (const n of plan.perNote) {
     console.log(`  ${n.note}: ${n.bullets} bullets, ${n.findings} findings, ${n.security} security${n.malformed.length ? `, MALFORMED ${n.malformed.length}` : ''}`);
-    for (const m of n.malformed) console.log(`    malformed (line ${m.line}): ${m.why}: ${m.text.slice(0, 120)}`);
+    for (const m of n.malformed) console.log(`    malformed (entry ${m.entry}): ${m.why}: ${m.text.slice(0, 120)}`);
   }
   console.log(`records: ${report.created} created, ${report.existing} already there, ${report.wouldCreate} to create, ${report.refused.length} refused`);
   for (const r of report.refused) console.log(`  refused ${r.id}: ${r.problems.map((p) => p.message).join('; ')}`);
@@ -79,7 +80,7 @@ async function main() {
     return;
   }
   const notes = ref ? notesFromRef(ref) : notesFromDir(resolve(dir));
-  const plan = planImport(notes, { ref: ref ?? resolve(dir) });
+  const plan = planImport(notes, { ref: ref ?? resolve(dir), parseNote, citedPaths });
 
   const backend = process.env.MONGODB_URI ? 'mongodb' : 'mangodb';
   const dbClient = backend === 'mongodb' ? new MongoClient(process.env.MONGODB_URI) : new MangoClient(process.env.HARBOUR_DATA_DIR || './data');

@@ -10,11 +10,11 @@
  * finding's end into it); the task's id derives from the finding's, so a retry after a failed end finds the task it
  * made and does not make a second one.
  */
-import { createHash } from 'node:crypto';
 import { Router } from 'express';
 import { jsonError } from '../lib/errors.js';
 import { requestFeatureFlags } from '../lib/run-controls.js';
 import { createRecordWrites } from '../lib/records/writes.js';
+import { fixedIdOf } from '../lib/records/refs.js';
 import { renderProjectPage } from '../lib/render-project-page.js';
 import { personWriterOf } from './task-records.js';
 import { isTerminalState } from '../lib/providers/state-map.js';
@@ -42,7 +42,6 @@ export function createProjectPageRoutes({ workspaceFromUrl, getDeployInfo, getOp
 
   const backTo = (urlKey, query = '') => `/workspace/${encodeURIComponent(urlKey)}/project${query}`;
   const refusedTo = (urlKey, message) => backTo(urlKey, `?refused=${encodeURIComponent(String(message).slice(0, 300))}`);
-  const derivedId = (base, suffix) => createHash('sha256').update(`${base}\n${suffix}`).digest('hex').slice(0, 8);
 
   router.get('/workspace/:urlKey/project', workspaceFromUrl, async (req, res) => {
     const { urlKey } = req.workspace;
@@ -80,7 +79,7 @@ export function createProjectPageRoutes({ workspaceFromUrl, getDeployInfo, getOp
       if (!finding || finding.kind !== 'finding' || finding.state !== 'open' || finding.to !== PROJECT) {
         return res.redirect(303, refusedTo(urlKey, 'That is not an open finding on the backlog'));
       }
-      const taskId = `task-${derivedId(finding.id, 'make-task')}`;
+      const taskId = fixedIdOf('task', finding.id, 'make-task');
       const words = finding.fields?.says || finding.fields?.how || finding.id;
       const made = await writes.add({ urlKey, kind: 'task', input: { 'done-when': words, to: PROJECT }, by: writer.by, fixedId: taskId });
       if (made.problems) return res.redirect(303, refusedTo(urlKey, made.problems[0]?.message || 'refused'));

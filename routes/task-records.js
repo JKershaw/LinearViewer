@@ -14,12 +14,12 @@
  * Supersede is two writes: the new record, then the end of the old one into it. The new record's id is derived from the
  * old one's, so a retry after a failed end finds the record it already made and does not make a second.
  */
-import { createHash } from 'node:crypto';
 import { Router } from 'express';
 import { isValidIssueId } from '../lib/workspace.js';
 import { taskPageHref } from '../lib/task-page-href.js';
 import { jsonError } from '../lib/errors.js';
 import { createRecordWrites } from '../lib/records/writes.js';
+import { fixedIdOf } from '../lib/records/refs.js';
 import { ADDABLE, SUPERSEDABLE } from '../lib/render-task-records.js';
 import { RecordsNotFound, RecordsVersionConflict } from '../lib/records-store.js';
 import { isTerminalState } from '../lib/providers/state-map.js';
@@ -37,9 +37,6 @@ export async function personWriterOf(req, accountStore) {
   }
   return { by: `person:${canonical}`, run: null };
 }
-
-/** A short, stable id fragment for a record derived from another (supersede). */
-const derivedId = (base, suffix) => createHash('sha256').update(`${base}\n${suffix}`).digest('hex').slice(0, 8);
 
 const trimmed = (x) => (typeof x === 'string' ? x.trim() : '');
 
@@ -143,7 +140,7 @@ export function createTaskRecordsRoutes({ workspaceFromUrl, recordsStore, accoun
       if (prev.ended) return res.redirect(303, refusedTo(urlKey, identifier, [{ message: 'That record has already ended' }]));
       const field = SUPERSEDABLE[prev.kind];
       if (!field) return res.redirect(303, refusedTo(urlKey, identifier, [{ message: `a ${prev.kind} cannot be superseded from the task page; a lesson or a decision can` }]));
-      const newId = `${prev.kind}-${derivedId(prev.id, 'supersede')}`;
+      const newId = fixedIdOf(prev.kind, prev.id, 'supersede');
       const to = trimmed(req.body?.to) || prev.to;
       const input = { [field]: trimmed(req.body?.[field]), ...(prev.in ? { in: prev.in } : {}), ...(to ? { to } : {}) };
       const made = await writes.add({ urlKey, kind: prev.kind, input, by: writer.by, run: writer.run, fixedId: newId });

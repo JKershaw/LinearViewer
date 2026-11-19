@@ -6,9 +6,11 @@
  * with what would work. `by` is never read from a body: it is filled here from the credential and the run it
  * names, by lib/run-lineage.js `writerOf` (three outcomes, and a refusal never falls through to a person).
  *
- * A write's body is checked before anything is written. A ticket the body names is checked as a dry run first
- * (it reads the tracker and claims nothing), so a refused body makes no task (LIN-4493 review, gap 5); the real
- * tasks are made only once the dry run is clean.
+ * A write's body is checked before anything is written, by the one checked pipeline (lib/records/writes.js, LIN-4494):
+ * a ticket the body names is checked as a dry run first (it reads the tracker and claims nothing), so a refused body
+ * makes no task (LIN-4493 review, gap 5); the real tasks are made only once the dry run is clean. This router fills the
+ * writer from the credential and maps the pipeline's results to statuses; the session routes and the importer call the
+ * same pipeline.
  *
  * Mounts: POST /api/proxy/records (add), POST /api/proxy/records/:id/{revise,end,link}, each behind
  * `requireWriteScope('recordWrite')` (the readWrite scope and the stage's allowance; `recordWrite` is allowed to

@@ -3058,6 +3058,14 @@ select.github-repo-select {
   padding: 0.4rem 0.6rem;
 }
 
+/* The Jira site picker (lib/render-pages.js renderJiraSiteSelectPage): a native select sizes itself to its longest
+   option, so a long site name pushed it past a phone's edge (Design & Interface Review, 8 Nov.). Keyed on this page's
+   own id, so the shared .github-repo-select hook above stays layout-free. */
+select#jira-site-select {
+  max-width: 100%;
+  box-sizing: border-box;
+}
+
 .repo-picker-row input[type="radio"] {
   accent-color: var(--brand);
 }

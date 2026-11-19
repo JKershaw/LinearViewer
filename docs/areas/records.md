@@ -8,8 +8,9 @@ check, the views, the brief; all pure) and `lib/records-store.js` (the one file 
 proxy router, `routes/proxy-records.js`, stays in Agent API by the registry's first-match rule. The run lifecycle
 seam, `lib/run-records.js`, stays in Runs & dispatch by its `run-` pattern.
 
-Records imports only Platform. The tracker read, the askedText reader, STAGE_KINDS and the workspace-person reader
-are injected by their callers (routes/proxy.js, server.js).
+Records imports only Platform. The tracker read, the askedText reader, STAGE_KINDS, the provider state map's closed
+state, the workspace-person reader and the area notes' reader are injected by their callers (routes/proxy.js,
+routes/proxy-records.js, routes/task-records.js, routes/project-page.js, server.js, scripts/records-import.mjs).
 
 ## Lessons
 
@@ -48,9 +49,9 @@ are injected by their callers (routes/proxy.js, server.js).
   signed-in task-page and project-page routes, and the importer. It checks the body, dry-runs the tickets it names, makes
   their tasks only when that is clean, then checks again. A writer passes `by` (its own: a stage kind, `person:<account>`,
   `import`); `by` is never read from a body. A new writer calls the pipeline, never the store's add, revise, end or link directly.
-- A write that makes one record and then ends another is two writes. Make the first one's id a function of the second
-  (`fixedId`, as make-a-task and supersede do), so a retry after a failed end finds the record it made, not a second one.
-  The same id rule makes an import idempotent, and it holds after an imported record ends.
+- A write that makes one record and then ends another is two writes. Name the first with `fixedIdOf` (lib/records/refs.js,
+  the one derived-id rule) from the second, as make-a-task and supersede do, so a retry after a failed end finds the
+  record it made. Imports use the same rule, which holds after an imported record ends. Never hash an id by hand.
 - Records stay outside `ruling.rows`. Home's Waiting on you draws the person's records beside the rulings
   (`createWaitingStanding` returns `records`); the count, the badge and the live merge keep reading rulings only.
 - Addressing a person needs the account id or the name the tracker shows, and a name read from the tracker often differs
@@ -59,12 +60,12 @@ are injected by their callers (routes/proxy.js, server.js).
 - A page never makes a task. The task page reads its task record by the ticket's claim (`taskForTicket`) and offers no
   forms until one exists; the project page's actions and the proxy are the writers that make tasks.
 - The importer reads the notes from a git ref given on the command line (never a default: piece 4 deletes the sections),
-  and its tests read committed fixtures, since CI checks out at depth 1 (tests/fixtures/records-import/).
+  and its tests read committed fixtures, since CI checks out at depth 1 (tests/fixtures/records-import/). It reads each
+  note with the guard's own reader (`parseNote`, `citedPaths` from lib/prompts/area-note-format.js, injected), so an
+  entry the guard counts is an entry the import writes.
 
 ## Waiting
 
 - The brief still reads the workspace's whole history (`snapshots`, `index`, `currentAt`) to compose its parts. It is
   pure and correct at this size, and piece 4 wires it behind the brief route; the change then is to read the parts
   through `find` and `lookup`. Cites `lib/records-store.js` and `lib/records/brief.js`.
-- `lib/records/import-apply.js`: the parked-ticket manifest (`scripts/records/parked-tickets.json`) is hand-written from the
-  tickets' comments and the design; a reviewer reads it as filed.
