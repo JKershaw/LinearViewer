@@ -19,6 +19,12 @@ are injected by their callers (routes/proxy.js, server.js).
   lineage lib/run-lineage.js reads. Every version of a run is kept: a resume reopens it as a new `open` version.
 - The query log has no TTL index (lib/db-indexes.js bans them). Its rows carry `expiresAt`, and the hourly cleanup
   removes them (lib/hourly-cleanup.js). Retention is 90 days; piece 5's readings need at least that.
+- A record id can have a ticket's shape (`finding-12345678` when its hex is all digits; a run id such as `row-12345`).
+  `routes/proxy-records.js` resolves a reference against the records first and sends only the rest to the tracker; a
+  new reference path must do the same, or a valid record is refused as an unreadable ticket.
+- A new collection is inventoried three times: `INVENTORY` in `lib/account-erasure.js`, `COLLECTION_CLASSES` in
+  `tests/unit/urlkey-holders.test.js`, and the dry-run's `URLKEY_SOURCES` (`scripts/dry-run-urlkey-duplicates.mjs`).
+  The second is the one a local run of the area's tests misses; CI's full suite caught it.
 
 ## Waiting
 

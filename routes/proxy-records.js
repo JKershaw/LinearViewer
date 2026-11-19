@@ -24,9 +24,9 @@ import { TOKEN_ORIGIN } from '../lib/stage-writes.js';
 import { RecordsVersionConflict, RecordsNotFound, looksLikeTicket } from '../lib/records-store.js';
 import { checkAdd, checkRevise, checkEnd, checkLink, refusalOf, splitRef, KINDS } from '../lib/records/check.js';
 import { viewOf } from '../lib/records/views.js';
+import { isTerminalState } from '../lib/providers/state-map.js';
 
 const LINK_TYPES = Object.keys(KINDS.links);
-const CLOSED_TYPES = ['completed', 'canceled'];
 
 /** What a refused writer says, by reason. Every refusal is a 403 that names its cause. */
 const REFUSAL_TEXT = {
@@ -54,8 +54,12 @@ function bodyWithout(body, keys) {
   return out;
 }
 
-/** Every reference a body names that may be a ticket (in, to, and the link values). */
-function ticketRefsIn(input) {
+/**
+ * Every reference a body names that may be a ticket (in, to, and the link values) and is not already a record.
+ * A record id can have a ticket's shape (`finding-12345678`, a run id such as `row-12345`), so a reference that
+ * names an existing record resolves to it and never reaches the tracker.
+ */
+function ticketRefsIn(input, idx) {
   const refs = new Set();
   const take = (v) => { if (typeof v === 'string' && looksLikeTicket(v)) refs.add(v.trim()); };
   take(input.in);
@@ -66,7 +70,7 @@ function ticketRefsIn(input) {
     if (input.links && input.links[type] !== undefined) linkValues.push(input.links[type]);
   }
   for (const v of linkValues) for (const x of [].concat(v)) take(typeof x === 'string' ? splitRef(x).id : x);
-  return [...refs];
+  return [...refs].filter((ref) => !idx.has(ref));
 }
 
 /**
@@ -108,7 +112,8 @@ export function createProxyRecordsRoutes({ recordsStore, proxyLimiter, authentic
     const issue = await readTicket(req, ref);
     if (!issue) return null;
     const state = issue.state || {};
-    const closed = CLOSED_TYPES.includes(state.type) || issue.trashed === true;
+    // Closed is the provider state map's word (completed, canceled, duplicate), or a trashed ticket.
+    const closed = isTerminalState(state.type) || issue.trashed === true;
     const info = {
       identifier: issue.identifier || ref,
       asked: askedText(issue.description || '') || '',
@@ -186,8 +191,8 @@ export function createProxyRecordsRoutes({ recordsStore, proxyLimiter, authentic
       if (!writer.ok) { logEvent(req, endpoint, 403); return refusal(res, writer); }
       const urlKey = req.proxyUrlKey;
       const input = bodyWithout(body, ['kind', 'run']);
-      const tickets = await ensureTickets(req, ticketRefsIn(input), writer.by);
       const idx = await recordsStore.index(urlKey);
+      const tickets = await ensureTickets(req, ticketRefsIn(input, idx), writer.by);
       const { problems, record } = checkAdd(body.kind, input, contextFor(urlKey, idx, tickets, await listPeople(urlKey)));
       if (problems.length) return reply(req, res, endpoint, 422, refusalOf(problems));
       const snap = await recordsStore.add(urlKey, record, { by: writer.by, run: writer.run ?? null });
@@ -211,7 +216,7 @@ export function createProxyRecordsRoutes({ recordsStore, proxyLimiter, authentic
       if (!prev) return reply(req, res, endpoint, 404, { error: `no record '${req.params.id}'` });
       if (prev.kind === 'run') return reply(req, res, endpoint, 422, refusalOf([RUN_ENDS_ITSELF]));
       const input = bodyWithout(body, ['run']);
-      const tickets = await ensureTickets(req, ticketRefsIn(input), writer.by);
+      const tickets = await ensureTickets(req, ticketRefsIn(input, idx), writer.by);
       const { problems, changes } = checkRevise(prev, input, contextFor(urlKey, idx, tickets, await listPeople(urlKey)));
       if (problems.length) return reply(req, res, endpoint, 422, refusalOf(problems));
       await recordsStore.revise(urlKey, prev.id, changes, { by: writer.by, run: writer.run ?? null, reason: input.reason });
@@ -261,7 +266,7 @@ export function createProxyRecordsRoutes({ recordsStore, proxyLimiter, authentic
       const links = {};
       for (const type of LINK_TYPES) if (body[type] !== undefined) links[type] = body[type];
       Object.assign(links, isPlainObject(body.links) ? body.links : {});
-      const tickets = await ensureTickets(req, ticketRefsIn({ links }), writer.by);
+      const tickets = await ensureTickets(req, ticketRefsIn({ links }, idx), writer.by);
       const { problems, links: normalized } = checkLink(prev, links, contextFor(urlKey, idx, tickets, await listPeople(urlKey)));
       if (problems.length) return reply(req, res, endpoint, 422, refusalOf(problems));
       await recordsStore.link(urlKey, prev.id, normalized, { by: writer.by, run: writer.run ?? null });

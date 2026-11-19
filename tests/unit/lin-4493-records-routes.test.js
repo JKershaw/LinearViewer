@@ -252,6 +252,16 @@ describe('the API review\'s call shape', () => {
     assert.equal((await store.current(URL_KEY, await store.taskForTicket(URL_KEY, 'LIN-4452'))).in, parent, 'the sibling sits in its parent\'s task');
   });
 
+  // Leftovers (LIN-4493): a record id can have a ticket's shape (`finding-12345678` when its hex is all digits,
+  // a run id such as `row-12345`). A reference to a record that exists resolves to it, and never reads the tracker.
+  test('a reference to an existing record shaped like a ticket id resolves to the record, without a tracker read', async () => {
+    await store.openRun(URL_KEY, { id: 'row-12345', stage: 'review', lineage: 'row-12345', at: '2026-11-19T10:00:04.000Z' });
+    const r = await post('/api/proxy/records', 'impl', { kind: 'finding', to: 'review', says: 'About that run.', about: 'row-12345', run: 'row-impl' });
+    assert.equal(r.status, 201, JSON.stringify(r.body));
+    assert.deepEqual(r.body.links.about, ['row-12345']);
+    assert.equal(calls.ticketReads.includes('row-12345'), false, 'no tracker read for a record that exists');
+  });
+
   test('a closed ticket is refused with the reason, and no task is made for it', async () => {
     const r = await post('/api/proxy/records', 'impl', { kind: 'finding', in: 'LIN-9', to: 'review', says: 'x', run: 'row-impl' });
     assert.equal(r.status, 422);
