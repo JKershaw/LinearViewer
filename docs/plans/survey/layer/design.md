@@ -1,6 +1,6 @@
 # The layer: design
 
-*Approved by John on 18 Nov after walk 7. Revised the same day: the integration work found that its path matching (task, area, lesson and run paths, and the brief parts built on them) works only on a codebase laid out like Harbour's (`integration/checks/repo-assumptions.md`). Removed, not patched. Walk 8 tests the revision. John: "removal is the process"; his approval means "this design looks good to me, and we can proceed", not that it is set in stone.*
+*Approved by John on 18 Nov after walk 7. Revised the same day: the integration work found that its path matching (task, area, lesson and run paths, and the brief parts built on them) works only on a codebase laid out like Harbour's (`integration/checks/repo-assumptions.md`). Removed, not patched. Walk 8 tested the revision; after it (19 Nov), `blind`, `check`, `same-as`, the lesson's `checked-at` and the `approve-with-notes` outcome were removed, and the plan goes in full only to the actor it is addressed to (`walks/8/results.md`). John: "removal is the process"; his approval means "this design looks good to me, and we can proceed", not that it is set in stone.*
 
 *Started 17 Nov at John's request (log, "17 Nov"). Revised in place each round; git keeps its history, the log keeps why, and each walk's results live in `walks/`. Marks are as on `situation.md`: [checked], [reported], [my reading], [guess]; "[checked wording]" means the words were checked, not the claim. Lines with no mark are design, mine until John corrects it.*
 
@@ -53,8 +53,8 @@ John: "a small minimal MVP, and we take it for a walk and see a) if it's better 
 | `by` | Who wrote it: a declared actor (3.2); `via` if relayed |
 | `at` | When each version was written |
 | `state` | The kind's starting state or one of its ends, with a `reason`. `handed-on` and `superseded` name the record that takes over |
-| `to` | Who must act on it next: a declared actor, a task record, or `project` (whoever works in this project next). Required on the hand-off kinds (finding, check, question); optional on every other kind |
-| `links` | `about` (its subjects), `on` (the exact versions it rests on, `id@v`; required on a verdict), `answers` (a decision to its question), `piece` (a task to its plan piece), `same-as`. Each type holds a list, except `answers` and `piece`, which hold one |
+| `to` | Who must act on it next: a declared actor, a task record, or `project` (whoever works in this project next). Required on the hand-off kinds (finding, question); optional on every other kind |
+| `links` | `about` (its subjects), `on` (the exact versions it rests on, `id@v`; required on a verdict), `answers` (a decision to its question), `piece` (a task to its plan piece). Each type holds a list, except `answers` and `piece`, which hold one |
 | versions | Every write (add, revise, end, link) is a new version with its `by`, `at` and, for a revise, its `reason`; earlier versions are kept. Any record can be read as of a time, or at a version. Any record may be revised except a task's `asked` |
 
 ### 3.2 Kinds and actors
@@ -65,26 +65,25 @@ John: "a small minimal MVP, and we take it for a walk and see a) if it's better 
 |---|---|---|---|
 | `task` | The order | `asked` (the person's words, fixed once written; a child made by breakdown has none and reads its piece, a child a person wrote keeps theirs), `done-when`, `ref` (the tracker's id for it, if any) | open → done, declined |
 | `plan` | One piece of how a task will be done; a parent's plan is its pieces | `says`, `order` | kept → superseded |
-| `finding` | Something someone must act on | `says`; `to` | open → done, declined, handed-on |
-| `check` | A verification needing the person's systems | `what`, `why-person`, `how`; `to` | open → done, declined, handed-on |
+| `finding` | Something someone must act on, including a verification to run | `says`, `how` (optional: how to verify or act); `to` | open → done, declined, handed-on |
 | `question` | A call waiting on a decider | `asks`, `options`, `recommended`, `if-unanswered`; `to` | open → answered, withdrawn, handed-on |
 | `decision` | What was decided and why, including a person's standing direction | `answer`, `why`, `scope` (optional: a task, covering it and every task under it; or `project`, covering every task) | stands → superseded, withdrawn |
 | `verdict` | A judgement `on` one version of a plan piece or change | `judgement` (which one: plan-review, review, blind-read), `outcome` from that judgement's set, `reasoning` | stands → superseded, withdrawn |
-| `lesson` | A lasting truth about the code or the work, for the project | `says`, `checked-at` (the commit it was last true at, if any) | holds → superseded, disproved |
+| `lesson` | A lasting truth about the code or the work, for the project | `says` | holds → superseded, disproved |
 | `change` | A handle on the work product: a PR, commit range or saved file; each new head is a new version | `ref`, `head` | open → merged, abandoned |
 | `run` | One actor's session, `in` its task | `stage`, `account` (what it wrote for people, in full: its own words, as it would post them) | open → done |
 
-**Outcome sets:** plan-review and review: approve, approve-with-notes, request-changes, needs-discussion. Blind-read: better, same, worse.
+**Outcome sets:** plan-review and review: approve, request-changes, needs-discussion (notes that come with an approval are findings). Blind-read: better, same, worse.
 
-**Open** records are those in state `open` (task, finding, check, question, change, run). The other kinds start in a standing state (kept, stands, holds).
+**Open** records are those in state `open` (task, finding, question, change, run). The other kinds start in a standing state (kept, stands, holds).
 
-**Actors** are declared in `actors.json`: the names that may appear in `by` and `to`. For Harbour: its stages (design, plan-review, breakdown, survey-task, survey-place, scoping, implementation, leftover, review, blind-read, close-out), the autopilot, John, and Harbour itself (the system). An actor may be marked `blind`: its brief and its queries leave out verdicts other than its own, and the accounts of runs by stages that write verdicts (in Harbour, blind-read, which judges the work without the review's view). These are the loop's actors, the same whatever codebase it works on; a different product using the layer would declare its own. Any actor may write any kind and end any record; which ones it should is its prompt's business and Harbour's.
+**Actors** are declared in `actors.json`: the names that may appear in `by` and `to`. For Harbour: its stages (design, plan-review, breakdown, survey-task, survey-place, scoping, implementation, leftover, review, blind-read, close-out), the autopilot, John, and Harbour itself (the system). Blindness (a judge that must not see another's judgement) is not the store's: retold judgements turn up in run reasons and revised findings, so filtering kinds can't hide them (walks 7–8). Harbour gives such a stage no brief and limits what it may read. These are the loop's actors, the same whatever codebase it works on; a different product using the layer would declare its own. Any actor may write any kind and end any record; which ones it should is its prompt's business and Harbour's.
 
 ### 3.3 What a write checks
 
 Only shape, so a malformed record can't enter:
 - the kind is declared; every field belongs to it and has its type; a verdict's outcome is in its set; a task's `asked` doesn't change once written;
-- `by` is a declared actor; a `to`, where present, is a declared actor, a task record or `project`, and the hand-off kinds (finding, check, question) must have one;
+- `by` is a declared actor; a `to`, where present, is a declared actor, a task record or `project`, and the hand-off kinds (finding, question) must have one;
 - `in`, where present, is a task; every link resolves; a verdict has an `on`; `answers` and `piece` join the kinds named above;
 - a state change goes to one of the kind's ends with a reason; `handed-on` and `superseded` name the record that takes over.
 
@@ -102,9 +101,9 @@ John: "previously an agent essentially got the brief, but then the ability to fi
 
 **A brief** is what an actor working on a task is given:
 1. **The task and the person's words:** the task's id, `ref` and `done-when`; then the `asked` of the task and of each ancestor, verbatim.
-2. **Its plan:** the current version of the task's `piece` (if superseded, the record that took over); for a task with no piece, every plan `in` it that is kept.
+2. **Its plan:** the current version of the task's `piece` (if superseded, the record that took over); for a task with no piece, every plan `in` it that is kept. In full to the actor a plan is addressed to; to others, its first paragraph and its id, to `get`.
 3. **Addressed to it, in full:** open records `in` this task whose `to` is this actor; open records anywhere whose `to` is this task; open records `in` this task addressed to a stage whose run on this task has ended (left behind); and open records under a child task that has ended.
-4. **What stands about this task:** verdicts (unless the actor is blind) and decisions `in` the task, or `about` or `on` its piece or its change, each with the version it rests on and the stale flag. An ancestor's decisions appear when `about` or `on` this task's piece, or when they carry a `scope` that covers it; a decision scoped to `project` covers every task.
+4. **What stands about this task:** verdicts and decisions `in` the task, or `about` or `on` its piece or its change, each with the version it rests on and the stale flag. An ancestor's decisions appear when `about` or `on` this task's piece, or when they carry a `scope` that covers it; a decision scoped to `project` covers every task.
 5. **The project:** how many open records are addressed to `project`, and how many lessons hold, with how to look them up (`find --to project`, `find --kind lesson`, both with `--text`). The actor decides what is worth reading.
 6. **Other open runs** in the project, other than the actor's own on this task: id, task and stage, so the actor can judge whether work elsewhere bears on its own.
 7. **An index of what else is known:** every other open record `in` the task, one line each: id, kind, to, and the first line of what it says.
@@ -130,7 +129,7 @@ Ended records are left out. Each brief reports what it carries and its size in b
 
 ## 5. Walks
 
-Walks 1–7 are in `walks/1/`–`walks/7/`. What they established: everything that happened had a home; retelling stops when stages can look things up; briefs stop growing with the ticket's history; with only shape checked, corrections replace instead of piling and stale shows only the real signal [checked, results files]. Walk 7 had stages write through this model on three tasks (32 steps): every hand-off was addressed by its writer and reached its reader, judgements were superseded rather than stacked, rulings were answered or withdrawn and ended, and what was open at each end was owned; the only refusals were malformed writes. It also filled in a project that is not Harbour (Yap) after the fact, with no refusals; but its areas were invented, one per file touched, so it never tested the path matching this page has since dropped (corrected 18 Nov). Walk 8 re-runs walk 7's three tasks and Yap on the revised page. Every walk replayed what stages really did; none did new work through the store. The comparison of a ticket reader with a store reader (walks 5–6) measured reading, not whether the structure holds the data, and is set aside.
+Walks 1–7 are in `walks/1/`–`walks/7/`. What they established: everything that happened had a home; retelling stops when stages can look things up; briefs stop growing with the ticket's history; with only shape checked, corrections replace instead of piling and stale shows only the real signal [checked, results files]. Walk 7 had stages write through this model on three tasks (32 steps): every hand-off was addressed by its writer and reached its reader, judgements were superseded rather than stacked, rulings were answered or withdrawn and ended, and what was open at each end was owned; the only refusals were malformed writes. It also filled in a project that is not Harbour (Yap) after the fact, with no refusals; but its areas were invented, one per file touched, so it never tested the path matching this page has since dropped (corrected 18 Nov). Walk 8 re-ran walk 7's three tasks and Yap on the page without paths or areas: nothing the stages needed was lost, finds about the project reached later stages through `project`, and walk 7's orphan didn't recur. Its refusals were all one malformed shape (links beside fields), a point for the API review (`walks/8/results.md`). Every walk replayed what stages really did; none did new work through the store. The comparison of a ticket reader with a store reader (walks 5–6) measured reading, not whether the structure holds the data, and is set aside.
 
 - **The question:** is everything that happened stored, addressed, ended or rightly open; could each stage find what it needed?
 - **A break,** each with why: something with no home; a hand-off to no reader; a thing retold that should be one record; something a stage needed that neither its brief nor a query gave it; a write refused that was right, or accepted that was malformed.
