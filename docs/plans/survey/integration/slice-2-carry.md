@@ -10,6 +10,18 @@
    - **What to do:** once LIN-4496's live import has run, remove the reader and move the stability scripts onto the records store.
    - **Ruled by John,** 19 Nov ~21:35: option (a), add it to the slice 2 draft.
 
+## Follow-ups from LIN-4495's close-out (morning, John)
+
+The ruling `lin4495-postdeploy-gate` (21:47, 19 Nov) was answered "accept" on my proposal. These items were moved out of LIN-4495 to keep the run going:
+
+2. **Re-run review on six legacy-held tasks:** LIN-4463, 4452, 4441, 4028, 3357, 2422 (finding-5ddda62d).
+   - This needs someone with a dispatch grant.
+   - LIN-4463 and LIN-4441 are paused lanes, so John decides when they move.
+3. **The signed-in task-page and log check:** look for "open findings not read" (finding-0cc5a636). It needs a signed-in page and server logs.
+4. **The `isEmptyStatement` defect** (finding-76683071): a pre-cutover ledger that has items can read as empty, so the gate says "none open". LIN-4495's own ledger hits it.
+   - Fix it before relying on the gate for older tickets.
+   - Check whether it touches LIN-4496.
+
 ## How tidies like this are handled
 
 A judgement call, not a rule (John, 19 Nov). Tidying as we go, a small standalone task, or waiting until the end can each be right, depending on the case. Keeping the running slice going matters most. John expects much of this to sort itself out once the upgrade is done.

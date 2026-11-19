@@ -4557,3 +4557,17 @@ John asked whether he can dismiss the 14 queued rows. From a subagent's code rea
 Option (a): the reader's removal goes into the slice 2 draft. It's recorded in `integration/slice-2-carry.md`, a running list of what slice 1 hands forward. John's general preference for tidies, where wise: tidy as we go, then a small standalone tidy task, then wait until the end. Keeping the running slice going comes first. No change to the running autopilot.
 
 - Correction (John): the tidy order is a judgement call, not a rule; much of it should sort itself out once the upgrade is done. `slice-2-carry.md` amended.
+
+### 19 Nov, ~21:55: the post-deploy ruling on LIN-4495; I proposed "accept"
+
+- **The ruling:** `lin4495-postdeploy-gate` was raised by the slice 1 autopilot at 21:47. LIN-4495 merged and deployed at 21:34, but two post-deploy items need a dispatch grant or a signed-in page:
+  - re-run review on six legacy-held tasks;
+  - the task-page and log check.
+- **The options:** you-run, extend, accept, stop.
+- **John asked me to propose an answer,** so he could approve it before going offline.
+- **I proposed accept** (suggest-answer, 201):
+  - you-run needs John;
+  - extend probably stalls, because the run has no dispatch grant (403 on LIN-4463) and the re-reviews touch parked lanes (LIN-4463, LIN-4441);
+  - accept records the items as follow-ups and moves on to LIN-4496.
+- **Follow-ups** are listed in `integration/slice-2-carry.md`: the six re-reviews, the task-page and log check, and the `isEmptyStatement` defect (finding-76683071).
+- **Close-out's other checks, shown:** the /records query is clean, and briefs without a run id are the same size as before.
