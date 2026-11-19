@@ -10,11 +10,6 @@
    - **What to do:** once LIN-4496's live import has run, remove the reader and move the stability scripts onto the records store.
    - **Ruled by John,** 19 Nov ~21:35: option (a), add it to the slice 2 draft.
 
-## How tidies like this are handled (John, 19 Nov)
+## How tidies like this are handled
 
-In order of preference, and only where it's wise:
-1. tidy as we go;
-2. a small standalone tidy task;
-3. wait until the end.
-
-Keeping the running slice going comes first: no tidy interrupts it.
+A judgement call, not a rule (John, 19 Nov). Tidying as we go, a small standalone task, or waiting until the end can each be right, depending on the case. Keeping the running slice going matters most. John expects much of this to sort itself out once the upgrade is done.
