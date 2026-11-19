@@ -101,3 +101,16 @@ On your first question, the record shows finished tasks going from spiralling to
 - **Colour.** John asked for the context that makes the asks easy to follow: a leaks table from the traces, a before-and-after drawing, a scene per slice. The same goes into each slice's ticket.
 - **Agreed** by John on 19 Nov (doc: https://claude.ai/artifact/62y2rpauvpedF8NRS4FqYh). Step 1 is done.
 - **Next, in order:** the documents to main by pull request; a fresh harbour.cat token; slice 1 filed as a Harbour task under a parent, with its why and scene; each later slice filed as the one before lands; the parked work after slice 4.
+
+## 19 Nov, later: filed, and how slice 1 will be driven
+
+- **Filed:** the parent LIN-4490 and slice 1 LIN-4491 under it, both Backlog, from `integration/tickets.md`. Slices 2–5 are drafted and filed under LIN-4490 as each previous one lands, from what it really left. Launch on LIN-4491, never the parent; file the next slice before anything runs on the parent again.
+- **Where things live:** the full record stays on `claude/cool-rubin-6acj5j`; tickets cite it by commit; slice 1's PR adds the two design pages to main.
+- **How it's driven (agreed with John, 19 Nov):** an autopilot kickoff on LIN-4491, as the November lanes ran. Not a passage or the Flight Companion (a supervising layer above the autopilot: supervision 28% → 45% of tokens in September; 41 sessions for V1's eight-line change). This session drives from high altitude and does not steer by hand (the 8 Nov review: the hand-run session was the main source of error):
+  1. a subagent takes the before readings at main's head (notes bytes, Waiting count, brief bytes, sessions and cost per task against 13–14 Nov);
+  2. kickoff goal = the ticket plus the standing lines: settle engineering questions yourself; keep building the uncontested parts while a ruling waits; any ruling says what the lane does next under each option (LIN-4463 and LIN-4470 parked on a "hold"); read the design at its commit;
+  3. check-ins by scheduled reminder, each a subagent reading the trail and returning a few lines;
+  4. to John: the breakdown when it lands, any ruling with its options, the merge with blind reads and after readings; the rest goes to the log;
+  5. when slice 1 lands, draft slice 2 for John, then file it.
+- **Token:** working token in the scratchpad (`harbour-token`), expires 21 Nov 10:11 UTC; never printed.
+- **Next:** compact; then the readings, then the kickoff.
