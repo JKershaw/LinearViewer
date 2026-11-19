@@ -4394,3 +4394,5 @@ Draft 3 removes what the layer dropped: area records and their import, task and 
 ## 19 Nov — Step 1 done: the integration design agreed
 
 John read the doc copy (with the leaks table, the before-and-after drawing and a scene per slice) and agreed it. Step 1, an integration design on paper, is done. Next: the documents to main by pull request so the slice tasks' agents can read them, a fresh harbour.cat token, then slice 1 filed as a Harbour task under a parent, each later slice filed as the one before lands.
+
+**Where the documents live (19 Nov).** A pull request from this branch would carry 1,717 files (the branch shares history with main; the clone had been shallow, which I first misread as separate history). Agreed with John: the full record stays on this branch for review, tickets cite it by commit, and slice 1's pull request adds the two design pages to main. Next: draft the parent and slice 1 tickets for John to read; the token when filing.

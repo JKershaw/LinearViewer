@@ -190,6 +190,8 @@ Each slice is built as a Harbour task through Harbour's own loop. That task runs
 | **5. Lessons** | Lesson records (`says`), with the notes' Lessons imported | Notes' Lessons, the pointer and its tests (C5-A01, A03, A06, A13, A14, A16–A18); the prompt readers of the registry path (C5-A04); the notes files | A lesson written in one task is counted in a later task's part 5 and found there with `find --kind lesson --text` | Lessons bytes | None |
 | **6. Wakes for open records** (held: filed only if slice 1's count shows the need) | The rule in §6 | Agents waking each other by hand for hand-offs (C5-B14) | A record to a held run wakes it once | Pause wakes that changed nothing | Records → Runs, one edge |
 
+**Where the documents live** (John, 19 Nov). The full record (log, walks, census, checks) stays on `claude/cool-rubin-6acj5j`, kept for review. Tickets cite it by branch and commit. Main gets only what it needs: slice 1's pull request adds `layer/design.md` and `integration/design.md`, and a later slice that changes the design updates them in its own pull request.
+
 **Every slice leaves Harbour whole if the next never lands.** Whatever hasn't moved still travels as ticket text, and agents still see it through the brief's kept ticket section until slice 4.
 
 ## 11. For John
