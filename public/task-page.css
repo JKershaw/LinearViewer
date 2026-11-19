@@ -167,6 +167,7 @@
       "answer answer"
       "question question"
       "run run"
+      "records records"
       "stages context"
       "timeline context"
       "pr context"
@@ -185,6 +186,8 @@
   .sess-page.task-page > .task-next { grid-area: run; }
   .sess-page.task-page > .task-question { grid-area: question; }
   .sess-page.task-page > .task-stages { grid-area: stages; }
+  /* LIN-4494: the Records section sits under the run line, in both templates. */
+  .sess-page.task-page > .task-records { grid-area: records; }
   /* LIN-4405: "Sessions on one clock" sits beneath the Stages, in both templates. */
   .sess-page.task-page > .task-timeline { grid-area: timeline; }
   .sess-page.task-page > .task-pr-section { grid-area: pr; }
@@ -199,6 +202,7 @@
       "answer answer"
       "question question"
       "run run"
+      "records records"
       "stages stages"
       "timeline timeline"
       "pr pr"
@@ -300,3 +304,21 @@ h1 .task-ident { font-size: inherit; }
   .tl-axis-track { height: 1.3rem; }
   .tl-axis-end { top: 0; }
 }
+
+/* LIN-4494: the Records section on a task page (lib/render-task-records.js). */
+.task-records-mount { display: grid; gap: var(--space-3); }
+.task-records-kind-title { font-size: var(--font-size-sm); color: var(--muted); margin: 0 0 var(--space-1); }
+.task-records-list { list-style: none; padding: 0; margin: 0; display: grid; gap: var(--space-2); }
+.task-record { border-left: 2px solid var(--line); padding: var(--space-1) var(--space-2); }
+.task-record-head, .task-record-meta, .task-record-flag { font-size: var(--font-size-sm); color: var(--muted); }
+.task-record-state { color: var(--text); }
+.task-record-preview { color: var(--text); margin: var(--space-1) 0; }
+.task-record-flag { color: var(--amber); }
+.task-record-noticket { color: var(--muted); font-style: italic; }
+.task-record-form { display: flex; flex-wrap: wrap; gap: var(--space-2); align-items: flex-end; margin-top: var(--space-1); }
+.task-record-form label { display: grid; gap: 2px; font-size: var(--font-size-sm); color: var(--muted); }
+/* Form controls take the type scale, not the browser's default control size (LIN-4107: the token sizes only). */
+.task-record-form input, .task-record-form select, .task-record-form button { font: inherit; }
+.task-records-refused { color: var(--amber); }
+.task-records-none { color: var(--muted); }
+

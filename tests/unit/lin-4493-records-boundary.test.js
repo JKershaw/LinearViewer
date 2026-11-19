@@ -46,3 +46,20 @@ describe('LIN-4493: the Records leaf imports only Platform (built-ins and its ow
     }
   });
 });
+
+describe('LIN-4494: the records store is written only through lib/records/writes.js', () => {
+  const SOURCE_DIRS = ['lib', 'routes', 'scripts'];
+  const sourceFiles = (dir) => readdirSync(join(ROOT, dir), { withFileTypes: true }).flatMap((e) => {
+    const rel = `${dir}/${e.name}`;
+    if (e.isDirectory()) return e.name === 'node_modules' ? [] : sourceFiles(rel);
+    return /\.(m?js)$/.test(e.name) && !/\.test\.m?js$/.test(e.name) ? [rel] : [];
+  });
+
+  test('no source file but writes.js calls recordsStore.add/revise/end/link (they check nothing)', () => {
+    const files = [...SOURCE_DIRS.flatMap(sourceFiles), 'server.js'].filter((rel) => rel !== 'lib/records/writes.js');
+    assert.ok(files.length > 100, 'the scan sees the source tree');
+    const offenders = files.filter((rel) => /\brecordsStore\??\.(add|revise|end|link)\(/.test(readFileSync(join(ROOT, rel), 'utf8')));
+    assert.deepEqual(offenders, [], 'write through lib/records/writes.js, which checks first');
+    assert.match(readFileSync(join(ROOT, 'lib/records/writes.js'), 'utf8'), /\brecordsStore\.add\(/, 'the guard looks for the spelling writes.js really uses');
+  });
+});

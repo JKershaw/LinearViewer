@@ -6,9 +6,11 @@
  * with what would work. `by` is never read from a body: it is filled here from the credential and the run it
  * names, by lib/run-lineage.js `writerOf` (three outcomes, and a refusal never falls through to a person).
  *
- * A write's body is checked before anything is written. A ticket the body names is checked as a dry run first
- * (it reads the tracker and claims nothing), so a refused body makes no task (LIN-4493 review, gap 5); the real
- * tasks are made only once the dry run is clean.
+ * A write's body is checked before anything is written, by the one checked pipeline (lib/records/writes.js, LIN-4494):
+ * a ticket the body names is checked as a dry run first (it reads the tracker and claims nothing), so a refused body
+ * makes no task (LIN-4493 review, gap 5); the real tasks are made only once the dry run is clean. This router fills the
+ * writer from the credential and maps the pipeline's results to statuses; the session routes and the importer call the
+ * same pipeline.
  *
  * Mounts: POST /api/proxy/records (add), POST /api/proxy/records/:id/{revise,end,link}, each behind
  * `requireWriteScope('recordWrite')` (the readWrite scope and the stage's allowance; `recordWrite` is allowed to
@@ -28,8 +30,9 @@ import { Router } from 'express';
 import { jsonError } from '../lib/errors.js';
 import { writerOf, WRITER_REFUSAL } from '../lib/run-lineage.js';
 import { TOKEN_ORIGIN, WRITES } from '../lib/stage-writes.js';
-import { RecordsVersionConflict, RecordsNotFound, looksLikeTicket, MAX_TICKET_DEPTH } from '../lib/records-store.js';
-import { checkAdd, checkRevise, checkEnd, checkLink, refusalOf, splitRef, KINDS } from '../lib/records/check.js';
+import { RecordsVersionConflict, RecordsNotFound } from '../lib/records-store.js';
+import { refusalOf, KINDS } from '../lib/records/check.js';
+import { createRecordWrites } from '../lib/records/writes.js';
 import { isTerminalState } from '../lib/providers/state-map.js';
 
 const LINK_TYPES = Object.keys(KINDS.links);
@@ -48,9 +51,6 @@ const REFUSAL_TEXT = {
   [WRITER_REFUSAL.OTHER_LINEAGE]: 'the run named is in another dispatch lineage than this credential'
 };
 
-/** A run record ends when its dispatch row does (Harbour writes that); an agent may not end or revise it. */
-const RUN_ENDS_ITSELF = { field: 'id', message: 'a run ends when its dispatch row ends; Harbour writes that, not an agent', works: [] };
-
 const isPlainObject = (x) => x !== null && typeof x === 'object' && !Array.isArray(x);
 
 /** The check's input: the body without the routing keys (`run`), with its own link object merged in. */
@@ -58,38 +58,6 @@ function bodyWithout(body, keys) {
   const out = {};
   for (const [k, v] of Object.entries(body)) if (!keys.includes(k)) out[k] = v;
   return out;
-}
-
-/** Every link value a body names, flat or under `links`. */
-function linkValuesIn(input) {
-  const values = [];
-  for (const type of LINK_TYPES) {
-    if (input[type] !== undefined) values.push(input[type]);
-    if (input.links && input.links[type] !== undefined) values.push(input.links[type]);
-  }
-  return values;
-}
-
-/**
- * Every reference a body names that may be a ticket (in, to, and the link values). `looksLikeTicket` takes an
- * upper-case team key and a number only, so a lower-case record id (`finding-12345678`) is never one. The guard stays
- * as a second line: checkWrite drops the references that name an existing record before any is read as a ticket
- * (LIN-4493 leftovers), so a reference that exists never reaches the tracker.
- */
-function ticketRefsIn(input) {
-  const refs = new Set();
-  const take = (v) => { if (typeof v === 'string' && looksLikeTicket(v)) refs.add(v.trim()); };
-  take(input.in);
-  take(input.to);
-  for (const v of linkValuesIn(input)) for (const x of [].concat(v)) take(typeof x === 'string' ? splitRef(x).id : x);
-  return [...refs];
-}
-
-/** The record ids a body names (in, to, into, link targets), so the store reads just those. */
-function recordIdsIn(input) {
-  const raw = [input.in, input.to, input.into];
-  for (const v of linkValuesIn(input)) raw.push(...[].concat(v));
-  return raw.filter((x) => typeof x === 'string').map((x) => splitRef(x).id);
 }
 
 /**
@@ -106,6 +74,9 @@ function recordIdsIn(input) {
  */
 export function createProxyRecordsRoutes({ recordsStore, proxyLimiter, authenticateProxyToken, requireWriteScope, logEvent, readTicket, askedText, stageKinds, listPeople = async () => [] }) {
   const router = Router();
+  // LIN-4494: the one checked write path (lib/records/writes.js), shared with the session routes and the project page.
+  // A router with no store (a test or a partial wiring) makes no writes; a write then answers 500, as a store-less route always did.
+  const writes = recordsStore ? createRecordWrites({ recordsStore, isTerminalState, readTicket, askedText, stageKinds, listPeople }) : null;
 
   /** The run a credential or a body names, as writerOf reads it: {id, kind (its stage), open, rootItemId}. */
   async function runRow(urlKey, id) {
@@ -126,89 +97,6 @@ export function createProxyRecordsRoutes({ recordsStore, proxyLimiter, authentic
   /** The ids and refusal text of a writer's refusal. */
   const refusal = (res, writer) => jsonError(res, 403, REFUSAL_TEXT[writer.reason] || 'this write is refused', { reason: writer.reason });
 
-  /** The tracker's view of a ticket, as the store's task needs it: its words, whether it is closed, its parent's. */
-  async function ticketInfo(req, ref, depth = 0) {
-    const issue = await readTicket(req, ref);
-    if (!issue) return null;
-    const state = issue.state || {};
-    // Closed is the provider state map's word (completed, canceled, duplicate), or a trashed ticket.
-    const closed = isTerminalState(state.type) || issue.trashed === true;
-    const info = {
-      identifier: issue.identifier || ref,
-      asked: askedText(issue.description || '') || '',
-      closed,
-      closedReason: closed ? (state.name || (issue.trashed ? 'Trashed' : null)) : null
-    };
-    const parentRef = issue.parent?.identifier;
-    if (parentRef && depth < MAX_TICKET_DEPTH) info.parent = await ticketInfo(req, parentRef, depth + 1);
-    return info;
-  }
-
-  /** The tracker's view of a ticket, or why it has none: the read failed, or the ticket is not readable here. */
-  async function readInfo(req, ref) {
-    try {
-      return (await ticketInfo(req, ref)) ?? { unreadable: `${ref} is not a ticket this workspace can read` };
-    } catch (err) {
-      // The tracker is unreachable: the ticket is named as unreadable, never guessed at.
-      return { unreadable: `${ref} could not be read from the tracker (${err?.message || 'unavailable'})` };
-    }
-  }
-
-  /**
-   * Make (or, with `dryRun`, plan) the task for every ticket a body names. Returns Map ref -> {id} | {problem}. A
-   * ticket Harbour cannot read is named as such; a closed one is refused with its reason (decision 5). `infos`
-   * caches the tracker reads between a dry run and the real one.
-   */
-  async function ensureTickets(req, refs, writerBy, { dryRun = false, infos = new Map() } = {}) {
-    const urlKey = req.proxyUrlKey;
-    const made = new Map();
-    for (const ref of refs) {
-      const existing = await recordsStore.taskForTicket(urlKey, ref);
-      if (existing) { made.set(ref, { id: existing }); continue; }
-      if (!infos.has(ref)) infos.set(ref, await readInfo(req, ref));
-      const info = infos.get(ref);
-      if (info.unreadable) { made.set(ref, { problem: info.unreadable }); continue; }
-      made.set(ref, await recordsStore.ensureTask(urlKey, info, { by: writerBy, dryRun }));
-    }
-    return made;
-  }
-
-  /**
-   * Check a write, then make the tasks its tickets name. The check runs first on a dry run of the tickets, which
-   * writes nothing, so a refused body leaves no task behind. Only a clean dry run makes the real tasks, and the
-   * check runs again on those: its result is the one written.
-   * @returns {Promise<object>} the check's result (`problems`, and `record`/`changes`/`links` when clean)
-   */
-  async function checkWrite(req, input, writerBy, check) {
-    const urlKey = req.proxyUrlKey;
-    const idx = await recordsStore.lookup(urlKey, recordIdsIn(input));
-    const refs = ticketRefsIn(input).filter((ref) => !idx.has(ref));
-    const infos = new Map();
-    const planned = await ensureTickets(req, refs, writerBy, { dryRun: true, infos });
-    const dry = check(idx, planned);
-    if (dry.problems.length) return dry;
-    const made = await ensureTickets(req, refs, writerBy, { infos });
-    return check(idx, made);
-  }
-
-  /** The check's context: a reference resolves to a task or record in this workspace, or to a made ticket task. */
-  function contextFor(urlKey, idx, tickets, people) {
-    return {
-      addressees: { stages: stageKinds, people },
-      resolve(ref) {
-        if (typeof ref !== 'string') return null;
-        if (tickets.has(ref)) {
-          const t = tickets.get(ref);
-          return t.problem ? { problem: t.problem } : { kind: 'task', id: t.id };
-        }
-        const snap = idx.at(ref);
-        return snap ? { kind: snap.kind, id: snap.id } : null;
-      },
-      currentVersion: (id) => idx.currentVersion(id),
-      versionExists: (id, v) => Boolean(idx.versionOf(id, v))
-    };
-  }
-
   const reply = (req, res, endpoint, status, body) => {
     logEvent(req, endpoint, status);
     return res.status(status).json(body);
@@ -222,6 +110,11 @@ export function createProxyRecordsRoutes({ recordsStore, proxyLimiter, authentic
     return reply(req, res, endpoint, 500, { error: 'The records store is unavailable', code: 'RECORDS_UNAVAILABLE' });
   }
 
+  /** A pipeline result as the route's answer: refused is 422 naming every problem; written is `status`. */
+  const answer = (req, res, endpoint, status, result, shape = (r) => r.record) => (result.problems
+    ? reply(req, res, endpoint, 422, refusalOf(result.problems))
+    : reply(req, res, endpoint, status, shape(result)));
+
   // ---- writes ------------------------------------------------------------
 
   router.post('/api/proxy/records', proxyLimiter, authenticateProxyToken, requireWriteScope('recordWrite'), async (req, res) => {
@@ -231,13 +124,8 @@ export function createProxyRecordsRoutes({ recordsStore, proxyLimiter, authentic
     try {
       const writer = await writerFor(req, body);
       if (!writer.ok) { logEvent(req, endpoint, 403); return refusal(res, writer); }
-      const urlKey = req.proxyUrlKey;
-      const input = bodyWithout(body, ['kind', 'run']);
-      const people = await listPeople(urlKey);
-      const checked = await checkWrite(req, input, writer.by, (idx, tickets) => checkAdd(body.kind, input, contextFor(urlKey, idx, tickets, people)));
-      if (checked.problems.length) return reply(req, res, endpoint, 422, refusalOf(checked.problems));
-      const snap = await recordsStore.add(urlKey, checked.record, { by: writer.by, run: writer.run ?? null });
-      return reply(req, res, endpoint, 201, await recordsStore.viewOfRecord(urlKey, snap));
+      const result = await writes.add({ ctx: req, urlKey: req.proxyUrlKey, kind: body.kind, input: bodyWithout(body, ['kind', 'run']), by: writer.by, run: writer.run ?? null });
+      return answer(req, res, endpoint, 201, result);
     } catch (err) {
       return failed(req, res, endpoint, err);
     }
@@ -250,16 +138,8 @@ export function createProxyRecordsRoutes({ recordsStore, proxyLimiter, authentic
     try {
       const writer = await writerFor(req, body);
       if (!writer.ok) { logEvent(req, endpoint, 403); return refusal(res, writer); }
-      const urlKey = req.proxyUrlKey;
-      const prev = await recordsStore.current(urlKey, req.params.id);
-      if (!prev) return reply(req, res, endpoint, 404, { error: `no record '${req.params.id}'` });
-      if (prev.kind === 'run') return reply(req, res, endpoint, 422, refusalOf([RUN_ENDS_ITSELF]));
-      const input = bodyWithout(body, ['run']);
-      const people = await listPeople(urlKey);
-      const checked = await checkWrite(req, input, writer.by, (idx, tickets) => checkRevise(prev, input, contextFor(urlKey, idx, tickets, people)));
-      if (checked.problems.length) return reply(req, res, endpoint, 422, refusalOf(checked.problems));
-      await recordsStore.revise(urlKey, prev.id, checked.changes, { by: writer.by, run: writer.run ?? null, reason: input.reason });
-      return reply(req, res, endpoint, 200, await recordsStore.viewOfRecord(urlKey, await recordsStore.current(urlKey, prev.id)));
+      const result = await writes.revise({ ctx: req, urlKey: req.proxyUrlKey, id: req.params.id, input: bodyWithout(body, ['run']), by: writer.by, run: writer.run ?? null });
+      return answer(req, res, endpoint, 200, result);
     } catch (err) {
       return failed(req, res, endpoint, err);
     }
@@ -272,18 +152,8 @@ export function createProxyRecordsRoutes({ recordsStore, proxyLimiter, authentic
     try {
       const writer = await writerFor(req, body);
       if (!writer.ok) { logEvent(req, endpoint, 403); return refusal(res, writer); }
-      const urlKey = req.proxyUrlKey;
-      const prev = await recordsStore.current(urlKey, req.params.id);
-      if (!prev) return reply(req, res, endpoint, 404, { error: `no record '${req.params.id}'` });
-      // Ending a record already in an end returns it unchanged (api-review 3), with who ended it.
-      if (prev.ended) return reply(req, res, endpoint, 200, { ...(await recordsStore.viewOfRecord(urlKey, prev)), changed: false, endedBy: prev.by });
-      if (prev.kind === 'run') return reply(req, res, endpoint, 422, refusalOf([RUN_ENDS_ITSELF]));
-      const input = bodyWithout(body, ['run']);
-      const idx = await recordsStore.lookup(urlKey, recordIdsIn(input));
-      const { problems } = checkEnd(prev, input, contextFor(urlKey, idx, new Map(), await listPeople(urlKey)));
-      if (problems.length) return reply(req, res, endpoint, 422, refusalOf(problems));
-      const out = await recordsStore.end(urlKey, prev.id, { state: input.state, reason: input.reason, into: input.into ?? null }, { by: writer.by, run: writer.run ?? null });
-      return reply(req, res, endpoint, 200, { ...(await recordsStore.viewOfRecord(urlKey, out.record)), changed: out.changed });
+      const result = await writes.end({ urlKey: req.proxyUrlKey, id: req.params.id, input: bodyWithout(body, ['run']), by: writer.by, run: writer.run ?? null });
+      return answer(req, res, endpoint, 200, result, (r) => ({ ...r.record, changed: r.changed, ...(r.endedBy ? { endedBy: r.endedBy } : {}) }));
     } catch (err) {
       return failed(req, res, endpoint, err);
     }
@@ -296,17 +166,11 @@ export function createProxyRecordsRoutes({ recordsStore, proxyLimiter, authentic
     try {
       const writer = await writerFor(req, body);
       if (!writer.ok) { logEvent(req, endpoint, 403); return refusal(res, writer); }
-      const urlKey = req.proxyUrlKey;
-      const prev = await recordsStore.current(urlKey, req.params.id);
-      if (!prev) return reply(req, res, endpoint, 404, { error: `no record '${req.params.id}'` });
       const links = {};
       for (const type of LINK_TYPES) if (body[type] !== undefined) links[type] = body[type];
       Object.assign(links, isPlainObject(body.links) ? body.links : {});
-      const people = await listPeople(urlKey);
-      const checked = await checkWrite(req, { links }, writer.by, (idx, tickets) => checkLink(prev, links, contextFor(urlKey, idx, tickets, people)));
-      if (checked.problems.length) return reply(req, res, endpoint, 422, refusalOf(checked.problems));
-      await recordsStore.link(urlKey, prev.id, checked.links, { by: writer.by, run: writer.run ?? null });
-      return reply(req, res, endpoint, 200, await recordsStore.viewOfRecord(urlKey, await recordsStore.current(urlKey, prev.id)));
+      const result = await writes.link({ ctx: req, urlKey: req.proxyUrlKey, id: req.params.id, links, by: writer.by, run: writer.run ?? null });
+      return answer(req, res, endpoint, 200, result);
     } catch (err) {
       return failed(req, res, endpoint, err);
     }

@@ -81,7 +81,7 @@ function sessionsOfState(model, taskState, runWords = null) {
  * @param {Function} [deps.now] - () → Date
  * @returns {Router}
  */
-export function createTaskPageRoutes({ workspaceFromUrl, getOpenRouterSource, getDeployInfo, loader, workspaceOwnerCheck = null, runProposalsStore = null, taskFacts = null, refreshTaskFacts = null, taskModeStore = null, accountStore = null, timelineFragment = null, now = () => new Date() }) {
+export function createTaskPageRoutes({ workspaceFromUrl, getOpenRouterSource, getDeployInfo, loader, workspaceOwnerCheck = null, runProposalsStore = null, taskFacts = null, refreshTaskFacts = null, taskModeStore = null, accountStore = null, timelineFragment = null, recordsStore = null, now = () => new Date() }) {
   if (!loader) throw new Error('task-page routes: loader is required');
   const router = Router();
 
@@ -120,6 +120,22 @@ export function createTaskPageRoutes({ workspaceFromUrl, getOpenRouterSource, ge
     if (!accountId || !workspaceOwnerCheck) return 'member';
     const { status } = await readOwnerSeamStatus(() => workspaceOwnerCheck({ workspaceId: req.workspace.id, accountId }));
     return status === 'owner' ? 'owner' : 'member';
+  };
+
+  // LIN-4494: the Records section for a signed-in owner or member. Stored facts only: the page GET never makes a task. A
+  // ticket with no task record has no records, but its forms are offered: the first write on it makes the task, through
+  // the checked POST (routes/task-records.js). A guest never reaches this (the guest route is /t/:token and passes no records).
+  const recordsOf = async (req, urlKey, identifier) => {
+    if (!recordsStore || !req.session?.accountId) return null;
+    // A records-store failure costs the Records section only (null: none drawn), never the whole task page.
+    try {
+      const taskId = await recordsStore.taskForTicket(urlKey, identifier);
+      const views = taskId ? await recordsStore.viewsOf(urlKey, await recordsStore.find(urlKey, { inRef: taskId })) : [];
+      return { views, canAct: true, refused: queryValue(req.query.records_refused) || null };
+    } catch (err) {
+      console.error('Task page records error:', err?.message || err);
+      return null;
+    }
   };
 
   router.get('/workspace/:urlKey/task/:identifier', workspaceFromUrl, async (req, res) => {
@@ -201,6 +217,7 @@ export function createTaskPageRoutes({ workspaceFromUrl, getOpenRouterSource, ge
         pageOptions,
         promptOpts,
         taskState: taskState || result.provisional || null,
+        records: await recordsOf(req, workspace.urlKey, model.identifier),
       }));
     } catch (error) {
       console.error('Task page error:', error);

@@ -102,7 +102,9 @@ import { createOnTicketWrite } from './lib/ticket-close-closer.js'
 import { ShelvedRulingsStore } from './lib/shelved-rulings-store.js'
 import { RecordsStore, RECORDS_COLLECTION, REFS_COLLECTION, QUERY_LOG_COLLECTION } from './lib/records-store.js'
 import { createRunRecords } from './lib/run-records.js'
-import { createListWorkspacePeople } from './lib/workspace-people.js'
+import { createListWorkspacePeople, storedNameOf } from './lib/workspace-people.js'
+import { createTaskRecordsRoutes } from './routes/task-records.js'
+import { createProjectPageRoutes } from './routes/project-page.js'
 import { DismissalSuggestionsStore } from './lib/dismissal-suggestions-store.js'
 import { HarbourCommentsStore } from './lib/harbour-comments-store.js'
 import { SavedChatStore } from './lib/saved-chat-store.js'
@@ -3293,7 +3295,10 @@ const recordPipelineMerge = createPipelineMergeRecorder({
 })
 // LIN-4493 (John's ruling, link-account): listRecordPeople is the people a record can be addressed to, read from the
 // names the tracker sign-in stored on each account's identity (lib/workspace-people.js).
-app.use(createProxyRoutes({ proxyTokenStore, proxyEventStore, agentStatusStore, recapCacheStore, briefCacheStore, taskSnapshotStore, dispatchQueueStore, dispatchTokenStore, closeOutEventsStore, llmCallLogStore, taskDecisionsStore, shelvedRulingsStore, dismissalSuggestionsStore, harbourCommentsStore, recordsStore, listRecordPeople: createListWorkspacePeople({ workspaceStore, accountStore, accountWorkspaceStore }), sessionsFeedCache, workspaceFromUrl, resolveWorkspaceAccess, getWorkspaceOpenRouterKey, getWorkspaceNorthStar, getNorthStarDocVersionForWorkspace, reportHistoryStore, workspacePreferencesStore, dispatchPresetsStore, freeTierStore, accountStore, rejectedCredentialRegistry, observerStateStore, savedChatStore, workspaceHaltStore, workspaceOwnerCheck, modelRoutingStore, livenessAlarmStore, onTicketWrite, recordPipelineMerge, consumerHeartbeatStore, requestUsageStore, requestUsageLoader, leftoverStep }))
+// LIN-4494: one reader, built once, for the proxy, the task and project pages, Home's Waiting section and `?assignee=me`.
+const listWorkspacePeople = createListWorkspacePeople({ workspaceStore, accountStore, accountWorkspaceStore })
+const canonicalAccountIdOf = (accountId) => accountStore.resolveCanonicalAccountId(accountId)
+app.use(createProxyRoutes({ proxyTokenStore, proxyEventStore, agentStatusStore, recapCacheStore, briefCacheStore, taskSnapshotStore, dispatchQueueStore, dispatchTokenStore, closeOutEventsStore, llmCallLogStore, taskDecisionsStore, shelvedRulingsStore, dismissalSuggestionsStore, harbourCommentsStore, recordsStore, listRecordPeople: listWorkspacePeople, sessionsFeedCache, workspaceFromUrl, resolveWorkspaceAccess, getWorkspaceOpenRouterKey, getWorkspaceNorthStar, getNorthStarDocVersionForWorkspace, reportHistoryStore, workspacePreferencesStore, dispatchPresetsStore, freeTierStore, accountStore, rejectedCredentialRegistry, observerStateStore, savedChatStore, workspaceHaltStore, workspaceOwnerCheck, modelRoutingStore, livenessAlarmStore, onTicketWrite, recordPipelineMerge, consumerHeartbeatStore, requestUsageStore, requestUsageLoader, leftoverStep }))
 
 // LIN-3098 S3: the runner kit (lib/runner-kit/*.mjs), public, for the served
 // runner prompt to fetch and verify against its sha256 pins (routes/runner-kit.js).
@@ -3319,7 +3324,7 @@ app.use(createCollectiveRoutes({ workspaceFromUrl, dispatchQueueStore, proxyToke
 // LIN-4168: the dashboard’s touched-task done cache, built here (not by the router’s default) so the key-state registry
 // can reach the same instance the feed reads.
 const dashboardTaskDoneCache = createTaskDoneCache();
-app.use(createDashboardRoutes({ installationTokenFor, workspaceFromUrl, dispatchQueueStore, agentStatusStore, observationSessionsStore, observationMaterializer, sessionsFeedCache, taskDoneCache: dashboardTaskDoneCache, runSummaryCacheStore, sessionSummaryCacheStore, runParagraphStore, briefCacheStore, recapCacheStore, proxyEventStore, freeTierStore, getWorkspaceAccessToken, fetchIssueContext, fetchWorkspaceIssues, getOpenRouterSource, getDeployInfo, workspacePreferencesStore, taskDecisionsStore, shelvedRulingsStore, dismissalSuggestionsStore, llmCallLogStore, runProposalsStore, proxyTokenStore, readRunEvidence, prStateStore, workspaceOwnerCheck, requestUsageLoader }))
+app.use(createDashboardRoutes({ installationTokenFor, workspaceFromUrl, dispatchQueueStore, agentStatusStore, observationSessionsStore, observationMaterializer, sessionsFeedCache, taskDoneCache: dashboardTaskDoneCache, runSummaryCacheStore, sessionSummaryCacheStore, runParagraphStore, recordsStore, briefCacheStore, recapCacheStore, proxyEventStore, freeTierStore, getWorkspaceAccessToken, fetchIssueContext, fetchWorkspaceIssues, getOpenRouterSource, getDeployInfo, workspacePreferencesStore, taskDecisionsStore, shelvedRulingsStore, dismissalSuggestionsStore, llmCallLogStore, runProposalsStore, proxyTokenStore, readRunEvidence, prStateStore, workspaceOwnerCheck, requestUsageLoader }))
 
 // Mount task-chat routes (experimental "talk to a task" conversation).
 // LIN-2966: taskDecisionsStore + shelvedRulingsStore thread the
@@ -3381,6 +3386,8 @@ const taskPageLoader = createTaskPageLoader({ dispatchStore: dispatchQueueStore,
 // LIN-4242: the Waiting on you reduction, shared by Home's page (above) and the live fragment route below.
 const waitingStanding = createWaitingStanding({
   getLoopsForWorkspace, dispatchStore: dispatchQueueStore, agentStatusStore, taskDecisionsStore, shelvedRulingsStore, enrichLoop,
+  // LIN-4494: the person's open records ride on the same section (lib/home-row-states.js), canonical account first.
+  recordsStore, canonicalAccountId: canonicalAccountIdOf,
 })
 const homeRowStates = createHomeRowStates({
   getLoopsForWorkspace, dispatchStore: dispatchQueueStore, agentStatusStore, taskDecisionsStore, shelvedRulingsStore, enrichLoop, deriveSessionWaiting,
@@ -3406,7 +3413,14 @@ app.use(createTaskPageRoutes({
   accountStore,
   // LIN-4405: the "Sessions on one clock" fragment, shared with the guest route.
   timelineFragment,
+  // LIN-4494: the Records section, for a signed-in owner or member (never a guest).
+  recordsStore,
 }))
+
+// LIN-4494 (piece 3): a signed-in person's record writes from the task page, and the project page (its backlog and
+// the two actions on it). Both write through the one checked pipeline (lib/records/writes.js), filed by the session's account.
+app.use(createTaskRecordsRoutes({ workspaceFromUrl, recordsStore, accountStore, listPeople: listWorkspacePeople }))
+app.use(createProjectPageRoutes({ workspaceFromUrl, getDeployInfo, getOpenRouterSource, recordsStore, accountStore, listPeople: listWorkspacePeople }))
 
 // Mount the task share routes (LIN-3330) — the owner mint/list/revoke controls
 // and the PUBLIC guest page at `/t/:token` (+ its stored-data `/t/:token/state`).
@@ -3503,6 +3517,20 @@ async function resolveTeamSelection(req, workspace) {
   return { teamId };
 }
 
+// LIN-4494: the signed-in person's name as the workspace shows it (lib/workspace-people.js), read by their canonical account.
+// Used by resolveAssigneeSelection's `me` name; a failed read is logged and falls through to the provider's viewer.
+async function storedPersonNameOf(req) {
+  try {
+    return await storedNameOf({ accountId: req.session.accountId, urlKey: req.workspace.urlKey }, {
+      listPeople: listWorkspacePeople,
+      canonicalAccountId: canonicalAccountIdOf,
+    });
+  } catch (err) {
+    console.error('workspace people read failed resolving ?assignee=me:', err?.message || err);
+    return null;
+  }
+}
+
 /**
  * Resolve the assignee filter for a workspace-scoped request (LIN-2526).
  *
@@ -3536,6 +3564,12 @@ async function resolveAssigneeSelection(req, provider, scope) {
   if (rawAssignee === 'me') {
     if (!provider.supports('viewer')) {
       return { selectedAssignee: 'all', resolvedAssigneeName: null };
+    }
+    // LIN-4494: the signed-in person's name as the workspace shows it (lib/workspace-people.js) comes before the provider's
+    // viewer, so Home and the other filtered pages read one name. An account with no stored name falls through to the viewer.
+    if (req.session?.accountId) {
+      const stored = await storedPersonNameOf(req);
+      if (stored) return { selectedAssignee: 'me', resolvedAssigneeName: stored };
     }
     try {
       const viewer = await provider.viewer(scope);

@@ -238,6 +238,10 @@ describe('the guest: no dollars in any of the three responses', () => {
     try {
       const page = await (await fetch(`${base}/t/${TOKEN}`)).text();
       assert.match(page, /Sessions on one clock/);
+      // LIN-4494: the guest page has no Records section. The guest route takes no records store at all (routes/task-share.js),
+      // so there is no path to a record to witness; the renderer's refusal to draw one for a guest is pinned in
+      // lin-4494-records-pages.test.js.
+      assert.doesNotMatch(page, /data-testid="task-records"/);
       assert.match(page, /elapsed 1h 3m · worked 2m 22s/, 'the same picture');
       assert.match(page, new RegExp(`data-timeline-url="/t/${TOKEN}/timeline"`));
       const section = page.slice(page.indexOf('data-testid="task-timeline"'), page.indexOf('</ol>', page.indexOf('data-testid="task-timeline"')));

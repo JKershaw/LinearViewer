@@ -2,13 +2,15 @@
 
 Area notes for `records` in the registry. Format and rules: README.md.
 
-This area is the layer's store (LIN-4493, piece 2 of 5 of LIN-4491): `lib/records/` (the kinds as data, the shape
+This area is the layer's store (LIN-4493, piece 2 of 5 of LIN-4491; its pages, the checked write path and the importer are
+LIN-4494, piece 3): `lib/records/` (the kinds as data, the shape
 check, the views, the brief; all pure) and `lib/records-store.js` (the one file that touches the database). Its
 proxy router, `routes/proxy-records.js`, stays in Agent API by the registry's first-match rule. The run lifecycle
 seam, `lib/run-records.js`, stays in Runs & dispatch by its `run-` pattern.
 
-Records imports only Platform. The tracker read, the askedText reader, STAGE_KINDS and the workspace-person reader
-are injected by their callers (routes/proxy.js, server.js).
+Records imports only Platform. The tracker read, the askedText reader, STAGE_KINDS, the provider state map's closed
+state, the workspace-person reader and the area notes' reader are injected by their callers (routes/proxy.js,
+routes/proxy-records.js, routes/task-records.js, routes/project-page.js, server.js, scripts/records-import.mjs).
 
 ## Lessons
 
@@ -42,6 +44,26 @@ are injected by their callers (routes/proxy.js, server.js).
 - A new collection is inventoried three times: `INVENTORY` in `lib/account-erasure.js`, `COLLECTION_CLASSES` in
   `tests/unit/urlkey-holders.test.js`, and the dry-run's `URLKEY_SOURCES` (`scripts/dry-run-urlkey-duplicates.mjs`).
   The second is the one a local run of the area's tests misses; CI's full suite caught it.
+
+- Every writer goes through one checked pipeline, `lib/records/writes.js` (`createRecordWrites`): the proxy routes, the
+  signed-in task-page and project-page routes, and the importer. It checks the body, dry-runs the tickets it names, makes
+  their tasks only when that is clean, then checks again. A writer passes `by` (its own: a stage kind, `person:<account>`,
+  `import`); `by` is never read from a body. A new writer calls the pipeline, never the store's add, revise, end or link directly.
+- A write that makes one record and then ends another is two writes. Name the first with `fixedIdOf` (lib/records/refs.js,
+  the one derived-id rule) from the second, as make-a-task and supersede do, so a retry after a failed end finds the
+  record it made. Imports use the same rule, which holds after an imported record ends. Never hash an id by hand.
+- Records stay outside `ruling.rows`. Home's Waiting on you draws the person's records beside the rulings
+  (`createWaitingStanding` returns `records`); the count, the badge and the live merge keep reading rulings only.
+- Addressing a person needs the account id or the name the tracker shows, and a name read from the tracker often differs
+  from how a note writes it. A manifest or note that writes "John" will be refused with the names that work; the
+  parked-ticket manifest addresses John as `project` with "For John:" in the words, and says so in its notes.
+- A page GET never makes a task. The task page reads its task record by the ticket's claim (`taskForTicket`) and offers
+  its add and child-task forms before one exists; the first write through the checked pipeline makes the task
+  (routes/task-records.js sends `in: <ticket>`). The project page's actions and the proxy make tasks the same way.
+- The importer reads the notes from a git ref given on the command line (never a default: piece 4 deletes the sections),
+  and its tests read committed fixtures, since CI checks out at depth 1 (tests/fixtures/records-import/). It reads each
+  note with the guard's own reader (`parseNote`, `citedPaths` from lib/prompts/area-note-format.js, injected), so an
+  entry the guard counts is an entry the import writes.
 
 ## Waiting
 
