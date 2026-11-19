@@ -4337,3 +4337,30 @@ John: "I'd suggest we compact this session and it becomes a sort of driver for t
   - My answer to the sanity-check idea: no. The parked work is worth most as one clean read against the baselines after slice 4. Each slice already has its own witness, and the task that builds the next slice is its first real use.
   - Recorded in design §11.
 - **The temporary ticket section in the brief until slice 4:** "That's fine. A little temporary scaffolding is ok." Accepted (design §11.3).
+
+## 18–19 Nov — Paths removed, walk 8, six more removals
+
+- **What John caught.** Area matching assumed every repository has Harbour's `docs/areas/areas.json`. John: "this is holding a bad idea and trying to work around it". An audit (`integration/checks/repo-assumptions.md`) found 25 places where the designs lean on a target repository's layout or a tracker's shape. Path matching ran through the approved design itself: task, area, lesson and run paths, and brief parts 5–7.
+- **His frame for revising.** John: "removal is the process". Approval means "this design looks good to me, and we can proceed", not set in stone. "When we refine, let's avoid silly mistakes like removing something we know is going to cause the walk to have issues." "Two steps forward, one step back, is an ideal, gentle process."
+- **Revision** (`563993da6`):
+  - removed: area kind, task paths, run claims, lesson paths, area scope, the overlap view, the `--area` and `--path` queries;
+  - added: `project` as an addressee and a scope;
+  - a person-written child task keeps its `asked`.
+- **Walk 8** (`layer/walks/8/results.md`): a model built fresh, walk 7's three tasks replayed (32 steps), and Yap filled again.
+  - **Held:** nothing the stages needed was lost; project records were read and acted on in every task; walk 7's orphan didn't recur; stale stayed quiet.
+  - **Failed:** blindness leaked twice, through a judge's run end reason and through a finding the judge revised.
+  - **Refusals:** 23, all one malformed shape (links beside fields); the model's usage notes didn't show `links`.
+  - **Briefs:** smaller on two tasks, larger on LIN-4446, because the full plan went to every stage.
+- **Six removals after walk 8,** agreed by John (`e6ede29fc`):
+  - `blind` leaves the store, and blindness becomes Harbour's (no brief, reads limited);
+  - `check` is merged into `finding`, with an optional `how`;
+  - `same-as` goes;
+  - the lesson's `checked-at` goes;
+  - the `approve-with-notes` outcome goes;
+  - the plan goes in full only to the actor it is addressed to.
+
+  A fresh model was built from the revised page to run its own test, with no walk; real work is the test.
+- **For later** (John):
+  - "at some point we'll review the API and how intuitive it is for agents to use". The evidence is in walk 8's results, §5.
+  - The piles of future work, now addressed and counted, "will be much easier to include in the UI layer for me to act on. Just getting them numbered is a good start, a little like a more traditional queue."
+- **The integration design is out of date on these points:** areas, the blind read, check, the project pile's owner. It's the next piece of work.

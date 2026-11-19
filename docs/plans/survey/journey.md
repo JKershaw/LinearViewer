@@ -70,3 +70,25 @@ On your first question, the record shows finished tasks going from spiralling to
   2. Build it through Harbour's own loop, one route per slice, removing the old route in the same move: hand-offs first (retires the Waiting lists, the `Retires:` conveyor, "record it as not run", answers as comments); then verdicts and runs (retires the comment classifier); then the plan as versioned state (retires the prune and the copy-down); then lessons and areas (retires the notes).
   3. Real work. **The first work through the upgraded Harbour is the parked work** (John, 18 Nov): the seven safety findings, LIN-4416, LIN-4210, and the paused lanes LIN-4441, LIN-4445, LIN-4463. Read against the 13–14 Nov baselines (notes growth, Waiting, sessions and cost per task, brief size, blind reads), reported, never gating. Then John's pet projects (Yap first, John as new user), then the Jira project.
 - **Housekeeping:** the harbour.cat proxy token in the session scratchpad expires 19 Nov; a new one is needed before real work. Steps 1–2 are desk and repository work.
+
+## 18–19 Nov: integration design drafted, paths removed, walk 8
+
+- **The integration design.** Step 1's plan was agreed, with John's correction that knots are called case by case (tidy before, tidy after, or accept), not ruled out (`integration/plan.md`).
+  - The census of today's code (`integration/census/`, 263 sites), draft 1, three checks and draft 2 are in `integration/`.
+  - John's answers so far:
+    - provider sync is a follow-up;
+    - the parked work runs after slice 4;
+    - the brief's temporary ticket section until slice 4 is fine ("a little temporary scaffolding is ok").
+- **Paths removed.** John caught the area list assuming Harbour's own repository layout. An audit found path matching throughout both designs. The layer was revised by removal: no areas, no task, lesson or run paths, and `project` as an addressee.
+- **Walk 8** confirmed the revision (`layer/walks/8/results.md`). Six more removals followed (log, "18–19 Nov"). The layer now has 10 kinds: task, plan, finding, question, decision, verdict, lesson, change, run, and the project as an addressee.
+- **Next, in order:**
+  1. Bring `integration/design.md` into line with the revised layer:
+     - no areas: findings go to `project`;
+     - the blind read through Harbour's route only;
+     - findings with `how` instead of checks;
+     - name who works the project pile down (likely the leftover step, one per build);
+     - the plan rule.
+  2. Then John's remaining integration questions, one at a time: the question kind's `on-answer` field, the actor list from the stage kinds, rulings as their own slice, slice 6, knots.
+  3. The API review (how intuitive the record calls are for agents) before or during slice 1.
+  4. Then build, slice by slice; the parked work runs after slice 4.
+- **Housekeeping:** the harbour.cat token expired on 19 Nov; a new one is needed before real work.
