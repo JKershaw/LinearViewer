@@ -4484,3 +4484,19 @@ John asked whether he can dismiss the 14 queued rows. From a subagent's code rea
 - **The build's own notes:** Home's assignee lookup wasn't moved, and the importer hasn't been run on production. The production run is piece 5's job.
 - **The Yap peer-colleague experiment ended** (John, ~17:36): the room had reliability problems. John's view is that explaining the work out loud helped a little. The listener is stopped, and there are no more posts to the room. One lesson for any later peer room: an untagged post doesn't notify the other party.
 - Next check-in at 18:10.
+
+### 19 Nov, 18:13: LIN-4494 reworked and conditionally approved
+
+- **Review f0f8fa09** (Opus, 17:34–17:38) asked for changes:
+  - the task page couldn't add a first record;
+  - follow-up-only sessions showed no account;
+  - Home used its own name lookup;
+  - two tests checked nothing.
+- **Rework 41cd381c** (Haiku, 17:38–18:07) pushed caa2463c9 and a12dcef1b, CI green. It started with a duplicate-launch alarm because leftover b2ff7059 was still live.
+- **Re-review 3cbeb1b8** (Opus, 18:07–18:12): approve, conditional on 7 close-out fixes. Among them: drop a stale LIN-4445 manifest entry, correct the PR's false "Retires: none", and fix a backlog test that passes with the sort reversed. Open items it lists:
+  - a 390px browser check (no E2E drives these pages);
+  - the "Assigned to me" name risk;
+  - the production import, which is piece 5's job.
+- **Blind read 396cc539:** running since 18:12.
+- **Watch item, mine:** leftover b2ff7059 (Opus, 17:34) said DONE at 17:46 but posted no done marker, so the row still shows as running. It also pushed fac1392eb, which includes a Jira site-picker fix on phones. That looks outside piece 3's scope. Check at close-out whether it stayed in the PR. No action now.
+- **Status:** LIN-4495 Todo. No rulings. 3 wakes queued again (expected; the autopilot is still in its 14:28 turn). Next check-in at 18:45.
