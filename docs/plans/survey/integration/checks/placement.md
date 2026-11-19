@@ -1,4 +1,4 @@
-# Where each census row goes (design draft 2)
+# Where each census row goes (design draft 3)
 
 *Read by `completeness.mjs`.*
 - **Slice numbers:** 1 is store, runs and hand-offs; 2 the plan; 3 verdicts and changes; 4 rulings and the ticket section; 5 lessons; 6 wakes.
@@ -14,7 +14,7 @@
   - 34: the blind-read classes.
 - **Change in slice 1:**
   - 12–14: the leftover stage ends one finding.
-  - 23–25: the prompts write checks and findings.
+  - 23–25: the prompts write findings, with `how` for a verification.
   - 28–32: counts and pages read records.
   - 37: an ask is a finding to the parent.
   - 38: look before adding.
@@ -55,9 +55,8 @@
   - 58: transport for the account.
 
 **C4 (the plan and the brief)**
-- **Retire in slice 2:** 01–19, 41 and 42, and 49.
+- **Retire in slice 2:** 01–19, 41 and 42, and 49. 07, the file-pointer pilot, goes with the plan paths it read.
 - **Change in slice 2:**
-  - 07: the pilot takes plan paths from records.
   - 21–23: the selector's plan facts come from records.
   - 32: surveys quote `asked`.
 - **Slice 4:**
@@ -74,10 +73,10 @@
   - 50: tests, replaced in each slice.
 
 **C5 (lessons, areas, wakes, the proxy, stores)**
-- **Slice 1:** A05 (the Waiting parse), A07, A09, A10, A12 and A21 (counts). The Waiting halves of A08, A11 and A15. A02 and A04: area records are imported and become the source, with a test against `areas.json`.
-- **Slice 5:** A01, A03, A06, A13, A14 and A16–A18. The Lessons halves of A08, A11 and A15.
+- **Slice 1:** A05 (the Waiting parse), A07, A09, A10, A12 and A21 (counts). The Waiting halves of A08, A11 and A15; A08's settling of one entry becomes the leftover step working one `project` record.
+- **Slice 5:** A01, A03, A06, A13, A14 and A16–A18. The Lessons halves of A08, A11 and A15. A04's prompt readers.
 - **Keep:**
-  - A19 and A20: the measuring tools read `areas.json`.
+  - A02, A19 and A20: `areas.json` stays as the code-shape kit's and the tests' map of Harbour's own source. It is not imported; the layer has no areas. A04 keeps spelling its path for those readers.
   - B01–B09, B13 and B15: engine.
   - B14: kept; slice 6 replaces its use for hand-offs.
   - C01–C13: the proxy. C01, C06 and C10 gain the record routes; C07's mint follows the id allocated early.

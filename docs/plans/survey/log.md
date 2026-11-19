@@ -4364,3 +4364,9 @@ John: "I'd suggest we compact this session and it becomes a sort of driver for t
   - "at some point we'll review the API and how intuitive it is for agents to use". The evidence is in walk 8's results, §5.
   - The piles of future work, now addressed and counted, "will be much easier to include in the UI layer for me to act on. Just getting them numbered is a good start, a little like a more traditional queue."
 - **The integration design is out of date on these points:** areas, the blind read, check, the project pile's owner. It's the next piece of work.
+
+## 19 Nov — Integration design draft 3, in line with the revised layer
+
+After the compact, John agreed the route to filing slices as Harbour tasks: draft 3, a light recheck, his remaining questions one at a time, the API review on paper, his read, then documents to main, a fresh token, and slice 1 filed. Main has moved one commit since the census (`68b5d8f3a`, the landing page only), so the census holds.
+
+Draft 3 removes what the layer dropped: area records and their import, task and lesson paths, part 5's list of areas, the `blind` mark, checks, `checked-at`, the file-pointer pilot (it read plan paths), and one set of areas per workspace. It adds who a plan is addressed to (`implementation`, so no readdress as it moves), the leftover step working one `project` record per build as it settles one Waiting entry today, a project page numbering that pile as a queue, and two questions for John: whether the record routes should guard the blind read's reads, and the pile's owner. `checks/placement.md` updated; `completeness.mjs` places all 263 rows.
