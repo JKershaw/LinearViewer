@@ -4551,3 +4551,7 @@ John asked whether he can dismiss the 14 queued rows. From a subagent's code rea
 - **Watch item (a), now a question for John:** the frozen Waiting-list reader stays with no end date. Its comment says it's kept "only for the one-off import", but the stability scripts now use it too. A kept path should say when it goes.
 - **Watch item (b), settled:** the prompt-size raises (plan +57, implementation +57, breakdown +13) each have their reason beside the ceiling.
 - **Status:** LIN-4496 Todo. Nothing shows the seven safety tasks moving. No rulings. 13 wakes queued.
+
+### 19 Nov, ~21:35: John's ruling on the frozen Waiting-list reader
+
+Option (a): the reader's removal goes into the slice 2 draft. It's recorded in `integration/slice-2-carry.md`, a running list of what slice 1 hands forward. John's general preference for tidies, where wise: tidy as we go, then a small standalone tidy task, then wait until the end. Keeping the running slice going comes first. No change to the running autopilot.
