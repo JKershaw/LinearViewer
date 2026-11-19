@@ -132,8 +132,8 @@ describe('run page owner path (routes/dashboard.js)', () => {
     assert.equal(res.statusCode, 200);
     assert.equal(calls.length, 1);
     const args = calls[0];
-    assert.deepEqual(Object.keys(args).sort(), ['asked', 'callScope', 'evidenceUrls', 'installationTokenFor', 'issueIdentifier', 'provider', 'runnerReady', 'stopAt', 'urlKey', 'variant', 'viewerIsOwner', 'workspaceId'],
-      'the pre-split readSessionRunEvidence keys plus LIN-3285\'s workspaceId + installationTokenFor — no allowlist/readPrStatus on the owner page');
+    assert.deepEqual(Object.keys(args).sort(), ['asked', 'callScope', 'evidenceUrls', 'installationTokenFor', 'issueIdentifier', 'provider', 'recordsStore', 'runnerReady', 'stopAt', 'urlKey', 'variant', 'viewerIsOwner', 'workspaceId'],
+      'the pre-split readSessionRunEvidence keys plus LIN-3285\'s workspaceId + installationTokenFor, and LIN-4495\'s recordsStore — no allowlist/readPrStatus on the owner page');
     // LIN-3285: the values, not just the keys: the owner is read from this id through this seam.
     assert.equal(args.workspaceId, 'ws-id-7', 'the session page hands the reader the workspace id');
     assert.equal(args.installationTokenFor, installationTokenFor, 'and the router\'s own seam');
