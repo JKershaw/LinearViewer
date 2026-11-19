@@ -1,0 +1,26 @@
+{
+  "kinds": {
+    "task":     { "fields": { "asked": "string", "done-when": "string", "ref": "string" }, "start": "open", "ends": ["done", "declined"] },
+    "plan":     { "fields": { "says": "string", "order": "number" }, "start": "kept", "ends": ["superseded"] },
+    "finding":  { "fields": { "says": "string", "how": "string" }, "start": "open", "ends": ["done", "declined", "handed-on"], "needsTo": true },
+    "question": { "fields": { "asks": "string", "options": "list", "recommended": "string", "if-unanswered": "string" }, "start": "open", "ends": ["answered", "withdrawn", "handed-on"], "needsTo": true },
+    "decision": { "fields": { "answer": "string", "why": "string", "scope": "scope" }, "start": "stands", "ends": ["superseded", "withdrawn"] },
+    "verdict":  { "fields": { "judgement": "string", "outcome": "string", "reasoning": "string" }, "start": "stands", "ends": ["superseded", "withdrawn"], "needsOn": true },
+    "lesson":   { "fields": { "says": "string" }, "start": "holds", "ends": ["superseded", "disproved"] },
+    "change":   { "fields": { "ref": "string", "head": "string" }, "start": "open", "ends": ["merged", "abandoned"] },
+    "run":      { "fields": { "stage": "string", "account": "string" }, "start": "open", "ends": ["done"] }
+  },
+  "outcomes": {
+    "plan-review": ["approve", "request-changes", "needs-discussion"],
+    "review": ["approve", "request-changes", "needs-discussion"],
+    "blind-read": ["better", "same", "worse"]
+  },
+  "links": {
+    "about": { "list": true },
+    "on": { "list": true, "versioned": true },
+    "answers": { "from": "decision", "target": "question" },
+    "piece": { "from": "task", "target": "plan" }
+  },
+  "takeover": ["handed-on", "superseded"],
+  "staleEnds": ["superseded", "withdrawn", "abandoned", "disproved"]
+}
