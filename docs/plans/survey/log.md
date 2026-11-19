@@ -4539,3 +4539,15 @@ John asked whether he can dismiss the 14 queued rows. From a subagent's code rea
   - the prompt-size ceiling was raised, not held. Check its reason is recorded beside it;
   - a duplicate launch: the rework started while the leftover session was still live on the same branch, about 4 minutes of overlap.
 - **Status:** LIN-4496 Todo. No rulings. 10 wakes queued.
+
+### 19 Nov, 21:31: the cutover merged; close-out running
+
+- **Rework 4e9ca286** (Haiku, 20:20–21:04) fixed the deadlock: open findings no longer block dispatching close-out, but still hold readiness, merge and Done. All nine smaller fixes landed, CI green at 3fb8ce9ed.
+- **Re-review d1b1554f** (Opus, 21:05–21:09): approve, conditional on close-out.
+  - Before merge: narrow the census exclusion to `runner.mjs`.
+  - After deploy: four checks. These stay with LIN-4495, because no person agreed to the rework moving them to LIN-4496.
+- **Blind read 54f36402:** "better" (8 small and 3 larger finds).
+- **Merge:** close-out 9ba30d7a (Sonnet, from 21:14) committed c5b5a28c9. PR #2468 merged at 21:26:52 as e942c1031. CI on main and the deploy are not yet shown.
+- **Watch item (a), now a question for John:** the frozen Waiting-list reader stays with no end date. Its comment says it's kept "only for the one-off import", but the stability scripts now use it too. A kept path should say when it goes.
+- **Watch item (b), settled:** the prompt-size raises (plan +57, implementation +57, breakdown +13) each have their reason beside the ceiling.
+- **Status:** LIN-4496 Todo. Nothing shows the seven safety tasks moving. No rulings. 13 wakes queued.
