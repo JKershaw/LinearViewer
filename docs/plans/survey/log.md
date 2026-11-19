@@ -4451,3 +4451,7 @@ John read the doc copy (with the leaks table, the before-and-after drawing and a
 - **LIN-4494.** survey-task, survey-place and scoping ran 16:33–16:44, before implementation 1a471c63 (Haiku, from 16:45). That is the normal sequence. The workaround wasn't needed here (no PR link was involved).
 - **The note to the slice 1 autopilot** (dispatch a6ffcb33, queued): the workaround is no longer needed; route the remaining pieces normally.
 - Rulings: none open. The next check-in is at 17:35.
+
+### 19 Nov, 16:57: John signed in again
+
+John signed out and back in with Linear, which stores his display name for person addressing. The slice 1 autopilot got a note (dispatch 3efeb3e8, queued) that LIN-4493's live sign-in check can now run where it fits, for example in LIN-4496's readings. Whether the name was stored isn't shown yet; the check will show it.
