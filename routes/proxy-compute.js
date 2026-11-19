@@ -34,6 +34,8 @@ import { armKeepalive, clientGoneSignal } from '../lib/http-keepalive.js';
 import { UUID_REGEX, isValidIssueId } from '../lib/workspace.js';
 import { badRequest, jsonError, keepaliveError, notFound } from '../lib/errors.js';
 import { isHermeticTestToken } from '../lib/should-mock-ai.js';
+import { composeRunBrief } from '../lib/records/run-brief.js';
+import { TOKEN_ORIGIN, WRITES } from '../lib/stage-writes.js';
 
 /**
  * @param {Object} deps
@@ -76,6 +78,7 @@ import { isHermeticTestToken } from '../lib/should-mock-ai.js';
  * @param {number} deps.CONTEXT_FETCH_TIMEOUT_MS - Backstop for the Linear context fetch on recommendation-style endpoints (module-scope; definition stays in routes/proxy.js, shared with group I)
  */
 export function createComputeRoutes({
+  recordsStore = null,
   recapCacheStore,
   briefCacheStore,
   taskSnapshotStore,
@@ -1329,6 +1332,26 @@ export function createComputeRoutes({
    * Shared :identifier param across both forms (LIN-528). POST /brief/:identifier
    * (force-regenerate) is intentionally left flat-only — out of scope for LIN-528.
    */
+  /**
+   * LIN-4495: the records parts for `?run=` (lib/records/run-brief.js), above the distilled brief. A dispatch credential
+   * reads only its own run; a blind read may not read records at all (its only read is its change, LIN-4437). A refusal
+   * or a missing run is a one-line note above the distilled brief, never a silent omission.
+   */
+  async function withRunRecords(req, distilled) {
+    const runId = typeof req.query?.run === 'string' && req.query.run ? req.query.run : null;
+    if (!runId) return distilled;
+    let head;
+    if (!recordsStore) head = '(records parts: the records store is not configured)';
+    else if (req.proxyWrites === WRITES.BLIND_COMMENT) head = '(records parts: a blind read may not read records)';
+    else if (req.proxyOrigin === TOKEN_ORIGIN.DISPATCH && req.proxyRunRecordId !== runId) head = '(records parts: a dispatch credential reads only its own run)';
+    else {
+      const asker = req.proxyOrigin === TOKEN_ORIGIN.DISPATCH ? `run:${req.proxyRunRecordId}` : (req.proxyCreatedBy ? `person:${req.proxyCreatedBy}` : null);
+      const built = await composeRunBrief({ store: recordsStore, urlKey: req.proxyUrlKey, runId, asker });
+      head = built.problem ? `(records parts: ${built.problem})` : built.text;
+    }
+    return `${head}\n\n${distilled}`;
+  }
+
   router.get(['/api/proxy/issues/:identifier/brief', '/api/proxy/brief/:identifier'], proxyLimiter, authenticateProxyToken, async (req, res) => {
     try {
       const { token: accessToken, reason, provider } = await resolveProviderAccess(req.proxyUrlKey, req.proxyCreatedBy, req, { source: req.query?.source });
@@ -1351,6 +1374,8 @@ export function createComputeRoutes({
       }
 
       const noRefresh = req.query.noRefresh === '1' || req.query.noRefresh === 'true';
+      // LIN-4495: `?run=` puts the run's records parts before today's brief, which is returned unchanged after them.
+      const withRecords = (distilled) => withRunRecords(req, distilled);
       const isTestMode = isHermeticTestToken(accessToken);
       const sessionApiKey = await getWorkspaceOpenRouterKey(req.proxyUrlKey, req.proxyCreatedBy);
 
@@ -1378,7 +1403,7 @@ export function createComputeRoutes({
           return keepalive.send(200, {
             status: 'fresh',
             identifier: context.issue?.identifier || identifier,
-            brief: cached.brief,
+            brief: await withRecords(cached.brief),
             generatedAt: cached.generatedAt,
             model: cached.model
           });
@@ -1443,7 +1468,7 @@ export function createComputeRoutes({
         keepalive.send(200, {
           status: 'fresh',
           identifier: context.issue?.identifier || identifier,
-          brief: stored?.brief ?? brief,
+          brief: await withRecords(stored?.brief ?? brief),
           generatedAt: stored?.generatedAt ?? new Date(),
           model: modelUsed
         });

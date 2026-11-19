@@ -44,8 +44,8 @@ describe('run-ledger: verdict', () => {
     const model = parseRunLedger(null);
     assert.strictEqual(model.verdict, 'unknown');
     assert.strictEqual(model.ledger.present, false);
-    assert.deepStrictEqual(model.ledger.items, []);
     assert.strictEqual(model.ledger.raw, null);
+    assert.strictEqual(model.ledger.empty, false);
   });
 });
 
@@ -67,121 +67,6 @@ describe('run-ledger: the review CI line and sha', () => {
   });
 });
 
-describe('run-ledger: ledger items and their marks', () => {
-  test('table ledger: each item keeps its own inside/outside mark, not a blended one', () => {
-    const { ledger } = parseRunLedger(fixture('request-changes-table'));
-    assert.strictEqual(ledger.present, true);
-    assert.strictEqual(ledger.empty, false);
-    const byId = Object.fromEntries(ledger.items.map(i => [i.id, i]));
-    assert.strictEqual(byId.D1.scope, 'inside');
-    assert.strictEqual(byId.N2.scope, 'inside');
-    assert.strictEqual(byId['R-L1'].scope, 'inside');
-    assert.strictEqual(byId.C6.scope, 'outside', 'the one outside item must stay outside');
-    assert.notStrictEqual(byId.C6.scope, byId.D1.scope);
-  });
-
-  test('table ledger: the discharge route is captured per item', () => {
-    const { ledger } = parseRunLedger(fixture('request-changes-table'));
-    const d3 = ledger.items.find(i => i.id === 'D3');
-    assert.strictEqual(d3.discharge, '**implementation** (test only), then re-review');
-  });
-
-  test('a follow-up link named for an outside item is surfaced', () => {
-    const { ledger } = parseRunLedger(fixture('request-changes-table'));
-    const c6 = ledger.items.find(i => i.id === 'C6');
-    assert.strictEqual(c6.followUp, 'LIN-2149');
-  });
-
-  test('a discharged item carries its discharge evidence', () => {
-    const { ledger } = parseRunLedger(fixture('conditional-table'));
-    const l7 = ledger.items.find(i => i.id === 'L7');
-    assert.strictEqual(l7.discharged, true);
-    assert.match(l7.dischargedBy, /:236/);
-    assert.ok(ledger.items.every(i => i.scope === 'inside'));
-  });
-
-  test('numbered-list ledger: marks are read per item across inside and outside', () => {
-    const { ledger } = parseRunLedger(fixture('numbered-list'));
-    assert.strictEqual(ledger.items.length, 6);
-    const scopes = ledger.items.map(i => i.scope);
-    assert.ok(scopes.includes('inside'));
-    assert.ok(scopes.includes('outside'));
-    assert.strictEqual(scopes.at(-1), 'outside', 'the last numbered item is the outside one');
-    assert.match(ledger.items[0].discharge, /F1's fix/);
-  });
-
-  test('bullet ledger: items are still enumerated', () => {
-    const { ledger } = parseRunLedger(fixture('conditional-bullets'));
-    assert.strictEqual(ledger.items.length, 2);
-    assert.match(ledger.items[0].claim, /backoff actually fires/);
-  });
-});
-
-describe('run-ledger: a stated discharge route is not a discharge (LIN-3296)', () => {
-  // The review template asks each item to "state how it can be discharged", so
-  // a route phrase sits in nearly every OPEN item. Only a result reads as
-  // discharged. The item wording mirrors that template; one review per case so
-  // each assertion names the phrase that failed.
-  const ledgerOf = itemText => parseRunLedger({
-    createdAt: '2026-10-03T00:00:00.000Z',
-    body: `## Review\n\n### What CI Did Not Prove\n- L1 (inside): ${itemText}\n\n**Verdict: Approve — conditional on close-out discharging the ledger.**`,
-  }).ledger.items[0];
-
-  test('a route phrase ("<modal>/to be discharged") leaves the item open', () => {
-    for (const phrase of [
-      'The live read. Can be discharged by a manual repro naming its exact precondition.',
-      'The live read. It could be discharged at close-out by opening the page.',
-      'The live read, still to be discharged by a real-world check.',
-      'The live read. May be discharged through normal post-merge observation.',
-      'The live read. Will be discharged by the deploy check.',
-      'The live read. Should be discharged by a manual repro.',
-      'The live read. It can only be discharged by cited evidence.',
-      'The live read. Discharges through normal post-merge observation.',
-    ]) {
-      assert.strictEqual(ledgerOf(phrase).discharged, false, phrase);
-      assert.strictEqual(ledgerOf(phrase).dischargedBy, null, phrase);
-    }
-  });
-
-  test('contractions, "un-" and "get discharged" leave the item open too', () => {
-    for (const phrase of [
-      'The live read. It isn\'t discharged yet.',
-      'The live read. It isn’t discharged yet.',
-      'The live read. It hasn\'t been discharged.',
-      'The live read. Still un-discharged.',
-      'The live read. It should get discharged by close-out.',
-      'The live read. It was never discharged.',
-    ]) {
-      assert.strictEqual(ledgerOf(phrase).discharged, false, phrase);
-      assert.strictEqual(ledgerOf(phrase).dischargedBy, null, phrase);
-    }
-  });
-
-  test('evidence is read from the result, not the route stated before it', () => {
-    const item = ledgerOf('The live read. Can be discharged by a repro; discharged by the repro in comment 4.');
-    assert.strictEqual(item.dischargedBy, 'the repro in comment 4');
-  });
-
-  test('a negated discharge leaves the item open (real LIN-3247 review, item 4)', () => {
-    const { ledger } = readRunLedger(RUN_COMMENT_TRAILS['lin-3247'].comments);
-    const item4 = ledger.items[3];
-    assert.match(item4.raw, /Inside, not discharged/);
-    assert.strictEqual(item4.discharged, false);
-  });
-
-  test('a stated result still reads as discharged', () => {
-    for (const phrase of [
-      'The live read — discharged by #123.',
-      'The live read. **Discharged:** filed LIN-9.',
-      'The live read — discharged.',
-      'The live read, already discharged at review.',
-      'The live read. Can be discharged by a repro; discharged by the repro in comment 4.',
-    ]) {
-      assert.strictEqual(ledgerOf(phrase).discharged, true, phrase);
-    }
-  });
-});
-
 describe('run-ledger: the ledger heading is anchored to a line start (R3)', () => {
   test('a heading mentioned inside prose/backticks does not start the ledger', () => {
     const body = [
@@ -200,7 +85,7 @@ describe('run-ledger: the ledger heading is anchored to a line start (R3)', () =
     ].join('\n');
     const { ledger } = parseRunLedger({ body });
     assert.strictEqual(ledger.present, true);
-    assert.deepStrictEqual(ledger.items.map(i => i.id), ['L1', 'L2'], 'only the real ledger items are read');
+    assert.match(ledger.raw, /L1: the real first item/, 'the real section is read');
     assert.doesNotMatch(ledger.raw, /S13|Scope held/, 'the prose bullets must not be captured as ledger content');
   });
 });
@@ -210,35 +95,7 @@ describe('run-ledger: the empty ledger is a distinct state', () => {
     const { ledger } = parseRunLedger(fixture('empty-ledger'));
     assert.strictEqual(ledger.present, true);
     assert.strictEqual(ledger.empty, true);
-    assert.strictEqual(ledger.unparsed, false);
-    assert.deepStrictEqual(ledger.items, []);
-  });
-});
-
-describe('run-ledger: unparseable text falls back to raw', () => {
-  const malformed = {
-    createdAt: '2026-07-01T12:00:00.000Z',
-    body: [
-      '## Review',
-      '',
-      '### What CI Did Not Prove',
-      '',
-      'This change leans on a remote queue CI cannot reach, and that is the whole story.',
-      '',
-      '**Verdict: Approve.**',
-    ].join('\n'),
-  };
-
-  test('the raw section survives intact and is flagged unparsed', () => {
-    const model = parseRunLedger(malformed);
-    assert.strictEqual(model.ledger.present, true);
-    assert.strictEqual(model.ledger.empty, false);
-    assert.strictEqual(model.ledger.unparsed, true);
-    assert.deepStrictEqual(model.ledger.items, []);
-    assert.strictEqual(
-      model.ledger.raw,
-      'This change leans on a remote queue CI cannot reach, and that is the whole story.',
-    );
+    assert.equal('items' in ledger, false, 'the items are records now (LIN-4495)');
   });
 });
 
@@ -279,18 +136,7 @@ describe('run-ledger: real finished-run trails (R1/R2)', () => {
     const model = readRunLedger(trail('lin-3245'));
     assert.strictEqual(model.verdict, 'approve');
     assert.strictEqual(model.ledger.present, true);
-    assert.strictEqual(model.ledger.items.length, 5);
-  });
-
-  test('LIN-3245: In/Out table cells keep their mark, including the "Out (P1b)" suffix', () => {
-    const { ledger } = readRunLedger(trail('lin-3245'));
-    assert.deepStrictEqual(
-      ledger.items.map(i => i.scope),
-      ['inside', 'outside', 'outside', 'inside', 'outside'],
-    );
-    assert.strictEqual(ledger.items[2].scope, 'outside', 'the "Out (P1b)" suffix must still read as outside');
-    assert.strictEqual(ledger.items.at(-1).scope, 'outside', 'the run-page item stays outside');
-    assert.ok(ledger.items.every(i => i.scope !== 'unknown'), 'no item may lose its mark');
+    assert.strictEqual(model.ledger.empty, false, 'a section with items is not stated empty');
   });
 
   test('LIN-3247: picks this review out of its own beat/autopilot trail', () => {

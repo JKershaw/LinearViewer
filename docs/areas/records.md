@@ -64,9 +64,3 @@ routes/proxy-records.js, routes/task-records.js, routes/project-page.js, server.
   and its tests read committed fixtures, since CI checks out at depth 1 (tests/fixtures/records-import/). It reads each
   note with the guard's own reader (`parseNote`, `citedPaths` from lib/prompts/area-note-format.js, injected), so an
   entry the guard counts is an entry the import writes.
-
-## Waiting
-
-- The brief still reads the workspace's whole history (`snapshots`, `index`, `currentAt`) to compose its parts. It is
-  pure and correct at this size, and piece 4 wires it behind the brief route; the change then is to read the parts
-  through `find` and `lookup`. Cites `lib/records-store.js` and `lib/records/brief.js`.

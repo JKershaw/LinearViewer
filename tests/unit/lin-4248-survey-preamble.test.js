@@ -29,9 +29,9 @@ const NON_WORK = WRITES_VALUES.filter(value => value !== WRITES.WORK);
 // fails here rather than passing silently.
 const MANDATE = {
   [WRITES.WORK]: 'Being dispatched here is your mandate for the reversible work — investigate, edit, open PRs, comment: do not hold your first call, or any call, waiting for a live reply before you start.',
-  [WRITES.NONE]: 'Being dispatched here is a reading pass: investigate and read freely, but do not change code, branches or pull requests; report your findings in this session, and do not hold your first call, or any call, waiting for a live reply before you start.',
-  [WRITES.ONE_COMMENT]: 'Being dispatched here is a read-only stage: investigate and read freely, but do not change code, branches or pull requests; your only write is one comment on the ticket named in your task, and do not hold your first call, or any call, waiting for a live reply before you start.',
-  [WRITES.BLIND_COMMENT]: 'Being dispatched here is a blind read: read the repository as your task says, and nothing on the tracker; do not change code, branches or pull requests; your only write is one comment on the ticket named in your task, and do not hold your first call, or any call, waiting for a live reply before you start.',
+  [WRITES.NONE]: 'Being dispatched here is a reading pass: investigate and read freely, but do not change code, branches or pull requests; report your findings in this session, record each hand-off your run owes as a finding (below), and do not hold your first call, or any call, waiting for a live reply before you start.',
+  [WRITES.ONE_COMMENT]: 'Being dispatched here is a read-only stage: investigate and read freely, but do not change code, branches or pull requests; your writes are one comment on the ticket named in your task and the hand-offs your run records (findings, below), and do not hold your first call, or any call, waiting for a live reply before you start.',
+  [WRITES.BLIND_COMMENT]: 'Being dispatched here is a blind read: read the repository as your task says, and nothing on the tracker; do not change code, branches or pull requests; your writes are one comment on the ticket named in your task and the hand-offs your run records (findings, below), and do not hold your first call, or any call, waiting for a live reply before you start.',
   [WRITES.TICKET_FIELDS]: 'Being dispatched here is to triage the ticket named in your task: investigate freely, and you may change its labels, priority, state and project and comment on it. Do not change code, branches or pull requests, and do not hold your first call, or any call, waiting for a live reply before you start.',
 };
 // LIN-4277: one literal lead-in (the two lines every closing opens with), then a tail per value. Written
@@ -48,8 +48,8 @@ const CLOSING = Object.fromEntries(Object.entries(CLOSING_TAIL).map(([value, tai
 // What each non-work value must say, and must not, beyond the exact sentences above.
 const PHRASES = {
   [WRITES.NONE]: { says: [/report your findings in this session/], closingSays: [/findings/] },
-  [WRITES.ONE_COMMENT]: { says: [/your only write is one comment on the ticket named in your task/], closingSays: [/the one comment you/] },
-  [WRITES.BLIND_COMMENT]: { says: [/a blind read/, /nothing on the tracker/, /your only write is one comment on the ticket named in your task/], closingSays: [/the one comment you/] },
+  [WRITES.ONE_COMMENT]: { says: [/your writes are one comment on the ticket named in your task/], closingSays: [/the one comment you/] },
+  [WRITES.BLIND_COMMENT]: { says: [/a blind read/, /nothing on the tracker/, /your writes are one comment on the ticket named in your task/], closingSays: [/the one comment you/] },
   [WRITES.TICKET_FIELDS]: {
     says: [/labels, priority, state and project/, /[Dd]o not change code, branches or pull requests/],
     closingSays: [/could not apply/],

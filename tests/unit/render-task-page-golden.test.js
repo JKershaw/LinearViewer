@@ -377,7 +377,8 @@ describe('task page structure', () => {
         assert.doesNotMatch(detail, /of 2 checked/, `${status}: no count while the close-out is finishing`);
         assert.match(detail, /close-out is still finishing/, `${status}: the settling sentence`);
       } else {
-        assert.match(detail, /2 things CI couldn&#039;t prove: 1 of 2 checked/, `${status}: the ledger sentence`);
+        // LIN-4495: the sentence is the open findings to close-out, as read; this fixture reads none, so it says so.
+        assert.match(detail, /open findings not read — not checked/, `${status}: the findings sentence`);
       }
       // The check reads what a reader sees: a tap time's ISO stamp is its `datetime` attribute, never shown.
       const visible = says.replace(/<[^>]+>/g, ' ');

@@ -1527,7 +1527,7 @@ export function createProxyRoutes({ proxyTokenStore, proxyEventStore, agentStatu
           // (LIN-772/773); dropping it here silently hid the section on the LLM
           // recommendation path autopilot drives by default — the sibling of the
           // deterministic LIN-776 fix. `focusedChild` stays (the router reads it).
-          await prepareRecommendationInput(context, { dispatchQueueStore, urlKey, identifier: issue.identifier }),
+          await prepareRecommendationInput(context, { dispatchQueueStore, urlKey, identifier: issue.identifier, recordsStore }),
           {
             apiKey: resolvedApiKey,
             model: selectedModel,
@@ -1590,7 +1590,7 @@ export function createProxyRoutes({ proxyTokenStore, proxyEventStore, agentStatu
 
   // Group F compute (LIN-679 Stage 4 / LIN-2538): extracted to
   // routes/proxy-compute.js, mounted at its original position.
-  router.use(createComputeRoutes({ recapCacheStore, briefCacheStore, taskSnapshotStore, dispatchQueueStore, closeOutEventsStore, requestUsageLoader, llmCallLogStore, getWorkspaceOpenRouterKey, getWorkspaceNorthStar, getNorthStarDocVersionForWorkspace, reportHistoryStore, workspacePreferencesStore, proxyLimiter, authenticateProxyToken, resolveProviderAccess, denyIfUnsupported, logEvent, logOpenRouterCredentialSource, workspaceUnavailable, graphqlErrorStatus, captureTaskSnapshot, chargeFreeTierOrReject, computeRecommendation, recommendErrorResponse, resolvePromptIssueContext, withTimeout, LINEAGE_QUERY_LIMIT, RECOMMEND_DESCENT_BUDGET_MS, LLM_TIMEOUT_MS, getTestMockData, fetchWithTimeout, CONTEXT_FETCH_TIMEOUT_MS }));
+  router.use(createComputeRoutes({ recordsStore, recapCacheStore, briefCacheStore, taskSnapshotStore, dispatchQueueStore, closeOutEventsStore, requestUsageLoader, llmCallLogStore, getWorkspaceOpenRouterKey, getWorkspaceNorthStar, getNorthStarDocVersionForWorkspace, reportHistoryStore, workspacePreferencesStore, proxyLimiter, authenticateProxyToken, resolveProviderAccess, denyIfUnsupported, logEvent, logOpenRouterCredentialSource, workspaceUnavailable, graphqlErrorStatus, captureTaskSnapshot, chargeFreeTierOrReject, computeRecommendation, recommendErrorResponse, resolvePromptIssueContext, withTimeout, LINEAGE_QUERY_LIMIT, RECOMMEND_DESCENT_BUDGET_MS, LLM_TIMEOUT_MS, getTestMockData, fetchWithTimeout, CONTEXT_FETCH_TIMEOUT_MS }));
 
 
   // Group G agent-status (LIN-679 Stage 1 / LIN-2533): extracted to

@@ -1,7 +1,8 @@
 // LIN-4251: the preamble's write mode reaches every entrance that builds a worker's preamble, and
 // `work` is unchanged. Three witnesses:
-//   1. `work` bytes: every endpoint-hint variant, in both delivery modes, equals the block captured at
-//      HEAD before this change (tests/fixtures/lin-4251-work-blocks.json). Nothing here names a stage.
+//   1. `work` bytes: every endpoint-hint variant, in both delivery modes, equals the block pinned in
+//      tests/fixtures/lin-4251-work-blocks.json (captured at LIN-4251's HEAD; re-pinned by LIN-4495, which adds the
+//      run-less line that says records writes are refused for a dispatch with no run: +99 bytes, nothing else). Nothing here names a stage.
 //      LIN-4362 re-pinned only the brief hint in those blocks (its wording is BRIEF_HINT in
 //      lib/as-asked.js, shared with four other surfaces); every other byte is as captured.
 //   2. stageWrites: the one lookup every entrance uses to hand the preamble a kind's `writes`.
@@ -20,14 +21,14 @@ import { WRITES } from '../../lib/stage-writes.js';
 const ROOT = fileURLToPath(new URL('../../', import.meta.url));
 const BASELINE = JSON.parse(readFileSync(join(ROOT, 'tests/fixtures/lin-4251-work-blocks.json'), 'utf8'));
 
-describe('LIN-4251 — the work block is byte-identical to HEAD before the change', () => {
+describe('LIN-4251 — the work block is pinned to its bytes (re-pinned by LIN-4495: the run-less hand-off line, +99 bytes)', () => {
   // The same enumeration the baseline was captured with: issue or not, delivery, and the eight
   // provider-flag combinations that pick each endpoint-hint branch. Keys match the fixture's.
   for (const issueIdentifier of ['LIN-42', null]) {
     for (const tokenDelivery of ['prose', 'mcp']) {
       for (const issueDetail of [true, false]) for (const relations of [true, false]) for (const search of [true, false]) {
         const key = `${issueIdentifier ?? 'none'}|${tokenDelivery}|detail=${issueDetail}|rel=${relations}|search=${search}|Linear`;
-        test(`${key}: work, and no writes, both equal the HEAD block`, () => {
+        test(`${key}: work, and no writes, both equal the pinned block`, () => {
           const input = { baseUrl: 'https://host', token: 'TOK123', issueIdentifier: issueIdentifier ?? undefined, tokenDelivery, providerDisplayName: 'Linear', providerUi: { issueDetail, relations, search } };
           assert.equal(buildProxyContextPreamble({ ...input, writes: WRITES.WORK }), BASELINE[key]);
           assert.equal(buildProxyContextPreamble(input), BASELINE[key]);
@@ -39,7 +40,7 @@ describe('LIN-4251 — the work block is byte-identical to HEAD before the chang
   for (const tokenDelivery of ['prose', 'mcp']) {
     for (const issueIdentifier of ['LIN-42', null]) {
       const key = `${issueIdentifier ?? 'none'}|${tokenDelivery}|no-provider`;
-      test(`${key}: no provider name or ui, still the HEAD block`, () => {
+      test(`${key}: no provider name or ui, still the pinned block`, () => {
         assert.equal(buildProxyContextPreamble({ baseUrl: 'https://host', token: 'TOK123', issueIdentifier: issueIdentifier ?? undefined, tokenDelivery, writes: WRITES.WORK }), BASELINE[key]);
       });
     }

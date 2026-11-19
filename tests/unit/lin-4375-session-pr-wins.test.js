@@ -28,7 +28,9 @@ import { createMockCollection } from '../fixtures/mock-collection.js';
 import { createLeftoverStep } from '../../lib/dispatch-leftover-hook.js';
 import { enqueueFollowUp } from '../../lib/follow-up-dispatch.js';
 import { lineagePrUrl } from '../../lib/dispatch-leftover.js';
-import { LEFTOVERS_HEADING } from '../../lib/prompts/leftover-words.js';
+// LIN-4495: the `### Leftovers` answer is retired. The heading survives here only as the text of a build's [done] message,
+// which the held-wake machinery reads as a plain message; no prompt renders it.
+const LEFTOVERS_HEADING = '### Leftovers';
 import { prUrlOfFeedback } from '../../lib/dispatch-wake.js';
 
 const READ_PR = 'https://github.com/JKershaw/LinearViewer/pull/2357';

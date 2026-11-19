@@ -18,14 +18,15 @@ import { createMangoTmpdir } from '../fixtures/mango-tmpdir.js';
 import { RecordsStore, RECORDS_COLLECTION, REFS_COLLECTION, QUERY_LOG_COLLECTION } from '../../lib/records-store.js';
 import { INDEX_SPECS } from '../../lib/db-indexes.js';
 import { planImport as planWith, readWaiting, SECURITY_PARENT_ID } from '../../lib/records/waiting-import.js';
-import { parseNote, citedPaths } from '../../lib/prompts/area-note-format.js';
+import { citedPaths } from '../../lib/prompts/area-note-format.js';
+import { parseWaitingSection } from '../../lib/records/waiting-import.js';
 import { applyWrites, waitingItems, applyManifest, manifestItems, ticketTaskIdOf } from '../../lib/records/import-apply.js';
 import { createRecordWrites } from '../../lib/records/writes.js';
 import { isTerminalState } from '../../lib/providers/state-map.js';
 import { STAGE_KINDS } from '../../lib/prompts/stage-kinds.js';
 
 const URL_KEY = 'lin-4494-import';
-const NOTE_READER = { parseNote, citedPaths };
+const NOTE_READER = { parseNote: parseWaitingSection, citedPaths };
 const planImport = (notes, opts = {}) => planWith(notes, { ...opts, ...NOTE_READER });
 const FIXTURES = new URL('../fixtures/records-import/baseline-bf2d1575f/', import.meta.url);
 const MANIFEST = new URL('../../scripts/records/parked-tickets.json', import.meta.url);

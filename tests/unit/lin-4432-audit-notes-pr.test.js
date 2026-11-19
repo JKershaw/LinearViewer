@@ -123,20 +123,20 @@ describe('(b) the stale claims this piece corrects (LIN-4432, beat 1 tests for b
     assert.ok(!/Close-out is the only one that files/.test(read('docs/areas/README.md')));
   });
 
-  test("docs/areas/README.md's writers list names the after-merge audit", () => {
-    const text = read('docs/areas/README.md');
-    const who = text.slice(text.indexOf('Who writes here:'));
-    assert.ok(who.includes('retrospective-audit'), 'the audit writes a note-bound find into a notes PR, so the writers list names it');
+  // LIN-4495: the area notes hold Lessons only; the audit's finds are records to the project, so the writers list is gone.
+  test("docs/areas/README.md names no notes-PR writer (the audit's finds are records now)", () => {
+    assert.ok(!read('docs/areas/README.md').includes('Who writes here:'));
   });
 
   test("close-out's Make the Fixes comment no longer calls close-out the only filer", () => {
     assert.ok(!read('lib/prompt-template-defs.js').includes('the only filer'));
   });
 
-  test('the leftover words header names the audit as a reader of CONSEQUENCE_TEST', () => {
+  test('the leftover words header says where the gate renders, and names the records that replaced the Waiting list (LIN-4495)', () => {
     const src = read('lib/prompts/leftover-words.js');
     const header = src.slice(0, src.indexOf('\nexport '));
-    assert.ok(header.includes('retrospective-audit'), 'the header names where the gate renders, including the audit');
+    assert.ok(header.includes('LIN-4495'), 'the header records the cutover');
+    assert.ok(header.includes('handoff-words.js'), 'the header names the protocol that writes the record');
   });
 
   test("public/llms.txt's retrospective-audit line is accurate: it no longer says the audit presents findings without writing back", () => {

@@ -30,7 +30,7 @@ import {
   DEFAULT_EXCLUDE, UsageError, commitDateOf, compileScope, emitJson, git, listBlobs, loadCore, parseArgs, readBlobs, readCommit,
   resolveCommit, runCli,
 } from './code-shape/code-shape-lib.mjs';
-import { NOTES_DIR, countWaiting } from '../lib/prompts/area-note-format.js';
+import { NOTES_DIR } from '../lib/prompts/area-note-format.js';
 import {
   NO_REFERENCE_KEYS, NO_REFERENCE_ROWS, SCOPE_INCLUDE, buildReading, churnRow, ciRow, formatTable, linesRow, noReferenceReading,
   notMeasured, parseLandingLog, parseNumstat, referencesFrom, waitingRows,
@@ -44,13 +44,10 @@ const LANDING_FORMAT = '--format=%H%x1f%cI%x1f%s%x1f%b%x1e';
 const GH_LIMIT = 1000;
 const NO_API = 'no --api given and HARBOUR_LOCAL_BASE unset';
 
-// Waiting entries at one commit, from git objects: the notes directly inside docs/areas/. A readable commit with no
-// such directory has none (0); a git failure is the caller's `not measured`.
-const waitingAt = (repo, sha) => {
-  const entries = listBlobs(repo, sha).filter((e) => e.path.startsWith(`${NOTES_DIR}/`) && !e.path.slice(NOTES_DIR.length + 1).includes('/'));
-  const byPath = readBlobs(repo, entries);
-  return countWaiting(Object.fromEntries(Object.entries(byPath).map(([p, text]) => [p.slice(NOTES_DIR.length + 1), text])));
-};
+// LIN-4495: the Waiting lists are retired, so the notes no longer hold a waiting count. A source that has no Waiting list
+// is `not measured` with its reason, never a zero (the cutover removed the source; a zero would read as a fall).
+const WAITING_RETIRED = 'the area notes\' Waiting lists were retired in LIN-4495; the backlog is the project\'s records';
+const waitingAt = () => { throw new Error(WAITING_RETIRED); };
 
 const tryCount = (fn) => { try { return { count: fn() }; } catch (e) { return { reason: firstLine(e) }; } };
 

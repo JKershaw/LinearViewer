@@ -144,44 +144,6 @@ describe('(iii) no rendered stage prompt, kickoff prompt or close-out completion
   });
 });
 
-describe('(iv) Follow-up Triage still tells close-out to file a gate ticket (the guard the old filing was for)', () => {
-  test('the Triage section renders the gate and states that close-out files the gate\'s tickets there', () => {
-    const triage = section(render('close-out'), 'Follow-up Triage');
-    assert.ok(triage.includes(CONSEQUENCE_TEST), 'Triage renders the consequence test exactly as the leaf states it');
-    assert.match(triage, /Only the gate's tickets are filed here/, 'Triage files only the gate\'s tickets');
-  });
-});
-
-describe('(v) the wording around the gate, held where no other part reads it', () => {
-  test('the gate states the provider fallback, the unmapped fallback and "Never both"', () => {
-    assert.match(CONSEQUENCE_TEST, /where the provider cannot create tickets, the summary comment/);
-    assert.match(CONSEQUENCE_TEST, /An unmapped path .* citing a file there first/);
-    assert.match(CONSEQUENCE_TEST, /Never both\./);
-  });
-
-  test('the leftover prompt tells the builder to write each note-bound outside find into its area\'s note, and its answer form says any area\'s note', () => {
-    const prompt = leftoverPrompt({ issueIdentifier: 'LIN-9401', prUrl: 'https://github.com/example/repo/pull/1' });
-    assert.ok(prompt.includes("Write each note-bound outside find into its area's note; for close-out, list only ticket-bound ones."), 'the note-bound rule');
-    assert.ok(prompt.includes("(tidied / noted, any area's note / for close-out, a ticket only)"), 'the answer form');
-  });
-
-  test('review names each outside find\'s home under the gate', () => {
-    const scope = section(render('review'), "Inside or Outside the Ticket's Scope");
-    assert.match(scope, /Name its home under the gate below \(an area slug with the entry worded ready to write, or "ticket" and why\)/);
-  });
-
-  test('close-out\'s Make the Fixes writes a note-bound outside find it notices itself before the merge, once', () => {
-    const fixes = section(render('close-out'), 'Make the Fixes Review Asked For');
-    assert.equal(occurrences(fixes, 'and any note-bound outside find you notice yourself'), 1);
-    assert.match(fixes, /any note-bound outside find you notice yourself, in its own area or another, into that area's `docs\/areas\/<slug>\.md` on the PR branch the same way, before the merge\./);
-  });
-
-  for (const [label, text] of [
-    ['review\'s "Inside or Outside the Ticket\'s Scope"', () => section(render('review'), "Inside or Outside the Ticket's Scope")],
-    ['close-out\'s "Follow-up Triage"', () => section(render('close-out'), 'Follow-up Triage')],
-  ]) {
-    test(`${label} offers "file" only for an outside item the gate sends to a ticket`, () => {
-      assert.ok(text().includes('"file" is offered only for an outside item the gate sends to a ticket'));
-    });
-  }
-});
+// LIN-4495: the consequence test is now a wording rule for a finding's `says` (lib/prompts/leftover-words.js), not a
+// ticket gate, so the (iv) Triage and (v) gate-wording pins are retired with the Triage section (their replacement is
+// the rendering witness, tests/unit/lin-4495-rendering.test.js).

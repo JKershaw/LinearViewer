@@ -1684,7 +1684,7 @@ describe('review template', () => {
   test('review body carries the ledger then hands off to close-out (LIN-550 ordering)', () => {
     const result = generatePrompt('review', mockIssue, mockContext);
     const manualIdx = result.prompt.indexOf('### Manual Verification');
-    const ledgerIdx = result.prompt.indexOf('### What CI Did Not Prove');
+    const ledgerIdx = result.prompt.indexOf('### Records for Close-Out');
     const verdictIdx = result.prompt.indexOf('### Verdict');
     const handoffIdx = result.prompt.indexOf('### Hand Off to Close-Out');
     const completionIdx = result.prompt.indexOf('### Completion');
@@ -1706,9 +1706,9 @@ describe('review template', () => {
     assert.ok(/CI is green on the PR/i.test(result.prompt), 'confirms CI green on the PR');
     assert.ok(/You do NOT merge, mark the task Done, or file the gate's tickets/i.test(result.prompt),
       "review does not merge, mark Done, or file the gate's tickets: close-out files them (LIN-3293, LIN-4401)");
-    assert.ok(/Approve — conditional on close-out discharging the ledger/i.test(result.prompt),
+    assert.ok(/Approve — conditional on close-out settling the findings/i.test(result.prompt),
       'a non-empty ledger forces a conditional approval');
-    assert.ok(/the `close-out` step does, from the ledger you wrote/i.test(result.prompt), 'hands off to the close-out step');
+    assert.ok(/the `close-out` step does, from the findings you recorded/i.test(result.prompt), 'hands off to the close-out step');
     // The retired "merger owns it" framing must be gone.
     assert.ok(!/belong to whoever merges/i.test(result.prompt) && !/belong to the merger/i.test(result.prompt),
       'no longer hands to an undefined merger');
@@ -2292,8 +2292,8 @@ describe('retrospective-audit template', () => {
     assert.ok(/do not change status, labels/i.test(result.prompt), 'must forbid status/label changes');
     assert.ok(/do not merge or mark anything Done/i.test(result.prompt), 'must forbid merge/Done');
     // LIN-4432: the filing sentence is the consequence test's now (LIN-3291's "that matter" became the gate's terms).
-    assert.ok(/Each gate ticket is filed readable on its own and linked from your comment/.test(result.prompt), 'must file only the gate\'s findings as tickets (LIN-3291, LIN-4432)');
-    assert.ok(/The rest go in one docs-only pull request off main/.test(result.prompt), 'must write the rest as one notes PR (LIN-4432)');
+    assert.ok(/Record each finding as a finding record, as the hand-off protocol says/.test(result.prompt), 'must file only the gate\'s findings as tickets (LIN-3291, LIN-4432)');
+    assert.ok(/The audit opens no pull request and writes no note/.test(result.prompt), 'the audit writes no note and opens no pull request (LIN-4495)');
   });
 
   test('reports findings as a comment (read-only workflow), not a Linear write beyond the comment', () => {
@@ -2327,8 +2327,8 @@ describe('close-out template + review→close-out ledger handoff (LIN-550)', () 
   test('(a) close-out reads the review ledger and settles each item before the merge it gates', () => {
     const { prompt } = generatePrompt('close-out', issue, context);
     assert.ok(/most recent review summary comment/i.test(prompt), 'reads the latest review comment');
-    assert.ok(/### Settle the Ledger/.test(prompt), 'has the ledger section');
-    assert.ok(/Review marked each item \*\*inside\*\*.*or \*\*outside\*\*/.test(prompt),
+    assert.ok(/### Settle the Findings/.test(prompt), 'has the ledger section');
+    assert.ok(/Review recorded each finding to close-out/.test(prompt),
       'the settling route is keyed on review\'s inside/outside mark');
     assert.ok(/may be accepted by a person, but only one who names the exact precondition they exercised/i.test(prompt),
       'any item may also be accepted by a human naming the precondition');
@@ -2347,9 +2347,9 @@ describe('close-out template + review→close-out ledger handoff (LIN-550)', () 
       assert.ok(/Inside or Outside the Ticket's Scope/i.test(prompt), 'review has the inside/outside scope section');
       assert.ok(/A finding inside a bounded class is scope/i.test(prompt), 'states rule 1 of the ruling');
       assert.ok(/scope discharges by done or an explicit drop, never by filing/i.test(prompt), 'states rule 2 of the ruling');
-      assert.ok(/mark it \*\*inside\*\* or \*\*outside\*\* the ticket's bounded classes/i.test(prompt),
+      assert.ok(/Mark every unhandled class instance above \*\*inside\*\* or \*\*outside\*\*/i.test(prompt),
         'the ledger instruction requires marking each item inside/outside');
-      assert.ok(/filing a ticket for it is never a discharge, since it belongs to this ticket/i.test(prompt),
+      assert.ok(/cannot discharge it merely by filing a ticket for it/i.test(prompt),
         'the ledger instruction states filing never discharges an inside item');
       // LIN-4021 (A3): the in-scope clause must be pinned, or reverting A3 goes unnoticed.
       assert.ok(prompt.includes('the classes or behaviours research or the plan named, with their places, in its issue description (LIN-1871)'),
@@ -2358,37 +2358,16 @@ describe('close-out template + review→close-out ledger handoff (LIN-550)', () 
 
     test('close-out settles an inside item only by done, or leaves it undone for a team-level reason; never by filing', () => {
       const { prompt } = generatePrompt('close-out', issue, context);
-      assert.ok(/\*\*Inside\*\*: done, shown by evidence you cite/.test(prompt), 'an inside item is settled by cited evidence of done');
+      assert.ok(/\*\*Inside work\*\*: done, shown by evidence you cite/.test(prompt), 'an inside item is settled by cited evidence of done');
       assert.ok(/Filing a ticket never settles inside work/.test(prompt), 'filing never settles an inside item');
       assert.ok(/Leave one undone only when finishing it is a change the team would need to hear about first, and say in your summary exactly what is left and why/.test(prompt),
         'an inside item is left undone only for a change the team would hear about first (LIN-3291), and said so');
     });
 
-    test('close-out lets an outside item be settled by a self-contained filed ticket', () => {
-      const { prompt } = generatePrompt('close-out', issue, context);
-      assert.ok(/\*\*Outside\*\*: settled by its note commit, or by the gate's ticket, written for a reader with no access to this task/.test(prompt),
-        'an outside item is settled by its note, or by a gate ticket that stands alone');
-    });
 
     // LIN-3006: the drop-then-file route is removed on purpose — inside work is
     // done or left undone with its reason, never filed.
-    test('close-out files outside items only — inside work is never filed', () => {
-      const { prompt } = generatePrompt('close-out', issue, context);
-      assert.ok(/Only the gate's tickets are filed here; inside work is done or left undone with its reason, never filed/.test(prompt),
-        'follow-up triage files outside items only');
-      assert.ok(!/inside-scope items you have explicitly dropped in the summary above, are eligible to be filed/i.test(prompt),
-        'the drop-then-file route stays removed');
-      const workflow = prompt.slice(prompt.indexOf('## Workflow'), prompt.indexOf('## Context'));
-      assert.ok(/file the gate's tickets/.test(workflow), "the workflow files the gate's tickets only");
-    });
 
-    test('review and close-out limit ruling options to outside-only filing', () => {
-      const review = generatePrompt('review', issue, context).prompt;
-      const closeout = generatePrompt('close-out', issue, context).prompt;
-      const rulingClause = /an inside item's options are "do it here" or "drop it, with the reason"; "file" is offered only for an outside item/i;
-      assert.ok(rulingClause.test(review), 'review limits ruling options to outside-only filing');
-      assert.ok(rulingClause.test(closeout), 'close-out limits ruling options to outside-only filing');
-    });
 
     test('inside is defined by kind (defect/idiom), not by research\'s enumerated list', () => {
       const review = generatePrompt('review', issue, context).prompt;
@@ -2443,7 +2422,7 @@ describe('close-out template + review→close-out ledger handoff (LIN-550)', () 
 
     test('a post-deploy step runs after the merge, once the deploy has landed, and never holds the merge', () => {
       const { prompt } = generatePrompt('close-out', issue, context);
-      assert.ok(/\*\*An item that can only run once the change is live\*\* \(a live check, a data clean-up\): do it after the merge, once the deploy has landed/.test(prompt),
+      assert.ok(/\*\*A finding that can only run once the change is live\*\* \(a live check, a data clean-up\): do it after the merge, once the deploy has landed/.test(prompt),
         'a live check or a clean-up runs after the merge');
       assert.ok(/It is never a reason to hold the merge/.test(prompt), 'a post-deploy step is not a merge condition');
       assert.ok(/wait until the deploy has landed \(the deployed commit is your merge or later; Harbour shows its own in the page footer\)/.test(prompt),
@@ -2470,8 +2449,8 @@ describe('close-out template + review→close-out ledger handoff (LIN-550)', () 
 
     test('review (LIN-3614): a claim only a human or the live system can verify goes in the ledger as not run, with why', () => {
       const { prompt } = generatePrompt('review', issue, context);
-      const manual = section(prompt, '### Manual Verification', '### What CI Did Not Prove');
-      assert.ok(/list it in the ledger as not run, with why/.test(manual), 'Manual Verification routes it to the ledger as not run');
+      const manual = section(prompt, '### Manual Verification', '### Records for Close-Out');
+      assert.ok(/record a finding with `how` \(the check to run\) and `to` the person/.test(manual), 'Manual Verification routes it to a finding, with how');
       assert.ok(!/flag it for human testing/i.test(prompt), 'the human-testing route is gone');
       const after = section(prompt, '- **After the deploy**', '- **A named monitor**');
       assert.ok(/never as a condition on the merge\./.test(after), 'a post-deploy step is never a merge condition');
@@ -2493,26 +2472,20 @@ describe('close-out template + review→close-out ledger handoff (LIN-550)', () 
 
     test('close-out (LIN-3903): Settle the Ledger points the post-deploy check to Land It and keeps the outsider standard on filing', () => {
       const { prompt } = generatePrompt('close-out', issue, context);
-      const settle = section(prompt, '### Settle the Ledger', '### Land It and Close the Loop');
-      const inside = settle.split('\n').find(l => l.startsWith('- **Inside**'));
+      const settle = section(prompt, '### Settle the Findings', '### Land It and Close the Loop');
+      const inside = settle.split('\n').find(l => l.startsWith('- **Inside work**'));
       assert.ok(inside && /A post-deploy check you cannot run: see Land It\./.test(inside),
         'the Inside bullet carries the not-run exception, pointing to Land It');
       assert.ok(/Leave one undone only when finishing it is a change the team would need to hear about first/.test(inside),
         'the hold for real inside work stays');
-      assert.ok(/written for a reader with no access to this task/.test(settle),
+      assert.ok(/Write each one for a reader with no access to this task/.test(prompt),
         'the Outside bullet keeps the outsider standard: the retained bound of review\'s cut Outside wording (LIN-3293)');
     });
 
-    test('close-out (LIN-3614): Follow-up Triage states the outsider standard for every outside item', () => {
-      const { prompt } = generatePrompt('close-out', issue, context);
-      const triage = section(prompt, '### Follow-up Triage', '### Archive & Prune');
-      assert.ok(/Write each for a reader with no access to this task\./.test(triage),
-        'the standard for a filed outside item, class-check siblings included, sits where filing happens (LIN-3293)');
-    });
 
     test('close-out (LIN-3614): Make the Fixes makes a stale citation a fix, listed with its commit, with no ruling and no assertion or behaviour edits', () => {
       const { prompt } = generatePrompt('close-out', issue, context);
-      const fixes = section(prompt, '### Make the Fixes Review Asked For', '### Settle the Ledger');
+      const fixes = section(prompt, '### Make the Fixes Review Asked For', '### Settle the Findings');
       assert.ok(/A citation or comment this change made stale is a fix even outside the ticket's files: list it with its commit, raise no ruling; an assertion or behaviour change is not one\./.test(fixes),
         'a stale citation is a fix outside the ticket\'s files, bounded to citations and comments');
     });
@@ -2543,9 +2516,9 @@ describe('close-out template + review→close-out ledger handoff (LIN-550)', () 
 
     test('review approves conditionally for a ledger or named fixes, and sends back only new design or behaviour', () => {
       const { prompt } = generatePrompt('review', issue, context);
-      assert.ok(/the verdict is `Approve — conditional on close-out discharging the ledger`, never a bare Approve/.test(prompt),
+      assert.ok(/the verdict is `Approve — conditional on close-out settling the findings`, never a bare Approve/.test(prompt),
         'the machine-read conditional verdict is unchanged (lib/run-ledger.js classifyVerdict)');
-      assert.ok(/only an explicitly empty ledger with nothing to fix may carry a plain \*\*Approve\*\*/.test(prompt));
+      assert.ok(/only a review that records no finding to close-out and names no fix may carry a plain \*\*Approve\*\*/.test(prompt));
       assert.ok(/Close-out makes the fixes you name itself, however many files they touch, so name each precisely enough to make without guessing/.test(prompt),
         'review names each fix precisely, with no size bound');
       assert.ok(/When the work still needs a new design or new behaviour, the verdict is \*\*Request Changes\*\* back to `implementation`/.test(prompt));
@@ -2565,39 +2538,11 @@ describe('close-out template + review→close-out ledger handoff (LIN-550)', () 
     // LIN-3293: one owner for filing. Review files nothing, so it carries the
     // no-re-raise check but not the filing check; close-out files the outside
     // items and runs the existing-ticket check before each.
-    test('review carries the no-re-raise clause after the LIN-3006 eligibility clause, and leaves filing to close-out', () => {
-      const review = generatePrompt('review', issue, context).prompt;
-      const eligibilityIdx = review.search(/"file" is offered only for an outside item/i);
-      const noReRaiseIdx = review.search(noReRaiseClause);
-      const nextSectionIdx = review.indexOf('### Test Quality Check');
-      assert.ok(eligibilityIdx > -1, 'sanity: LIN-3006\'s eligibility clause is present');
-      assert.ok(eligibilityIdx < noReRaiseIdx && noReRaiseIdx < nextSectionIdx, 'the no-re-raise clause sits after the eligibility clause');
-      assert.ok(!/on a finding, check it is not already covered/i.test(review), 'LIN-3903: the trigger is any DECISION:, not only one on a finding');
-      assert.equal(review.search(existingTicketClause), -1, 'review files nothing, so it has no filing check');
-      assert.match(review, /Close-out files the gate's tickets/);
-    });
 
-    test('Follow-up Triage carries both clauses, immediately after the eligibility clause and before the Priority bullet', () => {
-      const closeout = generatePrompt('close-out', issue, context).prompt;
-      const eligibilityIdx = closeout.search(/"file" is offered only for an outside item/i);
-      const existingIdx = closeout.search(existingTicketClause);
-      const noReRaiseIdx = closeout.search(noReRaiseClause);
-      const priorityIdx = closeout.indexOf('**Priority**');
-      assert.ok(eligibilityIdx > -1 && existingIdx > -1 && noReRaiseIdx > -1, 'all three clauses are present');
-      assert.ok(eligibilityIdx < existingIdx && existingIdx < noReRaiseIdx && noReRaiseIdx < priorityIdx,
-        'both new clauses sit after the eligibility clause and before the Priority bullet, in order');
-    });
 
     // LIN-3006's own pins (the block above and this ticket's own review/
     // close-out describe) must stay green unmodified — re-asserted here so a
     // future edit to this new describe block cannot silently regress them.
-    test('LIN-3006\'s own eligibility clause and boundary are untouched by the new clauses', () => {
-      const review = generatePrompt('review', issue, context).prompt;
-      const closeout = generatePrompt('close-out', issue, context).prompt;
-      const rulingClause = /an inside item's options are "do it here" or "drop it, with the reason"; "file" is offered only for an outside item/i;
-      assert.ok(rulingClause.test(review), 'review still limits ruling options to outside-only filing, unchanged');
-      assert.ok(rulingClause.test(closeout), 'close-out still limits ruling options to outside-only filing, unchanged');
-    });
 
   });
 
@@ -2605,38 +2550,38 @@ describe('close-out template + review→close-out ledger handoff (LIN-550)', () 
     const review = generatePrompt('review', issue, context).prompt;
     const closeout = generatePrompt('close-out', issue, context).prompt;
     // Review still emits the structured heading — helpful structure when present.
-    assert.ok(review.includes('### What CI Did Not Prove'), 'review writes the ### What CI Did Not Prove ledger');
+    assert.ok(review.includes('### Records for Close-Out'), 'review writes the ### What CI Did Not Prove ledger');
     // LIN-4353: Completion's "Record it in one summary comment: the ledger, the verdict,
     // and the CI state" restated the stage contract and was cut; Hand Off carries the claim.
-    assert.ok(/your deliverable is the ledger plus the verdict, recorded in the summary comment/i.test(review),
+    assert.ok(/your deliverable is the findings you record plus the verdict, recorded in the summary comment/i.test(review),
       'review records the ledger into its summary comment (the carrier)');
-    assert.ok(/Put the ledger under `### What CI Did Not Prove`/.test(review),
+    assert.ok(/record every claim the deliverable depends on that the green CI run does NOT actually exercise/.test(review),
       'the ledger heading is the stage contract\'s (LIN-3292)');
     // Close-out does not require that exact string — it reads the ledger generically.
-    assert.ok(!closeout.includes('### What CI Did Not Prove'),
+    assert.ok(!closeout.includes('### Records for Close-Out'),
       'close-out does not key on the literal heading (decoupled)');
-    assert.ok(/the ledger of what CI did not prove/i.test(closeout),
+    assert.ok(/The findings to close-out on this task are in your brief/i.test(closeout),
       'close-out reads the review\'s ledger generically');
   });
 
   test('(c) empty ledger => close-out has nothing to settle; review allows an unconditional Approve only then', () => {
     const closeout = generatePrompt('close-out', issue, context).prompt;
-    assert.ok(/An explicitly empty ledger has nothing to settle, so do not manufacture doubt about a self-contained change/.test(closeout),
+    assert.ok(/With no finding to close-out, there is nothing to settle, so do not manufacture doubt about a self-contained change/.test(closeout),
       'an explicitly empty ledger is a pass-through, not a reason for doubt');
     const review = generatePrompt('review', issue, context).prompt;
-    assert.ok(/only an explicitly empty ledger with nothing to fix may carry a plain \*\*Approve\*\*/i.test(review),
-      'review permits a plain Approve only when the ledger is explicitly empty and nothing is to be fixed');
-    assert.ok(/An explicitly empty ledger leaves close-out nothing to settle/i.test(review),
+    assert.ok(/only a review that records no finding to close-out and names no fix may carry a plain \*\*Approve\*\*/i.test(review),
+      'review permits a plain Approve only when it records no finding to close-out and names no fix');
+    assert.ok(/### Records for Close-Out/.test(review),
       'review states the empty-ledger contract');
   });
 
   test('(d) the gate invariants are present in the rendered close-out body', () => {
     const { prompt } = generatePrompt('close-out', issue, context);
     // 1. a missing verdict, or an Approve with no ledger at all, goes back to review (LIN-3291)
-    assert.ok(/With no review verdict on record, or an Approve with no ledger at all \(an explicitly empty one is fine\), the work is not ready: leave the task open and name `review` next/.test(prompt),
+    assert.ok(/With no review verdict on record, the work is not ready: leave the task open and name `review` next/.test(prompt),
       'a missing verdict or ledger goes back to review, never read as empty');
-    // 2. green CI alone never discharges a ledger item
-    assert.ok(/Green CI is never evidence for a ledger item/i.test(prompt),
+    // 2. green CI alone never settles a finding
+    assert.ok(/Green CI is never evidence for a finding/i.test(prompt),
       'green CI never discharges a ledger item');
     // 3. human acceptance counts only if it names the exact precondition
     assert.ok(/only one who names the exact precondition they exercised/i.test(prompt),
@@ -2649,7 +2594,7 @@ describe('close-out template + review→close-out ledger handoff (LIN-550)', () 
       'the old missing-ledger hard-block language is removed');
     assert.ok(!/route back to `review` to \(re\)write/i.test(prompt),
       'no longer routes back to review over a missing heading');
-    assert.ok(/Review has recorded its verdict and what green CI did not prove in its summary comment/.test(prompt),
+    assert.ok(/Review has recorded its verdict in its summary comment, and its findings to close-out as records/.test(prompt),
       'close-out starts from the recorded verdict');
   });
 
@@ -2657,8 +2602,8 @@ describe('close-out template + review→close-out ledger handoff (LIN-550)', () 
     const { prompt } = generatePrompt('close-out', issue, context);
     assert.ok(/A recorded review Approve is your authority to finish; no fresh "go ahead" is needed/.test(prompt),
       'the recorded Approve is the authorization, with no fresh go-ahead');
-    assert.ok(/Green CI is never evidence for a ledger item/i.test(prompt),
-      'green CI still never discharges a ledger item');
+    assert.ok(/Green CI is never evidence for a finding/i.test(prompt),
+      'green CI still never settles a finding');
   });
 
   test('(e1) close-out body emits no literal "Linear" and renames cleanly for a non-Linear provider', () => {
@@ -2690,7 +2635,7 @@ describe('close-out template + review→close-out ledger handoff (LIN-550)', () 
     const land = prompt.slice(prompt.indexOf('### Land It and Close the Loop'));
     const summaryAt = land.search(/Post the summary comment/);
     const archiveAt = land.search(/archive and prune the description/);
-    const followUpsAt = land.search(/file the gate's tickets/);
+    const followUpsAt = land.search(/Outside finds are not filed as tickets/);
     assert.ok(summaryAt > -1 && archiveAt > -1 && followUpsAt > -1, 'all three steps are present');
     assert.ok(summaryAt < archiveAt && archiveAt < followUpsAt,
       'archive+prune sits strictly between the summary post and follow-up filing');
@@ -2807,8 +2752,8 @@ describe('close-out template + review→close-out ledger handoff (LIN-550)', () 
 
   test('(h1) sanity: the close-out body states merge→done→summary→archive→prune→follow-up in order', () => {
     const { prompt } = generatePrompt('close-out', issue, context);
-    const land = prompt.slice(prompt.indexOf('### Land It and Close the Loop'), prompt.indexOf('### Follow-up Triage'));
-    const steps = [/Merge pinned/, /set the task to Done/, /Post the summary comment/, /archive and prune/, /file the gate's tickets/];
+    const land = prompt.slice(prompt.indexOf('### Land It and Close the Loop'), prompt.indexOf('### Outside Finds'));
+    const steps = [/Merge pinned/, /set the task to Done/, /Post the summary comment/, /archive and prune/, /Outside finds are not filed as tickets/];
     const positions = steps.map(re => land.search(re));
     assert.ok(positions.every(p => p > -1), 'every step is present in the Land It section');
     for (let i = 1; i < positions.length; i++) {
@@ -2836,60 +2781,11 @@ describe('close-out template + review→close-out ledger handoff (LIN-550)', () 
   // Follow-up triage: filed follow-ups get a priority and a type label (LIN-2309)
   // ===========================================================================
 
-  test('(i1) close-out carries a Follow-up Triage section requiring priority + type label on every filed follow-up', () => {
-    const { prompt } = generatePrompt('close-out', issue, context);
-    assert.ok(/### Follow-up Triage/.test(prompt), 'close-out has the Follow-up Triage section');
-    assert.ok(/never leave it at the provider default/i.test(prompt),
-      'follow-ups must not be left at the provider default');
-  });
 
-  test('(i2) priority guidance derives from risk, requires stated reasoning, and forbids inventing a numeric scale', () => {
-    const { prompt } = generatePrompt('close-out', issue, context);
-    assert.ok(/derive it from the finding's own risk/i.test(prompt), 'priority is derived from the finding\'s risk');
-    assert.ok(/state that reasoning in one line on the ticket/i.test(prompt), 'reasoning must be stated on the ticket');
-    assert.ok(/`priorityLevel` \(ascending, 4 = highest\)/.test(prompt), 'names the provider-neutral priorityLevel field with its ascending scale');
-    assert.ok(/do not invent a numeric scale of your own/i.test(prompt), 'forbids inventing a numeric scale');
-    // Field-scoped, not phrase-locked (LIN-2315): a paraphrase that still names the
-    // native field (e.g. "or `priority`, the provider-native equivalent") fails this
-    // even though it doesn't match the literal phrase the old assertion keyed on.
-    const triageSection = prompt.slice(prompt.indexOf('### Follow-up Triage'), prompt.indexOf('### Archive & Prune'));
-    const priorityBullet = triageSection.split('\n').find(l => l.trim().startsWith('- **Priority**:'));
-    assert.ok(priorityBullet, 'the Follow-up Triage Priority bullet is present');
-    assert.deepStrictEqual(namedPriorityFields(priorityBullet), ['priorityLevel'],
-      'the Priority bullet names exactly priorityLevel as a priority-family field — its scale is inverted on the native field (LIN-2311), so naming that field there under any wording is the hazard');
-  });
 
-  test('(i3) label guidance uses the workspace label catalog and requires an explicit note when nothing fits', () => {
-    const { prompt } = generatePrompt('close-out', issue, context);
-    assert.ok(/GET \/api\/proxy\/labels/.test(prompt), 'labels come from the workspace\'s own catalog endpoint');
-    assert.ok(/never a hardcoded vocabulary/i.test(prompt), 'forbids a hardcoded label vocabulary');
-    assert.ok(/say so explicitly on the ticket rather than inventing one/i.test(prompt),
-      'requires an explicit note instead of inventing a label');
-  });
 
-  test('(i4) triage is best-effort and degrades to a note rather than blocking or expanding the close', () => {
-    const { prompt } = generatePrompt('close-out', issue, context);
-    assert.ok(/best-effort, never blocking/i.test(prompt), 'triage is explicitly best-effort, never blocking');
-    assert.ok(/record a one-line note on the ticket saying so instead of retrying or failing the close/i.test(prompt),
-      'degrades to a stated note rather than retrying or failing the close');
-  });
 
-  test('(i5) the close-out step that files follow-ups points filers at Follow-up Triage', () => {
-    const { prompt } = generatePrompt('close-out', issue, context);
-    const land = prompt.slice(prompt.indexOf('### Land It and Close the Loop'), prompt.indexOf('### Follow-up Triage'));
-    assert.ok(/file the gate's tickets \(see Follow-up Triage below\)/.test(land),
-      'the filing step references Follow-up Triage');
-  });
 
-  test('(i6) Follow-up Triage sits after "Always name a next action" and before Archive & Prune', () => {
-    const { prompt } = generatePrompt('close-out', issue, context);
-    const nextActionAt = prompt.indexOf('**Always name a next action**');
-    const triageAt = prompt.indexOf('### Follow-up Triage');
-    const archiveAt = prompt.indexOf('### Archive & Prune Superseded Stage Artifacts');
-    assert.ok(nextActionAt > -1 && triageAt > -1 && archiveAt > -1, 'all three anchors are present');
-    assert.ok(nextActionAt < triageAt && triageAt < archiveAt,
-      'Follow-up Triage sits strictly between the next-action note and Archive & Prune');
-  });
 
   test('(i7) Follow-up Triage is scoped to close-out only — it does not leak into other templates via the shared grounding post-pass', () => {
     const { prompt: bugPrompt } = generatePrompt('bug', { ...issue, labels: ['bug'] }, context);
@@ -3136,9 +3032,9 @@ describe('how a ledger item is settled (LIN-898, LIN-3326)', () => {
   test('HARD FLOORS not regressed: green CI never settles, acceptance names the precondition, missing verdict still blocks', () => {
     const review = generatePrompt('review', issue, context).prompt;
     const closeout = generatePrompt('close-out', issue, context).prompt;
-    assert.ok(/Green CI is never evidence for a ledger item/i.test(closeout),
+    assert.ok(/Green CI is never evidence for a finding/i.test(closeout),
       'green CI still never settles a ledger item');
-    assert.ok(/Green CI never settles a ledger item/.test(review), 'review states the same floor (Scope and Authority)');
+    assert.ok(/Green CI never settles a finding/.test(review), 'review states the same floor (Scope and Authority)');
     assert.ok(/may be accepted by a person, but only one who names the exact precondition they exercised/i.test(closeout),
       'acceptance without a named precondition (a reviewer\'s own "no action needed" included) settles nothing');
     assert.ok(/With no review verdict on record/.test(closeout) && /the work is not ready: leave the task open and name `review` next/.test(closeout),
@@ -3147,7 +3043,7 @@ describe('how a ledger item is settled (LIN-898, LIN-3326)', () => {
 
   test('completion signals stay coherent with how items are settled', () => {
     const sig = COMPLETION_SIGNALS['close-out'];
-    assert.ok(sig.signals.some(s => /green CI alone never discharges a ledger item/i.test(s)),
+    assert.ok(sig.signals.some(s => /green CI alone never settles a finding/i.test(s)),
       'the checkpoint keeps the green-CI floor explicit');
     assert.ok(sig.signals.some(s => /accepted by a human naming the exact precondition exercised/i.test(s)),
       'the checkpoint keeps acceptance tied to a named precondition');
@@ -3230,15 +3126,15 @@ describe('named-discharge lanes and close-on-merge (LIN-1579)', () => {
     assert.ok(/An unnamed monitor or rollback settles nothing/.test(review), 'review: naming is the price of the route');
     assert.ok(/"we will notice" or "it can be reverted" with nothing named settles nothing/.test(closeout),
       'close-out: hand-waved reversibility is not a discharge');
-    assert.ok(/Green CI is never evidence for a ledger item/i.test(closeout),
-      'green CI still never discharges a ledger item');
+    assert.ok(/Green CI is never evidence for a finding/i.test(closeout),
+      'green CI still never settles a finding');
     assert.ok(/Still enumerate every claim CI does not exercise; only the route changes/.test(review),
       'every claim CI does not exercise is still enumerated');
   });
 
   test('(7) completion signals stay coherent with the named routes and close-on-merge', () => {
     const sig = COMPLETION_SIGNALS['close-out'];
-    assert.ok(sig.signals.some(s => /a monitor or rollback review named cited by that name \(an unnamed one settles nothing\)/.test(s)),
+    assert.ok(sig.signals.some(s => /a monitor or rollback named by the name review wrote \(an unnamed one settles nothing\)/.test(s)),
       'a checkpoint reflects the named-monitor / named-rollback discharge, naming as its price');
     assert.ok(sig.signals.some(s => /the change verified on what landed in the same session/i.test(s)),
       'a checkpoint reflects close-on-merge verification');
@@ -3576,14 +3472,14 @@ describe('the area notes pointer (LIN-4371)', () => {
     assert.match(line, /docs\/areas\/README\.md/);
     assert.match(line, /docs\/areas\/areas\.json/);
     assert.match(line, /Lessons bind how you work/);
-    assert.match(line, /Waiting entries are context, not scope, unless the size of the move takes them on/);
+    assert.match(line, /Where a Lesson bears on this work, name it \(its file and source\) where you record your decisions\./);
     assert.ok(!/LinearViewer|simple-dispatcher|Harbour|Linear/.test(line), 'no repository or provider named');
   });
 
   // LIN-4379 (LIN-4349 P1): the next look-first step cites what it used, so "a finding was used"
   // is checkable from the work's own record of its decisions.
   test('it asks the work to name a note entry it used, file and source, where it records its decisions', () => {
-    assert.match(line, /Where a note entry bears on this work, name it \(its file and source\) where you record your decisions\./);
+    assert.match(line, /Where a Lesson bears on this work, name it \(its file and source\) where you record your decisions\./);
     for (const kind of ['implementation', 'plan', 'review']) {
       assert.ok(generatePrompt(kind, issue, context).prompt.includes('name it (its file and source) where you record your decisions'), kind);
     }
@@ -4038,12 +3934,12 @@ describe('attachment perception discipline (LIN-872)', () => {
     const withAttachments = generatePrompt('review', mkIssue('review'), ctxWith).prompt;
     const idx = withAttachments.indexOf('### Manual Verification');
     assert.ok(idx !== -1, 'Manual Verification section must exist');
-    const section = withAttachments.slice(idx, withAttachments.indexOf('### What CI Did Not Prove'));
+    const section = withAttachments.slice(idx, withAttachments.indexOf('### Records for Close-Out'));
     assert.ok(/side-by-side/.test(section), 'Manual Verification must require side-by-side spec/result viewing');
 
     const withoutAttachments = generatePrompt('review', mkIssue('review'), ctxWithout).prompt;
     const idx2 = withoutAttachments.indexOf('### Manual Verification');
-    const section2 = withoutAttachments.slice(idx2, withoutAttachments.indexOf('### What CI Did Not Prove'));
+    const section2 = withoutAttachments.slice(idx2, withoutAttachments.indexOf('### Records for Close-Out'));
     assert.ok(!/side-by-side/.test(section2), 'side-by-side sentence must self-gate off when there are no attachments');
   });
 
@@ -4106,12 +4002,12 @@ describe('capability-gated CI/checks directive (LIN-1455)', () => {
 
   test('close-out still does not key on the review ledger heading (LIN-810 decoupling preserved)', () => {
     const { prompt } = generatePrompt('close-out', issue, context);
-    assert.ok(!prompt.includes('### What CI Did Not Prove'), 'close-out CI-gate block does not leak the ledger heading');
+    assert.ok(!prompt.includes('### Records for Close-Out'), 'close-out CI-gate block does not leak the ledger heading');
   });
 
   test('the substitute\'s own limits are folded into review\'s ledger residue, not treated as proof', () => {
     const { prompt } = generatePrompt('review', issue, context);
-    assert.ok(/its own limits belong here as ledger items too|its known limits belong here as ledger items too/.test(prompt),
+    assert.ok(/its known limits are findings too/.test(prompt),
       'review records the substitute\'s limits as ledger residue');
   });
 
@@ -4138,7 +4034,7 @@ describe('capability-gated CI/checks directive (LIN-1455)', () => {
     const closeout = COMPLETION_SIGNALS['close-out'];
     assert.ok(closeout.signals.some(s => /CI genuinely absent with the substitute re-run and recorded on it/.test(s)),
       'close-out signal names the no-CI substitute path');
-    assert.ok(closeout.signals.some(s => /green CI alone never discharges a ledger item/.test(s)),
+    assert.ok(closeout.signals.some(s => /green CI alone never settles a finding/.test(s)),
       'the never-discharges-a-ledger-item parenthetical is preserved verbatim');
   });
 
@@ -4298,7 +4194,7 @@ describe('the stage contract (LIN-3292)', () => {
     const formats = {
       plan: ['## Implementation Plan', 'plan-review due: yes'],
       'plan-review': ['### Plan Review Verdict'],
-      review: ['ledger empty', `## Review — ${issue.identifier}`],
+      review: ['CI covers the deliverable; nothing to record', `## Review — ${issue.identifier}`],
       'close-out': ['plan-review due:', `## Close-out — ${issue.identifier}`]
     };
     for (const [kind, needles] of Object.entries(formats)) {

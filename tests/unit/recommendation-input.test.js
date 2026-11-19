@@ -18,7 +18,7 @@ describe('prepareRecommendationInput (LIN-3469)', () => {
   test('forwards exactly the prompt-read fields plus the task\'s runs', async () => {
     const input = await prepareRecommendationInput(ctx, { dispatchQueueStore: store, urlKey: 'acme', identifier: 'LIN-1' });
     assert.deepEqual(Object.keys(input).sort(),
-      ['allRuns', 'attachments', 'children', 'comments', 'focusedChild', 'parent', 'project', 'runs', 'siblings']);
+      ['allRuns', 'attachments', 'children', 'comments', 'focusedChild', 'openFindings', 'parent', 'project', 'runs', 'siblings']);
     assert.equal(input.parent, ctx.parent);
     assert.equal(input.attachments, ctx.attachments);
     assert.deepEqual(input.runs, [{ stage: 'implementation', at: '2026-10-05T00:00:00.000Z', outcome: 'queued' }]);

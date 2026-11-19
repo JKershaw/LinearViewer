@@ -52,7 +52,7 @@ for (const p of PERIODICALS) {
       // and the closing comment names who finishes.
       assert.match(text, /Then hand off — do not stop silently, and do not merge or set Done yourself/);
       assert.match(text, /it neither merges nor moves the task to Done, and the task stays In Progress until close-out finishes/);
-      assert.match(text, /review approves, then close-out merges (?:that|any report) pull request, sets this task to Done and posts the final summary/);
+      assert.match(text, /review approves, then close-out merges (?:that|any report|that report) pull request, sets this task to Done and posts the final summary/);
       assert.match(text, /if the pull request cannot be made green, name the blocker in the closing comment/);
 
       // The second read (adversarialRead, all 16): comes before the hand-off, so close-out's Done is
@@ -70,11 +70,11 @@ for (const p of PERIODICALS) {
         assert.match(text, /hands its decision to the human through that summary/);
       } else {
         // areaNotes: the notes PR is handed off, never merged by the run.
-        assert.match(text, /one docs-only pull request off main, green under the notes guard and required checks, then hand it off/);
-        assert.match(text, /review approves it and close-out merges it, never this run/);
+        assert.match(text, /Record each finding for the project/);
+        assert.match(text, /`kind: finding` with `to: project`/);
         // conclude: the PR link comes first (the gate's evidence), then the closing comment.
-        assert.match(text, /As soon as the area-notes pull request is open, post its full URL as a comment on this task/);
-        assert.match(text, /The area-notes pull request carries the findings forward/);
+        assert.match(text, /As soon as the report pull request is open, post its full URL as a comment on this task/);
+        assert.match(text, /the findings it names are records in the project backlog/);
         // Findings stay in the notes and the closing comment; close-out is not handed them as tickets.
         assert.doesNotMatch(text, /close-out[^.]*(?:files?|mints?|turns?)[^.]*(?:findings|tickets)/i);
       }

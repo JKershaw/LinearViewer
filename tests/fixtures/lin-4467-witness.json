@@ -12,23 +12,23 @@
     },
     "bug:fresh": {
       "name": "bug",
-      "bytes": 6500,
-      "sha256": "6f2cc83cea095bc8bf992b7e1b3fba23b5bb47e4c504fd96d6ebf1352804a044"
+      "bytes": 6413,
+      "sha256": "d4d8ab440cd7114db5b999603d015f2166a9ee429d503866f6c32bc7e6302135"
     },
     "bug:fix": {
       "name": "bug",
-      "bytes": 6500,
-      "sha256": "6f2cc83cea095bc8bf992b7e1b3fba23b5bb47e4c504fd96d6ebf1352804a044"
+      "bytes": 6413,
+      "sha256": "d4d8ab440cd7114db5b999603d015f2166a9ee429d503866f6c32bc7e6302135"
     },
     "plan:fresh": {
       "name": "plan",
-      "bytes": 12229,
-      "sha256": "7d5c1e13193587873b65e0a4dd489f3eee3c29a6998d2f1896b4c82ce616babe"
+      "bytes": 12286,
+      "sha256": "7316f2deace90c1ca2a0dbc5769d074190777a422e54da0ad788cc346fb3010c"
     },
     "plan:fix": {
       "name": "plan",
-      "bytes": 12229,
-      "sha256": "7d5c1e13193587873b65e0a4dd489f3eee3c29a6998d2f1896b4c82ce616babe"
+      "bytes": 12286,
+      "sha256": "7316f2deace90c1ca2a0dbc5769d074190777a422e54da0ad788cc346fb3010c"
     },
     "look-into:fresh": {
       "name": "look into",
@@ -52,53 +52,53 @@
     },
     "breakdown:fresh": {
       "name": "breakdown",
-      "bytes": 6680,
-      "sha256": "cbe8d8248a56bf68031a8b894fdd48f7e2f266bd4ea9e83b326f9882fc079a42"
+      "bytes": 6693,
+      "sha256": "6a6f65584ea6b66761420bcfe74180177bc7bb2a8a3056e65cbd7977ed322c09"
     },
     "breakdown:fix": {
       "name": "breakdown",
-      "bytes": 6680,
-      "sha256": "cbe8d8248a56bf68031a8b894fdd48f7e2f266bd4ea9e83b326f9882fc079a42"
+      "bytes": 6693,
+      "sha256": "6a6f65584ea6b66761420bcfe74180177bc7bb2a8a3056e65cbd7977ed322c09"
     },
     "research:fresh": {
       "name": "research",
-      "bytes": 13968,
-      "sha256": "25c3096de7ea75e40947214601a069390916a17eb5ee4cae8b5689be656a9161"
+      "bytes": 13881,
+      "sha256": "d63591a49bc7a3e27d79865c6f68a0e02482edd6bb6d80fb4aa8efd6236cfb54"
     },
     "research:fix": {
       "name": "research",
-      "bytes": 13968,
-      "sha256": "25c3096de7ea75e40947214601a069390916a17eb5ee4cae8b5689be656a9161"
+      "bytes": 13881,
+      "sha256": "d63591a49bc7a3e27d79865c6f68a0e02482edd6bb6d80fb4aa8efd6236cfb54"
     },
     "scoping:fresh": {
       "name": "scoping",
-      "bytes": 6003,
-      "sha256": "32461bb41838f20d03714bf0f045719e245435eb083ab9199931ba616b7e5ea6"
+      "bytes": 5969,
+      "sha256": "3e0c724c10226c88b53ccf8abdfa06d98b28974d3fe9494d3f1856f5b9e0fa50"
     },
     "scoping:fix": {
       "name": "scoping",
-      "bytes": 6003,
-      "sha256": "32461bb41838f20d03714bf0f045719e245435eb083ab9199931ba616b7e5ea6"
+      "bytes": 5969,
+      "sha256": "3e0c724c10226c88b53ccf8abdfa06d98b28974d3fe9494d3f1856f5b9e0fa50"
     },
     "design:fresh": {
       "name": "design",
-      "bytes": 4603,
-      "sha256": "de602de812ebef68e21ece6d28bcf1006365d3e46f42770b8f170a8c9252949c"
+      "bytes": 4516,
+      "sha256": "3f0802a02d4084b5a8930baf48d453e48e6f231f9bf3436a0cdd4660104ef326"
     },
     "design:fix": {
       "name": "design",
-      "bytes": 4603,
-      "sha256": "de602de812ebef68e21ece6d28bcf1006365d3e46f42770b8f170a8c9252949c"
+      "bytes": 4516,
+      "sha256": "3f0802a02d4084b5a8930baf48d453e48e6f231f9bf3436a0cdd4660104ef326"
     },
     "spike:fresh": {
       "name": "spike",
-      "bytes": 4509,
-      "sha256": "9b1fddaa0a93c2ddd85204781a3d8081fa4c60101d8f63fa193ac8221ab02144"
+      "bytes": 4422,
+      "sha256": "83253ce0000495f10ec1715975917e9282f9141f704572d37c473d76ae670166"
     },
     "spike:fix": {
       "name": "spike",
-      "bytes": 4509,
-      "sha256": "9b1fddaa0a93c2ddd85204781a3d8081fa4c60101d8f63fa193ac8221ab02144"
+      "bytes": 4422,
+      "sha256": "83253ce0000495f10ec1715975917e9282f9141f704572d37c473d76ae670166"
     },
     "context:fresh": {
       "name": "context",
@@ -122,43 +122,43 @@
     },
     "implementation:fresh": {
       "name": "implement",
-      "bytes": 11042,
-      "sha256": "8fab8069b4f4a67418347d014dd94c637cea57542bd032a68a98c8b4bd89b5ee"
+      "bytes": 11099,
+      "sha256": "a96d43cb1ad4e65736a6372c4e69e1ff56329b771daa3f844eaa27a53773a013"
     },
     "implementation:fix": {
       "name": "implement",
-      "bytes": 11676,
-      "sha256": "c023942f9c7cca857510567e9d185387f90e6cde1f1bd6c212d7ad239c8e5c62"
+      "bytes": 11733,
+      "sha256": "87e6c5ec6da81cc157f7426e8b0a0081165f3acab4ebaa6dade1076cc61e33a9"
     },
     "review:fresh": {
       "name": "review",
-      "bytes": 18335,
-      "sha256": "4ee87323a5c927508a104d0ec46f87a5ab13b11f35f2bc892e16299765100278"
+      "bytes": 17845,
+      "sha256": "0e4de1ca3f8fab559219078ab7f381e30d0e7fbc3fd77e2800909f3a21088146"
     },
     "review:fix": {
       "name": "review",
-      "bytes": 18335,
-      "sha256": "4ee87323a5c927508a104d0ec46f87a5ab13b11f35f2bc892e16299765100278"
+      "bytes": 17845,
+      "sha256": "0e4de1ca3f8fab559219078ab7f381e30d0e7fbc3fd77e2800909f3a21088146"
     },
     "close-out:fresh": {
       "name": "close-out",
-      "bytes": 15275,
-      "sha256": "3c2183187847cb8457fd849d6d8378d93cb7228e1eb87d98588268b9eb843191"
+      "bytes": 13634,
+      "sha256": "7b6ef8198318551a4835bf9514241ec4faef20f1e73005ef70fa46bdcdf05586"
     },
     "close-out:fix": {
       "name": "close-out",
-      "bytes": 15275,
-      "sha256": "3c2183187847cb8457fd849d6d8378d93cb7228e1eb87d98588268b9eb843191"
+      "bytes": 13634,
+      "sha256": "7b6ef8198318551a4835bf9514241ec4faef20f1e73005ef70fa46bdcdf05586"
     },
     "retrospective-audit:fresh": {
       "name": "retrospective-audit",
-      "bytes": 6976,
-      "sha256": "2480f78daca3c36487f87e4a6d85ddd8261992968c0d60a2c6dab9b09a02a68a"
+      "bytes": 6361,
+      "sha256": "6d7dc8a241428fff6929ba6525f36bc312281335e5ba2680a32d45ce1cd6cae5"
     },
     "retrospective-audit:fix": {
       "name": "retrospective-audit",
-      "bytes": 6976,
-      "sha256": "2480f78daca3c36487f87e4a6d85ddd8261992968c0d60a2c6dab9b09a02a68a"
+      "bytes": 6361,
+      "sha256": "6d7dc8a241428fff6929ba6525f36bc312281335e5ba2680a32d45ce1cd6cae5"
     },
     "retro:fresh": {
       "name": "retro",
@@ -192,13 +192,13 @@
     },
     "blind-read:fresh": {
       "name": "blind-read",
-      "bytes": 4952,
-      "sha256": "0e2fccabe4b1266d7df14288c16dbb0a1844257527bc7460fefeb081d6cab9a4"
+      "bytes": 4513,
+      "sha256": "4204194a77aa79ab16326ef444a89628046cb95a02c435aff2ed54f0f8ddfd4b"
     },
     "blind-read:fix": {
       "name": "blind-read",
-      "bytes": 4952,
-      "sha256": "0e2fccabe4b1266d7df14288c16dbb0a1844257527bc7460fefeb081d6cab9a4"
+      "bytes": 4513,
+      "sha256": "4204194a77aa79ab16326ef444a89628046cb95a02c435aff2ed54f0f8ddfd4b"
     }
   },
   "tables": {
@@ -246,13 +246,13 @@
       "    ]",
       "  },",
       "  \"close-out\": {",
-      "    \"coreOutcome\": \"Approved work finished: the fixes review asked for made, the ledger settled, the PR merged, the post-deploy steps done once the deploy landed, the task Done, the summary posted, the description archived and pruned of superseded stage artifacts (or the skipped prune recorded), and related tickets tidied and each outside find written to its home\",",
-      "    \"readinessCheck\": \"Did the review record an Approve, and is the work then finished: the fixes review asked for made, every ledger item settled (an explicitly empty ledger under an Approve is a cheap no-op; a missing one goes back to review), merged, the post-deploy steps done once the deploy landed, set Done, summarized (with how the work meets what was asked), archived-and-pruned (or the skip recorded) below the `## As asked` block only, and each outside find written to its home?\",",
+      "    \"coreOutcome\": \"Approved work finished: the fixes review asked for made, the findings to close-out settled, the PR merged, the post-deploy steps done once the deploy landed, the task Done, the summary posted, the description archived and pruned of superseded stage artifacts (or the skipped prune recorded), and related tickets tidied and each outside find recorded to the project backlog\",",
+      "    \"readinessCheck\": \"Did the review record an Approve, and is the work then finished: the fixes review asked for made, every finding to close-out settled (with none recorded under an Approve, nothing waits; a missing verdict goes back to review), merged, the post-deploy steps done once the deploy landed, set Done, summarized (with how the work meets what was asked), archived-and-pruned (or the skip recorded) below the `## As asked` block only, and each outside find recorded to project?\",",
       "    \"signals\": [",
-      "      \"Review verdict read from the latest summary comment; any gaps it flagged as unproven by CI settled, an explicitly empty ledger passing through, and a missing one sent back to review to confirm\",",
+      "      \"Review verdict read from the latest summary comment; any finding to close-out settled, none recorded passing through, and a missing verdict sent back to review to confirm\",",
       "      \"The fixes review asked for made by close-out itself, each the size of a fix (new design or new behaviour handed back to review), listed in the summary with its commit, and CI green on the new head\",",
-      "      \"Every ledger item settled: inside work done with cited evidence, an outside item written to its home (a note commit, or a gate ticket filed on its own terms), a monitor or rollback review named cited by that name (an unnamed one settles nothing), or an item accepted by a human naming the exact precondition exercised; once the deploy landed, a post-deploy check close-out cannot run is recorded as not run (what, why, follow-up) and does not hold the close\",",
-      "      \"Green CI confirmed on the exact merged commit, or CI genuinely absent with the substitute re-run and recorded on it (green CI alone never discharges a ledger item)\",",
+      "      \"Every finding to close-out settled: inside work done with cited evidence, a monitor or rollback named by the name review wrote (an unnamed one settles nothing), or a finding accepted by a human naming the exact precondition exercised; an outside find recorded to project; once the deploy landed, a post-deploy check close-out cannot run is recorded as not run (what, why, follow-up) and does not hold the close\",",
+      "      \"Green CI confirmed on the exact merged commit, or CI genuinely absent with the substitute re-run and recorded on it (green CI alone never settles a finding)\",",
       "      \"PR merged; once the deploy landed, the post-deploy steps done and the change verified on what landed in the same session, then the task set to Done — not held open for a separate verification pass\",",
       "      \"Summary comment posted, saying how the merged work meets what was asked, related tickets this work settles closed or cancelled, outside finds written to their home, any gate ticket linked\",",
       "      \"A pre-prune snapshot archived and its capture verified before the description was rewritten; below the `## As asked` block, through `description/below`, superseded stage-artifact sections (plan(s), plan revisions, research findings, discharged scoping/design) replaced with a short stub, keeping any section a follow-up references and the session-fit phrase / `Implementation Plan` heading verbatim; with no block, no prune — or, where the archive could not be verified, the prune skipped and that recorded in the summary\"",
@@ -353,12 +353,12 @@
       "      \"Claims (in-code comments, PR/task description, summary comment) checked directly against the code at HEAD, not against the author's account of them\",",
       "      \"Tests checked for integrity, not just presence — a test passing for a reason unrelated to the behavior it names, a vacuous assertion, or a negative/spy test that never asserts is surfaced\",",
       "      \"Ownership orphans checked — a hazard deferred between this ticket and a sibling it references, unowned by either at HEAD\",",
-      "      \"Findings reported as a comment: each one the consequence test sends to a ticket filed as one, the rest as Waiting entries in one docs-only notes pull request linked from the comment (none when no finding is note-bound); no status/label/Done change, no merge\"",
+      "      \"Findings reported as a comment, and each one recorded as a finding to project (`to: project`), none written into a note; no status/label/Done change, no merge\"",
       "    ]",
       "  },",
       "  \"review\": {",
       "    \"coreOutcome\": \"Implementation verified and an explicit verdict (Approve / Request Changes / Needs Discussion) issued that authorizes the merge — or Request Changes naming the stage that fixes it\",",
-      "    \"readinessCheck\": \"Review does not merge or mark Done (close-out does that) — is an explicit verdict issued with CI green on the PR, or, when CI is genuinely absent, with the two-branch substitute independently re-run and recorded (either discharges this precondition and authorizes Approve, conditional when the ledger is non-empty — CI absence is not itself a closure-blocker route), and is the `### What CI Did Not Prove` ledger written into the summary comment — or, if not, is Request Changes issued, naming the fixing stage?\",",
+      "    \"readinessCheck\": \"Review does not merge or mark Done (close-out does that) — is an explicit verdict issued with CI green on the PR, or, when CI is genuinely absent, with the two-branch substitute independently re-run and recorded (either discharges this precondition and authorizes Approve, conditional when findings to close-out are recorded — CI absence is not itself a closure-blocker route), and are the findings to close-out recorded, with the verdict in the summary comment — or, if not, is Request Changes issued, naming the fixing stage?\",",
       "    \"signals\": [",
       "      \"Requirements matched\",",
       "      \"Tests pass\",",
@@ -477,7 +477,7 @@
       "  ],",
       "  \"review\": [",
       "    \"When this task fixes something, its cause is part of the work, wherever it lives. Judge the work, or propose the fix, against that cause rather than the ticket's wording. Only a change the team would need to hear about before it happens goes to the human, as one clear question with your recommendation.\",",
-      "    \"Green CI never settles a ledger item: CI is why it is on the list.\"",
+      "    \"Green CI never settles a finding: CI is why it was recorded.\"",
       "  ],",
       "  \"scoping\": [",
       "    \"When this task fixes something, its cause is part of the work, wherever it lives. Engineering choices, fixing at the cause and refactoring included, are yours; state each with its reason. Cutting the `## As asked` block is not yours: any sentence or clause not delivered in full, by scope, assumption, design, size limit or another ticket, is a cut. Quote each where you write and raise them as one ruling, a `DECISION:` before `BLOCKED:`; unanswered, a cut is not agreed. Only a change the team would need to hear about before it happens goes to the human, as one clear question with your recommendation.\"",
@@ -863,7 +863,7 @@
     ]
   },
   "stageLabels": "71b1066de2fe5206ed5acf5f18d47b5a62543f8c22697e24a7e982a3264e192a",
-  "contracts": "bb721a7fa72a8577c244ae2e81c12204abd06823ca7ad7913bf9b7caa41f40ec",
+  "contracts": "7f2d1b61cf5de5e4a17753729b181e3d6a70813c662d5a5734d984fd7237bc3d",
   "stepWords": "0a06759d642d8c2268893789c6c196461af7b338e3b58dccf0ce7ab5353cbec5",
   "overrideLine": "e8cd49b7b5b35ecfe83ae820694879f466b3017d1dad0ef0655dbe15944aefb9"
 }

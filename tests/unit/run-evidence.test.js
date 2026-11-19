@@ -184,7 +184,8 @@ describe('run-evidence: evidence rows and close-out', () => {
       prStatus: null,
     });
     assert.equal(m.ledger.verdict, 'approve-conditional');
-    assert.equal(m.ledger.ledger.items.length, 1);
+    assert.equal(m.ledger.ledger.items, undefined, 'the items are records now (LIN-4495)');
+    assert.equal(m.closeOut.openFindings.state, 'read', 'the reading rides the close-out model');
   });
 
   // LIN-3497: a review is on record only when a review comment exists.

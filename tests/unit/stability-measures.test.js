@@ -25,7 +25,7 @@ import { ROOT } from './helpers/area-registry.js';
 import { analyse } from '../../scripts/code-shape/shape-core.mjs';
 import { measureShape } from '../../scripts/code-shape/shape-report.mjs';
 import { compileScope } from '../../scripts/code-shape/code-shape-lib.mjs';
-import { NOT_NOTES, countWaiting, parseNote } from '../../lib/prompts/area-note-format.js';
+import { NOT_NOTES, parseNote } from '../../lib/prompts/area-note-format.js';
 import {
   MEASURES, MINTED_NOT_SUPPLIED, NOT_BUILT, NO_REFERENCE_KEYS, NO_REFERENCE_ROWS, SCOPE_INCLUDE, STATUS, buildReading, churnRow, ciRow, costRow, firstDispatchOf, formatTable,
   idSpanSearch, landingOwners, landingPr, linesRow, mintedRow, noReferenceReading, notMeasured, ownTicket, parseLandingLog, parseNumstat,
@@ -170,47 +170,13 @@ describe('CI: successful runs whose head sha is a landing', () => {
   });
 });
 
-describe('Waiting: one definition, zero versus unreadable', () => {
-  test('the stability count and the area notes guard share one definition of a waiting entry', () => {
-    const guard = readFileSync(join(ROOT, 'tests/unit/area-notes.test.js'), 'utf8');
-    assert.match(guard, /import \{[^}]*\bparseNote\b[^}]*\} from '\.\.\/\.\.\/lib\/prompts\/area-note-format\.js';/);
-    assert.doesNotMatch(guard, /function parseNote\b/, 'the guard keeps no copy of its own');
-    assert.doesNotMatch(guard, /new Set\(\['README\.md', 'areas\.json'\]\)/, 'nor of the files that are not notes');
-  });
-
-  test('`- ` bullets under ## Waiting in notes only; the README and the registry are not notes', () => {
-    const note = '# A\n\n## Lessons\n\n- not waiting\n\n## Waiting\n\n- `lib/a.js`: one\n  continued\n- `lib/b.js`: two\n  - nested, not an entry\n';
-    assert.strictEqual(parseNote(note).waiting.length, 2);
-    assert.ok(NOT_NOTES.has('README.md') && NOT_NOTES.has('areas.json'));
-    assert.strictEqual(countWaiting({ 'a.md': note, 'README.md': note, 'areas.json': note, 'b.md': note }), 4);
-  });
-
-  test('a readable commit with no notes directory reads 0, a measured zero', () => {
-    assert.strictEqual(countWaiting({}), 0);
-    const r = waitingRow('waiting.harbour', { base: { count: countWaiting({}) }, head: { count: 56 }, landings: 114 });
-    assert.deepStrictEqual([r.status, r.value.base, r.value.head, r.value.change, r.value.perLanding], [STATUS.MEASURED, 0, 56, 56, 0.49]);
-  });
-
-  test('a missing runner is not measured, and so is the sum; neither is 0', () => {
-    const [h, rn, total] = waitingRows({ harbour: { base: { count: 0 }, head: { count: 56 } }, runner: { reason: 'runner checkout not found at /x' }, landings: 114 });
-    assert.strictEqual(h.status, STATUS.MEASURED);
-    assert.deepStrictEqual([rn.status, rn.value, rn.reason], [STATUS.NOT_MEASURED, null, 'runner checkout not found at /x']);
-    assert.deepStrictEqual([total.status, total.value], [STATUS.NOT_MEASURED, null]);
-  });
-
-  test('an endpoint that failed to read is not measured with the endpoint named', () => {
-    const r = waitingRow('waiting.runner', { base: { count: 0 }, head: { reason: 'git cat-file failed' }, landings: 3 });
-    assert.deepStrictEqual([r.status, r.reason], [STATUS.NOT_MEASURED, 'head: git cat-file failed']);
-  });
-
-  test('both read: the sum, with the runner branch and endpoints carried', () => {
-    const rows = waitingRows({
-      harbour: { base: { count: 0 }, head: { count: 56 } },
-      runner: { base: { count: 0 }, head: { count: 10 }, detail: { branch: 'main', baseSha: '9478e1c53', headSha: '5d8489e7f' } },
-      landings: 114,
-    });
-    assert.deepStrictEqual(rows.map((r) => [r.key, r.value.head]), [['waiting.harbour', 56], ['waiting.runner', 10], ['waiting.total', 66]]);
-    assert.strictEqual(rows[1].value.headSha, '5d8489e7f');
+describe('Waiting: retired in LIN-4495, so the notes source is not measured, never zero', () => {
+  test('a notes source has no Waiting count: the reader keeps no Waiting section, and the row reads as not measured', () => {
+    const note = '# A\n\n## Lessons\n\n- a lesson\n';
+    assert.deepStrictEqual(parseNote(note).headings, ['Lessons']);
+    const r = waitingRow('waiting.harbour', { base: { reason: 'the area notes\' Waiting lists were retired in LIN-4495' }, head: { reason: 'the area notes\' Waiting lists were retired in LIN-4495' }, landings: 114 });
+    assert.equal(r.value, null, 'a retired source has no value, never a zero');
+    assert.match(JSON.stringify(r), /LIN-4495/, 'the row says why');
   });
 });
 
@@ -1098,8 +1064,9 @@ describe('the CLI\'s reads, end to end on fixture repositories', () => {
       // Without --diff-merges=first-parent the merge landing has no numstat and churn reads 2 added, 0 deleted.
       assert.deepStrictEqual([rows.churn.value.landings, rows.churn.value.added, rows.churn.value.deleted], [2, 5, 1]);
       assert.deepStrictEqual(rows.lines.value.net, { total: 4, code: 2, comment: 1, blank: 1 });
-      assert.deepStrictEqual([rows['waiting.harbour'].value.base, rows['waiting.harbour'].value.head], [1, 3]);
-      assert.deepStrictEqual([rows['waiting.runner'].value.base, rows['waiting.runner'].value.head, rows['waiting.runner'].value.headSha], [1, 2, runnerHead]);
+      // LIN-4495: the Waiting lists are retired, so the notes sources are not measured (with their reason), never counted.
+      assert.strictEqual(rows['waiting.harbour'].value, null, 'harbour: not measured, retired with the Waiting lists');
+      assert.strictEqual(rows['waiting.runner'].value, null, 'runner: not measured, retired with the Waiting lists');
       assert.deepStrictEqual([rows.ci.value.runs, rows.ci.value.medianMinutes], [2, 6], 'the base\'s run is not a landing\'s');
       const ghArgs = readFileSync(join(fake, 'args'), 'utf8').split('\n');
       for (const [flag, value] of [['--workflow', 'test.yml'], ['--branch', 'main'], ['--status', 'success'], ['--created', '2026-01-01..2026-01-05']]) {

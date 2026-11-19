@@ -380,22 +380,19 @@ describe('not finished stays on today\'s banner', () => {
     const html = renderTaskPullRequest(model, '', NOW);
     assert.doesNotMatch(html, /\d+ of \d+ checked/);
     assert.doesNotMatch(html, /open at merge/);
-    assert.match(html, /Review ledger — as the review wrote it/);
-    assert.match(html, /The pull request is merged and the close-out is still finishing; it settles these items\./);
     assert.doesNotMatch(html, /Close-out summary|as reported in the close-out/);
   });
 
   test('renderEvidence without opts is unchanged: counts and stamps stay', () => {
     const evidenceModel = {
       evidence: { asked: 'a', done: 'd', checked: { review: null, now: { state: 'unknown' } } },
-      ledger: { ledger: { present: true, items: [{ id: 'F1', claim: 'c', scope: 'inside', discharged: false }] } },
-      closeOut: { status: 'merged' },
+      ledger: { ledger: { present: false, empty: false, raw: null } },
+      closeOut: { status: 'merged', openFindings: { state: 'read', count: 1, ids: ['finding-aaaaaaaa'] } },
     };
     const html = renderEvidence(evidenceModel);
-    assert.match(html, /Review ledger — 1 item/);
-    assert.match(html, /open at merge/);
+    assert.match(html, /Review ledger — 1 open to close-out/);
     const fin = renderEvidence(evidenceModel, { finished: true });
-    assert.doesNotMatch(fin, /open at merge|1 item/);
+    assert.doesNotMatch(fin, /1 open to close-out/);
   });
 });
 

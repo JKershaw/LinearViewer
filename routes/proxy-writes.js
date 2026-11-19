@@ -13,10 +13,7 @@
  * the size record guard (LIN-4368, `refusedBySizeRecord`): a `## Size of the move` section
  * says what and why, never how, a policy never decides "wrong work", and a write may not drop
  * the section (lib/size-of-move.js checkSizeRecord). Every write that creates or edits a comment
- * body (create, edit, and the comment-target attachment caption) carries the leftover answer
- * guard (LIN-4414, `refusedByLeftoverAnswer`): a comment opening with the leftover heading names
- * the waiting entry the build settled (lib/dispatch-leftover-answer.js checkLeftoverAnswer).
- * The same writes carry the blind-read guard (LIN-4437, `refusedByBlindRead`): a comment opening
+ * body (create, edit, and the comment-target attachment caption) carries the blind-read guard (LIN-4437, `refusedByBlindRead`): a comment opening
  * with `## Blind read` has one verdict line and names exactly the landing's PRs
  * (lib/run-trail.js checkBlindRead); it is the one comment guard that reads the trail first.
  *
@@ -65,7 +62,6 @@ import { appendBlock, replace as replaceInDescription, DescriptionEditError } fr
 import { checkAsAsked, splitAsAsked, hasMarkerLine, askedText, AS_ASKED_HEADING } from '../lib/as-asked.js';
 import { sealForFiling } from '../lib/as-asked-seal.js';
 import { checkSizeRecord, recordShape, SIZE_OF_MOVE_HEADING, SIZE_RECORD_CODES, DECIDED_BY, WRONG_WORK } from '../lib/size-of-move.js';
-import { checkLeftoverAnswer, leftoverAnswerRefusal } from '../lib/dispatch-leftover-answer.js';
 import { blindReadRefusal } from '../lib/run-ledger.js';
 import { checkBlindRead, landingPrUrls } from '../lib/run-trail.js';
 import { isRestrictedStamp, sameTicketKey, ISSUE_PATCH_FIELDS } from '../lib/stage-writes.js';
@@ -409,22 +405,6 @@ export function createProxyWriteRoutes({
     return refuse(ctx, 422, message, { code: check.code, ...(check.kind ? { kind: check.kind } : {}), ...(check.line ? { line: check.line } : {}) });
   }
 
-  /**
-   * The leftover answer guard (LIN-4414), at every write that creates or edits a comment body:
-   * lib/dispatch-leftover-answer.js checkLeftoverAnswer acts only on a comment whose first
-   * non-blank line is the leftover heading (the builder's answer), so a review verdict with that
-   * heading further down, and every other comment, passes untouched. Answers 422 with the code
-   * (and the line for a shape refusal) before any provider call or dedupe lookup, posts nothing,
-   * and returns true once it has refused. Like the description guards, only this proxy lane is
-   * checked: an answer posted another way, and the copy in the builder's terminal message, are
-   * not (docs/architecture/dispatch-and-proxy.md); review reads the comment.
-   */
-  function refusedByLeftoverAnswer(ctx, body) {
-    const check = checkLeftoverAnswer(body);
-    if (check.ok) return false;
-    return refuse(ctx, 422, leftoverAnswerRefusal(check), { code: check.code, ...(check.kind ? { kind: check.kind } : {}), ...(check.line ? { line: check.line } : {}) });
-  }
-
   // ---------------------------------------------------------------------------
   // Issues
   // ---------------------------------------------------------------------------
@@ -760,7 +740,7 @@ export function createProxyWriteRoutes({
   // Comments
   /**
    * The blind-read guard (LIN-4437), at every write that creates or edits a comment body, after the
-   * leftover guard. It acts only on a comment whose first non-blank line is the `## Blind read`
+   * guard. It acts only on a comment whose first non-blank line is the `## Blind read`
    * heading (exactly, or with a `:` tail), so a review verdict that mentions the heading further down,
    * and a `## Blind read pilot` tally, pass untouched. The body's shape (one verdict line, one of the
    * three words, a reason, at least one full PR URL) is checked first and needs no read. The PR set
@@ -807,8 +787,6 @@ export function createProxyWriteRoutes({
     // cosmetic exception for a doubly-invalid body, which reports the
     // dangerous-chars message instead of the length one.
     if (refuseBadCommentBody(ctx, body)) return;
-    // LIN-4414: before the dedupe lookup, so a body refused once can never pass on a cache hit.
-    if (refusedByLeftoverAnswer(ctx, body)) return;
     // LIN-4468: the stage-target check comes before the blind read, which reads the target's comment trail
     // and can answer with its landing PRs: a stage outside its ticket is refused before any answer about it.
     if (!await guardTarget(ctx, 'issueWriteGuard', { onNull: 'proceed' })) return;
@@ -861,7 +839,6 @@ export function createProxyWriteRoutes({
     if (refuseBadUuid(ctx, commentId, 'comment')) return;
     const { body } = req.body;
     if (refuseBadCommentBody(ctx, body)) return;
-    if (refusedByLeftoverAnswer(ctx, body)) return;
     if (await refusedByBlindRead(ctx, body)) return;
     const updated = normalizeWritePayload(await provider.updateComment(token, commentId, body), 'comment');
     if (writeRejected(req, res, endpoint, updated, 'Comment was not updated')) return;
@@ -901,8 +878,6 @@ export function createProxyWriteRoutes({
     // type-check then dangerous-chars, comes before the length/budget math.
     const bodyValidation = validateCommentBody(body, { required: false });
     if (!bodyValidation.valid) return refuse(ctx, 400, bodyValidation.error);
-    // LIN-4414: a comment-target caption becomes the comment's opening text, so it is checked as one.
-    if (!toDescription && body && refusedByLeftoverAnswer(ctx, body)) return;
     if (!toDescription && body && await refusedByBlindRead(ctx, body)) return;
 
     if (!image) return refuse(ctx, 400, 'image is required');
