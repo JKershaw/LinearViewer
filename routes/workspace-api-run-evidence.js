@@ -12,7 +12,7 @@ import { json } from 'express';
 import { badRequest, jsonError, unauthorized } from '../lib/errors.js';
 import { readRunEvidence } from '../lib/run-evidence.js';
 import { CLOSE_OUT_ACTOR } from '../lib/run-closeout-state.js';
-import { recordMergedPrs } from '../lib/close-out-merges.js';
+import { recordMergedPrs, openFindingsStamp } from '../lib/close-out-merges.js';
 import { readCloseOutChain, closeOutNotReady, closeOutNotReadyRefusal } from '../lib/close-out-readiness.js';
 import { readOpenFindings, legacyLedgerOf } from '../lib/close-out-findings.js';
 import { readTrail } from '../lib/run-trail.js';
@@ -352,13 +352,9 @@ export function registerRunEvidenceRoutes(router, { workspaceFromUrl, dispatchQu
         const row = await Promise.resolve(dispatchQueueStore.getItemStatus(urlKey, dispatchId)).catch(() => null);
         if (row?.issueIdentifier === req.params.issueIdentifier) source = row.issueSource ?? null;
       }
-      const notReady = await closeOutNotReady({ workspace: req.workspace, issueIdentifier: req.params.issueIdentifier, source, store: dispatchQueueStore, seam: closeOut || {}, installationTokenFor, recordsStore });
-      if (notReady) {
-        const refusal = closeOutNotReadyRefusal(notReady);
-        return jsonError(res, 409, refusal.error, refusal.extra);
-      }
-      // LIN-4495: the open findings to close-out as read at the press (one comment read; the admitted press
-      // holds no open finding unless the PR had already merged, which the stamp records as it stood).
+      // LIN-4495: the open findings to close-out are read ONCE, here, and the guard is handed that reading; the
+      // event stamp below is built from the same one. Open findings never refuse the press (close-out is the stage
+      // that ends them): the stamp records them as they stood.
       let openPressFindings = closeOut?.openFindings || null;
       if (!openPressFindings) {
         const { provider: pressProvider, callScope: pressCallScope } = (closeOut?.resolveProvider || resolveIssueBinding)(req.workspace, source);
@@ -367,7 +363,11 @@ export function registerRunEvidenceRoutes(router, { workspaceFromUrl, dispatchQu
           store: recordsStore, urlKey, ticket: req.params.issueIdentifier, legacyLedger: legacyLedgerOf(readTrail(pressComments).review),
         });
       }
-      const openPressCount = openPressFindings.count ?? 0;
+      const notReady = await closeOutNotReady({ workspace: req.workspace, issueIdentifier: req.params.issueIdentifier, source, store: dispatchQueueStore, seam: closeOut || {}, installationTokenFor, recordsStore, openFindings: openPressFindings });
+      if (notReady) {
+        const refusal = closeOutNotReadyRefusal(notReady);
+        return jsonError(res, 409, refusal.error, refusal.extra);
+      }
       const event = closeOutEventsStore && await closeOutEventsStore.record({
         accountId: req.session.accountId,
         urlKey,
@@ -378,9 +378,9 @@ export function registerRunEvidenceRoutes(router, { workspaceFromUrl, dispatchQu
         prUrl,
         headSha: headSha ?? null,
         merged: false,
-        // LIN-4495: the press stamps the open findings as read at the press, never zeros: the reading is taken here.
-        openItems: { inside: 0, outside: 0, unknown: openPressCount, total: openPressCount },
-        openFindings: openPressFindings,
+        // LIN-4495: the press stamps the open findings as read at the press, never zeros: the same stamp the merge
+        // recorder writes (lib/close-out-merges.js), built from the one reading taken above.
+        ...openFindingsStamp(openPressFindings),
       });
       if (!event) return badRequest.json(res, 'Invalid close-out press');
       return res.status(201).json({

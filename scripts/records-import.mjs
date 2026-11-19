@@ -24,7 +24,6 @@ import { RecordsStore, RECORDS_COLLECTION, REFS_COLLECTION, QUERY_LOG_COLLECTION
 import { ensureIndexes } from '../lib/db-indexes.js';
 import { planImport } from '../lib/records/waiting-import.js';
 import { citedPaths } from '../lib/prompts/area-note-format.js';
-import { parseWaitingSection } from '../lib/records/waiting-import.js';
 import { applyWrites, waitingItems, applyManifest } from '../lib/records/import-apply.js';
 import { createRecordWrites } from '../lib/records/writes.js';
 import { isTerminalState } from '../lib/providers/state-map.js';
@@ -81,7 +80,7 @@ async function main() {
     return;
   }
   const notes = ref ? notesFromRef(ref) : notesFromDir(resolve(dir));
-  const plan = planImport(notes, { ref: ref ?? resolve(dir), parseNote: parseWaitingSection, citedPaths });
+  const plan = planImport(notes, { ref: ref ?? resolve(dir), citedPaths });
 
   const backend = process.env.MONGODB_URI ? 'mongodb' : 'mangodb';
   const dbClient = backend === 'mongodb' ? new MongoClient(process.env.MONGODB_URI) : new MangoClient(process.env.HARBOUR_DATA_DIR || './data');

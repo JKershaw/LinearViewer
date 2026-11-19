@@ -6,7 +6,7 @@
  *
  * It is a word census over the text under CENSUS_ROOTS (code, the live docs, the fixtures and the public pages), with
  * these deliberate exclusions, each by path and each with its reason in EXCLUDED_PREFIXES, and not by a blanket word:
- *   - lib/runner-kit/ is the runner's own kit (its local ledger is the runner's, not this one);
+ *   - lib/runner-kit/runner.mjs is the runner's own kit (its local ledger is the runner's, not this one);
  *   - docs/papers/, docs/plans/ and docs/reviews/ are dated records of the method as it was: they quote the retired
  *     words as history, and rewriting them would falsify the record;
  *   - tests/fixtures/records-import/ is the frozen import baseline at bf2d1575f: the pre-cutover notes the one-off
@@ -56,7 +56,7 @@ const TEXT_EXT = /\.(m?js|cjs|md|txt|json|html|css|ya?ml)$/;
  * Short on purpose: a new entry needs a reason here.
  */
 export const EXCLUDED_PREFIXES = Object.freeze({
-  'lib/runner-kit/': 'the runner\'s own kit: its local ledger is the runner\'s, not this one',
+  'lib/runner-kit/runner.mjs': 'the runner\'s own kit: its local ledger is the runner\'s, not this one',
   'docs/papers/': 'research papers: dated records of the method as it was, quoting the retired words as history',
   'docs/plans/': 'plans and designs of record: the LIN-4491 design quotes the retired words it retires',
   'docs/reviews/': 'dated review records, including the stability readings from before the cutover',
@@ -173,7 +173,7 @@ describe('LIN-4495 retirement census: the cutover left no retired word in the co
     assert.deepStrictEqual(findRetired({ 'lib/waiting-section.js': "// Waiting on you\nconst label = 'Waiting on you';\n// a run waiting on a live run\n" }), []);
   });
 
-  test('the runner kit is out of the census by directory (its own local ledger)', () => {
+  test('runner.mjs of the runner kit is out of the census by file (its own local ledger)', () => {
     assert.deepStrictEqual(findRetired({ 'lib/runner-kit/runner.mjs': 'const ledger = { items: [] }; ledger.items.push(1); // discharged\n' }), []);
   });
 });

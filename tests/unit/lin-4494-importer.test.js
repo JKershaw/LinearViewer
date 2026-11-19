@@ -86,7 +86,10 @@ describe('the Waiting entries at the baseline', () => {
   });
 
   test('a note with no Waiting section is present:false, and its absence is not an error', () => {
-    assert.throws(() => planWith([], {}), /needs parseNote and citedPaths/, 'the reader is never guessed');
+    assert.throws(() => planWith([], {}), /needs a parseNote function and citedPaths/, 'the cited-path predicate is never guessed');
+    // The Waiting reader defaults to this module's own (LIN-4495): a caller passes only the cited-path predicate.
+    const dflt = planWith([{ note: 'x', markdown: '## Waiting\n\n- `lib/ok.js` — fine\n' }], { citedPaths });
+    assert.equal(dflt.totals.entries, 1);
     assert.equal(readWaiting('# Notes\n\n## Lessons\n- x\n', NOTE_READER).present, false);
   });
 });
