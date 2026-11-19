@@ -4378,3 +4378,5 @@ Draft 3 removes what the layer dropped: area records and their import, task and 
 **John's questions, 3 (19 Nov).** Rulings stay their own slice 4; the in-between mess is fine while slices are built one after another with nothing else running. Rulings look ripe for a Theseus later.
 
 **John's questions, 4 (19 Nov).** Slice 6 waits. Slice 1's readings count records addressed to a stage or task with a held run and how long each sat; slice 6 is filed only if hand-offs are seen sitting. Likely not needed, or a later optimisation.
+
+**John's questions, 5 (19 Nov).** The knots are accepted as a tax, with nothing tidied first: make it work, then make it good. Rulings get a Theseus after slice 4, on what slice 4 leaves.

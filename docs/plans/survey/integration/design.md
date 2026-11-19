@@ -169,7 +169,7 @@ Each slice is built as a Harbour task through Harbour's own loop. That task runs
    - *Withdrawn (John, 19 Nov):* an `on-answer` field on the question kind. What an answer sets off stays on Harbour's feedback item (§5).
 4. **Agreed (John, 19 Nov): rulings as their own slice 4,** rather than inside hand-offs as the journey had it. The census shows 50 sites (C2). The in-between state (rulings on their page, findings in "Waiting on you") is accepted, since slices are built one after another with no other work running. John sees rulings as ripe for a Theseus rebuild later.
 5. **Agreed (John, 19 Nov): slice 6 waits.** Slice 1 measures records sitting for a held run; slice 6 is filed only if that shows the need.
-6. **Knots.** Records imports nothing back, so none of these makes a new pair, and none changes code inside today's tightest pair beyond its reads. My call is to accept them all, with nothing to tidy first.
+6. **Agreed (John, 19 Nov): accept the knots as a tax; later work tidies properly** ("Make it work, then make it good"). Records imports nothing back, so none of these makes a new pair, and none changes code inside today's tightest pair beyond its reads. Rulings get a Theseus after slice 4, on what is left (the page, shelving, the browser resume); before it would rebuild code slice 4 deletes.
 
    | Slice | Edges into Records |
    |---|---|
