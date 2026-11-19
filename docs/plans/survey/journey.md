@@ -149,3 +149,35 @@ On your first question, the record shows finished tasks going from spiralling to
   - don't hand John raw data walls.
 - **Still open:** the four `wake` rows on LIN-4493 that sit `queued` (unknown; no action); old Sep–Nov stale rows (housekeeping, untouched); the LIN-4399 blind-read lead (harm unknown).
 - **Next:** the scheduled check-in (about 16:12) reads LIN-4493 and LIN-4497 through a subagent, tags the colleague if LIN-4497's PR is up, and updates the recap. Then follow slice 1 piece by piece; when it lands, take the after readings and draft slice 2 for John.
+
+## 19 Nov, after compaction: a re-read against the other docs
+
+A fresh reader checked this page against the log from 18 Nov, the designs, the readings and the checks. What it adds:
+
+- **Correction:** there is no 13–14 Nov baseline for brief size (`integration/readings/slice-1-before.md:55`). The only figures are LIN-4491's live briefs: 11,338 B at plan and 16,460 B at plan review.
+- **The before figures have moved:**
+  - Waiting is 117, against the 111 the design and tickets use;
+  - notes are 95,485 B.
+  - The cost comparison rests on six unusual tasks.
+- **Open choice for the after readings:** a finished task's brief can only be read by regenerating it, at a few cents per task and overwriting the cache. The alternative is to poll a live task's stages. To be settled before the after readings.
+- **Watch item:** a piece dispatched while its blocker is still open also skips look-first, with the reason "open blocker" (`checks/lin-4493-skip.md:51`). Neither the workaround nor LIN-4497 covers it.
+- **Left after LIN-4497** (out of its scope, `checks/lin-4493-intent.md:93`):
+  - a quoted close-out heading is read as the ticket's own;
+  - a quoted PR can join the landing the blind read names;
+  - the selector's "PRs linked" fact.
+  - Whether any of these touches slice 1's blind reads is unknown.
+- **Launch risks still live** (log, slice 1 launched):
+  - the import must not dispatch the seven tasks it creates;
+  - the way back from a bad merge is a revert on main;
+  - the design is pinned at `92838c5cf`.
+- **Still owed:**
+  - a Theseus rebuild of rulings after slice 4;
+  - a provider-sync design after the slices, likely alongside Jira;
+  - slice 1's count decides slice 6;
+  - slice 3 counts the blind read's queries.
+- **John's frame for revising** (18 Nov):
+  - removal is the process;
+  - approval means we can proceed, not that it's set in stone;
+  - "two steps forward, one step back";
+  - retiring the old route in the same move is the default, and a kept path says when it goes;
+  - real work is the test, so no more walks.
