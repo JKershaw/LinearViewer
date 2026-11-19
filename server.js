@@ -2639,7 +2639,7 @@ function workspaceFromUrl(req, res, next) {
 }
 
 // Mount dispatch routes (requires workspaceFromUrl middleware)
-app.use(createDispatchRoutes({ installationTokenFor, dispatchQueueStore, dispatchTokenStore, workspaceFromUrl, userPreferencesStore, harbourFeedbackTokenStore, workspacePreferencesStore, dispatchPresetsStore, proxyTokenStore, workspaceOwnerCheck, getWorkspaceAccessToken, fetchIssueContext, workspaceHaltStore, sessionsFeedCache, taskModeStore, freeTierStore, accountStore, consumerHeartbeatStore, requestUsageStore, requestUsageLoader, leftoverStep }))
+app.use(createDispatchRoutes({ installationTokenFor, recordsStore, dispatchQueueStore, dispatchTokenStore, workspaceFromUrl, userPreferencesStore, harbourFeedbackTokenStore, workspacePreferencesStore, dispatchPresetsStore, proxyTokenStore, workspaceOwnerCheck, getWorkspaceAccessToken, fetchIssueContext, workspaceHaltStore, sessionsFeedCache, taskModeStore, freeTierStore, accountStore, consumerHeartbeatStore, requestUsageStore, requestUsageLoader, leftoverStep }))
 
 // Task-mode routes (LIN-2942): the ladder's client-side press record and the
 // per-account per-task mode read.
@@ -3290,6 +3290,7 @@ const onTicketWrite = createOnTicketWrite({
 const recordPipelineMerge = createPipelineMergeRecorder({
   closeOutEventsStore,
   dispatchStore: dispatchQueueStore,
+  recordsStore,
   installationTokenFor,
   resolveWorkspaceId: createSessionWorkspaceIdResolver({ sessionsCollection })
 })
@@ -3311,7 +3312,7 @@ app.use(createGettingStartedRouter())
 // LIN-3383: workspace-api, collective, dashboard, task-chat and flight-companion
 // all receive the ONE hoisted `workspaceOwnerCheck` (never a second
 // createWorkspaceOwnerCheck) for the owner-only runner enqueue gate.
-app.use(createWorkspaceApiRoutes({ installationTokenFor, workspaceFromUrl, freeTierStore, getOpenRouterSource, userPreferencesStore, workspacePreferencesStore, customPromptsStore, recapCacheStore, briefCacheStore, reportHistoryStore, dispatchQueueStore, agentStatusStore, promptTraceStore, proxyTokenStore, taskDecisionsStore, harbourCommentsStore, sessionsFeedCache, ownerCredentialStore, accountStore, adoptConnectionCredential: (args) => connectionAccess.adoptConnectionCredential(args), closeOutEventsStore, workspaceOwnerCheck, onTicketWrite, recordPipelineMerge, loadTaskState: (args) => taskPageLoader.loadTaskState(args) }))
+app.use(createWorkspaceApiRoutes({ installationTokenFor, recordsStore, workspaceFromUrl, freeTierStore, getOpenRouterSource, userPreferencesStore, workspacePreferencesStore, customPromptsStore, recapCacheStore, briefCacheStore, reportHistoryStore, dispatchQueueStore, agentStatusStore, promptTraceStore, proxyTokenStore, taskDecisionsStore, harbourCommentsStore, sessionsFeedCache, ownerCredentialStore, accountStore, adoptConnectionCredential: (args) => connectionAccess.adoptConnectionCredential(args), closeOutEventsStore, workspaceOwnerCheck, onTicketWrite, recordPipelineMerge, loadTaskState: (args) => taskPageLoader.loadTaskState(args) }))
 
 // Mount collective routes (experimental cross-project discussion — LIN-450).
 // yapClient falls back to DEFAULT_YAP_BASE_URL (lib/yap-client.js) when YAP_BASE_URL is unset.
@@ -3377,7 +3378,7 @@ registerKeyStateHolders(keyState, {
   workspaceKpisCache,
   timelineFragment,
 });
-const taskPageLoader = createTaskPageLoader({ dispatchStore: dispatchQueueStore, agentStatusStore, briefCacheStore, recapCacheStore, readRunEvidence, prStateStore, installationTokenFor, closeOutEventsStore, enrichLoop, deriveSessionWaiting, deriveSessionDecisions, taskDecisionsStore, shelvedRulingsStore, taskFacts: { read: taskFacts.read }, gatherTaskStates, readTaskTimeline })
+const taskPageLoader = createTaskPageLoader({ dispatchStore: dispatchQueueStore, agentStatusStore, briefCacheStore, recapCacheStore, readRunEvidence, prStateStore, installationTokenFor, closeOutEventsStore, recordsStore, enrichLoop, deriveSessionWaiting, deriveSessionDecisions, taskDecisionsStore, shelvedRulingsStore, taskFacts: { read: taskFacts.read }, gatherTaskStates, readTaskTimeline })
 // LIN-3833 / LIN-4016: Home's row states, assembled once for all three Home routes (lib/home-row-states.js): one lean
 // loop read for the workspace, grouped by task. A viewer who sees no sessions (copy-first, no `runControls`) reads
 // nothing and gets the tracker words alone. The states cover the Recent and project rows too, so a subtask that needs

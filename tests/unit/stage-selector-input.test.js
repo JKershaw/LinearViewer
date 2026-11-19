@@ -32,7 +32,7 @@ describe('trail facts (LIN-3300)', () => {
     assert.equal(facts.review, null);
     const withReview = assembleTrailFacts([planReview(1), review('Request Changes.', 2)], '');
     assert.equal(withReview.review.verdict, 'request-changes');
-    assert.equal(withReview.review.ledgerItems, 1);
+    assert.equal(withReview.review.openFindings.state, 'not-read', 'the findings come from the records, passed in: not measured by default');
     assert.equal(withReview.workAfterReview, false);
   });
 
@@ -265,13 +265,17 @@ describe('trail facts: the misroute fixes (LIN-3378)', () => {
   const ledgerLine = (verdict) => formatTrailFactsBlock(assembleTrailFacts([review(verdict, 1)], ''), 1)
     .split('\n').find(l => l.startsWith('- Latest code review'));
 
-  test('d: under an approving review the open ledger items are left for close-out; otherwise not discharged', () => {
-    assert.match(ledgerLine('Approve.'), /1 left for close-out to discharge\)/);
-    const conditional = 'Approve — conditional on close-out discharging the ledger';
+  test('d: under an approving review the open findings to close-out are left for close-out to settle; otherwise not settled (LIN-4495)', () => {
+    const one = { state: 'read', count: 1, ids: ['finding-aaaaaaaa'] };
+    const line = (verdict, reading) => formatTrailFactsBlock(assembleTrailFacts([review(verdict, 1)], '', { openFindings: reading }), 1)
+      .split('\n').find(l => l.startsWith('- Latest code review'));
+    assert.match(line('Approve.', one), /open findings to close-out: 1, left for close-out to settle\)/);
+    const conditional = 'Approve — conditional on close-out settling the findings';
     assert.equal(assembleTrailFacts([review(conditional, 1)], '').review.verdict, 'approve-conditional', 'the measured P11 verdict, not plain approve');
-    assert.match(ledgerLine(conditional), /approve-conditional .*1 left for close-out to discharge\)/);
-    assert.match(ledgerLine('Request Changes.'), /1 not discharged\)/);
-    assert.doesNotMatch(ledgerLine('Approve.'), /not discharged/);
+    assert.match(line(conditional, one), /approve-conditional .*open findings to close-out: 1, left for close-out to settle\)/);
+    assert.match(line('Request Changes.', one), /open findings to close-out: 1, not settled\)/);
+    assert.match(line('Approve.', { state: 'read', count: 0, ids: [] }), /open findings to close-out: 0\)/);
+    assert.match(line('Approve.', { state: 'not-read', count: null, ids: [], why: 'x' }), /open findings to close-out: not measured\)/);
   });
 
   const PARENT = { identifier: 'LIN-9', description: 'Epic.\n\n## Implementation Plan\n\nDo the steps.' };

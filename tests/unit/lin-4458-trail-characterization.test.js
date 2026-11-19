@@ -27,6 +27,7 @@
  */
 process.env.NODE_ENV = 'test';
 
+import { FINDINGS_NONE } from '../../lib/close-out-findings.js';
 import { test, describe, before, after } from 'node:test';
 import assert from 'node:assert/strict';
 import { closeOutNotReady } from '../../lib/close-out-readiness.js';
@@ -85,7 +86,7 @@ const ladderSeam = (comments) => ({
   resolveProvider: () => ({ provider: { name: 'local', async fetchIssueComments() { return comments; } }, callScope: 'scope' }),
   isStopAtRun: async () => null,
 });
-const ladderGuard = (comments) => closeOutNotReady({ workspace: { urlKey: 'acme' }, issueIdentifier: 'LIN-1', seam: ladderSeam(comments) });
+const ladderGuard = (comments) => closeOutNotReady({ openFindings: FINDINGS_NONE, workspace: { urlKey: 'acme' }, issueIdentifier: 'LIN-1', seam: ladderSeam(comments) });
 
 describe('pins: rows that hold today and after the one trail pass (LIN-4458)', () => {
   test('row 3: a read naming an older PR is not work after review; the landing is the reviewed PR; the route sends blind-read', () => {
@@ -200,7 +201,7 @@ describe('the box: a landing of [A] cited beside B', () => {
   });
 
   test('pin: the picker withholds, because it chooses from every cited URL', async () => {
-    const model = await readRunEvidence({ issueIdentifier: 'LIN-1', comments: CITED_NOT_LANDED, readPrStatus: async ({ number }) => openPr(number), stopAt: 'pr', runnerReady: true, viewerIsOwner: true });
+    const model = await readRunEvidence({ openFindings: FINDINGS_NONE, issueIdentifier: 'LIN-1', comments: CITED_NOT_LANDED, readPrStatus: async ({ number }) => openPr(number), stopAt: 'pr', runnerReady: true, viewerIsOwner: true });
     assert.deepEqual(model.state.prUrls.map(p => p.url), [B, A]);
     assert.equal(resolveRunPrRef(model).status, 'multiple');
   });
@@ -210,6 +211,7 @@ describe('the box: a landing of [A] cited beside B', () => {
   test('a landing of [A] cited beside B reads A in the box and withholds in the picker', async () => {
     const reads = [];
     const model = await readRunEvidence({
+      openFindings: FINDINGS_NONE,
       issueIdentifier: 'LIN-1', comments: CITED_NOT_LANDED, stopAt: 'pr', runnerReady: true, viewerIsOwner: true,
       readPrStatus: async ({ repo, number }) => { reads.push(`${repo}#${number}`); return number === 41 ? openPr(41) : closedPr(number); },
     });
@@ -233,6 +235,8 @@ describe('the owner\'s Done check: the same trail through the check route', () =
       workspaceFromUrl: (req, res, next) => next(),
       closeOutEventsStore: new CloseOutEventsStore({ collection }),
       closeOut: {
+        // LIN-4495: a store that answered "none open" (an unmeasured reading holds Done, so the seam says what it read).
+        openFindings: FINDINGS_NONE,
         resolveProvider: () => ({ provider: { async fetchIssueComments() { return comments; } }, callScope: 'scope' }),
         readPrStatus: async ({ number }) => { calls.reads.push(number); return statuses[number]; },
         isStopAtRun: async () => 'pr',

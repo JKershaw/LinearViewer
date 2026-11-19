@@ -2314,14 +2314,7 @@ Posting the same `(issue + body)` again within a short window does not create a 
 
 That invalidation has the same scope as the dedupe window it invalidates: **in-process**, on the server instance that handled the delete or edit. Behind more than one instance, a delete on instance A does not invalidate instance B, so a re-post routed to B can still return the pre-delete deduped response until the window expires. Like the dedupe cache itself, treat it as best-effort rather than a guarantee — if you need certainty that a comment is gone or changed, re-read the issue's comments.
 
-**The builder's leftover answer (LIN-4414).** A comment whose first non-blank line, trimmed, is exactly `### Leftovers` is the builder's leftover answer, and it names the waiting entry the build settled on exactly one line starting `Retires:`, in one of three forms: the entry's file as a repo-relative path in backticks, then its opening words; `none, no waiting entry`; or `none, nothing fix-sized`, then the smallest entry in the busiest touched area (its file in backticks) and why it is larger than a fix. Any other comment, including a review verdict with a `### Leftovers` subsection further down, is not checked. The check runs before the dedupe lookup and before any provider call, on create, edit and a comment-target attachment caption, and a refused body posts nothing:
-
-| Status | `code` | Meaning |
-|--------|--------|---------|
-| `422` | `LEFTOVER_RETIRES_MISSING` | the answer has no `Retires:` line. The message gives one literal example of each form. |
-| `422` | `LEFTOVER_RETIRES_SHAPE` | the answer has more than one `Retires:` line, or its line is in none of the three forms (`kind`: `"repeated"`, `"no-path"`, `"no-words"`, `"unknown-reason"`, `"fix-sized-no-entry"`, `"fix-sized-no-reason"`; `line: { number, text }`, 1-based within the comment). |
-
-Like the description guards, only this proxy is checked: an answer posted to the provider another way is not.
+**The leftover answer is retired (LIN-4495).** A builder's leftovers are findings now, written with `POST /api/proxy/records` (see Writing records); no comment opening with `### Leftovers` is checked, and the `422` codes that checked its retirement line are gone.
 
 **The blind read (LIN-4437).** A comment whose first non-blank line is `## Blind read` (exactly, or followed by `:`) is a blind read. It needs exactly one line starting `Verdict:`, whose first word is `better`, `same` or `worse`, followed by a reason. Its full PR URLs must equal the ticket's current landing (`landingPrUrls`, `lib/run-ledger.js`), with at least one. The shape is checked before any provider call. The landing check reads the ticket's whole comment trail. If that read fails, the landing check is skipped and logged, and the shape check still holds. Any other comment is not checked: one that mentions the heading further down, or one that opens with a longer heading such as `## Blind read pilot`. The check runs on create, edit and a comment-target attachment caption, and a refused body posts nothing:
 
@@ -2367,7 +2360,6 @@ Content-Type: application/json
 | `commentId` | UUID | Yes | The comment's own id |
 | `body` | string | Yes | New comment body in Markdown (max 50K chars) |
 
-An edited body that opens with `### Leftovers` is held to the leftover answer's `Retires:` line, with the same `422` codes as Add Comment.
 
 Returns `200`:
 ```json

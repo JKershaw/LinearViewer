@@ -22,12 +22,9 @@ const REVIEW_BODY = [
   '',
   'CI on `abc1234` is green.',
   '',
-  '### What CI Did Not Prove',
-  '| # | Claim | In/Out | Discharge |',
-  '|---|---|---|---|',
-  '| L1 | the task page keeps its evidence across a repaint | inside | this spec |',
+  'CI covers the deliverable; nothing to record.',
   '',
-  '**Verdict: Approve — conditional on close-out discharging the ledger.**',
+  '**Verdict: Approve — conditional on close-out settling the findings.**',
 ].join('\n');
 let URL_KEY;
 

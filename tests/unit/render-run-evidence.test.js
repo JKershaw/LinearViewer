@@ -32,12 +32,10 @@ function model(overrides = {}) {
       at: '2026-07-02T00:00:00.000Z',
       sha: 'abc1234',
       ledger: {
-        present: true, empty: false, unparsed: false,
-        items: [{ id: 'L1', claim: 'a claim', scope: 'inside', discharge: 'do the check', dischargedBy: null, discharged: false, followUp: 'LIN-999', raw: '| L1 | a claim | inside | do the check |' }],
-        raw: '| L1 | a claim | inside | do the check |',
+        present: false, empty: false, raw: null,
       },
     },
-    closeOut: { owner: true, status: 'ready', pr: { url: 'https://github.com/acme/widget/pull/12', number: 12 }, message: null },
+    closeOut: { owner: true, status: 'ready', pr: { url: 'https://github.com/acme/widget/pull/12', number: 12 }, message: null, openFindings: { state: 'read', count: 1, ids: ['finding-aaaaaaaa'] } },
     ...overrides,
   };
 }
@@ -88,37 +86,38 @@ describe('render-run-evidence: the checked row is two labelled lines', () => {
   });
 });
 
-describe('render-run-evidence: the collapsed ledger', () => {
-  test('items render under a <details> with their inside/outside mark', () => {
+describe('render-run-evidence: the collapsed ledger (LIN-4495: the findings to close-out, as read)', () => {
+  test('the findings reading renders under a <details>, with its count', () => {
     const html = renderEvidence(model());
     assert.match(html, /<details class="rev-ledger" data-testid="run-evidence-ledger">/);
-    assert.match(html, /data-testid="run-evidence-ledger-summary"/);
-    assert.match(html, /data-testid="run-evidence-ledger-item" data-scope="inside"/);
-    assert.match(html, /data-testid="run-evidence-ledger-followup">LIN-999</);
+    assert.match(html, /data-testid="run-evidence-findings">1 open finding to close-out</);
+    assert.match(html, /data-testid="run-evidence-ledger-summary">Review ledger — 1 open to close-out</);
   });
 
-  test('an outside item keeps its outside mark', () => {
+  test('a finding not read is shown as not read, never as zero', () => {
     const m = model();
-    m.ledger.ledger.items[0].scope = 'outside';
-    assert.match(renderEvidence(m), /data-testid="run-evidence-ledger-item" data-scope="outside"/);
+    m.closeOut.openFindings = { state: 'not-read', count: null, ids: [], why: 'x' };
+    const html = renderEvidence(m);
+    assert.match(html, /open findings not read — not checked/);
+    assert.match(html, /Review ledger — not measured/);
+    assert.doesNotMatch(html, /\b0 open to close-out/);
   });
 
-  test('the raw fallback survives intact as preformatted text', () => {
+  test('a pre-cutover ledger keeps its text, marked as not measured', () => {
     const raw = 'This claim is prose CI cannot structure, and it must survive verbatim <not a tag>.';
     const m = model();
-    m.ledger.ledger.items = [];
-    m.ledger.ledger.unparsed = true;
-    m.ledger.ledger.raw = raw;
+    m.ledger.ledger = { present: true, empty: false, raw };
     const html = renderEvidence(m);
     assert.match(html, /<pre class="rev-ledger-raw" data-testid="run-evidence-ledger-raw">/);
     assert.ok(html.includes('This claim is prose CI cannot structure, and it must survive verbatim &lt;not a tag&gt;.'));
+    assert.match(html, /not measured here/);
   });
 
-  test('an empty ledger is a distinct labelled state', () => {
+  test('a finished task keeps no count (LIN-3373)', () => {
     const m = model();
-    m.ledger.ledger.empty = true;
-    m.ledger.ledger.items = [];
-    assert.match(renderEvidence(m), /data-testid="run-evidence-ledger-empty">ledger empty/);
+    m.closeOut.status = 'merged';
+    const html = renderEvidence(m, { finished: true });
+    assert.match(html, /Review ledger — as the review wrote it/);
   });
 });
 
@@ -127,7 +126,7 @@ describe('render-run-evidence: escaping', () => {
     const m = model();
     m.evidence.asked = '<script>alert(1)</script>';
     m.evidence.checked.review.ciLine = '<img src=x onerror=alert(2)>';
-    m.ledger.ledger.items[0].claim = '"><b>bold</b>';
+    m.ledger.ledger = { present: true, empty: false, raw: '"><b>bold</b>' };
     const html = renderEvidence(m);
     assert.ok(!html.includes('<script>'));
     assert.ok(!html.includes('<img src=x'));
@@ -236,48 +235,6 @@ describe('render-run-evidence: P3 close-out box states (LIN-3248)', () => {
     const html = renderCloseOutBox({ owner: true, status: 'unknown', variant: 'standard', message: 'the pull request could not be read — not checked' });
     assert.match(html, /data-state="unknown"/);
     assert.match(html, /data-testid="run-evidence-closeout-withheld">the pull request could not be read/);
-  });
-});
-
-describe('render-run-evidence: open ledger items at a self-merge (LIN-3248)', () => {
-  test('a merged run marks every undischarged item "open at merge", inside with no follow-up says so', () => {
-    const m = model();
-    m.ledger.ledger.items = [
-      { id: 'L1', claim: 'an inside claim', scope: 'inside', discharge: 'manual repro', dischargedBy: null, discharged: false, followUp: null, raw: '' },
-      { id: 'L2', claim: 'an outside claim', scope: 'outside', discharge: 'file a follow-up', dischargedBy: null, discharged: false, followUp: 'LIN-999', raw: '' },
-    ];
-    m.closeOut = { owner: true, status: 'merged', variant: 'standard', message: 'PR #12 merged' };
-    const html = renderEvidence(m);
-    assert.match(html, /data-testid="run-evidence-ledger-open-at-merge">open at merge/);
-    assert.match(html, /data-testid="run-evidence-ledger-open-no-followup">open, no follow-up filed/);
-    // The outside item keeps its follow-up link; only the inside one is "no follow-up filed".
-    assert.equal((html.match(/run-evidence-ledger-open-no-followup/g) || []).length, 1);
-    assert.match(html, /data-testid="run-evidence-ledger-followup">LIN-999/);
-  });
-
-  test('a discharged item is not marked open at merge', () => {
-    const m = model();
-    m.ledger.ledger.items = [{ id: 'L1', claim: 'done', scope: 'inside', discharge: 'done', dischargedBy: 'evidence', discharged: true, followUp: null, raw: '' }];
-    m.closeOut = { owner: true, status: 'merged', variant: 'standard' };
-    const html = renderEvidence(m);
-    assert.ok(!html.includes('run-evidence-ledger-open-at-merge'));
-  });
-
-  test('an open PR (ready) run does not mark items open at merge', () => {
-    const m = model();
-    m.closeOut = { owner: true, status: 'ready', variant: 'standard' };
-    assert.ok(!renderEvidence(m).includes('run-evidence-ledger-open-at-merge'));
-  });
-
-  test('no stragglers: open items stay inside the collapsed ledger, never hoisted above the evidence rows', () => {
-    const m = model();
-    m.ledger.ledger.items = [{ id: 'L1', claim: 'an inside claim', scope: 'inside', discharge: null, dischargedBy: null, discharged: false, followUp: null, raw: '' }];
-    m.closeOut = { owner: true, status: 'merged', variant: 'standard' };
-    const html = renderEvidence(m);
-    const askedIdx = html.indexOf('data-testid="run-evidence-asked"');
-    const ledgerIdx = html.indexOf('data-testid="run-evidence-ledger"');
-    const openIdx = html.indexOf('run-evidence-ledger-open-at-merge');
-    assert.ok(askedIdx >= 0 && ledgerIdx > askedIdx && openIdx > ledgerIdx, 'open items sit inside the ledger, after the asked row');
   });
 });
 

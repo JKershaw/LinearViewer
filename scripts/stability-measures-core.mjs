@@ -7,7 +7,8 @@
 //   partial       value set from what could be read, `unreadable` counts what could not, `reason` names it;
 //   not measured  value null, reason says why, unreadable null.
 // A source that is missing or unreadable is `not measured`, never 0. Zero is a reading: a commit that can be read and
-// has no notes directory has 0 Waiting entries. Later pieces add rows of the same shape.
+// has no notes directory has 0 Waiting entries. The Waiting rows read `not measured` for a commit whose notes carry no
+// Waiting section (retired in LIN-4495). Later pieces add rows of the same shape.
 // LIN-4421 adds the tracker half: landing ownership, finished-task selection, sessions, speed, cost and the ID-span
 // search for tickets minted. Its reads come in as records too (issue reads, /cost bodies, probe results); the search
 // takes an injected probe, so the core still does no I/O of its own.

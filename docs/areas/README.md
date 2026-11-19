@@ -1,6 +1,6 @@
 # Area notes
 
-What has been learned about changing each area of the code, and what is waiting there,
+What has been learned about changing each area of the code,
 kept with the code on main (LIN-4347, LIN-4371). The next ticket in an area reads its
 notes before it changes anything there: the research, plan, bug, design, spike,
 implementation and review prompts say so, and scoping's in its own words (`GROUNDING_BY_KIND`
@@ -27,65 +27,24 @@ pinned in `tests/unit/area-map-placement.test.js`.
 
 ## A note
 
-An area's notes are `<slug>.md` in this directory, named by the area's `slug`. A note
-is optional: no file means nothing is known yet, and that is fine. Each note has two
-parts, under these two headings:
+An area's notes are `<slug>.md` in this directory, named by the area's `slug`. A note is optional: no file means
+nothing is known yet, and that is fine. A note has one part, `## Lessons`: what binds how you work in the area. A lesson
+is a rule a builder follows, learned from a change that went wrong or nearly did, or from a Periodical reading. Say why.
+Lessons are read before every change, so they stay within 6144 bytes (the guard's check 4). Lessons move to records in
+slice 5 of the layer (LIN-4491).
 
-- `## Lessons`: what binds how you work in the area. A lesson is a rule a builder
-  follows, learned from a change that went wrong or nearly did, or from a Periodical
-  reading. Say why. Lessons are read before every change, so they stay within 6144
-  bytes (the guard's check 4).
-- `## Waiting`: work known in the area but not scheduled. One bullet per entry. Each
-  entry **starts by citing the file it is about**, as a repo-relative path in
-  backticks, and says what is waiting and where it came from (a ticket, a comment or
-  a reading). Waiting has no size limit: an entry keeps its detail, and is never cut
-  or shortened to make room.
-
-An entry from a Periodical reading names its source as the Periodical's title and the
-reading's date, for example "(Seams & Tangles, 8 Nov.)". It cites the area's file first
-and the reading's report second, so the guard checks the first path against the area
-and the report path must exist in the same change.
-
-Cite files, never line numbers: lines move, and the docs anchor sweep reads this
-directory. A cited path is a backtick span holding a repo-relative path: it has a `/`
-in it, or it ends in a file extension such as `.js` or `.md`. Symbols, such as function
-names, have neither, so they are never read as paths. In code this is one predicate, `isCitedPath` in
+Cite files, never line numbers: lines move, and the docs anchor sweep reads this directory. A cited path is a backtick
+span holding a repo-relative path: it has a `/` in it, or it ends in a file extension such as `.js` or `.md`. Symbols,
+such as function names, have neither, so they are never read as paths. In code this is one predicate, `isCitedPath` in
 `lib/prompts/area-note-format.js`.
 
-## One home for each leftover
+## Where a hand-off goes
 
-Where a leftover goes, and why an item never lives both here and in a ticket, is written
-once in `lib/prompts/leftover-words.js`: `LEFTOVER_RULE` (LIN-4376) and `CONSEQUENCE_TEST`
-(LIN-4401), which says where an outside find goes. An outside find becomes a ticket only
-if it breaks something, blocks work, or touches safety; otherwise it is a `## Waiting`
-entry in the note of the area its first cited file maps to. Never both. The leftover
-step, review and close-out render both word for word. For the notes:
-
-- A waiting entry leaves in only three ways: a change settles it, a change makes it
-  untrue (either removes it in the same change), or the consequence test sends it to a ticket. It
-  never leaves, and is never shortened, to make room.
-- Waiting entries are context, not scope. A ticket takes one on only when the size of
-  its move does.
-- The one exception is the builder's leftover step (LIN-4414). Every stage build that
-  reaches it settles one fix-sized waiting entry on its PR branch, before it pushes:
-  in the area its change touched with the most waiting entries, or, if none there is
-  fix-sized, in another area it touched. It removes the entry and names it on the one
-  retirement line of its leftover answer. The line's forms and words are spelled once,
-  in `lib/prompts/leftover-words.js` (`RETIRES_LABEL`, `RETIRES_NONE`). The proxy refuses
-  an answer without a valid line (`lib/dispatch-leftover-answer.js`).
-  A ticket never counts as the retirement. The build itself still treats
-  Waiting as context.
-
-Who writes here: the builder's leftover step tidies or notes what its change left,
-writing an outside find into its own area's note (`lib/dispatch-leftover.js`, LIN-4401),
-the blind read before close-out names what a change left at its edges (LIN-4438), close-out
-fixes its fix-sized finds and writes review's note entries, in any area, on the PR branch
-before the merge (LIN-4374, LIN-4401), and Stage 2 of a Periodical writes its reading's entries in the same docs-only
-PR as its report (`lib/periodicals.js`, LIN-4379), and the after-merge audit
-(`retrospective-audit`, LIN-4432) writes its entries in one docs-only PR of its own. Close-out
-and the audit are the only ones that file a ticket, and only one the consequence test sends
-to a ticket; every other outside find is a note entry in its area. A Periodical that writes
-here files none.
+LIN-4495 retired the Waiting lists. An outside find, a leftover, a check that needs a person, and an ask to a parent
+or a sibling are now **records**, written through the proxy (`POST /api/proxy/records`) and read in the brief of the
+task or the project they name. The rule is written once, in `lib/prompts/handoff-words.js` (the hand-off protocol), and
+`lib/prompts/leftover-words.js` says where a leftover goes. A note is never where a find waits: a Lesson is the only
+thing a note holds. The backlog is the project's records, which the person orders on the project page.
 
 The Survey notebook's tally (`docs/plans/survey/broad-options.md`) moved here; the rest
 of `docs/plans/survey/` stays as frozen research.
@@ -96,12 +55,11 @@ of `docs/plans/survey/` stays as frozen research.
 
 1. a note's file name is not an area's slug;
 2. a path a note cites does not exist;
-3. a waiting entry cites no path, or its first cited path maps to another area;
-4. a note's `## Lessons` section is over 6144 bytes. Waiting is not counted. Keep
-   Lessons short enough to read before every change: prune lessons that no longer
-   bind, and remove waiting entries that are settled or no longer true;
+3. a note has a Waiting section (retired by LIN-4495; a find is a record);
+4. a note's `## Lessons` section is over 6144 bytes. Keep Lessons short enough to read
+   before every change: prune lessons that no longer bind;
 5. this README does not state that 6144-byte Lessons cap (the guard reads its own
    constant, so the two cannot drift).
 
-The guard also prints each note's Waiting count, so whether the lists are shrinking
-can be read in CI.
+The Survey notebook's tally (`docs/plans/survey/broad-options.md`) moved here; the rest
+of `docs/plans/survey/` stays as frozen research.

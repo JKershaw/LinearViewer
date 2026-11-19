@@ -28,7 +28,9 @@ import { DispatchQueueStore } from '../../lib/dispatch-store.js';
 import { createMockCollection } from '../fixtures/mock-collection.js';
 import { createLeftoverStep, workspaceIdResolverFrom } from '../../lib/dispatch-leftover-hook.js';
 import { decideLeftover, leftoverPrompt, isStageBuild } from '../../lib/dispatch-leftover.js';
-import { LEFTOVERS_HEADING } from '../../lib/prompts/leftover-words.js';
+// LIN-4495: the `### Leftovers` answer is retired. The heading survives here only as the text of a build's [done] message,
+// which the held-wake machinery reads as a plain message; no prompt renders it.
+const LEFTOVERS_HEADING = '### Leftovers';
 import { createDispatchItem } from '../../lib/dispatch-factory.js';
 import { createDispatchRoutes } from '../../routes/dispatch.js';
 import { createProxyRunnerRoutes } from '../../routes/proxy-runner.js';
@@ -129,7 +131,7 @@ describe('LIN-4373 — a build [done] queues one leftover row and holds the wake
     assert.equal(row.issueIdentifier, 'LIN-7', 'inherited from the build (once-per-ticket scope)');
     assert.equal(row.rootItemId, b.rootItemId, 'in the build lineage, so /cost reads it with the build');
     assert.equal(row.dispatchedBy, OWNER, "owner: the root's dispatchedBy");
-    assert.match(row.prompt, new RegExp(LEFTOVERS_HEADING.replace(/[#]/g, '\\#')));
+    assert.match(row.prompt, /^# Leftovers: LIN-/m, 'the leftover prompt names its ticket (LIN-4495: no answer heading)');
     assert.ok(row.prompt.includes(PR), 'the prompt names the PR');
     assert.deepEqual(wakesTo(world, a._id), [], 'the build wake is held');
     const edge = world.historyCollection._docs.find(d => d._id === b._id);
@@ -744,9 +746,10 @@ describe('LIN-4373 — the leftover step shows its own cost', () => {
 });
 
 describe('LIN-4373 — the leftover prompt', () => {
-  test('asks one question, names the PR, the notes, the heading and what the parent reads', () => {
+  test('asks one question, names the PR, the notes, and where each leftover goes: a fix, or a finding (LIN-4495)', () => {
     const prompt = leftoverPrompt({ issueIdentifier: 'LIN-7', prUrl: PR });
-    for (const needle of [PR, 'docs/areas/README.md', LEFTOVERS_HEADING, '## Waiting', '## Lessons', 'File nothing yourself', 'head SHA', '"Nothing" is a valid answer']) {
+    // LIN-4495: the leftover step writes findings, not an answer heading or a waiting entry (the Waiting list is gone).
+    for (const needle of [PR, 'docs/areas/README.md', '## Lessons', 'File nothing yourself', 'final message', '"Nothing" is a valid answer', 'kind: finding']) {
       assert.ok(prompt.includes(needle), `missing ${needle}`);
     }
   });

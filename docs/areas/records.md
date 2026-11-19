@@ -62,11 +62,9 @@ routes/proxy-records.js, routes/task-records.js, routes/project-page.js, server.
   (routes/task-records.js sends `in: <ticket>`). The project page's actions and the proxy make tasks the same way.
 - The importer reads the notes from a git ref given on the command line (never a default: piece 4 deletes the sections),
   and its tests read committed fixtures, since CI checks out at depth 1 (tests/fixtures/records-import/). It reads each
-  note with the guard's own reader (`parseNote`, `citedPaths` from lib/prompts/area-note-format.js, injected), so an
-  entry the guard counts is an entry the import writes.
-
-## Waiting
-
-- The brief still reads the workspace's whole history (`snapshots`, `index`, `currentAt`) to compose its parts. It is
-  pure and correct at this size, and piece 4 wires it behind the brief route; the change then is to read the parts
-  through `find` and `lookup`. Cites `lib/records-store.js` and `lib/records/brief.js`.
+  note's Waiting section with its own frozen reader (`parseWaitingSection` in `lib/records/waiting-import.js`, moved
+  there by LIN-4495 when the notes lost the section) and the guard's `citedPaths`.
+- A records reading has one caller per surface, and an injected alias hides a caller from a search by name: the
+  session page reads evidence through `readRunEvidenceFn` (`routes/dashboard.js`), missed the store at LIN-4495, and
+  every session page read "not measured". Search the aliases too, and keep a missing store reading "not measured",
+  never zero, so a missed caller shows instead of passing.

@@ -8,6 +8,7 @@
 // handler: the person-session-only rule, R1's four Done bounds, the multi-PR
 // partial merge, idempotency and the retried Done write.
 
+import { FINDINGS_NONE, findingsRead } from '../../lib/close-out-findings.js';
 import { test, describe, before, after } from 'node:test';
 import assert from 'node:assert/strict';
 import { createWorkspaceApiRoutes } from '../../routes/workspace-api.js';
@@ -63,6 +64,7 @@ function makeRouter({
   markDone = null,
   dispatchQueueStore = undefined,
   resolveProvider = null,
+  openFindings = FINDINGS_NONE,
 } = {}) {
   const collection = harness.freshDb().collection('close-out-events');
   const store = new CloseOutEventsStore({ collection });
@@ -72,7 +74,7 @@ function makeRouter({
     closeOutEventsStore: store,
     dispatchQueueStore,
     closeOut: {
-      resolveProvider: resolveProvider || (() => ({ provider: fakeProvider({ comments }), callScope: 'scope' })),
+      openFindings, resolveProvider: resolveProvider || (() => ({ provider: fakeProvider({ comments }), callScope: 'scope' })),
       readPrStatus: readPrStatus || (async ({ number }) => statuses[number] || unknownStatus(number)),
       isStopAtRun: isStopAtRun || (async () => 'pr'),
       runnerReady,
@@ -103,7 +105,7 @@ function makeDefaultMarkDoneRouter({ throwOnUpdate = false } = {}) {
     workspaceFromUrl: (req, res, next) => next(),
     closeOutEventsStore: store,
     closeOut: {
-      resolveProvider: () => ({ provider, callScope: 'scope' }),
+      openFindings: FINDINGS_NONE, resolveProvider: () => ({ provider, callScope: 'scope' }),
       readPrStatus: async ({ number }) => (number === 41 ? mergedStatus(41) : unknownStatus(number)),
       isStopAtRun: async () => 'pr',
       runnerReady: () => true,
@@ -207,7 +209,9 @@ describe('POST /api/run-evidence/:issueIdentifier/check', () => {
     assert.equal(stored[0].by, 'person');
     assert.equal(stored[0].prUrl, PR_A);
     assert.equal(stored[0].merged, true);
-    assert.deepEqual(stored[0].openItems, { inside: 1, outside: 0, unknown: 0, total: 1 });
+    // LIN-4495: the stamp is the open findings to close-out as read (none here), not the ledger's items.
+    assert.deepEqual(stored[0].openFindings, { state: 'read', count: 0 });
+    assert.deepEqual(stored[0].openItems, { inside: 0, outside: 0, unknown: 0, total: 0 });
   });
 
   test('R1 bound: the PR is not merged → no Done, nothing recorded', async () => {
@@ -420,7 +424,7 @@ describe('POST /api/run-evidence/:issueIdentifier/check', () => {
       dispatchQueueStore: queueStore,
       closeOutEventsStore: store,
       closeOut: {
-        resolveProvider: () => ({ provider: fakeProvider({ comments: [comment(PR_A, '2026-07-01T00:00:00.000Z'), comment(reviewBody(), '2026-07-02T00:00:00.000Z'), readOf(PR_A)] }), callScope: 'scope' }),
+        openFindings: FINDINGS_NONE, resolveProvider: () => ({ provider: fakeProvider({ comments: [comment(PR_A, '2026-07-01T00:00:00.000Z'), comment(reviewBody(), '2026-07-02T00:00:00.000Z'), readOf(PR_A)] }), callScope: 'scope' }),
         readPrStatus: async ({ number }) => mergedStatus(number),
         runnerReady: () => true,
         markDone: async () => { calls.markDone += 1; },
@@ -475,7 +479,7 @@ describe('POST /api/run-evidence/:issueIdentifier/check', () => {
       dispatchQueueStore: queueStore,
       closeOutEventsStore: store,
       closeOut: {
-        resolveProvider: () => ({ provider: fakeProvider({ comments: [comment(PR_A, '2026-07-01T00:00:00.000Z'), comment(reviewBody(), '2026-07-02T00:00:00.000Z'), readOf(PR_A)] }), callScope: 'scope' }),
+        openFindings: FINDINGS_NONE, resolveProvider: () => ({ provider: fakeProvider({ comments: [comment(PR_A, '2026-07-01T00:00:00.000Z'), comment(reviewBody(), '2026-07-02T00:00:00.000Z'), readOf(PR_A)] }), callScope: 'scope' }),
         readPrStatus: async ({ number }) => mergedStatus(number),
         runnerReady: () => true,
         markDone: async () => { calls.markDone += 1; },
@@ -491,6 +495,22 @@ describe('POST /api/run-evidence/:issueIdentifier/check', () => {
 });
 
 describe('POST /api/run-evidence/:issueIdentifier/close-out-press', () => {
+  // LIN-4495: the press asks the dispatch lane's question, so an open finding to close-out (which close-out itself
+  // ends) admits the press; the press records the open count it read, never zero by default.
+  test('LIN-4495: an open finding to close-out admits the press and stamps the count it read', async () => {
+    const built = makeRouter({
+      comments: [comment(PR_A, '2026-07-01T00:00:00.000Z'), comment(reviewBody(), '2026-07-02T00:00:00.000Z'), readOf(PR_A)],
+      statuses: { 41: openStatus(41) },
+      openFindings: findingsRead(['finding-1']),
+    });
+    const res = await press(built, baseReq({ body: { prUrl: PR_A, headSha: 'aaaaaaa', dispatchId: 'd-9' } }));
+    assert.equal(res.statusCode, 201, JSON.stringify(res.jsonBody));
+    const stored = await rows(built.collection);
+    assert.equal(stored.length, 1);
+    assert.equal(stored[0].openFindings.state, 'read');
+    assert.equal(stored[0].openFindings.count, 1);
+  });
+
   test('records a press with its dispatchId', async () => {
     const built = makeRouter();
     const res = await press(built);
@@ -639,7 +659,7 @@ describe('LIN-3657: close-out-press on a head-moved close-out', () => {
     const counts = { provider: 0, pr: 0 };
     const built = makeRouter({
       comments,
-      resolveProvider: () => { counts.provider += 1; return { provider: fakeProvider({ comments }), callScope: 'scope' }; },
+      openFindings: FINDINGS_NONE, resolveProvider: () => { counts.provider += 1; return { provider: fakeProvider({ comments }), callScope: 'scope' }; },
       readPrStatus: async ({ number }) => { counts.pr += 1; return openStatus(number, MOVED); },
     });
     await built.collection.insertOne({
@@ -671,7 +691,7 @@ describe('LIN-3657: close-out-press on a head-moved close-out', () => {
       const seen = [];
       const built = makeRouter({
         comments, statuses: movedStatuses, dispatchQueueStore: queueStore,
-        resolveProvider: (_workspace, source) => { seen.push(source ?? null); return { provider: fakeProvider({ comments }), callScope: 'scope' }; },
+        openFindings: FINDINGS_NONE, resolveProvider: (_workspace, source) => { seen.push(source ?? null); return { provider: fakeProvider({ comments }), callScope: 'scope' }; },
       });
       return { built, seen, id: added._id };
     }

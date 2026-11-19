@@ -12,8 +12,10 @@ import { json } from 'express';
 import { badRequest, jsonError, unauthorized } from '../lib/errors.js';
 import { readRunEvidence } from '../lib/run-evidence.js';
 import { CLOSE_OUT_ACTOR } from '../lib/run-closeout-state.js';
-import { recordMergedPrs } from '../lib/close-out-merges.js';
+import { recordMergedPrs, openFindingsStamp } from '../lib/close-out-merges.js';
 import { readCloseOutChain, closeOutNotReady, closeOutNotReadyRefusal } from '../lib/close-out-readiness.js';
+import { readOpenFindings, legacyLedgerOf } from '../lib/close-out-findings.js';
+import { readTrail } from '../lib/run-trail.js';
 import { getLoopsForIssue, sessionIdByLoop } from '../lib/pipeline-loops.js';
 import { sessionIdOf } from '../lib/live-console.js';
 import { toSessionView } from '../lib/sessions-view.js';
@@ -152,7 +154,7 @@ export function registerSessionsRoutes(router, { workspaceFromUrl, dispatchQueue
   });
 }
 
-export function registerRunEvidenceRoutes(router, { workspaceFromUrl, dispatchQueueStore, runEvidence, closeOutEventsStore, closeOut, onTicketWrite, installationTokenFor }) {
+export function registerRunEvidenceRoutes(router, { workspaceFromUrl, dispatchQueueStore, runEvidence, closeOutEventsStore, closeOut, onTicketWrite, installationTokenFor, recordsStore = null }) {
   /**
    * Run evidence (LIN-3247, P2 of LIN-2949). The data half of the page seam:
    * returns `{ state, evidence, ledger, closeOut }` for a run's issue. The PR
@@ -181,6 +183,7 @@ export function registerRunEvidenceRoutes(router, { workspaceFromUrl, dispatchQu
         installationTokenFor,
         readPrStatus: seam.readPrStatus || undefined,
         githubFetch: seam.githubFetch || null,
+        recordsStore,
       });
       res.json({ state, evidence, ledger, closeOut: closeOutModel });
     } catch (error) {
@@ -270,7 +273,7 @@ export function registerRunEvidenceRoutes(router, { workspaceFromUrl, dispatchQu
       // LIN-3634: the read chain is `lib/close-out-readiness.js`, shared with the
       // dispatch guard: comments, the trail, each landing PR's status (LIN-4458, keyed
       // by URL), stop-at, then `deriveCloseOutState`.
-      const { provider, callScope, prs, prStatuses, ledger, stopAt, state } = await readCloseOutChain({
+      const { provider, callScope, prs, prStatuses, openFindings, stopAt, state } = await readCloseOutChain({
         workspace,
         issueIdentifier,
         source,
@@ -280,6 +283,7 @@ export function registerRunEvidenceRoutes(router, { workspaceFromUrl, dispatchQu
         owner: true,
         actor: CLOSE_OUT_ACTOR.PERSON,
         installationTokenFor,
+        recordsStore,
       });
 
       // B1' (review `a1845467`): `done` is true on EVERY later call once a merge
@@ -293,7 +297,7 @@ export function registerRunEvidenceRoutes(router, { workspaceFromUrl, dispatchQu
       // Close-out is a stop-at-PR surface only: a normal run records and sets
       // nothing here.
       if (stopAt === 'pr') {
-        const merges = await recordMergedPrs({ store: closeOutEventsStore, workspace, accountId: req.session.accountId, issueIdentifier, prs, prStatuses, ledger });
+        const merges = await recordMergedPrs({ store: closeOutEventsStore, workspace, accountId: req.session.accountId, issueIdentifier, prs, prStatuses, openFindings });
         recorded = merges.recorded;
         let { mergedEvent } = merges;
 
@@ -348,7 +352,18 @@ export function registerRunEvidenceRoutes(router, { workspaceFromUrl, dispatchQu
         const row = await Promise.resolve(dispatchQueueStore.getItemStatus(urlKey, dispatchId)).catch(() => null);
         if (row?.issueIdentifier === req.params.issueIdentifier) source = row.issueSource ?? null;
       }
-      const notReady = await closeOutNotReady({ workspace: req.workspace, issueIdentifier: req.params.issueIdentifier, source, store: dispatchQueueStore, seam: closeOut || {}, installationTokenFor });
+      // LIN-4495: the open findings to close-out are read ONCE, here, and the guard is handed that reading; the
+      // event stamp below is built from the same one. Open findings never refuse the press (close-out is the stage
+      // that ends them): the stamp records them as they stood.
+      let openPressFindings = closeOut?.openFindings || null;
+      if (!openPressFindings) {
+        const { provider: pressProvider, callScope: pressCallScope } = (closeOut?.resolveProvider || resolveIssueBinding)(req.workspace, source);
+        const pressComments = await pressProvider.fetchIssueComments(pressCallScope, req.params.issueIdentifier);
+        openPressFindings = await readOpenFindings({
+          store: recordsStore, urlKey, ticket: req.params.issueIdentifier, legacyLedger: legacyLedgerOf(readTrail(pressComments).review),
+        });
+      }
+      const notReady = await closeOutNotReady({ workspace: req.workspace, issueIdentifier: req.params.issueIdentifier, source, store: dispatchQueueStore, seam: closeOut || {}, installationTokenFor, recordsStore, openFindings: openPressFindings });
       if (notReady) {
         const refusal = closeOutNotReadyRefusal(notReady);
         return jsonError(res, 409, refusal.error, refusal.extra);
@@ -363,7 +378,9 @@ export function registerRunEvidenceRoutes(router, { workspaceFromUrl, dispatchQu
         prUrl,
         headSha: headSha ?? null,
         merged: false,
-        openItems: { inside: 0, outside: 0, unknown: 0, total: 0 },
+        // LIN-4495: the press stamps the open findings as read at the press, never zeros: the same stamp the merge
+        // recorder writes (lib/close-out-merges.js), built from the one reading taken above.
+        ...openFindingsStamp(openPressFindings),
       });
       if (!event) return badRequest.json(res, 'Invalid close-out press');
       return res.status(201).json({

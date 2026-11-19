@@ -22,6 +22,7 @@
  */
 process.env.NODE_ENV = 'test';
 
+import { FINDINGS_NONE } from '../../lib/close-out-findings.js';
 import { test, describe, afterEach } from 'node:test';
 import assert from 'node:assert/strict';
 import { getRecommendation, setFetchImpl, setPromptTraceRecorder } from '../../lib/openrouter.js';
@@ -118,11 +119,11 @@ async function routeLane(row) {
 
 async function lanes(row) {
   const workspace = { urlKey: 'acme' };
-  const { state } = await readCloseOutChain({ workspace, issueIdentifier: 'LIN-1', seam: seamFor(row, 'pr'), stopAt: 'pr', runnerReady: true, owner: true, actor: 'harbour', prStatusCache: new Map() });
+  const { state } = await readCloseOutChain({ openFindings: FINDINGS_NONE, workspace, issueIdentifier: 'LIN-1', seam: seamFor(row, 'pr'), stopAt: 'pr', runnerReady: true, owner: true, actor: 'harbour', prStatusCache: new Map() });
   // LIN-4458: the box is read the way the page reads it (readRunEvidence: one read, of the landing's sole PR).
-  const box = (await readRunEvidence({ issueIdentifier: 'LIN-1', comments: row.comments, readPrStatus: async ({ repo, number }) => statusFor(row, `https://github.com/${repo}/pull/${number}`), stopAt: 'pr', runnerReady: true, viewerIsOwner: true })).closeOut;
-  const stopAtGuard = await closeOutNotReady({ workspace, issueIdentifier: 'LIN-1', seam: seamFor(row, 'pr') });
-  const ladderGuard = await closeOutNotReady({ workspace, issueIdentifier: 'LIN-1', seam: seamFor(row, null) });
+  const box = (await readRunEvidence({ openFindings: FINDINGS_NONE, issueIdentifier: 'LIN-1', comments: row.comments, readPrStatus: async ({ repo, number }) => statusFor(row, `https://github.com/${repo}/pull/${number}`), stopAt: 'pr', runnerReady: true, viewerIsOwner: true })).closeOut;
+  const stopAtGuard = await closeOutNotReady({ openFindings: FINDINGS_NONE, workspace, issueIdentifier: 'LIN-1', seam: seamFor(row, 'pr') });
+  const ladderGuard = await closeOutNotReady({ openFindings: FINDINGS_NONE, workspace, issueIdentifier: 'LIN-1', seam: seamFor(row, null) });
   return { route: await routeLane(row), state, box, stopAtGuard, ladderGuard };
 }
 

@@ -2,7 +2,7 @@
 // docs/areas/README.md owns the format; this test holds the five checks it names:
 //   1. every notes file is named by a registry area's slug;
 //   2. every path a note cites exists;
-//   3. every waiting entry cites a path, and its first cited path maps to the note's own area;
+//   3. no note has a `## Waiting` section (LIN-4495: the Waiting lists are retired; a find is a record, not a note entry);
 //   4. every note's `## Lessons` section stays under NOTE_BYTE_CAP (LIN-4414: Waiting has no cap, so a still-true
 //      entry is never squeezed or cut to make room; it leaves only when settled, untrue or filed);
 //   5. the README states NOTE_BYTE_CAP, so its number cannot drift from this constant (LIN-4414).
@@ -22,7 +22,7 @@ import { NOTES_DIR, NOT_NOTES, citedPaths, parseNote } from '../../lib/prompts/a
 // About 6 KB (LIN-4347's plan leaves the builder to pick it): a note's Lessons are read before every change in its
 // area, so they must stay short enough to read in full. Since LIN-4414 it caps the `## Lessons` section only.
 export const NOTE_BYTE_CAP = 6144;
-const SECTIONS = new Set(['Lessons', 'Waiting']);
+const SECTIONS = new Set(['Lessons']);
 /** The bytes of a note's `## Lessons` section: from its heading to the next level-two heading or the end; 0 if none. */
 export function lessonsBytes(text) {
   const lines = text.split('\n');
@@ -50,16 +50,10 @@ export function checkAreaNotes({ areas, files, exists, cap = NOTE_BYTE_CAP }) {
     for (const path of citedPaths(text)) {
       if (!exists(path)) problems.push({ check: 2, file, detail: `cites \`${path}\`, which does not exist (cite files, never line numbers)` });
     }
-    const { headings, waiting } = parseNote(text);
+    // LIN-4495: a note keeps Lessons only. A `## Waiting` section (or any other heading) is a check 3 problem.
+    const { headings } = parseNote(text);
     for (const h of headings) {
-      if (!SECTIONS.has(h)) problems.push({ check: 3, file, detail: `section "## ${h}" is neither Lessons nor Waiting, so its entries go unchecked` });
-    }
-    for (const entry of waiting) {
-      const [first] = citedPaths(entry);
-      if (!first) { problems.push({ check: 3, file, detail: `waiting entry cites no file: "${entry.slice(0, 80)}"` }); continue; }
-      // A cited directory (`lib/runner-kit/`) maps as a file inside it would.
-      const owner = areaOf(first.replace(/\/$/, '/x'), areas)?.slug;
-      if (owner !== slug) problems.push({ check: 3, file, detail: `waiting entry's first path \`${first}\` maps to ${owner ?? 'no area'}, not ${slug}` });
+      if (!SECTIONS.has(h)) problems.push({ check: 3, file, detail: `section "## ${h}" is not Lessons: a waiting find is a records finding, never a note section (LIN-4495)` });
     }
     const bytes = lessonsBytes(text);
     if (bytes > cap) problems.push({ check: 4, file, detail: `its Lessons are ${bytes} bytes, over the ${cap}-byte cap (Waiting has no cap)` });
@@ -94,16 +88,9 @@ describe('area notes (LIN-4371)', () => {
   // LIN-4414: an area's waiting list should shrink over time through the leftover step's retirements. The counts are
   // printed so a reader of CI can see it (baselines on 12 Nov: runs-and-dispatch 16, llm-and-prompts 15,
   // front-end-pages 13, agent-api 11).
-  test('each note\'s Waiting count (printed)', (t) => {
-    for (const file of Object.keys(tree.files).filter((f) => !NOT_NOTES.has(f)).sort()) {
-      const { waiting } = parseNote(tree.files[file]);
-      t.diagnostic(`area-notes waiting ${file.slice(0, -3)}: ${waiting.length} entries; Lessons ${lessonsBytes(tree.files[file])} of ${NOTE_BYTE_CAP} bytes`);
-    }
-  });
-
   // Each mutation is applied to a copy of the real tree, so a check that stopped looking would pass it.
   describe('each check fails on the defect it exists to catch', () => {
-    const note = Object.keys(tree.files).find((f) => !NOT_NOTES.has(f) && parseNote(tree.files[f]).waiting.length);
+    const note = Object.keys(tree.files).find((f) => !NOT_NOTES.has(f) && tree.files[f].includes('## Lessons'));
     const mutate = (change) => checkAreaNotes({ ...tree, files: { ...tree.files, ...change(tree.files) } });
     const checksOf = (problems) => [...new Set(problems.map((p) => p.check))];
 
@@ -123,14 +110,12 @@ describe('area notes (LIN-4371)', () => {
       assert.ok(lined.some((p) => p.check === 2 && p.detail.includes(`${first}:12`)), 'a line number fails the guard');
     });
 
-    test('3: a waiting entry filed under the wrong area, or citing no file', () => {
-      const target = ['server.js', 'lib/dispatch-store.js'].find((p) => areaOf(p).slug !== note.slice(0, -3));
-      const wrong = mutate((f) => ({ [note]: `${f[note]}- \`${target}\`: filed under the wrong area.\n` }));
-      assert.ok(wrong.some((p) => p.check === 3 && p.detail.includes(target)), JSON.stringify(wrong));
-      const bare = mutate((f) => ({ [note]: `${f[note]}- Something waits, but no file is named.\n` }));
-      assert.ok(bare.some((p) => p.check === 3 && p.detail.includes('cites no file')), JSON.stringify(bare));
-      const renamed = mutate((f) => ({ [note]: f[note].replace('## Waiting', '## Waiting work') }));
-      assert.ok(renamed.some((p) => p.check === 3 && p.detail.includes('Waiting work')), 'a renamed section cannot hide its entries');
+    test('3: a Waiting section (or any other section) in a note', () => {
+      const waiting = mutate((f) => ({ [note]: `${f[note]}\n## Waiting\n\n- \`lib/dispatch-store.js\`: a find kept in a note.\n` }));
+      assert.deepStrictEqual(checksOf(waiting), [3], JSON.stringify(waiting));
+      assert.ok(waiting.some((p) => p.check === 3 && p.detail.includes('Waiting')));
+      const other = mutate((f) => ({ [note]: `${f[note]}\n## Notes\n\n- Something.\n` }));
+      assert.ok(other.some((p) => p.check === 3 && p.detail.includes('Notes')), 'any section other than Lessons is refused');
     });
 
     test('4: a note whose Lessons are over the byte cap', () => {
@@ -140,14 +125,6 @@ describe('area notes (LIN-4371)', () => {
       assert.deepStrictEqual(checksOf(big), [4]);
     });
 
-    test('4: Waiting has no cap: 7 KB of valid waiting entries pass every check (LIN-4414)', () => {
-      const [owned] = citedPaths(parseNote(tree.files[note]).waiting[0]);
-      const entry = `- \`${owned}\`: a valid waiting entry, citing a file in this area first, grown to test the cap. (LIN-4414.)\n`;
-      const grown = `${tree.files[note].replace(/\n*$/, '\n')}${entry.repeat(Math.ceil(7168 / entry.length))}`;
-      assert.ok(Buffer.byteLength(grown) - Buffer.byteLength(tree.files[note]) >= 7168, 'grew by 7 KB');
-      assert.ok(Buffer.byteLength(grown) > NOTE_BYTE_CAP, 'the whole file is over the cap');
-      assert.deepStrictEqual(checksOf(mutate(() => ({ [note]: grown }))), []);
-    });
 
     test('4: a note with no Lessons section passes check 4', () => {
       const noLessons = mutate((f) => ({ [note]: f[note].replace(/## Lessons\n[\s\S]*?(?=\n## )/, '') }));

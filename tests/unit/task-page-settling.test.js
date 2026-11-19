@@ -9,6 +9,7 @@
  *
  * Run with: node --test tests/unit/task-page-settling.test.js
  */
+import { FINDINGS_NONE } from '../../lib/close-out-findings.js';
 import { test, describe } from 'node:test';
 import assert from 'node:assert/strict';
 import { createTaskPageLoader } from '../../lib/task-page-loader.js';
@@ -85,7 +86,7 @@ function makeLoader({ ctx, brief = null, recap = null, events = [], loops = [loo
     briefCacheStore: { async get() { return brief; } },
     recapCacheStore: { async get() { return recap; } },
     closeOutEventsStore: { async listForIssue() { return events; } },
-    readRunEvidence: (args) => readRunEvidence({ ...args, readPrStatus: async () => MERGED_PR }),
+    readRunEvidence: (args) => readRunEvidence({ openFindings: FINDINGS_NONE, ...args, readPrStatus: async () => MERGED_PR }),
     prStateStore: null,
     readTaskRunFacts: async () => ({ stopAt, variant: 'standard' }),
     enrichLoop,
@@ -113,17 +114,6 @@ const EMPTY_REVIEW = {
 };
 
 describe('LIN-3379: merged, not Done yet', () => {
-  test('no count, no stamps; says the close-out is still finishing and quotes it', async () => {
-    const { html } = await page('started');
-    const text = pageText(html.slice(html.indexOf('<main'), html.indexOf('</main>')));
-    assert.doesNotMatch(text, /\d+ of \d+ checked/);
-    assert.doesNotMatch(text, /open at merge/);
-    assert.doesNotMatch(text, /Review ledger — \d+ items?/);
-    assert.match(text, /Review ledger — as the review wrote it/);
-    assert.match(text, SETTLING_SENTENCE);
-    assert.match(text, /Close-out summary, .*its own words, not re-reviewed/);
-    assert.match(text, /All five items are discharged/);
-  });
 
   test('a Done task keeps the finished view, without the settling sentence', async () => {
     const { html } = await page('completed');
@@ -131,28 +121,6 @@ describe('LIN-3379: merged, not Done yet', () => {
     assert.match(pageText(html), /This task is done\./);
   });
 
-  test('renderEvidence without settling keeps the run page output (open at merge)', async () => {
-    const { model } = await page('started');
-    const run = renderEvidence(model.evidence);
-    assert.match(run, /open at merge/);
-    assert.doesNotMatch(run, /as the review wrote it/);
-  });
 
-  test('a partial close-out keeps today\'s behaviour', async () => {
-    const { model } = await page('started');
-    const partial = { ...model, evidence: { ...model.evidence, closeOut: { ...model.evidence.closeOut, status: 'partial' } } };
-    const text = pageText(renderTaskPullRequest(partial, '', NOW));
-    assert.match(text, /\d+ of \d+ checked/);
-    assert.match(text, /open at merge/);
-    assert.doesNotMatch(text, SETTLING_SENTENCE);
-  });
 
-  test('an empty ledger with a close-out summary does not say "these items"', async () => {
-    const { model } = await page('started', [OPENED, EMPTY_REVIEW, CLOSE_OUT]);
-    assert.equal(model.evidence.ledger.ledger.empty, true);
-    const text = pageText(renderTaskPullRequest(model, '', NOW));
-    assert.match(text, /nothing to check/);
-    assert.match(text, /The pull request is merged and the close-out is still finishing\./);
-    assert.doesNotMatch(text, /settles these items/);
-  });
 });

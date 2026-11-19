@@ -43,7 +43,7 @@ const PARENT = { identifier: 'LIN-899', title: 'Witness parent', state: { name: 
 
 const FRESH_COMMENTS = [
   comment('c1', 2, `Implementation: ${PR}`),
-  comment('c2', 3, '### Leftovers\nNothing left.\nRetires: none'),
+  comment('c2', 3, 'Nothing was left over from the build.'),
   comment('c3', 4, 'Context note from a person.')
 ];
 

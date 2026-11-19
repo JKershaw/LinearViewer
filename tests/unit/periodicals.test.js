@@ -343,20 +343,20 @@ describe('corrective reviews: feed the notes, mint nothing (LIN-4380)', () => {
   for (const template of corrective) {
     const prompt = template.generatePrompt();
     const lines = prompt.split('\n');
-    const notesBullet = lines.find(l => l.startsWith('- **Feed the area notes'));
-    const routesBullet = lines.find(l => l.startsWith('- **Route each finding that has no area note'));
+    const notesBullet = lines.find(l => l.startsWith('- **Record each finding for the project'));
+    const routesBullet = lines.find(l => l.startsWith('- **Route each finding that is not for the project'));
 
-    test(`${template.title} feeds the area notes through one docs-only PR, naming the reading as source`, () => {
+    test(`${template.title} records its findings for the project backlog, naming the reading as source`, () => {
       assert.ok(notesBullet, `${template.id}: the notes bullet is present`);
       for (const re of [
         /mint no follow-up tasks/i,
-        /searching the repo/i,
-        /follow their own rules/i,
+        /by searching/i,
         /since the commit the previous report measured/i,
-        /map each changed file to its area through the registry/i,
-        /prune entries you find settled or no longer true/i,
-        /one docs-only pull request/i,
-        /off main, green under the notes guard and required checks/i
+        /map each to its area/i,
+        /settled or made untrue/i,
+        /`kind: finding` with `to: project`/,
+        /by searching/i,
+        /settled or made untrue/i
       ]) assert.match(notesBullet, re, `${template.id}: ${re}`);
       // LIN-4414: the notes' own rules are not restated here, and nothing tells a reading to shorten a note.
       for (const re of SQUEEZE_AND_RESTATEMENT) assert.doesNotMatch(notesBullet, re, `${template.id}: ${re}`);
@@ -366,22 +366,22 @@ describe('corrective reviews: feed the notes, mint nothing (LIN-4380)', () => {
 
     test(`${template.title} routes what has no area note to the person, never to a ticket`, () => {
       assert.ok(routesBullet, `${template.id}: the routes bullet is present`);
-      for (const re of [/larger tidy/i, /no file in an area to cite/i, /addressed to the person/i, /cross-area seam/i, /repo with no area notes/i, /never (?:to|in) a ticket/i]) {
+      for (const re of [/larger tidy/i, /urgent breakage/i, /the person/i, /cross-area seam/i, /no registry or area code/i, /never (?:to|in) a ticket/i]) {
         assert.match(routesBullet, re, `${template.id}: ${re}`);
       }
     });
 
-    test(`${template.title} concludes on the notes PR, stays review-only around the note edits, keeps its output bounded`, () => {
-      assert.match(prompt, /The area-notes pull request carries the findings forward/);
-      assert.match(prompt, /beyond the report artifact itself and the area-note edits described above/);
-      assert.match(prompt, /After the report and its area-note edits above are written/);
-      assert.match(prompt, /what this reading writes — the report and its area-note entries — stays within its existing bound/);
+    test(`${template.title} concludes on the report PR, stays review-only around its findings, keeps its output bounded`, () => {
+      assert.match(prompt, /the findings it names are records in the project backlog/);
+      assert.match(prompt, /beyond the report artifact itself, and the findings the reading records/);
+      assert.match(prompt, /After the report and its findings above are written/);
+      assert.match(prompt, /what this reading writes — the report and its findings to the project — stays within its existing bound/);
       assert.doesNotMatch(prompt, /each note under its cap/);
     });
 
     test(`${template.title} still records every finding in the report and never re-raises a filed one`, () => {
       assert.match(prompt, /report of everything found/i);
-      assert.match(prompt, /A finding already filed as a ticket stays in the report only, never also in a note/);
+      assert.match(prompt, /A finding already on the backlog is revised, not filed again/);
     });
 
     test(`${template.title} gives no instruction to mint follow-up tasks`, () => {
@@ -1453,8 +1453,8 @@ describe('Seams & Tangles feeds the area notes, mints nothing (LIN-4379)', () =>
   const template = PERIODICALS.find(t => t.id === 'seams-tangles');
   const prompt = template.generatePrompt();
   const lines = prompt.split('\n');
-  const notesBullet = lines.find(l => l.startsWith('- **Feed the area notes'));
-  const routesBullet = lines.find(l => l.startsWith('- **Route each finding that has no area note'));
+  const notesBullet = lines.find(l => l.startsWith('- **Record each finding for the project'));
+  const routesBullet = lines.find(l => l.startsWith('- **Route each finding that is not for the project'));
 
   test('mints no follow-up tasks: no mint bullet, no one-move bullet, no follow-up shape', () => {
     assert.doesNotMatch(prompt, /Mint a bounded set of follow-up tasks/i);
@@ -1476,17 +1476,14 @@ describe('Seams & Tangles feeds the area notes, mints nothing (LIN-4379)', () =>
     assert.ok(notesBullet, 'the notes-output bullet is present');
     for (const re of [
       /mint no follow-up tasks/i,
-      /searching the repo/i,
-      /follow their own rules/i,
-      /registry/i, /guard/i, /one home/i,
+      /by searching/i,
+      /registry/i,
       /since the commit the previous report measured/i,
-      /map each changed file to its area through the registry/i,
-      /prune entries you find settled or no longer true/i,
+      /map each to its area/i,
+      /settled or made untrue/i,
       /Seams & Tangles, <the date of this run>/,
-      /already filed as a ticket stays in the report only/i,
-      /one docs-only pull request/i,
-      /off main, green under the notes guard and required checks/i,
-      /review approves it and close-out merges it, never this run/i
+      /already on the backlog is revised, not filed again/i,
+      /`kind: finding` with `to: project`/
     ]) assert.match(notesBullet, re);
   });
 
@@ -1494,9 +1491,9 @@ describe('Seams & Tangles feeds the area notes, mints nothing (LIN-4379)', () =>
     assert.ok(routesBullet, 'the routes bullet is present');
     for (const re of [
       /larger tidy/i, /size of move/i,
-      /no file in an area to cite/i, /live secret/i, /addressed to the person/i,
-      /cross-area seam/i, /area a change would start from/i, /naming the other side/i, /seams have no full home/i,
-      /repo with no area notes/i, /report and the closing comment only/i,
+      /urgent breakage/i, /live secret/i, /the person/i,
+      /cross-area seam/i, /naming both areas/i,
+      /no registry or area code/i, /closing comment/i,
       /never (?:to|in) a ticket/i
     ]) assert.match(routesBullet, re);
   });
@@ -1511,11 +1508,11 @@ describe('Seams & Tangles feeds the area notes, mints nothing (LIN-4379)', () =>
     assert.doesNotMatch(prompt, /docs\/areas/);
   });
 
-  test('conclude names the notes PR; review-only allows the report and the note edits; gap audit names the bounded output', () => {
-    assert.match(prompt, /The area-notes pull request carries the findings forward/i);
+  test('conclude names the report PR; review-only allows the report and its findings; gap audit names the bounded output', () => {
+    assert.match(prompt, /the findings it names are records in the project backlog/i);
     assert.match(prompt, /Stay review-only/);
-    assert.match(prompt, /beyond the report artifact itself and the area-note edits/i);
-    assert.match(prompt, /what this reading writes — the report and its area-note entries — stays within its existing bound/i);
+    assert.match(prompt, /beyond the report artifact itself, and the findings the reading records/i);
+    assert.match(prompt, /what this reading writes — the report and its findings to the project — stays within its existing bound/i);
   });
 
   test('keeps the report gate marker and the adversarial second read', () => {
@@ -1525,7 +1522,7 @@ describe('Seams & Tangles feeds the area notes, mints nothing (LIN-4379)', () =>
 
   test('the second read follows the report and its note edits, not follow-up tasks', () => {
     assert.doesNotMatch(prompt, /\(and any follow-up tasks\)/);
-    assert.match(prompt, /After the report and its area-note edits above are written/);
+    assert.match(prompt, /After the report and its findings above are written/);
   });
 });
 

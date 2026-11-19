@@ -37,12 +37,12 @@ describe('scoping reads the area notes by pointer (LIN-4346)', () => {
     assert.equal(count(prompt, '## Area Notes'), 1);
     assert.match(pointer, /`docs\/areas\/README\.md`/);
     assert.ok(pointer.includes(`\`${REGISTRY_PATH}\``));
-    assert.match(pointer, /Periodical readings reach you through these notes/);
+    assert.match(pointer, /Periodical readings reach the project backlog as findings/);
   });
 
   test('the pointer never asks for a record line: citations go in the final message, never the size record', () => {
     const prompt = render('scoping');
-    assert.match(pointer, /Name each entry you weighed \(its file and source\) in your final message, never in the size record\./);
+    assert.match(pointer, /Name each one you weighed in your final message, never in the size record\./);
     assert.ok(!prompt.includes('where you record your decisions'), 'not the shared pointer\'s "record your decisions"');
     assert.ok(!prompt.includes(formatAreaNotesPointer()), 'not the shared pointer');
     assert.ok(!/\*\*[^*]+:\*\*/.test(pointer), 'the pointer names no record label');
@@ -55,7 +55,7 @@ describe('scoping reads the area notes by pointer (LIN-4346)', () => {
   });
 
   test('a note entry is weighed by the bind rule scoping applies to a Survey finding', () => {
-    assert.match(pointer, /Weigh a note entry as you weigh a Survey finding\./);
+    assert.match(pointer, /weigh one as a Survey finding only when the person makes it this task\./);
     assert.match(render('scoping'), /A finding binds on this task only when the asked change would not work/);
   });
 

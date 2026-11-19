@@ -9,6 +9,7 @@
  */
 process.env.NODE_ENV = 'test';
 
+import { FINDINGS_NONE } from '../../lib/close-out-findings.js';
 import { test, describe, mock } from 'node:test';
 import assert from 'node:assert/strict';
 import { readCloseOutChain } from '../../lib/close-out-readiness.js';
@@ -19,6 +20,7 @@ const reviewBody = '## Review\n\nReviewed head `aaaaaaa1111111`.\n\n### What CI 
 const comment = (body, createdAt) => ({ body, createdAt, user: 'someone' });
 
 const chainFor = (comments) => readCloseOutChain({
+  openFindings: FINDINGS_NONE,
   workspace: { urlKey: 'acme' },
   issueIdentifier: 'LIN-1',
   seam: {
@@ -96,6 +98,7 @@ describe('readCloseOutChain when the comment read hits the cap (LIN-4322)', () =
     try {
       await assert.rejects(
         readCloseOutChain({
+          openFindings: FINDINGS_NONE,
           workspace: { urlKey: 'acme' },
           issueIdentifier: 'LIN-1',
           seam: {

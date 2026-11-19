@@ -18,14 +18,15 @@ import { createMangoTmpdir } from '../fixtures/mango-tmpdir.js';
 import { RecordsStore, RECORDS_COLLECTION, REFS_COLLECTION, QUERY_LOG_COLLECTION } from '../../lib/records-store.js';
 import { INDEX_SPECS } from '../../lib/db-indexes.js';
 import { planImport as planWith, readWaiting, SECURITY_PARENT_ID } from '../../lib/records/waiting-import.js';
-import { parseNote, citedPaths } from '../../lib/prompts/area-note-format.js';
+import { citedPaths } from '../../lib/prompts/area-note-format.js';
+import { parseWaitingSection } from '../../lib/records/waiting-import.js';
 import { applyWrites, waitingItems, applyManifest, manifestItems, ticketTaskIdOf } from '../../lib/records/import-apply.js';
 import { createRecordWrites } from '../../lib/records/writes.js';
 import { isTerminalState } from '../../lib/providers/state-map.js';
 import { STAGE_KINDS } from '../../lib/prompts/stage-kinds.js';
 
 const URL_KEY = 'lin-4494-import';
-const NOTE_READER = { parseNote, citedPaths };
+const NOTE_READER = { parseNote: parseWaitingSection, citedPaths };
 const planImport = (notes, opts = {}) => planWith(notes, { ...opts, ...NOTE_READER });
 const FIXTURES = new URL('../fixtures/records-import/baseline-bf2d1575f/', import.meta.url);
 const MANIFEST = new URL('../../scripts/records/parked-tickets.json', import.meta.url);
@@ -85,7 +86,10 @@ describe('the Waiting entries at the baseline', () => {
   });
 
   test('a note with no Waiting section is present:false, and its absence is not an error', () => {
-    assert.throws(() => planWith([], {}), /needs parseNote and citedPaths/, 'the reader is never guessed');
+    assert.throws(() => planWith([], {}), /needs a parseNote function and citedPaths/, 'the cited-path predicate is never guessed');
+    // The Waiting reader defaults to this module's own (LIN-4495): a caller passes only the cited-path predicate.
+    const dflt = planWith([{ note: 'x', markdown: '## Waiting\n\n- `lib/ok.js` — fine\n' }], { citedPaths });
+    assert.equal(dflt.totals.entries, 1);
     assert.equal(readWaiting('# Notes\n\n## Lessons\n- x\n', NOTE_READER).present, false);
   });
 });

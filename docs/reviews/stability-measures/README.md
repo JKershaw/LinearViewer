@@ -49,13 +49,13 @@ Net production lines lead, with code and comments counted apart.
 - `ci`: the median minutes (`updatedAt − startedAt`) of successful `test.yml` runs on `main` whose head sha is a
   window landing. Unit: one run per landing. Source: `gh`. Defined in `scripts/stability-measures-core.mjs`
   (`ciRow`) and `scripts/stability-measures.mjs` (the listing).
-- `waiting.harbour`, `waiting.runner`, `waiting.total`: Waiting entries in the area notes at base and head and the
-  change per landing, for this repository, the runner (simple-dispatcher) and both. An entry is a bullet under
-  `## Waiting` in `docs/areas/*.md`, read from git objects; a commit with no notes directory has 0. The runner's
-  endpoints are the last first-parent commits on its checked-out branch at or before base's and head's commit
-  times. Unit: landing (the change); the totals are counts. Source: git, both repositories. Defined in
-  `lib/prompts/area-note-format.js` (`countWaiting`, shared with the area-notes guard) and
-  `scripts/stability-measures.mjs` (`readRunner`).
+- `waiting.harbour`, `waiting.runner`, `waiting.total`: the bullets under each area note's `## Waiting` heading at base and
+  head, read by the frozen reader `countFrozenWaiting` (`lib/records/waiting-import.js`), which keeps the pre-cutover
+  shape for historical windows. A commit with no notes directory reads 0. A commit whose notes carry no `## Waiting`
+  section (every note after LIN-4495 retired the lists) reads `not measured` with that reason, never 0, so a window
+  that spans the cutover shows the gap rather than a fall. The readings below are from before LIN-4495. The records
+  rows that replace them (open to project, open to a stage, sit time) are LIN-4496's. Defined in
+  `scripts/stability-measures.mjs` (`waitingAt`).
 - `minted`: tickets minted per landing, an **ID-span estimate**: the highest issue number created at or before
   head's commit time, minus the same at base, over the window's landings. The span counts trashed and missing
   numbers. Unit: landing. Source: the tracker. Defined in `scripts/stability-measures-core.mjs` (`idSpanSearch`,

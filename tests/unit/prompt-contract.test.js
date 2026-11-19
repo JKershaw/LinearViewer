@@ -78,19 +78,19 @@ test('review: title, head, CI line, ledger and verdict all parse', () => {
   const read = readRunLedger(comments);
   assert.strictEqual(read.sha, 'abc1234');
   assert.match(read.ciLine, /^CI: green/);
-  assert.deepStrictEqual(read.ledger.items.map(i => [i.scope, i.discharged]), [['inside', false], ['outside', true]]);
+  assert.strictEqual(read.ledger.present, true, 'the section is present');
+  assert.strictEqual(read.ledger.empty, false, 'and not stated empty: a pre-cutover ledger, held as not measured (LIN-4495)');
   assert.strictEqual(read.verdict, 'approve-conditional');
 });
 
-test('review: the empty-ledger line and every verdict form parse', () => {
+test('review: every verdict form parses; the review writes no ledger section any more (LIN-4495: its findings are records)', () => {
   const c = formatStageContract('review', 'LIN-1');
-  const empty = ticks(c).find(t => t.includes('ledger empty'));
   const verdicts = ticks(c).slice(ticks(c).indexOf('### Verdict') + 1);
   const expected = ['approve', 'approve-conditional', 'request-changes', 'needs-discussion'];
   verdicts.forEach((v, i) => {
-    const body = `## Review — LIN-1\n\n### What CI Did Not Prove\n\n${empty}\n\n### Verdict\n${v}`;
+    const body = `## Review — LIN-1\n\n### Verdict\n${v}`;
     const read = readRunLedger([{ body, createdAt: at }]);
-    assert.strictEqual(read.ledger.empty, true);
+    assert.strictEqual(read.ledger.present, false, 'no ledger section on a review that records findings');
     assert.strictEqual(read.verdict, expected[i], v);
   });
 });

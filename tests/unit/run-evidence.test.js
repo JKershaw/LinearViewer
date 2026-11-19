@@ -8,6 +8,7 @@
 // zero / one / many / unreadable derivation into `{ state, evidence, ledger,
 // closeOut }`.
 
+import { FINDINGS_NONE } from '../../lib/close-out-findings.js';
 import { test, describe } from 'node:test';
 import assert from 'node:assert/strict';
 import { extractPrUrls, buildRunEvidence } from '../../lib/run-evidence.js';
@@ -70,7 +71,7 @@ describe('run-evidence: state derivation', () => {
   };
 
   test('zero PR URLs → no-pr', () => {
-    const m = buildRunEvidence({ issueIdentifier: 'LIN-1', comments: [], });
+    const m = buildRunEvidence({ openFindings: FINDINGS_NONE, issueIdentifier: 'LIN-1', comments: [], });
     assert.equal(m.closeOut.status, 'no-pr');
     assert.equal(m.state.pr, null, 'the picker names no PR');
     assert.match(m.closeOut.message, /no pull request/);
@@ -78,6 +79,7 @@ describe('run-evidence: state derivation', () => {
 
   test('exactly one open PR → ready, with the PR and checks link', () => {
     const m = buildRunEvidence({
+      openFindings: FINDINGS_NONE,
       issueIdentifier: 'LIN-1', comments: [comment(PR_A, '2026-07-01T00:00:00.000Z')], prStatus: oneOpen,
     });
     assert.equal(m.state.pr.state, 'open', 'the picker reads the open PR');
@@ -89,19 +91,21 @@ describe('run-evidence: state derivation', () => {
 
   test('LIN-4405: the PR carries GitHub\'s merged_at as mergedAt (additive; null when unset or unread)', () => {
     const merged = buildRunEvidence({
+      openFindings: FINDINGS_NONE,
       issueIdentifier: 'LIN-1', comments: [comment(PR_A, '2026-07-01T00:00:00.000Z')],
       prStatus: { ...oneOpen, state: 'closed', merged: true, merged_at: '2026-07-02T10:00:00Z' },
     });
     assert.equal(merged.closeOut.status, 'merged');
     assert.equal(merged.state.pr.mergedAt, '2026-07-02T10:00:00Z');
-    const open = buildRunEvidence({ issueIdentifier: 'LIN-1', comments: [comment(PR_A, '2026-07-01T00:00:00.000Z')], prStatus: oneOpen });
+    const open = buildRunEvidence({ openFindings: FINDINGS_NONE, issueIdentifier: 'LIN-1', comments: [comment(PR_A, '2026-07-01T00:00:00.000Z')], prStatus: oneOpen });
     assert.equal(open.state.pr.mergedAt, null);
-    const unread = buildRunEvidence({ issueIdentifier: 'LIN-1', comments: [comment(PR_A, '2026-07-01T00:00:00.000Z')], prStatus: { readable: false } });
+    const unread = buildRunEvidence({ openFindings: FINDINGS_NONE, issueIdentifier: 'LIN-1', comments: [comment(PR_A, '2026-07-01T00:00:00.000Z')], prStatus: { readable: false } });
     assert.equal(unread.state.pr.mergedAt, null);
   });
 
   test('more than one PR URL → multiple-prs, with the plan wording', () => {
     const m = buildRunEvidence({
+      openFindings: FINDINGS_NONE,
       issueIdentifier: 'LIN-1',
       comments: [comment(`${PR_A} ${PR_B}`, '2026-07-01T00:00:00.000Z')],
     });
@@ -112,6 +116,7 @@ describe('run-evidence: state derivation', () => {
 
   test('an unreadable PR read → unknown (fail-open), never throws', () => {
     const m = buildRunEvidence({
+      openFindings: FINDINGS_NONE,
       issueIdentifier: 'LIN-1', comments: [comment(PR_A, '2026-07-01T00:00:00.000Z')], prStatus: { readable: false, state: 'unknown', reason: 'private' },
     });
     assert.equal(m.closeOut.status, 'unknown');
@@ -121,11 +126,13 @@ describe('run-evidence: state derivation', () => {
 
   test('a closed (unmerged) PR → pr-not-open; a merged one → merged', () => {
     const closed = buildRunEvidence({
+      openFindings: FINDINGS_NONE,
       issueIdentifier: 'LIN-1', comments: [comment(PR_A, '2026-07-01T00:00:00.000Z')], prStatus: { ...oneOpen, state: 'closed' },
     });
     assert.equal(closed.closeOut.status, 'closed');
     assert.equal(closed.closeOut.reason, 'pr-not-open');
     const merged = buildRunEvidence({
+      openFindings: FINDINGS_NONE,
       issueIdentifier: 'LIN-1', comments: [comment(PR_A, '2026-07-01T00:00:00.000Z')], prStatus: { ...oneOpen, state: 'closed', merged: true },
     });
     assert.equal(merged.closeOut.status, 'merged');
@@ -144,7 +151,7 @@ describe('run-evidence: evidence rows and close-out', () => {
       comment(PR_A, '2026-07-01T00:00:00.000Z'),
       comment(`${REPLY}\n\nhead \`abc1234\``, '2026-07-02T00:00:00.000Z'),
     ];
-    const m = buildRunEvidence({ issueIdentifier: 'LIN-1', comments, prStatus: oneOpen });
+    const m = buildRunEvidence({ openFindings: FINDINGS_NONE, issueIdentifier: 'LIN-1', comments, prStatus: oneOpen });
     assert.equal(m.evidence.checked.review.verdict, 'approve-conditional');
     assert.equal(m.evidence.checked.review.sha, 'abc1234');
     assert.equal(m.evidence.checked.now.headSha, 'deadbeefdead');
@@ -155,6 +162,7 @@ describe('run-evidence: evidence rows and close-out', () => {
 
   test('asked comes from the issue title; done from the resolved PR', () => {
     const m = buildRunEvidence({
+      openFindings: FINDINGS_NONE,
       issueIdentifier: 'LIN-1', issue: { title: 'Do the thing' },
       comments: [comment(PR_A, '2026-07-01T00:00:00.000Z')], prStatus: oneOpen,
     });
@@ -163,24 +171,26 @@ describe('run-evidence: evidence rows and close-out', () => {
   });
 
   test('closeOut carries the owner flag and the state', () => {
-    const guest = buildRunEvidence({ issueIdentifier: 'LIN-1', comments: [], owner: false });
+    const guest = buildRunEvidence({ openFindings: FINDINGS_NONE, issueIdentifier: 'LIN-1', comments: [], owner: false });
     assert.equal(guest.closeOut.owner, false);
-    const owner = buildRunEvidence({ issueIdentifier: 'LIN-1', comments: [], owner: true });
+    const owner = buildRunEvidence({ openFindings: FINDINGS_NONE, issueIdentifier: 'LIN-1', comments: [], owner: true });
     assert.equal(owner.closeOut.owner, true);
   });
 
   test('the ledger model is threaded through for the collapsed fragment', () => {
     const m = buildRunEvidence({
+      openFindings: FINDINGS_NONE,
       issueIdentifier: 'LIN-1', comments: [comment(REPLY, '2026-07-02T00:00:00.000Z')],
       prStatus: null,
     });
     assert.equal(m.ledger.verdict, 'approve-conditional');
-    assert.equal(m.ledger.ledger.items.length, 1);
+    assert.equal(m.ledger.ledger.items, undefined, 'the items are records now (LIN-4495)');
+    assert.equal(m.closeOut.openFindings.state, 'read', 'the reading rides the close-out model');
   });
 
   // LIN-3497: a review is on record only when a review comment exists.
   test('no review comment: review and ledger are null, not an empty parse', () => {
-    const m = buildRunEvidence({ issueIdentifier: 'LIN-1', comments: [comment('just a note', '2026-07-01T00:00:00.000Z')] });
+    const m = buildRunEvidence({ openFindings: FINDINGS_NONE, issueIdentifier: 'LIN-1', comments: [comment('just a note', '2026-07-01T00:00:00.000Z')] });
     assert.equal(m.ledger, null);
     assert.equal(m.evidence.checked.review, null);
     assert.equal(m.closeOut.review.verdict, null);

@@ -492,7 +492,7 @@ describe('render-time secret masking (LIN-3389)', () => {
       }],
       evidence: {
         state: { pr: null },
-        ledger: { ledger: { present: true, empty: false, items: [{ id: 'L1', scope: 'inside', claim: `ledger ${F.awsAccessKey}`, discharged: false }] } },
+        ledger: { ledger: { present: true, empty: false, raw: `ledger ${F.awsAccessKey}` } },
       },
     };
     const { base, close } = await build({

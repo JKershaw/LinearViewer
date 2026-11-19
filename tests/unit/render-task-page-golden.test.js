@@ -16,6 +16,7 @@
  *   - every in-Harbour href goes through `harbourHref` (carries the source kind),
  *     the same for every viewer.
  */
+import { FINDINGS_NONE } from '../../lib/close-out-findings.js';
 import { test, describe } from 'node:test';
 import assert from 'node:assert/strict';
 import { readFileSync, writeFileSync, existsSync } from 'node:fs';
@@ -308,7 +309,7 @@ describe('task page structure', () => {
   // cannot paint "A review is on record" or an empty Pull request section.
   test('a built evidence model with no PR and no review comment renders no Pull request section', () => {
     const m = model('running-blocked-repeat');
-    const built = buildRunEvidence({ issueIdentifier: 'LIN-1', comments: [{ body: 'just a note', createdAt: '2026-07-01T00:00:00.000Z' }], owner: true });
+    const built = buildRunEvidence({ openFindings: FINDINGS_NONE, issueIdentifier: 'LIN-1', comments: [{ body: 'just a note', createdAt: '2026-07-01T00:00:00.000Z' }], owner: true });
     const html = renderTaskPage({ ...m, evidence: built }, { viewer: 'owner', urlKey: 'acme', binding: BINDING, now: NOW, pageOptions: PAGE_OPTIONS });
     assert.doesNotMatch(html, /task-page-pr-mount/, 'no section');
     assert.doesNotMatch(html, /A review is on record/);
@@ -376,7 +377,8 @@ describe('task page structure', () => {
         assert.doesNotMatch(detail, /of 2 checked/, `${status}: no count while the close-out is finishing`);
         assert.match(detail, /close-out is still finishing/, `${status}: the settling sentence`);
       } else {
-        assert.match(detail, /2 things CI couldn&#039;t prove: 1 of 2 checked/, `${status}: the ledger sentence`);
+        // LIN-4495: the sentence is the open findings to close-out, as read; this fixture reads none, so it says so.
+        assert.match(detail, /open findings not read — not checked/, `${status}: the findings sentence`);
       }
       // The check reads what a reader sees: a tap time's ISO stamp is its `datetime` attribute, never shown.
       const visible = says.replace(/<[^>]+>/g, ' ');
@@ -398,6 +400,7 @@ describe('task page structure', () => {
   test('a guest is not told an approved, ready PR is not ready (F1)', () => {
     const REPO = 'acme/app';
     const derive = (over) => deriveCloseOutState({
+      openFindings: FINDINGS_NONE,
       prs: [{ url: `https://github.com/${REPO}/pull/41`, repo: REPO, number: 41, corroborated: false }],
       // LIN-4458: statuses are keyed by PR URL.
       prStatuses: new Map([[`https://github.com/${REPO}/pull/41`, { repo: REPO, readable: true, number: 41, state: 'open', merged: false, head: { ref: 'x', sha: 'aaaaaaa' }, ref: 'aaaaaaa', checks: [] }]]),

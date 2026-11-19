@@ -16,6 +16,7 @@
  */
 process.env.NODE_ENV = 'test';
 
+import { FINDINGS_NONE } from '../../lib/close-out-findings.js';
 import { test, describe, before, after } from 'node:test';
 import assert from 'node:assert/strict';
 import express from 'express';
@@ -147,6 +148,7 @@ const status = (number, over = {}) => ({ readable: true, repo: REPO, number, sta
 
 describe('the stop-at guard decides from the landing', () => {
   const guard = (statuses, reads = []) => closeOutNotReady({
+    openFindings: FINDINGS_NONE,
     workspace: { urlKey: 'acme' }, issueIdentifier: 'LIN-1',
     seam: {
       resolveProvider: () => ({ provider: { name: 'local', async fetchIssueComments() { return CITED_NOT_LANDED; } }, callScope: 'scope' }),
@@ -200,7 +202,7 @@ describe('a PR cited only outside the landing is not read (the box\'s one read i
   test('a PR cited only by a Survey report: no read, box no-pr, picker one, page state unknown', async () => {
     const reads = [];
     const survey = c(1, `## Survey open-0: LIN-1 @ abc\n\nAn earlier attempt is ${PR_OLD}.`);
-    const model = await readRunEvidence({ issueIdentifier: 'LIN-1', comments: [survey], stopAt: 'pr', runnerReady: true, viewerIsOwner: true, readPrStatus: async ({ number }) => { reads.push(number); return status(number); } });
+    const model = await readRunEvidence({ openFindings: FINDINGS_NONE, issueIdentifier: 'LIN-1', comments: [survey], stopAt: 'pr', runnerReady: true, viewerIsOwner: true, readPrStatus: async ({ number }) => { reads.push(number); return status(number); } });
     assert.deepEqual(reads, []);
     assert.equal(model.closeOut.status, 'no-pr');
     assert.equal(resolveRunPrRef(model).status, 'one');
@@ -229,14 +231,14 @@ describe('an empty landing with a PR cited: the box reads no-pr (LIN-4458 review
   test('re-review naming the PR only as #41: readTrail().landing is [] and the box reads no-pr given a merged status (before: merged)', () => {
     assert.deepEqual(readTrail(EMPTY_LANDING).landing, []);
     assert.deepEqual(landingPrUrls(EMPTY_LANDING), []);
-    const model = buildRunEvidence({ issueIdentifier: 'LIN-1', comments: EMPTY_LANDING, prStatus: merged, stopAt: 'pr', runnerReady: true, owner: true });
+    const model = buildRunEvidence({ openFindings: FINDINGS_NONE, issueIdentifier: 'LIN-1', comments: EMPTY_LANDING, prStatus: merged, stopAt: 'pr', runnerReady: true, owner: true });
     assert.equal(model.closeOut.status, 'no-pr');
   });
 
   test('the same trail with the re-review naming the full URL keeps the landing, and the box reads the merged PR', () => {
     const named = [...EMPTY_LANDING.slice(0, 3), review(4, 'Approve', A)];
     assert.deepEqual(readTrail(named).landing, [A]);
-    const model = buildRunEvidence({ issueIdentifier: 'LIN-1', comments: named, prStatus: merged, stopAt: 'pr', runnerReady: true, owner: true });
+    const model = buildRunEvidence({ openFindings: FINDINGS_NONE, issueIdentifier: 'LIN-1', comments: named, prStatus: merged, stopAt: 'pr', runnerReady: true, owner: true });
     assert.notEqual(model.closeOut.status, 'no-pr');
   });
 });

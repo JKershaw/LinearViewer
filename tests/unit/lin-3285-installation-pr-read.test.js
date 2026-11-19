@@ -7,6 +7,7 @@
 //
 // Run with: node --test tests/unit/lin-3285-installation-pr-read.test.js
 
+import { FINDINGS_NONE } from '../../lib/close-out-findings.js';
 import { test, describe, beforeEach, before } from 'node:test';
 import assert from 'node:assert/strict';
 import { readFileSync, readdirSync, statSync } from 'node:fs';
@@ -332,6 +333,7 @@ describe('readers: a Linear workspace reads with the minted token', () => {
   test('readRunEvidence: authenticated read, scoped to the urlKey', async () => {
     const { installationTokenFor, github } = owned();
     const out = await readRunEvidence({
+      openFindings: FINDINGS_NONE,
       issueIdentifier: 'LIN-1', provider: linearProvider(), callScope: 'lin_key',
       urlKey: 'ws-a', workspaceId: WS, installationTokenFor, githubFetch: github,
     });
@@ -342,6 +344,7 @@ describe('readers: a Linear workspace reads with the minted token', () => {
   test('without the seam the same read is anonymous and 403s (the failing case this ticket fixes)', async () => {
     const github = fakeGitHub();
     const out = await readRunEvidence({
+      openFindings: FINDINGS_NONE,
       issueIdentifier: 'LIN-1', provider: linearProvider(), callScope: 'lin_key',
       urlKey: 'ws-a', workspaceId: WS, githubFetch: github,
     });
@@ -352,6 +355,7 @@ describe('readers: a Linear workspace reads with the minted token', () => {
   test('a cross-account installation leaves the read anonymous', async () => {
     const { installationTokenFor, github } = makeSeam({ rows: [connection(OTHER, 'github', 'inst-1')] });
     await readRunEvidence({
+      openFindings: FINDINGS_NONE,
       issueIdentifier: 'LIN-1', provider: linearProvider(), callScope: 'lin_key',
       urlKey: 'ws-a', workspaceId: WS, installationTokenFor, githubFetch: github,
     });
@@ -381,6 +385,7 @@ describe('readers: a Linear workspace reads with the minted token', () => {
     let asked = 0;
     let providerReads = 0;
     const state = await closeOutNotReady({
+      openFindings: FINDINGS_NONE,
       workspace: { urlKey: 'ws-a', id: WS }, issueIdentifier: 'LIN-1', store: {},
       seam: {
         isStopAtRun: async () => null,

@@ -24,7 +24,6 @@ const RETIRED = [
   'do not change code, branches, pull requests, tickets or Linear state',
   'do not change code, branches, pull requests, tickets or tracker state',
   'do not rewrite its description, do not create tickets or subtasks',
-  'one docs-only notes pull request',
   'Don\'t change code, branches, pull requests, tickets or Linear state',
   'Don\'t change code, branches, pull requests, tickets or tracker state',
   'rebase it onto main and get it green under the notes guard',
@@ -77,10 +76,11 @@ describe('LIN-4469: the shared clauses render where the folded rules were', () =
     assert.ok(prompts['stage:bug:fresh'].includes('(`docs/areas/areas.json`, first match wins; no notes file means nothing known yet)'));
   });
 
-  test('the notes pull request is the one shared clause, in periodical readings and the retrospective audit', () => {
-    const clause = 'one docs-only pull request off main, green under the notes guard and required checks';
-    assert.ok(prompts['periodical:seams-tangles'].includes(clause));
-    assert.ok(prompts['stage:retrospective-audit:fresh'].includes(clause));
+  // LIN-4495: the notes pull request is retired as a shared clause: a reading's and the audit's findings are records
+  // to the project, and the audit opens no pull request.
+  test('the findings go to the project as records, in periodical readings and the retrospective audit (LIN-4495)', () => {
+    assert.ok(prompts['periodical:seams-tangles'].includes('`kind: finding` with `to: project`'));
+    assert.ok(prompts['stage:retrospective-audit:fresh'].includes('The audit opens no pull request and writes no note'));
   });
 
   test('the blind read keeps its own area sentence, as piloted (LIN-4437)', () => {

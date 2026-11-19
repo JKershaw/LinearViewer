@@ -22,13 +22,9 @@ const REVIEW_BODY = [
   '',
   'CI on `abc1234` is green.',
   '',
-  '### What CI Did Not Prove',
-  '| # | Claim | In/Out | Discharge |',
-  '|---|---|---|---|',
-  '| L1 | the socket path handles a foreign user (EACCES) | inside | manual repro on a real host |',
-  '| L2 | the upstream contract is unchanged | outside | follow-up LIN-9999 |',
+  'CI covers the deliverable; nothing to record.',
   '',
-  '**Verdict: Approve — conditional on close-out discharging the ledger.**',
+  '**Verdict: Approve — conditional on close-out settling the findings.**',
 ].join('\n');
 
 let URL_KEY;
@@ -156,7 +152,7 @@ test.describe('Close-out box on the session page (LIN-3248)', () => {
     const nowLine = page.locator('[data-testid="run-evidence-checked-now"]');
     await expect(reviewLine).toBeVisible();
     await expect(nowLine).toBeVisible();
-    await expect(reviewLine).toContainText('Approve — conditional on close-out discharging the ledger.');
+    await expect(reviewLine).toContainText('Approve — conditional on close-out settling the findings.');
 
     const ledger = page.locator('[data-testid="run-evidence-ledger"]');
     await expect(ledger).toBeAttached();
@@ -210,8 +206,8 @@ test.describe('Close-out box on the session page (LIN-3248)', () => {
     const ledger = page.locator('[data-testid="run-evidence-ledger"]');
     expect(await ledger.evaluate(el => el.open)).toBe(false);
     await ledger.locator('summary').click();
-    await expect(page.locator('[data-testid="run-evidence-ledger-open-at-merge"]')).toHaveCount(2);
-    await expect(page.locator('[data-testid="run-evidence-ledger-open-no-followup"]')).toHaveCount(1);
+    // LIN-4495: the ledger's items are records now; the box reads the findings to close-out, none open here.
+    await expect(page.locator('[data-testid="run-evidence-findings"]')).toContainText('no open findings to close-out');
     // Nothing above the evidence rows.
     await expect(page.locator('[data-testid="session-waiting-banner"]')).toHaveCount(0);
   });

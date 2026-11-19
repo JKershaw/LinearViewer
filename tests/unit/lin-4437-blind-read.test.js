@@ -16,6 +16,7 @@
  */
 process.env.NODE_ENV = 'test';
 
+import { FINDINGS_NONE } from '../../lib/close-out-findings.js';
 import { test, describe } from 'node:test';
 import assert from 'node:assert/strict';
 import { readFileSync } from 'node:fs';
@@ -232,24 +233,33 @@ describe('witness 2: the read is blind', () => {
   });
 });
 
+const WHERE_EACH_FIND_GOES = "**Where each find goes.** A find inside the change's own area that one sitting on this branch could fix, without changing the change's design (a few lines in one or two files, and no new decision), is a finding `to` `close-out` on this ticket. A find that needs a decision, a new design or several areas, or any find outside the change's area, is a finding `to` `project`, with `says` naming its file and area. You only record; someone else acts on each find.";
+
 describe('the prompt is the piloted text', () => {
-  test('the render equals the frozen pilot but for its fill-ins, the Where-to-stand sentence and the Goal frame', () => {
+  test('the render keeps every paragraph of the frozen pilot but the ones LIN-4495 changed (the finds are records now)', () => {
     const pilot = read('tests/fixtures/blind-read-piloted.txt');
     const prompt = generatePrompt('blind-read', { identifier: 'LIN-9', state: {}, labels: [] }, { comments: [summary(1)] }).prompt;
     const body = prompt.slice(prompt.indexOf('## Process\n\n') + '## Process\n\n'.length);
     const [repo, lead, ...rest] = pilot.trimEnd().split('\n\n');
-    const expected = [repo.replace('JKershaw/LinearViewer (Harbour)', 'JKershaw/LinearViewer'), ...rest].join('\n\n')
-      .replace('{DESTINATION}', 'Your only output is one comment on LIN-9: the comment below. LIN-9 is where it goes, not something to read.')
-      .replaceAll('{PRS}', PR);
-    const where = body.split('\n\n').find(p => p.startsWith('**Where to stand.**'));
-    assert.equal(body.split('\n\n').filter(p => p !== where).join('\n\n'), expected);
     assert.ok(prompt.includes(`## Goal\n${lead}\n`), 'the lead is the pilot\'s second paragraph');
-    assert.match(where, /git fetch origin pull\/<number>\/head/);
+    // LIN-4495: these paragraphs are the cutover's: the Areas sentence (its finds), the three-class sort, the rules line
+    // (no class sections in the comment) and the class headings. Each is checked by its own rendered words below.
+    const CHANGED = ['**Where to stand.**', '**Areas.**', '**Sort each find', 'You only sort', 'Rules for the comment:', '### '];
+    const fill = (t) => t.replace('{DESTINATION}', 'Your outputs are one comment on LIN-9, the comment below, and the finds you record as findings (the hand-off protocol says how). LIN-9 is where the comment goes, not something to read.').replaceAll('{PRS}', PR);
+    for (const p of rest.filter(q => !CHANGED.some(c => q.startsWith(c)))) {
+      assert.ok(body.includes(fill(p)), `unchanged pilot paragraph: ${p.slice(0, 60)}`);
+    }
+    assert.ok(body.includes(WHERE_EACH_FIND_GOES), 'the routing paragraph is the rendered one');
+    assert.ok(body.includes('Rules for the comment: its first line is exactly `## Blind read`'), 'the rules line keeps its opening');
+    assert.doesNotMatch(body, /### Inside the area|### Outside the area/, 'no class sections in the comment');
+    assert.match(prompt, /## Goal/);
+    assert.match(body.split('\n\n').find(q => q.startsWith('**Where to stand.**')), /git fetch origin pull\/<number>\/head/);
   });
-  test('the class lines and the unmapped-path sentence are the leaf constants\' own words', () => {
+  test('where each find goes is the records routing (LIN-4495), and the unmapped-path find is worded by the consequence test', () => {
     const prompt = generatePrompt('blind-read', { identifier: 'LIN-9', state: {}, labels: [] }, { comments: [summary(1)] }).prompt;
-    for (const s of LEFTOVER_RULE.split(/(?<=\.)\s+/).slice(1, 4)) assert.ok(prompt.includes(`- ${s}\n`), s);
-    assert.ok(prompt.includes(CONSEQUENCE_TEST.split(/(?<=\.)\s+/).find(s => s.startsWith('An unmapped path'))));
+    assert.ok(prompt.includes('An unmapped path\'s find is a find outside the change\'s area'));
+    assert.ok(CONSEQUENCE_TEST.includes('Word an outside find'), 'the consequence test words the outside find');
+    assert.ok(LEFTOVER_RULE.includes('a finding'), 'the leftover rule routes a find to a finding');
   });
   test('with no PR on the landing the prompt says so and the run ends [skipped]', () => {
     const prompt = generatePrompt('blind-read', { identifier: 'LIN-9', state: {}, labels: [] }, { comments: [c(1, 'no links here')] }).prompt;
@@ -272,24 +282,24 @@ describe('the ledger carries the read', () => {
     assert.equal(Object.hasOwn(readRunLedger(trail), 'blindRead'), false);
   });
   test('buildRunEvidence carries it, and the fragment shows the verdict and reason, or none on record', () => {
-    const model = buildRunEvidence({ comments: trail, issueIdentifier: 'LIN-1' });
+    const model = buildRunEvidence({ openFindings: FINDINGS_NONE, comments: trail, issueIdentifier: 'LIN-1' });
     assert.equal(model.ledger.blindRead.verdict, 'same');
     assert.equal(model.evidence.checked.blindRead.verdict, 'same');
     const html = renderRunEvidence(model);
     assert.match(html, /data-testid="run-evidence-checked-blind-read-verdict">same</);
     assert.match(html, /one owner/);
-    assert.match(renderRunEvidence(buildRunEvidence({ comments: [summary(1), review(2)], issueIdentifier: 'LIN-1' })), /no blind read on record/);
+    assert.match(renderRunEvidence(buildRunEvidence({ openFindings: FINDINGS_NONE, comments: [summary(1), review(2)], issueIdentifier: 'LIN-1' })), /no blind read on record/);
   });
   test('a precomputed ledger brings its own read', () => {
     const ledger = { ...readRunLedger(trail), blindRead: readTrail(trail).review.blindRead };
-    assert.equal(buildRunEvidence({ comments: [], ledger, issueIdentifier: 'LIN-1' }).evidence.checked.blindRead.verdict, 'same');
+    assert.equal(buildRunEvidence({ openFindings: FINDINGS_NONE, comments: [], ledger, issueIdentifier: 'LIN-1' }).evidence.checked.blindRead.verdict, 'same');
   });
   test('a precomputed ledger with no blindRead key reads the read after ITS review, not the whole trail (LIN-4438)', () => {
     const older = [read1(1, [PR], 'worse'), summary(2), review(3)];
     const ledger = readRunLedger(older);
-    assert.equal(buildRunEvidence({ comments: older, ledger, issueIdentifier: 'LIN-1' }).evidence.checked.blindRead, null, 'review in the comments');
-    assert.equal(buildRunEvidence({ comments: [older[0]], ledger, issueIdentifier: 'LIN-1' }).evidence.checked.blindRead, null, 'placed by the ledger time');
-    assert.equal(buildRunEvidence({ comments: [...older, read1(4, [PR], 'same')], ledger, issueIdentifier: 'LIN-1' }).evidence.checked.blindRead.verdict, 'same');
+    assert.equal(buildRunEvidence({ openFindings: FINDINGS_NONE, comments: older, ledger, issueIdentifier: 'LIN-1' }).evidence.checked.blindRead, null, 'review in the comments');
+    assert.equal(buildRunEvidence({ openFindings: FINDINGS_NONE, comments: [older[0]], ledger, issueIdentifier: 'LIN-1' }).evidence.checked.blindRead, null, 'placed by the ledger time');
+    assert.equal(buildRunEvidence({ openFindings: FINDINGS_NONE, comments: [...older, read1(4, [PR], 'same')], ledger, issueIdentifier: 'LIN-1' }).evidence.checked.blindRead.verdict, 'same');
   });
 });
 

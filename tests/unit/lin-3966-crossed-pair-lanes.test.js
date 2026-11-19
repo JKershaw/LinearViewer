@@ -20,6 +20,7 @@
  */
 process.env.NODE_ENV = 'test';
 
+import { FINDINGS_NONE } from '../../lib/close-out-findings.js';
 import { test, describe } from 'node:test';
 import assert from 'node:assert/strict';
 import express from 'express';
@@ -107,7 +108,7 @@ async function pressRow(body, table) {
     workspacePreferencesStore: storeWith(table),
     // LIN-4438: the readiness guard reads the comments for every close-out (the blind-read gate); a seam
     // keeps that read off the network. No review on the trail, so the press is admitted as before.
-    closeOut: { resolveProvider: () => ({ provider: { async fetchIssueComments() { return []; } }, callScope: 'scope' }) },
+    closeOut: { openFindings: FINDINGS_NONE, resolveProvider: () => ({ provider: { async fetchIssueComments() { return []; } }, callScope: 'scope' }) },
     afterEnqueue: async () => undefined
   });
   assert.equal(responses[0]?.status, 201, `the press answered ${responses[0]?.status}: ${JSON.stringify(responses[0]?.body)}`);
