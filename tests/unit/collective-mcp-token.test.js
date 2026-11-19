@@ -258,7 +258,8 @@ describe('LIN-1582 — Collective prose branch under the ownerless switch', () =
     assert.equal(res.status, 201, JSON.stringify(res.body));
     assert.equal(minted.length, 1, 'exactly one mint, as before');
     // The four forwarded options plus the owner stamp — this is the equivalence
-    // the swap to provisionBootstrapToken has to preserve.
+    // the swap to provisionBootstrapToken has to preserve. LIN-4492: every dispatch
+    // mint also names its origin; a collective participant starts no run, so no runRecordId.
     assert.deepEqual(minted[0], {
       urlKey: 'alpha',
       opts: {
@@ -267,6 +268,7 @@ describe('LIN-1582 — Collective prose branch under the ownerless switch', () =
         label: 'collective',
         ttl: BOOTSTRAP_TOKEN_TTL_SECONDS,
         createdBy: 'account-A',
+        origin: 'dispatch',
       },
     });
     // ...and the prose block still carries the token inline.

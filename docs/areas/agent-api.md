@@ -47,6 +47,12 @@ Area notes for `agent-api` in the registry. Format and rules: README.md.
   reason in `tests/unit/dispatch-entrance-mint-sweep.test.js`. The refire broker minted unrestricted
   tokens for read-only rows because its mint was a bare `createToken`, which no helper-name search
   finds (LIN-4468).
+- A proxy token records its `origin` and, for a dispatch token, its `runRecordId`, set at mint and copied once by the
+  exchange (LIN-4492). A person's mint goes through `personMint()` (`lib/stage-writes.js`), which the census pins to the tokens
+  page and the test seams; a bare `origin: 'person'` is ignored. Find every mint by its call (`tests/unit/lin-4492-mint-census.test.js`):
+  a helper-name search misses a bare `createToken`, which is how LIN-4468 found its gap. A new mint fails the census until it is listed.
+- The dispatch factory allocates a row's id before its prompt is finalized (LIN-4492, `lib/dispatch-factory.js`). The prompt and every
+  credential minted for the row name it; `addItem` takes that id only as its trusted third argument, never from a body field.
 
 ## Waiting
 

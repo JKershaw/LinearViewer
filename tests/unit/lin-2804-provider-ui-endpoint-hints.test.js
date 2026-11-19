@@ -141,7 +141,13 @@ describe('LIN-2804 — request-scoped idiom (req.resolvedProvider.ui via POST /a
       assert.strictEqual(dispatch.items.length, 1);
       // Each app listens on its own ephemeral port, embedded in the prompt's
       // baseUrl — normalize that out before the byte-parity comparison.
-      return dispatch.items[0].item.prompt.replace(/http:\/\/127\.0\.0\.1:\d+/g, 'http://TESTHOST');
+      // LIN-4492: the autopilot kickoff's session-id block is appended by the factory, which allocates a
+      // fresh row id per dispatch (lib/run-identity.js). Its bytes are fixed; only that UUID differs
+      // between two dispatches, so it is normalised in both strings (and required to be present).
+      const prompt = dispatch.items[0].item.prompt.replace(/http:\/\/127\.0\.0\.1:\d+/g, 'http://TESTHOST');
+      const sessionId = prompt.match(/your \*\*session id\*\* — is `([0-9a-f-]{36})`/)?.[1];
+      assert.ok(sessionId, 'the autopilot session-id block is present');
+      return prompt.split(sessionId).join('SESSION_ID');
     }
 
     const explicitTrue = await queuedPrompt({ issueDetail: true, relations: true });
@@ -251,8 +257,17 @@ describe('LIN-2804 — workspace-scoped idiom (getProvider(workspace.provider)?.
       return dispatch.items[0].item.prompt.split('You have a workspace API proxy')[1] ?? '';
     }
 
-    const explicitTrue = await queuedPreamble({ issueDetail: true, relations: true });
-    const absent = await queuedPreamble({});
+    // LIN-4492: a named run adds `Your run: <uuid>.` to the preamble, and each dispatch allocates its own
+    // row id, so the two prompts differ by that UUID alone. Normalise that one line in both strings
+    // (and require it exactly once, so the normalisation cannot hide a missing or duplicated line).
+    const RUN_LINE = /^Your run: [0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}\.$/gm;
+    const normaliseRunLine = (text) => {
+      assert.equal(text.match(RUN_LINE)?.length, 1, 'exactly one `Your run:` line per preamble');
+      return text.replace(RUN_LINE, 'Your run: RUN_ID.');
+    };
+
+    const explicitTrue = normaliseRunLine(await queuedPreamble({ issueDetail: true, relations: true }));
+    const absent = normaliseRunLine(await queuedPreamble({}));
 
     assert.strictEqual(explicitTrue, absent, 'explicit true vs. absent must be a byte-identical no-op');
     assert.ok(explicitTrue.includes('/api/proxy/issues/'), 'raw issue detail stays available for a full-capability provider');

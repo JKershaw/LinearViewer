@@ -68,12 +68,15 @@ const TOKENS = {
 };
 
 // Exactly today's inline mint options (routes/dispatch.js broker route).
+// LIN-4492: every dispatch mint names its origin. The refire rows here start no run (autopilot kickoffs,
+// or no row at all), so the mint carries no runRecordId key.
 const grantlessOpts = (createdBy) => ({
   kind: 'bootstrap',
   scope: 'readWrite',
   label: 'refire-broker',
   ttl: BOOTSTRAP_TOKEN_TTL_SECONDS,
-  createdBy
+  createdBy,
+  origin: 'dispatch'
 });
 
 // ─────────────────────────────────────────────────────────────────────────────
@@ -267,7 +270,8 @@ function assertDeclared(res, world, id, why) {
     ownerAccountId: RECORD.ownerAccountId,
     grants: RECORD.grants,
     label: 'refire-broker',
-    profile: 'worker'
+    profile: 'worker',
+    origin: 'dispatch'
   }, `${why}: minted from the recorded owner/workspace/grants, worker profile`);
   // Two reads, both keyed by the token's urlKey and the body id: the route's own
   // (to branch and gate B1/B2) and the helper's re-read, from which it mints.

@@ -30,7 +30,7 @@ import os from 'os';
 import { spawnClaudeSession } from '../lib/harbour-spawn.js';
 import { DISPATCH_DEFAULT_KINDS, deriveDispatchKind, getPromptDescriptionsForAI } from '../lib/prompt-templates.js';
 import { stampFromRow, stampForItem } from '../lib/item-stage-stamp.js';
-import { stampMintOptions } from '../lib/stage-writes.js';
+import { dispatchMintOptions } from '../lib/stage-writes.js';
 import { resolveRoutingWithSources } from '../lib/dispatch-factory.js';
 import { getJob } from '../lib/llm-jobs.js';
 import { stageLabel } from '../lib/task-page-loader.js';
@@ -1500,7 +1500,9 @@ export function createDispatchRoutes({ dispatchQueueStore, dispatchTokenStore, w
             createdBy: req.dispatchTokenOwner,
             prompt: null,
             writes: stamp.writes,
-            writesTarget: stamp.writesTarget
+            writesTarget: stamp.writesTarget,
+            // LIN-4492: the refired row's own run (or the run it resumes), the same stamp as its stage.
+            runRecordId: stamp.runRecordId
           });
         } catch (err) {
           if (isStructuralGrantRefusal(err)) {
@@ -1529,14 +1531,16 @@ export function createDispatchRoutes({ dispatchQueueStore, dispatchTokenStore, w
     // stage-less and mints as before. A read fault is a 503: nothing is minted unstamped.
     let minted;
     try {
-      const stamp = itemId !== undefined ? await stampForItem(dispatchQueueStore, req.dispatchUrlKey, itemId) : { writes: null, writesTarget: null };
+      const stamp = itemId !== undefined ? await stampForItem(dispatchQueueStore, req.dispatchUrlKey, itemId) : { writes: null, writesTarget: null, runRecordId: null };
       minted = await proxyTokenStore.createToken(req.dispatchUrlKey, {
         kind: 'bootstrap',
         scope: READ_WRITE,
         label: 'refire-broker',
         ttl: BOOTSTRAP_TOKEN_TTL_SECONDS,
         createdBy: req.dispatchTokenOwner,
-        ...stampMintOptions(stamp.writes, stamp.writesTarget)
+        // LIN-4492: a runner's broker token is a dispatch credential; it names the refired row's run (none for an
+        // itemId-less refire, which records writes then refuse).
+        ...dispatchMintOptions({ writes: stamp.writes, writesTarget: stamp.writesTarget, runRecordId: stamp.runRecordId })
       });
     } catch (err) {
       console.error('Broker-token mint failed:', err.message);

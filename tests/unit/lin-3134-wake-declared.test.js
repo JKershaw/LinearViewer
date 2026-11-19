@@ -186,9 +186,11 @@ async function report(world, childId, message, provision, tokenLabel = 'token-a'
 function assertDeclaredWakeMint(world, row) {
   assert.equal(world.spy.plain.length, 0, `a declared wake never mints plain; saw ${JSON.stringify(world.spy.plain)}`);
   assert.equal(world.spy.grant.length, 1, 'exactly one grant mint');
+  // LIN-4492: every dispatch mint names its origin. The wake's parent row starts no run in these fixtures
+  // (no runRecordId on it), so the wake's mint carries no runRecordId key.
   assert.deepEqual(world.spy.grant[0], {
     urlKey: URL_KEY, workspaceId: RECORDED_WORKSPACE, ownerAccountId: RECORDED_OWNER,
-    grants: ['dispatch'], label: 'wake-bootstrap', profile: 'worker'
+    grants: ['dispatch'], label: 'wake-bootstrap', profile: 'worker', origin: 'dispatch'
   });
   assert.equal(row.bootstrapToken, world.spy.issued[0], 'the grant token travels on the wake row');
   assert.deepEqual(row.grantDeclaration, RECORD, 'the record is carried onto the wake row (C4)');

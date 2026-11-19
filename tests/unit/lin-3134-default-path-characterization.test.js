@@ -154,6 +154,7 @@ describe('S0 — provisionBootstrapToken default-path createToken arguments', ()
       scope: 'readWrite',
       label: 'dispatch-bootstrap',
       ttl: BOOTSTRAP_TOKEN_TTL_SECONDS,
+      origin: 'dispatch',
       createdBy: 'u1'
     });
     assert.equal(BOOTSTRAP_TOKEN_TTL_SECONDS, 48 * 60 * 60);
@@ -493,7 +494,7 @@ describe('S0 — POST /api/proxy/dispatch createToken arguments', () => {
     assert.equal(res.status, 201, JSON.stringify(res.body));
     assert.equal(calls.length, 1);
     assert.deepEqual(calls[0].opts, {
-      kind: 'bootstrap', scope: 'readWrite', label: 'dispatch-bootstrap', ttl: BOOTSTRAP_TOKEN_TTL_SECONDS, createdBy: 'u1'
+      kind: 'bootstrap', scope: 'readWrite', label: 'dispatch-bootstrap', ttl: BOOTSTRAP_TOKEN_TTL_SECONDS, createdBy: 'u1', origin: 'dispatch'
     });
   });
 
@@ -650,10 +651,14 @@ describe('S0 — projection source bodies are spread-free and token-free', () =>
 const PROXY_MARKER = '## Workspace API access (auto-appended)';
 const BRANCH_FOLLOW_UP = '11111111-2222-4333-8444-555555555555';
 
-function assertGoldenMint(calls, { createdBy, label = 'dispatch-bootstrap' } = {}) {
+// LIN-4492: every dispatch mint names its origin. `runRecordId` is passed only by a branch whose row starts a
+// run (the recommend-and-dispatch stage arms); it is that row's own id, read from the 201, never a literal.
+// Every other branch passes none, and the mint carries no runRecordId key.
+function assertGoldenMint(calls, { createdBy, label = 'dispatch-bootstrap', runRecordId } = {}) {
   assert.equal(calls.length, 1, 'exactly one createToken call on this branch');
   assert.deepEqual(calls[0].opts, {
-    kind: 'bootstrap', scope: 'readWrite', label, ttl: BOOTSTRAP_TOKEN_TTL_SECONDS, createdBy
+    kind: 'bootstrap', scope: 'readWrite', label, ttl: BOOTSTRAP_TOKEN_TTL_SECONDS, createdBy, origin: 'dispatch',
+    ...(runRecordId === undefined ? {} : { runRecordId })
   });
 }
 
@@ -680,7 +685,8 @@ function proxyApp() {
     briefCacheStore: { get: async () => null, set: async () => {} },
     dispatchQueueStore: {
       getGrantDeclaration: async () => ({ state: 'none' }),
-      addItem: async (urlKey, item) => { captured.items.push(item); return { _id: 'disp-1', dispatchedAt: '2026-06-28T00:00:00.000Z', ...item }; },
+      // LIN-4492: the real store takes its `_id` from the factory's trusted id (lib/dispatch-store.js trustedIdOf).
+      addItem: async (urlKey, item, trusted = null) => { captured.items.push(item); return { _id: trusted?.id ?? 'disp-1', dispatchedAt: '2026-06-28T00:00:00.000Z', ...item }; },
       getItemStatus: async () => null,
       listItems: async () => [],
       listHistory: async () => ({ items: [], total: 0 })
@@ -732,7 +738,7 @@ describe('S0 — proxy-dispatch branches: createToken args + finalizePrompt resu
     const { app, captured } = proxyApp();
     const res = await callRoute(app, 'post', RECOMMEND, { issueIdentifier: 'TEST-1', kind: 'implementation', followUpTo: BRANCH_FOLLOW_UP });
     assert.equal(res.status, 201, JSON.stringify(res.body));
-    assertGoldenMint(captured.mintCalls, { createdBy: 'u1' });
+    assertGoldenMint(captured.mintCalls, { createdBy: 'u1', runRecordId: res.body.id });
     assert.equal(captured.items[0].bootstrapToken, MINTED);
     assert.ok(!captured.items[0].prompt.includes(PROXY_MARKER), 'pbt does not append the block');
   });
@@ -742,7 +748,7 @@ describe('S0 — proxy-dispatch branches: createToken args + finalizePrompt resu
     const { app, captured } = proxyApp();
     const res = await callRoute(app, 'post', RECOMMEND, { issueIdentifier: 'TEST-1', kind: 'implementation', followUpTo: BRANCH_FOLLOW_UP, appendProxyContext: true, harness: 'claude-code' });
     assert.equal(res.status, 201, JSON.stringify(res.body));
-    assertGoldenMint(captured.mintCalls, { createdBy: 'u1' });
+    assertGoldenMint(captured.mintCalls, { createdBy: 'u1', runRecordId: res.body.id });
     assert.ok(captured.items[0].prompt.includes(PROXY_MARKER));
     assert.equal(captured.items[0].bootstrapToken, MINTED);
   });
@@ -751,7 +757,7 @@ describe('S0 — proxy-dispatch branches: createToken args + finalizePrompt resu
     const { app, captured } = proxyApp();
     const res = await callRoute(app, 'post', RECOMMEND, { issueIdentifier: 'TEST-1', kind: 'implementation', followUpTo: BRANCH_FOLLOW_UP, appendProxyContext: true, harness: 'opencode' });
     assert.equal(res.status, 201, JSON.stringify(res.body));
-    assertGoldenMint(captured.mintCalls, { createdBy: 'u1' });
+    assertGoldenMint(captured.mintCalls, { createdBy: 'u1', runRecordId: res.body.id });
     assert.ok(captured.items[0].prompt.includes(PROXY_MARKER));
     assert.ok(captured.items[0].prompt.includes(MINTED));
     assert.strictEqual(captured.items[0].bootstrapToken, null);
@@ -762,7 +768,7 @@ describe('S0 — proxy-dispatch branches: createToken args + finalizePrompt resu
     const { app, captured } = proxyApp();
     const res = await callRoute(app, 'post', RECOMMEND, { issueIdentifier: 'TEST-1', followUpTo: BRANCH_FOLLOW_UP });
     assert.equal(res.status, 201, JSON.stringify(res.body));
-    assertGoldenMint(captured.mintCalls, { createdBy: 'u1' });
+    assertGoldenMint(captured.mintCalls, { createdBy: 'u1', runRecordId: res.body.id });
     assert.equal(captured.items[0].bootstrapToken, MINTED);
     assert.ok(!captured.items[0].prompt.includes(PROXY_MARKER));
   });
@@ -772,7 +778,7 @@ describe('S0 — proxy-dispatch branches: createToken args + finalizePrompt resu
     const { app, captured } = proxyApp();
     const res = await callRoute(app, 'post', RECOMMEND, { issueIdentifier: 'TEST-1', followUpTo: BRANCH_FOLLOW_UP, appendProxyContext: true, harness: 'claude-code' });
     assert.equal(res.status, 201, JSON.stringify(res.body));
-    assertGoldenMint(captured.mintCalls, { createdBy: 'u1' });
+    assertGoldenMint(captured.mintCalls, { createdBy: 'u1', runRecordId: res.body.id });
     assert.ok(captured.items[0].prompt.includes(PROXY_MARKER));
     assert.equal(captured.items[0].bootstrapToken, MINTED);
   });
@@ -781,7 +787,7 @@ describe('S0 — proxy-dispatch branches: createToken args + finalizePrompt resu
     const { app, captured } = proxyApp();
     const res = await callRoute(app, 'post', RECOMMEND, { issueIdentifier: 'TEST-1', followUpTo: BRANCH_FOLLOW_UP, appendProxyContext: true, harness: 'opencode' });
     assert.equal(res.status, 201, JSON.stringify(res.body));
-    assertGoldenMint(captured.mintCalls, { createdBy: 'u1' });
+    assertGoldenMint(captured.mintCalls, { createdBy: 'u1', runRecordId: res.body.id });
     assert.ok(captured.items[0].prompt.includes(PROXY_MARKER));
     assert.ok(captured.items[0].prompt.includes(MINTED));
     assert.strictEqual(captured.items[0].bootstrapToken, null);
@@ -1036,7 +1042,7 @@ describe('S0 — wake branch createToken args + output', () => {
     assert.equal(mintCalls.length, 1);
     assert.equal(mintCalls[0].urlKey, 'acme');
     assert.deepEqual(mintCalls[0].opts, {
-      kind: 'bootstrap', scope: 'readWrite', label: 'wake-bootstrap', ttl: BOOTSTRAP_TOKEN_TTL_SECONDS, createdBy: 'acct'
+      kind: 'bootstrap', scope: 'readWrite', label: 'wake-bootstrap', ttl: BOOTSTRAP_TOKEN_TTL_SECONDS, createdBy: 'acct', origin: 'dispatch'
     });
   });
 });

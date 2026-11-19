@@ -66,9 +66,11 @@ function world({ freeTierCheck = null } = {}) {
     recapCacheStore: { get: async () => null, set: async () => {} },
     briefCacheStore: { get: async () => null, set: async () => {} },
     dispatchQueueStore: {
-      addItem: async (urlKey, item) => {
+      // LIN-4492: the real store takes its `_id` from the factory's trusted id (lib/dispatch-store.js
+      // trustedIdOf), so a run-starting row's runRecordId is its own `_id`.
+      addItem: async (urlKey, item, trusted = null) => {
         items.push(item);
-        return { _id: `disp-${items.length}`, dispatchedAt: '2026-10-01T00:00:00.000Z', ...item };
+        return { _id: trusted?.id ?? `disp-${items.length}`, dispatchedAt: '2026-10-01T00:00:00.000Z', ...item };
       },
       listItems: async (urlKey) => items.filter(i => i.urlKey === undefined || i.urlKey === urlKey),
       listHistory: async () => ({ items: [], total: 0 }),
@@ -131,8 +133,12 @@ describe('LIN-4313 — the owner\'s + Autopilot mint declares [dispatch] for its
     const item = w.items[0];
     assert.equal(w.spy.grant.length, 1, 'one declared mint');
     assert.equal(w.spy.plain.length, 0, 'no grant-less mint');
+    // LIN-4492: the periodical "+ Autopilot" row starts a periodical run, so the mint names the row's own id
+    // (read from the 201, never a literal) as runRecordId.
+    const rowId = res.body.item?.id ?? res.body.id;
+    assert.equal(typeof rowId, 'string');
     assert.deepEqual(w.spy.grant[0], {
-      urlKey: 'acme', workspaceId: WS, ownerAccountId: OWNER, grants: ['dispatch'], label: 'periodical-bootstrap', profile: 'worker'
+      urlKey: 'acme', workspaceId: WS, ownerAccountId: OWNER, grants: ['dispatch'], label: 'periodical-bootstrap', profile: 'worker', origin: 'dispatch', runRecordId: rowId
     });
     assert.equal(item.grantDeclaration.site, 'PM');
     assert.deepEqual(item.grantDeclaration.grants, ['dispatch']);

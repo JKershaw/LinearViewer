@@ -11,6 +11,7 @@
  * "harmonise" this chain onto that one.
  */
 import { Router } from 'express';
+import { personMint } from '../lib/stage-writes.js';
 import { badRequest, jsonError, notFound, serviceUnavailable } from '../lib/errors.js';
 import { MAX_NAME_LENGTH } from '../lib/issue-write-validation.js';
 import { UUID_REGEX } from '../lib/workspace.js';
@@ -193,7 +194,9 @@ export function createTokensAdminRoutes({ proxyTokenStore, proxyEventStore, work
 
         let minted;
         try {
+          // LIN-4492: the owner's own runner or agent copy acts as the owner (a person's credential).
           minted = await proxyTokenStore.mintGrantBootstrap({
+            ...personMint(),
             urlKey: workspace.urlKey,
             workspaceId: workspace.id,
             ownerAccountId: req.session.accountId,
@@ -287,7 +290,9 @@ export function createTokensAdminRoutes({ proxyTokenStore, proxyEventStore, work
       // self-prune instead of standing for the 90-day default.
       const isPromptProxy = (label || '') === PROMPT_PROXY_LABEL;
 
+      // LIN-4492: the tokens page and the `+proxy` toggle are a person's own mint (acts as the signed-in account).
       const result = await proxyTokenStore.createToken(workspace.urlKey, {
+        ...personMint(),
         label: label || 'default',
         scope: scope || 'read',
         createdBy: req.session?.accountId || null,

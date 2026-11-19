@@ -5,6 +5,7 @@
  * Only mounted when NODE_ENV === 'test'.
  */
 import express, { Router } from 'express';
+import { personMint } from '../lib/stage-writes.js';
 import crypto from 'crypto';
 import { getWorkspaceByUrlKey } from '../lib/workspace.js';
 import { RUNNER_GRANTS } from '../lib/proxy-scopes.js';
@@ -227,7 +228,7 @@ export function createTestRoutes({ dispatchQueueStore, dispatchTokenStore, freeT
     }
     if (!want) return null;
     const bootstrap = await proxyTokenStore.mintGrantBootstrap({
-      urlKey, workspaceId, ownerAccountId, grants: RUNNER_GRANTS, label: 'e2e runner key'
+      ...personMint(), urlKey, workspaceId, ownerAccountId, grants: RUNNER_GRANTS, label: 'e2e runner key'
     });
     const working = await proxyTokenStore.exchangeBootstrapToken(bootstrap.token);
     if (!working) throw new Error('runner key exchange failed');
@@ -978,6 +979,7 @@ export function createTestRoutes({ dispatchQueueStore, dispatchTokenStore, freeT
       // LIN-376: allow minting a single-use bootstrap for the exchange round-trip spec.
       const kind = req.query.kind === 'bootstrap' ? 'bootstrap' : 'standard'
       const result = await proxyTokenStore.createToken(urlKey, {
+        ...personMint(),
         label,
         scope,
         kind,

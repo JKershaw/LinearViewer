@@ -5,8 +5,8 @@ Area notes for `runs-and-dispatch` in the registry. Format and rules: README.md.
 ## Lessons
 
 - A run-row field that is always present with a default is one entry in `RUN_FIELDS`
-  (`lib/dispatch-fields.js`). A sparse field stays a conditional spread in `addItem` and
-  `_archiveItem`, so other rows keep their key sets byte-identical. Six fields were once
+  (`lib/dispatch-fields.js`). A sparse field stays a conditional spread in `addItem`, `_archiveItem` and both
+  projections (`_formatItem`, `_formatHistoryItem`, as `runRecordId` is, LIN-4492), so other rows keep their key sets byte-identical. Six fields were once
   dropped on one hop of four.
 - Every exit from the queue except a take archives through `_archiveItem` (`lib/dispatch-store.js`);
   a new exit must archive through it too.

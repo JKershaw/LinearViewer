@@ -72,9 +72,11 @@ function world({ ownerCheck, session } = {}) {
     // refused by the gate first, with the same code plus its `category`.
     workspaceOwnerCheck: async () => ({ status: 'owner' }),
     dispatchQueueStore: {
-      addItem: async (urlKey, item) => {
+      // LIN-4492: the real store takes its `_id` from the factory's trusted id (lib/dispatch-store.js
+      // trustedIdOf), so a run-starting row's runRecordId is its own `_id`.
+      addItem: async (urlKey, item, trusted = null) => {
         items.push(item);
-        return { _id: `disp-${items.length}`, dispatchedAt: '2026-10-01T00:00:00.000Z', ...item };
+        return { _id: trusted?.id ?? `disp-${items.length}`, dispatchedAt: '2026-10-01T00:00:00.000Z', ...item };
       }
     },
     dispatchTokenStore: {},
@@ -111,12 +113,18 @@ async function post(app, body) {
 const proseToken = (prompt) => (prompt.match(/Authorization: Bearer (\S+)" /) || [])[1];
 const AUTOPILOT = { prompt: 'Run the autopilot on LIN-1.', promptName: 'Autopilot', kind: 'autopilot', issueId: '11111111-2222-3333-4444-555555555555', issueIdentifier: 'LIN-1', attachProxy: true, target: 'cli' };
 
-async function assertDeclared(w, res, { prose }) {
+// LIN-4492: every dispatch mint names its origin. `runs`: the launched row starts a run (the periodical
+// "+ Autopilot" row, a periodical run), so it names its own id as runRecordId, read from the 201's item.
+// A plain autopilot kickoff starts no run and carries no runRecordId key.
+async function assertDeclared(w, res, { prose, runs = false }) {
   assert.equal(res.status, 201, JSON.stringify(res.body));
   assert.equal(w.spy.grant.length, 1, 'one declared mint');
   assert.equal(w.spy.plain.length, 0, 'no grant-less mint');
+  const rowId = res.body.item?.id ?? res.body.id;
+  assert.equal(typeof rowId, 'string');
   assert.deepEqual(w.spy.grant[0], {
-    urlKey: 'acme', workspaceId: WS, ownerAccountId: OWNER, grants: ['dispatch'], label: 'dispatch-bootstrap', profile: 'worker'
+    urlKey: 'acme', workspaceId: WS, ownerAccountId: OWNER, grants: ['dispatch'], label: 'dispatch-bootstrap', profile: 'worker', origin: 'dispatch',
+    ...(runs ? { runRecordId: rowId } : {})
   });
   const item = w.items[0];
   assert.equal(item.grantDeclaration.site, 'M2');
@@ -220,7 +228,7 @@ describe('LIN-3136 M2b — the periodical "+ Autopilot" dispatch', () => {
 
   test('owner "+ Autopilot" → site M2, the bootstrap exchanges to [dispatch]', async () => {
     const w = world();
-    await assertDeclared(w, await post(w.app, clientPayload(renderedContainer({ forced: true }))), { prose: true });
+    await assertDeclared(w, await post(w.app, clientPayload(renderedContainer({ forced: true }))), { prose: true, runs: true });
   });
 
   test('plain Mint stays a grant-less leaf (even when force-attached)', async () => {
