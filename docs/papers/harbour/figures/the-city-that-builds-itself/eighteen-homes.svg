@@ -31,8 +31,7 @@
 <text x="338" y="252" font-size="25" fill="#111827" font-weight="600">18 production files</text>
 <text x="22" y="351" font-size="27" fill="#111827" font-weight="650">Separate comparison across known decisions</text>
 <text x="22" y="387" font-size="24" fill="#475569" font-weight="400">June to 7 October 2026</text>
-<text x="22" y="435" font-size="24" fill="#1766ad" font-weight="600">Near a known site</text>
-<text x="336" y="435" font-size="24" fill="#475569" font-weight="600">Other changes</text>
+<text x="22" y="435" font-size="24" fill="#1766ad" font-weight="600">Near a known site vs other changes</text>
 <path d="M22 450H638" fill="none" stroke="#9ca3af" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/>
 <text x="22" y="491" font-size="30" fill="#111827" font-weight="650" font-family="monospace">229 vs 45</text>
 <text x="242" y="491" font-size="24" fill="#111827" font-weight="400">Median production lines per PR</text>
