@@ -201,9 +201,3 @@ Area notes for `runs-and-dispatch` in the registry. Format and rules: README.md.
   the release note in `lib/dispatch-store.js`. An `[evidence]` entry after `[done]` that names a sibling's PR can then be
   the PR a wake note names, when the `DONE:` line carries no URL. Moving them onto the bounded read changes wake prompts
   and the PR the leftover step is given, each pinned by the wake suites, so it needs its own witnesses. (LIN-4497 leftovers.)
-- `lib/run-trail.js` `readTrail().landing`: a sibling's close-out note that quotes the sibling's own PR (the LIN-4493
-  shape) reads as this ticket's landing, so the PR picker, close-out readiness and `reportsLandedWork` take another
-  ticket's PR as this one's. Since LIN-4497 a ticket's own PR is known from its done implementation run (`pr` on
-  `stageRuns`, `lib/recent-runs.js`), but only the look-first gate reads it: those readers have no run read, and adding
-  one to the trail's callers is a design change across the landing's consumers. The brief's side is LIN-4005; the
-  selector's line is the LLM & prompts Survey-PR entry. (LIN-4497 leftovers.)
