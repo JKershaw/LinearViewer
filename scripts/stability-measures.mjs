@@ -4,9 +4,9 @@
 // Usage: node scripts/stability-measures.mjs <repo> <base> <head> [--runner <dir>] [--api <base>] [--lookback-days <n>]
 //          [--reference <file> | --as-reference <label>]
 //   → JSON on stdout; the ordered opening table on stderr.
-// Reads: git objects of <repo> (lines through the code-shape kit's counter, first-parent churn, Waiting entries), `gh`
-// for CI runs (run from <repo>, so its GitHub remote decides the repository), and the runner checkout's git objects
-// for its Waiting entries. Every read that fails becomes `not measured: <reason>` in its row; nothing is zero-filled.
+// Reads: git objects of <repo> (lines through the code-shape kit's counter, first-parent churn), `gh` for CI runs (run
+// from <repo>, so its GitHub remote decides the repository). The Waiting rows are `not measured` since LIN-4495 retired
+// the lists. Every read that fails becomes `not measured: <reason>` in its row; nothing is zero-filled.
 // --api (default $HARBOUR_LOCAL_BASE/api/proxy) is the workspace proxy for finished tasks, speed, cost and tickets
 // minted (scripts/stability-measures-tracker.mjs: paced, honours 429 Retry-After). Finished tasks may have landed
 // before base, so the landings of the --lookback-days (default 3) before base are read for their tickets too. The same
