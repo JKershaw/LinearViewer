@@ -167,7 +167,7 @@ Each slice is built as a Harbour task through Harbour's own loop. That task runs
    - a temporary ninth brief part, the ticket section, until slice 4 (§3). **Accepted** (John, 18 Nov: "That's fine. A little temporary scaffolding is ok.")
    - *Withdrawn in draft 3:* part 5 listing every area while a task had no paths. Areas are gone.
    - *Withdrawn (John, 19 Nov):* an `on-answer` field on the question kind. What an answer sets off stays on Harbour's feedback item (§5).
-4. **Rulings as their own slice 4,** rather than inside hand-offs as the journey had it. The census shows 50 sites (C2).
+4. **Agreed (John, 19 Nov): rulings as their own slice 4,** rather than inside hand-offs as the journey had it. The census shows 50 sites (C2). The in-between state (rulings on their page, findings in "Waiting on you") is accepted, since slices are built one after another with no other work running. John sees rulings as ripe for a Theseus rebuild later.
 5. **Slice 6:** build it, or wait until hand-offs show the need.
 6. **Knots.** Records imports nothing back, so none of these makes a new pair, and none changes code inside today's tightest pair beyond its reads. My call is to accept them all, with nothing to tidy first.
 
