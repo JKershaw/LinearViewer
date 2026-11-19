@@ -25,7 +25,7 @@
   - `leftover`, `autopilot` and `harbour`;
   - each person who belongs to the workspace, named as `person:<accountId>`.
 
-  `harbour` writes but is never a `to`. Another project supplies its own list, as §3.2 says. "John" in the layer is the workspace owner's person actor (`getWorkspaceOwnerAccountId`). *The list grows from the layer's 14 names, read from code rather than `actors.json`. Flagged for John (§11).*
+- **`project` is the workspace.** The store is partitioned by workspace, so the `project` addressee, part 5's counts, part 6's open runs and the leftover step's pile each span one workspace. A workspace holding several codebases shares one pile; that stays open until Yap. Another project supplies its own list, as §3.2 says. "John" in the layer is the workspace owner's person actor (`getWorkspaceOwnerAccountId`). *The list grows from the layer's 14 names, read from code rather than `actors.json`. Flagged for John (§11).*
 - **Who imports Records:** Agent API (proxy), Runs & dispatch, LLM & prompts (the selector's facts) and the pages. Records imports only Platform. So each slice adds one-way edges into a leaf area and no new mutual pair; the tightest pair, LLM & prompts ⇄ Runs & dispatch at 39/60, is untouched (`census/seams-6f6c5d2.json`) [checked]. The knots to call are in §10.
 
 ## 2. How agents reach it: the proxy
@@ -47,7 +47,7 @@
   - `via` is kept only for real relays: an import or a scan.
   - Queries are logged with the run or account that asked, as the layer's §3.5 says.
 - **Tasks are found or made by tracker id.** A `to` or `in` naming a ticket (for example `LIN-4451`) resolves to its task record. If an open ticket has none yet, Harbour creates one from the tracker: `ref`, plus `in` the parent's task (made the same way, up the ticket's own tree).
-  - Only a ticket with no parent gets `asked`. A child has its piece, as the layer says (§3.2).
+  - A task made from a ticket gets the ticket's words as `asked`, child or not, as the layer keeps a person-written child's words (§3.2). From slice 2, a breakdown writes its children as task records with a `piece` and no `asked`.
   - A closed ticket is refused with the reason.
   - A hand-off to a sibling not yet dispatched therefore lands (paper walk B5).
 
@@ -62,7 +62,7 @@
   - the recap becomes `show --task` rendered short.
 - **Who a plan is addressed to.** Part 2 gives a plan in full only to the actor it is addressed to (§3.5). The design stage addresses its plan `to: implementation`, the stage that works from it; a breakdown addresses each piece the same way. Plan-review, breakdown and the rest see its first paragraph and id, and a judge reads the whole with one `get`. So nothing is readdressed as the plan moves along.
 - **The blind read keeps having no brief** (`lib/proxy-preamble.js:270-276`) [checked]. Blindness is Harbour's, not the store's (§3.2). Its prompt is given the change record's id to judge, and tells it, as today, to read nothing about the task. It writes its verdict and findings through the record routes. As today, its other reads are limited by its prompt, not by a guard (recheck BR5). Whether the record routes should also refuse its other reads is a question for John (§11).
-- **Size.** The brief's bytes are reported against walk 7's per slice, never gated. The frozen prompt-size test (C4-48) stays.
+- **Size.** The brief's bytes are reported per slice against today's brief (13–14 Nov) and walk 8's, never gated. The frozen prompt-size test (C4-48) stays.
 
 ## 4. Runs, changes and verdicts
 
@@ -79,6 +79,7 @@
 - **Verdict records** (`judgement`, `outcome`, `reasoning`, `on` the change or plan piece).
   - Harbour's rule that a blind read names exactly the landing changes stays in Harbour's route, as now (`routes/proxy-writes.js:773-787`) [checked]. It is checked against the task's open changes. It is workflow, so it is not part of the store's check.
   - The stale flag replaces `findSha` and `headMoved` (C3-08, C3-09).
+  - Today's "Approve — conditional" (`lib/run-closeout-state.js:108`, the review prompt's rule, C3-32) [checked] is written as `approve` plus one finding `to: close-out` per condition, as the layer's outcome set says. Close-out's approval check reads `approve` with its open findings.
 - **Every consumer of the classifier reads records instead** (C3 §"Consumers"): close-out, the selector's facts, look-first, run evidence and the measures. The Periodical gate is outside the layer and is kept (C3-23).
 
 ## 5. Rulings
@@ -100,7 +101,7 @@
 - **The engine's wakes are kept:** up-chain, leftover, CI sweep, person follow-ups (C5-B01–B07, B13).
 - **Slice 6, optional.** One rule: a record that is open, `to` a stage or task with a run held waiting on that task, enqueues one follow-up through `enqueueFollowUp`. The compare-and-swap is per (run, record). It skips records written by the waiting run's own children, since the up-chain wake already covers those (break-read 13).
 - **Records to `project` wake nothing.** Every brief carries their count (part 5), and stages look them up with `find --to project`. In walk 8, stages ended project records their own work settled [checked: `layer/walks/8/results.md`].
-- **The pile is worked down by the leftover step,** as it settles one Waiting entry per build today (C5-A08, `lib/dispatch-leftover.js:152`) [checked]. Each leftover run takes one open `project` record and acts on it, ends it, or hands it on to a task. Nothing else changes in the workflow. In walk 8 the pile grew, 18 added and 7 ended over three tasks; the count is reported per slice, never gated.
+- **The pile is worked down by the leftover step,** as it settles one Waiting entry per build today (C5-A08, `lib/dispatch-leftover.js:152`) [checked]. Each leftover run takes one open `project` record and acts on it, ends it, or hands it on to a task. Nothing else changes in the workflow. In walk 8 the pile grew, 18 added and 7 ended or handed on over three tasks; the count is reported per slice, never gated.
 
 ## 7. The tracker
 
@@ -124,7 +125,7 @@
   - A project page lists the open records addressed to `project`, numbered oldest first, so the pile reads as a queue (John, 19 Nov).
 - **Slice 3:** the run-evidence box.
 - **Slice 4:** the rulings page.
-- **Slice 5:** lessons on the task page.
+- **Slice 5:** lessons on the project page.
 
 Counts come from `find --count`.
 
@@ -149,9 +150,9 @@ Each slice is built as a Harbour task through Harbour's own loop. That task runs
 
 | Slice | Moves | Retires in the same move | Witness | Reading before | Knot |
 |---|---|---|---|---|---|
-| **1. Store, runs, hand-offs** | Store, routes, run ids and `by`; run and task records; findings (the ledger's not-run items, review and blind-read finds, leftovers, asks to a parent or sibling, finds `to: project`); the leftover step working one `project` record; the brief's record parts; the import; the pages above | Waiting writing and reading (C1-01–C1-11); the `Retires:` conveyor and its 422 (C1-15–C1-22), with the leftover stage now ending one finding; the ledger's item parse and counts (C1-26, C1-28–C1-31); the blind-read classes (C1-34) | Contract tests; walk 8's three tasks replayed through the proxy on a temporary store | Notes bytes and the Waiting count; brief bytes; sessions and cost per task (13–14 Nov) | Four one-way edges into Records. No new pair |
+| **1. Store, runs, hand-offs** | Store, routes, run ids and `by`; run and task records; findings (the ledger's not-run items, review and blind-read finds, leftovers, asks to a parent or sibling, finds `to: project`); the leftover step working one `project` record; the brief's record parts; the import; the pages above | Waiting writing and reading (C1-01–C1-11); the `Retires:` conveyor and its 422 (C1-15–C1-22), with the leftover stage now ending one finding; the ledger's item parse and counts (C1-26, C1-28–C1-31); the blind-read classes (C1-34) | Contract tests; walk 8's three tasks replayed through the proxy on a temporary store, seeds ported to the current kinds (a check becomes a finding with `how`; approve-with-notes becomes `approve` plus findings) | Notes bytes and the Waiting count; brief bytes; sessions and cost per task (13–14 Nov) | Four one-way edges into Records. No new pair |
 | **2. The plan** | Plan records with `piece` and `to`; breakdown writes child tasks; `asked` on the task record | Plan in the description and its parsers (C4-01–C4-13); the prune and `description/below` (C4-04, C4-19); the copy-down (C4-03); the As-asked seal and guard (C4-14–C4-18, C4-49); snapshots (C4-41, C4-42; Ship Biscuit's before and after reads plan versions instead); the file-pointer pilot, whose input was plan paths (C4-07) | A breakdown and a correction replayed: the child reads its piece, and a correction is a new version | Copied-count drift (trace 6); brief bytes | None new |
-| **3. Verdicts and changes** | Verdict and change records; consumers read records; verdict summaries to the tracker | `COMMENT_KINDS` (C3-01–C3-06); the verdict parse and `findSha` (C3-07, C3-08); the blind-read guard's shape half (C3-17); the blind-read words, not the kind (C3-41); `extractVerdict` (C3-19); the comment census test (C3-59); the verdict-comment contracts (C3-27–C3-36) | Close-out and the selector replayed on walk 7: the same decisions as from the comments | Blind-read results; review round trips | None new |
+| **3. Verdicts and changes** | Verdict and change records; consumers read records; verdict summaries to the tracker | `COMMENT_KINDS` (C3-01–C3-06); the verdict parse and `findSha` (C3-07, C3-08); the blind-read guard's shape half (C3-17); the blind-read words, not the kind (C3-41); `extractVerdict` (C3-19); the comment census test (C3-59); the verdict-comment contracts (C3-27–C3-36) | Close-out and the selector replayed on slice 1's ported walk 8 stores: the same decisions as from the comments | Blind-read results; review round trips | None new |
 | **4. Rulings, and the ticket section goes** | Question and decision records from the existing feedback; the rulings page | The predicate and its keyings (C2-08–C2-12); the task-decisions and dismissal stores and the two scripts that import them; answers as comments and `RULING_MARK` (C2-22, C2-23, C3-25); the size ruling's text (C2-43); the brief's ticket section, its cache and model, and the scripts that replay it (§3) | A question raised, shelved, answered and resumed, recorded end to end | Open rulings; time to answer; brief bytes | None new |
 | **5. Lessons** | Lesson records (`says`), with the notes' Lessons imported | Notes' Lessons, the pointer and its tests (C5-A01, A03, A06, A13, A14, A16–A18); the prompt readers of the registry path (C5-A04); the notes files | A lesson written in one task is counted in a later task's part 5 and found there with `find --kind lesson --text` | Lessons bytes | None |
 | **6. Wakes for open records** (optional) | The rule in §6 | Agents waking each other by hand for hand-offs (C5-B14) | A record to a held run wakes it once | Pause wakes that changed nothing | Records → Runs, one edge |
