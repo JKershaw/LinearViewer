@@ -15,9 +15,8 @@ Area notes for `runs-and-dispatch` in the registry. Format and rules: README.md.
   2297, 4080, 4166) run in an order that matters: change the pair whole, keep the wake suites
   passing, and update the two census pins (`lin-3134-declared-mint-census`,
   `lin-4080-addItem-census`) if the write moves.
-- "This run's PR" is the session's own report: `prUrlOfFeedback` (`lib/dispatch-wake.js`) takes a
-  PR on a report line before the `[done]` `url`, which older runners filled by mention count
-  (LIN-4375).
+- "This run's PR": `prUrlOfFeedback` takes a report line's PR before the `[done]` `url` (LIN-4375). Only a done
+  implementation row owns it (`ownPrOf`, LIN-4497): other rows name siblings, and detail reads merge follow-ups.
 - Two `[done]` posts can reach a decide-then-enqueue at once, so "no row yet" is no guard: claim
   first, compare-and-set on the row (`claimHeldWake`). LIN-4373 relied on the read and queued two
   leftover rows (LIN-4375).

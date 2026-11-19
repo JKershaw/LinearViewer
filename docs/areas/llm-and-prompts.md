@@ -134,13 +134,13 @@ kept are counted apart in LIN-4470's PR and measurement (`docs/areas/README.md`:
   `docs/reviews/drift-coherence-review-2026-11-13.md`.)
 - `lib/recommendation-facts.js`: `assembleTrailFacts` builds `prUrls` from every comment's PR links, with no kind filter,
   beside the one landing (`readTrail().landing`, `lib/run-trail.js`, whose `COMMENT_KINDS` gives blind reads, Survey
-  reports and area reads no landing). That list feeds the selector's "PRs linked on the trail" line and the look-first
-  gate's "has a PR" (`lib/recommendation-look-first.js`). So a `## Survey open-0` report that cites a related PR turns the
-  look-first route off: survey-place and scoping are skipped while the landing is empty (reproduced,
+  reports and area reads no landing). That list feeds the selector's "PRs linked on the trail" line. Its look-first half
+  is retired (LIN-4497): the look-first gate reads only this ticket's own implementation run, not these comment URLs, so a
+  `## Survey open-0` report that cites a related PR no longer skips survey-place and scoping (reproduced before the fix,
   `docs/reviews/_evidence-2026-11-14-drift/look-first-survey-pr-repro.mjs`). `lib/run-trail.js`'s header says the prompt is
-  a view of the trail and cannot disagree. Fix: read the PR list from the trail (the landing, or the table's PR column),
-  then re-pin the selector facts. The other side is Runs & dispatch (`lib/run-trail.js`). (Drift & Coherence Review,
-  14 Nov.; `docs/reviews/drift-coherence-review-2026-11-14.md`.)
+  a view of the trail and cannot disagree. Fix for the selector half: read the PR list from the trail (the landing, or the
+  table's PR column), then re-pin the selector facts. The other side is Runs & dispatch (`lib/run-trail.js`). (Drift &
+  Coherence Review, 14 Nov.; `docs/reviews/drift-coherence-review-2026-11-14.md`.)
 - `lib/prompts/stage-kinds.js`: each record's `catalogue.group` decides the Default and More split that
   `scripts/gen-llms-catalogue.mjs` writes into `public/llms.txt`, while the split the pages show is `DEFAULT_PROMPT_KEYS`
   (`lib/render-prompt-opts.js`). They agree today and no test links them, so changing the UI's defaults leaves the
