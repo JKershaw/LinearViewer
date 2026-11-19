@@ -16,7 +16,7 @@ Area notes for `runs-and-dispatch` in the registry. Format and rules: README.md.
   passing, and update the two census pins (`lin-3134-declared-mint-census`,
   `lin-4080-addItem-census`) if the write moves.
 - "This run's PR": `prUrlOfFeedback` takes a report line's PR before the `[done]` `url` (LIN-4375). Only a done
-  implementation row owns it (`ownPrOf`, LIN-4497): other rows name siblings, and detail reads merge follow-ups.
+  implementation row owns it, via `terminalPrUrlOfFeedback` (LIN-4497): other rows name siblings; detail reads merge follow-ups.
 - Two `[done]` posts can reach a decide-then-enqueue at once, so "no row yet" is no guard: claim
   first, compare-and-set on the row (`claimHeldWake`). LIN-4373 relied on the read and queued two
   leftover rows (LIN-4375).
@@ -191,10 +191,19 @@ Area notes for `runs-and-dispatch` in the registry. Format and rules: README.md.
   `followsPerson`, and `routesRead` writes its own variant inline. `followsPerson` and `waitsOn` have no production
   reader; `blindReadStep` reads `routesRead` alone. A change to the rule in one expression leaves the published fact
   disagreeing with the read routed. (Drift & Coherence Review, 14 Nov.; `docs/reviews/drift-coherence-review-2026-11-14.md`.)
-- `lib/dispatch-feedback-kinds.js`: its header says the runner prompt renders the kinds through the store's re-export and
-  that the store imports the table. The store does neither (its own comment says so) and `lib/prompts/runner-kickoff.js`
-  imports the leaf. A header fix. (Drift & Coherence Review, 14 Nov.; `docs/reviews/drift-coherence-review-2026-11-14.md`.)
 - `lib/dispatch-store.js`: a wake row takes its parent's run (`runRecordId`) only on the provisioned path, where
   `_deliverWake` reads the parent's status; a wake with no provisioner wired carries none. Every production wake is
   provisioned, so nothing is wrong today. Reading the parent outside that block adds a read to the wake path, whose guard
   order is pinned. (LIN-4492 leftover.)
+- `lib/dispatch-wake.js`: a build's PR is read two ways. The look-first gate reads it bounded at the row's terminal
+  entry (`terminalPrUrlOfFeedback`, through `lib/recent-runs.js`), while the held-wake readers call `prUrlOfFeedback` on
+  the whole feedback: `lineagePrUrl` (`lib/dispatch-leftover.js`), the outcome wake in `lib/dispatch-leftover-hook.js` and
+  the release note in `lib/dispatch-store.js`. An `[evidence]` entry after `[done]` that names a sibling's PR can then be
+  the PR a wake note names, when the `DONE:` line carries no URL. Moving them onto the bounded read changes wake prompts
+  and the PR the leftover step is given, each pinned by the wake suites, so it needs its own witnesses. (LIN-4497 leftovers.)
+- `lib/run-trail.js` `readTrail().landing`: a sibling's close-out note that quotes the sibling's own PR (the LIN-4493
+  shape) reads as this ticket's landing, so the PR picker, close-out readiness and `reportsLandedWork` take another
+  ticket's PR as this one's. Since LIN-4497 a ticket's own PR is known from its done implementation run (`pr` on
+  `stageRuns`, `lib/recent-runs.js`), but only the look-first gate reads it: those readers have no run read, and adding
+  one to the trail's callers is a design change across the landing's consumers. The brief's side is LIN-4005; the
+  selector's line is the LLM & prompts Survey-PR entry. (LIN-4497 leftovers.)

@@ -28,6 +28,8 @@
  *   - LIN-4398: a gate-marked Periodical review's sequence is scoping alone (the Surveys are
  *     skipped, never described as attempted); its unmarked twin and the manual `kind` override
  *     are unchanged.
+ *   - LIN-4497: the PR gate reads this ticket's own done implementation run (`pr`), not comment
+ *     URLs: a sibling's PR quoted on a fresh leaf leaves survey-task; the terminal bound holds.
  *
  * Run with: node --test tests/unit/lin-4370-look-first-route.test.js
  */
