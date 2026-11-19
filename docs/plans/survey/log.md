@@ -4455,3 +4455,14 @@ John read the doc copy (with the leaks table, the before-and-after drawing and a
 ### 19 Nov, 16:57: John signed in again
 
 John signed out and back in with Linear, which stores his display name for person addressing. The slice 1 autopilot got a note (dispatch 3efeb3e8, queued) that LIN-4493's live sign-in check can now run where it fits, for example in LIN-4496's readings. Whether the name was stored isn't shown yet; the check will show it.
+
+### 19 Nov, ~17:05: the 14 queued dispatches
+
+John asked why about 14 dispatches sit queued. From a read-only subagent:
+- **What they are:** all 14 are messages to the slice 1 autopilot 20fdf661: 12 child-finished wakes (9 on LIN-4493, 3 on LIN-4494, 14:32–16:44) and my two notes (a6ffcb33, 3efeb3e8).
+- **Why they wait:** wakes are made with `queueIfBusy` (`lib/dispatch-wake.js:221`). The runner delivers such follow-ups only between turns (simple-dispatcher `followup.js:105,151-155`). 20fdf661 has been in one unbroken turn since it took my 14:27 note at 14:27:58. Before that it paused between children, as df03bb30 did all along. Which runner version is deployed isn't shown.
+- **Nothing lost on the wakes:** the autopilot starts each next stage within seconds, so it learns child results another way. How is unknown.
+- **The notes are unread:** the "workaround no longer needed" note doesn't matter, because sending the look-first steps by name is the normal sequence anyway. The sign-in note may mean that check isn't picked up; it stays recorded on LIN-4493's close-out comment.
+- **What happens next:** when the turn ends, the rows are delivered oldest first, one turn each. Unclaimed rows expire after 24 h. If the session is cancelled, they fail.
+- **Before today:** 0 queued rows; the old leftovers sit as taken (21) and blocked (155).
+- **Bearing on the plan:** this is the wake problem slice 6 exists for. Slice 1's count decides whether slice 6 is built, so these 14 rows count as evidence for it. No action now.
