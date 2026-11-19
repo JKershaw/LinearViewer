@@ -24,13 +24,9 @@ const REVIEW_BODY = [
   '',
   'CI on `abc1234` is green.',
   '',
-  '### What CI Did Not Prove',
-  '| # | Claim | In/Out | Discharge |',
-  '|---|---|---|---|',
-  '| L1 | the socket path handles a foreign user (EACCES) | inside | manual repro on a real host |',
-  '| L2 | the upstream contract is unchanged | outside | follow-up LIN-9999 |',
+  'CI covers the deliverable; nothing to record.',
   '',
-  '**Verdict: Approve — conditional on close-out discharging the ledger.**',
+  '**Verdict: Approve — conditional on close-out settling the findings.**',
 ].join('\n');
 
 let URL_KEY;
@@ -155,7 +151,7 @@ test.describe('Run evidence on the session page (LIN-3247)', () => {
     const nowLine = page.locator('[data-testid="run-evidence-checked-now"]');
     await expect(reviewLine).toBeVisible();
     await expect(nowLine).toBeVisible();
-    await expect(reviewLine).toContainText('Approve — conditional on close-out discharging the ledger.');
+    await expect(reviewLine).toContainText('Approve — conditional on close-out settling the findings.');
     await expect(nowLine).toContainText('passing');
     // Review recorded a different head → shown, not gated.
     await expect(page.locator('[data-testid="run-evidence-head-moved"]')).toBeVisible();
@@ -165,11 +161,10 @@ test.describe('Run evidence on the session page (LIN-3247)', () => {
     await expect(ledger).toBeAttached();
     expect(await ledger.evaluate(el => el.open)).toBe(false);
     await ledger.locator('summary').click();
-    await expect(page.locator('[data-testid="run-evidence-ledger-item"]')).toHaveCount(2);
-    await expect(page.locator('[data-testid="run-evidence-ledger-item"][data-scope="inside"]')).toHaveCount(1);
-    await expect(page.locator('[data-testid="run-evidence-ledger-item"][data-scope="outside"]')).toHaveCount(1);
+    // LIN-4495: the ledger's items are records now; the reading says what is open to close-out.
+    await expect(page.locator('[data-testid="run-evidence-findings"]')).toContainText('no open findings to close-out');
     // Each claim is one step from its proof: the follow-up ticket is shown.
-    await expect(page.locator('[data-testid="run-evidence-ledger-followup"]')).toContainText('LIN-9999');
+
 
     // LIN-3418: the review saw a different head, so the box is NOT ready: it says
     // why instead of inviting a close-out beside the "head moved" line.

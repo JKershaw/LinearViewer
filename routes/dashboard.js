@@ -783,6 +783,8 @@ export function createDashboardRoutes(deps) {
         stopAt: facts.stopAt || null,
         variant: facts.variant || 'unknown',
         runnerReady: !!runnerReady,
+        // LIN-4495: the open findings to close-out come from the records store (absent: not measured).
+        recordsStore,
       });
     } catch (err) {
       console.error('Session page run-evidence read failed:', err.message);
