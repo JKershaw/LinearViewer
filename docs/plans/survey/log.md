@@ -4620,3 +4620,10 @@ The hourly check-in (trig_01XCTpQoZb2V1vqMFvzXKStm) is now a drive. When a slice
 - **The ruling** was answered at 22:28:27, and the autopilot resumed at 22:28:30. It then blocked again, waiting on LIN-4495's Done.
 - **I marked LIN-4495 Done** (PATCH stateId done, 200) and sent the autopilot a note (9798e64f) to carry on with LIN-4496.
 - **Caveat:** the Done gate read "none open" partly because of the `isEmptyStatement` defect (finding-76683071). That defect is on the carry list.
+
+### 19 Nov, 23:29: piece 5 building
+
+- **The autopilot** took the 22:58 note and carried on.
+- **LIN-4496:** survey-task 23:01, survey-place 23:06, scoping 23:09, then implementation (Haiku) from 23:12. Normal order. No PR yet.
+- **The live import has not run.** The survey says it connects straight to the production database, which no agent can reach, so John runs it. That is not yet checked in code. It goes on the morning list, and the seven safety tasks don't exist yet.
+- **Status:** no rulings. A review mentions two questions for John outside the rulings list: the hold for old reviews, and the Home badge count. Main is healthy (CI green on e942c1031).

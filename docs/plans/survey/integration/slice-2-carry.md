@@ -33,6 +33,11 @@ The ruling `lin4495-postdeploy-gate` (21:47, 19 Nov) was answered "accept" on my
 
 No follow-on dispatches were made. LIN-4495 was marked Done at 22:58.
 
+## Waiting on John from LIN-4496 (noted 23:29, 19 Nov)
+
+- **The live Waiting import:** per LIN-4496's survey, it connects straight to the production database, which no agent can reach. Not checked in code. It creates the seven safety tasks, which must not move without John.
+- **Two questions a review raised outside the rulings list:** keeping the hold for old reviews, and the Home badge count.
+
 ## How tidies like this are handled
 
 A judgement call, not a rule (John, 19 Nov). Tidying as we go, a small standalone task, or waiting until the end can each be right, depending on the case. Keeping the running slice going matters most. John expects much of this to sort itself out once the upgrade is done.
