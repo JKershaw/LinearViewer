@@ -680,7 +680,7 @@ const recordsStore = new RecordsStore({
   queryLog: db.collection(QUERY_LOG_COLLECTION)
 })
 // The run lifecycle seam: a run opens when its row is taken and ends on its terminal marker (lib/run-records.js).
-dispatchQueueStore.runRecords = createRunRecords({ recordsStore })
+dispatchQueueStore.runRecords = createRunRecords({ recordsStore, readRow: (urlKey, id) => dispatchQueueStore._rowForRunRecords(urlKey, id) })
 // LIN-2444: proposed dismissals — a view annotation on a ruling, never an
 // answer to it. Separate collection from shelved-rulings because the two are
 // different acts with different lifecycles (a shelve defers a decision the

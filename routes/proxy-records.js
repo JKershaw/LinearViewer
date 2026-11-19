@@ -6,11 +6,18 @@
  * with what would work. `by` is never read from a body: it is filled here from the credential and the run it
  * names, by lib/run-lineage.js `writerOf` (three outcomes, and a refusal never falls through to a person).
  *
+ * A write's body is checked before anything is written. A ticket the body names is checked as a dry run first
+ * (it reads the tracker and claims nothing), so a refused body makes no task (LIN-4493 review, gap 5); the real
+ * tasks are made only once the dry run is clean.
+ *
  * Mounts: POST /api/proxy/records (add), POST /api/proxy/records/:id/{revise,end,link}, each behind
  * `requireWriteScope('recordWrite')` (the readWrite scope and the stage's allowance; `recordWrite` is allowed to
  * every stamp, lib/stage-writes.js). Reads: GET /api/proxy/records/:id[@v], GET /api/proxy/records (find, with
  * `count`), GET /api/proxy/tasks/:id/records (show). A read is logged with who asked (decision 8). A blind-read
  * token (`blind-comment`) may not read records at all: enabling writes must not grant record reads.
+ *
+ * Reads and writes touch only the records they name, through the store's indexed readers: nothing here loads the
+ * workspace's whole history (LIN-4493 review, gap 4).
  *
  * Injected, never imported from the tracker or the workspace (Records imports only Platform): `readTicket`
  * (the provider read: the ticket's identifier, title, description, state and parent), `askedText`
@@ -23,7 +30,6 @@ import { writerOf, WRITER_REFUSAL } from '../lib/run-lineage.js';
 import { TOKEN_ORIGIN } from '../lib/stage-writes.js';
 import { RecordsVersionConflict, RecordsNotFound, looksLikeTicket } from '../lib/records-store.js';
 import { checkAdd, checkRevise, checkEnd, checkLink, refusalOf, splitRef, KINDS } from '../lib/records/check.js';
-import { viewOf } from '../lib/records/views.js';
 import { isTerminalState } from '../lib/providers/state-map.js';
 
 const LINK_TYPES = Object.keys(KINDS.links);
@@ -54,23 +60,35 @@ function bodyWithout(body, keys) {
   return out;
 }
 
+/** Every link value a body names, flat or under `links`. */
+function linkValuesIn(input) {
+  const values = [];
+  for (const type of LINK_TYPES) {
+    if (input[type] !== undefined) values.push(input[type]);
+    if (input.links && input.links[type] !== undefined) values.push(input.links[type]);
+  }
+  return values;
+}
+
 /**
- * Every reference a body names that may be a ticket (in, to, and the link values) and is not already a record.
- * A record id can have a ticket's shape (`finding-12345678`, a run id such as `row-12345`), so a reference that
- * names an existing record resolves to it and never reaches the tracker.
+ * Every reference a body names that may be a ticket (in, to, and the link values). A record id can have a ticket's
+ * shape (`finding-12345678`, a run id such as `row-12345`), so checkWrite drops the references that name an existing
+ * record before any is read as a ticket (LIN-4493 leftovers): a reference that exists never reaches the tracker.
  */
-function ticketRefsIn(input, idx) {
+function ticketRefsIn(input) {
   const refs = new Set();
   const take = (v) => { if (typeof v === 'string' && looksLikeTicket(v)) refs.add(v.trim()); };
   take(input.in);
   take(input.to);
-  const linkValues = [];
-  for (const type of LINK_TYPES) {
-    if (input[type] !== undefined) linkValues.push(input[type]);
-    if (input.links && input.links[type] !== undefined) linkValues.push(input.links[type]);
-  }
-  for (const v of linkValues) for (const x of [].concat(v)) take(typeof x === 'string' ? splitRef(x).id : x);
-  return [...refs].filter((ref) => !idx.has(ref));
+  for (const v of linkValuesIn(input)) for (const x of [].concat(v)) take(typeof x === 'string' ? splitRef(x).id : x);
+  return [...refs];
+}
+
+/** The record ids a body names (in, to, into, link targets), so the store reads just those. */
+function recordIdsIn(input) {
+  const raw = [input.in, input.to, input.into];
+  for (const v of linkValuesIn(input)) raw.push(...[].concat(v));
+  return raw.filter((x) => typeof x === 'string').map((x) => splitRef(x).id);
 }
 
 /**
@@ -125,28 +143,51 @@ export function createProxyRecordsRoutes({ recordsStore, proxyLimiter, authentic
     return info;
   }
 
+  /** The tracker's view of a ticket, or why it has none: the read failed, or the ticket is not readable here. */
+  async function readInfo(req, ref) {
+    try {
+      return (await ticketInfo(req, ref)) ?? { unreadable: `${ref} is not a ticket this workspace can read` };
+    } catch (err) {
+      // The tracker is unreachable: the ticket is named as unreadable, never guessed at.
+      return { unreadable: `${ref} could not be read from the tracker (${err?.message || 'unavailable'})` };
+    }
+  }
+
   /**
-   * Make (or find) the task for every ticket a body names. Returns Map ref -> {id} | {problem}. A ticket Harbour
-   * cannot read is named as such; a closed one is refused with its reason (decision 5).
+   * Make (or, with `dryRun`, plan) the task for every ticket a body names. Returns Map ref -> {id} | {problem}. A
+   * ticket Harbour cannot read is named as such; a closed one is refused with its reason (decision 5). `infos`
+   * caches the tracker reads between a dry run and the real one.
    */
-  async function ensureTickets(req, refs, writerBy) {
+  async function ensureTickets(req, refs, writerBy, { dryRun = false, infos = new Map() } = {}) {
     const urlKey = req.proxyUrlKey;
     const made = new Map();
     for (const ref of refs) {
       const existing = await recordsStore.taskForTicket(urlKey, ref);
       if (existing) { made.set(ref, { id: existing }); continue; }
-      let info;
-      try {
-        info = await ticketInfo(req, ref);
-      } catch (err) {
-        // The tracker is unreachable: the ticket is named as unreadable, never guessed at.
-        made.set(ref, { problem: `${ref} could not be read from the tracker (${err?.message || 'unavailable'})` });
-        continue;
-      }
-      if (!info) { made.set(ref, { problem: `${ref} is not a ticket this workspace can read` }); continue; }
-      made.set(ref, await recordsStore.ensureTask(urlKey, info, { by: writerBy }));
+      if (!infos.has(ref)) infos.set(ref, await readInfo(req, ref));
+      const info = infos.get(ref);
+      if (info.unreadable) { made.set(ref, { problem: info.unreadable }); continue; }
+      made.set(ref, await recordsStore.ensureTask(urlKey, info, { by: writerBy, dryRun }));
     }
     return made;
+  }
+
+  /**
+   * Check a write, then make the tasks its tickets name. The check runs first on a dry run of the tickets, which
+   * writes nothing, so a refused body leaves no task behind. Only a clean dry run makes the real tasks, and the
+   * check runs again on those: its result is the one written.
+   * @returns {Promise<object>} the check's result (`problems`, and `record`/`changes`/`links` when clean)
+   */
+  async function checkWrite(req, input, writerBy, check) {
+    const urlKey = req.proxyUrlKey;
+    const idx = await recordsStore.lookup(urlKey, recordIdsIn(input));
+    const refs = ticketRefsIn(input).filter((ref) => !idx.has(ref));
+    const infos = new Map();
+    const planned = await ensureTickets(req, refs, writerBy, { dryRun: true, infos });
+    const dry = check(idx, planned);
+    if (dry.problems.length) return dry;
+    const made = await ensureTickets(req, refs, writerBy, { infos });
+    return check(idx, made);
   }
 
   /** The check's context: a reference resolves to a task or record in this workspace, or to a made ticket task. */
@@ -191,13 +232,11 @@ export function createProxyRecordsRoutes({ recordsStore, proxyLimiter, authentic
       if (!writer.ok) { logEvent(req, endpoint, 403); return refusal(res, writer); }
       const urlKey = req.proxyUrlKey;
       const input = bodyWithout(body, ['kind', 'run']);
-      const idx = await recordsStore.index(urlKey);
-      const tickets = await ensureTickets(req, ticketRefsIn(input, idx), writer.by);
-      const { problems, record } = checkAdd(body.kind, input, contextFor(urlKey, idx, tickets, await listPeople(urlKey)));
-      if (problems.length) return reply(req, res, endpoint, 422, refusalOf(problems));
-      const snap = await recordsStore.add(urlKey, record, { by: writer.by, run: writer.run ?? null });
-      const after = await recordsStore.index(urlKey);
-      return reply(req, res, endpoint, 201, viewOf(after.at(snap.id), after));
+      const people = await listPeople(urlKey);
+      const checked = await checkWrite(req, input, writer.by, (idx, tickets) => checkAdd(body.kind, input, contextFor(urlKey, idx, tickets, people)));
+      if (checked.problems.length) return reply(req, res, endpoint, 422, refusalOf(checked.problems));
+      const snap = await recordsStore.add(urlKey, checked.record, { by: writer.by, run: writer.run ?? null });
+      return reply(req, res, endpoint, 201, await recordsStore.viewOfRecord(urlKey, snap));
     } catch (err) {
       return failed(req, res, endpoint, err);
     }
@@ -211,17 +250,15 @@ export function createProxyRecordsRoutes({ recordsStore, proxyLimiter, authentic
       const writer = await writerFor(req, body);
       if (!writer.ok) { logEvent(req, endpoint, 403); return refusal(res, writer); }
       const urlKey = req.proxyUrlKey;
-      const idx = await recordsStore.index(urlKey);
-      const prev = idx.at(req.params.id);
+      const prev = await recordsStore.current(urlKey, req.params.id);
       if (!prev) return reply(req, res, endpoint, 404, { error: `no record '${req.params.id}'` });
       if (prev.kind === 'run') return reply(req, res, endpoint, 422, refusalOf([RUN_ENDS_ITSELF]));
       const input = bodyWithout(body, ['run']);
-      const tickets = await ensureTickets(req, ticketRefsIn(input, idx), writer.by);
-      const { problems, changes } = checkRevise(prev, input, contextFor(urlKey, idx, tickets, await listPeople(urlKey)));
-      if (problems.length) return reply(req, res, endpoint, 422, refusalOf(problems));
-      await recordsStore.revise(urlKey, prev.id, changes, { by: writer.by, run: writer.run ?? null, reason: input.reason });
-      const after = await recordsStore.index(urlKey);
-      return reply(req, res, endpoint, 200, viewOf(after.at(prev.id), after));
+      const people = await listPeople(urlKey);
+      const checked = await checkWrite(req, input, writer.by, (idx, tickets) => checkRevise(prev, input, contextFor(urlKey, idx, tickets, people)));
+      if (checked.problems.length) return reply(req, res, endpoint, 422, refusalOf(checked.problems));
+      await recordsStore.revise(urlKey, prev.id, checked.changes, { by: writer.by, run: writer.run ?? null, reason: input.reason });
+      return reply(req, res, endpoint, 200, await recordsStore.viewOfRecord(urlKey, await recordsStore.current(urlKey, prev.id)));
     } catch (err) {
       return failed(req, res, endpoint, err);
     }
@@ -235,18 +272,17 @@ export function createProxyRecordsRoutes({ recordsStore, proxyLimiter, authentic
       const writer = await writerFor(req, body);
       if (!writer.ok) { logEvent(req, endpoint, 403); return refusal(res, writer); }
       const urlKey = req.proxyUrlKey;
-      const idx = await recordsStore.index(urlKey);
-      const prev = idx.at(req.params.id);
+      const prev = await recordsStore.current(urlKey, req.params.id);
       if (!prev) return reply(req, res, endpoint, 404, { error: `no record '${req.params.id}'` });
       // Ending a record already in an end returns it unchanged (api-review 3), with who ended it.
-      if (prev.ended) return reply(req, res, endpoint, 200, { ...viewOf(prev, idx), changed: false, endedBy: prev.by });
+      if (prev.ended) return reply(req, res, endpoint, 200, { ...(await recordsStore.viewOfRecord(urlKey, prev)), changed: false, endedBy: prev.by });
       if (prev.kind === 'run') return reply(req, res, endpoint, 422, refusalOf([RUN_ENDS_ITSELF]));
       const input = bodyWithout(body, ['run']);
+      const idx = await recordsStore.lookup(urlKey, recordIdsIn(input));
       const { problems } = checkEnd(prev, input, contextFor(urlKey, idx, new Map(), await listPeople(urlKey)));
       if (problems.length) return reply(req, res, endpoint, 422, refusalOf(problems));
       const out = await recordsStore.end(urlKey, prev.id, { state: input.state, reason: input.reason, into: input.into ?? null }, { by: writer.by, run: writer.run ?? null });
-      const after = await recordsStore.index(urlKey);
-      return reply(req, res, endpoint, 200, { ...viewOf(after.at(prev.id), after), changed: out.changed });
+      return reply(req, res, endpoint, 200, { ...(await recordsStore.viewOfRecord(urlKey, out.record)), changed: out.changed });
     } catch (err) {
       return failed(req, res, endpoint, err);
     }
@@ -260,18 +296,16 @@ export function createProxyRecordsRoutes({ recordsStore, proxyLimiter, authentic
       const writer = await writerFor(req, body);
       if (!writer.ok) { logEvent(req, endpoint, 403); return refusal(res, writer); }
       const urlKey = req.proxyUrlKey;
-      const idx = await recordsStore.index(urlKey);
-      const prev = idx.at(req.params.id);
+      const prev = await recordsStore.current(urlKey, req.params.id);
       if (!prev) return reply(req, res, endpoint, 404, { error: `no record '${req.params.id}'` });
       const links = {};
       for (const type of LINK_TYPES) if (body[type] !== undefined) links[type] = body[type];
       Object.assign(links, isPlainObject(body.links) ? body.links : {});
-      const tickets = await ensureTickets(req, ticketRefsIn({ links }, idx), writer.by);
-      const { problems, links: normalized } = checkLink(prev, links, contextFor(urlKey, idx, tickets, await listPeople(urlKey)));
-      if (problems.length) return reply(req, res, endpoint, 422, refusalOf(problems));
-      await recordsStore.link(urlKey, prev.id, normalized, { by: writer.by, run: writer.run ?? null });
-      const after = await recordsStore.index(urlKey);
-      return reply(req, res, endpoint, 200, viewOf(after.at(prev.id), after));
+      const people = await listPeople(urlKey);
+      const checked = await checkWrite(req, { links }, writer.by, (idx, tickets) => checkLink(prev, links, contextFor(urlKey, idx, tickets, people)));
+      if (checked.problems.length) return reply(req, res, endpoint, 422, refusalOf(checked.problems));
+      await recordsStore.link(urlKey, prev.id, checked.links, { by: writer.by, run: writer.run ?? null });
+      return reply(req, res, endpoint, 200, await recordsStore.viewOfRecord(urlKey, await recordsStore.current(urlKey, prev.id)));
     } catch (err) {
       return failed(req, res, endpoint, err);
     }
@@ -306,12 +340,11 @@ export function createProxyRecordsRoutes({ recordsStore, proxyLimiter, authentic
       const urlKey = req.proxyUrlKey;
       const [id, v] = String(req.params.id).split('@');
       const asOf = typeof req.query.asOf === 'string' ? req.query.asOf : undefined;
-      const idx = await recordsStore.index(urlKey);
-      const snap = v !== undefined ? idx.versionOf(id, Number(v)) : idx.at(id, asOf);
+      const { snap, versions } = await recordsStore.read(urlKey, id, { v: v !== undefined ? Number(v) : undefined, asOf });
       await recordsStore.logQuery(urlKey, { by: askerOf(req), cmd: 'get', recordId: id, asOf: asOf ?? null });
       if (!snap) return reply(req, res, endpoint, 404, { error: `no record '${req.params.id}'` });
-      const versions = idx.versionsOf(id).filter((x) => x.v <= snap.v).map((x) => ({ v: x.v, at: x.at, by: x.by, state: x.state, op: x.op, ...(x.reason ? { reason: x.reason } : {}) }));
-      return reply(req, res, endpoint, 200, { ...viewOf(snap, idx, asOf), versions });
+      const history = versions.filter((x) => x.id === snap.id && x.v <= snap.v).map((x) => ({ v: x.v, at: x.at, by: x.by, state: x.state, op: x.op, ...(x.reason ? { reason: x.reason } : {}) }));
+      return reply(req, res, endpoint, 200, { ...(await recordsStore.viewOfRecord(urlKey, snap, asOf)), versions: history });
     } catch (err) {
       return failed(req, res, endpoint, err);
     }
@@ -324,16 +357,18 @@ export function createProxyRecordsRoutes({ recordsStore, proxyLimiter, authentic
       const urlKey = req.proxyUrlKey;
       const q = req.query;
       const asOf = typeof q.asOf === 'string' ? q.asOf : undefined;
-      const idx = await recordsStore.index(urlKey);
-      const text = typeof q.text === 'string' ? q.text.toLowerCase() : null;
-      const matched = idx.all(asOf).filter((r) => (!q.kind || r.kind === q.kind)
-        && (!q.in || (q.in === KINDS.addressees.project ? !r.in : r.in === q.in))
-        && (!q.to || r.to === q.to)
-        && (!q.state || r.state === q.state)
-        && (!text || Object.values(r.fields || {}).join('\n').toLowerCase().includes(text)));
+      const inRef = typeof q.in === 'string' ? (q.in === KINDS.addressees.project ? null : q.in) : undefined;
+      const matched = await recordsStore.find(urlKey, {
+        kind: typeof q.kind === 'string' ? q.kind : undefined,
+        state: typeof q.state === 'string' ? q.state : undefined,
+        to: typeof q.to === 'string' ? q.to : undefined,
+        inRef,
+        asOf,
+        text: typeof q.text === 'string' ? q.text : undefined
+      });
       await recordsStore.logQuery(urlKey, { by: askerOf(req), cmd: 'find', taskId: typeof q.in === 'string' ? q.in : null, asOf: asOf ?? null });
       if (q.count !== undefined) return reply(req, res, endpoint, 200, { count: matched.length });
-      return reply(req, res, endpoint, 200, { records: matched.map((r) => viewOf(r, idx, asOf)) });
+      return reply(req, res, endpoint, 200, { records: await recordsStore.viewsOf(urlKey, matched, asOf) });
     } catch (err) {
       return failed(req, res, endpoint, err);
     }
@@ -345,12 +380,14 @@ export function createProxyRecordsRoutes({ recordsStore, proxyLimiter, authentic
     try {
       const urlKey = req.proxyUrlKey;
       const asOf = typeof req.query.asOf === 'string' ? req.query.asOf : undefined;
-      const idx = await recordsStore.index(urlKey);
-      const task = idx.at(req.params.id, asOf);
+      const { snap: task } = await recordsStore.read(urlKey, req.params.id, { asOf });
       await recordsStore.logQuery(urlKey, { by: askerOf(req), cmd: 'show', taskId: req.params.id, asOf: asOf ?? null });
       if (!task || task.kind !== 'task') return reply(req, res, endpoint, 404, { error: `'${req.params.id}' is not a task` });
-      const records = idx.all(asOf).filter((r) => r.in === task.id).map((r) => viewOf(r, idx, asOf));
-      return reply(req, res, endpoint, 200, { task: viewOf(task, idx, asOf), records });
+      const records = await recordsStore.find(urlKey, { inRef: task.id, asOf });
+      return reply(req, res, endpoint, 200, {
+        task: await recordsStore.viewOfRecord(urlKey, task, asOf),
+        records: await recordsStore.viewsOf(urlKey, records, asOf)
+      });
     } catch (err) {
       return failed(req, res, endpoint, err);
     }

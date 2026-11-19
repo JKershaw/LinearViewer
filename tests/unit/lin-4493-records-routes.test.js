@@ -23,6 +23,7 @@ import { requireWriteScope } from '../../lib/stage-write-gate.js';
 import { READ_WRITE } from '../../lib/proxy-scopes.js';
 import { askedText } from '../../lib/as-asked.js';
 import { STAGE_KINDS } from '../../lib/prompts/stage-kinds.js';
+import { createRunRecords } from '../../lib/run-records.js';
 
 const URL_KEY = 'routes-test-workspace';
 const harness = createMangoTmpdir('lin-4493-routes-');
@@ -336,5 +337,135 @@ describe('reads: find, show, get and the query log', () => {
     assert.equal(v1.body.fields.says, 'First lesson.');
     const asOf = await get(`/api/proxy/records/${made.body.id}?asOf=2026-11-01T00:00:00.000Z`, 'john');
     assert.equal(asOf.status, 404, 'the record did not exist then');
+  });
+});
+
+describe('wakes and follow-ups are filed under the run they resume (decision 2c; LIN-4493 gap 3)', () => {
+  const at = '2026-11-19T10:10:00.000Z';
+  const doneEntry = { kind: 'done', message: '[done] Task completed' };
+
+  test('a wake writes under the run it wakes: refused while that run has ended, and taking the wake reopens it', async () => {
+    await store.endRun(URL_KEY, 'row-impl', { state: 'done', at });
+    const refused = await post('/api/proxy/records', 'impl', { kind: 'finding', to: 'review', says: 'x', run: 'row-impl' });
+    assert.equal(refused.status, 403);
+    assert.equal(refused.body.reason, 'run-ended');
+    const seam = createRunRecords({ recordsStore: store, now: () => new Date(at) });
+    const wake = { _id: 'row-wake', urlKey: URL_KEY, kind: 'wake', runRecordId: 'row-impl', rootItemId: 'row-wake-root' };
+    await seam.onTaken(wake);
+    const ok = await post('/api/proxy/records', 'impl', { kind: 'finding', to: 'review', says: 'Woken finding.', how: 'check', run: 'row-impl' });
+    assert.equal(ok.status, 201, JSON.stringify(ok.body));
+    assert.equal(ok.body.by, 'implementation');
+    assert.equal(ok.body.run, 'row-impl');
+    await seam.onFeedback(wake, doneEntry, [doneEntry]);
+    const after = await post('/api/proxy/records', 'impl', { kind: 'finding', to: 'review', says: 'x', run: 'row-impl' });
+    assert.equal(after.status, 403);
+    assert.equal(after.body.reason, 'run-ended', 'the wake\'s own terminal ends the run again');
+  });
+
+  test('a stage-kind follow-up writes under its own new run, never under the finished build\'s run', async () => {
+    await store.endRun(URL_KEY, 'row-impl', { state: 'done', at });
+    const seam = createRunRecords({ recordsStore: store, now: () => new Date(at) });
+    await seam.onTaken({ _id: 'row-follow', urlKey: URL_KEY, kind: 'implementation', runRecordId: 'row-follow', rootItemId: 'row-root' });
+    tokens.follow = { origin: 'dispatch', runRecordId: 'row-follow', writes: 'implementation' };
+    const own = await post('/api/proxy/records', 'follow', { kind: 'finding', to: 'review', says: 'Follow-up finding.', how: 'check', run: 'row-follow' });
+    assert.equal(own.status, 201, JSON.stringify(own.body));
+    assert.equal(own.body.run, 'row-follow');
+    const build = await post('/api/proxy/records', 'follow', { kind: 'finding', to: 'review', says: 'x', run: 'row-impl' });
+    assert.equal(build.status, 403);
+    assert.equal(build.body.reason, 'run-ended');
+  });
+
+  test('a kind-less custom resume reopens the build\'s run through the seam, and its write is filed under that run', async () => {
+    await store.endRun(URL_KEY, 'row-impl', { state: 'done', at });
+    const seam = createRunRecords({ recordsStore: store, now: () => new Date(at) });
+    await seam.onTaken({ _id: 'row-resume', urlKey: URL_KEY, kind: null, runRecordId: 'row-impl', rootItemId: 'row-root' });
+    const ok = await post('/api/proxy/records', 'impl', { kind: 'finding', to: 'review', says: 'Resumed finding.', how: 'check', run: 'row-impl' });
+    assert.equal(ok.status, 201, JSON.stringify(ok.body));
+    assert.equal(ok.body.by, 'implementation');
+  });
+
+  test('a wake credential naming a run in another lineage is refused', async () => {
+    tokens.wakeElsewhere = { origin: 'dispatch', runRecordId: 'row-other', writes: 'implementation' };
+    const r = await post('/api/proxy/records', 'wakeElsewhere', { kind: 'finding', to: 'review', says: 'x', run: 'row-impl' });
+    assert.equal(r.status, 403);
+    assert.equal(r.body.reason, 'other-lineage');
+  });
+});
+
+describe('a refused write makes no task (LIN-4493 gap 5)', () => {
+  test('a 422 naming in: LIN-4452 leaves the ticket with no task, and the body\'s problems are all named', async () => {
+    const r = await post('/api/proxy/records', 'john', { kind: 'finding', to: 'review', says: 'x', bogus: 'nope', in: 'LIN-4452' });
+    assert.equal(r.status, 422, JSON.stringify(r.body));
+    assert.ok(r.body.problems.some((p) => p.field === 'bogus'));
+    assert.equal(await store.taskForTicket(URL_KEY, 'LIN-4452'), null, 'the refused write made no task for LIN-4452');
+    assert.equal(await store.taskForTicket(URL_KEY, 'LIN-4450'), null, 'nor for its parent');
+    const tasks = await db.collection(RECORDS_COLLECTION).countDocuments({ urlKey: URL_KEY, kind: 'task' });
+    assert.equal(tasks, 0);
+  });
+
+  test('a clean write that names the same ticket makes its task, parent first', async () => {
+    const r = await post('/api/proxy/records', 'john', { kind: 'finding', to: 'review', says: 'x', in: 'LIN-4452' });
+    assert.equal(r.status, 201, JSON.stringify(r.body));
+    const task = await store.taskForTicket(URL_KEY, 'LIN-4452');
+    assert.ok(task, 'the ticket\'s task was made');
+    assert.equal(r.body.in, task);
+    assert.ok(await store.taskForTicket(URL_KEY, 'LIN-4450'), 'the parent task was made above it');
+  });
+});
+
+describe('reads and writes touch only the records they name (LIN-4493 gap 4)', () => {
+  /** A store collection whose find() counts the documents it returns: the reads a request makes. */
+  function countingReads(collection, counter) {
+    return new Proxy(collection, {
+      get(target, prop) {
+        if (prop === 'find') {
+          return (...args) => {
+            const cursor = target.find(...args);
+            const toArray = cursor.toArray.bind(cursor);
+            cursor.toArray = async () => { const docs = await toArray(); counter.docs += docs.length; return docs; };
+            return cursor;
+          };
+        }
+        const value = Reflect.get(target, prop, target);
+        return typeof value === 'function' ? value.bind(target) : value;
+      }
+    });
+  }
+
+  test('with 2,000 unrelated versions in the workspace, writes and filtered reads read a handful of documents', async () => {
+    const seed = [];
+    for (let i = 0; i < 2000; i++) {
+      seed.push({ _id: `${URL_KEY}::lesson-u${i}::1`, urlKey: URL_KEY, id: `lesson-u${i}`, v: 1, op: 'add', kind: 'lesson', state: 'open', to: 'someone-else', at: '2026-11-01T00:00:00.000Z', by: 'implementation', links: {}, fields: { says: `unrelated ${i}` } });
+    }
+    for (let i = 0; i < seed.length; i += 500) await db.collection(RECORDS_COLLECTION).insertMany(seed.slice(i, i + 500));
+    const counter = { docs: 0 };
+    store.records = countingReads(store.records, counter);
+    const measure = async (label, fn) => {
+      const before = counter.docs;
+      const out = await fn();
+      const read = counter.docs - before;
+      assert.ok(read < 50, `${label} read ${read} documents`);
+      return out;
+    };
+    const made = await measure('add', () => post('/api/proxy/records', 'john', { kind: 'finding', to: 'review', says: 'Mine.', how: 'check' }));
+    assert.equal(made.status, 201, JSON.stringify(made.body));
+    const revised = await measure('revise', () => post(`/api/proxy/records/${made.body.id}/revise`, 'john', { says: 'Mine, revised.', reason: 'sharper' }));
+    assert.equal(revised.status, 200, JSON.stringify(revised.body));
+    const found = await measure('find by kind and addressee', () => get('/api/proxy/records?kind=finding&to=review', 'john'));
+    assert.equal(found.body.records.length, 1);
+    const count = await measure('find count by addressee', () => get('/api/proxy/records?to=review&count=1', 'john'));
+    assert.equal(count.body.count, 1);
+    assert.ok(counter.docs < 2000, `the whole test read ${counter.docs} documents, not the workspace's 2,000+`);
+  });
+});
+
+describe('a record id is never read as a ticket (a flake found by repeat runs: an all-digit hex suffix)', () => {
+  test('a record whose id reads like a ticket (kind-12345678) can be linked to: it is a record, not a ticket', async () => {
+    const id = 'change-44394596';
+    await db.collection(RECORDS_COLLECTION).insertOne({ _id: `${URL_KEY}::${id}::1`, urlKey: URL_KEY, id, v: 1, op: 'add', kind: 'change', state: 'open', at: '2026-11-19T10:00:00.000Z', by: 'implementation', links: {}, fields: { ref: 'PR 9', head: 'abc' } });
+    const made = await post('/api/proxy/records', 'john', { kind: 'finding', to: 'review', says: 'About it.', how: 'check', about: id });
+    assert.equal(made.status, 201, JSON.stringify(made.body));
+    assert.deepEqual(made.body.links.about, [id]);
+    assert.deepEqual(calls.ticketReads, [], 'no tracker read for a record id');
   });
 });

@@ -1,8 +1,9 @@
 /**
  * LIN-4493 (piece 2): the run lifecycle seam (lib/run-records.js) on the real records store. A run opens when its
- * row is taken and ends on its terminal marker; a custom resume reopens the run it carries (decision 2c); a wake
- * opens nothing; `[skipped]` ends nothing; the account is the final assistant text. The dispatch store's seam call
- * is best-effort: a fault in the seam never fails a take or a feedback.
+ * row is taken and ends on its terminal marker; a custom resume and a wake reopen the run they carry (decision 2c);
+ * a wake with no run opens nothing; `[skipped]` ends nothing; the account is the final assistant text; a row closed
+ * without a marker ends its run, except on a hand-off; an abort row's `[aborted]` ends its target's run. The dispatch
+ * store's seam call is best-effort: a fault in the seam never fails a take, a feedback or a closure.
  */
 import { describe, test, before, after, beforeEach } from 'node:test';
 import assert from 'node:assert/strict';
@@ -44,9 +45,19 @@ describe('the run opens when its row is taken', () => {
     assert.equal(run.lineage, 'row-impl');
   });
 
-  test('a wake opens nothing; an autopilot kickoff starts no run', async () => {
-    assert.equal(await seam.onTaken(row({ _id: 'row-wake', kind: 'wake', runRecordId: 'row-impl' })), null);
+  test('an autopilot kickoff starts no run, and a wake with no run to wake opens nothing', async () => {
+    assert.equal(await seam.onTaken(row({ _id: 'row-wake', kind: 'wake', runRecordId: null })), null);
+    assert.equal(await seam.onTaken(row({ _id: 'row-wake-2', kind: 'wake', runRecordId: 'row-missing' })), null);
     assert.equal(await seam.onTaken(row({ _id: 'row-kick', kind: 'autopilot' })), null);
+  });
+
+  test('a wake reopens the run it wakes, as a custom resume does, and keeps that run\'s lineage (decision 2c)', async () => {
+    await seam.onTaken(row({ _id: 'row-impl', kind: 'implementation', rootItemId: 'row-root' }));
+    await store.endRun(URL_KEY, 'row-impl', { state: 'done', at: '2026-11-19T12:01:00.000Z' });
+    const woken = await seam.onTaken(row({ _id: 'row-wake', kind: 'wake', runRecordId: 'row-impl', rootItemId: 'row-wake-root' }));
+    assert.equal(woken.id, 'row-impl');
+    assert.equal(woken.state, 'open');
+    assert.equal(woken.lineage, 'row-root', 'a wake\'s own rootItemId is not its run\'s lineage (lib/run-lineage.js)');
   });
 
   test('a kind-less custom resume reopens the ended run it carries, as a new version', async () => {
@@ -91,18 +102,69 @@ describe('the run ends on its terminal marker', () => {
   });
 });
 
+describe('a row closed without a marker ends its run (the closers)', () => {
+  test('a lineage-terminal closure ends the run of a row it closes, as the lineage\'s status', async () => {
+    await seam.onTaken(row({ _id: 'row-impl', kind: 'implementation' }));
+    const closed = [{ _id: 'row-impl', urlKey: URL_KEY, kind: 'implementation', runRecordId: 'row-impl', feedback: [{ kind: 'assistant-text', message: 'Half done.' }] }];
+    assert.equal(await seam.onClosed(closed, { reason: 'lineage-terminal', terminal: 'failed' }), 1);
+    const run = await store.run(URL_KEY, 'row-impl');
+    assert.equal(run.state, 'failed');
+    assert.equal(run.fields.account, 'Half done.');
+  });
+
+  test('a ticket-closed closure, or an operator stamp, ends the run as aborted', async () => {
+    await seam.onTaken(row({ _id: 'row-a', kind: 'review' }));
+    await seam.onTaken(row({ _id: 'row-b', kind: 'review' }));
+    await seam.onClosed([{ _id: 'row-a', urlKey: URL_KEY, kind: 'review', runRecordId: 'row-a', feedback: [] }], { reason: 'ticket-closed' });
+    await seam.onClosed([{ _id: 'row-b', urlKey: URL_KEY, kind: 'review', runRecordId: 'row-b', feedback: [] }], { reason: 'operator' });
+    assert.equal((await store.run(URL_KEY, 'row-a')).state, 'aborted');
+    assert.equal((await store.run(URL_KEY, 'row-b')).state, 'aborted');
+  });
+
+  test('a handed-on closure ends nothing: the successor that replaced the row carries its run on', async () => {
+    await seam.onTaken(row({ _id: 'row-impl', kind: 'implementation' }));
+    const closed = [{ _id: 'row-wake', urlKey: URL_KEY, kind: 'wake', runRecordId: 'row-impl', feedback: [] }];
+    assert.equal(await seam.onClosed(closed, { reason: 'handed-on' }), 0);
+    assert.equal((await store.run(URL_KEY, 'row-impl')).state, 'open');
+  });
+
+  test('a row with no run closes with nothing to end', async () => {
+    const closed = [{ _id: 'row-kick', urlKey: URL_KEY, kind: 'autopilot', runRecordId: null, feedback: [] }];
+    assert.equal(await seam.onClosed(closed, { reason: 'ticket-closed' }), 0);
+  });
+});
+
+describe('an abort row\'s [aborted] ends the run of the row it targets', () => {
+  test('the target run ends aborted, with the target\'s own final text; the abort row starts no run', async () => {
+    await seam.onTaken(row({ _id: 'row-impl', kind: 'implementation' }));
+    const targets = { 'row-impl': row({ _id: 'row-impl', kind: 'implementation', runRecordId: 'row-impl', feedback: [{ kind: 'assistant-text', message: 'Stopped midway.' }] }) };
+    const withReader = createRunRecords({ recordsStore: store, readRow: async (_u, id) => targets[id] ?? null, now: () => new Date('2026-11-19T12:00:00.000Z') });
+    const abortRow = { _id: 'abort-1', urlKey: URL_KEY, abort: true, abortTo: 'row-impl', kind: undefined };
+    const aborted = { kind: 'aborted', message: '[aborted] stopped by Stop' };
+    const ended = await withReader.onFeedback(abortRow, aborted, [aborted]);
+    assert.equal(ended.state, 'aborted');
+    assert.equal(ended.fields.account, 'Stopped midway.');
+    assert.equal(await store.run(URL_KEY, 'abort-1'), null);
+  });
+
+  test('without a reader for the target, an abort row ends nothing', async () => {
+    const aborted = { kind: 'aborted', message: '[aborted] stopped' };
+    assert.equal(await seam.onFeedback({ _id: 'abort-2', urlKey: URL_KEY, abort: true, abortTo: 'row-impl' }, aborted, [aborted]), null);
+  });
+});
+
 describe('the dispatch store\'s seam call is best-effort', () => {
   test('a fault in the seam is logged and never thrown to the take or the feedback', async () => {
     const errors = [];
     const original = console.error;
     console.error = (...args) => errors.push(args.join(' '));
     try {
-      const fake = { runRecords: { onTaken: async () => { throw new Error('records down'); } } };
-      await DispatchQueueStore.prototype._runRecordsSeam.call(fake, 'onTaken', row({}));
+      const fake = { runRecords: { onClosed: async () => { throw new Error('records down'); } } };
+      await DispatchQueueStore.prototype._runRecordsSeam.call(fake, 'onClosed', [row({})], { reason: 'ticket-closed' });
       await DispatchQueueStore.prototype._runRecordsSeam.call({}, 'onTaken', row({}));
     } finally {
       console.error = original;
     }
-    assert.ok(errors.some((line) => /Run records \(onTaken\) failed/.test(line) && /records down/.test(line)));
+    assert.ok(errors.some((line) => /Run records \(onClosed\) failed/.test(line) && /records down/.test(line)));
   });
 });

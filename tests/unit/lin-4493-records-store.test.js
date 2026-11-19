@@ -17,7 +17,8 @@ import {
   QUERY_LOG_RETENTION_MS,
   RECORDS_COLLECTION,
   REFS_COLLECTION,
-  QUERY_LOG_COLLECTION
+  QUERY_LOG_COLLECTION,
+  PLANNED_TASK
 } from '../../lib/records-store.js';
 import { INDEX_SPECS } from '../../lib/db-indexes.js';
 
@@ -29,12 +30,14 @@ const harness = createMangoTmpdir('lin-4493-records-');
 let db;
 let store;
 let records;
+let refs;
 
 before(() => harness.connect());
 after(() => harness.close());
 beforeEach(async () => {
   db = harness.freshDb();
   records = db.collection(RECORDS_COLLECTION);
+  refs = db.collection(REFS_COLLECTION);
   // The unique version key lib/db-indexes.js declares (boot tier); built here so the store runs against it.
   for (const collection of [RECORDS_COLLECTION, REFS_COLLECTION]) {
     for (const spec of INDEX_SPECS.filter((x) => x.collection === collection && x.options?.unique)) {
@@ -222,5 +225,40 @@ describe('records store: query log', () => {
     const logSpecs = INDEX_SPECS.filter((s) => s.collection === QUERY_LOG_COLLECTION);
     assert.ok(logSpecs.length > 0);
     for (const s of logSpecs) assert.equal(s.options.expireAfterSeconds, undefined);
+  });
+});
+
+describe('records store: reads by the indexed fields reduce to the current version', () => {
+  test('find matches a record on its current version only, and asOf reads the version that stood then', async () => {
+    const made = await store.add(URL_KEY, shape('finding', { says: 'Open for now.' }, { to: 'review' }), { by: 'implementation', at: at(1) });
+    const before = at(2);
+    await store.end(URL_KEY, made.id, { state: 'done', reason: 'fixed' }, { by: 'review', at: at(3) });
+    const openNow = await store.find(URL_KEY, { state: 'open' });
+    assert.equal(openNow.some((r) => r.id === made.id), false, 'an old open version does not match a read of open records');
+    const doneNow = await store.find(URL_KEY, { state: 'done' });
+    assert.deepEqual(doneNow.map((r) => r.id), [made.id]);
+    const openThen = await store.find(URL_KEY, { state: 'open', asOf: before });
+    assert.deepEqual(openThen.map((r) => r.id), [made.id], 'as it stood at the earlier time it was open');
+  });
+
+  test('find by addressee and by task reads the indexed fields; the project backlog is the records with no task', async () => {
+    const task = await store.ensureTask(URL_KEY, { identifier: 'LIN-7', asked: 'Ask.', closed: false }, { by: 'implementation', at: at(1) });
+    await store.add(URL_KEY, { kind: 'finding', state: 'open', fields: { says: 'In the task.' }, links: {}, in: task.id, to: 'review' }, { by: 'implementation', at: at(2) });
+    await store.add(URL_KEY, { kind: 'finding', state: 'open', fields: { says: 'Backlog.' }, links: {}, to: 'project' }, { by: 'implementation', at: at(3) });
+    assert.equal((await store.find(URL_KEY, { inRef: task.id })).length, 1);
+    assert.equal((await store.find(URL_KEY, { inRef: null, kind: 'finding' })).length, 1, 'the one with no task');
+    assert.equal((await store.find(URL_KEY, { to: 'project' })).length, 1);
+  });
+
+  test('a dry-run ensureTask writes nothing: no claim and no task, and the planned id is answered', async () => {
+    const info = { identifier: 'LIN-8', asked: 'Ask.', closed: false };
+    const planned = await store.ensureTask(URL_KEY, info, { by: 'implementation', at: at(1), dryRun: true });
+    assert.equal(planned.id, PLANNED_TASK);
+    assert.equal(await store.taskForTicket(URL_KEY, 'LIN-8'), null);
+    assert.equal(await refs.countDocuments({ urlKey: URL_KEY, ticket: 'LIN-8' }), 0);
+    assert.equal(await records.countDocuments({ urlKey: URL_KEY, kind: 'task' }), 0);
+    const made = await store.ensureTask(URL_KEY, info, { by: 'implementation', at: at(2) });
+    assert.notEqual(made.id, PLANNED_TASK);
+    assert.equal(await store.taskForTicket(URL_KEY, 'LIN-8'), made.id);
   });
 });
