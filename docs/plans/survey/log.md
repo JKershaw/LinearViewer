@@ -4850,3 +4850,5 @@ Still waiting on `lin4499-snapshot-cut`.
 - **Ruling `lin4504-design-plan-record`:** John answered no-record at 17:28. Plan-review resumed and wrote the decision.
 - **LIN-4504:** beat 1 of 5 since 17:13. The fleet pause and the production cutover are kept as a deliberate step. LIN-4506 is Todo.
 - **Status:** no rulings. Main green. Cost about $176.50, and counting.
+
+- **~17:40:** John approved dropping the task-snapshots collection (automatic backups exist). Dispatched as a small custom run on LIN-4502 (ff1e685a): `railway status`, then a dry run, then `--execute` only if the dry run names just that collection, then a comment and finding-4936b3f0 ended.
