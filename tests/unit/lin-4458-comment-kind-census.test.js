@@ -185,6 +185,44 @@ describe('LIN-4504: a plan comment is no longer read (plans are records)', () =>
   });
 });
 
+describe('the reading changes one kind per comment made (LIN-4458), each pinned by name', () => {
+  const PR1 = 'https://github.com/acme/widget/pull/41';
+  const PR2 = 'https://github.com/acme/widget/pull/42';
+  const c = (n, body) => ({ id: `c${n}`, body, createdAt: `2026-11-12T0${n}:00:00.000Z` });
+
+  // Before (f9a8cbcd1): true. The heading made it no plan-review VERDICT (no verdict word), so nothing
+  // excluded it. Now the comment is of kind plan-review, which is never a person's comment.
+  test('change 1: a plain-first-line comment with a plan-review heading lower down, no verdict word and no PR, is no longer a person\'s comment', () => {
+    const body = 'Thanks, see below.\n\n## Plan review notes\n\nStill reading.';
+    assert.equal(commentKindOf(body), 'plan-review');
+    assert.equal(isPersonComment(body), false);
+  });
+
+  // Before (f9a8cbcd1): 1 verdict. The heading test ignored the agent-note opening. Now the agent-note
+  // row is matched first, so the note is the planner's, and its quoted verdict is not counted.
+  test('change 2: an agent\'s note that carries a plan-review heading with a verdict is no longer counted as a plan-review verdict', () => {
+    const note = c(1, 'Plan revised to address the review.\n\n### Plan Review Verdict\n\n**Verdict:** Approve');
+    assert.equal(commentKindOf(note), 'agent-note');
+    const f = assemblePlanReviewFacts([note]);
+    assert.equal(f.verdicts, 0);
+    assert.equal(f.latestVerdict, null);
+  });
+
+  // Before (f9a8cbcd1): true. The audit check's own close-out test counted a review whose title mentions
+  // a close-out as the landing's close-out. Now that review is a review (as the landing and the
+  // after-review readings already read it), so no close-out is on the trail and no audit "already ran".
+  test('change 3: the audit-already-ran check no longer takes a review titled with "close-out" as the landing\'s close-out', () => {
+    const trail = [
+      c(1, `Implementation done: ${PR1}, CI green.`),
+      c(2, `## Review — conditional on close-out\n\nReviewed ${PR1}.\n\n**Verdict: Approve**`),
+      c(3, `## Retrospective audit — LIN-1\n\nNotes PR: ${PR2}.`),
+    ];
+    assert.equal(commentKindOf(trail[1]), 'review');
+    assert.equal(readTrail(trail).auditAfterCloseOut, false);
+    assert.equal(assembleTrailFacts(trail, '', { leaf: false }).auditAfterCloseOut, false);
+  });
+});
+
 // ─── The census ────────────────────────────────────────────────────────────────
 
 const RETIRED = [
