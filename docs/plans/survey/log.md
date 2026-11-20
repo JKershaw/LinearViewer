@@ -4805,3 +4805,12 @@ Still waiting on `lin4499-snapshot-cut`.
 - **Status:** no rulings. Main green. Slice 2 cost so far is $90.84.
 
 - **~14:45, John's answers on watching agents:** stream during a turn; words only, no tool calls; keep the permanent record; LIN-3976's redesign goes to the UI work. **Filed LIN-4508** (Backlog). LIN-1114, 1905, 1311 and 2546 were closed as canceled, each with a comment pointing to it ("duplicate" was refused with a 400). LIN-3976 moved under LIN-4008, with a comment.
+
+### 20 Nov, 15:29: slice 2, three of six done
+
+- **LIN-4501:** Done. PR #2472 merged at 15:09 as 09512c620, CI green. Review: conditional Approve. Blind read: "same".
+- **Left for John:**
+  - a post-deploy check: `records.tasklessRuns` should be 0 since 15:09 (finding-432cbfb9). That's agent-checkable via the records route.
+  - four open tasks hold a wrong `asked` (LIN-4210, 3357, 4028, 1785). Whether to correct them once is his call.
+- **LIN-4502** (the seal and the prune retired) and **LIN-4504** (the plan cutover) started at 15:12. LIN-4506 waits behind LIN-4504.
+- **Status:** no rulings. Main green. Cost $116.39. The seven security records are untouched.
