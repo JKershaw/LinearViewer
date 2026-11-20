@@ -4915,3 +4915,16 @@ The pause ruling was answered (a: lifted, stays lifted). LIN-4504's second revie
   The driver token could end them where the dispatch credential couldn't.
 - **Status:** LIN-4499's own close-out not started. No rulings. Cost about $253.
 - **Lesson again:** the standing production-access fact doesn't reach new pieces. Slice 3's ticket carries it as one of John's standing answers.
+
+### 20 Nov, 22:29: LIN-4506 done; slice 2's own close-out finishing
+
+- **LIN-4506:** the first review was stale (the readings had landed 4 minutes before it). Re-review: conditional Approve. Blind read: "same". PR #2477 merged as 3bccb8aa8, test-only, CI green.
+- **Production readings via `railway ssh`** (comment d9d8c372):
+  - records addressed to a held run sat a median 1.0 h, and 17.2 h for those addressed to `implementation`;
+  - 0 of 21 runs had no task;
+  - copied-count drift 26→25→23→22→12.
+
+  These bear on John's slice 6 call.
+- **LIN-4499:** review (22:02) conditional Approve, 7 findings. The close-out opened PR #2478 (5 fixes, CI green). It deadlocked: the engine won't send the blind read while close-out is open, and close-out can't merge without one. The autopilot forced the blind read with a kind override at 22:28.
+- **Status:** no rulings. Main green. Slice cost about $269.
+- **Stale claim in the autopilot's summary:** "the snapshot drop has not been run" is wrong; it ran at 17:35. The key rotation is LIN-4512.
