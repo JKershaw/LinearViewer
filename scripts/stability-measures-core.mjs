@@ -557,8 +557,9 @@ export function referencesFrom(json, { file = 'reference' } = {}) {
 // They are reported beside the five measures and never gate anything (the piece's rule). The inputs come in as data:
 // records as { id, kind, state, to, in, openedAt, ref } (`in` is the task, openedAt the first version's `at`, `ref` a
 // task's ticket), the query log as { at, by, taskId, recordId } (lib/records-store.js logQuery), dispatch rows, queue and
-// history both, as { _id, stage, status, issueIdentifier, heldWakeFor, heldWakeClaimedAt } (lib/dispatch-fields.js: the
-// hold is on the leftover row, the claim stamp on the producing row). A caller that could not read a source passes null.
+// history both, as { _id, kind, status, issueIdentifier, heldWakeFor, heldWakeClaimedAt } (lib/dispatch-fields.js: the
+// hold is on the leftover row, the claim stamp on the producing row; a dispatch row names its stage in `kind`). A
+// caller that could not read a source passes null.
 export const RECORDS_ROW_KEYS = Object.freeze(['records.openToProject', 'records.openToStage', 'records.sitTime', 'records.heldRuns']);
 const HAND_OFF_KINDS = Object.freeze(['finding', 'question']);
 const NOT_READ_RECORDS = 'the records store was not read';
@@ -587,35 +588,40 @@ export function recordsRows({ records, asOf, stageKinds, references = {} }) {
   ];
 }
 
-/** Dispatch rows that left the queue without running: a leftover row in one of these does not hold anything. */
-const NOT_RUN_ENDS = new Set(['cancelled', 'expired']);
+/**
+ * A leftover row in one of these statuses holds nothing. `cancelled` and `expired` never ran; the others are its end
+ * after it ran (lib/dispatch-terminal.js TERMINAL_HISTORY_STATUSES, LINEAGE_TERMINAL_STATUSES), which releases the hold.
+ */
+const ENDED_STATUSES = new Set(['cancelled', 'expired', 'done', 'failed', 'aborted', 'skipped']);
 
 /**
- * The held runs, from the real shape (lib/dispatch-fields.js): a `leftover` row L carries `heldWakeFor` = P, the id of
- * the producing row whose parent wake L holds back. The claim stamp (`heldWakeClaimedAt`) sits on P (its history doc),
- * never on L. So L is held while P is unclaimed and L did not end without running. A P that cannot be found is not
- * counted: its state is unknown, and the reading does not guess.
+ * The held runs, from the real shape (lib/dispatch-fields.js, lib/dispatch-leftover-hook.js): a `leftover` row L carries
+ * `heldWakeFor` = P, the id of the producing row whose terminal wake L holds back. The hook stamps the claim
+ * (`heldWakeClaimedAt`) on P's history doc BEFORE it queues L, and only a skip clears the stamp again. So a real held
+ * run has P stamped, and L is held while it is still queued or taken (its status is not in ENDED_STATUSES). An
+ * unclaimed P has no held wake, and a P that cannot be found is not counted: its state is unknown, and the reading does
+ * not guess.
  * @returns {Array<{leftover: object, producer: object}>}
  */
 export function heldRunsOf(dispatchRows) {
   const byId = new Map(dispatchRows.map((r) => [r._id ?? r.id, r]));
   const held = [];
   for (const leftover of dispatchRows) {
-    if (!leftover.heldWakeFor || NOT_RUN_ENDS.has(leftover.status)) continue;
+    if (!leftover.heldWakeFor || ENDED_STATUSES.has(leftover.status)) continue;
     const producer = byId.get(leftover.heldWakeFor);
-    if (!producer || producer.heldWakeClaimedAt) continue;
+    if (!producer || !producer.heldWakeClaimedAt) continue;
     held.push({ leftover, producer });
   }
   return held;
 }
 
 /**
- * The addressees a producing row answers to: its stage kind, and its task (the task whose `ref` is its issue, found in
- * `records`) and that task's parent (its `in`). A task record carries `ref` (its ticket) in the records this reads.
+ * The addressees a producing row answers to: its stage kind (a dispatch row's `kind`), and its task (the task whose
+ * `ref` is its issue, found in `records`) and that task's parent (its `in`). A task record carries `ref` (its ticket).
  */
 export function addresseesOf(producer, records) {
   const out = new Set();
-  if (producer.stage) out.add(producer.stage);
+  if (producer.kind) out.add(producer.kind);
   const task = producer.issueIdentifier ? records.find((r) => r.kind === 'task' && r.ref === producer.issueIdentifier) : null;
   if (task) {
     out.add(task.id);

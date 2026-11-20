@@ -268,10 +268,11 @@ hand-off is not measured too, because a median of nothing is not zero. `recordsR
 `scripts/stability-measures-core.mjs` builds them.
 
 The held-run reading (`heldRunReading`, `heldRunRow`) asks whether a hand-off waits on a run that is held. The hold
-is on a `leftover` row L, whose `heldWakeFor` names its producing row P. The claim stamp (`heldWakeClaimedAt`) sits on P,
-never on L. So L is held while P is unclaimed and L did not end as `cancelled` or `expired` (`heldRunsOf`); a P that
-cannot be found is not counted. A hand-off is addressed to a held run when its `to` is P's stage kind, or P's task (the
-task whose `ref` is P's `issueIdentifier`), or that task's parent (its `in`) (`addresseesOf`). For each such hand-off, the
+is on a `leftover` row L, whose `heldWakeFor` names its producing row P. The hook stamps the claim (`heldWakeClaimedAt`)
+on P before it queues L, so a real held run has P stamped; a skip clears the stamp. L is held while it is queued or taken,
+that is, not ended as `cancelled`, `expired`, or after it ran (`done`, `failed`, `aborted`, `skipped`) (`heldRunsOf`). A P
+that cannot be found is not counted. A hand-off is addressed to a held run when its `to` is P's stage kind (a dispatch
+row's `kind`), or P's task (the task whose `ref` is P's `issueIdentifier`), or that task's parent (its `in`) (`addresseesOf`). For each such hand-off, the
 reading says how long it sat before a reader first read it: the first query-log entry at or after
 it was opened that names its task or the record, by someone other than the measuring reader (so the reading does not
 count its own reads). A hand-off no reader has read by the reading's time is censored there, and is not counted as

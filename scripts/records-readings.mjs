@@ -23,7 +23,7 @@ export const STALE_RUN_HOURS = 24;
 const DB_NAME = 'linear-viewer';
 const DISPATCH_QUEUE = 'dispatch-queue';
 const DISPATCH_HISTORY = 'dispatch-history';
-const DISPATCH_FIELDS = { _id: 1, stage: 1, status: 1, issueIdentifier: 1, heldWakeFor: 1, heldWakeClaimedAt: 1 };
+const DISPATCH_FIELDS = { _id: 1, kind: 1, status: 1, issueIdentifier: 1, heldWakeFor: 1, heldWakeClaimedAt: 1 };
 
 /**
  * The current version of each record (its `in`, `to`, `state`, and a task's `ref`), its opening time (the first

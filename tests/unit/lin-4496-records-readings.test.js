@@ -41,15 +41,17 @@ async function seed() {
   // 5 minutes after it was opened, and that read must not count.
   await store.logQuery(URL_KEY, { by: 'implementation', cmd: 'brief', taskId: task.id }, new Date(BASE - 30 * 60000));
   await store.logQuery(URL_KEY, { by: 'records-readings', cmd: 'brief', taskId: task.id }, new Date(BASE - 55 * 60000));
-  // Dispatch: a leftover in the queue holds build-7 (unclaimed, LIN-9); a leftover holds build-8 (claimed); one is cancelled.
+  // Dispatch (the real shape: a row names its stage in `kind`, the hook stamps the claim on the producer): build-7 is
+  // claimed and its leftover is queued, so it is held; build-8 is unclaimed, so its queued leftover holds nothing;
+  // leftover-3 was cancelled before it ran.
   await db.collection('dispatch-history').insertMany([
-    { _id: 'build-7', urlKey: URL_KEY, stage: 'implementation', issueIdentifier: 'LIN-9', status: 'taken', heldWakeClaimedAt: null },
-    { _id: 'build-8', urlKey: URL_KEY, stage: 'review', issueIdentifier: 'LIN-9', status: 'taken', heldWakeClaimedAt: iso(-200) }
+    { _id: 'build-7', urlKey: URL_KEY, kind: 'implementation', issueIdentifier: 'LIN-9', status: 'taken', heldWakeClaimedAt: iso(-200) },
+    { _id: 'build-8', urlKey: URL_KEY, kind: 'review', issueIdentifier: 'LIN-9', status: 'taken', heldWakeClaimedAt: null }
   ]);
   await db.collection('dispatch-queue').insertMany([
-    { _id: 'leftover-1', urlKey: URL_KEY, stage: 'leftover', status: 'queued', heldWakeFor: 'build-7' },
-    { _id: 'leftover-2', urlKey: URL_KEY, stage: 'leftover', status: 'queued', heldWakeFor: 'build-8' },
-    { _id: 'leftover-3', urlKey: URL_KEY, stage: 'leftover', status: 'cancelled', heldWakeFor: 'build-7' }
+    { _id: 'leftover-1', urlKey: URL_KEY, kind: 'leftover', status: 'queued', heldWakeFor: 'build-7' },
+    { _id: 'leftover-2', urlKey: URL_KEY, kind: 'leftover', status: 'queued', heldWakeFor: 'build-8' },
+    { _id: 'leftover-3', urlKey: URL_KEY, kind: 'leftover', status: 'cancelled', heldWakeFor: 'build-7' }
   ]);
   return { toStageId: toStage.id };
 }
@@ -65,7 +67,7 @@ describe('the records readings reader (LIN-4496): read-only, with each reading\'
     assert.deepEqual(byKey['records.openToStage'].value, { count: 1, of: 2 });
     assert.equal(byKey['records.sitTime'].status, STATUS.MEASURED);
 
-    // Held: leftover-1 only (build-8 is claimed, leftover-2 holds it; leftover-3 was cancelled).
+    // Held: leftover-1 only (build-7 is claimed; build-8 is not, so leftover-2 holds nothing; leftover-3 was cancelled).
     const held = byKey['records.heldRuns'];
     assert.equal(held.status, STATUS.MEASURED);
     assert.equal(held.value.held, 1);
