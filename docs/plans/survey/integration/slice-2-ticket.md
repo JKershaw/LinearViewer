@@ -27,14 +27,14 @@
   - the prune, and `description/below`;
   - the copy-down;
   - the `## As asked` seal and its guard;
-  - task snapshots (what read them reads plan versions instead);
+  - task snapshots, fully: Ship Biscuit, their only other reader, moves onto the work that got done first (LIN-4500);
   - the file-pointer pilot, which fed on plan paths.
 
   The design's slice table lists the code sites for each.
 
-**Carried from slice 1 (John's ruling, 19 Nov).** The frozen Waiting-list reader (`lib/records/waiting-import.js`) was kept "only for the one-off import", with no end date. The stability scripts now use it too. Once LIN-4496's live import has run, remove the reader and the import script that uses it, and move the stability scripts onto the records store. The import is John's (finding-4519465a on LIN-4491): it needs the production database, which no agent can reach, and it hasn't run yet. If it still hasn't run when the rest of this slice is ready, land the rest and leave this one step open for John.
+**Carried from slice 1 (John's ruling, 19 Nov).** The frozen Waiting-list reader (`lib/records/waiting-import.js`) was kept "only for the one-off import", with no end date. The stability scripts now use it too. Once LIN-4496's live import has run, remove the reader and the import script that uses it, and move the stability scripts onto the records store. The import (finding-4519465a on LIN-4491) is agent work: production is reachable through the Railway CLI on John's machine. If it hasn't run by the time the rest of this slice is ready, land the rest and leave this one step open.
 
-**Not in this slice:** verdicts and changes (slice 3); rulings, and removing the brief's ticket section (slice 4); lessons (slice 5). Slice 1's follow-ups that wait on John: the live import, the production readings, the six re-reviewed tasks, and the signed-in page check.
+**Not in this slice:** verdicts and changes (slice 3); rulings, and removing the brief's ticket section (slice 4); lessons (slice 5). Slice 1's follow-ups, which are agent work on LIN-4491 except the signed-in page check, which is John's: the live import and the production readings. The six re-reviewed tasks wait for John.
 
 **Witness:** a breakdown and a correction replayed through the proxy on a temporary store. Each child reads its piece in its brief. A correction is a new version that the child's next brief shows, with the old one kept. Walk 8's stores, ported in slice 1 (`tests/fixtures/walk-8/`), hold plan records to start from.
 
@@ -47,11 +47,9 @@
 - a plan is records: stages write and correct it there, and no stage writes a plan into a ticket description;
 - a breakdown child points at its piece and reads it in its brief, with no plan text copied in, and a correction reaches it as a new version;
 - nothing prunes a description, and `description/below`, the As-asked seal and guard, snapshots and the file-pointer pilot are gone;
-- the frozen Waiting-list reader is gone, or, if John's import hasn't run, that one step is left open for him;
+- the frozen Waiting-list reader is gone, or, if the import hasn't run, that one step is left open;
 - the replay passes through the proxy, and the readings are reported;
 - Harbour still works for every route that hasn't moved yet.
-
-**Open:** PR #2446 is still open and adds two Waiting entries that no import ref holds (finding-d8e882ed on LIN-4491). Whether they move to the project before the import isn't settled, and it bears on when the reader can go.
 
 **Where to read:** `docs/plans/survey/integration/design.md` and `docs/plans/survey/layer/design.md` at their commit, `claude/cool-rubin-6acj5j@92838c5cf` (the copies on main are the same).
 
