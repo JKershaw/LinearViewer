@@ -102,6 +102,9 @@ test.describe("The Ship's Biscuit (experimental)", () => {
     test('a quiet window yields an honest slow-news-day edition, never fabricated headlines', async ({ page }) => {
       await page.goto(PAGE_URL);
       await page.waitForLoadState('networkidle');
+      // The test-token workspace carries tracker completions from the last month (LIN-4500 counts
+      // them as landed work), dated 2+ days ago. The "day" window is the one with nothing landed in it.
+      await page.locator('#ship-biscuit-window').selectOption('day');
       await page.locator('#ship-biscuit-generate').click();
 
       // The front page renders with a lede, and the index is an honest quiet note —
