@@ -4780,3 +4780,13 @@ Still waiting on `lin4499-snapshot-cut`.
   - The feedback route allows 100 requests a minute per IP, so posts need batching.
 - **Size:** small to medium.
 - **Decisions for John:** stream mid-turn or only at Stop; redaction at intake before turning on tool calls; whether transcripts stay in the permanent `feedback[]` or move to a capped store.
+
+### 20 Nov, 13:29: the live Waiting import ran through Railway
+
+- **LIN-4505's worker ran the import in production** (13:01–13:15): a dry run, then apply.
+  - 125 notes records (117 findings, and 7 security tasks under one parent) and 15 manifest records. 0 refused. A re-run is idempotent.
+  - LIN-4441, 4445 and 4463 already had open tasks, so their findings attached to those tasks.
+  - None of the parked tickets has been dispatched since 19 Nov.
+  - Whether the seven hand-off items exist is unknown: the records read was refused because the token predates run identity, so a new token is needed.
+- **Pieces:** LIN-4505's PR #2474 is in its leftover pass, with CI running. LIN-4501 has taken the Railway note (dee1c97d), and PR #2472 is green. LIN-4503 is Done. LIN-4502, 4504 and 4506 wait.
+- **Status:** no rulings. Main is green.
