@@ -4,7 +4,7 @@
  */
 import { test, describe } from 'node:test';
 import assert from 'node:assert/strict';
-import { STATUS, recordsRows, heldRunReading, heldRunRow, openHandOffs } from '../../scripts/stability-measures-core.mjs';
+import { STATUS, recordsRows, heldRunReading, heldRunRow, heldRunsOf, openHandOffs } from '../../scripts/stability-measures-core.mjs';
 
 const ASOF = '2026-11-20T12:00:00.000Z';
 const STAGES = ['implementation', 'review', 'close-out'];
@@ -53,18 +53,39 @@ describe('the records rows: open to the project, open to a stage, sit time', () 
 });
 
 describe('the held-run reading: how long a hand-off to a held run sat before it was read', () => {
+  // The real shape (lib/dispatch-fields.js): a leftover row holds its producer (heldWakeFor = the producer's _id), and
+  // the claim stamp is on the producer, never on the leftover. Queue and history rows are read together.
   const dispatchRows = [
-    { id: 'run-impl', stage: 'implementation', taskId: 'task-1', heldWakeFor: 'build-7', heldWakeClaimedAt: null },
-    { id: 'run-review', stage: 'review', taskId: 'task-1', heldWakeFor: 'build-8', heldWakeClaimedAt: '2026-11-20T11:00:00.000Z' },
-    { id: 'run-plain', stage: 'review', taskId: 'task-2' }
+    { _id: 'build-7', stage: 'implementation', issueIdentifier: 'LIN-1', status: 'taken', heldWakeClaimedAt: null },
+    { _id: 'leftover-1', stage: 'leftover', status: 'queued', heldWakeFor: 'build-7' },
+    { _id: 'build-8', stage: 'review', issueIdentifier: 'LIN-1', status: 'taken', heldWakeClaimedAt: '2026-11-20T11:00:00.000Z' },
+    { _id: 'leftover-2', stage: 'leftover', status: 'queued', heldWakeFor: 'build-8' },
+    { _id: 'build-9', stage: 'implementation', issueIdentifier: 'LIN-2', status: 'taken', heldWakeClaimedAt: null },
+    // a stamp on the leftover row does not claim its producer: this leftover is held while build-9 is unclaimed
+    { _id: 'leftover-3', stage: 'leftover', status: 'queued', heldWakeFor: 'build-9', heldWakeClaimedAt: '2026-11-20T11:30:00.000Z' },
+    // a leftover that ended without running holds nothing
+    { _id: 'leftover-4', stage: 'leftover', status: 'cancelled', heldWakeFor: 'build-9' },
+    { _id: 'run-plain', stage: 'review', issueIdentifier: 'LIN-3', status: 'taken' }
+  ];
+  // The task records the addressees resolve through: LIN-1 is task-1, whose parent is task-0.
+  const withTasks = [
+    ...records,
+    { id: 'task-0', kind: 'task', state: 'open', ref: 'LIN-0', openedAt: hours(300) },
+    { id: 'task-1', kind: 'task', state: 'open', ref: 'LIN-1', in: 'task-0', openedAt: hours(300) },
+    { id: 'finding-7', kind: 'finding', state: 'open', to: 'task-0', in: 'task-1', openedAt: hours(5) }
   ];
 
-  test('a held run is a dispatch row with heldWakeFor and no claim stamp; a claimed or plain row is not held', () => {
-    const r = heldRunReading({ records, queryLog: [], dispatchRows, asOf: ASOF });
-    assert.equal(r.held, 1);
-    assert.equal(r.addressed, 1, 'only question-3 is addressed to the held implementation run');
-    assert.equal(r.sample[0].id, 'question-3');
-    assert.deepEqual(r.sample[0].heldRunIds, ['run-impl']);
+  test('a held run is a leftover whose producer has no claim stamp; a claimed producer, a cancelled leftover or a plain row holds nothing', () => {
+    assert.deepEqual(heldRunsOf(dispatchRows).map((h) => h.leftover._id), ['leftover-1', 'leftover-3']);
+    assert.deepEqual(heldRunsOf([{ _id: 'L', stage: 'leftover', status: 'queued', heldWakeFor: 'nowhere' }]), [], 'a producer that cannot be found is not counted');
+  });
+
+  test('a hand-off is addressed to a held run by its producer stage, or by the producer\'s task or that task\'s parent', () => {
+    const r = heldRunReading({ records: withTasks, queryLog: [], dispatchRows, asOf: ASOF });
+    assert.equal(r.held, 2);
+    assert.deepEqual(r.sample.map((s) => s.id), ['question-3', 'finding-7']);
+    assert.deepEqual(r.sample[0].heldRunIds, ['leftover-1', 'leftover-3'], 'question-3 is addressed to the implementation stage both producers share');
+    assert.deepEqual(r.sample[1].heldRunIds, ['leftover-1'], 'finding-7 is addressed to LIN-1\'s parent task, which only build-7 answers to');
   });
 
   test('a hand-off read by a reader is measured to that read; the measuring reader\'s own reads do not count', () => {

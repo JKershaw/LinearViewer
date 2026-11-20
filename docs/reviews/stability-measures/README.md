@@ -267,18 +267,25 @@ questions addressed to the project), `records.openToStage` (open ones addressed 
 hand-off is not measured too, because a median of nothing is not zero. `recordsRows` in
 `scripts/stability-measures-core.mjs` builds them.
 
-The held-run reading (`heldRunReading`, `heldRunRow`) asks whether a hand-off waits on a run that is held. A held run
-is a dispatch row with `heldWakeFor` and no `heldWakeClaimedAt` stamp. For each open hand-off addressed to a held run's
-stage or task, it reads how long the hand-off sat before a reader first read it: the first query-log entry at or after
+The held-run reading (`heldRunReading`, `heldRunRow`) asks whether a hand-off waits on a run that is held. The hold
+is on a `leftover` row L, whose `heldWakeFor` names its producing row P. The claim stamp (`heldWakeClaimedAt`) sits on P,
+never on L. So L is held while P is unclaimed and L did not end as `cancelled` or `expired` (`heldRunsOf`); a P that
+cannot be found is not counted. A hand-off is addressed to a held run when its `to` is P's stage kind, or P's task (the
+task whose `ref` is P's `issueIdentifier`), or that task's parent (its `in`) (`addresseesOf`). For each such hand-off, the
+reading says how long it sat before a reader first read it: the first query-log entry at or after
 it was opened that names its task or the record, by someone other than the measuring reader (so the reading does not
 count its own reads). A hand-off no reader has read by the reading's time is censored there, and is not counted as
 read. The reading names its window and its sample sizes (`held`, `addressed`, `read`, `censored`). It decides whether
 wakes are built (slice 6); it gates nothing. Query-log entries expire after 90 days, so the sit-time reading has to be
 taken before the first entries are gone.
 
-These rows are not among the five measures, and `buildReading` does not print them yet: the stability tool reads git
-and the tracker, not the records store. Their inputs come from the production store, which only the deployed Harbour
-has, so a reading of them is taken there and reported on the parent ticket.
+These rows are not among the five measures, and `buildReading` does not print them: the stability tool reads git
+and the tracker, not the records store. They are read by `scripts/records-readings.mjs`, which reads the production
+store (MONGODB_URI, or the data directory as the importer does), prints each row with its window and sample size, and
+prints the stale-open-runs count beside them: open run records whose current version is more than 24 hours old. Run it
+no earlier than the evening of 21 Nov 2026, and read query-log evidence before 17 Feb 2027, its 90-day retention. A
+stale count of zero on a store with few tasks run end to end is not evidence that wakes are unneeded: the decision on
+wakes (slice 6) needs a later, representative reading. The reader is read-only, and is reported on the parent ticket.
 
 ## What this retires
 

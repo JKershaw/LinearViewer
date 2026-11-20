@@ -76,3 +76,27 @@ describe('a task written with a ticket ref is the ticket\'s one task (LIN-4496)'
     assert.equal((await tasksWithRef('LIN-7001')).length, 1);
   });
 });
+
+describe('a task revised to a ticket ref claims it too (LIN-4496, finding 869357bd)', () => {
+  test('revise-to-ref then `in` naming the ticket lands in the revised task, and one task carries the ref', async () => {
+    const made = await rh.post('/api/proxy/records', run.token, { kind: 'task', asked: 'The person\'s words.', 'done-when': 'It is done.', run: run.runId });
+    assert.equal(made.status, 201, JSON.stringify(made.body));
+    const rev = await rh.post(`/api/proxy/records/${made.body.id}/revise`, run.token, { ref: 'LIN-7001', reason: 'the ticket is known now', run: run.runId });
+    assert.equal(rev.status, 200, JSON.stringify(rev.body));
+    const finding = await rh.post('/api/proxy/records', run.token, { kind: 'finding', in: 'LIN-7001', to: 'project', says: 'A finding under the revised task.', how: 'read it', run: run.runId });
+    assert.equal(finding.status, 201, JSON.stringify(finding.body));
+    assert.equal(finding.body.in, made.body.id, 'the finding is in the task that was revised');
+    assert.equal((await tasksWithRef('LIN-7001')).length, 1, 'one task for the ticket');
+  });
+
+  test('revising a task to a ticket another task already holds is refused, naming that task, and changes nothing', async () => {
+    const holder = await rh.post('/api/proxy/records', run.token, taskBody('LIN-7002'));
+    assert.equal(holder.status, 201, JSON.stringify(holder.body));
+    const other = await rh.post('/api/proxy/records', run.token, { kind: 'task', asked: 'Another task.', 'done-when': 'It is done.', run: run.runId });
+    assert.equal(other.status, 201);
+    const rev = await rh.post(`/api/proxy/records/${other.body.id}/revise`, run.token, { ref: 'LIN-7002', reason: 'wrong guess', run: run.runId });
+    assert.equal(rev.status, 422, JSON.stringify(rev.body));
+    assert.deepEqual(rev.body.problems[0].works, [holder.body.id], 'the refusal names the task that holds the ticket');
+    assert.equal((await tasksWithRef('LIN-7002')).length, 1, 'the refused revise left the other task without the ref');
+  });
+});

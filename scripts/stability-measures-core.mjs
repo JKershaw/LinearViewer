@@ -555,9 +555,10 @@ export function referencesFrom(json, { file = 'reference' } = {}) {
 // ── the records rows and the held-run reading (LIN-4496, piece 5 of LIN-4491) ─────────────────────────────────────────
 // Read from the records store: the hand-offs that are open at a time, who they are addressed to, and how long they sat.
 // They are reported beside the five measures and never gate anything (the piece's rule). The inputs come in as data:
-// records as { id, kind, state, to, in, openedAt } (`in` is the task, openedAt the first version's `at`), the query log as { at, by,
-// taskId, recordId } (lib/records-store.js logQuery), dispatch rows as { id, stage, taskId, heldWakeFor,
-// heldWakeClaimedAt } (lib/dispatch-fields.js). A caller that could not read a source passes null for it.
+// records as { id, kind, state, to, in, openedAt, ref } (`in` is the task, openedAt the first version's `at`, `ref` a
+// task's ticket), the query log as { at, by, taskId, recordId } (lib/records-store.js logQuery), dispatch rows, queue and
+// history both, as { _id, stage, status, issueIdentifier, heldWakeFor, heldWakeClaimedAt } (lib/dispatch-fields.js: the
+// hold is on the leftover row, the claim stamp on the producing row). A caller that could not read a source passes null.
 export const RECORDS_ROW_KEYS = Object.freeze(['records.openToProject', 'records.openToStage', 'records.sitTime', 'records.heldRuns']);
 const HAND_OFF_KINDS = Object.freeze(['finding', 'question']);
 const NOT_READ_RECORDS = 'the records store was not read';
@@ -586,9 +587,46 @@ export function recordsRows({ records, asOf, stageKinds, references = {} }) {
   ];
 }
 
+/** Dispatch rows that left the queue without running: a leftover row in one of these does not hold anything. */
+const NOT_RUN_ENDS = new Set(['cancelled', 'expired']);
+
 /**
- * The held-run reading: the held runs (dispatch rows with `heldWakeFor` and no claim stamp), and for each open hand-off
- * addressed to a held run's stage or task, how long it sat before a reader first read it. A read is a query-log entry
+ * The held runs, from the real shape (lib/dispatch-fields.js): a `leftover` row L carries `heldWakeFor` = P, the id of
+ * the producing row whose parent wake L holds back. The claim stamp (`heldWakeClaimedAt`) sits on P (its history doc),
+ * never on L. So L is held while P is unclaimed and L did not end without running. A P that cannot be found is not
+ * counted: its state is unknown, and the reading does not guess.
+ * @returns {Array<{leftover: object, producer: object}>}
+ */
+export function heldRunsOf(dispatchRows) {
+  const byId = new Map(dispatchRows.map((r) => [r._id ?? r.id, r]));
+  const held = [];
+  for (const leftover of dispatchRows) {
+    if (!leftover.heldWakeFor || NOT_RUN_ENDS.has(leftover.status)) continue;
+    const producer = byId.get(leftover.heldWakeFor);
+    if (!producer || producer.heldWakeClaimedAt) continue;
+    held.push({ leftover, producer });
+  }
+  return held;
+}
+
+/**
+ * The addressees a producing row answers to: its stage kind, and its task (the task whose `ref` is its issue, found in
+ * `records`) and that task's parent (its `in`). A task record carries `ref` (its ticket) in the records this reads.
+ */
+export function addresseesOf(producer, records) {
+  const out = new Set();
+  if (producer.stage) out.add(producer.stage);
+  const task = producer.issueIdentifier ? records.find((r) => r.kind === 'task' && r.ref === producer.issueIdentifier) : null;
+  if (task) {
+    out.add(task.id);
+    if (task.in) out.add(task.in);
+  }
+  return out;
+}
+
+/**
+ * The held-run reading: the held runs (see heldRunsOf), and for each open hand-off addressed to a held run's producing
+ * stage or task (or that task's parent), how long it sat before a reader first read it. A read is a query-log entry
  * at or after the hand-off was opened, that names its task or the record, and is not the measuring reader's own (so the
  * reading does not count its own reads). A hand-off no reader has read by `asOf` is censored at `asOf`, not zero.
  * A reading with no held runs is a reading (held: 0); a missing source is not measured.
@@ -596,11 +634,11 @@ export function recordsRows({ records, asOf, stageKinds, references = {} }) {
  */
 export function heldRunReading({ records, queryLog, dispatchRows, asOf, measuringReader = null }) {
   if (!records || !queryLog || !dispatchRows) return null;
-  const held = dispatchRows.filter((r) => r.heldWakeFor && !r.heldWakeClaimedAt);
+  const held = heldRunsOf(dispatchRows).map((h) => ({ ...h, addressees: addresseesOf(h.producer, records) }));
   const open = openHandOffs(records);
   const sample = [];
   for (const rec of open) {
-    const runs = held.filter((r) => r.stage === rec.to || r.taskId === rec.to);
+    const runs = held.filter((h) => h.addressees.has(rec.to));
     if (!runs.length) continue;
     const opened = Date.parse(rec.openedAt);
     const reads = queryLog
@@ -608,7 +646,7 @@ export function heldRunReading({ records, queryLog, dispatchRows, asOf, measurin
       .map((q) => Date.parse(q.at));
     const firstRead = reads.length ? Math.min(...reads) : null;
     const end = firstRead ?? Date.parse(asOf);
-    sample.push({ id: rec.id, to: rec.to, heldRunIds: runs.map((r) => r.id), sitHours: round((end - opened) / 3600000, 2), censored: firstRead == null });
+    sample.push({ id: rec.id, to: rec.to, heldRunIds: runs.map((h) => h.leftover._id ?? h.leftover.id), sitHours: round((end - opened) / 3600000, 2), censored: firstRead == null });
   }
   const read = sample.filter((s) => !s.censored);
   return {

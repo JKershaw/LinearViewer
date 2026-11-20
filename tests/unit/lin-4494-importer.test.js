@@ -50,7 +50,8 @@ beforeEach(async () => {
     recordsStore: store,
     isTerminalState,
     stageKinds: Object.keys(STAGE_KINDS),
-    listPeople: async () => [{ accountId: 'acc-john', name: 'John' }],
+    // The workspace shows this person by this name (LIN-4496): a manifest addressed to 'John' does not resolve.
+    listPeople: async () => [{ accountId: 'e7e948a4-2951-4af4-b60e-572a473a491e', name: 'John “Sausage Roller” Kershaw' }],
   });
 });
 
@@ -153,10 +154,31 @@ describe('the parked-ticket manifest', () => {
     for (const t of manifest.tickets) {
       for (const f of t.findings) {
         assert.ok(f.says && f.says.length <= 600, `${t.ticket}: says is a sentence`);
-        // LIN-4496: a hand-off to John names him as the workspace shows him; the production dry run confirms that name.
-        assert.ok(f.to === 'project' || Object.keys(STAGE_KINDS).includes(f.to) || f.to === 'John', `${t.ticket}: to ${f.to} is a reader`);
+        // LIN-4496: a hand-off to a person names the workspace person by id (a display name is not a reader Harbour matches).
+        assert.ok(f.to === 'project' || Object.keys(STAGE_KINDS).includes(f.to) || f.to.startsWith('person:'), `${t.ticket}: to ${f.to} is a reader`);
       }
     }
+  });
+
+  test('the dry run refuses what --apply refuses, before anything is written: a name the workspace does not show is refused', async () => {
+    const manifest = { tickets: [{ ticket: 'LIN-4210', asked: 'The asked.', done_when: 'It is done.', findings: [{ says: 'Asks John.', to: 'John', how: 'read it' }] }] };
+    const dry = await applyManifest({ writes, recordsStore: store, urlKey: URL_KEY, apply: false, manifest });
+    assert.equal(dry.refused.length, 1, 'the finding addressed to a name the workspace does not show is refused in the dry run');
+    assert.equal(dry.refused[0].problems[0].field, 'to');
+    assert.equal(dry.wouldCreate, 1, 'the ticket\'s task is still creatable, and is counted');
+    assert.equal((await store.find(URL_KEY, {})).length, 0, 'the dry run writes nothing');
+    const applied = await applyManifest({ writes, recordsStore: store, urlKey: URL_KEY, apply: true, manifest });
+    assert.equal(applied.created, dry.wouldCreate, 'apply creates what the dry run counted');
+    assert.equal(applied.refused.length, dry.refused.length, 'and refuses what the dry run refused');
+  });
+
+  test('the committed manifest: the dry run reports the same counts as --apply on an empty store, with no refusals', async () => {
+    const manifest = JSON.parse(readFileSync(MANIFEST, 'utf8'));
+    const dry = await applyManifest({ writes, recordsStore: store, urlKey: URL_KEY, apply: false, manifest });
+    assert.deepEqual(dry.refused.map((r) => r.id), [], JSON.stringify(dry.refused.slice(0, 2)));
+    const applied = await applyManifest({ writes, recordsStore: store, urlKey: URL_KEY, apply: true, manifest });
+    assert.equal(applied.created, dry.wouldCreate);
+    assert.equal(applied.refused.length, 0, JSON.stringify(applied.refused.slice(0, 2)));
   });
 
   test('applying it makes each ticket a task claimed for its ticket, with its findings under it; a retry adds nothing', async () => {
