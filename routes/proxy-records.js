@@ -23,8 +23,10 @@
  *
  * Injected, never imported from the tracker or the workspace (Records imports only Platform): `readTicket`
  * (the provider read: the ticket's identifier, title, description, state and parent), `askedText`
- * (lib/as-asked.js), `stageKinds` (STAGE_KINDS' keys) and `listPeople` (the workspace-person reader; a
- * caller with none passes an empty list, and a `to` that names a person is then refused with the names that work).
+ * (lib/as-asked.js), `stageKinds` (STAGE_KINDS' keys), `listPeople` (the workspace-person reader; a
+ * caller with none passes an empty list, and a `to` that names a person is then refused with the names that work)
+ * and `tracker` (LIN-4503: the outward port for a request, lib/records-tracker.js; a child task's ticket and a plan's
+ * summary go through it after the record is written).
  */
 import { Router } from 'express';
 import { jsonError } from '../lib/errors.js';

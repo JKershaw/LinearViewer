@@ -16,6 +16,7 @@ import { RecordsStore, RECORDS_COLLECTION, REFS_COLLECTION, QUERY_LOG_COLLECTION
 import { INDEX_SPECS } from '../../lib/db-indexes.js';
 import { createTaskRecordsRoutes } from '../../routes/task-records.js';
 import { createFakeTracker } from '../helpers/fake-records-tracker.js';
+import { HARBOUR_WRITER } from '../../lib/records/writes.js';
 import { createProjectPageRoutes } from '../../routes/project-page.js';
 import { renderTaskRecordsSection, renderWaitingRecordLine } from '../../lib/render-task-records.js';
 import { renderTaskPage } from '../../lib/render-task-page.js';
@@ -280,7 +281,7 @@ describe('the session writes: a signed-in person, filed by their account', () =>
     // LIN-4503: the filing (v1) is the person's; the child's ticket then revises its ref as Harbour, so the current version is Harbour's.
     const [filed] = (await store.versionsOf(URL_KEY, [kids[0].id])).sort((a, b) => a.v - b.v);
     assert.equal(filed.by, `person:${ACCOUNT}`);
-    assert.equal(kids[0].by, 'harbour');
+    assert.equal(kids[0].by, HARBOUR_WRITER);
     assert.equal(kids[0].fields['done-when'], 'the count is right on Home');
   });
 

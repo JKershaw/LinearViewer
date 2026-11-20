@@ -8,9 +8,10 @@ check, the views, the brief; all pure) and `lib/records-store.js` (the one file 
 proxy router, `routes/proxy-records.js`, stays in Agent API by the registry's first-match rule. The run lifecycle
 seam, `lib/run-records.js`, stays in Runs & dispatch by its `run-` pattern.
 
-Records imports only Platform. The tracker read, the askedText reader, STAGE_KINDS, the provider state map's closed
-state, the workspace-person reader and the area notes' reader are injected by their callers (routes/proxy.js,
-routes/proxy-records.js, routes/task-records.js, routes/project-page.js, server.js, scripts/records-import.mjs).
+Records imports only Platform. The tracker read, the tracker port (LIN-4503, built over a provider by
+lib/records-tracker.js), the askedText reader, STAGE_KINDS, the provider state map's closed state, the workspace-person
+reader and the area notes' reader are injected by their callers (routes/proxy.js, routes/proxy-records.js,
+routes/task-records.js, routes/project-page.js, routes/dispatch.js, server.js, scripts/records-import.mjs).
 
 ## Lessons
 
@@ -44,10 +45,11 @@ routes/proxy-records.js, routes/task-records.js, routes/project-page.js, server.
   tasks only when that is clean, then checks again. `by` is the writer's own (a stage kind, `person:<account>`,
   `import`, `harbour`), never read from a body; a new writer calls the pipeline, never the store's add, revise, end or link.
 - Outward steps (LIN-4503) run after a record persists, through one injected `tracker(ctx)` port (lib/records-tracker.js),
-  never on a dry run or an import. A child task gets its ticket only when the parent's children read whole (`capped ===
-  false`; unknown fails closed) and no child carries the task's mark (`<!-- harbour-task: id -->`, lib/records/ticket-stub.js);
-  a mark another task holds is refused, not taken. A plan's summary is one comment per version and is never retried. A
-  summary opens `**Harbour summary** · <id> v<n>` and is excluded by lib/run-trail.js `harbour-summary`, first row.
+  never on a dry run or an import. A child ticket is made only when the parent's children read whole (`capped === false`;
+  unknown fails closed) and no child carries the task's mark (lib/records/ticket-stub.js); a mark another task holds is
+  refused, not taken. A plan's summary is one comment per version, never retried.
+- A route test that writes a child task or a plan injects a tracker (tests/helpers/fake-records-tracker.js), or it
+  reaches the network and the hermetic run fails. Censuses read `git ls-files`: stage a new file before running them.
 - A write that makes one record and then ends another is two writes. Name the first with `fixedIdOf` (lib/records/refs.js,
   the one derived-id rule) from the second, as make-a-task and supersede do, so a retry after a failed end finds the
   record it made. Imports use the same rule, which holds after an imported record ends. Never hash an id by hand.

@@ -12,7 +12,9 @@
  * proxyRunRecordId, proxyCreatedBy, proxyWrites, proxyWritesTarget, proxyTokenScope). A caller that needs a different
  * credential (the piece-2 test's stand-in) passes its own `authenticate`.
  *
- * The tracker is stood in by `tickets` (a Map of ticket id to the ticket's read shape), read through `readTicket`.
+ * The tracker is stood in by `tickets` (a Map of ticket id to the ticket's read shape), read through `readTicket`, and
+ * the outward port (LIN-4503) by `tracker` when a test passes one (tests/helpers/fake-records-tracker.js); with none,
+ * the routes make no child ticket and post no summary.
  */
 import express from 'express';
 import { RecordsStore, RECORDS_COLLECTION, REFS_COLLECTION, QUERY_LOG_COLLECTION } from '../../lib/records-store.js';
