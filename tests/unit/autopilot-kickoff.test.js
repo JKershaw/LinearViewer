@@ -517,7 +517,8 @@ describe('buildAutopilotKickoff (providerUi capability gate, LIN-2804)', () => {
 // changes it again on purpose: the tail is retired, so the goal block's last two lines now say the
 // run starts no Periodical unless the human's goal asks, and stops once its task is complete. The
 // golden (tests/fixtures/autopilot-kickoff/scoped-snapshot-golden.txt) was re-captured for that one
-// change, and the assertions below say what may and may not differ.
+// change, and the assertions below say what may and may not differ. LIN-4502 re-captured it for the
+// brief hint alone (BRIEF_HINT: the words come from the task's record, not a description block).
 describe('buildAutopilotKickoff (scoped snapshot, LIN-1829 golden updated for LIN-4415)', () => {
   const SEP = '\n\n---\n\n';
   // Must match the exact params the golden was generated with.

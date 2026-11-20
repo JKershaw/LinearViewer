@@ -117,11 +117,6 @@ export const ALLOW = Object.freeze({
     words: ['task snapshot symbols', 'the /snapshots routes'],
     reason: 'the source of the recorded eval fixture above: the tickets\' own words, as written',
   },
-  // Re-measured in one batch with the other prompt changes (LIN-4502's prompt step); the stale check drops this then.
-  'tests/fixtures/lin-4467-witness.json': {
-    words: ['the write-below route'],
-    reason: 'the stage-kind witness renders the close-out text as it stood before the prune was retired, until it is regenerated',
-  },
 });
 
 const allowed = (file, word, allow) => Boolean(allow[file]?.words.includes(word));

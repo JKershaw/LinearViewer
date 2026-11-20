@@ -16,3 +16,7 @@ Area notes for `platform-and-plumbing` in the registry. Format and rules: README
   dot segments before it sends, so a traversal probe over `fetch` really asks for the root server.js and proves nothing.
   `tests/unit/shared-modules.test.js` sends them with `node:http`. LIN-4471's review found that a static mount of the
   repo root passed every probe the list did not name; the structure test is what catches it.
+- The code censuses that read `tests/unit/helpers/shipped-sources.js` list files with `git ls-files`, so a new file is
+  invisible to them until it is added. Run them after `git add`, not only on the working tree: a plan-heading leaf
+  module LIN-4502 added passed the comment-kind census (`tests/unit/lin-4458-comment-kind-census.test.js`) while
+  untracked and failed once committed.

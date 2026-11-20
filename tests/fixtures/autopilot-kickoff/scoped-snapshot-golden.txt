@@ -16,7 +16,7 @@ one. Once it is complete, stop; at a point that wants the human, just stop.
 **Proxy:** base https://example.com/api/proxy · Bearer token supplied alongside this prompt (the +proxy block) · full
 verb catalog at `GET https://example.com/api/proxy/instructions`.
 
-**Your first act:** read **LIN-42** (`GET /brief/LIN-42` — the person's words, quoted from the description's `## As asked` block; no step may change them; the rest is the present state; `GET /issues/LIN-42` for full raw detail), then trigger
+**Your first act:** read **LIN-42** (`GET /brief/LIN-42` — the person's words under `## As asked`, from the task's record; no step may change them; the rest is the present state; `GET /issues/LIN-42` for full raw detail), then trigger
 `POST /recommend-and-dispatch` (`{ issueIdentifier: "LIN-42", sessionId }`) for the next step.
 Announce your choice in a line and go — the prompt is dispatched server-side; you never hold it. The
 human is watching asynchronously, not live; being dispatched into this run was already their go-ahead.
