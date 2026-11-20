@@ -50,8 +50,8 @@ beforeEach(async () => {
     recordsStore: store,
     isTerminalState,
     stageKinds: Object.keys(STAGE_KINDS),
-    // The workspace shows this person by this name (LIN-4496): a manifest addressed to 'John' does not resolve.
-    listPeople: async () => [{ accountId: 'e7e948a4-2951-4af4-b60e-572a473a491e', name: 'John “Sausage Roller” Kershaw' }],
+    // The workspace person the manifest names by id (LIN-4496). The name is a placeholder: a manifest addressed to 'John' does not resolve.
+    listPeople: async () => [{ accountId: 'e7e948a4-2951-4af4-b60e-572a473a491e', name: 'Placeholder Person' }],
   });
 });
 
