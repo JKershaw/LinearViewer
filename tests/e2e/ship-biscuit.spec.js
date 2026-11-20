@@ -5,8 +5,10 @@ import { SELECTORS } from '../helpers.js';
 // front page + index only). Seeds via /test/set-session (the test-token workspace),
 // so the generate endpoint serves a deterministic MOCK edition (buildMockEdition,
 // grounded in the real deterministic model) without an OpenRouter key. A quiet
-// window (no seeded activity) produces an honest slow-news-day edition; seeding one
-// agent-status entry gives the model feedstock so real inert headlines render.
+// window (nothing landed, nothing ran) produces an honest slow-news-day edition; seeding
+// one agent-status entry gives the model feedstock so real inert headlines render. The
+// test-token workspace's mock issues carry completions 2 to 28 days old, which count as
+// landed work (LIN-4500), so only the "day" window is quiet.
 
 let URL_KEY;
 let PAGE_URL;
@@ -84,9 +86,10 @@ test.describe("The Ship's Biscuit (experimental)", () => {
     test.beforeEach(async ({ page }) => {
       // Start from a clean slate so quiet-window behaviour is deterministic.
       //
-      // `isQuiet` is `sources.length === 0` over FOUR source kinds, not just the
-      // agent-status log: observation sessions, status, task snapshots and
-      // roadmap reports (lib/ship-biscuit.js). Clearing agent-status alone left
+      // `isQuiet` needs no sources and no unread source (lib/ship-biscuit.js). The sources
+      // are landed work (close-out merges joined to tracker completions, LIN-4500) and the
+      // background: observation sessions, status and roadmap reports. Merges are recorded only
+      // on the local worker key, never this one. Clearing agent-status alone left
       // the observation read-model behind, so any earlier spec in the same shard
       // that materialised a session (any agent-status write fires the
       // materializer) made this window silently non-quiet — a real ordering

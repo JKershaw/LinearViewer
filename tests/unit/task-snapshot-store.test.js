@@ -25,13 +25,6 @@ function createMockCollection() {
     if (query.urlKey !== undefined && doc.urlKey !== query.urlKey) return false;
     if (query.taskIdentifier !== undefined && doc.taskIdentifier !== query.taskIdentifier) return false;
     if (query.canonicalId !== undefined && doc.canonicalId !== query.canonicalId) return false;
-    // Range predicate on capturedAt, mirroring the { $gte: since } window scan the
-    // real Mongo/Mango layer honours (LIN-1197; its one caller was retired in LIN-4500).
-    if (query.capturedAt !== undefined && query.capturedAt && typeof query.capturedAt === 'object' && query.capturedAt.$gte !== undefined) {
-      const docMs = doc.capturedAt instanceof Date ? doc.capturedAt.getTime() : new Date(doc.capturedAt).getTime();
-      const sinceMs = query.capturedAt.$gte instanceof Date ? query.capturedAt.$gte.getTime() : new Date(query.capturedAt.$gte).getTime();
-      if (!(docMs >= sinceMs)) return false;
-    }
     return true;
   }
   return {
