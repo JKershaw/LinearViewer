@@ -56,6 +56,7 @@ import { registerProvider } from '../../lib/providers/registry.js';
 import { stubLineageIdentity } from '../fixtures/lineage-identity.js';
 import { PromptTraceStore } from '../../lib/prompt-trace-store.js';
 import { NO_REQUEST_RECORDS, withDefaults } from '../fixtures/request-usage-loader.js';
+import { planFactsOf, planFactsNotMeasured } from '../../lib/records/plan-facts.js';
 
 afterEach(() => { setFetchImpl(null); setPromptTraceRecorder(null); });
 
@@ -74,7 +75,11 @@ const sizeRuling = (at) => comment(at, "## Size of the move (the person's call)\
 const run = (stage, dispatched, outcome = 'done', ended = dispatched) => ({ stage, at: T(outcome === 'queued' || outcome === 'running' ? dispatched : ended), outcome, dispatchedAt: T(dispatched) });
 // LIN-4501: the person's words are the task's `asked` (prepareRecommendationInput reads them from the records store).
 const WORDS = 'Make the export button download a CSV.';
-const ctx = (comments = [], allRuns = [], over = {}) => ({ parent: null, siblings: [], project: null, children: [], comments, focusedChild: null, attachments: [], runs: [], allRuns, asked: WORDS, ...over });
+// LIN-4504: "has a plan" is the records' (prepareRecommendationInput's planFacts, lib/records/plan-facts.js).
+const NO_PLAN = planFactsOf({ task: { id: 'task-t1', kind: 'task', state: 'open' } });
+const A_PLAN = planFactsOf({ task: { id: 'task-t1', kind: 'task', state: 'open' }, inside: [{ id: 'plan-t1', v: 1, kind: 'plan', state: 'kept', in: 'task-t1', to: 'implementation', at: T('09:00') }] });
+const A_PIECE = planFactsOf({ task: { id: 'task-t1', kind: 'task', state: 'open', links: { piece: 'plan-t0' } }, piece: { id: 'plan-t0', v: 1, kind: 'plan', state: 'kept', in: 'task-t0', to: 'implementation', at: T('09:00') } });
+const ctx = (comments = [], allRuns = [], over = {}) => ({ parent: null, siblings: [], project: null, children: [], comments, focusedChild: null, attachments: [], runs: [], allRuns, asked: WORDS, planFacts: NO_PLAN, ...over });
 const stepOf = (issue, context) => lookFirstStep(issue, context)?.step ?? null;
 
 describe('step choice: survey-task, then survey-place, then scoping, each once', () => {
@@ -209,8 +214,10 @@ describe('when the route is off', () => {
   };
 
   test('a plan, a PR, a size record, children, no asked words on its task, completed or canceled, an open blocker, a waiting run, unknown runs', () => {
-    asOff(leaf({ description: `${ASKED}\n\n## Implementation Plan\n\nThe plan.` }), ctx(), 'has a plan');
-    asOff(leaf(), ctx([comment('10:00', '## Plan\n\nThe plan in a comment.')]), 'has a plan');
+    asOff(leaf(), ctx([], [], { planFacts: A_PLAN }), 'has a plan');
+    asOff(leaf(), ctx([], [], { planFacts: A_PIECE }), 'has a plan');
+    asOff(leaf(), ctx([], [], { planFacts: planFactsNotMeasured('no records store') }), 'plan facts not measured');
+    asOff(leaf(), ctx([], [], { planFacts: undefined }), 'plan facts not measured');
     // LIN-4497: the gate reads the implementation run's own PR, not a comment's URL (see the LIN-4497 block).
     asOff(leaf(), ctx([], stageRuns([{ id: 'im0', kind: 'implementation', status: 'taken', dispatchedAt: T('10:00'), feedback: [{ message: '[done] Built.', url: 'https://github.com/o/r/pull/7', timestamp: T('10:20') }] }])), 'has its own PR');
     asOff(leaf({ description: ASKED + RECORD() }), ctx(), 'size recorded');
@@ -230,9 +237,15 @@ describe('when the route is off', () => {
     assert.equal(stepOf(issue, ctx()), 'survey-task');
   });
 
-  test('a breakdown child whose plan is its parent\'s still gets the sequence', () => {
+  test('LIN-4504 poisoned description: plan text in the description or a comment is not a plan, and records win both ways', () => {
+    // The text says a plan; the records say none: the sequence runs.
+    const planText = leaf({ description: `${ASKED}\n\n## Implementation Plan\n\nThe plan.\n\nfits one session\n\nplan-review due: no` });
+    assert.equal(stepOf(planText, ctx([comment('10:00', '## Plan\n\nThe plan in a comment.')])), 'survey-task');
+    // A parent's description plan is not the child's plan either.
     const parent = { identifier: 'T-0', description: '## Implementation Plan\n\nThe parent plan.' };
     assert.equal(stepOf(leaf(), ctx([], [], { parent })), 'survey-task');
+    // The text says nothing; the records hold a plan: off.
+    assert.equal(lookFirstOff(leaf(), ctx([], [], { planFacts: A_PLAN })), 'has a plan');
   });
 
   test('verdict note 1: a run that ended done with an open DECISION: does not hold the route (the remaining steps proceed once each)', () => {
@@ -368,7 +381,9 @@ const runStore = (rows, live = []) => ({
 // words: every other records read fails inside its own guard, so the open findings stay "not read", as before records.
 const askedRecords = (words = WORDS) => ({
   askedForTicket: async () => words,
-  askedForTickets: async (_urlKey, tickets) => new Map(tickets.filter(Boolean).map((t) => [t, words]))
+  askedForTickets: async (_urlKey, tickets) => new Map(tickets.filter(Boolean).map((t) => [t, words])),
+  // LIN-4504: the ticket's plan facts, read by the same entrance; no plan record here.
+  planFactsForTickets: async (_urlKey, tickets) => new Map(tickets.filter(Boolean).map((t) => [t, NO_PLAN]))
 });
 
 function proxyApp({ rows = [], items = [], live = [] } = {}) {
@@ -724,7 +739,7 @@ describe('LIN-4398: a gate-marked Periodical review skips the two Surveys and st
   test('the other off-switches still hold on a marked review (a size record, a person\'s hold, a plan)', () => {
     assert.equal(lookFirstOff(marked({ description: MARKED + RECORD() }), ctx()), 'size recorded');
     assert.equal(lookFirstOff(marked(), ctx([surveyTask('10:00'), person('10:30')], [run('survey-task', '09:40', 'done', '10:00')])), "a person's comment holds it");
-    assert.equal(lookFirstOff(marked(), ctx([comment('10:00', '## Plan\n\nThe plan in a comment.')])), 'has a plan');
+    assert.equal(lookFirstOff(marked(), ctx([], [], { planFacts: A_PLAN })), 'has a plan');
   });
 
   test('wired: recommend-and-dispatch sends the marked review scoping with no model call, and the route is look-first', async () => {

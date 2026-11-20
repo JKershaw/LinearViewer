@@ -33,7 +33,7 @@ import { taskMarkOf, markedTaskOf, childTicketDescriptionOf } from '../../lib/re
 import { summaryOpeningOf } from '../../lib/records/summary.js';
 import { isTerminalState } from '../../lib/providers/state-map.js';
 import { STAGE_KINDS } from '../../lib/prompts/stage-kinds.js';
-import { isPersonComment, isPlanComment, commentKindOf, withoutHarbourSummaries, isHarbourSummary } from '../../lib/run-trail.js';
+import { isPersonComment, commentKindOf, withoutHarbourSummaries, isHarbourSummary } from '../../lib/run-trail.js';
 import { assembleTrailFacts } from '../../lib/recommendation-facts.js';
 import { trackerPortOf } from '../../lib/records-tracker.js';
 import { LocalStore } from '../../lib/local-store.js';
@@ -248,15 +248,13 @@ describe('LIN-4503: child tickets and plan summaries', () => {
     assert.equal(isHarbourSummary(summary), true);
     assert.equal(commentKindOf(summary), 'harbour-summary');
     assert.equal(isPersonComment(summary), false);
-    assert.equal(isPlanComment(summary), false);
     assert.deepEqual(withoutHarbourSummaries([{ body: summary }, { body: 'A person\'s reply.' }]).map((c) => c.body), ['A person\'s reply.']);
 
     const comments = [{ body: summary, createdAt: '2026-11-20T10:00:00Z', user: { name: 'Harbour' } }];
     const facts = assembleTrailFacts(comments, 'A description with no plan in it.', { leaf: true });
     assert.equal(facts.latestPerson, null, 'a summary is not the latest person comment');
-    assert.equal(facts.plan.where, null, 'a summary is not the selected plan');
-    assert.equal(facts.plan.sessionFit, null);
-    assert.equal(facts.plan.planReviewDue, null);
+    // LIN-4504: plan facts are records; no comment, a summary included, is read for them.
+    assert.equal(facts.plan.measured, false, 'with no records read the plan facts are not measured, never the summary\'s');
 
     // A near miss is not a summary: the mark must open the comment, and be the whole first line.
     assert.equal(isHarbourSummary(`A note that quotes ${summaryOpeningOf('plan-1a2b3c4d', 1)}`), false);

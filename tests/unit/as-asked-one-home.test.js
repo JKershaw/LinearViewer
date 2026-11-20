@@ -32,7 +32,8 @@ const planRows = [
 ];
 const gateDue = (description) =>
   roundTrips.computeIssueRoundTrips({ id: 'x', identifier: 'LIN-x', description, comments: [], rows: planRows }, { asOf: ASOF }).gateDue;
-const selectorDue = (description) => assembleTrailFacts([], description, { leaf: true }).plan.planReviewDue;
+// LIN-4504: the selector reads no due line at all; its plan facts are records (not measured with none read).
+const selectorDue = (description) => assembleTrailFacts([], description, { leaf: true }).plan.measured;
 
 /** Every module under lib/ and routes/, for import-graph questions. */
 function sourceGraph() {
@@ -47,13 +48,13 @@ const codeLines = (source) => source.split('\n').filter((l) => !/^\s*(\/\/|\/\*\
 describe('one reader for the plan-review due line', () => {
   test('the bold form is due through computeIssueRoundTrips, and the selector still reads it as yes', () => {
     assert.equal(gateDue('**plan-review due:** yes'), true, 'the round-trip measure reads the bold form as due');
-    assert.equal(selectorDue('**plan-review due:** yes'), 'yes', 'the selector\'s reading is unchanged');
+    assert.equal(selectorDue('**plan-review due:** yes'), false, 'LIN-4504: the selector reads no due line; its facts are records');
   });
 
   test('the bold form below a block that says no is due to both readers', () => {
     const desc = `${quoteAsked('Piece A.\n\n**Plan-review due:** no — covered by the parent')}\n\n## Implementation Plan (revision 2)\n\n**plan-review due:** yes`;
     assert.equal(gateDue(desc), true);
-    assert.equal(selectorDue(desc), 'yes');
+    assert.equal(selectorDue(desc), false);
   });
 
   test('planReviewDueOf: the first due line, plain or bold, value on the same line, word boundary after it', () => {

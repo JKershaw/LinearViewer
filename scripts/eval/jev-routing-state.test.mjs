@@ -48,10 +48,11 @@ test('node facts reuse assembleNodeFacts counts', () => {
   assert.equal(state.nodeFacts.frontierFacts.openCount, 2);
 });
 
-test('session fit is extracted from the description', () => {
-  assert.equal(buildDistilledState(leaf('L-1', 'Session fit: needs multiple sessions')).sessionFit, 'needs multiple sessions');
-  assert.equal(buildDistilledState(leaf('L-2', 'This fits one focused session.')).sessionFit, 'fits one session');
-  assert.equal(buildDistilledState(leaf('L-3', 'no fit statement here')).sessionFit, null);
+test('LIN-4504: session fit comes from the bundle\'s explicit plan facts, never the description', () => {
+  const planFacts = (sessionFit) => ({ measured: true, sessionFit });
+  assert.equal(buildDistilledState({ ...leaf('L-1', 'Session fit: needs multiple sessions'), planFacts: planFacts('one') }).sessionFit, 'one');
+  assert.equal(buildDistilledState({ ...leaf('L-2', 'This fits one focused session.'), planFacts: planFacts('several') }).sessionFit, 'several');
+  assert.equal(buildDistilledState(leaf('L-3', 'Session fit: needs multiple sessions')).sessionFit, 'not measured');
 });
 
 test('frontier child is the selectFocusSubtask pick (in-progress first)', () => {

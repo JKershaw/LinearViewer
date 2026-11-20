@@ -26,9 +26,9 @@ import { createLocalStore } from '../fixtures/local-harness.js';
 import { RecordsStore, RECORDS_COLLECTION, REFS_COLLECTION, QUERY_LOG_COLLECTION } from '../../lib/records-store.js';
 import { INDEX_SPECS } from '../../lib/db-indexes.js';
 import { quoteAsked, splitQuote, composeBrief } from '../../lib/brief-quote.js';
-import { askedOf, outsideAsked, legacyBlockSpan } from '../../lib/asked-of.js';
+import { askedOf, outsideAsked } from '../../lib/asked-of.js';
 import { adfToMarkdown, markdownToAdf } from '../../lib/providers/jira/adf.js';
-import { PLAN_HEADING_ANY } from '../../lib/run-trail.js';
+import { textBeforePlan } from '../../lib/legacy-plan-text.js';
 import { readFileSync } from 'node:fs';
 
 // Must match TEST_LOCAL_URL_KEY in routes/proxy.js: resolveProviderAccess then answers with the local provider.
@@ -176,9 +176,7 @@ describe('LIN-4502 witness (c): the legacy reader reads the block the seal wrote
     assert.ok(/^_End of what was asked\./m.test(jira), 'the codec renders the end line with underscores');
     assert.equal(askedOf(jira), 'Make the export button work.\nKeep both formats.');
     assert.equal(outsideAsked(jira).trim(), '## Implementation Plan\n\n1. a step');
-    const span = legacyBlockSpan(jira);
-    assert.equal(jira.slice(span.start, span.start + '## As asked'.length), '## As asked');
-    assert.ok(jira.slice(span.start, span.end).endsWith('changes._'), 'the span runs through the end line, offsets unchanged');
+    // LIN-4504 retired legacyBlockSpan with its one reader (the selector's plan condensing).
   });
   test('a CRLF Jira block reads the same words', () => {
     const jira = adfToMarkdown(markdownToAdf(LEGACY)).replace(/\n/g, '\r\n');
@@ -190,9 +188,14 @@ describe('LIN-4502 witness (c): the legacy reader reads the block the seal wrote
   });
 });
 
-describe('LIN-4502: askedOf\'s plan heading is the plan comment\'s, spelled the same', () => {
-  test('lib/asked-of.js holds a byte-equal copy of lib/run-trail.js PLAN_HEADING_ANY (its own, as a description reader)', () => {
+describe('LIN-4504: askedOf\'s plan heading is the one recognition rule (lib/legacy-plan-text.js)', () => {
+  test('lib/asked-of.js holds no heading of its own and cuts where the shared rule cuts, `#` to `###`', () => {
     const source = readFileSync(new URL('../../lib/asked-of.js', import.meta.url), 'utf8');
-    assert.ok(source.includes(`/${PLAN_HEADING_ANY.source}/${PLAN_HEADING_ANY.flags}`), 'the two spellings drifted apart');
+    assert.ok(!/Implementation Plan/.test(source.replace(/^\s*\/?\*.*$/gm, '').replace(/\/\/.*$/gm, '')), 'no plan heading spelled in code');
+    for (const h of ['#', '##', '###']) {
+      const text = `Words.\n\n${h} Implementation Plan\n\nplan`;
+      assert.equal(askedOf(text), textBeforePlan(text));
+      assert.equal(askedOf(text), 'Words.');
+    }
   });
 });

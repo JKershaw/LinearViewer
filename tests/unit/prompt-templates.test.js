@@ -3058,7 +3058,8 @@ describe('FRONTIER FACTS fact-surfacing (LIN-433)', () => {
       { identifier: 'LIN-428', blocked: false }
     ],
     nextChild: 'LIN-428',
-    sessionFit: 'fits one session'
+    // LIN-4504: the node's plan facts are the records' (lib/records/plan-facts.js).
+    planFacts: { measured: true, sessionFit: 'one', childTasksWithoutTicket: 0 }
   };
 
   test('the selector renders the node facts from frontierFacts, and none for a leaf', () => {
@@ -3066,7 +3067,7 @@ describe('FRONTIER FACTS fact-surfacing (LIN-433)', () => {
     assert.ok(/- Subtasks: 4 \(1 done, 0 in progress, 3 remaining\)/.test(p), 'counts surface');
     assert.ok(/LIN-401 \[blocked\]/.test(p) && /LIN-428 \[actionable\]/.test(p), 'per-child blocker status surfaces');
     assert.ok(/Frontier next child \(skip-blocked, unblocks-most\/critical-path ranked\): LIN-428/.test(p), 'the frontier next child and its ranking surface');
-    assert.ok(/Session fit stated in the plan: fits one session/.test(p), 'the extracted session-fit hint surfaces');
+    assert.ok(/Session fit \(this task's own plan records\): one session/.test(p), 'the records\' session fit surfaces');
     assert.equal(formatNodeFactsBlock({ frontierFacts: null }, 0), '', 'no block for a leaf');
   });
 
@@ -4056,10 +4057,11 @@ describe('breakdown template subtask-description mandate (LIN-3049)', () => {
       'the re-plan instruction is tied to drift');
   });
 
-  test('the plan route counts a seams-and-places plan as complete (LIN-4021 whenNot)', () => {
+  test('the plan route counts a plan record as a plan, never description text (LIN-4021 whenNot, LIN-4504)', () => {
     const whenNot = PROMPT_TEMPLATES.plan.route.whenNot;
-    assert.ok(/A complete plan \(approach, places, session fit\) is already in the description/.test(whenNot),
-      'the plan route names approach, places and session fit');
+    assert.ok(/The task has a plan record, or is a piece of its parent's plan: route on its session fit/.test(whenNot),
+      'the plan route names the plan record and the piece');
+    assert.ok(/Plan text in a description is not a plan/.test(whenNot));
     assert.ok(!/surfaces/.test(whenNot), 'the plan route no longer requires a surface list');
   });
 });

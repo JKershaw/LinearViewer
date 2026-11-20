@@ -1699,11 +1699,11 @@ describe('getPaidEnvKey / hasPaidEnvKey (LIN-961)', () => {
 // stages' own descriptions (LIN-3300); the live routing shape is measured by
 // scripts/eval/fixtures/recommend/approved-parent-breakdown.json.
 // =============================================================================
-describe('stage descriptions: approved-parent-plan child exemption (LIN-3049)', () => {
-  test('plan and plan-review each name the breakdown child\'s approved parent slice', async () => {
+describe('stage descriptions: approved-parent-plan child exemption (LIN-3049; LIN-4504: a piece, not a copied slice)', () => {
+  test('plan and plan-review each name the child that is a piece of its parent\'s plan', async () => {
     const stage = (k) => getSelectableStages().find(st => st.key === k);
-    assert.match(stage('plan').whenNot, /breakdown child's copied slice of an approved parent plan/);
-    assert.match(stage('plan-review').whenNot, /breakdown child covered by its parent's approving plan-review/);
+    assert.match(stage('plan').whenNot, /is a piece of its parent's plan/);
+    assert.match(stage('plan-review').whenNot, /a piece of an approved parent plan included/);
   });
 });
 

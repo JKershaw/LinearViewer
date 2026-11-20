@@ -8,7 +8,6 @@ import assert from 'node:assert';
 import { formatStageContract } from '../../lib/prompt-contract.js';
 import { latestReviewComment, readRunLedger } from '../../lib/run-trail.js';
 import { extractPlanSection } from '../../lib/file-pointer.js';
-import { extractSessionFit } from '../../lib/recommendation-facts.js';
 import { extractVerdict, planReviewDueOf } from '../../lib/plan-review-round-trips.js';
 import { extractPrUrls } from '../../lib/run-evidence.js';
 
@@ -33,8 +32,9 @@ test('plan: the heading, session-fit phrase and gate line are the ones their rea
   const [heading, fits, multi, dueYes, dueNo] = ticks(c);
   assert.strictEqual(heading, '## Implementation Plan');
   assert.strictEqual(extractPlanSection(`Intro\n\n${heading}\n\n- lib/a.js: change\n`).trim(), '- lib/a.js: change');
-  assert.strictEqual(extractSessionFit(`${heading}\n\n${fits}`), 'fits one session');
-  assert.strictEqual(extractSessionFit(`${heading}\n\n${multi}`), 'needs multiple sessions');
+  // LIN-4504 (S1): the selector reads session fit from the plan records' addressee, so no selector reader keys on
+  // these phrases any more; the plan contract itself moves to records in S2.
+  void fits; void multi;
   assert.strictEqual(planReviewDueOf(dueYes), 'yes');
   assert.strictEqual(planReviewDueOf(dueNo), 'no');
 });

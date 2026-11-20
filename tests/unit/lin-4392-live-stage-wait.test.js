@@ -48,6 +48,7 @@ import { createWorkspaceApiRoutes } from '../../routes/workspace-api.js';
 import { registerProvider } from '../../lib/providers/registry.js';
 import { stubLineageIdentity } from '../fixtures/lineage-identity.js';
 import { NO_REQUEST_RECORDS, withDefaults } from '../fixtures/request-usage-loader.js';
+import { planFactsOf } from '../../lib/records/plan-facts.js';
 
 afterEach(() => { setFetchImpl(null); setPromptTraceRecorder(null); });
 
@@ -93,7 +94,9 @@ const runStore = (rows, live = [], { failRead = false } = {}) => ({
 const TASK_WORDS = {};
 const askedRecords = () => ({
   askedForTicket: async (_urlKey, ticket) => TASK_WORDS[ticket] ?? null,
-  askedForTickets: async (_urlKey, tickets) => new Map(tickets.filter((t) => TASK_WORDS[t]).map((t) => [t, TASK_WORDS[t]]))
+  askedForTickets: async (_urlKey, tickets) => new Map(tickets.filter((t) => TASK_WORDS[t]).map((t) => [t, TASK_WORDS[t]])),
+  // LIN-4504: the plan facts the same entrance reads; no plan record on any of these tickets.
+  planFactsForTickets: async (_urlKey, tickets) => new Map(tickets.map((t) => [t, planFactsOf({ task: { id: `task-${t}`, kind: 'task' } })]))
 });
 
 function proxyApp({ rows = [], items = [], live = [], failRead = false } = {}) {

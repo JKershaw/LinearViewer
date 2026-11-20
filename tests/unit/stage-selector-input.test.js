@@ -4,9 +4,9 @@
  * - Trail facts computed in code from the WHOLE trail: the latest code review
  *   (run-ledger's reader, so a plan-review verdict or a bug write-up is never one),
  *   work and close-out reported after it, the PRs linked, the latest person's comment and
- *   ruling, and for a leaf the plan, its session fit and whether plan-review is due.
+ *   ruling, and for a leaf the plan facts (LIN-4504: from records, passed in; never ticket text).
  * - The selector's own view of the ticket: title, state, labels, relations, the
- *   description with a long plan body condensed, the latest 3 comments (capped) and the
+ *   description without its old plan section (LIN-4504), the latest 3 comments (capped) and the
  *   latest ruling wherever it sits. Older comment bodies and the worker-only epic-list
  *   nudge are not in it, and formatIssueContext (brief, recap, scan, task chat) is
  *   unchanged.
@@ -15,9 +15,8 @@
  */
 import { test, describe } from 'node:test';
 import assert from 'node:assert/strict';
-import {
-  assembleTrailFacts, formatTrailFactsBlock, condensePlan
-} from '../../lib/recommendation-facts.js';
+import { assembleTrailFacts, formatTrailFactsBlock } from '../../lib/recommendation-facts.js';
+import { planFactsOf } from '../../lib/records/plan-facts.js';
 import { RULING_MARK, isRuling } from '../../lib/run-trail.js';
 import { formatSelectorView, formatIssueContext, buildSelectorArgs } from '../../lib/openrouter.js';
 
@@ -25,6 +24,10 @@ const at = (d) => `2026-10-0${d}T10:00:00.000Z`;
 const PR = 'https://github.com/JKershaw/LinearViewer/pull/1747';
 const review = (verdict, d) => ({ createdAt: at(d), body: `## Review — LIN-1\n\nReviewed ${PR}.\n\n### Verdict\n${verdict}\n\n### What CI Did Not Prove\n- L1 (inside): the live run.` });
 const planReview = (d) => ({ createdAt: at(d), body: '### Plan Review Verdict\n\n**Verdict:** Approve.' });
+// LIN-4504: plan facts are records, folded by lib/records/plan-facts.js.
+const TASK = { id: 'task-1', kind: 'task', state: 'open' };
+const planRec = (id, to, v = 1, d = 1) => ({ id, v, kind: 'plan', state: 'kept', in: 'task-1', to, at: at(d) });
+const PLANNED = (to, findings = []) => planFactsOf({ task: TASK, inside: [planRec('plan-aa', to)], findings });
 
 describe('trail facts (LIN-3300)', () => {
   test('the latest code review comes from the run ledger; a plan-review Approve is not one', () => {
@@ -126,23 +129,36 @@ describe('trail facts (LIN-3300)', () => {
     assert.equal(facts.closeOutAfterReview, true);
   });
 
-  test('a plan posted as a comment counts, and its session fit and plan-review answer are read from it', () => {
-    const plan = { createdAt: at(1), body: `**Plan — the migration (technical-planner pass).**\n\n${'x'.repeat(2500)}\n\nSession-fit: does NOT fit one session. 4 sessions.\n\nplan-review due: yes` };
-    const facts = assembleTrailFacts([plan], 'Finish it.', { leaf: true });
-    assert.deepEqual(facts.plan, { where: 'comment', at: at(1), sessionFit: 'needs multiple sessions', planReviewDue: 'yes' });
-    assert.match(formatTrailFactsBlock(facts, 1), /- Implementation plan: in a comment \(2026-10-01 10:00\)/);
-    assert.match(formatTrailFactsBlock(facts, 1), /- Session fit stated: needs multiple sessions/);
+  test('LIN-4504: a plan posted as a comment, or written in the description, is not read: the facts are the records', () => {
+    const plan = { createdAt: at(1), body: `**Plan — the migration (technical-planner pass).**\n\nSession-fit: does NOT fit one session. 4 sessions.\n\nplan-review due: yes` };
+    const description = 'Goal.\n\n## Implementation Plan\n\nSession fit: does not fit one session.\n\nplan-review due: yes\n';
+    const none = planFactsOf({ task: TASK });
+    const facts = assembleTrailFacts([plan], description, { leaf: true, planFacts: none });
+    assert.equal(facts.plan, none);
+    const block = formatTrailFactsBlock(facts, 1);
+    assert.match(block, /- Plan records on this task: none/);
+    assert.match(block, /- Session fit \(the plan records' addressee\): none/);
+    assert.match(block, /- Plan review owed: no/);
   });
 
-  test('a leaf gets its plan facts; the negated session fit reads as multiple sessions', () => {
-    const description = 'Goal.\n\n## Implementation Plan\n\nRevision 3 — addresses plan-review F1.\n\nSession fit: does not fit one session.\n\nplan-review due: yes\n';
-    const facts = assembleTrailFacts([], description, { leaf: true });
-    assert.deepEqual(facts.plan, { where: 'description', at: null, sessionFit: 'needs multiple sessions', planReviewDue: 'yes' });
-    assert.doesNotMatch(formatTrailFactsBlock(facts, 0), /revision/i, 'the revision label is not a computed fact');
-    assert.equal(assembleTrailFacts([], 'Plan-review due: no — covered by LIN-9.', { leaf: true }).plan.planReviewDue, 'no');
-    assert.equal(assembleTrailFacts([], '**plan-review due:** yes — (b) a routed-around gap', { leaf: true }).plan.planReviewDue, 'yes', 'the bold form reads');
-    assert.deepEqual(assembleTrailFacts([], 'Just a goal.', { leaf: true }).plan, { where: null, at: null, sessionFit: null, planReviewDue: null });
-    assert.equal(assembleTrailFacts([], description, { leaf: false }).plan, null, 'a node reads session fit from FRONTIER FACTS instead');
+  test('a leaf gets its plan facts from records: addressee, version, last change and whether a review is owed', () => {
+    const one = assembleTrailFacts([], 'Goal.', { leaf: true, planFacts: PLANNED('implementation') });
+    const block = formatTrailFactsBlock(one, 0);
+    assert.match(block, /- Plan records on this task: plan-aa v1 to implementation \(changed 2026-10-01 10:00\)/);
+    assert.match(block, /- Session fit \(the plan records' addressee\): one session \(addressed to implementation\)/);
+    assert.match(block, /- Plan review owed: no/);
+    const several = formatTrailFactsBlock(assembleTrailFacts([], 'Goal.', { leaf: true, planFacts: PLANNED('breakdown') }), 0);
+    assert.match(several, /several sessions \(a plan is addressed to breakdown\)/);
+    assert.match(several, /- Plan review owed: yes \(plan-aa is addressed to breakdown and no plan-review finding is about it\)/);
+    const asked = PLANNED('implementation', [{ id: 'finding-r1', kind: 'finding', state: 'open', to: 'plan-review', links: { about: ['plan-aa'] } }]);
+    assert.match(formatTrailFactsBlock(assembleTrailFacts([], '', { leaf: true, planFacts: asked }), 0), /- Plan review owed: yes \(open finding finding-r1 to plan-review about plan-aa\)/);
+    assert.equal(assembleTrailFacts([], 'Goal.', { leaf: false, planFacts: PLANNED('breakdown') }).plan, null, 'a node reads its plan facts in the node facts instead');
+  });
+
+  test('plan facts not read say so, and claim no plan', () => {
+    const block = formatTrailFactsBlock(assembleTrailFacts([], 'Goal.\n\n## Implementation Plan\n\nfits one session', { leaf: true }), 0);
+    assert.match(block, /- Plan records: not measured \(no records read for this trail\); ticket text is not read for a plan/);
+    assert.doesNotMatch(block, /Session fit|Plan review owed/);
   });
 
   test('the block states each fact once and says which comments it read', () => {
@@ -151,51 +167,32 @@ describe('trail facts (LIN-3300)', () => {
     assert.match(block, /Latest code review: approve-conditional/);
     assert.match(block, /Work reported after it \(a later comment links a PR\): no/);
     assert.match(block, /PRs linked on the trail: https:\/\/github\.com\/JKershaw\/LinearViewer\/pull\/1747/);
-    assert.match(block, /- Implementation plan: none/);
+    assert.match(block, /- Plan records: not measured/);
     const none = formatTrailFactsBlock(assembleTrailFacts([], '', { leaf: false }), 0);
     assert.match(none, /Latest code review: none/);
-    assert.doesNotMatch(none, /Implementation plan:/);
+    assert.doesNotMatch(none, /Plan records/);
   });
 });
 
-describe('condensePlan (LIN-3300)', () => {
-  const section = (title, body) => `### ${title}\n\n${body}\n`;
-  const long = 'x'.repeat(900);
-  const plan = [
-    'Intro to the ticket.',
-    '',
-    '## Implementation Plan',
-    '',
-    'Revision 2 — addresses plan-review F1.',
-    '',
-    section('Surfaces', `First paragraph of surfaces.\n\n${long}`),
-    section('Session fit', 'Does not fit one session: each phase is its own implementation session.\n\nPhase 1 lands alone.\n\nPhase 2 follows.'),
-    section('Tests', `Test lead.\n\n${long}\n\n${long}`),
-    'plan-review due: yes',
-    '',
-    '## After the plan',
-    '',
-    'Kept whole.'
-  ].join('\n');
+describe('LIN-4504: the selector view and the kept section leave the old plan section out', () => {
+  const description = ['Intro to the ticket.', '', '## Implementation Plan', '', 'Old plan words.', '', '### Session fit', '', 'Old fit words.', '', '## After the plan', '', 'Kept whole.'].join('\n');
+  const issue = { identifier: 'LIN-1', title: 'A task', state: { name: 'Todo', type: 'unstarted' }, labels: [], description };
 
-  test('a long plan keeps each subsection lead, the whole Session fit section and the machine lines', () => {
-    const out = condensePlan(plan, { threshold: 500 });
-    assert.ok(out.length < plan.length, 'it is shorter');
-    assert.match(out, /Intro to the ticket\./);
-    assert.match(out, /Revision 2 — addresses plan-review F1\./);
-    assert.match(out, /### Surfaces\n\nFirst paragraph of surfaces\./);
-    assert.match(out, /Phase 1 lands alone\.\n\nPhase 2 follows\./, 'the Session fit section is whole');
-    assert.match(out, /### Tests\n\nTest lead\./);
-    assert.match(out, /plan-review due: yes/);
-    assert.doesNotMatch(out, /x{900}/, 'subsection bodies are cut');
-    assert.match(out, /## After the plan\n\nKept whole\./, 'text outside the plan is unchanged');
-    assert.match(out, /Plan body condensed for routing/);
+  test('formatSelectorView: the section and its subsections go, text around it stays', () => {
+    const view = formatSelectorView(issue, {});
+    assert.match(view, /\*\*Description:\*\* Intro to the ticket\.\n\n## After the plan\n\nKept whole\./);
+    assert.doesNotMatch(view, /Old plan words|Old fit words|Implementation Plan/);
   });
 
-  test('a short plan, or none, is unchanged', () => {
-    assert.equal(condensePlan(plan, { threshold: 1e6 }), plan);
-    assert.equal(condensePlan('No plan here.'), 'No plan here.');
-    assert.equal(condensePlan(''), '');
+  test('formatIssueContext (the brief\'s kept section, recap, scan, task chat) does the same', () => {
+    const ctx = formatIssueContext(issue, {});
+    assert.match(ctx, /Intro to the ticket\.\n\n## After the plan\n\nKept whole\./);
+    assert.doesNotMatch(ctx, /Old plan words|Implementation Plan/);
+  });
+
+  test('a description that is only a plan leaves no Description line; one with no plan is unchanged', () => {
+    assert.doesNotMatch(formatSelectorView({ ...issue, description: '## Implementation Plan\n\nonly' }, {}), /Description/);
+    assert.match(formatSelectorView({ ...issue, description: 'No plan here.' }, {}), /\*\*Description:\*\* No plan here\./);
   });
 });
 
@@ -278,38 +275,26 @@ describe('trail facts: the misroute fixes (LIN-3378)', () => {
     assert.match(line('Approve.', { state: 'not-read', count: null, ids: [], why: 'x' }), /open findings to close-out: not measured\)/);
   });
 
-  const PARENT = { identifier: 'LIN-9', description: 'Epic.\n\n## Implementation Plan\n\nDo the steps.' };
+  // LIN-4504: part of the parent's plan is a `piece`, never the parent's description.
+  const PIECE = planFactsOf({ task: { ...TASK, links: { piece: 'plan-p9' } }, piece: { id: 'plan-p9', v: 2, kind: 'plan', state: 'kept', in: 'task-9', to: 'implementation', at: at(2) } });
 
-  test('c: a leaf with no plan of its own names the plan in its parent description', () => {
-    const facts = assembleTrailFacts([], 'Do step 2.', { leaf: true, parentPlan: PARENT });
-    assert.equal(facts.plan.parent, 'LIN-9');
-    assert.match(formatTrailFactsBlock(facts, 0), /- Implementation plan: none on this task; it is part of the plan in its parent LIN-9's description/);
+  test('c: a leaf with a piece names its parent\'s plan record, reads one session and owes no review', () => {
+    const block = formatTrailFactsBlock(assembleTrailFacts([], 'Do step 2.', { leaf: true, planFacts: PIECE }), 0);
+    assert.match(block, /- Plan records on this task: none of its own; it is a piece of its parent's plan: plan-p9 v2 to implementation \(changed 2026-10-02 10:00\)/);
+    assert.match(block, /one session/);
+    assert.match(block, /- Plan review owed: no/);
   });
 
-  test('c: a leaf\'s own plan wins over the parent\'s', () => {
-    const own = assembleTrailFacts([], 'Goal.\n\n## Implementation Plan\n\nMine.', { leaf: true, parentPlan: PARENT });
-    assert.equal(own.plan.parent, undefined);
-    assert.match(formatTrailFactsBlock(own, 0), /- Implementation plan: in the description/);
-    const comment = assembleTrailFacts([{ createdAt: at(1), body: '**Plan — mine.**\n\nSteps.' }], 'Goal.', { leaf: true, parentPlan: PARENT });
-    assert.equal(comment.plan.parent, undefined);
-    assert.match(formatTrailFactsBlock(comment, 1), /in a comment/);
-  });
-
-  test('c: a parent without a plan section adds nothing; a node ignores the parent', () => {
-    const none = assembleTrailFacts([], 'Goal.', { leaf: true, parentPlan: { identifier: 'LIN-9', description: 'Just prose.' } });
-    assert.equal(none.plan.parent, undefined);
-    assert.match(formatTrailFactsBlock(none, 0), /- Implementation plan: none$/m);
-    assert.equal(assembleTrailFacts([], 'Goal.', { leaf: false, parentPlan: PARENT }).plan, null);
-  });
-
-  test('c: buildSelectorArgs passes the parent plan for a leaf and not for a node', () => {
+  test('c: buildSelectorArgs passes the records\' plan facts, and a parent description plan adds nothing', () => {
     const issue = { identifier: 'LIN-10', title: 'Step', description: 'Do step 2.', state: { name: 'Todo', type: 'unstarted' }, labels: [] };
-    const parent = { identifier: 'LIN-9', title: 'Epic', description: PARENT.description };
-    const leaf = buildSelectorArgs(issue, { parent, children: [], comments: [] });
-    assert.match(leaf.facts, /part of the plan in its parent LIN-9's description/);
-    const node = buildSelectorArgs(issue, { parent, children: [{ identifier: 'LIN-11', title: 'c', state: { type: 'unstarted' } }], comments: [] });
-    assert.doesNotMatch(node.facts, /parent LIN-9/);
-    const bare = buildSelectorArgs(issue, { parent: { identifier: 'LIN-9', title: 'Epic' }, children: [], comments: [] });
-    assert.doesNotMatch(bare.facts, /parent LIN-9/);
+    const parent = { identifier: 'LIN-9', title: 'Epic', description: 'Epic.\n\n## Implementation Plan\n\nDo the steps.' };
+    const withPiece = buildSelectorArgs(issue, { parent, children: [], comments: [], planFacts: PIECE });
+    assert.match(withPiece.facts, /a piece of its parent's plan: plan-p9/);
+    const without = buildSelectorArgs(issue, { parent, children: [], comments: [], planFacts: planFactsOf({ task: TASK }) });
+    assert.match(without.facts, /- Plan records on this task: none$/m);
+    assert.doesNotMatch(without.facts, /LIN-9/);
+    const node = buildSelectorArgs(issue, { parent, children: [{ identifier: 'LIN-11', title: 'c', state: { type: 'unstarted' } }], comments: [], planFacts: PIECE });
+    assert.doesNotMatch(node.facts, /Plan records/);
+    assert.match(node.facts, /- Session fit \(this task's own plan records\): one session/);
   });
 });
