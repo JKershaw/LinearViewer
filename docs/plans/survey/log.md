@@ -4741,3 +4741,5 @@ Still waiting on `lin4499-snapshot-cut`.
 - **The PATCH to LIN-4499 was refused** with AS_ASKED_IMMUTABLE: the seal blocks the correction, as John predicted.
 - **Proposed:** append a corrections section below the block. Waiting on John.
 - **Ruling:** with Ship Biscuit moved, retire-fully is now the right answer to `lin4499-snapshot-cut`.
+
+- **~10:35:** corrections appended to LIN-4499 below the sealed block (200): snapshots fully; production reachable, so the import and readings are agent work; PR #2446 closed. The proposal on `lin4499-snapshot-cut` is changed to retire-fully. Waiting for John to answer.
