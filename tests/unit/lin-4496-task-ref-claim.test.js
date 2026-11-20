@@ -14,6 +14,7 @@ import { describe, test, before, after, beforeEach, afterEach } from 'node:test'
 import assert from 'node:assert/strict';
 import { createMangoTmpdir } from '../fixtures/mango-tmpdir.js';
 import { createRecordsRouteHarness } from '../helpers/records-route-harness.js';
+import { ticketTaskIdOf } from '../../lib/records/refs.js';
 
 const URL_KEY = 'lin-4496-task-ref';
 const harness = createMangoTmpdir('lin-4496-task-ref-');
@@ -132,5 +133,16 @@ describe('a task keeps the ticket it holds (LIN-4496, finding 58119935)', () => 
     const finding = await rh.post('/api/proxy/records', run.token, { kind: 'finding', in: 'LIN-7002', to: 'project', says: 'Under B.', how: 'read it', run: run.runId });
     assert.equal(finding.body.in, fresh.body.id, 'B\'s hand-off is in B\'s own task');
     assert.equal((await tasksWithRef('LIN-7001'))[0].id, made.body.id, 'A\'s task is unchanged');
+  });
+});
+
+describe('a ticket\'s task has one id rule (LIN-4496, blind-read find ac5fb021)', () => {
+  test('a task made by a reference and a task written with the ref both carry ticketTaskIdOf(ticket)', async () => {
+    const finding = await rh.post('/api/proxy/records', run.token, { kind: 'finding', in: 'LIN-7002', to: 'project', says: 'Made by a reference.', how: 'read it', run: run.runId });
+    assert.equal(finding.status, 201, JSON.stringify(finding.body));
+    assert.equal(finding.body.in, ticketTaskIdOf('LIN-7002'), 'the reference minted the ticket\'s derived task id');
+    const written = await rh.post('/api/proxy/records', run.token, taskBody('LIN-7001'));
+    assert.equal(written.status, 201, JSON.stringify(written.body));
+    assert.equal(written.body.id, ticketTaskIdOf('LIN-7001'), 'the task write claimed the same derived id');
   });
 });
