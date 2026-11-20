@@ -4694,3 +4694,7 @@ The hourly check-in (trig_01XCTpQoZb2V1vqMFvzXKStm) is now a drive. When a slice
 ### 20 Nov, 04:28: no change
 
 LIN-4499 is still at scoping, waiting on `lin4499-snapshot-cut` (the only open ruling). No new rows since 02:30.
+
+### 20 Nov, 05:28: no change
+
+Still waiting on `lin4499-snapshot-cut`.
