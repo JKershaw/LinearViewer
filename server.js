@@ -102,6 +102,9 @@ import { createOnTicketWrite } from './lib/ticket-close-closer.js'
 import { ShelvedRulingsStore } from './lib/shelved-rulings-store.js'
 import { RecordsStore, RECORDS_COLLECTION, REFS_COLLECTION, QUERY_LOG_COLLECTION } from './lib/records-store.js'
 import { createRunRecords } from './lib/run-records.js'
+import { createRecordWrites } from './lib/records/writes.js'
+import { askedOf } from './lib/asked-of.js'
+import { flattenIssue as flattenRecordsIssue } from './lib/proxy-wire.js'
 import { createListWorkspacePeople, storedNameOf } from './lib/workspace-people.js'
 import { createTaskRecordsRoutes } from './routes/task-records.js'
 import { createProjectPageRoutes } from './routes/project-page.js'
@@ -117,7 +120,7 @@ import { getProvider, getProviderForWorkspace, getAllProviders, localProvider } 
 import { createProviderAuthRouter } from './routes/provider-auth-routers.js'
 import { LocalStore } from './lib/local-store.js'
 import { buildForest, partitionCompleted, buildInProgressForest, buildRecentActivityForest, RECENT_WINDOW_DAYS, NO_PROJECT_ID, PERIODICALS_PROJECT_ID, expandToTreeContext, nodeKey } from './lib/tree.js'
-import { isHiddenState } from './lib/providers/state-map.js'
+import { isHiddenState, isTerminalState } from './lib/providers/state-map.js'
 import { buildPeriodicalNodes } from './lib/periodicals.js'
 import { renderPage, renderErrorPage, renderUpstreamAwareErrorPage, renderWorkspaceNotFoundPage, homeRowsContext, renderHomeRowsHtml } from './lib/render.js'
 import { isAuthError, errorReference, clientErrorStatus, clientErrorMessage, badRequest, jsonError, serverError, unauthorized } from './lib/errors.js'
@@ -683,7 +686,30 @@ const recordsStore = new RecordsStore({
   queryLog: db.collection(QUERY_LOG_COLLECTION)
 })
 // The run lifecycle seam: a run opens when its row is taken and ends on its terminal marker (lib/run-records.js).
-dispatchQueueStore.runRecords = createRunRecords({ recordsStore, readRow: (urlKey, id) => dispatchQueueStore.rowForRunRecords(urlKey, id) })
+// LIN-4501 (P1): the task for a ticket, made if it has none, through the one checked writer (lib/records/writes.js
+// `taskOfTicket`, the same pipeline a body's tickets go through). Built once here and shared by the dispatch seat
+// (`dispatchQueueStore.taskOnDispatch`, lib/dispatch-factory.js taskOnDispatch) and the take fallback (the run seam's
+// `taskOfTicket`, lib/run-records.js). The tracker read is the workspace's own credential, or the dispatch's access
+// when the seat passes one.
+async function readTicketAt(access, ref) {
+  const issue = await access.provider.issueDetail(access.token, ref);
+  return issue ? flattenRecordsIssue(issue) : null;
+}
+async function workspaceTicketAccess(urlKey) {
+  const granted = await resolveWorkspaceAccess(urlKey);
+  if (!granted?.token || !granted?.provider) throw new Error(`tracker unavailable: ${granted?.reason || 'no access'}`);
+  return { provider: getProviderForWorkspace({ provider: granted.provider }), token: granted.scope ?? granted.token };
+}
+const ticketWriter = createRecordWrites({ recordsStore, isTerminalState, readTicket: readTicketAt, askedText: askedOf })
+async function taskForTicketAt(urlKey, ticket, resolveAccess = null) {
+  const held = await recordsStore.taskForTicket(urlKey, ticket);
+  if (held) return { id: held };
+  const access = resolveAccess ? await resolveAccess() : await workspaceTicketAccess(urlKey);
+  if (!access) return { problem: `${ticket}: no tracker access` };
+  return ticketWriter.taskOfTicket(access, urlKey, ticket, 'dispatch');
+}
+dispatchQueueStore.taskOnDispatch = (urlKey, ticket, resolveAccess) => taskForTicketAt(urlKey, ticket, resolveAccess)
+dispatchQueueStore.runRecords = createRunRecords({ recordsStore, readRow: (urlKey, id) => dispatchQueueStore.rowForRunRecords(urlKey, id), taskOfTicket: (urlKey, ticket) => taskForTicketAt(urlKey, ticket) })
 // LIN-2444: proposed dismissals — a view annotation on a ruling, never an
 // answer to it. Separate collection from shelved-rulings because the two are
 // different acts with different lifecycles (a shelve defers a decision the

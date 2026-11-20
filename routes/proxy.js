@@ -40,7 +40,7 @@ import { STAGE_PROVIDER_LANE, STAGE_PROXY_TOKEN } from '../lib/proxy-events.js';
 import { requireWriteScope } from '../lib/stage-write-gate.js';
 import { createProxyRecordsRoutes } from './proxy-records.js';
 import { trackerPortOf, childTicketRetryOf } from '../lib/records-tracker.js';
-import { askedText } from '../lib/as-asked.js';
+import { askedOf } from '../lib/asked-of.js';
 import { flattenIssue as flattenRecordsIssue } from '../lib/proxy-wire.js';
 import { STAGE_KINDS } from '../lib/prompts/stage-kinds.js';
 import { requireGrant } from '../lib/require-grant.js';
@@ -1375,7 +1375,7 @@ export function createProxyRoutes({ proxyTokenStore, proxyEventStore, agentStatu
     if (!access?.token || !access?.provider) throw new Error(`tracker unavailable: ${access?.reason || 'no access'}`);
     return trackerPortOf({ provider: access.provider, scope: access.token });
   };
-  router.use(createProxyRecordsRoutes({ recordsStore, proxyLimiter, authenticateProxyToken, requireWriteScope, logEvent, readTicket: readRecordsTicket, askedText, stageKinds: Object.keys(STAGE_KINDS), listPeople: listRecordPeople, tracker: recordsTrackerForRequest }));
+  router.use(createProxyRecordsRoutes({ recordsStore, proxyLimiter, authenticateProxyToken, requireWriteScope, logEvent, readTicket: readRecordsTicket, askedText: askedOf, stageKinds: Object.keys(STAGE_KINDS), listPeople: listRecordPeople, tracker: recordsTrackerForRequest }));
 
   // Group E writes (LIN-679 Stage 3b / LIN-2537): extracted to
   // routes/proxy-writes.js, mounted at its original position.
