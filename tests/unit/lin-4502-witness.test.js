@@ -26,7 +26,8 @@ import { createLocalStore } from '../fixtures/local-harness.js';
 import { RecordsStore, RECORDS_COLLECTION, REFS_COLLECTION, QUERY_LOG_COLLECTION } from '../../lib/records-store.js';
 import { INDEX_SPECS } from '../../lib/db-indexes.js';
 import { quoteAsked, splitQuote, composeBrief } from '../../lib/brief-quote.js';
-import { askedOf } from '../../lib/asked-of.js';
+import { askedOf, outsideAsked, legacyBlockSpan } from '../../lib/asked-of.js';
+import { adfToMarkdown, markdownToAdf } from '../../lib/providers/jira/adf.js';
 import { PLAN_HEADING_ANY } from '../../lib/run-trail.js';
 import { readFileSync } from 'node:fs';
 
@@ -168,6 +169,24 @@ describe('LIN-4502 witness (c): the legacy reader reads the block the seal wrote
   test('Linear\'s escaped storage of the same block reads the same words', () => {
     const escaped = LEGACY.replace(/([#*_[\]])/g, '\\$1');
     assert.equal(askedOf(escaped), 'Make the export button work.\nKeep both formats.');
+  });
+  // finding-684d2e80: a pre-P2 Jira ticket reads back through the codec, which renders the end line's italic as `_…_`.
+  test('a Jira ticket written before P2 (read back through the codec, end line in `_…_`) reads the same words', () => {
+    const jira = adfToMarkdown(markdownToAdf(LEGACY));
+    assert.ok(/^_End of what was asked\./m.test(jira), 'the codec renders the end line with underscores');
+    assert.equal(askedOf(jira), 'Make the export button work.\nKeep both formats.');
+    assert.equal(outsideAsked(jira).trim(), '## Implementation Plan\n\n1. a step');
+    const span = legacyBlockSpan(jira);
+    assert.equal(jira.slice(span.start, span.start + '## As asked'.length), '## As asked');
+    assert.ok(jira.slice(span.start, span.end).endsWith('changes._'), 'the span runs through the end line, offsets unchanged');
+  });
+  test('a CRLF Jira block reads the same words', () => {
+    const jira = adfToMarkdown(markdownToAdf(LEGACY)).replace(/\n/g, '\r\n');
+    assert.equal(askedOf(jira), 'Make the export button work.\r\nKeep both formats.');
+  });
+  test('an underscore end line with no heading above it is no block', () => {
+    const text = 'Some words\n\n_End of what was asked. Steps write below this line; nothing above it changes._';
+    assert.equal(askedOf(text), text);
   });
 });
 
