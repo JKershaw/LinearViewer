@@ -59,8 +59,6 @@ import { UUID_REGEX, isValidIssueId } from '../lib/workspace.js';
 import { appendBlock, replace as replaceInDescription, DescriptionEditError } from '../lib/description-edit.js';
 import { checkSizeRecord, recordShape, SIZE_OF_MOVE_HEADING, SIZE_RECORD_CODES, DECIDED_BY, WRONG_WORK } from '../lib/size-of-move.js';
 import { addedPlanHeadings, PLAN_HEADING_WORDS, PLAN_IN_DESCRIPTION } from '../lib/legacy-plan-text.js';
-
-export { PLAN_IN_DESCRIPTION };
 import { blindReadRefusal } from '../lib/run-ledger.js';
 import { checkBlindRead, landingPrUrls } from '../lib/run-trail.js';
 import { isRestrictedStamp, sameTicketKey, ISSUE_PATCH_FIELDS } from '../lib/stage-writes.js';

@@ -148,6 +148,30 @@ describe('planFactsForTickets: one call answers every ticket, in a fixed number 
     assert.equal(f.piece.id, next.id);
     assert.equal(f.hasPlan, true);
   });
+
+  test('a piece superseded twice (p1 -> p2 -> p3) is followed the whole way, as the pure fold does', async () => {
+    const parent = await task('LIN-310');
+    const p1 = await plan(parent.id, 'implementation');
+    const p2 = await plan(parent.id, 'implementation');
+    const p3 = await plan(parent.id, 'implementation');
+    await store.end(URL_KEY, p1.id, { state: 'superseded', reason: 'first correction', into: p2.id }, by);
+    await store.end(URL_KEY, p2.id, { state: 'superseded', reason: 'second correction', into: p3.id }, by);
+    await task('LIN-311', { in: parent.id, links: { piece: p1.id } });
+    const f = (await store.planFactsForTickets(URL_KEY, ['LIN-311'])).get('LIN-311');
+    assert.equal(f.piece.id, p3.id, 'the chain is read to its end');
+    assert.equal(f.hasPlan, true);
+  });
+
+  test('a supersede cycle terminates and reads no plan', async () => {
+    const parent = await task('LIN-320');
+    const a = await plan(parent.id, 'implementation');
+    const b = await plan(parent.id, 'implementation');
+    await store.end(URL_KEY, a.id, { state: 'superseded', reason: 'x', into: b.id }, by);
+    await store.end(URL_KEY, b.id, { state: 'superseded', reason: 'y', into: a.id }, by);
+    await task('LIN-321', { in: parent.id, links: { piece: a.id } });
+    const f = (await store.planFactsForTickets(URL_KEY, ['LIN-321'])).get('LIN-321');
+    assert.equal(f.piece, null);
+  });
 });
 
 describe('the fold (lib/records/plan-facts.js planFactsOf)', () => {
@@ -191,6 +215,20 @@ describe('the fold (lib/records/plan-facts.js planFactsOf)', () => {
     assert.equal(f.hasPlan, undefined);
     assert.equal(f.reason, 'the store is down');
     assert.equal(currentPieceOf(null, () => null), null);
+  });
+
+  test('currentPieceOf follows every hop of a chain, and a cycle reads no plan', () => {
+    const recs = {
+      a: { id: 'a', state: 'superseded', ended: { into: 'b' } },
+      b: { id: 'b', state: 'superseded', ended: { into: 'c' } },
+      c: { id: 'c', state: 'kept' },
+      x: { id: 'x', state: 'superseded', ended: { into: 'y' } },
+      y: { id: 'y', state: 'superseded', ended: { into: 'x' } }
+    };
+    const get = (id) => recs[id] || null;
+    assert.equal(currentPieceOf(recs.a, get).id, 'c', 'two hops reach the plan that holds');
+    assert.equal(currentPieceOf(recs.c, get).id, 'c');
+    assert.equal(currentPieceOf(recs.x, get), null);
   });
 });
 

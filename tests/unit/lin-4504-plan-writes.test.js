@@ -18,7 +18,7 @@ import { test, describe, beforeEach, afterEach } from 'node:test';
 import assert from 'node:assert/strict';
 import express from 'express';
 import { createProxyRoutes } from '../../routes/proxy.js';
-import { PLAN_IN_DESCRIPTION } from '../../routes/proxy-writes.js';
+import { PLAN_IN_DESCRIPTION } from '../../lib/legacy-plan-text.js';
 import { localProvider } from '../../lib/providers/local/index.js';
 import { createLocalStore } from '../fixtures/local-harness.js';
 

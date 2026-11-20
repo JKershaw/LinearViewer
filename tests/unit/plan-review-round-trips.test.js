@@ -16,9 +16,10 @@
 import { test, describe } from 'node:test';
 import assert from 'node:assert/strict';
 import {
-  extractVerdict, computeIssueRoundTrips, computePlanReviewRoundTrips,
+  computeIssueRoundTrips, computePlanReviewRoundTrips,
   derivePrimaryFloor, MIN_DENOMINATOR, __internal,
 } from '../../lib/plan-review-round-trips.js';
+import { extractVerdict } from '../../lib/run-trail.js';
 import { __internal as followOnRatioInternal } from '../../lib/follow-on-ratio.js';
 import { planFactsOf } from '../../lib/records/plan-facts.js';
 

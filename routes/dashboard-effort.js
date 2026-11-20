@@ -90,8 +90,8 @@ async function readGroupContexts(group, provider, callScope, supports) {
   const settled = await settleWithConcurrency(group.identifiers, EFFORT_READOUT_ISSUE_CONCURRENCY, async (identifier) => {
     // `fetchIssueComments` (not `fetchIssueContext`) because the verdict
     // walk needs each comment's own `id` + `createdAt`, which only this
-    // reader emits. `fetchIssueFields` supplies the description the gate
-    // fields are derived from.
+    // reader emits. `fetchIssueFields` supplies the issue's `id`; the gate is
+    // read from plan records (LIN-4504), so no description is read here.
     const [comments, fields] = await Promise.all([
       provider.fetchIssueComments(callScope, identifier),
       supports('fetchIssueFields') ? provider.fetchIssueFields(callScope, identifier) : Promise.resolve(null),
@@ -99,7 +99,6 @@ async function readGroupContexts(group, provider, callScope, supports) {
     return {
       identifier,
       id: fields?.id || identifier,
-      description: typeof fields?.description === 'string' ? fields.description : '',
       comments: Array.isArray(comments) ? comments : [],
     };
   });
