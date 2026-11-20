@@ -31,7 +31,7 @@ import { createRecordsRouteHarness } from '../helpers/records-route-harness.js';
 import { createRecordWrites } from '../../lib/records/writes.js';
 import { composeRunBrief } from '../../lib/records/run-brief.js';
 import { isTerminalState } from '../../lib/providers/state-map.js';
-import { askedText } from '../../lib/as-asked.js';
+import { askedOf } from '../../lib/asked-of.js';
 import { STAGE_KINDS } from '../../lib/prompts/stage-kinds.js';
 
 const URL_KEY = 'lin-4496-walk-8-replay';
@@ -88,7 +88,7 @@ async function replayWalk(walk) {
 
 async function replay(walk, rh) {
   const readTicket = async (_req, ref) => TICKETS.get(ref) ?? null;
-  const writes = createRecordWrites({ recordsStore: rh.store, isTerminalState, readTicket, askedText, stageKinds: STAGES, listPeople: async () => PEOPLE });
+  const writes = createRecordWrites({ recordsStore: rh.store, isTerminalState, readTicket, askedText: askedOf, stageKinds: STAGES, listPeople: async () => PEOPLE });
   const map = new Map();
   const real = (x) => {
     if (typeof x !== 'string') return x;

@@ -13,7 +13,7 @@ import assert from 'node:assert/strict';
 import { generatePrompt } from '../../lib/prompt-templates.js';
 import { formatAreaNotesPointer, formatScopingAreaNotesPointer } from '../../lib/prompt-formatters.js';
 import { REGISTRY_PATH } from '../../lib/prompts/area-registry-path.js';
-import { AS_ASKED_HEADING } from '../../lib/as-asked.js';
+import { ASKED_HEADING } from '../../lib/brief-quote.js';
 import {
   SIZE_OF_MOVE_HEADING, SIZES, SIZE_LABEL, WHY_LABEL, CUTS_LABEL, DECIDED_BY_LABEL, DECIDED_BY, NO_CUTS, checkSizeRecord
 } from '../../lib/size-of-move.js';
@@ -21,7 +21,7 @@ import {
 const END = '*End of what was asked. Steps write below this line; nothing above it changes.*';
 const ISSUE = {
   id: 'i-4346', identifier: 'LIN-4346', title: 'Area notes fixture',
-  description: `${AS_ASKED_HEADING}\n\nMake Brief and Recap populate on open.\n\n${END}`,
+  description: `${ASKED_HEADING}\n\nMake Brief and Recap populate on open.\n\n${END}`,
   url: 'https://linear.app/test/issue/LIN-4346', createdAt: '2026-11-08T00:00:00.000Z',
   state: { name: 'Todo', type: 'unstarted' }, labels: []
 };

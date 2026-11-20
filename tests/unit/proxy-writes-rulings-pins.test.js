@@ -26,7 +26,7 @@ import { DismissalSuggestionsStore } from '../../lib/dismissal-suggestions-store
 import { withFreshDigests } from '../fixtures/with-fresh-digests.js';
 import { installAsyncErrorForwarding } from '../../lib/async-errors.js';
 import { BASE_DEPS, buildApp, call, makeFakeProvider } from './lib/proxy-fake-deps.js';
-import { sealAsAsked } from '../../lib/as-asked.js';
+import { quoteAsked } from '../../lib/brief-quote.js';
 
 const URL_KEY = 'pins-workspace';
 const DECISION_ID = 'd-1';
@@ -150,7 +150,7 @@ function descriptionWorld({ rejectResolveAt, updateIssue } = {}) {
   const provider = makeFakeProvider();
   // Sealed (LIN-4352) so description/below has a block to write below; append and
   // replace edit below it, so they behave exactly as on an unsealed body.
-  provider.issueDescription = async () => ({ description: `${sealAsAsked('asked')}\n\nexisting` });
+  provider.issueDescription = async () => ({ description: `${quoteAsked('asked')}\n\nexisting` });
   if (updateIssue) provider.updateIssue = updateIssue;
   const deps = BASE_DEPS();
   const app = buildApp({

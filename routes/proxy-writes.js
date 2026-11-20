@@ -7,10 +7,8 @@
  * upload, relations create/delete, labels add/remove.
  *
  * The description writes (PATCH `description`, append, replace, below and the
- * description-target attachment) and the create carry the As asked guard
- * (LIN-4352, `refusedByAsAsked`): the block holding the words as filed cannot be
- * changed, dropped or forged through this lane. The same two description call sites carry
- * the size record guard (LIN-4368, `refusedBySizeRecord`): a `## Size of the move` section
+ * description-target attachment) carry the size record guard (LIN-4368,
+ * `refusedBySizeRecord`) at their two call sites: a `## Size of the move` section
  * says what and why, never how, a policy never decides "wrong work", and a write may not drop
  * the section (lib/size-of-move.js checkSizeRecord). Every write that creates or edits a comment
  * body (create, edit, and the comment-target attachment caption) carries the blind-read guard (LIN-4437, `refusedByBlindRead`): a comment opening
@@ -59,8 +57,8 @@ import { extractPeriodicalGateId } from '../lib/periodicals.js';
 import { flattenIssue, MAX_ATTACHMENT_BYTES } from '../lib/proxy-wire.js';
 import { UUID_REGEX, isValidIssueId } from '../lib/workspace.js';
 import { appendBlock, replace as replaceInDescription, DescriptionEditError } from '../lib/description-edit.js';
-import { checkAsAsked, splitAsAsked, hasMarkerLine, askedText, AS_ASKED_HEADING } from '../lib/as-asked.js';
-import { sealForFiling } from '../lib/as-asked-seal.js';
+import { legacyBlockSpan } from '../lib/asked-of.js';
+import { ASKED_HEADING } from '../lib/brief-quote.js';
 import { checkSizeRecord, recordShape, SIZE_OF_MOVE_HEADING, SIZE_RECORD_CODES, DECIDED_BY, WRONG_WORK } from '../lib/size-of-move.js';
 import { blindReadRefusal } from '../lib/run-ledger.js';
 import { checkBlindRead, landingPrUrls } from '../lib/run-trail.js';
@@ -72,16 +70,13 @@ const TRASHED_MESSAGE = 'Issue is trashed; refusing to modify a deleted issue';
 const BAD_ISSUE_ID = 'Invalid issue ID format';
 const COMMENT_TOO_LONG = `body exceeds maximum length of ${MAX_COMMENT_LENGTH}`;
 const RELATION_TYPES = ['blocks', 'blocked-by', 'duplicate', 'related'];
-// LIN-4352: the As asked guard's refusal wording, shared by every refused write.
-const AS_ASKED_LEAD = 'The "' + AS_ASKED_HEADING + '" block holds the words as filed, and no step may change them';
-const AS_ASKED_REMEDY = 'Write around it: append, replace a span below the block, or use description/below.';
 // LIN-4368: the size record guard's refusal wording.
 const SIZE_HOW_WORDS = { 'code-span': 'a code span', path: 'a file path', call: 'call syntax', 'numbered-steps': 'a numbered step' };
 // LIN-4369 arm 3: what a SIZE_RECORD_SHAPE refusal's kind means, for its message.
 const SIZE_SHAPE_WORDS = {
   'extra-line': 'is not one of the record\'s lines', 'repeated-line': 'repeats a line', 'missing-line': 'comes before a line the record is missing',
   size: 'names no size from the list', 'why-empty': 'gives no why', 'why-too-long': 'makes the why too long', 'why-sentences': 'makes the why more than one sentence',
-  'cuts-empty': 'opens the cuts with nothing under it', 'cut-unquoted': 'names a cut without quoting the As asked block word for word', 'cut-too-long': 'says too much beside its quotation',
+  'cuts-empty': 'opens the cuts with nothing under it', 'cut-unquoted': 'names a cut without quoting the task\'s asked word for word', 'cut-too-long': 'says too much beside its quotation',
   'decided-by': 'names no one who decided from the list', 'decided-by-too-long': 'says too much after who decided',
 };
 
@@ -164,7 +159,7 @@ export const SPEC_OPERATIONS = Object.freeze(Object.keys(SPEC));
  * @param {Function} deps.resolveProjectInput - Symbolic-or-UUID project ref resolver (closure-local)
  * @param {Function} deps.resolveLabelInput - Symbolic-or-UUID label ref resolver (closure-local)
  * @param {Function} deps.refResolutionFailed - Maps a RefResolutionError to its own 422 (closure-local)
- * @param {Function} deps.partialWriteFailed - Maps a PartialWriteError (write landed, its confirmation re-read or harbour.asAsked property check failed) to its own envelope (closure-local)
+ * @param {Function} deps.partialWriteFailed - Maps a PartialWriteError (write landed, its confirmation re-read failed) to its own envelope (closure-local)
  * @param {Object} [deps.recordsStore] - LIN-4501: the size guard reads the ticket's task `asked` (lib/records-store.js askedForTicket); absent, no ask is on record
  * @param {Function} deps.logEvent - Audit/witness event logger (closure-local)
  * @param {Object} [deps.harbourCommentsStore] - Durable (urlKey, commentId) ledger (LIN-2648); best-effort record at each createComment seam, never gates the response
@@ -359,34 +354,6 @@ export function createProxyWriteRoutes({
   const refuseNonUuidRef = (ctx, name, value) => Boolean(value) && !UUID_REGEX.test(value) && refuse(ctx, 400, `${name} must be a UUID`);
 
   /**
-   * The `## As asked` guard (LIN-4352): the agent lane may not
-   * change the block that holds the words as filed, drop it, or forge one onto a
-   * ticket that has none. `live` is the description the provider holds NOW (one
-   * fresh read per write, never a stored copy) and `next` the body the write would
-   * store; lib/as-asked.js checkAsAsked compares the two blocks normalised, so a
-   * provider whose round trip re-escapes the text is not refused for it. Answers
-   * 422 AS_ASKED_IMMUTABLE and returns true once it has refused.
-   *
-   * Only this proxy lane is guarded. The session lane (routes/workspace-api-issue-
-   * write.js, the task-edit page), edits made in Linear or GitHub directly, and an
-   * agent writing to the provider without the proxy are people's lanes by design,
-   * or outside what Harbour can see; the first-dispatch seal writes through the provider,
-   * so this guard does not see it either.
-   */
-  function refusedByAsAsked(ctx, live, next) {
-    const check = checkAsAsked(live, next);
-    if (check.ok) return false;
-    const quote = (line) => (line === null || line === undefined ? '(no line)' : JSON.stringify(line));
-    const firstLine = (text) => askedText(text).split('\n')[0];
-    const what = {
-      changed: `line ${check.line?.number} of the block would change from ${quote(check.line?.expected)} to ${quote(check.line?.actual)}`,
-      removed: `the new description drops the block, starting at its line 1, ${quote(firstLine(live))}`,
-      added: 'the new description adds a block this ticket does not have; only code seals one, when the ticket is filed or first dispatched',
-    }[check.kind];
-    return refuse(ctx, 422, `${AS_ASKED_LEAD}: ${what}. ${AS_ASKED_REMEDY}`, { code: 'AS_ASKED_IMMUTABLE', kind: check.kind, ...(check.line ? { line: check.line } : {}) });
-  }
-
-  /**
    * LIN-4501: the ticket's task `asked`, the only words a size record's cut may quote; null with no task, no store,
    * or a records fault (logged). The ticket is the route's own id, as the write names it.
    */
@@ -404,19 +371,19 @@ export function createProxyWriteRoutes({
   }
 
   /**
-   * The size record guard (LIN-4368), beside refusedByAsAsked at both of its description call
-   * sites and with the same `live` / `next`: lib/size-of-move.js checkSizeRecord acts only when
+   * The size record guard (LIN-4368), at both description call sites, given the live
+   * description and the one the write would store: lib/size-of-move.js checkSizeRecord acts only when
    * the write adds, changes or drops the `## Size of the move` section, so an older section
    * never blocks an unrelated write. Answers 422 with the code, and the line for a "how"
-   * or "shape" refusal, and returns true once it has refused. Like the As asked guard, only this proxy
-   * lane is guarded: the session lane and direct provider edits are people's lanes.
+   * or "shape" refusal, and returns true once it has refused. Only this proxy lane is guarded:
+   * the session lane and direct provider edits are people's lanes.
    */
   async function refusedBySizeRecord(ctx, live, next, liveIssue = null) {
     const check = checkSizeRecord(live, next, { asked: await askedOfTicket(ctx, liveIssue) });
     if (check.ok) return false;
     const lead = `The "${SIZE_OF_MOVE_HEADING}" section`;
     const message = {
-      [SIZE_RECORD_CODES.how]: `${lead} says what is being done and why, never how: its line ${check.line?.number} carries ${SIZE_HOW_WORDS[check.kind]} (${JSON.stringify(check.token)}). Say it in plain words; a quotation may carry such text only when it matches the As asked block word for word.`,
+      [SIZE_RECORD_CODES.how]: `${lead} says what is being done and why, never how: its line ${check.line?.number} carries ${SIZE_HOW_WORDS[check.kind]} (${JSON.stringify(check.token)}). Say it in plain words; a quotation may carry such text only when it matches the task's asked word for word.`,
       [SIZE_RECORD_CODES.shape]: `${lead} holds four lines and nothing else: its line ${check.line?.number} ${SIZE_SHAPE_WORDS[check.kind]}${check.missing ? ` (${check.missing})` : ''}. The lines: ${recordShape().join(' | ')}.`,
       [SIZE_RECORD_CODES.policyCut]: `${lead} cannot be decided by ${DECIDED_BY.policy} when the size is "${WRONG_WORK}": that cuts the ask, and a cut needs a person's ruling. Record it as ${DECIDED_BY.pending} and raise the ruling.`,
       [SIZE_RECORD_CODES.dropped]: `${lead} is kept once written: the new description drops it. Keep it, or replace it in place.`,
@@ -455,13 +422,6 @@ export function createProxyWriteRoutes({
     const fieldError = validateIssueWriteFields({ title, description }, { mode: 'create' });
     if (fieldError) return refuse(ctx, 400, fieldError, { log: false });
 
-    // LIN-4352: an agent may not file a body carrying an As asked marker line (raw
-    // or escaped). Code seals the block; a marker in the body would forge one, or
-    // end a later seal early.
-    if (hasMarkerLine(description)) {
-      return refuse(ctx, 422, `${AS_ASKED_LEAD}: this description already contains an As asked marker line ("${AS_ASKED_HEADING}" or the end sentence), and only code writes those. Remove that line and file again.`, { code: 'AS_ASKED_IMMUTABLE', kind: 'marker' });
-    }
-
     // LIN-2352: a create has no fetched issue to derive a team from, so supply
     // provider.name when the contract excludes teamId — a real non-empty string
     // every teamless states() implementation accepts and ignores (mirrors
@@ -481,10 +441,9 @@ export function createProxyWriteRoutes({
 
     const input = { title };
     if (requiresTeam) input.teamId = resolvedTeamId;
-    // LIN-4352: code seals the filed words into the As asked block where the
-    // ticket starts (a marker body was refused above; a provider that cannot hold
-    // the block is filed unsealed, with its own log line).
-    if (description) input.description = sealForFiling({ provider, words: description, lane: 'proxy create' }).description;
+    // LIN-4502: the description is filed as written (the As asked seal is retired; the
+    // task's `asked` keeps the person's words).
+    if (description) input.description = description;
 
     // In request order: each field is gated on the provider's write contract, then
     // converted (LIN-556: projectId / stateId accept symbolic names, state scoped
@@ -580,15 +539,14 @@ export function createProxyWriteRoutes({
     const teamId = guard?.team?.id || null;
 
     // LIN-4352: a PATCH that writes `description` makes one dedicated
-    // issueDescription read (the read editDescription makes), so the As asked guard
-    // compares the live block with the one being written. issueWriteGuard is not
+    // issueDescription read (the read editDescription makes), so the size record
+    // guard compares the live section with the one being written. issueWriteGuard is not
     // grown for this (lib/providers/linear/index.js says why), and a PATCH without
     // `description` makes no extra read. A missing issue compares as an empty body
     // and proceeds, so the provider's own not-found still maps as before.
     if (description !== undefined) {
       const live = await guardTarget(ctx, 'issueDescription', { onNull: 'proceed' });
       if (!live) return;
-      if (refusedByAsAsked(ctx, live.issue?.description || '', description)) return;
       if (await refusedBySizeRecord(ctx, live.issue?.description || '', description, live.issue)) return;
     }
 
@@ -654,9 +612,8 @@ export function createProxyWriteRoutes({
    * "Failed to read issue description" and maps no typed error; the write maps
    * RefResolutionError (a provider that REFUSES the write, e.g. Jira's D1
    * unrenderable-content guard, LIN-1886, is a permanent caller-visible 422, not a
-   * 500 telling an agent to retry) and PartialWriteError (LIN-2012, LIN-4452: the field
-   * PUT landed and only the confirmation re-read, or its harbour.asAsked property
-   * check, failed).
+   * 500 telling an agent to retry) and PartialWriteError (LIN-2012: the field PUT
+   * landed and only the confirmation re-read failed).
    */
   async function editDescription(ctx, merge) {
     const { req, res, endpoint, token, provider } = ctx;
@@ -678,9 +635,7 @@ export function createProxyWriteRoutes({
 
     if (next.length > MAX_DESCRIPTION_LENGTH) return refuse(ctx, 400, 'resulting description exceeds maximum length');
     if (DANGEROUS_CHARS_REGEX.test(next)) return refuse(ctx, 400, 'resulting description contains invalid characters');
-    // LIN-4352: the merged body must keep the live As asked block (append,
-    // replace, below and the description-target attachment all pass here).
-    if (refusedByAsAsked(ctx, current, next)) return;
+    // Append, replace, below and the description-target attachment all pass here.
     if (await refusedBySizeRecord(ctx, current, next, liveIssue)) return;
 
     try {
@@ -736,15 +691,16 @@ export function createProxyWriteRoutes({
   };
 
   /**
-   * Everything up to the As asked block's end line, kept exactly as read, then
-   * `body` after a blank line (nothing after the end line when `body` is empty).
-   * Text above the block, if any, is kept too. A ticket with no block has nothing
-   * to write below: a loud 422 naming PATCH, the full-rewrite route.
+   * Everything up to a legacy As asked block's end line (lib/asked-of.js
+   * legacyBlockSpan), kept exactly as read, then `body` after a blank line (nothing
+   * after the end line when `body` is empty). Text above the block, if any, is kept
+   * too. A ticket with no block has nothing to write below: a loud 422 naming PATCH,
+   * the full-rewrite route. Retired with the prune (LIN-4502, next step).
    */
   function keepBlockThen(current, body) {
-    const parts = splitAsAsked(current);
+    const parts = legacyBlockSpan(current);
     if (!parts) {
-      throw new DescriptionEditError('NO_AS_ASKED_BLOCK', 'This description has no "' + AS_ASKED_HEADING + '" block, so there is nothing to write below. To rewrite the whole body, use PATCH /api/proxy/issues/{issueId} with { "description": "..." }; to add to it, use description/append.', undefined);
+      throw new DescriptionEditError('NO_AS_ASKED_BLOCK', 'This description has no "' + ASKED_HEADING + '" block, so there is nothing to write below. To rewrite the whole body, use PATCH /api/proxy/issues/{issueId} with { "description": "..." }; to add to it, use description/append.', undefined);
     }
     const kept = current.slice(0, parts.end);
     return body ? `${kept}\n\n${body}` : kept;
@@ -753,7 +709,7 @@ export function createProxyWriteRoutes({
   // POST /api/proxy/issues/:issueId/description/below (LIN-4352): replace
   // everything after the As asked block's end line, keeping the block exactly as
   // read, so a prune never re-sends the person's words. Shares editDescription's
-  // read, length and character checks (and the As asked guard, which it passes).
+  // read, length and character checks.
   router.post('/api/proxy/issues/:issueId/description/below', ...writeAuth('belowDescription'),
     guarded({ ...SPEC.belowDescription, pre: refuseBadBelow }, (ctx) => editDescription(ctx, (current) => keepBlockThen(current, ctx.req.body.body))));
 

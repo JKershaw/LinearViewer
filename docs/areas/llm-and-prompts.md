@@ -16,8 +16,8 @@ Area notes for `llm-and-prompts` in the registry. Format and rules: README.md.
 - `lib/prompt-template-defs.js` and the budget test change in almost every merge: rebase,
   then re-measure. Its fixture passes no context (the empty-context branch), so dropping one
   can raise a ceiling while real renders shrink (LIN-4393).
-- The `## As asked` block's words have one owner, `lib/as-asked.js`: import its spellings,
-  never retype the heading or end line (LIN-4362).
+- The `## As asked` quote's words have one owner, `lib/brief-quote.js`: import its spellings,
+  never retype the heading or end line (LIN-4362, LIN-4502).
 - The blind read's kind, heading and verdict words have one owner, `lib/prompts/blind-read-words.js`;
   the verdict prose ("better, the same or worse") is built there from the words. Import them. The scan
   in `tests/unit/stage-kind-tables.test.js` fails on a literal elsewhere, except as a row key of a table it

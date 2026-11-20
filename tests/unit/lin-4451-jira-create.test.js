@@ -5,8 +5,9 @@
  *
  * The provider tests run against the repo's own in-memory Jira fake, so they prove the
  * provider's own logic (issue type, create-screen fields, epic, required-field refusal,
- * the sealed block, the re-read). They do NOT prove that live Jira accepts a create with
- * `properties` or a `parent`; that is LIN-4452's live check.
+ * the re-read). They do NOT prove that live Jira accepts a create with a `parent`; that is
+ * LIN-4452's live check. LIN-4502: a description is filed as markdownToAdf of what was sent,
+ * and no `harbour.asAsked` property is written (the As-asked seal and its Jira region are retired).
  *
  * Also pinned here: the Periodical gate reads its evidence from a Jira guard only when the
  * marker is present (review note 4), and a parentId / assigneeId / cycleId that is not a
@@ -22,11 +23,13 @@ import { createProxyRoutes } from '../../routes/proxy.js';
 import { createWorkspaceApiRoutes } from '../../routes/workspace-api.js';
 import { jiraProvider, JiraProvider } from '../../lib/providers/jira/index.js';
 import { createFakeJiraClient } from '../../lib/providers/jira/fake-client.js';
-import { AS_ASKED_PROPERTY, AS_ASKED_READ } from '../../lib/providers/jira/as-asked-region.js';
+// The entity property the retired As-asked region wrote; a read asks for it only to show it is never written.
+const ASKED_PROPERTY = 'harbour.asAsked';
+const ASKED_PROPERTY_READ = { properties: [ASKED_PROPERTY] };
 import { RefResolutionError } from '../../lib/proxy-ref-resolver.js';
 import { PartialWriteError } from '../../lib/partial-write-error.js';
 import { registerProvider } from '../../lib/providers/registry.js';
-import { sealAsAsked } from '../../lib/as-asked.js';
+import { quoteAsked } from '../../lib/brief-quote.js';
 import { buildPeriodicalGateMarker, extractPeriodicalGateId } from '../../lib/periodicals.js';
 import { flattenIssue } from '../../lib/proxy-wire.js';
 
@@ -114,17 +117,18 @@ describe('Jira create contract (LIN-4451)', () => {
     assert.equal(provider.ui.write, true, 'the create-URL gate stays');
   });
 
-  test('creates a Task with its block sealed: the property holds the exact words and the re-read serves them', async () => {
+  test('creates a Task: the description is filed as markdownToAdf of what was sent, and the re-read serves its rendering', async () => {
     const created = await provider.createIssue(SCOPE, {
-      teamId: 'ENG', title: 'Ship it', description: sealAsAsked(WORDS),
+      teamId: 'ENG', title: 'Ship it', description: WORDS,
     });
     assert.equal(created.identifier.startsWith('ENG-'), true);
     assert.equal(created.title, 'Ship it');
-    assert.match(created.description, /Keep \*this\* exactly, with _marks_ and a - bullet\./);
+    // The codec's rendering, not the bytes sent: with the region retired (LIN-4502) no property holds them.
+    assert.equal(created.description, 'Keep _this_ exactly, with _marks_ and a - bullet.');
 
-    const stored = await fake.getIssue(created.identifier, AS_ASKED_READ);
+    const stored = await fake.getIssue(created.identifier, ASKED_PROPERTY_READ);
     assert.equal(stored.fields.issuetype.id, TASK.id, 'Task is preferred');
-    assert.equal(stored.properties[AS_ASKED_PROPERTY].words, WORDS, 'the exact words sit in the property');
+    assert.equal(stored.properties?.[ASKED_PROPERTY], undefined, 'no property is written');
   });
 
   test('Task is preferred over an earlier standard type: Bug listed first, Task still chosen (not standard[0])', async () => {
@@ -138,10 +142,10 @@ describe('Jira create contract (LIN-4451)', () => {
     assert.equal(stored.fields.issuetype.id, TASK.id, 'Task, not the first standard type (Bug)');
   });
 
-  test('a plain description (no block) creates with no property', async () => {
-    const created = await provider.createIssue(SCOPE, { teamId: 'ENG', title: 'Plain', description: 'Just words.' });
-    const stored = await fake.getIssue(created.identifier, AS_ASKED_READ);
-    assert.equal(stored.properties?.[AS_ASKED_PROPERTY], undefined);
+  test('LIN-4502: a description holding an As asked block is filed as written, with no property', async () => {
+    const created = await provider.createIssue(SCOPE, { teamId: 'ENG', title: 'Block', description: quoteAsked(WORDS) });
+    const stored = await fake.getIssue(created.identifier, ASKED_PROPERTY_READ);
+    assert.equal(stored.properties?.[ASKED_PROPERTY], undefined);
   });
 
   test('with no Task, the first standard non-subtask type at hierarchy level 0 is chosen', async () => {
@@ -224,14 +228,12 @@ describe('Jira create contract (LIN-4451)', () => {
     assert.equal(creates.count, 0);
   });
 
-  test('a block too large to hold is refused 422 before the create, nothing created', async () => {
+  test('LIN-4502: a long block is filed; there is no entity-property limit to refuse it', async () => {
     const creates = countCreates(fake);
     const huge = 'x'.repeat(40000);
-    await assert.rejects(
-      () => provider.createIssue(SCOPE, { teamId: 'ENG', title: 'Too big', description: sealAsAsked(huge) }),
-      (err) => err instanceof RefResolutionError && err.status === 422 && /too large/.test(err.message),
-    );
-    assert.equal(creates.count, 0);
+    const created = await provider.createIssue(SCOPE, { teamId: 'ENG', title: 'Long', description: quoteAsked(huge) });
+    assert.equal(created.title, 'Long');
+    assert.equal(creates.count, 1);
   });
 
   test('a re-read that fails after the create is a PartialWriteError, so the caller does not retry the create', async () => {
@@ -416,14 +418,14 @@ describe('proxy create lane on Jira (POST /api/proxy/issues)', () => {
     jiraProvider.configure(savedJira);
   });
 
-  test('a Periodical-mint shape (a project key as the team) files a sealed Task', async () => {
+  test('a Periodical-mint shape (a project key as the team) files a Task, its description as written', async () => {
     const description = WORDS;
     const { status, body } = await call(buildProxyApp(), 'POST', '/api/proxy/issues', { teamId: 'ENG', title: 'Mint', description });
     assert.equal(status, 201, JSON.stringify(body));
     assert.equal(body.success, true);
-    const stored = await fake.getIssue(body.issue.identifier, AS_ASKED_READ);
+    const stored = await fake.getIssue(body.issue.identifier, ASKED_PROPERTY_READ);
     assert.equal(stored.fields.issuetype.id, TASK.id);
-    assert.equal(stored.properties[AS_ASKED_PROPERTY].words, WORDS, 'the lane seals the words; the property holds them exactly');
+    assert.equal(stored.properties?.[ASKED_PROPERTY], undefined, 'the lane seals nothing; no property is written');
   });
 
   test('projectId files the issue under the epic (parent on a team-managed screen)', async () => {
@@ -459,11 +461,12 @@ describe('session create lane on Jira (POST /workspace/:urlKey/api/issues)', () 
     jiraProvider.configure(savedJira);
   });
 
-  test('the in-app form path files a sealed Task', async () => {
+  test('the in-app form path files a Task, its description as written', async () => {
     const { status, body } = await call(buildSessionApp(), 'POST', '/workspace/acme-jira/api/issues', { teamId: 'ENG', title: 'From the form', description: WORDS });
     assert.equal(status, 201, JSON.stringify(body));
-    const stored = await fake.getIssue(body.issue.identifier, AS_ASKED_READ);
-    assert.equal(stored.properties[AS_ASKED_PROPERTY].words, WORDS);
+    const stored = await fake.getIssue(body.issue.identifier, ASKED_PROPERTY_READ);
+    assert.equal(stored.properties?.[ASKED_PROPERTY], undefined);
+    assert.match(body.issue.description, /Keep _this_ exactly/, 'the codec\'s rendering of what was sent');
   });
 
   test('projectId is refused 400, not dropped: the in-app form does not offer an epic on Jira', async () => {
@@ -551,7 +554,7 @@ describe('flattened proxy read of a Jira-created issue', () => {
   test('the created issue reads back through flattenIssue with its team as the project key', async () => {
     fake = seed();
     provider = new JiraProvider({ client: fake, clientFactory: () => fake, site: SITE });
-    const created = await provider.createIssue(SCOPE, { teamId: 'ENG', title: 'Round trip', description: sealAsAsked(WORDS) });
+    const created = await provider.createIssue(SCOPE, { teamId: 'ENG', title: 'Round trip', description: WORDS });
     const flat = flattenIssue({ ...created });
     assert.equal(flat.title, 'Round trip');
     assert.equal(flat.teamId, 'ENG');

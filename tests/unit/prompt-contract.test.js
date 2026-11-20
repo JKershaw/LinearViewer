@@ -10,7 +10,7 @@ import { latestReviewComment, readRunLedger } from '../../lib/run-trail.js';
 import { extractPlanSection } from '../../lib/file-pointer.js';
 import { extractSessionFit } from '../../lib/recommendation-facts.js';
 import { extractVerdict, planReviewDueOf } from '../../lib/plan-review-round-trips.js';
-import { AS_ASKED_HEADING } from '../../lib/as-asked.js';
+import { ASKED_HEADING } from '../../lib/brief-quote.js';
 import { extractPrUrls } from '../../lib/run-evidence.js';
 
 const titleIn = (contract, word) => contract.match(new RegExp('`(## ' + word + '[^`]*)`'))[1];
@@ -30,11 +30,9 @@ test('a read-only tracker gets no contract: it takes no writes', () => {
 
 test('plan: the heading, session-fit phrase and gate line are the ones their readers key on', () => {
   const c = formatStageContract('plan', 'LIN-1');
-  // LIN-4353: the plan line also names the block to write below; it is the marker
-  // lib/as-asked.js splits on, so a step aiming below it aims where the readers look.
-  const [asAsked, heading, fits, multi, dueYes, dueNo] = ticks(c);
+  // LIN-4502: the plan line no longer names a block to write below (the seal is retired).
+  const [heading, fits, multi, dueYes, dueNo] = ticks(c);
   assert.strictEqual(heading, '## Implementation Plan');
-  assert.strictEqual(asAsked, AS_ASKED_HEADING);
   assert.strictEqual(extractPlanSection(`Intro\n\n${heading}\n\n- lib/a.js: change\n`).trim(), '- lib/a.js: change');
   assert.strictEqual(extractSessionFit(`${heading}\n\n${fits}`), 'fits one session');
   assert.strictEqual(extractSessionFit(`${heading}\n\n${multi}`), 'needs multiple sessions');
@@ -108,6 +106,6 @@ test('close-out: the literals it keeps through the prune are the ones the reader
   assert.strictEqual(extractPlanSection(stub).trim().split('\n')[0], '- lib/a.js');
   assert.strictEqual(extractSessionFit(stub), 'fits one session');
   assert.strictEqual(planReviewDueOf(stub), 'yes');
-  // LIN-4353: the block it says is never pruned is the one lib/as-asked.js reads.
-  assert.strictEqual(ticks(c)[5], AS_ASKED_HEADING);
+  // LIN-4353: the block it says is never pruned is the one lib/brief-quote.js reads.
+  assert.strictEqual(ticks(c)[5], ASKED_HEADING);
 });

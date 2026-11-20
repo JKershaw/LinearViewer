@@ -1,14 +1,18 @@
 /**
- * LIN-4502 (P2) acceptance witnesses, written before any retirement. They drive the REAL proxy routes
- * (routes/proxy.js createProxyRoutes, which injects `askedOf` into the records route as production does) over a
- * REAL LocalStore and a real RecordsStore on a MangoDB engine.
+ * LIN-4502 (P2) acceptance witnesses, written before any retirement and kept through it. They drive the REAL proxy
+ * routes (routes/proxy.js createProxyRoutes, which injects `askedOf` into the records route as production does) over
+ * a REAL LocalStore and a real RecordsStore on a MangoDB engine.
  *
  *   (a) a task first named through the proxy takes the ticket's words as `asked`;
  *   (b) rewriting the description through the proxy (the whole body, and a span that used to sit inside the block)
- *       leaves the task's `asked` and brief part 1 unchanged.
+ *       leaves the task's `asked` and brief part 1 unchanged. Before P2 the As-asked guard refused both rewrites
+ *       (422 AS_ASKED_IMMUTABLE); with the guard retired both land (200), and the task's `asked` still holds.
+ *   (c) the legacy reader reads the block exactly as the seal wrote it: a literal pre-P2 description, typed out here,
+ *       gives askedOf its words. If the brief's quote is ever reworded, this fails until lib/asked-of.js freezes the
+ *       old spelling (its exit-condition note).
  *
- * Both are asserted on the stored task (RecordsStore.askedForTicket) and on the brief's quote (lib/brief-quote.js
- * composeBrief), never on the description alone.
+ * (a) and (b) are asserted on the stored task (RecordsStore.askedForTicket) and on the brief's quote
+ * (lib/brief-quote.js composeBrief), never on the description alone.
  */
 process.env.NODE_ENV = 'test';
 
@@ -21,8 +25,8 @@ import { localProvider } from '../../lib/providers/local/index.js';
 import { createLocalStore } from '../fixtures/local-harness.js';
 import { RecordsStore, RECORDS_COLLECTION, REFS_COLLECTION, QUERY_LOG_COLLECTION } from '../../lib/records-store.js';
 import { INDEX_SPECS } from '../../lib/db-indexes.js';
-import { sealAsAsked, splitAsAsked } from '../../lib/as-asked.js';
-import { composeBrief } from '../../lib/brief-quote.js';
+import { quoteAsked, splitQuote, composeBrief } from '../../lib/brief-quote.js';
+import { askedOf } from '../../lib/asked-of.js';
 
 // Must match TEST_LOCAL_URL_KEY in routes/proxy.js: resolveProviderAccess then answers with the local provider.
 const LOCAL_URL_KEY = 'local-workspace';
@@ -57,7 +61,7 @@ beforeEach(async () => {
     projects: [{ id: 'p1', name: 'Alpha', content: 'a', sortOrder: 1 }],
     issues: [
       // Sealed: the person's words are a `## As asked` block, then a plan below it (as every ticket filed before P2 is).
-      { id: 'i1', identifier: TICKET, title: 'Sealed', description: `${sealAsAsked(WORDS)}\n\n${PLAN}`, projectId: 'p1', state: { name: 'Todo', type: 'unstarted' } },
+      { id: 'i1', identifier: TICKET, title: 'Sealed', description: `${quoteAsked(WORDS)}\n\n${PLAN}`, projectId: 'p1', state: { name: 'Todo', type: 'unstarted' } },
       // Unsealed: the person's words, then a plan heading (the shape a ticket filed after the seal was retired has).
       { id: 'i2', identifier: PLAIN_TICKET, title: 'Plain', description: `${WORDS}\n\n${PLAN}`, projectId: 'p1', state: { name: 'Todo', type: 'unstarted' } },
     ],
@@ -125,12 +129,16 @@ describe('LIN-4502 witness (b): rewriting the description through the proxy leav
     const partOneBefore = composeBrief(askedBefore, MODEL_BRIEF).slice(0, composeBrief(askedBefore, MODEL_BRIEF).indexOf('## Situation'));
 
     const original = await storedDescription('i1');
-    // The whole body rewritten through the proxy. Today's guard (routes/proxy-writes.js refusedByAsAsked) answers 422
-    // because the block would change; the store keeps the old description.
+    // The whole body rewritten through the proxy: no guard refuses it any more (LIN-4502).
     const whole = await call('PATCH', '/api/proxy/issues/i1', { description: 'Entirely new body.\n\nNothing like before.' });
-    // A span that used to sit inside the block: one character of the words is replaced.
-    const span = await call('PATCH', '/api/proxy/issues/i1', { description: original.replace('full guide', 'short guide') });
-    assert.notEqual(original.replace('full guide', 'short guide'), original, 'the span edit changes the block\'s words');
+    assert.equal(whole.status, 200, JSON.stringify(whole.body));
+    assert.equal(await storedDescription('i1'), 'Entirely new body.\n\nNothing like before.');
+    // A span that used to sit inside the block: one phrase of the words is replaced.
+    const spanned = original.replace('full guide', 'short guide');
+    assert.notEqual(spanned, original, 'the span edit changes the block\'s words');
+    const span = await call('PATCH', '/api/proxy/issues/i1', { description: spanned });
+    assert.equal(span.status, 200, JSON.stringify(span.body));
+    assert.equal(await storedDescription('i1'), spanned);
 
     // Whatever the description now holds, the task's asked is written once, at its making, and is not re-derived.
     const second = await call('POST', '/api/proxy/records', { kind: 'finding', to: 'review', says: 'named again', how: 'look', in: TICKET });
@@ -145,6 +153,18 @@ describe('LIN-4502 witness (b): rewriting the description through the proxy leav
     assert.equal(askedAfter, askedBefore, 'the task\'s asked is unchanged');
     assert.equal(askedAfter, WORDS);
     assert.equal(partOneAfter, partOneBefore, 'brief part 1 is unchanged');
-    assert.equal(splitAsAsked(brief)?.words, WORDS, 'the brief quotes the task\'s words');
+    assert.equal(splitQuote(brief)?.words, WORDS, 'the brief quotes the task\'s words');
+  });
+});
+
+describe('LIN-4502 witness (c): the legacy reader reads the block the seal wrote, literally', () => {
+  // Typed out on purpose: the shape tickets filed before P2 carry, as the retired seal wrote it.
+  const LEGACY = '## As asked\n\nMake the export button work.\nKeep both formats.\n\n*End of what was asked. Steps write below this line; nothing above it changes.*\n\n## Implementation Plan\n\n1. a step';
+  test('askedOf takes the block\'s words, not the plan below it', () => {
+    assert.equal(askedOf(LEGACY), 'Make the export button work.\nKeep both formats.');
+  });
+  test('Linear\'s escaped storage of the same block reads the same words', () => {
+    const escaped = LEGACY.replace(/([#*_[\]])/g, '\\$1');
+    assert.equal(askedOf(escaped), 'Make the export button work.\nKeep both formats.');
   });
 });

@@ -45,7 +45,7 @@ import { liveWaitOf, STAGE_IN_FLIGHT_CODE } from '../../lib/run-live-wait.js';
 import { getRecommendation, getRecommendationStream, setFetchImpl, setPromptTraceRecorder, buildSelectorArgs } from '../../lib/openrouter.js';
 import { generatePrompt, PROMPT_TEMPLATES, deriveDispatchKind } from '../../lib/prompt-templates.js';
 import { SURVEY_HEADINGS } from '../../lib/prompts/survey-words.js';
-import { sealAsAsked } from '../../lib/as-asked.js';
+import { quoteAsked } from '../../lib/brief-quote.js';
 import { stageRuns, recentRuns } from '../../lib/recent-runs.js';
 import { BLIND_READ_KIND } from '../../lib/prompts/blind-read-words.js';
 import { buildRouterPrompt } from '../../lib/stage-router.js';
@@ -60,7 +60,7 @@ import { NO_REQUEST_RECORDS, withDefaults } from '../fixtures/request-usage-load
 afterEach(() => { setFetchImpl(null); setPromptTraceRecorder(null); });
 
 const OPEN = { name: 'Todo', type: 'unstarted' };
-const ASKED = sealAsAsked('Make the export button download a CSV.');
+const ASKED = quoteAsked('Make the export button download a CSV.');
 const RECORD = (decidedBy = 'the standing policy') => `\n\n## Size of the move\n\n**Size:** just the task\n**Why:** the export only needs the download, and nothing nearby binds on it.\n**Cuts:** none\n**Decided by:** ${decidedBy}`;
 const leaf = (over = {}) => ({ identifier: 'T-1', title: 'Export CSV', description: ASKED, state: OPEN, labels: [], ...over });
 
@@ -676,7 +676,7 @@ describe('LIN-4369 handoff: scoping\'s final message never reaches the stage aft
 // ── LIN-4398: a Periodical's review ticket starts at scoping; every other ticket keeps both Surveys ──
 
 describe('LIN-4398: a gate-marked Periodical review skips the two Surveys and starts at scoping', () => {
-  const MARKED = sealAsAsked(`${buildPeriodicalGateMarker('Documentation Review')}\n\nRun the documentation review.`);
+  const MARKED = quoteAsked(`${buildPeriodicalGateMarker('Documentation Review')}\n\nRun the documentation review.`);
   const marked = (over = {}) => leaf({ description: MARKED, ...over });
   const twin = (over = {}) => leaf(over);
   const mentions = leaf({ description: `${ASKED}\n\nThis ticket is not a Periodical review; it only mentions Periodicals in passing.` });

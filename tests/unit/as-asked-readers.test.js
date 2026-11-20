@@ -13,7 +13,7 @@
  */
 import { test, describe } from 'node:test';
 import assert from 'node:assert/strict';
-import { sealAsAsked, splitAsAsked } from '../../lib/as-asked.js';
+import { quoteAsked, splitQuote } from '../../lib/brief-quote.js';
 import {
   assembleTrailFacts,
   assembleNodeFacts,
@@ -27,7 +27,7 @@ import { __internal as followOnRatio } from '../../lib/follow-on-ratio.js';
 const ASOF = '2026-08-09T12:00:00.000Z';
 
 /** A breakdown child's block, the way breakdown files it. */
-const childBlock = (due, fit = 'fits one session') => sealAsAsked(
+const childBlock = (due, fit = 'fits one session') => quoteAsked(
   `Piece A of the parent's plan.\n\n**Session fit:** ${fit}\n\n**Plan-review due:** ${due} — covered by the parent's plan-review`
 );
 
@@ -63,7 +63,7 @@ describe('plan-review due: below the block wins', () => {
   });
 
   test('assembleTrailFacts: a plan comment outranks a plan heading inside the block', () => {
-    const desc = sealAsAsked('My idea.\n\n## Implementation Plan\n\nplan-review due: no');
+    const desc = quoteAsked('My idea.\n\n## Implementation Plan\n\nplan-review due: no');
     const comment = { body: '## Implementation Plan\n\nneeds multiple sessions\n\nplan-review due: yes', createdAt: '2026-11-07T10:00:00.000Z' };
     const plan = trailPlan(desc, [comment]);
     assert.equal(plan.where, 'comment');
@@ -78,12 +78,12 @@ describe('plan-review due: below the block wins', () => {
 
   test('round-trips gateDue: nothing below the block reads the block\'s no', () => {
     assert.equal(gateDue(childBlock('no')), false);
-    assert.equal(gateDue(sealAsAsked('plan-review due: yes')), true);
+    assert.equal(gateDue(quoteAsked('plan-review due: yes')), true);
   });
 
   test('round-trips gateDue: block yes, below no reads no (the inverse)', () => {
-    assert.equal(gateDue(`${sealAsAsked('plan-review due: yes')}\n\nplan-review due: no`), false);
-    assert.equal(gateDue(`${sealAsAsked('plan-review due: yes')}\n\n**plan-review due:** no`), false);
+    assert.equal(gateDue(`${quoteAsked('plan-review due: yes')}\n\nplan-review due: no`), false);
+    assert.equal(gateDue(`${quoteAsked('plan-review due: yes')}\n\n**plan-review due:** no`), false);
   });
 });
 
@@ -106,7 +106,7 @@ describe('session fit: below the block wins', () => {
 });
 
 describe('plan section: below the block wins', () => {
-  const blockPlan = sealAsAsked('Please fix it.\n\n## Implementation Plan\n\nTouch `lib/asked.js`.');
+  const blockPlan = quoteAsked('Please fix it.\n\n## Implementation Plan\n\nTouch `lib/asked.js`.');
 
   test('a plan below the block wins over a plan heading in the block', () => {
     const desc = `${blockPlan}\n\n## Implementation Plan (revision 1)\n\nTouch \`lib/revised.js\`.`;
@@ -124,12 +124,12 @@ describe('condensePlan never condenses inside the block', () => {
   const longPlan = (tag) => `## Implementation Plan\n\n${`${tag} lead paragraph. `.repeat(10)}\n\n${'### Step\n\n' + 'x'.repeat(4000)}`;
 
   test('a long plan heading inside the block is left byte for byte', () => {
-    const sealed = sealAsAsked(`The ask.\n\n${longPlan('asked')}`);
+    const sealed = quoteAsked(`The ask.\n\n${longPlan('asked')}`);
     const desc = `${sealed}\n\n${longPlan('revised')}`;
     const out = condensePlan(desc);
     assert.ok(out.startsWith(sealed), 'the block must come through untouched');
     assert.match(out.slice(sealed.length), /\[Plan body condensed for routing/, 'the plan below is still condensed');
-    assert.ok(splitAsAsked(out), 'the condensed description still carries its block');
+    assert.ok(splitQuote(out), 'the condensed description still carries its block');
   });
 
   test('a sealed description with nothing to condense is returned unchanged', () => {
@@ -176,8 +176,8 @@ describe('follow-on-ratio plan marker on a sealed ticket', () => {
   // A presence marker: "below wins" and "either place" give the same boolean, so
   // routing it through readFact cannot move this measure (stated in the module).
   test('a marker below or in the block counts; none in either does not', () => {
-    assert.equal(followOnRatio.hasPlanMarker({ description: `${sealAsAsked('The ask.')}\n\n## Implementation Plan` }), true);
-    assert.equal(followOnRatio.hasPlanMarker({ description: sealAsAsked('This fits one session.') }), true);
-    assert.equal(followOnRatio.hasPlanMarker({ description: `${sealAsAsked('The ask.')}\n\nnotes` }), false);
+    assert.equal(followOnRatio.hasPlanMarker({ description: `${quoteAsked('The ask.')}\n\n## Implementation Plan` }), true);
+    assert.equal(followOnRatio.hasPlanMarker({ description: quoteAsked('This fits one session.') }), true);
+    assert.equal(followOnRatio.hasPlanMarker({ description: `${quoteAsked('The ask.')}\n\nnotes` }), false);
   });
 });

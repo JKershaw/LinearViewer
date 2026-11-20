@@ -19,7 +19,6 @@ import express from 'express';
 import { createWorkspaceApiRoutes } from '../../routes/workspace-api.js';
 import { registerProvider } from '../../lib/providers/registry.js';
 import { renderTaskEditPage } from '../../lib/render-task-edit.js';
-import { sealAsAsked } from '../../lib/as-asked.js';
 
 const PROVIDER_NAME = 'issue-write-fake';
 const TEAM_UUID = '00000000-0000-0000-0000-0000000000aa';
@@ -145,9 +144,9 @@ describe('POST /workspace/:urlKey/api/issues (create)', () => {
     assert.strictEqual(calls.createIssue.length, 1);
     const input = calls.createIssue[0];
     assert.strictEqual(input.title, 'Add a widget');
-    // LIN-4352: the session create files the description sealed into the As asked
-    // block, byte for byte (still an exact pin, now on the sealed body).
-    assert.strictEqual(input.description, sealAsAsked('body'));
+    // LIN-4502: the session create files the description as written, byte for byte
+    // (the As asked seal is retired).
+    assert.strictEqual(input.description, 'body');
     assert.strictEqual(input.priority, 2);
     assert.strictEqual(input.teamId, TEAM_UUID);
     // The load-bearing assertion: createdBy comes from session.accountId.

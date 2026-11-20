@@ -20,7 +20,7 @@ process.env.NODE_ENV = 'test';
 import { test, describe, beforeEach, afterEach } from 'node:test';
 import assert from 'node:assert/strict';
 import express from 'express';
-import { sealAsAsked } from '../../lib/as-asked.js';
+import { quoteAsked } from '../../lib/brief-quote.js';
 import { composeBrief, briefQuoteEnd, attachAsked } from '../../lib/brief-quote.js';
 import { generateBrief, DEFAULT_BRIEF_MODEL } from '../../lib/brief.js';
 import { briefCurrentSection, briefWithoutCurrent } from '../../lib/task-page-loader.js';
@@ -97,7 +97,7 @@ const recordsWith = (words = {}) => ({
 describe('generateBrief quotes the task\'s asked ahead of a paraphrasing model', () => {
   test('the brief starts with ## As asked and the words\' exact bytes; the model\'s sections follow', async () => {
     installModelStub();
-    const { brief, model } = await generateBrief(issueOf(sealAsAsked(ASK)), contextOf(sealAsAsked(ASK), ASK), { apiKey: 'sk-test' });
+    const { brief, model } = await generateBrief(issueOf(quoteAsked(ASK)), contextOf(quoteAsked(ASK), ASK), { apiKey: 'sk-test' });
     assertQuoted(brief, ASK);
     assert.ok(brief.endsWith(MODEL_BRIEF), 'the model\'s four sections follow the quote unchanged');
     assert.equal(model, 'openai/gpt-5.4-mini', 'the brief model stays gpt-5.4-mini');
@@ -106,7 +106,7 @@ describe('generateBrief quotes the task\'s asked ahead of a paraphrasing model',
 
   test('briefCurrentSection returns the model\'s ## Current, not the person\'s', async () => {
     installModelStub();
-    const { brief } = await generateBrief(issueOf(sealAsAsked(ASK)), contextOf(sealAsAsked(ASK), ASK), { apiKey: 'sk-test' });
+    const { brief } = await generateBrief(issueOf(quoteAsked(ASK)), contextOf(quoteAsked(ASK), ASK), { apiKey: 'sk-test' });
     assert.equal(briefCurrentSection(brief), MODEL_CURRENT);
     const panel = briefWithoutCurrent(brief);
     assertQuoted(panel, ASK);
@@ -130,7 +130,7 @@ describe('generateBrief quotes the task\'s asked ahead of a paraphrasing model',
 
   test('a ticket with no task yet gets the model\'s output alone, even when its description is sealed', async () => {
     installModelStub();
-    const { brief } = await generateBrief(issueOf(sealAsAsked(ASK)), contextOf(sealAsAsked(ASK), null), { apiKey: 'sk-test' });
+    const { brief } = await generateBrief(issueOf(quoteAsked(ASK)), contextOf(quoteAsked(ASK), null), { apiKey: 'sk-test' });
     assert.equal(brief, MODEL_BRIEF, 'the description is never quoted in the task\'s place');
   });
 
@@ -148,7 +148,7 @@ describe('generateBrief quotes the task\'s asked ahead of a paraphrasing model',
   test('the sections cover what the source adds beyond the words, and a fresh ticket does not retell the ask', async () => {
     const { buildBriefMessages } = await import('../../lib/brief.js');
     const system = buildBriefMessages(issueOf(ASK), contextOf(ASK))[0].content;
-    assert.match(system, /do not restate, quote or paraphrase it/);
+    assert.match(system, /do not restate, quote or paraphrase them/);
     assert.match(system, /covering what the rest of the source adds/);
     assert.match(system, /Where nothing has been added yet, `## Current` says so in one line rather than retelling the ask/);
   });
@@ -157,7 +157,7 @@ describe('generateBrief quotes the task\'s asked ahead of a paraphrasing model',
 describe('composeBrief, briefQuoteEnd and attachAsked (lib/brief-quote.js)', () => {
   test('the quote ends where the model\'s output begins', () => {
     const brief = composeBrief(ASK, MODEL_BRIEF);
-    assert.equal(brief, `${sealAsAsked(ASK)}\n\n${MODEL_BRIEF}`);
+    assert.equal(brief, `${quoteAsked(ASK)}\n\n${MODEL_BRIEF}`);
     assert.equal(brief.slice(briefQuoteEnd(brief)).trimStart(), MODEL_BRIEF);
     assert.equal(briefQuoteEnd(MODEL_BRIEF), 0, 'an unquoted brief has no quote');
   });
@@ -188,13 +188,13 @@ describe('first-line readers show the person\'s first line from the task', () =>
   });
 
   test('buildMockBrief (session mock): quotes the task\'s words, and its summary is their first line', () => {
-    const brief = buildMockBrief(contextOf(sealAsAsked(ASK), ASK));
+    const brief = buildMockBrief(contextOf(quoteAsked(ASK), ASK));
     assertQuoted(brief, ASK);
     assert.equal(briefCurrentSection(brief), `Proxy guide — ${ASK.split('\n')[0]}`);
   });
 
   test('no task: no quote, and the mock summary says there are no words on record', () => {
-    assert.equal(buildMockBrief(contextOf(sealAsAsked(ASK), null)).split('\n').slice(0, 2).join('\n'), '## Current\nProxy guide — No words on record yet.');
+    assert.equal(buildMockBrief(contextOf(quoteAsked(ASK), null)).split('\n').slice(0, 2).join('\n'), '## Current\nProxy guide — No words on record yet.');
   });
 });
 
@@ -282,7 +282,7 @@ function sessionApp({ providerName, briefCacheStore, token = 'real-token', words
 describe('the proxy brief route serves the quoted brief, fresh and cached', () => {
   test('a ticket with a task: fresh, then cached without a second model call', async () => {
     installModelStub();
-    const provider = new FakeContextProvider('as-asked-proxy', sealAsAsked(ASK));
+    const provider = new FakeContextProvider('as-asked-proxy', quoteAsked(ASK));
     const app = proxyApp({ provider, briefCacheStore: new InMemoryBriefCacheStore(), words: { 'ENG-4351': ASK } });
     const fresh = await call(app, 'GET', '/api/proxy/issues/ENG-4351/brief');
     assert.equal(fresh.status, 200, JSON.stringify(fresh.body));
@@ -314,7 +314,7 @@ describe('the proxy brief route serves the quoted brief, fresh and cached', () =
 
   test('no task: the brief is the model\'s, unchanged, though the description is sealed', async () => {
     installModelStub();
-    const provider = new FakeContextProvider('as-asked-proxy-plain', sealAsAsked(ASK));
+    const provider = new FakeContextProvider('as-asked-proxy-plain', quoteAsked(ASK));
     const { body } = await call(proxyApp({ provider, briefCacheStore: new InMemoryBriefCacheStore() }), 'GET', '/api/proxy/issues/ENG-4351/brief');
     assert.equal(body.brief, MODEL_BRIEF);
   });
@@ -323,7 +323,7 @@ describe('the proxy brief route serves the quoted brief, fresh and cached', () =
 describe('the session brief route serves the quoted brief, fresh and cached', () => {
   test('a ticket with a task: POST generates fresh, GET serves the cached brief', async () => {
     installModelStub();
-    registerProvider(new FakeContextProvider('as-asked-session', sealAsAsked(ASK)));
+    registerProvider(new FakeContextProvider('as-asked-session', quoteAsked(ASK)));
     const app = sessionApp({ providerName: 'as-asked-session', briefCacheStore: new InMemoryBriefCacheStore(), words: { 'ENG-4351': ASK } });
     const fresh = await call(app, 'POST', '/workspace/acme/api/brief/ENG-4351', {});
     assert.equal(fresh.status, 200, JSON.stringify(fresh.body));
@@ -337,7 +337,7 @@ describe('the session brief route serves the quoted brief, fresh and cached', ()
 
   test('no task: the brief is the model\'s, unchanged', async () => {
     installModelStub();
-    registerProvider(new FakeContextProvider('as-asked-session-plain', sealAsAsked(ASK)));
+    registerProvider(new FakeContextProvider('as-asked-session-plain', quoteAsked(ASK)));
     const app = sessionApp({ providerName: 'as-asked-session-plain', briefCacheStore: new InMemoryBriefCacheStore() });
     const { body } = await call(app, 'POST', '/workspace/acme/api/brief/ENG-4351', {});
     assert.equal(body.brief, MODEL_BRIEF);
@@ -357,7 +357,7 @@ describe('a subtask\'s brief also quotes its parent\'s words (LIN-4353, the whos
   test('a child with words under a parent with words: the child\'s words, then the parent\'s, then the model', async () => {
     installModelStub();
     const { brief } = await generateBrief(issueOf(CHILD_SLICE), childContext(CHILD_SLICE, PARENT_ASK, { self: CHILD_SLICE, parent: PARENT_ASK }), { apiKey: 'sk-test' });
-    assert.equal(brief, `${sealAsAsked(CHILD_SLICE)}\n\n${PARENT_QUOTE}\n\n${MODEL_BRIEF}`);
+    assert.equal(brief, `${quoteAsked(CHILD_SLICE)}\n\n${PARENT_QUOTE}\n\n${MODEL_BRIEF}`);
     assert.equal(briefCurrentSection(brief), MODEL_CURRENT, 'the parent\'s own ## Current is not the brief\'s Current');
     assert.equal(brief.slice(briefQuoteEnd(brief)).trimStart(), MODEL_BRIEF, 'the quotes end where the model begins');
   });
@@ -369,7 +369,7 @@ describe('a subtask\'s brief also quotes its parent\'s words (LIN-4353, the whos
   });
 
   test('a parent with no words adds nothing, and no model output still stays empty', () => {
-    assert.equal(composeBrief(CHILD_SLICE, MODEL_BRIEF, { identifier: 'ENG-4345', asked: null }), `${sealAsAsked(CHILD_SLICE)}\n\n${MODEL_BRIEF}`);
+    assert.equal(composeBrief(CHILD_SLICE, MODEL_BRIEF, { identifier: 'ENG-4345', asked: null }), `${quoteAsked(CHILD_SLICE)}\n\n${MODEL_BRIEF}`);
     assert.equal(composeBrief(CHILD_SLICE, '', { identifier: 'ENG-4345', asked: PARENT_ASK }), '');
   });
 
@@ -378,8 +378,8 @@ describe('a subtask\'s brief also quotes its parent\'s words (LIN-4353, the whos
   test('the cache key does not read the parent\'s description block, sealed or not', async () => {
     const { hashContext } = await import('../../lib/brief-cache.js');
     const plain = childContext(CHILD_SLICE, PARENT_ASK);
-    const sealed = childContext(CHILD_SLICE, sealAsAsked(PARENT_ASK));
-    const edited = childContext(CHILD_SLICE, sealAsAsked(`${PARENT_ASK} Edited.`));
+    const sealed = childContext(CHILD_SLICE, quoteAsked(PARENT_ASK));
+    const edited = childContext(CHILD_SLICE, quoteAsked(`${PARENT_ASK} Edited.`));
     assert.equal(hashContext(sealed), hashContext(plain));
     assert.equal(hashContext(edited), hashContext(plain));
   });
@@ -389,7 +389,7 @@ describe('the mock brief builders quote the parent\'s words the same way (LIN-43
   test('buildMockBrief: a subtask whose parent has words opens with both quotes', () => {
     const parent = { id: 'uuid-p', identifier: 'ENG-4345', title: 'Parent', description: 'anything', state: { type: 'started' } };
     const brief = buildMockBrief({ ...contextOf('anything', 'The child\'s slice.'), parent, asked: { self: 'The child\'s slice.', parent: 'The parent\'s ask.' } });
-    assert.ok(brief.startsWith(`${sealAsAsked('The child\'s slice.')}\n\n## As asked on the parent, ENG-4345\n\nThe parent's ask.\n\n*End of what was asked on the parent.*\n\n## Current`), brief.slice(0, 300));
+    assert.ok(brief.startsWith(`${quoteAsked('The child\'s slice.')}\n\n## As asked on the parent, ENG-4345\n\nThe parent's ask.\n\n*End of what was asked on the parent.*\n\n## Current`), brief.slice(0, 300));
   });
 
   // Review mutation M5 (LIN-4345): the proxy's own test-mode builder must hand the parent
@@ -402,7 +402,7 @@ describe('the mock brief builders quote the parent\'s words the same way (LIN-43
     const app = proxyApp({ provider: new FakeContextProvider('as-asked-proxy-mock-parent', ''), token: 'test-token', briefCacheStore: new InMemoryBriefCacheStore(), words });
     const { status, body } = await call(app, 'GET', '/api/proxy/issues/TEST-2/brief');
     assert.equal(status, 200, JSON.stringify(body));
-    assert.ok(body.brief.startsWith(`${sealAsAsked('The child\'s slice.')}\n\n## As asked on the parent, ${parent.identifier}\n\nThe parent's ask.\n\n*End of what was asked on the parent.*\n\n## Current`), body.brief.slice(0, 300));
+    assert.ok(body.brief.startsWith(`${quoteAsked('The child\'s slice.')}\n\n## As asked on the parent, ${parent.identifier}\n\nThe parent's ask.\n\n*End of what was asked on the parent.*\n\n## Current`), body.brief.slice(0, 300));
   });
 
   // Review mutation M7 (LIN-4345): the in-app twin. Under a test token the session brief
@@ -417,6 +417,6 @@ describe('the mock brief builders quote the parent\'s words the same way (LIN-43
     const app = sessionApp({ providerName: 'as-asked-session-mock-parent', token: 'test-token', briefCacheStore: new InMemoryBriefCacheStore(), words });
     const { status, body } = await call(app, 'POST', '/workspace/acme/api/brief/TEST-2', {});
     assert.equal(status, 200, JSON.stringify(body));
-    assert.ok(body.brief.startsWith(`${sealAsAsked('The child\'s slice.')}\n\n## As asked on the parent, ${parent.identifier}\n\nThe parent's ask.\n\n*End of what was asked on the parent.*\n\n## Current`), body.brief.slice(0, 300));
+    assert.ok(body.brief.startsWith(`${quoteAsked('The child\'s slice.')}\n\n## As asked on the parent, ${parent.identifier}\n\nThe parent's ask.\n\n*End of what was asked on the parent.*\n\n## Current`), body.brief.slice(0, 300));
   });
 });

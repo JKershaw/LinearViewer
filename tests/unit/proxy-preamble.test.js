@@ -103,7 +103,7 @@ describe('buildProxyContextPreamble token-delivery modes (LIN-1155)', () => {
     // present state. Every other line of the block is unchanged.
     //
     // NOTE (LIN-4362): a deliberate re-pin of the same hint. Its wording is now BRIEF_HINT in
-    // lib/as-asked.js, shared with the four other surfaces that point at the brief, so the two
+    // lib/brief-quote.js, shared with the four other surfaces that point at the brief, so the two
     // lines it was wrapped across join into one. The words are the same; every other line is unchanged.
     const expected = [
       '',

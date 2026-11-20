@@ -2,23 +2,22 @@
  * One issue access and one issue read per dispatch (LIN-4361).
  *
  * `createDispatchItem` takes one `issueAccess` resolver (`() => { provider, token } | null`).
- * The factory reads the row's issue (`fields.issueIdentifier`) at most once, and that one
- * read serves both the first-dispatch seal and the file-pointer pilot's plan read:
+ * The factory resolves it once (the task seat, LIN-4501, and the child-ticket retry use it) and
+ * reads the row's issue (`fields.issueIdentifier`) at most once, for the file-pointer pilot's plan read:
  *   - a counting provider WITH `issueDescription` is read exactly once, for the row's
- *     identifier, and the plan paths still reach the prompt; the seal still writes by the
- *     id the read returned;
+ *     identifier, and the plan paths still reach the prompt;
+ *   - LIN-4502: no dispatch writes the description back. The first-dispatch seal is retired, so a
+ *     description with no plan is read and left exactly as filed;
  *   - a provider that declares `testTransport` (a plain, fixed property declared on the
  *     provider class) has no access to the hermetic `test-token` under
  *     NODE_ENV=test: Linear with `test-token` makes no transport call at all, with or
  *     without an installed transport (the e2e transport answers that token with a 401),
- *     still enqueues, and logs `seal skipped: no access`; a real token on the same provider
- *     does reach the transport; a provider that does not declare it still takes
- *     `test-token` as a working credential, and LocalProvider with `test-token` still seals;
- *   - a trashed issue is not sealed (the seal's existing "found nothing" line) but its
- *     plan still reaches the prompt.
+ *     and still enqueues; a real token on the same provider does reach the transport; a
+ *     provider that does not declare it still takes `test-token` as a working credential;
+ *   - a trashed issue's plan still reaches the prompt.
  *
- * Everything runs on a real DispatchQueueStore over mock collections, so the seal's
- * earlier-dispatch read and the pilot's eligible count are the store's own.
+ * Everything runs on a real DispatchQueueStore over mock collections, so the pilot's eligible
+ * count is the store's own.
  */
 process.env.NODE_ENV = 'test';
 
@@ -30,7 +29,6 @@ import { FILE_POINTER_MARKER } from '../../lib/file-pointer.js';
 import { setLinearFetchImpl, getLinearFetchImpl } from '../../lib/linear-fetch.js';
 import { linearProvider } from '../../lib/providers/linear/index.js';
 import { LocalProvider } from '../../lib/providers/local/index.js';
-import { sealAsAsked } from '../../lib/as-asked.js';
 import { createLocalStore } from '../fixtures/local-harness.js';
 import { createMockCollection } from '../fixtures/mock-collection.js';
 import { guardSockets } from '../fixtures/network-guard.js';
@@ -41,25 +39,10 @@ const WORDS = 'Please make the export button work.\nKeep **both** formats.';
 
 let queue;
 let store;
-let logs;
-const saved = {};
 
 beforeEach(() => {
   queue = createMockCollection();
   store = new DispatchQueueStore({ collection: queue, historyCollection: createMockCollection() });
-  logs = [];
-  for (const level of ['log', 'warn', 'error']) {
-    saved[level] = console[level];
-    console[level] = (...args) => {
-      const line = args.map(String).join(' ');
-      if (line.includes('[as-asked]')) logs.push(line);
-      else saved[level](...args);
-    };
-  }
-});
-
-afterEach(() => {
-  for (const level of ['log', 'warn', 'error']) console[level] = saved[level];
 });
 
 const queuedRows = async () => queue.find({}).toArray();
@@ -80,9 +63,8 @@ function dispatch({ issueIdentifier, issueAccess, ...rest }) {
 }
 
 /**
- * A provider that answers one issue by `issueDescription` (the seal's read) and counts
- * every issue read, through either method. It takes a write ONLY by the id its read
- * returned, as Linear's uuid and GitHub's and Jira's own ids do.
+ * A provider that answers one issue by `issueDescription` (the dispatch's raw read) and counts
+ * every issue read, through either method, and every write, so a test can show none is made.
  */
 function countingProvider({ identifier, id, description, trashed = false, testTransport }) {
   const reads = [];
@@ -112,7 +94,7 @@ function countingProvider({ identifier, id, description, trashed = false, testTr
   };
 }
 
-describe('one read per dispatch, shared by the seal and the plan read', () => {
+describe('one read per dispatch, for the plan read, and no write back', () => {
   test('a provider with issueDescription is read once, for the row\'s identifier, and the plan paths reach the prompt', async () => {
     const fake = countingProvider({ identifier: 'FAKE-7', id: 'uuid-7', description: PLAN });
     await dispatch({ issueIdentifier: 'FAKE-7', issueAccess: () => ({ provider: fake.provider, token: 't' }) });
@@ -121,15 +103,14 @@ describe('one read per dispatch, shared by the seal and the plan read', () => {
     assert.ok(row, 'the dispatch enqueued');
     assert.ok(row.prompt.startsWith(FILE_POINTER_MARKER), row.prompt);
     assert.match(row.prompt, /- lib\/plan\.js/);
-    assert.deepEqual(fake.writes, [], 'a description holding a plan heading is never sealed');
+    assert.deepEqual(fake.writes, [], 'the description is never written back');
   });
 
-  test('on an unsealed description the same one read is what the seal writes back, by the id it returned', async () => {
+  test('LIN-4502: a first dispatch on a description with no plan reads it once and writes nothing back (no seal)', async () => {
     const fake = countingProvider({ identifier: 'FAKE-8', id: 'uuid-8', description: WORDS });
     await dispatch({ issueIdentifier: 'FAKE-8', issueAccess: () => ({ provider: fake.provider, token: 't' }) });
-    assert.deepEqual(fake.reads, [['issueDescription', 'FAKE-8']], 'the seal and the plan read share one read');
-    assert.deepEqual(fake.writes, [['uuid-8', sealAsAsked(WORDS)]]);
-    assert.ok(logs.some((l) => l.includes('[as-asked] sealed at first dispatch')), JSON.stringify(logs));
+    assert.deepEqual(fake.reads, [['issueDescription', 'FAKE-8']], 'one read');
+    assert.deepEqual(fake.writes, [], 'no block is sealed onto the description');
     assert.equal((await queuedRows()).length, 1);
   });
 });
@@ -149,14 +130,12 @@ describe('the hermetic test token: a declared testTransport is skipped, an undec
   });
   afterEach(() => setLinearFetchImpl(kept));
 
-  test('Linear with test-token makes no transport call, still enqueues, and logs `seal skipped: no access`', async () => {
+  test('Linear with test-token makes no transport call and still enqueues', async () => {
     await dispatch({ issueIdentifier: 'LIN-9', issueAccess: () => ({ provider: linearProvider, token: 'test-token' }) });
     assert.deepEqual(calls, [], 'no Linear transport call');
     const [row] = await queuedRows();
     assert.ok(row, 'the dispatch enqueued');
     assert.ok(!row.prompt.startsWith(FILE_POINTER_MARKER), 'no plan paths without access');
-    assert.ok(logs.some((l) => l.includes('[as-asked] seal skipped: no access')), JSON.stringify(logs));
-    assert.ok(!logs.some((l) => l.includes('[as-asked] seal failed')), JSON.stringify(logs));
   });
 
   test('the control: Linear with any other token does reach the transport', async () => {
@@ -166,7 +145,7 @@ describe('the hermetic test token: a declared testTransport is skipped, an undec
     assert.equal((await queuedRows()).length, 1);
   });
 
-  test('the converse: LocalProvider with test-token still reads and seals through issueAccess', async () => {
+  test('the converse: LocalProvider with test-token still reads through issueAccess, and leaves the description as filed', async () => {
     const { store: issues } = createLocalStore();
     await issues.seed('test-token', {
       projects: [{ id: 'p1', name: 'Alpha', content: 'a', sortOrder: 1 }],
@@ -174,7 +153,7 @@ describe('the hermetic test token: a declared testTransport is skipped, an undec
     });
     const provider = new LocalProvider({ store: issues });
     await dispatch({ issueIdentifier: 'TEST-1', issueAccess: () => ({ provider, token: 'test-token' }) });
-    assert.equal((await issues.getIssue('test-token', 'TEST-1')).description, sealAsAsked(WORDS));
+    assert.equal((await issues.getIssue('test-token', 'TEST-1')).description, WORDS);
     assert.deepEqual(calls, [], 'LocalProvider never touches the Linear transport');
   });
 });
@@ -184,11 +163,10 @@ describe('the declared testTransport property, not the provider name', () => {
     const fake = countingProvider({ identifier: 'FAKE-10', id: 'uuid-10', description: PLAN, testTransport: true });
     await dispatch({ issueIdentifier: 'FAKE-10', issueAccess: () => ({ provider: fake.provider, token: 'test-token' }) });
     assert.deepEqual(fake.reads, [], 'no issue read through the declared provider');
-    assert.deepEqual(fake.writes, [], 'never sealed');
+    assert.deepEqual(fake.writes, [], 'nothing written');
     const [row] = await queuedRows();
     assert.ok(row, 'the dispatch enqueued');
     assert.ok(!row.prompt.startsWith(FILE_POINTER_MARKER), 'no plan paths without access');
-    assert.ok(logs.some((l) => l.includes('[as-asked] seal skipped: no access')), JSON.stringify(logs));
   });
 
   test('a stand-in that does not declare it still takes test-token as a working credential: one read, plan reaches the prompt', async () => {
@@ -209,29 +187,25 @@ describe('the declared testTransport property, not the provider name', () => {
       sockets.restore();
     }
     assert.deepEqual(sockets.connections, [], 'no non-loopback socket opened');
-    assert.ok(logs.some((l) => l.includes('[as-asked] seal skipped: no access')), JSON.stringify(logs));
-    assert.ok(!logs.some((l) => l.includes('[as-asked] seal failed')), JSON.stringify(logs));
     assert.equal((await queuedRows()).length, 1);
   });
 });
 
 describe('a trashed issue', () => {
-  test('is not sealed, but its plan still reaches the prompt', async () => {
+  test('its plan still reaches the prompt, and nothing is written', async () => {
     const fake = countingProvider({ identifier: 'FAKE-3', id: 'uuid-3', description: PLAN, trashed: true });
     await dispatch({ issueIdentifier: 'FAKE-3', issueAccess: () => ({ provider: fake.provider, token: 't' }) });
-    assert.deepEqual(fake.writes, [], 'never sealed');
-    assert.ok(logs.some((l) => l.includes('[as-asked] seal failed: issue read found nothing')), JSON.stringify(logs));
+    assert.deepEqual(fake.writes, [], 'nothing written');
     assert.deepEqual(fake.reads, [['issueDescription', 'FAKE-3']], 'one read');
     const [row] = await queuedRows();
     assert.ok(row.prompt.startsWith(FILE_POINTER_MARKER), row.prompt);
     assert.match(row.prompt, /- lib\/plan\.js/);
   });
 
-  test('without a plan it is still not sealed (today\'s line)', async () => {
+  test('without a plan it is enqueued and nothing is written', async () => {
     const fake = countingProvider({ identifier: 'FAKE-4', id: 'uuid-4', description: WORDS, trashed: true });
     await dispatch({ issueIdentifier: 'FAKE-4', issueAccess: () => ({ provider: fake.provider, token: 't' }) });
     assert.deepEqual(fake.writes, []);
-    assert.ok(logs.some((l) => l.includes('[as-asked] seal failed: issue read found nothing')), JSON.stringify(logs));
     assert.equal((await queuedRows()).length, 1);
   });
 });

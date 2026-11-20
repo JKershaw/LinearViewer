@@ -1,16 +1,15 @@
 /**
- * LIN-4452 review finding 1: a create that lands but whose seal the site drops (or whose
- * confirmation re-read fails) must reach the caller through the PartialWriteError envelope
- * on every create lane: `code: PARTIAL_WRITE`, `context.failed`, and `retryable: false`, so
- * a caller does not file a duplicate. Before the fix each lane answered a bare 500
- * "Failed to create issue" (proxy, session) or "Failed to submit feedback" (feedback),
- * and the PartialWriteError never reached the caller.
+ * LIN-4452 review finding 1: a create that lands but whose confirmation re-read fails must
+ * reach the caller through the PartialWriteError envelope on every create lane:
+ * `code: PARTIAL_WRITE`, `context.failed`, and `retryable: false`, so a caller does not file
+ * a duplicate. Before the fix each lane answered a bare 500 "Failed to create issue" (proxy,
+ * session) or "Failed to submit feedback" (feedback), and the PartialWriteError never reached
+ * the caller. (LIN-4502 retired the other way a create could land half-done, a site dropping
+ * the seal's `harbour.asAsked` property, with the seal.)
  *
- * The provider-level guard is pinned in lin-4452-jira-property-guard.test.js. These tests
- * pin the route boundary, against the in-memory Jira fake and a stub feedback provider.
- *
- * Also pinned: an edit that the site drops is still retryable (both Jira edits are
- * idempotent), so only a create that landed is marked non-retryable. The retry rule lives
+ * These tests pin the route boundary, against the in-memory Jira fake and a stub feedback
+ * provider. Also pinned: an edit that landed only in part is still retryable (both Jira edits
+ * are idempotent), so only a create that landed is marked non-retryable. The retry rule lives
  * in one builder, partialWriteEnvelope, which every create lane's catch calls.
  *
  * Run with: node scripts/run-unit-tests.mjs tests/unit/lin-4452-create-lane-envelope.test.js
@@ -48,13 +47,12 @@ const EXISTING = {
   },
 };
 
-function seed({ dropProperties = false } = {}) {
+function seed() {
   return createFakeJiraClient({
     projects: [{ id: '10001', key: 'ENG', name: 'Engineering' }],
     projectStatuses: {},
     createMeta: { ENG: { issueTypes: [TASK], fields: { [TASK.id]: SCREEN } } },
     issues: [structuredClone(EXISTING)],
-    dropProperties,
   });
 }
 
@@ -152,42 +150,26 @@ function assertCreatedEnvelope(body, failed) {
 describe('proxy create lane: a landed create reports PARTIAL_WRITE (POST /api/proxy/issues)', () => {
   let fake;
   beforeEach(() => {
-    fake = seed({ dropProperties: true });
+    fake = seed();
     jiraProvider.configure({ client: fake, clientFactory: () => fake, site: SITE });
   });
   afterEach(() => { jiraProvider.configure(savedJira); });
 
-  test('a site that drops the seal: 500 PARTIAL_WRITE, failed:"property", retryable:false, and the create ran once', async () => {
+  test('a confirmation re-read that fails: 500 (not the re-read 503), PARTIAL_WRITE, failed:"re-read", retryable:false, and the create ran once', async () => {
     let creates = 0;
-    const original = fake.createIssue;
-    fake.createIssue = async (body) => { creates += 1; return original(body); };
-    const { status, body } = await call(buildProxyApp(), 'POST', '/api/proxy/issues', { teamId: 'ENG', title: 'Dropped', description: WORDS });
-    assert.equal(status, 500, JSON.stringify(body));
-    assertCreatedEnvelope(body, 'property');
-    assert.equal(creates, 1, 'the issue exists once; the failure is reported, not repeated');
-  });
-
-  test('a confirmation re-read that fails: 500 (not the re-read 503), PARTIAL_WRITE, failed:"re-read", retryable:false', async () => {
-    fake = seed();
     failRereadAfterCreate(fake);
-    jiraProvider.configure({ client: fake, clientFactory: () => fake, site: SITE });
-    const { status, body } = await call(buildProxyApp(), 'POST', '/api/proxy/issues', { teamId: 'ENG', title: 'Lost confirmation' });
+    const counted = fake.createIssue;
+    fake.createIssue = async (body) => { creates += 1; return counted(body); };
+    const { status, body } = await call(buildProxyApp(), 'POST', '/api/proxy/issues', { teamId: 'ENG', title: 'Lost confirmation', description: WORDS });
     assert.equal(status, 500, JSON.stringify(body));
     assertCreatedEnvelope(body, 're-read');
+    assert.equal(creates, 1, 'the issue exists once; the failure is reported, not repeated');
   });
 });
 
 describe('session create lane: a landed create reports PARTIAL_WRITE (POST /workspace/:urlKey/api/issues)', () => {
   let fake;
   afterEach(() => { jiraProvider.configure(savedJira); });
-
-  test('a site that drops the seal: 500 PARTIAL_WRITE, failed:"property", retryable:false', async () => {
-    fake = seed({ dropProperties: true });
-    jiraProvider.configure({ client: fake, clientFactory: () => fake, site: SITE });
-    const { status, body } = await call(buildSessionApp(), 'POST', '/workspace/acme-jira/api/issues', { teamId: 'ENG', title: 'Dropped', description: WORDS });
-    assert.equal(status, 500, JSON.stringify(body));
-    assertCreatedEnvelope(body, 'property');
-  });
 
   test('a confirmation re-read that fails: 500 PARTIAL_WRITE, failed:"re-read", retryable:false', async () => {
     fake = seed();
@@ -205,7 +187,7 @@ describe('feedback lane: a landed ticket reports PARTIAL_WRITE (POST /workspace/
   beforeEach(() => { realJira = getProvider('jira'); });
   afterEach(() => { registerProvider(realJira); });
 
-  // A stand-in provider whose create lands and then fails the seal, as the Jira provider does.
+  // A stand-in provider whose create lands and then fails its confirmation re-read, as the Jira provider can.
   function stubProvider(error) {
     registerProvider({
       name: 'jira',
@@ -233,14 +215,14 @@ describe('feedback lane: a landed ticket reports PARTIAL_WRITE (POST /workspace/
     return app;
   }
 
-  test('a create that landed but lost its seal: 500 PARTIAL_WRITE, failed:"property", retryable:false', async () => {
+  test('a create that landed but whose confirmation re-read failed: 500 PARTIAL_WRITE, failed:"re-read", retryable:false', async () => {
     stubProvider(new PartialWriteError(
-      'Jira created ENG-9 but did not keep its harbour.asAsked property, so the words are not held on Jira — do not retry the create, read the issue instead',
-      { applied: ['created'], failed: 'property' },
+      'Jira created ENG-9 but the confirmation re-read failed — do not retry the create, read the issue instead',
+      { applied: ['created'], failed: 're-read' },
     ));
     const { status, body } = await call(feedbackApp(), 'POST', '/workspace/acme/api/feedback', { message: 'the form is slow', title: 'Slow form' });
     assert.equal(status, 500, JSON.stringify(body));
-    assertCreatedEnvelope(body, 'property');
+    assertCreatedEnvelope(body, 're-read');
   });
 });
 
@@ -253,9 +235,9 @@ describe('the one envelope builder decides retry (partialWriteEnvelope)', () => 
   });
 
   test('an edit that landed only in part stays retryable:true, and keeps the upstream status (a retry is safe)', () => {
-    const env = partialWriteEnvelope(new PartialWriteError('x', { applied: ['description'], failed: 'property', status: 429 }));
+    const env = partialWriteEnvelope(new PartialWriteError('x', { applied: ['description'], failed: 'stateId', status: 429 }));
     assert.equal(env.status, 429);
     assert.equal(env.extra.retryable, true);
-    assert.deepEqual(env.extra.context, { applied: ['description'], failed: 'property' });
+    assert.deepEqual(env.extra.context, { applied: ['description'], failed: 'stateId' });
   });
 });

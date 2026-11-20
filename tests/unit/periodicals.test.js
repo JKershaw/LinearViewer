@@ -1605,23 +1605,24 @@ describe('resolvePeriodicalIdFromGateMarker (LIN-2575)', () => {
   });
 });
 
-// LIN-4353: a proxy create seals the minted task's description into the `## As asked`
-// block (LIN-4352), so the gate marker is the block's first line, not the description's.
-// The gate regex is unanchored on purpose and still finds it there.
-describe('the gate marker inside a sealed As asked block (LIN-4353)', () => {
-  test('a sealed description still resolves to its periodical', async () => {
-    const { sealAsAsked } = await import('../../lib/as-asked.js');
+// LIN-4353: a proxy create used to seal the minted task's description into the `## As asked`
+// block (LIN-4352), so on a ticket filed before LIN-4502 the gate marker is the block's first
+// line, not the description's. The gate regex is unanchored on purpose and still finds it there.
+describe('the gate marker on a legacy sealed description (LIN-4353, LIN-4502)', () => {
+  test('a legacy sealed description still resolves to its periodical', async () => {
+    const { quoteAsked } = await import('../../lib/brief-quote.js');
     const p = PERIODICALS[0];
-    const sealed = sealAsAsked(`${buildPeriodicalGateMarker(p.title)}\n\nRun the review.`);
+    const sealed = quoteAsked(`${buildPeriodicalGateMarker(p.title)}\n\nRun the review.`);
     assert.ok(!sealed.startsWith('<!--'), 'the marker is no longer the description\'s first line');
     assert.strictEqual(resolvePeriodicalIdFromGateMarker(sealed), p.id);
   });
 
-  test('the mint prompt asks for the marker as the first line inside the block', () => {
+  test('the mint prompt asks for the marker as the first line of the description (LIN-4502: no block is sealed around it)', () => {
     for (const p of PERIODICALS) {
       const minted = p.generatePrompt({});
       if (!minted.includes(buildPeriodicalGateMarker(p.title))) continue;
-      assert.ok(/as the first line of the new task's description \(once Harbour seals it, the first line inside its `## As asked` block\)/.test(minted), `${p.id}: the marker goes first inside the block`);
+      assert.ok(/as the first line of the new task's description — an internal marker/.test(minted), `${p.id}: the marker goes first`);
+      assert.ok(!/once Harbour seals it/.test(minted), `${p.id}: no seal is promised`);
       assert.ok(!/very first line of the new task's description/.test(minted), `${p.id}: the old "very first line" wording is gone`);
     }
   });

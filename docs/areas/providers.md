@@ -1,25 +1,16 @@
 ## Lessons
 
-- A Jira description has one reader and one writer: `readDescription` and `holdAsAsked` in
-  `lib/providers/jira/as-asked-region.js`. They are the only code that knows the ADF region
-  and the `harbour.asAsked` entity property, and every provider-side `getIssue` passes
-  `AS_ASKED_READ`. Shape B keeps the words in two places, the region and the property, and
-  that is safe only while one module knows both. A new description read that calls
-  `adfToMarkdown` directly serves converted words and breaks the seal without anyone being
-  told. `tests/unit/jira-as-asked-region.test.js` fails on it. (LIN-4450.)
-- Decide whether the words are kept by comparing renderings, never ADF. Jira stamps
-  `localId` and similar attributes on ordinary saves, and `adfToMarkdown` ignores them.
-  A hash of the ADF would read every human save as an edit. (LIN-4450.)
-- The region reader accepts an end line whatever its marks, which is looser than
-  `splitAsAsked`. It stays safe because `descriptionRoundTrip` runs the same reader the
-  reads do, so a block the reader would misplace is refused at filing. Keep the seal's check
-  and the reads on one reader. (LIN-4450, Survey open-0.)
+- A Jira description is read with `adfToMarkdown` and written with `markdownToAdf`, one codec each
+  way (`lib/providers/jira/index.js`). It reads back as the codec's rendering, not the bytes sent
+  (`*this*` comes back `_this_`), so never treat a Jira description as byte-exact words: the person's
+  words are the task's `asked`. LIN-4502 retired the As-asked region that kept exact words in the
+  `harbour.asAsked` entity property; that property stays on older issues, and nothing reads or
+  removes it. (LIN-4450, LIN-4502.)
+- Compare renderings, never ADF. Jira stamps `localId` and similar attributes on ordinary saves,
+  and `adfToMarkdown` ignores them, so a hash of the ADF reads every human save as an edit. (LIN-4450.)
 - The Jira fake proves only the provider's own logic. It stores whatever it is handed and
-  never normalises ADF, so it cannot show whether live Jira keeps a region's rendering.
-  A claim about live behaviour needs a live check. (LIN-4450.) The live check is LIN-4452.
-  It is not yet run: the build session has no access to John's Jira, so it is a handoff
-  (the commands and evidence list are in the LIN-4445 comment), and no live outcome is
-  recorded here.
+  never normalises ADF, so it cannot show what live Jira keeps. A claim about live behaviour
+  needs a live check. (LIN-4450.)
 - A Jira create chooses the epic field from its own project's create screen, never from the
   tenant's field list. `parent` if the screen lists it, else Epic Link if it does; a screen with
   neither is refused 422 before the create. A field that exists on the tenant can still be absent
