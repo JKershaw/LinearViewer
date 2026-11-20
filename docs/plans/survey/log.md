@@ -4760,3 +4760,10 @@ Still waiting on `lin4499-snapshot-cut`.
 - **~12:35:** note sent to autopilot ec3417c3 (id 89ac15ca-f244-4627-b4a5-50f23884fd55): production is reachable via the Railway CLI. Pass it to LIN-4501 and any other piece that needs production.
 
 - **~12:45:** proposed answers on all four ruling rows (the two questions are each raised by both the worker loop and the autopilot loop). `lin-4501-closed-parent-task`: make-parent-task. `lin4505-runner-waiting`: not-measured, with the reason saying the better answer is to import simple-dispatcher's Waiting entries and remove its lists. Proposals carry only an option id, so that answer needs John's free text. John agreed with both views.
+
+### 20 Nov, ~13:20: Railway note sent straight to the piece runs
+
+- **Why:** the 12:57 note went to slice 2's autopilot, which was asked to pass it on, but LIN-4501 still said "needs production access" at 13:12.
+- **Sent directly** to LIN-4501's child autopilot (28de32b1, note c3c4851f) and LIN-4505's (196a5b59, note 29e11d0f): check `railway --help` and `railway status`, then use `railway run` for the import and readings.
+- **Status at 13:15:** LIN-4503 Done (merged ~12:37). LIN-4501 built with make-parent-task. LIN-4505 building with not-measured. Cost about $56. No new rulings. Main healthy.
+- **Lesson:** a note to an autopilot doesn't reliably reach its pieces. Send to the piece's own run.
