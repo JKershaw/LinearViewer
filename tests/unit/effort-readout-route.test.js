@@ -376,6 +376,22 @@ describe('provider capability gating', () => {
       console.error = origError;
     }
   });
+
+  test('a provider with comments but no fetchIssueFields still resolves the verdict walk from comments, and never calls it', async () => {
+    const store = fakeStore({ historyRows: LINEAGE });
+    const { name, seen } = fakeProvider({
+      comments: APPROVE_COMMENTS,
+      supports: (cap) => cap === 'fetchIssueComments',
+    });
+    const recordsStore = { planFactsForTickets: async (urlKey, tickets) => new Map(tickets.map((t) => [t, { measured: true, reviewAsked: true, everPlanned: true }])) };
+    const { status, body } = await get(buildApp({ store, providerName: name, recordsStore }), '/workspace/ws-1/api/effort-readout');
+    assert.equal(status, 200);
+    const planCard = JSON.parse(body).perKind.find((k) => k.kind === 'plan');
+    assert.equal(planCard.survival.state, 'computed');
+    assert.equal(planCard.survival.rate, 1, 'the verdict walk still resolves from comments');
+    assert.equal(seen.fields.length, 0, 'fetchIssueFields is not called when the provider does not support it');
+    assert.equal(seen.comments.length > 0, true);
+  });
 });
 
 describe('the fan-out is bounded by the route\'s own named constant', () => {

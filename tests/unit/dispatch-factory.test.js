@@ -12,6 +12,7 @@
 import { test, describe } from 'node:test';
 import assert from 'node:assert/strict';
 import { createDispatchItem, DUPLICATE_DISPATCH_WINDOW_MS, ANCHOR_TERMINAL_CODE, MAX_FRESH_SESSIONS_PER_TASK, TASK_SESSION_RUNAWAY_CODE, BUDGET_EXHAUSTED_CODE } from '../../lib/dispatch-factory.js';
+import { withAutopilotSessionHeading } from '../../lib/run-identity.js';
 import { WorkspacePreferencesStore } from '../../lib/workspace-preferences.js';
 import { DispatchQueueStore } from '../../lib/dispatch-store.js';
 import { createMockCollection as createDocCollection } from '../fixtures/mock-collection.js';
@@ -307,6 +308,36 @@ describe('createDispatchItem — finalizePrompt ordering', () => {
       finalizePrompt: (resolvedHarness) => { sawHarness = resolvedHarness; return { prompt: 'p', bootstrapToken: null }; }
     });
     assert.equal(sawHarness, 'claude-code');
+  });
+
+  // LIN-4499 close-out: both pins were incidental to the LIN-3200 file-pointer suite, deleted with the pilot (LIN-4504).
+  test('a finalizePrompt throw (a declared-launch refusal) reaches the caller and addItem is never called', async () => {
+    let addItemCalls = 0;
+    const store = { addItem: async () => { addItemCalls++; return { _id: 'item-1' }; } };
+    await assert.rejects(
+      createDispatchItem({
+        store, urlKey: 'acme', kind: 'implementation', prompt: 'BODY',
+        finalizePrompt: async () => { throw new Error('refused'); },
+        fields: { target: 'cli' }
+      }),
+      /refused/
+    );
+    assert.equal(addItemCalls, 0, 'the mint comes first, so a refusal leaves no row');
+  });
+
+  test('a fresh autopilot kickoff gets its own id block appended after finalize; any other kind keeps its prompt as is', async () => {
+    let trusted;
+    const store = {
+      captured: {},
+      addItem: async (urlKey, item, t) => { trusted = t; store.captured.item = item; return { _id: 'item-1', ...item }; }
+    };
+    await createDispatchItem({ store, urlKey: 'acme', kind: 'autopilot', prompt: 'BODY', fields: { target: 'cli' } });
+    assert.ok(trusted?.id, 'the factory\'s own id reaches the store');
+    assert.equal(store.captured.item.prompt, withAutopilotSessionHeading('BODY', trusted.id));
+    assert.match(store.captured.item.prompt, /## Your autopilot session id/);
+
+    await createDispatchItem({ store, urlKey: 'acme', kind: 'implementation', prompt: 'BODY', fields: { target: 'cli' } });
+    assert.equal(store.captured.item.prompt, 'BODY');
   });
 
   test('no finalizePrompt: the plain prompt passes through, bootstrapToken null', async () => {
