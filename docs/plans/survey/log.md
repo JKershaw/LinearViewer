@@ -4756,3 +4756,5 @@ Still waiting on `lin4499-snapshot-cut`.
 - **Ruling `lin-4501-closed-parent-task`:** a child ticket whose parent is closed and has no task; 46 tickets affected. The run recommends no-parent-link. My judgement: make-parent-task, which keeps the links true.
 - **Ruling `lin4505-runner-waiting`:** simple-dispatcher's notes still have Waiting lists (13 entries). The options are keep-counter (the mini-snapshot pattern again) or not-measured. My view: finish the move by importing simple-dispatcher's entries too and removing its lists. If that's too much now, not-measured.
 - **Status:** all three wait for John. Main is healthy.
+
+- **~12:35:** note sent to autopilot ec3417c3 (id 89ac15ca-f244-4627-b4a5-50f23884fd55): production is reachable via the Railway CLI. Pass it to LIN-4501 and any other piece that needs production.
