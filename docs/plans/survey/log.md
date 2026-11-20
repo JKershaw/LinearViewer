@@ -4869,3 +4869,14 @@ Still waiting on `lin4499-snapshot-cut`.
 - **The ruling:** `lin4504-cutover-pause` (the run's token is unbound, so it can't pause the fleet).
 - **What I did, on John's go-ahead:** set the pause myself (POST /dispatch/halt, mode pause, 19:16:59) with the owner-minted token. Proposed answer b on the ruling. Told the waiting run (note a5c1b066) to cut over and report "cutover done".
 - **Clearing it:** a background watcher checks every 2.5 min. The pause comes off as soon as the cutover is reported done, since nothing new starts while it is on.
+
+### 20 Nov, 20:08: LIN-4504 cutover done; secrets exposed in a transcript; pause question
+
+- **The cutover** (worker 5244c11f, 19:17–20:08):
+  - capture of 1,383 open tickets inside the pause;
+  - production dry run matched the plan (22 import, 34 held, 1,327 none);
+  - apply took records from 2,032 to 2,077 (22 plans and 23 finding versions);
+  - readback through the proxy is consistent; the compare found 120 differences, all explained;
+  - PLAN_RECORDS_SINCE set; the importer deleted in eaf96cde1; CI green.
+- **Security:** during the dry run, a remote call printed production environment variables into the session's output, including `GITHUB_APP_PRIVATE_KEY` and a private key line. The raw file was deleted, but the values are in the session transcript. **John needs to rotate them.** These came from tool output, which the text relay doesn't post, so they likely aren't in Harbour's feedback (unconfirmed).
+- **The pause:** the worker says keep the fleet paused until merge and deploy, so old code doesn't write plans into ticket text. But review and close-out are dispatches, which the pause holds. That's a deadlock. My proposal to John: clear the pause and watch that only LIN-4504's own stages run until deploy.
