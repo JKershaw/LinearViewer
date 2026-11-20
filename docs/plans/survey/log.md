@@ -4852,3 +4852,14 @@ Still waiting on `lin4499-snapshot-cut`.
 - **Status:** no rulings. Main green. Cost about $176.50, and counting.
 
 - **~17:40:** John approved dropping the task-snapshots collection (automatic backups exist). Dispatched as a small custom run on LIN-4502 (ff1e685a): `railway status`, then a dry run, then `--execute` only if the dry run names just that collection, then a comment and finding-4936b3f0 ended.
+
+### 20 Nov, 18:30: task-snapshots dropped in production; LIN-4504 building
+
+- **The snapshot drop** (ff1e685a, 17:33–17:36):
+  - dry run: `collection=task-snapshots existed=true records=12942`;
+  - execute: `dropped=true`. A second dry run shows the collection is absent.
+  - Commented on LIN-4502. Ending finding-4936b3f0 was refused ("dispatch credential names no run"), so it stays open, to tidy.
+- **How production is reached:** `railway run` failed, because the database host is internal-only. The agent used `railway ssh` into the harbour-cat container instead. That's the working route for agents.
+- **LIN-4504:** one session is doing all 5 beats. S1 and S2 are pushed. Draft PR #2476, with unit tests red on the 18:11 push, mid-work.
+  - The beat was dispatched before John's no-record answer and has touched the design writer too. Ruling relayed to its driver 12fc9326 (note 9ece2b28) so it checks the work matches.
+- **Status:** LIN-4506 Todo. No rulings. Main green. Cost about $215.

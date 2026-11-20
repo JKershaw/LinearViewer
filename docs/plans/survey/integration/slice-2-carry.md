@@ -60,6 +60,10 @@ The four tasks with a wrong `asked` were remade rather than corrected:
 
 LIN-4210 was dropped (no clear answer; already pinned). The old tickets are closed with pointers. Where the re-review verdicts above name LIN-3357 or LIN-4028, read LIN-4509 and LIN-4510.
 
+## Production access, how (20 Nov)
+
+`railway run` can't reach the database: its host is internal-only. What works is `railway ssh` into the harbour-cat container and running the script there (LIN-4502's drop, 17:35). Worth putting where agents will find it, without advertising it more widely than John wants.
+
 ## How tidies like this are handled
 
 A judgement call, not a rule (John, 19 Nov). Tidying as we go, a small standalone task, or waiting until the end can each be right, depending on the case. Keeping the running slice going matters most. John expects much of this to sort itself out once the upgrade is done.
