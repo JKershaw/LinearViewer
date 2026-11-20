@@ -58,6 +58,28 @@ describe('the held-run witness on the real dispatch queue (LIN-4496 finding ee29
     assert.equal(reading.censored, 1, 'nobody read it: censored at asOf, not zero');
   });
 
+  test('a finished leftover is no longer held: the store takes it through its completion, and the reading stops counting it (LIN-4496 finding 339d6a7f)', async () => {
+    const { store, rows } = fresh();
+    const build = await store.addItem(URL_KEY, { prompt: 'build it', kind: 'implementation', issueIdentifier: 'LIN-7', target: 'cli' });
+    await store.takeItem(build._id, URL_KEY, 'token-a');
+    assert.equal(await store.claimHeldWake(URL_KEY, build._id), true);
+    const leftover = await store.addItem(URL_KEY, {
+      prompt: 'leftover', kind: 'leftover', issueIdentifier: 'LIN-7', target: 'cli', followUpTo: build._id, heldWakeFor: build._id
+    });
+    await store.takeItem(leftover._id, URL_KEY, 'token-l');
+    assert.equal(heldRunsOf(rows()).length, 1, 'while the leftover runs, it is held');
+
+    await store.addFeedback(leftover._id, URL_KEY, { message: '[done] finished' }, 'token-l');
+    // The real shape after completion: the row stays `taken` in history and its end is in `lineageStatus`.
+    const finished = rows().find((r) => r._id === leftover._id);
+    assert.equal(finished.status, 'taken', 'a finished run keeps status taken');
+    assert.equal(finished.lineageStatus, 'done', 'its end is recorded in lineageStatus');
+
+    assert.deepEqual(heldRunsOf(rows()), [], 'a finished leftover holds nothing');
+    const reading = heldRunReading({ records, queryLog: [], dispatchRows: rows(), asOf: ASOF });
+    assert.equal(reading.held, 0, 'the reading does not count a finished leftover as held');
+  });
+
   test('a skip gives the claim back: with no leftover queued, nothing is held', async () => {
     const { store, rows } = fresh();
     const build = await store.addItem(URL_KEY, { prompt: 'build it', kind: 'implementation', issueIdentifier: 'LIN-7', target: 'cli' });

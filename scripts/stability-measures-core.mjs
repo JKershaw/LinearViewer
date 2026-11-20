@@ -595,19 +595,29 @@ export function recordsRows({ records, asOf, stageKinds, references = {} }) {
 const ENDED_STATUSES = new Set(['cancelled', 'expired', 'done', 'failed', 'aborted', 'skipped']);
 
 /**
+ * A history row that ran keeps `status: 'taken'` and records its end in `lineageStatus` (lib/dispatch-store.js
+ * listHistoryLineageRows: `taken` is a running row, `lineageStatus: null`). The terminal lineage statuses are
+ * lib/dispatch-lineage-status.js LINEAGE_TERMINAL_STATUSES; `closed` is a bookkeeping stamp, not a run's end, so a
+ * `closed` leftover stays held.
+ */
+const ENDED_LINEAGE_STATUSES = new Set(['done', 'failed', 'aborted', 'skipped']);
+
+/**
  * The held runs, from the real shape (lib/dispatch-fields.js, lib/dispatch-leftover-hook.js): a `leftover` row L carries
  * `heldWakeFor` = P, the id of the producing row whose terminal wake L holds back. The hook stamps the claim
  * (`heldWakeClaimedAt`) on P's history doc BEFORE it queues L, and only a skip clears the stamp again. So a real held
- * run has P stamped, and L is held while it is still queued or taken (its status is not in ENDED_STATUSES). An
- * unclaimed P has no held wake, and a P that cannot be found is not counted: its state is unknown, and the reading does
- * not guess.
+ * run has P stamped, and L is held while it is still queued or running. L has ended when its status is in
+ * ENDED_STATUSES (never ran, or ended in a queue-side status), or when its lineage ended (ENDED_LINEAGE_STATUSES).
+ * An unclaimed P has no held wake, and a P that cannot be found is not counted: its state is unknown, and the reading
+ * does not guess.
  * @returns {Array<{leftover: object, producer: object}>}
  */
 export function heldRunsOf(dispatchRows) {
   const byId = new Map(dispatchRows.map((r) => [r._id ?? r.id, r]));
   const held = [];
   for (const leftover of dispatchRows) {
-    if (!leftover.heldWakeFor || ENDED_STATUSES.has(leftover.status)) continue;
+    if (!leftover.heldWakeFor) continue;
+    if (ENDED_STATUSES.has(leftover.status) || ENDED_LINEAGE_STATUSES.has(leftover.lineageStatus)) continue;
     const producer = byId.get(leftover.heldWakeFor);
     if (!producer || !producer.heldWakeClaimedAt) continue;
     held.push({ leftover, producer });

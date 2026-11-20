@@ -46,7 +46,11 @@ async function seed() {
   // leftover-3 was cancelled before it ran.
   await db.collection('dispatch-history').insertMany([
     { _id: 'build-7', urlKey: URL_KEY, kind: 'implementation', issueIdentifier: 'LIN-9', status: 'taken', heldWakeClaimedAt: iso(-200) },
-    { _id: 'build-8', urlKey: URL_KEY, kind: 'review', issueIdentifier: 'LIN-9', status: 'taken', heldWakeClaimedAt: null }
+    { _id: 'build-8', urlKey: URL_KEY, kind: 'review', issueIdentifier: 'LIN-9', status: 'taken', heldWakeClaimedAt: null },
+    // build-9 was claimed and its leftover ran to completion: the row stays `taken` and its end is in lineageStatus, so
+    // it holds nothing (LIN-4496 finding 339d6a7f). The projection must carry lineageStatus or this reads as held.
+    { _id: 'build-9', urlKey: URL_KEY, kind: 'implementation', issueIdentifier: 'LIN-9', status: 'taken', heldWakeClaimedAt: iso(-100) },
+    { _id: 'leftover-4', urlKey: URL_KEY, kind: 'leftover', status: 'taken', lineageStatus: 'done', heldWakeFor: 'build-9' }
   ]);
   await db.collection('dispatch-queue').insertMany([
     { _id: 'leftover-1', urlKey: URL_KEY, kind: 'leftover', status: 'queued', heldWakeFor: 'build-7' },
@@ -67,7 +71,8 @@ describe('the records readings reader (LIN-4496): read-only, with each reading\'
     assert.deepEqual(byKey['records.openToStage'].value, { count: 1, of: 2 });
     assert.equal(byKey['records.sitTime'].status, STATUS.MEASURED);
 
-    // Held: leftover-1 only (build-7 is claimed; build-8 is not, so leftover-2 holds nothing; leftover-3 was cancelled).
+    // Held: leftover-1 only (build-7 is claimed; build-8 is not, so leftover-2 holds nothing; leftover-3 was cancelled;
+    // leftover-4 ran to `done` on the claimed build-9, so it is not held).
     const held = byKey['records.heldRuns'];
     assert.equal(held.status, STATUS.MEASURED);
     assert.equal(held.value.held, 1);
@@ -78,7 +83,7 @@ describe('the records readings reader (LIN-4496): read-only, with each reading\'
 
     // Stale open runs: run-old is 30 hours old; run-new is 2 hours old.
     assert.deepEqual(out.staleOpenRuns, { count: 1, of: 2, runs: ['run-old'], asOf: ASOF, olderThanHours: 24 });
-    assert.deepEqual(out.n, { records: 6, queryLog: 2, dispatchRows: 5 }, 'n: records (2 tasks, 2 findings, 2 runs), query-log rows, dispatch rows (queue and history)');
+    assert.deepEqual(out.n, { records: 6, queryLog: 2, dispatchRows: 7 }, 'n: records (2 tasks, 2 findings, 2 runs), query-log rows, dispatch rows (queue and history)');
   });
 
   test('the reader writes nothing: the query log is the same length after a read as before it', async () => {

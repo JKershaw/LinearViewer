@@ -270,7 +270,7 @@ hand-off is not measured too, because a median of nothing is not zero. `recordsR
 The held-run reading (`heldRunReading`, `heldRunRow`) asks whether a hand-off waits on a run that is held. The hold
 is on a `leftover` row L, whose `heldWakeFor` names its producing row P. The hook stamps the claim (`heldWakeClaimedAt`)
 on P before it queues L, so a real held run has P stamped; a skip clears the stamp. L is held while it is queued or taken,
-that is, not ended as `cancelled`, `expired`, or after it ran (`done`, `failed`, `aborted`, `skipped`) (`heldRunsOf`). A P
+that is, not ended as `cancelled` or `expired` (`status`), or after it ran: a run that ran stays `status: taken` and its end is its `lineageStatus` (`done`, `failed`, `aborted`, `skipped`; a `closed` stamp does not end it) (`heldRunsOf`). A P
 that cannot be found is not counted. A hand-off is addressed to a held run when its `to` is P's stage kind (a dispatch
 row's `kind`), or P's task (the task whose `ref` is P's `issueIdentifier`), or that task's parent (its `in`) (`addresseesOf`). For each such hand-off, the
 reading says how long it sat before a reader first read it: the first query-log entry at or after
