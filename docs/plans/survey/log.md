@@ -4928,3 +4928,9 @@ The pause ruling was answered (a: lifted, stays lifted). LIN-4504's second revie
 - **LIN-4499:** review (22:02) conditional Approve, 7 findings. The close-out opened PR #2478 (5 fixes, CI green). It deadlocked: the engine won't send the blind read while close-out is open, and close-out can't merge without one. The autopilot forced the blind read with a kind override at 22:28.
 - **Status:** no rulings. Main green. Slice cost about $269.
 - **Stale claim in the autopilot's summary:** "the snapshot drop has not been run" is wrong; it ran at 17:35. The key rotation is LIN-4512.
+
+### 20 Nov, ~23:35: slice 2 landed
+
+- LIN-4499 and LIN-4501..4506 are Done. PR #2478 merged as bc0535b5c, CI green.
+- After readings in `readings/slice-2-after.md`: notes 44,082 B; records 1,919 (342 findings); median cost per task $31.30; slice total $271.91. Brief size pending, from slice 3's live stages.
+- Slice 3 is being drafted with John's standing answers.
