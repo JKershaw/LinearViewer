@@ -4790,3 +4790,5 @@ Still waiting on `lin4499-snapshot-cut`.
   - Whether the seven hand-off items exist is unknown: the records read was refused because the token predates run identity, so a new token is needed.
 - **Pieces:** LIN-4505's PR #2474 is in its leftover pass, with CI running. LIN-4501 has taken the Railway note (dee1c97d), and PR #2472 is green. LIN-4503 is Done. LIN-4502, 4504 and 4506 wait.
 - **Status:** no rulings. Main is green.
+
+- **~13:40:** new proxy token from John (readWrite plus dispatch, expires 22 Nov 13:37). Horizon list started at `horizon/README.md`. Drafting the consolidated "watch agents work" ticket, which replaces LIN-1114, 3976, 1905, 1311 and 2546 (John agreed).
