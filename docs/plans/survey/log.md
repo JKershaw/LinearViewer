@@ -4743,3 +4743,16 @@ Still waiting on `lin4499-snapshot-cut`.
 - **Ruling:** with Ship Biscuit moved, retire-fully is now the right answer to `lin4499-snapshot-cut`.
 
 - **~10:35:** corrections appended to LIN-4499 below the sealed block (200): snapshots fully; production reachable, so the import and readings are agent work; PR #2446 closed. The proposal on `lin4499-snapshot-cut` is changed to retire-fully. Waiting for John to answer.
+
+### 20 Nov, 11:30–12:28: slice 2 resumed and broke down; two rulings and a stuck piece
+
+- **Slice 2 resumed** at 10:29, after John answered retire-fully at 10:28:
+  - design;
+  - plan, then plan-review Request Changes (1 blocker);
+  - plan revised, then plan-review Approve;
+  - breakdown into LIN-4501..4506.
+  - The size record has no cuts, so snapshots retire fully.
+- **LIN-4501** opened draft PR #2472, then blocked: "the pre-deploy import needs production access". The piece tickets don't carry the parent's appended corrections (the Railway CLI). Proposed to John: a note to autopilot ec3417c3 passing his correction on.
+- **Ruling `lin-4501-closed-parent-task`:** a child ticket whose parent is closed and has no task; 46 tickets affected. The run recommends no-parent-link. My judgement: make-parent-task, which keeps the links true.
+- **Ruling `lin4505-runner-waiting`:** simple-dispatcher's notes still have Waiting lists (13 entries). The options are keep-counter (the mini-snapshot pattern again) or not-measured. My view: finish the move by importing simple-dispatcher's entries too and removing its lists. If that's too much now, not-measured.
+- **Status:** all three wait for John. Main is healthy.
