@@ -82,13 +82,13 @@
     },
     "design:fresh": {
       "name": "design",
-      "bytes": 5148,
-      "sha256": "6da4688ed06b5d5c4b35ad494ee553c99db8eccc038d0678ac82fcc1c3eea98f"
+      "bytes": 4642,
+      "sha256": "3584f31007a747701f8f53fb678a41af44f3b7337aff2fcba7d0a87bdbb92d45"
     },
     "design:fix": {
       "name": "design",
-      "bytes": 5148,
-      "sha256": "6da4688ed06b5d5c4b35ad494ee553c99db8eccc038d0678ac82fcc1c3eea98f"
+      "bytes": 4642,
+      "sha256": "3584f31007a747701f8f53fb678a41af44f3b7337aff2fcba7d0a87bdbb92d45"
     },
     "spike:fresh": {
       "name": "spike",
@@ -862,7 +862,7 @@
     ]
   },
   "stageLabels": "71b1066de2fe5206ed5acf5f18d47b5a62543f8c22697e24a7e982a3264e192a",
-  "contracts": "12d2387f4c698339555f4c711b005c3b250895a57a7a5444583084da03379c1c",
+  "contracts": "b24ba578cda8fba7f900b82c829c70bc53fd2074d61a2cdf181fc23e7c9be3f8",
   "stepWords": "0a06759d642d8c2268893789c6c196461af7b338e3b58dccf0ce7ab5353cbec5",
   "overrideLine": "e8cd49b7b5b35ecfe83ae820694879f466b3017d1dad0ef0655dbe15944aefb9"
 }

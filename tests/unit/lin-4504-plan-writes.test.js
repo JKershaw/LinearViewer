@@ -145,42 +145,40 @@ for (const variant of [{ name: 'plain', store: (t) => t }, { name: 'Linear-escap
 }
 
 // ---------------------------------------------------------------------------
-// The open ruling lin4504-design-plan-record (plan-review Q1): design writes plan records (the ask's words), so a
-// design-written record is the task's plan, and the selector's facts say so. This pins the chosen behaviour and the
-// routing it gives: the plan route's whenNot applies (the task has a plan record), so `plan` is skipped; a design
-// plan addressed to breakdown, or with its review finding open, reads a review owed (plan-review next); one addressed
-// to implementation with no finding reads none owed (implementation next). Flipping DESIGN_WRITES_PLAN_RECORDS
-// (lib/prompts/plan-record-words.js) makes design write no record, and this describe's first assertion fails first.
+// John's ruling (LIN-4504 comment d1d5ab31, 20 Nov): the design stage writes no plan record; design → plan →
+// plan-review, as before. Plan update 684cd6fd names this test: after a design pass (an approach comment plus a
+// description summary, no plan record), the selector's facts read no plan and route to `plan`.
 // ---------------------------------------------------------------------------
-import { DESIGN_WRITES_PLAN_RECORDS } from '../../lib/prompts/plan-record-words.js';
 import { planFactsOf } from '../../lib/records/plan-facts.js';
 import { buildSelectorArgs } from '../../lib/openrouter.js';
 import { buildRouterPrompt } from '../../lib/stage-router.js';
 import { generatePrompt } from '../../lib/prompt-templates.js';
+import { formatStageContract } from '../../lib/prompt-contract.js';
+import { addedPlanHeadings } from '../../lib/legacy-plan-text.js';
+import { DESIGN_PLAN_LINE } from '../../lib/prompts/plan-record-words.js';
 
-describe('the design stage writes plan records (open ruling lin4504-design-plan-record)', () => {
-  const TASK = { id: 'task-d', kind: 'task', state: 'open' };
-  const designPlan = (to, findings = []) => planFactsOf({ task: TASK, inside: [{ id: 'plan-d1', v: 1, kind: 'plan', state: 'kept', in: 'task-d', to, by: 'design', at: '2026-11-20T10:00:00.000Z' }], findings });
-  const issue = { identifier: 'LIN-70', title: 'Pick a shape', description: 'Choose how to store it.', state: { name: 'Todo', type: 'unstarted' }, labels: [] };
+describe('the design stage writes no plan record (ruling d1d5ab31): design, then plan, then review', () => {
+  const before = 'Choose how to store it.';
+  const summary = `${before}\n\n## Chosen approach\n\nThe second shape: one collection, versioned rows.`;
+  const issue = { identifier: 'LIN-70', title: 'Pick a shape', description: summary, state: { name: 'Todo', type: 'unstarted' }, labels: [] };
   const comments = [{ user: 'Agent', createdAt: '2026-11-20T09:00:00.000Z', body: '## Design analysis\n\nThree shapes; the second wins.' }];
 
-  test('design\'s prompt writes the chosen approach as a plan record, with plan\'s contract', () => {
-    assert.equal(DESIGN_WRITES_PLAN_RECORDS, true);
+  test('design\'s prompt keeps its comment and description summary, sends the plan to the plan stage, and has no contract', () => {
     const p = generatePrompt('design', issue, { comments: [] }).prompt;
-    assert.match(p, /write the chosen approach as a plan record/);
-    assert.match(p, /"kind": "plan"/);
-    assert.doesNotMatch(p, /update description with chosen approach/);
+    assert.match(p, /Add full design analysis as comment, then update description with chosen approach/);
+    assert.match(p, /- \*\*Description\*\*: Summary of chosen approach and key implementation details/);
+    assert.ok(p.includes(DESIGN_PLAN_LINE), 'the one line saying the plan goes to the plan stage');
+    assert.doesNotMatch(p, /"kind": "plan"/, 'no plan-record call');
+    assert.equal(formatStageContract('design', 'LIN-70'), '', 'design\'s contract is null');
+    assert.deepEqual(addedPlanHeadings(before, summary), [], 'the summary carries no plan heading, so the 422 guard allows it');
   });
 
-  test('the selector reads a design record as the plan: one session and none owed, or several and owed', () => {
-    const one = buildSelectorArgs(issue, { comments, children: [], planFacts: designPlan('implementation') });
-    assert.match(one.facts, /- Plan records on this task: plan-d1 v1 to implementation/);
-    assert.match(one.facts, /- Plan review owed: no/);
-    const several = buildSelectorArgs(issue, { comments, children: [], planFacts: designPlan('breakdown') });
-    assert.match(several.facts, /- Plan review owed: yes \(plan-d1 is addressed to breakdown/);
-    const asked = buildSelectorArgs(issue, { comments, children: [], planFacts: designPlan('implementation', [{ id: 'finding-d1', kind: 'finding', state: 'open', to: 'plan-review', links: { about: ['plan-d1'] } }]) });
-    assert.match(asked.facts, /- Plan review owed: yes \(open finding finding-d1/);
-    // The stage the plan route names as not applying: the task has a plan record.
-    assert.match(buildRouterPrompt(one), /`plan`:[^\n]*\n  When:[^\n]*no plan record[^\n]*\n  Not when: The task has a plan record/);
+  test('after a design pass with no plan record, the selector reads no plan and the plan route applies', () => {
+    const args = buildSelectorArgs(issue, { comments, children: [], planFacts: planFactsOf({ task: { id: 'task-d', kind: 'task', state: 'open' } }) });
+    assert.match(args.facts, /- Plan records on this task: none$/m);
+    assert.match(args.facts, /- Session fit \(the plan records' addressee\): none/);
+    assert.match(args.facts, /- Plan review owed: no/);
+    // Plan's own route says it applies when the task has no plan record of its own and is not a piece of a parent's plan.
+    assert.match(buildRouterPrompt(args), /`plan`:[^\n]*\n  When:[^\n]*the task has no plan record of its own and is not a piece of its parent's plan/);
   });
 });

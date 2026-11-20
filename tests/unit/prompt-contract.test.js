@@ -10,7 +10,6 @@ import { latestReviewComment, readRunLedger } from '../../lib/run-trail.js';
 import { extractVerdict } from '../../lib/run-trail.js';
 import { planFactsOf } from '../../lib/records/plan-facts.js';
 import { PLAN_ADDRESSEES } from '../../lib/records/check.js';
-import { DESIGN_WRITES_PLAN_RECORDS } from '../../lib/prompts/plan-record-words.js';
 import { extractPrUrls } from '../../lib/run-evidence.js';
 
 const titleIn = (contract, word) => contract.match(new RegExp('`(## ' + word + '[^`]*)`'))[1];
@@ -40,9 +39,8 @@ test('plan (LIN-4504): the contract writes a plan record and its review finding,
   assert.deepEqual([facts.sessionFit, facts.reviewOwed.owed, facts.reviewOwed.why], ['several', true, 'open-finding']);
 });
 
-test('design (LIN-4504, open ruling lin4504-design-plan-record): writes plan records with plan\'s contract while the switch holds', () => {
-  assert.equal(DESIGN_WRITES_PLAN_RECORDS, true, 'the ask: "Plan and design write plan records"');
-  assert.equal(formatStageContract('design', 'LIN-1'), formatStageContract('plan', 'LIN-1'), 'design inherits plan\'s contract (plan-review Q1)');
+test('design (LIN-4504, John\'s ruling d1d5ab31): writes no plan record, so it has no contract', () => {
+  assert.strictEqual(formatStageContract('design', 'LIN-1'), '');
 });
 
 test('plan-review (LIN-4504): Approve ends the review finding; other verdicts leave it open', () => {
