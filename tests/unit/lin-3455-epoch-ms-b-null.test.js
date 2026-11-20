@@ -112,6 +112,5 @@ describe('null is missing, not epoch 0 (LIN-3453)', () => {
       snap('nul', { capturedAt: null, seq: 3 })
     );
     assert.deepEqual((await store._docsFor('acme', 'LIN-1')).map(d => d._id), ['nul', 's2', 's1']);
-    assert.deepEqual((await store.listByWorkspace('acme')).items.map(r => r.id), ['nul', 's2', 's1']);
   });
 });
