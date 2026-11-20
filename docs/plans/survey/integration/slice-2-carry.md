@@ -42,6 +42,11 @@ No follow-on dispatches were made. LIN-4495 was marked Done at 22:58.
 
 - The proxy token is refused by the records routes with 403 "predates run identity", and it expires 21 Nov 10:11. A new token from John is needed for records readings.
 
+## Settled overnight, for John to confirm or overrule
+
+- **`lin4499-snapshot-cut` (02:35, 20 Nov):** proposed and acted on as **slim-capture**. Snapshots keep state, priority, labels and children only, with no description or plan, so Ship Biscuit's board moves keep working. This narrows an agreed retirement, so it's close to John's "what to retire" line. To overrule: answer retire-fully (Ship Biscuit loses its board moves) or new-home (a new source for board movement, as extra scope).
+- **LIN-4491 Done:** the slice 1 parent stays open until John's production import and readings are done. Then its close-out re-runs.
+
 ## How tidies like this are handled
 
 A judgement call, not a rule (John, 19 Nov). Tidying as we go, a small standalone task, or waiting until the end can each be right, depending on the case. Keeping the running slice going matters most. John expects much of this to sort itself out once the upgrade is done.

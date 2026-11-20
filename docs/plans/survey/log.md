@@ -4664,3 +4664,17 @@ The hourly check-in (trig_01XCTpQoZb2V1vqMFvzXKStm) is now a drive. When a slice
 - **After readings:** in `readings/slice-1-after.md`. Harbour notes 95,485 → 42,715 B; Waiting 117 → 0 (the lists were deleted, and the entries await John's import); median cost per task $18.17 → $24.98 over 5 tasks. Brief size is pending, to be read from slice 2's live stages.
 - **New morning item:** the proxy token is refused by the records routes ("predates run identity"), so John needs to issue a new token. The current one expires 21 Nov 10:11.
 - **For the hourly drive:** the current slice is now slice 2, LIN-4499, autopilot ec3417c3. Slice 1's autopilot 20fdf661 was told to close out LIN-4491.
+
+### 20 Nov, 02:35: slice 2's first ruling settled overnight (slim-capture)
+
+- **LIN-4499:** survey-task 01:37, survey-place 01:41, then scoping from 01:44, blocked on ruling `lin4499-snapshot-cut`. The ticket and autopilot actually started at 01:37, not ~01:52 as I logged.
+- **The question:** retiring task snapshots would also remove Ship Biscuit's before→after board moves (state, priority, labels), which plan versions can't supply. The options:
+  - slim-capture (the run's recommendation);
+  - retire-fully, which loses the board moves;
+  - new-home, which adds scope.
+- **What I did:** settled it as slim-capture under John's overnight instruction. It breaks nothing, adds no scope, and is easy to reverse (retiring fully can come later).
+  - suggest-answer 201. The loop id was the ruling's own anchor, 24f761b7, not the autopilot id.
+  - Note e53abef5 told the autopilot to proceed.
+  - **For John:** it narrows an agreed retirement, so it sits close to his "what to retire" line. He can overrule in the morning.
+- **Slice 1:** close-out ran at 01:39, PR #2470 merged, green. LIN-4491 stays In Progress until John's production import and readings (not before the evening of 21 Nov); then close-out re-runs to set Done. The slice 1 autopilot is finished with nothing running.
+- **Main:** healthy.
