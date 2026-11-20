@@ -100,3 +100,37 @@ describe('a task revised to a ticket ref claims it too (LIN-4496, finding 869357
     assert.equal((await tasksWithRef('LIN-7002')).length, 1, 'the refused revise left the other task without the ref');
   });
 });
+
+describe('a task keeps the ticket it holds (LIN-4496, finding 58119935)', () => {
+  test('revising a claimed task to another ticket is refused, naming the ticket it holds, and changes nothing: A\'s hand-offs stay with it', async () => {
+    const made = await rh.post('/api/proxy/records', run.token, taskBody('LIN-7001'));
+    assert.equal(made.status, 201, JSON.stringify(made.body));
+    const rev = await rh.post(`/api/proxy/records/${made.body.id}/revise`, run.token, { ref: 'LIN-7002', reason: 'the other ticket', run: run.runId });
+    assert.equal(rev.status, 422, JSON.stringify(rev.body));
+    assert.equal(rev.body.problems[0].field, 'ref');
+    assert.match(rev.body.problems[0].message, /LIN-7001/, 'the refusal names the ticket the task holds');
+    assert.equal((await tasksWithRef('LIN-7001')).length, 1, 'the task still carries its ticket');
+    assert.equal((await tasksWithRef('LIN-7002')).length, 0, 'the refused revise made no claim on the other ticket');
+    // A's hand-off still lands in A's task, not in a task for B.
+    const finding = await rh.post('/api/proxy/records', run.token, { kind: 'finding', in: 'LIN-7001', to: 'project', says: 'Under A.', how: 'read it', run: run.runId });
+    assert.equal(finding.status, 201, JSON.stringify(finding.body));
+    assert.equal(finding.body.in, made.body.id, 'A\'s hand-off is in A\'s task');
+  });
+
+  test('a revise that keeps the task\'s ticket is not refused', async () => {
+    const made = await rh.post('/api/proxy/records', run.token, taskBody('LIN-7001'));
+    assert.equal(made.status, 201, JSON.stringify(made.body));
+    const rev = await rh.post(`/api/proxy/records/${made.body.id}/revise`, run.token, { ref: 'LIN-7001', reason: 'same ticket', run: run.runId });
+    assert.equal(rev.status, 200, JSON.stringify(rev.body));
+  });
+
+  test('the way to another ticket is a new task for it: it claims that ticket, and the old task keeps its own', async () => {
+    const made = await rh.post('/api/proxy/records', run.token, taskBody('LIN-7001'));
+    assert.equal(made.status, 201, JSON.stringify(made.body));
+    const fresh = await rh.post('/api/proxy/records', run.token, taskBody('LIN-7002'));
+    assert.equal(fresh.status, 201, JSON.stringify(fresh.body));
+    const finding = await rh.post('/api/proxy/records', run.token, { kind: 'finding', in: 'LIN-7002', to: 'project', says: 'Under B.', how: 'read it', run: run.runId });
+    assert.equal(finding.body.in, fresh.body.id, 'B\'s hand-off is in B\'s own task');
+    assert.equal((await tasksWithRef('LIN-7001'))[0].id, made.body.id, 'A\'s task is unchanged');
+  });
+});
