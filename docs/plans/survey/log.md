@@ -4814,3 +4814,13 @@ Still waiting on `lin4499-snapshot-cut`.
   - four open tasks hold a wrong `asked` (LIN-4210, 3357, 4028, 1785). Whether to correct them once is his call.
 - **LIN-4502** (the seal and the prune retired) and **LIN-4504** (the plan cutover) started at 15:12. LIN-4506 waits behind LIN-4504.
 - **Status:** no rulings. Main green. Cost $116.39. The seven security records are untouched.
+
+### 20 Nov, 16:30: slice 2, LIN-4502 building; one ruling
+
+- **LIN-4502:** on beat 4 of 5 (Opus). Beats 1–3 are local commits only. The suite is red on 32 prompt-pin tests until beat 4 lands. No PR yet.
+- **LIN-4504:** plan-review approved. It's parked waiting for LIN-4502. LIN-4506 is Todo.
+- **Post-deploy check from LIN-4501** (finding-432cbfb9): 0 of the 7 runs opened since 15:09 have no task. Passes.
+- **Ruling `lin4504-design-plan-record`:** should design write plan records? If it does, routing skips plan and usually plan-review. Options: no-record (narrows the ask) or design-plans.
+  - I proposed design-plans: one stage writes the plan, which matches the design. But plan-review must still run, because it caught a blocker in slice 2's own plan today. That needs John's free text.
+- **Status:** cost $152.68. Main green.
+- **Still with John:** closing PR #2185, and LIN-4210 (an agent-written question for him, not a task).
