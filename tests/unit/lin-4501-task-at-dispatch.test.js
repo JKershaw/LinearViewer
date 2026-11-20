@@ -70,7 +70,7 @@ function seamWith(tracker) {
   return createRunRecords({
     recordsStore: store,
     now: () => new Date('2026-11-20T12:00:00.000Z'),
-    taskOfTicket: (urlKey, ref, by) => writes.taskOfTicket(ctx, urlKey, ref, by)
+    taskOfTicket: (urlKey, ref) => writes.taskOfTicket(ctx, urlKey, ref, 'dispatch')
   });
 }
 
