@@ -4678,3 +4678,15 @@ The hourly check-in (trig_01XCTpQoZb2V1vqMFvzXKStm) is now a drive. When a slice
   - **For John:** it narrows an agreed retirement, so it sits close to his "what to retire" line. He can overrule in the morning.
 - **Slice 1:** close-out ran at 01:39, PR #2470 merged, green. LIN-4491 stays In Progress until John's production import and readings (not before the evening of 21 Nov); then close-out re-runs to set Done. The slice 1 autopilot is finished with nothing running.
 - **Main:** healthy.
+
+### 20 Nov, 03:29: slice 2 waits for John; the autopilot declined my note
+
+- **What happened:** the slice 2 autopilot read note e53abef5 at 02:30 and didn't act on it. Its reasons:
+  - the ruling has no recorded answer;
+  - the note came through the dispatch queue, not from John;
+  - what to cut is John's call.
+
+  It still recommends slim-capture. LIN-4499 stays at scoping and nothing is building. Cost so far is $4.07. Main is healthy.
+- **My reading:** the autopilot is right. It raises rulings only for John's calls, so any ruling it raises is one it treats as his, and a note from me can't stand in for his answer. The overnight workaround I set up therefore doesn't unblock rulings. It only helps where the work behind a ruling can be done by more runs (as with LIN-4495). I won't push further. The proposed answer sits on the ruling for John's one click.
+- **Also noticed:** PR #2446 was closed unmerged at 01:42, but LIN-4499's "Open" line still calls it open. Small; it's for the builder or John.
+- **Overnight:** nothing will move until John answers. The hourly checks continue, kept light.
