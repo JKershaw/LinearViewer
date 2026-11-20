@@ -77,7 +77,7 @@ describe('LIN-4467 — every stage kind gives every field, well-typed', () => {
 });
 
 describe('LIN-4467 — the record imports leaves only, so it cannot form a cycle with the views it feeds', () => {
-  const LEAVES = new Set(['lib/stage-writes.js', 'lib/brief-quote.js', 'lib/asked-of.js', 'lib/size-of-move.js', 'lib/description-edit.js', 'lib/prompts/blind-read-words.js', 'lib/prompts/leftover-words.js', 'lib/prompts/area-registry-path.js', 'lib/legacy-plan-text.js']);
+  const LEAVES = new Set(['lib/stage-writes.js', 'lib/brief-quote.js', 'lib/asked-of.js', 'lib/size-of-move.js', 'lib/description-edit.js', 'lib/prompts/blind-read-words.js', 'lib/prompts/leftover-words.js', 'lib/prompts/area-registry-path.js', 'lib/legacy-plan-text.js', 'lib/prompts/plan-record-words.js']);
   /** The static import targets of a module, as repo paths. */
   const importsOf = (rel) => [...read(rel).matchAll(/^import[^;]*?from '([^']+)';/gm)]
     .map(m => resolve(dirname(resolve(ROOT, rel)), m[1]).slice(ROOT.length + 1));

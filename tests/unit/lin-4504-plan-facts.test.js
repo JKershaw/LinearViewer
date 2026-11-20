@@ -287,8 +287,9 @@ describe('description invariance over the active routing fixtures', () => {
 });
 
 describe('the shared recognition rule (lib/legacy-plan-text.js) returns text, never a fact', () => {
-  test('exports: the heading, a presence test and two text helpers; nothing reads a session fit or a review', () => {
-    assert.deepEqual(Object.keys(legacy).sort(), ['LEGACY_PLAN_HEADING', 'PLAN_HEADING_WORDS', 'hasPlanHeading', 'textBeforePlan', 'textWithoutPlan'].sort());
+  test('exports: the heading, a presence test, two text helpers and the added-heading list; nothing reads a session fit or a review', () => {
+    assert.deepEqual(Object.keys(legacy).sort(), ['LEGACY_PLAN_HEADING', 'PLAN_HEADING_WORDS', 'PLAN_IN_DESCRIPTION', 'addedPlanHeadings', 'hasPlanHeading', 'textBeforePlan', 'textWithoutPlan'].sort());
+    assert.ok(Array.isArray(legacy.addedPlanHeadings('', '## Implementation Plan')), 'a list of heading lines, text');
     assert.equal(typeof legacy.textWithoutPlan('x'), 'string');
     assert.equal(typeof legacy.textBeforePlan('x'), 'string');
   });

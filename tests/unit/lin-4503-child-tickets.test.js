@@ -269,7 +269,7 @@ describe('LIN-4503: child tickets and plan summaries', () => {
     const token = await rh.mintRunToken(runId);
     const elsewhere = await rh.post('/api/proxy/records', token, { kind: 'plan', in: parent, says: 'A plan for the review.', to: 'plan-review', run: runId });
     assert.equal(elsewhere.status, 422);
-    assert.match(elsewhere.body.error, /implementation \(it fits one session\) or breakdown/);
+    assert.match(elsewhere.body.error, /implementation \(one session builds it\) or breakdown/);
     assert.match(elsewhere.body.error, /'plan-review' is neither/);
     const none = await rh.post('/api/proxy/records', token, { kind: 'plan', in: parent, says: 'A plan with no addressee.', run: runId });
     assert.equal(none.status, 422);

@@ -22,13 +22,13 @@
     },
     "plan:fresh": {
       "name": "plan",
-      "bytes": 12255,
-      "sha256": "21a193388abdb95da1e6cf4a64868eba50a46b5ac798082cd9f148e90d0f1a5f"
+      "bytes": 12712,
+      "sha256": "905e4e7789c33a870bf8a82dd568b7b3abf4f4efae41b52c70b23b4c1cc78dca"
     },
     "plan:fix": {
       "name": "plan",
-      "bytes": 12255,
-      "sha256": "21a193388abdb95da1e6cf4a64868eba50a46b5ac798082cd9f148e90d0f1a5f"
+      "bytes": 12712,
+      "sha256": "905e4e7789c33a870bf8a82dd568b7b3abf4f4efae41b52c70b23b4c1cc78dca"
     },
     "look-into:fresh": {
       "name": "look into",
@@ -52,13 +52,13 @@
     },
     "breakdown:fresh": {
       "name": "breakdown",
-      "bytes": 6693,
-      "sha256": "6a6f65584ea6b66761420bcfe74180177bc7bb2a8a3056e65cbd7977ed322c09"
+      "bytes": 5778,
+      "sha256": "b4d2991d3fba21a287f2db7ca08aaecd736c4fa4a9a002a5782e1e7c36d3db72"
     },
     "breakdown:fix": {
       "name": "breakdown",
-      "bytes": 6693,
-      "sha256": "6a6f65584ea6b66761420bcfe74180177bc7bb2a8a3056e65cbd7977ed322c09"
+      "bytes": 5778,
+      "sha256": "b4d2991d3fba21a287f2db7ca08aaecd736c4fa4a9a002a5782e1e7c36d3db72"
     },
     "research:fresh": {
       "name": "research",
@@ -82,13 +82,13 @@
     },
     "design:fresh": {
       "name": "design",
-      "bytes": 4516,
-      "sha256": "3f0802a02d4084b5a8930baf48d453e48e6f231f9bf3436a0cdd4660104ef326"
+      "bytes": 5148,
+      "sha256": "6da4688ed06b5d5c4b35ad494ee553c99db8eccc038d0678ac82fcc1c3eea98f"
     },
     "design:fix": {
       "name": "design",
-      "bytes": 4516,
-      "sha256": "3f0802a02d4084b5a8930baf48d453e48e6f231f9bf3436a0cdd4660104ef326"
+      "bytes": 5148,
+      "sha256": "6da4688ed06b5d5c4b35ad494ee553c99db8eccc038d0678ac82fcc1c3eea98f"
     },
     "spike:fresh": {
       "name": "spike",
@@ -112,23 +112,23 @@
     },
     "plan-review:fresh": {
       "name": "plan-review",
-      "bytes": 8965,
-      "sha256": "9d8fd68bb81645497a1daf4ae0256f28a4520e1fdd6c46afe87c6f62aac82347"
+      "bytes": 9262,
+      "sha256": "c432bc36108979781a17c6f588dc75e199cb48f07e335d798305c702971fa6cf"
     },
     "plan-review:fix": {
       "name": "plan-review",
-      "bytes": 8965,
-      "sha256": "9d8fd68bb81645497a1daf4ae0256f28a4520e1fdd6c46afe87c6f62aac82347"
+      "bytes": 9262,
+      "sha256": "c432bc36108979781a17c6f588dc75e199cb48f07e335d798305c702971fa6cf"
     },
     "implementation:fresh": {
       "name": "implement",
-      "bytes": 11099,
-      "sha256": "a96d43cb1ad4e65736a6372c4e69e1ff56329b771daa3f844eaa27a53773a013"
+      "bytes": 11281,
+      "sha256": "2e0788e8188b9275764b7308e5360713445de1f26c7af629ad040f9ff1a8db1d"
     },
     "implementation:fix": {
       "name": "implement",
-      "bytes": 11733,
-      "sha256": "87e6c5ec6da81cc157f7426e8b0a0081165f3acab4ebaa6dade1076cc61e33a9"
+      "bytes": 11915,
+      "sha256": "0a42877f1f9d6d9e6a85d29fca6bb4b14014e91fc45276fd4b324d7d5b4d7c59"
     },
     "review:fresh": {
       "name": "review",
@@ -229,8 +229,8 @@
       "    \"coreOutcome\": \"Task decomposed into actionable subtasks with clear ordering\",",
       "    \"readinessCheck\": \"Can someone start working through the subtasks in order?\",",
       "    \"signals\": [",
-      "      \"Subtasks created with clear titles and descriptions\",",
-      "      \"Each subtask has acceptance criteria\",",
+      "      \"Each piece written as a plan record in this task, addressed to implementation\",",
+      "      \"Each child task written with its piece and done-when, so Harbour makes its ticket; no plan text copied in\",",
       "      \"Blocked-by relations establish execution order\",",
       "      \"Summary comment added to parent task\"",
       "    ]",
@@ -299,16 +299,16 @@
       "    ]",
       "  },",
       "  \"plan\": {",
-      "    \"coreOutcome\": \"Implementation plan documented with session-fit decision made\",",
-      "    \"readinessCheck\": \"Does the plan document files, approach, and testing, and does it commit to a session-fit answer?\",",
+      "    \"coreOutcome\": \"A plan written as a plan record, addressed by its session fit\",",
+      "    \"readinessCheck\": \"Does the plan record document files, approach, and testing, and does its addressee commit to a session fit?\",",
       "    \"signals\": [",
-      "      \"Implementation steps clearly documented in description\",",
+      "      \"Steps clearly documented in the plan record\",",
       "      \"Files and functions to modify identified\",",
       "      \"Dependencies and order of operations defined\",",
       "      \"Test strategy outlined\",",
       "      \"Cuts to the `## As asked` block listed, or none\",",
       "      \"The behaviour is named, each place it lives is in or out of scope, and the plan says how it knows it found every place\",",
-      "      \"Session-fit answer recorded in the description (fits one session / needs multiple sessions)\"",
+      "      \"Session fit recorded as the plan record's addressee (implementation for one session, breakdown for several), with a plan-review finding when a review is due\"",
       "    ]",
       "  },",
       "  \"plan-review\": {",
@@ -318,7 +318,7 @@
       "      \"Premise checked: the cause the plan names, and each fact it inherits, confirmed true against its authoritative source\",",
       "      \"Whole problem checked: the plan says how it knows it found every place the behaviour lives, and each place it leaves out says why and names its ticket\",",
       "      \"Safeguards checked: a loosened validation, contract, or guard has a named test that tries what it stopped\",",
-      "      \"Shape checked: a prerequisite refactor is sequenced first only where something here needs it, and the plan says whether it fits one session\",",
+      "      \"Shape checked: a prerequisite refactor is sequenced first only where something here needs it, and the plan record's addressee matches how many sessions it needs\",",
       "      \"Each finding labelled block or note, with each note written so the builder can act on it\",",
       "      \"Explicit verdict issued (Approve / Request Changes / Needs Discussion), saying in one line how the plan meets what was asked (the `## As asked` block) and naming any cut\"",
       "    ]",
@@ -862,7 +862,7 @@
     ]
   },
   "stageLabels": "71b1066de2fe5206ed5acf5f18d47b5a62543f8c22697e24a7e982a3264e192a",
-  "contracts": "baa24393f465e10f56c21f82b73815dcaf78301e2697bc7d3eff97bfd2e07ee4",
+  "contracts": "12d2387f4c698339555f4c711b005c3b250895a57a7a5444583084da03379c1c",
   "stepWords": "0a06759d642d8c2268893789c6c196461af7b338e3b58dccf0ce7ab5353cbec5",
   "overrideLine": "e8cd49b7b5b35ecfe83ae820694879f466b3017d1dad0ef0655dbe15944aefb9"
 }

@@ -623,11 +623,11 @@ describe('plan template', () => {
     assert.ok(!result.prompt.includes('implementation engineer'));
   });
 
-  test('says whether the work fits one focused session, and what would make it need more than one', () => {
+  test('says whether one focused session can build it, and what would make it need more than one (LIN-4504: its addressee says so)', () => {
     const result = generatePrompt('plan', mockIssue, mockContext);
-    assert.ok(result.prompt.includes('The plan says whether the work fits one focused session, meaning one pass at building and verifying it without losing track of its edges.'));
+    assert.ok(result.prompt.includes('The plan says whether one focused session can build it, meaning one pass at building and verifying it without losing track of its edges: its addressee says so.'));
     assert.ok(result.prompt.includes('it needs more than one, split at seams where each piece lands and is verified on its own'));
-    assert.ok(result.prompt.includes('if you are reaching for examples, it fits one.'));
+    assert.ok(result.prompt.includes('if you are reaching for examples, one is enough.'));
   });
 
   test('includes if blocked section', () => {
@@ -657,8 +657,8 @@ describe('plan template', () => {
     assert.ok(rev < good, 'the revision section precedes the description of a good plan');
     assert.ok(proc.includes('Every finding is answered: fixed, or disagreed with and why.'),
       'every finding must be answered');
-    assert.ok(proc.includes('replace the old block in place (for example through `POST .../description/replace`)'),
-      'a revision replaces the plan in place');
+    assert.ok(proc.includes('A revision is a new version of the same plan record'),
+      'LIN-4504: a revision revises the plan record');
     assert.ok(proc.includes('Removing a step is a valid answer.'), 'a smaller revision is a valid answer');
   });
 
@@ -666,7 +666,7 @@ describe('plan template', () => {
     const result = generatePrompt('plan', mockIssue, mockContext);
     assert.ok(result.prompt.includes('Some plans deserve a second reader before anything is built: those that need more than one session, route around a cause tracked elsewhere, loosen a validation, contract or guard, or touch credentials, merge rules or the dispatch contract.'),
       'the four triggers must be named');
-    assert.ok(result.prompt.includes('The plan says whether it is one of them; most are not, and go straight to the builder.'),
+    assert.ok(result.prompt.includes('For one of them, ask for a plan review; most are not, and go straight to the builder.'),
       'the gate is gated, not universal');
   });
 
@@ -2841,13 +2841,13 @@ describe('plan-review gate + revision section in the plan template (LIN-1603, LI
     const p = plan();
     assert.ok(p.includes('Some plans deserve a second reader before anything is built: those that need more than one session, route around a cause tracked elsewhere, loosen a validation, contract or guard, or touch credentials, merge rules or the dispatch contract.'),
       'the four triggers are named');
-    assert.ok(p.includes('The plan says whether it is one of them; most are not, and go straight to the builder.'),
-      'the plan says whether it is one, and most are not');
+    assert.ok(p.includes('For one of them, ask for a plan review; most are not, and go straight to the builder.'),
+      'LIN-4504: one of them asks for a review (a finding to plan-review), and most are not');
   });
 
   test('the gate is sited AFTER the session-fit answer, which the triggers read', () => {
     const p = plan();
-    const sessionFit = p.indexOf('The plan says whether the work fits one focused session');
+    const sessionFit = p.indexOf('The plan says whether one focused session can build it');
     const gate = p.indexOf('Some plans deserve a second reader');
     assert.ok(sessionFit > -1 && gate > -1, 'both landmarks must be present');
     assert.ok(sessionFit < gate,
@@ -2857,7 +2857,7 @@ describe('plan-review gate + revision section in the plan template (LIN-1603, LI
   test('the revision section comes first, so a revising planner reads the verdict before the rest', () => {
     const p = plan();
     const revise = p.indexOf('### If this pass is a revision');
-    const replaceAt = p.indexOf('The description holds one current plan');
+    const replaceAt = p.indexOf('A revision is a new version of the same plan record');
     const good = p.indexOf('### What a good plan is');
     assert.ok(revise > -1 && replaceAt > -1 && good > -1, 'all three landmarks are present');
     assert.ok(revise < replaceAt && replaceAt < good,
@@ -2870,14 +2870,14 @@ describe('plan-review gate + revision section in the plan template (LIN-1603, LI
     const p = plan();
     assert.ok(p.includes('Every finding is answered: fixed, or disagreed with and why.'),
       'every finding must be answered');
-    assert.ok(p.includes('add a line saying what changed and which findings it answers'),
+    assert.ok(p.includes('with a reason saying what changed and which findings it answers'),
       'the revision must record which findings it addressed, so the next review can check it');
   });
 
-  test('a revision replaces the prior plan in place rather than appending it', () => {
+  test('a revision is a new version of the plan record rather than a second plan (LIN-4504)', () => {
     const p = plan();
-    assert.ok(p.includes('The description holds one current plan: replace the old block in place (for example through `POST .../description/replace`)'),
-      'the revision replaces the old block, through the targeted write');
+    assert.ok(p.includes('A revision is a new version of the same plan record'),
+      'the revision revises the record, never appends a second plan');
     assert.ok(p.includes('Removing a step is a valid answer.'), 'a smaller revision is valid');
   });
 
@@ -3964,71 +3964,27 @@ describe('breakdown template subtask-description mandate (LIN-3049)', () => {
     user: 'reviewer', createdAt: '2026-09-25T00:00:00.000Z'
   };
 
+  // LIN-4504: the copy-down is retired. A breakdown writes each piece as a plan record and each child task with its
+  // `piece`; the child reads its piece in its brief, so the Approve precondition and the (a)-(e) slice bullets go.
   const sectionOf = (prompt) => prompt.slice(
-    prompt.indexOf('### Creating Subtasks'),
-    prompt.indexOf('### After Creating All Subtasks')
+    prompt.indexOf('### Writing the pieces and the child tasks'),
+    prompt.indexOf('### After Writing Every Piece')
   );
 
-  // F4: the verdict lives on the DECOMPOSED ticket's own trail, never on
-  // context.parent. Both fixtures hold context.parent constant and vary only the
-  // issue's own comments; the static prose must name the this-ticket-own-trail
-  // precondition in both cases (the template is static — this pins its presence,
-  // not a runtime branch).
-  for (const [label, comments] of [
-    ['no Approve on the issue\'s own trail', []],
-    ['an Approve on the issue\'s own trail', [approvedVerdict]]
-  ]) {
-    test(`the precondition names the decomposed ticket's own trail (${label})`, () => {
-      const issue = { ...baseIssue, comments };
-      const p = generatePrompt('breakdown', issue, baseContext).prompt;
-      const section = sectionOf(p);
-      assert.ok(/THIS TICKET'S OWN comment trail/.test(section),
-        'the Creating Subtasks section must name the decomposed ticket\'s own comment trail');
-      assert.ok(/not the 'Parent Task' section rendered above in Context/.test(section),
-        'it must exclude the rendered Parent Task section (the F4 wrong-ticket trap)');
-      assert.ok(/If no such Approve is on record on this ticket's own trail/.test(section),
-        'it must state the no-Approve fallback');
-    });
-  }
-
-  test('the five approved-path bullets are present and in (a)-(e) order', () => {
-    const p = generatePrompt('breakdown', baseIssue, baseContext).prompt;
-    const section = sectionOf(p);
-    const a = section.indexOf('(a) This piece\'s slice of the approved plan');
-    const b = section.indexOf('(b) `Session fit: fits one session`');
-    const c = section.indexOf('(c) `Plan-review due: no');
-    const d = section.indexOf('(d) The grounding commit SHA(s)');
-    const e = section.indexOf('(e) A line saying the parent\'s approved plan is this piece\'s starting point');
-    assert.ok(a > -1 && b > -1 && c > -1 && d > -1 && e > -1, 'all five approved-path bullets must be present');
-    assert.ok(a < b && b < c && c < d && d < e, 'the five bullets must appear in (a)-(e) order');
-    // N2: bullet (c) names this ticket's own approving verdict, not the parent's.
-    assert.ok(/cited from this ticket's own approving verdict \(the one the precondition found\)/.test(section),
-      'N2: bullet (c) must cite this ticket\'s own approving verdict');
-    // R6: bullet (b) must not copy a false `fits one session` onto a piece the
-    // approved plan itself could not scope to one session; it must defer to a
-    // fresh `plan` pass instead (M13).
-    assert.ok(/if a piece genuinely does not fit one session, leave this line for a fresh `plan` pass to answer honestly rather than copying a false claim/.test(section),
-      'R6: bullet (b) must require omitting the session-fit line for a piece that does not fit one session');
+  test('each piece is a plan record to implementation, and each child task names its piece; nothing is copied', () => {
+    for (const comments of [[], [approvedVerdict]]) {
+      const section = sectionOf(generatePrompt('breakdown', { ...baseIssue, comments }, baseContext).prompt);
+      assert.ok(section.includes('"kind": "plan"') && section.includes('"to": "implementation"') && section.includes('"in": "LIN-910"'), 'the piece record');
+      assert.ok(section.includes('"kind": "task"') && section.includes('"piece"') && section.includes('"done-when"'), 'the child task with its piece');
+      assert.ok(section.includes('no plan text goes into the child ticket'));
+      assert.doesNotMatch(section, /slice of the approved plan|Session fit: |Plan-review due: no|THIS TICKET'S OWN comment trail/, 'the copy-down bullets and their precondition are gone');
+    }
   });
 
   test('the drift exit names the pieces, the order of landing and the approach/files the plan names', () => {
     const p = generatePrompt('breakdown', baseIssue, baseContext).prompt;
     assert.ok(/Confirm the pieces, the order of landing, and the files and approach it names still reflect the current codebase/.test(p),
       'the existing drift exit must name the copied specifics');
-  });
-
-  test('the existing fallback wording survives for the no-Approve case', () => {
-    const p = generatePrompt('breakdown', baseIssue, baseContext).prompt;
-    const section = sectionOf(p);
-    assert.ok(/create the subtask with only a plain acceptance-criteria description/.test(section),
-      'the no-Approve path must still produce a plain acceptance-criteria subtask');
-    // R4: the focused, per-piece acceptance-criteria guidance must survive as the
-    // fallback's description wording (it was deleted, leaving the precondition pointing
-    // at wording that no longer existed).
-    assert.ok(/Description with acceptance criteria for this piece — the child sees its parent only as a title, so say where the parent's scope and design can be read/.test(section),
-      'R4: the no-Approve fallback must keep the per-piece acceptance-criteria guidance (LIN-3296: and point the child at the parent it cannot see)');
-    assert.ok(/none of bullets \(a\)–\(e\) below apply, and the subtask is expected to route through `research`\/`plan` normally/.test(section),
-      'the fallback must withhold every approved-path bullet, (a) the plan slice included');
   });
 
   test('byte-parity: explicit Linear ui stays a no-op for the new breakdown content', () => {
@@ -4043,7 +3999,7 @@ describe('breakdown template subtask-description mandate (LIN-3049)', () => {
     const p = generatePrompt('breakdown', { ...baseIssue, title: 'Break down the pieces' }, baseContext).prompt;
     assert.ok(/the pieces the plan split the work into, how parts that share a path or state interact, and the order of landing/.test(p),
       'breakdown reads the pieces, their interaction and the order of landing');
-    assert.ok(/Create one subtask per piece/.test(p), 'one subtask per piece');
+    assert.ok(/Write one piece and one child task per piece/.test(p), 'one piece and one child task per piece');
     assert.ok(/`blocked-by` relations are the pieces that must land before it, in the plan's order of landing/.test(p),
       'blocked-by is taken from the order of landing');
     assert.ok(!/surface|dependency arrow/i.test(p), 'breakdown does not expect a surface list or arrows');
@@ -4092,7 +4048,7 @@ describe('the stage contract (LIN-3292)', () => {
 
   test('each format the contract carries is said once: the body no longer asks for it', () => {
     const formats = {
-      plan: ['## Implementation Plan', 'plan-review due: yes'],
+      plan: ['"kind": "plan"', '"to": "plan-review"'],
       'plan-review': ['### Plan Review Verdict'],
       review: ['CI covers the deliverable; nothing to record', `## Review — ${issue.identifier}`],
       'close-out': [`## Close-out — ${issue.identifier}`]

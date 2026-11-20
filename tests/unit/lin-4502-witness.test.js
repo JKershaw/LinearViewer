@@ -132,16 +132,17 @@ describe('LIN-4502 witness (b): rewriting the description through the proxy leav
     const partOneBefore = composeBrief(askedBefore, MODEL_BRIEF).slice(0, composeBrief(askedBefore, MODEL_BRIEF).indexOf('## Situation'));
 
     const original = await storedDescription('i1');
-    // The whole body rewritten through the proxy: no guard refuses it any more (LIN-4502).
-    const whole = await call('PATCH', '/api/proxy/issues/i1', { description: 'Entirely new body.\n\nNothing like before.' });
-    assert.equal(whole.status, 200, JSON.stringify(whole.body));
-    assert.equal(await storedDescription('i1'), 'Entirely new body.\n\nNothing like before.');
-    // A span that used to sit inside the block: one phrase of the words is replaced.
+    // A span that used to sit inside the block: one phrase of the words is replaced. (LIN-4504: first, while the old
+    // plan section is still there, so the PATCH adds no plan heading; re-adding a dropped one is refused 422.)
     const spanned = original.replace('full guide', 'short guide');
     assert.notEqual(spanned, original, 'the span edit changes the block\'s words');
     const span = await call('PATCH', '/api/proxy/issues/i1', { description: spanned });
     assert.equal(span.status, 200, JSON.stringify(span.body));
     assert.equal(await storedDescription('i1'), spanned);
+    // The whole body rewritten through the proxy: no guard refuses it any more (LIN-4502).
+    const whole = await call('PATCH', '/api/proxy/issues/i1', { description: 'Entirely new body.\n\nNothing like before.' });
+    assert.equal(whole.status, 200, JSON.stringify(whole.body));
+    assert.equal(await storedDescription('i1'), 'Entirely new body.\n\nNothing like before.');
 
     // Whatever the description now holds, the task's asked is written once, at its making, and is not re-derived.
     const second = await call('POST', '/api/proxy/records', { kind: 'finding', to: 'review', says: 'named again', how: 'look', in: TICKET });
