@@ -62,8 +62,13 @@ const sleep = (ms) => new Promise((r) => setTimeout(r, ms));
 /** The old session-fit answers, mapped to a plan's addressee. */
 export const ADDRESSEE_OF_FIT = Object.freeze({ 'needs multiple sessions': 'breakdown', 'fits one session': 'implementation' });
 
-/** The copied slice's mark in a breakdown child: its review-due line says no, covered by the parent's review. */
-const COPIED_SLICE = /plan-review due:?\**\s*no\b[^\n]{0,40}covered by/i;
+/**
+ * The copied slice's mark in a breakdown child: its review-due line says no, covered by its own PARENT's review (the
+ * breakdown template wrote the parent's identifier there). Naming the parent keeps a plan that only quotes the words
+ * (LIN-4499's plan quotes the old regex) from reading as a copy.
+ */
+const copiedSliceOf = (text, parentRef) => Boolean(parentRef)
+  && new RegExp(`plan-review due:?\\**\\s*no\\b[^\\n]{0,40}covered by\\W{0,4}${parentRef.replace(/[^\w-]/g, '')}\\b`, 'i').test(text || '');
 
 /** The deterministic ids (fixedIdOf, the one derived-id rule): a re-apply finds what it made. */
 export const importIdsOf = (ticket) => ({
@@ -224,7 +229,10 @@ export function planTicket(t, store) {
   if (!to) return { action: 'held', reason: 'unreadable', detail: 'a plan with no readable session-fit line: held for replanning, no default' };
   const text = ownText === 'comment' ? (t.planComment?.body || '') : (t.planSection ?? (t.description || ''));
   if (!text.trim()) return { action: 'held', reason: 'unreadable', detail: 'the plan text could not be cut out of the ticket' };
-  const copied = COPIED_SLICE.test(t.description || '') && ownText === 'description';
+  // A copied slice carries the covered-by line in the slice itself. The same words quoted in a ticket's asked text (a
+  // breakdown child that later got its own plan, as LIN-4504's asked quotes LIN-4499's review) do not make its own
+  // plan a copy: the dry run found exactly that on LIN-4499 and LIN-4504.
+  const copied = ownText === 'description' && copiedSliceOf(text, t.parentRef);
   const ids = importIdsOf(t.identifier);
   const says = copied
     ? `Imported at the slice-2 cutover from this child's copied slice of its parent's plan; it cannot be mapped to a parent piece.\n\n${text.trim()}`
@@ -342,6 +350,14 @@ export const EXPLAINED = Object.freeze({
   E: 'the ticket holding plan-72a996db (a throwaway plan record LIN-4503\'s close-out wrote)',
 });
 
+/**
+ * Explanations the dry run found that the approved list does not hold. A difference carrying one is still UNEXPLAINED
+ * (the fleet stays paused) until a person accepts it; the proposal says what it is so the ruling is quick.
+ */
+export const PROPOSED = Object.freeze({
+  F: 'a session-fit phrase in a ticket with no plan (prose, a Scope line, a quote): the old reader read it from text beside "Implementation plan: none"; with no plan record it reads none, which is what the slice asks (nothing reads session fit from ticket text). Not imported: it is not a plan',
+});
+
 const NEW_FIT = { several: 'needs multiple sessions', one: 'fits one session' };
 
 /**
@@ -393,7 +409,8 @@ export function compareFacts(cap, planned, after) {
       else if (row.action === 'held' && row.reason === 'parent-only') why = 'C';
       else if (fact === 'reviewDue' && oldValue === true && newValue === false && o.latestVerdict?.verdict === 'approve') why = 'A';
       else if (fact === 'reviewDue' && oldValue === false && newValue === true && n.reviewOwed?.why === 'breakdown-unreviewed') why = 'D';
-      differences.push({ ticket: ref, fact, old: oldValue, new: newValue, explained: why });
+      const proposal = !why && fact === 'sessionFit' && row.action === 'none' && !o.where && !o.parent && newValue === null ? 'F' : null;
+      differences.push({ ticket: ref, fact, old: oldValue, new: newValue, explained: why, ...(proposal ? { proposal } : {}) });
     };
     const oldHas = Boolean(o.where || o.parent || (!o.leaf && o.nodeSessionFit));
     if (oldHas !== n.hasPlan) explain('hasPlan', oldHas, n.hasPlan);

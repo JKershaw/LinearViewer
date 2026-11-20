@@ -22,7 +22,7 @@ import { isTerminalState } from '../../lib/providers/state-map.js';
 import { askedOf } from '../../lib/asked-of.js';
 import { STAGE_KINDS } from '../../lib/prompts/stage-kinds.js';
 import {
-  planTicket, planImport, applyImport, compareFacts, recordsAfter, importIdsOf, oldFactsOf, ADDRESSEE_OF_FIT, EXPLAINED,
+  planTicket, planImport, applyImport, compareFacts, recordsAfter, importIdsOf, oldFactsOf, ADDRESSEE_OF_FIT, EXPLAINED, PROPOSED,
 } from '../../scripts/records/slice-2-import.mjs';
 
 const old = (over = {}) => ({ leaf: true, where: null, parent: null, at: null, sessionFit: null, planReviewDue: null, nodeSessionFit: null, latestVerdict: { verdict: null, at: null }, lookFirstHasPlan: false, ...over });
@@ -75,12 +75,23 @@ describe('planTicket: what each in-flight plan becomes', () => {
     const store = { taskOf: () => ({ id: 'task-x' }), plansIn: () => [{ id: 'plan-72a996db', state: 'kept' }] };
     assert.deepEqual(planTicket(ticket('LIN-12', { planSection: 'p', old: old({ where: 'description', sessionFit: 'fits one session' }) }), store).reason, 'has-records');
     const copied = planTicket(ticket('LIN-13', {
-      description: 'Piece A.\n\n**Plan-review due:** no — covered by LIN-1\'s approving plan-review',
-      planSection: 'Slice A of the parent plan.', old: old({ where: 'description', sessionFit: 'fits one session', planReviewDue: 'no' }),
+      parentRef: 'LIN-1',
+      description: 'Piece A.\n\n## Implementation Plan\n\nSlice A of the parent plan.\n\n**Plan-review due:** no — covered by LIN-1\'s approving plan-review',
+      planSection: 'Slice A of the parent plan.\n\n**Plan-review due:** no — covered by LIN-1\'s approving plan-review', old: old({ where: 'description', sessionFit: 'fits one session', planReviewDue: 'no' }),
     }), NO_STORE);
     assert.equal(copied.copied, true);
     assert.equal(copied.plan.to, 'implementation');
     assert.match(copied.plan.says, /cannot be mapped to a parent piece/);
+    // The covered-by words in the asked text, with a plan of the ticket's own below them, are not a copied slice.
+    const own = planTicket(ticket('LIN-14', {
+      description: '## As asked\n\nPlan-review due: no — covered by LIN-1\'s approving plan-review.\n\n## Implementation Plan\n\nMy own plan.',
+      planSection: 'My own plan.', old: old({ where: 'description', sessionFit: 'needs multiple sessions' }),
+    }), NO_STORE);
+    assert.equal(own.copied, false);
+    assert.equal(own.plan.says, 'My own plan.');
+    // A plan that quotes the covered-by words about some other ticket is not a copy either.
+    const quoting = planTicket(ticket('LIN-15', { parentRef: 'LIN-1', planSection: 'It regexes `plan-review due: no ... covered by` out of descriptions.', old: old({ where: 'description', sessionFit: 'fits one session' }) }), NO_STORE);
+    assert.equal(quoting.copied, false);
   });
 
   test('ids come from fixedIdOf, so a second plan of the same capture names the same records', () => {
@@ -128,6 +139,15 @@ describe('compare: every difference is classified against the closed list', () =
     wrong.plans.find((p) => p.id === importIdsOf('LIN-4').plan).to = 'implementation';
     const bad = compareFacts(cap, planned, wrong);
     assert.ok(bad.unexplained.some((d) => d.ticket === 'LIN-4' && d.fact === 'sessionFit'), JSON.stringify(bad.unexplained));
+  });
+
+  test('a session-fit phrase on a ticket with no plan is proposed as F, and stays unexplained until a person accepts it', () => {
+    const cap = capOf({ 'LIN-9': ticket('LIN-9', { description: '## Scope\n\nOne session will do.', old: old({ sessionFit: 'fits one session' }) }) });
+    const planned = planImport(cap);
+    assert.equal(planned.rows[0].action, 'none', 'prose is not a plan: nothing is imported');
+    const result = compareFacts(cap, planned, recordsAfter(cap, planned));
+    assert.deepEqual(result.unexplained.map((d) => [d.fact, d.proposal]), [['sessionFit', 'F']]);
+    assert.ok(PROPOSED.F);
   });
 
   test('matching facts give no difference, and the ticket holding the throwaway plan is E', () => {
