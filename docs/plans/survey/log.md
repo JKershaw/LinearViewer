@@ -4726,3 +4726,11 @@ Still waiting on `lin4499-snapshot-cut`.
 - **LIN-4500** (id 2ce9650c-2b51-4e6f-b942-7be75e2a47dc), standalone, Backlog, from `integration/ship-biscuit-tidy.md`. John added a caution: regular tests only, no evals and no generated editions, because they cost money. John checks it live after deploy. That caution is also in the kickoff goal.
 - **Next:** when LIN-4500 lands, update LIN-4499 with John's corrections, answer `lin4499-snapshot-cut` to match (retire fully), and slice 2 proceeds.
 - **John on the stop:** it was right to stop, even if for the wrong reason ("it stopped for a vibe").
+
+### 20 Nov, 09:29: LIN-4500 approved; close-out next
+
+- Order: survey-task 08:34, survey-place 08:37, scoping 08:40 ("just the task"), plan 08:42, implementation (Haiku) 08:45–09:20, leftover 09:11–09:20.
+- Review 09:21–09:25: **Approved**. Blind read: **better**.
+- PR #2471 green, not merged yet.
+- No evals or generated editions seen; when there is nothing to report, the new code returns 502 without an LLM call.
+- Only open ruling: `lin4499-snapshot-cut`. Main healthy.
