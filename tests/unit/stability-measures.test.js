@@ -1140,6 +1140,48 @@ test('the lookback reads the first-parent landings of the days before base, base
   }
 });
 
+// LIN-4505 review (finding-5ebfd2a9): the CLI's records path for waiting.harbour, end to end. Both window endpoints are
+// fixture commits dated after `records.coveredFrom`, so neither is in the committed series and each is read from the
+// records store: a loopback stand-in for the proxy answers GET /records?to=project&state=open&asOf=... by the time asked.
+// Seen red with the CLI's head endpoint given `client: null` (the head then reads "no --api given", not 2).
+test('the CLI reads waiting.harbour from the records at each endpoint commit\'s time, through --api', async () => {
+  const repo = makeRepo();
+  const fake = mkdtempSync(join(tmpdir(), 'stability-gh-'));
+  const asked = [];
+  const open = (id, kind, to) => ({ id, kind, to, state: 'open', openedAt: '2026-11-20T13:06:49.033Z' });
+  const server = createServer((req, res) => {
+    const url = new URL(req.url, 'http://127.0.0.1');
+    res.setHeader('content-type', 'application/json');
+    if (url.pathname !== '/records') { res.end(JSON.stringify({ issues: [] })); return; }
+    asked.push({ to: url.searchParams.get('to'), state: url.searchParams.get('state'), asOf: url.searchParams.get('asOf') });
+    // One finding open at the base's time; two findings and a task (not a hand-off) at the head's.
+    const atBase = Date.parse(url.searchParams.get('asOf')) < Date.parse('2026-11-22T00:00:00Z');
+    res.end(JSON.stringify({ records: atBase ? [open('finding-a', 'finding', 'project')]
+      : [open('finding-a', 'finding', 'project'), open('question-b', 'question', 'project'), open('task-c', 'task', 'project')] }));
+  });
+  await new Promise((r) => server.listen(0, '127.0.0.1', r));
+  try {
+    const baseDate = '2026-11-21T12:00:00Z';
+    const headDate = '2026-11-22T12:00:00Z';
+    const base = repo.commit({ 'lib/a.js': 'const a = 1;\n' }, baseDate, 'LIN-1: base');
+    const head = repo.commit({ 'lib/b.js': 'const b = 1;\n' }, headDate, 'LIN-2: head');
+    writeFileSync(join(fake, 'gh'), '#!/bin/sh\necho "[]"\n');
+    chmodSync(join(fake, 'gh'), 0o755);
+    const out = await new Promise((resolve, reject) => execFile(process.execPath,
+      [join(ROOT, 'scripts/stability-measures.mjs'), repo.dir, base, head, '--api', `http://127.0.0.1:${server.address().port}`, '--lookback-days', '1'],
+      { env: { ...process.env, HARBOUR_LOCAL_BASE: '', PATH: `${fake}${delimiter}${process.env.PATH}` } },
+      (e, stdout, stderr) => (e ? reject(new Error(stderr || e.message)) : resolve(JSON.parse(stdout)))));
+    const harbour = rowsOf(out)['waiting.harbour'];
+    assert.strictEqual(harbour.status, STATUS.MEASURED, harbour.reason);
+    assert.deepStrictEqual([harbour.value.base, harbour.value.head], [1, 2], 'findings and questions to the project, not the task');
+    const waiting = asked.filter((q) => q.to === 'project' && q.state === 'open').map((q) => q.asOf);
+    assert.ok(waiting.includes(new Date(baseDate).toISOString()), 'the base commit\'s time was asked');
+    assert.ok(waiting.includes(new Date(headDate).toISOString()), 'the head commit\'s time was asked');
+  } finally {
+    server.close(); repo.cleanup(); rmSync(fake, { recursive: true, force: true });
+  }
+});
+
 // LIN-4439: measure 1 end to end. A fixture repository whose window holds one landing for each outcome, its origin a
 // GitHub remote, and a loopback stand-in proxy serving each ticket's comments. Its issue list fails, so the tracker
 // stops after one call (the client paces at 1.2 s a call) and measure 1 reads its own trails: only the tickets of

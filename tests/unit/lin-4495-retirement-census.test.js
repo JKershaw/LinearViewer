@@ -165,13 +165,20 @@ describe('LIN-4495 retirement census: the cutover left no retired word in the co
   });
 
   test('LIN-4505: the retired importer names are seen anywhere in the census, so a revived importer fails here', () => {
+    // One planted file per word the LIN-4505 change added to RETIRED: dropping any one row leaves its file unseen and fails the equality.
     const planted = {
       'lib/new-import.js': 'export const plan = planImport(notes);\n',
       'scripts/new-import.mjs': "import { countFrozenWaiting } from './x.js';\n",
       'docs/areas/new.md': 'The one-off `records-import` ran from the notes.\n',
       'lib/new-manifest.js': 'await applyManifest({});\n',
+      'lib/new-section.js': 'const sections = parseWaitingSection(text);\n',
+      'lib/new-endpoint.js': 'const n = waitingAt(sha);\n',
+      'docs/areas/new-reader.md': 'Read by the retired waiting-import module.\n',
+      'docs/areas/new-apply.md': 'Written by the retired import-apply module.\n',
+      'scripts/new-list.mjs': "const list = 'scripts/records/parked-tickets.json';\n",
     };
-    assert.deepStrictEqual(findRetired(planted).map((h) => h.word).sort(), ['applyManifest', 'countFrozenWaiting', 'planImport', 'records-import'].sort());
+    const nine = ['applyManifest', 'countFrozenWaiting', 'import-apply', 'parked-tickets', 'parseWaitingSection', 'planImport', 'records-import', 'waiting-import', 'waitingAt'];
+    assert.deepStrictEqual(findRetired(planted).map((h) => h.word).sort(), nine);
   });
 
   test('a file named in the allowlist is skipped, and only it: an allowance cannot hide a new word elsewhere', () => {

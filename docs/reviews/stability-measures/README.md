@@ -56,7 +56,7 @@ Net production lines lead, with code and comments counted apart.
   reason, never 0). A commit the series does not hold is `not measured`. From the first imported record on
   (`records.coveredFrom` in the series), `waiting.harbour` reads the open hand-offs to the project as of the commit's time,
   through the proxy (`GET /api/proxy/records`). The gap between the cutover and the import has no reading in either
-  source, so a window across it shows `not measured` rather than a fall. `waiting.runner` is read from the series up to the
+  source, so a window across it shows `not measured` rather than a fall. The two sources count different things: the series counts Waiting bullets (124 at the last pre-cutover commit), while the records reading counts open hand-offs to the project, including ones that predate the import (29 at the import, so it read 149 just after it). A window whose base reads the series and whose head reads the records therefore compares two definitions, and a rise across the import is not growth. `waiting.runner` is read from the series up to the
   Harbour cutover only: the runner's own lists are history, and from there `waiting.runner` and `waiting.total` read `not
   measured` (LIN-4505 ruling). Defined in `scripts/stability-measures-waiting.mjs`, read by `scripts/stability-measures.mjs`.
 - `minted`: tickets minted per landing, an **ID-span estimate**: the highest issue number created at or before
