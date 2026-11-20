@@ -29,13 +29,13 @@
       "done_when": "Once John rules, one place decides the poll's answer for an unreadable store, both consumers read that answer, and the old fallback copies are deleted.",
       "findings": [
         {
-          "says": "For John: Needs John's ruling (LIN-3024): when the halt store read fails on a cold cache, should the poll fail closed for a stop it has seen, or keep the null-on-cold-cache fallback pinned as a contract row?",
+          "says": "Needs John's ruling (LIN-3024): when the halt store read fails on a cold cache, should the poll fail closed for a stop it has seen, or keep the null-on-cold-cache fallback pinned as a contract row?",
           "how": "John rules. Then the poll distinguishes 'unset' from 'unknown' or pins the default, both consumers (kit haltAction, SD halt wiring) read it, and tests live in tests/unit/workspace-halt-store.test.js.",
           "to": "person:e7e948a4-2951-4af4-b60e-572a473a491e",
           "source": "description"
         }
       ],
-      "notes": "The ticket has no '## As asked' block, no comments, and no 'Done when' line; done_when is taken from its Acceptance list. The 'Unvalidated idea' in the description is an option, not a decision, so it is not listed as a separate finding. Hand-offs to John are addressed to project with \"For John:\" in their words: a person is addressed by account id, and this manifest holds none."
+      "notes": "The ticket has no '## As asked' block, no comments, and no 'Done when' line; done_when is taken from its Acceptance list. The 'Unvalidated idea' in the description is an option, not a decision, so it is not listed as a separate finding."
     },
     {
       "ticket": "LIN-4441",
@@ -56,13 +56,13 @@
           "source": "comment 9c1053b2 (ledger item 4)"
         },
         {
-          "says": "For John: The re-measure of the test-wait share cannot run: no committed script reproduces the 7-12 Nov baseline (28% CI wait, 10-13% local runs). John to say who produced it and where its inputs are, or agree to drop that bullet.",
+          "says": "The re-measure of the test-wait share cannot run: no committed script reproduces the 7-12 Nov baseline (28% CI wait, 10-13% local runs). John to say who produced it and where its inputs are, or agree to drop that bullet.",
           "how": "Supply the original method and inputs, or rule the Done-when bullet dropped (only John can). The method now committed in scripts/measure-ci-wall.mjs is the fallback.",
           "to": "person:e7e948a4-2951-4af4-b60e-572a473a491e",
           "source": "comment 9c1053b2 (ledger item 3); comment bf890e7d"
         }
       ],
-      "notes": "Still In Progress after merge (e3a3268a1); the close-out comment holds it open for these ledger items. Ledger items 1 and 5 are discharged. The formatLocalTestRule repo-command edge is a Waiting entry in docs/areas/llm-and-prompts.md and is left out here to avoid double-counting. Hand-offs to John are addressed to project with \"For John:\" in their words: a person is addressed by account id, and this manifest holds none."
+      "notes": "Still In Progress after merge (e3a3268a1); the close-out comment holds it open for these ledger items. Ledger items 1 and 5 are discharged. The formatLocalTestRule repo-command edge is a Waiting entry in docs/areas/llm-and-prompts.md and is left out here to avoid double-counting."
     },
     {
       "ticket": "LIN-4445",
@@ -71,13 +71,13 @@
       "done_when": "On John's Jira, a task filed through Harbour keeps the person's words sealed, a Periodical mints, and a task's last step can file.",
       "findings": [
         {
-          "says": "For John: Run the LIN-4452 live-check runbook on John's own Jira, including the epic placement and 409 Done-gate steps, and paste the evidence back. Nothing is proved on a live site until then.",
+          "says": "Run the LIN-4452 live-check runbook on John's own Jira, including the epic placement and 409 Done-gate steps, and paste the evidence back. Nothing is proved on a live site until then.",
           "how": "Runbook comment f495ca4b, steps 0-7. If Jira drops harbour.asAsked on a create (PARTIAL_WRITE, failed 'property'), the separate PUT fallback is the next change and needs property-1.json.",
           "to": "person:e7e948a4-2951-4af4-b60e-572a473a491e",
           "source": "comment d52aaac6 (hand-back); runbook comment f495ca4b ; ruling comment d1459aad"
         },
         {
-          "says": "For John: Open for John: a Jira screenshot is still refused with 422, since Jira has no uploadFile and an attachment needs an issue first. Jira feedback with no FEEDBACK_ default files to the first Jira project.",
+          "says": "Open for John: a Jira screenshot is still refused with 422, since Jira has no uploadFile and an attachment needs an issue first. Jira feedback with no FEEDBACK_ default files to the first Jira project.",
           "how": "John decides both: whether Jira screenshots are in scope, and whether Jira feedback should have a default project.",
           "to": "person:e7e948a4-2951-4af4-b60e-572a473a491e",
           "source": "comment 3fb9098b (LIN-4451 piece 2)"
@@ -95,7 +95,7 @@
           "source": "comment b92a0030 (LIN-4452 leftovers, 'Still open')"
         }
       ],
-      "notes": "Ruling d1459aad (epic placement and the 409 gate are required) is answered and folded into the live-check finding, not listed separately. The Waiting entries in docs/areas/providers.md (D1 vocabulary, holds-verbatim capability) are left out as area-note homes. The description's Done-when is checked only by the live run. Hand-offs to John are addressed to project with \"For John:\" in their words: a person is addressed by account id, and this manifest holds none. Hand-offs to John are addressed to project with \"For John:\" in their words: a person is addressed by account id, and this manifest holds none."
+      "notes": "Ruling d1459aad (epic placement and the 409 gate are required) is answered and folded into the live-check finding, not listed separately. The Waiting entries in docs/areas/providers.md (D1 vocabulary, holds-verbatim capability) are left out as area-note homes. The description's Done-when is checked only by the live run."
     },
     {
       "ticket": "LIN-4463",
@@ -110,7 +110,7 @@
           "source": "comment 5f70e262 (close-out, piece 4); description 'Scope after piece 3'"
         },
         {
-          "says": "For John: Done-when 3 waits on John's pass figure for the changed-code paired blind read. The frozen +0.5 threshold stands, and the deciding read will not run until he sets the figure.",
+          "says": "Done-when 3 waits on John's pass figure for the changed-code paired blind read. The frozen +0.5 threshold stands, and the deciding read will not run until he sets the figure.",
           "how": "John sets the pass figure. Then run the paired read on the files the lane changed, with an untouched control area, as comment db14ecf4 directs.",
           "to": "person:e7e948a4-2951-4af4-b60e-572a473a491e",
           "source": "comment 5f70e262 (close-out, piece 4); comment db14ecf4 ; comment 78e450ea"
@@ -122,7 +122,7 @@
           "source": "comment 5f70e262 (ledger, carried from pieces 1-3); comment f1bbb463"
         }
       ],
-      "notes": "Comment 19 (blocked check) says nothing waits on a person, but the later close-out (5f70e262) says Done-when 3 waits on John's pass figure; the later comment is followed. Pieces 1-4 are merged and the ticket stays In Progress. The 'larger' blind-read item and the other Waiting entries sit in docs/areas/front-end-browser.md and are left out. Hand-offs to John are addressed to project with \"For John:\" in their words: a person is addressed by account id, and this manifest holds none."
+      "notes": "Comment 19 (blocked check) says nothing waits on a person, but the later close-out (5f70e262) says Done-when 3 waits on John's pass figure; the later comment is followed. Pieces 1-4 are merged and the ticket stays In Progress. The 'larger' blind-read item and the other Waiting entries sit in docs/areas/front-end-browser.md and are left out."
     }
   ]
 }
