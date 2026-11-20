@@ -27,6 +27,8 @@ import { RecordsStore, RECORDS_COLLECTION, REFS_COLLECTION, QUERY_LOG_COLLECTION
 import { INDEX_SPECS } from '../../lib/db-indexes.js';
 import { quoteAsked, splitQuote, composeBrief } from '../../lib/brief-quote.js';
 import { askedOf } from '../../lib/asked-of.js';
+import { PLAN_HEADING_ANY } from '../../lib/run-trail.js';
+import { readFileSync } from 'node:fs';
 
 // Must match TEST_LOCAL_URL_KEY in routes/proxy.js: resolveProviderAccess then answers with the local provider.
 const LOCAL_URL_KEY = 'local-workspace';
@@ -166,5 +168,12 @@ describe('LIN-4502 witness (c): the legacy reader reads the block the seal wrote
   test('Linear\'s escaped storage of the same block reads the same words', () => {
     const escaped = LEGACY.replace(/([#*_[\]])/g, '\\$1');
     assert.equal(askedOf(escaped), 'Make the export button work.\nKeep both formats.');
+  });
+});
+
+describe('LIN-4502: askedOf\'s plan heading is the plan comment\'s, spelled the same', () => {
+  test('lib/asked-of.js holds a byte-equal copy of lib/run-trail.js PLAN_HEADING_ANY (its own, as a description reader)', () => {
+    const source = readFileSync(new URL('../../lib/asked-of.js', import.meta.url), 'utf8');
+    assert.ok(source.includes(`/${PLAN_HEADING_ANY.source}/${PLAN_HEADING_ANY.flags}`), 'the two spellings drifted apart');
   });
 });

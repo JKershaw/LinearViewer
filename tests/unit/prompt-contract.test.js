@@ -10,7 +10,6 @@ import { latestReviewComment, readRunLedger } from '../../lib/run-trail.js';
 import { extractPlanSection } from '../../lib/file-pointer.js';
 import { extractSessionFit } from '../../lib/recommendation-facts.js';
 import { extractVerdict, planReviewDueOf } from '../../lib/plan-review-round-trips.js';
-import { ASKED_HEADING } from '../../lib/brief-quote.js';
 import { extractPrUrls } from '../../lib/run-evidence.js';
 
 const titleIn = (contract, word) => contract.match(new RegExp('`(## ' + word + '[^`]*)`'))[1];
@@ -100,12 +99,8 @@ test('close-out: the contract title is never mistaken for the latest review', ()
   assert.strictEqual(latestReviewComment([review, closeOut]), review);
 });
 
-test('close-out: the literals it keeps through the prune are the ones the readers read', () => {
+test('close-out: LIN-4502 retired the prune, so the contract carries only the title', () => {
   const c = formatStageContract('close-out', 'LIN-1');
-  const stub = `Shipped in PR 12.\n\n## ${ticks(c)[1]}\n\n- lib/a.js\n\nfits one session\n\n${ticks(c)[4]} yes`;
-  assert.strictEqual(extractPlanSection(stub).trim().split('\n')[0], '- lib/a.js');
-  assert.strictEqual(extractSessionFit(stub), 'fits one session');
-  assert.strictEqual(planReviewDueOf(stub), 'yes');
-  // LIN-4353: the block it says is never pruned is the one lib/brief-quote.js reads.
-  assert.strictEqual(ticks(c)[5], ASKED_HEADING);
+  assert.deepStrictEqual(ticks(c), ['## Close-out — LIN-1']);
+  assert.doesNotMatch(c, /prune/i);
 });

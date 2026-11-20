@@ -74,8 +74,7 @@ function buildApp() {
   app.use(createProxyRoutes({
     proxyTokenStore: new ProxyTokenStore({ collection: createMockCollection() }),
     proxyEventStore: { recordEvent: async () => {} },
-    agentStatusStore: {}, recapCacheStore: {}, briefCacheStore: {}, taskSnapshotStore: {},
-    dispatchQueueStore: {},
+    agentStatusStore: {}, recapCacheStore: {}, briefCacheStore: {}, dispatchQueueStore: {},
     workspaceFromUrl: (req, _res, next) => {
       req.workspace = { urlKey: 'acme', id: 'ws-1', provider: 'local' };
       next();

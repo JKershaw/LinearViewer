@@ -71,8 +71,7 @@ function buildApp({ proxyTokenStore, session, workspace }) {
   app.use(createProxyRoutes({
     proxyTokenStore,
     proxyEventStore: { recordEvent: async () => {} },
-    agentStatusStore: {}, recapCacheStore: {}, briefCacheStore: {}, taskSnapshotStore: {},
-    dispatchQueueStore: {},
+    agentStatusStore: {}, recapCacheStore: {}, briefCacheStore: {}, dispatchQueueStore: {},
     workspaceFromUrl: (req, res, next) => {
       req.workspace = workspace || { urlKey: 'acme', id: 'ws-1', provider: 'linear' };
       req.session = session;

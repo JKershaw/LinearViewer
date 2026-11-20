@@ -46,8 +46,7 @@ function buildApp() {
     proxyTokenStore,
     proxyEventStore: { recordEvent: async () => {} },
     agentStatusStore: { listStatus: async () => ({ entries: [], total: 0 }) },
-    recapCacheStore: {}, briefCacheStore: {}, taskSnapshotStore: {},
-    dispatchQueueStore: {},
+    recapCacheStore: {}, briefCacheStore: {}, dispatchQueueStore: {},
     workspaceFromUrl: (req, _res, next) => {
       req.workspace = { urlKey: 'acme', id: 'ws-1', provider: 'local' };
       next();

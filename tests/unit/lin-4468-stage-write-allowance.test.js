@@ -257,7 +257,6 @@ const CENSUS = [
   { m: 'PATCH', p: '/api/proxy/issues/:issueId', kind: 'scoped', op: 'updateIssue' },
   { m: 'POST', p: '/api/proxy/issues/:issueId/description/append', kind: 'scoped', op: 'appendDescription' },
   { m: 'POST', p: '/api/proxy/issues/:issueId/description/replace', kind: 'scoped', op: 'replaceDescription' },
-  { m: 'POST', p: '/api/proxy/issues/:issueId/description/below', kind: 'scoped', op: 'belowDescription' },
   { m: 'POST', p: '/api/proxy/issues/:issueId/comments', kind: 'scoped', op: 'createComment' },
   { m: 'POST', p: '/api/proxy/comments/:issueId', kind: 'scoped', op: 'createComment' },
   { m: 'DELETE', p: '/api/proxy/issues/:issueId/comments/:commentId', kind: 'scoped', op: 'deleteComment' },

@@ -28,7 +28,6 @@ import {
   BASIS_VERSION
 } from '../../lib/scan-fingerprint.js';
 import { hashContext } from '../../lib/recap-cache.js';
-import { snapshotFromContext } from '../../lib/task-snapshot-store.js';
 
 /** A representative recommendation context. */
 function makeContext(overrides = {}) {
@@ -184,10 +183,10 @@ describe('scan basis fingerprint — the changes that DO count', () => {
   });
 
   test('there is no comment cap — a 501st comment still moves the basis', () => {
-    // Why this is NOT routed through lib/task-snapshot-store.js's
-    // snapshotFromContext: that projection slices to 500 comments, which would
-    // make "an agent answered the question in a comment" invisible on exactly
-    // the long-running tasks most likely to carry a pending ruling.
+    // Why the basis is not a clamped projection (the retired task-history slice
+    // clamped to 500 comments): a clamp would make "an agent answered the question
+    // in a comment" invisible on exactly the long-running tasks most likely to
+    // carry a pending ruling.
     const many = n => Array.from({ length: n }, (_, i) => ({
       id: `c${i}`, body: `comment ${i}`, createdAt: `2026-09-01T09:${String(i % 60).padStart(2, '0')}:00.000Z`
     }));
@@ -336,13 +335,13 @@ describe('basisChanged — the tri-state', () => {
  * LIN-2648 F1 — the `commentId` key is load-bearing: it must reach the scan
  * basis fallback (`scanBasisFromContext`'s `id || commentId`) WITHOUT reaching
  * `hashContext` (`lib/recap-cache.js`'s `extractHashableContext`, feeds
- * `inputHash`) or `snapshotFromContext` (`lib/task-snapshot-store.js`), both of
- * which read `c?.id` specifically and only that key. A leak here would shift
+ * `inputHash`), which reads `c?.id` specifically and only that key (the task-history
+ * slice that read it the same way went with LIN-4502). A leak here would shift
  * `inputHash` fleet-wide for every Linear task with a comment — see the LIN-2648
  * description's "Why the commentId key is load-bearing" section for the three
  * concrete consequences (resurrected rulings, false-stale, cache invalidation).
  */
-describe('F1 — commentId is invisible to hashContext/snapshotFromContext, visible only to the basis', () => {
+describe('F1 — commentId is invisible to hashContext, visible only to the basis', () => {
   // The Linear shape post-projection widening: comments carry `commentId`
   // (never `id`) alongside body/createdAt/user, per lib/providers/linear/index.js.
   function linearShapedContext(comments) {
@@ -354,7 +353,7 @@ describe('F1 — commentId is invisible to hashContext/snapshotFromContext, visi
     });
   }
 
-  test('[F1 golden/leak] commentId does not move hashContext or snapshotFromContext, in either direction', () => {
+  test('[F1 golden/leak] commentId does not move hashContext, in either direction', () => {
     const withCommentId = linearShapedContext();
     const withoutCommentId = {
       ...withCommentId,
@@ -368,14 +367,6 @@ describe('F1 — commentId is invisible to hashContext/snapshotFromContext, visi
     assert.strictEqual(
       hashContext(withoutCommentId), hashContext(withCommentId),
       'hashContext must ignore commentId (without -> with)'
-    );
-    assert.deepStrictEqual(
-      snapshotFromContext(withCommentId), snapshotFromContext(withoutCommentId),
-      'snapshotFromContext must ignore commentId (with -> without)'
-    );
-    assert.deepStrictEqual(
-      snapshotFromContext(withoutCommentId), snapshotFromContext(withCommentId),
-      'snapshotFromContext must ignore commentId (without -> with)'
     );
   });
 

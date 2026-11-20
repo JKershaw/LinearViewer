@@ -475,7 +475,7 @@ left no way to tell that apart from a garbage/never-issued bearer:
 
 Before this, both classes of `401` were undocumented and easy to conflate — a caller-token rejection carried no `code`/`category`/`stage` at all, and the distinction lived only in Harbour's own server-side logs (`[credential-rejected]`), invisible to the very agent that has to pick a remedy.
 
-**`PARTIAL_WRITE`** (LIN-2012) is the fourth adopter. Jira's `updateIssue` is necessarily two upstream calls — a field update, then a status transition — because Jira offers no multi-write transaction. A failure between them (or in the confirmation re-read that follows) can leave the issue **partially** updated: some of what you sent landed, some did not. A Jira create is the other case (LIN-4451): the issue exists once Jira answers, so a failed confirmation re-read is a partial write too. Rather than reporting that as an indistinguishable total failure, the affected write endpoints (`POST /issues` for a create, `PATCH /issues/{id}`, `POST /issues/{id}/description/append`, `POST /issues/{id}/description/replace`, `POST /issues/{id}/description/below`) return:
+**`PARTIAL_WRITE`** (LIN-2012) is the fourth adopter. Jira's `updateIssue` is necessarily two upstream calls — a field update, then a status transition — because Jira offers no multi-write transaction. A failure between them (or in the confirmation re-read that follows) can leave the issue **partially** updated: some of what you sent landed, some did not. A Jira create is the other case (LIN-4451): the issue exists once Jira answers, so a failed confirmation re-read is a partial write too. Rather than reporting that as an indistinguishable total failure, the affected write endpoints (`POST /issues` for a create, `PATCH /issues/{id}`, `POST /issues/{id}/description/append`, `POST /issues/{id}/description/replace`) return:
 
 ```json
 {
@@ -1139,68 +1139,6 @@ receives (`token`/`tool`/`done`/`error` event types; `call`/`result`/`error`/`pr
 Rate-limited independently of the general 60/min proxy limiter: **30 turns/hour per
 token**, **200 turns/day per workspace**. A 429 here means back off this endpoint
 specifically — it says nothing about the token's own health.
-
-#### Get Task History Snapshots
-
-```
-GET /api/proxy/issues/{identifier}/snapshots
-GET /api/proxy/issues/{identifier}/snapshots/diff
-```
-
-An append-only **history archive** of the task's observed state over time. The proxy
-captures a snapshot whenever a `recap` or `brief` read sees the issue change — title,
-description, state, labels, priority, comments, and parent/children state. Capture is
-hash-gated, so a snapshot is recorded only when the observed slice actually differs from
-the previous one (no churn on unchanged re-reads). Because edits often happen out-of-band
-in Linear's own UI, history reflects whatever this app has *observed*, not every edit
-ever made; reading the task's `recap`/`brief` is what advances the archive. Read scope is
-sufficient; both endpoints accept a UUID or an identifier.
-
-`/snapshots` lists snapshots newest-first. `?limit=N` caps the rows (max 100); `?diff=1`
-additionally folds in the diff of the two most recent snapshots. Retention is a per-task
-count cap (newest 50 kept), not a time window, so long-lived tasks keep their early
-history.
-
-Response:
-```json
-{
-  "identifier": "ENG-42",
-  "total": 3,
-  "snapshots": [
-    {
-      "id": "…",
-      "taskIdentifier": "ENG-42",
-      "canonicalId": "…uuid…",
-      "inputHash": "…sha256…",
-      "capturedAt": "2026-06-24T12:00:00Z",
-      "snapshot": {
-        "title": "…", "description": "…",
-        "state": { "name": "In Progress", "type": "started" },
-        "labels": ["bug"], "priority": 2,
-        "comments": [{ "id": "…", "body": "…", "createdAt": "…" }],
-        "parent": null, "children": []
-      }
-    }
-  ]
-}
-```
-
-`/snapshots/diff` returns a read-time field-level diff of the two most recent snapshots:
-
-```json
-{
-  "identifier": "ENG-42",
-  "changed": true,
-  "fields": [
-    { "field": "state", "before": { "name": "Todo", "type": "unstarted" }, "after": { "name": "In Progress", "type": "started" } }
-  ],
-  "from": { "…older snapshot record…": "…" },
-  "to": { "…newer snapshot record…": "…" }
-}
-```
-
-With fewer than two snapshots there is nothing to compare: `changed` is `false` and
-`fields` is empty.
 
 #### Get Task Cost
 
@@ -2195,15 +2133,14 @@ still uses to quote the person's words:
 No write is refused for changing, dropping or adding that block any more: the
 person's words live on the ticket's task (`asked`), which no description write
 reaches. Every description write through this proxy (`PATCH` with `description`,
-`description/append`, `description/replace`, `description/below`, and an attachment
+`description/append`, `description/replace`, and an attachment
 with `"target": "description"`) still reads the live description, for the size record:
 
 | Status | `code` | Meaning |
 |--------|--------|---------|
-| `422` | `NO_AS_ASKED_BLOCK` | `description/below` on a description with no block: there is nothing to write below; use `PATCH` to rewrite the whole body. |
 | `422` | `SIZE_RECORD_HOW` | (LIN-4368) the write adds or changes the `## Size of the move` section, and a line of it carries a file path, a code span, call syntax or a numbered step (`kind`: `"path"`, `"code-span"`, `"call"`, `"numbered-steps"`; `line: { number, text }`, 1-based within the section, the heading being line 1). The record says what and why, never how. A quotation (`"…"`, `“…”` or a `>` line) that matches the task's `asked` word for word is exempt, so a cut can be quoted. |
 | `422` | `SIZE_RECORD_POLICY_CUT` | (LIN-4368) the section's size is "wrong work" and it says it was decided by "the standing policy": a cut needs a person's ruling. Record it as "pending a ruling". |
-| `422` | `SIZE_RECORD_DROPPED` | (LIN-4368) the write drops an existing `## Size of the move` section (a close-out prune included). Keep it, or replace it in place. A write that leaves the section unchanged is never refused for it. |
+| `422` | `SIZE_RECORD_DROPPED` | (LIN-4368) the write drops an existing `## Size of the move` section. Keep it, or replace it in place. A write that leaves the section unchanged is never refused for it. |
 
 Only this proxy holds the size record. A person editing a description in Harbour's
 task editor (the session lane), or in Linear or GitHub directly, is not refused, and
@@ -2259,27 +2196,6 @@ It **fails loud — never a silent no-op**:
 
 To swap *every* occurrence of a string at once, rewrite the whole body via
 `PATCH` instead. On success, returns `{ "success": true, "issue": {...} }`.
-
-#### Write Below the As Asked Block
-
-```
-POST /api/proxy/issues/{issueId}/description/below
-Content-Type: application/json
-
-{ "body": "## Summary\n\nShipped in #123." }
-```
-
-| Field | Type | Required | Description |
-|-------|------|----------|-------------|
-| `body` | string | Yes | Markdown that replaces everything after the block's end line (max 100K chars; `""` clears it) |
-
-Replaces everything after the `## As asked` block's end line with `body`, after a
-blank line. The block (and anything above it) is kept exactly as read, so the
-person's words are never re-sent: this is the route for pruning or rewriting what
-steps wrote below them. It makes the same description read and the same length and
-character checks as append and replace. On a description with no block it answers
-`422 NO_AS_ASKED_BLOCK`, naming `PATCH` as the full-rewrite route. On success,
-returns `{ "success": true, "issue": {...} }`.
 
 #### Add Comment
 

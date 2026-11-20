@@ -174,7 +174,6 @@ function buildApp({ getWorkspaceOpenRouterKey, events, accessToken = 'not-a-real
     agentStatusStore: {},
     recapCacheStore: makeCacheStore(),
     briefCacheStore: makeCacheStore(),
-    taskSnapshotStore: null,
     dispatchQueueStore: dispatchQueueStore || makeDispatchQueueStore(),
     workspaceFromUrl: (req, res, next) => next(),
     getWorkspaceAccessToken: () => null,

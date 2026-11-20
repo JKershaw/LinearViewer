@@ -123,7 +123,6 @@ function buildProxyApp({ provider, harbourCommentsStore }) {
     agentStatusStore: {},
     recapCacheStore: { get: async () => null, set: async () => {} },
     briefCacheStore: { get: async () => null, set: async () => {} },
-    taskSnapshotStore: {},
     dispatchQueueStore: {},
     workspaceFromUrl: (req, res, next) => next(),
     workspacePreferencesStore: {},

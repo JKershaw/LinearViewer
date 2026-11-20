@@ -3,7 +3,7 @@
  * routes/proxy.js, byte-identical handler bodies).
  *
  * Task-automation / compute endpoints: task stack, prompt generation,
- * AI recommendation, task snapshots + diff, cost, north-star, periodicals,
+ * AI recommendation, cost, north-star, periodicals,
  * recap (GET+POST), brief (GET+POST).
  */
 import { Router } from 'express';
@@ -42,7 +42,6 @@ import { TOKEN_ORIGIN, WRITES } from '../lib/stage-writes.js';
  * @param {Object} deps
  * @param {Object} deps.recapCacheStore - Recap cache storage instance
  * @param {Object} deps.briefCacheStore - Brief cache storage instance
- * @param {Object} deps.taskSnapshotStore - Task-history snapshot storage instance
  * @param {Object} deps.dispatchQueueStore - Dispatch queue storage instance
  * @param {Object|null} [deps.closeOutEventsStore] - Merged close-out events (lib/close-out-events-store.js),
  *   read by GET /api/proxy/periodicals for landings (LIN-4381). server.js passes it; without it the route
@@ -65,7 +64,6 @@ import { TOKEN_ORIGIN, WRITES } from '../lib/stage-writes.js';
  * @param {Function} deps.logOpenRouterCredentialSource - Logs which OpenRouter credential source served a free-tier-eligible request (closure-local; shared with group I)
  * @param {Function} deps.workspaceUnavailable - 503 envelope for an unresolvable workspace credential (closure-local)
  * @param {Function} deps.graphqlErrorStatus - Maps a provider/GraphQL error to an HTTP status (closure-local)
- * @param {Function} deps.captureTaskSnapshot - Fire-and-forget task-history snapshot capture (closure-local)
  * @param {Function} deps.chargeFreeTierOrReject - Free-tier metering choke point (closure-local; relocated in routes/proxy.js by G1, shared with group I)
  * @param {Function} deps.computeRecommendation - Shared, test-mode-aware recommendation compute (closure-local; relocated in routes/proxy.js by G1, shared with group I)
  * @param {Function} deps.recommendErrorResponse - Maps a recommendation error to {status, body} (closure-local; relocated in routes/proxy.js by G1, shared with group I)
@@ -82,7 +80,6 @@ export function createComputeRoutes({
   recordsStore = null,
   recapCacheStore,
   briefCacheStore,
-  taskSnapshotStore,
   dispatchQueueStore,
   closeOutEventsStore = null,
   requestUsageLoader,
@@ -100,7 +97,6 @@ export function createComputeRoutes({
   logOpenRouterCredentialSource,
   workspaceUnavailable,
   graphqlErrorStatus,
-  captureTaskSnapshot,
   chargeFreeTierOrReject,
   computeRecommendation,
   recommendErrorResponse,
@@ -589,67 +585,6 @@ export function createComputeRoutes({
   });
 
   /**
-   * GET /api/proxy/issues/:identifier/snapshots  (LIN-598)
-   * Lists the task-history archive for an issue, newest-first: the append-only
-   * sequence of observed-state snapshots captured at the recap/brief read seams.
-   * `?limit=N` caps the returned rows; `?diff=1` additionally folds in the
-   * read-time diff of the two most recent snapshots (same as /snapshots/diff).
-   * Pure read of local history — no Linear fetch, no LLM call.
-   */
-  router.get('/api/proxy/issues/:identifier/snapshots', proxyLimiter, authenticateProxyToken, async (req, res) => {
-    try {
-      if (!taskSnapshotStore) {
-        logEvent(req, '/api/proxy/snapshots', 503);
-        return jsonError(res, 503, 'Task snapshot store not configured');
-      }
-      const { identifier } = req.params;
-      if (!isValidIssueId(identifier)) {
-        logEvent(req, '/api/proxy/snapshots', 400);
-        return badRequest.json(res, 'Invalid identifier format');
-      }
-
-      const rawLimit = parseInt(req.query.limit, 10);
-      const limit = Number.isFinite(rawLimit) && rawLimit > 0 ? Math.min(rawLimit, 100) : undefined;
-      const { items, total } = await taskSnapshotStore.list(req.proxyUrlKey, identifier, { limit });
-
-      const body = { identifier, total, snapshots: items };
-      if (req.query.diff === '1' || req.query.diff === 'true') {
-        body.diff = await taskSnapshotStore.diffLatest(req.proxyUrlKey, identifier);
-      }
-      logEvent(req, '/api/proxy/snapshots', 200);
-      res.json(body);
-    } catch (err) {
-      logEvent(req, '/api/proxy/snapshots', 500);
-      jsonError(res, 500, 'Failed to list task snapshots');
-    }
-  });
-
-  /**
-   * GET /api/proxy/issues/:identifier/snapshots/diff  (LIN-598)
-   * Read-time field-level diff of the two most recent snapshots for an issue.
-   * `changed: false` with one (or zero) snapshot means nothing to compare yet.
-   */
-  router.get('/api/proxy/issues/:identifier/snapshots/diff', proxyLimiter, authenticateProxyToken, async (req, res) => {
-    try {
-      if (!taskSnapshotStore) {
-        logEvent(req, '/api/proxy/snapshots/diff', 503);
-        return jsonError(res, 503, 'Task snapshot store not configured');
-      }
-      const { identifier } = req.params;
-      if (!isValidIssueId(identifier)) {
-        logEvent(req, '/api/proxy/snapshots/diff', 400);
-        return badRequest.json(res, 'Invalid identifier format');
-      }
-      const diff = await taskSnapshotStore.diffLatest(req.proxyUrlKey, identifier);
-      logEvent(req, '/api/proxy/snapshots/diff', 200);
-      res.json({ identifier, ...diff });
-    } catch (err) {
-      logEvent(req, '/api/proxy/snapshots/diff', 500);
-      jsonError(res, 500, 'Failed to diff task snapshots');
-    }
-  });
-
-  /**
    * GET /api/proxy/issues/:identifier/cost  (canonical — nested issue-scoped)
    * GET /api/proxy/cost/:identifier          (forgiving alias, flat form)
    * (LIN-1775)
@@ -1115,7 +1050,6 @@ export function createComputeRoutes({
 
         const canonicalId = context.issue?.id || identifier;
         const inputHash = hashContext(context);
-        captureTaskSnapshot({ urlKey: req.proxyUrlKey, identifier, context, canonicalId, inputHash });
         const cached = await recapCacheStore.get(req.proxyUrlKey, canonicalId);
 
         if (cached && cached.inputHash === inputHash) {
@@ -1273,7 +1207,6 @@ export function createComputeRoutes({
 
         const canonicalId = context.issue?.id || identifier;
         const inputHash = hashContext(context);
-        captureTaskSnapshot({ urlKey: req.proxyUrlKey, identifier, context, canonicalId, inputHash });
 
         const selectedModel = await resolveAiOperationModel({ urlKey: req.proxyUrlKey, workspacePreferencesStore, opKind: 'recap', forceDefault: isFreeTier });
         let recap;
@@ -1398,7 +1331,6 @@ export function createComputeRoutes({
 
         const canonicalId = context.issue?.id || identifier;
         const inputHash = hashContext(context);
-        captureTaskSnapshot({ urlKey: req.proxyUrlKey, identifier, context, canonicalId, inputHash });
         const cached = await briefCacheStore.get(req.proxyUrlKey, canonicalId);
 
         if (cached && cached.inputHash === inputHash) {
@@ -1556,7 +1488,6 @@ export function createComputeRoutes({
 
         const canonicalId = context.issue?.id || identifier;
         const inputHash = hashContext(context);
-        captureTaskSnapshot({ urlKey: req.proxyUrlKey, identifier, context, canonicalId, inputHash });
 
         // LIN-4501: the brief quotes the task's `asked`, read here just before it is composed (lib/brief-quote.js).
         await attachAsked(context, { recordsStore, urlKey: req.proxyUrlKey });

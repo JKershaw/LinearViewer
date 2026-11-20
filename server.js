@@ -96,7 +96,6 @@ import { createRunParagraphPrecompute } from './lib/run-paragraph-hook.js'
 import { createSessionSummaryPrecompute, createMaterializerPrecompute } from './lib/session-materializer-precompute.js'
 import { ReportHistoryStore } from './lib/report-history-store.js'
 import { ShipBiscuitHistoryStore } from './lib/ship-biscuit-history-store.js'
-import { TaskSnapshotStore } from './lib/task-snapshot-store.js'
 import { TaskDecisionsStore } from './lib/task-decisions-store.js'
 import { createOnTicketWrite } from './lib/ticket-close-closer.js'
 import { ShelvedRulingsStore } from './lib/shelved-rulings-store.js'
@@ -650,19 +649,10 @@ const shipBiscuitHistoryStore = new ShipBiscuitHistoryStore({
   collection: shipBiscuitHistoryCollection
 })
 
-// Task snapshot archive (LIN-598): append-only per-task history of the observed
-// issue slice. Captured fire-and-forget at the proxy recap/brief read seams
-// (which already compute hashContext), hash-gated so a write happens only on a
-// real change. Durable + per-task count-capped (no TTL), like report-history.
-const taskSnapshotCollection = db.collection('task-snapshots')
-const taskSnapshotStore = new TaskSnapshotStore({
-  collection: taskSnapshotCollection
-})
-
 // Task decision store (LIN-2197 Phase 2, routes wired in Phase 4): task-keyed
 // record of scan-produced decisions, the third producer into the operator
 // decision queue (LIN-1721). Durable + per-task count-capped (no TTL), like
-// task-snapshots above — a TTL would silently delete an unanswered ruling.
+// report-history — a TTL would silently delete an unanswered ruling.
 const taskDecisionsCollection = db.collection('task-decisions')
 const taskDecisionsStore = new TaskDecisionsStore({
   collection: taskDecisionsCollection
@@ -1305,7 +1295,7 @@ if (process.env.NODE_ENV === 'test') {
   // additive, test-only seam so a spec can inject a rejecting aggregate() on
   // the exact two collections /kpis' loaders read, without touching /kpis'
   // own route logic. See routes/test.js's kpis-fail-next-aggregate handler.
-  app.use(createTestRoutes({ dispatchQueueStore, dispatchTokenStore, freeTierStore, userPreferencesStore, workspacePreferencesStore, modelRoutingStore, customPromptsStore, collectiveCharactersStore, collectivePresetsStore, dispatchPresetsStore, proxyTokenStore, proxyEventStore, agentStatusStore, observationSessionsStore, sessionsFeedCache, recapCacheStore, briefCacheStore, runSummaryCacheStore, sessionSummaryCacheStore, reportHistoryStore, shipBiscuitHistoryStore, taskSnapshotStore, taskDecisionsStore, shelvedRulingsStore, dismissalSuggestionsStore, savedChatStore, localStore, getWorkspaceAccessToken, accountStore, accountWorkspaceStore, ownerCredentialStore, connectionStore, clearWorkspaceIssuesMemo, resetKeyState: (ctx) => keyState.resetKey(ctx), observerStateStore, dispatchHistoryCollection, proxyEventsCollection, resetKpiCache: (mode) => kpiPage.reset(mode), workspaceHaltStore, emailTransport: emailTransport?.kind === 'capture' ? emailTransport : null, commentDedupe, decisionStampDedupe, taskModeStore, taskShareCollection: db.collection('task_share_links'), kpiDailyRollupCollection, clearWorkspaceKpis: (urlKey) => workspaceKpisCache.clear({ urlKey }) }))
+  app.use(createTestRoutes({ dispatchQueueStore, dispatchTokenStore, freeTierStore, userPreferencesStore, workspacePreferencesStore, modelRoutingStore, customPromptsStore, collectiveCharactersStore, collectivePresetsStore, dispatchPresetsStore, proxyTokenStore, proxyEventStore, agentStatusStore, observationSessionsStore, sessionsFeedCache, recapCacheStore, briefCacheStore, runSummaryCacheStore, sessionSummaryCacheStore, reportHistoryStore, shipBiscuitHistoryStore, taskDecisionsStore, shelvedRulingsStore, dismissalSuggestionsStore, savedChatStore, localStore, getWorkspaceAccessToken, accountStore, accountWorkspaceStore, ownerCredentialStore, connectionStore, clearWorkspaceIssuesMemo, resetKeyState: (ctx) => keyState.resetKey(ctx), observerStateStore, dispatchHistoryCollection, proxyEventsCollection, resetKpiCache: (mode) => kpiPage.reset(mode), workspaceHaltStore, emailTransport: emailTransport?.kind === 'capture' ? emailTransport : null, commentDedupe, decisionStampDedupe, taskModeStore, taskShareCollection: db.collection('task_share_links'), kpiDailyRollupCollection, clearWorkspaceKpis: (urlKey) => workspaceKpisCache.clear({ urlKey }) }))
 }
 
 // =============================================================================
@@ -3325,7 +3315,7 @@ const recordPipelineMerge = createPipelineMergeRecorder({
 // LIN-4494: one reader, built once, for the proxy, the task and project pages, Home's Waiting section and `?assignee=me`.
 const listWorkspacePeople = createListWorkspacePeople({ workspaceStore, accountStore, accountWorkspaceStore })
 const canonicalAccountIdOf = (accountId) => accountStore.resolveCanonicalAccountId(accountId)
-app.use(createProxyRoutes({ proxyTokenStore, proxyEventStore, agentStatusStore, recapCacheStore, briefCacheStore, taskSnapshotStore, dispatchQueueStore, dispatchTokenStore, closeOutEventsStore, llmCallLogStore, taskDecisionsStore, shelvedRulingsStore, dismissalSuggestionsStore, harbourCommentsStore, recordsStore, listRecordPeople: listWorkspacePeople, sessionsFeedCache, workspaceFromUrl, resolveWorkspaceAccess, getWorkspaceOpenRouterKey, getWorkspaceNorthStar, getNorthStarDocVersionForWorkspace, reportHistoryStore, workspacePreferencesStore, dispatchPresetsStore, freeTierStore, accountStore, rejectedCredentialRegistry, observerStateStore, savedChatStore, workspaceHaltStore, workspaceOwnerCheck, modelRoutingStore, livenessAlarmStore, onTicketWrite, recordPipelineMerge, consumerHeartbeatStore, requestUsageStore, requestUsageLoader, leftoverStep }))
+app.use(createProxyRoutes({ proxyTokenStore, proxyEventStore, agentStatusStore, recapCacheStore, briefCacheStore, dispatchQueueStore, dispatchTokenStore, closeOutEventsStore, llmCallLogStore, taskDecisionsStore, shelvedRulingsStore, dismissalSuggestionsStore, harbourCommentsStore, recordsStore, listRecordPeople: listWorkspacePeople, sessionsFeedCache, workspaceFromUrl, resolveWorkspaceAccess, getWorkspaceOpenRouterKey, getWorkspaceNorthStar, getNorthStarDocVersionForWorkspace, reportHistoryStore, workspacePreferencesStore, dispatchPresetsStore, freeTierStore, accountStore, rejectedCredentialRegistry, observerStateStore, savedChatStore, workspaceHaltStore, workspaceOwnerCheck, modelRoutingStore, livenessAlarmStore, onTicketWrite, recordPipelineMerge, consumerHeartbeatStore, requestUsageStore, requestUsageLoader, leftoverStep }))
 
 // LIN-3098 S3: the runner kit (lib/runner-kit/*.mjs), public, for the served
 // runner prompt to fetch and verify against its sha256 pins (routes/runner-kit.js).
@@ -3497,7 +3487,7 @@ app.use(createShipJourneyRoutes({ workspaceFromUrl, reportHistoryStore, fetchWor
 // deterministic edition model over the wired event stores + one editor-in-chief
 // call → durable front page + index. Mirrors the free-tier/model wiring of the other gated AI routes.
 // LIN-4500: landed work = merges (closeOutEventsStore) joined to tracker completions (fetchWorkspaceIssues),
-// wired as Ship Journey is above. Ship Biscuit no longer reads task snapshots.
+// wired as Ship Journey is above.
 app.use(createShipBiscuitRoutes({ workspaceFromUrl, freeTierStore, workspacePreferencesStore, getOpenRouterSource, getDeployInfo, observationSessionsStore, agentStatusStore, llmCallLogStore, closeOutEventsStore, fetchWorkspaceIssues, reportHistoryStore, shipBiscuitHistoryStore }))
 
 /**

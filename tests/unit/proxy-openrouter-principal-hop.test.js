@@ -173,7 +173,6 @@ function buildApp({ getWorkspaceOpenRouterKey: resolverFn, proxyEventStore, disp
     agentStatusStore: {},
     recapCacheStore: makeCacheStore(),
     briefCacheStore: makeCacheStore(),
-    taskSnapshotStore: null,
     dispatchQueueStore: dispatchQueueStore || makeDispatchQueueStore(),
     workspaceFromUrl: (req, res, next) => next(),
     getWorkspaceAccessToken: async () => accessToken,

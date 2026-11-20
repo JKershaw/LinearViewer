@@ -83,7 +83,6 @@ import { getNorthStarDocVersion } from '../lib/north-star-resolver.js';
 import { generateRecap } from '../lib/recap.js';
 import { generateBrief } from '../lib/brief.js';
 import { hashContext } from '../lib/recap-cache.js';
-import { snapshotFromContext } from '../lib/task-snapshot-store.js';
 import { isBlocked, isTerminalState } from '../lib/providers/state-map.js';
 import { buildTaskStack } from '../lib/task-stack.js';
 import { generatePrompt, hasPrompt, isValidDispatchKind, deriveDispatchKind, getPromptDisplayName, PROMPT_TEMPLATES, DISPATCH_KINDS } from '../lib/prompt-templates.js';
@@ -480,30 +479,8 @@ async function fetchWithTimeout(workFn, ms) {
  *   workspace selects it, and via this injection.
  * @returns {Router} Express router with proxy routes
  */
-export function createProxyRoutes({ proxyTokenStore, proxyEventStore, agentStatusStore, recapCacheStore, briefCacheStore, taskSnapshotStore, dispatchQueueStore, dispatchTokenStore = null, closeOutEventsStore = null, llmCallLogStore, taskDecisionsStore = null, shelvedRulingsStore = null, dismissalSuggestionsStore = null, harbourCommentsStore = null, sessionsFeedCache = null, workspaceFromUrl, resolveWorkspaceAccess, getWorkspaceOpenRouterKey, getWorkspaceNorthStar, getNorthStarDocVersionForWorkspace = null, reportHistoryStore, workspacePreferencesStore, dispatchPresetsStore, freeTierStore, accountStore = null, provider: injectedProvider = null, rejectedCredentialRegistry = null, observerStateStore, flightCompanionChatClient = undefined, flightCompanionCreateToolCatalog = undefined, savedChatStore = null, workspaceHaltStore = null, workspaceOwnerCheck = null, modelRoutingStore = null, livenessAlarmStore = null, onTicketWrite = null, recordPipelineMerge = null, consumerHeartbeatStore = null, requestUsageStore = null, requestUsageLoader = null, leftoverStep = null, recordsStore = null, listRecordPeople = undefined }) {
+export function createProxyRoutes({ proxyTokenStore, proxyEventStore, agentStatusStore, recapCacheStore, briefCacheStore, dispatchQueueStore, dispatchTokenStore = null, closeOutEventsStore = null, llmCallLogStore, taskDecisionsStore = null, shelvedRulingsStore = null, dismissalSuggestionsStore = null, harbourCommentsStore = null, sessionsFeedCache = null, workspaceFromUrl, resolveWorkspaceAccess, getWorkspaceOpenRouterKey, getWorkspaceNorthStar, getNorthStarDocVersionForWorkspace = null, reportHistoryStore, workspacePreferencesStore, dispatchPresetsStore, freeTierStore, accountStore = null, provider: injectedProvider = null, rejectedCredentialRegistry = null, observerStateStore, flightCompanionChatClient = undefined, flightCompanionCreateToolCatalog = undefined, savedChatStore = null, workspaceHaltStore = null, workspaceOwnerCheck = null, modelRoutingStore = null, livenessAlarmStore = null, onTicketWrite = null, recordPipelineMerge = null, consumerHeartbeatStore = null, requestUsageStore = null, requestUsageLoader = null, leftoverStep = null, recordsStore = null, listRecordPeople = undefined }) {
   const router = Router();
-
-  /**
-   * Capture a task-history snapshot (LIN-598), fire-and-forget. Called at the
-   * recap/brief read seams right after the existing `hashContext(context)`, so
-   * it reuses the already-computed `context` + `inputHash` — no second fetch or
-   * hash. The store is hash-gated, so a write happens only when the observed
-   * slice actually changed; an unchanged re-read is a no-op. Never awaited on the
-   * response path (mirrors agentStatusStore.onWrite, LIN-623), so a slow or
-   * failing capture cannot affect proxy latency or the response.
-   */
-  function captureTaskSnapshot({ urlKey, identifier, context, canonicalId, inputHash }) {
-    if (!taskSnapshotStore) return;
-    Promise.resolve()
-      .then(() => taskSnapshotStore.captureIfChanged({
-        urlKey,
-        taskIdentifier: context?.issue?.identifier || identifier,
-        canonicalId,
-        inputHash,
-        snapshot: snapshotFromContext(context)
-      }))
-      .catch(err => console.error('task-snapshot capture error:', err?.message || err));
-  }
 
   // =========================================================================
   // Proxy Token Authentication Middleware
@@ -1597,7 +1574,7 @@ export function createProxyRoutes({ proxyTokenStore, proxyEventStore, agentStatu
 
   // Group F compute (LIN-679 Stage 4 / LIN-2538): extracted to
   // routes/proxy-compute.js, mounted at its original position.
-  router.use(createComputeRoutes({ recordsStore, recapCacheStore, briefCacheStore, taskSnapshotStore, dispatchQueueStore, closeOutEventsStore, requestUsageLoader, llmCallLogStore, getWorkspaceOpenRouterKey, getWorkspaceNorthStar, getNorthStarDocVersionForWorkspace, reportHistoryStore, workspacePreferencesStore, proxyLimiter, authenticateProxyToken, resolveProviderAccess, denyIfUnsupported, logEvent, logOpenRouterCredentialSource, workspaceUnavailable, graphqlErrorStatus, captureTaskSnapshot, chargeFreeTierOrReject, computeRecommendation, recommendErrorResponse, resolvePromptIssueContext, withTimeout, LINEAGE_QUERY_LIMIT, RECOMMEND_DESCENT_BUDGET_MS, LLM_TIMEOUT_MS, getTestMockData, fetchWithTimeout, CONTEXT_FETCH_TIMEOUT_MS }));
+  router.use(createComputeRoutes({ recordsStore, recapCacheStore, briefCacheStore, dispatchQueueStore, closeOutEventsStore, requestUsageLoader, llmCallLogStore, getWorkspaceOpenRouterKey, getWorkspaceNorthStar, getNorthStarDocVersionForWorkspace, reportHistoryStore, workspacePreferencesStore, proxyLimiter, authenticateProxyToken, resolveProviderAccess, denyIfUnsupported, logEvent, logOpenRouterCredentialSource, workspaceUnavailable, graphqlErrorStatus, chargeFreeTierOrReject, computeRecommendation, recommendErrorResponse, resolvePromptIssueContext, withTimeout, LINEAGE_QUERY_LIMIT, RECOMMEND_DESCENT_BUDGET_MS, LLM_TIMEOUT_MS, getTestMockData, fetchWithTimeout, CONTEXT_FETCH_TIMEOUT_MS }));
 
 
   // Group G agent-status (LIN-679 Stage 1 / LIN-2533): extracted to

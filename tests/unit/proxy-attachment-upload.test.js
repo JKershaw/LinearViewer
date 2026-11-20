@@ -92,7 +92,6 @@ function buildApp({ token = 'ws-token', reason = 'ok', provider, scope = 'readWr
     agentStatusStore: {},
     recapCacheStore: { get: async () => null, set: async () => {} },
     briefCacheStore: { get: async () => null, set: async () => {} },
-    taskSnapshotStore: {},
     dispatchQueueStore: {},
     workspaceFromUrl: (req, res, next) => next(),
     workspacePreferencesStore: {},

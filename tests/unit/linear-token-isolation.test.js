@@ -661,7 +661,6 @@ function buildApp({ resolveWorkspaceAccess, provider }) {
     agentStatusStore: {},
     recapCacheStore: {},
     briefCacheStore: {},
-    taskSnapshotStore: {},
     dispatchQueueStore: {},
     workspaceFromUrl: (req, res, next) => next(),
     resolveWorkspaceAccess,

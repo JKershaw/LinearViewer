@@ -71,7 +71,6 @@ function buildProxyApp({ captured, token = 'test-token' }) {
     agentStatusStore: {},
     recapCacheStore: { get: async () => null, set: async () => {} },
     briefCacheStore: { get: async () => null, set: async () => {} },
-    taskSnapshotStore: {},
     llmCallLogStore: {},
     dispatchQueueStore: capturingStore(captured),
     workspaceFromUrl: (req, res, next) => next(),

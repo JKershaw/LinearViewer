@@ -14,8 +14,8 @@ import { test, describe, beforeEach } from 'node:test';
 import assert from 'node:assert';
 import { TaskDecisionsStore } from '../../lib/task-decisions-store.js';
 
-// Minimal in-memory mock of the collection surface the store uses, mirroring
-// tests/unit/task-snapshot-store.test.js's mock.
+// Minimal in-memory mock of the collection surface the store uses (it once mirrored
+// the retired task-snapshot store's test mock).
 function createMockCollection() {
   const docs = [];
   // Minimal `$in`/`$ne` support (real MongoDB/MangoDB shape) — only what
@@ -1045,11 +1045,9 @@ describe('TaskDecisionsStore.answer (LIN-2889)', () => {
   });
 });
 
-// LIN-2226 (folded in from LIN-2223): line-for-line mirror of
-// TaskSnapshotStore.clear's own test (tests/unit/task-snapshot-store.test.js,
-// "clear removes a workspace history") — the method itself is a mirror of
-// TaskSnapshotStore.clear (same guard, same deleteMany({urlKey}), same
-// log-and-return-0), so its test should be too.
+// LIN-2226 (folded in from LIN-2223): the clear method's own test (it began as a
+// line-for-line mirror of the retired task-snapshot store's clear, LIN-4502): same
+// guard, same deleteMany({urlKey}), same log-and-return-0.
 describe('TaskDecisionsStore.clear', () => {
   test('clear removes a workspace\'s scan rows', async () => {
     const collection = createMockCollection();

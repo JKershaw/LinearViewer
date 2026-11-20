@@ -527,7 +527,6 @@ function buildLiveRecommendApp({ description, captured }) {
     agentStatusStore: {},
     recapCacheStore: { get: async () => null, set: async () => {}, put: async () => {} },
     briefCacheStore: { get: async () => null, set: async () => {}, put: async () => {} },
-    taskSnapshotStore: {},
     dispatchQueueStore: {
       addItem: async (urlKey, item) => {
         captured.item = item;

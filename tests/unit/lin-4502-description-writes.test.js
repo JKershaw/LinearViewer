@@ -8,9 +8,8 @@
  *     and a PATCH that adds one, are written as sent (no AS_ASKED_IMMUTABLE): the person's words live on the task's
  *     `asked`, which no description write reaches (tests/unit/lin-4502-witness.test.js pins that side);
  *   - a create whose body holds the heading or end line is filed as written, with no block sealed around it;
- *   - append and replace still splice; description/below still keeps a legacy block and replaces what follows it
- *     (it goes with the prune, the next step of LIN-4502), and on a description with no block answers 422
- *     NO_AS_ASKED_BLOCK;
+ *   - append and replace still splice;
+ *   - the write-below route the close-out prune used is gone (LIN-4502 retired the prune): it answers 404;
  *   - a PATCH with a description still makes exactly one issueDescription read (the size record guard's);
  *   - Jira: descriptions are read with the one adfToMarkdown reader and written with markdownToAdf. A block in the
  *     ADF reads back as its rendering, and an orphaned `harbour.asAsked` property is never read and never removed.
@@ -27,7 +26,7 @@ import { jiraProvider } from '../../lib/providers/jira/index.js';
 import { createFakeJiraClient } from '../../lib/providers/jira/fake-client.js';
 import { adfToMarkdown, markdownToAdf } from '../../lib/providers/jira/adf.js';
 import { createLocalStore } from '../fixtures/local-harness.js';
-import { quoteAsked, splitQuote, ASKED_HEADING, ASKED_END } from '../../lib/brief-quote.js';
+import { quoteAsked, ASKED_HEADING, ASKED_END } from '../../lib/brief-quote.js';
 
 // Must match TEST_LOCAL_URL_KEY in routes/proxy.js (and LOCAL_WORKSPACE_URL_KEY).
 const LOCAL_URL_KEY = 'local-workspace';
@@ -102,12 +101,6 @@ for (const variant of VARIANTS) {
     });
 
     const storedDescription = async (id) => (await store.getIssue(LOCAL_URL_KEY, id)).description;
-    /** A legacy block's bytes exactly as stored: everything up to the end line. */
-    const blockBytes = (description) => {
-      const parts = splitQuote(description);
-      assert.ok(parts, `expected a block in ${JSON.stringify(description)}`);
-      return description.slice(0, parts.end);
-    };
 
     test('a PATCH that changes one character inside a legacy block is written as sent', async () => {
       const edited = sealed.replace('full guide', 'fuller guide');
@@ -143,22 +136,10 @@ for (const variant of VARIANTS) {
       assert.equal(after, `${sealed}\n\n## Notes\n\nfound it`);
     });
 
-    test('description/below keeps a legacy block exactly as read and replaces everything after its end line', async () => {
-      const before = blockBytes(sealed);
+    test('the retired write-below route is not registered: 404, store unchanged', async () => {
       const res = await call(proxyApp(), 'POST', '/api/proxy/issues/i1/description/below', { body: 'Shipped in #12.' });
-      assert.equal(res.status, 200, JSON.stringify(res.body));
-      assert.equal(res.body.success, true);
-      const after = await storedDescription('i1');
-      assert.equal(after, `${before}\n\nShipped in #12.`);
-      assert.ok(!after.includes('step one'), 'the old text below is gone');
-    });
-
-    test('description/below on a description with no block → 422 NO_AS_ASKED_BLOCK naming PATCH; store unchanged', async () => {
-      const res = await call(proxyApp(), 'POST', '/api/proxy/issues/i2/description/below', { body: 'x' });
-      assert.equal(res.status, 422, JSON.stringify(res.body));
-      assert.equal(res.body.code, 'NO_AS_ASKED_BLOCK');
-      assert.match(res.body.error, /PATCH/);
-      assert.equal(await storedDescription('i2'), unsealed);
+      assert.equal(res.status, 404, JSON.stringify(res.body));
+      assert.equal(await storedDescription('i1'), sealed);
     });
 
     test('a create whose body holds the heading or the end line is filed as written, with no block sealed around it', async () => {
@@ -273,12 +254,6 @@ describe('description writes against the Jira fake', () => {
     assert.equal((await call(app, 'POST', '/api/proxy/issues/ENG-1/description/replace', { oldString: 'step one', newString: 'step two' })).status, 200);
     assert.equal((await call(app, 'PATCH', '/api/proxy/issues/ENG-1', { description: 'rewritten' })).status, 200);
     assert.equal((await jiraProvider.issueDescription(SCOPE, 'ENG-1')).description, 'rewritten');
-  });
-
-  test('description/below on a Jira ticket with no block → 422 NO_AS_ASKED_BLOCK', async () => {
-    const res = await call(jiraApp(), 'POST', '/api/proxy/issues/ENG-1/description/below', { body: 'x' });
-    assert.equal(res.status, 422, JSON.stringify(res.body));
-    assert.equal(res.body.code, 'NO_AS_ASKED_BLOCK');
   });
 
   test('a block the region wrote reads back as the plain rendering of its ADF; the orphaned property is never read', async () => {

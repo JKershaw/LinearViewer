@@ -14,7 +14,6 @@ import { createChatToolCatalog, CHAT_TOOL_SCHEMAS, CHAT_TOOL_SCOPE_TIERS, CHAT_T
 import { deriveFollowUpDispatch } from '../../lib/follow-up-dispatch.js';
 import { TOOL_RESULT_MAX_CHARS } from '../../lib/openrouter.js';
 import { hashContext } from '../../lib/recap-cache.js';
-import { snapshotFromContext } from '../../lib/task-snapshot-store.js';
 import { getSessionsForWorkspace, getLoopsForWorkspace } from '../../lib/pipeline-loops.js';
 import { classifyLoop } from '../../lib/observer-sweep.js';
 import { computeSupersededLoopIds } from '../../lib/loop-supersede.js';
@@ -459,9 +458,9 @@ describe('executors — direct provider calls, workspace-scoped', () => {
   });
 
   // The load-bearing shared-surface guard: the two new child fields ride on
-  // context.children but must NOT change the hash/snapshot slices, or every task
-  // resnapshots and recap/brief caches invalidate workspace-wide.
-  test('the new child fields (updatedAt, relations) do not leak into hashContext / snapshotFromContext (LIN-1066)', () => {
+  // context.children but must NOT change the hashed slice, or recap/brief caches
+  // invalidate workspace-wide.
+  test('the new child fields (updatedAt, relations) do not leak into hashContext (LIN-1066; the task-snapshot slice it also guarded went with LIN-4502)', () => {
     const withNewFields = childrenContextFor('LIN-200');
     // The same context with the two new fields stripped from every child.
     const withoutNewFields = {
@@ -472,10 +471,6 @@ describe('executors — direct provider calls, workspace-scoped', () => {
     assert.strictEqual(
       hashContext(withNewFields), hashContext(withoutNewFields),
       'hashContext must ignore child updatedAt/relations',
-    );
-    assert.deepStrictEqual(
-      snapshotFromContext(withNewFields), snapshotFromContext(withoutNewFields),
-      'snapshotFromContext must ignore child updatedAt/relations',
     );
   });
 

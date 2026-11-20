@@ -229,15 +229,13 @@ describe('the standing policy line', () => {
 });
 
 describe('close-out keeps the record', () => {
-  test('the prune step says to keep the size section verbatim, in the prune instruction itself', () => {
+  // LIN-4502: the prune (and its keep-the-record-verbatim line) is retired; close-out no longer rewrites the
+  // description, so it cannot drop the record. The proxy still refuses a write that drops it (size-of-move-guard).
+  test('close-out has no prune step that could rewrite the record', () => {
     const issue = { identifier: 'ABC-7', title: 'Approved work', description: withRecord(PLAIN), state: { name: 'In Progress', type: 'started' }, labels: [] };
     const { prompt } = generatePrompt('close-out', issue, { comments: [] });
-    const prune = prompt.split('\n').find((l) => l.includes('**Prune**'));
-    assert.ok(prune, 'close-out has its prune step');
-    assert.match(prune, /description\/below/);
-    assert.ok(prune.includes(`Keep the \`${SIZE_OF_MOVE_HEADING}\` section verbatim`), prune);
-    // LIN-4369 arm 3: a stub straight below the record would sit inside its section and be refused.
-    assert.ok(prune.includes(`section verbatim, with your stub under a heading of its own`), prune);
+    assert.ok(!prompt.split('\n').some((l) => l.includes('**Prune**')), 'no prune step');
+    assert.doesNotMatch(prompt, /description\/below/);
   });
 });
 

@@ -359,7 +359,7 @@ function buildApp(provider) {
     getWorkspaceAccessToken: async () => 'ws-token',
     getWorkspaceOpenRouterKey: async () => null,
     agentStatusStore: {}, recapCacheStore: { get: async () => null, set: async () => {} },
-    briefCacheStore: { get: async () => null, set: async () => {} }, taskSnapshotStore: {}, dispatchQueueStore: {},
+    briefCacheStore: { get: async () => null, set: async () => {} }, dispatchQueueStore: {},
     workspaceFromUrl: (req, res, next) => next(), workspacePreferencesStore: {},
     freeTierStore: { tryUse: async () => ({ allowed: true }) }, provider,
   }));

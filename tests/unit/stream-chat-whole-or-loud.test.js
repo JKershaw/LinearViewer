@@ -425,7 +425,6 @@ function proxyApp({ provider, briefCacheStore }) {
     agentStatusStore: {},
     recapCacheStore: { get: async () => null, put: async () => {} },
     briefCacheStore,
-    taskSnapshotStore: {},
     dispatchQueueStore: {},
     workspaceFromUrl: (req, res, next) => next(),
     workspacePreferencesStore: null,

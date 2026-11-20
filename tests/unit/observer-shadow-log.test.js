@@ -12,7 +12,7 @@
  *      consume them without translation.
  *   C. ObserverShadowLogStore — recordActions / listByWorkspace / cleanup,
  *      against an in-memory mock collection (precedent:
- *      tests/unit/task-snapshot-store.test.js).
+ *      tests/unit/task-decisions-store.test.js).
  *   D. Growth/retention cap — per-workspace count cap, matching P1-2's
  *      (lib/observer-state-store.js) retention pattern per this ticket's own
  *      acceptance criteria.
@@ -45,7 +45,7 @@ import {
 import { isWakeEvent, findWakeEvent } from '../../lib/dispatch-terminal.js';
 
 // Minimal in-memory mock of the collection surface the store uses —
-// precedent: tests/unit/task-snapshot-store.test.js's createMockCollection.
+// precedent: tests/unit/task-decisions-store.test.js's createMockCollection.
 function createMockCollection() {
   const docs = [];
   function matches(doc, query) {

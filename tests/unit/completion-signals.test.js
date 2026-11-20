@@ -197,10 +197,8 @@ describe('judging signals read the As asked block (LIN-4353)', () => {
     assert.match(COMPLETION_SIGNALS['close-out'].readinessCheck, /how the work meets what was asked/);
   });
 
-  test('close-out: the prune writes below the block through description/below, and not at all with no block', () => {
-    const prune = doneSignal('close-out', /pre-prune snapshot/);
-    assert.match(prune, /below the `## As asked` block, through `description\/below`/);
-    assert.match(prune, /with no block, no prune/);
-    assert.match(COMPLETION_SIGNALS['close-out'].readinessCheck, /below the `## As asked` block only/);
+  test('close-out: LIN-4502 retired the prune, so no signal names it', () => {
+    const sig = COMPLETION_SIGNALS['close-out'];
+    for (const text of [sig.coreOutcome, sig.readinessCheck, ...sig.signals]) assert.doesNotMatch(text, /prune|archive|description\/below/i);
   });
 });

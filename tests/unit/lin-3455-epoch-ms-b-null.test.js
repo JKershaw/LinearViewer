@@ -13,7 +13,6 @@ import { test, describe } from 'node:test';
 import assert from 'node:assert/strict';
 import { ShelvedRulingsStore } from '../../lib/shelved-rulings-store.js';
 import { TaskDecisionsStore } from '../../lib/task-decisions-store.js';
-import { TaskSnapshotStore } from '../../lib/task-snapshot-store.js';
 
 // One generic in-memory collection: equality, $in, $ne on top-level fields.
 function createMockCollection() {
@@ -100,17 +99,5 @@ describe('null is missing, not epoch 0 (LIN-3453)', () => {
       collection._docs.push(row('valid', 't1', { scannedAt: T1 }), row('nul', 't1', { scannedAt: null }));
       assert.equal((await store.listNewestScanPerTask(['acme']))['acme::t1'].scannedAt, T1.toISOString());
     });
-  });
-
-  test('task-snapshot-store: a null capturedAt orders by seq like junk (it sorted as epoch 0, last)', async () => {
-    const collection = createMockCollection();
-    const store = new TaskSnapshotStore({ collection });
-    const snap = (id, extra) => ({ _id: id, urlKey: 'acme', taskIdentifier: 'LIN-1', ...extra });
-    collection._docs.push(
-      snap('s1', { capturedAt: T1, seq: 1 }),
-      snap('s2', { capturedAt: T2, seq: 2 }),
-      snap('nul', { capturedAt: null, seq: 3 })
-    );
-    assert.deepEqual((await store._docsFor('acme', 'LIN-1')).map(d => d._id), ['nul', 's2', 's1']);
   });
 });

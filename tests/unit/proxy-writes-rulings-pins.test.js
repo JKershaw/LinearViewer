@@ -137,8 +137,6 @@ const PNG = 'data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJA
 const DESCRIPTION_FORMS = {
   append: { path: '/api/proxy/issues/LIN-1/description/append', body: { block: 'more' }, endpoint: '/api/proxy/issues/:id/description/append', resolves: 1 },
   replace: { path: '/api/proxy/issues/LIN-1/description/replace', body: { oldString: 'existing', newString: 'changed' }, endpoint: '/api/proxy/issues/:id/description/replace', resolves: 1 },
-  // LIN-4352: description/below runs the same pipeline, on a sealed description.
-  below: { path: '/api/proxy/issues/LIN-1/description/below', body: { body: 'pruned' }, endpoint: '/api/proxy/issues/:id/description/below', resolves: 1 },
   // The attachments route resolves once itself, then again inside the description pipeline.
   attachments: { path: '/api/proxy/issues/LIN-1/attachments', body: { image: PNG, target: 'description' }, endpoint: '/api/proxy/issues/:id/attachments', resolves: 2 },
 };
@@ -148,8 +146,8 @@ function descriptionWorld({ rejectResolveAt, updateIssue } = {}) {
   const writeEvents = [];
   let resolves = 0;
   const provider = makeFakeProvider();
-  // Sealed (LIN-4352) so description/below has a block to write below; append and
-  // replace edit below it, so they behave exactly as on an unsealed body.
+  // A legacy sealed body (filed before LIN-4502); append and replace edit below it, so
+  // they behave exactly as on an unsealed body.
   provider.issueDescription = async () => ({ description: `${quoteAsked('asked')}\n\nexisting` });
   if (updateIssue) provider.updateIssue = updateIssue;
   const deps = BASE_DEPS();

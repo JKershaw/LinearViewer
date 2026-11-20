@@ -3,10 +3,10 @@
  * routes/proxy.js; rebuilt design-first in LIN-3573 / LIN-3576).
  *
  * Consumer-API write endpoints: POST /issues, PATCH /issues/:issueId,
- * description append/replace/below, comments create/delete/patch, attachments
+ * description append/replace, comments create/delete/patch, attachments
  * upload, relations create/delete, labels add/remove.
  *
- * The description writes (PATCH `description`, append, replace, below and the
+ * The description writes (PATCH `description`, append, replace and the
  * description-target attachment) carry the size record guard (LIN-4368,
  * `refusedBySizeRecord`) at their two call sites: a `## Size of the move` section
  * says what and why, never how, a policy never decides "wrong work", and a write may not drop
@@ -29,7 +29,7 @@
  *    400s on comment create/delete/edit, relation create/delete and label
  *    add/remove; the comment body type/character/length 400s; the relatedIssueId
  *    400; and the field-validation 400s on create/update.
- *  - Order deviations: append/replace/below validate their body BEFORE resolving
+ *  - Order deviations: append/replace validate their body BEFORE resolving
  *    (a 400 beats a 503); labels resolve the label ref before the trashed read;
  *    comment create refuses a trashed target before its dedupe lookup; the
  *    attachments `target` check runs after the 503 and the uploadFile gate.
@@ -57,8 +57,6 @@ import { extractPeriodicalGateId } from '../lib/periodicals.js';
 import { flattenIssue, MAX_ATTACHMENT_BYTES } from '../lib/proxy-wire.js';
 import { UUID_REGEX, isValidIssueId } from '../lib/workspace.js';
 import { appendBlock, replace as replaceInDescription, DescriptionEditError } from '../lib/description-edit.js';
-import { legacyBlockSpan } from '../lib/asked-of.js';
-import { ASKED_HEADING } from '../lib/brief-quote.js';
 import { checkSizeRecord, recordShape, SIZE_OF_MOVE_HEADING, SIZE_RECORD_CODES, DECIDED_BY, WRONG_WORK } from '../lib/size-of-move.js';
 import { blindReadRefusal } from '../lib/run-ledger.js';
 import { checkBlindRead, landingPrUrls } from '../lib/run-trail.js';
@@ -127,7 +125,6 @@ const SPEC = {
   updateIssue: { endpoint: '/api/proxy/issues/:id', needs: 'updateIssue', source: true, issueId: 'logged', failure: 'Failed to update issue', label: 'update issue', refs: true, partial: true },
   appendDescription: { endpoint: '/api/proxy/issues/:id/description/append', needs: 'updateIssue', source: true, issueId: 'logged', failure: 'Failed to update description', label: 'description edit', refs: true, partial: true },
   replaceDescription: { endpoint: '/api/proxy/issues/:id/description/replace', needs: 'updateIssue', source: true, issueId: 'logged', failure: 'Failed to update description', label: 'description edit', refs: true, partial: true },
-  belowDescription: { endpoint: '/api/proxy/issues/:id/description/below', needs: 'updateIssue', source: true, issueId: 'logged', failure: 'Failed to update description', label: 'description edit', refs: true, partial: true },
   createComment: { endpoint: '/api/proxy/issues/comments', needs: 'createComment', source: true, issueId: 'silent', failure: 'Failed to create comment', label: 'create comment' },
   deleteComment: { endpoint: '/api/proxy/issues/comments', needs: 'deleteComment', source: true, issueId: 'silent', failure: 'Failed to delete comment', label: 'delete comment' },
   updateComment: { endpoint: '/api/proxy/issues/comments', needs: 'updateComment', source: true, issueId: 'silent', failure: 'Failed to update comment', label: 'update comment' },
@@ -635,7 +632,7 @@ export function createProxyWriteRoutes({
 
     if (next.length > MAX_DESCRIPTION_LENGTH) return refuse(ctx, 400, 'resulting description exceeds maximum length');
     if (DANGEROUS_CHARS_REGEX.test(next)) return refuse(ctx, 400, 'resulting description contains invalid characters');
-    // Append, replace, below and the description-target attachment all pass here.
+    // Append, replace and the description-target attachment all pass here.
     if (await refusedBySizeRecord(ctx, current, next, liveIssue)) return;
 
     try {
@@ -680,38 +677,6 @@ export function createProxyWriteRoutes({
       const { oldString, newString } = ctx.req.body;
       return editDescription(ctx, (current) => replaceInDescription(current, oldString, newString));
     }));
-
-  /** Body check for description/below, before resolution like append/replace. An empty body clears everything below. */
-  const refuseBadBelow = (ctx) => {
-    const { body } = ctx.req.body;
-    if (typeof body !== 'string') return refuse(ctx, 400, 'body is required');
-    if (body.length > MAX_DESCRIPTION_LENGTH) return refuse(ctx, 400, 'body exceeds maximum length');
-    if (DANGEROUS_CHARS_REGEX.test(body)) return refuse(ctx, 400, 'body contains invalid characters');
-    return false;
-  };
-
-  /**
-   * Everything up to a legacy As asked block's end line (lib/asked-of.js
-   * legacyBlockSpan), kept exactly as read, then `body` after a blank line (nothing
-   * after the end line when `body` is empty). Text above the block, if any, is kept
-   * too. A ticket with no block has nothing to write below: a loud 422 naming PATCH,
-   * the full-rewrite route. Retired with the prune (LIN-4502, next step).
-   */
-  function keepBlockThen(current, body) {
-    const parts = legacyBlockSpan(current);
-    if (!parts) {
-      throw new DescriptionEditError('NO_AS_ASKED_BLOCK', 'This description has no "' + ASKED_HEADING + '" block, so there is nothing to write below. To rewrite the whole body, use PATCH /api/proxy/issues/{issueId} with { "description": "..." }; to add to it, use description/append.', undefined);
-    }
-    const kept = current.slice(0, parts.end);
-    return body ? `${kept}\n\n${body}` : kept;
-  }
-
-  // POST /api/proxy/issues/:issueId/description/below (LIN-4352): replace
-  // everything after the As asked block's end line, keeping the block exactly as
-  // read, so a prune never re-sends the person's words. Shares editDescription's
-  // read, length and character checks.
-  router.post('/api/proxy/issues/:issueId/description/below', ...writeAuth('belowDescription'),
-    guarded({ ...SPEC.belowDescription, pre: refuseBadBelow }, (ctx) => editDescription(ctx, (current) => keepBlockThen(current, ctx.req.body.body))));
 
   // ---------------------------------------------------------------------------
   // Comments
