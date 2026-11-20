@@ -9,11 +9,9 @@
 // import is the honest gap. The runner's lists are not read after the Harbour cutover (the LIN-4505 ruling), so the
 // runner row reads `not measured` from there on. The rows' shape and their totals are the core's (waitingRows).
 import { readFileSync } from 'node:fs';
-import { firstLine } from './stability-measures-tracker.mjs';
+import { openHandOffs } from './stability-measures-core.mjs';
 
 export const SERIES_URL = new URL('../docs/reviews/stability-measures/waiting-series.json', import.meta.url);
-/** The hand-off kinds the records rows count (stability-measures-core.mjs HAND_OFF_KINDS). */
-const HAND_OFF_KINDS = Object.freeze(['finding', 'question']);
 
 /** The committed series, read as data. Throws when the file is missing or not the series, so a run cannot quietly read nothing. */
 export function loadWaitingSeries(url = SERIES_URL) {
@@ -41,15 +39,15 @@ export function seriesReadingAt(side, sha) {
 }
 
 /**
- * The records reading at a time: the open hand-offs to the project as of `asOf`, through the proxy. A failed read is a
- * reason. `client` is the proxy client (createProxyClient): its get never throws.
+ * The records reading at a time: the open hand-offs to the project as of `asOf`, through the proxy, counted by the core's
+ * own rule (`openHandOffs`, the one the records rows use). A failed read is a reason. `client` is the proxy client (createProxyClient): its get never throws.
  * @returns {Promise<{count: number}|{reason: string}>}
  */
 export async function recordsReadingAt(client, asOf) {
   const r = await client.get(`/records?to=project&state=open&asOf=${encodeURIComponent(new Date(asOf).toISOString())}`);
   if (!r.ok) return { reason: `records read: ${r.reason}` };
   if (!Array.isArray(r.body?.records)) return { reason: 'records read: the answer has no records list' };
-  return { count: r.body.records.filter((x) => HAND_OFF_KINDS.includes(x.kind)).length };
+  return { count: openHandOffs(r.body.records).length };
 }
 
 /**

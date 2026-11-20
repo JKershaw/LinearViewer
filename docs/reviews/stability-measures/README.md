@@ -288,7 +288,7 @@ taken before the first entries are gone.
 These rows are not among the five measures, and `buildReading` does not print them. The stability tool reads the
 records store only through the proxy, and only for `waiting.harbour` after the import (LIN-4505); it never reads the
 store directly. They are read by `scripts/records-readings.mjs`, which reads the production
-store (MONGODB_URI, or the data directory as the importer does), prints each row with its window and sample size, and
+store (MONGODB_URI, or the data directory as server.js does), prints each row with its window and sample size, and
 prints the stale-open-runs count beside them: open run records whose current version is more than 24 hours old. Run it
 no earlier than the evening of 21 Nov 2026, and read query-log evidence before 17 Feb 2027, its 90-day retention. A
 stale count of zero on a store with few tasks run end to end is not evidence that wakes are unneeded: the decision on

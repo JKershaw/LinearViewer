@@ -136,13 +136,11 @@ describe('the runner after the Harbour cutover: its lists are history, not read'
   });
 
   test('a window endpoint after the cutover reads not measured for the runner, even at a runner commit from before it (the ruling)', () => {
-    const headSha = series.runner.commits && Object.keys(series.runner.commits)[0];
     const lastBefore = '4dc83d1e582f' + '0'.repeat(28);
     assert.deepStrictEqual(runnerEndpointAt({ series, sha: lastBefore, date: '2026-11-14T11:09:44+00:00' }), { count: series.runner.commits['4dc83d1e582f'] });
     const reading = runnerEndpointAt({ series, sha: lastBefore, date: '2026-11-19T19:39:51+00:00' });
     assert.ok('reason' in reading);
     assert.match(reading.reason, /not read after the Harbour cutover/);
-    assert.ok(headSha, 'the series has runner commits');
   });
 
   test('waiting.runner and waiting.total read not measured for a window whose head is after the cutover', () => {

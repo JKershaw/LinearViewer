@@ -57,3 +57,8 @@ Area notes for `reports-and-operator-tools` in the registry. Format and rules: R
   stand-in proxy; a new read gets a case there, not only a hand run. On git 2.46
   `--first-parent` already gives first-parent merge diffs, so dropping the explicit
   `--diff-merges=first-parent` passes the test there; keep the flag for older git (LIN-4423 leftovers).
+- A production run that needs Node goes through `railway ssh` into the app service (`harbour-cat`), not MongoDB-harbour:
+  it has Node, `MONGODB_URI` and the deployed build, but no git. Pass inputs as a base64 tarball unpacked in `/dev/shm`;
+  a script run from there resolves bare imports from its own folder, so symlink `/app/node_modules` beside it. Tar on
+  macOS with `COPYFILE_DISABLE=1`, or `._*.md` AppleDouble files ride along and read as notes. Retire a reader by
+  committing its readings, checked against the committed reference first (LIN-4505).

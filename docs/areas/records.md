@@ -40,8 +40,8 @@ routes/task-records.js, routes/project-page.js, routes/dispatch.js, server.js).
   `tests/unit/urlkey-holders.test.js`, and the dry-run's `URLKEY_SOURCES` (`scripts/dry-run-urlkey-duplicates.mjs`).
   The second is the one a local run of the area's tests misses; CI's full suite caught it.
 
-- Every writer goes through one checked pipeline, `lib/records/writes.js` (`createRecordWrites`): the proxy routes, the
-  task-page and project-page routes, and the importer. It checks the body, dry-runs the tickets it names, makes their
+- Every writer goes through one checked pipeline, `lib/records/writes.js` (`createRecordWrites`): the proxy routes and the
+  task-page and project-page routes. It checks the body, dry-runs the tickets it names, makes their
   tasks only when that is clean, then checks again. `by` is the writer's own (a stage kind, `person:<account>`,
   `import`, `harbour`), never read from a body; a new writer calls the pipeline, never the store's add, revise, end or link.
 - Outward steps (LIN-4503) run after a record persists, through one injected `tracker(ctx)` port (lib/records-tracker.js),
@@ -61,9 +61,7 @@ routes/task-records.js, routes/project-page.js, routes/dispatch.js, server.js).
 - A page GET never makes a task. The task page reads its task record by the ticket's claim (`taskForTicket`) and offers
   its add and child-task forms before one exists; the first write through the checked pipeline makes the task
   (routes/task-records.js sends `in: <ticket>`). The project page's actions and the proxy make tasks the same way.
-- The one-off import (LIN-4494's importer, run in production by LIN-4505) and its parked-ticket manifest are retired: the
-  records it wrote stay, `via: import`, under their fixed ids. Its Waiting reader is gone too; the stability measures read the
-  committed series for commits before the cutover and the records after it (scripts/stability-measures-waiting.mjs).
+- Imported records (LIN-4505) keep `via: import` and their fixed ids: never re-import or re-id them; the importer is gone.
 - A records reading has one caller per surface, and an injected alias hides a caller from a search by name: the
   session page reads evidence through `readRunEvidenceFn` (`routes/dashboard.js`), missed the store at LIN-4495, and
   every session page read "not measured". Search the aliases too, and keep a missing store reading "not measured",

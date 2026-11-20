@@ -1,6 +1,6 @@
 // LIN-4420: the stability measures' core (scripts/stability-measures-core.mjs). Pure inputs in, rows out: the row
 // contract's three states, the counting rule against the code-shape kit's own counter, churn's scope and denominator,
-// CI matching, Waiting's zero-versus-unreadable line, and the measures' order. The live run on the 8 Nov window needs
+// CI matching, and the measures' order (the Waiting readings are tests/unit/lin-4505-waiting-series.test.js). The live run on the 8 Nov window needs
 // the proxy, `gh` and two checkouts, so it is not run here: its committed output (LIN-4423) is checked below, and the
 // CLI's own reads are run against fixture repositories and a stand-in `gh`.
 // LIN-4421: the tracker half. Landing ownership, finished-task selection across window edges, sessions as /cost
@@ -1016,7 +1016,8 @@ describe('the declaration names what the tool emits', () => {
 // whose issue list is empty: the tracker rows stop there, after the log was read. The proxy reads themselves are the
 // tracker tests' above.
 describe('the CLI\'s reads, end to end on fixture repositories', () => {
-  const note = (n) => `# x\n\n## Lessons\n\n## Waiting\n\n${Array.from({ length: n }, (_, i) => `- \`lib/a.js\`: entry ${i}.\n`).join('')}`;
+  // A note's text only gives each fixture commit a change: the tool no longer reads notes for Waiting (LIN-4505).
+  const note = (n) => `# x\n\n## Lessons\n\n${Array.from({ length: n }, (_, i) => `- \`lib/a.js\`: lesson ${i}.\n`).join('')}`;
   const at = (d) => `2026-01-0${d}T12:00:00Z`;
 
   test('churn counts a merge landing against its first parent; tickets, Waiting, runner endpoints and CI are read; measure 1 needs --api', () => {

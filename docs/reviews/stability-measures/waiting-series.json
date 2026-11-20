@@ -2530,7 +2530,7 @@
   },
   "runner": {
     "repo": "simple-dispatcher",
-    "through": "first-parent commit on origin/main at or before",
+    "through": "origin/main first-parent commits up to throughDate",
     "throughDate": "2026-11-19T19:39:50Z",
     "commits": {
       "88ba61c2400a": 0,
