@@ -49,13 +49,16 @@ Net production lines lead, with code and comments counted apart.
 - `ci`: the median minutes (`updatedAt − startedAt`) of successful `test.yml` runs on `main` whose head sha is a
   window landing. Unit: one run per landing. Source: `gh`. Defined in `scripts/stability-measures-core.mjs`
   (`ciRow`) and `scripts/stability-measures.mjs` (the listing).
-- `waiting.harbour`, `waiting.runner`, `waiting.total`: the bullets under each area note's `## Waiting` heading at base and
-  head, read by the frozen reader `countFrozenWaiting` (`lib/records/waiting-import.js`), which keeps the pre-cutover
-  shape for historical windows. A commit with no notes directory reads 0. A commit whose notes carry no `## Waiting`
-  section (every note after LIN-4495 retired the lists) reads `not measured` with that reason, never 0, so a window
-  that spans the cutover shows the gap rather than a fall. The readings below are from before LIN-4495. The records
-  rows that replace them (open to project, open to a stage, sit time) are LIN-4496's. Defined in
-  `scripts/stability-measures.mjs` (`waitingAt`).
+- `waiting.harbour`, `waiting.runner`, `waiting.total`: the bullets under each area note's `## Waiting` heading, the count
+  the lists stood at before the LIN-4495 cutover. LIN-4505 moved the readings off git: before the cutover they come from
+  the committed series `waiting-series.json` beside this file (one entry per first-parent commit, read once from git and
+  kept as data; a commit with no notes directory reads 0, and a commit whose notes carry no `## Waiting` section reads its
+  reason, never 0). A commit the series does not hold is `not measured`. From the first imported record on
+  (`records.coveredFrom` in the series), `waiting.harbour` reads the open hand-offs to the project as of the commit's time,
+  through the proxy (`GET /api/proxy/records`). The gap between the cutover and the import has no reading in either
+  source, so a window across it shows `not measured` rather than a fall. The two sources count different things: the series counts Waiting bullets (124 at the last pre-cutover commit), while the records reading counts open hand-offs to the project, including ones that predate the import (29 at the import, so it read 149 just after it). A window whose base reads the series and whose head reads the records therefore compares two definitions, and a rise across the import is not growth. `waiting.runner` is read from the series up to the
+  Harbour cutover only: the runner's own lists are history, and from there `waiting.runner` and `waiting.total` read `not
+  measured` (LIN-4505 ruling). Defined in `scripts/stability-measures-waiting.mjs`, read by `scripts/stability-measures.mjs`.
 - `minted`: tickets minted per landing, an **ID-span estimate**: the highest issue number created at or before
   head's commit time, minus the same at base, over the window's landings. The span counts trashed and missing
   numbers. Unit: landing. Source: the tracker. Defined in `scripts/stability-measures-core.mjs` (`idSpanSearch`,
@@ -142,8 +145,10 @@ folder and runs the committed script; it does not copy or write measuring script
   tracker rows took about 280 calls and the seat about 1,700 more (one detail read per lineage member), roughly
   40 minutes in all.
 - **`gh`**, for `ci`. It runs from the repository, so its GitHub remote decides which repository's runs are read.
-- **The runner checkout** (`--runner`), for `waiting.runner`. A checkout older than head, whose origin has moved on,
-  reads `not measured`.
+- **The runner checkout** (`--runner`), for the runner's commits in `waiting.runner`. A checkout older than head, whose
+  origin has moved on, reads `not measured`. The runner's Waiting counts come from the committed series, not the checkout's
+  notes.
+- **The proxy** (`--api`), for `waiting.harbour` after the import. Without it, those commits read `not measured`.
 
 A source that is absent prints its rows as `not measured` with the reason.
 
@@ -280,9 +285,10 @@ read. The reading names its window and its sample sizes (`held`, `addressed`, `r
 wakes are built (slice 6); it gates nothing. Query-log entries expire after 90 days, so the sit-time reading has to be
 taken before the first entries are gone.
 
-These rows are not among the five measures, and `buildReading` does not print them: the stability tool reads git
-and the tracker, not the records store. They are read by `scripts/records-readings.mjs`, which reads the production
-store (MONGODB_URI, or the data directory as the importer does), prints each row with its window and sample size, and
+These rows are not among the five measures, and `buildReading` does not print them. The stability tool reads the
+records store only through the proxy, and only for `waiting.harbour` after the import (LIN-4505); it never reads the
+store directly. They are read by `scripts/records-readings.mjs`, which reads the production
+store (MONGODB_URI, or the data directory as server.js does), prints each row with its window and sample size, and
 prints the stale-open-runs count beside them: open run records whose current version is more than 24 hours old. Run it
 no earlier than the evening of 21 Nov 2026, and read query-log evidence before 17 Feb 2027, its 90-day retention. A
 stale count of zero on a store with few tasks run end to end is not evidence that wakes are unneeded: the decision on
@@ -290,7 +296,7 @@ wakes (slice 6) needs a later, representative reading. The reader is read-only, 
 
 ## What this retires
 
-- **Reading `## Waiting` from the notes for commits after the cutover.** LIN-4495 retired the lists, so the `waiting.*` rows read `not measured` from there on. The records rows above are the reading that replaces them (LIN-4496).
+- **Reading `## Waiting` from git, and the one-off importer** (LIN-4505). The frozen reader (`countFrozenWaiting`), the importer script, its manifest and its fixtures are gone. The counts before the cutover are the committed series; the records that replaced the lists (LIN-4496) are read for `waiting.harbour` from the import on.
 - **Copying or writing measuring scripts into each run's evidence folder.** The review runs the committed script and
   saves its output. Frozen evidence folders and published reports stay as they are, because reports cite them.
 - **The per-day rows of `project-velocity-trajectory`** (LV and SD). The next report closes both ledger rows as

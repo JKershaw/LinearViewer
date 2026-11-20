@@ -6,7 +6,7 @@
  *
  *   node scripts/records-readings.mjs --urlkey <workspace urlKey> [--as-of <iso>] [--json]
  *
- * The database is the server's, chosen as the importer chooses it: MONGODB_URI when set, else the MangoDB data
+ * The database is the server's, chosen as server.js chooses it: MONGODB_URI when set, else the MangoDB data
  * directory (HARBOUR_DATA_DIR or ./data). Each reading prints its own window and n. The stale-open-runs count is only
  * meaningful from the evening of 21 Nov 2026 (48 hours after the records deploy), and a run is stale when its current
  * version is `open` and that version is more than 24 hours old at the reading time. A reader's own reads never enter

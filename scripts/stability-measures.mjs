@@ -5,9 +5,10 @@
 //          [--reference <file> | --as-reference <label>]
 //   → JSON on stdout; the ordered opening table on stderr.
 // Reads: git objects of <repo> (lines through the code-shape kit's counter, first-parent churn), `gh` for CI runs (run
-// from <repo>, so its GitHub remote decides the repository). The Waiting rows count the lists at a pre-cutover commit
-// (LIN-4495 retired them: a commit whose notes carry no Waiting section is `not measured`). Every read that fails
-// becomes `not measured: <reason>` in its row; nothing is zero-filled.
+// from <repo>, so its GitHub remote decides the repository). The Waiting rows read the committed Waiting series
+// (docs/reviews/stability-measures/waiting-series.json) at pre-cutover commits, and the records store through the proxy
+// from the first imported record on (scripts/stability-measures-waiting.mjs; LIN-4495 retired the lists, LIN-4505 imported
+// them). Every read that fails becomes `not measured: <reason>` in its row; nothing is zero-filled.
 // --api (default $HARBOUR_LOCAL_BASE/api/proxy) is the workspace proxy for finished tasks, speed, cost and tickets
 // minted (scripts/stability-measures-tracker.mjs: paced, honours 429 Retry-After). Finished tasks may have landed
 // before base, so the landings of the --lookback-days (default 3) before base are read for their tickets too. The same
@@ -28,17 +29,16 @@ import { existsSync, readFileSync } from 'node:fs';
 import { resolve } from 'node:path';
 import { spawnSync } from 'node:child_process';
 import {
-  DEFAULT_EXCLUDE, UsageError, commitDateOf, compileScope, emitJson, git, listBlobs, loadCore, parseArgs, readBlobs, readCommit,
+  DEFAULT_EXCLUDE, UsageError, commitDateOf, compileScope, emitJson, git, loadCore, parseArgs, readCommit,
   resolveCommit, runCli,
 } from './code-shape/code-shape-lib.mjs';
-import { NOTES_DIR, isNoteFile } from '../lib/prompts/area-note-format.js';
-import { countFrozenWaiting } from '../lib/records/waiting-import.js';
 import {
   NO_REFERENCE_KEYS, NO_REFERENCE_ROWS, SCOPE_INCLUDE, buildReading, churnRow, ciRow, formatTable, linesRow, noReferenceReading,
   notMeasured, parseLandingLog, parseNumstat, referencesFrom, waitingRows,
 } from './stability-measures-core.mjs';
 import { createProxyClient, firstLine, readSeat, readTracker, readTrails, trackerNotMeasured } from './stability-measures-tracker.mjs';
 import { blindRow, repoSlugOf, ticketsToRead } from './stability-measures-blind.mjs';
+import { harbourEndpointAt, loadWaitingSeries, runnerEndpointAt } from './stability-measures-waiting.mjs';
 
 const USAGE = 'usage: node scripts/stability-measures.mjs <repo> <base> <head> [--runner <dir>] [--api <base>] [--lookback-days <n>] [--reference <file> | --as-reference <label>]';
 const DEFAULT_LOOKBACK_DAYS = 3;
@@ -46,23 +46,11 @@ const LANDING_FORMAT = '--format=%H%x1f%cI%x1f%s%x1f%b%x1e';
 const GH_LIMIT = 1000;
 const NO_API = 'no --api given and HARBOUR_LOCAL_BASE unset';
 
-// The Waiting count of the notes at one commit: the frozen reader (lib/records/waiting-import.js), kept for the windows
-// that predate LIN-4495. A commit whose notes carry no Waiting section throws its reason: `not measured`, never zero.
-const waitingAt = (repo, sha) => {
-  const entries = listBlobs(repo, sha).filter((e) => e.path.startsWith(`${NOTES_DIR}/`) && !e.path.slice(NOTES_DIR.length + 1).includes('/'));
-  const byPath = readBlobs(repo, entries);
-  const reading = countFrozenWaiting(Object.fromEntries(Object.entries(byPath).map(([p, text]) => [p.slice(NOTES_DIR.length + 1), text])), { isNoteFile });
-  if ('reason' in reading) throw new Error(reading.reason);
-  return reading.count;
-};
-
-const tryCount = (fn) => { try { return { count: fn() }; } catch (e) { return { reason: firstLine(e) }; } };
-
 // The runner's endpoints: the last first-parent commits on its checked-out branch at or before each repository
 // endpoint's commit time. A tip older than the head endpoint is either a stale checkout or a current branch that has
 // had no commit since; origin tells them apart. The checkout is current when origin's branch tip is its own tip or
 // already contained in it; otherwise it cannot show what the runner had at head.
-function readRunner(dir, window) {
+function readRunner(dir, window, series) {
   const source = { dir };
   if (!dir) return { source, reading: { reason: 'no --runner given' } };
   if (!existsSync(dir)) return { source, reading: { reason: `runner checkout not found at ${dir}` } };
@@ -92,10 +80,10 @@ function readRunner(dir, window) {
   } catch (e) {
     return { source, reading: { reason: `runner: ${firstLine(e)}` } };
   }
-  const endpointRead = (sha, which) => (sha ? tryCount(() => waitingAt(dir, sha)) : { reason: `runner has no commit on ${source.branch} at or before the ${which} endpoint` });
+  const endpointRead = (sha, which, date) => (sha ? runnerEndpointAt({ series, sha, date }) : { reason: `runner has no commit on ${source.branch} at or before the ${which} endpoint` });
   return {
     source,
-    reading: { base: endpointRead(source.baseSha, 'base'), head: endpointRead(source.headSha, 'head'), detail: { branch: source.branch, baseSha: source.baseSha, headSha: source.headSha } },
+    reading: { base: endpointRead(source.baseSha, 'base', window.baseDate), head: endpointRead(source.headSha, 'head', window.headDate), detail: { branch: source.branch, baseSha: source.baseSha, headSha: source.headSha } },
   };
 }
 
@@ -200,13 +188,17 @@ await runCli(async () => {
   try { lines = linesRow({ base: shapeAt(base), head: shapeAt(head), landings: landings.length, reference: refs.lines }); } catch (e) { lines = notMeasured('lines', `shape read failed: ${firstLine(e)}`, { reference: refs.lines }); }
 
   const ci = readCiRuns(repo, window);
-  const runner = readRunner(runnerDir, window);
-  const harbour = { base: tryCount(() => waitingAt(repo, base)), head: tryCount(() => waitingAt(repo, head)) };
+  // One paced client for the tracker, the seat, measure 1 and the records reading of the Waiting rows, so all share the token's budget.
+  const client = api ? createProxyClient({ base: api }) : null;
+  const series = loadWaitingSeries();
+  const runner = readRunner(runnerDir, window, series);
+  const harbour = {
+    base: await harbourEndpointAt({ series, sha: base, date: window.baseDate, client }),
+    head: await harbourEndpointAt({ series, sha: head, date: window.headDate, client }),
+  };
   // The window's landing log (subjects and bodies), read once: measure 1's landings and the tracker's ticket owners.
   let windowLog;
   try { windowLog = { landings: parseLandingLog(git(repo, ['log', '--first-parent', LANDING_FORMAT, `${base}..${head}`])) }; } catch (e) { windowLog = { reason: firstLine(e) }; }
-  // One paced client for the tracker, the seat and measure 1, so all three share the token's budget.
-  const client = api ? createProxyClient({ base: api }) : null;
   const tracker = await readTrackerRows(repo, client, window, lookbackDays, windowLog, { references: refs, readSeatRows: asReference == null });
   const seat = asReference != null ? NO_REFERENCE_ROWS.seat.map(noReading) : tracker.rows.seat;
   const noNewMess = asReference != null

@@ -1,6 +1,6 @@
 // LIN-4420: the stability measures' core (scripts/stability-measures-core.mjs). Pure inputs in, rows out: the row
 // contract's three states, the counting rule against the code-shape kit's own counter, churn's scope and denominator,
-// CI matching, Waiting's zero-versus-unreadable line, and the measures' order. The live run on the 8 Nov window needs
+// CI matching, and the measures' order (the Waiting readings are tests/unit/lin-4505-waiting-series.test.js). The live run on the 8 Nov window needs
 // the proxy, `gh` and two checkouts, so it is not run here: its committed output (LIN-4423) is checked below, and the
 // CLI's own reads are run against fixture repositories and a stand-in `gh`.
 // LIN-4421: the tracker half. Landing ownership, finished-task selection across window edges, sessions as /cost
@@ -25,13 +25,11 @@ import { ROOT } from './helpers/area-registry.js';
 import { analyse } from '../../scripts/code-shape/shape-core.mjs';
 import { measureShape } from '../../scripts/code-shape/shape-report.mjs';
 import { compileScope } from '../../scripts/code-shape/code-shape-lib.mjs';
-import { NOT_NOTES, parseNote } from '../../lib/prompts/area-note-format.js';
-import { countFrozenWaiting } from '../../lib/records/waiting-import.js';
 import {
   MEASURES, MINTED_NOT_SUPPLIED, NOT_BUILT, NO_REFERENCE_KEYS, NO_REFERENCE_ROWS, SCOPE_INCLUDE, STATUS, buildReading, churnRow, ciRow, costRow, firstDispatchOf, formatTable,
   idSpanSearch, landingOwners, landingPr, linesRow, mintedRow, noReferenceReading, notMeasured, ownTicket, parseLandingLog, parseNumstat,
   referencesFrom, row, selectFinished,
-  sessionsOf, speedRow, tasksRow, waitingRow, waitingRows,
+  sessionsOf, speedRow, tasksRow,
 } from '../../scripts/stability-measures-core.mjs';
 import { DISPATCH_LIST_LIMIT, createProxyClient, readSeat, readTracker, readTrails, retryAfterMs, trackerNotMeasured } from '../../scripts/stability-measures-tracker.mjs';
 import {
@@ -168,28 +166,6 @@ describe('CI: successful runs whose head sha is a landing', () => {
   test('an unreadable gh is not measured with its reason, never a zero', () => {
     const r = ciRow({ runs: null, reason: 'gh unreadable: spawnSync gh ENOENT', landingShas: ['a'] });
     assert.deepStrictEqual([r.status, r.value, r.reason], [STATUS.NOT_MEASURED, null, 'gh unreadable: spawnSync gh ENOENT']);
-  });
-});
-
-describe('Waiting: the frozen reader for pre-cutover commits, and not measured once the lists are retired (LIN-4495)', () => {
-  const WITH = '# A\n\n## Lessons\n\n- a lesson\n\n## Waiting\n\n- `lib/a.js`: one.\n- `lib/b.js`: two\n  wrapped onto a second line.\n';
-  const WITHOUT = '# A\n\n## Lessons\n\n- a lesson\n';
-  const isNoteFile = (name) => name.endsWith('.md');
-
-  test('two synthetic commits: one whose notes carry the section counts it, one whose notes do not reads not measured with its reason', () => {
-    const before = countFrozenWaiting({ 'a.md': WITH, 'b.md': '# B\n\n## Waiting\n\n- `lib/c.js`: three.\n' }, { isNoteFile });
-    assert.deepStrictEqual(before, { count: 3 });
-    const after = countFrozenWaiting({ 'a.md': WITHOUT, 'README.md': 'not a note' }, { isNoteFile });
-    assert.ok('reason' in after, 'a commit with notes and no Waiting section has no count');
-    assert.match(after.reason, /LIN-4495/);
-    const row = waitingRow('waiting.harbour', { base: before, head: after, landings: 2 });
-    assert.equal(row.value, null, 'a half-read window is not measured, never a zero or a fall');
-    assert.match(JSON.stringify(row), /LIN-4495/, 'the row says why');
-  });
-
-  test('a commit with no notes at all reads 0 (the rule the committed reference reads by), and the parser keeps no Waiting section for a note without one', () => {
-    assert.deepStrictEqual(countFrozenWaiting({}, { isNoteFile }), { count: 0 });
-    assert.deepStrictEqual(parseNote(WITHOUT).headings, ['Lessons']);
   });
 });
 
@@ -1034,13 +1010,14 @@ describe('the declaration names what the tool emits', () => {
 });
 
 // The CLI's own reads (LIN-4423 leftovers): git numstat with merge landings, the landing log's ownership, Waiting in both
-// repositories, the runner's endpoints by date, the `gh` listing and measure 1 without a proxy, run end to end on fixture
+// repositories (LIN-4505: from the committed series, so a fixture commit reads not measured), the runner's endpoints by date, the `gh` listing and measure 1 without a proxy, run end to end on fixture
 // repositories. `gh` is a stand-in script first on PATH that records its arguments and prints fixed runs, so nothing
 // leaves the machine. The lookback's prior-landing log is read only with a proxy, so its test gives a loopback stand-in
 // whose issue list is empty: the tracker rows stop there, after the log was read. The proxy reads themselves are the
 // tracker tests' above.
 describe('the CLI\'s reads, end to end on fixture repositories', () => {
-  const note = (n) => `# x\n\n## Lessons\n\n## Waiting\n\n${Array.from({ length: n }, (_, i) => `- \`lib/a.js\`: entry ${i}.\n`).join('')}`;
+  // A note's text only gives each fixture commit a change: the tool no longer reads notes for Waiting (LIN-4505).
+  const note = (n) => `# x\n\n## Lessons\n\n${Array.from({ length: n }, (_, i) => `- \`lib/a.js\`: lesson ${i}.\n`).join('')}`;
   const at = (d) => `2026-01-0${d}T12:00:00Z`;
 
   test('churn counts a merge landing against its first parent; tickets, Waiting, runner endpoints and CI are read; measure 1 needs --api', () => {
@@ -1077,10 +1054,13 @@ describe('the CLI\'s reads, end to end on fixture repositories', () => {
       // Without --diff-merges=first-parent the merge landing has no numstat and churn reads 2 added, 0 deleted.
       assert.deepStrictEqual([rows.churn.value.landings, rows.churn.value.added, rows.churn.value.deleted], [2, 5, 1]);
       assert.deepStrictEqual(rows.lines.value.net, { total: 4, code: 2, comment: 1, blank: 1 });
-      // Pre-cutover windows still count: harbour's notes hold 1 entry at base and 3 at head; the runner's checkout
-      // holds 1 at its base endpoint and 2 at its head endpoint (its tip after head is not an endpoint).
-      assert.deepStrictEqual([rows['waiting.harbour'].value.base, rows['waiting.harbour'].value.head], [1, 3]);
-      assert.deepStrictEqual([rows['waiting.runner'].value.base, rows['waiting.runner'].value.head], [1, 2]);
+      // LIN-4505: the Waiting rows read the committed series and the records, never the notes in git. These fixture
+      // commits are not in the series and predate the records, so each Waiting row is not measured with that reason.
+      assert.strictEqual(rows['waiting.harbour'].status, STATUS.NOT_MEASURED);
+      assert.match(rows['waiting.harbour'].reason, /no reading at .*: it is not in the committed Waiting series/);
+      assert.strictEqual(rows['waiting.runner'].status, STATUS.NOT_MEASURED);
+      assert.match(rows['waiting.runner'].reason, /is not in the committed Waiting series for simple-dispatcher/);
+      assert.strictEqual(rows['waiting.total'].status, STATUS.NOT_MEASURED);
       assert.deepStrictEqual([rows.ci.value.runs, rows.ci.value.medianMinutes], [2, 6], 'the base\'s run is not a landing\'s');
       const ghArgs = readFileSync(join(fake, 'args'), 'utf8').split('\n');
       for (const [flag, value] of [['--workflow', 'test.yml'], ['--branch', 'main'], ['--status', 'success'], ['--created', '2026-01-01..2026-01-05']]) {
@@ -1155,6 +1135,48 @@ test('the lookback reads the first-parent landings of the days before base, base
     assert.deepStrictEqual(out.sources.tracker.lookback, { days: 3, since: '2025-12-29T12:00:00.000Z' });
     assert.strictEqual(out.sources.tracker.priorLandings, 2, 'LIN-8 and base; not LIN-7');
     assert.match(rowsOf(out).tasks.reason, /issue list has no LIN- issue/);
+  } finally {
+    server.close(); repo.cleanup(); rmSync(fake, { recursive: true, force: true });
+  }
+});
+
+// LIN-4505 review (finding-5ebfd2a9): the CLI's records path for waiting.harbour, end to end. Both window endpoints are
+// fixture commits dated after `records.coveredFrom`, so neither is in the committed series and each is read from the
+// records store: a loopback stand-in for the proxy answers GET /records?to=project&state=open&asOf=... by the time asked.
+// Seen red with the CLI's head endpoint given `client: null` (the head then reads "no --api given", not 2).
+test('the CLI reads waiting.harbour from the records at each endpoint commit\'s time, through --api', async () => {
+  const repo = makeRepo();
+  const fake = mkdtempSync(join(tmpdir(), 'stability-gh-'));
+  const asked = [];
+  const open = (id, kind, to) => ({ id, kind, to, state: 'open', openedAt: '2026-11-20T13:06:49.033Z' });
+  const server = createServer((req, res) => {
+    const url = new URL(req.url, 'http://127.0.0.1');
+    res.setHeader('content-type', 'application/json');
+    if (url.pathname !== '/records') { res.end(JSON.stringify({ issues: [] })); return; }
+    asked.push({ to: url.searchParams.get('to'), state: url.searchParams.get('state'), asOf: url.searchParams.get('asOf') });
+    // One finding open at the base's time; two findings and a task (not a hand-off) at the head's.
+    const atBase = Date.parse(url.searchParams.get('asOf')) < Date.parse('2026-11-22T00:00:00Z');
+    res.end(JSON.stringify({ records: atBase ? [open('finding-a', 'finding', 'project')]
+      : [open('finding-a', 'finding', 'project'), open('question-b', 'question', 'project'), open('task-c', 'task', 'project')] }));
+  });
+  await new Promise((r) => server.listen(0, '127.0.0.1', r));
+  try {
+    const baseDate = '2026-11-21T12:00:00Z';
+    const headDate = '2026-11-22T12:00:00Z';
+    const base = repo.commit({ 'lib/a.js': 'const a = 1;\n' }, baseDate, 'LIN-1: base');
+    const head = repo.commit({ 'lib/b.js': 'const b = 1;\n' }, headDate, 'LIN-2: head');
+    writeFileSync(join(fake, 'gh'), '#!/bin/sh\necho "[]"\n');
+    chmodSync(join(fake, 'gh'), 0o755);
+    const out = await new Promise((resolve, reject) => execFile(process.execPath,
+      [join(ROOT, 'scripts/stability-measures.mjs'), repo.dir, base, head, '--api', `http://127.0.0.1:${server.address().port}`, '--lookback-days', '1'],
+      { env: { ...process.env, HARBOUR_LOCAL_BASE: '', PATH: `${fake}${delimiter}${process.env.PATH}` } },
+      (e, stdout, stderr) => (e ? reject(new Error(stderr || e.message)) : resolve(JSON.parse(stdout)))));
+    const harbour = rowsOf(out)['waiting.harbour'];
+    assert.strictEqual(harbour.status, STATUS.MEASURED, harbour.reason);
+    assert.deepStrictEqual([harbour.value.base, harbour.value.head], [1, 2], 'findings and questions to the project, not the task');
+    const waiting = asked.filter((q) => q.to === 'project' && q.state === 'open').map((q) => q.asOf);
+    assert.ok(waiting.includes(new Date(baseDate).toISOString()), 'the base commit\'s time was asked');
+    assert.ok(waiting.includes(new Date(headDate).toISOString()), 'the head commit\'s time was asked');
   } finally {
     server.close(); repo.cleanup(); rmSync(fake, { recursive: true, force: true });
   }

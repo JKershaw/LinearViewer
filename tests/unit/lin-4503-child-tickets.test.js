@@ -290,10 +290,7 @@ describe('LIN-4503: child tickets and plan summaries', () => {
     assert.equal(fake.created.length, 1);
   });
 
-  test('12. the importer only adds plans: revise takes no via, and the importer never revises', async () => {
-    const applyWrites = readFileSync(new URL('../../lib/records/import-apply.js', import.meta.url), 'utf8');
-    assert.doesNotMatch(applyWrites, /writes\.revise\(/, 'the import applies adds only');
-    assert.match(applyWrites, /writes\.add\(\{[^}]*via: 'import'/);
+  test('12. revise takes no via, so a plan revision always posts its summary (the one-off importer is retired, LIN-4505)', async () => {
     const pipeline = readFileSync(new URL('../../lib/records/writes.js', import.meta.url), 'utf8');
     const reviseSignature = /async revise\(\{([^}]*)\}\)/.exec(pipeline);
     assert.ok(reviseSignature, 'revise is one method with one argument object');
