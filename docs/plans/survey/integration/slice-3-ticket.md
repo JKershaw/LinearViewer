@@ -11,7 +11,7 @@
 
 **After this slice,** verdicts and changes are records. A change record holds a PR and its head, and each new head is a new version. A verdict is `on` the version its judge read. When a later push moves the change on, the verdict shows as stale wherever it is read, including after close-out's own commits. Close-out, the selector and the pages read the records, not the comments.
 
-**What slice 2 left to build on** (PRs #2472–#2478; main at `bc0535b5c`):
+**What slice 2 left to build on** (main at `bc0535b5c`):
 - Runs carry their task (0 of 21 since 20 Nov 15:09 had none). Plans are records, with one marked summary comment per plan version.
 - The store already knows `verdict` and `change`: their fields, the outcome sets, the stale flag, and the brief's "what stands" part. Nothing in code writes or reads them yet. Reviews have written three verdicts and one change by hand. That change (PR #2471) is still open although the PR merged on 20 Nov, because nothing ends a change.
 - Plan-review's verdict is still a comment. Slice 2 marks a plan review as owed with an open finding to plan-review, which an Approve ends.
@@ -21,7 +21,17 @@
 - Plan-review, review and the blind read write their verdicts as records, `on` the plan piece or change version they read. A verdict is pinned to the head its judge read, and the head is then refreshed from the PR.
 - "Approve — conditional" becomes `approve` plus one finding to close-out per condition.
 - Harbour ends a change `merged` when it records the merge.
-- Everything that reads verdicts from comments reads records instead: close-out, the blind-read route, the selector's facts, look-first, the revision brief, run evidence and its box on the session page, and the measures (round trips, churn, the effort readout, the stability scripts).
+- Everything that reads verdicts from comments reads records instead:
+  - close-out, which keeps refusing when the head has moved, now reading the stale flag;
+  - the blind-read route;
+  - the selector's facts and the stage-router rule (C3-39);
+  - the autopilot kickoff (C3-40);
+  - look-first;
+  - the plan and breakdown prompts that read a plan-review verdict (C3-37);
+  - `ci-wake`, with change heads refreshed at each verdict write (C3-57);
+  - run evidence and its box on the session and task pages (C3-42);
+  - the measures: round trips, churn, follow-on ratio (C3-24), the effort readout and the stability scripts.
+- The revision brief retires, as `checks/placement.md` says (C3-18): its reasoning reaches the next stage through the brief's "what stands" part. It isn't on the slice table, so this line states it.
 - People still see each verdict in the tracker, as one marked summary comment.
 - **Retired in the same move:**
   - the comment classifier, `COMMENT_KINDS`, and its readers (C3-01–C3-06);
@@ -56,11 +66,11 @@
 - the replay passes through the proxy, and the readings are reported;
 - Harbour still works for every route that hasn't moved yet.
 
-**Open:**
-- What a stale verdict sets off. Holding the merge until something re-reads the new head costs a run per task, so that goes to John as a ruling.
-- Slice 2's stand-in for a plan-review verdict (the open finding to plan-review, `lib/records/plan-facts.js`) doubles the verdict record once there is one. It isn't on the slice table, so retiring it is John's call.
-- LIN-4499's close-out deadlocked: the engine wouldn't send the blind read while close-out was open, and close-out can't merge without one. This slice changes what the blind-read route and close-out read. Whether the deadlock lives there isn't known.
-- Verdicts already sitting in comments on open tasks: the design plans no import for this slice (§9).
+**Two questions for John** (asked before filing; see the answers below if given):
+1. **Close-out's own commits.** Close-out already refuses when the head has moved after the approval, and that refusal carries over onto the stale flag. The open case is close-out's own fix commits, which make the approval stale. Should merging then wait for a quick re-review of the new head? It costs a run per task.
+2. **Verdicts already in comments** on open tasks. With no import, an open task reviewed by comment has no verdict record at cutover, so it would need a re-review before close-out. Import those verdicts once (as slice 2 did for plans), or re-review as each task comes up?
+
+**Open (engineering, for the builder):** whether the LIN-4499 deadlock (the engine wouldn't send the blind read while close-out was open, and close-out can't merge without one) lives in the reads this slice moves. Slice 2's plan-review stand-in finding asks for a review and the verdict is the review's answer, so the two don't double; keep or move it as the standing answers say.
 
 **Where to read:** `docs/plans/survey/integration/design.md` and `docs/plans/survey/layer/design.md` at their commit, `claude/cool-rubin-6acj5j@92838c5cf` (the copies on main are the same).
 
