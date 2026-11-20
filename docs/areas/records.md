@@ -11,7 +11,7 @@ seam, `lib/run-records.js`, stays in Runs & dispatch by its `run-` pattern.
 Records imports only Platform. The tracker read, the tracker port (LIN-4503, built over a provider by
 lib/records-tracker.js), the askedText reader, STAGE_KINDS, the provider state map's closed state, the workspace-person
 reader and the area notes' reader are injected by their callers (routes/proxy.js, routes/proxy-records.js,
-routes/task-records.js, routes/project-page.js, routes/dispatch.js, server.js, scripts/records-import.mjs).
+routes/task-records.js, routes/project-page.js, routes/dispatch.js, server.js).
 
 ## Lessons
 
@@ -57,13 +57,13 @@ routes/task-records.js, routes/project-page.js, routes/dispatch.js, server.js, s
   (`createWaitingStanding` returns `records`); the count, the badge and the live merge keep reading rulings only.
 - Addressing a person needs the account id or the name the tracker shows, and a name read from the tracker often differs
   from how a note writes it. A manifest or note that writes "John" will be refused with the names that work; the
-  parked-ticket manifest addresses John as `project` with "For John:" in the words, and says so in its notes.
+  manifest that LIN-4505 imported addressed people by account id (`person:<id>`).
 - A page GET never makes a task. The task page reads its task record by the ticket's claim (`taskForTicket`) and offers
   its add and child-task forms before one exists; the first write through the checked pipeline makes the task
   (routes/task-records.js sends `in: <ticket>`). The project page's actions and the proxy make tasks the same way.
-- The importer reads the notes from a git ref given on the command line (never a default), and its tests read committed
-  fixtures, since CI checks out at depth 1 (tests/fixtures/records-import/). Its Waiting section is read by its own frozen
-  reader (`parseWaitingSection`, lib/records/waiting-import.js), with the guard's `citedPaths`.
+- The one-off import (LIN-4494's importer, run in production by LIN-4505) and its parked-ticket manifest are retired: the
+  records it wrote stay, `via: import`, under their fixed ids. Its Waiting reader is gone too; the stability measures read the
+  committed series for commits before the cutover and the records after it (scripts/stability-measures-waiting.mjs).
 - A records reading has one caller per surface, and an injected alias hides a caller from a search by name: the
   session page reads evidence through `readRunEvidenceFn` (`routes/dashboard.js`), missed the store at LIN-4495, and
   every session page read "not measured". Search the aliases too, and keep a missing store reading "not measured",

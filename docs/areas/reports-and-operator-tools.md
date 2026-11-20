@@ -7,8 +7,9 @@ Area notes for `reports-and-operator-tools` in the registry. Format and rules: R
 - A measure whose source is missing or unreadable reads `not measured: <reason>`, never 0;
   zero is a reading only from a source that was read (a commit with no notes directory has 0
   Waiting entries). New stability rows use the row shape in `scripts/stability-measures-core.mjs`
-  (measured, partial with its unreadable count, not measured) and count Waiting entries with
-  the frozen reader `countFrozenWaiting` in `lib/records/waiting-import.js`, never a regex of their own (LIN-4420; LIN-4495).
+  (measured, partial with its unreadable count, not measured). Waiting entries are read from the committed series
+  (`docs/reviews/stability-measures/waiting-series.json`) and, from the first imported record, from the records store
+  through the proxy (`scripts/stability-measures-waiting.mjs`), never by a regex of their own (LIN-4420; LIN-4495; LIN-4505).
 - Churn passes `--diff-merges=first-parent` explicitly: with merge diffs off, the 8 Nov window's
   14 merge landings vanish and churn reads a plausible 8,590 / 3,055 instead of 10,235 / 3,677.
   Filter its paths with the kit's `compileScope`, not a git pathspec, so churn and line totals

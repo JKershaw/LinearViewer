@@ -25,13 +25,11 @@ import { ROOT } from './helpers/area-registry.js';
 import { analyse } from '../../scripts/code-shape/shape-core.mjs';
 import { measureShape } from '../../scripts/code-shape/shape-report.mjs';
 import { compileScope } from '../../scripts/code-shape/code-shape-lib.mjs';
-import { NOT_NOTES, parseNote } from '../../lib/prompts/area-note-format.js';
-import { countFrozenWaiting } from '../../lib/records/waiting-import.js';
 import {
   MEASURES, MINTED_NOT_SUPPLIED, NOT_BUILT, NO_REFERENCE_KEYS, NO_REFERENCE_ROWS, SCOPE_INCLUDE, STATUS, buildReading, churnRow, ciRow, costRow, firstDispatchOf, formatTable,
   idSpanSearch, landingOwners, landingPr, linesRow, mintedRow, noReferenceReading, notMeasured, ownTicket, parseLandingLog, parseNumstat,
   referencesFrom, row, selectFinished,
-  sessionsOf, speedRow, tasksRow, waitingRow, waitingRows,
+  sessionsOf, speedRow, tasksRow,
 } from '../../scripts/stability-measures-core.mjs';
 import { DISPATCH_LIST_LIMIT, createProxyClient, readSeat, readTracker, readTrails, retryAfterMs, trackerNotMeasured } from '../../scripts/stability-measures-tracker.mjs';
 import {
@@ -168,28 +166,6 @@ describe('CI: successful runs whose head sha is a landing', () => {
   test('an unreadable gh is not measured with its reason, never a zero', () => {
     const r = ciRow({ runs: null, reason: 'gh unreadable: spawnSync gh ENOENT', landingShas: ['a'] });
     assert.deepStrictEqual([r.status, r.value, r.reason], [STATUS.NOT_MEASURED, null, 'gh unreadable: spawnSync gh ENOENT']);
-  });
-});
-
-describe('Waiting: the frozen reader for pre-cutover commits, and not measured once the lists are retired (LIN-4495)', () => {
-  const WITH = '# A\n\n## Lessons\n\n- a lesson\n\n## Waiting\n\n- `lib/a.js`: one.\n- `lib/b.js`: two\n  wrapped onto a second line.\n';
-  const WITHOUT = '# A\n\n## Lessons\n\n- a lesson\n';
-  const isNoteFile = (name) => name.endsWith('.md');
-
-  test('two synthetic commits: one whose notes carry the section counts it, one whose notes do not reads not measured with its reason', () => {
-    const before = countFrozenWaiting({ 'a.md': WITH, 'b.md': '# B\n\n## Waiting\n\n- `lib/c.js`: three.\n' }, { isNoteFile });
-    assert.deepStrictEqual(before, { count: 3 });
-    const after = countFrozenWaiting({ 'a.md': WITHOUT, 'README.md': 'not a note' }, { isNoteFile });
-    assert.ok('reason' in after, 'a commit with notes and no Waiting section has no count');
-    assert.match(after.reason, /LIN-4495/);
-    const row = waitingRow('waiting.harbour', { base: before, head: after, landings: 2 });
-    assert.equal(row.value, null, 'a half-read window is not measured, never a zero or a fall');
-    assert.match(JSON.stringify(row), /LIN-4495/, 'the row says why');
-  });
-
-  test('a commit with no notes at all reads 0 (the rule the committed reference reads by), and the parser keeps no Waiting section for a note without one', () => {
-    assert.deepStrictEqual(countFrozenWaiting({}, { isNoteFile }), { count: 0 });
-    assert.deepStrictEqual(parseNote(WITHOUT).headings, ['Lessons']);
   });
 });
 
@@ -1034,7 +1010,7 @@ describe('the declaration names what the tool emits', () => {
 });
 
 // The CLI's own reads (LIN-4423 leftovers): git numstat with merge landings, the landing log's ownership, Waiting in both
-// repositories, the runner's endpoints by date, the `gh` listing and measure 1 without a proxy, run end to end on fixture
+// repositories (LIN-4505: from the committed series, so a fixture commit reads not measured), the runner's endpoints by date, the `gh` listing and measure 1 without a proxy, run end to end on fixture
 // repositories. `gh` is a stand-in script first on PATH that records its arguments and prints fixed runs, so nothing
 // leaves the machine. The lookback's prior-landing log is read only with a proxy, so its test gives a loopback stand-in
 // whose issue list is empty: the tracker rows stop there, after the log was read. The proxy reads themselves are the
@@ -1077,10 +1053,13 @@ describe('the CLI\'s reads, end to end on fixture repositories', () => {
       // Without --diff-merges=first-parent the merge landing has no numstat and churn reads 2 added, 0 deleted.
       assert.deepStrictEqual([rows.churn.value.landings, rows.churn.value.added, rows.churn.value.deleted], [2, 5, 1]);
       assert.deepStrictEqual(rows.lines.value.net, { total: 4, code: 2, comment: 1, blank: 1 });
-      // Pre-cutover windows still count: harbour's notes hold 1 entry at base and 3 at head; the runner's checkout
-      // holds 1 at its base endpoint and 2 at its head endpoint (its tip after head is not an endpoint).
-      assert.deepStrictEqual([rows['waiting.harbour'].value.base, rows['waiting.harbour'].value.head], [1, 3]);
-      assert.deepStrictEqual([rows['waiting.runner'].value.base, rows['waiting.runner'].value.head], [1, 2]);
+      // LIN-4505: the Waiting rows read the committed series and the records, never the notes in git. These fixture
+      // commits are not in the series and predate the records, so each Waiting row is not measured with that reason.
+      assert.strictEqual(rows['waiting.harbour'].status, STATUS.NOT_MEASURED);
+      assert.match(rows['waiting.harbour'].reason, /no reading at .*: it is not in the committed Waiting series/);
+      assert.strictEqual(rows['waiting.runner'].status, STATUS.NOT_MEASURED);
+      assert.match(rows['waiting.runner'].reason, /is not in the committed Waiting series for simple-dispatcher/);
+      assert.strictEqual(rows['waiting.total'].status, STATUS.NOT_MEASURED);
       assert.deepStrictEqual([rows.ci.value.runs, rows.ci.value.medianMinutes], [2, 6], 'the base\'s run is not a landing\'s');
       const ghArgs = readFileSync(join(fake, 'args'), 'utf8').split('\n');
       for (const [flag, value] of [['--workflow', 'test.yml'], ['--branch', 'main'], ['--status', 'success'], ['--created', '2026-01-01..2026-01-05']]) {
