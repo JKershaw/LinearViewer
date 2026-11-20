@@ -4718,3 +4718,5 @@ Still waiting on `lin4499-snapshot-cut`.
 
   That check is running.
 - **Not rushing:** the slice 2 corrections wait until John finishes his review. Then I update LIN-4499 and answer the ruling.
+
+- **Ship Biscuit check done** (08:30). Every source it reads is about runs. Snapshots feed only its Before→After moves, and it is the only caller of `listByWorkspace`. Merges recorded in `close-out-events` (`listMergedSince`) are a lasting source, which slice 3's change records build on. Tracker completions come via `fetchWorkspaceIssues`. Nothing would turn this into a ruling. Draft ticket at `integration/ship-biscuit-tidy.md`, for John to review before filing.
