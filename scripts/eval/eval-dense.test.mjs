@@ -29,7 +29,7 @@ function leafWorkspace(ids) {
     bundles[id] = {
       issue: {
         id, identifier: id, title: `task ${id}`,
-        description: `A focused ${id} task that fits one session.`,
+        description: `A focused ${id} task that one session can build.`,
         state: { name: 'In Progress', type: 'started' },
         createdAt: '2026-01-01T00:00:00.000Z', labels: []
       },

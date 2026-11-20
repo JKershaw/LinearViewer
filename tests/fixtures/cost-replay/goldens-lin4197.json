@@ -3,7 +3,7 @@
     "what": "LIN-4197 beat 4: the read path's recorded baseline over the transcript corpus (each stage run on its own through runReplay), and over the mixed-harness control.",
     "recordedAt": "Harbour 72305215 (main), recorded on feat/lin-4197-cost-corpus with the beat 3 corpus and the beat 4 fixture changes; no production code differs from 72305215. Corpus data copied from simple-dispatcher 7a2d83c00485add17e0e15e00be8d3e609a537e6.",
     "baseline": "Recorded BEFORE any read change. Piece 4 (the records-first cutover) must be diffed against these values; each case note says where the read path differs from its oracle, and those differences are the baseline, not defects to fix here.",
-    "mustNotBeRegenerated": "Do not regenerate or edit this file to make a later production change pass. A change to any value here is a reviewed change to this baseline, with the reason stated. LIN-4404 (reviewed amendment, re-recorded with record-lin4197.mjs and diffed against the previous file): /cost/:identifier (S1) reads a task's whole life, not the 30-day reporting window (the task-life rule, lib/read-horizon.js, ruled on LIN-4395). Exactly these values moved, and nothing else: (1) every S1 body's window, in every section, from { days: 30, appCallsSince: <30 days before the replay clock> } to { days: null, appCallsSince: null, scope: 'task-life' }; (2) existingCorpusAtHead S1 only: the straddlers now read their founders older than 30 days. LIN-8 so (corpus case 7) is complete and priced at 1.1 (0.7 founder delta + 0.4), so its costUsd, pricedUsd and totalUsd move from null/0/null to 1.1; so (case 7), nss (case 16), cg (case 17) and LIN-42 st (case 4) take their founder's dispatchedAt as the session's; LIN-42's appCalls gain call c5 (proxy-x, $0.90, 60 days old) and its totalUsd gains 0.90. S2 to S13 (the reporting windows) and the over-cap filler cases 20-21 do not move.",
+    "mustNotBeRegenerated": "Do not regenerate or edit this file to make a later production change pass. A change to any value here is a reviewed change to this baseline, with the reason stated. LIN-4404 (reviewed amendment, re-recorded with record-lin4197.mjs and diffed against the previous file): /cost/:identifier (S1) reads a task's whole life, not the 30-day reporting window (the task-life rule, lib/read-horizon.js, ruled on LIN-4395). Exactly these values moved, and nothing else: (1) every S1 body's window, in every section, from { days: 30, appCallsSince: <30 days before the replay clock> } to { days: null, appCallsSince: null, scope: 'task-life' }; (2) existingCorpusAtHead S1 only: the straddlers now read their founders older than 30 days. LIN-8 so (corpus case 7) is complete and priced at 1.1 (0.7 founder delta + 0.4), so its costUsd, pricedUsd and totalUsd move from null/0/null to 1.1; so (case 7), nss (case 16), cg (case 17) and LIN-42 st (case 4) take their founder's dispatchedAt as the session's; LIN-42's appCalls gain call c5 (proxy-x, $0.90, 60 days old) and its totalUsd gains 0.90. S2 to S13 (the reporting windows) and the over-cap filler cases 20-21 do not move. LIN-4504 (reviewed amendment, re-recorded with record-lin4197.mjs and diffed against the previous file): the effort read-out (S10) reads its plan-review gate from records, not a description line, so exactly its notes moved, in every section: gateFieldsUnavailable goes, planRecordsCoverage comes (the gate reads not measured: no plan records cover the replay), and reviewGateDueHonoured names the records reader. No figure moves.",
     "recordsOnlyAddition": "LIN-4201 added one section, recordsOnly (change list item (e)): a lineage killed before its first Stop, so it has request records and NO [usage] snapshot. It was recorded at Harbour eb44eff9 (main, the read path before LIN-4201), so its values are the before. Every other section is byte-identical to the LIN-4197 recording.",
     "fields": "recordsOnly: runReplay output over that lineage, its summary and oracle (as a case). existingCorpusAtHead: runReplay over the existing corpus at this commit (the same output goldens.json holds, re-run here; goldens.json itself is the LIN-4177 baseline and is not re-recorded). replay: runReplay output over the stage (S1 to S13, mixedHarness). summary.readRunPageUsd: S13 cost for the stage's lineage (null when withheld). summary.readModelsSpendUsd / readModelsUnpriced: S5 for the implementation job (priced spend, and the count of unpriced runs). oracleUsd: the LIN-4197 beat 1 oracle (each record priced alone with computeUsageCostUsd, shared ids once). differenceUsd: readRunPageUsd minus oracleUsd (null when the read withholds the figure)."
   },
@@ -77330,7 +77330,7 @@
         "complete": true
       },
       "notes": {
-        "reviewGateDueHonoured": "gateDue/gateHonoured are plan-pair-only (planReviewDueOf reads a plan-phase description line); they are not rendered for the review pair, which has no `review due:` analogue.",
+        "reviewGateDueHonoured": "gateDue/gateHonoured are plan-pair-only (a plan-review finding about one of the issue's plan records); they are not rendered for the review pair, which has no review-finding analogue.",
         "orchestrationKinds": "Orchestration-step kinds (autopilot, wake, custom, periodical) are excluded from survival by construction, not because they were never measured.",
         "noGatePairKinds": "A kind with no defined next-gate pair (e.g. plan-review, review, close-out) still reports cost/duration/effort; it has no survival concept, which is distinct from \"not yet instrumented\".",
         "denominatorsNotComparable": "The plan card's survival rate pools verdict tiers a/b/c; the implementation card's pools tiers a/b only (tier-c count shown beside it) — the two rates are not directly comparable.",
@@ -77339,7 +77339,7 @@
         "harnessModelRows": "Per-card rows split the kind's lineages by their REALISED harness, model and effort — the values the run itself stamped on its [usage] telemetry, never the dispatch row's requested fields. A \"—\" cell means the run reported no value there: opencode posts no effort field by design, so its rows read \"—\" for effort rather than disappearing, and backfill lineages with no telemetry at all read \"—\" for all three columns.",
         "walkKindBlindness": "The reused verdict walk keeps only plan-review spine rows and never reads bug rows (an off-spine investigation, not a gate step), so bug rows are invisible to survival while still reporting cost, duration and effort here. That is why they show a card but no gate figure.",
         "survivalUnavailable": "This workspace's provider does not serve issue comments, so no gate verdict can be resolved. The survival columns report unavailable rather than zero; cost, duration and effort are unaffected.",
-        "gateFieldsUnavailable": "No per-issue description could be read, so plan-review due/honoured are omitted rather than reported as zero (they are derived from description text).",
+        "planRecordsCoverage": "plan-review gate due/honoured read not measured: no plan records cover this history yet (the slice-2 cutover has not applied), and no figure is derived from description text.",
         "effortShipEmpty": "The effort column is empty: none of the runs in this corpus reported a realised effort value. It reads the SAME telemetry field either way, so the column fills for any run that does report one."
       }
     },
@@ -79603,7 +79603,7 @@
             "complete": true
           },
           "notes": {
-            "reviewGateDueHonoured": "gateDue/gateHonoured are plan-pair-only (planReviewDueOf reads a plan-phase description line); they are not rendered for the review pair, which has no `review due:` analogue.",
+            "reviewGateDueHonoured": "gateDue/gateHonoured are plan-pair-only (a plan-review finding about one of the issue's plan records); they are not rendered for the review pair, which has no review-finding analogue.",
             "orchestrationKinds": "Orchestration-step kinds (autopilot, wake, custom, periodical) are excluded from survival by construction, not because they were never measured.",
             "noGatePairKinds": "A kind with no defined next-gate pair (e.g. plan-review, review, close-out) still reports cost/duration/effort; it has no survival concept, which is distinct from \"not yet instrumented\".",
             "denominatorsNotComparable": "The plan card's survival rate pools verdict tiers a/b/c; the implementation card's pools tiers a/b only (tier-c count shown beside it) — the two rates are not directly comparable.",
@@ -79612,7 +79612,7 @@
             "harnessModelRows": "Per-card rows split the kind's lineages by their REALISED harness, model and effort — the values the run itself stamped on its [usage] telemetry, never the dispatch row's requested fields. A \"—\" cell means the run reported no value there: opencode posts no effort field by design, so its rows read \"—\" for effort rather than disappearing, and backfill lineages with no telemetry at all read \"—\" for all three columns.",
             "walkKindBlindness": "The reused verdict walk keeps only plan-review spine rows and never reads bug rows (an off-spine investigation, not a gate step), so bug rows are invisible to survival while still reporting cost, duration and effort here. That is why they show a card but no gate figure.",
             "survivalUnavailable": "This workspace's provider does not serve issue comments, so no gate verdict can be resolved. The survival columns report unavailable rather than zero; cost, duration and effort are unaffected.",
-            "gateFieldsUnavailable": "No per-issue description could be read, so plan-review due/honoured are omitted rather than reported as zero (they are derived from description text).",
+            "planRecordsCoverage": "plan-review gate due/honoured read not measured: no plan records cover this history yet (the slice-2 cutover has not applied), and no figure is derived from description text.",
             "effortShipEmpty": "The effort column is populated for dispatch runs after the LIN-2567 telemetry stamp landed; earlier (backfill) rows report no realised effort and stay \"not reported\" permanently — no backfill is planned. It reads the SAME telemetry field either way; no Harbour-side change was needed for it to start filling."
           }
         },
@@ -80695,7 +80695,7 @@
             "complete": true
           },
           "notes": {
-            "reviewGateDueHonoured": "gateDue/gateHonoured are plan-pair-only (planReviewDueOf reads a plan-phase description line); they are not rendered for the review pair, which has no `review due:` analogue.",
+            "reviewGateDueHonoured": "gateDue/gateHonoured are plan-pair-only (a plan-review finding about one of the issue's plan records); they are not rendered for the review pair, which has no review-finding analogue.",
             "orchestrationKinds": "Orchestration-step kinds (autopilot, wake, custom, periodical) are excluded from survival by construction, not because they were never measured.",
             "noGatePairKinds": "A kind with no defined next-gate pair (e.g. plan-review, review, close-out) still reports cost/duration/effort; it has no survival concept, which is distinct from \"not yet instrumented\".",
             "denominatorsNotComparable": "The plan card's survival rate pools verdict tiers a/b/c; the implementation card's pools tiers a/b only (tier-c count shown beside it) — the two rates are not directly comparable.",
@@ -80704,7 +80704,7 @@
             "harnessModelRows": "Per-card rows split the kind's lineages by their REALISED harness, model and effort — the values the run itself stamped on its [usage] telemetry, never the dispatch row's requested fields. A \"—\" cell means the run reported no value there: opencode posts no effort field by design, so its rows read \"—\" for effort rather than disappearing, and backfill lineages with no telemetry at all read \"—\" for all three columns.",
             "walkKindBlindness": "The reused verdict walk keeps only plan-review spine rows and never reads bug rows (an off-spine investigation, not a gate step), so bug rows are invisible to survival while still reporting cost, duration and effort here. That is why they show a card but no gate figure.",
             "survivalUnavailable": "This workspace's provider does not serve issue comments, so no gate verdict can be resolved. The survival columns report unavailable rather than zero; cost, duration and effort are unaffected.",
-            "gateFieldsUnavailable": "No per-issue description could be read, so plan-review due/honoured are omitted rather than reported as zero (they are derived from description text).",
+            "planRecordsCoverage": "plan-review gate due/honoured read not measured: no plan records cover this history yet (the slice-2 cutover has not applied), and no figure is derived from description text.",
             "effortShipEmpty": "The effort column is populated for dispatch runs after the LIN-2567 telemetry stamp landed; earlier (backfill) rows report no realised effort and stay \"not reported\" permanently — no backfill is planned. It reads the SAME telemetry field either way; no Harbour-side change was needed for it to start filling."
           }
         },
@@ -81782,7 +81782,7 @@
             "complete": true
           },
           "notes": {
-            "reviewGateDueHonoured": "gateDue/gateHonoured are plan-pair-only (planReviewDueOf reads a plan-phase description line); they are not rendered for the review pair, which has no `review due:` analogue.",
+            "reviewGateDueHonoured": "gateDue/gateHonoured are plan-pair-only (a plan-review finding about one of the issue's plan records); they are not rendered for the review pair, which has no review-finding analogue.",
             "orchestrationKinds": "Orchestration-step kinds (autopilot, wake, custom, periodical) are excluded from survival by construction, not because they were never measured.",
             "noGatePairKinds": "A kind with no defined next-gate pair (e.g. plan-review, review, close-out) still reports cost/duration/effort; it has no survival concept, which is distinct from \"not yet instrumented\".",
             "denominatorsNotComparable": "The plan card's survival rate pools verdict tiers a/b/c; the implementation card's pools tiers a/b only (tier-c count shown beside it) — the two rates are not directly comparable.",
@@ -81791,7 +81791,7 @@
             "harnessModelRows": "Per-card rows split the kind's lineages by their REALISED harness, model and effort — the values the run itself stamped on its [usage] telemetry, never the dispatch row's requested fields. A \"—\" cell means the run reported no value there: opencode posts no effort field by design, so its rows read \"—\" for effort rather than disappearing, and backfill lineages with no telemetry at all read \"—\" for all three columns.",
             "walkKindBlindness": "The reused verdict walk keeps only plan-review spine rows and never reads bug rows (an off-spine investigation, not a gate step), so bug rows are invisible to survival while still reporting cost, duration and effort here. That is why they show a card but no gate figure.",
             "survivalUnavailable": "This workspace's provider does not serve issue comments, so no gate verdict can be resolved. The survival columns report unavailable rather than zero; cost, duration and effort are unaffected.",
-            "gateFieldsUnavailable": "No per-issue description could be read, so plan-review due/honoured are omitted rather than reported as zero (they are derived from description text).",
+            "planRecordsCoverage": "plan-review gate due/honoured read not measured: no plan records cover this history yet (the slice-2 cutover has not applied), and no figure is derived from description text.",
             "effortShipEmpty": "The effort column is populated for dispatch runs after the LIN-2567 telemetry stamp landed; earlier (backfill) rows report no realised effort and stay \"not reported\" permanently — no backfill is planned. It reads the SAME telemetry field either way; no Harbour-side change was needed for it to start filling."
           }
         },
@@ -82874,7 +82874,7 @@
             "complete": true
           },
           "notes": {
-            "reviewGateDueHonoured": "gateDue/gateHonoured are plan-pair-only (planReviewDueOf reads a plan-phase description line); they are not rendered for the review pair, which has no `review due:` analogue.",
+            "reviewGateDueHonoured": "gateDue/gateHonoured are plan-pair-only (a plan-review finding about one of the issue's plan records); they are not rendered for the review pair, which has no review-finding analogue.",
             "orchestrationKinds": "Orchestration-step kinds (autopilot, wake, custom, periodical) are excluded from survival by construction, not because they were never measured.",
             "noGatePairKinds": "A kind with no defined next-gate pair (e.g. plan-review, review, close-out) still reports cost/duration/effort; it has no survival concept, which is distinct from \"not yet instrumented\".",
             "denominatorsNotComparable": "The plan card's survival rate pools verdict tiers a/b/c; the implementation card's pools tiers a/b only (tier-c count shown beside it) — the two rates are not directly comparable.",
@@ -82883,7 +82883,7 @@
             "harnessModelRows": "Per-card rows split the kind's lineages by their REALISED harness, model and effort — the values the run itself stamped on its [usage] telemetry, never the dispatch row's requested fields. A \"—\" cell means the run reported no value there: opencode posts no effort field by design, so its rows read \"—\" for effort rather than disappearing, and backfill lineages with no telemetry at all read \"—\" for all three columns.",
             "walkKindBlindness": "The reused verdict walk keeps only plan-review spine rows and never reads bug rows (an off-spine investigation, not a gate step), so bug rows are invisible to survival while still reporting cost, duration and effort here. That is why they show a card but no gate figure.",
             "survivalUnavailable": "This workspace's provider does not serve issue comments, so no gate verdict can be resolved. The survival columns report unavailable rather than zero; cost, duration and effort are unaffected.",
-            "gateFieldsUnavailable": "No per-issue description could be read, so plan-review due/honoured are omitted rather than reported as zero (they are derived from description text).",
+            "planRecordsCoverage": "plan-review gate due/honoured read not measured: no plan records cover this history yet (the slice-2 cutover has not applied), and no figure is derived from description text.",
             "effortShipEmpty": "The effort column is populated for dispatch runs after the LIN-2567 telemetry stamp landed; earlier (backfill) rows report no realised effort and stay \"not reported\" permanently — no backfill is planned. It reads the SAME telemetry field either way; no Harbour-side change was needed for it to start filling."
           }
         },
@@ -83966,7 +83966,7 @@
             "complete": true
           },
           "notes": {
-            "reviewGateDueHonoured": "gateDue/gateHonoured are plan-pair-only (planReviewDueOf reads a plan-phase description line); they are not rendered for the review pair, which has no `review due:` analogue.",
+            "reviewGateDueHonoured": "gateDue/gateHonoured are plan-pair-only (a plan-review finding about one of the issue's plan records); they are not rendered for the review pair, which has no review-finding analogue.",
             "orchestrationKinds": "Orchestration-step kinds (autopilot, wake, custom, periodical) are excluded from survival by construction, not because they were never measured.",
             "noGatePairKinds": "A kind with no defined next-gate pair (e.g. plan-review, review, close-out) still reports cost/duration/effort; it has no survival concept, which is distinct from \"not yet instrumented\".",
             "denominatorsNotComparable": "The plan card's survival rate pools verdict tiers a/b/c; the implementation card's pools tiers a/b only (tier-c count shown beside it) — the two rates are not directly comparable.",
@@ -83975,7 +83975,7 @@
             "harnessModelRows": "Per-card rows split the kind's lineages by their REALISED harness, model and effort — the values the run itself stamped on its [usage] telemetry, never the dispatch row's requested fields. A \"—\" cell means the run reported no value there: opencode posts no effort field by design, so its rows read \"—\" for effort rather than disappearing, and backfill lineages with no telemetry at all read \"—\" for all three columns.",
             "walkKindBlindness": "The reused verdict walk keeps only plan-review spine rows and never reads bug rows (an off-spine investigation, not a gate step), so bug rows are invisible to survival while still reporting cost, duration and effort here. That is why they show a card but no gate figure.",
             "survivalUnavailable": "This workspace's provider does not serve issue comments, so no gate verdict can be resolved. The survival columns report unavailable rather than zero; cost, duration and effort are unaffected.",
-            "gateFieldsUnavailable": "No per-issue description could be read, so plan-review due/honoured are omitted rather than reported as zero (they are derived from description text).",
+            "planRecordsCoverage": "plan-review gate due/honoured read not measured: no plan records cover this history yet (the slice-2 cutover has not applied), and no figure is derived from description text.",
             "effortShipEmpty": "The effort column is populated for dispatch runs after the LIN-2567 telemetry stamp landed; earlier (backfill) rows report no realised effort and stay \"not reported\" permanently — no backfill is planned. It reads the SAME telemetry field either way; no Harbour-side change was needed for it to start filling."
           }
         },
@@ -85058,7 +85058,7 @@
             "complete": true
           },
           "notes": {
-            "reviewGateDueHonoured": "gateDue/gateHonoured are plan-pair-only (planReviewDueOf reads a plan-phase description line); they are not rendered for the review pair, which has no `review due:` analogue.",
+            "reviewGateDueHonoured": "gateDue/gateHonoured are plan-pair-only (a plan-review finding about one of the issue's plan records); they are not rendered for the review pair, which has no review-finding analogue.",
             "orchestrationKinds": "Orchestration-step kinds (autopilot, wake, custom, periodical) are excluded from survival by construction, not because they were never measured.",
             "noGatePairKinds": "A kind with no defined next-gate pair (e.g. plan-review, review, close-out) still reports cost/duration/effort; it has no survival concept, which is distinct from \"not yet instrumented\".",
             "denominatorsNotComparable": "The plan card's survival rate pools verdict tiers a/b/c; the implementation card's pools tiers a/b only (tier-c count shown beside it) — the two rates are not directly comparable.",
@@ -85067,7 +85067,7 @@
             "harnessModelRows": "Per-card rows split the kind's lineages by their REALISED harness, model and effort — the values the run itself stamped on its [usage] telemetry, never the dispatch row's requested fields. A \"—\" cell means the run reported no value there: opencode posts no effort field by design, so its rows read \"—\" for effort rather than disappearing, and backfill lineages with no telemetry at all read \"—\" for all three columns.",
             "walkKindBlindness": "The reused verdict walk keeps only plan-review spine rows and never reads bug rows (an off-spine investigation, not a gate step), so bug rows are invisible to survival while still reporting cost, duration and effort here. That is why they show a card but no gate figure.",
             "survivalUnavailable": "This workspace's provider does not serve issue comments, so no gate verdict can be resolved. The survival columns report unavailable rather than zero; cost, duration and effort are unaffected.",
-            "gateFieldsUnavailable": "No per-issue description could be read, so plan-review due/honoured are omitted rather than reported as zero (they are derived from description text).",
+            "planRecordsCoverage": "plan-review gate due/honoured read not measured: no plan records cover this history yet (the slice-2 cutover has not applied), and no figure is derived from description text.",
             "effortShipEmpty": "The effort column is populated for dispatch runs after the LIN-2567 telemetry stamp landed; earlier (backfill) rows report no realised effort and stay \"not reported\" permanently — no backfill is planned. It reads the SAME telemetry field either way; no Harbour-side change was needed for it to start filling."
           }
         },
@@ -86150,7 +86150,7 @@
             "complete": true
           },
           "notes": {
-            "reviewGateDueHonoured": "gateDue/gateHonoured are plan-pair-only (planReviewDueOf reads a plan-phase description line); they are not rendered for the review pair, which has no `review due:` analogue.",
+            "reviewGateDueHonoured": "gateDue/gateHonoured are plan-pair-only (a plan-review finding about one of the issue's plan records); they are not rendered for the review pair, which has no review-finding analogue.",
             "orchestrationKinds": "Orchestration-step kinds (autopilot, wake, custom, periodical) are excluded from survival by construction, not because they were never measured.",
             "noGatePairKinds": "A kind with no defined next-gate pair (e.g. plan-review, review, close-out) still reports cost/duration/effort; it has no survival concept, which is distinct from \"not yet instrumented\".",
             "denominatorsNotComparable": "The plan card's survival rate pools verdict tiers a/b/c; the implementation card's pools tiers a/b only (tier-c count shown beside it) — the two rates are not directly comparable.",
@@ -86159,7 +86159,7 @@
             "harnessModelRows": "Per-card rows split the kind's lineages by their REALISED harness, model and effort — the values the run itself stamped on its [usage] telemetry, never the dispatch row's requested fields. A \"—\" cell means the run reported no value there: opencode posts no effort field by design, so its rows read \"—\" for effort rather than disappearing, and backfill lineages with no telemetry at all read \"—\" for all three columns.",
             "walkKindBlindness": "The reused verdict walk keeps only plan-review spine rows and never reads bug rows (an off-spine investigation, not a gate step), so bug rows are invisible to survival while still reporting cost, duration and effort here. That is why they show a card but no gate figure.",
             "survivalUnavailable": "This workspace's provider does not serve issue comments, so no gate verdict can be resolved. The survival columns report unavailable rather than zero; cost, duration and effort are unaffected.",
-            "gateFieldsUnavailable": "No per-issue description could be read, so plan-review due/honoured are omitted rather than reported as zero (they are derived from description text).",
+            "planRecordsCoverage": "plan-review gate due/honoured read not measured: no plan records cover this history yet (the slice-2 cutover has not applied), and no figure is derived from description text.",
             "effortShipEmpty": "The effort column is populated for dispatch runs after the LIN-2567 telemetry stamp landed; earlier (backfill) rows report no realised effort and stay \"not reported\" permanently — no backfill is planned. It reads the SAME telemetry field either way; no Harbour-side change was needed for it to start filling."
           }
         },
@@ -87242,7 +87242,7 @@
             "complete": true
           },
           "notes": {
-            "reviewGateDueHonoured": "gateDue/gateHonoured are plan-pair-only (planReviewDueOf reads a plan-phase description line); they are not rendered for the review pair, which has no `review due:` analogue.",
+            "reviewGateDueHonoured": "gateDue/gateHonoured are plan-pair-only (a plan-review finding about one of the issue's plan records); they are not rendered for the review pair, which has no review-finding analogue.",
             "orchestrationKinds": "Orchestration-step kinds (autopilot, wake, custom, periodical) are excluded from survival by construction, not because they were never measured.",
             "noGatePairKinds": "A kind with no defined next-gate pair (e.g. plan-review, review, close-out) still reports cost/duration/effort; it has no survival concept, which is distinct from \"not yet instrumented\".",
             "denominatorsNotComparable": "The plan card's survival rate pools verdict tiers a/b/c; the implementation card's pools tiers a/b only (tier-c count shown beside it) — the two rates are not directly comparable.",
@@ -87251,7 +87251,7 @@
             "harnessModelRows": "Per-card rows split the kind's lineages by their REALISED harness, model and effort — the values the run itself stamped on its [usage] telemetry, never the dispatch row's requested fields. A \"—\" cell means the run reported no value there: opencode posts no effort field by design, so its rows read \"—\" for effort rather than disappearing, and backfill lineages with no telemetry at all read \"—\" for all three columns.",
             "walkKindBlindness": "The reused verdict walk keeps only plan-review spine rows and never reads bug rows (an off-spine investigation, not a gate step), so bug rows are invisible to survival while still reporting cost, duration and effort here. That is why they show a card but no gate figure.",
             "survivalUnavailable": "This workspace's provider does not serve issue comments, so no gate verdict can be resolved. The survival columns report unavailable rather than zero; cost, duration and effort are unaffected.",
-            "gateFieldsUnavailable": "No per-issue description could be read, so plan-review due/honoured are omitted rather than reported as zero (they are derived from description text).",
+            "planRecordsCoverage": "plan-review gate due/honoured read not measured: no plan records cover this history yet (the slice-2 cutover has not applied), and no figure is derived from description text.",
             "effortShipEmpty": "The effort column is populated for dispatch runs after the LIN-2567 telemetry stamp landed; earlier (backfill) rows report no realised effort and stay \"not reported\" permanently — no backfill is planned. It reads the SAME telemetry field either way; no Harbour-side change was needed for it to start filling."
           }
         },
@@ -88329,7 +88329,7 @@
             "complete": true
           },
           "notes": {
-            "reviewGateDueHonoured": "gateDue/gateHonoured are plan-pair-only (planReviewDueOf reads a plan-phase description line); they are not rendered for the review pair, which has no `review due:` analogue.",
+            "reviewGateDueHonoured": "gateDue/gateHonoured are plan-pair-only (a plan-review finding about one of the issue's plan records); they are not rendered for the review pair, which has no review-finding analogue.",
             "orchestrationKinds": "Orchestration-step kinds (autopilot, wake, custom, periodical) are excluded from survival by construction, not because they were never measured.",
             "noGatePairKinds": "A kind with no defined next-gate pair (e.g. plan-review, review, close-out) still reports cost/duration/effort; it has no survival concept, which is distinct from \"not yet instrumented\".",
             "denominatorsNotComparable": "The plan card's survival rate pools verdict tiers a/b/c; the implementation card's pools tiers a/b only (tier-c count shown beside it) — the two rates are not directly comparable.",
@@ -88338,7 +88338,7 @@
             "harnessModelRows": "Per-card rows split the kind's lineages by their REALISED harness, model and effort — the values the run itself stamped on its [usage] telemetry, never the dispatch row's requested fields. A \"—\" cell means the run reported no value there: opencode posts no effort field by design, so its rows read \"—\" for effort rather than disappearing, and backfill lineages with no telemetry at all read \"—\" for all three columns.",
             "walkKindBlindness": "The reused verdict walk keeps only plan-review spine rows and never reads bug rows (an off-spine investigation, not a gate step), so bug rows are invisible to survival while still reporting cost, duration and effort here. That is why they show a card but no gate figure.",
             "survivalUnavailable": "This workspace's provider does not serve issue comments, so no gate verdict can be resolved. The survival columns report unavailable rather than zero; cost, duration and effort are unaffected.",
-            "gateFieldsUnavailable": "No per-issue description could be read, so plan-review due/honoured are omitted rather than reported as zero (they are derived from description text).",
+            "planRecordsCoverage": "plan-review gate due/honoured read not measured: no plan records cover this history yet (the slice-2 cutover has not applied), and no figure is derived from description text.",
             "effortShipEmpty": "The effort column is populated for dispatch runs after the LIN-2567 telemetry stamp landed; earlier (backfill) rows report no realised effort and stay \"not reported\" permanently — no backfill is planned. It reads the SAME telemetry field either way; no Harbour-side change was needed for it to start filling."
           }
         },
@@ -89399,7 +89399,7 @@
           "complete": true
         },
         "notes": {
-          "reviewGateDueHonoured": "gateDue/gateHonoured are plan-pair-only (planReviewDueOf reads a plan-phase description line); they are not rendered for the review pair, which has no `review due:` analogue.",
+          "reviewGateDueHonoured": "gateDue/gateHonoured are plan-pair-only (a plan-review finding about one of the issue's plan records); they are not rendered for the review pair, which has no review-finding analogue.",
           "orchestrationKinds": "Orchestration-step kinds (autopilot, wake, custom, periodical) are excluded from survival by construction, not because they were never measured.",
           "noGatePairKinds": "A kind with no defined next-gate pair (e.g. plan-review, review, close-out) still reports cost/duration/effort; it has no survival concept, which is distinct from \"not yet instrumented\".",
           "denominatorsNotComparable": "The plan card's survival rate pools verdict tiers a/b/c; the implementation card's pools tiers a/b only (tier-c count shown beside it) — the two rates are not directly comparable.",
@@ -89408,7 +89408,7 @@
           "harnessModelRows": "Per-card rows split the kind's lineages by their REALISED harness, model and effort — the values the run itself stamped on its [usage] telemetry, never the dispatch row's requested fields. A \"—\" cell means the run reported no value there: opencode posts no effort field by design, so its rows read \"—\" for effort rather than disappearing, and backfill lineages with no telemetry at all read \"—\" for all three columns.",
           "walkKindBlindness": "The reused verdict walk keeps only plan-review spine rows and never reads bug rows (an off-spine investigation, not a gate step), so bug rows are invisible to survival while still reporting cost, duration and effort here. That is why they show a card but no gate figure.",
           "survivalUnavailable": "This workspace's provider does not serve issue comments, so no gate verdict can be resolved. The survival columns report unavailable rather than zero; cost, duration and effort are unaffected.",
-          "gateFieldsUnavailable": "No per-issue description could be read, so plan-review due/honoured are omitted rather than reported as zero (they are derived from description text).",
+          "planRecordsCoverage": "plan-review gate due/honoured read not measured: no plan records cover this history yet (the slice-2 cutover has not applied), and no figure is derived from description text.",
           "effortShipEmpty": "The effort column is empty: none of the runs in this corpus reported a realised effort value. It reads the SAME telemetry field either way, so the column fills for any run that does report one."
         }
       },
@@ -90534,7 +90534,7 @@
           "complete": true
         },
         "notes": {
-          "reviewGateDueHonoured": "gateDue/gateHonoured are plan-pair-only (planReviewDueOf reads a plan-phase description line); they are not rendered for the review pair, which has no `review due:` analogue.",
+          "reviewGateDueHonoured": "gateDue/gateHonoured are plan-pair-only (a plan-review finding about one of the issue's plan records); they are not rendered for the review pair, which has no review-finding analogue.",
           "orchestrationKinds": "Orchestration-step kinds (autopilot, wake, custom, periodical) are excluded from survival by construction, not because they were never measured.",
           "noGatePairKinds": "A kind with no defined next-gate pair (e.g. plan-review, review, close-out) still reports cost/duration/effort; it has no survival concept, which is distinct from \"not yet instrumented\".",
           "denominatorsNotComparable": "The plan card's survival rate pools verdict tiers a/b/c; the implementation card's pools tiers a/b only (tier-c count shown beside it) — the two rates are not directly comparable.",
@@ -90543,7 +90543,7 @@
           "harnessModelRows": "Per-card rows split the kind's lineages by their REALISED harness, model and effort — the values the run itself stamped on its [usage] telemetry, never the dispatch row's requested fields. A \"—\" cell means the run reported no value there: opencode posts no effort field by design, so its rows read \"—\" for effort rather than disappearing, and backfill lineages with no telemetry at all read \"—\" for all three columns.",
           "walkKindBlindness": "The reused verdict walk keeps only plan-review spine rows and never reads bug rows (an off-spine investigation, not a gate step), so bug rows are invisible to survival while still reporting cost, duration and effort here. That is why they show a card but no gate figure.",
           "survivalUnavailable": "This workspace's provider does not serve issue comments, so no gate verdict can be resolved. The survival columns report unavailable rather than zero; cost, duration and effort are unaffected.",
-          "gateFieldsUnavailable": "No per-issue description could be read, so plan-review due/honoured are omitted rather than reported as zero (they are derived from description text).",
+          "planRecordsCoverage": "plan-review gate due/honoured read not measured: no plan records cover this history yet (the slice-2 cutover has not applied), and no figure is derived from description text.",
           "effortShipEmpty": "The effort column is empty: none of the runs in this corpus reported a realised effort value. It reads the SAME telemetry field either way, so the column fills for any run that does report one."
         }
       },

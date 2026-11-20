@@ -4,15 +4,14 @@
  *
  * The quote holds the task's `asked`, byte for byte. These tests pin its fixed shape (quoteAsked), how a text
  * splits around it (splitQuote), how its two marker lines are found (after normalizeEscaping, so Linear's
- * backslash escapes still match: a description filed before LIN-4502 carries the block in this same shape), and
- * the fact reader every code-read line goes through ("outside the block wins", lib/asked-of.js readFact).
+ * backslash escapes still match: a description filed before LIN-4502 carries the block in this same shape).
+ * LIN-4504 retired the fact reader (readFact) that read code-read lines around it.
  *
  * Run with: node scripts/run-unit-tests.mjs tests/unit/brief-quote.test.js
  */
 import { test, describe } from 'node:test';
 import assert from 'node:assert';
 import { ASKED_HEADING, ASKED_END, quoteAsked, splitQuote } from '../../lib/brief-quote.js';
-import { readFact } from '../../lib/asked-of.js';
 
 // Spelled out here on purpose, once: the test pins the shape the module owns.
 // Production code must import the constants, never repeat these strings.
@@ -136,64 +135,5 @@ describe('splitQuote', () => {
   });
 });
 
-describe('readFact', () => {
-  const block = quoteAsked('Child slice.\n\n**Plan-review due:** no — covered by the parent');
-
-  test('below the block wins over the block', () => {
-    const desc = `${block}\n\n## Implementation Plan\n\nplan-review due: yes`;
-    assert.strictEqual(readFact(desc, readDue), 'yes');
-  });
-
-  test('falls back to the block when the text below lacks the fact', () => {
-    assert.strictEqual(readFact(block, readDue), 'no');
-    assert.strictEqual(readFact(`${block}\n\nSome notes, no due line.`, readDue), 'no');
-  });
-
-  test('an unsealed ticket reads its whole description, as today', () => {
-    const desc = 'plan-review due: no\n\nlater: plan-review due: yes';
-    assert.strictEqual(readFact(desc, readDue), readDue(desc));
-    assert.strictEqual(readFact(desc, readDue), 'no');
-  });
-
-  test('block yes, below no reads no: a negative answer below is not absence', () => {
-    const desc = `${quoteAsked('plan-review due: yes')}\n\nplan-review due: no`;
-    assert.strictEqual(readFact(desc, readDue), 'no');
-    // A reader whose negative answer is `false` (and absence `null`) must keep it.
-    const dueBool = (t) => { const m = t.match(DUE); return m ? m[1].toLowerCase() === 'yes' : null; };
-    assert.strictEqual(readFact(desc, dueBool), false);
-    assert.strictEqual(readFact(quoteAsked('plan-review due: yes'), dueBool), true);
-  });
-
-  test('only null and undefined count as absent below; false is an answer', () => {
-    const maybe = (t) => (t.includes('needle') ? 'found' : undefined);
-    assert.strictEqual(readFact(quoteAsked('needle'), maybe), 'found');
-    const orNull = (t) => (t.includes('needle') ? 'found' : null);
-    assert.strictEqual(readFact(quoteAsked('needle'), orNull), 'found');
-    // A presence predicate says "absent" with null, not false (see readFact's doc).
-    const has = (t) => /needle/.test(t) || null;
-    assert.strictEqual(readFact(quoteAsked('needle'), has), true);
-    assert.strictEqual(readFact(`${quoteAsked('hay')}\n\nhay`, has), null);
-    assert.strictEqual(readFact(`${quoteAsked('needle')}\n\nhay`, (t) => /needle/.test(t)), false);
-  });
-
-  test('text above a block reads with the text below, ahead of the block', () => {
-    const desc = `plan-review due: yes\n\n${block}`;
-    assert.strictEqual(readFact(desc, readDue), 'yes');
-  });
-
-  test('`after` text (a plan comment) reads with the text below, ahead of the block', () => {
-    const block = quoteAsked('plan-review due: no');
-    assert.strictEqual(readFact(block, readDue, { after: 'plan-review due: yes' }), 'yes');
-    assert.strictEqual(readFact(block, readDue, { after: 'no line here' }), 'no');
-    // Unsealed: the description then the after text, joined as callers joined them before.
-    const seen = [];
-    readFact('desc', (t) => { seen.push(t); return null; }, { after: 'comment' });
-    assert.deepStrictEqual(seen, ['desc\n\ncomment']);
-  });
-
-  test('an empty or missing description is read as the empty string', () => {
-    assert.strictEqual(readFact(undefined, readDue), null);
-    assert.strictEqual(readFact('', (t) => t), '');
-  });
-});
+// LIN-4504 retired readFact with its last caller: no reader takes a plan fact from a description.
 

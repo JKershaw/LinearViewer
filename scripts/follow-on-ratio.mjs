@@ -90,6 +90,7 @@ import { tmpdir } from 'node:os';
 import { fileURLToPath } from 'node:url';
 import { execFileSync } from 'node:child_process';
 import { computeFollowOnRatio } from '../lib/follow-on-ratio.js';
+import { readPlanFactsThroughProxy } from './plan-facts-proxy.mjs';
 import { classifyUpstreamError } from '../lib/errors.js';
 
 const REPO_ROOT = join(dirname(fileURLToPath(import.meta.url)), '..');
@@ -320,7 +321,7 @@ function render(result, meta) {
   L.push(`  mean relations per completed    ${d.meanRelationsPerCompleted == null ? '—' : d.meanRelationsPerCompleted.toFixed(2)}   (union of both arms)`);
   L.push(`  with >=1 relation               ${pctOf(d.pctWithAnyRelation)}`);
   L.push(`  with a review ledger            ${pctOf(d.pctWithReviewLedger)}`);
-  L.push(`  with a plan marker              ${pctOf(d.pctWithPlanMarker)}`);
+  L.push(`  planned (plan records)          ${pctOf(d.pctPlanned)}   of ${num(d.plannedMeasured)} measured; ${num(d.plannedNotMeasured)} not measured${Object.keys(d.plannedNotMeasuredReasons).length ? ` (${Object.entries(d.plannedNotMeasuredReasons).map(([r, n]) => `${n}: ${r}`).join('; ')})` : ''}`);
   L.push(`  fully matured sources           ${num(d.maturedSources)}`);
   L.push(`  unresolved peers                ${num(d.unresolvedPeers)}   (relation present, peer createdAt unreadable)`);
   L.push(`  completed but undated           ${num(d.undated)}`);
@@ -335,7 +336,7 @@ function render(result, meta) {
   L.push(`  excluded      ${result.definition.excluded.join('; ')}`);
   L.push(`  counting      ${result.definition.numeratorCounting}`);
   L.push(`  maturity      ${result.definition.maturityDays} days`);
-  L.push(`  plan marker   ${result.definition.planMarker}   (matched against the ${result.definition.planMarkerScope} only)`);
+  L.push(`  planned       ${result.definition.plannedRule}, covered from ${result.definition.plannedCoverageFrom || 'not yet (no plan records)'}`);
   L.push('');
   L.push(`  read: ${meta.listCalls} list calls + ${meta.detailCalls} detail reads`);
   L.push('  Known limits are in the header of lib/follow-on-ratio.js — read them before');
@@ -374,8 +375,12 @@ async function main() {
   log('uniform detail pass over every issue (denominator + peer index)…');
   const { details, skipped } = await fetchAllDetails(rows, args);
 
+  log('reading plan records through the proxy (three reads)…');
+  const planFacts = await readPlanFactsThroughProxy({ base: args.base, token: args.token, getJson, tickets: details.map((d) => d.identifier).filter(Boolean) });
+
   const asOf = iso(Date.now()); // the read's own timestamp, recorded with the result
   const result = computeFollowOnRatio(details, {
+    planFacts,
     windowStart: args.windowStart,
     windowEnd: args.windowEnd,
     asOf,

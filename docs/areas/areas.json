@@ -41,7 +41,7 @@
       "name": "LLM & prompts",
       "slug": "llm-and-prompts",
       "match": [
-        "^lib/prompts/|^lib/(asked-of|legacy-plan-text|size-of-move|openrouter(?!-key-resolver\\.js$)[^/]*|prompt-[^/]*|stage-router|code-routes|recommend[^/]*|recommendation-[^/]*|chat-[^/]*|agent-turn|bash-tool|llm-call-log|llm-jobs|model-routing[^/]*|model-pricing|catalog-rate|call-budget|completion-signals|should-mock-ai|brief[^/]*|recap[^/]*|collective-[^/]*|yap-client|north-star-resolver|scan|scan-fingerprint|audit|roadmap|context-graph|graph-features|library|library-metadata|custom-prompts-store|saved-chat-store|file-pointer|feedback-title|action-kind|flight-companion-gate|flight-companion-census-seed|harbour-comments-store|report-history-store|ship-biscuit|ship-biscuit-history-store|periodicals)\\.js$"
+        "^lib/prompts/|^lib/(asked-of|legacy-plan-text|size-of-move|openrouter(?!-key-resolver\\.js$)[^/]*|prompt-[^/]*|stage-router|code-routes|recommend[^/]*|recommendation-[^/]*|chat-[^/]*|agent-turn|bash-tool|llm-call-log|llm-jobs|model-routing[^/]*|model-pricing|catalog-rate|call-budget|completion-signals|should-mock-ai|brief[^/]*|recap[^/]*|collective-[^/]*|yap-client|north-star-resolver|scan|scan-fingerprint|audit|roadmap|context-graph|graph-features|library|library-metadata|custom-prompts-store|saved-chat-store|feedback-title|action-kind|flight-companion-gate|flight-companion-census-seed|harbour-comments-store|report-history-store|ship-biscuit|ship-biscuit-history-store|periodicals)\\.js$"
       ]
     },
     {
@@ -72,7 +72,7 @@
       "name": "Providers (Linear, GitHub, Jira, local)",
       "slug": "providers",
       "match": [
-        "^lib/providers/|^lib/sample-data/|^lib/(linear|linear-fetch|local-store|starter-seed|issue-write-validation|description-edit|github-pr-files|github-pr-status|pr-state-copy|pr-state-store|attachment-upload|task-attachments|trashed-signal)\\.js$"
+        "^lib/providers/|^lib/sample-data/|^lib/(linear|linear-fetch|local-store|starter-seed|issue-write-validation|description-edit|github-pr-status|pr-state-copy|pr-state-store|attachment-upload|task-attachments|trashed-signal)\\.js$"
       ]
     },
     {

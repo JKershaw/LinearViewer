@@ -1,5 +1,5 @@
 {
-  "note": "LIN-4177: the change list. Each entry names one intended difference from the baseline goldens: a=cap (LIN-4148), b=horizon straddler credited to its true issue, c=true base kind, d=incomplete lineages show no figure. LIN-4178 adds the KPI path and run page: d also reaches S11, S12 and S13 (the same narrow incomplete rule, and the S12/S13 display fixes). Anything else that differs is a defect (W9). The workerSessions[].dispatchedAt decision is option (ii): the fetched earliest member's time is kept (no entry: no replay line moves). The S11 baseline was re-recorded at 9e397e6b over the horizon-filtered rows /kpis actually reads (LIN-4178): the first golden was recorded on unfiltered rows. LIN-4179 adds the calls population: S2 and S3 stop counting a null call cost as $0 (d): the priced sum keeps its value ($0.33), and the unpriced count (2) and the withheld total (totalUsd null) say so. S4 is value-identical (no entry: the scan estimate is S7's scan typicalUsd, shaped as before). S1's appCalls wire, S7, and every other surface are unchanged by LIN-4179. LIN-4404 adds g=task-life (/cost/:identifier reads a task's whole life, not the 30-day window; lib/read-horizon.js): S1's window reads { days: null, appCallsSince: null, scope: 'task-life' }; the horizon straddlers (corpus cases 4, 7, 16, 17) read their founders, older than 30 days, so each session's dispatchedAt is its founder's and LIN-8's opencode lineage is complete and priced (1.1, not withheld); LIN-42's 60-day-old call (c5, $0.90) joins its appCalls and totalUsd. Entries a, b and d below whose value moved say so. The over-cap fillers (cases 20-21) sit inside 30 days and do not move. S2 to S13 (the reporting windows) do not move. goldens.json stays the 9e397e6b baseline: re-recording it would erase this ledger.",
+  "note": "LIN-4177: the change list. Each entry names one intended difference from the baseline goldens: a=cap (LIN-4148), b=horizon straddler credited to its true issue, c=true base kind, d=incomplete lineages show no figure. LIN-4178 adds the KPI path and run page: d also reaches S11, S12 and S13 (the same narrow incomplete rule, and the S12/S13 display fixes). Anything else that differs is a defect (W9). The workerSessions[].dispatchedAt decision is option (ii): the fetched earliest member's time is kept (no entry: no replay line moves). The S11 baseline was re-recorded at 9e397e6b over the horizon-filtered rows /kpis actually reads (LIN-4178): the first golden was recorded on unfiltered rows. LIN-4179 adds the calls population: S2 and S3 stop counting a null call cost as $0 (d): the priced sum keeps its value ($0.33), and the unpriced count (2) and the withheld total (totalUsd null) say so. S4 is value-identical (no entry: the scan estimate is S7's scan typicalUsd, shaped as before). S1's appCalls wire, S7, and every other surface are unchanged by LIN-4179. LIN-4404 adds g=task-life (/cost/:identifier reads a task's whole life, not the 30-day window; lib/read-horizon.js): S1's window reads { days: null, appCallsSince: null, scope: 'task-life' }; the horizon straddlers (corpus cases 4, 7, 16, 17) read their founders, older than 30 days, so each session's dispatchedAt is its founder's and LIN-8's opencode lineage is complete and priced (1.1, not withheld); LIN-42's 60-day-old call (c5, $0.90) joins its appCalls and totalUsd. Entries a, b and d below whose value moved say so. The over-cap fillers (cases 20-21) sit inside 30 days and do not move. S2 to S13 (the reporting windows) do not move. goldens.json stays the 9e397e6b baseline: re-recording it would erase this ledger. LIN-4504 adds h=plan records: the effort read-out's plan-review gate is read from records (a plan-review finding about the issue's plan records), not a description line, so S10's notes change: gateFieldsUnavailable (the description-read caveat) goes, planRecordsCoverage (not measured before the plan records) comes, and reviewGateDueHonoured names the records reader.",
   "changes": [
     {
       "path": "S1.LIN-99.body.workerSessions.P",
@@ -225,6 +225,21 @@
       "path": "S1.LIN-42.body.appCalls",
       "change": "g",
       "reason": "LIN-4404 (task-life): the call-log read takes the task-life bound, so LIN-42's call c5 (proxy-x, $0.90, 60 days old) is counted: calls 0 to 1, costUsd 0 to 0.90, one proxy-x feature row."
+    },
+    {
+      "path": "S10.notes.gateFieldsUnavailable",
+      "change": "h",
+      "reason": "LIN-4504: the gate no longer reads a description, so the caveat that none could be read goes."
+    },
+    {
+      "path": "S10.notes.planRecordsCoverage",
+      "change": "h",
+      "reason": "LIN-4504: the gate reads not measured where no plan records cover the history (the replay passes none), never zero."
+    },
+    {
+      "path": "S10.notes.reviewGateDueHonoured",
+      "change": "h",
+      "reason": "LIN-4504: the note names the records reader (a plan-review finding about the issue's plan records) instead of the retired description reader."
     }
   ]
 }

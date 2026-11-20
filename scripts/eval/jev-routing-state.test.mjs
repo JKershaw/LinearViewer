@@ -38,7 +38,7 @@ test('node facts reuse assembleNodeFacts counts', () => {
     { id: 'a', identifier: 'N-1a', title: 'a', state: { ...DONE } },
     { id: 'b', identifier: 'N-1b', title: 'b', state: { ...STARTED } },
     { id: 'c', identifier: 'N-1c', title: 'c', state: { ...TODO } },
-  ], 'fits one session', 'N-1b'));
+  ], 'Session fit: one session.', 'N-1b'));
   assert.equal(state.hasSubtasks, true);
   assert.equal(state.nodeFacts.subtaskCount, 3);
   assert.equal(state.nodeFacts.completedCount, 1);
@@ -50,9 +50,9 @@ test('node facts reuse assembleNodeFacts counts', () => {
 
 test('LIN-4504: session fit comes from the bundle\'s explicit plan facts, never the description', () => {
   const planFacts = (sessionFit) => ({ measured: true, sessionFit });
-  assert.equal(buildDistilledState({ ...leaf('L-1', 'Session fit: needs multiple sessions'), planFacts: planFacts('one') }).sessionFit, 'one');
-  assert.equal(buildDistilledState({ ...leaf('L-2', 'This fits one focused session.'), planFacts: planFacts('several') }).sessionFit, 'several');
-  assert.equal(buildDistilledState(leaf('L-3', 'Session fit: needs multiple sessions')).sessionFit, 'not measured');
+  assert.equal(buildDistilledState({ ...leaf('L-1', 'Session fit: several sessions.'), planFacts: planFacts('one') }).sessionFit, 'one');
+  assert.equal(buildDistilledState({ ...leaf('L-2', 'Session fit: one session.'), planFacts: planFacts('several') }).sessionFit, 'several');
+  assert.equal(buildDistilledState(leaf('L-3', 'Session fit: several sessions.')).sessionFit, 'not measured');
 });
 
 test('frontier child is the selectFocusSubtask pick (in-progress first)', () => {
@@ -72,7 +72,7 @@ test('divergence marker flags a later comment that refutes an earlier finding', 
   assert.equal(trail.divergenceMarker.flagged, true);
   assert.ok(trail.divergenceMarker.commentIndexes.includes(1));
   const calm = summarizeTrail([
-    { user: 'a', createdAt: '2026-01-01T00:00:00Z', body: 'Plan ready, fits one session.' },
+    { user: 'a', createdAt: '2026-01-01T00:00:00Z', body: 'Plan ready, one session.' },
     { user: 'b', createdAt: '2026-01-02T00:00:00Z', body: 'Implemented; PR open, CI green.' },
   ]);
   assert.equal(calm.divergenceMarker.flagged, false);

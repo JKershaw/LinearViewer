@@ -149,7 +149,7 @@ async function readIssueContexts(workspace, groups) {
   return { issueContext, skipped, supportsFns };
 }
 
-async function computeWorkspaceEffortReadout(workspace, { now }, { dispatchQueueStore, requestUsageLoader }) {
+async function computeWorkspaceEffortReadout(workspace, { now }, { dispatchQueueStore, requestUsageLoader, recordsStore = null }) {
   const urlKey = workspace.urlKey;
   const loader = requireRequestUsageLoader(requestUsageLoader, 'effort read-out');
 
@@ -181,7 +181,9 @@ async function computeWorkspaceEffortReadout(workspace, { now }, { dispatchQueue
   const { issueContext, skipped, supportsFns } = await readIssueContexts(workspace, groups);
 
   const survivalAvailable = supportsFns.some((fn) => fn('fetchIssueComments'));
-  const gateFieldsAvailable = supportsFns.some((fn) => fn('fetchIssueFields'));
+  // LIN-4504: the plan-review gate is read from records, one batched read for every scored issue; no store or a
+  // fault leaves it not measured (never zero, never read from a description).
+  const planFacts = await readPlanFacts(recordsStore, urlKey, identifiers);
 
   return computeEffortReadout({
     liveRows,
@@ -191,11 +193,22 @@ async function computeWorkspaceEffortReadout(workspace, { now }, { dispatchQueue
     asOf: now.toISOString(),
     skipped,
     survivalAvailable,
-    gateFieldsAvailable,
+    planFacts,
     identityRows,
     requestSource: loader,
     urlKey,
   });
+}
+
+/** LIN-4504: the scored issues' plan facts from records, or null (not measured) with no store or on a fault (logged). */
+async function readPlanFacts(recordsStore, urlKey, identifiers) {
+  if (!recordsStore || typeof recordsStore.planFactsForTickets !== 'function') return null;
+  try {
+    return await recordsStore.planFactsForTickets(urlKey, identifiers);
+  } catch (err) {
+    console.error(`[effort-readout] plan facts could not be read (${urlKey}): ${err?.message || err}`);
+    return null;
+  }
 }
 
 function effortReadoutPage(ctx) {

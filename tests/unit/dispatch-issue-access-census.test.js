@@ -3,7 +3,7 @@
  * retired the seal). Every caller of `createDispatchItem` in lib/ and routes/, and every `enqueueRow` lane in
  * lib/dispatch-entrance.js, passes its own `issueAccess`, or is on NEVER_FIRST with the reason it names no ticket or
  * only ever continues one. The factory resolves that access once for the task seat (lib/dispatch-factory.js
- * taskOnDispatch, LIN-4501), the file-pointer plan read and the child-ticket retry (LIN-4503), so a lane that
+ * taskOnDispatch, LIN-4501) and the child-ticket retry (LIN-4503), so a lane that
  * dropped it would make those run without the dispatch's own credential.
  *
  * Run with: node scripts/run-unit-tests.mjs tests/unit/dispatch-issue-access-census.test.js

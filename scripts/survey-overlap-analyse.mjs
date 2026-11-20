@@ -4,6 +4,7 @@
 // and docs/papers/harbour/step-overlap-codes.json when it exists. No proxy calls.
 import { readFileSync, writeFileSync, existsSync } from 'fs';
 import { gitCommits } from './survey-rules-timeline.mjs';
+import { planFactsFromRecords } from '../lib/records/plan-facts.js';
 import { STEPS, stepOfKind, attribute, splitDescription, words, restated, verbatim, refShare, seenShare, median, quart } from './survey-overlap-lib.mjs';
 
 const arg = (k, d) => { const i = process.argv.indexOf(k); return i >= 0 ? process.argv[i + 1] : d; };
@@ -13,6 +14,9 @@ const J = (p) => JSON.parse(readFileSync(p, 'utf8'));
 const TX = J('data/survey-overlap/transcripts.json'); const sessions = TX.sessions;
 const proxy = J('data/survey-overlap/proxy.json'); const D = proxy.details;
 const sel = J('data/survey-overlap/select.json');
+// LIN-4504: the capture's records (`proxy.records`: {tasks, plans, findings}, read through GET /records), folded by the
+// store's own pure fold. A capture without them (every capture before the slice-2 cutover) measures nothing here.
+const planFactsOfCapture = proxy.records ? planFactsFromRecords(proxy.records, Object.keys(D)) : new Map();
 const runner = J('data/survey-doubling/runner.json').rows;
 const readText = new Map();
 for (const l of readFileSync('data/survey-overlap/transcripts-reads.jsonl', 'utf8').split('\n')) { if (!l) continue; const o = JSON.parse(l); readText.set(`${o.ws}/${o.file}/${o.i}`, o.text); }
@@ -178,13 +182,15 @@ for (const [p, kids] of Object.entries(sel.split)) {
     const sibSess = sessions.filter((s) => ka.slice(0, i).some(([b]) => sIssue(s) === b) && ['research', 'plan'].includes(sKind(s)) && s.first < (mine[0]?.first || '9'));
     const sibFiles = new Set(sibSess.flatMap((s) => s.files.filter((f) => f.path).map((f) => f.path)));
     const fr = mine.flatMap((s) => s.files.filter((f) => f.path)); const tb = fr.reduce((x, f) => x + f.bytes, 0);
-    // A breakdown that copied an approved plan slice leaves this line in the child (lib/prompt-template-defs.js:485).
-    const inherited = /plan-review due:?\**\s*no\b[^\n]{0,40}covered by/i.test(a.d.description || '');
+    // LIN-4504: covered by the parent's plan means the child's task has a `piece` (records), never a line in its
+    // description. Read from the capture's records when it holds them; else not measured (null), never false.
+    const pf = planFactsOfCapture.get(k);
+    const inherited = pf && pf.measured ? pf.partOfParent : null;
     split.push({ parent: p, child: k, order: i, repo: repo(k), inherited, ranPlan: mine.some((s) => sKind(s) === 'plan'), ranResearch: mine.some((s) => sKind(s) === 'research'), ranPlanReview: sessions.some((s) => sIssue(s) === k && sKind(s) === 'plan-review'), words: words(own), fromParent: words(own) >= 30 ? r3(restated(parentText, own)) : null, refsFromParent: words(own) >= 30 ? r3(refShare(parentText, own)) : null, fromSiblings: i && words(own) >= 30 ? r3(restated(sib, own)) : null, refsFromSiblings: i && words(own) >= 30 ? r3(refShare(sib, own)) : null, siblingReread: i && tb && sibFiles.size ? r3(fr.filter((f) => sibFiles.has(f.path)).reduce((x, f) => x + f.bytes, 0) / tb) : null, tokens: mine.reduce((x, s) => x + s.tokens, 0) });
   }
 }
 const later = split.filter((s) => s.order > 0);
-out.split = { inherited: split.filter((s) => s.inherited).length, inheritedThenPlanned: split.filter((s) => s.inherited && (s.ranPlan || s.ranPlanReview)).length, ranPlan: split.filter((s) => s.ranPlan).length, ranPlanReview: split.filter((s) => s.ranPlanReview).length, withText: split.filter((s) => s.words >= 30).length, parents: new Set(split.map((s) => s.parent)).size, children: split.length, laterSiblings: later.length, fromParent: quart(split.map((s) => s.fromParent)).map(r3), refsFromParent: quart(split.map((s) => s.refsFromParent)).map(r3), fromSiblings: quart(later.map((s) => s.fromSiblings)).map(r3), refsFromSiblings: quart(later.map((s) => s.refsFromSiblings)).map(r3), siblingReread: quart(later.map((s) => s.siblingReread)).map(r3), siblingRereadN: later.filter((s) => s.siblingReread != null).length, rows: split };
+out.split = { inherited: split.filter((s) => s.inherited).length, inheritedNotMeasured: split.filter((s) => s.inherited === null).length, inheritedThenPlanned: split.filter((s) => s.inherited && (s.ranPlan || s.ranPlanReview)).length, ranPlan: split.filter((s) => s.ranPlan).length, ranPlanReview: split.filter((s) => s.ranPlanReview).length, withText: split.filter((s) => s.words >= 30).length, parents: new Set(split.map((s) => s.parent)).size, children: split.length, laterSiblings: later.length, fromParent: quart(split.map((s) => s.fromParent)).map(r3), refsFromParent: quart(split.map((s) => s.refsFromParent)).map(r3), fromSiblings: quart(later.map((s) => s.fromSiblings)).map(r3), refsFromSiblings: quart(later.map((s) => s.refsFromSiblings)).map(r3), siblingReread: quart(later.map((s) => s.siblingReread)).map(r3), siblingRereadN: later.filter((s) => s.siblingReread != null).length, rows: split };
 
 // ---- 5b. Split census (transcripts and the ticket list): for every parent with two or more children that ran a session on disk,
 // which planning steps the parent and each child ran, and the tokens the children's own research, plan and plan-review sessions took.

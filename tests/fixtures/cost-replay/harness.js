@@ -360,7 +360,7 @@ export async function runReplay(corpusOverride, { readRecords = false } = {}) {
       issueContext: new Map(),
       asOf: now,
       survivalAvailable: false,
-      gateFieldsAvailable: false,
+      // LIN-4504: the plan-review gate is read from records; the replay passes none, so it reads not measured.
       identityRows: effortIdentity,
       requestSource: requestUsageLoader,
       urlKey: URL_KEY,

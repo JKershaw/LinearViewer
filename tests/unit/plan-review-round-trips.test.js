@@ -20,6 +20,7 @@ import {
   derivePrimaryFloor, MIN_DENOMINATOR, __internal,
 } from '../../lib/plan-review-round-trips.js';
 import { __internal as followOnRatioInternal } from '../../lib/follow-on-ratio.js';
+import { planFactsOf } from '../../lib/records/plan-facts.js';
 
 const ASOF = '2026-08-09T12:00:00.000Z';
 
@@ -39,9 +40,16 @@ function feedbackDone(message, timestamp) {
   return [{ message, timestamp }];
 }
 
-function issue(id, { description = '', comments = [], rows = [] } = {}) {
-  return { id, identifier: `LIN-${id}`, description, comments, rows };
+function issue(id, { description = '', comments = [], rows = [], planFacts } = {}) {
+  return { id, identifier: `LIN-${id}`, description, comments, rows, ...(planFacts ? { planFacts } : {}) };
 }
+
+// LIN-4504: the gate is read from records: a plan-review finding about one of the issue's plans existed. The coverage
+// instant is passed per call (the module default, PLAN_RECORDS_SINCE, is null until the cutover commit sets it).
+const COVERED = '2026-01-01T00:00:00.000Z';
+const PLAN_REC = { id: 'plan-g', v: 1, kind: 'plan', state: 'kept', in: 'task-g', to: 'breakdown' };
+const ASKED = planFactsOf({ task: { id: 'task-g', kind: 'task' }, inside: [PLAN_REC], findings: [{ id: 'finding-g', kind: 'finding', state: 'done', to: 'plan-review', links: { about: ['plan-g'] } }] });
+const NOT_ASKED = planFactsOf({ task: { id: 'task-g', kind: 'task' }, inside: [{ ...PLAN_REC, to: 'implementation' }] });
 
 // ─── T19 / T19b (LIN-2653): the pinned status readers ───────────────────────
 //
@@ -516,54 +524,43 @@ describe('verdict tier precedence and the shared window bound', () => {
 // ─── gate-due / gate-honoured (unconditioned series) ─────────────────────────
 
 describe('gate-due / gate-honoured', () => {
-  test('gateDue requires BOTH a plan dispatch and the description marker; gateHonoured additionally requires reaching plan-review', () => {
-    const gateDueAndHonoured = issue('gate-1', {
-      description: 'plan-review due: yes — (a) needs multiple sessions.',
-      rows: [
-        row('p1', 'plan', 'done', '2026-08-09T09:00:00.000Z', '2026-08-09T09:30:00.000Z'),
-        row('r1', 'plan-review', 'done', '2026-08-09T10:00:00.000Z', '2026-08-09T10:05:00.000Z',
-          feedbackDone('DONE: Verdict: Approve.', '2026-08-09T10:05:00.000Z')),
-      ],
-    });
-    const r1 = computeIssueRoundTrips(gateDueAndHonoured, { asOf: ASOF });
+  test('LIN-4504: gateDue requires BOTH a plan dispatch and a plan-review finding on record; gateHonoured additionally requires reaching plan-review', () => {
+    const opts = { asOf: ASOF, planRecordsSince: COVERED };
+    const planRow = row('p1', 'plan', 'done', '2026-08-09T09:00:00.000Z', '2026-08-09T09:30:00.000Z');
+    const r1 = computeIssueRoundTrips(issue('gate-1', { planFacts: ASKED, rows: [planRow,
+      row('r1', 'plan-review', 'done', '2026-08-09T10:00:00.000Z', '2026-08-09T10:05:00.000Z', feedbackDone('DONE: Verdict: Approve.', '2026-08-09T10:05:00.000Z'))] }), opts);
     assert.equal(r1.gateDue, true);
     assert.equal(r1.gateHonoured, true);
-
-    const gateDueNotHonoured = issue('gate-2', {
-      description: 'plan-review due: yes — (a) needs multiple sessions.',
-      rows: [
-        row('p1', 'plan', 'done', '2026-08-09T09:00:00.000Z', '2026-08-09T09:30:00.000Z'),
-        // Gate declared due, but the only plan-review row never attempted.
-        row('r1', 'plan-review', 'cancelled', '2026-08-09T10:00:00.000Z', '2026-08-09T10:01:00.000Z'),
-      ],
-    });
-    const r2 = computeIssueRoundTrips(gateDueNotHonoured, { asOf: ASOF });
+    const r2 = computeIssueRoundTrips(issue('gate-2', { planFacts: ASKED, rows: [planRow,
+      row('r1', 'plan-review', 'cancelled', '2026-08-09T10:00:00.000Z', '2026-08-09T10:01:00.000Z')] }), opts);
     assert.equal(r2.gateDue, true);
     assert.equal(r2.gateHonoured, false);
-
-    const noGateMarker = issue('gate-3', {
-      description: 'plan-review due: no — none of (a)-(d).',
-      rows: [row('p1', 'plan', 'done', '2026-08-09T09:00:00.000Z', '2026-08-09T09:30:00.000Z')],
-    });
-    const r3 = computeIssueRoundTrips(noGateMarker, { asOf: ASOF });
+    const r3 = computeIssueRoundTrips(issue('gate-3', { planFacts: NOT_ASKED, rows: [planRow] }), opts);
     assert.equal(r3.gateDue, false);
-
-    const noPlanDispatch = issue('gate-4', {
-      description: 'plan-review due: yes — (c) relaxes a guard.',
-      rows: [row('r1', 'plan-review', 'done', '2026-08-09T10:00:00.000Z', '2026-08-09T10:05:00.000Z')],
-    });
-    const r4 = computeIssueRoundTrips(noPlanDispatch, { asOf: ASOF });
-    assert.equal(r4.gateDue, false, 'gateDue requires a plan dispatch even when the marker is present');
+    const r4 = computeIssueRoundTrips(issue('gate-4', { planFacts: ASKED, rows: [] }), opts);
+    assert.equal(r4.gateDue, false, 'no plan dispatch: not due, whatever the records hold');
   });
 
-  test('the marker is scoped to the description only, not comments', () => {
-    const iss = issue('gate-comment-only', {
-      description: 'No marker here.',
-      comments: [comment('c1', 'plan-review due: yes — mentioned only in a comment.', '2026-08-09T09:00:00.000Z')],
-      rows: [row('p1', 'plan', 'done', '2026-08-09T09:00:00.000Z', '2026-08-09T09:30:00.000Z')],
-    });
-    const result = computeIssueRoundTrips(iss, { asOf: ASOF });
-    assert.equal(result.gateDue, false);
+  test('LIN-4504 poisoned description: the text says due and the records not, and the reverse; the records win; comments are never read', () => {
+    const opts = { asOf: ASOF, planRecordsSince: COVERED };
+    const rows = [row('p1', 'plan', 'done', '2026-08-09T09:00:00.000Z', '2026-08-09T09:30:00.000Z')];
+    assert.equal(computeIssueRoundTrips(issue('p-1', { description: 'plan-review due: yes — (a) needs multiple sessions.', planFacts: NOT_ASKED, rows }), opts).gateDue, false);
+    assert.equal(computeIssueRoundTrips(issue('p-2', { description: 'plan-review due: no — none of (a)-(d).', planFacts: ASKED, rows }), opts).gateDue, true);
+    assert.equal(computeIssueRoundTrips(issue('p-3', { comments: [comment('c1', 'plan-review due: yes', '2026-08-09T09:00:00.000Z')], planFacts: NOT_ASKED, rows }), opts).gateDue, false);
+  });
+
+  test('LIN-4504: an issue the plan records do not cover reads null (not measured), never false', () => {
+    const rows = [row('p1', 'plan', 'done', '2026-08-09T09:00:00.000Z', '2026-08-09T09:30:00.000Z')];
+    const none = computeIssueRoundTrips(issue('n-1', { description: 'plan-review due: yes', planFacts: ASKED, rows }), { asOf: ASOF });
+    assert.equal(none.gateDue, null);
+    assert.equal(none.gateHonoured, null);
+    assert.match(none.gateNotMeasured, /no plan records yet/);
+    const early = computeIssueRoundTrips(issue('n-2', { planFacts: ASKED, rows }), { asOf: ASOF, planRecordsSince: '2026-08-09T10:00:00.000Z' });
+    assert.equal(early.gateDue, null, 'its plan was dispatched before the records began');
+    const unread = computeIssueRoundTrips(issue('n-3', { rows }), { asOf: ASOF, planRecordsSince: COVERED });
+    assert.equal(unread.gateDue, null, 'no plan facts read for it');
+    const agg = computePlanReviewRoundTrips([issue('n-4', { rows }), issue('n-5', { rows, planFacts: ASKED })], { asOf: ASOF, planRecordsSince: COVERED });
+    assert.deepEqual([agg.gate.due, agg.gate.measured, agg.gate.notMeasured, agg.gate.dueRate], [1, 1, 1, 1], 'the rate is over measured issues');
   });
 });
 
@@ -763,7 +760,7 @@ describe('computePlanReviewRoundTrips — aggregate', () => {
     const issues = [];
     for (let i = 0; i < MIN_DENOMINATOR - 1; i++) {
       issues.push(issue(`gd${i}`, {
-        description: 'plan-review due: yes.',
+        planFacts: ASKED,
         rows: [
           row('p1', 'plan', 'done', '2026-08-01T00:00:00.000Z', '2026-08-01T00:05:00.000Z'),
           row('r1', 'plan-review', 'done', '2026-08-01T00:10:00.000Z', '2026-08-01T00:15:00.000Z',
@@ -771,19 +768,19 @@ describe('computePlanReviewRoundTrips — aggregate', () => {
         ],
       }));
     }
-    const under = computePlanReviewRoundTrips(issues, { asOf: ASOF });
+    const under = computePlanReviewRoundTrips(issues, { asOf: ASOF, planRecordsSince: COVERED });
     assert.equal(under.gate.due, MIN_DENOMINATOR - 1);
     assert.equal(under.gate.sufficient, false);
 
     issues.push(issue('gdN', {
-      description: 'plan-review due: yes.',
+      planFacts: ASKED,
       rows: [
         row('p1', 'plan', 'done', '2026-08-01T00:00:00.000Z', '2026-08-01T00:05:00.000Z'),
         row('r1', 'plan-review', 'done', '2026-08-01T00:10:00.000Z', '2026-08-01T00:15:00.000Z',
           feedbackDone('DONE: Verdict: Approve.', '2026-08-01T00:15:00.000Z')),
       ],
     }));
-    const atFloor = computePlanReviewRoundTrips(issues, { asOf: ASOF });
+    const atFloor = computePlanReviewRoundTrips(issues, { asOf: ASOF, planRecordsSince: COVERED });
     assert.equal(atFloor.gate.due, MIN_DENOMINATOR);
     assert.equal(atFloor.gate.sufficient, true);
     assert.equal(atFloor.gate.honouredRate, 1);
@@ -1087,12 +1084,12 @@ describe('computeIssueRoundTrips — {gateKind, rePassKind} option (LIN-2592)', 
 
   test('gateDue reaches true under the review pair via a non-default rePassKind dispatch (kills a hardcoded-`plan` regression in hasRePassDispatch)', () => {
     const iss = issue('gate-review-pair', {
-      description: 'plan-review due: yes — (a) needs multiple sessions.',
+      planFacts: ASKED,
       rows: [
         row('i1', 'implementation', 'done', '2026-08-09T09:00:00.000Z', '2026-08-09T09:30:00.000Z'),
       ],
     });
-    const result = computeIssueRoundTrips(iss, { asOf: ASOF, gateKind: 'review', rePassKind: 'implementation' });
+    const result = computeIssueRoundTrips(iss, { asOf: ASOF, gateKind: 'review', rePassKind: 'implementation', planRecordsSince: COVERED });
     assert.equal(result.gateDue, true,
       'hasRePassDispatch must check options.rePassKind ("implementation"), not a hardcoded "plan" literal — this issue has an implementation row and no plan row at all');
   });
@@ -1315,7 +1312,7 @@ describe('LIN-1871 — third-round counting (mutation-checked)', () => {
 // `docs/papers/harbour/review-loops.md`'s own 30-day split.
 describe('LIN-1871 — options.windowDays (calendar window, not a row-count cap)', () => {
   const inWindow = issue('in-window', {
-    description: 'plan-review due: yes',
+    planFacts: ASKED,
     rows: [
       row('p1', 'plan', 'done', '2026-08-05T00:00:00.000Z', '2026-08-05T00:05:00.000Z'),
       row('r1', 'plan-review', 'done', '2026-08-05T01:00:00.000Z', '2026-08-05T01:05:00.000Z',
@@ -1323,7 +1320,7 @@ describe('LIN-1871 — options.windowDays (calendar window, not a row-count cap)
     ],
   });
   const outOfWindow = issue('out-of-window', {
-    description: 'plan-review due: yes',
+    planFacts: ASKED,
     rows: [
       row('p1', 'plan', 'done', '2026-06-01T00:00:00.000Z', '2026-06-01T00:05:00.000Z'),
       row('r1', 'plan-review', 'done', '2026-06-01T01:00:00.000Z', '2026-06-01T01:05:00.000Z',
@@ -1350,7 +1347,7 @@ describe('LIN-1871 — options.windowDays (calendar window, not a row-count cap)
   });
 
   test('the excluded issue contributes to NO series, not just roundTrips', () => {
-    const agg = computePlanReviewRoundTrips([inWindow, outOfWindow], { asOf: ASOF, windowDays: 30 });
+    const agg = computePlanReviewRoundTrips([inWindow, outOfWindow], { asOf: ASOF, windowDays: 30, planRecordsSince: COVERED });
     assert.equal(agg.primary.denominator, 1, 'outOfWindow\'s approve must not inflate the primary denominator');
     assert.equal(agg.roundTrips.n, 1);
     assert.equal(agg.gate.due, 1);

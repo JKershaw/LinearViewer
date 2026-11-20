@@ -1,13 +1,9 @@
 /**
  * LIN-4360: each rule around the `## As asked` block lives in one place.
  *
- * - The `plan-review due:` line has one reader, `planReviewDueOf` in
- *   lib/plan-review-round-trips.js. The round-trip measure's `gateDue` and the
- *   selector's `planReviewDue` read through it, so the bold form
- *   (`**plan-review due:** yes`) is due to both. The four cases where the measure's
- *   old reader disagreed with the selector's are pinned in as-asked-readers.test.js.
+ * - The `plan-review due:` line has no reader any more (LIN-4504: the gate and the selector read records).
  * - "The text outside the block" (a legacy block, filed before LIN-4502) has one definition,
- *   `outsideAsked` in lib/asked-of.js, which readFact and assembleTrailFacts both use.
+ *   `outsideAsked` in lib/asked-of.js, which the size record's region uses.
  * - The brief composer (`composeBrief`, `briefQuoteEnd`) and the quote's spellings live in the
  *   pure lib/brief-quote.js (LIN-4501: it quotes the task's `asked`; LIN-4502 retired the
  *   block's own module), so the test-mode mocks do not pull in the live model client
@@ -45,38 +41,13 @@ function sourceGraph() {
 /** Lines that are not comments: a `//` line or a JSDoc line. */
 const codeLines = (source) => source.split('\n').filter((l) => !/^\s*(\/\/|\/\*\*|\*(\s|\/|$))/.test(l));
 
-describe('one reader for the plan-review due line', () => {
-  test('the bold form is due through computeIssueRoundTrips, and the selector still reads it as yes', () => {
-    assert.equal(gateDue('**plan-review due:** yes'), true, 'the round-trip measure reads the bold form as due');
-    assert.equal(selectorDue('**plan-review due:** yes'), false, 'LIN-4504: the selector reads no due line; its facts are records');
-  });
-
-  test('the bold form below a block that says no is due to both readers', () => {
-    const desc = `${quoteAsked('Piece A.\n\n**Plan-review due:** no — covered by the parent')}\n\n## Implementation Plan (revision 2)\n\n**plan-review due:** yes`;
-    assert.equal(gateDue(desc), true);
-    assert.equal(selectorDue(desc), false);
-  });
-
-  test('planReviewDueOf: the first due line, plain or bold, value on the same line, word boundary after it', () => {
-    const { planReviewDueOf } = roundTrips;
-    assert.equal(typeof planReviewDueOf, 'function', 'lib/plan-review-round-trips.js exports planReviewDueOf');
-    assert.equal(planReviewDueOf('plan-review due: yes'), 'yes');
-    assert.equal(planReviewDueOf('Plan-review due: No — covered'), 'no');
-    assert.equal(planReviewDueOf('**plan-review due:** yes'), 'yes');
-    assert.equal(planReviewDueOf('plan-review due: no\n\nplan-review due: yes'), 'no');
-    assert.equal(planReviewDueOf('plan-review due:\nyes'), null);
-    assert.equal(planReviewDueOf('plan-review due: yesterday'), null);
-    assert.equal(planReviewDueOf('no due line'), null);
-    assert.equal(planReviewDueOf(''), null);
-  });
-
-  test('no other module under lib/ or routes/ carries its own due-line pattern', () => {
+describe('LIN-4504: no reader of the plan-review due line remains', () => {
+  test('the round-trip measure and the selector read the gate from records; no module carries a due-line pattern', () => {
+    assert.equal(gateDue('**plan-review due:** yes'), null, 'the round-trip gate is not measured without plan records');
+    assert.equal(selectorDue('**plan-review due:** yes'), false, 'the selector\'s plan facts are records, not measured with none read');
+    assert.equal(roundTrips.planReviewDueOf, undefined, 'planReviewDueOf is retired');
     const graph = sourceGraph();
-    const holders = graph.paths().filter((p) => codeLines(graph.sourceOf(p)).some((l) => /\/plan-review due:/i.test(l)));
-    assert.deepEqual(holders, ['lib/plan-review-round-trips.js']);
-    const source = readFileSync('lib/plan-review-round-trips.js', 'utf8');
-    assert.equal(codeLines(source).filter((l) => /\/plan-review due:/i.test(l)).length, 1, 'one pattern in that module');
-    assert.equal(roundTrips.__internal.GATE_DUE_MARKER, undefined, 'GATE_DUE_MARKER has left __internal');
+    assert.deepEqual(graph.paths().filter((p) => codeLines(graph.sourceOf(p)).some((l) => /\/plan-review due:/i.test(l))), []);
   });
 });
 

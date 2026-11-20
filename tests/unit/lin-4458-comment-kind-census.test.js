@@ -201,9 +201,7 @@ const OPENING = /close-\??out|retrospective audit|plan review verdict|plan\[-\\s
  * kinds. Each is named with its file and why; an exception that no longer matches its file fails.
  */
 const DESCRIPTION_READERS = [
-  { file: 'lib/file-pointer.js', pattern: '^##[ \\t]+Implementation Plan\\b[^\\n]*$', why: 'extractPlanSection cuts the plan section out of a description' },
   { file: 'lib/legacy-plan-text.js', pattern: '^((?:\\\\?#){1,3})[ \\t]+Implementation Plan\\b[^\\n]*$', why: 'LIN-4504: the one recognition rule for old plan text in a description, used to leave it out (askedOf, the kept section, the selector view) and refuse new writes of it; it returns text, never a fact' },
-  { file: 'lib/follow-on-ratio.js', pattern: '#{1,4}\\s*implementation plan\\b|\\bfits one session\\b|\\bneeds multiple sessions\\b', why: 'PLAN_MARKER, the follow-on ratio\'s did-plan-run marker, is matched against the description only (its limit 7)' },
 ];
 const excepted = (file, pattern) => DESCRIPTION_READERS.some(e => e.file === file && e.pattern === pattern);
 

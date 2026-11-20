@@ -16,6 +16,7 @@
 import { createHash } from 'node:crypto';
 import { writeFileSync } from 'node:fs';
 import { fileURLToPath } from 'node:url';
+import { PLAN_HEADING_WORDS } from '../../lib/legacy-plan-text.js';
 
 const sha = (s) => createHash('sha256').update(s).digest('hex');
 const at = (day) => `2026-11-${String(day).padStart(2, '0')}T10:00:00.000Z`;
@@ -27,7 +28,7 @@ const ISSUE = {
   id: 'LIN-900',
   identifier: 'LIN-900',
   title: 'Witness ticket for the stage-kind record',
-  description: '## As asked\n\nWitness ask: every stage renders the same text it did.\n\n## Size of the move\n\n**Size:** just the task\n**Why:** one piece.\n**Cuts:** none\n**Decided by:** the standing policy\n\n## Implementation Plan\n\nWitness plan.\n\nfits one session\n\nplan-review due: no\n',
+  description: `## As asked\n\nWitness ask: every stage renders the same text it did.\n\n## Size of the move\n\n**Size:** just the task\n**Why:** one piece.\n**Cuts:** none\n**Decided by:** the standing policy\n\n## ${PLAN_HEADING_WORDS}\n\nWitness plan.\n\nSession fit: one session.\n\nNo plan review owed.\n`,
   url: 'https://linear.app/witness/issue/LIN-900',
   state: { name: 'In Progress', type: 'started' },
   labels: ['Bug', 'Area: prompts'],
