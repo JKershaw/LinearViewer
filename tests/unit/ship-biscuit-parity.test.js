@@ -139,6 +139,25 @@ const FIXTURES = {
     generatedAt: '2026-07-01T00:00:00.000Z', window: '', isQuiet: false,
     frontPage: {}, index: [stub('m1', 'The Wire', 4)],
   },
+  // LIN-4500: a saved edition written before the change keeps its legacy `task:` ref; the new
+  // edition carries a `landed:` ref. Renderers never branch on kind, so both must render alike.
+  'landed-first edition beside a legacy task: reference — mixed kinds render alike': {
+    generatedAt: '2026-06-30T00:00:00.000Z', window: 'week', isQuiet: false,
+    frontPage: { headline: 'Seal the hatch — finished, and its PR merged', standfirst: 'One landing, one old task.', lede: 'A landing led the week.' },
+    index: [
+      {
+        id: 'art-1', section: 'The Wire', weight: 5,
+        headline: 'Seal the hatch — finished, and its PR merged', dek: 'Finished in the tracker, and its PR merged.',
+        sourceRefs: [{ id: 'landed:LIN-7', kind: 'landed', headline: 'Seal the hatch — finished, and its PR merged',
+          snapshot: { identifier: 'LIN-7', title: 'Seal the hatch', prs: [{ url: 'https://github.com/acme/app/pull/7', mergedAt: '2026-06-29T00:00:00.000Z' }], merged: true, finished: true, completedAt: '2026-06-29T00:00:00.000Z' } }],
+      },
+      {
+        id: 'art-2', section: 'Deep Dive', weight: 3,
+        headline: 'LIN-3 — still In Review', dek: 'Status update on LIN-3.',
+        sourceRefs: [{ id: 'task:LIN-3', kind: 'task', headline: 'LIN-3 — still In Review', snapshot: { taskIdentifier: 'LIN-3', transitioned: false } }],
+      },
+    ],
+  },
 };
 
 describe('Ship\'s Biscuit — server↔client structural parity (LIN-1198 ledger item 1)', () => {
@@ -155,5 +174,11 @@ describe('Ship\'s Biscuit — server↔client structural parity (LIN-1198 ledger
     assert.ok(rendered.some(h => /data-testid="ship-biscuit-columns"/.test(h)), 'no fixture renders columns');
     assert.ok(rendered.some(h => /data-testid="ship-biscuit-stubs"/.test(h)), 'no fixture renders stubs');
     assert.ok(rendered.some(h => /data-testid="ship-biscuit-quiet"/.test(h)), 'no fixture renders the quiet note');
+  });
+
+  test('a saved landed: edition and a legacy task: edition both render their headlines on the server', () => {
+    const html = renderEditionHtml(FIXTURES['landed-first edition beside a legacy task: reference — mixed kinds render alike']);
+    assert.match(html, /Seal the hatch — finished, and its PR merged/);
+    assert.match(html, /LIN-3 — still In Review/);
   });
 });

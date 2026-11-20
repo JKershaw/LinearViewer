@@ -311,21 +311,10 @@ describe('LIN-3455 characterization: task-decisions-store', () => {
 });
 
 // ---------------------------------------------------------------------------
-// task-snapshot-store (:300 listByWorkspace, :330 _docsFor — `|| seq` sorts)
+// task-snapshot-store (:330 _docsFor — `|| seq` sorts; listByWorkspace retired, LIN-4500)
 // ---------------------------------------------------------------------------
 describe('LIN-3455 characterization: task-snapshot-store newest-first', () => {
   const snap = (id, extra = {}) => ({ _id: id, urlKey: 'acme', taskIdentifier: 'LIN-1', ...extra });
-  test('listByWorkspace: a junk-capturedAt row with the highest seq stays first', async () => {
-    const collection = createMockCollection();
-    const store = new TaskSnapshotStore({ collection });
-    collection._docs.push(
-      snap('s1', { capturedAt: T1, seq: 1 }),
-      snap('s2', { capturedAt: T2, seq: 2 }),
-      snap('junk', { capturedAt: 'not-a-date', seq: 3 })
-    );
-    const { items } = await store.listByWorkspace('acme');
-    assert.deepEqual(items.map(r => r.id), ['junk', 's2', 's1']);
-  });
   test('_docsFor / latest: the same with an absent capturedAt', async () => {
     const collection = createMockCollection();
     const store = new TaskSnapshotStore({ collection });

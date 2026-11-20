@@ -11,10 +11,16 @@
  *   POST /workspace/:urlKey/api/ship-biscuit/generate  — build + persist an edition (gated → 403)
  *
  * The generate endpoint is the deterministic index-first pass: gather the window's
- * already-wired event sources → build the deterministic edition model → make ONE
- * editor-in-chief LLM call → persist the edition durably → return it. Article bodies
- * are NOT generated here (the deferred V2 on-demand pass). A quiet window skips the
- * LLM entirely and yields an honest slow-news-day edition (quiet-window honesty).
+ * landed work (merges from the close-out ledger, joined to tracker completions) and its
+ * background sources → build the deterministic edition model → make ONE editor-in-chief
+ * LLM call → persist the edition durably → return it. Article bodies are NOT generated
+ * here (the deferred V2 on-demand pass). A quiet window skips the LLM entirely and yields
+ * an honest slow-news-day edition (quiet-window honesty).
+ *
+ * A failed tracker read (LIN-4500) is never an empty success. It is reported to the model as
+ * an unread source, so the editor says landed work could not be read. With nothing else to
+ * report it is a retryable 502: no LLM call, no free-tier charge, nothing saved (a saved
+ * "couldn't read" edition would replace the last good one on the page).
  *
  * §C — free-tier + model override: `chargeRoadmapLayer` is private to
  * createWorkspaceApiRoutes, so this router carries its own 2-line free-tier guard
@@ -55,6 +61,30 @@ import { armKeepalive } from '../lib/http-keepalive.js';
 const EDITOR_PROSE_MAX_TOKENS = 6000;
 
 /**
+ * Read the workspace's tracker issues for the completions half of landed work (LIN-4500).
+ *
+ * A failure is reported as `unread`, never as an empty success: an empty success reads as a
+ * quiet week, which is the honesty property this feature exists for. So this does NOT use the
+ * neighbouring reads' `.catch(() => empty)` degrade. A missing dependency is also unread.
+ *
+ * @param {Function|undefined} fetchWorkspaceIssues
+ * @param {Object} workspace
+ * @returns {Promise<{ issues: Array<Object>, unread: boolean }>}
+ */
+async function readTrackerIssues(fetchWorkspaceIssues, workspace) {
+  if (typeof fetchWorkspaceIssues !== 'function') return { issues: [], unread: true };
+  try {
+    const issues = await fetchWorkspaceIssues(workspace);
+    if (Array.isArray(issues)) return { issues, unread: false };
+    console.error("Ship's Biscuit tracker read returned no issue list for", workspace?.urlKey);
+    return { issues: [], unread: true };
+  } catch (error) {
+    console.error("Ship's Biscuit could not read the tracker for", workspace?.urlKey, error);
+    return { issues: [], unread: true };
+  }
+}
+
+/**
  * @param {Object} deps
  * @param {Function} deps.workspaceFromUrl        - middleware: session + req.workspace
  * @param {Object}   deps.freeTierStore           - free-tier usage store (tryUse)
@@ -64,7 +94,9 @@ const EDITOR_PROSE_MAX_TOKENS = 6000;
  * @param {Object}   deps.observationSessionsStore - materialized sessions read-model (findByWorkspace)
  * @param {Object}   deps.agentStatusStore        - agent-status log (listStatus)
  * @param {Object}   deps.llmCallLogStore         - LLM call log (summarize → Weather)
- * @param {Object}   deps.taskSnapshotStore       - task-snapshot archive (listByWorkspace → task feedstock)
+ * @param {Object}   deps.closeOutEventsStore     - close-out ledger (listMergedSince → the window's merged PRs, LIN-4500)
+ * @param {Function} deps.fetchWorkspaceIssues    - (workspace) → Promise<Issue[]>, the tracker read for completions (LIN-4500).
+ *   Absent or failing counts as an unread source, never as an empty one.
  * @param {Object}   deps.reportHistoryStore      - roadmap report-history (getLatest → roadmap narrative/orientation source, LIN-1212)
  * @param {Object}   deps.shipBiscuitHistoryStore - durable edition store (save/getLatest)
  * @returns {Router}
@@ -78,7 +110,8 @@ export function createShipBiscuitRoutes({
   observationSessionsStore,
   agentStatusStore,
   llmCallLogStore,
-  taskSnapshotStore,
+  closeOutEventsStore,
+  fetchWorkspaceIssues,
   reportHistoryStore,
   shipBiscuitHistoryStore
 }) {
@@ -147,15 +180,18 @@ export function createShipBiscuitRoutes({
     // keepalive.send() so it works whether or not the guard has already flushed.
     const keepalive = armKeepalive(res);
     try {
-      // 1) Gather the window's already-wired event sources (deterministic inputs).
+      // 1) Gather the window's sources (deterministic inputs). Landed work is two reads
+      // joined on issue identifier (LIN-4500): merge records from the close-out ledger, and
+      // tracker completions. The tracker read is handled on its own below, never swallowed.
       const range = windowRange(req.body?.window);
-      const [sessionsResult, statusResult, taskSnapshotResult, llmStats, roadmapReport] = await Promise.all([
+      const [sessionsResult, statusResult, merges, tracker, llmStats, roadmapReport] = await Promise.all([
         observationSessionsStore ? observationSessionsStore.findByWorkspace(workspace.urlKey).catch(() => ({ sessions: [] })) : Promise.resolve({ sessions: [] }),
         agentStatusStore ? agentStatusStore.listStatus(workspace.urlKey, { since: range.since }).catch(() => ({ items: [] })) : Promise.resolve({ items: [] }),
-        // Workspace-wide task-snapshot window scan (LIN-1197) — the SAME `range.since`
-        // lower bound as the status read, so no window-ceiling drift. Store miss/empty
-        // degrades to { items: [] } exactly like the other reads (guards LIN-1185).
-        taskSnapshotStore ? taskSnapshotStore.listByWorkspace(workspace.urlKey, { since: range.since }).catch(() => ({ items: [] })) : Promise.resolve({ items: [] }),
+        // Merged PRs in the window. listMergedSince already turns its own read errors into []
+        // (the merge store's contract, outside this task), so an outage here looks like a quiet
+        // merge set. The tracker read below covers the completions Harbour never saw merge.
+        closeOutEventsStore ? closeOutEventsStore.listMergedSince({ urlKey: workspace.urlKey, since: range.since }).catch(() => []) : Promise.resolve([]),
+        readTrackerIssues(fetchWorkspaceIssues, workspace),
         // Weather: the calls read over the fixed 30-day horizon (review F6 is a product call; the window stays a parameter here).
         llmCallLogStore
           ? Promise.resolve().then(() => llmCallLogStore.listInHorizon(workspace.urlKey, { since: readHorizonStart() })).then(callsSurfaceOf).catch(() => null)
@@ -168,15 +204,25 @@ export function createShipBiscuitRoutes({
       ]);
 
       // 2) Build the deterministic, addressable edition model.
+      const sourcesUnread = tracker.unread ? ['tracker'] : [];
       const model = buildEditionModel({
         window: range.window,
         workspaceName: workspace.name || workspace.organizationName || workspace.urlKey,
+        merges: Array.isArray(merges) ? merges : [],
+        issues: tracker.issues,
+        sourcesUnread,
         sessions: sessionsResult.sessions || [],
         agentStatusItems: statusResult.items || [],
-        taskSnapshotItems: taskSnapshotResult.items || [],
         llmStats,
         roadmapReport,
       });
+
+      // A tracker read that failed with nothing else to report: retryable 502. No LLM call, no
+      // free-tier charge, nothing saved. Saving a "couldn't read" edition would replace the last
+      // good one on the page, since the renderers do not branch on edition kind.
+      if (model.sources.length === 0 && model.sourcesUnread.length > 0) {
+        return keepaliveError(keepalive, 502, "Couldn't read the tracker, try again.");
+      }
 
       // 3) Produce the front page + index.
       let body;
