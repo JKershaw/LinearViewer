@@ -4803,3 +4803,5 @@ Still waiting on `lin4499-snapshot-cut`.
 - **LIN-4502, 4504, 4506:** waiting behind LIN-4501.
 - **Records** read fine with the new token. The seven security tasks exist as children of task-309c83df, all open at version 1 with no ticket. Nothing in the records shows them moved.
 - **Status:** no rulings. Main green. Slice 2 cost so far is $90.84.
+
+- **~14:45, John's answers on watching agents:** stream during a turn; words only, no tool calls; keep the permanent record; LIN-3976's redesign goes to the UI work. **Filed LIN-4508** (Backlog). LIN-1114, 1905, 1311 and 2546 were closed as canceled, each with a comment pointing to it ("duplicate" was refused with a 400). LIN-3976 moved under LIN-4008, with a comment.
