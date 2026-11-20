@@ -4889,3 +4889,14 @@ Still waiting on `lin4499-snapshot-cut`.
 
 The pause ruling was answered (a: lifted, stays lifted). LIN-4504's second review has run since 20:07. Nothing else is queued, so no other work is running before deploy. No open rulings.
 - **~20:35:** John dismissed a ruling about the exposed key. It is covered by LIN-4512 (rotation at the end of next week).
+
+### 20 Nov, ~20:55: the overnight drive updated for slice 3
+
+- **What changed:** with John's agreement, each slice ticket the drive drafts now carries his standing answers, plainly worded:
+  - retire everything the slice table lists, with no slimmer kept versions;
+  - move dependants onto the right data;
+  - production via `railway ssh`, and never print the env;
+  - the driving session sets and clears any fleet pause;
+  - design writes no plan record; plan and plan-review keep running.
+- **Also in the drive:** it sets and clears a fleet pause itself when a cutover needs one, and proposes answers on rulings. Only John can answer them; an overnight stop is an accepted inconvenience.
+- **Expected:** slice 2 lands around midnight to 1am; slice 3 is filed and launched at the next hourly drive after that.
