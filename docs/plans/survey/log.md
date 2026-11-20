@@ -4882,3 +4882,5 @@ Still waiting on `lin4499-snapshot-cut`.
 - **The pause:** the worker says keep the fleet paused until merge and deploy, so old code doesn't write plans into ticket text. But review and close-out are dispatches, which the pause holds. That's a deadlock. My proposal to John: clear the pause and watch that only LIN-4504's own stages run until deploy.
 
 - **~20:20:** pause cleared (DELETE /dispatch/halt, 200). John will rotate keys when he is back (end of next week), with a ticket to retire all tokens and keys. Scanned for leaked key material: none found in any of LIN-4504's 20 dispatch rows (feedback included), or in LIN-4504's and LIN-4499's descriptions and comments. CI secret scan green on PR #2476.
+
+- **Filed LIN-4512**, "Rotate and retire tokens and keys" (Backlog, High). John will do it at the end of next week. It is also on the horizon list.
