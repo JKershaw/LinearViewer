@@ -4690,3 +4690,7 @@ The hourly check-in (trig_01XCTpQoZb2V1vqMFvzXKStm) is now a drive. When a slice
 - **My reading:** the autopilot is right. It raises rulings only for John's calls, so any ruling it raises is one it treats as his, and a note from me can't stand in for his answer. The overnight workaround I set up therefore doesn't unblock rulings. It only helps where the work behind a ruling can be done by more runs (as with LIN-4495). I won't push further. The proposed answer sits on the ruling for John's one click.
 - **Also noticed:** PR #2446 was closed unmerged at 01:42, but LIN-4499's "Open" line still calls it open. Small; it's for the builder or John.
 - **Overnight:** nothing will move until John answers. The hourly checks continue, kept light.
+
+### 20 Nov, 04:28: no change
+
+LIN-4499 is still at scoping, waiting on `lin4499-snapshot-cut` (the only open ruling). No new rows since 02:30.
