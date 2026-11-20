@@ -4649,3 +4649,18 @@ The hourly check-in (trig_01XCTpQoZb2V1vqMFvzXKStm) is now a drive. When a slice
   - the stale-status check (finding-f4c0b65d), possible from the evening of 21 Nov.
 - **What I did:** marked LIN-4496 Done at 01:33, since what remains needs John, as with LIN-4495. I sent the autopilot a note (1939d4d5) to close out slice 1.
 - **In progress:** after readings and the slice 2 draft, each with its own subagent. A fresh check follows, then filing and launch.
+
+### 20 Nov, ~01:55: slice 2 filed as LIN-4499 and launched
+
+- **The draft** (`integration/slice-2-ticket.md`) was checked by a fresh reader against the designs at 92838c5cf. Its fixes, all applied:
+  - the slice 1 PR list was wrong (#2466 is LIN-4497);
+  - I had invented a fallback for the Waiting reader. That was a new ruling, so it's gone. If the import hasn't run, that step stays open for John;
+  - the draft now says where `asked` comes from once the seal goes;
+  - the unchecked figures are gone from the scene;
+  - the breakdown now writes the pieces.
+- **The "Retires" list** matches the design's slice 2 row.
+- **Filed:** LIN-4499 (id c7d814f8-b034-4fd0-a980-32cd52a4aafe), Backlog, under LIN-4490.
+- **Launched:** autopilot ec3417c3-606f-407a-bf94-7cfd5066c29a, with slice 1's goal lines plus "slice 1 has landed; build on what it left".
+- **After readings:** in `readings/slice-1-after.md`. Harbour notes 95,485 → 42,715 B; Waiting 117 → 0 (the lists were deleted, and the entries await John's import); median cost per task $18.17 → $24.98 over 5 tasks. Brief size is pending, to be read from slice 2's live stages.
+- **New morning item:** the proxy token is refused by the records routes ("predates run identity"), so John needs to issue a new token. The current one expires 21 Nov 10:11.
+- **For the hourly drive:** the current slice is now slice 2, LIN-4499, autopilot ec3417c3. Slice 1's autopilot 20fdf661 was told to close out LIN-4491.

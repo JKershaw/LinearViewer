@@ -38,6 +38,10 @@ No follow-on dispatches were made. LIN-4495 was marked Done at 22:58.
 - **The live Waiting import:** per LIN-4496's survey, it connects straight to the production database, which no agent can reach. Not checked in code. It creates the seven safety tasks, which must not move without John.
 - **Two questions a review raised outside the rulings list:** keeping the hold for old reviews, and the Home badge count.
 
+## Token (noted 01:50, 20 Nov)
+
+- The proxy token is refused by the records routes with 403 "predates run identity", and it expires 21 Nov 10:11. A new token from John is needed for records readings.
+
 ## How tidies like this are handled
 
 A judgement call, not a rule (John, 19 Nov). Tidying as we go, a small standalone task, or waiting until the end can each be right, depending on the case. Keeping the running slice going matters most. John expects much of this to sort itself out once the upgrade is done.

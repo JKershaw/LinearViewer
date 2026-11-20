@@ -198,3 +198,13 @@ A fresh reader checked this page against the log from 18 Nov, the designs, the r
   - the open-blocker worry closed with evidence;
   - and the calibration: bring a second view only where it could change the action, and keep reports to John short.
 - **Next:** check-ins via the scheduled reminder; at LIN-4495, check that the run-ledger exports really are retired; when slice 1 lands, take the after readings, then draft slice 2.
+
+## 20 Nov, overnight: slice 1 landed; slice 2 launched
+
+- **Slice 1:** all five pieces merged and deployed, LIN-4492 to LIN-4496, PRs #2464, #2465, #2467, #2468 and #2469. LIN-4495 and LIN-4496 were marked Done by me, with John's checks carried. The slice 1 autopilot 20fdf661 was told to close out LIN-4491.
+- **After readings:** in `integration/readings/slice-1-after.md`.
+- **Slice 2: LIN-4499** (id c7d814f8-b034-4fd0-a980-32cd52a4aafe), the plan as versioned records. Autopilot **ec3417c3-606f-407a-bf94-7cfd5066c29a**. The draft is in `integration/slice-2-ticket.md`, checked by a fresh reader.
+- **Overnight mode** (John, 19 Nov, 22:30–22:37): the hourly drive (trig_01XCTpQoZb2V1vqMFvzXKStm) runs slice by slice up to the end of slice 4.
+  - Rulings that aren't John's call: I settle them by doing the work, proposing the answer, and sending the paused run a note.
+  - I may pause if things go sideways.
+- **Waiting for John:** the list is in `integration/slice-2-carry.md`. It includes the live import, the readings, the re-review verdicts, the signed-in page check, the `isEmptyStatement` defect, and a new token (records routes refuse the current one, which expires 21 Nov 10:11).
