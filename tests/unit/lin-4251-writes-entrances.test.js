@@ -4,7 +4,7 @@
 //      tests/fixtures/lin-4251-work-blocks.json (captured at LIN-4251's HEAD; re-pinned by LIN-4495, which adds the
 //      run-less line that says records writes are refused for a dispatch with no run: +99 bytes, nothing else). Nothing here names a stage.
 //      LIN-4362 re-pinned only the brief hint in those blocks (its wording is BRIEF_HINT in
-//      lib/as-asked.js, shared with four other surfaces); every other byte is as captured.
+//      lib/brief-quote.js, shared with four other surfaces); every other byte is as captured.
 //   2. stageWrites: the one lookup every entrance uses to hand the preamble a kind's `writes`.
 //   3. A census of the call sites of attachProxyContext in lib/ and routes/: each must be listed with
 //      the reason it passes (or does not pass) `writes`. A new site fails until its author decides.

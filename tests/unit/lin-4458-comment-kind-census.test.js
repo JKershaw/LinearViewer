@@ -262,6 +262,7 @@ const OPENING = /close-\??out|retrospective audit|plan review verdict|plan\[-\\s
 const DESCRIPTION_READERS = [
   { file: 'lib/file-pointer.js', pattern: '^##[ \\t]+Implementation Plan\\b[^\\n]*$', why: 'extractPlanSection cuts the plan section out of a description' },
   { file: 'lib/recommendation-facts.js', pattern: '^##[ \\t]+Implementation Plan\\b[^\\n]*$', why: 'condensePlan condenses the plan section of a description for routing' },
+  { file: 'lib/asked-of.js', pattern: '^#{1,3}[ \\t]+Implementation Plan\\b', why: 'askedOf cuts a task\'s asked before the first plan heading of a description (LIN-4501); pinned equal to PLAN_HEADING_ANY by lin-4502-witness' },
   { file: 'lib/follow-on-ratio.js', pattern: '#{1,4}\\s*implementation plan\\b|\\bfits one session\\b|\\bneeds multiple sessions\\b', why: 'PLAN_MARKER, the follow-on ratio\'s did-plan-run marker, is matched against the description only (its limit 7)' },
 ];
 const excepted = (file, pattern) => DESCRIPTION_READERS.some(e => e.file === file && e.pattern === pattern);

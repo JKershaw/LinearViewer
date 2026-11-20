@@ -35,8 +35,7 @@ function buildRunnerApp({ ownerCheck, session }) {
   app.use(createProxyRoutes({
     proxyTokenStore,
     proxyEventStore: { recordEvent: async () => {} },
-    agentStatusStore: {}, recapCacheStore: {}, briefCacheStore: {}, taskSnapshotStore: {},
-    dispatchQueueStore: {},
+    agentStatusStore: {}, recapCacheStore: {}, briefCacheStore: {}, dispatchQueueStore: {},
     workspaceFromUrl: (req, res, next) => {
       req.workspace = WORKSPACE;
       req.session = session;

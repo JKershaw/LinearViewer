@@ -22,13 +22,13 @@
     },
     "plan:fresh": {
       "name": "plan",
-      "bytes": 12286,
-      "sha256": "7316f2deace90c1ca2a0dbc5769d074190777a422e54da0ad788cc346fb3010c"
+      "bytes": 12255,
+      "sha256": "21a193388abdb95da1e6cf4a64868eba50a46b5ac798082cd9f148e90d0f1a5f"
     },
     "plan:fix": {
       "name": "plan",
-      "bytes": 12286,
-      "sha256": "7316f2deace90c1ca2a0dbc5769d074190777a422e54da0ad788cc346fb3010c"
+      "bytes": 12255,
+      "sha256": "21a193388abdb95da1e6cf4a64868eba50a46b5ac798082cd9f148e90d0f1a5f"
     },
     "look-into:fresh": {
       "name": "look into",
@@ -72,13 +72,13 @@
     },
     "scoping:fresh": {
       "name": "scoping",
-      "bytes": 5969,
-      "sha256": "3e0c724c10226c88b53ccf8abdfa06d98b28974d3fe9494d3f1856f5b9e0fa50"
+      "bytes": 5938,
+      "sha256": "c44a128eb99ad84024033fc94d998d3cc56d0a62f0b9babe29f26258f62431cd"
     },
     "scoping:fix": {
       "name": "scoping",
-      "bytes": 5969,
-      "sha256": "3e0c724c10226c88b53ccf8abdfa06d98b28974d3fe9494d3f1856f5b9e0fa50"
+      "bytes": 5938,
+      "sha256": "c44a128eb99ad84024033fc94d998d3cc56d0a62f0b9babe29f26258f62431cd"
     },
     "design:fresh": {
       "name": "design",
@@ -142,13 +142,13 @@
     },
     "close-out:fresh": {
       "name": "close-out",
-      "bytes": 13634,
-      "sha256": "7b6ef8198318551a4835bf9514241ec4faef20f1e73005ef70fa46bdcdf05586"
+      "bytes": 11151,
+      "sha256": "68811102db2bec3004d72c2101c3dab0b9c5a74137c60143239b3b425fc34662"
     },
     "close-out:fix": {
       "name": "close-out",
-      "bytes": 13634,
-      "sha256": "7b6ef8198318551a4835bf9514241ec4faef20f1e73005ef70fa46bdcdf05586"
+      "bytes": 11151,
+      "sha256": "68811102db2bec3004d72c2101c3dab0b9c5a74137c60143239b3b425fc34662"
     },
     "retrospective-audit:fresh": {
       "name": "retrospective-audit",
@@ -246,16 +246,15 @@
       "    ]",
       "  },",
       "  \"close-out\": {",
-      "    \"coreOutcome\": \"Approved work finished: the fixes review asked for made, the findings to close-out settled, the PR merged, the post-deploy steps done once the deploy landed, the task Done, the summary posted, the description archived and pruned of superseded stage artifacts (or the skipped prune recorded), and related tickets tidied and each outside find recorded to the project backlog\",",
-      "    \"readinessCheck\": \"Did the review record an Approve, and is the work then finished: the fixes review asked for made, every finding to close-out settled (with none recorded under an Approve, nothing waits; a missing verdict goes back to review), merged, the post-deploy steps done once the deploy landed, set Done, summarized (with how the work meets what was asked), archived-and-pruned (or the skip recorded) below the `## As asked` block only, and each outside find recorded to project?\",",
+      "    \"coreOutcome\": \"Approved work finished: the fixes review asked for made, the findings to close-out settled, the PR merged, the post-deploy steps done once the deploy landed, the task Done, the summary posted, and related tickets tidied and each outside find recorded to the project backlog\",",
+      "    \"readinessCheck\": \"Did the review record an Approve, and is the work then finished: the fixes review asked for made, every finding to close-out settled (with none recorded under an Approve, nothing waits; a missing verdict goes back to review), merged, the post-deploy steps done once the deploy landed, set Done, summarized (with how the work meets what was asked), and each outside find recorded to project?\",",
       "    \"signals\": [",
       "      \"Review verdict read from the latest summary comment; any finding to close-out settled, none recorded passing through, and a missing verdict sent back to review to confirm\",",
       "      \"The fixes review asked for made by close-out itself, each the size of a fix (new design or new behaviour handed back to review), listed in the summary with its commit, and CI green on the new head\",",
       "      \"Every finding to close-out settled: inside work done with cited evidence, a monitor or rollback named by the name review wrote (an unnamed one settles nothing), or a finding accepted by a human naming the exact precondition exercised; an outside find recorded to project; once the deploy landed, a post-deploy check close-out cannot run is recorded as not run (what, why, follow-up) and does not hold the close\",",
       "      \"Green CI confirmed on the exact merged commit, or CI genuinely absent with the substitute re-run and recorded on it (green CI alone never settles a finding)\",",
       "      \"PR merged; once the deploy landed, the post-deploy steps done and the change verified on what landed in the same session, then the task set to Done — not held open for a separate verification pass\",",
-      "      \"Summary comment posted, saying how the merged work meets what was asked, related tickets this work settles closed or cancelled, outside finds written to their home, any gate ticket linked\",",
-      "      \"A pre-prune snapshot archived and its capture verified before the description was rewritten; below the `## As asked` block, through `description/below`, superseded stage-artifact sections (plan(s), plan revisions, research findings, discharged scoping/design) replaced with a short stub, keeping any section a follow-up references and the session-fit phrase / `Implementation Plan` heading verbatim; with no block, no prune — or, where the archive could not be verified, the prune skipped and that recorded in the summary\"",
+      "      \"Summary comment posted, saying how the merged work meets what was asked, related tickets this work settles closed or cancelled, outside finds written to their home, any gate ticket linked\"",
       "    ]",
       "  },",
       "  \"context\": {",
@@ -375,7 +374,7 @@
       "    \"signals\": [",
       "      \"Survey comments, filing comments and any person's size comment read\",",
       "      \"Sizes weighed from just the task to wrong work, one recommended\",",
-      "      \"One `## Size of the move` section below the `## As asked` block, holding only the record's 4 lines\",",
+      "      \"One `## Size of the move` section in the description, holding only the record's 4 lines\",",
       "      \"Cuts to the `## As asked` block listed in the record, or none\",",
       "      \"Decided by a ruling or the standing policy; pending, with a `DECISION:`, only for a size the policy may not decide\"",
       "    ]",
@@ -681,7 +680,7 @@
       "  },",
       "  \"close-out\": {",
       "    \"category\": \"universal\",",
-      "    \"description\": \"Finish approved work: make the fixes review asked for, merge, do the post-deploy steps once the deploy lands, set Done, post the summary, archive & prune, and file the gate's tickets. Use when review has Approved and the PR is green (or, with no CI, the established-absence substitute was recorded).\",",
+      "    \"description\": \"Finish approved work: make the fixes review asked for, merge, do the post-deploy steps once the deploy lands, set Done, post the summary, and file the gate's tickets. Use when review has Approved and the PR is green (or, with no CI, the established-absence substitute was recorded).\",",
       "    \"name\": \"close-out\",",
       "    \"route\": {",
       "      \"requires\": \"An Approve from a code review; a plan-review Approve is not one.\",",
@@ -863,7 +862,7 @@
     ]
   },
   "stageLabels": "71b1066de2fe5206ed5acf5f18d47b5a62543f8c22697e24a7e982a3264e192a",
-  "contracts": "7f2d1b61cf5de5e4a17753729b181e3d6a70813c662d5a5734d984fd7237bc3d",
+  "contracts": "baa24393f465e10f56c21f82b73815dcaf78301e2697bc7d3eff97bfd2e07ee4",
   "stepWords": "0a06759d642d8c2268893789c6c196461af7b338e3b58dccf0ce7ab5353cbec5",
   "overrideLine": "e8cd49b7b5b35ecfe83ae820694879f466b3017d1dad0ef0655dbe15944aefb9"
 }

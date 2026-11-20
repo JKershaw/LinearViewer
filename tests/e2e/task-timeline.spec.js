@@ -1,7 +1,7 @@
 import { test, expect } from '../fixtures/test-base.js';
 import { localSeedId } from '../fixtures/local-harness.js';
 import { expectNoClippedOverflow } from '../helpers.js';
-import { sealAsAsked } from '../../lib/as-asked.js';
+import { quoteAsked } from '../../lib/brief-quote.js';
 
 // LIN-4405: "Sessions on one clock" on the task page, at a 390px phone and on desktop.
 //
@@ -30,7 +30,7 @@ async function seedTask(page) {
       runnerKey: true,
       projects: [{ id: id('tl-proj'), name: 'Timeline project', content: 'A project', sortOrder: 1 }],
       issues: [{
-        id: id('tl-1'), identifier: 'LOCAL-TL1', title: 'A task with two sessions', description: sealAsAsked('Seeded timeline task'),
+        id: id('tl-1'), identifier: 'LOCAL-TL1', title: 'A task with two sessions', description: quoteAsked('Seeded timeline task'),
         projectId: id('tl-proj'), sortOrder: 1, state: { name: 'In Progress', type: 'started' }, url: `/workspace/${URL_KEY}/issue/${id('tl-1')}`,
       }],
     },

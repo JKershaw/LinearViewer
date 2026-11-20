@@ -265,12 +265,6 @@ const ROWS = [
     run: () => call(buildApp(), 'POST', '/api/proxy/issues/LIN-1/description/replace', { body: {} }),
   },
   {
-    group: 'E', method: 'POST', url: '/api/proxy/issues/LIN-1/description/below', expect: 400,
-    note: 'LIN-4352: body required (refuseBadBelow, before resolution)',
-    expectBody: { error: 'body is required' },
-    run: () => call(buildApp(), 'POST', '/api/proxy/issues/LIN-1/description/below', { body: {} }),
-  },
-  {
     group: 'E', method: 'POST', url: '/api/proxy/issues/LIN-1/comments', expect: 400,
     note: 'body required, canonical form (:2998)',
     run: () => call(buildApp(), 'POST', '/api/proxy/issues/LIN-1/comments', { body: {} }),
@@ -345,16 +339,6 @@ const ROWS = [
     note: 'flat alias form (:3825 array path)',
     expectBody: { error: 'Issue not found' },
     run: () => call(buildApp(), 'GET', '/api/proxy/recommend/LIN-999999'),
-  },
-  {
-    group: 'F', method: 'GET', url: '/api/proxy/issues/LIN-1/snapshots', expect: 200,
-    note: 'taskSnapshotStore.list() (routes/proxy-compute.js:571)',
-    run: () => call(buildApp(), 'GET', '/api/proxy/issues/LIN-1/snapshots'),
-  },
-  {
-    group: 'F', method: 'GET', url: '/api/proxy/issues/LIN-1/snapshots/diff', expect: 200,
-    note: 'taskSnapshotStore.diffLatest() (:4065)',
-    run: () => call(buildApp(), 'GET', '/api/proxy/issues/LIN-1/snapshots/diff'),
   },
   {
     group: 'F', method: 'GET', url: '/api/proxy/issues/LIN-1/cost', expect: 200,

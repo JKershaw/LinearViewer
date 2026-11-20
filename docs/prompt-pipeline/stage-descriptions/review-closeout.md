@@ -10,6 +10,10 @@ Read at the working tree in `/home/user/LinearViewer` on 2026-10-03 (no git chec
 > write yourself", B5's numeric bound and the LIN-3033 floor below say otherwise, the templates in
 > `lib/prompt-template-defs.js` are current.
 >
+> **Superseded in part by LIN-4502 (2026-11-20).** Close-out no longer archives or prunes the
+> description: the prune, the route it wrote through and task snapshots are retired, so every passage
+> below about the archive call, the snapshot check and the prune (including the LIN-4353 note) is history.
+>
 > **Superseded in part by LIN-4353 (2026-11-07).** Close-out now prunes only below the description's
 > `## As asked` block, through `POST /api/proxy/issues/{identifier}/description/below`, and does not
 > prune a description with no block. The never-prune list and the `PATCH` prune described below are

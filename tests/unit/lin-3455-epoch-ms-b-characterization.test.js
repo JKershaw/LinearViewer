@@ -23,7 +23,6 @@ import { ReportHistoryStore } from '../../lib/report-history-store.js';
 import { ShelvedRulingsStore } from '../../lib/shelved-rulings-store.js';
 import { ShipBiscuitHistoryStore } from '../../lib/ship-biscuit-history-store.js';
 import { TaskDecisionsStore } from '../../lib/task-decisions-store.js';
-import { TaskSnapshotStore } from '../../lib/task-snapshot-store.js';
 import { collectUnansweredDecisions } from '../../lib/unanswered-decisions.js';
 import { extractPrUrls, closeOutSummaryFor } from '../../lib/run-evidence.js';
 import { recentRuns } from '../../lib/recent-runs.js';
@@ -307,30 +306,6 @@ describe('LIN-3455 characterization: task-decisions-store', () => {
       );
       assert.deepEqual((await store._docsFor('acme', ISSUE)).map(d => d._id), ['junk', 't2', 't1']);
     });
-  });
-});
-
-// ---------------------------------------------------------------------------
-// task-snapshot-store (:330 _docsFor — `|| seq` sorts; listByWorkspace retired, LIN-4500)
-// ---------------------------------------------------------------------------
-describe('LIN-3455 characterization: task-snapshot-store newest-first', () => {
-  const snap = (id, extra = {}) => ({ _id: id, urlKey: 'acme', taskIdentifier: 'LIN-1', ...extra });
-  test('_docsFor / latest: the same with an absent capturedAt', async () => {
-    const collection = createMockCollection();
-    const store = new TaskSnapshotStore({ collection });
-    collection._docs.push(
-      snap('s1', { capturedAt: T1, seq: 1 }),
-      snap('s2', { capturedAt: T2, seq: 2 }),
-      snap('junk', { seq: 3 })
-    );
-    assert.deepEqual((await store._docsFor('acme', 'LIN-1')).map(d => d._id), ['junk', 's2', 's1']);
-    assert.equal((await store.latest('acme', 'LIN-1')).id, 'junk');
-  });
-  test('control: valid rows with the same capturedAt order by seq', async () => {
-    const collection = createMockCollection();
-    const store = new TaskSnapshotStore({ collection });
-    collection._docs.push(snap('a', { capturedAt: T1, seq: 1 }), snap('b', { capturedAt: T1, seq: 2 }));
-    assert.deepEqual((await store._docsFor('acme', 'LIN-1')).map(d => d._id), ['b', 'a']);
   });
 });
 

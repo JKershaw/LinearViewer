@@ -31,9 +31,7 @@ import { shouldMockAi } from '../lib/should-mock-ai.js';
 import { requestOriginOrNull, ORIGIN_UNRESOLVED_REFUSAL } from '../lib/public-origin.js';
 import { buildMockFeedbackTitle } from '../lib/workspace-api-mocks.js';
 import { normalizeWritePayload } from '../lib/proxy-graphql-errors.js';
-import { sealForFiling } from '../lib/as-asked-seal.js';
 import { answerPartialWrite } from '../lib/partial-write-error.js';
-import { AS_ASKED_HEADING } from '../lib/as-asked.js';
 
 // ===========================================================================
 // Feedback intake constants (LIN-636 route / LIN-635 widget)
@@ -108,12 +106,12 @@ const FEEDBACK_ORIGIN_FRAMING =
 // context (LIN-2818), but this call site passes none — it threads the framing in
 // via the dedicated `originNote` seam, which stays the distinct, system-authored
 // carrier. It tells the run the ticket is a raw, un-triaged user report whose
-// first job is understanding. LIN-4353: the report is sealed in the `## As asked` block
-// (LIN-4352), and is the person's own words, no longer "a starting hypothesis".
+// first job is understanding. LIN-4353: the report is the person's own words, no longer "a starting hypothesis"
+// (LIN-4502: the brief quotes them from the task's `asked`; the seal is retired).
 export const FEEDBACK_AUTOPILOT_ORIGIN_NOTE =
   `**Origin — raw feedback:** ${FEEDBACK_ORIGIN_FRAMING}. Before driving toward a fix, ` +
   'your first job is to *understand* it: read the report closely and reproduce or ground the problem ' +
-  'against the current code. The description\'s `' + AS_ASKED_HEADING + '` block is the person\'s own report: work ' +
+  'against the current code. The report is the person\'s own words: work ' +
   'out what they need from it, and where a fix they suggest looks wrong, say so rather than quietly ' +
   'narrowing the report.';
 
@@ -278,7 +276,7 @@ export function registerFeedbackRoutes(router, { workspaceFromUrl, freeTierStore
         // LIN-3238 free-tier run gate, built by the route at the dispatch point;
         // a refusal leaves the filed ticket intact.
         runGate: overrides.runGate || null,
-        // The first-dispatch seal's access to the issue (the ticket's create access).
+        // The dispatch seat's access to the issue (the ticket's create access).
         issueAccess: () => overrides.access || null,
         model: overrides.model,
         harness: overrides.harness,
@@ -348,7 +346,7 @@ export function registerFeedbackRoutes(router, { workspaceFromUrl, freeTierStore
         kind: 'autopilot',
         // LIN-3238: a refusal leaves the filed ticket intact and mints nothing.
         runGate: overrides.runGate || null,
-        // The first-dispatch seal's access to the issue (the ticket's create access).
+        // The dispatch seat's access to the issue (the ticket's create access).
         issueAccess: () => overrides.access || null,
         model: overrides.model,
         harness: overrides.harness,
@@ -516,15 +514,13 @@ export function registerFeedbackRoutes(router, { workspaceFromUrl, freeTierStore
       // activates. It never alters the message, capture block or screenshot above.
       const below = [...belowParts, `---\n${FEEDBACK_ORIGIN_TRIAGE_MARKER}`];
 
-      // LIN-4352: the person's report (message, capture, screenshot) is sealed into
-      // the As asked block; the priority line and the triage marker are code's own
-      // text and go after its end line. A report that already holds a marker line,
-      // or a provider that cannot hold the block, is filed in the unsealed layout
-      // with one log line (lib/as-asked-seal.js).
+      // The person's report (message, capture, screenshot), then code's own text (the
+      // priority line and the triage marker) after a blank line. LIN-4502: no block is
+      // sealed around the report any more; the task's `asked` keeps the words.
       const createInput = {
         teamId: resolvedTeamId,
         title: await resolveFeedbackTitle(req, workspace, { title, message }),
-        description: sealForFiling({ provider, words: parts.join('\n\n'), below: below.join('\n\n'), lane: 'feedback' }).description,
+        description: [parts.join('\n\n'), below.join('\n\n')].filter(Boolean).join('\n\n'),
       };
       if (resolvedProjectId) createInput.projectId = resolvedProjectId;
       if (priority > 0 && canSetPriority) createInput.priority = priority;
@@ -555,9 +551,9 @@ export function registerFeedbackRoutes(router, { workspaceFromUrl, freeTierStore
       // the SAME resolved binding that produced `provider` / `token`, so the source
       // the issue is created in and the stamped one cannot drift. Selection-only
       // provenance, never a credential (B1).
-      // LIN-4352: `access` is the provider and token that just created the ticket, for
-      // the first-dispatch seal. The ticket is already sealed, so the seal finds a block
-      // and does nothing; passing it means "no access" in the log is always a real gap.
+      // `access` is the provider and token that just created the ticket, for the dispatch
+      // seat's one issue access (the ticket's task, LIN-4501; the file-pointer plan read;
+      // the child-ticket retry). Passing it means "no access" in the log is a real gap.
       const overrides = { model, harness, runGate, bindingPair: provider?.name ? { issueSource: provider.name } : {}, access: { provider, token } };
 
       // LIN-3383: both lanes enqueue a `cli` row for the owner's runner, so only the
@@ -599,7 +595,7 @@ export function registerFeedbackRoutes(router, { workspaceFromUrl, freeTierStore
       });
     } catch (error) {
       console.error('Feedback submit error:', error);
-      // A ticket that landed without its seal (LIN-4452): the same PARTIAL_WRITE envelope
+      // A ticket that landed but whose confirmation re-read failed (Jira, LIN-4451): the same PARTIAL_WRITE envelope
       // as the other create lanes. retryable:false advises callers not to retry; the feedback
       // widget (public/feedback-widget.js) does not read it yet, so it can still resubmit.
       if (answerPartialWrite(res, error)) return;

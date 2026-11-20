@@ -15,7 +15,7 @@ import { generatePrompt } from '../../lib/prompt-templates.js';
 import { SURVEY_HEADINGS } from '../../lib/prompts/survey-words.js';
 import { CUT } from '../../lib/prompts/stage-kinds.js';
 import { COMPLETION_SIGNALS } from '../../lib/completion-signals.js';
-import { AS_ASKED_HEADING } from '../../lib/as-asked.js';
+import { ASKED_HEADING } from '../../lib/brief-quote.js';
 import {
   SIZE_OF_MOVE_HEADING, SIZES, DECIDED_BY, SIZE_LABEL, WHY_LABEL, CUTS_LABEL, DECIDED_BY_LABEL, RECORD_LINES, NO_CUTS, WRONG_WORK,
   readSizeRecord, checkSizeRecord, recordShape, STANDING_POLICY_LINE
@@ -24,7 +24,7 @@ import {
 const END = '*End of what was asked. Steps write below this line; nothing above it changes.*';
 const ISSUE = {
   id: 'i-4369', identifier: 'LIN-4369', title: 'Size fixture',
-  description: `${AS_ASKED_HEADING}\n\nMake Brief and Recap populate on open.\n\n${END}`,
+  description: `${ASKED_HEADING}\n\nMake Brief and Recap populate on open.\n\n${END}`,
   url: 'https://linear.app/test/issue/LIN-4369', createdAt: '2026-11-08T00:00:00.000Z',
   state: { name: 'Todo', type: 'unstarted' }, labels: []
 };

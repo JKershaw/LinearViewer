@@ -15,11 +15,11 @@ const { formatRecentRuns } = await import(`${LV}/lib/recent-runs.js`);
 const { selectFocusSubtask } = await import(`${LV}/lib/tree.js`);
 const { getStateOrder } = await import(`${LV}/lib/providers/state-map.js`);
 
-// Proxy reads are cached here (git-ignored): tickets, dispatch rows and task-history snapshots.
+// Proxy reads are cached here (git-ignored): tickets and dispatch rows.
 export const S = join(HERE, '.cache');
 const BASE = process.env.PROXY_BASE || `${process.env.HARBOUR_LOCAL_BASE}/api/proxy`;
 const AUTH = process.env.PROXY_TOKEN ? { Authorization: `Bearer ${process.env.PROXY_TOKEN}` } : {};
-for (const d of ['issues', 'dispatch', 'snaps']) mkdirSync(join(S, d), { recursive: true });
+for (const d of ['issues', 'dispatch']) mkdirSync(join(S, d), { recursive: true });
 
 async function cached(dir, id, path) {
   const f = join(S, dir, `${id}.json`);
@@ -39,29 +39,17 @@ const at = (iso) => Date.parse(iso);
 /**
  * The getRecommendation inputs for `id` as they stood at `cutoff`.
  * `states` overrides {identifier: {name,type}} for issue/children/parent/siblings at that time
- * (the proxy only has today's states). The description is today's (no history via the proxy).
+ * (the proxy only has today's states). The description is today's (no history via the proxy):
+ * LIN-4502 retired the task-history snapshots this harness used to read a past description and
+ * past states from, so a past state now comes only from `states`.
  */
 export async function bundleAt(id, cutoff, states = {}) {
   const T = at(cutoff);
-  // The task-history snapshot taken at the next dispatch holds the description, state and
-  // child states the selector saw just before it (GET /issues/:id/snapshots).
-  const snaps = ((await cached('snaps', id, `/issues/${id}/snapshots`)).snapshots || [])
-    .filter(s => at(s.capturedAt) >= T).sort((a, b) => at(a.capturedAt) - at(b.capturedAt));
-  if (!snaps.length) {
-    const before = ((await cached('snaps', id, `/issues/${id}/snapshots`)).snapshots || []).filter(s => at(s.capturedAt) < T).sort((a, b) => at(b.capturedAt) - at(a.capturedAt));
-    if (before.length) snaps.push(before[0]);
-  }
-  const snap = snaps[0]?.snapshot || null;
   states = { ...states };
-  if (snap) {
-    states[id] = snap.state;
-    for (const c of snap.children || []) states[c.identifier] = c.state;
-  }
   const st = (i) => states[i.identifier] || i.state;
   const raw = await getIssue(id);
   const issue = {
-    id: raw.id, identifier: raw.identifier, title: raw.title, description: snap ? snap.description : raw.description,
-    snapshotAt: snaps[0]?.capturedAt || null,
+    id: raw.id, identifier: raw.identifier, title: raw.title, description: raw.description,
     state: st(raw), createdAt: raw.createdAt, labels: (raw.labels || []).map(l => l.name || l),
     blockedBy: (raw.inverseRelations || []).filter(r => r.type === 'blocks').map(r => r.issue || r.relatedIssue).filter(Boolean)
   };
@@ -77,8 +65,7 @@ export async function bundleAt(id, cutoff, states = {}) {
   let parent = null, siblings = [], siblingsTotal = 0;
   if (raw.parent) {
     const p = await getIssue(raw.parent.identifier);
-    const psnaps = ((await cached('snaps', p.identifier, `/issues/${p.identifier}/snapshots`)).snapshots || []).filter(s => at(s.capturedAt) <= T).sort((a, b) => at(b.capturedAt) - at(a.capturedAt));
-    parent = { id: p.id, identifier: p.identifier, title: p.title, state: st(p), description: psnaps[0]?.snapshot?.description ?? p.description };
+    parent = { id: p.id, identifier: p.identifier, title: p.title, state: st(p), description: p.description };
     const all = [];
     for (const c of p.children || []) {
       if (c.id === raw.id) continue;

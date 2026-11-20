@@ -21,9 +21,10 @@
  */
 import { describe, test } from 'node:test';
 import assert from 'node:assert/strict';
-import { existsSync, readFileSync, readdirSync, statSync } from 'node:fs';
-import { join, sep } from 'node:path';
+import { existsSync, readFileSync } from 'node:fs';
+import { join } from 'node:path';
 import { fileURLToPath } from 'node:url';
+import { scanFiles, CENSUS_ROOTS, EXCLUDED_PREFIXES } from './helpers/retirement-census.js';
 
 const ROOT = fileURLToPath(new URL('../../', import.meta.url));
 
@@ -55,23 +56,8 @@ export const RETIRED = Object.freeze([
   { word: 'parked-tickets', re: /\bparked-tickets\b/ },
 ]);
 
-/** The roots the census reads: the code, the live docs, the fixtures and the public pages. */
-export const CENSUS_ROOTS = Object.freeze(['lib', 'routes', 'server.js', 'scripts', 'docs', 'tests/fixtures', 'public']);
-
-/** Text extensions the census reads; binary assets (fonts, images) are not text and are not scanned. */
-const TEXT_EXT = /\.(m?js|cjs|md|txt|json|html|css|ya?ml)$/;
-
-/**
- * Paths out of the census, by prefix, each with its reason. A prefix is a directory (ending in `/`) or a file.
- * Short on purpose: a new entry needs a reason here.
- */
-export const EXCLUDED_PREFIXES = Object.freeze({
-  'lib/runner-kit/runner.mjs': 'the runner\'s own kit: its local ledger is the runner\'s, not this one',
-  'docs/papers/': 'research papers: dated records of the method as it was, quoting the retired words as history',
-  'docs/plans/': 'plans and designs of record: the LIN-4491 design quotes the retired words it retires',
-  'docs/reviews/': 'dated review records, including the stability readings from before the cutover',
-  'tests/fixtures/walk-8/': 'the walk-8 stores (LIN-4496), ported to today\'s kinds: the historical records the replay writes through the proxy, and their retired words (Retires: lines, the retired flags) are the walk\'s record, as the walk wrote them',
-});
+// The roots and the reasoned exclusions are shared with the LIN-4502 census (tests/unit/helpers/retirement-census.js).
+export { CENSUS_ROOTS, EXCLUDED_PREFIXES };
 
 /**
  * Files that keep a retired word, each with its reason. Short on purpose: a new entry needs a reason here, and a file
@@ -83,22 +69,9 @@ export const ALLOW = Object.freeze({
   'tests/fixtures/run-ledger-trails.js': 'pre-cutover review comments, kept as the legacy-hold fixture: the ledger items as the comment wrote them, read as text',
 });
 
-function textFilesUnder(rel, out = []) {
-  const full = join(ROOT, rel);
-  if (!existsSync(full)) return out;
-  if (!statSync(full).isDirectory()) {
-    if (TEXT_EXT.test(rel)) out.push(rel.split(sep).join('/'));
-    return out;
-  }
-  for (const name of readdirSync(full)) textFilesUnder(join(rel, name), out);
-  return out;
-}
-
 /** The census's file list: the text under CENSUS_ROOTS, minus the excluded prefixes (the scan's whole input). */
 export function censusFiles() {
-  return CENSUS_ROOTS.flatMap((root) => textFilesUnder(root))
-    .filter((f) => !Object.keys(EXCLUDED_PREFIXES).some((p) => f.startsWith(p)))
-    .sort();
+  return scanFiles(ROOT, CENSUS_ROOTS, EXCLUDED_PREFIXES);
 }
 
 /**

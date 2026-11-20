@@ -16,7 +16,7 @@ import { createMangoTmpdir } from '../fixtures/mango-tmpdir.js';
 import { RecordsStore, RECORDS_COLLECTION, REFS_COLLECTION, QUERY_LOG_COLLECTION } from '../../lib/records-store.js';
 import { createRunRecords } from '../../lib/run-records.js';
 import { createRecordWrites } from '../../lib/records/writes.js';
-import { splitAsAsked } from '../../lib/as-asked.js';
+import { splitQuote } from '../../lib/brief-quote.js';
 import { askedOf } from '../../lib/asked-of.js';
 import { isTerminalState } from '../../lib/providers/state-map.js';
 import { COMPLETED } from '../../lib/providers/models.js';
@@ -92,7 +92,7 @@ async function logged(fn) {
 describe('askedOf: the one rule for a task\'s asked', () => {
   test('a sealed description takes its sealed words', () => {
     const description = '## As asked\n\nFix the footer.\n\n*End of what was asked. Steps write below this line; nothing above it changes.*\n\n## Notes\nplan here';
-    assert.equal(askedOf(description), splitAsAsked(description).words);
+    assert.equal(askedOf(description), splitQuote(description).words);
   });
 
   test('an unsealed description with a plan takes the words before the plan heading', () => {

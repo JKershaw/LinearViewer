@@ -23,7 +23,7 @@ import { createProxyRecordsRoutes } from '../../routes/proxy-records.js';
 import { requireWriteScope } from '../../lib/stage-write-gate.js';
 import { READ_WRITE } from '../../lib/proxy-scopes.js';
 import { TOKEN_ORIGIN, WRITES, personMint } from '../../lib/stage-writes.js';
-import { askedText } from '../../lib/as-asked.js';
+import { askedOf } from '../../lib/asked-of.js';
 import { STAGE_KINDS } from '../../lib/prompts/stage-kinds.js';
 import { ProxyTokenStore } from '../../lib/proxy-tokens.js';
 
@@ -78,7 +78,8 @@ export async function createRecordsRouteHarness({ harness, urlKey, tickets, peop
     requireWriteScope,
     logEvent: () => {},
     readTicket: readTicket ?? (async (_req, ref) => tickets.get(ref) ?? null),
-    askedText,
+    // Production's injection (routes/proxy.js): the one writer rule, lib/asked-of.js askedOf.
+    askedText: askedOf,
     stageKinds: Object.keys(STAGE_KINDS),
     listPeople: async () => people,
     tracker

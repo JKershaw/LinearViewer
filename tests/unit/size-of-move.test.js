@@ -28,7 +28,7 @@ import {
   RECORD_LINES, RECORD_PARTS, SIZE_LABEL, WHY_LABEL, CUTS_LABEL, DECIDED_BY_LABEL, NO_CUTS, WHY_MAX_WORDS, CUT_MAX_OTHER_WORDS,
   readSizeRecord, sizeFact, checkSizeRecord, STANDING_POLICY_LINE, recordShape
 } from '../../lib/size-of-move.js';
-import { sealAsAsked } from '../../lib/as-asked.js';
+import { quoteAsked } from '../../lib/brief-quote.js';
 import { askedOf } from '../../lib/asked-of.js';
 import { assembleTrailFacts, formatTrailFactsBlock } from '../../lib/recommendation-facts.js';
 import { generatePrompt } from '../../lib/prompt-templates.js';
@@ -37,7 +37,7 @@ const ROOT = join(dirname(fileURLToPath(import.meta.url)), '..', '..');
 const FIXTURES = join(ROOT, 'tests', 'fixtures', 'size-of-move');
 
 const ASK = 'Keep the look-first step as advice (on main: `docs/plans/survey.md`). Write a full guide.';
-const SEALED = sealAsAsked(ASK);
+const SEALED = quoteAsked(ASK);
 
 /** A record body in the shape scoping writes (LIN-4369 arm 3: four lines and nothing else). */
 const PLAIN = [
@@ -92,7 +92,7 @@ describe('the parser reads the description outside the As-asked block, never com
   test('no section is not recorded; a heading quoted inside the As-asked block is not a record', () => {
     assert.equal(readSizeRecord(SEALED), null);
     assert.equal(sizeFact(null), 'not recorded');
-    const asked = sealAsAsked(`Please decide.\n\n${SIZE_OF_MOVE_HEADING}\n\n**Size:** rebuild the area`);
+    const asked = quoteAsked(`Please decide.\n\n${SIZE_OF_MOVE_HEADING}\n\n**Size:** rebuild the area`);
     assert.equal(readSizeRecord(asked), null, 'the person\'s words are not a record');
   });
 
@@ -229,15 +229,13 @@ describe('the standing policy line', () => {
 });
 
 describe('close-out keeps the record', () => {
-  test('the prune step says to keep the size section verbatim, in the prune instruction itself', () => {
+  // LIN-4502: the prune (and its keep-the-record-verbatim line) is retired; close-out no longer rewrites the
+  // description, so it cannot drop the record. The proxy still refuses a write that drops it (size-of-move-guard).
+  test('close-out has no prune step that could rewrite the record', () => {
     const issue = { identifier: 'ABC-7', title: 'Approved work', description: withRecord(PLAIN), state: { name: 'In Progress', type: 'started' }, labels: [] };
     const { prompt } = generatePrompt('close-out', issue, { comments: [] });
-    const prune = prompt.split('\n').find((l) => l.includes('**Prune**'));
-    assert.ok(prune, 'close-out has its prune step');
-    assert.match(prune, /description\/below/);
-    assert.ok(prune.includes(`Keep the \`${SIZE_OF_MOVE_HEADING}\` section verbatim`), prune);
-    // LIN-4369 arm 3: a stub straight below the record would sit inside its section and be refused.
-    assert.ok(prune.includes(`section verbatim, with your stub under a heading of its own`), prune);
+    assert.ok(!prompt.split('\n').some((l) => l.includes('**Prune**')), 'no prune step');
+    assert.doesNotMatch(prompt, /description\/below/);
   });
 });
 

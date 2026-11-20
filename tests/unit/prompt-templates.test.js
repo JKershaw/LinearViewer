@@ -2627,133 +2627,31 @@ describe('close-out template + review→close-out ledger handoff (LIN-550)', () 
   });
 
   // ===========================================================================
-  // Archive + prune superseded stage artifacts on successful close-out (LIN-1770)
+  // LIN-4502: the archive + prune of superseded stage artifacts (LIN-1770) is retired, with the
+  // write-below route and task snapshots it relied on. Close-out neither archives nor prunes.
   // ===========================================================================
 
-  test('(g1) archive+prune follows the summary and precedes filing follow-ups', () => {
+  test('(g) LIN-4502: close-out neither archives nor prunes, and names no snapshot check or write-below route', () => {
     const { prompt } = generatePrompt('close-out', issue, context);
-    const land = prompt.slice(prompt.indexOf('### Land It and Close the Loop'));
-    const summaryAt = land.search(/Post the summary comment/);
-    const archiveAt = land.search(/archive and prune the description/);
-    const followUpsAt = land.search(/Outside finds are not filed as tickets/);
-    assert.ok(summaryAt > -1 && archiveAt > -1 && followUpsAt > -1, 'all three steps are present');
-    assert.ok(summaryAt < archiveAt && archiveAt < followUpsAt,
-      'archive+prune sits strictly between the summary post and follow-up filing');
-  });
-
-  test('(g2) the workflow list also carries archive & prune before filing follow-ups', () => {
-    const { prompt } = generatePrompt('close-out', issue, context);
-    const workflow = prompt.slice(prompt.indexOf('## Workflow'), prompt.indexOf('## Context'));
-    const archiveAt = workflow.search(/archive & prune the description/);
-    const followUpsAt = workflow.search(/file the gate's tickets/);
-    assert.ok(archiveAt > -1 && followUpsAt > -1 && archiveAt < followUpsAt,
-      'the workflow list sequences archive & prune before filing follow-ups');
-  });
-
-  test('(g3) archive-first uses the zero-spend brief flag, then verifies the snapshot landed before pruning', () => {
-    const { prompt } = generatePrompt('close-out', issue, context);
-    assert.ok(/brief\?noRefresh=1/.test(prompt), 'archive step calls the brief endpoint with noRefresh=1 (zero LLM spend)');
-    assert.ok(/GET \/api\/proxy\/issues\/LIN-901\/snapshots/.test(prompt),
-      'verify step reads the snapshot listing before editing');
-    assert.ok(/fire-and-forget server-side and swallows its own errors/i.test(prompt),
-      'a 200 from the archive call is explicitly NOT treated as proof it captured anything');
-  });
-
-  // LIN-4353: g4 pinned the never-prune list and its pointer to a scoping
-  // instruction that no longer exists. Since LIN-4352 the person's words sit in a
-  // sealed `## As asked` block the proxy refuses to change, so the prune's behaviour
-  // is what matters: it writes below the block through `description/below` (never a
-  // whole-body PATCH that re-sends the block), and on a description with no block it
-  // does not prune at all. Only "any section a follow-up ticket references" survives.
-  test('(g4) the prune writes below the As asked block through description/below, and skips with no block', () => {
-    const { prompt } = generatePrompt('close-out', issue, context);
-    const prune = prompt.slice(prompt.indexOf('### Archive & Prune Superseded Stage Artifacts'), prompt.indexOf('Comments are untouched by policy'));
-    assert.ok(/\/api\/proxy\/issues\/LIN-901\/description\/below/.test(prune), 'the prune writes through description/below');
-    assert.ok(!/PATCH/.test(prune), 'the prune never rewrites the whole body with PATCH (that would re-send the block)');
-    assert.ok(sentenceWith(prune, [/no `## As asked` block|without an? `## As asked` block/i, /(do not|don't|never|skip)[^.]*prune|prune[^.]*skip/i]),
-      'with no `## As asked` block on the description, the prune is skipped');
-    assert.ok(/any section a follow-up ticket references/i.test(prune), 'sections a follow-up references are kept');
-    assert.ok(!/single source of truth/i.test(prompt), 'the dangling pointer to the scoping template is gone');
-    assert.ok(!/original problem statement/i.test(prompt), 'never-prune rule 5 is gone: the block, not a guess, keeps the person\'s words');
-  });
-
-  test('(g5) the stub must preserve the session-fit phrase or Implementation Plan heading verbatim, and the block', () => {
-    const { prompt } = generatePrompt('close-out', issue, context);
-    // Carried by the stage contract (LIN-3292), appended by code after the brief.
-    assert.ok(/keep word for word any `Implementation Plan` heading/i.test(prompt),
-      'the marker-preservation mandate is explicit and verbatim');
-    assert.ok(/fits one session.*needs multiple sessions/.test(prompt), 'both session-fit phrases are named');
-    assert.ok(/any `plan-review due:` line/.test(prompt), 'LIN-3296: the plan-review gate marker survives the prune');
-    assert.ok(/code reads them there/i.test(prompt),
-      'the prompt explains WHY the literals matter, so an implementer does not "clean up" the wording');
-    // LIN-4353: the contract's kept set now names the As asked block too.
-    const contract = formatStageContract('close-out', 'LIN-901');
-    assert.ok(/`## As asked` block/.test(contract), 'the close-out contract keeps the `## As asked` block');
-  });
-
-  test('(g6) archive+prune runs only on the all-clear path, never on the cannot-close branch', () => {
-    const { prompt } = generatePrompt('close-out', issue, context);
-    assert.ok(/This step runs only here, after the merge and the Done transition, on the successful all-clear path/i.test(prompt),
-      'the prune step is explicitly scoped to the all-clear path');
-    assert.ok(/never on a cannot-close branch, and never on a task that stays open with Request Changes/i.test(prompt),
-      'the prune step explicitly excludes the cannot-close / stays-open branches');
-  });
-
-  test('(g7) comments stay untouched by policy — the prune is a description-only edit', () => {
-    const { prompt } = generatePrompt('close-out', issue, context);
-    assert.ok(/Comments are untouched by policy/i.test(prompt),
-      'comments are explicitly out of scope for the prune, stated as a policy choice rather than a capability gap');
-    assert.ok(/the prune is a description edit only/i.test(prompt), 'the policy distinction is preserved');
-    assert.ok(/using the existing write surface/i.test(prompt), 'the prune uses only existing write surfaces');
-    // The comment-edit route aside was a note for rule authors, not the agent (LIN-3293 dedup).
-  });
-
-  test('(g8) close-out still emits no literal "Linear" with the archive+prune section included (LIN-177 parity)', () => {
-    const { prompt } = generatePrompt('close-out', issue, context);
-    assert.ok(/Archive & Prune/.test(prompt), 'sanity: the new section is actually present in this render');
-    assert.ok(!prompt.includes('Linear'), 'the archive+prune addition introduces no literal "Linear"');
-  });
-
-  test('(g9) archive-verification failure branch: skip-and-close is sited between verify and prune, and names the post-merge discriminator', () => {
-    const { prompt } = generatePrompt('close-out', issue, context);
-    const section = prompt.slice(prompt.indexOf('### Archive & Prune Superseded Stage Artifacts'));
-    const verifyAt = section.search(/\d\. \*\*Verify the archive landed\*\*/);
-    const failureAt = section.search(/\d\. \*\*If the snapshot cannot be verified\*\*/);
-    const pruneAt = section.search(/\d\. \*\*Prune\*\*/);
-    assert.ok(verifyAt > -1 && failureAt > -1 && pruneAt > -1, 'all three steps are present');
-    assert.ok(verifyAt < failureAt && failureAt < pruneAt,
-      'the failure branch sits strictly between verification and pruning');
-    assert.ok(/do not prune/i.test(section) && /close the task anyway/i.test(section),
-      'the branch states do-not-prune and close-anyway');
-    assert.ok(/record in the close-out summary that the archive could not be confirmed and the prune was skipped/i.test(section),
-      'the branch requires recording the skip in the summary');
-    assert.ok(/never hold open, re-route, or reopen a task whose merge and Done transition have landed/i.test(section),
-      'the branch prohibits holding open, re-routing, or reopening');
-    assert.ok(/merge and Done transition are already irreversible/i.test(section) || /merge and Done transition have landed/i.test(section),
-      'the branch names the post-merge/Done discriminator — this is what distinguishes it from the pre-merge gate');
-  });
-
-
-  test('(g12) coreOutcome and readinessCheck carry the "(or the skip recorded)" wording together — never readinessCheck alone', () => {
+    assert.ok(!/Archive & Prune/.test(prompt), 'no archive and prune section');
+    assert.ok(!/prune/i.test(prompt), 'no prune step anywhere in the close-out prompt');
+    assert.ok(!/\/snapshots/.test(prompt), 'no snapshot verification');
+    assert.ok(!/description\/below/.test(prompt), 'no write-below route');
     const sig = COMPLETION_SIGNALS['close-out'];
-    assert.ok(/archived and pruned of superseded stage artifacts \(or the skipped prune recorded\)/i.test(sig.coreOutcome),
-      'coreOutcome carries the skipped-prune parenthetical');
-    assert.ok(/archived-and-pruned \(or the skip recorded\)/i.test(sig.readinessCheck),
-      'readinessCheck carries the matching parenthetical, so the two fields state one contract, not two');
-    assert.ok(sig.readinessCheck.trim().endsWith('?'),
-      'the question-mark invariant is preserved (locked separately in tests/unit/completion-signals.test.js:86)');
-    assert.ok(sig.signals.some(s => /where the archive could not be verified, the prune skipped and that recorded in the summary/i.test(s)),
-      'signals[] carries the same contract for consistency, even though it reaches no prompt path');
+    for (const text of [sig.coreOutcome, sig.readinessCheck, ...sig.signals, PROMPT_TEMPLATES['close-out'].description]) {
+      assert.ok(!/prune|archive/i.test(text), `a close-out signal still names the prune: ${text}`);
+    }
+    assert.ok(sig.readinessCheck.trim().endsWith('?'), 'the question-mark invariant is preserved');
   });
 
   // ===========================================================================
   // Catalog text pinned to the template body's step ordering (LIN-1773)
   // ===========================================================================
 
-  test('(h1) sanity: the close-out body states merge→done→summary→archive→prune→follow-up in order', () => {
+  test('(h1) sanity: the close-out body states merge→done→summary→follow-up in order', () => {
     const { prompt } = generatePrompt('close-out', issue, context);
     const land = prompt.slice(prompt.indexOf('### Land It and Close the Loop'), prompt.indexOf('### Outside Finds'));
-    const steps = [/Merge pinned/, /set the task to Done/, /Post the summary comment/, /archive and prune/, /Outside finds are not filed as tickets/];
+    const steps = [/Merge pinned/, /set the task to Done/, /Post the summary comment/, /Outside finds are not filed as tickets/];
     const positions = steps.map(re => land.search(re));
     assert.ok(positions.every(p => p > -1), 'every step is present in the Land It section');
     for (let i = 1; i < positions.length; i++) {
@@ -2763,7 +2661,7 @@ describe('close-out template + review→close-out ledger handoff (LIN-550)', () 
 
   // LIN-3300: aiHint.goal and aiHint.workflow (two more copies) are gone; the description stays.
   test('(h2) the description names every irreversible-set step in the body\'s order', () => {
-    const keywords = ['merge', 'done', 'summary', 'archive', 'prune', "gate's tickets"];
+    const keywords = ['merge', 'done', 'summary', "gate's tickets"];
     const assertOrdered = (text, label) => {
       const lower = text.toLowerCase();
       const positions = keywords.map(k => lower.indexOf(k));
@@ -4195,7 +4093,7 @@ describe('the stage contract (LIN-3292)', () => {
       plan: ['## Implementation Plan', 'plan-review due: yes'],
       'plan-review': ['### Plan Review Verdict'],
       review: ['CI covers the deliverable; nothing to record', `## Review — ${issue.identifier}`],
-      'close-out': ['plan-review due:', `## Close-out — ${issue.identifier}`]
+      'close-out': [`## Close-out — ${issue.identifier}`]
     };
     for (const [kind, needles] of Object.entries(formats)) {
       const body = PROMPT_TEMPLATES[kind].generate(issue, context, {});

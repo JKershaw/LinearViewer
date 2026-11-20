@@ -98,7 +98,7 @@ const uuidForUrlKey = (key) => {
  * @param {Object|null} [options.taskModeStore] - Task-mode event store (LIN-2942), for /test/clear-task-mode-events
  * @returns {Router} Express router
  */
-export function createTestRoutes({ dispatchQueueStore, dispatchTokenStore, freeTierStore, userPreferencesStore, workspacePreferencesStore, modelRoutingStore = null, customPromptsStore, collectiveCharactersStore, collectivePresetsStore, dispatchPresetsStore, proxyTokenStore, proxyEventStore, agentStatusStore, observationSessionsStore, sessionsFeedCache, recapCacheStore, briefCacheStore, runSummaryCacheStore, sessionSummaryCacheStore, reportHistoryStore, shipBiscuitHistoryStore, taskSnapshotStore, taskDecisionsStore, shelvedRulingsStore, dismissalSuggestionsStore, savedChatStore, localStore, getWorkspaceAccessToken, accountStore, accountWorkspaceStore, ownerCredentialStore, connectionStore, clearWorkspaceIssuesMemo, resetKeyState = null, observerStateStore, dispatchHistoryCollection, proxyEventsCollection, resetKpiCache, workspaceHaltStore, emailTransport = null, commentDedupe = null, decisionStampDedupe = null, taskModeStore = null, taskShareCollection = null, kpiDailyRollupCollection = null, clearWorkspaceKpis = () => {} }) {
+export function createTestRoutes({ dispatchQueueStore, dispatchTokenStore, freeTierStore, userPreferencesStore, workspacePreferencesStore, modelRoutingStore = null, customPromptsStore, collectiveCharactersStore, collectivePresetsStore, dispatchPresetsStore, proxyTokenStore, proxyEventStore, agentStatusStore, observationSessionsStore, sessionsFeedCache, recapCacheStore, briefCacheStore, runSummaryCacheStore, sessionSummaryCacheStore, reportHistoryStore, shipBiscuitHistoryStore, taskDecisionsStore, shelvedRulingsStore, dismissalSuggestionsStore, savedChatStore, localStore, getWorkspaceAccessToken, accountStore, accountWorkspaceStore, ownerCredentialStore, connectionStore, clearWorkspaceIssuesMemo, resetKeyState = null, observerStateStore, dispatchHistoryCollection, proxyEventsCollection, resetKpiCache, workspaceHaltStore, emailTransport = null, commentDedupe = null, decisionStampDedupe = null, taskModeStore = null, taskShareCollection = null, kpiDailyRollupCollection = null, clearWorkspaceKpis = () => {} }) {
   const router = Router();
 
   // ── Connection-backed fixture variants (LIN-3124 PR3 checkpoint F, T27) ────
@@ -1259,24 +1259,13 @@ export function createTestRoutes({ dispatchQueueStore, dispatchTokenStore, freeT
     }
   })
 
-  // Endpoint to clear the task-snapshot archive for testing (LIN-598)
-  // LIN-2444: sibling of the snapshot clear below. Without it an e2e workspace
-  // reset clears shelved rulings but leaks proposed-dismissal rows into the
-  // next test, which the rulings-tab specs will depend on.
+  // LIN-2444: clears the proposed-dismissal rows for testing. Without it an e2e
+  // workspace reset clears shelved rulings but leaks proposed-dismissal rows into
+  // the next test, which the rulings-tab specs will depend on.
   router.get('/test/clear-dismissal-suggestions', async (req, res) => {
     try {
       const urlKey = req.query.urlKey || 'test-workspace'
       if (dismissalSuggestionsStore) await dismissalSuggestionsStore.clear(urlKey)
-      res.send('ok')
-    } catch (err) {
-      res.status(500).json({ error: err.message })
-    }
-  })
-
-  router.get('/test/clear-task-snapshots', async (req, res) => {
-    try {
-      const urlKey = req.query.urlKey || 'test-workspace'
-      if (taskSnapshotStore) await taskSnapshotStore.clear(urlKey)
       res.send('ok')
     } catch (err) {
       res.status(500).json({ error: err.message })

@@ -97,12 +97,13 @@ describe('code-shape area map placement (LIN-3729)', () => {
     assert.strictEqual(areaOf('lib/task-board-view.js'), 'Front end: server-rendered pages');
   });
 
-  // LIN-4371: the `## As asked` block's owner sits with the prompts that read it (the brief, the stage contract, stage
+  // LIN-4371: the `## As asked` words' owner sits with the prompts that read it (the brief, the stage contract, stage
   // intent's CUT). It used to fall through to the catch-all `^lib/` in "Other features", which filed every area note about
-  // the block's words under the catch-all. Its seal (as-asked-seal.js, the create lanes) is not moved with it.
-  test('the As-asked block owner lands in LLM & prompts; its seal does not move', () => {
-    assert.strictEqual(areaOf('lib/as-asked.js'), 'LLM & prompts');
-    assert.strictEqual(areaOf('lib/as-asked-seal.js'), 'Other features');
+  // the words under the catch-all. LIN-4502 retired the block's module and its seal: the quote's spellings live in
+  // lib/brief-quote.js and the legacy reader in lib/asked-of.js, and both stay in LLM & prompts.
+  test('the quote\'s owner and the legacy reader land in LLM & prompts', () => {
+    assert.strictEqual(areaOf('lib/brief-quote.js'), 'LLM & prompts');
+    assert.strictEqual(areaOf('lib/asked-of.js'), 'LLM & prompts');
   });
 
   // LIN-4369: the size record's owner supplies the scoping prompt's words (sizes, decided-by values, record parts)

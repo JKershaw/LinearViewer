@@ -691,12 +691,14 @@ test.describe('Proxy API - Route Aliases (LIN-528)', () => {
 // token was never involved) — the exact gap LIN-1910 closed on the session-auth
 // surfaces (routes/workspace-api.js) but explicitly left open here.
 //
-// Witness strategy (LIN-598's snapshot capture, no LLM spend): GET .../recap
-// runs its context fetch + captureTaskSnapshot BEFORE the cache-hit/noRefresh
-// short-circuit (routes/proxy.js, verified at the recap/brief handlers above),
-// so `?noRefresh=1` on a never-cached issue still proves a REAL, successful
-// provider-routed fetch happened — {status:'missing'}, no OpenRouter call. The
-// archived slice is then readable over the same token via GET .../snapshots.
+// Witness strategy (no LLM spend): GET .../recap runs its context fetch BEFORE
+// the cache-hit/noRefresh short-circuit, so `?noRefresh=1` on a never-cached
+// issue answers {status:'missing'} with no OpenRouter call, and a 200 there means
+// the Jira credential served the fetch (a fall-through to Linear 401s). The
+// title read-back that used to prove the fetch rode on LIN-598's task snapshots,
+// which LIN-4502 retired; that the active provider's own fetcher is the one
+// called, with its own data in the response, is pinned at the unit layer
+// (tests/unit/proxy-provider-routed-compute.test.js, the recap and brief seams).
 // =============================================================================
 test.describe('Proxy API - Jira-active compute endpoints (LIN-2044)', () => {
   let jiraToken;
@@ -708,11 +710,11 @@ test.describe('Proxy API - Jira-active compute endpoints (LIN-2044)', () => {
     jiraToken = (await tokenResp.json()).token;
   });
 
-  test('positive witness: GET /api/proxy/recap/ENG-1?noRefresh=1 succeeds against Jira and snapshots the real Jira title', async ({ request }) => {
+  test('positive witness: GET /api/proxy/recap/ENG-1?noRefresh=1 succeeds against Jira', async ({ request }) => {
     const recapResp = await request.get('/api/proxy/recap/ENG-1?noRefresh=1', {
       headers: { Authorization: `Bearer ${jiraToken}` }
     });
-    // Negative control (part 1): pre-fix, a Jira-active workspace sent a Jira
+    // Negative control: pre-fix, a Jira-active workspace sent a Jira
     // API token to Linear's GraphQL client and got a 401 (graphqlErrorStatus
     // mapping Linear's own auth rejection) — never `Entity not found: Issue`,
     // since the credential shape alone was wrong before any lookup happened.
@@ -721,27 +723,6 @@ test.describe('Proxy API - Jira-active compute endpoints (LIN-2044)', () => {
     const recapBody = await recapResp.json();
     expect(recapBody.status).toBe('missing');
     expect(recapBody.identifier).toBe('ENG-1');
-
-    // Snapshot capture is fire-and-forget on the response path (routes/proxy.js's
-    // captureTaskSnapshot: a bare Promise chain, never awaited before the recap
-    // response is sent), so the read below polls briefly rather than racing it —
-    // same discipline as tests/unit/proxy-snapshot-capture.test.js's header note.
-    await expect.poll(async () => {
-      const snapshotsResp = await request.get('/api/proxy/issues/ENG-1/snapshots', {
-        headers: { Authorization: `Bearer ${jiraToken}` }
-      });
-      if (snapshotsResp.status() !== 200) return null;
-      const body = await snapshotsResp.json();
-      // Each list entry wraps the captured fields under `.snapshot` alongside
-      // record metadata (id/taskIdentifier/canonicalId/inputHash/capturedAt) —
-      // see task-snapshot-store.js's toRecord().
-      return body?.snapshots?.[0]?.snapshot?.title ?? null;
-    }, { timeout: 5000 }).toBe(
-      // Negative control (part 2): the exact, distinctive Jira fixture title —
-      // Linear has no such issue, so a silent fallback to Linear (or to a
-      // default/mock context) cannot produce this string by accident.
-      'Jira task to do'
-    );
   });
 
   test('positive witness: GET /api/proxy/brief/ENG-1?noRefresh=1 also succeeds against Jira (mirrors the recap seam)', async ({ request }) => {

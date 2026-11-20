@@ -58,7 +58,6 @@ function briefHandler({ recordsStore }) {
     recordsStore,
     recapCacheStore: null,
     briefCacheStore: { async get() { return CACHED; } },
-    taskSnapshotStore: null,
     dispatchQueueStore: null,
     llmCallLogStore: null,
     getWorkspaceOpenRouterKey: async () => null,

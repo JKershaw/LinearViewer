@@ -6,31 +6,26 @@
  *   selector's `planReviewDue` read through it, so the bold form
  *   (`**plan-review due:** yes`) is due to both. The four cases where the measure's
  *   old reader disagreed with the selector's are pinned in as-asked-readers.test.js.
- * - "The text outside the block" has one definition, `outsideAsAsked` in
- *   lib/as-asked.js, which readFact and assembleTrailFacts both use.
- * - The brief composer (`composeBrief`, `briefQuoteEnd`) lives in the pure
- *   lib/brief-quote.js (LIN-4501: it quotes the task's `asked`, and moved out of
- *   lib/as-asked.js, which P2 deletes), so the test-mode mocks do not pull in the live
- *   model client (`streamChat`) through lib/brief.js, and there is one mock brief
- *   builder, lib/workspace-api-mocks.js's `buildMockBrief`, which the proxy routes use too.
+ * - "The text outside the block" (a legacy block, filed before LIN-4502) has one definition,
+ *   `outsideAsked` in lib/asked-of.js, which readFact and assembleTrailFacts both use.
+ * - The brief composer (`composeBrief`, `briefQuoteEnd`) and the quote's spellings live in the
+ *   pure lib/brief-quote.js (LIN-4501: it quotes the task's `asked`; LIN-4502 retired the
+ *   block's own module), so the test-mode mocks do not pull in the live model client
+ *   (`streamChat`) through lib/brief.js, and there is one mock brief builder,
+ *   lib/workspace-api-mocks.js's `buildMockBrief`, which the proxy routes use too.
  *
  * Run with: node --test tests/unit/as-asked-one-home.test.js
  */
 process.env.NODE_ENV = 'test';
 
-import { test, describe, beforeEach } from 'node:test';
+import { test, describe } from 'node:test';
 import assert from 'node:assert/strict';
 import { readFileSync, readdirSync } from 'node:fs';
-import express from 'express';
 import { buildImportGraph } from './lib/import-graph.js';
-import * as asAsked from '../../lib/as-asked.js';
+import { quoteAsked } from '../../lib/brief-quote.js';
+import { outsideAsked } from '../../lib/asked-of.js';
 import * as roundTrips from '../../lib/plan-review-round-trips.js';
 import { assembleTrailFacts } from '../../lib/recommendation-facts.js';
-import { createProxyRoutes } from '../../routes/proxy.js';
-import { localProvider } from '../../lib/providers/local/index.js';
-import { createLocalStore } from '../fixtures/local-harness.js';
-
-const { sealAsAsked } = asAsked;
 const ASOF = '2026-08-09T12:00:00.000Z';
 const planRows = [
   { id: 'p1', kind: 'plan', status: 'done', dispatchedAt: '2026-08-09T09:00:00.000Z', completedAt: '2026-08-09T09:30:00.000Z' }
@@ -56,7 +51,7 @@ describe('one reader for the plan-review due line', () => {
   });
 
   test('the bold form below a block that says no is due to both readers', () => {
-    const desc = `${sealAsAsked('Piece A.\n\n**Plan-review due:** no — covered by the parent')}\n\n## Implementation Plan (revision 2)\n\n**plan-review due:** yes`;
+    const desc = `${quoteAsked('Piece A.\n\n**Plan-review due:** no — covered by the parent')}\n\n## Implementation Plan (revision 2)\n\n**plan-review due:** yes`;
     assert.equal(gateDue(desc), true);
     assert.equal(selectorDue(desc), 'yes');
   });
@@ -85,20 +80,19 @@ describe('one reader for the plan-review due line', () => {
 });
 
 describe('one definition of the text outside the block', () => {
-  test('outsideAsAsked: above plus below when sealed, the whole text when not, empty for null', () => {
-    const { outsideAsAsked } = asAsked;
-    assert.equal(typeof outsideAsAsked, 'function', 'lib/as-asked.js exports outsideAsAsked');
-    const sealed = sealAsAsked('The ask.');
-    assert.equal(outsideAsAsked(`Above.\n${sealed}\n\nBelow.`), 'Above.\n\n\nBelow.');
-    assert.equal(outsideAsAsked(sealed), '');
-    assert.equal(outsideAsAsked('No block here.'), 'No block here.');
-    assert.equal(outsideAsAsked(null), '');
-    assert.equal(outsideAsAsked(undefined), '');
+  test('outsideAsked: above plus below a legacy block, the whole text when none, empty for null', () => {
+    assert.equal(typeof outsideAsked, 'function', 'lib/asked-of.js exports outsideAsked');
+    const sealed = quoteAsked('The ask.');
+    assert.equal(outsideAsked(`Above.\n${sealed}\n\nBelow.`), 'Above.\n\n\nBelow.');
+    assert.equal(outsideAsked(sealed), '');
+    assert.equal(outsideAsked('No block here.'), 'No block here.');
+    assert.equal(outsideAsked(null), '');
+    assert.equal(outsideAsked(undefined), '');
   });
 
-  test('no module under lib/ or routes/ rebuilds it by hand from splitAsAsked', () => {
+  test('no module under lib/ or routes/ rebuilds it by hand from a split', () => {
     const graph = sourceGraph();
-    const handSplits = graph.paths().filter((p) => p !== 'lib/as-asked.js' &&
+    const handSplits = graph.paths().filter((p) => p !== 'lib/asked-of.js' &&
       codeLines(graph.sourceOf(p)).some((l) => /\.before\s*\+\s*\w+\.below\b/.test(l)));
     assert.deepEqual(handSplits, []);
   });
@@ -109,13 +103,12 @@ describe('a pure brief composer and one mock brief', () => {
     assert.equal(sourceGraph().reaches('lib/workspace-api-mocks.js', 'streamChat'), false);
   });
 
-  test('composeBrief and briefQuoteEnd live in lib/brief-quote.js, which imports only lib/as-asked.js (itself only description-edit.js)', () => {
+  test('composeBrief, briefQuoteEnd and the quote\'s spellings live in lib/brief-quote.js, which imports only description-edit.js', () => {
     const graph = sourceGraph();
-    assert.ok(graph.exportedNamesOf('lib/brief-quote.js').includes('composeBrief'));
-    assert.ok(graph.exportedNamesOf('lib/brief-quote.js').includes('briefQuoteEnd'));
-    assert.ok(!graph.exportedNamesOf('lib/as-asked.js').includes('composeBrief'), 'one home: lib/as-asked.js no longer has it');
-    assert.deepEqual(graph.dependenciesOf('lib/brief-quote.js'), ['lib/as-asked.js']);
-    assert.deepEqual(graph.dependenciesOf('lib/as-asked.js'), ['lib/description-edit.js']);
+    for (const name of ['composeBrief', 'briefQuoteEnd', 'quoteAsked', 'splitQuote', 'ASKED_HEADING', 'ASKED_END', 'BRIEF_HINT']) {
+      assert.ok(graph.exportedNamesOf('lib/brief-quote.js').includes(name), name);
+    }
+    assert.deepEqual(graph.dependenciesOf('lib/brief-quote.js'), ['lib/description-edit.js']);
     const briefSource = codeLines(readFileSync('lib/brief.js', 'utf8')).join('\n');
     assert.doesNotMatch(briefSource, /function (composeBrief|briefQuoteEnd)\b/, 'lib/brief.js no longer defines them');
   });
@@ -141,73 +134,4 @@ describe('a pure brief composer and one mock brief', () => {
       .filter((name) => name === 'composeBrief' || name === 'askedText');
     assert.deepEqual(composerImports, [], 'proxy-compute no longer imports composeBrief or askedText');
   });
-});
-
-// Characterization of the proxy guard's "removed" message, pinned before its
-// `firstLine` moves from splitAsAsked to askedText: it quotes line 1 of the block's
-// words as stored, Linear escapes and all.
-describe('the guard\'s removed message quotes the block\'s first line', () => {
-  const LOCAL_URL_KEY = 'local-workspace';
-  const WORDS = 'Please write a **full** guide.\nCover both modes.';
-  const linearEscape = (text) => text.replace(/([#*_[\]])/g, '\\$1');
-
-  function proxyApp() {
-    const app = express();
-    app.use(express.json());
-    app.use(createProxyRoutes({
-      proxyTokenStore: {
-        validateToken: async () => ({ tokenId: 't1', urlKey: LOCAL_URL_KEY, label: 'test', scope: 'readWrite', createdBy: 'u1' }),
-      },
-      proxyEventStore: { recordEvent: async () => {} },
-      resolveWorkspaceAccess: async () => ({ token: null, reason: 'not_connected' }),
-      getWorkspaceAccessToken: async () => null,
-      agentStatusStore: {},
-      recapCacheStore: {},
-      briefCacheStore: {},
-      dispatchQueueStore: {},
-      workspaceFromUrl: (req, res, next) => next(),
-      getWorkspaceOpenRouterKey: async () => null,
-      workspacePreferencesStore: {},
-      freeTierStore: { tryUse: async () => ({ allowed: true }) },
-    }));
-    return app;
-  }
-
-  async function patch(app, path, body) {
-    const server = app.listen(0, '127.0.0.1');
-    await new Promise((r) => server.once('listening', r));
-    const { port } = server.address();
-    try {
-      const res = await fetch(`http://127.0.0.1:${port}${path}`, {
-        method: 'PATCH',
-        headers: { Authorization: 'Bearer anything', 'Content-Type': 'application/json' },
-        body: JSON.stringify(body),
-      });
-      return { status: res.status, body: await res.json() };
-    } finally {
-      await new Promise((r) => server.close(r));
-    }
-  }
-
-  for (const [name, store] of [['plain', (t) => t], ['Linear-escaped', linearEscape]]) {
-    describe(name, () => {
-      const description = store(`${sealAsAsked(WORDS)}\n\n## Notes\n\nbelow`);
-      beforeEach(async () => {
-        const { store: localStore } = createLocalStore();
-        await localStore.seed(LOCAL_URL_KEY, {
-          projects: [{ id: 'p1', name: 'Alpha', content: 'a', sortOrder: 1 }],
-          issues: [{ id: 'i1', identifier: 'LOCAL-1', title: 'Sealed', description, projectId: 'p1', state: { name: 'Todo', type: 'unstarted' } }],
-        });
-        localProvider.configure({ store: localStore });
-      });
-
-      test('a PATCH that drops the block names its line 1, as stored', async () => {
-        const res = await patch(proxyApp(), '/api/proxy/issues/i1', { description: 'A tidy summary.' });
-        assert.equal(res.status, 422);
-        assert.equal(res.body.kind, 'removed');
-        const firstLine = store(WORDS).split('\n')[0];
-        assert.match(res.body.error, new RegExp(`starting at its line 1, ${JSON.stringify(firstLine).replace(/[.*+?^${}()|[\]\\]/g, '\\$&')}`));
-      });
-    });
-  }
 });

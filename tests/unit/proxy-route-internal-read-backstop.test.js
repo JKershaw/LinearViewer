@@ -22,8 +22,8 @@
  * Sites covered (the 8 in routes/proxy.js): refuseIfTrashed (1),
  * PATCH inline guard (2), applyDescriptionEdit (3), the attachment
  * description-length precheck (4), POST labels (5, 6), DELETE labels (7, 8).
- * LIN-4352 adds description/below to site 3 and a ninth site: the PATCH's
- * dedicated issueDescription read when the body carries `description` (9).
+ * LIN-4352 adds a ninth site: the PATCH's dedicated issueDescription read
+ * when the body carries `description` (9; the size record guard's read since LIN-4502).
  *
  * Run with: node --test tests/unit/proxy-route-internal-read-backstop.test.js
  */
@@ -164,12 +164,7 @@ describe('missing issueDescription declines 422 instead of 500', () => {
       { oldString: 'a', newString: 'b' }), 'issueDescription');
   });
 
-  test('site 3 — POST …/description/below shares the same helper (LIN-4352)', async () => {
-    assertDeclined(await call(omitted(), 'POST', `/api/proxy/issues/${ISSUE_ID}/description/below`,
-      { body: 'pruned' }), 'issueDescription');
-  });
-
-  test('site 9 — PATCH …/issues/:id with description (the As asked guard read, LIN-4352)', async () => {
+  test('site 9 — PATCH …/issues/:id with description (the size record guard\'s read, LIN-4352)', async () => {
     assertDeclined(await call(omitted(), 'PATCH', `/api/proxy/issues/${ISSUE_ID}`, { description: 'new body' }), 'issueDescription');
   });
 

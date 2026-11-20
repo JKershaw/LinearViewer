@@ -41,8 +41,7 @@ async function mint(body, { workspaceId = 'ws-session' } = {}) {
   app.use(createProxyRoutes({
     proxyTokenStore,
     proxyEventStore: { recordEvent: async () => {} },
-    agentStatusStore: {}, recapCacheStore: {}, briefCacheStore: {}, taskSnapshotStore: {},
-    dispatchQueueStore: {},
+    agentStatusStore: {}, recapCacheStore: {}, briefCacheStore: {}, dispatchQueueStore: {},
     workspaceFromUrl: (req, res, next) => {
       req.workspace = { urlKey: 'acme', id: workspaceId };
       req.session = { accountId: 'account-A', features: { proxy: true } };

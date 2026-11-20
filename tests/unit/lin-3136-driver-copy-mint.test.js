@@ -56,7 +56,6 @@ function buildApp({ proxyTokenStore, session: sess, captured = {} }) {
     agentStatusStore: {},
     recapCacheStore: { get: async () => null, set: async () => {} },
     briefCacheStore: { get: async () => null, set: async () => {} },
-    taskSnapshotStore: {},
     // addItem-only: the referent guard fails open without the read capability.
     dispatchQueueStore: {
       addItem: async (urlKey, item) => {

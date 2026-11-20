@@ -21,7 +21,7 @@ process.env.NODE_ENV = 'test';
 import { test, describe, beforeEach, afterEach } from 'node:test';
 import assert from 'node:assert/strict';
 import fs from 'node:fs';
-import { sealAsAsked } from '../../lib/as-asked.js';
+import { quoteAsked } from '../../lib/brief-quote.js';
 import { generateBrief } from '../../lib/brief.js';
 import { generatePrompt } from '../../lib/prompt-templates.js';
 
@@ -30,7 +30,7 @@ const PHRASE = 'a full guide on how to properly configure';
 
 // What LIN-4085's description looked like once sealed and worked: the block, then
 // the stages' writing below it, including the plan that narrowed the ask.
-const DESCRIPTION = `${sealAsAsked(FILED)}\n\n## Implementation Plan\n\nAdd a homepage prompt and a short /getting-started page that sequences the human's few clicks, within a size budget of about 4.5 KB.\n\nfits one session\n\nplan-review due: no`;
+const DESCRIPTION = `${quoteAsked(FILED)}\n\n## Implementation Plan\n\nAdd a homepage prompt and a short /getting-started page that sequences the human's few clicks, within a size budget of about 4.5 KB.\n\nfits one session\n\nplan-review due: no`;
 const ISSUE = { id: 'i-4085', identifier: 'LIN-4085', title: 'Homepage getting-started prompt for agents', description: DESCRIPTION, labels: [], comments: [] };
 const CONTEXT = { parent: null, siblings: [], project: { name: 'Harbour' }, children: [], comments: [] };
 // LIN-4501: the brief quotes the task's `asked`: the task made from the sealed description holds the filed words.

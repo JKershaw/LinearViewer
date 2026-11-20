@@ -6,7 +6,7 @@
  *
  * LIN-4367: the tests read `CUT` and `DECIDE` themselves, so none pins the rule's wording or
  * keeps its own list of deciding stages. The old source scan for a literal copy of the rule could
- * never fire. The LIN-4362 marker census makes any copy interpolate AS_ASKED_HEADING, so the
+ * never fire. The LIN-4362 marker census makes any copy interpolate ASKED_HEADING, so the
  * literal is never in source (blind pass BT on LIN-4150 planted a census-compliant copy, and the
  * scan passed). The scan below looks for the part of `CUT` that a copy must still spell out.
  */
@@ -18,7 +18,7 @@ import { generatePrompt, PROMPT_TEMPLATES } from '../../lib/prompt-templates.js'
 import { STAGE_INTENT } from '../../lib/prompts/stage-intent.js';
 import { CUT, DECIDE } from '../../lib/prompts/stage-kinds.js';
 import { COMPLETION_SIGNALS } from '../../lib/completion-signals.js';
-import { AS_ASKED_HEADING } from '../../lib/as-asked.js';
+import { ASKED_HEADING } from '../../lib/brief-quote.js';
 import { CUTS_LABEL } from '../../lib/size-of-move.js';
 
 const decides = (kind) => Object.hasOwn(STAGE_INTENT, kind) && STAGE_INTENT[kind][0] === DECIDE;
@@ -26,7 +26,7 @@ const DECIDING = Object.keys(STAGE_INTENT).filter(decides);
 
 const ISSUE = {
   id: 'issue-cut', identifier: 'LIN-4345', title: 'Cut rule fixture',
-  description: `${AS_ASKED_HEADING}\n\nWrite a full guide.\n\n*End of what was asked. Steps write below this line; nothing above it changes.*`,
+  description: `${ASKED_HEADING}\n\nWrite a full guide.\n\n*End of what was asked. Steps write below this line; nothing above it changes.*`,
   url: 'https://linear.app/test/issue/LIN-4345', createdAt: '2026-11-07T00:00:00.000Z',
   state: { name: 'In Progress', type: 'started' }, labels: []
 };
@@ -34,7 +34,7 @@ const CONTEXT = { parent: null, siblings: [], project: { name: 'P' }, children: 
 const count = (text, needle) => text.split(needle).length - 1;
 
 /** The longest stretch of `CUT` with no interpolation in it: what a copy has to spell out in its source. */
-const CUT_LITERAL = CUT.split(AS_ASKED_HEADING).reduce((a, b) => (b.length > a.length ? b : a));
+const CUT_LITERAL = CUT.split(ASKED_HEADING).reduce((a, b) => (b.length > a.length ? b : a));
 
 /** `source` with the cut rule's literal stretch counted, for the scan and its own mutation test. */
 const copiesIn = (source) => count(source, CUT_LITERAL);
@@ -75,7 +75,7 @@ describe('the cut rule has one home (LIN-4345)', () => {
 
   test('the scan catches a census-compliant copy (the copy BT planted)', () => {
     assert.ok(!CUT_LITERAL.includes("'"), 'the planted copy below is a valid single-quoted string');
-    const planted = `const COPY = 'Cutting the \`' + AS_ASKED_HEADING + '${CUT_LITERAL}';`;
+    const planted = `const COPY = 'Cutting the \`' + ASKED_HEADING + '${CUT_LITERAL}';`;
     assert.equal(copiesIn(planted), 1);
   });
 });

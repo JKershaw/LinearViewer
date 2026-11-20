@@ -85,7 +85,6 @@ export const BASE_DEPS = () => ({
   agentStatusStore: {},
   recapCacheStore: { get: async () => null, set: async () => {} },
   briefCacheStore: { get: async () => null, set: async () => {} },
-  taskSnapshotStore: { list: async () => ({ items: [], total: 0 }), diffLatest: async () => ({ changed: false }) },
   workspaceFromUrl: (req, res, next) => next(),
   workspacePreferencesStore: {},
   freeTierStore: { tryUse: async () => ({ allowed: true }) },

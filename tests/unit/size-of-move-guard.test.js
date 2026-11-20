@@ -2,14 +2,15 @@
  * LIN-4368, the size record guard on the proxy's description writes.
  *
  * Drives the REAL proxy write routes over a REAL seeded LocalStore (the
- * tests/unit/as-asked-guard.test.js seam) and reads the stored description back from
- * the store, so a refusal is shown to leave the ticket unchanged:
- *   - PATCH, append, replace and description/below that add or change a
- *     `## Size of the move` section carrying how are refused 422 SIZE_RECORD_HOW naming the line;
+ * tests/unit/lin-4502-description-writes.test.js seam) and reads the stored description back
+ * from the store, so a refusal is shown to leave the ticket unchanged:
+ *   - PATCH, append and replace that add or change a `## Size of the move` section
+ *     carrying how are refused 422 SIZE_RECORD_HOW naming the line;
  *   - the standing policy deciding "wrong work" is refused 422 SIZE_RECORD_POLICY_CUT;
  *   - (LIN-4369 arm 3) a record that is not its four lines is refused 422 SIZE_RECORD_SHAPE;
- *   - a close-out prune (description/below) whose body drops the section is refused
- *     422 SIZE_RECORD_DROPPED, and a prune that keeps it verbatim succeeds;
+ *   - a whole-body rewrite that drops the section is refused 422 SIZE_RECORD_DROPPED, and
+ *     one that keeps it verbatim succeeds (LIN-4502 retired the close-out prune and its
+ *     write-below route, so the rewrite here is a PATCH on a legacy sealed body);
  *   - a plain record is accepted, and an unrelated write beside an old section that
  *     breaks the rules is accepted (an unchanged section never blocks);
  *   - the session lane's PATCH is a person's lane and is not guarded.
@@ -23,13 +24,13 @@ import { createProxyRoutes } from '../../routes/proxy.js';
 import { createWorkspaceApiRoutes } from '../../routes/workspace-api.js';
 import { localProvider } from '../../lib/providers/local/index.js';
 import { createLocalStore } from '../fixtures/local-harness.js';
-import { sealAsAsked } from '../../lib/as-asked.js';
+import { quoteAsked } from '../../lib/brief-quote.js';
 import { SIZE_OF_MOVE_HEADING, SIZE_RECORD_CODES, DECIDED_BY, WRONG_WORK, recordShape } from '../../lib/size-of-move.js';
 
 // Must match TEST_LOCAL_URL_KEY in routes/proxy.js (and LOCAL_WORKSPACE_URL_KEY).
 const LOCAL_URL_KEY = 'local-workspace';
 
-const SEALED = sealAsAsked('Keep it advice (on main: `docs/plans/survey.md`). Write a full guide.');
+const SEALED = quoteAsked('Keep it advice (on main: `docs/plans/survey.md`). Write a full guide.');
 const RECORD = [
   SIZE_OF_MOVE_HEADING,
   '',
@@ -117,19 +118,18 @@ describe('the size record guard on the proxy lane', () => {
   const proxy = (method, path, body) => call(proxyApp(), method, `/api/proxy/issues/${path}`, body);
 
   test('a plain record written below the block is accepted', async () => {
-    const res = await proxy('POST', 'LOCAL-1/description/below', { body: `${RECORD}\n\n${PLAN}` });
+    const res = await proxy('PATCH', 'LOCAL-1', { description: `${SEALED}\n\n${RECORD}\n\n${PLAN}` });
     assert.equal(res.status, 200, JSON.stringify(res.body));
     assert.ok((await stored('i1')).includes(RECORD));
   });
 
-  test('append, PATCH, replace and below that add how are refused 422 SIZE_RECORD_HOW naming the line; the store is unchanged', async () => {
+  test('append, PATCH and replace that add how are refused 422 SIZE_RECORD_HOW naming the line; the store is unchanged', async () => {
     const before = await stored('i1');
     const how = `${RECORD}\nReuse \`outsideAsAsked\` here.`;
     const attempts = [
       proxy('POST', 'LOCAL-1/description/append', { block: how }),
       proxy('PATCH', 'LOCAL-1', { description: `${before}\n\n${how}` }),
       proxy('POST', 'LOCAL-1/description/replace', { oldString: PLAN, newString: `${how}\n\n${PLAN}` }),
-      proxy('POST', 'LOCAL-1/description/below', { body: how }),
     ];
     for (const res of await Promise.all(attempts)) {
       assert.equal(res.status, 422, JSON.stringify(res.body));
@@ -175,19 +175,19 @@ describe('the size record guard on the proxy lane', () => {
     assert.match(res.body.error, /a cut needs a person's ruling/);
   });
 
-  test('a close-out prune that drops the section is refused 422 SIZE_RECORD_DROPPED; one that keeps it verbatim succeeds', async () => {
-    const stub = 'Implemented in PR #1 as approved; the full history is in the task snapshots and the comment trail.';
-    const dropped = await proxy('POST', 'LOCAL-2/description/below', { body: stub });
+  test('a rewrite that drops the section is refused 422 SIZE_RECORD_DROPPED; one that keeps it verbatim succeeds', async () => {
+    const stub = 'Implemented in PR #1 as approved; the full history is in the comment trail.';
+    const dropped = await proxy('PATCH', 'LOCAL-2', { description: `${SEALED}\n\n${stub}` });
     assert.equal(dropped.status, 422);
     assert.equal(dropped.body.code, SIZE_RECORD_CODES.dropped);
-    assert.ok((await stored('i2')).includes(PLAN), 'nothing was pruned');
+    assert.ok((await stored('i2')).includes(PLAN), 'nothing was written');
 
     // LIN-4369 arm 3: text below the record with no heading of its own is inside the section, so the
-    // shape check refuses it; close-out's prune line says to put its stub under a heading of its own.
-    const glued = await proxy('POST', 'LOCAL-2/description/below', { body: `${RECORD}\n\n${stub}` });
+    // shape check refuses it; a stub goes under a heading of its own.
+    const glued = await proxy('PATCH', 'LOCAL-2', { description: `${SEALED}\n\n${RECORD}\n\n${stub}` });
     assert.deepEqual([glued.status, glued.body.code, glued.body.kind], [422, SIZE_RECORD_CODES.shape, 'extra-line']);
 
-    const kept = await proxy('POST', 'LOCAL-2/description/below', { body: `${RECORD}\n\n## Implemented\n\n${stub}` });
+    const kept = await proxy('PATCH', 'LOCAL-2', { description: `${SEALED}\n\n${RECORD}\n\n## Implemented\n\n${stub}` });
     assert.equal(kept.status, 200, JSON.stringify(kept.body));
     assert.equal(await stored('i2'), `${SEALED}\n\n${RECORD}\n\n## Implemented\n\n${stub}`);
   });
@@ -219,7 +219,7 @@ describe('the size record guard on the proxy lane', () => {
     };
     try {
       const cut = RECORD.replace('**Cuts:** none', '**Cuts:**\n- "Write a full guide." is cut, pending a ruling');
-      const res = await call(proxyApp({ recordsStore }), 'POST', '/api/proxy/issues/i1/description/below', { body: `${cut}\n\n${PLAN}` });
+      const res = await call(proxyApp({ recordsStore }), 'PATCH', '/api/proxy/issues/i1', { description: `${SEALED}\n\n${cut}\n\n${PLAN}` });
       assert.equal(res.status, 200, JSON.stringify(res.body));
       assert.deepEqual(asks, ['LOCAL-1'], 'the lookup keyed on the live read\'s identifier, not the route\'s id');
     } finally {

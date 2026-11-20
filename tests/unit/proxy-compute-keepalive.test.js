@@ -71,7 +71,6 @@ function buildRouter({ issues }) {
       async get() { return recapDoc.current; }
     },
     briefCacheStore: null,
-    taskSnapshotStore: null,
     dispatchQueueStore: null,
     llmCallLogStore: null,
     getWorkspaceOpenRouterKey: async () => null,
