@@ -19,6 +19,7 @@ import { createRecordWrites } from '../../lib/records/writes.js';
 import { splitAsAsked } from '../../lib/as-asked.js';
 import { askedOf } from '../../lib/asked-of.js';
 import { isTerminalState } from '../../lib/providers/state-map.js';
+import { COMPLETED } from '../../lib/providers/models.js';
 import { createDispatchItem } from '../../lib/dispatch-factory.js';
 import { DispatchQueueStore } from '../../lib/dispatch-store.js';
 import { createMockCollection } from '../fixtures/mock-collection.js';
@@ -173,14 +174,64 @@ describe('the checked writer makes a ticket\'s task once, with its asked', () =>
     assert.equal(tracker.reads.length, 1, 'the second call reads no tracker');
   });
 
-  test('a closed parent with no task of its own refuses the child\'s task, naming the parent', async () => {
+  // John's ruling (20 Nov, on LIN-4501): make the closed parent's task first, then link the child.
+  test('a completed parent with no task gets its task made and ended done, and the child\'s task is in it', async () => {
     const tracker = trackerFake({
       'LIN-6': ticket('LIN-6', 'Child.', { parent: { identifier: 'LIN-7' } }),
-      'LIN-7': ticket('LIN-7', 'Parent.', { state: { name: 'Done', type: 'completed' } })
+      'LIN-7': ticket('LIN-7', 'Parent words.', { state: { name: 'Done', type: COMPLETED } })
     });
     const made = await writesWith(tracker).taskOfTicket({}, URL_KEY, 'LIN-6', 'dispatch');
+    assert.ok(made.id, `the child gets its task (${made.problem || ''})`);
+    const child = await store.current(URL_KEY, made.id);
+    assert.equal(child.state, 'open', 'the child is open work');
+    assert.ok(child.in, 'the child is linked to its parent\'s task');
+    const parent = await store.current(URL_KEY, child.in);
+    assert.equal(parent.fields.ref, 'LIN-7');
+    assert.equal(parent.fields.asked, 'Parent words.');
+    assert.equal(parent.state, 'done', 'a completed ticket\'s task ends done');
+    assert.match(parent.ended.reason, /closed \(Done\)/);
+  });
+
+  test('a canceled parent\'s task ends declined', async () => {
+    const tracker = trackerFake({
+      'LIN-8': ticket('LIN-8', 'Child.', { parent: { identifier: 'LIN-9' } }),
+      'LIN-9': ticket('LIN-9', 'Parent.', { state: { name: 'Canceled', type: 'canceled' } })
+    });
+    const made = await writesWith(tracker).taskOfTicket({}, URL_KEY, 'LIN-8', 'dispatch');
+    const parent = await store.current(URL_KEY, (await store.current(URL_KEY, made.id)).in);
+    assert.equal(parent.state, 'declined');
+  });
+
+  test('a second child of the same closed parent links to the same task, which is ended once', async () => {
+    const tracker = trackerFake({
+      'LIN-10': ticket('LIN-10', 'First child.', { parent: { identifier: 'LIN-12' } }),
+      'LIN-11': ticket('LIN-11', 'Second child.', { parent: { identifier: 'LIN-12' } }),
+      'LIN-12': ticket('LIN-12', 'Parent.', { state: { name: 'Done', type: COMPLETED } })
+    });
+    const writes = writesWith(tracker);
+    const a = await store.current(URL_KEY, (await writes.taskOfTicket({}, URL_KEY, 'LIN-10', 'dispatch')).id);
+    const b = await store.current(URL_KEY, (await writes.taskOfTicket({}, URL_KEY, 'LIN-11', 'dispatch')).id);
+    assert.equal(a.in, b.in);
+    const parent = await store.current(URL_KEY, a.in);
+    assert.equal(parent.v, 2, 'made once (v1) and ended once (v2)');
+  });
+
+  test('the closed ticket a write names is still refused: only an ancestor is made', async () => {
+    const tracker = trackerFake({ 'LIN-13': ticket('LIN-13', 'Done.', { state: { name: 'Done', type: COMPLETED } }) });
+    const made = await writesWith(tracker).taskOfTicket({}, URL_KEY, 'LIN-13', 'dispatch');
     assert.equal(made.id, undefined);
-    assert.match(made.problem, /LIN-7 is closed/);
+    assert.match(made.problem, /LIN-13 is closed/);
+  });
+
+  test('a take under a closed parent opens its run in the child\'s task, with no miss', async () => {
+    const tracker = trackerFake({
+      'LIN-14': ticket('LIN-14', 'Follow-up.', { parent: { identifier: 'LIN-15' } }),
+      'LIN-15': ticket('LIN-15', 'Epic.', { state: { name: 'Done', type: COMPLETED } })
+    });
+    const { value: run, lines } = await logged(() => seamWith(tracker).onTaken(row({ _id: 'row-under-closed', issueIdentifier: 'LIN-14' })));
+    assert.ok(run.in);
+    assert.equal((await store.current(URL_KEY, run.in)).fields.ref, 'LIN-14');
+    assert.equal(lines.filter((l) => l.startsWith('[task-missing-at-take]')).length, 0);
   });
 });
 
