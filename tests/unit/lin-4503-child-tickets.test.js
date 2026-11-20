@@ -17,7 +17,9 @@
  *   10. the route refuses a stage's plan addressed elsewhere (naming both addressees), and answers a child's ticket;
  *   11. the importer only adds plans, because revise takes no `via`;
  *   12. a child ticket is filed under its parent on the real local provider, and reads back as the parent's child;
- *   13. a ticket mark names its task exactly (a prefix of another task id is not a match).
+ *   13. a ticket mark names its task exactly (a prefix of another task id is not a match);
+ *   16. the real port's parent-link gate: a Jira-shaped and a GitHub-shaped provider cannot, the local provider can;
+ *   17. two writers (the proxy, the session and the dispatch retry each build their own) share one line per task.
  */
 import { describe, test, before, after, afterEach } from 'node:test';
 import assert from 'node:assert/strict';
@@ -372,5 +374,37 @@ describe('LIN-4503: child tickets and plan summaries', () => {
     assert.match(stub, /\*\*Piece:\*\* plan-abcd1234/);
     assert.match(stub, /\*\*Done when:\*\* the done words/);
     assert.doesNotMatch(stub, /## Implementation Plan/, 'a stub copies no plan text');
+  });
+
+  test('16. the real port\'s parent-link gate: Jira-shaped and GitHub-shaped providers cannot, the local provider can', async () => {
+    // Jira: an apiWriteFields() that leaves parentId out. GitHub: no apiWriteFields() at all. Neither is held by the cap
+    // gate alone (the second gate); this pins canParentLink itself, so forcing it true goes red here.
+    const jiraShaped = trackerPortOf({ provider: { apiWriteFields: () => ['title', 'description', 'stateId'] }, scope: 's' });
+    const githubShaped = trackerPortOf({ provider: {}, scope: 's' });
+    const linearShaped = trackerPortOf({ provider: { apiWriteFields: () => ['title', 'description', 'parentId'] }, scope: 's' });
+    assert.equal(jiraShaped.canParentLink(), false, 'a provider whose write fields omit parentId cannot link a child');
+    assert.equal(githubShaped.canParentLink(), false, 'a provider with no write-field list cannot link a child');
+    assert.equal(linearShaped.canParentLink(), true, 'a provider that writes parentId can');
+    assert.equal(trackerPortOf({ provider: localProvider, scope: URL_KEY }).canParentLink(), true, 'the real local provider can');
+  });
+
+  test('17. two writers share one line per task: a retry racing a child-add makes one ticket', async () => {
+    await fresh();
+    const parent = await parentTask();
+    fake.knobs.createFails = 'the tracker is down';
+    const { record } = await childTask(parent, 'raced child');
+    fake.knobs.createFails = null;
+    assert.equal(fake.created.length, 0, 'the first attempt made nothing');
+    // A slow create, so the two writers' steps overlap: without one shared line both read no mark and both create.
+    const createChild = fake.port.createChild;
+    fake.port.createChild = async (...args) => { await new Promise((r) => setTimeout(r, 25)); return createChild(...args); };
+    // The proxy route, the session route and the dispatch retry each build their own writer over the one store.
+    const other = createRecordWrites({ recordsStore: rh.store, isTerminalState, readTicket: fake.readTicket, askedText: () => '', stageKinds: STAGES, listPeople: async () => PEOPLE, tracker: fake.tracker });
+    const [a, b] = await Promise.all([
+      writes.retryChildTickets({ urlKey: URL_KEY, parentRef: 'LIN-1' }),
+      other.retryChildTickets({ urlKey: URL_KEY, parentRef: 'LIN-1' })
+    ]);
+    assert.equal(fake.created.length, 1, `exactly one ticket was made across both writers (${JSON.stringify([a, b])})`);
+    assert.equal(await refOf(record.id), 'LIN-101');
   });
 });

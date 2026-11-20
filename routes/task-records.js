@@ -128,7 +128,7 @@ export function createTaskRecordsRoutes({ workspaceFromUrl, recordsStore, accoun
       const doneWhen = trimmed(req.body?.['done-when']);
       const result = await writes.add({ ctx: req, urlKey, kind: 'task', input: { in: identifier, 'done-when': doneWhen }, by: writer.by, run: writer.run });
       if (result.problems) return res.redirect(303, refusedTo(urlKey, identifier, result.problems));
-      // LIN-4503: a child the record made gets its ticket here; a failure is named on the page, and the next dispatch retries it.
+      // LIN-4503: a child the record made gets its ticket here; a failure is only logged here (the page shows no notice), and the next dispatch of the parent retries it.
       if (result.ticket?.error) console.warn(`[records] child task on ${identifier} has no ticket yet: ${result.ticket.error}`);
       return res.redirect(303, backTo(urlKey, identifier));
     } catch (err) {

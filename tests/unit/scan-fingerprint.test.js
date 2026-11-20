@@ -531,3 +531,17 @@ describe('dueChanged — the tri-state (LIN-2649 WS2 required tests)', () => {
     assert.strictEqual(dueChanged(), null);
   });
 });
+
+describe('scan basis fingerprint: Harbour plan summaries (LIN-4503)', () => {
+  const summary = { id: 'cs', body: '**Harbour summary** · plan-1a2b3c4d v1\nFirst version.\n\nThe plan text.', createdAt: '2026-09-01T09:30:00.000Z' };
+
+  test('a posted summary moves neither the scan basis nor the due basis; a plain comment still does', () => {
+    const base = makeContext();
+    const withSummary = makeContext({ comments: [...base.comments, summary] });
+    const withPlain = makeContext({ comments: [...base.comments, { id: 'cp', body: 'A person speaks.', createdAt: '2026-09-01T09:30:00.000Z' }] });
+    assert.equal(scanBasisHashFromContext(withSummary), scanBasisHashFromContext(base), 'the scan basis ignores the summary');
+    assert.equal(dueBasisHashFromContext(withSummary), dueBasisHashFromContext(base), 'the due basis ignores the summary');
+    assert.notEqual(scanBasisHashFromContext(withPlain), scanBasisHashFromContext(base), 'a plain comment moves the scan basis');
+    assert.notEqual(dueBasisHashFromContext(withPlain), dueBasisHashFromContext(base), 'a plain comment moves the due basis');
+  });
+});
