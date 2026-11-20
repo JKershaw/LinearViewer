@@ -47,6 +47,10 @@ No follow-on dispatches were made. LIN-4495 was marked Done at 22:58.
 - **`lin4499-snapshot-cut` (02:35, 20 Nov), first thing in the morning:** I proposed **slim-capture** (the run's own recommendation too). The autopilot rightly declined to act on my note without John's answer, so slice 2 waits at scoping until John answers. Snapshots keep state, priority, labels and children only, with no description or plan, so Ship Biscuit's board moves keep working. This narrows an agreed retirement, so it's close to John's "what to retire" line. To overrule: answer retire-fully (Ship Biscuit loses its board moves) or new-home (a new source for board movement, as extra scope).
 - **LIN-4491 Done:** the slice 1 parent stays open until John's production import and readings are done. Then its close-out re-runs.
 
+## Correction (John, 20 Nov morning)
+
+Agents can reach production through the Railway CLI on John's machine. It's deliberately unadvertised. So the live import and the production readings are agent work, not John's. John does the signed-in checks.
+
 ## How tidies like this are handled
 
 A judgement call, not a rule (John, 19 Nov). Tidying as we go, a small standalone task, or waiting until the end can each be right, depending on the case. Keeping the running slice going matters most. John expects much of this to sort itself out once the upgrade is done.

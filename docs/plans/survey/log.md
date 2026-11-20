@@ -4706,3 +4706,15 @@ Still waiting on `lin4499-snapshot-cut`.
 ### 20 Nov, 07:28: no change
 
 Still waiting on `lin4499-snapshot-cut`.
+
+### 20 Nov, morning: John's review of the slice 2 draft begins; corrections
+
+- **The overnight stall:** slice 2 waited ~6 h on `lin4499-snapshot-cut`. I'd proposed slim-capture, which was wrong. John's answer: retire snapshots fully, and move Ship Biscuit onto the right data. "Get rid of the snapshots" answered with "a mini snapshot" is the familiar overbuild. The ruling did its job, because my choice would have been worse. The rule-grant idea is held.
+- **John's correction 1:** agents can reach production. The Railway CLI is installed on John's machine, deliberately unadvertised. So the live import and the production readings aren't blocked on John. He does the signed-in checks.
+- **John's correction 2:** the size of the move may include moving Ship Biscuit to better-suited data, changing its story if need be (experimental, only John uses it). Spin it out as a tidy-first task, drafted and filed from here:
+  1. a subagent first checks what data Ship Biscuit uses now;
+  2. what data it could use that keeps updating as the layer lands;
+  3. what else would snag.
+
+  That check is running.
+- **Not rushing:** the slice 2 corrections wait until John finishes his review. Then I update LIN-4499 and answer the ruling.
