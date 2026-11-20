@@ -255,7 +255,7 @@ export function planTicket(t, store) {
  * The whole import plan from a capture: one row per open ticket, the records to write, the held list.
  * @param {object} cap - capture()'s output
  */
-export function planImport(cap) {
+export function importPlanOf(cap) {
   const tasks = (cap.records?.tasks || []).filter((r) => r.kind === 'task');
   const taskByRef = new Map(tasks.filter((t) => t.fields?.ref).map((t) => [t.fields.ref, t]));
   const plans = cap.records?.plans || [];
@@ -436,7 +436,7 @@ async function main() {
     console.log(`captured ${out.open.length} open tickets of ${out.listed}`);
   } else if (step === 'plan') {
     const cap = JSON.parse(readFileSync(argOf('--capture'), 'utf8'));
-    const planned = { ...planImport(cap), urlKey: argOf('--urlkey') || 'linearviewer', tickets: Object.fromEntries(Object.entries(cap.tickets).map(([k, t]) => [k, { description: t.description, state: t.state, parentRef: t.parentRef }])) };
+    const planned = { ...importPlanOf(cap), urlKey: argOf('--urlkey') || 'linearviewer', tickets: Object.fromEntries(Object.entries(cap.tickets).map(([k, t]) => [k, { description: t.description, state: t.state, parentRef: t.parentRef }])) };
     writeFileSync(argOf('--out') || 'plan.json', JSON.stringify(planned, null, 2));
     console.log(JSON.stringify(planned.counts));
   } else if (step === 'apply') {

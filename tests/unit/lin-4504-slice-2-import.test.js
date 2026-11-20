@@ -22,7 +22,7 @@ import { isTerminalState } from '../../lib/providers/state-map.js';
 import { askedOf } from '../../lib/asked-of.js';
 import { STAGE_KINDS } from '../../lib/prompts/stage-kinds.js';
 import {
-  planTicket, planImport, applyImport, compareFacts, recordsAfter, importIdsOf, oldFactsOf, ADDRESSEE_OF_FIT, EXPLAINED, PROPOSED,
+  planTicket, importPlanOf, applyImport, compareFacts, recordsAfter, importIdsOf, oldFactsOf, ADDRESSEE_OF_FIT, EXPLAINED, PROPOSED,
 } from '../../scripts/records/slice-2-import.mjs';
 
 const old = (over = {}) => ({ leaf: true, where: null, parent: null, at: null, sessionFit: null, planReviewDue: null, nodeSessionFit: null, latestVerdict: { verdict: null, at: null }, lookFirstHasPlan: false, ...over });
@@ -123,7 +123,7 @@ describe('compare: every difference is classified against the closed list', () =
       'LIN-4': ticket('LIN-4', { planSection: 'p', old: old({ where: 'description', sessionFit: 'needs multiple sessions', planReviewDue: 'no', lookFirstHasPlan: true }) }),
     };
     const cap = capOf(tickets);
-    const planned = planImport(cap);
+    const planned = importPlanOf(cap);
     const result = compareFacts(cap, planned, recordsAfter(cap, planned));
     const by = (t, f) => result.differences.find((d) => d.ticket === t && d.fact === f);
     assert.equal(by('LIN-1', 'reviewDue').explained, 'A');
@@ -143,7 +143,7 @@ describe('compare: every difference is classified against the closed list', () =
 
   test('a session-fit phrase on a ticket with no plan is proposed as F, and stays unexplained until a person accepts it', () => {
     const cap = capOf({ 'LIN-9': ticket('LIN-9', { description: '## Scope\n\nOne session will do.', old: old({ sessionFit: 'fits one session' }) }) });
-    const planned = planImport(cap);
+    const planned = importPlanOf(cap);
     assert.equal(planned.rows[0].action, 'none', 'prose is not a plan: nothing is imported');
     const result = compareFacts(cap, planned, recordsAfter(cap, planned));
     assert.deepEqual(result.unexplained.map((d) => [d.fact, d.proposal]), [['sessionFit', 'F']]);
@@ -156,7 +156,7 @@ describe('compare: every difference is classified against the closed list', () =
       'LIN-6': ticket('LIN-6', { old: old() }),
     };
     const cap = capOf(tickets, { tasks: [{ id: 'task-6', kind: 'task', state: 'open', fields: { ref: 'LIN-6' }, links: {} }], plans: [{ id: 'plan-72a996db', kind: 'plan', state: 'kept', in: 'task-6', to: 'implementation', v: 1 }] });
-    const planned = planImport(cap);
+    const planned = importPlanOf(cap);
     const result = compareFacts(cap, planned, recordsAfter(cap, planned));
     assert.ok(result.differences.every((d) => d.ticket === 'LIN-6' && d.explained === 'E'), JSON.stringify(result.differences));
     assert.ok(result.differences.length >= 1);
@@ -189,7 +189,7 @@ describe('apply: through the checked writer, via import, with fixed ids', () => 
       'LIN-21': ticket('LIN-21', { planSection: 'Build it in pieces.', old: old({ where: 'description', sessionFit: 'needs multiple sessions', planReviewDue: 'yes', latestVerdict: { verdict: 'approve', at: '2026-11-18T00:00:00.000Z' } }) }),
       'LIN-22': ticket('LIN-22', { planSection: 'One go.', old: old({ where: 'description', sessionFit: 'fits one session', planReviewDue: 'yes' }) }),
     } };
-    return { ...planImport(cap), urlKey: URL_KEY };
+    return { ...importPlanOf(cap), urlKey: URL_KEY };
   };
 
   test('a dry run writes nothing; apply writes the plans and findings; a re-apply makes nothing twice', async () => {
