@@ -23,15 +23,17 @@
  *
  * Injected, never imported from the tracker or the workspace (Records imports only Platform): `readTicket`
  * (the provider read: the ticket's identifier, title, description, state and parent), `askedText`
- * (lib/as-asked.js), `stageKinds` (STAGE_KINDS' keys) and `listPeople` (the workspace-person reader; a
- * caller with none passes an empty list, and a `to` that names a person is then refused with the names that work).
+ * (lib/as-asked.js), `stageKinds` (STAGE_KINDS' keys), `listPeople` (the workspace-person reader; a
+ * caller with none passes an empty list, and a `to` that names a person is then refused with the names that work)
+ * and `tracker` (LIN-4503: the outward port for a request, lib/records-tracker.js; a child task's ticket and a plan's
+ * summary go through it after the record is written).
  */
 import { Router } from 'express';
 import { jsonError } from '../lib/errors.js';
 import { writerOf, WRITER_REFUSAL } from '../lib/run-lineage.js';
 import { TOKEN_ORIGIN, WRITES } from '../lib/stage-writes.js';
 import { RecordsVersionConflict, RecordsNotFound } from '../lib/records-store.js';
-import { refusalOf, KINDS } from '../lib/records/check.js';
+import { refusalOf, KINDS, PLAN_ADDRESSEES, planAddresseeProblem } from '../lib/records/check.js';
 import { createRecordWrites } from '../lib/records/writes.js';
 import { isTerminalState } from '../lib/providers/state-map.js';
 
@@ -71,12 +73,13 @@ function bodyWithout(body, keys) {
  * @param {(description: string) => string} deps.askedText - lib/as-asked.js askedText
  * @param {string[]} deps.stageKinds - STAGE_KINDS' keys
  * @param {(urlKey: string) => Promise<{accountId: string, name: string}[]>} [deps.listPeople]
+ * @param {(req: object) => Promise<object|null>} [deps.tracker] - LIN-4503: the tracker port for a request (lib/records-tracker.js)
  */
-export function createProxyRecordsRoutes({ recordsStore, proxyLimiter, authenticateProxyToken, requireWriteScope, logEvent, readTicket, askedText, stageKinds, listPeople = async () => [] }) {
+export function createProxyRecordsRoutes({ recordsStore, proxyLimiter, authenticateProxyToken, requireWriteScope, logEvent, readTicket, askedText, stageKinds, listPeople = async () => [], tracker = null }) {
   const router = Router();
   // LIN-4494: the one checked write path (lib/records/writes.js), shared with the session routes and the project page.
   // A router with no store (a test or a partial wiring) makes no writes; a write then answers 500, as a store-less route always did.
-  const writes = recordsStore ? createRecordWrites({ recordsStore, isTerminalState, readTicket, askedText, stageKinds, listPeople }) : null;
+  const writes = recordsStore ? createRecordWrites({ recordsStore, isTerminalState, readTicket, askedText, stageKinds, listPeople, tracker }) : null;
 
   /** The run a credential or a body names, as writerOf reads it: {id, kind (its stage), open, rootItemId}. */
   async function runRow(urlKey, id) {
@@ -110,12 +113,23 @@ export function createProxyRecordsRoutes({ recordsStore, proxyLimiter, authentic
     return reply(req, res, endpoint, 500, { error: 'The records store is unavailable', code: 'RECORDS_UNAVAILABLE' });
   }
 
-  /** A pipeline result as the route's answer: refused is 422 naming every problem; written is `status`. */
-  const answer = (req, res, endpoint, status, result, shape = (r) => r.record) => (result.problems
+  /**
+   * A pipeline result as the route's answer: refused is 422 naming every problem; written is `status`. LIN-4503: the outward
+   * steps' answers come beside the record's fields: `ticket` (a child task's ticket, or `{error}` when none was made) and
+   * `summary` (a plan's summary, posted, skipped, or `{error}`). Neither can change the record, which is already written.
+   */
+  const withOutward = (r) => ({ ...r.record, ...(r.ticket ? { ticket: r.ticket } : {}), ...(r.summary ? { summary: r.summary } : {}) });
+  const answer = (req, res, endpoint, status, result, shape = withOutward) => (result.problems
     ? reply(req, res, endpoint, 422, refusalOf(result.problems))
     : reply(req, res, endpoint, status, shape(result)));
 
   // ---- writes ------------------------------------------------------------
+
+  /**
+   * LIN-4503: a stage's plan is addressed to `implementation` (one session) or `breakdown` (several). The route refuses any
+   * other addressee, naming both; `to` is the body's, or on a revise the plan's current addressee when the body gives none.
+   */
+  const refusedPlanAddressee = (to) => (typeof to === 'string' && PLAN_ADDRESSEES.includes(to.trim()) ? null : refusalOf([planAddresseeProblem(to)]));
 
   router.post('/api/proxy/records', proxyLimiter, authenticateProxyToken, requireWriteScope('recordWrite'), async (req, res) => {
     const endpoint = '/api/proxy/records';
@@ -124,6 +138,10 @@ export function createProxyRecordsRoutes({ recordsStore, proxyLimiter, authentic
     try {
       const writer = await writerFor(req, body);
       if (!writer.ok) { logEvent(req, endpoint, 403); return refusal(res, writer); }
+      if (body.kind === 'plan') {
+        const refused = refusedPlanAddressee(body.to);
+        if (refused) return reply(req, res, endpoint, 422, refused);
+      }
       const result = await writes.add({ ctx: req, urlKey: req.proxyUrlKey, kind: body.kind, input: bodyWithout(body, ['kind', 'run']), by: writer.by, run: writer.run ?? null });
       return answer(req, res, endpoint, 201, result);
     } catch (err) {
@@ -138,6 +156,11 @@ export function createProxyRecordsRoutes({ recordsStore, proxyLimiter, authentic
     try {
       const writer = await writerFor(req, body);
       if (!writer.ok) { logEvent(req, endpoint, 403); return refusal(res, writer); }
+      const prev = await recordsStore.current(req.proxyUrlKey, req.params.id);
+      if (prev?.kind === 'plan') {
+        const refused = refusedPlanAddressee(body.to !== undefined ? body.to : prev.to);
+        if (refused) return reply(req, res, endpoint, 422, refused);
+      }
       const result = await writes.revise({ ctx: req, urlKey: req.proxyUrlKey, id: req.params.id, input: bodyWithout(body, ['run']), by: writer.by, run: writer.run ?? null });
       return answer(req, res, endpoint, 200, result);
     } catch (err) {

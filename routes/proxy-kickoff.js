@@ -37,6 +37,7 @@ import { jsonError } from '../lib/errors.js';
  * @param {string} deps.PROXY_ATTACH_FAILED_MESSAGE - 503 message when the out-of-band bootstrap token could not be minted (closure-local)
  */
 export function createKickoffRoutes({
+  childTickets = null,
   proxyLimiter,
   authenticateProxyToken,
   requireWriteScope,
@@ -112,6 +113,7 @@ export function createKickoffRoutes({
       req,
       res,
       endpoint: '/api/proxy/autopilot/kickoff',
+      childTickets,
       dispatchQueueStore,
       dispatchTokenStore,
       dispatchPresetsStore,

@@ -39,6 +39,7 @@ import { SENTINEL_EXPIRY_FLOOR_MS } from '../lib/credential-diagnostics.js';
 import { STAGE_PROVIDER_LANE, STAGE_PROXY_TOKEN } from '../lib/proxy-events.js';
 import { requireWriteScope } from '../lib/stage-write-gate.js';
 import { createProxyRecordsRoutes } from './proxy-records.js';
+import { trackerPortOf, childTicketRetryOf } from '../lib/records-tracker.js';
 import { askedText } from '../lib/as-asked.js';
 import { flattenIssue as flattenRecordsIssue } from '../lib/proxy-wire.js';
 import { STAGE_KINDS } from '../lib/prompts/stage-kinds.js';
@@ -1368,7 +1369,13 @@ export function createProxyRoutes({ proxyTokenStore, proxyEventStore, agentStatu
     const issue = await access.provider.issueDetail(access.token, ref);
     return issue ? flattenRecordsIssue(issue) : null;
   };
-  router.use(createProxyRecordsRoutes({ recordsStore, proxyLimiter, authenticateProxyToken, requireWriteScope, logEvent, readTicket: readRecordsTicket, askedText, stageKinds: Object.keys(STAGE_KINDS), listPeople: listRecordPeople }));
+  // LIN-4503: the outward port for a request's writes (child tickets, plan summaries), over the same provider access.
+  const recordsTrackerForRequest = async (req) => {
+    const access = await resolveProviderAccess(req.proxyUrlKey, req.proxyCreatedBy, req);
+    if (!access?.token || !access?.provider) throw new Error(`tracker unavailable: ${access?.reason || 'no access'}`);
+    return trackerPortOf({ provider: access.provider, scope: access.token });
+  };
+  router.use(createProxyRecordsRoutes({ recordsStore, proxyLimiter, authenticateProxyToken, requireWriteScope, logEvent, readTicket: readRecordsTicket, askedText, stageKinds: Object.keys(STAGE_KINDS), listPeople: listRecordPeople, tracker: recordsTrackerForRequest }));
 
   // Group E writes (LIN-679 Stage 3b / LIN-2537): extracted to
   // routes/proxy-writes.js, mounted at its original position.
@@ -1627,11 +1634,13 @@ export function createProxyRoutes({ proxyTokenStore, proxyEventStore, agentStatu
 
   // Group H kickoff (LIN-679 Stage 5 / LIN-2539): extracted to
   // routes/proxy-kickoff.js, mounted at its original position.
-  router.use(createKickoffRoutes({ proxyLimiter, authenticateProxyToken, requireWriteScope, requireGrant, logEvent, dispatchQueueStore, dispatchTokenStore, dispatchPresetsStore, workspacePreferencesStore, proxyTokenStore, resolveProviderAccess, workspaceUnavailable, denyIfUnsupported, resolvePromptIssueContext, relayDispatchRefusal, getWorkspaceOpenRouterKey, freeTierStore, accountStore, graphqlErrorStatus, PROXY_ATTACH_FAILED_MESSAGE }));
+  // LIN-4503: each dispatch of a ticket through this router retries its child tasks' tickets (lib/dispatch-factory.js).
+  const childTickets = recordsStore ? childTicketRetryOf({ recordsStore }) : null;
+  router.use(createKickoffRoutes({ childTickets, proxyLimiter, authenticateProxyToken, requireWriteScope, requireGrant, logEvent, dispatchQueueStore, dispatchTokenStore, dispatchPresetsStore, workspacePreferencesStore, proxyTokenStore, resolveProviderAccess, workspaceUnavailable, denyIfUnsupported, resolvePromptIssueContext, relayDispatchRefusal, getWorkspaceOpenRouterKey, freeTierStore, accountStore, graphqlErrorStatus, PROXY_ATTACH_FAILED_MESSAGE }));
 
   // Group I dispatch (LIN-679 Stage 6 / LIN-2540): extracted to
   // routes/proxy-dispatch.js, mounted at its original position.
-  router.use(createDispatchRoutes({ authenticateProxyToken, chargeFreeTierOrReject, computeRecommendation, denyIfUnsupported, dispatchQueueStore, dispatchTokenStore, getWorkspaceOpenRouterKey, graphqlErrorStatus, logEvent, logOpenRouterCredentialSource, proxyLimiter, PROXY_ATTACH_FAILED_MESSAGE, proxyTokenStore, recommendErrorResponse, RECOMMEND_DESCENT_BUDGET_MS, relayDispatchRefusal, freeTierStore, accountStore, requireGrant, requireWriteScope, resolvePromptIssueContext, resolveProviderAccess, workspacePreferencesStore, workspaceUnavailable }));
+  router.use(createDispatchRoutes({ childTickets, authenticateProxyToken, chargeFreeTierOrReject, computeRecommendation, denyIfUnsupported, dispatchQueueStore, dispatchTokenStore, getWorkspaceOpenRouterKey, graphqlErrorStatus, logEvent, logOpenRouterCredentialSource, proxyLimiter, PROXY_ATTACH_FAILED_MESSAGE, proxyTokenStore, recommendErrorResponse, RECOMMEND_DESCENT_BUDGET_MS, relayDispatchRefusal, freeTierStore, accountStore, requireGrant, requireWriteScope, resolvePromptIssueContext, resolveProviderAccess, workspacePreferencesStore, workspaceUnavailable }));
 
   // LIN-3130 S2a: the runner proxy surface (routes/proxy-runner.js) over the
   // runner credential. Mounted PATH-LESS like the halt/kickoff/dispatch

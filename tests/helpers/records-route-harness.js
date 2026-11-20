@@ -12,7 +12,9 @@
  * proxyRunRecordId, proxyCreatedBy, proxyWrites, proxyWritesTarget, proxyTokenScope). A caller that needs a different
  * credential (the piece-2 test's stand-in) passes its own `authenticate`.
  *
- * The tracker is stood in by `tickets` (a Map of ticket id to the ticket's read shape), read through `readTicket`.
+ * The tracker is stood in by `tickets` (a Map of ticket id to the ticket's read shape), read through `readTicket`, and
+ * the outward port (LIN-4503) by `tracker` when a test passes one (tests/helpers/fake-records-tracker.js); with none,
+ * the routes make no child ticket and post no summary.
  */
 import express from 'express';
 import { RecordsStore, RECORDS_COLLECTION, REFS_COLLECTION, QUERY_LOG_COLLECTION } from '../../lib/records-store.js';
@@ -57,8 +59,9 @@ export function tokenAuthenticator(tokenStore) {
  * @param {Array<{accountId: string, name: string}>} opts.people - the workspace people `to` may name
  * @param {Function} [opts.authenticate] - the credential middleware; default: tokenAuthenticator over a real ProxyTokenStore
  * @param {Function} [opts.readTicket] - the tracker read; default: reads `tickets`
+ * @param {Function} [opts.tracker] - LIN-4503: the outward port for a request (`(req) => TrackerPort|null`); default: none
  */
-export async function createRecordsRouteHarness({ harness, urlKey, tickets, people, authenticate = null, readTicket = null }) {
+export async function createRecordsRouteHarness({ harness, urlKey, tickets, people, authenticate = null, readTicket = null, tracker = null }) {
   const db = harness.freshDb();
   for (const collection of [RECORDS_COLLECTION, REFS_COLLECTION]) {
     for (const spec of INDEX_SPECS.filter((x) => x.collection === collection && x.options?.unique)) {
@@ -77,7 +80,8 @@ export async function createRecordsRouteHarness({ harness, urlKey, tickets, peop
     readTicket: readTicket ?? (async (_req, ref) => tickets.get(ref) ?? null),
     askedText,
     stageKinds: Object.keys(STAGE_KINDS),
-    listPeople: async () => people
+    listPeople: async () => people,
+    tracker
   });
   const app = express();
   app.use(express.json());

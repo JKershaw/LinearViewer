@@ -28,6 +28,7 @@ import { ADDABLE, SUPERSEDABLE } from '../lib/render-task-records.js';
 import { RecordsNotFound, RecordsVersionConflict } from '../lib/records-store.js';
 import { isTerminalState } from '../lib/providers/state-map.js';
 import { STAGE_KINDS } from '../lib/prompts/stage-kinds.js';
+import { trackerPortOf } from '../lib/records-tracker.js';
 
 /** The person a session writes as: `person:<canonical account id>` (a merged account writes as its canonical one). */
 export async function personWriterOf(req, accountStore) {
@@ -56,6 +57,15 @@ export async function readSessionTicket(req, ref) {
 }
 
 /**
+ * LIN-4503: the outward port for a session write (a child task's ticket, a plan's summary), over the workspace's own binding:
+ * the one the task page reads its ticket through. A session with no binding throws, and the write names the tracker as unreachable.
+ */
+export function sessionTrackerFor(req) {
+  const { provider, callScope } = resolveIssueBinding(req.workspace, null);
+  return trackerPortOf({ provider, scope: callScope });
+}
+
+/**
  * @param {Object} deps
  * @param {Function} deps.workspaceFromUrl - the workspace middleware (lib/workspace.js)
  * @param {import('../lib/records-store.js').RecordsStore} deps.recordsStore
@@ -64,7 +74,7 @@ export async function readSessionTicket(req, ref) {
  * @param {(req: object, ref: string) => Promise<object|null>} [deps.readTicket] - the tracker read a ticket's first write
  *   needs; the session's own binding (`readSessionTicket`) when omitted
  */
-export function createTaskRecordsRoutes({ workspaceFromUrl, recordsStore, accountStore = null, listPeople = async () => [], readTicket = readSessionTicket }) {
+export function createTaskRecordsRoutes({ workspaceFromUrl, recordsStore, accountStore = null, listPeople = async () => [], readTicket = readSessionTicket, tracker = sessionTrackerFor }) {
   if (!recordsStore) throw new Error('task records routes: recordsStore is required');
   const router = Router();
   const writes = createRecordWrites({
@@ -74,6 +84,7 @@ export function createTaskRecordsRoutes({ workspaceFromUrl, recordsStore, accoun
     askedText: () => '',
     stageKinds: Object.keys(STAGE_KINDS),
     listPeople,
+    tracker,
   });
 
   const backTo = (urlKey, identifier, query = '') => `${taskPageHref({ urlKey, identifier })}${query}#task-records`;
@@ -117,6 +128,8 @@ export function createTaskRecordsRoutes({ workspaceFromUrl, recordsStore, accoun
       const doneWhen = trimmed(req.body?.['done-when']);
       const result = await writes.add({ ctx: req, urlKey, kind: 'task', input: { in: identifier, 'done-when': doneWhen }, by: writer.by, run: writer.run });
       if (result.problems) return res.redirect(303, refusedTo(urlKey, identifier, result.problems));
+      // LIN-4503: a child the record made gets its ticket here; a failure is only logged here (the page shows no notice), and the next dispatch of the parent retries it.
+      if (result.ticket?.error) console.warn(`[records] child task on ${identifier} has no ticket yet: ${result.ticket.error}`);
       return res.redirect(303, backTo(urlKey, identifier));
     } catch (err) {
       console.error('Task records child error:', err?.message || err);

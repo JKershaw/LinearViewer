@@ -93,7 +93,7 @@
       "name": "Records",
       "slug": "records",
       "match": [
-        "^lib/records/|^lib/records-store\\.js$"
+        "^lib/records/|^lib/records-store\\.js$|^lib/records-tracker\\.js$"
       ]
     },
     {

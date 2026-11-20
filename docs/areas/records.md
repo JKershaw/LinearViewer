@@ -8,9 +8,10 @@ check, the views, the brief; all pure) and `lib/records-store.js` (the one file 
 proxy router, `routes/proxy-records.js`, stays in Agent API by the registry's first-match rule. The run lifecycle
 seam, `lib/run-records.js`, stays in Runs & dispatch by its `run-` pattern.
 
-Records imports only Platform. The tracker read, the askedText reader, STAGE_KINDS, the provider state map's closed
-state, the workspace-person reader and the area notes' reader are injected by their callers (routes/proxy.js,
-routes/proxy-records.js, routes/task-records.js, routes/project-page.js, server.js, scripts/records-import.mjs).
+Records imports only Platform. The tracker read, the tracker port (LIN-4503, built over a provider by
+lib/records-tracker.js), the askedText reader, STAGE_KINDS, the provider state map's closed state, the workspace-person
+reader and the area notes' reader are injected by their callers (routes/proxy.js, routes/proxy-records.js,
+routes/task-records.js, routes/project-page.js, routes/dispatch.js, server.js, scripts/records-import.mjs).
 
 ## Lessons
 
@@ -20,35 +21,35 @@ routes/proxy-records.js, routes/task-records.js, routes/project-page.js, server.
 - A run record is written from the dispatch row's own id and lineage (`rootItemId`, else its own id), the same
   lineage lib/run-lineage.js reads. Every version of a run is kept: a resume or a wake reopens it as a new `open`
   version (a wake reopens the run it wakes, as a custom resume does: LIN-4493 review, gap 3).
-- A run ends when its row stops being live: its terminal marker; an abort row's `[aborted]`, which ends the run of
-  the row it targets (`abortTo`), since the target never receives that marker as its own feedback; or its closure
-  by a bookkeeping stamp (the lineage closer, the ticket closer, an operator's stamp), which ends it as the
-  lineage's terminal status or `aborted`. A `handed-on` closure ends nothing: the successor carries the run on.
-  The hooks are in lib/dispatch-store.js (`takeItem`, `addFeedback`, `_closeRows`, `stampBookkeeping`), and each
-  is witnessed through the real store in tests/unit/lin-4493-run-lifecycle.test.js.
-- A person is addressed by the name the tracker shows them, and that name is stored on the account's identity at sign-in
-  (`identity.name`, from the viewer's display name, the GitHub login, or the Jira display name; lib/account-session.js
-  `establishAccount`). The one reader is lib/workspace-people.js (a member with a named identity on the workspace's
-  provider, canonical accounts only). An account that signed in before the name was stored has none until its next
-  sign-in, so it cannot be addressed until then; the refusal names the people who can be.
+- A run ends when its row stops being live: its terminal marker, an abort row's `[aborted]` (which ends the run it
+  targets, `abortTo`), or a bookkeeping stamp (lineage closer, ticket closer, operator), which ends it as the lineage's
+  terminal status or `aborted`. A `handed-on` closure ends nothing. Hooks: lib/dispatch-store.js (`takeItem`,
+  `addFeedback`, `_closeRows`, `stampBookkeeping`), witnessed in tests/unit/lin-4493-run-lifecycle.test.js.
+- A person is addressed by the name the tracker shows, stored at sign-in as `identity.name` (lib/account-session.js
+  `establishAccount`) and read by lib/workspace-people.js (canonical accounts with a named identity). An account that
+  signed in before the name was stored cannot be addressed until its next sign-in; the refusal names who can be.
 - Reads are by the indexed fields. A write reads only the records it names (`versionsOf`, `lookup`), and a find
   picks candidates by `{urlKey, kind, state, to}` or `{urlKey, in}` and reduces each to its current version
   (`find`). A write's body is checked as a dry run before any ticket is made, so a refused body makes no task.
 - The query log has no TTL index (lib/db-indexes.js bans them). Its rows carry `expiresAt`, and the hourly cleanup
   removes them (lib/hourly-cleanup.js). Retention is 90 days; piece 5's readings need at least that.
-- A record id can have a ticket's shape (`finding-12345678` when its hex is all digits; a run id such as `row-12345`). A
-  ticket identifier is an upper-case team key and a number, so `looksLikeTicket` reads only that shape; a record id that
-  exists is never read as a ticket either (`checkWrite`).
-  `routes/proxy-records.js` resolves a reference against the records first and sends only the rest to the tracker; a
-  new reference path must do the same, or a valid record is refused as an unreadable ticket.
+- A record id can have a ticket's shape (`finding-12345678`, `row-12345`). `looksLikeTicket` reads only an upper-case
+  team key and a number, and a record id that exists is never read as a ticket (`checkWrite`). A new reference path
+  resolves against the records first and sends only the rest to the tracker, or a valid record is refused as unreadable.
 - A new collection is inventoried three times: `INVENTORY` in `lib/account-erasure.js`, `COLLECTION_CLASSES` in
   `tests/unit/urlkey-holders.test.js`, and the dry-run's `URLKEY_SOURCES` (`scripts/dry-run-urlkey-duplicates.mjs`).
   The second is the one a local run of the area's tests misses; CI's full suite caught it.
 
 - Every writer goes through one checked pipeline, `lib/records/writes.js` (`createRecordWrites`): the proxy routes, the
-  signed-in task-page and project-page routes, and the importer. It checks the body, dry-runs the tickets it names, makes
-  their tasks only when that is clean, then checks again. A writer passes `by` (its own: a stage kind, `person:<account>`,
-  `import`); `by` is never read from a body. A new writer calls the pipeline, never the store's add, revise, end or link directly.
+  task-page and project-page routes, and the importer. It checks the body, dry-runs the tickets it names, makes their
+  tasks only when that is clean, then checks again. `by` is the writer's own (a stage kind, `person:<account>`,
+  `import`, `harbour`), never read from a body; a new writer calls the pipeline, never the store's add, revise, end or link.
+- Outward steps (LIN-4503) run after a record persists, through one injected `tracker(ctx)` port (lib/records-tracker.js),
+  never on a dry run or an import. A child ticket is made only when the parent's children read whole (`capped === false`;
+  unknown fails closed) and no child carries the task's mark (lib/records/ticket-stub.js); a mark another task holds is
+  refused, not taken. A plan's summary is one comment per version, never retried.
+- A route test that writes a child task or a plan injects a tracker (tests/helpers/fake-records-tracker.js), or it
+  reaches the network and the hermetic run fails. Censuses read `git ls-files`: stage a new file before running them.
 - A write that makes one record and then ends another is two writes. Name the first with `fixedIdOf` (lib/records/refs.js,
   the one derived-id rule) from the second, as make-a-task and supersede do, so a retry after a failed end finds the
   record it made. Imports use the same rule, which holds after an imported record ends. Never hash an id by hand.
@@ -60,10 +61,9 @@ routes/proxy-records.js, routes/task-records.js, routes/project-page.js, server.
 - A page GET never makes a task. The task page reads its task record by the ticket's claim (`taskForTicket`) and offers
   its add and child-task forms before one exists; the first write through the checked pipeline makes the task
   (routes/task-records.js sends `in: <ticket>`). The project page's actions and the proxy make tasks the same way.
-- The importer reads the notes from a git ref given on the command line (never a default: piece 4 deletes the sections),
-  and its tests read committed fixtures, since CI checks out at depth 1 (tests/fixtures/records-import/). It reads each
-  note's Waiting section with its own frozen reader (`parseWaitingSection` in `lib/records/waiting-import.js`, moved
-  there by LIN-4495 when the notes lost the section) and the guard's `citedPaths`.
+- The importer reads the notes from a git ref given on the command line (never a default), and its tests read committed
+  fixtures, since CI checks out at depth 1 (tests/fixtures/records-import/). Its Waiting section is read by its own frozen
+  reader (`parseWaitingSection`, lib/records/waiting-import.js), with the guard's `citedPaths`.
 - A records reading has one caller per surface, and an injected alias hides a caller from a search by name: the
   session page reads evidence through `readRunEvidenceFn` (`routes/dashboard.js`), missed the store at LIN-4495, and
   every session page read "not measured". Search the aliases too, and keep a missing store reading "not measured",

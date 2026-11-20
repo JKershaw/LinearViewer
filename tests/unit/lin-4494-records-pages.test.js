@@ -15,6 +15,8 @@ import { createMangoTmpdir } from '../fixtures/mango-tmpdir.js';
 import { RecordsStore, RECORDS_COLLECTION, REFS_COLLECTION, QUERY_LOG_COLLECTION } from '../../lib/records-store.js';
 import { INDEX_SPECS } from '../../lib/db-indexes.js';
 import { createTaskRecordsRoutes } from '../../routes/task-records.js';
+import { createFakeTracker } from '../helpers/fake-records-tracker.js';
+import { HARBOUR_WRITER } from '../../lib/records/writes.js';
 import { createProjectPageRoutes } from '../../routes/project-page.js';
 import { renderTaskRecordsSection, renderWaitingRecordLine } from '../../lib/render-task-records.js';
 import { renderTaskPage } from '../../lib/render-task-page.js';
@@ -81,6 +83,8 @@ async function serve(router) {
 
 /** The tracker's words for a ticket, as the session's binding reads them (a stand-in: no tracker is called). */
 const readTicket = async (_ctx, ref) => (ref === 'LIN-NOPE' ? null : { identifier: ref, description: 'The person asked for this.', state: { type: 'started', name: 'In Progress' }, parent: null });
+// LIN-4503: a child task's ticket goes through the outward port; this test's tracker is the in-memory one, never the network.
+const outward = createFakeTracker();
 
 const pagesRoutes = () => {
   const deps = {
@@ -89,6 +93,7 @@ const pagesRoutes = () => {
     accountStore: { resolveCanonicalAccountId: async (id) => id },
     listPeople: people,
     readTicket,
+    tracker: outward.tracker,
   };
   return [
     createTaskRecordsRoutes(deps),
@@ -164,7 +169,7 @@ describe('the task page for a ticket with no task record yet', () => {
       workspaceFromUrl: session, getOpenRouterSource: () => null, getDeployInfo: () => ({}), loader,
       workspaceOwnerCheck: async () => ({ status: 'member' }), recordsStore: store, now: () => new Date(),
     }));
-    app.use(createTaskRecordsRoutes({ workspaceFromUrl: session, recordsStore: store, accountStore: { resolveCanonicalAccountId: async (id) => id }, listPeople: people, readTicket }));
+    app.use(createTaskRecordsRoutes({ workspaceFromUrl: session, recordsStore: store, accountStore: { resolveCanonicalAccountId: async (id) => id }, listPeople: people, readTicket, tracker: outward.tracker }));
     server = await new Promise((resolve) => { const s = app.listen(0, '127.0.0.1', () => resolve(s)); });
     base = `http://127.0.0.1:${server.address().port}`;
 
@@ -273,7 +278,10 @@ describe('the session writes: a signed-in person, filed by their account', () =>
     assert.equal(child.status, 303);
     const kids = (await store.find(URL_KEY, { kind: 'task', inRef: taskId }));
     assert.equal(kids.length, 1);
-    assert.equal(kids[0].by, `person:${ACCOUNT}`);
+    // LIN-4503: the filing (v1) is the person's; the child's ticket then revises its ref as Harbour, so the current version is Harbour's.
+    const [filed] = (await store.versionsOf(URL_KEY, [kids[0].id])).sort((a, b) => a.v - b.v);
+    assert.equal(filed.by, `person:${ACCOUNT}`);
+    assert.equal(kids[0].by, HARBOUR_WRITER);
     assert.equal(kids[0].fields['done-when'], 'the count is right on Home');
   });
 
