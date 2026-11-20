@@ -145,6 +145,30 @@ describe('G2 — issue-object contract (plan-review 583701c2)', async () => {
   });
 });
 
+describe('LIN-4504: the plan-review gate is read from records, never the description', () => {
+  const COVERED = '2026-01-01T00:00:00.000Z';
+  const facts = (reviewAsked) => new Map([['LIN-1', { measured: true, reviewAsked, everPlanned: true }]]);
+  const readoutWith = (description, planFacts, planRecordsSince = COVERED) => computeEffortReadout({
+    liveRows: [], historyRows: fourRowLineageRows(), asOf: ASOF, planFacts, planRecordsSince,
+    issueContext: new Map([['LIN-1', { id: 'issue-1', description, comments: fourRowLineageComments() }]]),
+  }).then((r) => r.perKind.find((k) => k.kind === 'plan').survival);
+
+  test('poisoned both ways: the text says due and the records not, and the reverse', async () => {
+    const notAsked = await readoutWith('plan-review due: yes', facts(false));
+    assert.deepEqual([notAsked.gateDue, notAsked.gateMeasured, notAsked.gateNotMeasured], [0, 1, 0]);
+    const asked = await readoutWith('plan-review due: no', facts(true));
+    assert.deepEqual([asked.gateDue, asked.gateHonoured, asked.gateHonouredRate], [1, 1, 1]);
+  });
+
+  test('no records, or no coverage, reads not measured: never a figure derived from text', async () => {
+    const none = await readoutWith('plan-review due: yes', null);
+    assert.deepEqual([none.gateDue, none.gateNotMeasured, none.gateDueRate], [0, 1, null]);
+    const uncovered = await readoutWith('plan-review due: yes', facts(true), null);
+    assert.equal(uncovered.gateNotMeasured, 1);
+    assert.equal(uncovered.gateCoverageFrom, null);
+  });
+});
+
 describe('G3 — asOf threaded, not omitted or improvised per-call', async () => {
   test('both computePlanReviewRoundTrips calls receive the exact injected asOf', async () => {
     const rows = fourRowLineageRows();

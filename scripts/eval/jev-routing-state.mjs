@@ -8,16 +8,19 @@
  * into that distilled state.
  *
  * Deterministic facts are NOT re-implemented here: `assembleNodeFacts` /
- * `selectFocusSubtask` / `isTerminalState` / `extractSessionFit` are imported from
+ * `selectFocusSubtask` / `isTerminalState` are imported from
  * lib/recommendation-facts.js (LIN-434) — the same unit-tested seam `buildMetaPrompt`
  * consumes (lib/openrouter.js) — so the counts and the frontier child can never drift
  * from the live meta-prompt.
+ *
+ * LIN-4504: session fit is a plan record's addressee, never ticket text. A bundle carries explicit `planFacts`
+ * (lib/records/plan-facts.js); without them the state says `not measured`, and the trail's lexical tags no longer
+ * read a session-fit phrase.
  */
 import {
   assembleNodeFacts,
   selectFocusSubtask,
   isTerminalState,
-  extractSessionFit,
 } from '../../lib/recommendation-facts.js';
 
 /** Collapse markdown/whitespace and truncate — extractive only, never model-summarised. */
@@ -33,11 +36,10 @@ export function digest(text, max = 240) {
 }
 
 // Lexical proxies for the behaviours the state must surface without the raw thread: a
-// session-fit verdict, landed work, a review verdict, an override, and — the hard case —
+// landed work, a review verdict, an override, and — the hard case —
 // a later finding that REFUTES an earlier one. These are deliberately conservative and
 // documented as a lexical proxy (a stand-in for a semantic read, not a replacement).
 const SIGNAL_TAGS = [
-  ['session-fit', /\b(needs?\s+multiple\s+sessions|fits?\s+(?:in\s+)?one\s+(?:focused\s+)?session)\b/i],
   ['plan', /(^|\n)#{1,3}[^\n]*\bplan\b/i],
   ['review-verdict', /(###\s*[^\n]*verdict|verdict:\s*(approve|request changes)|\brequest changes\b)/i],
   ['approved', /(verdict:\s*approve|approved\b|\bapprove\b)/i],
@@ -106,7 +108,7 @@ export function buildDistilledState(bundle = {}) {
   const issue = bundle.issue || {};
   const children = bundle.children || [];
   const comments = bundle.comments || [];
-  const facts = assembleNodeFacts(issue, children);
+  const facts = assembleNodeFacts(issue, children, bundle.planFacts ? { planFacts: bundle.planFacts } : undefined);
   const focus = selectFocusSubtask(children);
   const deferEligible = focus != null;
   const trail = summarizeTrail(comments);
@@ -127,7 +129,7 @@ export function buildDistilledState(bundle = {}) {
       // frontierFacts null on a leaf, matching assembleNodeFacts' own contract.
       frontierFacts: facts.frontierFacts,
     },
-    sessionFit: extractSessionFit(issue.description),
+    sessionFit: bundle.planFacts?.measured ? bundle.planFacts.sessionFit : 'not measured',
     deferEligible,
     deferTarget: focus ? focus.identifier : null,
     descriptionDigest: digest(issue.description, 600),
@@ -137,4 +139,4 @@ export function buildDistilledState(bundle = {}) {
 }
 
 /** Expose the raw primitives the tests assert against (all from the shared seam). */
-export { assembleNodeFacts, selectFocusSubtask, isTerminalState, extractSessionFit };
+export { assembleNodeFacts, selectFocusSubtask, isTerminalState };

@@ -33,6 +33,15 @@ import assert from 'node:assert/strict';
 import {
   computeFollowOnRatio, isVerifiedDone, countFollowOns, __internal,
 } from '../../lib/follow-on-ratio.js';
+import { planFactsOf, planFactsNotMeasured } from '../../lib/records/plan-facts.js';
+
+// LIN-4504: "planned" is read from records. The coverage instant is passed per run (the module's own default,
+// PLAN_RECORDS_SINCE, is null until the cutover commit sets it); facts are folded from small record sets.
+const COVERED = '2026-05-01T00:00:00.000Z';
+const PLAN_OF = (id) => planFactsOf({ task: { id: `task-${id}`, kind: 'task' }, inside: [{ id: `plan-${id}`, v: 1, kind: 'plan', state: 'kept', in: `task-${id}`, to: 'implementation' }] });
+const NO_PLAN_OF = (id) => planFactsOf({ task: { id: `task-${id}`, kind: 'task' } });
+/** Plan facts for the given identifiers: `planned` ids have a plan record, the rest none. */
+const factsFor = (ids, planned = []) => new Map(ids.map((id) => [id, planned.includes(id) ? PLAN_OF(id) : NO_PLAN_OF(id)]));
 
 // ─── fixture builders (literal wire shape, parameterised only where a case varies) ──
 
@@ -327,7 +336,7 @@ describe('C. numerator predicate — the causal rule', () => {
 
 describe('D. companion instruments', () => {
   const DONE = '2026-06-10T00:00:00.000Z';   // 21 days before windowEnd → fully matured
-  const PLANNED = 'Session fit: needs multiple sessions';
+  const PLANNED = 'Session fit: needs multiple sessions'; // old plan text: no longer read (LIN-4504)
 
   test('matured7d counts a peer at +6d and drops one at +8d', () => {
     const r = run([
@@ -356,92 +365,50 @@ describe('D. companion instruments', () => {
     assert.equal(r.diagnostics.maturedSources, 1);
   });
 
-  test('planScoped narrows the denominator to plan-marked sources; primary is the intersection', () => {
+  test('LIN-4504: planScoped narrows the denominator to sources whose records hold a plan; primary is the intersection', () => {
     const r = run([
-      source('planned', DONE, { description: PLANNED, relations: [outgoing('related', 'p1')] }),
+      source('planned', DONE, { relations: [outgoing('related', 'p1')] }),
       source('unplanned', DONE, { relations: [outgoing('related', 'p2')] }),
       peer('p1', '2026-06-12T00:00:00.000Z'),
       peer('p2', '2026-06-12T00:00:00.000Z'),
-    ]);
+    ], { planRecordsSince: COVERED, planFacts: factsFor(['LIN-planned', 'LIN-unplanned'], ['LIN-planned']) });
     assert.equal(r.denominator, 2);
     assert.equal(r.planScoped.denominator, 1);
     assert.equal(r.planScoped.numerator, 1);
-    assert.equal(r.primary.denominator, 1, 'plan-marked AND fully matured');
+    assert.equal(r.primary.denominator, 1, 'planned AND fully matured');
     assert.equal(r.primary.numerator, 1);
-    assert.equal(r.diagnostics.pctWithPlanMarker, 0.5);
+    assert.equal(r.diagnostics.pctPlanned, 0.5);
+    assert.equal(r.diagnostics.plannedNotMeasured, 0);
+    assert.equal(r.definition.plannedCoverageFrom, COVERED);
   });
 
-  test('the plan marker reads the DESCRIPTION ONLY — a comment never sets it', () => {
-    // F2. The two session-fit phrases are mandated into the DESCRIPTION by the
-    // `plan` template (lib/prompt-template-defs.js:242) — the true positive —
-    // but they also appear in the instruction text of `plan-review` (:782) and
-    // `breakdown` (:364), and a plan-review verdict lands as a COMMENT. Since
-    // `plan-review` is the gate LIN-1600 ships, baseline-window issues never met
-    // it and re-read-window issues will: reading comments would inflate the
-    // after-period planScoped/primary denominator and bias the ratio DOWN, in
-    // the direction of the pre-registered hypothesis, on the primary instrument.
-    // That is differential misclassification aligned with the treatment.
-    const viaComment = run([source('s', DONE, {
-      comments: [{ id: 'c1', body: 'Plan complete. Session fit: fits one session', createdAt: DONE }],
-    })]);
-    assert.equal(viaComment.planScoped.denominator, 0, 'a comment must not set the plan marker');
-    assert.equal(viaComment.diagnostics.pctWithPlanMarker, 0);
-    assert.equal(viaComment.denominator, 1, 'the headline denominator is untouched by the scoping');
-
-    // The realistic contamination shape, stated as its own assertion: a
-    // plan-review verdict comment on an issue the `plan` step never ran on.
-    const reviewed = run([source('s', DONE, {
-      description: 'Fix the thing.',
-      comments: [{ id: 'c1', body: '## Review — LIN-1\nCheck #4: does it fit one session? Yes.\n\n### Verdict\nApprove', createdAt: DONE }],
-    })]);
-    assert.equal(reviewed.planScoped.denominator, 0, 'a plan-review comment is not evidence the plan step ran');
-    assert.equal(reviewed.diagnostics.pctWithReviewLedger, 1, 'while the ledger marker DOES still read comments — that is where review posts it');
-
-    // The description surface still works, both markers.
-    assert.equal(run([source('s', DONE, { description: PLANNED })]).planScoped.denominator, 1);
+  test('LIN-4504 poisoned description: the text says planned and the records none, and the reverse; the records win', () => {
+    const issues = [source('a', DONE, { description: PLANNED }), source('b', DONE, { description: 'Just the ask.' })];
+    const r = run(issues, { planRecordsSince: COVERED, planFacts: factsFor(['LIN-a', 'LIN-b'], ['LIN-b']) });
+    assert.equal(r.planScoped.denominator, 1);
+    assert.equal(r.diagnostics.pctPlanned, 0.5);
+    // A comment saying so is not a plan either.
+    const viaComment = run([source('s', DONE, { comments: [{ id: 'c1', body: 'Plan complete. Session fit: fits one session', createdAt: DONE }] })],
+      { planRecordsSince: COVERED, planFacts: factsFor(['LIN-s']) });
+    assert.equal(viaComment.planScoped.denominator, 0);
+    assert.equal(viaComment.diagnostics.pctWithReviewLedger, 0);
   });
 
-  test('the plan marker is overridable and the ruler actually applied is echoed into the result', () => {
-    // It is a heuristic, not a schema, so a baseline must record which ruler it
-    // used — otherwise a later re-read moves because the ruler changed.
-    const custom = /## Bespoke Plan Marker/;
-    const r = run([
-      source('hit', DONE, { description: '## Bespoke Plan Marker\nbody' }),
-      source('miss', DONE, { description: PLANNED }),
-    ], { planMarker: custom });
-    assert.equal(r.planScoped.denominator, 1, 'the override replaces the default entirely');
-    assert.equal(r.definition.planMarker, String(custom));
-    assert.equal(r.definition.planMarkerScope, 'description');
-    assert.equal(r.definition.reviewLedgerMarkerScope, 'description+comments');
+  test('LIN-4504: work the plan records do not cover reads not measured, never unplanned and never 0', () => {
+    const issues = [source('a', DONE, { description: PLANNED })];
+    const none = run(issues);
+    assert.equal(none.planScoped.denominator, 0);
+    assert.equal(none.diagnostics.pctPlanned, null, 'no measured source: null, not 0');
+    assert.equal(none.diagnostics.plannedNotMeasured, 1);
+    assert.deepEqual(Object.keys(none.diagnostics.plannedNotMeasuredReasons), ['no plan records before 2026-11-20']);
+    const before = run(issues, { planRecordsSince: '2026-06-20T00:00:00.000Z', planFacts: factsFor(['LIN-a'], ['LIN-a']) });
+    assert.equal(before.diagnostics.plannedNotMeasured, 1, 'completed before the cutover');
+    const unread = run(issues, { planRecordsSince: COVERED, planFacts: new Map([['LIN-a', planFactsNotMeasured('store down')]]) });
+    assert.deepEqual(unread.diagnostics.plannedNotMeasuredReasons, { 'store down': 1 });
+    assert.equal(run(issues, { planRecordsSince: COVERED }).diagnostics.plannedNotMeasured, 1, 'no facts read at all');
   });
 
-  test('a /g-flagged marker override does NOT under-count — regex state is never carried', () => {
-    // F1. `RegExp.prototype.test` advances `lastIndex` on a /g (or /y) regex and
-    // resumes from there next call, so N identical sources alternate hit/miss.
-    // Measured at the PR head: /gi gave planScoped.denominator 2 of 3. This
-    // matters because `options.planMarker` is the documented resolution path for
-    // the plan-marker heuristic — the person handing in a fresh regex is exactly
-    // the person likely to write /gi — and it corrupts `primary`, the instrument
-    // LIN-1600 designates as the decision metric.
-    const three = [
-      source('s1', DONE, { description: PLANNED }),
-      source('s2', DONE, { description: PLANNED }),
-      source('s3', DONE, { description: PLANNED }),
-    ];
-    const stateless = run(three, { planMarker: /needs multiple sessions/i });
-    assert.equal(stateless.planScoped.denominator, 3, 'the control: all three are plan-marked');
-
-    for (const flags of ['g', 'gi', 'y', 'gy']) {
-      const pattern = new RegExp('needs multiple sessions', flags);
-      const r = run(three, { planMarker: pattern });
-      assert.equal(r.planScoped.denominator, 3, `/${flags} must count all three, not alternate`);
-      assert.equal(r.primary.denominator, 3, `/${flags} must not corrupt the primary instrument`);
-      assert.equal(pattern.lastIndex, 0, 'and the caller\'s own regex is never mutated');
-      assert.ok(!/[gy]/.test(r.definition.planMarker.split('/').pop()), 'the ruler recorded is the one applied, stripped of statefulness');
-    }
-
-    // Both overridable patterns are affected — the class is exactly two, and
-    // they are fixed together.
+  test('a /g-flagged review-ledger override does NOT under-count — regex state is never carried', () => {
     const ledger = { comments: [{ id: 'c', body: '## Review — LIN-1\n- x', createdAt: DONE }] };
     const ledgered = run(
       [source('s1', DONE, ledger), source('s2', DONE, ledger), source('s3', DONE, ledger)],
@@ -511,9 +478,9 @@ describe('E. sufficiency floor and freeze-list shape', () => {
     // The over-claim MIN_COHORT_EDIT guards, moved up a level: the headline can
     // clear the floor while the plan-scoped sub-instrument sits far below it.
     const issues = cohort(40, 40);
-    issues.filter((i) => i.state.type === 'completed').slice(0, 3)
-      .forEach((s) => { s.description = 'Session fit: needs multiple sessions'; });
-    const r = run(issues);
+    const done = issues.filter((i) => i.state.type === 'completed');
+    // LIN-4504: three sources have a plan record; the rest have none.
+    const r = run(issues, { planRecordsSince: COVERED, planFacts: factsFor(done.map((i) => i.identifier), done.slice(0, 3).map((i) => i.identifier)) });
     assert.equal(r.sufficient, true, 'headline clears both floors');
     assert.equal(r.planScoped.denominator, 3);
     assert.equal(r.planScoped.sufficient, false, 'the sub-instrument does not inherit the headline flag');
@@ -631,8 +598,8 @@ describe('F. clock-freedom, loudness and __internal', () => {
 
   test('__internal helpers behave as the module relies on', () => {
     const {
-      peerOf, rate, typeCounted, buildPeerIndex, dedupeById, hasPlanMarker, hasReviewLedger,
-      requireInstant, textOf, descriptionOf, nonGlobal,
+      peerOf, rate, typeCounted, buildPeerIndex, dedupeById, plannedOf, hasReviewLedger,
+      requireInstant, textOf, nonGlobal,
     } = __internal;
 
     // the highest-consequence predicate: both arms, and a shape it cannot read
@@ -658,18 +625,17 @@ describe('F. clock-freedom, loudness and __internal', () => {
     assert.equal(idx.size, 1);
     assert.equal(idx.get('p').identifier, 'LIN-p');
 
-    assert.equal(hasPlanMarker({ description: 'Session fit: fits one session' }), true);
-    assert.equal(hasPlanMarker({ description: '## Implementation Plan (LIN-1)' }), true);
-    assert.equal(hasPlanMarker({ description: 'no marker here' }), false);
-    assert.equal(hasPlanMarker({ description: '', comments: [{ body: 'fits one session' }] }), false, 'F2: comments are not a plan-marker surface');
+    // LIN-4504: planned is read from records; the description is never read.
+    assert.deepEqual(plannedOf({ identifier: 'LIN-1', description: 'Session fit: fits one session' }, '2026-06-10T00:00:00.000Z', factsFor(['LIN-1']), COVERED), { measured: true, planned: false });
+    assert.deepEqual(plannedOf({ identifier: 'LIN-1' }, '2026-06-10T00:00:00.000Z', factsFor(['LIN-1'], ['LIN-1']), COVERED), { measured: true, planned: true });
+    assert.equal(plannedOf({ identifier: 'LIN-1' }, '2026-06-10T00:00:00.000Z', factsFor(['LIN-1'], ['LIN-1']), null).measured, false);
+    assert.equal('hasPlanMarker' in __internal, false);
+    assert.equal('PLAN_MARKER' in __internal, false);
     assert.equal(hasReviewLedger({ comments: [{ body: '## Review — LIN-1\n- x' }] }), true);
     // LIN-4495: the retired heading no longer marks a review; a post-cutover review's title does.
     assert.equal(hasReviewLedger({ comments: [{ body: '### What CI Did Not Prove\n- x' }] }), false);
     assert.equal(hasReviewLedger({ description: '' }), false);
     assert.equal(textOf({ description: 'a', comments: [{ body: 'b' }] }), 'a\nb');
-    assert.equal(descriptionOf({ description: 'a', comments: [{ body: 'b' }] }), 'a', 'the narrow surface reads no further');
-    assert.equal(descriptionOf({ comments: [{ body: 'b' }] }), '');
-    assert.equal(descriptionOf(null), '');
 
     // F1: statelessness is a property of the copy, and the original is untouched
     const global = /x/gi;

@@ -17,9 +17,11 @@ import { fileURLToPath } from 'url';
 import { dirname, join } from 'path';
 import { buildRouterPrompt } from '../../lib/stage-router.js';
 import { buildSelectorArgs } from '../../lib/openrouter.js';
+import { planFactsOf } from '../../lib/records/plan-facts.js';
 
-// The facts a leaf with no comments and no plan gets (LIN-3300: the selector's facts).
-const leaf = buildSelectorArgs({ identifier: '{{IDENTIFIER}}', title: '', state: {}, labels: [] }, {});
+// The facts a leaf with no comments and no plan gets (LIN-3300: the selector's facts; LIN-4504: a task whose records
+// hold no plan, read, so "none" and not "not measured").
+const leaf = buildSelectorArgs({ identifier: '{{IDENTIFIER}}', title: '', state: {}, labels: [] }, { planFacts: planFactsOf({ task: { id: 'task-leaf', kind: 'task' } }) });
 const text = buildRouterPrompt({ ...leaf, view: '{{ISSUE_CONTEXT}}', featureFlags: {} });
 
 const out = join(dirname(fileURLToPath(import.meta.url)), 'meta-prompt.baseline.txt');

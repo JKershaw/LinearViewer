@@ -17,7 +17,7 @@ for splitting.
 | file | role |
 |---|---|
 | `jev-routing-criteria.mjs` | builds the Jev `choice` question + per-action criteria from the live `aiHint`s and the same vocabulary `getAIRecommendationActionNames()` injects |
-| `jev-routing-state.mjs` | builds the distilled state; reuses `assembleNodeFacts` / `selectFocusSubtask` / `isTerminalState` / `extractSessionFit` from `lib/recommendation-facts.js` (no re-implementation) |
+| `jev-routing-state.mjs` | builds the distilled state; reuses `assembleNodeFacts` / `selectFocusSubtask` / `isTerminalState` from `lib/recommendation-facts.js` (no re-implementation); session fit comes from a bundle's explicit `planFacts` (LIN-4504), else `not measured` |
 | `build-widened-routing-fixtures.mjs` | regenerates the class-D fixtures under `fixtures-widened/` from committed captures; hand-builds the two synthetic cases |
 | `jev-routing-eval.mjs` | the 3-arm harness, deterministic grading, gold overrides, statistics, `results.json` + `report.md` |
 | `jev-routing-state.test.mjs` | state-builder + grading/override/loader tests |

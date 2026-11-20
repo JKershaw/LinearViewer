@@ -164,7 +164,6 @@ const TABLE = {
   'lib/item-stage-stamp.js :: stampForItem': [SRV, 1],
   'lib/item-stage-stamp.js :: stampForFollowUp': [SRV, 1],
   'lib/dispatch-factory.js :: anchor': [SRV, 1],
-  'lib/dispatch-factory.js :: defaultFetchPilotPrFiles': [SRV, 2],
   'lib/dispatch-factory.js :: run': [SRV, 1],
   'lib/ci-wake-sweep.js :: readLineageRows': [SRV, 2],
   'lib/liveness-alarm-sweep.js :: sweepD2': [SRV, 2],

@@ -3,13 +3,14 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import { scrub, doneLooksLike, QUESTIONS, VIEWS, rps, score, ev, computeNorms, normsText, toBins } from './jev-progress-eval.mjs';
+import { PLAN_HEADING_WORDS } from '../../lib/legacy-plan-text.js';
 
 test('scrub drops post-hoc close-out sections, merge paragraphs and ticked boxes', () => {
   const desc = [
     '## Problem', 'Tests idle for 25s.', '',
     '## Acceptance', '- [x] no open handles', '',
     '## Shipped (close-out 2026-09-29)', 'Merged via PR #1609, merge commit `dab2bc7`.', '### Evidence', 'CI green.', '',
-    '## Implementation Plan', 'Step one.', '', '**Completion stub.** Shipped in PR #1602 (merged as `50588ae`).', '',
+    `## ${PLAN_HEADING_WORDS}`, 'Step one.', '', '**Completion stub.** Shipped in PR #1602 (merged as `50588ae`).', '',
     '## Dependencies', 'Blocked by LIN-3059, which must be merged first.',
   ].join('\n');
   const out = scrub(desc);

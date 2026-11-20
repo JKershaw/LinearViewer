@@ -58,6 +58,7 @@ import { flattenIssue, MAX_ATTACHMENT_BYTES } from '../lib/proxy-wire.js';
 import { UUID_REGEX, isValidIssueId } from '../lib/workspace.js';
 import { appendBlock, replace as replaceInDescription, DescriptionEditError } from '../lib/description-edit.js';
 import { checkSizeRecord, recordShape, SIZE_OF_MOVE_HEADING, SIZE_RECORD_CODES, DECIDED_BY, WRONG_WORK } from '../lib/size-of-move.js';
+import { addedPlanHeadings, PLAN_HEADING_WORDS, PLAN_IN_DESCRIPTION } from '../lib/legacy-plan-text.js';
 import { blindReadRefusal } from '../lib/run-ledger.js';
 import { checkBlindRead, landingPrUrls } from '../lib/run-trail.js';
 import { isRestrictedStamp, sameTicketKey, ISSUE_PATCH_FIELDS } from '../lib/stage-writes.js';
@@ -388,6 +389,19 @@ export function createProxyWriteRoutes({
     return refuse(ctx, 422, message, { code: check.code, ...(check.kind ? { kind: check.kind } : {}), ...(check.line ? { line: check.line } : {}) });
   }
 
+  /**
+   * LIN-4504: a plan is records (`POST /api/proxy/records`, a plan addressed to implementation or breakdown), never a
+   * description section. Every proxy description write (create, PATCH, append, replace, and the description-target
+   * attachment) is refused 422 when it ADDS a plan heading line (lib/legacy-plan-text.js addedPlanHeadings, the one
+   * recognition rule): an edit elsewhere in an old description that already holds a plan passes. Only this proxy lane is
+   * guarded: the session and feedback create lanes and direct provider edits are people's lanes.
+   */
+  function refusedByPlanHeading(ctx, live, next) {
+    const added = addedPlanHeadings(live, next);
+    if (!added.length) return false;
+    return refuse(ctx, 422, `A plan is written as records, not into a description: write it with POST /api/proxy/records (kind "plan", "in" the task, "to" implementation for one session's work or breakdown for several). The write adds a "${PLAN_HEADING_WORDS}" heading (${JSON.stringify(added[0])}); nothing was written.`, { code: PLAN_IN_DESCRIPTION, heading: added[0], use: 'POST /api/proxy/records' });
+  }
+
   // ---------------------------------------------------------------------------
   // Issues
   // ---------------------------------------------------------------------------
@@ -439,7 +453,8 @@ export function createProxyWriteRoutes({
     const input = { title };
     if (requiresTeam) input.teamId = resolvedTeamId;
     // LIN-4502: the description is filed as written (the As asked seal is retired; the
-    // task's `asked` keeps the person's words).
+    // task's `asked` keeps the person's words). LIN-4504: but never with a plan in it.
+    if (description && refusedByPlanHeading(ctx, '', description)) return;
     if (description) input.description = description;
 
     // In request order: each field is gated on the provider's write contract, then
@@ -544,6 +559,7 @@ export function createProxyWriteRoutes({
     if (description !== undefined) {
       const live = await guardTarget(ctx, 'issueDescription', { onNull: 'proceed' });
       if (!live) return;
+      if (refusedByPlanHeading(ctx, live.issue?.description || '', description)) return;
       if (await refusedBySizeRecord(ctx, live.issue?.description || '', description, live.issue)) return;
     }
 
@@ -633,6 +649,7 @@ export function createProxyWriteRoutes({
     if (next.length > MAX_DESCRIPTION_LENGTH) return refuse(ctx, 400, 'resulting description exceeds maximum length');
     if (DANGEROUS_CHARS_REGEX.test(next)) return refuse(ctx, 400, 'resulting description contains invalid characters');
     // Append, replace and the description-target attachment all pass here.
+    if (refusedByPlanHeading(ctx, current, next)) return;
     if (await refusedBySizeRecord(ctx, current, next, liveIssue)) return;
 
     try {
@@ -834,6 +851,8 @@ export function createProxyWriteRoutes({
     // oversized `body` is then a 400 with no side effect, instead of an orphaned,
     // wasted asset per call.
     const bodyBudget = body ? body.length + 2 : 0; // "\n\n" separator before the embed
+    // LIN-4504: refused before the upload, so a refused caption leaves no orphaned asset (editDescription checks again).
+    if (toDescription && body && refusedByPlanHeading(ctx, '', body)) return;
     if (toDescription) {
       const current = await guardTarget(ctx, 'issueDescription', { onNull: 'notFound', refuseTrashed: false });
       if (!current) return;

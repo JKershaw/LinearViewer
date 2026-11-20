@@ -101,6 +101,13 @@ function renderContext(issue, project = 'Product') {
   if (issue.labels?.length) L.push(`**Labels:** ${issue.labels.join(', ')}`);
   if (project) L.push(`**Project:** ${project}`);
   if (issue.comments?.length) L.push(renderComments(issue.comments));
+  // LIN-4504: plan facts are records, given explicitly per case in the selector's own fact words
+  // (lib/recommendation-facts.js planFactLines); description text is never read for them.
+  if (issue.planFacts) {
+    L.push(`- Plan records on this task: ${issue.planFacts.records}`);
+    L.push(`- Session fit (the plan records' addressee): ${issue.planFacts.sessionFit}`);
+    L.push(`- Plan review owed: ${issue.planFacts.reviewOwed}`);
+  }
   return L.join('\n');
 }
 
@@ -268,9 +275,9 @@ Both fit the current store. The tradeoff (simplicity vs. crash-tolerance) is rea
     }
   },
   {
-    id: 'plan already documented (fits one session)',
+    id: 'plan record for one session',
     expect: ['implement'],
-    why: 'Complete plan in description, commits to "fits one session".',
+    why: 'A plan record addressed to implementation (LIN-4504: plan facts are explicit records, not description text).',
     issue: {
       identifier: 'SYN-8', createdAt: '2026-06-01T00:00:00Z', state: inProgress, labels: [],
       title: 'Add a --json flag to the CLI viewer command',
@@ -281,7 +288,8 @@ Both fit the current store. The tradeoff (simplicity vs. crash-tolerance) is rea
 - Testing: add a unit test asserting JSON output shape.
 
 ## Scope
-Single surface. Fits one session.`
+Single surface.`,
+      planFacts: { records: 'plan-syn8 v1 to implementation', sessionFit: 'one session (addressed to implementation)', reviewOwed: 'no' }
     }
   },
   {
@@ -342,9 +350,9 @@ Approach is settled; just needs building.`
     }
   },
   {
-    id: 'plan says needs multiple sessions',
+    id: 'plan record for several sessions',
     expect: ['breakdown'],
-    why: 'Complete plan that explicitly needs multiple sessions.',
+    why: 'A plan record addressed to breakdown, already reviewed (LIN-4504: explicit plan facts).',
     issue: {
       identifier: 'SYN-12', createdAt: '2026-06-01T00:00:00Z', state: inProgress, labels: [],
       title: 'Migrate session storage from file-based MangoDB to MongoDB',
@@ -352,7 +360,8 @@ Approach is settled; just needs building.`
 Surfaces: session-store.js, server.js (store wiring), user-preferences.js (shares the store), a data migration step, and a rollback path.
 Arrows: server wiring depends on the store rewrite; migration depends on both.
 ## Scope
-Needs multiple sessions — migration + rollback alone is its own focused pass; the three call sites each carry distinct edges.`
+Several passes: migration + rollback alone is its own focused pass; the three call sites each carry distinct edges.`,
+      planFacts: { records: 'plan-syn12 v1 to breakdown', sessionFit: 'several sessions (a plan is addressed to breakdown)', reviewOwed: 'no' }
     }
   },
 

@@ -6,7 +6,6 @@
 import { test, describe } from 'node:test';
 import assert from 'node:assert';
 import {
-  extractSessionFit,
   computeNodeStateCounts,
   assembleNodeFacts,
   computeFrontierFacts,
@@ -16,6 +15,7 @@ import {
   isTerminalState
 } from '../../lib/recommendation-facts.js';
 import * as tree from '../../lib/tree.js';
+import { planFactsOf } from '../../lib/records/plan-facts.js';
 
 // Small helpers to build child issues with a given state type.
 const child = (identifier, type, extra = {}) => ({ identifier, state: { type }, ...extra });
@@ -37,42 +37,11 @@ describe('recommendation-facts: focus-child picker ownership (LIN-3727)', () => 
   });
 });
 
-describe('recommendation-facts: extractSessionFit', () => {
-  test('returns null for empty / missing description', () => {
-    assert.strictEqual(extractSessionFit(undefined), null);
-    assert.strictEqual(extractSessionFit(''), null);
-    assert.strictEqual(extractSessionFit('no canonical phrase here'), null);
-  });
-
-  test('matches "fits one session" and the "fits in one focused session" variant', () => {
-    assert.strictEqual(extractSessionFit('**Session fit:** fits one session.'), 'fits one session');
-    assert.strictEqual(extractSessionFit('This fits in one focused session.'), 'fits one session');
-    assert.strictEqual(extractSessionFit('It FITS ONE SESSION'), 'fits one session');
-  });
-
-  test('matches "needs multiple sessions" (and the singular "need")', () => {
-    assert.strictEqual(extractSessionFit('This needs multiple sessions.'), 'needs multiple sessions');
-    assert.strictEqual(extractSessionFit('these need multiple sessions'), 'needs multiple sessions');
-  });
-
-  test('"needs multiple sessions" takes precedence when both phrases appear', () => {
-    const desc = 'Originally fits one session, but on reflection it needs multiple sessions.';
-    assert.strictEqual(extractSessionFit(desc), 'needs multiple sessions');
-  });
-
-  // LIN-3300: a negated fit used to match the positive phrase, so "Does not fit one
-  // session" read as fitting (LIN-385's and LIN-2944's own plans say it that way).
-  test('a negated fit reads as needing multiple sessions, never as fitting', () => {
-    for (const desc of [
-      'Session fit: Does not fit one session.',
-      'Session-fit: does NOT fit one session. 4 sessions',
-      'It doesn\'t fit in one focused session.',
-      'This does not fit into one session; each phase is its own implementation session.',
-      'It will not fit one session.',
-      'It cannot fit one session.'
-    ]) {
-      assert.strictEqual(extractSessionFit(desc), 'needs multiple sessions', desc);
-    }
+describe('recommendation-facts: no description reader of session fit (LIN-4504)', () => {
+  test('extractSessionFit is gone: session fit is the plan records\' addressee (lib/records/plan-facts.js)', async () => {
+    const facts = await import('../../lib/recommendation-facts.js');
+    assert.strictEqual(facts.extractSessionFit, undefined);
+    assert.strictEqual(facts.condensePlan, undefined);
   });
 });
 
@@ -130,23 +99,24 @@ describe('recommendation-facts: assembleNodeFacts', () => {
     assert.strictEqual(facts.isTerminal, true);
   });
 
-  test('with open children → frontier facts carry session-fit from the description', () => {
-    const issue = { state: { type: 'started' }, description: 'Plan says this fits one session.' };
+  test('with open children → frontier facts carry the plan facts passed in (records), never the description\'s (LIN-4504)', () => {
+    const issue = { state: { type: 'started' }, description: 'Plan says this needs multiple sessions.' };
     const children = [child('LIN-10', 'unstarted'), child('LIN-11', 'completed')];
-    const facts = assembleNodeFacts(issue, children);
+    const planFacts = planFactsOf({ task: { id: 'task-n', kind: 'task' }, inside: [{ id: 'plan-n', v: 1, kind: 'plan', state: 'kept', in: 'task-n', to: 'implementation' }] });
+    const facts = assembleNodeFacts(issue, children, { planFacts });
 
     assert.strictEqual(facts.completedCount, 1);
     assert.strictEqual(facts.remainingCount, 1);
     assert.strictEqual(facts.hasOpenChildren, true);
     assert.ok(facts.frontierFacts, 'frontier facts present when there are children');
     assert.strictEqual(facts.frontierFacts.openCount, 1);
-    assert.strictEqual(facts.frontierFacts.sessionFit, 'fits one session');
+    assert.strictEqual(facts.frontierFacts.planFacts.sessionFit, 'one', 'the record says one session; the description says several and is not read');
     assert.strictEqual(facts.frontierFacts.nextChild, 'LIN-10');
   });
 
-  test('session-fit is null when the description lacks a canonical phrase', () => {
-    const facts = assembleNodeFacts({ state: { type: 'started' }, description: 'no phrase' }, [child('LIN-1', 'unstarted')]);
-    assert.strictEqual(facts.frontierFacts.sessionFit, null);
+  test('with no plan facts passed, the node\'s plan facts are not measured, never "none"', () => {
+    const facts = assembleNodeFacts({ state: { type: 'started' }, description: 'fits one session' }, [child('LIN-1', 'unstarted')]);
+    assert.strictEqual(facts.frontierFacts.planFacts.measured, false);
   });
 
   test('is pure: repeated calls on the same input yield equal facts', () => {

@@ -18,8 +18,9 @@ describe('prepareRecommendationInput (LIN-3469)', () => {
   test('forwards exactly the prompt-read fields plus the task\'s runs', async () => {
     const input = await prepareRecommendationInput(ctx, { dispatchQueueStore: store, urlKey: 'acme', identifier: 'LIN-1' });
     assert.deepEqual(Object.keys(input).sort(),
-      ['allRuns', 'asked', 'attachments', 'children', 'comments', 'focusedChild', 'openFindings', 'parent', 'project', 'runs', 'siblings']);
+      ['allRuns', 'asked', 'attachments', 'children', 'comments', 'focusedChild', 'openFindings', 'parent', 'planFacts', 'project', 'runs', 'siblings']);
     assert.equal(input.asked, null, 'no records store: no words on record');
+    assert.equal(input.planFacts.measured, false, 'LIN-4504: no records store: plan facts not measured, never "no plan"');
     assert.equal(input.parent, ctx.parent);
     assert.equal(input.attachments, ctx.attachments);
     assert.deepEqual(input.runs, [{ stage: 'implementation', at: '2026-10-05T00:00:00.000Z', outcome: 'queued' }]);

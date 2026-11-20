@@ -13,7 +13,14 @@
  * change to the prompt text, or a skipped capability pass, fails. Regenerate
  * intentionally, and review the diff, with:
  *   node scripts/eval/regen-stage-router-snapshots.mjs
+ *
+ * LIN-4504: plan facts are records, so each case carries its `planFacts` explicitly (folded by
+ * lib/records/plan-facts.js from small record sets). The planned leaf keeps an old plan section in its
+ * description on purpose, saying the opposite of its records: the selector reads none of it, and the view leaves the
+ * section out (its heading is built from the one spelling, lib/legacy-plan-text.js).
  */
+import { planFactsOf } from '../../../lib/records/plan-facts.js';
+import { PLAN_HEADING_WORDS } from '../../../lib/legacy-plan-text.js';
 
 const GITHUB = { providerUi: { displayName: 'GitHub Issues' } };
 const LOCAL = { providerUi: { displayName: 'Local' } };
@@ -21,15 +28,22 @@ const LOCAL = { providerUi: { displayName: 'Local' } };
 const open = { name: 'In Progress', type: 'started' };
 const done = { name: 'Done', type: 'completed' };
 const at = (d) => `2026-10-0${d}T10:00:00.000Z`;
+const task = (id) => ({ id, kind: 'task', state: 'open', v: 1 });
+const NO_PLAN = (id) => planFactsOf({ task: task(id) });
 const LEAF = {
   issue: { id: 'leaf', identifier: 'ABC-10', title: 'A leaf task', description: 'Make the thing work.', state: open, labels: [] },
-  context: { parent: null, siblings: [], project: { name: 'Project' }, children: [], comments: [], focusedChild: null }
+  context: { parent: null, siblings: [], project: { name: 'Project' }, children: [], comments: [], focusedChild: null, planFacts: NO_PLAN('task-abc10') }
 };
 // A node whose subtasks are all done, with a landed PR and an approving code review.
 const COMPLETE_NODE = {
   issue: { id: 'node', identifier: 'ABC-20', title: 'A node whose subtasks are done', description: 'Ship it.', state: open, labels: [] },
   context: {
     parent: null, siblings: [], project: null, focusedChild: null,
+    planFacts: planFactsOf({
+      task: task('task-abc20'),
+      inside: [{ id: 'plan-abc20aa', v: 1, kind: 'plan', state: 'kept', in: 'task-abc20', to: 'breakdown', at: at(1) }],
+      findings: [{ id: 'finding-abc20aa', v: 2, kind: 'finding', state: 'done', to: 'plan-review', links: { about: ['plan-abc20aa'] } }]
+    }),
     children: [
       { id: 'c1', identifier: 'ABC-21', title: 'one', state: done },
       { id: 'c2', identifier: 'ABC-22', title: 'two', state: done }
@@ -44,7 +58,7 @@ const COMPLETE_NODE = {
 const OPEN_CHILD_NODE = {
   issue: { id: 'term', identifier: 'ABC-30', title: 'A terminal node with an open subtask', description: 'Parent.', state: done, labels: [] },
   context: {
-    parent: null, siblings: [], project: null, comments: [],
+    parent: null, siblings: [], project: null, comments: [], planFacts: NO_PLAN('task-abc30'),
     children: [
       { id: 'c3', identifier: 'ABC-31', title: 'done one', state: done },
       { id: 'c4', identifier: 'ABC-32', title: 'open one', state: open }
@@ -54,9 +68,15 @@ const OPEN_CHILD_NODE = {
 };
 // A planned leaf whose plan-review asked for changes, a person's comment after it, and its runs.
 const PLAN_REVIEWED = {
-  issue: { id: 'pr', identifier: 'ABC-40', title: 'A planned leaf', description: 'Goal.\n\n## Implementation Plan\n\nRevision 2 — addresses plan-review F1.\n\nSession fit: fits one session.\n\nplan-review due: yes', state: open, labels: [] },
+  issue: { id: 'pr', identifier: 'ABC-40', title: 'A planned leaf', description: `Goal.\n\n## ${PLAN_HEADING_WORDS}\n\nRevision 1, old text.\n\nSession fit: several sessions.\n\nA plan review is owed: no.`, state: open, labels: [] },
   context: {
     parent: null, siblings: [], project: null, children: [], focusedChild: null,
+    // The plan record was revised (v2) after the Request Changes verdict; its plan-review finding is still open.
+    planFacts: planFactsOf({
+      task: task('task-abc40'),
+      inside: [{ id: 'plan-abc40aa', v: 2, kind: 'plan', state: 'kept', in: 'task-abc40', to: 'implementation', at: at(3) }],
+      findings: [{ id: 'finding-abc40aa', v: 1, kind: 'finding', state: 'open', to: 'plan-review', links: { about: ['plan-abc40aa'] } }]
+    }),
     comments: [
       { user: 'Agent', createdAt: at(1), body: '### Plan Review Verdict\n\n**Verdict:** Request Changes.' },
       { user: 'John', createdAt: at(2), body: 'F1 is right; take the narrow revision.' }

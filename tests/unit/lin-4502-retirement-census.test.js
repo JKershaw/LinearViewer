@@ -70,8 +70,8 @@ export const ALLOW = Object.freeze({
   },
   'lib/asked-of.js': {
     words: ['splitQuote'],
-    reason: 'the ONE legacy reader of the block that tickets filed before P2 still carry (askedOf, readFact, outsideAsked, '
-      + 'legacyBlockSpan all go through its private legacyBlock). Exit condition, written in its header: P4 (LIN-4504) moves '
+    reason: 'the ONE legacy reader of the block that tickets filed before P2 still carry (askedOf and outsideAsked go '
+      + 'through its private legacyBlock; LIN-4504 retired readFact and legacyBlockSpan). Exit condition, written in its header: P4 (LIN-4504) moves '
       + 'plan facts and the size record to records, and no ticket with a block is left without a task; then this goes',
   },
   'scripts/prompt-template-change-log.md': {

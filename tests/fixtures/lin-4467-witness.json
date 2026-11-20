@@ -22,13 +22,13 @@
     },
     "plan:fresh": {
       "name": "plan",
-      "bytes": 12255,
-      "sha256": "21a193388abdb95da1e6cf4a64868eba50a46b5ac798082cd9f148e90d0f1a5f"
+      "bytes": 12712,
+      "sha256": "905e4e7789c33a870bf8a82dd568b7b3abf4f4efae41b52c70b23b4c1cc78dca"
     },
     "plan:fix": {
       "name": "plan",
-      "bytes": 12255,
-      "sha256": "21a193388abdb95da1e6cf4a64868eba50a46b5ac798082cd9f148e90d0f1a5f"
+      "bytes": 12712,
+      "sha256": "905e4e7789c33a870bf8a82dd568b7b3abf4f4efae41b52c70b23b4c1cc78dca"
     },
     "look-into:fresh": {
       "name": "look into",
@@ -52,13 +52,13 @@
     },
     "breakdown:fresh": {
       "name": "breakdown",
-      "bytes": 6693,
-      "sha256": "6a6f65584ea6b66761420bcfe74180177bc7bb2a8a3056e65cbd7977ed322c09"
+      "bytes": 5778,
+      "sha256": "b4d2991d3fba21a287f2db7ca08aaecd736c4fa4a9a002a5782e1e7c36d3db72"
     },
     "breakdown:fix": {
       "name": "breakdown",
-      "bytes": 6693,
-      "sha256": "6a6f65584ea6b66761420bcfe74180177bc7bb2a8a3056e65cbd7977ed322c09"
+      "bytes": 5778,
+      "sha256": "b4d2991d3fba21a287f2db7ca08aaecd736c4fa4a9a002a5782e1e7c36d3db72"
     },
     "research:fresh": {
       "name": "research",
@@ -82,13 +82,13 @@
     },
     "design:fresh": {
       "name": "design",
-      "bytes": 4516,
-      "sha256": "3f0802a02d4084b5a8930baf48d453e48e6f231f9bf3436a0cdd4660104ef326"
+      "bytes": 4642,
+      "sha256": "3584f31007a747701f8f53fb678a41af44f3b7337aff2fcba7d0a87bdbb92d45"
     },
     "design:fix": {
       "name": "design",
-      "bytes": 4516,
-      "sha256": "3f0802a02d4084b5a8930baf48d453e48e6f231f9bf3436a0cdd4660104ef326"
+      "bytes": 4642,
+      "sha256": "3584f31007a747701f8f53fb678a41af44f3b7337aff2fcba7d0a87bdbb92d45"
     },
     "spike:fresh": {
       "name": "spike",
@@ -112,23 +112,23 @@
     },
     "plan-review:fresh": {
       "name": "plan-review",
-      "bytes": 8965,
-      "sha256": "9d8fd68bb81645497a1daf4ae0256f28a4520e1fdd6c46afe87c6f62aac82347"
+      "bytes": 9262,
+      "sha256": "c432bc36108979781a17c6f588dc75e199cb48f07e335d798305c702971fa6cf"
     },
     "plan-review:fix": {
       "name": "plan-review",
-      "bytes": 8965,
-      "sha256": "9d8fd68bb81645497a1daf4ae0256f28a4520e1fdd6c46afe87c6f62aac82347"
+      "bytes": 9262,
+      "sha256": "c432bc36108979781a17c6f588dc75e199cb48f07e335d798305c702971fa6cf"
     },
     "implementation:fresh": {
       "name": "implement",
-      "bytes": 11099,
-      "sha256": "a96d43cb1ad4e65736a6372c4e69e1ff56329b771daa3f844eaa27a53773a013"
+      "bytes": 11281,
+      "sha256": "2e0788e8188b9275764b7308e5360713445de1f26c7af629ad040f9ff1a8db1d"
     },
     "implementation:fix": {
       "name": "implement",
-      "bytes": 11733,
-      "sha256": "87e6c5ec6da81cc157f7426e8b0a0081165f3acab4ebaa6dade1076cc61e33a9"
+      "bytes": 11915,
+      "sha256": "0a42877f1f9d6d9e6a85d29fca6bb4b14014e91fc45276fd4b324d7d5b4d7c59"
     },
     "review:fresh": {
       "name": "review",
@@ -172,23 +172,23 @@
     },
     "survey-task:fresh": {
       "name": "survey-task",
-      "bytes": 2623,
-      "sha256": "790c1ec217daead6dc45e2b9a380b67cdff604df1a619384c8fa94b3b87cba84"
+      "bytes": 2633,
+      "sha256": "e10c2c6d0c64cda26010946f6322c253896eb72b8d901a40582109077860112b"
     },
     "survey-task:fix": {
       "name": "survey-task",
-      "bytes": 2623,
-      "sha256": "790c1ec217daead6dc45e2b9a380b67cdff604df1a619384c8fa94b3b87cba84"
+      "bytes": 2633,
+      "sha256": "e10c2c6d0c64cda26010946f6322c253896eb72b8d901a40582109077860112b"
     },
     "survey-place:fresh": {
       "name": "survey-place",
-      "bytes": 3538,
-      "sha256": "e24ab78beb62819ce2eef17e0c2b8767df19abfeeba0befd0e94a8dc82ec8a80"
+      "bytes": 3548,
+      "sha256": "87bed7d2135be6264c3557747096f078c9c93a225f1c848d2806ccd720c26ae2"
     },
     "survey-place:fix": {
       "name": "survey-place",
-      "bytes": 3538,
-      "sha256": "e24ab78beb62819ce2eef17e0c2b8767df19abfeeba0befd0e94a8dc82ec8a80"
+      "bytes": 3548,
+      "sha256": "87bed7d2135be6264c3557747096f078c9c93a225f1c848d2806ccd720c26ae2"
     },
     "blind-read:fresh": {
       "name": "blind-read",
@@ -229,8 +229,8 @@
       "    \"coreOutcome\": \"Task decomposed into actionable subtasks with clear ordering\",",
       "    \"readinessCheck\": \"Can someone start working through the subtasks in order?\",",
       "    \"signals\": [",
-      "      \"Subtasks created with clear titles and descriptions\",",
-      "      \"Each subtask has acceptance criteria\",",
+      "      \"Each piece written as a plan record in this task, addressed to implementation\",",
+      "      \"Each child task written with its piece and done-when, so Harbour makes its ticket; no plan text copied in\",",
       "      \"Blocked-by relations establish execution order\",",
       "      \"Summary comment added to parent task\"",
       "    ]",
@@ -299,16 +299,16 @@
       "    ]",
       "  },",
       "  \"plan\": {",
-      "    \"coreOutcome\": \"Implementation plan documented with session-fit decision made\",",
-      "    \"readinessCheck\": \"Does the plan document files, approach, and testing, and does it commit to a session-fit answer?\",",
+      "    \"coreOutcome\": \"A plan written as a plan record, addressed by its session fit\",",
+      "    \"readinessCheck\": \"Does the plan record document files, approach, and testing, and does its addressee commit to a session fit?\",",
       "    \"signals\": [",
-      "      \"Implementation steps clearly documented in description\",",
+      "      \"Steps clearly documented in the plan record\",",
       "      \"Files and functions to modify identified\",",
       "      \"Dependencies and order of operations defined\",",
       "      \"Test strategy outlined\",",
       "      \"Cuts to the `## As asked` block listed, or none\",",
       "      \"The behaviour is named, each place it lives is in or out of scope, and the plan says how it knows it found every place\",",
-      "      \"Session-fit answer recorded in the description (fits one session / needs multiple sessions)\"",
+      "      \"Session fit recorded as the plan record's addressee (implementation for one session, breakdown for several), with a plan-review finding when a review is due\"",
       "    ]",
       "  },",
       "  \"plan-review\": {",
@@ -318,7 +318,7 @@
       "      \"Premise checked: the cause the plan names, and each fact it inherits, confirmed true against its authoritative source\",",
       "      \"Whole problem checked: the plan says how it knows it found every place the behaviour lives, and each place it leaves out says why and names its ticket\",",
       "      \"Safeguards checked: a loosened validation, contract, or guard has a named test that tries what it stopped\",",
-      "      \"Shape checked: a prerequisite refactor is sequenced first only where something here needs it, and the plan says whether it fits one session\",",
+      "      \"Shape checked: a prerequisite refactor is sequenced first only where something here needs it, and the plan record's addressee matches how many sessions it needs\",",
       "      \"Each finding labelled block or note, with each note written so the builder can act on it\",",
       "      \"Explicit verdict issued (Approve / Request Changes / Needs Discussion), saying in one line how the plan meets what was asked (the `## As asked` block) and naming any cut\"",
       "    ]",
@@ -662,8 +662,8 @@
       "    \"description\": \"Break a large or vague task into smaller, actionable subtasks. Use when task scope is unclear or too big to start.\",",
       "    \"name\": \"breakdown\",",
       "    \"route\": {",
-      "      \"requires\": \"A plan or explicit phases, and an Approve from any plan-review that was due.\",",
-      "      \"when\": \"The plan needs multiple sessions, or the description lays out phases that each land on their own, and no subtasks cover them yet.\",",
+      "      \"requires\": \"A plan or explicit phases, and no plan review owed.\",",
+      "      \"when\": \"The plan records say several sessions (a plan addressed to breakdown), or the description lays out phases that each land on their own, and no subtasks cover them yet.\",",
       "      \"whenNot\": \"Steps that land together as one PR, or one PR in ordered commits (`implementation`); subtasks already cover the scope (`defer`).\"",
       "    },",
       "    \"writes\": \"work\"",
@@ -715,7 +715,7 @@
       "    \"name\": \"implement\",",
       "    \"route\": {",
       "      \"requires\": \"Gathered knowledge, a decided shape and committed scope.\",",
-      "      \"when\": \"A plan that fits one session, approved by any plan-review that was due; a small task whose one surface and change are already named; or the fix round after a code review requested changes.\",",
+      "      \"when\": \"A plan for one session (addressed to implementation) with no plan review owed; a small task whose one surface and change are already named; or the fix round after a code review requested changes.\",",
       "      \"whenNot\": \"No committed scope: a long or legible description is not a plan (`plan` or `research`). Landed work (`review`); a review Approve, plain or conditional: close-out makes its fixes. A bug cause that is refuted or unconfirmed (`bug`).\"",
       "    },",
       "    \"writes\": \"work\"",
@@ -732,12 +732,12 @@
       "  },",
       "  \"plan\": {",
       "    \"category\": \"ready\",",
-      "    \"description\": \"Decide how a well-defined change will be made, so it can be built without re-deciding anything, and whether it fits one session. Use when the task is well-defined and you need to document the approach before coding.\",",
+      "    \"description\": \"Decide how a well-defined change will be made, so it can be built without re-deciding anything, and whether one session can build it. Use when the task is well-defined and you need to document the approach before coding.\",",
       "    \"name\": \"plan\",",
       "    \"route\": {",
       "      \"requires\": \"Gathered knowledge and a decided shape.\",",
-      "      \"when\": \"The knowledge is gathered and the shape decided, but there is no plan with a session-fit answer.\",",
-      "      \"whenNot\": \"A complete plan (approach, places, session fit) is already in the description, a breakdown child's copied slice of an approved parent plan included: route on its session fit.\"",
+      "      \"when\": \"The knowledge is gathered and the shape decided, but the task has no plan record of its own and is not a piece of its parent's plan.\",",
+      "      \"whenNot\": \"The task has a plan record, or is a piece of its parent's plan: route on its session fit. Plan text in a description is not a plan.\"",
       "    },",
       "    \"writes\": \"work\"",
       "  },",
@@ -746,9 +746,9 @@
       "    \"description\": \"Judge a plan with fresh context before implementation starts: will building it solve the task's problem, with its premise, safeguards and shape checked against the code as it stands now, then issue a verdict. Use when a plan is documented but not yet implemented.\",",
       "    \"name\": \"plan-review\",",
       "    \"route\": {",
-      "      \"requires\": \"A plan in the description.\",",
-      "      \"when\": \"No plan-review since the plan last changed, and the gate is met: the plan says \\\"plan-review due: yes\\\", or it needs multiple sessions, routes around a named contract gap, relaxes a validation, contract or guard, or touches credential, merge-rule or dispatch-contract surfaces.\",",
-      "      \"whenNot\": \"The plan says \\\"plan-review due: no\\\" and nothing in it contradicts that (a breakdown child covered by its parent's approving plan-review included), or the work has landed.\"",
+      "      \"requires\": \"A plan record.\",",
+      "      \"when\": \"The facts say a plan review is owed (an open finding to plan-review about the plan, or a breakdown plan no plan-review has seen), and no plan-review since the plan last changed.\",",
+      "      \"whenNot\": \"No plan review is owed (a piece of an approved parent plan included), or the work has landed.\"",
       "    },",
       "    \"writes\": \"work\"",
       "  },",
@@ -862,7 +862,7 @@
     ]
   },
   "stageLabels": "71b1066de2fe5206ed5acf5f18d47b5a62543f8c22697e24a7e982a3264e192a",
-  "contracts": "baa24393f465e10f56c21f82b73815dcaf78301e2697bc7d3eff97bfd2e07ee4",
+  "contracts": "b24ba578cda8fba7f900b82c829c70bc53fd2074d61a2cdf181fc23e7c9be3f8",
   "stepWords": "0a06759d642d8c2268893789c6c196461af7b338e3b58dccf0ce7ab5353cbec5",
   "overrideLine": "e8cd49b7b5b35ecfe83ae820694879f466b3017d1dad0ef0655dbe15944aefb9"
 }

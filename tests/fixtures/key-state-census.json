@@ -55,10 +55,6 @@
     "disposition": "database-backed",
     "why": "A field of DispatchQueueStore; the store is database-backed and its own /test/clear-* routes reset it."
   },
-  "lib/github-pr-files.js::prFilesCache": {
-    "disposition": "global-only",
-    "exception": "github-pr-files-cache"
-  },
   "lib/github-pr-status.js::failOpenPrStatusCache": {
     "disposition": "global-only",
     "exception": "pr-status-fail-open"

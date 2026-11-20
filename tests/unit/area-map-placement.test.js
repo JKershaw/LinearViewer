@@ -106,6 +106,12 @@ describe('code-shape area map placement (LIN-3729)', () => {
     assert.strictEqual(areaOf('lib/asked-of.js'), 'LLM & prompts');
   });
 
+  // LIN-4504: the one recognition rule for old plan text (lib/legacy-plan-text.js) sits beside asked-of.js, its first user;
+  // the selector view, the kept section and the proxy's write refusal are its other users. Not the catch-all.
+  test('the legacy plan-text rule lands in LLM & prompts', () => {
+    assert.strictEqual(areaOf('lib/legacy-plan-text.js'), 'LLM & prompts');
+  });
+
   // LIN-4369: the size record's owner supplies the scoping prompt's words (sizes, decided-by values, record parts)
   // and the selector's facts line, beside the As-asked owner. It fell through to the catch-all when LIN-4368 added it.
   test('the size record owner lands in LLM & prompts', () => {

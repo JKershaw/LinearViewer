@@ -7,9 +7,9 @@ import { test } from 'node:test';
 import assert from 'node:assert';
 import { formatStageContract } from '../../lib/prompt-contract.js';
 import { latestReviewComment, readRunLedger } from '../../lib/run-trail.js';
-import { extractPlanSection } from '../../lib/file-pointer.js';
-import { extractSessionFit } from '../../lib/recommendation-facts.js';
-import { extractVerdict, planReviewDueOf } from '../../lib/plan-review-round-trips.js';
+import { extractVerdict } from '../../lib/run-trail.js';
+import { planFactsOf } from '../../lib/records/plan-facts.js';
+import { PLAN_ADDRESSEES } from '../../lib/records/check.js';
 import { extractPrUrls } from '../../lib/run-evidence.js';
 
 const titleIn = (contract, word) => contract.match(new RegExp('`(## ' + word + '[^`]*)`'))[1];
@@ -27,16 +27,26 @@ test('a read-only tracker gets no contract: it takes no writes', () => {
   assert.notStrictEqual(formatStageContract('review', 'LIN-1', { write: true }), '');
 });
 
-test('plan: the heading, session-fit phrase and gate line are the ones their readers key on', () => {
+test('plan (LIN-4504): the contract writes a plan record and its review finding, the shapes the records readers key on', () => {
   const c = formatStageContract('plan', 'LIN-1');
-  // LIN-4502: the plan line no longer names a block to write below (the seal is retired).
-  const [heading, fits, multi, dueYes, dueNo] = ticks(c);
-  assert.strictEqual(heading, '## Implementation Plan');
-  assert.strictEqual(extractPlanSection(`Intro\n\n${heading}\n\n- lib/a.js: change\n`).trim(), '- lib/a.js: change');
-  assert.strictEqual(extractSessionFit(`${heading}\n\n${fits}`), 'fits one session');
-  assert.strictEqual(extractSessionFit(`${heading}\n\n${multi}`), 'needs multiple sessions');
-  assert.strictEqual(planReviewDueOf(dueYes), 'yes');
-  assert.strictEqual(planReviewDueOf(dueNo), 'no');
+  assert.ok(!/Implementation Plan|description, under/.test(c), 'no plan goes into the description');
+  for (const shape of ['POST /api/proxy/records', '"kind": "plan"', '"in": "LIN-1"', '"to": "implementation"', '"to": "breakdown"', '"to": "plan-review"', '"about": "<the plan id>"', '/revise']) {
+    assert.ok(c.includes(shape), shape);
+  }
+  for (const to of PLAN_ADDRESSEES) assert.ok(c.includes(`"to": "${to}"`), `the contract names the addressee ${to} the records route accepts`);
+  // The records the contract asks for fold into the facts the selector reads.
+  const facts = planFactsOf({ task: { id: 'task-1', kind: 'task' }, inside: [{ id: 'plan-1', v: 1, kind: 'plan', state: 'kept', in: 'task-1', to: 'breakdown' }], findings: [{ id: 'finding-1', kind: 'finding', state: 'open', to: 'plan-review', links: { about: ['plan-1'] } }] });
+  assert.deepEqual([facts.sessionFit, facts.reviewOwed.owed, facts.reviewOwed.why], ['several', true, 'open-finding']);
+});
+
+test('design (LIN-4504, John\'s ruling d1d5ab31): writes no plan record, so it has no contract', () => {
+  assert.strictEqual(formatStageContract('design', 'LIN-1'), '');
+});
+
+test('plan-review (LIN-4504): Approve ends the review finding; other verdicts leave it open', () => {
+  const c = formatStageContract('plan-review', 'LIN-1');
+  assert.ok(c.includes('On Approve, end the open finding to plan-review about the plan'));
+  assert.ok(c.includes('On Request Changes or Needs Discussion, leave it open'));
 });
 
 test('plan-review: the verdict comment shape resolves its verdict, even when a finding names another word', () => {

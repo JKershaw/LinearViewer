@@ -1,7 +1,7 @@
 #!/usr/bin/env node
 /**
  * Post-deploy retention-lifetime operator pass (LIN-3164; phase **C** of the
- * approved LIN-3157 implementation plan v3, §3 "C").
+ * approved LIN-3157 plan v3, §3 "C").
  *
  * NOT a route, NOT autopilot-reachable, NOT auto-executed on boot or anywhere
  * else — this file has no import site in the app. An operator runs it by hand.

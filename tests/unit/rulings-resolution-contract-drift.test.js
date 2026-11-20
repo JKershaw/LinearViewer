@@ -33,6 +33,7 @@ import { fileURLToPath } from 'node:url';
 import { dirname, join } from 'node:path';
 import { buildRouterPrompt } from '../../lib/stage-router.js';
 import { buildSelectorArgs } from '../../lib/openrouter.js';
+import { planFactsOf } from '../../lib/records/plan-facts.js';
 
 const __dirname = dirname(fileURLToPath(import.meta.url));
 const read = (relPath) => readFileSync(join(__dirname, '../..', relPath), 'utf8');
@@ -160,7 +161,8 @@ describe('no-re-raise guidance literal list (LIN-2891/LIN-3038)', () => {
     assert.strictEqual(countOccurrences(baselineSource, 'answered, or dismissed'), 0,
       'the baseline snapshot carries no stale list');
 
-    const leaf = buildSelectorArgs({ identifier: '{{IDENTIFIER}}', title: '', state: {}, labels: [] }, {});
+    // LIN-4504: the same explicit plan facts regen-baseline.mjs renders (a task whose records hold no plan).
+    const leaf = buildSelectorArgs({ identifier: '{{IDENTIFIER}}', title: '', state: {}, labels: [] }, { planFacts: planFactsOf({ task: { id: 'task-leaf', kind: 'task' } }) });
     const fresh = buildRouterPrompt({ ...leaf, view: '{{ISSUE_CONTEXT}}', featureFlags: {} });
     assert.strictEqual(baselineSource, fresh,
       'scripts/eval/meta-prompt.baseline.txt is stale — run `node scripts/eval/regen-baseline.mjs`');

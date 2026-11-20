@@ -1,6 +1,6 @@
 #!/usr/bin/env node
 /**
- * scripts/plan-review-round-trips.mjs  (LIN-1883 Session 1 — Implementation Plan v3)
+ * scripts/plan-review-round-trips.mjs  (LIN-1883 Session 1 — the plan of record, v3)
  *
  * The network read behind the plan-review round-trips instrument. All analysis
  * lives in `lib/plan-review-round-trips.js` (pure, network-free, unit-tested);
@@ -41,7 +41,8 @@
  *
  * ── THE READ PLAN ────────────────────────────────────────────────────────────
  * Per issue in the workspace:
- *   1. `GET /issues/{id}`                          — description (gateDue) + comments (tier A verdict)
+ *   1. `GET /issues/{id}`                          — comments (tier A verdict)
+ *   (and once: `GET /records?kind=task|plan|finding&to=plan-review` — the plan facts gateDue reads, LIN-4504)
  *   2. `GET /dispatch?issueIdentifier={id}&limit=…` — the H12-guarded SCOPED pipeline read (never
  *                                                      the unscoped list endpoint — LIN-1030)
  *   3. `GET /dispatch/{rowId}` per `plan-review`-kind row from (2) — feedback, for the tier B
@@ -60,6 +61,7 @@ import { tmpdir } from 'node:os';
 import { fileURLToPath } from 'node:url';
 import { execFileSync } from 'node:child_process';
 import { computePlanReviewRoundTrips, __internal } from '../lib/plan-review-round-trips.js';
+import { readPlanFactsThroughProxy } from './plan-facts-proxy.mjs';
 const { requireInstant } = __internal;
 import { classifyUpstreamError } from '../lib/errors.js';
 
@@ -328,7 +330,7 @@ function render(result, meta) {
   L.push('');
   L.push('  GATE-DUE / GATE-HONOURED (unconditioned series)');
   L.push('  ' + '─'.repeat(74));
-  L.push(`    due=${num(result.gate.due)}  honoured=${num(result.gate.honoured)}  dueRate=${pctOf(result.gate.dueRate)}  honouredRate=${pctOf(result.gate.honouredRate)}  ${result.gate.sufficient ? 'sufficient' : 'INSUFFICIENT'} (floor ${result.gate.minDenominator})`);
+  L.push(`    due=${num(result.gate.due)}  honoured=${num(result.gate.honoured)}  measured=${num(result.gate.measured)}  not measured=${num(result.gate.notMeasured)} (no plan records cover them)  dueRate=${pctOf(result.gate.dueRate)}  honouredRate=${pctOf(result.gate.honouredRate)}  ${result.gate.sufficient ? 'sufficient' : 'INSUFFICIENT'} (floor ${result.gate.minDenominator})`);
   L.push('');
   if (!result.primary.sufficient) {
     L.push('  ⚠ INSUFFICIENT DATA on the primary rate. Record the baseline anyway — a null');
@@ -406,9 +408,13 @@ async function main() {
   log('per-issue read: detail + scoped dispatch pipeline + plan-review row detail…');
   const { issues, skipped, calls } = await fetchAll(rows, args);
 
+  log('reading plan records through the proxy (three reads)…');
+  const planFacts = await readPlanFactsThroughProxy({ base: args.base, token: args.token, getJson, tickets: issues.map((i) => i.identifier).filter(Boolean) });
+
   const asOf = iso(Date.now());
   const result = computePlanReviewRoundTrips(issues, {
     asOf,
+    planFacts,
     rulerChangeAt: args.rulerChangeAt || undefined,
     windowDays: args.windowDays || undefined,
     codeVersion: readCodeVersion(),

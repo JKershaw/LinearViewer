@@ -83,7 +83,7 @@ function fakeProvider({ comments = [], description = '', supports = () => true, 
   return { name, seen };
 }
 
-function buildApp({ store, providerName }) {
+function buildApp({ store, providerName, recordsStore }) {
   const workspace = { urlKey: 'ws-1', name: 'Workspace One', provider: providerName, accessToken: 'tok' };
   const app = express();
   app.use(createDashboardRoutes({
@@ -102,6 +102,7 @@ function buildApp({ store, providerName }) {
     fetchWorkspaceIssues: async () => [],
     getOpenRouterSource: () => null,
     getDeployInfo: () => ({}),
+    ...(recordsStore ? { recordsStore } : {}),
   }));
   return app;
 }
@@ -141,9 +142,11 @@ describe('the happy path populates both survival rows through the provider seam'
     const planCard = json.perKind.find((k) => k.kind === 'plan');
     assert.equal(planCard.survival.state, 'computed');
     assert.equal(planCard.survival.rate, 1);
-    // The description WAS read, so the gate fields are real rather than omitted.
-    assert.equal(planCard.survival.gateDue, 1);
-    assert.equal(planCard.survival.gateHonoured, 1);
+    // LIN-4504: the description says due, but the gate is read from records only; with no records store (and no
+    // plan records covering this history) it reads not measured, never 1 and never 0.
+    assert.equal(planCard.survival.gateDue, 0);
+    assert.equal(planCard.survival.gateNotMeasured, 1);
+    assert.equal(planCard.survival.gateDueRate, null);
     assert.equal(json.completeness.complete, true);
   });
 
@@ -344,22 +347,34 @@ describe('provider capability gating', () => {
     assert.ok(json.notes.survivalUnavailable);
   });
 
-  test('a provider with comments but no fetchIssueFields omits gateDue/gateHonoured rather than zeroing them', async () => {
+  test('LIN-4504: the route reads plan facts from the records store, once for every scored issue; no figure from a description', async () => {
     const store = fakeStore({ historyRows: LINEAGE });
-    const { name, seen } = fakeProvider({
-      comments: APPROVE_COMMENTS,
-      supports: (cap) => cap === 'fetchIssueComments',
-    });
-    const { status, body } = await get(buildApp({ store, providerName: name }), '/workspace/ws-1/api/effort-readout');
+    const { name } = fakeProvider({ comments: APPROVE_COMMENTS, description: 'plan-review due: yes' });
+    const asked = [];
+    const recordsStore = { planFactsForTickets: async (urlKey, tickets) => { asked.push([urlKey, tickets]); return new Map(tickets.map((t) => [t, { measured: true, reviewAsked: true, everPlanned: true }])); } };
+    const { status, body } = await get(buildApp({ store, providerName: name, recordsStore }), '/workspace/ws-1/api/effort-readout');
     assert.equal(status, 200);
-    const json = JSON.parse(body);
-    const planCard = json.perKind.find((k) => k.kind === 'plan');
-    assert.equal(planCard.survival.state, 'computed');
-    assert.equal(planCard.survival.rate, 1, 'the verdict walk still resolves from comments');
-    assert.equal(planCard.survival.gateDue, undefined, 'a fabricated zero is worse than an omission');
-    assert.equal(planCard.survival.gateFieldsUnavailable, true);
-    assert.equal(seen.fields.length, 0);
-    assert.ok(json.notes.gateFieldsUnavailable);
+    assert.deepEqual(asked, [['ws-1', ['LIN-1']]], 'one batched read');
+    const planCard = JSON.parse(body).perKind.find((k) => k.kind === 'plan');
+    assert.equal(planCard.survival.gateNotMeasured, 1, 'this history predates the cutover (PLAN_RECORDS_SINCE, 2026-11-20): not measured');
+    assert.match(JSON.parse(body).notes.planRecordsCoverage, /not measured/);
+    const page = await get(buildApp({ store, providerName: name, recordsStore }), '/workspace/ws-1/effort-readout');
+    assert.match(page.body, /plan-review gate due\/honoured: not measured for 1 \(no plan records before 2026-11-20\)/);
+  });
+
+  test('LIN-4504: a records store that fails leaves the gate not measured, and the read-out still renders', async () => {
+    const store = fakeStore({ historyRows: LINEAGE });
+    const { name } = fakeProvider({ comments: APPROVE_COMMENTS });
+    const recordsStore = { planFactsForTickets: async () => { throw new Error('db down'); } };
+    const origError = console.error;
+    console.error = () => {};
+    try {
+      const { status, body } = await get(buildApp({ store, providerName: name, recordsStore }), '/workspace/ws-1/api/effort-readout');
+      assert.equal(status, 200);
+      assert.equal(JSON.parse(body).perKind.find((k) => k.kind === 'plan').survival.gateNotMeasured, 1);
+    } finally {
+      console.error = origError;
+    }
   });
 });
 

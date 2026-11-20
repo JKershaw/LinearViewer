@@ -552,8 +552,7 @@ export function registerFeedbackRoutes(router, { workspaceFromUrl, freeTierStore
       // the issue is created in and the stamped one cannot drift. Selection-only
       // provenance, never a credential (B1).
       // `access` is the provider and token that just created the ticket, for the dispatch
-      // seat's one issue access (the ticket's task, LIN-4501; the file-pointer plan read;
-      // the child-ticket retry). Passing it means "no access" in the log is a real gap.
+      // seat's one issue access (the ticket's task, LIN-4501; the child-ticket retry). Passing it means "no access" in the log is a real gap.
       const overrides = { model, harness, runGate, bindingPair: provider?.name ? { issueSource: provider.name } : {}, access: { provider, token } };
 
       // LIN-3383: both lanes enqueue a `cli` row for the owner's runner, so only the

@@ -108,7 +108,7 @@ describe('the selector prompt (LIN-3300)', () => {
     assert.doesNotMatch(p, /Comment number 1\./);
     assert.match(p, /Comment number 5\./);
     assert.match(p, /TRAIL FACTS \(computed in code from all 5 comments/);
-    assert.match(p, /- Implementation plan: none/);
+    assert.match(p, /- Plan records: not measured/, 'LIN-4504: with no records read, the plan facts say so');
   });
 
   test('a node sees its subtask facts and the suggested child', () => {
@@ -116,7 +116,7 @@ describe('the selector prompt (LIN-3300)', () => {
     const p = prompt(leaf(), ctx({ children, focusedChild: { issue: children[0] } }));
     assert.match(p, /- Subtasks: 1 \(0 done, 0 in progress, 1 remaining\)/);
     assert.match(p, /Frontier next child[^\n]*LIN-2/);
-    assert.doesNotMatch(p, /- Implementation plan:/, 'plan facts are a leaf\'s');
+    assert.doesNotMatch(p, /- Plan records/, 'plan records lines are a leaf\'s');
   });
 
   // LIN-3300 simplify: the plan-review facts are plain data. The selector sees the
