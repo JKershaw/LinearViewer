@@ -20,6 +20,8 @@ It never looks at what actually landed (`lib/ship-biscuit.js:37-38`). Its "Befor
 - an edition leads with what landed in its window;
 - its tests pin the new shape.
 
+**Checking it:** the regular tests only. Don't run evals, and don't generate editions to try it out: each costs John money. John checks it live himself once it's deployed.
+
 **Not in this ticket:** the snapshot store, its capture code and its two proxy endpoints. Slice 2 retires those.
 
 **Where to read:** a read-only check of the current code (20 Nov) found:

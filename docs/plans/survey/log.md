@@ -4720,3 +4720,9 @@ Still waiting on `lin4499-snapshot-cut`.
 - **Not rushing:** the slice 2 corrections wait until John finishes his review. Then I update LIN-4499 and answer the ruling.
 
 - **Ship Biscuit check done** (08:30). Every source it reads is about runs. Snapshots feed only its Before→After moves, and it is the only caller of `listByWorkspace`. Merges recorded in `close-out-events` (`listMergedSince`) are a lasting source, which slice 3's change records build on. Tracker completions come via `fetchWorkspaceIssues`. Nothing would turn this into a ruling. Draft ticket at `integration/ship-biscuit-tidy.md`, for John to review before filing.
+
+### 20 Nov, ~08:45: Ship Biscuit tidy-first filed and launched; slice 2 waits on it
+
+- **LIN-4500** (id 2ce9650c-2b51-4e6f-b942-7be75e2a47dc), standalone, Backlog, from `integration/ship-biscuit-tidy.md`. John added a caution: regular tests only, no evals and no generated editions, because they cost money. John checks it live after deploy. That caution is also in the kickoff goal.
+- **Next:** when LIN-4500 lands, update LIN-4499 with John's corrections, answer `lin4499-snapshot-cut` to match (retire fully), and slice 2 proceeds.
+- **John on the stop:** it was right to stop, even if for the wrong reason ("it stopped for a vibe").
