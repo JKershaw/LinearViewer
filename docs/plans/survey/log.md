@@ -4734,3 +4734,10 @@ Still waiting on `lin4499-snapshot-cut`.
 - PR #2471 green, not merged yet.
 - No evals or generated editions seen; when there is nothing to report, the new code returns 502 without an LLM call.
 - Only open ruling: `lin4499-snapshot-cut`. Main healthy.
+
+### 20 Nov, 10:27
+
+- **LIN-4500 Done** (merged and deployed). John checked it live: it works, but misses the big picture. Fine for now; noted for the smoothing pass.
+- **The PATCH to LIN-4499 was refused** with AS_ASKED_IMMUTABLE: the seal blocks the correction, as John predicted.
+- **Proposed:** append a corrections section below the block. Waiting on John.
+- **Ruling:** with Ship Biscuit moved, retire-fully is now the right answer to `lin4499-snapshot-cut`.
