@@ -4863,3 +4863,9 @@ Still waiting on `lin4499-snapshot-cut`.
 - **LIN-4504:** one session is doing all 5 beats. S1 and S2 are pushed. Draft PR #2476, with unit tests red on the 18:11 push, mid-work.
   - The beat was dispatched before John's no-record answer and has touched the design writer too. Ruling relayed to its driver 12fc9326 (note 9ece2b28) so it checks the work matches.
 - **Status:** LIN-4506 Todo. No rulings. Main green. Cost about $215.
+
+### 20 Nov, 19:17: fleet paused for the LIN-4504 cutover
+
+- **The ruling:** `lin4504-cutover-pause` (the run's token is unbound, so it can't pause the fleet).
+- **What I did, on John's go-ahead:** set the pause myself (POST /dispatch/halt, mode pause, 19:16:59) with the owner-minted token. Proposed answer b on the ruling. Told the waiting run (note a5c1b066) to cut over and report "cutover done".
+- **Clearing it:** a background watcher checks every 2.5 min. The pause comes off as soon as the cutover is reported done, since nothing new starts while it is on.
