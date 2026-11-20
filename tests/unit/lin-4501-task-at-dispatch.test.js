@@ -235,6 +235,23 @@ describe('the checked writer makes a ticket\'s task once, with its asked', () =>
   });
 });
 
+describe('askedForTickets: the person\'s words for many tickets in one read (the readers\' source)', () => {
+  test('each ticket with a task maps to its asked; no task, or a task with no asked, is absent', async () => {
+    const tracker = trackerFake({
+      'LIN-20': ticket('LIN-20', 'First words.'),
+      'LIN-21': ticket('LIN-21', 'Second words.\n\n## Implementation Plan\n\nplan'),
+      'LIN-22': ticket('LIN-22', '')
+    });
+    const writes = writesWith(tracker);
+    for (const ref of ['LIN-20', 'LIN-21', 'LIN-22']) await writes.taskOfTicket({}, URL_KEY, ref, 'dispatch');
+    const got = await store.askedForTickets(URL_KEY, ['LIN-20', 'LIN-21', 'LIN-22', 'LIN-99', null, 'LIN-20']);
+    assert.deepEqual(Object.fromEntries(got), { 'LIN-20': 'First words.', 'LIN-21': 'Second words.' });
+    assert.equal(await store.askedForTicket(URL_KEY, 'LIN-21'), 'Second words.');
+    assert.equal(await store.askedForTicket(URL_KEY, 'LIN-99'), null);
+    assert.equal((await store.askedForTickets('another-workspace', ['LIN-20'])).size, 0, 'one workspace\'s words never answer another');
+  });
+});
+
 describe('the dispatch seat makes the task on every dispatch that names a ticket', () => {
   // The real factory on a real dispatch store (the lin-3134 pattern); the store's seam is a recording fake, as
   // server.js injects the real one.
@@ -284,5 +301,25 @@ describe('the dispatch seat makes the task on every dispatch that names a ticket
     const { value: item, lines } = await logged(() => dispatch(store, { issueIdentifier: 'LIN-11' }));
     assert.ok(item?._id);
     assert.ok(lines.some((l) => l.startsWith('[task-missing-at-dispatch]') && /is closed/.test(l)));
+  });
+});
+
+describe('the readings count a take that opened task-less (records.tasklessRuns)', () => {
+  test('a run whose fallback failed counts, a run in its task does not, and --since narrows the window', async () => {
+    const { recordsOfSnapshots } = await import('../../scripts/records-readings.mjs');
+    const good = trackerFake({ 'LIN-30': ticket('LIN-30', 'Words.') });
+    const opened = (at) => createRunRecords({
+      recordsStore: store,
+      now: () => new Date(at),
+      taskOfTicket: (urlKey, ref) => writesWith(ref === 'LIN-30' ? good : trackerFake({}, { failing: true })).taskOfTicket({}, urlKey, ref, 'dispatch')
+    });
+    await logged(() => opened('2026-11-20T10:00:00.000Z').onTaken(row({ _id: 'row-old', issueIdentifier: 'LIN-31' })));
+    await logged(() => opened('2026-11-20T14:00:00.000Z').onTaken(row({ _id: 'row-in', issueIdentifier: 'LIN-30' })));
+    await logged(() => opened('2026-11-20T15:00:00.000Z').onTaken(row({ _id: 'row-miss', issueIdentifier: 'LIN-32' })));
+    const snaps = await store.snapshots(URL_KEY);
+    const asOf = '2026-11-20T16:00:00.000Z';
+    assert.deepEqual(recordsOfSnapshots(snaps, asOf).tasklessRuns, { count: 2, of: 3, since: null, asOf, runs: ['row-old', 'row-miss'] });
+    const sinceDeploy = recordsOfSnapshots(snaps, asOf, { since: '2026-11-20T12:00:00.000Z' }).tasklessRuns;
+    assert.deepEqual([sinceDeploy.count, sinceDeploy.of, sinceDeploy.runs], [1, 2, ['row-miss']], 'since the deploy: only the miss');
   });
 });
