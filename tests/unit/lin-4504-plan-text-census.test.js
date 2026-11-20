@@ -68,6 +68,8 @@ export const SLICE2_EXCLUDED = Object.freeze({
   'docs/prompt-system-audit.md': 'a dated audit whose recommendations name the code as it stood',
   'docs/prompt-system-audit.html': 'the rendered copy of the dated audit above',
   'docs/recommendation-engine-redesign.md': 'a dated design record',
+  // Branch-only, as the P1 and P5 importers were: it goes in the PR's last commit, and this line with it.
+  'scripts/records/slice-2-import.mjs': 'the branch-only slice-2 cutover importer: it reads old plan text by design, through the deployed commit\'s readers, and is deleted in the PR\'s last commit',
 });
 
 /**
