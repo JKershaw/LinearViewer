@@ -22,7 +22,7 @@ import { isTerminalState } from '../../lib/providers/state-map.js';
 import { askedOf } from '../../lib/asked-of.js';
 import { STAGE_KINDS } from '../../lib/prompts/stage-kinds.js';
 import {
-  planTicket, importPlanOf, applyImport, compareFacts, recordsAfter, importIdsOf, oldFactsOf, ADDRESSEE_OF_FIT, EXPLAINED, PROPOSED,
+  planTicket, importPlanOf, applyImport, compareFacts, recordsAfter, importIdsOf, oldFactsOf, ADDRESSEE_OF_FIT, EXPLAINED,
 } from '../../scripts/records/slice-2-import.mjs';
 
 const old = (over = {}) => ({ leaf: true, where: null, parent: null, at: null, sessionFit: null, planReviewDue: null, nodeSessionFit: null, latestVerdict: { verdict: null, at: null }, lookFirstHasPlan: false, ...over });
@@ -132,7 +132,7 @@ describe('compare: every difference is classified against the closed list', () =
     assert.equal(by('LIN-3', 'partOfParent').explained, 'C');
     assert.equal(by('LIN-4', 'reviewDue').explained, 'D');
     assert.deepEqual(result.unexplained, []);
-    assert.deepEqual(Object.keys(EXPLAINED), ['A', 'B', 'C', 'D', 'E']);
+    assert.deepEqual(Object.keys(EXPLAINED), ['A', 'B', 'C', 'D', 'E', 'F']);
 
     // A record the import did not write (or wrote wrongly) shows as unexplained: here a plan addressed the other way.
     const wrong = recordsAfter(cap, planned);
@@ -141,13 +141,25 @@ describe('compare: every difference is classified against the closed list', () =
     assert.ok(bad.unexplained.some((d) => d.ticket === 'LIN-4' && d.fact === 'sessionFit'), JSON.stringify(bad.unexplained));
   });
 
-  test('a session-fit phrase on a ticket with no plan is proposed as F, and stays unexplained until a person accepts it', () => {
+  test('a session-fit phrase on a ticket with no plan is explained as F (plan-review finding-eb79d156)', () => {
     const cap = capOf({ 'LIN-9': ticket('LIN-9', { description: '## Scope\n\nOne session will do.', old: old({ sessionFit: 'fits one session' }) }) });
     const planned = importPlanOf(cap);
     assert.equal(planned.rows[0].action, 'none', 'prose is not a plan: nothing is imported');
     const result = compareFacts(cap, planned, recordsAfter(cap, planned));
-    assert.deepEqual(result.unexplained.map((d) => [d.fact, d.proposal]), [['sessionFit', 'F']]);
-    assert.ok(PROPOSED.F);
+    assert.deepEqual(result.differences.map((d) => [d.fact, d.explained]), [['sessionFit', 'F']]);
+    assert.deepEqual(result.unexplained, []);
+  });
+
+  test('F never explains a ticket that holds a plan: the same shape with a plan stays unexplained', () => {
+    // A ticket whose old reader found a plan (captured where, a session fit) that the import did not carry: its
+    // session fit now reads none. That is a real loss, not prose, so F must not cover it.
+    const cap = capOf({ 'LIN-10': ticket('LIN-10', { planSection: 'p', old: old({ where: 'description', sessionFit: 'fits one session', lookFirstHasPlan: true }) }) });
+    const planned = { ...importPlanOf(cap), rows: [{ ticket: 'LIN-10', action: 'none' }] };
+    const result = compareFacts(cap, planned, recordsAfter(cap, planned));
+    const d = result.differences.find((x) => x.fact === 'sessionFit');
+    assert.ok(d, 'the session-fit loss is compared');
+    assert.equal(d.explained, null);
+    assert.equal(result.unexplained.length > 0, true);
   });
 
   test('matching facts give no difference, and the ticket holding the throwaway plan is E', () => {

@@ -348,14 +348,7 @@ export const EXPLAINED = Object.freeze({
   C: 'a note-A leaf (planned only through its parent) held: reads no plan',
   D: 'a breakdown plan with no plan-review finding: reads due',
   E: 'the ticket holding plan-72a996db (a throwaway plan record LIN-4503\'s close-out wrote)',
-});
-
-/**
- * Explanations the dry run found that the approved list does not hold. A difference carrying one is still UNEXPLAINED
- * (the fleet stays paused) until a person accepts it; the proposal says what it is so the ruling is quick.
- */
-export const PROPOSED = Object.freeze({
-  F: 'a session-fit phrase in a ticket with no plan (prose, a Scope line, a quote): the old reader read it from text beside "Implementation plan: none"; with no plan record it reads none, which is what the slice asks (nothing reads session fit from ticket text). Not imported: it is not a plan',
+  F: 'a session-fit phrase in a ticket with no plan (prose, a Scope line, a quote): the old reader read it from ticket text; with no plan record it reads none, which is what the slice asks (nothing reads session fit from ticket text). Not imported: it is not a plan. Accepted by plan-review finding-eb79d156 (LIN-4504); not a John call. Only a ticket with no plan, no parent plan and no import row can be F',
 });
 
 const NEW_FIT = { several: 'needs multiple sessions', one: 'fits one session' };
@@ -409,8 +402,10 @@ export function compareFacts(cap, planned, after) {
       else if (row.action === 'held' && row.reason === 'parent-only') why = 'C';
       else if (fact === 'reviewDue' && oldValue === true && newValue === false && o.latestVerdict?.verdict === 'approve') why = 'A';
       else if (fact === 'reviewDue' && oldValue === false && newValue === true && n.reviewOwed?.why === 'breakdown-unreviewed') why = 'D';
-      const proposal = !why && fact === 'sessionFit' && row.action === 'none' && !o.where && !o.parent && newValue === null ? 'F' : null;
-      differences.push({ ticket: ref, fact, old: oldValue, new: newValue, explained: why, ...(proposal ? { proposal } : {}) });
+      // F: a ticket with no plan (nothing captured, nothing imported) whose old session fit came from prose. Guarded so a
+      // ticket that does hold a plan can never be explained this way: its difference stays unexplained.
+      if (!why && fact === 'sessionFit' && row.action === 'none' && !o.where && !o.parent && newValue === null) why = 'F';
+      differences.push({ ticket: ref, fact, old: oldValue, new: newValue, explained: why });
     };
     const oldHas = Boolean(o.where || o.parent || (!o.leaf && o.nodeSessionFit));
     if (oldHas !== n.hasPlan) explain('hasPlan', oldHas, n.hasPlan);
