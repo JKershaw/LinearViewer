@@ -51,6 +51,15 @@ No follow-on dispatches were made. LIN-4495 was marked Done at 22:58.
 
 Agents can reach production through the Railway CLI on John's machine. It's deliberately unadvertised. So the live import and the production readings are agent work, not John's. John does the signed-in checks.
 
+## Remakes (20 Nov afternoon)
+
+The four tasks with a wrong `asked` were remade rather than corrected:
+- LIN-3357 → LIN-4509;
+- LIN-4028 → LIN-4510 (PR #2185 closed);
+- LIN-1785 → LIN-4511 (children LIN-2421 and 2422 re-parented).
+
+LIN-4210 was dropped (no clear answer; already pinned). The old tickets are closed with pointers. Where the re-review verdicts above name LIN-3357 or LIN-4028, read LIN-4509 and LIN-4510.
+
 ## How tidies like this are handled
 
 A judgement call, not a rule (John, 19 Nov). Tidying as we go, a small standalone task, or waiting until the end can each be right, depending on the case. Keeping the running slice going matters most. John expects much of this to sort itself out once the upgrade is done.

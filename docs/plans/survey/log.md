@@ -4824,3 +4824,21 @@ Still waiting on `lin4499-snapshot-cut`.
   - I proposed design-plans: one stage writes the plan, which matches the design. But plan-review must still run, because it caught a blocker in slice 2's own plan today. That needs John's free text.
 - **Status:** cost $152.68. Main green.
 - **Still with John:** closing PR #2185, and LIN-4210 (an agent-written question for him, not a task).
+
+### 20 Nov, ~16:50: four tickets remade or dropped; design keeps its stage
+
+- **Remade, each carrying only the original ask,** so Harbour's own surveys and planning start fresh:
+  - LIN-3357 → **LIN-4509**, with John's words from LIN-751;
+  - LIN-4028 → **LIN-4510**;
+  - LIN-1785 → **LIN-4511**.
+  - Parent, project and priority match the originals. The old tickets are closed with pointers.
+  - LIN-4511 took LIN-1785's open children (LIN-2421, 2422).
+  - Notes pointing to the new tickets went on LIN-3449, 4156, 1788, 1822 and 2569.
+- **PR #2185** closed on John's go-ahead (572 commits behind main, conflicting).
+- **LIN-4210** dropped: an agent-written question with no clear answer. Every halt read fails open by design (LIN-2994, LIN-4080), and a test already pins the cold-cache case.
+- **My slip:** a script captured the HTTP status along with each new id, so eight pointer comments named the wrong tickets and two re-parents failed. All were corrected in place within minutes.
+- **Ruling `lin4504-design-plan-record`:** a subagent found a clear division of labour.
+  - Design picks the shape. Plan checks it against the code, finds every place it touches, adds tests and decides on review.
+  - On LIN-4497 and LIN-4499, plan corrected design, and plan-review caught more.
+  - The proposal is changed to **no-record**.
+  - Integration design §3 line 88 ("The design stage addresses its plan") came from the walks, which had no plan stage. It should read "the plan stage". Noted here rather than edited, since the design is pinned at 92838c5cf.
