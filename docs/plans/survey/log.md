@@ -4758,3 +4758,5 @@ Still waiting on `lin4499-snapshot-cut`.
 - **Status:** all three wait for John. Main is healthy.
 
 - **~12:35:** note sent to autopilot ec3417c3 (id 89ac15ca-f244-4627-b4a5-50f23884fd55): production is reachable via the Railway CLI. Pass it to LIN-4501 and any other piece that needs production.
+
+- **~12:45:** proposed answers on all four ruling rows (the two questions are each raised by both the worker loop and the autopilot loop). `lin-4501-closed-parent-task`: make-parent-task. `lin4505-runner-waiting`: not-measured, with the reason saying the better answer is to import simple-dispatcher's Waiting entries and remove its lists. Proposals carry only an option id, so that answer needs John's free text. John agreed with both views.
