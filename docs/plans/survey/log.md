@@ -4884,3 +4884,7 @@ Still waiting on `lin4499-snapshot-cut`.
 - **~20:20:** pause cleared (DELETE /dispatch/halt, 200). John will rotate keys when he is back (end of next week), with a ticket to retire all tokens and keys. Scanned for leaked key material: none found in any of LIN-4504's 20 dispatch rows (feedback included), or in LIN-4504's and LIN-4499's descriptions and comments. CI secret scan green on PR #2476.
 
 - **Filed LIN-4512**, "Rotate and retire tokens and keys" (Backlog, High). John will do it at the end of next week. It is also on the horizon list.
+
+### 20 Nov, 20:28
+
+The pause ruling was answered (a: lifted, stays lifted). LIN-4504's second review has run since 20:07. Nothing else is queued, so no other work is running before deploy. No open rulings.
