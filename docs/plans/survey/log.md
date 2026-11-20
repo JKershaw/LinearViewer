@@ -4627,3 +4627,15 @@ The hourly check-in (trig_01XCTpQoZb2V1vqMFvzXKStm) is now a drive. When a slice
 - **LIN-4496:** survey-task 23:01, survey-place 23:06, scoping 23:09, then implementation (Haiku) from 23:12. Normal order. No PR yet.
 - **The live import has not run.** The survey says it connects straight to the production database, which no agent can reach, so John runs it. That is not yet checked in code. It goes on the morning list, and the seven safety tasks don't exist yet.
 - **Status:** no rulings. A review mentions two questions for John outside the rulings list: the hold for old reviews, and the Home badge count. Main is healthy (CI green on e942c1031).
+
+### 20 Nov, 00:29: piece 5 in its third build round
+
+- **LIN-4496:** PR #2469.
+  - Review (23:45–23:52): Request Changes. Four findings for implementation, plus two for John: the import (finding-4519465a) and the readings (finding-8fef4f19).
+  - The rework fixed all four findings, CI green at 5735327d2.
+  - Re-review (00:22–00:27): Request Changes again. The held-run reading is backwards and would show zero in production. A security check was weakened: it now accepts a 12-character token tail instead of 4.
+  - Third round (Haiku) from 00:27.
+  - Each round found real issues. Not a loop yet.
+- **The live import:** not run. It needs `MONGODB_URI` and production data (the run confirmed this in the importer code). It's left for John after merge.
+- **The "seven safety tasks":** these are hand-offs to John in the import list (LIN-4210, 4441, 4445 ×3, 4463 ×2). None have been created.
+- **Status:** no rulings. Main healthy at e942c1031. Slice 1 not landed. 7 wakes queued.
