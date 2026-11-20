@@ -1,5 +1,5 @@
 {
- "_about": "LIN-4496 walk-8 replay fixture for LIN-4446: the walk 8 store (layer/walks/8/replay-4446) ported to today's kinds. check -> finding (what, then why-person under it, how); lesson drops checked-at; approve-with-notes -> approve. seeds are the store before step 1, replayed through the pipeline with their historical by/at; each step's ops are its versions in the step window, replayed through the proxy under a dispatch run of that stage. runs are dispatch rows, not records. expect is the store at the end of the walk, by historical id.",
+ "_about": "LIN-4496 walk-8 replay fixture for LIN-4446: the walk 8 store (layer/walks/8/replay-4446) ported to today's kinds. check -> finding (what, then why-person under it, how); lesson drops checked-at; approve-with-notes -> approve. seeds are the store before step 1, replayed through the pipeline with their historical by/at; each step's ops are its versions in the step window, replayed through the proxy under a dispatch run of that stage. runs are dispatch rows, not records. expect is the store at the end of the walk, by historical id. LIN-4503: the plan's first write is addressed to implementation (its end state in expect, v6), not to plan-review: a plan's addressee is its session fit, which the records route now enforces (implementation or breakdown); plan-review is the review, not an addressee.",
  "ticket": "LIN-4446",
  "task": "task-8",
  "tasks": {
@@ -378,7 +378,7 @@
       "order": 1
      },
      "in": "task-8",
-     "to": "plan-review"
+     "to": "implementation"
     },
     {
      "op": "link",

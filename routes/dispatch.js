@@ -65,6 +65,7 @@ import { resolveAccountGroup } from '../lib/account-group.js';
 import { redactSessionItem, redactSessionItems } from '../lib/dispatch-session-redaction.js';
 import { publicOrigin } from '../lib/public-origin.js';
 import { postUsage } from '../lib/request-usage-intake.js';
+import { childTicketRetryOf } from '../lib/records-tracker.js';
 
 // Directory for Harbour OS dispatch prompt staging files. The OS tmp dir is
 // shared between the Node server and the Harbour OS terminal that reads the
@@ -284,6 +285,8 @@ const queryText = (value) => (typeof value === 'string' && value.trim() ? value 
  */
 export function createDispatchRoutes({ dispatchQueueStore, dispatchTokenStore, workspaceFromUrl, userPreferencesStore, harbourFeedbackTokenStore, workspacePreferencesStore, dispatchPresetsStore, proxyTokenStore, provider: injectedProvider = null, getWorkspaceAccessToken = null, fetchIssueContext = null, workspaceHaltStore = null, haltReadTimeoutMs = POLL_HALT_READ_TIMEOUT_MS, sessionsFeedCache = null, workspaceOwnerCheck = null, taskModeStore = null, freeTierStore = null, accountStore = null, consumerHeartbeatStore = null, closeOut = null, installationTokenFor = null, requestUsageStore = null, requestUsageLoader = null, leftoverStep = null, recordsStore = null }) {
   const router = Router();
+  // LIN-4503: each session dispatch of a ticket retries its child tasks' tickets (lib/dispatch-factory.js).
+  const childTickets = recordsStore ? childTicketRetryOf({ recordsStore }) : null;
 
   // =========================================================================
   // Consumer API Authentication Middleware
@@ -474,6 +477,7 @@ export function createDispatchRoutes({ dispatchQueueStore, dispatchTokenStore, w
       req,
       res,
       workspace: req.workspace,
+      childTickets,
       dispatchQueueStore,
       dispatchTokenStore,
       workspacePreferencesStore,

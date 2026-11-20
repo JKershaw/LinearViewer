@@ -134,6 +134,17 @@ describe('the old checks, one by one (lib/run-ledger.js and lib/recommendation-f
     assert.equal(opensWithCloseOutTitle('\n## Close-out'), false, 'the very first line, as before');
   });
 
+  test('change 4 (LIN-4503): a Harbour plan summary is the first row, lands nowhere and reports nothing; the person and plan readers exclude it', () => {
+    assert.equal(COMMENT_KINDS[0].kind, 'harbour-summary');
+    assert.deepEqual([COMMENT_KINDS[0].landing, COMMENT_KINDS[0].landed, COMMENT_KINDS[0].work], ['none', 'never', 'never']);
+    const body = '**Harbour summary** \u00b7 plan-1a2b3c4d v1\n\nFirst version.\n\n## Implementation Plan\n\nThe plan words.';
+    assert.equal(commentKindOf(body), 'harbour-summary');
+    assert.equal(isPersonComment(body), false, 'a summary is not a person\'s comment');
+    assert.equal(isPlanComment(body), false, 'a summary is not a plan comment, though it holds a plan heading');
+    assert.equal(reportsLandedWork(body), false);
+    assert.equal(commentKindOf('**Harbour summary** is quoted in this note, so the note is plain'), 'plain', 'the mark must open the comment');
+  });
+
   test('commentKindOf takes a comment or its body', () => {
     assert.equal(commentKindOf({ body: review }), 'review');
     assert.equal(commentKindOf({}), 'plain');

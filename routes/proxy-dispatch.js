@@ -175,6 +175,7 @@ function dispatchWatchChanged(baseline, item) {
  * @param {Function} deps.workspaceUnavailable - 503 envelope for an unresolvable workspace credential (closure-local)
  */
 export function createDispatchRoutes({
+  childTickets = null,
   authenticateProxyToken,
   chargeFreeTierOrReject,
   computeRecommendation,
@@ -215,6 +216,8 @@ export function createDispatchRoutes({
   // What the two enqueue verbs below need from this factory: the stores and the Agent API closures
   // lib/dispatch-entrance.js calls (it imports nothing from routes/).
   const lane = {
+    // LIN-4503: the child-ticket retry each dispatch of a ticket runs (lib/records-tracker.js childTicketRetryOf).
+    childTickets,
     dispatchQueueStore,
     dispatchTokenStore,
     workspacePreferencesStore,
