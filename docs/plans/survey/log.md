@@ -4792,3 +4792,14 @@ Still waiting on `lin4499-snapshot-cut`.
 - **Status:** no rulings. Main is green.
 
 - **~13:40:** new proxy token from John (readWrite plus dispatch, expires 22 Nov 13:37). Horizon list started at `horizon/README.md`. Drafting the consolidated "watch agents work" ticket, which replaces LIN-1114, 3976, 1905, 1311 and 2546 (John agreed).
+
+### 20 Nov, 14:30: slice 2, three of six moving well
+
+- **LIN-4505:** Done at 13:56. PR #2474 merged as 3002092e5, CI green. Review: conditional Approve. Blind read: "better". The close-out's four fixes weren't re-read.
+- **LIN-4503:** Done. Review: conditional Approve. Blind read: "same".
+- **LIN-4501:** still working.
+  - Production write via Railway: dry run 14:17, then apply at 14:19 made **1367 tasks**. A re-run made 0.
+  - Draft PR #2472 at 1124393dc; CI hasn't run on that head yet.
+- **LIN-4502, 4504, 4506:** waiting behind LIN-4501.
+- **Records** read fine with the new token. The seven security tasks exist as children of task-309c83df, all open at version 1 with no ticket. Nothing in the records shows them moved.
+- **Status:** no rulings. Main green. Slice 2 cost so far is $90.84.
