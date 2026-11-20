@@ -40,7 +40,7 @@ const RECORD = [
 ].join('\n');
 const PLAN = '## Implementation Plan\n\n1. a plan step, outside the record';
 
-function proxyApp() {
+function proxyApp({ recordsStore = null } = {}) {
   const app = express();
   app.use(express.json());
   app.use(createProxyRoutes({
@@ -58,6 +58,7 @@ function proxyApp() {
     getWorkspaceOpenRouterKey: async () => null,
     workspacePreferencesStore: {},
     freeTierStore: { tryUse: async () => ({ allowed: true }) },
+    ...(recordsStore ? { recordsStore } : {}),
   }));
   return app;
 }
@@ -202,5 +203,27 @@ describe('the size record guard on the proxy lane', () => {
     const res = await call(sessionApp(), 'PATCH', `/workspace/${LOCAL_URL_KEY}/api/issues/LOCAL-2`, { description: `${SEALED}\n\nA person rewrote this.` });
     assert.equal(res.status, 200, JSON.stringify(res.body));
     assert.equal(await stored('i2'), `${SEALED}\n\nA person rewrote this.`);
+  });
+
+  // LIN-4501 (finding-6222cfac): a task's claim is keyed by the ticket identifier. A description write addressed by the
+  // issue's id (a UUID on Linear) must still find the task's `asked`, through the identifier the live read carries.
+  test('a cut quoting the task\'s asked is accepted when the write is addressed by the issue id, not the identifier', async () => {
+    const asked = 'Write a full guide. Keep it on main: `docs/plans/survey.md`.';
+    const asks = [];
+    const recordsStore = { askedForTicket: async (_urlKey, ticket) => { asks.push(ticket); return ticket === 'LOCAL-1' ? asked : null; } };
+    // Linear's description read carries the identifier beside the id; the local store's does not, so the test adds it.
+    const read = localProvider.issueDescription;
+    localProvider.issueDescription = async function (token, key) {
+      const issue = await read.call(this, token, key);
+      return issue ? { ...issue, identifier: 'LOCAL-1' } : issue;
+    };
+    try {
+      const cut = RECORD.replace('**Cuts:** none', '**Cuts:**\n- "Write a full guide." is cut, pending a ruling');
+      const res = await call(proxyApp({ recordsStore }), 'POST', '/api/proxy/issues/i1/description/below', { body: `${cut}\n\n${PLAN}` });
+      assert.equal(res.status, 200, JSON.stringify(res.body));
+      assert.deepEqual(asks, ['LOCAL-1'], 'the lookup keyed on the live read\'s identifier, not the route\'s id');
+    } finally {
+      localProvider.issueDescription = read;
+    }
   });
 });
