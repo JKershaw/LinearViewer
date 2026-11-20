@@ -70,3 +70,8 @@ routes/proxy-records.js, routes/task-records.js, routes/project-page.js, server.
   never zero, so a missed caller shows instead of passing.
 - A task written with a ticket `ref` claims that ticket (`lib/records/writes.js`), as `ensureTask` does; else the ticket's
   references make a second task. A ticket's task id has one rule, `ticketTaskIdOf` (`lib/records/refs.js`).
+- A task keeps the ticket it holds: a revise that changes a claimed `ref` is refused (422), since the old claim would route the old
+  ticket's hand-offs into the new ticket's task (`lib/records/writes.js`, LIN-4496 finding 58119935).
+- The held-wake claim is stamped on the producing dispatch row before its leftover is queued (`lib/dispatch-leftover-hook.js`), so a
+  real held run has its producer stamped. A reader that takes the stamp as "not held" inverts the reading and reads zero on every hold.
+  A dispatch row names its stage in `kind`, not `stage` (`scripts/records-readings.mjs`, LIN-4496 finding ee29d305).
