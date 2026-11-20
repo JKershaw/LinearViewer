@@ -4888,3 +4888,4 @@ Still waiting on `lin4499-snapshot-cut`.
 ### 20 Nov, 20:28
 
 The pause ruling was answered (a: lifted, stays lifted). LIN-4504's second review has run since 20:07. Nothing else is queued, so no other work is running before deploy. No open rulings.
+- **~20:35:** John dismissed a ruling about the exposed key. It is covered by LIN-4512 (rotation at the end of next week).
