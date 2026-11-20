@@ -4900,3 +4900,18 @@ The pause ruling was answered (a: lifted, stays lifted). LIN-4504's second revie
   - design writes no plan record; plan and plan-review keep running.
 - **Also in the drive:** it sets and clears a fleet pause itself when a cutover needs one, and proposes answers on rulings. Only John can answer them; an overnight stop is an accepted inconvenience.
 - **Expected:** slice 2 lands around midnight to 1am; slice 3 is filed and launched at the next hourly drive after that.
+
+### 20 Nov, 21:30: LIN-4504 merged; LIN-4506 building; tidying stale items
+
+- **LIN-4504:** PR #2476 merged at 20:48 as ebc89d7e7, CI green, deployed.
+  - The close-out (20:34–21:06) fixed a supersession bug the blind read found (0743b92e9), and that fix wasn't reviewed.
+  - No plan-family stage ran between the pause lifting and the deploy.
+- **LIN-4506:** surveys and scoping 21:08–21:18, then implementation (Haiku). PR #2477 green.
+  - Its readings again said "no Railway access", so I sent its autopilot f9a2fbc1 the `railway ssh` note directly (e8974506).
+- **Tidied:** two findings that were really already settled, both ended done:
+  - finding-4936b3f0 (the snapshot drop);
+  - finding-b5b06c08 (the four wrong-asked tasks, remade).
+
+  The driver token could end them where the dispatch credential couldn't.
+- **Status:** LIN-4499's own close-out not started. No rulings. Cost about $253.
+- **Lesson again:** the standing production-access fact doesn't reach new pieces. Slice 3's ticket carries it as one of John's standing answers.
