@@ -4639,3 +4639,13 @@ The hourly check-in (trig_01XCTpQoZb2V1vqMFvzXKStm) is now a drive. When a slice
 - **The live import:** not run. It needs `MONGODB_URI` and production data (the run confirmed this in the importer code). It's left for John after merge.
 - **The "seven safety tasks":** these are hand-offs to John in the import list (LIN-4210, 4441, 4445 ×3, 4463 ×2). None have been created.
 - **Status:** no rulings. Main healthy at e942c1031. Slice 1 not landed. 7 wakes queued.
+
+### 20 Nov, 01:33: all five slice 1 pieces merged; LIN-4496 Done; slice 2 being drafted
+
+- **LIN-4496:** four reviews and three fix rounds, each finding new real bugs. The held-run reading was wrong three different ways. The fourth review approved at d588b093e with no conditions. Blind read: "same", with 4 finds fixed at close-out and 4 to the project. PR #2469 merged at 01:19 as 0d56aabdf, CI green, deployed at 01:25.
+- **Left for John** (reported on LIN-4491, and on the carry list):
+  - the live import (finding-4519465a);
+  - the readings (finding-8fef4f19);
+  - the stale-status check (finding-f4c0b65d), possible from the evening of 21 Nov.
+- **What I did:** marked LIN-4496 Done at 01:33, since what remains needs John, as with LIN-4495. I sent the autopilot a note (1939d4d5) to close out slice 1.
+- **In progress:** after readings and the slice 2 draft, each with its own subagent. A fresh check follows, then filing and launch.
