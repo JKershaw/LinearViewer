@@ -19,10 +19,11 @@ import { generateBrief } from '../lib/brief.js';
 import { truncationFailureOf } from '../lib/openrouter.js';
 import { extractPrUrls } from '../lib/run-evidence.js';
 import { buildMockBrief } from '../lib/workspace-api-mocks.js';
+import { attachAsked } from '../lib/brief-quote.js';
 import { fixtureParent } from '../lib/sample-data/fixture-parent.js';
 import { hashContext } from '../lib/recap-cache.js';
 import { isTerminalState } from '../lib/providers/state-map.js';
-import { buildTaskStack } from '../lib/task-stack.js';
+import { buildTaskStack, askedForStack } from '../lib/task-stack.js';
 import { generatePrompt, hasPrompt, deriveDispatchKind } from '../lib/prompt-templates.js';
 import { promptContextOf } from '../lib/prompts/prompt-context.js';
 import { getPeriodicals } from '../lib/periodicals.js';
@@ -282,7 +283,9 @@ export function createComputeRoutes({
       // Project the sorted stack via the shared pure pipeline (lib/task-stack.js),
       // the exact same projection the read-only `get_stack` chat tool drives.
       const view = req.query.view === 'digest' ? 'digest' : 'full';
-      const { tasks, total, view: resolvedView } = buildTaskStack({ projects, issues, limit, view });
+      // LIN-4501: the digest's headlines are the tasks' `asked` (one batched records read), never the descriptions.
+      const askedByTicket = view === 'digest' ? await askedForStack(recordsStore, req.proxyUrlKey, issues) : new Map();
+      const { tasks, total, view: resolvedView } = buildTaskStack({ projects, issues, limit, view, askedByTicket });
 
       logEvent(req, '/api/proxy/stack', 200);
       res.json({ tasks, total, view: resolvedView });
@@ -1442,6 +1445,8 @@ export function createComputeRoutes({
         }
       }
 
+        // LIN-4501: the brief quotes the task's `asked`, read here just before it is composed (lib/brief-quote.js).
+        await attachAsked(context, { recordsStore, urlKey: req.proxyUrlKey });
         const selectedModel = await resolveAiOperationModel({ urlKey: req.proxyUrlKey, workspacePreferencesStore, opKind: 'brief', forceDefault: isFreeTier });
         let brief;
         let modelUsed;
@@ -1553,6 +1558,8 @@ export function createComputeRoutes({
         const inputHash = hashContext(context);
         captureTaskSnapshot({ urlKey: req.proxyUrlKey, identifier, context, canonicalId, inputHash });
 
+        // LIN-4501: the brief quotes the task's `asked`, read here just before it is composed (lib/brief-quote.js).
+        await attachAsked(context, { recordsStore, urlKey: req.proxyUrlKey });
         const selectedModel = await resolveAiOperationModel({ urlKey: req.proxyUrlKey, workspacePreferencesStore, opKind: 'brief', forceDefault: isFreeTier });
         let brief;
         let modelUsed;

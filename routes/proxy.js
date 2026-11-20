@@ -1379,7 +1379,7 @@ export function createProxyRoutes({ proxyTokenStore, proxyEventStore, agentStatu
 
   // Group E writes (LIN-679 Stage 3b / LIN-2537): extracted to
   // routes/proxy-writes.js, mounted at its original position.
-  router.use(createProxyWriteRoutes({ onTicketWrite, recordPipelineMerge, proxyLimiter, commentDedupe, commentDedupeGenerations, authenticateProxyToken, requireWriteScope, resolveProviderAccess, denyIfUnsupported, denyIfMissingRead, workspaceUnavailable, graphqlErrorStatus, writeRejected, resolveTeamInput, resolveStateInput, resolveProjectInput, resolveLabelInput, refResolutionFailed, partialWriteFailed, logEvent, harbourCommentsStore }));
+  router.use(createProxyWriteRoutes({ recordsStore, onTicketWrite, recordPipelineMerge, proxyLimiter, commentDedupe, commentDedupeGenerations, authenticateProxyToken, requireWriteScope, resolveProviderAccess, denyIfUnsupported, denyIfMissingRead, workspaceUnavailable, graphqlErrorStatus, writeRejected, resolveTeamInput, resolveStateInput, resolveProjectInput, resolveLabelInput, refResolutionFailed, partialWriteFailed, logEvent, harbourCommentsStore }));
 
   // Charge one free-tier unit for a proxy LLM request about to generate. Returns
   // null when the request may proceed, or a { status, body } rejection carrying
@@ -1671,7 +1671,7 @@ export function createProxyRoutes({ proxyTokenStore, proxyEventStore, agentStatu
   // router's own real defaults still apply. Named distinctly from a bare
   // `chatClient`/`createToolCatalog` at this composer's own top level so a
   // future second sub-router needing the same seam cannot collide with it.
-  router.use(createProxyFlightCompanionRoutes({ proxyLimiter, authenticateProxyToken, resolveProviderAccess, workspaceUnavailable, logEvent, logOpenRouterCredentialSource, getWorkspaceOpenRouterKey, chargeFreeTierOrReject, observerStateStore, workspacePreferencesStore, recapCacheStore, briefCacheStore, dispatchQueueStore, agentStatusStore, proxyTokenStore, taskDecisionsStore, shelvedRulingsStore, savedChatStore, chatClient: flightCompanionChatClient, createToolCatalog: flightCompanionCreateToolCatalog }));
+  router.use(createProxyFlightCompanionRoutes({ proxyLimiter, authenticateProxyToken, resolveProviderAccess, workspaceUnavailable, logEvent, logOpenRouterCredentialSource, getWorkspaceOpenRouterKey, chargeFreeTierOrReject, observerStateStore, workspacePreferencesStore, recapCacheStore, briefCacheStore, recordsStore, dispatchQueueStore, agentStatusStore, proxyTokenStore, taskDecisionsStore, shelvedRulingsStore, savedChatStore, chatClient: flightCompanionChatClient, createToolCatalog: flightCompanionCreateToolCatalog }));
 
   return router;
 }

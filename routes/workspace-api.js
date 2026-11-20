@@ -49,6 +49,7 @@ import { prepareRecommendationInput } from '../lib/recommendation-input.js';
 import { resolveAiOperationModel } from '../lib/workspace-preferences.js';
 import { generateRecap } from '../lib/recap.js';
 import { generateBrief } from '../lib/brief.js';
+import { attachAsked } from '../lib/brief-quote.js';
 import { buildContextGraph } from '../lib/context-graph.js';
 import { hashContext } from '../lib/recap-cache.js';
 import { getFeatureFlags } from '../lib/feature-defaults.js';
@@ -705,6 +706,9 @@ export function createWorkspaceApiRoutes({ workspaceFromUrl, freeTierStore, getO
       const canonicalId = context.issue?.id || issueId;
       const inputHash = hashContext(context);
       const model = await resolveAiOperationModel({ urlKey: workspace.urlKey, workspacePreferencesStore, opKind: kind, forceDefault: isFreeTier });
+      // LIN-4501: a brief quotes the task's `asked` (lib/brief-quote.js), read just before it is composed. Not in the hash:
+      // `asked` is immutable once written, and the proxy's brief route keys the same cache without it.
+      if (kind === 'brief') await attachAsked(context, { recordsStore, urlKey: workspace.urlKey });
 
       let body;
       let modelUsed;

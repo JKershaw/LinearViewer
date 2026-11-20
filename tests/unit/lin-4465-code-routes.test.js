@@ -69,7 +69,8 @@ describe('CODE_ROUTES: each route fires on its fixture and records a declared tr
   const fixtures = {
     'live-wait': { issue: { identifier: 'T-1', state: STARTED, description: '' }, context: { comments: [], allRuns: [run('implementation', 3, 'running')] } },
     'review-bound': { issue: { identifier: 'T-1', state: STARTED, description: '' }, context: { comments: [RCn(1, 3), RCn(2, 3), RCn(3, 3)], allRuns: [] } },
-    'look-first': { issue: { identifier: 'T-1', state: OPEN, description: ASKED }, context: { comments: [], allRuns: [] } },
+    // LIN-4501: the person's words are the task's `asked` on the recommendation input, not the description's block.
+    'look-first': { issue: { identifier: 'T-1', state: OPEN, description: ASKED }, context: { comments: [], allRuns: [], asked: 'Make the export button download a CSV.' } },
   };
 
   for (const name of ['live-wait', 'review-bound', 'look-first']) {

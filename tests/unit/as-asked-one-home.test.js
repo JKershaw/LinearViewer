@@ -9,9 +9,10 @@
  * - "The text outside the block" has one definition, `outsideAsAsked` in
  *   lib/as-asked.js, which readFact and assembleTrailFacts both use.
  * - The brief composer (`composeBrief`, `briefQuoteEnd`) lives in the pure
- *   lib/as-asked.js, so the test-mode mocks no longer pull in the live model client
- *   (`streamChat`) through lib/brief.js, and there is one mock brief builder,
- *   lib/workspace-api-mocks.js's `buildMockBrief`, which the proxy routes use too.
+ *   lib/brief-quote.js (LIN-4501: it quotes the task's `asked`, and moved out of
+ *   lib/as-asked.js, which P2 deletes), so the test-mode mocks do not pull in the live
+ *   model client (`streamChat`) through lib/brief.js, and there is one mock brief
+ *   builder, lib/workspace-api-mocks.js's `buildMockBrief`, which the proxy routes use too.
  *
  * Run with: node --test tests/unit/as-asked-one-home.test.js
  */
@@ -108,19 +109,22 @@ describe('a pure brief composer and one mock brief', () => {
     assert.equal(sourceGraph().reaches('lib/workspace-api-mocks.js', 'streamChat'), false);
   });
 
-  test('composeBrief and briefQuoteEnd live in lib/as-asked.js, which imports only description-edit.js', () => {
+  test('composeBrief and briefQuoteEnd live in lib/brief-quote.js, which imports only lib/as-asked.js (itself only description-edit.js)', () => {
     const graph = sourceGraph();
-    assert.ok(graph.exportedNamesOf('lib/as-asked.js').includes('composeBrief'));
-    assert.ok(graph.exportedNamesOf('lib/as-asked.js').includes('briefQuoteEnd'));
+    assert.ok(graph.exportedNamesOf('lib/brief-quote.js').includes('composeBrief'));
+    assert.ok(graph.exportedNamesOf('lib/brief-quote.js').includes('briefQuoteEnd'));
+    assert.ok(!graph.exportedNamesOf('lib/as-asked.js').includes('composeBrief'), 'one home: lib/as-asked.js no longer has it');
+    assert.deepEqual(graph.dependenciesOf('lib/brief-quote.js'), ['lib/as-asked.js']);
     assert.deepEqual(graph.dependenciesOf('lib/as-asked.js'), ['lib/description-edit.js']);
     const briefSource = codeLines(readFileSync('lib/brief.js', 'utf8')).join('\n');
     assert.doesNotMatch(briefSource, /function (composeBrief|briefQuoteEnd)\b/, 'lib/brief.js no longer defines them');
   });
 
-  test('the mocks and the task page take the composer from lib/as-asked.js, not lib/brief.js', () => {
+  test('the mocks and the task page take the composer from lib/brief-quote.js, not lib/brief.js', () => {
     const graph = sourceGraph();
     for (const path of ['lib/workspace-api-mocks.js', 'lib/task-page-loader.js']) {
       assert.ok(!graph.dependenciesOf(path).includes('lib/brief.js'), `${path} must not import lib/brief.js`);
+      assert.ok(graph.dependenciesOf(path).includes('lib/brief-quote.js'), `${path} takes the composer from lib/brief-quote.js`);
     }
   });
 

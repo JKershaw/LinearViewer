@@ -3358,7 +3358,7 @@ app.use(createDashboardRoutes({ installationTokenFor, workspaceFromUrl, dispatch
 // `list_pending_decisions` chat tool the same way createFlightCompanionRoutes
 // already does below (LIN-2617) — Task Chat now builds its catalog through the
 // same createChatToolCatalog call the turn core makes for every surface.
-app.use(createTaskChatRoutes({ installationTokenFor, workspaceFromUrl, freeTierStore, workspacePreferencesStore, getOpenRouterSource, getDeployInfo, savedChatStore, recapCacheStore, briefCacheStore, dispatchQueueStore, agentStatusStore, proxyTokenStore, taskDecisionsStore, shelvedRulingsStore, runProposalsStore, workspaceOwnerCheck }))
+app.use(createTaskChatRoutes({ installationTokenFor, workspaceFromUrl, freeTierStore, workspacePreferencesStore, getOpenRouterSource, getDeployInfo, savedChatStore, recapCacheStore, briefCacheStore, recordsStore, dispatchQueueStore, agentStatusStore, proxyTokenStore, taskDecisionsStore, shelvedRulingsStore, runProposalsStore, workspaceOwnerCheck }))
 
 // Mount the task-edit page (LIN-1565) — the dedicated drill-down that replaces
 // the inline edit form formerly hidden inside a tree row's Details panel. No
@@ -3474,7 +3474,7 @@ app.use(createTaskShareRoutes({
 // `list_pending_decisions` chat tool needs to return the same rows the rulings
 // feed returns. LIN-2966 threads the same pair into createTaskChatRoutes above,
 // so both surfaces' catalogs now answer that tool identically.
-app.use(createFlightCompanionRoutes({ installationTokenFor, workspaceFromUrl, getOpenRouterSource, getDeployInfo, observerStateStore, freeTierStore, workspacePreferencesStore, recapCacheStore, briefCacheStore, dispatchQueueStore, agentStatusStore, proxyTokenStore, taskDecisionsStore, shelvedRulingsStore, workspaceOwnerCheck }))
+app.use(createFlightCompanionRoutes({ installationTokenFor, workspaceFromUrl, getOpenRouterSource, getDeployInfo, observerStateStore, freeTierStore, workspacePreferencesStore, recapCacheStore, briefCacheStore, recordsStore, dispatchQueueStore, agentStatusStore, proxyTokenStore, taskDecisionsStore, shelvedRulingsStore, workspaceOwnerCheck }))
 
 // Mount passage-planner routes (experimental one-click kickoff prompt, Flight Companion parity — LIN-1849).
 app.use(createPassagePlannerRoutes({ workspaceFromUrl, getOpenRouterSource, getDeployInfo }))

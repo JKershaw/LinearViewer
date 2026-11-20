@@ -240,7 +240,7 @@ export function buildMockAnswer(context, question, related) {
  *   route's real (non-mockAi) run-scoped propose path is pinned end to end.
  * @returns {Router}
  */
-export function createTaskChatRoutes({ workspaceFromUrl, freeTierStore, workspacePreferencesStore, getOpenRouterSource, getDeployInfo, savedChatStore, recapCacheStore, briefCacheStore, dispatchQueueStore, agentStatusStore, proxyTokenStore, taskDecisionsStore, shelvedRulingsStore, runProposalsStore, chatClient, workspaceOwnerCheck = null, installationTokenFor = null }) {
+export function createTaskChatRoutes({ workspaceFromUrl, freeTierStore, workspacePreferencesStore, getOpenRouterSource, getDeployInfo, savedChatStore, recapCacheStore, briefCacheStore, dispatchQueueStore, agentStatusStore, proxyTokenStore, taskDecisionsStore, shelvedRulingsStore, runProposalsStore, chatClient, workspaceOwnerCheck = null, installationTokenFor = null, recordsStore = null }) {
   const router = Router();
 
   // ─── HTML page ──────────────────────────────────────────────────────────────
@@ -685,6 +685,7 @@ export function createTaskChatRoutes({ workspaceFromUrl, freeTierStore, workspac
           },
           recapCacheStore,
           briefCacheStore,
+          recordsStore,
           urlKey: workspace.urlKey,
           // LIN-1073: session read-model + the gated follow-up write.
           dispatchQueueStore,
