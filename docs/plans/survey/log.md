@@ -4842,3 +4842,11 @@ Still waiting on `lin4499-snapshot-cut`.
   - On LIN-4497 and LIN-4499, plan corrected design, and plan-review caught more.
   - The proposal is changed to **no-record**.
   - Integration design §3 line 88 ("The design stage addresses its plan") came from the walks, which had no plan stage. It should read "the plan stage". Noted here rather than edited, since the design is pinned at 92838c5cf.
+
+### 20 Nov, 17:30: LIN-4502 merged; the seal and the prune are gone
+
+- **LIN-4502:** PR #2475 merged as 9e562cfc3, CI green, deployed. Review: conditional Approve (all five findings ended). Blind read: **better**. The close-out's commit d07b5803d wasn't re-reviewed.
+- **Left for John:** the irreversible production drop of the task-snapshots collection (`drop-task-snapshots-collection.mjs --execute`, finding-4936b3f0).
+- **Ruling `lin4504-design-plan-record`:** John answered no-record at 17:28. Plan-review resumed and wrote the decision.
+- **LIN-4504:** beat 1 of 5 since 17:13. The fleet pause and the production cutover are kept as a deliberate step. LIN-4506 is Todo.
+- **Status:** no rulings. Main green. Cost about $176.50, and counting.
