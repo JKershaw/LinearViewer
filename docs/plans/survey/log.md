@@ -4767,3 +4767,16 @@ Still waiting on `lin4499-snapshot-cut`.
 - **Sent directly** to LIN-4501's child autopilot (28de32b1, note c3c4851f) and LIN-4505's (196a5b59, note 29e11d0f): check `railway --help` and `railway status`, then use `railway run` for the import and readings.
 - **Status at 13:15:** LIN-4503 Done (merged ~12:37). LIN-4501 built with make-parent-task. LIN-4505 building with not-measured. Cost about $56. No new rulings. Main healthy.
 - **Lesson:** a note to an autopilot doesn't reliably reach its pieces. Send to the piece's own run.
+
+### 20 Nov, ~13:30: transcripts to Harbour, a feasibility read (information only)
+
+- **Mostly built already:**
+  - At each Stop the runner posts every unsent assistant text block as `assistant-text` feedback. It's on by default (LIN-4165, simple-dispatcher `hook.js:256-317`).
+  - Harbour stores these in the dispatch row's `feedback[]` and shows them on the session page as a chat thread.
+  - A tool-call relay exists but is off (`SD_TOOL_ACTIVITY_RELAY`). It sends the tool name plus a 60-character head, never output.
+- **The gap:**
+  - Nothing is sent mid-turn: the 30 s heartbeat already reads the transcript but posts only a summary, so long turns show nothing until Stop.
+  - Secret masking runs only on share pages, not on feedback intake.
+  - The feedback route allows 100 requests a minute per IP, so posts need batching.
+- **Size:** small to medium.
+- **Decisions for John:** stream mid-turn or only at Stop; redaction at intake before turning on tool calls; whether transcripts stay in the permanent `feedback[]` or move to a capped store.
