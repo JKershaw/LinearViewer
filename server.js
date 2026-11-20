@@ -3470,7 +3470,9 @@ app.use(createShipJourneyRoutes({ workspaceFromUrl, reportHistoryStore, fetchWor
 // The Ship's Biscuit (experimental, LIN-818): flag-gated LLM-set newspaper — a
 // deterministic edition model over the wired event stores + one editor-in-chief
 // call → durable front page + index. Mirrors the free-tier/model wiring of the other gated AI routes.
-app.use(createShipBiscuitRoutes({ workspaceFromUrl, freeTierStore, workspacePreferencesStore, getOpenRouterSource, getDeployInfo, observationSessionsStore, agentStatusStore, llmCallLogStore, taskSnapshotStore, reportHistoryStore, shipBiscuitHistoryStore }))
+// LIN-4500: landed work = merges (closeOutEventsStore) joined to tracker completions (fetchWorkspaceIssues),
+// wired as Ship Journey is above. Ship Biscuit no longer reads task snapshots.
+app.use(createShipBiscuitRoutes({ workspaceFromUrl, freeTierStore, workspacePreferencesStore, getOpenRouterSource, getDeployInfo, observationSessionsStore, agentStatusStore, llmCallLogStore, closeOutEventsStore, fetchWorkspaceIssues, reportHistoryStore, shipBiscuitHistoryStore }))
 
 /**
  * Resolve the team filter for a workspace-scoped request (LIN-2521).

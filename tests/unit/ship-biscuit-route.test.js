@@ -129,7 +129,7 @@ describe('ship-biscuit generate survives H12 via the flushed keepalive branch (L
       observationSessionsStore: { async findByWorkspace() { await gate; return { sessions: [] }; } },
       agentStatusStore: { async listStatus() { return { items: [] }; } },
       llmCallLogStore: { async listInHorizon() { return []; } },
-      taskSnapshotStore: { async listByWorkspace() { return { items: [] }; } },
+      fetchWorkspaceIssues: async () => [],
       shipBiscuitHistoryStore: { async save(_urlKey, edition) { return { id: 'ed-1', ...edition }; } }
     });
 
@@ -197,7 +197,7 @@ describe('ship-biscuit generate threads the latest roadmap report into the editi
     observationSessionsStore: { async findByWorkspace() { return { sessions: [] }; } },
     agentStatusStore: { async listStatus() { return { items: [] }; } },
     llmCallLogStore: { async listInHorizon() { return []; } },
-    taskSnapshotStore: { async listByWorkspace() { return { items: [] }; } },
+    fetchWorkspaceIssues: async () => [],
     shipBiscuitHistoryStore: { async save(_urlKey, edition) { return { id: 'ed-1', ...edition }; } },
   });
 
@@ -300,7 +300,7 @@ describe('ship-biscuit generate 429s a free-tier denial with the exact error + f
         observationSessionsStore: { async findByWorkspace() { return { sessions: [] }; } },
         agentStatusStore: { async listStatus() { return { items: [] }; } },
         llmCallLogStore: { async listInHorizon() { return []; } },
-        taskSnapshotStore: { async listByWorkspace() { return { items: [] }; } },
+        fetchWorkspaceIssues: async () => [],
         // An in-window roadmap report makes the window non-quiet, so the handler
         // reaches the one paid call (and its free-tier gate).
         reportHistoryStore: {
@@ -366,7 +366,7 @@ describe('ship-biscuit Weather reads the calls through cost-read (LIN-4179, chan
             ];
           },
         },
-        taskSnapshotStore: { async listByWorkspace() { return { items: [] }; } },
+        fetchWorkspaceIssues: async () => [],
         reportHistoryStore: { async getLatest() { return report; } },
         shipBiscuitHistoryStore: { async save(_urlKey, edition) { saved.push(edition); return { id: 'ed-1', ...edition }; } },
       });
@@ -393,5 +393,152 @@ describe('ship-biscuit Weather reads the calls through cost-read (LIN-4179, chan
     } finally {
       process.env.NODE_ENV = prev;
     }
+  });
+});
+
+// ─── LIN-4500: landed work from merges and the tracker ─────────────────────────
+
+async function inTestEnv(fn) {
+  const prev = process.env.NODE_ENV;
+  process.env.NODE_ENV = 'test';
+  try {
+    return await fn();
+  } finally {
+    if (prev === undefined) delete process.env.NODE_ENV; else process.env.NODE_ENV = prev;
+  }
+}
+
+// Stores for a generate call. Every read is an empty, successful one unless overridden.
+// `saved` and `tryUses` record writes and free-tier charges, so a test can assert none happened.
+function landedStores(overrides = {}) {
+  const saved = [];
+  const tryUses = [];
+  const merges = [];
+  return {
+    saved, tryUses, merges,
+    deps: {
+      workspaceFromUrl: (req, res, next) => next(),
+      freeTierStore: { async tryUse(urlKey) { tryUses.push(urlKey); return { allowed: true }; } },
+      workspacePreferencesStore: null,
+      getOpenRouterSource: () => 'oauth',
+      getDeployInfo: () => ({}),
+      observationSessionsStore: { async findByWorkspace() { return { sessions: [] }; } },
+      agentStatusStore: { async listStatus() { return { items: [] }; } },
+      llmCallLogStore: { async listInHorizon() { return []; } },
+      closeOutEventsStore: { async listMergedSince(args) { merges.push(args); return []; } },
+      fetchWorkspaceIssues: async () => [],
+      reportHistoryStore: { async getLatest() { return null; } },
+      shipBiscuitHistoryStore: { async save(_urlKey, edition) { saved.push(edition); return { id: `ed-${saved.length}`, ...edition }; } },
+      ...overrides,
+    },
+  };
+}
+
+async function generateWith(deps) {
+  const router = createShipBiscuitRoutes(deps);
+  const handler = getRouteHandler(router, 'post', '/workspace/:urlKey/api/ship-biscuit/generate');
+  const req = {
+    workspace: { urlKey: 'ws-a', name: 'Alpha', provider: 'local' },
+    session: { features: { shipBiscuit: true } },
+    body: {},
+  };
+  const res = makeFlushRes();
+  await handler(req, res);
+  return res;
+}
+
+const RECENT = () => new Date(Date.now() - 86400000).toISOString();
+
+describe('ship-biscuit reads landed work from merges and the tracker (LIN-4500)', () => {
+  test('the route no longer reads task snapshots at all', () => {
+    assert.doesNotMatch(ROUTE_SRC, /taskSnapshotStore|listByWorkspace/);
+    assert.match(ROUTE_SRC, /closeOutEventsStore\.listMergedSince\(\{\s*urlKey:\s*workspace\.urlKey,\s*since:\s*range\.since\s*\}\)/);
+  });
+
+  test('a merged PR and a tracker completion lead the edition, as one landed slice', () => {
+    return inTestEnv(async () => {
+      const at = RECENT();
+      const { deps, merges } = landedStores({
+        closeOutEventsStore: { async listMergedSince(args) { merges.push(args); return [{ prUrl: 'https://github.com/acme/app/pull/7', issueIdentifier: 'LIN-7', mergedAt: at }]; } },
+        fetchWorkspaceIssues: async () => [{ identifier: 'LIN-7', title: 'Seal the hatch', state: { type: 'completed' }, completedAt: at }],
+      });
+      const res = await generateWith(deps);
+      assert.equal(res.statusCode, 200);
+      const edition = res.jsonBody.edition;
+      assert.equal(edition.isQuiet, false);
+      assert.equal(edition.index[0].sourceRefs[0].id, 'landed:LIN-7');
+      assert.equal(edition.frontPage.headline, 'Seal the hatch — finished, and its PR merged');
+      assert.equal(merges.length, 1);
+      assert.equal(merges[0].urlKey, 'ws-a');
+      assert.ok(merges[0].since instanceof Date, 'the merge read is bounded by the window start');
+    });
+  });
+
+  test('a rejected tracker read with nothing else to report is a retryable 502: nothing saved, nothing charged', () => {
+    return inTestEnv(async () => {
+      const { deps, saved, tryUses } = landedStores({ fetchWorkspaceIssues: async () => { throw new Error('expired token'); } });
+      const res = await generateWith(deps);
+      assert.equal(res.statusCode, 502);
+      assert.match(res.jsonBody.error, /Couldn't read the tracker, try again\./);
+      assert.deepEqual(saved, [], 'a "couldn\'t read" edition is never saved over the last good one');
+      assert.deepEqual(tryUses, [], 'no free-tier charge for a read that failed');
+    });
+  });
+
+  test('an absent tracker dependency counts as unread, not as an empty success', () => {
+    return inTestEnv(async () => {
+      const { deps, saved } = landedStores({ fetchWorkspaceIssues: undefined });
+      const res = await generateWith(deps);
+      assert.equal(res.statusCode, 502);
+      assert.deepEqual(saved, []);
+    });
+  });
+
+  test('a tracker read that returns something other than a list counts as unread', () => {
+    return inTestEnv(async () => {
+      const { deps, saved } = landedStores({ fetchWorkspaceIssues: async () => null });
+      const res = await generateWith(deps);
+      assert.equal(res.statusCode, 502);
+      assert.deepEqual(saved, []);
+    });
+  });
+
+  test('a failed tracker read beside a merge builds the edition from the merge, not a quiet edition', () => {
+    return inTestEnv(async () => {
+      const at = RECENT();
+      const { deps, saved } = landedStores({
+        closeOutEventsStore: { async listMergedSince() { return [{ prUrl: 'https://github.com/acme/app/pull/8', issueIdentifier: 'LIN-8', mergedAt: at }]; } },
+        fetchWorkspaceIssues: async () => { throw new Error('rate limited'); },
+      });
+      const res = await generateWith(deps);
+      assert.equal(res.statusCode, 200);
+      const edition = res.jsonBody.edition;
+      assert.equal(edition.isQuiet, false, 'an unread tracker is never a quiet edition');
+      assert.equal(edition.index[0].sourceRefs[0].id, 'landed:LIN-8');
+      assert.equal(saved.length, 1);
+    });
+  });
+
+  test('a failed tracker read beside a roadmap report builds the edition, not a 502', () => {
+    return inTestEnv(async () => {
+      const { deps } = landedStores({
+        fetchWorkspaceIssues: async () => { throw new Error('rate limited'); },
+        reportHistoryStore: { async getLatest() { return { id: 'rep-u', generatedAt: RECENT(), northStar: 'Ship', narrative: { digest: 'Steady.' }, orientation: [] }; } },
+      });
+      const res = await generateWith(deps);
+      assert.equal(res.statusCode, 200, 'background sources are still reported');
+      assert.equal(res.jsonBody.edition.isQuiet, false);
+    });
+  });
+
+  test('a tracker read that succeeds and is empty is the honest quiet edition, not a 502', () => {
+    return inTestEnv(async () => {
+      const { deps, saved } = landedStores({ fetchWorkspaceIssues: async () => [] });
+      const res = await generateWith(deps);
+      assert.equal(res.statusCode, 200);
+      assert.equal(res.jsonBody.edition.isQuiet, true);
+      assert.equal(res.jsonBody.edition.model, 'quiet');
+      assert.equal(saved.length, 1);
+    });
   });
 });

@@ -17,7 +17,8 @@ import {
   assessEditorOutcome,
   buildQuietEdition,
   buildMockEdition,
-  buildEditorMessages
+  buildEditorMessages,
+  EDITOR_SYSTEM_PROMPT
 } from '../../lib/prompts/ship-biscuit-editor.js';
 
 const NOW = Date.UTC(2026, 6, 9, 12, 0, 0);
@@ -318,5 +319,78 @@ describe('roadmap report-history source through the editor (LIN-1212)', () => {
       out.index[0].sourceRefs[0].snapshot.orientation,
       [{ identifier: 'LIN-9', bearing: 'toward', reason: 'core path' }]
     );
+  });
+});
+
+// ── LIN-4500: landed work leads the edition, through the mock and the prompt ─
+
+const LANDED_AT = new Date(NOW - 86400000).toISOString();
+
+function landedModel({ unread = [] } = {}) {
+  return buildEditionModel({
+    window: 'week', now: NOW, workspaceName: 'Acme',
+    merges: [{ prUrl: 'https://github.com/acme/app/pull/12', issueIdentifier: 'LIN-12', mergedAt: LANDED_AT }],
+    issues: [{ identifier: 'LIN-12', title: 'Seal the hatch', state: { name: 'Done', type: 'completed' }, completedAt: LANDED_AT }],
+    agentStatusItems: [{ id: 'st-9', taskIdentifier: 'LIN-2', action: 'fix', status: 'completed', summary: 'Fixed the bug.', timestamp: new Date(NOW - 3600000).toISOString() }],
+    sourcesUnread: unread,
+  });
+}
+
+describe('mock edition leads with landed work (LIN-4500)', () => {
+  test('the lead is the first landed slice, and the landed stub is not a "Status update on…"', () => {
+    const mock = buildMockEdition(landedModel());
+    assert.strictEqual(mock.frontPage.headline, 'Seal the hatch — finished, and its PR merged');
+    assert.strictEqual(mock.index[0].sourceRefs[0].id, 'landed:LIN-12', 'landed work leads the index, ahead of the newer status');
+    const stub = mock.index.find(s => s.sourceRefs[0].id === 'landed:LIN-12');
+    assert.strictEqual(stub.section, 'The Wire');
+    assert.strictEqual(stub.dek, 'Finished in the tracker, and its PR merged.');
+    assert.doesNotMatch(stub.dek, /Status update on/);
+  });
+
+  test('the lede counts landed first, then background', () => {
+    const mock = buildMockEdition(landedModel());
+    assert.match(mock.frontPage.lede, /^1 item landed or finished over the last 7 day\(s\), and 1 background item/);
+    assert.doesNotMatch(mock.frontPage.lede, /tracker could not be read/);
+  });
+
+  test('the mock says so when the tracker could not be read', () => {
+    const mock = buildMockEdition(landedModel({ unread: ['tracker'] }));
+    assert.match(mock.frontPage.lede, /The tracker could not be read, so landed work may be missing\./);
+  });
+
+  test('a PR-only landed item gets its own dek, not the status fallback', () => {
+    const model = buildEditionModel({
+      window: 'week', now: NOW,
+      merges: [{ prUrl: 'https://github.com/acme/app/pull/13', issueIdentifier: 'LIN-13', mergedAt: LANDED_AT }],
+    });
+    const stub = buildMockEdition(model).index[0];
+    assert.strictEqual(stub.dek, 'Its PR merged in this window.');
+  });
+});
+
+describe('quiet edition describes neither landed work nor runs (LIN-4500)', () => {
+  test('the quiet lede names nothing landed and nothing ran', () => {
+    const q = buildQuietEdition(buildEditionModel({ window: 'week', now: NOW, sessions: [], agentStatusItems: [], llmStats: null }));
+    assert.match(q.frontPage.lede, /Nothing landed and nothing ran/);
+    assert.doesNotMatch(q.frontPage.lede, /no autopilot sessions, no status/);
+  });
+});
+
+describe('editor prompt rules (LIN-4500)', () => {
+  test('tells the editor to lead with landed work, keep runs as background, and disclose an unread tracker', () => {
+    assert.match(EDITOR_SYSTEM_PROMPT, /LEAD WITH LANDED WORK/);
+    assert.match(EDITOR_SYSTEM_PROMPT, /Runs \(sessions, status updates, roadmap reports\) are background/);
+    assert.match(EDITOR_SYSTEM_PROMPT, /tracker could not be read, say so plainly/);
+  });
+
+  test('the example ids are landed:LIN-12 and session:abc, not the retired status example', () => {
+    assert.match(EDITOR_SYSTEM_PROMPT, /"landed:LIN-12", "session:abc"/);
+    assert.doesNotMatch(EDITOR_SYSTEM_PROMPT, /"status:def"/);
+  });
+
+  test('the editor context puts landed work first and names it in the user message', () => {
+    const [, user] = buildEditorMessages(landedModel());
+    assert.match(user.content, /LANDED IN THIS WINDOW/);
+    assert.ok(user.content.indexOf('id: landed:LIN-12') < user.content.indexOf('id: status:st-9'));
   });
 });
