@@ -573,13 +573,13 @@ export const openHandOffs = (records) => records.filter((r) => r.state === 'open
  * @returns {object[]} rows of the shared row shape, in RECORDS_ROW_KEYS order (the first three)
  */
 export function recordsRows({ records, asOf, stageKinds, references = {} }) {
-  if (!records) return ['records.openToProject', 'records.openToStage', 'records.sitTime'].map((k) => notMeasured(k, NOT_READ_RECORDS, { reference: references[k] }));
+  if (!records) return RECORDS_ROW_KEYS.slice(0, 3).map((k) => notMeasured(k, NOT_READ_RECORDS, { reference: references[k] }));
   const open = openHandOffs(records);
   const toProject = open.filter((r) => r.to === 'project').length;
   const toStage = open.filter((r) => stageKinds.includes(r.to)).length;
   const ages = open.map((r) => (Date.parse(asOf) - Date.parse(r.openedAt)) / 3600000).filter((x) => Number.isFinite(x) && x >= 0);
   const sit = ages.length
-    ? row('records.sitTime', { medianHours: round(median(ages), 1), meanHours: round(ages.reduce((a, b) => a + b, 0) / ages.length, 1), open: ages.length }, { reference: references['records.sitTime'] })
+    ? row('records.sitTime', { medianHours: round(median(ages), 1), meanHours: round(mean(ages), 1), open: ages.length }, { reference: references['records.sitTime'] })
     : notMeasured('records.sitTime', 'no open hand-offs at this time, so there is no sit time to read', { reference: references['records.sitTime'] });
   return [
     row('records.openToProject', { count: toProject, of: open.length }, { reference: references['records.openToProject'] }),
@@ -665,12 +665,13 @@ export function heldRunReading({ records, queryLog, dispatchRows, asOf, measurin
     sample.push({ id: rec.id, to: rec.to, heldRunIds: runs.map((h) => h.leftover._id ?? h.leftover.id), sitHours: round((end - opened) / 3600000, 2), censored: firstRead == null });
   }
   const read = sample.filter((s) => !s.censored);
+  const medianSit = median(read.map((s) => s.sitHours));
   return {
     held: held.length,
     addressed: sample.length,
     read: read.length,
     censored: sample.length - read.length,
-    medianSitHours: median(read.map((s) => s.sitHours)) == null ? null : round(median(read.map((s) => s.sitHours)), 2),
+    medianSitHours: medianSit == null ? null : round(medianSit, 2),
     sample,
     window: { asOf }
   };
