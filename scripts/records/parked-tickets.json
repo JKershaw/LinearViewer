@@ -31,7 +31,7 @@
         {
           "says": "For John: Needs John's ruling (LIN-3024): when the halt store read fails on a cold cache, should the poll fail closed for a stop it has seen, or keep the null-on-cold-cache fallback pinned as a contract row?",
           "how": "John rules. Then the poll distinguishes 'unset' from 'unknown' or pins the default, both consumers (kit haltAction, SD halt wiring) read it, and tests live in tests/unit/workspace-halt-store.test.js.",
-          "to": "project",
+          "to": "person:e7e948a4-2951-4af4-b60e-572a473a491e",
           "source": "description"
         }
       ],
@@ -58,7 +58,7 @@
         {
           "says": "For John: The re-measure of the test-wait share cannot run: no committed script reproduces the 7-12 Nov baseline (28% CI wait, 10-13% local runs). John to say who produced it and where its inputs are, or agree to drop that bullet.",
           "how": "Supply the original method and inputs, or rule the Done-when bullet dropped (only John can). The method now committed in scripts/measure-ci-wall.mjs is the fallback.",
-          "to": "project",
+          "to": "person:e7e948a4-2951-4af4-b60e-572a473a491e",
           "source": "comment 9c1053b2 (ledger item 3); comment bf890e7d"
         }
       ],
@@ -73,13 +73,13 @@
         {
           "says": "For John: Run the LIN-4452 live-check runbook on John's own Jira, including the epic placement and 409 Done-gate steps, and paste the evidence back. Nothing is proved on a live site until then.",
           "how": "Runbook comment f495ca4b, steps 0-7. If Jira drops harbour.asAsked on a create (PARTIAL_WRITE, failed 'property'), the separate PUT fallback is the next change and needs property-1.json.",
-          "to": "project",
+          "to": "person:e7e948a4-2951-4af4-b60e-572a473a491e",
           "source": "comment d52aaac6 (hand-back); runbook comment f495ca4b ; ruling comment d1459aad"
         },
         {
           "says": "For John: Open for John: a Jira screenshot is still refused with 422, since Jira has no uploadFile and an attachment needs an issue first. Jira feedback with no FEEDBACK_ default files to the first Jira project.",
           "how": "John decides both: whether Jira screenshots are in scope, and whether Jira feedback should have a default project.",
-          "to": "project",
+          "to": "person:e7e948a4-2951-4af4-b60e-572a473a491e",
           "source": "comment 3fb9098b (LIN-4451 piece 2)"
         },
         {
@@ -91,7 +91,7 @@
         {
           "says": "The PUT fallback for the harbour.asAsked property is still open: it is built only if the live check shows Jira drops the property on the confirmation re-read, and it waits on property-1.json from that check.",
           "how": "Build the PUT fallback only on a dropped or changed property in the live check's evidence; the guard in createIssue already refuses the create. Trigger named in the LIN-4452 leftovers comment.",
-          "to": "project",
+          "to": "person:e7e948a4-2951-4af4-b60e-572a473a491e",
           "source": "comment b92a0030 (LIN-4452 leftovers, 'Still open')"
         }
       ],
@@ -112,13 +112,13 @@
         {
           "says": "For John: Done-when 3 waits on John's pass figure for the changed-code paired blind read. The frozen +0.5 threshold stands, and the deciding read will not run until he sets the figure.",
           "how": "John sets the pass figure. Then run the paired read on the files the lane changed, with an untouched control area, as comment db14ecf4 directs.",
-          "to": "project",
+          "to": "person:e7e948a4-2951-4af4-b60e-572a473a491e",
           "source": "comment 5f70e262 (close-out, piece 4); comment db14ecf4 ; comment 78e450ea"
         },
         {
           "says": "Post-deploy browser checks not run, needing a signed-in operator: Observation, task pages, /t/<token> polling, a priced KPI chart and flight companion in Safari and Firefox, with no console, CSP or module-MIME errors.",
           "how": "Open each page on the deployed build in Safari and Firefox and check the listed behaviour. Rollbacks are listed in comment 5f70e262 (6348e57) and the earlier close-outs.",
-          "to": "project",
+          "to": "person:e7e948a4-2951-4af4-b60e-572a473a491e",
           "source": "comment 5f70e262 (ledger, carried from pieces 1-3); comment f1bbb463"
         }
       ],

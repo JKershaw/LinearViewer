@@ -68,3 +68,5 @@ routes/proxy-records.js, routes/task-records.js, routes/project-page.js, server.
   session page reads evidence through `readRunEvidenceFn` (`routes/dashboard.js`), missed the store at LIN-4495, and
   every session page read "not measured". Search the aliases too, and keep a missing store reading "not measured",
   never zero, so a missed caller shows instead of passing.
+- A task written with a ticket `ref` claims that ticket (`lib/records/writes.js`), as `ensureTask` does; else the ticket's
+  references make a second task. A ticket's task id has one rule, `ticketTaskIdOf` (`lib/records/refs.js`). A revise that changes a claimed `ref` is refused (422).

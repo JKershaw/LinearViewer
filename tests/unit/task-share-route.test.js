@@ -512,7 +512,10 @@ describe('render-time secret masking (LIN-3389)', () => {
 
   test('a minted Harbour token planted bare in description, comment and brief is masked on the rendered page (LIN-3795)', async () => {
     for (const kind of ['proxy', 'dispatch', 'feedback']) {
-      const minted = mintHarbourToken(kind);
+      // The token keeps its prefix and 43-char base64url shape, so the redaction matches it as a real one. Its last 4
+      // characters are fixed, not random: a random 4-char tail can occur in page text by chance, which made this check
+      // flaky (LIN-3795). The page is fixed too, so the 4-char tail check below is deterministic.
+      const minted = mintHarbourToken(kind).slice(0, -4) + 'Tq7w';
       const { base, close } = await build({
         store: withRecord(),
         loader: fakeLoader({ loadTaskPage: async () => ({ model: secretModel(minted) }) }),

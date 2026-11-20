@@ -259,8 +259,38 @@ about 5.7 minutes, gave byte-identical JSON and identical tables, with every tra
 unreadable. Both runs were on one day, so they cannot show tracker drift across days, and both were in one
 environment.
 
+## The records rows and the held-run reading (LIN-4496)
+
+Three rows read the records store, the one place hand-offs live (LIN-4491): `records.openToProject` (open findings and
+questions addressed to the project), `records.openToStage` (open ones addressed to a stage kind), and `records.sitTime`
+(the median age in hours of the open hand-offs at the reading's time). A missing store is not measured; no open
+hand-off is not measured too, because a median of nothing is not zero. `recordsRows` in
+`scripts/stability-measures-core.mjs` builds them.
+
+The held-run reading (`heldRunReading`, `heldRunRow`) asks whether a hand-off waits on a run that is held. The hold
+is on a `leftover` row L, whose `heldWakeFor` names its producing row P. The hook stamps the claim (`heldWakeClaimedAt`)
+on P before it queues L, so a real held run has P stamped; a skip clears the stamp. L is held while it is queued or taken,
+that is, not ended as `cancelled` or `expired` (`status`), or after it ran: a run that ran stays `status: taken` and its end is its `lineageStatus` (`done`, `failed`, `aborted`, `skipped`; a `closed` stamp does not end it) (`heldRunsOf`). A P
+that cannot be found is not counted. A hand-off is addressed to a held run when its `to` is P's stage kind (a dispatch
+row's `kind`), or P's task (the task whose `ref` is P's `issueIdentifier`), or that task's parent (its `in`) (`addresseesOf`). For each such hand-off, the
+reading says how long it sat before a reader first read it: the first query-log entry at or after
+it was opened that names its task or the record, by someone other than the measuring reader (so the reading does not
+count its own reads). A hand-off no reader has read by the reading's time is censored there, and is not counted as
+read. The reading names its window and its sample sizes (`held`, `addressed`, `read`, `censored`). It decides whether
+wakes are built (slice 6); it gates nothing. Query-log entries expire after 90 days, so the sit-time reading has to be
+taken before the first entries are gone.
+
+These rows are not among the five measures, and `buildReading` does not print them: the stability tool reads git
+and the tracker, not the records store. They are read by `scripts/records-readings.mjs`, which reads the production
+store (MONGODB_URI, or the data directory as the importer does), prints each row with its window and sample size, and
+prints the stale-open-runs count beside them: open run records whose current version is more than 24 hours old. Run it
+no earlier than the evening of 21 Nov 2026, and read query-log evidence before 17 Feb 2027, its 90-day retention. A
+stale count of zero on a store with few tasks run end to end is not evidence that wakes are unneeded: the decision on
+wakes (slice 6) needs a later, representative reading. The reader is read-only, and is reported on the parent ticket.
+
 ## What this retires
 
+- **Reading `## Waiting` from the notes for commits after the cutover.** LIN-4495 retired the lists, so the `waiting.*` rows read `not measured` from there on. The records rows above are the reading that replaces them (LIN-4496).
 - **Copying or writing measuring scripts into each run's evidence folder.** The review runs the committed script and
   saves its output. Frozen evidence folders and published reports stay as they are, because reports cite them.
 - **The per-day rows of `project-velocity-trajectory`** (LV and SD). The next report closes both ledger rows as

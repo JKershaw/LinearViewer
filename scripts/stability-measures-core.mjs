@@ -551,3 +551,134 @@ export function referencesFrom(json, { file = 'reference' } = {}) {
   }
   return byKey;
 }
+
+// ── the records rows and the held-run reading (LIN-4496, piece 5 of LIN-4491) ─────────────────────────────────────────
+// Read from the records store: the hand-offs that are open at a time, who they are addressed to, and how long they sat.
+// They are reported beside the five measures and never gate anything (the piece's rule). The inputs come in as data:
+// records as { id, kind, state, to, in, openedAt, ref } (`in` is the task, openedAt the first version's `at`, `ref` a
+// task's ticket), the query log as { at, by, taskId, recordId } (lib/records-store.js logQuery), dispatch rows, queue and
+// history both, as { _id, kind, status, issueIdentifier, heldWakeFor, heldWakeClaimedAt } (lib/dispatch-fields.js: the
+// hold is on the leftover row, the claim stamp on the producing row; a dispatch row names its stage in `kind`). A
+// caller that could not read a source passes null.
+export const RECORDS_ROW_KEYS = Object.freeze(['records.openToProject', 'records.openToStage', 'records.sitTime', 'records.heldRuns']);
+const HAND_OFF_KINDS = Object.freeze(['finding', 'question']);
+const NOT_READ_RECORDS = 'the records store was not read';
+
+/** The open hand-offs (findings and questions), the records every rows reads from. */
+export const openHandOffs = (records) => records.filter((r) => r.state === 'open' && HAND_OFF_KINDS.includes(r.kind));
+
+/**
+ * The three records rows: open to the project, open to a stage, and the median sit time of the open hand-offs at `asOf`
+ * (hours). A median of nothing is not measured, never zero: with no open hand-off there is no sit time to read.
+ * @returns {object[]} rows of the shared row shape, in RECORDS_ROW_KEYS order (the first three)
+ */
+export function recordsRows({ records, asOf, stageKinds, references = {} }) {
+  if (!records) return RECORDS_ROW_KEYS.slice(0, 3).map((k) => notMeasured(k, NOT_READ_RECORDS, { reference: references[k] }));
+  const open = openHandOffs(records);
+  const toProject = open.filter((r) => r.to === 'project').length;
+  const toStage = open.filter((r) => stageKinds.includes(r.to)).length;
+  const ages = open.map((r) => (Date.parse(asOf) - Date.parse(r.openedAt)) / 3600000).filter((x) => Number.isFinite(x) && x >= 0);
+  const sit = ages.length
+    ? row('records.sitTime', { medianHours: round(median(ages), 1), meanHours: round(mean(ages), 1), open: ages.length }, { reference: references['records.sitTime'] })
+    : notMeasured('records.sitTime', 'no open hand-offs at this time, so there is no sit time to read', { reference: references['records.sitTime'] });
+  return [
+    row('records.openToProject', { count: toProject, of: open.length }, { reference: references['records.openToProject'] }),
+    row('records.openToStage', { count: toStage, of: open.length }, { reference: references['records.openToStage'] }),
+    sit
+  ];
+}
+
+/**
+ * A leftover row in one of these statuses holds nothing. `cancelled` and `expired` never ran; the others are its end
+ * after it ran (lib/dispatch-terminal.js TERMINAL_HISTORY_STATUSES, LINEAGE_TERMINAL_STATUSES), which releases the hold.
+ */
+const ENDED_STATUSES = new Set(['cancelled', 'expired', 'done', 'failed', 'aborted', 'skipped']);
+
+/**
+ * A history row that ran keeps `status: 'taken'` and records its end in `lineageStatus` (lib/dispatch-store.js
+ * listHistoryLineageRows: `taken` is a running row, `lineageStatus: null`). The terminal lineage statuses are
+ * lib/dispatch-lineage-status.js LINEAGE_TERMINAL_STATUSES; `closed` is a bookkeeping stamp, not a run's end, so a
+ * `closed` leftover stays held.
+ */
+const ENDED_LINEAGE_STATUSES = new Set(['done', 'failed', 'aborted', 'skipped']);
+
+/**
+ * The held runs, from the real shape (lib/dispatch-fields.js, lib/dispatch-leftover-hook.js): a `leftover` row L carries
+ * `heldWakeFor` = P, the id of the producing row whose terminal wake L holds back. The hook stamps the claim
+ * (`heldWakeClaimedAt`) on P's history doc BEFORE it queues L, and only a skip clears the stamp again. So a real held
+ * run has P stamped, and L is held while it is still queued or running. L has ended when its status is in
+ * ENDED_STATUSES (never ran, or ended in a queue-side status), or when its lineage ended (ENDED_LINEAGE_STATUSES).
+ * An unclaimed P has no held wake, and a P that cannot be found is not counted: its state is unknown, and the reading
+ * does not guess.
+ * @returns {Array<{leftover: object, producer: object}>}
+ */
+export function heldRunsOf(dispatchRows) {
+  const byId = new Map(dispatchRows.map((r) => [r._id ?? r.id, r]));
+  const held = [];
+  for (const leftover of dispatchRows) {
+    if (!leftover.heldWakeFor) continue;
+    if (ENDED_STATUSES.has(leftover.status) || ENDED_LINEAGE_STATUSES.has(leftover.lineageStatus)) continue;
+    const producer = byId.get(leftover.heldWakeFor);
+    if (!producer || !producer.heldWakeClaimedAt) continue;
+    held.push({ leftover, producer });
+  }
+  return held;
+}
+
+/**
+ * The addressees a producing row answers to: its stage kind (a dispatch row's `kind`), and its task (the task whose
+ * `ref` is its issue, found in `records`) and that task's parent (its `in`). A task record carries `ref` (its ticket).
+ */
+export function addresseesOf(producer, records) {
+  const out = new Set();
+  if (producer.kind) out.add(producer.kind);
+  const task = producer.issueIdentifier ? records.find((r) => r.kind === 'task' && r.ref === producer.issueIdentifier) : null;
+  if (task) {
+    out.add(task.id);
+    if (task.in) out.add(task.in);
+  }
+  return out;
+}
+
+/**
+ * The held-run reading: the held runs (see heldRunsOf), and for each open hand-off addressed to a held run's producing
+ * stage or task (or that task's parent), how long it sat before a reader first read it. A read is a query-log entry
+ * at or after the hand-off was opened, that names its task or the record, and is not the measuring reader's own (so the
+ * reading does not count its own reads). A hand-off no reader has read by `asOf` is censored at `asOf`, not zero.
+ * A reading with no held runs is a reading (held: 0); a missing source is not measured.
+ * @returns {{ held: number, addressed: number, read: number, censored: number, medianSitHours: number|null, sample: object[], window: {asOf: string} }|null}
+ */
+export function heldRunReading({ records, queryLog, dispatchRows, asOf, measuringReader = null }) {
+  if (!records || !queryLog || !dispatchRows) return null;
+  const held = heldRunsOf(dispatchRows).map((h) => ({ ...h, addressees: addresseesOf(h.producer, records) }));
+  const open = openHandOffs(records);
+  const sample = [];
+  for (const rec of open) {
+    const runs = held.filter((h) => h.addressees.has(rec.to));
+    if (!runs.length) continue;
+    const opened = Date.parse(rec.openedAt);
+    const reads = queryLog
+      .filter((q) => q.by !== measuringReader && (q.taskId === rec.in || q.recordId === rec.id) && Date.parse(q.at) >= opened)
+      .map((q) => Date.parse(q.at));
+    const firstRead = reads.length ? Math.min(...reads) : null;
+    const end = firstRead ?? Date.parse(asOf);
+    sample.push({ id: rec.id, to: rec.to, heldRunIds: runs.map((h) => h.leftover._id ?? h.leftover.id), sitHours: round((end - opened) / 3600000, 2), censored: firstRead == null });
+  }
+  const read = sample.filter((s) => !s.censored);
+  const medianSit = median(read.map((s) => s.sitHours));
+  return {
+    held: held.length,
+    addressed: sample.length,
+    read: read.length,
+    censored: sample.length - read.length,
+    medianSitHours: medianSit == null ? null : round(medianSit, 2),
+    sample,
+    window: { asOf }
+  };
+}
+
+/** The held-run reading as a row of the shared shape: measured with its counts, or not measured with its reason. */
+export function heldRunRow(reading, { reference } = {}) {
+  if (!reading) return notMeasured('records.heldRuns', NOT_READ_RECORDS, { reference });
+  return row('records.heldRuns', { held: reading.held, addressed: reading.addressed, read: reading.read, censored: reading.censored, medianSitHours: reading.medianSitHours, window: reading.window }, { reference });
+}
