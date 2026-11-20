@@ -522,7 +522,8 @@ describe('render-time secret masking (LIN-3389)', () => {
           const res = await get(base, `/t/${TOKEN}`);
           assert.equal(res.status, 200);
           assert.ok(!res.text.includes(minted), `${kind} token reached the body`);
-          assert.ok(!res.text.includes(minted.slice(-4)), `${kind} token tail reached the body`);
+          // A 12-char tail, not 4: the token is 43 random base64url chars, and a 4-char tail collides with page text by chance.
+          assert.ok(!res.text.includes(minted.slice(-12)), `${kind} token tail reached the body`);
           assert.ok((res.text.match(/\[redacted\]/g) || []).length >= 3, 'description, comment and brief');
         });
       } finally { await close(); }
