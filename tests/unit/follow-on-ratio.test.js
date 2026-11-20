@@ -400,7 +400,7 @@ describe('D. companion instruments', () => {
     assert.equal(none.planScoped.denominator, 0);
     assert.equal(none.diagnostics.pctPlanned, null, 'no measured source: null, not 0');
     assert.equal(none.diagnostics.plannedNotMeasured, 1);
-    assert.deepEqual(Object.keys(none.diagnostics.plannedNotMeasuredReasons), ['no plan records yet (the slice-2 cutover has not applied)']);
+    assert.deepEqual(Object.keys(none.diagnostics.plannedNotMeasuredReasons), ['no plan records before 2026-11-20']);
     const before = run(issues, { planRecordsSince: '2026-06-20T00:00:00.000Z', planFacts: factsFor(['LIN-a'], ['LIN-a']) });
     assert.equal(before.diagnostics.plannedNotMeasured, 1, 'completed before the cutover');
     const unread = run(issues, { planRecordsSince: COVERED, planFacts: new Map([['LIN-a', planFactsNotMeasured('store down')]]) });

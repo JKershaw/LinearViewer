@@ -554,7 +554,7 @@ describe('gate-due / gate-honoured', () => {
     const none = computeIssueRoundTrips(issue('n-1', { description: 'plan-review due: yes', planFacts: ASKED, rows }), { asOf: ASOF });
     assert.equal(none.gateDue, null);
     assert.equal(none.gateHonoured, null);
-    assert.match(none.gateNotMeasured, /no plan records yet/);
+    assert.match(none.gateNotMeasured, /no plan records before 2026-11-20/);
     const early = computeIssueRoundTrips(issue('n-2', { planFacts: ASKED, rows }), { asOf: ASOF, planRecordsSince: '2026-08-09T10:00:00.000Z' });
     assert.equal(early.gateDue, null, 'its plan was dispatched before the records began');
     const unread = computeIssueRoundTrips(issue('n-3', { rows }), { asOf: ASOF, planRecordsSince: COVERED });

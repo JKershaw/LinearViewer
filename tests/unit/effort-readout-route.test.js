@@ -356,10 +356,10 @@ describe('provider capability gating', () => {
     assert.equal(status, 200);
     assert.deepEqual(asked, [['ws-1', ['LIN-1']]], 'one batched read');
     const planCard = JSON.parse(body).perKind.find((k) => k.kind === 'plan');
-    assert.equal(planCard.survival.gateNotMeasured, 1, 'no plan records cover this history yet (the cutover sets PLAN_RECORDS_SINCE)');
+    assert.equal(planCard.survival.gateNotMeasured, 1, 'this history predates the cutover (PLAN_RECORDS_SINCE, 2026-11-20): not measured');
     assert.match(JSON.parse(body).notes.planRecordsCoverage, /not measured/);
     const page = await get(buildApp({ store, providerName: name, recordsStore }), '/workspace/ws-1/effort-readout');
-    assert.match(page.body, /plan-review gate due\/honoured: not measured for 1 \(no plan records yet\)/);
+    assert.match(page.body, /plan-review gate due\/honoured: not measured for 1 \(no plan records before 2026-11-20\)/);
   });
 
   test('LIN-4504: a records store that fails leaves the gate not measured, and the read-out still renders', async () => {
