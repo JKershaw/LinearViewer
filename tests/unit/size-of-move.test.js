@@ -29,6 +29,7 @@ import {
   readSizeRecord, sizeFact, checkSizeRecord, STANDING_POLICY_LINE, recordShape
 } from '../../lib/size-of-move.js';
 import { sealAsAsked } from '../../lib/as-asked.js';
+import { askedOf } from '../../lib/asked-of.js';
 import { assembleTrailFacts, formatTrailFactsBlock } from '../../lib/recommendation-facts.js';
 import { generatePrompt } from '../../lib/prompt-templates.js';
 
@@ -187,17 +188,17 @@ describe('the check: what it permits', () => {
 
   test('a quoted cut whose quote carries a code span from the ask; the same span not in the ask is refused', () => {
     const quoted = PLAIN.replace('**Cuts:** none.', '**Cuts:**\n- "Write a full guide." and "on main: `docs/plans/survey.md`" are cut, pending a ruling.');
-    assert.deepEqual(checkSizeRecord(SEALED, withRecord(quoted)), { ok: true });
+    assert.deepEqual(checkSizeRecord(SEALED, withRecord(quoted), { asked: ASK }), { ok: true });
     const notInAsk = quoted.replace('docs/plans/survey.md', 'docs/plans/other.md');
-    const r = checkSizeRecord(SEALED, withRecord(notInAsk));
+    const r = checkSizeRecord(SEALED, withRecord(notInAsk), { asked: ASK });
     assert.deepEqual([r.ok, r.kind], [false, 'code-span']);
     const unquoted = PLAIN.replace('**Cuts:** none.', '**Cuts:**\n- Keep it on main: `docs/plans/survey.md`.');
-    assert.equal(checkSizeRecord(SEALED, withRecord(unquoted)).ok, false, 'the ask\'s words outside a quotation are not exempt');
+    assert.equal(checkSizeRecord(SEALED, withRecord(unquoted), { asked: ASK }).ok, false, 'the ask\'s words outside a quotation are not exempt');
   });
 
   test('a > quotation of the ask passes the how check, and is then a line the record does not hold', () => {
     const blockquote = `${PLAIN}\n> Keep the look-first step as advice (on main: \`docs/plans/survey.md\`).`;
-    const r = checkSizeRecord(SEALED, withRecord(blockquote));
+    const r = checkSizeRecord(SEALED, withRecord(blockquote), { asked: ASK });
     assert.deepEqual([r.code, r.kind], [SIZE_RECORD_CODES.shape, 'extra-line']);
   });
 
@@ -244,7 +245,8 @@ describe('close-out keeps the record', () => {
 // lines and nothing else, so how has no room. Two free-form arms put the how wherever the record
 // left space (lists and code spans, then plain-word definitions); code now holds the shape.
 describe('the shape: four lines and nothing else (LIN-4369 arm 3)', () => {
-  const shape = (body, ask = SEALED) => checkSizeRecord(ask, withRecord(body, { ask, after: '' }));
+  // LIN-4501: the words a cut quotes are the task's `asked`, here what the task made from `ask` would hold (askedOf).
+  const shape = (body, ask = SEALED) => checkSizeRecord(ask, withRecord(body, { ask, after: '' }), { asked: askedOf(ask) });
   const kindOf = (body, ask) => { const r = shape(body, ask); return r.ok ? 'ok' : `${r.code}:${r.kind}`; };
   const S = SIZE_RECORD_CODES.shape;
   const swap = (label, value) => PLAIN.replace(new RegExp(`^\\*\\*${label}:\\*\\*.*$`, 'm'), `**${label}:** ${value}`);
@@ -301,12 +303,15 @@ describe('the shape: four lines and nothing else (LIN-4369 arm 3)', () => {
     assert.equal(kindOf(swap(CUTS_LABEL, `${NO_CUTS}\n- "Write a full guide." is cut`)), `${S}:extra-line`, '"none" takes no bullets under it');
   });
 
-  test('on an unsealed ticket a cut quotes the description outside the record', () => {
+  // LIN-4501: a cut quotes the task's `asked`, whether or not the description is sealed; the description is never read.
+  test('a cut quotes the task\'s asked, and with no task on record there is no ask to quote', () => {
     const live = 'Write a full guide to the look-first step.';
     const body = swap(CUTS_LABEL, '"Write a full guide" is cut, pending a ruling.');
-    assert.deepEqual(checkSizeRecord(live, `${live}\n\n${SIZE_OF_MOVE_HEADING}\n\n${body}`), { ok: true });
-    const r = checkSizeRecord(live, `${live}\n\n${SIZE_OF_MOVE_HEADING}\n\n${swap(CUTS_LABEL, '"a short note" is cut.')}`);
+    assert.deepEqual(checkSizeRecord(live, `${live}\n\n${SIZE_OF_MOVE_HEADING}\n\n${body}`, { asked: live }), { ok: true });
+    const r = checkSizeRecord(live, `${live}\n\n${SIZE_OF_MOVE_HEADING}\n\n${swap(CUTS_LABEL, '"a short note" is cut.')}`, { asked: live });
     assert.deepEqual([r.code, r.kind], [S, 'cut-unquoted']);
+    const none = checkSizeRecord(live, `${live}\n\n${SIZE_OF_MOVE_HEADING}\n\n${body}`);
+    assert.deepEqual([none.code, none.kind], [S, 'cut-unquoted'], 'no task: the description around the record is not the ask');
   });
 
   test('decided by one of the list, with at most a few words of who and when', () => {

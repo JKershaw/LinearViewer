@@ -88,6 +88,14 @@ const runStore = (rows, live = [], { failRead = false } = {}) => ({
   }
 });
 
+// LIN-4501: the person's words are the task's `asked`, read from the records store. Only a ticket a test gives words
+// to has them (the look-first fixture); every other ticket here has no task, so the route stays off for it.
+const TASK_WORDS = {};
+const askedRecords = () => ({
+  askedForTicket: async (_urlKey, ticket) => TASK_WORDS[ticket] ?? null,
+  askedForTickets: async (_urlKey, tickets) => new Map(tickets.filter((t) => TASK_WORDS[t]).map((t) => [t, TASK_WORDS[t]]))
+});
+
 function proxyApp({ rows = [], items = [], live = [], failRead = false } = {}) {
   const app = express();
   app.use(express.json());
@@ -109,7 +117,8 @@ function proxyApp({ rows = [], items = [], live = [], failRead = false } = {}) {
     },
     workspaceFromUrl: (req, res, next) => next(),
     workspacePreferencesStore: { getWorkspacePreferences: async () => ({}) },
-    freeTierStore: { tryUse: async () => ({ allowed: true }), checkRun: async () => ({ allowed: true, runsUsed: 0, limit: 10, remaining: 10, resetsAt: null }) }
+    freeTierStore: { tryUse: async () => ({ allowed: true }), checkRun: async () => ({ allowed: true, runsUsed: 0, limit: 10, remaining: 10, resetsAt: null }) },
+    recordsStore: askedRecords()
   }));
   return app;
 }
@@ -123,7 +132,8 @@ function uiApp({ rows = [], live = [] } = {}) {
     workspacePreferencesStore: { getWorkspacePreferences: async () => ({}) },
     getOpenRouterSource: () => null,
     userPreferencesStore: {}, customPromptsStore: {}, recapCacheStore: {}, briefCacheStore: {}, reportHistoryStore: {}, agentStatusStore: {}, promptTraceStore: {},
-    dispatchQueueStore: runStore(rows, live)
+    dispatchQueueStore: runStore(rows, live),
+    recordsStore: askedRecords()
   }));
   return app;
 }
@@ -335,8 +345,10 @@ describe('wired: the operator\'s escapes still dispatch (acceptance 2)', () => {
     assert.equal(items[0].force, true);
   });
 
-  test('W5: on a look-first ticket, force sends the next step beside the live one; without force it still waits', async () => {
+  test('W5: on a look-first ticket, force sends the next step beside the live one; without force it still waits', async (t) => {
     setIssue({ identifier: 'LW-1', title: 'Export CSV', description: ASKED });
+    TASK_WORDS['LW-1'] = 'Make the export button download a CSV.';
+    t.after(() => { delete TASK_WORDS['LW-1']; });
     const asks = selector();
     const rows = [silentRow('survey-task', '10:00')];
     let items = [];

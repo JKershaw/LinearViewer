@@ -17,6 +17,7 @@ import {
   clampStackLimit,
   toStackHeadline,
   STACK_HEADLINE_MAX,
+  askedForStack,
 } from '../../lib/task-stack.js';
 import { testMockData } from '../../lib/sample-data/mock-data.js';
 
@@ -116,12 +117,28 @@ describe('buildTaskStack — projection contract', () => {
     }
   });
 
-  test('digest headline is the first non-empty description line', () => {
-    const digest = buildTaskStack({ ...freshInput(), limit: 50, view: 'digest' });
+  // LIN-4501: the headline is the first non-empty line of the ticket's task `asked`, never of the description.
+  test('digest headline is the first non-empty line of the task\'s asked, and empty with no task', () => {
+    const input = freshInput();
+    const askedByTicket = new Map([['TEST-1', '\n  The person\'s own words.  \nA second line.']]);
+    const digest = buildTaskStack({ ...input, limit: 50, view: 'digest', askedByTicket });
     const byId = new Map(digest.tasks.map(t => [t.identifier, t]));
-    // TEST-1's description is 'This is a parent task' (single line).
-    const t1 = byId.get('TEST-1');
-    if (t1) assert.strictEqual(t1.headline, 'This is a parent task');
+    assert.ok(byId.has('TEST-1'), 'the fixture parent is in the stack');
+    assert.strictEqual(byId.get('TEST-1').headline, 'The person\'s own words.');
+    // TEST-1's description is 'This is a parent task': a ticket with no task on record has no words, so no headline.
+    const none = buildTaskStack({ ...freshInput(), limit: 50, view: 'digest' });
+    assert.strictEqual(new Map(none.tasks.map(t => [t.identifier, t])).get('TEST-1').headline, '');
+  });
+
+  test('askedForStack reads the words in one batch, and reads as none with no store or on a fault', async () => {
+    const asks = [];
+    const records = { askedForTickets: async (urlKey, tickets) => { asks.push([urlKey, tickets]); return new Map([['A-1', 'Words.']]); } };
+    const got = await askedForStack(records, 'acme', [{ identifier: 'A-1' }, { identifier: 'A-2' }]);
+    assert.deepStrictEqual([...got], [['A-1', 'Words.']]);
+    assert.deepStrictEqual(asks, [['acme', ['A-1', 'A-2']]], 'one read for every ticket');
+    assert.strictEqual((await askedForStack(null, 'acme', [{ identifier: 'A-1' }])).size, 0);
+    const faulty = { askedForTickets: async () => { throw new Error('records down'); } };
+    assert.strictEqual((await askedForStack(faulty, 'acme', [{ identifier: 'A-1' }])).size, 0);
   });
 
   test('is deterministic — repeated calls yield identical ordering', () => {

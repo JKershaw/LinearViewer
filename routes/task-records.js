@@ -23,6 +23,7 @@ import { isValidIssueId, resolveIssueBinding } from '../lib/workspace.js';
 import { taskPageHref } from '../lib/task-page-href.js';
 import { jsonError } from '../lib/errors.js';
 import { createRecordWrites } from '../lib/records/writes.js';
+import { askedOf } from '../lib/asked-of.js';
 import { fixedIdOf } from '../lib/records/refs.js';
 import { ADDABLE, SUPERSEDABLE } from '../lib/render-task-records.js';
 import { RecordsNotFound, RecordsVersionConflict } from '../lib/records-store.js';
@@ -81,7 +82,7 @@ export function createTaskRecordsRoutes({ workspaceFromUrl, recordsStore, accoun
     recordsStore,
     isTerminalState,
     readTicket,
-    askedText: () => '',
+    askedText: askedOf,
     stageKinds: Object.keys(STAGE_KINDS),
     listPeople,
     tracker,

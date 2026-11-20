@@ -72,7 +72,9 @@ const person = (at, body = 'Hold this until the auth change lands.') => comment(
 const sizeRuling = (at) => comment(at, "## Size of the move (the person's call)\n\nJust the task, please.");
 // A run fact as loadRecentRuns' allRuns carries it.
 const run = (stage, dispatched, outcome = 'done', ended = dispatched) => ({ stage, at: T(outcome === 'queued' || outcome === 'running' ? dispatched : ended), outcome, dispatchedAt: T(dispatched) });
-const ctx = (comments = [], allRuns = [], over = {}) => ({ parent: null, siblings: [], project: null, children: [], comments, focusedChild: null, attachments: [], runs: [], allRuns, ...over });
+// LIN-4501: the person's words are the task's `asked` (prepareRecommendationInput reads them from the records store).
+const WORDS = 'Make the export button download a CSV.';
+const ctx = (comments = [], allRuns = [], over = {}) => ({ parent: null, siblings: [], project: null, children: [], comments, focusedChild: null, attachments: [], runs: [], allRuns, asked: WORDS, ...over });
 const stepOf = (issue, context) => lookFirstStep(issue, context)?.step ?? null;
 
 describe('step choice: survey-task, then survey-place, then scoping, each once', () => {
@@ -206,7 +208,7 @@ describe('when the route is off', () => {
     assert.equal(lookFirstOff(issue, context), reason);
   };
 
-  test('a plan, a PR, a size record, children, no As-asked block, completed or canceled, an open blocker, a waiting run, unknown runs', () => {
+  test('a plan, a PR, a size record, children, no asked words on its task, completed or canceled, an open blocker, a waiting run, unknown runs', () => {
     asOff(leaf({ description: `${ASKED}\n\n## Implementation Plan\n\nThe plan.` }), ctx(), 'has a plan');
     asOff(leaf(), ctx([comment('10:00', '## Plan\n\nThe plan in a comment.')]), 'has a plan');
     // LIN-4497: the gate reads the implementation run's own PR, not a comment's URL (see the LIN-4497 block).
@@ -214,7 +216,8 @@ describe('when the route is off', () => {
     asOff(leaf({ description: ASKED + RECORD() }), ctx(), 'size recorded');
     asOff(leaf({ description: ASKED + RECORD('pending a ruling') }), ctx(), 'size recorded');
     asOff(leaf(), ctx([], [], { children: [{ identifier: 'T-2', state: OPEN }] }), 'not a leaf');
-    asOff(leaf({ description: 'Make the export button download a CSV.' }), ctx(), 'no As-asked block');
+    // LIN-4501: a task with no `asked` is off, whatever the description holds (a sealed block included).
+    asOff(leaf(), ctx([], [], { asked: null }), 'no asked words on its task');
     asOff(leaf({ state: { name: 'Done', type: 'completed' } }), ctx(), 'completed or canceled');
     asOff(leaf({ state: { name: 'Canceled', type: 'canceled' } }), ctx(), 'completed or canceled');
     asOff(leaf({ blockedBy: [{ identifier: 'T-9', state: { name: 'In Progress', type: 'started' } }] }), ctx(), 'open blocker');
@@ -361,6 +364,13 @@ const runStore = (rows, live = []) => ({
   listHistory: async (urlKey, { issueIdentifier } = {}) => ({ items: rows.filter(r => r.issueIdentifier === issueIdentifier), total: rows.length })
 });
 
+// LIN-4501: the ticket's task holds the person's words, read by prepareRecommendationInput (askedForTicket). Only the
+// words: every other records read fails inside its own guard, so the open findings stay "not read", as before records.
+const askedRecords = (words = WORDS) => ({
+  askedForTicket: async () => words,
+  askedForTickets: async (_urlKey, tickets) => new Map(tickets.filter(Boolean).map((t) => [t, words]))
+});
+
 function proxyApp({ rows = [], items = [], live = [] } = {}) {
   const app = express();
   app.use(express.json());
@@ -380,7 +390,8 @@ function proxyApp({ rows = [], items = [], live = [] } = {}) {
     },
     workspaceFromUrl: (req, res, next) => next(),
     workspacePreferencesStore: { getWorkspacePreferences: async () => ({}) },
-    freeTierStore: { tryUse: async () => ({ allowed: true }), checkRun: async () => ({ allowed: true, runsUsed: 0, limit: 10, remaining: 10, resetsAt: null }) }
+    freeTierStore: { tryUse: async () => ({ allowed: true }), checkRun: async () => ({ allowed: true, runsUsed: 0, limit: 10, remaining: 10, resetsAt: null }) },
+    recordsStore: askedRecords()
   }));
   return app;
 }
@@ -394,7 +405,8 @@ function uiApp({ rows = [], live = [] } = {}) {
     workspacePreferencesStore: { getWorkspacePreferences: async () => ({}) },
     getOpenRouterSource: () => null,
     userPreferencesStore: {}, customPromptsStore: {}, recapCacheStore: {}, briefCacheStore: {}, reportHistoryStore: {}, agentStatusStore: {}, promptTraceStore: {},
-    dispatchQueueStore: runStore(rows, live)
+    dispatchQueueStore: runStore(rows, live),
+    recordsStore: askedRecords()
   }));
   return app;
 }

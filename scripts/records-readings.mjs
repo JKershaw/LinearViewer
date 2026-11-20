@@ -4,13 +4,17 @@
  * dispatch queue and history of one workspace, and prints the records rows (open to project, open to stage, sit time),
  * the held-run row (with its window and n), and the stale-open-runs count. Nothing here writes, and nothing gates.
  *
- *   node scripts/records-readings.mjs --urlkey <workspace urlKey> [--as-of <iso>] [--json]
+ *   node scripts/records-readings.mjs --urlkey <workspace urlKey> [--as-of <iso>] [--since <iso>] [--json]
  *
  * The database is the server's, chosen as server.js chooses it: MONGODB_URI when set, else the MangoDB data
  * directory (HARBOUR_DATA_DIR or ./data). Each reading prints its own window and n. The stale-open-runs count is only
  * meaningful from the evening of 21 Nov 2026 (48 hours after the records deploy), and a run is stale when its current
  * version is `open` and that version is more than 24 hours old at the reading time. A reader's own reads never enter
  * the query log (this reads the collections directly), and the held-run reading also leaves out READER's `by`.
+ *
+ * LIN-4501: `records.tasklessRuns` counts the runs that opened with no task (a run record with no `in`): the data side of
+ * the `task-missing-at-take` log line (lib/run-records.js). Before P1's deploy every run is task-less; read it with
+ * `--since <deploy time>` and the count is the takes whose task could not be found or made.
  */
 import { MongoClient } from 'mongodb';
 import { MangoClient } from '@jkershaw/mangodb';
@@ -31,7 +35,7 @@ const DISPATCH_FIELDS = { _id: 1, kind: 1, status: 1, lineageStatus: 1, issueIde
  * version's `at`), and the open runs whose current version is more than STALE_RUN_HOURS old at `asOf`.
  * @param {object[]} snaps - every version of every record in one workspace (RecordsStore.snapshots)
  */
-export function recordsOfSnapshots(snaps, asOf) {
+export function recordsOfSnapshots(snaps, asOf, { since = null } = {}) {
   const first = new Map();
   const current = new Map();
   for (const s of snaps) {
@@ -40,13 +44,27 @@ export function recordsOfSnapshots(snaps, asOf) {
   }
   const records = [];
   const openRuns = [];
+  const runs = [];
   for (const [id, cur] of current) {
     records.push({ id, kind: cur.kind, state: cur.state, to: cur.to, in: cur.in, ref: cur.kind === 'task' ? cur.fields?.ref : undefined, openedAt: first.get(id).at });
     if (cur.kind === 'run' && cur.state === 'open') openRuns.push({ id, at: cur.at });
+    if (cur.kind === 'run') runs.push({ id, openedAt: first.get(id).at, inTask: Boolean(cur.in) });
   }
   const cutoff = Date.parse(asOf) - STALE_RUN_HOURS * 3600000;
   const stale = openRuns.filter((r) => Date.parse(r.at) < cutoff).map((r) => r.id).sort();
-  return { records, staleOpenRuns: { count: stale.length, of: openRuns.length, runs: stale, asOf, olderThanHours: STALE_RUN_HOURS } };
+  return { records, staleOpenRuns: { count: stale.length, of: openRuns.length, runs: stale, asOf, olderThanHours: STALE_RUN_HOURS }, tasklessRuns: tasklessRunsOf(runs, { since, asOf }) };
+}
+
+/**
+ * LIN-4501: the runs opened with no task (no `in`), in the window `since` (inclusive) to `asOf`; `since` null is every
+ * run. `count` of `of` runs opened in the window, and the task-less ids, newest last.
+ */
+export function tasklessRunsOf(runs, { since = null, asOf }) {
+  const from = since ? Date.parse(since) : -Infinity;
+  const to = Date.parse(asOf);
+  const inWindow = runs.filter((r) => { const t = Date.parse(r.openedAt); return t >= from && t <= to; });
+  const taskless = inWindow.filter((r) => !r.inTask).sort((a, b) => Date.parse(a.openedAt) - Date.parse(b.openedAt)).map((r) => r.id);
+  return { count: taskless.length, of: inWindow.length, since, asOf, runs: taskless };
 }
 
 /**
@@ -54,8 +72,8 @@ export function recordsOfSnapshots(snaps, asOf) {
  * { at: iso, by, taskId, recordId }), `dispatchRows` (queue and history rows as DISPATCH_FIELDS). Returns the rows in
  * the shared row shape, with the window and n each one was read over.
  */
-export function readingsOf({ snapshots, queryLog, dispatchRows, asOf, stageKinds = Object.keys(STAGE_KINDS), measuringReader = READER }) {
-  const { records, staleOpenRuns } = recordsOfSnapshots(snapshots, asOf);
+export function readingsOf({ snapshots, queryLog, dispatchRows, asOf, since = null, stageKinds = Object.keys(STAGE_KINDS), measuringReader = READER }) {
+  const { records, staleOpenRuns, tasklessRuns } = recordsOfSnapshots(snapshots, asOf, { since });
   const rows = [
     ...recordsRows({ records, asOf, stageKinds }),
     heldRunRow(heldRunReading({ records, queryLog, dispatchRows, asOf, measuringReader }))
@@ -65,12 +83,13 @@ export function readingsOf({ snapshots, queryLog, dispatchRows, asOf, stageKinds
     // A source that was not read is null, never zero (the held-run row says so too).
     n: { records: records.length, queryLog: queryLog?.length ?? null, dispatchRows: dispatchRows?.length ?? null },
     rows,
-    staleOpenRuns
+    staleOpenRuns,
+    tasklessRuns
   };
 }
 
 /** The same readings, from a database: the collections read once each, the query log's dates as ISO text. */
-export async function readFromDb(db, urlKey, { asOf, stageKinds, measuringReader } = {}) {
+export async function readFromDb(db, urlKey, { asOf, since = null, stageKinds, measuringReader } = {}) {
   const store = new RecordsStore({ records: db.collection(RECORDS_COLLECTION), refs: db.collection(REFS_COLLECTION), queryLog: db.collection(QUERY_LOG_COLLECTION) });
   const snapshots = await store.snapshots(urlKey);
   const logDocs = await db.collection(QUERY_LOG_COLLECTION).find({ urlKey }, { projection: { _id: 0, at: 1, by: 1, taskId: 1, recordId: 1 } }).toArray();
@@ -79,7 +98,7 @@ export async function readFromDb(db, urlKey, { asOf, stageKinds, measuringReader
     ...(await db.collection(DISPATCH_QUEUE).find({ urlKey }, { projection: DISPATCH_FIELDS }).toArray()),
     ...(await db.collection(DISPATCH_HISTORY).find({ urlKey }, { projection: DISPATCH_FIELDS }).toArray())
   ];
-  return readingsOf({ snapshots, queryLog, dispatchRows, asOf, stageKinds, measuringReader: measuringReader ?? READER });
+  return readingsOf({ snapshots, queryLog, dispatchRows, asOf, since, stageKinds, measuringReader: measuringReader ?? READER });
 }
 
 function argValue(name) {
@@ -95,12 +114,14 @@ function printReadings(out) {
   }
   const s = out.staleOpenRuns;
   console.log(`records.staleOpenRuns: ${s.count} of ${s.of} open runs are older than ${s.olderThanHours} h at ${s.asOf}${s.runs.length ? ` (${s.runs.join(', ')})` : ''}`);
+  const t = out.tasklessRuns;
+  console.log(`records.tasklessRuns: ${t.count} of ${t.of} runs opened ${t.since ? `since ${t.since}` : 'ever'} have no task (task-missing-at-take)${t.runs.length ? ` (last: ${t.runs.slice(-10).join(', ')})` : ''}`);
 }
 
 async function main() {
   const urlKey = argValue('--urlkey');
   if (!urlKey) {
-    console.error('usage: records-readings.mjs --urlkey <urlKey> [--as-of <iso>] [--json]');
+    console.error('usage: records-readings.mjs --urlkey <urlKey> [--as-of <iso>] [--since <iso>] [--json]');
     process.exitCode = 2;
     return;
   }
@@ -109,7 +130,7 @@ async function main() {
   const dbClient = backend === 'mongodb' ? new MongoClient(process.env.MONGODB_URI) : new MangoClient(process.env.HARBOUR_DATA_DIR || './data');
   await dbClient.connect();
   try {
-    const out = await readFromDb(dbClient.db(DB_NAME), urlKey, { asOf });
+    const out = await readFromDb(dbClient.db(DB_NAME), urlKey, { asOf, since: argValue('--since') });
     if (process.argv.includes('--json')) console.log(JSON.stringify(out, null, 2));
     else printReadings(out);
   } finally {

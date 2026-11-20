@@ -378,6 +378,8 @@ export function createFlightCompanionRoutes({
   workspaceFromUrl, getOpenRouterSource, getDeployInfo, observerStateStore,
   freeTierStore, workspacePreferencesStore, recapCacheStore, briefCacheStore,
   dispatchQueueStore, agentStatusStore, proxyTokenStore,
+  // LIN-4501: the get_stack headlines read each task `asked` (lib/chat-tools.js).
+  recordsStore = null,
   // LIN-3383: the hoisted workspace-owner seam (server.js). Approve and reply
   // (send_follow_up) are owner-only.
   workspaceOwnerCheck = null,
@@ -617,7 +619,7 @@ export function createFlightCompanionRoutes({
           return { reason: 'free-tier', freeTierCheck: gate };
         },
         deps: {
-          observerStateStore, workspacePreferencesStore, recapCacheStore, briefCacheStore,
+          observerStateStore, workspacePreferencesStore, recapCacheStore, briefCacheStore, recordsStore,
           dispatchQueueStore, agentStatusStore, taskDecisionsStore, shelvedRulingsStore,
           proxyTokenStore, sessionIsTerminal, enrichLoop,
           chatClient, createToolCatalog,
@@ -776,7 +778,7 @@ export function createFlightCompanionRoutes({
           return { reason: 'free-tier', freeTierCheck: gate };
         },
         deps: {
-          observerStateStore, workspacePreferencesStore, recapCacheStore, briefCacheStore,
+          observerStateStore, workspacePreferencesStore, recapCacheStore, briefCacheStore, recordsStore,
           dispatchQueueStore, agentStatusStore, taskDecisionsStore, shelvedRulingsStore,
           proxyTokenStore, sessionIsTerminal, enrichLoop,
           chatClient, createToolCatalog,

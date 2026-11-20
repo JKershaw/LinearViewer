@@ -33,6 +33,8 @@ const PHRASE = 'a full guide on how to properly configure';
 const DESCRIPTION = `${sealAsAsked(FILED)}\n\n## Implementation Plan\n\nAdd a homepage prompt and a short /getting-started page that sequences the human's few clicks, within a size budget of about 4.5 KB.\n\nfits one session\n\nplan-review due: no`;
 const ISSUE = { id: 'i-4085', identifier: 'LIN-4085', title: 'Homepage getting-started prompt for agents', description: DESCRIPTION, labels: [], comments: [] };
 const CONTEXT = { parent: null, siblings: [], project: { name: 'Harbour' }, children: [], comments: [] };
+// LIN-4501: the brief quotes the task's `asked`: the task made from the sealed description holds the filed words.
+const BRIEF_CONTEXT = { ...CONTEXT, asked: { self: FILED, parent: null } };
 
 // The stub brief model thins the ask the way scoping did on the day.
 const THIN_BRIEF = '## Current\nSequence the human\'s few clicks to onboard an agent.\n\n## Constraints\n- _None._\n\n## Open questions\n- _None._\n\n## Changelog\n- _None._';
@@ -86,7 +88,7 @@ describe('the LIN-4085 replay, deterministic part (LIN-4353)', () => {
 
   test('the brief carries the filed words verbatim, though the model thinned them', async () => {
     installModelStub(THIN_BRIEF);
-    const { brief } = await generateBrief(ISSUE, CONTEXT, { apiKey: 'test-key' });
+    const { brief } = await generateBrief(ISSUE, BRIEF_CONTEXT, { apiKey: 'test-key' });
     assert.ok(!THIN_BRIEF.includes(PHRASE), 'the stub model really did drop the phrase');
     assert.ok(brief.startsWith(`## As asked\n\n${FILED}\n\n`), 'the brief opens with the filed words, byte for byte');
     assert.ok(brief.includes(PHRASE), `the brief carries "${PHRASE}" verbatim`);

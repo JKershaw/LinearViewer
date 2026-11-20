@@ -192,6 +192,33 @@ describe('the task page for a ticket with no task record yet', () => {
   });
 });
 
+describe('LIN-4501: a task made by the task page takes its `asked` from the ticket (finding-2edf23b4)', () => {
+  const WITH_PLAN = 'Do X.\n\n## Implementation Plan\nstep one';
+  const readPlanTicket = async (_ctx, ref) => ({ identifier: ref, description: WITH_PLAN, state: { type: 'unstarted', name: 'Todo' }, parent: null });
+
+  test('the first record written on the task page for an untasked ticket makes the task with the words before the plan', async () => {
+    await serve(createTaskRecordsRoutes({
+      workspaceFromUrl: session, recordsStore: store, accountStore: { resolveCanonicalAccountId: async (id) => id },
+      listPeople: people, readTicket: readPlanTicket, tracker: outward.tracker,
+    }));
+    assert.equal(await store.askedForTicket(URL_KEY, 'LIN-9'), null, 'no task yet');
+    const add = await fetch(`${base}/workspace/${URL_KEY}/task/LIN-9/records`, {
+      method: 'POST', redirect: 'manual', headers: { 'content-type': 'application/x-www-form-urlencoded' },
+      body: new URLSearchParams({ kind: 'question', text: 'who owns the footer?', to: 'project' }),
+    });
+    assert.equal(add.status, 303);
+    assert.equal(await store.askedForTicket(URL_KEY, 'LIN-9'), 'Do X.', 'the plan is stage output, never the person\'s words; was null before the fix');
+  });
+
+  test('the project page wires the same rule, so the two writers cannot drift', async () => {
+    const src = await import('node:fs').then((fs) => ['routes/task-records.js', 'routes/project-page.js'].map((f) => fs.readFileSync(new URL(`../../${f}`, import.meta.url), 'utf8')));
+    for (const text of src) {
+      assert.match(text, /askedText: askedOf/);
+      assert.doesNotMatch(text, /askedText: \(\) => ''/);
+    }
+  });
+});
+
 describe('a records-store failure costs the records, not the page', () => {
   test('the task page still renders, with no Records section, when the records read throws', async () => {
     const loader = {

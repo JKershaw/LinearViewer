@@ -168,10 +168,15 @@ describe('records store: tickets become tasks, once', () => {
     assert.equal((await store.current(URL_KEY, r.id)).in, parentId);
   });
 
-  test('a closed parent refuses the child, naming the parent', async () => {
-    const child = ticket('LIN-11', { parent: ticket('LIN-10', { closed: true, closedReason: 'Canceled' }) });
+  // LIN-4501 (John's ruling, 20 Nov): a closed parent no longer refuses the child. Its task is made first, ended as its
+  // ticket ended, and the child's task is linked in it. The closed ticket a write names is still refused (above).
+  test('a closed parent gets its task made and ended, and the child is linked in it', async () => {
+    const child = ticket('LIN-11', { parent: ticket('LIN-10', { closed: true, closedReason: 'Canceled', closedEnd: 'declined' }) });
     const r = await store.ensureTask(URL_KEY, child, { by: 'Harbour', at: at(1) });
-    assert.match(r.problem, /LIN-10 is closed/);
+    assert.ok(r.id, `the child gets its task (${r.problem || ''})`);
+    const parent = await store.current(URL_KEY, (await store.current(URL_KEY, r.id)).in);
+    assert.equal(parent.fields.ref, 'LIN-10');
+    assert.equal(parent.state, 'declined');
   });
 });
 

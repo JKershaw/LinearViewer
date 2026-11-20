@@ -165,6 +165,7 @@ export const SPEC_OPERATIONS = Object.freeze(Object.keys(SPEC));
  * @param {Function} deps.resolveLabelInput - Symbolic-or-UUID label ref resolver (closure-local)
  * @param {Function} deps.refResolutionFailed - Maps a RefResolutionError to its own 422 (closure-local)
  * @param {Function} deps.partialWriteFailed - Maps a PartialWriteError (write landed, its confirmation re-read or harbour.asAsked property check failed) to its own envelope (closure-local)
+ * @param {Object} [deps.recordsStore] - LIN-4501: the size guard reads the ticket's task `asked` (lib/records-store.js askedForTicket); absent, no ask is on record
  * @param {Function} deps.logEvent - Audit/witness event logger (closure-local)
  * @param {Object} [deps.harbourCommentsStore] - Durable (urlKey, commentId) ledger (LIN-2648); best-effort record at each createComment seam, never gates the response
  * @param {Function} [deps.onTicketWrite] - Optional ticket-closed closer seam (LIN-3366), fire-and-forget; never changes a response
@@ -192,6 +193,7 @@ export function createProxyWriteRoutes({
   harbourCommentsStore = null,
   onTicketWrite = null,
   recordPipelineMerge = null,
+  recordsStore = null,
 }) {
   const router = Router();
   // LIN-4468: each mount names its operation (the SPEC key) so the gate checks the stage's allowance for it.
@@ -385,6 +387,23 @@ export function createProxyWriteRoutes({
   }
 
   /**
+   * LIN-4501: the ticket's task `asked`, the only words a size record's cut may quote; null with no task, no store,
+   * or a records fault (logged). The ticket is the route's own id, as the write names it.
+   */
+  async function askedOfTicket(ctx, issue = null) {
+    if (!recordsStore || typeof recordsStore.askedForTicket !== 'function') return null;
+    // A task's claim is keyed by the ticket identifier. A write addressed by UUID names no identifier, so the
+    // live read the guard already made supplies it (the Linear description read carries it).
+    const ticket = issue?.identifier || ctx.req.params.issueId;
+    try {
+      return await recordsStore.askedForTicket(ctx.req.proxyUrlKey, ticket);
+    } catch (err) {
+      console.error(`[size-of-move] the task's asked could not be read (${ctx.req.proxyUrlKey} ${ticket}): ${err?.message || err}`);
+      return null;
+    }
+  }
+
+  /**
    * The size record guard (LIN-4368), beside refusedByAsAsked at both of its description call
    * sites and with the same `live` / `next`: lib/size-of-move.js checkSizeRecord acts only when
    * the write adds, changes or drops the `## Size of the move` section, so an older section
@@ -392,8 +411,8 @@ export function createProxyWriteRoutes({
    * or "shape" refusal, and returns true once it has refused. Like the As asked guard, only this proxy
    * lane is guarded: the session lane and direct provider edits are people's lanes.
    */
-  function refusedBySizeRecord(ctx, live, next) {
-    const check = checkSizeRecord(live, next);
+  async function refusedBySizeRecord(ctx, live, next, liveIssue = null) {
+    const check = checkSizeRecord(live, next, { asked: await askedOfTicket(ctx, liveIssue) });
     if (check.ok) return false;
     const lead = `The "${SIZE_OF_MOVE_HEADING}" section`;
     const message = {
@@ -570,7 +589,7 @@ export function createProxyWriteRoutes({
       const live = await guardTarget(ctx, 'issueDescription', { onNull: 'proceed' });
       if (!live) return;
       if (refusedByAsAsked(ctx, live.issue?.description || '', description)) return;
-      if (refusedBySizeRecord(ctx, live.issue?.description || '', description)) return;
+      if (await refusedBySizeRecord(ctx, live.issue?.description || '', description, live.issue)) return;
     }
 
     const input = {};
@@ -643,9 +662,11 @@ export function createProxyWriteRoutes({
     const { req, res, endpoint, token, provider } = ctx;
     let current;
     let next;
+    let liveIssue = null;
     try {
       const target = await guardTarget(ctx, 'issueDescription', { onNull: 'notFound' });
       if (!target) return;
+      liveIssue = target.issue;
       current = target.issue.description || '';
       next = merge(current);
     } catch (err) {
@@ -660,7 +681,7 @@ export function createProxyWriteRoutes({
     // LIN-4352: the merged body must keep the live As asked block (append,
     // replace, below and the description-target attachment all pass here).
     if (refusedByAsAsked(ctx, current, next)) return;
-    if (refusedBySizeRecord(ctx, current, next)) return;
+    if (await refusedBySizeRecord(ctx, current, next, liveIssue)) return;
 
     try {
       const updated = normalizeWritePayload(await provider.updateIssue(token, req.params.issueId, { description: next }), 'issue');

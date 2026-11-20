@@ -23,7 +23,7 @@
  *
  * Injected, never imported from the tracker or the workspace (Records imports only Platform): `readTicket`
  * (the provider read: the ticket's identifier, title, description, state and parent), `askedText`
- * (lib/as-asked.js), `stageKinds` (STAGE_KINDS' keys), `listPeople` (the workspace-person reader; a
+ * (lib/asked-of.js askedOf), `stageKinds` (STAGE_KINDS' keys), `listPeople` (the workspace-person reader; a
  * caller with none passes an empty list, and a `to` that names a person is then refused with the names that work)
  * and `tracker` (LIN-4503: the outward port for a request, lib/records-tracker.js; a child task's ticket and a plan's
  * summary go through it after the record is written).
@@ -70,7 +70,7 @@ function bodyWithout(body, keys) {
  * @param {Function} deps.requireWriteScope - `requireWriteScope(op)` (lib/stage-write-gate.js)
  * @param {Function} deps.logEvent
  * @param {(req: object, ref: string) => Promise<object|null>} deps.readTicket - the tracker read, by ticket identifier
- * @param {(description: string) => string} deps.askedText - lib/as-asked.js askedText
+ * @param {(description: string) => string} deps.askedText - lib/asked-of.js askedOf (routes/proxy.js injects it)
  * @param {string[]} deps.stageKinds - STAGE_KINDS' keys
  * @param {(urlKey: string) => Promise<{accountId: string, name: string}[]>} [deps.listPeople]
  * @param {(req: object) => Promise<object|null>} [deps.tracker] - LIN-4503: the tracker port for a request (lib/records-tracker.js)

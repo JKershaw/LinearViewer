@@ -14,6 +14,7 @@ import { Router } from 'express';
 import { jsonError } from '../lib/errors.js';
 import { requestFeatureFlags } from '../lib/run-controls.js';
 import { createRecordWrites } from '../lib/records/writes.js';
+import { askedOf } from '../lib/asked-of.js';
 import { fixedIdOf } from '../lib/records/refs.js';
 import { renderProjectPage } from '../lib/render-project-page.js';
 import { personWriterOf } from './task-records.js';
@@ -38,7 +39,7 @@ export const BACKLOG_LIMIT = 500;
 export function createProjectPageRoutes({ workspaceFromUrl, getDeployInfo, getOpenRouterSource, recordsStore, accountStore = null, listPeople = async () => [] }) {
   if (!recordsStore) throw new Error('project page routes: recordsStore is required');
   const router = Router();
-  const writes = createRecordWrites({ recordsStore, isTerminalState, askedText: () => '', stageKinds: Object.keys(STAGE_KINDS), listPeople });
+  const writes = createRecordWrites({ recordsStore, isTerminalState, askedText: askedOf, stageKinds: Object.keys(STAGE_KINDS), listPeople });
 
   const backTo = (urlKey, query = '') => `/workspace/${encodeURIComponent(urlKey)}/project${query}`;
   const refusedTo = (urlKey, message) => backTo(urlKey, `?refused=${encodeURIComponent(String(message).slice(0, 300))}`);

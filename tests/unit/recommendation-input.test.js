@@ -18,12 +18,25 @@ describe('prepareRecommendationInput (LIN-3469)', () => {
   test('forwards exactly the prompt-read fields plus the task\'s runs', async () => {
     const input = await prepareRecommendationInput(ctx, { dispatchQueueStore: store, urlKey: 'acme', identifier: 'LIN-1' });
     assert.deepEqual(Object.keys(input).sort(),
-      ['allRuns', 'attachments', 'children', 'comments', 'focusedChild', 'openFindings', 'parent', 'project', 'runs', 'siblings']);
+      ['allRuns', 'asked', 'attachments', 'children', 'comments', 'focusedChild', 'openFindings', 'parent', 'project', 'runs', 'siblings']);
+    assert.equal(input.asked, null, 'no records store: no words on record');
     assert.equal(input.parent, ctx.parent);
     assert.equal(input.attachments, ctx.attachments);
     assert.deepEqual(input.runs, [{ stage: 'implementation', at: '2026-10-05T00:00:00.000Z', outcome: 'queued' }]);
     // LIN-4370, LIN-4392: the same read's unsliced runs, with dispatch times and ids, for the look-first route's attempts and the live-stage wait.
     assert.deepEqual(input.allRuns, [{ stage: 'implementation', at: '2026-10-05T00:00:00.000Z', outcome: 'queued', dispatchedAt: '2026-10-05T00:00:00.000Z', id: null }]);
+  });
+
+  // LIN-4501: the look-first route reads the person's words from the ticket's task, never from the description.
+  test('asked is the ticket\'s task words from the records store, and null when it has no task', async () => {
+    const records = { askedForTicket: async (urlKey, ticket) => (urlKey === 'acme' && ticket === 'LIN-1' ? 'The words.' : null) };
+    const input = await prepareRecommendationInput(ctx, { dispatchQueueStore: store, urlKey: 'acme', identifier: 'LIN-1', recordsStore: records });
+    assert.equal(input.asked, 'The words.');
+    const none = await prepareRecommendationInput(ctx, { dispatchQueueStore: store, urlKey: 'acme', identifier: 'LIN-2', recordsStore: records });
+    assert.equal(none.asked, null);
+    const faulty = { askedForTicket: async () => { throw new Error('records down'); } };
+    const failed = await prepareRecommendationInput(ctx, { dispatchQueueStore: store, urlKey: 'acme', identifier: 'LIN-1', recordsStore: faulty });
+    assert.equal(failed.asked, null, 'a records fault reads as no words, never the description');
   });
 
   test('does not leak other context fields (issue, siblingsTotal)', async () => {

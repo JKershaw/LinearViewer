@@ -470,5 +470,9 @@
   "lib/records/writes.js::inLine": {
     "disposition": "not-state",
     "why": "LIN-4503: an in-flight lock per task (the ticket step runs one at a time per task in this process). Each entry is the step's tail promise, removed when that step settles (serially's finally), so it holds nothing between steps; the cross-request guard is the ticket claim, not this map."
+  },
+  "server.js::ticketWriter": {
+    "disposition": "not-state",
+    "why": "The checked records writer (lib/records/writes.js createRecordWrites), built once over the records store: it keeps no per-key state of its own, its tracker reads and store writes happen per call."
   }
 }
