@@ -113,7 +113,9 @@ async function buildPlan() {
 const run = (write) => applyImport({ plan: planned, lib, writes, recordsStore: store, urlKey: URL_KEY, readPrStatus, write });
 const rowOf = (result, ticket) => result.tasks.find((t) => t.ticket === ticket);
 const current = (id) => store.current(URL_KEY, id);
-const viewOfId = async (id) => store.viewOfRecord(URL_KEY, await current(id), iso(1000));
+// The view as it stands now: the apply writes at the wall clock, so a fixture instant would read before its writes
+// (CI's clock-shift arm, LIN-3949).
+const viewOfId = async (id) => store.viewOfRecord(URL_KEY, await current(id));
 const versions = async (id) => (await store.versionsOf(URL_KEY, [id])).sort((a, b) => a.v - b.v);
 
 before(async () => {
