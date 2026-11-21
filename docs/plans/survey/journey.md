@@ -274,3 +274,30 @@ A fresh reader checked this page against the log from 18 Nov, the designs, the r
 
 - **John approved carrying on past slice 4,** assuming no trouble. The drive prompt is updated: after slice 4's readings, the parked work runs one item at a time (LIN-4416 with the seven safety findings, then LIN-4441, then LIN-4463). Each is read against the 13–14 Nov baselines. Then slice 5, then slice 6. The new stop is when slice 6 lands, with a report to John; the rest of the horizon list is his to order.
 - **Two of these are my reading, not John's words,** and he can redirect: that "keep going" includes slice 6 (the readings show the need, and he said 5 and 6 are wanted), and one item at a time for the parked work.
+
+## 21 Nov, 18:10: handover for compaction (the slice 3 stop)
+
+**Where we are.**
+- **Slices 1 and 2 have landed and work.** Research on 21 Nov found no harm to real work from what they left behind. They did leave pieces of the old way in code, prompts, tests and saved test files, with nothing scheduled to remove them.
+- **Slice 3 (LIN-4513) is stopped.**
+  - P1–P4 are merged and sound. P2's change backstop wrote stray change records (findings 1e53ebaf, 0f91d9be).
+  - P5 (LIN-4518) is unmerged on `feat/lin-4518-records-standing` (draft PR #2483). Its latest review asks for changes, and its test translator (`tests/helpers/records-trail.js`) must be replaced by converting the saved cases.
+  - Slice 3's final cutover hasn't happened, so main's gates still read comments.
+  - The lane was stopped by a cascade abort at 17:47. John deleted its queued run, and the abort queue drained by 18:05.
+  - The ruling `lin4518-250-expectation` is open (answer: re-review) and waits for the restart.
+- **The fleet pause is still set** (since 17:04). The "taken" rows in the dispatch list are old stale rows from Sep–Nov, not live work.
+- **Filed 21 Nov, both High, Todo:**
+  - **LIN-4522** (under LIN-4490): finish slices 1 and 2. Draft at `integration/slice-1-finish-ticket.md`. Code, prompts and tests only; no production.
+  - **LIN-4523** (no parent): stopping a run stops all of it, queued work included. Stopping holds, not cancels; pause and stop made plain. Draft at `integration/stop-ticket.md`.
+
+**The order (John, 21 Nov).** No parallel work: the cleanup and slice 3 touch the same files.
+1. Launch LIN-4522 and lift the pause.
+2. When it lands, stop.
+3. John approves restarting slice 3, corrected: tests and saved cases are part of the work; P5 converts its saved cases and deletes the translator; P7 (LIN-4520) covers every stopgap.
+4. LIN-4523 runs after the cleanup, before slice 3 restarts, if John agrees.
+
+**Before launching anything:** the hourly drive's prompt (trig_01XCTpQoZb2V1vqMFvzXKStm) still says to carry on through slice 3 and beyond. Show John new wording first: follow LIN-4522, stop when it lands, don't touch slice 3 until John approves. Show John every ticket, note and launch before sending.
+
+**Then, as planned:** slice 3 lands; slice 4 (rulings); the parked work, one item at a time (LIN-4416 with the seven safety findings, LIN-4441, LIN-4463); slice 5 (lessons); slice 6 (wakes); then John orders the horizon list. Later: Yap and John's own projects, then Jira (LIN-4445 set aside for now).
+
+**Token:** the scratchpad token expires 22 Nov 13:37 UTC; John is sorting a new one.
