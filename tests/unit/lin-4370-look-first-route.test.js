@@ -35,6 +35,7 @@
  */
 process.env.NODE_ENV = 'test';
 
+import { markHarbourComment } from '../../lib/harbour-comment-mark.js';
 import { test, describe, afterEach } from 'node:test';
 import assert from 'node:assert/strict';
 import express from 'express';
@@ -67,8 +68,10 @@ const leaf = (over = {}) => ({ identifier: 'T-1', title: 'Export CSV', descripti
 
 const T = (hm) => `2026-11-08T${hm}:00.000Z`;
 const comment = (at, body) => ({ user: 'John', createdAt: T(at), body });
-const surveyTask = (at, verdict = 'Just drill: the change is small.') => comment(at, `${SURVEY_HEADINGS['survey-task']}: T-1 @ abc123def\n\n${verdict}`);
-const surveyPlace = (at, verdict = 'The place is fine.') => comment(at, `${SURVEY_HEADINGS['survey-place']}: T-1 @ abc123def\n\n${verdict}`);
+// LIN-4518 (beat 4, ruling lin4518-authorship): a Survey's report is a Harbour write, and a Harbour write carries the mark
+// authorship is read from (lib/harbour-comment-mark.js); unmarked, it would read as a person's under the ruling.
+const surveyTask = (at, verdict = 'Just drill: the change is small.') => comment(at, markHarbourComment(`${SURVEY_HEADINGS['survey-task']}: T-1 @ abc123def\n\n${verdict}`));
+const surveyPlace = (at, verdict = 'The place is fine.') => comment(at, markHarbourComment(`${SURVEY_HEADINGS['survey-place']}: T-1 @ abc123def\n\n${verdict}`));
 const person = (at, body = 'Hold this until the auth change lands.') => comment(at, body);
 const sizeRuling = (at) => comment(at, "## Size of the move (the person's call)\n\nJust the task, please.");
 // A run fact as loadRecentRuns' allRuns carries it.
@@ -204,10 +207,12 @@ describe('the hold: a person\'s word after work started outranks the sequence', 
     assert.ok(holdingComment(comments, midRun));
   });
 
-  test('a Survey\'s own headed comment never holds, and neither does a headed size ruling', () => {
+  // LIN-4518 (beat 4, ruling lin4518-authorship): retired, the "neither does a headed size ruling" half. Authorship is the
+  // Harbour mark now, not a comment's shape, so a person's size ruling is a person's comment and holds like any other (the
+  // ruling; tests/unit/lin-4518-authorship-marker.test.js). A Survey's own comment still never holds: it carries the mark.
+  test('a Survey\'s own comment never holds (it carries the Harbour mark)', () => {
     const runs = [run('survey-task', '09:40', 'done', '10:00')];
     assert.equal(stepOf(leaf(), ctx([surveyTask('10:00')], runs)), 'survey-place');
-    assert.equal(stepOf(leaf(), ctx([surveyTask('10:00'), sizeRuling('10:40')], runs)), 'survey-place');
   });
 
   // LIN-4518 (beat 4): the sequence starts at the first run, not at a Survey comment. The old pin (a comment-only Survey
@@ -270,7 +275,8 @@ describe('when the route is off', () => {
     ] }];
     const allRuns = stageRuns(rows);
     assert.equal(allRuns.at(-1).outcome, 'done', 'a DECISION: on the way to done does not read as waiting on a person');
-    assert.equal(stepOf(leaf(), ctx([comment('10:30', '## Research\n\nFindings. DECISION: {"decision_id":"d1"}')], allRuns)), 'survey-task');
+    // LIN-4518 (beat 4): the research report is a Harbour write, so it carries the mark (an unmarked one reads as a person's).
+    assert.equal(stepOf(leaf(), ctx([comment('10:30', markHarbourComment('## Research\n\nFindings. DECISION: {"decision_id":"d1"}'))], allRuns)), 'survey-task');
   });
 });
 
@@ -288,7 +294,9 @@ describe('a pending record plus an answered ruling, and the in-flight shapes', (
   test('the LIN-4348 shape (Survey comments, a headed size comment, no record) is unsized and gets scoping once nothing holds it', () => {
     const runs = [run('survey-task', '09:00', 'done', '09:20'), run('survey-place', '09:30', 'done', '09:50')];
     const comments = [surveyTask('09:20'), surveyPlace('09:50'), sizeRuling('10:00')];
-    assert.equal(stepOf(leaf(), ctx(comments, runs)), 'scoping');
+    // LIN-4518 (beat 4, ruling lin4518-authorship): retired, the assertion that the headed size comment does not hold (scoping
+    // was sent with it on the trail). The size comment is a person's, unmarked, so under the ruling it holds like any person's
+    // comment. The rest stands: a later person's comment holds, and a run dispatched after both releases it.
     // A later plain person's comment (LIN-4348 had one at 10:15) holds it until another run is dispatched.
     const held = [...comments, person('10:15', 'Also cover the PDF export.')];
     assert.equal(stepOf(leaf(), ctx(held, runs)), null);
@@ -821,7 +829,8 @@ describe('LIN-4497: the PR gate reads this ticket\'s own implementation run, not
 
   test('a sibling close-out note posted after survey-task gives survey-place (the mid-sequence case a time boundary would miss)', () => {
     const runs = stageRuns([{ id: 'st1', kind: 'survey-task', status: 'taken', dispatchedAt: T('10:00'), feedback: [entry('10:20', '[done] Surveyed the task.')] }]);
-    const sibling = comment('10:30', INCIDENT_NOTES[0][2]);
+    // LIN-4518 (beat 4): a sibling's close-out note is a Harbour write, so it carries the mark (unmarked, it would hold as a person's).
+    const sibling = comment('10:30', markHarbourComment(INCIDENT_NOTES[0][2]));
     assert.equal(stepOf(leaf(), ctx([surveyTask('10:20'), sibling], runs)), 'survey-place');
   });
 

@@ -10,7 +10,7 @@
  * codeRouteOf over CODE_ROUTES with exactly those two entries put back as they were: the live-stage wait without the
  * parked close-out step-aside, and the blind-read route on comments. Every other entry is the live one, unchanged.
  */
-import { readTrail } from '../../lib/run-trail.js';
+import { readTrail, isPersonComment } from '../../lib/run-trail.js';
 import { closeOutDecision } from '../../lib/run-closeout-state.js';
 import { findingsNotRead } from '../../lib/close-out-findings.js';
 import { isLiveRun, liveWaitOf } from '../../lib/run-live-wait.js';
@@ -19,6 +19,13 @@ import { BLIND_READ_KIND } from '../../lib/prompts/blind-read-words.js';
 import { CODE_ROUTES } from '../../lib/code-routes.js';
 
 const ATTEMPT_BOUND = 2;
+
+/**
+ * The comment path's person rule (LIN-4518, beat 4): authorship read from a comment's shape (lib/run-trail.js
+ * isPersonComment), as it was before the marker convention (lib/harbour-comment-mark.js). Live readers take it as their
+ * `isPerson` reader, so the goldens keep deciding what the comment path decided. P7 (LIN-4520) deletes it with run-trail.
+ */
+export const frozenIsPerson = (comment) => isPersonComment(typeof comment === 'string' ? comment : comment?.body);
 
 /** Ended blind-read runs dispatched after `reviewAt` (ms), from the unsliced run facts (as it was before LIN-4518). */
 function endedReadsSince(allRuns, reviewAt) {
@@ -68,6 +75,7 @@ function frozenEntryRoute(entry, issue, context) {
  * @returns {{action: string|null, codeRoute: string, why: string, wait?: object}|null}
  */
 export function frozenRouteOf(issue, context = {}) {
+  context = { isPerson: frozenIsPerson, ...context };
   for (const entry of CODE_ROUTES) {
     const route = frozenEntryRoute(entry, issue, context);
     if (route) return route;

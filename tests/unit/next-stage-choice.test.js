@@ -9,6 +9,7 @@
  *
  * Run with: node --test tests/unit/next-stage-choice.test.js
  */
+import { markHarbourComment } from '../../lib/harbour-comment-mark.js';
 import { test, describe, mock } from 'node:test';
 import assert from 'node:assert/strict';
 import { GraphQLClient } from 'graphql-request';
@@ -152,7 +153,8 @@ describe('plan-review verdict facts (LIN-3309 S2)', () => {
         '**Autopilot step record — plan revision 1 done (verified); plan-review round 2 started.**',
         '## Autopilot plan step done',
       ]) {
-        assert.equal(assemblePlanReviewFacts([...twoRc, note(body)]).personSince, false, body);
+        // LIN-4518 (beat 4, ruling lin4518-authorship): an agent's note is a Harbour write and carries the mark (lib/harbour-comment-mark.js).
+        assert.equal(assemblePlanReviewFacts([...twoRc, note(markHarbourComment(body))]).personSince, false, body);
       }
     });
 
@@ -258,7 +260,8 @@ describe('the review loop bound: the first route code settles (LIN-3309; the loo
   test('a person\'s comment since the latest verdict lifts it; an agent note does not', () => {
     assert.equal(reviewLoopExhausted(leaf(), [...rcs(3), after('go on, take it to implementation')]), false);
     assert.equal(reviewLoopExhausted(leaf(), [...rcs(3), after('Hold until LIN-3098 ships.')]), false);
-    assert.equal(reviewLoopExhausted(leaf(), [...rcs(3), after('**Plan posted** — plan revision written.')]), true);
+    // LIN-4518 (beat 4, ruling lin4518-authorship): the agent's note is a Harbour write and carries the mark (lib/harbour-comment-mark.js).
+    assert.equal(reviewLoopExhausted(leaf(), [...rcs(3), after(markHarbourComment('**Plan posted** — plan revision written.'))]), true);
   });
 
   test('landed work since the latest verdict, or a terminal task, is not a running loop', () => {

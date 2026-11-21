@@ -52,7 +52,7 @@ import { liveWaitOf } from '../../lib/run-live-wait.js';
 import { closeOutDecision, CLOSE_OUT_ACTOR } from '../../lib/run-closeout-state.js';
 import { FINDINGS_NONE, findingsNotRead } from '../../lib/close-out-findings.js';
 import { assembleTrailFacts, assemblePlanReviewFacts, reviewLoopStop, reviewLoopConverging } from '../../lib/recommendation-facts.js';
-import { blindReadStepFromComments, frozenSurfaceRoute, standingFromComments } from './comment-path-frozen.js';
+import { blindReadStepFromComments, frozenSurfaceRoute, standingFromComments, frozenIsPerson } from './comment-path-frozen.js';
 import { readRunEvidence } from '../../lib/run-evidence.js';
 import { readCloseOutChain, closeOutNotReady } from '../../lib/close-out-readiness.js';
 import { COMMENT_PATH_ROWS } from './comment-path-rows.js';
@@ -223,7 +223,7 @@ function trailValue(trail) {
 }
 
 function selectorFacts(comments) {
-  const facts = assembleTrailFacts(comments, '', { leaf: true, openFindings: FINDINGS_NONE, standing: standingFromComments(comments) });
+  const facts = assembleTrailFacts(comments, '', { leaf: true, openFindings: FINDINGS_NONE, standing: standingFromComments(comments), isPerson: frozenIsPerson });
   for (const key of NOT_VERDICT_FACTS) delete facts[key];
   return facts;
 }
@@ -344,10 +344,10 @@ export async function captureRows(rows = COMMENT_PATH_ROWS) {
 /** What each seed pins beyond the common capture, computed for every case so no seed's reading hides another's. */
 function seedExtras(seedCase, issue) {
   const { comments } = seedCase;
-  const facts = assemblePlanReviewFacts(comments);
+  const facts = assemblePlanReviewFacts(comments, frozenIsPerson);
   const extras = {
     // Seed 1 (and 5's personSince): the plan-review loop's facts, its stop and its convergence.
-    planReview: { facts, stop: reviewLoopStop(issue, comments), converging: reviewLoopConverging(facts.run) },
+    planReview: { facts, stop: reviewLoopStop(issue, comments, frozenIsPerson), converging: reviewLoopConverging(facts.run) },
     // Seed 2: the live wait, CODE_ROUTES[0].
     liveWait: liveWaitOf(seedCase.allRuns),
     // Seed 5: each comment's authorship as the comment path reads it.

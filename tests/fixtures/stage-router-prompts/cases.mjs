@@ -22,6 +22,9 @@
 import { planFactsOf } from '../../../lib/records/plan-facts.js';
 import { PLAN_HEADING_WORDS } from '../../../lib/legacy-plan-text.js';
 import { standingFromComments } from '../../helpers/comment-path-frozen.js';
+// LIN-4518 (beat 4, ruling lin4518-authorship): the Agent comments are Harbour writes, so they carry the mark authorship is read
+// from; the selector's view drops the mark, so the rendered snapshots are unchanged.
+import { markHarbourComment } from '../../../lib/harbour-comment-mark.js';
 
 const GITHUB = { providerUi: { displayName: 'GitHub Issues' } };
 const LOCAL = { providerUi: { displayName: 'Local' } };
@@ -50,8 +53,8 @@ const COMPLETE_NODE = {
       { id: 'c2', identifier: 'ABC-22', title: 'two', state: done }
     ],
     comments: [
-      { user: 'Agent', createdAt: at(1), body: 'Implementation landed: https://github.com/o/r/pull/7' },
-      { user: 'Agent', createdAt: at(2), body: '## Review — ABC-20\n\n### Verdict\nApprove — conditional on close-out.\n\n### What CI Did Not Prove\n- L1 (inside): the live run.' }
+      { user: 'Agent', createdAt: at(1), body: markHarbourComment('Implementation landed: https://github.com/o/r/pull/7') },
+      { user: 'Agent', createdAt: at(2), body: markHarbourComment('## Review — ABC-20\n\n### Verdict\nApprove — conditional on close-out.\n\n### What CI Did Not Prove\n- L1 (inside): the live run.') }
     ]
   }
 };
@@ -79,7 +82,7 @@ const PLAN_REVIEWED = {
       findings: [{ id: 'finding-abc40aa', v: 1, kind: 'finding', state: 'open', to: 'plan-review', links: { about: ['plan-abc40aa'] } }]
     }),
     comments: [
-      { user: 'Agent', createdAt: at(1), body: '### Plan Review Verdict\n\n**Verdict:** Request Changes.' },
+      { user: 'Agent', createdAt: at(1), body: markHarbourComment('### Plan Review Verdict\n\n**Verdict:** Request Changes.') },
       { user: 'John', createdAt: at(2), body: 'F1 is right; take the narrow revision.' }
     ],
     // The task's recent runs (LIN-3300): the revision after the verdict is a run.

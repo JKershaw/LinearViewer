@@ -39,6 +39,7 @@
  *  - Attachments with a description target re-resolve, re-check updateIssue and
  *    re-read the description inside the description pipeline.
  */
+import { markHarbourComment } from '../lib/harbour-comment-mark.js';
 import { Router, json } from 'express';
 import { dedupeKey } from '../lib/proxy-dedupe.js';
 import { graphqlErrorExtra, graphqlErrorDetail, normalizeWritePayload } from '../lib/proxy-graphql-errors.js';
@@ -328,7 +329,8 @@ export function createProxyWriteRoutes({
 
   /** Create a comment and answer 201; `remember` sees the payload once the write is accepted. */
   async function postComment({ req, res, endpoint, token, provider }, text, remember) {
-    const created = normalizeWritePayload(await provider.createComment(token, req.params.issueId, text), 'comment');
+    // LIN-4518 (beat 4): a Harbour write carries the mark authorship is read from (lib/harbour-comment-mark.js).
+    const created = normalizeWritePayload(await provider.createComment(token, req.params.issueId, markHarbourComment(text)), 'comment');
     // A clear failure instead of a misleading 201 when the provider reports the write did not land.
     if (writeRejected(req, res, endpoint, created, 'Comment was not created')) return;
     remember?.(created);

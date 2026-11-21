@@ -13,6 +13,7 @@
  *
  * Run with: node --test tests/unit/stage-selector-input.test.js
  */
+import { markHarbourComment } from '../../lib/harbour-comment-mark.js';
 import { test, describe } from 'node:test';
 import assert from 'node:assert/strict';
 import { assembleTrailFacts as assembleTrailFactsOf, formatTrailFactsBlock } from '../../lib/recommendation-facts.js';
@@ -27,6 +28,9 @@ import { RULING_MARK, isRuling } from '../../lib/run-trail.js';
 import { formatSelectorView, formatIssueContext, buildSelectorArgs } from '../../lib/openrouter.js';
 
 const at = (d) => `2026-10-0${d}T10:00:00.000Z`;
+// LIN-4518 (beat 4, ruling lin4518-authorship): a Harbour write carries the mark authorship is read from
+// (lib/harbour-comment-mark.js); these fixtures' agent notes, reports, verdicts and close-outs are Harbour writes, so they carry it.
+const harbour = (c) => ({ ...c, body: markHarbourComment(c.body) });
 const PR = 'https://github.com/JKershaw/LinearViewer/pull/1747';
 const review = (verdict, d) => ({ createdAt: at(d), body: `## Review — LIN-1\n\nReviewed ${PR}.\n\n### Verdict\n${verdict}\n\n### What CI Did Not Prove\n- L1 (inside): the live run.` });
 const planReview = (d) => ({ createdAt: at(d), body: '### Plan Review Verdict\n\n**Verdict:** Approve.' });
@@ -56,9 +60,9 @@ describe('trail facts (LIN-3300)', () => {
   test('PR links and the latest ruling are read from every comment, in time order', () => {
     const facts = assembleTrailFacts([
       { createdAt: at(3), body: `Go to implementation.\n\n${RULING_MARK}` },
-      { createdAt: at(1), body: `Opened https://github.com/a/b/pull/1` },
+      harbour({ createdAt: at(1), body: `Opened https://github.com/a/b/pull/1` }),
       { createdAt: at(2), body: `Hold.\n\n${RULING_MARK}` },
-      { createdAt: at(4), body: `Now ${PR}` }
+      harbour({ createdAt: at(4), body: `Now ${PR}` })
     ], '');
     assert.deepEqual(facts.prUrls, ['https://github.com/a/b/pull/1', PR]);
     assert.equal(facts.latestPerson.at, at(3));
@@ -76,7 +80,7 @@ describe('trail facts (LIN-3300)', () => {
     assert.equal(isRuling(`Plan revised in the description.\n\n${RULING_MARK}`), false);
     const facts = assembleTrailFacts([
       { createdAt: at(1), body: `Hold.\n\n${RULING_MARK}` },
-      { createdAt: at(2), body: `### Plan Review Verdict\n\nQuotes "${RULING_MARK}" mid-text.\n\n**Verdict:** Approve.` }
+      harbour({ createdAt: at(2), body: `### Plan Review Verdict\n\nQuotes "${RULING_MARK}" mid-text.\n\n**Verdict:** Approve.` })
     ], '');
     assert.equal(facts.latestPerson.at, at(1), 'the quoting verdict is skipped');
   });
@@ -91,36 +95,36 @@ describe('trail facts (LIN-3300)', () => {
   test('the latest person\'s comment skips agent notes, landing reports, reviews, verdicts and close-outs', () => {
     const facts = assembleTrailFacts([
       { createdAt: at(1), body: '**Last round before re-review (FC, an engineering call):**\n- land F1.' },
-      { createdAt: at(2), body: '**Autopilot run summary: P0 landed.** https://github.com/o/r/pull/1' },
-      { createdAt: at(3), body: '### Plan Review Verdict\n\n**Verdict:** Approve.' }
+      harbour({ createdAt: at(2), body: '**Autopilot run summary: P0 landed.** https://github.com/o/r/pull/1' }),
+      harbour({ createdAt: at(3), body: '### Plan Review Verdict\n\n**Verdict:** Approve.' })
     ], '');
     assert.equal(facts.latestPerson.at, at(1));
     assert.equal(facts.latestPerson.ruling, false);
     assert.equal(facts.latestPerson.actedAfter, true, 'an autopilot run summary after it is an agent acting');
     const headed = assembleTrailFacts([
       { createdAt: at(1), body: 'Go on with the narrow revision.' },
-      { createdAt: at(2), body: '## Plan finalized — next action: breakdown' }
+      harbour({ createdAt: at(2), body: '## Plan finalized — next action: breakdown' })
     ], '');
     assert.equal(headed.latestPerson.at, at(1), 'a headed stage report is not a person\'s comment');
     const closed = assembleTrailFacts([
       { createdAt: at(1), body: `Yes: merge #1616.\n\n${RULING_MARK}` },
-      { createdAt: at(2), body: '**Close-out: PR #1616 merged. The ticket stays open for L2.**' }
+      harbour({ createdAt: at(2), body: '**Close-out: PR #1616 merged. The ticket stays open for L2.**' })
     ], '');
     assert.equal(closed.latestPerson.at, at(1), 'a close-out is not a person\'s comment');
     assert.equal(closed.latestPerson.actedAfter, true, 'a close-out after it carries out the ruling');
     // Coordinator fix: an agent's own note after the person's comment means the comment
     // was acted on, so rule 1 does not pick its stage again on every pass.
     const revised = assembleTrailFacts([
-      { createdAt: at(1), body: '### Plan Review Verdict\n\n**Verdict:** Request Changes.' },
+      harbour({ createdAt: at(1), body: '### Plan Review Verdict\n\n**Verdict:** Request Changes.' }),
       { createdAt: at(2), body: 'Take the narrow revision.' },
-      { createdAt: at(3), body: '**Plan revised in the description (`## Implementation Plan`), answering the plan-review.**' }
+      harbour({ createdAt: at(3), body: '**Plan revised in the description (`## Implementation Plan`), answering the plan-review.**' })
     ], '');
     assert.equal(revised.latestPerson.at, at(2));
     assert.equal(revised.latestPerson.actedAfter, true, 'the planner acted on it');
     assert.match(formatTrailFactsBlock(revised, 3), /an agent acted after it \(a note, landed work or a close-out\): yes/);
     const fixed = assembleTrailFacts([
       { createdAt: at(1), body: 'Addendum: two more items for this round.' },
-      { createdAt: at(2), body: `## Review fixes landed — PR updated\n\n${PR}` }
+      harbour({ createdAt: at(2), body: `## Review fixes landed — PR updated\n\n${PR}` })
     ], '');
     assert.equal(fixed.latestPerson.actedAfter, true, 'a later landing report supersedes it');
   });

@@ -16,6 +16,7 @@
  */
 process.env.NODE_ENV = 'test';
 
+import { markHarbourComment } from '../../lib/harbour-comment-mark.js';
 import { FINDINGS_NONE } from '../../lib/close-out-findings.js';
 import { test, describe } from 'node:test';
 import assert from 'node:assert/strict';
@@ -169,7 +170,10 @@ describe('no local copies: recommendation-facts imports the moved readers', () =
 
 describe('witness 1: a read is never landing work, never an answer to a person', () => {
   const person = c(3, 'Please keep the old flag; we still read it in the export.');
-  const trail = [summary(1), review(2), person, read1(4)];
+  // LIN-4518 (beat 4, ruling lin4518-authorship): the read is a Harbour write and carries the mark authorship is read from
+  // (lib/harbour-comment-mark.js); unmarked, it would read as the latest person's comment.
+  const markedRead = (h) => { const r = read1(h); return { ...r, body: markHarbourComment(r.body) }; };
+  const trail = [summary(1), review(2), person, markedRead(4)];
   const rows = [
     { id: 'r-review', kind: 'review', status: 'taken', dispatchedAt: at(1), feedback: [{ message: '[done] reviewed', timestamp: at(2) }] },
     { id: 'r-read', kind: 'blind-read', status: 'taken', dispatchedAt: at(3), feedback: [{ message: '[done] posted the read', timestamp: at(4) }] }

@@ -61,9 +61,9 @@ export async function readSessionTicket(req, ref) {
  * LIN-4503: the outward port for a session write (a child task's ticket, a plan's summary), over the workspace's own binding:
  * the one the task page reads its ticket through. A session with no binding throws, and the write names the tracker as unreachable.
  */
-export function sessionTrackerFor(req, harbourComments = null) {
+export function sessionTrackerFor(req) {
   const { provider, callScope } = resolveIssueBinding(req.workspace, null);
-  return trackerPortOf({ provider, scope: callScope, harbourComments });
+  return trackerPortOf({ provider, scope: callScope });
 }
 
 /**
@@ -75,12 +75,8 @@ export function sessionTrackerFor(req, harbourComments = null) {
  * @param {(req: object, ref: string) => Promise<object|null>} [deps.readTicket] - the tracker read a ticket's first write
  *   needs; the session's own binding (`readSessionTicket`) when omitted
  */
-export function createTaskRecordsRoutes({ workspaceFromUrl, recordsStore, accountStore = null, listPeople = async () => [], readTicket = readSessionTicket, tracker = sessionTrackerFor, harbourCommentsStore = null }) {
+export function createTaskRecordsRoutes({ workspaceFromUrl, recordsStore, accountStore = null, listPeople = async () => [], readTicket = readSessionTicket, tracker = sessionTrackerFor }) {
   if (!recordsStore) throw new Error('task records routes: recordsStore is required');
-  // LIN-4518 (beat 4): the session's own tracker writes record their comments in the ledger of Harbour writes, per request's workspace.
-  const trackerForRequest = tracker === sessionTrackerFor
-    ? (req) => sessionTrackerFor(req, harbourCommentsStore ? { urlKey: req.workspace?.urlKey ?? null, store: harbourCommentsStore } : null)
-    : tracker;
   const router = Router();
   const writes = createRecordWrites({
     recordsStore,
@@ -89,7 +85,7 @@ export function createTaskRecordsRoutes({ workspaceFromUrl, recordsStore, accoun
     askedText: askedOf,
     stageKinds: Object.keys(STAGE_KINDS),
     listPeople,
-    tracker: trackerForRequest,
+    tracker,
   });
 
   const backTo = (urlKey, identifier, query = '') => `${taskPageHref({ urlKey, identifier })}${query}#task-records`;
