@@ -5111,3 +5111,15 @@ The full stop holds: the fleet is paused, and the drive is only reporting. The o
 - **Drafts written, not filed:**
   - `integration/slice-1-finish-ticket.md` now covers slices 1 and 2 in plain words, with the fresh reader's fixes;
   - `integration/stop-ticket.md`: stopping a run stops its queued work too; queued items can be cancelled through the proxy; pause and stop made plain.
+
+### 21 Nov, ~18:05: the plan from here (John)
+
+- John deleted the queued LIN-4518 implementation (55122851).
+- **The ~180 queued items** were the abort commands my cascade stop created at 17:47:03: one per session slice 3 had ever run. The runner works through them even while paused. Most end "failed: no session to abort". About 50 remain.
+- **My error at the full stop:** I set `pause`, not `stop`.
+- **John's order:**
+  1. Wait for the aborts to drain.
+  2. Run the slices 1–2 finish ticket.
+  3. Stop when it lands.
+  4. John approves restarting slice 3 (corrected).
+  No parallel work: the cleanup and slice 3 touch the same files.
