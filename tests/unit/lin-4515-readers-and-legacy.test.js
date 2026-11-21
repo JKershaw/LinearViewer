@@ -203,4 +203,44 @@ describe('the change PR reader: one path, the workspace\'s credential', () => {
     const { store } = await freshStore();
     assert.throws(() => createChangeBackstop({ recordsStore: store }), /prReaderFor/);
   });
+
+  test('the reader is resolved when a run ends, not at construction: a backstop built before its dependency exists works', async () => {
+    // The boot wiring (server.js) builds createRunRecords, and so the backstop, before installationTokenFor is declared
+    // further down. The closure must reach it only when a read happens, or the build fails with a temporal-dead-zone error.
+    const { store } = await freshStore();
+    const taskId = await taskFor(store);
+    await store.openRun(URL_KEY, { id: RUN, stage: 'implementation', taskId, lineage: RUN, at: T0 });
+    const { seen, seam } = spySeam(readable('H5'));
+    const build = () => createChangeBackstop({
+      recordsStore: store,
+      prReaderFor: createChangePrReaders({
+        resolveAccess: async () => ({ callScope: 'lin-token', providerKind: 'linear' }),
+        resolveWorkspaceId: async () => 'ws-id-1',
+        installationTokenFor: (args) => mintToken(args),
+        seam,
+      }),
+      log: () => {},
+    });
+    const changeBackstop = build(); // built here, before mintToken is declared below
+    const mintToken = async ({ workspaceId, repo }) => (workspaceId === 'ws-id-1' && repo === REPO ? 'ghs_install' : null);
+    await changeBackstop({ urlKey: URL_KEY, runId: RUN, feedback: [{ message: `DONE: ${PR_URL}` }] });
+    const [change] = await store.find(URL_KEY, { kind: 'change', inRef: taskId });
+    assert.equal(change.fields.head, 'H5');
+    assert.equal(seen[0].token, 'ghs_install', 'the closure reached the binding declared after the build');
+  });
+
+  test('a reader that throws fails the one run, logged, and never the backstop\'s construction or the run seam', async () => {
+    const { store } = await freshStore();
+    const taskId = await taskFor(store);
+    await store.openRun(URL_KEY, { id: RUN, stage: 'implementation', taskId, lineage: RUN, at: T0 });
+    const logged = [];
+    const changeBackstop = createChangeBackstop({
+      recordsStore: store,
+      prReaderFor: () => { throw new Error('reader unavailable'); },
+      log: (m) => logged.push(m),
+    });
+    const out = await changeBackstop({ urlKey: URL_KEY, runId: RUN, feedback: [{ message: `DONE: ${PR_URL}` }] });
+    assert.equal(out, null, 'the run seam gets no throw');
+    assert.ok(logged.some((m) => m.includes('reader unavailable')), 'the fault is logged');
+  });
 });
