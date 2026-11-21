@@ -5175,3 +5175,12 @@ The full stop holds: the fleet is paused, and the drive is only reporting. The o
 - The plan run folded John's `record-rows` answer at 19:13 (plan v3) as agreeing the RETAINED table; the suggestion's reason ("don't build the exception table or widen the censuses to the tests") did not reach it. Plan-review passed at 19:13, breakdown at 19:17, before the ticket was corrected at 19:24.
 - Pieces: LIN-4524 (A: one shared retirement-census table over the whole tests root) In Progress, implementation started 19:27; LIN-4525 (B: slice 2 readers) and LIN-4526 (C: slice 1 hold, surfaces, prompts, saved files) Backlog.
 - Proposed to John, not sent: a note to the LIN-4522 autopilot to stop piece A, cancel LIN-4524, and revise the plan and pieces B and C against the corrected ticket. No pause set; no other rulings.
+
+## 21 Nov, 21:35: tidy for the restart (John's go-ahead, 21:1x)
+
+- LIN-4522's run was aborted at about 20:00. John had LIN-4522 and pieces LIN-4524–4526 cancelled; Sol (another model family's agent) filed LIN-4527, "Finish the Slice 1 and 2 retirements", in their place, and aligned the design (#2485, #2486 merged; main 815daa345, CI green). LIN-4513 now links the design at main; Git-free close-out is outside slice 3.
+- John's decisions: dismiss the 250 ruling (its question was raised by #2483's own branch; main's eval test already expects 255); restart slice 3 with fresh sessions from the best step, which is the end of P4 (P1–P4 merged). P5 is redone from main. Work redone is fine if it keeps things simple and reliable.
+- Done: LIN-4527 links the design at main and no longer points runs at the cancelled tickets. LIN-4518 and plan-f77d6aea (v5) drop the line keeping #2483. PR #2483 closed unmerged.
+- Records ended: LIN-4522's run (4 tasks declined; 3 changes abandoned; verdict-9229b03b withdrawn; 5 census findings declined). Old P5 (4 verdicts withdrawn; change-d2313813 abandoned; 14 findings declined as moot or covered by a named ticket, sorted by a read-only subagent against main). finding-eb0a2a6a handed on into finding-0f91d9be.
+- Kept open: to P5, 0f91d9be (any PR URL becomes a change record; real on main; the task still holds #1622 and #2447 ended "merged", which can't be re-ended), e99fe61f, 7577ea9d, b44dd95a, d0a8b20a; to P7, 6be368c6, 6e05393c, 92289ee4; to project, 41fb5f7f, ad088c22.
+- Not done: branches feat/lin-4524-shared-retirement-census and feat/lin-4518-records-standing (this session can't delete them). Halt stays "stop" until the go.
