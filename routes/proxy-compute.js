@@ -36,6 +36,7 @@ import { UUID_REGEX, isValidIssueId } from '../lib/workspace.js';
 import { badRequest, jsonError, keepaliveError, notFound } from '../lib/errors.js';
 import { isHermeticTestToken } from '../lib/should-mock-ai.js';
 import { composeRunBrief } from '../lib/records/run-brief.js';
+import { refreshTaskHeads } from '../lib/task-standing.js';
 import { TOKEN_ORIGIN, WRITES } from '../lib/stage-writes.js';
 
 /**
@@ -1282,6 +1283,11 @@ export function createComputeRoutes({
     else if (req.proxyOrigin === TOKEN_ORIGIN.DISPATCH && req.proxyRunRecordId !== runId) head = '(records parts: a dispatch credential reads only its own run)';
     else {
       const asker = req.proxyOrigin === TOKEN_ORIGIN.DISPATCH ? `run:${req.proxyRunRecordId}` : (req.proxyCreatedBy ? `person:${req.proxyCreatedBy}` : null);
+      // LIN-4518 (review finding ea3ed46b): the run's task heads are refreshed from their PRs before the brief reads the
+      // standing, as every gating read does, so a push after a verdict shows STALE here even when no gate ran since the push
+      // (a dispatch that skips the selector). Fail open: refreshTaskHeads logs and goes on.
+      const run = await recordsStore.run(req.proxyUrlKey, runId);
+      if (run?.in) await refreshTaskHeads({ recordsStore, urlKey: req.proxyUrlKey, taskId: run.in });
       const built = await composeRunBrief({ store: recordsStore, urlKey: req.proxyUrlKey, runId, asker });
       head = built.problem ? `(records parts: ${built.problem})` : built.text;
     }

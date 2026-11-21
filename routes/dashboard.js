@@ -74,7 +74,7 @@ import { createDashboardEffortRoutes } from './dashboard-effort.js';
 import { createDashboardSummariesRoutes, buildTestSummary, buildTestSessionSummary } from './dashboard-summaries.js';
 import { createDashboardDrilldownRoutes } from './dashboard-drilldown.js';
 import { deriveSessionWaiting, deriveSessionDecisions, settleWithConcurrency, isStandaloneSession, deriveSessionStatus } from './dashboard-session-state.js';
-import { changePrsOfRun } from '../lib/task-standing.js';
+import { changePrsOf } from '../lib/task-standing.js';
 export { settleWithConcurrency, isStandaloneSession, deriveSessionStatus, deriveSessionWaiting, deriveSessionDecisions, buildTestSummary, buildTestSessionSummary };
 
 
@@ -523,7 +523,7 @@ export function createDashboardRoutes(deps) {
       }
       const { provider, callScope } = prStateSeams.resolveProvider(workspace, null);
       // LIN-4518: the run's own PRs are the change records filed under it; the comments name them only when no change is.
-      const runPrs = await changePrsOfRun({ recordsStore, urlKey: workspace.urlKey, ticket: run.issueIdentifier, runId });
+      const runPrs = await changePrsOf({ recordsStore, urlKey: workspace.urlKey, ticket: run.issueIdentifier, runId });
       const comments = runPrs.length ? [] : await provider.fetchIssueComments(callScope, run.issueIdentifier);
       // Through LIN-2949's run-evidence model, not a new parser.
       const model = buildRunEvidence({

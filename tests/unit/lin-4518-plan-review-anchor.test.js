@@ -84,4 +84,18 @@ describe('assembleTrailFacts reads plan review from the records when measured (f
     const facts = assembleTrailFacts([], '', { leaf: true, planFacts: planFactsOf(rounds) });
     assert.deepEqual(facts.planReview.byKind, { 'request changes': 1, approve: 1, 'needs discussion': 1 });
   });
+
+  // LIN-4518 review finding c568c3f0: the records branch's speech facts need their own witness. Mutating
+  // planReviewOfRecords to `...speechSince(comments, null, isPerson)` made them always false/null with no test red.
+  test('a person comment and landed work after the latest round are read on the records branch (finding c568c3f0)', () => {
+    const comments = [
+      verdictComment(at('09:00')),
+      personComment(at('12:30')),
+      landedComment(at('12:40')),
+    ];
+    const facts = assembleTrailFacts(comments, '', { leaf: true, planFacts: planFactsOf(THREE_STUCK) });
+    assert.equal(facts.planReview.latestAt, at('12:00'));
+    assert.equal(facts.planReview.personSince, true, 'the person spoke after the latest round');
+    assert.equal(facts.planReview.landed, 'https://github.com/o/r/pull/7', 'the landing after the latest round is named');
+  });
 });
