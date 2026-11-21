@@ -5139,3 +5139,11 @@ The full stop holds: the fleet is paused, and the drive is only reporting. The o
 
 - LIN-4522 is moving normally: survey-task, survey-place and scoping done; research running (18:22). In Progress, no pieces yet, no new rulings. No pause set.
 - Only open ruling is `lin4518-250-expectation`, held until the slice 3 restart (suggestion updated 18:13). A subagent is checking whether answering it would resume the stopped P5 session, to settle the restart order.
+
+## 21 Nov, ~18:40: how to answer the 250 ruling at the slice 3 restart (subagent, read-only)
+
+- Answer `lin4518-250-expectation` on the **Rulings page**, not the Task page card. The Rulings page records the answer (a comment on LIN-4518 plus the answered stamp) and its resume into the stopped P5 session is refused (RUN_STOPPED); it shows "could not resume" with a Retry that fails the same way. That is expected and harmless.
+- The Task page card (answer or Dismiss) sends a forced person's reply, which gets past the stop and restarts the old P5 session (c7501b5c) alone, with no coordinator to report to. Don't use it for this ruling.
+- Then kick off LIN-4513 fresh. Nothing blocks a fresh kickoff (no duplicate within 5 min, STAGE_IN_FLIGHT doesn't apply to kickoff, LIN-4522 is another issue). The new run's survey reads answered rulings and prior comments.
+- Not watched live: the abort row itself, an actual refusal, or the new run acting on the answer.
+- Proposed to John: a no-evals line (stubbed eval test is enough; one or two real runs at most as a sanity check) for slice 3's standing answers, and possibly LIN-4522's ticket. Waiting on his answer.
