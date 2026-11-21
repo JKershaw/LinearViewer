@@ -4955,3 +4955,7 @@ The pause ruling was answered (a: lifted, stays lifted). LIN-4504's second revie
   - LIN-4514 and 4515 are on beat 4–5 of 5. Nothing pushed yet. Main green.
 - **Question 1** (close-out's own commits) is raised twice, by plan and breakdown: `lin-4513-closeout-own-commits` and `lin4513-ruling1-closeout-own-commits`. I proposed yes on both.
 - **Question 2** (import comment verdicts) was raised by both runs but isn't on the rulings list at all. A second `DECISION:` in a run seems to be dropped. A Harbour bug for slice 4 or the smoothing pass. John to answer it in the morning (suggested: import once).
+
+### 21 Nov, 02:28
+
+Slice 3: LIN-4514 and 4515 are Done (close-outs 01:46 and 01:51). LIN-4516 has been building since 02:25. LIN-4517..4521 wait. The two copies of question 1 are still open, with yes proposed. No pause.
