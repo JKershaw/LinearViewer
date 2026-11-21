@@ -55,6 +55,7 @@ import { RecordsVersionConflict, RecordsNotFound } from '../lib/records-store.js
 import { refusalOf, KINDS, PLAN_ADDRESSEES, planAddresseeProblem } from '../lib/records/check.js';
 import { createRecordWrites } from '../lib/records/writes.js';
 import { pinVerdictToHeads, refreshTaskChanges, blindReadSetProblems } from '../lib/change-records.js';
+import { BLIND_READ_KIND } from '../lib/prompts/blind-read-words.js';
 import { isTerminalState } from '../lib/providers/state-map.js';
 
 const LINK_TYPES = Object.keys(KINDS.links);
@@ -160,7 +161,7 @@ export function createProxyRecordsRoutes({ recordsStore, proxyLimiter, authentic
    * set; this checks the set the record would hold afterwards (the links it has, plus those added).
    */
   async function blindReadAfter(urlKey, prev, addedOn) {
-    if (addedOn === undefined || prev?.kind !== 'verdict' || prev.fields?.judgement !== 'blind-read') return [];
+    if (addedOn === undefined || prev?.kind !== 'verdict' || prev.fields?.judgement !== BLIND_READ_KIND) return [];
     return blindReadSetProblems({ urlKey, recordsStore, on: [].concat(prev.links?.on ?? [], addedOn).filter((x) => typeof x === 'string') });
   }
 
@@ -206,7 +207,7 @@ export function createProxyRecordsRoutes({ recordsStore, proxyLimiter, authentic
         const refused = refusedPlanAddressee(body.to);
         if (refused) return reply(req, res, endpoint, 422, refused);
       }
-      if (body.kind === 'verdict' && body.judgement === 'blind-read' && body.on !== undefined) {
+      if (body.kind === 'verdict' && body.judgement === BLIND_READ_KIND && body.on !== undefined) {
         // LIN-4516: a blind read names exactly the landing (subset and superset refused), checked before any pin.
         const exact = await blindReadSetProblems({ urlKey: req.proxyUrlKey, recordsStore, on: [].concat(body.on).filter((x) => typeof x === 'string') });
         if (exact.length) return reply(req, res, endpoint, 422, refusalOf(exact));

@@ -327,6 +327,10 @@
     "disposition": "not-state",
     "why": "Its factory keeps no empty Map, Set or WeakMap of its own (census scan, factory-level)."
   },
+  "server.js::changePrReaderFor": {
+    "disposition": "not-state",
+    "why": "Built by createChangePrReaders (lib/change-records.js), a factory that keeps no Map, Set or WeakMap of its own: each PR read goes through readPrStatusOf, whose shared cache is the listed lib/github-pr-status.js::failOpenPrStatusCache."
+  },
   "server.js::connectionAccess": {
     "disposition": "not-state",
     "why": "Its factory keeps no empty Map, Set or WeakMap of its own (census scan, factory-level)."
