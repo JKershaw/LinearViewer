@@ -4975,3 +4975,7 @@ Slice 3: LIN-4514, 4515 and 4516 Done (the comment-guard ruling was settled and 
 ### 21 Nov, 05:28
 
 LIN-4517 (verdict import) built and was reviewed (review done 05:04). LIN-4518..4521 wait. Same three rulings open, all with proposals. No pause.
+
+### 21 Nov, 06:28: no change
+
+LIN-4517 has had no new rows since its 05:04 review. It is likely parked on `lin4513-p4-verdict-import` until John answers. The same three rulings are open.
