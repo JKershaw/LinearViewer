@@ -5014,3 +5014,8 @@ LIN-4518 (P5) is still building; latest beat taken at 10:19, after John answered
 ### 21 Nov, 12:28
 
 LIN-4518 (P5) is still building.
+
+### 21 Nov, ~12:45: two P5 rulings, answered by John against the run's picks
+
+- **`lin4518-authorship`: marker.** Harbour stamps its own comments; unmarked reads as a person's. Simplest, with existing precedent. Older Harbour comments read as a person's, and that eases with age. Slice 4 makes this mostly moot.
+- **`lin4518-blockcount`: finding-per-issue.** Each blocking issue is a finding back to the plan, and the count is the open findings. No new verdict field. Matches how approval conditions became findings.
