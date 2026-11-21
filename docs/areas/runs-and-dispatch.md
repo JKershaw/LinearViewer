@@ -70,3 +70,10 @@ Area notes for `runs-and-dispatch` in the registry. Format and rules: README.md.
   `callsSurfaceOf` are pure over docs their caller keys to one workspace (`listInHorizon(urlKey)`). The
   instance-wide boundary is the `urlKey` / `instanceWide` guard on `lineageRecords` and `readCost`
   (LIN-4226), not these readers. A new calls shape goes beside them, and `appCallsOf([])` is the one empty shape.
+- The gating reads refresh heads before they read the ticket's standing (`standingForTicket`, `lib/task-standing.js`,
+  LIN-4518): the close-out guard, the merge recorder, the blind-read route, the selector's facts, run evidence and the
+  live-stage wait all call the one refresh first, so a push after a verdict shows the verdict stale on every surface.
+  The selector stays fail-open here: each PR is read through the shared 60 s status cache (`readPrStatusOf`), so a head
+  pushed in the last minute may read as the old one; an unreadable PR leaves its change where it is, and a refresh
+  that throws is logged and the read goes on. Close-out's live head comparison reads the same cache, so it has the same window; the next read after the cache expires closes it.
+  Nothing else reads a change's head (lib/change-records.js; LIN-4518 review finding d99d9922, plan note 11).
