@@ -1151,6 +1151,7 @@ scheduler.register({
   leaseMs: CI_WAKE_SWEEP_LEASE_MS,
   run: createCiWakeSweepRun({
     dispatchStore: dispatchQueueStore,
+    recordsStore,
     agentStatusStore,
     proxyTokenStore,
     workspacePreferencesStore,
