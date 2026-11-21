@@ -153,6 +153,7 @@ export const SELF = Object.freeze({
   'tests/unit/lin-4504-plan-text-census.test.js': 'the LIN-4504 census: its RETIRED list and planted files name every word it reads',
   'tests/unit/helpers/retirement-census.js': 'the census scan and this table: their word lists and comments name the words they describe',
   'tests/unit/retirement-census-table.test.js': 'the table\'s own tests: their planted bad rows name the words the table refuses',
+  'tests/unit/retirement-census-words.test.js': 'the per-word mutation proofs: each planted sample is one of the words it proves',
 });
 
 /** The live rules a live row names (path and symbol); the table test checks each symbol still exists in its file. */
@@ -224,6 +225,7 @@ export const RETAINED = Object.freeze([
   { kind: 'live', file: 'tests/unit/stage-selector-input.test.js', words: ['the plan heading'], reason: R_LEGACY, rule: RULE.legacy },
   { kind: 'live', file: 'tests/unit/stage-selector-input.test.js', words: ['plan-review due'], reason: R_FACTS, rule: RULE.facts },
 
+  { kind: 'live', file: 'tests/unit/lin-4502-description-writes.test.js', words: ['the write-below route'], reason: 'pins the retired write-below route as not registered (404): the live rule is the route table in routes/proxy-writes.js (createProxyWriteRoutes)', rule: { path: 'routes/proxy-writes.js', symbol: 'createProxyWriteRoutes' } },
   // ── temporary: the owner removes the hit ────────────────────────────────────────────────────────────────────────────
   { kind: 'temporary', file: 'tests/unit/lin-4373-leftover-step.test.js', words: ['LEFTOVERS_HEADING'], reason: 'these hold tests run lib/dispatch-leftover.js\'s queue and hold, which piece C (LIN-4526) removes', owner: 'LIN-4526', exit: 'piece C removes the leftover hold; these tests and their heading go with it' },
   { kind: 'temporary', file: 'tests/unit/lin-4375-session-pr-wins.test.js', words: ['LEFTOVERS_HEADING'], reason: 'these tests run the leftover step\'s hold, which piece C (LIN-4526) removes', owner: 'LIN-4526', exit: 'piece C removes the leftover hold; these tests and their heading go with it' },

@@ -136,6 +136,14 @@ for (const variant of VARIANTS) {
       assert.equal(after, `${sealed}\n\n## Notes\n\nfound it`);
     });
 
+    // LIN-4524 (beat 4): restored. The census word 'the write-below route' covers the literal path in source; this pins
+    // what a request does: the retired route is not registered, and the stored description is untouched.
+    test('the retired write-below route is not registered: 404, store unchanged', async () => {
+      const res = await call(proxyApp(), 'POST', '/api/proxy/issues/i1/description/below', { body: 'Shipped in #12.' });
+      assert.equal(res.status, 404, JSON.stringify(res.body));
+      assert.equal(await storedDescription('i1'), sealed);
+    });
+
     test('a create whose body holds the heading or the end line is filed as written, with no block sealed around it', async () => {
       const app = proxyApp();
       for (const marker of [ASKED_HEADING, ASKED_END]) {
