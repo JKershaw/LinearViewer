@@ -65,6 +65,7 @@ function makeRouter({
   dispatchQueueStore = undefined,
   resolveProvider = null,
   openFindings = FINDINGS_NONE,
+  recordsStore = null,
 } = {}) {
   const collection = harness.freshDb().collection('close-out-events');
   const store = new CloseOutEventsStore({ collection });
@@ -73,6 +74,7 @@ function makeRouter({
     workspaceFromUrl: (req, res, next) => next(),
     closeOutEventsStore: store,
     dispatchQueueStore,
+    recordsStore,
     closeOut: {
       openFindings, resolveProvider: resolveProvider || (() => ({ provider: fakeProvider({ comments }), callScope: 'scope' })),
       readPrStatus: readPrStatus || (async ({ number }) => statuses[number] || unknownStatus(number)),
@@ -509,6 +511,44 @@ describe('POST /api/run-evidence/:issueIdentifier/close-out-press', () => {
     assert.equal(stored.length, 1);
     assert.equal(stored[0].openFindings.state, 'read');
     assert.equal(stored[0].openFindings.count, 1);
+  });
+
+  // LIN-4527 (finding-195531ad): the two tests above hand the press a fixed reading through the `closeOut` seam, so
+  // the route's OWN read of the records store never ran under test. With `openFindings: null` the route reads the
+  // store itself, and these two pin what it stamps. Each fails if that read is replaced by a constant zero.
+  test('LIN-4527: a ticket with no task record stamps not-read with a null count, never zero', async () => {
+    const built = makeRouter({
+      comments: [comment(PR_A, '2026-07-01T00:00:00.000Z'), comment(reviewBody(), '2026-07-02T00:00:00.000Z'), readOf(PR_A)],
+      statuses: { 41: openStatus(41) },
+      openFindings: null,
+      recordsStore: { async taskForTicket() { return null; }, async find() { throw new Error('no task, so no finding read'); } },
+    });
+    const res = await press(built, baseReq({ body: { prUrl: PR_A, headSha: 'aaaaaaa', dispatchId: 'd-9' } }));
+    assert.equal(res.statusCode, 201, JSON.stringify(res.jsonBody));
+    const stored = await rows(built.collection);
+    assert.equal(stored.length, 1);
+    assert.deepEqual(stored[0].openFindings, { state: 'not-read', count: null });
+    assert.equal('openItems' in stored[0], false, 'no openItems counts are written');
+  });
+
+  test('LIN-4527: the press reads the store itself: one open finding to close-out stamps read with count 1', async () => {
+    const asked = [];
+    const built = makeRouter({
+      comments: [comment(PR_A, '2026-07-01T00:00:00.000Z'), comment(reviewBody(), '2026-07-02T00:00:00.000Z'), readOf(PR_A)],
+      statuses: { 41: openStatus(41) },
+      openFindings: null,
+      recordsStore: {
+        async taskForTicket(urlKey, ticket) { asked.push(['task', urlKey, ticket]); return 'task-1'; },
+        async find(urlKey, query) { asked.push(['find', urlKey, query]); return [{ id: 'finding-1' }]; },
+      },
+    });
+    const res = await press(built, baseReq({ body: { prUrl: PR_A, headSha: 'aaaaaaa', dispatchId: 'd-9' } }));
+    assert.equal(res.statusCode, 201, JSON.stringify(res.jsonBody));
+    const stored = await rows(built.collection);
+    assert.equal(stored.length, 1);
+    assert.deepEqual(stored[0].openFindings, { state: 'read', count: 1 });
+    assert.deepEqual(asked[0], ['task', 'ws', 'LIN-1']);
+    assert.deepEqual(asked[1], ['find', 'ws', { kind: 'finding', state: 'open', to: 'close-out', inRef: 'task-1' }]);
   });
 
   test('records a press with its dispatchId', async () => {
