@@ -5029,3 +5029,7 @@ LIN-4518 (P5) is on its last beat, waiting for CI on bf349ff5f. Two follow-up ro
 - **What happened:** P5's worker built the ledger (bf349ff5f, CI green) before John's "marker" answer reached it at 13:17. Ruling `lin4518-authorship-conflict` asks which governs.
 - **My proposal:** marker, with the ledger removed in the same move. John's ruling stands; a ledger needs keeping in step forever; slice 4 makes most of it moot.
 - **Process point:** a run built the contested part while its ruling waited, against "keep building the uncontested parts". For slice 4 and the smoothing pass.
+
+### 21 Nov, 14:28
+
+LIN-4518 (P5) has been rebuilding authorship on the marker since 13:55. No rulings, no pause.
