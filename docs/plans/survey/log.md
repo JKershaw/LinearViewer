@@ -4948,3 +4948,10 @@ The pause ruling was answered (a: lifted, stays lifted). LIN-4504's second revie
   1. close-out's own commits make the approval stale: re-review (yes);
   2. verdicts already in comments: import once.
 - **Filed:** LIN-4513 under LIN-4490. Autopilot **894a0750-07c6-492e-8d0b-89d0c2621f55**.
+
+### 21 Nov, 01:29: slice 3 broke down; question 1 raised twice; question 2 missing
+
+- **LIN-4513:** survey-task, survey-place, scoping, plan, then plan-review (approved, 11 notes), then breakdown into 8 children (LIN-4514..4521).
+  - LIN-4514 and 4515 are on beat 4–5 of 5. Nothing pushed yet. Main green.
+- **Question 1** (close-out's own commits) is raised twice, by plan and breakdown: `lin-4513-closeout-own-commits` and `lin4513-ruling1-closeout-own-commits`. I proposed yes on both.
+- **Question 2** (import comment verdicts) was raised by both runs but isn't on the rulings list at all. A second `DECISION:` in a run seems to be dropped. A Harbour bug for slice 4 or the smoothing pass. John to answer it in the morning (suggested: import once).
