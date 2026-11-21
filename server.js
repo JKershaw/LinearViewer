@@ -101,6 +101,7 @@ import { createOnTicketWrite } from './lib/ticket-close-closer.js'
 import { ShelvedRulingsStore } from './lib/shelved-rulings-store.js'
 import { RecordsStore, RECORDS_COLLECTION, REFS_COLLECTION, QUERY_LOG_COLLECTION } from './lib/records-store.js'
 import { createRunRecords } from './lib/run-records.js'
+import { createChangeBackstop, createChangePrReaders } from './lib/change-records.js'
 import { createRecordWrites } from './lib/records/writes.js'
 import { askedOf } from './lib/asked-of.js'
 import { flattenIssue as flattenRecordsIssue } from './lib/proxy-wire.js'
@@ -699,7 +700,17 @@ async function taskForTicketAt(urlKey, ticket, resolveAccess = null) {
   return ticketWriter.taskOfTicket(access, urlKey, ticket, 'dispatch');
 }
 dispatchQueueStore.taskOnDispatch = (urlKey, ticket, resolveAccess) => taskForTicketAt(urlKey, ticket, resolveAccess)
-dispatchQueueStore.runRecords = createRunRecords({ recordsStore, readRow: (urlKey, id) => dispatchQueueStore.rowForRunRecords(urlKey, id), taskOfTicket: (urlKey, ticket) => taskForTicketAt(urlKey, ticket) })
+dispatchQueueStore.runRecords = createRunRecords({ recordsStore, readRow: (urlKey, id) => dispatchQueueStore.rowForRunRecords(urlKey, id), taskOfTicket: (urlKey, ticket) => taskForTicketAt(urlKey, ticket), changeBackstop: createChangeBackstop({ recordsStore, prReaderFor: createChangePrReaders({
+  // LIN-4515 (beat 4): the backstop's PR reader is the close-out chain's: the workspace's own credential, the owner's
+  // installation token for a Linear- or Jira-bound repo, the shared cache. The installation resolver is a `const` below,
+  // so it is reached through a closure (a direct reference here is a temporal-dead-zone error at boot).
+  resolveAccess: async (urlKey) => {
+    const granted = await resolveWorkspaceAccess(urlKey);
+    return granted?.token && granted?.provider ? { callScope: granted.scope ?? granted.token, providerKind: granted.provider } : null;
+  },
+  resolveWorkspaceId: createSessionWorkspaceIdResolver({ sessionsCollection }),
+  installationTokenFor: (args) => installationTokenFor(args),
+}) }) })
 // LIN-2444: proposed dismissals — a view annotation on a ruling, never an
 // answer to it. Separate collection from shelved-rulings because the two are
 // different acts with different lifecycles (a shelve defers a decision the

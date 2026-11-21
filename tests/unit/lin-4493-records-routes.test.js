@@ -151,7 +151,7 @@ describe('a stage credential writes, reads and ends through the proxy, filed by 
     const rev = await post(`/api/proxy/records/${id}/revise`, 'impl', { says: 'Second.', reason: 'sharpened', run: 'row-impl' });
     assert.equal(rev.status, 200, JSON.stringify(rev.body));
     assert.equal(rev.body.v, 2);
-    const change = await post('/api/proxy/records', 'impl', { kind: 'change', ref: 'PR 9', head: 'abc', run: 'row-impl' });
+    const change = await post('/api/proxy/records', 'impl', { kind: 'change', ref: 'https://github.com/acme/widget/pull/9', head: 'abc', run: 'row-impl' });
     const linked = await post(`/api/proxy/records/${id}/link`, 'impl', { about: change.body.id, run: 'row-impl' });
     assert.equal(linked.status, 200, JSON.stringify(linked.body));
     assert.deepEqual(linked.body.links.about, [change.body.id]);
@@ -206,7 +206,7 @@ describe('the API review\'s call shape', () => {
   });
 
   test('a bare id in on is pinned to the current version of the change', async () => {
-    const c = await post('/api/proxy/records', 'impl', { kind: 'change', ref: 'PR 9', head: 'abc', run: 'row-impl' });
+    const c = await post('/api/proxy/records', 'impl', { kind: 'change', ref: 'https://github.com/acme/widget/pull/9', head: 'abc', run: 'row-impl' });
     const v = await post('/api/proxy/records', 'impl', { kind: 'verdict', judgement: 'review', outcome: 'approve', reasoning: 'fine', on: c.body.id, run: 'row-impl' });
     assert.equal(v.status, 201, JSON.stringify(v.body));
     assert.deepEqual(v.body.links.on, [`${c.body.id}@1`]);
@@ -435,7 +435,7 @@ describe('reads and writes touch only the records they name (LIN-4493 gap 4)', (
 describe('a record id is never read as a ticket (a flake found by repeat runs: an all-digit hex suffix)', () => {
   test('a record whose id reads like a ticket (kind-12345678) can be linked to: it is a record, not a ticket', async () => {
     const id = 'change-44394596';
-    await db.collection(RECORDS_COLLECTION).insertOne({ _id: `${URL_KEY}::${id}::1`, urlKey: URL_KEY, id, v: 1, op: 'add', kind: 'change', state: 'open', at: '2026-11-19T10:00:00.000Z', by: 'implementation', links: {}, fields: { ref: 'PR 9', head: 'abc' } });
+    await db.collection(RECORDS_COLLECTION).insertOne({ _id: `${URL_KEY}::${id}::1`, urlKey: URL_KEY, id, v: 1, op: 'add', kind: 'change', state: 'open', at: '2026-11-19T10:00:00.000Z', by: 'implementation', links: {}, fields: { ref: 'https://github.com/acme/widget/pull/9', head: 'abc' } });
     const made = await post('/api/proxy/records', 'john', { kind: 'finding', to: 'review', says: 'About it.', how: 'check', about: id });
     assert.equal(made.status, 201, JSON.stringify(made.body));
     assert.deepEqual(made.body.links.about, [id]);

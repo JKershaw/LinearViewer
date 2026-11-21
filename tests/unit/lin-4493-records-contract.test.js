@@ -115,7 +115,7 @@ describe('shape: what a write may hold (check.js)', () => {
 
   test('links beside the fields are accepted, as are links under links', async () => {
     const t = await add('task', { asked: 'Make the footer show runs left.', 'done-when': 'shows N' }, 'John');
-    const c = await add('change', { in: t, ref: 'PR 9', head: 'abc' });
+    const c = await add('change', { in: t, ref: 'https://github.com/acme/widget/pull/9', head: 'abc' });
     const flat = checkAdd('finding', { in: t, to: 'review', says: 'x', about: [c] }, ctx());
     assert.deepEqual(flat.problems, []);
     assert.deepEqual(flat.record.links, { about: [c] });
@@ -154,7 +154,7 @@ describe('shape: what a write may hold (check.js)', () => {
   });
 
   test('`in` must name a task, and an unresolved link names what is wrong', async () => {
-    const c = await add('change', { ref: 'PR 9', head: 'abc' });
+    const c = await add('change', { ref: 'https://github.com/acme/widget/pull/9', head: 'abc' });
     refused(checkAdd('lesson', { says: 'x', in: c }, ctx()).problems, 'in');
     refused(checkAdd('lesson', { says: 'x', about: ['task-99'] }, ctx()).problems, 'about');
   });
@@ -167,7 +167,7 @@ describe('shape: what a write may hold (check.js)', () => {
   });
 
   test('a verdict needs an on, and its outcome must be in its judgement\'s set', async () => {
-    const c = await add('change', { ref: 'PR 9', head: 'abc' });
+    const c = await add('change', { ref: 'https://github.com/acme/widget/pull/9', head: 'abc' });
     refused(checkAdd('verdict', { judgement: 'review', outcome: 'approve' }, ctx()).problems, 'on');
     refused(checkAdd('verdict', { judgement: 'review', outcome: 'better', on: [c] }, ctx()).problems, 'outcome');
     refused(checkAdd('verdict', { judgement: 'vibes', outcome: 'approve', on: [c] }, ctx()).problems, 'judgement');
@@ -175,7 +175,7 @@ describe('shape: what a write may hold (check.js)', () => {
   });
 
   test('a bare on id is pinned to the change\'s current version; an unknown version is refused', async () => {
-    const c = await add('change', { ref: 'PR 9', head: 'abc' });
+    const c = await add('change', { ref: 'https://github.com/acme/widget/pull/9', head: 'abc' });
     const pinned = checkAdd('verdict', { judgement: 'review', outcome: 'approve', on: c }, ctx());
     assert.deepEqual(pinned.record.links.on, [`${c}@1`]);
     await revise(c, { head: 'def', reason: 'new head' }, 'implementation');
@@ -213,7 +213,7 @@ describe('shape: what a write may hold (check.js)', () => {
 
   test('a link call adds to a list and only checks, never removes', async () => {
     const t = await add('task', { asked: 'x' }, 'John');
-    const c = await add('change', { ref: 'PR 9', head: 'abc' });
+    const c = await add('change', { ref: 'https://github.com/acme/widget/pull/9', head: 'abc' });
     assert.deepEqual(checkLink(idx.at(t), { about: c }, ctx()).links, { about: [c] });
   });
 });
@@ -261,7 +261,7 @@ describe('views (views.js)', () => {
 
   test('a verdict is stale when its change was revised after the verdict read it', async () => {
     const t = await add('task', { asked: 'x' }, 'John');
-    const c = await add('change', { in: t, ref: 'PR 9', head: 'abc' }, 'implementation');
+    const c = await add('change', { in: t, ref: 'https://github.com/acme/widget/pull/9', head: 'abc' }, 'implementation');
     const v = await add('verdict', { in: t, judgement: 'review', outcome: 'approve', reasoning: 'fine', on: `${c}@1` }, 'review');
     await revise(c, { head: 'def', reason: 'new head' }, 'implementation');
     assert.deepEqual(viewOf(idx.at(v), idx).flags.stale, [`on ${c}@1, now @2`]);
@@ -278,7 +278,7 @@ describe('views (views.js)', () => {
 
   test('not stale as of a time before the revise', async () => {
     const t = await add('task', { asked: 'x' }, 'John');
-    const c = await add('change', { in: t, ref: 'PR 9', head: 'abc' }, 'implementation');
+    const c = await add('change', { in: t, ref: 'https://github.com/acme/widget/pull/9', head: 'abc' }, 'implementation');
     const v = await add('verdict', { in: t, judgement: 'review', outcome: 'approve', reasoning: 'fine', on: c }, 'review');
     const earlier = at(minute - 0);
     await revise(c, { head: 'def', reason: 'new head' }, 'implementation');
@@ -300,7 +300,7 @@ describe('the brief (brief.js, parts 1–8)', () => {
     const t1 = await add('task', { asked: 'Make the footer show runs left.', 'done-when': 'footer shows N runs', ref: 'LIN-1' }, 'John');
     const plan2 = await add('plan', { in: t1, says: 'Old plan.', order: 1 }, 'design');
     const t3 = await add('task', { in: t1, 'done-when': 'child done', piece: plan2 }, 'breakdown');
-    const c4 = await add('change', { in: t3, ref: 'PR 9', head: 'abc' }, 'implementation');
+    const c4 = await add('change', { in: t3, ref: 'https://github.com/acme/widget/pull/9', head: 'abc' }, 'implementation');
     const v5 = await add('verdict', { in: t3, judgement: 'review', outcome: 'approve', reasoning: 'fine', on: `${c4}@1` }, 'review');
     await revise(c4, { head: 'def', reason: 'new head' }, 'implementation');
     const plan7 = await add('plan', { in: t1, says: 'Para one.\n\nPara two.', order: 2, to: 'implementation' }, 'design');
