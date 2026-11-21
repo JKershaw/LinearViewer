@@ -1,0 +1,475 @@
+{
+  "_about": "LIN-4514 frozen inputs for the readings over trails: each walk-8 ticket's own landing on main, as git records it (git log --first-parent: commit, committer date, subject, body; and --numstat --no-renames: its files). Read by tests/helpers/comment-path-capture.js for measure 1 (scripts/stability-measures-blind.mjs readLanding).",
+  "landings": {
+    "lin-4446": [
+      {
+        "body": "* LIN-4446: share the cost formatter with the browser, retire its restated copy\n\nThe browser had its own formatUsd (public/cost-format.js) held to the server's\nby a parity test. It is replaced by lib/cost-format.js, served to the browser\nas /shared/cost-format.js through the SHARED_MODULES allow-list in\nlib/vendor-assets.js, and loaded by a module shim (public/cost-format-global.js)\nthat sets window.CostFormat for the classic page scripts.\n\n- lib/components/page.js: a { module } script entry emits <script type=\"module\">;\n  string entries stay classic.\n- public/workspace-kpis.js builds on DOMContentLoaded: its Chart.js tick callback\n  reads window.CostFormat synchronously inside the chart constructor, and the\n  module shim runs after the classic scripts have parsed.\n- CLAUDE.md's no-build-step line states the reading; the limits are in\n  docs/areas/front-end-browser.md.\n- Retired: public/cost-format.js and tests/unit/cost-format-parity.test.js. Their\n  server-side assertions moved to tests/unit/cost-format.test.js.\n\nCo-Authored-By: Claude Haiku 5.5 <noreply@anthropic.com>\n\n* LIN-4446 leftovers: true comments, one purity spelling, swipe zoom\n\nEdges of the shared cost-format slice:\n- Test comments that described the formatter loading before the page script\n  (lin-3833-run-control, flight-companion-client) now describe what each seam\n  does; loadChatUI drops a formatter install chat.js never reads.\n- server.js's mount comment names the /shared/* modules too.\n- The shim guard no longer asserts list position: a module runs after every\n  classic script wherever it is listed.\n- The purity rule is spelled as the guard enforces it (imports nothing, names\n  no browser or Node global) in lib/vendor-assets.js, lib/cost-format.js and\n  the area notes.\n- Area notes: two Waiting reasons corrected, the vendor-assets name noted in\n  platform-and-plumbing, and a Lesson on module order in vm seams.\n\nSettles a front-end-pages Waiting entry: the swipe page drops its\nuser-scalable=no viewport for the shared default, so pinch zoom works\n(WCAG 1.4.4), with a test.\n\nCo-Authored-By: Claude Opus 5.5 <noreply@anthropic.com>\n\n* LIN-4446 close-out: blind-read test cleanups, bridge and ship-copy Waiting entries\n\nCo-Authored-By: Claude Sonnet 5.5 <noreply@anthropic.com>\n\n---------\n\nCo-authored-by: KulchoAI <ai@kulcho.com>\nCo-authored-by: Claude Haiku 5.5 <noreply@anthropic.com>",
+        "commit": "92676b1febeb5407878d69b5e7a8f166a9371777",
+        "date": "2026-11-13T15:22:55Z",
+        "files": [
+          {
+            "added": 2,
+            "deleted": 2,
+            "path": "CLAUDE.md"
+          },
+          {
+            "added": 2,
+            "deleted": 1,
+            "path": "docs/architecture/source-map.md"
+          },
+          {
+            "added": 35,
+            "deleted": 1,
+            "path": "docs/areas/front-end-browser.md"
+          },
+          {
+            "added": 0,
+            "deleted": 1,
+            "path": "docs/areas/front-end-pages.md"
+          },
+          {
+            "added": 2,
+            "deleted": 1,
+            "path": "docs/areas/other-features.md"
+          },
+          {
+            "added": 4,
+            "deleted": 0,
+            "path": "docs/areas/platform-and-plumbing.md"
+          },
+          {
+            "added": 10,
+            "deleted": 3,
+            "path": "lib/components/page.js"
+          },
+          {
+            "added": 1,
+            "deleted": 1,
+            "path": "lib/cost-format.js"
+          },
+          {
+            "added": 1,
+            "deleted": 1,
+            "path": "lib/render-flight-companion.js"
+          },
+          {
+            "added": 1,
+            "deleted": 1,
+            "path": "lib/render-observation.js"
+          },
+          {
+            "added": 1,
+            "deleted": 2,
+            "path": "lib/render-swipe.js"
+          },
+          {
+            "added": 1,
+            "deleted": 1,
+            "path": "lib/render-task-page.js"
+          },
+          {
+            "added": 1,
+            "deleted": 1,
+            "path": "lib/render-workspace-kpis.js"
+          },
+          {
+            "added": 1,
+            "deleted": 1,
+            "path": "lib/render.js"
+          },
+          {
+            "added": 31,
+            "deleted": 6,
+            "path": "lib/vendor-assets.js"
+          },
+          {
+            "added": 12,
+            "deleted": 0,
+            "path": "public/cost-format-global.js"
+          },
+          {
+            "added": 0,
+            "deleted": 34,
+            "path": "public/cost-format.js"
+          },
+          {
+            "added": 3,
+            "deleted": 8,
+            "path": "public/flight-companion.js"
+          },
+          {
+            "added": 3,
+            "deleted": 3,
+            "path": "public/observation.js"
+          },
+          {
+            "added": 3,
+            "deleted": 1,
+            "path": "public/prompt-section.js"
+          },
+          {
+            "added": 124,
+            "deleted": 118,
+            "path": "public/workspace-kpis.js"
+          },
+          {
+            "added": 2,
+            "deleted": 1,
+            "path": "server.js"
+          },
+          {
+            "added": 21,
+            "deleted": 0,
+            "path": "tests/e2e/workspace-kpis.spec.js"
+          },
+          {
+            "added": 7,
+            "deleted": 9,
+            "path": "tests/fixtures/browser-cost-format.js"
+          },
+          {
+            "added": 7,
+            "deleted": 7,
+            "path": "tests/fixtures/render-task-page-golden.json"
+          },
+          {
+            "added": 77,
+            "deleted": 0,
+            "path": "tests/unit/cost-format-consumers.test.js"
+          },
+          {
+            "added": 0,
+            "deleted": 74,
+            "path": "tests/unit/cost-format-parity.test.js"
+          },
+          {
+            "added": 78,
+            "deleted": 0,
+            "path": "tests/unit/cost-format.test.js"
+          },
+          {
+            "added": 2,
+            "deleted": 3,
+            "path": "tests/unit/cost-read-census.test.js"
+          },
+          {
+            "added": 4,
+            "deleted": 2,
+            "path": "tests/unit/flight-companion-client.test.js"
+          },
+          {
+            "added": 5,
+            "deleted": 2,
+            "path": "tests/unit/lin-3833-run-control.test.js"
+          },
+          {
+            "added": 5,
+            "deleted": 2,
+            "path": "tests/unit/observation-scan-due.test.js"
+          },
+          {
+            "added": 12,
+            "deleted": 0,
+            "path": "tests/unit/render-swipe.test.js"
+          },
+          {
+            "added": 248,
+            "deleted": 0,
+            "path": "tests/unit/shared-modules.test.js"
+          },
+          {
+            "added": 84,
+            "deleted": 0,
+            "path": "tests/unit/workspace-kpis-cost-order.test.js"
+          }
+        ],
+        "subject": "LIN-4446: share the cost formatter with the browser (slice 1) (#2423)"
+      }
+    ],
+    "lin-4450": [
+      {
+        "body": "* LIN-4450: Jira seal — exact words in harbour.asAsked, formatted block in the description\n\nA Jira description now holds the person's `## As asked` words byte-exact.\nThe block is an ordinary formatted region in the description (h2 heading,\nmarkdownToAdf(words), italic end line). The exact words travel in the issue\nentity property `harbour.asAsked = { v: 1, words, rendered }`, where\n`rendered` is a SHA-256 of the region's rendering (stored as a digest, only\never compared). The property is written in the same PUT as the description.\n\n- lib/providers/jira/as-asked-region.js (new): the one reader\n  (readDescription) and writer (holdAsAsked). It is the only module that\n  knows the ADF region and the property. It imports the block's spellings\n  from lib/as-asked.js and never retypes them.\n  - Reader: serves the exact words while the region still renders to\n    `rendered`; an edit made in Jira is served as the rendering behind the\n    canonical markers; a property with no block is ignored.\n  - The end line is found by digest, not by position. Words may hold the\n    end sentence as plain or underscore text, so the reader takes the\n    candidate whose region renders to the stored digest. The writer takes\n    the candidate whose interior renders to the words.\n  - Size guard: UTF-8 bytes of the serialized property must be at most\n    32,768 (Atlassian's documented entity-property limit; the docs give it\n    in bytes on some pages and characters on others, so the stricter\n    reading is enforced). Over the limit, holdAsAsked throws, the seal is\n    skipped, and an oversized updateIssue returns 422 naming the size.\n- lib/providers/jira/index.js: all four description reads go through\n  readDescription (canonical issue, parent, context issue, issueDescription).\n  Every provider-side getIssue asks for properties=harbour.asAsked. updateIssue\n  holds the block before any write and writes the property in the same PUT.\n  descriptionRoundTrip is the pure write-then-read through the same reader,\n  so providerHoldsAsAsked is true for Jira with no change to\n  lib/as-asked-seal.js.\n- lib/providers/jira/adf.js: the empty fenced code block now renders as the\n  bare fence. It rendered as a blank line between two fences, which the\n  writer split apart, so every later below-the-line write was refused (422).\n  The write gate accepts an empty fence. plainText is exported for the region.\n- client.js / fake-client.js: getIssue takes `properties`; updateIssue takes\n  `properties`. The fake returns requested keys only, as real Jira does.\n\nRetires: the \"Jira is skipped\" seal claims in lib/as-asked-seal.js,\nlib/as-asked.js, the descriptionRoundTrip comment, lib/dispatch-factory.js\nand docs/proxy-integration.md (Jira no longer files unsealed). Adds the\nregion module to docs/architecture/source-map.md. The seal tests that pinned\nJira as \"cannot hold the block\" now pin it as sealed and kept; the\nsealForFiling provider-skip branch is witnessed with a synthetic lossy round\ntrip.\n\nNot verified live: no credential for John's Jira. Whether the site keeps the\nrendered digest across an ordinary editor save below the block is open until\nthe live check (LIN-4452).\n\nCo-Authored-By: Claude Haiku 5.5 <noreply@anthropic.com>\n\n* LIN-4450 leftovers: true comments at the seal's edges, a providers note, one test-token check\n\nTidied (comments the seal made untrue or incomplete):\n- lib/providers/jira/adf.js: the header said the codec is reached only by\n  index.js through three exports; the region module reaches it too, through\n  a fourth (plainText).\n- lib/providers/jira/index.js: issueDescription's comment described the\n  append/replace lane as ADF -> markdown -> markdownToAdf; it now goes\n  through readDescription and holdAsAsked.\n- lib/providers/jira/fake-client.js: the seed-shape comment documents the\n  `_properties` seed and the `properties` read and write.\n- lib/as-asked.js: \"Who uses what\" names the Jira region module for\n  sealAsAsked, splitAsAsked and the marker spellings.\n\nNoted: docs/areas/providers.md (new) gets four Lessons from this change and\none Waiting entry: the bulk Jira reads do not ask for harbour.asAsked, so a\nsealed block shows its rendering there.\n\nRetires (llm-and-prompts Waiting, `lib/should-mock-ai.js`): the inline\ntest-token checks in routes/proxy-compute.js, routes/task-chat.js,\nroutes/workspace-api-steps.js (isTestToken) and server.js now call\nisHermeticTestToken. The expression is identical, so behaviour is unchanged.\nroutes/workspace-api-audit.js keeps its own predicate on purpose (its comment\nsays why).\n\nCo-Authored-By: Claude Opus 5.5 <noreply@anthropic.com>\n\n* LIN-4450: close-out fixes from review and blind read\n\n- test: pin the oversize filing's skip log line (exactly one line, via mock console.log); review's named fix\n- routes/workspace-api-audit.js: use isHermeticTestToken, keeping its own local-provider alternative (blind read)\n- routes/workspace-api-steps.js: drop the isTestToken alias; callers use isHermeticTestToken(workspace.accessToken) directly (blind read)\n- docs/architecture/source-map.md: steps list no longer names isTestToken (stale citation this change made)\n- test: delete the comment-phrase test; behaviour is covered by as-asked-create-seal\n\nCo-Authored-By: Claude Sonnet 5.5 <noreply@anthropic.com>\n\n---------\n\nCo-authored-by: KulchoAI <ai@kulcho.com>\nCo-authored-by: Claude Haiku 5.5 <noreply@anthropic.com>",
+        "commit": "2bf788b6da71c82db6a1d84b361da98ef9cdedbb",
+        "date": "2026-11-13T15:32:12Z",
+        "files": [
+          {
+            "added": 3,
+            "deleted": 2,
+            "path": "docs/architecture/source-map.md"
+          },
+          {
+            "added": 0,
+            "deleted": 3,
+            "path": "docs/areas/llm-and-prompts.md"
+          },
+          {
+            "added": 28,
+            "deleted": 0,
+            "path": "docs/areas/providers.md"
+          },
+          {
+            "added": 1,
+            "deleted": 1,
+            "path": "docs/proxy-integration.md"
+          },
+          {
+            "added": 4,
+            "deleted": 3,
+            "path": "lib/as-asked-seal.js"
+          },
+          {
+            "added": 8,
+            "deleted": 4,
+            "path": "lib/as-asked.js"
+          },
+          {
+            "added": 2,
+            "deleted": 2,
+            "path": "lib/dispatch-factory.js"
+          },
+          {
+            "added": 19,
+            "deleted": 9,
+            "path": "lib/providers/jira/adf.js"
+          },
+          {
+            "added": 160,
+            "deleted": 0,
+            "path": "lib/providers/jira/as-asked-region.js"
+          },
+          {
+            "added": 8,
+            "deleted": 3,
+            "path": "lib/providers/jira/client.js"
+          },
+          {
+            "added": 34,
+            "deleted": 3,
+            "path": "lib/providers/jira/fake-client.js"
+          },
+          {
+            "added": 58,
+            "deleted": 29,
+            "path": "lib/providers/jira/index.js"
+          },
+          {
+            "added": 8,
+            "deleted": 7,
+            "path": "routes/proxy-compute.js"
+          },
+          {
+            "added": 2,
+            "deleted": 2,
+            "path": "routes/task-chat.js"
+          },
+          {
+            "added": 3,
+            "deleted": 2,
+            "path": "routes/workspace-api-audit.js"
+          },
+          {
+            "added": 3,
+            "deleted": 2,
+            "path": "routes/workspace-api-issue-read.js"
+          },
+          {
+            "added": 3,
+            "deleted": 2,
+            "path": "routes/workspace-api-issue-write.js"
+          },
+          {
+            "added": 4,
+            "deleted": 3,
+            "path": "routes/workspace-api-prompts.js"
+          },
+          {
+            "added": 4,
+            "deleted": 11,
+            "path": "routes/workspace-api-steps.js"
+          },
+          {
+            "added": 7,
+            "deleted": 6,
+            "path": "routes/workspace-api.js"
+          },
+          {
+            "added": 4,
+            "deleted": 4,
+            "path": "server.js"
+          },
+          {
+            "added": 4,
+            "deleted": 0,
+            "path": "tests/fixtures/key-state-census.json"
+          },
+          {
+            "added": 14,
+            "deleted": 9,
+            "path": "tests/unit/as-asked-create-seal.test.js"
+          },
+          {
+            "added": 14,
+            "deleted": 8,
+            "path": "tests/unit/as-asked-dispatch-seal.test.js"
+          },
+          {
+            "added": 36,
+            "deleted": 22,
+            "path": "tests/unit/as-asked-guard.test.js"
+          },
+          {
+            "added": 309,
+            "deleted": 0,
+            "path": "tests/unit/jira-as-asked-region.test.js"
+          },
+          {
+            "added": 3,
+            "deleted": 1,
+            "path": "tests/unit/jira-provider-adf-codec.test.js"
+          }
+        ],
+        "subject": "LIN-4450: Jira seal — exact words in harbour.asAsked, formatted block in the description (#2421)"
+      }
+    ],
+    "lin-4469": [
+      {
+        "body": "* LIN-4469: prompt folds after the guard, one re-pin (piece 5)\n\nRetires duplicate prompt wording and tracker clauses the write guard now\nrefuses (LIN-4468); the rendered prompts that carry a folded rule fall.\n\n- Mandates (lib/proxy-preamble.js): ONE_COMMENT, BLIND_COMMENT, NONE and\n  TICKET_FIELDS drop the tracker clauses the guard refuses (\"tickets or\n  Linear state\", \"post nothing to Linear\", \"rewrite its description\",\n  \"create tickets or subtasks\"). Kept in words, with reason: the code,\n  branch and PR prohibitions (no code backstop, the runner's GitHub\n  credential is outside the proxy) and the merge sentences (cut by ruling).\n- Look-into's \"unless the person asks\" exception is retired (John's ruling,\n  LIN-4448 comment bdcd3128); NONE_MANDATE drops it.\n- lib/prompts/leftover-words.js: areaLookup (first-match clause, used by\n  CONSEQUENCE_TEST and the area-notes pointer) and NOTES_PR (the docs-only\n  notes pull request, used by retrospective-audit and the Periodical notes\n  bullet). The blind read's own area sentence stays as piloted.\n- lib/periodicals.js: committedSearch, Stability's wording for the four\n  committed-tool spellings.\n- \"narrowing\" becomes \"cut\" in the plan-review and review verdicts (CUT's word).\n- Re-pin: 13 Periodical hashes, the LIN-4467 witness, FROZEN_TOTAL_BYTES\n  396884 -> 396559 (ceilings sum), nine template ceilings, two source ceilings.\n  Reasons in scripts/prompt-template-change-log.md.\n- New tests/unit/lin-4469-prompt-folds.test.js: retired spellings appear in\n  no rendered prompt; the guarded clauses are absent from every preamble.\n\nRefs LIN-4469, LIN-4448\n\nCo-Authored-By: Claude Haiku 5.5 <noreply@anthropic.com>\n\n* LIN-4469: fold the guarded clause in the survey and blind-read templates\n\nFollow-up to PR #2447, on John's ruling. survey-task, survey-place and the\nblind read's read-only line drop the tracker clause the write guard refuses\n(\"tickets or Linear state\" / \"tickets or tracker state\"); \"code, branches or\npull requests\" stays in words. The blind read's piloted fixture takes the same\none-line change; the pilot itself was not re-run.\n\nCeilings: survey-task -23, survey-place -23, blind-read -24,\nprompt-template-defs.js source -70; FROZEN_TOTAL_BYTES 396559 -> 396419.\nWitness regenerated. Change log and the new test's retired list updated.\n\nRefs LIN-4469\n\nCo-Authored-By: Claude Haiku 5.5 <noreply@anthropic.com>\n\n* LIN-4469: triage's guarded clause folds, docs point to the retirement words, re-pin\n\nPiece 5 of LIN-4448, the remaining items on PR #2447.\n\n- lib/prompt-template-defs.js: triage drops the description-rewrite and\n  subtask clauses the write guard refuses (LIN-4468, ticket-fields). The\n  scope rule and \"findings stay observations\" stay in words. The four\n  mandates already say the allowance (TICKET_FIELDS_MANDATE).\n- docs/areas/README.md and docs/architecture/dispatch-and-proxy.md no longer\n  restate the three retirement-line forms; they point to RETIRES_LABEL and\n  RETIRES_NONE in lib/prompts/leftover-words.js.\n- lib/prompts/leftover-words.js: the area-registry import moves to the top;\n  the leaf is described as \"a leaf that imports only leaves\", and the area\n  note's Lesson says the same.\n- tests: the RETIRED list gains the old committed change-coupling spelling.\n  Mutation witness: restoring it in lib/periodicals.js fails the test with\n  \"retired spelling appears in 2 templates: periodical:seams-tangles,\n  periodical:seams-tangles:autopilot\". Restored afterwards.\n- prompt-templates.test.js: the triage assertion pins the scope rule, not the\n  refused clauses.\n- Re-pin: triage rendered 2429 -> 2252, lib/prompt-template-defs.js source\n  99095 -> 98917, FROZEN_TOTAL_BYTES 396419 -> 396064 (= the ceilings' sum).\n  Witness regenerated (triage fresh and fix).\n- scripts/prompt-template-change-log.md: measured figures against the PR base\n  (827520 -> 825330 bytes with preambles); seams-tangles +24 disclosed.\n- docs/areas/llm-and-prompts.md: the retirement-line Waiting entry narrows to\n  the simple-dispatcher remainder and the proxy-integration refusal table.\n\nRefs LIN-4469\n\nCo-Authored-By: Claude Haiku 5.5 <noreply@anthropic.com>\n\n* LIN-4469 leftovers: the leaf's header names its constants; the witness stays as a ratchet\n\n- lib/prompts/leftover-words.js: the header said \"Three constants\" and named\n  three; it now names the heading and retirement words and this PR's\n  areaLookup and NOTES_PR.\n- Settles the Waiting entry on the LIN-4467 witness (retire, fold or keep\n  after piece 5 re-pins): kept as a ratchet. It is the identity pin on\n  real-context renders, fresh and fix round, and piece 5 used its byte counts\n  as the real-context witness; the budget test's ceilings are caps over a\n  context-free fixture, so folding the two would lose the identity check.\n  Recorded as a Lesson in docs/areas/llm-and-prompts.md and in the fixture's\n  header; the entry is removed.\n\nRefs LIN-4469\n\nCo-Authored-By: Claude Opus 5.5 <noreply@anthropic.com>\n\n* LIN-4469 close-out: Seams & Tangles' stray parenthesis goes, helper takes a tail, zero-occurrence test\n\n- lib/periodicals.js: drop the hand-typed \"(no path is written here)\" from Seams & Tangles' first\n  runReview bullet (main's words; it folded nothing and made that Periodical +24, now -2).\n  committedSearch takes an optional tail inside its parenthesis, so Stability no longer strips it\n  with .slice(0, -1); Stability's rendered bytes are unchanged.\n- tests/unit/lin-4469-prompt-folds.test.js: a retired phrase must occur zero times, not at most once.\n- tests/unit/lin-4313-periodical-prompt-bytes.test.js: re-pin both seams-tangles hashes; correct the\n  LIN-4469 header (only the second bullet and Stability use the helper).\n- tests/unit/prompt-size-budget.test.js: delete the stray budget-comment fragment.\n- docs/architecture/source-map.md: leftover-words.js exports NOTES_PR and areaLookup and imports\n  area-registry-path.js.\n- scripts/prompt-template-change-log.md: 827520 -> 825278 (-2242), nothing rises.\n\nCo-Authored-By: Claude Sonnet 5.5 <noreply@anthropic.com>\n\n* LIN-4469 close-out: reading-pass lines on the records, Waiting entries for the larger blind-read finds\n\n- lib/prompts/stage-kinds.js: the six reading-pass records (look-into, context, retro, survey-task,\n  survey-place, blind-read) declare their intent line instead of `intent: null` plus a loop that\n  rewrote the exported records after declaration. Rendered bytes are identical (72 renders compared);\n  tests/unit/lin-4253-stage-traits.test.js still ties the line to `writes`.\n- docs/areas: Waiting entries for the witness's table hashes, run-view's STEP_KIND_WORDS copy and\n  completion-signals' unused helpers (larger than a fix, or another area's file).\n\nCo-Authored-By: Claude Sonnet 5.5 <noreply@anthropic.com>\n\n* LIN-4469 close-out: file each Waiting entry under the area its first path maps to\n\nThe witness entry cites lib/prompts/stage-kinds.js first (tests/ maps to no area); the run-view\nentry moves to runs-and-dispatch.md. tests/unit/area-notes.test.js passes again.\n\nCo-Authored-By: Claude Sonnet 5.5 <noreply@anthropic.com>\n\n---------\n\nCo-authored-by: KulchoAI <ai@kulcho.com>\nCo-authored-by: Claude Haiku 5.5 <noreply@anthropic.com>",
+        "commit": "ca77a891e8e32f8132b9d3d0da0c860bfd0b213b",
+        "date": "2026-11-13T23:51:43Z",
+        "files": [
+          {
+            "added": 1,
+            "deleted": 1,
+            "path": "docs/architecture/dispatch-and-proxy.md"
+          },
+          {
+            "added": 1,
+            "deleted": 1,
+            "path": "docs/architecture/source-map.md"
+          },
+          {
+            "added": 3,
+            "deleted": 6,
+            "path": "docs/areas/README.md"
+          },
+          {
+            "added": 30,
+            "deleted": 36,
+            "path": "docs/areas/llm-and-prompts.md"
+          },
+          {
+            "added": 13,
+            "deleted": 0,
+            "path": "docs/areas/runs-and-dispatch.md"
+          },
+          {
+            "added": 16,
+            "deleted": 4,
+            "path": "lib/periodicals.js"
+          },
+          {
+            "added": 2,
+            "deleted": 1,
+            "path": "lib/prompt-formatters.js"
+          },
+          {
+            "added": 8,
+            "deleted": 8,
+            "path": "lib/prompt-template-defs.js"
+          },
+          {
+            "added": 26,
+            "deleted": 3,
+            "path": "lib/prompts/leftover-words.js"
+          },
+          {
+            "added": 11,
+            "deleted": 15,
+            "path": "lib/prompts/stage-kinds.js"
+          },
+          {
+            "added": 4,
+            "deleted": 4,
+            "path": "lib/proxy-preamble.js"
+          },
+          {
+            "added": 14,
+            "deleted": 0,
+            "path": "scripts/prompt-template-change-log.md"
+          },
+          {
+            "added": 1,
+            "deleted": 1,
+            "path": "tests/fixtures/blind-read-piloted.txt"
+          },
+          {
+            "added": 2,
+            "deleted": 0,
+            "path": "tests/fixtures/lin-4467-witness.js"
+          },
+          {
+            "added": 53,
+            "deleted": 53,
+            "path": "tests/fixtures/lin-4467-witness.json"
+          },
+          {
+            "added": 3,
+            "deleted": 3,
+            "path": "tests/unit/completion-signals.test.js"
+          },
+          {
+            "added": 5,
+            "deleted": 5,
+            "path": "tests/unit/lin-4248-survey-preamble.test.js"
+          },
+          {
+            "added": 20,
+            "deleted": 13,
+            "path": "tests/unit/lin-4313-periodical-prompt-bytes.test.js"
+          },
+          {
+            "added": 1,
+            "deleted": 1,
+            "path": "tests/unit/lin-4346-scoping-area-notes.test.js"
+          },
+          {
+            "added": 2,
+            "deleted": 2,
+            "path": "tests/unit/lin-4377-area-notes-pointer-bytes.test.js"
+          },
+          {
+            "added": 1,
+            "deleted": 1,
+            "path": "tests/unit/lin-4390-periodical-hand-off.test.js"
+          },
+          {
+            "added": 1,
+            "deleted": 1,
+            "path": "tests/unit/lin-4467-stage-kind-record.test.js"
+          },
+          {
+            "added": 111,
+            "deleted": 0,
+            "path": "tests/unit/lin-4469-prompt-folds.test.js"
+          },
+          {
+            "added": 3,
+            "deleted": 3,
+            "path": "tests/unit/periodicals.test.js"
+          },
+          {
+            "added": 17,
+            "deleted": 17,
+            "path": "tests/unit/prompt-size-budget.test.js"
+          },
+          {
+            "added": 13,
+            "deleted": 12,
+            "path": "tests/unit/prompt-templates.test.js"
+          }
+        ],
+        "subject": "LIN-4469: prompt folds after the guard, one re-pin (piece 5) (#2447)"
+      }
+    ]
+  }
+}

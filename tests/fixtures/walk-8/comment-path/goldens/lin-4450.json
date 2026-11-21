@@ -1,0 +1,4388 @@
+{
+  "_about": "LIN-4514 golden for LIN-4450: the comment path's answers at every instant, derived from lin-4450.json by tests/helpers/comment-path-capture.js (its header says what each part is). Never edit by hand; rerun the helper.",
+  "instants": [
+    {
+      "at": "2026-11-13T13:44:54.296Z",
+      "because": [
+        "step 1 survey-task"
+      ],
+      "commentIds": [],
+      "decision": {
+        "ladder": {
+          "entries": [],
+          "followsPerson": null,
+          "headMoved": false,
+          "message": "no pull request found in this task's comments",
+          "pr": null,
+          "reason": null,
+          "refuses": null,
+          "routesRead": false,
+          "setDone": false,
+          "status": "no-pr",
+          "waitsOn": null
+        },
+        "stopAtHarbour": {
+          "entries": [],
+          "followsPerson": null,
+          "headMoved": false,
+          "message": "no pull request found in this task's comments",
+          "pr": null,
+          "reason": null,
+          "refuses": null,
+          "routesRead": false,
+          "setDone": false,
+          "status": "no-pr",
+          "waitsOn": null
+        },
+        "stopAtPerson": {
+          "entries": [],
+          "followsPerson": null,
+          "headMoved": false,
+          "message": "no pull request found in this task's comments",
+          "pr": null,
+          "reason": null,
+          "refuses": null,
+          "routesRead": false,
+          "setDone": false,
+          "status": "no-pr",
+          "waitsOn": null
+        }
+      },
+      "prs": {
+        "https://github.com/JKershaw/LinearViewer/pull/2421": {
+          "checks": [],
+          "head": {
+            "ref": "branch",
+            "sha": "a98d042c635782454113a70b93582708ec74013d"
+          },
+          "merged": false,
+          "merged_at": null,
+          "number": 2421,
+          "readable": true,
+          "ref": "a98d042c635782454113a70b93582708ec74013d",
+          "repo": "JKershaw/LinearViewer",
+          "state": "open"
+        }
+      },
+      "runEvidence": {
+        "checked": {
+          "blindRead": null,
+          "now": {
+            "checks": [],
+            "checksUrl": null,
+            "headMoved": false,
+            "headSha": null,
+            "prUrl": null,
+            "read": false,
+            "state": "unknown"
+          },
+          "review": null
+        },
+        "closeOut": {
+          "followsPerson": null,
+          "headMoved": false,
+          "issueIdentifier": "LIN-1",
+          "mergedCount": 0,
+          "message": "no pull request found in this task's comments",
+          "openCount": 0,
+          "openFindings": {
+            "count": 0,
+            "ids": [],
+            "state": "read"
+          },
+          "openFindingsCount": 0,
+          "owner": true,
+          "pr": null,
+          "pressable": false,
+          "prs": [],
+          "ready": false,
+          "readyCopy": null,
+          "reason": null,
+          "refuses": null,
+          "review": {
+            "approved": false,
+            "verdict": null
+          },
+          "setDone": false,
+          "setupCopy": null,
+          "status": "no-pr",
+          "stopAt": "pr",
+          "unknownCount": 0,
+          "urlKey": null,
+          "variant": "unknown",
+          "waitsOn": null
+        },
+        "prReads": []
+      },
+      "selector": {
+        "blindReadStep": null,
+        "trailFacts": {
+          "auditAfterCloseOut": false,
+          "closeOutAfterReview": false,
+          "latestPerson": null,
+          "latestRuling": null,
+          "planReview": {
+            "byKind": {},
+            "count": 0,
+            "landed": null,
+            "latestAt": null,
+            "latestVerdict": null,
+            "personSince": false,
+            "run": [],
+            "verdicts": 0
+          },
+          "prUrls": [],
+          "review": null,
+          "workAfterReview": false
+        }
+      },
+      "ticketState": "started",
+      "trail": {
+        "auditAfterCloseOut": false,
+        "closeOutAfterReview": false,
+        "closeOutOnTrail": false,
+        "landing": [],
+        "landingHasNotesPr": false,
+        "notesPrs": [],
+        "review": null,
+        "reviewCommentId": null,
+        "workAfterReview": false
+      }
+    },
+    {
+      "at": "2026-11-13T13:47:23.104Z",
+      "because": [
+        "comment 14a24576-df33-43ba-8fde-3a63d411da6f"
+      ],
+      "commentIds": [
+        "14a24576-df33-43ba-8fde-3a63d411da6f"
+      ],
+      "decision": {
+        "ladder": {
+          "entries": [],
+          "followsPerson": null,
+          "headMoved": false,
+          "message": "no pull request found in this task's comments",
+          "pr": null,
+          "reason": null,
+          "refuses": null,
+          "routesRead": false,
+          "setDone": false,
+          "status": "no-pr",
+          "waitsOn": null
+        },
+        "stopAtHarbour": {
+          "entries": [],
+          "followsPerson": null,
+          "headMoved": false,
+          "message": "no pull request found in this task's comments",
+          "pr": null,
+          "reason": null,
+          "refuses": null,
+          "routesRead": false,
+          "setDone": false,
+          "status": "no-pr",
+          "waitsOn": null
+        },
+        "stopAtPerson": {
+          "entries": [],
+          "followsPerson": null,
+          "headMoved": false,
+          "message": "no pull request found in this task's comments",
+          "pr": null,
+          "reason": null,
+          "refuses": null,
+          "routesRead": false,
+          "setDone": false,
+          "status": "no-pr",
+          "waitsOn": null
+        }
+      },
+      "prs": {
+        "https://github.com/JKershaw/LinearViewer/pull/2421": {
+          "checks": [],
+          "head": {
+            "ref": "branch",
+            "sha": "a98d042c635782454113a70b93582708ec74013d"
+          },
+          "merged": false,
+          "merged_at": null,
+          "number": 2421,
+          "readable": true,
+          "ref": "a98d042c635782454113a70b93582708ec74013d",
+          "repo": "JKershaw/LinearViewer",
+          "state": "open"
+        }
+      },
+      "runEvidence": {
+        "checked": {
+          "blindRead": null,
+          "now": {
+            "checks": [],
+            "checksUrl": null,
+            "headMoved": false,
+            "headSha": null,
+            "prUrl": null,
+            "read": false,
+            "state": "unknown"
+          },
+          "review": null
+        },
+        "closeOut": {
+          "followsPerson": null,
+          "headMoved": false,
+          "issueIdentifier": "LIN-1",
+          "mergedCount": 0,
+          "message": "no pull request found in this task's comments",
+          "openCount": 0,
+          "openFindings": {
+            "count": 0,
+            "ids": [],
+            "state": "read"
+          },
+          "openFindingsCount": 0,
+          "owner": true,
+          "pr": null,
+          "pressable": false,
+          "prs": [],
+          "ready": false,
+          "readyCopy": null,
+          "reason": null,
+          "refuses": null,
+          "review": {
+            "approved": false,
+            "verdict": null
+          },
+          "setDone": false,
+          "setupCopy": null,
+          "status": "no-pr",
+          "stopAt": "pr",
+          "unknownCount": 0,
+          "urlKey": null,
+          "variant": "unknown",
+          "waitsOn": null
+        },
+        "prReads": []
+      },
+      "selector": {
+        "blindReadStep": null,
+        "trailFacts": {
+          "auditAfterCloseOut": false,
+          "closeOutAfterReview": false,
+          "latestPerson": null,
+          "latestRuling": null,
+          "planReview": {
+            "byKind": {},
+            "count": 0,
+            "landed": null,
+            "latestAt": null,
+            "latestVerdict": null,
+            "personSince": false,
+            "run": [],
+            "verdicts": 0
+          },
+          "prUrls": [],
+          "review": null,
+          "workAfterReview": false
+        }
+      },
+      "ticketState": "started",
+      "trail": {
+        "auditAfterCloseOut": false,
+        "closeOutAfterReview": false,
+        "closeOutOnTrail": false,
+        "landing": [],
+        "landingHasNotesPr": false,
+        "notesPrs": [],
+        "review": null,
+        "reviewCommentId": null,
+        "workAfterReview": false
+      }
+    },
+    {
+      "at": "2026-11-13T13:47:54.628Z",
+      "because": [
+        "step 2 survey-place"
+      ],
+      "commentIds": [
+        "14a24576-df33-43ba-8fde-3a63d411da6f"
+      ],
+      "decision": {
+        "ladder": {
+          "entries": [],
+          "followsPerson": null,
+          "headMoved": false,
+          "message": "no pull request found in this task's comments",
+          "pr": null,
+          "reason": null,
+          "refuses": null,
+          "routesRead": false,
+          "setDone": false,
+          "status": "no-pr",
+          "waitsOn": null
+        },
+        "stopAtHarbour": {
+          "entries": [],
+          "followsPerson": null,
+          "headMoved": false,
+          "message": "no pull request found in this task's comments",
+          "pr": null,
+          "reason": null,
+          "refuses": null,
+          "routesRead": false,
+          "setDone": false,
+          "status": "no-pr",
+          "waitsOn": null
+        },
+        "stopAtPerson": {
+          "entries": [],
+          "followsPerson": null,
+          "headMoved": false,
+          "message": "no pull request found in this task's comments",
+          "pr": null,
+          "reason": null,
+          "refuses": null,
+          "routesRead": false,
+          "setDone": false,
+          "status": "no-pr",
+          "waitsOn": null
+        }
+      },
+      "prs": {
+        "https://github.com/JKershaw/LinearViewer/pull/2421": {
+          "checks": [],
+          "head": {
+            "ref": "branch",
+            "sha": "a98d042c635782454113a70b93582708ec74013d"
+          },
+          "merged": false,
+          "merged_at": null,
+          "number": 2421,
+          "readable": true,
+          "ref": "a98d042c635782454113a70b93582708ec74013d",
+          "repo": "JKershaw/LinearViewer",
+          "state": "open"
+        }
+      },
+      "runEvidence": {
+        "checked": {
+          "blindRead": null,
+          "now": {
+            "checks": [],
+            "checksUrl": null,
+            "headMoved": false,
+            "headSha": null,
+            "prUrl": null,
+            "read": false,
+            "state": "unknown"
+          },
+          "review": null
+        },
+        "closeOut": {
+          "followsPerson": null,
+          "headMoved": false,
+          "issueIdentifier": "LIN-1",
+          "mergedCount": 0,
+          "message": "no pull request found in this task's comments",
+          "openCount": 0,
+          "openFindings": {
+            "count": 0,
+            "ids": [],
+            "state": "read"
+          },
+          "openFindingsCount": 0,
+          "owner": true,
+          "pr": null,
+          "pressable": false,
+          "prs": [],
+          "ready": false,
+          "readyCopy": null,
+          "reason": null,
+          "refuses": null,
+          "review": {
+            "approved": false,
+            "verdict": null
+          },
+          "setDone": false,
+          "setupCopy": null,
+          "status": "no-pr",
+          "stopAt": "pr",
+          "unknownCount": 0,
+          "urlKey": null,
+          "variant": "unknown",
+          "waitsOn": null
+        },
+        "prReads": []
+      },
+      "selector": {
+        "blindReadStep": null,
+        "trailFacts": {
+          "auditAfterCloseOut": false,
+          "closeOutAfterReview": false,
+          "latestPerson": null,
+          "latestRuling": null,
+          "planReview": {
+            "byKind": {},
+            "count": 0,
+            "landed": null,
+            "latestAt": null,
+            "latestVerdict": null,
+            "personSince": false,
+            "run": [],
+            "verdicts": 0
+          },
+          "prUrls": [],
+          "review": null,
+          "workAfterReview": false
+        }
+      },
+      "ticketState": "started",
+      "trail": {
+        "auditAfterCloseOut": false,
+        "closeOutAfterReview": false,
+        "closeOutOnTrail": false,
+        "landing": [],
+        "landingHasNotesPr": false,
+        "notesPrs": [],
+        "review": null,
+        "reviewCommentId": null,
+        "workAfterReview": false
+      }
+    },
+    {
+      "at": "2026-11-13T13:51:36.308Z",
+      "because": [
+        "comment 36b55409-ecb6-4096-a63a-7aa2cb66e579"
+      ],
+      "commentIds": [
+        "14a24576-df33-43ba-8fde-3a63d411da6f",
+        "36b55409-ecb6-4096-a63a-7aa2cb66e579"
+      ],
+      "decision": {
+        "ladder": {
+          "entries": [],
+          "followsPerson": null,
+          "headMoved": false,
+          "message": "no pull request found in this task's comments",
+          "pr": null,
+          "reason": null,
+          "refuses": null,
+          "routesRead": false,
+          "setDone": false,
+          "status": "no-pr",
+          "waitsOn": null
+        },
+        "stopAtHarbour": {
+          "entries": [],
+          "followsPerson": null,
+          "headMoved": false,
+          "message": "no pull request found in this task's comments",
+          "pr": null,
+          "reason": null,
+          "refuses": null,
+          "routesRead": false,
+          "setDone": false,
+          "status": "no-pr",
+          "waitsOn": null
+        },
+        "stopAtPerson": {
+          "entries": [],
+          "followsPerson": null,
+          "headMoved": false,
+          "message": "no pull request found in this task's comments",
+          "pr": null,
+          "reason": null,
+          "refuses": null,
+          "routesRead": false,
+          "setDone": false,
+          "status": "no-pr",
+          "waitsOn": null
+        }
+      },
+      "prs": {
+        "https://github.com/JKershaw/LinearViewer/pull/2421": {
+          "checks": [],
+          "head": {
+            "ref": "branch",
+            "sha": "a98d042c635782454113a70b93582708ec74013d"
+          },
+          "merged": false,
+          "merged_at": null,
+          "number": 2421,
+          "readable": true,
+          "ref": "a98d042c635782454113a70b93582708ec74013d",
+          "repo": "JKershaw/LinearViewer",
+          "state": "open"
+        }
+      },
+      "runEvidence": {
+        "checked": {
+          "blindRead": null,
+          "now": {
+            "checks": [],
+            "checksUrl": null,
+            "headMoved": false,
+            "headSha": null,
+            "prUrl": null,
+            "read": false,
+            "state": "unknown"
+          },
+          "review": null
+        },
+        "closeOut": {
+          "followsPerson": null,
+          "headMoved": false,
+          "issueIdentifier": "LIN-1",
+          "mergedCount": 0,
+          "message": "no pull request found in this task's comments",
+          "openCount": 0,
+          "openFindings": {
+            "count": 0,
+            "ids": [],
+            "state": "read"
+          },
+          "openFindingsCount": 0,
+          "owner": true,
+          "pr": null,
+          "pressable": false,
+          "prs": [],
+          "ready": false,
+          "readyCopy": null,
+          "reason": null,
+          "refuses": null,
+          "review": {
+            "approved": false,
+            "verdict": null
+          },
+          "setDone": false,
+          "setupCopy": null,
+          "status": "no-pr",
+          "stopAt": "pr",
+          "unknownCount": 0,
+          "urlKey": null,
+          "variant": "unknown",
+          "waitsOn": null
+        },
+        "prReads": []
+      },
+      "selector": {
+        "blindReadStep": null,
+        "trailFacts": {
+          "auditAfterCloseOut": false,
+          "closeOutAfterReview": false,
+          "latestPerson": null,
+          "latestRuling": null,
+          "planReview": {
+            "byKind": {},
+            "count": 0,
+            "landed": null,
+            "latestAt": null,
+            "latestVerdict": null,
+            "personSince": false,
+            "run": [],
+            "verdicts": 0
+          },
+          "prUrls": [],
+          "review": null,
+          "workAfterReview": false
+        }
+      },
+      "ticketState": "started",
+      "trail": {
+        "auditAfterCloseOut": false,
+        "closeOutAfterReview": false,
+        "closeOutOnTrail": false,
+        "landing": [],
+        "landingHasNotesPr": false,
+        "notesPrs": [],
+        "review": null,
+        "reviewCommentId": null,
+        "workAfterReview": false
+      }
+    },
+    {
+      "at": "2026-11-13T13:52:09.214Z",
+      "because": [
+        "step 3 scoping"
+      ],
+      "commentIds": [
+        "14a24576-df33-43ba-8fde-3a63d411da6f",
+        "36b55409-ecb6-4096-a63a-7aa2cb66e579"
+      ],
+      "decision": {
+        "ladder": {
+          "entries": [],
+          "followsPerson": null,
+          "headMoved": false,
+          "message": "no pull request found in this task's comments",
+          "pr": null,
+          "reason": null,
+          "refuses": null,
+          "routesRead": false,
+          "setDone": false,
+          "status": "no-pr",
+          "waitsOn": null
+        },
+        "stopAtHarbour": {
+          "entries": [],
+          "followsPerson": null,
+          "headMoved": false,
+          "message": "no pull request found in this task's comments",
+          "pr": null,
+          "reason": null,
+          "refuses": null,
+          "routesRead": false,
+          "setDone": false,
+          "status": "no-pr",
+          "waitsOn": null
+        },
+        "stopAtPerson": {
+          "entries": [],
+          "followsPerson": null,
+          "headMoved": false,
+          "message": "no pull request found in this task's comments",
+          "pr": null,
+          "reason": null,
+          "refuses": null,
+          "routesRead": false,
+          "setDone": false,
+          "status": "no-pr",
+          "waitsOn": null
+        }
+      },
+      "prs": {
+        "https://github.com/JKershaw/LinearViewer/pull/2421": {
+          "checks": [],
+          "head": {
+            "ref": "branch",
+            "sha": "a98d042c635782454113a70b93582708ec74013d"
+          },
+          "merged": false,
+          "merged_at": null,
+          "number": 2421,
+          "readable": true,
+          "ref": "a98d042c635782454113a70b93582708ec74013d",
+          "repo": "JKershaw/LinearViewer",
+          "state": "open"
+        }
+      },
+      "runEvidence": {
+        "checked": {
+          "blindRead": null,
+          "now": {
+            "checks": [],
+            "checksUrl": null,
+            "headMoved": false,
+            "headSha": null,
+            "prUrl": null,
+            "read": false,
+            "state": "unknown"
+          },
+          "review": null
+        },
+        "closeOut": {
+          "followsPerson": null,
+          "headMoved": false,
+          "issueIdentifier": "LIN-1",
+          "mergedCount": 0,
+          "message": "no pull request found in this task's comments",
+          "openCount": 0,
+          "openFindings": {
+            "count": 0,
+            "ids": [],
+            "state": "read"
+          },
+          "openFindingsCount": 0,
+          "owner": true,
+          "pr": null,
+          "pressable": false,
+          "prs": [],
+          "ready": false,
+          "readyCopy": null,
+          "reason": null,
+          "refuses": null,
+          "review": {
+            "approved": false,
+            "verdict": null
+          },
+          "setDone": false,
+          "setupCopy": null,
+          "status": "no-pr",
+          "stopAt": "pr",
+          "unknownCount": 0,
+          "urlKey": null,
+          "variant": "unknown",
+          "waitsOn": null
+        },
+        "prReads": []
+      },
+      "selector": {
+        "blindReadStep": null,
+        "trailFacts": {
+          "auditAfterCloseOut": false,
+          "closeOutAfterReview": false,
+          "latestPerson": null,
+          "latestRuling": null,
+          "planReview": {
+            "byKind": {},
+            "count": 0,
+            "landed": null,
+            "latestAt": null,
+            "latestVerdict": null,
+            "personSince": false,
+            "run": [],
+            "verdicts": 0
+          },
+          "prUrls": [],
+          "review": null,
+          "workAfterReview": false
+        }
+      },
+      "ticketState": "started",
+      "trail": {
+        "auditAfterCloseOut": false,
+        "closeOutAfterReview": false,
+        "closeOutOnTrail": false,
+        "landing": [],
+        "landingHasNotesPr": false,
+        "notesPrs": [],
+        "review": null,
+        "reviewCommentId": null,
+        "workAfterReview": false
+      }
+    },
+    {
+      "at": "2026-11-13T13:55:48.569Z",
+      "because": [
+        "step 4 implementation"
+      ],
+      "commentIds": [
+        "14a24576-df33-43ba-8fde-3a63d411da6f",
+        "36b55409-ecb6-4096-a63a-7aa2cb66e579"
+      ],
+      "decision": {
+        "ladder": {
+          "entries": [],
+          "followsPerson": null,
+          "headMoved": false,
+          "message": "no pull request found in this task's comments",
+          "pr": null,
+          "reason": null,
+          "refuses": null,
+          "routesRead": false,
+          "setDone": false,
+          "status": "no-pr",
+          "waitsOn": null
+        },
+        "stopAtHarbour": {
+          "entries": [],
+          "followsPerson": null,
+          "headMoved": false,
+          "message": "no pull request found in this task's comments",
+          "pr": null,
+          "reason": null,
+          "refuses": null,
+          "routesRead": false,
+          "setDone": false,
+          "status": "no-pr",
+          "waitsOn": null
+        },
+        "stopAtPerson": {
+          "entries": [],
+          "followsPerson": null,
+          "headMoved": false,
+          "message": "no pull request found in this task's comments",
+          "pr": null,
+          "reason": null,
+          "refuses": null,
+          "routesRead": false,
+          "setDone": false,
+          "status": "no-pr",
+          "waitsOn": null
+        }
+      },
+      "prs": {
+        "https://github.com/JKershaw/LinearViewer/pull/2421": {
+          "checks": [],
+          "head": {
+            "ref": "branch",
+            "sha": "a98d042c635782454113a70b93582708ec74013d"
+          },
+          "merged": false,
+          "merged_at": null,
+          "number": 2421,
+          "readable": true,
+          "ref": "a98d042c635782454113a70b93582708ec74013d",
+          "repo": "JKershaw/LinearViewer",
+          "state": "open"
+        }
+      },
+      "runEvidence": {
+        "checked": {
+          "blindRead": null,
+          "now": {
+            "checks": [],
+            "checksUrl": null,
+            "headMoved": false,
+            "headSha": null,
+            "prUrl": null,
+            "read": false,
+            "state": "unknown"
+          },
+          "review": null
+        },
+        "closeOut": {
+          "followsPerson": null,
+          "headMoved": false,
+          "issueIdentifier": "LIN-1",
+          "mergedCount": 0,
+          "message": "no pull request found in this task's comments",
+          "openCount": 0,
+          "openFindings": {
+            "count": 0,
+            "ids": [],
+            "state": "read"
+          },
+          "openFindingsCount": 0,
+          "owner": true,
+          "pr": null,
+          "pressable": false,
+          "prs": [],
+          "ready": false,
+          "readyCopy": null,
+          "reason": null,
+          "refuses": null,
+          "review": {
+            "approved": false,
+            "verdict": null
+          },
+          "setDone": false,
+          "setupCopy": null,
+          "status": "no-pr",
+          "stopAt": "pr",
+          "unknownCount": 0,
+          "urlKey": null,
+          "variant": "unknown",
+          "waitsOn": null
+        },
+        "prReads": []
+      },
+      "selector": {
+        "blindReadStep": null,
+        "trailFacts": {
+          "auditAfterCloseOut": false,
+          "closeOutAfterReview": false,
+          "latestPerson": null,
+          "latestRuling": null,
+          "planReview": {
+            "byKind": {},
+            "count": 0,
+            "landed": null,
+            "latestAt": null,
+            "latestVerdict": null,
+            "personSince": false,
+            "run": [],
+            "verdicts": 0
+          },
+          "prUrls": [],
+          "review": null,
+          "workAfterReview": false
+        }
+      },
+      "ticketState": "started",
+      "trail": {
+        "auditAfterCloseOut": false,
+        "closeOutAfterReview": false,
+        "closeOutOnTrail": false,
+        "landing": [],
+        "landingHasNotesPr": false,
+        "notesPrs": [],
+        "review": null,
+        "reviewCommentId": null,
+        "workAfterReview": false
+      }
+    },
+    {
+      "at": "2026-11-13T14:07:24.000Z",
+      "because": [
+        "PR #2421 head a98d042c6 (check-run)"
+      ],
+      "commentIds": [
+        "14a24576-df33-43ba-8fde-3a63d411da6f",
+        "36b55409-ecb6-4096-a63a-7aa2cb66e579"
+      ],
+      "decision": {
+        "ladder": {
+          "entries": [],
+          "followsPerson": null,
+          "headMoved": false,
+          "message": "no pull request found in this task's comments",
+          "pr": null,
+          "reason": null,
+          "refuses": null,
+          "routesRead": false,
+          "setDone": false,
+          "status": "no-pr",
+          "waitsOn": null
+        },
+        "stopAtHarbour": {
+          "entries": [],
+          "followsPerson": null,
+          "headMoved": false,
+          "message": "no pull request found in this task's comments",
+          "pr": null,
+          "reason": null,
+          "refuses": null,
+          "routesRead": false,
+          "setDone": false,
+          "status": "no-pr",
+          "waitsOn": null
+        },
+        "stopAtPerson": {
+          "entries": [],
+          "followsPerson": null,
+          "headMoved": false,
+          "message": "no pull request found in this task's comments",
+          "pr": null,
+          "reason": null,
+          "refuses": null,
+          "routesRead": false,
+          "setDone": false,
+          "status": "no-pr",
+          "waitsOn": null
+        }
+      },
+      "prs": {
+        "https://github.com/JKershaw/LinearViewer/pull/2421": {
+          "checks": [],
+          "head": {
+            "ref": "branch",
+            "sha": "a98d042c635782454113a70b93582708ec74013d"
+          },
+          "merged": false,
+          "merged_at": null,
+          "number": 2421,
+          "readable": true,
+          "ref": "a98d042c635782454113a70b93582708ec74013d",
+          "repo": "JKershaw/LinearViewer",
+          "state": "open"
+        }
+      },
+      "runEvidence": {
+        "checked": {
+          "blindRead": null,
+          "now": {
+            "checks": [],
+            "checksUrl": null,
+            "headMoved": false,
+            "headSha": null,
+            "prUrl": null,
+            "read": false,
+            "state": "unknown"
+          },
+          "review": null
+        },
+        "closeOut": {
+          "followsPerson": null,
+          "headMoved": false,
+          "issueIdentifier": "LIN-1",
+          "mergedCount": 0,
+          "message": "no pull request found in this task's comments",
+          "openCount": 0,
+          "openFindings": {
+            "count": 0,
+            "ids": [],
+            "state": "read"
+          },
+          "openFindingsCount": 0,
+          "owner": true,
+          "pr": null,
+          "pressable": false,
+          "prs": [],
+          "ready": false,
+          "readyCopy": null,
+          "reason": null,
+          "refuses": null,
+          "review": {
+            "approved": false,
+            "verdict": null
+          },
+          "setDone": false,
+          "setupCopy": null,
+          "status": "no-pr",
+          "stopAt": "pr",
+          "unknownCount": 0,
+          "urlKey": null,
+          "variant": "unknown",
+          "waitsOn": null
+        },
+        "prReads": []
+      },
+      "selector": {
+        "blindReadStep": null,
+        "trailFacts": {
+          "auditAfterCloseOut": false,
+          "closeOutAfterReview": false,
+          "latestPerson": null,
+          "latestRuling": null,
+          "planReview": {
+            "byKind": {},
+            "count": 0,
+            "landed": null,
+            "latestAt": null,
+            "latestVerdict": null,
+            "personSince": false,
+            "run": [],
+            "verdicts": 0
+          },
+          "prUrls": [],
+          "review": null,
+          "workAfterReview": false
+        }
+      },
+      "ticketState": "started",
+      "trail": {
+        "auditAfterCloseOut": false,
+        "closeOutAfterReview": false,
+        "closeOutOnTrail": false,
+        "landing": [],
+        "landingHasNotesPr": false,
+        "notesPrs": [],
+        "review": null,
+        "reviewCommentId": null,
+        "workAfterReview": false
+      }
+    },
+    {
+      "at": "2026-11-13T14:13:35.898Z",
+      "because": [
+        "comment a331c74f-41ef-4b7c-b58a-471704bae5d1"
+      ],
+      "commentIds": [
+        "14a24576-df33-43ba-8fde-3a63d411da6f",
+        "36b55409-ecb6-4096-a63a-7aa2cb66e579",
+        "a331c74f-41ef-4b7c-b58a-471704bae5d1"
+      ],
+      "decision": {
+        "ladder": {
+          "entries": [
+            {
+              "corroborated": false,
+              "headMoved": false,
+              "headSha": null,
+              "merged": false,
+              "number": 2421,
+              "open": false,
+              "readable": false,
+              "repo": "JKershaw/LinearViewer",
+              "state": null,
+              "url": "https://github.com/JKershaw/LinearViewer/pull/2421"
+            }
+          ],
+          "followsPerson": null,
+          "headMoved": false,
+          "message": "the pull request could not be read — not checked",
+          "pr": {
+            "corroborated": false,
+            "headMoved": false,
+            "headSha": null,
+            "merged": false,
+            "number": 2421,
+            "open": false,
+            "readable": false,
+            "repo": "JKershaw/LinearViewer",
+            "state": null,
+            "url": "https://github.com/JKershaw/LinearViewer/pull/2421"
+          },
+          "reason": "pr-unreadable",
+          "refuses": null,
+          "routesRead": false,
+          "setDone": false,
+          "status": "unknown",
+          "waitsOn": null
+        },
+        "stopAtHarbour": {
+          "entries": [
+            {
+              "corroborated": false,
+              "headMoved": false,
+              "headSha": "a98d042c635782454113a70b93582708ec74013d",
+              "merged": false,
+              "number": 2421,
+              "open": true,
+              "readable": true,
+              "repo": "JKershaw/LinearViewer",
+              "state": "open",
+              "url": "https://github.com/JKershaw/LinearViewer/pull/2421"
+            }
+          ],
+          "followsPerson": null,
+          "headMoved": false,
+          "message": "the review has not approved this PR yet",
+          "pr": {
+            "corroborated": false,
+            "headMoved": false,
+            "headSha": "a98d042c635782454113a70b93582708ec74013d",
+            "merged": false,
+            "number": 2421,
+            "open": true,
+            "readable": true,
+            "repo": "JKershaw/LinearViewer",
+            "state": "open",
+            "url": "https://github.com/JKershaw/LinearViewer/pull/2421"
+          },
+          "reason": "review-not-approve",
+          "refuses": null,
+          "routesRead": false,
+          "setDone": false,
+          "status": "not-ready",
+          "waitsOn": null
+        },
+        "stopAtPerson": {
+          "entries": [
+            {
+              "corroborated": false,
+              "headMoved": false,
+              "headSha": "a98d042c635782454113a70b93582708ec74013d",
+              "merged": false,
+              "number": 2421,
+              "open": true,
+              "readable": true,
+              "repo": "JKershaw/LinearViewer",
+              "state": "open",
+              "url": "https://github.com/JKershaw/LinearViewer/pull/2421"
+            }
+          ],
+          "followsPerson": null,
+          "headMoved": false,
+          "message": "the review has not approved this PR yet",
+          "pr": {
+            "corroborated": false,
+            "headMoved": false,
+            "headSha": "a98d042c635782454113a70b93582708ec74013d",
+            "merged": false,
+            "number": 2421,
+            "open": true,
+            "readable": true,
+            "repo": "JKershaw/LinearViewer",
+            "state": "open",
+            "url": "https://github.com/JKershaw/LinearViewer/pull/2421"
+          },
+          "reason": "review-not-approve",
+          "refuses": null,
+          "routesRead": false,
+          "setDone": false,
+          "status": "not-ready",
+          "waitsOn": null
+        }
+      },
+      "prs": {
+        "https://github.com/JKershaw/LinearViewer/pull/2421": {
+          "checks": [],
+          "head": {
+            "ref": "branch",
+            "sha": "a98d042c635782454113a70b93582708ec74013d"
+          },
+          "merged": false,
+          "merged_at": null,
+          "number": 2421,
+          "readable": true,
+          "ref": "a98d042c635782454113a70b93582708ec74013d",
+          "repo": "JKershaw/LinearViewer",
+          "state": "open"
+        }
+      },
+      "runEvidence": {
+        "checked": {
+          "blindRead": null,
+          "now": {
+            "checks": [],
+            "checksUrl": "https://github.com/JKershaw/LinearViewer/pull/2421/checks",
+            "headMoved": false,
+            "headSha": "a98d042c635782454113a70b93582708ec74013d",
+            "prUrl": "https://github.com/JKershaw/LinearViewer/pull/2421",
+            "read": true,
+            "state": "unknown"
+          },
+          "review": null
+        },
+        "closeOut": {
+          "followsPerson": null,
+          "headMoved": false,
+          "issueIdentifier": "LIN-1",
+          "mergedCount": 0,
+          "message": "the review has not approved this PR yet",
+          "openCount": 1,
+          "openFindings": {
+            "count": 0,
+            "ids": [],
+            "state": "read"
+          },
+          "openFindingsCount": 0,
+          "owner": true,
+          "pr": {
+            "corroborated": false,
+            "headMoved": false,
+            "headSha": "a98d042c635782454113a70b93582708ec74013d",
+            "merged": false,
+            "number": 2421,
+            "open": true,
+            "readable": true,
+            "repo": "JKershaw/LinearViewer",
+            "state": "open",
+            "url": "https://github.com/JKershaw/LinearViewer/pull/2421"
+          },
+          "pressable": false,
+          "prs": [
+            {
+              "corroborated": false,
+              "headMoved": false,
+              "headSha": "a98d042c635782454113a70b93582708ec74013d",
+              "merged": false,
+              "number": 2421,
+              "open": true,
+              "readable": true,
+              "repo": "JKershaw/LinearViewer",
+              "state": "open",
+              "url": "https://github.com/JKershaw/LinearViewer/pull/2421"
+            }
+          ],
+          "ready": false,
+          "readyCopy": null,
+          "reason": "review-not-approve",
+          "refuses": null,
+          "review": {
+            "approved": false,
+            "verdict": null
+          },
+          "setDone": false,
+          "setupCopy": "○ set up ›",
+          "status": "not-ready",
+          "stopAt": "pr",
+          "unknownCount": 0,
+          "urlKey": null,
+          "variant": "unknown",
+          "waitsOn": null
+        },
+        "prReads": [
+          "https://github.com/JKershaw/LinearViewer/pull/2421"
+        ]
+      },
+      "selector": {
+        "blindReadStep": null,
+        "trailFacts": {
+          "auditAfterCloseOut": false,
+          "closeOutAfterReview": false,
+          "latestPerson": null,
+          "latestRuling": null,
+          "planReview": {
+            "byKind": {},
+            "count": 0,
+            "landed": null,
+            "latestAt": null,
+            "latestVerdict": null,
+            "personSince": false,
+            "run": [],
+            "verdicts": 0
+          },
+          "prUrls": [
+            "https://github.com/JKershaw/LinearViewer/pull/2421"
+          ],
+          "review": null,
+          "workAfterReview": false
+        }
+      },
+      "ticketState": "started",
+      "trail": {
+        "auditAfterCloseOut": false,
+        "closeOutAfterReview": false,
+        "closeOutOnTrail": false,
+        "landing": [
+          "https://github.com/JKershaw/LinearViewer/pull/2421"
+        ],
+        "landingHasNotesPr": false,
+        "notesPrs": [],
+        "review": null,
+        "reviewCommentId": null,
+        "workAfterReview": false
+      }
+    },
+    {
+      "at": "2026-11-13T14:14:08.405Z",
+      "because": [
+        "step 5 leftover"
+      ],
+      "commentIds": [
+        "14a24576-df33-43ba-8fde-3a63d411da6f",
+        "36b55409-ecb6-4096-a63a-7aa2cb66e579",
+        "a331c74f-41ef-4b7c-b58a-471704bae5d1"
+      ],
+      "decision": {
+        "ladder": {
+          "entries": [
+            {
+              "corroborated": false,
+              "headMoved": false,
+              "headSha": null,
+              "merged": false,
+              "number": 2421,
+              "open": false,
+              "readable": false,
+              "repo": "JKershaw/LinearViewer",
+              "state": null,
+              "url": "https://github.com/JKershaw/LinearViewer/pull/2421"
+            }
+          ],
+          "followsPerson": null,
+          "headMoved": false,
+          "message": "the pull request could not be read — not checked",
+          "pr": {
+            "corroborated": false,
+            "headMoved": false,
+            "headSha": null,
+            "merged": false,
+            "number": 2421,
+            "open": false,
+            "readable": false,
+            "repo": "JKershaw/LinearViewer",
+            "state": null,
+            "url": "https://github.com/JKershaw/LinearViewer/pull/2421"
+          },
+          "reason": "pr-unreadable",
+          "refuses": null,
+          "routesRead": false,
+          "setDone": false,
+          "status": "unknown",
+          "waitsOn": null
+        },
+        "stopAtHarbour": {
+          "entries": [
+            {
+              "corroborated": false,
+              "headMoved": false,
+              "headSha": "a98d042c635782454113a70b93582708ec74013d",
+              "merged": false,
+              "number": 2421,
+              "open": true,
+              "readable": true,
+              "repo": "JKershaw/LinearViewer",
+              "state": "open",
+              "url": "https://github.com/JKershaw/LinearViewer/pull/2421"
+            }
+          ],
+          "followsPerson": null,
+          "headMoved": false,
+          "message": "the review has not approved this PR yet",
+          "pr": {
+            "corroborated": false,
+            "headMoved": false,
+            "headSha": "a98d042c635782454113a70b93582708ec74013d",
+            "merged": false,
+            "number": 2421,
+            "open": true,
+            "readable": true,
+            "repo": "JKershaw/LinearViewer",
+            "state": "open",
+            "url": "https://github.com/JKershaw/LinearViewer/pull/2421"
+          },
+          "reason": "review-not-approve",
+          "refuses": null,
+          "routesRead": false,
+          "setDone": false,
+          "status": "not-ready",
+          "waitsOn": null
+        },
+        "stopAtPerson": {
+          "entries": [
+            {
+              "corroborated": false,
+              "headMoved": false,
+              "headSha": "a98d042c635782454113a70b93582708ec74013d",
+              "merged": false,
+              "number": 2421,
+              "open": true,
+              "readable": true,
+              "repo": "JKershaw/LinearViewer",
+              "state": "open",
+              "url": "https://github.com/JKershaw/LinearViewer/pull/2421"
+            }
+          ],
+          "followsPerson": null,
+          "headMoved": false,
+          "message": "the review has not approved this PR yet",
+          "pr": {
+            "corroborated": false,
+            "headMoved": false,
+            "headSha": "a98d042c635782454113a70b93582708ec74013d",
+            "merged": false,
+            "number": 2421,
+            "open": true,
+            "readable": true,
+            "repo": "JKershaw/LinearViewer",
+            "state": "open",
+            "url": "https://github.com/JKershaw/LinearViewer/pull/2421"
+          },
+          "reason": "review-not-approve",
+          "refuses": null,
+          "routesRead": false,
+          "setDone": false,
+          "status": "not-ready",
+          "waitsOn": null
+        }
+      },
+      "prs": {
+        "https://github.com/JKershaw/LinearViewer/pull/2421": {
+          "checks": [],
+          "head": {
+            "ref": "branch",
+            "sha": "a98d042c635782454113a70b93582708ec74013d"
+          },
+          "merged": false,
+          "merged_at": null,
+          "number": 2421,
+          "readable": true,
+          "ref": "a98d042c635782454113a70b93582708ec74013d",
+          "repo": "JKershaw/LinearViewer",
+          "state": "open"
+        }
+      },
+      "runEvidence": {
+        "checked": {
+          "blindRead": null,
+          "now": {
+            "checks": [],
+            "checksUrl": "https://github.com/JKershaw/LinearViewer/pull/2421/checks",
+            "headMoved": false,
+            "headSha": "a98d042c635782454113a70b93582708ec74013d",
+            "prUrl": "https://github.com/JKershaw/LinearViewer/pull/2421",
+            "read": true,
+            "state": "unknown"
+          },
+          "review": null
+        },
+        "closeOut": {
+          "followsPerson": null,
+          "headMoved": false,
+          "issueIdentifier": "LIN-1",
+          "mergedCount": 0,
+          "message": "the review has not approved this PR yet",
+          "openCount": 1,
+          "openFindings": {
+            "count": 0,
+            "ids": [],
+            "state": "read"
+          },
+          "openFindingsCount": 0,
+          "owner": true,
+          "pr": {
+            "corroborated": false,
+            "headMoved": false,
+            "headSha": "a98d042c635782454113a70b93582708ec74013d",
+            "merged": false,
+            "number": 2421,
+            "open": true,
+            "readable": true,
+            "repo": "JKershaw/LinearViewer",
+            "state": "open",
+            "url": "https://github.com/JKershaw/LinearViewer/pull/2421"
+          },
+          "pressable": false,
+          "prs": [
+            {
+              "corroborated": false,
+              "headMoved": false,
+              "headSha": "a98d042c635782454113a70b93582708ec74013d",
+              "merged": false,
+              "number": 2421,
+              "open": true,
+              "readable": true,
+              "repo": "JKershaw/LinearViewer",
+              "state": "open",
+              "url": "https://github.com/JKershaw/LinearViewer/pull/2421"
+            }
+          ],
+          "ready": false,
+          "readyCopy": null,
+          "reason": "review-not-approve",
+          "refuses": null,
+          "review": {
+            "approved": false,
+            "verdict": null
+          },
+          "setDone": false,
+          "setupCopy": "○ set up ›",
+          "status": "not-ready",
+          "stopAt": "pr",
+          "unknownCount": 0,
+          "urlKey": null,
+          "variant": "unknown",
+          "waitsOn": null
+        },
+        "prReads": [
+          "https://github.com/JKershaw/LinearViewer/pull/2421"
+        ]
+      },
+      "selector": {
+        "blindReadStep": null,
+        "trailFacts": {
+          "auditAfterCloseOut": false,
+          "closeOutAfterReview": false,
+          "latestPerson": null,
+          "latestRuling": null,
+          "planReview": {
+            "byKind": {},
+            "count": 0,
+            "landed": null,
+            "latestAt": null,
+            "latestVerdict": null,
+            "personSince": false,
+            "run": [],
+            "verdicts": 0
+          },
+          "prUrls": [
+            "https://github.com/JKershaw/LinearViewer/pull/2421"
+          ],
+          "review": null,
+          "workAfterReview": false
+        }
+      },
+      "ticketState": "started",
+      "trail": {
+        "auditAfterCloseOut": false,
+        "closeOutAfterReview": false,
+        "closeOutOnTrail": false,
+        "landing": [
+          "https://github.com/JKershaw/LinearViewer/pull/2421"
+        ],
+        "landingHasNotesPr": false,
+        "notesPrs": [],
+        "review": null,
+        "reviewCommentId": null,
+        "workAfterReview": false
+      }
+    },
+    {
+      "at": "2026-11-13T14:18:02.000Z",
+      "because": [
+        "PR #2421 head f9fa4a80c (check-run)"
+      ],
+      "commentIds": [
+        "14a24576-df33-43ba-8fde-3a63d411da6f",
+        "36b55409-ecb6-4096-a63a-7aa2cb66e579",
+        "a331c74f-41ef-4b7c-b58a-471704bae5d1"
+      ],
+      "decision": {
+        "ladder": {
+          "entries": [
+            {
+              "corroborated": false,
+              "headMoved": false,
+              "headSha": null,
+              "merged": false,
+              "number": 2421,
+              "open": false,
+              "readable": false,
+              "repo": "JKershaw/LinearViewer",
+              "state": null,
+              "url": "https://github.com/JKershaw/LinearViewer/pull/2421"
+            }
+          ],
+          "followsPerson": null,
+          "headMoved": false,
+          "message": "the pull request could not be read — not checked",
+          "pr": {
+            "corroborated": false,
+            "headMoved": false,
+            "headSha": null,
+            "merged": false,
+            "number": 2421,
+            "open": false,
+            "readable": false,
+            "repo": "JKershaw/LinearViewer",
+            "state": null,
+            "url": "https://github.com/JKershaw/LinearViewer/pull/2421"
+          },
+          "reason": "pr-unreadable",
+          "refuses": null,
+          "routesRead": false,
+          "setDone": false,
+          "status": "unknown",
+          "waitsOn": null
+        },
+        "stopAtHarbour": {
+          "entries": [
+            {
+              "corroborated": false,
+              "headMoved": false,
+              "headSha": "f9fa4a80ca19503bebbf5abd81dc83d3e86296b6",
+              "merged": false,
+              "number": 2421,
+              "open": true,
+              "readable": true,
+              "repo": "JKershaw/LinearViewer",
+              "state": "open",
+              "url": "https://github.com/JKershaw/LinearViewer/pull/2421"
+            }
+          ],
+          "followsPerson": null,
+          "headMoved": false,
+          "message": "the review has not approved this PR yet",
+          "pr": {
+            "corroborated": false,
+            "headMoved": false,
+            "headSha": "f9fa4a80ca19503bebbf5abd81dc83d3e86296b6",
+            "merged": false,
+            "number": 2421,
+            "open": true,
+            "readable": true,
+            "repo": "JKershaw/LinearViewer",
+            "state": "open",
+            "url": "https://github.com/JKershaw/LinearViewer/pull/2421"
+          },
+          "reason": "review-not-approve",
+          "refuses": null,
+          "routesRead": false,
+          "setDone": false,
+          "status": "not-ready",
+          "waitsOn": null
+        },
+        "stopAtPerson": {
+          "entries": [
+            {
+              "corroborated": false,
+              "headMoved": false,
+              "headSha": "f9fa4a80ca19503bebbf5abd81dc83d3e86296b6",
+              "merged": false,
+              "number": 2421,
+              "open": true,
+              "readable": true,
+              "repo": "JKershaw/LinearViewer",
+              "state": "open",
+              "url": "https://github.com/JKershaw/LinearViewer/pull/2421"
+            }
+          ],
+          "followsPerson": null,
+          "headMoved": false,
+          "message": "the review has not approved this PR yet",
+          "pr": {
+            "corroborated": false,
+            "headMoved": false,
+            "headSha": "f9fa4a80ca19503bebbf5abd81dc83d3e86296b6",
+            "merged": false,
+            "number": 2421,
+            "open": true,
+            "readable": true,
+            "repo": "JKershaw/LinearViewer",
+            "state": "open",
+            "url": "https://github.com/JKershaw/LinearViewer/pull/2421"
+          },
+          "reason": "review-not-approve",
+          "refuses": null,
+          "routesRead": false,
+          "setDone": false,
+          "status": "not-ready",
+          "waitsOn": null
+        }
+      },
+      "prs": {
+        "https://github.com/JKershaw/LinearViewer/pull/2421": {
+          "checks": [],
+          "head": {
+            "ref": "branch",
+            "sha": "f9fa4a80ca19503bebbf5abd81dc83d3e86296b6"
+          },
+          "merged": false,
+          "merged_at": null,
+          "number": 2421,
+          "readable": true,
+          "ref": "f9fa4a80ca19503bebbf5abd81dc83d3e86296b6",
+          "repo": "JKershaw/LinearViewer",
+          "state": "open"
+        }
+      },
+      "runEvidence": {
+        "checked": {
+          "blindRead": null,
+          "now": {
+            "checks": [],
+            "checksUrl": "https://github.com/JKershaw/LinearViewer/pull/2421/checks",
+            "headMoved": false,
+            "headSha": "f9fa4a80ca19503bebbf5abd81dc83d3e86296b6",
+            "prUrl": "https://github.com/JKershaw/LinearViewer/pull/2421",
+            "read": true,
+            "state": "unknown"
+          },
+          "review": null
+        },
+        "closeOut": {
+          "followsPerson": null,
+          "headMoved": false,
+          "issueIdentifier": "LIN-1",
+          "mergedCount": 0,
+          "message": "the review has not approved this PR yet",
+          "openCount": 1,
+          "openFindings": {
+            "count": 0,
+            "ids": [],
+            "state": "read"
+          },
+          "openFindingsCount": 0,
+          "owner": true,
+          "pr": {
+            "corroborated": false,
+            "headMoved": false,
+            "headSha": "f9fa4a80ca19503bebbf5abd81dc83d3e86296b6",
+            "merged": false,
+            "number": 2421,
+            "open": true,
+            "readable": true,
+            "repo": "JKershaw/LinearViewer",
+            "state": "open",
+            "url": "https://github.com/JKershaw/LinearViewer/pull/2421"
+          },
+          "pressable": false,
+          "prs": [
+            {
+              "corroborated": false,
+              "headMoved": false,
+              "headSha": "f9fa4a80ca19503bebbf5abd81dc83d3e86296b6",
+              "merged": false,
+              "number": 2421,
+              "open": true,
+              "readable": true,
+              "repo": "JKershaw/LinearViewer",
+              "state": "open",
+              "url": "https://github.com/JKershaw/LinearViewer/pull/2421"
+            }
+          ],
+          "ready": false,
+          "readyCopy": null,
+          "reason": "review-not-approve",
+          "refuses": null,
+          "review": {
+            "approved": false,
+            "verdict": null
+          },
+          "setDone": false,
+          "setupCopy": "○ set up ›",
+          "status": "not-ready",
+          "stopAt": "pr",
+          "unknownCount": 0,
+          "urlKey": null,
+          "variant": "unknown",
+          "waitsOn": null
+        },
+        "prReads": [
+          "https://github.com/JKershaw/LinearViewer/pull/2421"
+        ]
+      },
+      "selector": {
+        "blindReadStep": null,
+        "trailFacts": {
+          "auditAfterCloseOut": false,
+          "closeOutAfterReview": false,
+          "latestPerson": null,
+          "latestRuling": null,
+          "planReview": {
+            "byKind": {},
+            "count": 0,
+            "landed": null,
+            "latestAt": null,
+            "latestVerdict": null,
+            "personSince": false,
+            "run": [],
+            "verdicts": 0
+          },
+          "prUrls": [
+            "https://github.com/JKershaw/LinearViewer/pull/2421"
+          ],
+          "review": null,
+          "workAfterReview": false
+        }
+      },
+      "ticketState": "started",
+      "trail": {
+        "auditAfterCloseOut": false,
+        "closeOutAfterReview": false,
+        "closeOutOnTrail": false,
+        "landing": [
+          "https://github.com/JKershaw/LinearViewer/pull/2421"
+        ],
+        "landingHasNotesPr": false,
+        "notesPrs": [],
+        "review": null,
+        "reviewCommentId": null,
+        "workAfterReview": false
+      }
+    },
+    {
+      "at": "2026-11-13T15:11:36.148Z",
+      "because": [
+        "comment d6fc89a0-9e7e-4fa1-aabc-81ff420f834c"
+      ],
+      "commentIds": [
+        "14a24576-df33-43ba-8fde-3a63d411da6f",
+        "36b55409-ecb6-4096-a63a-7aa2cb66e579",
+        "a331c74f-41ef-4b7c-b58a-471704bae5d1",
+        "d6fc89a0-9e7e-4fa1-aabc-81ff420f834c"
+      ],
+      "decision": {
+        "ladder": {
+          "entries": [
+            {
+              "corroborated": false,
+              "headMoved": false,
+              "headSha": null,
+              "merged": false,
+              "number": 2421,
+              "open": false,
+              "readable": false,
+              "repo": "JKershaw/LinearViewer",
+              "state": null,
+              "url": "https://github.com/JKershaw/LinearViewer/pull/2421"
+            }
+          ],
+          "followsPerson": null,
+          "headMoved": false,
+          "message": "the pull request could not be read — not checked",
+          "pr": {
+            "corroborated": false,
+            "headMoved": false,
+            "headSha": null,
+            "merged": false,
+            "number": 2421,
+            "open": false,
+            "readable": false,
+            "repo": "JKershaw/LinearViewer",
+            "state": null,
+            "url": "https://github.com/JKershaw/LinearViewer/pull/2421"
+          },
+          "reason": "pr-unreadable",
+          "refuses": null,
+          "routesRead": false,
+          "setDone": false,
+          "status": "unknown",
+          "waitsOn": null
+        },
+        "stopAtHarbour": {
+          "entries": [
+            {
+              "corroborated": false,
+              "headMoved": false,
+              "headSha": "f9fa4a80ca19503bebbf5abd81dc83d3e86296b6",
+              "merged": false,
+              "number": 2421,
+              "open": true,
+              "readable": true,
+              "repo": "JKershaw/LinearViewer",
+              "state": "open",
+              "url": "https://github.com/JKershaw/LinearViewer/pull/2421"
+            }
+          ],
+          "followsPerson": null,
+          "headMoved": false,
+          "message": "the review has not approved this PR yet",
+          "pr": {
+            "corroborated": false,
+            "headMoved": false,
+            "headSha": "f9fa4a80ca19503bebbf5abd81dc83d3e86296b6",
+            "merged": false,
+            "number": 2421,
+            "open": true,
+            "readable": true,
+            "repo": "JKershaw/LinearViewer",
+            "state": "open",
+            "url": "https://github.com/JKershaw/LinearViewer/pull/2421"
+          },
+          "reason": "review-not-approve",
+          "refuses": null,
+          "routesRead": false,
+          "setDone": false,
+          "status": "not-ready",
+          "waitsOn": null
+        },
+        "stopAtPerson": {
+          "entries": [
+            {
+              "corroborated": false,
+              "headMoved": false,
+              "headSha": "f9fa4a80ca19503bebbf5abd81dc83d3e86296b6",
+              "merged": false,
+              "number": 2421,
+              "open": true,
+              "readable": true,
+              "repo": "JKershaw/LinearViewer",
+              "state": "open",
+              "url": "https://github.com/JKershaw/LinearViewer/pull/2421"
+            }
+          ],
+          "followsPerson": null,
+          "headMoved": false,
+          "message": "the review has not approved this PR yet",
+          "pr": {
+            "corroborated": false,
+            "headMoved": false,
+            "headSha": "f9fa4a80ca19503bebbf5abd81dc83d3e86296b6",
+            "merged": false,
+            "number": 2421,
+            "open": true,
+            "readable": true,
+            "repo": "JKershaw/LinearViewer",
+            "state": "open",
+            "url": "https://github.com/JKershaw/LinearViewer/pull/2421"
+          },
+          "reason": "review-not-approve",
+          "refuses": null,
+          "routesRead": false,
+          "setDone": false,
+          "status": "not-ready",
+          "waitsOn": null
+        }
+      },
+      "prs": {
+        "https://github.com/JKershaw/LinearViewer/pull/2421": {
+          "checks": [],
+          "head": {
+            "ref": "branch",
+            "sha": "f9fa4a80ca19503bebbf5abd81dc83d3e86296b6"
+          },
+          "merged": false,
+          "merged_at": null,
+          "number": 2421,
+          "readable": true,
+          "ref": "f9fa4a80ca19503bebbf5abd81dc83d3e86296b6",
+          "repo": "JKershaw/LinearViewer",
+          "state": "open"
+        }
+      },
+      "runEvidence": {
+        "checked": {
+          "blindRead": null,
+          "now": {
+            "checks": [],
+            "checksUrl": "https://github.com/JKershaw/LinearViewer/pull/2421/checks",
+            "headMoved": false,
+            "headSha": "f9fa4a80ca19503bebbf5abd81dc83d3e86296b6",
+            "prUrl": "https://github.com/JKershaw/LinearViewer/pull/2421",
+            "read": true,
+            "state": "unknown"
+          },
+          "review": null
+        },
+        "closeOut": {
+          "followsPerson": null,
+          "headMoved": false,
+          "issueIdentifier": "LIN-1",
+          "mergedCount": 0,
+          "message": "the review has not approved this PR yet",
+          "openCount": 1,
+          "openFindings": {
+            "count": 0,
+            "ids": [],
+            "state": "read"
+          },
+          "openFindingsCount": 0,
+          "owner": true,
+          "pr": {
+            "corroborated": false,
+            "headMoved": false,
+            "headSha": "f9fa4a80ca19503bebbf5abd81dc83d3e86296b6",
+            "merged": false,
+            "number": 2421,
+            "open": true,
+            "readable": true,
+            "repo": "JKershaw/LinearViewer",
+            "state": "open",
+            "url": "https://github.com/JKershaw/LinearViewer/pull/2421"
+          },
+          "pressable": false,
+          "prs": [
+            {
+              "corroborated": false,
+              "headMoved": false,
+              "headSha": "f9fa4a80ca19503bebbf5abd81dc83d3e86296b6",
+              "merged": false,
+              "number": 2421,
+              "open": true,
+              "readable": true,
+              "repo": "JKershaw/LinearViewer",
+              "state": "open",
+              "url": "https://github.com/JKershaw/LinearViewer/pull/2421"
+            }
+          ],
+          "ready": false,
+          "readyCopy": null,
+          "reason": "review-not-approve",
+          "refuses": null,
+          "review": {
+            "approved": false,
+            "verdict": null
+          },
+          "setDone": false,
+          "setupCopy": "○ set up ›",
+          "status": "not-ready",
+          "stopAt": "pr",
+          "unknownCount": 0,
+          "urlKey": null,
+          "variant": "unknown",
+          "waitsOn": null
+        },
+        "prReads": [
+          "https://github.com/JKershaw/LinearViewer/pull/2421"
+        ]
+      },
+      "selector": {
+        "blindReadStep": null,
+        "trailFacts": {
+          "auditAfterCloseOut": false,
+          "closeOutAfterReview": false,
+          "latestPerson": null,
+          "latestRuling": null,
+          "planReview": {
+            "byKind": {},
+            "count": 0,
+            "landed": null,
+            "latestAt": null,
+            "latestVerdict": null,
+            "personSince": false,
+            "run": [],
+            "verdicts": 0
+          },
+          "prUrls": [
+            "https://github.com/JKershaw/LinearViewer/pull/2421"
+          ],
+          "review": null,
+          "workAfterReview": false
+        }
+      },
+      "ticketState": "started",
+      "trail": {
+        "auditAfterCloseOut": false,
+        "closeOutAfterReview": false,
+        "closeOutOnTrail": false,
+        "landing": [
+          "https://github.com/JKershaw/LinearViewer/pull/2421"
+        ],
+        "landingHasNotesPr": false,
+        "notesPrs": [],
+        "review": null,
+        "reviewCommentId": null,
+        "workAfterReview": false
+      }
+    },
+    {
+      "at": "2026-11-13T15:12:24.573Z",
+      "because": [
+        "step 6 review"
+      ],
+      "commentIds": [
+        "14a24576-df33-43ba-8fde-3a63d411da6f",
+        "36b55409-ecb6-4096-a63a-7aa2cb66e579",
+        "a331c74f-41ef-4b7c-b58a-471704bae5d1",
+        "d6fc89a0-9e7e-4fa1-aabc-81ff420f834c"
+      ],
+      "decision": {
+        "ladder": {
+          "entries": [
+            {
+              "corroborated": false,
+              "headMoved": false,
+              "headSha": null,
+              "merged": false,
+              "number": 2421,
+              "open": false,
+              "readable": false,
+              "repo": "JKershaw/LinearViewer",
+              "state": null,
+              "url": "https://github.com/JKershaw/LinearViewer/pull/2421"
+            }
+          ],
+          "followsPerson": null,
+          "headMoved": false,
+          "message": "the pull request could not be read — not checked",
+          "pr": {
+            "corroborated": false,
+            "headMoved": false,
+            "headSha": null,
+            "merged": false,
+            "number": 2421,
+            "open": false,
+            "readable": false,
+            "repo": "JKershaw/LinearViewer",
+            "state": null,
+            "url": "https://github.com/JKershaw/LinearViewer/pull/2421"
+          },
+          "reason": "pr-unreadable",
+          "refuses": null,
+          "routesRead": false,
+          "setDone": false,
+          "status": "unknown",
+          "waitsOn": null
+        },
+        "stopAtHarbour": {
+          "entries": [
+            {
+              "corroborated": false,
+              "headMoved": false,
+              "headSha": "f9fa4a80ca19503bebbf5abd81dc83d3e86296b6",
+              "merged": false,
+              "number": 2421,
+              "open": true,
+              "readable": true,
+              "repo": "JKershaw/LinearViewer",
+              "state": "open",
+              "url": "https://github.com/JKershaw/LinearViewer/pull/2421"
+            }
+          ],
+          "followsPerson": null,
+          "headMoved": false,
+          "message": "the review has not approved this PR yet",
+          "pr": {
+            "corroborated": false,
+            "headMoved": false,
+            "headSha": "f9fa4a80ca19503bebbf5abd81dc83d3e86296b6",
+            "merged": false,
+            "number": 2421,
+            "open": true,
+            "readable": true,
+            "repo": "JKershaw/LinearViewer",
+            "state": "open",
+            "url": "https://github.com/JKershaw/LinearViewer/pull/2421"
+          },
+          "reason": "review-not-approve",
+          "refuses": null,
+          "routesRead": false,
+          "setDone": false,
+          "status": "not-ready",
+          "waitsOn": null
+        },
+        "stopAtPerson": {
+          "entries": [
+            {
+              "corroborated": false,
+              "headMoved": false,
+              "headSha": "f9fa4a80ca19503bebbf5abd81dc83d3e86296b6",
+              "merged": false,
+              "number": 2421,
+              "open": true,
+              "readable": true,
+              "repo": "JKershaw/LinearViewer",
+              "state": "open",
+              "url": "https://github.com/JKershaw/LinearViewer/pull/2421"
+            }
+          ],
+          "followsPerson": null,
+          "headMoved": false,
+          "message": "the review has not approved this PR yet",
+          "pr": {
+            "corroborated": false,
+            "headMoved": false,
+            "headSha": "f9fa4a80ca19503bebbf5abd81dc83d3e86296b6",
+            "merged": false,
+            "number": 2421,
+            "open": true,
+            "readable": true,
+            "repo": "JKershaw/LinearViewer",
+            "state": "open",
+            "url": "https://github.com/JKershaw/LinearViewer/pull/2421"
+          },
+          "reason": "review-not-approve",
+          "refuses": null,
+          "routesRead": false,
+          "setDone": false,
+          "status": "not-ready",
+          "waitsOn": null
+        }
+      },
+      "prs": {
+        "https://github.com/JKershaw/LinearViewer/pull/2421": {
+          "checks": [],
+          "head": {
+            "ref": "branch",
+            "sha": "f9fa4a80ca19503bebbf5abd81dc83d3e86296b6"
+          },
+          "merged": false,
+          "merged_at": null,
+          "number": 2421,
+          "readable": true,
+          "ref": "f9fa4a80ca19503bebbf5abd81dc83d3e86296b6",
+          "repo": "JKershaw/LinearViewer",
+          "state": "open"
+        }
+      },
+      "runEvidence": {
+        "checked": {
+          "blindRead": null,
+          "now": {
+            "checks": [],
+            "checksUrl": "https://github.com/JKershaw/LinearViewer/pull/2421/checks",
+            "headMoved": false,
+            "headSha": "f9fa4a80ca19503bebbf5abd81dc83d3e86296b6",
+            "prUrl": "https://github.com/JKershaw/LinearViewer/pull/2421",
+            "read": true,
+            "state": "unknown"
+          },
+          "review": null
+        },
+        "closeOut": {
+          "followsPerson": null,
+          "headMoved": false,
+          "issueIdentifier": "LIN-1",
+          "mergedCount": 0,
+          "message": "the review has not approved this PR yet",
+          "openCount": 1,
+          "openFindings": {
+            "count": 0,
+            "ids": [],
+            "state": "read"
+          },
+          "openFindingsCount": 0,
+          "owner": true,
+          "pr": {
+            "corroborated": false,
+            "headMoved": false,
+            "headSha": "f9fa4a80ca19503bebbf5abd81dc83d3e86296b6",
+            "merged": false,
+            "number": 2421,
+            "open": true,
+            "readable": true,
+            "repo": "JKershaw/LinearViewer",
+            "state": "open",
+            "url": "https://github.com/JKershaw/LinearViewer/pull/2421"
+          },
+          "pressable": false,
+          "prs": [
+            {
+              "corroborated": false,
+              "headMoved": false,
+              "headSha": "f9fa4a80ca19503bebbf5abd81dc83d3e86296b6",
+              "merged": false,
+              "number": 2421,
+              "open": true,
+              "readable": true,
+              "repo": "JKershaw/LinearViewer",
+              "state": "open",
+              "url": "https://github.com/JKershaw/LinearViewer/pull/2421"
+            }
+          ],
+          "ready": false,
+          "readyCopy": null,
+          "reason": "review-not-approve",
+          "refuses": null,
+          "review": {
+            "approved": false,
+            "verdict": null
+          },
+          "setDone": false,
+          "setupCopy": "○ set up ›",
+          "status": "not-ready",
+          "stopAt": "pr",
+          "unknownCount": 0,
+          "urlKey": null,
+          "variant": "unknown",
+          "waitsOn": null
+        },
+        "prReads": [
+          "https://github.com/JKershaw/LinearViewer/pull/2421"
+        ]
+      },
+      "selector": {
+        "blindReadStep": null,
+        "trailFacts": {
+          "auditAfterCloseOut": false,
+          "closeOutAfterReview": false,
+          "latestPerson": null,
+          "latestRuling": null,
+          "planReview": {
+            "byKind": {},
+            "count": 0,
+            "landed": null,
+            "latestAt": null,
+            "latestVerdict": null,
+            "personSince": false,
+            "run": [],
+            "verdicts": 0
+          },
+          "prUrls": [
+            "https://github.com/JKershaw/LinearViewer/pull/2421"
+          ],
+          "review": null,
+          "workAfterReview": false
+        }
+      },
+      "ticketState": "started",
+      "trail": {
+        "auditAfterCloseOut": false,
+        "closeOutAfterReview": false,
+        "closeOutOnTrail": false,
+        "landing": [
+          "https://github.com/JKershaw/LinearViewer/pull/2421"
+        ],
+        "landingHasNotesPr": false,
+        "notesPrs": [],
+        "review": null,
+        "reviewCommentId": null,
+        "workAfterReview": false
+      }
+    },
+    {
+      "at": "2026-11-13T15:18:12.503Z",
+      "because": [
+        "comment d9db330c-04a0-4456-be07-a275fb74b323"
+      ],
+      "commentIds": [
+        "14a24576-df33-43ba-8fde-3a63d411da6f",
+        "36b55409-ecb6-4096-a63a-7aa2cb66e579",
+        "a331c74f-41ef-4b7c-b58a-471704bae5d1",
+        "d6fc89a0-9e7e-4fa1-aabc-81ff420f834c",
+        "d9db330c-04a0-4456-be07-a275fb74b323"
+      ],
+      "decision": {
+        "ladder": {
+          "entries": [
+            {
+              "corroborated": false,
+              "headMoved": false,
+              "headSha": null,
+              "merged": false,
+              "number": 2421,
+              "open": false,
+              "readable": false,
+              "repo": "JKershaw/LinearViewer",
+              "state": null,
+              "url": "https://github.com/JKershaw/LinearViewer/pull/2421"
+            }
+          ],
+          "followsPerson": null,
+          "headMoved": false,
+          "message": "the pull request could not be read — not checked",
+          "pr": {
+            "corroborated": false,
+            "headMoved": false,
+            "headSha": null,
+            "merged": false,
+            "number": 2421,
+            "open": false,
+            "readable": false,
+            "repo": "JKershaw/LinearViewer",
+            "state": null,
+            "url": "https://github.com/JKershaw/LinearViewer/pull/2421"
+          },
+          "reason": "pr-unreadable",
+          "refuses": "blind-read-missing",
+          "routesRead": true,
+          "setDone": false,
+          "status": "unknown",
+          "waitsOn": "blind-read"
+        },
+        "stopAtHarbour": {
+          "entries": [
+            {
+              "corroborated": false,
+              "headMoved": false,
+              "headSha": "f9fa4a80ca19503bebbf5abd81dc83d3e86296b6",
+              "merged": false,
+              "number": 2421,
+              "open": true,
+              "readable": true,
+              "repo": "JKershaw/LinearViewer",
+              "state": "open",
+              "url": "https://github.com/JKershaw/LinearViewer/pull/2421"
+            }
+          ],
+          "followsPerson": null,
+          "headMoved": false,
+          "message": "no blind read on record since the review",
+          "pr": {
+            "corroborated": false,
+            "headMoved": false,
+            "headSha": "f9fa4a80ca19503bebbf5abd81dc83d3e86296b6",
+            "merged": false,
+            "number": 2421,
+            "open": true,
+            "readable": true,
+            "repo": "JKershaw/LinearViewer",
+            "state": "open",
+            "url": "https://github.com/JKershaw/LinearViewer/pull/2421"
+          },
+          "reason": "blind-read-missing",
+          "refuses": "blind-read-missing",
+          "routesRead": true,
+          "setDone": false,
+          "status": "not-ready",
+          "waitsOn": "blind-read"
+        },
+        "stopAtPerson": {
+          "entries": [
+            {
+              "corroborated": false,
+              "headMoved": false,
+              "headSha": "f9fa4a80ca19503bebbf5abd81dc83d3e86296b6",
+              "merged": false,
+              "number": 2421,
+              "open": true,
+              "readable": true,
+              "repo": "JKershaw/LinearViewer",
+              "state": "open",
+              "url": "https://github.com/JKershaw/LinearViewer/pull/2421"
+            }
+          ],
+          "followsPerson": null,
+          "headMoved": false,
+          "message": "no blind read on record since the review",
+          "pr": {
+            "corroborated": false,
+            "headMoved": false,
+            "headSha": "f9fa4a80ca19503bebbf5abd81dc83d3e86296b6",
+            "merged": false,
+            "number": 2421,
+            "open": true,
+            "readable": true,
+            "repo": "JKershaw/LinearViewer",
+            "state": "open",
+            "url": "https://github.com/JKershaw/LinearViewer/pull/2421"
+          },
+          "reason": "blind-read-missing",
+          "refuses": "blind-read-missing",
+          "routesRead": true,
+          "setDone": false,
+          "status": "not-ready",
+          "waitsOn": "blind-read"
+        }
+      },
+      "prs": {
+        "https://github.com/JKershaw/LinearViewer/pull/2421": {
+          "checks": [],
+          "head": {
+            "ref": "branch",
+            "sha": "f9fa4a80ca19503bebbf5abd81dc83d3e86296b6"
+          },
+          "merged": false,
+          "merged_at": null,
+          "number": 2421,
+          "readable": true,
+          "ref": "f9fa4a80ca19503bebbf5abd81dc83d3e86296b6",
+          "repo": "JKershaw/LinearViewer",
+          "state": "open"
+        }
+      },
+      "runEvidence": {
+        "checked": {
+          "blindRead": null,
+          "now": {
+            "checks": [],
+            "checksUrl": "https://github.com/JKershaw/LinearViewer/pull/2421/checks",
+            "headMoved": false,
+            "headSha": "f9fa4a80ca19503bebbf5abd81dc83d3e86296b6",
+            "prUrl": "https://github.com/JKershaw/LinearViewer/pull/2421",
+            "read": true,
+            "state": "unknown"
+          },
+          "review": {
+            "at": "2026-11-13T15:18:12.503Z",
+            "ciLine": "CI: green on `f9fa4a80c` (ci-success, unit, unit-proxy clock +400d, E2E 1–4/4, secret scan). I also re-ran these locally, all green: `jira-as-asked-region` 39/39, `as-asked-create-seal` 14, `as-asked-dispatch-seal` 29, `as-asked-guard` 28, `as-asked-readers` 22, `as-asked` 32, `as-asked-marker-census` 15, `jira-provider-adf-codec` 285.",
+            "sha": "f9fa4a80ca19503bebbf5abd81dc83d3e86296b6",
+            "verdict": "approve-conditional",
+            "verdictText": "Approve — conditional on close-out discharging the ledger"
+          }
+        },
+        "closeOut": {
+          "followsPerson": null,
+          "headMoved": false,
+          "issueIdentifier": "LIN-1",
+          "mergedCount": 0,
+          "message": "no blind read on record since the review",
+          "openCount": 1,
+          "openFindings": {
+            "count": 0,
+            "ids": [],
+            "state": "read"
+          },
+          "openFindingsCount": 0,
+          "owner": true,
+          "pr": {
+            "corroborated": false,
+            "headMoved": false,
+            "headSha": "f9fa4a80ca19503bebbf5abd81dc83d3e86296b6",
+            "merged": false,
+            "number": 2421,
+            "open": true,
+            "readable": true,
+            "repo": "JKershaw/LinearViewer",
+            "state": "open",
+            "url": "https://github.com/JKershaw/LinearViewer/pull/2421"
+          },
+          "pressable": false,
+          "prs": [
+            {
+              "corroborated": false,
+              "headMoved": false,
+              "headSha": "f9fa4a80ca19503bebbf5abd81dc83d3e86296b6",
+              "merged": false,
+              "number": 2421,
+              "open": true,
+              "readable": true,
+              "repo": "JKershaw/LinearViewer",
+              "state": "open",
+              "url": "https://github.com/JKershaw/LinearViewer/pull/2421"
+            }
+          ],
+          "ready": false,
+          "readyCopy": null,
+          "reason": "blind-read-missing",
+          "refuses": "blind-read-missing",
+          "review": {
+            "approved": true,
+            "verdict": "approve-conditional"
+          },
+          "setDone": false,
+          "setupCopy": "○ set up ›",
+          "status": "not-ready",
+          "stopAt": "pr",
+          "unknownCount": 0,
+          "urlKey": null,
+          "variant": "unknown",
+          "waitsOn": "blind-read"
+        },
+        "prReads": [
+          "https://github.com/JKershaw/LinearViewer/pull/2421"
+        ]
+      },
+      "selector": {
+        "blindReadStep": {
+          "codeRoute": "blind-read",
+          "step": "blind-read",
+          "why": "the latest code review approved, and no blind read since it names https://github.com/JKershaw/LinearViewer/pull/2421; close-out merges only after one does, so code sends the read first."
+        },
+        "trailFacts": {
+          "auditAfterCloseOut": false,
+          "closeOutAfterReview": false,
+          "latestPerson": null,
+          "latestRuling": null,
+          "planReview": {
+            "byKind": {},
+            "count": 0,
+            "landed": null,
+            "latestAt": null,
+            "latestVerdict": null,
+            "personSince": false,
+            "run": [],
+            "verdicts": 0
+          },
+          "prUrls": [
+            "https://github.com/JKershaw/LinearViewer/pull/2421"
+          ],
+          "review": {
+            "at": "2026-11-13T15:18:12.503Z",
+            "openFindings": {
+              "count": 0,
+              "ids": [],
+              "state": "read"
+            },
+            "verdict": "approve-conditional"
+          },
+          "workAfterReview": false
+        }
+      },
+      "ticketState": "started",
+      "trail": {
+        "auditAfterCloseOut": false,
+        "closeOutAfterReview": false,
+        "closeOutOnTrail": false,
+        "landing": [
+          "https://github.com/JKershaw/LinearViewer/pull/2421"
+        ],
+        "landingHasNotesPr": false,
+        "notesPrs": [],
+        "review": {
+          "at": "2026-11-13T15:18:12.503Z",
+          "blindRead": null,
+          "ciLine": "CI: green on `f9fa4a80c` (ci-success, unit, unit-proxy clock +400d, E2E 1–4/4, secret scan). I also re-ran these locally, all green: `jira-as-asked-region` 39/39, `as-asked-create-seal` 14, `as-asked-dispatch-seal` 29, `as-asked-guard` 28, `as-asked-readers` 22, `as-asked` 32, `as-asked-marker-census` 15, `jira-provider-adf-codec` 285.",
+          "commentId": "d9db330c-04a0-4456-be07-a275fb74b323",
+          "ledger": {
+            "empty": false,
+            "present": true,
+            "rawRef": "933ac1276f9e"
+          },
+          "sha": "f9fa4a80ca19503bebbf5abd81dc83d3e86296b6",
+          "verdict": "approve-conditional",
+          "verdictText": "Approve — conditional on close-out discharging the ledger"
+        },
+        "reviewCommentId": "d9db330c-04a0-4456-be07-a275fb74b323",
+        "workAfterReview": false
+      }
+    },
+    {
+      "at": "2026-11-13T15:18:45.249Z",
+      "because": [
+        "step 7 blind-read"
+      ],
+      "commentIds": [
+        "14a24576-df33-43ba-8fde-3a63d411da6f",
+        "36b55409-ecb6-4096-a63a-7aa2cb66e579",
+        "a331c74f-41ef-4b7c-b58a-471704bae5d1",
+        "d6fc89a0-9e7e-4fa1-aabc-81ff420f834c",
+        "d9db330c-04a0-4456-be07-a275fb74b323"
+      ],
+      "decision": {
+        "ladder": {
+          "entries": [
+            {
+              "corroborated": false,
+              "headMoved": false,
+              "headSha": null,
+              "merged": false,
+              "number": 2421,
+              "open": false,
+              "readable": false,
+              "repo": "JKershaw/LinearViewer",
+              "state": null,
+              "url": "https://github.com/JKershaw/LinearViewer/pull/2421"
+            }
+          ],
+          "followsPerson": null,
+          "headMoved": false,
+          "message": "the pull request could not be read — not checked",
+          "pr": {
+            "corroborated": false,
+            "headMoved": false,
+            "headSha": null,
+            "merged": false,
+            "number": 2421,
+            "open": false,
+            "readable": false,
+            "repo": "JKershaw/LinearViewer",
+            "state": null,
+            "url": "https://github.com/JKershaw/LinearViewer/pull/2421"
+          },
+          "reason": "pr-unreadable",
+          "refuses": "blind-read-missing",
+          "routesRead": true,
+          "setDone": false,
+          "status": "unknown",
+          "waitsOn": "blind-read"
+        },
+        "stopAtHarbour": {
+          "entries": [
+            {
+              "corroborated": false,
+              "headMoved": false,
+              "headSha": "f9fa4a80ca19503bebbf5abd81dc83d3e86296b6",
+              "merged": false,
+              "number": 2421,
+              "open": true,
+              "readable": true,
+              "repo": "JKershaw/LinearViewer",
+              "state": "open",
+              "url": "https://github.com/JKershaw/LinearViewer/pull/2421"
+            }
+          ],
+          "followsPerson": null,
+          "headMoved": false,
+          "message": "no blind read on record since the review",
+          "pr": {
+            "corroborated": false,
+            "headMoved": false,
+            "headSha": "f9fa4a80ca19503bebbf5abd81dc83d3e86296b6",
+            "merged": false,
+            "number": 2421,
+            "open": true,
+            "readable": true,
+            "repo": "JKershaw/LinearViewer",
+            "state": "open",
+            "url": "https://github.com/JKershaw/LinearViewer/pull/2421"
+          },
+          "reason": "blind-read-missing",
+          "refuses": "blind-read-missing",
+          "routesRead": true,
+          "setDone": false,
+          "status": "not-ready",
+          "waitsOn": "blind-read"
+        },
+        "stopAtPerson": {
+          "entries": [
+            {
+              "corroborated": false,
+              "headMoved": false,
+              "headSha": "f9fa4a80ca19503bebbf5abd81dc83d3e86296b6",
+              "merged": false,
+              "number": 2421,
+              "open": true,
+              "readable": true,
+              "repo": "JKershaw/LinearViewer",
+              "state": "open",
+              "url": "https://github.com/JKershaw/LinearViewer/pull/2421"
+            }
+          ],
+          "followsPerson": null,
+          "headMoved": false,
+          "message": "no blind read on record since the review",
+          "pr": {
+            "corroborated": false,
+            "headMoved": false,
+            "headSha": "f9fa4a80ca19503bebbf5abd81dc83d3e86296b6",
+            "merged": false,
+            "number": 2421,
+            "open": true,
+            "readable": true,
+            "repo": "JKershaw/LinearViewer",
+            "state": "open",
+            "url": "https://github.com/JKershaw/LinearViewer/pull/2421"
+          },
+          "reason": "blind-read-missing",
+          "refuses": "blind-read-missing",
+          "routesRead": true,
+          "setDone": false,
+          "status": "not-ready",
+          "waitsOn": "blind-read"
+        }
+      },
+      "prs": {
+        "https://github.com/JKershaw/LinearViewer/pull/2421": {
+          "checks": [],
+          "head": {
+            "ref": "branch",
+            "sha": "f9fa4a80ca19503bebbf5abd81dc83d3e86296b6"
+          },
+          "merged": false,
+          "merged_at": null,
+          "number": 2421,
+          "readable": true,
+          "ref": "f9fa4a80ca19503bebbf5abd81dc83d3e86296b6",
+          "repo": "JKershaw/LinearViewer",
+          "state": "open"
+        }
+      },
+      "runEvidence": {
+        "checked": {
+          "blindRead": null,
+          "now": {
+            "checks": [],
+            "checksUrl": "https://github.com/JKershaw/LinearViewer/pull/2421/checks",
+            "headMoved": false,
+            "headSha": "f9fa4a80ca19503bebbf5abd81dc83d3e86296b6",
+            "prUrl": "https://github.com/JKershaw/LinearViewer/pull/2421",
+            "read": true,
+            "state": "unknown"
+          },
+          "review": {
+            "at": "2026-11-13T15:18:12.503Z",
+            "ciLine": "CI: green on `f9fa4a80c` (ci-success, unit, unit-proxy clock +400d, E2E 1–4/4, secret scan). I also re-ran these locally, all green: `jira-as-asked-region` 39/39, `as-asked-create-seal` 14, `as-asked-dispatch-seal` 29, `as-asked-guard` 28, `as-asked-readers` 22, `as-asked` 32, `as-asked-marker-census` 15, `jira-provider-adf-codec` 285.",
+            "sha": "f9fa4a80ca19503bebbf5abd81dc83d3e86296b6",
+            "verdict": "approve-conditional",
+            "verdictText": "Approve — conditional on close-out discharging the ledger"
+          }
+        },
+        "closeOut": {
+          "followsPerson": null,
+          "headMoved": false,
+          "issueIdentifier": "LIN-1",
+          "mergedCount": 0,
+          "message": "no blind read on record since the review",
+          "openCount": 1,
+          "openFindings": {
+            "count": 0,
+            "ids": [],
+            "state": "read"
+          },
+          "openFindingsCount": 0,
+          "owner": true,
+          "pr": {
+            "corroborated": false,
+            "headMoved": false,
+            "headSha": "f9fa4a80ca19503bebbf5abd81dc83d3e86296b6",
+            "merged": false,
+            "number": 2421,
+            "open": true,
+            "readable": true,
+            "repo": "JKershaw/LinearViewer",
+            "state": "open",
+            "url": "https://github.com/JKershaw/LinearViewer/pull/2421"
+          },
+          "pressable": false,
+          "prs": [
+            {
+              "corroborated": false,
+              "headMoved": false,
+              "headSha": "f9fa4a80ca19503bebbf5abd81dc83d3e86296b6",
+              "merged": false,
+              "number": 2421,
+              "open": true,
+              "readable": true,
+              "repo": "JKershaw/LinearViewer",
+              "state": "open",
+              "url": "https://github.com/JKershaw/LinearViewer/pull/2421"
+            }
+          ],
+          "ready": false,
+          "readyCopy": null,
+          "reason": "blind-read-missing",
+          "refuses": "blind-read-missing",
+          "review": {
+            "approved": true,
+            "verdict": "approve-conditional"
+          },
+          "setDone": false,
+          "setupCopy": "○ set up ›",
+          "status": "not-ready",
+          "stopAt": "pr",
+          "unknownCount": 0,
+          "urlKey": null,
+          "variant": "unknown",
+          "waitsOn": "blind-read"
+        },
+        "prReads": [
+          "https://github.com/JKershaw/LinearViewer/pull/2421"
+        ]
+      },
+      "selector": {
+        "blindReadStep": {
+          "codeRoute": "blind-read",
+          "step": "blind-read",
+          "why": "the latest code review approved, and no blind read since it names https://github.com/JKershaw/LinearViewer/pull/2421; close-out merges only after one does, so code sends the read first."
+        },
+        "trailFacts": {
+          "auditAfterCloseOut": false,
+          "closeOutAfterReview": false,
+          "latestPerson": null,
+          "latestRuling": null,
+          "planReview": {
+            "byKind": {},
+            "count": 0,
+            "landed": null,
+            "latestAt": null,
+            "latestVerdict": null,
+            "personSince": false,
+            "run": [],
+            "verdicts": 0
+          },
+          "prUrls": [
+            "https://github.com/JKershaw/LinearViewer/pull/2421"
+          ],
+          "review": {
+            "at": "2026-11-13T15:18:12.503Z",
+            "openFindings": {
+              "count": 0,
+              "ids": [],
+              "state": "read"
+            },
+            "verdict": "approve-conditional"
+          },
+          "workAfterReview": false
+        }
+      },
+      "ticketState": "started",
+      "trail": {
+        "auditAfterCloseOut": false,
+        "closeOutAfterReview": false,
+        "closeOutOnTrail": false,
+        "landing": [
+          "https://github.com/JKershaw/LinearViewer/pull/2421"
+        ],
+        "landingHasNotesPr": false,
+        "notesPrs": [],
+        "review": {
+          "at": "2026-11-13T15:18:12.503Z",
+          "blindRead": null,
+          "ciLine": "CI: green on `f9fa4a80c` (ci-success, unit, unit-proxy clock +400d, E2E 1–4/4, secret scan). I also re-ran these locally, all green: `jira-as-asked-region` 39/39, `as-asked-create-seal` 14, `as-asked-dispatch-seal` 29, `as-asked-guard` 28, `as-asked-readers` 22, `as-asked` 32, `as-asked-marker-census` 15, `jira-provider-adf-codec` 285.",
+          "commentId": "d9db330c-04a0-4456-be07-a275fb74b323",
+          "ledger": {
+            "empty": false,
+            "present": true,
+            "rawRef": "933ac1276f9e"
+          },
+          "sha": "f9fa4a80ca19503bebbf5abd81dc83d3e86296b6",
+          "verdict": "approve-conditional",
+          "verdictText": "Approve — conditional on close-out discharging the ledger"
+        },
+        "reviewCommentId": "d9db330c-04a0-4456-be07-a275fb74b323",
+        "workAfterReview": false
+      }
+    },
+    {
+      "at": "2026-11-13T15:21:22.841Z",
+      "because": [
+        "comment 8657e1c5-c37f-4c9e-8500-92cb37605d59"
+      ],
+      "commentIds": [
+        "14a24576-df33-43ba-8fde-3a63d411da6f",
+        "36b55409-ecb6-4096-a63a-7aa2cb66e579",
+        "a331c74f-41ef-4b7c-b58a-471704bae5d1",
+        "d6fc89a0-9e7e-4fa1-aabc-81ff420f834c",
+        "d9db330c-04a0-4456-be07-a275fb74b323",
+        "8657e1c5-c37f-4c9e-8500-92cb37605d59"
+      ],
+      "decision": {
+        "ladder": {
+          "entries": [
+            {
+              "corroborated": false,
+              "headMoved": false,
+              "headSha": null,
+              "merged": false,
+              "number": 2421,
+              "open": false,
+              "readable": false,
+              "repo": "JKershaw/LinearViewer",
+              "state": null,
+              "url": "https://github.com/JKershaw/LinearViewer/pull/2421"
+            }
+          ],
+          "followsPerson": null,
+          "headMoved": false,
+          "message": "the pull request could not be read — not checked",
+          "pr": {
+            "corroborated": false,
+            "headMoved": false,
+            "headSha": null,
+            "merged": false,
+            "number": 2421,
+            "open": false,
+            "readable": false,
+            "repo": "JKershaw/LinearViewer",
+            "state": null,
+            "url": "https://github.com/JKershaw/LinearViewer/pull/2421"
+          },
+          "reason": "pr-unreadable",
+          "refuses": null,
+          "routesRead": false,
+          "setDone": false,
+          "status": "unknown",
+          "waitsOn": null
+        },
+        "stopAtHarbour": {
+          "entries": [
+            {
+              "corroborated": false,
+              "headMoved": false,
+              "headSha": "f9fa4a80ca19503bebbf5abd81dc83d3e86296b6",
+              "merged": false,
+              "number": 2421,
+              "open": true,
+              "readable": true,
+              "repo": "JKershaw/LinearViewer",
+              "state": "open",
+              "url": "https://github.com/JKershaw/LinearViewer/pull/2421"
+            }
+          ],
+          "followsPerson": null,
+          "headMoved": false,
+          "message": null,
+          "pr": {
+            "corroborated": false,
+            "headMoved": false,
+            "headSha": "f9fa4a80ca19503bebbf5abd81dc83d3e86296b6",
+            "merged": false,
+            "number": 2421,
+            "open": true,
+            "readable": true,
+            "repo": "JKershaw/LinearViewer",
+            "state": "open",
+            "url": "https://github.com/JKershaw/LinearViewer/pull/2421"
+          },
+          "reason": null,
+          "refuses": null,
+          "routesRead": false,
+          "setDone": false,
+          "status": "ready",
+          "waitsOn": null
+        },
+        "stopAtPerson": {
+          "entries": [
+            {
+              "corroborated": false,
+              "headMoved": false,
+              "headSha": "f9fa4a80ca19503bebbf5abd81dc83d3e86296b6",
+              "merged": false,
+              "number": 2421,
+              "open": true,
+              "readable": true,
+              "repo": "JKershaw/LinearViewer",
+              "state": "open",
+              "url": "https://github.com/JKershaw/LinearViewer/pull/2421"
+            }
+          ],
+          "followsPerson": null,
+          "headMoved": false,
+          "message": null,
+          "pr": {
+            "corroborated": false,
+            "headMoved": false,
+            "headSha": "f9fa4a80ca19503bebbf5abd81dc83d3e86296b6",
+            "merged": false,
+            "number": 2421,
+            "open": true,
+            "readable": true,
+            "repo": "JKershaw/LinearViewer",
+            "state": "open",
+            "url": "https://github.com/JKershaw/LinearViewer/pull/2421"
+          },
+          "reason": null,
+          "refuses": null,
+          "routesRead": false,
+          "setDone": false,
+          "status": "ready",
+          "waitsOn": null
+        }
+      },
+      "prs": {
+        "https://github.com/JKershaw/LinearViewer/pull/2421": {
+          "checks": [],
+          "head": {
+            "ref": "branch",
+            "sha": "f9fa4a80ca19503bebbf5abd81dc83d3e86296b6"
+          },
+          "merged": false,
+          "merged_at": null,
+          "number": 2421,
+          "readable": true,
+          "ref": "f9fa4a80ca19503bebbf5abd81dc83d3e86296b6",
+          "repo": "JKershaw/LinearViewer",
+          "state": "open"
+        }
+      },
+      "runEvidence": {
+        "checked": {
+          "blindRead": {
+            "at": "2026-11-13T15:21:22.841Z",
+            "reason": "It gives Jira's description read and write a single owner (`lib/providers/jira/as-asked-region.js`: `readDescription`/`holdAsAsked`, and `descriptionRoundTrip` now runs that same pair, so the seal decision and the write can't disagree). It also folds ten inline copies of the test-token predicate onto `isHermeticTestToken` (`routes/proxy-compute.js`, `server.js`, `routes/task-chat.js`, `routes/workspace-api-steps.js`). On the worse side, a Jira issue's `description` now depends on which read produced it: the batch path in `lib/providers/jira/index.js` serves the converted words and the single-issue reads serve the exact ones.",
+            "verdict": "better"
+          },
+          "now": {
+            "checks": [],
+            "checksUrl": "https://github.com/JKershaw/LinearViewer/pull/2421/checks",
+            "headMoved": false,
+            "headSha": "f9fa4a80ca19503bebbf5abd81dc83d3e86296b6",
+            "prUrl": "https://github.com/JKershaw/LinearViewer/pull/2421",
+            "read": true,
+            "state": "unknown"
+          },
+          "review": {
+            "at": "2026-11-13T15:18:12.503Z",
+            "ciLine": "CI: green on `f9fa4a80c` (ci-success, unit, unit-proxy clock +400d, E2E 1–4/4, secret scan). I also re-ran these locally, all green: `jira-as-asked-region` 39/39, `as-asked-create-seal` 14, `as-asked-dispatch-seal` 29, `as-asked-guard` 28, `as-asked-readers` 22, `as-asked` 32, `as-asked-marker-census` 15, `jira-provider-adf-codec` 285.",
+            "sha": "f9fa4a80ca19503bebbf5abd81dc83d3e86296b6",
+            "verdict": "approve-conditional",
+            "verdictText": "Approve — conditional on close-out discharging the ledger"
+          }
+        },
+        "closeOut": {
+          "followsPerson": null,
+          "headMoved": false,
+          "issueIdentifier": "LIN-1",
+          "mergedCount": 0,
+          "message": null,
+          "openCount": 1,
+          "openFindings": {
+            "count": 0,
+            "ids": [],
+            "state": "read"
+          },
+          "openFindingsCount": 0,
+          "owner": true,
+          "pr": {
+            "corroborated": false,
+            "headMoved": false,
+            "headSha": "f9fa4a80ca19503bebbf5abd81dc83d3e86296b6",
+            "merged": false,
+            "number": 2421,
+            "open": true,
+            "readable": true,
+            "repo": "JKershaw/LinearViewer",
+            "state": "open",
+            "url": "https://github.com/JKershaw/LinearViewer/pull/2421"
+          },
+          "pressable": true,
+          "prs": [
+            {
+              "corroborated": false,
+              "headMoved": false,
+              "headSha": "f9fa4a80ca19503bebbf5abd81dc83d3e86296b6",
+              "merged": false,
+              "number": 2421,
+              "open": true,
+              "readable": true,
+              "repo": "JKershaw/LinearViewer",
+              "state": "open",
+              "url": "https://github.com/JKershaw/LinearViewer/pull/2421"
+            }
+          ],
+          "ready": true,
+          "readyCopy": "✓ PR ready for close-out",
+          "reason": null,
+          "refuses": null,
+          "review": {
+            "approved": true,
+            "verdict": "approve-conditional"
+          },
+          "setDone": false,
+          "setupCopy": null,
+          "status": "ready",
+          "stopAt": "pr",
+          "unknownCount": 0,
+          "urlKey": null,
+          "variant": "unknown",
+          "waitsOn": null
+        },
+        "prReads": [
+          "https://github.com/JKershaw/LinearViewer/pull/2421"
+        ]
+      },
+      "selector": {
+        "blindReadStep": null,
+        "trailFacts": {
+          "auditAfterCloseOut": false,
+          "closeOutAfterReview": false,
+          "latestPerson": null,
+          "latestRuling": null,
+          "planReview": {
+            "byKind": {},
+            "count": 0,
+            "landed": null,
+            "latestAt": null,
+            "latestVerdict": null,
+            "personSince": false,
+            "run": [],
+            "verdicts": 0
+          },
+          "prUrls": [
+            "https://github.com/JKershaw/LinearViewer/pull/2421"
+          ],
+          "review": {
+            "at": "2026-11-13T15:18:12.503Z",
+            "openFindings": {
+              "count": 0,
+              "ids": [],
+              "state": "read"
+            },
+            "verdict": "approve-conditional"
+          },
+          "workAfterReview": false
+        }
+      },
+      "ticketState": "started",
+      "trail": {
+        "auditAfterCloseOut": false,
+        "closeOutAfterReview": false,
+        "closeOutOnTrail": false,
+        "landing": [
+          "https://github.com/JKershaw/LinearViewer/pull/2421"
+        ],
+        "landingHasNotesPr": false,
+        "notesPrs": [],
+        "review": {
+          "at": "2026-11-13T15:18:12.503Z",
+          "blindRead": {
+            "at": "2026-11-13T15:21:22.841Z",
+            "commentId": "8657e1c5-c37f-4c9e-8500-92cb37605d59",
+            "prs": [
+              "https://github.com/JKershaw/LinearViewer/pull/2421"
+            ],
+            "reason": "It gives Jira's description read and write a single owner (`lib/providers/jira/as-asked-region.js`: `readDescription`/`holdAsAsked`, and `descriptionRoundTrip` now runs that same pair, so the seal decision and the write can't disagree). It also folds ten inline copies of the test-token predicate onto `isHermeticTestToken` (`routes/proxy-compute.js`, `server.js`, `routes/task-chat.js`, `routes/workspace-api-steps.js`). On the worse side, a Jira issue's `description` now depends on which read produced it: the batch path in `lib/providers/jira/index.js` serves the converted words and the single-issue reads serve the exact ones.",
+            "verdict": "better"
+          },
+          "ciLine": "CI: green on `f9fa4a80c` (ci-success, unit, unit-proxy clock +400d, E2E 1–4/4, secret scan). I also re-ran these locally, all green: `jira-as-asked-region` 39/39, `as-asked-create-seal` 14, `as-asked-dispatch-seal` 29, `as-asked-guard` 28, `as-asked-readers` 22, `as-asked` 32, `as-asked-marker-census` 15, `jira-provider-adf-codec` 285.",
+          "commentId": "d9db330c-04a0-4456-be07-a275fb74b323",
+          "ledger": {
+            "empty": false,
+            "present": true,
+            "rawRef": "933ac1276f9e"
+          },
+          "sha": "f9fa4a80ca19503bebbf5abd81dc83d3e86296b6",
+          "verdict": "approve-conditional",
+          "verdictText": "Approve — conditional on close-out discharging the ledger"
+        },
+        "reviewCommentId": "d9db330c-04a0-4456-be07-a275fb74b323",
+        "workAfterReview": false
+      }
+    },
+    {
+      "at": "2026-11-13T15:21:56.087Z",
+      "because": [
+        "step 8 close-out"
+      ],
+      "commentIds": [
+        "14a24576-df33-43ba-8fde-3a63d411da6f",
+        "36b55409-ecb6-4096-a63a-7aa2cb66e579",
+        "a331c74f-41ef-4b7c-b58a-471704bae5d1",
+        "d6fc89a0-9e7e-4fa1-aabc-81ff420f834c",
+        "d9db330c-04a0-4456-be07-a275fb74b323",
+        "8657e1c5-c37f-4c9e-8500-92cb37605d59"
+      ],
+      "decision": {
+        "ladder": {
+          "entries": [
+            {
+              "corroborated": false,
+              "headMoved": false,
+              "headSha": null,
+              "merged": false,
+              "number": 2421,
+              "open": false,
+              "readable": false,
+              "repo": "JKershaw/LinearViewer",
+              "state": null,
+              "url": "https://github.com/JKershaw/LinearViewer/pull/2421"
+            }
+          ],
+          "followsPerson": null,
+          "headMoved": false,
+          "message": "the pull request could not be read — not checked",
+          "pr": {
+            "corroborated": false,
+            "headMoved": false,
+            "headSha": null,
+            "merged": false,
+            "number": 2421,
+            "open": false,
+            "readable": false,
+            "repo": "JKershaw/LinearViewer",
+            "state": null,
+            "url": "https://github.com/JKershaw/LinearViewer/pull/2421"
+          },
+          "reason": "pr-unreadable",
+          "refuses": null,
+          "routesRead": false,
+          "setDone": false,
+          "status": "unknown",
+          "waitsOn": null
+        },
+        "stopAtHarbour": {
+          "entries": [
+            {
+              "corroborated": false,
+              "headMoved": false,
+              "headSha": "f9fa4a80ca19503bebbf5abd81dc83d3e86296b6",
+              "merged": false,
+              "number": 2421,
+              "open": true,
+              "readable": true,
+              "repo": "JKershaw/LinearViewer",
+              "state": "open",
+              "url": "https://github.com/JKershaw/LinearViewer/pull/2421"
+            }
+          ],
+          "followsPerson": null,
+          "headMoved": false,
+          "message": null,
+          "pr": {
+            "corroborated": false,
+            "headMoved": false,
+            "headSha": "f9fa4a80ca19503bebbf5abd81dc83d3e86296b6",
+            "merged": false,
+            "number": 2421,
+            "open": true,
+            "readable": true,
+            "repo": "JKershaw/LinearViewer",
+            "state": "open",
+            "url": "https://github.com/JKershaw/LinearViewer/pull/2421"
+          },
+          "reason": null,
+          "refuses": null,
+          "routesRead": false,
+          "setDone": false,
+          "status": "ready",
+          "waitsOn": null
+        },
+        "stopAtPerson": {
+          "entries": [
+            {
+              "corroborated": false,
+              "headMoved": false,
+              "headSha": "f9fa4a80ca19503bebbf5abd81dc83d3e86296b6",
+              "merged": false,
+              "number": 2421,
+              "open": true,
+              "readable": true,
+              "repo": "JKershaw/LinearViewer",
+              "state": "open",
+              "url": "https://github.com/JKershaw/LinearViewer/pull/2421"
+            }
+          ],
+          "followsPerson": null,
+          "headMoved": false,
+          "message": null,
+          "pr": {
+            "corroborated": false,
+            "headMoved": false,
+            "headSha": "f9fa4a80ca19503bebbf5abd81dc83d3e86296b6",
+            "merged": false,
+            "number": 2421,
+            "open": true,
+            "readable": true,
+            "repo": "JKershaw/LinearViewer",
+            "state": "open",
+            "url": "https://github.com/JKershaw/LinearViewer/pull/2421"
+          },
+          "reason": null,
+          "refuses": null,
+          "routesRead": false,
+          "setDone": false,
+          "status": "ready",
+          "waitsOn": null
+        }
+      },
+      "prs": {
+        "https://github.com/JKershaw/LinearViewer/pull/2421": {
+          "checks": [],
+          "head": {
+            "ref": "branch",
+            "sha": "f9fa4a80ca19503bebbf5abd81dc83d3e86296b6"
+          },
+          "merged": false,
+          "merged_at": null,
+          "number": 2421,
+          "readable": true,
+          "ref": "f9fa4a80ca19503bebbf5abd81dc83d3e86296b6",
+          "repo": "JKershaw/LinearViewer",
+          "state": "open"
+        }
+      },
+      "runEvidence": {
+        "checked": {
+          "blindRead": {
+            "at": "2026-11-13T15:21:22.841Z",
+            "reason": "It gives Jira's description read and write a single owner (`lib/providers/jira/as-asked-region.js`: `readDescription`/`holdAsAsked`, and `descriptionRoundTrip` now runs that same pair, so the seal decision and the write can't disagree). It also folds ten inline copies of the test-token predicate onto `isHermeticTestToken` (`routes/proxy-compute.js`, `server.js`, `routes/task-chat.js`, `routes/workspace-api-steps.js`). On the worse side, a Jira issue's `description` now depends on which read produced it: the batch path in `lib/providers/jira/index.js` serves the converted words and the single-issue reads serve the exact ones.",
+            "verdict": "better"
+          },
+          "now": {
+            "checks": [],
+            "checksUrl": "https://github.com/JKershaw/LinearViewer/pull/2421/checks",
+            "headMoved": false,
+            "headSha": "f9fa4a80ca19503bebbf5abd81dc83d3e86296b6",
+            "prUrl": "https://github.com/JKershaw/LinearViewer/pull/2421",
+            "read": true,
+            "state": "unknown"
+          },
+          "review": {
+            "at": "2026-11-13T15:18:12.503Z",
+            "ciLine": "CI: green on `f9fa4a80c` (ci-success, unit, unit-proxy clock +400d, E2E 1–4/4, secret scan). I also re-ran these locally, all green: `jira-as-asked-region` 39/39, `as-asked-create-seal` 14, `as-asked-dispatch-seal` 29, `as-asked-guard` 28, `as-asked-readers` 22, `as-asked` 32, `as-asked-marker-census` 15, `jira-provider-adf-codec` 285.",
+            "sha": "f9fa4a80ca19503bebbf5abd81dc83d3e86296b6",
+            "verdict": "approve-conditional",
+            "verdictText": "Approve — conditional on close-out discharging the ledger"
+          }
+        },
+        "closeOut": {
+          "followsPerson": null,
+          "headMoved": false,
+          "issueIdentifier": "LIN-1",
+          "mergedCount": 0,
+          "message": null,
+          "openCount": 1,
+          "openFindings": {
+            "count": 0,
+            "ids": [],
+            "state": "read"
+          },
+          "openFindingsCount": 0,
+          "owner": true,
+          "pr": {
+            "corroborated": false,
+            "headMoved": false,
+            "headSha": "f9fa4a80ca19503bebbf5abd81dc83d3e86296b6",
+            "merged": false,
+            "number": 2421,
+            "open": true,
+            "readable": true,
+            "repo": "JKershaw/LinearViewer",
+            "state": "open",
+            "url": "https://github.com/JKershaw/LinearViewer/pull/2421"
+          },
+          "pressable": true,
+          "prs": [
+            {
+              "corroborated": false,
+              "headMoved": false,
+              "headSha": "f9fa4a80ca19503bebbf5abd81dc83d3e86296b6",
+              "merged": false,
+              "number": 2421,
+              "open": true,
+              "readable": true,
+              "repo": "JKershaw/LinearViewer",
+              "state": "open",
+              "url": "https://github.com/JKershaw/LinearViewer/pull/2421"
+            }
+          ],
+          "ready": true,
+          "readyCopy": "✓ PR ready for close-out",
+          "reason": null,
+          "refuses": null,
+          "review": {
+            "approved": true,
+            "verdict": "approve-conditional"
+          },
+          "setDone": false,
+          "setupCopy": null,
+          "status": "ready",
+          "stopAt": "pr",
+          "unknownCount": 0,
+          "urlKey": null,
+          "variant": "unknown",
+          "waitsOn": null
+        },
+        "prReads": [
+          "https://github.com/JKershaw/LinearViewer/pull/2421"
+        ]
+      },
+      "selector": {
+        "blindReadStep": null,
+        "trailFacts": {
+          "auditAfterCloseOut": false,
+          "closeOutAfterReview": false,
+          "latestPerson": null,
+          "latestRuling": null,
+          "planReview": {
+            "byKind": {},
+            "count": 0,
+            "landed": null,
+            "latestAt": null,
+            "latestVerdict": null,
+            "personSince": false,
+            "run": [],
+            "verdicts": 0
+          },
+          "prUrls": [
+            "https://github.com/JKershaw/LinearViewer/pull/2421"
+          ],
+          "review": {
+            "at": "2026-11-13T15:18:12.503Z",
+            "openFindings": {
+              "count": 0,
+              "ids": [],
+              "state": "read"
+            },
+            "verdict": "approve-conditional"
+          },
+          "workAfterReview": false
+        }
+      },
+      "ticketState": "started",
+      "trail": {
+        "auditAfterCloseOut": false,
+        "closeOutAfterReview": false,
+        "closeOutOnTrail": false,
+        "landing": [
+          "https://github.com/JKershaw/LinearViewer/pull/2421"
+        ],
+        "landingHasNotesPr": false,
+        "notesPrs": [],
+        "review": {
+          "at": "2026-11-13T15:18:12.503Z",
+          "blindRead": {
+            "at": "2026-11-13T15:21:22.841Z",
+            "commentId": "8657e1c5-c37f-4c9e-8500-92cb37605d59",
+            "prs": [
+              "https://github.com/JKershaw/LinearViewer/pull/2421"
+            ],
+            "reason": "It gives Jira's description read and write a single owner (`lib/providers/jira/as-asked-region.js`: `readDescription`/`holdAsAsked`, and `descriptionRoundTrip` now runs that same pair, so the seal decision and the write can't disagree). It also folds ten inline copies of the test-token predicate onto `isHermeticTestToken` (`routes/proxy-compute.js`, `server.js`, `routes/task-chat.js`, `routes/workspace-api-steps.js`). On the worse side, a Jira issue's `description` now depends on which read produced it: the batch path in `lib/providers/jira/index.js` serves the converted words and the single-issue reads serve the exact ones.",
+            "verdict": "better"
+          },
+          "ciLine": "CI: green on `f9fa4a80c` (ci-success, unit, unit-proxy clock +400d, E2E 1–4/4, secret scan). I also re-ran these locally, all green: `jira-as-asked-region` 39/39, `as-asked-create-seal` 14, `as-asked-dispatch-seal` 29, `as-asked-guard` 28, `as-asked-readers` 22, `as-asked` 32, `as-asked-marker-census` 15, `jira-provider-adf-codec` 285.",
+          "commentId": "d9db330c-04a0-4456-be07-a275fb74b323",
+          "ledger": {
+            "empty": false,
+            "present": true,
+            "rawRef": "933ac1276f9e"
+          },
+          "sha": "f9fa4a80ca19503bebbf5abd81dc83d3e86296b6",
+          "verdict": "approve-conditional",
+          "verdictText": "Approve — conditional on close-out discharging the ledger"
+        },
+        "reviewCommentId": "d9db330c-04a0-4456-be07-a275fb74b323",
+        "workAfterReview": false
+      }
+    },
+    {
+      "at": "2026-11-13T15:26:05.000Z",
+      "because": [
+        "PR #2421 head 26299c9b0 (check-run)"
+      ],
+      "commentIds": [
+        "14a24576-df33-43ba-8fde-3a63d411da6f",
+        "36b55409-ecb6-4096-a63a-7aa2cb66e579",
+        "a331c74f-41ef-4b7c-b58a-471704bae5d1",
+        "d6fc89a0-9e7e-4fa1-aabc-81ff420f834c",
+        "d9db330c-04a0-4456-be07-a275fb74b323",
+        "8657e1c5-c37f-4c9e-8500-92cb37605d59"
+      ],
+      "decision": {
+        "ladder": {
+          "entries": [
+            {
+              "corroborated": false,
+              "headMoved": false,
+              "headSha": null,
+              "merged": false,
+              "number": 2421,
+              "open": false,
+              "readable": false,
+              "repo": "JKershaw/LinearViewer",
+              "state": null,
+              "url": "https://github.com/JKershaw/LinearViewer/pull/2421"
+            }
+          ],
+          "followsPerson": null,
+          "headMoved": false,
+          "message": "the pull request could not be read — not checked",
+          "pr": {
+            "corroborated": false,
+            "headMoved": false,
+            "headSha": null,
+            "merged": false,
+            "number": 2421,
+            "open": false,
+            "readable": false,
+            "repo": "JKershaw/LinearViewer",
+            "state": null,
+            "url": "https://github.com/JKershaw/LinearViewer/pull/2421"
+          },
+          "reason": "pr-unreadable",
+          "refuses": null,
+          "routesRead": false,
+          "setDone": false,
+          "status": "unknown",
+          "waitsOn": null
+        },
+        "stopAtHarbour": {
+          "entries": [
+            {
+              "corroborated": false,
+              "headMoved": true,
+              "headSha": "26299c9b0c6ecb57edd029f49578282224f6d31e",
+              "merged": false,
+              "number": 2421,
+              "open": true,
+              "readable": true,
+              "repo": "JKershaw/LinearViewer",
+              "state": "open",
+              "url": "https://github.com/JKershaw/LinearViewer/pull/2421"
+            }
+          ],
+          "followsPerson": null,
+          "headMoved": true,
+          "message": "the pull request changed since the review approved it",
+          "pr": {
+            "corroborated": false,
+            "headMoved": true,
+            "headSha": "26299c9b0c6ecb57edd029f49578282224f6d31e",
+            "merged": false,
+            "number": 2421,
+            "open": true,
+            "readable": true,
+            "repo": "JKershaw/LinearViewer",
+            "state": "open",
+            "url": "https://github.com/JKershaw/LinearViewer/pull/2421"
+          },
+          "reason": "head-moved",
+          "refuses": "head-moved",
+          "routesRead": false,
+          "setDone": false,
+          "status": "not-ready",
+          "waitsOn": null
+        },
+        "stopAtPerson": {
+          "entries": [
+            {
+              "corroborated": false,
+              "headMoved": true,
+              "headSha": "26299c9b0c6ecb57edd029f49578282224f6d31e",
+              "merged": false,
+              "number": 2421,
+              "open": true,
+              "readable": true,
+              "repo": "JKershaw/LinearViewer",
+              "state": "open",
+              "url": "https://github.com/JKershaw/LinearViewer/pull/2421"
+            }
+          ],
+          "followsPerson": null,
+          "headMoved": true,
+          "message": "the pull request changed since the review approved it",
+          "pr": {
+            "corroborated": false,
+            "headMoved": true,
+            "headSha": "26299c9b0c6ecb57edd029f49578282224f6d31e",
+            "merged": false,
+            "number": 2421,
+            "open": true,
+            "readable": true,
+            "repo": "JKershaw/LinearViewer",
+            "state": "open",
+            "url": "https://github.com/JKershaw/LinearViewer/pull/2421"
+          },
+          "reason": "head-moved",
+          "refuses": "head-moved",
+          "routesRead": false,
+          "setDone": false,
+          "status": "not-ready",
+          "waitsOn": null
+        }
+      },
+      "prs": {
+        "https://github.com/JKershaw/LinearViewer/pull/2421": {
+          "checks": [],
+          "head": {
+            "ref": "branch",
+            "sha": "26299c9b0c6ecb57edd029f49578282224f6d31e"
+          },
+          "merged": false,
+          "merged_at": null,
+          "number": 2421,
+          "readable": true,
+          "ref": "26299c9b0c6ecb57edd029f49578282224f6d31e",
+          "repo": "JKershaw/LinearViewer",
+          "state": "open"
+        }
+      },
+      "runEvidence": {
+        "checked": {
+          "blindRead": {
+            "at": "2026-11-13T15:21:22.841Z",
+            "reason": "It gives Jira's description read and write a single owner (`lib/providers/jira/as-asked-region.js`: `readDescription`/`holdAsAsked`, and `descriptionRoundTrip` now runs that same pair, so the seal decision and the write can't disagree). It also folds ten inline copies of the test-token predicate onto `isHermeticTestToken` (`routes/proxy-compute.js`, `server.js`, `routes/task-chat.js`, `routes/workspace-api-steps.js`). On the worse side, a Jira issue's `description` now depends on which read produced it: the batch path in `lib/providers/jira/index.js` serves the converted words and the single-issue reads serve the exact ones.",
+            "verdict": "better"
+          },
+          "now": {
+            "checks": [],
+            "checksUrl": "https://github.com/JKershaw/LinearViewer/pull/2421/checks",
+            "headMoved": true,
+            "headSha": "26299c9b0c6ecb57edd029f49578282224f6d31e",
+            "prUrl": "https://github.com/JKershaw/LinearViewer/pull/2421",
+            "read": true,
+            "state": "unknown"
+          },
+          "review": {
+            "at": "2026-11-13T15:18:12.503Z",
+            "ciLine": "CI: green on `f9fa4a80c` (ci-success, unit, unit-proxy clock +400d, E2E 1–4/4, secret scan). I also re-ran these locally, all green: `jira-as-asked-region` 39/39, `as-asked-create-seal` 14, `as-asked-dispatch-seal` 29, `as-asked-guard` 28, `as-asked-readers` 22, `as-asked` 32, `as-asked-marker-census` 15, `jira-provider-adf-codec` 285.",
+            "sha": "f9fa4a80ca19503bebbf5abd81dc83d3e86296b6",
+            "verdict": "approve-conditional",
+            "verdictText": "Approve — conditional on close-out discharging the ledger"
+          }
+        },
+        "closeOut": {
+          "followsPerson": null,
+          "headMoved": true,
+          "issueIdentifier": "LIN-1",
+          "mergedCount": 0,
+          "message": "the pull request changed since the review approved it",
+          "openCount": 1,
+          "openFindings": {
+            "count": 0,
+            "ids": [],
+            "state": "read"
+          },
+          "openFindingsCount": 0,
+          "owner": true,
+          "pr": {
+            "corroborated": false,
+            "headMoved": true,
+            "headSha": "26299c9b0c6ecb57edd029f49578282224f6d31e",
+            "merged": false,
+            "number": 2421,
+            "open": true,
+            "readable": true,
+            "repo": "JKershaw/LinearViewer",
+            "state": "open",
+            "url": "https://github.com/JKershaw/LinearViewer/pull/2421"
+          },
+          "pressable": false,
+          "prs": [
+            {
+              "corroborated": false,
+              "headMoved": true,
+              "headSha": "26299c9b0c6ecb57edd029f49578282224f6d31e",
+              "merged": false,
+              "number": 2421,
+              "open": true,
+              "readable": true,
+              "repo": "JKershaw/LinearViewer",
+              "state": "open",
+              "url": "https://github.com/JKershaw/LinearViewer/pull/2421"
+            }
+          ],
+          "ready": false,
+          "readyCopy": null,
+          "reason": "head-moved",
+          "refuses": "head-moved",
+          "review": {
+            "approved": true,
+            "verdict": "approve-conditional"
+          },
+          "setDone": false,
+          "setupCopy": "○ set up ›",
+          "status": "not-ready",
+          "stopAt": "pr",
+          "unknownCount": 0,
+          "urlKey": null,
+          "variant": "unknown",
+          "waitsOn": null
+        },
+        "prReads": [
+          "https://github.com/JKershaw/LinearViewer/pull/2421"
+        ]
+      },
+      "selector": {
+        "blindReadStep": null,
+        "trailFacts": {
+          "auditAfterCloseOut": false,
+          "closeOutAfterReview": false,
+          "latestPerson": null,
+          "latestRuling": null,
+          "planReview": {
+            "byKind": {},
+            "count": 0,
+            "landed": null,
+            "latestAt": null,
+            "latestVerdict": null,
+            "personSince": false,
+            "run": [],
+            "verdicts": 0
+          },
+          "prUrls": [
+            "https://github.com/JKershaw/LinearViewer/pull/2421"
+          ],
+          "review": {
+            "at": "2026-11-13T15:18:12.503Z",
+            "openFindings": {
+              "count": 0,
+              "ids": [],
+              "state": "read"
+            },
+            "verdict": "approve-conditional"
+          },
+          "workAfterReview": false
+        }
+      },
+      "ticketState": "started",
+      "trail": {
+        "auditAfterCloseOut": false,
+        "closeOutAfterReview": false,
+        "closeOutOnTrail": false,
+        "landing": [
+          "https://github.com/JKershaw/LinearViewer/pull/2421"
+        ],
+        "landingHasNotesPr": false,
+        "notesPrs": [],
+        "review": {
+          "at": "2026-11-13T15:18:12.503Z",
+          "blindRead": {
+            "at": "2026-11-13T15:21:22.841Z",
+            "commentId": "8657e1c5-c37f-4c9e-8500-92cb37605d59",
+            "prs": [
+              "https://github.com/JKershaw/LinearViewer/pull/2421"
+            ],
+            "reason": "It gives Jira's description read and write a single owner (`lib/providers/jira/as-asked-region.js`: `readDescription`/`holdAsAsked`, and `descriptionRoundTrip` now runs that same pair, so the seal decision and the write can't disagree). It also folds ten inline copies of the test-token predicate onto `isHermeticTestToken` (`routes/proxy-compute.js`, `server.js`, `routes/task-chat.js`, `routes/workspace-api-steps.js`). On the worse side, a Jira issue's `description` now depends on which read produced it: the batch path in `lib/providers/jira/index.js` serves the converted words and the single-issue reads serve the exact ones.",
+            "verdict": "better"
+          },
+          "ciLine": "CI: green on `f9fa4a80c` (ci-success, unit, unit-proxy clock +400d, E2E 1–4/4, secret scan). I also re-ran these locally, all green: `jira-as-asked-region` 39/39, `as-asked-create-seal` 14, `as-asked-dispatch-seal` 29, `as-asked-guard` 28, `as-asked-readers` 22, `as-asked` 32, `as-asked-marker-census` 15, `jira-provider-adf-codec` 285.",
+          "commentId": "d9db330c-04a0-4456-be07-a275fb74b323",
+          "ledger": {
+            "empty": false,
+            "present": true,
+            "rawRef": "933ac1276f9e"
+          },
+          "sha": "f9fa4a80ca19503bebbf5abd81dc83d3e86296b6",
+          "verdict": "approve-conditional",
+          "verdictText": "Approve — conditional on close-out discharging the ledger"
+        },
+        "reviewCommentId": "d9db330c-04a0-4456-be07-a275fb74b323",
+        "workAfterReview": false
+      }
+    },
+    {
+      "at": "2026-11-13T15:32:12.000Z",
+      "because": [
+        "PR #2421 merged"
+      ],
+      "commentIds": [
+        "14a24576-df33-43ba-8fde-3a63d411da6f",
+        "36b55409-ecb6-4096-a63a-7aa2cb66e579",
+        "a331c74f-41ef-4b7c-b58a-471704bae5d1",
+        "d6fc89a0-9e7e-4fa1-aabc-81ff420f834c",
+        "d9db330c-04a0-4456-be07-a275fb74b323",
+        "8657e1c5-c37f-4c9e-8500-92cb37605d59"
+      ],
+      "decision": {
+        "ladder": {
+          "entries": [
+            {
+              "corroborated": false,
+              "headMoved": false,
+              "headSha": null,
+              "merged": false,
+              "number": 2421,
+              "open": false,
+              "readable": false,
+              "repo": "JKershaw/LinearViewer",
+              "state": null,
+              "url": "https://github.com/JKershaw/LinearViewer/pull/2421"
+            }
+          ],
+          "followsPerson": null,
+          "headMoved": false,
+          "message": "the pull request could not be read — not checked",
+          "pr": {
+            "corroborated": false,
+            "headMoved": false,
+            "headSha": null,
+            "merged": false,
+            "number": 2421,
+            "open": false,
+            "readable": false,
+            "repo": "JKershaw/LinearViewer",
+            "state": null,
+            "url": "https://github.com/JKershaw/LinearViewer/pull/2421"
+          },
+          "reason": "pr-unreadable",
+          "refuses": null,
+          "routesRead": false,
+          "setDone": false,
+          "status": "unknown",
+          "waitsOn": null
+        },
+        "stopAtHarbour": {
+          "entries": [
+            {
+              "corroborated": false,
+              "headMoved": true,
+              "headSha": "26299c9b0c6ecb57edd029f49578282224f6d31e",
+              "merged": true,
+              "number": 2421,
+              "open": false,
+              "readable": true,
+              "repo": "JKershaw/LinearViewer",
+              "state": "closed",
+              "url": "https://github.com/JKershaw/LinearViewer/pull/2421"
+            }
+          ],
+          "followsPerson": "merged",
+          "headMoved": true,
+          "message": "PR #2421 merged",
+          "pr": {
+            "corroborated": false,
+            "headMoved": true,
+            "headSha": "26299c9b0c6ecb57edd029f49578282224f6d31e",
+            "merged": true,
+            "number": 2421,
+            "open": false,
+            "readable": true,
+            "repo": "JKershaw/LinearViewer",
+            "state": "closed",
+            "url": "https://github.com/JKershaw/LinearViewer/pull/2421"
+          },
+          "reason": null,
+          "refuses": null,
+          "routesRead": false,
+          "setDone": false,
+          "status": "merged",
+          "waitsOn": null
+        },
+        "stopAtPerson": {
+          "entries": [
+            {
+              "corroborated": false,
+              "headMoved": true,
+              "headSha": "26299c9b0c6ecb57edd029f49578282224f6d31e",
+              "merged": true,
+              "number": 2421,
+              "open": false,
+              "readable": true,
+              "repo": "JKershaw/LinearViewer",
+              "state": "closed",
+              "url": "https://github.com/JKershaw/LinearViewer/pull/2421"
+            }
+          ],
+          "followsPerson": "merged",
+          "headMoved": true,
+          "message": "PR #2421 merged",
+          "pr": {
+            "corroborated": false,
+            "headMoved": true,
+            "headSha": "26299c9b0c6ecb57edd029f49578282224f6d31e",
+            "merged": true,
+            "number": 2421,
+            "open": false,
+            "readable": true,
+            "repo": "JKershaw/LinearViewer",
+            "state": "closed",
+            "url": "https://github.com/JKershaw/LinearViewer/pull/2421"
+          },
+          "reason": null,
+          "refuses": null,
+          "routesRead": false,
+          "setDone": true,
+          "status": "merged",
+          "waitsOn": null
+        }
+      },
+      "prs": {
+        "https://github.com/JKershaw/LinearViewer/pull/2421": {
+          "checks": [],
+          "head": {
+            "ref": "branch",
+            "sha": "26299c9b0c6ecb57edd029f49578282224f6d31e"
+          },
+          "merged": true,
+          "merged_at": "2026-11-13T15:32:12Z",
+          "number": 2421,
+          "readable": true,
+          "ref": "26299c9b0c6ecb57edd029f49578282224f6d31e",
+          "repo": "JKershaw/LinearViewer",
+          "state": "closed"
+        }
+      },
+      "runEvidence": {
+        "checked": {
+          "blindRead": {
+            "at": "2026-11-13T15:21:22.841Z",
+            "reason": "It gives Jira's description read and write a single owner (`lib/providers/jira/as-asked-region.js`: `readDescription`/`holdAsAsked`, and `descriptionRoundTrip` now runs that same pair, so the seal decision and the write can't disagree). It also folds ten inline copies of the test-token predicate onto `isHermeticTestToken` (`routes/proxy-compute.js`, `server.js`, `routes/task-chat.js`, `routes/workspace-api-steps.js`). On the worse side, a Jira issue's `description` now depends on which read produced it: the batch path in `lib/providers/jira/index.js` serves the converted words and the single-issue reads serve the exact ones.",
+            "verdict": "better"
+          },
+          "now": {
+            "checks": [],
+            "checksUrl": "https://github.com/JKershaw/LinearViewer/pull/2421/checks",
+            "headMoved": true,
+            "headSha": "26299c9b0c6ecb57edd029f49578282224f6d31e",
+            "prUrl": "https://github.com/JKershaw/LinearViewer/pull/2421",
+            "read": true,
+            "state": "unknown"
+          },
+          "review": {
+            "at": "2026-11-13T15:18:12.503Z",
+            "ciLine": "CI: green on `f9fa4a80c` (ci-success, unit, unit-proxy clock +400d, E2E 1–4/4, secret scan). I also re-ran these locally, all green: `jira-as-asked-region` 39/39, `as-asked-create-seal` 14, `as-asked-dispatch-seal` 29, `as-asked-guard` 28, `as-asked-readers` 22, `as-asked` 32, `as-asked-marker-census` 15, `jira-provider-adf-codec` 285.",
+            "sha": "f9fa4a80ca19503bebbf5abd81dc83d3e86296b6",
+            "verdict": "approve-conditional",
+            "verdictText": "Approve — conditional on close-out discharging the ledger"
+          }
+        },
+        "closeOut": {
+          "followsPerson": "merged",
+          "headMoved": true,
+          "issueIdentifier": "LIN-1",
+          "mergedCount": 1,
+          "message": "PR #2421 merged",
+          "openCount": 0,
+          "openFindings": {
+            "count": 0,
+            "ids": [],
+            "state": "read"
+          },
+          "openFindingsCount": 0,
+          "owner": true,
+          "pr": {
+            "corroborated": false,
+            "headMoved": true,
+            "headSha": "26299c9b0c6ecb57edd029f49578282224f6d31e",
+            "merged": true,
+            "number": 2421,
+            "open": false,
+            "readable": true,
+            "repo": "JKershaw/LinearViewer",
+            "state": "closed",
+            "url": "https://github.com/JKershaw/LinearViewer/pull/2421"
+          },
+          "pressable": false,
+          "prs": [
+            {
+              "corroborated": false,
+              "headMoved": true,
+              "headSha": "26299c9b0c6ecb57edd029f49578282224f6d31e",
+              "merged": true,
+              "number": 2421,
+              "open": false,
+              "readable": true,
+              "repo": "JKershaw/LinearViewer",
+              "state": "closed",
+              "url": "https://github.com/JKershaw/LinearViewer/pull/2421"
+            }
+          ],
+          "ready": false,
+          "readyCopy": null,
+          "reason": null,
+          "refuses": null,
+          "review": {
+            "approved": true,
+            "verdict": "approve-conditional"
+          },
+          "setDone": false,
+          "setupCopy": null,
+          "status": "merged",
+          "stopAt": "pr",
+          "unknownCount": 0,
+          "urlKey": null,
+          "variant": "unknown",
+          "waitsOn": null
+        },
+        "prReads": [
+          "https://github.com/JKershaw/LinearViewer/pull/2421"
+        ]
+      },
+      "selector": {
+        "blindReadStep": null,
+        "trailFacts": {
+          "auditAfterCloseOut": false,
+          "closeOutAfterReview": false,
+          "latestPerson": null,
+          "latestRuling": null,
+          "planReview": {
+            "byKind": {},
+            "count": 0,
+            "landed": null,
+            "latestAt": null,
+            "latestVerdict": null,
+            "personSince": false,
+            "run": [],
+            "verdicts": 0
+          },
+          "prUrls": [
+            "https://github.com/JKershaw/LinearViewer/pull/2421"
+          ],
+          "review": {
+            "at": "2026-11-13T15:18:12.503Z",
+            "openFindings": {
+              "count": 0,
+              "ids": [],
+              "state": "read"
+            },
+            "verdict": "approve-conditional"
+          },
+          "workAfterReview": false
+        }
+      },
+      "ticketState": "started",
+      "trail": {
+        "auditAfterCloseOut": false,
+        "closeOutAfterReview": false,
+        "closeOutOnTrail": false,
+        "landing": [
+          "https://github.com/JKershaw/LinearViewer/pull/2421"
+        ],
+        "landingHasNotesPr": false,
+        "notesPrs": [],
+        "review": {
+          "at": "2026-11-13T15:18:12.503Z",
+          "blindRead": {
+            "at": "2026-11-13T15:21:22.841Z",
+            "commentId": "8657e1c5-c37f-4c9e-8500-92cb37605d59",
+            "prs": [
+              "https://github.com/JKershaw/LinearViewer/pull/2421"
+            ],
+            "reason": "It gives Jira's description read and write a single owner (`lib/providers/jira/as-asked-region.js`: `readDescription`/`holdAsAsked`, and `descriptionRoundTrip` now runs that same pair, so the seal decision and the write can't disagree). It also folds ten inline copies of the test-token predicate onto `isHermeticTestToken` (`routes/proxy-compute.js`, `server.js`, `routes/task-chat.js`, `routes/workspace-api-steps.js`). On the worse side, a Jira issue's `description` now depends on which read produced it: the batch path in `lib/providers/jira/index.js` serves the converted words and the single-issue reads serve the exact ones.",
+            "verdict": "better"
+          },
+          "ciLine": "CI: green on `f9fa4a80c` (ci-success, unit, unit-proxy clock +400d, E2E 1–4/4, secret scan). I also re-ran these locally, all green: `jira-as-asked-region` 39/39, `as-asked-create-seal` 14, `as-asked-dispatch-seal` 29, `as-asked-guard` 28, `as-asked-readers` 22, `as-asked` 32, `as-asked-marker-census` 15, `jira-provider-adf-codec` 285.",
+          "commentId": "d9db330c-04a0-4456-be07-a275fb74b323",
+          "ledger": {
+            "empty": false,
+            "present": true,
+            "rawRef": "933ac1276f9e"
+          },
+          "sha": "f9fa4a80ca19503bebbf5abd81dc83d3e86296b6",
+          "verdict": "approve-conditional",
+          "verdictText": "Approve — conditional on close-out discharging the ledger"
+        },
+        "reviewCommentId": "d9db330c-04a0-4456-be07-a275fb74b323",
+        "workAfterReview": false
+      }
+    },
+    {
+      "at": "2026-11-13T15:40:37.083Z",
+      "because": [
+        "comment 326a7237-b11a-44eb-a86e-f93cebcf6bf4"
+      ],
+      "commentIds": [
+        "14a24576-df33-43ba-8fde-3a63d411da6f",
+        "36b55409-ecb6-4096-a63a-7aa2cb66e579",
+        "a331c74f-41ef-4b7c-b58a-471704bae5d1",
+        "d6fc89a0-9e7e-4fa1-aabc-81ff420f834c",
+        "d9db330c-04a0-4456-be07-a275fb74b323",
+        "8657e1c5-c37f-4c9e-8500-92cb37605d59",
+        "326a7237-b11a-44eb-a86e-f93cebcf6bf4"
+      ],
+      "decision": {
+        "ladder": {
+          "entries": [
+            {
+              "corroborated": false,
+              "headMoved": false,
+              "headSha": null,
+              "merged": false,
+              "number": 2421,
+              "open": false,
+              "readable": false,
+              "repo": "JKershaw/LinearViewer",
+              "state": null,
+              "url": "https://github.com/JKershaw/LinearViewer/pull/2421"
+            }
+          ],
+          "followsPerson": null,
+          "headMoved": false,
+          "message": "the pull request could not be read — not checked",
+          "pr": {
+            "corroborated": false,
+            "headMoved": false,
+            "headSha": null,
+            "merged": false,
+            "number": 2421,
+            "open": false,
+            "readable": false,
+            "repo": "JKershaw/LinearViewer",
+            "state": null,
+            "url": "https://github.com/JKershaw/LinearViewer/pull/2421"
+          },
+          "reason": "pr-unreadable",
+          "refuses": null,
+          "routesRead": false,
+          "setDone": false,
+          "status": "unknown",
+          "waitsOn": null
+        },
+        "stopAtHarbour": {
+          "entries": [
+            {
+              "corroborated": false,
+              "headMoved": true,
+              "headSha": "26299c9b0c6ecb57edd029f49578282224f6d31e",
+              "merged": true,
+              "number": 2421,
+              "open": false,
+              "readable": true,
+              "repo": "JKershaw/LinearViewer",
+              "state": "closed",
+              "url": "https://github.com/JKershaw/LinearViewer/pull/2421"
+            }
+          ],
+          "followsPerson": "merged",
+          "headMoved": true,
+          "message": "PR #2421 merged",
+          "pr": {
+            "corroborated": false,
+            "headMoved": true,
+            "headSha": "26299c9b0c6ecb57edd029f49578282224f6d31e",
+            "merged": true,
+            "number": 2421,
+            "open": false,
+            "readable": true,
+            "repo": "JKershaw/LinearViewer",
+            "state": "closed",
+            "url": "https://github.com/JKershaw/LinearViewer/pull/2421"
+          },
+          "reason": null,
+          "refuses": null,
+          "routesRead": false,
+          "setDone": false,
+          "status": "merged",
+          "waitsOn": null
+        },
+        "stopAtPerson": {
+          "entries": [
+            {
+              "corroborated": false,
+              "headMoved": true,
+              "headSha": "26299c9b0c6ecb57edd029f49578282224f6d31e",
+              "merged": true,
+              "number": 2421,
+              "open": false,
+              "readable": true,
+              "repo": "JKershaw/LinearViewer",
+              "state": "closed",
+              "url": "https://github.com/JKershaw/LinearViewer/pull/2421"
+            }
+          ],
+          "followsPerson": "merged",
+          "headMoved": true,
+          "message": "PR #2421 merged",
+          "pr": {
+            "corroborated": false,
+            "headMoved": true,
+            "headSha": "26299c9b0c6ecb57edd029f49578282224f6d31e",
+            "merged": true,
+            "number": 2421,
+            "open": false,
+            "readable": true,
+            "repo": "JKershaw/LinearViewer",
+            "state": "closed",
+            "url": "https://github.com/JKershaw/LinearViewer/pull/2421"
+          },
+          "reason": null,
+          "refuses": null,
+          "routesRead": false,
+          "setDone": true,
+          "status": "merged",
+          "waitsOn": null
+        }
+      },
+      "prs": {
+        "https://github.com/JKershaw/LinearViewer/pull/2421": {
+          "checks": [],
+          "head": {
+            "ref": "branch",
+            "sha": "26299c9b0c6ecb57edd029f49578282224f6d31e"
+          },
+          "merged": true,
+          "merged_at": "2026-11-13T15:32:12Z",
+          "number": 2421,
+          "readable": true,
+          "ref": "26299c9b0c6ecb57edd029f49578282224f6d31e",
+          "repo": "JKershaw/LinearViewer",
+          "state": "closed"
+        }
+      },
+      "runEvidence": {
+        "checked": {
+          "blindRead": {
+            "at": "2026-11-13T15:21:22.841Z",
+            "reason": "It gives Jira's description read and write a single owner (`lib/providers/jira/as-asked-region.js`: `readDescription`/`holdAsAsked`, and `descriptionRoundTrip` now runs that same pair, so the seal decision and the write can't disagree). It also folds ten inline copies of the test-token predicate onto `isHermeticTestToken` (`routes/proxy-compute.js`, `server.js`, `routes/task-chat.js`, `routes/workspace-api-steps.js`). On the worse side, a Jira issue's `description` now depends on which read produced it: the batch path in `lib/providers/jira/index.js` serves the converted words and the single-issue reads serve the exact ones.",
+            "verdict": "better"
+          },
+          "now": {
+            "checks": [],
+            "checksUrl": "https://github.com/JKershaw/LinearViewer/pull/2421/checks",
+            "headMoved": true,
+            "headSha": "26299c9b0c6ecb57edd029f49578282224f6d31e",
+            "prUrl": "https://github.com/JKershaw/LinearViewer/pull/2421",
+            "read": true,
+            "state": "unknown"
+          },
+          "review": {
+            "at": "2026-11-13T15:18:12.503Z",
+            "ciLine": "CI: green on `f9fa4a80c` (ci-success, unit, unit-proxy clock +400d, E2E 1–4/4, secret scan). I also re-ran these locally, all green: `jira-as-asked-region` 39/39, `as-asked-create-seal` 14, `as-asked-dispatch-seal` 29, `as-asked-guard` 28, `as-asked-readers` 22, `as-asked` 32, `as-asked-marker-census` 15, `jira-provider-adf-codec` 285.",
+            "sha": "f9fa4a80ca19503bebbf5abd81dc83d3e86296b6",
+            "verdict": "approve-conditional",
+            "verdictText": "Approve — conditional on close-out discharging the ledger"
+          }
+        },
+        "closeOut": {
+          "followsPerson": "merged",
+          "headMoved": true,
+          "issueIdentifier": "LIN-1",
+          "mergedCount": 1,
+          "message": "PR #2421 merged",
+          "openCount": 0,
+          "openFindings": {
+            "count": 0,
+            "ids": [],
+            "state": "read"
+          },
+          "openFindingsCount": 0,
+          "owner": true,
+          "pr": {
+            "corroborated": false,
+            "headMoved": true,
+            "headSha": "26299c9b0c6ecb57edd029f49578282224f6d31e",
+            "merged": true,
+            "number": 2421,
+            "open": false,
+            "readable": true,
+            "repo": "JKershaw/LinearViewer",
+            "state": "closed",
+            "url": "https://github.com/JKershaw/LinearViewer/pull/2421"
+          },
+          "pressable": false,
+          "prs": [
+            {
+              "corroborated": false,
+              "headMoved": true,
+              "headSha": "26299c9b0c6ecb57edd029f49578282224f6d31e",
+              "merged": true,
+              "number": 2421,
+              "open": false,
+              "readable": true,
+              "repo": "JKershaw/LinearViewer",
+              "state": "closed",
+              "url": "https://github.com/JKershaw/LinearViewer/pull/2421"
+            }
+          ],
+          "ready": false,
+          "readyCopy": null,
+          "reason": null,
+          "refuses": null,
+          "review": {
+            "approved": true,
+            "verdict": "approve-conditional"
+          },
+          "setDone": false,
+          "setupCopy": null,
+          "status": "merged",
+          "stopAt": "pr",
+          "unknownCount": 0,
+          "urlKey": null,
+          "variant": "unknown",
+          "waitsOn": null
+        },
+        "prReads": [
+          "https://github.com/JKershaw/LinearViewer/pull/2421"
+        ]
+      },
+      "selector": {
+        "blindReadStep": null,
+        "trailFacts": {
+          "auditAfterCloseOut": false,
+          "closeOutAfterReview": true,
+          "latestPerson": null,
+          "latestRuling": null,
+          "planReview": {
+            "byKind": {},
+            "count": 0,
+            "landed": null,
+            "latestAt": null,
+            "latestVerdict": null,
+            "personSince": false,
+            "run": [],
+            "verdicts": 0
+          },
+          "prUrls": [
+            "https://github.com/JKershaw/LinearViewer/pull/2421"
+          ],
+          "review": {
+            "at": "2026-11-13T15:18:12.503Z",
+            "openFindings": {
+              "count": 0,
+              "ids": [],
+              "state": "read"
+            },
+            "verdict": "approve-conditional"
+          },
+          "workAfterReview": false
+        }
+      },
+      "ticketState": "completed",
+      "trail": {
+        "auditAfterCloseOut": false,
+        "closeOutAfterReview": true,
+        "closeOutOnTrail": true,
+        "landing": [
+          "https://github.com/JKershaw/LinearViewer/pull/2421"
+        ],
+        "landingHasNotesPr": false,
+        "notesPrs": [],
+        "review": {
+          "at": "2026-11-13T15:18:12.503Z",
+          "blindRead": {
+            "at": "2026-11-13T15:21:22.841Z",
+            "commentId": "8657e1c5-c37f-4c9e-8500-92cb37605d59",
+            "prs": [
+              "https://github.com/JKershaw/LinearViewer/pull/2421"
+            ],
+            "reason": "It gives Jira's description read and write a single owner (`lib/providers/jira/as-asked-region.js`: `readDescription`/`holdAsAsked`, and `descriptionRoundTrip` now runs that same pair, so the seal decision and the write can't disagree). It also folds ten inline copies of the test-token predicate onto `isHermeticTestToken` (`routes/proxy-compute.js`, `server.js`, `routes/task-chat.js`, `routes/workspace-api-steps.js`). On the worse side, a Jira issue's `description` now depends on which read produced it: the batch path in `lib/providers/jira/index.js` serves the converted words and the single-issue reads serve the exact ones.",
+            "verdict": "better"
+          },
+          "ciLine": "CI: green on `f9fa4a80c` (ci-success, unit, unit-proxy clock +400d, E2E 1–4/4, secret scan). I also re-ran these locally, all green: `jira-as-asked-region` 39/39, `as-asked-create-seal` 14, `as-asked-dispatch-seal` 29, `as-asked-guard` 28, `as-asked-readers` 22, `as-asked` 32, `as-asked-marker-census` 15, `jira-provider-adf-codec` 285.",
+          "commentId": "d9db330c-04a0-4456-be07-a275fb74b323",
+          "ledger": {
+            "empty": false,
+            "present": true,
+            "rawRef": "933ac1276f9e"
+          },
+          "sha": "f9fa4a80ca19503bebbf5abd81dc83d3e86296b6",
+          "verdict": "approve-conditional",
+          "verdictText": "Approve — conditional on close-out discharging the ledger"
+        },
+        "reviewCommentId": "d9db330c-04a0-4456-be07-a275fb74b323",
+        "workAfterReview": false
+      }
+    }
+  ],
+  "texts": {
+    "933ac1276f9e": "- **Inside** (bounded class: the property semantics, item 6). Live Jira accepts `properties: [{key:'harbour.asAsked', value}]` on `PUT /rest/api/3/issue/{key}` and returns it as `properties['harbour.asAsked']` on `GET ?properties=harbour.asAsked`. The fake is built to that shape, but no test reaches Atlassian. **After the deploy:** the LIN-4452 live check on John's site, as one sealed `updateIssue`. The condition that separates right from wrong: the re-read's `properties['harbour.asAsked'].words` is byte-equal to the words written. An absent `properties` key means the PUT dropped it.\n- **Inside** (the reader, item 1: \"compare rendered content\"). Live Jira's editor keeps the region's `adfToMarkdown` rendering, and so the digest, when someone edits and saves a line *below* the block. If it does not, every sealed issue silently serves converted words (`*em*`→`_em_`). The fake cannot normalise ADF (providers.md lesson, LIN-4450). **After the deploy:** the LIN-4452 live check, following plan-review note 1. File a lossy body (`* a`, `*em*`, trailing spaces, `3.`). Edit one line below the block in Jira's own editor and save. Re-read. Right means the words are byte-equal to what was filed and the digest-match branch was taken (`digest(region) === property.rendered`). Wrong means the words equal `adfToMarkdown(markdownToAdf(words))`.\n- **Inside** (the consequence named in Done-when). Once this is live, the first dispatch of a Jira-native ticket writes the block through `updateIssue`. **After the deploy:** dispatch one never-dispatched Jira-native ticket on John's site. Right is either of two outcomes, with the dispatch row enqueued in both: the ticket shows the formatted block with no \"seal skipped\" line, or a ticket carrying mentions/emoji/panels logs the existing D1 refusal line.\n- **Rollback (named).** Revert PR #2421's squash commit. Properties already written stay on issues but nothing reads them. A sealed description then reads through `adfToMarkdown` as `_End of…_`, which `splitAsAsked` does not recognise, so those tickets fall back to the existing unsealed readers. That is reversible in effect, with no data loss."
+  },
+  "ticket": "LIN-4450"
+}

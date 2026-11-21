@@ -1,0 +1,1501 @@
+{
+  "_about": "LIN-4514: the old measure readers (round trips, churn, effort readout, follow-on ratio, stability measure 1) over the frozen trails, as far as they carry each reader; `not measured` with its reason where they do not. Derived by tests/helpers/comment-path-capture.js; never edit by hand.",
+  "seeds": [
+    {
+      "cases": [
+        {
+          "churn": {
+            "key": "churn",
+            "reason": "the frozen inputs hold comments and landings, not dispatch rows: classifyTicket classifies a ticket's dispatch rows, and reads a verdict from a row's feedback",
+            "reference": null,
+            "status": "not measured",
+            "unreadable": null,
+            "value": null
+          },
+          "effortReadout": {
+            "key": "effortReadout",
+            "reason": "the frozen inputs hold comments and landings, not dispatch rows or request records: computeEffortReadout reads the dispatch history and its cost records",
+            "reference": null,
+            "status": "not measured",
+            "unreadable": null,
+            "value": null
+          },
+          "followOnRatio": {
+            "ratio": {
+              "key": "followOnRatio",
+              "reason": "the frozen inputs hold one ticket's trail, not the window's issues and their relations",
+              "reference": null,
+              "status": "not measured",
+              "unreadable": null,
+              "value": null
+            },
+            "reviewLedger": false
+          },
+          "id": "converging/1-verdicts",
+          "roundTrips": {
+            "tierA": [
+              {
+                "at": "2026-11-20T10:00:00.000Z",
+                "id": "converging-rc-1",
+                "verdict": "request changes"
+              }
+            ],
+            "walk": {
+              "key": "roundTrips",
+              "reason": "the frozen inputs hold comments and landings, not dispatch rows: computeIssueRoundTrips settles R0 on the pipeline rows (GET /dispatch)",
+              "reference": null,
+              "status": "not measured",
+              "unreadable": null,
+              "value": null
+            }
+          },
+          "stabilityBlind": {
+            "key": "blind",
+            "reason": "a seed has no landing",
+            "reference": null,
+            "status": "not measured",
+            "unreadable": null,
+            "value": null
+          }
+        },
+        {
+          "churn": {
+            "key": "churn",
+            "reason": "the frozen inputs hold comments and landings, not dispatch rows: classifyTicket classifies a ticket's dispatch rows, and reads a verdict from a row's feedback",
+            "reference": null,
+            "status": "not measured",
+            "unreadable": null,
+            "value": null
+          },
+          "effortReadout": {
+            "key": "effortReadout",
+            "reason": "the frozen inputs hold comments and landings, not dispatch rows or request records: computeEffortReadout reads the dispatch history and its cost records",
+            "reference": null,
+            "status": "not measured",
+            "unreadable": null,
+            "value": null
+          },
+          "followOnRatio": {
+            "ratio": {
+              "key": "followOnRatio",
+              "reason": "the frozen inputs hold one ticket's trail, not the window's issues and their relations",
+              "reference": null,
+              "status": "not measured",
+              "unreadable": null,
+              "value": null
+            },
+            "reviewLedger": false
+          },
+          "id": "converging/2-verdicts",
+          "roundTrips": {
+            "tierA": [
+              {
+                "at": "2026-11-20T10:00:00.000Z",
+                "id": "converging-rc-1",
+                "verdict": "request changes"
+              },
+              {
+                "at": "2026-11-20T11:00:00.000Z",
+                "id": "converging-rc-2",
+                "verdict": "request changes"
+              }
+            ],
+            "walk": {
+              "key": "roundTrips",
+              "reason": "the frozen inputs hold comments and landings, not dispatch rows: computeIssueRoundTrips settles R0 on the pipeline rows (GET /dispatch)",
+              "reference": null,
+              "status": "not measured",
+              "unreadable": null,
+              "value": null
+            }
+          },
+          "stabilityBlind": {
+            "key": "blind",
+            "reason": "a seed has no landing",
+            "reference": null,
+            "status": "not measured",
+            "unreadable": null,
+            "value": null
+          }
+        },
+        {
+          "churn": {
+            "key": "churn",
+            "reason": "the frozen inputs hold comments and landings, not dispatch rows: classifyTicket classifies a ticket's dispatch rows, and reads a verdict from a row's feedback",
+            "reference": null,
+            "status": "not measured",
+            "unreadable": null,
+            "value": null
+          },
+          "effortReadout": {
+            "key": "effortReadout",
+            "reason": "the frozen inputs hold comments and landings, not dispatch rows or request records: computeEffortReadout reads the dispatch history and its cost records",
+            "reference": null,
+            "status": "not measured",
+            "unreadable": null,
+            "value": null
+          },
+          "followOnRatio": {
+            "ratio": {
+              "key": "followOnRatio",
+              "reason": "the frozen inputs hold one ticket's trail, not the window's issues and their relations",
+              "reference": null,
+              "status": "not measured",
+              "unreadable": null,
+              "value": null
+            },
+            "reviewLedger": false
+          },
+          "id": "converging/3-verdicts",
+          "roundTrips": {
+            "tierA": [
+              {
+                "at": "2026-11-20T10:00:00.000Z",
+                "id": "converging-rc-1",
+                "verdict": "request changes"
+              },
+              {
+                "at": "2026-11-20T11:00:00.000Z",
+                "id": "converging-rc-2",
+                "verdict": "request changes"
+              },
+              {
+                "at": "2026-11-20T12:00:00.000Z",
+                "id": "converging-rc-3",
+                "verdict": "request changes"
+              }
+            ],
+            "walk": {
+              "key": "roundTrips",
+              "reason": "the frozen inputs hold comments and landings, not dispatch rows: computeIssueRoundTrips settles R0 on the pipeline rows (GET /dispatch)",
+              "reference": null,
+              "status": "not measured",
+              "unreadable": null,
+              "value": null
+            }
+          },
+          "stabilityBlind": {
+            "key": "blind",
+            "reason": "a seed has no landing",
+            "reference": null,
+            "status": "not measured",
+            "unreadable": null,
+            "value": null
+          }
+        },
+        {
+          "churn": {
+            "key": "churn",
+            "reason": "the frozen inputs hold comments and landings, not dispatch rows: classifyTicket classifies a ticket's dispatch rows, and reads a verdict from a row's feedback",
+            "reference": null,
+            "status": "not measured",
+            "unreadable": null,
+            "value": null
+          },
+          "effortReadout": {
+            "key": "effortReadout",
+            "reason": "the frozen inputs hold comments and landings, not dispatch rows or request records: computeEffortReadout reads the dispatch history and its cost records",
+            "reference": null,
+            "status": "not measured",
+            "unreadable": null,
+            "value": null
+          },
+          "followOnRatio": {
+            "ratio": {
+              "key": "followOnRatio",
+              "reason": "the frozen inputs hold one ticket's trail, not the window's issues and their relations",
+              "reference": null,
+              "status": "not measured",
+              "unreadable": null,
+              "value": null
+            },
+            "reviewLedger": false
+          },
+          "id": "converging/4-verdicts",
+          "roundTrips": {
+            "tierA": [
+              {
+                "at": "2026-11-20T10:00:00.000Z",
+                "id": "converging-rc-1",
+                "verdict": "request changes"
+              },
+              {
+                "at": "2026-11-20T11:00:00.000Z",
+                "id": "converging-rc-2",
+                "verdict": "request changes"
+              },
+              {
+                "at": "2026-11-20T12:00:00.000Z",
+                "id": "converging-rc-3",
+                "verdict": "request changes"
+              },
+              {
+                "at": "2026-11-20T13:00:00.000Z",
+                "id": "converging-rc-4",
+                "verdict": "request changes"
+              }
+            ],
+            "walk": {
+              "key": "roundTrips",
+              "reason": "the frozen inputs hold comments and landings, not dispatch rows: computeIssueRoundTrips settles R0 on the pipeline rows (GET /dispatch)",
+              "reference": null,
+              "status": "not measured",
+              "unreadable": null,
+              "value": null
+            }
+          },
+          "stabilityBlind": {
+            "key": "blind",
+            "reason": "a seed has no landing",
+            "reference": null,
+            "status": "not measured",
+            "unreadable": null,
+            "value": null
+          }
+        },
+        {
+          "churn": {
+            "key": "churn",
+            "reason": "the frozen inputs hold comments and landings, not dispatch rows: classifyTicket classifies a ticket's dispatch rows, and reads a verdict from a row's feedback",
+            "reference": null,
+            "status": "not measured",
+            "unreadable": null,
+            "value": null
+          },
+          "effortReadout": {
+            "key": "effortReadout",
+            "reason": "the frozen inputs hold comments and landings, not dispatch rows or request records: computeEffortReadout reads the dispatch history and its cost records",
+            "reference": null,
+            "status": "not measured",
+            "unreadable": null,
+            "value": null
+          },
+          "followOnRatio": {
+            "ratio": {
+              "key": "followOnRatio",
+              "reason": "the frozen inputs hold one ticket's trail, not the window's issues and their relations",
+              "reference": null,
+              "status": "not measured",
+              "unreadable": null,
+              "value": null
+            },
+            "reviewLedger": false
+          },
+          "id": "converging/5-verdicts",
+          "roundTrips": {
+            "tierA": [
+              {
+                "at": "2026-11-20T10:00:00.000Z",
+                "id": "converging-rc-1",
+                "verdict": "request changes"
+              },
+              {
+                "at": "2026-11-20T11:00:00.000Z",
+                "id": "converging-rc-2",
+                "verdict": "request changes"
+              },
+              {
+                "at": "2026-11-20T12:00:00.000Z",
+                "id": "converging-rc-3",
+                "verdict": "request changes"
+              },
+              {
+                "at": "2026-11-20T13:00:00.000Z",
+                "id": "converging-rc-4",
+                "verdict": "request changes"
+              },
+              {
+                "at": "2026-11-20T14:00:00.000Z",
+                "id": "converging-rc-5",
+                "verdict": "request changes"
+              }
+            ],
+            "walk": {
+              "key": "roundTrips",
+              "reason": "the frozen inputs hold comments and landings, not dispatch rows: computeIssueRoundTrips settles R0 on the pipeline rows (GET /dispatch)",
+              "reference": null,
+              "status": "not measured",
+              "unreadable": null,
+              "value": null
+            }
+          },
+          "stabilityBlind": {
+            "key": "blind",
+            "reason": "a seed has no landing",
+            "reference": null,
+            "status": "not measured",
+            "unreadable": null,
+            "value": null
+          }
+        },
+        {
+          "churn": {
+            "key": "churn",
+            "reason": "the frozen inputs hold comments and landings, not dispatch rows: classifyTicket classifies a ticket's dispatch rows, and reads a verdict from a row's feedback",
+            "reference": null,
+            "status": "not measured",
+            "unreadable": null,
+            "value": null
+          },
+          "effortReadout": {
+            "key": "effortReadout",
+            "reason": "the frozen inputs hold comments and landings, not dispatch rows or request records: computeEffortReadout reads the dispatch history and its cost records",
+            "reference": null,
+            "status": "not measured",
+            "unreadable": null,
+            "value": null
+          },
+          "followOnRatio": {
+            "ratio": {
+              "key": "followOnRatio",
+              "reason": "the frozen inputs hold one ticket's trail, not the window's issues and their relations",
+              "reference": null,
+              "status": "not measured",
+              "unreadable": null,
+              "value": null
+            },
+            "reviewLedger": false
+          },
+          "id": "flat/1-verdicts",
+          "roundTrips": {
+            "tierA": [
+              {
+                "at": "2026-11-20T10:00:00.000Z",
+                "id": "flat-rc-1",
+                "verdict": "request changes"
+              }
+            ],
+            "walk": {
+              "key": "roundTrips",
+              "reason": "the frozen inputs hold comments and landings, not dispatch rows: computeIssueRoundTrips settles R0 on the pipeline rows (GET /dispatch)",
+              "reference": null,
+              "status": "not measured",
+              "unreadable": null,
+              "value": null
+            }
+          },
+          "stabilityBlind": {
+            "key": "blind",
+            "reason": "a seed has no landing",
+            "reference": null,
+            "status": "not measured",
+            "unreadable": null,
+            "value": null
+          }
+        },
+        {
+          "churn": {
+            "key": "churn",
+            "reason": "the frozen inputs hold comments and landings, not dispatch rows: classifyTicket classifies a ticket's dispatch rows, and reads a verdict from a row's feedback",
+            "reference": null,
+            "status": "not measured",
+            "unreadable": null,
+            "value": null
+          },
+          "effortReadout": {
+            "key": "effortReadout",
+            "reason": "the frozen inputs hold comments and landings, not dispatch rows or request records: computeEffortReadout reads the dispatch history and its cost records",
+            "reference": null,
+            "status": "not measured",
+            "unreadable": null,
+            "value": null
+          },
+          "followOnRatio": {
+            "ratio": {
+              "key": "followOnRatio",
+              "reason": "the frozen inputs hold one ticket's trail, not the window's issues and their relations",
+              "reference": null,
+              "status": "not measured",
+              "unreadable": null,
+              "value": null
+            },
+            "reviewLedger": false
+          },
+          "id": "flat/2-verdicts",
+          "roundTrips": {
+            "tierA": [
+              {
+                "at": "2026-11-20T10:00:00.000Z",
+                "id": "flat-rc-1",
+                "verdict": "request changes"
+              },
+              {
+                "at": "2026-11-20T11:00:00.000Z",
+                "id": "flat-rc-2",
+                "verdict": "request changes"
+              }
+            ],
+            "walk": {
+              "key": "roundTrips",
+              "reason": "the frozen inputs hold comments and landings, not dispatch rows: computeIssueRoundTrips settles R0 on the pipeline rows (GET /dispatch)",
+              "reference": null,
+              "status": "not measured",
+              "unreadable": null,
+              "value": null
+            }
+          },
+          "stabilityBlind": {
+            "key": "blind",
+            "reason": "a seed has no landing",
+            "reference": null,
+            "status": "not measured",
+            "unreadable": null,
+            "value": null
+          }
+        },
+        {
+          "churn": {
+            "key": "churn",
+            "reason": "the frozen inputs hold comments and landings, not dispatch rows: classifyTicket classifies a ticket's dispatch rows, and reads a verdict from a row's feedback",
+            "reference": null,
+            "status": "not measured",
+            "unreadable": null,
+            "value": null
+          },
+          "effortReadout": {
+            "key": "effortReadout",
+            "reason": "the frozen inputs hold comments and landings, not dispatch rows or request records: computeEffortReadout reads the dispatch history and its cost records",
+            "reference": null,
+            "status": "not measured",
+            "unreadable": null,
+            "value": null
+          },
+          "followOnRatio": {
+            "ratio": {
+              "key": "followOnRatio",
+              "reason": "the frozen inputs hold one ticket's trail, not the window's issues and their relations",
+              "reference": null,
+              "status": "not measured",
+              "unreadable": null,
+              "value": null
+            },
+            "reviewLedger": false
+          },
+          "id": "flat/3-verdicts",
+          "roundTrips": {
+            "tierA": [
+              {
+                "at": "2026-11-20T10:00:00.000Z",
+                "id": "flat-rc-1",
+                "verdict": "request changes"
+              },
+              {
+                "at": "2026-11-20T11:00:00.000Z",
+                "id": "flat-rc-2",
+                "verdict": "request changes"
+              },
+              {
+                "at": "2026-11-20T12:00:00.000Z",
+                "id": "flat-rc-3",
+                "verdict": "request changes"
+              }
+            ],
+            "walk": {
+              "key": "roundTrips",
+              "reason": "the frozen inputs hold comments and landings, not dispatch rows: computeIssueRoundTrips settles R0 on the pipeline rows (GET /dispatch)",
+              "reference": null,
+              "status": "not measured",
+              "unreadable": null,
+              "value": null
+            }
+          },
+          "stabilityBlind": {
+            "key": "blind",
+            "reason": "a seed has no landing",
+            "reference": null,
+            "status": "not measured",
+            "unreadable": null,
+            "value": null
+          }
+        }
+      ],
+      "id": "converging-plan-review-loop"
+    },
+    {
+      "cases": [
+        {
+          "churn": {
+            "key": "churn",
+            "reason": "the frozen inputs hold comments and landings, not dispatch rows: classifyTicket classifies a ticket's dispatch rows, and reads a verdict from a row's feedback",
+            "reference": null,
+            "status": "not measured",
+            "unreadable": null,
+            "value": null
+          },
+          "effortReadout": {
+            "key": "effortReadout",
+            "reason": "the frozen inputs hold comments and landings, not dispatch rows or request records: computeEffortReadout reads the dispatch history and its cost records",
+            "reference": null,
+            "status": "not measured",
+            "unreadable": null,
+            "value": null
+          },
+          "followOnRatio": {
+            "ratio": {
+              "key": "followOnRatio",
+              "reason": "the frozen inputs hold one ticket's trail, not the window's issues and their relations",
+              "reference": null,
+              "status": "not measured",
+              "unreadable": null,
+              "value": null
+            },
+            "reviewLedger": true
+          },
+          "id": "parked-close-out",
+          "roundTrips": {
+            "tierA": [
+              {
+                "at": "2026-11-20T10:38:03.980Z",
+                "id": "62f0d763-8a4c-477b-ad9b-16372d1be25c",
+                "verdict": "approve"
+              },
+              {
+                "at": "2026-11-20T10:49:20.799Z",
+                "id": "ea404d85-2a27-4cf5-9031-9a52f20c269d",
+                "verdict": "request changes"
+              },
+              {
+                "at": "2026-11-20T10:56:12.410Z",
+                "id": "363b5c30-94f8-4b87-b722-3675e8edcdc0",
+                "verdict": "approve"
+              },
+              {
+                "at": "2026-11-20T15:36:17.448Z",
+                "id": "b30f502b-8deb-4994-9de7-806ea358fb2d",
+                "verdict": "approve"
+              },
+              {
+                "at": "2026-11-20T22:08:21.858Z",
+                "id": "9e94fdc4-f457-4f88-aa09-1e7644fd08e5",
+                "verdict": "approve"
+              }
+            ],
+            "walk": {
+              "key": "roundTrips",
+              "reason": "the frozen inputs hold comments and landings, not dispatch rows: computeIssueRoundTrips settles R0 on the pipeline rows (GET /dispatch)",
+              "reference": null,
+              "status": "not measured",
+              "unreadable": null,
+              "value": null
+            }
+          },
+          "stabilityBlind": {
+            "key": "blind",
+            "reason": "a seed has no landing",
+            "reference": null,
+            "status": "not measured",
+            "unreadable": null,
+            "value": null
+          }
+        },
+        {
+          "churn": {
+            "key": "churn",
+            "reason": "the frozen inputs hold comments and landings, not dispatch rows: classifyTicket classifies a ticket's dispatch rows, and reads a verdict from a row's feedback",
+            "reference": null,
+            "status": "not measured",
+            "unreadable": null,
+            "value": null
+          },
+          "effortReadout": {
+            "key": "effortReadout",
+            "reason": "the frozen inputs hold comments and landings, not dispatch rows or request records: computeEffortReadout reads the dispatch history and its cost records",
+            "reference": null,
+            "status": "not measured",
+            "unreadable": null,
+            "value": null
+          },
+          "followOnRatio": {
+            "ratio": {
+              "key": "followOnRatio",
+              "reason": "the frozen inputs hold one ticket's trail, not the window's issues and their relations",
+              "reference": null,
+              "status": "not measured",
+              "unreadable": null,
+              "value": null
+            },
+            "reviewLedger": true
+          },
+          "id": "no-live-run",
+          "roundTrips": {
+            "tierA": [
+              {
+                "at": "2026-11-20T10:38:03.980Z",
+                "id": "62f0d763-8a4c-477b-ad9b-16372d1be25c",
+                "verdict": "approve"
+              },
+              {
+                "at": "2026-11-20T10:49:20.799Z",
+                "id": "ea404d85-2a27-4cf5-9031-9a52f20c269d",
+                "verdict": "request changes"
+              },
+              {
+                "at": "2026-11-20T10:56:12.410Z",
+                "id": "363b5c30-94f8-4b87-b722-3675e8edcdc0",
+                "verdict": "approve"
+              },
+              {
+                "at": "2026-11-20T15:36:17.448Z",
+                "id": "b30f502b-8deb-4994-9de7-806ea358fb2d",
+                "verdict": "approve"
+              },
+              {
+                "at": "2026-11-20T22:08:21.858Z",
+                "id": "9e94fdc4-f457-4f88-aa09-1e7644fd08e5",
+                "verdict": "approve"
+              }
+            ],
+            "walk": {
+              "key": "roundTrips",
+              "reason": "the frozen inputs hold comments and landings, not dispatch rows: computeIssueRoundTrips settles R0 on the pipeline rows (GET /dispatch)",
+              "reference": null,
+              "status": "not measured",
+              "unreadable": null,
+              "value": null
+            }
+          },
+          "stabilityBlind": {
+            "key": "blind",
+            "reason": "a seed has no landing",
+            "reference": null,
+            "status": "not measured",
+            "unreadable": null,
+            "value": null
+          }
+        }
+      ],
+      "id": "parked-close-out"
+    },
+    {
+      "cases": [
+        {
+          "churn": {
+            "key": "churn",
+            "reason": "the frozen inputs hold comments and landings, not dispatch rows: classifyTicket classifies a ticket's dispatch rows, and reads a verdict from a row's feedback",
+            "reference": null,
+            "status": "not measured",
+            "unreadable": null,
+            "value": null
+          },
+          "effortReadout": {
+            "key": "effortReadout",
+            "reason": "the frozen inputs hold comments and landings, not dispatch rows or request records: computeEffortReadout reads the dispatch history and its cost records",
+            "reference": null,
+            "status": "not measured",
+            "unreadable": null,
+            "value": null
+          },
+          "followOnRatio": {
+            "ratio": {
+              "key": "followOnRatio",
+              "reason": "the frozen inputs hold one ticket's trail, not the window's issues and their relations",
+              "reference": null,
+              "status": "not measured",
+              "unreadable": null,
+              "value": null
+            },
+            "reviewLedger": false
+          },
+          "id": "no-read",
+          "roundTrips": {
+            "tierA": [
+              {
+                "at": "2026-11-12T02:00:00.000Z",
+                "id": "approve-review",
+                "verdict": "approve"
+              }
+            ],
+            "walk": {
+              "key": "roundTrips",
+              "reason": "the frozen inputs hold comments and landings, not dispatch rows: computeIssueRoundTrips settles R0 on the pipeline rows (GET /dispatch)",
+              "reference": null,
+              "status": "not measured",
+              "unreadable": null,
+              "value": null
+            }
+          },
+          "stabilityBlind": {
+            "key": "blind",
+            "reason": "a seed has no landing",
+            "reference": null,
+            "status": "not measured",
+            "unreadable": null,
+            "value": null
+          }
+        },
+        {
+          "churn": {
+            "key": "churn",
+            "reason": "the frozen inputs hold comments and landings, not dispatch rows: classifyTicket classifies a ticket's dispatch rows, and reads a verdict from a row's feedback",
+            "reference": null,
+            "status": "not measured",
+            "unreadable": null,
+            "value": null
+          },
+          "effortReadout": {
+            "key": "effortReadout",
+            "reason": "the frozen inputs hold comments and landings, not dispatch rows or request records: computeEffortReadout reads the dispatch history and its cost records",
+            "reference": null,
+            "status": "not measured",
+            "unreadable": null,
+            "value": null
+          },
+          "followOnRatio": {
+            "ratio": {
+              "key": "followOnRatio",
+              "reason": "the frozen inputs hold one ticket's trail, not the window's issues and their relations",
+              "reference": null,
+              "status": "not measured",
+              "unreadable": null,
+              "value": null
+            },
+            "reviewLedger": false
+          },
+          "id": "read-both",
+          "roundTrips": {
+            "tierA": [
+              {
+                "at": "2026-11-12T02:00:00.000Z",
+                "id": "approve-review",
+                "verdict": "approve"
+              }
+            ],
+            "walk": {
+              "key": "roundTrips",
+              "reason": "the frozen inputs hold comments and landings, not dispatch rows: computeIssueRoundTrips settles R0 on the pipeline rows (GET /dispatch)",
+              "reference": null,
+              "status": "not measured",
+              "unreadable": null,
+              "value": null
+            }
+          },
+          "stabilityBlind": {
+            "key": "blind",
+            "reason": "a seed has no landing",
+            "reference": null,
+            "status": "not measured",
+            "unreadable": null,
+            "value": null
+          }
+        },
+        {
+          "churn": {
+            "key": "churn",
+            "reason": "the frozen inputs hold comments and landings, not dispatch rows: classifyTicket classifies a ticket's dispatch rows, and reads a verdict from a row's feedback",
+            "reference": null,
+            "status": "not measured",
+            "unreadable": null,
+            "value": null
+          },
+          "effortReadout": {
+            "key": "effortReadout",
+            "reason": "the frozen inputs hold comments and landings, not dispatch rows or request records: computeEffortReadout reads the dispatch history and its cost records",
+            "reference": null,
+            "status": "not measured",
+            "unreadable": null,
+            "value": null
+          },
+          "followOnRatio": {
+            "ratio": {
+              "key": "followOnRatio",
+              "reason": "the frozen inputs hold one ticket's trail, not the window's issues and their relations",
+              "reference": null,
+              "status": "not measured",
+              "unreadable": null,
+              "value": null
+            },
+            "reviewLedger": false
+          },
+          "id": "read-open-only",
+          "roundTrips": {
+            "tierA": [
+              {
+                "at": "2026-11-12T02:00:00.000Z",
+                "id": "approve-review",
+                "verdict": "approve"
+              }
+            ],
+            "walk": {
+              "key": "roundTrips",
+              "reason": "the frozen inputs hold comments and landings, not dispatch rows: computeIssueRoundTrips settles R0 on the pipeline rows (GET /dispatch)",
+              "reference": null,
+              "status": "not measured",
+              "unreadable": null,
+              "value": null
+            }
+          },
+          "stabilityBlind": {
+            "key": "blind",
+            "reason": "a seed has no landing",
+            "reference": null,
+            "status": "not measured",
+            "unreadable": null,
+            "value": null
+          }
+        },
+        {
+          "churn": {
+            "key": "churn",
+            "reason": "the frozen inputs hold comments and landings, not dispatch rows: classifyTicket classifies a ticket's dispatch rows, and reads a verdict from a row's feedback",
+            "reference": null,
+            "status": "not measured",
+            "unreadable": null,
+            "value": null
+          },
+          "effortReadout": {
+            "key": "effortReadout",
+            "reason": "the frozen inputs hold comments and landings, not dispatch rows or request records: computeEffortReadout reads the dispatch history and its cost records",
+            "reference": null,
+            "status": "not measured",
+            "unreadable": null,
+            "value": null
+          },
+          "followOnRatio": {
+            "ratio": {
+              "key": "followOnRatio",
+              "reason": "the frozen inputs hold one ticket's trail, not the window's issues and their relations",
+              "reference": null,
+              "status": "not measured",
+              "unreadable": null,
+              "value": null
+            },
+            "reviewLedger": false
+          },
+          "id": "read-merged-only",
+          "roundTrips": {
+            "tierA": [
+              {
+                "at": "2026-11-12T02:00:00.000Z",
+                "id": "approve-review",
+                "verdict": "approve"
+              }
+            ],
+            "walk": {
+              "key": "roundTrips",
+              "reason": "the frozen inputs hold comments and landings, not dispatch rows: computeIssueRoundTrips settles R0 on the pipeline rows (GET /dispatch)",
+              "reference": null,
+              "status": "not measured",
+              "unreadable": null,
+              "value": null
+            }
+          },
+          "stabilityBlind": {
+            "key": "blind",
+            "reason": "a seed has no landing",
+            "reference": null,
+            "status": "not measured",
+            "unreadable": null,
+            "value": null
+          }
+        }
+      ],
+      "id": "two-pr-partly-merged"
+    },
+    {
+      "cases": [
+        {
+          "churn": {
+            "key": "churn",
+            "reason": "the frozen inputs hold comments and landings, not dispatch rows: classifyTicket classifies a ticket's dispatch rows, and reads a verdict from a row's feedback",
+            "reference": null,
+            "status": "not measured",
+            "unreadable": null,
+            "value": null
+          },
+          "effortReadout": {
+            "key": "effortReadout",
+            "reason": "the frozen inputs hold comments and landings, not dispatch rows or request records: computeEffortReadout reads the dispatch history and its cost records",
+            "reference": null,
+            "status": "not measured",
+            "unreadable": null,
+            "value": null
+          },
+          "followOnRatio": {
+            "ratio": {
+              "key": "followOnRatio",
+              "reason": "the frozen inputs hold one ticket's trail, not the window's issues and their relations",
+              "reference": null,
+              "status": "not measured",
+              "unreadable": null,
+              "value": null
+            },
+            "reviewLedger": false
+          },
+          "id": "approve-no-read",
+          "roundTrips": {
+            "tierA": [
+              {
+                "at": "2026-11-12T02:00:00.000Z",
+                "id": "approve-review",
+                "verdict": "approve"
+              }
+            ],
+            "walk": {
+              "key": "roundTrips",
+              "reason": "the frozen inputs hold comments and landings, not dispatch rows: computeIssueRoundTrips settles R0 on the pipeline rows (GET /dispatch)",
+              "reference": null,
+              "status": "not measured",
+              "unreadable": null,
+              "value": null
+            }
+          },
+          "stabilityBlind": {
+            "key": "blind",
+            "reason": "a seed has no landing",
+            "reference": null,
+            "status": "not measured",
+            "unreadable": null,
+            "value": null
+          }
+        },
+        {
+          "churn": {
+            "key": "churn",
+            "reason": "the frozen inputs hold comments and landings, not dispatch rows: classifyTicket classifies a ticket's dispatch rows, and reads a verdict from a row's feedback",
+            "reference": null,
+            "status": "not measured",
+            "unreadable": null,
+            "value": null
+          },
+          "effortReadout": {
+            "key": "effortReadout",
+            "reason": "the frozen inputs hold comments and landings, not dispatch rows or request records: computeEffortReadout reads the dispatch history and its cost records",
+            "reference": null,
+            "status": "not measured",
+            "unreadable": null,
+            "value": null
+          },
+          "followOnRatio": {
+            "ratio": {
+              "key": "followOnRatio",
+              "reason": "the frozen inputs hold one ticket's trail, not the window's issues and their relations",
+              "reference": null,
+              "status": "not measured",
+              "unreadable": null,
+              "value": null
+            },
+            "reviewLedger": false
+          },
+          "id": "approve-read-moved-head",
+          "roundTrips": {
+            "tierA": [
+              {
+                "at": "2026-11-12T02:00:00.000Z",
+                "id": "approve-review",
+                "verdict": "approve"
+              }
+            ],
+            "walk": {
+              "key": "roundTrips",
+              "reason": "the frozen inputs hold comments and landings, not dispatch rows: computeIssueRoundTrips settles R0 on the pipeline rows (GET /dispatch)",
+              "reference": null,
+              "status": "not measured",
+              "unreadable": null,
+              "value": null
+            }
+          },
+          "stabilityBlind": {
+            "key": "blind",
+            "reason": "a seed has no landing",
+            "reference": null,
+            "status": "not measured",
+            "unreadable": null,
+            "value": null
+          }
+        },
+        {
+          "churn": {
+            "key": "churn",
+            "reason": "the frozen inputs hold comments and landings, not dispatch rows: classifyTicket classifies a ticket's dispatch rows, and reads a verdict from a row's feedback",
+            "reference": null,
+            "status": "not measured",
+            "unreadable": null,
+            "value": null
+          },
+          "effortReadout": {
+            "key": "effortReadout",
+            "reason": "the frozen inputs hold comments and landings, not dispatch rows or request records: computeEffortReadout reads the dispatch history and its cost records",
+            "reference": null,
+            "status": "not measured",
+            "unreadable": null,
+            "value": null
+          },
+          "followOnRatio": {
+            "ratio": {
+              "key": "followOnRatio",
+              "reason": "the frozen inputs hold one ticket's trail, not the window's issues and their relations",
+              "reference": null,
+              "status": "not measured",
+              "unreadable": null,
+              "value": null
+            },
+            "reviewLedger": false
+          },
+          "id": "request-changes",
+          "roundTrips": {
+            "tierA": [
+              {
+                "at": "2026-11-12T02:00:00.000Z",
+                "id": "request-changes-review",
+                "verdict": "request changes"
+              }
+            ],
+            "walk": {
+              "key": "roundTrips",
+              "reason": "the frozen inputs hold comments and landings, not dispatch rows: computeIssueRoundTrips settles R0 on the pipeline rows (GET /dispatch)",
+              "reference": null,
+              "status": "not measured",
+              "unreadable": null,
+              "value": null
+            }
+          },
+          "stabilityBlind": {
+            "key": "blind",
+            "reason": "a seed has no landing",
+            "reference": null,
+            "status": "not measured",
+            "unreadable": null,
+            "value": null
+          }
+        }
+      ],
+      "id": "ladder-lane"
+    },
+    {
+      "cases": [
+        {
+          "churn": {
+            "key": "churn",
+            "reason": "the frozen inputs hold comments and landings, not dispatch rows: classifyTicket classifies a ticket's dispatch rows, and reads a verdict from a row's feedback",
+            "reference": null,
+            "status": "not measured",
+            "unreadable": null,
+            "value": null
+          },
+          "effortReadout": {
+            "key": "effortReadout",
+            "reason": "the frozen inputs hold comments and landings, not dispatch rows or request records: computeEffortReadout reads the dispatch history and its cost records",
+            "reference": null,
+            "status": "not measured",
+            "unreadable": null,
+            "value": null
+          },
+          "followOnRatio": {
+            "ratio": {
+              "key": "followOnRatio",
+              "reason": "the frozen inputs hold one ticket's trail, not the window's issues and their relations",
+              "reference": null,
+              "status": "not measured",
+              "unreadable": null,
+              "value": null
+            },
+            "reviewLedger": false
+          },
+          "id": "note-after-verdict",
+          "roundTrips": {
+            "tierA": [
+              {
+                "at": "2026-11-20T10:56:12.410Z",
+                "id": "363b5c30-94f8-4b87-b722-3675e8edcdc0",
+                "verdict": "approve"
+              }
+            ],
+            "walk": {
+              "key": "roundTrips",
+              "reason": "the frozen inputs hold comments and landings, not dispatch rows: computeIssueRoundTrips settles R0 on the pipeline rows (GET /dispatch)",
+              "reference": null,
+              "status": "not measured",
+              "unreadable": null,
+              "value": null
+            }
+          },
+          "stabilityBlind": {
+            "key": "blind",
+            "reason": "a seed has no landing",
+            "reference": null,
+            "status": "not measured",
+            "unreadable": null,
+            "value": null
+          }
+        },
+        {
+          "churn": {
+            "key": "churn",
+            "reason": "the frozen inputs hold comments and landings, not dispatch rows: classifyTicket classifies a ticket's dispatch rows, and reads a verdict from a row's feedback",
+            "reference": null,
+            "status": "not measured",
+            "unreadable": null,
+            "value": null
+          },
+          "effortReadout": {
+            "key": "effortReadout",
+            "reason": "the frozen inputs hold comments and landings, not dispatch rows or request records: computeEffortReadout reads the dispatch history and its cost records",
+            "reference": null,
+            "status": "not measured",
+            "unreadable": null,
+            "value": null
+          },
+          "followOnRatio": {
+            "ratio": {
+              "key": "followOnRatio",
+              "reason": "the frozen inputs hold one ticket's trail, not the window's issues and their relations",
+              "reference": null,
+              "status": "not measured",
+              "unreadable": null,
+              "value": null
+            },
+            "reviewLedger": false
+          },
+          "id": "ruling-after-verdict",
+          "roundTrips": {
+            "tierA": [
+              {
+                "at": "2026-11-20T10:56:12.410Z",
+                "id": "363b5c30-94f8-4b87-b722-3675e8edcdc0",
+                "verdict": "approve"
+              }
+            ],
+            "walk": {
+              "key": "roundTrips",
+              "reason": "the frozen inputs hold comments and landings, not dispatch rows: computeIssueRoundTrips settles R0 on the pipeline rows (GET /dispatch)",
+              "reference": null,
+              "status": "not measured",
+              "unreadable": null,
+              "value": null
+            }
+          },
+          "stabilityBlind": {
+            "key": "blind",
+            "reason": "a seed has no landing",
+            "reference": null,
+            "status": "not measured",
+            "unreadable": null,
+            "value": null
+          }
+        },
+        {
+          "churn": {
+            "key": "churn",
+            "reason": "the frozen inputs hold comments and landings, not dispatch rows: classifyTicket classifies a ticket's dispatch rows, and reads a verdict from a row's feedback",
+            "reference": null,
+            "status": "not measured",
+            "unreadable": null,
+            "value": null
+          },
+          "effortReadout": {
+            "key": "effortReadout",
+            "reason": "the frozen inputs hold comments and landings, not dispatch rows or request records: computeEffortReadout reads the dispatch history and its cost records",
+            "reference": null,
+            "status": "not measured",
+            "unreadable": null,
+            "value": null
+          },
+          "followOnRatio": {
+            "ratio": {
+              "key": "followOnRatio",
+              "reason": "the frozen inputs hold one ticket's trail, not the window's issues and their relations",
+              "reference": null,
+              "status": "not measured",
+              "unreadable": null,
+              "value": null
+            },
+            "reviewLedger": false
+          },
+          "id": "person-after-note",
+          "roundTrips": {
+            "tierA": [
+              {
+                "at": "2026-11-20T10:56:12.410Z",
+                "id": "363b5c30-94f8-4b87-b722-3675e8edcdc0",
+                "verdict": "approve"
+              }
+            ],
+            "walk": {
+              "key": "roundTrips",
+              "reason": "the frozen inputs hold comments and landings, not dispatch rows: computeIssueRoundTrips settles R0 on the pipeline rows (GET /dispatch)",
+              "reference": null,
+              "status": "not measured",
+              "unreadable": null,
+              "value": null
+            }
+          },
+          "stabilityBlind": {
+            "key": "blind",
+            "reason": "a seed has no landing",
+            "reference": null,
+            "status": "not measured",
+            "unreadable": null,
+            "value": null
+          }
+        },
+        {
+          "churn": {
+            "key": "churn",
+            "reason": "the frozen inputs hold comments and landings, not dispatch rows: classifyTicket classifies a ticket's dispatch rows, and reads a verdict from a row's feedback",
+            "reference": null,
+            "status": "not measured",
+            "unreadable": null,
+            "value": null
+          },
+          "effortReadout": {
+            "key": "effortReadout",
+            "reason": "the frozen inputs hold comments and landings, not dispatch rows or request records: computeEffortReadout reads the dispatch history and its cost records",
+            "reference": null,
+            "status": "not measured",
+            "unreadable": null,
+            "value": null
+          },
+          "followOnRatio": {
+            "ratio": {
+              "key": "followOnRatio",
+              "reason": "the frozen inputs hold one ticket's trail, not the window's issues and their relations",
+              "reference": null,
+              "status": "not measured",
+              "unreadable": null,
+              "value": null
+            },
+            "reviewLedger": true
+          },
+          "id": "lin-4499-to-22-14",
+          "roundTrips": {
+            "tierA": [
+              {
+                "at": "2026-11-20T10:38:03.980Z",
+                "id": "62f0d763-8a4c-477b-ad9b-16372d1be25c",
+                "verdict": "approve"
+              },
+              {
+                "at": "2026-11-20T10:49:20.799Z",
+                "id": "ea404d85-2a27-4cf5-9031-9a52f20c269d",
+                "verdict": "request changes"
+              },
+              {
+                "at": "2026-11-20T10:56:12.410Z",
+                "id": "363b5c30-94f8-4b87-b722-3675e8edcdc0",
+                "verdict": "approve"
+              },
+              {
+                "at": "2026-11-20T15:36:17.448Z",
+                "id": "b30f502b-8deb-4994-9de7-806ea358fb2d",
+                "verdict": "approve"
+              },
+              {
+                "at": "2026-11-20T22:08:21.858Z",
+                "id": "9e94fdc4-f457-4f88-aa09-1e7644fd08e5",
+                "verdict": "approve"
+              }
+            ],
+            "walk": {
+              "key": "roundTrips",
+              "reason": "the frozen inputs hold comments and landings, not dispatch rows: computeIssueRoundTrips settles R0 on the pipeline rows (GET /dispatch)",
+              "reference": null,
+              "status": "not measured",
+              "unreadable": null,
+              "value": null
+            }
+          },
+          "stabilityBlind": {
+            "key": "blind",
+            "reason": "a seed has no landing",
+            "reference": null,
+            "status": "not measured",
+            "unreadable": null,
+            "value": null
+          }
+        }
+      ],
+      "id": "unheaded-agent-note"
+    }
+  ],
+  "tickets": [
+    {
+      "churn": {
+        "key": "churn",
+        "reason": "the frozen inputs hold comments and landings, not dispatch rows: classifyTicket classifies a ticket's dispatch rows, and reads a verdict from a row's feedback",
+        "reference": null,
+        "status": "not measured",
+        "unreadable": null,
+        "value": null
+      },
+      "effortReadout": {
+        "key": "effortReadout",
+        "reason": "the frozen inputs hold comments and landings, not dispatch rows or request records: computeEffortReadout reads the dispatch history and its cost records",
+        "reference": null,
+        "status": "not measured",
+        "unreadable": null,
+        "value": null
+      },
+      "followOnRatio": {
+        "ratio": {
+          "key": "followOnRatio",
+          "reason": "the frozen inputs hold one ticket's trail, not the window's issues and their relations",
+          "reference": null,
+          "status": "not measured",
+          "unreadable": null,
+          "value": null
+        },
+        "reviewLedger": true
+      },
+      "roundTrips": {
+        "tierA": [
+          {
+            "at": "2026-11-13T23:03:57.654Z",
+            "id": "39207a24-8015-4a5e-9c33-fc592b20a5e3",
+            "verdict": "needs discussion"
+          },
+          {
+            "at": "2026-11-13T23:21:48.924Z",
+            "id": "042f607d-474b-49c2-acbc-15f45c3969e9",
+            "verdict": "approve"
+          }
+        ],
+        "walk": {
+          "key": "roundTrips",
+          "reason": "the frozen inputs hold comments and landings, not dispatch rows: computeIssueRoundTrips settles R0 on the pipeline rows (GET /dispatch)",
+          "reference": null,
+          "status": "not measured",
+          "unreadable": null,
+          "value": null
+        }
+      },
+      "stabilityBlind": [
+        {
+          "commentId": "d96c0849-7422-43e5-b6ea-ed6db1791bab",
+          "commit": "ca77a891e8e32f8132b9d3d0da0c860bfd0b213b",
+          "mergedAt": "2026-11-13T23:51:43Z",
+          "prUrl": "https://github.com/JKershaw/LinearViewer/pull/2447",
+          "readAt": "2026-11-13T23:26:25.368Z",
+          "status": "read",
+          "verdict": "better"
+        }
+      ],
+      "ticket": "LIN-4469"
+    },
+    {
+      "churn": {
+        "key": "churn",
+        "reason": "the frozen inputs hold comments and landings, not dispatch rows: classifyTicket classifies a ticket's dispatch rows, and reads a verdict from a row's feedback",
+        "reference": null,
+        "status": "not measured",
+        "unreadable": null,
+        "value": null
+      },
+      "effortReadout": {
+        "key": "effortReadout",
+        "reason": "the frozen inputs hold comments and landings, not dispatch rows or request records: computeEffortReadout reads the dispatch history and its cost records",
+        "reference": null,
+        "status": "not measured",
+        "unreadable": null,
+        "value": null
+      },
+      "followOnRatio": {
+        "ratio": {
+          "key": "followOnRatio",
+          "reason": "the frozen inputs hold one ticket's trail, not the window's issues and their relations",
+          "reference": null,
+          "status": "not measured",
+          "unreadable": null,
+          "value": null
+        },
+        "reviewLedger": true
+      },
+      "roundTrips": {
+        "tierA": [
+          {
+            "at": "2026-11-13T14:27:54.348Z",
+            "id": "06e0039d-8d7f-4e47-a371-86d501ecc18a",
+            "verdict": "request changes"
+          },
+          {
+            "at": "2026-11-13T14:36:13.975Z",
+            "id": "2a141c44-3d6e-4c26-9c11-439c227f827f",
+            "verdict": "approve"
+          },
+          {
+            "at": "2026-11-13T15:11:29.505Z",
+            "id": "1f349668-597c-4528-a77d-5aceb1326765",
+            "verdict": "approve"
+          }
+        ],
+        "walk": {
+          "key": "roundTrips",
+          "reason": "the frozen inputs hold comments and landings, not dispatch rows: computeIssueRoundTrips settles R0 on the pipeline rows (GET /dispatch)",
+          "reference": null,
+          "status": "not measured",
+          "unreadable": null,
+          "value": null
+        }
+      },
+      "stabilityBlind": [
+        {
+          "commentId": "07cfe71c-593c-4be6-b0c3-408a5452fe79",
+          "commit": "92676b1febeb5407878d69b5e7a8f166a9371777",
+          "mergedAt": "2026-11-13T15:22:55Z",
+          "prUrl": "https://github.com/JKershaw/LinearViewer/pull/2423",
+          "readAt": "2026-11-13T15:14:31.812Z",
+          "status": "read",
+          "verdict": "better"
+        }
+      ],
+      "ticket": "LIN-4446"
+    },
+    {
+      "churn": {
+        "key": "churn",
+        "reason": "the frozen inputs hold comments and landings, not dispatch rows: classifyTicket classifies a ticket's dispatch rows, and reads a verdict from a row's feedback",
+        "reference": null,
+        "status": "not measured",
+        "unreadable": null,
+        "value": null
+      },
+      "effortReadout": {
+        "key": "effortReadout",
+        "reason": "the frozen inputs hold comments and landings, not dispatch rows or request records: computeEffortReadout reads the dispatch history and its cost records",
+        "reference": null,
+        "status": "not measured",
+        "unreadable": null,
+        "value": null
+      },
+      "followOnRatio": {
+        "ratio": {
+          "key": "followOnRatio",
+          "reason": "the frozen inputs hold one ticket's trail, not the window's issues and their relations",
+          "reference": null,
+          "status": "not measured",
+          "unreadable": null,
+          "value": null
+        },
+        "reviewLedger": true
+      },
+      "roundTrips": {
+        "tierA": [
+          {
+            "at": "2026-11-13T15:18:12.503Z",
+            "id": "d9db330c-04a0-4456-be07-a275fb74b323",
+            "verdict": "approve"
+          }
+        ],
+        "walk": {
+          "key": "roundTrips",
+          "reason": "the frozen inputs hold comments and landings, not dispatch rows: computeIssueRoundTrips settles R0 on the pipeline rows (GET /dispatch)",
+          "reference": null,
+          "status": "not measured",
+          "unreadable": null,
+          "value": null
+        }
+      },
+      "stabilityBlind": [
+        {
+          "commentId": "8657e1c5-c37f-4c9e-8500-92cb37605d59",
+          "commit": "2bf788b6da71c82db6a1d84b361da98ef9cdedbb",
+          "mergedAt": "2026-11-13T15:32:12Z",
+          "prUrl": "https://github.com/JKershaw/LinearViewer/pull/2421",
+          "readAt": "2026-11-13T15:21:22.841Z",
+          "status": "read",
+          "verdict": "better"
+        }
+      ],
+      "ticket": "LIN-4450"
+    }
+  ]
+}
