@@ -20,6 +20,7 @@ process.env.NODE_ENV = 'test';
 
 import { test, describe } from 'node:test';
 import assert from 'node:assert/strict';
+import { readFileSync } from 'node:fs';
 import { prUrlsIn } from '../../lib/run-ledger.js';
 import { TICKETS, loadInput, loadDerived, captureTicket, instantsOf } from '../helpers/comment-path-capture.js';
 
@@ -176,5 +177,57 @@ describe('rows.json agrees with the cells its source tests assert (LIN-4514)', (
 
   test('the ladder guard makes no PR read on any row (LIN-4438)', () => {
     for (const row of ROWS) assert.deepEqual(row.output.surfaces.prReads.ladderGuard, [], row.id);
+  });
+});
+
+describe('the old measure readers over the frozen trails, for P6 (LIN-4514)', () => {
+  const readings = loadDerived('goldens/readings.json');
+  const ticket = (id) => readings.tickets.find((t) => t.ticket === id);
+
+  test('measure 1 reads each walk-8 landing against its trail; the readers the inputs cannot carry say why, never zero', () => {
+    for (const id of ['LIN-4469', 'LIN-4446', 'LIN-4450']) {
+      const t = ticket(id);
+      assert.deepEqual(t.stabilityBlind.map((b) => [b.status, b.verdict]), [['read', 'better']], `${id}: one landing, read before its merge`);
+      for (const key of ['churn', 'effortReadout']) {
+        assert.equal(t[key].status, 'not measured', `${id}: ${key}`);
+        assert.equal(t[key].value, null);
+        assert.match(t[key].reason, /dispatch rows/);
+      }
+      assert.equal(t.roundTrips.walk.status, 'not measured');
+      assert.equal(t.followOnRatio.ratio.status, 'not measured');
+      assert.equal(t.followOnRatio.reviewLedger, true, `${id}: the review carries its ledger heading (C3-24)`);
+    }
+    assert.deepEqual(ticket('LIN-4446').roundTrips.tierA.map((v) => v.verdict), ['request changes', 'approve', 'approve'], 'two plan reviews, then the code review');
+    assert.deepEqual(ticket('LIN-4469').roundTrips.tierA.map((v) => v.verdict), ['needs discussion', 'approve'], 'tier A reads the word, so "Approve — conditional" is approve');
+  });
+
+  test('every seed case is read too; a seed has no landing, so measure 1 is not measured', () => {
+    const cases = readings.seeds.flatMap((s) => s.cases);
+    assert.equal(cases.length, 21);
+    for (const c of cases) assert.equal(c.stabilityBlind.status, 'not measured', c.id);
+    const loop = readings.seeds.find((s) => s.id === 'converging-plan-review-loop').cases.find((c) => c.id === 'converging/5-verdicts');
+    assert.deepEqual(loop.roundTrips.tierA.map((v) => v.verdict), Array(5).fill('request changes'));
+  });
+});
+
+describe('the pre-landing readings are committed (LIN-4514)', () => {
+  const dir = new URL('../../docs/reviews/slice-3-readings/', import.meta.url);
+  const read = (f) => JSON.parse(readFileSync(new URL(f, dir), 'utf8'));
+  const rowsOf = (v) => (v && typeof v === 'object' ? [...(v.status ? [v] : []), ...Object.values(v).flatMap(rowsOf)] : []);
+
+  test('history and production readings: each row measured, or not measured with its reason; nothing secret', () => {
+    for (const f of ['history-2026-11-21.json', 'production-2026-11-21.json']) {
+      const text = readFileSync(new URL(f, dir), 'utf8');
+      assert.doesNotMatch(text, /mongodb(\+srv)?:\/\/|password|bearer [a-z0-9]{8,}/i, `${f}: no secret`);
+      for (const r of rowsOf(read(f))) {
+        if (r.status === 'not measured') assert.ok(r.reason && r.value == null, `${f}: ${r.key} says why, with no value`);
+      }
+    }
+    const history = read('history-2026-11-21.json');
+    assert.equal(history.blindReadResults.status, 'measured');
+    assert.equal(history.reviewRoundTrips.planReview.gate.status, 'not measured', 'plan facts not read: the gate-due series is not zero');
+    const prod = read('production-2026-11-21.json');
+    assert.equal(prod.heldRuns.row.status, 'measured');
+    assert.equal(typeof prod.blindReadQueries.reading.rows, 'number');
   });
 });

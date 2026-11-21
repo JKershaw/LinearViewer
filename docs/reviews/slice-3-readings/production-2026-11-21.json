@@ -1,0 +1,107 @@
+{
+  "_about": "LIN-4514 pre-landing readings from production (slice 3, before verdicts and changes become records). Read-only, through railway ssh into harbour-cat with the deployed build: docs/reviews/slice-3-readings/production-read.mjs (it calls scripts/records-readings.mjs readFromDb and scripts/stability-measures-core.mjs heldRunReading, slice 2's method, LIN-4506). Only reading output was printed; no environment, no workspace key, no record contents. Readings are reported, never a gate.",
+  "asOf": "2026-11-21T01:28:48.695Z",
+  "blindReadQueries": {
+    "joinCheck": {
+      "matchedToRunRecords": 53,
+      "queryRowsByRunStage": {
+        "breakdown": 11,
+        "close-out": 129,
+        "design": 6,
+        "implementation": 59,
+        "leftover": 14,
+        "plan": 3,
+        "plan-review": 7,
+        "review": 182,
+        "scoping": 9,
+        "survey-task": 14
+      },
+      "runAskers": 54
+    },
+    "method": "every records query-log row whose asker is a blind-read run (by = run:<id> of a run record by blind-read), classified by what it named; the join was checked: of the query log's run askers, those matched to run records are counted by their run's stage",
+    "queryLog": {
+      "first": "2026-11-19T16:32:07.677Z",
+      "last": "2026-11-21T01:24:14.076Z",
+      "rows": 536
+    },
+    "reading": {
+      "blindReadRunRecords": 12,
+      "byClass": {},
+      "byCmd": {},
+      "first": null,
+      "last": null,
+      "rows": 0,
+      "runsThatQueried": 0
+    }
+  },
+  "heldRuns": {
+    "method": "slice 2's (LIN-4499 comment of 20 Nov 21:47, section 1): records-readings.mjs readFromDb, and the same data passed to heldRunReading for its per-record sample, split by addressee",
+    "row": {
+      "key": "records.heldRuns",
+      "reason": null,
+      "reference": null,
+      "status": "measured",
+      "unreadable": 0,
+      "value": {
+        "addressed": 8,
+        "censored": 0,
+        "held": 4,
+        "medianSitHours": 17.22,
+        "read": 8,
+        "window": {
+          "asOf": "2026-11-21T01:28:48.695Z"
+        }
+      }
+    },
+    "split": {
+      "addressed": 8,
+      "byAddressee": {
+        "implementation": {
+          "censored": 0,
+          "medianSitHours": 17.22,
+          "read": 8,
+          "records": 8,
+          "sits": [
+            0.58,
+            15.13,
+            17.22,
+            17.22,
+            17.22,
+            17.22,
+            17.22,
+            17.22
+          ]
+        }
+      },
+      "censored": 0,
+      "held": 4,
+      "medianSitHours": 17.22,
+      "read": 8
+    }
+  },
+  "n": {
+    "dispatchRows": 26684,
+    "queryLog": 536,
+    "records": 1951
+  },
+  "sitTime": {
+    "key": "records.sitTime",
+    "reason": null,
+    "reference": null,
+    "status": "measured",
+    "unreadable": 0,
+    "value": {
+      "meanHours": 15.1,
+      "medianHours": 12.4,
+      "open": 232
+    }
+  },
+  "staleOpenRuns": {
+    "count": 2,
+    "of": 4
+  },
+  "store": {
+    "changeRecords": 1,
+    "verdictRecords": 3
+  }
+}

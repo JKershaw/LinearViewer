@@ -43,7 +43,10 @@
 import { readFileSync, writeFileSync, mkdirSync } from 'node:fs';
 import { fileURLToPath } from 'node:url';
 import { createHash } from 'node:crypto';
-import { readTrail, landingPrUrls, commentKindOf, isPersonComment, reportsLandedWork, isRuling } from '../../lib/run-trail.js';
+import { readTrail, landingPrUrls, commentKindOf, isPersonComment, reportsLandedWork, isRuling, extractVerdict } from '../../lib/run-trail.js';
+import { __internal as followOnInternal } from '../../lib/follow-on-ratio.js';
+import { readLanding } from '../../scripts/stability-measures-blind.mjs';
+import { notMeasured } from '../../scripts/stability-measures-core.mjs';
 import { checkBlindReadShape } from '../../lib/run-ledger.js';
 import { liveWaitOf } from '../../lib/run-live-wait.js';
 import { closeOutDecision, CLOSE_OUT_ACTOR } from '../../lib/run-closeout-state.js';
@@ -405,12 +408,76 @@ export async function captureSeeds(input = loadSeeds()) {
   };
 }
 
+// ─── The old measure readers over the frozen trails (goldens/readings.json; for P6, LIN-4519) ───────────
+//
+// Each measure reader is read over each trail as far as the frozen inputs carry it, and says `not measured` with its
+// reason where they do not (docs/areas/reports-and-operator-tools.md: never zero). The frozen inputs hold comments and
+// landings, not dispatch rows, request records or the workspace's other issues, so:
+//   - round trips (lib/plan-review-round-trips.js): its walk settles R0 on pipeline rows, not read here; what it reads
+//     from comments is extractVerdict's word (tier A), given for every comment that has one;
+//   - churn (lib/pipeline-churn.js) and the effort readout (lib/effort-readout.js): dispatch rows (and request records
+//     for cost), not read here; churn's verdict comes from a row's feedback, and the readout's survival from the round
+//     trips' tiers, so neither has a comment-only part beyond tier A;
+//   - follow-on ratio (lib/follow-on-ratio.js): the ratio needs the window's issues and relations, not read here; its
+//     comment reading, the review-ledger diagnostic (C3-24), is given;
+//   - stability measure 1 (scripts/stability-measures-blind.mjs readLanding): each walk-8 ticket's own landing
+//     (landings.json) against its trail; a seed has no landing.
+
+const NO_ROWS = 'the frozen inputs hold comments and landings, not dispatch rows';
+
+function readingsOf(comments, landings) {
+  return {
+    roundTrips: {
+      walk: notMeasured('roundTrips', `${NO_ROWS}: computeIssueRoundTrips settles R0 on the pipeline rows (GET /dispatch)`),
+      tierA: comments.map((cm) => ({ id: cm.id, at: cm.createdAt, verdict: extractVerdict(cm.body) })).filter((v) => v.verdict !== null),
+    },
+    churn: notMeasured('churn', `${NO_ROWS}: classifyTicket classifies a ticket's dispatch rows, and reads a verdict from a row's feedback`),
+    effortReadout: notMeasured('effortReadout', `${NO_ROWS} or request records: computeEffortReadout reads the dispatch history and its cost records`),
+    followOnRatio: {
+      ratio: notMeasured('followOnRatio', 'the frozen inputs hold one ticket\'s trail, not the window\'s issues and their relations'),
+      reviewLedger: followOnInternal.hasReviewLedger({ description: '', comments }),
+    },
+    stabilityBlind: landings
+      ? landings.map((l) => ({ commit: l.commit, mergedAt: l.date, ...readLanding({ landing: l, files: l.files, trail: { comments, truncated: false }, repo: 'JKershaw/LinearViewer' }) }))
+      : notMeasured('blind', 'a seed has no landing'),
+  };
+}
+
+/** goldens/readings.json: the old measure readers over each walk-8 trail and each seed case. */
+export function captureReadings() {
+  const { landings } = JSON.parse(readFileSync(new URL('landings.json', FIXTURE_DIR), 'utf8'));
+  const seeds = loadSeeds();
+  return {
+    _about: 'LIN-4514: the old measure readers (round trips, churn, effort readout, follow-on ratio, stability measure 1) over the frozen trails, as far as they carry each reader; `not measured` with its reason where they do not. Derived by tests/helpers/comment-path-capture.js; never edit by hand.',
+    tickets: TICKETS.map((name) => ({ ticket: loadInput(name).ticket, ...readingsOf(loadInput(name).comments, landings[name]) })),
+    seeds: seeds.seeds.map((seed) => ({
+      id: seed.id,
+      cases: seed.cases.map((sc) => ({ id: sc.id, ...readingsOf(sc.commentIds.map((id) => seeds.comments[id]), null) })),
+    })),
+  };
+}
+
+/** The first difference between two byte strings, as a line, a column and both lines: a readable diff location. */
+export function firstDifference(want, got) {
+  if (want === got) return null;
+  const a = want.split('\n');
+  const b = got.split('\n');
+  for (let i = 0; i < Math.max(a.length, b.length); i++) {
+    if (a[i] !== b[i]) {
+      const col = [...(a[i] ?? '')].findIndex((ch, j) => ch !== (b[i] ?? '')[j]);
+      return { line: i + 1, column: (col < 0 ? Math.min((a[i] ?? '').length, (b[i] ?? '').length) : col) + 1, committed: a[i] ?? '(end of file)', rerun: b[i] ?? '(end of file)', committedLines: a.length, rerunLines: b.length };
+    }
+  }
+  return { line: null, column: null, committed: '(same lines; bytes differ)', rerun: '', committedLines: a.length, rerunLines: b.length };
+}
+
 /** Every output file, as {relative path: bytes}. */
 export async function captureAll() {
   const files = {};
   for (const name of TICKETS) files[`goldens/${name}.json`] = stableJson(internRefs(await captureTicket(loadInput(name))));
   files['rows.json'] = stableJson(internRefs(await captureRows()));
   files['goldens/seeds.json'] = stableJson(internRefs(await captureSeeds()));
+  files['goldens/readings.json'] = stableJson(captureReadings());
   return files;
 }
 

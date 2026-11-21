@@ -8,8 +8,10 @@ replays these inputs on records and is held to these decisions. P7 (LIN-4520) de
 |---|---|
 | `lin-4469.json`, `lin-4446.json`, `lin-4450.json` | Frozen inputs: each ticket's real comments verbatim, each cited PR's head timeline and merge, the ticket's state over time, and walk 8's step boundaries |
 | `seeds.json` | Frozen inputs for the five seeds the walks lack. Each comment says whether it is real (a LIN-4499 comment) or synthetic |
+| `landings.json` | Frozen inputs for measure 1: each walk-8 ticket's own landing on main (commit, date, subject, files) |
 | `goldens/lin-*.json` | The comment path's answers at every instant of each ticket |
 | `goldens/seeds.json` | The answers for every seed case |
+| `goldens/readings.json` | The old measure readers over each trail and seed, for P6 (LIN-4519). Where these inputs cannot carry a reader, it reads `not measured` with the reason |
 | `rows.json` | The comment-path rows of lin-4438, lin-4458 and lin-4460 as data, with the cells their tests assert |
 
 Everything under `goldens/` and `rows.json` is derived. Never edit it by hand. To rebuild it, run
@@ -18,7 +20,12 @@ deterministic (no clock, no network, sorted keys), so a rerun gives the same byt
 `ledger.rawRef` points into `texts`, and `inputs.commentRefs` points into `comments`. Read a derived file with
 `loadDerived` (or `resolveRefs`) from the helper, which puts them back.
 
-Tests: `tests/unit/lin-4514-comment-path-goldens.test.js` and `tests/unit/lin-4514-comment-path-seeds.test.js`.
+Tests: `tests/unit/lin-4514-comment-path-goldens.test.js`, `tests/unit/lin-4514-comment-path-seeds.test.js`, and
+`tests/unit/lin-4514-comment-path-rerun.test.js`. The last reruns the helper and compares every derived file byte for
+byte, naming the first differing line and column.
+
+The readings over history (blind reads, round trips, held runs, blind-read queries) are in
+`docs/reviews/slice-3-readings/`.
 
 ## Known flaws of the baseline: a replay must match these, not fix them silently
 

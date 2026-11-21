@@ -1,0 +1,819 @@
+{
+  "_about": "LIN-4514: the comment readers' last readings over history (scripts/slice-3-pre-landing-readings.mjs). Never edit by hand.",
+  "window": {
+    "from": {
+      "commit": "eb14b7fff9f1b0e0de623add1b1fc61fd924021a",
+      "mergedAt": "2026-11-12T21:06:21Z",
+      "why": "the blind-read gate (LIN-4438, GATE_LANDING)"
+    },
+    "to": {
+      "commit": "bc0535b5cf41a6942568b5614f7f27b1fbfc9389"
+    },
+    "asOf": "2026-11-21T01:30:56.892Z",
+    "landings": 65,
+    "tickets": 49
+  },
+  "blindReadResults": {
+    "key": "blind",
+    "value": {
+      "landings": 65,
+      "read": 39,
+      "verdicts": {
+        "better": 28,
+        "same": 11,
+        "worse": 0
+      },
+      "unread": {
+        "no ticket": 2,
+        "not an ordinary landing": 13,
+        "landed before the gate": 0,
+        "no read on record": 11
+      },
+      "gate": {
+        "commit": "eb14b7fff9f1b0e0de623add1b1fc61fd924021a",
+        "pr": 2413,
+        "mergedAt": "2026-11-12T21:06:21Z"
+      },
+      "repo": "JKershaw/LinearViewer",
+      "perLanding": [
+        {
+          "commit": "e3a3268a17609e035a64c62d52fb6f827331e90d",
+          "ticket": "LIN-4441",
+          "pr": 2414,
+          "mergedAt": "2026-11-12T21:22:35Z",
+          "status": "no read on record",
+          "why": "no blind read naming #2414 before the merge"
+        },
+        {
+          "commit": "ceda351273fb63a6e975cf589accf7b1b1c2ef45",
+          "ticket": "LIN-4424",
+          "pr": 2411,
+          "mergedAt": "2026-11-12T22:35:24Z",
+          "status": "read",
+          "verdict": "same",
+          "readAt": "2026-11-12T22:25:56.611Z",
+          "commentId": "aceebb0c-d936-438e-883e-4d825c908b08",
+          "prUrl": "https://github.com/JKershaw/LinearViewer/pull/2411"
+        },
+        {
+          "commit": "aebe6108191db720787d440e940c06cb6a00807f",
+          "ticket": "LIN-4439",
+          "pr": 2415,
+          "mergedAt": "2026-11-12T22:46:23Z",
+          "status": "read",
+          "verdict": "better",
+          "readAt": "2026-11-12T22:20:09.755Z",
+          "commentId": "21b23445-1ec4-431c-ab27-da900d8a77a2",
+          "prUrl": "https://github.com/JKershaw/LinearViewer/pull/2415"
+        },
+        {
+          "commit": "163efc0698934c3e8a5f3c30e48dc15b51ac3a24",
+          "ticket": "LIN-4396",
+          "pr": 2416,
+          "mergedAt": "2026-11-12T23:17:49Z",
+          "status": "no read on record",
+          "why": "#2416 is not on the ticket's landing before the merge"
+        },
+        {
+          "commit": "e2d4659c4bf07ed266735f718e85232e5f2a6458",
+          "ticket": "LIN-4442",
+          "pr": 2417,
+          "mergedAt": "2026-11-13T00:58:41Z",
+          "status": "not an ordinary landing"
+        },
+        {
+          "commit": "0072d1b78c71061b5a5674b36d4e79cb97290e72",
+          "ticket": "LIN-4443",
+          "pr": 2418,
+          "mergedAt": "2026-11-13T08:12:25Z",
+          "status": "not an ordinary landing"
+        },
+        {
+          "commit": "5e09b564340c31dda02f19a097037a1e164a5231",
+          "ticket": "LIN-4444",
+          "pr": 2419,
+          "mergedAt": "2026-11-13T08:31:33Z",
+          "status": "not an ordinary landing"
+        },
+        {
+          "commit": "4b5001ddfa185eed683ccb8b9805d493c8c380da",
+          "ticket": null,
+          "pr": 2420,
+          "mergedAt": "2026-11-13T12:01:48Z",
+          "status": "no ticket"
+        },
+        {
+          "commit": "cfd152fa477d047c670a2ab59672b8cc79d8e17b",
+          "ticket": "LIN-4453",
+          "pr": 2422,
+          "mergedAt": "2026-11-13T14:54:55Z",
+          "status": "not an ordinary landing"
+        },
+        {
+          "commit": "92676b1febeb5407878d69b5e7a8f166a9371777",
+          "ticket": "LIN-4446",
+          "pr": 2423,
+          "mergedAt": "2026-11-13T15:22:55Z",
+          "status": "read",
+          "verdict": "better",
+          "readAt": "2026-11-13T15:14:31.812Z",
+          "commentId": "07cfe71c-593c-4be6-b0c3-408a5452fe79",
+          "prUrl": "https://github.com/JKershaw/LinearViewer/pull/2423"
+        },
+        {
+          "commit": "2bf788b6da71c82db6a1d84b361da98ef9cdedbb",
+          "ticket": "LIN-4450",
+          "pr": 2421,
+          "mergedAt": "2026-11-13T15:32:12Z",
+          "status": "read",
+          "verdict": "better",
+          "readAt": "2026-11-13T15:21:22.841Z",
+          "commentId": "8657e1c5-c37f-4c9e-8500-92cb37605d59",
+          "prUrl": "https://github.com/JKershaw/LinearViewer/pull/2421"
+        },
+        {
+          "commit": "c205190fdd0628e36f6fcfd26fb333f66a6a6e0b",
+          "ticket": "LIN-4454",
+          "pr": 2425,
+          "mergedAt": "2026-11-13T15:39:20Z",
+          "status": "read",
+          "verdict": "better",
+          "readAt": "2026-11-13T15:31:08.883Z",
+          "commentId": "c37d6229-b908-46ab-8564-76de488af628",
+          "prUrl": "https://github.com/JKershaw/LinearViewer/pull/2425"
+        },
+        {
+          "commit": "5dcf5bcda359846d695ecb52a49e9b022c6ec089",
+          "ticket": "LIN-4457",
+          "pr": 2424,
+          "mergedAt": "2026-11-13T15:49:16Z",
+          "status": "read",
+          "verdict": "better",
+          "readAt": "2026-11-13T15:36:15.549Z",
+          "commentId": "eebd03c0-8ae5-4b21-982f-f433cc80e5b5",
+          "prUrl": "https://github.com/JKershaw/LinearViewer/pull/2424"
+        },
+        {
+          "commit": "e8e92d50afbad748587ba0fb884cb1e57d5af49c",
+          "ticket": "LIN-4456",
+          "pr": 2426,
+          "mergedAt": "2026-11-13T15:59:05Z",
+          "status": "read",
+          "verdict": "same",
+          "readAt": "2026-11-13T15:30:30.869Z",
+          "commentId": "466ecda2-228a-4adc-83f7-ee6bf5fcf797",
+          "prUrl": "https://github.com/JKershaw/LinearViewer/pull/2426"
+        },
+        {
+          "commit": "192e1f81fa9ea13d16c3b34eab9303d4a67ebebe",
+          "ticket": "LIN-4455",
+          "pr": 2427,
+          "mergedAt": "2026-11-13T16:09:25Z",
+          "status": "read",
+          "verdict": "better",
+          "readAt": "2026-11-13T15:56:30.603Z",
+          "commentId": "9c3b13bc-9cd2-4571-9e0d-7bb52e3b7ea5",
+          "prUrl": "https://github.com/JKershaw/LinearViewer/pull/2427"
+        },
+        {
+          "commit": "0092d8d9e8fef6feb878809d1a215c3e55681304",
+          "ticket": "LIN-4456",
+          "pr": 2428,
+          "mergedAt": "2026-11-13T16:19:20Z",
+          "status": "not an ordinary landing"
+        },
+        {
+          "commit": "2aab32bf03ab5ad00e0d93a7d2d8997b8e44b9d8",
+          "ticket": "LIN-4464",
+          "pr": 2430,
+          "mergedAt": "2026-11-13T16:48:24Z",
+          "status": "not an ordinary landing"
+        },
+        {
+          "commit": "c174185f64af0238ee875f66dc84d5bd43a3d758",
+          "ticket": "LIN-4459",
+          "pr": 2432,
+          "mergedAt": "2026-11-13T17:12:48Z",
+          "status": "read",
+          "verdict": "better",
+          "readAt": "2026-11-13T17:04:26.892Z",
+          "commentId": "16376a3c-53ac-413e-871e-fa11060749ac",
+          "prUrl": "https://github.com/JKershaw/LinearViewer/pull/2432"
+        },
+        {
+          "commit": "17faa83f4807ea7c8c8db52faf492607d06fdcb0",
+          "ticket": "LIN-4471",
+          "pr": 2431,
+          "mergedAt": "2026-11-13T17:13:01Z",
+          "status": "read",
+          "verdict": "better",
+          "readAt": "2026-11-13T16:57:15.347Z",
+          "commentId": "71507404-26e1-48df-aa63-3a1f0dfd4353",
+          "prUrl": "https://github.com/JKershaw/LinearViewer/pull/2431"
+        },
+        {
+          "commit": "904719353b71595152b24260b357c1629c80b1e1",
+          "ticket": "LIN-4451",
+          "pr": 2429,
+          "mergedAt": "2026-11-13T17:25:00Z",
+          "status": "read",
+          "verdict": "same",
+          "readAt": "2026-11-13T17:15:43.948Z",
+          "commentId": "888e20b8-e451-422b-96a6-8cb01d7fe68f",
+          "prUrl": "https://github.com/JKershaw/LinearViewer/pull/2429"
+        },
+        {
+          "commit": "5cf4f6aa23b2483d2f8de569505dca38234319d2",
+          "ticket": "LIN-4459",
+          "pr": 2434,
+          "mergedAt": "2026-11-13T17:29:01Z",
+          "status": "not an ordinary landing"
+        },
+        {
+          "commit": "0dbf2d4eac531e6f8f85b6a129ba160ebec63110",
+          "ticket": "LIN-4458",
+          "pr": 2435,
+          "mergedAt": "2026-11-13T18:08:40Z",
+          "status": "read",
+          "verdict": "better",
+          "readAt": "2026-11-13T17:58:58.965Z",
+          "commentId": "cba19fd2-75ae-40bf-afd7-b66514ba177b",
+          "prUrl": "https://github.com/JKershaw/LinearViewer/pull/2435"
+        },
+        {
+          "commit": "0cf05ce8f5234277e5aecde1800f50f652131e33",
+          "ticket": "LIN-4472",
+          "pr": 2436,
+          "mergedAt": "2026-11-13T18:29:57Z",
+          "status": "read",
+          "verdict": "better",
+          "readAt": "2026-11-13T18:10:45.410Z",
+          "commentId": "1d521baf-b746-4d67-a3c6-94c7a4ab9e16",
+          "prUrl": "https://github.com/JKershaw/LinearViewer/pull/2436"
+        },
+        {
+          "commit": "49d4c880e000d440a49fc350bed62104b5e1c4ae",
+          "ticket": "LIN-4452",
+          "pr": 2437,
+          "mergedAt": "2026-11-13T18:40:12Z",
+          "status": "read",
+          "verdict": "better",
+          "readAt": "2026-11-13T18:29:32.329Z",
+          "commentId": "02405eb1-6acc-4398-afbb-8820c169e98b",
+          "prUrl": "https://github.com/JKershaw/LinearViewer/pull/2437"
+        },
+        {
+          "commit": "091c8c934738df556b29d628f5fbb8a813330b6f",
+          "ticket": "LIN-4452",
+          "pr": 2440,
+          "mergedAt": "2026-11-13T18:54:37Z",
+          "status": "not an ordinary landing"
+        },
+        {
+          "commit": "23ebfcb4ad883b017a637fd4cb6d582239f9cc49",
+          "ticket": "LIN-4463",
+          "pr": 2439,
+          "mergedAt": "2026-11-13T19:22:53Z",
+          "status": "not an ordinary landing"
+        },
+        {
+          "commit": "d52c676fabb1623d4d65417afa3ab96e2c7448f2",
+          "ticket": "LIN-4460",
+          "pr": 2438,
+          "mergedAt": "2026-11-13T19:27:57Z",
+          "status": "read",
+          "verdict": "better",
+          "readAt": "2026-11-13T19:16:50.913Z",
+          "commentId": "cde0cb4b-9598-4c98-be75-ad1173a79365",
+          "prUrl": "https://github.com/JKershaw/LinearViewer/pull/2438"
+        },
+        {
+          "commit": "e666c4b609f1779efec16f507bdf47abcdb6fd05",
+          "ticket": "LIN-4465",
+          "pr": 2433,
+          "mergedAt": "2026-11-13T19:44:59Z",
+          "status": "read",
+          "verdict": "better",
+          "readAt": "2026-11-13T19:27:36.527Z",
+          "commentId": "9b04d6e4-e01c-4fab-a522-020a25ad1dd0",
+          "prUrl": "https://github.com/JKershaw/LinearViewer/pull/2433"
+        },
+        {
+          "commit": "dc12ca51b2275caabda68af077b7fef98a3ed2a4",
+          "ticket": "LIN-4466",
+          "pr": 2441,
+          "mergedAt": "2026-11-13T20:42:28Z",
+          "status": "read",
+          "verdict": "better",
+          "readAt": "2026-11-13T20:31:44.219Z",
+          "commentId": "0071bab8-229a-4e1f-966c-d7a4956f2391",
+          "prUrl": "https://github.com/JKershaw/LinearViewer/pull/2441"
+        },
+        {
+          "commit": "b8e2a0aad2e4990524d5e7213ba48cac9c512a08",
+          "ticket": "LIN-4463",
+          "pr": 2442,
+          "mergedAt": "2026-11-13T20:55:42Z",
+          "status": "read",
+          "verdict": "better",
+          "readAt": "2026-11-13T20:46:42.226Z",
+          "commentId": "99e4e3b6-c4aa-4f4c-9742-358835aaa034",
+          "prUrl": "https://github.com/JKershaw/LinearViewer/pull/2442"
+        },
+        {
+          "commit": "8fea3869f019530c0e3ec7847e138d3b25718d98",
+          "ticket": "LIN-4467",
+          "pr": 2444,
+          "mergedAt": "2026-11-13T21:58:11Z",
+          "status": "read",
+          "verdict": "better",
+          "readAt": "2026-11-13T21:41:12.549Z",
+          "commentId": "48312d67-2ce0-41de-b7da-c8b5c51a748d",
+          "prUrl": "https://github.com/JKershaw/LinearViewer/pull/2444"
+        },
+        {
+          "commit": "6348e57810df58682100f42cc3869d2889f40f35",
+          "ticket": "LIN-4463",
+          "pr": 2445,
+          "mergedAt": "2026-11-13T22:01:09Z",
+          "status": "read",
+          "verdict": "better",
+          "readAt": "2026-11-13T21:50:18.132Z",
+          "commentId": "ee469b7d-f49e-43a8-a95e-341826bad57c",
+          "prUrl": "https://github.com/JKershaw/LinearViewer/pull/2445"
+        },
+        {
+          "commit": "b937237a414ece3affc57ebaaf6273834aea85a7",
+          "ticket": "LIN-4468",
+          "pr": 2443,
+          "mergedAt": "2026-11-13T22:29:42Z",
+          "status": "read",
+          "verdict": "better",
+          "readAt": "2026-11-13T22:19:03.110Z",
+          "commentId": "98ced843-4929-4789-9505-c950ccde3b99",
+          "prUrl": "https://github.com/JKershaw/LinearViewer/pull/2443"
+        },
+        {
+          "commit": "ca77a891e8e32f8132b9d3d0da0c860bfd0b213b",
+          "ticket": "LIN-4469",
+          "pr": 2447,
+          "mergedAt": "2026-11-13T23:51:43Z",
+          "status": "read",
+          "verdict": "better",
+          "readAt": "2026-11-13T23:26:25.368Z",
+          "commentId": "d96c0849-7422-43e5-b6ea-ed6db1791bab",
+          "prUrl": "https://github.com/JKershaw/LinearViewer/pull/2447"
+        },
+        {
+          "commit": "302edafc3a27a8d0d64a88435766625ab8d24cb5",
+          "ticket": "LIN-4475",
+          "pr": 2448,
+          "mergedAt": "2026-11-14T00:51:43Z",
+          "status": "read",
+          "verdict": "better",
+          "readAt": "2026-11-14T00:29:17.395Z",
+          "commentId": "6fb3fa58-b653-47d3-8008-9e73bd3a0f93",
+          "prUrl": "https://github.com/JKershaw/LinearViewer/pull/2448"
+        },
+        {
+          "commit": "a886fb50691383b02cd230d4dfd685aca6b4a9b4",
+          "ticket": "LIN-4462",
+          "pr": 2449,
+          "mergedAt": "2026-11-14T02:27:00Z",
+          "status": "not an ordinary landing"
+        },
+        {
+          "commit": "fb358dbda7f26ab44b3f58acb15886b21ac20950",
+          "ticket": "LIN-4470",
+          "pr": 2450,
+          "mergedAt": "2026-11-14T09:49:26Z",
+          "status": "read",
+          "verdict": "better",
+          "readAt": "2026-11-14T09:40:04.370Z",
+          "commentId": "d2b42ac0-ea3e-48bd-85a1-328eacde2a65",
+          "prUrl": "https://github.com/JKershaw/LinearViewer/pull/2450"
+        },
+        {
+          "commit": "06a7da871be73dd60e857b11f849dcbb6236360c",
+          "ticket": "LIN-4448",
+          "pr": 2457,
+          "mergedAt": "2026-11-14T10:52:31Z",
+          "status": "no read on record",
+          "why": "#2457 is not on the ticket's landing before the merge"
+        },
+        {
+          "commit": "0a1adcf9bedb859ffefc1859a411dc721771826a",
+          "ticket": "LIN-4482",
+          "pr": 2454,
+          "mergedAt": "2026-11-14T11:00:30Z",
+          "status": "not an ordinary landing"
+        },
+        {
+          "commit": "f0d19bdf1114d60908c5073d6bc941a965a4c114",
+          "ticket": "LIN-4481",
+          "pr": 2455,
+          "mergedAt": "2026-11-14T11:09:39Z",
+          "status": "not an ordinary landing"
+        },
+        {
+          "commit": "2c58c6517d7722b89b2280858ef443081c2ea067",
+          "ticket": "LIN-4483",
+          "pr": 2456,
+          "mergedAt": "2026-11-14T11:20:32Z",
+          "status": "not an ordinary landing"
+        },
+        {
+          "commit": "8fe48492932ff83e9a79f19c6fa7c2d72e854e46",
+          "ticket": "LIN-4478",
+          "pr": 2451,
+          "mergedAt": "2026-11-14T12:00:27Z",
+          "status": "no read on record",
+          "why": "no blind read naming #2451 before the merge"
+        },
+        {
+          "commit": "5f6de1eb78bd76cbe1c573ddb8a3e750be2c5681",
+          "ticket": "LIN-4479",
+          "pr": 2452,
+          "mergedAt": "2026-11-14T12:48:50Z",
+          "status": "no read on record",
+          "why": "no blind read naming #2452 before the merge"
+        },
+        {
+          "commit": "993f618bcd1d85d3466eceb3ee755383a3675bfb",
+          "ticket": "LIN-4480",
+          "pr": 2453,
+          "mergedAt": "2026-11-14T12:56:26Z",
+          "status": "no read on record",
+          "why": "no blind read naming #2453 before the merge"
+        },
+        {
+          "commit": "af0e2d5c9c072eae3796c3e2c3f8d348956f247d",
+          "ticket": "LIN-4485",
+          "pr": 2458,
+          "mergedAt": "2026-11-14T13:50:45Z",
+          "status": "no read on record",
+          "why": "no blind read naming #2458 before the merge"
+        },
+        {
+          "commit": "160f9b99565f5af306e3da526b1a2ab732608f40",
+          "ticket": "LIN-4484",
+          "pr": 2459,
+          "mergedAt": "2026-11-14T14:03:49Z",
+          "status": "no read on record",
+          "why": "no blind read naming #2459 before the merge"
+        },
+        {
+          "commit": "6f6c5d2e26b58db9c2b662f110f6f2ba053b03b0",
+          "ticket": "LIN-4486",
+          "pr": 2460,
+          "mergedAt": "2026-11-14T14:14:38Z",
+          "status": "no read on record",
+          "why": "no blind read naming #2460 before the merge"
+        },
+        {
+          "commit": "68b5d8f3a8c6ee3d4d3dfea87a705d703c7a0192",
+          "ticket": "LIN-4487",
+          "pr": 2461,
+          "mergedAt": "2026-11-18T14:10:42Z",
+          "status": "read",
+          "verdict": "better",
+          "readAt": "2026-11-18T14:02:08.969Z",
+          "commentId": "4d51a4fd-1e41-402b-ae09-3c9a35c84be4",
+          "prUrl": "https://github.com/JKershaw/LinearViewer/pull/2461"
+        },
+        {
+          "commit": "945defb09efa818575f17d54f829f6ecd3def0dd",
+          "ticket": "LIN-4489",
+          "pr": 2462,
+          "mergedAt": "2026-11-19T11:21:20Z",
+          "status": "no read on record",
+          "why": "no blind read naming #2462 before the merge"
+        },
+        {
+          "commit": "bf2d1575ff19cce99fefa0307b556d0a3f625726",
+          "ticket": null,
+          "pr": 2463,
+          "mergedAt": "2026-11-19T11:45:42Z",
+          "status": "no ticket"
+        },
+        {
+          "commit": "079f0b6ff06f96eca753514a8b6509727088a30c",
+          "ticket": "LIN-4492",
+          "pr": 2464,
+          "mergedAt": "2026-11-19T13:43:46Z",
+          "status": "read",
+          "verdict": "same",
+          "readAt": "2026-11-19T13:30:56.852Z",
+          "commentId": "4b78c8d7-65f7-4129-b73a-19247ece0d5d",
+          "prUrl": "https://github.com/JKershaw/LinearViewer/pull/2464"
+        },
+        {
+          "commit": "a475c464ffdae9abc11fb4a342b4b97c7616068f",
+          "ticket": "LIN-4493",
+          "pr": 2465,
+          "mergedAt": "2026-11-19T16:24:20Z",
+          "status": "read",
+          "verdict": "same",
+          "readAt": "2026-11-19T16:14:08.899Z",
+          "commentId": "48f80086-13ec-4332-9b7f-5a4d7777e886",
+          "prUrl": "https://github.com/JKershaw/LinearViewer/pull/2465"
+        },
+        {
+          "commit": "2024de6208900cebd3da7d53a8bf788b1c6a1864",
+          "ticket": "LIN-4497",
+          "pr": 2466,
+          "mergedAt": "2026-11-19T16:37:41Z",
+          "status": "read",
+          "verdict": "same",
+          "readAt": "2026-11-19T16:18:04.804Z",
+          "commentId": "d000cd71-d273-4180-8f9b-5900f2c56b4b",
+          "prUrl": "https://github.com/JKershaw/LinearViewer/pull/2466"
+        },
+        {
+          "commit": "4f6fe01a2c0737647bac2dc6b2f4993175a05953",
+          "ticket": "LIN-4494",
+          "pr": 2467,
+          "mergedAt": "2026-11-19T18:28:10Z",
+          "status": "read",
+          "verdict": "same",
+          "readAt": "2026-11-19T18:15:36.678Z",
+          "commentId": "a9218c76-7beb-49a5-bda2-76f27c6cea1a",
+          "prUrl": "https://github.com/JKershaw/LinearViewer/pull/2467"
+        },
+        {
+          "commit": "e942c1031d4dd74ed2acf19bab784592406a5df0",
+          "ticket": "LIN-4495",
+          "pr": 2468,
+          "mergedAt": "2026-11-19T21:26:52Z",
+          "status": "read",
+          "verdict": "better",
+          "readAt": "2026-11-19T21:14:05.198Z",
+          "commentId": "f3dd2588-91e0-42bf-a4dc-047b900e8483",
+          "prUrl": "https://github.com/JKershaw/LinearViewer/pull/2468"
+        },
+        {
+          "commit": "0d56aabdfced1257ed38da656dbe25096980d9c5",
+          "ticket": "LIN-4496",
+          "pr": 2469,
+          "mergedAt": "2026-11-20T01:19:10Z",
+          "status": "read",
+          "verdict": "same",
+          "readAt": "2026-11-20T01:10:02.068Z",
+          "commentId": "4fbc194f-3ea1-460b-a33b-71b77f68cc8f",
+          "prUrl": "https://github.com/JKershaw/LinearViewer/pull/2469"
+        },
+        {
+          "commit": "e44a842d16ffba258c5354580420b583d39f4e14",
+          "ticket": "LIN-4491",
+          "pr": 2470,
+          "mergedAt": "2026-11-20T01:50:50Z",
+          "status": "no read on record",
+          "why": "no blind read naming #2470 before the merge"
+        },
+        {
+          "commit": "df1e8ef3c4ddaa8afdf21ff109f2f9d3840cdf35",
+          "ticket": "LIN-4500",
+          "pr": 2471,
+          "mergedAt": "2026-11-20T09:35:54Z",
+          "status": "read",
+          "verdict": "better",
+          "readAt": "2026-11-20T09:27:59.797Z",
+          "commentId": "1d1e53c4-b6c7-44af-878c-99199ad53fd5",
+          "prUrl": "https://github.com/JKershaw/LinearViewer/pull/2471"
+        },
+        {
+          "commit": "c08a9a898931902db808422b605b9ac79faaed3e",
+          "ticket": "LIN-4503",
+          "pr": 2473,
+          "mergedAt": "2026-11-20T12:28:55Z",
+          "status": "read",
+          "verdict": "same",
+          "readAt": "2026-11-20T12:17:33.534Z",
+          "commentId": "26c41858-70bb-4533-b54b-84e0804be500",
+          "prUrl": "https://github.com/JKershaw/LinearViewer/pull/2473"
+        },
+        {
+          "commit": "3002092e5c9e38f2fcf45d22e97e54e3d2be0024",
+          "ticket": "LIN-4505",
+          "pr": 2474,
+          "mergedAt": "2026-11-20T13:49:57Z",
+          "status": "read",
+          "verdict": "better",
+          "readAt": "2026-11-20T13:39:50.262Z",
+          "commentId": "3fbb84e5-d2c6-4539-a437-f25eb166e41b",
+          "prUrl": "https://github.com/JKershaw/LinearViewer/pull/2474"
+        },
+        {
+          "commit": "09512c620f15c29fc948a71380551a212ed993c1",
+          "ticket": "LIN-4501",
+          "pr": 2472,
+          "mergedAt": "2026-11-20T15:02:33Z",
+          "status": "read",
+          "verdict": "same",
+          "readAt": "2026-11-20T14:51:42.746Z",
+          "commentId": "d1b74eb1-14cb-4bd7-b0ec-c03ed3f1756d",
+          "prUrl": "https://github.com/JKershaw/LinearViewer/pull/2472"
+        },
+        {
+          "commit": "9e562cfc3ed1fd357272c22f783cb7a72ce38a75",
+          "ticket": "LIN-4502",
+          "pr": 2475,
+          "mergedAt": "2026-11-20T17:02:58Z",
+          "status": "read",
+          "verdict": "better",
+          "readAt": "2026-11-20T16:51:38.650Z",
+          "commentId": "868647b9-bd44-40e3-bb84-fb013f4b77e8",
+          "prUrl": "https://github.com/JKershaw/LinearViewer/pull/2475"
+        },
+        {
+          "commit": "ebc89d7e70d8e887798e5ad7bf33fe951b91a872",
+          "ticket": "LIN-4504",
+          "pr": 2476,
+          "mergedAt": "2026-11-20T20:48:24Z",
+          "status": "read",
+          "verdict": "better",
+          "readAt": "2026-11-20T20:33:43.494Z",
+          "commentId": "d1da9da3-de62-4150-bb1c-cf0071c419f8",
+          "prUrl": "https://github.com/JKershaw/LinearViewer/pull/2476"
+        },
+        {
+          "commit": "3bccb8aa8e6c1eb8f1b498f57b4a1412973ed42b",
+          "ticket": "LIN-4506",
+          "pr": 2477,
+          "mergedAt": "2026-11-20T21:55:22Z",
+          "status": "read",
+          "verdict": "same",
+          "readAt": "2026-11-20T21:54:07.521Z",
+          "commentId": "4641f0f4-e317-4c65-9dc4-d74dfdcc7292",
+          "prUrl": "https://github.com/JKershaw/LinearViewer/pull/2477"
+        },
+        {
+          "commit": "bc0535b5cf41a6942568b5614f7f27b1fbfc9389",
+          "ticket": "LIN-4499",
+          "pr": 2478,
+          "mergedAt": "2026-11-20T23:04:07Z",
+          "status": "read",
+          "verdict": "better",
+          "readAt": "2026-11-20T22:30:31.183Z",
+          "commentId": "03e5e576-9fe6-40c6-98b1-2efeb1a7b842",
+          "prUrl": "https://github.com/JKershaw/LinearViewer/pull/2478"
+        }
+      ]
+    },
+    "reference": null,
+    "status": "measured",
+    "reason": null,
+    "unreadable": 0
+  },
+  "reviewRoundTrips": {
+    "planReview": {
+      "window": {
+        "asOf": "2026-11-21T01:30:56.892Z",
+        "rulerChangeAt": null,
+        "windowDays": null
+      },
+      "scale": {
+        "issuesRead": 49,
+        "reachedPlanReviewAny": 9,
+        "issuesExcludedByWindow": 0
+      },
+      "primary": {
+        "numerator": 4,
+        "denominator": 9,
+        "rate": 0.4444444444444444,
+        "sufficient": false
+      },
+      "roundTrips": {
+        "n": 9,
+        "mean": 0.6666666666666666,
+        "distribution": {
+          "0": 4,
+          "1": 4,
+          "2": 1
+        }
+      },
+      "diagnostics": {
+        "noGenuineAttempt": 0,
+        "noGenuineAttemptIssues": 40,
+        "rightCensoredFirstPass": 0,
+        "reachedButUnresolvedFirstPass": 0,
+        "verdictTier": {
+          "a": 15,
+          "b": 0,
+          "c": 0,
+          "none": 0
+        },
+        "crossTierDisagreements": {
+          "aVsB": 0,
+          "aVsC": 1,
+          "bVsC": 1
+        },
+        "lineageBleed": 1,
+        "subWindows": 6
+      },
+      "completeness": {
+        "attempted": 49,
+        "read": 49,
+        "skipped": 0,
+        "complete": true
+      },
+      "definition": {
+        "pinnedOn": "LIN-1883 (plan v3, approved b44b782f)",
+        "primaryRule": "resolved(R0) && verdict(R0) === 'approve'; denominator = issues whose R0 walk settled RESOLVED (excludes right-censored, reached-but-unresolved, and no-genuine-attempt issues, each counted separately in diagnostics)",
+        "r0EligibilityRule": "extraction-first, state-second — see module header",
+        "verdictExtraction": "anchor every /verdict/i occurrence, [-80,+120) char window, first resolving token wins, no unanchored fallback; tier A comment > tier B DONE-line > tier C structural (next pipeline row kind)",
+        "windowBound": "windowStart = row-own dispatchedAt (never lineage-merged); windowEnd = next pipeline row dispatchedAt, else completedAt ?? asOf",
+        "roundTripsRule": "n/mean/distribution computed over issues with reachedPlanReviewAny === true only (LIN-1883 §2.3, conditional on reaching the gate) — see scale.reachedPlanReviewAny",
+        "sufficiencyFormula": "two-proportion power calc: N ≥ [z(α/2)·√(2p̄(1-p̄)) + z(β)·√(p1(1-p1)+p2(1-p2))]² / (p2-p1)² ≈ 49, numerator ≥ N·p1 ≈ 22 (p1 = 0.4444 measured at read time, p2 = 0.7222 = min(2·p1, 1−(1−p1)/2) — the more conservative of doubling the rate and halving the shortfall — a 1.625× realised relative effect, α = 0.05, power = 0.80)",
+        "measuredP1": 0.4444444444444444
+      },
+      "gate": {
+        "key": "gate",
+        "value": null,
+        "reference": null,
+        "status": "not measured",
+        "reason": "plan facts were not read by this reading, so the gate-due series is not measured (the reader alone would count those issues as not due)",
+        "unreadable": null
+      }
+    },
+    "codeReview": {
+      "window": {
+        "asOf": "2026-11-21T01:30:56.892Z",
+        "rulerChangeAt": null,
+        "windowDays": null
+      },
+      "scale": {
+        "issuesRead": 49,
+        "reachedPlanReviewAny": 41,
+        "issuesExcludedByWindow": 0
+      },
+      "primary": {
+        "numerator": 28,
+        "denominator": 41,
+        "rate": 0.6829268292682927,
+        "sufficient": false
+      },
+      "roundTrips": {
+        "n": 41,
+        "mean": 0.3902439024390244,
+        "distribution": {
+          "0": 31,
+          "1": 6,
+          "2": 2,
+          "3": 2
+        }
+      },
+      "diagnostics": {
+        "noGenuineAttempt": 0,
+        "noGenuineAttemptIssues": 8,
+        "rightCensoredFirstPass": 0,
+        "reachedButUnresolvedFirstPass": 0,
+        "verdictTier": {
+          "a": 60,
+          "b": 0,
+          "c": 4,
+          "none": 0
+        },
+        "crossTierDisagreements": {
+          "aVsB": 0,
+          "aVsC": 4,
+          "bVsC": 0
+        },
+        "lineageBleed": 2,
+        "subWindows": 23
+      },
+      "completeness": {
+        "attempted": 49,
+        "read": 49,
+        "skipped": 0,
+        "complete": true
+      },
+      "definition": {
+        "pinnedOn": "LIN-1883 (plan v3, approved b44b782f)",
+        "primaryRule": "resolved(R0) && verdict(R0) === 'approve'; denominator = issues whose R0 walk settled RESOLVED (excludes right-censored, reached-but-unresolved, and no-genuine-attempt issues, each counted separately in diagnostics)",
+        "r0EligibilityRule": "extraction-first, state-second — see module header",
+        "verdictExtraction": "anchor every /verdict/i occurrence, [-80,+120) char window, first resolving token wins, no unanchored fallback; tier A comment > tier B DONE-line > tier C structural (next pipeline row kind)",
+        "windowBound": "windowStart = row-own dispatchedAt (never lineage-merged); windowEnd = next pipeline row dispatchedAt, else completedAt ?? asOf",
+        "roundTripsRule": "n/mean/distribution computed over issues with reachedPlanReviewAny === true only (LIN-1883 §2.3, conditional on reaching the gate) — see scale.reachedPlanReviewAny",
+        "sufficiencyFormula": "two-proportion power calc: N ≥ [z(α/2)·√(2p̄(1-p̄)) + z(β)·√(p1(1-p1)+p2(1-p2))]² / (p2-p1)² ≈ 113, numerator ≥ N·p1 ≈ 78 (p1 = 0.6829 measured at read time, p2 = 0.8415 = min(2·p1, 1−(1−p1)/2) — the more conservative of doubling the rate and halving the shortfall — a 1.232× realised relative effect, α = 0.05, power = 0.80)",
+        "measuredP1": 0.6829268292682927
+      },
+      "gate": {
+        "key": "gate",
+        "value": null,
+        "reference": null,
+        "status": "not measured",
+        "reason": "plan facts were not read by this reading, so the gate-due series is not measured (the reader alone would count those issues as not due)",
+        "unreadable": null
+      }
+    }
+  },
+  "meta": {
+    "proxyCalls": {
+      "trails": 49,
+      "roundTrips": 113
+    },
+    "issuesRead": 49,
+    "skipped": 0
+  }
+}
