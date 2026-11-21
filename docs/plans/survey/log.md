@@ -5048,3 +5048,10 @@ John took LIN-4445 (the loop on Jira) off the parked work; he'll come back to it
 - The blind read and close-out didn't deadlock this time.
 - P6–P8 (LIN-4519..4521) wait. No rulings, no pause.
 - John approved carrying on past slice 4, assuming no trouble. The drive prompt update that does it is waiting for his approval.
+
+### 21 Nov, ~16:50: ruling `lin4518-250-expectation`
+
+- **The question:** P5 moved a frozen eval count from 255 to 250. It blamed the change on an old approval (LIN-3125, PR #1622, 1 Oct) that now reads stale, because a branch update was pushed after the review.
+- **Settled by the review at 16:48** (finding-2e2360b5 v2): 250 is wrong. Production already reads that approval as stale, correctly. The drop came from the test helpers not doing what production does at merge. The fix is test-only and puts the count back to 255; close-out does it, then a re-review follows.
+- **I proposed re-review.**
+- **For the smoothing pass:** the run raised an engineering question as a ruling, and the review settled it minutes later.
