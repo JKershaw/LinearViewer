@@ -5191,3 +5191,8 @@ The full stop holds: the fleet is paused, and the drive is only reporting. The o
 - John: hard-coding PRs into code is what to avoid; the marker solves a problem that won't exist by the end of the slices. Simplify.
 - Applied to ticket, piece plan and task record (`done-when`, a third copy I had missed): LIN-4518 (only the task's own PR, recorded by the stage that opened it; no guessing; nothing in code requires a PR; #1622 and #2447 don't count; no test builds records from comments; authorship stays on today's text rule until slice 4), LIN-4520 (comment readers P5's review hands on; the text rule stays until slice 4), LIN-4513 (marker removed from the text and the decisions line). A sweep of 23 slice 3 texts finds no marker, #2483, translator or old design pin.
 - Watch item (John): agents may try to solve problems later slices already solve. Read each plan for it.
+
+## 21 Nov, 21:52: LIN-4527 launched; overnight standing
+
+- Halt cleared; LIN-4527 autopilot queued at 21:51 (plain kickoff). The hourly check's prompt is now two sentences (John: the session holds the context).
+- John: pause only if the work goes sideways or overcomplicates (as discussed tonight). When LIN-4527 has landed (merged, deployed, main green), kick off LIN-4513 without waiting and send a short report on how slices 1 and 2 landed. Run overnight; if anything goes wrong, stop and wait for John in the morning.
