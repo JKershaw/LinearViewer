@@ -50,7 +50,7 @@ const firstAt = (versions) => versions.reduce((min, s) => (!min || s.at < min ? 
 /**
  * Step 1: what the query needs from the records store, as plain data. `store` is a RecordsStore (lib/records-store.js)
  * or anything with its `find` and `versionsOf`.
- * @returns {Promise<{asOf: string, tasks: object[], verdicts: object[], changes: object[]}>}
+ * @returns {Promise<{asOf: string, tasks: object[], verdicts: object[], changes: object[], plans: object[]}>}
  */
 export async function dumpFromStore({ store, urlKey, asOf = new Date().toISOString() }) {
   const tasks = (await store.find(urlKey, { kind: 'task', state: 'open', asOf }))
@@ -67,8 +67,17 @@ export async function dumpFromStore({ store, urlKey, asOf = new Date().toISOStri
     via: v.via ?? null,
     at: firstAt(versions.filter((s) => s.id === v.id)) ?? v.at,
   }));
-  const changes = (await store.find(urlKey, { kind: 'change', asOf })).map((c) => ({ id: c.id, in: c.in ?? null, state: c.state }));
-  return { asOf, tasks, verdicts, changes };
+  const changes = (await store.find(urlKey, { kind: 'change', asOf })).map((c) => ({ id: c.id, in: c.in ?? null, state: c.state, ref: c.fields?.ref ?? null }));
+  // LIN-4517 beat 3: the plan records, with each version's time and how it came, for the verdict import's plan-review pin.
+  const planSnaps = await store.find(urlKey, { kind: 'plan', asOf });
+  const planVersions = await store.versionsOf(urlKey, planSnaps.map((p) => p.id));
+  const plans = planSnaps.map((p) => ({
+    id: p.id,
+    in: p.in ?? null,
+    state: p.state,
+    versions: planVersions.filter((s) => s.id === p.id).sort((a, b) => a.v - b.v).map((s) => ({ v: s.v, at: s.at, via: s.via ?? null })),
+  }));
+  return { asOf, tasks, verdicts, changes, plans };
 }
 
 /** The stage a verdict record speaks for: its writer. */
@@ -88,13 +97,14 @@ function tasksOfVerdict(v, taskOfChange) {
 }
 
 /**
- * Item lines in a ledger section's text, less a line that itself says "none". An item is a bullet, a numbered line, or
- * a line led by bold text (`**Item — ...**`, the shape a live ledger used on LIN-2634).
+ * Item lines in a ledger section's text, less a line that itself says "none" and a line about the ledger itself (LIN-2634
+ * closes its items with "**Ledger status: no item is a close-out gate…**", which is what isEmptyStatement reads as
+ * empty). An item is a bullet, a numbered line, or a line led by bold text (`**Item — ...**`, LIN-2634's shape).
  */
 export function ledgerItemLines(raw) {
   return String(raw || '').split('\n')
     .map((line) => line.match(/^\s*(?:(?:[-*+]|\d+[.)])\s+|(?=\*\*\S|__\S))(\S.*)$/))
-    .filter((m) => m && !/^\(?\s*(?:none|n\/a|nothing)\b/i.test(m[1].replace(/[*_`]/g, '')))
+    .filter((m) => m && !/^\(?\s*(?:none|n\/a|nothing|ledger)\b/i.test(m[1].replace(/[*_`]/g, '')))
     .map((m) => m[1]);
 }
 

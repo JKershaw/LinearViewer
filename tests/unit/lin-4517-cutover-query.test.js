@@ -42,7 +42,7 @@ const blindRead = `## Blind read\n\nVerdict: better, the change reads clearly an
 const LEDGER_NONE = 'None.';
 const LEDGER_ITEMS = '- The migration was not run against a production-sized store.\n- The page was not checked on a phone.';
 // The shape seen on a live task (LIN-2634, 21 Nov): bold-led items, not bullets, one of which says "no open".
-const LEDGER_MISREAD = '**Import — checked by hand on staging; no open questions about its ids.**\n\n**Rollback — not exercised.**';
+const LEDGER_MISREAD = '**Import — checked by hand on staging; no open questions about its ids.**\n\n**Rollback — not exercised.**\n\n**Ledger status: no item is a close-out gate.**';
 
 const comment = (id, body, minutes) => ({ id, body, createdAt: iso(minutes) });
 
@@ -131,6 +131,7 @@ describe('LIN-4517 cutover query: the fixtures classify as intended', () => {
     assert.equal(parseRunLedger({ body: review('Approve', LEDGER_ITEMS) }).ledger.empty, false);
     assert.deepEqual(ledgerItemLines('- None.\n- (none)'), []);
     assert.equal(ledgerItemLines('- One.\n2. Two.').length, 2);
+    assert.deepEqual(ledgerItemLines('**Ledger status: no item is a close-out gate.**'), [], 'a line about the ledger is not an item');
   });
 });
 
@@ -142,6 +143,8 @@ describe('LIN-4517 cutover query: the dump', () => {
     assert.ok(dump.verdicts.every((v) => v.by === 'review' && v.at));
     assert.equal(dump.changes.length, 1);
     assert.equal(dump.changes[0].in, ids[4]);
+    assert.equal(dump.changes[0].ref, PR);
+    assert.deepEqual(dump.plans, []);
   });
 
   test('the tickets are paged whole, and comments are read only for open tickets with an open task', () => {
