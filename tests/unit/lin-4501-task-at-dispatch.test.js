@@ -5,8 +5,7 @@
  * - a take with no claimed task makes the task through the checked writer, and the run opens in it;
  * - a take whose fallback fails (the ticket read fails) opens a task-less run and logs `task-missing-at-take`
  *   with the reason;
- * - a task's `asked` is askedOf(description): the sealed words, else the words before the first plan heading,
- *   else the whole description;
+ * - a task's `asked` is askedOf(description): the description as filed, whole (LIN-4527: the plan is not cut from it);
  * - the checked writer's taskOfTicket makes a ticket's task once, with that `asked`, and refuses a closed ticket
  *   with its reason.
  */
@@ -89,15 +88,16 @@ async function logged(fn) {
   }
 }
 
-describe('askedOf: the one rule for a task\'s asked', () => {
-  test('a sealed description takes its sealed words', () => {
+describe('askedOf: the one rule for a task\'s asked (LIN-4527: the description as filed)', () => {
+  test('a sealed description is taken whole, block and notes, as filed', () => {
     const description = '## As asked\n\nFix the footer.\n\n*End of what was asked. Steps write below this line; nothing above it changes.*\n\n## Notes\nplan here';
-    assert.equal(askedOf(description), splitQuote(description).words);
+    assert.equal(askedOf(description), description);
+    assert.equal(splitQuote(description).words, 'Fix the footer.');
   });
 
-  test('an unsealed description with a plan takes the words before the plan heading', () => {
+  test('an unsealed description with a plan is taken whole: the plan is not cut from the request', () => {
     const description = 'Make the seam take its task.\n\nIt matters for briefs.\n\n## Implementation Plan\n\nFiles: lib/run-records.js';
-    assert.equal(askedOf(description), 'Make the seam take its task.\n\nIt matters for briefs.');
+    assert.equal(askedOf(description), description);
   });
 
   test('a phrase in the person\'s own prose is their words, not a cut', () => {
@@ -132,7 +132,7 @@ describe('the run opens in its ticket\'s task', () => {
     const task = await store.current(URL_KEY, run.in);
     assert.equal(task.kind, 'task');
     assert.equal(task.fields.ref, 'LIN-2');
-    assert.equal(task.fields.asked, 'Build the seam.', 'the task takes the words before the plan');
+    assert.equal(task.fields.asked, 'Build the seam.\n\n## Implementation Plan\n\nplan', 'the task takes the description as filed (LIN-4527)');
     assert.ok(lines.some((l) => l.startsWith('[task-made-at-take]')), 'the made task is logged');
     assert.deepEqual(tracker.reads, ['LIN-2']);
   });
@@ -245,8 +245,8 @@ describe('askedForTickets: the person\'s words for many tickets in one read (the
     const writes = writesWith(tracker);
     for (const ref of ['LIN-20', 'LIN-21', 'LIN-22']) await writes.taskOfTicket({}, URL_KEY, ref, 'dispatch');
     const got = await store.askedForTickets(URL_KEY, ['LIN-20', 'LIN-21', 'LIN-22', 'LIN-99', null, 'LIN-20']);
-    assert.deepEqual(Object.fromEntries(got), { 'LIN-20': 'First words.', 'LIN-21': 'Second words.' });
-    assert.equal(await store.askedForTicket(URL_KEY, 'LIN-21'), 'Second words.');
+    assert.deepEqual(Object.fromEntries(got), { 'LIN-20': 'First words.', 'LIN-21': 'Second words.\n\n## Implementation Plan\n\nplan' });
+    assert.equal(await store.askedForTicket(URL_KEY, 'LIN-21'), 'Second words.\n\n## Implementation Plan\n\nplan');
     assert.equal(await store.askedForTicket(URL_KEY, 'LIN-99'), null);
     assert.equal((await store.askedForTickets('another-workspace', ['LIN-20'])).size, 0, 'one workspace\'s words never answer another');
   });

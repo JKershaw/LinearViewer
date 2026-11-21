@@ -7,9 +7,8 @@
  *   (b) rewriting the description through the proxy (the whole body, and a span that used to sit inside the block)
  *       leaves the task's `asked` and brief part 1 unchanged. Before P2 the As-asked guard refused both rewrites
  *       (422 AS_ASKED_IMMUTABLE); with the guard retired both land (200), and the task's `asked` still holds.
- *   (c) the legacy reader reads the block exactly as the seal wrote it: a literal pre-P2 description, typed out here,
- *       gives askedOf its words. If the brief's quote is ever reworded, this fails until lib/asked-of.js freezes the
- *       old spelling (its exit-condition note).
+ *   (c) LIN-4527: askedOf takes the description as filed, whole. A literal pre-P2 description (typed out here, its
+ *       block and plan both kept) is returned unchanged, in every spelling a ticket reads back in.
  *
  * (a) and (b) are asserted on the stored task (RecordsStore.askedForTicket) and on the brief's quote
  * (lib/brief-quote.js composeBrief), never on the description alone.
@@ -26,9 +25,8 @@ import { createLocalStore } from '../fixtures/local-harness.js';
 import { RecordsStore, RECORDS_COLLECTION, REFS_COLLECTION, QUERY_LOG_COLLECTION } from '../../lib/records-store.js';
 import { INDEX_SPECS } from '../../lib/db-indexes.js';
 import { quoteAsked, splitQuote, composeBrief } from '../../lib/brief-quote.js';
-import { askedOf, outsideAsked } from '../../lib/asked-of.js';
+import { askedOf } from '../../lib/asked-of.js';
 import { adfToMarkdown, markdownToAdf } from '../../lib/providers/jira/adf.js';
-import { textBeforePlan } from '../../lib/legacy-plan-text.js';
 import { readFileSync } from 'node:fs';
 
 // Must match TEST_LOCAL_URL_KEY in routes/proxy.js: resolveProviderAccess then answers with the local provider.
@@ -110,17 +108,17 @@ async function call(method, path, body) {
 
 const storedDescription = async (id) => (await localStore.getIssue(LOCAL_URL_KEY, id)).description;
 
-describe('LIN-4502 witness (a): a task first named through the proxy takes the ticket\'s words as `asked`', () => {
-  test('a sealed ticket: the first record that names it through the proxy makes its task, asked = the sealed words', async () => {
+describe('LIN-4502 witness (a), as converted by LIN-4527: a task first named through the proxy takes the ticket\'s description as filed', () => {
+  test('a sealed ticket: the first record that names it through the proxy makes its task, asked = the description as filed (block and plan)', async () => {
     const r = await call('POST', '/api/proxy/records', { kind: 'finding', to: 'review', says: 'first named', how: 'look', in: TICKET });
     assert.ok(r.status < 300, JSON.stringify(r.body));
-    assert.equal(await recordsStore.askedForTicket(LOCAL_URL_KEY, TICKET), WORDS);
+    assert.equal(await recordsStore.askedForTicket(LOCAL_URL_KEY, TICKET), `${quoteAsked(WORDS)}\n\n${PLAN}`);
   });
 
-  test('an unsealed ticket with a plan heading: asked = the words before the plan, never the plan', async () => {
+  test('an unsealed ticket with a plan heading: asked = the whole description, the plan included (LIN-4527: no cut)', async () => {
     const r = await call('POST', '/api/proxy/records', { kind: 'finding', to: 'review', says: 'first named', how: 'look', in: PLAIN_TICKET });
     assert.ok(r.status < 300, JSON.stringify(r.body));
-    assert.equal(await recordsStore.askedForTicket(LOCAL_URL_KEY, PLAIN_TICKET), WORDS);
+    assert.equal(await recordsStore.askedForTicket(LOCAL_URL_KEY, PLAIN_TICKET), `${WORDS}\n\n${PLAN}`);
   });
 });
 
@@ -155,48 +153,40 @@ describe('LIN-4502 witness (b): rewriting the description through the proxy leav
     // Witness output recorded for the report: the proxy's answers and the description's state.
     console.log(JSON.stringify({ whole: { status: whole.status, code: whole.body?.code }, span: { status: span.status, code: span.body?.code }, descriptionNowStartsWith: (await storedDescription('i1')).slice(0, 40) }));
     assert.equal(askedAfter, askedBefore, 'the task\'s asked is unchanged');
-    assert.equal(askedAfter, WORDS);
+    assert.equal(askedAfter, `${quoteAsked(WORDS)}\n\n${PLAN}`, 'asked is the description as first named (LIN-4527)');
     assert.equal(partOneAfter, partOneBefore, 'brief part 1 is unchanged');
-    assert.equal(splitQuote(brief)?.words, WORDS, 'the brief quotes the task\'s words');
+    assert.ok(brief.includes(askedAfter), 'the brief quotes the task\'s asked');
   });
 });
 
-describe('LIN-4502 witness (c): the legacy reader reads the block the seal wrote, literally', () => {
+describe('LIN-4527: askedOf is the description as filed, whole (the block and the plan are kept)', () => {
   // Typed out on purpose: the shape tickets filed before P2 carry, as the retired seal wrote it.
   const LEGACY = '## As asked\n\nMake the export button work.\nKeep both formats.\n\n*End of what was asked. Steps write below this line; nothing above it changes.*\n\n## Implementation Plan\n\n1. a step';
-  test('askedOf takes the block\'s words, not the plan below it', () => {
-    assert.equal(askedOf(LEGACY), 'Make the export button work.\nKeep both formats.');
+  test('askedOf returns the sealed description unchanged: the block, then the plan below it', () => {
+    assert.equal(askedOf(LEGACY), LEGACY);
   });
-  test('Linear\'s escaped storage of the same block reads the same words', () => {
+  test('Linear\'s escaped storage of the same description is returned as stored', () => {
     const escaped = LEGACY.replace(/([#*_[\]])/g, '\\$1');
-    assert.equal(askedOf(escaped), 'Make the export button work.\nKeep both formats.');
+    assert.equal(askedOf(escaped), escaped);
   });
   // finding-684d2e80: a pre-P2 Jira ticket reads back through the codec, which renders the end line's italic as `_…_`.
-  test('a Jira ticket written before P2 (read back through the codec, end line in `_…_`) reads the same words', () => {
+  test('a Jira ticket written before P2 (read back through the codec, end line in `_…_`) is returned as read back', () => {
     const jira = adfToMarkdown(markdownToAdf(LEGACY));
     assert.ok(/^_End of what was asked\./m.test(jira), 'the codec renders the end line with underscores');
-    assert.equal(askedOf(jira), 'Make the export button work.\nKeep both formats.');
-    assert.equal(outsideAsked(jira).trim(), '## Implementation Plan\n\n1. a step');
-    // LIN-4504 retired legacyBlockSpan with its one reader (the selector's plan condensing).
+    assert.equal(askedOf(jira), jira);
   });
-  test('a CRLF Jira block reads the same words', () => {
+  test('a CRLF Jira description is returned as read back', () => {
     const jira = adfToMarkdown(markdownToAdf(LEGACY)).replace(/\n/g, '\r\n');
-    assert.equal(askedOf(jira), 'Make the export button work.\r\nKeep both formats.');
+    assert.equal(askedOf(jira), jira);
   });
-  test('an underscore end line with no heading above it is no block', () => {
+  test('an underscore end line with no heading above it is returned as well', () => {
     const text = 'Some words\n\n_End of what was asked. Steps write below this line; nothing above it changes._';
     assert.equal(askedOf(text), text);
   });
-});
-
-describe('LIN-4504: askedOf\'s plan heading is the one recognition rule (lib/legacy-plan-text.js)', () => {
-  test('lib/asked-of.js holds no heading of its own and cuts where the shared rule cuts, `#` to `###`', () => {
-    const source = readFileSync(new URL('../../lib/asked-of.js', import.meta.url), 'utf8');
-    assert.ok(!/Implementation Plan/.test(source.replace(/^\s*\/?\*.*$/gm, '').replace(/\/\/.*$/gm, '')), 'no plan heading spelled in code');
+  test('a plan heading at `#`, `##` or `###` is not cut from the request (the plan is records; asked keeps it as filed)', () => {
     for (const h of ['#', '##', '###']) {
       const text = `Words.\n\n${h} Implementation Plan\n\nplan`;
-      assert.equal(askedOf(text), textBeforePlan(text));
-      assert.equal(askedOf(text), 'Words.');
+      assert.equal(askedOf(text), text);
     }
   });
 });

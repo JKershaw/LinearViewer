@@ -98,7 +98,7 @@ const uuidForUrlKey = (key) => {
  * @param {Object|null} [options.taskModeStore] - Task-mode event store (LIN-2942), for /test/clear-task-mode-events
  * @returns {Router} Express router
  */
-export function createTestRoutes({ dispatchQueueStore, dispatchTokenStore, freeTierStore, userPreferencesStore, workspacePreferencesStore, modelRoutingStore = null, customPromptsStore, collectiveCharactersStore, collectivePresetsStore, dispatchPresetsStore, proxyTokenStore, proxyEventStore, agentStatusStore, observationSessionsStore, sessionsFeedCache, recapCacheStore, briefCacheStore, runSummaryCacheStore, sessionSummaryCacheStore, reportHistoryStore, shipBiscuitHistoryStore, taskDecisionsStore, shelvedRulingsStore, dismissalSuggestionsStore, savedChatStore, localStore, getWorkspaceAccessToken, accountStore, accountWorkspaceStore, ownerCredentialStore, connectionStore, clearWorkspaceIssuesMemo, resetKeyState = null, observerStateStore, dispatchHistoryCollection, proxyEventsCollection, resetKpiCache, workspaceHaltStore, emailTransport = null, commentDedupe = null, decisionStampDedupe = null, taskModeStore = null, taskShareCollection = null, kpiDailyRollupCollection = null, clearWorkspaceKpis = () => {} }) {
+export function createTestRoutes({ dispatchQueueStore, dispatchTokenStore, freeTierStore, userPreferencesStore, workspacePreferencesStore, modelRoutingStore = null, customPromptsStore, collectiveCharactersStore, collectivePresetsStore, dispatchPresetsStore, proxyTokenStore, proxyEventStore, agentStatusStore, observationSessionsStore, sessionsFeedCache, recapCacheStore, briefCacheStore, runSummaryCacheStore, sessionSummaryCacheStore, reportHistoryStore, shipBiscuitHistoryStore, taskDecisionsStore, shelvedRulingsStore, dismissalSuggestionsStore, savedChatStore, localStore, recordsStore = null, getWorkspaceAccessToken, accountStore, accountWorkspaceStore, ownerCredentialStore, connectionStore, clearWorkspaceIssuesMemo, resetKeyState = null, observerStateStore, dispatchHistoryCollection, proxyEventsCollection, resetKpiCache, workspaceHaltStore, emailTransport = null, commentDedupe = null, decisionStampDedupe = null, taskModeStore = null, taskShareCollection = null, kpiDailyRollupCollection = null, clearWorkspaceKpis = () => {} }) {
   const router = Router();
 
   // ── Connection-backed fixture variants (LIN-3124 PR3 checkpoint F, T27) ────
@@ -629,6 +629,19 @@ export function createTestRoutes({ dispatchQueueStore, dispatchTokenStore, freeT
       }
     })
   })
+
+  // LIN-4527: seat a ticket's task for a spec that reads the open-findings reading (no task reads as not-read). Test-only:
+  // in this E2E harness the dispatch seat finds no usable tracker credential for a seeded LOCAL- ticket
+  // ('tracker unavailable: ok'), so it makes no task. A local workspace made through POST /workspace/new does seat
+  // one at dispatch (read on 2026-11-21 in a non-test boot: LOCAL-1 got a task, no task-missing-at-dispatch line).
+  router.get('/test/seed-ticket-task', async (req, res) => {
+    const { urlKey, ticket } = req.query;
+    if (!recordsStore) return res.status(503).send('no records store wired into test routes');
+    if (typeof urlKey !== 'string' || typeof ticket !== 'string') return res.status(400).send('urlKey and ticket are required');
+    const made = await recordsStore.ensureTask(urlKey, { identifier: ticket, title: ticket, closed: false }, { by: 'Harbour', at: new Date().toISOString() });
+    if (made.problem) return res.status(422).json(made);
+    res.json({ id: made.id });
+  });
 
   // Endpoint to create a dispatch token for testing
   // Optional query parameters: ?label=custom-label (default: 'test-token'),

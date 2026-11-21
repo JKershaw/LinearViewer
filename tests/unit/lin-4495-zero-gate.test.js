@@ -1,7 +1,7 @@
 /**
  * LIN-4495 (piece 4 of LIN-4491): the zero-gate witness. A task with one open finding to close-out is NOT ready
  * to close, the decision says why, and ending the finding clears readiness. Every reading that is not "read with
- * none open" holds the gate too (not-read, legacy): none reads as zero.
+ * none open" holds the gate too (not-read, including a ticket with no task record): none reads as zero.
  *
  * Runs on a real MangoDB engine (tests/fixtures/mango-tmpdir.js) through the records store, so the finding is a
  * record written the way an agent writes one, and the reading is the one the gate uses (lib/close-out-findings.js).
@@ -15,7 +15,7 @@ import { RecordsStore, RECORDS_COLLECTION, REFS_COLLECTION, QUERY_LOG_COLLECTION
 import { INDEX_SPECS } from '../../lib/db-indexes.js';
 import { readTrail } from '../../lib/run-trail.js';
 import { closeOutDecision, CLOSE_OUT_REASON, CLOSE_OUT_STATUS } from '../../lib/run-closeout-state.js';
-import { readOpenFindings, findingsRead, findingsNotRead, findingsLegacy, findingsHold, findingsCopy, FINDINGS_NONE } from '../../lib/close-out-findings.js';
+import { readOpenFindings, findingsRead, findingsNotRead, findingsHold, findingsCopy, FINDINGS_NONE } from '../../lib/close-out-findings.js';
 
 const URL_KEY = 'zero-gate-workspace';
 const REPO = 'acme/widget';
@@ -94,15 +94,25 @@ describe('zero-gate: the decision reads the finding reading', () => {
     assert.match(d.message, /not read/);
   });
 
-  test('a legacy ledger (items as comment text, no finding records) is not ready', () => {
-    const legacy = [
-      c(1, `Implementation done: ${PR1}, CI green.`),
-      c(2, `## Code Review\n\nReviewed head \`${REVIEWED}\` of ${PR1}.\n\n### What CI Did Not Prove\n| # | Claim | In/Out | Discharge |\n| --- | --- | --- | --- |\n| 1 | one claim | In | a repro |\n\n**Verdict: Approve**`),
-      c(3, TRAIL[2].body),
-    ];
-    const trail = readTrail(legacy);
-    assert.equal(trail.review.ledger.present, true);
-    const d = closeOutDecision({ trail, prStatuses: statuses, stopAt: 'pr', runnerReady: true, actor: 'harbour', openFindings: findingsLegacy([]) });
+  // LIN-4527: the legacy-ledger hold is gone. A review that still carries a non-empty old `### What CI Did Not Prove`
+  // section is read as the records say: with no open finding to close-out, the task is none open and is ready.
+  // This is the guard loosening, written as intended: the section is text the gate no longer parses.
+  const LEGACY_LEDGER_REVIEW = [
+    c(1, `Implementation done: ${PR1}, CI green.`),
+    c(2, `## Code Review\n\nReviewed head \`${REVIEWED}\` of ${PR1}.\n\n### What CI Did Not Prove\n| # | Claim | In/Out | Discharge |\n| --- | --- | --- | --- |\n| 1 | one claim | In | a repro |\n\n**Verdict: Approve**`),
+    c(3, TRAIL[2].body),
+  ];
+  test('a pre-cutover review with a non-empty old ledger section, and no open finding to close-out, is ready (the old section is no longer read)', () => {
+    const trail = readTrail(LEGACY_LEDGER_REVIEW);
+    assert.equal(trail.review.ledger.present, true, 'the section is still visible to the Slice 3 tooling');
+    const d = closeOutDecision({ trail, prStatuses: statuses, stopAt: 'pr', runnerReady: true, actor: 'harbour', openFindings: FINDINGS_NONE });
+    assert.equal(d.status, CLOSE_OUT_STATUS.READY);
+    assert.equal(d.reason, null);
+  });
+
+  test('the paired case: the same review on a task whose findings are not read still holds, never a zero', () => {
+    const trail = readTrail(LEGACY_LEDGER_REVIEW);
+    const d = closeOutDecision({ trail, prStatuses: statuses, stopAt: 'pr', runnerReady: true, actor: 'harbour', openFindings: findingsNotRead('no task record for the ticket') });
     assert.equal(d.status, CLOSE_OUT_STATUS.NOT_READY);
     assert.equal(d.reason, CLOSE_OUT_REASON.OPEN_FINDINGS);
   });
@@ -111,13 +121,11 @@ describe('zero-gate: the decision reads the finding reading', () => {
     assert.throws(() => decide(undefined), /openFindings/);
   });
 
-  test('the copy names the three readings and never reads a hold as zero', () => {
+  test('the copy names the two readings and never reads a hold as zero', () => {
     assert.equal(findingsCopy(findingsRead([])), 'no open findings to close-out');
     assert.match(findingsCopy(findingsNotRead('x')), /not read/);
-    assert.match(findingsCopy(findingsLegacy([])), /not measured: re-run `review` to record its findings/);
     assert.equal(findingsHold(findingsRead([])), false);
     assert.equal(findingsHold(findingsNotRead('x')), true);
-    assert.equal(findingsHold(findingsLegacy([])), true);
   });
 });
 
@@ -128,7 +136,7 @@ describe('zero-gate: the records store is the source of the reading', () => {
       kind: 'finding', state: 'open', fields: { says: 'The footer count is off.', how: 'a repro' }, links: {}, in: task.id, to: 'close-out',
     }, { by: 'review', run: null, at: at(4) });
 
-    const open = await readOpenFindings({ store, urlKey: URL_KEY, ticket: TICKET, legacyLedger: false });
+    const open = await readOpenFindings({ store, urlKey: URL_KEY, ticket: TICKET });
     assert.equal(open.state, 'read');
     assert.equal(open.count, 1);
     assert.deepEqual(open.ids, [finding.id]);
@@ -136,18 +144,36 @@ describe('zero-gate: the records store is the source of the reading', () => {
 
     await store.end(URL_KEY, finding.id, { state: 'done', reason: 'the footer was fixed' }, { by: 'close-out', at: at(9) });
 
-    const after = await readOpenFindings({ store, urlKey: URL_KEY, ticket: TICKET, legacyLedger: false });
+    const after = await readOpenFindings({ store, urlKey: URL_KEY, ticket: TICKET });
     assert.equal(after.count, 0);
     assert.equal(decide(after).status, CLOSE_OUT_STATUS.READY);
   });
 
-  test('a task with no record reads none open (no finding can exist for it), and a finding to another reader does not count', async () => {
-    const none = await readOpenFindings({ store, urlKey: URL_KEY, ticket: 'LIN-9999', legacyLedger: false });
-    assert.equal(none.count, 0);
+  // LIN-4527: a ticket with no task record is not read, never "none open": the store cannot tell "never had a task"
+  // from "the lookup missed it".
+  test('a task with no record is not read (never none open), and a finding to another reader does not count', async () => {
+    const none = await readOpenFindings({ store, urlKey: URL_KEY, ticket: 'LIN-9999' });
+    assert.equal(none.state, 'not-read');
+    assert.equal(none.count, null);
+    assert.equal(none.why, 'no task record for the ticket');
+    assert.equal(findingsHold(none), true);
     const task = await store.ensureTask(URL_KEY, ticket, { by: 'Harbour', at: at(1) });
     await store.add(URL_KEY, { kind: 'finding', state: 'open', fields: { says: 'For the project.' }, links: {}, in: task.id, to: 'project' }, { by: 'review', run: null, at: at(4) });
-    const r = await readOpenFindings({ store, urlKey: URL_KEY, ticket: TICKET, legacyLedger: false });
+    const r = await readOpenFindings({ store, urlKey: URL_KEY, ticket: TICKET });
+    assert.equal(r.state, 'read');
     assert.equal(r.count, 0);
+  });
+
+  // LIN-4527: the person's merge reads the same gate. A merged, approved landing whose task has no record is not Done.
+  test('a person-merged, approved landing with no task record reads not-read: setDone is false, and a read of zero sets it', async () => {
+    const merged = new Map([[PR1, { ...openPr, state: 'closed', merged: true }]]);
+    const decideMerged = (open) => closeOutDecision({ trail: readTrail(TRAIL), prStatuses: merged, stopAt: 'pr', runnerReady: true, actor: 'person', openFindings: open });
+    const untasked = await readOpenFindings({ store, urlKey: URL_KEY, ticket: 'LIN-9998' });
+    assert.equal(decideMerged(untasked).setDone, false);
+    await store.ensureTask(URL_KEY, ticket, { by: 'Harbour', at: at(1) });
+    const read0 = await readOpenFindings({ store, urlKey: URL_KEY, ticket: TICKET });
+    assert.equal(read0.count, 0);
+    assert.equal(decideMerged(read0).setDone, true);
   });
 
   test('a store that throws is not-read, never a zero', async () => {

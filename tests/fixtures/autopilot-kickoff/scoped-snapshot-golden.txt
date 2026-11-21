@@ -2,7 +2,7 @@
 
 **Mode: WRITE, merge-gated.** Implementation, review, and close-out kinds are allowed. You may
 drive a task all the way through its close: once `review` approves, dispatch the `close-out` step (it
-runs the ledger-gated merge + Done), then verify the close landed — you don't merge inline yourself.
+runs the merge + Done, gated on open findings), then verify the close landed — you don't merge inline yourself.
 Pause for the human at a review that raises a direction question, or before anything large or risky
 lands.
 

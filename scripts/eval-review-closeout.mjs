@@ -149,6 +149,17 @@ async function rate(prompt, rubric) {
   return scores.reduce((a, b) => a + b, 0);
 }
 
+// LIN-4527: the A/B measured a ledger directive the live review prompt no longer has (LIN-4495 retired the section,
+// and the records wording replaced it). Its arm A strips that section, so on HEAD it cannot build its arms. Stop here,
+// before any model call, with one line; the recorded baseline and this header stay (docs/papers/harbour/steady-base.md).
+const LEDGER_HEADING_IN_LIVE_REVIEW = /### What CI Did Not Prove/.test(
+  generatePrompt('review', CASES[0].issue, { project: { name: 'Product' }, parent: null, siblings: [], children: [], comments: [] }).prompt,
+);
+if (!LEDGER_HEADING_IN_LIVE_REVIEW) {
+  console.error('This A/B measured the "What CI Did Not Prove" ledger directive, which the live review prompt no longer has (LIN-4495 retired it; LIN-4527). It cannot be re-run on HEAD; stopping before any model call.');
+  process.exit(2);
+}
+
 const cases = CASES.filter(c => !ONLY || c.id.includes(ONLY));
 console.log(`gen=${GEN_MODEL}  judge=${JUDGE_MODEL}  K=${K}  REPS=${REPS}  (n=${K * REPS} per cell)\n`);
 console.log('Hypothesis: on self-contained, CI-covered tasks the ledger adds NO noise —');

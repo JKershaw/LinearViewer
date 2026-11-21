@@ -15,8 +15,7 @@ import { CLOSE_OUT_ACTOR } from '../lib/run-closeout-state.js';
 import { recordMergedPrs, openFindingsStamp } from '../lib/close-out-merges.js';
 import { changesEndingFor } from '../lib/change-records.js';
 import { readCloseOutChain, closeOutNotReady, closeOutNotReadyRefusal } from '../lib/close-out-readiness.js';
-import { readOpenFindings, legacyLedgerOf } from '../lib/close-out-findings.js';
-import { readTrail } from '../lib/run-trail.js';
+import { readOpenFindings } from '../lib/close-out-findings.js';
 import { getLoopsForIssue, sessionIdByLoop } from '../lib/pipeline-loops.js';
 import { sessionIdOf } from '../lib/live-console.js';
 import { toSessionView } from '../lib/sessions-view.js';
@@ -360,11 +359,7 @@ export function registerRunEvidenceRoutes(router, { workspaceFromUrl, dispatchQu
       // that ends them): the stamp records them as they stood.
       let openPressFindings = closeOut?.openFindings || null;
       if (!openPressFindings) {
-        const { provider: pressProvider, callScope: pressCallScope } = (closeOut?.resolveProvider || resolveIssueBinding)(req.workspace, source);
-        const pressComments = await pressProvider.fetchIssueComments(pressCallScope, req.params.issueIdentifier);
-        openPressFindings = await readOpenFindings({
-          store: recordsStore, urlKey, ticket: req.params.issueIdentifier, legacyLedger: legacyLedgerOf(readTrail(pressComments).review),
-        });
+        openPressFindings = await readOpenFindings({ store: recordsStore, urlKey, ticket: req.params.issueIdentifier });
       }
       const notReady = await closeOutNotReady({ workspace: req.workspace, issueIdentifier: req.params.issueIdentifier, source, store: dispatchQueueStore, seam: closeOut || {}, installationTokenFor, recordsStore, openFindings: openPressFindings });
       if (notReady) {

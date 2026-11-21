@@ -2,8 +2,8 @@
  * LIN-4360: each rule around the `## As asked` block lives in one place.
  *
  * - The `plan-review due:` line has no reader any more (LIN-4504: the gate and the selector read records).
- * - "The text outside the block" (a legacy block, filed before LIN-4502) has one definition,
- *   `outsideAsked` in lib/asked-of.js, which the size record's region uses.
+ * - The text of a description is read whole (LIN-4527): the size record reads the whole description, and
+ *   lib/asked-of.js exports only `askedOf`, the request as filed. No second split of a legacy block exists.
  * - The brief composer (`composeBrief`, `briefQuoteEnd`) and the quote's spellings live in the
  *   pure lib/brief-quote.js (LIN-4501: it quotes the task's `asked`; LIN-4502 retired the
  *   block's own module), so the test-mode mocks do not pull in the live model client
@@ -19,7 +19,7 @@ import assert from 'node:assert/strict';
 import { readFileSync, readdirSync } from 'node:fs';
 import { buildImportGraph } from './lib/import-graph.js';
 import { quoteAsked } from '../../lib/brief-quote.js';
-import { outsideAsked } from '../../lib/asked-of.js';
+import * as askedOfModule from '../../lib/asked-of.js';
 import * as roundTrips from '../../lib/plan-review-round-trips.js';
 import { assembleTrailFacts } from '../../lib/recommendation-facts.js';
 const ASOF = '2026-08-09T12:00:00.000Z';
@@ -52,14 +52,11 @@ describe('LIN-4504: no reader of the plan-review due line remains', () => {
 });
 
 describe('one definition of the text outside the block', () => {
-  test('outsideAsked: above plus below a legacy block, the whole text when none, empty for null', () => {
-    assert.equal(typeof outsideAsked, 'function', 'lib/asked-of.js exports outsideAsked');
+  test('lib/asked-of.js exports only askedOf: the text outside a block is retired (LIN-4527), the whole description is read', () => {
+    assert.deepEqual(Object.keys(askedOfModule).sort(), ['askedOf']);
     const sealed = quoteAsked('The ask.');
-    assert.equal(outsideAsked(`Above.\n${sealed}\n\nBelow.`), 'Above.\n\n\nBelow.');
-    assert.equal(outsideAsked(sealed), '');
-    assert.equal(outsideAsked('No block here.'), 'No block here.');
-    assert.equal(outsideAsked(null), '');
-    assert.equal(outsideAsked(undefined), '');
+    assert.equal(askedOfModule.askedOf(`Above.\n${sealed}\n\nBelow.`), `Above.\n${sealed}\n\nBelow.`);
+    assert.equal(askedOfModule.askedOf(null), '');
   });
 
   test('no module under lib/ or routes/ rebuilds it by hand from a split', () => {

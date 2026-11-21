@@ -3,7 +3,8 @@
 
 import { test, describe, before, after } from 'node:test';
 import assert from 'node:assert/strict';
-import { createPipelineMergeRecorder, createSessionWorkspaceIdResolver } from '../../lib/close-out-merges.js';
+import { createPipelineMergeRecorder, createSessionWorkspaceIdResolver, openFindingsStamp } from '../../lib/close-out-merges.js';
+import { findingsNotRead, findingsRead } from '../../lib/close-out-findings.js';
 import { CloseOutEventsStore } from '../../lib/close-out-events-store.js';
 import { createMangoTmpdir } from '../fixtures/mango-tmpdir.js';
 
@@ -142,7 +143,7 @@ describe('createPipelineMergeRecorder', () => {
 
   test('a stop-at-PR task with a prior press records close-out', async () => {
     const c = setup({ stopAt: 'pr' });
-    await c.store.record({ accountId: 'acct-1', urlKey: 'ws', issueIdentifier: 'LIN-1', by: 'press', dispatchId: 'd-1', prUrl: PR, headSha: 'old', merged: false, openItems: { inside: 0, outside: 0, unknown: 0, total: 0 } });
+    await c.store.record({ accountId: 'acct-1', urlKey: 'ws', issueIdentifier: 'LIN-1', by: 'press', dispatchId: 'd-1', prUrl: PR, headSha: 'old', merged: false, openFindings: { state: 'read', count: 0 } });
     await c.run();
     const merged = (await rows(c)).filter(e => e.merged);
     assert.equal(merged.length, 1);
@@ -184,5 +185,16 @@ describe('createSessionWorkspaceIdResolver', () => {
     assert.equal(await resolver('ws'), 'w-9');
     assert.equal(await resolver('old'), null);
     assert.equal(await resolver('nope'), null);
+  });
+});
+
+// LIN-4527: the stamp the merge recorder keeps. A not-read reading is `count: null`, never zero, and no `openItems`
+// counts are written beside it (the old counts read a not-read as zero).
+describe('openFindingsStamp (LIN-4527)', () => {
+  test('a read stamps its count; a not-read stamps null, and writes no openItems', () => {
+    assert.deepEqual(openFindingsStamp(findingsRead(['f1', 'f2'])), { openFindings: { state: 'read', count: 2 } });
+    assert.deepEqual(openFindingsStamp(findingsRead([])), { openFindings: { state: 'read', count: 0 } });
+    assert.deepEqual(openFindingsStamp(findingsNotRead('no task record for the ticket')), { openFindings: { state: 'not-read', count: null } });
+    assert.equal('openItems' in openFindingsStamp(findingsRead([])), false);
   });
 });

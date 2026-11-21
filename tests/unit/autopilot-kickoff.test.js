@@ -51,7 +51,7 @@ describe('buildAutopilotKickoff (shared guide)', () => {
     // It no longer over-asserts the token IS the human's authorization to act.
     assert.ok(!/\*\*is\*\* the human's authorization to act/.test(text),
       'drops the token-is-authorization conflation');
-    // Merge/Done are gated separately on a recorded review Approve + discharged ledger.
+    // Merge/Done are gated separately on a recorded review Approve + no open findings to close-out.
     assert.ok(/not\*\* authorization for the irreversible finish/.test(text));
     assert.ok(text.includes('The token authenticates the channel; it is not permission to merge.'));
   });
@@ -61,8 +61,9 @@ describe('buildAutopilotKickoff (shared guide)', () => {
     // The old blanket clause contradicted every other surface once the lane widened.
     assert.ok(!/a human sign-off for\s+risky merges/.test(text),
       'drops the unqualified "human sign-off for risky merges" clause');
-    assert.ok(/No human has to tick a box\s+for a ledger item/.test(text),
-      'no ledger item waits on a fresh human sign-off');
+    assert.ok(/No human has to tick a box\s+for a finding/.test(text),
+      'no finding waits on a fresh human sign-off (LIN-4527: the records wording, not the retired ledger)');
+    assert.ok(!/What CI Did Not Prove/.test(text), 'the kickoff no longer describes the retired review ledger (LIN-4527)');
     // A claim only production can show settles through the monitor review named.
     assert.ok(/a claim only production can show settles through the \*\*named\*\* monitor review\s+wrote for it/.test(text),
       'an item unprovable before merge settles via its named monitor');
@@ -518,7 +519,8 @@ describe('buildAutopilotKickoff (providerUi capability gate, LIN-2804)', () => {
 // run starts no Periodical unless the human's goal asks, and stops once its task is complete. The
 // golden (tests/fixtures/autopilot-kickoff/scoped-snapshot-golden.txt) was re-captured for that one
 // change, and the assertions below say what may and may not differ. LIN-4502 re-captured it for the
-// brief hint alone (BRIEF_HINT: the words come from the task's record, not a description block).
+// brief hint alone (BRIEF_HINT: the words come from the task's record, not a description block). LIN-4527 re-captured
+// it for the ledger's wording alone: the close-out step's line now says the merge is gated on open findings.
 describe('buildAutopilotKickoff (scoped snapshot, LIN-1829 golden updated for LIN-4415)', () => {
   const SEP = '\n\n---\n\n';
   // Must match the exact params the golden was generated with.
