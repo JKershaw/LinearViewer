@@ -67,7 +67,6 @@ routes/task-records.js, routes/project-page.js, routes/dispatch.js, server.js).
   every session page read "not measured". Search the aliases too, and keep a missing store reading "not measured",
   never zero, so a missed caller shows instead of passing.
 - A verdict rests on the head its judge read (LIN-4516): `heads` names it per change in `on`, is never stored, and pins
-  before the refresh (`routes/proxy-records.js`; `pinVerdictToHeads` in `lib/change-records.js`). The route reads `on` flat or
-  under `links` (`onOf`), so no alias skips the pin; the pin and the blind-read exactness apply to verdicts only.
+  before the refresh (`routes/proxy-records.js`; `pinVerdictToHeads` in `lib/change-records.js`).
 - A task written with a ticket `ref` claims that ticket (`lib/records/writes.js`), as `ensureTask` does; else the ticket's
   references make a second task. A ticket's task id has one rule, `ticketTaskIdOf` (`lib/records/refs.js`). A revise that changes a claimed `ref` is refused (422).
