@@ -220,3 +220,47 @@ A fresh reader checked this page against the log from 18 Nov, the designs, the r
 - **Slice 3: LIN-4513** (verdicts and changes as records), autopilot **894a0750-07c6-492e-8d0b-89d0c2621f55**, launched at 00:30 on 21 Nov. Its ticket carries John's standing answers. Two questions are left for John as rulings.
 - **How agents reach production:** `railway ssh` into harbour-cat (`railway run` can't reach the database).
 - **Fleet pause:** the driver's owner-minted token sets and clears it.
+
+## 21 Nov, 15:30: handover for compaction
+
+**Where we are.**
+- **Slices 1 and 2** have landed.
+- **Slice 3, LIN-4513** (verdicts and changes as records), autopilot 894a0750-07c6-492e-8d0b-89d0c2621f55, 8 pieces:
+  - P1–P4 Done (LIN-4514..4517). P4 imported 21 comment verdicts into records in production.
+  - P5 (LIN-4518: close-out, the router and run evidence read records) is building, about $47 so far. John's answers it carries: marker for authorship, with the ledger removed; finding-per-issue for blocking counts; retire look-first's survey-comment check.
+  - P6–P8 (LIN-4519..4521: measures; remove old parsers; re-review after close-out's own commits) wait.
+  - Slice cost so far about $160.
+- **After slice 3:** take readings, draft slice 4 (rulings) with John's standing answers and the ruling lessons as its scenes, then the fresh check, file, launch.
+- **Stop after slice 4.** The parked work goes through the upgraded Harbour, then slice 5 (lessons), then slice 6 (wakes; John to confirm; readings say needed), then the horizon list (`horizon/README.md`).
+
+**How the work is driven.**
+- **Hourly drive** (trig_01XCTpQoZb2V1vqMFvzXKStm, :27 past each hour).
+  - Light checks use the scratchpad token. Deeper ones go through one subagent.
+  - It proposes answers on rulings; John clicks.
+  - It sets and clears any fleet pause.
+  - When a slice lands, it drafts, checks, files and launches the next.
+- **Ruling answers:** propose via suggest-answer, with decisionLoopId set to the ruling's own `anchor.loopId`.
+- **Notes to runs:** they go to the piece's own run. Notes to the top autopilot don't reach pieces.
+- **Production:** `railway ssh` into harbour-cat. Never print the env.
+- **The token** expires 22 Nov 13:37. Ask John for a new one before then.
+
+**Methodology** (John's, as practised):
+- stay at altitude; Harbour's process does the work;
+- the simple sensible choice; retire, don't keep slimmer versions; move dependants onto the right data;
+- rulings only for John's calls, and a proposed answer on each;
+- check against the records before relaying; label claims shown or unknown;
+- remove rather than add rules;
+- the log is append-only;
+- John's questions one at a time, plainly.
+
+**Known rough edges** (for slice 4, slice 6 or the smoothing pass):
+- duplicate rulings from the plan and breakdown loops;
+- a second DECISION in a run gets dropped;
+- runs building the contested part while a ruling waits;
+- the close-out and blind-read deadlock;
+- close-out commits after approval (slice 3 P8 fixes this);
+- rows reading "closed" while still posting;
+- refused follow-ups showing as "failed";
+- no mid-turn visibility (LIN-4508).
+
+**For John:** LIN-4512 (key rotation, end of next week); the slice 6 confirmation; Ship Biscuit's big picture.
