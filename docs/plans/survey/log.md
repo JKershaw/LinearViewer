@@ -5001,3 +5001,7 @@ LIN-4517 Done (close-out ran 64 min: the verdict import and cutover). LIN-4518 (
 ### 21 Nov, 09:28
 
 LIN-4518 (P5) beat 1 is green (draft PR #2483), and the piece is still building. A ruling, `lin4518-p5-remainder` (continue / split / close at beat 1): I proposed **continue**, finishing the piece as planned. No pause.
+
+### 21 Nov, 10:28
+
+LIN-4518 (P5) is still building; latest beat taken at 10:19, after John answered continue. No rulings, no pause.
