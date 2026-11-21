@@ -16,6 +16,7 @@ import { createRecordWrites } from '../../lib/records/writes.js';
 import { isTerminalState } from '../../lib/providers/state-map.js';
 import { refreshTaskChanges } from '../../lib/change-records.js';
 import { readStandingRecords } from '../../lib/records/standing.js';
+import { BLIND_READ_KIND } from '../../lib/prompts/blind-read-words.js';
 
 const URL_KEY = 'lin-4518-workspace';
 const TICKET = 'LIN-4518';
@@ -102,7 +103,7 @@ async function reviewOn(changeIds, heads) {
   return v.body.id;
 }
 
-const standing = () => readStandingRecords({ recordsStore: store, urlKey: URL_KEY, taskId });
+const standing = () => readStandingRecords({ recordsStore: store, urlKey: URL_KEY, taskId, judgements: { review: 'review', blindRead: BLIND_READ_KIND } });
 
 describe('witness 1: a push after the review makes the review stale and counts as work after it', () => {
   test('the judge read H1; the PR moves to H2; the verdict stays on H1, shows stale, and work came after the review', async () => {
