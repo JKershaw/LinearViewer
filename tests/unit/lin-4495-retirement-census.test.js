@@ -1,128 +1,65 @@
 /**
  * LIN-4495 (piece 4 of LIN-4491): the retirement census. The cutover removes the Waiting lists, the `Retires:`
  * conveyor and its 422, the leftover answer's heading, the ledger's item parse and its counts, and the notes-PR
- * clause. This test fails on any of their words in the code, the docs and the fixtures, outside a short, reasoned
- * allowlist.
+ * clause. This test fails on any of their words in the code, the docs, the fixtures and the tests, outside the shared
+ * RETAINED table (tests/unit/helpers/retirement-census.js).
  *
- * It is a word census over the text under CENSUS_ROOTS (code, the live docs, the fixtures and the public pages), with
- * these deliberate exclusions, each by path and each with its reason in EXCLUDED_PREFIXES, and not by a blanket word:
- *   - lib/runner-kit/runner.mjs is the runner's own kit (its local ledger is the runner's, not this one);
- *   - docs/papers/, docs/plans/ and docs/reviews/ are dated records of the method as it was: they quote the retired
- *     words as history, and rewriting them would falsify the record;
- *   - tests/fixtures/walk-8/ is walk 8's store, ported to today's kinds (LIN-4496): the historical records the replay writes
- *     through the proxy, quoting the retired words as the walk wrote them;
- *   - the census's own test files are under tests/unit/, which is not a census root.
- * Matching is by symbol and by heading, not by bare word: "Waiting" alone is never retired (Home's "Waiting on you"
- * and lib/recommendation-look-first.js's wait on a live run are different things), and `## Waiting` matches anywhere,
- * including inside a JS string.
+ * LIN-4524 (piece A) moved this census onto that one table, and widened its scan from the code, docs, fixtures and
+ * public pages to the whole tests root. What the census keeps from before:
+ *   - its words: CENSUS_WORDS.LIN_4495, unchanged;
+ *   - its matching: by symbol and by heading, not by bare word ("Waiting" alone is never retired; `## Waiting` matches
+ *     anywhere, including inside a JS string);
+ *   - its reasoned exclusions (dated papers, plans and reviews, the walk-8 stores, the runner's own kit) and its
+ *     allowances, now rows of the table, each with its kind and reason;
+ *   - its planted-mutation proofs below, so a row cannot hide a new word.
+ * What changed: the per-file allowances and the exclusion list are rows of RETAINED, and every row is checked against
+ * the real tree by tests/unit/retirement-census-table.test.js (a stale row, a missing file, an unknown word, a
+ * duplicate, a row outside the scanned roots). The stale-allowance and excluded-path tests this file used to hold are
+ * that table test now, so they check every census's rows, not only this one's.
  *
- * ALLOW lists the files that keep a retired word for a reason the census cannot read. Each has its reason. The planted
- * mutations below prove the scan sees a new retired word, so an allowlisted file cannot hide a new one.
+ * The census's own test files, and its helper, are SELF: they name the words as their own lists.
  */
 import { describe, test } from 'node:test';
 import assert from 'node:assert/strict';
-import { existsSync, readFileSync } from 'node:fs';
+import { readFileSync } from 'node:fs';
 import { join } from 'node:path';
 import { fileURLToPath } from 'node:url';
-import { scanFiles, CENSUS_ROOTS, EXCLUDED_PREFIXES } from './helpers/retirement-census.js';
+import { scanFiles, censusHits, CENSUS_WORDS, RETAINED, SELF, WHOLE_ROOTS } from './helpers/retirement-census.js';
 
 const ROOT = fileURLToPath(new URL('../../', import.meta.url));
 
 /** The retired words, each with the spelling the census matches. */
-export const RETIRED = Object.freeze([
-  { word: 'Retires:', re: /Retires:/ },
-  { word: 'RETIRES_*', re: /\bRETIRES_[A-Z]/ },
-  { word: 'LEFTOVER_RETIRES_', re: /LEFTOVER_RETIRES_/ },
-  { word: 'NOTES_PR', re: /\bNOTES_PR\b/ },
-  { word: '## Waiting', re: /## Waiting\b/ },
-  { word: 'countWaiting', re: /\bcountWaiting\b/ },
-  { word: 'dispatch-leftover-answer', re: /dispatch-leftover-answer/ },
-  { word: 'LEFTOVERS_HEADING', re: /\bLEFTOVERS_HEADING\b/ },
-  { word: 'FOR_CLOSE_OUT', re: /\bFOR_CLOSE_OUT\b/ },
-  { word: 'FOLLOW_UP_SHAPE', re: /\bFOLLOW_UP_SHAPE\b/ },
-  { word: 'dischargedBy', re: /\bdischargedBy\b/ },
-  { word: '.discharged', re: /\.discharged\b/ },
-  { word: 'ledger.items', re: /\bledger\??\.items\b/ },
-  { word: 'ledgerItems / ledgerOpen', re: /\bledger(?:Items|Open)\b/ },
-  // LIN-4505: the one-off importer and its frozen Waiting reader are retired (the records they wrote stay, by id).
-  { word: 'parseWaitingSection', re: /\bparseWaitingSection\b/ },
-  { word: 'countFrozenWaiting', re: /\bcountFrozenWaiting\b/ },
-  { word: 'waitingAt', re: /\bwaitingAt\b/ },
-  { word: 'planImport', re: /\bplanImport\b/ },
-  { word: 'applyManifest', re: /\bapplyManifest\b/ },
-  { word: 'waiting-import', re: /\bwaiting-import\b/ },
-  { word: 'import-apply', re: /\bimport-apply\b/ },
-  { word: 'records-import', re: /\brecords-import\b/ },
-  { word: 'parked-tickets', re: /\bparked-tickets\b/ },
-]);
-
-// The roots and the reasoned exclusions are shared with the LIN-4502 census (tests/unit/helpers/retirement-census.js).
-export { CENSUS_ROOTS, EXCLUDED_PREFIXES };
+export const RETIRED = CENSUS_WORDS.LIN_4495;
 
 /**
- * Files that keep a retired word, each with its reason. Short on purpose: a new entry needs a reason here, and a file
- * listed here that holds no retired word fails the stale-allowance test.
+ * Every LIN-4495 word in the given files that no row covers, and that is not SELF: `[{file, word, line}]`. Pure over the
+ * file text, so the planted-mutation tests can run it over synthetic files.
+ * @param {Record<string, string>} files - repo-relative path → text
+ * @param {readonly object[]} [rows] - the table (default: the shared RETAINED)
  */
-export const ALLOW = Object.freeze({
-  'lib/prompts/leftover-words.js': 'the history header that says what the cutover retired (`Retires:`, the answer\'s guard)',
-  'scripts/prompt-template-change-log.md': 'the change log: each row names what it retired, so the words are the record itself',
-  'tests/fixtures/run-ledger-trails.js': 'pre-cutover review comments, kept as the legacy-hold fixture: the ledger items as the comment wrote them, read as text',
-});
-
-/** The census's file list: the text under CENSUS_ROOTS, minus the excluded prefixes (the scan's whole input). */
-export function censusFiles() {
-  return scanFiles(ROOT, CENSUS_ROOTS, EXCLUDED_PREFIXES);
+export function findRetired(files, rows = RETAINED) {
+  return censusHits(files, RETIRED, 'LIN_4495', rows, SELF);
 }
 
-/**
- * Every retired word in the given files, outside the allowlist and the excluded prefixes: `[{file, word, line}]`. Pure
- * over the file text, so the planted-mutation tests can run it over a synthetic file.
- * @param {Record<string, string>} files - repo-relative path → text
- * @param {Record<string, string>} [allow]
- */
-export function findRetired(files, allow = ALLOW) {
-  const hits = [];
-  for (const [file, text] of Object.entries(files)) {
-    if (allow[file] || Object.keys(EXCLUDED_PREFIXES).some((p) => file.startsWith(p))) continue;
-    for (const { word, re } of RETIRED) {
-      const m = re.exec(text);
-      if (!m) continue;
-      const line = text.slice(0, m.index).split('\n').length;
-      hits.push({ file, word, line });
-    }
-  }
-  return hits;
+/** The census's file list: the text under the whole tests root and the census roots (the shared table does the excluding). */
+export function censusFiles() {
+  return scanFiles(ROOT, WHOLE_ROOTS);
 }
 
 const readAll = (files) => Object.fromEntries(files.map((f) => [f, readFileSync(join(ROOT, f), 'utf8')]));
 
-describe('LIN-4495 retirement census: the cutover left no retired word in the code, the docs or the fixtures', () => {
-  test('no retired word outside the reasoned allowlist and exclusions', () => {
+describe('LIN-4495 retirement census: the cutover left no retired word in the code, the docs, the fixtures or the tests', () => {
+  test('no retired word outside the shared table, the SELF list and the reasoned records', () => {
     const hits = findRetired(readAll(censusFiles()));
     assert.deepStrictEqual(hits, [], `retired words still in the tree:\n${hits.map((h) => `  ${h.file}:${h.line} ${h.word}`).join('\n')}`);
   });
 
-  test('every allowlisted file is scanned and still holds a retired word (an allowance with nothing to allow is stale)', () => {
-    const all = readAll(censusFiles());
-    for (const [file, reason] of Object.entries(ALLOW)) {
-      assert.ok(all[file] !== undefined, `${file} is listed but not scanned`);
-      assert.ok(RETIRED.some(({ re }) => re.test(all[file])), `${file} is allowlisted but holds no retired word: drop its entry`);
-      assert.ok(reason.length > 20, `${file} needs a reason`);
-    }
-  });
-
-  test('every excluded prefix names a real path and carries a reason (an exclusion with nothing to exclude is stale)', () => {
-    for (const [prefix, reason] of Object.entries(EXCLUDED_PREFIXES)) {
-      assert.ok(existsSync(join(ROOT, prefix)), `${prefix} is excluded but does not exist`);
-      assert.ok(reason.length > 20, `${prefix} needs a reason`);
-    }
-  });
-
-  test('the census reads the roots it names: docs, fixtures and public pages are scanned, not only code', () => {
+  test('the census reads the roots it names: docs, fixtures, public pages and the whole tests root', () => {
     const files = censusFiles();
     assert.ok(files.some((f) => f.startsWith('docs/architecture/')), 'docs/architecture is scanned');
     assert.ok(files.some((f) => f.startsWith('tests/fixtures/')), 'the fixtures are scanned');
     assert.ok(files.some((f) => f.startsWith('public/')), 'the public pages are scanned');
+    assert.ok(files.some((f) => f.startsWith('tests/unit/')), 'the whole tests root is scanned, not only the fixtures (LIN-4524)');
   });
 
   test('a planted retired word is seen: the scan is not vacuous', () => {
@@ -154,24 +91,32 @@ describe('LIN-4495 retirement census: the cutover left no retired word in the co
     assert.deepStrictEqual(findRetired(planted).map((h) => h.word).sort(), nine);
   });
 
-  test('a file named in the allowlist is skipped, and only it: an allowance cannot hide a new word elsewhere', () => {
+  test('a row covers its file and its word, and nothing else: a file named in a row is skipped for that word, and only it', () => {
+    const rows = [{ kind: 'record', file: 'lib/prompts/leftover-words.js', words: ['Retires:'], reason: 'the history header' }];
     const files = { 'lib/prompts/leftover-words.js': 'Retires: x\n', 'lib/other.js': 'Retires: x\n' };
-    const hits = findRetired(files);
-    assert.deepStrictEqual(hits.map((h) => h.file), ['lib/other.js']);
+    assert.deepStrictEqual(findRetired(files, rows).map((h) => h.file), ['lib/other.js']);
   });
 
-  test('an excluded prefix is skipped, and only it', () => {
+  test('a directory row covers every file under it, for its word; a file outside the directory is still read', () => {
+    const rows = [{ kind: 'record', file: 'docs/plans/', words: ['*'], reason: 'plans of record' }];
     const excluded = ['docs', 'plans', 'x.md'].join('/');
     const kept = ['docs', 'architecture', 'x.md'].join('/');
     const files = { [excluded]: '## Waiting\n', [kept]: '## Waiting\n' };
-    assert.deepStrictEqual(findRetired(files).map((h) => h.file), [kept]);
+    assert.deepStrictEqual(findRetired(files, rows).map((h) => h.file), [kept]);
+  });
+
+  test('an ALL:<census> row covers only that census\'s words: this census still reads the others under the same directory', () => {
+    const rows = [{ kind: 'record', file: 'scripts/eval/fixtures/', words: ['ALL:LIN_4504'], reason: 'recorded corpora' }];
+    const files = { 'scripts/eval/fixtures/a.json': 'Retires: x; fits one session\n' };
+    assert.deepStrictEqual(findRetired(files, rows).map((h) => h.word), ['Retires:']);
   });
 
   test('Home\'s "Waiting on you" and the live-run Waiting are not the retired word', () => {
     assert.deepStrictEqual(findRetired({ 'lib/waiting-section.js': "// Waiting on you\nconst label = 'Waiting on you';\n// a run waiting on a live run\n" }), []);
   });
 
-  test('runner.mjs of the runner kit is out of the census by file (its own local ledger)', () => {
+  test('the runner\'s own kit is covered by its live row: its ledger.items is the runner\'s, the census keeps reading the rest', () => {
     assert.deepStrictEqual(findRetired({ 'lib/runner-kit/runner.mjs': 'const ledger = { items: [] }; ledger.items.push(1); // discharged\n' }), []);
+    assert.equal(findRetired({ 'lib/runner-kit/runner.mjs': "// Retires: x\n" }).length, 1, 'a retired word the row does not name is still seen');
   });
 });

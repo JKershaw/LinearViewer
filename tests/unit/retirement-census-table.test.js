@@ -10,7 +10,7 @@
 import { describe, test } from 'node:test';
 import assert from 'node:assert/strict';
 import { fileURLToPath } from 'node:url';
-import { KINDS, SELF, RETAINED, WHOLE_ROOTS, CENSUS_ROOTS, retainedProblems, fsEnv } from './helpers/retirement-census.js';
+import { KINDS, SELF, RETAINED, WHOLE_ROOTS, CENSUS_ROOTS, WORD_PATTERNS, retainedProblems, fsEnv } from './helpers/retirement-census.js';
 
 const ROOT = fileURLToPath(new URL('../../', import.meta.url));
 const WORD = 'PLANTED_WORD';
@@ -27,6 +27,7 @@ function planted({ files = {}, rules = {}, words = [WORD], roots = WHOLE_ROOTS }
     ),
     ruleHas: (path, symbol) => Boolean(rules[path]?.includes(symbol)),
     knownWord: (label) => words.includes(label),
+    knownCensus: (name) => ['LIN_4495', 'LIN_4502', 'LIN_4504'].includes(name),
   };
 }
 
@@ -133,11 +134,21 @@ describe('LIN-4524 shared RETAINED table: the schema and its validation', () => 
     assert.ok(problems.some((p) => /SELF/.test(p) && /reason/.test(p)), JSON.stringify(problems));
   });
 
-  test('the real module validates against the real tree: SELF names real files with reasons, RETAINED is valid', () => {
+  test('a whole-set token is allowed only as the sole word of a record row, and ALL: names a real census', () => {
+    const wideOnLive = [{ kind: 'live', file: 'lib/a.js', words: ['*'], reason: REASON, rule: { path: 'lib/rule.js', symbol: 'ruleFn' } }];
+    assert.ok(PROBLEMS(wideOnLive).some((p) => /\*/.test(p) && /record/.test(p)), 'a * on a live row');
+    const mixed = [record({ words: ['*', WORD] })];
+    assert.ok(PROBLEMS(mixed).some((p) => /sole word/.test(p)), 'a * beside another word');
+    const noSuchCensus = [record({ file: 'docs/dir/', words: ['ALL:LIN_9999'] })];
+    assert.ok(PROBLEMS(noSuchCensus).some((p) => /LIN_9999/.test(p) && /census/.test(p)), 'an unknown census');
+    assert.deepEqual(PROBLEMS([record({ file: 'docs/dir/', words: ['*'] }), record({ file: 'tests/unit/c.test.js', words: ['ALL:LIN_4504'] })]), []);
+  });
+
+  test('the real module validates against the real tree: SELF names real files with reasons, and every RETAINED row holds', () => {
     for (const [path, reason] of Object.entries(SELF)) {
       assert.equal(typeof reason, 'string', `${path} has a reason`);
       assert.ok(reason.trim().length > 20, `${path} has a reason long enough to say why`);
     }
-    assert.deepEqual(retainedProblems(RETAINED, SELF, fsEnv(ROOT, new Map(), WHOLE_ROOTS)), []);
+    assert.deepEqual(retainedProblems(RETAINED, SELF, fsEnv(ROOT, WORD_PATTERNS, WHOLE_ROOTS)), []);
   });
 });
