@@ -36,6 +36,7 @@ import { closeOutWaitsOn } from '../../lib/run-closeout-state.js';
 import { landingPrUrls } from '../../lib/run-trail.js';
 import { assembleTrailFacts } from '../../lib/recommendation-facts.js';
 import { blindReadStep } from '../../lib/recommendation-blind-read.js';
+import { standingOfComments } from '../helpers/records-trail.js';
 import { generatePrompt } from '../../lib/prompt-templates.js';
 import { resolveRunPrRef } from '../../lib/pr-state-store.js';
 import { SURVEY_HEADINGS } from '../../lib/prompts/survey-words.js';
@@ -81,7 +82,7 @@ const ROWS = {
 };
 
 const facts = (comments) => assembleTrailFacts(comments, '', { leaf: false });
-const step = (comments, state = STARTED) => blindReadStep({ state }, { comments, allRuns: [] })?.step ?? null;
+const step = (comments, state = STARTED) => blindReadStep({ state }, { standing: standingOfComments(comments), allRuns: [] })?.step ?? null;
 const ladderSeam = (comments) => ({
   resolveProvider: () => ({ provider: { name: 'local', async fetchIssueComments() { return comments; } }, callScope: 'scope' }),
   isStopAtRun: async () => null,

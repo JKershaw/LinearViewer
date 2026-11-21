@@ -27,6 +27,7 @@ import { readTrail } from '../../lib/run-trail.js';
 import { readRunEvidence } from '../../lib/run-evidence.js';
 import { readCloseOutChain, closeOutNotReady } from '../../lib/close-out-readiness.js';
 import { blindReadStep } from '../../lib/recommendation-blind-read.js';
+import { standingOfComments } from '../helpers/records-trail.js';
 import { RUN_COMMENT_TRAILS } from '../fixtures/run-ledger-trails.js';
 
 const REPO = 'acme/widget';
@@ -81,7 +82,7 @@ async function surfaces(comments, { shape = 'full', issue = STARTED, merged = []
   });
   const stopAtGuard = await closeOutNotReady({ openFindings: FINDINGS_NONE, workspace: WORKSPACE, issueIdentifier: 'LIN-1', seam: seamFor(comments, readOne, 'pr') });
   const ladderGuard = await closeOutNotReady({ openFindings: FINDINGS_NONE, workspace: WORKSPACE, issueIdentifier: 'LIN-1', seam: seamFor(comments, readOne, null) });
-  const step = blindReadStep({ state: issue }, { comments, allRuns: [] });
+  const step = blindReadStep({ state: issue }, { standing: standingOfComments(comments), allRuns: [] });
   return {
     box: box.closeOut,
     check: check.state,
@@ -327,13 +328,13 @@ describe('the recommendation\'s read: the decision\'s advice answer (LIN-4460, r
 
   for (const row of [doneNoClose, doneClosed, doneAudit, canceled, started]) {
     test(`${row.name}: routesRead is ${row.route}`, () => {
-      const step = blindReadStep({ state: row.state }, { comments: row.comments, allRuns: [] });
+      const step = blindReadStep({ state: row.state }, { standing: standingOfComments(row.comments), allRuns: [] });
       assert.equal(step !== null, row.route);
     });
   }
 
   test('ticket unknown routes like In Progress, with no passenger loosening (review F2b)', () => {
-    assert.notEqual(blindReadStep({}, { comments: approved, allRuns: [] }), null);
+    assert.notEqual(blindReadStep({}, { standing: standingOfComments(approved), allRuns: [] }), null);
   });
 
   test('Done alone does not stand the enforcement gate aside: an approved, unmerged, unread landing is still refused (both lanes)', async () => {
@@ -346,7 +347,7 @@ describe('the recommendation\'s read: the decision\'s advice answer (LIN-4460, r
   test('lin4447-recommend-path-outside-merge: an outside merge on a ticket still In Progress still routes the read (John\'s accepted limit, 13 Nov)', async () => {
     // The PR is merged outside Harbour. The recommend path reads no PR and the ladder lane reads none (John:
     // "Accept: no new GitHub reads on the recommend path or ladder lane; add the fact later if a stuck case shows up").
-    const step = blindReadStep({ state: STARTED }, { comments: approved, allRuns: [] });
+    const step = blindReadStep({ state: STARTED }, { standing: standingOfComments(approved), allRuns: [] });
     assert.equal(step?.step, 'blind-read', 'the read is routed');
     const ladder = await surfaces(approved, { issue: STARTED, merged: [41] });
     assert.equal(refusedOn(ladder.ladderGuard), 'blind-read-missing', 'the ladder lane still refuses');

@@ -18,6 +18,7 @@ import { readFileSync } from 'node:fs';
 import { CODE_ROUTES } from '../../lib/code-routes.js';
 import { reviewLoopStep } from '../../lib/recommendation-facts.js';
 import { getRecommendation, setFetchImpl, setPromptTraceRecorder } from '../../lib/openrouter.js';
+import { standingOfComments } from '../helpers/records-trail.js';
 import { quoteAsked } from '../../lib/brief-quote.js';
 
 afterEach(() => { setFetchImpl(null); setPromptTraceRecorder(null); });
@@ -86,11 +87,11 @@ describe('CODE_ROUTES: each route fires on its fixture and records a declared tr
   test('blind-read fires (send) and blocked (two ended reads, no verdict), both declared', () => {
     const issue = { identifier: 'T-1', state: STARTED, description: '' };
     const comments = [c(1, `Implementation done: ${PR1}, CI green.`), c(2, `## Code Review\n\nReviewed head \`${REVIEWED}\` of ${PR1}.\n\n### What CI Did Not Prove\n| # | Claim | In/Out | Discharge |\n| --- | --- | --- | --- |\n| 1 | one claim | In | a repro |\n\n**Verdict: Approve**`)];
-    const sent = entry('blind-read').route(issue, { comments, allRuns: [] });
+    const sent = entry('blind-read').route(issue, { comments, standing: standingOfComments(comments), allRuns: [] });
     assert.equal(sent?.codeRoute, 'blind-read');
     assert.ok(entry('blind-read').emits.includes('blind-read'));
     const bounded = entry('blind-read').route(issue, {
-      comments, allRuns: [run('blind-read', 3, 'done'), run('blind-read', 4, 'failed')]
+      comments, standing: standingOfComments(comments), allRuns: [run('blind-read', 3, 'done'), run('blind-read', 4, 'failed')]
     });
     assert.equal(bounded?.codeRoute, 'blocked');
     assert.ok(entry('blind-read').emits.includes('blocked'));

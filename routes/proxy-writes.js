@@ -61,6 +61,7 @@ import { checkSizeRecord, recordShape, SIZE_OF_MOVE_HEADING, SIZE_RECORD_CODES, 
 import { addedPlanHeadings, PLAN_HEADING_WORDS, PLAN_IN_DESCRIPTION } from '../lib/legacy-plan-text.js';
 import { blindReadRefusal } from '../lib/run-ledger.js';
 import { checkBlindRead, landingPrUrls } from '../lib/run-trail.js';
+import { standingForTicket } from '../lib/task-standing.js';
 import { isRestrictedStamp, sameTicketKey, ISSUE_PATCH_FIELDS } from '../lib/stage-writes.js';
 import { jsonError } from '../lib/errors.js';
 import { parseFeedbackImage } from '../lib/attachment-upload.js';
@@ -716,8 +717,18 @@ export function createProxyWriteRoutes({
     if (!shape.ok) return refuseBlindRead(ctx, shape);
     let landing = null;
     try {
-      if (typeof ctx.provider.fetchIssueComments !== 'function') throw new Error('the provider reads no comment trail');
-      landing = landingPrUrls(await ctx.provider.fetchIssueComments(ctx.token, ctx.req.params.issueId));
+      // LIN-4518: the landing is the task's open changes plus the round's merged ones (lib/records/landing.js), read from
+      // records when the ticket has a task. Without a task, the comment trail, as before (retired with the shape half, P7).
+      const taskId = recordsStore && typeof recordsStore.taskForTicket === 'function'
+        ? await recordsStore.taskForTicket(ctx.req.proxyUrlKey, ctx.req.params.issueId) : null;
+      if (taskId) {
+        const standing = await standingForTicket({ recordsStore, urlKey: ctx.req.proxyUrlKey, ticket: ctx.req.params.issueId });
+        if (!standing) throw new Error('the task standing could not be read');
+        landing = standing.landing;
+      } else {
+        if (typeof ctx.provider.fetchIssueComments !== 'function') throw new Error('the provider reads no comment trail');
+        landing = landingPrUrls(await ctx.provider.fetchIssueComments(ctx.token, ctx.req.params.issueId));
+      }
     } catch (err) {
       console.warn(`[blind-read] ${ctx.req.params.issueId}: PR-set check skipped, the trail could not be read whole (${err?.message || err}); the shape check held`);
     }

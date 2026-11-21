@@ -27,6 +27,7 @@ import { CloseOutEventsStore } from '../../lib/close-out-events-store.js';
 import { FINDINGS_NONE } from '../../lib/close-out-findings.js';
 import { readPrStatuses, closeOutNotReady } from '../../lib/close-out-readiness.js';
 import { closeOutDecision } from '../../lib/run-closeout-state.js';
+import { versionsOfComments } from '../helpers/records-trail.js';
 import { terminalPrUrlOfFeedback } from '../../lib/dispatch-wake.js';
 
 const harness = createMangoTmpdir('lin-4515-characterization-');
@@ -165,10 +166,20 @@ describe('witness 6: the ladder lane makes no PR read (characterization)', () =>
       readPrStatus: async () => { counts.prReads++; throw new Error('a PR read on the ladder lane'); },
       githubFetch: async () => { counts.prReads++; throw new Error('a GitHub read on the ladder lane'); },
     };
-    // Any records read throws: the ladder lane must not touch the store.
-    const recordsStore = new Proxy({}, { get(_t, name) { throw new Error(`a records read on the ladder lane: ${String(name)}`); } });
+    // LIN-4518: the ladder lane's gate reads the ticket's records standing, not the comments. The store serves the trail's
+    // records (tests/helpers/records-trail.js), and every read is counted: the lane reads records, never a comment or a PR.
+    const versions = versionsOfComments(COMMENTS);
+    const index = (rows) => rows.filter((s, i, all) => all.findIndex((x) => x.id === s.id) === i);
+    const current = (kind) => index(versions.filter((v) => v.kind === kind).sort((a, b) => b.v - a.v));
+    const recordsStore = {
+      reads: 0,
+      async taskForTicket() { this.reads++; return 'task-trail'; },
+      async find(_urlKey, { kind }) { this.reads++; return current(kind); },
+      async versionsOf(_urlKey, ids) { this.reads++; return versions.filter((v) => ids.includes(v.id)); },
+    };
     const state = await closeOutNotReady({ openFindings: FINDINGS_NONE, workspace: { urlKey: 'acme' }, issueIdentifier: 'LIN-1', seam, recordsStore });
-    assert.deepEqual(counts, { comments: 1, prReads: 0 });
+    assert.deepEqual(counts, { comments: 0, prReads: 0 });
+    assert.ok(recordsStore.reads > 0, 'the gate read the records');
     assert.equal(state?.reason, 'blind-read-missing', 'the ladder still refuses on the gate');
   });
 });

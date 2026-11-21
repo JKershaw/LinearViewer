@@ -32,6 +32,8 @@ import { closeOutWaitsOn } from '../../lib/run-closeout-state.js';
 import { landingPrUrls, commentKindOf, isPersonComment } from '../../lib/run-trail.js';
 import { assembleTrailFacts } from '../../lib/recommendation-facts.js';
 import { blindReadStep, BLIND_READ_ATTEMPT_BOUND } from '../../lib/recommendation-blind-read.js';
+import { standingOfComments } from '../helpers/records-trail.js';
+import { prUrlsIn } from '../../lib/run-ledger.js';
 import { generatePrompt } from '../../lib/prompt-templates.js';
 import { SURVEY_HEADINGS } from '../../lib/prompts/survey-words.js';
 
@@ -89,7 +91,9 @@ const ROWS = [
 ];
 
 const SELECTOR_REPLY = { choices: [{ message: { content: '## Reasoning\n→ **close-out**' }, finish_reason: 'stop' }], usage: { completion_tokens: 3 } };
-const context = (row) => ({ parent: null, siblings: [], project: null, children: [], comments: row.comments, focusedChild: null, attachments: [], runs: [], allRuns: Object.hasOwn(row, 'allRuns') ? row.allRuns : [] });
+// LIN-4518: the route reads the ticket's standing; the row's trail is written as records (tests/helpers/records-trail.js).
+const statusesOf = (row) => Object.fromEntries(row.comments.flatMap((c) => prUrlsIn(c.body)).map((u) => [u, statusFor(row, u)]));
+const context = (row) => ({ parent: null, siblings: [], project: null, children: [], comments: row.comments, focusedChild: null, attachments: [], runs: [], allRuns: Object.hasOwn(row, 'allRuns') ? row.allRuns : [], standing: standingOfComments(row.comments, { statuses: statusesOf(row) }) });
 const issueOf = (row) => ({ identifier: 'LIN-1', title: 'Gate fixture', description: '', state: row.state || STARTED, labels: [] });
 
 function statusFor(row, url) {
@@ -198,20 +202,20 @@ describe('the route\'s own edges', () => {
 
   test('a Canceled or Duplicate ticket stands aside; a Done ticket stands aside unless an audit\'s notes PR reads after it', () => {
     for (const type of ['canceled', 'duplicate']) {
-      assert.equal(blindReadStep({ state: { type } }, { comments: approved, allRuns: [] }), null, type);
+      assert.equal(blindReadStep({ state: { type } }, { standing: standingOfComments(approved), allRuns: [] }), null, type);
     }
     // Row 196, first half (flipped by LIN-4460): a person set the ticket Done outside Harbour and the trail holds
     // no close-out on its landing, so Harbour follows and sends no read to a Done ticket.
-    assert.equal(blindReadStep({ state: DONE }, { comments: approved, allRuns: [] }), null, 'Done with no close-out on the landing: the person\'s Done stands');
+    assert.equal(blindReadStep({ state: DONE }, { standing: standingOfComments(approved), allRuns: [] }), null, 'Done with no close-out on the landing: the person\'s Done stands');
     // Row 196, second half (unchanged): a close-out after the review.
-    assert.equal(blindReadStep({ state: DONE }, { comments: [summary(1), review(2), closeOut(3, `Merged ${PR1}; set Done.`)], allRuns: [] }), null, 'Done, closed out after the review, no read: stands aside');
+    assert.equal(blindReadStep({ state: DONE }, { standing: standingOfComments([summary(1), review(2), closeOut(3, `Merged ${PR1}; set Done.`)]), allRuns: [] }), null, 'Done, closed out after the review, no read: stands aside');
     // Added by LIN-4460: an audit's notes PR opened after Done still gets its read (its own review comes after the close-out).
-    assert.equal(blindReadStep({ state: DONE }, { comments: [summary(1), review(2), closeOut(3, `Merged ${PR1}; set Done.`), audit(4), review(5, 'Approve', PR2)], allRuns: [] }).step, 'blind-read', 'a post-Done audit notes PR is still read');
+    assert.equal(blindReadStep({ state: DONE }, { standing: standingOfComments([summary(1), review(2), closeOut(3, `Merged ${PR1}; set Done.`), audit(4), review(5, 'Approve', PR2)]), allRuns: [] }).step, 'blind-read', 'a post-Done audit notes PR is still read');
   });
 
   test('a live blind read is not an ended attempt; runs before the review do not count', () => {
     assert.equal(BLIND_READ_ATTEMPT_BOUND, 2);
-    const step = (allRuns) => blindReadStep({ state: STARTED }, { comments: approved, allRuns }).step;
+    const step = (allRuns) => blindReadStep({ state: STARTED }, { standing: standingOfComments(approved), allRuns }).step;
     assert.equal(step([run('blind-read', 3, 'done')]), 'blind-read', 'one ended attempt');
     assert.equal(step([run('blind-read', 3, 'done'), run('blind-read', 4, 'running')]), 'blind-read', 'one ended, one live');
     assert.equal(step([run('blind-read', 0, 'done'), run('blind-read', 1, 'failed'), run('blind-read', 3, 'done')]), 'blind-read', 'two before the review');
@@ -221,7 +225,7 @@ describe('the route\'s own edges', () => {
   });
 
   test('the route reads the ledger whole: a read written before the review is not its read', () => {
-    assert.equal(blindReadStep({ state: STARTED }, { comments: [summary(1), read(2, PR1), review(3)], allRuns: [] }).step, 'blind-read');
+    assert.equal(blindReadStep({ state: STARTED }, { standing: standingOfComments([summary(1), read(2, PR1), review(3)]), allRuns: [] }).step, 'blind-read');
   });
 });
 
