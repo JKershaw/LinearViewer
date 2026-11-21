@@ -143,7 +143,7 @@ describe('createPipelineMergeRecorder', () => {
 
   test('a stop-at-PR task with a prior press records close-out', async () => {
     const c = setup({ stopAt: 'pr' });
-    await c.store.record({ accountId: 'acct-1', urlKey: 'ws', issueIdentifier: 'LIN-1', by: 'press', dispatchId: 'd-1', prUrl: PR, headSha: 'old', merged: false, openItems: { inside: 0, outside: 0, unknown: 0, total: 0 } });
+    await c.store.record({ accountId: 'acct-1', urlKey: 'ws', issueIdentifier: 'LIN-1', by: 'press', dispatchId: 'd-1', prUrl: PR, headSha: 'old', merged: false, openFindings: { state: 'read', count: 0 } });
     await c.run();
     const merged = (await rows(c)).filter(e => e.merged);
     assert.equal(merged.length, 1);

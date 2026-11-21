@@ -45,14 +45,15 @@ Area notes for `runs-and-dispatch` in the registry. Format and rules: README.md.
 - A task timeline lane is running from the page's open session ids (`isOpenState`), never the
   cost row; a lineage's own `incomplete`, not the shared `lineagesTruncated`, decides "not
   complete" (LIN-4405, `lib/task-timeline.js`).
-- A test that dispatches a close-out passes a `closeOut` seam (`resolveProvider`): the readiness
-  guard reads comments for every close-out since LIN-4438, and without the seam it reaches the real
-  provider and fails open, a pass the hermetic watcher catches only in CI.
+- A close-out test passes a `closeOut` seam (`resolveProvider`): the guard reads comments (LIN-4438),
+  and without it fails open on the real provider. An E2E spec reading findings seeds the ticket's task
+  (`/test/seed-ticket-task`, LIN-4527).
 - Close-out readiness is one decision, `closeOutDecision` (`lib/run-closeout-state.js`, LIN-4460): every surface
   renders or enforces its answer. A new reason is a row of `CLOSE_OUT_REASONS` plus a row in
   `lin-4438-blind-read-gate` and `lin-4460-close-out-decision`, whose census reads code, not comments.
-- When a person acts, Harbour follows (LIN-4447, John): a landing whose every PR reads merged stands the gate aside;
-  a Done ticket with no close-out on its landing stands only the recommendation's read aside. Harbour never sets Done.
+- When a person acts, Harbour follows (LIN-4447): an all-merged landing stands the refusals aside, not Done:
+  the check sets Done only on a findings read of zero (LIN-4527); a Done ticket with no close-out stands only the
+  read aside. Harbour never sets Done.
 - What a comment is, and which PRs are the task's, are read once in `lib/run-trail.js`: a comment kind
   is a row of `COMMENT_KINDS` (`lin-4458-comment-kind-census` fails on a kind test elsewhere), and the
   box, the guard, the owner's check and the merge take their PRs from `readTrail().landing`, statuses

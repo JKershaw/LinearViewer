@@ -85,7 +85,7 @@ describe('LIN-4381: GET /api/proxy/periodicals over real stores', () => {
       prUrl: `https://github.com/JKershaw/LinearViewer/pull/${n}`,
       headSha: `sha${n}`,
       merged: true,
-      openItems: { inside: 0, outside: 0, unknown: 0, total: 0 },
+      openFindings: { state: 'read', count: 0 },
       prMergedAt: new Date(Date.now() - DAY_MS)
     });
     assert.ok(event?._id, 'setup: the merged event must record');
