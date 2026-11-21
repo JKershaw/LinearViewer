@@ -5010,3 +5010,7 @@ LIN-4518 (P5) is still building; latest beat taken at 10:19, after John answered
 
 - LIN-4518 (P5) is still building; beat taken at 10:32.
 - Ruling `lin4518-b3-lookfirst` (retire look-first's Survey comment check now, or keep): I proposed **retire-now**. The slice ticket lists it (§10), and John's standing answer is to retire what the slice lists. The run raised a ruling anyway; the standing answers aren't fully heading off "what to retire" questions.
+
+### 21 Nov, 12:28
+
+LIN-4518 (P5) is still building.
