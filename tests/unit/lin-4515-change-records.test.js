@@ -33,6 +33,10 @@ import { STAGE_KINDS } from '../../lib/prompts/stage-kinds.js';
 import { askedOf } from '../../lib/asked-of.js';
 import { canonicalChangeRef, changeKeyOf } from '../../lib/records/change-ref.js';
 import { backstopChangeFor, refreshTaskChanges } from '../../lib/change-records.js';
+import { createRunRecords } from '../../lib/run-records.js';
+import { createWorkspaceApiRoutes } from '../../routes/workspace-api.js';
+import { FINDINGS_NONE } from '../../lib/close-out-findings.js';
+import { findRouteLayer } from './lib/route-layer.js';
 import { createPipelineMergeRecorder } from '../../lib/close-out-merges.js';
 import { CloseOutEventsStore } from '../../lib/close-out-events-store.js';
 
@@ -254,4 +258,161 @@ describe('witness 5: the change ref', () => {
   async function doneImplementationRun(store, taskId) {
     await store.openRun(URL_KEY, { id: RUN, stage: 'implementation', taskId, lineage: RUN, at: T0 });
   }
+});
+
+describe('witness 1b: a PR closed unmerged (finding-64d471fd)', () => {
+  test('ends the open change abandoned with no head revise, and a second refresh does nothing more', async () => {
+    const { store, writes } = await freshStore();
+    const taskId = await taskFor(store);
+    const id = await stageChange(writes, taskId, PR_URL, 'H1');
+    const readPrStatus = reader(() => ({ ...status({ sha: 'H5', closed: true }), merged: false }));
+    const first = await refreshTaskChanges({ urlKey: URL_KEY, taskId, writes, recordsStore: store, readPrStatus });
+    assert.deepEqual(first, [{ id, abandoned: true }]);
+    assert.equal((await store.find(URL_KEY, { kind: 'change', inRef: taskId, state: 'abandoned' })).length, 1, 'the change ends abandoned');
+    assert.equal((await store.find(URL_KEY, { kind: 'change', inRef: taskId, state: 'merged' })).length, 0, 'not merged');
+    const versions = await versionsOf(store, id);
+    assert.ok(versions.every((v) => v.fields.head === 'H1'), 'no head revise: a closed PR\'s head is not recorded');
+    const before = versions.length;
+    const second = await refreshTaskChanges({ urlKey: URL_KEY, taskId, writes, recordsStore: store, readPrStatus });
+    assert.deepEqual(second, [], 'an ended change is no longer open, so a second refresh finds nothing');
+    assert.equal((await versionsOf(store, id)).length, before, 'no further version');
+  });
+});
+
+describe('witness 3b: the backstop at the run lifecycle (finding-de843ab5)', () => {
+  const doneFeedback = (message) => [{ kind: 'system', message: `[done] ${message}` }];
+  const rowOf = (over = {}) => ({ _id: RUN, urlKey: URL_KEY, kind: 'implementation', rootItemId: null, runRecordId: null, ...over });
+  /** A backstop spy that records its calls and resolves, with the seam built around it. */
+  async function seamWithSpy() {
+    const { store } = await freshStore();
+    const calls = [];
+    const changeBackstop = async (args) => { calls.push(args); return null; };
+    const seam = createRunRecords({ recordsStore: store, changeBackstop, now: () => new Date(T0) });
+    return { seam, calls, store };
+  }
+  /** The backstop starts without being awaited (finding-a8b61efc), so a test lets the microtask queue drain. */
+  const drain = () => new Promise((resolve) => setImmediate(resolve));
+  async function feedbackOf(seam, row, text) {
+    await seam.onTaken(row);
+    const feedback = doneFeedback(text);
+    await seam.onFeedback(row, feedback[0], feedback);
+    await drain();
+    return feedback;
+  }
+
+  test('an implementation row\'s [done] calls the backstop once with its urlKey, its run id and its feedback', async () => {
+    const { seam, calls } = await seamWithSpy();
+    const feedback = await feedbackOf(seam, rowOf(), `PR ${PR_URL}`);
+    assert.equal(calls.length, 1);
+    assert.deepEqual(calls[0], { urlKey: URL_KEY, runId: RUN, feedback });
+  });
+
+  test('a retrospective-audit row\'s [done] calls it too', async () => {
+    const { seam, calls } = await seamWithSpy();
+    await feedbackOf(seam, rowOf({ _id: 'run-audit-4515', kind: 'retrospective-audit' }), `notes ${PR_URL}`);
+    assert.equal(calls.length, 1);
+    assert.equal(calls[0].runId, 'run-audit-4515');
+  });
+
+  test('a review row\'s [done] does not', async () => {
+    const { seam, calls } = await seamWithSpy();
+    await feedbackOf(seam, rowOf({ _id: 'run-review-4515', kind: 'review' }), 'Approve');
+    assert.equal(calls.length, 0);
+  });
+
+  test('an implementation row\'s [failed] does not', async () => {
+    const { seam, calls } = await seamWithSpy();
+    const row = rowOf();
+    await seam.onTaken(row);
+    const failed = [{ kind: 'system', message: '[failed] could not push' }];
+    await seam.onFeedback(row, failed[0], failed);
+    await drain();
+    assert.equal(calls.length, 0);
+  });
+
+  test('a backstop that never settles does not hold the terminal feedback write (finding-a8b61efc)', async () => {
+    const { store } = await freshStore();
+    const changeBackstop = () => new Promise(() => {}); // a GitHub read that hangs
+    const seam = createRunRecords({ recordsStore: store, changeBackstop, now: () => new Date(T0) });
+    const row = rowOf();
+    await seam.onTaken(row);
+    const feedback = doneFeedback(`PR ${PR_URL}`);
+    const bound = new Promise((resolve) => setTimeout(() => resolve('held'), 2000));
+    const outcome = await Promise.race([seam.onFeedback(row, feedback[0], feedback).then(() => 'returned'), bound]);
+    assert.equal(outcome, 'returned', 'onFeedback returns without waiting for the backstop');
+  });
+
+  test('a backstop that throws is logged and never fails the feedback write', async () => {
+    const { store } = await freshStore();
+    const seam = createRunRecords({ recordsStore: store, changeBackstop: async () => { throw new Error('boom'); }, now: () => new Date(T0) });
+    const row = rowOf();
+    await seam.onTaken(row);
+    const feedback = doneFeedback(`PR ${PR_URL}`);
+    const logged = [];
+    const original = console.log;
+    console.log = (m) => logged.push(String(m));
+    try {
+      await assert.doesNotReject(seam.onFeedback(row, feedback[0], feedback));
+      await drain();
+    } finally { console.log = original; }
+    assert.ok(logged.some((m) => m.includes('[change-backstop]') && m.includes('boom')), 'the fault is logged');
+  });
+});
+
+describe('witness 2b: the task-page check ends the change (finding-8593665e)', () => {
+  const CHECK_PATH = '/workspace/:urlKey/api/run-evidence/:issueIdentifier/check';
+  const at = (d) => `2026-07-0${d}T00:00:00.000Z`;
+  const reviewBody = '## Review\n\n### What CI Did Not Prove\n| # | Claim | In/Out | Discharge |\n| --- | --- | --- | --- |\n| 1 | one claim | In | none |\n\n**Verdict: Approve**';
+  const comments = [
+    { body: PR_URL, createdAt: at(1), user: 'w' },
+    { body: reviewBody, createdAt: at(2), user: 'reviewer' },
+    { body: `## Blind read\nVerdict: same. It left the close-out area neither better nor worse.\n\nRead: ${PR_URL}.`, createdAt: at(3), user: 'reviewer' },
+  ];
+
+  async function checkWith(recordsStore, prStatus) {
+    const router = createWorkspaceApiRoutes({
+      workspaceFromUrl: (req, res, next) => next(),
+      closeOutEventsStore: new CloseOutEventsStore({ collection: harness.freshDb().collection('close-out-events') }),
+      recordsStore,
+      closeOut: {
+        openFindings: FINDINGS_NONE,
+        resolveProvider: () => ({ provider: { async fetchIssueComments() { return comments; } }, callScope: 'scope' }),
+        readPrStatus: async () => prStatus,
+        isStopAtRun: async () => 'pr',
+        runnerReady: () => true,
+        markDone: async () => {},
+      },
+    });
+    const layer = findRouteLayer(router, 'post', CHECK_PATH);
+    const handler = layer.route.stack[layer.route.stack.length - 1].handle;
+    const res = { statusCode: 200, jsonBody: null, status(c) { this.statusCode = c; return this; }, json(b) { this.jsonBody = b; return this; }, end() { return this; } };
+    await handler({
+      session: { accountId: 'acct-1', workspaces: ['ws'] },
+      workspace: { urlKey: URL_KEY, id: 'ws', accessToken: 't' },
+      params: { urlKey: URL_KEY, issueIdentifier: TICKET },
+      query: {}, body: {},
+    }, res, (err) => { if (err) throw err; });
+    return res;
+  }
+
+  test('a merged PR seen by the stop-at-PR check ends the open change merged, its last head the head at merge', async () => {
+    const { store, writes } = await freshStore();
+    const taskId = await taskFor(store);
+    const id = await stageChange(writes, taskId, PR_URL, 'H1');
+    const res = await checkWith(store, status({ sha: 'H9', merged: true, extra: { merge_commit_sha: 'M9' } }));
+    assert.equal(res.statusCode, 200);
+    assert.equal(res.jsonBody.state.status, 'merged', 'the check saw the merge');
+    const ended = await store.find(URL_KEY, { kind: 'change', inRef: taskId, state: 'merged' });
+    assert.equal(ended.length, 1, 'the check ends the change merged');
+    assert.equal(ended[0].id, id);
+    assert.equal((await versionsOf(store, id)).at(-1).fields.head, 'H9', 'the head at merge, not the merge commit');
+  });
+
+  test('an open PR leaves the change open', async () => {
+    const { store, writes } = await freshStore();
+    const taskId = await taskFor(store);
+    await stageChange(writes, taskId, PR_URL, 'H1');
+    await checkWith(store, status({ sha: 'H1' }));
+    assert.equal((await store.find(URL_KEY, { kind: 'change', inRef: taskId, state: 'open' })).length, 1);
+  });
 });
