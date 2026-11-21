@@ -5037,3 +5037,7 @@ LIN-4518 (P5) has been rebuilding authorship on the marker since 13:55. No rulin
 ### 21 Nov, 15:28
 
 LIN-4518 (P5) is still going: a new implementation beat started at 15:15, after the marker rebuild. No rulings, no pause.
+
+### 21 Nov, ~16:00: LIN-4445 off the parked list
+
+John took LIN-4445 (the loop on Jira) off the parked work; he'll come back to it later. The parked work is now the seven safety findings, LIN-4416, LIN-4441 and LIN-4463. LIN-4445 still isn't dispatched. John's reasons for running the parked work after slice 4: work queued up to put the improvements through their paces; no work running while the core changes; test what's been built at the earliest sensible time. Slices 5 and 6 are still wanted, 5 especially, given how the notes grow.

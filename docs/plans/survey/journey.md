@@ -264,3 +264,8 @@ A fresh reader checked this page against the log from 18 Nov, the designs, the r
 - no mid-turn visibility (LIN-4508).
 
 **For John:** LIN-4512 (key rotation, end of next week); the slice 6 confirmation; Ship Biscuit's big picture.
+
+## 21 Nov, 16:00: the parked work, trimmed
+
+- **LIN-4445 (the loop on Jira) is off the parked list.** John will come back to it later. The parked work is now the seven safety findings, LIN-4416, LIN-4441 and LIN-4463.
+- **Why it runs after slice 4** (John's reasons): work queued up to put the improvements through their paces, and these are good candidates; no work runs while the core is changing; test what's been built at the earliest sensible time. Slices 5 and 6 are still wanted, 5 especially, given how the notes grow.
