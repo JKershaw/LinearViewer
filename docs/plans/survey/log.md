@@ -5152,3 +5152,8 @@ The full stop holds: the fleet is paused, and the drive is only reporting. The o
 
 - LIN-4513 (slice 3): added the tests line (tests and saved test files in scope; no translators or stopgaps, in code or tests) and the no-evals line (no evals with real model calls; the stubbed eval test is enough; at most one or two real runs as a sanity check, only if a piece really needs one).
 - LIN-4522: added the no-evals line (it already had the tests line). It is running; the line is read wherever the run next reads its ticket.
+
+## 21 Nov, ~19:00: LIN-4522's ruling answered (John: accept)
+
+- `lin4522-slice2-read-records`: John accepted. A new task's `asked` is the description as filed (the old-block reader goes); the size note stays in the description, read whole (no size record kind); the plan-section skip in `lib/legacy-plan-text.js` stays until slice 4 (brief's ticket section and the selector's view). One production write: LIN-4508 gets its task before the merge, while the old reader still exists. The 110 closed sealed tickets and other workspaces stay as they are.
+- LIN-4522's research (comment fe7b6618) found more left than the ticket listed: the kickoff mentions the ledger in 10 places, and the autopilot handbook still says review writes one. What slice 3 still reads of the ledger stays until P7 under a named exception (finding-92289ee4 to LIN-4520). Removal spike: 25 of 26,214 unit tests failed, all expected.
