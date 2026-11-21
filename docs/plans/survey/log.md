@@ -5041,3 +5041,10 @@ LIN-4518 (P5) is still going: a new implementation beat started at 15:15, after 
 ### 21 Nov, ~16:00: LIN-4445 off the parked list
 
 John took LIN-4445 (the loop on Jira) off the parked work; he'll come back to it later. The parked work is now the seven safety findings, LIN-4416, LIN-4441 and LIN-4463. LIN-4445 still isn't dispatched. John's reasons for running the parked work after slice 4: work queued up to put the improvements through their paces; no work running while the core changes; test what's been built at the earliest sensible time. Slices 5 and 6 are still wanted, 5 especially, given how the notes grow.
+
+### 21 Nov, 16:27
+
+- LIN-4518 (P5): the re-review approved at 15:56. Its verdict is a record (verdict-078b2b5a), pinned to change-d2313813@9, the head it read: slice 3's own records at work. The blind read at 16:02 said "same", meaning better and worse in balance. At 16:03 the autopilot pinned one more implementation beat, for the review's before-merge conditions and the blind read's five small findings, ahead of close-out.
+- The blind read and close-out didn't deadlock this time.
+- P6–P8 (LIN-4519..4521) wait. No rulings, no pause.
+- John approved carrying on past slice 4, assuming no trouble. The drive prompt update that does it is waiting for his approval.
