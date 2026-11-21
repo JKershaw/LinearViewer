@@ -4,6 +4,8 @@
  * Allows tests to bypass OAuth and use predictable mock data.
  * Only mounted when NODE_ENV === 'test'.
  */
+import { createTestRecordSeed } from '../lib/records/writes.js';
+import { BLIND_READ_KIND } from '../lib/prompts/blind-read-words.js';
 import express, { Router } from 'express';
 import { personMint } from '../lib/stage-writes.js';
 import crypto from 'crypto';
@@ -2095,33 +2097,19 @@ export function createTestRoutes({ recordsStore = null, dispatchQueueStore, disp
   // `{ repo, number, readable, state?, merged?, headSha?, checks?, reason? }`.
   // LIN-3251 (RC2): the SAME value also primes the pr-state route's own
   // whole-reader cache, so the header PR line is hermetic too.
-  // LIN-4518 (beat 4): seeds the records a ticket's gates read: its task, one change per PR (at the head the PR is at), and
-  // the verdicts that judge them (`changes` names indexes into this request's changes). The E2E specs seed these instead of
-  // review and blind-read comments: the gates read the records standing only.
+  // LIN-4518 (beat 4): seeds the records a ticket's gates read (lib/records/writes.js createTestRecordSeed, unchecked by design).
+  // The E2E specs seed these instead of review and blind-read comments: the gates read the records standing only.
+  const seedTestRecords = recordsStore ? createTestRecordSeed({ recordsStore }) : null;
   router.post('/test/seed-verdict-records', async (req, res) => {
     try {
-      if (!recordsStore) return res.status(503).json({ error: 'records store not configured' });
-      const { urlKey, ticket, asked = 'Seeded records.', changes = [], verdicts = [] } = req.body || {};
+      if (!seedTestRecords) return res.status(503).json({ error: 'records store not configured' });
+      const { urlKey, ticket, asked, changes = [], verdicts = [] } = req.body || {};
       if (!urlKey || !ticket) return res.status(400).json({ error: 'urlKey and ticket are required' });
-      // Records persist per workspace across tests: this ticket's own task and its records are cleared first, so a verdict
-      // an earlier test seeded cannot judge this one.
-      const claim = await recordsStore.refs.findOne({ urlKey, ticket });
-      if (claim) {
-        await recordsStore.records.deleteMany({ urlKey, $or: [{ id: claim.taskId }, { in: claim.taskId }] });
-        await recordsStore.refs.deleteMany({ urlKey, ticket });
-      }
-      const task = await recordsStore.ensureTask(urlKey, { identifier: ticket, asked }, { by: 'harbour' });
-      if (task.problem) return res.status(422).json({ error: task.problem });
-      const pins = [];
-      for (const ch of changes) {
-        const snap = await recordsStore.add(urlKey, { kind: 'change', in: task.id, fields: { ref: ch.ref, head: ch.head } }, { by: 'implementation' });
-        pins.push(`${snap.id}@${snap.v}`);
-      }
-      for (const vd of verdicts) {
-        const on = (vd.changes ?? [0]).map((i) => pins[i]);
-        await recordsStore.add(urlKey, { kind: 'verdict', in: task.id, links: { on }, fields: { judgement: vd.judgement, outcome: vd.outcome, reasoning: vd.reasoning ?? 'seeded' } }, { by: vd.judgement === 'blind-read' ? 'blind-read' : 'review' });
-      }
-      res.status(201).json({ taskId: task.id, changes: pins });
+      // The writer each verdict is filed under: a blind read under its own kind (the constants module names it).
+      const filed = verdicts.map((vd) => ({ ...vd, by: vd.judgement === BLIND_READ_KIND ? BLIND_READ_KIND : 'review' }));
+      const out = await seedTestRecords({ urlKey, ticket, asked, changes, verdicts: filed });
+      if (out.problem) return res.status(422).json({ error: out.problem });
+      res.status(201).json({ taskId: out.taskId, changes: out.changes });
     } catch (err) {
       res.status(500).json({ error: err.message });
     }
