@@ -4959,3 +4959,11 @@ The pause ruling was answered (a: lifted, stays lifted). LIN-4504's second revie
 ### 21 Nov, 02:28
 
 Slice 3: LIN-4514 and 4515 are Done (close-outs 01:46 and 01:51). LIN-4516 has been building since 02:25. LIN-4517..4521 wait. The two copies of question 1 are still open, with yes proposed. No pause.
+
+### 21 Nov, 03:28
+
+- **Slice 3:** LIN-4514 and 4515 Done; LIN-4516 in close-out since 03:04; LIN-4517..4521 wait.
+- **Two new rulings, with proposals:**
+  - `lin4513-p4-verdict-import` (question 2 surfaced after all): import, once, as slice 2 did for plans.
+  - `lin4516-b3-comment-guard`: keep the comment landing until P5 flips the stages, then retire it in P5. That's sequencing, not a kept version.
+- **Question 1:** both copies still open, yes proposed. No pause.
