@@ -5147,3 +5147,8 @@ The full stop holds: the fleet is paused, and the drive is only reporting. The o
 - Then kick off LIN-4513 fresh. Nothing blocks a fresh kickoff (no duplicate within 5 min, STAGE_IN_FLIGHT doesn't apply to kickoff, LIN-4522 is another issue). The new run's survey reads answered rulings and prior comments.
 - Not watched live: the abort row itself, an actual refusal, or the new run acting on the answer.
 - Proposed to John: a no-evals line (stubbed eval test is enough; one or two real runs at most as a sanity check) for slice 3's standing answers, and possibly LIN-4522's ticket. Waiting on his answer.
+
+## 21 Nov, ~18:50: standing answers added (John)
+
+- LIN-4513 (slice 3): added the tests line (tests and saved test files in scope; no translators or stopgaps, in code or tests) and the no-evals line (no evals with real model calls; the stubbed eval test is enough; at most one or two real runs as a sanity check, only if a piece really needs one).
+- LIN-4522: added the no-evals line (it already had the tests line). It is running; the line is read wherever the run next reads its ticket.
