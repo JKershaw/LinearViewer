@@ -5033,3 +5033,7 @@ LIN-4518 (P5) is on its last beat, waiting for CI on bf349ff5f. Two follow-up ro
 ### 21 Nov, 14:28
 
 LIN-4518 (P5) has been rebuilding authorship on the marker since 13:55. No rulings, no pause.
+
+### 21 Nov, 15:28
+
+LIN-4518 (P5) is still going: a new implementation beat started at 15:15, after the marker rebuild. No rulings, no pause.
