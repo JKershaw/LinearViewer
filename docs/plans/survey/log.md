@@ -5129,3 +5129,8 @@ The full stop holds: the fleet is paused, and the drive is only reporting. The o
 - John approved. LIN-4522 (finish slices 1 and 2) dispatched as a plain autopilot kickoff with no goal text, since the ticket says it all (run b35afbf4, taken within seconds). The fleet pause is lifted; the queue was empty, so nothing else was released.
 - The hourly check-in stays as it is (John). Slice 3 stays stopped until John approves its restart.
 - The suggested answer on `lin4518-250-expectation` was replaced to fit the plan: re-review, answered only when slice 3 restarts, because answering resumes LIN-4518's stopped session. On restart P5 converts its saved cases and deletes `records-trail.js`, and the expectation goes back to 255.
+
+## 21 Nov, ~18:20: LIN-4523 set aside (John)
+
+- LIN-4523 (stopping a run stops all of it) does not run before slice 3. An agent not stopping when a human asks is a bigger issue than we can take on now; John will come back to it once the dust has settled. Don't dispatch it.
+- The order is now: LIN-4522 lands, stop and report, then John approves the slice 3 restart.
