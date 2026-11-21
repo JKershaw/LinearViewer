@@ -66,9 +66,9 @@
 - the replay passes through the proxy, and the readings are reported;
 - Harbour still works for every route that hasn't moved yet.
 
-**Two questions for John** (asked before filing; see the answers below if given):
-1. **Close-out's own commits.** Close-out already refuses when the head has moved after the approval, and that refusal carries over onto the stale flag. The open case is close-out's own fix commits, which make the approval stale. Should merging then wait for a quick re-review of the new head? It costs a run per task.
-2. **Verdicts already in comments** on open tasks. With no import, an open task reviewed by comment has no verdict record at cutover, so it would need a re-review before close-out. Import those verdicts once (as slice 2 did for plans), or re-review as each task comes up?
+**Two questions for John.** He hadn't answered them when this was filed, so raise them as rulings when you reach them, and keep building the rest meanwhile. The driving session's suggestions are given with each.
+1. **Close-out's own commits.** Close-out already refuses when the head has moved after the approval, and that refusal carries over onto the stale flag. The open case is close-out's own fix commits, which make the approval stale. Should merging then wait for a quick re-review of the new head? It costs a run per task. *Suggested: yes; it closes the unreviewed-commit gap seen on LIN-4502, 4504, 4505 and 4499.*
+2. **Verdicts already in comments** on open tasks. With no import, an open task reviewed by comment has no verdict record at cutover, so it would need a re-review before close-out. Import those verdicts once (as slice 2 did for plans), or re-review as each task comes up? *Suggested: import once, following slice 2's plan import.*
 
 **Open (engineering, for the builder):** whether the LIN-4499 deadlock (the engine wouldn't send the blind read while close-out was open, and close-out can't merge without one) lives in the reads this slice moves. Slice 2's plan-review stand-in finding asks for a review and the verdict is the review's answer, so the two don't double; keep or move it as the standing answers say.
 

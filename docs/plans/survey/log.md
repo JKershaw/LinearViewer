@@ -4934,3 +4934,17 @@ The pause ruling was answered (a: lifted, stays lifted). LIN-4504's second revie
 - LIN-4499 and LIN-4501..4506 are Done. PR #2478 merged as bc0535b5c, CI green.
 - After readings in `readings/slice-2-after.md`: notes 44,082 B; records 1,919 (342 findings); median cost per task $31.30; slice total $271.91. Brief size pending, from slice 3's live stages.
 - Slice 3 is being drafted with John's standing answers.
+
+### 21 Nov, 00:30: slice 3 filed as LIN-4513 and launched
+
+- **The draft** (`integration/slice-3-ticket.md`) was checked by a fresh reader against the designs. Its fixes, all applied:
+  - the close-out head-moved refusal carries over onto the stale flag;
+  - five missed readers added (C3-39, C3-40, C3-24, C3-37, C3-57);
+  - the revision brief retires (C3-18);
+  - the plan-review stand-in is engineering, not a ruling;
+  - two real questions put to John as choices.
+- **John's standing answers** are included.
+- **John didn't answer the two questions before bed,** so they're left for rulings, with suggestions:
+  1. close-out's own commits make the approval stale: re-review (yes);
+  2. verdicts already in comments: import once.
+- **Filed:** LIN-4513 under LIN-4490. Autopilot **894a0750-07c6-492e-8d0b-89d0c2621f55**.

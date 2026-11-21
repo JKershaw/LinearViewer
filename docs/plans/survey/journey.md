@@ -208,3 +208,15 @@ A fresh reader checked this page against the log from 18 Nov, the designs, the r
   - Rulings that aren't John's call: I settle them by doing the work, proposing the answer, and sending the paused run a note.
   - I may pause if things go sideways.
 - **Waiting for John:** the list is in `integration/slice-2-carry.md`. It includes the live import, the readings, the re-review verdicts, the signed-in page check, the `isEmptyStatement` defect, and a new token (records routes refuse the current one, which expires 21 Nov 10:11).
+
+## 20–21 Nov: slice 2 landed; slice 3 running
+
+- **Slice 2 (LIN-4499)** landed at 23:12 on 20 Nov: six pieces, LIN-4501 to 4506, about $272. Plans are records; the seal and the prune are gone; the Waiting lists were imported; task-snapshots were dropped. Readings are in `integration/readings/slice-2-after.md`.
+- **Along the way:**
+  - Ship Biscuit was moved off snapshots (LIN-4500);
+  - LIN-4508 (watch agents work) filed;
+  - four tickets remade (LIN-4509/4510/4511), and LIN-4210 dropped;
+  - the key rotation filed (LIN-4512).
+- **Slice 3: LIN-4513** (verdicts and changes as records), autopilot **894a0750-07c6-492e-8d0b-89d0c2621f55**, launched at 00:30 on 21 Nov. Its ticket carries John's standing answers. Two questions are left for John as rulings.
+- **How agents reach production:** `railway ssh` into harbour-cat (`railway run` can't reach the database).
+- **Fleet pause:** the driver's owner-minted token sets and clears it.
