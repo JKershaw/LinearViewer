@@ -17,8 +17,8 @@
  *   refresh fills the head once the PR can be read (fail open, as the refresh does).
  * - A change ref with no PR URL is refused at write: the refresh cannot read it and a landing cannot match it.
  *
- * Inert seams: lib/records/change-ref.js and lib/change-records.js return their input or nothing until beat 3, so the
- * assertions below fail on the missing behaviour, not on a missing module.
+ * The witnesses below were written failing first (beat 2); lib/records/change-ref.js and lib/change-records.js are now
+ * fully implemented, so each one asserts against the real behaviour.
  */
 process.env.NODE_ENV = 'test';
 
