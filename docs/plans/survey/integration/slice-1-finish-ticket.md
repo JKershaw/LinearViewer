@@ -21,6 +21,7 @@ From slice 2:
 **What we want.**
 - Everything slices 1 and 2 retired is gone: from the code, the prompts, the tests, the saved test files and the scripts. Prompts say what is true now.
 - Where something still depends on a retired thing, move it onto the right data, rather than keeping a reader of the old shape. For slice 2, a task's `asked` and the size record should read records, not the old block. Keep only what the design itself keeps until slice 4, the brief's ticket section, and name it plainly.
+- This is code, prompts and tests only. The data moves were done in slices 1 and 2; nothing here needs production.
 - Tests and saved test files are part of the work. A saved file is either converted to the new shape or deleted if nothing needs it. A helper that reads the old shape for the tests doesn't count as converting.
 - Each slice's retired-words test lists every word its slice retired, so a leftover fails the suite.
 - End the findings above that this work settles.
@@ -41,7 +42,5 @@ From slice 2:
 - Retire everything the design's slice table lists for this slice. Don't keep slimmer versions of retired things.
 - If something else depends on what's retired, move it onto the right data rather than keeping the old thing.
 - Tests and saved test files are in scope. Move them to the new shape in the same piece; no translators or stopgaps, in code or tests.
-- Production is reachable: use `railway ssh` into the harbour-cat container (`railway run` can't reach the database). Never print the production environment.
-- If you need the fleet paused for a cutover, say so; the driving session sets and clears it.
 
 **Every change names what it retires. Questions:** settle engineering questions yourself; only John's calls (product, money, authority, what to retire) go to him as rulings.
