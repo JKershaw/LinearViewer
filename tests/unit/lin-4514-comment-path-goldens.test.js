@@ -20,12 +20,12 @@ process.env.NODE_ENV = 'test';
 
 import { test, describe } from 'node:test';
 import assert from 'node:assert/strict';
-import { readFileSync } from 'node:fs';
 import { prUrlsIn } from '../../lib/run-ledger.js';
-import { TICKETS, FIXTURE_DIR, loadInput, captureTicket, instantsOf } from '../helpers/comment-path-capture.js';
+import { TICKETS, loadInput, loadDerived, captureTicket, instantsOf } from '../helpers/comment-path-capture.js';
 
-const golden = (name) => JSON.parse(readFileSync(new URL(`goldens/${name}.json`, FIXTURE_DIR), 'utf8'));
-const ROWS = JSON.parse(readFileSync(new URL('rows.json', FIXTURE_DIR), 'utf8')).rows;
+// The derived files store each repeated text once (internRefs); loadDerived puts every one back.
+const golden = (name) => loadDerived(`goldens/${name}.json`);
+const ROWS = loadDerived('rows.json').rows;
 const PARTS = ['trail', 'decision', 'selector', 'runEvidence'];
 const LANES = ['stopAtHarbour', 'stopAtPerson', 'ladder'];
 

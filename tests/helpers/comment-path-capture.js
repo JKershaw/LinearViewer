@@ -42,10 +42,13 @@
  */
 import { readFileSync, writeFileSync, mkdirSync } from 'node:fs';
 import { fileURLToPath } from 'node:url';
-import { readTrail } from '../../lib/run-trail.js';
+import { createHash } from 'node:crypto';
+import { readTrail, landingPrUrls, commentKindOf, isPersonComment, reportsLandedWork, isRuling } from '../../lib/run-trail.js';
+import { checkBlindReadShape } from '../../lib/run-ledger.js';
+import { liveWaitOf } from '../../lib/run-live-wait.js';
 import { closeOutDecision, CLOSE_OUT_ACTOR } from '../../lib/run-closeout-state.js';
 import { FINDINGS_NONE, findingsNotRead } from '../../lib/close-out-findings.js';
-import { assembleTrailFacts } from '../../lib/recommendation-facts.js';
+import { assembleTrailFacts, assemblePlanReviewFacts, reviewLoopStop, reviewLoopConverging } from '../../lib/recommendation-facts.js';
 import { blindReadStep } from '../../lib/recommendation-blind-read.js';
 import { readRunEvidence } from '../../lib/run-evidence.js';
 import { readCloseOutChain, closeOutNotReady } from '../../lib/close-out-readiness.js';
@@ -75,6 +78,74 @@ function sorted(value) {
 /** Sorted-key JSON, two-space indent, one trailing newline: the goldens' byte form. */
 export function stableJson(value) {
   return `${JSON.stringify(sorted(value), null, 2)}\n`;
+}
+
+// ─── Repeated text, stored once ─────────────────────────────────────────────────────────────────────
+//
+// The same review's ledger text repeats at every instant after it, and the same comment trail repeats across rows
+// (lin-4460's full and unreadable reads; lin-4458's rows are lin-4438's; a seed's prefixes). Each distinct one is
+// stored once in the file's `texts` (a ledger's raw text) or `comments` (an input comment), under the first 12 hex of
+// its sha-256, and referenced where it was: `ledger.rawRef` for `ledger.raw`, `inputs.commentRefs` for
+// `inputs.comments`. Nothing else changes. Read a file through resolveRefs (or loadDerived), which puts each one back.
+
+const refOf = (value) => createHash('sha256').update(typeof value === 'string' ? value : stableJson(value)).digest('hex').slice(0, 12);
+
+/** The document with repeated texts and trails replaced by references, and the tables beside them. */
+export function internRefs(doc) {
+  const texts = {};
+  const comments = {};
+  const walk = (v) => {
+    if (Array.isArray(v)) return v.map(walk);
+    if (!v || typeof v !== 'object') return v;
+    const out = {};
+    for (const [k, x] of Object.entries(v)) {
+      if (k === 'ledger' && x && typeof x === 'object' && typeof x.raw === 'string') {
+        const ref = refOf(x.raw);
+        texts[ref] = x.raw;
+        const { raw, ...rest } = x;
+        out[k] = { ...walk(rest), rawRef: ref };
+      } else if (k === 'inputs' && x && Array.isArray(x.comments)) {
+        const refs = x.comments.map((cm) => { const ref = refOf(cm); comments[ref] = cm; return ref; });
+        const { comments: _, ...rest } = x;
+        out[k] = { ...walk(rest), commentRefs: refs };
+      } else {
+        out[k] = walk(x);
+      }
+    }
+    return out;
+  };
+  const body = walk(doc);
+  return { ...body, ...(Object.keys(texts).length ? { texts } : {}), ...(Object.keys(comments).length ? { comments } : {}) };
+}
+
+/** internRefs undone: every `rawRef` and `commentRefs` put back as what it names; the tables dropped. */
+export function resolveRefs(doc) {
+  const { texts = {}, comments = {}, ...body } = doc;
+  const walk = (v) => {
+    if (Array.isArray(v)) return v.map(walk);
+    if (!v || typeof v !== 'object') return v;
+    const out = {};
+    for (const [k, x] of Object.entries(v)) {
+      if (k === 'rawRef') {
+        if (!Object.hasOwn(texts, x)) throw new Error(`comment-path-capture: no text ${x}`);
+        out.raw = texts[x];
+      } else if (k === 'commentRefs') {
+        out.comments = x.map((ref) => {
+          if (!Object.hasOwn(comments, ref)) throw new Error(`comment-path-capture: no comment ${ref}`);
+          return comments[ref];
+        });
+      } else {
+        out[k] = walk(x);
+      }
+    }
+    return out;
+  };
+  return walk(body);
+}
+
+/** A derived file (goldens/*.json, rows.json), read and resolved. */
+export function loadDerived(path) {
+  return resolveRefs(JSON.parse(readFileSync(new URL(path, FIXTURE_DIR), 'utf8')));
 }
 
 // ─── Time ───────────────────────────────────────────────────────────────────────────────────────────
@@ -211,7 +282,7 @@ async function surfacesOf({ comments, statusOf, ticketState, allRuns }) {
       { parent: null, siblings: [], project: null, children: [], comments, focusedChild: null, attachments: [], runs: [], allRuns },
       { apiKey: 'stub', model: 'x' },
     );
-    route = { codeRoute: rec.codeRoute ?? null, recommendedAction: rec.recommendedAction ?? null };
+    route = { codeRoute: rec.codeRoute ?? null, recommendedAction: rec.recommendedAction ?? null, ...(rec.liveWait ? { liveWait: rec.liveWait } : {}) };
   } finally {
     setFetchImpl(null);
     setPromptTraceRecorder(null);
@@ -273,11 +344,73 @@ export async function captureRows(rows = COMMENT_PATH_ROWS) {
   };
 }
 
+// ─── The five seeds (seeds.json; plan-review notes 1, 2, 3, 7 and 8 on LIN-4513) ───────────────────────
+
+/** What each seed pins beyond the common capture, computed for every case so no seed's reading hides another's. */
+function seedExtras(seedCase, issue) {
+  const { comments } = seedCase;
+  const facts = assemblePlanReviewFacts(comments);
+  const extras = {
+    // Seed 1 (and 5's personSince): the plan-review loop's facts, its stop and its convergence.
+    planReview: { facts, stop: reviewLoopStop(issue, comments), converging: reviewLoopConverging(facts.run) },
+    // Seed 2: the live wait, CODE_ROUTES[0].
+    liveWait: liveWaitOf(seedCase.allRuns),
+    // Seed 5: each comment's authorship as the comment path reads it.
+    authorship: comments.map((cm) => ({
+      id: cm.id, kind: commentKindOf(cm.body), isPerson: isPersonComment(cm.body), landedWork: reportsLandedWork(cm.body), ruling: isRuling(cm.body),
+    })),
+  };
+  // Seed 3: the write-time blind-read check (routes/proxy-writes.js): the read's body against the landing of the
+  // trail as it stood before the read was posted.
+  if (seedCase.writeCheck) {
+    const readComment = comments.find((cm) => cm.id === seedCase.writeCheck);
+    const before = comments.filter((cm) => cm !== readComment);
+    extras.writeCheck = { landingBefore: landingPrUrls(before), check: checkBlindReadShape(readComment.body, { landing: landingPrUrls(before) }) };
+  }
+  return extras;
+}
+
+export function loadSeeds() {
+  return JSON.parse(readFileSync(new URL('seeds.json', FIXTURE_DIR), 'utf8'));
+}
+
+/** goldens/seeds.json: every seed case's inputs, the common capture, the surfaces and the seed's own readings. */
+export async function captureSeeds(input = loadSeeds()) {
+  const seeds = [];
+  for (const seed of input.seeds) {
+    const cases = [];
+    for (const stored of seed.cases) {
+      const sc = { ...stored, comments: stored.commentIds.map((id) => {
+        if (!Object.hasOwn(input.comments, id)) throw new Error(`comment-path-capture: seed ${seed.id}/${stored.id} names no comment ${id}`);
+        return input.comments[id];
+      }) };
+      const statusOf = (url) => (Object.hasOwn(sc.statuses, url) ? sc.statuses[url] : UNREAD);
+      const caseInput = { comments: sc.comments, statusOf, ticketState: sc.ticketState, allRuns: sc.allRuns };
+      cases.push({
+        id: sc.id,
+        name: sc.name,
+        inputs: { comments: sc.comments, statuses: sc.statuses, ticketState: sc.ticketState, allRuns: sc.allRuns, ...(sc.runsNote ? { runsNote: sc.runsNote } : {}), ...(sc.writeCheck ? { writeCheck: sc.writeCheck } : {}) },
+        output: {
+          ...(await captureCase(caseInput)),
+          surfaces: await surfacesOf(caseInput),
+          ...seedExtras(sc, { state: { type: sc.ticketState } }),
+        },
+      });
+    }
+    seeds.push({ id: seed.id, note: seed.note, cases });
+  }
+  return {
+    _about: 'LIN-4514: the five comment-path seeds (seeds.json), each case\'s inputs and what the comment path decided: the common capture, the surfaces (route, check, both guards, PR reads) and the seed\'s own readings (planReview, liveWait, authorship, writeCheck). Derived by tests/helpers/comment-path-capture.js; never edit by hand.',
+    seeds,
+  };
+}
+
 /** Every output file, as {relative path: bytes}. */
 export async function captureAll() {
   const files = {};
-  for (const name of TICKETS) files[`goldens/${name}.json`] = stableJson(await captureTicket(loadInput(name)));
-  files['rows.json'] = stableJson(await captureRows());
+  for (const name of TICKETS) files[`goldens/${name}.json`] = stableJson(internRefs(await captureTicket(loadInput(name))));
+  files['rows.json'] = stableJson(internRefs(await captureRows()));
+  files['goldens/seeds.json'] = stableJson(internRefs(await captureSeeds()));
   return files;
 }
 
