@@ -60,6 +60,7 @@ export async function dumpFromStore({ store, urlKey, asOf = new Date().toISOStri
   const verdicts = verdictSnaps.map((v) => ({
     id: v.id,
     by: v.by ?? null,
+    judgement: v.fields?.judgement ?? null,
     state: v.state,
     outcome: v.fields?.outcome ?? null,
     in: v.in ?? null,
@@ -80,8 +81,14 @@ export async function dumpFromStore({ store, urlKey, asOf = new Date().toISOStri
   return { asOf, tasks, verdicts, changes, plans };
 }
 
-/** The stage a verdict record speaks for: its writer. */
-function stageOfVerdict(v) {
+/**
+ * The stage a verdict record speaks for: its judgement (the field the records check holds to a stage, and the one every
+ * production reader keys on), else its writer. The import writes `by: import` with the stage in its judgement, so keying on
+ * `by` alone would read every imported verdict as no stage (finding-8f523a17). The writer is the fallback for a dump taken
+ * before the judgement was carried (21 Nov's first reading).
+ */
+export function stageOfVerdict(v) {
+  if (STAGES.includes(v.judgement)) return v.judgement;
   return STAGES.includes(v.by) ? v.by : null;
 }
 

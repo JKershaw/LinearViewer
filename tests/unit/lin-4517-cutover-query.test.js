@@ -17,6 +17,9 @@
  *   LIN-8  open, a review verdict record, then a later review comment  → comment-only (the record is older)
  *   LIN-9  task record ended done, ticket open                         → excluded (not an open task)
  *   LIN-10 open task record, ticket not listed (deleted)               → excluded
+ *   LIN-11 open, a review comment, then a plan-review comment, then an
+ *          imported plan-review verdict record (by: import, its stage in
+ *          its judgement) after both                                   → comment-only (review); plan-review covered
  *   (no ticket) one open task with no ref                              → counted apart
  */
 import { describe, test, before, after } from 'node:test';
@@ -26,7 +29,7 @@ import { RecordsStore, RECORDS_COLLECTION, REFS_COLLECTION, QUERY_LOG_COLLECTION
 import { commentKindOf } from '../../lib/run-trail.js';
 import { parseRunLedger } from '../../lib/run-ledger.js';
 import {
-  dumpFromStore, cutoverReading, readTickets, loadReaders, ledgerItemLines,
+  dumpFromStore, cutoverReading, readTickets, loadReaders, ledgerItemLines, stageOfVerdict,
 } from '../../docs/reviews/slice-3-readings/cutover-query.mjs';
 
 const URL_KEY = 'lin-4517-cutover';
@@ -56,14 +59,17 @@ async function seed() {
   store = new RecordsStore({ records: db.collection(RECORDS_COLLECTION), refs: db.collection(REFS_COLLECTION), queryLog: db.collection(QUERY_LOG_COLLECTION) });
   const task = async (ref) => (await store.add(URL_KEY, shape('task', { ...(ref ? { ref } : {}), asked: `Task ${ref}.` }), { by: 'import', at: iso(-1000) })).id;
   const ids = {};
-  for (const n of [1, 2, 3, 4, 5, 6, 7, 8, 9, 10]) ids[n] = await task(`LIN-${n}`);
+  for (const n of [1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11]) ids[n] = await task(`LIN-${n}`);
   ids.none = await task(null);
   await store.end(URL_KEY, ids[9], { state: 'done', reason: 'landed' }, { by: 'close-out', at: iso(-500) });
   // LIN-4: a change, and a review verdict on it written 5 minutes after the review comment.
   const change = await store.add(URL_KEY, shape('change', { ref: PR, head: 'abc1234' }, { in: ids[4] }), { by: 'implementation', at: iso(-300) });
-  await store.add(URL_KEY, shape('verdict', { judgement: 'Holds.', outcome: 'approve', reasoning: 'Read it.' }, { state: 'stands', links: { on: [`${change.id}@1`] } }), { by: 'review', at: iso(-95) });
+  await store.add(URL_KEY, shape('verdict', { judgement: 'review', outcome: 'approve', reasoning: 'Read it.' }, { state: 'stands', links: { on: [`${change.id}@1`] } }), { by: 'review', at: iso(-95) });
   // LIN-8: a review verdict record 3 hours before the latest review comment.
-  await store.add(URL_KEY, shape('verdict', { judgement: 'Holds.', outcome: 'approve', reasoning: 'Read it.' }, { state: 'stands', in: ids[8], links: { on: [`${ids[8]}@1`] } }), { by: 'review', at: iso(-280) });
+  await store.add(URL_KEY, shape('verdict', { judgement: 'review', outcome: 'approve', reasoning: 'Read it.' }, { state: 'stands', in: ids[8], links: { on: [`${ids[8]}@1`] } }), { by: 'review', at: iso(-280) });
+  // LIN-11: an imported plan-review verdict, written after both of the ticket's comments. Its writer is `import`, so
+  // only its judgement says which stage it covers; it must not cover the review.
+  await store.add(URL_KEY, shape('verdict', { judgement: 'plan-review', outcome: 'request-changes', reasoning: 'Imported.' }, { state: 'stands', in: ids[11], links: { on: [`${ids[11]}@1`] } }), { by: 'import', via: 'import', at: iso(-40) });
   return ids;
 }
 
@@ -99,10 +105,12 @@ const issueMap = () => new Map([
   ['LIN-8', { state: 'started', comments: [comment('c8', review('Request changes', LEDGER_NONE), -100)] }],
   ['LIN-9', { state: 'started', comments: [comment('c9', review('Approve', LEDGER_NONE), -100)] }],
   ['LIN-10', { state: 'started', unlisted: true, comments: [comment('c10', review('Approve', LEDGER_NONE), -100)] }],
+  ['LIN-11', { state: 'started', comments: [comment('c11a', review('Approve', LEDGER_NONE), -100), comment('c11b', planReview, -60)] }],
 ].map(([identifier, i]) => [identifier, { identifier, ...i }]));
 
 let ids;
 let proxyCalls;
+let loadedReaders;
 
 before(async () => {
   await harness.connect();
@@ -111,7 +119,8 @@ before(async () => {
   const proxy = standInProxy(issueMap());
   tickets = await readTickets({ base: 'http://proxy.test/api/proxy', dump, fetchImpl: proxy.fetchImpl });
   proxyCalls = proxy.calls;
-  reading = cutoverReading({ dump, tickets, readers: await loadReaders() });
+  loadedReaders = await loadReaders();
+  reading = cutoverReading({ dump, tickets, readers: loadedReaders });
 });
 after(() => harness.close());
 
@@ -137,10 +146,11 @@ describe('LIN-4517 cutover query: the fixtures classify as intended', () => {
 
 describe('LIN-4517 cutover query: the dump', () => {
   test('holds the open task records only, every verdict with its first write time, and the changes\' tasks', () => {
-    assert.equal(dump.tasks.length, 10);
+    assert.equal(dump.tasks.length, 11);
     assert.ok(!dump.tasks.some((t) => t.id === ids[9]));
-    assert.equal(dump.verdicts.length, 2);
-    assert.ok(dump.verdicts.every((v) => v.by === 'review' && v.at));
+    assert.equal(dump.verdicts.length, 3);
+    assert.ok(dump.verdicts.every((v) => v.at));
+    assert.deepEqual(dump.verdicts.map((v) => [v.by, v.judgement, v.via]).sort(), [['import', 'plan-review', 'import'], ['review', 'review', null], ['review', 'review', null]]);
     assert.equal(dump.changes.length, 1);
     assert.equal(dump.changes[0].in, ids[4]);
     assert.equal(dump.changes[0].ref, PR);
@@ -150,19 +160,19 @@ describe('LIN-4517 cutover query: the dump', () => {
   test('the tickets are paged whole, and comments are read only for open tickets with an open task', () => {
     assert.equal(proxyCalls.filter((p) => p.startsWith('/issues?')).length, 2);
     const detail = proxyCalls.filter((p) => !p.startsWith('/issues?')).map((p) => p.slice('/issues/'.length)).sort();
-    assert.deepEqual(detail, ['LIN-1', 'LIN-2', 'LIN-3', 'LIN-4', 'LIN-6', 'LIN-7', 'LIN-8']);
+    assert.deepEqual(detail, ['LIN-1', 'LIN-11', 'LIN-2', 'LIN-3', 'LIN-4', 'LIN-6', 'LIN-7', 'LIN-8']);
   });
 });
 
 describe('LIN-4517 cutover query: the reading', () => {
   test('the window: closed, unlisted, ended and ticketless tasks are not open', () => {
-    assert.deepEqual(reading.window, { openTaskRecords: 10, noTicket: 1, ticketClosed: 1, ticketNotListed: 1, open: 7 });
+    assert.deepEqual(reading.window, { openTaskRecords: 11, noTicket: 1, ticketClosed: 1, ticketNotListed: 1, open: 8 });
     assert.deepEqual(reading.noTicketTasks, { count: 1, withVerdictRecord: 0, tasks: [ids.none] });
   });
 
   test('comment-only: the latest verdict of a stage is a comment with no record at or after it', () => {
-    assert.deepEqual(ticketsOf(reading.commentOnly.tasks), ['LIN-1', 'LIN-2', 'LIN-3', 'LIN-6', 'LIN-8']);
-    assert.deepEqual(reading.commentOnly.byStage, { review: 4, 'plan-review': 1, 'blind-read': 1 });
+    assert.deepEqual(ticketsOf(reading.commentOnly.tasks), ['LIN-1', 'LIN-11', 'LIN-2', 'LIN-3', 'LIN-6', 'LIN-8']);
+    assert.deepEqual(reading.commentOnly.byStage, { review: 5, 'plan-review': 1, 'blind-read': 1 });
     const six = reading.commentOnly.tasks.find((r) => r.ticket === 'LIN-6');
     assert.deepEqual(six.stages.map((s) => [s.stage, s.verdict]), [['plan-review', 'request changes'], ['blind-read', 'better']]);
   });
@@ -170,7 +180,22 @@ describe('LIN-4517 cutover query: the reading', () => {
   test('a record written after the comment covers it; one older than the comment does not', () => {
     assert.ok(!ticketsOf(reading.commentOnly.tasks).includes('LIN-4'));
     assert.ok(ticketsOf(reading.commentOnly.tasks).includes('LIN-8'));
-    assert.deepEqual(ticketsOf(reading.withVerdictRecord.tasks), ['LIN-4', 'LIN-8']);
+    assert.deepEqual(ticketsOf(reading.withVerdictRecord.tasks), ['LIN-11', 'LIN-4', 'LIN-8']);
+  });
+
+  test('a record covers only its own stage, read from its judgement: an imported plan review covers no review (LIN-11)', () => {
+    const eleven = reading.commentOnly.tasks.find((r) => r.ticket === 'LIN-11');
+    assert.deepEqual(eleven.stages.map((s) => s.stage), ['review'], 'the plan review is covered and the review is not');
+    assert.equal(stageOfVerdict({ by: 'import', judgement: 'plan-review' }), 'plan-review');
+    assert.equal(stageOfVerdict({ by: 'review', judgement: null }), 'review', 'a dump without judgements falls back to the writer');
+    assert.equal(stageOfVerdict({ by: 'import', judgement: null }), null);
+  });
+
+  test('a dump taken before judgements were carried reads the same for records whose writer is their stage', () => {
+    const old = { ...dump, verdicts: dump.verdicts.filter((v) => v.by !== 'import').map(({ judgement, ...v }) => v) };
+    const without = cutoverReading({ dump: old, tickets, readers: loadedReaders });
+    assert.deepEqual(ticketsOf(without.withVerdictRecord.tasks), ['LIN-4', 'LIN-8']);
+    assert.ok(!ticketsOf(without.commentOnly.tasks).includes('LIN-4'));
   });
 
   test('the ledgers: a legacy one, and one the heuristic reads as empty although it lists items', () => {
@@ -179,14 +204,14 @@ describe('LIN-4517 cutover query: the reading', () => {
   });
 
   test('needs an import or a re-review: the union, each task once', () => {
-    assert.equal(reading.needsImportOrReReview.count, 5);
-    assert.deepEqual(ticketsOf(reading.needsImportOrReReview.tasks), ['LIN-1', 'LIN-2', 'LIN-3', 'LIN-6', 'LIN-8']);
+    assert.equal(reading.needsImportOrReReview.count, 6);
+    assert.deepEqual(ticketsOf(reading.needsImportOrReReview.tasks), ['LIN-1', 'LIN-11', 'LIN-2', 'LIN-3', 'LIN-6', 'LIN-8']);
     assert.deepEqual(reading.needsImportOrReReview.tasks.find((r) => r.ticket === 'LIN-1'), { task: ids[1], ticket: 'LIN-1' });
   });
 
   test('no verdict record at all: split into judged by comment only and never judged', () => {
     assert.deepEqual(reading.noVerdictRecord, { count: 5, neverJudged: 1, judgedByCommentOnly: 4 });
-    assert.equal(reading.importMarkedVerdicts, 0);
+    assert.equal(reading.importMarkedVerdicts, 1);
   });
 
   test('prints counts and ids only: no comment text and no PR URL reaches the output', () => {

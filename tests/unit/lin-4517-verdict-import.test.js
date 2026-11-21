@@ -76,7 +76,7 @@ const COMMENTS = {
 
 let store; let records; let lib; let readers; let writes;
 let ids; let dump; let reading; let selection; let capture; let planned;
-let dry; let first; let second;
+let dry; let first; let second; let applyStartedAt; let afterImport;
 let docsBeforeDry; let docsAfterDry; let docsAfterFirst; let docsAfterSecond;
 
 const allDocs = () => records.find({ urlKey: URL_KEY }).toArray();
@@ -110,6 +110,18 @@ async function buildPlan() {
   planned = writesPlanOf(capture, lib);
 }
 
+/**
+ * The import's own post-check: the cutover query rerun over the store as the apply left it. The import writes at the wall
+ * clock, so each comment is moved to the same distance before the apply that it sits before the fixture instant: the
+ * comments come first and the import after, as in production, under CI's clock-shift arm too.
+ */
+async function rerunCutoverQuery() {
+  const shift = applyStartedAt - BASE;
+  const moved = (c) => ({ ...c, createdAt: new Date(Date.parse(c.createdAt) + shift).toISOString() });
+  const tickets = new Map(Object.entries(COMMENTS).map(([ticket, comments]) => [ticket, { state: 'started', comments: comments.map(moved) }]));
+  return readers.cutoverReading({ dump: await dumpFromStore({ store, urlKey: URL_KEY }), tickets, readers });
+}
+
 const run = (write) => applyImport({ plan: planned, lib, writes, recordsStore: store, urlKey: URL_KEY, readPrStatus, write });
 const rowOf = (result, ticket) => result.tasks.find((t) => t.ticket === ticket);
 const current = (id) => store.current(URL_KEY, id);
@@ -128,10 +140,12 @@ before(async () => {
   docsBeforeDry = (await allDocs()).length;
   dry = await run(false);
   docsAfterDry = (await allDocs()).length;
+  applyStartedAt = Date.now();
   first = await run(true);
   docsAfterFirst = (await allDocs()).length;
   second = await run(true);
   docsAfterSecond = (await allDocs()).length;
+  afterImport = await rerunCutoverQuery();
 });
 after(() => harness.close());
 
@@ -281,6 +295,18 @@ describe('LIN-4517 import: idempotent by fixedIdOf', () => {
     assert.deepEqual(second.counts.verdicts, { exists: 6 });
     assert.deepEqual(second.counts.findings, { exists: 4 });
     assert.deepEqual(second.counts.changes, { exists: 5 });
+  });
+});
+
+describe('LIN-4517 import: the cutover query rerun after the apply (finding-8f523a17)', () => {
+  test('lists only the tasks the import skipped: LIN-4 (verdict does not parse) and LIN-5 (two-PR landing)', () => {
+    assert.deepEqual(afterImport.needsImportOrReReview.tasks.map((t) => t.ticket), ['LIN-4', 'LIN-5']);
+    assert.equal(afterImport.importMarkedVerdicts, 6);
+  });
+
+  test('each imported verdict covers its own stage, read from its judgement although its writer is import', () => {
+    assert.deepEqual(afterImport.commentOnly.tasks.map((t) => [t.ticket, t.stages.map((s) => s.stage)]), [['LIN-4', ['review']], ['LIN-5', ['review']]]);
+    assert.deepEqual(afterImport.withVerdictRecord.tasks.map((t) => t.ticket), ['LIN-1', 'LIN-2', 'LIN-3', 'LIN-6', 'LIN-7', 'LIN-8']);
   });
 });
 
