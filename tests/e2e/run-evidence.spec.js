@@ -72,7 +72,8 @@ async function seedLocalWorkspaceWithEvidence(page, { extraPrUrl = null } = {}) 
   });
   expect(resp.ok(), `local seed failed: ${resp.status()} ${await resp.text()}`).toBeTruthy();
   // LIN-4518 (beat 4): the review and the blind read the gates judge are records; the comments are the display text.
-  const changes = [PR, extraPrUrl].filter(Boolean).map((ref) => ({ ref, head: PR_HEAD }));
+  // The head the review judged is the one its comment names (REVIEW_SHA): the live PR head is PR_HEAD, so the box shows the move.
+  const changes = [PR, extraPrUrl].filter(Boolean).map((ref) => ({ ref, head: REVIEW_SHA }));
   const all = changes.map((_, i) => i);
   await seedVerdictRecords(page, { urlKey: URL_KEY, ticket: 'LOCAL-EV1', asked: 'Seeded run-evidence task', changes,
     verdicts: [{ judgement: 'review', outcome: 'approve', changes: all }, { judgement: 'blind-read', outcome: 'same', changes: all }] });
