@@ -205,11 +205,23 @@ describe('the API review\'s call shape', () => {
     assert.ok(r.body.problems.length >= 3, JSON.stringify(r.body.problems));
   });
 
-  test('a bare id in on is pinned to the current version of the change', async () => {
+  test('a bare id in on is pinned to the current version of its record', async () => {
+    // LIN-4516: a change is pinned by the head its judge read (heads), not by its current version; see the next test.
+    const f = await post('/api/proxy/records', 'impl', { kind: 'finding', to: 'review', says: 'Check the footer.', run: 'row-impl' });
+    assert.equal(f.status, 201, JSON.stringify(f.body));
+    const v = await post('/api/proxy/records', 'impl', { kind: 'verdict', judgement: 'review', outcome: 'approve', reasoning: 'fine', on: f.body.id, run: 'row-impl' });
+    assert.equal(v.status, 201, JSON.stringify(v.body));
+    assert.deepEqual(v.body.links.on, [`${f.body.id}@1`]);
+  });
+
+  test('a verdict on a change with no head named is refused (LIN-4516): a bare id no longer pins a change to whatever it is now', async () => {
     const c = await post('/api/proxy/records', 'impl', { kind: 'change', ref: 'https://github.com/acme/widget/pull/9', head: 'abc', run: 'row-impl' });
     const v = await post('/api/proxy/records', 'impl', { kind: 'verdict', judgement: 'review', outcome: 'approve', reasoning: 'fine', on: c.body.id, run: 'row-impl' });
-    assert.equal(v.status, 201, JSON.stringify(v.body));
-    assert.deepEqual(v.body.links.on, [`${c.body.id}@1`]);
+    assert.equal(v.status, 422, JSON.stringify(v.body));
+    assert.ok(v.body.problems.some((p) => p.field === 'heads'), JSON.stringify(v.body));
+    const pinned = await post('/api/proxy/records', 'impl', { kind: 'verdict', judgement: 'review', outcome: 'approve', reasoning: 'fine', on: c.body.id, heads: { [c.body.id]: 'abc' }, run: 'row-impl' });
+    assert.equal(pinned.status, 201, JSON.stringify(pinned.body));
+    assert.deepEqual(pinned.body.links.on, [`${c.body.id}@1`]);
   });
 
   test('a ticket id names its task: made from the tracker with its words, and a sibling not yet dispatched lands', async () => {

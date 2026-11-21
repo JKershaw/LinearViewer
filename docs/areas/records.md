@@ -47,7 +47,7 @@ routes/task-records.js, routes/project-page.js, routes/dispatch.js, server.js).
 - Outward steps (LIN-4503) run after a record persists, through one injected `tracker(ctx)` port (lib/records-tracker.js),
   never on a dry run or an import. A child ticket is made only when the parent's children read whole (`capped === false`;
   unknown fails closed) and no child carries the task's mark (lib/records/ticket-stub.js); a mark another task holds is
-  refused, not taken. A plan's summary is one comment per version, never retried.
+  refused, not taken. A plan's or verdict's summary is one comment per version, never retried; `isSummaryBody` is the one mark.
 - A route test that writes a child task or a plan injects a tracker (tests/helpers/fake-records-tracker.js), or it
   reaches the network and the hermetic run fails. Censuses read `git ls-files`: stage a new file before running them.
 - A write that makes one record and then ends another is two writes. Name the first with `fixedIdOf` (lib/records/refs.js,
@@ -66,5 +66,7 @@ routes/task-records.js, routes/project-page.js, routes/dispatch.js, server.js).
   session page reads evidence through `readRunEvidenceFn` (`routes/dashboard.js`), missed the store at LIN-4495, and
   every session page read "not measured". Search the aliases too, and keep a missing store reading "not measured",
   never zero, so a missed caller shows instead of passing.
+- A verdict rests on the head its judge read (LIN-4516): `heads` names it per change in `on`, is never stored, and pins
+  before the refresh (`routes/proxy-records.js`; `pinVerdictToHeads` in `lib/change-records.js`).
 - A task written with a ticket `ref` claims that ticket (`lib/records/writes.js`), as `ensureTask` does; else the ticket's
   references make a second task. A ticket's task id has one rule, `ticketTaskIdOf` (`lib/records/refs.js`). A revise that changes a claimed `ref` is refused (422).

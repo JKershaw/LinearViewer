@@ -2835,6 +2835,32 @@ is refused with a reason when it names no run, a run that ended, or a run in ano
 A blind-read token (`blind-comment`) may not read records. The records reads log who asked (`records-query-log`,
 90-day expiry, swept by the hourly cleanup). The full call shapes are in `lib/proxy-instructions.js` (Records).
 
+**A verdict's head pin (LIN-4516).** A verdict names the head its judge read, `heads: {"<change id>": "<sha>"}`, one sha per
+change in `on`. `heads` is a write-only request field and is never stored: the pinned change version already holds the
+sha (`lib/records/kinds.json` is unchanged). The route pins each change in `on` to the newest version holding that sha;
+when no version holds it, the change is revised to the sha first, through the change writer, and the pin is that version.
+The verdict is written on those pins, and only then does the route run the one refresh (`refreshTaskChanges`,
+`lib/change-records.js`) to the live head. So a refresh that has already moved the change on cannot move the pin, and a
+push the judge never saw shows the verdict stale at once. A verdict on a change with no sha in `heads` is refused with
+422 naming `heads`; a `heads` key that names no change in `on`, or an `@v` on a change, is refused too. A target that is
+not a change (a plan-review verdict on a plan piece) needs no head and is pinned as before. The rule is the same wherever
+`on` is written: beside the fields or under `links`, on add, revise or link (naming it in both places is refused), and the
+pinned refs go back to where `on` was. It binds a verdict only: any other kind that names `on` (a finding on a change) needs
+no head, and a `heads` on one is refused as misplaced.
+
+A verdict on changes is filed `in` their task (a field any record may carry; no kind changes), so the task's records and its
+round can find it. A **blind-read** verdict's `on` must name exactly the task's landing: its open changes plus those merged in
+the current round (`readLanding`, `lib/records/landing.js`, the one landing function). The round is cut at the end of the
+latest close-out run that ended before the latest review verdict. A subset or a superset is refused with 422 naming `on`.
+
+**Conditions and summaries (LIN-4516).** An approval with conditions is an approval plus one finding to close-out per
+condition, `about` the change, written before the approval; the approval is the commit point. A `conditions` field is
+refused (422, a misplaced field), so a condition cannot be a verdict field. The route cannot enforce that the conditions
+are written, or written first: that is the review stage's write order, not the route's to check. A verdict's write posts
+one marked summary on its task's ticket, once per version, never on an import, never retried; a failed post is named in
+the answer. A summary opens with `**Harbour summary** · <record id> v<n>`; that first line is the one mark, and nothing
+reads a summary as a person's comment, landed work or scan input.
+
 ## Error Handling
 
 | Status | Error | Description |
