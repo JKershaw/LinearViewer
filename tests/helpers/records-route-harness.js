@@ -60,8 +60,10 @@ export function tokenAuthenticator(tokenStore) {
  * @param {Function} [opts.authenticate] - the credential middleware; default: tokenAuthenticator over a real ProxyTokenStore
  * @param {Function} [opts.readTicket] - the tracker read; default: reads `tickets`
  * @param {Function} [opts.tracker] - LIN-4503: the outward port for a request (`(req) => TrackerPort|null`); default: none
+ * @param {Function} [opts.changePrReaderFor] - LIN-4516: `(urlKey) => (args) => status`, the PR reader the verdict route's refresh
+ *   uses; default: none (the route then logs that no refresh ran)
  */
-export async function createRecordsRouteHarness({ harness, urlKey, tickets, people, authenticate = null, readTicket = null, tracker = null }) {
+export async function createRecordsRouteHarness({ harness, urlKey, tickets, people, authenticate = null, readTicket = null, tracker = null, changePrReaderFor = null }) {
   const db = harness.freshDb();
   for (const collection of [RECORDS_COLLECTION, REFS_COLLECTION]) {
     for (const spec of INDEX_SPECS.filter((x) => x.collection === collection && x.options?.unique)) {
@@ -82,7 +84,8 @@ export async function createRecordsRouteHarness({ harness, urlKey, tickets, peop
     askedText: askedOf,
     stageKinds: Object.keys(STAGE_KINDS),
     listPeople: async () => people,
-    tracker
+    tracker,
+    changePrReaderFor
   });
   const app = express();
   app.use(express.json());

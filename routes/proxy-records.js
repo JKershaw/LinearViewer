@@ -21,6 +21,25 @@
  * Reads and writes touch only the records they name, through the store's indexed readers: nothing here loads the
  * workspace's whole history (LIN-4493 review, gap 4).
  *
+ * A verdict's head pin (LIN-4516, plan-4761b4db). A verdict names the head its judge read in `heads`, one sha per change in
+ * `on`: `{"<change id>": "<sha>"}`. `heads` is a write-only request field, never stored (lib/records/kinds.json and the
+ * three-place inventory are unchanged): the pinned change version already holds the sha. The route strips it, pins each
+ * change in `on` to the newest version holding that sha (revising the change to it first when none does, through the
+ * change writer), writes the verdict on those versions, and only then runs the one refresh (lib/change-records.js
+ * refreshTaskChanges) to the live head. So a refresh that already made a newer version cannot move the pin, and a push the
+ * judge never saw shows the verdict stale at once. A verdict on a change with no sha in `heads` is refused with 422 naming
+ * `heads`; a non-change target (a plan-review verdict on a plan piece) needs no head.
+ *
+ * Conditions and the summary (LIN-4516). An approval with conditions is an approval plus one finding to close-out per
+ * condition, `about` the change, written BEFORE the approval (the approval is the commit point: open findings hold close-out,
+ * LIN-4495). There is no `conditions` field: a verdict body that names one is refused as a misplaced field, so a condition
+ * cannot ride on the verdict as prose. What the route cannot enforce: that a review writes its conditions at all, or that it
+ * writes them before the approval (it cannot know how many a review meant to write, and a caller can order its writes either
+ * way). That order is the review stage's contract, held by its prompts when P5 flips the stage; until then the route holds
+ * what it can. A verdict's write posts one marked summary through the tracker port (writes.js outwardAfterAdd, the plan path):
+ * once per version, never on an import or a dry run, never retried. A summary is read by `isSummaryBody` (lib/records/summary.js),
+ * the one mark predicate.
+ *
  * Injected, never imported from the tracker or the workspace (Records imports only Platform): `readTicket`
  * (the provider read: the ticket's identifier, title, description, state and parent), `askedText`
  * (lib/asked-of.js askedOf), `stageKinds` (STAGE_KINDS' keys), `listPeople` (the workspace-person reader; a
@@ -35,6 +54,7 @@ import { TOKEN_ORIGIN, WRITES } from '../lib/stage-writes.js';
 import { RecordsVersionConflict, RecordsNotFound } from '../lib/records-store.js';
 import { refusalOf, KINDS, PLAN_ADDRESSEES, planAddresseeProblem } from '../lib/records/check.js';
 import { createRecordWrites } from '../lib/records/writes.js';
+import { pinVerdictToHeads, refreshTaskChanges, blindReadSetProblems } from '../lib/change-records.js';
 import { isTerminalState } from '../lib/providers/state-map.js';
 
 const LINK_TYPES = Object.keys(KINDS.links);
@@ -74,8 +94,10 @@ function bodyWithout(body, keys) {
  * @param {string[]} deps.stageKinds - STAGE_KINDS' keys
  * @param {(urlKey: string) => Promise<{accountId: string, name: string}[]>} [deps.listPeople]
  * @param {(req: object) => Promise<object|null>} [deps.tracker] - LIN-4503: the tracker port for a request (lib/records-tracker.js)
+ * @param {(urlKey: string) => (args: {repo: string, number: number}) => Promise<object>} [deps.changePrReaderFor] - LIN-4516:
+ *   the per-workspace PR reader P2's refresh uses after a verdict is pinned (createChangePrReaders in lib/change-records.js)
  */
-export function createProxyRecordsRoutes({ recordsStore, proxyLimiter, authenticateProxyToken, requireWriteScope, logEvent, readTicket, askedText, stageKinds, listPeople = async () => [], tracker = null }) {
+export function createProxyRecordsRoutes({ recordsStore, proxyLimiter, authenticateProxyToken, requireWriteScope, logEvent, readTicket, askedText, stageKinds, listPeople = async () => [], tracker = null, changePrReaderFor = null }) {
   const router = Router();
   // LIN-4494: the one checked write path (lib/records/writes.js), shared with the session routes and the project page.
   // A router with no store (a test or a partial wiring) makes no writes; a write then answers 500, as a store-less route always did.
@@ -123,6 +145,48 @@ export function createProxyRecordsRoutes({ recordsStore, proxyLimiter, authentic
     ? reply(req, res, endpoint, 422, refusalOf(result.problems))
     : reply(req, res, endpoint, status, shape(result)));
 
+  /**
+   * LIN-4516: the head pin for any write that names `on` (flat or under links), on add, revise or link, so no route can attach
+   * a change to a record by its current version. `heads` is write-only and is stripped by the caller. Returns `{on, tasks}`,
+   * with `on` undefined when the write names no `on` and no heads, or the refusal.
+   */
+  async function pinOnOf(urlKey, on, heads, run) {
+    if (on === undefined && heads === undefined) return { on: undefined, tasks: [] };
+    return pinVerdictToHeads({ urlKey, on, heads, writes, recordsStore, run });
+  }
+
+  /**
+   * LIN-4516: a blind read's `on` stays exactly the landing when a revise or link adds to it. The add checks its own
+   * set; this checks the set the record would hold afterwards (the links it has, plus those added).
+   */
+  async function blindReadAfter(urlKey, prev, addedOn) {
+    if (addedOn === undefined || prev?.kind !== 'verdict' || prev.fields?.judgement !== 'blind-read') return [];
+    return blindReadSetProblems({ urlKey, recordsStore, on: [].concat(prev.links?.on ?? [], addedOn).filter((x) => typeof x === 'string') });
+  }
+
+  /**
+   * LIN-4516: after a verdict is written on its pinned versions, P2's one refresh runs for each task it rests on, so
+   * a change whose PR has moved on gets a newer head version the verdict does not name (the verdict then shows stale).
+   * Fail open is deliberate (plan-91aae6d8 item 2): a PR that cannot be read at verdict time leaves its change where it is, so
+   * the verdict is not stale until a later read reads that PR. The verdict shows stale at once only when its PR is readable;
+   * refusing a verdict on an unreadable PR would stall close-out on every GitHub blip. A refresh that cannot run is logged and
+   * the verdict stands; the next gating read refreshes the change.
+   */
+  async function refreshAfterPin(urlKey, taskIds) {
+    if (!changePrReaderFor) {
+      console.warn(`[records] ${urlKey}: no PR reader, so no refresh ran after a verdict pinned ${taskIds.length} task(s)`);
+      return;
+    }
+    const readPrStatus = changePrReaderFor(urlKey);
+    for (const taskId of taskIds) {
+      try {
+        await refreshTaskChanges({ urlKey, taskId, writes, recordsStore, readPrStatus });
+      } catch (err) {
+        console.warn(`[records] ${urlKey} ${taskId}: refresh after a verdict failed: ${err?.message || err}`);
+      }
+    }
+  }
+
   // ---- writes ------------------------------------------------------------
 
   /**
@@ -142,7 +206,20 @@ export function createProxyRecordsRoutes({ recordsStore, proxyLimiter, authentic
         const refused = refusedPlanAddressee(body.to);
         if (refused) return reply(req, res, endpoint, 422, refused);
       }
-      const result = await writes.add({ ctx: req, urlKey: req.proxyUrlKey, kind: body.kind, input: bodyWithout(body, ['kind', 'run']), by: writer.by, run: writer.run ?? null });
+      if (body.kind === 'verdict' && body.judgement === 'blind-read' && body.on !== undefined) {
+        // LIN-4516: a blind read names exactly the landing (subset and superset refused), checked before any pin.
+        const exact = await blindReadSetProblems({ urlKey: req.proxyUrlKey, recordsStore, on: [].concat(body.on).filter((x) => typeof x === 'string') });
+        if (exact.length) return reply(req, res, endpoint, 422, refusalOf(exact));
+      }
+      const pin = await pinOnOf(req.proxyUrlKey, body.on, body.heads, writer.run ?? null);
+      if (pin.problems) return reply(req, res, endpoint, 422, refusalOf(pin.problems));
+      const input = bodyWithout(body, ['kind', 'run', 'heads']);
+      if (body.on !== undefined) input.on = pin.on;
+      // LIN-4516: a verdict belongs to the task its changes are on, so the task's records and its round cut can find it.
+      // `in` is any record's field, so no kind changes (lib/records/kinds.json).
+      if (body.kind === 'verdict' && pin.tasks.length === 1 && input.in === undefined) input.in = pin.tasks[0];
+      const result = await writes.add({ ctx: req, urlKey: req.proxyUrlKey, kind: body.kind, input, by: writer.by, run: writer.run ?? null });
+      if (!result.problems) await refreshAfterPin(req.proxyUrlKey, pin.tasks);
       return answer(req, res, endpoint, 201, result);
     } catch (err) {
       return failed(req, res, endpoint, err);
@@ -161,7 +238,14 @@ export function createProxyRecordsRoutes({ recordsStore, proxyLimiter, authentic
         const refused = refusedPlanAddressee(body.to !== undefined ? body.to : prev.to);
         if (refused) return reply(req, res, endpoint, 422, refused);
       }
-      const result = await writes.revise({ ctx: req, urlKey: req.proxyUrlKey, id: req.params.id, input: bodyWithout(body, ['run']), by: writer.by, run: writer.run ?? null });
+      const exact = await blindReadAfter(req.proxyUrlKey, prev, body.on);
+      if (exact.length) return reply(req, res, endpoint, 422, refusalOf(exact));
+      const pin = await pinOnOf(req.proxyUrlKey, body.on, body.heads, writer.run ?? null);
+      if (pin.problems) return reply(req, res, endpoint, 422, refusalOf(pin.problems));
+      const input = bodyWithout(body, ['run', 'heads']);
+      if (body.on !== undefined) input.on = pin.on;
+      const result = await writes.revise({ ctx: req, urlKey: req.proxyUrlKey, id: req.params.id, input, by: writer.by, run: writer.run ?? null });
+      if (!result.problems) await refreshAfterPin(req.proxyUrlKey, pin.tasks);
       return answer(req, res, endpoint, 200, result);
     } catch (err) {
       return failed(req, res, endpoint, err);
@@ -192,7 +276,15 @@ export function createProxyRecordsRoutes({ recordsStore, proxyLimiter, authentic
       const links = {};
       for (const type of LINK_TYPES) if (body[type] !== undefined) links[type] = body[type];
       Object.assign(links, isPlainObject(body.links) ? body.links : {});
+      const prev = await recordsStore.current(req.proxyUrlKey, req.params.id);
+      if (!prev) throw new RecordsNotFound(req.params.id);
+      const exact = await blindReadAfter(req.proxyUrlKey, prev, links.on);
+      if (exact.length) return reply(req, res, endpoint, 422, refusalOf(exact));
+      const pin = await pinOnOf(req.proxyUrlKey, links.on, body.heads, writer.run ?? null);
+      if (pin.problems) return reply(req, res, endpoint, 422, refusalOf(pin.problems));
+      if (links.on !== undefined) links.on = pin.on;
       const result = await writes.link({ ctx: req, urlKey: req.proxyUrlKey, id: req.params.id, links, by: writer.by, run: writer.run ?? null });
+      if (!result.problems) await refreshAfterPin(req.proxyUrlKey, pin.tasks);
       return answer(req, res, endpoint, 200, result);
     } catch (err) {
       return failed(req, res, endpoint, err);

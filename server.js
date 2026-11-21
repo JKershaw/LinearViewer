@@ -700,7 +700,9 @@ async function taskForTicketAt(urlKey, ticket, resolveAccess = null) {
   return ticketWriter.taskOfTicket(access, urlKey, ticket, 'dispatch');
 }
 dispatchQueueStore.taskOnDispatch = (urlKey, ticket, resolveAccess) => taskForTicketAt(urlKey, ticket, resolveAccess)
-dispatchQueueStore.runRecords = createRunRecords({ recordsStore, readRow: (urlKey, id) => dispatchQueueStore.rowForRunRecords(urlKey, id), taskOfTicket: (urlKey, ticket) => taskForTicketAt(urlKey, ticket), changeBackstop: createChangeBackstop({ recordsStore, prReaderFor: createChangePrReaders({
+// LIN-4516: one per-workspace PR reader for the change records: the backstop (LIN-4515) and the verdict route's
+// refresh (routes/proxy-records.js) both read PRs through it, on the same cache and credential.
+const changePrReaderFor = createChangePrReaders({
   // LIN-4515 (beat 4): the backstop's PR reader is the close-out chain's: the workspace's own credential, the owner's
   // installation token for a Linear- or Jira-bound repo, the shared cache. The installation resolver is a `const` below,
   // so it is reached through a closure (a direct reference here is a temporal-dead-zone error at boot).
@@ -710,7 +712,8 @@ dispatchQueueStore.runRecords = createRunRecords({ recordsStore, readRow: (urlKe
   },
   resolveWorkspaceId: createSessionWorkspaceIdResolver({ sessionsCollection }),
   installationTokenFor: (args) => installationTokenFor(args),
-}) }) })
+})
+dispatchQueueStore.runRecords = createRunRecords({ recordsStore, readRow: (urlKey, id) => dispatchQueueStore.rowForRunRecords(urlKey, id), taskOfTicket: (urlKey, ticket) => taskForTicketAt(urlKey, ticket), changeBackstop: createChangeBackstop({ recordsStore, prReaderFor: changePrReaderFor }) })
 // LIN-2444: proposed dismissals — a view annotation on a ruling, never an
 // answer to it. Separate collection from shelved-rulings because the two are
 // different acts with different lifecycles (a shelve defers a decision the
@@ -3326,7 +3329,7 @@ const recordPipelineMerge = createPipelineMergeRecorder({
 // LIN-4494: one reader, built once, for the proxy, the task and project pages, Home's Waiting section and `?assignee=me`.
 const listWorkspacePeople = createListWorkspacePeople({ workspaceStore, accountStore, accountWorkspaceStore })
 const canonicalAccountIdOf = (accountId) => accountStore.resolveCanonicalAccountId(accountId)
-app.use(createProxyRoutes({ proxyTokenStore, proxyEventStore, agentStatusStore, recapCacheStore, briefCacheStore, dispatchQueueStore, dispatchTokenStore, closeOutEventsStore, llmCallLogStore, taskDecisionsStore, shelvedRulingsStore, dismissalSuggestionsStore, harbourCommentsStore, recordsStore, listRecordPeople: listWorkspacePeople, sessionsFeedCache, workspaceFromUrl, resolveWorkspaceAccess, getWorkspaceOpenRouterKey, getWorkspaceNorthStar, getNorthStarDocVersionForWorkspace, reportHistoryStore, workspacePreferencesStore, dispatchPresetsStore, freeTierStore, accountStore, rejectedCredentialRegistry, observerStateStore, savedChatStore, workspaceHaltStore, workspaceOwnerCheck, modelRoutingStore, livenessAlarmStore, onTicketWrite, recordPipelineMerge, consumerHeartbeatStore, requestUsageStore, requestUsageLoader, leftoverStep }))
+app.use(createProxyRoutes({ proxyTokenStore, proxyEventStore, agentStatusStore, recapCacheStore, briefCacheStore, dispatchQueueStore, dispatchTokenStore, closeOutEventsStore, llmCallLogStore, taskDecisionsStore, shelvedRulingsStore, dismissalSuggestionsStore, harbourCommentsStore, recordsStore, changePrReaderFor, listRecordPeople: listWorkspacePeople, sessionsFeedCache, workspaceFromUrl, resolveWorkspaceAccess, getWorkspaceOpenRouterKey, getWorkspaceNorthStar, getNorthStarDocVersionForWorkspace, reportHistoryStore, workspacePreferencesStore, dispatchPresetsStore, freeTierStore, accountStore, rejectedCredentialRegistry, observerStateStore, savedChatStore, workspaceHaltStore, workspaceOwnerCheck, modelRoutingStore, livenessAlarmStore, onTicketWrite, recordPipelineMerge, consumerHeartbeatStore, requestUsageStore, requestUsageLoader, leftoverStep }))
 
 // LIN-3098 S3: the runner kit (lib/runner-kit/*.mjs), public, for the served
 // runner prompt to fetch and verify against its sha256 pins (routes/runner-kit.js).
