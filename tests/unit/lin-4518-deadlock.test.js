@@ -25,6 +25,7 @@ import { frozenRouteOf } from '../helpers/comment-path-frozen.js';
 import { assembleTrailFacts, formatTrailFactsBlock } from '../../lib/recommendation-facts.js';
 import { closeOutGateHeld } from '../../lib/recommendation-blind-read.js';
 import { FINDINGS_NONE } from '../../lib/close-out-findings.js';
+import { gateTrailOf } from '../../lib/task-standing.js';
 
 const REPO = 'acme/widget';
 const PR = (n) => `https://github.com/${REPO}/pull/${n}`;
@@ -110,9 +111,41 @@ describe('a task with no verdict record routes to review (LIN-4518 witness)', ()
     assert.match(formatTrailFactsBlock(facts, comments.length), /Latest code review: none/);
   });
 
-  test('records not read: the facts say not measured, never none', () => {
-    const comments = [summary('c1', '21:00', 2478)];
+  test('records not read: the facts read the comment trail, the same answer as with no store', () => {
+    const comments = [summary('c1', '21:00', 2478), review('c2', '22:08', 2478)];
     const facts = assembleTrailFacts(comments, '', { leaf: true, openFindings: FINDINGS_NONE, standing: null });
-    assert.match(formatTrailFactsBlock(facts, comments.length), /Latest code review: not measured/);
+    const none = assembleTrailFacts(comments, '', { leaf: true, openFindings: FINDINGS_NONE });
+    assert.equal(formatTrailFactsBlock(facts, comments.length), formatTrailFactsBlock(none, comments.length));
+    assert.match(formatTrailFactsBlock(facts, comments.length), /Latest code review: approve/);
+  });
+});
+
+describe('which trail a gate reads: the newest verdict wins, comments until a record is the newest (LIN-4518)', () => {
+  const approveAt = (hhmm) => review(`r-${hhmm}`, hhmm, 2478);
+  const standingAt = (hhmm) => standingOfComments([summary('s', '21:00', 2478), approveAt(hhmm)], { statuses: { [PR(2478)]: { readable: true, state: 'open', merged: false, head: { sha: HEAD }, checks: [] } } });
+
+  test('no records review: the comment trail governs, as it always did', () => {
+    const comments = [summary('c1', '21:00', 2478), approveAt('22:08')];
+    const gate = gateTrailOf({ standing: null, comments });
+    assert.equal(gate.source, 'comments');
+    assert.equal(gate.trail.review.verdict, 'approve');
+  });
+
+  test('a record at or after the newest review comment governs', () => {
+    const comments = [summary('c1', '21:00', 2478), approveAt('22:08')];
+    const gate = gateTrailOf({ standing: standingAt('22:08'), comments });
+    assert.equal(gate.source, 'records', 'a tie goes to the record');
+    assert.equal(gate.trail.review.verdict, 'approve');
+  });
+
+  test('an older record (a cutover import) yields to a newer review comment', () => {
+    // The record's verdict is written at 22:08; a review comment posted at 23:00 is the newest verdict.
+    const comments = [summary('c1', '21:00', 2478), approveAt('22:08'), review('r-late', '23:00', 2478)];
+    const gate = gateTrailOf({ standing: standingAt('22:08'), comments });
+    assert.equal(gate.source, 'comments');
+  });
+
+  test('neither source given: nothing is known, so the gate is null (the caller stands aside)', () => {
+    assert.equal(gateTrailOf({}), null);
   });
 });

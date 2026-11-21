@@ -60,8 +60,8 @@ import { appendBlock, replace as replaceInDescription, DescriptionEditError } fr
 import { checkSizeRecord, recordShape, SIZE_OF_MOVE_HEADING, SIZE_RECORD_CODES, DECIDED_BY, WRONG_WORK } from '../lib/size-of-move.js';
 import { addedPlanHeadings, PLAN_HEADING_WORDS, PLAN_IN_DESCRIPTION } from '../lib/legacy-plan-text.js';
 import { blindReadRefusal } from '../lib/run-ledger.js';
-import { checkBlindRead, landingPrUrls } from '../lib/run-trail.js';
-import { standingForTicket } from '../lib/task-standing.js';
+import { checkBlindRead } from '../lib/run-trail.js';
+import { standingForTicket, gateTrailOf } from '../lib/task-standing.js';
 import { isRestrictedStamp, sameTicketKey, ISSUE_PATCH_FIELDS } from '../lib/stage-writes.js';
 import { jsonError } from '../lib/errors.js';
 import { parseFeedbackImage } from '../lib/attachment-upload.js';
@@ -717,18 +717,12 @@ export function createProxyWriteRoutes({
     if (!shape.ok) return refuseBlindRead(ctx, shape);
     let landing = null;
     try {
-      // LIN-4518: the landing is the task's open changes plus the round's merged ones (lib/records/landing.js), read from
-      // records when the ticket has a task. Without a task, the comment trail, as before (retired with the shape half, P7).
-      const taskId = recordsStore && typeof recordsStore.taskForTicket === 'function'
-        ? await recordsStore.taskForTicket(ctx.req.proxyUrlKey, ctx.req.params.issueId) : null;
-      if (taskId) {
-        const standing = await standingForTicket({ recordsStore, urlKey: ctx.req.proxyUrlKey, ticket: ctx.req.params.issueId });
-        if (!standing) throw new Error('the task standing could not be read');
-        landing = standing.landing;
-      } else {
-        if (typeof ctx.provider.fetchIssueComments !== 'function') throw new Error('the provider reads no comment trail');
-        landing = landingPrUrls(await ctx.provider.fetchIssueComments(ctx.token, ctx.req.params.issueId));
-      }
+      // LIN-4518: the landing is the gate's: the records' (lib/records/landing.js) once the task's newest verdict is a record,
+      // else the comment trail, as before (lib/task-standing.js gateTrailOf; retired with the shape half, P7).
+      if (typeof ctx.provider.fetchIssueComments !== 'function') throw new Error('the provider reads no comment trail');
+      const comments = await ctx.provider.fetchIssueComments(ctx.token, ctx.req.params.issueId);
+      const standing = recordsStore ? await standingForTicket({ recordsStore, urlKey: ctx.req.proxyUrlKey, ticket: ctx.req.params.issueId }) : null;
+      landing = gateTrailOf({ standing, comments }).trail.landing;
     } catch (err) {
       console.warn(`[blind-read] ${ctx.req.params.issueId}: PR-set check skipped, the trail could not be read whole (${err?.message || err}); the shape check held`);
     }

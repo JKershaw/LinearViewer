@@ -166,8 +166,9 @@ describe('witness 6: the ladder lane makes no PR read (characterization)', () =>
       readPrStatus: async () => { counts.prReads++; throw new Error('a PR read on the ladder lane'); },
       githubFetch: async () => { counts.prReads++; throw new Error('a GitHub read on the ladder lane'); },
     };
-    // LIN-4518: the ladder lane's gate reads the ticket's records standing, not the comments. The store serves the trail's
-    // records (tests/helpers/records-trail.js), and every read is counted: the lane reads records, never a comment or a PR.
+    // LIN-4518: the ladder lane reads the comments once, as it always did, and consults the ticket's records standing for the
+    // gate (lib/task-standing.js gateTrailOf: the records govern once the newest verdict is a record). The store serves the
+    // trail's records (tests/helpers/records-trail.js), and its reads are counted.
     const versions = versionsOfComments(COMMENTS);
     const index = (rows) => rows.filter((s, i, all) => all.findIndex((x) => x.id === s.id) === i);
     const current = (kind) => index(versions.filter((v) => v.kind === kind).sort((a, b) => b.v - a.v));
@@ -178,8 +179,8 @@ describe('witness 6: the ladder lane makes no PR read (characterization)', () =>
       async versionsOf(_urlKey, ids) { this.reads++; return versions.filter((v) => ids.includes(v.id)); },
     };
     const state = await closeOutNotReady({ openFindings: FINDINGS_NONE, workspace: { urlKey: 'acme' }, issueIdentifier: 'LIN-1', seam, recordsStore });
-    assert.deepEqual(counts, { comments: 0, prReads: 0 });
-    assert.ok(recordsStore.reads > 0, 'the gate read the records');
+    assert.deepEqual(counts, { comments: 1, prReads: 0 });
+    assert.ok(recordsStore.reads > 0, 'the gate consulted the records standing');
     assert.equal(state?.reason, 'blind-read-missing', 'the ladder still refuses on the gate');
   });
 });
