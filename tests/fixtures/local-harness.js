@@ -482,3 +482,15 @@ export async function seedLocalWorkspace(page, seed = null, { features, openRout
   const body = await resp.json();
   return { urlKey: body.urlKey, dashboard: localDashboardUrl(body.urlKey) };
 }
+
+/**
+ * LIN-4518 (beat 4): seed the records a ticket's gates read (the task, one change per PR at its head, and the verdicts that
+ * judge them). The gates read the records standing only, so a spec that needs a review or a blind read seeds it here; the
+ * comments a spec also posts are the people's view and display text. `changes[i]` is `{ref, head}`; a verdict names
+ * `changes` as indexes (default: the first change), with `judgement` `review` or `blind-read` and an `outcome`.
+ */
+export async function seedVerdictRecords(page, { urlKey = LOCAL_WORKSPACE_URL_KEY, ticket, asked, changes = [], verdicts = [] }) {
+  const resp = await page.request.post('/test/seed-verdict-records', { data: { urlKey, ticket, asked, changes, verdicts } });
+  if (!resp.ok()) throw new Error(`verdict records seed failed: ${resp.status()} ${await resp.text()}`);
+  return resp.json();
+}

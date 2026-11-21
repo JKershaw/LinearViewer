@@ -1,5 +1,5 @@
 import { test, expect } from '../fixtures/test-base.js';
-import { localSeedId } from '../fixtures/local-harness.js';
+import { localSeedId, seedVerdictRecords } from '../fixtures/local-harness.js';
 
 // LIN-3247 (P2 of LIN-2949): the run-evidence fragment mounted at the top of
 // the per-session page. A finished run renders asked / done / checked (the
@@ -71,6 +71,11 @@ async function seedLocalWorkspaceWithEvidence(page, { extraPrUrl = null } = {}) 
     },
   });
   expect(resp.ok(), `local seed failed: ${resp.status()} ${await resp.text()}`).toBeTruthy();
+  // LIN-4518 (beat 4): the review and the blind read the gates judge are records; the comments are the display text.
+  const changes = [PR, extraPrUrl].filter(Boolean).map((ref) => ({ ref, head: PR_HEAD }));
+  const all = changes.map((_, i) => i);
+  await seedVerdictRecords(page, { urlKey: URL_KEY, ticket: 'LOCAL-EV1', asked: 'Seeded run-evidence task', changes,
+    verdicts: [{ judgement: 'review', outcome: 'approve', changes: all }, { judgement: 'blind-read', outcome: 'same', changes: all }] });
 }
 
 // Seed a finished (terminal [done]) session on LOCAL-EV1 so session.seedIssue

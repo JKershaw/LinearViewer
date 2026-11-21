@@ -1,5 +1,5 @@
 import { test, expect } from '../fixtures/test-base.js';
-import { localSeedId } from '../fixtures/local-harness.js';
+import { localSeedId, seedVerdictRecords } from '../fixtures/local-harness.js';
 import { seedWorkspaceOwnership } from '../fixtures/workspace-ownership.js';
 
 // LIN-3248 (P3 of LIN-2949): the close-out box on a finished stop-at-PR run.
@@ -66,6 +66,12 @@ async function seedLocalWorkspaceWithEvidence(page) {
     },
   });
   expect(resp.ok(), `local seed failed: ${resp.status()} ${await resp.text()}`).toBeTruthy();
+  // LIN-4518 (beat 4): the review and the blind read the gates judge are records; the comments above are the display text.
+  await seedVerdictRecords(page, {
+    urlKey: URL_KEY, ticket: 'LOCAL-CO1', asked: 'Seeded close-out task',
+    changes: [{ ref: PR, head: PR_HEAD }],
+    verdicts: [{ judgement: 'review', outcome: 'approve' }, { judgement: 'blind-read', outcome: 'same' }],
+  });
   // LIN-3383: queueing work for a runner is owner-only; state the owner explicitly
   // rather than inheriting it from first-binder order.
   await seedWorkspaceOwnership(page, URL_KEY, 'owner');

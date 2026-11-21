@@ -98,7 +98,7 @@ const uuidForUrlKey = (key) => {
  * @param {Object|null} [options.taskModeStore] - Task-mode event store (LIN-2942), for /test/clear-task-mode-events
  * @returns {Router} Express router
  */
-export function createTestRoutes({ dispatchQueueStore, dispatchTokenStore, freeTierStore, userPreferencesStore, workspacePreferencesStore, modelRoutingStore = null, customPromptsStore, collectiveCharactersStore, collectivePresetsStore, dispatchPresetsStore, proxyTokenStore, proxyEventStore, agentStatusStore, observationSessionsStore, sessionsFeedCache, recapCacheStore, briefCacheStore, runSummaryCacheStore, sessionSummaryCacheStore, reportHistoryStore, shipBiscuitHistoryStore, taskDecisionsStore, shelvedRulingsStore, dismissalSuggestionsStore, savedChatStore, localStore, getWorkspaceAccessToken, accountStore, accountWorkspaceStore, ownerCredentialStore, connectionStore, clearWorkspaceIssuesMemo, resetKeyState = null, observerStateStore, dispatchHistoryCollection, proxyEventsCollection, resetKpiCache, workspaceHaltStore, emailTransport = null, commentDedupe = null, decisionStampDedupe = null, taskModeStore = null, taskShareCollection = null, kpiDailyRollupCollection = null, clearWorkspaceKpis = () => {} }) {
+export function createTestRoutes({ recordsStore = null, dispatchQueueStore, dispatchTokenStore, freeTierStore, userPreferencesStore, workspacePreferencesStore, modelRoutingStore = null, customPromptsStore, collectiveCharactersStore, collectivePresetsStore, dispatchPresetsStore, proxyTokenStore, proxyEventStore, agentStatusStore, observationSessionsStore, sessionsFeedCache, recapCacheStore, briefCacheStore, runSummaryCacheStore, sessionSummaryCacheStore, reportHistoryStore, shipBiscuitHistoryStore, taskDecisionsStore, shelvedRulingsStore, dismissalSuggestionsStore, savedChatStore, localStore, getWorkspaceAccessToken, accountStore, accountWorkspaceStore, ownerCredentialStore, connectionStore, clearWorkspaceIssuesMemo, resetKeyState = null, observerStateStore, dispatchHistoryCollection, proxyEventsCollection, resetKpiCache, workspaceHaltStore, emailTransport = null, commentDedupe = null, decisionStampDedupe = null, taskModeStore = null, taskShareCollection = null, kpiDailyRollupCollection = null, clearWorkspaceKpis = () => {} }) {
   const router = Router();
 
   // ── Connection-backed fixture variants (LIN-3124 PR3 checkpoint F, T27) ────
@@ -2095,6 +2095,38 @@ export function createTestRoutes({ dispatchQueueStore, dispatchTokenStore, freeT
   // `{ repo, number, readable, state?, merged?, headSha?, checks?, reason? }`.
   // LIN-3251 (RC2): the SAME value also primes the pr-state route's own
   // whole-reader cache, so the header PR line is hermetic too.
+  // LIN-4518 (beat 4): seeds the records a ticket's gates read: its task, one change per PR (at the head the PR is at), and
+  // the verdicts that judge them (`changes` names indexes into this request's changes). The E2E specs seed these instead of
+  // review and blind-read comments: the gates read the records standing only.
+  router.post('/test/seed-verdict-records', async (req, res) => {
+    try {
+      if (!recordsStore) return res.status(503).json({ error: 'records store not configured' });
+      const { urlKey, ticket, asked = 'Seeded records.', changes = [], verdicts = [] } = req.body || {};
+      if (!urlKey || !ticket) return res.status(400).json({ error: 'urlKey and ticket are required' });
+      // Records persist per workspace across tests: this ticket's own task and its records are cleared first, so a verdict
+      // an earlier test seeded cannot judge this one.
+      const claim = await recordsStore.refs.findOne({ urlKey, ticket });
+      if (claim) {
+        await recordsStore.records.deleteMany({ urlKey, $or: [{ id: claim.taskId }, { in: claim.taskId }] });
+        await recordsStore.refs.deleteMany({ urlKey, ticket });
+      }
+      const task = await recordsStore.ensureTask(urlKey, { identifier: ticket, asked }, { by: 'harbour' });
+      if (task.problem) return res.status(422).json({ error: task.problem });
+      const pins = [];
+      for (const ch of changes) {
+        const snap = await recordsStore.add(urlKey, { kind: 'change', in: task.id, fields: { ref: ch.ref, head: ch.head } }, { by: 'implementation' });
+        pins.push(`${snap.id}@${snap.v}`);
+      }
+      for (const vd of verdicts) {
+        const on = (vd.changes ?? [0]).map((i) => pins[i]);
+        await recordsStore.add(urlKey, { kind: 'verdict', in: task.id, links: { on }, fields: { judgement: vd.judgement, outcome: vd.outcome, reasoning: vd.reasoning ?? 'seeded' } }, { by: vd.judgement === 'blind-read' ? 'blind-read' : 'review' });
+      }
+      res.status(201).json({ taskId: task.id, changes: pins });
+    } catch (err) {
+      res.status(500).json({ error: err.message });
+    }
+  });
+
   router.post('/test/seed-pr-status', (req, res) => {
     const { repo, number, readable, state = null, merged = false, headSha = null, checks = [], reason = 'not checked' } = req.body || {};
     if (!repo || number === undefined) return res.status(400).json({ error: 'repo and number are required' });

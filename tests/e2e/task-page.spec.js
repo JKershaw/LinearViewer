@@ -1,5 +1,5 @@
 import { test, expect } from '../fixtures/test-base.js';
-import { localSeedId } from '../fixtures/local-harness.js';
+import { localSeedId, seedVerdictRecords } from '../fixtures/local-harness.js';
 import { expectNoClippedOverflow } from '../helpers.js';
 import { defaultJiraSeed, JIRA_SITE } from '../fixtures/jira-harness.js';
 import { quoteAsked } from '../../lib/brief-quote.js';
@@ -17,6 +17,7 @@ const PHONE = { width: 360, height: 780 };
 // A review summary comment on the tracker, so the page's evidence read finds a
 // ledger (the same seed shape run-evidence.spec.js uses). No PR URL: nothing
 // here reaches GitHub.
+const PR_HEAD = 'abc1234deadbeefdeadbeefdeadbeefdeadbeef0';
 const REVIEW_BODY = [
   '## Review — seeded',
   '',
@@ -504,6 +505,9 @@ test.describe('Task page, owner view (LIN-3329)', () => {
       },
     });
     expect(resp.ok(), `local seed failed: ${resp.status()} ${await resp.text()}`).toBeTruthy();
+    // LIN-4518 (beat 4): the review and the blind read the gates judge are records; the comments are the display text.
+    await seedVerdictRecords(page, { urlKey: URL_KEY, ticket: 'LOCAL-TP1', asked: 'Seeded task', changes: [{ ref: PR_URL, head: PR_HEAD }],
+      verdicts: [{ judgement: 'review', outcome: 'approve' }, { judgement: 'blind-read', outcome: 'same' }] });
 
     // A stop-at-PR run keyed to the task, on its own row, plus an open PR whose
     // review approved: the ready state. GitHub is stubbed via /test/seed-pr-status.
@@ -603,6 +607,9 @@ test.describe('Task page, owner view (LIN-3329)', () => {
       },
     });
     expect(resp.ok(), `local seed failed: ${resp.status()} ${await resp.text()}`).toBeTruthy();
+    // LIN-4518 (beat 4): the review and the blind read the gates judge are records; the comments are the display text.
+    await seedVerdictRecords(page, { urlKey: URL_KEY, ticket: 'LOCAL-TP1', asked: 'Seeded task', changes: [{ ref: PR_URL, head: PR_HEAD }],
+      verdicts: [{ judgement: 'review', outcome: 'approve' }, { judgement: 'blind-read', outcome: 'same' }] });
 
     const token = await runnerToken(page);
     const anchor = await page.request.post(`/workspace/${URL_KEY}/api/dispatch`, {
@@ -660,6 +667,9 @@ test.describe('Task page, owner view (LIN-3329)', () => {
       },
     });
     expect(resp.ok(), `local seed failed: ${resp.status()} ${await resp.text()}`).toBeTruthy();
+    // LIN-4518 (beat 4): the review and the blind read the gates judge are records; the comments are the display text.
+    await seedVerdictRecords(page, { urlKey: URL_KEY, ticket: 'LOCAL-TP1', asked: 'Seeded task', changes: [{ ref: PR_URL, head: PR_HEAD }],
+      verdicts: [{ judgement: 'review', outcome: 'approve' }, { judgement: 'blind-read', outcome: 'same' }] });
 
     const token = await runnerToken(page);
     const anchor = await page.request.post(`/workspace/${URL_KEY}/api/dispatch`, {
@@ -724,6 +734,9 @@ test.describe('Task page, owner view (LIN-3329)', () => {
 
     let resp = await page.request.post('/test/set-local-session', { data: seedTask({ name: 'In Progress', type: 'started' }) });
     expect(resp.ok(), `local seed failed: ${resp.status()} ${await resp.text()}`).toBeTruthy();
+    // LIN-4518 (beat 4): the review the gates judge is a record; the comment is the display text.
+    await seedVerdictRecords(page, { urlKey: URL_KEY, ticket: 'LOCAL-TP1', asked: 'A reopened task', changes: [{ ref: PR_URL, head: PR_HEAD }],
+      verdicts: [{ judgement: 'review', outcome: 'approve' }] });
 
     const token = await runnerToken(page);
     const anchor = await page.request.post(`/workspace/${URL_KEY}/api/dispatch`, {
