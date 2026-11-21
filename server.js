@@ -3343,7 +3343,7 @@ app.use(createGettingStartedRouter())
 // LIN-3383: workspace-api, collective, dashboard, task-chat and flight-companion
 // all receive the ONE hoisted `workspaceOwnerCheck` (never a second
 // createWorkspaceOwnerCheck) for the owner-only runner enqueue gate.
-app.use(createWorkspaceApiRoutes({ installationTokenFor, recordsStore, workspaceFromUrl, freeTierStore, getOpenRouterSource, userPreferencesStore, workspacePreferencesStore, customPromptsStore, recapCacheStore, briefCacheStore, reportHistoryStore, dispatchQueueStore, agentStatusStore, promptTraceStore, proxyTokenStore, taskDecisionsStore, harbourCommentsStore, sessionsFeedCache, ownerCredentialStore, accountStore, adoptConnectionCredential: (args) => connectionAccess.adoptConnectionCredential(args), closeOutEventsStore, workspaceOwnerCheck, onTicketWrite, recordPipelineMerge, loadTaskState: (args) => taskPageLoader.loadTaskState(args) }))
+app.use(createWorkspaceApiRoutes({ installationTokenFor, recordsStore, harbourCommentsStore, workspaceFromUrl, freeTierStore, getOpenRouterSource, userPreferencesStore, workspacePreferencesStore, customPromptsStore, recapCacheStore, briefCacheStore, reportHistoryStore, dispatchQueueStore, agentStatusStore, promptTraceStore, proxyTokenStore, taskDecisionsStore, harbourCommentsStore, sessionsFeedCache, ownerCredentialStore, accountStore, adoptConnectionCredential: (args) => connectionAccess.adoptConnectionCredential(args), closeOutEventsStore, workspaceOwnerCheck, onTicketWrite, recordPipelineMerge, loadTaskState: (args) => taskPageLoader.loadTaskState(args) }))
 
 // Mount collective routes (experimental cross-project discussion — LIN-450).
 // yapClient falls back to DEFAULT_YAP_BASE_URL (lib/yap-client.js) when YAP_BASE_URL is unset.
@@ -3451,7 +3451,7 @@ app.use(createTaskPageRoutes({
 
 // LIN-4494 (piece 3): a signed-in person's record writes from the task page, and the project page (its backlog and
 // the two actions on it). Both write through the one checked pipeline (lib/records/writes.js), filed by the session's account.
-app.use(createTaskRecordsRoutes({ workspaceFromUrl, recordsStore, accountStore, listPeople: listWorkspacePeople }))
+app.use(createTaskRecordsRoutes({ workspaceFromUrl, recordsStore, accountStore, listPeople: listWorkspacePeople, harbourCommentsStore }))
 app.use(createProjectPageRoutes({ workspaceFromUrl, getDeployInfo, getOpenRouterSource, recordsStore, accountStore, listPeople: listWorkspacePeople }))
 
 // Mount the task share routes (LIN-3330) — the owner mint/list/revoke controls

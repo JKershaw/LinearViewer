@@ -1350,7 +1350,7 @@ export function createProxyRoutes({ proxyTokenStore, proxyEventStore, agentStatu
   const recordsTrackerForRequest = async (req) => {
     const access = await resolveProviderAccess(req.proxyUrlKey, req.proxyCreatedBy, req);
     if (!access?.token || !access?.provider) throw new Error(`tracker unavailable: ${access?.reason || 'no access'}`);
-    return trackerPortOf({ provider: access.provider, scope: access.token });
+    return trackerPortOf({ provider: access.provider, scope: access.token, harbourComments: harbourCommentsStore ? { urlKey: req.proxyUrlKey, store: harbourCommentsStore } : null });
   };
   router.use(createProxyRecordsRoutes({ recordsStore, proxyLimiter, authenticateProxyToken, requireWriteScope, logEvent, readTicket: readRecordsTicket, askedText: askedOf, stageKinds: Object.keys(STAGE_KINDS), listPeople: listRecordPeople, tracker: recordsTrackerForRequest, changePrReaderFor }));
 
@@ -1511,7 +1511,7 @@ export function createProxyRoutes({ proxyTokenStore, proxyEventStore, agentStatu
           // (LIN-772/773); dropping it here silently hid the section on the LLM
           // recommendation path autopilot drives by default — the sibling of the
           // deterministic LIN-776 fix. `focusedChild` stays (the router reads it).
-          await prepareRecommendationInput(context, { dispatchQueueStore, urlKey, identifier: issue.identifier, recordsStore }),
+          await prepareRecommendationInput(context, { dispatchQueueStore, urlKey, identifier: issue.identifier, recordsStore, harbourCommentsStore }),
           {
             apiKey: resolvedApiKey,
             model: selectedModel,

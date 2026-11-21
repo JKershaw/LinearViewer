@@ -18,8 +18,10 @@ describe('prepareRecommendationInput (LIN-3469)', () => {
   test('forwards exactly the prompt-read fields plus the task\'s runs', async () => {
     const input = await prepareRecommendationInput(ctx, { dispatchQueueStore: store, urlKey: 'acme', identifier: 'LIN-1' });
     assert.deepEqual(Object.keys(input).sort(),
-      ['allRuns', 'asked', 'attachments', 'children', 'comments', 'focusedChild', 'openFindings', 'parent', 'planFacts', 'project', 'runs', 'siblings', 'standing']);
+      // LIN-4518 (beat 4): `harbourIds` is the ledger of Harbour's own comment writes (authorship reads it); the key is added by this beat.
+      ['allRuns', 'asked', 'attachments', 'children', 'comments', 'focusedChild', 'harbourIds', 'openFindings', 'parent', 'planFacts', 'project', 'runs', 'siblings', 'standing']);
     assert.equal(input.asked, null, 'no records store: no words on record');
+    assert.equal(input.harbourIds, null, 'LIN-4518: no ledger store: no Harbour ids, so authorship reads the body as before');
     // LIN-4518: the ticket's records standing; with no store it is not read (null), never the empty standing.
     assert.equal(input.standing, null, 'no records store: the standing is not read');
     assert.equal(input.planFacts.measured, false, 'LIN-4504: no records store: plan facts not measured, never "no plan"');
