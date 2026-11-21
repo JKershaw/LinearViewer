@@ -4993,3 +4993,7 @@ John answered all three rulings. LIN-4517 resumed at 07:01. Slice 3: P1–P3 Don
 ### 21 Nov, 08:28
 
 LIN-4517 has been in close-out since 07:39 (the verdict import and cutover). No rulings, no pause. LIN-4518..4521 wait.
+
+### 21 Nov, 08:56
+
+LIN-4517 Done (close-out ran 64 min: the verdict import and cutover). LIN-4518 (P5: close-out, the selector and run evidence read records) has been building since 08:46. No rulings, no pause.
