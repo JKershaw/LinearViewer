@@ -5163,3 +5163,9 @@ The full stop holds: the fleet is paused, and the drive is only reporting. The o
 - LIN-4522's plan (plan-c8c68fff v2) grew a census framework: one shared RETAINED table with three kinds of row, table tests and planted-mutation proofs, and the censuses widened to every test folder (about 93 test files and 25 others to sort). The cause is the driving session's own ticket line asking each retired-words test to list every retired word. The core removals are sound and the plan review checked them.
 - Two rulings ask the same question (`lin4522-recorded-history` from plan, `lin4522-record-keepers` from plan-review): may recorded history (eval baselines and source text, four survey scripts the papers cite, dated docs) keep the old words? Suggested answers posted: yes, leave history as it is, and drop the census line (no exception table, no widening to the tests).
 - Proposed to John, not done: edit LIN-4522 to take the census line off (What we want, Done when, the census bullet) and say recorded history stays. The run is waiting on the rulings.
+
+## 21 Nov, ~19:25: LIN-4522 ticket corrected (John)
+
+- John answered both rulings as suggested (recorded history stays; no exception table; censuses not widened to the tests). The plan run resumed.
+- With John's OK, the census requirement came off LIN-4522: removed the "each retired-words test lists every word" line, its Done-when item and the bullet about the slice 1 census missing two words. Added: "Recorded history stays as it is: dated docs, recorded eval baselines and their source material, and the scripts the papers cite."
+- Left as written: the research notes the run appended to the description still describe the RETAINED table. The ruling answers supersede them; the run revises its own notes.
