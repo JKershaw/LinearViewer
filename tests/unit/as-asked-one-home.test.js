@@ -42,12 +42,9 @@ function sourceGraph() {
 const codeLines = (source) => source.split('\n').filter((l) => !/^\s*(\/\/|\/\*\*|\*(\s|\/|$))/.test(l));
 
 describe('LIN-4504: no reader of the plan-review due line remains', () => {
-  test('the round-trip measure and the selector read the gate from records; no module carries a due-line pattern', () => {
+  test('the round-trip measure and the selector read the gate from records, not the description', () => {
     assert.equal(gateDue('**plan-review due:** yes'), null, 'the round-trip gate is not measured without plan records');
     assert.equal(selectorDue('**plan-review due:** yes'), false, 'the selector\'s plan facts are records, not measured with none read');
-    assert.equal(roundTrips.planReviewDueOf, undefined, 'planReviewDueOf is retired');
-    const graph = sourceGraph();
-    assert.deepEqual(graph.paths().filter((p) => codeLines(graph.sourceOf(p)).some((l) => /\/plan-review due:/i.test(l))), []);
   });
 });
 

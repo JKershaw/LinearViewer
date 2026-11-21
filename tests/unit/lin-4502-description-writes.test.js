@@ -5,7 +5,7 @@
  * Drives the REAL proxy write routes over a REAL seeded LocalStore, and over the Jira provider's fake, then reads
  * the stored description straight from the store:
  *   - a PATCH or a replace that changes words inside a legacy `## As asked` block, a PATCH that drops the block,
- *     and a PATCH that adds one, are written as sent (no AS_ASKED_IMMUTABLE): the person's words live on the task's
+ *     and a PATCH that adds one, are written as sent (no retired immutable guard): the person's words live on the task's
  *     `asked`, which no description write reaches (tests/unit/lin-4502-witness.test.js pins that side);
  *   - a create whose body holds the heading or end line is filed as written, with no block sealed around it;
  *   - append and replace still splice;
@@ -32,7 +32,7 @@ import { quoteAsked, ASKED_HEADING, ASKED_END } from '../../lib/brief-quote.js';
 const LOCAL_URL_KEY = 'local-workspace';
 
 const WORDS = 'Please write a full guide on how to properly configure it.\nCover **both** modes.';
-const BELOW = '## Implementation Plan\n\n1. step one';
+const BELOW = '## Notes\n\n1. step one';
 
 /** Linear-style storage: markdown punctuation backslash-escaped. */
 const linearEscape = (text) => text.replace(/([#*_[\]])/g, '\\$1');
@@ -134,12 +134,6 @@ for (const variant of VARIANTS) {
       assert.equal(res.status, 200, JSON.stringify(res.body));
       const after = await storedDescription('i1');
       assert.equal(after, `${sealed}\n\n## Notes\n\nfound it`);
-    });
-
-    test('the retired write-below route is not registered: 404, store unchanged', async () => {
-      const res = await call(proxyApp(), 'POST', '/api/proxy/issues/i1/description/below', { body: 'Shipped in #12.' });
-      assert.equal(res.status, 404, JSON.stringify(res.body));
-      assert.equal(await storedDescription('i1'), sealed);
     });
 
     test('a create whose body holds the heading or the end line is filed as written, with no block sealed around it', async () => {

@@ -13,7 +13,7 @@
  * This is the ONLY reason this store method needs a real-tmpdir test — the
  * selection logic that used to force this requirement (Revision 1's
  * `silentSince`/`$nor` predicate) no longer lives in the store at all (see
- * LIN-2633's Implementation Plan, Revision 2 note, point 4).
+ * LIN-2633's plan, Revision 2 note, point 4).
  *
  * Covers the plan's T8/T9/T15:
  *   T8  — idempotence: a second stamp call is a no-op; `bookkeeping.at` is

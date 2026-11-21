@@ -5,7 +5,7 @@
  * The quote holds the task's `asked`, byte for byte. These tests pin its fixed shape (quoteAsked), how a text
  * splits around it (splitQuote), how its two marker lines are found (after normalizeEscaping, so Linear's
  * backslash escapes still match: a description filed before LIN-4502 carries the block in this same shape).
- * LIN-4504 retired the fact reader (readFact) that read code-read lines around it.
+ * LIN-4504 retired the fact reader that read code-read lines around it.
  *
  * Run with: node scripts/run-unit-tests.mjs tests/unit/brief-quote.test.js
  */
@@ -22,8 +22,6 @@ const END = '*End of what was asked. Steps write below this line; nothing above 
 const LINEAR_HEADING = '\\#\\# As asked';
 const LINEAR_END = '\\*End of what was asked\\. Steps write below this line; nothing above it changes\\.\\*';
 
-const DUE = /plan-review due:\**[ \t]*(yes|no)\b/i;
-const readDue = (text) => (text.match(DUE)?.[1] || '').toLowerCase() || null;
 
 describe('markers', () => {
   test('the module exports the two marker lines exactly', () => {
@@ -69,10 +67,10 @@ describe('splitQuote', () => {
 
   test('returns the text below the block, and offsets that bound the block', () => {
     const sealed = quoteAsked('The ask.');
-    const desc = `${sealed}\n\n## Implementation Plan\n\nStep one.`;
+    const desc = `${sealed}\n\n## Notes\n\nStep one.`;
     const parts = splitQuote(desc);
     assert.strictEqual(parts.words, 'The ask.');
-    assert.strictEqual(parts.below, '\n\n## Implementation Plan\n\nStep one.');
+    assert.strictEqual(parts.below, '\n\n## Notes\n\nStep one.');
     assert.strictEqual(parts.start, 0);
     assert.strictEqual(parts.end, sealed.length);
     assert.strictEqual(desc.slice(parts.start, parts.end), sealed);
@@ -135,5 +133,5 @@ describe('splitQuote', () => {
   });
 });
 
-// LIN-4504 retired readFact with its last caller: no reader takes a plan fact from a description.
+// LIN-4504 retired the fact reader with its last caller: no reader takes a plan fact from a description.
 

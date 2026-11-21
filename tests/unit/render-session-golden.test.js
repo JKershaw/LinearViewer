@@ -132,9 +132,9 @@ function runEvidenceFixture(overrides = {}) {
       ledger: {
         present: true, empty: false, unparsed: false,
         items: [
-          { id: 'L1', claim: 'a claim', scope: 'inside', discharge: 'check it', dischargedBy: null, discharged: false, followUp: null, raw: '' },
-          { id: 'L2', claim: 'b claim', scope: 'outside', discharge: 'file it', dischargedBy: null, discharged: false, followUp: 'LIN-999', raw: '' },
-          { id: 'L3', claim: 'c claim', scope: 'inside', discharge: 'done it', dischargedBy: 'abc1234', discharged: true, followUp: null, raw: '' }
+          { id: 'L1', claim: 'a claim', scope: 'inside', discharge: 'check it', discharged: false, followUp: null, raw: '' },
+          { id: 'L2', claim: 'b claim', scope: 'outside', discharge: 'file it', discharged: false, followUp: 'LIN-999', raw: '' },
+          { id: 'L3', claim: 'c claim', scope: 'inside', discharge: 'done it', discharged: true, followUp: null, raw: '' }
         ],
         raw: ''
       }

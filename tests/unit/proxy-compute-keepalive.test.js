@@ -86,7 +86,6 @@ function buildRouter({ issues }) {
     logOpenRouterCredentialSource: () => {},
     workspaceUnavailable: () => {},
     graphqlErrorStatus: () => 500,
-    captureTaskSnapshot: () => {},
     chargeFreeTierOrReject: async () => null,
     computeRecommendation: async () => { throw new Error('not exercised by this test'); },
     recommendErrorResponse: () => ({ status: 500, body: { error: 'not exercised by this test' } }),

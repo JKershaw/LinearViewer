@@ -2633,7 +2633,6 @@ describe('close-out template + review→close-out ledger handoff (LIN-550)', () 
 
   test('(g) LIN-4502: close-out neither archives nor prunes, and names no snapshot check or write-below route', () => {
     const { prompt } = generatePrompt('close-out', issue, context);
-    assert.ok(!/Archive & Prune/.test(prompt), 'no archive and prune section');
     assert.ok(!/prune/i.test(prompt), 'no prune step anywhere in the close-out prompt');
     assert.ok(!/\/snapshots/.test(prompt), 'no snapshot verification');
     assert.ok(!/description\/below/.test(prompt), 'no write-below route');

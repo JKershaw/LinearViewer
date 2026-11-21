@@ -126,8 +126,8 @@ describe('the check: what it refuses', () => {
   });
 
   test('a backticked helper', () => {
-    const r = refusal(`${PLAIN}\nReuse \`outsideAsAsked\` for this.`);
-    assert.deepEqual([r.code, r.kind, r.token], [SIZE_RECORD_CODES.how, 'code-span', '`outsideAsAsked`']);
+    const r = refusal(`${PLAIN}\nReuse \`outsideAsk\` for this.`);
+    assert.deepEqual([r.code, r.kind, r.token], [SIZE_RECORD_CODES.how, 'code-span', '`outsideAsk`']);
   });
 
   test('call syntax, dotted or camelCase', () => {

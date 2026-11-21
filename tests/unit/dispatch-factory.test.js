@@ -309,7 +309,7 @@ describe('createDispatchItem — finalizePrompt ordering', () => {
     assert.equal(sawHarness, 'claude-code');
   });
 
-  // LIN-4499 close-out: this pin was incidental to the LIN-3200 file-pointer suite, deleted with the pilot (LIN-4504). The
+  // LIN-4499 close-out: this pin was incidental to the LIN-3200 pointer suite, deleted with the pilot (LIN-4504). The
   // autopilot id block's append is pinned by tests/unit/lin-4492-run-identity.test.js.
   test('a finalizePrompt throw (a declared-launch refusal) reaches the caller and addItem is never called', async () => {
     let addItemCalls = 0;

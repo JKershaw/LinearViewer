@@ -141,12 +141,12 @@ describe('LocalProvider reads', () => {
     await store.seed(SCOPE, {
       projects: [{ id: 'p1', name: 'Alpha', sortOrder: 1 }],
       issues: [
-        { id: 'i1', identifier: 'LOCAL-1', title: 'Parent', projectId: 'p1', description: '## Implementation Plan\n\nSteps.' },
+        { id: 'i1', identifier: 'LOCAL-1', title: 'Parent', projectId: 'p1', description: '## Notes\n\nSteps.' },
         { id: 'i2', identifier: 'LOCAL-2', title: 'Child', projectId: 'p1', parentId: 'i1' },
       ],
     });
     const ctx = await provider.fetchIssueContext(SCOPE, 'i2');
-    assert.equal(ctx.parent.description, '## Implementation Plan\n\nSteps.');
+    assert.equal(ctx.parent.description, '## Notes\n\nSteps.');
   });
 
   test('fetchIssueContext throws for a missing issue', async () => {

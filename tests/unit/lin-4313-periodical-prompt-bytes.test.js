@@ -63,7 +63,7 @@
  * phrases back into `lib/periodicals.js` reproduces every old hash, so they are the only change.
  *
  * LIN-4469 (piece 5) re-pinned 13 (all but Stability, Recent Headwinds and Integration Surface): the notes bullet's
- * "one docs-only pull request" sentence now reads NOTES_PR (lib/prompts/leftover-words.js), the committed-tool
+ * "one docs-only pull request" sentence now reads a retired notes-PR sentence (its home was lib/prompts/leftover-words.js), the committed-tool
  * sentences of Drift & Coherence, Seams & Tangles' second bullet and Stability are built by `committedSearch` (lib/periodicals.js;
  * Stability passes its look-beside tail as the helper's second argument, its bytes unchanged; Seams & Tangles' first bullet is
  * main's own words and does not use the helper), and the rebase instruction is gone (the clause says "off main"). The three

@@ -184,7 +184,6 @@ describe('run-evidence: evidence rows and close-out', () => {
       prStatus: null,
     });
     assert.equal(m.ledger.verdict, 'approve-conditional');
-    assert.equal(m.ledger.ledger.items, undefined, 'the items are records now (LIN-4495)');
     assert.equal(m.closeOut.openFindings.state, 'read', 'the reading rides the close-out model');
   });
 

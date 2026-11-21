@@ -206,7 +206,7 @@ describe('witness 2: the read is blind', () => {
   const context = {
     parent: { identifier: 'LIN-8', title: 'TOKEN_PARENT_7731', description: 'TOKEN_PDESC_7731' },
     siblings: [], children: [], project: { name: 'TOKEN_PROJECT_7731' },
-    comments: [c(1, `TOKEN_COMMENT_7731 Implementation: ${PR}`), c(2, '### Leftovers\nTOKEN_LEFTOVERS_7731\nRetires: none')],
+    comments: [c(1, `TOKEN_COMMENT_7731 Implementation: ${PR}`), c(2, '### Notes\nTOKEN_LEFTOVERS_7731')],
     attachments: [{ id: 'att:1', title: 'TOKEN_ATTACH_7731', kind: 'file' }]
   };
   const prompt = generatePrompt('blind-read', issue, context).prompt;

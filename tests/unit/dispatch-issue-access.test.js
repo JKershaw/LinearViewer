@@ -3,7 +3,7 @@
  *
  * `createDispatchItem` takes one `issueAccess` resolver (`() => { provider, token } | null`).
  * The factory resolves it once, for the dispatch seat: the ticket's task (LIN-4501) and the child-ticket retry
- * (LIN-4503). LIN-4504 retired the file-pointer pilot, whose plan read was the one place the factory read the row's
+ * (LIN-4503). LIN-4504 retired the pointer pilot, whose plan read was the one place the factory read the row's
  * issue, so a dispatch now reads no issue text at all:
  *   - a counting provider with `issueDescription` is never read, the seat gets the resolved access, the prompt is the
  *     prompt as finalized, and nothing is written back;
@@ -26,7 +26,7 @@ import { createMockCollection } from '../fixtures/mock-collection.js';
 import { guardSockets } from '../fixtures/network-guard.js';
 
 const URL_KEY = 'acme';
-const PLAN = 'Goal.\n\n## Implementation Plan\nlib/plan.js\nroutes/plan-route.js';
+const PLAN = 'Goal.\n\n## Notes\nlib/plan.js\nroutes/plan-route.js';
 const WORDS = 'Please make the export button work.\nKeep **both** formats.';
 
 let queue;

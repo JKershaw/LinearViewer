@@ -4,7 +4,7 @@
  *
  * Run with: node --test tests/unit/flight-companion-gate.test.js
  *
- * Coverage, per the Implementation Plan §5:
+ * Coverage, per the plan §5:
  *   - buildCompanionSnapshot: the deterministic snapshot builder.
  *   - shouldSpendTurn's six-branch precedence (no-census, no-companion,
  *     hash-identical, floor, no-delta, spend), asserting `reason` AND

@@ -12,14 +12,14 @@ import { PERIODICALS } from '../../lib/periodicals.js';
 
 const ISSUE = { id: 'x', identifier: 'ABC-1', title: 'T', description: 'D', state: { name: 'Done', type: 'completed' }, labels: [] };
 
-// LIN-4495: FOLLOW_UP_SHAPE is retired (close-out and the audit file records, not tickets); its carrier pins are gone.
+// LIN-4495: the follow-up filing shape is retired (close-out and the audit file records, not tickets); its carrier pins are gone.
 
-// LIN-4380 (LIN-4349 P2): this used to pin "every task-minting periodical carries FOLLOW_UP_SHAPE".
+// LIN-4380 (LIN-4349 P2): this used to pin "every task-minting periodical carries the follow-up filing shape".
 // No Periodical files a ticket now (the 13 corrective ones feed the area notes, the 3 advisory ones
 // report to a person), so the shape's carriers are exactly the filing prompts above. This pins
 // that: no Periodical prompt tells the run to file follow-ups, none carries the filing shape, and
 // each says positively that it mints none. A Periodical that starts filing again fails here.
-test('no Periodical files a follow-up, so none carries FOLLOW_UP_SHAPE (LIN-4380)', () => {
+test('no Periodical files a follow-up, so none carries the filing shape (LIN-4380)', () => {
   assert.strictEqual(PERIODICALS.length, 16);
   for (const p of PERIODICALS) {
     const text = p.generatePrompt();

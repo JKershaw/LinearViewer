@@ -6,7 +6,7 @@
  * round-trips.mjs` owns the network read; nothing here touches it.
  *
  * Several fixtures below are modeled directly on the real record cited by
- * LIN-1883's Implementation Plan (v3) and its approving plan-review verdict
+ * LIN-1883's plan (v3) and its approving plan-review verdict
  * (`b44b782f`) — the five extraction surface forms, the LIN-1714-shaped
  * directional-bias regression, and the LIN-1408 abort-skip sequence
  * (`plan-review(50960260, aborted) → plan → plan-review(70eac018, done)`,

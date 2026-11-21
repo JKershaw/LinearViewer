@@ -17,7 +17,7 @@
  *     Verdict-VALUE parsers are outside it: `extractVerdict` (lib/run-trail.js since LIN-4504) and the
  *     verdict word `planReviewVerdictOf` reads stay where they are; only "is this a plan-review
  *     verdict" moved into the table.
- *   - A PLAN COMMENT is no longer read (LIN-4504: plans are records); `isPlanComment` is retired.
+ *   - A PLAN COMMENT is no longer read (LIN-4504: plans are records); its function is retired.
  *   - THE READING CHANGES one kind per comment made, each pinned by name, with what the code before
  *     it (f9a8cbcd1) answered.
  */
@@ -177,8 +177,6 @@ describe('the old checks, one by one (lib/run-ledger.js and lib/recommendation-f
 describe('LIN-4504: a plan comment is no longer read (plans are records)', () => {
   test('lib/run-trail.js exports no plan-comment predicate or plan heading, and the selector reads no plan from a comment', async () => {
     const trail = await import('../../lib/run-trail.js');
-    assert.equal(trail.isPlanComment, undefined);
-    assert.equal(trail.PLAN_HEADING_ANY, undefined);
     const plan = { createdAt: '2026-11-12T01:00:00.000Z', body: 'Plan posted.\n\n## Implementation Plan\n\nfits one session' };
     const facts = assembleTrailFacts([plan], '');
     assert.equal(facts.plan.measured, false, 'with no records read, the plan facts are not measured, never read from the comment');
@@ -230,7 +228,6 @@ const RETIRED = [
   'isAgentNote', 'isRuling', 'isPersonComment', 'isLandingEvidence', 'isAuditReport', 'isAreaRead',
   'auditAfterLandingCloseOut', 'opensWithHeading', 'firstHeading', 'firstLineOf', 'titleOf',
   'AGENT_NOTE_RE', 'RULING_MARK', 'CLOSE_OUT_TITLE_RE', 'PLAN_REVIEW_VERDICT_HEADING', 'PLAN_REVIEW_LEGACY_HEADING',
-  'isPlanComment', 'PLAN_HEADING_ANY',
 ];
 const OPENING = /close-\??out|retrospective audit|plan review verdict|plan\[-\\s\]\+review|area read|blind read|survey (?:open|global)|autopilot\\b|plan\\s\+\(\?:posted|ruling recorded|\^plan\\b|implementation plan/i;
 

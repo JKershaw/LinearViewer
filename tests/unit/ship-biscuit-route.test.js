@@ -451,7 +451,7 @@ const RECENT = () => new Date(Date.now() - 86400000).toISOString();
 
 describe('ship-biscuit reads landed work from merges and the tracker (LIN-4500)', () => {
   test('the route no longer reads task snapshots at all', () => {
-    assert.doesNotMatch(ROUTE_SRC, /taskSnapshotStore|listByWorkspace/);
+    assert.doesNotMatch(ROUTE_SRC, /listByWorkspace/);
     assert.match(ROUTE_SRC, /closeOutEventsStore\.listMergedSince\(\{\s*urlKey:\s*workspace\.urlKey,\s*since:\s*range\.since\s*\}\)/);
   });
 

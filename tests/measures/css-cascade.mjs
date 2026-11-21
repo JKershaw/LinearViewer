@@ -127,7 +127,7 @@ export function snapshot(root) {
 }
 
 // Changed, added and removed declarations between two snapshots, page by page.
-export function diffSnapshots(base, head) {
+export function diffCascade(base, head) {
   const changes = {};
   const keys = new Set([...Object.keys(base), ...Object.keys(head)]);
   for (const page of [...keys].sort()) {
@@ -303,7 +303,7 @@ if (process.argv[1] === fileURLToPath(import.meta.url)) {
     process.stdout.write(`${JSON.stringify(report, null, 2)}\n`);
   } else if (process.argv[2] === '--diff') {
     const read = (p) => JSON.parse(readFileSync(p, 'utf8'));
-    const changes = diffSnapshots(read(process.argv[3]), read(process.argv[4]));
+    const changes = diffCascade(read(process.argv[3]), read(process.argv[4]));
     const summary = Object.fromEntries(Object.entries(changes).map(([page, list]) => [page, list.length]));
     process.stdout.write(`${JSON.stringify({ pages: Object.keys(changes).length, summary, changes }, null, 2)}\n`);
   } else {

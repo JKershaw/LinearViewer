@@ -381,7 +381,7 @@ describe('addFeedback concurrency (real MangoDB tmpdir, LIN-1343)', () => {
 
 // ── LIN-3009: addFeedback keeps feedbackVersion/feedbackDigest current ──────
 //
-// Phase 1 of LIN-2996 (approved Implementation Plan Revision 5, strategy B+E,
+// Phase 1 of LIN-2996 (approved plan, Revision 5, strategy B+E,
 // plan-review a2bc2ab6). addFeedback must `$inc: { feedbackVersion: 1 }` in
 // the SAME atomic findOneAndUpdate as the feedback $push (LIN-1343-preserving,
 // no read-modify-write), then best-effort persist a materialized

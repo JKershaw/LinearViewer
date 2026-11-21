@@ -101,7 +101,7 @@ describe('askedOf: the one rule for a task\'s asked', () => {
   });
 
   test('a phrase in the person\'s own prose is their words, not a cut', () => {
-    const description = 'This fits one session comfortably.\n\nDo the thing.';
+    const description = 'This fits in one change comfortably.\n\nDo the thing.';
     assert.equal(askedOf(description), description);
   });
 

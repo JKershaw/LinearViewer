@@ -1608,7 +1608,7 @@ function runEvidenceFixture(overrides = {}) {
         now: { state: 'passing', checks: [], headSha: 'deadbeef', prUrl: 'https://github.com/acme/widget/pull/12', checksUrl: 'https://github.com/acme/widget/pull/12/checks', headMoved: false },
       },
     },
-    ledger: { verdict: 'approve-conditional', verdictText: 'Approve — conditional on close-out discharging the ledger.', ciLine: 'CI is green.', at: '2026-07-02T00:00:00.000Z', sha: 'abc1234', ledger: { present: true, empty: false, unparsed: false, items: [{ id: 'L1', claim: 'a claim', scope: 'inside', discharge: 'check it', dischargedBy: null, discharged: false, followUp: null, raw: '' }], raw: '' } },
+    ledger: { verdict: 'approve-conditional', verdictText: 'Approve — conditional on close-out discharging the ledger.', ciLine: 'CI is green.', at: '2026-07-02T00:00:00.000Z', sha: 'abc1234', ledger: { present: true, empty: false, unparsed: false, items: [{ id: 'L1', claim: 'a claim', scope: 'inside', discharge: 'check it', discharged: false, followUp: null, raw: '' }], raw: '' } },
     closeOut: { owner: true, status: 'ready', pr: { url: 'https://github.com/acme/widget/pull/12', number: 12 }, message: null },
     ...overrides,
   };

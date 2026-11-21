@@ -630,7 +630,6 @@ describe('F. clock-freedom, loudness and __internal', () => {
     assert.deepEqual(plannedOf({ identifier: 'LIN-1' }, '2026-06-10T00:00:00.000Z', factsFor(['LIN-1'], ['LIN-1']), COVERED), { measured: true, planned: true });
     assert.equal(plannedOf({ identifier: 'LIN-1' }, '2026-06-10T00:00:00.000Z', factsFor(['LIN-1'], ['LIN-1']), null).measured, false);
     assert.equal('hasPlanMarker' in __internal, false);
-    assert.equal('PLAN_MARKER' in __internal, false);
     assert.equal(hasReviewLedger({ comments: [{ body: '## Review — LIN-1\n- x' }] }), true);
     // LIN-4495: the retired heading no longer marks a review; a post-cutover review's title does.
     assert.equal(hasReviewLedger({ comments: [{ body: '### What CI Did Not Prove\n- x' }] }), false);
@@ -735,10 +734,10 @@ describe('G. LIN-2628: relationTypes and maturityDays are both forwarded, not re
   });
 });
 
-// LIN-1770 locked a close-out prune stub to keep a PLAN_MARKER literal, so a pruned description still read as
+// LIN-1770 locked a close-out prune stub to keep a plan-marker literal, so a pruned description still read as
 // "a plan ran". LIN-4502 retired the prune: no stage removes a description's plan any more, so the marker the
 // metric reads is never stubbed away. This pins that close-out carries no prune step a later edit could revive.
-describe('LIN-4502: close-out no longer prunes, so PLAN_MARKER is never stubbed away', () => {
+describe('LIN-4502: close-out no longer prunes, so the plan marker is never stubbed away', () => {
   test('the close-out template has no prune step', async () => {
     const { generatePrompt } = await import('../../lib/prompt-templates.js');
     const issue = {

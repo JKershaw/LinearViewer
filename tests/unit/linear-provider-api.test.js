@@ -137,13 +137,13 @@ describe('fetchIssueContext comment projection carries commentId, never id (LIN-
         url: 'https://linear.app/acme/issue/LIN-2',
         state: { name: 'Todo', type: 'unstarted' },
         labels: { nodes: [] },
-        parent: { id: 'p-1', identifier: 'LIN-1', title: 'P', description: '## Implementation Plan\n\nSteps.', state: { name: 'Todo', type: 'unstarted' }, children: { nodes: [] } },
+        parent: { id: 'p-1', identifier: 'LIN-1', title: 'P', description: '## Notes\n\nSteps.', state: { name: 'Todo', type: 'unstarted' }, children: { nodes: [] } },
         children: { nodes: [] },
         comments: { nodes: [] }
       }
     }));
     const context = await fetchIssueContext(API_KEY, 'LIN-2');
-    assert.strictEqual(context.parent.description, '## Implementation Plan\n\nSteps.');
+    assert.strictEqual(context.parent.description, '## Notes\n\nSteps.');
     const query = m.mock.calls.map(c => String(c.arguments[0]?.document ?? c.arguments[0])).join('\n');
     assert.match(query, /parent\s*\{\s*id\s*identifier\s*title\s*description/);
   });

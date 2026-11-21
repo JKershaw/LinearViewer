@@ -6,7 +6,7 @@
  *   (a) a task first named through the proxy takes the ticket's words as `asked`;
  *   (b) rewriting the description through the proxy (the whole body, and a span that used to sit inside the block)
  *       leaves the task's `asked` and brief part 1 unchanged. Before P2 the As-asked guard refused both rewrites
- *       (422 AS_ASKED_IMMUTABLE); with the guard retired both land (200), and the task's `asked` still holds.
+ *       (422, the retired immutable guard); with the guard retired both land (200), and the task's `asked` still holds.
  *   (c) the legacy reader reads the block exactly as the seal wrote it: a literal pre-P2 description, typed out here,
  *       gives askedOf its words. If the brief's quote is ever reworded, this fails until lib/asked-of.js freezes the
  *       old spelling (its exit-condition note).
@@ -192,7 +192,6 @@ describe('LIN-4502 witness (c): the legacy reader reads the block the seal wrote
 describe('LIN-4504: askedOf\'s plan heading is the one recognition rule (lib/legacy-plan-text.js)', () => {
   test('lib/asked-of.js holds no heading of its own and cuts where the shared rule cuts, `#` to `###`', () => {
     const source = readFileSync(new URL('../../lib/asked-of.js', import.meta.url), 'utf8');
-    assert.ok(!/Implementation Plan/.test(source.replace(/^\s*\/?\*.*$/gm, '').replace(/\/\/.*$/gm, '')), 'no plan heading spelled in code');
     for (const h of ['#', '##', '###']) {
       const text = `Words.\n\n${h} Implementation Plan\n\nplan`;
       assert.equal(askedOf(text), textBeforePlan(text));

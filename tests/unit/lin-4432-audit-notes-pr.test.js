@@ -33,13 +33,13 @@ const read = (path) => readFileSync(join(ROOT, path), 'utf8');
 
 const at = (d) => `2026-11-1${d}T10:00:00.000Z`;
 const LANDING_PR = 'https://github.com/JKershaw/LinearViewer/pull/2402';
-const NOTES_PR = 'https://github.com/JKershaw/LinearViewer/pull/2500';
+const AUDIT_PR = 'https://github.com/JKershaw/LinearViewer/pull/2500';
 
 const landingReview = { createdAt: at(1), body: `## Review — LIN-1\n\nReviewed ${LANDING_PR}.\n\n### Verdict\nApprove.\n\n### What CI Did Not Prove\n- L1 (inside): the live run.` };
 const landingCloseOut = { createdAt: at(2), body: `## Close-out — LIN-1\n\nMerged ${LANDING_PR}.` };
-const audit = { createdAt: at(3), body: `## Retrospective audit — LIN-1\n\nNo claim failed. Notes PR: ${NOTES_PR}.` };
-const notesReview = { createdAt: at(4), body: `## Review — LIN-1\n\nReviewed ${NOTES_PR}.\n\n### Verdict\nApprove.\n\n### What CI Did Not Prove\n- L1 (inside): the notes.` };
-const notesCloseOut = { createdAt: at(5), body: `## Close-out — LIN-1\n\nMerged ${NOTES_PR}.` };
+const audit = { createdAt: at(3), body: `## Retrospective audit — LIN-1\n\nNo claim failed. Notes PR: ${AUDIT_PR}.` };
+const notesReview = { createdAt: at(4), body: `## Review — LIN-1\n\nReviewed ${AUDIT_PR}.\n\n### Verdict\nApprove.\n\n### What CI Did Not Prove\n- L1 (inside): the notes.` };
+const notesCloseOut = { createdAt: at(5), body: `## Close-out — LIN-1\n\nMerged ${AUDIT_PR}.` };
 
 describe('(a) trail facts around an audit notes PR on a Done ticket (LIN-4432, verdict note 5)', () => {
   test('while the notes PR is open, the audit comment is work after the landing review (the selector routes to review)', () => {
@@ -57,7 +57,7 @@ describe('(a) trail facts around an audit notes PR on a Done ticket (LIN-4432, v
     const afterNotes = assembleTrailFacts([landingReview, landingCloseOut, audit, notesReview, notesCloseOut], '', { leaf: true });
     assert.equal(landing.auditAfterCloseOut, false, 'landing day still routes to the audit: no audit has run');
     assert.equal(afterNotes.auditAfterCloseOut, true, 'the post-notes-PR trail records the audit, so the selector stops re-selecting it');
-    assert.ok(afterNotes.prUrls.includes(NOTES_PR), 'the notes PR is linked on the trail');
+    assert.ok(afterNotes.prUrls.includes(AUDIT_PR), 'the notes PR is linked on the trail');
     assert.equal(afterNotes.workAfterReview, false);
     assert.equal(afterNotes.closeOutAfterReview, true);
   });

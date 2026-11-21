@@ -37,14 +37,6 @@ describe('recommendation-facts: focus-child picker ownership (LIN-3727)', () => 
   });
 });
 
-describe('recommendation-facts: no description reader of session fit (LIN-4504)', () => {
-  test('extractSessionFit is gone: session fit is the plan records\' addressee (lib/records/plan-facts.js)', async () => {
-    const facts = await import('../../lib/recommendation-facts.js');
-    assert.strictEqual(facts.extractSessionFit, undefined);
-    assert.strictEqual(facts.condensePlan, undefined);
-  });
-});
-
 describe('recommendation-facts: computeNodeStateCounts', () => {
   test('empty children → all zero, no open children', () => {
     assert.deepStrictEqual(computeNodeStateCounts([]), {

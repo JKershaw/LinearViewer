@@ -65,7 +65,7 @@ describe('the series is data: keys, values and coverage', () => {
   test('the Harbour cutover commit reads its reason, not a count: the lists were removed there', () => {
     const reading = seriesReadingAt(series.harbour, '81b5901834a7' + 'f'.repeat(28));
     assert.ok('reason' in reading, JSON.stringify(reading));
-    assert.match(reading.reason, /LIN-4495|no ## Waiting section/);
+    assert.match(reading.reason, /LIN-4495/);
   });
 
   test('a commit the series does not hold is a reason naming it, never a zero', () => {

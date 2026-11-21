@@ -125,7 +125,7 @@ describe('the size record guard on the proxy lane', () => {
 
   test('append, PATCH and replace that add how are refused 422 SIZE_RECORD_HOW naming the line; the store is unchanged', async () => {
     const before = await stored('i1');
-    const how = `${RECORD}\nReuse \`outsideAsAsked\` here.`;
+    const how = `${RECORD}\nReuse \`outsideAsk\` here.`;
     const attempts = [
       proxy('POST', 'LOCAL-1/description/append', { block: how }),
       proxy('PATCH', 'LOCAL-1', { description: `${before}\n\n${how}` }),
@@ -135,7 +135,7 @@ describe('the size record guard on the proxy lane', () => {
       assert.equal(res.status, 422, JSON.stringify(res.body));
       assert.equal(res.body.code, SIZE_RECORD_CODES.how);
       assert.equal(res.body.kind, 'code-span');
-      assert.deepEqual(res.body.line, { number: 7, text: 'Reuse `outsideAsAsked` here.' });
+      assert.deepEqual(res.body.line, { number: 7, text: 'Reuse `outsideAsk` here.' });
       assert.match(res.body.error, /what is being done and why, never how: its line 7 carries a code span/);
     }
     assert.equal(await stored('i1'), before);
