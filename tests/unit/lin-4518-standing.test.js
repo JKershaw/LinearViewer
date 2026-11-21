@@ -222,3 +222,23 @@ describe('witness 6: a task with no review has no review standing', () => {
     assert.equal(s.closeOutAfterReview, false);
   });
 });
+
+describe('witness 7 (finding 4c23d02b): closeOutOnTrail on records is a close-out on this landing\'s round, not any close-out', () => {
+  test('a close-out that ended before the review cut this round: not on the trail; one after the review is on it', async () => {
+    clock('2026-11-21T10:30:00.000Z');
+    await store.openRun(URL_KEY, { id: 'row-close-cut', stage: 'close-out', taskId, lineage: 'row-root', at: '2026-11-21T10:20:00.000Z' });
+    await store.endRun(URL_KEY, 'row-close-cut', { state: 'done', at: '2026-11-21T10:25:00.000Z' });
+    const c = await addChange(110, 'H1');
+    await reviewOn([c], { [c]: 'H1' });
+    let s = await standing();
+    assert.equal(s.closeOutOnTrail, false, 'the close-out ended before the round was cut: it is the previous round\'s, not this landing\'s');
+    assert.equal(s.closeOutAfterReview, false);
+
+    clock('2026-11-21T11:30:00.000Z');
+    await store.openRun(URL_KEY, { id: 'row-close-on', stage: 'close-out', taskId, lineage: 'row-root', at: '2026-11-21T11:20:00.000Z' });
+    await store.endRun(URL_KEY, 'row-close-on', { state: 'done', at: '2026-11-21T11:25:00.000Z' });
+    s = await standing();
+    assert.equal(s.closeOutOnTrail, true, 'a close-out ended after the review is on this landing\'s trail');
+    assert.equal(s.closeOutAfterReview, true);
+  });
+});
