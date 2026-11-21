@@ -71,6 +71,9 @@ async function seedLocalWorkspaceWithEvidence(page, { extraPrUrl = null } = {}) 
     },
   });
   expect(resp.ok(), `local seed failed: ${resp.status()} ${await resp.text()}`).toBeTruthy();
+  // LIN-4527: a dispatched ticket has its task (every dispatch seats it); the findings reading reads "not read" without it.
+  const seat = await page.request.get(`/test/seed-ticket-task?urlKey=${URL_KEY}&ticket=LOCAL-EV1`);
+  expect(seat.ok(), `task seed failed: ${seat.status()} ${await seat.text()}`).toBeTruthy();
 }
 
 // Seed a finished (terminal [done]) session on LOCAL-EV1 so session.seedIssue

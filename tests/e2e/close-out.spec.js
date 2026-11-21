@@ -66,6 +66,9 @@ async function seedLocalWorkspaceWithEvidence(page) {
     },
   });
   expect(resp.ok(), `local seed failed: ${resp.status()} ${await resp.text()}`).toBeTruthy();
+  // LIN-4527: a dispatched ticket has its task (every dispatch seats it); the findings reading reads "not read" without it.
+  const seat = await page.request.get(`/test/seed-ticket-task?urlKey=${URL_KEY}&ticket=LOCAL-CO1`);
+  expect(seat.ok(), `task seed failed: ${seat.status()} ${await seat.text()}`).toBeTruthy();
   // LIN-3383: queueing work for a runner is owner-only; state the owner explicitly
   // rather than inheriting it from first-binder order.
   await seedWorkspaceOwnership(page, URL_KEY, 'owner');

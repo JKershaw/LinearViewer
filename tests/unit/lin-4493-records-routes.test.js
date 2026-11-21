@@ -230,7 +230,7 @@ describe('the API review\'s call shape', () => {
     const task = await store.taskForTicket(URL_KEY, 'LIN-4451');
     assert.equal(r.body.in, task);
     const taskRec = await store.current(URL_KEY, task);
-    assert.equal(taskRec.fields.asked, 'The person\'s words.', 'the ticket\'s asked, from its description (as-asked block)');
+    assert.equal(taskRec.fields.asked, 'Make the footer show runs left.\n\n## As asked\n\nThe person\'s words.\n\n*End of what was asked. Steps write below this line; nothing above it changes.*\n\n## Steps\nbelow', 'the ticket\'s asked is its description as filed (LIN-4527: whole, no block or plan cut)');
     const sib = await post('/api/proxy/records', 'impl', { kind: 'finding', to: 'LIN-4452', says: 'Hand-off to a sibling.', run: 'row-impl' });
     assert.equal(sib.status, 201, JSON.stringify(sib.body));
     assert.ok(await store.taskForTicket(URL_KEY, 'LIN-4452'), 'the sibling\'s task was made');

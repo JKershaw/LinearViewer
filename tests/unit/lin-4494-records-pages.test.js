@@ -192,11 +192,11 @@ describe('the task page for a ticket with no task record yet', () => {
   });
 });
 
-describe('LIN-4501: a task made by the task page takes its `asked` from the ticket (finding-2edf23b4)', () => {
+describe('LIN-4501 (as converted by LIN-4527): a task made by the task page takes its `asked` from the ticket (finding-2edf23b4)', () => {
   const WITH_PLAN = 'Do X.\n\n## Implementation Plan\nstep one';
   const readPlanTicket = async (_ctx, ref) => ({ identifier: ref, description: WITH_PLAN, state: { type: 'unstarted', name: 'Todo' }, parent: null });
 
-  test('the first record written on the task page for an untasked ticket makes the task with the words before the plan', async () => {
+  test('the first record written on the task page for an untasked ticket makes the task with the description as filed, plan included', async () => {
     await serve(createTaskRecordsRoutes({
       workspaceFromUrl: session, recordsStore: store, accountStore: { resolveCanonicalAccountId: async (id) => id },
       listPeople: people, readTicket: readPlanTicket, tracker: outward.tracker,
@@ -207,7 +207,7 @@ describe('LIN-4501: a task made by the task page takes its `asked` from the tick
       body: new URLSearchParams({ kind: 'question', text: 'who owns the footer?', to: 'project' }),
     });
     assert.equal(add.status, 303);
-    assert.equal(await store.askedForTicket(URL_KEY, 'LIN-9'), 'Do X.', 'the plan is stage output, never the person\'s words; was null before the fix');
+    assert.equal(await store.askedForTicket(URL_KEY, 'LIN-9'), WITH_PLAN, 'asked is the description as filed (LIN-4527: the plan is not cut from it); was null before the fix');
   });
 
   test('the project page wires the same rule, so the two writers cannot drift', async () => {
