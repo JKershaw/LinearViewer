@@ -8,12 +8,14 @@
  * competing full-run instruction survives, that the no-CI substitute is still named, and that
  * review and close-out do not render the rule (their re-runs are a different job).
  */
+import { standingFromComments } from '../helpers/comment-path-frozen.js';
 import { test, describe } from 'node:test';
 import assert from 'node:assert/strict';
 import { generatePrompt } from '../../lib/prompt-templates.js';
 
 const issue = { identifier: 'LIN-4441', title: 'Cut waiting on tests', description: 'd', state: { name: 'In Progress', type: 'started' } };
-const ctx = (comments) => ({ parent: null, siblings: [], project: { name: 'P' }, children: [], comments, focusedChild: null });
+// LIN-4518 (beat 4): the fix round reads the records standing's review, so the context carries the comment trail's standing.
+const ctx = (comments) => ({ parent: null, siblings: [], project: { name: 'P' }, children: [], comments, focusedChild: null, standing: standingFromComments(comments) });
 const REQUEST_CHANGES = { createdAt: '2026-01-01T00:00:00Z', body: '## Review: LIN-4441 PR (#1)\n\nCI: green\n\n### Verdict\nRequest Changes — one finding' };
 
 const FRESH = generatePrompt('implementation', issue, ctx([])).prompt;

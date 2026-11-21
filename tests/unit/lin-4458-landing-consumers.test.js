@@ -27,7 +27,13 @@ import { landingPrUrls, readTrail } from '../../lib/run-trail.js';
 import { generatePrompt } from '../../lib/prompt-templates.js';
 import { closeOutNotReady } from '../../lib/close-out-readiness.js';
 import { createPipelineMergeRecorder } from '../../lib/close-out-merges.js';
-import { readRunEvidence, buildRunEvidence } from '../../lib/run-evidence.js';
+import { readRunEvidence as readRunEvidenceOf, buildRunEvidence as buildRunEvidenceOf } from '../../lib/run-evidence.js';
+import { recordsStoreOf } from '../helpers/records-trail.js';
+import { standingFromComments } from '../helpers/comment-path-frozen.js';
+
+// LIN-4518 (beat 4): the box reads its review and landing from the records standing; these trails are comment trails written as the standing.
+const readRunEvidence = (input = {}) => readRunEvidenceOf({ standing: standingFromComments(input.comments ?? []), ...input });
+const buildRunEvidence = (input = {}) => buildRunEvidenceOf({ standing: standingFromComments(input.comments ?? []), ...input });
 import { resolveRunPrRef } from '../../lib/pr-state-store.js';
 import { CloseOutEventsStore } from '../../lib/close-out-events-store.js';
 import { createMangoTmpdir } from '../fixtures/mango-tmpdir.js';
@@ -78,6 +84,8 @@ async function postRead(trail, prs) {
     briefCacheStore: { get: async () => null, set: async () => {} }, dispatchQueueStore: {},
     workspaceFromUrl: (req, res, next) => next(), workspacePreferencesStore: {},
     freeTierStore: { tryUse: async () => ({ allowed: true }) }, provider: new FakeProvider(trail),
+    // LIN-4518 (beat 4): the write check's landing is the task's records; this trail is written as a records store.
+    recordsStore: recordsStoreOf(trail),
   }));
   const server = app.listen(0, '127.0.0.1');
   await new Promise((r) => server.once('listening', r));
@@ -116,7 +124,7 @@ describe('the blind-read write check names the landing under the new rule', () =
 describe('the blind-read prompt names the landing under the new rule', () => {
   const prompt = (comments, state = { name: 'In Progress', type: 'started' }) => generatePrompt('blind-read',
     { identifier: 'LIN-1', title: 'Gate fixture', description: '', state, labels: [] },
-    { parent: null, siblings: [], project: null, children: [], comments, focusedChild: null, attachments: [], runs: [], allRuns: [] }).prompt;
+    { parent: null, siblings: [], project: null, children: [], comments, focusedChild: null, attachments: [], runs: [], allRuns: [], standing: standingFromComments(comments) }).prompt;
 
   test('row 14: the notes PR alone (before: both PRs)', () => {
     const p = prompt(ROW_14, { name: 'Done', type: 'completed' });
@@ -151,6 +159,7 @@ describe('the stop-at guard decides from the landing', () => {
     openFindings: FINDINGS_NONE,
     workspace: { urlKey: 'acme' }, issueIdentifier: 'LIN-1',
     seam: {
+      standing: standingFromComments(CITED_NOT_LANDED),
       resolveProvider: () => ({ provider: { name: 'local', async fetchIssueComments() { return CITED_NOT_LANDED; } }, callScope: 'scope' }),
       readPrStatus: async ({ number }) => { reads.push(number); return statuses[number]; },
       isStopAtRun: async () => 'pr',
@@ -183,6 +192,8 @@ describe('the pipeline merge recorder records the landing\'s merges only', () =>
     const reads = [];
     const record = createPipelineMergeRecorder({
       closeOutEventsStore: new CloseOutEventsStore({ collection }),
+      // Both PRs read merged (below), so the store says so: B merged at the close-out that cut it, outside the landing.
+      recordsStore: recordsStoreOf(CITED_NOT_LANDED, { statuses: { [PR1]: status(41, { state: 'closed', merged: true }), [PR2]: status(42, { state: 'closed', merged: true }) } }),
       dispatchStore: { async listItems() { return []; }, async listHistory() { return []; }, async getItemStatus() { return null; } },
       readPrStatus: async ({ number }) => { reads.push(number); return status(number, { state: 'closed', merged: true, created_at: T(1), merged_at: T(8) }); },
       log: () => {},

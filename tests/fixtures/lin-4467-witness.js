@@ -17,6 +17,7 @@ import { createHash } from 'node:crypto';
 import { writeFileSync } from 'node:fs';
 import { fileURLToPath } from 'node:url';
 import { PLAN_HEADING_WORDS } from '../../lib/legacy-plan-text.js';
+import { standingFromComments } from '../helpers/comment-path-frozen.js';
 
 const sha = (s) => createHash('sha256').update(s).digest('hex');
 const at = (day) => `2026-11-${String(day).padStart(2, '0')}T10:00:00.000Z`;
@@ -67,6 +68,8 @@ const REVIEW_REQUESTS_CHANGES = comment('r1', 5, [
 ].join('\n'));
 
 const contextFor = (comments) => ({
+  // LIN-4518 (beat 4): the blind read names the landing from the records standing; the comments are written as one here.
+  standing: standingFromComments(comments),
   parent: PARENT,
   siblings: [{ identifier: 'LIN-901', title: 'Witness sibling', state: { name: 'Todo' } }],
   children: [],

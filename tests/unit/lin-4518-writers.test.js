@@ -10,6 +10,7 @@ import { describe, test } from 'node:test';
 import assert from 'node:assert/strict';
 import { STAGE_KINDS } from '../../lib/prompts/stage-kinds.js';
 import { generatePrompt } from '../../lib/prompt-templates.js';
+import { standingFromComments } from '../helpers/comment-path-frozen.js';
 
 const ticket = { identifier: 'LIN-1', title: 'Writers', description: '', state: { name: 'In Progress', type: 'started' }, labels: [] };
 
@@ -30,7 +31,8 @@ describe('the verdict writers say so as records (LIN-4518, beat 3)', () => {
   });
 
   test('blind-read: its prompt asks for a verdict record on each PR\'s change, at the head read', () => {
-    const p = generatePrompt('blind-read', ticket, { comments: [{ id: 'c1', body: 'Implementation done: https://github.com/acme/widget/pull/41, CI green.', createdAt: '2026-11-21T10:00:00.000Z' }], allRuns: [] }).prompt;
+    const comments = [{ id: 'c1', body: 'Implementation done: https://github.com/acme/widget/pull/41, CI green.', createdAt: '2026-11-21T10:00:00.000Z' }];
+    const p = generatePrompt('blind-read', ticket, { comments, allRuns: [], standing: standingFromComments(comments) }).prompt;
     assert.match(p, /\*\*The verdict record\*\*/);
     assert.match(p, /judgement` `blind-read`/);
   });

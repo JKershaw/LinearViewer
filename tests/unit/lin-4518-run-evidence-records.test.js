@@ -34,19 +34,18 @@ describe('the run-evidence box on records (LIN-4518, beat 2)', () => {
     assert.deepEqual(model.closeOut.landingPrs ?? model.closeOut.prs.map((p) => p.url), [PR(2483)]);
   });
 
-  test('a review comment posted after the record governs: the box reads the comment trail', () => {
+  test('a review comment posted after the record does not govern: the box reads the record (LIN-4518 beat 4: records only)', () => {
     const earlier = [summary('c1', '09:00', 2483), review('c2', '09:10', 2483)];
     const standing = standingOfComments(earlier, { statuses });
     const later = [...earlier, review('c3', '11:00', 2483, 'aaaaaaa111')];
     const model = buildRunEvidence({ openFindings: FINDINGS_NONE, issueIdentifier: 'LIN-1', comments: later, standing, prStatus: open });
-    assert.equal(model.evidence.checked.review.sha, 'aaaaaaa111', 'the newer comment review is the verdict the box shows');
+    assert.equal(model.evidence.checked.review.sha, HEAD, 'the verdict the box shows is the record\'s');
   });
 
-  test('with no records standing the box reads exactly what it read before', () => {
+  test('with no records standing the box reads no review and no landing (not read, never the comments)', () => {
     const comments = [summary('c1', '09:00', 2483), review('c2', '09:10', 2483)];
-    const withStore = buildRunEvidence({ openFindings: FINDINGS_NONE, issueIdentifier: 'LIN-1', comments, standing: null, prStatus: open });
-    const without = buildRunEvidence({ openFindings: FINDINGS_NONE, issueIdentifier: 'LIN-1', comments, prStatus: open });
-    assert.deepEqual(withStore.evidence, without.evidence);
-    assert.equal(without.evidence.checked.review.sha, HEAD.slice(0, 9));
+    const model = buildRunEvidence({ openFindings: FINDINGS_NONE, issueIdentifier: 'LIN-1', comments, standing: null, prStatus: open });
+    assert.equal(model.evidence.checked.review, null, 'the review is not read from the comments');
+    assert.equal(model.evidence.checked.blindRead, null);
   });
 });

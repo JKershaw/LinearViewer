@@ -26,6 +26,7 @@
  *
  * Run with: node --test tests/unit/rulings-resolution-contract-drift.test.js
  */
+import { emptyStanding } from '../../lib/task-standing.js';
 import { test, describe } from 'node:test';
 import assert from 'node:assert/strict';
 import { readFileSync } from 'node:fs';
@@ -162,7 +163,8 @@ describe('no-re-raise guidance literal list (LIN-2891/LIN-3038)', () => {
       'the baseline snapshot carries no stale list');
 
     // LIN-4504: the same explicit plan facts regen-baseline.mjs renders (a task whose records hold no plan).
-    const leaf = buildSelectorArgs({ identifier: '{{IDENTIFIER}}', title: '', state: {}, labels: [] }, { planFacts: planFactsOf({ task: { id: 'task-leaf', kind: 'task' } }) });
+    // LIN-4518 (beat 4): and the same empty standing (no verdict record), since the review facts read the records standing.
+    const leaf = buildSelectorArgs({ identifier: '{{IDENTIFIER}}', title: '', state: {}, labels: [] }, { planFacts: planFactsOf({ task: { id: 'task-leaf', kind: 'task' } }), standing: emptyStanding() });
     const fresh = buildRouterPrompt({ ...leaf, view: '{{ISSUE_CONTEXT}}', featureFlags: {} });
     assert.strictEqual(baselineSource, fresh,
       'scripts/eval/meta-prompt.baseline.txt is stale — run `node scripts/eval/regen-baseline.mjs`');

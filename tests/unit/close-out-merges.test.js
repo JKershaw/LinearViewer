@@ -6,6 +6,7 @@ import assert from 'node:assert/strict';
 import { createPipelineMergeRecorder, createSessionWorkspaceIdResolver } from '../../lib/close-out-merges.js';
 import { CloseOutEventsStore } from '../../lib/close-out-events-store.js';
 import { createMangoTmpdir } from '../fixtures/mango-tmpdir.js';
+import { recordsStoreOf } from '../helpers/records-trail.js';
 
 before(() => { process.env.NODE_ENV = 'test'; });
 const harness = createMangoTmpdir('lin-3756-close-out-merges-');
@@ -32,6 +33,8 @@ function setup({ stopAt = null, comments = [{ body: PR, createdAt: '2026-10-20T1
   const readPrStatus = async (args) => { reads.push(args); return status; };
   const record = createPipelineMergeRecorder({
     closeOutEventsStore: store, dispatchStore, readPrStatus, log: () => {},
+    // LIN-4518 (beat 4): the landing is the task's records; this trail's comments are written as a records store.
+    recordsStore: recordsStoreOf(comments),
     installationTokenFor: listOwnerInstall,
     ...(workspaceResolver ? { resolveWorkspaceId: workspaceResolver } : {}),
   });
@@ -160,7 +163,13 @@ describe('createPipelineMergeRecorder', () => {
   test('a throwing resolver or provider is swallowed', async () => {
     const c = setup({ workspaceResolver: async () => { throw new Error('boom'); } });
     await assert.doesNotReject(c.run({ workspaceId: null }));
-    const bad = await c.run({ provider: { name: 'github', async fetchIssueComments() { throw new Error('down'); } } });
+    // LIN-4518 (beat 4): the landing is read from the records store, so the throw is the store's: a records fault answers [].
+    const down = { async taskForTicket() { throw new Error('down'); } };
+    const bad = await createPipelineMergeRecorder({
+      closeOutEventsStore: new CloseOutEventsStore({ collection: harness.freshDb().collection('close-out-events') }),
+      dispatchStore: { async listItems() { return []; }, async listHistory() { return []; }, async getItemStatus() { return null; } },
+      recordsStore: down, log: () => {}, readPrStatus: async () => mergedStatus,
+    })({ urlKey: 'ws', workspaceId: 'ws-id', accountId: 'acct-1', provider: { name: 'github', async fetchIssueComments() { return []; } }, callScope: { token: 'ghs_token', repo: 'acme/widget' }, written: doneIssue });
     assert.deepEqual(bad, { recorded: [] });
   });
 });

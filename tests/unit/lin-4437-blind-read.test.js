@@ -29,14 +29,22 @@ import {
 } from '../../lib/run-trail.js';
 import { BLIND_READ_HEADING } from '../../lib/prompts/blind-read-words.js';
 import { SURVEY_HEADINGS } from '../../lib/prompts/survey-words.js';
-import { assembleTrailFacts, assemblePlanReviewFacts } from '../../lib/recommendation-facts.js';
+import { assembleTrailFacts as assembleTrailFactsOf, assemblePlanReviewFacts } from '../../lib/recommendation-facts.js';
+import { standingFromComments } from '../helpers/comment-path-frozen.js';
+
+// LIN-4518 (beat 4): the selector's review facts read the records standing; these trails are comment trails written as the standing.
+const assembleTrailFacts = (comments = [], description = '', options = {}) =>
+  assembleTrailFactsOf(comments, description, { standing: standingFromComments(comments), ...options });
 import { readTrail } from '../../lib/run-trail.js';
 import { buildSelectorArgs } from '../../lib/openrouter.js';
 import { recentRuns, stageRuns } from '../../lib/recent-runs.js';
 import { liveWaitOf } from '../../lib/run-live-wait.js';
 import { generatePrompt } from '../../lib/prompt-templates.js';
 import { buildProxyContextPreamble } from '../../lib/proxy-preamble.js';
-import { buildRunEvidence } from '../../lib/run-evidence.js';
+import { buildRunEvidence as buildRunEvidenceOf } from '../../lib/run-evidence.js';
+
+// LIN-4518 (beat 4): the box reads its review and landing from the records standing (the comment trail, written as the standing here).
+const buildRunEvidence = (input = {}) => buildRunEvidenceOf({ standing: standingFromComments(input.comments ?? []), ...input });
 import { renderRunEvidence } from '../../lib/render-run-evidence.js';
 import { LEFTOVER_RULE, CONSEQUENCE_TEST } from '../../lib/prompts/leftover-words.js';
 import { createProxyRoutes } from '../../routes/proxy.js';
@@ -183,7 +191,7 @@ describe('witness 1: a read is never landing work, never an answer to a person',
     const runs = recentRuns(rows);
     assert.deepEqual(runs.map(r => r.stage), ['review'], 'selectorSlice leaves the read out');
     assert.equal(stageRuns(rows).length, 2, 'allRuns keeps it');
-    const { facts } = buildSelectorArgs({ identifier: 'LIN-1', title: 'T', description: '', state: {}, labels: [] }, { comments: trail, runs });
+    const { facts } = buildSelectorArgs({ identifier: 'LIN-1', title: 'T', description: '', state: {}, labels: [] }, { comments: trail, runs, standing: standingFromComments(trail) });
     assert.doesNotMatch(facts, /blind-read/);
     assert.match(facts, /Work reported after it \(a later comment links a PR\): no/);
     const runLines = facts.split('\n').filter(l => /^\s+- \w/.test(l) && /Recent runs/.test(facts));
@@ -238,7 +246,7 @@ const WHERE_EACH_FIND_GOES = "**Where each find goes.** A find inside the change
 describe('the prompt is the piloted text', () => {
   test('the render keeps every paragraph of the frozen pilot but the ones LIN-4495 changed (the finds are records now)', () => {
     const pilot = read('tests/fixtures/blind-read-piloted.txt');
-    const prompt = generatePrompt('blind-read', { identifier: 'LIN-9', state: {}, labels: [] }, { comments: [summary(1)] }).prompt;
+    const prompt = generatePrompt('blind-read', { identifier: 'LIN-9', state: {}, labels: [] }, { comments: [summary(1)], standing: standingFromComments([summary(1)]) }).prompt;
     const body = prompt.slice(prompt.indexOf('## Process\n\n') + '## Process\n\n'.length);
     const [repo, lead, ...rest] = pilot.trimEnd().split('\n\n');
     assert.ok(prompt.includes(`## Goal\n${lead}\n`), 'the lead is the pilot\'s second paragraph');
@@ -256,19 +264,19 @@ describe('the prompt is the piloted text', () => {
     assert.match(body.split('\n\n').find(q => q.startsWith('**Where to stand.**')), /git fetch origin pull\/<number>\/head/);
   });
   test('where each find goes is the records routing (LIN-4495), and the unmapped-path find is worded by the consequence test', () => {
-    const prompt = generatePrompt('blind-read', { identifier: 'LIN-9', state: {}, labels: [] }, { comments: [summary(1)] }).prompt;
+    const prompt = generatePrompt('blind-read', { identifier: 'LIN-9', state: {}, labels: [] }, { comments: [summary(1)], standing: standingFromComments([summary(1)]) }).prompt;
     assert.ok(prompt.includes('An unmapped path\'s find is a find outside the change\'s area'));
     assert.ok(CONSEQUENCE_TEST.includes('Word an outside find'), 'the consequence test words the outside find');
     assert.ok(LEFTOVER_RULE.includes('a finding'), 'the leftover rule routes a find to a finding');
   });
   test('with no PR on the landing the prompt says so and the run ends [skipped]', () => {
-    const prompt = generatePrompt('blind-read', { identifier: 'LIN-9', state: {}, labels: [] }, { comments: [c(1, 'no links here')] }).prompt;
+    const prompt = generatePrompt('blind-read', { identifier: 'LIN-9', state: {}, labels: [] }, { comments: [c(1, 'no links here')], standing: standingFromComments([c(1, 'no links here')]) }).prompt;
     assert.match(prompt, /\*\*Nothing to read\.\*\*/);
     assert.match(prompt, /`\[skipped\]`/);
     assert.doesNotMatch(prompt, /Repository:/);
   });
   test('the landing\'s repository names the Repository line; the pilot file is a pointer now', () => {
-    const prompt = generatePrompt('blind-read', { identifier: 'LIN-9', state: {}, labels: [] }, { comments: [summary(1, FOREIGN), summary(2)] }).prompt;
+    const prompt = generatePrompt('blind-read', { identifier: 'LIN-9', state: {}, labels: [] }, { comments: [summary(1, FOREIGN), summary(2)], standing: standingFromComments([summary(1, FOREIGN), summary(2)]) }).prompt;
     assert.match(prompt, /^Repository: other\/repo, JKershaw\/LinearViewer\. /m);
     assert.doesNotMatch(read('docs/plans/survey/blind-read-prompt.md'), /^```$/m, 'no second live copy of the prompt');
   });
@@ -394,20 +402,9 @@ describe('the proxy holds the blind read\'s shape', () => {
     const res = await post(new FakeProvider(TRAIL), `${BLIND_READ_HEADING}\nVerdict: better.\n\nRead: ${PR} (${++uniq})`);
     assert.equal(res.body.code, BLIND_READ_CODES.reasonMissing);
   });
-  test('refuses a read whose PR URLs differ from landingPrUrls, naming both sets', async () => {
-    const p = new FakeProvider(TRAIL);
-    const res = await post(p, readBody('same', [PR, OLD]));
-    assert.equal(res.status, 422);
-    assert.equal(res.body.code, BLIND_READ_CODES.prsMismatch);
-    assert.deepEqual(res.body.expected, [PR]);
-    assert.equal(p.calls.createComment, 0);
-  });
-  test('posts a read naming exactly the landing', async () => {
-    const p = new FakeProvider(TRAIL);
-    const res = await post(p, readBody('worse'));
-    assert.equal(res.status, 201, JSON.stringify(res.body));
-    assert.equal(p.calls.fetchIssueComments, 1);
-  });
+  // LIN-4518 (beat 4) retires the two landing-set tests that were here: the exact-landing check reads the task's records now,
+  // not the ticket's comments, and its rule (a read names exactly the open changes, refused naming `on` on a subset or a
+  // superset) is pinned on the records route by tests/unit/lin-4516-verdict-records.test.js, witness 3.
   test('passes a review verdict that mentions the heading mid-comment, and never reads the trail for it', async () => {
     const p = new FakeProvider(TRAIL);
     const res = await post(p, `${review(5).body}\n\n${BLIND_READ_HEADING}\nVerdict: mixed (${++uniq})`);

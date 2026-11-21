@@ -21,6 +21,7 @@
  */
 import { planFactsOf } from '../../../lib/records/plan-facts.js';
 import { PLAN_HEADING_WORDS } from '../../../lib/legacy-plan-text.js';
+import { standingFromComments } from '../../helpers/comment-path-frozen.js';
 
 const GITHUB = { providerUi: { displayName: 'GitHub Issues' } };
 const LOCAL = { providerUi: { displayName: 'Local' } };
@@ -97,5 +98,8 @@ export const CASES = [
 
 export function renderCase(entry, { buildRouterPrompt, buildSelectorArgs }) {
   const t = entry.ticket;
-  return buildRouterPrompt(buildSelectorArgs(t.issue, t.context, t.featureFlags || {}, t.providerUi || null));
+  // LIN-4518 (beat 4): the selector's review facts read the records standing; each case's comments are written as the standing
+  // (the comment-trail standing), so the rendered facts are the ones the comments give.
+  const context = { ...t.context, standing: standingFromComments(t.context.comments ?? []) };
+  return buildRouterPrompt(buildSelectorArgs(t.issue, context, t.featureFlags || {}, t.providerUi || null));
 }

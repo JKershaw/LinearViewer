@@ -20,7 +20,7 @@ import { routeStage, parseRouteDecision, parseRecommendedAction } from '../../li
 import { formatStageContract } from '../../lib/prompt-contract.js';
 import { generatePrompt } from '../../lib/prompt-templates.js';
 import { readRunLedger } from '../../lib/run-trail.js';
-import { isRequestChangesRound } from '../../lib/prompts/revision-brief.js';
+import { standingFromComments } from '../helpers/comment-path-frozen.js';
 import { fetchIssueContext } from '../../lib/providers/linear/index.js';
 import { LocalProvider } from '../../lib/providers/local/index.js';
 import { createLocalProvider } from '../fixtures/local-harness.js';
@@ -188,20 +188,23 @@ describe('plan-review verdict facts (LIN-3309 S2)', () => {
 
 describe('the implementation fix-round brief (LIN-3309 S4)', () => {
   const issue = { identifier: 'LIN-3124', title: 'Cut over reads', description: 'd', state: { name: 'In Progress', type: 'started' } };
-  const ctx = (comments) => ({ parent: null, siblings: [], project: { name: 'P' }, children: [], comments, focusedChild: null });
+  // LIN-4518 (beat 4): the fix round reads the records standing's review, so each context carries the comment trail's standing.
+  const ctx = (comments) => ({ parent: null, siblings: [], project: { name: 'P' }, children: [], comments, focusedChild: null, standing: standingFromComments(comments) });
   const PR3 = '## Review: LIN-3124 PR3 (#1618)\n\nCI: green\n\n### What CI Did Not Prove\n- x\n\n### Verdict\nRequest Changes — one finding';
   const PR1 = '### Review Verdict — LIN-3124 PR1 (#1610)\n\nCI: green\n\n### Verdict\nApprove';
 
   test('the review reader classifies the real heading forms', () => {
     assert.equal(readRunLedger([{ createdAt: '2026-01-01T00:00:00Z', body: PR3 }]).verdict, 'request-changes');
     assert.equal(readRunLedger([{ createdAt: '2026-01-01T00:00:00Z', body: PR1 }]).verdict, 'approve');
-    assert.equal(isRequestChangesRound([{ createdAt: '2026-01-01T00:00:00Z', body: PR3 }]), true);
+    // LIN-4518 (beat 4): isRequestChangesRound is retired with lib/prompts/revision-brief.js; the fix round reads the standing's review.
+    assert.equal(standingFromComments([{ createdAt: '2026-01-01T00:00:00Z', body: PR3 }]).review.outcome, 'request-changes');
   });
 
   test('a Request Changes review switches the brief to continue the reviewed PR', () => {
     const prompt = generatePrompt('implementation', issue, ctx([{ createdAt: '2026-01-01T00:00:00Z', body: PR3 }])).prompt;
     assert.match(prompt, /### Revising After a Review/);
-    assert.match(prompt, /The latest review verdict is \*\*Request Changes\*\* \(review: `Review: LIN-3124 PR3 \(#1618\)`\)/);
+    // LIN-4518 (beat 4): the quoted review title is retired with the comment read (a records review carries no title).
+    assert.match(prompt, /The latest review verdict is \*\*Request Changes\*\*, so this pass is a revision/);
     assert.match(prompt, /the PR the review names/);
     assert.match(prompt, /do not open a new PR/i);
     assert.match(prompt, /\*\*Branch\*\*: Continue the existing branch/);
@@ -211,8 +214,9 @@ describe('the implementation fix-round brief (LIN-3309 S4)', () => {
   });
 
   test('a review that names a full PR URL uses it verbatim', () => {
-    const withUrl = '## Review: LIN-3124 PR3\n\nSee https://github.com/JKershaw/LinearViewer/pull/1618\n\n### Verdict\nRequest Changes';
-    const prompt = generatePrompt('implementation', issue, ctx([{ createdAt: '2026-01-01T00:00:00Z', body: withUrl }])).prompt;
+    // LIN-4518 (beat 4): the PR is the review record's link (its `on`), not a URL read from the comment; the record names it.
+    const review = { outcome: 'request-changes', at: '2026-01-01T00:00:00.000Z', on: ['https://github.com/JKershaw/LinearViewer/pull/1618'] };
+    const prompt = generatePrompt('implementation', issue, { ...ctx([]), standing: { review } }).prompt;
     assert.match(prompt, /https:\/\/github\.com\/JKershaw\/LinearViewer\/pull\/1618/);
   });
 

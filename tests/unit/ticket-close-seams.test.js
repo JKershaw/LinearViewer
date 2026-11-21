@@ -10,6 +10,7 @@ import { FINDINGS_NONE } from '../../lib/close-out-findings.js';
  */
 process.env.NODE_ENV = 'test';
 
+import { standingFromComments } from '../helpers/comment-path-frozen.js';
 import { test, describe, before, after } from 'node:test';
 import assert from 'node:assert/strict';
 import express from 'express';
@@ -197,8 +198,9 @@ describe('seam 3: close-out check Done write', () => {
   const comment = (body, createdAt) => ({ body, createdAt, user: 'reviewer' });
   function build({ withMarkDone, onTicketWrite }) {
     const collection = harness.freshDb().collection('close-out-events');
+    const trail = [comment(PR_A, '2026-07-01T00:00:00.000Z'), comment(reviewBody, '2026-07-02T00:00:00.000Z')];
     const provider = {
-      async fetchIssueComments() { return [comment(PR_A, '2026-07-01T00:00:00.000Z'), comment(reviewBody, '2026-07-02T00:00:00.000Z')]; },
+      async fetchIssueComments() { return trail; },
       async fetchIssueContext() { return { issue: { id: 'iss-1', identifier: 'LIN-1', team: { id: 'team-1' }, state: { type: 'completed' } } }; },
       async issueWriteGuard() { return { team: { id: 'team-1' } }; },
       async states() { return [{ id: 'st-done', name: 'Done', type: 'completed' }]; },
@@ -211,6 +213,8 @@ describe('seam 3: close-out check Done write', () => {
       closeOut: {
         // LIN-4495: a store that answered "none open" (an unmeasured reading holds Done, so the seam says what it read).
         openFindings: FINDINGS_NONE,
+        // LIN-4518 (beat 4): the gate reads the records standing; this trail's comments are written as the comment-trail standing.
+        standing: standingFromComments(trail),
         resolveProvider: () => ({ provider, callScope: 'scope' }),
         readPrStatus: async () => merged, isStopAtRun: async () => 'pr', runnerReady: () => true,
         ...(withMarkDone ? { markDone: withMarkDone } : {})

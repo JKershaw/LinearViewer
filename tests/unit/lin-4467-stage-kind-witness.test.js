@@ -11,15 +11,18 @@ import assert from 'node:assert/strict';
 import { readFileSync } from 'node:fs';
 import { fileURLToPath } from 'node:url';
 import { captureWitness, MODES } from '../fixtures/lin-4467-witness.js';
-import { isRequestChangesRound } from '../../lib/prompts/revision-brief.js';
+import { generatePrompt } from '../../lib/prompt-templates.js';
 
 const expected = JSON.parse(readFileSync(fileURLToPath(new URL('../fixtures/lin-4467-witness.json', import.meta.url)), 'utf8'));
 const actual = await captureWitness();
 
 describe('LIN-4467 — the witness context is real: a fix round is a fix round, a fresh start is not', () => {
-  test('the fix context reads as a request-changes round; the fresh context does not', () => {
-    assert.equal(isRequestChangesRound(MODES.fix.comments), true);
-    assert.equal(isRequestChangesRound(MODES.fresh.comments), false);
+  // LIN-4518 (beat 4): isRequestChangesRound is retired with lib/prompts/revision-brief.js. The fix round is read from the
+  // records standing's review, so the check is on what the implementation prompt renders for each context.
+  test('the fix context renders the revision section; the fresh context does not', () => {
+    const issue = { identifier: 'LIN-4467', title: 'Witness', description: '', state: { name: 'In Progress', type: 'started' }, labels: [] };
+    assert.match(generatePrompt('implementation', issue, MODES.fix).prompt, /### Revising After a Review/);
+    assert.doesNotMatch(generatePrompt('implementation', issue, MODES.fresh).prompt, /### Revising After a Review/);
   });
 });
 

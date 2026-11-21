@@ -23,6 +23,7 @@ import { commentKindOf, COMMENT_KINDS } from '../../lib/run-trail.js';
 import { parseRunLedger, prUrlsIn } from '../../lib/run-ledger.js';
 import { canonicalChangeRef, changeKeyOf } from '../../lib/records/change-ref.js';
 import { standingOf } from '../../lib/records/standing.js';
+import { index } from '../../lib/records/views.js';
 import { BLIND_READ_KIND, BLIND_READ_VERDICTS } from '../../lib/prompts/blind-read-words.js';
 
 const TASK = 'task-trail';
@@ -177,3 +178,24 @@ export function standingOfComments(comments, options = {}) {
 /** The comment kinds the trail writes as changes: exported for the header's claim (the classifier's own rows). */
 export const LANDING_CARRIER_KINDS = [...LANDING_KINDS];
 export { COMMENT_KINDS };
+
+/**
+ * A records store, for a fixture's trail, that serves the trail's records (the versions of versionsOfComments) to the readers
+ * that take a store: `taskForTicket`, `find` and `versionsOf`. Test-only, with no database.
+ * @param {Array<{id?: string, body: string, createdAt: string}>} comments
+ * @param {{statuses?: Record<string, object>, taskId?: string}} [options]
+ */
+export function recordsStoreOf(comments, options = {}) {
+  const taskId = options.taskId ?? TASK;
+  const versions = versionsOfComments(comments, options);
+  const current = () => index(versions).all();
+  return {
+    async taskForTicket() { return taskId; },
+    async find(_urlKey, query = {}) {
+      return current().filter((s) => (!query.kind || s.kind === query.kind)
+        && (!query.inRef || s.in === query.inRef)
+        && (!query.state || s.state === query.state));
+    },
+    async versionsOf(_urlKey, ids) { return versions.filter((v) => ids.includes(v.id)); },
+  };
+}

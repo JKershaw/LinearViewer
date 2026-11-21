@@ -11,6 +11,7 @@
  *
  * Run with: node --test tests/unit/task-page-finished-story.test.js
  */
+import { recordsStoreOf } from '../helpers/records-trail.js';
 import { FINDINGS_NONE } from '../../lib/close-out-findings.js';
 import { test, describe } from 'node:test';
 import assert from 'node:assert/strict';
@@ -91,6 +92,8 @@ function makeLoader({ ctx, brief = null, recap = null, events = [], loops = [loo
     briefCacheStore: { async get() { return brief; } },
     recapCacheStore: { async get() { return recap; } },
     closeOutEventsStore: { async listForIssue() { return events; } },
+    // LIN-4518 (beat 4): the page reads the task's records; this context's comments are written as a records store.
+    recordsStore: recordsStoreOf(ctx?.comments ?? []),
     readRunEvidence: (args) => readRunEvidence({ openFindings: FINDINGS_NONE, ...args, readPrStatus: async () => MERGED_PR }),
     prStateStore: null,
     readTaskRunFacts: async () => ({ stopAt, variant: 'standard' }),

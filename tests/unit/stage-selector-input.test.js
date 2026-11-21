@@ -15,7 +15,13 @@
  */
 import { test, describe } from 'node:test';
 import assert from 'node:assert/strict';
-import { assembleTrailFacts, formatTrailFactsBlock } from '../../lib/recommendation-facts.js';
+import { assembleTrailFacts as assembleTrailFactsOf, formatTrailFactsBlock } from '../../lib/recommendation-facts.js';
+import { standingFromComments } from '../helpers/comment-path-frozen.js';
+
+// LIN-4518 (beat 4): the selector's review facts read the records standing. These trails are comment trails, written as the
+// comment-trail standing here, so every expectation below is the one the comment trail gave.
+const assembleTrailFacts = (comments = [], description = '', options = {}) =>
+  assembleTrailFactsOf(comments, description, { standing: standingFromComments(comments), ...options });
 import { planFactsOf } from '../../lib/records/plan-facts.js';
 import { RULING_MARK, isRuling } from '../../lib/run-trail.js';
 import { formatSelectorView, formatIssueContext, buildSelectorArgs } from '../../lib/openrouter.js';

@@ -717,12 +717,13 @@ export function createProxyWriteRoutes({
     if (!shape.ok) return refuseBlindRead(ctx, shape);
     let landing = null;
     try {
-      // LIN-4518: the landing is the gate's: the records' (lib/records/landing.js) once the task's newest verdict is a record,
-      // else the comment trail, as before (lib/task-standing.js gateTrailOf; retired with the shape half, P7).
-      if (typeof ctx.provider.fetchIssueComments !== 'function') throw new Error('the provider reads no comment trail');
-      const comments = await ctx.provider.fetchIssueComments(ctx.token, ctx.req.params.issueId);
+      // LIN-4518 (beat 4): the landing is the task's records (lib/records/landing.js, through the standing): the open changes
+      // and the round's merged ones. A ticket with no task has no landing on record, so the set check is skipped, as it is
+      // when the trail cannot be read whole (fail open, logged).
       const standing = recordsStore ? await standingForTicket({ recordsStore, urlKey: ctx.req.proxyUrlKey, ticket: ctx.req.params.issueId }) : null;
-      landing = gateTrailOf({ standing, comments }).trail.landing;
+      const gate = gateTrailOf({ standing });
+      if (!gate) throw new Error('the task standing could not be read');
+      landing = gate.trail.landing;
     } catch (err) {
       console.warn(`[blind-read] ${ctx.req.params.issueId}: PR-set check skipped, the trail could not be read whole (${err?.message || err}); the shape check held`);
     }

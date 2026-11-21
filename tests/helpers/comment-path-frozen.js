@@ -88,3 +88,41 @@ export function frozenSurfaceRoute(issue, context = {}, selectorAnswer = 'close-
     ...(r.wait ? { liveWait: r.wait } : {}),
   };
 }
+
+/**
+ * The comment trail as a records standing (LIN-4518, beat 4): the shape the gates read, carrying the comment path's own
+ * values (the review's word, sha and time, its blind read's PRs and word, the landing, the work and close-out facts), with no
+ * stale flag. A gate given this standing answers what it answered from comments before the records flip: the head is the
+ * review's own sha (the legacy head comparison), and no PR is stale. Test-only: the goldens and the comment-path tests read
+ * through it, so their expectations stay what they were. P7 (LIN-4520) deletes it with lib/run-trail.js.
+ * @param {Array<{body?: string, createdAt?: string, id?: string}>} comments
+ */
+export function standingFromComments(comments) {
+  const t = readTrail(comments);
+  const r = t.review;
+  return {
+    review: r ? {
+      id: r.commentId ?? null,
+      outcome: r.verdict,
+      at: r.at,
+      on: [],
+      sha: r.sha ?? null,
+      stale: false,
+      staleBy: [],
+      staleUrls: undefined,
+    } : null,
+    blindRead: r?.blindRead ? {
+      id: r.blindRead.commentId ?? null,
+      outcome: r.blindRead.verdict,
+      at: r.blindRead.at,
+      prs: r.blindRead.prs,
+    } : null,
+    landing: t.landing,
+    landingHasNotesPr: t.landingHasNotesPr,
+    notesPrs: t.notesPrs,
+    workAfterReview: t.workAfterReview,
+    reviewStale: false,
+    closeOutAfterReview: t.closeOutAfterReview,
+    closeOutOnTrail: t.closeOutOnTrail,
+  };
+}

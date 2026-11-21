@@ -10,11 +10,10 @@
 process.env.NODE_ENV = 'test';
 
 import { FINDINGS_NONE } from '../../lib/close-out-findings.js';
-import { test, describe, mock } from 'node:test';
+import { test, describe } from 'node:test';
 import assert from 'node:assert/strict';
 import { readCloseOutChain } from '../../lib/close-out-readiness.js';
-import { GraphQLClient } from 'graphql-request';
-import { CONNECTION_CAP, linearProvider } from '../../lib/providers/linear/index.js';
+import { standingFromComments } from '../helpers/comment-path-frozen.js';
 
 const reviewBody = '## Review\n\nReviewed head `aaaaaaa1111111`.\n\n### What CI Did Not Prove\n| # | Claim | In/Out | Discharge |\n| --- | --- | --- | --- |\n| 1 | one claim | In | none |\n\n**Verdict: Approve**';
 const comment = (body, createdAt) => ({ body, createdAt, user: 'someone' });
@@ -32,6 +31,8 @@ const chainFor = (comments) => readCloseOutChain({
   owner: true,
   actor: 'person',
   stopAt: null,
+  // LIN-4518 (beat 4): the gate reads the records standing; this trail's comments are written as the comment-trail standing.
+  standing: standingFromComments(comments),
 });
 
 describe('readCloseOutChain review on record (LIN-3497)', () => {
@@ -81,40 +82,6 @@ describe('readCloseOutChain carries the blind read (LIN-4437)', () => {
   });
 });
 
-describe('readCloseOutChain when the comment read hits the cap (LIN-4322)', () => {
-  test('rejects over the real Linear read: no merge or Done is judged on a prefix of the trail', async () => {
-    const all = Array.from({ length: CONNECTION_CAP + 1 }, (_, i) => ({
-      id: `c${i}`, body: `c ${i}`, createdAt: new Date(Date.UTC(2026, 10, 1, 0, 0, i)).toISOString(), user: { name: 'Fake' },
-    }));
-    const m = mock.method(GraphQLClient.prototype, 'request', async (query, variables) => {
-      const start = variables.after === undefined ? 0 : Number(Buffer.from(variables.after, 'base64').toString());
-      const end = Math.min(start + 100, all.length);
-      const page = {
-        nodes: all.slice(start, end),
-        pageInfo: { hasNextPage: end < all.length, endCursor: end < all.length ? Buffer.from(String(end)).toString('base64') : null },
-      };
-      return variables.after === undefined ? { issue: { id: 'issue-1', comments: page } } : { issue: { comments: page } };
-    });
-    try {
-      await assert.rejects(
-        readCloseOutChain({
-          openFindings: FINDINGS_NONE,
-          workspace: { urlKey: 'acme' },
-          issueIdentifier: 'LIN-1',
-          seam: {
-            resolveProvider: () => ({ provider: linearProvider, callScope: 'lin_api_test' }),
-            readPrStatus: async () => { throw new Error('no PR expected'); },
-            isStopAtRun: async () => null,
-          },
-          runnerReady: true,
-          owner: true,
-          actor: 'person',
-          stopAt: null,
-        }),
-        /cannot read the latest review/,
-      );
-    } finally {
-      m.mock.restore();
-    }
-  });
-});
+// LIN-4322's cap describe block (a Linear comment read capped at CONNECTION_CAP, no merge judged on a prefix of the trail)
+// retired with LIN-4518 beat 4: the close-out gate no longer reads the comment trail, so it has no comment read to cap. The
+// records standing is whole by construction (tests/unit/lin-4518-*.test.js).
