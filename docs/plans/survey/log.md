@@ -4967,3 +4967,7 @@ Slice 3: LIN-4514 and 4515 are Done (close-outs 01:46 and 01:51). LIN-4516 has b
   - `lin4513-p4-verdict-import` (question 2 surfaced after all): import, once, as slice 2 did for plans.
   - `lin4516-b3-comment-guard`: keep the comment landing until P5 flips the stages, then retire it in P5. That's sequencing, not a kept version.
 - **Question 1:** both copies still open, yes proposed. No pause.
+
+### 21 Nov, 04:28
+
+Slice 3: LIN-4514, 4515 and 4516 Done (the comment-guard ruling was settled and is gone from the list). LIN-4517 (the verdict import) has had a worker on it since 03:38, while its ruling waits for John. LIN-4518..4521 wait. Open rulings: verdict-import, and question 1 (two copies), all with proposals. No pause.
