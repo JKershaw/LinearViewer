@@ -26,6 +26,8 @@
  *   landing commit is #2447 alone. So the comment path holds #2444 in the landing from 21:49 to the merge, and the record side
  *   does not. The walk-8 README says the same of the approval: it is right to refuse on #2447, and #2444 is not this task's.
  * - LIN-4438 row 15: a foreign PR (other/repo#7) cited only in research notes. The record side does not take it.
+ * Also replayed, with no difference to name (close-out finding 1d3d9f13): LIN-4438 row 13 (approve, a not-ready close-out, a fix
+ * round re-naming the PR, then a re-review) and every case of goldens/seeds.json that has a PR.
  */
 process.env.NODE_ENV = 'test';
 
@@ -211,36 +213,65 @@ describe('walk 8: the record-side landing replays the comment path at every inst
   }
 });
 
-describe('the frozen landing rows replay (LIN-4438 rows 14-15, LIN-4458 landing rows) (LIN-4516)', () => {
-  const rows = loadDerived('rows.json').rows.filter((row) => Array.isArray(row.expected?.landing));
+/**
+ * Replay one frozen case (a row, or a seed case) onto records and return what the record side's landing is at the last
+ * comment, with the foreign PRs (ones the task's own implementation did not write) it leaves out.
+ */
+async function replayFrozen({ comments, statuses }) {
+  // A PR the task's own implementation did not write: one only a research note, blind read, area read or survey names.
+  const NOT_OWN = /^## (Research notes|Blind read|Area read|Survey)/;
+  const citers = (url) => comments.filter((c) => prUrlsIn(c.body).includes(url));
+  const foreign = new Set(Object.keys(statuses).filter((url) => citers(url).every((c) => NOT_OWN.test(c.body) || commentKindOf(c.body) === 'blind-read')));
+  const closeOuts = comments.filter((c) => commentKindOf(c.body) === 'close-out');
+  const lastAt = comments.map((c) => iso(c.createdAt)).sort().at(-1);
+  const prs = Object.entries(statuses).filter(([url]) => !foreign.has(url)).map(([url, s]) => {
+    // What a close-out says it did with the PR: "Merged <url>" is the merge recorder's write; "closed unmerged" ends the change.
+    const merged = closeOuts.find((c) => c.body.includes(url) && /Merged /.test(c.body))?.createdAt;
+    const closed = closeOuts.find((c) => c.body.includes(url) && /closed unmerged/.test(c.body))?.createdAt;
+    const firstCloseOutCiting = closeOuts.filter((c) => prUrlsIn(c.body).includes(url)).map((c) => c.createdAt).sort()[0];
+    return {
+      url,
+      head: s.head?.sha ?? null,
+      mergedAt: merged ?? (s.merged ? (firstCloseOutCiting ?? lastAt) : null),
+      mergedHead: (merged || s.merged) ? s.head?.sha ?? null : null,
+      closedAt: closed && !merged ? closed : null,
+    };
+  });
+  const r = await replay({ ticket: 'LIN-4438', comments, prs });
+  return { record: await r.landingAt(lastAt), foreign };
+}
+
+describe('the frozen landing rows replay (LIN-4438 rows 13-15, LIN-4458 landing rows) (LIN-4516)', () => {
+  // Rows that state a landing, plus LIN-4438 row 13, whose landing is the comment path's own reading of it (the trail's
+  // `landing`): approve, a not-ready close-out, a fix round re-naming the PR, then a re-review (close-out finding 1d3d9f13).
+  const all = loadDerived('rows.json').rows;
+  const rows = all.filter((row) => Array.isArray(row.expected?.landing) || row.id === 'lin-4438/row-13');
+  test('row 13 is among the replayed rows', () => {
+    assert.ok(rows.some((row) => row.id === 'lin-4438/row-13'), 'lin-4438/row-13 is in rows.json and replayed');
+  });
   for (const row of rows) {
     test(`${row.id}: the record-side landing is the row's landing, or the difference is named`, async () => {
-      const statuses = row.inputs.statuses ?? {};
-      const comments = row.inputs.comments ?? [];
-      // A PR the task's own implementation did not write: one only a research note, blind read, area read or survey names.
-      const NOT_OWN = /^## (Research notes|Blind read|Area read|Survey)/;
-      const citers = (url) => comments.filter((c) => prUrlsIn(c.body).includes(url));
-      const foreign = new Set(Object.keys(statuses).filter((url) => citers(url).every((c) => NOT_OWN.test(c.body) || commentKindOf(c.body) === 'blind-read')));
-      const closeOuts = comments.filter((c) => commentKindOf(c.body) === 'close-out');
-      const lastAt = comments.map((c) => iso(c.createdAt)).sort().at(-1);
-      const prs = Object.entries(statuses).filter(([url]) => !foreign.has(url)).map(([url, s]) => {
-        // What a close-out says it did with the PR: "Merged <url>" is the merge recorder's write; "closed unmerged" ends the change.
-        const merged = closeOuts.find((c) => c.body.includes(url) && /Merged /.test(c.body))?.createdAt;
-        const closed = closeOuts.find((c) => c.body.includes(url) && /closed unmerged/.test(c.body))?.createdAt;
-        const firstCloseOutCiting = closeOuts.filter((c) => prUrlsIn(c.body).includes(url)).map((c) => c.createdAt).sort()[0];
-        return {
-          url,
-          head: s.head?.sha ?? null,
-          mergedAt: merged ?? (s.merged ? (firstCloseOutCiting ?? lastAt) : null),
-          mergedHead: (merged || s.merged) ? s.head?.sha ?? null : null,
-          closedAt: closed && !merged ? closed : null,
-        };
-      });
-      const r = await replay({ ticket: 'LIN-4438', comments, prs });
-      const record = await r.landingAt(lastAt);
-      const expected = row.expected.landing;
+      const expected = row.expected?.landing ?? row.output.trail.landing;
+      assert.ok(Array.isArray(expected) && expected.length > 0, `${row.id}: the comment path's landing is read from the row`);
+      const { record, foreign } = await replayFrozen({ comments: row.inputs.comments ?? [], statuses: row.inputs.statuses ?? {} });
       const wanted = expected.filter((url) => !foreign.has(url));
       assert.deepEqual(record, wanted, `${row.id}: records ${JSON.stringify(record)}, comment path ${JSON.stringify(wanted)} (foreign PRs removed from the comment side: ${[...foreign].join(', ') || 'none'})`);
+    });
+  }
+});
+
+describe('the frozen seed cases replay (goldens/seeds.json) (LIN-4516, close-out finding 1d3d9f13)', () => {
+  // The five seeds the walks lack. A case with no PR has no landing to replay (the converging and flat plan-review runs).
+  const seeds = Object.values(loadDerived('goldens/seeds.json').seeds);
+  const cases = seeds.flatMap((seed) => seed.cases.map((c) => ({ seed: seed.id, ...c })));
+  test('the seeds hold cases with a landing to replay', () => {
+    assert.ok(cases.filter((c) => (c.output.trail?.landing ?? []).length > 0).length >= 10, 'at least ten seed cases carry a landing');
+  });
+  for (const c of cases.filter((x) => (x.output.trail?.landing ?? []).length > 0)) {
+    test(`${c.id}: the record-side landing is the comment path's landing, or the difference is named`, async () => {
+      const { record, foreign } = await replayFrozen({ comments: c.inputs.comments ?? [], statuses: c.inputs.statuses ?? {} });
+      const wanted = c.output.trail.landing.filter((url) => !foreign.has(url));
+      assert.deepEqual(record, wanted, `${c.id}: records ${JSON.stringify(record)}, comment path ${JSON.stringify(wanted)} (foreign PRs removed from the comment side: ${[...foreign].join(', ') || 'none'})`);
     });
   }
 });

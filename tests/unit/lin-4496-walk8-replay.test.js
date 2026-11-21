@@ -186,6 +186,16 @@ async function replay(walk, rh) {
   return { rh, map, real, toOf, briefChecks, parentBrief, taskReal };
 }
 
+/** The one task the changes a verdict is on belong to, or null when it is on no change or on changes of more than one task. */
+async function taskOfChanges(store, verdict) {
+  const tasks = new Set();
+  for (const ref of [].concat(verdict.links?.on ?? [])) {
+    const snap = await store.current(URL_KEY, String(ref).split('@')[0]);
+    if (snap?.kind === 'change' && snap.in) tasks.add(snap.in);
+  }
+  return tasks.size === 1 ? [...tasks][0] : null;
+}
+
 /** Open hand-offs (findings and questions) addressed to any of `targets`, as store ids. */
 async function openHandOffs(store, targets) {
   const ids = new Set();
@@ -195,12 +205,37 @@ async function openHandOffs(store, targets) {
   return [...ids];
 }
 
+/**
+ * LIN-4516: a verdict's `on` through the route names a change by the head its judge read, never by `@v` (the route refuses a
+ * pin the judge did not name, on `on` beside the fields and under `links` alike). The walk's stored verdicts name a change
+ * version, `change@v`; the agent-facing call that wrote one says that version's head. So a historical `change@v` in a
+ * verdict's links goes out as the bare change id plus `heads: {<id>: <the head version v holds>}`: the same pin, said as the
+ * route takes it. A link to anything else is left as it was.
+ * @returns {Promise<{links: object|undefined, heads?: object}>}
+ */
+async function verdictLinks(rh, links) {
+  if (!links?.on) return { links };
+  const heads = {};
+  const on = [];
+  for (const ref of [].concat(links.on)) {
+    const [id, v] = String(ref).split('@');
+    const snap = v !== undefined ? await rh.store.current(URL_KEY, id) : null;
+    if (snap?.kind !== 'change') { on.push(ref); continue; }
+    const held = (await rh.store.versionsOf(URL_KEY, [id])).find((x) => x.v === Number(v));
+    if (!held?.fields?.head) throw new Error(`${ref}: the change version a verdict names holds no head to send`);
+    heads[id] = held.fields.head;
+    on.push(id);
+  }
+  return { links: { ...links, on }, ...(Object.keys(heads).length ? { heads } : {}) };
+}
+
 /** One historical op, as the agent-facing call: flat bodies, the run named, the writer filled from the credential. */
 async function applyOverRoutes(rh, map, real, linksOf, op, who) {
   const run = who.runId ? { run: who.runId } : {};
   const token = who.token;
   if (op.op === 'add') {
-    const body = strip({ kind: op.kind, ...scopedWith(real, op.fields), in: op.in && real(op.in), to: op.to && real(op.to), links: op.links && linksOf(op.links), ...run });
+    const verdict = op.kind === 'verdict' ? await verdictLinks(rh, op.links && linksOf(op.links)) : { links: op.links && linksOf(op.links) };
+    const body = strip({ kind: op.kind, ...scopedWith(real, op.fields), in: op.in && real(op.in), to: op.to && real(op.to), links: verdict.links, heads: verdict.heads, ...run });
     const r = await rh.post('/api/proxy/records', token, body);
     if (r.status !== 201) throw new Error(`add ${op.id} (${op.kind}) refused ${r.status}: ${JSON.stringify(r.body).slice(0, 600)}`);
     if (op.by !== 'John' && r.body.by !== op.by) throw new Error(`add ${op.id} filed by ${r.body.by}, not ${op.by}`);
@@ -209,15 +244,18 @@ async function applyOverRoutes(rh, map, real, linksOf, op, who) {
   }
   const id = map.get(op.id);
   if (!id) throw new Error(`${op.op} of ${op.id}: no record under that id`);
+  const isVerdict = (await rh.store.current(URL_KEY, id))?.kind === 'verdict';
   if (op.op === 'revise') {
-    const body = strip({ ...scopedWith(real, op.fields), reason: op.reason, in: op.in && real(op.in), to: op.to && real(op.to), links: op.links && linksOf(op.links), ...run });
+    const pinned = isVerdict ? await verdictLinks(rh, op.links && linksOf(op.links)) : { links: op.links && linksOf(op.links) };
+    const body = strip({ ...scopedWith(real, op.fields), reason: op.reason, in: op.in && real(op.in), to: op.to && real(op.to), links: pinned.links, heads: pinned.heads, ...run });
     const r = await rh.post(`/api/proxy/records/${id}/revise`, token, body);
     if (r.status !== 200) throw new Error(`revise ${op.id} refused ${r.status}: ${JSON.stringify(r.body).slice(0, 600)}`);
   } else if (op.op === 'end') {
     const r = await rh.post(`/api/proxy/records/${id}/end`, token, strip({ state: op.state, reason: op.reason, into: op.into && real(op.into), ...run }));
     if (r.status !== 200) throw new Error(`end ${op.id} refused ${r.status}: ${JSON.stringify(r.body).slice(0, 600)}`);
   } else if (op.op === 'link') {
-    const r = await rh.post(`/api/proxy/records/${id}/link`, token, { links: linksOf(op.links), ...run });
+    const pinned = isVerdict ? await verdictLinks(rh, linksOf(op.links)) : { links: linksOf(op.links) };
+    const r = await rh.post(`/api/proxy/records/${id}/link`, token, strip({ links: pinned.links, heads: pinned.heads, ...run }));
     if (r.status !== 200) throw new Error(`link ${op.id} refused ${r.status}: ${JSON.stringify(r.body).slice(0, 600)}`);
   } else {
     throw new Error(`unknown op ${op.op}`);
@@ -235,7 +273,11 @@ describe('walk 8 replayed through the proxy (LIN-4496)', () => {
           const id = map.get(hist);
           if (!id) { mismatches.push(`${hist}: never made`); continue; }
           const { snap } = await rh.store.read(URL_KEY, id);
-          const want = { kind: exp.kind, state: exp.state, v: exp.v, to: exp.to ? toOf(exp.to) : null, in: exp.in ? real(exp.in) : null };
+          // LIN-4516: a verdict on changes is filed `in` the one task its changes are on (the route does it; the stored walk's
+          // verdicts, written before, name no task). That is the one difference from the stored end state, and it is checked
+          // against the change records themselves, not assumed.
+          const wantIn = exp.in ? real(exp.in) : (exp.kind === 'verdict' ? await taskOfChanges(rh.store, snap) : null);
+          const want = { kind: exp.kind, state: exp.state, v: exp.v, to: exp.to ? toOf(exp.to) : null, in: wantIn };
           const got = { kind: snap.kind, state: snap.state, v: snap.v, to: snap.to ?? null, in: snap.in ?? null };
           if (JSON.stringify(got) !== JSON.stringify(want)) mismatches.push(`${hist} (${id}): got ${JSON.stringify(got)}, want ${JSON.stringify(want)}`);
         }

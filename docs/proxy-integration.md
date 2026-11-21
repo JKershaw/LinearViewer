@@ -2843,7 +2843,10 @@ The verdict is written on those pins, and only then does the route run the one r
 `lib/change-records.js`) to the live head. So a refresh that has already moved the change on cannot move the pin, and a
 push the judge never saw shows the verdict stale at once. A verdict on a change with no sha in `heads` is refused with
 422 naming `heads`; a `heads` key that names no change in `on`, or an `@v` on a change, is refused too. A target that is
-not a change (a plan-review verdict on a plan piece) needs no head and is pinned as before.
+not a change (a plan-review verdict on a plan piece) needs no head and is pinned as before. The rule is the same wherever
+`on` is written: beside the fields or under `links`, on add, revise or link (naming it in both places is refused), and the
+pinned refs go back to where `on` was. It binds a verdict only: any other kind that names `on` (a finding on a change) needs
+no head, and a `heads` on one is refused as misplaced.
 
 A verdict on changes is filed `in` their task (a field any record may carry; no kind changes), so the task's records and its
 round can find it. A **blind-read** verdict's `on` must name exactly the task's landing: its open changes plus those merged in

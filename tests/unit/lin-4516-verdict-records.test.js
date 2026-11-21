@@ -34,7 +34,9 @@ import { createFakeTracker } from '../helpers/fake-records-tracker.js';
 import { createRecordWrites } from '../../lib/records/writes.js';
 import { isTerminalState } from '../../lib/providers/state-map.js';
 import { refreshTaskChanges } from '../../lib/change-records.js';
-import { SUMMARY_LEAD } from '../../lib/records/summary.js';
+import { SUMMARY_LEAD, summaryBodyOf } from '../../lib/records/summary.js';
+import { computeIssueRoundTrips } from '../../lib/plan-review-round-trips.js';
+import { parseBlindRead } from '../../lib/run-trail.js';
 import { readOpenFindings, findingsHold } from '../../lib/close-out-findings.js';
 import { readTrail, withoutHarbourSummaries, isHarbourSummary, isPersonComment } from '../../lib/run-trail.js';
 
@@ -416,5 +418,134 @@ describe('witness 5 : the summary path', () => {
     assert.equal(tracker.comments.length, before + 1, 'the new version posted exactly one summary');
     assert.ok(tracker.comments.at(-1).body.startsWith(SUMMARY_LEAD), 'the summary opens with the mark');
     assert.equal(linked.body.summary?.posted, true, JSON.stringify(linked.body.summary));
+  });
+});
+
+describe('close-out witness A: `on` under links is read as `on` beside the fields (findings 356a11ca, 369e09dc)', () => {
+  const nested = (on, heads, extra = {}) => ({ kind: 'verdict', judgement: 'review', outcome: 'approve', reasoning: 'read at the head named', links: { on }, ...(heads ? { heads } : {}), run: 'row-review', ...extra });
+
+  test('a verdict naming its change under links.on with no head is refused, naming heads, and nothing is written', async () => {
+    const changeId = await addChange(41, 'H1');
+    const r = await post(tokens.review, nested([changeId]));
+    assert.equal(r.status, 422, `a links.on verdict with no head was accepted: ${JSON.stringify(r.body)}`);
+    assert.ok(r.body.problems?.some((p) => p.field === 'heads'), `the refusal does not name heads: ${JSON.stringify(r.body)}`);
+    assert.equal((await store.find(URL_KEY, { kind: 'verdict' })).length, 0, 'nothing was written');
+  });
+
+  test('a bare-id links.on (not a list) is refused the same way', async () => {
+    const changeId = await addChange(41, 'H1');
+    const r = await post(tokens.review, nested(changeId));
+    assert.equal(r.status, 422, `a bare links.on id with no head was accepted: ${JSON.stringify(r.body)}`);
+    assert.ok(r.body.problems?.some((p) => p.field === 'heads'), JSON.stringify(r.body));
+  });
+
+  test('with heads, links.on is pinned to the version holding the sha (not the current one), filed under the task, and stale at once', async () => {
+    const changeId = await addChange(41, 'H1');
+    prs.set(41, { sha: 'H2', merged: false });
+    await refresh();
+    const r = await post(tokens.review, nested([changeId], { [changeId]: 'H1' }));
+    assert.equal(r.status, 201, `the links.on verdict was refused: ${JSON.stringify(r.body)}`);
+    assert.deepEqual(onOf(r.body), [`${changeId}@1`], 'pinned to the version that holds H1, not the current H2');
+    assert.equal(r.body.in, taskId, 'filed under the task its change is on');
+    const read = await get(r.body.id, tokens.review);
+    assert.ok(read.body.flags?.stale?.length, 'stale: the change is at H2');
+  });
+
+  test('a blind read naming a subset of the landing under links.on is refused, naming on', async () => {
+    const a = await addChange(41, 'HA');
+    await addChange(42, 'HB');
+    const r = await post(tokens.blind, { kind: 'verdict', judgement: 'blind-read', outcome: 'same', reasoning: 'the change reads as it did', links: { on: [a] }, heads: { [a]: 'HA' }, run: 'row-blind' });
+    assert.equal(r.status, 422, `a subset blind read via links.on was accepted: ${JSON.stringify(r.body)}`);
+    assert.ok(r.body.problems?.some((p) => p.field === 'on'), JSON.stringify(r.body));
+  });
+
+  test('revise adding links.on without heads is refused; with heads it pins to the sha named', async () => {
+    const changeId = await addChange(41, 'H1');
+    const f = await post(tokens.review, { kind: 'finding', in: taskId, to: 'review', says: 'Check the footer.', how: 'run it', run: 'row-review' });
+    const v = await post(tokens.review, reviewVerdict([f.body.id], {}));
+    assert.equal(v.status, 201, JSON.stringify(v.body));
+    const bare = await rh.post(`/api/proxy/records/${v.body.id}/revise`, tokens.review, { links: { on: [changeId] }, reason: 'add the change', run: 'row-review' });
+    assert.equal(bare.status, 422, `a links.on revise with no head was accepted: ${JSON.stringify(bare.body)}`);
+    assert.ok(bare.body.problems?.some((p) => p.field === 'heads'), JSON.stringify(bare.body));
+    const pinned = await rh.post(`/api/proxy/records/${v.body.id}/revise`, tokens.review, { links: { on: [changeId] }, heads: { [changeId]: 'H1' }, reason: 'add the change', run: 'row-review' });
+    assert.equal(pinned.status, 200, JSON.stringify(pinned.body));
+    assert.ok(onOf(pinned.body).includes(`${changeId}@1`), `not pinned to H1: ${JSON.stringify(pinned.body.links)}`);
+  });
+
+  test('a body naming on beside the fields and under links is refused, and no head is revised on the way', async () => {
+    const changeId = await addChange(41, 'H1');
+    const r = await post(tokens.review, nested([changeId], { [changeId]: 'H9' }, { on: [changeId] }));
+    assert.equal(r.status, 422, `on named twice was accepted: ${JSON.stringify(r.body)}`);
+    assert.ok(r.body.problems?.some((p) => p.field === 'on'), JSON.stringify(r.body));
+    const versions = await store.versionsOf(URL_KEY, [changeId]);
+    assert.equal(versions.length, 1, 'no head revise was left behind by a refused body');
+  });
+});
+
+describe('close-out witness B: only a verdict rests on a head (finding 804994d8)', () => {
+  test('a finding on a change needs no head, and one carrying heads is refused as misplaced', async () => {
+    const changeId = await addChange(41, 'H1');
+    const plain = await post(tokens.review, { kind: 'finding', in: taskId, to: 'close-out', on: [changeId], says: 'Add the footer test.', how: 'run the footer test', run: 'row-review' });
+    assert.equal(plain.status, 201, `a finding on a change was refused for want of a head: ${JSON.stringify(plain.body)}`);
+    const withHeads = await post(tokens.review, { kind: 'finding', in: taskId, to: 'close-out', on: [changeId], heads: { [changeId]: 'H1' }, says: 'Again.', how: 'run it', run: 'row-review' });
+    assert.equal(withHeads.status, 422, JSON.stringify(withHeads.body));
+    assert.ok(withHeads.body.problems?.some((p) => p.field === 'heads' && /verdict/.test(p.message)), JSON.stringify(withHeads.body));
+  });
+});
+
+describe('close-out witness C: no comment reader picks a verdict summary up (finding f83642c2)', () => {
+  const ASOF = '2026-11-21T12:00:00.000Z';
+  const T = Date.parse('2026-11-21T10:00:00.000Z');
+  const at = (min) => new Date(T + min * 60000).toISOString();
+  const rounds = (comments) => computeIssueRoundTrips({
+    id: 'i1', identifier: 'LIN-1', description: '', comments,
+    rows: [{ id: 'r1', kind: 'plan-review', status: 'done', dispatchedAt: at(0), completedAt: at(60) }],
+  }, { asOf: ASOF, planFacts: undefined });
+  const summary = (judgement, outcome, reasoning) => summaryBodyOf({ id: `verdict-${judgement}`, v: 1, kind: 'verdict', fields: { judgement, outcome, reasoning } });
+
+  test('a plan-review, a review and a blind-read verdict summary in the round-trip window read as no comment at all', () => {
+    const baseline = rounds([]);
+    assert.equal(baseline.R0.verdict, null, 'baseline: no verdict');
+    for (const body of [
+      summary('plan-review', 'approve', 'The plan holds.'),
+      summary('review', 'request-changes', 'Needs discussion before this lands. Verdict follows in the records.'),
+      summary('blind-read', 'same', 'Reads as it did.'),
+    ]) {
+      const got = rounds([{ id: 'c1', body, createdAt: at(30) }]);
+      assert.deepEqual(got, baseline, `a summary changed the round-trip reading: ${body.split('\n')[0]}`);
+    }
+  });
+
+  test('a blind-read summary is not a blind read to the measure-1 and run-evidence parser', () => {
+    assert.equal(parseBlindRead({ id: 'c1', body: summary('blind-read', 'same', 'Reads as it did.'), createdAt: at(30) }), null);
+  });
+});
+
+describe('close-out witness D: a merged change that takes a later version stays merged at its merge (finding 9a6a5703)', () => {
+  test('a link added to a change after it merged and after the round cut does not put its PR back in the landing', async () => {
+    clock('2026-11-21T11:00:00.000Z');
+    const b = await addChange(42, 'HB');
+    clock('2026-11-21T11:05:00.000Z');
+    const a = await addChange(41, 'HA');
+    clock('2026-11-21T11:30:00.000Z');
+    prs.set(41, { sha: 'HA', merged: true });
+    await refresh();
+    clock('2026-11-21T11:40:00.000Z');
+    await store.openRun(URL_KEY, { id: 'row-close-1', stage: 'close-out', taskId, lineage: 'row-root', at: '2026-11-21T11:40:00.000Z' });
+    clock('2026-11-21T11:50:00.000Z');
+    await store.endRun(URL_KEY, 'row-close-1', { state: 'done', at: '2026-11-21T11:50:00.000Z' });
+    clock('2026-11-21T12:00:00.000Z');
+    const r = await post(tokens.review, reviewVerdict([b], { [b]: 'HB' }));
+    assert.equal(r.status, 201, JSON.stringify(r.body));
+    // A is merged (ended at 11:30, before the cut at 11:50). A later link gives it a new version at 12:40, after the cut.
+    const f = await post(tokens.review, { kind: 'finding', in: taskId, to: 'project', says: 'A note about A.', how: 'none', run: 'row-review' });
+    assert.equal(f.status, 201, JSON.stringify(f.body));
+    clock('2026-11-21T12:40:00.000Z');
+    const linked = await writes.link({ urlKey: URL_KEY, id: a, links: { about: [f.body.id] }, by: 'review' });
+    assert.ok(!linked.problems, `the link was refused: ${JSON.stringify(linked.problems)}`);
+    assert.equal((await store.versionsOf(URL_KEY, [a])).length >= 3, true, 'the merged change took a new version after it ended');
+    clock('2026-11-21T12:50:00.000Z');
+    const exact = await post(tokens.blind, blindVerdict([b], { [b]: 'HB' }));
+    assert.equal(exact.status, 201, `the landing put the merged-before-the-cut PR back: ${JSON.stringify(exact.body)}`);
   });
 });

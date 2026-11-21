@@ -84,6 +84,26 @@ function bodyWithout(body, keys) {
 }
 
 /**
+ * LIN-4516 (close-out, findings 356a11ca and 369e09dc): the `on` a body names, flat or under `links`, and where it sat, so
+ * the pin and the blind-read check read it wherever it was written and the pinned refs go back to the same place. Naming
+ * it in both places is refused, as the checked pipeline refuses it (lib/records/check.js).
+ * @returns {{on: *, where: 'flat'|'links', problems?: object[]}}
+ */
+function onOf(body) {
+  const nested = isPlainObject(body.links) ? body.links.on : undefined;
+  if (body.on !== undefined && nested !== undefined) {
+    return { on: undefined, where: 'flat', problems: [{ field: 'on', message: "'on' is given twice: beside the fields and under links" }] };
+  }
+  return nested !== undefined ? { on: nested, where: 'links' } : { on: body.on, where: 'flat' };
+}
+
+/** Writes `on` back to where it was read (see onOf) in the input the checked pipeline gets. */
+function putOn(input, where, on) {
+  if (where === 'links') input.links = { ...input.links, on };
+  else input.on = on;
+}
+
+/**
  * @param {Object} deps
  * @param {import('../lib/records-store.js').RecordsStore} deps.recordsStore
  * @param {Function} deps.proxyLimiter
@@ -147,11 +167,17 @@ export function createProxyRecordsRoutes({ recordsStore, proxyLimiter, authentic
     : reply(req, res, endpoint, status, shape(result)));
 
   /**
-   * LIN-4516: the head pin for any write that names `on` (flat or under links), on add, revise or link, so no route can attach
-   * a change to a record by its current version. `heads` is write-only and is stripped by the caller. Returns `{on, tasks}`,
-   * with `on` undefined when the write names no `on` and no heads, or the refusal.
+   * LIN-4516: the head pin for a VERDICT write that names `on` (flat or under links), on add, revise or link, so no route
+   * can attach a change to a verdict by its current version. `heads` is write-only and is stripped by the caller. Returns
+   * `{on, tasks}`, with `on` undefined when the write names no `on` and no heads, or the refusal. Only a verdict rests on a
+   * head its judge read (close-out, finding 804994d8): any other kind that names `on` is left to the checked pipeline as it
+   * was, and a `heads` on one is refused as misplaced, so a finding on a change is not asked for a head.
    */
-  async function pinOnOf(urlKey, on, heads, run) {
+  async function pinOnOf(urlKey, { isVerdict, on, heads, run }) {
+    if (!isVerdict) {
+      if (heads !== undefined) return { problems: [{ field: 'heads', message: "'heads' belongs to a verdict: it names the head its judge read, one sha per change in on" }] };
+      return { on, tasks: [] };
+    }
     if (on === undefined && heads === undefined) return { on: undefined, tasks: [] };
     return pinVerdictToHeads({ urlKey, on, heads, writes, recordsStore, run });
   }
@@ -207,18 +233,21 @@ export function createProxyRecordsRoutes({ recordsStore, proxyLimiter, authentic
         const refused = refusedPlanAddressee(body.to);
         if (refused) return reply(req, res, endpoint, 422, refused);
       }
-      if (body.kind === 'verdict' && body.judgement === BLIND_READ_KIND && body.on !== undefined) {
+      const named = onOf(body);
+      if (named.problems) return reply(req, res, endpoint, 422, refusalOf(named.problems));
+      const isVerdict = body.kind === 'verdict';
+      if (isVerdict && body.judgement === BLIND_READ_KIND && named.on !== undefined) {
         // LIN-4516: a blind read names exactly the landing (subset and superset refused), checked before any pin.
-        const exact = await blindReadSetProblems({ urlKey: req.proxyUrlKey, recordsStore, on: [].concat(body.on).filter((x) => typeof x === 'string') });
+        const exact = await blindReadSetProblems({ urlKey: req.proxyUrlKey, recordsStore, on: [].concat(named.on).filter((x) => typeof x === 'string') });
         if (exact.length) return reply(req, res, endpoint, 422, refusalOf(exact));
       }
-      const pin = await pinOnOf(req.proxyUrlKey, body.on, body.heads, writer.run ?? null);
+      const pin = await pinOnOf(req.proxyUrlKey, { isVerdict, on: named.on, heads: body.heads, run: writer.run ?? null });
       if (pin.problems) return reply(req, res, endpoint, 422, refusalOf(pin.problems));
       const input = bodyWithout(body, ['kind', 'run', 'heads']);
-      if (body.on !== undefined) input.on = pin.on;
+      if (named.on !== undefined) putOn(input, named.where, pin.on);
       // LIN-4516: a verdict belongs to the task its changes are on, so the task's records and its round cut can find it.
       // `in` is any record's field, so no kind changes (lib/records/kinds.json).
-      if (body.kind === 'verdict' && pin.tasks.length === 1 && input.in === undefined) input.in = pin.tasks[0];
+      if (isVerdict && pin.tasks.length === 1 && input.in === undefined) input.in = pin.tasks[0];
       const result = await writes.add({ ctx: req, urlKey: req.proxyUrlKey, kind: body.kind, input, by: writer.by, run: writer.run ?? null });
       if (!result.problems) await refreshAfterPin(req.proxyUrlKey, pin.tasks);
       return answer(req, res, endpoint, 201, result);
@@ -239,12 +268,14 @@ export function createProxyRecordsRoutes({ recordsStore, proxyLimiter, authentic
         const refused = refusedPlanAddressee(body.to !== undefined ? body.to : prev.to);
         if (refused) return reply(req, res, endpoint, 422, refused);
       }
-      const exact = await blindReadAfter(req.proxyUrlKey, prev, body.on);
+      const named = onOf(body);
+      if (named.problems) return reply(req, res, endpoint, 422, refusalOf(named.problems));
+      const exact = await blindReadAfter(req.proxyUrlKey, prev, named.on);
       if (exact.length) return reply(req, res, endpoint, 422, refusalOf(exact));
-      const pin = await pinOnOf(req.proxyUrlKey, body.on, body.heads, writer.run ?? null);
+      const pin = await pinOnOf(req.proxyUrlKey, { isVerdict: prev?.kind === 'verdict', on: named.on, heads: body.heads, run: writer.run ?? null });
       if (pin.problems) return reply(req, res, endpoint, 422, refusalOf(pin.problems));
       const input = bodyWithout(body, ['run', 'heads']);
-      if (body.on !== undefined) input.on = pin.on;
+      if (named.on !== undefined) putOn(input, named.where, pin.on);
       const result = await writes.revise({ ctx: req, urlKey: req.proxyUrlKey, id: req.params.id, input, by: writer.by, run: writer.run ?? null });
       if (!result.problems) await refreshAfterPin(req.proxyUrlKey, pin.tasks);
       return answer(req, res, endpoint, 200, result);
@@ -274,6 +305,8 @@ export function createProxyRecordsRoutes({ recordsStore, proxyLimiter, authentic
     try {
       const writer = await writerFor(req, body);
       if (!writer.ok) { logEvent(req, endpoint, 403); return refusal(res, writer); }
+      const named = onOf(body);
+      if (named.problems) return reply(req, res, endpoint, 422, refusalOf(named.problems));
       const links = {};
       for (const type of LINK_TYPES) if (body[type] !== undefined) links[type] = body[type];
       Object.assign(links, isPlainObject(body.links) ? body.links : {});
@@ -281,7 +314,7 @@ export function createProxyRecordsRoutes({ recordsStore, proxyLimiter, authentic
       if (!prev) throw new RecordsNotFound(req.params.id);
       const exact = await blindReadAfter(req.proxyUrlKey, prev, links.on);
       if (exact.length) return reply(req, res, endpoint, 422, refusalOf(exact));
-      const pin = await pinOnOf(req.proxyUrlKey, links.on, body.heads, writer.run ?? null);
+      const pin = await pinOnOf(req.proxyUrlKey, { isVerdict: prev.kind === 'verdict', on: links.on, heads: body.heads, run: writer.run ?? null });
       if (pin.problems) return reply(req, res, endpoint, 422, refusalOf(pin.problems));
       if (links.on !== undefined) links.on = pin.on;
       const result = await writes.link({ ctx: req, urlKey: req.proxyUrlKey, id: req.params.id, links, by: writer.by, run: writer.run ?? null });
