@@ -5064,3 +5064,18 @@ John took LIN-4445 (the loop on Jira) off the parked work; he'll come back to it
 - **A read-only audit of slices 1–3** (merged) and P5's branch is running, to see whether the same pattern exists elsewhere.
 - **My error:** I first proposed leaving the conversion to P7 to spare P5 a round. That was the schedule over doing it right.
 - **For slice 4's standing answers:** tests and saved test cases move to the new shape in the same piece; no translators or stopgaps, in code or tests.
+
+### 21 Nov, 17:04: full stop; the audit's findings
+
+- **John: "FULL STOP".** I set the fleet pause at 17:04:01. P5's review run 5a02c204 was already under way and was left to finish its turn: it can only review, not merge. John declined switching off the hourly drive. While the pause holds, the drive only reports.
+- **Read-only audit of slices 1–3 and P5's branch.** Verdict: a few. It is mostly a slice 3 pattern; slices 1 and 2 left small residues.
+  - **Slice 1, should be gone, no ticket:**
+    - `ANY_EXTENSION` in `lib/prompts/area-note-format.js`, a remnant of the retired `Retires:` checker that one test still uses;
+    - two orphan fixtures in the retired leftovers shape;
+    - the old ledger-count shape (`openItems`) still written as zeros in close-out events;
+    - `legacyLedgerOf` in `lib/close-out-findings.js` (5 production callers), still reading the pre-cutover ledger heading.
+  - **Slice 2, mostly allowed by the design:** `lib/asked-of.js` and `lib/legacy-plan-text.js` serve the ticket section kept until slice 4. Their exit condition isn't checked. The eval fixtures still carry plans in descriptions, display-only.
+  - **Slice 3 on main:** the stopgaps (the comment-path oracle helpers, the throwaway import script, the comment-side blind-read guard) are named for P7. One permanent loophole has no ticket: `lib/records/check.js` lets non-URL change refs through unchecked.
+  - **P5's branch:**
+    - `tests/helpers/records-trail.js` is the one stopgap with no named exit, and P7 deleting `lib/run-trail.js` would break it;
+    - a third production comment fallback, `recordsHoldRounds` in `lib/recommendation-facts.js`, is marked "until P7".
