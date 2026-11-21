@@ -5157,3 +5157,9 @@ The full stop holds: the fleet is paused, and the drive is only reporting. The o
 
 - `lin4522-slice2-read-records`: John accepted. A new task's `asked` is the description as filed (the old-block reader goes); the size note stays in the description, read whole (no size record kind); the plan-section skip in `lib/legacy-plan-text.js` stays until slice 4 (brief's ticket section and the selector's view). One production write: LIN-4508 gets its task before the merge, while the old reader still exists. The 110 closed sealed tickets and other workspaces stay as they are.
 - LIN-4522's research (comment fe7b6618) found more left than the ticket listed: the kickoff mentions the ledger in 10 places, and the autopilot handbook still says review writes one. What slice 3 still reads of the ledger stays until P7 under a named exception (finding-92289ee4 to LIN-4520). Removal spike: 25 of 26,214 unit tests failed, all expected.
+
+## 21 Nov, ~19:20: LIN-4522 overgrew; suggestions on its two rulings
+
+- LIN-4522's plan (plan-c8c68fff v2) grew a census framework: one shared RETAINED table with three kinds of row, table tests and planted-mutation proofs, and the censuses widened to every test folder (about 93 test files and 25 others to sort). The cause is the driving session's own ticket line asking each retired-words test to list every retired word. The core removals are sound and the plan review checked them.
+- Two rulings ask the same question (`lin4522-recorded-history` from plan, `lin4522-record-keepers` from plan-review): may recorded history (eval baselines and source text, four survey scripts the papers cite, dated docs) keep the old words? Suggested answers posted: yes, leave history as it is, and drop the census line (no exception table, no widening to the tests).
+- Proposed to John, not done: edit LIN-4522 to take the census line off (What we want, Done when, the census bullet) and say recorded history stays. The run is waiting on the rulings.
