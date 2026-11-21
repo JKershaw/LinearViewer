@@ -5079,3 +5079,7 @@ John took LIN-4445 (the loop on Jira) off the parked work; he'll come back to it
   - **P5's branch:**
     - `tests/helpers/records-trail.js` is the one stopgap with no named exit, and P7 deleting `lib/run-trail.js` would break it;
     - a third production comment fallback, `recordsHoldRounds` in `lib/recommendation-facts.js`, is marked "until P7".
+
+### 21 Nov, 17:27: held
+
+The full stop holds: the fleet is paused, and the drive is only reporting. The open ruling, `lin4518-250-expectation`, waits for John. Agreed path (under discussion; nothing sent): one plain verify-and-clean task for slices 1 and 2; P5 fixes its tests properly in parallel; slice 3's planned stopgaps go to P7.
