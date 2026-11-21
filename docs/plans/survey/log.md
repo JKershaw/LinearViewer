@@ -5055,3 +5055,12 @@ John took LIN-4445 (the loop on Jira) off the parked work; he'll come back to it
 - **Settled by the review at 16:48** (finding-2e2360b5 v2): 250 is wrong. Production already reads that approval as stale, correctly. The drop came from the test helpers not doing what production does at merge. The fix is test-only and puts the count back to 255; close-out does it, then a re-review follows.
 - **I proposed re-review.**
 - **For the smoothing pass:** the run raised an engineering question as a ruling, and the review settled it minutes later.
+
+### 21 Nov, ~17:05: P5's test translator
+
+- **Found while explaining the 250 ruling:** P5 added `tests/helpers/records-trail.js`, a translator that turns old saved comment trails into records so 13 unit tests and the eval keep passing. It is built on `COMMENT_KINDS` and `parseRunLedger`, which slice 3 retires, and it is on no removal list. The slice was meant to convert the saved cases instead.
+- **John:** "the work is completed correctly, not awkwardly and incorrectly patched"; the review stage should flag it, remove the unwanted code and fix the tests.
+- **Note sent to P5's review run** (5a02c204, queued as 6603b5e7). It asks the review to request changes: convert the saved cases and eval fixtures to records, delete the translator, and list each old comment path P5 keeps as a finding to LIN-4520.
+- **A read-only audit of slices 1–3** (merged) and P5's branch is running, to see whether the same pattern exists elsewhere.
+- **My error:** I first proposed leaving the conversion to P7 to spare P5 a round. That was the schedule over doing it right.
+- **For slice 4's standing answers:** tests and saved test cases move to the new shape in the same piece; no translators or stopgaps, in code or tests.
