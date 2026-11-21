@@ -5019,3 +5019,7 @@ LIN-4518 (P5) is still building.
 
 - **`lin4518-authorship`: marker.** Harbour stamps its own comments; unmarked reads as a person's. Simplest, with existing precedent. Older Harbour comments read as a person's, and that eases with age. Slice 4 makes this mostly moot.
 - **`lin4518-blockcount`: finding-per-issue.** Each blocking issue is a finding back to the plan, and the count is the open findings. No new verdict field. Matches how approval conditions became findings.
+
+### 21 Nov, 13:28
+
+LIN-4518 (P5) is on its last beat, waiting for CI on bf349ff5f. Two follow-up rows at 13:17 show "failed", but the worker's latest feedback says it is verifying, so this looks like the same refused-follow-up pattern. No rulings, no pause.
