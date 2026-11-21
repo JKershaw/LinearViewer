@@ -280,6 +280,18 @@ function build() {
     if (src.bundles[id]) bundles[id] = src.bundles[id];
   }
 
+  // LIN-4518: the PR statuses each trail was read against (the live head and merged state of a PR it cites). The source
+  // capture carries none, so they are added here and survive a REFRESH. PR #1622 merged at e4e373aff after LIN-3125's
+  // review read 19e4397c (update-branch, 06:23 on 1 Oct), so the approval it carries is stale at the merge.
+  const BUNDLE_STATUSES = {
+    'LIN-3125': {
+      'https://github.com/JKershaw/LinearViewer/pull/1622': { readable: true, state: 'closed', merged: true, head: { sha: 'e4e373aff0ed4c27241d3eecb370ec64103679a7' } },
+    },
+  };
+  for (const [id, statuses] of Object.entries(BUNDLE_STATUSES)) {
+    if (bundles[id]) bundles[id] = { ...bundles[id], statuses };
+  }
+
   const fixture = {
     name: 'LargeDense',
     note: 'Large/dense real-ticket context bundles for LIN-1693. Captured from the live tracker at HEAD (see '

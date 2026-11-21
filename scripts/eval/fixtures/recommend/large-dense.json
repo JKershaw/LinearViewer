@@ -2405,7 +2405,17 @@
           "user": "John “Sausage Roller” Kershaw"
         }
       ],
-      "focusedChild": null
+      "focusedChild": null,
+      "statuses": {
+        "https://github.com/JKershaw/LinearViewer/pull/1622": {
+          "readable": true,
+          "state": "closed",
+          "merged": true,
+          "head": {
+            "sha": "e4e373aff0ed4c27241d3eecb370ec64103679a7"
+          }
+        }
+      }
     }
   }
 }

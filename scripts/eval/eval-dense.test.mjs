@@ -80,11 +80,13 @@ test('STUB runs with OPENROUTER_API_KEY unset (reaches the stub transport)', (t)
   // FC-ruling carry-ins, and the last round added the two implementation-landed cases.
   // All hit under the stub, so the counts move to 255/280. The 25 remaining misses are
   // the pre-existing LIN-385 / LIN-389 / LIN-428 descent cases.
-  // LIN-4518: 250. LIN-2149's descent reaches LIN-3125, whose trail cites PR #1622 again in a note after the approving
+  // LIN-4518: 255. LIN-2149's descent reaches LIN-3125, whose trail cites PR #1622 again in a note after the approving
   // review ("Phase 0 complete — PR #1622 merged"). On the comment path that restated PR was work after review, so the read
-  // stood aside. On records it is not (a restated reviewed PR is not new work, and a merge does not stale an approval), so
-  // the approved landing gets its blind read first: five runs of LIN-2149 now answer blind-read where they answered implement.
-  assert.equal(r.summary.production.hit, 250);
+  // stood aside. On records the merge is work after review: PR #1622 merged at e4e373aff after the review read 19e4397c
+  // (update-branch pushed it, LIN-3125's fixture carries the PR's status), so the merge revises the head and the approval
+  // reads stale, and the approved landing gets its blind read first. Five runs of LIN-2149 answer blind-read where they
+  // answered implement. (250 was a fixture translation error: the status was not supplied and the merge did not revise.)
+  assert.equal(r.summary.production.hit, 255);
   assert.equal(r.summary.production.n, 280);
 });
 

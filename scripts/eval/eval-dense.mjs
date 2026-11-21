@@ -211,9 +211,9 @@ function makeComputeOne(bundles, model, onCall, hopLog) {
           parent: b.parent, siblings: b.siblings || [], siblingsTotal: b.siblingsTotal || 0,
           project: b.project, children: b.children || [], comments: b.comments || [],
           focusedChild: b.focusedChild || null,
-          // LIN-4518: the route reads the ticket's records standing. The fixture's trail is written as records (its statuses
-          // are not in the fixture, so each PR keeps the head its review read).
-          standing: standingOfComments(b.comments || []),
+          // LIN-4518: the route reads the ticket's records standing. The fixture's trail is written as records; the PR
+          // statuses the fixture carries (its live head and merged state) are the ones the comments were read against.
+          standing: standingOfComments(b.comments || [], { statuses: b.statuses || {} }),
         },
         { apiKey: API_KEY, model, featureFlags: {} }
       );

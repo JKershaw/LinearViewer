@@ -122,7 +122,15 @@ export function versionsOfComments(comments, { statuses = {} } = {}) {
     const s = statuses[ch.url];
     if (s?.merged === true && !versions.some((v) => v.id === ch.id && v.state === 'merged')) {
       const firstClose = sorted.find((c) => commentKindOf(c.body) === 'close-out' && prUrlsIn(c.body).some((u) => changeKeyOf(canonicalChangeRef(u)) === changeKeyOf(ch.url)));
-      endChange(versions, ch, firstClose?.createdAt ?? at(lastMs), 'merged');
+      const mergedAt = firstClose?.createdAt ?? at(lastMs);
+      // The merge revises the head to the PR's head at merge before it ends the change (lib/change-records.js
+      // recordChangeMerged), so an approval read on an earlier head is stale. Mirror that: revise first, at the same instant.
+      const liveAtMerge = headOf(ch.url);
+      const current = versions.filter((v) => v.id === ch.id && !v.op).sort((a, b) => b.v - a.v)[0];
+      if (liveAtMerge && current.fields.head !== liveAtMerge) {
+        versions.push({ ...current, v: current.v + 1, at: at(epoch(mergedAt)), fields: { ...current.fields, head: liveAtMerge }, by: 'harbour' });
+      }
+      endChange(versions, ch, mergedAt, 'merged');
     }
   }
 
