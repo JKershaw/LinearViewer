@@ -14,6 +14,7 @@
  * this is the focused proof that B1's seam works.
  */
 
+import { markHarbourComment } from '../../lib/harbour-comment-mark.js';
 import { test, before } from 'node:test';
 import assert from 'node:assert/strict';
 import express from 'express';
@@ -145,7 +146,9 @@ test('POST comment lands on local and returns the proxy { success, comment } sha
   // AND the route-level normalization gives it the `{ success, comment }` envelope.
   assert.equal(status, 201);
   assert.equal(body.success, true);
-  assert.equal(body.comment.body, 'hello from the proxy');
+  // LIN-4518 (beat 4, ruling lin4518-authorship): a proxy comment is a Harbour write, so the body it posts carries the mark
+  // authorship is read from (lib/harbour-comment-mark.js); the expectation is the exact marked body.
+  assert.equal(body.comment.body, markHarbourComment('hello from the proxy'));
 });
 
 test('unknown issue id still validates format before the provider (400)', async () => {

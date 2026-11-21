@@ -52,10 +52,9 @@ import { liveWaitOf } from '../../lib/run-live-wait.js';
 import { closeOutDecision, CLOSE_OUT_ACTOR } from '../../lib/run-closeout-state.js';
 import { FINDINGS_NONE, findingsNotRead } from '../../lib/close-out-findings.js';
 import { assembleTrailFacts, assemblePlanReviewFacts, reviewLoopStop, reviewLoopConverging } from '../../lib/recommendation-facts.js';
-import { blindReadStep } from '../../lib/recommendation-blind-read.js';
+import { blindReadStepFromComments, frozenSurfaceRoute, standingFromComments, frozenIsPerson } from './comment-path-frozen.js';
 import { readRunEvidence } from '../../lib/run-evidence.js';
 import { readCloseOutChain, closeOutNotReady } from '../../lib/close-out-readiness.js';
-import { getRecommendation, setFetchImpl, setPromptTraceRecorder } from '../../lib/openrouter.js';
 import { COMMENT_PATH_ROWS } from './comment-path-rows.js';
 
 export const FIXTURE_DIR = new URL('../fixtures/walk-8/comment-path/', import.meta.url);
@@ -224,7 +223,7 @@ function trailValue(trail) {
 }
 
 function selectorFacts(comments) {
-  const facts = assembleTrailFacts(comments, '', { leaf: true, openFindings: FINDINGS_NONE });
+  const facts = assembleTrailFacts(comments, '', { leaf: true, openFindings: FINDINGS_NONE, standing: standingFromComments(comments), isPerson: frozenIsPerson });
   for (const key of NOT_VERDICT_FACTS) delete facts[key];
   return facts;
 }
@@ -243,8 +242,9 @@ async function captureCase({ comments, statusOf, ticketState, allRuns }) {
   const evidence = await readRunEvidence({
     openFindings: FINDINGS_NONE, issueIdentifier: ISSUE, comments, stopAt: 'pr', runnerReady: true, viewerIsOwner: true,
     readPrStatus: async ({ repo, number }) => { reads.push(urlOf(repo, number)); return statusOf(urlOf(repo, number)); },
+    standing: standingFromComments(comments),
   });
-  const step = blindReadStep({ state: { type: ticketState } }, { comments, allRuns });
+  const step = blindReadStepFromComments({ state: { type: ticketState } }, { comments, allRuns });
   return {
     trail: trailValue(trail),
     decision: {
@@ -271,25 +271,17 @@ async function surfacesOf({ comments, statusOf, ticketState, allRuns }) {
   const workspace = { urlKey: 'acme' };
   const { state: check } = await readCloseOutChain({
     openFindings: FINDINGS_NONE, workspace, issueIdentifier: ISSUE, seam: seam('pr', reads.chain), stopAt: 'pr',
-    runnerReady: true, owner: true, actor: CLOSE_OUT_ACTOR.PERSON, prStatusCache: new Map(),
+    runnerReady: true, owner: true, actor: CLOSE_OUT_ACTOR.PERSON, prStatusCache: new Map(), standing: standingFromComments(comments),
   });
-  const stopAtGuard = await closeOutNotReady({ openFindings: FINDINGS_NONE, workspace, issueIdentifier: ISSUE, seam: seam('pr', reads.stopAtGuard) });
-  const ladderGuard = await closeOutNotReady({ openFindings: FINDINGS_NONE, workspace, issueIdentifier: ISSUE, seam: seam(null, reads.ladderGuard) });
+  const stopAtGuard = await closeOutNotReady({ openFindings: FINDINGS_NONE, workspace, issueIdentifier: ISSUE, seam: seam('pr', reads.stopAtGuard), standing: standingFromComments(comments) });
+  const ladderGuard = await closeOutNotReady({ openFindings: FINDINGS_NONE, workspace, issueIdentifier: ISSUE, seam: seam(null, reads.ladderGuard), standing: standingFromComments(comments) });
 
-  setPromptTraceRecorder(() => {});
-  setFetchImpl(async () => ({ ok: true, json: async () => SELECTOR_REPLY }));
-  let route;
-  try {
-    const rec = await getRecommendation(
-      { identifier: ISSUE, title: 'Gate fixture', description: '', state: { name: ticketState, type: ticketState }, labels: [] },
-      { parent: null, siblings: [], project: null, children: [], comments, focusedChild: null, attachments: [], runs: [], allRuns },
-      { apiKey: 'stub', model: 'x' },
-    );
-    route = { codeRoute: rec.codeRoute ?? null, recommendedAction: rec.recommendedAction ?? null, ...(rec.liveWait ? { liveWait: rec.liveWait } : {}) };
-  } finally {
-    setFetchImpl(null);
-    setPromptTraceRecorder(null);
-  }
+  // LIN-4518: the route the comment path gave (frozen in tests/helpers/comment-path-frozen.js), not the live codeRouteOf,
+  // which reads records now. The selector's answer is the stub's `close-out`, as it was.
+  const route = frozenSurfaceRoute(
+    { identifier: ISSUE, title: 'Gate fixture', description: '', state: { name: ticketState, type: ticketState }, labels: [] },
+    { parent: null, siblings: [], project: null, children: [], comments, focusedChild: null, attachments: [], runs: [], allRuns },
+  );
   return { route, check, stopAtGuard, ladderGuard, prReads: reads };
 }
 
@@ -352,10 +344,10 @@ export async function captureRows(rows = COMMENT_PATH_ROWS) {
 /** What each seed pins beyond the common capture, computed for every case so no seed's reading hides another's. */
 function seedExtras(seedCase, issue) {
   const { comments } = seedCase;
-  const facts = assemblePlanReviewFacts(comments);
+  const facts = assemblePlanReviewFacts(comments, frozenIsPerson);
   const extras = {
     // Seed 1 (and 5's personSince): the plan-review loop's facts, its stop and its convergence.
-    planReview: { facts, stop: reviewLoopStop(issue, comments), converging: reviewLoopConverging(facts.run) },
+    planReview: { facts, stop: reviewLoopStop(issue, comments, frozenIsPerson), converging: reviewLoopConverging(facts.run) },
     // Seed 2: the live wait, CODE_ROUTES[0].
     liveWait: liveWaitOf(seedCase.allRuns),
     // Seed 5: each comment's authorship as the comment path reads it.

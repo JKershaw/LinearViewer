@@ -36,6 +36,7 @@ import { closeOutWaitsOn } from '../../lib/run-closeout-state.js';
 import { landingPrUrls } from '../../lib/run-trail.js';
 import { assembleTrailFacts } from '../../lib/recommendation-facts.js';
 import { blindReadStep } from '../../lib/recommendation-blind-read.js';
+import { standingFromComments } from '../helpers/comment-path-frozen.js';
 import { generatePrompt } from '../../lib/prompt-templates.js';
 import { resolveRunPrRef } from '../../lib/pr-state-store.js';
 import { SURVEY_HEADINGS } from '../../lib/prompts/survey-words.js';
@@ -80,9 +81,10 @@ const ROWS = {
   15: [research(1), summary(2), review(3), read(4, PR1)],
 };
 
-const facts = (comments) => assembleTrailFacts(comments, '', { leaf: false });
-const step = (comments, state = STARTED) => blindReadStep({ state }, { comments, allRuns: [] })?.step ?? null;
+const facts = (comments) => assembleTrailFacts(comments, '', { leaf: false, standing: standingFromComments(comments) });
+const step = (comments, state = STARTED) => blindReadStep({ state }, { standing: standingFromComments(comments), allRuns: [] })?.step ?? null;
 const ladderSeam = (comments) => ({
+  standing: standingFromComments(comments),
   resolveProvider: () => ({ provider: { name: 'local', async fetchIssueComments() { return comments; } }, callScope: 'scope' }),
   isStopAtRun: async () => null,
 });
@@ -139,7 +141,7 @@ describe('the new rule (LIN-4458)', () => {
     const { review: rv } = facts(comments);
     assert.equal(closeOutWaitsOn({ ...rv, blindRead: { prs: [PR2] } }, landingPrUrls(comments)), null, 'a read of the notes PR alone clears it');
     const prompt = generatePrompt('blind-read', { identifier: 'LIN-1', title: 'Gate fixture', description: '', state: DONE, labels: [] },
-      { parent: null, siblings: [], project: null, children: [], comments, focusedChild: null, attachments: [], runs: [], allRuns: [] }).prompt;
+      { parent: null, siblings: [], project: null, children: [], comments, focusedChild: null, attachments: [], runs: [], allRuns: [], standing: standingFromComments(comments) }).prompt;
     assert.ok(prompt.includes(`**The change:** ${PR2}`) && !prompt.includes(`**The change:** ${PR1}`), 'the reader is told to read the notes PR only');
   });
 
@@ -201,7 +203,7 @@ describe('the box: a landing of [A] cited beside B', () => {
   });
 
   test('pin: the picker withholds, because it chooses from every cited URL', async () => {
-    const model = await readRunEvidence({ openFindings: FINDINGS_NONE, issueIdentifier: 'LIN-1', comments: CITED_NOT_LANDED, readPrStatus: async ({ number }) => openPr(number), stopAt: 'pr', runnerReady: true, viewerIsOwner: true });
+    const model = await readRunEvidence({ openFindings: FINDINGS_NONE, issueIdentifier: 'LIN-1', comments: CITED_NOT_LANDED, standing: standingFromComments(CITED_NOT_LANDED), readPrStatus: async ({ number }) => openPr(number), stopAt: 'pr', runnerReady: true, viewerIsOwner: true });
     assert.deepEqual(model.state.prUrls.map(p => p.url), [B, A]);
     assert.equal(resolveRunPrRef(model).status, 'multiple');
   });
@@ -212,7 +214,7 @@ describe('the box: a landing of [A] cited beside B', () => {
     const reads = [];
     const model = await readRunEvidence({
       openFindings: FINDINGS_NONE,
-      issueIdentifier: 'LIN-1', comments: CITED_NOT_LANDED, stopAt: 'pr', runnerReady: true, viewerIsOwner: true,
+      issueIdentifier: 'LIN-1', comments: CITED_NOT_LANDED, standing: standingFromComments(CITED_NOT_LANDED), stopAt: 'pr', runnerReady: true, viewerIsOwner: true,
       readPrStatus: async ({ repo, number }) => { reads.push(`${repo}#${number}`); return number === 41 ? openPr(41) : closedPr(number); },
     });
     assert.deepEqual(reads, [`${REPO}#41`], 'one read, of the landing\'s sole PR');
@@ -237,6 +239,7 @@ describe('the owner\'s Done check: the same trail through the check route', () =
       closeOut: {
         // LIN-4495: a store that answered "none open" (an unmeasured reading holds Done, so the seam says what it read).
         openFindings: FINDINGS_NONE,
+        standing: standingFromComments(comments),
         resolveProvider: () => ({ provider: { async fetchIssueComments() { return comments; } }, callScope: 'scope' }),
         readPrStatus: async ({ number }) => { calls.reads.push(number); return statuses[number]; },
         isStopAtRun: async () => 'pr',

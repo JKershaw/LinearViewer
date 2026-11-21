@@ -14,6 +14,7 @@
  *
  * Run with: node --test tests/unit/task-page-loader.test.js
  */
+import { recordsStoreOf } from '../helpers/records-trail.js';
 import { test, describe, before, after } from 'node:test';
 import assert from 'node:assert/strict';
 import { createTaskPageLoader, buildTaskPageModel, sessionMessage, buildTaskStages, briefCurrentSection, deriveHeader, deriveReadyHeader, fmtWhen } from '../../lib/task-page-loader.js';
@@ -114,12 +115,14 @@ function done(over = {}) {
   return loop({ terminalStatus: 'done', terminalCompletedAt: '2026-10-06T11:00:00.000Z', feedback: [{ message: '[done] landed it', timestamp: '2026-10-06T11:00:00.000Z' }], ...over });
 }
 
-function loaderWith({ loops = [], brief = null, recap = null, getLoops = null, evidence = undefined, prStateStore = null, dispatchStore = {} } = {}) {
+function loaderWith({ loops = [], brief = null, recap = null, getLoops = null, evidence = undefined, prStateStore = null, dispatchStore = {}, recordsStore = null } = {}) {
   const briefSpy = cacheSpy(brief);
   const recapSpy = cacheSpy(recap);
   const loader = createTaskPageLoader({
     dispatchStore,
     agentStatusStore: {},
+    // LIN-4518 (beat 4): the evidence reads the task's records, not the comments; a test that reads evidence supplies them.
+    recordsStore,
     briefCacheStore: briefSpy.store,
     recapCacheStore: recapSpy.store,
     readRunEvidence: evidence === undefined ? readRunEvidence : evidence,
@@ -141,7 +144,7 @@ describe('task page loader: what it reads', () => {
       now: () => NOW.getTime(),
       async readResult(ref) { prReads.push(ref); return { result: { readable: true, state: 'open', merged: false, head: { sha: 'abc1234' }, checks: [] }, via: 'cache' }; },
     };
-    const { loader } = loaderWith({ loops: [done()], prStateStore });
+    const { loader } = loaderWith({ loops: [done()], prStateStore, recordsStore: recordsStoreOf(comments) });
     const { model } = await loader.loadTaskPage({ urlKey: 'ws', identifier: 'LIN-50', access: { provider, callScope: 'tok' } });
 
     assert.deepEqual(calls.map(c => c.method), ['fetchRecommendationContext'], 'one task-scoped read, nothing else (no allowlist read — LIN-3333)');

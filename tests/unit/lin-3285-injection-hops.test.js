@@ -14,6 +14,8 @@ import assert from 'node:assert/strict';
 import express from 'express';
 import { clearFailOpenPrStatus } from '../../lib/github-pr-status.js';
 import { clearPrStateCache, createPrStateStore } from '../../lib/pr-state-store.js';
+import { standingFromComments } from '../helpers/comment-path-frozen.js';
+import { recordsStoreOf } from '../helpers/records-trail.js';
 import { registerProvider } from '../../lib/providers/registry.js';
 import { setProxyFetchImpl } from '../../lib/proxy-fetch.js';
 import { readRunEvidence } from '../../lib/run-evidence.js';
@@ -135,7 +137,7 @@ describe('hop 1: routes/dashboard.js', () => {
         now: () => Date.now(),
         cache: new Map(),
         bucket: [],
-        resolveProvider: () => ({ provider: linear, callScope: 'lin_key' }),
+        standing: standingFromComments(CLOSE_OUT_COMMENTS), resolveProvider: () => ({ provider: linear, callScope: 'lin_key' }),
         loadRun: async () => ({ issueIdentifier: 'LIN-1', evidenceUrls: [] }),
         githubFetch: github,
       },
@@ -164,10 +166,12 @@ describe('hop 2: routes/workspace-api.js', () => {
     return createWorkspaceApiRoutes({
       workspaceFromUrl: (req, res, next) => next(),
       installationTokenFor,
+      // LIN-4518 (beat 4): the run evidence reads the task's records; this trail's comments are written as a records store.
+      recordsStore: recordsStoreOf(CLOSE_OUT_COMMENTS),
       // Neither `readPrStatus` nor `markDone` is overridden: the real default reader runs.
-      runEvidence: { resolveProvider: () => ({ provider: linear, callScope: 'lin_key' }), githubFetch: github },
+      runEvidence: { standing: standingFromComments(CLOSE_OUT_COMMENTS), resolveProvider: () => ({ provider: linear, callScope: 'lin_key' }), githubFetch: github },
       closeOut: {
-        resolveProvider: () => ({ provider: linear, callScope: 'lin_key' }),
+        standing: standingFromComments(CLOSE_OUT_COMMENTS), resolveProvider: () => ({ provider: linear, callScope: 'lin_key' }),
         githubFetch: github,
         isStopAtRun: async () => 'pr',
         runnerReady: () => true,
@@ -235,7 +239,7 @@ describe('hop 3: routes/dispatch.js → enterSessionDispatch → closeOutNotRead
       harbourFeedbackTokenStore: null,
       installationTokenFor,
       closeOut: {
-        resolveProvider: () => ({ provider: linear, callScope: 'lin_key' }),
+        standing: standingFromComments(CLOSE_OUT_COMMENTS), resolveProvider: () => ({ provider: linear, callScope: 'lin_key' }),
         githubFetch: github,
         isStopAtRun: async () => 'pr',
       },
@@ -259,6 +263,7 @@ describe('hop 4: routes/task-page.js and routes/task-share.js', () => {
   function loaderFor(github, installationTokenFor) {
     return createTaskPageLoader({
       dispatchStore: {}, agentStatusStore: {},
+      recordsStore: recordsStoreOf(CLOSE_OUT_COMMENTS),
       briefCacheStore: { async get() { return null; } },
       recapCacheStore: { async get() { return null; } },
       readRunEvidence,

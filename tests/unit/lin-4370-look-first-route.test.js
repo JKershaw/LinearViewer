@@ -35,6 +35,7 @@
  */
 process.env.NODE_ENV = 'test';
 
+import { markHarbourComment } from '../../lib/harbour-comment-mark.js';
 import { test, describe, afterEach } from 'node:test';
 import assert from 'node:assert/strict';
 import express from 'express';
@@ -67,8 +68,10 @@ const leaf = (over = {}) => ({ identifier: 'T-1', title: 'Export CSV', descripti
 
 const T = (hm) => `2026-11-08T${hm}:00.000Z`;
 const comment = (at, body) => ({ user: 'John', createdAt: T(at), body });
-const surveyTask = (at, verdict = 'Just drill: the change is small.') => comment(at, `${SURVEY_HEADINGS['survey-task']}: T-1 @ abc123def\n\n${verdict}`);
-const surveyPlace = (at, verdict = 'The place is fine.') => comment(at, `${SURVEY_HEADINGS['survey-place']}: T-1 @ abc123def\n\n${verdict}`);
+// LIN-4518 (beat 4, ruling lin4518-authorship): a Survey's report is a Harbour write, and a Harbour write carries the mark
+// authorship is read from (lib/harbour-comment-mark.js); unmarked, it would read as a person's under the ruling.
+const surveyTask = (at, verdict = 'Just drill: the change is small.') => comment(at, markHarbourComment(`${SURVEY_HEADINGS['survey-task']}: T-1 @ abc123def\n\n${verdict}`));
+const surveyPlace = (at, verdict = 'The place is fine.') => comment(at, markHarbourComment(`${SURVEY_HEADINGS['survey-place']}: T-1 @ abc123def\n\n${verdict}`));
 const person = (at, body = 'Hold this until the auth change lands.') => comment(at, body);
 const sizeRuling = (at) => comment(at, "## Size of the move (the person's call)\n\nJust the task, please.");
 // A run fact as loadRecentRuns' allRuns carries it.
@@ -83,11 +86,19 @@ const ctx = (comments = [], allRuns = [], over = {}) => ({ parent: null, sibling
 const stepOf = (issue, context) => lookFirstStep(issue, context)?.step ?? null;
 
 describe('step choice: survey-task, then survey-place, then scoping, each once', () => {
-  test('an unsized leaf with an empty trail gets survey-task; with that comment, survey-place; with both, scoping', () => {
+  // LIN-4518 (beat 4): the step on record is its run, not its comment. This test's inputs gained the runs; its expectations
+  // (the order of the three steps) are the same, and the comment-only case is pinned below.
+  test('an unsized leaf with an empty trail gets survey-task; with its run on record, survey-place; with both, scoping', () => {
     assert.deepEqual(LOOK_FIRST_STEPS, ['survey-task', 'survey-place', 'scoping']);
     assert.equal(stepOf(leaf(), ctx()), 'survey-task');
-    assert.equal(stepOf(leaf(), ctx([surveyTask('10:00')])), 'survey-place');
-    assert.equal(stepOf(leaf(), ctx([surveyTask('10:00'), surveyPlace('10:30')])), 'scoping');
+    assert.equal(stepOf(leaf(), ctx([surveyTask('10:00')], [run('survey-task', '09:50', 'done', '10:00')])), 'survey-place');
+    assert.equal(stepOf(leaf(), ctx([surveyTask('10:00'), surveyPlace('10:30')], [run('survey-task', '09:50', 'done', '10:00'), run('survey-place', '10:20', 'done', '10:30')])), 'scoping');
+  });
+
+  // LIN-4518 (beat 4, new): a Survey comment alone is not a step on record, so the sequence sends that Survey again.
+  test('a Survey comment with no run on record is not an attempt: survey-task is sent again (LIN-4518 beat 4)', () => {
+    assert.equal(stepOf(leaf(), ctx([surveyTask('10:00')])), 'survey-task');
+    assert.equal(stepOf(leaf(), ctx([surveyTask('10:00'), surveyPlace('10:30')])), 'survey-task');
   });
 
   test('a "Before you start" comment and no runs gets survey-task (the LIN-4347/4350 shape)', () => {
@@ -115,11 +126,14 @@ describe('step choice: survey-task, then survey-place, then scoping, each once',
     assert.equal(lookFirstStep(leaf(), ctx(surveys, waiting)), null);
   });
 
+  // LIN-4518 (beat 4): input-only change: both Surveys' runs are on record (the sequence reads them). The subject, that the
+  // verdicts say nothing to the route, is unchanged.
   test('Survey comments that say opposite things give the same route (advice, not a gate)', () => {
+    const runs = [run('survey-task', '09:50', 'done', '10:00'), run('survey-place', '10:20', 'done', '10:30')];
     const wrong = [surveyTask('10:00', 'This is the wrong work: the export belongs elsewhere.'), surveyPlace('10:30', 'Rebuild the whole area first.')];
     const drill = [surveyTask('10:00', 'Just drill.'), surveyPlace('10:30', 'Nothing to tidy.')];
-    assert.equal(stepOf(leaf(), ctx(wrong)), 'scoping');
-    assert.equal(stepOf(leaf(), ctx(drill)), 'scoping');
+    assert.equal(stepOf(leaf(), ctx(wrong, runs)), 'scoping');
+    assert.equal(stepOf(leaf(), ctx(drill, runs)), 'scoping');
   });
 
   // LIN-4458: a Survey's report is a comment of that Survey's kind (lib/run-trail.js, the one classifier).
@@ -193,17 +207,23 @@ describe('the hold: a person\'s word after work started outranks the sequence', 
     assert.ok(holdingComment(comments, midRun));
   });
 
-  test('a Survey\'s own headed comment never holds, and neither does a headed size ruling', () => {
+  // LIN-4518 (beat 4, ruling lin4518-authorship): retired, the "neither does a headed size ruling" half. Authorship is the
+  // Harbour mark now, not a comment's shape, so a person's size ruling is a person's comment and holds like any other (the
+  // ruling; tests/unit/lin-4518-authorship-marker.test.js). A Survey's own comment still never holds: it carries the mark.
+  test('a Survey\'s own comment never holds (it carries the Harbour mark)', () => {
     const runs = [run('survey-task', '09:40', 'done', '10:00')];
     assert.equal(stepOf(leaf(), ctx([surveyTask('10:00')], runs)), 'survey-place');
-    assert.equal(stepOf(leaf(), ctx([surveyTask('10:00'), sizeRuling('10:40')], runs)), 'survey-place');
   });
 
-  test('the sequence starts at the earlier of the first run and the first Survey comment', () => {
-    // A hand-run Survey with no run on record (comment only) starts it, so a later person's comment holds.
-    assert.equal(stepOf(leaf(), ctx([surveyTask('10:00'), person('10:30')])), null);
-    // Before the first Survey comment, a person's comment is filing context.
-    assert.equal(stepOf(leaf(), ctx([person('09:30'), surveyTask('10:00')])), 'survey-place');
+  // LIN-4518 (beat 4): the sequence starts at the first run, not at a Survey comment. The old pin (a comment-only Survey
+  // starts it) is retired with the comment read; the hold and the filing rule are pinned on runs.
+  test('the sequence starts at the first run; a Survey comment with no run is filing context', () => {
+    // No run on record: nothing has started, so a person's comment after the Survey comment holds nothing.
+    assert.equal(stepOf(leaf(), ctx([surveyTask('10:00'), person('10:30')])), 'survey-task');
+    // The run starts it, so a later person's comment holds.
+    assert.equal(stepOf(leaf(), ctx([surveyTask('10:00'), person('10:30')], [run('survey-task', '10:00', 'done', '10:20')])), null);
+    // Before the first run, a person's comment is filing context.
+    assert.equal(stepOf(leaf(), ctx([person('09:30'), surveyTask('10:00')], [run('survey-task', '10:00', 'done', '10:20')])), 'survey-place');
   });
 });
 
@@ -255,7 +275,8 @@ describe('when the route is off', () => {
     ] }];
     const allRuns = stageRuns(rows);
     assert.equal(allRuns.at(-1).outcome, 'done', 'a DECISION: on the way to done does not read as waiting on a person');
-    assert.equal(stepOf(leaf(), ctx([comment('10:30', '## Research\n\nFindings. DECISION: {"decision_id":"d1"}')], allRuns)), 'survey-task');
+    // LIN-4518 (beat 4): the research report is a Harbour write, so it carries the mark (an unmarked one reads as a person's).
+    assert.equal(stepOf(leaf(), ctx([comment('10:30', markHarbourComment('## Research\n\nFindings. DECISION: {"decision_id":"d1"}'))], allRuns)), 'survey-task');
   });
 });
 
@@ -273,7 +294,9 @@ describe('a pending record plus an answered ruling, and the in-flight shapes', (
   test('the LIN-4348 shape (Survey comments, a headed size comment, no record) is unsized and gets scoping once nothing holds it', () => {
     const runs = [run('survey-task', '09:00', 'done', '09:20'), run('survey-place', '09:30', 'done', '09:50')];
     const comments = [surveyTask('09:20'), surveyPlace('09:50'), sizeRuling('10:00')];
-    assert.equal(stepOf(leaf(), ctx(comments, runs)), 'scoping');
+    // LIN-4518 (beat 4, ruling lin4518-authorship): retired, the assertion that the headed size comment does not hold (scoping
+    // was sent with it on the trail). The size comment is a person's, unmarked, so under the ruling it holds like any person's
+    // comment. The rest stands: a later person's comment holds, and a run dispatched after both releases it.
     // A later plain person's comment (LIN-4348 had one at 10:15) holds it until another run is dispatched.
     const held = [...comments, person('10:15', 'Also cover the PDF export.')];
     assert.equal(stepOf(leaf(), ctx(held, runs)), null);
@@ -722,9 +745,10 @@ describe('LIN-4398: a gate-marked Periodical review skips the two Surveys and st
     assert.match(step.why, /Periodical review lands no code/);
   });
 
-  test('its unmarked twin keeps both Surveys: survey-task first, scoping only after both comments', () => {
+  test('its unmarked twin keeps both Surveys: survey-task first, scoping only after both Surveys ran', () => {
     assert.equal(stepOf(twin(), ctx()), 'survey-task');
-    assert.equal(stepOf(twin(), ctx([surveyTask('10:00'), surveyPlace('10:30')])), 'scoping');
+    // LIN-4518 (beat 4): scoping follows both Surveys' runs on record (the comments alone are not steps).
+    assert.equal(stepOf(twin(), ctx([surveyTask('10:00'), surveyPlace('10:30')], [run('survey-task', '09:50', 'done', '10:00'), run('survey-place', '10:20', 'done', '10:30')])), 'scoping');
     assert.equal(lookFirstStep(twin(), ctx()).why, 'the look-first sequence: no size of the move is recorded, so survey-task is next; code sends each step once, whatever an earlier step said.', 'the ordinary reason text is unchanged');
   });
 
@@ -805,7 +829,8 @@ describe('LIN-4497: the PR gate reads this ticket\'s own implementation run, not
 
   test('a sibling close-out note posted after survey-task gives survey-place (the mid-sequence case a time boundary would miss)', () => {
     const runs = stageRuns([{ id: 'st1', kind: 'survey-task', status: 'taken', dispatchedAt: T('10:00'), feedback: [entry('10:20', '[done] Surveyed the task.')] }]);
-    const sibling = comment('10:30', INCIDENT_NOTES[0][2]);
+    // LIN-4518 (beat 4): a sibling's close-out note is a Harbour write, so it carries the mark (unmarked, it would hold as a person's).
+    const sibling = comment('10:30', markHarbourComment(INCIDENT_NOTES[0][2]));
     assert.equal(stepOf(leaf(), ctx([surveyTask('10:20'), sibling], runs)), 'survey-place');
   });
 

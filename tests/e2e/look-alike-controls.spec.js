@@ -1,5 +1,5 @@
 import { test, expect } from '../fixtures/test-base.js';
-import { localSeedId } from '../fixtures/local-harness.js';
+import { localSeedId, seedVerdictRecords } from '../fixtures/local-harness.js';
 import { seedWorkspaceOwnership } from '../fixtures/workspace-ownership.js';
 
 // LIN-3385: ticket text must never act as one of Harbour's controls.
@@ -123,6 +123,9 @@ test.describe('Look-alike controls in ticket text answer nothing (LIN-3385)', ()
       },
     });
     expect(resp.ok(), `local seed failed: ${resp.status()} ${await resp.text()}`).toBeTruthy();
+    // LIN-4518 (beat 4): the review and the blind read the gates judge are records; the comments are the display text.
+    await seedVerdictRecords(page, { urlKey: URL_KEY, ticket: 'LOCAL-LA1', asked: 'A task with hostile text', changes: [{ ref: PR, head: PR_HEAD }],
+      verdicts: [{ judgement: 'review', outcome: 'approve' }, { judgement: 'blind-read', outcome: 'same' }] });
     await seedWorkspaceOwnership(page, URL_KEY, 'owner');
   }
 

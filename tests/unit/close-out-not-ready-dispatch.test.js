@@ -18,6 +18,7 @@ import express from 'express';
 import { createDispatchRoutes } from '../../routes/dispatch.js';
 import { DispatchQueueStore } from '../../lib/dispatch-store.js';
 import { closeOutNotReady, CLOSE_OUT_NOT_READY_CODE } from '../../lib/close-out-readiness.js';
+import { standingFromComments } from '../helpers/comment-path-frozen.js';
 import { clearFailOpenPrStatus } from '../../lib/github-pr-status.js';
 import { ISSUE_NOT_FOUND_CODE } from '../../lib/dispatch-referent-guard.js';
 import { createMockCollection } from '../fixtures/mock-collection.js';
@@ -48,7 +49,11 @@ function makeSeam({ comments = COMMENTS, statuses = { 41: openStatus(41, MOVED) 
   const calls = { resolveProvider: 0, fetchIssueComments: 0, readPrStatus: 0 };
   return {
     calls,
-    openFindings: FINDINGS_NONE, resolveProvider: () => {
+    openFindings: FINDINGS_NONE,
+    // LIN-4518 (beat 4): the guards read the records standing; this trail's comments are written as the comment-trail standing.
+    // A records fault (throwComments) has no standing, so the guard stands aside to admit, as its failed comment read did.
+    standing: throwComments ? undefined : standingFromComments(comments),
+    resolveProvider: () => {
       calls.resolveProvider += 1;
       return {
         provider: { async fetchIssueComments() { calls.fetchIssueComments += 1; if (throwComments) throw new Error('boom'); return comments; } },
@@ -165,12 +170,13 @@ describe('LIN-3634: session close-out readiness stage', () => {
 
   // LIN-4438 reverses LIN-3634's "zero reads" pin on purpose: the ladder lane now spends ONE comment
   // read (and still no PR or GitHub read) so the session lane cannot close out past the blind-read gate.
-  test('ordinary ladder close-out (not stop-at) with a read on record: admitted with one comment read and NO PR read', async () => {
+  // LIN-4518 (beat 4): the ladder lane reads the records standing, not the comments, so it makes no comment read either.
+  test('ordinary ladder close-out (not stop-at) with a read on record: admitted with NO comment read and NO PR read', async () => {
     const { store } = makeStore();
     const seam = makeSeam({ stopAt: null });
     const res = await post(buildApp(store, seam), CLOSE_OUT);
     assert.equal(res.status, 201, JSON.stringify(res.body));
-    assert.deepEqual(seam.calls, { resolveProvider: 1, fetchIssueComments: 1, readPrStatus: 0 });
+    assert.deepEqual(seam.calls, { resolveProvider: 0, fetchIssueComments: 0, readPrStatus: 0 });
   });
 
   test('two open PRs, a review that is not Approve, and a merged PR are not head-moved: admitted', async () => {
@@ -271,7 +277,7 @@ describe('LIN-3634: session close-out readiness stage', () => {
       const followUpTo = await warmItem(store, app);
       const res = await post(app, { ...CLOSE_OUT, followUpTo });
       assert.equal(res.status, 201, JSON.stringify(res.body));
-      assert.equal(seam.calls.fetchIssueComments, 1, 'the ladder lane reads the comments once (LIN-4438)');
+      assert.equal(seam.calls.fetchIssueComments, 0, 'the ladder lane reads no comments: the gate reads the records standing (LIN-4518 beat 4; LIN-4438 read it once)');
       assert.equal(seam.calls.readPrStatus, 0);
     });
   });
@@ -287,7 +293,7 @@ describe('LIN-4438: the session lane holds the blind-read gate', () => {
     assert.equal(res.body.reason, 'blind-read-missing');
     assert.equal(res.body.error, 'No blind read on record since the review');
     assert.equal(getInsertCount(), 0);
-    assert.deepEqual(seam.calls, { resolveProvider: 1, fetchIssueComments: 1, readPrStatus: 0 });
+    assert.deepEqual(seam.calls, { resolveProvider: 0, fetchIssueComments: 0, readPrStatus: 0 });
   });
 
   test('stop-at lane, approve and no read: 409 blind-read-missing, even with the head unmoved', async () => {
@@ -338,7 +344,7 @@ describe('LIN-3634: the guard reads uncached (F2)', () => {
     return { ok: true, status: 200, json: async () => body, text: async () => JSON.stringify(body), headers: new Headers() };
   };
   const seamWith = (heads) => ({
-    openFindings: FINDINGS_NONE, resolveProvider: () => ({ provider: { async fetchIssueComments() { return COMMENTS; } }, callScope: 'scope' }),
+    openFindings: FINDINGS_NONE, standing: standingFromComments(COMMENTS), resolveProvider: () => ({ provider: { async fetchIssueComments() { return COMMENTS; } }, callScope: 'scope' }),
     isStopAtRun: async () => 'pr',
     githubFetch: githubFor(heads)
   });

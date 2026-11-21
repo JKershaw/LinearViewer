@@ -17,7 +17,12 @@ import { readFileSync } from 'node:fs';
 import { join } from 'node:path';
 import { fileURLToPath } from 'node:url';
 
-import { assembleTrailFacts, formatTrailFactsBlock } from '../../lib/recommendation-facts.js';
+import { assembleTrailFacts as assembleTrailFactsOf, formatTrailFactsBlock } from '../../lib/recommendation-facts.js';
+import { standingFromComments } from '../helpers/comment-path-frozen.js';
+
+// LIN-4518 (beat 4): the selector's review facts read the records standing; these trails are comment trails written as the standing.
+const assembleTrailFacts = (comments = [], description = '', options = {}) =>
+  assembleTrailFactsOf(comments, description, { standing: standingFromComments(comments), ...options });
 import { generatePrompt, PROMPT_TEMPLATES } from '../../lib/prompt-templates.js';
 
 const ISSUE = {

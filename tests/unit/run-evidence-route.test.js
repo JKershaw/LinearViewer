@@ -23,6 +23,8 @@ function getHandler(router, method, path) {
   return layer.route.stack[layer.route.stack.length - 1].handle;
 }
 
+import { recordsStoreOf } from '../helpers/records-trail.js';
+
 function fakeProvider({ comments = [] } = {}) {
   return {
     async fetchIssueComments() { return comments; },
@@ -32,6 +34,8 @@ function fakeProvider({ comments = [] } = {}) {
 function makeRouter({ comments = [], readPrStatus = null, owner = true } = {}) {
   return createWorkspaceApiRoutes({
     workspaceFromUrl: (req, res, next) => next(),
+    // LIN-4518 (beat 4): the box reads the task's records; this trail's comments are written as a records store.
+    recordsStore: recordsStoreOf(comments),
     runEvidence: {
       resolveProvider: () => ({ provider: fakeProvider({ comments }), callScope: 'scope' }),
       viewerIsOwner: () => owner,
@@ -66,7 +70,9 @@ describe('GET /api/run-evidence/:issueIdentifier', () => {
     assert.equal(res.jsonBody.state.pr.state, 'open');
     assert.equal(res.jsonBody.state.pr.number, 12);
     assert.equal(res.jsonBody.evidence.checked.now.state, 'passing');
-    assert.equal(res.jsonBody.ledger.verdict, 'approve-conditional');
+    // LIN-4518 (beat 4): the verdict is the record's word. An approval with conditions is `approve`, with one finding to
+    // close-out per condition (the review contract), so the word `approve-conditional` no longer comes from a record.
+    assert.equal(res.jsonBody.ledger.verdict, 'approve');
   });
 
   test('zero PR URLs → no-pr (withholds)', async () => {

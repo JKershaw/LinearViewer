@@ -32,6 +32,8 @@ import { closeOutWaitsOn } from '../../lib/run-closeout-state.js';
 import { landingPrUrls, commentKindOf, isPersonComment } from '../../lib/run-trail.js';
 import { assembleTrailFacts } from '../../lib/recommendation-facts.js';
 import { blindReadStep, BLIND_READ_ATTEMPT_BOUND } from '../../lib/recommendation-blind-read.js';
+import { standingFromComments } from '../helpers/comment-path-frozen.js';
+import { prUrlsIn } from '../../lib/run-ledger.js';
 import { generatePrompt } from '../../lib/prompt-templates.js';
 import { SURVEY_HEADINGS } from '../../lib/prompts/survey-words.js';
 
@@ -89,7 +91,9 @@ const ROWS = [
 ];
 
 const SELECTOR_REPLY = { choices: [{ message: { content: '## Reasoning\n→ **close-out**' }, finish_reason: 'stop' }], usage: { completion_tokens: 3 } };
-const context = (row) => ({ parent: null, siblings: [], project: null, children: [], comments: row.comments, focusedChild: null, attachments: [], runs: [], allRuns: Object.hasOwn(row, 'allRuns') ? row.allRuns : [] });
+// LIN-4518: the route reads the ticket's standing; the row's trail is written as records (tests/helpers/records-trail.js).
+const statusesOf = (row) => Object.fromEntries(row.comments.flatMap((c) => prUrlsIn(c.body)).map((u) => [u, statusFor(row, u)]));
+const context = (row) => ({ parent: null, siblings: [], project: null, children: [], comments: row.comments, focusedChild: null, attachments: [], runs: [], allRuns: Object.hasOwn(row, 'allRuns') ? row.allRuns : [], standing: standingFromComments(row.comments, { statuses: statusesOf(row) }) });
 const issueOf = (row) => ({ identifier: 'LIN-1', title: 'Gate fixture', description: '', state: row.state || STARTED, labels: [] });
 
 function statusFor(row, url) {
@@ -99,6 +103,7 @@ function statusFor(row, url) {
 
 function seamFor(row, stopAt) {
   return {
+    standing: standingFromComments(row.comments),
     resolveProvider: () => ({ provider: { name: 'local', async fetchIssueComments() { return row.comments; } }, callScope: 'scope' }),
     readPrStatus: async ({ repo, number }) => statusFor(row, `https://github.com/${repo}/pull/${number}`),
     isStopAtRun: async () => stopAt
@@ -121,7 +126,7 @@ async function lanes(row) {
   const workspace = { urlKey: 'acme' };
   const { state } = await readCloseOutChain({ openFindings: FINDINGS_NONE, workspace, issueIdentifier: 'LIN-1', seam: seamFor(row, 'pr'), stopAt: 'pr', runnerReady: true, owner: true, actor: 'harbour', prStatusCache: new Map() });
   // LIN-4458: the box is read the way the page reads it (readRunEvidence: one read, of the landing's sole PR).
-  const box = (await readRunEvidence({ openFindings: FINDINGS_NONE, issueIdentifier: 'LIN-1', comments: row.comments, readPrStatus: async ({ repo, number }) => statusFor(row, `https://github.com/${repo}/pull/${number}`), stopAt: 'pr', runnerReady: true, viewerIsOwner: true })).closeOut;
+  const box = (await readRunEvidence({ openFindings: FINDINGS_NONE, issueIdentifier: 'LIN-1', comments: row.comments, readPrStatus: async ({ repo, number }) => statusFor(row, `https://github.com/${repo}/pull/${number}`), stopAt: 'pr', runnerReady: true, viewerIsOwner: true, standing: standingFromComments(row.comments) })).closeOut;
   const stopAtGuard = await closeOutNotReady({ openFindings: FINDINGS_NONE, workspace, issueIdentifier: 'LIN-1', seam: seamFor(row, 'pr') });
   const ladderGuard = await closeOutNotReady({ openFindings: FINDINGS_NONE, workspace, issueIdentifier: 'LIN-1', seam: seamFor(row, null) });
   return { route: await routeLane(row), state, box, stopAtGuard, ladderGuard };
@@ -167,7 +172,7 @@ describe('rows that need more than the lanes', () => {
     const row = ROWS.find(r => r.n === 11);
     assert.notEqual(commentKindOf(LINK_BODY), 'agent-note', 'never an agent-note opening, so it counts as landing work');
     assert.equal(isPersonComment(LINK_BODY), false, 'never read as a person waiting for an answer');
-    const facts = assembleTrailFacts(row.comments, '', { leaf: false });
+    const facts = assembleTrailFacts(row.comments, '', { leaf: false, standing: standingFromComments(row.comments) });
     assert.equal(facts.workAfterReview, true, 'the selector facts show work after review');
     assert.equal(facts.closeOutAfterReview, false);
     assert.equal(closeOutWaitsOn(facts.review, landingPrUrls(row.comments)), 'blind-read');
@@ -179,7 +184,7 @@ describe('rows that need more than the lanes', () => {
   // first to cite, so the notes PR's landing is PR2 alone.
   test('row 14: the audit re-cites the merged landing PR, and the notes PR\'s read names the notes PR alone (flipped by LIN-4458)', () => {
     const row = ROWS.find(r => r.n === 14);
-    const facts = assembleTrailFacts(row.comments, '', { leaf: false });
+    const facts = assembleTrailFacts(row.comments, '', { leaf: false, standing: standingFromComments(row.comments) });
     assert.deepEqual(landingPrUrls(row.comments), [PR2]);
     assert.equal(closeOutWaitsOn({ ...facts.review, blindRead: { prs: [PR2] } }, landingPrUrls(row.comments)), null, 'a read of the notes PR alone clears it');
     assert.equal(closeOutWaitsOn({ ...facts.review, blindRead: { prs: [PR1] } }, landingPrUrls(row.comments)), 'blind-read', 'a read of the merged landing alone does not');
@@ -198,20 +203,20 @@ describe('the route\'s own edges', () => {
 
   test('a Canceled or Duplicate ticket stands aside; a Done ticket stands aside unless an audit\'s notes PR reads after it', () => {
     for (const type of ['canceled', 'duplicate']) {
-      assert.equal(blindReadStep({ state: { type } }, { comments: approved, allRuns: [] }), null, type);
+      assert.equal(blindReadStep({ state: { type } }, { standing: standingFromComments(approved), allRuns: [] }), null, type);
     }
     // Row 196, first half (flipped by LIN-4460): a person set the ticket Done outside Harbour and the trail holds
     // no close-out on its landing, so Harbour follows and sends no read to a Done ticket.
-    assert.equal(blindReadStep({ state: DONE }, { comments: approved, allRuns: [] }), null, 'Done with no close-out on the landing: the person\'s Done stands');
+    assert.equal(blindReadStep({ state: DONE }, { standing: standingFromComments(approved), allRuns: [] }), null, 'Done with no close-out on the landing: the person\'s Done stands');
     // Row 196, second half (unchanged): a close-out after the review.
-    assert.equal(blindReadStep({ state: DONE }, { comments: [summary(1), review(2), closeOut(3, `Merged ${PR1}; set Done.`)], allRuns: [] }), null, 'Done, closed out after the review, no read: stands aside');
+    assert.equal(blindReadStep({ state: DONE }, { standing: standingFromComments([summary(1), review(2), closeOut(3, `Merged ${PR1}; set Done.`)]), allRuns: [] }), null, 'Done, closed out after the review, no read: stands aside');
     // Added by LIN-4460: an audit's notes PR opened after Done still gets its read (its own review comes after the close-out).
-    assert.equal(blindReadStep({ state: DONE }, { comments: [summary(1), review(2), closeOut(3, `Merged ${PR1}; set Done.`), audit(4), review(5, 'Approve', PR2)], allRuns: [] }).step, 'blind-read', 'a post-Done audit notes PR is still read');
+    assert.equal(blindReadStep({ state: DONE }, { standing: standingFromComments([summary(1), review(2), closeOut(3, `Merged ${PR1}; set Done.`), audit(4), review(5, 'Approve', PR2)]), allRuns: [] }).step, 'blind-read', 'a post-Done audit notes PR is still read');
   });
 
   test('a live blind read is not an ended attempt; runs before the review do not count', () => {
     assert.equal(BLIND_READ_ATTEMPT_BOUND, 2);
-    const step = (allRuns) => blindReadStep({ state: STARTED }, { comments: approved, allRuns }).step;
+    const step = (allRuns) => blindReadStep({ state: STARTED }, { standing: standingFromComments(approved), allRuns }).step;
     assert.equal(step([run('blind-read', 3, 'done')]), 'blind-read', 'one ended attempt');
     assert.equal(step([run('blind-read', 3, 'done'), run('blind-read', 4, 'running')]), 'blind-read', 'one ended, one live');
     assert.equal(step([run('blind-read', 0, 'done'), run('blind-read', 1, 'failed'), run('blind-read', 3, 'done')]), 'blind-read', 'two before the review');
@@ -221,7 +226,7 @@ describe('the route\'s own edges', () => {
   });
 
   test('the route reads the ledger whole: a read written before the review is not its read', () => {
-    assert.equal(blindReadStep({ state: STARTED }, { comments: [summary(1), read(2, PR1), review(3)], allRuns: [] }).step, 'blind-read');
+    assert.equal(blindReadStep({ state: STARTED }, { standing: standingFromComments([summary(1), read(2, PR1), review(3)]), allRuns: [] }).step, 'blind-read');
   });
 });
 
@@ -230,12 +235,12 @@ describe('a Survey report is not landing work, for the trail facts as for landin
 
   test('a Survey after the review is not work after review, and the landing skips it', () => {
     const comments = [summary(1), review(2), survey(3)];
-    assert.equal(assembleTrailFacts(comments, '', { leaf: false }).workAfterReview, false);
+    assert.equal(assembleTrailFacts(comments, '', { leaf: false, standing: standingFromComments(comments) }).workAfterReview, false);
     assert.deepEqual(landingPrUrls(comments), [PR1]);
   });
 
   test('a Survey after a plan-review verdict is not landed work', () => {
     const verdict = c(1, '### Plan Review Verdict\n\n**Verdict:** Request Changes. 2 blocking findings.');
-    assert.equal(assembleTrailFacts([verdict, survey(2)], '').planReview.landed, null);
+    assert.equal(assembleTrailFacts([verdict, survey(2)], '', { standing: standingFromComments([verdict, survey(2)]) }).planReview.landed, null);
   });
 });

@@ -23,10 +23,12 @@ import { join, relative, dirname } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { createMangoTmpdir } from '../fixtures/mango-tmpdir.js';
 import { recordMergedPrs, createPipelineMergeRecorder } from '../../lib/close-out-merges.js';
+import { recordsStoreOf } from '../helpers/records-trail.js';
 import { CloseOutEventsStore } from '../../lib/close-out-events-store.js';
 import { FINDINGS_NONE } from '../../lib/close-out-findings.js';
 import { readPrStatuses, closeOutNotReady } from '../../lib/close-out-readiness.js';
 import { closeOutDecision } from '../../lib/run-closeout-state.js';
+import { versionsOfComments } from '../helpers/records-trail.js';
 import { terminalPrUrlOfFeedback } from '../../lib/dispatch-wake.js';
 
 const harness = createMangoTmpdir('lin-4515-characterization-');
@@ -71,13 +73,15 @@ describe('createPipelineMergeRecorder answers (characterization)', () => {
     async listHistory() { return []; },
     async getItemStatus() { return null; },
   };
-  const provider = { name: 'github', async fetchIssueComments() { return [{ body: PR1, createdAt: '2026-11-21T11:00:00Z', user: 'w' }]; } };
+  // LIN-4518 (beat 4): the merge recorder's landing is the task's records; this trail is written as a records store.
+  const MERGE_TRAIL = [{ body: PR1, createdAt: '2026-11-21T11:00:00Z', user: 'w' }];
+  const provider = { name: 'github', async fetchIssueComments() { return MERGE_TRAIL; } };
   const callScope = { token: 'ghs_token', repo: REPO };
   const done = { id: 'iss-1', identifier: 'LIN-1', state: { type: 'completed' } };
 
   test('a merged PR answers exactly {recorded} with one row, headSha the head sha', async () => {
     const record = createPipelineMergeRecorder({
-      closeOutEventsStore: eventsStore(), dispatchStore, log: () => {},
+      closeOutEventsStore: eventsStore(), dispatchStore, recordsStore: recordsStoreOf(MERGE_TRAIL), log: () => {},
       readPrStatus: async () => merged(41, 'H9'),
     });
     const out = await record({ urlKey: 'ws', workspaceId: 'ws-id', accountId: 'acct-1', provider, callScope, written: done });
@@ -89,16 +93,17 @@ describe('createPipelineMergeRecorder answers (characterization)', () => {
 
   test('a non-completed write answers exactly {recorded: []} and reads nothing', async () => {
     let reads = 0;
-    const record = createPipelineMergeRecorder({ closeOutEventsStore: eventsStore(), dispatchStore, log: () => {}, readPrStatus: async () => { reads++; return merged(41, 'H9'); } });
+    const record = createPipelineMergeRecorder({ closeOutEventsStore: eventsStore(), dispatchStore, recordsStore: recordsStoreOf(MERGE_TRAIL), log: () => {}, readPrStatus: async () => { reads++; return merged(41, 'H9'); } });
     const out = await record({ urlKey: 'ws', workspaceId: 'ws-id', accountId: 'acct-1', provider, callScope, written: { ...done, state: { type: 'canceled' } } });
     assert.deepEqual(out, { recorded: [] });
     assert.equal(reads, 0);
   });
 
-  test('a throwing provider answers exactly {recorded: []}, never a throw', async () => {
-    const record = createPipelineMergeRecorder({ closeOutEventsStore: eventsStore(), dispatchStore, log: () => {}, readPrStatus: async () => merged(41, 'H9') });
-    const bad = { name: 'github', async fetchIssueComments() { throw new Error('down'); } };
-    assert.deepEqual(await record({ urlKey: 'ws', workspaceId: 'ws-id', accountId: 'acct-1', provider: bad, callScope, written: done }), { recorded: [] });
+  // LIN-4518 (beat 4): the landing is read from the records store, so the throw is the store's (a records fault), not the provider's.
+  test('a throwing records store answers exactly {recorded: []}, never a throw', async () => {
+    const down = { async taskForTicket() { throw new Error('down'); } };
+    const record = createPipelineMergeRecorder({ closeOutEventsStore: eventsStore(), dispatchStore, recordsStore: down, log: () => {}, readPrStatus: async () => merged(41, 'H9') });
+    assert.deepEqual(await record({ urlKey: 'ws', workspaceId: 'ws-id', accountId: 'acct-1', provider, callScope, written: done }), { recorded: [] });
   });
 });
 
@@ -165,10 +170,22 @@ describe('witness 6: the ladder lane makes no PR read (characterization)', () =>
       readPrStatus: async () => { counts.prReads++; throw new Error('a PR read on the ladder lane'); },
       githubFetch: async () => { counts.prReads++; throw new Error('a GitHub read on the ladder lane'); },
     };
-    // Any records read throws: the ladder lane must not touch the store.
-    const recordsStore = new Proxy({}, { get(_t, name) { throw new Error(`a records read on the ladder lane: ${String(name)}`); } });
+    // LIN-4518: the ladder lane reads the comments once, as it always did, and consults the ticket's records standing for the
+    // gate (lib/task-standing.js gateTrailOf: the records govern once the newest verdict is a record). The store serves the
+    // trail's records (tests/helpers/records-trail.js), and its reads are counted.
+    const versions = versionsOfComments(COMMENTS);
+    const index = (rows) => rows.filter((s, i, all) => all.findIndex((x) => x.id === s.id) === i);
+    const current = (kind) => index(versions.filter((v) => v.kind === kind).sort((a, b) => b.v - a.v));
+    const recordsStore = {
+      reads: 0,
+      async taskForTicket() { this.reads++; return 'task-trail'; },
+      async find(_urlKey, { kind }) { this.reads++; return current(kind); },
+      async versionsOf(_urlKey, ids) { this.reads++; return versions.filter((v) => ids.includes(v.id)); },
+    };
     const state = await closeOutNotReady({ openFindings: FINDINGS_NONE, workspace: { urlKey: 'acme' }, issueIdentifier: 'LIN-1', seam, recordsStore });
-    assert.deepEqual(counts, { comments: 1, prReads: 0 });
+    // LIN-4518 (beat 4): the ladder lane reads no comment: its gate is the records standing (this witness's subject moved).
+    assert.deepEqual(counts, { comments: 0, prReads: 0 });
+    assert.ok(recordsStore.reads > 0, 'the gate consulted the records standing');
     assert.equal(state?.reason, 'blind-read-missing', 'the ladder still refuses on the gate');
   });
 });

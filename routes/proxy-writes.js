@@ -39,6 +39,7 @@
  *  - Attachments with a description target re-resolve, re-check updateIssue and
  *    re-read the description inside the description pipeline.
  */
+import { markHarbourComment } from '../lib/harbour-comment-mark.js';
 import { Router, json } from 'express';
 import { dedupeKey } from '../lib/proxy-dedupe.js';
 import { graphqlErrorExtra, graphqlErrorDetail, normalizeWritePayload } from '../lib/proxy-graphql-errors.js';
@@ -60,7 +61,8 @@ import { appendBlock, replace as replaceInDescription, DescriptionEditError } fr
 import { checkSizeRecord, recordShape, SIZE_OF_MOVE_HEADING, SIZE_RECORD_CODES, DECIDED_BY, WRONG_WORK } from '../lib/size-of-move.js';
 import { addedPlanHeadings, PLAN_HEADING_WORDS, PLAN_IN_DESCRIPTION } from '../lib/legacy-plan-text.js';
 import { blindReadRefusal } from '../lib/run-ledger.js';
-import { checkBlindRead, landingPrUrls } from '../lib/run-trail.js';
+import { checkBlindRead } from '../lib/run-trail.js';
+import { standingForTicket, gateTrailOf } from '../lib/task-standing.js';
 import { isRestrictedStamp, sameTicketKey, ISSUE_PATCH_FIELDS } from '../lib/stage-writes.js';
 import { jsonError } from '../lib/errors.js';
 import { parseFeedbackImage } from '../lib/attachment-upload.js';
@@ -327,7 +329,8 @@ export function createProxyWriteRoutes({
 
   /** Create a comment and answer 201; `remember` sees the payload once the write is accepted. */
   async function postComment({ req, res, endpoint, token, provider }, text, remember) {
-    const created = normalizeWritePayload(await provider.createComment(token, req.params.issueId, text), 'comment');
+    // LIN-4518 (beat 4): a Harbour write carries the mark authorship is read from (lib/harbour-comment-mark.js).
+    const created = normalizeWritePayload(await provider.createComment(token, req.params.issueId, markHarbourComment(text)), 'comment');
     // A clear failure instead of a misleading 201 when the provider reports the write did not land.
     if (writeRejected(req, res, endpoint, created, 'Comment was not created')) return;
     remember?.(created);
@@ -716,8 +719,13 @@ export function createProxyWriteRoutes({
     if (!shape.ok) return refuseBlindRead(ctx, shape);
     let landing = null;
     try {
-      if (typeof ctx.provider.fetchIssueComments !== 'function') throw new Error('the provider reads no comment trail');
-      landing = landingPrUrls(await ctx.provider.fetchIssueComments(ctx.token, ctx.req.params.issueId));
+      // LIN-4518 (beat 4): the landing is the task's records (lib/records/landing.js, through the standing): the open changes
+      // and the round's merged ones. A ticket with no task has no landing on record, so the set check is skipped, as it is
+      // when the trail cannot be read whole (fail open, logged).
+      const standing = recordsStore ? await standingForTicket({ recordsStore, urlKey: ctx.req.proxyUrlKey, ticket: ctx.req.params.issueId }) : null;
+      const gate = gateTrailOf({ standing });
+      if (!gate) throw new Error('the task standing could not be read');
+      landing = gate.trail.landing;
     } catch (err) {
       console.warn(`[blind-read] ${ctx.req.params.issueId}: PR-set check skipped, the trail could not be read whole (${err?.message || err}); the shape check held`);
     }

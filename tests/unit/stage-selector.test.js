@@ -12,6 +12,7 @@
  *
  * Run with: node --test tests/unit/stage-selector.test.js
  */
+import { markHarbourComment } from '../../lib/harbour-comment-mark.js';
 import { test, describe } from 'node:test';
 import assert from 'node:assert/strict';
 import { buildRouterPrompt, routeStage, parseWhyNow } from '../../lib/stage-router.js';
@@ -70,9 +71,11 @@ describe('the selector prompt (LIN-3300)', () => {
   });
 
   test('no dangling step references, and "fix it here" names a stage', () => {
+    // LIN-4518 (beat 4, ruling lin4518-authorship): the verdict and the landing report are Harbour writes, so they carry the
+    // mark authorship is read from (lib/harbour-comment-mark.js); unmarked, the report would read as a person's.
     const landed = [
-      { createdAt: '2026-01-01T00:00:00Z', body: '### Plan Review Verdict\n\n**Verdict:** Approve.' },
-      { createdAt: '2026-01-02T00:00:00Z', body: 'Implementation landed: https://github.com/o/r/pull/9' }
+      { createdAt: '2026-01-01T00:00:00Z', body: markHarbourComment('### Plan Review Verdict\n\n**Verdict:** Approve.') },
+      { createdAt: '2026-01-02T00:00:00Z', body: markHarbourComment('Implementation landed: https://github.com/o/r/pull/9') }
     ];
     const p = prompt(leaf(), ctx({ comments: landed }));
     assert.match(p, /Since the latest plan-review verdict: a person's comment: no; landed work: https:\/\/github\.com\/o\/r\/pull\/9/);

@@ -24,6 +24,7 @@
  * Run with: node --test tests/unit/proxy-github-write-routes.test.js
  */
 
+import { markHarbourComment } from '../../lib/harbour-comment-mark.js';
 import { test, describe, beforeEach, afterEach } from 'node:test';
 import assert from 'node:assert/strict';
 import express from 'express';
@@ -162,7 +163,9 @@ describe('GitHub-backed proxy writes land (were 500 "Linear API request failed")
     assert.equal(body.success, true);
     const comments = await fake.listComments(REPO, 7);
     assert.equal(comments.length, 1);
-    assert.equal(comments[0].body, 'hello from the proxy');
+    // LIN-4518 (beat 4, ruling lin4518-authorship): a proxy comment is a Harbour write, so the body it posts carries the mark
+    // authorship is read from (lib/harbour-comment-mark.js); the expectation is the exact marked body.
+    assert.equal(comments[0].body, markHarbourComment('hello from the proxy'));
   });
 
   test('POST /issues/:id/description/append → 200 and the body is appended', async () => {

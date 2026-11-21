@@ -22,13 +22,13 @@
     },
     "plan:fresh": {
       "name": "plan",
-      "bytes": 12712,
-      "sha256": "905e4e7789c33a870bf8a82dd568b7b3abf4f4efae41b52c70b23b4c1cc78dca"
+      "bytes": 12848,
+      "sha256": "87f3ed5c9149651332c57960bc72827044f7cca4f1e8992a42aa96b3f8ee3d6a"
     },
     "plan:fix": {
       "name": "plan",
-      "bytes": 12712,
-      "sha256": "905e4e7789c33a870bf8a82dd568b7b3abf4f4efae41b52c70b23b4c1cc78dca"
+      "bytes": 12848,
+      "sha256": "87f3ed5c9149651332c57960bc72827044f7cca4f1e8992a42aa96b3f8ee3d6a"
     },
     "look-into:fresh": {
       "name": "look into",
@@ -112,13 +112,13 @@
     },
     "plan-review:fresh": {
       "name": "plan-review",
-      "bytes": 9262,
-      "sha256": "c432bc36108979781a17c6f588dc75e199cb48f07e335d798305c702971fa6cf"
+      "bytes": 9986,
+      "sha256": "ef4de978ea241471bbb4e73d62b7ff5c572e4756069ca479f5d1410120be5c3b"
     },
     "plan-review:fix": {
       "name": "plan-review",
-      "bytes": 9262,
-      "sha256": "c432bc36108979781a17c6f588dc75e199cb48f07e335d798305c702971fa6cf"
+      "bytes": 9986,
+      "sha256": "ef4de978ea241471bbb4e73d62b7ff5c572e4756069ca479f5d1410120be5c3b"
     },
     "implementation:fresh": {
       "name": "implement",
@@ -127,28 +127,28 @@
     },
     "implementation:fix": {
       "name": "implement",
-      "bytes": 12025,
-      "sha256": "a920de47fd3f360ab943ea97874c56c14dbef17ddc5be74c25135e1d6a816e55"
+      "bytes": 11918,
+      "sha256": "7272b61f2545fb60fab4246c407f75b42e1525277371c93549cddee6391a8b54"
     },
     "review:fresh": {
       "name": "review",
-      "bytes": 17845,
-      "sha256": "0e4de1ca3f8fab559219078ab7f381e30d0e7fbc3fd77e2800909f3a21088146"
+      "bytes": 18396,
+      "sha256": "69c149e9d009eb9892a5f835c5f71260fb2b1a0b2e78350adc44bab00f7d65d5"
     },
     "review:fix": {
       "name": "review",
-      "bytes": 17845,
-      "sha256": "0e4de1ca3f8fab559219078ab7f381e30d0e7fbc3fd77e2800909f3a21088146"
+      "bytes": 18396,
+      "sha256": "69c149e9d009eb9892a5f835c5f71260fb2b1a0b2e78350adc44bab00f7d65d5"
     },
     "close-out:fresh": {
       "name": "close-out",
-      "bytes": 11151,
-      "sha256": "68811102db2bec3004d72c2101c3dab0b9c5a74137c60143239b3b425fc34662"
+      "bytes": 11323,
+      "sha256": "9992e315290789e8534df3ef56c7806eb0b4bd2f3aa37972024adc68e08370e7"
     },
     "close-out:fix": {
       "name": "close-out",
-      "bytes": 11151,
-      "sha256": "68811102db2bec3004d72c2101c3dab0b9c5a74137c60143239b3b425fc34662"
+      "bytes": 11323,
+      "sha256": "9992e315290789e8534df3ef56c7806eb0b4bd2f3aa37972024adc68e08370e7"
     },
     "retrospective-audit:fresh": {
       "name": "retrospective-audit",
@@ -192,13 +192,13 @@
     },
     "blind-read:fresh": {
       "name": "blind-read",
-      "bytes": 4513,
-      "sha256": "4204194a77aa79ab16326ef444a89628046cb95a02c435aff2ed54f0f8ddfd4b"
+      "bytes": 4903,
+      "sha256": "43ab0c3b76dbe06ba2b47ab739b5cd73e8f7ad72e4d39d50f684a8eda8fd093f"
     },
     "blind-read:fix": {
       "name": "blind-read",
-      "bytes": 4513,
-      "sha256": "4204194a77aa79ab16326ef444a89628046cb95a02c435aff2ed54f0f8ddfd4b"
+      "bytes": 4903,
+      "sha256": "43ab0c3b76dbe06ba2b47ab739b5cd73e8f7ad72e4d39d50f684a8eda8fd093f"
     }
   },
   "tables": {
@@ -249,7 +249,7 @@
       "    \"coreOutcome\": \"Approved work finished: the fixes review asked for made, the findings to close-out settled, the PR merged, the post-deploy steps done once the deploy landed, the task Done, the summary posted, and related tickets tidied and each outside find recorded to the project backlog\",",
       "    \"readinessCheck\": \"Did the review record an Approve, and is the work then finished: the fixes review asked for made, every finding to close-out settled (with none recorded under an Approve, nothing waits; a missing verdict goes back to review), merged, the post-deploy steps done once the deploy landed, set Done, summarized (with how the work meets what was asked), and each outside find recorded to project?\",",
       "    \"signals\": [",
-      "      \"Review verdict read from the latest summary comment; any finding to close-out settled, none recorded passing through, and a missing verdict sent back to review to confirm\",",
+      "      \"Review verdict read from the latest summary comment and from the review's verdict record (the gates read the record); any finding to close-out settled, none recorded passing through, and a missing verdict sent back to review to confirm\",",
       "      \"The fixes review asked for made by close-out itself, each the size of a fix (new design or new behaviour handed back to review), listed in the summary with its commit, and CI green on the new head\",",
       "      \"Every finding to close-out settled: inside work done with cited evidence, a monitor or rollback named by the name review wrote (an unnamed one settles nothing), or a finding accepted by a human naming the exact precondition exercised; an outside find recorded to project; once the deploy landed, a post-deploy check close-out cannot run is recorded as not run (what, why, follow-up) and does not hold the close\",",
       "      \"Green CI confirmed on the exact merged commit, or CI genuinely absent with the substitute re-run and recorded on it (green CI alone never settles a finding)\",",
@@ -862,7 +862,7 @@
     ]
   },
   "stageLabels": "71b1066de2fe5206ed5acf5f18d47b5a62543f8c22697e24a7e982a3264e192a",
-  "contracts": "49dda006ac99f4735a75b5e2791a2caf053b6dc2c8a1aae4983aed17cdb0e6fc",
+  "contracts": "7a4477a6e7c094fd0b6f21e2d2185fa7e34f3736592df0fd7fac6a1d10546ba3",
   "stepWords": "0a06759d642d8c2268893789c6c196461af7b338e3b58dccf0ce7ab5353cbec5",
   "overrideLine": "e8cd49b7b5b35ecfe83ae820694879f466b3017d1dad0ef0655dbe15944aefb9"
 }

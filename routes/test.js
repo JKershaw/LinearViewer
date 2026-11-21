@@ -4,6 +4,8 @@
  * Allows tests to bypass OAuth and use predictable mock data.
  * Only mounted when NODE_ENV === 'test'.
  */
+import { createTestRecordSeed } from '../lib/records/writes.js';
+import { BLIND_READ_KIND } from '../lib/prompts/blind-read-words.js';
 import express, { Router } from 'express';
 import { personMint } from '../lib/stage-writes.js';
 import crypto from 'crypto';
@@ -98,7 +100,7 @@ const uuidForUrlKey = (key) => {
  * @param {Object|null} [options.taskModeStore] - Task-mode event store (LIN-2942), for /test/clear-task-mode-events
  * @returns {Router} Express router
  */
-export function createTestRoutes({ dispatchQueueStore, dispatchTokenStore, freeTierStore, userPreferencesStore, workspacePreferencesStore, modelRoutingStore = null, customPromptsStore, collectiveCharactersStore, collectivePresetsStore, dispatchPresetsStore, proxyTokenStore, proxyEventStore, agentStatusStore, observationSessionsStore, sessionsFeedCache, recapCacheStore, briefCacheStore, runSummaryCacheStore, sessionSummaryCacheStore, reportHistoryStore, shipBiscuitHistoryStore, taskDecisionsStore, shelvedRulingsStore, dismissalSuggestionsStore, savedChatStore, localStore, getWorkspaceAccessToken, accountStore, accountWorkspaceStore, ownerCredentialStore, connectionStore, clearWorkspaceIssuesMemo, resetKeyState = null, observerStateStore, dispatchHistoryCollection, proxyEventsCollection, resetKpiCache, workspaceHaltStore, emailTransport = null, commentDedupe = null, decisionStampDedupe = null, taskModeStore = null, taskShareCollection = null, kpiDailyRollupCollection = null, clearWorkspaceKpis = () => {} }) {
+export function createTestRoutes({ recordsStore = null, dispatchQueueStore, dispatchTokenStore, freeTierStore, userPreferencesStore, workspacePreferencesStore, modelRoutingStore = null, customPromptsStore, collectiveCharactersStore, collectivePresetsStore, dispatchPresetsStore, proxyTokenStore, proxyEventStore, agentStatusStore, observationSessionsStore, sessionsFeedCache, recapCacheStore, briefCacheStore, runSummaryCacheStore, sessionSummaryCacheStore, reportHistoryStore, shipBiscuitHistoryStore, taskDecisionsStore, shelvedRulingsStore, dismissalSuggestionsStore, savedChatStore, localStore, getWorkspaceAccessToken, accountStore, accountWorkspaceStore, ownerCredentialStore, connectionStore, clearWorkspaceIssuesMemo, resetKeyState = null, observerStateStore, dispatchHistoryCollection, proxyEventsCollection, resetKpiCache, workspaceHaltStore, emailTransport = null, commentDedupe = null, decisionStampDedupe = null, taskModeStore = null, taskShareCollection = null, kpiDailyRollupCollection = null, clearWorkspaceKpis = () => {} }) {
   const router = Router();
 
   // ── Connection-backed fixture variants (LIN-3124 PR3 checkpoint F, T27) ────
@@ -2095,6 +2097,24 @@ export function createTestRoutes({ dispatchQueueStore, dispatchTokenStore, freeT
   // `{ repo, number, readable, state?, merged?, headSha?, checks?, reason? }`.
   // LIN-3251 (RC2): the SAME value also primes the pr-state route's own
   // whole-reader cache, so the header PR line is hermetic too.
+  // LIN-4518 (beat 4): seeds the records a ticket's gates read (lib/records/writes.js createTestRecordSeed, unchecked by design).
+  // The E2E specs seed these instead of review and blind-read comments: the gates read the records standing only.
+  const seedTestRecords = recordsStore ? createTestRecordSeed({ recordsStore }) : null;
+  router.post('/test/seed-verdict-records', async (req, res) => {
+    try {
+      if (!seedTestRecords) return res.status(503).json({ error: 'records store not configured' });
+      const { urlKey, ticket, asked, changes = [], verdicts = [] } = req.body || {};
+      if (!urlKey || !ticket) return res.status(400).json({ error: 'urlKey and ticket are required' });
+      // The writer each verdict is filed under: a blind read under its own kind (the constants module names it).
+      const filed = verdicts.map((vd) => ({ ...vd, by: vd.judgement === BLIND_READ_KIND ? BLIND_READ_KIND : 'review' }));
+      const out = await seedTestRecords({ urlKey, ticket, asked, changes, verdicts: filed });
+      if (out.problem) return res.status(422).json({ error: out.problem });
+      res.status(201).json({ taskId: out.taskId, changes: out.changes });
+    } catch (err) {
+      res.status(500).json({ error: err.message });
+    }
+  });
+
   router.post('/test/seed-pr-status', (req, res) => {
     const { repo, number, readable, state = null, merged = false, headSha = null, checks = [], reason = 'not checked' } = req.body || {};
     if (!repo || number === undefined) return res.status(400).json({ error: 'repo and number are required' });

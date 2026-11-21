@@ -7,6 +7,8 @@
 //
 // Run with: node --test tests/unit/lin-3285-installation-pr-read.test.js
 
+import { standingFromComments } from '../helpers/comment-path-frozen.js';
+import { recordsStoreOf } from '../helpers/records-trail.js';
 import { FINDINGS_NONE } from '../../lib/close-out-findings.js';
 import { test, describe, beforeEach, before } from 'node:test';
 import assert from 'node:assert/strict';
@@ -34,7 +36,8 @@ import {
 beforeEach(() => { clearFailOpenPrStatus(); clearPrStateCache(); });
 before(installAppKey);
 
-const linearProvider = (comments = [{ id: 'c1', body: `opened ${PR_URL}`, createdAt: '2026-10-19T11:00:00.000Z' }]) => ({
+const TRAIL = [{ id: 'c1', body: `opened ${PR_URL}`, createdAt: '2026-10-19T11:00:00.000Z' }];
+const linearProvider = (comments = TRAIL) => ({
   name: 'linear',
   async fetchIssueComments() { return comments; },
 });
@@ -335,6 +338,8 @@ describe('readers: a Linear workspace reads with the minted token', () => {
     const out = await readRunEvidence({
       openFindings: FINDINGS_NONE,
       issueIdentifier: 'LIN-1', provider: linearProvider(), callScope: 'lin_key',
+      // LIN-4518 (beat 4): the box reads the task's records; this trail's comments are written as the comment-trail standing.
+      standing: standingFromComments(TRAIL),
       urlKey: 'ws-a', workspaceId: WS, installationTokenFor, githubFetch: github,
     });
     assert.ok(github.prCalls().length > 0 && github.prCalls().every(c => c.auth === MINTED_AUTH));
@@ -379,15 +384,17 @@ describe('readers: a Linear workspace reads with the minted token', () => {
     assert.match(anon.reason, /\b403\b|rate limit/i);
   });
 
-  // LIN-4438 changed this pin on purpose: the ladder lane now reads the comments once (the blind-read
-  // gate), and still asks for no installation token, since it reads no PR.
-  test('C1: a close-out that does not stop at the PR makes zero installation calls and one provider (comment) read', async () => {
+  // LIN-4438 changed this pin on purpose: the ladder lane read the comments once (the blind-read gate). LIN-4518
+  // (beat 4) retires that read: the gate reads the records standing the seam supplies, so the provider is not read for
+  // the gate at all. Still zero installation calls, since the ladder reads no PR.
+  test('C1: a close-out that does not stop at the PR makes zero installation calls and no provider (comment) read', async () => {
     let asked = 0;
     let providerReads = 0;
     const state = await closeOutNotReady({
       openFindings: FINDINGS_NONE,
       workspace: { urlKey: 'ws-a', id: WS }, issueIdentifier: 'LIN-1', store: {},
       seam: {
+        standing: standingFromComments(TRAIL),
         isStopAtRun: async () => null,
         resolveProvider: () => { providerReads++; return { provider: linearProvider(), callScope: 'k' }; },
       },
@@ -395,7 +402,7 @@ describe('readers: a Linear workspace reads with the minted token', () => {
     });
     assert.equal(state, null);
     assert.equal(asked, 0);
-    assert.equal(providerReads, 1);
+    assert.equal(providerReads, 0, 'the gate reads the records standing, not the comments (LIN-4518 beat 4)');
   });
 
   test('C2: a guard read after a cached read still fetches the live head', async () => {
@@ -444,6 +451,8 @@ describe('readers: a Linear workspace reads with the minted token', () => {
         dispatchStore: {}, agentStatusStore: {},
         briefCacheStore: { async get() { return null; } },
         recapCacheStore: { async get() { return null; } },
+        // LIN-4518 (beat 4): the page reads the task's records; this trail's comments are written as a records store.
+        recordsStore: recordsStoreOf(TRAIL),
         readRunEvidence, prStateStore, installationTokenFor, enrichLoop, deriveSessionWaiting,
         getLoopsForIssue: async () => [],
         now: () => new Date('2026-10-19T12:00:00.000Z'),

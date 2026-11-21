@@ -11,7 +11,12 @@
 import { FINDINGS_NONE } from '../../lib/close-out-findings.js';
 import { test, describe } from 'node:test';
 import assert from 'node:assert/strict';
-import { extractPrUrls, buildRunEvidence } from '../../lib/run-evidence.js';
+import { extractPrUrls, buildRunEvidence as buildRunEvidenceOf } from '../../lib/run-evidence.js';
+import { standingFromComments } from '../helpers/comment-path-frozen.js';
+
+// LIN-4518 (beat 4): the box reads its review and landing from the records standing. These trails are comment trails, written as
+// the comment-trail standing here, so every expectation below is the one the comment trail gave.
+const buildRunEvidence = (input = {}) => buildRunEvidenceOf({ standing: standingFromComments(input.comments ?? []), ...input });
 import { summarizeChecks } from '../../lib/github-pr-status.js';
 
 const REPLY = '## Review\n\n### What CI Did Not Prove\n- one claim\n\n**Verdict: Approve — conditional on close-out discharging the ledger.**';

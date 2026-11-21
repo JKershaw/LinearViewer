@@ -54,6 +54,7 @@ import { fileURLToPath } from 'url';
 import { dirname, join } from 'path';
 import { getRecommendation, setLlmCallRecorder, setFetchImpl } from '../../lib/openrouter.js';
 import { resolveRecommendation } from '../../lib/recommend-recurse.js';
+import { standingOfComments } from '../../tests/helpers/records-trail.js';
 
 const HERE = dirname(fileURLToPath(import.meta.url));
 const STUB = !!process.env.STUB;
@@ -209,7 +210,10 @@ function makeComputeOne(bundles, model, onCall, hopLog) {
         {
           parent: b.parent, siblings: b.siblings || [], siblingsTotal: b.siblingsTotal || 0,
           project: b.project, children: b.children || [], comments: b.comments || [],
-          focusedChild: b.focusedChild || null
+          focusedChild: b.focusedChild || null,
+          // LIN-4518: the route reads the ticket's records standing. The fixture's trail is written as records (its statuses
+          // are not in the fixture, so each PR keeps the head its review read).
+          standing: standingOfComments(b.comments || []),
         },
         { apiKey: API_KEY, model, featureFlags: {} }
       );

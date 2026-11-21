@@ -26,7 +26,8 @@
     "finding": {
       "fields": {
         "says": "string",
-        "how": "string"
+        "how": "string",
+        "blocking": "flag"
       },
       "start": "open",
       "ends": [

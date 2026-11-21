@@ -20,6 +20,7 @@
 
 process.env.NODE_ENV = 'test';
 
+import { markHarbourComment } from '../../lib/harbour-comment-mark.js';
 import { test, describe } from 'node:test';
 import assert from 'node:assert/strict';
 import express from 'express';
@@ -131,7 +132,9 @@ describe('POST /api/proxy/issues/:issueId/attachments (LIN-891)', () => {
     const { status, body } = await postAttachment(buildApp({ provider }), { image: PNG_DATA_URL });
     assert.equal(status, 201);
     assert.equal(body.success, true);
-    assert.equal(body.comment.body, '![](https://uploads.linear.app/fake-asset.png)');
+    // LIN-4518 (beat 4, ruling lin4518-authorship): a proxy comment is a Harbour write, so the body it posts carries the mark
+    // authorship is read from (lib/harbour-comment-mark.js); the expectation is the exact marked body.
+    assert.equal(body.comment.body, markHarbourComment('![](https://uploads.linear.app/fake-asset.png)'));
     assert.equal(provider.calls.uploadFile.length, 1);
     assert.equal(provider.calls.uploadFile[0].meta.contentType, 'image/png');
     assert.equal(provider.calls.createComment.length, 1);
@@ -145,7 +148,9 @@ describe('POST /api/proxy/issues/:issueId/attachments (LIN-891)', () => {
       body: 'Before/after screenshot of the fix:',
     });
     assert.equal(status, 201);
-    assert.equal(body.comment.body, 'Before/after screenshot of the fix:\n\n![](https://uploads.linear.app/fake-asset.png)');
+    // LIN-4518 (beat 4, ruling lin4518-authorship): a proxy comment is a Harbour write, so the body it posts carries the mark
+    // authorship is read from (lib/harbour-comment-mark.js); the expectation is the exact marked body.
+    assert.equal(body.comment.body, markHarbourComment('Before/after screenshot of the fix:\n\n![](https://uploads.linear.app/fake-asset.png)'));
   });
 
   test('"description" target uploads the image and appends it to the description via updateIssue', async () => {

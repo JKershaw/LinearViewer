@@ -9,6 +9,8 @@
 //
 // Run with: node --test tests/unit/authenticated-pr-reads.test.js
 
+import { standingFromComments } from '../helpers/comment-path-frozen.js';
+import { recordsStoreOf } from '../helpers/records-trail.js';
 import { FINDINGS_NONE } from '../../lib/close-out-findings.js';
 import { test, describe, beforeEach, before } from 'node:test';
 import assert from 'node:assert/strict';
@@ -236,6 +238,8 @@ describe('task page loader', () => {
       dispatchStore: {}, agentStatusStore: {},
       briefCacheStore: { async get() { return null; } },
       recapCacheStore: { async get() { return null; } },
+      // LIN-4518 (beat 4): the task page reads the task's records; this trail's comments are written as a records store.
+      recordsStore: recordsStoreOf(comments),
       readRunEvidence, prStateStore, enrichLoop, deriveSessionWaiting,
       getLoopsForIssue: async () => [],
       now: () => NOW,
@@ -285,7 +289,7 @@ describe('task page loader', () => {
 });
 
 describe('readRunEvidence default reader (run page / run-evidence route path)', () => {
-  const base = { issueIdentifier: 'GH-12', provider: null, comments: [{ body: PR_URL, createdAt: '2026-10-06T11:00:00.000Z' }] };
+  const base = { issueIdentifier: 'GH-12', provider: null, comments: [{ body: PR_URL, createdAt: '2026-10-06T11:00:00.000Z' }], standing: standingFromComments([{ body: PR_URL, createdAt: '2026-10-06T11:00:00.000Z' }]) };
 
   test('threads the token and urlKey into the default fail-open reader', async () => {
     const stub = githubStub();
@@ -321,13 +325,16 @@ describe('routes', () => {
       json(b) { this.jsonBody = b; return this; },
     };
   }
-  const provider = { async fetchIssueComments() { return [{ body: PR_URL, createdAt: '2026-10-06T11:00:00.000Z' }]; } };
+  const TRAIL = [{ body: PR_URL, createdAt: '2026-10-06T11:00:00.000Z' }];
+  const provider = { async fetchIssueComments() { return TRAIL; } };
   const workspaceOf = urlKey => ({ urlKey, accessToken: 't' });
 
   test('GET run-evidence: authenticated, and a second workspace on the same repo does not reuse the first one\'s cache entry', async () => {
     const stub = githubStub();
     const router = createWorkspaceApiRoutes({
       workspaceFromUrl: (req, res, next) => next(),
+      // LIN-4518 (beat 4): the box reads the task's records; this trail's comments are written as a records store.
+      recordsStore: recordsStoreOf(TRAIL),
       runEvidence: { resolveProvider: () => ({ provider, callScope: GH_SCOPE }), githubFetch: stub },
     });
     const handler = getHandler(router, 'get', '/workspace/:urlKey/api/run-evidence/:issueIdentifier');
@@ -350,6 +357,7 @@ describe('routes', () => {
     const build = callScope => createWorkspaceApiRoutes({
       workspaceFromUrl: (req, res, next) => next(),
       closeOut: {
+        standing: standingFromComments(TRAIL),
         resolveProvider: () => ({ provider, callScope }),
         readPrStatus: async args => { seen.push(args); return { readable: false, state: 'unknown' }; },
         isStopAtRun: async () => 'pr',

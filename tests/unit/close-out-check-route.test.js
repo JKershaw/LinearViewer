@@ -16,6 +16,7 @@ import { CloseOutEventsStore } from '../../lib/close-out-events-store.js';
 import { DispatchQueueStore } from '../../lib/dispatch-store.js';
 import { createMangoTmpdir } from '../fixtures/mango-tmpdir.js';
 import { findRouteLayer } from './lib/route-layer.js';
+import { standingFromComments } from '../helpers/comment-path-frozen.js';
 
 const CHECK_PATH = '/workspace/:urlKey/api/run-evidence/:issueIdentifier/check';
 const PRESS_PATH = '/workspace/:urlKey/api/run-evidence/:issueIdentifier/close-out-press';
@@ -74,7 +75,10 @@ function makeRouter({
     closeOutEventsStore: store,
     dispatchQueueStore,
     closeOut: {
-      openFindings, resolveProvider: resolveProvider || (() => ({ provider: fakeProvider({ comments }), callScope: 'scope' })),
+      openFindings,
+      // LIN-4518 (beat 4): the gate reads the records standing; this trail's comments are written as the comment-trail standing.
+      standing: standingFromComments(comments),
+      resolveProvider: resolveProvider || (() => ({ provider: fakeProvider({ comments }), callScope: 'scope' })),
       readPrStatus: readPrStatus || (async ({ number }) => statuses[number] || unknownStatus(number)),
       isStopAtRun: isStopAtRun || (async () => 'pr'),
       runnerReady,
@@ -90,8 +94,9 @@ function makeDefaultMarkDoneRouter({ throwOnUpdate = false } = {}) {
   const collection = harness.freshDb().collection('close-out-events');
   const store = new CloseOutEventsStore({ collection });
   const calls = { updateIssue: [] };
+  const trail = [comment(PR_A, '2026-07-01T00:00:00.000Z'), comment(reviewBody(), '2026-07-02T00:00:00.000Z'), readOf(PR_A)];
   const provider = {
-    async fetchIssueComments() { return [comment(PR_A, '2026-07-01T00:00:00.000Z'), comment(reviewBody(), '2026-07-02T00:00:00.000Z'), readOf(PR_A)]; },
+    async fetchIssueComments() { return trail; },
     async fetchIssueContext() { return { issue: { id: 'issue-uuid', identifier: 'LIN-1', team: { id: 'team-1' } } }; },
     async issueWriteGuard() { return { team: { id: 'team-1' } }; },
     async states() { return [{ id: 'st-open', name: 'In Progress', type: 'started' }, { id: 'st-done', name: 'Done', type: 'completed' }]; },
@@ -105,6 +110,7 @@ function makeDefaultMarkDoneRouter({ throwOnUpdate = false } = {}) {
     workspaceFromUrl: (req, res, next) => next(),
     closeOutEventsStore: store,
     closeOut: {
+      standing: standingFromComments(trail),
       openFindings: FINDINGS_NONE, resolveProvider: () => ({ provider, callScope: 'scope' }),
       readPrStatus: async ({ number }) => (number === 41 ? mergedStatus(41) : unknownStatus(number)),
       isStopAtRun: async () => 'pr',
@@ -424,7 +430,7 @@ describe('POST /api/run-evidence/:issueIdentifier/check', () => {
       dispatchQueueStore: queueStore,
       closeOutEventsStore: store,
       closeOut: {
-        openFindings: FINDINGS_NONE, resolveProvider: () => ({ provider: fakeProvider({ comments: [comment(PR_A, '2026-07-01T00:00:00.000Z'), comment(reviewBody(), '2026-07-02T00:00:00.000Z'), readOf(PR_A)] }), callScope: 'scope' }),
+        openFindings: FINDINGS_NONE, standing: standingFromComments([comment(PR_A, '2026-07-01T00:00:00.000Z'), comment(reviewBody(), '2026-07-02T00:00:00.000Z'), readOf(PR_A)]), resolveProvider: () => ({ provider: fakeProvider({ comments: [comment(PR_A, '2026-07-01T00:00:00.000Z'), comment(reviewBody(), '2026-07-02T00:00:00.000Z'), readOf(PR_A)] }), callScope: 'scope' }),
         readPrStatus: async ({ number }) => mergedStatus(number),
         runnerReady: () => true,
         markDone: async () => { calls.markDone += 1; },
@@ -479,7 +485,7 @@ describe('POST /api/run-evidence/:issueIdentifier/check', () => {
       dispatchQueueStore: queueStore,
       closeOutEventsStore: store,
       closeOut: {
-        openFindings: FINDINGS_NONE, resolveProvider: () => ({ provider: fakeProvider({ comments: [comment(PR_A, '2026-07-01T00:00:00.000Z'), comment(reviewBody(), '2026-07-02T00:00:00.000Z'), readOf(PR_A)] }), callScope: 'scope' }),
+        openFindings: FINDINGS_NONE, standing: standingFromComments([comment(PR_A, '2026-07-01T00:00:00.000Z'), comment(reviewBody(), '2026-07-02T00:00:00.000Z'), readOf(PR_A)]), resolveProvider: () => ({ provider: fakeProvider({ comments: [comment(PR_A, '2026-07-01T00:00:00.000Z'), comment(reviewBody(), '2026-07-02T00:00:00.000Z'), readOf(PR_A)] }), callScope: 'scope' }),
         readPrStatus: async ({ number }) => mergedStatus(number),
         runnerReady: () => true,
         markDone: async () => { calls.markDone += 1; },

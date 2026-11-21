@@ -32,6 +32,7 @@
  * The 422 this suite DOES assert is the description-splice NOT_FOUND/NOT_UNIQUE.
  */
 
+import { markHarbourComment } from '../../lib/harbour-comment-mark.js';
 import { test, expect } from '../fixtures/test-base.js';
 
 const LOCAL_URL_KEY = 'local-workspace';
@@ -287,10 +288,12 @@ test.describe('Proxy API — local workspace e2e (LIN-584)', () => {
     expect(resp.status()).toBe(201);
     const body = await resp.json();
     expect(body.success).toBe(true);
-    expect(body.comment.body).toBe('A proxy comment');
+    // LIN-4518 (beat 4, ruling lin4518-authorship): a proxy comment is a Harbour write, so the body it posts carries the mark
+    // authorship is read from (lib/harbour-comment-mark.js); the expectation is the exact marked body.
+    expect(body.comment.body).toBe(markHarbourComment('A proxy comment'));
 
     const back = await read(request, '/api/proxy/issues/LOCAL-1');
-    expect((await back.json()).comments.some(c => c.body === 'A proxy comment')).toBe(true);
+    expect((await back.json()).comments.some(c => c.body === markHarbourComment('A proxy comment'))).toBe(true);
   });
 
   // ---- Writes: comment delete/edit (LIN-1160) ------------------------------
