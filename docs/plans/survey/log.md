@@ -5134,3 +5134,8 @@ The full stop holds: the fleet is paused, and the drive is only reporting. The o
 
 - LIN-4523 (stopping a run stops all of it) does not run before slice 3. An agent not stopping when a human asks is a bigger issue than we can take on now; John will come back to it once the dust has settled. Don't dispatch it.
 - The order is now: LIN-4522 lands, stop and report, then John approves the slice 3 restart.
+
+## 21 Nov, 18:28: hourly
+
+- LIN-4522 is moving normally: survey-task, survey-place and scoping done; research running (18:22). In Progress, no pieces yet, no new rulings. No pause set.
+- Only open ruling is `lin4518-250-expectation`, held until the slice 3 restart (suggestion updated 18:13). A subagent is checking whether answering it would resume the stopped P5 session, to settle the restart order.
