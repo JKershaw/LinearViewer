@@ -4989,3 +4989,7 @@ John answered all three rulings. LIN-4517 resumed at 07:01. Slice 3: P1–P3 Don
 - The verdict-import question appeared again, as a twin raised from the other loop: `lin4513-ruling2-import-verdicts`. I proposed import, matching John's answer on its twin.
 - LIN-4517 has been working since 07:01.
 - The duplicate-question pattern (the same question from the plan loop and the breakdown loop) is now seen three times. For slice 4.
+
+### 21 Nov, 08:28
+
+LIN-4517 has been in close-out since 07:39 (the verdict import and cutover). No rulings, no pause. LIN-4518..4521 wait.
