@@ -630,8 +630,10 @@ export function createTestRoutes({ dispatchQueueStore, dispatchTokenStore, freeT
     })
   })
 
-  // LIN-4527: seat a ticket's task the way a dispatch does (taskOnDispatch makes it through the records store). Local
-  // tickets cannot be read by the dispatch seat in tests, so a spec that reads the findings reading seeds the task here.
+  // LIN-4527: seat a ticket's task for a spec that reads the open-findings reading (no task reads as not-read). Test-only:
+  // in this E2E harness the dispatch seat finds no usable tracker credential for a seeded LOCAL- ticket
+  // ('tracker unavailable: ok'), so it makes no task. A local workspace made through POST /workspace/new does seat
+  // one at dispatch (read on 2026-11-21 in a non-test boot: LOCAL-1 got a task, no task-missing-at-dispatch line).
   router.get('/test/seed-ticket-task', async (req, res) => {
     const { urlKey, ticket } = req.query;
     if (!recordsStore) return res.status(503).send('no records store wired into test routes');
