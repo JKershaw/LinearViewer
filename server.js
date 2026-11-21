@@ -101,6 +101,7 @@ import { createOnTicketWrite } from './lib/ticket-close-closer.js'
 import { ShelvedRulingsStore } from './lib/shelved-rulings-store.js'
 import { RecordsStore, RECORDS_COLLECTION, REFS_COLLECTION, QUERY_LOG_COLLECTION } from './lib/records-store.js'
 import { createRunRecords } from './lib/run-records.js'
+import { createChangeBackstop } from './lib/change-records.js'
 import { createRecordWrites } from './lib/records/writes.js'
 import { askedOf } from './lib/asked-of.js'
 import { flattenIssue as flattenRecordsIssue } from './lib/proxy-wire.js'
@@ -699,7 +700,7 @@ async function taskForTicketAt(urlKey, ticket, resolveAccess = null) {
   return ticketWriter.taskOfTicket(access, urlKey, ticket, 'dispatch');
 }
 dispatchQueueStore.taskOnDispatch = (urlKey, ticket, resolveAccess) => taskForTicketAt(urlKey, ticket, resolveAccess)
-dispatchQueueStore.runRecords = createRunRecords({ recordsStore, readRow: (urlKey, id) => dispatchQueueStore.rowForRunRecords(urlKey, id), taskOfTicket: (urlKey, ticket) => taskForTicketAt(urlKey, ticket) })
+dispatchQueueStore.runRecords = createRunRecords({ recordsStore, readRow: (urlKey, id) => dispatchQueueStore.rowForRunRecords(urlKey, id), taskOfTicket: (urlKey, ticket) => taskForTicketAt(urlKey, ticket), changeBackstop: createChangeBackstop({ recordsStore }) })
 // LIN-2444: proposed dismissals — a view annotation on a ruling, never an
 // answer to it. Separate collection from shelved-rulings because the two are
 // different acts with different lifecycles (a shelve defers a decision the

@@ -13,6 +13,7 @@ import { badRequest, jsonError, unauthorized } from '../lib/errors.js';
 import { readRunEvidence } from '../lib/run-evidence.js';
 import { CLOSE_OUT_ACTOR } from '../lib/run-closeout-state.js';
 import { recordMergedPrs, openFindingsStamp } from '../lib/close-out-merges.js';
+import { changesEndingFor } from '../lib/change-records.js';
 import { readCloseOutChain, closeOutNotReady, closeOutNotReadyRefusal } from '../lib/close-out-readiness.js';
 import { readOpenFindings, legacyLedgerOf } from '../lib/close-out-findings.js';
 import { readTrail } from '../lib/run-trail.js';
@@ -297,7 +298,9 @@ export function registerRunEvidenceRoutes(router, { workspaceFromUrl, dispatchQu
       // Close-out is a stop-at-PR surface only: a normal run records and sets
       // nothing here.
       if (stopAt === 'pr') {
-        const merges = await recordMergedPrs({ store: closeOutEventsStore, workspace, accountId: req.session.accountId, issueIdentifier, prs, prStatuses, openFindings });
+        // LIN-4515: the same merge ends the PR's change record, as the Done writes do (lib/change-records.js).
+        const changeEnd = recordsStore ? changesEndingFor({ recordsStore, urlKey: req.workspace.urlKey, issueIdentifier }) : null;
+        const merges = await recordMergedPrs({ store: closeOutEventsStore, workspace, accountId: req.session.accountId, issueIdentifier, prs, prStatuses, openFindings, changeEnd });
         recorded = merges.recorded;
         let { mergedEvent } = merges;
 
