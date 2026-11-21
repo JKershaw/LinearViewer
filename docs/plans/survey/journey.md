@@ -269,3 +269,8 @@ A fresh reader checked this page against the log from 18 Nov, the designs, the r
 
 - **LIN-4445 (the loop on Jira) is off the parked list.** John will come back to it later. The parked work is now the seven safety findings, LIN-4416, LIN-4441 and LIN-4463.
 - **Why it runs after slice 4** (John's reasons): work queued up to put the improvements through their paces, and these are good candidates; no work runs while the core is changing; test what's been built at the earliest sensible time. Slices 5 and 6 are still wanted, 5 especially, given how the notes grow.
+
+## 21 Nov, 16:32: past slice 4
+
+- **John approved carrying on past slice 4,** assuming no trouble. The drive prompt is updated: after slice 4's readings, the parked work runs one item at a time (LIN-4416 with the seven safety findings, then LIN-4441, then LIN-4463). Each is read against the 13–14 Nov baselines. Then slice 5, then slice 6. The new stop is when slice 6 lands, with a report to John; the rest of the horizon list is his to order.
+- **Two of these are my reading, not John's words,** and he can redirect: that "keep going" includes slice 6 (the readings show the need, and he said 5 and 6 are wanted), and one item at a time for the parked work.
