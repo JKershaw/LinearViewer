@@ -10,6 +10,8 @@ that is gone (lesson LIN-4505, `docs/areas/reports-and-operator-tools.md`).
 | `history-2026-11-21.json` | Blind-read results and review round trips over history. Written by `scripts/slice-3-pre-landing-readings.mjs` through the workspace proxy |
 | `production-2026-11-21.json` | Held runs, how long records addressed to them sat, and blind-read queries from the query log. Read from production with `production-read.mjs` |
 | `production-read.mjs` | That production read: read-only, run in `harbour-cat` through `railway ssh`. It prints counts and record ids only |
+| `cutover-query.mjs` | LIN-4517 (P4): the read-only cutover query. Open tasks whose latest review, plan review or blind read is a comment with no verdict record, open tasks whose latest review's ledger carries items (including those `isEmptyStatement` misreads as empty), and open tasks with no verdict record at all. Its `dump` step runs in `harbour-cat` through `railway ssh` (records); its `query` step runs locally through the workspace proxy (ticket states and comments). It prints counts, task ids and ticket ids only. Tested in `tests/unit/lin-4517-cutover-query.test.js`; run again inside P5's fleet pause |
+| `cutover-2026-11-21.json` | That query's first production reading (21 Nov 04:09Z), the "before" count for P5's pause |
 
 The same readers, applied to the frozen walk-8 trails and seeds, are in `tests/fixtures/walk-8/comment-path/goldens/readings.json`.
 

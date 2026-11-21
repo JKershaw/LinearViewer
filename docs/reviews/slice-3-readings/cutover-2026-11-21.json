@@ -1,0 +1,446 @@
+{
+  "asOf": "2026-11-21T04:09:06.661Z",
+  "window": {
+    "openTaskRecords": 1411,
+    "noTicket": 8,
+    "ticketClosed": 21,
+    "ticketNotListed": 0,
+    "open": 1382
+  },
+  "needsImportOrReReview": {
+    "count": 22,
+    "tasks": [
+      {
+        "task": "task-1ce29cff",
+        "ticket": "LIN-1408"
+      },
+      {
+        "task": "task-557c8028",
+        "ticket": "LIN-1717"
+      },
+      {
+        "task": "task-859c3299",
+        "ticket": "LIN-1739"
+      },
+      {
+        "task": "task-78a2abd1",
+        "ticket": "LIN-1788"
+      },
+      {
+        "task": "task-af061003",
+        "ticket": "LIN-2083"
+      },
+      {
+        "task": "task-881171bc",
+        "ticket": "LIN-2114"
+      },
+      {
+        "task": "task-6731b6b9",
+        "ticket": "LIN-2153"
+      },
+      {
+        "task": "task-e9384705",
+        "ticket": "LIN-2322"
+      },
+      {
+        "task": "task-08882d50",
+        "ticket": "LIN-2422"
+      },
+      {
+        "task": "task-3d13d795",
+        "ticket": "LIN-2626"
+      },
+      {
+        "task": "task-31f94da5",
+        "ticket": "LIN-2627"
+      },
+      {
+        "task": "task-5ae84009",
+        "ticket": "LIN-2634"
+      },
+      {
+        "task": "task-1e6e6552",
+        "ticket": "LIN-2809"
+      },
+      {
+        "task": "task-9447af7e",
+        "ticket": "LIN-2919"
+      },
+      {
+        "task": "task-47a95ec4",
+        "ticket": "LIN-3075"
+      },
+      {
+        "task": "task-8d3762c2",
+        "ticket": "LIN-4441"
+      },
+      {
+        "task": "task-69be3c4e",
+        "ticket": "LIN-4445"
+      },
+      {
+        "task": "task-dfc7d4fc",
+        "ticket": "LIN-4452"
+      },
+      {
+        "task": "task-4d9a849e",
+        "ticket": "LIN-4463"
+      },
+      {
+        "task": "task-7d2ab8b5",
+        "ticket": "LIN-4491"
+      },
+      {
+        "task": "task-ff9900ab",
+        "ticket": "LIN-4513"
+      },
+      {
+        "task": "task-fb47e9ff",
+        "ticket": "LIN-751"
+      }
+    ]
+  },
+  "commentOnly": {
+    "count": 22,
+    "byStage": {
+      "review": 8,
+      "plan-review": 20,
+      "blind-read": 3
+    },
+    "tasks": [
+      {
+        "task": "task-1ce29cff",
+        "ticket": "LIN-1408",
+        "stages": [
+          {
+            "stage": "plan-review",
+            "verdict": "request changes",
+            "at": "2026-08-02T23:32:22.169Z"
+          }
+        ]
+      },
+      {
+        "task": "task-557c8028",
+        "ticket": "LIN-1717",
+        "stages": [
+          {
+            "stage": "plan-review",
+            "verdict": "request changes",
+            "at": "2026-07-31T07:29:10.341Z"
+          }
+        ]
+      },
+      {
+        "task": "task-859c3299",
+        "ticket": "LIN-1739",
+        "stages": [
+          {
+            "stage": "plan-review",
+            "verdict": "request changes",
+            "at": "2026-07-31T07:49:19.415Z"
+          }
+        ]
+      },
+      {
+        "task": "task-78a2abd1",
+        "ticket": "LIN-1788",
+        "stages": [
+          {
+            "stage": "plan-review",
+            "verdict": "approve",
+            "at": "2026-08-01T17:55:53.685Z"
+          }
+        ]
+      },
+      {
+        "task": "task-af061003",
+        "ticket": "LIN-2083",
+        "stages": [
+          {
+            "stage": "plan-review",
+            "verdict": "request changes",
+            "at": "2026-08-14T10:43:13.001Z"
+          }
+        ]
+      },
+      {
+        "task": "task-881171bc",
+        "ticket": "LIN-2114",
+        "stages": [
+          {
+            "stage": "plan-review",
+            "verdict": "request changes",
+            "at": "2026-08-16T11:32:56.367Z"
+          }
+        ]
+      },
+      {
+        "task": "task-6731b6b9",
+        "ticket": "LIN-2153",
+        "stages": [
+          {
+            "stage": "review",
+            "verdict": "unknown",
+            "at": "2026-09-13T18:09:38.766Z"
+          },
+          {
+            "stage": "plan-review",
+            "verdict": "request changes",
+            "at": "2026-09-13T20:18:33.688Z"
+          }
+        ]
+      },
+      {
+        "task": "task-e9384705",
+        "ticket": "LIN-2322",
+        "stages": [
+          {
+            "stage": "plan-review",
+            "verdict": "request changes",
+            "at": "2026-09-13T19:23:25.158Z"
+          }
+        ]
+      },
+      {
+        "task": "task-08882d50",
+        "ticket": "LIN-2422",
+        "stages": [
+          {
+            "stage": "review",
+            "verdict": "approve-conditional",
+            "at": "2026-11-19T22:35:38.151Z"
+          }
+        ]
+      },
+      {
+        "task": "task-3d13d795",
+        "ticket": "LIN-2626",
+        "stages": [
+          {
+            "stage": "plan-review",
+            "verdict": "unknown",
+            "at": "2026-09-05T08:16:06.506Z"
+          }
+        ]
+      },
+      {
+        "task": "task-31f94da5",
+        "ticket": "LIN-2627",
+        "stages": [
+          {
+            "stage": "plan-review",
+            "verdict": "unknown",
+            "at": "2026-09-05T08:16:08.446Z"
+          }
+        ]
+      },
+      {
+        "task": "task-5ae84009",
+        "ticket": "LIN-2634",
+        "stages": [
+          {
+            "stage": "review",
+            "verdict": "approve",
+            "at": "2026-09-11T22:04:03.742Z"
+          },
+          {
+            "stage": "plan-review",
+            "verdict": "needs discussion",
+            "at": "2026-09-11T21:09:54.195Z"
+          }
+        ]
+      },
+      {
+        "task": "task-1e6e6552",
+        "ticket": "LIN-2809",
+        "stages": [
+          {
+            "stage": "plan-review",
+            "verdict": "approve",
+            "at": "2026-09-17T21:00:20.638Z"
+          }
+        ]
+      },
+      {
+        "task": "task-9447af7e",
+        "ticket": "LIN-2919",
+        "stages": [
+          {
+            "stage": "review",
+            "verdict": "unknown",
+            "at": "2026-09-25T06:58:06.842Z"
+          },
+          {
+            "stage": "plan-review",
+            "verdict": "approve",
+            "at": "2026-09-25T12:58:37.722Z"
+          }
+        ]
+      },
+      {
+        "task": "task-47a95ec4",
+        "ticket": "LIN-3075",
+        "stages": [
+          {
+            "stage": "plan-review",
+            "verdict": "needs discussion",
+            "at": "2026-09-26T09:39:04.039Z"
+          }
+        ]
+      },
+      {
+        "task": "task-8d3762c2",
+        "ticket": "LIN-4441",
+        "stages": [
+          {
+            "stage": "review",
+            "verdict": "request-changes",
+            "at": "2026-11-19T22:34:41.077Z"
+          },
+          {
+            "stage": "plan-review",
+            "verdict": "approve",
+            "at": "2026-11-12T20:21:49.883Z"
+          }
+        ]
+      },
+      {
+        "task": "task-69be3c4e",
+        "ticket": "LIN-4445",
+        "stages": [
+          {
+            "stage": "plan-review",
+            "verdict": "approve",
+            "at": "2026-11-13T13:40:55.240Z"
+          }
+        ]
+      },
+      {
+        "task": "task-dfc7d4fc",
+        "ticket": "LIN-4452",
+        "stages": [
+          {
+            "stage": "review",
+            "verdict": "approve-conditional",
+            "at": "2026-11-19T22:32:37.903Z"
+          },
+          {
+            "stage": "blind-read",
+            "verdict": "better",
+            "at": "2026-11-13T18:29:32.329Z"
+          }
+        ]
+      },
+      {
+        "task": "task-4d9a849e",
+        "ticket": "LIN-4463",
+        "stages": [
+          {
+            "stage": "plan-review",
+            "verdict": "approve",
+            "at": "2026-11-13T16:02:45.347Z"
+          },
+          {
+            "stage": "blind-read",
+            "verdict": "better",
+            "at": "2026-11-13T21:50:18.132Z"
+          }
+        ]
+      },
+      {
+        "task": "task-7d2ab8b5",
+        "ticket": "LIN-4491",
+        "stages": [
+          {
+            "stage": "review",
+            "verdict": "approve-conditional",
+            "at": "2026-11-20T01:35:25.884Z"
+          },
+          {
+            "stage": "plan-review",
+            "verdict": "approve",
+            "at": "2026-11-19T12:31:14.546Z"
+          },
+          {
+            "stage": "blind-read",
+            "verdict": "better",
+            "at": "2026-11-20T01:39:04.005Z"
+          }
+        ]
+      },
+      {
+        "task": "task-ff9900ab",
+        "ticket": "LIN-4513",
+        "stages": [
+          {
+            "stage": "plan-review",
+            "verdict": "approve",
+            "at": "2026-11-21T00:50:03.877Z"
+          }
+        ]
+      },
+      {
+        "task": "task-fb47e9ff",
+        "ticket": "LIN-751",
+        "stages": [
+          {
+            "stage": "review",
+            "verdict": "unknown",
+            "at": "2026-09-05T08:10:42.221Z"
+          },
+          {
+            "stage": "plan-review",
+            "verdict": "request changes",
+            "at": "2026-09-05T08:15:46.281Z"
+          }
+        ]
+      }
+    ]
+  },
+  "legacyLedger": {
+    "count": 0,
+    "tasks": []
+  },
+  "ledgerReadEmptyWithItems": {
+    "count": 1,
+    "tasks": [
+      {
+        "task": "task-5ae84009",
+        "ticket": "LIN-2634"
+      }
+    ]
+  },
+  "withVerdictRecord": {
+    "count": 1,
+    "tasks": [
+      {
+        "task": "task-4d9a849e",
+        "ticket": "LIN-4463",
+        "verdicts": [
+          "verdict-2574090d"
+        ]
+      }
+    ]
+  },
+  "noVerdictRecord": {
+    "count": 1381,
+    "neverJudged": 1360,
+    "judgedByCommentOnly": 21
+  },
+  "noTicketTasks": {
+    "count": 8,
+    "withVerdictRecord": 0,
+    "tasks": [
+      "task-309c83df",
+      "task-37347dd4",
+      "task-53e1786b",
+      "task-6e82c9d1",
+      "task-8237e103",
+      "task-84a6e5e2",
+      "task-9a4f20af",
+      "task-b5166546"
+    ]
+  },
+  "truncatedComments": [],
+  "importMarkedVerdicts": 0
+}
