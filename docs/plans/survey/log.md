@@ -5123,3 +5123,9 @@ The full stop holds: the fleet is paused, and the drive is only reporting. The o
   3. Stop when it lands.
   4. John approves restarting slice 3 (corrected).
   No parallel work: the cleanup and slice 3 touch the same files.
+
+## 21 Nov, ~18:13: LIN-4522 launched, pause lifted
+
+- John approved. LIN-4522 (finish slices 1 and 2) dispatched as a plain autopilot kickoff with no goal text, since the ticket says it all (run b35afbf4, taken within seconds). The fleet pause is lifted; the queue was empty, so nothing else was released.
+- The hourly check-in stays as it is (John). Slice 3 stays stopped until John approves its restart.
+- The suggested answer on `lin4518-250-expectation` was replaced to fit the plan: re-review, answered only when slice 3 restarts, because answering resumes LIN-4518's stopped session. On restart P5 converts its saved cases and deletes `records-trail.js`, and the expectation goes back to 255.
