@@ -4997,3 +4997,7 @@ LIN-4517 has been in close-out since 07:39 (the verdict import and cutover). No 
 ### 21 Nov, 08:56
 
 LIN-4517 Done (close-out ran 64 min: the verdict import and cutover). LIN-4518 (P5: close-out, the selector and run evidence read records) has been building since 08:46. No rulings, no pause.
+
+### 21 Nov, 09:28
+
+See the chat for the state; LIN-4518 is building.
