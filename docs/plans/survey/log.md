@@ -4971,3 +4971,7 @@ Slice 3: LIN-4514 and 4515 are Done (close-outs 01:46 and 01:51). LIN-4516 has b
 ### 21 Nov, 04:28
 
 Slice 3: LIN-4514, 4515 and 4516 Done (the comment-guard ruling was settled and is gone from the list). LIN-4517 (the verdict import) has had a worker on it since 03:38, while its ruling waits for John. LIN-4518..4521 wait. Open rulings: verdict-import, and question 1 (two copies), all with proposals. No pause.
+
+### 21 Nov, 05:28
+
+LIN-4517 (verdict import) built and was reviewed (review done 05:04). LIN-4518..4521 wait. Same three rulings open, all with proposals. No pause.
