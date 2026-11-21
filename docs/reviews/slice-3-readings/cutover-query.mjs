@@ -5,7 +5,7 @@
 //   - comment-only: the task's latest review, plan review or blind read is a comment, and no verdict record of that
 //     stage was written at or after it (less RECORD_LAG_MS: a judge writing both posts them minutes apart);
 //   - legacy ledger: the latest review's `### What CI Did Not Prove` section carries items as text (legacyLedgerOf,
-//     the close-out gate's own test);
+//     lib/run-ledger.js);
 //   - ledger read as empty with items: the same section, which isEmptyStatement reads as empty although it lists
 //     items (finding-76683071). The gate reads these as "none open" today.
 // And how many open tasks have no verdict record at all.
@@ -34,14 +34,14 @@ const TERMINAL_TICKET_STATES = new Set(['completed', 'canceled']);
 /** The comment readers today's gate uses, loaded from the repo's lib/ (never from the container). */
 export async function loadReaders() {
   const trail = await import('../../../lib/run-trail.js');
-  const findings = await import('../../../lib/close-out-findings.js');
+  const ledger = await import('../../../lib/run-ledger.js');
   return {
     commentKindOf: trail.commentKindOf,
     latestReviewComment: trail.latestReviewComment,
     readTrail: trail.readTrail,
     extractVerdict: trail.extractVerdict,
     parseBlindRead: trail.parseBlindRead,
-    legacyLedgerOf: findings.legacyLedgerOf,
+    legacyLedgerOf: ledger.legacyLedgerOf,
   };
 }
 

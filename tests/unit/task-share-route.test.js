@@ -480,7 +480,7 @@ describe('render-time secret masking (LIN-3389)', () => {
     } finally { await close(); }
   });
 
-  test('secrets in an agent (stage-session) message and a ledger row are masked', async () => {
+  test('secrets in an agent (stage-session) message and an evidence row are masked', async () => {
     const startedAt = NOW.toISOString();
     const model = {
       ...guestModel(),
@@ -490,9 +490,12 @@ describe('render-time secret masking (LIN-3389)', () => {
         sessions: [{ state: 'done', message: `agent ${F.githubPat}`, endedAt: startedAt, links: [], loopId: 'l1' }],
         checkIns: [],
       }],
+      // LIN-4527: the review ledger's raw section is no longer shown on the box; the evidence row that still exists
+      // (the review's CI line) carries the second secret.
       evidence: {
         state: { pr: null },
-        ledger: { ledger: { present: true, empty: false, raw: `ledger ${F.awsAccessKey}` } },
+        ledger: { ledger: { present: false, empty: false, raw: null } },
+        evidence: { checked: { review: { ciLine: `ci ${F.awsAccessKey}` } } },
       },
     };
     const { base, close } = await build({
@@ -503,9 +506,9 @@ describe('render-time secret masking (LIN-3389)', () => {
       await withLogs(async () => {
         const res = await get(base, `/t/${TOKEN}`);
         assert.equal(res.status, 200);
-        assert.ok((res.text.match(/\[redacted\]/g) || []).length >= 2, 'agent message and ledger row both redacted');
+        assert.ok((res.text.match(/\[redacted\]/g) || []).length >= 2, 'agent message and CI line both redacted');
         assert.ok(!res.text.includes(F.githubPat), 'agent message secret reached the body');
-        assert.ok(!res.text.includes(F.awsAccessKey), 'ledger row secret reached the body');
+        assert.ok(!res.text.includes(F.awsAccessKey), 'CI line secret reached the body');
       });
     } finally { await close(); }
   });

@@ -211,7 +211,7 @@ describe('POST /api/run-evidence/:issueIdentifier/check', () => {
     assert.equal(stored[0].merged, true);
     // LIN-4495: the stamp is the open findings to close-out as read (none here), not the ledger's items.
     assert.deepEqual(stored[0].openFindings, { state: 'read', count: 0 });
-    assert.deepEqual(stored[0].openItems, { inside: 0, outside: 0, unknown: 0, total: 0 });
+    assert.equal('openItems' in stored[0], false, 'LIN-4527: no openItems counts are written');
   });
 
   test('R1 bound: the PR is not merged → no Done, nothing recorded', async () => {

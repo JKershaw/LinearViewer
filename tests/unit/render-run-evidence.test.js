@@ -103,14 +103,17 @@ describe('render-run-evidence: the collapsed ledger (LIN-4495: the findings to c
     assert.doesNotMatch(html, /\b0 open to close-out/);
   });
 
-  test('a pre-cutover ledger keeps its text, marked as not measured', () => {
+  // LIN-4527: the pre-cutover section's text is no longer shown: the gate does not read it, so the box shows only the live
+  // open-findings reading. The box keeps its label and its findings line.
+  test('a pre-cutover ledger section is not shown; the box keeps the live open-findings reading', () => {
     const raw = 'This claim is prose CI cannot structure, and it must survive verbatim <not a tag>.';
     const m = model();
     m.ledger.ledger = { present: true, empty: false, raw };
     const html = renderEvidence(m);
-    assert.match(html, /<pre class="rev-ledger-raw" data-testid="run-evidence-ledger-raw">/);
-    assert.ok(html.includes('This claim is prose CI cannot structure, and it must survive verbatim &lt;not a tag&gt;.'));
-    assert.match(html, /not measured here/);
+    assert.doesNotMatch(html, /run-evidence-ledger-raw|run-evidence-ledger-legacy|not measured here/);
+    assert.ok(!html.includes('This claim is prose CI cannot structure'));
+    assert.match(html, /data-testid="run-evidence-findings"/);
+    assert.match(html, /data-testid="run-evidence-ledger"/);
   });
 
   test('a finished task keeps no count (LIN-3373)', () => {

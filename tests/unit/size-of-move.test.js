@@ -89,11 +89,18 @@ describe('the parser reads the description outside the As-asked block, never com
     assert.equal(sizeFact(readSizeRecord(withRecord('We weigh it below.'))), 'recorded, with no size named (by no one named)');
   });
 
-  test('no section is not recorded; a heading quoted inside the As-asked block is not a record', () => {
+  test('no section is not recorded; a heading quoted with `>` inside the As-asked block is not a record', () => {
     assert.equal(readSizeRecord(SEALED), null);
     assert.equal(sizeFact(null), 'not recorded');
-    const asked = quoteAsked(`Please decide.\n\n${SIZE_OF_MOVE_HEADING}\n\n**Size:** rebuild the area`);
-    assert.equal(readSizeRecord(asked), null, 'the person\'s words are not a record');
+    // LIN-4527: the size record is read from the whole description, so the quotation guard carries the load: only the
+    // exact heading line opens a section, and a `>`-quoted one never does.
+    const quoted = quoteAsked(`Please decide.\n\n> ${SIZE_OF_MOVE_HEADING}\n>\n> **Size:** rebuild the area`);
+    assert.equal(readSizeRecord(quoted), null, 'the person\'s quoted words are not a record');
+  });
+
+  test('the same heading unquoted, inside a sealed block, reads as a record (LIN-4527 residual: no production block holds one)', () => {
+    const unquoted = quoteAsked(`Please decide.\n\n${SIZE_OF_MOVE_HEADING}\n\n**Size:** rebuild the area`);
+    assert.equal(sizeFact(readSizeRecord(unquoted)), 'chosen rebuild the area (by no one named)');
   });
 
   test('a Linear-escaped description reads the same', () => {

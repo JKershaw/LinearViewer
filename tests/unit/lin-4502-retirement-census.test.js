@@ -42,7 +42,8 @@ export const RETIRED = Object.freeze([
   { word: 'hasMarkerLine', re: /\bhasMarkerLine\b/ },
   { word: 'the As-asked modules', re: /\bas-asked(?:-seal|-region)?\.js\b/ },
   { word: 'the [as-asked] log lines', re: /\[as-asked\]/ },
-  // The quote's reader may read a description in one place only: lib/asked-of.js's legacy reader (see ALLOW).
+  // The quote's reader may read a description in one place only: lib/brief-quote.js (see ALLOW). LIN-4527 removed
+  // the legacy block reader in lib/asked-of.js, the only other caller.
   { word: 'splitQuote', re: /\bsplitQuote\b/ },
   // The close-out prune and the route it wrote through.
   { word: 'belowDescription', re: /\bbelowDescription\b/ },
@@ -67,12 +68,6 @@ export const ALLOW = Object.freeze({
   'lib/brief-quote.js': {
     words: ['splitQuote'],
     reason: 'the quote\'s home: splitQuote reads the brief\'s own quote (briefQuoteEnd), and the module defines it',
-  },
-  'lib/asked-of.js': {
-    words: ['splitQuote'],
-    reason: 'the ONE legacy reader of the block that tickets filed before P2 still carry (askedOf, outsideAsked and descriptionWithoutPlan go '
-      + 'through its private legacyBlock; LIN-4504 retired readFact and legacyBlockSpan). Exit condition, written in its header: P4 (LIN-4504) moves '
-      + 'plan facts and the size record to records, and no ticket with a block is left without a task, and no description with a block is shown in the brief or the selector view; then this goes',
   },
   'scripts/prompt-template-change-log.md': {
     words: ['AS_ASKED_*', 'the As-asked modules', 'the write-below route', 'Archive & Prune'],
@@ -164,9 +159,10 @@ describe('LIN-4502 retirement census: the seal, the guard, the Jira region, the 
     }
   });
 
-  test('the legacy reader\'s allowance names its exit condition', () => {
-    assert.match(ALLOW['lib/asked-of.js'].reason, /Exit condition/);
-    assert.match(readFileSync(join(ROOT, 'lib/asked-of.js'), 'utf8'), /Exit condition/, 'the module states it too');
+  // LIN-4527: the legacy block reader (and its allowance here, removed) is retired; asked-of.js reads the description whole.
+  test('lib/asked-of.js no longer splits or reads the block (LIN-4527: the allowance for it is removed, not widened)', () => {
+    assert.equal(ALLOW['lib/asked-of.js'], undefined);
+    assert.doesNotMatch(readFileSync(join(ROOT, 'lib/asked-of.js'), 'utf8'), /splitQuote|legacyBlock/);
   });
 
   test('the retired modules are gone from disk', () => {
@@ -204,10 +200,10 @@ describe('LIN-4502 retirement census: the seal, the guard, the Jira region, the 
 
   test('a per-word allowance hides only its word in only its file', () => {
     const files = {
-      'lib/asked-of.js': 'splitQuote(x); sealAsAsked(y);\n',
+      'lib/brief-quote.js': 'splitQuote(x); sealAsAsked(y);\n',
       'lib/other.js': 'splitQuote(x);\n',
     };
-    assert.deepStrictEqual(findRetired(files).map((h) => `${h.file} ${h.word}`).sort(), ['lib/asked-of.js *AsAsked* symbols', 'lib/other.js splitQuote']);
+    assert.deepStrictEqual(findRetired(files).map((h) => `${h.file} ${h.word}`).sort(), ['lib/brief-quote.js *AsAsked* symbols', 'lib/other.js splitQuote']);
   });
 
   test('the words that stay are not retired: the brief label, the writer rule, the injected-reader name, the orphaned property', () => {

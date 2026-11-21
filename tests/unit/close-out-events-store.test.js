@@ -24,7 +24,7 @@ const personMerge = (over = {}) => ({
   prUrl: PR_URL,
   headSha: 'abc1234',
   merged: true,
-  openItems: { inside: 1, outside: 2, unknown: 0, total: 3 },
+  openFindings: { state: 'read', count: 3 },
   ...over,
 });
 
@@ -38,7 +38,7 @@ const pressEvent = (over = {}) => ({
   prUrl: PR_URL,
   headSha: 'abc1234',
   merged: false,
-  openItems: { inside: 0, outside: 0, unknown: 0, total: 0 },
+  openFindings: { state: 'read', count: 0 },
   ...over,
 });
 
@@ -66,9 +66,11 @@ describe('vocabulary + validation', () => {
       'press without dispatchId': pressEvent({ dispatchId: null }),
       'person with a dispatchId': personMerge({ dispatchId: 'd-1' }),
       'merged not boolean': personMerge({ merged: 'yes' }),
-      'negative count': personMerge({ openItems: { inside: -1, outside: 0, unknown: 0, total: 0 } }),
-      'non-integer count': personMerge({ openItems: { inside: 0.5, outside: 0, unknown: 0, total: 1 } }),
-      'missing openItems': personMerge({ openItems: null }),
+      'negative count': personMerge({ openFindings: { state: 'read', count: -1 } }),
+      'non-integer count': personMerge({ openFindings: { state: 'read', count: 0.5 } }),
+      'a read with no count': personMerge({ openFindings: { state: 'read', count: null } }),
+      'a not-read with a count': personMerge({ openFindings: { state: 'not-read', count: 0 } }),
+      'a legacy stamp (no longer written)': personMerge({ openFindings: { state: 'legacy', count: 1 } }),
       'oversized identifier': personMerge({ issueIdentifier: 'x'.repeat(201) }),
       'control characters': personMerge({ issueIdentifier: 'LIN-42\n' }),
     };
@@ -93,8 +95,9 @@ describe('CloseOutEventsStore.record', () => {
     const doc = await store.record(personMerge());
     const [stored] = await db.collection('close-out-events').find({}).toArray();
     assert.deepStrictEqual(Object.keys(stored).sort(), [
-      '_id', 'accountId', 'at', 'by', 'dispatchId', 'doneAt', 'doneError', 'headSha', 'issueId', 'issueIdentifier', 'merged', 'openFindings', 'openItems', 'prMergedAt', 'prOpenedAt', 'prUrl', 'urlKey'
+      '_id', 'accountId', 'at', 'by', 'dispatchId', 'doneAt', 'doneError', 'headSha', 'issueId', 'issueIdentifier', 'merged', 'openFindings', 'prMergedAt', 'prOpenedAt', 'prUrl', 'urlKey'
     ]);
+    assert.deepStrictEqual(stored.openFindings, { state: 'read', count: 3 });
     assert.strictEqual(stored.prOpenedAt, null);
     assert.strictEqual(stored.prMergedAt, null);
     assert.strictEqual(stored._id, doc._id);
@@ -103,7 +106,6 @@ describe('CloseOutEventsStore.record', () => {
     assert.strictEqual(stored.doneAt, null);
     assert.strictEqual(stored.doneError, null);
     assert.strictEqual(stored.merged, true);
-    assert.deepStrictEqual(stored.openItems, { inside: 1, outside: 2, unknown: 0, total: 3 });
     assert.ok(new Date(stored.at).getTime() >= before);
   });
 
@@ -134,6 +136,24 @@ describe('CloseOutEventsStore.record', () => {
     assert.strictEqual(old.prMergedAt, null);
   });
 
+  // LIN-4527: stored events are not rewritten. An event with only the old openItems counts (no openFindings) reads its
+  // stamp as null, never as zero; a stored `legacy` stamp loads unchanged; a read of zero stays zero; openItems is no
+  // longer part of the read shape.
+  test('LIN-4527: stored stamps load as written: no openFindings reads null (never zero), a legacy stamp and a read of zero load unchanged', async () => {
+    const col = db.collection('close-out-events');
+    const base = { urlKey: 'ws', issueIdentifier: 'LIN-1', by: 'person', headSha: 'a', merged: true, at: new Date() };
+    await col.insertOne({ ...base, _id: 'old-counts', prUrl: 'https://github.com/o/r/pull/1', openItems: { inside: 0, outside: 0, unknown: 4, total: 4 } });
+    await col.insertOne({ ...base, _id: 'legacy', prUrl: 'https://github.com/o/r/pull/2', openFindings: { state: 'legacy', count: 2 }, openItems: { inside: 0, outside: 0, unknown: 2, total: 2 } });
+    await col.insertOne({ ...base, _id: 'zero', prUrl: 'https://github.com/o/r/pull/3', openFindings: { state: 'read', count: 0 }, openItems: { inside: 0, outside: 0, unknown: 0, total: 0 } });
+    const old = await store.findMergedByPr({ urlKey: 'ws', prUrl: 'https://github.com/o/r/pull/1' });
+    assert.strictEqual(old.openFindings, null, 'an event with no stamp reads null, not zero');
+    assert.ok(!('openItems' in old), 'openItems is not in the read shape');
+    const legacy = await store.findMergedByPr({ urlKey: 'ws', prUrl: 'https://github.com/o/r/pull/2' });
+    assert.deepStrictEqual(legacy.openFindings, { state: 'legacy', count: 2 });
+    const zero = await store.findMergedByPr({ urlKey: 'ws', prUrl: 'https://github.com/o/r/pull/3' });
+    assert.deepStrictEqual(zero.openFindings, { state: 'read', count: 0 });
+  });
+
   test('records a press with its dispatchId', async () => {
     await store.record(pressEvent());
     const [stored] = await db.collection('close-out-events').find({}).toArray();
@@ -144,20 +164,20 @@ describe('CloseOutEventsStore.record', () => {
 
   test('is idempotent on urlKey + prUrl + headSha + by: a repeat returns the first doc, no second row', async () => {
     const first = await store.record(personMerge());
-    const second = await store.record(personMerge({ accountId: 'acct-2', openItems: { inside: 9, outside: 0, unknown: 0, total: 9 } }));
+    const second = await store.record(personMerge({ accountId: 'acct-2', openFindings: { state: 'read', count: 9 } }));
     assert.strictEqual(second._id, first._id);
     assert.strictEqual((await db.collection('close-out-events').find({}).toArray()).length, 1);
   });
 
-  test('B2: a press followed by a person merge on the same head records TWO docs, and the merge carries merged + open counts', async () => {
+  test('B2: a press followed by a person merge on the same head records TWO docs, and the merge carries merged + the open-findings stamp', async () => {
     const press = await store.record(pressEvent({ merged: false }));
-    const merge = await store.record(personMerge({ merged: true, openItems: { inside: 2, outside: 1, unknown: 0, total: 3 } }));
+    const merge = await store.record(personMerge({ merged: true, openFindings: { state: 'read', count: 3 } }));
     assert.notStrictEqual(merge._id, press._id);
     const docs = await db.collection('close-out-events').find({}).toArray();
     assert.strictEqual(docs.length, 2);
     const mergeDoc = docs.find(d => d.by === 'person');
     assert.strictEqual(mergeDoc.merged, true);
-    assert.deepStrictEqual(mergeDoc.openItems, { inside: 2, outside: 1, unknown: 0, total: 3 });
+    assert.deepStrictEqual(mergeDoc.openFindings, { state: 'read', count: 3 });
     // The key is scoped by `by`: each kind answers for itself on the same head.
     const personHit = await store.getByPr({ urlKey: 'ws', prUrl: PR_URL, headSha: 'abc1234', by: 'person' });
     const pressHit = await store.getByPr({ urlKey: 'ws', prUrl: PR_URL, headSha: 'abc1234', by: 'press' });

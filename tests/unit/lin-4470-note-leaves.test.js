@@ -16,41 +16,41 @@ import { readFileSync } from 'node:fs';
 import { join } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { REGISTRY_PATH } from '../../lib/prompts/area-registry-path.js';
-import { NOTES_DIR, REGISTRY_FILE, NOT_NOTES, NOTE_EXTENSIONS, ANY_EXTENSION, isCitedPath } from '../../lib/prompts/area-note-format.js';
+import { NOTES_DIR, REGISTRY_FILE, NOT_NOTES, isCitedPath } from '../../lib/prompts/area-note-format.js';
 
 const ROOT = fileURLToPath(new URL('../..', import.meta.url));
 
-// [span, the notes guard's reading (NOTE_EXTENSIONS), the retirement-line checker's reading (ANY_EXTENSION)], at HEAD.
+// [span, the notes guard's reading], at HEAD. LIN-4527: the retirement-line checker's column and ANY_EXTENSION are gone.
 const BEFORE = [
-  ['lib/a.js', true, true],
-  ['server.js', true, true],
-  ['tests/fixtures/', true, true],
-  ['x.js:3', true, true],
-  ['run.sh', true, true],
-  ['/dispatch', false, false],
-  ['^lib/', false, false],
-  ['provider.name', false, true],
-  ['GATE_DUE_MARKER', false, false],
-  ['doc.kind', false, true],
-  ['src/x.ts', true, true],
-  ['a.py', false, true],
-  ['svc/main.go', true, true],
-  ['provider.name:12', false, true],
-  ['lib/b.js:12:4', true, true],
-  ['a.json', true, true],
-  ['a.markdown', false, false],
-  ['README.md', true, true],
-  ['foo.bar.baz', false, true],
-  ['x.toml', true, true],
-  ['lib/x.mjs:9', true, true],
-  ['a.yaml', true, true],
-  ['ab.cdefghi', false, false],
-  ['pkg.tsx', false, true],
-  ['lib/runner-kit/', true, true],
-  ['docs/areas/', true, true],
-  ['v1.2', false, true],
-  ['lib/a.js:', true, true],
-  ['12.5', false, true],
+  ['lib/a.js', true],
+  ['server.js', true],
+  ['tests/fixtures/', true],
+  ['x.js:3', true],
+  ['run.sh', true],
+  ['/dispatch', false],
+  ['^lib/', false],
+  ['provider.name', false],
+  ['GATE_DUE_MARKER', false],
+  ['doc.kind', false],
+  ['src/x.ts', true],
+  ['a.py', false],
+  ['svc/main.go', true],
+  ['provider.name:12', false],
+  ['lib/b.js:12:4', true],
+  ['a.json', true],
+  ['a.markdown', false],
+  ['README.md', true],
+  ['foo.bar.baz', false],
+  ['x.toml', true],
+  ['lib/x.mjs:9', true],
+  ['a.yaml', true],
+  ['ab.cdefghi', false],
+  ['pkg.tsx', false],
+  ['lib/runner-kit/', true],
+  ['docs/areas/', true],
+  ['v1.2', false],
+  ['lib/a.js:', true],
+  ['12.5', false],
 ];
 
 describe('LIN-4470 — the registry path is derived from the notes directory, spelled once', () => {
@@ -74,21 +74,14 @@ describe('LIN-4470 — the registry path is derived from the notes directory, sp
   });
 });
 
-describe('LIN-4470 — the cited-path rule is one predicate, read with each caller\'s extension list', () => {
+describe('LIN-4470 — the cited-path rule is one predicate', () => {
   test('the notes guard reads each span as it did at HEAD', () => {
     for (const [span, guard] of BEFORE) {
-      assert.equal(isCitedPath(span, NOTE_EXTENSIONS), guard, `guard: ${span}`);
+      assert.equal(isCitedPath(span), guard, `guard: ${span}`);
     }
   });
 
-  test('the retirement-line checker reads each span as it did at HEAD', () => {
-    for (const [span, , leftover] of BEFORE) {
-      assert.equal(isCitedPath(span, ANY_EXTENSION), leftover, `checker: ${span}`);
-    }
-  });
-
-  test('a retirement line can name another repository\'s file; the notes guard does not read it as a note path', () => {
-    assert.equal(isCitedPath('a.py', ANY_EXTENSION), true);
-    assert.equal(isCitedPath('a.py', NOTE_EXTENSIONS), false);
+  test('a file of another extension is not a cited path (LIN-4527: the any-extension reading went with its checker)', () => {
+    assert.equal(isCitedPath('a.py'), false);
   });
 });
