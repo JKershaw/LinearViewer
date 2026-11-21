@@ -4979,3 +4979,7 @@ LIN-4517 (verdict import) built and was reviewed (review done 05:04). LIN-4518..
 ### 21 Nov, 06:28: no change
 
 LIN-4517 has had no new rows since its 05:04 review. It is likely parked on `lin4513-p4-verdict-import` until John answers. The same three rulings are open.
+
+### 21 Nov, 07:02: morning
+
+John answered all three rulings. LIN-4517 resumed at 07:01. Slice 3: P1–P3 Done (LIN-4514..4516), P4 (LIN-4517, the verdict import and cutover) under way, P5–P8 (LIN-4518..4521) to come. No rulings open.
