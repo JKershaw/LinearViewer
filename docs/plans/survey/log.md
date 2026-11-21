@@ -5083,3 +5083,22 @@ John took LIN-4445 (the loop on Jira) off the parked work; he'll come back to it
 ### 21 Nov, 17:27: held
 
 The full stop holds: the fleet is paused, and the drive is only reporting. The open ruling, `lin4518-250-expectation`, waits for John. Agreed path (under discussion; nothing sent): one plain verify-and-clean task for slices 1 and 2; P5 fixes its tests properly in parallel; slice 3's planned stopgaps go to P7.
+
+### 21 Nov, ~17:50: research on the situation (two read-only readers)
+
+- **Slice 1/2 leftovers: no harm seen on real work.**
+  - Since slice 1's cutover, 205 comments (26 reviews, 16 close-outs) carry no old ledger or leftovers section, and no hold cites a legacy ledger. The six legacy tasks have cleared.
+  - The only live effect is the old ledger box on 8 Done tasks' evidence pages.
+  - One real defect predates the layer: LIN-2634 reads "none open" (finding-76683071). P7 is named to fix it.
+  - Several leftovers are already open findings (5b2fe3b2, b559517b, 4657b715, 987a7853) with no piece scheduled.
+- **Finishing slices 3 and 4 doesn't remove most of them.** P7 removes legacyLedgerOf and isEmptyStatement. The kickoff prompt text, openItems, ANY_EXTENSION, the orphan fixtures and slice 2's readers survive, and the ledger box would be left dead. Slice 2's readers also serve things slice 4 keeps (task `asked`, the size record, the 422 guard); the design never listed them as kept.
+- **Slice 3:**
+  - P1–P4 merged as 16 commits, and nothing has merged since, so a revert would be clean. Records written since (5 live verdicts, 21 imported, ~10 changes) would stay; they're valid for the old code.
+  - P4's cutover is still pending, so main's gates still read comments.
+  - P2's change backstop wrote stray change records: two are still wrong on LIN-4518. Findings 1e53ebaf and 0f91d9be are open.
+  - P5 is 26 commits on its branch, unmerged, and the latest review requests changes (verdict-417d9bea).
+- **Stopping a lane:**
+  - A cascade abort on 894a0750 stops only slice 3.
+  - The queued implementation 55122851 would survive it and launch when the pause lifts. It has to be deleted on the Dispatch page (owner only).
+  - A fresh kickoff later works from ticket state: it skips Done pieces and continues P5's branch. There's no exact precedent of stop-then-re-kick, though LIN-4463's r2 shows a fresh kickoff working from ticket state.
+- **The pause holds only fresh items.** Follow-ups and wakes into a live session still flow, which is why the 17:09 wake ran.
