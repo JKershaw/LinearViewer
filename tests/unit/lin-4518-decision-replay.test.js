@@ -11,12 +11,18 @@
  *     A foreign PR (one the task's implementation did not write: LIN-4469's #2444) is not a change of this task, so the
  *     records cannot hold it; the replay names that, and compares the decision on what the records hold.
  *
- * Every difference is classified below, and an unclassified one fails the test. The classes are the records-side
- * differences the design names, and the walk-8 README's known baseline flaws:
- *   - foreign-PR: the comment landing names a PR of another task; the records do not (see above);
+ * Every difference is classified below, and an unclassified one fails the test. The oracle is the BASELINE: the comment
+ * path's decision on the same trail, less the foreign PRs (the records cannot hold them), and the golden's own landing
+ * where it names no foreign PR. A difference against the baseline is excused only by a named class. Differences against
+ * the golden itself, on an instant with a foreign PR, are informative: they are classified too, and only a field the
+ * multi-PR branch shapes on a multi-PR golden landing counts as a foreign-PR consequence. Nothing is excused just because
+ * the instant holds a foreign PR (finding 7e6b9961). The classes:
  *   - stale-refusal (LIN-4469, flaw 1): a later push staled the approval, and the records refuse on the moved PR; the comment
- *     path's multi-PR branch never read the head, so it does not;
- *   - the rest are named where they are asserted.
+ *     path's multi-PR branch never read the head, so it does not (against the baseline it is named; against the golden it
+ *     is known-flaw-1);
+ *   - stale-at-posting (LIN-4469): a review posted after a push the judge never saw, so its blind-read step waits;
+ *   - foreign-PR-consequence: a golden difference that the foreign PR's multi-PR landing alone explains;
+ *   - known-flaw-1: the golden's multi-PR refusal the records answer as the flaw names (see above).
  *
  * Witness shapes: the close-out, the selector's facts and the stage routes are read as the production readers read them.
  * The run evidence box (beat 3) and the live-stage wait's run facts (allRuns, the dispatch store) are not replayed here.
@@ -217,7 +223,8 @@ async function replayTicket(name) {
       const expectedLanding = goldenLanding.filter((u) => !foreign.has(u));
 
       if (JSON.stringify(records.landing) !== JSON.stringify(expectedLanding)) {
-        diffs.push({ at: instant.at, field: 'landing', want: expectedLanding, got: records.landing, class: hasForeign ? 'foreign-PR' : 'UNCLASSIFIED' });
+        // expectedLanding already excludes the foreign PRs, so any difference here is not explained by them.
+        diffs.push({ at: instant.at, field: 'landing', want: expectedLanding, got: records.landing, class: 'UNCLASSIFIED' });
       }
 
       // The comment path's answer on the same trail, less the foreign PRs: what the records must agree with.
@@ -231,7 +238,7 @@ async function replayTicket(name) {
       const got = lanesOf({ ...records, workAfterReview: records.workAfterReview, closeOutOnTrail: records.closeOutOnTrail }, { statuses: statusesFor(records.landing) });
       for (const d of laneDiffs(baseline, got)) {
         const staleRefusal = d.field === 'refuses' && d.got === 'head-moved' && (d.want ?? null) === null;
-        diffs.push({ at: instant.at, ...d, class: hasForeign ? 'foreign-PR' : (staleRefusal ? 'stale-refusal' : 'UNCLASSIFIED') });
+        diffs.push({ at: instant.at, ...d, class: staleRefusal ? 'stale-refusal' : 'UNCLASSIFIED' });
       }
       // Against the golden itself, where it names a foreign PR: the records hold one PR fewer, so the golden's multi-PR
       // branch and the records' single-PR branch are compared. A stale approval refused on the moved PR (LIN-4469,
@@ -239,6 +246,8 @@ async function replayTicket(name) {
       if (hasForeign) {
         for (const d of laneDiffs(goldenLanesOf(instant), got)) {
           const flawOne = d.field === 'refuses' && d.got === 'head-moved' && (d.want ?? null) === null && goldenLanding.length > 1;
+          // Informational: the golden holds the foreign PR, so these differences are its consequence by construction. The
+          // oracle is the baseline above (and the landing and the blind-read step below); the test reports these, never asserts them.
           diffs.push({ at: instant.at, golden: true, ...d, class: flawOne ? 'known-flaw-1 (LIN-4469 multi-PR head-moved)' : 'foreign-PR-consequence' });
         }
       }
@@ -251,7 +260,7 @@ async function replayTicket(name) {
         // A review whose judged head a later push had already passed when it was posted is stale on records from the start,
         // so the read waits for review (the design's "nothing is blessed unseen"). The golden routed the read.
         const unseenPush = wantStep === BLIND_READ_KIND && gotStep === null && (standing.review?.staleUrls?.length ?? 0) > 0;
-        const cls = unseenPush ? 'stale-at-posting (LIN-4469: a push no review saw, before the re-review)' : (hasForeign ? 'foreign-PR' : 'UNCLASSIFIED');
+        const cls = unseenPush ? 'stale-at-posting (LIN-4469: a push no review saw, before the re-review)' : 'UNCLASSIFIED';
         diffs.push({ at: instant.at, field: 'blindReadStep', want: wantStep, got: gotStep, standing: summary, class: cls });
       }
     }
@@ -271,7 +280,9 @@ describe('walk 8 replayed through the proxy: records decide what the comment pat
       for (const d of r.diffs.filter((x) => x.class !== 'UNCLASSIFIED' && x.golden !== true).slice(0, 40)) t.diagnostic(`  ${d.at} ${d.class} ${d.lane ?? ''}.${d.field}: golden/comment ${JSON.stringify(d.want)} records ${JSON.stringify(d.got)}${d.standing ? ' standing ' + JSON.stringify(d.standing) : ''}`);
       for (const d of r.diffs.filter((x) => x.golden === true)) t.diagnostic(`  vs golden ${d.at} ${d.class} ${d.lane ?? ''}.${d.field}: golden ${JSON.stringify(d.want)} records ${JSON.stringify(d.got)}`);
       assert.deepEqual(r.refusals, [], `${name}: the proxy refused a replayed write`);
-      const unclassified = r.diffs.filter((d) => d.class === 'UNCLASSIFIED');
+      // The strict oracle: every difference against the baseline, the landing and the blind-read step is named. The golden
+      // comparisons (golden: true) are informational, and are excluded here by design.
+      const unclassified = r.diffs.filter((d) => d.class === 'UNCLASSIFIED' && d.golden !== true);
       assert.deepEqual(unclassified, [], `${name}: ${unclassified.length} difference(s) the replay does not name`);
       // The replay must reach the two named records-side differences on LIN-4469 (or it is not replaying the stale path).
       if (name === 'lin-4469') {
