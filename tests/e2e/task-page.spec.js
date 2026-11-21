@@ -66,6 +66,11 @@ async function seedTasks(page, { omit = [], reviewed = false } = {}) {
     },
   });
   expect(resp.ok(), `local seed failed: ${resp.status()} ${await resp.text()}`).toBeTruthy();
+  // LIN-4518 (beat 4): a reviewed task's review is a record on its PR (the gates and the box read records, not the comment).
+  if (reviewed) {
+    await seedVerdictRecords(page, { urlKey: URL_KEY, ticket: 'LOCAL-TP1', asked: 'Seeded task',
+      changes: [{ ref: 'https://github.com/acme/app/pull/41', head: PR_HEAD }], verdicts: [{ judgement: 'review', outcome: 'approve' }] });
+  }
 }
 
 async function runnerToken(page) {
