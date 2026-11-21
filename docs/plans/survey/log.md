@@ -5102,3 +5102,12 @@ The full stop holds: the fleet is paused, and the drive is only reporting. The o
   - The queued implementation 55122851 would survive it and launch when the pause lifts. It has to be deleted on the Dispatch page (owner only).
   - A fresh kickoff later works from ticket state: it skips Done pieces and continues P5's branch. There's no exact precedent of stop-then-re-kick, though LIN-4463's r2 shows a fresh kickoff working from ticket state.
 - **The pause holds only fresh items.** Follow-ups and wakes into a live session still flow, which is why the 17:09 wake ran.
+
+### 21 Nov, ~18:00: slice 3 lane stopped; two drafts for John
+
+- **John agreed the order:** finish slices 1 and 2, then restart slice 3.
+- **The stop:** I stopped slice 3's autopilot (894a0750) with a cascade abort; the coordinator and its live wakes read aborted. The queued implementation 55122851 for LIN-4518 is still queued, and John is to delete it on the Dispatch page.
+- **My error at the full stop:** the halt has two modes. I set `pause`, which only holds fresh items; `stop` also ends running sessions.
+- **Drafts written, not filed:**
+  - `integration/slice-1-finish-ticket.md` now covers slices 1 and 2 in plain words, with the fresh reader's fixes;
+  - `integration/stop-ticket.md`: stopping a run stops its queued work too; queued items can be cancelled through the proxy; pause and stop made plain.
