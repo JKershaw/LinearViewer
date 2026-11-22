@@ -475,6 +475,22 @@ describe('witness 3c: the backstop reads only the PR the run reported (LIN-4518 
     assert.equal(changes[0].run, RUN, 'under the run');
   });
 
+  test('a DONE: line naming another PR after the [done] entry is not the run\'s report (LIN-4518 finding-08e9831c)', async () => {
+    const { store } = await freshStore();
+    const taskId = await taskFor(store);
+    await doneImplementationRun(store, taskId);
+    const { backstop } = lifecycleBackstop(store, reader(() => status({ sha: 'H1' })));
+    const feedback = [
+      { kind: 'assistant', message: `DONE: ${PR_URL}` },
+      { kind: 'system', message: '[done] Shipped the widget.' },
+      { kind: 'assistant', message: `DONE: ${FOREIGN}` },
+    ];
+    await backstop({ urlKey: URL_KEY, runId: RUN, feedback });
+    const changes = await changesOf(store, taskId);
+    assert.equal(changes.length, 1, 'one change');
+    assert.equal(changes[0].fields.ref, PR_URL, 'the report line before the terminal entry, not the one after it');
+  });
+
   test('a PR another task already holds is not given to this task by the backstop', async () => {
     const { store, writes } = await freshStore();
     const taskId = await taskFor(store);
