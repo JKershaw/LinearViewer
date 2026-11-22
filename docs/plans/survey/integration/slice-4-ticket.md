@@ -26,7 +26,7 @@
   - The question ends `answered`.
   - The answer resumes the asking run, whose prompt carries the question, the chosen option and the person's words. A run that was stopped stays stopped, and the page says it wasn't resumed, as today; the decision stands in the task for the next stage to read. The per-ruling effect choice (resume, record, dispatch) retires.
   - A question that has already ended is refused, as the 409 does today.
-- **Dismissing ends the question `withdrawn`, `by` the person,** with the reason "not worth asking". If the asking run is waiting, it resumes with "proceed on your best judgment". It is the same on every surface. The false-escalation measure counts questions a person withdrew.
+- **Dismissing ends the question `withdrawn`, `by` the person,** with the reason "dismissed". If the asking run is waiting, it resumes, told the question was dismissed. It is the same on every surface. The false-escalation measure counts dismissed questions.
 - The Rulings page shows what is open for the signed-in person: questions and findings addressed to them.
 - Shelving retires (John: unused), with its store and its resurface timer.
 - A suggested answer or dismissal is a finding `to` the person, `about` the question, written through `/records`.
