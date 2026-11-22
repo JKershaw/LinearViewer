@@ -24,8 +24,8 @@
 // The hand-run passes' Balance-to-sign rule (codeBalance) left with the sample: the paper's coder is its one user, and
 // it lives beside that coder (docs/papers/harbour/cleaner-than-it-started-scripts/balance-sign.mjs).
 
-import { BLIND_READ_VERDICTS } from '../lib/prompts/blind-read-words.js';
-import { VERDICT_JUDGEMENTS, VERDICT_RECORDS_SINCE, verdictCoverageAt, verdictsInWindow } from '../lib/records/verdict-facts.js';
+import { BLIND_READ_KIND, BLIND_READ_VERDICTS } from '../lib/prompts/blind-read-words.js';
+import { VERDICT_RECORDS_SINCE, verdictCoverageAt, verdictsInWindow } from '../lib/records/verdict-facts.js';
 import { prOf } from '../lib/run-ledger.js';
 import { landingPr, notMeasured, ownTicket, row } from './stability-measures-core.mjs';
 
@@ -112,7 +112,7 @@ export function readLanding({ landing, files, facts, changeRefs = new Map(), gat
   const pr = landingPr(landing.subject);
   if (pr == null) return { status: UNREAD.noRead, why: 'the landing names no PR' };
   const reads = [];
-  for (const v of verdictsInWindow(facts.verdicts, { judgement: VERDICT_JUDGEMENTS.blindRead, to: landing.date })) {
+  for (const v of verdictsInWindow(facts.verdicts, { judgement: BLIND_READ_KIND, to: landing.date })) {
     if (!BLIND_READ_VERDICTS.includes(v.outcome)) continue;
     const prUrl = v.on.map((o) => changeRefs.get(o.id)).find((u) => u && isPr(u, pr, repo));
     if (prUrl) reads.push({ v, prUrl });

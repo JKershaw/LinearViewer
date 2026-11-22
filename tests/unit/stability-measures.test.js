@@ -1283,7 +1283,8 @@ test('measure 1 reads the verdict records through --api and counts the window\'s
     // LIN-4 landed before the verdict records; LIN-3 is a merge landing (its ticket from the branch, its PR from "Merge
     // pull request #8"), and its verdict names simple-dispatcher's #8, not this repository's: no read on record.
     assert.deepStrictEqual(blind.value.unread, { 'no ticket': 1, 'not an ordinary landing': 1, 'landed before the gate': 0, 'before the verdict records': 1, 'no read on record': 1 });
-    assert.deepStrictEqual(paths.filter((p) => p.startsWith('/records?kind=')), ['/records?kind=task', '/records?kind=verdict', '/records?kind=change']);
+    // The three list reads run in parallel, so their arrival order is not fixed: the set is.
+    assert.deepStrictEqual(paths.filter((p) => p.startsWith('/records?kind=')).sort(), ['/records?kind=change', '/records?kind=task', '/records?kind=verdict']);
     assert.ok(!paths.some((p) => p.startsWith('/issues/')), 'no ticket\'s comments are read');
     assert.match(rowsOf(out.json).tasks.reason, /^proxy: issue list: not found$/);
     assert.match(blind.reason, /^1 landing\(s\) merged before the verdict records began \(2026-11-21T08:06:29\.634Z\), not read from them$/);
