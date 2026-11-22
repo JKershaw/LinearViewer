@@ -132,23 +132,23 @@
     },
     "review:fresh": {
       "name": "review",
-      "bytes": 18359,
-      "sha256": "729c977683d987750b311a9513d2e7cd051895da2ba1400b76040861f45cd01f"
+      "bytes": 18700,
+      "sha256": "50234c9c9c1f66dabcb9dc27dc003aa0e91e3043d63fd1bb403417ea5d59180f"
     },
     "review:fix": {
       "name": "review",
-      "bytes": 18359,
-      "sha256": "729c977683d987750b311a9513d2e7cd051895da2ba1400b76040861f45cd01f"
+      "bytes": 18700,
+      "sha256": "50234c9c9c1f66dabcb9dc27dc003aa0e91e3043d63fd1bb403417ea5d59180f"
     },
     "close-out:fresh": {
       "name": "close-out",
-      "bytes": 11041,
-      "sha256": "cdf2d09f67daa38542f4e1449b0a34dddc31badcebd08ef40679b327b2c3ef49"
+      "bytes": 11370,
+      "sha256": "aa6dc9a7d16e3870a19f29fb662c90396fad64800dd902515bfce1c0f76b10b7"
     },
     "close-out:fix": {
       "name": "close-out",
-      "bytes": 11041,
-      "sha256": "cdf2d09f67daa38542f4e1449b0a34dddc31badcebd08ef40679b327b2c3ef49"
+      "bytes": 11370,
+      "sha256": "aa6dc9a7d16e3870a19f29fb662c90396fad64800dd902515bfce1c0f76b10b7"
     },
     "retrospective-audit:fresh": {
       "name": "retrospective-audit",
@@ -247,10 +247,10 @@
       "  },",
       "  \"close-out\": {",
       "    \"coreOutcome\": \"Approved work finished: the fixes review asked for made, the findings to close-out settled, the PR merged, the post-deploy steps done once the deploy landed, the task Done, the summary posted, and related tickets tidied and each outside find recorded to the project backlog\",",
-      "    \"readinessCheck\": \"Did the review record an Approve, and is the work then finished: the fixes review asked for made, every finding to close-out settled (with none recorded under an Approve, nothing waits; a missing verdict goes back to review), merged, the post-deploy steps done once the deploy landed, set Done, summarized (with how the work meets what was asked), and each outside find recorded to project?\",",
+      "    \"readinessCheck\": \"Did the review record an Approve, and is the work then finished: the fixes review asked for made, every finding to close-out settled (with none recorded under an Approve, nothing waits; a missing verdict, or a commit pushed after the approval, goes back to review), merged, the post-deploy steps done once the deploy landed, set Done, summarized (with how the work meets what was asked), and each outside find recorded to project?\",",
       "    \"signals\": [",
       "      \"Review verdict read from its verdict record on the task (in the brief); any finding to close-out settled, none recorded passing through, and a missing verdict sent back to review to confirm\",",
-      "      \"The fixes review asked for made by close-out itself, each the size of a fix (new design or new behaviour handed back to review), listed in the summary with its commit, and CI green on the new head\",",
+      "      \"The fixes review asked for made by close-out itself, each the size of a fix (new design or new behaviour handed back to review), listed with its commit in a finding to review, and review named next: no merge after a commit pushed past the approval\",",
       "      \"Every finding to close-out settled: inside work done with cited evidence, a monitor or rollback named by the name review wrote (an unnamed one settles nothing), or a finding accepted by a human naming the exact precondition exercised; an outside find recorded to project; once the deploy landed, a post-deploy check close-out cannot run is recorded as not run (what, why, follow-up) and does not hold the close\",",
       "      \"Green CI confirmed on the exact merged commit, or CI genuinely absent with the substitute re-run and recorded on it (green CI alone never settles a finding)\",",
       "      \"PR merged; once the deploy landed, the post-deploy steps done and the change verified on what landed in the same session, then the task set to Done — not held open for a separate verification pass\",",
@@ -862,7 +862,7 @@
     ]
   },
   "stageLabels": "71b1066de2fe5206ed5acf5f18d47b5a62543f8c22697e24a7e982a3264e192a",
-  "contracts": "40635cd9eea5c9c69925af008b1a5fef663c4bb48890e753696202b85df8c7f5",
+  "contracts": "07b9aba2a8077256f6bd5ec8216351f2767b27c2e64fa74cccf379c14853d472",
   "stepWords": "0a06759d642d8c2268893789c6c196461af7b338e3b58dccf0ce7ab5353cbec5",
   "overrideLine": "e8cd49b7b5b35ecfe83ae820694879f466b3017d1dad0ef0655dbe15944aefb9"
 }

@@ -83,14 +83,17 @@ describe('a close-out parked on the blind read does not hold the ticket (finding
     assert.equal(rec.liveWait?.kind, 'close-out');
   });
 
-  test('the review half: approve at H1, a push to H2, a close-out running and no read: no live wait, and the selector is told work came after the review', async () => {
+  test('the review half: approve at H1, a push to H2, a close-out running and no read: no live wait, and code sends the re-review (LIN-4521)', async () => {
     const trail = await trailOf([ev.pr(1, A, H1), ev.review(2, A, { heads: { [A]: H1 } }), ev.head(3, A, H2), ev.run(4, 'close-out', null)]);
     const requests = [];
     const rec = await routeFor({ trail, allRuns: [closeOutRunning], requests });
     assert.equal(rec.liveWait, undefined, 'the parked close-out lifts the live wait');
-    assert.equal(rec.codeRoute, undefined, 'no code route settles it: the selector is offered the re-review');
-    assert.equal(requests.length, 1, 'the selector was asked once');
-    assert.ok(requests[0].includes('Work reported after it (a later comment links a PR): yes'), 'the selector\'s TRAIL FACTS say work came after the review');
+    // LIN-4521 (ruling 1): a stale approval is a code gate, as the blind read is. The selector used to be offered this
+    // (LIN-4518 step 3), but its rules order close-out before review, and close-out is refused at a moved head: the
+    // ticket could loop. So code sends `review`, and the selector is not asked.
+    assert.equal(rec.codeRoute, 're-review', 'code sends the re-review of the moved head');
+    assert.equal(rec.recommendedAction, 'review');
+    assert.equal(requests.length, 0, 'the selector was not asked');
   });
 
   test('no records read (the trail is null): the live wait holds, as it did before', async () => {

@@ -361,6 +361,35 @@ describe('witness 10 (finding d115ccd8): staleness and judged heads are per PR o
   });
 });
 
+describe('LIN-4521: movedUrls names the open changes a push moved, so a re-review is never sent for a merged PR', () => {
+  test('a push to an open PR after the review: stale and moved, and the trail carries both', async () => {
+    clock('2026-11-21T11:00:00.000Z');
+    const c = await addChange(221, 'H1');
+    await reviewOn([c], { [c]: 'H1' });
+    prs.set(221, { sha: 'H2', merged: false });
+    clock('2026-11-21T11:30:00.000Z');
+    await refresh();
+    const s = await standing();
+    assert.deepEqual(s.review.staleUrls, [prUrl(221)]);
+    assert.deepEqual(s.review.movedUrls, [prUrl(221)], 'the open change that moved is the one review must re-judge');
+    assert.deepEqual(trailOfStanding(s).review.movedUrls, [prUrl(221)], 'the trail carries it to the decision');
+  });
+
+  test('a PR merged after an unreviewed push: the approval is stale (the head at merge), but nothing is moved', async () => {
+    clock('2026-11-21T11:00:00.000Z');
+    const c = await addChange(222, 'H1');
+    await reviewOn([c], { [c]: 'H1' });
+    // Someone pushed H2 and merged it: the merge function revises the head to H2, then ends the change merged.
+    prs.set(222, { sha: 'H2', merged: true });
+    clock('2026-11-21T11:30:00.000Z');
+    await refresh();
+    const s = await standing();
+    assert.deepEqual(s.review.staleUrls, [prUrl(222)], 'the approval does not cover the merged head');
+    assert.deepEqual(s.review.movedUrls, [], 'a merged PR cannot be re-judged before its merge, so it is not moved');
+    assert.deepEqual(s.landing, [prUrl(222)], 'the merged PR is still this round\'s landing');
+  });
+});
+
 describe('witness 11 (finding d115ccd8): trailOfStanding carries the verdict, stale PRs, per-PR heads and blind-read PRs', () => {
   test('a two-PR landing with a blind read: the trail names the verdict, the stale PR, the heads per PR and the blind-read PRs', async () => {
     clock('2026-11-21T11:00:00.000Z');

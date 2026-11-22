@@ -2414,10 +2414,51 @@ describe('close-out template + review→close-out ledger handoff (LIN-550)', () 
       assert.ok(!/at most 2 files and 3 hunks/i.test(prompt) && !/trivially small/i.test(prompt), 'the old size bound is gone');
       assert.ok(/one that turns out to need a new design or new behaviour is not a fix, so hold the merge and name `review` next/.test(prompt),
         'a new design or new behaviour goes back to review');
-      assert.ok(/Nobody reviews what you change after the approval, so list each change in your summary/.test(prompt),
-        'the reason for recording each change is kept with the rule');
-      assert.ok(/re-establish CI on the new head before merging/.test(prompt) && /--match-head-commit/.test(prompt),
-        'CI is re-established on the new head and the merge is pinned to it');
+      assert.ok(/Every commit you push after the approval stales it, so the work goes back to review rather than merging/.test(prompt),
+        'LIN-4521: a commit after the approval hands the work back to review (the reason is stated with the rule)');
+      assert.ok(!/Nobody reviews what you change after the approval/.test(prompt) && !/re-establish CI on the new head before merging/.test(prompt),
+        'LIN-4521: the old rule that close-out merges its own commits is gone');
+      assert.ok(/--match-head-commit/.test(prompt) && /merge at the head review approved/.test(prompt),
+        'the merge is pinned to the commit CI passed on, at the head review approved');
+    });
+
+    test('LIN-4521: a commit close-out pushes after the approval is recorded as a finding to review, and named as the next stage', () => {
+      const { prompt } = generatePrompt('close-out', issue, context);
+      const fixes = section(prompt, '### Make the Fixes Review Asked For', '### Settle the Findings');
+      assert.ok(/record a finding `to` `review`, `in` this ticket, with that list, and name `review` next/.test(fixes),
+        'the hand-back is a finding to review that lists the commits, then review is named next');
+      assert.ok(/A rebase or merge with no conflict moves the head too, so it is handed back the same way/.test(fixes),
+        'a rebase with no conflict is handed back as well: it moves the head');
+      assert.ok(/review re-reads them with the change/.test(fixes), 'the blind read\'s fix-sized findings are re-read with the change');
+    });
+
+    test('LIN-4521 (finding-3944c511): the Workflow step and Land It each carry the hand-back, so neither can drift back to merging', () => {
+      const { prompt } = generatePrompt('close-out', issue, context);
+      const workflow = section(prompt, '## Workflow', '## Context');
+      assert.ok(/A commit you push after the approval hands the work back to review, so do not merge after it\./.test(workflow),
+        'Workflow step 2: a commit after the approval hands the work back, and close-out does not merge after it');
+      assert.ok(!/Then re-establish CI on the new head\./.test(workflow), 'Workflow step 2 no longer re-establishes CI to merge its own commit');
+      const landIt = prompt.slice(prompt.indexOf('### Land It and Close the Loop'));
+      assert.ok(/Merge pinned to the commit CI passed on and review approved \(`--match-head-commit`\)/.test(landIt),
+        'Land It: the merge is pinned to the head review approved');
+      assert.ok(/a head that moved since the approval, a rebase with no conflict included, is handed back, not merged/.test(landIt),
+        'Land It: a moved head, a clean rebase included, is handed back, not merged');
+      assert.ok(!/ordinary mechanics/.test(landIt), 'Land It no longer calls a post-approval rebase ordinary mechanics (finding-d547d0ce)');
+    });
+
+    test('LIN-4521 (finding-d547d0ce): the close-out contract signal names the hand-back, not a merge of close-out\'s own head', () => {
+      const signals = COMPLETION_SIGNALS['close-out'].signals.join('\n');
+      assert.ok(/listed with its commit in a finding to review, and review named next: no merge after a commit pushed past the approval/.test(signals),
+        'the signal says each fix is listed in a finding to review, with no merge after it');
+      assert.ok(!/and CI green on the new head/.test(signals), 'the old "CI green on the new head" signal is gone');
+    });
+
+    test('LIN-4521 (finding-b86622c8): review ends the hand-back findings to review on its verdict', () => {
+      const { prompt } = generatePrompt('review', issue, context);
+      assert.ok(/Read the open findings `to` `review` on this ticket/.test(prompt), 'review reads the findings to review');
+      assert.ok(/On Approve, end each \(`POST \/api\/proxy\/records\/<finding id>\/end`, `"state": "done"`, a `reason` naming this verdict\)/.test(prompt),
+        'an Approve ends each with a reason naming the verdict');
+      assert.ok(/on Request Changes or Needs Discussion, leave it open/.test(prompt), 'other verdicts leave it open');
     });
 
     test('a post-deploy step runs after the merge, once the deploy has landed, and never holds the merge', () => {
