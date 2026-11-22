@@ -5211,3 +5211,10 @@ The full stop holds: the fleet is paused, and the drive is only reporting. The o
 - Waiting for John: lin4513-session-cap (lift); lin4518-p5-scope (my suggested reshape: P5 is steps 1–3; rulings already decided; readings are P6's, retirements and replay P7's, the import ran in P4); lin4518-stray-changes (my lean: option 3, excluded as merged before the work began); a signed-in check of the blind-read prompt route (finding-598a59f0); the fleet pause for #2492's deploy if the run asks.
 - Cause of stale asks found: LIN-4513's task keeps the original ticket as filed ("two questions for John", walk-8 replay, readings, cutover), and runs read it beside the corrected plan.
 - 01:28: ended 8 blind-read findings that described #2483-only code (not on main).
+
+## 22 Nov, 20:10: slice 3 complete (LIN-4513 Done)
+
+- Merged and deployed today, CI green on each: #2492 (P5 step 3: consumers read records; parked close-out deadlock fixed), #2493 (LIN-4528: session cap removed, John's call after it blocked legitimate work twice), #2494 (P6: measures read verdict records; cutover instant corrected in review), #2495 (P7: comment verdict and comment-trail paths retired, about 4,100 lines net removed; fix-round brief retired with the continue-the-same-PR switch kept on records, per John's ruling lin4520-revision-brief), #2496 (P8: close-out's own commits send the work back to review). LIN-4513 Done at 20:07.
+- Process notes: child pieces build straight from their piece plans; a piece edited after the breakdown's plan review gets no new review (P6, P8 both passed review anyway). The cap "lift" answer had no mechanism; a fresh run or removal was the lever. The original ticket text kept in the task's `asked` fed stale instructions to runs all day.
+- Open after it: finding-145b1665 (close-out's hand-back finding `to: review` has no reader or owner; it will pile up), two signed-in checks for John (finding-598a59f0 blind-read prompt, finding-b89ac5a3 effort page) and P8's live check (finding-da5bc495), several backlog tidy-ups.
+- Next (John): draft slice 4's ticket together, with full focus, correct before kickoff.
