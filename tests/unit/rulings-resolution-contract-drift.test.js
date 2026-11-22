@@ -33,6 +33,7 @@ import { fileURLToPath } from 'node:url';
 import { dirname, join } from 'node:path';
 import { buildRouterPrompt } from '../../lib/stage-router.js';
 import { buildSelectorArgs } from '../../lib/openrouter.js';
+import { planReviewRunOf } from '../../lib/records/plan-review-run.js';
 import { planFactsOf } from '../../lib/records/plan-facts.js';
 
 const __dirname = dirname(fileURLToPath(import.meta.url));
@@ -162,7 +163,13 @@ describe('no-re-raise guidance literal list (LIN-2891/LIN-3038)', () => {
       'the baseline snapshot carries no stale list');
 
     // LIN-4504: the same explicit plan facts regen-baseline.mjs renders (a task whose records hold no plan).
-    const leaf = buildSelectorArgs({ identifier: '{{IDENTIFIER}}', title: '', state: {}, labels: [] }, { planFacts: planFactsOf({ task: { id: 'task-leaf', kind: 'task' } }) });
+    // LIN-4520: and the same records-read empty trail and plan-review run (no review, no verdict on record).
+    const emptyTrail = { review: null, landing: [], workAfterReview: false, closeOutAfterReview: false, closeOutOnTrail: false, landingHasNotesPr: false, notesPrs: [], auditAfterCloseOut: false };
+    const leaf = buildSelectorArgs({ identifier: '{{IDENTIFIER}}', title: '', state: {}, labels: [] }, {
+      planFacts: planFactsOf({ task: { id: 'task-leaf', kind: 'task' } }),
+      trail: emptyTrail,
+      planReviewRun: planReviewRunOf({ verdicts: [], findings: [] }),
+    });
     const fresh = buildRouterPrompt({ ...leaf, view: '{{ISSUE_CONTEXT}}', featureFlags: {} });
     assert.strictEqual(baselineSource, fresh,
       'scripts/eval/meta-prompt.baseline.txt is stale — run `node scripts/eval/regen-baseline.mjs`');

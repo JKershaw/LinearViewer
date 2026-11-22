@@ -72,13 +72,13 @@
     },
     "scoping:fresh": {
       "name": "scoping",
-      "bytes": 5930,
-      "sha256": "8dd450313cb1fa600cc1da38221350ea5e37fe01170c47de282c70e7d996d4e2"
+      "bytes": 5938,
+      "sha256": "390d181d2530bb6a978a1ad548a5b97f284c61c43a1cd334a9e78929e72662c6"
     },
     "scoping:fix": {
       "name": "scoping",
-      "bytes": 5930,
-      "sha256": "8dd450313cb1fa600cc1da38221350ea5e37fe01170c47de282c70e7d996d4e2"
+      "bytes": 5938,
+      "sha256": "390d181d2530bb6a978a1ad548a5b97f284c61c43a1cd334a9e78929e72662c6"
     },
     "design:fresh": {
       "name": "design",
@@ -172,23 +172,23 @@
     },
     "survey-task:fresh": {
       "name": "survey-task",
-      "bytes": 2625,
-      "sha256": "23b2e82817ce6f8203b8d394c4cc0b55a69827a84cd3f34eb74ba67c645d3b19"
+      "bytes": 2633,
+      "sha256": "f6d0fd0783da2270e2a4ad89e5fcd2ef7d9da19546b7e3fec39f205178473979"
     },
     "survey-task:fix": {
       "name": "survey-task",
-      "bytes": 2625,
-      "sha256": "23b2e82817ce6f8203b8d394c4cc0b55a69827a84cd3f34eb74ba67c645d3b19"
+      "bytes": 2633,
+      "sha256": "f6d0fd0783da2270e2a4ad89e5fcd2ef7d9da19546b7e3fec39f205178473979"
     },
     "survey-place:fresh": {
       "name": "survey-place",
-      "bytes": 3540,
-      "sha256": "27de77bd8992dd58f8840727f92e7ea5743f41a3a29e4c50cc14e978b53a7797"
+      "bytes": 3548,
+      "sha256": "72b5180bc5e9fc7c918361592fc8580d44c4d5d0342a789dfdccde76aadbd1dc"
     },
     "survey-place:fix": {
       "name": "survey-place",
-      "bytes": 3540,
-      "sha256": "27de77bd8992dd58f8840727f92e7ea5743f41a3a29e4c50cc14e978b53a7797"
+      "bytes": 3548,
+      "sha256": "72b5180bc5e9fc7c918361592fc8580d44c4d5d0342a789dfdccde76aadbd1dc"
     },
     "blind-read:fresh": {
       "name": "blind-read",
@@ -390,7 +390,7 @@
       "    ]",
       "  },",
       "  \"survey-place\": {",
-      "    \"coreOutcome\": \"A read-only forecast of what this task will do to the codebase as a place, reported at the named base\",",
+      "    \"coreOutcome\": \"A read-only forecast of what this task will do to the codebase as a place, posted as one comment on the surveyed ticket at the named base\",",
       "    \"readinessCheck\": \"Is the report read-only, at the named base, and under its word limit?\",",
       "    \"signals\": [",
       "      \"Read at the base the report names, with nothing after it: no later commits, tickets, comments or reports, and no reviews or maps of the codebase's shape\",",
@@ -402,7 +402,7 @@
       "    ]",
       "  },",
       "  \"survey-task\": {",
-      "    \"coreOutcome\": \"A read-only forecast of why this task will be difficult, and what would be done first, reported at the named base\",",
+      "    \"coreOutcome\": \"A read-only forecast of why this task will be difficult, and what would be done first, posted as one comment on the surveyed ticket at the named base\",",
       "    \"readinessCheck\": \"Is the report read-only, at the named base, and under its word limit?\",",
       "    \"signals\": [",
       "      \"Read at the base the report names, with nothing after it: no later commits, tickets, comments or reports\",",
@@ -812,14 +812,14 @@
       "  },",
       "  \"survey-place\": {",
       "    \"category\": \"universal\",",
-      "    \"description\": \"Sent by the look-first route or by hand, never by the selector. A read-only forecast of the codebase as a place, before work starts: where this task lands, what the obvious way would add, move, tangle or leave in two places, and what would leave the place better. Its report is its own account, and it changes nothing else.\",",
+      "    \"description\": \"Sent by the look-first route or by hand, never by the selector. A read-only forecast of the codebase as a place, before work starts: where this task lands, what the obvious way would add, move, tangle or leave in two places, and what would leave the place better. Posts one comment on the surveyed ticket and changes nothing else.\",",
       "    \"name\": \"survey-place\",",
       "    \"route\": null,",
       "    \"writes\": \"one-comment\"",
       "  },",
       "  \"survey-task\": {",
       "    \"category\": \"universal\",",
-      "    \"description\": \"Sent by the look-first route or by hand, never by the selector. A read-only forecast, before work starts: why this task will be difficult and what you would do first, from a fresh session at origin/main. Its report is its own account, and it changes nothing else.\",",
+      "    \"description\": \"Sent by the look-first route or by hand, never by the selector. A read-only forecast, before work starts: why this task will be difficult and what you would do first, from a fresh session at origin/main. Posts one comment on the surveyed ticket and changes nothing else.\",",
       "    \"name\": \"survey-task\",",
       "    \"route\": null,",
       "    \"writes\": \"one-comment\"",

@@ -9,7 +9,7 @@
  *
  * LIN-4520: every trail is a records trail (the ticket's records, seeded by tests/helpers/records-scenario.js and read
  * by trailForTicket). The comment-shaped rows of the first version are kept as their records events: the expected
- * answers are the same. The real finished-run trails of tests/fixtures/run-ledger-trails.js are kept by name.
+ * answers are the same. The real finished-run trails are kept by name (their comment fixture went with the parse, LIN-4520).
  *
  * Run with: node --test tests/unit/lin-4460-close-out-decision.test.js
  */

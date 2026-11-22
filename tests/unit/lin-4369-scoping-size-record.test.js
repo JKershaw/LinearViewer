@@ -120,9 +120,9 @@ describe('scoping writes the size record (LIN-4369)', () => {
     assert.ok(!p.includes('what done means. Read the code first'), 'the old lead is gone');
   });
 
-  test('it reads both Surveys\' reports, the filing comments, and a subtask\'s parent record (LIN-4520: no Survey comment heading)', () => {
+  test('it reads both Surveys\' report comments, the filing comments, and a subtask\'s parent record (LIN-4520: no Survey comment heading)', () => {
     const p = processOf(render());
-    assert.match(p, /the two Surveys' reports \(`survey-task`, `survey-place`\)/);
+    assert.match(p, /the two Surveys' report comments \(`survey-task`, `survey-place`\)/);
     assert.match(p, /the comments filed with the ticket/);
     assert.match(p, /for a subtask its parent's size record/);
     assert.match(p, new RegExp(`A person's size comment on the trail is their ruling: record it as decided by ${DECIDED_BY.ruling}\\.`));

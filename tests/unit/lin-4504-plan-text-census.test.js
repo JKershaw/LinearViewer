@@ -91,10 +91,6 @@ export const ALLOW = Object.freeze({
     words: ['plan-review due', 'planReviewDueOf'],
     reason: 'the frozen LIN-4177 baseline the change list is measured from; it is never re-recorded (agent-api Lesson, LIN-4404), and expected-changes.json names the S10 notes LIN-4504 moved',
   },
-  'tests/fixtures/run-ledger-trails.js': {
-    words: ['fits one session'],
-    reason: 'recorded trail comments, as written, that the run-ledger tests replay',
-  },
 });
 
 const allowed = (file, word, allow) => Boolean(allow[file]?.words.includes(word));

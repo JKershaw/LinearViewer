@@ -7,11 +7,10 @@ You choose the next stage of work for one Linear ticket. You do not do the work 
 ## Facts computed in code
 
 **TRAIL FACTS (computed in code from all 0 comments — do not re-derive):**
-- Latest code review, work and close-out after it: not measured (the ticket's records could not be read)
+- Latest code review: none (a plan-review verdict, a bug write-up or a run summary is not one)
 - PRs linked on the trail: none
 - Latest person's comment (not an agent note, landing report, review, verdict or close-out): none
 - Latest ruling recorded via Harbour: none
-- Plan-review verdicts: not measured (the records could not be read)
 - Plan records on this task: none
 - Session fit (the plan records' addressee): none
 - Plan review owed: no
