@@ -16,6 +16,7 @@ import { createRecordWrites } from '../../lib/records/writes.js';
 import { isTerminalState } from '../../lib/providers/state-map.js';
 import { refreshTaskChanges } from '../../lib/change-records.js';
 import { readStandingRecords, trailOfStanding } from '../../lib/records/standing.js';
+import { readLanding } from '../../lib/records/landing.js';
 import { BLIND_READ_KIND } from '../../lib/prompts/blind-read-words.js';
 import { standingForTicket, setStandingPrReaderFor } from '../../lib/task-standing.js';
 
@@ -421,5 +422,29 @@ describe('witness 12 (finding 6d32cb5a): an audit\'s notes PR is the change its 
     const s = await standing();
     assert.deepEqual(s.notesPrs, [], 'no change was written by an audit run');
     assert.equal(s.landingHasNotesPr, false);
+  });
+});
+
+describe('witness 13 (finding 398df7e5): the landing and the standing cut the round at the same instant, a close-out run revised after it ended', () => {
+  test('a close-out ended at 10:25 and revised at 10:35, after the review at 10:30: readLanding and standingOf both cut at 10:25, so a PR merged at 10:23 is the previous round\'s', async () => {
+    clock('2026-11-21T10:00:00.000Z');
+    const open = await addChange(120, 'H1');
+    clock('2026-11-21T10:05:00.000Z');
+    await addChange(121, 'E1');
+    await store.openRun(URL_KEY, { id: 'row-close-w13', stage: 'close-out', taskId, lineage: 'row-root', at: '2026-11-21T10:20:00.000Z' });
+    clock('2026-11-21T10:23:00.000Z');
+    prs.set(121, { sha: 'E1', merged: true });
+    await refresh();
+    clock('2026-11-21T10:25:00.000Z');
+    await store.endRun(URL_KEY, 'row-close-w13', { state: 'done', at: '2026-11-21T10:25:00.000Z' });
+    clock('2026-11-21T10:30:00.000Z');
+    await reviewOn([open], { [open]: 'H1' });
+    // A later write to the ended run: its current instant moves past the review, but its end stays at 10:25.
+    await store.revise(URL_KEY, 'row-close-w13', { fields: { stage: 'close-out' } }, { at: '2026-11-21T10:35:00.000Z', reason: 'a later write to the ended run' });
+
+    const fromStore = await readLanding({ recordsStore: store, urlKey: URL_KEY, taskId });
+    const s = await standing();
+    assert.deepEqual(s.landing, fromStore, 'the standing and the landing read take the same round from the same instants');
+    assert.deepEqual(fromStore, [prUrl(120)], 'the cut is the close-out\'s end (10:25), not its current instant (10:35): the merge at 10:23 is not in the round');
   });
 });
