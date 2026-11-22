@@ -106,8 +106,8 @@ describe('createPipelineMergeRecorder answers (characterization)', () => {
 });
 
 describe('the PR head close-out reads (characterization)', () => {
-  // A review on record at REVIEWED, and one landing PR.
-  const trail = { landing: [PR1], review: { sha: REVIEWED, verdict: 'approve', blindRead: null } };
+  // A review on record at REVIEWED, and one landing PR. LIN-4520: a records review judges each PR at its head (`heads`).
+  const trail = { landing: [PR1], review: { heads: { [PR1]: REVIEWED }, staleUrls: [], sha: null, verdict: 'approve', blindRead: null } };
   const decide = (status) => closeOutDecision({
     trail, prStatuses: new Map([[PR1, status]]), stopAt: 'pr', runnerReady: true, actor: 'harbour', openFindings: FINDINGS_NONE,
   });

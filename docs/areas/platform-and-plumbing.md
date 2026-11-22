@@ -18,5 +18,5 @@ Area notes for `platform-and-plumbing` in the registry. Format and rules: README
   repo root passed every probe the list did not name; the structure test is what catches it.
 - The code censuses that read `tests/unit/helpers/shipped-sources.js` list files with `git ls-files`, so a new file is
   invisible to them until it is added. Run them after `git add`, not only on the working tree: a plan-heading leaf
-  module LIN-4502 added passed the comment-kind census (`tests/unit/lin-4458-comment-kind-census.test.js`) while
-  untracked and failed once committed.
+  module LIN-4502 added passed a comment-kind census while untracked and failed once committed (that census is
+  retired, LIN-4520).

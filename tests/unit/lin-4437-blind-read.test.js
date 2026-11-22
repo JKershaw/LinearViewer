@@ -1,17 +1,19 @@
 /**
  * LIN-4437 (piece 2 of LIN-4396): the `blind-read` stage, sent by hand. Nothing gates on it yet.
  *
- *   - the readers' one home (lib/run-trail.js since LIN-4458): the comment shape, `landingPrUrls`,
- *     `latestBlindRead`, and the comment kinds, `firstLineOf` with them (no local copies left);
+ *   - LIN-4520: a read's verdict is a records verdict (`trail.review.blindRead`, lib/task-standing.js), and its PR set is
+ *     lib/run-ledger.js checkBlindReadPrs against the records landing. The comment-shape readers (the verdict line, the
+ *     verdict word, the reason, the repeated verdict) and the comment landing and kind readers are retired, and their
+ *     cases are gone; the records-side cases below replace them;
  *   - witness 1: a read is never landing work and never an answer to a person (no loop, no silenced
  *     person), down to the selector's rendered facts with runs known;
  *   - witness 2: the read is blind: the prompt and its preamble carry no ticket text, no attachment
  *     title and no brief or issue-read hint;
  *   - the prompt is the piloted text (tests/fixtures/blind-read-piloted.txt, frozen from #2407) but for
  *     its fill-ins and the Where-to-stand sentence;
- *   - the proxy holds the comment's shape, and with a failed trail read keeps the shape check and skips
+ *   - the proxy holds the PR set of a read, and with a failed records read keeps the no-PR check and skips
  *     only the PR-set check, with a log;
- *   - the ledger model carries `blindRead`, and the run-evidence fragment shows it;
+ *   - the run-evidence box shows the records blind read;
  *   - a live blind read holds the live-stage wait; the churn and round-trip readers place it.
  */
 process.env.NODE_ENV = 'test';
@@ -19,20 +21,19 @@ process.env.NODE_ENV = 'test';
 import { FINDINGS_NONE } from '../../lib/close-out-findings.js';
 import { test, describe, before, after } from 'node:test';
 import { createMangoTmpdir } from '../fixtures/mango-tmpdir.js';
-import { seededRecordsStore, ev } from '../helpers/records-scenario.js';
+import { seededRecordsStore, recordsStoreFor, seedTicketRecords, ev } from '../helpers/records-scenario.js';
 import assert from 'node:assert/strict';
 import { readFileSync } from 'node:fs';
 import { fileURLToPath } from 'node:url';
 import express from 'express';
 import { BLIND_READ_CODES } from '../../lib/run-ledger.js';
-import {
-  landingPrUrls, latestBlindRead, parseBlindRead, checkBlindRead, commentKindOf,
-  readRunLedger, latestReviewComment, isPersonComment
-} from '../../lib/run-trail.js';
+import { isPersonComment, opensAsBlindRead } from '../../lib/run-trail.js';
 import { BLIND_READ_HEADING } from '../../lib/prompts/blind-read-words.js';
 import { SURVEY_HEADINGS } from '../../lib/prompts/survey-words.js';
-import { assembleTrailFacts, assemblePlanReviewFacts } from '../../lib/recommendation-facts.js';
-import { readTrail } from '../../lib/run-trail.js';
+import { assembleTrailFacts, planReviewFactsOf } from '../../lib/recommendation-facts.js';
+import { planReviewRunOf } from '../../lib/records/plan-review-run.js';
+import { planRound } from '../helpers/plan-review-loop.js';
+import { trailForTicket } from '../../lib/task-standing.js';
 import { buildSelectorArgs } from '../../lib/openrouter.js';
 import { recentRuns, stageRuns } from '../../lib/recent-runs.js';
 import { liveWaitOf } from '../../lib/run-live-wait.js';
@@ -62,92 +63,58 @@ const c = (h, body, id = `c${h}`) => ({ id, body, createdAt: at(h) });
 
 const review = (h, verdict = 'Approve', pr = PR) => c(h, `## Review — LIN-1\n\n${pr}\n\n**Verdict:** ${verdict}\n\n### What CI Did Not Prove\n\nNone.`);
 const summary = (h, pr = PR) => c(h, `Implementation done: ${pr} at \`abc1234\`.`);
-const closeOut = (h, text = 'not ready', pr = PR) => c(h, `## Close-out — ${text}\n\n${pr}`);
 const read1 = (h, prs = [PR], verdict = 'better') => c(h, `${BLIND_READ_HEADING}\nVerdict: ${verdict}. The change gave the parser one owner in \`lib/a.js\`; it left a stale comment in \`lib/b.js\`.\n\nRead: ${prs.join(', ')} at \`abc\` against \`def\`.\n\n### Inside the area, fix-sized\nNone.`);
 
-describe('the comment shape (checkBlindRead, parseBlindRead)', () => {
-  const ok = read1(1).body;
-  test('a well-formed read passes, with its verdict, reason and PRs', () => {
-    const r = checkBlindRead(ok, { landing: [PR] });
-    assert.equal(r.ok, true);
-    assert.equal(r.verdict, 'better');
-    assert.deepEqual(r.prs, [PR]);
-    assert.match(r.reason, /one owner/);
-  });
-  test('"mixed" is refused: there is no fourth word', () => {
-    assert.equal(checkBlindRead(ok.replace('Verdict: better', 'Verdict: mixed')).code, BLIND_READ_CODES.verdictWord);
-  });
-  test('a verdict with no reason is refused', () => {
-    assert.equal(checkBlindRead(`${BLIND_READ_HEADING}\nVerdict: same.\n\nRead: ${PR}`).code, BLIND_READ_CODES.reasonMissing);
-  });
-  test('two verdict lines, or none, are refused', () => {
-    assert.equal(checkBlindRead(`${ok}\nVerdict: worse. A second line that also has reasons.`).code, BLIND_READ_CODES.verdictRepeated);
-    assert.equal(checkBlindRead(`${BLIND_READ_HEADING}\n\nRead: ${PR}`).code, BLIND_READ_CODES.verdictMissing);
-  });
-  test('a read naming no PR, or PRs other than the landing, is refused', () => {
-    assert.equal(checkBlindRead(ok.replace(PR, '#77')).code, BLIND_READ_CODES.prsMissing);
-    const r = checkBlindRead(ok, { landing: [PR, PR2] });
-    assert.equal(r.code, BLIND_READ_CODES.prsMismatch);
-    assert.deepEqual(r.expected, [PR, PR2]);
-    assert.equal(checkBlindRead(read1(1, [PR, OLD]).body, { landing: [PR] }).code, BLIND_READ_CODES.prsMismatch, 'an extra URL');
-  });
-  test('the heading is matched exactly: a longer heading, or a mention further down, is not a read', () => {
-    assert.equal(commentKindOf(`${BLIND_READ_HEADING} pilot\nVerdict: mixed`) === 'blind-read', false);
-    assert.deepEqual(checkBlindRead(`${BLIND_READ_HEADING} pilot\nVerdict: mixed`), { ok: true, applies: false });
-    assert.deepEqual(checkBlindRead(review(1).body + `\n\nThe ${BLIND_READ_HEADING} comment said same.\nVerdict: mixed`), { ok: true, applies: false });
-    assert.equal(commentKindOf(`\n\n${BLIND_READ_HEADING}: LIN-1\nVerdict: same. a b c ${PR}`) === 'blind-read', true, 'a `:` tail, after blank lines');
-  });
-  test('a read is neither a review nor a close-out nor a person\'s comment', () => {
-    assert.equal(latestReviewComment([read1(1)]), null);
-    assert.notEqual(commentKindOf(read1(1).body), 'close-out');
+/** The ticket's records trail for `events` (LIN-4518 step 3): seeded into a fresh store, read the way the gates read it. */
+async function trailOf(events) {
+  const recordsStore = await recordsStoreFor(harness);
+  await seedTicketRecords(recordsStore, 'acme', 'LIN-1', events);
+  return trailForTicket({ recordsStore, urlKey: 'acme', ticket: 'LIN-1' });
+}
+
+describe('a read is recognised by its opening, and is no person\'s comment (opensAsBlindRead, isPersonComment)', () => {
+  test('a well-formed read opens as a blind read and is not a person\'s comment', () => {
+    assert.equal(opensAsBlindRead(read1(1)), true);
     assert.equal(isPersonComment(read1(1).body), false);
   });
-  test('parseBlindRead gives the model, or null for a malformed read', () => {
-    assert.deepEqual(parseBlindRead(read1(3)), { verdict: 'better', reason: parseBlindRead(read1(3)).reason, prs: [PR], at: at(3), commentId: 'c3' });
-    assert.equal(parseBlindRead(c(3, `${BLIND_READ_HEADING}\nVerdict: mixed. a b c ${PR}`)), null);
+  test('the heading is matched exactly: a longer heading, or a mention further down, is not a read', () => {
+    assert.equal(opensAsBlindRead(c(1, `${BLIND_READ_HEADING} pilot\nVerdict: mixed`)), false);
+    assert.equal(opensAsBlindRead(c(1, review(1).body + `\n\nThe ${BLIND_READ_HEADING} comment said same.\nVerdict: mixed`)), false);
+    assert.equal(opensAsBlindRead(c(1, `\n\n${BLIND_READ_HEADING}: LIN-1\nVerdict: same. a b c ${PR}`)), true, 'a `:` tail, after blank lines');
   });
 });
 
-describe('landingPrUrls: the one owner of "which landing is current"', () => {
-  test('no review: every full PR URL on the trail', () => {
-    assert.deepEqual(landingPrUrls([summary(1, OLD), summary(2, PR)]), [OLD, PR]);
+describe('the landing is the records landing, which decides the PR set of a read (LIN-4520; was the comment landing)', () => {
+  test('no review: every change on the task is the landing', async () => {
+    assert.deepEqual([...(await trailOf([ev.pr(1, OLD, 'h'), ev.pr(2, PR, 'h')])).landing].sort(), [OLD, PR].sort());
   });
-  test('the anchor is the latest close-out before the latest review', () => {
-    const trail = [summary(1, OLD), review(2, 'Approve', OLD), closeOut(3, 'merged', OLD), summary(4, PR), review(5)];
-    assert.deepEqual(landingPrUrls(trail), [PR]);
+  test('the anchor is the latest close-out before the latest review: the merged earlier PR leaves the landing', async () => {
+    const trail = await trailOf([ev.pr(1, OLD, 'h'), ev.review(2, OLD), ev.close(3), ev.merged(3, OLD), ev.pr(4, PR, 'h'), ev.review(5, PR)]);
+    assert.deepEqual(trail.landing, [PR]);
   });
-  test('a close-out after the latest review never resets scope', () => {
-    const trail = [summary(1), review(2), closeOut(3, 'not ready')];
-    assert.deepEqual(landingPrUrls(trail), [PR]);
+  test('a close-out after the latest review never resets scope', async () => {
+    assert.deepEqual((await trailOf([ev.pr(1, PR, 'h'), ev.review(2, PR), ev.close(3)])).landing, [PR]);
   });
-  test('a not-ready close-out before a re-review keeps the PR re-named by the fix round', () => {
-    const trail = [summary(1), review(2), closeOut(3, 'not ready'), summary(4), review(5)];
-    assert.deepEqual(landingPrUrls(trail), [PR]);
+  test('a not-ready close-out before a re-review keeps the PR re-named by the fix round', async () => {
+    assert.deepEqual((await trailOf([ev.pr(1, PR, 'h'), ev.review(2, PR), ev.close(3), ev.review(5, PR)])).landing, [PR]);
   });
-  test('a review whose title mentions close-out is not an anchor', () => {
-    const conditional = c(2, `## Review — Approve, conditional on close-out\n\n${OLD}\n\n**Verdict:** Approve (conditional)`);
-    assert.deepEqual(landingPrUrls([summary(1, OLD), conditional, summary(3), review(4)]), [OLD, PR]);
+  test('a blind read and a Survey report never carry the landing (the LIN-4396 note-1 decision)', async () => {
+    // A Survey is a run of its stage and writes no change; a read is a verdict on the landing's change.
+    assert.deepEqual((await trailOf([ev.run(0, 'survey-task'), ev.pr(1, PR, 'h'), ev.review(2, PR), ev.read(3, PR)])).landing, [PR]);
   });
-  test('a blind read and a Survey report never carry the landing (the LIN-4396 note-1 decision)', () => {
-    const survey = c(0, `${SURVEY_HEADINGS['survey-place']}: LIN-1 @ abc\n\nSee ${OLD} for the precedent.`);
-    assert.deepEqual(landingPrUrls([survey, summary(1), review(2), read1(3, [OLD])]), [PR]);
-  });
-  test('kept on purpose: a foreign-repository URL before the first review joins the landing (narrowing by repo needs a repo no caller holds)', () => {
-    assert.deepEqual(landingPrUrls([c(0, `Like ${FOREIGN}.`), summary(1), review(2)]), [FOREIGN, PR]);
+  test('kept on purpose: a change for a foreign-repository PR before the first review joins the landing (narrowing by repo needs a repo no caller holds)', async () => {
+    assert.deepEqual([...(await trailOf([ev.pr(0, FOREIGN, 'h'), ev.pr(1, PR, 'h'), ev.review(2, PR)])).landing].sort(), [FOREIGN, PR].sort());
   });
 });
 
-describe('latestBlindRead: over the whole trail', () => {
-  test('the newest well-formed read after the latest review', () => {
-    const trail = [summary(1), review(2), read1(3, [PR], 'worse'), read1(4, [PR], 'same'), c(5, `${BLIND_READ_HEADING}\nVerdict: mixed. x y z ${PR}`)];
-    assert.equal(latestBlindRead(trail, latestReviewComment(trail)).verdict, 'same');
+describe('the blind read on record is the one after the latest review (LIN-4520; was latestBlindRead over the comments)', () => {
+  test('the newest read after the latest review is the one on record', async () => {
+    const trail = await trailOf([ev.pr(1, PR, 'h'), ev.review(2, PR), ev.read(3, PR, { outcome: 'worse' }), ev.read(4, PR, { outcome: 'same' })]);
+    assert.equal(trail.review.blindRead.verdict, 'same');
   });
-  test('a read before the latest review is not on record for it', () => {
-    const trail = [summary(1), review(2), read1(3), summary(4), review(5)];
-    assert.equal(latestBlindRead(trail, latestReviewComment(trail)), null);
-  });
-  test('with no review, the latest read anywhere', () => {
-    assert.equal(latestBlindRead([summary(1), read1(2)]).verdict, 'better');
+  test('a read before the latest review is not on record for it', async () => {
+    const trail = await trailOf([ev.pr(1, PR, 'h'), ev.review(2, PR), ev.read(3, PR), ev.review(5, PR)]);
+    assert.equal(trail.review.blindRead, null);
   });
 });
 
@@ -167,29 +134,32 @@ describe('no local copies: recommendation-facts imports the moved readers', () =
 
 describe('witness 1: a read is never landing work, never an answer to a person', () => {
   const person = c(3, 'Please keep the old flag; we still read it in the export.');
-  const trail = [summary(1), review(2), person, read1(4)];
+  const comments = [summary(1), review(2), person, read1(4)];
+  const events = [ev.pr(1, PR, 'abc1234'), ev.review(2, PR), ev.read(4, PR)];
   const rows = [
     { id: 'r-review', kind: 'review', status: 'taken', dispatchedAt: at(1), feedback: [{ message: '[done] reviewed', timestamp: at(2) }] },
     { id: 'r-read', kind: 'blind-read', status: 'taken', dispatchedAt: at(3), feedback: [{ message: '[done] posted the read', timestamp: at(4) }] }
   ];
 
-  test('workAfterReview is false and the latest person\'s comment is not acted on', () => {
-    const f = assembleTrailFacts(trail, '');
+  test('workAfterReview is false and the latest person\'s comment is not acted on', async () => {
+    const trail = await trailOf(events);
+    const f = assembleTrailFacts(comments, '', { trail });
     assert.equal(f.workAfterReview, false);
     assert.equal(f.latestPerson.at, at(3));
     assert.equal(f.latestPerson.actedAfter, false);
   });
 
   test('the plan-review landed fact is unchanged by a read', () => {
-    const verdict = c(0, '### Plan Review Verdict\n\n**Verdict:** Approve.');
-    assert.deepEqual(assemblePlanReviewFacts([verdict, person, read1(4)]), assemblePlanReviewFacts([verdict, person]));
+    const run = planReviewRunOf({ verdicts: [planRound(at(0), 'approve').verdict], findings: [] });
+    assert.deepEqual(planReviewFactsOf(run, [person, read1(4)]), planReviewFactsOf(run, [person]));
   });
 
-  test('the selector\'s rendered facts, with runs known, show no blind-read line and no run after the person', () => {
+  test('the selector\'s rendered facts, with runs known, show no blind-read line and no run after the person', async () => {
+    const trail = await trailOf(events);
     const runs = recentRuns(rows);
     assert.deepEqual(runs.map(r => r.stage), ['review'], 'selectorSlice leaves the read out');
     assert.equal(stageRuns(rows).length, 2, 'allRuns keeps it');
-    const { facts } = buildSelectorArgs({ identifier: 'LIN-1', title: 'T', description: '', state: {}, labels: [] }, { comments: trail, runs });
+    const { facts } = buildSelectorArgs({ identifier: 'LIN-1', title: 'T', description: '', state: {}, labels: [] }, { comments, runs, trail });
     assert.doesNotMatch(facts, /blind-read/);
     assert.match(facts, /Work reported after it \(a later comment links a PR\): no/);
     const runLines = facts.split('\n').filter(l => /^\s+- \w/.test(l) && /Recent runs/.test(facts));
@@ -233,7 +203,7 @@ describe('witness 2: the read is blind', () => {
   test('the ticket appears only as where the comment goes', () => {
     for (const line of prompt.split('\n').filter(l => l.includes('LIN-9'))) {
       // The verdict record (LIN-4518 step 2) names the ticket as its `in`, the place a record goes, not a text to read.
-      assert.match(line, /one comment on LIN-9|LIN-9 is where it goes|linked on LIN-9|"in": "LIN-9"/, line);
+      assert.match(line, /the comment below on LIN-9|one comment on LIN-9|LIN-9 is where it goes|linked on LIN-9|"in": "LIN-9"/, line);
     }
   });
   test('the skip is the blind read\'s alone: another stage still renders the attachments', () => {
@@ -252,7 +222,9 @@ describe('the prompt is the piloted text', () => {
     assert.ok(prompt.includes(`## Goal\n${lead}\n`), 'the lead is the pilot\'s second paragraph');
     // LIN-4495: these paragraphs are the cutover's: the Areas sentence (its finds), the three-class sort, the rules line
     // (no class sections in the comment) and the class headings. Each is checked by its own rendered words below.
-    const CHANGED = ['**Where to stand.**', '**Areas.**', '**Sort each find', 'You only sort', 'Rules for the comment:', '### '];
+    // LIN-4520: the read-only line names the comment and the verdict record, the verdict paragraph names the record, and the
+    // comment is its heading and Read line only (the verdict line is gone).
+    const CHANGED = ['**Where to stand.**', '**Areas.**', '**Sort each find', 'You only sort', 'Rules for the comment:', '### ', '**This is read-only.**', '**The verdict**', '## Blind read'];
     const fill = (t) => t.replace('{DESTINATION}', 'Your outputs are one comment on LIN-9, the comment below, and the finds you record as findings (the hand-off protocol says how). LIN-9 is where the comment goes, not something to read.').replaceAll('{PRS}', PR);
     for (const p of rest.filter(q => !CHANGED.some(c => q.startsWith(c)))) {
       assert.ok(body.includes(fill(p)), `unchanged pilot paragraph: ${p.slice(0, 60)}`);
@@ -282,32 +254,20 @@ describe('the prompt is the piloted text', () => {
   });
 });
 
-describe('the ledger carries the read', () => {
-  const trail = [summary(1), review(2), read1(3, [PR], 'same')];
-  test('readTrail carries blindRead (the route reads it there); readRunLedger no longer does (LIN-4438: nothing read it)', () => {
-    assert.equal(readTrail(trail).review.blindRead.verdict, 'same');
-    assert.equal(readTrail([summary(1), review(2)]).review.blindRead, null);
-    assert.equal(Object.hasOwn(readRunLedger(trail), 'blindRead'), false);
+describe('the records carry the read (LIN-4520: the box and the route read the review\'s blind read)', () => {
+  const withRead = [ev.pr(1, PR), ev.review(2, PR), ev.read(3, PR, { outcome: 'same' })];
+  test('the records review carries its blind read; no review, or no read after it, carries none', async () => {
+    assert.equal((await trailOf(withRead)).review.blindRead.verdict, 'same');
+    assert.equal((await trailOf([ev.pr(1, PR), ev.review(2, PR)])).review.blindRead, null);
   });
-  test('buildRunEvidence carries it, and the fragment shows the verdict and reason, or none on record', () => {
-    const model = buildRunEvidence({ openFindings: FINDINGS_NONE, comments: trail, issueIdentifier: 'LIN-1' });
+  test('buildRunEvidence carries it, and the fragment shows the verdict, or none on record', async () => {
+    const model = buildRunEvidence({ openFindings: FINDINGS_NONE, trail: await trailOf(withRead), issueIdentifier: 'LIN-1' });
     assert.equal(model.ledger.blindRead.verdict, 'same');
     assert.equal(model.evidence.checked.blindRead.verdict, 'same');
     const html = renderRunEvidence(model);
     assert.match(html, /data-testid="run-evidence-checked-blind-read-verdict">same</);
-    assert.match(html, /one owner/);
-    assert.match(renderRunEvidence(buildRunEvidence({ openFindings: FINDINGS_NONE, comments: [summary(1), review(2)], issueIdentifier: 'LIN-1' })), /no blind read on record/);
-  });
-  test('a precomputed ledger brings its own read', () => {
-    const ledger = { ...readRunLedger(trail), blindRead: readTrail(trail).review.blindRead };
-    assert.equal(buildRunEvidence({ openFindings: FINDINGS_NONE, comments: [], ledger, issueIdentifier: 'LIN-1' }).evidence.checked.blindRead.verdict, 'same');
-  });
-  test('a precomputed ledger with no blindRead key reads the read after ITS review, not the whole trail (LIN-4438)', () => {
-    const older = [read1(1, [PR], 'worse'), summary(2), review(3)];
-    const ledger = readRunLedger(older);
-    assert.equal(buildRunEvidence({ openFindings: FINDINGS_NONE, comments: older, ledger, issueIdentifier: 'LIN-1' }).evidence.checked.blindRead, null, 'review in the comments');
-    assert.equal(buildRunEvidence({ openFindings: FINDINGS_NONE, comments: [older[0]], ledger, issueIdentifier: 'LIN-1' }).evidence.checked.blindRead, null, 'placed by the ledger time');
-    assert.equal(buildRunEvidence({ openFindings: FINDINGS_NONE, comments: [...older, read1(4, [PR], 'same')], ledger, issueIdentifier: 'LIN-1' }).evidence.checked.blindRead.verdict, 'same');
+    const none = renderRunEvidence(buildRunEvidence({ openFindings: FINDINGS_NONE, trail: await trailOf([ev.pr(1, PR), ev.review(2, PR)]), issueIdentifier: 'LIN-1' }));
+    assert.match(none, /no blind read on record/);
   });
 });
 
@@ -317,18 +277,18 @@ describe('the run readers place a blind read', () => {
     assert.equal(wait.wait.kind, 'blind-read');
   });
   test('a blind read sent by hand between a Request Changes review and the fix round does not flip the review\'s verdict', () => {
-    // No verdict comment, so the walk reads the verdict from the next pipeline row (tier C). On the walk,
-    // the read would be that row and read as an Approve; off it, the fix round is, a Request Changes.
+    // The review's verdict is the records verdict (judgement review, outcome request-changes), not the next pipeline row,
+    // so the read between the review and the fix round does not turn it into an approval.
     const issue = {
       id: 'i', identifier: 'LIN-1', description: '', comments: [],
+      verdictFacts: { measured: true, verdicts: [{ id: 'v-rc', judgement: 'review', outcome: 'request-changes', at: at(2), state: 'stands', in: 'task', on: [] }] },
       rows: [
         { id: 'rv', kind: 'review', status: 'taken', dispatchedAt: at(1), completedAt: at(2) },
         { id: 'br', kind: 'blind-read', status: 'taken', dispatchedAt: at(3), completedAt: at(4) },
         { id: 'im', kind: 'implementation', status: 'taken', dispatchedAt: at(5), completedAt: at(6) }
       ]
     };
-    // LIN-4519: pinned to the comments source, whose structural tier is the walk under test (records would read these rows not measured).
-    const out = computeIssueRoundTrips(issue, { asOf: at(9), gateKind: 'review', rePassKind: 'implementation', verdictSource: 'comments' });
+    const out = computeIssueRoundTrips(issue, { asOf: at(9), gateKind: 'review', rePassKind: 'implementation', verdictRecordsSince: '2026-11-01T00:00:00.000Z' });
     assert.equal(out.R0.nextRow.kind, 'implementation');
     assert.equal(out.R0.verdict, 'request changes');
   });
@@ -340,11 +300,11 @@ describe('the run readers place a blind read', () => {
   });
 });
 
-// ── The proxy holds the comment's shape (routes/proxy-writes.js refusedByBlindRead) ──────────────
+// ── The proxy holds a read's PR set (routes/proxy-writes.js refusedByBlindRead, checkBlindReadPrs) ──────────────
 const URL_KEY = 'acme-4437';
 const ISSUE_ID = '44374437-4437-4437-4437-443744374437';
 class FakeProvider extends ProviderInterface {
-  constructor(trail) {
+  constructor() {
     super();
     this.name = 'fake';
     this.calls = { createComment: 0, fetchIssueComments: 0 };
@@ -353,8 +313,7 @@ class FakeProvider extends ProviderInterface {
     this.issueWriteGuard = async () => ({ id: ISSUE_ID, team: { id: 't' } });
     this.fetchIssueComments = async () => {
       this.calls.fetchIssueComments++;
-      if (trail instanceof Error) throw trail;
-      return trail;
+      return [summary(1), review(2)];
     };
   }
 }
@@ -392,63 +351,58 @@ async function post(provider, body, method = 'POST', path = `${ISSUE_ID}/comment
 }
 let uniq = 0;
 const readBody = (verdict = 'better', prs = [PR]) => `${read1(1, prs, verdict).body}\n\n(${++uniq})`;
-const TRAIL = [summary(1), review(2)];
+const NO_PR_READ = (n) => `${BLIND_READ_HEADING}\n\nI read the change and it is fine. No link given (${n}).`;
 
-describe('the proxy holds the blind read\'s shape', () => {
-  test('refuses "mixed" with 422, before any trail read, and posts nothing', async () => {
-    const p = new FakeProvider(TRAIL);
-    const res = await post(p, readBody('mixed'));
+describe('the proxy holds a read\'s PR set', () => {
+  test('refuses a read that names no PR by full URL with 422, before any trail read, and posts nothing', async () => {
+    const p = new FakeProvider();
+    const res = await post(p, NO_PR_READ(++uniq));
     assert.equal(res.status, 422);
-    assert.equal(res.body.code, BLIND_READ_CODES.verdictWord);
-    assert.match(res.body.error, /there is no fourth/);
+    assert.equal(res.body.code, BLIND_READ_CODES.prsMissing);
     assert.deepEqual(p.calls, { createComment: 0, fetchIssueComments: 0 });
   });
-  test('refuses a verdict with no reason', async () => {
-    const res = await post(new FakeProvider(TRAIL), `${BLIND_READ_HEADING}\nVerdict: better.\n\nRead: ${PR} (${++uniq})`);
-    assert.equal(res.body.code, BLIND_READ_CODES.reasonMissing);
-  });
-  test('refuses a read whose PR URLs differ from landingPrUrls, naming both sets', async () => {
-    const p = new FakeProvider(TRAIL);
+  test('refuses a read whose PR URLs differ from the records landing, naming both sets', async () => {
+    const p = new FakeProvider();
     const res = await post(p, readBody('same', [PR, OLD]));
     assert.equal(res.status, 422);
     assert.equal(res.body.code, BLIND_READ_CODES.prsMismatch);
     assert.deepEqual(res.body.expected, [PR]);
     assert.equal(p.calls.createComment, 0);
   });
-  test('posts a read naming exactly the landing', async () => {
-    const p = new FakeProvider(TRAIL);
+  test('posts a read naming exactly the landing, and reads no comment for the set check', async () => {
+    const p = new FakeProvider();
     const res = await post(p, readBody('worse'));
     assert.equal(res.status, 201, JSON.stringify(res.body));
     // The landing is read from the records (LIN-4518 step 3): no comment read for the set check.
     assert.equal(p.calls.fetchIssueComments, 0);
   });
   test('passes a review verdict that mentions the heading mid-comment, and never reads the trail for it', async () => {
-    const p = new FakeProvider(TRAIL);
+    const p = new FakeProvider();
     const res = await post(p, `${review(5).body}\n\n${BLIND_READ_HEADING}\nVerdict: mixed (${++uniq})`);
     assert.equal(res.status, 201, JSON.stringify(res.body));
     assert.equal(p.calls.fetchIssueComments, 0);
   });
   test('never validates a `## Blind read pilot` tally as a read', async () => {
-    const res = await post(new FakeProvider(TRAIL), `${BLIND_READ_HEADING} pilot\n\n- #2404 · same. Verdict: mixed (${++uniq})`);
+    const res = await post(new FakeProvider(), `${BLIND_READ_HEADING} pilot\n\n- #2404 · same. Verdict: mixed (${++uniq})`);
     assert.equal(res.status, 201, JSON.stringify(res.body));
   });
-  test('with a failed trail read, keeps the shape check and skips only the set check, with a log', async () => {
+  test('with a failed records read, skips only the PR-set check, with a log; the no-PR check still holds', async () => {
     const warned = [];
     const original = console.warn;
     console.warn = (...args) => warned.push(args.join(' '));
     try {
-      const failing = new FakeProvider(new Error('Comments for X could not be read whole'));
-      const passed = await post(failing, readBody('same', [PR, OLD]), 'POST', `${ISSUE_ID}/comments`, { async taskForTicket() { throw new Error('the store is down'); } });
+      const failingStore = { async taskForTicket() { throw new Error('the store is down'); } };
+      const passed = await post(new FakeProvider(), readBody('same', [PR, OLD]), 'POST', `${ISSUE_ID}/comments`, failingStore);
       assert.equal(passed.status, 201, 'the set check is skipped');
       assert.ok(warned.some(w => /\[blind-read\].*PR-set check skipped/.test(w)), 'and logged');
-      const refused = await post(new FakeProvider(new Error('down')), readBody('mixed'));
-      assert.equal(refused.body.code, BLIND_READ_CODES.verdictWord, 'the shape check still holds');
+      const refused = await post(new FakeProvider(), NO_PR_READ(++uniq), 'POST', `${ISSUE_ID}/comments`, failingStore);
+      assert.equal(refused.body.code, BLIND_READ_CODES.prsMissing, 'the no-PR check holds without the records');
     } finally {
       console.warn = original;
     }
   });
-  test('PATCH is held to the same shape', async () => {
-    const res = await post(new FakeProvider(TRAIL), readBody('mixed'), 'PATCH', `${ISSUE_ID}/comments/0c0c0c0c-0c0c-0c0c-0c0c-0c0c0c0c0c0c`);
-    assert.equal(res.body.code, BLIND_READ_CODES.verdictWord);
+  test('PATCH is held to the same PR-set check', async () => {
+    const res = await post(new FakeProvider(), NO_PR_READ(++uniq), 'PATCH', `${ISSUE_ID}/comments/0c0c0c0c-0c0c-0c0c-0c0c-0c0c0c0c0c0c`);
+    assert.equal(res.body.code, BLIND_READ_CODES.prsMissing);
   });
 });

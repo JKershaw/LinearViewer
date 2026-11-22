@@ -46,9 +46,13 @@ const byUrl = (prs = [], statuses = []) => new Map(prs.map((p, i) => [p.url, sta
 const derive = (input) => {
   const explicit = Array.isArray(input.landingPrs) && input.landingPrs.length > 0;
   const landing = explicit ? input.landingPrs : (input.prs || []).map(p => p.url);
-  const review = input.review && !explicit && input.review.blindRead === undefined
+  const withBlindRead = input.review && !explicit && input.review.blindRead === undefined
     ? { ...input.review, blindRead: { prs: landing } }
     : input.review;
+  // LIN-4520: a records review judges each landing PR at its head (`heads`, standingOf). A fixture's `sha` is that head for every PR.
+  const review = withBlindRead && !withBlindRead.heads
+    ? { ...withBlindRead, heads: Object.fromEntries(landing.map((url) => [url, withBlindRead.sha])) }
+    : withBlindRead;
   return deriveCloseOutState({ openFindings: FINDINGS_NONE, ...input, landingPrs: landing, review, prStatuses: byUrl(input.prs, input.prStatuses) });
 };
 // The decision's setDone for a set of statuses: the landing is the statuses' own PRs (LIN-4458).
@@ -59,7 +63,7 @@ const setsDone = ({ statuses, landing = [...statuses.keys()], review = approve()
 // own cases are in the describe at the end.
 const NO_LANDING = [];
 
-const approve = (verdict = 'approve') => ({ verdict, verdictText: verdict === 'approve' ? 'Approve' : 'Approve — conditional', sha: 'aaaaaaa' });
+const approve = (verdict = 'approve') => ({ verdict, sha: 'aaaaaaa' });
 
 describe('sameHead', () => {
   test('an abbreviated sha equals its full form; a different sha does not', () => {
@@ -114,9 +118,9 @@ describe('deriveCloseOutState — variant is preserved fail-closed', () => {
 });
 
 describe('isApprovedReview', () => {
-  test('accepts Approve and Approve — conditional, nothing else', () => {
+  test('accepts Approve, nothing else (a conditional approve is an approve with open findings to close-out; finding-ba76decd)', () => {
     assert.strictEqual(isApprovedReview(approve('approve')), true);
-    assert.strictEqual(isApprovedReview(approve('approve-conditional')), true);
+    assert.strictEqual(isApprovedReview(approve('approve-conditional')), false, 'the comment-era conditional verdict is retired');
     assert.strictEqual(isApprovedReview(approve('request-changes')), false);
     assert.strictEqual(isApprovedReview(approve('needs-discussion')), false);
     assert.strictEqual(isApprovedReview(approve('unknown')), false);
@@ -177,8 +181,16 @@ describe('deriveCloseOutState — truth table', () => {
     assert.strictEqual(derive(movedArgs({ review: approve('request-changes') })).reason, 'review-not-approve');
     assert.strictEqual(derive(movedArgs({ runnerReady: false })).reason, 'runner-not-set-up');
     assert.strictEqual(
-      derive(movedArgs({ prs: [pr(41), pr(42)], prStatuses: [openStatus('bbbbbbb', { number: 41 }), openStatus('bbbbbbb', { number: 42 })] })).reason,
+      derive(movedArgs({ prs: [pr(41), pr(42)], prStatuses: [openStatus('aaaaaaa', { number: 41 }), openStatus('aaaaaaa', { number: 42 })] })).reason,
       'multiple-prs'
+    );
+  });
+
+  test('a multi-PR landing whose open PR moved reads head-moved (LIN-4518 step 3: each PR is judged at its own head)', () => {
+    // Records reviews carry `heads`, so the multi-PR branch judges each open PR against its own judged head.
+    assert.strictEqual(
+      derive(movedArgs({ prs: [pr(41), pr(42)], prStatuses: [openStatus('bbbbbbb', { number: 41 }), openStatus('bbbbbbb', { number: 42 })] })).reason,
+      'head-moved'
     );
   });
 
@@ -483,7 +495,6 @@ describe('LIN-4438: closeOutWaitsOn and the blind-read gate in the box state', (
 
   test('waits only when the review approves, the landing has a PR, and a landing PR is unnamed', () => {
     assert.strictEqual(closeOutWaitsOn(withRead('approve', null), [URL41]), 'blind-read');
-    assert.strictEqual(closeOutWaitsOn(withRead('approve-conditional', null), [URL41]), 'blind-read');
     assert.strictEqual(closeOutWaitsOn(withRead('approve', read(URL41)), [URL41]), null);
     assert.strictEqual(closeOutWaitsOn(withRead('approve', read(URL40)), [URL41]), 'blind-read', 'an older PR only');
     assert.strictEqual(closeOutWaitsOn(withRead('approve', read(URL41)), [URL40, URL41]), 'blind-read', 'every landing PR, not any');

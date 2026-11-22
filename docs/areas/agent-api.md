@@ -21,8 +21,8 @@ Area notes for `agent-api` in the registry. Format and rules: README.md.
   reason; record with `tests/fixtures/cost-replay/record-lin4197.mjs`) and the `docs/passage-runner-prompt.md` drift
   guard. `tests/fixtures/cost-replay/goldens.json` stays the baseline: re-recording it erases the change list (LIN-4404).
 - A check on comment bodies keys on the comment's opening line, never on any line: reviewers write
-  the same `## Blind read` heading mid-comment, so matching any heading line would refuse the verdict
-  that gates merge (`routes/proxy-writes.js` `refusedByBlindRead`; the leftover answer's guard that first
+  the same `## Blind read` heading mid-comment, so matching any heading line would refuse a review's
+  summary comment (`routes/proxy-writes.js` `refusedByBlindRead`; the leftover answer's guard that first
   taught this at LIN-4414 is retired, LIN-4495). Test it against real comments, review verdicts included
   (`tests/unit/lin-4437-blind-read.test.js`).
 - A format check on an optional create or PATCH field refuses (400); it is never the field's

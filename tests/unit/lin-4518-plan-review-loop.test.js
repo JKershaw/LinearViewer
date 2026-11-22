@@ -147,12 +147,15 @@ describe('RecordsStore.planReviewRunForTicket folds the same run from the task r
   });
 });
 
-// LIN-4518 (finding-5cdbcb2b): the loop's comment-side facts. A person's speech and landed work lift the bound only when
-// they come after the latest verdict; the run and that instant come from the records.
+// LIN-4518 (finding-5cdbcb2b): the loop's facts. A person's speech and landed work lift the bound only when they come after
+// the latest verdict; the run and that instant come from the records. LIN-4520 (finding-ca44ecba): landed work is the run's
+// `landed` change records, one per head-writing version and each dated by its own write, never a comment that cites a PR.
 describe('loopFactsOf: a person\'s speech and landed work since the latest verdict', () => {
   const latestAt = at(3);
+  const PR_1748 = 'https://github.com/JKershaw/LinearViewer/pull/1748';
   const speech = (day) => ({ createdAt: at(day), body: 'go on, take it to implementation' });
-  const landed = (day) => ({ createdAt: at(day), body: '**Implementation complete — PR opened: https://github.com/JKershaw/LinearViewer/pull/1748** (commit e1287c0c).' });
+  const landed = (day) => ({ url: PR_1748, at: at(day) });
+  const citing = (day) => ({ createdAt: at(day), body: `**Implementation complete — PR opened: ${PR_1748}** (commit e1287c0c).` });
 
   test('a person\'s comment after the latest verdict sets personSince; one before it, or none, does not', () => {
     assert.equal(loopFactsOf({ run: [], latestAt }, [speech(4)]).personSince, true);
@@ -160,14 +163,18 @@ describe('loopFactsOf: a person\'s speech and landed work since the latest verdi
     assert.equal(loopFactsOf({ run: [], latestAt }, []).personSince, false);
   });
 
-  test('landed work after the latest verdict sets landed to its PR; before it does not', () => {
-    assert.equal(loopFactsOf({ run: [], latestAt }, [landed(4)]).landed, 'https://github.com/JKershaw/LinearViewer/pull/1748');
-    assert.equal(loopFactsOf({ run: [], latestAt }, [landed(2)]).landed, null);
+  test('a change version written after the latest verdict sets landed to its PR; one written before it does not', () => {
+    assert.equal(loopFactsOf({ run: [], latestAt, landed: [landed(4)] }, []).landed, PR_1748);
+    assert.equal(loopFactsOf({ run: [], latestAt, landed: [landed(2)] }, []).landed, null);
+  });
+
+  test('a comment that cites a PR after the latest verdict is not landed work (finding-ca44ecba)', () => {
+    assert.equal(loopFactsOf({ run: [], latestAt }, [citing(4)]).landed, null);
   });
 
   test('with no verdict on record there is no "since": no speech and no landed work is read', () => {
-    assert.equal(loopFactsOf({ run: [], latestAt: null }, [speech(4), landed(4)]).personSince, false);
-    assert.equal(loopFactsOf({ run: [], latestAt: null }, [speech(4), landed(4)]).landed, null);
+    assert.equal(loopFactsOf({ run: [], latestAt: null, landed: [landed(4)] }, [speech(4)]).personSince, false);
+    assert.equal(loopFactsOf({ run: [], latestAt: null, landed: [landed(4)] }, [speech(4)]).landed, null);
   });
 
   test('the run it returns is the records\' run, untouched by the comments', () => {

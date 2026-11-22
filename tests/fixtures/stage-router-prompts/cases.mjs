@@ -21,6 +21,9 @@
  */
 import { planFactsOf } from '../../../lib/records/plan-facts.js';
 import { PLAN_HEADING_WORDS } from '../../../lib/legacy-plan-text.js';
+import { trailOfStanding } from '../../../lib/records/standing.js';
+import { emptyStanding } from '../../../lib/task-standing.js';
+import { planReviewRunOf } from '../../../lib/records/plan-review-run.js';
 
 const GITHUB = { providerUi: { displayName: 'GitHub Issues' } };
 const LOCAL = { providerUi: { displayName: 'Local' } };
@@ -30,15 +33,22 @@ const done = { name: 'Done', type: 'completed' };
 const at = (d) => `2026-10-0${d}T10:00:00.000Z`;
 const task = (id) => ({ id, kind: 'task', state: 'open', v: 1 });
 const NO_PLAN = (id) => planFactsOf({ task: task(id) });
+// LIN-4520: the review, the landing and the plan-review verdicts are records, so each case carries its trail and its
+// plan-review run as lib/recommendation-input.js hands them. A case with no such record reads "none", never "not measured".
+const NO_TRAIL = trailOfStanding(emptyStanding());
+const NO_PLAN_RUN = planReviewRunOf({});
 const LEAF = {
   issue: { id: 'leaf', identifier: 'ABC-10', title: 'A leaf task', description: 'Make the thing work.', state: open, labels: [] },
-  context: { parent: null, siblings: [], project: { name: 'Project' }, children: [], comments: [], focusedChild: null, planFacts: NO_PLAN('task-abc10') }
+  context: { parent: null, siblings: [], project: { name: 'Project' }, children: [], comments: [], focusedChild: null, planFacts: NO_PLAN('task-abc10'), trail: NO_TRAIL, planReviewRun: NO_PLAN_RUN }
 };
 // A node whose subtasks are all done, with a landed PR and an approving code review.
 const COMPLETE_NODE = {
   issue: { id: 'node', identifier: 'ABC-20', title: 'A node whose subtasks are done', description: 'Ship it.', state: open, labels: [] },
   context: {
     parent: null, siblings: [], project: null, focusedChild: null,
+    // The approving review and the landed PR are records (the trail); the comments above stay for the authorship text rule.
+    trail: { ...NO_TRAIL, review: { verdict: 'approve', at: at(2), sha: null, heads: undefined, commentId: 'review-abc20aa', blindRead: null, staleUrls: [] } },
+    planReviewRun: NO_PLAN_RUN,
     planFacts: planFactsOf({
       task: task('task-abc20'),
       inside: [{ id: 'plan-abc20aa', v: 1, kind: 'plan', state: 'kept', in: 'task-abc20', to: 'breakdown', at: at(1) }],
@@ -58,7 +68,7 @@ const COMPLETE_NODE = {
 const OPEN_CHILD_NODE = {
   issue: { id: 'term', identifier: 'ABC-30', title: 'A terminal node with an open subtask', description: 'Parent.', state: done, labels: [] },
   context: {
-    parent: null, siblings: [], project: null, comments: [], planFacts: NO_PLAN('task-abc30'),
+    parent: null, siblings: [], project: null, comments: [], planFacts: NO_PLAN('task-abc30'), trail: NO_TRAIL, planReviewRun: NO_PLAN_RUN,
     children: [
       { id: 'c3', identifier: 'ABC-31', title: 'done one', state: done },
       { id: 'c4', identifier: 'ABC-32', title: 'open one', state: open }
@@ -71,6 +81,12 @@ const PLAN_REVIEWED = {
   issue: { id: 'pr', identifier: 'ABC-40', title: 'A planned leaf', description: `Goal.\n\n## ${PLAN_HEADING_WORDS}\n\nRevision 1, old text.\n\nSession fit: several sessions.\n\nA plan review is owed: no.`, state: open, labels: [] },
   context: {
     parent: null, siblings: [], project: null, children: [], focusedChild: null,
+    trail: NO_TRAIL,
+    // The Request Changes verdict is a plan-review verdict record (judgement plan-review) with one blocking finding to plan.
+    planReviewRun: planReviewRunOf({
+      verdicts: [{ id: 'verdict-abc40aa', at: at(1), run: 'run-abc40a', fields: { judgement: 'plan-review', outcome: 'request-changes' } }],
+      findings: [{ id: 'finding-abc40bb', at: at(1), run: 'run-abc40a', to: 'plan' }]
+    }),
     // The plan record was revised (v2) after the Request Changes verdict; its plan-review finding is still open.
     planFacts: planFactsOf({
       task: task('task-abc40'),

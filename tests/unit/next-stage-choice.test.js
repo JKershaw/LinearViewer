@@ -7,21 +7,24 @@
  *   - the fix-round implementation brief (continue the reviewed PR, temp N+1 where used);
  *   - D1 (a `**Reasoning**`/headerless reply still streams reasoning) and D2 (`retro` refused).
  *
+ * LIN-4520: the verdicts, the review and the landing are records. The plan-review facts are the records run
+ * (planReviewRunOf) with the person's speech and landed work read from the comments; the fix-round brief reads the
+ * records review (reviewRoundOf). No comment is read for a verdict, a review title or a blocking count.
+ *
  * Run with: node --test tests/unit/next-stage-choice.test.js
  */
 import { test, describe, mock } from 'node:test';
 import assert from 'node:assert/strict';
 import { GraphQLClient } from 'graphql-request';
 import {
-  assemblePlanReviewFacts, reviewLoopExhausted, reviewLoopConverging, reviewLoopStop, REVIEW_LOOP_BOUND, REVIEW_LOOP_CEILING
+  planReviewFactsOf, reviewLoopExhausted, reviewLoopConverging, reviewLoopStop, REVIEW_LOOP_BOUND, REVIEW_LOOP_CEILING
 } from '../../lib/recommendation-facts.js';
+import { planReviewRunOf } from '../../lib/records/plan-review-run.js';
 import { formatIssueContext, getRecommendation, getRecommendationStream, setFetchImpl } from '../../lib/openrouter.js';
 
 import { routeStage, parseRouteDecision, parseRecommendedAction } from '../../lib/stage-router.js';
-import { formatStageContract } from '../../lib/prompt-contract.js';
 import { generatePrompt } from '../../lib/prompt-templates.js';
-import { readRunLedger } from '../../lib/run-trail.js';
-import { isRequestChangesRound } from '../../lib/prompts/revision-brief.js';
+import { isRequestChangesRound, reviewRoundOf } from '../../lib/prompts/fix-round.js';
 import { fetchIssueContext } from '../../lib/providers/linear/index.js';
 import { LocalProvider } from '../../lib/providers/local/index.js';
 import { createLocalProvider } from '../fixtures/local-harness.js';
@@ -29,19 +32,21 @@ import { planRound, loopFactsFor } from '../helpers/plan-review-loop.js';
 
 // LIN-4518 (finding-527b8237): the loop's facts are built from records (tests/helpers/plan-review-loop.js): a round is a
 // plan-review verdict on record with its own run's `to: plan` findings. `rr`, `ndr` and `apr` are those rounds, `n` being
-// the blocking findings the round wrote. The comments (RC, ND, APP, RCn below) are the thread, and a person's speech or
-// landed work since the latest verdict is read from them by loopFactsOf.
+// the blocking findings the round wrote. The comments (RC below) are the thread, and a person's speech since the latest
+// verdict is read from them by loopFactsOf; landed work is a change record first written after it (LIN-4520, finding-ca44ecba).
 const rr = (at, n = 0) => planRound(at, 'request-changes', n);
 const ndr = (at, n = 0) => planRound(at, 'needs-discussion', n);
 const apr = (at) => planRound(at, 'approve');
-const exhausted = (issue, rounds, comments = []) => reviewLoopExhausted(issue, loopFactsFor(rounds, comments));
-const stop = (issue, rounds, comments = []) => reviewLoopStop(issue, loopFactsFor(rounds, comments));
+const exhausted = (issue, rounds, comments = [], changes = []) => reviewLoopExhausted(issue, loopFactsFor(rounds, comments, changes));
+const stop = (issue, rounds, comments = [], changes = []) => reviewLoopStop(issue, loopFactsFor(rounds, comments, changes));
+// The plan-review facts of a ticket: the records run folded from its rounds and its change records, and the comments read for a person.
+const runOf = (rounds, changes = []) => planReviewRunOf({ verdicts: rounds.map((r) => r.verdict), findings: rounds.flatMap((r) => r.findings), changes });
+const factsOf = (rounds, comments = [], changes = []) => planReviewFactsOf(runOf(rounds, changes), comments);
+// A change record first written at `at` for `ref` (the PR the work landed in).
+const landedChange = (at, ref = 'https://github.com/JKershaw/LinearViewer/pull/7') => ({ at, fields: { ref } });
 
+// A plan-review verdict comment as the thread carries it (the verdict itself is the record, not this text).
 const RC = (at, id = at) => ({ id, createdAt: at, body: `### Plan Review Verdict\n\nFinding.\n\n**Verdict: Request Changes.**` });
-const ND = (at, id = at) => ({ id, createdAt: at, body: `### Plan Review Verdict\n\n**Verdict: Needs Discussion.**` });
-const APP = (at, id = at) => ({ id, createdAt: at, body: `### Plan Review Verdict\n\n**Verdict: Approve.**` });
-// A Request Changes verdict that states its count on the contract's own line (LIN-3651).
-const RCn = (at, n, id = at) => ({ id, createdAt: at, body: `### Plan Review Verdict\n\n**Verdict: Request Changes.**\n\nFinding.\n\nBlocking findings: ${n}` });
 const REVIEW = { identifier: 'LIN-1', title: 'A task', description: 'Do it.', state: { name: 'In Progress', type: 'started' } };
 
 describe('relations reach the router (LIN-3309 S1)', () => {
@@ -117,43 +122,47 @@ describe('relations reach the router (LIN-3309 S1)', () => {
 });
 
 describe('plan-review verdict facts (LIN-3309 S2)', () => {
-  test('reads the contract heading, the legacy heading, and ignores autopilot records', () => {
-    const facts = assemblePlanReviewFacts([
-      { createdAt: '2026-01-01T00:00:00Z', body: '### Plan Review Verdict\n\n**Verdict: Request Changes.**' },
-      { createdAt: '2026-01-02T00:00:00Z', body: '## Plan-review (round 2) — Request Changes' },
-      { createdAt: '2026-01-03T00:00:00Z', body: '**Autopilot step** — dispatched implementation' },
-      { createdAt: '2026-01-04T00:00:00Z', body: '### Plan Review Verdict\n\n**Verdict: Needs Discussion.**' },
-    ]);
-    assert.equal(facts.verdicts, 3, 'autopilot record is not a verdict');
+  test('the verdicts on record are counted by kind, and the latest is named with its instant', () => {
+    const rounds = [rr('2026-01-01T00:00:00Z'), rr('2026-01-02T00:00:00Z'), ndr('2026-01-04T00:00:00Z')];
+    const facts = factsOf(rounds);
+    assert.equal(facts.verdicts, 3);
     assert.deepEqual(facts.byKind, { 'request changes': 2, 'needs discussion': 1 });
-    assert.equal(facts.count, 3);
+    assert.equal(runOf(rounds).run.length, 3, 'the count is the run since the latest Approve');
     assert.equal(facts.latestVerdict, 'needs discussion');
     assert.equal(facts.latestAt, '2026-01-04T00:00:00Z');
   });
 
-  test('only an Approve resets the count; a revision alone does not', () => {
-    const c = (verdict, d) => ({ createdAt: `2026-01-0${d}T00:00:00Z`, body: `### Plan Review Verdict\n\n**Verdict: ${verdict}.**` });
-    const count = (...vs) => assemblePlanReviewFacts(vs.map((v, i) => c(v, i + 1))).count;
-    assert.equal(count('Request Changes'), 1);
-    assert.equal(count('Request Changes', 'Request Changes', 'Request Changes', 'Request Changes'), 4);
-    assert.equal(count('Request Changes', 'Approve', 'Request Changes'), 1);
-    assert.equal(count('Request Changes', 'Needs Discussion'), 2);
-    assert.equal(count('Request Changes', 'Approve'), 0);
-    assert.equal(assemblePlanReviewFacts([]).count, 0);
+  test('a verdict record that is not a plan review is not a plan-review verdict', () => {
+    const other = { verdict: { id: 'v-review', kind: 'verdict', at: '2026-01-03T00:00:00Z', run: null, fields: { judgement: 'review', outcome: 'approve' } }, findings: [] };
+    assert.equal(factsOf([rr('2026-01-01T00:00:00Z'), other]).verdicts, 1);
   });
 
-  test('shuffled input order yields the same facts (the reader sorts by createdAt)', () => {
+  test('only an Approve resets the count; a revision alone does not', () => {
+    const count = (...outcomes) => runOf(outcomes.map((o, i) => planRound(`2026-01-0${i + 1}T00:00:00Z`, o))).run.length;
+    assert.equal(count('request-changes'), 1);
+    assert.equal(count('request-changes', 'request-changes', 'request-changes', 'request-changes'), 4);
+    assert.equal(count('request-changes', 'approve', 'request-changes'), 1);
+    assert.equal(count('request-changes', 'needs-discussion'), 2);
+    assert.equal(count('request-changes', 'approve'), 0);
+    assert.equal(runOf([]).run.length, 0);
+  });
+
+  test('shuffled input order yields the same facts (the run sorts by the verdict instant)', () => {
     // Asymmetric on purpose (review F5): a reply lands after the latest verdict in
     // time but before it in array order, so a reader that trusts input order differs.
-    const trail = [RC('2026-01-03T00:00:00Z'), { createdAt: '2026-01-04T00:00:00Z', body: 'go on' }, RC('2026-01-01T00:00:00Z')];
-    const a = assemblePlanReviewFacts(trail);
-    assert.deepEqual(a, assemblePlanReviewFacts([...trail].reverse()));
+    const reply = { createdAt: '2026-01-04T00:00:00Z', body: 'go on' };
+    const a = planReviewFactsOf(runOf([rr('2026-01-03T00:00:00Z'), rr('2026-01-01T00:00:00Z')]), [reply]);
+    assert.deepEqual(a, planReviewFactsOf(runOf([rr('2026-01-01T00:00:00Z'), rr('2026-01-03T00:00:00Z')]), [reply]));
     assert.equal(a.personSince, true, 'the reply after the latest verdict is seen');
+  });
+
+  test('no plan-review run on record is "not measured", never zero verdicts', () => {
+    assert.equal(planReviewFactsOf(null, [{ createdAt: '2026-01-01T00:00:00Z', body: 'go on' }]), null);
   });
 
   describe('a reply means a person\'s comment (FC 10c608df)', () => {
     const note = (body) => ({ createdAt: '2026-01-03T00:00:00Z', body });
-    const twoRc = [RC('2026-01-01T00:00:00Z'), RC('2026-01-02T00:00:00Z')];
+    const twoRc = [rr('2026-01-01T00:00:00Z'), rr('2026-01-02T00:00:00Z')];
 
     test('each agent note form is part of the trail, not a person\'s comment', () => {
       for (const body of [
@@ -164,30 +173,34 @@ describe('plan-review verdict facts (LIN-3309 S2)', () => {
         '**Autopilot step record — plan revision 1 done (verified); plan-review round 2 started.**',
         '## Autopilot plan step done',
       ]) {
-        assert.equal(assemblePlanReviewFacts([...twoRc, note(body)]).personSince, false, body);
+        assert.equal(factsOf(twoRc, [note(body)]).personSince, false, body);
       }
     });
 
     test('a person\'s comment, an FC ruling included, is one', () => {
       for (const body of ['Decision (FC): go on — take the revision.', '**Note for the plan revision (FC).** F3 is right.', 'Hold until LIN-3098 ships.']) {
-        assert.equal(assemblePlanReviewFacts([...twoRc, note(body)]).personSince, true, body);
+        assert.equal(factsOf(twoRc, [note(body)]).personSince, true, body);
       }
     });
   });
 
-  describe('work that landed after the latest verdict (FC 10c608df)', () => {
+  describe('work that landed after the latest verdict (FC 10c608df; LIN-4520, finding-ca44ecba: a change record, never a comment)', () => {
     const summary = (at = '2026-01-03T00:00:00Z') => ({ createdAt: at, body: '**Implementation complete — PR opened: https://github.com/JKershaw/LinearViewer/pull/1748** (commit e1287c0c).' });
 
-    test('a PR or a code review after the latest verdict is landed work', () => {
-      assert.equal(assemblePlanReviewFacts([APP('2026-01-01T00:00:00Z'), summary()]).landed, 'https://github.com/JKershaw/LinearViewer/pull/1748');
-      const review = { createdAt: '2026-02-01T00:00:00Z', body: '## Review — LIN-3309\n\n### Verdict\nRequest Changes — F1' };
-      assert.equal(assemblePlanReviewFacts([RC('2026-01-01T00:00:00Z'), review]).landed, 'a code review');
+    test('a change record first written after the latest verdict is landed work, named by its PR', () => {
+      assert.equal(factsOf([apr('2026-01-01T00:00:00Z')], [], [landedChange('2026-01-03T00:00:00Z', 'https://github.com/JKershaw/LinearViewer/pull/1748')]).landed, 'https://github.com/JKershaw/LinearViewer/pull/1748');
     });
 
-    test('a PR only before the latest verdict, or cited in a planner note, is not landed', () => {
-      assert.equal(assemblePlanReviewFacts([summary('2026-01-01T00:00:00Z'), RC('2026-01-02T00:00:00Z')]).landed, null);
+    test('a PR a comment cites, or a code review after the latest verdict, is not landed work', () => {
+      assert.equal(factsOf([apr('2026-01-01T00:00:00Z')], [summary()]).landed, null);
+      const review = { createdAt: '2026-02-01T00:00:00Z', body: '## Review — LIN-3309\n\n### Verdict\nRequest Changes — F1' };
+      assert.equal(factsOf([rr('2026-01-01T00:00:00Z')], [review]).landed, null);
       const plannerCites = { createdAt: '2026-01-03T00:00:00Z', body: '**Plan revised in the description (Revision 2)**, grounded on https://github.com/JKershaw/LinearViewer/pull/1747.' };
-      assert.equal(assemblePlanReviewFacts([RC('2026-01-02T00:00:00Z'), plannerCites]).landed, null);
+      assert.equal(factsOf([rr('2026-01-02T00:00:00Z')], [plannerCites]).landed, null);
+    });
+
+    test('a change first written before the latest verdict is not landed work since it', () => {
+      assert.equal(factsOf([rr('2026-01-02T00:00:00Z')], [], [landedChange('2026-01-01T00:00:00Z')]).landed, null);
     });
   });
 
@@ -200,37 +213,51 @@ describe('plan-review verdict facts (LIN-3309 S2)', () => {
 
 describe('the implementation fix-round brief (LIN-3309 S4)', () => {
   const issue = { identifier: 'LIN-3124', title: 'Cut over reads', description: 'd', state: { name: 'In Progress', type: 'started' } };
-  const ctx = (comments) => ({ parent: null, siblings: [], project: { name: 'P' }, children: [], comments, focusedChild: null });
-  const PR3 = '## Review: LIN-3124 PR3 (#1618)\n\nCI: green\n\n### What CI Did Not Prove\n- x\n\n### Verdict\nRequest Changes — one finding';
-  const PR1 = '### Review Verdict — LIN-3124 PR1 (#1610)\n\nCI: green\n\n### Verdict\nApprove';
+  const PR_URL = 'https://github.com/JKershaw/LinearViewer/pull/1618';
+  // The records trail the brief reads (lib/task-standing.js trailForTicket): the review on record and the landing.
+  const trailOf = (verdict, landing = [PR_URL]) => ({ review: verdict ? { verdict, at: '2026-01-01T00:00:00Z' } : null, landing });
+  const ctx = (trail) => ({ parent: null, siblings: [], project: { name: 'P' }, children: [], comments: [], focusedChild: null, reviewRound: reviewRoundOf(trail) });
 
-  test('the review reader classifies the real heading forms', () => {
-    assert.equal(readRunLedger([{ createdAt: '2026-01-01T00:00:00Z', body: PR3 }]).verdict, 'request-changes');
-    assert.equal(readRunLedger([{ createdAt: '2026-01-01T00:00:00Z', body: PR1 }]).verdict, 'approve');
-    assert.equal(isRequestChangesRound([{ createdAt: '2026-01-01T00:00:00Z', body: PR3 }]), true);
+  test('the records review classifies the verdict: Request Changes is a fix round, Approve and no review are not', () => {
+    assert.equal(isRequestChangesRound(reviewRoundOf(trailOf('request-changes'))), true);
+    assert.equal(isRequestChangesRound(reviewRoundOf(trailOf('approve'))), false);
+    assert.equal(isRequestChangesRound(reviewRoundOf(trailOf(null, []))), false);
+    assert.equal(isRequestChangesRound(reviewRoundOf(null)), false, 'a trail not read is the fresh-start brief');
   });
 
-  test('a Request Changes review switches the brief to continue the reviewed PR', () => {
-    const prompt = generatePrompt('implementation', issue, ctx([{ createdAt: '2026-01-01T00:00:00Z', body: PR3 }])).prompt;
-    assert.match(prompt, /### Revising After a Review/);
-    assert.match(prompt, /The latest review verdict is \*\*Request Changes\*\* \(review: `Review: LIN-3124 PR3 \(#1618\)`\)/);
-    assert.match(prompt, /the PR the review names/);
-    assert.match(prompt, /do not open a new PR/i);
-    assert.match(prompt, /\*\*Branch\*\*: Continue the existing branch/);
+  // LIN-4520 (finding-a610ceb9): the "Revising After a Review" section is retired. Its reasoning reaches the stage through the
+  // brief's "what stands" part; the fix-round workflow keeps the steps that stop a fresh PR (continue the same PR).
+  test('a Request Changes review switches the workflow to continue the change\'s PR, and retires the revision section', () => {
+    const prompt = generatePrompt('implementation', issue, ctx(trailOf('request-changes'))).prompt;
+    assert.doesNotMatch(prompt, /### Revising After a Review/, 'the revision section is retired');
+    assert.match(prompt, /\*\*Branch\*\*: Continue the existing branch and the PR the task's change record names/);
     assert.match(prompt, /\*\*Update the PR\*\*: Push the fixes to the existing PR/);
+    assert.match(prompt, /do not open a new PR/i);
+    assert.match(prompt, /Address every open finding to implementation on this task/);
+    assert.match(prompt, /do not re-implement what already landed/i);
     assert.doesNotMatch(prompt, /\*\*Open a PR\*\*/);
-    assert.doesNotMatch(prompt, /pull\/1618/, 'it never guesses a PR URL for a bare #1618');
   });
 
-  test('a review that names a full PR URL uses it verbatim', () => {
-    const withUrl = '## Review: LIN-3124 PR3\n\nSee https://github.com/JKershaw/LinearViewer/pull/1618\n\n### Verdict\nRequest Changes';
-    const prompt = generatePrompt('implementation', issue, ctx([{ createdAt: '2026-01-01T00:00:00Z', body: withUrl }])).prompt;
-    assert.match(prompt, /https:\/\/github\.com\/JKershaw\/LinearViewer\/pull\/1618/);
+  test('step 2 points at the open findings to implementation on the task, not at a review comment', () => {
+    const prompt = generatePrompt('implementation', issue, ctx(trailOf('request-changes'))).prompt;
+    assert.match(prompt, /including the open findings to implementation on this task/);
+    assert.doesNotMatch(prompt, /review comment with its findings/);
   });
 
-  test('an Approve or no review leaves the fresh-start brief byte-identical', () => {
-    const fresh = generatePrompt('implementation', issue, ctx([])).prompt;
-    assert.equal(generatePrompt('implementation', issue, ctx([{ createdAt: '2026-01-01T00:00:00Z', body: PR1 }])).prompt, fresh);
+  test('the fix-round workflow names no PR URL: the change record, carried by the brief, names it', () => {
+    const prompt = generatePrompt('implementation', issue, ctx(trailOf('request-changes'))).prompt;
+    assert.doesNotMatch(prompt, /pull\/1618/);
+  });
+
+  test('a landing of more than one PR continues the same way', () => {
+    const prompt = generatePrompt('implementation', issue, ctx(trailOf('request-changes', [PR_URL, 'https://github.com/JKershaw/LinearViewer/pull/1619']))).prompt;
+    assert.match(prompt, /\*\*Branch\*\*: Continue the existing branch/);
+    assert.doesNotMatch(prompt, /pull\/1618|pull\/1619/);
+  });
+
+  test('an Approve, or no review, leaves the fresh-start brief byte-identical', () => {
+    const fresh = generatePrompt('implementation', issue, ctx(null)).prompt;
+    assert.equal(generatePrompt('implementation', issue, ctx(trailOf('approve'))).prompt, fresh);
     assert.match(fresh, /\*\*Open a PR\*\*/);
     assert.doesNotMatch(fresh, /### Revising After a Review/);
   });
@@ -252,8 +279,8 @@ describe('the review loop bound: the first route code settles (LIN-3309; the loo
   const open = { name: 'In Progress', type: 'started' };
   const leaf = (over = {}) => ({ identifier: 'T-9', title: 't', description: 'A plan.', state: open, labels: [], ...over });
   // The loop's facts are the rounds on record; the comments carry the thread (the selector's facts still read it) and a
-  // person's speech and landed work since the latest verdict (LIN-4518 finding-527b8237).
-  const bundle = (rounds, comments = []) => ({ parent: null, siblings: [], project: null, children: [], comments, planReviewLoop: loopFactsFor(rounds, comments), focusedChild: null });
+  // person's speech since the latest verdict (LIN-4518 finding-527b8237). Landed work is the change records (LIN-4520).
+  const bundle = (rounds, comments = [], changes = []) => ({ parent: null, siblings: [], project: null, children: [], comments, planReviewLoop: loopFactsFor(rounds, comments, changes), planReviewRun: runOf(rounds, changes), focusedChild: null });
   const rcs = (n) => Array.from({ length: n }, (_, i) => rr(`2026-01-0${i + 1}T00:00:00Z`));
   const rcComments = (n) => Array.from({ length: n }, (_, i) => RC(`2026-01-0${i + 1}T00:00:00Z`));
   const after = (body) => ({ createdAt: '2026-01-09T00:00:00Z', body });
@@ -273,9 +300,18 @@ describe('the review loop bound: the first route code settles (LIN-3309; the loo
   });
 
   test('landed work since the latest verdict, or a terminal task, is not a running loop', () => {
-    assert.equal(exhausted(leaf(), rcs(3), [after('Implementation landed: https://github.com/o/r/pull/7')]), false);
+    assert.equal(exhausted(leaf(), rcs(3), [], [landedChange('2026-01-09T00:00:00Z')]), false);
     assert.equal(exhausted(leaf({ state: { name: 'Canceled', type: 'canceled' } }), rcs(3)), false);
     assert.equal(exhausted(leaf({ state: { name: 'Done', type: 'completed' } }), rcs(3)), false);
+  });
+
+  test('a comment that only looks like a verdict does not lift the bound (LIN-4520, finding-ca44ecba)', () => {
+    // Review's repro at 2d0b71414: three request-changes verdicts are not converging, and a review-titled comment with an
+    // approve word after the latest verdict used to lift the bound. Only a change record written after the verdict is work.
+    const reviewLooking = after('## Review notes\nI would approve this plan once the tests are named.');
+    assert.equal(exhausted(leaf(), rcs(3), [reviewLooking]), true);
+    assert.equal(exhausted(leaf(), rcs(3), [reviewLooking], [landedChange('2026-01-09T00:00:00Z')]), false, 'a change record written after the verdict is the landed work');
+    assert.equal(exhausted(leaf(), rcs(3), [after('Implementation landed: https://github.com/o/r/pull/7')]), true, 'a PR a comment cites is not landed work');
   });
 
   test('getRecommendation stops at blocked without a routing call, with the blocked stage prompt', async () => {
@@ -332,7 +368,7 @@ describe('the review loop bound: the first route code settles (LIN-3309; the loo
 describe('a converging plan gets another round, up to a ceiling (LIN-3651)', () => {
   const open = { name: 'In Progress', type: 'started' };
   const leaf = () => ({ identifier: 'T-9', title: 't', description: 'A plan.', state: open, labels: [] });
-  const bundle = (rounds, comments = []) => ({ parent: null, siblings: [], project: null, children: [], comments, planReviewLoop: loopFactsFor(rounds, comments), focusedChild: null });
+  const bundle = (rounds, comments = []) => ({ parent: null, siblings: [], project: null, children: [], comments, planReviewLoop: loopFactsFor(rounds, comments), planReviewRun: runOf(rounds), focusedChild: null });
   // Rounds on record: `counted(3, 2, 1)` is three request-changes verdicts with 3, 2 and 1 `to: plan` findings.
   const counted = (...ns) => ns.map((n, i) => rr(`2026-01-0${i + 1}T00:00:00Z`, n));
   const after = (body) => ({ createdAt: '2026-01-09T00:00:00Z', body });
@@ -379,31 +415,15 @@ describe('a converging plan gets another round, up to a ceiling (LIN-3651)', () 
   test('person comment, landed work and Approve still lift it, at the ceiling too', () => {
     const five = counted(3, 2, 2, 1, 1);
     assert.equal(exhausted(leaf(), five, [after('go on, take it to implementation')]), false);
-    assert.equal(exhausted(leaf(), five, [after('Implementation landed: https://github.com/o/r/pull/7')]), false);
+    assert.equal(exhausted(leaf(), five, [], [landedChange('2026-01-09T00:00:00Z')]), false);
     assert.equal(exhausted(leaf(), [...five, apr('2026-01-08T00:00:00Z')]), false);
     assert.equal(exhausted(leaf(), [...counted(3, 3, 3), apr('2026-01-08T00:00:00Z')]), false);
   });
 
   test('the run since the latest Approve carries each verdict\'s count; only Request Changes has one', () => {
     const f = loopFactsFor([rr('2026-01-01T00:00:00Z', 4), apr('2026-01-02T00:00:00Z'), rr('2026-01-03T00:00:00Z', 2), ndr('2026-01-04T00:00:00Z')]);
-    assert.deepEqual(f.run.map(({ verdict, blocking }) => ({ verdict, blocking })), [{ verdict: 'request changes', blocking: 2 }, { verdict: 'needs discussion', blocking: null }]);
+    assert.deepStrictEqual(f.run.map(({ verdict, blocking }) => ({ verdict, blocking })), [{ verdict: 'request changes', blocking: 2 }, { verdict: 'needs discussion', blocking: null }]);
   });
-
-  // The comment fold's own reading (the selector's display line, retired in P7): a fold test, not a loop fact.
-  test('the count line parses from the contract\'s own wording; zero, junk and quoted lines do not mislead', () => {
-    const wording = formatStageContract('plan-review', 'LIN-1').match(/`(Blocking findings: <n>)`/)?.[1];
-    assert.ok(wording, 'the contract names the line');
-    const verdict = (text) => assemblePlanReviewFacts([{ createdAt: '2026-01-01T00:00:00Z', body: `### Plan Review Verdict\n\n**Verdict: Request Changes.**\n\n${text}` }]).run[0].blocking;
-    assert.equal(verdict(wording.replace('<n>', '2')), 2);
-    assert.equal(verdict('**Blocking findings: 3**'), 3);
-    assert.equal(verdict('> - Blocking findings: 4'), 4);
-    assert.equal(verdict('blocking FINDINGS: 5'), 5);
-    assert.equal(verdict('Blocking findings: 0'), null);
-    assert.equal(verdict('Blocking findings: many'), null);
-    assert.equal(verdict('The reviewer wrote that Blocking findings: 2 earlier.'), null, 'mid-line is not the line');
-    assert.equal(verdict('> Blocking findings: 2\n\nBlocking findings: 1'), 2, 'first line match wins');
-  });
-
 
   test('order does not matter to the run', () => {
     const trail = counted(3, 3, 1);

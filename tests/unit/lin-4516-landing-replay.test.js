@@ -1,6 +1,11 @@
 /**
  * LIN-4516: the record-side landing replayed against the comment path's frozen decisions (P1, LIN-4514).
  *
+ * LIN-4520: the comment path is retired, so its goldens (tests/fixtures/walk-8/comment-path/) are the only comment side and
+ * are asserted as captured. The replay still classifies each frozen comment to drive its writes: `frozenKindOf` below is
+ * the retired classifier's rows for the kinds the replay uses (close-out, review, blind read), checked against that table
+ * over every frozen body. The goldens were not regenerated and no expected landing changed.
+ *
  * The plan's second-likeliest break is the landing: the record side must agree with the comment side wherever the comment
  * side is right, and where they differ, say which is right. Each replay writes a ticket's history onto records in time
  * order, each write at its own instant (the store's clock), with the real pipeline (lib/records/writes.js), the real
@@ -45,8 +50,9 @@ import { refreshTaskChanges, pinVerdictToHeads } from '../../lib/change-records.
 import { readLanding } from '../../lib/records/landing.js';
 import { changeKeyOf } from '../../lib/records/change-ref.js';
 import { prUrlsIn } from '../../lib/run-ledger.js';
-import { commentKindOf } from '../../lib/run-trail.js';
-import { TICKETS, loadInput, loadDerived } from '../helpers/comment-path-capture.js';
+import { isHarbourSummary } from '../../lib/run-trail.js';
+import { BLIND_READ_HEADING } from '../../lib/prompts/blind-read-words.js';
+import { TICKETS, loadInput, loadDerived } from '../helpers/walk-8-frozen.js';
 
 const URL_KEY = 'lin-4516-replay-workspace';
 const harness = createMangoTmpdir('lin-4516-landing-replay-');
@@ -55,6 +61,32 @@ after(() => harness.close());
 
 /** An ISO instant with milliseconds, whatever the frozen input wrote (`2026-11-13T21:58:11Z` or `...11.000Z`). */
 const iso = (t) => new Date(t).toISOString();
+
+// BEGIN FROZEN-KIND
+// The replay's own reading of a frozen comment, for the kinds it writes from (close-out, review, blind-read). The comment
+// classifier is retired (LIN-4520). These rules are its table's rows for those kinds, in its match order (Harbour summary,
+// review, close-out, blind read, then plain), so the replay writes what the captured run wrote. Checked against the retired
+// table over every frozen body (the replay's corpus) when this was written.
+const firstLineOf = (body) => ((body.split('\n').find((l) => l.trim()) || '').trim()).replace(/^[#>*_\s]+/, '');
+const firstHeadingOf = (body) => { const m = body.match(/^#{1,6}[ \t]+([^\n]*)/m); return m ? m[1].trim() : ''; };
+const TITLE_NON_REVIEW = /^(?:close-?out|autopilot)\b/i;
+const VERDICT_WORD = /\b(?:approve[sd]?|request(?:ed)?\s+changes?|needs?\s+discussion)\b/i;
+const LEDGER_HEADING = /^###\s*What CI Did Not Prove\b[^\n]*/im;
+function opensAsReviewFrozen(body) {
+  const title = firstHeadingOf(body);
+  if (!title || TITLE_NON_REVIEW.test(title)) return false;
+  if (!/\breview\b/i.test(title) || /plan[-\s]+review/i.test(title)) return false;
+  return VERDICT_WORD.test(body) || LEDGER_HEADING.test(body);
+}
+function frozenKindOf(body) {
+  if (isHarbourSummary(body)) return 'harbour-summary';
+  if (opensAsReviewFrozen(body)) return 'review';
+  if (/\bclose-?out\b/i.test(firstHeadingOf(body)) || /^close-?out\b/i.test(firstLineOf(body))) return 'close-out';
+  const first = (body.split('\n').find((l) => l.trim()) || '').trim();
+  if (first.startsWith(BLIND_READ_HEADING) && /^(?:$|:)/.test(first.slice(BLIND_READ_HEADING.length))) return 'blind-read';
+  return 'other';
+}
+// END FROZEN-KIND
 
 async function freshStore() {
   const db = harness.freshDb();
@@ -147,7 +179,7 @@ async function replay({ ticket, comments, prs }) {
   }
   for (const c of comments) {
     const at = iso(c.createdAt);
-    const kind = commentKindOf(c.body);
+    const kind = frozenKindOf(c.body);
     events.push({ at, rank: 3, run: async () => {
       clock(at);
       if (kind === 'close-out') {
@@ -221,8 +253,8 @@ async function replayFrozen({ comments, statuses }) {
   // A PR the task's own implementation did not write: one only a research note, blind read, area read or survey names.
   const NOT_OWN = /^## (Research notes|Blind read|Area read|Survey)/;
   const citers = (url) => comments.filter((c) => prUrlsIn(c.body).includes(url));
-  const foreign = new Set(Object.keys(statuses).filter((url) => citers(url).every((c) => NOT_OWN.test(c.body) || commentKindOf(c.body) === 'blind-read')));
-  const closeOuts = comments.filter((c) => commentKindOf(c.body) === 'close-out');
+  const foreign = new Set(Object.keys(statuses).filter((url) => citers(url).every((c) => NOT_OWN.test(c.body) || frozenKindOf(c.body) === 'blind-read')));
+  const closeOuts = comments.filter((c) => frozenKindOf(c.body) === 'close-out');
   const lastAt = comments.map((c) => iso(c.createdAt)).sort().at(-1);
   const prs = Object.entries(statuses).filter(([url]) => !foreign.has(url)).map(([url, s]) => {
     // What a close-out says it did with the PR: "Merged <url>" is the merge recorder's write; "closed unmerged" ends the change.

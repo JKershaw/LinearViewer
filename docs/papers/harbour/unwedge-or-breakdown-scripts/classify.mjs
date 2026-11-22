@@ -6,7 +6,8 @@
  * exactly as the router counts it. Only the loop rule is re-applied by date (eraOf), since
  * the rule changed three times.
  */
-import { assemblePlanReviewFacts, reviewLoopStop } from '../../../../lib/recommendation-facts.js';
+import { reviewLoopStop } from '../../../../lib/recommendation-facts.js';
+import { countPlanReviewVerdicts } from './frozen-plan-review-counter.mjs';
 
 const MIN = 60_000;
 const ms = (iso) => Date.parse(iso);
@@ -44,7 +45,7 @@ export function replayFirstStop(comments, era) {
   let verdictsSoFar = 0;
   for (let i = 0; i < sorted.length; i++) {
     const prefix = sorted.slice(0, i + 1);
-    const facts = assemblePlanReviewFacts(prefix);
+    const facts = countPlanReviewVerdicts(prefix);
     if (facts.verdicts === verdictsSoFar) continue;
     verdictsSoFar = facts.verdicts;
     const current = eraAt(sorted[i].createdAt);

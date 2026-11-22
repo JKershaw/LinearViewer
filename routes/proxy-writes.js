@@ -12,8 +12,8 @@
  * says what and why, never how, a policy never decides "wrong work", and a write may not drop
  * the section (lib/size-of-move.js checkSizeRecord). Every write that creates or edits a comment
  * body (create, edit, and the comment-target attachment caption) carries the blind-read guard (LIN-4437, `refusedByBlindRead`): a comment opening
- * with `## Blind read` has one verdict line and names exactly the landing's PRs
- * (lib/run-trail.js checkBlindRead); it is the one comment guard that reads the trail first.
+ * with `## Blind read` names exactly the landing's PRs (lib/run-ledger.js checkBlindReadPrs; LIN-4520 retired its
+ * verdict-line shape, a verdict being a record); it is the one comment guard that reads the trail first.
  *
  * Shape. Every route is one literal registration whose handler runs through
  * `guarded(spec, handler)`, which owns the part they all share, in this order:
@@ -59,8 +59,8 @@ import { UUID_REGEX, isValidIssueId } from '../lib/workspace.js';
 import { appendBlock, replace as replaceInDescription, DescriptionEditError } from '../lib/description-edit.js';
 import { checkSizeRecord, recordShape, SIZE_OF_MOVE_HEADING, SIZE_RECORD_CODES, DECIDED_BY, WRONG_WORK } from '../lib/size-of-move.js';
 import { addedPlanHeadings, PLAN_HEADING_WORDS, PLAN_IN_DESCRIPTION } from '../lib/legacy-plan-text.js';
-import { blindReadRefusal } from '../lib/run-ledger.js';
-import { checkBlindRead } from '../lib/run-trail.js';
+import { blindReadRefusal, checkBlindReadPrs } from '../lib/run-ledger.js';
+import { opensAsBlindRead } from '../lib/run-trail.js';
 import { landingOfTicket } from '../lib/records/landing.js';
 import { isRestrictedStamp, sameTicketKey, ISSUE_PATCH_FIELDS } from '../lib/stage-writes.js';
 import { jsonError } from '../lib/errors.js';
@@ -699,32 +699,27 @@ export function createProxyWriteRoutes({
   // ---------------------------------------------------------------------------
   // Comments
   /**
-   * The blind-read guard (LIN-4437), at every write that creates or edits a comment body, after the
-   * guard. It acts only on a comment whose first non-blank line is the `## Blind read`
-   * heading (exactly, or with a `:` tail), so a review verdict that mentions the heading further down,
-   * and a `## Blind read pilot` tally, pass untouched. The body's shape (one verdict line, one of the
-   * three words, a reason, at least one full PR URL) is checked first and needs no read. The PR set
-   * then needs the ticket's whole, timestamped trail (`fetchIssueComments`, which throws rather than
-   * return a prefix): not the write guard's capped `comments(last: 20)`, which carries no times. When
-   * that read fails or the provider has none, the set check is skipped and logged, and the shape
-   * check still holds: fail open, as the close-out gate does on a failed read. 422 with the code.
-   * Resolves true once it has refused.
+   * The blind-read guard (LIN-4437, its PR-set half kept by LIN-4520), at every write that creates or edits a comment
+   * body, after the guard. It acts only on a comment whose first non-blank line is the `## Blind read` heading
+   * (exactly, or with a `:` tail), so a review verdict that mentions the heading further down, and a
+   * `## Blind read pilot` tally, pass untouched. The body must name at least one full PR URL (no read needed). The PR set
+   * then needs the ticket's records landing (lib/records/landing.js), the one every gate reads: exactly the landing's PRs.
+   * When the landing cannot be read, the set check is skipped and logged, and the URL check still holds: fail open, as the
+   * close-out gate does on a failed read. 422 with the code. Resolves true once it has refused.
+   * LIN-4520: the verdict's shape (one verdict line, a word, a reason) is no longer checked here; a blind read's verdict is
+   * a record.
    */
   async function refusedByBlindRead(ctx, body) {
-    // Not a blind read (lib/run-trail.js, the one classifier): `applies: false`, untouched.
-    const shape = checkBlindRead(body);
-    if (shape.ok && !shape.applies) return false;
-    if (!shape.ok) return refuseBlindRead(ctx, shape);
+    if (!opensAsBlindRead(body)) return false;
     // LIN-4518 step 3: the landing is the task's records landing (lib/records/landing.js), the one every gate reads.
     let landing = null;
     try {
       if (!recordsStore) throw new Error('no records store');
       landing = await landingOfTicket({ recordsStore, urlKey: ctx.req.proxyUrlKey, ticket: ctx.req.params.issueId });
     } catch (err) {
-      console.warn(`[blind-read] ${ctx.req.params.issueId}: PR-set check skipped, the landing could not be read (${err?.message || err}); the shape check held`);
+      console.warn(`[blind-read] ${ctx.req.params.issueId}: PR-set check skipped, the landing could not be read (${err?.message || err}); the URL check held`);
     }
-    if (landing === null) return false;
-    const check = checkBlindRead(body, { landing });
+    const check = checkBlindReadPrs(body, { landing });
     return check.ok ? false : refuseBlindRead(ctx, check);
   }
 

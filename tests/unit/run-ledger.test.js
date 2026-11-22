@@ -1,238 +1,99 @@
-// Unit tests for the pure run-ledger reader (LIN-3247, P2 of LIN-2949).
+// Unit tests for the pure run-ledger helpers (LIN-3247, P2 of LIN-2949; LIN-4520 retired the comment parsers).
 //
 // Run with: node --test tests/unit/run-ledger.test.js
 //
-// The parser is grounded in REAL review comments (verbatim bodies in
-// tests/fixtures/run-ledger-comments.js, extracted from
-// scripts/eval/fixtures/recommend/_source/large-dense.json and
-// scripts/eval/fixtures/recommend/closeout-review.json). Nothing here invents
-// a review comment except the one deliberately malformed ledger used to prove
-// the raw fallback.
+// What stays here: the full PR URL reader (prUrlsIn, prOf), the trail sort (byTime), and the blind read's PR set
+// (checkBlindReadPrs, LIN-4437). The verdict, ledger and review-comment parsers are retired: a verdict is a records
+// fact now (lib/records/*), so no test reads a review comment for one.
 
 import { test, describe } from 'node:test';
 import assert from 'node:assert';
-import { readFileSync } from 'node:fs';
-import { fileURLToPath } from 'node:url';
-import { dirname, join } from 'node:path';
-import { parseRunLedger } from '../../lib/run-ledger.js';
-import { readRunLedger, latestReviewComment } from '../../lib/run-trail.js';
-import { RUN_LEDGER_COMMENTS } from '../fixtures/run-ledger-comments.js';
-import { RUN_COMMENT_TRAILS } from '../fixtures/run-ledger-trails.js';
+import { prUrlsIn, prOf, byTime, checkBlindReadPrs, blindReadRefusal, BLIND_READ_CODES } from '../../lib/run-ledger.js';
 
-const fixture = name => RUN_LEDGER_COMMENTS[name].comment;
+const A = 'https://github.com/acme/app/pull/101';
+const B = 'https://github.com/acme/app/pull/202';
+const C = 'https://github.com/acme/tools/pull/7';
 
-describe('run-ledger: verdict', () => {
-  test('distinguishes a plain Approve from the conditional form', () => {
-    assert.strictEqual(parseRunLedger(fixture('plain-approve-ci')).verdict, 'approve');
-    assert.strictEqual(parseRunLedger(fixture('empty-ledger')).verdict, 'approve');
-    assert.strictEqual(parseRunLedger(fixture('conditional-table')).verdict, 'approve-conditional');
-    assert.strictEqual(parseRunLedger(fixture('conditional-bullets')).verdict, 'approve-conditional');
+describe('run-ledger: full PR URLs', () => {
+  test('prUrlsIn returns each distinct full URL once, in first-appearance order', () => {
+    assert.deepStrictEqual(prUrlsIn(`Landed ${B} then ${A}. Re-cites ${B}.`), [B, A]);
   });
 
-  test('a non-approve verdict is carried, not read as approval', () => {
-    const model = parseRunLedger(fixture('request-changes-table'));
-    assert.strictEqual(model.verdict, 'request-changes');
-    assert.match(model.verdictText, /Request Changes/);
+  test('a bare #N or a non-PR GitHub URL is not a PR URL', () => {
+    assert.deepStrictEqual(prUrlsIn('see #101 and https://github.com/acme/app/issues/5'), []);
   });
 
-  test('the verdict text is exactly as the review wrote it', () => {
-    const model = parseRunLedger(fixture('conditional-table'));
-    assert.strictEqual(model.verdictText, 'Approve — conditional on close-out discharging the ledger.');
+  test('an absent body names no PR', () => {
+    assert.deepStrictEqual(prUrlsIn(null), []);
+    assert.deepStrictEqual(prUrlsIn(undefined), []);
   });
 
-  test('an absent review is an unknown verdict with an absent ledger, never a crash', () => {
-    const model = parseRunLedger(null);
-    assert.strictEqual(model.verdict, 'unknown');
-    assert.strictEqual(model.ledger.present, false);
-    assert.strictEqual(model.ledger.raw, null);
-    assert.strictEqual(model.ledger.empty, false);
+  test('prOf reads the owner/name slug and the number of a PR URL', () => {
+    assert.deepStrictEqual(prOf(C), { repo: 'acme/tools', number: 7 });
   });
 });
 
-describe('run-ledger: the review CI line and sha', () => {
-  test('captures the CI line verbatim and the head sha the comment carries', () => {
-    const model = parseRunLedger(fixture('plain-approve-ci'));
-    assert.ok(model.ciLine.startsWith('CI on `1dffc408` is **green**.'), `ciLine was: ${model.ciLine}`);
-    assert.match(model.ciLine, /36306122471/);
-    assert.strictEqual(model.sha, '1dffc408');
-  });
-
-  test('captures a different real review head sha', () => {
-    assert.strictEqual(parseRunLedger(fixture('conditional-table')).sha, 'e10768db');
-    assert.strictEqual(parseRunLedger(fixture('request-changes-table')).sha, '8790ce34');
-  });
-
-  test('carries the comment time', () => {
-    assert.strictEqual(parseRunLedger(fixture('conditional-table')).at, '2026-09-28T21:27:05.078Z');
-  });
-});
-
-describe('run-ledger: the ledger heading is anchored to a line start (R3)', () => {
-  test('a heading mentioned inside prose/backticks does not start the ledger', () => {
-    const body = [
-      '## Review — draft',
-      '',
-      'An earlier review quoted the heading `### What CI Did Not Prove` in backticks.',
-      '- S13: a bullet that is not ledger content',
-      '- Scope held: a second non-ledger bullet',
-      '',
-      '### What CI Did Not Prove',
-      '',
-      '- L1: the real first item, *Inside*',
-      '- L2: the real second item, *Outside*',
-      '',
-      '**Verdict: Approve.**',
-    ].join('\n');
-    const { ledger } = parseRunLedger({ body });
-    assert.strictEqual(ledger.present, true);
-    assert.match(ledger.raw, /L1: the real first item/, 'the real section is read');
-    assert.doesNotMatch(ledger.raw, /S13|Scope held/, 'the prose bullets must not be captured as ledger content');
-  });
-});
-
-describe('run-ledger: the empty ledger is a distinct state', () => {
-  test('an explicit "(none ...)" ledger is empty, not unparsed and not absent', () => {
-    const { ledger } = parseRunLedger(fixture('empty-ledger'));
-    assert.strictEqual(ledger.present, true);
-    assert.strictEqual(ledger.empty, true);
-    assert.equal('items' in ledger, false, 'the items are records now (LIN-4495)');
-  });
-});
-
-describe('run-ledger: latest review comment selection', () => {
-  const review = (id, createdAt, body) => ({ id, createdAt, body });
-
-  test('picks the newest review summary comment and ignores non-review chatter', () => {
+describe('run-ledger: the trail sort', () => {
+  test('byTime orders by createdAt, oldest first, whatever order the provider gave', () => {
     const comments = [
-      review('eng-1', '2026-07-01T00:00:00.000Z', 'Implemented it. PR #1 opened; CI green.'),
-      review('r1', '2026-07-02T00:00:00.000Z', '## Review\n\n### What CI Did Not Prove\n- one item\n\n**Verdict: Approve.**'),
-      review('r2', '2026-07-03T00:00:00.000Z', '## Re-review\n\n### What CI Did Not Prove\n- carried\n\n**Verdict: Approve — conditional on close-out discharging the ledger.**'),
-      review('note', '2026-07-04T00:00:00.000Z', 'A later non-review note with no verdict and no ledger.'),
+      { id: 'late', body: 'b', createdAt: '2026-07-03T00:00:00.000Z' },
+      { id: 'early', body: 'a', createdAt: '2026-07-01T00:00:00.000Z' },
+      { id: 'mid', body: 'c', createdAt: '2026-07-02T00:00:00.000Z' },
     ];
-    assert.strictEqual(latestReviewComment(comments)?.id, 'r2');
-    assert.strictEqual(readRunLedger(comments).verdict, 'approve-conditional');
+    assert.deepStrictEqual(byTime(comments).map((c) => c.id), ['early', 'mid', 'late']);
+    assert.strictEqual(comments[0].id, 'late', 'the input is not reordered in place');
   });
 
-  test('returns null / an unknown model when no review comment exists', () => {
-    assert.strictEqual(latestReviewComment([]), null);
-    assert.strictEqual(latestReviewComment([{ id: 'x', body: 'nothing review-like' }]), null);
-    assert.strictEqual(readRunLedger([]).verdict, 'unknown');
-  });
-});
-
-describe('run-ledger: real finished-run trails (R1/R2)', () => {
-  const trail = name => RUN_COMMENT_TRAILS[name].comments;
-
-  test('LIN-3245: picks the review, not the close-out or autopilot wrap-up that shadow it', () => {
-    const comments = trail('lin-3245');
-    assert.strictEqual(comments.length, 10);
-    const picked = latestReviewComment(comments);
-    assert.strictEqual(picked?.id, '3e984ba9-c93e-4fea-83b8-9890af4e107b', 'the review summary must win');
-    assert.notStrictEqual(picked?.id, '6522575f-ad97-4465-9345-20d397144673', 'the close-out must not shadow the review');
-    assert.notStrictEqual(picked?.id, '4222f717-02b0-4dee-a915-f5e80ab9a41f', 'the autopilot wrap-up must not shadow the review');
-  });
-
-  test('LIN-3245: the reader yields Approve with the ledger, not an unknown verdict', () => {
-    const model = readRunLedger(trail('lin-3245'));
-    assert.strictEqual(model.verdict, 'approve');
-    assert.strictEqual(model.ledger.present, true);
-    assert.strictEqual(model.ledger.empty, false, 'a section with items is not stated empty');
-  });
-
-  test('LIN-3247: picks this review out of its own beat/autopilot trail', () => {
-    const comments = trail('lin-3247');
-    assert.strictEqual(comments.length, 6);
-    assert.strictEqual(latestReviewComment(comments)?.id, '3f374473-e5e4-4914-98ea-25bbfd7b7bf9');
-    assert.strictEqual(readRunLedger(comments).verdict, 'request-changes');
-  });
-
-  test('LIN-3098: the close-out/autopilot title exclusion keeps the S6 review over the autopilot wrap-up that follows it', () => {
-    const comments = trail('lin-3098-pair');
-    assert.strictEqual(comments.length, 2);
-    assert.strictEqual(
-      latestReviewComment(comments)?.id,
-      '81c9f76f-d68a-4f65-b55e-38383ad833eb',
-      'the S6 review must beat the autopilot wrap-up whose title names a review',
-    );
-    assert.notStrictEqual(
-      latestReviewComment(comments)?.id,
-      '4f3ef92a-1203-49d8-a20c-0addd3ddc4e7',
-      'an autopilot-titled comment must not be selected as the review',
-    );
-    assert.strictEqual(readRunLedger(comments).verdict, 'approve-conditional');
+  test('byTime keeps only comments with a string body', () => {
+    const comments = [null, { id: 'no-body', createdAt: '2026-07-01T00:00:00.000Z' }, { id: 'ok', body: '', createdAt: '2026-07-01T00:00:00.000Z' }];
+    assert.deepStrictEqual(byTime(comments).map((c) => c.id), ['ok']);
+    assert.deepStrictEqual(byTime(null), []);
   });
 });
 
-describe('run-ledger: selection over the real large-dense corpus (R1′)', () => {
-  const ROOT = join(dirname(fileURLToPath(import.meta.url)), '../..');
-  const source = JSON.parse(readFileSync(
-    join(ROOT, 'scripts/eval/fixtures/recommend/_source/large-dense.json'),
-    'utf8',
-  ));
-
-  // The source capture keeps only body/createdAt/user (build-large-dense-fixtures.mjs
-  // strips ids), so give each comment a stable synthetic id from its bundle and
-  // index before asserting which one the selector picks.
-  const commentsFor = bundleId => source.bundles[bundleId].comments
-    .map((c, i) => ({ ...c, id: `${bundleId}#${i}` }));
-
-  // Hand-verified expected review comment per bundle; null = the trail holds no
-  // review. LIN-2149 (breakdown/autopilot only) and LIN-3059 (plan reviews only)
-  // are the two bundles with no review.
-  const EXPECTED = {
-    'LIN-2149': null,
-    'LIN-1892': 'LIN-1892#40',
-    'LIN-2944': 'LIN-2944#34',
-    'LIN-3059': null,
-    'LIN-3098': 'LIN-3098#26',
-    'LIN-3107': 'LIN-3107#15',
-    'LIN-3124': 'LIN-3124#41',
-    'LIN-3135': 'LIN-3135#9',
-    'LIN-2403': 'LIN-2403#4',
-    'LIN-2882': 'LIN-2882#15',
-    'LIN-3125': 'LIN-3125#13',
-  };
-
-  test('every bundle selects its review comment, or nothing when it has none', () => {
-    assert.deepStrictEqual(
-      Object.keys(EXPECTED).sort(),
-      Object.keys(source.bundles).sort(),
-      'the table must cover every bundle in the corpus',
-    );
-    for (const [bundleId, expectedId] of Object.entries(EXPECTED)) {
-      const comments = commentsFor(bundleId);
-      const picked = latestReviewComment(comments);
-      assert.strictEqual(picked?.id ?? null, expectedId, `${bundleId}: selected the wrong comment`);
-
-      const model = readRunLedger(comments);
-      assert.strictEqual(model.commentId, expectedId, `${bundleId}: readRunLedger parsed the wrong comment`);
-      if (expectedId === null) {
-        assert.strictEqual(model.verdict, 'unknown', `${bundleId}: no review must read as unknown`);
-        assert.strictEqual(model.ledger.present, false, `${bundleId}: no review must have no ledger`);
-      } else {
-        assert.strictEqual(model.ledger.present, true, `${bundleId}: the selected review must carry its ledger`);
-      }
-    }
+describe('run-ledger: the blind read PR set (checkBlindReadPrs)', () => {
+  test('a blind read that names no PR by full URL is refused as missing', () => {
+    const check = checkBlindReadPrs('## Blind read\n\nI read the code and it looks fine. See #101.', { landing: [A] });
+    assert.strictEqual(check.ok, false);
+    assert.strictEqual(check.code, BLIND_READ_CODES.prsMissing);
   });
 
-  test('the two whole-trail fixtures still select their review', () => {
-    assert.strictEqual(
-      latestReviewComment(RUN_COMMENT_TRAILS['lin-3245'].comments)?.id,
-      '3e984ba9-c93e-4fea-83b8-9890af4e107b',
-    );
-    assert.strictEqual(
-      latestReviewComment(RUN_COMMENT_TRAILS['lin-3247'].comments)?.id,
-      '3f374473-e5e4-4914-98ea-25bbfd7b7bf9',
-    );
+  test('a PR the landing does not hold is a mismatch, with the expected and the named PRs', () => {
+    const check = checkBlindReadPrs(`## Blind read\n\nRead ${B}.`, { landing: [A] });
+    assert.strictEqual(check.ok, false);
+    assert.strictEqual(check.code, BLIND_READ_CODES.prsMismatch);
+    assert.deepStrictEqual(check.expected, [A]);
+    assert.deepStrictEqual(check.got, [B]);
   });
 
-  test('a review-titled fix-up with no verdict word or ledger is not selected as the review', () => {
-    const fixUp = source.bundles['LIN-2944'].comments[26];
-    assert.match(fixUp.body.split('\n')[0], /re-review fix-up/);
-    assert.strictEqual(
-      latestReviewComment([{ ...fixUp, id: 'fixup' }]),
-      null,
-      'a title that merely names a review must still carry a verdict or ledger',
-    );
+  test('a blind read that names fewer PRs than the landing holds is a mismatch', () => {
+    const check = checkBlindReadPrs(`## Blind read\n\nRead ${A}.`, { landing: [A, C] });
+    assert.strictEqual(check.ok, false);
+    assert.strictEqual(check.code, BLIND_READ_CODES.prsMismatch);
+  });
+
+  test('a blind read that names an extra PR beyond the landing is a mismatch', () => {
+    const check = checkBlindReadPrs(`## Blind read\n\nRead ${A} and ${B}.`, { landing: [A] });
+    assert.strictEqual(check.ok, false);
+    assert.strictEqual(check.code, BLIND_READ_CODES.prsMismatch);
+    assert.deepStrictEqual(check.got, [A, B]);
+  });
+
+  test('exactly the landing\'s PRs, in any order, passes and says the set was checked', () => {
+    const check = checkBlindReadPrs(`## Blind read\n\nRead ${C} then ${A}.`, { landing: [A, C] });
+    assert.deepStrictEqual(check, { ok: true, prs: [C, A], setChecked: true });
+  });
+
+  test('a null landing (records not read) skips the set check and still needs a PR', () => {
+    const check = checkBlindReadPrs(`## Blind read\n\nRead ${B}.`, { landing: null });
+    assert.deepStrictEqual(check, { ok: true, prs: [B], setChecked: false });
+    assert.strictEqual(checkBlindReadPrs('## Blind read\n\nno PR', { landing: null }).code, BLIND_READ_CODES.prsMissing);
+  });
+
+  test('the refusal names the landing and what the blind read named, so one retry can fix it', () => {
+    const message = blindReadRefusal(checkBlindReadPrs(`## Blind read\n\nRead ${B}.`, { landing: [A] }));
+    assert.match(message, /Nothing was posted/);
+    assert.ok(message.includes(A), 'names the landing PR');
+    assert.ok(message.includes(B), 'names the PR the read gave');
   });
 });

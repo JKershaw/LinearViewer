@@ -123,12 +123,12 @@ function runEvidenceFixture(overrides = {}) {
     evidence: {
       asked: 'Do the thing', done: 'PR #12',
       checked: {
-        review: { verdict: 'approve-conditional', verdictText: 'Approve — conditional on close-out discharging the ledger.', ciLine: 'CI is green.', at: '2026-07-02T00:00:00.000Z', sha: 'abc1234' },
+        review: { verdict: 'approve', at: '2026-07-02T00:00:00.000Z', sha: 'abc1234' },
         now: { state: 'passing', checks: [], headSha: 'deadbeef', prUrl: PR_URL, checksUrl: `${PR_URL}/checks`, headMoved: false },
       },
     },
     ledger: {
-      verdict: 'approve-conditional', verdictText: 'Approve — conditional on close-out discharging the ledger.', ciLine: 'CI is green.', at: '2026-07-02T00:00:00.000Z', sha: 'abc1234',
+      verdict: 'approve', at: '2026-07-02T00:00:00.000Z', sha: 'abc1234',
       ledger: {
         present: true, empty: false, unparsed: false,
         items: [

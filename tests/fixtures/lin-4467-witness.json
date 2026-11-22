@@ -22,13 +22,13 @@
     },
     "plan:fresh": {
       "name": "plan",
-      "bytes": 12712,
-      "sha256": "905e4e7789c33a870bf8a82dd568b7b3abf4f4efae41b52c70b23b4c1cc78dca"
+      "bytes": 12687,
+      "sha256": "bfa8f4c7cf977fc95a2f173430fabda83a39677950caa179535a402204dfeaa7"
     },
     "plan:fix": {
       "name": "plan",
-      "bytes": 12712,
-      "sha256": "905e4e7789c33a870bf8a82dd568b7b3abf4f4efae41b52c70b23b4c1cc78dca"
+      "bytes": 12687,
+      "sha256": "bfa8f4c7cf977fc95a2f173430fabda83a39677950caa179535a402204dfeaa7"
     },
     "look-into:fresh": {
       "name": "look into",
@@ -73,12 +73,12 @@
     "scoping:fresh": {
       "name": "scoping",
       "bytes": 5938,
-      "sha256": "c44a128eb99ad84024033fc94d998d3cc56d0a62f0b9babe29f26258f62431cd"
+      "sha256": "390d181d2530bb6a978a1ad548a5b97f284c61c43a1cd334a9e78929e72662c6"
     },
     "scoping:fix": {
       "name": "scoping",
       "bytes": 5938,
-      "sha256": "c44a128eb99ad84024033fc94d998d3cc56d0a62f0b9babe29f26258f62431cd"
+      "sha256": "390d181d2530bb6a978a1ad548a5b97f284c61c43a1cd334a9e78929e72662c6"
     },
     "design:fresh": {
       "name": "design",
@@ -112,13 +112,13 @@
     },
     "plan-review:fresh": {
       "name": "plan-review",
-      "bytes": 9824,
-      "sha256": "9621420f7be1e1a7161a697e290421669cc9cace515bd22b2396d5956d8905e3"
+      "bytes": 9517,
+      "sha256": "1b1a0a845a4d307e2b8131fce543efc4dbdc9b7efa704b6bc41544efd246f871"
     },
     "plan-review:fix": {
       "name": "plan-review",
-      "bytes": 9824,
-      "sha256": "9621420f7be1e1a7161a697e290421669cc9cace515bd22b2396d5956d8905e3"
+      "bytes": 9517,
+      "sha256": "1b1a0a845a4d307e2b8131fce543efc4dbdc9b7efa704b6bc41544efd246f871"
     },
     "implementation:fresh": {
       "name": "implement",
@@ -127,38 +127,38 @@
     },
     "implementation:fix": {
       "name": "implement",
-      "bytes": 12025,
-      "sha256": "a920de47fd3f360ab943ea97874c56c14dbef17ddc5be74c25135e1d6a816e55"
+      "bytes": 11736,
+      "sha256": "97d47c5f69bc59127414cf95b877549758c2a94f5ccceda072ab3c11085de358"
     },
     "review:fresh": {
       "name": "review",
-      "bytes": 18552,
-      "sha256": "5094f529e06271a4c9940c2b7e8e999f6ffdc01453b2206a1e8491115fef11e5"
+      "bytes": 18359,
+      "sha256": "729c977683d987750b311a9513d2e7cd051895da2ba1400b76040861f45cd01f"
     },
     "review:fix": {
       "name": "review",
-      "bytes": 18552,
-      "sha256": "5094f529e06271a4c9940c2b7e8e999f6ffdc01453b2206a1e8491115fef11e5"
+      "bytes": 18359,
+      "sha256": "729c977683d987750b311a9513d2e7cd051895da2ba1400b76040861f45cd01f"
     },
     "close-out:fresh": {
       "name": "close-out",
-      "bytes": 11151,
-      "sha256": "68811102db2bec3004d72c2101c3dab0b9c5a74137c60143239b3b425fc34662"
+      "bytes": 11041,
+      "sha256": "cdf2d09f67daa38542f4e1449b0a34dddc31badcebd08ef40679b327b2c3ef49"
     },
     "close-out:fix": {
       "name": "close-out",
-      "bytes": 11151,
-      "sha256": "68811102db2bec3004d72c2101c3dab0b9c5a74137c60143239b3b425fc34662"
+      "bytes": 11041,
+      "sha256": "cdf2d09f67daa38542f4e1449b0a34dddc31badcebd08ef40679b327b2c3ef49"
     },
     "retrospective-audit:fresh": {
       "name": "retrospective-audit",
-      "bytes": 6450,
-      "sha256": "5ef12a69cfd445f6a92388577b57611ec78ae17915c18cefb0542713ebff13ef"
+      "bytes": 6419,
+      "sha256": "79b7806685713bb086c7e4e6677bdd3f89bccf394271dc170b67307c819892c0"
     },
     "retrospective-audit:fix": {
       "name": "retrospective-audit",
-      "bytes": 6450,
-      "sha256": "5ef12a69cfd445f6a92388577b57611ec78ae17915c18cefb0542713ebff13ef"
+      "bytes": 6419,
+      "sha256": "79b7806685713bb086c7e4e6677bdd3f89bccf394271dc170b67307c819892c0"
     },
     "retro:fresh": {
       "name": "retro",
@@ -173,43 +173,43 @@
     "survey-task:fresh": {
       "name": "survey-task",
       "bytes": 2633,
-      "sha256": "e10c2c6d0c64cda26010946f6322c253896eb72b8d901a40582109077860112b"
+      "sha256": "f6d0fd0783da2270e2a4ad89e5fcd2ef7d9da19546b7e3fec39f205178473979"
     },
     "survey-task:fix": {
       "name": "survey-task",
       "bytes": 2633,
-      "sha256": "e10c2c6d0c64cda26010946f6322c253896eb72b8d901a40582109077860112b"
+      "sha256": "f6d0fd0783da2270e2a4ad89e5fcd2ef7d9da19546b7e3fec39f205178473979"
     },
     "survey-place:fresh": {
       "name": "survey-place",
       "bytes": 3548,
-      "sha256": "87bed7d2135be6264c3557747096f078c9c93a225f1c848d2806ccd720c26ae2"
+      "sha256": "72b5180bc5e9fc7c918361592fc8580d44c4d5d0342a789dfdccde76aadbd1dc"
     },
     "survey-place:fix": {
       "name": "survey-place",
       "bytes": 3548,
-      "sha256": "87bed7d2135be6264c3557747096f078c9c93a225f1c848d2806ccd720c26ae2"
+      "sha256": "72b5180bc5e9fc7c918361592fc8580d44c4d5d0342a789dfdccde76aadbd1dc"
     },
     "blind-read:fresh": {
       "name": "blind-read",
-      "bytes": 5030,
-      "sha256": "a677e0d90b4544620394ef89cc3a45c2f4e3c6265829d6b9f6d995b8a1e3e47b"
+      "bytes": 5018,
+      "sha256": "f524df41614b035b26d364a9806e1ecb00ef11053cd75dacace32f71852ed5df"
     },
     "blind-read:fix": {
       "name": "blind-read",
-      "bytes": 5030,
-      "sha256": "a677e0d90b4544620394ef89cc3a45c2f4e3c6265829d6b9f6d995b8a1e3e47b"
+      "bytes": 5018,
+      "sha256": "f524df41614b035b26d364a9806e1ecb00ef11053cd75dacace32f71852ed5df"
     }
   },
   "tables": {
     "COMPLETION_SIGNALS": [
       "{",
       "  \"blind-read\": {",
-      "    \"coreOutcome\": \"The current landing read cold at its head against its merge-base: whether the change left its area better, the same or worse, with its finds sorted three ways, posted as one `## Blind read` comment\",",
-      "    \"readinessCheck\": \"Is there one `## Blind read` comment with one verdict word and a two-sided reason, naming exactly the landing's PRs, read from the code alone?\",",
+      "    \"coreOutcome\": \"The current landing read cold at its head against its merge-base: whether the change left its area better, the same or worse, with its finds sorted three ways, posted as one `## Blind read` comment and its verdict recorded\",",
+      "    \"readinessCheck\": \"Is there one `## Blind read` comment naming exactly the landing's PRs, and one blind-read verdict record with a two-sided reason, read from the code alone?\",",
       "    \"signals\": [",
       "      \"Read only the diff, the code at the merge-base and at the head, and the area registry: no pull request text, commit messages, ticket, area notes or plans\",",
-      "      \"One verdict word, better, same or worse, with a reason naming what the change made better and what it made worse, with their files\",",
+      "      \"One verdict record, `judgement` blind-read, with outcome better, same or worse, and a reason naming what the change made better and what it made worse, with their files\",",
       "      \"Each find sorted into exactly one class: inside the area and fix-sized, inside but larger, or outside the area\",",
       "      \"One comment on the named ticket, its first line exactly `## Blind read`, naming every PR of the landing by full URL and no other; nothing else changed\",",
       "      \"With no PR on the landing, nothing read or posted, and the run ended `[skipped]`\"",
@@ -249,7 +249,7 @@
       "    \"coreOutcome\": \"Approved work finished: the fixes review asked for made, the findings to close-out settled, the PR merged, the post-deploy steps done once the deploy landed, the task Done, the summary posted, and related tickets tidied and each outside find recorded to the project backlog\",",
       "    \"readinessCheck\": \"Did the review record an Approve, and is the work then finished: the fixes review asked for made, every finding to close-out settled (with none recorded under an Approve, nothing waits; a missing verdict goes back to review), merged, the post-deploy steps done once the deploy landed, set Done, summarized (with how the work meets what was asked), and each outside find recorded to project?\",",
       "    \"signals\": [",
-      "      \"Review verdict read from the latest summary comment; any finding to close-out settled, none recorded passing through, and a missing verdict sent back to review to confirm\",",
+      "      \"Review verdict read from its verdict record on the task (in the brief); any finding to close-out settled, none recorded passing through, and a missing verdict sent back to review to confirm\",",
       "      \"The fixes review asked for made by close-out itself, each the size of a fix (new design or new behaviour handed back to review), listed in the summary with its commit, and CI green on the new head\",",
       "      \"Every finding to close-out settled: inside work done with cited evidence, a monitor or rollback named by the name review wrote (an unnamed one settles nothing), or a finding accepted by a human naming the exact precondition exercised; an outside find recorded to project; once the deploy landed, a post-deploy check close-out cannot run is recorded as not run (what, why, follow-up) and does not hold the close\",",
       "      \"Green CI confirmed on the exact merged commit, or CI genuinely absent with the substitute re-run and recorded on it (green CI alone never settles a finding)\",",
@@ -357,7 +357,7 @@
       "  },",
       "  \"review\": {",
       "    \"coreOutcome\": \"Implementation verified and an explicit verdict (Approve / Request Changes / Needs Discussion) issued that authorizes the merge — or Request Changes naming the stage that fixes it\",",
-      "    \"readinessCheck\": \"Review does not merge or mark Done (close-out does that) — is an explicit verdict issued with CI green on the PR, or, when CI is genuinely absent, with the two-branch substitute independently re-run and recorded (either discharges this precondition and authorizes Approve, conditional when findings to close-out are recorded — CI absence is not itself a closure-blocker route), and are the findings to close-out recorded, with the verdict in the summary comment — or, if not, is Request Changes issued, naming the fixing stage?\",",
+      "    \"readinessCheck\": \"Review does not merge or mark Done (close-out does that) — is an explicit verdict issued with CI green on the PR, or, when CI is genuinely absent, with the two-branch substitute independently re-run and recorded (either discharges this precondition and authorizes Approve, conditional when findings to close-out are recorded — CI absence is not itself a closure-blocker route), and are the findings to close-out recorded, with the verdict recorded as a verdict record — or, if not, is Request Changes issued, naming the fixing stage?\",",
       "    \"signals\": [",
       "      \"Requirements matched\",",
       "      \"Tests pass\",",
@@ -372,7 +372,7 @@
       "    \"coreOutcome\": \"The size of the move, and why, recorded in the description\",",
       "    \"readinessCheck\": \"Does the ticket say plainly what size of move this is and why, with nothing about how?\",",
       "    \"signals\": [",
-      "      \"Survey comments, filing comments and any person's size comment read\",",
+      "      \"The two Surveys' reports, filing comments and any person's size comment read\",",
       "      \"Sizes weighed from just the task to wrong work, one recommended\",",
       "      \"One `## Size of the move` section in the description, holding only the record's 4 lines\",",
       "      \"Cuts to the `## As asked` block listed in the record, or none\",",
@@ -391,24 +391,24 @@
       "  },",
       "  \"survey-place\": {",
       "    \"coreOutcome\": \"A read-only forecast of what this task will do to the codebase as a place, posted as one comment on the surveyed ticket at the named base\",",
-      "    \"readinessCheck\": \"Is the comment read-only, at the named base, under its word limit, and on the surveyed ticket?\",",
+      "    \"readinessCheck\": \"Is the report read-only, at the named base, and under its word limit?\",",
       "    \"signals\": [",
-      "      \"Read at the base the heading names, with nothing after it: no later commits, tickets, comments or reports, and no reviews or maps of the codebase's shape\",",
+      "      \"Read at the base the report names, with nothing after it: no later commits, tickets, comments or reports, and no reviews or maps of the codebase's shape\",",
       "      \"Says where the task lands and whether that part of the place is getting better or worse, from what is visible\",",
       "      \"Names what the obvious way would add, move, tangle, leave without a home or leave in two places, and what else would have to learn about it\",",
       "      \"Names what would leave the place better at a cost this task could carry, and what is not this task's to carry\",",
-      "      \"One comment on the surveyed ticket, headed with the base; no code, branch, pull request, ticket or Linear state changed\",",
+      "      \"The report names its base; no code, branch, pull request, ticket or Linear state changed\",",
       "      \"Under 500 words\"",
       "    ]",
       "  },",
       "  \"survey-task\": {",
       "    \"coreOutcome\": \"A read-only forecast of why this task will be difficult, and what would be done first, posted as one comment on the surveyed ticket at the named base\",",
-      "    \"readinessCheck\": \"Is the comment read-only, at the named base, under its word limit, and on the surveyed ticket?\",",
+      "    \"readinessCheck\": \"Is the report read-only, at the named base, and under its word limit?\",",
       "    \"signals\": [",
-      "      \"Read at the base the heading names, with nothing after it: no later commits, tickets, comments or reports\",",
+      "      \"Read at the base the report names, with nothing after it: no later commits, tickets, comments or reports\",",
       "      \"Answers why the change will be difficult, or says plainly that it will not, from the code found\",",
       "      \"Says what would be done first, if anything, and why\",",
-      "      \"One comment on the surveyed ticket, headed with the base; no code, branch, pull request, ticket or Linear state changed\",",
+      "      \"The report names its base; no code, branch, pull request, ticket or Linear state changed\",",
       "      \"Under 500 words\"",
       "    ]",
       "  },",
@@ -642,7 +642,7 @@
       "{",
       "  \"blind-read\": {",
       "    \"category\": \"universal\",",
-      "    \"description\": \"Sent by code after an approving review, never by the selector. A blind read of the current landing's pull request(s) before merge: whether the change left its area better, the same or worse, and its finds sorted three ways. Reads only the diff, the code at its merge-base and head, and the area registry; posts one comment on the ticket and changes nothing else.\",",
+      "    \"description\": \"Sent by code after an approving review, never by the selector. A blind read of the current landing's pull request(s) before merge: whether the change left its area better, the same or worse, and its finds sorted three ways. Reads only the diff, the code at its merge-base and head, and the area registry; posts one comment on the ticket and records its verdict, and changes nothing else.\",",
       "    \"name\": \"blind-read\",",
       "    \"route\": null,",
       "    \"writes\": \"blind-comment\"",
@@ -862,7 +862,7 @@
     ]
   },
   "stageLabels": "71b1066de2fe5206ed5acf5f18d47b5a62543f8c22697e24a7e982a3264e192a",
-  "contracts": "65a6a43178e62a809138f0ffbdc4404b23b96f012c638f36a6b3e040fd114f84",
+  "contracts": "40635cd9eea5c9c69925af008b1a5fef663c4bb48890e753696202b85df8c7f5",
   "stepWords": "0a06759d642d8c2268893789c6c196461af7b338e3b58dccf0ce7ab5353cbec5",
   "overrideLine": "e8cd49b7b5b35ecfe83ae820694879f466b3017d1dad0ef0655dbe15944aefb9"
 }

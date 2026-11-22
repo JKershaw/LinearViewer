@@ -7,31 +7,29 @@
  * and the recommendation's read (blindReadStep). The agreement table below runs each surface over the same
  * trails, with the input shape that surface really has, and writes each expected answer in its cell.
  *
- * The trails are the synthetic shapes the blind-read gate uses, plus three real finished-run trails from
- * tests/fixtures/run-ledger-trails.js (verbatim tracker comments, LIN-3245, LIN-3247, LIN-3098).
+ * LIN-4520: every trail is a records trail (the ticket's records, seeded by tests/helpers/records-scenario.js and read
+ * by trailForTicket). The comment-shaped rows of the first version are kept as their records events: the expected
+ * answers are the same. The real finished-run trails are kept by name (their comment fixture went with the parse, LIN-4520).
  *
  * Run with: node --test tests/unit/lin-4460-close-out-decision.test.js
  */
 process.env.NODE_ENV = 'test';
 
 import { FINDINGS_NONE } from '../../lib/close-out-findings.js';
-import { test, describe } from 'node:test';
+import { test, describe, before, after } from 'node:test';
 import assert from 'node:assert/strict';
 import { readFileSync, readdirSync, statSync } from 'node:fs';
 import { join, relative, dirname } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import {
-  closeOutDecision, deriveCloseOutState, CLOSE_OUT_REASONS, CLOSE_OUT_REASON, CLOSE_OUT_STATUS, CLOSE_OUT_ACTOR,
+  closeOutDecision, CLOSE_OUT_REASONS, CLOSE_OUT_REASON, CLOSE_OUT_STATUS, CLOSE_OUT_ACTOR,
 } from '../../lib/run-closeout-state.js';
-import { readTrail } from '../../lib/run-trail.js';
 import { readRunEvidence } from '../../lib/run-evidence.js';
 import { readCloseOutChain, closeOutNotReady } from '../../lib/close-out-readiness.js';
 import { blindReadStep } from '../../lib/recommendation-blind-read.js';
-import { RUN_COMMENT_TRAILS } from '../fixtures/run-ledger-trails.js';
 import { createMangoTmpdir } from '../fixtures/mango-tmpdir.js';
 import { seededRecordsStore, ev } from '../helpers/records-scenario.js';
 import { trailForTicket } from '../../lib/task-standing.js';
-import { before, after } from 'node:test';
 
 const harness = createMangoTmpdir('lin-4460-close-out-decision-');
 before(() => harness.connect());
@@ -43,14 +41,6 @@ const PR1 = PR(41);
 const PR2 = PR(42);
 const REVIEWED = 'aaaaaaa1111111';
 const MOVED = 'bbbbbbb2222222';
-const T = (n) => `2026-11-12T${String(n).padStart(2, '0')}:00:00.000Z`;
-const c = (n, body) => ({ id: `c${n}`, body, createdAt: T(n), user: 'agent' });
-const summary = (n, url = PR1) => c(n, `Implementation done: ${url}, CI green.`);
-const review = (n, verdict = 'Approve', url = PR1) => c(n, `## Code Review\n\nReviewed head \`${REVIEWED}\` of ${url}.\n\n### What CI Did Not Prove\n| # | Claim | In/Out | Discharge |\n| --- | --- | --- | --- |\n| 1 | one claim | In | a repro |\n\n**Verdict: ${verdict}**`);
-const read = (n, ...urls) => c(n, `## Blind read\nVerdict: same. It gave the gate one owner in lib/run-closeout-state.js and left nothing worse.\n\nRead: ${urls.join(', ')} at \`${REVIEWED.slice(0, 9)}\` against \`000000000\`.\n\n### Inside the area, fix-sized\nNone.`);
-const closeOut = (n, body) => c(n, `## Close-out\n\n${body}`);
-const link = (n) => c(n, `PR to merge: ${PR2}`);
-const audit = (n) => c(n, `## Retrospective audit — LIN-1\n\nThe landing ${PR1} holds; one note entry is wrong. Notes PR: ${PR2}.`);
 
 const STARTED = { name: 'In Progress', type: 'started' };
 const DONE = { name: 'Done', type: 'completed' };
@@ -65,19 +55,33 @@ const statusOf = {
 
 // The surfaces, each called the way it is really called. `shape` is the PR input: 'full' reads every PR
 // the surface asks for, 'unreadable' fails every read. `stopAt` is the run's boundary.
-function seamFor(comments, readOne, stopAt) {
+function seamFor(readOne, stopAt) {
   return {
-    resolveProvider: () => ({ provider: { name: 'local', async fetchIssueComments() { return comments; } }, callScope: 'scope' }),
+    resolveProvider: () => ({ provider: { name: 'local', async fetchIssueComments() { return []; } }, callScope: 'scope' }),
     readPrStatus: async ({ repo, number }) => readOne(`https://github.com/${repo}/pull/${number}`),
     isStopAtRun: async () => stopAt,
   };
 }
 const WORKSPACE = { urlKey: 'acme' };
 
-// LIN-4518 step 3: the same trails as records (the gates read records). Every PR is at REVIEWED when its event is written.
+// The ticket's events, as the records a stage writes (tests/helpers/records-scenario.js). Every PR is at REVIEWED when
+// its event is written.
 const evPr = (n, url = PR1) => ev.pr(n, url, REVIEWED);
 const evReview = (n, outcome = 'approve', url = PR1) => ev.review(n, url, { outcome, heads: { [url]: REVIEWED } });
 const evRead = (n, ...urls) => ev.read(n, urls.length ? urls : PR1);
+const evClose = (n) => ev.close(n);
+const evAudit = (n, url, head = REVIEWED) => ev.audit(n, url, head);
+
+// Named ticket shapes, one per trail the surfaces are checked over.
+const RESTING = [evPr(1), evReview(2)];                                  // approved, unmerged, no read on record
+const READ = [evPr(1), evReview(2), evRead(3, PR1)];                     // approved, a read names the PR
+const CHANGES = [evPr(1), evReview(2, 'request-changes')];               // request changes
+
+/** The ticket's records trail (the one the gates read), for a given event list. */
+async function trailOfEvents(events) {
+  const recordsStore = await seededRecordsStore(harness, events, { urlKey: WORKSPACE.urlKey, tickets: ['LIN-1'] });
+  return trailForTicket({ recordsStore, urlKey: WORKSPACE.urlKey, ticket: 'LIN-1' });
+}
 
 /** The surfaces over one ticket's records (`events`, LIN-4518 step 3): each reads the same store. */
 async function surfaces(events, { shape = 'full', issue = STARTED, merged = [], movedHead = false } = {}) {
@@ -85,19 +89,18 @@ async function surfaces(events, { shape = 'full', issue = STARTED, merged = [], 
   const trail = await trailForTicket({ recordsStore, urlKey: WORKSPACE.urlKey, ticket: 'LIN-1' });
   const readOne = (url) => (shape === 'unreadable' ? statusOf.unreadable()
     : (merged.includes(prOf(url).number) ? statusOf.merged(url) : statusOf.open(url, movedHead ? MOVED : REVIEWED)));
-  const comments = [];
   const box = await readRunEvidence({
     openFindings: FINDINGS_NONE,
-    issueIdentifier: 'LIN-1', comments, urlKey: WORKSPACE.urlKey, recordsStore, readPrStatus: async ({ repo, number }) => readOne(`https://github.com/${repo}/pull/${number}`),
+    issueIdentifier: 'LIN-1', comments: [], urlKey: WORKSPACE.urlKey, recordsStore, readPrStatus: async ({ repo, number }) => readOne(`https://github.com/${repo}/pull/${number}`),
     stopAt: 'pr', runnerReady: true, viewerIsOwner: true,
   });
   const check = await readCloseOutChain({
     openFindings: FINDINGS_NONE, recordsStore,
-    workspace: WORKSPACE, issueIdentifier: 'LIN-1', seam: seamFor(comments, readOne, 'pr'), stopAt: 'pr',
+    workspace: WORKSPACE, issueIdentifier: 'LIN-1', seam: seamFor(readOne, 'pr'), stopAt: 'pr',
     runnerReady: true, owner: true, actor: CLOSE_OUT_ACTOR.PERSON, prStatusCache: new Map(),
   });
-  const stopAtGuard = await closeOutNotReady({ openFindings: FINDINGS_NONE, recordsStore, workspace: WORKSPACE, issueIdentifier: 'LIN-1', seam: seamFor(comments, readOne, 'pr') });
-  const ladderGuard = await closeOutNotReady({ openFindings: FINDINGS_NONE, recordsStore, workspace: WORKSPACE, issueIdentifier: 'LIN-1', seam: seamFor(comments, readOne, null) });
+  const stopAtGuard = await closeOutNotReady({ openFindings: FINDINGS_NONE, recordsStore, workspace: WORKSPACE, issueIdentifier: 'LIN-1', seam: seamFor(readOne, 'pr') });
+  const ladderGuard = await closeOutNotReady({ openFindings: FINDINGS_NONE, recordsStore, workspace: WORKSPACE, issueIdentifier: 'LIN-1', seam: seamFor(readOne, null) });
   const step = blindReadStep({ state: issue }, { trail, allRuns: [] });
   return {
     box: box.closeOut,
@@ -119,44 +122,43 @@ const refusedOn = (guardAnswer) => (guardAnswer ? guardAnswer.reason : null);
 const SYNTHETIC = [
   {
     name: 'approved, merged, no read on record',
-    comments: [summary(1), review(2)], events: [evPr(1), evReview(2)], merged: [41],
+    events: RESTING, merged: [41],
     full: { box: ['merged', null], check: ['merged', true], stopAt: null, ladder: 'blind-read-missing', routesRead: true },
     unreadable: { box: ['not-ready', 'blind-read-missing'], check: ['not-ready', false], stopAt: 'blind-read-missing', ladder: 'blind-read-missing', routesRead: true },
   },
   {
     name: 'approved, open, a read names the PR',
-    comments: [summary(1), review(2), read(3, PR1)], events: [evPr(1), evReview(2), evRead(3, PR1)],
+    events: READ,
     full: { box: ['ready', null], check: ['ready', false], stopAt: null, ladder: null, routesRead: false },
     unreadable: { box: ['unknown', null], check: ['unknown', false], stopAt: null, ladder: null, routesRead: false },
   },
   {
     name: 'approved, open, no read on record',
-    comments: [summary(1), review(2)], events: [evPr(1), evReview(2)],
+    events: RESTING,
     full: { box: ['not-ready', 'blind-read-missing'], check: ['not-ready', false], stopAt: 'blind-read-missing', ladder: 'blind-read-missing', routesRead: true },
     unreadable: { box: ['not-ready', 'blind-read-missing'], check: ['not-ready', false], stopAt: 'blind-read-missing', ladder: 'blind-read-missing', routesRead: true },
   },
   {
     name: 'request changes, open, no read',
-    comments: [summary(1), review(2, 'Request Changes')], events: [evPr(1), evReview(2, 'request-changes')],
+    events: CHANGES,
     full: { box: ['not-ready', null], check: ['not-ready', false], stopAt: null, ladder: null, routesRead: false },
     unreadable: { box: ['unknown', null], check: ['unknown', false], stopAt: null, ladder: null, routesRead: false },
   },
   {
     name: 'approved, one landing PR merged and one open, no read (partial)',
-    comments: [summary(1), review(2), link(3)], events: [evPr(1), evReview(2), evPr(3, PR2)], merged: [41],
+    events: [evPr(1), evReview(2), evPr(3, PR2)], merged: [41],
     // Multi-PR: the box reads no PR (LIN-4458), so it reads the gate as not known merged.
     full: { box: ['not-ready', 'blind-read-missing'], check: ['partial', false], stopAt: 'blind-read-missing', ladder: 'blind-read-missing', routesRead: false },
     unreadable: { box: ['not-ready', 'blind-read-missing'], check: ['not-ready', false], stopAt: 'blind-read-missing', ladder: 'blind-read-missing', routesRead: false },
   },
   {
     name: 'approved, open at a moved head, a read names the PR (head-moved)',
-    comments: [summary(1), review(2), read(3, PR1)], events: [evPr(1), evReview(2), evRead(3, PR1)], movedHead: true,
+    events: READ, movedHead: true,
     full: { box: ['not-ready', 'head-moved'], check: ['not-ready', false], stopAt: 'head-moved', ladder: null, routesRead: false },
     unreadable: { box: ['unknown', null], check: ['unknown', false], stopAt: null, ladder: null, routesRead: false },
   },
   {
     name: 'empty landing: a review, and a PR named only as #N',
-    comments: [c(1, 'Implementation done, CI green.'), review(2, 'Approve', 'the change')],
     // A verdict rests on a change, so the records of this row hold no PR and no review.
     events: [],
     full: { box: ['no-pr', null], check: ['no-pr', false], stopAt: null, ladder: null, routesRead: false },
@@ -167,7 +169,7 @@ const SYNTHETIC = [
 const REAL = [
   {
     name: 'LIN-3245: merged, approved, closed out on the trail (real trail)',
-    comments: RUN_COMMENT_TRAILS['lin-3245'].comments, merged: [1716], ticket: DONE,
+    merged: [1716], ticket: DONE,
     // The PR's review (approve) and its close-out, which merged it (the trail's own order).
     events: [ev.pr(1, PR(1716), REVIEWED), ev.review(2, PR(1716), { outcome: 'approve', heads: { [PR(1716)]: REVIEWED } }), ev.close(3), ev.merged(3, PR(1716))],
     full: { box: ['merged', null], check: ['merged', true], stopAt: null, ladder: 'blind-read-missing', routesRead: false },
@@ -175,14 +177,12 @@ const REAL = [
   },
   {
     name: 'LIN-3247: request changes on a open PR (real trail)',
-    comments: RUN_COMMENT_TRAILS['lin-3247'].comments,
     events: [ev.pr(1, PR(1723), REVIEWED), ev.review(2, PR(1723), { outcome: 'request-changes', heads: { [PR(1723)]: REVIEWED } })],
     full: { box: ['not-ready', null], check: ['not-ready', false], stopAt: null, ladder: null, routesRead: false },
     unreadable: { box: ['unknown', null], check: ['unknown', false], stopAt: null, ladder: null, routesRead: false },
   },
   {
     name: 'LIN-3098: a review that names no PR by full URL (real trail)',
-    comments: RUN_COMMENT_TRAILS['lin-3098-pair'].comments,
     // Its review names no PR by full URL, so the records of the ticket hold no PR to rest a verdict on.
     events: [],
     full: { box: ['no-pr', null], check: ['no-pr', false], stopAt: null, ladder: null, routesRead: false },
@@ -203,8 +203,7 @@ describe('the agreement table: every surface, over the same trails, with the exp
   for (const row of [...SYNTHETIC, ...REAL]) {
     for (const shape of ['full', 'unreadable']) {
       test(`${row.name} — ${shape} reads`, async () => {
-        const merged = row.merged || [];
-        const got = await surfacesFor(row, shape, merged);
+        const got = await surfacesFor(row, shape, row.merged || []);
         assertCell(row, shape, got, row[shape]);
       });
     }
@@ -226,8 +225,8 @@ async function surfacesFor(row, shape, merged) {
 
 describe('dropping a fact never moves the passenger fact or the gate the wrong way (LIN-4460, Constraints)', () => {
   for (const row of SYNTHETIC.filter(r => r.name.startsWith('approved'))) {
-    test(`${row.name}: an unreadable or missing status never turns followsPerson into 'merged' or clears waitsOn`, () => {
-      const trail = readTrail(row.comments);
+    test(`${row.name}: an unreadable or missing status never turns followsPerson into 'merged' or clears waitsOn`, async () => {
+      const trail = await trailOfEvents(row.events);
       const full = closeOutDecision({ openFindings: FINDINGS_NONE, trail, prStatuses: new Map(trail.landing.map(u => [u, statusOf.merged(u)])), actor: 'person' });
       const dropped = closeOutDecision({ openFindings: FINDINGS_NONE, trail, prStatuses: new Map(trail.landing.map(u => [u, statusOf.unreadable()])), actor: 'person' });
       const unread = closeOutDecision({ openFindings: FINDINGS_NONE, trail, prStatuses: new Map(), actor: 'person' });
@@ -250,81 +249,81 @@ describe('dropping a fact never moves the passenger fact or the gate the wrong w
 });
 
 describe('the decision\'s rules, one per named case', () => {
-  const merged = (comments) => closeOutDecision({ openFindings: FINDINGS_NONE, trail: readTrail(comments), prStatuses: new Map([[PR1, statusOf.merged(PR1)]]), stopAt: 'pr', runnerReady: true, actor: CLOSE_OUT_ACTOR.PERSON });
+  const decide = (trail, statuses, extra = {}) => closeOutDecision({ openFindings: FINDINGS_NONE, trail, prStatuses: new Map(statuses), ...extra });
 
   test('a person\'s check on a merged, approved, unread landing sets Done, and the stop-at lane stands aside', async () => {
-    const comments = [summary(1), review(2)];
-    const decision = merged(comments);
+    const decision = decide(await trailOfEvents(RESTING), [[PR1, statusOf.merged(PR1)]], { stopAt: 'pr', runnerReady: true, actor: CLOSE_OUT_ACTOR.PERSON });
     assert.equal(decision.setDone, true);
     assert.equal(decision.followsPerson, 'merged');
     assert.equal(decision.refuses, null, 'the gate stands aside on a merged landing');
-    const got = await surfaces([evPr(1), evReview(2)], { merged: [41] });
+    const got = await surfaces(RESTING, { merged: [41] });
     assert.equal(got.check.setDone, true, 'the check route sets Done');
     assert.equal(got.stopAtGuard, null, 'the stop-at lane admits');
   });
 
   test('approved, unmerged, unread: both guard lanes refuse blind-read-missing, whether or not the ticket is Done', async () => {
     for (const issue of [STARTED, DONE]) {
-      const got = await surfaces([evPr(1), evReview(2)], { issue });
+      const got = await surfaces(RESTING, { issue });
       assert.equal(refusedOn(got.stopAtGuard), 'blind-read-missing', `stop-at lane, ${issue.type}`);
       assert.equal(refusedOn(got.ladderGuard), 'blind-read-missing', `ladder lane, ${issue.type}`);
       assert.equal(got.check.setDone, false, `no Done from an unmerged landing, ${issue.type}`);
     }
   });
 
-  test('a person\'s check without an approving review sets no Done', () => {
-    const decision = closeOutDecision({ openFindings: FINDINGS_NONE, trail: readTrail([summary(1), review(2, 'Request Changes')]), prStatuses: new Map([[PR1, statusOf.merged(PR1)]]), actor: CLOSE_OUT_ACTOR.PERSON });
+  test('a person\'s check without an approving review sets no Done', async () => {
+    const decision = decide(await trailOfEvents(CHANGES), [[PR1, statusOf.merged(PR1)]], { actor: CLOSE_OUT_ACTOR.PERSON });
     assert.equal(decision.setDone, false);
   });
 
-  test('head-moved refuses both actors: the person\'s check and Harbour', () => {
-    const comments = [summary(1), review(2), read(3, PR1)];
-    const statuses = new Map([[PR1, statusOf.open(PR1, MOVED)]]);
+  test('head-moved refuses both actors: the person\'s check and Harbour', async () => {
+    const trail = await trailOfEvents(READ);
+    const statuses = [[PR1, statusOf.open(PR1, MOVED)]];
     for (const actor of [CLOSE_OUT_ACTOR.PERSON, CLOSE_OUT_ACTOR.HARBOUR]) {
-      const decision = closeOutDecision({ openFindings: FINDINGS_NONE, trail: readTrail(comments), prStatuses: statuses, stopAt: 'pr', runnerReady: true, actor });
+      const decision = decide(trail, statuses, { stopAt: 'pr', runnerReady: true, actor });
       assert.equal(decision.refuses, 'head-moved', actor);
       assert.equal(decision.setDone, false, actor);
     }
   });
 
-  test('an unreadable PR keeps the blind-read gate in place, but unreadability alone never refuses', () => {
-    const unreadBlind = closeOutDecision({ openFindings: FINDINGS_NONE, trail: readTrail([summary(1), review(2)]), prStatuses: new Map([[PR1, statusOf.unreadable()]]), stopAt: 'pr', runnerReady: true });
+  test('an unreadable PR keeps the blind-read gate in place, but unreadability alone never refuses', async () => {
+    const unreadBlind = decide(await trailOfEvents(RESTING), [[PR1, statusOf.unreadable()]], { stopAt: 'pr', runnerReady: true });
     assert.equal(unreadBlind.refuses, 'blind-read-missing', 'the gate still holds');
-    const unreadRead = closeOutDecision({ openFindings: FINDINGS_NONE, trail: readTrail([summary(1), review(2), read(3, PR1)]), prStatuses: new Map([[PR1, statusOf.unreadable()]]), stopAt: 'pr', runnerReady: true });
+    const unreadRead = decide(await trailOfEvents(READ), [[PR1, statusOf.unreadable()]], { stopAt: 'pr', runnerReady: true });
     assert.equal(unreadRead.refuses, null, 'a read on record, the unreadable PR alone refuses nothing');
     assert.equal(unreadRead.status, CLOSE_OUT_STATUS.UNKNOWN);
   });
 
-  test('Harbour never sets Done, even on a merged, approved landing with nothing else open', () => {
-    const decision = closeOutDecision({ openFindings: FINDINGS_NONE, trail: readTrail([summary(1), review(2), read(3, PR1)]), prStatuses: new Map([[PR1, statusOf.merged(PR1)]]), actor: CLOSE_OUT_ACTOR.HARBOUR });
+  test('Harbour never sets Done, even on a merged, approved landing with nothing else open', async () => {
+    const decision = decide(await trailOfEvents(READ), [[PR1, statusOf.merged(PR1)]], { actor: CLOSE_OUT_ACTOR.HARBOUR });
     assert.equal(decision.setDone, false);
     assert.equal(decision.status, CLOSE_OUT_STATUS.MERGED);
   });
 
-  test('the empty-landing witness: no PR on the landing is no merged evidence, so no merge, no Done and no stand-aside', () => {
-    const trail = readTrail([c(1, 'Implementation done, CI green.'), review(2, 'Approve', 'the change')]);
+  test('the empty-landing witness: no PR on the landing is no merged evidence, so no merge, no Done and no stand-aside', async () => {
+    const trail = await trailOfEvents([]);
     assert.deepEqual(trail.landing, [], 'the landing is empty');
-    const decision = closeOutDecision({ openFindings: FINDINGS_NONE, trail, prStatuses: new Map(), actor: CLOSE_OUT_ACTOR.PERSON });
+    const decision = decide(trail, [], { actor: CLOSE_OUT_ACTOR.PERSON });
     assert.equal(decision.status, CLOSE_OUT_STATUS.NO_PR);
     assert.equal(decision.setDone, false);
     assert.equal(decision.followsPerson, null, 'an empty landing is not merged');
     assert.equal(decision.refuses, null);
   });
 
-  test('a ticket\'s state never reaches enforcement: Done, Canceled and In Progress answer the same for refuses and setDone', () => {
-    const trail = readTrail([summary(1), review(2)]);
-    const base = closeOutDecision({ openFindings: FINDINGS_NONE, trail, prStatuses: new Map([[PR1, statusOf.open(PR1)]]), stopAt: 'pr', runnerReady: true, actor: CLOSE_OUT_ACTOR.PERSON });
+  test('a ticket\'s state never reaches enforcement: Done, Canceled and In Progress answer the same for refuses and setDone', async () => {
+    const trail = await trailOfEvents(RESTING);
+    const statuses = [[PR1, statusOf.open(PR1)]];
+    const base = decide(trail, statuses, { stopAt: 'pr', runnerReady: true, actor: CLOSE_OUT_ACTOR.PERSON });
     for (const ticketState of ['completed', 'canceled', 'started', null]) {
-      const d = closeOutDecision({ openFindings: FINDINGS_NONE, trail, prStatuses: new Map([[PR1, statusOf.open(PR1)]]), stopAt: 'pr', runnerReady: true, actor: CLOSE_OUT_ACTOR.PERSON, ticketState });
+      const d = decide(trail, statuses, { stopAt: 'pr', runnerReady: true, actor: CLOSE_OUT_ACTOR.PERSON, ticketState });
       assert.equal(d.refuses, base.refuses, `refuses, ${ticketState}`);
       assert.equal(d.setDone, base.setDone, `setDone, ${ticketState}`);
       assert.equal(d.waitsOn, base.waitsOn, `waitsOn, ${ticketState}`);
     }
   });
 
-  test('a landing PR cited outside the landing is not read by the decision (LIN-4458: the landing decides)', () => {
-    const trail = readTrail([summary(1), review(2), read(3, PR1)]);
-    const d = closeOutDecision({ openFindings: FINDINGS_NONE, trail, prStatuses: new Map([[PR1, statusOf.merged(PR1)], [PR2, statusOf.open(PR2)]]), actor: CLOSE_OUT_ACTOR.PERSON });
+  test('a landing PR cited outside the landing is not read by the decision (LIN-4458: the landing decides)', async () => {
+    const trail = await trailOfEvents(READ);
+    const d = decide(trail, [[PR1, statusOf.merged(PR1)], [PR2, statusOf.open(PR2)]], { actor: CLOSE_OUT_ACTOR.PERSON });
     assert.equal(d.setDone, true, 'an open PR2 outside the landing does not withhold Done');
   });
 
@@ -340,26 +339,26 @@ describe('the decision\'s rules, one per named case', () => {
 });
 
 describe('the recommendation\'s read: the decision\'s advice answer (LIN-4460, row 196 and the audit-after-Done case)', () => {
-  const approved = [summary(1), review(2)];
-  const doneNoClose = { name: 'Done, no close-out on the landing, no audit notes PR (row 196, first half, flipped)', state: DONE, comments: approved, route: false };
-  const doneClosed = { name: 'Done, a close-out after the review (row 196, second half, unchanged)', state: DONE, comments: [summary(1), review(2), closeOut(3, `Merged ${PR1}; set Done.`)], route: false };
-  const doneAudit = { name: 'Done, then an audit\'s notes PR and its review: still read (added)', state: DONE, comments: [summary(1), review(2), closeOut(3, `Merged ${PR1}; set Done.`), audit(4), review(5, 'Approve', PR2)], route: true };
-  const canceled = { name: 'Canceled', state: CANCELED, comments: approved, route: false };
-  const started = { name: 'In Progress, approved, unread', state: STARTED, comments: approved, route: true };
+  const AUDITED = [evPr(1), evReview(2), evClose(3), ev.merged(3, PR1), evAudit(4, PR2), evReview(5, 'approve', PR2)];
+  const doneNoClose = { name: 'Done, no close-out on the landing, no audit notes PR (row 196, first half, flipped)', state: DONE, events: RESTING, route: false };
+  const doneClosed = { name: 'Done, a close-out after the review (row 196, second half, unchanged)', state: DONE, events: [evPr(1), evReview(2), evClose(3), ev.merged(3, PR1)], route: false };
+  const doneAudit = { name: 'Done, then an audit\'s notes PR and its review: still read (added)', state: DONE, events: AUDITED, route: true };
+  const canceled = { name: 'Canceled', state: CANCELED, events: RESTING, route: false };
+  const started = { name: 'In Progress, approved, unread', state: STARTED, events: RESTING, route: true };
 
   for (const row of [doneNoClose, doneClosed, doneAudit, canceled, started]) {
-    test(`${row.name}: routesRead is ${row.route}`, () => {
-      const step = blindReadStep({ state: row.state }, { comments: row.comments, allRuns: [] });
+    test(`${row.name}: routesRead is ${row.route}`, async () => {
+      const step = blindReadStep({ state: row.state }, { trail: await trailOfEvents(row.events), allRuns: [] });
       assert.equal(step !== null, row.route);
     });
   }
 
-  test('ticket unknown routes like In Progress, with no passenger loosening (review F2b)', () => {
-    assert.notEqual(blindReadStep({}, { comments: approved, allRuns: [] }), null);
+  test('ticket unknown routes like In Progress, with no passenger loosening (review F2b)', async () => {
+    assert.notEqual(blindReadStep({}, { trail: await trailOfEvents(RESTING), allRuns: [] }), null);
   });
 
   test('Done alone does not stand the enforcement gate aside: an approved, unmerged, unread landing is still refused (both lanes)', async () => {
-    const got = await surfaces([evPr(1), evReview(2)], { issue: DONE });
+    const got = await surfaces(RESTING, { issue: DONE });
     assert.equal(refusedOn(got.stopAtGuard), 'blind-read-missing');
     assert.equal(refusedOn(got.ladderGuard), 'blind-read-missing');
     assert.equal(got.routesRead, false, 'the recommendation stands aside, the enforcement still holds');
@@ -368,9 +367,9 @@ describe('the recommendation\'s read: the decision\'s advice answer (LIN-4460, r
   test('lin4447-recommend-path-outside-merge: an outside merge on a ticket still In Progress still routes the read (John\'s accepted limit, 13 Nov)', async () => {
     // The PR is merged outside Harbour. The recommend path reads no PR and the ladder lane reads none (John:
     // "Accept: no new GitHub reads on the recommend path or ladder lane; add the fact later if a stuck case shows up").
-    const step = blindReadStep({ state: STARTED }, { comments: approved, allRuns: [] });
+    const step = blindReadStep({ state: STARTED }, { trail: await trailOfEvents(RESTING), allRuns: [] });
     assert.equal(step?.step, 'blind-read', 'the read is routed');
-    const ladder = await surfaces([evPr(1), evReview(2)], { issue: STARTED, merged: [41] });
+    const ladder = await surfaces(RESTING, { issue: STARTED, merged: [41] });
     assert.equal(refusedOn(ladder.ladderGuard), 'blind-read-missing', 'the ladder lane still refuses');
     // A stop-at lane that reads the PR does see the merge and stands aside: the limit is the recommend path and ladder only.
     assert.equal(ladder.stopAtGuard, null, 'the stop-at lane, which reads the landing, stands aside');

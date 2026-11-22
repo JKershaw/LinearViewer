@@ -66,7 +66,6 @@ export { CENSUS_ROOTS, EXCLUDED_PREFIXES };
 export const ALLOW = Object.freeze({
   'lib/prompts/leftover-words.js': 'the history header that says what the cutover retired (`Retires:`, the answer\'s guard)',
   'scripts/prompt-template-change-log.md': 'the change log: each row names what it retired, so the words are the record itself',
-  'tests/fixtures/run-ledger-trails.js': 'pre-cutover review comments, kept as the legacy-hold fixture: the ledger items as the comment wrote them, read as text',
 });
 
 /** The census's file list: the text under CENSUS_ROOTS, minus the excluded prefixes (the scan's whole input). */

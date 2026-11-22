@@ -43,20 +43,19 @@ Area notes for `runs-and-dispatch` in the registry. Format and rules: README.md.
 - A task timeline lane is running from the page's open session ids (`isOpenState`), never the
   cost row; a lineage's own `incomplete`, not the shared `lineagesTruncated`, decides "not
   complete" (LIN-4405, `lib/task-timeline.js`).
-- A close-out test passes a `closeOut` seam (`resolveProvider`): the guard reads comments (LIN-4438),
-  and without it fails open on the real provider. An E2E spec reading findings seeds the ticket's task
-  (`/test/seed-ticket-task`, LIN-4527).
+- A close-out test seeds the ticket's records (`tests/helpers/records-scenario.js`): the guard reads the records
+  trail, not comments (LIN-4520). An E2E spec reading findings seeds the ticket's task (`/test/seed-ticket-task`, LIN-4527).
 - Close-out readiness is one decision, `closeOutDecision` (`lib/run-closeout-state.js`, LIN-4460): every surface
   renders or enforces its answer. A new reason is a row of `CLOSE_OUT_REASONS` plus a row in
   `lin-4438-blind-read-gate` and `lin-4460-close-out-decision`, whose census reads code, not comments.
 - When a person acts, Harbour follows (LIN-4447): an all-merged landing stands the refusals aside, not Done:
   the check sets Done only on a findings read of zero (LIN-4527); a Done ticket with no close-out stands only the
   read aside. Harbour never sets Done.
-- What a comment is, and which PRs are the task's, are read once in `lib/run-trail.js`: a comment kind
-  is a row of `COMMENT_KINDS` (`lin-4458-comment-kind-census` fails on a kind test elsewhere), and the
-  box, the guard, the owner's check and the merge take their PRs from `readTrail().landing`, statuses
-  keyed by PR URL: the cited list (newest first) and the landing (oldest first) order PRs differently,
-  so a shared index points at the wrong PR (LIN-4458).
+- Verdicts, changes and the landing are records (LIN-4520): read them from the records (`landingOfTicket`,
+  `lib/records/landing.js`), never a comment; `lib/run-trail.js` keeps only the authorship text rule. To retire an
+  export, grep every tree for its name: a `docs/papers` script and a hand-built prompt context still reached the
+  retired readers; only CI caught them. Key PR statuses by PR URL, never by index: the
+  cited list and the landing order PRs differently (LIN-4458).
 - A reader that classifies by kind routes `custom` before `bucketOf`: `BUCKET_OF_KIND` maps
   `custom` to orchestration, and `bucketOf` falls back to orchestration silently, so check membership
   (`lib/wall-clock-summary.js`). `dispatchesOf` turns a missing kind into `custom` (`lib/cost-read.js`):
@@ -64,7 +63,7 @@ Area notes for `runs-and-dispatch` in the registry. Format and rules: README.md.
 - A full PR URL's repository and number come from `prOf` beside `prUrlsIn` (`lib/run-ledger.js`),
   for the task page and measure 1 alike; compare repositories case-blind, as GitHub does (LIN-4439).
 - A per-dispatch figure (its model, cost or completeness) is the fold's answer, carried through
-  `lib/cost-read.js`; a reader never re-ranks `byModel` itself. (Drift & Coherence Review, 13 Nov.)
+  `lib/cost-read.js`; a reader never re-ranks `byModel` itself (D&C Review, 13 Nov).
 - The Harbour calls read is `lib/cost-read-calls.js` (LIN-4457): `readCalls`, `appCallsOf` and
   `callsSurfaceOf` are pure over docs their caller keys to one workspace (`listInHorizon(urlKey)`). The
   instance-wide boundary is the `urlKey` / `instanceWide` guard on `lineageRecords` and `readCost`

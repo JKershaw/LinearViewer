@@ -41,6 +41,13 @@ const ASKED = quoteAsked('Make the export button download a CSV.');
 // LIN-4518 (finding-527b8237): the loop's facts are records-built: `ROUNDS(3, 2, 1)` is three plan-review verdicts on
 // record, each with that many `to: plan` findings in its own run (tests/helpers/plan-review-loop.js).
 const ROUNDS = (...counts) => counts.map((n, i) => planRound(T(i + 1), 'request-changes', n));
+// LIN-4520: the review and the landing are the records trail (lib/task-standing.js trailForTicket's shape): an approving
+// review at `n` of the PR, with no blind read on record yet.
+const approvedTrail = (n = 2) => ({
+  review: { verdict: 'approve', at: T(n), sha: REVIEWED, heads: { [PR1]: REVIEWED }, commentId: 'review-1', blindRead: null, staleUrls: [] },
+  landing: [PR1], workAfterReview: false, closeOutAfterReview: false, closeOutOnTrail: false,
+  landingHasNotesPr: false, notesPrs: [], auditAfterCloseOut: false,
+});
 
 const entry = (name) => {
   const found = CODE_ROUTES.find(r => r.name === name);
@@ -89,12 +96,13 @@ describe('CODE_ROUTES: each route fires on its fixture and records a declared tr
 
   test('blind-read fires (send) and blocked (two ended reads, no verdict), both declared', () => {
     const issue = { identifier: 'T-1', state: STARTED, description: '' };
-    const comments = [c(1, `Implementation done: ${PR1}, CI green.`), c(2, `## Code Review\n\nReviewed head \`${REVIEWED}\` of ${PR1}.\n\n### What CI Did Not Prove\n| # | Claim | In/Out | Discharge |\n| --- | --- | --- | --- |\n| 1 | one claim | In | a repro |\n\n**Verdict: Approve**`)];
-    const sent = entry('blind-read').route(issue, { comments, allRuns: [] });
+    // LIN-4520: the approving review on the PR, and the landing, are the records trail; no comment is read.
+    const trail = approvedTrail();
+    const sent = entry('blind-read').route(issue, { trail, allRuns: [] });
     assert.equal(sent?.codeRoute, 'blind-read');
     assert.ok(entry('blind-read').emits.includes('blind-read'));
     const bounded = entry('blind-read').route(issue, {
-      comments, allRuns: [run('blind-read', 3, 'done'), run('blind-read', 4, 'failed')]
+      trail, allRuns: [run('blind-read', 3, 'done'), run('blind-read', 4, 'failed')]
     });
     assert.equal(bounded?.codeRoute, 'blocked');
     assert.ok(entry('blind-read').emits.includes('blocked'));

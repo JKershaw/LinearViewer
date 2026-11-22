@@ -7,7 +7,7 @@
  */
 import { readdirSync, readFileSync, writeFileSync, mkdirSync } from 'node:fs';
 import { join } from 'node:path';
-import { assemblePlanReviewFacts } from '../../../../lib/recommendation-facts.js';
+import { countPlanReviewVerdicts } from './frozen-plan-review-counter.mjs';
 import { carveChild, classifyRefactor } from './classify.mjs';
 
 const [cacheDir, censusPath, sizesPath, outDir, nextMovesPath] = process.argv.slice(2);
@@ -223,7 +223,7 @@ function generatorOf(row) {
       const h = (c.body || '').split('\n').find(l => l.trim()) || '';
       if (!/^[#\s*]*Plan Review Verdict\b/i.test(h)) continue;
       heads++;
-      if (assemblePlanReviewFacts([{ body: c.body, createdAt: c.createdAt }]).verdicts === 0) {
+      if (countPlanReviewVerdicts([{ body: c.body, createdAt: c.createdAt }]).verdicts === 0) {
         misses++;
         missed.push(`${r.issue.identifier} ${c.createdAt.slice(0, 16)}`);
       }

@@ -237,9 +237,13 @@ describe('a revision the selector can see (request-changes, revise to v2, review
     const t = await task('LIN-50');
     const p = await plan(t.id, 'implementation', { at: undefined });
     await finding(p.id, 'open');
-    const verdict = { user: 'Reviewer', createdAt: '2026-11-20T12:00:00.000Z', body: '### Plan Review Verdict\n\n**Verdict:** Request Changes.\n\nBlocking findings: 1' };
+    // LIN-4520: the verdict is a plan-review run on records (its verdict on the plan, and one blocking finding to plan in
+    // the same run), not a comment. The selector reads the run from the store.
+    const RUN = 'run-plan-review-1';
+    await store.add(URL_KEY, { kind: 'verdict', state: 'stands', in: t.id, fields: { judgement: 'plan-review', outcome: 'request-changes', reasoning: 'plan review' }, links: { on: [`${p.id}@${p.v}`] } }, { by: 'plan-review', run: RUN, at: '2026-11-20T12:00:00.000Z' });
+    await store.add(URL_KEY, { kind: 'finding', state: 'open', in: t.id, to: 'plan', links: { about: [p.id] }, fields: { says: 'blocking finding 1', how: 'the check that settles it' } }, { by: 'plan-review', run: RUN, at: '2026-11-20T12:00:00.000Z' });
     const issue = { identifier: 'LIN-50', title: 'x', description: 'Goal.', state: { name: 'Todo', type: 'unstarted' }, labels: [] };
-    const factsOf = async () => buildSelectorArgs(issue, { comments: [verdict], children: [], planFacts: (await store.planFactsForTickets(URL_KEY, ['LIN-50'])).get('LIN-50') }).facts;
+    const factsOf = async () => buildSelectorArgs(issue, { comments: [], children: [], planReviewRun: await store.planReviewRunForTicket(URL_KEY, 'LIN-50'), planFacts: (await store.planFactsForTickets(URL_KEY, ['LIN-50'])).get('LIN-50') }).facts;
 
     const before = await factsOf();
     await store.revise(URL_KEY, p.id, { fields: { says: 'revised plan' } }, { by: 'plan', reason: 'answers the verdict', at: '2026-11-20T13:00:00.000Z' });

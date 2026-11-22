@@ -5,8 +5,10 @@ Read at the working tree in `/home/user/LinearViewer` on 2026-10-03 (no git chec
 > **Superseded in part by LIN-4527 (2026-11-21).** The ledger this analysis describes is retired: review records each
 > claim as a finding to close-out (`to: close-out`, LIN-4495), the gate reads open findings from records, and a ticket with no
 > task record reads as not read, never as none open. Where a passage below reads the `### What CI Did Not Prove` section,
-> its parser, its item counts or its empty-section rule, that is history; `lib/run-ledger.js` keeps only the Slice 3 tooling's
-> reading (`legacyLedgerOf`). The templates and `lib/close-out-findings.js` are current.
+> its parser, its item counts or its empty-section rule, that is history; the ledger reading in `lib/run-ledger.js` is retired too (LIN-4520).
+> The templates and `lib/close-out-findings.js` are current.
+
+> **Superseded in part by LIN-4520 (2026-11-22).** Verdicts, changes, the review, the blind read's verdict and the landing are records: no comment is read to find a verdict or the commit it judged (the contract is in `docs/proxy-integration.md`, Records). Every passage below that reads a `## Review —` or `### Verdict` comment, the `COMMENT_KINDS` rows, the verdict-word and ledger parsers, `findSha`, or the review's comment template is history, and so are the file:line citations to them.
 >
 > **Superseded in part by LIN-3326 (2026-10-06).** Close-out has no authoring bound now: it makes the
 > fixes review asked for itself, however many files they touch, as long as they stay the size of

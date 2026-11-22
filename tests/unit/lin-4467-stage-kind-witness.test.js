@@ -11,15 +11,15 @@ import assert from 'node:assert/strict';
 import { readFileSync } from 'node:fs';
 import { fileURLToPath } from 'node:url';
 import { captureWitness, MODES } from '../fixtures/lin-4467-witness.js';
-import { isRequestChangesRound } from '../../lib/prompts/revision-brief.js';
+import { isRequestChangesRound } from '../../lib/prompts/fix-round.js';
 
 const expected = JSON.parse(readFileSync(fileURLToPath(new URL('../fixtures/lin-4467-witness.json', import.meta.url)), 'utf8'));
 const actual = await captureWitness();
 
 describe('LIN-4467 — the witness context is real: a fix round is a fix round, a fresh start is not', () => {
   test('the fix context reads as a request-changes round; the fresh context does not', () => {
-    assert.equal(isRequestChangesRound(MODES.fix.comments), true);
-    assert.equal(isRequestChangesRound(MODES.fresh.comments), false);
+    assert.equal(isRequestChangesRound(MODES.fix.reviewRound), true);
+    assert.equal(isRequestChangesRound(MODES.fresh.reviewRound), false);
   });
 });
 

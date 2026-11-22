@@ -41,18 +41,15 @@
  *
  * ── THE READ PLAN ────────────────────────────────────────────────────────────
  * Per issue in the workspace:
- *   1. `GET /issues/{id}`                          — comments (tier A verdict)
- *   (and once: `GET /records?kind=task|plan|finding&to=plan-review` — the plan facts gateDue reads, LIN-4504)
+ *   1. `GET /issues/{id}`                          — identifier and state (the scope and the cache key)
+ *   (and once: `GET /records?kind=task|plan|finding&to=plan-review` — the plan facts gateDue reads, LIN-4504;
+ *    and the verdict records the gate verdicts read, LIN-4519 — lib/records/verdict-facts.js)
  *   2. `GET /dispatch?issueIdentifier={id}&limit=…` — the H12-guarded SCOPED pipeline read (never
  *                                                      the unscoped list endpoint — LIN-1030)
- *   3. `GET /dispatch/{rowId}` per `plan-review`-kind row from (2) — feedback, for the tier B
- *      `DONE:` line
- * Steps 1 and 2 are one call each per issue; step 3 is one call per plan-review
- * row (roughly 1-2 per issue at the measured baseline shape). `--no-cache`
- * forces a full re-read for a pristine baseline (Session 2's posture); the
- * default run caches TERMINAL issues only, mirroring `follow-on-ratio.mjs`'s
- * cache-honesty note (a terminal issue can still accrue a new plan-review
- * comment, so a cached read can miss a late-posted verdict).
+ * Step 1 and step 2 are one call each per issue. The comment trail and the per-row DONE feedback are not read
+ * (LIN-4520): no verdict comes from text. `--no-cache` forces a full re-read for a pristine baseline (Session 2's
+ * posture); the default run caches TERMINAL issues only. A cached issue cannot hide a late verdict, because the verdict
+ * records are read on every run and never cached.
  */
 
 import { mkdirSync, readFileSync, writeFileSync, existsSync } from 'node:fs';
@@ -73,7 +70,7 @@ const REPO_ROOT = join(dirname(fileURLToPath(import.meta.url)), '..');
 const TERMINAL_STATES = ['completed', 'canceled', 'duplicate'];
 
 const USAGE = `usage: PROXY_TOKEN=xxx node scripts/plan-review-round-trips.mjs \\
-         [--json] [--no-cache] [--ruler-change-at <ISO>] [--window-days <n>] [--verdicts records|comments]
+         [--json] [--no-cache] [--ruler-change-at <ISO>] [--window-days <n>]
        [--base <url>] [--token <tok>] [--cache <dir>] [--limit <n>]`;
 
 function parseArgs(argv) {
@@ -85,9 +82,6 @@ function parseArgs(argv) {
     limit: 250,
     rulerChangeAt: null,
     windowDays: null,
-    // LIN-4519: verdicts come from records (the default). `comments` is the historic reproduction only: the comment
-    // trail the committed slice-3 readings were taken from, until P7 (LIN-4520) retires that reader.
-    verdicts: 'records',
   };
   for (let i = 0; i < argv.length; i++) {
     const v = argv[i];
@@ -100,9 +94,8 @@ function parseArgs(argv) {
     else if (v === '--limit') a.limit = parseInt(argv[++i], 10) || 250;
     else if (v === '--ruler-change-at') a.rulerChangeAt = argv[++i];
     else if (v === '--window-days') a.windowDays = parseInt(argv[++i], 10) || null;
-    else if (v === '--verdicts') a.verdicts = argv[++i];
+    else if (v === '--verdicts') throw new Error('--verdicts is retired (LIN-4520): verdicts are read from records only');
   }
-  if (!['records', 'comments'].includes(a.verdicts)) throw new Error(`--verdicts must be records or comments (got ${JSON.stringify(a.verdicts)})`);
   return a;
 }
 
@@ -209,11 +202,9 @@ async function listAllIssues({ base, token, limit }) {
 }
 
 /**
- * The full per-issue shape this instrument needs: description + comments
- * (`GET /issues/{id}`), then the SCOPED pipeline read
- * (`GET /dispatch?issueIdentifier=…` — never the unscoped list endpoint, the
- * LIN-1030 H12 guard), then one detail fetch per `plan-review`-kind row for
- * its `DONE:` feedback line.
+ * The per-issue shape this instrument needs: the issue (`GET /issues/{id}`: identifier and state), then the SCOPED
+ * pipeline read (`GET /dispatch?issueIdentifier=…` — never the unscoped list endpoint, the LIN-1030 H12 guard). The
+ * comment trail and per-row feedback are not read (LIN-4520): verdicts come from records.
  */
 async function fetchIssuePlanReviewShape(row, { base, token, cache, noCache }, counters) {
   const terminal = TERMINAL_STATES.includes(row.state?.type);
@@ -234,8 +225,8 @@ async function fetchIssuePlanReviewShape(row, { base, token, cache, noCache }, c
 
   // Failures below are retryable-only (getJson now throws non-retryable ones
   // straight through — LIN-1984), so a `null` here is a transient miss. It
-  // must still be counted rather than silently read as "no rows" / "no
-  // feedback" — that was the two previously-invisible skip sites.
+  // must still be counted rather than silently read as "no rows" — that was
+  // a previously-invisible skip site.
   const shapeSkips = [];
 
   const scopeIdentifier = detail.identifier || row.identifier;
@@ -253,29 +244,14 @@ async function fetchIssuePlanReviewShape(row, { base, token, cache, noCache }, c
   }
   const items = Array.isArray(dispatchList?.items) ? dispatchList.items : [];
 
-  const rows = [];
-  for (const item of items) {
-    if (item.kind !== 'plan-review') {
-      rows.push({ id: item.id, kind: item.kind, status: item.status, dispatchedAt: item.dispatchedAt, completedAt: item.completedAt });
-      continue;
-    }
-    const rowDetail = await getJson(`${base}/dispatch/${item.id}`, token, { tolerate: true });
-    counters.fetched++;
-    await sleep(1100);
-    if (rowDetail === null) {
-      shapeSkips.push({ id: item.id, identifier: detail.identifier, reason: 'plan-review row detail fetch failed after retries' });
-    }
-    rows.push({
-      id: item.id, kind: item.kind, status: item.status,
-      dispatchedAt: item.dispatchedAt, completedAt: item.completedAt,
-      feedback: Array.isArray(rowDetail?.feedback) ? rowDetail.feedback : [],
-    });
-  }
+  const rows = items.map((item) => ({
+    id: item.id, kind: item.kind, status: item.status,
+    dispatchedAt: item.dispatchedAt, completedAt: item.completedAt,
+  }));
 
   const shaped = {
     id: detail.id, identifier: detail.identifier,
     description: detail.description || '',
-    comments: Array.isArray(detail.comments) ? detail.comments : [],
     rows,
     skipped: shapeSkips,
   };
@@ -411,23 +387,19 @@ async function main() {
   const { rows } = await listAllIssues(args);
   log(`  ${rows.length} issues listed`);
 
-  log('per-issue read: detail + scoped dispatch pipeline + plan-review row detail…');
+  log('per-issue read: detail + scoped dispatch pipeline…');
   const { issues, skipped, calls } = await fetchAll(rows, args);
 
   const tickets = issues.map((i) => i.identifier).filter(Boolean);
   log('reading plan records through the proxy (three reads)…');
   const planFacts = await readPlanFactsThroughProxy({ base: args.base, token: args.token, getJson, tickets });
-  let verdictFacts = null;
-  if (args.verdicts === 'records') {
-    log('reading verdict records through the proxy (reads by kind, then first writes)…');
-    verdictFacts = (await readVerdictFactsThroughProxy({ base: args.base, token: args.token, getJson, tickets })).facts;
-  }
+  log('reading verdict records through the proxy (reads by kind, then first writes)…');
+  const verdictFacts = (await readVerdictFactsThroughProxy({ base: args.base, token: args.token, getJson, tickets })).facts;
 
   const asOf = iso(Date.now());
   const result = computePlanReviewRoundTrips(issues, {
     asOf,
     planFacts,
-    verdictSource: args.verdicts,
     verdictFacts,
     rulerChangeAt: args.rulerChangeAt || undefined,
     windowDays: args.windowDays || undefined,

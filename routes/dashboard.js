@@ -49,7 +49,7 @@ import { buildRunView } from '../lib/run-view.js';
 import { requireRequestUsageLoader } from '../lib/request-usage-loader.js';
 import { pointReadSession as pointReadSessionFor, readSessionById } from '../lib/dispatch-session-read.js';
 import { resolveIssueBinding } from '../lib/workspace.js';
-import { readRunEvidence, buildRunEvidence } from '../lib/run-evidence.js';
+import { readRunEvidence, extractPrUrls } from '../lib/run-evidence.js';
 import { createPrStateStore, resolveRunPrRef } from '../lib/pr-state-store.js';
 import { resolvePrReadToken } from '../lib/github-pr-status.js';
 import { prStateCopy } from '../lib/pr-state-copy.js';
@@ -522,14 +522,10 @@ export function createDashboardRoutes(deps) {
       }
       const { provider, callScope } = prStateSeams.resolveProvider(workspace, null);
       const comments = await provider.fetchIssueComments(callScope, run.issueIdentifier);
-      // Through LIN-2949's run-evidence model, not a new parser.
-      const model = buildRunEvidence({
-        issueIdentifier: run.issueIdentifier,
-        comments,
-        evidenceUrls: run.evidenceUrls || [],
-        prStatus: null
-      });
-      const { status, ref } = resolveRunPrRef(model);
+      // LIN-4520 (finding-27957095): the picker chooses among the PRs the comments cite (the page's links, for display). It
+      // reads no verdict and no landing, so it reads no records trail and builds no evidence model: resolveRunPrRef takes
+      // only the cited URLs, which extractPrUrls (LIN-2949's reader of them) already gives.
+      const { status, ref } = resolveRunPrRef({ state: { prUrls: extractPrUrls(comments, run.evidenceUrls || []) } });
       if (status !== 'one') {
         // zero PRs -> "none"; several -> withhold (never pick one silently)
         const state = status === 'none' ? 'none' : 'unknown';

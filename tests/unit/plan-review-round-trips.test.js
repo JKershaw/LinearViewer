@@ -5,10 +5,15 @@
  * number LIN-1871's template fix is judged against. `scripts/plan-review-
  * round-trips.mjs` owns the network read; nothing here touches it.
  *
+ * LIN-4520 (slice 3 P7): verdicts are records. The comment trail and the DONE-line
+ * text tier are retired, so these fixtures carry verdict records (lib/records/verdict-facts.js
+ * shape) where they used to carry a `DONE: Verdict:` line or a verdict comment. The
+ * records-mode cutover and the verdict-record witnesses live in
+ * tests/unit/lin-4519-round-trips-records.test.js.
+ *
  * Several fixtures below are modeled directly on the real record cited by
  * LIN-1883's Implementation Plan (v3) and its approving plan-review verdict
- * (`b44b782f`) — the five extraction surface forms, the LIN-1714-shaped
- * directional-bias regression, and the LIN-1408 abort-skip sequence
+ * (`b44b782f`) — the LIN-1408 abort-skip sequence
  * (`plan-review(50960260, aborted) → plan → plan-review(70eac018, done)`,
  * independently confirmed live against the real dispatch record while writing
  * this suite).
@@ -19,41 +24,54 @@ import {
   computeIssueRoundTrips as computeIssueRoundTripsOf, computePlanReviewRoundTrips as computePlanReviewRoundTripsOf,
   derivePrimaryFloor, MIN_DENOMINATOR, __internal,
 } from '../../lib/plan-review-round-trips.js';
-
-// LIN-4519: this file pins the COMMENTS reading (the historic reproduction: tiers A and B read the comment trail). The
-// default is records now, so every call here names the comments source; records are pinned in
-// tests/unit/lin-4519-round-trips-records.test.js.
-const computeIssueRoundTrips = (issue, options = {}) => computeIssueRoundTripsOf(issue, { verdictSource: 'comments', ...options });
-const computePlanReviewRoundTrips = (issues, options = {}) => computePlanReviewRoundTripsOf(issues, { verdictSource: 'comments', ...options });
-import { extractVerdict } from '../../lib/run-trail.js';
 import { __internal as followOnRatioInternal } from '../../lib/follow-on-ratio.js';
 import { planFactsOf } from '../../lib/records/plan-facts.js';
+import { VERDICT_JUDGEMENTS } from '../../lib/records/verdict-facts.js';
 
 const ASOF = '2026-08-09T12:00:00.000Z';
+// The fixtures are dated 2026-08, before the production verdict cutover (VERDICT_RECORDS_SINCE). Every call names an
+// earlier coverage instant, so the rows are measured; the cutover itself is pinned in lin-4519-round-trips-records.test.js.
+const COVERED = '2026-01-01T00:00:00.000Z';
+const computeIssueRoundTrips = (issue, options = {}) => computeIssueRoundTripsOf(issue, { verdictRecordsSince: COVERED, ...options });
+const computePlanReviewRoundTrips = (issues, options = {}) => computePlanReviewRoundTripsOf(issues, { verdictRecordsSince: COVERED, ...options });
 
 // ─── fixture builders ────────────────────────────────────────────────────────
 
-function row(id, kind, status, dispatchedAt, completedAt = null, feedback = undefined) {
-  const r = { id, kind, status, dispatchedAt, completedAt };
-  if (feedback !== undefined) r.feedback = feedback;
-  return r;
+function row(id, kind, status, dispatchedAt, completedAt = null) {
+  return { id, kind, status, dispatchedAt, completedAt };
 }
 
+// A verdict record as the walk reads it: the judgement, the outcome word (request-changes, needs-discussion, approve),
+// the instant it was written, and whether it stands or was withdrawn (lib/records/verdict-facts.js verdictViewOf).
+function verdict(id, outcome, at, { judgement = 'plan-review', state = 'stands' } = {}) {
+  return { id, judgement, outcome, at, state, in: 'task-1', on: [] };
+}
+
+// A comment (or DONE feedback) is text: the walk reads neither, which the pin tests below assert.
 function comment(id, body, createdAt) {
   return { id, body, createdAt };
 }
 
-function feedbackDone(message, timestamp) {
-  return [{ message, timestamp }];
+// Every issue carries its verdict facts as read (measured), so an issue with no records is "no verdict written", never
+// "not read". Pass `verdicts` for the records the issue has.
+function issue(id, { description = '', rows = [], planFacts, verdicts = [] } = {}) {
+  return {
+    id, identifier: `LIN-${id}`, description, rows,
+    verdictFacts: { measured: true, taskId: 'task-1', verdicts },
+    ...(planFacts ? { planFacts } : {}),
+  };
 }
 
-function issue(id, { description = '', comments = [], rows = [], planFacts } = {}) {
-  return { id, identifier: `LIN-${id}`, description, comments, rows, ...(planFacts ? { planFacts } : {}) };
+// One plan-review row that settles on a verdict record written inside it: the common aggregate fixture.
+function reviewedIssue(id, outcome) {
+  return issue(id, {
+    rows: [row('r1', 'plan-review', 'done', '2026-08-01T00:00:00.000Z', '2026-08-01T00:05:00.000Z')],
+    verdicts: [verdict(`v-${id}`, outcome, '2026-08-01T00:03:00.000Z')],
+  });
 }
 
 // LIN-4504: the gate is read from records: a plan-review finding about one of the issue's plans existed. The coverage
 // instant is passed per call (the module default, PLAN_RECORDS_SINCE, is null until the cutover commit sets it).
-const COVERED = '2026-01-01T00:00:00.000Z';
 const PLAN_REC = { id: 'plan-g', v: 1, kind: 'plan', state: 'kept', in: 'task-g', to: 'breakdown' };
 const ASKED = planFactsOf({ task: { id: 'task-g', kind: 'task' }, inside: [PLAN_REC], findings: [{ id: 'finding-g', kind: 'finding', state: 'done', to: 'plan-review', links: { about: ['plan-g'] } }] });
 const NOT_ASKED = planFactsOf({ task: { id: 'task-g', kind: 'task' }, inside: [{ ...PLAN_REC, to: 'implementation' }] });
@@ -68,8 +86,8 @@ const NOT_ASKED = planFactsOf({ task: { id: 'task-g', kind: 'task' }, inside: [{
 // rewriting the measured population. A stamped row keeps `status: 'taken'`
 // and therefore stays right-censored exactly as before.
 //
-// T19  pins NO_ATTEMPT_STATUSES (:152) — a stamped row must not fall into it.
-// T19b pins IN_FLIGHT_STATUSES (:159, read at :346) — the twelfth reader.
+// T19  pins NO_ATTEMPT_STATUSES — a stamped row must not fall into it.
+// T19b pins IN_FLIGHT_STATUSES — the twelfth reader.
 //
 // Note on reachability, stated rather than implied: `bookkeeping` is NOT on
 // the proxy wire this instrument reads from (both proxy dispatch surfaces
@@ -149,10 +167,10 @@ describe('T19/T19b — the LIN-1963 instrument is unchanged for a bookkeeping-st
       row('r1', 'plan-review', 'done', '2026-08-09T10:00:00.000Z', '2026-08-09T10:05:00.000Z'),
       row('r2', 'plan', 'done', '2026-08-09T11:00:00.000Z', '2026-08-09T11:05:00.000Z')
     ];
-    const comments = [comment('c1', '**Verdict: Request Changes** — see findings.', '2026-08-09T10:30:00.000Z')];
+    const verdicts = [verdict('v1', 'request-changes', '2026-08-09T10:30:00.000Z')];
 
-    const plain = issue('t19-settled', { description: 'plan-review due: yes', comments, rows });
-    const stamped = issue('t19-settled', { description: 'plan-review due: yes', comments, rows: rows.map(stamp) });
+    const plain = issue('t19-settled', { description: 'plan-review due: yes', verdicts, rows });
+    const stamped = issue('t19-settled', { description: 'plan-review due: yes', verdicts, rows: rows.map(stamp) });
 
     const before = computeIssueRoundTrips(plain, { asOf: ASOF });
     const after = computeIssueRoundTrips(stamped, { asOf: ASOF });
@@ -173,75 +191,6 @@ describe('T19/T19b — the LIN-1963 instrument is unchanged for a bookkeeping-st
   });
 });
 
-// ─── extractVerdict — the five measured surface forms (G1) ──────────────────
-
-describe('extractVerdict — surface forms', () => {
-  test('label+value bolded together: **Verdict: Request Changes**', () => {
-    assert.equal(extractVerdict('**Verdict: Request Changes** — hand back to plan.'), 'request changes');
-  });
-
-  test('bold value under a header, trailing period inside the bold', () => {
-    const text = '### Plan Review Verdict\n\n**Request Changes.** — the fold\'s structure is sound.';
-    assert.equal(extractVerdict(text), 'request changes');
-  });
-
-  test('heading form with a backtick value', () => {
-    const text = '### Verdict: `Request Changes`\n\nSee findings below.';
-    assert.equal(extractVerdict(text), 'request changes');
-  });
-
-  test('fenced code block, no bold at all', () => {
-    const text = 'Summary:\n```\nVerdict: Request Changes\n```\n';
-    assert.equal(extractVerdict(text), 'request changes');
-  });
-
-  test('DONE-line form: the value PRECEDES the word "verdict" (bidirectional window)', () => {
-    const text = 'DONE: Plan review complete and verified — Request Changes verdict posted as Linear comment `27deb244` (HTTP 201).';
-    assert.equal(extractVerdict(text), 'request changes');
-  });
-
-  test('a forward-only window would miss the value-precedes-label form', () => {
-    // Pin the reason the window is bidirectional, not forward-only: strip
-    // everything AFTER the anchor and confirm the token still resolves only
-    // because it is captured by the backward half of the window.
-    const text = 'Request Changes verdict';
-    assert.equal(extractVerdict(text), 'request changes');
-  });
-
-  test('no anchor at all → null, no unanchored fallback', () => {
-    assert.equal(extractVerdict('This plan looks solid and is approved on its merits.'), null);
-  });
-
-  test('empty/non-string input → null', () => {
-    assert.equal(extractVerdict(''), null);
-    assert.equal(extractVerdict(null), null);
-    assert.equal(extractVerdict(undefined), null);
-  });
-});
-
-// ─── G1 — directional-bias regression ────────────────────────────────────────
-
-describe('extractVerdict — directional-bias regression', () => {
-  test('remediation prose ("...is **approved** on its merits") with no nearby verdict anchor does not resolve, and a real verdict elsewhere still wins', () => {
-    const text = [
-      'Layer 1 is **approved** on its merits — none of them changes the **approved** mechanism.',
-      '',
-      'Elsewhere in this review:',
-      '',
-      '**Verdict: Request Changes** — see findings 1-3.',
-    ].join('\n');
-    assert.equal(extractVerdict(text), 'request changes');
-  });
-
-  test('"**Verdict: Approved**" does not resolve — \\bapprove\\b does not match "Approved" (trailing -d breaks the word boundary)', () => {
-    assert.equal(extractVerdict('**Verdict: Approved** — proceed.'), null);
-  });
-
-  test('"approves"/"approved" alone, anywhere, never resolves as a token', () => {
-    assert.equal(extractVerdict('The verdict here is that everyone approved this already.'), null);
-  });
-});
-
 // ─── computeIssueRoundTrips — R0 eligibility walk (G2) ───────────────────────
 
 describe('computeIssueRoundTrips — R0 eligibility (extraction-first, state-second)', () => {
@@ -250,17 +199,14 @@ describe('computeIssueRoundTrips — R0 eligibility (extraction-first, state-sec
     // plan-review(done, resolves) → plan → plan-review(done).
     const iss = issue('1408', {
       rows: [
-        row('50960260', 'plan-review', 'aborted', '2026-08-02T22:51:14.958Z', '2026-08-02T22:52:19.373Z',
-          feedbackDone('[aborted] Cancelled running session 414ca37c (EXECUTING).', '2026-08-02T22:52:19.373Z')),
+        row('50960260', 'plan-review', 'aborted', '2026-08-02T22:51:14.958Z', '2026-08-02T22:52:19.373Z'),
         row('8627353e', 'plan', 'done', '2026-08-02T22:52:05.863Z', '2026-08-02T22:59:39.348Z'),
-        row('70eac018', 'plan-review', 'done', '2026-08-02T23:00:48.086Z', '2026-08-02T23:08:05.046Z',
-          feedbackDone('DONE: Plan review complete and verified — Request Changes verdict posted as Linear comment `27deb244`.', '2026-08-02T23:08:03.775Z')),
+        row('70eac018', 'plan-review', 'done', '2026-08-02T23:00:48.086Z', '2026-08-02T23:08:05.046Z'),
         row('1acc202d', 'plan', 'done', '2026-08-02T23:08:53.500Z', '2026-08-02T23:21:10.596Z'),
         row('6faad2c8', 'plan-review', 'done', '2026-08-02T23:21:58.799Z', '2026-08-02T23:32:57.908Z'),
       ],
-      comments: [
-        comment('27deb244', '### Plan Review Verdict\n\n**Verdict: Request Changes** — hand back to `plan`.', '2026-08-02T23:07:40.360Z'),
-      ],
+      // The Request Changes verdict the session posted as comment 27deb244, now a verdict record.
+      verdicts: [verdict('27deb244', 'request-changes', '2026-08-02T23:07:40.360Z')],
     });
 
     const result = computeIssueRoundTrips(iss, { asOf: ASOF });
@@ -280,24 +226,24 @@ describe('computeIssueRoundTrips — R0 eligibility (extraction-first, state-sec
     // aborted row's nextRow is a `plan` row, so tier C WOULD resolve to
     // 'request changes' if this row's tally were counted — pinning that it
     // is not, since the row never settled anything (it was skipped, and R0
-    // settles two rows later on the DONE-line tier-B resolution instead).
+    // settles two rows later on its verdict record instead).
     const iss = issue('verdict-tier-skip', {
       rows: [
         row('aborted-row', 'plan-review', 'aborted', '2026-08-09T10:00:00.000Z', '2026-08-09T10:01:00.000Z'),
         row('next', 'plan', 'done', '2026-08-09T10:05:00.000Z', '2026-08-09T10:10:00.000Z'),
-        row('resolved-row', 'plan-review', 'done', '2026-08-09T10:15:00.000Z', '2026-08-09T10:20:00.000Z',
-          feedbackDone('DONE: Verdict: Approve.', '2026-08-09T10:20:00.000Z')),
+        row('resolved-row', 'plan-review', 'done', '2026-08-09T10:15:00.000Z', '2026-08-09T10:20:00.000Z'),
       ],
+      verdicts: [verdict('v-resolved', 'approve', '2026-08-09T10:18:00.000Z')],
     });
 
     const result = computeIssueRoundTrips(iss, { asOf: ASOF });
     assert.equal(result.diagnostics.noGenuineAttempt, 1);
     assert.equal(result.R0.row.id, 'resolved-row');
-    assert.deepEqual(result.verdictTier, { a: 0, b: 1, c: 0, none: 0 },
+    assert.deepEqual(result.verdictTier, { a: 1, b: 0, c: 0, none: 0 },
       'the skipped aborted row must not tally into tier c, even though its structural tier would have resolved');
 
     const agg = computePlanReviewRoundTrips([iss], { asOf: ASOF });
-    assert.deepEqual(agg.diagnostics.verdictTier, { a: 0, b: 1, c: 0, none: 0 },
+    assert.deepEqual(agg.diagnostics.verdictTier, { a: 1, b: 0, c: 0, none: 0 },
       'the aggregate total must also exclude the skipped row');
   });
 
@@ -369,10 +315,9 @@ describe('computeIssueRoundTrips — R0 eligibility (extraction-first, state-sec
     assert.equal(agg.primary.denominator, 0, 'right-censored rows stay out of the primary denominator');
   });
 
-  test('done row with no next row and no resolvable text falls to tier C, which is null with no next row → reachedButUnresolvedFirstPass', () => {
+  test('done row with no next row and no verdict record falls to tier C, which is null with no next row → reachedButUnresolvedFirstPass', () => {
     const iss = issue('unresolved', {
       rows: [row('r1', 'plan-review', 'done', '2026-08-09T10:00:00.000Z', '2026-08-09T10:05:00.000Z')],
-      comments: [],
     });
     const result = computeIssueRoundTrips(iss, { asOf: ASOF });
     assert.equal(result.R0.resolved, false);
@@ -383,7 +328,7 @@ describe('computeIssueRoundTrips — R0 eligibility (extraction-first, state-sec
     assert.equal(agg.primary.denominator, 0);
   });
 
-  test('done row with no resolvable text but a next `plan` row falls to tier C ⇒ "request changes"', () => {
+  test('done row with no verdict record but a next `plan` row falls to tier C ⇒ "request changes"', () => {
     const iss = issue('structural-rc', {
       rows: [
         row('r1', 'plan-review', 'done', '2026-08-09T10:00:00.000Z', '2026-08-09T10:05:00.000Z'),
@@ -396,7 +341,7 @@ describe('computeIssueRoundTrips — R0 eligibility (extraction-first, state-sec
     assert.equal(result.R0.resolved, true);
   });
 
-  test('done row with no resolvable text but a next non-plan row falls to tier C ⇒ "approve"', () => {
+  test('done row with no verdict record but a next non-plan row falls to tier C ⇒ "approve"', () => {
     const iss = issue('structural-approve', {
       rows: [
         row('r1', 'plan-review', 'done', '2026-08-09T10:00:00.000Z', '2026-08-09T10:05:00.000Z'),
@@ -406,6 +351,18 @@ describe('computeIssueRoundTrips — R0 eligibility (extraction-first, state-sec
     const result = computeIssueRoundTrips(iss, { asOf: ASOF });
     assert.equal(result.R0.tier, 'c');
     assert.equal(result.R0.verdict, 'approve');
+  });
+
+  test('a comment or a DONE line never settles a verdict: only the record does (LIN-4520)', () => {
+    const rows = [
+      { ...row('r1', 'plan-review', 'done', '2026-08-09T10:00:00.000Z', '2026-08-09T10:05:00.000Z'),
+        feedback: [{ message: 'DONE: Verdict: Approve.', timestamp: '2026-08-09T10:04:00.000Z' }] },
+      row('r2', 'plan', 'done', '2026-08-09T10:10:00.000Z', '2026-08-09T10:20:00.000Z'),
+    ];
+    const iss = { ...issue('text-unread', { rows }), comments: [comment('c1', '**Verdict: Approve** — ok.', '2026-08-09T10:02:00.000Z')] };
+    const result = computeIssueRoundTrips(iss, { asOf: ASOF });
+    assert.equal(result.R0.tier, 'c', 'no record: the structural tier, not the comment or the DONE line');
+    assert.equal(result.R0.verdict, 'request changes', 'the next row is a plan re-pass');
   });
 });
 
@@ -421,50 +378,62 @@ describe('computeIssueRoundTrips — required asOf', () => {
   });
 });
 
-// ─── verdict precedence (tier A > tier B), window bound, lineageBleed ────────
+// ─── the verdict record, the shared window bound, lineageBleed ───────────────
 
-describe('verdict tier precedence and the shared window bound', () => {
-  test('tier A (comment) wins over tier B (DONE-line) when they disagree', () => {
-    const iss = issue('precedence', {
-      rows: [
-        row('r1', 'plan-review', 'done', '2026-08-09T10:00:00.000Z', '2026-08-09T10:05:00.000Z',
-          feedbackDone('DONE: Verdict: Approve — proceed.', '2026-08-09T10:05:00.000Z')),
-      ],
-      comments: [
-        comment('c1', '**Verdict: Request Changes** — see findings.', '2026-08-09T10:02:00.000Z'),
-      ],
-    });
+describe('the verdict record and the shared window bound', () => {
+  test('a verdict record settles the row, and a DONE line that disagrees is not read', () => {
+    const iss = {
+      ...issue('precedence', {
+        rows: [
+          { ...row('r1', 'plan-review', 'done', '2026-08-09T10:00:00.000Z', '2026-08-09T10:05:00.000Z'),
+            feedback: [{ message: 'DONE: Verdict: Approve — proceed.', timestamp: '2026-08-09T10:05:00.000Z' }] },
+        ],
+        verdicts: [verdict('v1', 'request-changes', '2026-08-09T10:02:00.000Z')],
+      }),
+    };
     const result = computeIssueRoundTrips(iss, { asOf: ASOF });
     assert.equal(result.R0.tier, 'a');
     assert.equal(result.R0.verdict, 'request changes');
-    assert.equal(result.crossTierDisagreements.aVsB, 1);
+    assert.deepEqual(result.crossTierDisagreements, { aVsB: 0, aVsC: 0, bVsC: 0 },
+      'the text tier is not read, so no tier-b disagreement can be counted');
   });
 
-  test('most-recently-posted comment inside the window wins when more than one resolves', () => {
+  test('a record that disagrees with the structural tier is counted in aVsC', () => {
+    const iss = issue('avsc', {
+      rows: [
+        row('r1', 'plan-review', 'done', '2026-08-09T10:00:00.000Z', '2026-08-09T10:05:00.000Z'),
+        row('r2', 'implementation', 'done', '2026-08-09T10:10:00.000Z', '2026-08-09T10:20:00.000Z'),
+      ],
+      verdicts: [verdict('v1', 'request-changes', '2026-08-09T10:02:00.000Z')],
+    });
+    const result = computeIssueRoundTrips(iss, { asOf: ASOF });
+    assert.equal(result.R0.tier, 'a', 'the record wins over the structural tier, which would say approve');
+    assert.equal(result.crossTierDisagreements.aVsC, 1);
+  });
+
+  test('the latest verdict record inside the window wins when more than one is written there', () => {
     const iss = issue('most-recent', {
       rows: [
         row('r1', 'plan-review', 'done', '2026-08-09T10:00:00.000Z', '2026-08-09T10:30:00.000Z'),
       ],
-      comments: [
-        comment('c1', '**Verdict: Approve** — early, superseded.', '2026-08-09T10:05:00.000Z'),
-        comment('c2', '**Verdict: Request Changes** — later, wins.', '2026-08-09T10:15:00.000Z'),
+      verdicts: [
+        verdict('v1', 'approve', '2026-08-09T10:05:00.000Z'),
+        verdict('v2', 'request-changes', '2026-08-09T10:15:00.000Z'),
       ],
     });
     const result = computeIssueRoundTrips(iss, { asOf: ASOF });
     assert.equal(result.R0.verdict, 'request changes');
   });
 
-  test('windowStart = row-own dispatchedAt: a comment BEFORE the row dispatched does not count', () => {
+  test('windowStart = row-own dispatchedAt: a record BEFORE the row dispatched does not count', () => {
     const iss = issue('before-window', {
       rows: [
         row('r1', 'plan-review', 'done', '2026-08-09T10:00:00.000Z', '2026-08-09T10:30:00.000Z'),
       ],
-      comments: [
-        comment('c0', '**Verdict: Approve** — stale, from a PRIOR row.', '2026-08-09T09:00:00.000Z'),
-      ],
+      verdicts: [verdict('v0', 'approve', '2026-08-09T09:00:00.000Z')],
     });
     const result = computeIssueRoundTrips(iss, { asOf: ASOF });
-    assert.equal(result.R0.resolved, false, 'the out-of-window comment must not resolve tier A');
+    assert.equal(result.R0.resolved, false, 'the out-of-window record must not settle tier a');
   });
 
   test('windowEnd = next pipeline row dispatchedAt (any kind), not just the next plan-review row', () => {
@@ -473,13 +442,11 @@ describe('verdict tier precedence and the shared window bound', () => {
         row('r1', 'plan-review', 'done', '2026-08-09T10:00:00.000Z', '2026-08-09T10:30:00.000Z'),
         row('r2', 'plan', 'done', '2026-08-09T10:10:00.000Z', '2026-08-09T10:20:00.000Z'),
       ],
-      comments: [
-        // Posted AFTER r2 dispatched — outside r1's window (which ends at r2.dispatchedAt).
-        comment('c1', '**Verdict: Approve** — too late for r1\'s window.', '2026-08-09T10:12:00.000Z'),
-      ],
+      // Written AFTER r2 dispatched — outside r1's window (which ends at r2.dispatchedAt).
+      verdicts: [verdict('v1', 'approve', '2026-08-09T10:12:00.000Z')],
     });
     const result = computeIssueRoundTrips(iss, { asOf: ASOF });
-    // Falls through to tier C since the comment is out of window and there's no DONE line.
+    // Falls through to tier C since the record is out of window.
     assert.equal(result.R0.tier, 'c');
     assert.equal(result.R0.verdict, 'request changes'); // next row is `plan`
   });
@@ -500,11 +467,11 @@ describe('verdict tier precedence and the shared window bound', () => {
   test('lineageBleed fires when R0 completedAt postdates the next pipeline row dispatchedAt', () => {
     const iss = issue('bleed', {
       rows: [
-        row('r1', 'plan-review', 'done', '2026-08-09T10:00:00.000Z', '2026-08-09T10:30:00.000Z',
-          feedbackDone('DONE: Verdict: Approve.', '2026-08-09T10:30:00.000Z')),
+        row('r1', 'plan-review', 'done', '2026-08-09T10:00:00.000Z', '2026-08-09T10:30:00.000Z'),
         // Next pipeline row dispatched BEFORE r1's (lineage-merged) completedAt.
         row('r2', 'plan', 'done', '2026-08-09T10:15:00.000Z', '2026-08-09T10:20:00.000Z'),
       ],
+      verdicts: [verdict('v1', 'approve', '2026-08-09T10:05:00.000Z')],
     });
     const result = computeIssueRoundTrips(iss, { asOf: ASOF });
     assert.equal(result.lineageBleed, true);
@@ -515,9 +482,9 @@ describe('verdict tier precedence and the shared window bound', () => {
       rows: [
         row('r1', 'plan-review', 'aborted', '2026-08-09T10:00:00.000Z', '2026-08-09T10:30:00.000Z'),
         row('r2', 'plan', 'done', '2026-08-09T10:05:00.000Z', '2026-08-09T10:10:00.000Z'),
-        row('r3', 'plan-review', 'done', '2026-08-09T10:15:00.000Z', '2026-08-09T10:20:00.000Z',
-          feedbackDone('DONE: Verdict: Approve.', '2026-08-09T10:20:00.000Z')),
+        row('r3', 'plan-review', 'done', '2026-08-09T10:15:00.000Z', '2026-08-09T10:20:00.000Z'),
       ],
+      verdicts: [verdict('v3', 'approve', '2026-08-09T10:18:00.000Z')],
     });
     const result = computeIssueRoundTrips(iss, { asOf: ASOF });
     assert.equal(result.R0.row.id, 'r3');
@@ -535,7 +502,8 @@ describe('gate-due / gate-honoured', () => {
     const opts = { asOf: ASOF, planRecordsSince: COVERED };
     const planRow = row('p1', 'plan', 'done', '2026-08-09T09:00:00.000Z', '2026-08-09T09:30:00.000Z');
     const r1 = computeIssueRoundTrips(issue('gate-1', { planFacts: ASKED, rows: [planRow,
-      row('r1', 'plan-review', 'done', '2026-08-09T10:00:00.000Z', '2026-08-09T10:05:00.000Z', feedbackDone('DONE: Verdict: Approve.', '2026-08-09T10:05:00.000Z'))] }), opts);
+      row('r1', 'plan-review', 'done', '2026-08-09T10:00:00.000Z', '2026-08-09T10:05:00.000Z')],
+    verdicts: [verdict('v1', 'approve', '2026-08-09T10:02:00.000Z')] }), opts);
     assert.equal(r1.gateDue, true);
     assert.equal(r1.gateHonoured, true);
     const r2 = computeIssueRoundTrips(issue('gate-2', { planFacts: ASKED, rows: [planRow,
@@ -553,7 +521,8 @@ describe('gate-due / gate-honoured', () => {
     const rows = [row('p1', 'plan', 'done', '2026-08-09T09:00:00.000Z', '2026-08-09T09:30:00.000Z')];
     assert.equal(computeIssueRoundTrips(issue('p-1', { description: 'plan-review due: yes — (a) needs multiple sessions.', planFacts: NOT_ASKED, rows }), opts).gateDue, false);
     assert.equal(computeIssueRoundTrips(issue('p-2', { description: 'plan-review due: no — none of (a)-(d).', planFacts: ASKED, rows }), opts).gateDue, true);
-    assert.equal(computeIssueRoundTrips(issue('p-3', { comments: [comment('c1', 'plan-review due: yes', '2026-08-09T09:00:00.000Z')], planFacts: NOT_ASKED, rows }), opts).gateDue, false);
+    const p3 = { ...issue('p-3', { planFacts: NOT_ASKED, rows }), comments: [comment('c1', 'plan-review due: yes', '2026-08-09T09:00:00.000Z')] };
+    assert.equal(computeIssueRoundTrips(p3, opts).gateDue, false);
   });
 
   test('LIN-4504: an issue the plan records do not cover reads null (not measured), never false', () => {
@@ -580,14 +549,8 @@ describe('computePlanReviewRoundTrips — aggregate', () => {
   });
 
   test('primary numerator/denominator aggregate across issues, excluding the three separately-countable buckets', () => {
-    const approved = issue('a1', {
-      rows: [row('r1', 'plan-review', 'done', '2026-08-01T00:00:00.000Z', '2026-08-01T00:05:00.000Z',
-        feedbackDone('DONE: Verdict: Approve.', '2026-08-01T00:05:00.000Z'))],
-    });
-    const requestChanges = issue('a2', {
-      rows: [row('r1', 'plan-review', 'done', '2026-08-01T00:00:00.000Z', '2026-08-01T00:05:00.000Z',
-        feedbackDone('DONE: Verdict: Request Changes.', '2026-08-01T00:05:00.000Z'))],
-    });
+    const approved = reviewedIssue('a1', 'approve');
+    const requestChanges = reviewedIssue('a2', 'request-changes');
     const rightCensored = issue('a3', {
       rows: [row('r1', 'plan-review', 'taken', '2026-08-01T00:00:00.000Z', null)],
     });
@@ -608,16 +571,10 @@ describe('computePlanReviewRoundTrips — aggregate', () => {
   test('LIN-2035 B1 regression: denominator=33, numerator=1 must NOT be sufficient (the pre-fix tautology declared this sufficient)', () => {
     const issues = [];
     // 1 approve.
-    issues.push(issue('b1-approve', {
-      rows: [row('r1', 'plan-review', 'done', '2026-08-01T00:00:00.000Z', '2026-08-01T00:05:00.000Z',
-        feedbackDone('DONE: Verdict: Approve.', '2026-08-01T00:05:00.000Z'))],
-    }));
+    issues.push(reviewedIssue('b1-approve', 'approve'));
     // 32 request-changes, bringing denominator to 33 with numerator 1 (p1 ≈ 0.03).
     for (let i = 0; i < 32; i++) {
-      issues.push(issue(`b1-rc-${i}`, {
-        rows: [row('r1', 'plan-review', 'done', '2026-08-01T00:00:00.000Z', '2026-08-01T00:05:00.000Z',
-          feedbackDone('DONE: Verdict: Request Changes.', '2026-08-01T00:05:00.000Z'))],
-      }));
+      issues.push(reviewedIssue(`b1-rc-${i}`, 'request-changes'));
     }
     const agg = computePlanReviewRoundTrips(issues, { asOf: ASOF });
     assert.equal(agg.primary.denominator, 33);
@@ -629,10 +586,7 @@ describe('computePlanReviewRoundTrips — aggregate', () => {
   test('LIN-2035 B1 regression: p1=0 at a large denominator must not falsely claim there is no denominator', () => {
     const issues = [];
     for (let i = 0; i < 500; i++) {
-      issues.push(issue(`b1-zero-${i}`, {
-        rows: [row('r1', 'plan-review', 'done', '2026-08-01T00:00:00.000Z', '2026-08-01T00:05:00.000Z',
-          feedbackDone('DONE: Verdict: Request Changes.', '2026-08-01T00:05:00.000Z'))],
-      }));
+      issues.push(reviewedIssue(`b1-zero-${i}`, 'request-changes'));
     }
     const agg = computePlanReviewRoundTrips(issues, { asOf: ASOF });
     assert.equal(agg.primary.denominator, 500);
@@ -647,18 +601,8 @@ describe('computePlanReviewRoundTrips — aggregate', () => {
 
   function verdictIssues(idPrefix, approveCount, requestChangesCount) {
     const issues = [];
-    for (let i = 0; i < approveCount; i++) {
-      issues.push(issue(`${idPrefix}-a${i}`, {
-        rows: [row('r1', 'plan-review', 'done', '2026-08-01T00:00:00.000Z', '2026-08-01T00:05:00.000Z',
-          feedbackDone('DONE: Verdict: Approve.', '2026-08-01T00:05:00.000Z'))],
-      }));
-    }
-    for (let i = 0; i < requestChangesCount; i++) {
-      issues.push(issue(`${idPrefix}-rc${i}`, {
-        rows: [row('r1', 'plan-review', 'done', '2026-08-01T00:00:00.000Z', '2026-08-01T00:05:00.000Z',
-          feedbackDone('DONE: Verdict: Request Changes.', '2026-08-01T00:05:00.000Z'))],
-      }));
-    }
+    for (let i = 0; i < approveCount; i++) issues.push(reviewedIssue(`${idPrefix}-a${i}`, 'approve'));
+    for (let i = 0; i < requestChangesCount; i++) issues.push(reviewedIssue(`${idPrefix}-rc${i}`, 'request-changes'));
     return issues;
   }
 
@@ -701,19 +645,18 @@ describe('computePlanReviewRoundTrips — aggregate', () => {
   });
 
   test('round-trip distribution and mean', () => {
-    const zero = issue('rt0', {
-      rows: [row('r1', 'plan-review', 'done', '2026-08-01T00:00:00.000Z', '2026-08-01T00:05:00.000Z',
-        feedbackDone('DONE: Verdict: Approve.', '2026-08-01T00:05:00.000Z'))],
-    });
+    const zero = reviewedIssue('rt0', 'approve');
     const two = issue('rt2', {
       rows: [
         row('r1', 'plan-review', 'aborted', '2026-08-02T22:51:14.958Z', '2026-08-02T22:52:19.373Z'),
         row('r2', 'plan', 'done', '2026-08-02T22:52:05.863Z', '2026-08-02T22:59:39.348Z'),
-        row('r3', 'plan-review', 'done', '2026-08-02T23:00:48.086Z', '2026-08-02T23:08:05.046Z',
-          feedbackDone('DONE: Verdict: Request Changes.', '2026-08-02T23:08:03.775Z')),
+        row('r3', 'plan-review', 'done', '2026-08-02T23:00:48.086Z', '2026-08-02T23:08:05.046Z'),
         row('r4', 'plan', 'done', '2026-08-02T23:08:53.500Z', '2026-08-02T23:21:10.596Z'),
-        row('r5', 'plan-review', 'done', '2026-08-02T23:21:58.799Z', '2026-08-02T23:32:57.908Z',
-          feedbackDone('DONE: Verdict: Approve.', '2026-08-02T23:32:57.908Z')),
+        row('r5', 'plan-review', 'done', '2026-08-02T23:21:58.799Z', '2026-08-02T23:32:57.908Z'),
+      ],
+      verdicts: [
+        verdict('v3', 'request-changes', '2026-08-02T23:08:03.775Z'),
+        verdict('v5', 'approve', '2026-08-02T23:30:00.000Z'),
       ],
     });
 
@@ -725,10 +668,7 @@ describe('computePlanReviewRoundTrips — aggregate', () => {
 
   test('LIN-2035 B2 regression: roundTrips distribution is conditioned on reachedPlanReviewAny, not diluted by issues that never reached plan-review', () => {
     // Reaches plan-review, resolves, zero round trips.
-    const reached = issue('b2-reached', {
-      rows: [row('r1', 'plan-review', 'done', '2026-08-01T00:00:00.000Z', '2026-08-01T00:05:00.000Z',
-        feedbackDone('DONE: Verdict: Approve.', '2026-08-01T00:05:00.000Z'))],
-    });
+    const reached = reviewedIssue('b2-reached', 'approve');
     // Never dispatches a plan-review row at all — the workspace-shape bulk
     // the real read pass showed diluting the aggregate 45× (LIN-2035 B2).
     const neverReached = [];
@@ -764,29 +704,23 @@ describe('computePlanReviewRoundTrips — aggregate', () => {
   });
 
   test('gate-due / gate-honoured rates aggregate, with the MIN_DENOMINATOR floor', () => {
+    const gated = (id) => issue(id, {
+      planFacts: ASKED,
+      rows: [
+        row('p1', 'plan', 'done', '2026-08-01T00:00:00.000Z', '2026-08-01T00:05:00.000Z'),
+        row('r1', 'plan-review', 'done', '2026-08-01T00:10:00.000Z', '2026-08-01T00:15:00.000Z'),
+      ],
+      verdicts: [verdict(`v-${id}`, 'approve', '2026-08-01T00:12:00.000Z')],
+    });
     const issues = [];
     for (let i = 0; i < MIN_DENOMINATOR - 1; i++) {
-      issues.push(issue(`gd${i}`, {
-        planFacts: ASKED,
-        rows: [
-          row('p1', 'plan', 'done', '2026-08-01T00:00:00.000Z', '2026-08-01T00:05:00.000Z'),
-          row('r1', 'plan-review', 'done', '2026-08-01T00:10:00.000Z', '2026-08-01T00:15:00.000Z',
-            feedbackDone('DONE: Verdict: Approve.', '2026-08-01T00:15:00.000Z')),
-        ],
-      }));
+      issues.push(gated(`gd${i}`));
     }
     const under = computePlanReviewRoundTrips(issues, { asOf: ASOF, planRecordsSince: COVERED });
     assert.equal(under.gate.due, MIN_DENOMINATOR - 1);
     assert.equal(under.gate.sufficient, false);
 
-    issues.push(issue('gdN', {
-      planFacts: ASKED,
-      rows: [
-        row('p1', 'plan', 'done', '2026-08-01T00:00:00.000Z', '2026-08-01T00:05:00.000Z'),
-        row('r1', 'plan-review', 'done', '2026-08-01T00:10:00.000Z', '2026-08-01T00:15:00.000Z',
-          feedbackDone('DONE: Verdict: Approve.', '2026-08-01T00:15:00.000Z')),
-      ],
-    }));
+    issues.push(gated('gdN'));
     const atFloor = computePlanReviewRoundTrips(issues, { asOf: ASOF, planRecordsSince: COVERED });
     assert.equal(atFloor.gate.due, MIN_DENOMINATOR);
     assert.equal(atFloor.gate.sufficient, true);
@@ -921,14 +855,36 @@ describe('computePlanReviewRoundTrips — aggregate', () => {
       rows: [
         row('50960260', 'plan-review', 'aborted', '2026-08-02T22:51:14.958Z', '2026-08-02T22:52:19.373Z'),
         row('8627353e', 'plan', 'done', '2026-08-02T22:52:05.863Z', '2026-08-02T22:59:39.348Z'),
-        row('70eac018', 'plan-review', 'done', '2026-08-02T23:00:48.086Z', '2026-08-02T23:08:05.046Z',
-          feedbackDone('DONE: Verdict: Request Changes.', '2026-08-02T23:08:03.775Z')),
+        row('70eac018', 'plan-review', 'done', '2026-08-02T23:00:48.086Z', '2026-08-02T23:08:05.046Z'),
       ],
+      verdicts: [verdict('v70', 'request-changes', '2026-08-02T23:08:03.775Z')],
     });
     const agg = computePlanReviewRoundTrips([iss], { asOf: ASOF });
     assert.equal(agg.perIssue.length, 1);
     assert.equal(agg.perIssue[0].R0.rowId, '70eac018');
     assert.equal(agg.perIssue[0].noGenuineAttemptRowIds[0], '50960260');
+  });
+
+  test('the retired text tier and cross-tier fields stay in the shape at 0; the source is named as records (LIN-4520)', () => {
+    const agg = computePlanReviewRoundTrips([reviewedIssue('shape', 'approve')], { asOf: ASOF });
+    assert.equal(agg.diagnostics.verdictTier.b, 0, 'tier b reads no text, so it is never used');
+    assert.deepEqual(agg.diagnostics.crossTierDisagreements, { aVsB: 0, aVsC: 0, bVsC: 0 });
+    assert.equal(agg.window.verdictSource, 'records');
+    assert.match(agg.definition.verdictExtraction, /no text is read/);
+    assert.equal(agg.definition.verdictExtraction.includes(VERDICT_JUDGEMENTS.planReview), true);
+  });
+
+  test('verdictSource: \'comments\' is retired and throws, rather than silently reading records under the old name (LIN-4520)', () => {
+    assert.throws(
+      () => computeIssueRoundTripsOf(issue('x'), { asOf: ASOF, verdictSource: 'comments' }),
+      /verdictSource "comments" is retired \(LIN-4520\)/,
+    );
+    assert.throws(
+      () => computePlanReviewRoundTripsOf([], { asOf: ASOF, verdictSource: 'comments' }),
+      /verdictSource "comments" is retired/,
+    );
+    assert.equal(computePlanReviewRoundTripsOf([], { asOf: ASOF, verdictSource: 'records' }).window.verdictSource, 'records',
+      'naming the default is accepted');
   });
 });
 
@@ -1021,23 +977,26 @@ describe('derivePrimaryFloor', () => {
 
 describe('computeIssueRoundTrips — {gateKind, rePassKind} option (LIN-2592)', () => {
   test('a {gateKind: "review", rePassKind: "implementation"} walk produces the analogous result to the default plan/plan-review walk over an isomorphic fixture', () => {
-    // Two structurally identical fixtures — same timestamps, same verdict-comment
-    // convention — differing ONLY in which kind labels play gate vs re-pass.
+    // Two structurally identical fixtures — same timestamps, same verdict
+    // records — differing ONLY in which kind labels play gate vs re-pass, and
+    // in the judgement the gate's records carry.
     const buildRows = (gateKind, rePassKind) => [
       row('r1', rePassKind, 'done', '2026-08-09T09:00:00.000Z', '2026-08-09T09:30:00.000Z'),
-      row('r2', gateKind, 'done', '2026-08-09T10:00:00.000Z', '2026-08-09T10:05:00.000Z',
-        feedbackDone('DONE: Verdict: Request Changes.', '2026-08-09T10:05:00.000Z')),
+      row('r2', gateKind, 'done', '2026-08-09T10:00:00.000Z', '2026-08-09T10:05:00.000Z'),
       row('r3', rePassKind, 'done', '2026-08-09T10:10:00.000Z', '2026-08-09T10:40:00.000Z'),
-      row('r4', gateKind, 'done', '2026-08-09T11:00:00.000Z', '2026-08-09T11:05:00.000Z',
-        feedbackDone('DONE: Verdict: Approve.', '2026-08-09T11:05:00.000Z')),
+      row('r4', gateKind, 'done', '2026-08-09T11:00:00.000Z', '2026-08-09T11:05:00.000Z'),
+    ];
+    const verdictsFor = (judgement) => [
+      verdict('v2', 'request-changes', '2026-08-09T10:04:00.000Z', { judgement }),
+      verdict('v4', 'approve', '2026-08-09T11:04:00.000Z', { judgement }),
     ];
 
     const defaultResult = computeIssueRoundTrips(
-      issue('default-pair', { rows: buildRows('plan-review', 'plan') }),
+      issue('default-pair', { rows: buildRows('plan-review', 'plan'), verdicts: verdictsFor(VERDICT_JUDGEMENTS.planReview) }),
       { asOf: ASOF },
     );
     const newPairResult = computeIssueRoundTrips(
-      issue('new-pair', { rows: buildRows('review', 'implementation') }),
+      issue('new-pair', { rows: buildRows('review', 'implementation'), verdicts: verdictsFor(VERDICT_JUDGEMENTS.review) }),
       { asOf: ASOF, gateKind: 'review', rePassKind: 'implementation' },
     );
 
@@ -1054,9 +1013,9 @@ describe('computeIssueRoundTrips — {gateKind, rePassKind} option (LIN-2592)', 
     assert.equal(newPairResult.subWindows.length, defaultResult.subWindows.length);
 
     // And the concrete values are the ones the shared walk is known to produce
-    // for this shape (R0 settles on the FIRST gate row, tier B, "request changes";
-    // roundTrips=1 for the one re-pass row — r3 — following it).
-    assert.equal(newPairResult.R0.tier, 'b');
+    // for this shape (R0 settles on the FIRST gate row, its verdict record,
+    // "request changes"; roundTrips=1 for the one re-pass row — r3 — following it).
+    assert.equal(newPairResult.R0.tier, 'a');
     assert.equal(newPairResult.R0.verdict, 'request changes');
     assert.equal(newPairResult.roundTrips, 1);
   });
@@ -1064,13 +1023,12 @@ describe('computeIssueRoundTrips — {gateKind, rePassKind} option (LIN-2592)', 
   test('under the review pair, a `plan-review` row is NOT treated as the gate (no silent fallback to the literal)', () => {
     const iss = issue('not-a-gate', {
       rows: [
-        row('r1', 'plan-review', 'done', '2026-08-09T10:00:00.000Z', '2026-08-09T10:05:00.000Z',
-          feedbackDone('DONE: Verdict: Approve.', '2026-08-09T10:05:00.000Z')),
+        row('r1', 'plan-review', 'done', '2026-08-09T10:00:00.000Z', '2026-08-09T10:05:00.000Z'),
       ],
+      // A resolving plan-review verdict exists: if a helper silently fell back to the 'plan-review' literal, the row would settle.
+      verdicts: [verdict('v1', 'approve', '2026-08-09T10:03:00.000Z')],
     });
     const result = computeIssueRoundTrips(iss, { asOf: ASOF, gateKind: 'review', rePassKind: 'implementation' });
-    // If a helper silently fell back to the hardcoded 'plan-review' literal,
-    // this row WOULD settle R0 (it carries a perfectly resolving DONE line).
     assert.equal(result.R0, null);
     assert.equal(result.reachedPlanReviewAny, false);
   });
@@ -1078,12 +1036,12 @@ describe('computeIssueRoundTrips — {gateKind, rePassKind} option (LIN-2592)', 
   test('under the review pair, a legacy `plan` row is NOT counted as the re-pass kind by countRoundTrips (no silent fallback to the literal)', () => {
     const iss = issue('not-a-repass', {
       rows: [
-        row('r1', 'review', 'done', '2026-08-09T10:00:00.000Z', '2026-08-09T10:05:00.000Z',
-          feedbackDone('DONE: Verdict: Request Changes.', '2026-08-09T10:05:00.000Z')),
+        row('r1', 'review', 'done', '2026-08-09T10:00:00.000Z', '2026-08-09T10:05:00.000Z'),
         // A `plan` row, not `implementation` — must NOT be counted as a re-pass
         // under the {gateKind: 'review', rePassKind: 'implementation'} pair.
         row('r2', 'plan', 'done', '2026-08-09T10:10:00.000Z', '2026-08-09T10:20:00.000Z'),
       ],
+      verdicts: [verdict('v1', 'request-changes', '2026-08-09T10:04:00.000Z', { judgement: VERDICT_JUDGEMENTS.review })],
     });
     const result = computeIssueRoundTrips(iss, { asOf: ASOF, gateKind: 'review', rePassKind: 'implementation' });
     assert.equal(result.roundTrips, 0);
@@ -1105,10 +1063,10 @@ describe('computeIssueRoundTrips — {gateKind, rePassKind} option (LIN-2592)', 
     const iss = issue('agg-review-pair', {
       rows: [
         row('i1', 'implementation', 'done', '2026-08-09T09:00:00.000Z', '2026-08-09T09:30:00.000Z'),
-        row('r1', 'review', 'done', '2026-08-09T10:00:00.000Z', '2026-08-09T10:05:00.000Z',
-          feedbackDone('DONE: Verdict: Approve.', '2026-08-09T10:05:00.000Z')),
+        row('r1', 'review', 'done', '2026-08-09T10:00:00.000Z', '2026-08-09T10:05:00.000Z'),
         row('i2', 'implementation', 'done', '2026-08-09T10:10:00.000Z', '2026-08-09T10:40:00.000Z'),
       ],
+      verdicts: [verdict('v1', 'approve', '2026-08-09T10:03:00.000Z', { judgement: VERDICT_JUDGEMENTS.review })],
     });
     const agg = computePlanReviewRoundTrips([iss], { asOf: ASOF, gateKind: 'review', rePassKind: 'implementation' });
     assert.equal(agg.scale.reachedPlanReviewAny, 1,
@@ -1223,37 +1181,31 @@ describe('LIN-4376 — an off-spine leftover row does not enter the R0 walk', ()
   });
 });
 
-// ─── LIN-4376: Tier B reads a report line by the wake's rule ───────────────────
+// ─── LIN-4520: a DONE report line is text, and the walk reads no text ─────────
 //
-// One rule for "what the session reported": `reportLinesOf` (lib/dispatch-terminal.js),
-// which the wake's PR pick also reads. A `DONE:` line that ends a multi-line message
-// counts (the closing contract puts it last), so does a `[done]` line, and the
-// match is case-sensitive like the contract everywhere else.
+// The DONE report line (`reportLinesOf`, the wake's rule, LIN-4376) used to settle a verdict as tier b. It settles
+// nothing now: whatever the line says, the verdict is the record, or the structural tier when there is none.
 
-describe('LIN-4376 — Tier B reads the shared report-line rule', () => {
+describe('LIN-4520 — a DONE report line is not read for a verdict', () => {
   const ISO = (m) => `2026-08-01T00:${String(m).padStart(2, '0')}:00.000Z`;
-  const tierB = (message) => {
-    const rows = [row('pr', 'plan-review', 'done', ISO(0), ISO(5), feedbackDone(message, ISO(5)))];
+  const settle = (message) => {
+    const rows = [
+      { ...row('pr', 'plan-review', 'done', ISO(0), ISO(5)), feedback: [{ message, timestamp: ISO(5) }] },
+      row('impl', 'implementation', 'done', ISO(10), ISO(20)),
+    ];
     const result = computeIssueRoundTrips(issue('1', { rows }), { asOf: ASOF });
-    return result.R0 ? { verdict: result.R0.verdict, tier: result.R0.tier } : null;
+    return { verdict: result.R0.verdict, tier: result.R0.tier };
   };
 
-  test('a DONE: line that ends a multi-line message is the session\'s report', () => {
-    assert.deepEqual(tierB('Read the plan against the code.\nDONE: Verdict: Approve.'), { verdict: 'approve', tier: 'b' });
-  });
-
-  test('a [done] line is a report line too', () => {
-    assert.deepEqual(tierB('[done] Verdict: Request Changes.'), { verdict: 'request changes', tier: 'b' });
-  });
-
-  test('a message with no report line gives Tier B nothing, and lowercase done: is not one', () => {
-    assert.notEqual(tierB('Verdict: Approve.')?.tier, 'b');
-    assert.notEqual(tierB('done: Verdict: Approve.')?.tier, 'b');
-  });
-
-  test('a DONE: line at the start still counts, as before', () => {
-    assert.deepEqual(tierB('DONE: Verdict: Approve.'), { verdict: 'approve', tier: 'b' });
-  });
+  for (const message of [
+    'DONE: Verdict: Request Changes.',
+    'Read the plan against the code.\nDONE: Verdict: Request Changes.',
+    '[done] Verdict: Request Changes.',
+  ]) {
+    test(`${JSON.stringify(message)} settles nothing: the structural tier answers (the next row is implementation)`, () => {
+      assert.deepEqual(settle(message), { verdict: 'approve', tier: 'c' });
+    });
+  }
 });
 
 // =============================================================================
@@ -1286,14 +1238,16 @@ describe('LIN-1871 — third-round counting (mutation-checked)', () => {
       description: 'plan-review due: yes',
       rows: [
         row('plan-1', 'plan', 'done', '2026-08-01T00:00:00.000Z', '2026-08-01T00:05:00.000Z'),
-        row('rev-1', 'plan-review', 'done', '2026-08-01T01:00:00.000Z', '2026-08-01T01:05:00.000Z',
-          feedbackDone('DONE: Verdict: Request Changes.', '2026-08-01T01:05:00.000Z')),
+        row('rev-1', 'plan-review', 'done', '2026-08-01T01:00:00.000Z', '2026-08-01T01:05:00.000Z'),
         row('plan-2', 'plan', 'done', '2026-08-01T02:00:00.000Z', '2026-08-01T02:05:00.000Z'),
-        row('rev-2', 'plan-review', 'done', '2026-08-01T03:00:00.000Z', '2026-08-01T03:05:00.000Z',
-          feedbackDone('DONE: Verdict: Request Changes.', '2026-08-01T03:05:00.000Z')),
+        row('rev-2', 'plan-review', 'done', '2026-08-01T03:00:00.000Z', '2026-08-01T03:05:00.000Z'),
         row('plan-3', 'plan', 'done', '2026-08-01T04:00:00.000Z', '2026-08-01T04:05:00.000Z'),
-        row('rev-3', 'plan-review', 'done', '2026-08-01T05:00:00.000Z', '2026-08-01T05:05:00.000Z',
-          feedbackDone('DONE: Verdict: Approve.', '2026-08-01T05:05:00.000Z')),
+        row('rev-3', 'plan-review', 'done', '2026-08-01T05:00:00.000Z', '2026-08-01T05:05:00.000Z'),
+      ],
+      verdicts: [
+        verdict('v1', 'request-changes', '2026-08-01T01:04:00.000Z'),
+        verdict('v2', 'request-changes', '2026-08-01T03:04:00.000Z'),
+        verdict('v3', 'approve', '2026-08-01T05:04:00.000Z'),
       ],
     });
     const result = computeIssueRoundTrips(iss, { asOf: ASOF });
@@ -1322,17 +1276,17 @@ describe('LIN-1871 — options.windowDays (calendar window, not a row-count cap)
     planFacts: ASKED,
     rows: [
       row('p1', 'plan', 'done', '2026-08-05T00:00:00.000Z', '2026-08-05T00:05:00.000Z'),
-      row('r1', 'plan-review', 'done', '2026-08-05T01:00:00.000Z', '2026-08-05T01:05:00.000Z',
-        feedbackDone('DONE: Verdict: Approve.', '2026-08-05T01:05:00.000Z')),
+      row('r1', 'plan-review', 'done', '2026-08-05T01:00:00.000Z', '2026-08-05T01:05:00.000Z'),
     ],
+    verdicts: [verdict('v1', 'approve', '2026-08-05T01:03:00.000Z')],
   });
   const outOfWindow = issue('out-of-window', {
     planFacts: ASKED,
     rows: [
       row('p1', 'plan', 'done', '2026-06-01T00:00:00.000Z', '2026-06-01T00:05:00.000Z'),
-      row('r1', 'plan-review', 'done', '2026-06-01T01:00:00.000Z', '2026-06-01T01:05:00.000Z',
-        feedbackDone('DONE: Verdict: Approve.', '2026-06-01T01:05:00.000Z')),
+      row('r1', 'plan-review', 'done', '2026-06-01T01:00:00.000Z', '2026-06-01T01:05:00.000Z'),
     ],
+    verdicts: [verdict('v2', 'approve', '2026-06-01T01:03:00.000Z')],
   });
 
   test('omitted (default): every issue is read, unchanged from before the option existed', () => {
@@ -1364,9 +1318,9 @@ describe('LIN-1871 — options.windowDays (calendar window, not a row-count cap)
     const boundary = issue('boundary', {
       description: 'plan-review due: yes',
       rows: [
-        row('r1', 'plan-review', 'done', '2026-07-10T12:00:00.000Z', '2026-07-10T12:05:00.000Z',
-          feedbackDone('DONE: Verdict: Approve.', '2026-07-10T12:05:00.000Z')),
+        row('r1', 'plan-review', 'done', '2026-07-10T12:00:00.000Z', '2026-07-10T12:05:00.000Z'),
       ],
+      verdicts: [verdict('v1', 'approve', '2026-07-10T12:03:00.000Z')],
     });
     // ASOF - 30 days = 2026-07-10T12:00:00.000Z exactly.
     const agg = computePlanReviewRoundTrips([boundary], { asOf: ASOF, windowDays: 30 });
@@ -1390,39 +1344,38 @@ describe('LIN-1871 — options.windowDays (calendar window, not a row-count cap)
 // so these are the paths where a `null` that coerces to 0 would be dangerous.
 describe('junk timestamps (LIN-3456 characterization)', () => {
   const JUNK = [undefined, 'not-a-date'];
-  const VERDICT_COMMENT = (createdAt) => comment('c1', '**Verdict: Approve** — ok.', createdAt);
 
-  test('control: a dated gate row resolves tier A from an in-window comment', () => {
+  test('control: a dated gate row resolves tier a from an in-window verdict record', () => {
     const r = computeIssueRoundTrips(issue('ctl', {
       rows: [row('r1', 'plan-review', 'done', '2026-08-09T10:00:00.000Z', '2026-08-09T10:30:00.000Z')],
-      comments: [VERDICT_COMMENT('2026-08-09T10:05:00.000Z')],
+      verdicts: [verdict('v1', 'approve', '2026-08-09T10:05:00.000Z')],
     }), { asOf: ASOF });
     assert.equal(r.R0.tier, 'a');
     assert.equal(r.R0.verdict, 'approve');
   });
 
-  test('a gate row with a missing/junk dispatchedAt has an empty comment window (no tier A)', () => {
+  test('a gate row with a missing/junk dispatchedAt cannot be placed against the records: not measured, and no record is read', () => {
     for (const junk of JUNK) {
       const r = computeIssueRoundTrips(issue('junk-gate', {
         rows: [row('r1', 'plan-review', 'done', junk, '2026-08-09T10:30:00.000Z')],
         // Would be in any window that started at the epoch: must NOT be picked up.
-        comments: [VERDICT_COMMENT('2026-08-09T10:05:00.000Z')],
+        verdicts: [verdict('v1', 'approve', '2026-08-09T10:05:00.000Z')],
       }), { asOf: ASOF });
-      assert.notEqual(r.R0.tier, 'a', `dispatchedAt=${String(junk)}`);
-      assert.equal(r.R0.resolved, false);
+      assert.equal(r.R0, null, `dispatchedAt=${String(junk)}`);
+      assert.ok(r.verdictNotMeasured, 'named as not measured, never guessed by the structural tier');
     }
   });
 
-  test('a next row with a missing/junk dispatchedAt leaves the gate window empty (no tier A) and no lineageBleed', () => {
+  test('a next row with a missing/junk dispatchedAt leaves the gate window empty (no tier a) and no lineageBleed', () => {
     for (const junk of JUNK) {
       const r = computeIssueRoundTrips(issue('junk-next', {
         rows: [
           row('r1', 'plan-review', 'done', '2026-08-09T10:00:00.000Z', '2026-08-09T10:30:00.000Z'),
           row('r2', 'plan', 'done', junk, '2026-08-09T10:20:00.000Z'),
         ],
-        comments: [VERDICT_COMMENT('2026-08-09T10:05:00.000Z')],
+        verdicts: [verdict('v1', 'approve', '2026-08-09T10:05:00.000Z')],
       }), { asOf: ASOF });
-      assert.notEqual(r.R0.tier, 'a', `nextRow.dispatchedAt=${String(junk)}`);
+      assert.equal(r.R0.tier, 'c', `nextRow.dispatchedAt=${String(junk)}: no window end, so no record; the structural tier answers`);
       assert.equal(r.lineageBleed, false);
     }
   });
@@ -1437,17 +1390,17 @@ describe('junk timestamps (LIN-3456 characterization)', () => {
     assert.equal(r.lineageBleed, false);
   });
 
-  test('comments with a missing/junk createdAt are ignored; the newest valid in-window one wins', () => {
+  test('verdict records with a missing/junk written-at are ignored; the newest valid in-window one wins', () => {
     for (const junk of JUNK) {
-      const r = computeIssueRoundTrips(issue('junk-comment', {
+      const r = computeIssueRoundTrips(issue('junk-verdict', {
         rows: [row('r1', 'plan-review', 'done', '2026-08-09T10:00:00.000Z', '2026-08-09T10:30:00.000Z')],
-        comments: [
-          comment('cj', '**Verdict: Request Changes** — junk-dated.', junk),
-          comment('c1', '**Verdict: Approve** — early.', '2026-08-09T10:05:00.000Z'),
-          comment('c2', '**Verdict: Needs Discussion** — newest.', '2026-08-09T10:15:00.000Z'),
+        verdicts: [
+          verdict('vj', 'request-changes', junk),
+          verdict('v1', 'approve', '2026-08-09T10:05:00.000Z'),
+          verdict('v2', 'needs-discussion', '2026-08-09T10:15:00.000Z'),
         ],
       }), { asOf: ASOF });
-      assert.equal(r.R0.tier, 'a', `createdAt=${String(junk)}`);
+      assert.equal(r.R0.tier, 'a', `at=${String(junk)}`);
       assert.equal(r.R0.verdict, 'needs discussion');
     }
   });
@@ -1489,17 +1442,18 @@ describe('junk timestamps (LIN-3456 characterization)', () => {
   });
 });
 
-describe('comment window: a junk comment createdAt never lands in a pre-1970 window (LIN-3453)', () => {
-  const VERDICT_COMMENT = (createdAt) => comment('c1', '**Verdict: Approve** — ok.', createdAt);
+describe('verdict record window: a junk written-at never lands in a pre-1970 window (LIN-3453)', () => {
   const gate = () => row('r1', 'plan-review', 'done', '1969-12-31T23:00:00.000Z', '1970-01-01T01:00:00.000Z');
+  // The coverage instant must sit before the gate row, or the row is not measured at all (lin-4519 pins that).
+  const opts = { asOf: ASOF, verdictRecordsSince: '1900-01-01T00:00:00.000Z' };
 
-  test('control: a dated in-window comment resolves tier A for a pre-1970 gate row', () => {
-    const r = computeIssueRoundTrips(issue('pre70-ctl', { rows: [gate()], comments: [VERDICT_COMMENT('1969-12-31T23:30:00.000Z')] }), { asOf: ASOF });
+  test('control: a dated in-window verdict record resolves tier a for a pre-1970 gate row', () => {
+    const r = computeIssueRoundTrips(issue('pre70-ctl', { rows: [gate()], verdicts: [verdict('v1', 'approve', '1969-12-31T23:30:00.000Z')] }), opts);
     assert.equal(r.R0.tier, 'a');
   });
 
-  test("a 'not-a-date' comment createdAt is not in the window, even though epoch 0 lies inside it", () => {
-    const r = computeIssueRoundTrips(issue('pre70-junk', { rows: [gate()], comments: [VERDICT_COMMENT('not-a-date')] }), { asOf: ASOF });
+  test('a \'not-a-date\' written-at is not in the window, even though epoch 0 lies inside it', () => {
+    const r = computeIssueRoundTrips(issue('pre70-junk', { rows: [gate()], verdicts: [verdict('v1', 'approve', 'not-a-date')] }), opts);
     assert.notEqual(r.R0.tier, 'a');
   });
 });

@@ -12,7 +12,6 @@ import { test, describe } from 'node:test';
 import assert from 'node:assert/strict';
 import { readFileSync } from 'node:fs';
 import { generatePrompt } from '../../lib/prompt-templates.js';
-import { SURVEY_HEADINGS } from '../../lib/prompts/survey-words.js';
 import { CUT } from '../../lib/prompts/stage-kinds.js';
 import { COMPLETION_SIGNALS } from '../../lib/completion-signals.js';
 import { ASKED_HEADING } from '../../lib/brief-quote.js';
@@ -121,18 +120,19 @@ describe('scoping writes the size record (LIN-4369)', () => {
     assert.ok(!p.includes('what done means. Read the code first'), 'the old lead is gone');
   });
 
-  test('it reads both Survey comments by their headings, the filing comments, and a subtask\'s parent record', () => {
+  test('it reads both Surveys\' report comments, the filing comments, and a subtask\'s parent record (LIN-4520: no Survey comment heading)', () => {
     const p = processOf(render());
-    assert.ok(p.includes(`\`${SURVEY_HEADINGS['survey-task']}\``) && p.includes(`\`${SURVEY_HEADINGS['survey-place']}\``));
+    assert.match(p, /the two Surveys' report comments \(`survey-task`, `survey-place`\)/);
     assert.match(p, /the comments filed with the ticket/);
     assert.match(p, /for a subtask its parent's size record/);
     assert.match(p, new RegExp(`A person's size comment on the trail is their ruling: record it as decided by ${DECIDED_BY.ruling}\\.`));
   });
 
-  test('each Survey template opens its comment with the heading scoping reads', () => {
+  test('each Survey template reports the base it read at, with no headed comment (LIN-4520)', () => {
     for (const kind of ['survey-task', 'survey-place']) {
       const p = generatePrompt(kind, ISSUE, CONTEXT).prompt;
-      assert.ok(p.includes(`\`${SURVEY_HEADINGS[kind]}: ${ISSUE.identifier} @ {BASE}\``), kind);
+      assert.ok(p.includes('names the base you read at as {BASE}'), kind);
+      assert.ok(!p.includes('## Survey'), `${kind}: no Survey heading`);
     }
   });
 });
@@ -176,7 +176,7 @@ describe('scoping\'s completion signals (LIN-4369)', () => {
     assert.ok(signals.some(s => s.includes(SIZE_OF_MOVE_HEADING) && s.includes(`only the record's ${RECORD_LINES.length} lines`)), 'one section, holding only its lines');
     assert.ok(signals.some(s => s.includes(SIZES[0]) && s.includes(WRONG_WORK)), 'sizes weighed from just the task to wrong work');
     assert.ok(signals.some(s => /standing policy/.test(s) && /`DECISION:`, only for a size the policy may not decide/.test(s)), 'policy, and pending with a DECISION: only where the policy may not decide (a cut)');
-    assert.ok(signals.some(s => /Survey comments/.test(s)), 'Surveys read');
+    assert.ok(signals.some(s => /The two Surveys' reports/.test(s)), 'Surveys read');
     for (const old of [/In scope items/, /Out of scope items/, /Assumptions stated/, /Success criteria defined/]) {
       assert.ok(!signals.some(s => old.test(s)), `no ${old}`);
     }

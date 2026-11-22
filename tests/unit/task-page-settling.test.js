@@ -29,7 +29,14 @@ const harness = createMangoTmpdir('lin-3379-task-page-settling-');
 let RECORDS = null;
 before(async () => {
   await harness.connect();
-  RECORDS = await seededRecordsStore(harness, [ev.pr(1, PR_URL, 'abc1234'), ev.review(2, PR_URL, { heads: { [PR_URL]: 'abc1234' } }), ev.close(3), ev.merged(3, PR_URL)], { urlKey: 'ws', tickets: ['LIN-51'] });
+  // The close-out's summary is its run's account (LIN-4520, finding-9d0c053a), so the close-out run carries the CLOSE_OUT text,
+  // on the same clock as the comments this file was written against.
+  RECORDS = await seededRecordsStore(harness, [
+    ev.pr('2026-10-08T16:00:00.000Z', PR_URL, 'abc1234'),
+    ev.review('2026-10-08T17:00:00.000Z', PR_URL, { heads: { [PR_URL]: 'abc1234' } }),
+    ev.close('2026-10-08T18:11:00.000Z', undefined, CLOSE_OUT.body),
+    ev.merged('2026-10-08T18:05:00.000Z', PR_URL),
+  ], { urlKey: 'ws', tickets: ['LIN-51'] });
 });
 after(() => harness.close());
 

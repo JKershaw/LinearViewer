@@ -36,8 +36,8 @@ Area notes for `reports-and-operator-tools` in the registry. Format and rules: R
   landing counts as read only when a blind-read verdict first written before its merge names its PR through the change
   record's ref, and anything else is unread under a named reason. A landing merged before `VERDICT_RECORDS_SINCE`
   (lib/records/verdict-facts.js, the P5 writers' production go-live, 22 Nov 04:20:39Z, not the 21 Nov import) is `before the verdict records`, never a guess from a
-  comment. The comment reader lives only in `scripts/historic-comment-readers.mjs`, for reproducing the committed
-  readings, and is deleted with the comment readers in P7 (LIN-4520). A hand-run Balance cell becomes a sign only in
+  comment. The comment reader that reproduced the committed readings was deleted with the comment readers in P7
+  (LIN-4520); the committed readings in `docs/reviews/slice-3-readings/` are the evidence, not output to re-derive. A hand-run Balance cell becomes a sign only in
   `docs/papers/harbour/cleaner-than-it-started-scripts/balance-sign.mjs`, beside the paper's coder (LIN-4439).
 - Every verdict-dependent measure (round trips, churn, the effort readout's survival, measure 1) reads verdict records
   from `VERDICT_RECORDS_SINCE` and says `not measured: <reason>` for a row dispatched or landed before it. Its committed

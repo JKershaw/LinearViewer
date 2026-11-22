@@ -21,7 +21,6 @@ import {
   CONNECTION_CAP,
 } from '../../lib/providers/linear/index.js';
 import { flattenIssue } from '../../lib/proxy-wire.js';
-import { latestReviewComment } from '../../lib/run-trail.js';
 
 let restore;
 function stub(impl) {
@@ -244,7 +243,7 @@ describe('relations reads both lists whole, and flags a cut one', () => {
 });
 
 describe('fetchIssueComments (the close-out gate read)', () => {
-  test('returns all 120 comments, and the latest review verdict past index 50 is among them', async () => {
+  test('returns all 120 comments, and the comment past index 50 (a review verdict) is among them', async () => {
     const trail = items('c', 120);
     trail[110] = {
       ...trail[110],
@@ -256,7 +255,8 @@ describe('fetchIssueComments (the close-out gate read)', () => {
     const comments = await fetchIssueComments('lin_api_test', 'LIN-4150');
 
     assert.equal(comments.length, 120);
-    assert.equal(latestReviewComment(comments)?.id, 'c110', 'the verdict at index 110, not a stale prefix');
+    assert.equal(comments[110]?.id, 'c110', 'the comment at index 110, not a stale prefix');
+    assert.match(comments[110].body, /Verdict: Approved/);
   });
 
   test('a trail past the cap throws rather than return a prefix that reads as complete', async () => {

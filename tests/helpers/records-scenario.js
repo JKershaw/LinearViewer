@@ -15,7 +15,7 @@
  *                                                   verdict is on the task's plan, since a verdict needs an `on` but no
  *                                                   change; it reads as a review with an empty landing
  *   { kind: 'blindRead', at, on, outcome? }         a blind-read verdict on the PR URLs in `on` (default outcome 'same')
- *   { kind: 'closeOut', at, state? }                a close-out run, ended `state` (default 'done') at `at`
+ *   { kind: 'closeOut', at, state?, account? }      a close-out run, ended `state` (default 'done') at `at`, its final text `account`
  *   { kind: 'audit', at, pr }                       an audit run that writes the notes change `pr` (its first version)
  *   { kind: 'run', at, stage, state? }              any other stage run, ended `state` (default 'done') at `at`; `null` leaves it running
  *   { kind: 'finding', at, says, how }              an open finding to close-out on the task
@@ -61,12 +61,12 @@ export async function seedTicketRecords(store, urlKey, ticket, events) {
   const taskId = (await store.ensureTask(urlKey, { identifier: ticket, asked: `${ticket} asked`, closed: false, closedReason: null }, { by: HARBOUR, at: SEED_T0 })).id;
   const changes = new Map();
   let runSeq = 0;
-  const openRunAt = async (stage, at, state) => {
+  const openRunAt = async (stage, at, state, account = null) => {
     runSeq += 1;
     const id = `run-${stage}-${runSeq}`;
     await store.openRun(urlKey, { id, stage, taskId, lineage: id, at: minus(at, 1) });
-    // A run ends in `state`; `undefined` or `null` leaves it open (running).
-    if (state) await store.endRun(urlKey, id, { state, at });
+    // A run ends in `state`; `undefined` or `null` leaves it open (running). `account` is its final text (LIN-4520).
+    if (state) await store.endRun(urlKey, id, { state, at, account });
     return id;
   };
   const changeOf = (pr) => {
@@ -160,7 +160,7 @@ export async function seedTicketRecords(store, urlKey, ticket, events) {
         break;
       }
       case 'closeOut': {
-        await openRunAt(CLOSE_OUT_STAGE, at, ev.state ?? 'done');
+        await openRunAt(CLOSE_OUT_STAGE, at, ev.state ?? 'done', ev.account ?? null);
         break;
       }
       case 'audit': {
@@ -187,7 +187,7 @@ export async function seedTicketRecords(store, urlKey, ticket, events) {
 }
 
 /** The instant of scenario minute `n` (hours of 2026-11-12, as the lin-4438 table writes them). */
-export const scenarioAt = (n) => `2026-11-12T${String(n).padStart(2, '0')}:00:00.000Z`;
+export const scenarioAt = (n) => (typeof n === 'string' ? n : `2026-11-12T${String(n).padStart(2, '0')}:00:00.000Z`);
 
 /**
  * Event builders for scenarios, so a test writes its trail as the records it is (see seedTicketRecords). `on` and `pr`
@@ -198,7 +198,7 @@ export const ev = {
   head: (n, pr, head) => ({ kind: 'head', at: scenarioAt(n), pr, head }),
   review: (n, on, { outcome = 'approve', heads } = {}) => ({ kind: 'review', at: scenarioAt(n), on: [].concat(on), outcome, heads }),
   read: (n, on, { outcome } = {}) => ({ kind: 'blindRead', at: scenarioAt(n), on: [].concat(on), ...(outcome ? { outcome } : {}) }),
-  close: (n, state) => ({ kind: 'closeOut', at: scenarioAt(n), ...(state ? { state } : {}) }),
+  close: (n, state, account) => ({ kind: 'closeOut', at: scenarioAt(n), ...(state ? { state } : {}), ...(account ? { account } : {}) }),
   merged: (n, pr) => ({ kind: 'merged', at: scenarioAt(n), pr }),
   abandoned: (n, pr) => ({ kind: 'abandoned', at: scenarioAt(n), pr }),
   audit: (n, pr, head) => ({ kind: 'audit', at: scenarioAt(n), pr, head }),

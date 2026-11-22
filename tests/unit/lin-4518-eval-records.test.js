@@ -3,9 +3,11 @@
  *
  * The dense sweep hands each bundle its trail, landing and plan-review loop from records
  * (scripts/eval/fixtures/recommend-records, seeded by scripts/eval/records-context.mjs). The records are written by hand
- * from each bundle's comments, so this file checks them against those comments: the comment reader (readTrail and the plan
- * review fold) is the ORACLE here, read in a test only, never to build a record. Each mismatch the authoring leaves is named
- * in `EXCEPTIONS` with its reason, so a record that drifts from its comments fails here rather than moving the sweep.
+ * from each bundle's comments, so this file checks them against those comments. LIN-4520 retired the comment readers
+ * (readTrail, assemblePlanReviewFacts), so the comment side is no longer computed here: ORACLE_AT_HEAD is the comment
+ * side as the retired readers read it at HEAD before LIN-4520 (a frozen snapshot, one entry per bundle, taken by running
+ * those readers over each bundle's comments). Each mismatch the authoring leaves is named in `EXCEPTIONS` with its reason,
+ * so a record that drifts from its comments fails here rather than moving the sweep.
  *
  * Run with: node scripts/run-unit-tests.mjs tests/unit/lin-4518-eval-records.test.js
  */
@@ -16,8 +18,6 @@ import assert from 'node:assert/strict';
 import { readFileSync, readdirSync } from 'node:fs';
 import { join, dirname } from 'node:path';
 import { fileURLToPath } from 'node:url';
-import { readTrail } from '../../lib/run-trail.js';
-import { assemblePlanReviewFacts } from '../../lib/recommendation-facts.js';
 import { attachRecordsContext } from '../../scripts/eval/records-context.mjs';
 
 const HERE = dirname(fileURLToPath(import.meta.url));
@@ -25,7 +25,7 @@ const FIXTURES = join(HERE, '..', '..', 'scripts', 'eval', 'fixtures');
 const RECORDS_DIR = join(FIXTURES, 'recommend-records');
 
 /**
- * Where the authored records differ from the comment oracle on purpose. Each entry names the bundle, the field and why.
+ * Where the authored records differ from the comment side on purpose. Each entry names the bundle, the field and why.
  * Anything not listed must agree.
  */
 const EXCEPTIONS = {
@@ -35,6 +35,43 @@ const EXCEPTIONS = {
   'LIN-3098': {
     planReview: '"Verdict: Revise" (13:50) is not a plan-review outcome in the records vocabulary (approve | request-changes | needs-discussion), so no record holds it; the comment fold ignores it too',
   },
+};
+
+/**
+ * The comment side at HEAD (before LIN-4520), per bundle: the review the comment reader found (verdict word and instant,
+ * or null), the landing it read, its close-out-after-review fact, and the plan-review run's verdicts since the latest
+ * Approve. Frozen, not recomputed: the readers it was read with are retired.
+ */
+const ORACLE_AT_HEAD = {
+  "FIX-812-approve-ledger": { review: { verdict: "approve-conditional", at: "2026-06-20T02:00:00.000Z" }, landing: [], closeOutAfterReview: false, planRun: [] },
+  "FIX-812-approve-empty": { review: { verdict: "approve", at: "2026-06-21T02:00:00.000Z" }, landing: [], closeOutAfterReview: false, planRun: [] },
+  "LIN-1892": { review: { verdict: "request-changes", at: "2026-09-29T10:09:47.602Z" }, landing: ["https://github.com/JKershaw/LinearViewer/pull/1611"], closeOutAfterReview: true, planRun: [] },
+  "LIN-2944": { review: { verdict: "approve-conditional", at: "2026-09-29T05:26:10.064Z" }, landing: ["https://github.com/JKershaw/LinearViewer/pull/1604"], closeOutAfterReview: true, planRun: [] },
+  "LIN-3059": { review: null, landing: ["https://github.com/JKershaw/LinearViewer/pull/1605", "https://github.com/JKershaw/LinearViewer/pull/1606"], closeOutAfterReview: false, planRun: [] },
+  "LIN-3098": { review: { verdict: "approve-conditional", at: "2026-10-01T06:29:23.137Z" }, landing: ["https://github.com/JKershaw/LinearViewer/pull/1619", "https://github.com/JKershaw/LinearViewer/pull/1620", "https://github.com/JKershaw/LinearViewer/pull/1621", "https://github.com/JKershaw/LinearViewer/pull/1623"], closeOutAfterReview: true, planRun: [] },
+  "LIN-3107": { review: { verdict: "approve", at: "2026-09-27T08:35:39.893Z" }, landing: ["https://github.com/JKershaw/LinearViewer/pull/1598"], closeOutAfterReview: true, planRun: ["request changes", "request changes", "request changes"] },
+  "LIN-3124": { review: { verdict: "approve-conditional", at: "2026-09-29T14:29:13.269Z" }, landing: ["https://github.com/JKershaw/LinearViewer/pull/1618", "https://github.com/JKershaw/LinearViewer/pull/1610", "https://github.com/JKershaw/LinearViewer/pull/1613"], closeOutAfterReview: true, planRun: [] },
+  "LIN-3135": { review: { verdict: "unknown", at: "2026-09-29T12:28:17.802Z" }, landing: ["https://github.com/JKershaw/LinearViewer/pull/1616"], closeOutAfterReview: true, planRun: [] },
+  "LIN-2403": { review: { verdict: "approve-conditional", at: "2026-09-02T23:13:35.162Z" }, landing: ["https://github.com/JKershaw/LinearViewer/pull/1333"], closeOutAfterReview: true, planRun: [] },
+  "LIN-2882": { review: { verdict: "approve", at: "2026-09-27T10:40:32.526Z" }, landing: ["https://github.com/JKershaw/LinearViewer/pull/1600"], closeOutAfterReview: true, planRun: [] },
+  "NSC-LIN-2950-R2": { review: null, landing: [], closeOutAfterReview: false, planRun: ["request changes", "request changes"] },
+  "NSC-LIN-2950-GO": { review: null, landing: [], closeOutAfterReview: false, planRun: ["request changes", "request changes", "request changes"] },
+  "NSC-LIN-2950-HOLD": { review: null, landing: [], closeOutAfterReview: false, planRun: ["request changes", "request changes", "request changes"] },
+  "NSC-LIN-2950-NOTE": { review: null, landing: [], closeOutAfterReview: false, planRun: ["request changes", "request changes", "request changes"] },
+  "NSC-LIN-2950-LATEST-REPLY": { review: null, landing: [], closeOutAfterReview: false, planRun: ["request changes", "request changes"] },
+  "NSC-LIN-2950-GO-REV": { review: null, landing: [], closeOutAfterReview: false, planRun: ["request changes", "request changes", "request changes"] },
+  "NSC-LIN-3309-REVISED": { review: null, landing: [], closeOutAfterReview: false, planRun: ["request changes"] },
+  "NSC-LIN-3309-NOW": { review: null, landing: [], closeOutAfterReview: false, planRun: ["request changes"] },
+  "NSC-LIN-3309-R2-REV": { review: null, landing: [], closeOutAfterReview: false, planRun: ["request changes", "request changes"] },
+  "NSC-LIN-3309-LANDED": { review: null, landing: ["https://github.com/JKershaw/LinearViewer/pull/1748"], closeOutAfterReview: false, planRun: ["request changes", "request changes"] },
+  "NSC-PR-1603-RC1-REV": { review: null, landing: [], closeOutAfterReview: false, planRun: ["request changes"] },
+  "NSC-PR-1603-RC1-HOLD": { review: null, landing: [], closeOutAfterReview: false, planRun: ["request changes"] },
+  "NSC-PR-1603-RC1-FC-RULING": { review: null, landing: [], closeOutAfterReview: false, planRun: ["request changes"] },
+  "NSC-PR-1603-APPROVE-LANDED": { review: null, landing: ["https://github.com/JKershaw/LinearViewer/pull/1603"], closeOutAfterReview: false, planRun: [] },
+  "PR-1603-verdict-approve": { review: null, landing: [], closeOutAfterReview: false, planRun: [] },
+  "PR-1603-request-changes-1": { review: null, landing: [], closeOutAfterReview: false, planRun: ["request changes"] },
+  "PR-1603-request-changes-2": { review: null, landing: [], closeOutAfterReview: false, planRun: ["request changes", "request changes"] },
+  "PR-1603-request-changes-3": { review: null, landing: [], closeOutAfterReview: false, planRun: ["request changes", "request changes", "request changes"] },
 };
 
 let harness;
@@ -77,6 +114,10 @@ describe('the authored records agree with the comment history they were written 
     }
   });
 
+  test('the frozen comment side covers every authored bundle, and no other', () => {
+    assert.deepStrictEqual(Object.keys(ORACLE_AT_HEAD).sort(), bundlesOf.map((b) => b.id).sort());
+  });
+
   test('a review of a task with no PR is on record as a review of its plan, not "not read" (LIN-4518 finding-d3b5b9de)', () => {
     for (const id of ['FIX-812-approve-ledger', 'FIX-812-approve-empty']) {
       const { bundle } = bundlesOf.find((b) => b.id === id);
@@ -87,31 +128,30 @@ describe('the authored records agree with the comment history they were written 
     }
   });
 
-  test('the trail gate facts (review, landing, close-out after the review) agree with the comments', () => {
+  test('the trail gate facts (review, landing, close-out after the review) agree with the comment side', () => {
     for (const { id, bundle } of bundlesOf) {
       const ctx = bundle.recordsContext;
-      const oracle = readTrail(bundle.comments || []);
+      const oracle = ORACLE_AT_HEAD[id];
       const exc = EXCEPTIONS[id] || {};
       if (!exc.review) {
         const rec = ctx.trail?.review ?? null;
-        const com = oracle?.review ?? null;
+        const com = oracle.review;
         assert.equal(rec !== null, com !== null, `${id}: review on record ${rec !== null} vs in comments ${com !== null}`);
         if (rec && com) {
           assert.equal(isApproval(rec.verdict), isApproval(com.verdict), `${id}: review verdict ${rec.verdict} vs comment ${com.verdict}`);
           assert.equal(String(rec.at).slice(0, 16), String(com.at).slice(0, 16), `${id}: review instant`);
         }
       }
-      assert.deepEqual(prsOf(ctx.trail?.landing || []), prsOf(oracle?.landing || []), `${id}: landing PRs`);
-      assert.equal(ctx.trail?.closeOutAfterReview, oracle?.closeOutAfterReview, `${id}: a close-out after the review`);
+      assert.deepEqual(prsOf(ctx.trail?.landing || []), prsOf(oracle.landing), `${id}: landing PRs`);
+      assert.equal(ctx.trail?.closeOutAfterReview, oracle.closeOutAfterReview, `${id}: a close-out after the review`);
     }
   });
 
-  test('the plan-review run agrees with the comments: the same verdicts since the latest Approve', () => {
+  test('the plan-review run agrees with the comment side: the same verdicts since the latest Approve', () => {
     for (const { id, bundle } of bundlesOf) {
       if (EXCEPTIONS[id]?.planReview) continue;
-      const comment = assemblePlanReviewFacts(bundle.comments || []).run.map((r) => r.verdict);
       const records = bundle.recordsContext.planReviewLoop.run.map((r) => r.verdict);
-      assert.deepEqual(records, comment, `${id}: plan-review run`);
+      assert.deepEqual(records, ORACLE_AT_HEAD[id].planRun, `${id}: plan-review run`);
     }
   });
 

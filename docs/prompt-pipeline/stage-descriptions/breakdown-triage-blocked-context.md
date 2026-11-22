@@ -115,11 +115,9 @@ what that check reads.
 
 **Read by the agent, and resolvable by code instead:**
 
-- **`### Plan Review Verdict`** headed comment with Approve, on *this* ticket's own trail
-  (`:480`, `:446-447`). plan-review is required to emit that heading (`prompt-template-defs.js:912`),
-  and the verdict token is already parsed elsewhere:
-  `VERDICT_TOKEN = /\b(approve|request changes|needs discussion)\b/i`
-  (`lib/plan-review-round-trips.js:167`). `generatePrompt` already receives `context.comments` on
+- **A plan-review Approve** on *this* ticket's own trail, read from the records (LIN-4520: a verdict is a record,
+  not a comment). The `### Plan Review Verdict` heading and the `VERDICT_TOKEN` parse this bullet used to cite
+  (`:480`, `:446-447`, `lib/plan-review-round-trips.js:167`) are history. `generatePrompt` already receives `context.comments` on
   the dispatch paths (`routes/proxy-dispatch.js:960`, `routes/proxy-compute.js:316`, `:466`,
   `routes/workspace-api.js:601`), though breakdown never renders them. The mechanical layer can
   resolve "approved: yes/no, comment id, revision" and hand the writer a fact. That removes the

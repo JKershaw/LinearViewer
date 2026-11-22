@@ -21,14 +21,12 @@ function model(overrides = {}) {
       asked: 'Do the thing',
       done: 'PR #12',
       checked: {
-        review: { verdict: 'approve-conditional', verdictText: 'Approve — conditional on close-out discharging the ledger.', ciLine: 'CI is green on the PR.', at: '2026-07-02T00:00:00.000Z', sha: 'abc1234' },
+        review: { verdict: 'approve', at: '2026-07-02T00:00:00.000Z', sha: 'abc1234' },
         now: { state: 'passing', checks: [{ name: 'unit', conclusion: 'success' }], headSha: 'deadbeef', prUrl: 'https://github.com/acme/widget/pull/12', checksUrl: 'https://github.com/acme/widget/pull/12/checks', headMoved: false },
       },
     },
     ledger: {
-      verdict: 'approve-conditional',
-      verdictText: 'Approve — conditional on close-out discharging the ledger.',
-      ciLine: 'CI is green on the PR.',
+      verdict: 'approve',
       at: '2026-07-02T00:00:00.000Z',
       sha: 'abc1234',
       ledger: {
@@ -48,8 +46,9 @@ describe('render-run-evidence: the checked row is two labelled lines', () => {
     assert.match(html, /data-testid="run-evidence-checked-now"/);
     assert.match(html, /Review&#039;s claim/);
     assert.match(html, />Now</);
-    // Review's line carries the verbatim verdict; the Now line carries the head.
-    assert.match(html, /Approve — conditional on close-out discharging the ledger\./);
+    // Review's line carries the record's verdict word (no comment wording, no CI line); the Now line carries the head.
+    assert.match(html, /data-testid="run-evidence-checked-review-verdict">Approve</);
+    assert.doesNotMatch(html, /run-evidence-checked-review-ci/, 'the review has no CI line any more (finding-ba76decd)');
     assert.match(html, /data-testid="run-evidence-checked-now-state">passing/);
     assert.match(html, /data-testid="run-evidence-checked-now-sha">head deadbeef/);
     assert.match(html, /data-testid="run-evidence-checks-link"[^>]*href="https:\/\/github\.com\/acme\/widget\/pull\/12\/checks"/);
@@ -128,7 +127,7 @@ describe('render-run-evidence: escaping', () => {
   test('interpolated text is escaped, never raw HTML', () => {
     const m = model();
     m.evidence.asked = '<script>alert(1)</script>';
-    m.evidence.checked.review.ciLine = '<img src=x onerror=alert(2)>';
+    m.evidence.checked.blindRead = { verdict: 'same', reason: '<img src=x onerror=alert(2)>', at: null };
     m.ledger.ledger = { present: true, empty: false, raw: '"><b>bold</b>' };
     const html = renderEvidence(m);
     assert.ok(!html.includes('<script>'));

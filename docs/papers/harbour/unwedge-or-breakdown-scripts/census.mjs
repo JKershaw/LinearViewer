@@ -10,7 +10,7 @@
  */
 import { readdirSync, readFileSync, writeFileSync } from 'node:fs';
 import { join } from 'node:path';
-import { assemblePlanReviewFacts } from '../../../../lib/recommendation-facts.js';
+import { countPlanReviewVerdicts } from './frozen-plan-review-counter.mjs';
 import { eraOf, replayFirstStop, carveChild, classifyBlocker, breakdownCase } from './classify.mjs';
 
 const [cacheDir, outPath] = process.argv.slice(2);
@@ -24,7 +24,7 @@ const num = (identifier) => Number(identifier.split('-')[1]);
 const RULING_MARK = '— Ruling recorded via Harbour';
 const FILED_RE = /\b(filed|opened|created)\b[^\n]{0,80}\bLIN-\d+/i;
 const PR_LINK_RE = /https:\/\/github\.com\/[^\s)]+\/pull\/\d+/;
-const planReviewed = (body) => assemblePlanReviewFacts([{ body, createdAt: '' }]).verdicts > 0;
+const planReviewed = (body) => countPlanReviewVerdicts([{ body, createdAt: '' }]).verdicts > 0;
 
 // 1. Read the cache. Errors (4 tickets "Could not find referenced Issue") are kept, not dropped.
 const byId = new Map();
@@ -47,7 +47,7 @@ for (const [identifier, { issue, cost }] of byId) {
     return at || null;
   };
   const comments = issue.comments.map(c => ({ body: c.body, createdAt: c.createdAt }));
-  const verdictFacts = assemblePlanReviewFacts(comments);
+  const verdictFacts = countPlanReviewVerdicts(comments);
   const stop = verdictFacts.verdicts ? replayFirstStop(comments, eraOf) : null;
   const carveChildren = (issue.children || [])
     .map(c => byId.get(c.identifier)?.issue)

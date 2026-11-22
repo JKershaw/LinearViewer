@@ -3,8 +3,8 @@
  *
  * A plan-review round is what the records hold (lib/records/plan-review-run.js): a verdict record judged `plan-review`,
  * and one finding `to: plan` per blocking issue its own run wrote. `loopFactsFor` folds those records with planReviewRunOf,
- * then reads a person's speech and landed work since the latest verdict from the comments (loopFactsOf), exactly as the
- * entrance does (lib/recommendation-input.js planReviewLoopOfTicket).
+ * then reads a person's speech since the latest verdict from the comments and landed work from the change records
+ * (loopFactsOf; LIN-4520, finding-ca44ecba), exactly as the entrance does (lib/recommendation-input.js planReviewLoopOfTicket).
  */
 import { planReviewRunOf, PLAN_REVIEW_JUDGEMENT, PLAN_FINDING_TO } from '../../lib/records/plan-review-run.js';
 import { loopFactsOf } from '../../lib/recommendation-facts.js';
@@ -25,13 +25,15 @@ export function planRound(at, outcome, blocking = 0) {
 }
 
 /**
- * The loop's facts for `rounds` (planRound values, in time order): the run folded from their records, and the person's
- * speech and landed work since the latest verdict read from `comments`.
+ * The loop's facts for `rounds` (planRound values, in time order): the run folded from their records, the person's
+ * speech since the latest verdict read from `comments`, and the landed work from `changes`: change records, each with the
+ * instant its record was first written (`at`) and its PR (`fields.ref`).
  * @param {Array<{verdict: object, findings: object[]}>} rounds
  * @param {Array<{body?: string, createdAt?: string}>} [comments]
+ * @param {Array<{at: string, fields: {ref: string}}>} [changes]
  */
-export function loopFactsFor(rounds, comments = []) {
+export function loopFactsFor(rounds, comments = [], changes = []) {
   const verdicts = rounds.map((r) => r.verdict);
   const findings = rounds.flatMap((r) => r.findings);
-  return loopFactsOf(planReviewRunOf({ verdicts, findings }), comments);
+  return loopFactsOf(planReviewRunOf({ verdicts, findings, changes }), comments);
 }

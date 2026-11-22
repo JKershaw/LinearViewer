@@ -5,7 +5,7 @@
  * Why a new file rather than more steps in tests/unit/lin-4496-walk8-replay.test.js: that file replays a walk whose plans
  * and children are seeds (written through the pipeline with a historical `by`, no addressee, no ticket). This replay writes
  * every step it asserts through the routes, as today's stages write them: a plan to breakdown, a plan-review finding, a
- * verdict (a comment, as plan-review writes it until slice 3), a revise, a finding end, pieces to implementation, and child
+ * verdict (a records verdict, as the plan-review stage POSTs it), a revise, a finding end, pieces to implementation, and child
  * tasks with their `piece`. The historical file stays as the witness of the walk's end state.
  *
  * Source material: walk 8's `lin-4469` fixture (LIN-4448's breakdown): its seven piece plans (plan-109..115, texts and
@@ -72,8 +72,9 @@ const tailOf = (s) => String(s).slice(firstParagraph(s).length).trim();
 const PLAN_TEXT = ['Walk 8 (LIN-4448): seven pieces, each built in its own session, in order.', ...PIECES.map((p) => firstParagraph(p.says))].join('\n\n');
 const PLAN_TEXT_V2 = `${PLAN_TEXT}\n\nRevised after plan-review: piece 6 names the witness it leaves open.`;
 const PIECE0_CORRECTED = PIECES[0].says.replace('Piece 0:', 'Piece 0 (corrected by John):');
-const CHANGES_REQUESTED = '### Plan Review Verdict\n\n**Verdict:** Request Changes.\n\nBlocking findings: 1\n\nPiece 6 leaves its witness open.';
-const APPROVED = '### Plan Review Verdict\n\n**Verdict:** Approve.\n\nBlocking findings: 0';
+// LIN-4520: a plan-review verdict is a records verdict, not a comment: its reasoning is the one-line reason the stage gives.
+const CHANGES_REASONING = 'Piece 6 leaves its witness open.';
+const APPROVED_REASONING = 'the revised plan names its witness';
 
 const mango = createMangoTmpdir('lin-4506-');
 before(() => mango.connect());
@@ -104,20 +105,23 @@ async function briefOf(run) {
   return brief;
 }
 
-/** The selector's plan facts for a ticket: the fold, and the facts text the selector is given. */
+/** The selector's plan facts for a ticket: the fold, the plan-review run, and the facts text the selector is given. */
 async function factsOf(identifier, comments = []) {
   const planFacts = (await rh.store.planFactsForTickets(URL_KEY, [identifier])).get(identifier);
+  const planReviewRun = await rh.store.planReviewRunForTicket(URL_KEY, identifier);
   const issue = await localProvider.issueDetail(URL_KEY, identifier);
-  return { planFacts, text: buildSelectorArgs(issue, { comments, children: [], planFacts }).facts };
+  return { planFacts, planReviewRun, text: buildSelectorArgs(issue, { comments, children: [], planFacts, planReviewRun }).facts };
 }
 
-/** A verdict, written as a comment on the parent ticket (verdicts stay comments until slice 3). Returns it as the selector reads it. */
-async function verdict(parentId, body) {
-  await localProvider.createComment(URL_KEY, parentId, body);
-  const comments = await localProvider.fetchIssueComments(URL_KEY, parentId);
-  const last = comments.filter((c) => c.body === body).at(-1);
-  assert.ok(last?.createdAt, 'the verdict comment reads back with its time');
-  return { id: last.id, body: last.body, createdAt: last.createdAt, user: { name: 'plan-review' } };
+/**
+ * A plan-review verdict on `planId`, POSTed under the plan-review run as the stage writes it (lib/prompts/stage-kinds.js).
+ * Returns it with the instant the records hold for it.
+ */
+async function verdictOf(run, planId, outcome, reasoning) {
+  const made = ok(await rh.post('/api/proxy/records', run.token, { kind: 'verdict', judgement: 'plan-review', outcome, in: run.taskId, on: [planId], reasoning, run: run.runId }), `plan-review verdict ${outcome}`);
+  const { snap } = await rh.store.read(URL_KEY, made.id);
+  assert.ok(snap?.at, 'the verdict record reads back with its time');
+  return { id: made.id, outcome, at: snap.at };
 }
 
 /** A task made from a ticket through the route, as dispatch makes it: `ref` names the ticket. */
@@ -154,24 +158,24 @@ async function replay() {
   Object.assign(out, { planId: plan.id, findingId: finding.id });
   out.factsReviewDue = await factsOf(parent.identifier);
 
-  // Plan-review requests changes (a comment). The finding stays open and the plan is not yet revised.
+  // Plan-review requests changes (a records verdict). The finding stays open and the plan is not yet revised.
   await sleep(10);
-  track(await stage('plan-review', parentTask));
-  out.changesRequested = await verdict(parent.id, CHANGES_REQUESTED);
-  out.factsUnrevised = await factsOf(parent.identifier, [out.changesRequested]);
+  const changesRun = track(await stage('plan-review', parentTask));
+  out.changesRequested = await verdictOf(changesRun, plan.id, 'request-changes', CHANGES_REASONING);
+  out.factsUnrevised = await factsOf(parent.identifier);
 
   // The plan is revised (v2, a new last-changed time), with its reason.
   await sleep(10);
   const reviseRun = track(await stage('plan', parentTask));
   out.revised = ok(await rh.post(`/api/proxy/records/${plan.id}/revise`, reviseRun.token, { says: PLAN_TEXT_V2, reason: 'answers the request-changes verdict: piece 6 names its witness', run: reviseRun.runId }), 'plan revise');
-  out.factsRevised = await factsOf(parent.identifier, [out.changesRequested]);
+  out.factsRevised = await factsOf(parent.identifier);
 
   // Plan-review again: Approve, which ends the finding (the plan-review route's own step).
   await sleep(10);
   const approveRun = track(await stage('plan-review', parentTask));
-  out.approved = await verdict(parent.id, APPROVED);
+  out.approved = await verdictOf(approveRun, plan.id, 'approve', APPROVED_REASONING);
   ok(await rh.post(`/api/proxy/records/${finding.id}/end`, approveRun.token, { state: 'done', reason: 'approved: the verdict on the revised plan', run: approveRun.runId }), 'finding end');
-  out.factsApproved = await factsOf(parent.identifier, [out.changesRequested, out.approved]);
+  out.factsApproved = await factsOf(parent.identifier);
 
   // Breakdown: each piece to implementation, then each child task with its piece. ensureTicket makes each child's ticket.
   const breakdownRun = track(await stage('breakdown', parentTask));
@@ -303,7 +307,7 @@ describe('LIN-4506: walk 8 breakdown and correction replayed through the proxy',
   });
 
   test('5. the revision round: review owed while the finding is open; once the plan has changed since the verdict, it is owed again; an Approve ends it', async () => {
-    const verdictAt = Date.parse(S.changesRequested.createdAt);
+    const verdictAt = Date.parse(S.changesRequested.at);
     assert.equal(S.factsReviewDue.planFacts.sessionFit, 'several');
     assert.equal(S.factsReviewDue.planFacts.reviewOwed.why, 'open-finding');
     assert.equal(S.factsReviewDue.planFacts.reviewOwed.finding, S.findingId);
