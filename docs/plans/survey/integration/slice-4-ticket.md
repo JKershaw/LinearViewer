@@ -40,7 +40,7 @@
 
   Every reader moves onto question and decision records: the ticket closer, the observer sweep, the KPIs, session and Home row states, account erasure, and the chat tools' `list_pending_decisions` (still read-only).
 - The scan retires, with its routes, page, fingerprint and the `harbour-comments` ledger it alone reads: stages raise their own questions.
-- **The size of the move is an ordinary question.** Scoping asks the person how big a move to make: a few reasonable options, its recommendation, and always room to go bigger. It's meant to be fuzzy. The answer, in the person's words, is a decision on the task. Until the person answers, the work goes ahead on the standing policy (err larger), as today. The `## Size of the move` section, its fixed shape, its guard and its vocabulary module retire.
+- **The size of the move is a decision on the task, kept fuzzy.** Scoping settles it as it does today: under the standing policy (err larger), with a sentence of why, written as a `decision` in the task. A person corrects it with a comment or a decision. Only when scoping would cut part of the ask, or judges the ticket the wrong work, does it ask the person, as an ordinary question, and that work waits for the answer. The `## Size of the move` section, its fixed shape and list of sizes, its guard and its vocabulary module retire.
 
 **The brief**
 - The brief is built from records, parts 1–8, for the run the dispatch credential names. No `?run=` is needed.
@@ -70,7 +70,7 @@
   - the authorship text rules: `isRuling`, `opensAsAgentNote`, `isPersonComment`, `isAgentActivity`, `reportsLandedWork` and selector rule 1's text;
   - the blind read's comment check (`refusedByBlindRead`). The rule that a blind read names exactly the landing changes already holds on its verdict.
 
-**Departures from the design, agreed with John (22 Nov):** agents ask through the records API, not through `DECISION:` (§5); the size of the move is an ordinary question (§5); no import of open questions (§9).
+**Departures from the design, agreed with John (22 Nov):** agents ask through the records API, not through `DECISION:` (§5); the size of the move is a plain decision, with no formal section (§5); no import of open questions (§9).
 
 **Not in this slice:**
 - lessons (slice 5);
@@ -97,7 +97,7 @@ Also: a comment John posts on that ticket reaches the next stage's brief as his 
 **Done when**
 - agents ask through the records API, and the feedback-to-ruling path and `DECISION:` teaching are gone;
 - rulings are question and decision records, and every surface and agent reads them there;
-- the size of the move is an ordinary question, and its section, shape, guard and vocabulary are gone;
+- the size of the move is a decision on the task, and its section, shape, guard and vocabulary are gone;
 - a resumed worker receives the question, the chosen option and the person's words;
 - dismissing means one thing everywhere;
 - the brief is built from records for the credential's run, and the ticket section and the recap's model summary are gone, with their caches, models and scripts;
