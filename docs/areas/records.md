@@ -66,7 +66,8 @@ routes/task-records.js, routes/project-page.js, routes/dispatch.js, server.js).
   session page reads evidence through `readRunEvidenceFn` (`routes/dashboard.js`), missed the store at LIN-4495, and
   every session page read "not measured". Search the aliases too, and keep a missing store reading "not measured",
   never zero, so a missed caller shows instead of passing.
-- A verdict rests on the head its judge read (LIN-4516): `heads` pins it per change before the refresh (`pinVerdictToHeads`).
-  A change write for an open PR revises that change (`versionChangeWrite`); a blind read gets its ids in its prompt.
+- A verdict rests on the head its judge read: `heads` pins it before the refresh (`pinVerdictToHeads`, LIN-4516). A merge
+  revises the head (`recordChangeMerged`), so a PR merged after an unseen push is in `staleUrls` but not
+  `movedUrls`: re-review on that (LIN-4521).
 - A task written with a ticket `ref` claims that ticket (`lib/records/writes.js`), as `ensureTask` does; else the ticket's
   references make a second task. A ticket's task id has one rule, `ticketTaskIdOf` (`lib/records/refs.js`). A revise that changes a claimed `ref` is refused (422).
