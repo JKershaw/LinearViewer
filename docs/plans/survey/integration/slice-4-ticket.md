@@ -1,11 +1,11 @@
 **Title:** Layer slice 4: rulings as records, and the ticket section goes
 
-**Repository:** JKershaw/LinearViewer (Harbour). simple-dispatcher needs no change: it forwards any `/api/proxy/*` path, and its `DECISION:` and `WITHDRAW:` markers stay as they are.
+**Repositories:** JKershaw/LinearViewer (Harbour), and one piece in JKershaw/simple-dispatcher: it stops teaching agents the `DECISION:` and `WITHDRAW:` markers, after Harbour's side has landed.
 
 **What this is for.** Slices 1–3 moved hand-offs, plans, verdicts and changes into records. Two things still travel as text, and this slice moves them and removes the scaffolding that carried them.
 - **Rulings are kept in several places at once.** Loop rulings live on dispatch-row feedback, scan rulings in `task-decisions`, and shelves and suggestions in two more stores. A predicate stitches them together on every read, keyed by loop, lineage, task and decision id.
 - **The answer is posted as a comment carrying `RULING_MARK`.** On a resume, the worker gets either the option label or the typed text, never both, and not the question. So a qualification you add to an option doesn't reach the worker.
-- **A second `DECISION:` on a row disappears,** because the feed shows only the last one.
+- **Agents ask by writing text that gets scraped.** A `DECISION:` block in the agent's reply is picked out by simple-dispatcher (the first one only) and forwarded, and Harbour shows only the last one per run.
 - **The brief still carries the ticket.** The brief agents are pointed at is a model-written summary of the ticket and its comments, with its own cache and model, and the recap is a second one. The record parts are built only when the caller passes `?run=`, and no prompt says to. So the parts addressed to a stage may never have reached it.
 - **Who wrote a comment is guessed from its text** (`isRuling`, `opensAsAgentNote`, `isPersonComment` and selector rule 1), because agents and people post through the same credential.
 
@@ -19,18 +19,12 @@
 **What we want.** The design's slice 4 row is the how, read with §3 (the brief), §5 (rulings), §7 (the tracker) and §9 (in flight). In short:
 
 **Rulings**
-- When Harbour receives `decision` feedback, it writes a `question` record:
-  - `by` the row's stage, or `autopilot` for a row with no run;
-  - `in` the task, `about` the asking run where there is one;
-  - `to` the owner (or the deciding stage the feedback names);
-  - with the ask, the options and the recommended option.
-
-  Every decision entry on a row becomes its own question. `decision-withdrawn` ends its question `withdrawn`.
+- **Agents ask through the records API,** as they write findings: a `question` record, `in` the task, `to` the person (or a deciding stage), with the ask, the options and the recommended option. Its writer and asking run come from the run, as for every record. A run may ask as many questions as it needs. An agent withdraws its own question by ending it `withdrawn`.
+- Harbour's path from `decision` feedback to a ruling retires, and the stage prompts and the runner kit ask through the API instead.
 - Answering is one route, used by the Rulings page, the task page card and Home.
   - It writes a `decision` (`by` the person, `answers` the question). The answer holds the chosen option and the person's own words, both.
   - The question ends `answered`.
-  - The effect then runs from the asking run, as it does today (resume, record or dispatch).
-  - A resumed worker's prompt carries the question, the chosen option and the person's words.
+  - The answer resumes the asking run, whose prompt carries the question, the chosen option and the person's words. If that run can't be resumed, the decision stands in the task, and the next stage reads it in its brief. The per-ruling effect choice (resume, record, dispatch) retires.
   - A question that has already ended is refused, as the 409 does today.
 - **Dismissing ends the question `withdrawn`, `by` the person,** with the reason "not worth asking". If the asking run is waiting, it resumes with "proceed on your best judgment". It is the same on every surface. The false-escalation measure counts questions a person withdrew.
 - The Rulings page shows what is open for the signed-in person: questions and findings addressed to them.
@@ -46,7 +40,7 @@
 
   Every reader moves onto question and decision records: the ticket closer, the observer sweep, the KPIs, session and Home row states, account erasure, and the chat tools' `list_pending_decisions` (still read-only).
 - The scan retires, with its routes, page, fingerprint and the `harbour-comments` ledger it alone reads: stages raise their own questions.
-- [to confirm: size] The size of the move becomes a decision `scope`d to the task (design §5). The description's size section, its parser and its guard retire. *Or:* it stays in the description, read whole.
+- **The size of the move is an ordinary question.** Scoping asks the person how big a move to make: a few reasonable options, its recommendation, and always room to go bigger. It's meant to be fuzzy. The answer, in the person's words, is a decision on the task. If it's unanswered, the standing policy (err larger) applies, as today. The `## Size of the move` section, its fixed shape, its guard and its vocabulary module retire.
 
 **The brief**
 - The brief is built from records, parts 1–8, for the run the dispatch credential names. No `?run=` is needed.
@@ -76,9 +70,7 @@
   - the authorship text rules: `isRuling`, `opensAsAgentNote`, `isPersonComment`, `isAgentActivity`, `reportsLandedWork` and selector rule 1's text;
   - the blind read's comment check (`refusedByBlindRead`). The rule that a blind read names exactly the landing changes already holds on its verdict.
 
-**Departures from the design, agreed with John:**
-- [to confirm: import] No import of open loop or scan questions (design §9). Rulings open at the cutover are answered before it deploys.
-- [to confirm: one per turn] One `DECISION:` per turn. The stage prompts say so, and simple-dispatcher's first-match scan stays.
+**Departures from the design, agreed with John (22 Nov):** agents ask through the records API, not through `DECISION:` (§5); the size of the move is an ordinary question (§5); no import of open questions (§9).
 
 **Not in this slice:**
 - lessons (slice 5);
@@ -90,7 +82,7 @@
 - stopping a run and its queued work (LIN-4523).
 
 **Witness:** after the cutover deploys, on a real task:
-1. a stage raises a question;
+1. a stage asks a question through the API;
 2. it shows on the Rulings page and the task page;
 3. John answers it with an option and a sentence qualifying it;
 4. the resumed worker's prompt shows the question, the option and the sentence.
@@ -103,7 +95,9 @@ Also: a comment John posts on that ticket reaches the next stage's brief as his 
 - as before: records addressed to a held run, and how long each sat.
 
 **Done when**
+- agents ask through the records API, and the feedback-to-ruling path and `DECISION:` teaching are gone;
 - rulings are question and decision records, and every surface and agent reads them there;
+- the size of the move is an ordinary question, and its section, shape, guard and vocabulary are gone;
 - a resumed worker receives the question, the chosen option and the person's words;
 - dismissing means one thing everywhere;
 - the brief is built from records for the credential's run, and the ticket section and the recap's model summary are gone, with their caches, models and scripts;

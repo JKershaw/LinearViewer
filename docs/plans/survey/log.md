@@ -5218,3 +5218,10 @@ The full stop holds: the fleet is paused, and the drive is only reporting. The o
 - Process notes: child pieces build straight from their piece plans; a piece edited after the breakdown's plan review gets no new review (P6, P8 both passed review anyway). The cap "lift" answer had no mechanism; a fresh run or removal was the lever. The original ticket text kept in the task's `asked` fed stale instructions to runs all day.
 - Open after it: finding-145b1665 (close-out's hand-back finding `to: review` has no reader or owner; it will pile up), two signed-in checks for John (finding-598a59f0 blind-read prompt, finding-b89ac5a3 effort page) and P8's live check (finding-da5bc495), several backlog tidy-ups.
 - Next (John): draft slice 4's ticket together, with full focus, correct before kickoff.
+
+## 22 Nov, ~22:00: slice 4 drafted with John (not filed)
+
+- One ticket, as slice 3; Harbour's breakdown makes the pieces. Draft at `integration/slice-4-ticket.md`, from a read-only research pass on main (2af7a7aea) and reviewed by a fresh reader against the slice 1–3 lessons ("ready after fixes"; fixes applied).
+- Found on main: the brief's record parts are built only with `?run=`, and no prompt passes it, so stages may never have received the parts addressed to them. Slice 4 builds the brief from the credential's run.
+- John's answers: Periodicals and their gate stay as they are (a report comment becoming a finding on its own ticket is fine); the scan retires (never really used); shelving retires (never used); comments simplified: stage runs write none, and any comment that isn't a Harbour summary becomes a person's finding, with no ledger, refusal or new marker; the size of the move was meant to be fuzzy, so it becomes an ordinary question and the formal section, guard and vocabulary retire; agents ask through the records API, not `DECISION:` text (simple-dispatcher's teaching of the marker goes as one piece, as LIN-4447's piece 8 did); no import, and no ceremony over the switch-over ("do it properly").
+- John: keep this simpler and easier to explain; questions one at a time, with context checked in the notes.
