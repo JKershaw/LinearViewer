@@ -20,9 +20,7 @@ import assert from 'node:assert/strict';
 import {
   createDispatchItem,
   BUDGET_EXHAUSTED_CODE,
-  TASK_SESSION_RUNAWAY_CODE,
-  DUPLICATE_DISPATCH_CODE,
-  MAX_FRESH_SESSIONS_PER_TASK
+  DUPLICATE_DISPATCH_CODE
 } from '../../lib/dispatch-factory.js';
 
 const NOW = Date.parse('2026-10-16T12:00:00.000Z');
@@ -57,8 +55,8 @@ describe('fix 1: a sync throw acts as a rejection, a plain return as its value',
   const reject = async () => { throw new Error('async read failure'); };
 
   test('run-row read: sync throw = rejection (the run reads as absent)', async () => {
-    const thrown = makeStore({ getItemStatus: syncThrow, countDistinctTasksForSession: async () => ({ count: 0, taskDispatches: 0 }) });
-    const rejected = makeStore({ getItemStatus: reject, countDistinctTasksForSession: async () => ({ count: 0, taskDispatches: 0 }) });
+    const thrown = makeStore({ getItemStatus: syncThrow, countDistinctTasksForSession: async () => ({ count: 0 }) });
+    const rejected = makeStore({ getItemStatus: reject, countDistinctTasksForSession: async () => ({ count: 0 }) });
     await dispatch(thrown).promise;
     await dispatch(rejected).promise;
     assert.equal(thrown.calls.addItem, 1);
@@ -91,13 +89,15 @@ describe('fix 1: a sync throw acts as a rejection, a plain return as its value',
     assert.equal(plain.calls.item.issueIdentifier, 'LIN-9');
   });
 
-  test('count read: a sync throw with no maxTasks admits (the failsafe fails open), like a rejection', async () => {
-    const thrown = makeStore({ getItemStatus: async () => ({}), countDistinctTasksForSession: syncThrow });
-    const rejected = makeStore({ getItemStatus: async () => ({}), countDistinctTasksForSession: reject });
+  test('count read: with no maxTasks the count is never read, so a sync throw and a rejection both admit (LIN-4528)', async () => {
+    let reads = 0;
+    const thrown = makeStore({ getItemStatus: async () => ({}), countDistinctTasksForSession: () => { reads++; return syncThrow(); } });
+    const rejected = makeStore({ getItemStatus: async () => ({}), countDistinctTasksForSession: async () => { reads++; return reject(); } });
     await dispatch(thrown).promise;
     await dispatch(rejected).promise;
     assert.equal(thrown.calls.addItem, 1);
     assert.equal(rejected.calls.addItem, 1);
+    assert.equal(reads, 0, 'an undeclared budget is never counted');
   });
 
   test('preset read: sync throw = rejection (no preset), plain return = its value', async () => {
@@ -141,36 +141,35 @@ describe('fix 1: a sync throw acts as a rejection, a plain return as its value',
     }
 
     test('a count at the maxTasks bound for a new task still refuses', async () => {
-      const store = makeStore({ getItemStatus: runRow, countDistinctTasksForSession: async () => ({ count: 3, alreadyCounted: false, taskDispatches: 0 }) });
+      const store = makeStore({ getItemStatus: runRow, countDistinctTasksForSession: async () => ({ count: 3, alreadyCounted: false }) });
       await assert.rejects(dispatch(store).promise, (err) => err.budgetExhausted?.count === 3);
       assert.equal(store.calls.addItem, 0);
     });
 
     test('the same count for an already-counted task admits', async () => {
-      const store = makeStore({ getItemStatus: runRow, countDistinctTasksForSession: async () => ({ count: 3, alreadyCounted: true, taskDispatches: 0 }) });
+      const store = makeStore({ getItemStatus: runRow, countDistinctTasksForSession: async () => ({ count: 3, alreadyCounted: true }) });
       await dispatch(store).promise;
       assert.equal(store.calls.addItem, 1);
     });
 
-    test('taskDispatches 29 admits and 30 refuses with TASK_SESSION_RUNAWAY', async () => {
-      assert.equal(MAX_FRESH_SESSIONS_PER_TASK, 30);
-      const at = (taskDispatches) => makeStore({ getItemStatus: async () => ({}), countDistinctTasksForSession: async () => ({ count: 1, alreadyCounted: true, taskDispatches }) });
-      const admitted = at(29);
-      await dispatch(admitted).promise;
-      assert.equal(admitted.calls.addItem, 1);
-      const refused = at(30);
-      await assert.rejects(dispatch(refused).promise, (err) => err.taskSessionRunaway?.code === TASK_SESSION_RUNAWAY_CODE);
-      assert.equal(refused.calls.addItem, 0);
+    test('WITNESS (LIN-4528): a legacy taskDispatches of 30 is ignored: a declared-budget fresh session is admitted', async () => {
+      // Kept on purpose: `taskDispatches` is the field the removed per-task cap read. It refused
+      // here (TASK_SESSION_RUNAWAY) before the change and admits after it. No current store returns it.
+      const store = makeStore({ getItemStatus: runRow, countDistinctTasksForSession: async () => ({ count: 1, alreadyCounted: true, taskDispatches: 30 }) });
+      await dispatch(store).promise;
+      assert.equal(store.calls.addItem, 1);
     });
   });
 });
 
 describe('fix 2: a count resolving undefined is unreadable, like null', () => {
-  test('with no maxTasks the failsafe fails open: admitted, no TypeError', async () => {
-    const store = makeStore({ getItemStatus: async () => ({}), countDistinctTasksForSession: async () => undefined });
+  test('with no maxTasks the count is never read: admitted, no TypeError, no budgetPosition (LIN-4528)', async () => {
+    let reads = 0;
+    const store = makeStore({ getItemStatus: async () => ({}), countDistinctTasksForSession: async () => { reads++; return undefined; } });
     await dispatch(store).promise;
     assert.equal(store.calls.addItem, 1);
     assert.equal(store.calls.item.budgetPosition, undefined);
+    assert.equal(reads, 0);
   });
 
   test('with maxTasks declared it fails closed: 409 BUDGET_EXHAUSTED, count null, no mint', async () => {
