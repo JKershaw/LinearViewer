@@ -62,6 +62,7 @@ import { fileURLToPath } from 'node:url';
 import { execFileSync } from 'node:child_process';
 import { computePlanReviewRoundTrips, __internal } from '../lib/plan-review-round-trips.js';
 import { readPlanFactsThroughProxy } from './plan-facts-proxy.mjs';
+import { readVerdictFactsThroughProxy } from './verdict-facts-proxy.mjs';
 const { requireInstant } = __internal;
 import { classifyUpstreamError } from '../lib/errors.js';
 
@@ -72,7 +73,7 @@ const REPO_ROOT = join(dirname(fileURLToPath(import.meta.url)), '..');
 const TERMINAL_STATES = ['completed', 'canceled', 'duplicate'];
 
 const USAGE = `usage: PROXY_TOKEN=xxx node scripts/plan-review-round-trips.mjs \\
-         [--json] [--no-cache] [--ruler-change-at <ISO>] [--window-days <n>]
+         [--json] [--no-cache] [--ruler-change-at <ISO>] [--window-days <n>] [--verdicts records|comments]
        [--base <url>] [--token <tok>] [--cache <dir>] [--limit <n>]`;
 
 function parseArgs(argv) {
@@ -84,6 +85,9 @@ function parseArgs(argv) {
     limit: 250,
     rulerChangeAt: null,
     windowDays: null,
+    // LIN-4519: verdicts come from records (the default). `comments` is the historic reproduction only: the comment
+    // trail the committed slice-3 readings were taken from, until P7 (LIN-4520) retires that reader.
+    verdicts: 'records',
   };
   for (let i = 0; i < argv.length; i++) {
     const v = argv[i];
@@ -96,7 +100,9 @@ function parseArgs(argv) {
     else if (v === '--limit') a.limit = parseInt(argv[++i], 10) || 250;
     else if (v === '--ruler-change-at') a.rulerChangeAt = argv[++i];
     else if (v === '--window-days') a.windowDays = parseInt(argv[++i], 10) || null;
+    else if (v === '--verdicts') a.verdicts = argv[++i];
   }
+  if (!['records', 'comments'].includes(a.verdicts)) throw new Error(`--verdicts must be records or comments (got ${JSON.stringify(a.verdicts)})`);
   return a;
 }
 
@@ -408,13 +414,21 @@ async function main() {
   log('per-issue read: detail + scoped dispatch pipeline + plan-review row detail…');
   const { issues, skipped, calls } = await fetchAll(rows, args);
 
+  const tickets = issues.map((i) => i.identifier).filter(Boolean);
   log('reading plan records through the proxy (three reads)…');
-  const planFacts = await readPlanFactsThroughProxy({ base: args.base, token: args.token, getJson, tickets: issues.map((i) => i.identifier).filter(Boolean) });
+  const planFacts = await readPlanFactsThroughProxy({ base: args.base, token: args.token, getJson, tickets });
+  let verdictFacts = null;
+  if (args.verdicts === 'records') {
+    log('reading verdict records through the proxy (reads by kind, then first writes)…');
+    verdictFacts = (await readVerdictFactsThroughProxy({ base: args.base, token: args.token, getJson, tickets })).facts;
+  }
 
   const asOf = iso(Date.now());
   const result = computePlanReviewRoundTrips(issues, {
     asOf,
     planFacts,
+    verdictSource: args.verdicts,
+    verdictFacts,
     rulerChangeAt: args.rulerChangeAt || undefined,
     windowDays: args.windowDays || undefined,
     codeVersion: readCodeVersion(),

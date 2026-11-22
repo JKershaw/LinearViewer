@@ -16,9 +16,15 @@
 import { test, describe } from 'node:test';
 import assert from 'node:assert/strict';
 import {
-  computeIssueRoundTrips, computePlanReviewRoundTrips,
+  computeIssueRoundTrips as computeIssueRoundTripsOf, computePlanReviewRoundTrips as computePlanReviewRoundTripsOf,
   derivePrimaryFloor, MIN_DENOMINATOR, __internal,
 } from '../../lib/plan-review-round-trips.js';
+
+// LIN-4519: this file pins the COMMENTS reading (the historic reproduction: tiers A and B read the comment trail). The
+// default is records now, so every call here names the comments source; records are pinned in
+// tests/unit/lin-4519-round-trips-records.test.js.
+const computeIssueRoundTrips = (issue, options = {}) => computeIssueRoundTripsOf(issue, { verdictSource: 'comments', ...options });
+const computePlanReviewRoundTrips = (issues, options = {}) => computePlanReviewRoundTripsOf(issues, { verdictSource: 'comments', ...options });
 import { extractVerdict } from '../../lib/run-trail.js';
 import { __internal as followOnRatioInternal } from '../../lib/follow-on-ratio.js';
 import { planFactsOf } from '../../lib/records/plan-facts.js';

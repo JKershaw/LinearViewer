@@ -15,6 +15,11 @@
  *   3. `GET /dispatch/{rowId}/prompt` per `custom` row whose feedback names no task
  *      (an aborted row never posts `[started]`)                its first line
  *   4. `GET /rulings?issueIdentifier={id}&includeResolved=true` raise/answer times
+ *   5. the verdict records, once for every ticket (scripts/verdict-facts-proxy.mjs):
+ *      `GET /records?kind=task|verdict|change` and `GET /records/{id}` per verdict whose
+ *      current version is not its first. A review or plan-review cause reads the verdict
+ *      record of its window; work before the verdict cutover (lib/records/verdict-facts.js)
+ *      reads "not-measured", and so does a row with no such record. No comment is read for a verdict.
  * Reads only, rate-limited under the proxy's 60/min cap and cached to disk; a
  * row is cached only once it is terminal or closed.
  *
@@ -39,6 +44,7 @@ import { mkdirSync, readFileSync, writeFileSync, existsSync } from 'node:fs';
 import { join } from 'node:path';
 import { tmpdir } from 'node:os';
 import { classifyTicket, summarizeChurn, taskHead } from '../lib/pipeline-churn.js';
+import { readVerdictFactsThroughProxy } from './verdict-facts-proxy.mjs';
 
 function parseArgs(argv) {
   const a = { base: process.env.PROXY_BASE || 'https://projects.jkershaw.com/api/proxy',
@@ -130,6 +136,8 @@ function render(tickets, summary, showRows) {
     }
   }
   L.push('');
+  const notMeasured = summary.byCause.find((c) => c.cause === 'not-measured');
+  if (notMeasured) L.push('  not-measured: the verdict is not in the records (work before the verdict cutover, or no verdict record in the row\'s window); --rows gives each reason.');
   L.push('  wall: a worker\'s dispatch to its end (parked time included); a wake\'s or custom\'s own turn.');
   L.push('  stalled: the longest `[stalled?] no tool activity` stretch inside a row\'s working window.');
   L.push('');
@@ -143,10 +151,17 @@ async function main() {
     process.exit(2);
   }
   const get = makeReader(args);
+  const getJson = (url) => {
+    const path = url.slice(args.base.length);
+    const one = /^\/records\/([^?]+)$/.exec(path);
+    return get(path, one ? { cacheKey: `record-${decodeURIComponent(one[1])}`, keep: () => true } : {});
+  };
+  process.stderr.write(`  reading verdict records…\n`);
+  const verdicts = await readVerdictFactsThroughProxy({ base: args.base, token: args.token, getJson, tickets: args.issues });
   const tickets = [];
   for (const id of args.issues) {
     process.stderr.write(`  reading ${id}…\n`);
-    tickets.push(classifyTicket(await readTicket(get, id)));
+    tickets.push(classifyTicket({ ...(await readTicket(get, id)), verdicts: verdicts.facts.get(id) }));
   }
   const summary = summarizeChurn(tickets);
   if (args.json) console.log(JSON.stringify({ summary, tickets }, null, 2));

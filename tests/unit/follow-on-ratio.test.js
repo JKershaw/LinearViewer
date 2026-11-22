@@ -391,7 +391,7 @@ describe('D. companion instruments', () => {
     const viaComment = run([source('s', DONE, { comments: [{ id: 'c1', body: 'Plan complete. Session fit: fits one session', createdAt: DONE }] })],
       { planRecordsSince: COVERED, planFacts: factsFor(['LIN-s']) });
     assert.equal(viaComment.planScoped.denominator, 0);
-    assert.equal(viaComment.diagnostics.pctWithReviewLedger, 0);
+    assert.equal(viaComment.diagnostics.pctWithReviewLedger, null, 'LIN-4519: retired, so not measured; never 0');
   });
 
   test('LIN-4504: work the plan records do not cover reads not measured, never unplanned and never 0', () => {
@@ -408,13 +408,18 @@ describe('D. companion instruments', () => {
     assert.equal(run(issues, { planRecordsSince: COVERED }).diagnostics.plannedNotMeasured, 1, 'no facts read at all');
   });
 
-  test('a /g-flagged review-ledger override does NOT under-count — regex state is never carried', () => {
+  test('LIN-4519: the review-ledger diagnostic is retired: not measured, whatever the comment text or the override says', () => {
     const ledger = { comments: [{ id: 'c', body: '## Review — LIN-1\n- x', createdAt: DONE }] };
-    const ledgered = run(
+    const r = run(
       [source('s1', DONE, ledger), source('s2', DONE, ledger), source('s3', DONE, ledger)],
       { reviewLedgerMarker: /^##\s*Review\s+—\s+\S+/gm },
     );
-    assert.equal(ledgered.diagnostics.pctWithReviewLedger, 1, 'a /g review-ledger override must not alternate either');
+    assert.equal(r.diagnostics.pctWithReviewLedger, null, 'a review ledger in every comment still reads not measured');
+    assert.match(r.diagnostics.pctWithReviewLedgerReason, /^not measured: /);
+    assert.equal(r.denominator, 3, 'the denominator does not read the ledger either');
+    assert.equal('reviewLedgerMarker' in r.definition, false, 'the retired ruler is no longer echoed as if applied');
+    assert.equal('reviewLedgerMarkerScope' in r.definition, false);
+    assert.match(r.definition.reviewLedger, /^not measured: /);
   });
 
   test('a duplicate issue row does not inflate the denominator', () => {

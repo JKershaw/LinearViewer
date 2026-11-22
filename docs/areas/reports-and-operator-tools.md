@@ -32,12 +32,17 @@ Area notes for `reports-and-operator-tools` in the registry. Format and rules: R
   `/cost` lists, not roots: on LIN-4393 each member's own resume lines were missing from
   its root's merged read. `dispatchedBy` is never origin (one account for autopilot and
   person), and `/rulings` returns loop rulings only (LIN-4422).
-- Measure 1 has one source, the pre-merge `## Blind read`: a landing counts as read only when a
-  read naming its PR was posted before its merge, matched through `landingPrUrls` and
-  `parseBlindRead` from `lib/run-trail.js`, never a parser of its own; anything else is
-  unread under a named reason. A hand-run Balance cell becomes a sign only in
-  `docs/papers/harbour/cleaner-than-it-started-scripts/balance-sign.mjs`, beside the paper's
-  coder, which must reproduce both frozen codes files (LIN-4439).
+- Measure 1 has one source, the pre-merge blind-read verdict record (LIN-4519; the `## Blind read` comment before P6): a
+  landing counts as read only when a blind-read verdict first written before its merge names its PR through the change
+  record's ref, and anything else is unread under a named reason. A landing merged before `VERDICT_RECORDS_SINCE`
+  (lib/records/verdict-facts.js, the first verdict-import write) is `before the verdict records`, never a guess from a
+  comment. The comment reader lives only in `scripts/historic-comment-readers.mjs`, for reproducing the committed
+  readings, and is deleted with the comment readers in P7 (LIN-4520). A hand-run Balance cell becomes a sign only in
+  `docs/papers/harbour/cleaner-than-it-started-scripts/balance-sign.mjs`, beside the paper's coder (LIN-4439).
+- Every verdict-dependent measure (round trips, churn, the effort readout's survival, measure 1) reads verdict records
+  from `VERDICT_RECORDS_SINCE` and says `not measured: <reason>` for a row dispatched or landed before it. Its committed
+  readings (docs/reviews/slice-3-readings/) are the baseline and are never re-derived with a comment parser (LIN-4519).
+  A verdict is read from its first write, not its current version: an ended one keeps its place in a window.
 - A landing's subject is read through the core's regexes only: `MERGE_PR` gives a merge landing
   both its branch (`ownTicket`) and its PR number (`landingPr`), so the two never parse it apart
   (LIN-4439 leftovers).

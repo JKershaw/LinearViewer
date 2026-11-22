@@ -1,8 +1,9 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import {
-  classifyTicket, summarizeChurn, ownSegment, workerSpanMs, longestStallMs, taskHead,
+  classifyTicket, summarizeChurn, ownSegment, workerSpanMs, longestStallMs, taskHead, CAUSES,
 } from '../../lib/pipeline-churn.js';
+import { verdictFactsFromRecords } from '../../lib/records/verdict-facts.js';
 
 // Rows in the shape GET /dispatch?issueIdentifier= merged with GET /dispatch/{id}
 // returns: wakes and customs carry their lineage's feedback, workers their own.
@@ -63,19 +64,6 @@ test('the leftover step is a stage of the path, not a stall recovery, and adds n
   assert.equal(entry.cause, 'stage-path');
   assert.equal(entry.note, 'leftover step');
   assert.equal(summarizeChurn([r]).extraOverStagePath, 0);
-});
-
-test('a plan sent back by plan-review costs a re-plan and a re-review, read structurally when no verdict text is anchored', () => {
-  const ap = autopilot();
-  const rows = [ap,
-    worker('plan', 1, 3), worker('plan-review', 4, 6, { text: 'DONE: posted Request Changes, 2 blocking findings.' }),
-    worker('plan', 7, 8), worker('plan-review', 9, 10, { text: 'DONE: plan-review verdict: Approve.' }),
-    worker('implementation', 11, 20)];
-  const r = classifyTicket({ identifier: 'LIN-1', rows });
-  assert.deepEqual(causesOf(r).slice(1, 5), ['plan:first-pass-stage', 'plan-review:first-pass-stage', 'plan:plan-rejected', 'plan-review:plan-rejected']);
-  assert.match(r.entries[3].note, /structural/);
-  assert.equal(r.entries[5].cause, 'stage-path');
-  assert.equal(r.entries[5].afterFirstImplementation, false);
 });
 
 test('a CI-finished wake is the orchestrator\'s when it lands on the autopilot lineage, a worker\'s when on the worker, CI red when failing', () => {
@@ -144,17 +132,6 @@ test('a dispatch aborted before work and its abort carrier are one misroute, and
   assert.deepEqual(causesOf(r).slice(1, 4), ['breakdown:aborted-before-work', 'custom:aborted-before-work', 'wake:aborted-before-work']);
 });
 
-test('implementation after an Approve is a fix round close-out owns; after Request Changes it is review changes', () => {
-  const ap = autopilot();
-  const approve = classifyTicket({ identifier: 'LIN-1', rows: [ap, worker('implementation', 1, 5),
-    worker('review', 6, 8, { text: 'DONE: verdict "Approve — conditional on close-out discharging the ledger".' }),
-    worker('implementation', 9, 12)] });
-  assert.equal(approve.entries[3].cause, 'fixes-outside-close-out');
-  const rc = classifyTicket({ identifier: 'LIN-1', rows: [ap, worker('implementation', 1, 5),
-    worker('review', 6, 8, { text: 'DONE: verdict is Request Changes.' }), worker('implementation', 9, 12), worker('review', 13, 15)] });
-  assert.deepEqual(causesOf(rc).slice(3), ['implementation:review-changes', 'review:review-changes']);
-});
-
 test('a worker dispatched as a follow-up into another worker is stall recovery, not a fresh stage', () => {
   const ap = autopilot();
   const impl = worker('implementation', 1, 10);
@@ -216,4 +193,167 @@ test('a stall counts only inside the working window, and a parked worker\'s span
 test('taskHead prefers the prompt line the script read for a row that never posted [started]', () => {
   assert.equal(taskHead({ promptHead: 'Operator note: merged', feedback: [] }), 'Operator note: merged');
   assert.equal(taskHead(custom(1, 'CI finished on x (head a): passing.')), 'CI finished on x (head a): passing.');
+});
+
+// Characterization (LIN-4519 P6): the readings that do not depend on verdicts. Captured from the code before the
+// verdict-record change; a row's cause, note, walls and the summary's shape must stay exactly these.
+test('characterization: the verdict-free readings keep their causes, notes, walls and summary shape', () => {
+  const ap = autopilot();
+  const survey = worker('survey-task', 0.5, 2);
+  const plan = worker('plan', 3, 5);
+  const pr = worker('plan-review', 6, 7, { text: 'DONE: verdict Approve.' });
+  const impl = worker('implementation', 8, 12);
+  const wk1 = wake(12, ap.id);
+  const rev = worker('review', 13, 15, { text: 'DONE: verdict Approve.' });
+  const blind = worker('blind-read', 15.5, 16, { text: 'DONE: Verdict: better.' });
+  const wk2 = wake(15, ap.id);
+  const heldCo = worker('close-out', 17, 20, { marker: 'blocked', text: 'BLOCKED: PR 1 is merged and deployed; post-deploy checks need production access.' });
+  const co = worker('close-out', 30, 32);
+  const ci = custom(33, 'CI finished on https://github.com/o/r/pull/1 (head abc1234): failing.', { followUpTo: co.id });
+  const leftover = worker('leftover', 12.2, 13, { followUpTo: impl.id, text: 'DONE: ### Leftovers: nothing.' });
+  const bd = worker('breakdown', 40, 40.2, { marker: 'aborted', status: 'aborted', text: 'aborted' });
+  const carrier = custom(40.1, '', { status: 'aborted', end: 40.2 });
+  const op = custom(50, 'Operator note: check the deploy', {});
+  const rows = [ap, survey, plan, pr, impl, wk1, leftover, rev, blind, wk2, heldCo, co, ci, bd, carrier, op];
+  const named = (s) => {
+    let out = s;
+    for (const r of rows) if (out) out = out.replace(new RegExp(`${r.id.slice(0, 8)}(?=[\\s:]|$)`, "g"), `<${r.kind}>`);
+    return out;
+  };
+  const result = classifyTicket({ identifier: 'LIN-1', rows });
+  const entries = result.entries.map((e) => ({
+    kind: e.kind, cause: e.cause, note: named(e.note), wallMs: e.wallMs, stalledMs: e.stalledMs,
+    owner: rows.find((r) => r.id === e.ownerId)?.kind ?? null, afterFirstImplementation: e.afterFirstImplementation,
+  }));
+  assert.deepEqual(entries, [
+  { kind: 'autopilot', cause: 'stage-path', note: null, wallMs: 30000, stalledMs: 0, owner: null, afterFirstImplementation: false },
+  { kind: 'survey-task', cause: 'first-pass-stage', note: null, wallMs: 90000, stalledMs: 0, owner: null, afterFirstImplementation: false },
+  { kind: 'plan', cause: 'first-pass-stage', note: null, wallMs: 120000, stalledMs: 0, owner: null, afterFirstImplementation: false },
+  { kind: 'plan-review', cause: 'first-pass-stage', note: null, wallMs: 60000, stalledMs: 0, owner: null, afterFirstImplementation: false },
+  { kind: 'implementation', cause: 'stage-path', note: null, wallMs: 240000, stalledMs: 0, owner: null, afterFirstImplementation: false },
+  { kind: 'wake', cause: 'stage-path', note: 'wake after implementation <implementation>', wallMs: 30000, stalledMs: 0, owner: 'implementation', afterFirstImplementation: true },
+  { kind: 'leftover', cause: 'stage-path', note: '<leftover> step', wallMs: 48000, stalledMs: 0, owner: null, afterFirstImplementation: true },
+  { kind: 'review', cause: 'stage-path', note: null, wallMs: 120000, stalledMs: 0, owner: null, afterFirstImplementation: true },
+  { kind: 'wake', cause: 'stage-path', note: 'wake after review <review>', wallMs: 30000, stalledMs: 0, owner: 'review', afterFirstImplementation: true },
+  { kind: 'blind-read', cause: 'stage-path', note: 'blind read', wallMs: 30000, stalledMs: 0, owner: null, afterFirstImplementation: true },
+  { kind: 'close-out', cause: 'stage-path', note: null, wallMs: 180000, stalledMs: 0, owner: null, afterFirstImplementation: true },
+  { kind: 'close-out', cause: 'close-out-held', note: 'held on a post-deploy check', wallMs: 120000, stalledMs: 0, owner: null, afterFirstImplementation: true },
+  { kind: 'custom', cause: 'ci-red', note: 'CI failing on https://github.com/o/r/pull/1', wallMs: 30000, stalledMs: 0, owner: null, afterFirstImplementation: true },
+  { kind: 'breakdown', cause: 'aborted-before-work', note: 'breakdown aborted after 12s', wallMs: 12000, stalledMs: 0, owner: null, afterFirstImplementation: true },
+  { kind: 'custom', cause: 'aborted-before-work', note: 'abort of breakdown <breakdown>', wallMs: 6000, stalledMs: 0, owner: 'breakdown', afterFirstImplementation: true },
+  { kind: 'custom', cause: 'operator-follow-up', note: 'Operator note: check the deploy', wallMs: 30000, stalledMs: 0, owner: null, afterFirstImplementation: true },
+  ]);
+  const summary = summarizeChurn([result]);
+  assert.deepEqual(Object.keys(summary), ['tickets', 'dispatches', 'extraOverStagePath', 'byCause', 'rulings', 'personWaitMs']);
+  assert.deepEqual(summary.byCause.map((c) => [c.cause, c.dispatches, c.wakes, c.wallMs, c.stalledMs, c.tickets]), [
+    ['stage-path', 8, 2, 708000, 0, { 'LIN-1': 8 }],
+    ['first-pass-stage', 3, 0, 270000, 0, { 'LIN-1': 3 }],
+    ['aborted-before-work', 2, 0, 18000, 0, { 'LIN-1': 2 }],
+    ['close-out-held', 1, 0, 120000, 0, { 'LIN-1': 1 }],
+    ['ci-red', 1, 0, 30000, 0, { 'LIN-1': 1 }],
+    ['operator-follow-up', 1, 0, 30000, 0, { 'LIN-1': 1 }],
+  ]);
+});
+
+// LIN-4519 P6: a verdict-dependent reading comes from the verdict records of the row's window. The rows here are
+// shifted past the cutover (VERDICT_RECORDS_SINCE, 2026-11-21 08:06Z) unless a test says otherwise.
+const LATE_MS = Date.parse('2026-11-22T10:00:00.000Z') - T0;
+const shiftIso = (iso) => (iso ? new Date(Date.parse(iso) + LATE_MS).toISOString() : iso);
+const late = (row) => ({ ...row, dispatchedAt: shiftIso(row.dispatchedAt), completedAt: shiftIso(row.completedAt), closedAt: shiftIso(row.closedAt),
+  feedback: (row.feedback || []).map((f) => ({ ...f, timestamp: shiftIso(f.timestamp) })) });
+const vAt = (min) => shiftIso(at(min));
+/** The verdict facts of LIN-1 from records: [judgement, outcome, first-write instant] per verdict. */
+const factsOf = (verdicts = []) => verdictFactsFromRecords({
+  tasks: [{ id: 'task-1', kind: 'task', fields: { ref: 'LIN-1' } }],
+  verdicts: verdicts.map(([judgement, outcome, when], i) => ({ id: `verdict-${i}`, kind: 'verdict', in: 'task-1', at: when, state: 'stands', fields: { judgement, outcome } })),
+}, ['LIN-1']).get('LIN-1');
+
+test('implementation after a review that asked for changes reads the review record, not the review text', () => {
+  const ap = autopilot();
+  const rows = [ap, worker('implementation', 1, 5), worker('review', 6, 8, { text: 'DONE: verdict Approve.' }), worker('implementation', 9, 12)].map(late);
+  const r = classifyTicket({ identifier: 'LIN-1', rows, verdicts: factsOf([['review', 'request-changes', vAt(7)]]) });
+  assert.equal(r.entries[3].cause, 'review-changes');
+  assert.equal(r.entries[3].note, `review ${r.entries[2].id.slice(0, 8)}: request-changes`);
+});
+
+test('implementation after a review whose record approves is a fix round close-out owns, whatever the text says', () => {
+  const ap = autopilot();
+  const rows = [ap, worker('implementation', 1, 5), worker('review', 6, 8, { text: 'DONE: verdict Request Changes.' }), worker('implementation', 9, 12)].map(late);
+  const r = classifyTicket({ identifier: 'LIN-1', rows, verdicts: factsOf([['review', 'approve', vAt(7)]]) });
+  assert.equal(r.entries[3].cause, 'fixes-outside-close-out');
+});
+
+test('before the cutover a review verdict is not measured, with the reason, and the comment text is not read', () => {
+  const ap = autopilot();
+  const rows = [ap, worker('implementation', 1, 5), worker('review', 6, 8, { text: 'DONE: verdict Request Changes.' }), worker('implementation', 9, 12)];
+  const r = classifyTicket({ identifier: 'LIN-1', rows, verdicts: factsOf() });
+  assert.equal(r.entries[3].cause, 'not-measured');
+  assert.match(r.entries[3].note, /^review .*: not measured \(no verdict records before 2026-11-21 08:06Z\)$/);
+  const s = summarizeChurn([r]);
+  assert.equal(s.extraOverStagePath, 1); // not-measured is still a dispatch beyond the stage path
+  assert.equal(s.byCause.find((c) => c.cause === 'not-measured').label, CAUSES['not-measured'].label);
+});
+
+test('a post-cutover review with no verdict record in its window is not measured, not repeat-stage', () => {
+  const ap = autopilot();
+  const rows = [ap, worker('implementation', 1, 5), worker('review', 6, 8), worker('implementation', 9, 12)].map(late);
+  const r = classifyTicket({ identifier: 'LIN-1', rows, verdicts: factsOf() });
+  assert.equal(r.entries[3].cause, 'not-measured');
+  assert.match(r.entries[3].note, /no review verdict record written in its window/);
+});
+
+test('a verdict written outside the review\'s window is not that review\'s', () => {
+  const ap = autopilot();
+  const rows = [ap, worker('implementation', 1, 5), worker('review', 6, 8), worker('implementation', 9, 12)].map(late);
+  const r = classifyTicket({ identifier: 'LIN-1', rows, verdicts: factsOf([['review', 'request-changes', vAt(20)]]) });
+  assert.equal(r.entries[3].cause, 'not-measured');
+});
+
+test('a verdict of another judgement in the window does not stand for the review', () => {
+  const ap = autopilot();
+  const rows = [ap, worker('implementation', 1, 5), worker('review', 6, 8), worker('implementation', 9, 12)].map(late);
+  const r = classifyTicket({ identifier: 'LIN-1', rows, verdicts: factsOf([['blind-read', 'worse', vAt(7)]]) });
+  assert.equal(r.entries[3].cause, 'not-measured');
+});
+
+test('two review verdicts in one window: the later one is the review\'s outcome', () => {
+  const ap = autopilot();
+  const rows = [ap, worker('implementation', 1, 5), worker('review', 6, 8), worker('implementation', 9, 12)].map(late);
+  const r = classifyTicket({ identifier: 'LIN-1', rows, verdicts: factsOf([['review', 'request-changes', vAt(7)], ['review', 'approve', vAt(7.5)]]) });
+  assert.equal(r.entries[3].cause, 'fixes-outside-close-out');
+});
+
+test('no verdict records read at all is not measured, never "no verdict"', () => {
+  const ap = autopilot();
+  const rows = [ap, worker('implementation', 1, 5), worker('review', 6, 8, { text: 'DONE: verdict Request Changes.' }), worker('implementation', 9, 12)].map(late);
+  const r = classifyTicket({ identifier: 'LIN-1', rows });
+  assert.equal(r.entries[3].cause, 'not-measured');
+  assert.match(r.entries[3].note, /the verdict records were not read/);
+});
+
+test('a re-review follows the verdict of the review before it: request changes is review changes, approve is a repeat', () => {
+  const ap = autopilot();
+  const rows = [ap, worker('implementation', 1, 5), worker('review', 6, 8), worker('implementation', 9, 12), worker('review', 13, 15)].map(late);
+  const asked = classifyTicket({ identifier: 'LIN-1', rows, verdicts: factsOf([['review', 'request-changes', vAt(7)]]) });
+  assert.equal(asked.entries[4].cause, 'review-changes');
+  const approved = classifyTicket({ identifier: 'LIN-1', rows, verdicts: factsOf([['review', 'approve', vAt(7)]]) });
+  assert.equal(approved.entries[4].cause, 'repeat-stage');
+});
+
+test('a plan sent back by plan-review reads the plan-review record: request changes re-plans, approve does not', () => {
+  const ap = autopilot();
+  const rows = [ap, worker('plan', 1, 3), worker('plan-review', 4, 6), worker('plan', 7, 8), worker('plan-review', 9, 10), worker('implementation', 11, 20)].map(late);
+  const asked = classifyTicket({ identifier: 'LIN-1', rows, verdicts: factsOf([['plan-review', 'request-changes', vAt(5)], ['plan-review', 'approve', vAt(10)]]) });
+  assert.deepEqual(causesOf(asked).slice(1, 6), ['plan:first-pass-stage', 'plan-review:first-pass-stage', 'plan:plan-rejected', 'plan-review:plan-rejected', 'implementation:stage-path']);
+  assert.equal(asked.entries[3].note, `plan-review ${asked.entries[2].id.slice(0, 8)}: request-changes`);
+  const approved = classifyTicket({ identifier: 'LIN-1', rows, verdicts: factsOf([['plan-review', 'approve', vAt(5)], ['plan-review', 'approve', vAt(10)]]) });
+  assert.equal(approved.entries[3].cause, 'repeat-stage');
+});
+
+test('a re-plan before the cutover is not measured, with the reason', () => {
+  const ap = autopilot();
+  const rows = [ap, worker('plan', 1, 3), worker('plan-review', 4, 6, { text: 'DONE: verdict Request Changes.' }), worker('plan', 7, 8)];
+  const r = classifyTicket({ identifier: 'LIN-1', rows, verdicts: factsOf() });
+  assert.equal(r.entries[3].cause, 'not-measured');
+  assert.match(r.entries[3].note, /no verdict records before 2026-11-21 08:06Z/);
 });

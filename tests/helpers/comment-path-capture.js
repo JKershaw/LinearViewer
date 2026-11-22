@@ -45,7 +45,7 @@ import { fileURLToPath } from 'node:url';
 import { createHash } from 'node:crypto';
 import { readTrail, landingPrUrls, commentKindOf, isPersonComment, reportsLandedWork, isRuling, extractVerdict } from '../../lib/run-trail.js';
 import { __internal as followOnInternal } from '../../lib/follow-on-ratio.js';
-import { readLanding } from '../../scripts/stability-measures-blind.mjs';
+import { readLanding } from '../../scripts/historic-comment-readers.mjs';
 import { notMeasured } from '../../scripts/stability-measures-core.mjs';
 import { checkBlindReadShape } from '../../lib/run-ledger.js';
 import { liveWaitOf } from '../../lib/run-live-wait.js';
@@ -456,7 +456,7 @@ export async function captureSeeds(input = loadSeeds()) {
 //     trips' tiers, so neither has a comment-only part beyond tier A;
 //   - follow-on ratio (lib/follow-on-ratio.js): the ratio needs the window's issues and relations, not read here; its
 //     comment reading, the review-ledger diagnostic (C3-24), is given;
-//   - stability measure 1 (scripts/stability-measures-blind.mjs readLanding): each walk-8 ticket's own landing
+//   - stability measure 1 (scripts/historic-comment-readers.mjs readLanding): each walk-8 ticket's own landing
 //     (landings.json) against its trail; a seed has no landing.
 
 const NO_ROWS = 'the frozen inputs hold comments and landings, not dispatch rows';

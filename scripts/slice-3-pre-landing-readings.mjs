@@ -8,7 +8,7 @@
  * once here and committed (docs/reviews/slice-3-readings/).
  *
  * The readings, both over the window from the blind-read gate (GATE_LANDING, LIN-4438's merge) to <head>:
- *   - blind-read results: measure 1 of the Stability Review (scripts/stability-measures-blind.mjs blindRow), the
+ *   - blind-read results: measure 1 of the Stability Review (scripts/historic-comment-readers.mjs blindRow), the
  *     landings of the window against their tickets' pre-merge `## Blind read`;
  *   - review round trips: lib/plan-review-round-trips.js computePlanReviewRoundTrips, once for plan review
  *     (plan-review -> plan, its own default) and once for code review (review -> implementation, the gate pair the
@@ -26,8 +26,8 @@ import { writeFileSync } from 'node:fs';
 import { join } from 'node:path';
 import { tmpdir } from 'node:os';
 import { parseLandingLog, parseNumstat, notMeasured } from './stability-measures-core.mjs';
-import { createProxyClient, readTrails } from './stability-measures-tracker.mjs';
-import { blindRow, ticketsToRead, GATE_LANDING } from './stability-measures-blind.mjs';
+import { createProxyClient } from './stability-measures-tracker.mjs';
+import { blindRow, ticketsToRead, GATE_LANDING, readTrails } from './historic-comment-readers.mjs';
 import { fetchAll } from './plan-review-round-trips.mjs';
 import { computePlanReviewRoundTrips } from '../lib/plan-review-round-trips.js';
 
@@ -75,8 +75,10 @@ async function main() {
   // The round-trip reader's own issue reads (a placeholder bearer: the local proxy supplies the credential).
   const listRows = tickets.map((id) => ({ id, identifier: id }));
   const { issues, skipped, calls } = await fetchAll(listRows, { base: api, token: 'local-proxy', noCache: true, cache: join(tmpdir(), 'lin-4514-readings-unused-cache') });
-  const planReview = computePlanReviewRoundTrips(issues, { asOf, skipped });
-  const codeReview = computePlanReviewRoundTrips(issues, { asOf, skipped, gateKind: 'review', rePassKind: 'implementation' });
+  // LIN-4519: the history is read from the comments it was taken from (verdictSource 'comments'), the reproduction of the
+  // committed readings. Live measures read records.
+  const planReview = computePlanReviewRoundTrips(issues, { asOf, skipped, verdictSource: 'comments' });
+  const codeReview = computePlanReviewRoundTrips(issues, { asOf, skipped, gateKind: 'review', rePassKind: 'implementation', verdictSource: 'comments' });
 
   const out = {
     _about: 'LIN-4514: the comment readers\' last readings over history (scripts/slice-3-pre-landing-readings.mjs). Never edit by hand.',

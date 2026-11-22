@@ -4,30 +4,18 @@
  *   GET /workspace/:urlKey/effort-readout      — operator-facing per-kind effort x cost x duration x survived-the-next-gate read-out (LIN-2641); URL-only, unflagged and unlinked
  *   GET /workspace/:urlKey/api/effort-readout  — the same read-out as JSON
  *
- * Page-load-only: it makes per-issue provider reads, so it never joins the poll
+ * Page-load-only: it reads records on each load, so it never joins the poll
  * path (see the comment on `computeWorkspaceEffortReadout`).
  */
 import { Router } from 'express';
 import { keepaliveError, classifyUpstreamError, isAuthError } from '../lib/errors.js';
 import { renderUpstreamAwareErrorPage, renderErrorPage } from '../lib/render-pages.js';
-import { resolveIssueBinding } from '../lib/workspace.js';
 import { computeEffortReadout, eligibleIssueIdentifiers } from '../lib/effort-readout.js';
 import { anchorOf } from '../lib/lineage-membership.js';
 import { requireRequestUsageLoader } from '../lib/request-usage-loader.js';
 import { renderEffortReadoutPage } from '../lib/render-effort-readout.js';
 import { armKeepalive } from '../lib/http-keepalive.js';
 import { requestFeatureFlags } from '../lib/run-controls.js';
-import { settleWithConcurrency } from './dashboard-session-state.js';
-
-// Max per-issue provider round trips in flight for the effort read-out's
-// comment/description fan-out (LIN-2641). Deliberately its OWN constant rather
-// than a reuse of WORKSPACE_FANOUT_CONCURRENCY (dashboard-session-state.js):
-// that one bounds a cross-WORKSPACE Loop-graph fan-out whose per-slot cost is a
-// full 30-day history materialisation, while this bounds per-ISSUE HTTP reads
-// against one provider. They are different resources with different right
-// answers, and coupling them would make a change to either silently re-tune the
-// other.
-const EFFORT_READOUT_ISSUE_CONCURRENCY = 4;
 
 // The history read's row bound (LIN-2641). `listHistory` sorts { resolvedAt: -1 }
 // and pushes this into the query, so it means "the 200 most recently RESOLVED
@@ -45,108 +33,10 @@ const EFFORT_READOUT_HISTORY_LIMIT = 200;
 // (dashboard-kpis.js): a URL-only operator page (unflagged, unlinked) that
 // computes on page load rather than being polled.
 //
-// NOT on the poll path, deliberately. `public/llms.txt` documents that the
-// live feed reads Mongo only — no provider calls per poll — and this route
-// DOES make per-issue provider reads, so it must stay a page-load-only
-// surface. Never move this computation into /api/dashboard/sessions.
-
-// LIN-3242 (LIN-3126 §4) / LIN-3335: group the eligible population by the
-// dispatch row's OWN provider-kind `issueSource`, not by the workspace's
-// active binding. Each DISTINCT stamped source resolves ONCE via the
-// source-only `resolveIssueBinding`; the call scope/credential always comes
-// from the hydrated binding. An UNSTAMPED issue keeps today's behaviour: the
-// null group resolves to the workspace's active binding. The pair-era scope
-// plumbing is gone.
-function groupBySource(identifiers, rows) {
-  const stampByIdentifier = new Map();
-  for (const row of rows) {
-    const id = row.issueIdentifier;
-    if (!id) continue;
-    const stamped = row.issueSource != null;
-    const existing = stampByIdentifier.get(id);
-    if (existing === undefined || (existing === null && stamped)) {
-      stampByIdentifier.set(id, stamped ? row.issueSource : null);
-    }
-  }
-  const groups = new Map();
-  for (const identifier of identifiers) {
-    const selector = stampByIdentifier.get(identifier) ?? null;
-    const key = selector ?? '';
-    let group = groups.get(key);
-    if (!group) {
-      group = { selector, identifiers: [] };
-      groups.set(key, group);
-    }
-    group.identifiers.push(identifier);
-  }
-  return groups;
-}
-
-// One group's per-issue reads, `{ contexts, skipped }`. An auth rejection is NOT
-// a skip (LIN-1984's lesson: a run that silently skipped most of its reads still
-// reported success). It is non-retryable and cannot be fixed by rendering
-// partial numbers, so it propagates to the caller's upstream-aware error branch.
-async function readGroupContexts(group, provider, callScope, supports) {
-  const settled = await settleWithConcurrency(group.identifiers, EFFORT_READOUT_ISSUE_CONCURRENCY, async (identifier) => {
-    // `fetchIssueComments` (not `fetchIssueContext`) because the verdict
-    // walk needs each comment's own `id` + `createdAt`, which only this
-    // reader emits. `fetchIssueFields` supplies the issue's `id`; the gate is
-    // read from plan records (LIN-4504), so no description is read here.
-    const [comments, fields] = await Promise.all([
-      provider.fetchIssueComments(callScope, identifier),
-      supports('fetchIssueFields') ? provider.fetchIssueFields(callScope, identifier) : Promise.resolve(null),
-    ]);
-    return {
-      identifier,
-      id: fields?.id || identifier,
-      comments: Array.isArray(comments) ? comments : [],
-    };
-  });
-
-  const contexts = [];
-  let skipped = 0;
-  for (const outcome of settled) {
-    if (outcome.status === 'fulfilled') {
-      contexts.push(outcome.value);
-      continue;
-    }
-    if (isAuthError(outcome.reason)) throw outcome.reason;
-    // Retryable (429/5xx/network) — count it, still render, and say so.
-    skipped += 1;
-  }
-  return { contexts, skipped };
-}
-
-// Capability flags: the workspace's own default resolution (today's single
-// read) PLUS every resolved stamped group, so a stamped binding that can serve
-// comments still lights the survival columns even when the active binding
-// refuses.
-async function readIssueContexts(workspace, groups) {
-  const defaultBinding = resolveIssueBinding(workspace, null);
-  const defaultSupports = (name) => typeof defaultBinding.provider?.supports === 'function' && defaultBinding.provider.supports(name);
-  const supportsFns = [defaultSupports];
-  const issueContext = new Map();
-  let skipped = 0;
-
-  for (const group of groups.values()) {
-    const binding = resolveIssueBinding(workspace, group.selector);
-    if (binding.error) {
-      // Unstamped on a multi-binding workspace, or a stale stamped key:
-      // disclose by counting the whole group as skipped, never throw.
-      skipped += group.identifiers.length;
-      continue;
-    }
-    const { provider, callScope } = binding;
-    const supports = (name) => typeof provider?.supports === 'function' && provider.supports(name);
-    supportsFns.push(supports);
-    if (!supports('fetchIssueComments')) continue;
-
-    const read = await readGroupContexts(group, provider, callScope, supports);
-    for (const ctx of read.contexts) issueContext.set(ctx.identifier, ctx);
-    skipped += read.skipped;
-  }
-  return { issueContext, skipped, supportsFns };
-}
+// NOT on the poll path, deliberately. Its reads are the dispatch queue and the
+// records (batched, one read per kind, per load), which the poll path does not
+// make; it must stay a page-load-only surface. Never move this computation into
+// /api/dashboard/sessions.
 
 async function computeWorkspaceEffortReadout(workspace, { now }, { dispatchQueueStore, requestUsageLoader, recordsStore = null }) {
   const urlKey = workspace.urlKey;
@@ -166,37 +56,46 @@ async function computeWorkspaceEffortReadout(workspace, { now }, { dispatchQueue
   const anchors = [...new Set([...liveRows, ...historyRows].map(anchorOf).filter(Boolean))];
   // LIN-4226: the founder lookup and the lineages' request records run in parallel, as at HEAD: the lookup is started
   // now and awaited inside the cost read, which starts the records load (through the loader) alongside it. It is
-  // marked handled at once, so a rejection while the issue contexts are fetched is not an unhandled rejection; the
-  // read still re-raises it when it awaits the lookup.
+  // marked handled at once, so a rejection while the records are read is not an unhandled rejection; the read still
+  // re-raises it when it awaits the lookup.
   const identityRows = Promise.resolve(dispatchQueueStore.lineageIdentityRows(urlKey, { anchors }));
   identityRows.catch(() => {});
 
   // The issues the survival walk will actually score — derived through the
-  // SAME population rule the compute layer uses, so the set fetched and the
-  // set scored cannot drift.
+  // SAME population rule the compute layer uses, so the set read and the set
+  // scored cannot drift.
   const identifiers = eligibleIssueIdentifiers({ liveRows, historyRows });
 
-  const groups = groupBySource(identifiers, [...liveRows, ...historyRows]);
-  const { issueContext, skipped, supportsFns } = await readIssueContexts(workspace, groups);
-
-  const survivalAvailable = supportsFns.some((fn) => fn('fetchIssueComments'));
-  // LIN-4504: the plan-review gate is read from records, one batched read for every scored issue; no store or a
-  // fault leaves it not measured (never zero, never read from a description).
+  // LIN-4519: the gate verdicts come from verdict records, one batched read for every scored issue, and the plan-review
+  // gate from plan records (LIN-4504). No provider is asked for comments. No store or a fault leaves a read not measured
+  // (never zero, never read from a comment).
+  const verdictFacts = await readVerdictFacts(recordsStore, urlKey, identifiers);
   const planFacts = await readPlanFacts(recordsStore, urlKey, identifiers);
 
   return computeEffortReadout({
     liveRows,
     historyRows,
     historyTotal: history.total ?? historyRows.length,
-    issueContext,
     asOf: now.toISOString(),
-    skipped,
-    survivalAvailable,
+    skipped: 0,
+    survivalAvailable: verdictFacts !== null,
     planFacts,
+    verdictFacts,
     identityRows,
     requestSource: loader,
     urlKey,
   });
+}
+
+/** LIN-4519: the scored issues' verdict facts from records, or null (not measured) with no store or on a fault (logged). */
+async function readVerdictFacts(recordsStore, urlKey, identifiers) {
+  if (!recordsStore || typeof recordsStore.verdictFactsForTickets !== 'function') return null;
+  try {
+    return await recordsStore.verdictFactsForTickets(urlKey, identifiers);
+  } catch (err) {
+    console.error(`[effort-readout] verdict facts could not be read (${urlKey}): ${err?.message || err}`);
+    return null;
+  }
 }
 
 /** LIN-4504: the scored issues' plan facts from records, or null (not measured) with no store or on a fault (logged). */

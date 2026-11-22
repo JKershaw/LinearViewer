@@ -1,6 +1,6 @@
 // The stability measures' tracker reads (LIN-4421): a paced workspace-proxy client and the reads behind the finished
 // tasks, speed, cost and minted rows, (LIN-4422) the seat's rulings and dispatch reads over the same finished set, and
-// (LIN-4439) the comment trails measure 1 counts blind reads from. Its own file because the CLI runs when imported and
+// (LIN-4519) the verdict records measure 1 counts blind reads from. Its own file because the CLI runs when imported and
 // the core does no I/O: here `fetch`, `sleep` and the clock are injected, so pacing, the 429 path and the whole read
 // are tested without a network (tests/unit/stability-measures.test.js). The decisions (ownership, selection, sessions,
 // the search) stay in the core.
@@ -19,6 +19,7 @@ import {
   TICKET_KEY, costRow, idSpanSearch, landingOwners, mintedRow, notMeasured, selectFinished, speedRow, tasksRow,
 } from './stability-measures-core.mjs';
 import { membersOf, seatNotMeasured, seatRows } from './stability-measures-seat.mjs';
+import { readVerdictFactsThroughProxy } from './verdict-facts-proxy.mjs';
 
 export const DEFAULT_PER_MINUTE = 50;
 export const DEFAULT_RETRIES = 3;
@@ -85,7 +86,7 @@ export function createProxyClient({
     }
   }
 
-  return { get, stats };
+  return { get, stats, root };
 }
 
 // ── the tracker read ─────────────────────────────────────────────────────────
@@ -100,6 +101,9 @@ export const trackerNotMeasured = (why, references = {}) => ({
   ...Object.fromEntries(['tasks', 'speed', 'cost', 'minted'].map((k) => [k, notMeasured(k, why, { reference: references[k] })])),
   seat: seatNotMeasured(why, references),
 });
+
+/** An issue read's failure as the reason a row carries: a 404 is named, anything else is the client's reason. */
+const issueFailure = (r) => (r.status === 404 ? 'issue not found' : r.reason);
 
 /** The highest issue number on the newest page of the issue list: a known existing number to bracket the search. */
 async function readBracket(client, key) {
@@ -129,12 +133,10 @@ export async function readTracker({ client, windowLandings, priorLandings = [], 
   if (bracket.reason) return { rows: trackerNotMeasured(`proxy: ${bracket.reason}`, references), selection: null, tasks: null, stats: client.stats };
 
   const issues = new Map();
-  const trails = new Map();
   const ids = [...new Set([...own.owners.keys(), ...prior.owners.keys()])];
   for (const id of ids) {
     const r = await client.get(`/issues/${enc(id)}`);
     issues.set(id, r.ok ? { state: r.body?.state ?? null, completedAt: r.body?.completedAt ?? null, parent: r.body?.parent?.identifier ?? null } : { reason: issueFailure(r) });
-    trails.set(id, trailOf(r));
   }
   const selection = selectFinished({ window: own, prior, issues, baseDate: window.baseDate, headDate: window.headDate });
 
@@ -160,34 +162,24 @@ export async function readTracker({ client, windowLandings, priorLandings = [], 
     // row, LIN-4422): one finished set, two readers, never a second issue or /cost pass.
     selection,
     tasks,
-    // Each ticket's comment trail from the same issue reads, for measure 1 (readTrails, LIN-4439): no second issue pass.
-    trails,
     stats: client.stats,
   };
 }
 
-// ── the trail read (LIN-4439, measure 1) ────────────────────────────────────
-const issueFailure = (r) => (r.status === 404 ? 'issue not found' : r.reason);
-
-/** One issue read → its comment trail: { comments, truncated } or { reason }. */
-const trailOf = (r) => {
-  if (!r.ok) return { reason: issueFailure(r) };
-  if (!Array.isArray(r.body?.comments)) return { reason: 'issue body has no comment list' };
-  return { comments: r.body.comments, truncated: r.body?.truncated?.comments === true };
-};
-
+// ── the verdict record read (LIN-4519, measure 1) ───────────────────────────
 /**
- * The comment trails measure 1 reads (scripts/stability-measures-blind.mjs blindRow): ticket → { comments, truncated }
- * or { reason }. A ticket already in `known` (readTracker's own issue reads) costs no call; the rest are one
- * GET /issues/{id} each, in order. A truncated trail is returned flagged, never as if whole.
+ * The verdict facts of `tickets` and the change records they name, for measure 1 (scripts/stability-measures-blind.mjs
+ * blindRow): readVerdictFactsThroughProxy (scripts/verdict-facts-proxy.mjs) through the paced client, so its reads share
+ * the token's budget. A failed read makes every ticket's facts `not measured` with its reason, never "no verdict".
+ * → { facts: Map ticket → facts, changes, reads }.
  */
-export async function readTrails({ client, tickets, known = new Map() }) {
-  const trails = new Map();
-  for (const id of tickets) {
-    if (known.has(id)) { trails.set(id, known.get(id)); continue; }
-    trails.set(id, trailOf(await client.get(`/issues/${enc(id)}`)));
-  }
-  return { trails, stats: client.stats };
+export async function readVerdictRecords({ client, tickets }) {
+  const getJson = async (url) => {
+    const r = await client.get(url.slice(client.root.length));
+    if (!r.ok) throw new Error(r.reason);
+    return r.body;
+  };
+  return readVerdictFactsThroughProxy({ base: client.root, token: null, getJson, tickets });
 }
 
 // ── the seat read (LIN-4422) ────────────────────────────────────────────────

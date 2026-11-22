@@ -288,7 +288,7 @@ function renderInstrument(label, r) {
          `peers=${String(r.distinctPeers).padStart(4)}  ${flag}`;
 }
 
-function render(result, meta) {
+export function render(result, meta) {
   const L = [];
   L.push('');
   L.push('══ follow-on task ratio — LIN-1600 S6 baseline ═══════════════════════════════');
@@ -320,7 +320,7 @@ function render(result, meta) {
   L.push(`  in-window completions          ${num(d.inWindowCompletions)}`);
   L.push(`  mean relations per completed    ${d.meanRelationsPerCompleted == null ? '—' : d.meanRelationsPerCompleted.toFixed(2)}   (union of both arms)`);
   L.push(`  with >=1 relation               ${pctOf(d.pctWithAnyRelation)}`);
-  L.push(`  with a review ledger            ${pctOf(d.pctWithReviewLedger)}`);
+  L.push(`  with a review ledger            ${d.pctWithReviewLedger == null ? 'not measured (retired, LIN-4519 P6; lib/follow-on-ratio.js limit 6)' : pctOf(d.pctWithReviewLedger)}`);
   L.push(`  planned (plan records)          ${pctOf(d.pctPlanned)}   of ${num(d.plannedMeasured)} measured; ${num(d.plannedNotMeasured)} not measured${Object.keys(d.plannedNotMeasuredReasons).length ? ` (${Object.entries(d.plannedNotMeasuredReasons).map(([r, n]) => `${n}: ${r}`).join('; ')})` : ''}`);
   L.push(`  fully matured sources           ${num(d.maturedSources)}`);
   L.push(`  unresolved peers                ${num(d.unresolvedPeers)}   (relation present, peer createdAt unreadable)`);
