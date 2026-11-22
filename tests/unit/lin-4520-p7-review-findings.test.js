@@ -4,8 +4,11 @@
 //   9058b84e  close-out refuses on a PR the stale flag names, even when its live head is the one the review judged.
 //   9d0c053a  the share page's close-out quote is the close-out run's account, not a comment.
 //   a610ceb9  the fix-round brief section is retired; the workflow points at the task's open findings and change.
-//   ca44ecba  landed work is a change record first written after an instant, not a verdict-looking comment (the loop
-//             and the selector's acted-after read it; next-stage-choice.test.js pins the loop repro).
+//   ca44ecba  landed work is a change record version that wrote a head after an instant, not a verdict-looking comment (the
+//             loop and the selector's acted-after read it; next-stage-choice.test.js pins the loop repro).
+//   2f1e89d3  promptContextOf carries reviewRound (lin-4518-step2-witnesses.test.js runs the three entrances end to end).
+//   5d38c050  a revision pushed to an existing PR is landed work since the verdict or comment before it (every head-writing
+//             version counts, not the first write only; lin-4520-landed-work-store.test.js pins the store's dating).
 
 import { test, describe } from 'node:test';
 import assert from 'node:assert/strict';
@@ -16,6 +19,7 @@ import { planReviewRunOf } from '../../lib/records/plan-review-run.js';
 import { formatStageContract } from '../../lib/prompt-contract.js';
 import { loopFactsOf } from '../../lib/recommendation-facts.js';
 import { generatePrompt } from '../../lib/prompt-templates.js';
+import { promptContextOf } from '../../lib/prompts/prompt-context.js';
 import { buildImplementationWorkflow, reviewRoundOf } from '../../lib/prompts/fix-round.js';
 
 const PR_A = 'https://github.com/acme/widget/pull/12';
@@ -139,21 +143,53 @@ describe('a610ceb9: the fix round is one workflow, from records; the revision se
   });
 });
 
-describe('ca44ecba: landed work is a change record first written after an instant', () => {
+describe('ca44ecba: landed work is a change record version that wrote a head after an instant', () => {
   const verdict = { id: 'verdict-1', at: '2026-07-01T10:00:00.000Z', run: 'r1', fields: { judgement: 'plan-review', outcome: 'request-changes' } };
 
-  test('a change record first written after the latest verdict is landed work; a comment citing a PR is not', () => {
+  test('a change record written after the latest verdict is landed work; a comment citing a PR is not', () => {
     const withChange = planReviewRunOf({ verdicts: [verdict], changes: [{ at: '2026-07-01T11:00:00.000Z', fields: { ref: PR_A } }] });
     assert.equal(loopFactsOf(withChange, []).landed, PR_A);
     const noChange = planReviewRunOf({ verdicts: [verdict] });
     assert.equal(loopFactsOf(noChange, [{ createdAt: '2026-07-01T11:00:00.000Z', body: `Landed in ${PR_A}` }]).landed, null);
   });
 
-  test('a change first written before the latest verdict is not landed work since it', () => {
+  test('a change written only before the latest verdict is not landed work since it', () => {
     const run = planReviewRunOf({
       verdicts: [{ id: 'verdict-1', at: '2026-07-01T10:00:00.000Z', run: 'r1', fields: { judgement: 'plan-review', outcome: 'request-changes' } }],
       changes: [{ at: '2026-07-01T09:00:00.000Z', fields: { ref: PR_A } }],
     });
     assert.equal(loopFactsOf(run, []).landed, null);
+  });
+
+  // finding-5d38c050: the store emits one entry per head-writing version, so a revision pushed after the verdict counts.
+  test('a change recorded before the verdict whose head moved after it (v1, then v2) is landed work since it', () => {
+    const run = planReviewRunOf({
+      verdicts: [{ id: 'verdict-1', at: '2026-07-01T10:00:00.000Z', run: 'r1', fields: { judgement: 'plan-review', outcome: 'request-changes' } }],
+      changes: [
+        { at: '2026-07-01T09:00:00.000Z', fields: { ref: PR_A } },
+        { at: '2026-07-01T12:00:00.000Z', fields: { ref: PR_A } },
+      ],
+    });
+    assert.equal(loopFactsOf(run, []).landed, PR_A);
+    assert.deepEqual(run.landed.map((w) => w.at), ['2026-07-01T09:00:00.000Z', '2026-07-01T12:00:00.000Z'], 'oldest first');
+  });
+});
+
+// finding-2f1e89d3: the one explicit field list a stage prompt receives must carry the fix round, or three entrances drop it.
+describe('2f1e89d3: promptContextOf carries reviewRound to generatePrompt', () => {
+  const ctx = { parent: null, siblings: [], project: null, children: [], comments: [], attachments: [] };
+  const issue = { id: 'i', identifier: 'LIN-4520', title: 'Fix round', description: 'd', state: { name: 'In Progress', type: 'started' }, labels: [] };
+
+  test('a request-changes round projected through promptContextOf continues the existing branch', () => {
+    const prompt = generatePrompt('implementation', issue, promptContextOf({ ...ctx, reviewRound: { fixRound: true } })).prompt;
+    assert.match(prompt, /Continue the existing branch/);
+    assert.doesNotMatch(prompt, /\*\*Open a PR\*\*/);
+  });
+
+  test('a context with no reviewRound, or a null one (records not read), stays the fresh-start workflow', () => {
+    assert.ok(!('reviewRound' in promptContextOf(ctx)));
+    for (const withRound of [ctx, { ...ctx, reviewRound: null }]) {
+      assert.match(generatePrompt('implementation', issue, promptContextOf(withRound)).prompt, /\*\*Open a PR\*\*/);
+    }
   });
 });

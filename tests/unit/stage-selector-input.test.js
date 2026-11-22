@@ -125,7 +125,7 @@ describe('trail facts (LIN-3300)', () => {
     assert.equal(revised.latestPerson.at, at(2));
     assert.equal(revised.latestPerson.actedAfter, true, 'the planner acted on it');
     assert.match(formatTrailFactsBlock(revised, 3), /an agent acted after it \(a note, landed work or a close-out\): yes/);
-    // LIN-4520 (finding-ca44ecba): landed work is a change record first written after the person's comment, not a comment
+    // LIN-4520 (finding-ca44ecba): landed work is a change record version that wrote a head after the person's comment, not a comment
     // that cites a PR. A landing report in a comment alone is not acted-on work; the change record is.
     const reportOnly = assembleTrailFacts([
       { createdAt: at(1), body: 'Addendum: two more items for this round.' },
@@ -136,7 +136,7 @@ describe('trail facts (LIN-3300)', () => {
       { createdAt: at(1), body: 'Addendum: two more items for this round.' },
       { createdAt: at(2), body: `## Review fixes landed — PR updated\n\n${PR}` }
     ], '', { planReviewRun: planReviewRunOf({ changes: [{ at: at(3), fields: { ref: PR } }] }) });
-    assert.equal(landed.latestPerson.actedAfter, true, 'a change record first written after it is landed work');
+    assert.equal(landed.latestPerson.actedAfter, true, 'a change record version written after it is landed work');
   });
 
   // LIN-4520: the agent notes and the unheaded close-out are not work: the trail (records) decides, and the comments do not.

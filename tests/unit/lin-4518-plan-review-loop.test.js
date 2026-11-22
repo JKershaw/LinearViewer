@@ -149,7 +149,7 @@ describe('RecordsStore.planReviewRunForTicket folds the same run from the task r
 
 // LIN-4518 (finding-5cdbcb2b): the loop's facts. A person's speech and landed work lift the bound only when they come after
 // the latest verdict; the run and that instant come from the records. LIN-4520 (finding-ca44ecba): landed work is the run's
-// `landed` change records, each dated by its first write, never a comment that cites a PR.
+// `landed` change records, one per head-writing version and each dated by its own write, never a comment that cites a PR.
 describe('loopFactsOf: a person\'s speech and landed work since the latest verdict', () => {
   const latestAt = at(3);
   const PR_1748 = 'https://github.com/JKershaw/LinearViewer/pull/1748';
@@ -163,7 +163,7 @@ describe('loopFactsOf: a person\'s speech and landed work since the latest verdi
     assert.equal(loopFactsOf({ run: [], latestAt }, []).personSince, false);
   });
 
-  test('a change first written after the latest verdict sets landed to its PR; one written before it does not', () => {
+  test('a change version written after the latest verdict sets landed to its PR; one written before it does not', () => {
     assert.equal(loopFactsOf({ run: [], latestAt, landed: [landed(4)] }, []).landed, PR_1748);
     assert.equal(loopFactsOf({ run: [], latestAt, landed: [landed(2)] }, []).landed, null);
   });
