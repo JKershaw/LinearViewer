@@ -9,8 +9,82 @@
 // Returns the same two fields the paper reads: `verdicts` (count of verdicts in time order) and `count` (Request Changes
 // and Needs Discussion since the latest Approve; only an Approve resets it).
 
-import { isPersonComment, reportsLandedWork } from '../../../../lib/run-trail.js';
-import { prUrlsIn } from '../../../../lib/run-ledger.js';
+// Nothing here is imported from live code (finding-d95fb57b). The person and landed-work text rules below are the
+// trail-rules module as it stood at commit 2d0b71414, before LIN-4520 took the verdict-word branch out of
+// `reportsLandedWork`, copied with the helpers they need (the PR URL reader, the Harbour summary mark, the Survey and
+// blind-read headings, the ruling mark). Do not "fix" them to match live code:
+// they are what the paper's numbers were counted with.
+
+const PR_URL_ALL = /https:\/\/github\.com\/[A-Za-z0-9_.-]+\/[A-Za-z0-9_.-]+\/pull\/\d+/g;
+const prUrlsIn = (body) => [...new Set(String(body || '').match(PR_URL_ALL) || [])];
+
+const SUMMARY_LEAD = '**Harbour summary** · ';
+const BLIND_READ_HEADING = '## Blind read';
+const SURVEY_HEADINGS = { 'survey-task': '## Survey open-0', 'survey-place': '## Survey global' };
+const AREA_READ_HEADING = '## Area read';
+const RULING_MARK = '— Ruling recorded via Harbour';
+const REPORT_TAIL = /^(?:$|[:\s])/;
+
+const firstLine = (body) => (String(body || '').split('\n').find((l) => l.trim()) || '').trim();
+const firstLineOf = (body) => firstLine(body).replace(/^[#>*_\s]+/, '');
+const firstHeading = (body) => {
+  const m = (body || '').match(/^#{1,6}[ \t]+([^\n]*)/m);
+  return m ? m[1].trim() : '';
+};
+const bodyOf = (comment) => (typeof comment === 'string' ? comment : (comment && typeof comment.body === 'string' ? comment.body : ''));
+
+function opensWithHeading(body, heading, tail = /^(?:$|:)/) {
+  const line = firstLine(body);
+  return line.startsWith(heading) && tail.test(line.slice(heading.length));
+}
+
+const isHarbourSummary = (comment) => firstLine(bodyOf(comment)).startsWith(SUMMARY_LEAD);
+
+const TITLE_NON_REVIEW = /^(?:close-?out|autopilot)\b/i;
+const TITLE_PLAN_REVIEW = /plan[-\s]+review/i;
+const TITLE_NAMES_REVIEW = /\breview\b/i;
+const VERDICT_WORD = /\b(?:approve[sd]?|request(?:ed)?\s+changes?|needs?\s+discussion)\b/i;
+const LEDGER_HEADING = /^###\s*What CI Did Not Prove\b[^\n]*/im;
+
+function opensAsReview(body) {
+  const title = firstHeading(body);
+  if (!title || TITLE_NON_REVIEW.test(title)) return false;
+  if (!TITLE_NAMES_REVIEW.test(title) || TITLE_PLAN_REVIEW.test(title)) return false;
+  return VERDICT_WORD.test(body) || LEDGER_HEADING.test(body);
+}
+
+const AGENT_NOTE_OPENING = /^(?:autopilot\b|plan\s+(?:posted|revis\w*)\b|revision\s+\d+\s*[—–-]\s*addresses plan-review)/i;
+const opensAsAgentNote = (body) => AGENT_NOTE_OPENING.test(firstLineOf(body));
+const opensAsPlanReview = (body) => PLAN_REVIEW_HEADINGS.some((re) => re.test(firstHeading(body)));
+const opensAsCloseOut = (body) => /\bclose-?out\b/i.test(firstHeading(body)) || /^close-?out\b/i.test(firstLineOf(body));
+const opensAsSurveyOrAreaRead = (body) => opensWithHeading(body, SURVEY_HEADINGS['survey-task'], REPORT_TAIL)
+  || opensWithHeading(body, SURVEY_HEADINGS['survey-place'], REPORT_TAIL)
+  || opensWithHeading(body, AREA_READ_HEADING, REPORT_TAIL);
+const opensAsBlindRead = (body) => opensWithHeading(body, BLIND_READ_HEADING) && !isHarbourSummary(body) && !opensAsCloseOut(body) && !opensAsReview(body);
+
+function isRuling(comment) {
+  const text = bodyOf(comment).trimEnd();
+  return text.endsWith(RULING_MARK) && !opensAsAgentNote(text);
+}
+
+/** Pre-retirement: a review-titled comment carrying a verdict word reports landed work (the branch LIN-4520 removed). */
+function reportsLandedWork(comment) {
+  const body = bodyOf(comment);
+  if (isHarbourSummary(body)) return false;
+  if (opensAsReview(body)) return true;
+  if (opensAsCloseOut(body)) return prUrlsIn(body).length > 0;
+  if (opensAsBlindRead(body) || opensAsSurveyOrAreaRead(body) || opensAsAgentNote(body)) return false;
+  return prUrlsIn(body).length > 0;
+}
+
+function isPersonComment(comment) {
+  const body = bodyOf(comment);
+  if (isHarbourSummary(body)) return false;
+  if (isRuling(body)) return true;
+  if (/^#{1,6}[ \t]/.test(firstLine(body))) return false;
+  if (opensAsAgentNote(body) || opensAsPlanReview(body) || opensAsCloseOut(body) || opensAsReview(body)) return false;
+  return !reportsLandedWork(body);
+}
 
 const VERDICT_TOKEN = /\b(approve|request changes|needs discussion)\b/i;
 // The reviewer's own count: `Blocking findings: <n>` on its own line (the pre-retirement reader's rule).
