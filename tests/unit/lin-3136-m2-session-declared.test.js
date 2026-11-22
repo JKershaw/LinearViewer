@@ -115,16 +115,19 @@ const AUTOPILOT = { prompt: 'Run the autopilot on LIN-1.', promptName: 'Autopilo
 
 // LIN-4492: every dispatch mint names its origin. `runs`: the launched row starts a run (the periodical
 // "+ Autopilot" row, a periodical run), so it names its own id as runRecordId, read from the 201's item.
-// A plain autopilot kickoff starts no run and carries no runRecordId key.
+// LIN-4531: a plain autopilot kickoff starts its run too.
 async function assertDeclared(w, res, { prose, runs = false }) {
   assert.equal(res.status, 201, JSON.stringify(res.body));
   assert.equal(w.spy.grant.length, 1, 'one declared mint');
   assert.equal(w.spy.plain.length, 0, 'no grant-less mint');
   const rowId = res.body.item?.id ?? res.body.id;
   assert.equal(typeof rowId, 'string');
-  assert.deepEqual(w.spy.grant[0], {
-    urlKey: 'acme', workspaceId: WS, ownerAccountId: OWNER, grants: ['dispatch'], label: 'dispatch-bootstrap', profile: 'worker', origin: 'dispatch',
-    ...(runs ? { runRecordId: rowId } : {})
+  // LIN-4531: a run-starting launch (a fresh autopilot kickoff, a periodical "+ Autopilot") names its own run; the id is the factory's.
+  const { runRecordId, ...mint } = w.spy.grant[0];
+  if (runs) assert.equal(typeof runRecordId, 'string', 'the launched row names its run');
+  else assert.equal(runRecordId, undefined, 'a run-less launch carries no run');
+  assert.deepEqual(mint, {
+    urlKey: 'acme', workspaceId: WS, ownerAccountId: OWNER, grants: ['dispatch'], label: 'dispatch-bootstrap', profile: 'worker', origin: 'dispatch'
   });
   const item = w.items[0];
   assert.equal(item.grantDeclaration.site, 'M2');
@@ -145,17 +148,17 @@ function assertLeaf(w, res) {
 describe('LIN-3136 M2 — the owner\'s autopilot dispatch declares [dispatch]', () => {
   test('explicit claude-code harness (MCP field)', async () => {
     const w = world();
-    await assertDeclared(w, await post(w.app, { ...AUTOPILOT, harness: 'claude-code' }), { prose: false });
+    await assertDeclared(w, await post(w.app, { ...AUTOPILOT, harness: 'claude-code' }), { prose: false, runs: true });
   });
 
   test('blank harness (prose: this route interposes no default harness)', async () => {
     const w = world();
-    await assertDeclared(w, await post(w.app, AUTOPILOT), { prose: true });
+    await assertDeclared(w, await post(w.app, AUTOPILOT), { prose: true, runs: true });
   });
 
   test('explicit opencode harness (prose)', async () => {
     const w = world();
-    await assertDeclared(w, await post(w.app, { ...AUTOPILOT, harness: 'opencode' }), { prose: true });
+    await assertDeclared(w, await post(w.app, { ...AUTOPILOT, harness: 'opencode' }), { prose: true, runs: true });
   });
 });
 

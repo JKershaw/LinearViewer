@@ -244,7 +244,7 @@ export async function readRunAccount(recordsStore, readRow, urlKey, session) {
   const loopIds = [...new Set((Array.isArray(session?.loops) ? session.loops : []).map((l) => l?.loopId).filter(Boolean))];
   if (!loopIds.length) return null;
   const rows = await Promise.all(loopIds.map((id) => readRow(urlKey, id).catch(() => null)));
-  const runIds = [...new Set(rows.filter(Boolean).map((row) => runRecordIdFor({ kind: row.kind ?? null, id: String(row._id), resumedRunRecordId: row.runRecordId ?? null })).filter(Boolean))];
+  const runIds = [...new Set(rows.filter(Boolean).map((row) => runRecordIdFor({ kind: row.kind ?? null, id: String(row._id), resumedRunRecordId: row.runRecordId ?? null, followUpTo: row.followUpTo ?? null })).filter(Boolean))];
   if (!runIds.length) return null;
   const versions = await recordsStore.versionsOf(urlKey, runIds);
   const latest = versions

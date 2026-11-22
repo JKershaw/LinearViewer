@@ -471,6 +471,10 @@
     "disposition": "not-state",
     "why": "LIN-4503: an in-flight lock per task (the ticket step runs one at a time per task in this process). Each entry is the step's tail promise, removed when that step settles (serially's finally), so it holds nothing between steps; the cross-request guard is the ticket claim, not this map."
   },
+  "lib/question-answers.js::inLine": {
+    "disposition": "not-state",
+    "why": "LIN-4531: an in-flight lock per question (the answer and the dismiss of one question run one at a time in this process). Each entry is the step's tail promise, removed when that step settles (the finally in serialisedOn), so it holds nothing between requests; the cross-request guard is the question's own state (an ended question answers 409) and the follow-up marker, not this map."
+  },
   "server.js::ticketWriter": {
     "disposition": "not-state",
     "why": "The checked records writer (lib/records/writes.js createRecordWrites), built once over the records store: it keeps no per-key state of its own, its tracker reads and store writes happen per call."

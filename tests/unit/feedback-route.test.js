@@ -331,10 +331,10 @@ describe('feedback submit (LIN-635)', () => {
     assert.strictEqual(proxyTokenStore.calls[0].options.runRecordId, rowId, 'the token names the created row as its run');
   });
 
-  test("action:'autopilot' mints with origin dispatch and NO runRecordId key: a kickoff starts no run (LIN-4492)", async () => {
+  test("action:'autopilot' mints with origin dispatch and names the kickoff's own row as its run (LIN-4531)", async () => {
     const { provider } = makeFakeProvider();
     const dispatch = capturingDispatchStore();
-    const proxyTokenStore = fakeProxyTokenStore('rw-tok-auto-norun');
+    const proxyTokenStore = fakeProxyTokenStore('rw-tok-auto-run');
     const app = buildApp({ provider, dispatchQueueStore: dispatch, proxyTokenStore });
 
     const { status } = await submit(app, 'acme', { message: 'run this end to end', action: 'autopilot' });
@@ -343,8 +343,11 @@ describe('feedback submit (LIN-635)', () => {
     assert.strictEqual(proxyTokenStore.grantCalls.length, 1);
     assert.strictEqual(proxyTokenStore.grantCalls[0].label, 'feedback-autopilot');
     assert.strictEqual(proxyTokenStore.grantCalls[0].origin, 'dispatch');
-    assert.ok(!('runRecordId' in proxyTokenStore.grantCalls[0]), 'no run key on a kickoff\'s credential');
-    assert.ok(!dispatch.items[0].trusted?.runRecordId, 'and the row carries no run either');
+    // LIN-4531: a fresh kickoff starts its run, so its credential names the row as its run and can file a question.
+    const rowId = dispatch.items[0].trusted?.id;
+    assert.ok(rowId, 'the factory allocated the row id');
+    assert.strictEqual(proxyTokenStore.grantCalls[0].runRecordId, rowId, 'the credential names the kickoff row as its run');
+    assert.strictEqual(dispatch.items[0].trusted.runRecordId, rowId, 'and the row is its own run');
   });
 
   test("action:'autopilot' enqueues a scoped autopilot run with the feedback-origin brief", async () => {

@@ -350,7 +350,8 @@ export function registerFeedbackRoutes(router, { workspaceFromUrl, freeTierStore
         issueAccess: () => overrides.access || null,
         model: overrides.model,
         harness: overrides.harness,
-        finalizePrompt: (harness, kind) => attachProxyContext({
+        // LIN-4531: a fresh kickoff starts its own run (lib/run-identity.js), so its credential names that run, as triage's does.
+        finalizePrompt: (harness, kind, { runRecordId = null } = {}) => attachProxyContext({
           ...feedbackProxyContext({ workspace, issue, baseUrl, session, harness, prompt: kickoff, label: 'feedback-autopilot' }),
           // LIN-4251: the same helper as the triage twin (`autopilot` has no template: work).
           writes: stageWrites(kind),
@@ -358,7 +359,8 @@ export function registerFeedbackRoutes(router, { workspaceFromUrl, freeTierStore
           declaredGrants: ['dispatch'],
           declaredSite: 'M4',
           grantOwnerAccountId: session?.accountId || null,
-          workspaceId: workspace.id
+          workspaceId: workspace.id,
+          runRecordId
         }),
         fields: {
           promptName: `Autopilot — ${issue.identifier}`,

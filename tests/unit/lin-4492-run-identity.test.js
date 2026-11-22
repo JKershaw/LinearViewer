@@ -44,8 +44,8 @@ describe('LIN-4492: which rows start a run', () => {
     }
   });
 
-  test('autopilot kickoffs, kind-less custom and work rows, collective, chat and wake start none', () => {
-    for (const kind of ['autopilot', 'custom', 'work', 'wake', 'collective', 'chat', '', null, undefined]) {
+  test('kind-less custom and work rows, collective, chat and wake start none', () => {
+    for (const kind of ['custom', 'work', 'wake', 'collective', 'chat', '', null, undefined]) {
       assert.equal(startsRun(kind), false, String(kind));
     }
   });
@@ -54,7 +54,9 @@ describe('LIN-4492: which rows start a run', () => {
     assert.equal(runRecordIdFor({ kind: 'implementation', id: 'row-1', resumedRunRecordId: 'old' }), 'row-1');
     assert.equal(runRecordIdFor({ kind: 'custom', id: 'row-2', resumedRunRecordId: 'build-1' }), 'build-1');
     assert.equal(runRecordIdFor({ kind: 'custom', id: 'row-3', resumedRunRecordId: null }), null);
-    assert.equal(runRecordIdFor({ kind: 'autopilot', id: 'row-4', resumedRunRecordId: null }), null);
+    // LIN-4531: a fresh autopilot kickoff starts its own run; its follow-up belongs to the run it resumes.
+    assert.equal(runRecordIdFor({ kind: 'autopilot', id: 'row-4', resumedRunRecordId: null }), 'row-4');
+    assert.equal(runRecordIdFor({ kind: 'autopilot', id: 'row-5', resumedRunRecordId: 'row-4', followUpTo: 'row-4' }), 'row-4');
   });
 });
 
@@ -77,13 +79,13 @@ describe('LIN-4492: the id comes before the prompt, and the run is the row', () 
     assert.equal(item._id, ids.id);
   });
 
-  test('an autopilot kickoff starts no run: no runRecordId key on the row, and its id is still first', async () => {
+  test('an autopilot kickoff starts its run (LIN-4531): its run is its own id, and that id comes first', async () => {
     const store = makeStore();
     const { item, ids } = await dispatch(store, { kind: 'autopilot', prompt: 'You are Autopilot.' });
 
-    assert.equal(ids.runRecordId, null);
+    assert.equal(ids.runRecordId, ids.id, 'the kickoff is its own run, so it can file a question');
     assert.equal(item._id, ids.id);
-    assert.equal('runRecordId' in item, false, 'a run-less row keeps its key set');
+    assert.equal(item.runRecordId, ids.id);
   });
 
   test('the kickoff\'s session-id block is the same bytes as before, and names the row id', async () => {
@@ -110,7 +112,7 @@ describe('LIN-4492: the id comes before the prompt, and the run is the row', () 
     assert.equal(withAutopilotSessionHeading('BODY', ids.id), expected);
   });
 
-  test('a follow-up of an autopilot run is not a run root: no heading, no run', async () => {
+  test('a follow-up of an autopilot run is not a run root: no heading, and it belongs to the kickoff\'s run', async () => {
     const store = makeStore();
     const kickoff = (await dispatch(store, { kind: 'autopilot', prompt: 'kickoff' })).item;
     await store.takeItem(kickoff._id, URL_KEY, 'token-a');
@@ -124,7 +126,8 @@ describe('LIN-4492: the id comes before the prompt, and the run is the row', () 
       finalizePrompt: async (h, k, ids) => ({ prompt: 'a note' })
     });
     assert.equal(note.prompt, 'a note');
-    assert.equal('runRecordId' in note, false);
+    assert.equal(note.runRecordId, kickoff.runRecordId, 'the note is a message into the run it resumes');
+    assert.notEqual(note.runRecordId, note._id, 'and it starts no run of its own');
   });
 });
 

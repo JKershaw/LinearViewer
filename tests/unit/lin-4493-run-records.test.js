@@ -45,10 +45,15 @@ describe('the run opens when its row is taken', () => {
     assert.equal(run.lineage, 'row-impl');
   });
 
-  test('an autopilot kickoff starts no run, and a wake with no run to wake opens nothing', async () => {
+  test('a wake with no run to wake opens nothing; a fresh autopilot kickoff opens its own run (LIN-4531), and its follow-up none', async () => {
     assert.equal(await seam.onTaken(row({ _id: 'row-wake', kind: 'wake', runRecordId: null })), null);
     assert.equal(await seam.onTaken(row({ _id: 'row-wake-2', kind: 'wake', runRecordId: 'row-missing' })), null);
-    assert.equal(await seam.onTaken(row({ _id: 'row-kick', kind: 'autopilot' })), null);
+    const kick = await seam.onTaken(row({ _id: 'row-kick', kind: 'autopilot' }));
+    assert.equal(kick.id, 'row-kick', 'the kickoff is its own run, so it can file a question');
+    // A follow-up of the kickoff is a message into its run: it reopens that run and starts none of its own.
+    const note = await seam.onTaken(row({ _id: 'row-kick-note', kind: 'autopilot', followUpTo: 'row-kick', runRecordId: 'row-kick' }));
+    assert.equal(note.id, 'row-kick');
+    assert.equal(note.fields?.stage, 'autopilot', 'the run keeps the kickoff\'s stage: the follow-up opens no run of its own');
   });
 
   test('a wake reopens the run it wakes, as a custom resume does, and keeps that run\'s lineage (decision 2c)', async () => {
