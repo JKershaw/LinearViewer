@@ -102,6 +102,7 @@ import { ShelvedRulingsStore } from './lib/shelved-rulings-store.js'
 import { RecordsStore, RECORDS_COLLECTION, REFS_COLLECTION, QUERY_LOG_COLLECTION } from './lib/records-store.js'
 import { createRunRecords } from './lib/run-records.js'
 import { createChangeBackstop, createChangePrReaders } from './lib/change-records.js'
+import { setStandingPrReaderFor } from './lib/task-standing.js'
 import { createRecordWrites } from './lib/records/writes.js'
 import { askedOf } from './lib/asked-of.js'
 import { flattenIssue as flattenRecordsIssue } from './lib/proxy-wire.js'
@@ -713,6 +714,8 @@ const changePrReaderFor = createChangePrReaders({
   resolveWorkspaceId: createSessionWorkspaceIdResolver({ sessionsCollection }),
   installationTokenFor: (args) => installationTokenFor(args),
 })
+// LIN-4518 (P5 step 1): every standing read refreshes change heads through the same per-workspace reader (lib/task-standing.js).
+setStandingPrReaderFor(changePrReaderFor)
 dispatchQueueStore.runRecords = createRunRecords({ recordsStore, readRow: (urlKey, id) => dispatchQueueStore.rowForRunRecords(urlKey, id), taskOfTicket: (urlKey, ticket) => taskForTicketAt(urlKey, ticket), changeBackstop: createChangeBackstop({ recordsStore, prReaderFor: changePrReaderFor }) })
 // LIN-2444: proposed dismissals — a view annotation on a ruling, never an
 // answer to it. Separate collection from shelved-rulings because the two are
