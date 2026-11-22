@@ -9,7 +9,7 @@
  *     by LIN-3325; the owner page path is pinned here).
  */
 import { FINDINGS_NONE } from '../../lib/close-out-findings.js';
-import { test, describe, before } from 'node:test';
+import { test, describe, before, after } from 'node:test';
 import assert from 'node:assert/strict';
 import { readRunEvidence } from '../../lib/run-evidence.js';
 import { createWorkspaceApiRoutes } from '../../routes/workspace-api.js';
@@ -23,12 +23,20 @@ setRunControlsResolver(async () => ({ runControls: true, runSetup: false }));
 import { InMemoryRunParagraphStore } from '../../lib/run-paragraph-store.js';
 import { withFreshDigests } from '../fixtures/with-fresh-digests.js';
 import { findRouteLayer } from './lib/route-layer.js';
+import { createMangoTmpdir } from '../fixtures/mango-tmpdir.js';
+import { recordsStoreFor } from '../helpers/records-scenario.js';
 import { NO_REQUEST_RECORDS, withDefaults } from '../fixtures/request-usage-loader.js';
 // LIN-4201: these tests read snapshot-only lineages, so they pass "no request records" explicitly (plumbing only).
 const createDashboardRoutes = withDefaults(createDashboardRoutes__unplumbed, 0, { requestUsageLoader: NO_REQUEST_RECORDS });
 
 
 before(() => { process.env.NODE_ENV = 'test'; });
+// LIN-4518 step 3: the reader reads the ticket's records. These tests read no landing from them: an empty store (no task) is
+// the records' answer for a ticket with none, and the comments these tests build the model from are the cited list.
+const harness = createMangoTmpdir('lin-3329-run-evidence-seams-');
+let EMPTY_RECORDS = null;
+before(async () => { await harness.connect(); EMPTY_RECORDS = await recordsStoreFor(harness); });
+after(() => harness.close());
 
 const PR_A = 'https://github.com/acme/widget/pull/12';
 const comment = (body, createdAt = '2026-07-01T00:00:00.000Z') => ({ body, createdAt, user: 'worker' });
@@ -46,13 +54,13 @@ const unreadable = async () => ({ readable: false, state: 'unknown', reason: 'st
 
 describe('readRunEvidence: viewerIsOwner defaults to false', () => {
   test('flag omitted → closeOut.owner === false', async () => {
-    const model = await readRunEvidence({ openFindings: FINDINGS_NONE, issueIdentifier: 'LIN-1', provider: countingProvider(), callScope: 's', readPrStatus: unreadable });
+    const model = await readRunEvidence({ recordsStore: EMPTY_RECORDS, openFindings: FINDINGS_NONE, issueIdentifier: 'LIN-1', provider: countingProvider(), callScope: 's', readPrStatus: unreadable });
     assert.equal(model.closeOut.owner, false);
   });
 
   test('explicit true and false are honoured', async () => {
-    const owner = await readRunEvidence({ openFindings: FINDINGS_NONE, issueIdentifier: 'LIN-1', provider: countingProvider(), callScope: 's', readPrStatus: unreadable, viewerIsOwner: true });
-    const guest = await readRunEvidence({ openFindings: FINDINGS_NONE, issueIdentifier: 'LIN-1', provider: countingProvider(), callScope: 's', readPrStatus: unreadable, viewerIsOwner: false });
+    const owner = await readRunEvidence({ recordsStore: EMPTY_RECORDS, openFindings: FINDINGS_NONE, issueIdentifier: 'LIN-1', provider: countingProvider(), callScope: 's', readPrStatus: unreadable, viewerIsOwner: true });
+    const guest = await readRunEvidence({ recordsStore: EMPTY_RECORDS, openFindings: FINDINGS_NONE, issueIdentifier: 'LIN-1', provider: countingProvider(), callScope: 's', readPrStatus: unreadable, viewerIsOwner: false });
     assert.equal(owner.closeOut.owner, true);
     assert.equal(guest.closeOut.owner, false);
   });
@@ -60,6 +68,7 @@ describe('readRunEvidence: viewerIsOwner defaults to false', () => {
   test('the /api/run-evidence route still defaults its viewer to owner (() => true), unchanged', async () => {
     const provider = countingProvider();
     const router = createWorkspaceApiRoutes({
+      recordsStore: EMPTY_RECORDS,
       workspaceFromUrl: (req, res, next) => next(),
       runEvidence: { resolveProvider: () => ({ provider, callScope: 's' }), readPrStatus: unreadable }
     });
@@ -177,7 +186,7 @@ describe('run page owner path (routes/dashboard.js)', () => {
 describe('readRunEvidence: optional comments (LIN-3329)', () => {
   test('comments supplied → no fetchIssueComments; the model is built from them', async () => {
     const provider = countingProvider({ comments: [] });
-    const model = await readRunEvidence({ openFindings: FINDINGS_NONE, issueIdentifier: 'LIN-1', provider, callScope: 's', readPrStatus: unreadable, comments: [comment(`opened ${PR_A}`)] });
+    const model = await readRunEvidence({ recordsStore: EMPTY_RECORDS, openFindings: FINDINGS_NONE, issueIdentifier: 'LIN-1', provider, callScope: 's', readPrStatus: unreadable, comments: [comment(`opened ${PR_A}`)] });
     assert.equal(provider.counts.comments, 0, 'the supplied comments were used');
     assert.equal(model.state.pr.url, PR_A);
     assert.equal(model.closeOut.owner, false, 'the viewerIsOwner default is untouched');
@@ -185,14 +194,14 @@ describe('readRunEvidence: optional comments (LIN-3329)', () => {
 
   test('comments omitted → fetched exactly once, as before', async () => {
     const provider = countingProvider();
-    const model = await readRunEvidence({ openFindings: FINDINGS_NONE, issueIdentifier: 'LIN-1', provider, callScope: 's', readPrStatus: unreadable });
+    const model = await readRunEvidence({ recordsStore: EMPTY_RECORDS, openFindings: FINDINGS_NONE, issueIdentifier: 'LIN-1', provider, callScope: 's', readPrStatus: unreadable });
     assert.equal(provider.counts.comments, 1);
     assert.equal(model.state.pr.url, PR_A);
   });
 
   test('an empty supplied list is respected (no fetch, no PR)', async () => {
     const provider = countingProvider();
-    const model = await readRunEvidence({ openFindings: FINDINGS_NONE, issueIdentifier: 'LIN-1', provider, callScope: 's', readPrStatus: unreadable, comments: [] });
+    const model = await readRunEvidence({ recordsStore: EMPTY_RECORDS, openFindings: FINDINGS_NONE, issueIdentifier: 'LIN-1', provider, callScope: 's', readPrStatus: unreadable, comments: [] });
     assert.equal(provider.counts.comments, 0);
     assert.equal(model.closeOut.status, 'no-pr');
   });

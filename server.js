@@ -1164,6 +1164,7 @@ scheduler.register({
       getProviderByName: (name) => getProviderForWorkspace({ provider: name })
     }),
     baseUrl: ciWakeBaseUrl,
+    recordsStore,
     installationTokenFor
   })
 // Same discipline as the sweeps above: not awaited, with a purpose-written catch.

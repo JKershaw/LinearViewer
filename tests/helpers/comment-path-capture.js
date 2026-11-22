@@ -53,8 +53,10 @@ import { closeOutDecision, CLOSE_OUT_ACTOR } from '../../lib/run-closeout-state.
 import { FINDINGS_NONE, findingsNotRead } from '../../lib/close-out-findings.js';
 import { assembleTrailFacts, assemblePlanReviewFacts, reviewLoopStop, reviewLoopConverging } from '../../lib/recommendation-facts.js';
 import { blindReadStep } from '../../lib/recommendation-blind-read.js';
-import { readRunEvidence } from '../../lib/run-evidence.js';
-import { readCloseOutChain, closeOutNotReady } from '../../lib/close-out-readiness.js';
+import { buildRunEvidence, extractPrUrls, landingPrRefs } from '../../lib/run-evidence.js';
+import { readPrStatuses } from '../../lib/close-out-readiness.js';
+import { deriveCloseOutState, blindReadMissingState, CLOSE_OUT_REASON } from '../../lib/run-closeout-state.js';
+import { prOf } from '../../lib/run-ledger.js';
 import { getRecommendation, setFetchImpl, setPromptTraceRecorder } from '../../lib/openrouter.js';
 import { COMMENT_PATH_ROWS } from './comment-path-rows.js';
 
@@ -229,6 +231,44 @@ function selectorFacts(comments) {
   return facts;
 }
 
+// ─── The comment path's three lanes, as they read the trail before LIN-4518 step 3 ────────────────────
+// readRunEvidence, readCloseOutChain and closeOutNotReady read the ticket's records now. These are the same steps over
+// readTrail, the comment trail the goldens froze, so the capture still reproduces the comment path. P7 (LIN-4520) deletes them.
+
+/** readRunEvidence's comment-path read: the landing's sole PR is read; a multi-PR landing reads none. */
+async function commentRunEvidence({ comments, readPrStatus }) {
+  const landing = landingPrUrls(comments);
+  let prStatus = null;
+  if (landing.length === 1) {
+    const { repo, number } = prOf(landing[0]);
+    prStatus = await readPrStatus({ repo, number });
+  }
+  return buildRunEvidence({ issueIdentifier: ISSUE, comments, prUrls: extractPrUrls(comments, []), prStatus, stopAt: 'pr', runnerReady: true, owner: true, openFindings: FINDINGS_NONE });
+}
+
+/** readCloseOutChain's comment-path answer: the landing's PRs read through the seam, decided for `actor`. */
+async function commentChain({ comments, seam, stopAt, actor }) {
+  const trail = readTrail(comments);
+  const prs = landingPrRefs(trail.landing);
+  const read = await readPrStatuses({ prUrls: prs, callScope: 'scope', workspace: { urlKey: 'acme' }, seam, prStatusCache: new Map(), providerKind: 'local' });
+  const prStatuses = new Map(prs.map((pr, i) => [pr.url, read[i]]));
+  const state = deriveCloseOutState({ prs, prStatuses, landingPrs: trail.landing, review: trail.review, runnerReady: true, owner: true, stopAt, actor, openFindings: FINDINGS_NONE });
+  return { state, prStatuses };
+}
+
+/** closeOutNotReady's comment-path refusal for one lane: the stop-at guard (`pr`) or the ladder (`null`). */
+async function commentGuard({ comments, seam, stopAt }) {
+  if (stopAt !== 'pr') {
+    const trail = readTrail(comments);
+    const state = deriveCloseOutState({ landingPrs: trail.landing, review: trail.review, actor: CLOSE_OUT_ACTOR.HARBOUR, openFindings: findingsNotRead('the ladder guard refuses on the blind read only and reads no findings') });
+    return state.refuses === CLOSE_OUT_REASON.BLIND_READ_MISSING ? blindReadMissingState(state, null) : null;
+  }
+  const { state } = await commentChain({ comments, seam, stopAt, actor: CLOSE_OUT_ACTOR.HARBOUR });
+  if (state.refuses === CLOSE_OUT_REASON.HEAD_MOVED) return state;
+  if (state.refuses === CLOSE_OUT_REASON.BLIND_READ_MISSING) return blindReadMissingState(state, state.pr ?? null);
+  return null;
+}
+
 /**
  * The comment path's answers for one trail. `statusOf(url)` is the PR reader: the status a lane gets when it asks.
  * @param {{comments: Object[], statusOf: (url: string) => Object, ticketState: string, allRuns: (Object[]|null)}} c
@@ -240,8 +280,8 @@ async function captureCase({ comments, statusOf, ticketState, allRuns }) {
     trail: { review: trail.review, landing: trail.landing }, prStatuses, stopAt, runnerReady: true, actor, openFindings,
   });
   const reads = [];
-  const evidence = await readRunEvidence({
-    openFindings: FINDINGS_NONE, issueIdentifier: ISSUE, comments, stopAt: 'pr', runnerReady: true, viewerIsOwner: true,
+  const evidence = await commentRunEvidence({
+    comments,
     readPrStatus: async ({ repo, number }) => { reads.push(urlOf(repo, number)); return statusOf(urlOf(repo, number)); },
   });
   const step = blindReadStep({ state: { type: ticketState } }, { comments, allRuns });
@@ -268,13 +308,9 @@ async function surfacesOf({ comments, statusOf, ticketState, allRuns }) {
     readPrStatus: async ({ repo, number }) => { log.push(urlOf(repo, number)); return statusOf(urlOf(repo, number)); },
     isStopAtRun: async () => stopAt,
   });
-  const workspace = { urlKey: 'acme' };
-  const { state: check } = await readCloseOutChain({
-    openFindings: FINDINGS_NONE, workspace, issueIdentifier: ISSUE, seam: seam('pr', reads.chain), stopAt: 'pr',
-    runnerReady: true, owner: true, actor: CLOSE_OUT_ACTOR.PERSON, prStatusCache: new Map(),
-  });
-  const stopAtGuard = await closeOutNotReady({ openFindings: FINDINGS_NONE, workspace, issueIdentifier: ISSUE, seam: seam('pr', reads.stopAtGuard) });
-  const ladderGuard = await closeOutNotReady({ openFindings: FINDINGS_NONE, workspace, issueIdentifier: ISSUE, seam: seam(null, reads.ladderGuard) });
+  const { state: check } = await commentChain({ comments, seam: seam('pr', reads.chain), stopAt: 'pr', actor: CLOSE_OUT_ACTOR.PERSON });
+  const stopAtGuard = await commentGuard({ comments, seam: seam('pr', reads.stopAtGuard), stopAt: 'pr' });
+  const ladderGuard = await commentGuard({ comments, seam: seam(null, reads.ladderGuard), stopAt: null });
 
   setPromptTraceRecorder(() => {});
   setFetchImpl(async () => ({ ok: true, json: async () => SELECTOR_REPLY }));

@@ -22,6 +22,7 @@ import { readdirSync, readFileSync, statSync } from 'node:fs';
 import { join, relative, dirname } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { createMangoTmpdir } from '../fixtures/mango-tmpdir.js';
+import { seededRecordsStore, ev } from '../helpers/records-scenario.js';
 import { recordMergedPrs, createPipelineMergeRecorder } from '../../lib/close-out-merges.js';
 import { CloseOutEventsStore } from '../../lib/close-out-events-store.js';
 import { FINDINGS_NONE } from '../../lib/close-out-findings.js';
@@ -66,6 +67,8 @@ describe('recordMergedPrs (characterization)', () => {
 });
 
 describe('createPipelineMergeRecorder answers (characterization)', () => {
+  // LIN-4518 step 3: the recorder reads the landing from the ticket's records: one change for PR 41, at head H9.
+  const records = () => seededRecordsStore(harness, [ev.pr(1, PR1, 'H9')], { urlKey: 'ws', tickets: ['LIN-1'] });
   const dispatchStore = {
     async listItems() { return []; },
     async listHistory() { return []; },
@@ -77,7 +80,7 @@ describe('createPipelineMergeRecorder answers (characterization)', () => {
 
   test('a merged PR answers exactly {recorded} with one row, headSha the head sha', async () => {
     const record = createPipelineMergeRecorder({
-      closeOutEventsStore: eventsStore(), dispatchStore, log: () => {},
+      closeOutEventsStore: eventsStore(), dispatchStore, log: () => {}, recordsStore: await records(),
       readPrStatus: async () => merged(41, 'H9'),
     });
     const out = await record({ urlKey: 'ws', workspaceId: 'ws-id', accountId: 'acct-1', provider, callScope, written: done });
@@ -89,16 +92,16 @@ describe('createPipelineMergeRecorder answers (characterization)', () => {
 
   test('a non-completed write answers exactly {recorded: []} and reads nothing', async () => {
     let reads = 0;
-    const record = createPipelineMergeRecorder({ closeOutEventsStore: eventsStore(), dispatchStore, log: () => {}, readPrStatus: async () => { reads++; return merged(41, 'H9'); } });
+    const record = createPipelineMergeRecorder({ closeOutEventsStore: eventsStore(), dispatchStore, log: () => {}, recordsStore: await records(), readPrStatus: async () => { reads++; return merged(41, 'H9'); } });
     const out = await record({ urlKey: 'ws', workspaceId: 'ws-id', accountId: 'acct-1', provider, callScope, written: { ...done, state: { type: 'canceled' } } });
     assert.deepEqual(out, { recorded: [] });
     assert.equal(reads, 0);
   });
 
-  test('a throwing provider answers exactly {recorded: []}, never a throw', async () => {
-    const record = createPipelineMergeRecorder({ closeOutEventsStore: eventsStore(), dispatchStore, log: () => {}, readPrStatus: async () => merged(41, 'H9') });
-    const bad = { name: 'github', async fetchIssueComments() { throw new Error('down'); } };
-    assert.deepEqual(await record({ urlKey: 'ws', workspaceId: 'ws-id', accountId: 'acct-1', provider: bad, callScope, written: done }), { recorded: [] });
+  test('a throwing records read answers exactly {recorded: []}, never a throw', async () => {
+    const down = { async taskForTicket() { throw new Error('down'); } };
+    const record = createPipelineMergeRecorder({ closeOutEventsStore: eventsStore(), dispatchStore, log: () => {}, recordsStore: down, readPrStatus: async () => merged(41, 'H9') });
+    assert.deepEqual(await record({ urlKey: 'ws', workspaceId: 'ws-id', accountId: 'acct-1', provider, callScope, written: done }), { recorded: [] });
   });
 });
 
@@ -157,7 +160,7 @@ describe('witness 6: the ladder lane makes no PR read (characterization)', () =>
     { id: 'c2', body: '## Review\n\nReviewed head `aaaaaaa1111111`.\n\n### What CI Did Not Prove\n| # | Claim | In/Out | Discharge |\n| --- | --- | --- | --- |\n| 1 | one claim | In | none |\n\n**Verdict: Approve**', createdAt: '2026-07-02T00:00:00.000Z', user: 'agent' },
   ];
 
-  test('a ladder close-out dispatch reads the comments once, and no PR, GitHub or records read', async () => {
+  test('a ladder close-out dispatch reads its records once, and no comment, PR or GitHub read', async () => {
     const counts = { comments: 0, prReads: 0 };
     const seam = {
       resolveProvider: () => ({ provider: { async fetchIssueComments() { counts.comments++; return COMMENTS; } }, callScope: 'scope' }),
@@ -165,10 +168,17 @@ describe('witness 6: the ladder lane makes no PR read (characterization)', () =>
       readPrStatus: async () => { counts.prReads++; throw new Error('a PR read on the ladder lane'); },
       githubFetch: async () => { counts.prReads++; throw new Error('a GitHub read on the ladder lane'); },
     };
-    // Any records read throws: the ladder lane must not touch the store.
-    const recordsStore = new Proxy({}, { get(_t, name) { throw new Error(`a records read on the ladder lane: ${String(name)}`); } });
+    // LIN-4518 step 3: the gate reads the ticket's records (the trail), once; the lane reads no comment and no PR.
+    const real = await seededRecordsStore(harness, [ev.pr(1, PR1, REVIEWED), ev.review(2, PR1, { heads: { [PR1]: REVIEWED } })], { urlKey: 'acme', tickets: ['LIN-1'] });
+    const recordReads = [];
+    const recordsStore = new Proxy(real, { get(target, name) {
+      const v = target[name];
+      if (typeof v !== 'function') return v;
+      return (...args) => { recordReads.push(String(name)); return v.apply(target, args); };
+    } });
     const state = await closeOutNotReady({ openFindings: FINDINGS_NONE, workspace: { urlKey: 'acme' }, issueIdentifier: 'LIN-1', seam, recordsStore });
-    assert.deepEqual(counts, { comments: 1, prReads: 0 });
+    assert.deepEqual(counts, { comments: 0, prReads: 0 });
+    assert.ok(recordReads.includes('taskForTicket'), 'the gate reads the ticket\'s task from the records');
     assert.equal(state?.reason, 'blind-read-missing', 'the ladder still refuses on the gate');
   });
 });

@@ -17,10 +17,21 @@ import { renderTaskPage, renderTaskPullRequest } from '../../lib/render-task-pag
 import { renderEvidence } from '../../lib/render-run-evidence.js';
 import { readRunEvidence } from '../../lib/run-evidence.js';
 import { enrichLoop, deriveSessionWaiting } from '../../routes/dashboard.js';
+import { createMangoTmpdir } from '../fixtures/mango-tmpdir.js';
+import { seededRecordsStore, ev } from '../helpers/records-scenario.js';
+import { before, after } from 'node:test';
 
 const NOW = new Date('2026-10-08T21:00:00.000Z');
 const UUID = '11111111-2222-3333-4444-555555555555';
 const PR_URL = 'https://github.com/acme/app/pull/41';
+// LIN-4518 step 3: the default trail (the PR, its approve, the close-out that merged it) as the ticket's records.
+const harness = createMangoTmpdir('lin-3379-task-page-settling-');
+let RECORDS = null;
+before(async () => {
+  await harness.connect();
+  RECORDS = await seededRecordsStore(harness, [ev.pr(1, PR_URL, 'abc1234'), ev.review(2, PR_URL, { heads: { [PR_URL]: 'abc1234' } }), ev.close(3), ev.merged(3, PR_URL)], { urlKey: 'ws', tickets: ['LIN-51'] });
+});
+after(() => harness.close());
 
 const REVIEW = {
   id: 'c-review',
@@ -81,6 +92,7 @@ const MERGED_PR = { readable: true, state: 'closed', merged: true, head: { sha: 
 
 function makeLoader({ ctx, brief = null, recap = null, events = [], loops = [loop()], stopAt = 'pr' } = {}) {
   const loader = createTaskPageLoader({
+    recordsStore: RECORDS,
     dispatchStore: {},
     agentStatusStore: {},
     briefCacheStore: { async get() { return brief; } },

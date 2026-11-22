@@ -17,7 +17,9 @@
 process.env.NODE_ENV = 'test';
 
 import { FINDINGS_NONE } from '../../lib/close-out-findings.js';
-import { test, describe } from 'node:test';
+import { test, describe, before, after } from 'node:test';
+import { createMangoTmpdir } from '../fixtures/mango-tmpdir.js';
+import { seededRecordsStore, ev } from '../helpers/records-scenario.js';
 import assert from 'node:assert/strict';
 import { readFileSync } from 'node:fs';
 import { fileURLToPath } from 'node:url';
@@ -46,6 +48,10 @@ import { computeIssueRoundTrips } from '../../lib/plan-review-round-trips.js';
 
 const ROOT = new URL('../../', import.meta.url);
 const read = (p) => readFileSync(fileURLToPath(new URL(p, ROOT)), 'utf8');
+
+const harness = createMangoTmpdir('lin-4437-blind-read-');
+before(() => harness.connect());
+after(() => harness.close());
 
 const PR = 'https://github.com/JKershaw/LinearViewer/pull/77';
 const PR2 = 'https://github.com/JKershaw/LinearViewer/pull/78';
@@ -207,7 +213,8 @@ describe('witness 2: the read is blind', () => {
     parent: { identifier: 'LIN-8', title: 'TOKEN_PARENT_7731', description: 'TOKEN_PDESC_7731' },
     siblings: [], children: [], project: { name: 'TOKEN_PROJECT_7731' },
     comments: [c(1, `TOKEN_COMMENT_7731 Implementation: ${PR}`), c(2, '### Leftovers\nTOKEN_LEFTOVERS_7731\nRetires: none')],
-    attachments: [{ id: 'att:1', title: 'TOKEN_ATTACH_7731', kind: 'file' }]
+    attachments: [{ id: 'att:1', title: 'TOKEN_ATTACH_7731', kind: 'file' }],
+    landingChanges: [{ id: 'change-pr77', ref: PR, head: 'abc1234' }],
   };
   const prompt = generatePrompt('blind-read', issue, context).prompt;
   const preamble = buildProxyContextPreamble({ baseUrl: 'https://h', token: 'T', issueIdentifier: 'LIN-9', writes: 'blind-comment' });
@@ -225,7 +232,8 @@ describe('witness 2: the read is blind', () => {
   });
   test('the ticket appears only as where the comment goes', () => {
     for (const line of prompt.split('\n').filter(l => l.includes('LIN-9'))) {
-      assert.match(line, /one comment on LIN-9|LIN-9 is where it goes|linked on LIN-9/, line);
+      // The verdict record (LIN-4518 step 2) names the ticket as its `in`, the place a record goes, not a text to read.
+      assert.match(line, /one comment on LIN-9|LIN-9 is where it goes|linked on LIN-9|"in": "LIN-9"/, line);
     }
   });
   test('the skip is the blind read\'s alone: another stage still renders the attachments', () => {
@@ -238,7 +246,7 @@ const WHERE_EACH_FIND_GOES = "**Where each find goes.** A find inside the change
 describe('the prompt is the piloted text', () => {
   test('the render keeps every paragraph of the frozen pilot but the ones LIN-4495 changed (the finds are records now)', () => {
     const pilot = read('tests/fixtures/blind-read-piloted.txt');
-    const prompt = generatePrompt('blind-read', { identifier: 'LIN-9', state: {}, labels: [] }, { comments: [summary(1)] }).prompt;
+    const prompt = generatePrompt('blind-read', { identifier: 'LIN-9', state: {}, labels: [] }, { landingChanges: [{ id: 'change-pr77', ref: PR, head: 'abc1234' }] }).prompt;
     const body = prompt.slice(prompt.indexOf('## Process\n\n') + '## Process\n\n'.length);
     const [repo, lead, ...rest] = pilot.trimEnd().split('\n\n');
     assert.ok(prompt.includes(`## Goal\n${lead}\n`), 'the lead is the pilot\'s second paragraph');
@@ -256,19 +264,19 @@ describe('the prompt is the piloted text', () => {
     assert.match(body.split('\n\n').find(q => q.startsWith('**Where to stand.**')), /git fetch origin pull\/<number>\/head/);
   });
   test('where each find goes is the records routing (LIN-4495), and the unmapped-path find is worded by the consequence test', () => {
-    const prompt = generatePrompt('blind-read', { identifier: 'LIN-9', state: {}, labels: [] }, { comments: [summary(1)] }).prompt;
+    const prompt = generatePrompt('blind-read', { identifier: 'LIN-9', state: {}, labels: [] }, { landingChanges: [{ id: 'change-pr77', ref: PR, head: 'abc1234' }] }).prompt;
     assert.ok(prompt.includes('An unmapped path\'s find is a find outside the change\'s area'));
     assert.ok(CONSEQUENCE_TEST.includes('Word an outside find'), 'the consequence test words the outside find');
     assert.ok(LEFTOVER_RULE.includes('a finding'), 'the leftover rule routes a find to a finding');
   });
   test('with no PR on the landing the prompt says so and the run ends [skipped]', () => {
-    const prompt = generatePrompt('blind-read', { identifier: 'LIN-9', state: {}, labels: [] }, { comments: [c(1, 'no links here')] }).prompt;
+    const prompt = generatePrompt('blind-read', { identifier: 'LIN-9', state: {}, labels: [] }, { landingChanges: [] }).prompt;
     assert.match(prompt, /\*\*Nothing to read\.\*\*/);
     assert.match(prompt, /`\[skipped\]`/);
     assert.doesNotMatch(prompt, /Repository:/);
   });
   test('the landing\'s repository names the Repository line; the pilot file is a pointer now', () => {
-    const prompt = generatePrompt('blind-read', { identifier: 'LIN-9', state: {}, labels: [] }, { comments: [summary(1, FOREIGN), summary(2)] }).prompt;
+    const prompt = generatePrompt('blind-read', { identifier: 'LIN-9', state: {}, labels: [] }, { landingChanges: [{ id: 'change-foreign', ref: FOREIGN, head: null }, { id: 'change-pr77', ref: PR, head: null }] }).prompt;
     assert.match(prompt, /^Repository: other\/repo, JKershaw\/LinearViewer\. /m);
     assert.doesNotMatch(read('docs/plans/survey/blind-read-prompt.md'), /^```$/m, 'no second live copy of the prompt');
   });
@@ -349,10 +357,11 @@ class FakeProvider extends ProviderInterface {
     };
   }
 }
-function buildApp(provider) {
+function buildApp(provider, recordsStore = null) {
   const app = express();
   app.use(express.json());
   app.use(createProxyRoutes({
+    recordsStore,
     proxyTokenStore: { validateToken: async () => ({ tokenId: 't1', urlKey: URL_KEY, label: 'test', scope: 'readWrite', createdBy: 'u1' }) },
     proxyEventStore: { recordEvent: async () => {} },
     resolveWorkspaceAccess: async () => ({ token: 'ws-token', reason: 'ok' }),
@@ -365,8 +374,11 @@ function buildApp(provider) {
   }));
   return app;
 }
-async function post(provider, body, method = 'POST', path = `${ISSUE_ID}/comments`) {
-  const server = buildApp(provider).listen(0, '127.0.0.1');
+// The ticket's records (LIN-4518 step 3): the landing is PR 77, a review on it. `records` overrides the store.
+const LANDING = [ev.pr(1, PR, 'abc1234'), ev.review(2, PR)];
+async function post(provider, body, method = 'POST', path = `${ISSUE_ID}/comments`, records = null) {
+  const recordsStore = records ?? await seededRecordsStore(harness, LANDING, { urlKey: URL_KEY, tickets: [ISSUE_ID] });
+  const server = buildApp(provider, recordsStore).listen(0, '127.0.0.1');
   await new Promise((r) => server.once('listening', r));
   try {
     const res = await fetch(`http://127.0.0.1:${server.address().port}/api/proxy/issues/${path}`, {
@@ -406,7 +418,8 @@ describe('the proxy holds the blind read\'s shape', () => {
     const p = new FakeProvider(TRAIL);
     const res = await post(p, readBody('worse'));
     assert.equal(res.status, 201, JSON.stringify(res.body));
-    assert.equal(p.calls.fetchIssueComments, 1);
+    // The landing is read from the records (LIN-4518 step 3): no comment read for the set check.
+    assert.equal(p.calls.fetchIssueComments, 0);
   });
   test('passes a review verdict that mentions the heading mid-comment, and never reads the trail for it', async () => {
     const p = new FakeProvider(TRAIL);
@@ -424,7 +437,7 @@ describe('the proxy holds the blind read\'s shape', () => {
     console.warn = (...args) => warned.push(args.join(' '));
     try {
       const failing = new FakeProvider(new Error('Comments for X could not be read whole'));
-      const passed = await post(failing, readBody('same', [PR, OLD]));
+      const passed = await post(failing, readBody('same', [PR, OLD]), 'POST', `${ISSUE_ID}/comments`, { async taskForTicket() { throw new Error('the store is down'); } });
       assert.equal(passed.status, 201, 'the set check is skipped');
       assert.ok(warned.some(w => /\[blind-read\].*PR-set check skipped/.test(w)), 'and logged');
       const refused = await post(new FakeProvider(new Error('down')), readBody('mixed'));

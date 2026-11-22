@@ -1,55 +1,66 @@
 /**
- * LIN-3497: the close-out read chain reads "a review is on record" the same way
- * buildRunEvidence does — only a real review summary comment is a review. A task
- * whose comments hold no review summary has `ledger === null` and
- * `state.review.verdict === null`, not a non-null 'unknown' model.
+ * LIN-3497: the close-out read chain reads "a review is on record" the same way buildRunEvidence does — only a real review
+ * record is a review. A task with no review record has `ledger === null` and `state.review.verdict === null`.
  *
- * Seam fakes only (the `closeOut` seam of close-out-not-ready-dispatch.test.js);
- * no live hosts, no model calls.
+ * LIN-4518 step 3: the chain reads its review, its blind read and its landing from the ticket's records, not from comments,
+ * so the fixtures here are records (tests/helpers/records-scenario.js). No comment is read, so the comment cap (LIN-4322)
+ * no longer applies; its invariant is that an unreadable ticket refuses rather than deciding on an empty trail.
+ *
+ * Seam fakes only (no live hosts, no model calls).
  */
 process.env.NODE_ENV = 'test';
 
 import { FINDINGS_NONE } from '../../lib/close-out-findings.js';
-import { test, describe, mock } from 'node:test';
+import { test, describe, before, after } from 'node:test';
 import assert from 'node:assert/strict';
 import { readCloseOutChain } from '../../lib/close-out-readiness.js';
-import { GraphQLClient } from 'graphql-request';
-import { CONNECTION_CAP, linearProvider } from '../../lib/providers/linear/index.js';
+import { createMangoTmpdir } from '../fixtures/mango-tmpdir.js';
+import { seededRecordsStore, ev } from '../helpers/records-scenario.js';
 
-const reviewBody = '## Review\n\nReviewed head `aaaaaaa1111111`.\n\n### What CI Did Not Prove\n| # | Claim | In/Out | Discharge |\n| --- | --- | --- | --- |\n| 1 | one claim | In | none |\n\n**Verdict: Approve**';
-const comment = (body, createdAt) => ({ body, createdAt, user: 'someone' });
+const harness = createMangoTmpdir('lin-3497-close-out-readiness-chain-');
+before(() => harness.connect());
+after(() => harness.close());
 
-const chainFor = (comments) => readCloseOutChain({
-  openFindings: FINDINGS_NONE,
-  workspace: { urlKey: 'acme' },
-  issueIdentifier: 'LIN-1',
-  seam: {
-    resolveProvider: () => ({ provider: { async fetchIssueComments() { return comments; } }, callScope: 'scope' }),
-    readPrStatus: async () => { throw new Error('no PR expected'); },
-    isStopAtRun: async () => null,
-  },
-  runnerReady: true,
-  owner: true,
-  actor: 'person',
-  stopAt: null,
-});
+const PR = 'https://github.com/acme/repo/pull/7';
+const REVIEWED = 'aaaaaaa1111111';
+
+/** The chain over the ticket's records (`events`); `recordsStore` overrides the store (a fault, say). */
+async function chainFor(events, { recordsStore = null } = {}) {
+  return readCloseOutChain({
+    openFindings: FINDINGS_NONE,
+    workspace: { urlKey: 'acme' },
+    issueIdentifier: 'LIN-1',
+    recordsStore: recordsStore ?? await seededRecordsStore(harness, events, { urlKey: 'acme', tickets: ['LIN-1'] }),
+    seam: {
+      resolveProvider: () => ({ provider: { async fetchIssueComments() { throw new Error('the chain reads no comments'); } }, callScope: 'scope' }),
+      readPrStatus: async () => { throw new Error('no PR expected'); },
+      isStopAtRun: async () => null,
+    },
+    runnerReady: true,
+    owner: true,
+    actor: 'person',
+    stopAt: null,
+  });
+}
+
+const approve = (n) => ev.review(n, PR, { heads: { [PR]: REVIEWED } });
 
 describe('readCloseOutChain review on record (LIN-3497)', () => {
-  test('no review summary comment: ledger and state.review.verdict are null', async () => {
-    const { ledger, state } = await chainFor([comment('an ordinary comment', '2026-07-01T00:00:00.000Z')]);
+  test('no review on record: ledger and state.review.verdict are null', async () => {
+    const { ledger, state } = await chainFor([ev.pr(1, PR, REVIEWED)]);
     assert.equal(ledger, null);
     assert.equal(state.review.verdict, null);
     assert.equal(state.review.approved, false);
   });
 
-  test('no comments at all: ledger is null', async () => {
+  test('no task on record: ledger is null', async () => {
     const { ledger, state } = await chainFor([]);
     assert.equal(ledger, null);
     assert.equal(state.review.verdict, null);
   });
 
-  test('a review summary comment is still parsed into the ledger', async () => {
-    const { ledger, state } = await chainFor([comment(reviewBody, '2026-07-02T00:00:00.000Z')]);
+  test('a review record is still the ledger', async () => {
+    const { ledger, state } = await chainFor([ev.pr(1, PR, REVIEWED), approve(2)]);
     assert.notEqual(ledger, null);
     assert.equal(ledger.verdict, 'approve');
     assert.equal(state.review.verdict, 'approve');
@@ -57,64 +68,24 @@ describe('readCloseOutChain review on record (LIN-3497)', () => {
 });
 
 describe('readCloseOutChain carries the blind read (LIN-4437)', () => {
-  const PR = 'https://github.com/acme/repo/pull/7';
-  const readBody = `## Blind read\n\nVerdict: worse — lib/foo.js grew a second copy of the parser.\n\nRead: ${PR}`;
-
   test('an approving review then a valid read after it: ledger.blindRead names the read', async () => {
-    const { ledger } = await chainFor([
-      { ...comment(reviewBody, '2026-07-02T00:00:00.000Z'), id: 'review-1' },
-      { ...comment(readBody, '2026-07-03T00:00:00.000Z'), id: 'read-1' },
-    ]);
+    const { ledger } = await chainFor([ev.pr(1, PR, REVIEWED), approve(2), ev.read(3, PR, { outcome: 'worse' })]);
     assert.equal(ledger.verdict, 'approve');
     assert.notEqual(ledger.blindRead, null);
     assert.equal(ledger.blindRead.verdict, 'worse');
-    assert.equal(ledger.blindRead.commentId, 'read-1');
+    assert.equal(typeof ledger.blindRead.commentId, 'string', 'the read is the verdict record on the change');
     assert.deepEqual(ledger.blindRead.prs, [PR]);
   });
 
   test('a read before the review is not this review\'s read: ledger.blindRead is null', async () => {
-    const { ledger } = await chainFor([
-      { ...comment(readBody, '2026-07-01T00:00:00.000Z'), id: 'read-0' },
-      { ...comment(reviewBody, '2026-07-02T00:00:00.000Z'), id: 'review-1' },
-    ]);
+    const { ledger } = await chainFor([ev.pr(0, PR, REVIEWED), ev.read(1, PR, { outcome: 'worse' }), approve(2)]);
     assert.equal(ledger.blindRead, null);
   });
 });
 
-describe('readCloseOutChain when the comment read hits the cap (LIN-4322)', () => {
-  test('rejects over the real Linear read: no merge or Done is judged on a prefix of the trail', async () => {
-    const all = Array.from({ length: CONNECTION_CAP + 1 }, (_, i) => ({
-      id: `c${i}`, body: `c ${i}`, createdAt: new Date(Date.UTC(2026, 10, 1, 0, 0, i)).toISOString(), user: { name: 'Fake' },
-    }));
-    const m = mock.method(GraphQLClient.prototype, 'request', async (query, variables) => {
-      const start = variables.after === undefined ? 0 : Number(Buffer.from(variables.after, 'base64').toString());
-      const end = Math.min(start + 100, all.length);
-      const page = {
-        nodes: all.slice(start, end),
-        pageInfo: { hasNextPage: end < all.length, endCursor: end < all.length ? Buffer.from(String(end)).toString('base64') : null },
-      };
-      return variables.after === undefined ? { issue: { id: 'issue-1', comments: page } } : { issue: { comments: page } };
-    });
-    try {
-      await assert.rejects(
-        readCloseOutChain({
-          openFindings: FINDINGS_NONE,
-          workspace: { urlKey: 'acme' },
-          issueIdentifier: 'LIN-1',
-          seam: {
-            resolveProvider: () => ({ provider: linearProvider, callScope: 'lin_api_test' }),
-            readPrStatus: async () => { throw new Error('no PR expected'); },
-            isStopAtRun: async () => null,
-          },
-          runnerReady: true,
-          owner: true,
-          actor: 'person',
-          stopAt: null,
-        }),
-        /cannot read the latest review/,
-      );
-    } finally {
-      m.mock.restore();
-    }
+describe('readCloseOutChain when the ticket\'s records cannot be read (LIN-4322, on records)', () => {
+  test('an unreadable ticket refuses: no merge or Done is judged on an unread trail', async () => {
+    const unreadable = { async taskForTicket() { throw new Error('the store is down'); } };
+    await assert.rejects(chainFor([], { recordsStore: unreadable }), /could not be read/);
   });
 });

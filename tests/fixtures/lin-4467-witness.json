@@ -192,13 +192,13 @@
     },
     "blind-read:fresh": {
       "name": "blind-read",
-      "bytes": 4648,
-      "sha256": "b46b25486c8e1c1d11f5d612b5f180e25160560b82c39312e88fc6320f22a710"
+      "bytes": 5030,
+      "sha256": "a677e0d90b4544620394ef89cc3a45c2f4e3c6265829d6b9f6d995b8a1e3e47b"
     },
     "blind-read:fix": {
       "name": "blind-read",
-      "bytes": 4648,
-      "sha256": "b46b25486c8e1c1d11f5d612b5f180e25160560b82c39312e88fc6320f22a710"
+      "bytes": 5030,
+      "sha256": "a677e0d90b4544620394ef89cc3a45c2f4e3c6265829d6b9f6d995b8a1e3e47b"
     }
   },
   "tables": {

@@ -28,11 +28,17 @@ import { enrichLoop, deriveSessionWaiting } from '../../routes/dashboard.js';
 import { DispatchQueueStore } from '../../lib/dispatch-store.js';
 import { AgentStatusStore } from '../../lib/agent-status-store.js';
 import { createMangoTmpdir } from '../fixtures/mango-tmpdir.js';
+import { landingRecordsStore } from '../helpers/records-scenario.js';
 
 const NOW = new Date('2026-10-06T15:00:00.000Z');
 const DAY_MS = 24 * 60 * 60 * 1000;
 const ISSUE_UUID = '11111111-2222-3333-4444-555555555555';
 const PR_URL = 'https://github.com/acme/app/pull/41';
+// LIN-4518 step 3: the landing the loader's reader takes is the ticket's records: PR_URL, open, on LIN-50 in ws.
+const recordsHarness = createMangoTmpdir('lin-4515-task-page-loader-records-');
+let LANDING = null;
+before(async () => { await recordsHarness.connect(); LANDING = await landingRecordsStore(recordsHarness, { prUrl: PR_URL, ticket: 'LIN-50', urlKeys: ['ws'] }); });
+after(() => recordsHarness.close());
 
 /** A tracker context in `fetchRecommendationContext`'s canonical shape. */
 function ctxFor(identifier, { stateType = 'started', stateName = 'In Progress', comments = [], description = null } = {}) {
@@ -118,6 +124,7 @@ function loaderWith({ loops = [], brief = null, recap = null, getLoops = null, e
   const briefSpy = cacheSpy(brief);
   const recapSpy = cacheSpy(recap);
   const loader = createTaskPageLoader({
+    recordsStore: LANDING,
     dispatchStore,
     agentStatusStore: {},
     briefCacheStore: briefSpy.store,
@@ -214,7 +221,7 @@ describe('task page loader: unbounded history through the real store', () => {
     await db.collection('dispatch-history').updateOne({ _id: old._id }, { $set: { dispatchedAt: aged } });
     const fresh = await dispatchStore.addItem('ws', { prompt: 'p', promptName: 'implementation', kind: 'implementation', issueIdentifier: 'LIN-50', issueTitle: 'Stored title' });
 
-    const loader = createTaskPageLoader({ dispatchStore, agentStatusStore, enrichLoop, deriveSessionWaiting, now: () => NOW });
+    const loader = createTaskPageLoader({ recordsStore: LANDING, dispatchStore, agentStatusStore, enrichLoop, deriveSessionWaiting, now: () => NOW });
     const { provider } = spyProvider({ ctx: ctxFor('LIN-50') });
     const { model } = await loader.loadTaskPage({ urlKey: 'ws', identifier: 'LIN-50', access: { provider, callScope: 'tok' } });
     assert.deepEqual(model.sessions.map(s => s.loopId), [String(old._id), String(fresh._id)], 'oldest-first, the aged row included');

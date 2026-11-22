@@ -31,6 +31,8 @@ import { readRunEvidence, buildRunEvidence } from '../../lib/run-evidence.js';
 import { resolveRunPrRef } from '../../lib/pr-state-store.js';
 import { CloseOutEventsStore } from '../../lib/close-out-events-store.js';
 import { createMangoTmpdir } from '../fixtures/mango-tmpdir.js';
+import { seededRecordsStore, ev } from '../helpers/records-scenario.js';
+import { landingChangesFor } from '../../lib/records/landing.js';
 
 const REPO = 'acme/widget';
 const PR = (n) => `https://github.com/${REPO}/pull/${n}`;
@@ -52,6 +54,14 @@ const areaRead = (n, url) => c(n, `## Area read: Runs & dispatch @ 4b5001ddf\n\n
 const ROW_14 = [summary(1), review(2), read(3, PR1), closeOut(4, `Merged ${PR1}; set Done.`), audit(5), review(6, 'Approve', PR2)];
 const AREA_READ = [summary(1), review(2), areaRead(3, PR_OLD)];
 
+// LIN-4518 step 3: the same trails as records. An area read is a report, not a change, so it adds none.
+const ROW_14_EVENTS = [ev.pr(1, PR1, REVIEWED), ev.review(2, PR1), ev.read(3, PR1), ev.close(4), ev.merged(4, PR1), ev.audit(5, PR2, REVIEWED), ev.review(6, PR2)];
+const AREA_READ_EVENTS = [ev.pr(1, PR1, REVIEWED), ev.review(2, PR1)];
+
+const harness = createMangoTmpdir('lin-4458-landing-consumers-');
+before(() => harness.connect());
+after(() => harness.close());
+
 // ── The blind-read write check ────────────────────────────────────────────────────────────────────
 const URL_KEY = 'acme-4458';
 const ISSUE_ID = '44584458-4458-4458-4458-445844584458';
@@ -65,10 +75,12 @@ class FakeProvider extends ProviderInterface {
     this.fetchIssueComments = async () => trail;
   }
 }
-async function postRead(trail, prs) {
+async function postRead(events, prs) {
+  const recordsStore = await seededRecordsStore(harness, events, { urlKey: URL_KEY, tickets: [ISSUE_ID] });
   const app = express();
   app.use(express.json());
   app.use(createProxyRoutes({
+    recordsStore,
     proxyTokenStore: { validateToken: async () => ({ tokenId: 't1', urlKey: URL_KEY, label: 'test', scope: 'readWrite', createdBy: 'u1' }) },
     proxyEventStore: { recordEvent: async () => {} },
     resolveWorkspaceAccess: async () => ({ token: 'ws-token', reason: 'ok' }),
@@ -77,7 +89,7 @@ async function postRead(trail, prs) {
     agentStatusStore: {}, recapCacheStore: { get: async () => null, set: async () => {} },
     briefCacheStore: { get: async () => null, set: async () => {} }, dispatchQueueStore: {},
     workspaceFromUrl: (req, res, next) => next(), workspacePreferencesStore: {},
-    freeTierStore: { tryUse: async () => ({ allowed: true }) }, provider: new FakeProvider(trail),
+    freeTierStore: { tryUse: async () => ({ allowed: true }) }, provider: new FakeProvider([]),
   }));
   const server = app.listen(0, '127.0.0.1');
   await new Promise((r) => server.once('listening', r));
@@ -96,8 +108,8 @@ describe('the blind-read write check names the landing under the new rule', () =
   // Before: the landing was [PR1, PR2] (the audit's re-cite of PR1 joined it), so a read of the notes
   // PR alone was refused and one naming both was posted.
   test('row 14: a read naming the notes PR alone is posted; one naming the merged landing PR too is refused', async () => {
-    assert.equal((await postRead(ROW_14, [PR2])).status, 201);
-    const both = await postRead(ROW_14, [PR1, PR2]);
+    assert.equal((await postRead(ROW_14_EVENTS, [PR2])).status, 201);
+    const both = await postRead(ROW_14_EVENTS, [PR1, PR2]);
     assert.equal(both.status, 422);
     assert.equal(both.body.code, BLIND_READ_CODES.prsMismatch);
     assert.deepEqual(both.body.expected, [PR2]);
@@ -105,27 +117,31 @@ describe('the blind-read write check names the landing under the new rule', () =
 
   // Before: an area read's PR joined the landing, so the read had to name PR_OLD too.
   test('an area read\'s PR is not in the landing: a read naming the reviewed PR alone is posted', async () => {
-    assert.deepEqual(landingPrUrls(AREA_READ), [PR1]);
-    assert.equal((await postRead(AREA_READ, [PR1])).status, 201);
-    const extra = await postRead(AREA_READ, [PR1, PR_OLD]);
+    assert.equal((await postRead(AREA_READ_EVENTS, [PR1])).status, 201);
+    const extra = await postRead(AREA_READ_EVENTS, [PR1, PR_OLD]);
     assert.equal(extra.status, 422);
     assert.deepEqual(extra.body.expected, [PR1]);
   });
 });
 
 describe('the blind-read prompt names the landing under the new rule', () => {
-  const prompt = (comments, state = { name: 'In Progress', type: 'started' }) => generatePrompt('blind-read',
-    { identifier: 'LIN-1', title: 'Gate fixture', description: '', state, labels: [] },
-    { parent: null, siblings: [], project: null, children: [], comments, focusedChild: null, attachments: [], runs: [], allRuns: [] }).prompt;
+  // The prompt names the landing's change records (landingChangesFor, what the entrances hand it).
+  const prompt = async (events, state = { name: 'In Progress', type: 'started' }) => {
+    const recordsStore = await seededRecordsStore(harness, events, { urlKey: 'acme', tickets: ['LIN-1'] });
+    const landingChanges = await landingChangesFor({ urlKey: 'acme', ticket: 'LIN-1', recordsStore });
+    return generatePrompt('blind-read',
+      { identifier: 'LIN-1', title: 'Gate fixture', description: '', state, labels: [] },
+      { parent: null, siblings: [], project: null, children: [], comments: [], focusedChild: null, attachments: [], runs: [], allRuns: [], landingChanges }).prompt;
+  };
 
-  test('row 14: the notes PR alone (before: both PRs)', () => {
-    const p = prompt(ROW_14, { name: 'Done', type: 'completed' });
+  test('row 14: the notes PR alone (before: both PRs)', async () => {
+    const p = await prompt(ROW_14_EVENTS, { name: 'Done', type: 'completed' });
     assert.ok(p.includes(`**The change:** ${PR2}`));
     assert.ok(!p.includes(`**The change:** ${PR1}`));
   });
 
-  test('an area read\'s PR is not named (before: the reviewed PR and the area read\'s)', () => {
-    const p = prompt(AREA_READ);
+  test('an area read\'s PR is not named (before: the reviewed PR and the area read\'s)', async () => {
+    const p = await prompt(AREA_READ_EVENTS);
     assert.ok(p.includes(`**The change:** ${PR1}`));
     assert.ok(!p.includes(PR_OLD), 'the area read\'s PR is nowhere in the prompt');
   });
@@ -144,14 +160,20 @@ const CITED_NOT_LANDED = [
   review(5, 'Approve', A),
   read(6, A),
 ];
+// The same round as records: B closed unmerged (its change ends abandoned) before the close-out; A is the landing.
+const CITED_NOT_LANDED_EVENTS = [
+  ev.pr(1, B, REVIEWED), ev.review(2, B, { outcome: 'request-changes' }), ev.close(3), ev.abandoned(3, B),
+  ev.pr(4, A, REVIEWED), ev.review(5, A), ev.read(6, A),
+];
 const status = (number, over = {}) => ({ readable: true, repo: REPO, number, state: 'open', merged: false, head: { ref: 'f', sha: REVIEWED }, ref: REVIEWED, checks: [], ...over });
 
 describe('the stop-at guard decides from the landing', () => {
-  const guard = (statuses, reads = []) => closeOutNotReady({
+  const guard = async (statuses, reads = []) => closeOutNotReady({
     openFindings: FINDINGS_NONE,
     workspace: { urlKey: 'acme' }, issueIdentifier: 'LIN-1',
+    recordsStore: await seededRecordsStore(harness, CITED_NOT_LANDED_EVENTS, { urlKey: 'acme', tickets: ['LIN-1'] }),
     seam: {
-      resolveProvider: () => ({ provider: { name: 'local', async fetchIssueComments() { return CITED_NOT_LANDED; } }, callScope: 'scope' }),
+      resolveProvider: () => ({ provider: { name: 'local', async fetchIssueComments() { return []; } }, callScope: 'scope' }),
       readPrStatus: async ({ number }) => { reads.push(number); return statuses[number]; },
       isStopAtRun: async () => 'pr',
     },
@@ -173,21 +195,18 @@ describe('the stop-at guard decides from the landing', () => {
 });
 
 describe('the pipeline merge recorder records the landing\'s merges only', () => {
-  const harness = createMangoTmpdir('lin-4458-landing-consumers-');
-  before(() => harness.connect());
-  after(() => harness.close());
-
   // Before: it read every cited PR and recorded a merged event for each merged one, B included.
   test('A merged and B merged outside the landing: only A\'s merge is recorded, and only A is read', async () => {
     const collection = harness.freshDb().collection('close-out-events');
     const reads = [];
     const record = createPipelineMergeRecorder({
       closeOutEventsStore: new CloseOutEventsStore({ collection }),
+      recordsStore: await seededRecordsStore(harness, CITED_NOT_LANDED_EVENTS, { urlKey: 'ws', tickets: ['LIN-1'] }),
       dispatchStore: { async listItems() { return []; }, async listHistory() { return []; }, async getItemStatus() { return null; } },
       readPrStatus: async ({ number }) => { reads.push(number); return status(number, { state: 'closed', merged: true, created_at: T(1), merged_at: T(8) }); },
       log: () => {},
     });
-    const provider = { name: 'github', async fetchIssueComments() { return CITED_NOT_LANDED; } };
+    const provider = { name: 'github', async fetchIssueComments() { return []; } };
     const { recorded } = await record({ urlKey: 'ws', workspaceId: 'ws-id', accountId: 'acct-1', provider, callScope: { token: 'ghs_token', repo: REPO }, written: { id: 'iss-1', identifier: 'LIN-1', state: { type: 'completed' } } });
     assert.deepEqual(reads, [41]);
     assert.deepEqual(recorded.map(r => r.prUrl), [A]);
@@ -202,7 +221,9 @@ describe('a PR cited only outside the landing is not read (the box\'s one read i
   test('a PR cited only by a Survey report: no read, box no-pr, picker one, page state unknown', async () => {
     const reads = [];
     const survey = c(1, `## Survey open-0: LIN-1 @ abc\n\nAn earlier attempt is ${PR_OLD}.`);
-    const model = await readRunEvidence({ openFindings: FINDINGS_NONE, issueIdentifier: 'LIN-1', comments: [survey], stopAt: 'pr', runnerReady: true, viewerIsOwner: true, readPrStatus: async ({ number }) => { reads.push(number); return status(number); } });
+    // The survey names PR_OLD, which is no change of the task: the records hold no landing.
+    const recordsStore = await seededRecordsStore(harness, [], { urlKey: 'acme', tickets: ['LIN-1'] });
+    const model = await readRunEvidence({ openFindings: FINDINGS_NONE, issueIdentifier: 'LIN-1', comments: [survey], urlKey: 'acme', recordsStore, stopAt: 'pr', runnerReady: true, viewerIsOwner: true, readPrStatus: async ({ number }) => { reads.push(number); return status(number); } });
     assert.deepEqual(reads, []);
     assert.equal(model.closeOut.status, 'no-pr');
     assert.equal(resolveRunPrRef(model).status, 'one');

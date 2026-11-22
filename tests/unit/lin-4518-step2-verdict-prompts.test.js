@@ -79,10 +79,13 @@ describe('the blind read is handed the change records it judges, and writes its 
     assert.match(p, /the same word as the comment, `"in": "LIN-1"`/);
   });
 
-  test('with no landing handed in: the prompt says the record cannot be written, and names no id', () => {
+  // LIN-4518 step 3: the prompt reads the landing from its change records (finding 75b33054). With none handed in
+  // (not read), it says the landing could not be read, and names no id or verdict record.
+  test('with no landing handed in: the prompt says the landing could not be read, and names no id', () => {
     const p = prompt(null);
-    assert.match(p, /cannot be written: no change record is on record for this landing/);
+    assert.match(p, /\*\*The landing could not be read\.\*\*/);
     assert.doesNotMatch(p, /"judgement": "blind-read"/);
+    assert.doesNotMatch(p, /change record is for/);
   });
 
   test('the comment is still written (the tracker and the old readers keep it until P7)', () => {
