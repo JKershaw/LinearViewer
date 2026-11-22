@@ -27,7 +27,8 @@ routes/task-records.js, routes/project-page.js, routes/dispatch.js, server.js).
   `addFeedback`, `_closeRows`, `stampBookkeeping`), witnessed in tests/unit/lin-4493-run-lifecycle.test.js.
 - A person is addressed by the name the tracker shows, stored at sign-in as `identity.name` (lib/account-session.js
   `establishAccount`) and read by lib/workspace-people.js (canonical accounts with a named identity). An account that
-  signed in before the name was stored cannot be addressed until its next sign-in; the refusal names who can be.
+  signed in before the name was stored cannot be addressed until its next sign-in; the refusal names who can be. A note
+  writing "John" is refused if the tracker spells it otherwise: address by `person:<accountId>` (LIN-4505).
 - Reads are by the indexed fields. A write reads only the records it names (`versionsOf`, `lookup`), and a find
   picks candidates by `{urlKey, kind, state, to}` or `{urlKey, in}` and reduces each to its current version
   (`find`). A write's body is checked as a dry run before any ticket is made, so a refused body makes no task.
@@ -55,9 +56,6 @@ routes/task-records.js, routes/project-page.js, routes/dispatch.js, server.js).
   record it made. Imports use the same rule, which holds after an imported record ends. Never hash an id by hand.
 - Records stay outside `ruling.rows`. Home's Waiting on you draws the person's records beside the rulings
   (`createWaitingStanding` returns `records`); the count, the badge and the live merge keep reading rulings only.
-- Addressing a person needs the account id or the name the tracker shows, and a name read from the tracker often differs
-  from how a note writes it. A manifest or note that writes "John" will be refused with the names that work; the
-  manifest that LIN-4505 imported addressed people by account id (`person:<id>`).
 - A page GET never makes a task. The task page reads its task record by the ticket's claim (`taskForTicket`) and offers
   its add and child-task forms before one exists; the first write through the checked pipeline makes the task
   (routes/task-records.js sends `in: <ticket>`). The project page's actions and the proxy make tasks the same way.
@@ -71,3 +69,5 @@ routes/task-records.js, routes/project-page.js, routes/dispatch.js, server.js).
   `movedUrls`: re-review on that (LIN-4521).
 - A task written with a ticket `ref` claims that ticket (`lib/records/writes.js`), as `ensureTask` does; else the ticket's
   references make a second task. A ticket's task id has one rule, `ticketTaskIdOf` (`lib/records/refs.js`). A revise that changes a claimed `ref` is refused (422).
+- A decision's `answer` and `words` are stored as written, never trimmed (LIN-4530). Part 3 shows a question
+  only to its addressee; part 4 (lib/records/brief.js) adds the question a decision answers.
