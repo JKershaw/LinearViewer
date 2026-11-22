@@ -5196,3 +5196,10 @@ The full stop holds: the fleet is paused, and the drive is only reporting. The o
 
 - Halt cleared; LIN-4527 autopilot queued at 21:51 (plain kickoff). The hourly check's prompt is now two sentences (John: the session holds the context).
 - John: pause only if the work goes sideways or overcomplicates (as discussed tonight). When LIN-4527 has landed (merged, deployed, main green), kick off LIN-4513 without waiting and send a short report on how slices 1 and 2 landed. Run overnight; if anything goes wrong, stop and wait for John in the morning.
+
+## 22 Nov, 00:29: slices 1 and 2 finished (LIN-4527 Done); slice 3 restarted
+
+- LIN-4527 Done: PR #2487 merged as 3df770e92, CI green, production health OK. Survey, plan, plan review (approved unchanged), implementation, review, blind read and close-out, with no rulings and no pause. It removed the close-out gate's old-ledger hold, the old request and plan readers, the stale prompt passages and old-shape tests. It kept the plan display (slice 4) and the old-ledger reading (moved to lib/run-ledger.js) for slice 3's cutover tools, and set aside the census table and translators as asked.
+- Behaviour change: a ticket with no task record reads as "findings not read". Close-out checked outside tests that a local workspace in production seats a task at dispatch; only the E2E harness differs (finding-0d0ea9bd, to project).
+- Open after it: finding-0bb50a0d to LIN-4520 (what slice 3 tooling still imports); project findings 09e34102 (the eval script now exits early), 3c29963d, 3f64b084, 0d0ea9bd. The PR has four duplicate change records, counted once, which is the record-writing P5 tidies.
+- 00:29: LIN-4513 autopilot kicked off (plain), per John's overnight standing. P5 picks up from main.
