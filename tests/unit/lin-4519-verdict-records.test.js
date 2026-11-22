@@ -23,7 +23,7 @@ import { readVerdictFactsThroughProxy } from '../../scripts/verdict-facts-proxy.
 
 describe('the cutover instant', () => {
   test('is the P5 writers\' go-live, and covers from that instant on (never before)', () => {
-    assert.equal(VERDICT_RECORDS_SINCE, '2026-11-22T04:20:39.504Z', 'the first stage-written verdict record in production, after the P5 go-live');
+    assert.equal(VERDICT_RECORDS_SINCE, '2026-11-22T04:20:39.504Z', 'the production go-live of #2491 (deployment 8c9182ee)');
     assert.equal(verdictCoverageAt('2026-11-22T04:20:39.504Z').covered, true, 'at the instant: covered');
     assert.equal(verdictCoverageAt('2026-11-22T04:20:39.503Z').covered, false, 'a millisecond before: not covered');
     const before = verdictCoverageAt('2026-11-20T23:00:00.000Z');

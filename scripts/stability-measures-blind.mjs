@@ -111,6 +111,9 @@ export function readLanding({ landing, files, facts, changeRefs = new Map(), gat
   if (!facts?.measured) return { status: 'unreadable', why: facts?.reason ?? 'the ticket\'s verdict records were not read' };
   const pr = landingPr(landing.subject);
   if (pr == null) return { status: UNREAD.noRead, why: 'the landing names no PR' };
+  // A PR no change record names (one opened before the writers went live) can have been blind-read only as a comment,
+  // which measure 1 does not read: that is a reading that cannot be taken, never "no read on record" (finding-309f5e52).
+  if (![...changeRefs.values()].some((u) => isPr(u, pr, repo))) return { status: 'unreadable', why: `no change record names #${pr}` };
   const reads = [];
   for (const v of verdictsInWindow(facts.verdicts, { judgement: BLIND_READ_KIND, to: landing.date })) {
     if (!BLIND_READ_VERDICTS.includes(v.outcome)) continue;
