@@ -33,6 +33,7 @@ test.use({ viewport: PHONE });
 test.beforeEach(async ({ page, localWorkerUrlKey }) => {
   URL_KEY = localWorkerUrlKey;
   await page.request.get('/test/clear-comment-dedupe');
+  await page.request.get(`/test/clear-ticket-records?urlKey=${URL_KEY}`);
   await page.goto('/test/clear-local-store');
   await page.goto(`/test/clear-dispatch-queue?urlKey=${URL_KEY}`);
   await page.goto(`/test/clear-dispatch-history?urlKey=${URL_KEY}`);
@@ -65,6 +66,29 @@ async function seedTasks(page, { omit = [], reviewed = false } = {}) {
     },
   });
   expect(resp.ok(), `local seed failed: ${resp.status()} ${await resp.text()}`).toBeTruthy();
+  // LIN-4518 step 3: a reviewed task's review is a verdict on its PR, so its trail is the PR and the review on it.
+  if (reviewed) {
+    const trail = await page.request.post('/test/seed-ticket-records', {
+      data: { urlKey: URL_KEY, ticket: 'LOCAL-TP1', events: [
+        { kind: 'pr', at: '2026-10-06T09:00:00Z', pr: 'https://github.com/acme/widget/pull/12', head: 'abc1234' },
+        { kind: 'review', at: '2026-10-06T10:00:00Z', on: 'https://github.com/acme/widget/pull/12', head: 'abc1234' },
+      ] },
+    });
+    expect(trail.ok(), `records seed failed: ${trail.status()} ${await trail.text()}`).toBeTruthy();
+  }
+}
+
+// LIN-4518 step 3: a task's trail as records (the gates and the evidence read them): the PR at its head, the approving review
+// on it, and the blind read after the review. Each spec names the PR and head its comments describe.
+async function seedTrailRecords(page, { ticket, prUrl, head }) {
+  const resp = await page.request.post('/test/seed-ticket-records', {
+    data: { urlKey: URL_KEY, ticket, events: [
+      { kind: 'pr', at: '2026-10-06T09:00:00Z', pr: prUrl, head },
+      { kind: 'review', at: '2026-10-06T10:00:00Z', on: prUrl },
+      { kind: 'blindRead', at: '2026-10-06T10:30:00Z', on: prUrl },
+    ] },
+  });
+  expect(resp.ok(), `records seed failed: ${resp.status()} ${await resp.text()}`).toBeTruthy();
 }
 
 async function runnerToken(page) {
@@ -504,6 +528,7 @@ test.describe('Task page, owner view (LIN-3329)', () => {
       },
     });
     expect(resp.ok(), `local seed failed: ${resp.status()} ${await resp.text()}`).toBeTruthy();
+    await seedTrailRecords(page, { ticket: 'LOCAL-TP1', prUrl: 'https://github.com/acme/app/pull/41', head: 'abc1234deadbeefdeadbeefdeadbeefdeadbeef0' });
 
     // A stop-at-PR run keyed to the task, on its own row, plus an open PR whose
     // review approved: the ready state. GitHub is stubbed via /test/seed-pr-status.
@@ -603,6 +628,7 @@ test.describe('Task page, owner view (LIN-3329)', () => {
       },
     });
     expect(resp.ok(), `local seed failed: ${resp.status()} ${await resp.text()}`).toBeTruthy();
+    await seedTrailRecords(page, { ticket: 'LOCAL-TP1', prUrl: PR_URL, head: 'abc1234deadbeefdeadbeefdeadbeefdeadbeef0' });
 
     const token = await runnerToken(page);
     const anchor = await page.request.post(`/workspace/${URL_KEY}/api/dispatch`, {
@@ -660,6 +686,7 @@ test.describe('Task page, owner view (LIN-3329)', () => {
       },
     });
     expect(resp.ok(), `local seed failed: ${resp.status()} ${await resp.text()}`).toBeTruthy();
+    await seedTrailRecords(page, { ticket: 'LOCAL-TP1', prUrl: PR_URL, head: 'abc1234deadbeefdeadbeefdeadbeefdeadbeef0' });
 
     const token = await runnerToken(page);
     const anchor = await page.request.post(`/workspace/${URL_KEY}/api/dispatch`, {
@@ -724,6 +751,7 @@ test.describe('Task page, owner view (LIN-3329)', () => {
 
     let resp = await page.request.post('/test/set-local-session', { data: seedTask({ name: 'In Progress', type: 'started' }) });
     expect(resp.ok(), `local seed failed: ${resp.status()} ${await resp.text()}`).toBeTruthy();
+    await seedTrailRecords(page, { ticket: 'LOCAL-TP1', prUrl: PR_URL, head: 'abc1234deadbeefdeadbeefdeadbeefdeadbeef0' });
 
     const token = await runnerToken(page);
     const anchor = await page.request.post(`/workspace/${URL_KEY}/api/dispatch`, {

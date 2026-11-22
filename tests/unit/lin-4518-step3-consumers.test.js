@@ -23,7 +23,7 @@ import { trailForTicket } from '../../lib/task-standing.js';
 import { landingChangesFor } from '../../lib/records/landing.js';
 import { createRecordWrites } from '../../lib/records/writes.js';
 import { isTerminalState } from '../../lib/providers/state-map.js';
-import { versionChangeWrite } from '../../lib/change-records.js';
+import { versionChangeWrite, refreshTaskChanges } from '../../lib/change-records.js';
 import { generatePrompt } from '../../lib/prompt-templates.js';
 import { getRecommendation, setFetchImpl, setPromptTraceRecorder } from '../../lib/openrouter.js';
 import { closeOutDecision, CLOSE_OUT_ACTOR } from '../../lib/run-closeout-state.js';
@@ -198,3 +198,38 @@ describe('an unreadable ticket is "not read", never "no review" (trailForTicket)
     assert.deepEqual(trail.landing, []);
   });
 });
+
+describe('a head written as its abbreviation is the commit it begins (the records head compare)', () => {
+  // The review prompt names the first nine characters of the head it read; GitHub reports the full sha. The refresh that
+  // reads the PR must not revise the judged head to the full sha: that would make the approval stale on the spot.
+  test('a refresh that reads the full head leaves the abbreviated judged head alone: no new version, the approval current', async () => {
+    const FULL = 'abc1234deadbeefdeadbeefdeadbeefdeadbeef0';
+    const store = await recordsStoreFor(harness);
+    const { taskId, changes } = await seedTicketRecords(store, 'acme', 'LIN-1', [ev.pr(1, A, 'abc1234'), ev.review(2, A, { heads: { [A]: 'abc1234' } })]);
+    const writes = createRecordWrites({ recordsStore: store, isTerminalState });
+    await refreshTaskChanges({
+      urlKey: 'acme', taskId, writes, recordsStore: store,
+      readPrStatus: async () => ({ readable: true, repo: REPO, number: 41, state: 'open', merged: false, head: { sha: FULL }, ref: FULL, checks: [] }),
+    });
+    const [changeId] = [...changes.values()];
+    assert.equal((await store.versionsOf('acme', [changeId])).length, 1, 'the same commit is not a new version');
+    const trail = await trailForTicket({ recordsStore: store, urlKey: 'acme', ticket: 'LIN-1' });
+    assert.deepEqual(trail.review.staleUrls, [], 'the approval is not stale');
+    const d = closeOutDecision({ trail, prStatuses: new Map([[A, open(A, FULL)]]), stopAt: 'pr', runnerReady: true, actor: CLOSE_OUT_ACTOR.HARBOUR, openFindings: FINDINGS_NONE });
+    assert.notEqual(d.refuses, 'head-moved', 'the live head is the commit the review read');
+  });
+
+  test('a head that is a different commit is a move: the refresh revises it, and the approval goes stale', async () => {
+    const store = await recordsStoreFor(harness);
+    const { taskId } = await seedTicketRecords(store, 'acme', 'LIN-1', [ev.pr(1, A, 'abc1234'), ev.review(2, A, { heads: { [A]: 'abc1234' } })]);
+    const writes = createRecordWrites({ recordsStore: store, isTerminalState });
+    const MOVED_FULL = 'bbbbbbb2222222cccccccccccccccccccccccccc';
+    await refreshTaskChanges({
+      urlKey: 'acme', taskId, writes, recordsStore: store,
+      readPrStatus: async () => ({ readable: true, repo: REPO, number: 41, state: 'open', merged: false, head: { sha: MOVED_FULL }, ref: MOVED_FULL, checks: [] }),
+    });
+    const trail = await trailForTicket({ recordsStore: store, urlKey: 'acme', ticket: 'LIN-1' });
+    assert.ok(trail.review.staleUrls.includes(A), 'a different commit stales the approval');
+  });
+});
+

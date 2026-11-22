@@ -6,6 +6,11 @@
  */
 import express, { Router } from 'express';
 import { personMint } from '../lib/stage-writes.js';
+import { BLIND_READ_KIND } from '../lib/prompts/blind-read-words.js';
+import { REVIEW_JUDGEMENT, CLOSE_OUT_STAGE } from '../lib/records/words.js';
+import { createRecordWrites } from '../lib/records/writes.js';
+import { isTerminalState } from '../lib/providers/state-map.js';
+import { pinVerdictToHeads } from '../lib/change-records.js';
 import crypto from 'crypto';
 import { getWorkspaceByUrlKey } from '../lib/workspace.js';
 import { RUNNER_GRANTS } from '../lib/proxy-scopes.js';
@@ -641,6 +646,68 @@ export function createTestRoutes({ dispatchQueueStore, dispatchTokenStore, freeT
     const made = await recordsStore.ensureTask(urlKey, { identifier: ticket, title: ticket, closed: false }, { by: 'Harbour', at: new Date().toISOString() });
     if (made.problem) return res.status(422).json(made);
     res.json({ id: made.id });
+  });
+
+  // LIN-4518 step 3: clear one workspace's records (and its ticket claims), so each E2E spec seeds its own trail.
+  router.get('/test/clear-ticket-records', async (req, res) => {
+    if (!recordsStore) return res.status(503).send('no records store wired into test routes');
+    const urlKey = req.query.urlKey;
+    if (typeof urlKey !== 'string') return res.status(400).send('urlKey is required');
+    await recordsStore.records.deleteMany({ urlKey });
+    await recordsStore.refs.deleteMany({ urlKey });
+    res.json({ ok: true });
+  });
+
+  // LIN-4518 step 3: seed a ticket's records, the trail the gates read, for an E2E spec whose comments name the same trail.
+  // Test-only, and written as the records a stage writes: a PR (`pr`, a change at `head`), a review or a blind read
+  // (`review` / `blindRead`, a verdict on the PR URLs in `on`, pinned to the head given), a close-out run (`closeOut`), and
+  // a merge (`merged`, the PR's change ends merged). Each event carries its `at`. The seam answers the task and change ids.
+  router.post('/test/seed-ticket-records', express.json(), async (req, res) => {
+    if (!recordsStore) return res.status(503).send('no records store wired into test routes');
+    const { urlKey, ticket, events } = req.body || {};
+    if (typeof urlKey !== 'string' || typeof ticket !== 'string' || !Array.isArray(events)) {
+      return res.status(400).send('urlKey, ticket and events are required');
+    }
+    // The checked pipeline and the proxy's own pin answer every write, so the seed is what a stage would write.
+    const writes = createRecordWrites({ recordsStore, isTerminalState });
+    const by = 'Harbour';
+    const first = events[0]?.at ?? new Date().toISOString();
+    const { id: taskId } = await recordsStore.ensureTask(urlKey, { identifier: ticket, title: ticket, closed: false }, { by, at: first });
+    const changes = new Map();
+    const heads = new Map();
+    const minusMinute = (at) => new Date(Date.parse(at) - 60_000).toISOString();
+    for (const [n, ev] of events.entries()) {
+      if (ev.kind === 'pr') {
+        const out = await writes.add({ urlKey, kind: 'change', input: { in: taskId, ref: ev.pr, head: ev.head }, by, run: null });
+        if (out.problems) return res.status(422).json(out.problems);
+        changes.set(ev.pr, out.record.id);
+        heads.set(ev.pr, ev.head);
+      } else if (ev.kind === 'review' || ev.kind === 'blindRead') {
+        const prs = [].concat(ev.on);
+        if (prs.some((pr) => !changes.has(pr))) return res.status(422).send(`the event names a PR before its change: ${prs.join(', ')}`);
+        const ids = prs.map((pr) => changes.get(pr));
+        const pin = await pinVerdictToHeads({
+          urlKey, on: ids, heads: Object.fromEntries(prs.map((pr) => [changes.get(pr), ev.head ?? heads.get(pr)])), writes, recordsStore, run: null,
+        });
+        if (pin.problems) return res.status(422).json(pin.problems);
+        const judgement = ev.kind === 'review' ? REVIEW_JUDGEMENT : BLIND_READ_KIND;
+        const outcome = ev.outcome ?? (ev.kind === 'review' ? 'approve' : 'same');
+        const out = await writes.add({ urlKey, kind: 'verdict', input: { in: taskId, judgement, outcome, reasoning: 'seeded by an E2E spec', on: pin.on }, by, run: null });
+        if (out.problems) return res.status(422).json(out.problems);
+      } else if (ev.kind === 'closeOut') {
+        const runId = `close-out-seed-${n}-${crypto.randomUUID().slice(0, 8)}`;
+        await recordsStore.openRun(urlKey, { id: runId, stage: CLOSE_OUT_STAGE, taskId, lineage: runId, at: minusMinute(ev.at) });
+        await recordsStore.endRun(urlKey, runId, { state: 'done', at: ev.at });
+      } else if (ev.kind === 'merged') {
+        const id = changes.get(ev.pr);
+        if (!id) return res.status(422).send(`the event names ${ev.pr} before its change`);
+        const out = await writes.end({ urlKey, id, input: { state: 'merged', reason: 'the PR merged' }, by, run: null });
+        if (out.problems) return res.status(422).json(out.problems);
+      } else {
+        return res.status(422).send(`no seeded event kind ${ev.kind}`);
+      }
+    }
+    res.json({ taskId, changes: Object.fromEntries(changes) });
   });
 
   // Endpoint to create a dispatch token for testing
