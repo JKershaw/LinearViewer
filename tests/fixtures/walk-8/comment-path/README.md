@@ -1,8 +1,10 @@
 # The comment path, frozen (LIN-4514)
 
 What Harbour decided from comments before verdicts and changes became records (LIN-4513, slice 3). P5 (LIN-4518)
-replays these inputs on records and is held to these decisions. P7 (LIN-4520) deletes the helpers with
-`lib/run-trail.js`. The files here stay as the record.
+replays these inputs on records and is held to these decisions. P7 (LIN-4520) retired the comment path and its
+helpers (`tests/helpers/comment-path-capture.js`, `tests/helpers/comment-path-rows.js`, the goldens' rerun test, and
+`scripts/historic-comment-readers.mjs`). The files here stay as the record: the captured results are evidence, and
+they cannot be regenerated any more. `tests/helpers/walk-8-frozen.js` loads them for the record-side replay.
 
 | File | What it is |
 |---|---|
@@ -14,15 +16,12 @@ replays these inputs on records and is held to these decisions. P7 (LIN-4520) de
 | `goldens/readings.json` | The old measure readers over each trail and seed, for P6 (LIN-4519). Where these inputs cannot carry a reader, it reads `not measured` with the reason |
 | `rows.json` | The comment-path rows of lin-4438, lin-4458 and lin-4460 as data, with the cells their tests assert |
 
-Everything under `goldens/` and `rows.json` is derived. Never edit it by hand. To rebuild it, run
-`node tests/helpers/comment-path-capture.js --write`. The helper's header says what each part holds. It is
-deterministic (no clock, no network, sorted keys), so a rerun gives the same bytes. Repeated text is stored once:
-`ledger.rawRef` points into `texts`, and `inputs.commentRefs` points into `comments`. Read a derived file with
-`loadDerived` (or `resolveRefs`) from the helper, which puts them back.
+Everything under `goldens/` and `rows.json` is derived by the retired capture helper and must not be edited by hand.
+Repeated text is stored once: `ledger.rawRef` points into `texts`, and `inputs.commentRefs` points into `comments`.
+Read a derived file with `loadDerived` (or `resolveRefs`) from `tests/helpers/walk-8-frozen.js`, which puts them back.
 
-Tests: `tests/unit/lin-4514-comment-path-goldens.test.js`, `tests/unit/lin-4514-comment-path-seeds.test.js`, and
-`tests/unit/lin-4514-comment-path-rerun.test.js`. The last reruns the helper and compares every derived file byte for
-byte, naming the first differing line and column.
+Tests: `tests/unit/lin-4516-landing-replay.test.js` replays the record side against these frozen decisions. The
+comment-path goldens tests and the rerun test were retired with the helper (LIN-4520).
 
 The readings over history (blind reads, round trips, held runs, blind-read queries) are in
 `docs/reviews/slice-3-readings/`.

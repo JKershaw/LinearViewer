@@ -36,9 +36,8 @@ import { isTerminalState } from '../../lib/providers/state-map.js';
 import { refreshTaskChanges } from '../../lib/change-records.js';
 import { SUMMARY_LEAD, summaryBodyOf } from '../../lib/records/summary.js';
 import { computeIssueRoundTrips } from '../../lib/plan-review-round-trips.js';
-import { parseBlindRead } from '../../lib/run-trail.js';
 import { readOpenFindings, findingsHold } from '../../lib/close-out-findings.js';
-import { readTrail, withoutHarbourSummaries, isHarbourSummary, isPersonComment } from '../../lib/run-trail.js';
+import { withoutHarbourSummaries, isHarbourSummary, isPersonComment, opensAsBlindRead } from '../../lib/run-trail.js';
 
 const URL_KEY = 'lin-4516-workspace';
 const TICKET = 'LIN-4516';
@@ -274,7 +273,7 @@ describe('witness 5: a verdict summary of every kind changes nothing for any com
     assert.ok(tracker.comments[0].body.startsWith(SUMMARY_LEAD), 'the summary opens with the mark');
   });
 
-  test('each summary kind is a harbour summary to the one predicate, and feeding it to each comment reader changes nothing', async () => {
+  test('each summary kind is a harbour summary to the one predicate, and is no person\'s comment or blind read to the openings', async () => {
     const changeId = await addChange(41, 'H1');
     const verdictRes = await post(tokens.review, reviewVerdict([changeId], { [changeId]: 'H1' }));
     assert.equal(verdictRes.status, 201, `the verdict was refused: ${JSON.stringify(verdictRes.body)}`);
@@ -286,13 +285,12 @@ describe('witness 5: a verdict summary of every kind changes nothing for any com
       { body: 'Looks right to me, but check the footer count.', createdAt: '2026-11-21T09:00:00Z' },
       { body: '### Plan Review Verdict\n\n**Verdict:** Approve.', createdAt: '2026-11-21T09:30:00Z' },
     ];
-    const baseline = readTrail(human);
     for (const body of summaries) {
       const comment = { body, createdAt: '2026-11-21T10:00:00Z' };
       assert.ok(isHarbourSummary(comment), `not read as a harbour summary: ${body.split('\n')[0]}`);
       assert.equal(isPersonComment(comment), false, `read as a person's comment: ${body.split('\n')[0]}`);
+      assert.equal(opensAsBlindRead(comment), false, `opened as a blind read: ${body.split('\n')[0]}`);
       assert.deepEqual(withoutHarbourSummaries([...human, comment]), human, 'the summary is filtered out of the discussed comments');
-      assert.deepEqual(readTrail([...human, comment]), baseline, 'the trail reads the same with the summary in it');
     }
   });
 });
@@ -497,15 +495,20 @@ describe('close-out witness C: no comment reader picks a verdict summary up (fin
   const ASOF = '2026-11-21T12:00:00.000Z';
   const T = Date.parse('2026-11-21T10:00:00.000Z');
   const at = (min) => new Date(T + min * 60000).toISOString();
+  // LIN-4520: verdicts are read from the records (`verdictFacts`); the comments are not a verdict source, so the summaries
+  // in them must change nothing. The records here hold no verdict, so the baseline has none.
   const rounds = (comments) => computeIssueRoundTrips({
     id: 'i1', identifier: 'LIN-1', description: '', comments,
+    verdictFacts: { measured: true, verdicts: [] },
     rows: [{ id: 'r1', kind: 'plan-review', status: 'done', dispatchedAt: at(0), completedAt: at(60) }],
-  }, { asOf: ASOF, planFacts: undefined, verdictSource: 'comments' });
+  }, { asOf: ASOF, planFacts: undefined });
   const summary = (judgement, outcome, reasoning) => summaryBodyOf({ id: `verdict-${judgement}`, v: 1, kind: 'verdict', fields: { judgement, outcome, reasoning } });
 
-  test('a plan-review, a review and a blind-read verdict summary in the round-trip window read as no comment at all', () => {
+  test('a plan-review, a review and a blind-read verdict summary in the round-trip window change no reading (the comments are not a verdict source)', () => {
     const baseline = rounds([]);
-    assert.equal(baseline.R0.verdict, null, 'baseline: no verdict');
+    // Was `baseline.R0.verdict === null` on the comment source (a settled row with no verdict); on records with no
+    // verdict record there is no settled round at all (LIN-4520 expectation change, see the report).
+    assert.equal(baseline.R0, null, 'baseline: no verdict record on the records source, so no settled round');
     for (const body of [
       summary('plan-review', 'approve', 'The plan holds.'),
       summary('review', 'request-changes', 'Needs discussion before this lands. Verdict follows in the records.'),
@@ -516,8 +519,8 @@ describe('close-out witness C: no comment reader picks a verdict summary up (fin
     }
   });
 
-  test('a blind-read summary is not a blind read to the measure-1 and run-evidence parser', () => {
-    assert.equal(parseBlindRead({ id: 'c1', body: summary('blind-read', 'same', 'Reads as it did.'), createdAt: at(30) }), null);
+  test('a blind-read summary is not a blind read to the opening predicate (the comment reader that parsed it is retired, LIN-4520)', () => {
+    assert.equal(opensAsBlindRead({ id: 'c1', body: summary('blind-read', 'same', 'Reads as it did.'), createdAt: at(30) }), false);
   });
 });
 

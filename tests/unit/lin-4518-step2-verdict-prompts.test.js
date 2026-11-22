@@ -42,9 +42,10 @@ describe('the review contract asks for a verdict record on the change it read, a
     assert.match(line, /Write them before the approval record/);
   });
 
-  test('the verdict form list still ends the contract (the forms are read after "### Verdict")', () => {
+  test('the contract ends on the conditional-approval record line; no comment verdict form follows it (LIN-4520)', () => {
     const lines = contract.split('\n').filter((l) => l.startsWith('- '));
-    assert.match(lines[lines.length - 1], /^- End with `### Verdict`/);
+    assert.match(lines[lines.length - 1], /^- An Approve with conditions/);
+    assert.doesNotMatch(contract, /### Verdict/);
   });
 });
 
@@ -76,7 +77,7 @@ describe('the blind read is handed the change records it judges, and writes its 
     assert.match(p, /"heads"` naming the \{HEAD\} you read for each, as `\{"<change id>": "<sha>"\}`/);
     assert.match(p, /`change-abc123` is the change record for https:\/\/github\.com\/acme\/widget\/pull\/7\./);
     // finding-53f10ec3 (4): a space after the comma that ends the clause.
-    assert.match(p, /the same word as the comment, `"in": "LIN-1"`/);
+    assert.match(p, /`"in": "LIN-1"`, `"reasoning"` the reason in one line/);
   });
 
   // LIN-4518 step 3: the prompt reads the landing from its change records (finding 75b33054). With none handed in

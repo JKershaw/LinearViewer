@@ -9,7 +9,7 @@
  * implementation). Their verdicts come from records, `on` the version each judge read.
  *
  * Plan facts are not read, so the gate-due series is reported not measured, never zero: the reader alone would count the
- * issues outside the window as not due (the same reason scripts/slice-3-pre-landing-readings.mjs gives).
+ * issues outside the window as not due (the reason the Slice 3 readings in docs/reviews/slice-3-readings/README.md give).
  *
  * Reads only. Every proxy call goes through the workspace proxy; nothing is written anywhere.
  *

@@ -52,11 +52,10 @@ Area notes for `runs-and-dispatch` in the registry. Format and rules: README.md.
 - When a person acts, Harbour follows (LIN-4447): an all-merged landing stands the refusals aside, not Done:
   the check sets Done only on a findings read of zero (LIN-4527); a Done ticket with no close-out stands only the
   read aside. Harbour never sets Done.
-- What a comment is, and which PRs are the task's, are read once in `lib/run-trail.js`: a comment kind
-  is a row of `COMMENT_KINDS` (`lin-4458-comment-kind-census` fails on a kind test elsewhere), and the
-  box, the guard, the owner's check and the merge take their PRs from `readTrail().landing`, statuses
-  keyed by PR URL: the cited list (newest first) and the landing (oldest first) order PRs differently,
-  so a shared index points at the wrong PR (LIN-4458).
+- Verdicts, changes and the landing are records (LIN-4520): read the task's landing PRs from the records
+  (`landingOfTicket`, `lib/records/landing.js`), never from a comment. `lib/run-trail.js` keeps only the
+  authorship text rule. Key PR statuses by PR URL, never by index: the cited list (newest first) and the
+  landing (oldest first) order PRs differently, so a shared index points at the wrong PR (LIN-4458).
 - A reader that classifies by kind routes `custom` before `bucketOf`: `BUCKET_OF_KIND` maps
   `custom` to orchestration, and `bucketOf` falls back to orchestration silently, so check membership
   (`lib/wall-clock-summary.js`). `dispatchesOf` turns a missing kind into `custom` (`lib/cost-read.js`):

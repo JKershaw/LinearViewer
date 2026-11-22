@@ -2,8 +2,11 @@
  * LIN-4370 (LIN-4346 piece 4): code runs the look-first sequence (survey-task, then
  * survey-place, then scoping) at both recommendation seams.
  *
+ * LIN-4520: an attempt is a dispatched run of its stage. A Survey's report comment is advice, never a step: a
+ * comment with no run of its stage does not move the sequence (the comment-only cases are the runs-only expectation).
+ *
  * Witnesses, in the ticket's order:
- *   - the step choice: empty trail → survey-task; with its comment → survey-place; with both →
+ *   - the step choice: empty trail → survey-task; with its run → survey-place; with both runs →
  *     scoping; a "Before you start" filing comment and no runs → survey-task;
  *   - each step attempted once: an ended Survey run with no comment moves on; a scoping run on
  *     record (ended with no record, queued, running, waiting) → the route returns nothing;
@@ -39,7 +42,6 @@ import { test, describe, afterEach } from 'node:test';
 import assert from 'node:assert/strict';
 import express from 'express';
 import { lookFirstStep, lookFirstOff, lookFirstSteps, holdingComment, LOOK_FIRST_STEPS } from '../../lib/recommendation-look-first.js';
-import { commentKindOf } from '../../lib/run-trail.js';
 import { buildPeriodicalGateMarker, isPeriodicalReview } from '../../lib/periodicals.js';
 import { liveWaitOf, STAGE_IN_FLIGHT_CODE } from '../../lib/run-live-wait.js';
 import { getRecommendation, getRecommendationStream, setFetchImpl, setPromptTraceRecorder, buildSelectorArgs } from '../../lib/openrouter.js';
@@ -85,11 +87,18 @@ const ctx = (comments = [], allRuns = [], over = {}) => ({ parent: null, sibling
 const stepOf = (issue, context) => lookFirstStep(issue, context)?.step ?? null;
 
 describe('step choice: survey-task, then survey-place, then scoping, each once', () => {
-  test('an unsized leaf with an empty trail gets survey-task; with that comment, survey-place; with both, scoping', () => {
+  test('an unsized leaf with an empty trail gets survey-task; with that Survey run, survey-place; with both, scoping', () => {
     assert.deepEqual(LOOK_FIRST_STEPS, ['survey-task', 'survey-place', 'scoping']);
     assert.equal(stepOf(leaf(), ctx()), 'survey-task');
-    assert.equal(stepOf(leaf(), ctx([surveyTask('10:00')])), 'survey-place');
-    assert.equal(stepOf(leaf(), ctx([surveyTask('10:00'), surveyPlace('10:30')])), 'scoping');
+    assert.equal(stepOf(leaf(), ctx([surveyTask('10:00')], [run('survey-task', '09:50', 'done', '10:00')])), 'survey-place');
+    assert.equal(stepOf(leaf(), ctx([surveyTask('10:00'), surveyPlace('10:30')], [run('survey-task', '09:50', 'done', '10:00'), run('survey-place', '10:20', 'done', '10:30')])), 'scoping');
+  });
+
+  // LIN-4520 (was: a Survey comment alone gave survey-place): the attempt is the run, so a report with no run of its
+  // stage is not an attempt and the sequence has not moved past survey-task.
+  test('a Survey report comment with no run of its stage is not an attempt: the route stays on survey-task', () => {
+    assert.equal(stepOf(leaf(), ctx([surveyTask('10:00')])), 'survey-task');
+    assert.equal(stepOf(leaf(), ctx([surveyTask('10:00'), surveyPlace('10:30')])), 'survey-task');
   });
 
   test('a "Before you start" comment and no runs gets survey-task (the LIN-4347/4350 shape)', () => {
@@ -118,18 +127,11 @@ describe('step choice: survey-task, then survey-place, then scoping, each once',
   });
 
   test('Survey comments that say opposite things give the same route (advice, not a gate)', () => {
+    const runs = [run('survey-task', '09:50', 'done', '10:00'), run('survey-place', '10:20', 'done', '10:30')];
     const wrong = [surveyTask('10:00', 'This is the wrong work: the export belongs elsewhere.'), surveyPlace('10:30', 'Rebuild the whole area first.')];
     const drill = [surveyTask('10:00', 'Just drill.'), surveyPlace('10:30', 'Nothing to tidy.')];
-    assert.equal(stepOf(leaf(), ctx(wrong)), 'scoping');
-    assert.equal(stepOf(leaf(), ctx(drill)), 'scoping');
-  });
-
-  // LIN-4458: a Survey's report is a comment of that Survey's kind (lib/run-trail.js, the one classifier).
-  test('a Survey\'s kind reads the heading constant both Surveys post under, and only it', () => {
-    assert.equal(commentKindOf(surveyTask('10:00').body), 'survey-task');
-    assert.notEqual(commentKindOf(surveyTask('10:00').body), 'survey-place');
-    assert.notEqual(commentKindOf(`${SURVEY_HEADINGS['survey-task']}x: T-1`), 'survey-task', 'a longer heading is another heading');
-    assert.notEqual(commentKindOf('Survey open-0 looks fine'), 'survey-task', 'prose naming it is not the report');
+    assert.equal(stepOf(leaf(), ctx(wrong, runs)), 'scoping');
+    assert.equal(stepOf(leaf(), ctx(drill, runs)), 'scoping');
   });
 });
 
@@ -201,11 +203,17 @@ describe('the hold: a person\'s word after work started outranks the sequence', 
     assert.equal(stepOf(leaf(), ctx([surveyTask('10:00'), sizeRuling('10:40')], runs)), 'survey-place');
   });
 
-  test('the sequence starts at the earlier of the first run and the first Survey comment', () => {
-    // A hand-run Survey with no run on record (comment only) starts it, so a later person's comment holds.
-    assert.equal(stepOf(leaf(), ctx([surveyTask('10:00'), person('10:30')])), null);
-    // Before the first Survey comment, a person's comment is filing context.
-    assert.equal(stepOf(leaf(), ctx([person('09:30'), surveyTask('10:00')])), 'survey-place');
+  test('the sequence starts at the ticket\'s first run: a person\'s comment after it holds, one before it is filing context', () => {
+    const survey = [run('survey-task', '09:40', 'done', '10:00')];
+    assert.equal(stepOf(leaf(), ctx([surveyTask('10:00'), person('10:30')], survey)), null);
+    // Before the first run, a person's comment is filing context.
+    assert.equal(stepOf(leaf(), ctx([person('09:30'), surveyTask('10:00')], [run('survey-task', '09:50', 'done', '10:00')])), 'survey-place');
+  });
+
+  // LIN-4520 (was: a hand-run Survey comment with no run started the sequence, so a later person's comment held it,
+  // null). Runs decide the start: with no run there is no sequence, so the comment is filing context and nothing holds.
+  test('with no run on record a Survey comment does not start the sequence, so a later person\'s comment does not hold it', () => {
+    assert.equal(stepOf(leaf(), ctx([surveyTask('10:00'), person('10:30')])), 'survey-task');
   });
 });
 
@@ -728,7 +736,7 @@ describe('LIN-4398: a gate-marked Periodical review skips the two Surveys and st
 
   test('its unmarked twin keeps both Surveys: survey-task first, scoping only after both comments', () => {
     assert.equal(stepOf(twin(), ctx()), 'survey-task');
-    assert.equal(stepOf(twin(), ctx([surveyTask('10:00'), surveyPlace('10:30')])), 'scoping');
+    assert.equal(stepOf(twin(), ctx([surveyTask('10:00'), surveyPlace('10:30')], [run('survey-task', '09:50', 'done', '10:00'), run('survey-place', '10:20', 'done', '10:30')])), 'scoping');
     assert.equal(lookFirstStep(twin(), ctx()).why, 'the look-first sequence: no size of the move is recorded, so survey-task is next; code sends each step once, whatever an earlier step said.', 'the ordinary reason text is unchanged');
   });
 

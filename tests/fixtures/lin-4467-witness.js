@@ -66,7 +66,7 @@ const REVIEW_REQUESTS_CHANGES = comment('r1', 5, [
   '1. The fix round must keep the leftover step.'
 ].join('\n'));
 
-const contextFor = (comments) => ({
+const contextFor = (comments, reviewRound) => ({
   parent: PARENT,
   siblings: [{ identifier: 'LIN-901', title: 'Witness sibling', state: { name: 'Todo' } }],
   children: [],
@@ -74,12 +74,14 @@ const contextFor = (comments) => ({
   comments,
   attachments: [{ id: 'att:1', title: 'Witness spec', kind: 'file', contentType: 'text/markdown' }],
   // LIN-4518 step 3: the blind read is handed its landing's change records (the entrances do; a blind read reads no records).
-  landingChanges: [{ id: 'change-witness-2400', ref: PR, head: 'witness' }]
+  landingChanges: [{ id: 'change-witness-2400', ref: PR, head: 'witness' }],
+  // LIN-4520: the fix round is read from the records trail (lib/prompts/revision-brief.js reviewRoundOf), not from comments.
+  reviewRound
 });
 
 export const MODES = {
-  fresh: contextFor(FRESH_COMMENTS),
-  fix: contextFor([...FRESH_COMMENTS, REVIEW_REQUESTS_CHANGES])
+  fresh: contextFor(FRESH_COMMENTS, { fixRound: false, prUrl: null }),
+  fix: contextFor([...FRESH_COMMENTS, REVIEW_REQUESTS_CHANGES], { fixRound: true, prUrl: PR })
 };
 
 /** Sorted-key JSON, so a reordered object literal does not move the hash. */

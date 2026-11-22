@@ -603,7 +603,7 @@ describe('F. clock-freedom, loudness and __internal', () => {
 
   test('__internal helpers behave as the module relies on', () => {
     const {
-      peerOf, rate, typeCounted, buildPeerIndex, dedupeById, plannedOf, hasReviewLedger,
+      peerOf, rate, typeCounted, buildPeerIndex, dedupeById, plannedOf,
       requireInstant, textOf, nonGlobal,
     } = __internal;
 
@@ -636,10 +636,6 @@ describe('F. clock-freedom, loudness and __internal', () => {
     assert.equal(plannedOf({ identifier: 'LIN-1' }, '2026-06-10T00:00:00.000Z', factsFor(['LIN-1'], ['LIN-1']), null).measured, false);
     assert.equal('hasPlanMarker' in __internal, false);
     assert.equal('PLAN_MARKER' in __internal, false);
-    assert.equal(hasReviewLedger({ comments: [{ body: '## Review — LIN-1\n- x' }] }), true);
-    // LIN-4495: the retired heading no longer marks a review; a post-cutover review's title does.
-    assert.equal(hasReviewLedger({ comments: [{ body: '### What CI Did Not Prove\n- x' }] }), false);
-    assert.equal(hasReviewLedger({ description: '' }), false);
     assert.equal(textOf({ description: 'a', comments: [{ body: 'b' }] }), 'a\nb');
 
     // F1: statelessness is a property of the copy, and the original is untouched

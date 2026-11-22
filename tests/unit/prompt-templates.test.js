@@ -1220,7 +1220,7 @@ describe('behaviour and its places — plan-review template (LIN-4021)', () => {
 
   test('is read-only and hands off on Approve, otherwise back to the planner', () => {
     const result = generatePrompt('plan-review', reviewIssue, ctx);
-    assert.ok(/You are read-only: post the verdict, and do not edit the plan, build it or file tickets/.test(result.prompt),
+    assert.ok(/You are read-only: record the verdict \(a verdict record, below\), and do not edit the plan, build it or file tickets/.test(result.prompt),
       'read-only is stated');
     assert.ok(/On Approve, the plan goes to `implementation` with your notes/.test(result.prompt),
       'an approval goes to implementation with its notes');
@@ -1706,8 +1706,8 @@ describe('review template', () => {
     assert.ok(/CI is green on the PR/i.test(result.prompt), 'confirms CI green on the PR');
     assert.ok(/You do NOT merge, mark the task Done, or file the gate's tickets/i.test(result.prompt),
       "review does not merge, mark Done, or file the gate's tickets: close-out files them (LIN-3293, LIN-4401)");
-    assert.ok(/Approve — conditional on close-out settling the findings/i.test(result.prompt),
-      'a non-empty ledger forces a conditional approval');
+    assert.ok(/an approve with those findings recorded \(an Approve plus one finding per condition\)/i.test(result.prompt),
+      'a non-empty ledger forces an approve plus its findings (LIN-4520: a verdict record)');
     assert.ok(/the `close-out` step does, from the findings you recorded/i.test(result.prompt), 'hands off to the close-out step');
     // The retired "merger owns it" framing must be gone.
     assert.ok(!/belong to whoever merges/i.test(result.prompt) && !/belong to the merger/i.test(result.prompt),
@@ -2326,7 +2326,7 @@ describe('close-out template + review→close-out ledger handoff (LIN-550)', () 
 
   test('(a) close-out reads the review ledger and settles each item before the merge it gates', () => {
     const { prompt } = generatePrompt('close-out', issue, context);
-    assert.ok(/most recent review summary comment/i.test(prompt), 'reads the latest review comment');
+    assert.ok(/review's verdict and the blind read's verdict are records/.test(prompt), 'reads the review verdict on record, not a comment');
     assert.ok(/### Settle the Findings/.test(prompt), 'has the ledger section');
     assert.ok(/Review recorded each finding to close-out/.test(prompt),
       'the settling route is keyed on review\'s inside/outside mark');
@@ -2516,8 +2516,8 @@ describe('close-out template + review→close-out ledger handoff (LIN-550)', () 
 
     test('review approves conditionally for a ledger or named fixes, and sends back only new design or behaviour', () => {
       const { prompt } = generatePrompt('review', issue, context);
-      assert.ok(/the verdict is `Approve — conditional on close-out settling the findings`, never a bare Approve/.test(prompt),
-        'the machine-read conditional verdict is unchanged (lib/run-ledger.js classifyVerdict)');
+      assert.ok(/the verdict is an approve with those findings recorded \(an Approve plus one finding per condition\), never a bare approve/.test(prompt),
+        'the conditional approve is an approve plus its findings to close-out (LIN-4520: a verdict record)');
       assert.ok(/only a review that records no finding to close-out and names no fix may carry a plain \*\*Approve\*\*/.test(prompt));
       assert.ok(/Close-out makes the fixes you name itself, however many files they touch, so name each precisely enough to make without guessing/.test(prompt),
         'review names each fix precisely, with no size bound');
@@ -2553,15 +2553,15 @@ describe('close-out template + review→close-out ledger handoff (LIN-550)', () 
     assert.ok(review.includes('### Records for Close-Out'), 'review writes the ### What CI Did Not Prove ledger');
     // LIN-4353: Completion's "Record it in one summary comment: the ledger, the verdict,
     // and the CI state" restated the stage contract and was cut; Hand Off carries the claim.
-    assert.ok(/your deliverable is the findings you record plus the verdict, recorded in the summary comment/i.test(review),
-      'review records the ledger into its summary comment (the carrier)');
+    assert.ok(/your deliverable is the findings you record plus the verdict, recorded as a verdict record/i.test(review),
+      'review records its verdict as a verdict record (LIN-4520: no summary comment carries it)');
     assert.ok(/record every claim the deliverable depends on that the green CI run does NOT actually exercise/.test(review),
       'the ledger heading is the stage contract\'s (LIN-3292)');
     // Close-out does not require that exact string — it reads the ledger generically.
     assert.ok(!closeout.includes('### Records for Close-Out'),
       'close-out does not key on the literal heading (decoupled)');
-    assert.ok(/The findings to close-out on this task are in your brief/i.test(closeout),
-      'close-out reads the review\'s ledger generically');
+    assert.ok(/and so are the findings to close-out/i.test(closeout),
+      'close-out reads the review\'s findings on record generically');
   });
 
   test('(c) empty ledger => close-out has nothing to settle; review allows an unconditional Approve only then', () => {
@@ -2594,7 +2594,7 @@ describe('close-out template + review→close-out ledger handoff (LIN-550)', () 
       'the old missing-ledger hard-block language is removed');
     assert.ok(!/route back to `review` to \(re\)write/i.test(prompt),
       'no longer routes back to review over a missing heading');
-    assert.ok(/Review has recorded its verdict in its summary comment, and its findings to close-out as records/.test(prompt),
+    assert.ok(/Review has recorded its verdict as a verdict record, and its findings to close-out as records/.test(prompt),
       'close-out starts from the recorded verdict');
   });
 
@@ -2775,7 +2775,7 @@ describe('plan-review template + the four qualities (LIN-1602 / LIN-1859 / LIN-4
       'the goal line draws the block line');
     assert.ok(/a clean verdict is a few lines: what you checked, and that it holds\./.test(prompt), 'a clean verdict is a few lines');
     // Read-only: no plan edits, no implementing, no tickets filed.
-    assert.ok(/You are read-only: post the verdict, and do not edit the plan, build it or file tickets\./.test(prompt),
+    assert.ok(/You are read-only: record the verdict \(a verdict record, below\), and do not edit the plan, build it or file tickets\./.test(prompt),
       'plan-review is read-only');
   });
 
@@ -2862,8 +2862,8 @@ describe('plan-review gate + revision section in the plan template (LIN-1603, LI
     assert.ok(revise > -1 && replaceAt > -1 && good > -1, 'all three landmarks are present');
     assert.ok(revise < replaceAt && replaceAt < good,
       'the replace instruction sits inside the revision section, before the description of a good plan');
-    assert.ok(p.includes('If the comments hold a plan-review verdict (headed `### Plan Review Verdict`)'),
-      'the header is named as the verdict\'s marker');
+    assert.ok(p.includes('If a plan-review verdict on record asked for changes'),
+      'the verdict on record, not a comment heading, marks a revision (LIN-4520)');
   });
 
   test('a revision answers every finding and says what changed', () => {
@@ -4049,8 +4049,8 @@ describe('the stage contract (LIN-3292)', () => {
   test('each format the contract carries is said once: the body no longer asks for it', () => {
     const formats = {
       plan: ['"kind": "plan"', '"to": "plan-review"'],
-      'plan-review': ['### Plan Review Verdict'],
-      review: ['CI covers the deliverable; nothing to record', `## Review — ${issue.identifier}`],
+      'plan-review': ['"judgement": "plan-review"'],
+      review: ['CI covers the deliverable; nothing to record', '"judgement": "review"'],
       'close-out': [`## Close-out — ${issue.identifier}`]
     };
     for (const [kind, needles] of Object.entries(formats)) {

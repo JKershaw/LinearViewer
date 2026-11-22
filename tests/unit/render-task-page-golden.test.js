@@ -309,7 +309,9 @@ describe('task page structure', () => {
   // cannot paint "A review is on record" or an empty Pull request section.
   test('a built evidence model with no PR and no review comment renders no Pull request section', () => {
     const m = model('running-blocked-repeat');
-    const built = buildRunEvidence({ openFindings: FINDINGS_NONE, issueIdentifier: 'LIN-1', comments: [{ body: 'just a note', createdAt: '2026-07-01T00:00:00.000Z' }], owner: true });
+    // LIN-4520: the trail is the ticket's records trail; no review, no landing on record.
+    const trail = { review: null, landing: [], workAfterReview: false, closeOutAfterReview: false, closeOutOnTrail: false, landingHasNotesPr: false, notesPrs: [], auditAfterCloseOut: false };
+    const built = buildRunEvidence({ openFindings: FINDINGS_NONE, issueIdentifier: 'LIN-1', comments: [{ body: 'just a note', createdAt: '2026-07-01T00:00:00.000Z' }], trail, owner: true });
     const html = renderTaskPage({ ...m, evidence: built }, { viewer: 'owner', urlKey: 'acme', binding: BINDING, now: NOW, pageOptions: PAGE_OPTIONS });
     assert.doesNotMatch(html, /task-page-pr-mount/, 'no section');
     assert.doesNotMatch(html, /A review is on record/);

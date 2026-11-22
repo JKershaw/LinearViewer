@@ -1,5 +1,7 @@
 # plan, plan-review, design: from rules to briefs
 
+> **Superseded in part by LIN-4520 (2026-11-22).** A plan-review verdict is a record now, not a comment: the plan-review records run (`lib/records/plan-review-run.js`, `planReviewRunOf`) holds the verdicts, their kinds and the latest, and `planReviewFactsOf` reads it (`lib/recommendation-facts.js`). Every passage below that relies on the `### Plan Review Verdict` header, its `Verdict:` line, the verdict-word round-trip parser or the verdict comment as the handoff, including the "What the mechanical tail should append" block, is history. The records contract is in `docs/proxy-integration.md` (Records, LIN-4493).
+
 Sources read: `lib/prompt-template-defs.js` (plan L172-329, design L691-744, plan-review L835-917),
 `lib/prompt-formatters.js` (every formatter these three call, plus the post-passes
 `appendGroundingSections`, `formatAttachmentsSection` and `applyPromptCapabilities`),

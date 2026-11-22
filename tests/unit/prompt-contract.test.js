@@ -1,14 +1,15 @@
 /**
  * LIN-3292: every format the stage contract asks for is one a real reader
  * parses. Each test writes the format exactly as the contract words it and runs
- * the reader that keys on it.
+ * the reader that keys on it. LIN-4520: the verdicts are records, so the review
+ * and plan-review contracts are checked against the record shapes their readers key on.
  */
 import { test } from 'node:test';
 import assert from 'node:assert';
 import { formatStageContract } from '../../lib/prompt-contract.js';
-import { latestReviewComment, readRunLedger } from '../../lib/run-trail.js';
-import { extractVerdict } from '../../lib/run-trail.js';
+import { opensWithCloseOutTitle } from '../../lib/run-trail.js';
 import { planFactsOf } from '../../lib/records/plan-facts.js';
+import { PLAN_FINDING_TO, PLAN_REVIEW_JUDGEMENT } from '../../lib/records/plan-review-run.js';
 import { PLAN_ADDRESSEES } from '../../lib/records/check.js';
 import { extractPrUrls } from '../../lib/run-evidence.js';
 
@@ -49,17 +50,12 @@ test('plan-review (LIN-4504): Approve ends the review finding; other verdicts le
   assert.ok(c.includes('On Request Changes or Needs Discussion, leave it open'));
 });
 
-test('plan-review: the verdict comment shape resolves its verdict, even when a finding names another word', () => {
+test('plan-review (LIN-4520): the verdict is a record judged plan-review, and its blocking findings are to the plan', () => {
   const c = formatStageContract('plan-review', 'LIN-1');
-  const [header, label] = ticks(c);
-  assert.strictEqual(header, '### Plan Review Verdict');
-  const comment = `${header}\n${label} Request Changes — check 2 names no gap.\n\n1. Completeness: I would approve the bound.`;
-  assert.strictEqual(extractVerdict(comment), 'request changes');
-});
-
-test('plan-review: the contract asks for a Blocking findings count line on Request Changes (LIN-3651)', () => {
-  const c = formatStageContract('plan-review', 'LIN-1');
-  assert.ok(c.includes('On Request Changes, also write `Blocking findings: <n>` on its own line'));
+  assert.ok(c.includes(`"kind": "verdict"`) && c.includes(`"judgement": "${PLAN_REVIEW_JUDGEMENT}"`), 'the verdict record the verdict reader keys on');
+  assert.ok(c.includes(`"to": "${PLAN_FINDING_TO}"`), 'the blocking findings are to the addressee the run count reads');
+  for (const word of ['approve', 'request-changes', 'needs-discussion']) assert.ok(c.includes(`\`${word}\``), word);
+  assert.ok(!/Plan Review Verdict|Blocking findings/.test(c), 'no comment format names the verdict or counts blocking findings');
 });
 
 test('implementation: the PR URL shape is the one run-evidence extracts', () => {
@@ -70,43 +66,19 @@ test('implementation: the PR URL shape is the one run-evidence extracts', () => 
   assert.deepStrictEqual(found.map(p => p.number), [12]);
 });
 
-test('review: title, head, CI line, ledger and verdict all parse', () => {
+test('review (LIN-4520): the verdict is a record with its heads and its outcome words, and the findings to close-out are records', () => {
   const c = formatStageContract('review', 'LIN-1');
-  const body = [
-    titleIn(c, 'Review'), '', 'Reviewed head `abc1234`.', '',
-    'CI: green on the PR head.', '',
-    '### What CI Did Not Prove', '',
-    '- L1 (inside): the producer sends the new field. Settled by a manual repro.',
-    '- L2 (outside): the export page. Discharged by LIN-9.', '',
-    '### Verdict', '', 'Approve — conditional on close-out discharging the ledger'
-  ].join('\n');
-  const comments = [{ body, createdAt: at }];
-  assert.ok(latestReviewComment(comments));
-  const read = readRunLedger(comments);
-  assert.strictEqual(read.sha, 'abc1234');
-  assert.match(read.ciLine, /^CI: green/);
-  assert.strictEqual(read.ledger.present, true, 'the section is present');
-  assert.strictEqual(read.ledger.empty, false, 'and not stated empty: a pre-cutover ledger, held as not measured (LIN-4495)');
-  assert.strictEqual(read.verdict, 'approve-conditional');
+  for (const shape of ['"kind": "verdict"', '"judgement": "review"', '"heads"', '"kind": "finding"', '"to": "close-out"']) {
+    assert.ok(c.includes(shape), shape);
+  }
+  for (const word of ['approve', 'request-changes', 'needs-discussion']) assert.ok(c.includes(`\`${word}\``), word);
+  assert.ok(!/## Review|### Verdict|CI:/.test(c), 'no comment title, verdict heading or CI line is parsed any more');
 });
 
-test('review: every verdict form parses; the review writes no ledger section any more (LIN-4495: its findings are records)', () => {
-  const c = formatStageContract('review', 'LIN-1');
-  const verdicts = ticks(c).slice(ticks(c).indexOf('### Verdict') + 1);
-  const expected = ['approve', 'approve-conditional', 'request-changes', 'needs-discussion'];
-  verdicts.forEach((v, i) => {
-    const body = `## Review — LIN-1\n\n### Verdict\n${v}`;
-    const read = readRunLedger([{ body, createdAt: at }]);
-    assert.strictEqual(read.ledger.present, false, 'no ledger section on a review that records findings');
-    assert.strictEqual(read.verdict, expected[i], v);
-  });
-});
-
-test('close-out: the contract title is never mistaken for the latest review', () => {
+test('close-out: the contract title is the one the share page opens on, and it is not a verdict', () => {
   const c = formatStageContract('close-out', 'LIN-1');
-  const review = { body: '## Review — LIN-1\n\n**Verdict: Approve**', createdAt: at };
-  const closeOut = { body: `${titleIn(c, 'Close-out')}\n\nLedger review: discharged. Verdict: Approve.`, createdAt: '2026-10-03T01:00:00.000Z' };
-  assert.strictEqual(latestReviewComment([review, closeOut]), review);
+  assert.ok(opensWithCloseOutTitle(`${titleIn(c, 'Close-out')}\n\nSummary.`));
+  assert.ok(!opensWithCloseOutTitle('## Review — LIN-1\n\n**Verdict: Approve**'));
 });
 
 test('close-out: LIN-4502 retired the prune, so the contract carries only the title', () => {

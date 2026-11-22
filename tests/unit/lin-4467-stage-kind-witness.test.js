@@ -18,8 +18,8 @@ const actual = await captureWitness();
 
 describe('LIN-4467 — the witness context is real: a fix round is a fix round, a fresh start is not', () => {
   test('the fix context reads as a request-changes round; the fresh context does not', () => {
-    assert.equal(isRequestChangesRound(MODES.fix.comments), true);
-    assert.equal(isRequestChangesRound(MODES.fresh.comments), false);
+    assert.equal(isRequestChangesRound(MODES.fix.reviewRound), true);
+    assert.equal(isRequestChangesRound(MODES.fresh.reviewRound), false);
   });
 });
 

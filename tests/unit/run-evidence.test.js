@@ -23,6 +23,13 @@ function comment(body, createdAt) {
 const PR_A = 'https://github.com/acme/widget/pull/12';
 const PR_B = 'https://github.com/acme/gadget/pull/7';
 
+// LIN-4520: the review, its blind read and the landing come from the ticket's records trail (lib/task-standing.js
+// trailForTicket), never from comments. These tests write the trail a records read returns (trailOfStanding's shape).
+const trailOf = ({ landing = [], review = null } = {}) => ({
+  review, landing, workAfterReview: false, closeOutAfterReview: false, closeOutOnTrail: false,
+  landingHasNotesPr: false, notesPrs: [], auditAfterCloseOut: false,
+});
+
 describe('run-evidence: extractPrUrls', () => {
   test('collects PR URLs newest-comment first, deduped', () => {
     const comments = [
@@ -71,7 +78,7 @@ describe('run-evidence: state derivation', () => {
   };
 
   test('zero PR URLs → no-pr', () => {
-    const m = buildRunEvidence({ openFindings: FINDINGS_NONE, issueIdentifier: 'LIN-1', comments: [], });
+    const m = buildRunEvidence({ openFindings: FINDINGS_NONE, issueIdentifier: 'LIN-1', comments: [], trail: trailOf() });
     assert.equal(m.closeOut.status, 'no-pr');
     assert.equal(m.state.pr, null, 'the picker names no PR');
     assert.match(m.closeOut.message, /no pull request/);
@@ -80,7 +87,7 @@ describe('run-evidence: state derivation', () => {
   test('exactly one open PR → ready, with the PR and checks link', () => {
     const m = buildRunEvidence({
       openFindings: FINDINGS_NONE,
-      issueIdentifier: 'LIN-1', comments: [comment(PR_A, '2026-07-01T00:00:00.000Z')], prStatus: oneOpen,
+      issueIdentifier: 'LIN-1', comments: [comment(PR_A, '2026-07-01T00:00:00.000Z')], prStatus: oneOpen, trail: trailOf({ landing: [PR_A] }),
     });
     assert.equal(m.state.pr.state, 'open', 'the picker reads the open PR');
     assert.equal(m.state.pr.number, 12);
@@ -92,14 +99,14 @@ describe('run-evidence: state derivation', () => {
   test('LIN-4405: the PR carries GitHub\'s merged_at as mergedAt (additive; null when unset or unread)', () => {
     const merged = buildRunEvidence({
       openFindings: FINDINGS_NONE,
-      issueIdentifier: 'LIN-1', comments: [comment(PR_A, '2026-07-01T00:00:00.000Z')],
+      issueIdentifier: 'LIN-1', comments: [comment(PR_A, '2026-07-01T00:00:00.000Z')], trail: trailOf({ landing: [PR_A] }),
       prStatus: { ...oneOpen, state: 'closed', merged: true, merged_at: '2026-07-02T10:00:00Z' },
     });
     assert.equal(merged.closeOut.status, 'merged');
     assert.equal(merged.state.pr.mergedAt, '2026-07-02T10:00:00Z');
-    const open = buildRunEvidence({ openFindings: FINDINGS_NONE, issueIdentifier: 'LIN-1', comments: [comment(PR_A, '2026-07-01T00:00:00.000Z')], prStatus: oneOpen });
+    const open = buildRunEvidence({ openFindings: FINDINGS_NONE, issueIdentifier: 'LIN-1', comments: [comment(PR_A, '2026-07-01T00:00:00.000Z')], trail: trailOf({ landing: [PR_A] }), prStatus: oneOpen });
     assert.equal(open.state.pr.mergedAt, null);
-    const unread = buildRunEvidence({ openFindings: FINDINGS_NONE, issueIdentifier: 'LIN-1', comments: [comment(PR_A, '2026-07-01T00:00:00.000Z')], prStatus: { readable: false } });
+    const unread = buildRunEvidence({ openFindings: FINDINGS_NONE, issueIdentifier: 'LIN-1', comments: [comment(PR_A, '2026-07-01T00:00:00.000Z')], trail: trailOf({ landing: [PR_A] }), prStatus: { readable: false } });
     assert.equal(unread.state.pr.mergedAt, null);
   });
 
@@ -108,6 +115,7 @@ describe('run-evidence: state derivation', () => {
       openFindings: FINDINGS_NONE,
       issueIdentifier: 'LIN-1',
       comments: [comment(`${PR_A} ${PR_B}`, '2026-07-01T00:00:00.000Z')],
+      trail: trailOf({ landing: [PR_A, PR_B] }),
     });
     assert.equal(m.closeOut.status, 'multiple-prs');
     assert.equal(m.state.pr, null);
@@ -117,7 +125,7 @@ describe('run-evidence: state derivation', () => {
   test('an unreadable PR read → unknown (fail-open), never throws', () => {
     const m = buildRunEvidence({
       openFindings: FINDINGS_NONE,
-      issueIdentifier: 'LIN-1', comments: [comment(PR_A, '2026-07-01T00:00:00.000Z')], prStatus: { readable: false, state: 'unknown', reason: 'private' },
+      issueIdentifier: 'LIN-1', comments: [comment(PR_A, '2026-07-01T00:00:00.000Z')], trail: trailOf({ landing: [PR_A] }), prStatus: { readable: false, state: 'unknown', reason: 'private' },
     });
     assert.equal(m.closeOut.status, 'unknown');
     assert.equal(m.evidence.checked.now.state, 'unknown');
@@ -127,15 +135,21 @@ describe('run-evidence: state derivation', () => {
   test('a closed (unmerged) PR → pr-not-open; a merged one → merged', () => {
     const closed = buildRunEvidence({
       openFindings: FINDINGS_NONE,
-      issueIdentifier: 'LIN-1', comments: [comment(PR_A, '2026-07-01T00:00:00.000Z')], prStatus: { ...oneOpen, state: 'closed' },
+      issueIdentifier: 'LIN-1', comments: [comment(PR_A, '2026-07-01T00:00:00.000Z')], trail: trailOf({ landing: [PR_A] }), prStatus: { ...oneOpen, state: 'closed' },
     });
     assert.equal(closed.closeOut.status, 'closed');
     assert.equal(closed.closeOut.reason, 'pr-not-open');
     const merged = buildRunEvidence({
       openFindings: FINDINGS_NONE,
-      issueIdentifier: 'LIN-1', comments: [comment(PR_A, '2026-07-01T00:00:00.000Z')], prStatus: { ...oneOpen, state: 'closed', merged: true },
+      issueIdentifier: 'LIN-1', comments: [comment(PR_A, '2026-07-01T00:00:00.000Z')], trail: trailOf({ landing: [PR_A] }), prStatus: { ...oneOpen, state: 'closed', merged: true },
     });
     assert.equal(merged.closeOut.status, 'merged');
+  });
+
+  // LIN-4520: the trail is the records read the caller makes; with none, the box would read an unread ticket as "no review".
+  test('no records trail (absent or null) throws: the box never reads an unread ticket as no review', () => {
+    assert.throws(() => buildRunEvidence({ openFindings: FINDINGS_NONE, issueIdentifier: 'LIN-1', comments: [] }), /records trail was not read/);
+    assert.throws(() => buildRunEvidence({ openFindings: FINDINGS_NONE, issueIdentifier: 'LIN-1', comments: [], trail: null }), /records trail was not read/);
   });
 });
 
@@ -146,13 +160,12 @@ describe('run-evidence: evidence rows and close-out', () => {
     checks: [{ name: 'unit', conclusion: 'success' }],
   };
 
+  // LIN-4520: the review's approval word and judged head are records (a conditional approve is an approve with open
+  // findings to close-out), so the review is the records' review, and the comment carries only the PR link.
   test('review claim and live head are separate; head-moved is shown, not gated', () => {
-    const comments = [
-      comment(PR_A, '2026-07-01T00:00:00.000Z'),
-      comment(`${REPLY}\n\nhead \`abc1234\``, '2026-07-02T00:00:00.000Z'),
-    ];
-    const m = buildRunEvidence({ openFindings: FINDINGS_NONE, issueIdentifier: 'LIN-1', comments, prStatus: oneOpen });
-    assert.equal(m.evidence.checked.review.verdict, 'approve-conditional');
+    const review = { verdict: 'approve', at: '2026-07-02T00:00:00.000Z', sha: 'abc1234', heads: { [PR_A]: 'abc1234' }, commentId: 'review-1', blindRead: null, staleUrls: [] };
+    const m = buildRunEvidence({ openFindings: FINDINGS_NONE, issueIdentifier: 'LIN-1', comments: [comment(PR_A, '2026-07-01T00:00:00.000Z')], prStatus: oneOpen, trail: trailOf({ landing: [PR_A], review }) });
+    assert.equal(m.evidence.checked.review.verdict, 'approve');
     assert.equal(m.evidence.checked.review.sha, 'abc1234');
     assert.equal(m.evidence.checked.now.headSha, 'deadbeefdead');
     assert.equal(m.evidence.checked.now.headMoved, true);
@@ -164,33 +177,34 @@ describe('run-evidence: evidence rows and close-out', () => {
     const m = buildRunEvidence({
       openFindings: FINDINGS_NONE,
       issueIdentifier: 'LIN-1', issue: { title: 'Do the thing' },
-      comments: [comment(PR_A, '2026-07-01T00:00:00.000Z')], prStatus: oneOpen,
+      comments: [comment(PR_A, '2026-07-01T00:00:00.000Z')], trail: trailOf({ landing: [PR_A] }), prStatus: oneOpen,
     });
     assert.equal(m.evidence.asked, 'Do the thing');
     assert.equal(m.evidence.done, 'PR #12');
   });
 
   test('closeOut carries the owner flag and the state', () => {
-    const guest = buildRunEvidence({ openFindings: FINDINGS_NONE, issueIdentifier: 'LIN-1', comments: [], owner: false });
+    const guest = buildRunEvidence({ openFindings: FINDINGS_NONE, issueIdentifier: 'LIN-1', comments: [], trail: trailOf(), owner: false });
     assert.equal(guest.closeOut.owner, false);
-    const owner = buildRunEvidence({ openFindings: FINDINGS_NONE, issueIdentifier: 'LIN-1', comments: [], owner: true });
+    const owner = buildRunEvidence({ openFindings: FINDINGS_NONE, issueIdentifier: 'LIN-1', comments: [], trail: trailOf(), owner: true });
     assert.equal(owner.closeOut.owner, true);
   });
 
   test('the ledger model is threaded through for the collapsed fragment', () => {
+    const review = { verdict: 'approve', at: '2026-07-02T00:00:00.000Z', sha: null, heads: {}, commentId: 'review-1', blindRead: null, staleUrls: [] };
     const m = buildRunEvidence({
       openFindings: FINDINGS_NONE,
-      issueIdentifier: 'LIN-1', comments: [comment(REPLY, '2026-07-02T00:00:00.000Z')],
+      issueIdentifier: 'LIN-1', comments: [], trail: trailOf({ review }),
       prStatus: null,
     });
-    assert.equal(m.ledger.verdict, 'approve-conditional');
-    assert.equal(m.ledger.ledger.items, undefined, 'the items are records now (LIN-4495)');
+    assert.equal(m.ledger.verdict, 'approve');
+    assert.equal(m.ledger.items, undefined, 'the items are records now (LIN-4495)');
     assert.equal(m.closeOut.openFindings.state, 'read', 'the reading rides the close-out model');
   });
 
-  // LIN-3497: a review is on record only when a review comment exists.
-  test('no review comment: review and ledger are null, not an empty parse', () => {
-    const m = buildRunEvidence({ openFindings: FINDINGS_NONE, issueIdentifier: 'LIN-1', comments: [comment('just a note', '2026-07-01T00:00:00.000Z')] });
+  // LIN-3497: a review is on record only when the records hold one; a comment is not a review.
+  test('no review on the records: review and ledger are null, not an empty parse', () => {
+    const m = buildRunEvidence({ openFindings: FINDINGS_NONE, issueIdentifier: 'LIN-1', comments: [comment('just a note', '2026-07-01T00:00:00.000Z')], trail: trailOf() });
     assert.equal(m.ledger, null);
     assert.equal(m.evidence.checked.review, null);
     assert.equal(m.closeOut.review.verdict, null);

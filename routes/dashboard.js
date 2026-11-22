@@ -522,12 +522,15 @@ export function createDashboardRoutes(deps) {
       }
       const { provider, callScope } = prStateSeams.resolveProvider(workspace, null);
       const comments = await provider.fetchIssueComments(callScope, run.issueIdentifier);
-      // Through LIN-2949's run-evidence model, not a new parser.
+      // LIN-4520: the picker chooses among the PRs the comments cite (the page's links, for display). It reads no verdict and
+      // no landing, so no records trail is read for it: buildRunEvidence takes a trail, and this one holds no review and no
+      // landing, which resolveRunPrRef never reads. Through LIN-2949's run-evidence model, not a new parser.
       const model = buildRunEvidence({
         issueIdentifier: run.issueIdentifier,
         comments,
         evidenceUrls: run.evidenceUrls || [],
-        prStatus: null
+        prStatus: null,
+        trail: { review: null, landing: [] },
       });
       const { status, ref } = resolveRunPrRef(model);
       if (status !== 'one') {

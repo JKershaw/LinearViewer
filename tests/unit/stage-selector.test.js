@@ -18,6 +18,7 @@ import { buildRouterPrompt, routeStage, parseWhyNow } from '../../lib/stage-rout
 import { formatStageOptions, getSelectableStages, STAGE_LEADS } from '../../lib/prompt-templates.js';
 import { getRecommendation, setFetchImpl, buildSelectorArgs } from '../../lib/openrouter.js';
 import { RULING_MARK } from '../../lib/run-trail.js';
+import { planReviewRunOf } from '../../lib/records/plan-review-run.js';
 
 const open = { name: 'In Progress', type: 'started' };
 const leaf = (over = {}) => ({ identifier: 'LIN-1', title: 'A task', description: 'Do it.', state: open, labels: [], ...over });
@@ -70,11 +71,12 @@ describe('the selector prompt (LIN-3300)', () => {
   });
 
   test('no dangling step references, and "fix it here" names a stage', () => {
+    // LIN-4520: the plan-review Approve is a records verdict (the plan-review run), not a comment; the landed work is a comment.
+    const planReviewRun = planReviewRunOf({ verdicts: [{ id: 'verdict-1', at: '2026-01-01T00:00:00Z', run: 'run-1', fields: { judgement: 'plan-review', outcome: 'approve' } }] });
     const landed = [
-      { createdAt: '2026-01-01T00:00:00Z', body: '### Plan Review Verdict\n\n**Verdict:** Approve.' },
       { createdAt: '2026-01-02T00:00:00Z', body: 'Implementation landed: https://github.com/o/r/pull/9' }
     ];
-    const p = prompt(leaf(), ctx({ comments: landed }));
+    const p = prompt(leaf(), ctx({ comments: landed, planReviewRun }));
     assert.match(p, /Since the latest plan-review verdict: a person's comment: no; landed work: https:\/\/github\.com\/o\/r\/pull\/9/);
     assert.doesNotMatch(p, /Step \d/, 'the selector has rules, not Steps');
     assert.doesNotMatch(p, /Route on these facts|Route this pass/, 'the facts steer to no stage; the rules read them');
@@ -123,13 +125,14 @@ describe('the selector prompt (LIN-3300)', () => {
   // verdicts by kind, the latest and whether a person or landed work followed it; the
   // guidance lives once, in rule 8, and the loop bound is code's alone.
   test('plan-review verdicts arrive as plain data, with no precedence list and no loop count', () => {
-    const rc = (d) => ({ createdAt: `2026-01-0${d}T00:00:00Z`, body: '### Plan Review Verdict\n\n**Verdict: Request Changes.**' });
-    const app = { createdAt: '2026-01-01T00:00:00Z', body: '### Plan Review Verdict\n\n**Verdict: Approve.**' };
-    const p = prompt(leaf(), ctx({ comments: [app, rc(2), rc(3), { createdAt: '2026-01-04T00:00:00Z', body: 'Go on with the narrow revision.' }] }));
+    // LIN-4520: the verdicts are records (the plan-review run, folded from the verdict records); the person's comment is read.
+    const verdict = (id, at, outcome) => ({ id, at, run: `run-${id}`, fields: { judgement: 'plan-review', outcome } });
+    const planReviewRun = planReviewRunOf({ verdicts: [verdict('v-app', '2026-01-01T00:00:00Z', 'approve'), verdict('v-2', '2026-01-02T00:00:00Z', 'request-changes'), verdict('v-3', '2026-01-03T00:00:00Z', 'request-changes')] });
+    const p = prompt(leaf(), ctx({ comments: [{ createdAt: '2026-01-04T00:00:00Z', body: 'Go on with the narrow revision.' }], planReviewRun }));
     assert.match(p, /- Plan-review verdicts: 3 \(1 approve, 2 request changes\); latest: request changes \(2026-01-03 00:00\)/);
     assert.match(p, /- Since the latest plan-review verdict: a person's comment: yes; landed work: none/);
     assert.doesNotMatch(p, /PLAN-REVIEW FACTS|first match wins|since the latest Approve|Count \d|third|escalat/i);
-    assert.doesNotMatch(prompt(), /Plan-review verdicts:/, 'no verdict, no line');
+    assert.doesNotMatch(prompt(leaf(), ctx({ planReviewRun: planReviewRunOf({}) })), /Plan-review verdicts:/, 'no verdict, no line');
   });
 
   test('rule 8 carries the plan-review guidance once, as judgement with its reason', () => {

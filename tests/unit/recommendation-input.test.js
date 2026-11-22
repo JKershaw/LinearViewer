@@ -21,7 +21,7 @@ describe('prepareRecommendationInput (LIN-3469)', () => {
   test('forwards exactly the prompt-read fields plus the task\'s runs', async () => {
     const input = await prepareRecommendationInput(ctx, { dispatchQueueStore: store, urlKey: 'acme', identifier: 'LIN-1' });
     assert.deepEqual(Object.keys(input).sort(),
-      ['allRuns', 'asked', 'attachments', 'children', 'comments', 'focusedChild', 'landingChanges', 'openFindings', 'parent', 'planFacts', 'planReviewLoop', 'project', 'runs', 'siblings', 'trail']);
+      ['allRuns', 'asked', 'attachments', 'children', 'comments', 'focusedChild', 'landingChanges', 'openFindings', 'parent', 'planFacts', 'planReviewLoop', 'planReviewRun', 'project', 'reviewRound', 'runs', 'siblings', 'trail']);
     assert.equal(input.asked, null, 'no records store: no words on record');
     assert.equal(input.trail, null, 'LIN-4518 step 3: no records store: the trail is not read, so no gate reads a comment for it');
     assert.equal(input.landingChanges, null, 'LIN-4518 step 2: no records store: the landing is not read, so a blind read names no id');

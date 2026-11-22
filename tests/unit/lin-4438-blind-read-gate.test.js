@@ -15,8 +15,11 @@
  * flipped on purpose by LIN-4458 (piece 2 of LIN-4447): with one comment classifier, an audit carries
  * only the PRs it is the first on the trail to cite (its notes PRs), so the merged landing PR it re-cites
  * no longer joins the notes PR's landing, and the read names the notes PR alone. Row 15 (a foreign PR
- * cited before the first review joins a first landing) stays a stated limit: no caller holds the task's
- * repository (docs/areas/runs-and-dispatch.md says why).
+ * cited before the first review joins a first landing) was a stated limit under the comment path; LIN-4518
+ * step 3 flipped it on records: a comment that cites a foreign PR is not a change of this task.
+ *
+ * LIN-4520: every trail is the ticket's records trail (seeded from each row's events, read by trailForTicket). No
+ * comment is read for a verdict, a landing, a blind read or a Survey; a comment decides nothing here.
  *
  * Run with: node --test tests/unit/lin-4438-blind-read-gate.test.js
  */
@@ -27,14 +30,16 @@ import { test, describe, afterEach, before, after } from 'node:test';
 import assert from 'node:assert/strict';
 import { createMangoTmpdir } from '../fixtures/mango-tmpdir.js';
 import { recordsStoreFor, seedTicketRecords } from '../helpers/records-scenario.js';
+import { planRound } from '../helpers/plan-review-loop.js';
 import { trailForTicket } from '../../lib/task-standing.js';
 import { getRecommendation, setFetchImpl, setPromptTraceRecorder } from '../../lib/openrouter.js';
 import { readCloseOutChain, closeOutNotReady } from '../../lib/close-out-readiness.js';
 import { readRunEvidence } from '../../lib/run-evidence.js';
 import { closeOutWaitsOn } from '../../lib/run-closeout-state.js';
-import { landingPrUrls, commentKindOf, isPersonComment } from '../../lib/run-trail.js';
 import { assembleTrailFacts } from '../../lib/recommendation-facts.js';
+import { isPersonComment } from '../../lib/run-trail.js';
 import { blindReadStep, BLIND_READ_ATTEMPT_BOUND } from '../../lib/recommendation-blind-read.js';
+import { planReviewRunOf } from '../../lib/records/plan-review-run.js';
 import { generatePrompt } from '../../lib/prompt-templates.js';
 import { SURVEY_HEADINGS } from '../../lib/prompts/survey-words.js';
 
@@ -74,6 +79,13 @@ const evClose = (n) => ({ kind: 'closeOut', at: T(n) });
 const evMerged = (n, url) => ({ kind: 'merged', at: T(n), pr: url });
 const evAudit = (n, url, head = REVIEWED) => ({ kind: 'audit', at: T(n), pr: url, head });
 const evRun = (stage, n, state) => ({ kind: 'run', at: T(n), stage, state });
+
+/** The ticket's records trail for `events` (LIN-4518 step 3): seeded into a fresh store, read the way the gates read it. */
+async function trailOfEvents(events) {
+  const recordsStore = await recordsStoreFor(harness);
+  await seedTicketRecords(recordsStore, URL_KEY, 'LIN-1', events);
+  return trailForTicket({ recordsStore, urlKey: URL_KEY, ticket: 'LIN-1' });
+}
 
 const STARTED = { name: 'In Progress', type: 'started' };
 const DONE = { name: 'Done', type: 'completed' };
@@ -189,80 +201,81 @@ describe('the shared-trail table: every lane agrees (LIN-4438)', () => {
 });
 
 describe('rows that need more than the lanes', () => {
-  test('row 11: the plain link comment is work after review, not an agent note or a person; the predicate waits', () => {
+  test('row 11: the plain link comment is a change after review, so the facts show work after it and the predicate waits', async () => {
     const row = ROWS.find(r => r.n === 11);
-    assert.notEqual(commentKindOf(LINK_BODY), 'agent-note', 'never an agent-note opening, so it counts as landing work');
+    const trail = await trailOfEvents(row.events);
+    const facts = assembleTrailFacts(row.comments, '', { leaf: false, trail });
     assert.equal(isPersonComment(LINK_BODY), false, 'never read as a person waiting for an answer');
-    const facts = assembleTrailFacts(row.comments, '', { leaf: false });
     assert.equal(facts.workAfterReview, true, 'the selector facts show work after review');
     assert.equal(facts.closeOutAfterReview, false);
-    assert.equal(closeOutWaitsOn(facts.review, landingPrUrls(row.comments)), 'blind-read');
-    assert.deepEqual(landingPrUrls(row.comments), [PR1, PR2]);
+    assert.equal(closeOutWaitsOn(trail.review, trail.landing), 'blind-read');
+    assert.deepEqual([...trail.landing].sort(), [PR1, PR2]);
   });
 
   // Flipped on purpose by LIN-4458: before it, the audit's re-cite of the merged PR1 joined the notes
   // PR's landing, so the read had to name both. One classifier gives an audit only the PRs it is the
   // first to cite, so the notes PR's landing is PR2 alone.
-  test('row 14: the audit re-cites the merged landing PR, and the notes PR\'s read names the notes PR alone (flipped by LIN-4458)', () => {
+  test('row 14: the audit re-cites the merged landing PR, and the notes PR\'s read names the notes PR alone (flipped by LIN-4458)', async () => {
     const row = ROWS.find(r => r.n === 14);
-    const facts = assembleTrailFacts(row.comments, '', { leaf: false });
-    assert.deepEqual(landingPrUrls(row.comments), [PR2]);
-    assert.equal(closeOutWaitsOn({ ...facts.review, blindRead: { prs: [PR2] } }, landingPrUrls(row.comments)), null, 'a read of the notes PR alone clears it');
-    assert.equal(closeOutWaitsOn({ ...facts.review, blindRead: { prs: [PR1] } }, landingPrUrls(row.comments)), 'blind-read', 'a read of the merged landing alone does not');
+    const trail = await trailOfEvents(row.events);
+    assert.deepEqual(trail.landing, [PR2]);
+    assert.equal(closeOutWaitsOn({ ...trail.review, blindRead: { prs: [PR2] } }, trail.landing), null, 'a read of the notes PR alone clears it');
+    assert.equal(closeOutWaitsOn({ ...trail.review, blindRead: { prs: [PR1] } }, trail.landing), 'blind-read', 'a read of the merged landing alone does not');
     // The prompt names the landing's change records (LIN-4518 step 3, finding 75b33054): the notes PR's change alone.
-    const prompt = generatePrompt('blind-read', issueOf(row), { ...context(row), landingChanges: [{ id: 'change-notes', ref: PR2, head: REVIEWED }] }).prompt;
+    const prompt = generatePrompt('blind-read', issueOf(row), { ...context(row, trail), landingChanges: [{ id: 'change-notes', ref: PR2, head: REVIEWED }] }).prompt;
     assert.ok(prompt.includes(`**The change:** ${PR2}`) && !prompt.includes(`**The change:** ${PR1}`), 'the reader is told to read the notes PR only');
-  });
-
-  test('row 15: the landing keeps a foreign PR cited before the first review in a first landing (a stated limit)', () => {
-    const row = ROWS.find(r => r.n === 15);
-    assert.deepEqual(landingPrUrls(row.comments), [FOREIGN, PR1]);
   });
 });
 
 describe('the route\'s own edges', () => {
-  const approved = [summary(1), review(2)];
+  const approved = [evPr(1), evReview(2)];
 
-  test('a Canceled or Duplicate ticket stands aside; a Done ticket stands aside unless an audit\'s notes PR reads after it', () => {
+  test('a Canceled or Duplicate ticket stands aside; a Done ticket stands aside unless an audit\'s notes PR reads after it', async () => {
+    const trail = await trailOfEvents(approved);
     for (const type of ['canceled', 'duplicate']) {
-      assert.equal(blindReadStep({ state: { type } }, { comments: approved, allRuns: [] }), null, type);
+      assert.equal(blindReadStep({ state: { type } }, { trail, allRuns: [] }), null, type);
     }
     // Row 196, first half (flipped by LIN-4460): a person set the ticket Done outside Harbour and the trail holds
     // no close-out on its landing, so Harbour follows and sends no read to a Done ticket.
-    assert.equal(blindReadStep({ state: DONE }, { comments: approved, allRuns: [] }), null, 'Done with no close-out on the landing: the person\'s Done stands');
+    assert.equal(blindReadStep({ state: DONE }, { trail, allRuns: [] }), null, 'Done with no close-out on the landing: the person\'s Done stands');
     // Row 196, second half (unchanged): a close-out after the review.
-    assert.equal(blindReadStep({ state: DONE }, { comments: [summary(1), review(2), closeOut(3, `Merged ${PR1}; set Done.`)], allRuns: [] }), null, 'Done, closed out after the review, no read: stands aside');
+    const closed = await trailOfEvents([evPr(1), evReview(2), evClose(3), evMerged(3, PR1)]);
+    assert.equal(blindReadStep({ state: DONE }, { trail: closed, allRuns: [] }), null, 'Done, closed out after the review, no read: stands aside');
     // Added by LIN-4460: an audit's notes PR opened after Done still gets its read (its own review comes after the close-out).
-    assert.equal(blindReadStep({ state: DONE }, { comments: [summary(1), review(2), closeOut(3, `Merged ${PR1}; set Done.`), audit(4), review(5, 'Approve', PR2)], allRuns: [] }).step, 'blind-read', 'a post-Done audit notes PR is still read');
+    const audited = await trailOfEvents([evPr(1), evReview(2), evClose(3), evMerged(3, PR1), evAudit(4, PR2), evReview(5, 'approve', PR2)]);
+    assert.equal(blindReadStep({ state: DONE }, { trail: audited, allRuns: [] }).step, 'blind-read', 'a post-Done audit notes PR is still read');
   });
 
-  test('a live blind read is not an ended attempt; runs before the review do not count', () => {
+  test('a live blind read is not an ended attempt; runs before the review do not count', async () => {
     assert.equal(BLIND_READ_ATTEMPT_BOUND, 2);
-    const step = (allRuns) => blindReadStep({ state: STARTED }, { comments: approved, allRuns }).step;
+    const trail = await trailOfEvents(approved);
+    const step = (allRuns) => blindReadStep({ state: STARTED }, { trail, allRuns }).step;
     assert.equal(step([run('blind-read', 3, 'done')]), 'blind-read', 'one ended attempt');
-    assert.equal(step([run('blind-read', 3, 'done'), run('blind-read', 4, 'running')]), 'blind-read', 'one ended, one live');
+    assert.equal(step([run('blind-read', 3, 'done'), { ...run('blind-read', 4, 'running') }]), 'blind-read', 'one ended, one live');
     assert.equal(step([run('blind-read', 0, 'done'), run('blind-read', 1, 'failed'), run('blind-read', 3, 'done')]), 'blind-read', 'two before the review');
     for (const outcome of ['skipped', 'aborted', 'closed', 'waiting on a person']) {
       assert.equal(step([run('blind-read', 3, 'done'), run('blind-read', 4, outcome)]), 'blocked', outcome);
     }
   });
 
-  test('the route reads the ledger whole: a read written before the review is not its read', () => {
-    assert.equal(blindReadStep({ state: STARTED }, { comments: [summary(1), read(2, PR1), review(3)], allRuns: [] }).step, 'blind-read');
+  test('the route reads the ledger whole: a read written before the review is not its read', async () => {
+    const trail = await trailOfEvents([evPr(1), evRead(2, PR1), evReview(3)]);
+    assert.equal(blindReadStep({ state: STARTED }, { trail, allRuns: [] }).step, 'blind-read');
   });
 });
 
-describe('a Survey report is not landing work, for the trail facts as for landingPrUrls (LIN-4438 leftovers)', () => {
+describe('a Survey report is not landing work, for the trail facts as for the landing (LIN-4438 leftovers)', () => {
   const survey = (n) => c(n, `${SURVEY_HEADINGS['survey-task']}: LIN-1 @ abc123def\n\nAn earlier attempt is ${PR_OLD}; start from it.`);
 
-  test('a Survey after the review is not work after review, and the landing skips it', () => {
-    const comments = [summary(1), review(2), survey(3)];
-    assert.equal(assembleTrailFacts(comments, '', { leaf: false }).workAfterReview, false);
-    assert.deepEqual(landingPrUrls(comments), [PR1]);
+  test('a Survey after the review is not work after review, and the landing skips it', async () => {
+    // The Survey is a run of its stage (LIN-4520: runs decide); it writes no change, so the landing is the review's PR alone.
+    const trail = await trailOfEvents([evPr(1), evReview(2), evRun('survey-task', 3, 'done')]);
+    assert.equal(assembleTrailFacts([summary(1), review(2), survey(3)], '', { leaf: false, trail }).workAfterReview, false);
+    assert.deepEqual(trail.landing, [PR1]);
   });
 
   test('a Survey after a plan-review verdict is not landed work', () => {
-    const verdict = c(1, '### Plan Review Verdict\n\n**Verdict:** Request Changes. 2 blocking findings.');
-    assert.equal(assembleTrailFacts([verdict, survey(2)], '').planReview.landed, null);
+    const verdictRun = planReviewRunOf({ verdicts: [planRound(T(1), 'request-changes').verdict], findings: [] });
+    assert.equal(assembleTrailFacts([survey(2)], '', { planReviewRun: verdictRun }).planReview.landed, null);
   });
 });

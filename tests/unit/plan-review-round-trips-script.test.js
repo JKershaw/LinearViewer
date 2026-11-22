@@ -137,9 +137,10 @@ describe('fetchAll — H12 scope guard: every /dispatch list URL carries a non-e
       assert.ok(u.searchParams.get('issueIdentifier'), `list url missing non-empty issueIdentifier: ${u}`);
     }
 
+    // LIN-4520: the script no longer reads per-row feedback (only the retired DONE-line tier read it), so no
+    // `/dispatch/{rowId}` detail call is made at all; the list-vs-detail distinction is still pinned by the assertion above.
     const detailUrls = calls.map((c) => new URL(c)).filter((u) => u.pathname === '/dispatch/row-1');
-    assert.equal(detailUrls.length, 1);
-    assert.equal(detailUrls[0].searchParams.get('issueIdentifier'), null);
+    assert.equal(detailUrls.length, 0);
   });
 
   test('a falsy identifier (list row AND fetched detail both empty) rejects before any /dispatch read', async () => {

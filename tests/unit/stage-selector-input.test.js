@@ -24,25 +24,37 @@ const at = (d) => `2026-10-0${d}T10:00:00.000Z`;
 const PR = 'https://github.com/JKershaw/LinearViewer/pull/1747';
 const review = (verdict, d) => ({ createdAt: at(d), body: `## Review — LIN-1\n\nReviewed ${PR}.\n\n### Verdict\n${verdict}\n\n### What CI Did Not Prove\n- L1 (inside): the live run.` });
 const planReview = (d) => ({ createdAt: at(d), body: '### Plan Review Verdict\n\n**Verdict:** Approve.' });
+// LIN-4520: the review, its work and close-out facts are records: the trail a records read gives (lib/task-standing.js
+// trailForTicket). The comments still carry the PR links and the person's words; a trail is passed in beside them.
+const trailOf = ({ review = null, ...facts } = {}) => ({
+  review, landing: [], workAfterReview: false, closeOutAfterReview: false, closeOutOnTrail: false,
+  landingHasNotesPr: false, notesPrs: [], auditAfterCloseOut: false, ...facts,
+});
+const reviewOf = (outcome, d) => ({ verdict: outcome, at: at(d), sha: null, heads: {}, commentId: `review-${d}`, blindRead: null, staleUrls: [] });
 // LIN-4504: plan facts are records, folded by lib/records/plan-facts.js.
 const TASK = { id: 'task-1', kind: 'task', state: 'open' };
 const planRec = (id, to, v = 1, d = 1) => ({ id, v, kind: 'plan', state: 'kept', in: 'task-1', to, at: at(d) });
 const PLANNED = (to, findings = []) => planFactsOf({ task: TASK, inside: [planRec('plan-aa', to)], findings });
 
 describe('trail facts (LIN-3300)', () => {
-  test('the latest code review comes from the run ledger; a plan-review Approve is not one', () => {
-    const facts = assembleTrailFacts([planReview(1)], '');
+  test('the latest code review is the records review; a plan-review Approve is not one', () => {
+    const facts = assembleTrailFacts([planReview(1)], '', { trail: trailOf() });
     assert.equal(facts.review, null);
-    const withReview = assembleTrailFacts([planReview(1), review('Request Changes.', 2)], '');
+    const withReview = assembleTrailFacts([planReview(1), review('Request Changes.', 2)], '', { trail: trailOf({ review: reviewOf('request-changes', 2) }) });
     assert.equal(withReview.review.verdict, 'request-changes');
     assert.equal(withReview.review.openFindings.state, 'not-read', 'the findings come from the records, passed in: not measured by default');
     assert.equal(withReview.workAfterReview, false);
   });
 
-  test('a later comment linking a PR is work reported after the review; a close-out is not', () => {
-    const fixed = assembleTrailFacts([review('Request Changes.', 1), { createdAt: at(2), body: `## Review fixes landed — PR updated\n\n${PR}` }], '');
+  // LIN-4520: work after the review is the records' fact (a change recorded after the review), not a comment's: a later
+  // comment that links a PR no longer makes it, and the trail's fact is what the selector reads.
+  test('work after the review is the records fact: a comment linking a PR does not make it; the trail\'s fact does', () => {
+    const fixes = [review('Request Changes.', 1), { createdAt: at(2), body: `## Review fixes landed — PR updated\n\n${PR}` }];
+    const unrecorded = assembleTrailFacts(fixes, '', { trail: trailOf({ review: reviewOf('request-changes', 1) }) });
+    assert.equal(unrecorded.workAfterReview, false, 'no change is recorded after the review: the comment is not the fact');
+    const fixed = assembleTrailFacts(fixes, '', { trail: trailOf({ review: reviewOf('request-changes', 1), workAfterReview: true }) });
     assert.equal(fixed.workAfterReview, true);
-    const closed = assembleTrailFacts([review('Approve.', 1), { createdAt: at(2), body: `## Close-out — LIN-1\n\nMerged ${PR}.` }], '');
+    const closed = assembleTrailFacts([review('Approve.', 1), { createdAt: at(2), body: `## Close-out — LIN-1\n\nMerged ${PR}.` }], '', { trail: trailOf({ review: reviewOf('approve', 1), closeOutAfterReview: true }) });
     assert.equal(closed.workAfterReview, false);
     assert.equal(closed.closeOutAfterReview, true);
   });
@@ -119,12 +131,13 @@ describe('trail facts (LIN-3300)', () => {
     assert.equal(fixed.latestPerson.actedAfter, true, 'a later landing report supersedes it');
   });
 
+  // LIN-4520: the agent notes and the unheaded close-out are not work: the trail (records) decides, and the comments do not.
   test('work after the review ignores agent notes and an unheaded close-out', () => {
     const facts = assembleTrailFacts([
       review('Approve.', 1),
       { createdAt: at(2), body: `**Close-out: PR #1747 merged.** ${PR}` },
       { createdAt: at(3), body: `**Autopilot run summary (stepper): P0 landed.** ${PR}` }
-    ], '');
+    ], '', { trail: trailOf({ review: reviewOf('approve', 1), closeOutAfterReview: true }) });
     assert.equal(facts.workAfterReview, false);
     assert.equal(facts.closeOutAfterReview, true);
   });
@@ -162,13 +175,13 @@ describe('trail facts (LIN-3300)', () => {
   });
 
   test('the block states each fact once and says which comments it read', () => {
-    const block = formatTrailFactsBlock(assembleTrailFacts([review('Approve — conditional on close-out.', 1)], 'x', { leaf: true }), 7);
+    const block = formatTrailFactsBlock(assembleTrailFacts([review('Approve — conditional on close-out.', 1)], 'x', { leaf: true, trail: trailOf({ review: reviewOf('approve', 1) }) }), 7);
     assert.match(block, /TRAIL FACTS \(computed in code from all 7 comments — do not re-derive\)/);
-    assert.match(block, /Latest code review: approve-conditional/);
+    assert.match(block, /Latest code review: approve \(/);
     assert.match(block, /Work reported after it \(a later comment links a PR\): no/);
     assert.match(block, /PRs linked on the trail: https:\/\/github\.com\/JKershaw\/LinearViewer\/pull\/1747/);
     assert.match(block, /- Plan records: not measured/);
-    const none = formatTrailFactsBlock(assembleTrailFacts([], '', { leaf: false }), 0);
+    const none = formatTrailFactsBlock(assembleTrailFacts([], '', { leaf: false, trail: trailOf() }), 0);
     assert.match(none, /Latest code review: none/);
     assert.doesNotMatch(none, /Plan records/);
   });
@@ -259,20 +272,16 @@ describe('the selector view (LIN-3300)', () => {
 });
 
 describe('trail facts: the misroute fixes (LIN-3378)', () => {
-  const ledgerLine = (verdict) => formatTrailFactsBlock(assembleTrailFacts([review(verdict, 1)], ''), 1)
-    .split('\n').find(l => l.startsWith('- Latest code review'));
-
+  // LIN-4520: the review's outcome is the records' (approve | request-changes | needs-discussion). A conditional approve is
+  // an approve with open findings to close-out, so the comment-era `approve-conditional` word is retired.
   test('d: under an approving review the open findings to close-out are left for close-out to settle; otherwise not settled (LIN-4495)', () => {
     const one = { state: 'read', count: 1, ids: ['finding-aaaaaaaa'] };
-    const line = (verdict, reading) => formatTrailFactsBlock(assembleTrailFacts([review(verdict, 1)], '', { openFindings: reading }), 1)
+    const line = (outcome, reading) => formatTrailFactsBlock(assembleTrailFacts([], '', { openFindings: reading, trail: trailOf({ review: reviewOf(outcome, 1) }) }), 1)
       .split('\n').find(l => l.startsWith('- Latest code review'));
-    assert.match(line('Approve.', one), /open findings to close-out: 1, left for close-out to settle\)/);
-    const conditional = 'Approve — conditional on close-out settling the findings';
-    assert.equal(assembleTrailFacts([review(conditional, 1)], '').review.verdict, 'approve-conditional', 'the measured P11 verdict, not plain approve');
-    assert.match(line(conditional, one), /approve-conditional .*open findings to close-out: 1, left for close-out to settle\)/);
-    assert.match(line('Request Changes.', one), /open findings to close-out: 1, not settled\)/);
-    assert.match(line('Approve.', { state: 'read', count: 0, ids: [] }), /open findings to close-out: 0\)/);
-    assert.match(line('Approve.', { state: 'not-read', count: null, ids: [], why: 'x' }), /open findings to close-out: not measured\)/);
+    assert.match(line('approve', one), /Latest code review: approve \(.*open findings to close-out: 1, left for close-out to settle\)/);
+    assert.match(line('request-changes', one), /open findings to close-out: 1, not settled\)/);
+    assert.match(line('approve', { state: 'read', count: 0, ids: [] }), /open findings to close-out: 0\)/);
+    assert.match(line('approve', { state: 'not-read', count: null, ids: [], why: 'x' }), /open findings to close-out: not measured\)/);
   });
 
   // LIN-4504: part of the parent's plan is a `piece`, never the parent's description.

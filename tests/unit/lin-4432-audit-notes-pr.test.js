@@ -11,7 +11,7 @@
  *
  * Run with: node --test tests/unit/lin-4432-audit-notes-pr.test.js
  */
-import { test, describe } from 'node:test';
+import { test, describe, before, after } from 'node:test';
 import assert from 'node:assert/strict';
 import { readFileSync } from 'node:fs';
 import { join } from 'node:path';
@@ -19,6 +19,10 @@ import { fileURLToPath } from 'node:url';
 
 import { assembleTrailFacts, formatTrailFactsBlock } from '../../lib/recommendation-facts.js';
 import { generatePrompt, PROMPT_TEMPLATES } from '../../lib/prompt-templates.js';
+import { trailForTicket } from '../../lib/task-standing.js';
+import { AUDIT_STAGE } from '../../lib/records/words.js';
+import { createMangoTmpdir } from '../fixtures/mango-tmpdir.js';
+import { seededRecordsStore, ev } from '../helpers/records-scenario.js';
 
 const ISSUE = {
   id: 'issue-4432', identifier: 'LIN-9432', title: 'Audit notes PR fixture', description: 'Some work',
@@ -34,6 +38,18 @@ const read = (path) => readFileSync(join(ROOT, path), 'utf8');
 const at = (d) => `2026-11-1${d}T10:00:00.000Z`;
 const LANDING_PR = 'https://github.com/JKershaw/LinearViewer/pull/2402';
 const NOTES_PR = 'https://github.com/JKershaw/LinearViewer/pull/2500';
+const HEAD_LANDING = 'aaaaaaa1111111';
+const HEAD_NOTES = 'bbbbbbb2222222';
+const HEAD_REOPEN = 'ccccccc3333333';
+
+// LIN-4520: the trail is the records read (lib/task-standing.js trailForTicket) over the records a scenario seeds.
+const harness = createMangoTmpdir('lin-4432-audit-notes-');
+before(() => harness.connect());
+after(() => harness.close());
+const trailAfter = async (events) => trailForTicket({
+  recordsStore: await seededRecordsStore(harness, events, { urlKey: 'ws', tickets: [ISSUE.identifier] }),
+  urlKey: 'ws', ticket: ISSUE.identifier,
+});
 
 const landingReview = { createdAt: at(1), body: `## Review — LIN-1\n\nReviewed ${LANDING_PR}.\n\n### Verdict\nApprove.\n\n### What CI Did Not Prove\n- L1 (inside): the live run.` };
 const landingCloseOut = { createdAt: at(2), body: `## Close-out — LIN-1\n\nMerged ${LANDING_PR}.` };
@@ -42,8 +58,14 @@ const notesReview = { createdAt: at(4), body: `## Review — LIN-1\n\nReviewed $
 const notesCloseOut = { createdAt: at(5), body: `## Close-out — LIN-1\n\nMerged ${NOTES_PR}.` };
 
 describe('(a) trail facts around an audit notes PR on a Done ticket (LIN-4432, verdict note 5)', () => {
-  test('while the notes PR is open, the audit comment is work after the landing review (the selector routes to review)', () => {
-    const facts = assembleTrailFacts([landingReview, landingCloseOut, audit], '', { leaf: true });
+  // LIN-4520: the review, the close-out, the audit and the notes PR are records (the trail a records read gives), so each
+  // test seeds the records the stages write, in the order its comments are written. The comments still carry the PR links.
+  const LANDING_EVENTS = [ev.pr(1, LANDING_PR, HEAD_LANDING), ev.review(2, LANDING_PR), ev.close(3)];
+  const NOTES_EVENTS = [ev.audit(4, NOTES_PR, HEAD_NOTES), ev.review(5, NOTES_PR), ev.close(6)];
+  const factsFor = async (comments, events) => assembleTrailFacts(comments, '', { leaf: true, trail: await trailAfter(events) });
+
+  test('while the notes PR is open, the audit comment is work after the landing review (the selector routes to review)', async () => {
+    const facts = await factsFor([landingReview, landingCloseOut, audit], [...LANDING_EVENTS, ev.audit(4, NOTES_PR, HEAD_NOTES)]);
     assert.equal(facts.review.verdict, 'approve');
     assert.equal(facts.workAfterReview, true, 'an audit comment linking a PR counts as work reported after the review');
     assert.equal(facts.closeOutAfterReview, true);
@@ -52,9 +74,9 @@ describe('(a) trail facts around an audit notes PR on a Done ticket (LIN-4432, v
   // Verdict note 5 (beat 3): the second audit. Engineering choice: a computed trail fact, because
   // nothing in the existing facts records that an audit ran, and a prose whenNot alone would rest
   // on the model reading comment prose. Witness: before the fact existed, these were undefined.
-  test("after the notes PR's review and close-out, the trail fact says an audit already ran on this landing (landing day's says it did not)", () => {
-    const landing = assembleTrailFacts([landingReview, landingCloseOut], '', { leaf: true });
-    const afterNotes = assembleTrailFacts([landingReview, landingCloseOut, audit, notesReview, notesCloseOut], '', { leaf: true });
+  test("after the notes PR's review and close-out, the trail fact says an audit already ran on this landing (landing day's says it did not)", async () => {
+    const landing = await factsFor([landingReview, landingCloseOut], LANDING_EVENTS);
+    const afterNotes = await factsFor([landingReview, landingCloseOut, audit, notesReview, notesCloseOut], [...LANDING_EVENTS, ...NOTES_EVENTS]);
     assert.equal(landing.auditAfterCloseOut, false, 'landing day still routes to the audit: no audit has run');
     assert.equal(afterNotes.auditAfterCloseOut, true, 'the post-notes-PR trail records the audit, so the selector stops re-selecting it');
     assert.ok(afterNotes.prUrls.includes(NOTES_PR), 'the notes PR is linked on the trail');
@@ -62,14 +84,14 @@ describe('(a) trail facts around an audit notes PR on a Done ticket (LIN-4432, v
     assert.equal(afterNotes.closeOutAfterReview, true);
   });
 
-  test('while the notes PR is open, the audit fact is already yes, so the audit whenNot sends the open PR to review', () => {
-    const window = assembleTrailFacts([landingReview, landingCloseOut, audit], '', { leaf: true });
+  test('while the notes PR is open, the audit fact is already yes, so the audit whenNot sends the open PR to review', async () => {
+    const window = await factsFor([landingReview, landingCloseOut, audit], [...LANDING_EVENTS, ev.audit(4, NOTES_PR, HEAD_NOTES)]);
     assert.equal(window.auditAfterCloseOut, true);
   });
 
-  test('the trail block states the audit fact beside the close-out fact, on landing day and after the notes PR', () => {
-    const landing = formatTrailFactsBlock(assembleTrailFacts([landingReview, landingCloseOut], '', { leaf: true }), 2);
-    const afterNotes = formatTrailFactsBlock(assembleTrailFacts([landingReview, landingCloseOut, audit, notesReview, notesCloseOut], '', { leaf: true }), 5);
+  test('the trail block states the audit fact beside the close-out fact, on landing day and after the notes PR', async () => {
+    const landing = formatTrailFactsBlock(await factsFor([landingReview, landingCloseOut], LANDING_EVENTS), 2);
+    const afterNotes = formatTrailFactsBlock(await factsFor([landingReview, landingCloseOut, audit, notesReview, notesCloseOut], [...LANDING_EVENTS, ...NOTES_EVENTS]), 5);
     assert.match(landing, /- Audit reported after the landing close-out: no/);
     assert.match(afterNotes, /- Audit reported after the landing close-out: yes/);
   });
@@ -81,20 +103,21 @@ describe('(a) trail facts around an audit notes PR on a Done ticket (LIN-4432, v
   const reopenReview = { createdAt: at(6), body: `## Review — LIN-1\n\nReviewed ${REOPEN_PR}.\n\n### Verdict\nApprove.\n\n### What CI Did Not Prove\n- L1 (inside): the reopened work.` };
   const reopenCloseOut = { createdAt: at(7), body: `## Close-out — LIN-1\n\nMerged ${REOPEN_PR}.` };
   const secondAudit = { createdAt: at(8), body: `## Retrospective audit — LIN-1\n\nNo claim failed.` };
+  const REOPEN_EVENTS = [ev.pr(7, REOPEN_PR, HEAD_REOPEN), ev.review(8, REOPEN_PR), ev.close(9)];
 
-  test('a reopened ticket that lands again is not already audited: its landing close-out merges a new PR, not a notes PR', () => {
-    const facts = assembleTrailFacts([landingReview, landingCloseOut, audit, notesReview, notesCloseOut, reopenReview, reopenCloseOut], '', { leaf: true });
+  test('a reopened ticket that lands again is not already audited: its landing close-out merges a new PR, not a notes PR', async () => {
+    const facts = await factsFor([landingReview, landingCloseOut, audit, notesReview, notesCloseOut, reopenReview, reopenCloseOut], [...LANDING_EVENTS, ...NOTES_EVENTS, ...REOPEN_EVENTS]);
     assert.equal(facts.auditAfterCloseOut, false, 'the second landing has no audit after it yet');
   });
 
-  test('an audit of the reopened ticket\'s second landing is recognised as that landing\'s audit', () => {
-    const facts = assembleTrailFacts([landingReview, landingCloseOut, audit, notesReview, notesCloseOut, reopenReview, reopenCloseOut, secondAudit], '', { leaf: true });
+  test('an audit of the reopened ticket\'s second landing is recognised as that landing\'s audit', async () => {
+    const facts = await factsFor([landingReview, landingCloseOut, audit, notesReview, notesCloseOut, reopenReview, reopenCloseOut, secondAudit], [...LANDING_EVENTS, ...NOTES_EVENTS, ...REOPEN_EVENTS, ev.run(10, AUDIT_STAGE)]);
     assert.equal(facts.auditAfterCloseOut, true);
   });
 
-  test('an audit that cites the landing PR (already linked before it) does not make that PR a notes PR', () => {
+  test('an audit that cites the landing PR (already linked before it) does not make that PR a notes PR', async () => {
     const citing = { createdAt: at(3), body: `## Retrospective audit — LIN-1\n\nAudited ${LANDING_PR}; no claim failed.` };
-    const facts = assembleTrailFacts([landingReview, landingCloseOut, citing], '', { leaf: true });
+    const facts = await factsFor([landingReview, landingCloseOut, citing], [...LANDING_EVENTS, ev.run(4, AUDIT_STAGE)]);
     assert.equal(facts.auditAfterCloseOut, true, 'the landing close-out is still a landing, so the audit is after it');
   });
 });

@@ -75,8 +75,7 @@ describe('a gate row settles on its verdict record', () => {
     const r = computeIssueRoundTrips(iss, { asOf: ASOF, verdictFacts: facts([]) });
     assert.notEqual(r.R0?.tier, 'a', 'no tier-a verdict: the comment is not read');
     assert.equal(r.R0?.tier, 'c', 'a done row with no verdict record settles on the structural tier, as it always did');
-    const commentsReading = computeIssueRoundTrips(iss, { asOf: ASOF, verdictSource: 'comments' });
-    assert.equal(commentsReading.R0.tier, 'a', 'the comments source (historic) reads the same comment as tier a');
+    assert.throws(() => computeIssueRoundTrips(iss, { asOf: ASOF, verdictSource: 'comments' }), /comments/, 'the comments source is retired (LIN-4520)');
   });
 
   test('the latest verdict of the window wins, and a withdrawn one does not count', () => {
@@ -179,12 +178,8 @@ describe('the default is records; the comments source is the historic reproducti
     assert.equal(r.perIssue[0].R0.tier, 'c', 'the comment is not read');
   });
 
-  test('the comments source reads the comment trail as before', () => {
+  test('the comments source is retired: asking for it throws, it never reads the comment trail (LIN-4520)', () => {
     const iss = issue(LATE_REVIEW_ROWS, [], { comments: [{ id: 'c1', body: 'Verdict: request changes', createdAt: '2026-11-25T01:05:00.000Z' }] });
-    const r = computePlanReviewRoundTrips([iss], { asOf: ASOF, verdictSource: 'comments' });
-    assert.equal(r.window.verdictSource, 'comments');
-    assert.equal(r.window.verdictRecordsSince, null);
-    assert.equal(r.perIssue[0].R0.verdict, 'request changes');
-    assert.equal(r.perIssue[0].R0.tier, 'a');
+    assert.throws(() => computePlanReviewRoundTrips([iss], { asOf: ASOF, verdictSource: 'comments' }), /comments/);
   });
 });
