@@ -1,8 +1,9 @@
 /**
  * LIN-4521 (P8 of LIN-4513, ruling 1 = yes: close-out's own commits stale the approval, so the work goes back to review
  * rather than merging). Witnesses:
- *   - reReviewStep (lib/recommendation-re-review.js) sends `review` when an approving review's landing PR has moved since
- *     it was judged (the trail's `staleUrls`), and stands aside for every other reading;
+ *   - reReviewStep (lib/recommendation-re-review.js) sends `review` when closeOutDecision's `routesReview` says an approving
+ *     review's open landing change moved since it was judged (the trail's `movedUrls`), and stands aside otherwise: a merged
+ *     PR (stale, not moved), a terminal ticket, no approve;
  *   - CODE_ROUTES holds the route after review-bound and before blind-read, so a stale approval is re-reviewed before a
  *     blind read is sent for it, and the selector is never asked (a fetch that throws proves it);
  *   - the blind read stands aside while the approval is stale (its own routesRead rule), so it is not sent for a head
@@ -15,6 +16,9 @@ import assert from 'node:assert/strict';
 import { CODE_ROUTES } from '../../lib/code-routes.js';
 import { reReviewStep } from '../../lib/recommendation-re-review.js';
 import { blindReadStep } from '../../lib/recommendation-blind-read.js';
+import { closeOutDecision } from '../../lib/run-closeout-state.js';
+import { findingsNotRead } from '../../lib/close-out-findings.js';
+import { readFileSync } from 'node:fs';
 import { getRecommendation, setFetchImpl, setPromptTraceRecorder } from '../../lib/openrouter.js';
 
 afterEach(() => { setFetchImpl(null); setPromptTraceRecorder(null); });
@@ -26,16 +30,20 @@ const REVIEWED = 'aaaaaaa1111111';
 const T = (n) => `2026-11-22T${String(n).padStart(2, '0')}:00:00.000Z`;
 const STARTED = { name: 'In Progress', type: 'started' };
 const issue = { identifier: 'LIN-4521', state: STARTED, description: '' };
+const issueIn = (type) => ({ identifier: 'LIN-4521', state: { name: type, type }, description: '' });
 
-/** An approving review on PR1 (judged at REVIEWED), with the given stale PRs and no blind read yet. */
-const trailOf = ({ verdict = 'approve', staleUrls = [], landing = [PR1], blindRead = null } = {}) => ({
-  review: { verdict, at: T(2), sha: REVIEWED, heads: { [PR1]: REVIEWED }, commentId: 'review-1', blindRead, staleUrls },
+/**
+ * An approving review on PR1 (judged at REVIEWED), with the given stale PRs and no blind read yet. `movedUrls` (the stale
+ * PRs whose change is still open, lib/records/standing.js) defaults to the stale ones: a merged PR is passed explicitly.
+ */
+const trailOf = ({ verdict = 'approve', staleUrls = [], movedUrls = staleUrls, landing = [PR1], blindRead = null, landingHasNotesPr = false } = {}) => ({
+  review: { verdict, at: T(2), sha: REVIEWED, heads: { [PR1]: REVIEWED }, commentId: 'review-1', blindRead, staleUrls, movedUrls },
   landing,
   // trailOfStanding sets workAfterReview from the stale flag: a stale approval is work after the review.
   workAfterReview: staleUrls.length > 0,
   closeOutAfterReview: false,
   closeOutOnTrail: false,
-  landingHasNotesPr: false,
+  landingHasNotesPr,
   notesPrs: [],
   auditAfterCloseOut: false,
 });
@@ -76,6 +84,44 @@ describe('reReviewStep: an approval whose landing PR moved is sent back to revie
   test('no trail (not read) stands aside; the route never guesses from comments', () => {
     assert.equal(reReviewStep(issue, { trail: null }), null);
     assert.equal(reReviewStep(issue, {}), null);
+  });
+
+  test('a PR merged after the push (stale, but not an open change that moved) stands aside: it cannot be re-judged before its merge', () => {
+    assert.equal(reReviewStep(issue, { trail: trailOf({ staleUrls: [PR1], movedUrls: [] }) }), null);
+  });
+
+  test('a terminal ticket stands aside (Canceled, Duplicate, or Done: Harbour follows the person), as the blind read does', () => {
+    const trail = trailOf({ staleUrls: [PR1] });
+    for (const type of ['canceled', 'completed']) assert.equal(reReviewStep(issueIn(type), { trail }), null, type);
+  });
+
+  test('a Done ticket whose landing is an audit notes PR is still re-reviewed, as it still gets its blind read', () => {
+    const got = reReviewStep(issueIn('completed'), { trail: trailOf({ staleUrls: [PR1], landingHasNotesPr: true }) });
+    assert.equal(got?.codeRoute, 're-review');
+  });
+});
+
+describe('closeOutDecision owns the answer (routesReview), as it owns routesRead', () => {
+  const decide = (trail, ticketState = 'started') => closeOutDecision({ trail, ticketState, openFindings: findingsNotRead('advice only') });
+
+  test('routesReview and movedPrs: true with the moved landing PRs, false and empty otherwise', () => {
+    const moved = decide(trailOf({ landing: [PR1, PR2], staleUrls: [PR2] }));
+    assert.equal(moved.routesReview, true);
+    assert.deepEqual(moved.movedPrs, [PR2]);
+    for (const trail of [trailOf(), trailOf({ verdict: 'request-changes', staleUrls: [PR1] }), trailOf({ staleUrls: [PR1], movedUrls: [] })]) {
+      const d = decide(trail);
+      assert.equal(d.routesReview, false);
+      assert.deepEqual(d.movedPrs, []);
+    }
+    assert.equal(decide(trailOf({ staleUrls: [PR1] }), 'canceled').routesReview, false);
+  });
+
+  test('the route only delegates: it fires exactly when the decision routes a review', () => {
+    for (const trail of [trailOf(), trailOf({ staleUrls: [PR1] }), trailOf({ staleUrls: [PR1], movedUrls: [] }), trailOf({ staleUrls: [PR2] })]) {
+      assert.equal(reReviewStep(issue, { trail }) !== null, decide(trail).routesReview);
+    }
+    const source = readFileSync(new URL('../../lib/recommendation-re-review.js', import.meta.url), 'utf8');
+    assert.ok(!/staleUrls|movedUrls|isApprovedReview/.test(source), 'lib/recommendation-re-review.js spells no rule of its own');
   });
 });
 
