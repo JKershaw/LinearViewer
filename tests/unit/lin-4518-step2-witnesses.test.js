@@ -224,3 +224,44 @@ describe('finding-12145bdf: a review run\'s brief names each change by its PR, s
     assert.ok(line.includes(prUrl(PR)), `the change line does not name its PR: ${line}`);
   });
 });
+
+// LIN-4520 (finding-2f1e89d3): attachLandingChanges hands an implementation prompt the fix round read from the records, but the
+// three entrances that project the context through promptContextOf dropped it, so a request-changes round got the fresh-start
+// "Open a PR" workflow. Each witness is a request-changes review on record, then the prompt each entrance renders.
+describe('finding-2f1e89d3: an implementation prompt after a request-changes review continues the PR on every entrance', () => {
+  beforeEach(async () => {
+    // The review judged the open change at its head; its verdict on record is request-changes.
+    await store.add(URL_KEY, {
+      kind: 'verdict', state: 'stands', in: taskId,
+      fields: { judgement: 'review', outcome: 'request-changes', reasoning: 'read at the head named' },
+      links: { on: [`${openId}@1`] },
+    }, { by: 'review', at: '2026-11-22T10:30:00.000Z' });
+  });
+
+  /** The fix-round workflow, and not the fresh-start one. */
+  function assertFixRound(prompt, label) {
+    assert.ok(typeof prompt === 'string' && prompt.length > 0, `${label}: no prompt text came back`);
+    assert.match(prompt, /Continue the existing branch and the PR the task's change record names/, `${label}: the fix-round workflow did not reach the prompt`);
+    assert.doesNotMatch(prompt, /\*\*Open a PR\*\*/, `${label}: the fresh-start "Open a PR" workflow was handed to a fix round`);
+  }
+
+  test('GET /api/proxy/prompt/:identifier/implementation', async () => {
+    const res = await call(proxyApp(), 'get', `/api/proxy/prompt/${TICKET}/implementation`);
+    assert.equal(res.status, 200, `expected 200, got ${res.status}: ${JSON.stringify(res.body)}`);
+    assertFixRound(res.body.prompt, '/api/proxy/prompt');
+  });
+
+  test('GET /api/proxy/recommend/:identifier?kind=implementation', async () => {
+    const res = await call(proxyApp(), 'get', `/api/proxy/recommend/${TICKET}?kind=implementation`);
+    assert.equal(res.status, 200, `expected 200, got ${res.status}: ${JSON.stringify(res.body)}`);
+    assertFixRound(res.body.prompt, '/api/proxy/recommend?kind=');
+  });
+
+  test('POST /api/proxy/recommend-and-dispatch { kind: implementation } (the pinned dispatch entrance)', async () => {
+    proxyApp.captured = null;
+    const res = await call(proxyApp(), 'post', '/api/proxy/recommend-and-dispatch', { issueIdentifier: TICKET, kind: 'implementation' });
+    assert.equal(res.status, 201, `expected 201, got ${res.status}: ${JSON.stringify(res.body)}`);
+    assert.ok(proxyApp.captured, 'the override must dispatch an item');
+    assertFixRound(proxyApp.captured.prompt, 'recommend-and-dispatch kind override');
+  });
+});
