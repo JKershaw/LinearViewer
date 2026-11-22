@@ -141,7 +141,7 @@ describe('a decision holds the option, the words, or both (LIN-4530 plan D1)', (
   });
 
   test('an option over the limit is refused the same way', () => {
-    refused(checkAdd('decision', { answer: 'x'.repeat(10001) }, ctx()).problems, 'answer');
+    refused(checkAdd('decision', { answer: 'x'.repeat(KINDS.limits.decision.answer + 1) }, ctx()).problems, 'answer');
   });
 
   test('exactly at the limit is accepted, and stored whole, never cut', async () => {

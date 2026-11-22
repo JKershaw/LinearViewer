@@ -1,5 +1,5 @@
 {
-  "_about": "LIN-4493 (layer slice 1). The record shape, written once: every kind's fields, starting state and ends (layer design §3.2), the outcome sets (§3.2), the link types (§3.1), and the ends that name a record that takes over (§3.3). Pure data: check.js, views.js and brief.js read it, and nothing else spells a kind out. Field types: string, number, list (of strings), scope (a task id or 'project').",
+  "_about": "LIN-4493 (layer slice 1). The record shape, written once: every kind's fields, starting state and ends (layer design §3.2), the outcome sets (§3.2), the link types (§3.1), and the ends that name a record that takes over (§3.3), plus the text limits (LIN-4530). Pure data: check.js, views.js and brief.js read it, and nothing else spells a kind out. Field types: string, number, list (of strings), scope (a task id or 'project').",
   "kinds": {
     "task": {
       "fields": {

@@ -67,7 +67,7 @@ John: "a small minimal MVP, and we take it for a walk and see a) if it's better 
 | `plan` | One piece of how a task will be done; a parent's plan is its pieces | `says`, `order` | kept → superseded |
 | `finding` | Something someone must act on, including a verification to run | `says`, `how` (optional: how to verify or act); `to` | open → done, declined, handed-on |
 | `question` | A call waiting on a decider | `asks`, `options`, `recommended`, `if-unanswered`; `to` | open → answered, withdrawn, handed-on |
-| `decision` | What was decided and why, including a person's standing direction | `answer`, `why`, `scope` (optional: a task, covering it and every task under it; or `project`, covering every task) | stands → superseded, withdrawn |
+| `decision` | What was decided and why, including a person's standing direction | `answer` (the option chosen), `words` (the person's own words; at least one of the two, each stored as written, LIN-4530), `why`, `scope` (optional: a task, covering it and every task under it; or `project`, covering every task) | stands → superseded, withdrawn |
 | `verdict` | A judgement `on` one version of a plan piece or change | `judgement` (which one: plan-review, review, blind-read), `outcome` from that judgement's set, `reasoning` | stands → superseded, withdrawn |
 | `lesson` | A lasting truth about the code or the work, for the project | `says` | holds → superseded, disproved |
 | `change` | A handle on the work product: a PR, commit range or saved file; each new head is a new version | `ref`, `head` | open → merged, abandoned |
@@ -90,7 +90,7 @@ Only shape, so a malformed record can't enter:
 ### 3.4 Views, computed when read
 
 - **Open for a reader:** open records whose `to` is that actor, that task, or `project`.
-- **Answered:** a question with a standing decision that `answers` it shows that decision beside it, whether or not its state has been ended yet.
+- **Answered:** a question with a standing decision that `answers` it shows that decision beside it, with its option and words, whether or not its state has been ended yet.
 - **Stale:** a verdict or decision, not ended, one of whose `on` links points to a version after which its target's content was revised (a change to its fields; not to its `to`, `in` or links), or to a target ended superseded, withdrawn, abandoned or disproved. Only direct links count. Shown as a flag that says which link moved and how (e.g. "on change-5@1, now @2").
 - **Counts:** any `find` can return its count instead of its records, as of any time.
 - **Under an ended task:** open records `in` or `to` a task that has ended. They reach its parent's brief (part 3); for a task with no parent, `find` shows them.
@@ -103,7 +103,7 @@ John: "previously an agent essentially got the brief, but then the ability to fi
 1. **The task and the person's words:** the task's id, `ref` and `done-when`; then the `asked` of the task and of each ancestor, verbatim.
 2. **Its plan:** the current version of the task's `piece` (if superseded, the record that took over); for a task with no piece, every plan `in` it that is kept. In full to the actor a plan is addressed to; to others, its first paragraph and its id, to `get`.
 3. **Addressed to it, in full:** open records `in` this task whose `to` is this actor; open records anywhere whose `to` is this task; open records `in` this task addressed to a stage whose run on this task has ended (left behind); and open records under a child task that has ended.
-4. **What stands about this task:** verdicts and decisions `in` the task, or `about` or `on` its piece or its change, each with the version it rests on and the stale flag. An ancestor's decisions appear when `about` or `on` this task's piece, or when they carry a `scope` that covers it; a decision scoped to `project` covers every task.
+4. **What stands about this task:** verdicts and decisions `in` the task, or `about` or `on` its piece or its change, each with the version it rests on and the stale flag. An ancestor's decisions appear when `about` or `on` this task's piece, or when they carry a `scope` that covers it; a decision scoped to `project` covers every task. A decision that `answers` a question brings that question with it (LIN-4530).
 5. **The project:** how many open records are addressed to `project`, and how many lessons hold, with how to look them up (`find --to project`, `find --kind lesson`, both with `--text`). The actor decides what is worth reading.
 6. **Other open runs** in the project, other than the actor's own on this task: id, task and stage, so the actor can judge whether work elsewhere bears on its own.
 7. **An index of what else is known:** every other open record `in` the task, one line each: id, kind, to, and the first line of what it says.
