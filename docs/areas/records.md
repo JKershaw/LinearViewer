@@ -68,6 +68,6 @@ routes/task-records.js, routes/project-page.js, routes/dispatch.js, server.js).
   never zero, so a missed caller shows instead of passing.
 - A verdict rests on the head its judge read: `heads` pins it before the refresh (`pinVerdictToHeads`, LIN-4516). A merge
   revises the head (`recordChangeMerged`), so a PR merged after an unseen push is in `staleUrls` but not
-  `movedUrls`: re-review on that (LIN-4521). An open PR first written after the review (one it never judged) joins `movedUrls` too.
+  `movedUrls`: re-review on that (LIN-4521).
 - A task written with a ticket `ref` claims that ticket (`lib/records/writes.js`), as `ensureTask` does; else the ticket's
   references make a second task. A ticket's task id has one rule, `ticketTaskIdOf` (`lib/records/refs.js`). A revise that changes a claimed `ref` is refused (422).
