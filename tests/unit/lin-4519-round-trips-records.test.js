@@ -101,7 +101,7 @@ describe('the cutover: a gate row before the verdict records is not measured, ne
     const vs = [verdict('old', 'plan-review', 'approve', '2026-11-10T01:05:00.000Z')];
     const r = computeIssueRoundTrips(issue(EARLY_ROWS, vs), { asOf: ASOF, verdictFacts: facts(vs) });
     assert.equal(r.R0, null);
-    assert.match(r.verdictNotMeasured, /dispatched before the verdict records \(2026-11-21T08:06Z\)/);
+    assert.match(r.verdictNotMeasured, /dispatched before the verdict records \(2026-11-22T04:20Z\)/);
     assert.equal(r.reachedPlanReviewAny, false, 'not reached: its verdict is unknown, so it is out of the round-trip series');
   });
 

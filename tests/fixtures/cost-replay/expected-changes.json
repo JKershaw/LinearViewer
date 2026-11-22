@@ -249,7 +249,7 @@
     {
       "path": "S10.notes.verdictRecordsCoverage",
       "change": "i",
-      "reason": "LIN-4519: the coverage note for gate verdicts (from the verdict records' cutover, 2026-11-21 08:06Z). New in the note set."
+      "reason": "LIN-4519: the coverage note for gate verdicts (from the verdict records' cutover, 2026-11-22 04:20Z). New in the note set."
     }
   ]
 }

@@ -256,7 +256,7 @@ test('characterization: the verdict-free readings keep their causes, notes, wall
 });
 
 // LIN-4519 P6: a verdict-dependent reading comes from the verdict records of the row's window. The rows here are
-// shifted past the cutover (VERDICT_RECORDS_SINCE, 2026-11-21 08:06Z) unless a test says otherwise.
+// shifted past the cutover (VERDICT_RECORDS_SINCE, 2026-11-22 04:20Z) unless a test says otherwise.
 const LATE_MS = Date.parse('2026-11-22T10:00:00.000Z') - T0;
 const shiftIso = (iso) => (iso ? new Date(Date.parse(iso) + LATE_MS).toISOString() : iso);
 const late = (row) => ({ ...row, dispatchedAt: shiftIso(row.dispatchedAt), completedAt: shiftIso(row.completedAt), closedAt: shiftIso(row.closedAt),
@@ -288,10 +288,23 @@ test('before the cutover a review verdict is not measured, with the reason, and 
   const rows = [ap, worker('implementation', 1, 5), worker('review', 6, 8, { text: 'DONE: verdict Request Changes.' }), worker('implementation', 9, 12)];
   const r = classifyTicket({ identifier: 'LIN-1', rows, verdicts: factsOf() });
   assert.equal(r.entries[3].cause, 'not-measured');
-  assert.match(r.entries[3].note, /^review .*: not measured \(no verdict records before 2026-11-21 08:06Z\)$/);
+  assert.match(r.entries[3].note, /^review .*: not measured \(no verdict records before 2026-11-22 04:20Z\)$/);
   const s = summarizeChurn([r]);
   assert.equal(s.extraOverStagePath, 1); // not-measured is still a dispatch beyond the stage path
   assert.equal(s.byCause.find((c) => c.cause === 'not-measured').label, CAUSES['not-measured'].label);
+});
+
+test('a withdrawn approve in the review window is no verdict: the implementation row reads not-measured, not fixes-outside-close-out', () => {
+  // finding-1d1d6d74: round trips leaves a withdrawn verdict out, and churn must too (verdictsInWindow).
+  const ap = autopilot();
+  const rows = [ap, worker('implementation', 1, 5), worker('review', 6, 8, { text: 'DONE: verdict Approve.' }), worker('implementation', 9, 12)].map(late);
+  const withdrawn = verdictFactsFromRecords({
+    tasks: [{ id: 'task-1', kind: 'task', fields: { ref: 'LIN-1' } }],
+    verdicts: [{ id: 'verdict-w', kind: 'verdict', in: 'task-1', at: vAt(7), state: 'withdrawn', fields: { judgement: 'review', outcome: 'approve' } }],
+  }, ['LIN-1']).get('LIN-1');
+  const r = classifyTicket({ identifier: 'LIN-1', rows, verdicts: withdrawn });
+  assert.equal(r.entries[3].cause, 'not-measured');
+  assert.notEqual(r.entries[3].cause, 'fixes-outside-close-out');
 });
 
 test('a post-cutover review with no verdict record in its window is not measured, not repeat-stage', () => {
@@ -355,5 +368,5 @@ test('a re-plan before the cutover is not measured, with the reason', () => {
   const rows = [ap, worker('plan', 1, 3), worker('plan-review', 4, 6, { text: 'DONE: verdict Request Changes.' }), worker('plan', 7, 8)];
   const r = classifyTicket({ identifier: 'LIN-1', rows, verdicts: factsOf() });
   assert.equal(r.entries[3].cause, 'not-measured');
-  assert.match(r.entries[3].note, /no verdict records before 2026-11-21 08:06Z/);
+  assert.match(r.entries[3].note, /no verdict records before 2026-11-22 04:20Z/);
 });

@@ -22,13 +22,13 @@ import {
 import { readVerdictFactsThroughProxy } from '../../scripts/verdict-facts-proxy.mjs';
 
 describe('the cutover instant', () => {
-  test('is the first verdict-import write, and covers from that instant on (never before)', () => {
-    assert.equal(VERDICT_RECORDS_SINCE, '2026-11-21T08:06:29.634Z', 'the production import: first verdict written at this instant');
-    assert.equal(verdictCoverageAt('2026-11-21T08:06:29.634Z').covered, true, 'at the instant: covered');
-    assert.equal(verdictCoverageAt('2026-11-21T08:06:29.633Z').covered, false, 'a millisecond before: not covered');
+  test('is the P5 writers\' go-live, and covers from that instant on (never before)', () => {
+    assert.equal(VERDICT_RECORDS_SINCE, '2026-11-22T04:20:39.504Z', 'the first stage-written verdict record in production, after the P5 go-live');
+    assert.equal(verdictCoverageAt('2026-11-22T04:20:39.504Z').covered, true, 'at the instant: covered');
+    assert.equal(verdictCoverageAt('2026-11-22T04:20:39.503Z').covered, false, 'a millisecond before: not covered');
     const before = verdictCoverageAt('2026-11-20T23:00:00.000Z');
     assert.equal(before.covered, false);
-    assert.match(before.reason, /no verdict records before 2026-11-21 08:06Z/);
+    assert.match(before.reason, /no verdict records before 2026-11-22 04:20Z/);
   });
 
   test('an absent instant or an absent cutover is not covered, with a reason, never a value', () => {

@@ -107,7 +107,7 @@ async function get(app, path) {
   }
 }
 
-// Before the verdict cutover (2026-11-21): these rows' gate verdicts read not measured.
+// Before the verdict cutover (2026-11-22 04:20Z): these rows' gate verdicts read not measured.
 const LINEAGE = [
   doneRow({ id: 'r1', issueIdentifier: 'LIN-1', kind: 'plan', dispatchedAt: '2026-09-01T00:00:00.000Z', completedAt: '2026-09-01T00:30:00.000Z' }),
   doneRow({ id: 'r2', issueIdentifier: 'LIN-1', kind: 'plan-review', dispatchedAt: '2026-09-01T01:00:00.000Z', completedAt: '2026-09-01T01:30:00.000Z' }),
@@ -163,7 +163,7 @@ describe('the happy path reads both survival rows from verdict records', () => {
     assert.equal(planCard.survival.rate, null, 'no verdict is read for a gate before the cutover');
     assert.equal(planCard.survival.denominator, 0);
     assert.equal(planCard.survival.verdictNotMeasured, 1);
-    assert.match(JSON.parse(body).notes.verdictRecordsCoverage, /from 2026-11-21 08:06Z/);
+    assert.match(JSON.parse(body).notes.verdictRecordsCoverage, /from 2026-11-22 04:20Z/);
   });
 
   // LIN-2830: the page must show an opencode run as its own row — harness `opencode`, model `z-ai/glm-5.3`, and a visible
