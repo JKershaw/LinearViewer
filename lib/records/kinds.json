@@ -54,6 +54,7 @@
     "decision": {
       "fields": {
         "answer": "string",
+        "words": "string",
         "why": "string",
         "scope": "scope"
       },
@@ -109,6 +110,13 @@
         "aborted"
       ],
       "harbourOnly": true
+    }
+  },
+  "limits": {
+    "_about": "LIN-4530 (LIN-4529 plan D1). The most characters a text field may hold, by kind and field. A longer value is refused with this limit named; it is never truncated.",
+    "decision": {
+      "answer": 10000,
+      "words": 10000
     }
   },
   "outcomes": {
