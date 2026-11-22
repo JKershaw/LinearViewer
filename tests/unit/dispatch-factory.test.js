@@ -1318,7 +1318,7 @@ describe('createDispatchItem — no per-task session cap (LIN-4528)', () => {
   // dispatches) live in proxy-dispatch-max-tasks and dispatch-route-max-tasks.
   const RUN = { 'run-1': {} };
 
-  test('an unbudgeted run: a fresh session to a task already run 30 times is admitted, and the count is never read', async () => {
+  test('an unbudgeted run: a fresh session is admitted, and the count is never read', async () => {
     const store = budgetStore({ runs: RUN, countResult: { count: 1, alreadyCounted: true } });
     const item = await freshDispatch(store, { fields: { sessionId: 'run-1' } });
     assert.equal(item.issueIdentifier, 'LIN-1');
@@ -1326,7 +1326,7 @@ describe('createDispatchItem — no per-task session cap (LIN-4528)', () => {
     assert.ok(!('budgetPosition' in item), 'an unbudgeted 201 carries no budgetPosition');
   });
 
-  test('a declared budget: a fresh session to an already-counted task is admitted however many sessions it has had', async () => {
+  test('a declared budget: a fresh session to an already-counted task is admitted', async () => {
     const store = budgetStore({ runs: { 'run-1': { maxTasks: 50 } }, countResult: { count: 10, alreadyCounted: true } });
     const item = await freshDispatch(store, { fields: { sessionId: 'run-1' } });
     assert.equal(item.issueIdentifier, 'LIN-1');
