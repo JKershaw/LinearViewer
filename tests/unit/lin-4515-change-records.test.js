@@ -32,7 +32,7 @@ import { isTerminalState } from '../../lib/providers/state-map.js';
 import { STAGE_KINDS } from '../../lib/prompts/stage-kinds.js';
 import { askedOf } from '../../lib/asked-of.js';
 import { canonicalChangeRef, changeKeyOf } from '../../lib/records/change-ref.js';
-import { backstopChangeFor, refreshTaskChanges } from '../../lib/change-records.js';
+import { backstopChangeFor, createChangeBackstop, refreshTaskChanges } from '../../lib/change-records.js';
 import { createRunRecords } from '../../lib/run-records.js';
 import { createWorkspaceApiRoutes } from '../../routes/workspace-api.js';
 import { FINDINGS_NONE } from '../../lib/close-out-findings.js';
@@ -414,5 +414,97 @@ describe('witness 2b: the task-page check ends the change (finding-8593665e)', (
     await stageChange(writes, taskId, PR_URL, 'H1');
     await checkWith(store, status({ sha: 'H1' }));
     assert.equal((await store.find(URL_KEY, { kind: 'change', inRef: taskId, state: 'open' })).length, 1);
+  });
+});
+
+describe('witness 3c: the backstop reads only the PR the run reported (LIN-4518 finding-0f91d9be)', () => {
+  const FOREIGN = `https://github.com/${REPO}/pull/1622`;
+  const OTHER_TICKET = 'LIN-4469';
+  const MERGED_BEFORE_RUN = '2026-11-20T08:00:00Z';
+
+  async function doneImplementationRun(store, taskId) {
+    await store.openRun(URL_KEY, { id: RUN, stage: 'implementation', taskId, lineage: RUN, at: T0 });
+  }
+  /** The backstop as the run lifecycle builds it: the run's feedback in, the change out (createChangeBackstop). */
+  function lifecycleBackstop(store, readPrStatus) {
+    const logged = [];
+    const backstop = createChangeBackstop({ recordsStore: store, prReaderFor: () => readPrStatus, log: (m) => logged.push(m) });
+    return { backstop, logged };
+  }
+  const changesOf = (store, taskId) => store.find(URL_KEY, { kind: 'change', inRef: taskId });
+
+  test('a [done] entry whose runner url names a foreign PR writes no change, and the foreign PR gets none either', async () => {
+    const { store } = await freshStore();
+    const taskId = await taskFor(store);
+    await doneImplementationRun(store, taskId);
+    const { backstop } = lifecycleBackstop(store, reader(() => status({ sha: 'H1' })));
+    const feedback = [
+      { kind: 'system', message: 'Shipped the widget.', url: null },
+      { kind: 'system', message: '[done] Shipped the widget.', url: FOREIGN },
+    ];
+    await backstop({ urlKey: URL_KEY, runId: RUN, feedback });
+    assert.equal((await changesOf(store, taskId)).length, 0, 'no change: the run reported no PR on a report line');
+  });
+
+  test('a PR the run only mentions in ordinary text, not on a DONE: or [done] line, writes no change', async () => {
+    const { store } = await freshStore();
+    const taskId = await taskFor(store);
+    await doneImplementationRun(store, taskId);
+    const { backstop } = lifecycleBackstop(store, reader(() => status({ sha: 'H1' })));
+    const feedback = [
+      { kind: 'assistant', message: `Compared the approach with ${FOREIGN} for context.` },
+      { kind: 'system', message: '[done] Shipped the widget.' },
+    ];
+    await backstop({ urlKey: URL_KEY, runId: RUN, feedback });
+    assert.equal((await changesOf(store, taskId)).length, 0, 'a PR cited in prose is not the run\'s report');
+  });
+
+  test('the PR on the run\'s own DONE: line is its change, even when the runner url names another PR', async () => {
+    const { store } = await freshStore();
+    const taskId = await taskFor(store);
+    await doneImplementationRun(store, taskId);
+    const { backstop } = lifecycleBackstop(store, reader(() => status({ sha: 'H1' })));
+    const feedback = [
+      { kind: 'assistant', message: `DONE: ${PR_URL}` },
+      { kind: 'system', message: '[done] Shipped the widget.', url: FOREIGN },
+    ];
+    await backstop({ urlKey: URL_KEY, runId: RUN, feedback });
+    const changes = await changesOf(store, taskId);
+    assert.equal(changes.length, 1, 'one change');
+    assert.equal(changes[0].fields.ref, PR_URL, 'the reported PR, not the runner url');
+    assert.equal(changes[0].run, RUN, 'under the run');
+  });
+
+  test('a PR another task already holds is not given to this task by the backstop', async () => {
+    const { store, writes } = await freshStore();
+    const taskId = await taskFor(store);
+    const other = (await store.ensureTask(URL_KEY, { identifier: OTHER_TICKET, asked: 'Another task.', closed: false, closedReason: null }, { by: 'Harbour', at: T0 })).id;
+    await stageChange(writes, other, PR_URL, 'H1');
+    await doneImplementationRun(store, taskId);
+    const { backstop } = lifecycleBackstop(store, reader(() => status({ sha: 'H1' })));
+    await backstop({ urlKey: URL_KEY, runId: RUN, feedback: [{ kind: 'assistant', message: `DONE: ${PR_URL}` }, { kind: 'system', message: '[done] Shipped.' }] });
+    assert.equal((await changesOf(store, taskId)).length, 0, 'no change for this task');
+    assert.equal((await changesOf(store, other)).length, 1, 'the other task keeps its one change');
+  });
+
+  test('a PR the forge reports merged before the run opened is not this run\'s change', async () => {
+    const { store } = await freshStore();
+    const taskId = await taskFor(store);
+    await doneImplementationRun(store, taskId);
+    const readPrStatus = reader(() => status({ sha: 'H1', merged: true, extra: { merged_at: MERGED_BEFORE_RUN } }));
+    const out = await backstopChangeFor({ urlKey: URL_KEY, taskId, runId: RUN, prUrl: PR_URL, writes: createRecordWrites({ recordsStore: store, isTerminalState, askedText: askedOf, stageKinds: Object.keys(STAGE_KINDS), listPeople: async () => [] }), recordsStore: store, readPrStatus });
+    assert.match(out.skipped, /merged before run/, 'skipped, with the reason');
+    assert.equal((await changesOf(store, taskId)).length, 0, 'no change written');
+  });
+
+  test('a PR merged after the run opened is still its change', async () => {
+    const { store } = await freshStore();
+    const taskId = await taskFor(store);
+    await doneImplementationRun(store, taskId);
+    const { backstop } = lifecycleBackstop(store, reader(() => status({ sha: 'H1', merged: true })));
+    await backstop({ urlKey: URL_KEY, runId: RUN, feedback: [{ kind: 'assistant', message: `DONE: ${PR_URL}` }, { kind: 'system', message: '[done] Shipped.' }] });
+    const changes = await changesOf(store, taskId);
+    assert.equal(changes.length, 1, 'one change');
+    assert.equal(changes[0].fields.ref, PR_URL);
   });
 });
