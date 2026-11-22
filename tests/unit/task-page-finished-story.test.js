@@ -32,7 +32,14 @@ const harness = createMangoTmpdir('lin-3379-task-page-finished-story-');
 let RECORDS = null;
 before(async () => {
   await harness.connect();
-  RECORDS = await seededRecordsStore(harness, [ev.pr(1, PR_URL, 'abc1234'), ev.review(2, PR_URL, { heads: { [PR_URL]: 'abc1234' } }), ev.close(3), ev.merged(3, PR_URL)], { urlKey: 'ws', tickets: ['LIN-51'] });
+  // The records sit on the same clock as the comments this file was written against (LIN-4520). The close-out's summary is
+  // its run's account, so the close-out run carries the text (finding-9d0c053a).
+  RECORDS = await seededRecordsStore(harness, [
+    ev.pr('2026-10-08T16:00:00.000Z', PR_URL, 'abc1234'),
+    ev.review('2026-10-08T17:00:00.000Z', PR_URL, { heads: { [PR_URL]: 'abc1234' } }),
+    ev.close('2026-10-08T18:11:00.000Z', undefined, CLOSE_OUT.body),
+    ev.merged('2026-10-08T18:05:00.000Z', PR_URL),
+  ], { urlKey: 'ws', tickets: ['LIN-51'] });
 });
 after(() => harness.close());
 const OTHER_PR_URL = 'https://github.com/acme/app/pull/99';
@@ -299,8 +306,10 @@ describe('B4 merger rule', () => {
     assert.match(await leadFor([{ by: 'person', prUrl: PR_URL, merged: false }]), /^PR #41 is merged/);
   });
 
-  test('no close-out comment: no "when", no summary, same sentence otherwise', async () => {
-    const lead = await leadFor([{ by: 'person', prUrl: PR_URL, merged: true }], { comments: [OPENED, REVIEW] });
+  test('no close-out run on record: no "when", no summary, same sentence otherwise', async () => {
+    // LIN-4520: the close-out is a run record, so "no close-out" is a trail with no close-out run.
+    const records = await seededRecordsStore(harness, [ev.pr(1, PR_URL, 'abc1234'), ev.review(2, PR_URL, { heads: { [PR_URL]: 'abc1234' } }), ev.merged(3, PR_URL)], { urlKey: 'ws', tickets: ['LIN-51'] });
+    const lead = await leadFor([{ by: 'person', prUrl: PR_URL, merged: true }], { comments: [OPENED, REVIEW], records });
     assert.equal(lead, 'PR #41 was merged by hand.');
   });
 
@@ -367,19 +376,27 @@ describe('deriveCloseOutState: a merged PR reads the same for every viewer (LIN-
   });
 });
 
-describe('closeOutSummaryFor', () => {
-  test('latest close-out after the review; its leading block only', () => {
-    const later = { createdAt: '2026-10-08T19:00:00.000Z', body: '## Close-out (final)\n\nFinal summary line.\n\nSecond paragraph.\n\n## Ledger\n- x' };
-    const got = closeOutSummaryFor([REVIEW, CLOSE_OUT, later], REVIEW);
-    assert.deepEqual(got, { at: later.createdAt, text: 'Final summary line.\n\nSecond paragraph.' });
+describe('closeOutSummaryFor (LIN-4520, finding-9d0c053a: the close-out run record\'s account, never a comment)', () => {
+  // A close-out run record as the store reads it: its end instant in `at`, its final text in `fields.account`.
+  const closeOutRun = (at, account) => ({ at, fields: { stage: 'close-out', account } });
+  const REVIEW_TRAIL = { at: REVIEW.createdAt };
+  test('latest close-out run after the review; its leading block only', () => {
+    const later = closeOutRun('2026-10-08T19:00:00.000Z', '## Close-out (final)\n\nFinal summary line.\n\nSecond paragraph.\n\n## Ledger\n- x');
+    const got = closeOutSummaryFor([closeOutRun('2026-10-08T18:11:00.000Z', 'Earlier.'), later], REVIEW_TRAIL);
+    assert.deepEqual(got, { at: later.at, text: 'Final summary line.\n\nSecond paragraph.' });
   });
-  test('a close-out dated before the review belongs to an earlier round', () => {
-    assert.equal(closeOutSummaryFor([{ createdAt: '2026-10-08T10:00:00.000Z', body: '## Close-out\n\nOld.' }, REVIEW], REVIEW), null);
+  test('a close-out run ended before the review belongs to an earlier round', () => {
+    assert.equal(closeOutSummaryFor([closeOutRun('2026-10-08T10:00:00.000Z', 'Old.')], REVIEW_TRAIL), null);
   });
-  test('none, a title with nothing under it, and a non-close-out heading are null', () => {
-    assert.equal(closeOutSummaryFor([REVIEW], REVIEW), null);
-    assert.equal(closeOutSummaryFor([{ createdAt: '2026-10-08T19:00:00.000Z', body: '## Close-out' }], REVIEW), null);
-    assert.equal(closeOutSummaryFor([{ createdAt: '2026-10-08T19:00:00.000Z', body: '## Autopilot close-out\n\nnot it' }], REVIEW), null);
+  test('no run, an account with nothing under its title, and no account are null', () => {
+    assert.equal(closeOutSummaryFor([], REVIEW_TRAIL), null);
+    assert.equal(closeOutSummaryFor([closeOutRun('2026-10-08T19:00:00.000Z', '## Close-out')], REVIEW_TRAIL), null);
+    assert.equal(closeOutSummaryFor([closeOutRun('2026-10-08T19:00:00.000Z', null)], REVIEW_TRAIL), null);
+  });
+  test('a close-out title in a comment is not the quote: only the run record is read', () => {
+    const titled = { createdAt: '2026-10-08T19:00:00.000Z', body: '## Close-out\n\nFrom a comment.' };
+    assert.equal(closeOutSummaryFor([], REVIEW_TRAIL), null);
+    assert.equal(closeOutSummaryFor([titled], REVIEW_TRAIL), null);
   });
 });
 
@@ -387,7 +404,9 @@ describe('not finished stays on today\'s banner', () => {
   // LIN-3379: the merged-but-not-Done window used to keep the count and stamps
   // (pinned here by LIN-3373); it now says the close-out is still finishing.
   test('person-merge, no close-out: no count or stamps; says the close-out is still finishing', async () => {
-    const { loader, access } = makeLoader({ ctx: ctxFor({ stateType: 'started', comments: [OPENED, REVIEW] }), events: [] });
+    // LIN-4520: no close-out run on record (the close-out is a run record, not a comment).
+    const records = await seededRecordsStore(harness, [ev.pr(1, PR_URL, 'abc1234'), ev.review(2, PR_URL, { heads: { [PR_URL]: 'abc1234' } }), ev.merged(3, PR_URL)], { urlKey: 'ws', tickets: ['LIN-51'] });
+    const { loader, access } = makeLoader({ ctx: ctxFor({ stateType: 'started', comments: [OPENED, REVIEW] }), events: [], recordsOverride: records });
     const { model } = await loader.loadTaskPage({ urlKey: 'ws', identifier: 'LIN-51', access });
     assert.equal(model.finished, false);
     const html = renderTaskPullRequest(model, '', NOW);

@@ -11,7 +11,7 @@ import assert from 'node:assert/strict';
 import { readFileSync } from 'node:fs';
 import { fileURLToPath } from 'node:url';
 import { captureWitness, MODES } from '../fixtures/lin-4467-witness.js';
-import { isRequestChangesRound } from '../../lib/prompts/revision-brief.js';
+import { isRequestChangesRound } from '../../lib/prompts/fix-round.js';
 
 const expected = JSON.parse(readFileSync(fileURLToPath(new URL('../fixtures/lin-4467-witness.json', import.meta.url)), 'utf8'));
 const actual = await captureWitness();

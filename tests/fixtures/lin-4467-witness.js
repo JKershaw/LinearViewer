@@ -7,7 +7,7 @@
  * caps (tests/unit/prompt-size-budget.test.js, context-free fixture) are not.
  * Renders use REAL context: a ticket with a parent, siblings, children, a project, comments that carry a PR, a
  * leftover and an attachment, not the context-free budget fixture (LIN-4393). Each kind renders twice: a fresh
- * start, and a fix round whose latest review requested changes (the revision section and the fix-round workflow).
+ * start, and a fix round whose latest review requested changes (the fix-round workflow; LIN-4520 retired the revision section).
  *
  * Regenerate with: node tests/fixtures/lin-4467-witness.js --write
  * (it rewrites tests/fixtures/lin-4467-witness.json; a deliberate change to a rendered text or table is written
@@ -75,13 +75,13 @@ const contextFor = (comments, reviewRound) => ({
   attachments: [{ id: 'att:1', title: 'Witness spec', kind: 'file', contentType: 'text/markdown' }],
   // LIN-4518 step 3: the blind read is handed its landing's change records (the entrances do; a blind read reads no records).
   landingChanges: [{ id: 'change-witness-2400', ref: PR, head: 'witness' }],
-  // LIN-4520: the fix round is read from the records trail (lib/prompts/revision-brief.js reviewRoundOf), not from comments.
+  // LIN-4520: the fix round is read from the records trail (lib/prompts/fix-round.js reviewRoundOf), not from comments; it names no PR.
   reviewRound
 });
 
 export const MODES = {
-  fresh: contextFor(FRESH_COMMENTS, { fixRound: false, prUrl: null }),
-  fix: contextFor([...FRESH_COMMENTS, REVIEW_REQUESTS_CHANGES], { fixRound: true, prUrl: PR })
+  fresh: contextFor(FRESH_COMMENTS, { fixRound: false }),
+  fix: contextFor([...FRESH_COMMENTS, REVIEW_REQUESTS_CHANGES], { fixRound: true })
 };
 
 /** Sorted-key JSON, so a reordered object literal does not move the hash. */

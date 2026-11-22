@@ -408,7 +408,7 @@ describe('task page structure', () => {
       prStatuses: new Map([[`https://github.com/${REPO}/pull/41`, { repo: REPO, readable: true, number: 41, state: 'open', merged: false, head: { ref: 'x', sha: 'aaaaaaa' }, ref: 'aaaaaaa', checks: [] }]]),
       // LIN-4438: a blind read naming the PR is on record, so the gate is met and the runner decides.
       landingPrs: [`https://github.com/${REPO}/pull/41`],
-      review: { verdict: 'approve', verdictText: 'Approve', sha: 'aaaaaaa', blindRead: { prs: [`https://github.com/${REPO}/pull/41`] } },
+      review: { verdict: 'approve', verdictText: 'Approve', sha: 'aaaaaaa', heads: { [`https://github.com/${REPO}/pull/41`]: 'aaaaaaa' }, blindRead: { prs: [`https://github.com/${REPO}/pull/41`] } },
       stopAt: 'pr', variant: 'standard', urlKey: 'acme', issueIdentifier: 'LIN-50',
       ...over,
     });

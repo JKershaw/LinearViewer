@@ -379,13 +379,15 @@ describe('LIN-3455 characterization: run-evidence tsOf', () => {
     assert.deepEqual(absent.map(u => u.url), [PR_B, PR_A]);
   });
 
-  const closeOut = (text, createdAt) => c(`## Close-out\n${text}`, createdAt);
-  test('closeOutSummaryFor: a junk review createdAt (0, falsy) applies no review cutoff', () => {
-    const out = closeOutSummaryFor([closeOut('done', T1.toISOString())], { createdAt: 'not-a-date' });
+  // LIN-4520 (finding-9d0c053a): the close-out is a run record, ended at `at`, its account in fields.account. The junk-instant
+  // rules are the same: a junk instant reads as 0.
+  const closeOut = (text, at) => ({ at, fields: { stage: 'close-out', account: `## Close-out\n${text}` } });
+  test('closeOutSummaryFor: a junk review at (0, falsy) applies no review cutoff', () => {
+    const out = closeOutSummaryFor([closeOut('done', T1.toISOString())], { at: 'not-a-date' });
     assert.deepEqual(out, { at: T1.toISOString(), text: 'done' });
   });
-  test('closeOutSummaryFor: a junk close-out createdAt reads as 0, so it is skipped once a review time is set', () => {
-    const review = { createdAt: T1.toISOString() };
+  test('closeOutSummaryFor: a junk close-out at reads as 0, so it is skipped once a review time is set', () => {
+    const review = { at: T1.toISOString() };
     assert.equal(closeOutSummaryFor([closeOut('junk', 'not-a-date')], review), null);
     assert.deepEqual(closeOutSummaryFor([closeOut('junk', 'not-a-date'), closeOut('later', T2.toISOString())], review), { at: T2.toISOString(), text: 'later' });
   });

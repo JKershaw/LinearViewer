@@ -46,9 +46,13 @@ const byUrl = (prs = [], statuses = []) => new Map(prs.map((p, i) => [p.url, sta
 const derive = (input) => {
   const explicit = Array.isArray(input.landingPrs) && input.landingPrs.length > 0;
   const landing = explicit ? input.landingPrs : (input.prs || []).map(p => p.url);
-  const review = input.review && !explicit && input.review.blindRead === undefined
+  const withBlindRead = input.review && !explicit && input.review.blindRead === undefined
     ? { ...input.review, blindRead: { prs: landing } }
     : input.review;
+  // LIN-4520: a records review judges each landing PR at its head (`heads`, standingOf). A fixture's `sha` is that head for every PR.
+  const review = withBlindRead && !withBlindRead.heads
+    ? { ...withBlindRead, heads: Object.fromEntries(landing.map((url) => [url, withBlindRead.sha])) }
+    : withBlindRead;
   return deriveCloseOutState({ openFindings: FINDINGS_NONE, ...input, landingPrs: landing, review, prStatuses: byUrl(input.prs, input.prStatuses) });
 };
 // The decision's setDone for a set of statuses: the landing is the statuses' own PRs (LIN-4458).
@@ -177,8 +181,16 @@ describe('deriveCloseOutState — truth table', () => {
     assert.strictEqual(derive(movedArgs({ review: approve('request-changes') })).reason, 'review-not-approve');
     assert.strictEqual(derive(movedArgs({ runnerReady: false })).reason, 'runner-not-set-up');
     assert.strictEqual(
-      derive(movedArgs({ prs: [pr(41), pr(42)], prStatuses: [openStatus('bbbbbbb', { number: 41 }), openStatus('bbbbbbb', { number: 42 })] })).reason,
+      derive(movedArgs({ prs: [pr(41), pr(42)], prStatuses: [openStatus('aaaaaaa', { number: 41 }), openStatus('aaaaaaa', { number: 42 })] })).reason,
       'multiple-prs'
+    );
+  });
+
+  test('a multi-PR landing whose open PR moved reads head-moved (LIN-4518 step 3: each PR is judged at its own head)', () => {
+    // Records reviews carry `heads`, so the multi-PR branch judges each open PR against its own judged head.
+    assert.strictEqual(
+      derive(movedArgs({ prs: [pr(41), pr(42)], prStatuses: [openStatus('bbbbbbb', { number: 41 }), openStatus('bbbbbbb', { number: 42 })] })).reason,
+      'head-moved'
     );
   });
 

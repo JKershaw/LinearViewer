@@ -7,13 +7,11 @@
 import { test } from 'node:test';
 import assert from 'node:assert';
 import { formatStageContract } from '../../lib/prompt-contract.js';
-import { opensWithCloseOutTitle } from '../../lib/run-trail.js';
 import { planFactsOf } from '../../lib/records/plan-facts.js';
 import { PLAN_FINDING_TO, PLAN_REVIEW_JUDGEMENT } from '../../lib/records/plan-review-run.js';
 import { PLAN_ADDRESSEES } from '../../lib/records/check.js';
 import { extractPrUrls } from '../../lib/run-evidence.js';
 
-const titleIn = (contract, word) => contract.match(new RegExp('`(## ' + word + '[^`]*)`'))[1];
 const ticks = (contract) => [...contract.matchAll(/`([^`]+)`/g)].map(m => m[1]);
 const at = '2026-10-03T00:00:00.000Z';
 
@@ -75,14 +73,8 @@ test('review (LIN-4520): the verdict is a record with its heads and its outcome 
   assert.ok(!/## Review|### Verdict|CI:/.test(c), 'no comment title, verdict heading or CI line is parsed any more');
 });
 
-test('close-out: the contract title is the one the share page opens on, and it is not a verdict', () => {
-  const c = formatStageContract('close-out', 'LIN-1');
-  assert.ok(opensWithCloseOutTitle(`${titleIn(c, 'Close-out')}\n\nSummary.`));
-  assert.ok(!opensWithCloseOutTitle('## Review — LIN-1\n\n**Verdict: Approve**'));
-});
-
-test('close-out: LIN-4502 retired the prune, so the contract carries only the title', () => {
-  const c = formatStageContract('close-out', 'LIN-1');
-  assert.deepStrictEqual(ticks(c), ['## Close-out — LIN-1']);
-  assert.doesNotMatch(c, /prune/i);
+test('close-out: no contract line; the share page quotes the close-out run\'s account (LIN-4520, finding-9d0c053a)', () => {
+  // The title contract the share page used to open on is retired: the quote is read from the close-out run record.
+  assert.equal(formatStageContract('close-out', 'LIN-1'), '');
+  assert.equal(formatStageContract('close-out', 'LIN-1', { write: false }), '');
 });

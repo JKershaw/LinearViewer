@@ -4051,7 +4051,7 @@ describe('the stage contract (LIN-3292)', () => {
       plan: ['"kind": "plan"', '"to": "plan-review"'],
       'plan-review': ['"judgement": "plan-review"'],
       review: ['CI covers the deliverable; nothing to record', '"judgement": "review"'],
-      'close-out': [`## Close-out — ${issue.identifier}`]
+      // close-out has no contract line any more (LIN-4520, finding-9d0c053a): its summary is quoted from its run record.
     };
     for (const [kind, needles] of Object.entries(formats)) {
       const body = PROMPT_TEMPLATES[kind].generate(issue, context, {});

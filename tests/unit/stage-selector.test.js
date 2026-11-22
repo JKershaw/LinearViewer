@@ -71,12 +71,13 @@ describe('the selector prompt (LIN-3300)', () => {
   });
 
   test('no dangling step references, and "fix it here" names a stage', () => {
-    // LIN-4520: the plan-review Approve is a records verdict (the plan-review run), not a comment; the landed work is a comment.
-    const planReviewRun = planReviewRunOf({ verdicts: [{ id: 'verdict-1', at: '2026-01-01T00:00:00Z', run: 'run-1', fields: { judgement: 'plan-review', outcome: 'approve' } }] });
-    const landed = [
-      { createdAt: '2026-01-02T00:00:00Z', body: 'Implementation landed: https://github.com/o/r/pull/9' }
-    ];
-    const p = prompt(leaf(), ctx({ comments: landed, planReviewRun }));
+    // LIN-4520: the plan-review Approve is a records verdict (the plan-review run), and the landed work is a change record
+    // first written after it (finding-ca44ecba), not a comment that cites the PR.
+    const planReviewRun = planReviewRunOf({
+      verdicts: [{ id: 'verdict-1', at: '2026-01-01T00:00:00Z', run: 'run-1', fields: { judgement: 'plan-review', outcome: 'approve' } }],
+      changes: [{ at: '2026-01-02T00:00:00Z', fields: { ref: 'https://github.com/o/r/pull/9' } }],
+    });
+    const p = prompt(leaf(), ctx({ comments: [], planReviewRun }));
     assert.match(p, /Since the latest plan-review verdict: a person's comment: no; landed work: https:\/\/github\.com\/o\/r\/pull\/9/);
     assert.doesNotMatch(p, /Step \d/, 'the selector has rules, not Steps');
     assert.doesNotMatch(p, /Route on these facts|Route this pass/, 'the facts steer to no stage; the rules read them');

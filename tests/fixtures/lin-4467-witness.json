@@ -127,8 +127,8 @@
     },
     "implementation:fix": {
       "name": "implement",
-      "bytes": 11994,
-      "sha256": "2a8992aa8141d8290be85ca461a8f13b78ee241c1f0dff618b78e9993c54b3c5"
+      "bytes": 11736,
+      "sha256": "97d47c5f69bc59127414cf95b877549758c2a94f5ccceda072ab3c11085de358"
     },
     "review:fresh": {
       "name": "review",
@@ -142,13 +142,13 @@
     },
     "close-out:fresh": {
       "name": "close-out",
-      "bytes": 11128,
-      "sha256": "e4b7143f6655187faa56d481397e89dccb75cfcccdeb537958ff740d4a3491ae"
+      "bytes": 11041,
+      "sha256": "cdf2d09f67daa38542f4e1449b0a34dddc31badcebd08ef40679b327b2c3ef49"
     },
     "close-out:fix": {
       "name": "close-out",
-      "bytes": 11128,
-      "sha256": "e4b7143f6655187faa56d481397e89dccb75cfcccdeb537958ff740d4a3491ae"
+      "bytes": 11041,
+      "sha256": "cdf2d09f67daa38542f4e1449b0a34dddc31badcebd08ef40679b327b2c3ef49"
     },
     "retrospective-audit:fresh": {
       "name": "retrospective-audit",
@@ -862,7 +862,7 @@
     ]
   },
   "stageLabels": "71b1066de2fe5206ed5acf5f18d47b5a62543f8c22697e24a7e982a3264e192a",
-  "contracts": "93eec53eed06a18d9a497874e165ee0720178aceb19f0ada2239a9fdfa8c4202",
+  "contracts": "40635cd9eea5c9c69925af008b1a5fef663c4bb48890e753696202b85df8c7f5",
   "stepWords": "0a06759d642d8c2268893789c6c196461af7b338e3b58dccf0ce7ab5353cbec5",
   "overrideLine": "e8cd49b7b5b35ecfe83ae820694879f466b3017d1dad0ef0655dbe15944aefb9"
 }

@@ -43,6 +43,8 @@ const CORPUS = [
 ];
 
 // Captured from the classifier before LIN-4520 (COMMENT_KINDS + isPersonComment/reportsLandedWork), on main fc6849b1a.
+// LIN-4520 (finding-ca44ecba): a review's verdict words no longer make work landed; only a cited PR does. The four review
+// rows below read landed: false for that reason. Their `person` answers (the authorship rule) are unchanged.
 const EXPECTED = {
   "plain-person": {
     "person": true,
@@ -100,13 +102,13 @@ const EXPECTED = {
   },
   "heading-review": {
     "person": false,
-    "landed": true,
+    "landed": false,
     "ruling": false,
     "summary": false
   },
   "heading-review-title-close": {
     "person": false,
-    "landed": true,
+    "landed": false,
     "ruling": false,
     "summary": false
   },
@@ -190,7 +192,7 @@ const EXPECTED = {
   },
   "review-title-no-heading-first": {
     "person": false,
-    "landed": true,
+    "landed": false,
     "ruling": false,
     "summary": false
   },
@@ -232,7 +234,7 @@ const EXPECTED = {
   },
   "quote-review-heading-later": {
     "person": false,
-    "landed": true,
+    "landed": false,
     "ruling": false,
     "summary": false
   }
