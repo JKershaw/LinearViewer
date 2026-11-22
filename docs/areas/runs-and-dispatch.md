@@ -40,8 +40,6 @@ Area notes for `runs-and-dispatch` in the registry. Format and rules: README.md.
   constant is imported from its owner (`HALT_MODES`, `followUpTarget`, `NEVER_RAN` in
   `lib/dispatch-terminal.js`). The decision-stamp set had four copies in `lib/`; the LIN-4455
   censuses (`lin-4455-feedback-kinds-table`, `lin-4455-constants-owners`) fail on a new one.
-- Price a pulled extra like any piece: a cost read that rode along with LIN-4201 landed alone as
-  LIN-4226.
 - A task timeline lane is running from the page's open session ids (`isOpenState`), never the
   cost row; a lineage's own `incomplete`, not the shared `lineagesTruncated`, decides "not
   complete" (LIN-4405, `lib/task-timeline.js`).
@@ -66,8 +64,10 @@ Area notes for `runs-and-dispatch` in the registry. Format and rules: README.md.
 - A full PR URL's repository and number come from `prOf` beside `prUrlsIn` (`lib/run-ledger.js`),
   for the task page and measure 1 alike; compare repositories case-blind, as GitHub does (LIN-4439).
 - A per-dispatch figure (its model, cost or completeness) is the fold's answer, carried through
-  `lib/cost-read.js`; a reader never re-ranks `byModel` itself. (Drift & Coherence Review, 13 Nov.; `docs/reviews/drift-coherence-review-2026-11-13.md`.)
+  `lib/cost-read.js`; a reader never re-ranks `byModel` itself. (Drift & Coherence Review, 13 Nov.)
 - The Harbour calls read is `lib/cost-read-calls.js` (LIN-4457): `readCalls`, `appCallsOf` and
   `callsSurfaceOf` are pure over docs their caller keys to one workspace (`listInHorizon(urlKey)`). The
   instance-wide boundary is the `urlKey` / `instanceWide` guard on `lineageRecords` and `readCost`
   (LIN-4226), not these readers. A new calls shape goes beside them, and `appCallsOf([])` is the one empty shape.
+- The effort read-out (S10) is frozen in the cost-replay goldens (`tests/fixtures/cost-replay/goldens.json`):
+  run the `cost-*` tests before changing it (LIN-4519).
