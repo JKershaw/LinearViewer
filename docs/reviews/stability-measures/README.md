@@ -20,18 +20,23 @@ window where it finished.
 
 Landings read the same or better in a blind read before they merge.
 
-- `blind`: the window's landings, how many have a `## Blind read` naming their PR posted on their ticket before their
-  merge, and that read's verdict counted as better, same or worse (the newest such read when there are several).
+- `blind`: the window's landings, how many have a blind-read verdict naming their PR, written on record before their
+  merge, and that verdict's outcome counted as better, same or worse (the newest such verdict when there are several).
   Every other landing is counted unread under one named reason, the first that holds: **no ticket** (it names no
   ticket of its own, `ownTicket`); **not an ordinary landing** (an *ordinary* landing names its own ticket and
   touches a path outside `docs/`); **landed before the gate** (merged at or before PR #2413, `eb14b7fff`, the merge
-  from which close-out waits on a recorded read); **no read on record**. A landing's PR is its `Merge pull request
-  #N` or trailing `(#N)`, matched against the ticket's landing as it stood at the merge (`landingPrUrls` in
-  `lib/run-ledger.js`, the gate's own reader) and narrowed to this repository when its origin is a GitHub remote.
-  A ticket whose comments could not be read whole (a failed read, or comments the proxy flagged truncated) makes
-  the row partial, never "no read". Without `--api` the row reads `not measured`. Unit: landing. Source: git and
-  the tracker (`GET /issues/{id}`, the same read as `tasks`, so a ticket costs one call). Defined in
-  `scripts/stability-measures-blind.mjs` (`blindRow`, `GATE_LANDING`, `isOrdinaryLanding`).
+  from which close-out waits on a recorded read); **before the verdict records** (merged before 22 Nov 2026 04:20Z,
+  the go-live of the P5 writers, `VERDICT_RECORDS_SINCE`, from harbour-cat's deploy log: the stages wrote verdicts as
+  comments until then, even where the 21 Nov import had a record for an open task. The records do not cover it, so it
+  is not read from them and is never counted as no read); **no read on record**. A landing's PR is its `Merge pull request #N` or trailing
+  `(#N)`, matched against the refs of the change records that the verdict's `on` names, and narrowed to this
+  repository when its origin is a GitHub remote. A ticket whose verdict records could not be read makes the row
+  partial, never "no read". A landing counted before the verdict records is in the row's unreadable count, and the
+  row's reason names it, so a window that starts before the cutover reads partial. Without `--api` the row reads
+  `not measured`. Unit: landing. Source: git and the verdict records (`GET /records?kind=task`, `?kind=verdict` and
+  `?kind=change` through the proxy, read only for the tickets of landings at or after the cutover; `readVerdictRecords`
+  in `scripts/stability-measures-tracker.mjs`). Defined in `scripts/stability-measures-blind.mjs` (`blindRow`,
+  `readLanding`, `GATE_LANDING`, `VERDICT_RECORDS_SINCE`, `isOrdinaryLanding`).
 
 ### 2. The curve
 
@@ -140,7 +145,8 @@ folder and runs the committed script; it does not copy or write measuring script
 ### What it reads outside this repository
 
 - **The tracker**, through the workspace API proxy (`--api`, default `$HARBOUR_LOCAL_BASE/api/proxy`), for
-  `blind`, `minted`, `tasks`, `speed`, `cost`, `rulings` and `operator-free`. Reads are paced at 50 a minute and honour
+  `minted`, `tasks`, `speed`, `cost`, `rulings` and `operator-free`. The verdict records for `blind` come through the
+  same proxy, under the same pacing. Reads are paced at 50 a minute and honour
   429 `Retry-After` (`createProxyClient` in `scripts/stability-measures-tracker.mjs`). On the 8 Nov window the
   tracker rows took about 280 calls and the seat about 1,700 more (one detail read per lineage member), roughly
   40 minutes in all.
@@ -158,6 +164,12 @@ A source that is absent prints its rows as `not measured` with the reason.
 hand-run pass stops.** The `blind-read` stage reads each change cold after its approving review and before close-out
 merges it, and close-out waits on that comment (LIN-4437, LIN-4438). The review reads those comments through the
 tool. It no longer samples landings or starts readers of its own, and there is no signs file to keep.
+
+**From 22 November 2026 (LIN-4519), measure 1 reads the blind-read verdict records, not the comments.** The cutover is
+the go-live of the P5 writers (#2491, 04:20:39Z), not the 21 November verdict import: a blind read before it exists
+only as a comment. A landing merged before the cutover cannot be read from records, so it is counted `before the
+verdict records` and the `blind` row is partial, not `no read on record` and not a comment's verdict. A withdrawn
+verdict is not counted (`verdictsInWindow`).
 
 **A diff-scoped read does not replace the Periodicals.** The blind read sees one change's diff and its area, not the
 code's shape across a window. LIN-4253 read better in both hand-run blind passes, while Seams & Tangles run 8 rated

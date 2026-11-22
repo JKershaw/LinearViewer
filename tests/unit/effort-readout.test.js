@@ -22,7 +22,35 @@ import { computePlanReviewRoundTrips } from '../../lib/plan-review-round-trips.j
 import { NO_REQUEST_RECORDS } from '../fixtures/request-usage-loader.js';
 // LIN-4201: these tests read snapshot-only lineages, so they pass "no request records" explicitly (plumbing only).
 // LIN-4226: the read loads its records through the source; these tests read snapshot-only lineages (no records, named).
-const computeEffortReadout = (params) => computeEffortReadout__unplumbed({ urlKey: 'acme', requestSource: NO_REQUEST_RECORDS, ...params });
+// LIN-4519: gate verdicts come from verdict records, not comments. These fixtures state their verdicts as comments on the
+// issue, so each comment becomes a verdict record at the comment's instant, for both gate judgements (a plan-review and a
+// review gate read the same comment as their own judgement), and the coverage instant is set to the epoch so every
+// fixture date is covered. An issue with no comments reads as measured with no verdict, as a workspace with no verdicts does.
+const VERDICT_EPOCH = '1970-01-01T00:00:00.000Z';
+const verdictWords = { approve: 'approve', 'request changes': 'request-changes', 'needs discussion': 'needs-discussion' };
+function verdictFactsFromComments(params) {
+  const identifiers = new Set([...(params.liveRows || []), ...(params.historyRows || [])].map((r) => r.issueIdentifier).filter(Boolean));
+  const out = new Map();
+  for (const identifier of identifiers) {
+    const ctx = params.issueContext?.get(identifier) || {};
+    const verdicts = [];
+    for (const c of ctx.comments || []) {
+      const m = /verdict:\s*(approve|request changes|needs discussion)/i.exec(c.body || '');
+      if (!m) continue;
+      for (const judgement of ['plan-review', 'review']) {
+        verdicts.push({ id: `${c.id}-${judgement}`, judgement, outcome: verdictWords[m[1].toLowerCase()], at: c.createdAt, state: 'stands', in: `task-${identifier}`, on: [] });
+      }
+    }
+    out.set(identifier, { measured: true, taskId: `task-${identifier}`, verdicts });
+  }
+  return out;
+}
+const computeEffortReadout = (params) => computeEffortReadout__unplumbed({
+  urlKey: 'acme', requestSource: NO_REQUEST_RECORDS,
+  verdictRecordsSince: VERDICT_EPOCH,
+  verdictFacts: verdictFactsFromComments(params),
+  ...params,
+});
 
 
 const ASOF = '2026-09-05T16:00:00.000Z';
@@ -114,17 +142,20 @@ describe('G2 — issue-object contract (plan-review 583701c2)', async () => {
     // `buildIssueCorpus` consumes NORMALIZED rows (lifecycleStatus, not raw
     // status) — 'done' here is the derived value normalizeDispatchRow would
     // have produced from each row's [done] terminal marker.
-    const corpus = buildIssueCorpus(rows.map((r) => ({ ...r, lifecycleStatus: 'done', completedAt: r.feedback[0].timestamp })), issueContext);
+    const corpus = buildIssueCorpus(rows.map((r) => ({ ...r, lifecycleStatus: 'done', completedAt: r.feedback[0].timestamp })));
     assert.equal(corpus.length, 1);
     assert.equal(corpus[0].identifier, 'LIN-1');
     assert.ok(Array.isArray(corpus[0].rows) && corpus[0].rows.length === 4);
+    // LIN-4519: the corpus carries no comments; the verdicts the walk reads come from verdict records (here, the fixture's
+    // comments stated as records, see verdictFactsFromComments).
+    const verdictOpts = { verdictRecordsSince: VERDICT_EPOCH, verdictFacts: verdictFactsFromComments({ historyRows: rows, issueContext }) };
 
-    const planResult = computePlanReviewRoundTrips(corpus, { asOf: ASOF });
+    const planResult = computePlanReviewRoundTrips(corpus, { asOf: ASOF, ...verdictOpts });
     assert.equal(planResult.primary.rate, 1);
     assert.equal(planResult.primary.denominator, 1);
     assert.equal(planResult.roundTrips.n, 1);
 
-    const reviewResult = computePlanReviewRoundTrips(corpus, { asOf: ASOF, gateKind: 'review', rePassKind: 'implementation' });
+    const reviewResult = computePlanReviewRoundTrips(corpus, { asOf: ASOF, gateKind: 'review', rePassKind: 'implementation', ...verdictOpts });
     assert.equal(reviewResult.scale.issuesRead, 1);
   });
 

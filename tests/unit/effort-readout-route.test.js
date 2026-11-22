@@ -1,18 +1,12 @@
 /**
- * Route + provider-seam tests for the effort read-out (LIN-2641).
- *
- * Hermetic: a fake provider is registered in the REAL registry under a unique
- * name (the `tests/unit/detail-route-binding-provider.test.js` seam) and the
- * workspace resolves to it through `resolveIssueBinding`, so no socket is
- * opened. The store is a fixture object exposing only the two methods this
- * route calls, which is also how the read BOUNDS are asserted: the test
- * captures the options each call actually received.
+ * Route tests for the effort read-out (LIN-2641), on records (LIN-4519): the gate verdicts and the plan facts come from the
+ * records store, and the route asks no provider for comments. Hermetic: the store is a fixture object exposing only the
+ * methods this route calls, which is also how the read BOUNDS are asserted (the test captures the options each call got).
  */
 import { test, describe, before } from 'node:test';
 import assert from 'node:assert/strict';
 import express from 'express';
 import { createDashboardRoutes as createDashboardRoutes__unplumbed } from '../../routes/dashboard.js';
-import { registerProvider } from '../../lib/providers/registry.js';
 import { stubLineageIdentity } from '../fixtures/lineage-identity.js';
 import { NO_REQUEST_RECORDS, withDefaults } from '../fixtures/request-usage-loader.js';
 // LIN-4201: these tests read snapshot-only lineages, so they pass "no request records" explicitly (plumbing only).
@@ -20,8 +14,6 @@ const createDashboardRoutes = withDefaults(createDashboardRoutes__unplumbed, 0, 
 
 
 before(() => { process.env.NODE_ENV = 'test'; });
-
-let providerSeq = 0;
 
 function doneRow({ id, issueIdentifier, kind, dispatchedAt, completedAt, resolvedAt }) {
   return {
@@ -32,8 +24,8 @@ function doneRow({ id, issueIdentifier, kind, dispatchedAt, completedAt, resolve
 }
 
 /**
- * A store fixture that records the options each read received, so the tests
- * can assert what the route actually asked for rather than what it claims.
+ * A store fixture that records the options each read received, so the tests can assert what the route actually asked for
+ * rather than what it claims.
  */
 function fakeStore({ liveRows = [], historyRows = [], historyTotal, identityOnly = [] } = {}) {
   const calls = { listItems: [], listHistory: [] };
@@ -58,33 +50,28 @@ function fakeStore({ liveRows = [], historyRows = [], historyTotal, identityOnly
 }
 
 /**
- * Register a fake provider under a unique name so tests never contend over one
- * shared registry slot.
+ * The records the route reads, as fixtures. `verdicts` maps a ticket to its verdict views (`at` is the first write);
+ * `plans` maps a ticket to its plan facts. `asked` captures every batched read; `fail` makes every read throw.
  */
-function fakeProvider({ comments = [], description = '', supports = () => true, onFetch, throwOn } = {}) {
-  const name = `fake-effort-${++providerSeq}`;
-  const seen = { comments: [], fields: [] };
-  registerProvider({
-    name,
-    ui: {},
-    supports,
-    fetchIssueComments: async (scope, issueId) => {
-      seen.comments.push(issueId);
-      if (onFetch) onFetch(issueId);
-      if (throwOn) throw throwOn;
-      return comments;
+function fakeRecords({ verdicts = {}, plans = null, fail = null } = {}) {
+  const asked = { verdicts: [], plans: [] };
+  return {
+    asked,
+    async verdictFactsForTickets(urlKey, tickets) {
+      asked.verdicts.push([urlKey, tickets]);
+      if (fail) throw fail;
+      return new Map(tickets.map((t) => [t, { measured: true, taskId: `task-${t}`, verdicts: verdicts[t] || [] }]));
     },
-    fetchIssueFields: async (scope, issueId) => {
-      seen.fields.push(issueId);
-      if (throwOn) throw throwOn;
-      return { id: `uuid-${issueId}`, identifier: issueId, description };
+    async planFactsForTickets(urlKey, tickets) {
+      asked.plans.push([urlKey, tickets]);
+      if (fail) throw fail;
+      return new Map(tickets.map((t) => [t, plans ? plans(t) : { measured: true, reviewAsked: true, everPlanned: true }]));
     },
-  });
-  return { name, seen };
+  };
 }
 
-function buildApp({ store, providerName, recordsStore }) {
-  const workspace = { urlKey: 'ws-1', name: 'Workspace One', provider: providerName, accessToken: 'tok' };
+function buildApp({ store, recordsStore = null }) {
+  const workspace = { urlKey: 'ws-1', name: 'Workspace One', provider: 'local', accessToken: 'tok' };
   const app = express();
   app.use(createDashboardRoutes({
     workspaceFromUrl: (req, _res, next) => {
@@ -102,7 +89,7 @@ function buildApp({ store, providerName, recordsStore }) {
     fetchWorkspaceIssues: async () => [],
     getOpenRouterSource: () => null,
     getDeployInfo: () => ({}),
-    ...(recordsStore ? { recordsStore } : {}),
+    recordsStore,
   }));
   return app;
 }
@@ -120,6 +107,7 @@ async function get(app, path) {
   }
 }
 
+// Before the verdict cutover (2026-11-22 04:20Z): these rows' gate verdicts read not measured.
 const LINEAGE = [
   doneRow({ id: 'r1', issueIdentifier: 'LIN-1', kind: 'plan', dispatchedAt: '2026-09-01T00:00:00.000Z', completedAt: '2026-09-01T00:30:00.000Z' }),
   doneRow({ id: 'r2', issueIdentifier: 'LIN-1', kind: 'plan-review', dispatchedAt: '2026-09-01T01:00:00.000Z', completedAt: '2026-09-01T01:30:00.000Z' }),
@@ -127,41 +115,59 @@ const LINEAGE = [
   doneRow({ id: 'r4', issueIdentifier: 'LIN-1', kind: 'review', dispatchedAt: '2026-09-01T03:00:00.000Z', completedAt: '2026-09-01T03:30:00.000Z' }),
 ];
 
-const APPROVE_COMMENTS = [
-  { id: 'c1', body: 'Verdict: approve', createdAt: '2026-09-01T01:30:00.000Z', user: 'John' },
-  { id: 'c2', body: 'Verdict: approve', createdAt: '2026-09-01T03:30:00.000Z', user: 'John' },
+// After the cutover: the same four rows a week later.
+const LATE_LINEAGE = [
+  doneRow({ id: 'r1', issueIdentifier: 'LIN-1', kind: 'plan', dispatchedAt: '2026-11-25T00:00:00.000Z', completedAt: '2026-11-25T00:30:00.000Z' }),
+  doneRow({ id: 'r2', issueIdentifier: 'LIN-1', kind: 'plan-review', dispatchedAt: '2026-11-25T01:00:00.000Z', completedAt: '2026-11-25T01:30:00.000Z' }),
+  doneRow({ id: 'r3', issueIdentifier: 'LIN-1', kind: 'implementation', dispatchedAt: '2026-11-25T02:00:00.000Z', completedAt: '2026-11-25T02:30:00.000Z' }),
+  doneRow({ id: 'r4', issueIdentifier: 'LIN-1', kind: 'review', dispatchedAt: '2026-11-25T03:00:00.000Z', completedAt: '2026-11-25T03:30:00.000Z' }),
 ];
 
-describe('the happy path populates both survival rows through the provider seam', () => {
-  test('a fake provider returning comments yields a populated plan card', async () => {
-    const store = fakeStore({ historyRows: LINEAGE });
-    const { name } = fakeProvider({ comments: APPROVE_COMMENTS, description: 'plan-review due: yes' });
-    const { status, body } = await get(buildApp({ store, providerName: name }), '/workspace/ws-1/api/effort-readout');
+// Approvals as verdict records: each gate's judgement, written inside that gate's own window.
+const LATE_VERDICTS = {
+  'LIN-1': [
+    { id: 'v1', judgement: 'plan-review', outcome: 'approve', at: '2026-11-25T01:30:00.000Z', state: 'stands', in: 'task-LIN-1', on: [] },
+    { id: 'v2', judgement: 'review', outcome: 'approve', at: '2026-11-25T03:30:00.000Z', state: 'stands', in: 'task-LIN-1', on: [] },
+  ],
+};
+
+describe('the happy path reads both survival rows from verdict records', () => {
+  test('verdict records after the cutover give a populated plan card, read in one batched call', async () => {
+    const store = fakeStore({ historyRows: LATE_LINEAGE });
+    const recordsStore = fakeRecords({ verdicts: LATE_VERDICTS });
+    const { status, body } = await get(buildApp({ store, recordsStore }), '/workspace/ws-1/api/effort-readout');
     assert.equal(status, 200);
     const json = JSON.parse(body);
     const planCard = json.perKind.find((k) => k.kind === 'plan');
     assert.equal(planCard.survival.state, 'computed');
     assert.equal(planCard.survival.rate, 1);
-    // LIN-4504: the description says due, but the gate is read from records only; with no records store (and no
-    // plan records covering this history) it reads not measured, never 1 and never 0.
-    assert.equal(planCard.survival.gateDue, 0);
-    assert.equal(planCard.survival.gateNotMeasured, 1);
-    assert.equal(planCard.survival.gateDueRate, null);
+    assert.equal(planCard.survival.verdictNotMeasured, 0);
+    assert.deepEqual(recordsStore.asked.verdicts, [['ws-1', ['LIN-1']]], 'one batched verdict read for every scored issue');
     assert.equal(json.completeness.complete, true);
   });
 
   test('the page route renders HTML with the per-kind cards', async () => {
-    const store = fakeStore({ historyRows: LINEAGE });
-    const { name } = fakeProvider({ comments: APPROVE_COMMENTS });
-    const { status, body } = await get(buildApp({ store, providerName: name }), '/workspace/ws-1/effort-readout');
+    const store = fakeStore({ historyRows: LATE_LINEAGE });
+    const { status, body } = await get(buildApp({ store, recordsStore: fakeRecords({ verdicts: LATE_VERDICTS }) }), '/workspace/ws-1/effort-readout');
     assert.equal(status, 200);
     assert.match(body, /data-testid="effort-card-plan"/);
     assert.match(body, /Effort Self-Assessment/);
   });
 
-  // LIN-2830: the page must show an opencode run as its own row — harness
-  // `opencode`, model `z-ai/glm-5.3`, and a visible "—" where claude-code
-  // would show a realised effort level (opencode posts no effort field).
+  test('a gate row dispatched before the cutover reads verdict not measured, never a figure from a comment', async () => {
+    const store = fakeStore({ historyRows: LINEAGE });
+    const recordsStore = fakeRecords({ verdicts: LATE_VERDICTS });
+    const { status, body } = await get(buildApp({ store, recordsStore }), '/workspace/ws-1/api/effort-readout');
+    assert.equal(status, 200);
+    const planCard = JSON.parse(body).perKind.find((k) => k.kind === 'plan');
+    assert.equal(planCard.survival.rate, null, 'no verdict is read for a gate before the cutover');
+    assert.equal(planCard.survival.denominator, 0);
+    assert.equal(planCard.survival.verdictNotMeasured, 1);
+    assert.match(JSON.parse(body).notes.verdictRecordsCoverage, /from 2026-11-22 04:20Z/);
+  });
+
+  // LIN-2830: the page must show an opencode run as its own row — harness `opencode`, model `z-ai/glm-5.3`, and a visible
+  // "—" where claude-code would show a realised effort level (opencode posts no effort field).
   test('the page renders the harness/model/effort breakdown rows, with "—" for a missing effort (LIN-2830)', async () => {
     const historyRows = [
       doneRow({ id: 'r1', issueIdentifier: 'LIN-1', kind: 'plan', dispatchedAt: '2026-09-01T00:00:00.000Z', completedAt: '2026-09-01T00:30:00.000Z' }),
@@ -175,8 +181,8 @@ describe('the happy path populates both survival rows through the provider seam'
       },
     ];
     const store = fakeStore({ historyRows });
-    const { name } = fakeProvider({ comments: [] });
-    const { status, body } = await get(buildApp({ store, providerName: name }), '/workspace/ws-1/effort-readout');
+    const recordsStore = fakeRecords();
+    const { status, body } = await get(buildApp({ store, recordsStore }), '/workspace/ws-1/effort-readout');
     assert.equal(status, 200);
     assert.match(body, /data-testid="effort-card-rows-implementation"/, 'the implementation card carries the rows breakdown');
     const rowsBlock = body.match(/data-testid="effort-card-rows-implementation"[\s\S]*?<div class="effort-card-footnote/)?.[0]
@@ -185,7 +191,7 @@ describe('the happy path populates both survival rows through the provider seam'
     assert.ok(rowsBlock.includes('z-ai/glm-5.3'), 'the row names its model');
     assert.ok(/>—<\/span>/.test(rowsBlock), 'a missing effort renders as the visible "—" placeholder');
     // The JSON route carries the same breakdown.
-    const jsonRes = await get(buildApp({ store, providerName: name }), '/workspace/ws-1/api/effort-readout');
+    const jsonRes = await get(buildApp({ store, recordsStore }), '/workspace/ws-1/api/effort-readout');
     const json = JSON.parse(jsonRes.body);
     const implCard = json.perKind.find((k) => k.kind === 'implementation');
     assert.equal(implCard.rows.length, 1);
@@ -201,9 +207,8 @@ describe('H1 — the two reads carry their two REAL bounds', () => {
       id: `live-${i}`, issueId: 'uuid-LIN-9', issueIdentifier: 'LIN-9', kind: 'implementation',
       dispatchedAt: '2026-09-05T00:00:00.000Z',
     }));
-    // 250 history rows whose resolvedAt order is DELIBERATELY the reverse of
-    // their dispatchedAt order, so a read that sorted by the wrong clock would
-    // return a different 200.
+    // 250 history rows whose resolvedAt order is DELIBERATELY the reverse of their dispatchedAt order, so a read that
+    // sorted by the wrong clock would return a different 200.
     const historyRows = Array.from({ length: 250 }, (_, i) => doneRow({
       id: `h-${i}`, issueIdentifier: `LIN-${i}`, kind: 'plan',
       dispatchedAt: new Date(Date.UTC(2026, 0, 1) + i * 60000).toISOString(),
@@ -211,8 +216,7 @@ describe('H1 — the two reads carry their two REAL bounds', () => {
       resolvedAt: new Date(Date.UTC(2026, 5, 1) - i * 60000).toISOString(),
     }));
     const store = fakeStore({ liveRows, historyRows, historyTotal: 250 });
-    const { name } = fakeProvider({ comments: [] });
-    const { status, body } = await get(buildApp({ store, providerName: name }), '/workspace/ws-1/api/effort-readout');
+    const { status, body } = await get(buildApp({ store, recordsStore: fakeRecords() }), '/workspace/ws-1/api/effort-readout');
     assert.equal(status, 200);
     const json = JSON.parse(body);
 
@@ -233,80 +237,16 @@ describe('H1 — the two reads carry their two REAL bounds', () => {
   });
 
   test('the history window is the newest by resolvedAt, not by dispatchedAt', async () => {
-    // Row A resolved most recently but was dispatched FIRST; row B is the
-    // opposite. A limit-1 read must return A.
+    // Row A resolved most recently but was dispatched FIRST; row B is the opposite. Both fit inside the 200 bound, so both
+    // issues are scored; the point pinned is that the STORE was asked to sort by resolvedAt.
     const historyRows = [
       doneRow({ id: 'A', issueIdentifier: 'LIN-A', kind: 'plan', dispatchedAt: '2026-01-01T00:00:00.000Z', completedAt: '2026-01-01T01:00:00.000Z', resolvedAt: '2026-06-01T00:00:00.000Z' }),
       doneRow({ id: 'B', issueIdentifier: 'LIN-B', kind: 'plan', dispatchedAt: '2026-05-01T00:00:00.000Z', completedAt: '2026-05-01T01:00:00.000Z', resolvedAt: '2026-02-01T00:00:00.000Z' }),
     ];
     const store = fakeStore({ historyRows });
-    const seenIssues = [];
-    const { name } = fakeProvider({ comments: [], onFetch: (id) => seenIssues.push(id) });
-    await get(buildApp({ store, providerName: name }), '/workspace/ws-1/api/effort-readout');
-    // Both rows fit inside the 200 bound, so both issues are read — the point
-    // this pins is that the STORE was asked to sort by resolvedAt (the fixture
-    // sorts that way and the route passes no competing sort).
-    assert.deepEqual([...seenIssues].sort(), ['LIN-A', 'LIN-B']);
-  });
-});
-
-describe('D2 — the error split: auth is never a skip, retryable is', () => {
-  test('a 401 renders the upstream-aware error page with NO numbers', async () => {
-    const store = fakeStore({ historyRows: LINEAGE });
-    const err = new Error('unauthorized');
-    err.response = { status: 401 };
-    const { name } = fakeProvider({ throwOn: err });
-    const { status, body } = await get(buildApp({ store, providerName: name }), '/workspace/ws-1/effort-readout');
-    assert.equal(status, 401);
-    assert.match(body, /Re-authentication Needed/);
-    assert.ok(!/data-testid="effort-card-plan"/.test(body), 'no per-kind numbers may render on an auth failure');
-  });
-
-  test('a 403 is treated the same as a 401 (both are auth, both non-retryable)', async () => {
-    const store = fakeStore({ historyRows: LINEAGE });
-    const err = new Error('forbidden');
-    err.response = { status: 403 };
-    const { name } = fakeProvider({ throwOn: err });
-    const { status } = await get(buildApp({ store, providerName: name }), '/workspace/ws-1/effort-readout');
-    assert.equal(status, 401);
-  });
-
-  test('the JSON route returns 401 with the classified code, not a skip', async () => {
-    const store = fakeStore({ historyRows: LINEAGE });
-    const err = new Error('unauthorized');
-    err.status = 401;
-    const { name } = fakeProvider({ throwOn: err });
-    const { status, body } = await get(buildApp({ store, providerName: name }), '/workspace/ws-1/api/effort-readout');
-    assert.equal(status, 401);
-    const json = JSON.parse(body);
-    assert.equal(json.code, 'LINEAR_AUTH');
-    assert.equal(json.retryable, false);
-    assert.equal(json.perKind, undefined, 'no figures on an auth failure');
-  });
-
-  test('a 500 IS a skip: numbers still render, completeness reports it', async () => {
-    const store = fakeStore({ historyRows: LINEAGE });
-    const err = new Error('upstream boom');
-    err.response = { status: 500 };
-    const { name } = fakeProvider({ throwOn: err });
-    const { status, body } = await get(buildApp({ store, providerName: name }), '/workspace/ws-1/api/effort-readout');
-    assert.equal(status, 200);
-    const json = JSON.parse(body);
-    assert.equal(json.completeness.skipped, 1);
-    assert.equal(json.completeness.complete, false);
-    // Cost/duration still computed for the kinds present.
-    assert.ok(json.perKind.length > 0);
-    assert.ok(json.perKind.some((k) => k.sessionCount > 0));
-  });
-
-  test('a 429 is a skip too (retryable), and the page shows the completeness notice', async () => {
-    const store = fakeStore({ historyRows: LINEAGE });
-    const err = new Error('rate limited');
-    err.response = { status: 429 };
-    const { name } = fakeProvider({ throwOn: err });
-    const { status, body } = await get(buildApp({ store, providerName: name }), '/workspace/ws-1/effort-readout');
-    assert.equal(status, 200);
-    assert.match(body, /issue read\(s\) skipped/);
+    const recordsStore = fakeRecords();
+    await get(buildApp({ store, recordsStore }), '/workspace/ws-1/api/effort-readout');
+    assert.deepEqual([...recordsStore.asked.verdicts[0][1]].sort(), ['LIN-A', 'LIN-B']);
   });
 });
 
@@ -322,8 +262,7 @@ describe('the cost read is wired to the founder lookup (LIN-4177)', () => {
     own.feedback = [usageOf(1), ...own.feedback];
     const founder = { id: 'st', _id: 'st', rootItemId: 'st', status: 'taken', abort: false, kind: 'implementation', issueIdentifier: 'LIN-42', dispatchedAt: '2026-09-20T10:00:00.000Z', feedback: [] };
     const store = fakeStore({ historyRows: [followUp, own], identityOnly: [founder] });
-    const { name } = fakeProvider({ comments: [] });
-    const { status, body } = await get(buildApp({ store, providerName: name }), '/workspace/ws-1/api/effort-readout');
+    const { status, body } = await get(buildApp({ store, recordsStore: fakeRecords() }), '/workspace/ws-1/api/effort-readout');
     assert.equal(status, 200);
     const json = JSON.parse(body);
     const implementation = json.perKind.find(row => row.kind === 'implementation');
@@ -333,103 +272,61 @@ describe('the cost read is wired to the founder lookup (LIN-4177)', () => {
   });
 });
 
-describe('provider capability gating', () => {
-  test('a provider without fetchIssueComments renders survival unavailable, other columns intact', async () => {
+describe('LIN-4504 / LIN-4519: the records the route reads, and what a failed read says', () => {
+  test('the plan facts are read from the records store, once for every scored issue; no figure from a description', async () => {
     const store = fakeStore({ historyRows: LINEAGE });
-    const { name, seen } = fakeProvider({ supports: () => false });
-    const { status, body } = await get(buildApp({ store, providerName: name }), '/workspace/ws-1/api/effort-readout');
+    const recordsStore = fakeRecords({ verdicts: LATE_VERDICTS });
+    const { status, body } = await get(buildApp({ store, recordsStore }), '/workspace/ws-1/api/effort-readout');
     assert.equal(status, 200);
-    const json = JSON.parse(body);
-    const planCard = json.perKind.find((k) => k.kind === 'plan');
-    assert.equal(planCard.survival.state, 'unavailable_provider');
-    assert.ok(planCard.sessionCount > 0, 'cost/duration/effort still render');
-    assert.equal(seen.comments.length, 0, 'no provider call is attempted when the capability is absent');
-    assert.ok(json.notes.survivalUnavailable);
-  });
-
-  test('LIN-4504: the route reads plan facts from the records store, once for every scored issue; no figure from a description', async () => {
-    const store = fakeStore({ historyRows: LINEAGE });
-    const { name } = fakeProvider({ comments: APPROVE_COMMENTS, description: 'plan-review due: yes' });
-    const asked = [];
-    const recordsStore = { planFactsForTickets: async (urlKey, tickets) => { asked.push([urlKey, tickets]); return new Map(tickets.map((t) => [t, { measured: true, reviewAsked: true, everPlanned: true }])); } };
-    const { status, body } = await get(buildApp({ store, providerName: name, recordsStore }), '/workspace/ws-1/api/effort-readout');
-    assert.equal(status, 200);
-    assert.deepEqual(asked, [['ws-1', ['LIN-1']]], 'one batched read');
+    assert.deepEqual(recordsStore.asked.plans, [['ws-1', ['LIN-1']]], 'one batched read');
     const planCard = JSON.parse(body).perKind.find((k) => k.kind === 'plan');
     assert.equal(planCard.survival.gateNotMeasured, 1, 'this history predates the cutover (PLAN_RECORDS_SINCE, 2026-11-20): not measured');
     assert.match(JSON.parse(body).notes.planRecordsCoverage, /not measured/);
-    const page = await get(buildApp({ store, providerName: name, recordsStore }), '/workspace/ws-1/effort-readout');
+    const page = await get(buildApp({ store, recordsStore }), '/workspace/ws-1/effort-readout');
     assert.match(page.body, /plan-review gate due\/honoured: not measured for 1 \(no plan records before 2026-11-20\)/);
   });
 
-  test('LIN-4504: a records store that fails leaves the gate not measured, and the read-out still renders', async () => {
-    const store = fakeStore({ historyRows: LINEAGE });
-    const { name } = fakeProvider({ comments: APPROVE_COMMENTS });
-    const recordsStore = { planFactsForTickets: async () => { throw new Error('db down'); } };
+  test('a records store whose verdict read fails leaves survival unavailable, and the read-out still renders', async () => {
+    const store = fakeStore({ historyRows: LATE_LINEAGE });
+    const recordsStore = fakeRecords({ fail: new Error('db down') });
     const origError = console.error;
     console.error = () => {};
     try {
-      const { status, body } = await get(buildApp({ store, providerName: name, recordsStore }), '/workspace/ws-1/api/effort-readout');
+      const { status, body } = await get(buildApp({ store, recordsStore }), '/workspace/ws-1/api/effort-readout');
       assert.equal(status, 200);
-      assert.equal(JSON.parse(body).perKind.find((k) => k.kind === 'plan').survival.gateNotMeasured, 1);
+      const json = JSON.parse(body);
+      assert.equal(json.perKind.find((k) => k.kind === 'plan').survival.state, 'unavailable_records');
+      assert.match(json.notes.survivalUnavailable, /verdict records/);
     } finally {
       console.error = origError;
     }
   });
 
-  test('a provider with comments but no fetchIssueFields still resolves the verdict walk from comments, and never calls it', async () => {
-    const store = fakeStore({ historyRows: LINEAGE });
-    const { name, seen } = fakeProvider({
-      comments: APPROVE_COMMENTS,
-      supports: (cap) => cap === 'fetchIssueComments',
-    });
-    const recordsStore = { planFactsForTickets: async (urlKey, tickets) => new Map(tickets.map((t) => [t, { measured: true, reviewAsked: true, everPlanned: true }])) };
-    const { status, body } = await get(buildApp({ store, providerName: name, recordsStore }), '/workspace/ws-1/api/effort-readout');
-    assert.equal(status, 200);
-    const planCard = JSON.parse(body).perKind.find((k) => k.kind === 'plan');
-    assert.equal(planCard.survival.state, 'computed');
-    assert.equal(planCard.survival.rate, 1, 'the verdict walk still resolves from comments');
-    assert.equal(seen.fields.length, 0, 'fetchIssueFields is not called when the provider does not support it');
-    assert.equal(seen.comments.length > 0, true);
-  });
-});
-
-describe('the fan-out is bounded by the route\'s own named constant', () => {
-  test('no more than 4 per-issue provider reads are ever in flight at once', async () => {
-    const historyRows = Array.from({ length: 20 }, (_, i) => doneRow({
-      id: `r-${i}`, issueIdentifier: `LIN-${i}`, kind: 'plan',
-      dispatchedAt: '2026-09-01T00:00:00.000Z', completedAt: '2026-09-01T00:30:00.000Z',
-    }));
-    const store = fakeStore({ historyRows });
-    let inFlight = 0;
-    let peak = 0;
-    const name = `fake-effort-conc-${++providerSeq}`;
-    registerProvider({
-      name,
-      ui: {},
-      supports: () => true,
-      fetchIssueComments: async () => {
-        inFlight += 1;
-        peak = Math.max(peak, inFlight);
-        await new Promise((r) => setTimeout(r, 5));
-        inFlight -= 1;
-        return [];
-      },
-      fetchIssueFields: async (scope, issueId) => ({ id: `uuid-${issueId}`, description: '' }),
-    });
-    const { status } = await get(buildApp({ store, providerName: name }), '/workspace/ws-1/api/effort-readout');
-    assert.equal(status, 200);
-    assert.ok(peak > 1, 'the fan-out is concurrent at all');
-    assert.ok(peak <= 4, `peak concurrency ${peak} exceeded the route's bound of 4`);
+  test('a records store whose plan read fails leaves the gate not measured, and the read-out still renders', async () => {
+    const store = fakeStore({ historyRows: LATE_LINEAGE });
+    const recordsStore = {
+      verdictFactsForTickets: async (urlKey, tickets) => new Map(tickets.map((t) => [t, { measured: true, taskId: null, verdicts: LATE_VERDICTS[t] || [] }])),
+      planFactsForTickets: async () => { throw new Error('db down'); },
+    };
+    const origError = console.error;
+    console.error = () => {};
+    try {
+      const { status, body } = await get(buildApp({ store, recordsStore }), '/workspace/ws-1/api/effort-readout');
+      assert.equal(status, 200);
+      const plan = JSON.parse(body).perKind.find((k) => k.kind === 'plan');
+      assert.equal(plan.survival.gateNotMeasured, 1);
+      assert.equal(plan.survival.rate, 1, 'the verdict read is independent of the plan read');
+    } finally {
+      console.error = origError;
+    }
   });
 
-  test('only the eligible population\'s issues are fetched — an in-flight live row costs no provider read', async () => {
-    const store = fakeStore({
-      liveRows: [{ id: 'live-1', issueId: 'uuid-LIN-LIVE', issueIdentifier: 'LIN-LIVE', kind: 'plan', dispatchedAt: '2026-09-05T00:00:00.000Z' }],
-      historyRows: [doneRow({ id: 'r1', issueIdentifier: 'LIN-DONE', kind: 'plan', dispatchedAt: '2026-09-01T00:00:00.000Z', completedAt: '2026-09-01T00:30:00.000Z' })],
-    });
-    const { name, seen } = fakeProvider({ comments: [] });
-    await get(buildApp({ store, providerName: name }), '/workspace/ws-1/api/effort-readout');
-    assert.deepEqual(seen.comments, ['LIN-DONE'], 'the right-censored live row is not fetched');
+  test('no records store at all: survival unavailable, and nothing is read from a provider', async () => {
+    const store = fakeStore({ historyRows: LATE_LINEAGE });
+    const { status, body } = await get(buildApp({ store, recordsStore: null }), '/workspace/ws-1/api/effort-readout');
+    assert.equal(status, 200);
+    const json = JSON.parse(body);
+    assert.equal(json.perKind.find((k) => k.kind === 'plan').survival.state, 'unavailable_records');
+    assert.equal(json.perKind.find((k) => k.kind === 'implementation').survival.state, 'unavailable_records');
   });
 });

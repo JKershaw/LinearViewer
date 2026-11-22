@@ -240,6 +240,16 @@
       "path": "S10.notes.reviewGateDueHonoured",
       "change": "h",
       "reason": "LIN-4504: the note names the records reader (a plan-review finding about the issue's plan records) instead of the retired description reader."
+    },
+    {
+      "path": "S10.notes.survivalUnavailable",
+      "change": "i",
+      "reason": "LIN-4519: the effort read-out's survival comes from verdict records, not a provider's comments. The replay supplies no records, so the note says the verdict records could not be read (was: the provider does not serve issue comments)."
+    },
+    {
+      "path": "S10.notes.verdictRecordsCoverage",
+      "change": "i",
+      "reason": "LIN-4519: the coverage note for gate verdicts (from the verdict records' cutover, 2026-11-22 04:20Z). New in the note set."
     }
   ]
 }

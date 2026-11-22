@@ -500,7 +500,7 @@ describe('close-out witness C: no comment reader picks a verdict summary up (fin
   const rounds = (comments) => computeIssueRoundTrips({
     id: 'i1', identifier: 'LIN-1', description: '', comments,
     rows: [{ id: 'r1', kind: 'plan-review', status: 'done', dispatchedAt: at(0), completedAt: at(60) }],
-  }, { asOf: ASOF, planFacts: undefined });
+  }, { asOf: ASOF, planFacts: undefined, verdictSource: 'comments' });
   const summary = (judgement, outcome, reasoning) => summaryBodyOf({ id: `verdict-${judgement}`, v: 1, kind: 'verdict', fields: { judgement, outcome, reasoning } });
 
   test('a plan-review, a review and a blind-read verdict summary in the round-trip window read as no comment at all', () => {

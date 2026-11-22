@@ -1,0 +1,9 @@
+{
+ "cutover": "2026-11-22T04:20:39.504Z",
+ "asOf": "2026-11-22T14:43:25.122Z",
+ "blindReadRuns": 28,
+ "queryRowsSinceCutover": 346,
+ "blindReadRowsSinceCutover": 0,
+ "blindReadRunsThatQueried": 0,
+ "rows": []
+}

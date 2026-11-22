@@ -16,7 +16,8 @@
  */
 import { test, describe, beforeEach, afterEach } from 'node:test';
 import assert from 'node:assert/strict';
-import { getJson } from '../../scripts/follow-on-ratio.mjs';
+import { getJson, render } from '../../scripts/follow-on-ratio.mjs';
+import { computeFollowOnRatio } from '../../lib/follow-on-ratio.js';
 
 describe('getJson — non-retryable vs retryable (LIN-1984)', () => {
   let realFetch;
@@ -72,5 +73,25 @@ describe('getJson — non-retryable vs retryable (LIN-1984)', () => {
     globalThis.fetch = async () => ({ ok: true, status: 200, json: async () => ({ hello: 'world' }) });
     const result = await getJson('https://proxy.example/issues/x', 'tok', { tolerate: true });
     assert.deepEqual(result, { hello: 'world' });
+  });
+});
+
+describe('render — the review-ledger line says what it is (LIN-4519)', () => {
+  const DONE = '2026-06-10T00:00:00.000Z';
+  const issue = (id, extra = {}) => ({
+    id, identifier: `LIN-${id}`, title: id, description: '', state: { name: 'Done', type: 'completed' }, trashed: null,
+    createdAt: '2026-05-01T00:00:00.000Z', completedAt: DONE, parent: null, children: [], relations: [], inverseRelations: [],
+    comments: [{ id: `c-${id}`, body: '## Review — LIN-1\n- finding', createdAt: DONE }], ...extra,
+  });
+
+  test('the ledger line reads "not measured" with its reason, never a percentage', () => {
+    const result = computeFollowOnRatio([issue('a'), issue('b')], {
+      windowStart: '2026-06-01T00:00:00.000Z', windowEnd: '2026-07-01T00:00:00.000Z', asOf: '2026-07-01T12:00:00.000Z',
+    });
+    const text = render(result, { listCalls: 1, detailCalls: 2 });
+    const line = text.split('\n').find((l) => l.includes('with a review ledger'));
+    assert.ok(line, 'the line is still printed');
+    assert.match(line, /with a review ledger\s+not measured/);
+    assert.doesNotMatch(line, /\d\.\d%/, 'no percentage is printed for a retired diagnostic');
   });
 });

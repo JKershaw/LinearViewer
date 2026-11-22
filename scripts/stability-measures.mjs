@@ -1,6 +1,7 @@
 #!/usr/bin/env node
 // The Stability Review's measures over one window of landings (LIN-4399; the repository reads, LIN-4420; the tracker
-// reads, LIN-4421; the person's seat, LIN-4422; measure 1 from the blind-read ledger, LIN-4439).
+// reads, LIN-4421; the person's seat, LIN-4422; measure 1 from the blind-read ledger, LIN-4439; measure 1 from the verdict
+// records, LIN-4519).
 // Usage: node scripts/stability-measures.mjs <repo> <base> <head> [--runner <dir>] [--api <base>] [--lookback-days <n>]
 //          [--reference <file> | --as-reference <label>]
 //   → JSON on stdout; the ordered opening table on stderr.
@@ -14,10 +15,12 @@
 // before base, so the landings of the --lookback-days (default 3) before base are read for their tickets too. The same
 // proxy reads the person's seat over those finished tasks (scripts/stability-measures-seat.mjs: loop rulings only;
 // person origin not measured; the operator-free share an upper bound).
-// Measure 1 (scripts/stability-measures-blind.mjs) counts the window's landings that have a `## Blind read` naming their
-// PR posted before their merge, with its verdict, and the unread by named reason. It reads the tickets' comments
-// through the same proxy client (the tracker's own issue reads first, so a ticket costs one call); without --api it is
-// `not measured`. It replaced LIN-4422's sample and its hand-scored signs file (LIN-4439): one source.
+// Measure 1 (scripts/stability-measures-blind.mjs) counts the window's landings that have a blind-read verdict naming
+// their PR, written before their merge, with its outcome, and the unread by named reason. It reads verdict records
+// (kind verdict, task and change) through the same proxy client (readVerdictRecords), and only for the tickets of the
+// landings at or after the cutover (VERDICT_RECORDS_SINCE): an earlier landing is counted "before the verdict records",
+// never read from comments. Without --api it is `not measured`. It replaced LIN-4422's sample and its hand-scored signs
+// file (LIN-4439): one source, and since LIN-4519 that source is the records.
 // LIN-4423, the reference: --as-reference <label> writes a reference reading of an earlier window. Its blind-read and
 // seat rows read `no <label> reading; the first reading sets it` (the seat is not read, saving its ~1,700 calls), and
 // the session-local diagnostics that would differ on a re-run are left out (the runner tip and freshness check's
@@ -36,8 +39,8 @@ import {
   NO_REFERENCE_KEYS, NO_REFERENCE_ROWS, SCOPE_INCLUDE, buildReading, churnRow, ciRow, formatTable, linesRow, noReferenceReading,
   notMeasured, parseLandingLog, parseNumstat, referencesFrom, waitingRows,
 } from './stability-measures-core.mjs';
-import { createProxyClient, firstLine, readSeat, readTracker, readTrails, trackerNotMeasured } from './stability-measures-tracker.mjs';
-import { blindRow, repoSlugOf, ticketsToRead } from './stability-measures-blind.mjs';
+import { createProxyClient, firstLine, readSeat, readTracker, readVerdictRecords, trackerNotMeasured } from './stability-measures-tracker.mjs';
+import { blindRow, changeRefsOf, repoSlugOf, ticketsToRead } from './stability-measures-blind.mjs';
 import { harbourEndpointAt, loadWaitingSeries, runnerEndpointAt } from './stability-measures-waiting.mjs';
 
 const USAGE = 'usage: node scripts/stability-measures.mjs <repo> <base> <head> [--runner <dir>] [--api <base>] [--lookback-days <n>] [--reference <file> | --as-reference <label>]';
@@ -110,8 +113,7 @@ function readCiRuns(repo, window) {
 // and marked Done after it (close-out runs after the merge), which finish in this window (LIN-4421 ruling). Older
 // landings are not read: a ticket whose only landings predate the lookback and that finished here is not counted.
 // The seat is read over the same finished tasks with the same client, so its calls share the one pacing budget.
-// With readSeatRows false (a reference reading) the seat is not read and `rows.seat` is left to the caller. `trails` are
-// the issue reads' comment trails, handed to measure 1 so a ticket is read once.
+// With readSeatRows false (a reference reading) the seat is not read and `rows.seat` is left to the caller.
 async function readTrackerRows(repo, client, window, lookbackDays, windowLog, { references = {}, readSeatRows = true } = {}) {
   const lookback = { days: lookbackDays, since: new Date(new Date(window.baseDate).getTime() - lookbackDays * 86400e3).toISOString() };
   if (!client) return { lookback, rows: trackerNotMeasured(NO_API, references) };
@@ -124,23 +126,23 @@ async function readTrackerRows(repo, client, window, lookbackDays, windowLog, { 
   }
   const tracker = await readTracker({ client, windowLandings: windowLog.landings, priorLandings, window, lookback, references });
   if (!tracker.selection) return { lookback, rows: tracker.rows, stats: tracker.stats, priorLandings: priorLandings.length };
-  const done = { lookback, stats: client.stats, priorLandings: priorLandings.length, trails: tracker.trails };
+  const done = { lookback, stats: client.stats, priorLandings: priorLandings.length };
   if (!readSeatRows) return { ...done, rows: tracker.rows };
   const seat = await readSeat({ client, finished: tracker.selection.finished, tasks: tracker.tasks, references });
   return { ...done, rows: { ...tracker.rows, seat: seat.rows } };
 }
 
-// Measure 1: the comments of the tickets its landings need (ticketsToRead: ordinary landings after the gate), reusing
-// the tracker's trails, then the row. `repo` narrows a PR number to this repository's URLs; null when origin is not a
-// GitHub remote (the number alone is matched).
-async function readBlindRow(repo, client, windowLog, numstat, known, reference) {
+// Measure 1: the verdict records of the tickets its landings need (ticketsToRead: ordinary landings at or after the
+// cutover), read through the same paced client, then the row. `repo` narrows a PR number to this repository's URLs; null
+// when origin is not a GitHub remote (the number alone is matched). A window wholly before the cutover reads no records.
+async function readBlindRow(repo, client, windowLog, numstat, reference) {
   if (!client) return notMeasured('blind', NO_API, { reference });
   if (windowLog.reason) return notMeasured('blind', `landing log unreadable: ${windowLog.reason}`, { reference });
   let slug = null;
   try { slug = repoSlugOf(git(repo, ['remote', 'get-url', 'origin'])); } catch { slug = null; }
   const tickets = ticketsToRead({ landings: windowLog.landings, numstat });
-  const { trails } = await readTrails({ client, tickets, known: known ?? new Map() });
-  return blindRow({ landings: windowLog.landings, numstat, trails, repo: slug, reference });
+  const { facts, changes } = tickets.length ? await readVerdictRecords({ client, tickets }) : { facts: new Map(), changes: [] };
+  return blindRow({ landings: windowLog.landings, numstat, facts, changeRefs: changeRefsOf(changes), repo: slug, reference });
 }
 
 // The reference slots for --reference: a file that cannot be read or is not a matching reference reading stops the run,
@@ -203,7 +205,7 @@ await runCli(async () => {
   const seat = asReference != null ? NO_REFERENCE_ROWS.seat.map(noReading) : tracker.rows.seat;
   const noNewMess = asReference != null
     ? NO_REFERENCE_ROWS['no-new-mess'].map(noReading)
-    : [await readBlindRow(repo, client, windowLog, landings, tracker.trails, refs.blind)];
+    : [await readBlindRow(repo, client, windowLog, landings, refs.blind)];
 
   const reading = buildReading({
     window,

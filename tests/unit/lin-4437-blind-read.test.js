@@ -327,7 +327,8 @@ describe('the run readers place a blind read', () => {
         { id: 'im', kind: 'implementation', status: 'taken', dispatchedAt: at(5), completedAt: at(6) }
       ]
     };
-    const out = computeIssueRoundTrips(issue, { asOf: at(9), gateKind: 'review', rePassKind: 'implementation' });
+    // LIN-4519: pinned to the comments source, whose structural tier is the walk under test (records would read these rows not measured).
+    const out = computeIssueRoundTrips(issue, { asOf: at(9), gateKind: 'review', rePassKind: 'implementation', verdictSource: 'comments' });
     assert.equal(out.R0.nextRow.kind, 'implementation');
     assert.equal(out.R0.verdict, 'request changes');
   });

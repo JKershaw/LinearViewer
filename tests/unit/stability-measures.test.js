@@ -12,7 +12,8 @@
 // LIN-4423: the reference reading (referencesFrom, the table's reference line, the CLI's refusals), the committed 8 Nov
 // reference against piece 1's verified figures, and the declaration naming every measure and row the tool emits.
 // LIN-4439: measure 1 reads the ledger (a pre-merge `## Blind read` naming each landing's PR, unread by named reason),
-// its trails through the paced client, the CLI end to end on a loopback proxy, and one source (no sample, no --blind).
+// LIN-4519: from the verdict records instead (blind-read verdicts, the cutover, the paced records reads), the CLI end to
+// end on a loopback proxy, and one source (no sample, no --blind).
 import { describe, test } from 'node:test';
 import assert from 'node:assert/strict';
 import { chmodSync, existsSync, mkdtempSync, readFileSync, rmSync, writeFileSync } from 'node:fs';
@@ -31,10 +32,13 @@ import {
   referencesFrom, row, selectFinished,
   sessionsOf, speedRow, tasksRow,
 } from '../../scripts/stability-measures-core.mjs';
-import { DISPATCH_LIST_LIMIT, createProxyClient, readSeat, readTracker, readTrails, retryAfterMs, trackerNotMeasured } from '../../scripts/stability-measures-tracker.mjs';
+import { DISPATCH_LIST_LIMIT, createProxyClient, readSeat, readTracker, readVerdictRecords, retryAfterMs, trackerNotMeasured } from '../../scripts/stability-measures-tracker.mjs';
 import {
-  GATE_LANDING, UNREAD, blindRow, isOrdinaryLanding, repoSlugOf, ticketsToRead,
+  GATE_LANDING, UNREAD, blindRow, changeRefsOf, isOrdinaryLanding, repoSlugOf, ticketsToRead,
 } from '../../scripts/stability-measures-blind.mjs';
+import {
+  VERDICT_RECORDS_SINCE, verdictFactsFromRecords, verdictFactsNotMeasured,
+} from '../../lib/records/verdict-facts.js';
 import { codeBalance } from '../../docs/papers/harbour/cleaner-than-it-started-scripts/balance-sign.mjs';
 import {
   MISSING_CONDITION, ORIGIN_UNREADABLE, UPPER_BOUND, LOOP_ONLY, hasBlockedMarker, membersOf, operatorFreeRow, rulingsRow,
@@ -573,13 +577,14 @@ describe('the Balance-to-sign rule: one rule for the paper\'s coder', () => {
   });
 });
 
-// ── LIN-4439: measure 1 reads the ledger ────────────────────────────────────
-// Landings after the gate (PR #2413, merged 12 Nov 21:06:21Z) unless a test says otherwise, oldest first in `specs`,
-// handed over newest first as git logs them. A trail is a ticket's comments as GET /issues/{id} returns them.
+// ── LIN-4519: measure 1 reads the verdict records ───────────────────────────
+// A blind read is a verdict record: judgement `blind-read`, outcome better, same or worse, `in` the ticket's task and `on`
+// the change of the PR it read. The fixtures are the records the proxy reader folds (verdictFactsFromRecords), so the same
+// fold decides the facts the tests see. Landings are after the cutover (VERDICT_RECORDS_SINCE, 22 Nov 04:20Z) unless a
+// test says otherwise.
 const PR = (n, repo = 'JKershaw/LinearViewer') => `https://github.com/${repo}/pull/${n}`;
 const AFTER = (h, m = 0) => new Date(Date.parse('2026-11-13T00:00:00Z') + (h * 60 + m) * 60e3).toISOString().replace('.000Z', 'Z');
-const read = (verdict, prs, createdAt, id = `r-${createdAt}`) => ({ id, createdAt, body: `## Blind read\n\nVerdict: ${verdict} because the area reads plainer now\n\n${prs.join('\n')}` });
-const said = (body, createdAt) => ({ id: `c-${createdAt}`, createdAt, body });
+const LATER = (h, m = 0) => new Date(Date.parse('2026-11-22T06:00:00Z') + (h * 60 + m) * 60e3).toISOString().replace('.000Z', 'Z');
 const ledgerWindow = (specs) => {
   const landings = [];
   const numstat = [];
@@ -590,150 +595,218 @@ const ledgerWindow = (specs) => {
   });
   return { landings, numstat };
 };
-const trailsOf = (byTicket) => new Map(Object.entries(byTicket).map(([t, comments]) => [t, Array.isArray(comments) ? { comments, truncated: false } : comments]));
+/** The records blind reads leave: `reads` = [{ ticket, outcome, prs, at, id?, judgement? }] → { tasks, verdicts, changes, firstAt }. */
+function recordsOf(reads, extraChanges = []) {
+  const tasks = new Map();
+  const changes = new Map();
+  for (const url of extraChanges) changes.set(url, { kind: 'change', id: `change-${changes.size + 1}`, fields: { ref: url } });
+  const verdicts = [];
+  const firstAt = new Map();
+  for (const r of reads) {
+    if (!tasks.has(r.ticket)) tasks.set(r.ticket, { kind: 'task', id: `task-${r.ticket}`, fields: { ref: r.ticket } });
+    const on = r.prs.map((url) => {
+      if (!changes.has(url)) changes.set(url, { kind: 'change', id: `change-${changes.size + 1}`, fields: { ref: url } });
+      return `${changes.get(url).id}@1`;
+    });
+    const id = r.id ?? `verdict-${verdicts.length + 1}`;
+    verdicts.push({ kind: 'verdict', id, v: 1, at: r.at, in: `task-${r.ticket}`, links: { on }, state: r.state ?? 'stands', fields: { judgement: r.judgement ?? 'blind-read', outcome: r.outcome } });
+    firstAt.set(id, r.at);
+  }
+  return { tasks: [...tasks.values()], verdicts, changes: [...changes.values()], firstAt };
+}
+/** The facts and change refs measure 1 is handed for `tickets`, folded from `reads` by the proxy reader's own fold. */
+function factsOf(reads, tickets, extraChanges = []) {
+  const r = recordsOf(reads, extraChanges);
+  return { facts: verdictFactsFromRecords({ tasks: r.tasks, verdicts: r.verdicts, firstAt: r.firstAt }, tickets), changeRefs: changeRefsOf(r.changes) };
+}
+/** Measure 1 over landings `specs` (ledgerWindow) with `reads` (recordsOf), for the tickets the window needs. `changes` are PR URLs of change records no verdict is on. */
+function measure1(specs, reads, { changes = [], ...opts } = {}) {
+  const { landings, numstat } = ledgerWindow(specs);
+  const { facts, changeRefs } = factsOf(reads, ticketsToRead({ landings, numstat }), changes);
+  return blindRow({ landings, numstat, facts, changeRefs, ...opts });
+}
 
-describe('measure 1: a landing counts as read only with a blind read naming its PR before its merge', () => {
-  const merged = AFTER(2);
-  const one = (comments, subject = 'LIN-1: change (#20)') => {
-    const { landings, numstat } = ledgerWindow([{ subject, date: merged }]);
-    return blindRow({ landings, numstat, trails: trailsOf({ 'LIN-1': comments }) });
-  };
+describe('measure 1: a landing counts as read only with a blind-read verdict naming its PR, written before its merge', () => {
+  const merged = LATER(2);
+  const one = (reads, subject = 'LIN-1: change (#20)', opts = {}) => measure1([{ subject, date: merged }], reads, opts);
 
-  test('a timely read naming the landing\'s PR counts as read, with its verdict', () => {
-    const r = one([said(`Implemented: ${PR(20)}`, AFTER(1)), read('worse', [PR(20)], AFTER(1, 30))]);
+  test('a timely verdict on the change whose ref names the landing\'s PR counts as read, with its outcome', () => {
+    const r = one([{ ticket: 'LIN-1', outcome: 'worse', prs: [PR(20)], at: LATER(1, 30) }]);
     assert.deepStrictEqual([r.key, r.status, r.value.landings, r.value.read], ['blind', STATUS.MEASURED, 1, 1]);
     assert.deepStrictEqual(r.value.verdicts, { better: 0, same: 0, worse: 1 });
-    assert.deepStrictEqual(r.value.unread, { [UNREAD.noTicket]: 0, [UNREAD.notOrdinary]: 0, [UNREAD.beforeGate]: 0, [UNREAD.noRead]: 0 });
-    assert.deepStrictEqual([r.value.perLanding[0].status, r.value.perLanding[0].verdict, r.value.perLanding[0].prUrl], ['read', 'worse', PR(20)]);
+    assert.deepStrictEqual(r.value.unread, { [UNREAD.noTicket]: 0, [UNREAD.notOrdinary]: 0, [UNREAD.beforeGate]: 0, [UNREAD.beforeRecords]: 0, [UNREAD.noRead]: 0 });
+    const p = r.value.perLanding[0];
+    assert.deepStrictEqual([p.status, p.verdict, p.prUrl, p.readAt, p.verdictId], ['read', 'worse', PR(20), LATER(1, 30), 'verdict-1']);
   });
 
-  test('a read posted after the merge is no read on record', () => {
-    const r = one([said(`Implemented: ${PR(20)}`, AFTER(1)), read('better', [PR(20)], AFTER(2, 5))]);
+  test('a verdict first written after the merge is no read on record', () => {
+    const r = one([{ ticket: 'LIN-1', outcome: 'better', prs: [PR(20)], at: LATER(2, 5) }]);
     assert.deepStrictEqual([r.value.read, r.value.unread[UNREAD.noRead]], [0, 1]);
     assert.match(r.value.perLanding[0].why, /no blind read naming #20 before the merge/);
   });
 
-  test('a read naming a different PR is no read on record', () => {
-    const r = one([said(`Implemented: ${PR(19)} then ${PR(20)}`, AFTER(1)), read('better', [PR(19)], AFTER(1, 30))]);
+  test('a verdict on a change naming a different PR is no read on record', () => {
+    const r = one([{ ticket: 'LIN-1', outcome: 'better', prs: [PR(19)], at: LATER(1, 30) }], undefined, { changes: [PR(20)] });
     assert.deepStrictEqual([r.value.read, r.value.unread[UNREAD.noRead]], [0, 1]);
   });
 
-  test('the newest timely read gives the verdict; a malformed read (no reason) is not a read', () => {
-    const r = one([said(PR(20), AFTER(1)), read('worse', [PR(20)], AFTER(1, 10)), read('same', [PR(20)], AFTER(1, 40)),
-      said(`## Blind read\n\nVerdict: better\n\n${PR(20)}`, AFTER(1, 50))]);
-    assert.deepStrictEqual(r.value.verdicts, { better: 0, same: 1, worse: 0 });
+  test('a landing whose PR no change record names is unreadable, never "no read on record" (finding-309f5e52)', () => {
+    // LIN-2's PR (#21) was opened before the writers went live: its blind read is a comment, which measure 1 does not read.
+    const specs = [{ subject: 'LIN-1: change (#20)', date: LATER(2) }, { subject: 'LIN-2: change (#21)', date: LATER(3) }];
+    const reads = [{ ticket: 'LIN-1', outcome: 'better', prs: [PR(20)], at: LATER(1, 30) }];
+    for (const [label, rs, changes] of [['no change record at all', reads, []], ['only a change record for another PR', [...reads, { ticket: 'LIN-2', outcome: 'same', prs: [PR(19)], at: LATER(2, 30) }], []]]) {
+      const r = measure1(specs, rs, { changes });
+      const p = r.value.perLanding.find((l) => l.pr === 21);
+      assert.deepStrictEqual([p.status, p.why], ['unreadable', 'no change record names #21'], label);
+      assert.deepStrictEqual([r.status, r.unreadable, r.value.read, r.value.unread[UNREAD.noRead]], [STATUS.PARTIAL, 1, 1, 0], label);
+      assert.match(r.reason, /1 landing\(s\) unreadable: \w+ no change record names #21/, label);
+    }
   });
 
-  test('a PR that is not on the ticket\'s landing before the merge is no read on record, whatever a read names', () => {
-    const r = one([read('better', [PR(20)], AFTER(1))]);
-    assert.match(r.value.perLanding[0].why, /#20 is not on the ticket's landing before the merge/);
-    assert.match(one([said(PR(20), AFTER(1)), read('better', [PR(20)], AFTER(1, 5))], 'LIN-1: pushed straight to main').value.perLanding[0].why, /names no PR/);
+  test('a review verdict, or one on no change at all, is no blind read', () => {
+    const r = one([{ ticket: 'LIN-1', outcome: 'better', prs: [PR(20)], at: LATER(1, 30), judgement: 'review' },
+      { ticket: 'LIN-1', outcome: 'better', prs: [], at: LATER(1, 35) }]);
+    assert.deepStrictEqual([r.value.read, r.value.unread[UNREAD.noRead]], [0, 1]);
+  });
+
+  test('a withdrawn blind-read verdict is no read on record (finding-1d1d6d74: it is not counted, as round trips leaves it out)', () => {
+    const r = one([{ ticket: 'LIN-1', outcome: 'better', prs: [PR(20)], at: LATER(1, 30), state: 'withdrawn' }]);
+    assert.deepStrictEqual([r.value.read, r.value.unread[UNREAD.noRead]], [0, 1]);
+    assert.match(r.value.perLanding[0].why, /no blind read naming #20 before the merge/);
+  });
+
+  test('the newest verdict gives the outcome; a verdict whose outcome is not a word is not a read', () => {
+    const r = one([{ ticket: 'LIN-1', outcome: 'worse', prs: [PR(20)], at: LATER(1, 10) }, { ticket: 'LIN-1', outcome: 'same', prs: [PR(20)], at: LATER(1, 40) },
+      { ticket: 'LIN-1', outcome: null, prs: [PR(20)], at: LATER(1, 50) }]);
+    assert.deepStrictEqual(r.value.verdicts, { better: 0, same: 1, worse: 0 });
   });
 
   test('a merge landing\'s PR is its "Merge pull request #N"; a squash landing\'s its trailing (#N)', () => {
     assert.deepStrictEqual([landingPr('Merge pull request #2413 from JKershaw/feat/lin-4438-x'), landingPr('LIN-4419: pin Node (#2412)'), landingPr('LIN-1: see #12 for why')], [2413, 2412, null]);
-    const { landings, numstat } = ledgerWindow([{ subject: 'Merge pull request #21 from JKershaw/feat/lin-1-x', date: merged }]);
-    const r = blindRow({ landings, numstat, trails: trailsOf({ 'LIN-1': [said(PR(21), AFTER(1)), read('better', [PR(21)], AFTER(1, 5))] }) });
+    const r = one([{ ticket: 'LIN-1', outcome: 'better', prs: [PR(21)], at: LATER(1, 5) }], 'Merge pull request #21 from JKershaw/feat/lin-1-x');
     assert.deepStrictEqual(r.value.verdicts.better, 1);
   });
 
-  test('with the repository known, a PR number names only that repository\'s PR', () => {
+  test('with the repository known, a PR number names only that repository\'s PR; owner and name ignore case', () => {
     const foreign = PR(20, 'JKershaw/simple-dispatcher');
-    const { landings, numstat } = ledgerWindow([{ subject: 'LIN-1: change (#20)', date: merged }]);
-    const trails = trailsOf({ 'LIN-1': [said(foreign, AFTER(1)), read('better', [foreign], AFTER(1, 5))] });
-    assert.strictEqual(blindRow({ landings, numstat, trails }).value.read, 1, 'the number alone matches when the repository is unknown');
-    assert.strictEqual(blindRow({ landings, numstat, trails, repo: 'JKershaw/LinearViewer' }).value.unread[UNREAD.noRead], 1);
-    const own = trailsOf({ 'LIN-1': [said(PR(20), AFTER(1)), read('better', [PR(20)], AFTER(1, 5))] });
-    assert.strictEqual(blindRow({ landings, numstat, trails: own, repo: 'jkershaw/linearviewer' }).value.read, 1, 'GitHub owner and name ignore case (prOf, lib/run-ledger.js)');
+    const reads = [{ ticket: 'LIN-1', outcome: 'better', prs: [foreign], at: LATER(1, 5) }];
+    assert.strictEqual(one(reads).value.read, 1, 'the number alone matches when the repository is unknown');
+    // This repository's #20 has no change record (the one record names another repository's #20): it cannot be read.
+    const other = one(reads, undefined, { repo: 'JKershaw/LinearViewer' });
+    assert.strictEqual(other.status, STATUS.NOT_MEASURED);
+    assert.match(other.reason, /^no landing could be read \(\w+ no change record names #20\)$/);
+    const own = [{ ticket: 'LIN-1', outcome: 'better', prs: [PR(20)], at: LATER(1, 5) }];
+    assert.strictEqual(one(own, undefined, { repo: 'jkershaw/linearviewer' }).value.read, 1, 'GitHub owner and name ignore case (prOf, lib/run-ledger.js)');
     assert.deepStrictEqual([repoSlugOf('https://github.com/JKershaw/LinearViewer.git\n'), repoSlugOf('git@github.com:JKershaw/LinearViewer.git'), repoSlugOf('/tmp/x')],
       ['JKershaw/LinearViewer', 'JKershaw/LinearViewer', null]);
   });
 });
 
-describe('measure 1: each unread landing is counted by its own named reason', () => {
-  const window = ledgerWindow([
+describe('measure 1: the cutover: a landing merged before the verdict records is counted apart, never as no read', () => {
+  const specs = [
     { subject: 'LIN-1: before the gate (#10)', date: '2026-11-12T20:00:00Z' },
-    { subject: 'Merge pull request #2413 from JKershaw/feat/lin-4438-blind-read-gate', date: GATE_LANDING.mergedAt },
-    { subject: 'Tidy the README (#11)', date: AFTER(1) },
-    { subject: 'LIN-2: notes only (#12)', date: AFTER(2), files: ['docs/areas/x.md'] },
-    { subject: 'LIN-3: no read (#13)', date: AFTER(3) },
-    { subject: 'LIN-4: read (#14)', date: AFTER(4), files: ['docs/x.md', 'routes/y.js'] },
-  ]);
-  const trails = trailsOf({ 'LIN-3': [said(PR(13), AFTER(2, 30))], 'LIN-4': [said(PR(14), AFTER(3, 30)), read('better', [PR(14)], AFTER(3, 45))] });
-  const r = blindRow({ ...window, trails });
+    { subject: 'LIN-2: after the gate, before the cutover (#11)', date: AFTER(2) },
+    { subject: 'LIN-3: read (#12)', date: LATER(3) },
+  ];
+  const reads = [{ ticket: 'LIN-3', outcome: 'better', prs: [PR(12)], at: LATER(2, 30) }];
+  const { landings, numstat } = ledgerWindow(specs);
 
-  test('no ticket, not an ordinary landing, landed before the gate and no read on record each have a fixture', () => {
-    assert.deepStrictEqual(Object.keys(r.value.unread), ['no ticket', 'not an ordinary landing', 'landed before the gate', 'no read on record']);
-    assert.deepStrictEqual(r.value.unread, { 'no ticket': 1, 'not an ordinary landing': 1, 'landed before the gate': 2, 'no read on record': 1 });
-    assert.deepStrictEqual(r.value.perLanding.map((l) => l.status), ['landed before the gate', 'landed before the gate', 'no ticket', 'not an ordinary landing', 'no read on record', 'read'], 'oldest first');
-    assert.deepStrictEqual([r.status, r.value.landings, r.value.read, r.value.verdicts.better], [STATUS.MEASURED, 6, 1, 1]);
+  test('the cutover is the P5 writers\' go-live, 22 Nov 04:20:39.504Z (lib/records/verdict-facts.js)', () => {
+    assert.strictEqual(VERDICT_RECORDS_SINCE, '2026-11-22T04:20:39.504Z');
   });
 
-  test('the gate is piece 3\'s landing; its own merge was not held by it, so it counts as before the gate', () => {
-    assert.deepStrictEqual([GATE_LANDING.pr, GATE_LANDING.ticket, GATE_LANDING.commit.slice(0, 9)], [2413, 'LIN-4438', 'eb14b7fff']);
-    assert.strictEqual(r.value.perLanding[1].ticket, 'LIN-4438');
-    assert.deepStrictEqual(r.value.gate, { commit: GATE_LANDING.commit, pr: 2413, mergedAt: GATE_LANDING.mergedAt });
+  test('only landings at or after the cutover need their ticket\'s records', () => {
+    assert.deepStrictEqual(ticketsToRead({ landings, numstat }), ['LIN-3']);
   });
 
-  test('only ordinary landings after the gate need their ticket\'s comments', () => {
-    assert.deepStrictEqual(ticketsToRead(window), ['LIN-4', 'LIN-3']);
+  test('a landing after the gate and before the cutover is "before the verdict records", and the row says so', () => {
+    const { facts, changeRefs } = factsOf(reads, ['LIN-3']);
+    const r = blindRow({ landings, numstat, facts, changeRefs });
+    assert.deepStrictEqual(r.value.perLanding.map((l) => l.status), ['landed before the gate', UNREAD.beforeRecords, 'read'], 'oldest first');
+    assert.deepStrictEqual([r.status, r.unreadable, r.value.read, r.value.verdictRecordsSince], [STATUS.PARTIAL, 1, 1, VERDICT_RECORDS_SINCE]);
+    assert.deepStrictEqual(r.value.unread, { [UNREAD.noTicket]: 0, [UNREAD.notOrdinary]: 0, [UNREAD.beforeGate]: 1, [UNREAD.beforeRecords]: 1, [UNREAD.noRead]: 0 });
+    assert.match(r.reason, /^1 landing\(s\) merged before the verdict records began \(2026-11-22T04:20:39\.504Z\), not read from them$/);
   });
 
-  test('ordinary is LIN-4422\'s definition: its own ticket and a path outside docs/', () => {
-    assert.strictEqual(isOrdinaryLanding(landing('a', 'x', 'LIN-5: x'), [{ path: 'docs/a.md' }, { path: 'lib/a.js' }]), true);
-    assert.strictEqual(isOrdinaryLanding(landing('a', 'x', 'LIN-5: x'), [{ path: 'docs/a.md' }]), false);
-    assert.strictEqual(isOrdinaryLanding(landing('a', 'x', 'Tidy'), [{ path: 'lib/a.js' }]), false);
+  test('a window of landings all before the gate stays measured: the gate reason, no partial row', () => {
+    const early = ledgerWindow([{ subject: 'LIN-1: a (#1)', date: '2026-11-11T10:00:00Z' }, { subject: 'LIN-2: b (#2)', date: '2026-11-12T10:00:00Z' }]);
+    const r = blindRow({ ...early, facts: new Map() });
+    assert.deepStrictEqual([r.status, r.unreadable, r.reason, r.value.unread[UNREAD.beforeGate]], [STATUS.MEASURED, 0, null, 2]);
   });
 
-  test('the opening table prints the read count, the verdicts and every unread reason', () => {
-    const w = { base: 'b'.repeat(40), head: 'h'.repeat(40), baseDate: 'x', headDate: 'y', landings: 6 };
-    assert.match(formatTable(buildReading({ window: w, rows: { 'no-new-mess': [r] } })),
-      /^1\. No new mess\n {3}blind +1 of 6 landings read blind before merge \(better 1, same 0, worse 0\); unread: no ticket 1, not an ordinary landing 1, landed before the gate 2, no read on record 1$/m);
+  test('a window after the gate and wholly before the cutover is not measured, its reason naming the cutover', () => {
+    const mid = ledgerWindow([{ subject: 'LIN-1: a (#1)', date: AFTER(1) }, { subject: 'LIN-2: b (#2)', date: AFTER(2) }]);
+    assert.deepStrictEqual(blindRow({ ...mid, facts: new Map() }), notMeasured('blind', 'every landing merged before the verdict records began (2026-11-22T04:20:39.504Z)'));
   });
 });
 
 describe('measure 1: what could not be read is counted, never "no read"', () => {
-  const window = ledgerWindow([{ subject: 'LIN-1: a (#1)', date: AFTER(1) }, { subject: 'LIN-2: b (#2)', date: AFTER(2) }, { subject: 'LIN-3: c (#3)', date: AFTER(3), files: null },
-    { subject: 'LIN-4: d (#4)', date: AFTER(4) }]);
+  const window = ledgerWindow([{ subject: 'LIN-1: a (#1)', date: LATER(1) }, { subject: 'LIN-2: b (#2)', date: LATER(2) }, { subject: 'LIN-3: c (#3)', date: LATER(3), files: null },
+    { subject: 'LIN-4: d (#4)', date: LATER(4) }]);
 
-  test('a failed ticket read, a truncated trail and a landing with no file list make the row partial', () => {
-    const r = blindRow({ ...window, trails: trailsOf({ 'LIN-1': { reason: 'HTTP 500' }, 'LIN-2': { comments: [], truncated: true }, 'LIN-4': [] }) });
-    assert.deepStrictEqual([r.status, r.unreadable, r.value.read, r.value.unread[UNREAD.noRead]], [STATUS.PARTIAL, 3, 0, 1], 'the truncated trail is not "no read"');
-    assert.match(r.reason, /ticket read failed: HTTP 500; .* comments came back truncated; .* no file list/);
+  test('a failed records read and a landing with no file list make the row partial, with their reasons', () => {
+    const facts = new Map([
+      ['LIN-1', verdictFactsNotMeasured('the records could not be read through the proxy (HTTP 500)')],
+      ['LIN-2', { measured: true, taskId: 'task-LIN-2', verdicts: [] }],
+      ['LIN-4', { measured: true, taskId: null, verdicts: [] }],
+    ]);
+    const changeRefs = new Map([['change-2', PR(2)], ['change-4', PR(4)]]); // each has a change record and no blind read
+    const r = blindRow({ ...window, facts, changeRefs });
+    assert.deepStrictEqual([r.status, r.unreadable, r.value.read, r.value.unread[UNREAD.noRead]], [STATUS.PARTIAL, 2, 0, 2]);
+    assert.match(r.reason, /the records could not be read through the proxy \(HTTP 500\); .* no file list/);
   });
 
   test('no landing readable, or no landing at all, is not measured with its reason', () => {
-    const { landings, numstat } = ledgerWindow([{ subject: 'LIN-1: a (#1)', date: AFTER(1) }]);
-    const none = blindRow({ landings, numstat, trails: new Map() });
+    const { landings, numstat } = ledgerWindow([{ subject: 'LIN-1: a (#1)', date: LATER(1) }]);
+    const none = blindRow({ landings, numstat, facts: new Map([['LIN-1', verdictFactsNotMeasured('the records could not be read through the proxy (HTTP 500)')]]) });
     assert.deepStrictEqual([none.status, none.value], [STATUS.NOT_MEASURED, null]);
-    assert.match(none.reason, /^no landing could be read \(.* ticket read failed: not read\)$/);
-    assert.deepStrictEqual(blindRow({ landings: [], numstat: [], trails: new Map() }), notMeasured('blind', 'no landings in the window'));
+    assert.match(none.reason, /^no landing could be read \(.* the records could not be read through the proxy \(HTTP 500\)\)$/);
+    assert.deepStrictEqual(blindRow({ landings: [], numstat: [], facts: new Map() }), notMeasured('blind', 'no landings in the window'));
   });
 });
 
-describe('measure 1: the trails come through the paced proxy client, one issue read per ticket', () => {
-  const client = (routes) => {
+describe('measure 1: the verdict records come through the paced proxy client, the fold\'s reads only', () => {
+  const fakeProxy = (routes) => {
     const paths = [];
     const fetch = async (url) => {
       const path = url.replace('http://p/api/proxy', '');
       paths.push(path);
-      const r = routes[path] ?? { status: 500 };
+      const r = routes[path] ?? { status: 404 };
       return { status: r.status, headers: { get: () => null }, json: async () => r.body ?? {} };
     };
     return { paths, client: createProxyClient({ base: 'http://p/api/proxy', fetch, now: () => 0, sleep: async () => {} }) };
   };
 
-  test('a known trail costs no call; the rest are read, a truncated one flagged and a failed one carrying its reason', async () => {
-    const { client: c, paths } = client({
-      '/issues/LIN-2': { status: 200, body: { comments: [said('x', AFTER(1))], truncated: { comments: true } } },
-      '/issues/LIN-3': { status: 404 },
-      '/issues/LIN-4': { status: 200, body: { comments: [said('y', AFTER(1))] } },
+  test('the task, verdict and change lists, then the first version of a verdict that has moved on; no issue or comment read', async () => {
+    const { client, paths } = fakeProxy({
+      '/records?kind=task': { status: 200, body: { records: [{ kind: 'task', id: 'task-1', fields: { ref: 'LIN-1' } }] } },
+      '/records?kind=verdict': { status: 200, body: { records: [{ kind: 'verdict', id: 'verdict-2', v: 2, at: LATER(1, 40), in: 'task-1', links: { on: ['change-1@1'] }, fields: { judgement: 'blind-read', outcome: 'worse' } }] } },
+      '/records?kind=change': { status: 200, body: { records: [{ kind: 'change', id: 'change-1', v: 1, fields: { ref: PR(5) } }] } },
+      '/records/verdict-2': { status: 200, body: { id: 'verdict-2', versions: [{ v: 1, at: LATER(1, 5) }, { v: 2, at: LATER(1, 40) }] } },
     });
-    const known = new Map([['LIN-1', { comments: [], truncated: false }]]);
-    const { trails } = await readTrails({ client: c, tickets: ['LIN-1', 'LIN-2', 'LIN-3', 'LIN-4'], known });
-    assert.deepStrictEqual(paths, ['/issues/LIN-2', '/issues/LIN-3', '/issues/LIN-4']);
-    assert.deepStrictEqual([trails.get('LIN-1'), trails.get('LIN-2').truncated, trails.get('LIN-3'), trails.get('LIN-4').truncated], [known.get('LIN-1'), true, { reason: 'issue not found' }, false]);
+    const { facts, changes } = await readVerdictRecords({ client, tickets: ['LIN-1', 'LIN-9'] });
+    assert.deepStrictEqual(paths, ['/records?kind=task', '/records?kind=verdict', '/records?kind=change', '/records/verdict-2']);
+    assert.deepStrictEqual(facts.get('LIN-1').verdicts.map((x) => [x.id, x.at, x.outcome]), [['verdict-2', LATER(1, 5), 'worse']], 'the first write time, from the first version');
+    assert.deepStrictEqual(facts.get('LIN-9'), { measured: true, taskId: null, verdicts: [] }, 'a ticket with no task has no verdicts, which is measured');
+    assert.deepStrictEqual(changes.map((c) => c.fields.ref), [PR(5)]);
   });
+
+  test('a failed records read makes every ticket\'s facts not measured, with its reason, never "no verdict"', async () => {
+    const { client } = fakeProxy({ '/records?kind=task': { status: 500 } });
+    const { facts } = await readVerdictRecords({ client, tickets: ['LIN-1', 'LIN-2'] });
+    assert.strictEqual(facts.get('LIN-1').measured, false);
+    assert.match(facts.get('LIN-1').reason, /could not be read through the proxy \(HTTP 500\)/);
+    assert.deepStrictEqual(facts.get('LIN-2'), facts.get('LIN-1'));
+  });
+});
+
+// LIN-4519 acceptance: measure 1 reads no comment. Its module, its reader and the CLI name no comment parser or trail read.
+test('measure 1 reads no comment: no comment parser or trail read in its module, reader or CLI', () => {
+  for (const f of ['scripts/stability-measures-blind.mjs', 'scripts/stability-measures-tracker.mjs', 'scripts/stability-measures.mjs']) {
+    const src = readFileSync(join(ROOT, f), 'utf8');
+    assert.doesNotMatch(src, /^import .*run-trail/m, `${f} imports no comment parser`);
+    assert.doesNotMatch(src, /\b(parseBlindRead|landingPrUrls|readTrails|latestBlindRead|checkBlindRead)\b/, f);
+  }
 });
 
 // ── LIN-4422: measure 4, the person's seat ──────────────────────────────────
@@ -919,7 +992,7 @@ describe('the reference: written and read by the tool, never another definition'
   });
 
   test('the rows a reference never has are the rows measures 1 and 4 emit, in their modules\' order', () => {
-    assert.deepStrictEqual(NO_REFERENCE_ROWS['no-new-mess'], [blindRow({ landings: [], numstat: [], trails: new Map() }).key]);
+    assert.deepStrictEqual(NO_REFERENCE_ROWS['no-new-mess'], [blindRow({ landings: [], numstat: [], facts: new Map() }).key]);
     assert.deepStrictEqual(NO_REFERENCE_ROWS.seat, seatNotMeasured('x').map((r) => r.key));
     assert.deepStrictEqual(NO_REFERENCE_KEYS, [...NO_REFERENCE_ROWS['no-new-mess'], ...NO_REFERENCE_ROWS.seat]);
   });
@@ -935,7 +1008,7 @@ describe('the reference: written and read by the tool, never another definition'
     const refs = referencesFrom(reference([churnRow(parseNumstat('@a\n\n3\t1\tlib/x.js'), inScope), notMeasured('blind', noReferenceReading('8 Nov'))]));
     const table = formatTable(buildReading({
       window,
-      rows: { curve: [churnRow(parseNumstat('@a\n\n9\t3\tlib/x.js'), inScope, { reference: refs.churn })], 'no-new-mess': [blindRow({ landings: [], numstat: [], trails: new Map(), reference: refs.blind })] },
+      rows: { curve: [churnRow(parseNumstat('@a\n\n9\t3\tlib/x.js'), inScope, { reference: refs.churn })], 'no-new-mess': [blindRow({ landings: [], numstat: [], facts: new Map(), reference: refs.blind })] },
     }));
     assert.match(table, new RegExp(`churn +${live.value.added} added.*\\n {20}8 Nov: 3 added, 1 deleted over 1 landings`));
     assert.match(table, /blind +not measured: no landings in the window\n {20}8 Nov: not measured: no 8 Nov reading; the first reading sets it/);
@@ -1182,42 +1255,45 @@ test('the CLI reads waiting.harbour from the records at each endpoint commit\'s 
   }
 });
 
-// LIN-4439: measure 1 end to end. A fixture repository whose window holds one landing for each outcome, its origin a
-// GitHub remote, and a loopback stand-in proxy serving each ticket's comments. Its issue list fails, so the tracker
-// stops after one call (the client paces at 1.2 s a call) and measure 1 reads its own trails: only the tickets of
-// ordinary landings after the gate. Reusing the tracker's trails is readTrails' `known` (the client test above).
-test('measure 1 reads each ticket\'s comments through --api and counts the window\'s landings by outcome', async () => {
+// LIN-4519: measure 1 end to end. A fixture repository whose window holds one landing for each outcome, its origin a
+// GitHub remote, and a loopback stand-in proxy serving the verdict records. Its issue list fails, so the tracker stops
+// after one call, and measure 1 reads the records (task, verdict, change) of its ordinary landings at or after the
+// cutover, and no comment.
+test('measure 1 reads the verdict records through --api and counts the window\'s landings by outcome', async () => {
   const repo = makeRepo();
   const fake = mkdtempSync(join(tmpdir(), 'stability-gh-'));
   const lv = (n) => `https://github.com/JKershaw/LinearViewer/pull/${n}`;
   const foreign = 'https://github.com/JKershaw/simple-dispatcher/pull/8';
-  const blindRead = (verdict, url, createdAt) => ({ id: createdAt, createdAt, body: `## Blind read\n\nVerdict: ${verdict}, the new module has one obvious home\n\n${url}` });
-  const comments = {
-    'LIN-1': [{ id: 'a', createdAt: '2026-11-13T10:30:00Z', body: `Implemented: ${lv(5)}` }, blindRead('better', lv(5), '2026-11-13T10:50:00Z')],
-    'LIN-3': [{ id: 'b', createdAt: '2026-11-13T12:30:00Z', body: `See ${foreign}` }, blindRead('same', foreign, '2026-11-13T12:40:00Z')],
+  const records = {
+    task: [{ kind: 'task', id: 'task-1', fields: { ref: 'LIN-1' } }, { kind: 'task', id: 'task-3', fields: { ref: 'LIN-3' } }],
+    change: [{ kind: 'change', id: 'change-5', fields: { ref: lv(5) } }, { kind: 'change', id: 'change-8', fields: { ref: foreign } }],
+    verdict: [
+      { kind: 'verdict', id: 'verdict-1', v: 1, at: '2026-11-22T10:50:00Z', in: 'task-1', links: { on: ['change-5@1'] }, fields: { judgement: 'blind-read', outcome: 'better' } },
+      { kind: 'verdict', id: 'verdict-3', v: 1, at: '2026-11-22T12:40:00Z', in: 'task-3', links: { on: ['change-8@1'] }, fields: { judgement: 'blind-read', outcome: 'same' } },
+    ],
   };
   const paths = [];
   const server = createServer((req, res) => {
     paths.push(req.url);
     res.setHeader('content-type', 'application/json');
-    const m = /^\/issues\/(LIN-\d+)$/.exec(req.url);
-    if (m) return res.end(JSON.stringify({ identifier: m[1], state: { type: 'started' }, comments: comments[m[1]] ?? [] }));
+    const m = /^\/records\?kind=(task|verdict|change)$/.exec(req.url);
+    if (m) return res.end(JSON.stringify({ records: records[m[1]] }));
     res.statusCode = 404;
     return res.end('{}');
   });
   await new Promise((r) => server.listen(0, '127.0.0.1', r));
   try {
     repo.git('remote', 'add', 'origin', 'https://github.com/JKershaw/LinearViewer.git');
-    const base = repo.commit({ 'lib/a.js': 'const a = 0;\n' }, '2026-11-12T20:00:00Z', 'base');
-    repo.commit({ 'lib/a.js': 'const a = 1;\n' }, '2026-11-12T21:00:00Z', 'LIN-4: before the gate (#4)');
-    repo.commit({ 'lib/b.js': 'const b = 1;\n' }, '2026-11-13T11:00:00Z', 'LIN-1: add b (#5)');
-    repo.commit({ 'docs/n.md': 'n\n' }, '2026-11-13T11:30:00Z', 'LIN-2: notes only (#6)');
-    repo.commit({ 'lib/c.js': 'const c = 1;\n' }, '2026-11-13T12:00:00Z', 'Tidy c (#7)');
+    const base = repo.commit({ 'lib/a.js': 'const a = 0;\n' }, '2026-11-21T06:00:00Z', 'base');
+    repo.commit({ 'lib/a.js': 'const a = 1;\n' }, '2026-11-21T07:00:00Z', 'LIN-4: before the verdict records (#4)');
+    repo.commit({ 'lib/b.js': 'const b = 1;\n' }, '2026-11-22T11:00:00Z', 'LIN-1: add b (#5)');
+    repo.commit({ 'docs/n.md': 'n\n' }, '2026-11-22T11:30:00Z', 'LIN-2: notes only (#6)');
+    repo.commit({ 'lib/c.js': 'const c = 1;\n' }, '2026-11-22T12:00:00Z', 'Tidy c (#7)');
     repo.git('checkout', '-q', '-b', 'feat/lin-3-d');
-    repo.commit({ 'lib/d.js': 'const d = 1;\n' }, '2026-11-13T12:50:00Z', 'work');
+    repo.commit({ 'lib/d.js': 'const d = 1;\n' }, '2026-11-22T12:50:00Z', 'work');
     repo.git('checkout', '-q', 'main');
     spawnSync('git', ['-C', repo.dir, '-c', 'user.name=t', '-c', 'user.email=t@example.com', 'merge', '-q', '--no-ff', 'feat/lin-3-d',
-      '-m', 'Merge pull request #8 from x/feat/lin-3-d', '-m', 'Add d'], { env: { ...process.env, GIT_AUTHOR_DATE: '2026-11-13T13:00:00Z', GIT_COMMITTER_DATE: '2026-11-13T13:00:00Z' } });
+      '-m', 'Merge pull request #8 from x/feat/lin-3-d', '-m', 'Add d'], { env: { ...process.env, GIT_AUTHOR_DATE: '2026-11-22T13:00:00Z', GIT_COMMITTER_DATE: '2026-11-22T13:00:00Z' } });
     const head = repo.git('rev-parse', 'HEAD').trim();
     writeFileSync(join(fake, 'gh'), '#!/bin/sh\necho "[]"\n');
     chmodSync(join(fake, 'gh'), 0o755);
@@ -1226,14 +1302,51 @@ test('measure 1 reads each ticket\'s comments through --api and counts the windo
       { env: { ...process.env, HARBOUR_LOCAL_BASE: '', PATH: `${fake}${delimiter}${process.env.PATH}` } },
       (e, stdout, stderr) => (e ? reject(new Error(stderr || e.message)) : resolve({ json: JSON.parse(stdout), table: stderr }))));
     const blind = rowsOf(out.json).blind;
-    assert.deepStrictEqual([blind.status, blind.value.landings, blind.value.read, blind.value.repo], [STATUS.MEASURED, 5, 1, 'JKershaw/LinearViewer']);
+    assert.deepStrictEqual([blind.status, blind.value.landings, blind.value.read, blind.value.repo], [STATUS.PARTIAL, 5, 1, 'JKershaw/LinearViewer']);
     assert.deepStrictEqual(blind.value.verdicts, { better: 1, same: 0, worse: 0 });
-    // LIN-3 is a merge landing (its ticket from the branch, its PR from "Merge pull request #8"); its read names
-    // simple-dispatcher's #8, not this repository's: no read on record.
-    assert.deepStrictEqual(blind.value.unread, { 'no ticket': 1, 'not an ordinary landing': 1, 'landed before the gate': 1, 'no read on record': 1 });
-    assert.deepStrictEqual(paths, ['/issues?limit=50', '/issues/LIN-3', '/issues/LIN-1'], 'LIN-4 (before the gate) and LIN-2 (not ordinary) cost no call');
+    // LIN-4 landed before the verdict records; LIN-3 is a merge landing (its ticket from the branch, its PR from "Merge
+    // pull request #8"), and its verdict names simple-dispatcher's #8, not this repository's: no change record names
+    // this repository's #8, so the landing is unreadable (finding-309f5e52), not "no read on record".
+    assert.deepStrictEqual(blind.value.unread, { 'no ticket': 1, 'not an ordinary landing': 1, 'landed before the gate': 0, 'before the verdict records': 1, 'no read on record': 0 });
+    assert.strictEqual(blind.unreadable, 2);
+    assert.match(blind.value.perLanding.find((l) => l.pr === 8).why, /^no change record names #8$/);
+    // The three list reads run in parallel, so their arrival order is not fixed: the set is.
+    assert.deepStrictEqual(paths.filter((p) => p.startsWith('/records?kind=')).sort(), ['/records?kind=change', '/records?kind=task', '/records?kind=verdict']);
+    assert.ok(!paths.some((p) => p.startsWith('/issues/')), 'no ticket\'s comments are read');
     assert.match(rowsOf(out.json).tasks.reason, /^proxy: issue list: not found$/);
-    assert.match(out.table, /blind +1 of 5 landings read blind before merge \(better 1, same 0, worse 0\)/);
+    assert.match(blind.reason, /^1 landing\(s\) unreadable: \w+ no change record names #8; 1 landing\(s\) merged before the verdict records began \(2026-11-22T04:20:39\.504Z\), not read from them$/);
+  } finally {
+    server.close(); repo.cleanup(); rmSync(fake, { recursive: true, force: true });
+  }
+});
+
+// LIN-4519: a window wholly before the cutover reads no record at all (ticketsToRead is empty), and measure 1 is not
+// measured with the cutover as its reason.
+test('a window wholly before the verdict records reads no record and is not measured, its reason naming the cutover', async () => {
+  const repo = makeRepo();
+  const fake = mkdtempSync(join(tmpdir(), 'stability-gh-'));
+  const paths = [];
+  const server = createServer((req, res) => {
+    paths.push(req.url);
+    res.setHeader('content-type', 'application/json');
+    res.statusCode = 404;
+    return res.end('{}');
+  });
+  await new Promise((r) => server.listen(0, '127.0.0.1', r));
+  try {
+    repo.git('remote', 'add', 'origin', 'https://github.com/JKershaw/LinearViewer.git');
+    const base = repo.commit({ 'lib/a.js': 'const a = 0;\n' }, '2026-11-20T06:00:00Z', 'base');
+    const head = repo.commit({ 'lib/a.js': 'const a = 1;\n' }, '2026-11-20T07:00:00Z', 'LIN-1: add a (#5)');
+    writeFileSync(join(fake, 'gh'), '#!/bin/sh\necho "[]"\n');
+    chmodSync(join(fake, 'gh'), 0o755);
+    const out = await new Promise((resolve, reject) => execFile(process.execPath,
+      [join(ROOT, 'scripts/stability-measures.mjs'), repo.dir, base, head, '--api', `http://127.0.0.1:${server.address().port}`, '--lookback-days', '0'],
+      { env: { ...process.env, HARBOUR_LOCAL_BASE: '', PATH: `${fake}${delimiter}${process.env.PATH}` } },
+      (e, stdout, stderr) => (e ? reject(new Error(stderr || e.message)) : resolve({ json: JSON.parse(stdout), table: stderr }))));
+    const blind = rowsOf(out.json).blind;
+    assert.deepStrictEqual([blind.status, blind.value], [STATUS.NOT_MEASURED, null]);
+    assert.strictEqual(blind.reason, 'every landing merged before the verdict records began (2026-11-22T04:20:39.504Z)');
+    assert.deepStrictEqual(paths.filter((p) => p.startsWith('/records?kind=') || p.startsWith('/issues/')), [], 'no verdict or comment read');
   } finally {
     server.close(); repo.cleanup(); rmSync(fake, { recursive: true, force: true });
   }

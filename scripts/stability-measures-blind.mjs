@@ -1,10 +1,8 @@
-// Measure 1, no new mess: the pre-merge blind read, counted from the ledger (LIN-4439, piece 4 of LIN-4396). Pure, like
-// the core: landings, their file lists and each ticket's comment trail come in as data, the row comes out. The reads are
-// scripts/stability-measures-tracker.mjs readTrails (comments through createProxyClient on --api).
-//
-// It replaces LIN-4422's sample of up to 8 ordinary landings, hand-scored from a file of Balance cells, in place:
-// measure 1 has one source, the `## Blind read` comments the blind-read stage posts before close-out merges (LIN-4437,
-// LIN-4438).
+// Measure 1, no new mess: the pre-merge blind read, counted from the verdict records (LIN-4439 counted the `## Blind read`
+// comments; LIN-4519, P6 of LIN-4513, reads the blind-read verdicts instead). Pure, like the core: landings, their file
+// lists, each ticket's verdict facts and the change records' PR URLs come in as data, the row comes out. The reads are
+// scripts/stability-measures.mjs readBlindRow (readVerdictRecords in scripts/stability-measures-tracker.mjs, through the
+// workspace proxy).
 //
 // Every first-parent landing of the window is counted once, by the first of these that holds:
 //   no ticket                 the landing names no ticket of its own (ownTicket, the core's one rule);
@@ -12,19 +10,23 @@
 //                             a path outside docs/;
 //   landed before the gate    merged at or before piece 3's landing (GATE_LANDING, PR #2413). "At": the gate's own
 //                             merge was not held by the gate it delivered;
-//   no read on record         no well-formed blind read (parseBlindRead) posted on the ticket before the merge names the
-//                             landing's PR;
-//   read                      the newest such read, with its verdict (better, same or worse).
-// The landing's PR is its number (landingPr) matched against landingPrUrls of the trail as it stood at the merge: the
-// landing then was the one the gate read. A ticket whose trail could not be read whole (a failed read, or comments the
-// proxy flagged truncated) and a landing with no file list are unreadable: the row is partial, never "no read".
+//   before the verdict        merged before VERDICT_RECORDS_SINCE, the instant the records cover the workspace's verdicts
+//   records                   (lib/records/verdict-facts.js). A landing then cannot be read from records, and is never
+//                             counted "no read on record" or guessed from a comment;
+//   no read on record         no blind-read verdict first written before the merge, with an outcome that is one of
+//                             better, same or worse, whose `on` change's ref names the landing's PR;
+//   read                      the newest such verdict, with its outcome.
+// The landing's PR is its number (landingPr) matched against the change records' refs: the landing then was the change
+// the verdict read. The match is narrowed to this repository when its origin is a GitHub remote (`repo`). A ticket whose
+// verdict records could not be read is unreadable: the row is partial, never "no read". A landing counted "before the
+// verdict records" is not read either, so it is in the row's `unreadable` count, and the row's reason says so.
 //
 // The hand-run passes' Balance-to-sign rule (codeBalance) left with the sample: the paper's coder is its one user, and
 // it lives beside that coder (docs/papers/harbour/cleaner-than-it-started-scripts/balance-sign.mjs).
 
-import { BLIND_READ_VERDICTS } from '../lib/prompts/blind-read-words.js';
+import { BLIND_READ_KIND, BLIND_READ_VERDICTS } from '../lib/prompts/blind-read-words.js';
+import { VERDICT_RECORDS_SINCE, verdictCoverageAt, verdictsInWindow } from '../lib/records/verdict-facts.js';
 import { prOf } from '../lib/run-ledger.js';
-import { landingPrUrls, parseBlindRead } from '../lib/run-trail.js';
 import { landingPr, notMeasured, ownTicket, row } from './stability-measures-core.mjs';
 
 /** Piece 3's landing (LIN-4438): from this merge, close-out waits on a recorded `## Blind read` naming the PR. */
@@ -37,6 +39,7 @@ export const UNREAD = Object.freeze({
   noTicket: 'no ticket',
   notOrdinary: 'not an ordinary landing',
   beforeGate: 'landed before the gate',
+  beforeRecords: 'before the verdict records',
   noRead: 'no read on record',
 });
 
@@ -51,6 +54,15 @@ export function repoSlugOf(remoteUrl) {
   return m ? m[1] : null;
 }
 
+/**
+ * The change records' PR URLs by change id: what a verdict's `on` names, read to its PR. Pure.
+ * @param {object[]} changes - change records (current versions; `id`, `fields.ref`)
+ * @returns {Map<string, string>}
+ */
+export function changeRefsOf(changes = []) {
+  return new Map(changes.filter((c) => typeof c?.id === 'string' && typeof c.fields?.ref === 'string').map((c) => [c.id, c.fields.ref]));
+}
+
 /** Whether a full PR URL is PR `n` (of `repo`, when the repository is known; GitHub's owner and name ignore case). */
 const isPr = (url, n, repo) => {
   const pr = prOf(url);
@@ -60,59 +72,68 @@ const isPr = (url, n, repo) => {
 const atOrBefore = (a, b) => Date.parse(a) <= Date.parse(b);
 
 /**
- * The first reason a landing is unread that needs no trail, or null when only its ticket's comments can tell.
- * → { reason } | { unreadable } | { ticket } (read the trail).
+ * The first reason a landing is unread that needs no verdict facts, or null when only its ticket's records can tell.
+ * → { reason } | { unreadable } | { ticket } (read the ticket's verdicts).
  */
-function triage(landing, files, gate) {
+function triage(landing, files, gate, since) {
   const ticket = ownTicket(landing.subject, landing.body);
   if (!ticket) return { reason: UNREAD.noTicket };
   if (!files) return { ticket, unreadable: 'no file list' };
   if (!isOrdinaryLanding(landing, files)) return { ticket, reason: UNREAD.notOrdinary };
   if (atOrBefore(landing.date, gate.mergedAt)) return { ticket, reason: UNREAD.beforeGate };
+  if (!verdictCoverageAt(landing.date, since).covered) return { ticket, reason: UNREAD.beforeRecords };
   return { ticket };
 }
 
 /**
- * The tickets whose comments measure 1 needs: those of the window's ordinary landings after the gate. The CLI reads
- * only these, so a window before the gate spends no proxy call on measure 1.
+ * The tickets whose verdict records measure 1 needs: those of the window's ordinary landings at or after the cutover.
+ * The CLI reads only these, so a window before the cutover spends no proxy call on measure 1.
  */
-export function ticketsToRead({ landings, numstat, gate = GATE_LANDING }) {
+export function ticketsToRead({ landings, numstat, gate = GATE_LANDING, since = VERDICT_RECORDS_SINCE }) {
   const filesOf = new Map(numstat.map((c) => [c.commit, c.files]));
   const tickets = new Set();
   for (const l of landings) {
-    const t = triage(l, filesOf.get(l.commit), gate);
+    const t = triage(l, filesOf.get(l.commit), gate, since);
     if (t.ticket && !t.reason && !t.unreadable) tickets.add(t.ticket);
   }
   return [...tickets];
 }
 
 /**
- * One landing against its ticket's trail. `trail` is { comments, truncated } or { reason } (a failed read).
- * → { status: 'read', verdict, readAt, commentId, prUrl } | { status: <an UNREAD reason>, why? } | { status: 'unreadable', why }.
+ * One landing against its ticket's verdict facts (verdictFactsFromRecords or readVerdictFactsThroughProxy: a view with
+ * `measured`, and `verdicts` when measured) and the change refs (changeRefsOf).
+ * → { status: 'read', verdict, readAt, verdictId, prUrl } | { status: <an UNREAD reason>, why? } | { status: 'unreadable', why }.
  */
-export function readLanding({ landing, files, trail, gate = GATE_LANDING, repo = null }) {
-  const t = triage(landing, files, gate);
+export function readLanding({ landing, files, facts, changeRefs = new Map(), gate = GATE_LANDING, since = VERDICT_RECORDS_SINCE, repo = null }) {
+  const t = triage(landing, files, gate, since);
   if (t.unreadable) return { status: 'unreadable', why: t.unreadable };
   if (t.reason) return { status: t.reason };
-  if (!trail || trail.reason) return { status: 'unreadable', why: `ticket read failed: ${trail?.reason ?? 'not read'}` };
-  if (trail.truncated) return { status: 'unreadable', why: 'the ticket\'s comments came back truncated' };
+  if (!facts?.measured) return { status: 'unreadable', why: facts?.reason ?? 'the ticket\'s verdict records were not read' };
   const pr = landingPr(landing.subject);
   if (pr == null) return { status: UNREAD.noRead, why: 'the landing names no PR' };
-  const before = (trail.comments ?? []).filter((c) => c && Date.parse(c.createdAt ?? '') < Date.parse(landing.date));
-  const prUrl = landingPrUrls(before).find((u) => isPr(u, pr, repo)) ?? null;
-  if (!prUrl) return { status: UNREAD.noRead, why: `#${pr} is not on the ticket's landing before the merge` };
-  const reads = before.map(parseBlindRead).filter((r) => r && r.prs.includes(prUrl));
+  // A PR no change record names (one opened before the writers went live) can have been blind-read only as a comment,
+  // which measure 1 does not read: that is a reading that cannot be taken, never "no read on record" (finding-309f5e52).
+  if (![...changeRefs.values()].some((u) => isPr(u, pr, repo))) return { status: 'unreadable', why: `no change record names #${pr}` };
+  const reads = [];
+  for (const v of verdictsInWindow(facts.verdicts, { judgement: BLIND_READ_KIND, to: landing.date })) {
+    if (!BLIND_READ_VERDICTS.includes(v.outcome)) continue;
+    const prUrl = v.on.map((o) => changeRefs.get(o.id)).find((u) => u && isPr(u, pr, repo));
+    if (prUrl) reads.push({ v, prUrl });
+  }
   if (!reads.length) return { status: UNREAD.noRead, why: `no blind read naming #${pr} before the merge` };
-  const latest = reads.reduce((a, b) => (Date.parse(b.at ?? '') >= Date.parse(a.at ?? '') ? b : a));
-  return { status: 'read', verdict: latest.verdict, readAt: latest.at, commentId: latest.commentId, prUrl };
+  const latest = reads.reduce((a, b) => (Date.parse(b.v.at) >= Date.parse(a.v.at) ? b : a));
+  return { status: 'read', verdict: latest.v.outcome, readAt: latest.v.at, verdictId: latest.v.id, prUrl: latest.prUrl };
 }
 
 /**
  * Measure 1's row. `landings` are parseLandingLog() records of the window, `numstat` parseNumstat() records of the
- * same window (files per commit), `trails` a Map ticket → { comments, truncated } | { reason } holding at least
- * ticketsToRead()'s tickets. `repo` (owner/name) narrows a PR number to this repository's URL when it is known.
+ * same window (files per commit), `facts` a Map ticket → verdict facts holding at least ticketsToRead()'s tickets, and
+ * `changeRefs` changeRefsOf() of the change records read with them. `repo` (owner/name) narrows a PR number to this
+ * repository's URL when it is known.
  */
-export function blindRow({ landings, numstat, trails, gate = GATE_LANDING, repo = null, reference = null }) {
+export function blindRow({
+  landings, numstat, facts = new Map(), changeRefs = new Map(), gate = GATE_LANDING, since = VERDICT_RECORDS_SINCE, repo = null, reference = null,
+}) {
   if (!landings.length) return notMeasured('blind', 'no landings in the window', { reference });
   const filesOf = new Map(numstat.map((c) => [c.commit, c.files]));
   const verdicts = Object.fromEntries(BLIND_READ_VERDICTS.map((v) => [v, 0]));
@@ -122,20 +143,32 @@ export function blindRow({ landings, numstat, trails, gate = GATE_LANDING, repo 
   let read = 0;
   for (const l of [...landings].reverse()) {
     const ticket = ownTicket(l.subject, l.body);
-    const r = readLanding({ landing: l, files: filesOf.get(l.commit), trail: ticket ? trails.get(ticket) : null, gate, repo });
+    const r = readLanding({
+      landing: l, files: filesOf.get(l.commit), facts: ticket ? facts.get(ticket) : null, changeRefs, gate, since, repo,
+    });
     perLanding.push({ commit: l.commit, ticket, pr: landingPr(l.subject), mergedAt: l.date, ...r });
     if (r.status === 'read') { read++; verdicts[r.verdict]++; } else if (r.status === 'unreadable') unreadableWhy.push(`${l.commit.slice(0, 9)} ${r.why}`);
     else unread[r.status]++;
   }
-  if (unreadableWhy.length === landings.length) return notMeasured('blind', `no landing could be read (${unreadableWhy[0]})`, { reference });
+  const beforeRecords = unread[UNREAD.beforeRecords];
+  const counted = landings.length - unreadableWhy.length - beforeRecords;
+  if (counted === 0) {
+    const reason = unreadableWhy.length
+      ? `no landing could be read (${unreadableWhy[0]}${beforeRecords ? `; ${beforeRecords} merged before the verdict records` : ''})`
+      : `every landing merged before the verdict records began (${since ?? 'no cutover'})`;
+    return notMeasured('blind', reason, { reference });
+  }
+  const reasons = [];
+  if (unreadableWhy.length) reasons.push(`${unreadableWhy.length} landing(s) unreadable: ${unreadableWhy.join('; ')}`);
+  if (beforeRecords) reasons.push(`${beforeRecords} landing(s) merged before the verdict records began (${since ?? 'no cutover'}), not read from them`);
   const value = {
     landings: landings.length, read, verdicts, unread,
-    gate: { commit: gate.commit, pr: gate.pr, mergedAt: gate.mergedAt }, repo,
+    gate: { commit: gate.commit, pr: gate.pr, mergedAt: gate.mergedAt }, verdictRecordsSince: since, repo,
     perLanding,
   };
   return row('blind', value, {
-    unreadable: unreadableWhy.length,
-    reason: unreadableWhy.length ? `${unreadableWhy.length} landing(s) unreadable: ${unreadableWhy.join('; ')}` : null,
+    unreadable: unreadableWhy.length + beforeRecords,
+    reason: reasons.length ? reasons.join('; ') : null,
     reference,
   });
 }
