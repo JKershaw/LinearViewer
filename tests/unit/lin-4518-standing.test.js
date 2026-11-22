@@ -399,18 +399,23 @@ describe('witness 12 (finding 6d32cb5a): an audit\'s notes PR is the change its 
   test('a change the backstop wrote for an audit run is the notes PR and is in the landing; an implementation run\'s change is not', async () => {
     clock('2026-11-21T10:00:00.000Z');
     await store.openRun(URL_KEY, { id: 'row-audit', stage: 'retrospective-audit', taskId, lineage: 'row-root', at: '2026-11-21T10:00:00.000Z' });
+    // An implementation run on the task. It must be a task run: standingOf reads only runs whose `in` is the task, so
+    // a run opened without a task would make the stage filter untestable. (beforeEach's row-impl has no task.)
+    await store.openRun(URL_KEY, { id: 'row-impl-task', stage: 'implementation', taskId, lineage: 'row-root', at: '2026-11-21T10:00:00.000Z' });
     // The backstop's shape: written under the backstop's name (not the audit), with the audit run as its run.
     const notes = await writes.add({ urlKey: URL_KEY, kind: 'change', input: { in: taskId, ref: prUrl(301), head: 'N1' }, by: 'harbour', run: 'row-audit' });
     assert.equal(notes.problems, undefined, `the audit's change was refused: ${JSON.stringify(notes.problems)}`);
-    const impl = await addChange(302, 'I1');
-    assert.ok(impl);
+    // The implementation's change, written under the task's implementation run.
+    prs.set(302, { sha: 'I1', merged: false });
+    const impl = await writes.add({ urlKey: URL_KEY, kind: 'change', input: { in: taskId, ref: prUrl(302), head: 'I1' }, by: 'harbour', run: 'row-impl-task' });
+    assert.equal(impl.problems, undefined, `the implementation's change was refused: ${JSON.stringify(impl.problems)}`);
     const s = await standing();
     assert.deepEqual(s.notesPrs, [prUrl(301)], 'only the change the audit run first wrote is a notes PR');
     assert.ok(s.landing.includes(prUrl(301)));
     assert.equal(s.landingHasNotesPr, true, 'the landing holds the audit\'s notes PR');
   });
 
-  test('an audit change that is not in the landing does not make it hold a notes PR', async () => {
+  test('a landing whose changes were all written by implementation runs holds no notes PR', async () => {
     await store.openRun(URL_KEY, { id: 'row-audit-2', stage: 'retrospective-audit', taskId, lineage: 'row-root', at: '2026-11-21T10:00:00.000Z' });
     await addChange(303, 'I1');
     const s = await standing();
