@@ -34,18 +34,18 @@
   - A question that has already ended is refused, as the 409 does today.
 - **Dismissing ends the question `withdrawn`, `by` the person,** with the reason "not worth asking". If the asking run is waiting, it resumes with "proceed on your best judgment". It is the same on every surface. The false-escalation measure counts questions a person withdrew.
 - The Rulings page shows what is open for the signed-in person: questions and findings addressed to them.
-- [to confirm: shelving] Shelving keeps its store, with its resurface timer, keyed by question id. *Or:* shelving retires.
+- Shelving retires (John: unused), with its store and its resurface timer.
 - A suggested answer or dismissal is a finding `to` the person, `about` the question, written through `/records`.
 - Harbour posts one marked summary per decision, as it does for plans and verdicts, so people still see each answer on the ticket.
 - **Open questions are in every brief.** The brief shows the task's open questions and standing decisions, so a stage sees what is already asked or decided before it asks. The asking stage builds nothing its open question contests. There's no code gate.
 - **Retired in the same move:**
   - the unanswered-decisions predicate and its keyings (`buildRulingRef`, loop and lineage keys);
-  - the `task-decisions` and `dismissal-suggestions` stores, and the two scripts that import `TaskDecisionsStore`;
+  - the `task-decisions`, `dismissal-suggestions` and `shelved-rulings` stores, and the two scripts that import `TaskDecisionsStore`;
   - the agents' rulings route (`GET /api/proxy/rulings`) and its `suggest-answer` and `suggest-dismissal` routes, with their write operations, and the `/rulings?includeResolved` instructions;
   - answers as comments, `RULING_MARK`, `isRuling` and the `decision-answer` stamp.
 
   Every reader moves onto question and decision records: the ticket closer, the observer sweep, the KPIs, session and Home row states, account erasure, and the chat tools' `list_pending_decisions` (still read-only).
-- [to confirm: scan] The scan retires, with its fingerprint and its dismiss path: stages now raise their own questions. *Or:* the scan stays and writes its questions as records, `to` the person, with nothing resumed.
+- The scan retires, with its routes, page, fingerprint and the `harbour-comments` ledger it alone reads: stages raise their own questions.
 - [to confirm: size] The size of the move becomes a decision `scope`d to the task (design §5). The description's size section, its parser and its guard retire. *Or:* it stays in the description, read whole.
 
 **The brief**
@@ -70,14 +70,7 @@
   - The write stamps' comment allowances (`one-comment`, `blind-comment`) and their mandates go. The blind read stays blind.
   - Stages still change ticket state, descriptions where scoping writes them, and relations.
 - At each run's end, Harbour posts one marked line listing what is open in the task (design §7).
-- **A person's comment becomes a finding.** Each comment posted after the cutover that a person wrote becomes one `finding`, once, `by` that person (as the workspace shows them, else the owner), `to` the task. It reaches the next stage through the brief. Comments from before the cutover don't become findings.
-- **[to confirm: authorship] How Harbour tells a person's comment.** *Either:*
-  - Harbour records the id of every comment it, or one of its runs, posts. Any other comment is a person's.
-    - That one rule replaces the text rules and the summary mark's job of telling authors apart.
-    - The Periodical gate is outside the layer and keeps its two comments as they are.
-    - The `harbour-comments` ledger becomes that record and no longer holds people's comments.
-
-  *Or:* any comment without Harbour's summary mark (`**Harbour summary**`, `lib/records/summary.js`) is a person's, and the proxy refuses comment writes from stage runs. Periodical runs keep theirs, and their comments are told apart by the Periodical gate's own fields. No new marker either way.
+- **A person's comment becomes a finding.** Any comment posted after the cutover that isn't a Harbour summary (its existing `**Harbour summary**` opening line, `lib/records/summary.js`) becomes one `finding`, once, `by` the person who posted it as the workspace shows them (else the owner), `to` the task. It reaches the next stage through the brief. Comments from before the cutover don't become findings. No new marker, and no refusal of comment writes. The Periodical gate is outside the layer and stays: a Periodical's report comment becomes a finding on its own ticket, which is harmless.
 - The authorship readers move onto records: selector rule 1, look-first's holding comment, and `personSince`/`actedAfter` read a person's open findings and standing decisions in the task.
 - **Retired:**
   - the authorship text rules: `isRuling`, `opensAsAgentNote`, `isPersonComment`, `isAgentActivity`, `reportsLandedWork` and selector rule 1's text;
@@ -98,7 +91,7 @@
 
 **Witness:** after the cutover deploys, on a real task:
 1. a stage raises a question;
-2. it shows on the Rulings page and the task page, and is shelved;
+2. it shows on the Rulings page and the task page;
 3. John answers it with an option and a sentence qualifying it;
 4. the resumed worker's prompt shows the question, the option and the sentence.
 
@@ -115,7 +108,7 @@ Also: a comment John posts on that ticket reaches the next stage's brief as his 
 - dismissing means one thing everywhere;
 - the brief is built from records for the credential's run, and the ticket section and the recap's model summary are gone, with their caches, models and scripts;
 - stage runs write no comments; a person's comment after the cutover becomes their finding;
-- the predicate, the two ruling stores, the agents' rulings routes, `RULING_MARK`, the authorship text rules and the blind read's comment check are gone;
+- the predicate, the three ruling stores, the scan, the agents' rulings routes, `RULING_MARK`, the authorship text rules and the blind read's comment check are gone;
 - the witness is recorded and the readings reported;
 - Harbour still works throughout.
 
