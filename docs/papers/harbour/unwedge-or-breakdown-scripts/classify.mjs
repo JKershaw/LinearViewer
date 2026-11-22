@@ -51,7 +51,7 @@ export function replayFirstStop(comments, era) {
     let kind = null;
     if (current === 'one-cycle' && facts.count >= 2) kind = 'one-cycle';
     if (current === 'bound-3' && facts.count >= 3) kind = 'bound';
-    if (current === 'ceiling-5') kind = reviewLoopStop({ state: { type: 'started' } }, prefix);
+    if (current === 'ceiling-5') kind = reviewLoopStop({ state: { type: 'started' } }, facts);
     if (kind) return { at: sorted[i].createdAt, count: facts.count, kind, verdictIndex: i };
   }
   return null;

@@ -29,6 +29,7 @@ import { getRecommendation, setFetchImpl, setPromptTraceRecorder } from '../../l
 import { closeOutDecision, CLOSE_OUT_ACTOR } from '../../lib/run-closeout-state.js';
 import { liveWaitOf } from '../../lib/run-live-wait.js';
 import { FINDINGS_NONE } from '../../lib/close-out-findings.js';
+import { CLOSE_OUT_STATUS } from '../../lib/run-closeout-state.js';
 
 const harness = createMangoTmpdir('lin-4518-step3-consumers-');
 before(() => harness.connect());
@@ -53,9 +54,9 @@ async function trailOf(events, ticket = 'LIN-1') {
 }
 
 /** The code route the selector's entrance answers for `trail` with `allRuns` (the code routes run before the selector). */
-async function routeFor({ trail, allRuns }) {
+async function routeFor({ trail, allRuns, requests = null }) {
   setPromptTraceRecorder(() => {});
-  setFetchImpl(async () => ({ ok: true, json: async () => ({ choices: [{ message: { content: '## Reasoning\n→ **close-out**' }, finish_reason: 'stop' }], usage: { completion_tokens: 3 } }) }));
+  setFetchImpl(async (_url, init) => (requests?.push(String(init?.body || '')), { ok: true, json: async () => ({ choices: [{ message: { content: '## Reasoning\n→ **close-out**' }, finish_reason: 'stop' }], usage: { completion_tokens: 3 } }) }));
   try {
     return await getRecommendation(ISSUE, { parent: null, siblings: [], project: null, children: [], comments: [], focusedChild: null, attachments: [], runs: [], allRuns, trail }, { apiKey: 'stub', model: 'x' });
   } finally {
@@ -80,6 +81,16 @@ describe('a close-out parked on the blind read does not hold the ticket (finding
     const rec = await routeFor({ trail, allRuns: [closeOutRunning] });
     assert.equal(rec.codeRoute, 'live-wait');
     assert.equal(rec.liveWait?.kind, 'close-out');
+  });
+
+  test('the review half: approve at H1, a push to H2, a close-out running and no read: no live wait, and the selector is told work came after the review', async () => {
+    const trail = await trailOf([ev.pr(1, A, H1), ev.review(2, A, { heads: { [A]: H1 } }), ev.head(3, A, H2), ev.run(4, 'close-out', null)]);
+    const requests = [];
+    const rec = await routeFor({ trail, allRuns: [closeOutRunning], requests });
+    assert.equal(rec.liveWait, undefined, 'the parked close-out lifts the live wait');
+    assert.equal(rec.codeRoute, undefined, 'no code route settles it: the selector is offered the re-review');
+    assert.equal(requests.length, 1, 'the selector was asked once');
+    assert.ok(requests[0].includes('Work reported after it (a later comment links a PR): yes'), 'the selector\'s TRAIL FACTS say work came after the review');
   });
 
   test('no records read (the trail is null): the live wait holds, as it did before', async () => {
@@ -153,6 +164,10 @@ describe('the gate judges each PR at the head its review read (LIN-4469 flaw 1, 
     assert.deepEqual([...trail.landing].sort(), [A, N].sort());
     const d = decide(trail, { [A]: H1, [N]: H1 });
     assert.equal(d.refuses, 'head-moved', 'the approval does not cover PR N');
+    // LIN-4518 (finding 47f14b6e): the branch's status, reason and PR are pinned too, not only the refusal.
+    assert.equal(d.reason, 'head-moved');
+    assert.equal(d.status, CLOSE_OUT_STATUS.NOT_READY);
+    assert.equal(d.pr?.url, N, 'the PR the review did not judge is the one named');
   });
 
   test('a two-PR landing judged at its reviewed heads, read in full: nothing refuses (and it is not a single-PR close-out)', async () => {

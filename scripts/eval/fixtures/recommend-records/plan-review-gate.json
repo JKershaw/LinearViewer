@@ -1,0 +1,61 @@
+{
+ "_about": "Records for the eval harness (LIN-4518 finding-004175cc). Each target's events are authored from its comment history, reduced to the facts the gates read: the plan-review verdicts and their stated blocking counts, the latest code review per PR with the head it judged, the PRs of the landing, and the close-outs after the review. The harness seeds them into a real records store and hands the trail, landing changes and plan-review loop to getRecommendation. A target with `unrepresentable` has a fact records cannot hold (a review with no PR names no change), so it is handed as not read.",
+ "PR-1603-verdict-approve": {
+  "events": [
+   {
+    "kind": "planReview",
+    "at": "2026-07-22T01:00:00.000Z",
+    "outcome": "approve",
+    "findings": 0
+   }
+  ]
+ },
+ "PR-1603-request-changes-1": {
+  "events": [
+   {
+    "kind": "planReview",
+    "at": "2026-07-23T01:00:00.000Z",
+    "outcome": "request-changes",
+    "findings": 0
+   }
+  ]
+ },
+ "PR-1603-request-changes-2": {
+  "events": [
+   {
+    "kind": "planReview",
+    "at": "2026-07-24T01:00:00.000Z",
+    "outcome": "request-changes",
+    "findings": 0
+   },
+   {
+    "kind": "planReview",
+    "at": "2026-07-24T03:00:00.000Z",
+    "outcome": "request-changes",
+    "findings": 0
+   }
+  ]
+ },
+ "PR-1603-request-changes-3": {
+  "events": [
+   {
+    "kind": "planReview",
+    "at": "2026-07-24T01:00:00.000Z",
+    "outcome": "request-changes",
+    "findings": 0
+   },
+   {
+    "kind": "planReview",
+    "at": "2026-07-24T03:00:00.000Z",
+    "outcome": "request-changes",
+    "findings": 0
+   },
+   {
+    "kind": "planReview",
+    "at": "2026-07-24T05:00:00.000Z",
+    "outcome": "request-changes",
+    "findings": 0
+   }
+  ]
+ }
+}

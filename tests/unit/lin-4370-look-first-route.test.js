@@ -57,6 +57,7 @@ import { stubLineageIdentity } from '../fixtures/lineage-identity.js';
 import { PromptTraceStore } from '../../lib/prompt-trace-store.js';
 import { NO_REQUEST_RECORDS, withDefaults } from '../fixtures/request-usage-loader.js';
 import { planFactsOf, planFactsNotMeasured } from '../../lib/records/plan-facts.js';
+import { assemblePlanReviewFacts } from '../../lib/recommendation-facts.js';
 
 afterEach(() => { setFetchImpl(null); setPromptTraceRecorder(null); });
 
@@ -79,7 +80,7 @@ const WORDS = 'Make the export button download a CSV.';
 const NO_PLAN = planFactsOf({ task: { id: 'task-t1', kind: 'task', state: 'open' } });
 const A_PLAN = planFactsOf({ task: { id: 'task-t1', kind: 'task', state: 'open' }, inside: [{ id: 'plan-t1', v: 1, kind: 'plan', state: 'kept', in: 'task-t1', to: 'implementation', at: T('09:00') }] });
 const A_PIECE = planFactsOf({ task: { id: 'task-t1', kind: 'task', state: 'open', links: { piece: 'plan-t0' } }, piece: { id: 'plan-t0', v: 1, kind: 'plan', state: 'kept', in: 'task-t0', to: 'implementation', at: T('09:00') } });
-const ctx = (comments = [], allRuns = [], over = {}) => ({ parent: null, siblings: [], project: null, children: [], comments, focusedChild: null, attachments: [], runs: [], allRuns, asked: WORDS, planFacts: NO_PLAN, ...over });
+const ctx = (comments = [], allRuns = [], over = {}) => ({ parent: null, siblings: [], project: null, children: [], comments, planReviewLoop: assemblePlanReviewFacts(comments), focusedChild: null, attachments: [], runs: [], allRuns, asked: WORDS, planFacts: NO_PLAN, ...over });
 const stepOf = (issue, context) => lookFirstStep(issue, context)?.step ?? null;
 
 describe('step choice: survey-task, then survey-place, then scoping, each once', () => {

@@ -16,6 +16,11 @@ import {
   assemblePlanReviewFacts, reviewLoopExhausted, reviewLoopConverging, reviewLoopStop, REVIEW_LOOP_BOUND, REVIEW_LOOP_CEILING
 } from '../../lib/recommendation-facts.js';
 import { formatIssueContext, getRecommendation, getRecommendationStream, setFetchImpl } from '../../lib/openrouter.js';
+
+// LIN-4518 (finding-55356e66): the loop reads its facts from records (planReviewLoop). These tests drive the bound's
+// arithmetic with the comment fold as the facts, which is the same run and the same person/landed reading.
+const exhausted = (issue, comments) => reviewLoopExhausted(issue, assemblePlanReviewFacts(comments));
+const stop = (issue, comments) => reviewLoopStop(issue, assemblePlanReviewFacts(comments));
 import { routeStage, parseRouteDecision, parseRecommendedAction } from '../../lib/stage-router.js';
 import { formatStageContract } from '../../lib/prompt-contract.js';
 import { generatePrompt } from '../../lib/prompt-templates.js';
@@ -239,28 +244,28 @@ describe('D2: excluded kinds are refused (LIN-3309 S5)', () => {
 describe('the review loop bound: the first route code settles (LIN-3309; the look-first sequence is LIN-4370)', () => {
   const open = { name: 'In Progress', type: 'started' };
   const leaf = (over = {}) => ({ identifier: 'T-9', title: 't', description: 'A plan.', state: open, labels: [], ...over });
-  const bundle = (comments) => ({ parent: null, siblings: [], project: null, children: [], comments, focusedChild: null });
+  const bundle = (comments) => ({ parent: null, siblings: [], project: null, children: [], comments, planReviewLoop: assemblePlanReviewFacts(comments), focusedChild: null });
   const rcs = (n) => Array.from({ length: n }, (_, i) => RC(`2026-01-0${i + 1}T00:00:00Z`));
   const after = (body) => ({ createdAt: '2026-01-09T00:00:00Z', body });
 
   test(`${REVIEW_LOOP_BOUND} verdicts asking for changes since the latest Approve stop the loop`, () => {
     assert.equal(REVIEW_LOOP_BOUND, 3);
-    assert.equal(reviewLoopExhausted(leaf(), rcs(2)), false);
-    assert.equal(reviewLoopExhausted(leaf(), rcs(3)), true);
-    assert.equal(reviewLoopExhausted(leaf(), [RC('2026-01-01T00:00:00Z'), ND('2026-01-02T00:00:00Z'), RC('2026-01-03T00:00:00Z')]), true);
-    assert.equal(reviewLoopExhausted(leaf(), [...rcs(3), APP('2026-01-08T00:00:00Z')]), false, 'an Approve resets it');
+    assert.equal(exhausted(leaf(), rcs(2)), false);
+    assert.equal(exhausted(leaf(), rcs(3)), true);
+    assert.equal(exhausted(leaf(), [RC('2026-01-01T00:00:00Z'), ND('2026-01-02T00:00:00Z'), RC('2026-01-03T00:00:00Z')]), true);
+    assert.equal(exhausted(leaf(), [...rcs(3), APP('2026-01-08T00:00:00Z')]), false, 'an Approve resets it');
   });
 
   test('a person\'s comment since the latest verdict lifts it; an agent note does not', () => {
-    assert.equal(reviewLoopExhausted(leaf(), [...rcs(3), after('go on, take it to implementation')]), false);
-    assert.equal(reviewLoopExhausted(leaf(), [...rcs(3), after('Hold until LIN-3098 ships.')]), false);
-    assert.equal(reviewLoopExhausted(leaf(), [...rcs(3), after('**Plan posted** — plan revision written.')]), true);
+    assert.equal(exhausted(leaf(), [...rcs(3), after('go on, take it to implementation')]), false);
+    assert.equal(exhausted(leaf(), [...rcs(3), after('Hold until LIN-3098 ships.')]), false);
+    assert.equal(exhausted(leaf(), [...rcs(3), after('**Plan posted** — plan revision written.')]), true);
   });
 
   test('landed work since the latest verdict, or a terminal task, is not a running loop', () => {
-    assert.equal(reviewLoopExhausted(leaf(), [...rcs(3), after('Implementation landed: https://github.com/o/r/pull/7')]), false);
-    assert.equal(reviewLoopExhausted(leaf({ state: { name: 'Canceled', type: 'canceled' } }), rcs(3)), false);
-    assert.equal(reviewLoopExhausted(leaf({ state: { name: 'Done', type: 'completed' } }), rcs(3)), false);
+    assert.equal(exhausted(leaf(), [...rcs(3), after('Implementation landed: https://github.com/o/r/pull/7')]), false);
+    assert.equal(exhausted(leaf({ state: { name: 'Canceled', type: 'canceled' } }), rcs(3)), false);
+    assert.equal(exhausted(leaf({ state: { name: 'Done', type: 'completed' } }), rcs(3)), false);
   });
 
   test('getRecommendation stops at blocked without a routing call, with the blocked stage prompt', async () => {
@@ -312,7 +317,7 @@ describe('the review loop bound: the first route code settles (LIN-3309; the loo
 describe('a converging plan gets another round, up to a ceiling (LIN-3651)', () => {
   const open = { name: 'In Progress', type: 'started' };
   const leaf = () => ({ identifier: 'T-9', title: 't', description: 'A plan.', state: open, labels: [] });
-  const bundle = (comments) => ({ parent: null, siblings: [], project: null, children: [], comments, focusedChild: null });
+  const bundle = (comments) => ({ parent: null, siblings: [], project: null, children: [], comments, planReviewLoop: assemblePlanReviewFacts(comments), focusedChild: null });
   const counted = (...ns) => ns.map((n, i) => RCn(`2026-01-0${i + 1}T00:00:00Z`, n));
   const after = (body) => ({ createdAt: '2026-01-09T00:00:00Z', body });
 
@@ -323,45 +328,45 @@ describe('a converging plan gets another round, up to a ceiling (LIN-3651)', () 
 
   test('narrowing counts (3,3,1; 2,2,1) and a steady one (1,1,1) are not exhausted at the bound', () => {
     for (const ns of [[3, 3, 1], [2, 2, 1], [1, 1, 1]]) {
-      assert.equal(reviewLoopExhausted(leaf(), counted(...ns)), false, ns.join(','));
+      assert.equal(exhausted(leaf(), counted(...ns)), false, ns.join(','));
     }
-    assert.equal(reviewLoopStop(leaf(), counted(3, 3, 1)), null);
+    assert.equal(stop(leaf(), counted(3, 3, 1)), null);
   });
 
   test('rising, flat above 1, and uncounted runs stop at the bound', () => {
     for (const ns of [[1, 3, 4], [3, 3, 3]]) {
-      assert.equal(reviewLoopExhausted(leaf(), counted(...ns)), true, ns.join(','));
-      assert.equal(reviewLoopStop(leaf(), counted(...ns)), 'not-converging');
+      assert.equal(exhausted(leaf(), counted(...ns)), true, ns.join(','));
+      assert.equal(stop(leaf(), counted(...ns)), 'not-converging');
     }
     const plain = [RC('2026-01-01T00:00:00Z'), RC('2026-01-02T00:00:00Z'), RC('2026-01-03T00:00:00Z')];
-    assert.equal(reviewLoopExhausted(leaf(), plain), true, 'no count lines: today\'s behaviour');
+    assert.equal(exhausted(leaf(), plain), true, 'no count lines: today\'s behaviour');
   });
 
   test('five verdicts stop at the ceiling even while narrowing', () => {
-    assert.equal(reviewLoopExhausted(leaf(), counted(3, 2, 2, 1)), false, 'four, still narrowing: another round');
-    assert.equal(reviewLoopExhausted(leaf(), counted(3, 2, 2, 1, 1)), true);
-    assert.equal(reviewLoopStop(leaf(), counted(3, 2, 2, 1, 1)), 'ceiling');
+    assert.equal(exhausted(leaf(), counted(3, 2, 2, 1)), false, 'four, still narrowing: another round');
+    assert.equal(exhausted(leaf(), counted(3, 2, 2, 1, 1)), true);
+    assert.equal(stop(leaf(), counted(3, 2, 2, 1, 1)), 'ceiling');
   });
 
   test('a Needs Discussion latest verdict is not converging', () => {
     const run = [RCn('2026-01-01T00:00:00Z', 3), RCn('2026-01-02T00:00:00Z', 1), ND('2026-01-03T00:00:00Z')];
-    assert.equal(reviewLoopExhausted(leaf(), run), true);
+    assert.equal(exhausted(leaf(), run), true);
     assert.equal(reviewLoopConverging(assemblePlanReviewFacts(run).run), false);
   });
 
   test('a Needs Discussion latest verdict that carries a count line is still not converging (LIN-3651)', () => {
     const nd = { createdAt: '2026-01-03T00:00:00Z', body: '### Plan Review Verdict\n\n**Verdict: Needs Discussion.**\n\nBlocking findings: 1' };
     const run = [RCn('2026-01-01T00:00:00Z', 3), RCn('2026-01-02T00:00:00Z', 2), nd];
-    assert.equal(reviewLoopExhausted(leaf(), run), true);
+    assert.equal(exhausted(leaf(), run), true);
     assert.equal(assemblePlanReviewFacts(run).run[2].blocking, null);
   });
 
   test('person comment, landed work and Approve still lift it, at the ceiling too', () => {
     const five = counted(3, 2, 2, 1, 1);
-    assert.equal(reviewLoopExhausted(leaf(), [...five, after('go on, take it to implementation')]), false);
-    assert.equal(reviewLoopExhausted(leaf(), [...five, after('Implementation landed: https://github.com/o/r/pull/7')]), false);
-    assert.equal(reviewLoopExhausted(leaf(), [...five, APP('2026-01-08T00:00:00Z')]), false);
-    assert.equal(reviewLoopExhausted(leaf(), [...counted(3, 3, 3), APP('2026-01-08T00:00:00Z')]), false);
+    assert.equal(exhausted(leaf(), [...five, after('go on, take it to implementation')]), false);
+    assert.equal(exhausted(leaf(), [...five, after('Implementation landed: https://github.com/o/r/pull/7')]), false);
+    assert.equal(exhausted(leaf(), [...five, APP('2026-01-08T00:00:00Z')]), false);
+    assert.equal(exhausted(leaf(), [...counted(3, 3, 3), APP('2026-01-08T00:00:00Z')]), false);
   });
 
   test('the run since the latest Approve carries each verdict\'s count; only Request Changes has one', () => {

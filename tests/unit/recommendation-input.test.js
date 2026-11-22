@@ -18,11 +18,13 @@ describe('prepareRecommendationInput (LIN-3469)', () => {
   test('forwards exactly the prompt-read fields plus the task\'s runs', async () => {
     const input = await prepareRecommendationInput(ctx, { dispatchQueueStore: store, urlKey: 'acme', identifier: 'LIN-1' });
     assert.deepEqual(Object.keys(input).sort(),
-      ['allRuns', 'asked', 'attachments', 'children', 'comments', 'focusedChild', 'landingChanges', 'openFindings', 'parent', 'planFacts', 'project', 'runs', 'siblings', 'trail']);
+      ['allRuns', 'asked', 'attachments', 'children', 'comments', 'focusedChild', 'landingChanges', 'openFindings', 'parent', 'planFacts', 'planReviewLoop', 'project', 'runs', 'siblings', 'trail']);
     assert.equal(input.asked, null, 'no records store: no words on record');
     assert.equal(input.trail, null, 'LIN-4518 step 3: no records store: the trail is not read, so no gate reads a comment for it');
     assert.equal(input.landingChanges, null, 'LIN-4518 step 2: no records store: the landing is not read, so a blind read names no id');
     assert.equal(input.planFacts.measured, false, 'LIN-4504: no records store: plan facts not measured, never "no plan"');
+    // LIN-4518 (finding-55356e66): the plan-review loop is not read without a records store, so the bound stands aside.
+    assert.equal(input.planReviewLoop, null, 'no records store: the loop is not read, never read from the comments');
     assert.equal(input.parent, ctx.parent);
     assert.equal(input.attachments, ctx.attachments);
     assert.deepEqual(input.runs, [{ stage: 'implementation', at: '2026-10-05T00:00:00.000Z', outcome: 'queued' }]);

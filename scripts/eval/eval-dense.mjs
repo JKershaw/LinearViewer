@@ -39,6 +39,8 @@
  *   STUB                when set, install a fake transport; zero calls, zero cost
  *   ONLY                substring filter on target id
  *   FIXTURES_DIR        fixtures dir override
+ *   RECORDS_DIR         each target's authored records (default: recommend-records beside FIXTURES_DIR; see
+ *                       scripts/eval/records-context.mjs). A bundle's trail, landing and plan-review loop come from them
  *   OUT_DIR             output dir override (default recommend-baseline/<DATE>-dense[-stub])
  *   DATE                output date stamp (default 2026-10-01)
  *
@@ -54,6 +56,7 @@ import { fileURLToPath } from 'url';
 import { dirname, join } from 'path';
 import { getRecommendation, setLlmCallRecorder, setFetchImpl } from '../../lib/openrouter.js';
 import { resolveRecommendation } from '../../lib/recommend-recurse.js';
+import { attachRecordsContext } from './records-context.mjs';
 
 const HERE = dirname(fileURLToPath(import.meta.url));
 const STUB = !!process.env.STUB;
@@ -81,6 +84,8 @@ const DENSE_ONLY = !!process.env.DENSE_ONLY;
 const DATE = process.env.DATE || '2026-10-01';
 const FIXTURES_DIR = process.env.FIXTURES_DIR || join(HERE, 'fixtures', 'recommend');
 const OUT_DIR = process.env.OUT_DIR || join(HERE, 'recommend-baseline', `${DATE}-dense${STUB ? '-stub' : ''}`);
+// LIN-4518 (finding-004175cc): each target's records, authored beside the fixtures (a sibling of FIXTURES_DIR).
+const RECORDS_DIR = process.env.RECORDS_DIR || join(dirname(FIXTURES_DIR), 'recommend-records');
 
 const CALLS_PATH = join(OUT_DIR, 'calls.jsonl');
 const RUNS_PATH = join(OUT_DIR, 'runs.jsonl');
@@ -186,6 +191,8 @@ function installStub(fixtures) {
 
 // ---- one recommend hop with per-call usage capture --------------------------------
 let pendingCalls = [];
+// Hops by the context they were handed: from records (a bundle with recordsContext) or from comments alone.
+const hops = { records: 0, comments: 0 };
 function makeComputeOne(bundles, model, onCall, hopLog) {
   return async function computeOne(identifier) {
     const b = bundles[identifier];
@@ -204,12 +211,17 @@ function makeComputeOne(bundles, model, onCall, hopLog) {
     };
     const callOnce = async () => {
       const t0 = Date.now();
+      // The records context a bundle is handed (attachRecordsContext): the trail, landing and plan-review loop are read
+      // from records, so the hop reads none of them from a comment. A bundle with no context is counted as a comment hop.
+      const rc = b.recordsContext;
+      if (rc) hops.records += 1; else hops.comments += 1;
+      const recordsFields = rc ? { trail: rc.trail, landingChanges: rc.landingChanges, planReviewLoop: rc.planReviewLoop } : {};
       const recommendation = await getRecommendation(
         b.issue,
         {
           parent: b.parent, siblings: b.siblings || [], siblingsTotal: b.siblingsTotal || 0,
           project: b.project, children: b.children || [], comments: b.comments || [],
-          focusedChild: b.focusedChild || null
+          focusedChild: b.focusedChild || null, ...recordsFields
         },
         { apiKey: API_KEY, model, featureFlags: {} }
       );
@@ -303,6 +315,7 @@ async function runOne(model, ws, target, state) {
 mkdirSync(OUT_DIR, { recursive: true });
 const fixtures = loadWorkspaces(FIXTURES_DIR);
 if (STUB) installStub(fixtures);
+const recordsSeed = await attachRecordsContext(fixtures, RECORDS_DIR);
 
 // Current accept-set / descentExpect per target, from the committed fixtures. Used
 // both when running and when re-scoring offline (RESCORE=1), so a label fix in the
@@ -442,12 +455,15 @@ const summary = {
   totalCostUsd: Number(sum(runs.map(r => r.runCostUsd)).toFixed(6)),
   maxUsd: MAX_USD, halted: state.halted, wallSeconds: Math.round((Date.now() - startedAt) / 1000),
   byModel, perAction, promptQuality,
+  // LIN-4518 (finding-004175cc): what the records seeded, and how many hops were handed records rather than comments.
+  records: { recordsDir: RECORDS_DIR, ...recordsSeed.counts, hops: { ...hops } },
   // production view: errors (unparseable response) are failures — what the user actually gets
   production: { hit: runs.filter(r => scoreOf(r).actionCorrect).length, n: runs.length, errors: runs.filter(r => r.error).length },
   // lab view: errors excluded
   lab: { hit: runs.filter(r => !r.error && scoreOf(r).actionCorrect).length, n: runs.filter(r => !r.error).length }
 };
 writeFileSync(join(OUT_DIR, 'summary.json'), JSON.stringify(summary, null, 2) + '\n');
+await recordsSeed.harness.close();
 
 const pct = (x, n) => n ? Math.round((x / n) * 100) + '%' : '-';
 const lines = [

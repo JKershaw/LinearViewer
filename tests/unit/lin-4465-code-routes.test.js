@@ -16,7 +16,7 @@ import { test, describe, afterEach } from 'node:test';
 import assert from 'node:assert/strict';
 import { readFileSync } from 'node:fs';
 import { CODE_ROUTES } from '../../lib/code-routes.js';
-import { reviewLoopStep } from '../../lib/recommendation-facts.js';
+import { reviewLoopStep, assemblePlanReviewFacts } from '../../lib/recommendation-facts.js';
 import { getRecommendation, setFetchImpl, setPromptTraceRecorder } from '../../lib/openrouter.js';
 import { quoteAsked } from '../../lib/brief-quote.js';
 
@@ -68,7 +68,7 @@ describe('CODE_ROUTES: the contract', () => {
 describe('CODE_ROUTES: each route fires on its fixture and records a declared trace value', () => {
   const fixtures = {
     'live-wait': { issue: { identifier: 'T-1', state: STARTED, description: '' }, context: { comments: [], allRuns: [run('implementation', 3, 'running')] } },
-    'review-bound': { issue: { identifier: 'T-1', state: STARTED, description: '' }, context: { comments: [RCn(1, 3), RCn(2, 3), RCn(3, 3)], allRuns: [] } },
+    'review-bound': { issue: { identifier: 'T-1', state: STARTED, description: '' }, context: { planReviewLoop: assemblePlanReviewFacts([RCn(1, 3), RCn(2, 3), RCn(3, 3)]), allRuns: [] } },
     // LIN-4501: the person's words are the task's `asked` on the recommendation input, not the description's block.
     'look-first': { issue: { identifier: 'T-1', state: OPEN, description: ASKED }, context: { comments: [], allRuns: [], asked: 'Make the export button download a CSV.', planFacts: { measured: true, hasPlan: false } } },
   };
@@ -99,7 +99,7 @@ describe('CODE_ROUTES: each route fires on its fixture and records a declared tr
   test('review-bound fires with blocked, its declared value', () => {
     const issue = { identifier: 'T-1', state: STARTED, description: '' };
     const comments = [RCn(1, 3), RCn(2, 3), RCn(3, 3)];
-    assert.equal(entry('review-bound').route(issue, { comments, allRuns: [] })?.codeRoute, 'blocked');
+    assert.equal(entry('review-bound').route(issue, { planReviewLoop: assemblePlanReviewFacts(comments), allRuns: [] })?.codeRoute, 'blocked');
   });
 });
 
@@ -111,6 +111,7 @@ describe('skipLiveWait drops the first entry only', () => {
   const context = {
     parent: null, siblings: [], project: null, children: [], focusedChild: null, attachments: [], runs: [],
     comments: [RCn(1, 3), RCn(2, 3), RCn(3, 3)],
+    planReviewLoop: assemblePlanReviewFacts([RCn(1, 3), RCn(2, 3), RCn(3, 3)]),
     allRuns: [run('implementation', 5, 'running')]
   };
   const traced = [];
@@ -140,7 +141,7 @@ describe('CODE_ROUTES: the bound keeps its reasons byte for byte', () => {
   const issue = { identifier: 'T-1', state: STARTED, description: '' };
 
   test('not converging: the bound sentence, then the person-comment tail', () => {
-    const r = entry('review-bound').route(issue, { comments: [RCn(1, 3), RCn(2, 3), RCn(3, 3)], allRuns: [] });
+    const r = entry('review-bound').route(issue, { planReviewLoop: assemblePlanReviewFacts([RCn(1, 3), RCn(2, 3), RCn(3, 3)]), allRuns: [] });
     assert.deepEqual(r, {
       action: 'blocked',
       codeRoute: 'blocked',
@@ -150,7 +151,7 @@ describe('CODE_ROUTES: the bound keeps its reasons byte for byte', () => {
 
   test('ceiling: the ceiling sentence, then the person-comment tail', () => {
     const comments = [RCn(1, 3), RCn(2, 2), RCn(3, 2), RCn(4, 1), RCn(5, 1)];
-    const r = entry('review-bound').route(issue, { comments, allRuns: [] });
+    const r = entry('review-bound').route(issue, { planReviewLoop: assemblePlanReviewFacts(comments), allRuns: [] });
     assert.deepEqual(r, {
       action: 'blocked',
       codeRoute: 'blocked',
@@ -159,13 +160,16 @@ describe('CODE_ROUTES: the bound keeps its reasons byte for byte', () => {
   });
 
   test('no loop: the bound stands aside', () => {
-    assert.equal(entry('review-bound').route(issue, { comments: [RCn(1, 3)], allRuns: [] }), null);
+    assert.equal(entry('review-bound').route(issue, { planReviewLoop: assemblePlanReviewFacts([RCn(1, 3)]), allRuns: [] }), null);
+    assert.equal(entry('review-bound').route(issue, { planReviewLoop: assemblePlanReviewFacts([RCn(1, 3)]), allRuns: [] }), null, 'comments alone are not the loop\'s facts');
   });
 
   test('the entry delegates: its reasons are written once, beside the bound (lib/recommendation-facts.js reviewLoopStep)', () => {
     for (const comments of [[RCn(1, 3), RCn(2, 3), RCn(3, 3)], [RCn(1, 3), RCn(2, 2), RCn(3, 2), RCn(4, 1), RCn(5, 1)]]) {
-      const step = reviewLoopStep(issue, comments);
-      assert.deepEqual(entry('review-bound').route(issue, { comments, allRuns: [] }), { action: step.step, codeRoute: step.codeRoute, why: step.why });
+      // LIN-4518 (finding-55356e66): the entry reads the loop's facts, not the comments; the comment fold stands in for them here.
+      const planReviewLoop = assemblePlanReviewFacts(comments);
+      const step = reviewLoopStep(issue, planReviewLoop);
+      assert.deepEqual(entry('review-bound').route(issue, { planReviewLoop, allRuns: [] }), { action: step.step, codeRoute: step.codeRoute, why: step.why });
     }
     const source = readFileSync(new URL('../../lib/code-routes.js', import.meta.url), 'utf8');
     assert.ok(!source.includes('findings are not narrowing') && !source.includes('whatever the findings count'), 'lib/code-routes.js spells no reason of its own');

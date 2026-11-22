@@ -13,3 +13,6 @@ scripts/eval/fixtures/*
 !scripts/eval/fixtures/*.json
 !scripts/eval/fixtures/recommend/
 !scripts/eval/fixtures/recommend/*.json
+# LIN-4518: each recommend bundle's authored records (the trail, landing and plan-review loop the sweep seeds), curated alongside.
+!scripts/eval/fixtures/recommend-records/
+!scripts/eval/fixtures/recommend-records/*.json

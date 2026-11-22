@@ -16,6 +16,9 @@
  *   { kind: 'audit', at, pr }                       an audit run that writes the notes change `pr` (its first version)
  *   { kind: 'run', at, stage, state? }              any other stage run, ended `state` (default 'done') at `at`; `null` leaves it running
  *   { kind: 'finding', at, says, how }              an open finding to close-out on the task
+ *   { kind: 'planReview', at, outcome, findings? }  a plan-review run (LIN-4518 finding-55356e66): `findings` finding records
+ *                                                   `to: plan` about the task's plan, then the verdict on that plan, all
+ *                                                   under one run id; `outcome` is approve | request-changes | needs-discussion
  *
  * The task is made for `ticket` in `urlKey` at `T0`, so each scenario starts from the same task.
  */
@@ -88,9 +91,27 @@ export async function seedTicketRecords(store, urlKey, ticket, events) {
     links: { on: refs },
   }, { by: HARBOUR, at, run: null });
 
+  // The task's plan, made once when a plan-review event first needs it (a plan review judges a plan).
+  let plan = null;
+  const planOf = async (at) => {
+    if (!plan) {
+      const rec = await store.add(urlKey, { kind: 'plan', state: 'kept', in: taskId, to: 'implementation', fields: { says: 'the plan', order: 1 } }, { by: HARBOUR, at });
+      plan = { id: rec.id, v: rec.v };
+    }
+    return plan;
+  };
   for (const ev of events) {
     const at = ev.at;
     if (ev.kind === 'audit' && !ev.head) throw new Error('an audit event names the notes PR head it wrote');
+    if (ev.kind === 'planReview') {
+      const p = await planOf(at);
+      const run = `run-plan-review-${at}`;
+      for (let i = 0; i < (ev.findings || 0); i++) {
+        await store.add(urlKey, { kind: 'finding', state: 'open', in: taskId, to: 'plan', links: { about: [p.id] }, fields: { says: `blocking finding ${i + 1}`, how: 'the check that settles it' } }, { by: 'plan-review', run, at });
+      }
+      await store.add(urlKey, { kind: 'verdict', state: 'stands', in: taskId, fields: { judgement: 'plan-review', outcome: ev.outcome, reasoning: 'plan review' }, links: { on: [`${p.id}@${p.v}`] } }, { by: 'plan-review', run, at });
+      continue;
+    }
     if (ev.kind === 'finding') {
       await store.add(urlKey, { kind: 'finding', state: 'open', in: taskId, to: 'close-out', fields: { says: ev.says, how: ev.how } }, { by: HARBOUR, at });
       continue;

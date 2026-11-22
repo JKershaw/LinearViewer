@@ -318,7 +318,7 @@ async function surfacesOf({ comments, statusOf, ticketState, allRuns }) {
   try {
     const rec = await getRecommendation(
       { identifier: ISSUE, title: 'Gate fixture', description: '', state: { name: ticketState, type: ticketState }, labels: [] },
-      { parent: null, siblings: [], project: null, children: [], comments, focusedChild: null, attachments: [], runs: [], allRuns },
+      { parent: null, siblings: [], project: null, children: [], comments, planReviewLoop: assemblePlanReviewFacts(comments), focusedChild: null, attachments: [], runs: [], allRuns },
       { apiKey: 'stub', model: 'x' },
     );
     route = { codeRoute: rec.codeRoute ?? null, recommendedAction: rec.recommendedAction ?? null, ...(rec.liveWait ? { liveWait: rec.liveWait } : {}) };
@@ -391,7 +391,7 @@ function seedExtras(seedCase, issue) {
   const facts = assemblePlanReviewFacts(comments);
   const extras = {
     // Seed 1 (and 5's personSince): the plan-review loop's facts, its stop and its convergence.
-    planReview: { facts, stop: reviewLoopStop(issue, comments), converging: reviewLoopConverging(facts.run) },
+    planReview: { facts, stop: reviewLoopStop(issue, facts), converging: reviewLoopConverging(facts.run) },
     // Seed 2: the live wait, CODE_ROUTES[0].
     liveWait: liveWaitOf(seedCase.allRuns),
     // Seed 5: each comment's authorship as the comment path reads it.

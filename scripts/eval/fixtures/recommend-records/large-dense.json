@@ -1,0 +1,415 @@
+{
+ "_about": "Records for the eval harness (LIN-4518 finding-004175cc). Each target's events are authored from its comment history, reduced to the facts the gates read: the plan-review verdicts and their stated blocking counts, the latest code review per PR with the head it judged, the PRs of the landing, and the close-outs after the review. The harness seeds them into a real records store and hands the trail, landing changes and plan-review loop to getRecommendation. A target with `unrepresentable` has a fact records cannot hold (a review with no PR names no change), so it is handed as not read.",
+ "LIN-1892": {
+  "events": [
+   {
+    "kind": "planReview",
+    "at": "2026-09-27T09:41:40.000Z",
+    "outcome": "request-changes",
+    "findings": 0
+   },
+   {
+    "kind": "planReview",
+    "at": "2026-09-27T10:39:27.000Z",
+    "outcome": "approve",
+    "findings": 0
+   },
+   {
+    "kind": "pr",
+    "at": "2026-09-29T07:42:38.000Z",
+    "pr": "https://github.com/JKershaw/LinearViewer/pull/1611",
+    "head": "8790ce34075de0e54d3632eda6e0c6d4b7e8942d"
+   },
+   {
+    "kind": "review",
+    "at": "2026-09-29T07:57:47.000Z",
+    "on": [
+     "https://github.com/JKershaw/LinearViewer/pull/1611"
+    ],
+    "outcome": "request-changes",
+    "heads": {
+     "https://github.com/JKershaw/LinearViewer/pull/1611": "8790ce34075de0e54d3632eda6e0c6d4b7e8942d"
+    }
+   },
+   {
+    "kind": "head",
+    "at": "2026-09-29T08:20:00.000Z",
+    "pr": "https://github.com/JKershaw/LinearViewer/pull/1611",
+    "head": "3c886cad924302a591060b64084bb154b02aa0a6"
+   },
+   {
+    "kind": "review",
+    "at": "2026-09-29T08:39:33.000Z",
+    "on": [
+     "https://github.com/JKershaw/LinearViewer/pull/1611"
+    ],
+    "outcome": "request-changes",
+    "heads": {
+     "https://github.com/JKershaw/LinearViewer/pull/1611": "3c886cad924302a591060b64084bb154b02aa0a6"
+    }
+   },
+   {
+    "kind": "head",
+    "at": "2026-09-29T09:54:00.000Z",
+    "pr": "https://github.com/JKershaw/LinearViewer/pull/1611",
+    "head": "b050ce9963342239db857b6a93eb410eb326721e"
+   },
+   {
+    "kind": "review",
+    "at": "2026-09-29T10:09:47.000Z",
+    "on": [
+     "https://github.com/JKershaw/LinearViewer/pull/1611"
+    ],
+    "outcome": "request-changes",
+    "heads": {
+     "https://github.com/JKershaw/LinearViewer/pull/1611": "b050ce9963342239db857b6a93eb410eb326721e"
+    }
+   },
+   {
+    "kind": "closeOut",
+    "at": "2026-09-29T11:57:36.000Z"
+   }
+  ]
+ },
+ "LIN-2944": {
+  "events": [
+   {
+    "kind": "planReview",
+    "at": "2026-09-27T11:46:00.000Z",
+    "outcome": "request-changes",
+    "findings": 0
+   },
+   {
+    "kind": "planReview",
+    "at": "2026-09-27T12:15:00.000Z",
+    "outcome": "approve",
+    "findings": 0
+   },
+   {
+    "kind": "pr",
+    "at": "2026-09-28T21:56:44.000Z",
+    "pr": "https://github.com/JKershaw/LinearViewer/pull/1604",
+    "head": "c1a81c88d0748bc6155c66de5636d55c36ed79b9"
+   },
+   {
+    "kind": "head",
+    "at": "2026-09-29T01:33:28.000Z",
+    "pr": "https://github.com/JKershaw/LinearViewer/pull/1604",
+    "head": "0473a41ebc80eeae184ab0897ac5a311906b6b0b"
+   },
+   {
+    "kind": "review",
+    "at": "2026-09-29T05:26:10.000Z",
+    "on": [
+     "https://github.com/JKershaw/LinearViewer/pull/1604"
+    ],
+    "outcome": "approve",
+    "heads": {
+     "https://github.com/JKershaw/LinearViewer/pull/1604": "0473a41ebc80eeae184ab0897ac5a311906b6b0b"
+    }
+   },
+   {
+    "kind": "closeOut",
+    "at": "2026-09-29T05:28:48.000Z"
+   }
+  ]
+ },
+ "LIN-3059": {
+  "events": [
+   {
+    "kind": "planReview",
+    "at": "2026-09-28T20:39:09.000Z",
+    "outcome": "request-changes",
+    "findings": 3
+   },
+   {
+    "kind": "planReview",
+    "at": "2026-09-28T20:58:07.000Z",
+    "outcome": "request-changes",
+    "findings": 0
+   },
+   {
+    "kind": "planReview",
+    "at": "2026-09-28T21:26:22.000Z",
+    "outcome": "approve",
+    "findings": 0
+   },
+   {
+    "kind": "pr",
+    "at": "2026-09-28T23:56:00.000Z",
+    "pr": "https://github.com/JKershaw/LinearViewer/pull/1605",
+    "head": null
+   },
+   {
+    "kind": "pr",
+    "at": "2026-09-28T23:56:00.000Z",
+    "pr": "https://github.com/JKershaw/LinearViewer/pull/1606",
+    "head": null
+   }
+  ]
+ },
+ "LIN-3098": {
+  "events": [
+   {
+    "kind": "planReview",
+    "at": "2026-09-29T14:06:05.000Z",
+    "outcome": "approve",
+    "findings": 0
+   },
+   {
+    "kind": "pr",
+    "at": "2026-09-29T14:27:57.000Z",
+    "pr": "https://github.com/JKershaw/LinearViewer/pull/1619",
+    "head": "00b304d11f895aaf3c0b98effdae1584a4087957"
+   },
+   {
+    "kind": "pr",
+    "at": "2026-09-29T16:38:27.000Z",
+    "pr": "https://github.com/JKershaw/LinearViewer/pull/1620",
+    "head": "b86e623fd4fd3275343cdcea654e9ae7fffd2d35"
+   },
+   {
+    "kind": "pr",
+    "at": "2026-09-29T18:02:55.000Z",
+    "pr": "https://github.com/JKershaw/LinearViewer/pull/1621",
+    "head": "816bf9b711df77ffa97fad3abd27e4487952878c"
+   },
+   {
+    "kind": "pr",
+    "at": "2026-10-01T06:20:46.000Z",
+    "pr": "https://github.com/JKershaw/LinearViewer/pull/1623",
+    "head": "6ac7ce11ed5f7963e074e8c84f3534dcdd34bd7c"
+   },
+   {
+    "kind": "review",
+    "at": "2026-10-01T06:29:23.000Z",
+    "on": [
+     "https://github.com/JKershaw/LinearViewer/pull/1623"
+    ],
+    "outcome": "approve",
+    "heads": {
+     "https://github.com/JKershaw/LinearViewer/pull/1623": "6ac7ce11ed5f7963e074e8c84f3534dcdd34bd7c"
+    }
+   },
+   {
+    "kind": "closeOut",
+    "at": "2026-10-01T06:32:16.000Z"
+   }
+  ]
+ },
+ "LIN-3107": {
+  "events": [
+   {
+    "kind": "planReview",
+    "at": "2026-09-26T20:04:23.000Z",
+    "outcome": "request-changes",
+    "findings": 0
+   },
+   {
+    "kind": "planReview",
+    "at": "2026-09-26T20:25:58.000Z",
+    "outcome": "request-changes",
+    "findings": 0
+   },
+   {
+    "kind": "planReview",
+    "at": "2026-09-26T21:29:16.000Z",
+    "outcome": "request-changes",
+    "findings": 0
+   },
+   {
+    "kind": "pr",
+    "at": "2026-09-27T08:31:03.000Z",
+    "pr": "https://github.com/JKershaw/LinearViewer/pull/1598",
+    "head": "1dffc408"
+   },
+   {
+    "kind": "review",
+    "at": "2026-09-27T08:35:39.000Z",
+    "on": [
+     "https://github.com/JKershaw/LinearViewer/pull/1598"
+    ],
+    "outcome": "approve",
+    "heads": {
+     "https://github.com/JKershaw/LinearViewer/pull/1598": "1dffc408"
+    }
+   },
+   {
+    "kind": "closeOut",
+    "at": "2026-09-27T08:40:11.000Z"
+   }
+  ]
+ },
+ "LIN-3124": {
+  "events": [
+   {
+    "kind": "planReview",
+    "at": "2026-09-29T01:30:42.000Z",
+    "outcome": "request-changes",
+    "findings": 1
+   },
+   {
+    "kind": "planReview",
+    "at": "2026-09-29T03:33:18.000Z",
+    "outcome": "needs-discussion",
+    "findings": 0
+   },
+   {
+    "kind": "planReview",
+    "at": "2026-09-29T06:23:45.000Z",
+    "outcome": "request-changes",
+    "findings": 0
+   },
+   {
+    "kind": "planReview",
+    "at": "2026-09-29T06:28:57.000Z",
+    "outcome": "approve",
+    "findings": 0
+   },
+   {
+    "kind": "pr",
+    "at": "2026-09-29T07:58:59.000Z",
+    "pr": "https://github.com/JKershaw/LinearViewer/pull/1610",
+    "head": "a13095584ffd320e65d69504cc401b50229505d3"
+   },
+   {
+    "kind": "pr",
+    "at": "2026-09-29T09:24:05.000Z",
+    "pr": "https://github.com/JKershaw/LinearViewer/pull/1613",
+    "head": "dcfb00fab412e93cfc95defbc24260a40873add2"
+   },
+   {
+    "kind": "pr",
+    "at": "2026-09-29T13:26:00.000Z",
+    "pr": "https://github.com/JKershaw/LinearViewer/pull/1618",
+    "head": "a36eec1e33e8c88516942c26addc07f6723ac211"
+   },
+   {
+    "kind": "head",
+    "at": "2026-09-29T14:25:35.000Z",
+    "pr": "https://github.com/JKershaw/LinearViewer/pull/1618",
+    "head": "b8c6f5f9b7d5d0c3d4fa38f71ce1137bc34c940b"
+   },
+   {
+    "kind": "review",
+    "at": "2026-09-29T14:29:13.000Z",
+    "on": [
+     "https://github.com/JKershaw/LinearViewer/pull/1618"
+    ],
+    "outcome": "approve",
+    "heads": {
+     "https://github.com/JKershaw/LinearViewer/pull/1618": "b8c6f5f9b7d5d0c3d4fa38f71ce1137bc34c940b"
+    }
+   },
+   {
+    "kind": "closeOut",
+    "at": "2026-09-29T14:34:00.000Z"
+   }
+  ]
+ },
+ "LIN-3135": {
+  "events": [
+   {
+    "kind": "planReview",
+    "at": "2026-09-29T11:28:00.000Z",
+    "outcome": "request-changes",
+    "findings": 0
+   },
+   {
+    "kind": "planReview",
+    "at": "2026-09-29T11:43:00.000Z",
+    "outcome": "approve",
+    "findings": 0
+   },
+   {
+    "kind": "pr",
+    "at": "2026-09-29T12:10:44.000Z",
+    "pr": "https://github.com/JKershaw/LinearViewer/pull/1616",
+    "head": "9e86e50c66e56b0fc1d873f6bd2f04eec20f5daf"
+   },
+   {
+    "kind": "review",
+    "at": "2026-09-29T12:28:17.000Z",
+    "on": [
+     "https://github.com/JKershaw/LinearViewer/pull/1616"
+    ],
+    "outcome": "approve",
+    "heads": {
+     "https://github.com/JKershaw/LinearViewer/pull/1616": "9e86e50c66e56b0fc1d873f6bd2f04eec20f5daf"
+    }
+   },
+   {
+    "kind": "closeOut",
+    "at": "2026-09-29T12:37:43.000Z"
+   }
+  ]
+ },
+ "LIN-2403": {
+  "events": [
+   {
+    "kind": "pr",
+    "at": "2026-09-02T22:53:00.000Z",
+    "pr": "https://github.com/JKershaw/LinearViewer/pull/1333",
+    "head": "f4ddce1dea50adeb94483c7c9337f774e1348210"
+   },
+   {
+    "kind": "review",
+    "at": "2026-09-02T23:13:35.000Z",
+    "on": [
+     "https://github.com/JKershaw/LinearViewer/pull/1333"
+    ],
+    "outcome": "approve",
+    "heads": {
+     "https://github.com/JKershaw/LinearViewer/pull/1333": "f4ddce1dea50adeb94483c7c9337f774e1348210"
+    }
+   },
+   {
+    "kind": "closeOut",
+    "at": "2026-09-02T23:22:10.000Z"
+   }
+  ]
+ },
+ "LIN-2882": {
+  "events": [
+   {
+    "kind": "planReview",
+    "at": "2026-09-27T09:29:57.000Z",
+    "outcome": "request-changes",
+    "findings": 3
+   },
+   {
+    "kind": "planReview",
+    "at": "2026-09-27T09:47:28.000Z",
+    "outcome": "approve",
+    "findings": 0
+   },
+   {
+    "kind": "pr",
+    "at": "2026-09-27T10:07:35.000Z",
+    "pr": "https://github.com/JKershaw/LinearViewer/pull/1600",
+    "head": "fe5190e8"
+   },
+   {
+    "kind": "head",
+    "at": "2026-09-27T10:37:58.000Z",
+    "pr": "https://github.com/JKershaw/LinearViewer/pull/1600",
+    "head": "e8b10682aacd0dac9472bfb80b20036d41c9fa14"
+   },
+   {
+    "kind": "review",
+    "at": "2026-09-27T10:40:32.000Z",
+    "on": [
+     "https://github.com/JKershaw/LinearViewer/pull/1600"
+    ],
+    "outcome": "approve",
+    "heads": {
+     "https://github.com/JKershaw/LinearViewer/pull/1600": "e8b10682aacd0dac9472bfb80b20036d41c9fa14"
+    }
+   },
+   {
+    "kind": "closeOut",
+    "at": "2026-09-27T10:48:34.000Z"
+   }
+  ]
+ }
+}
