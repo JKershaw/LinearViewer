@@ -8,7 +8,9 @@
 // Run with: node --test tests/unit/lin-3285-installation-pr-read.test.js
 
 import { FINDINGS_NONE } from '../../lib/close-out-findings.js';
-import { test, describe, beforeEach, before } from 'node:test';
+import { test, describe, beforeEach, before, after } from 'node:test';
+import { createMangoTmpdir } from '../fixtures/mango-tmpdir.js';
+import { landingRecordsStore } from '../helpers/records-scenario.js';
 import assert from 'node:assert/strict';
 import { readFileSync, readdirSync, statSync } from 'node:fs';
 import { join } from 'node:path';
@@ -32,7 +34,12 @@ import {
 } from '../fixtures/lin-3285-seam.js';
 
 beforeEach(() => { clearFailOpenPrStatus(); clearPrStateCache(); });
+// LIN-4518 step 3: the landing the readers take is the ticket's records: PR_URL, open, on LIN-1 in ws-a.
+const harness = createMangoTmpdir('lin-3285-installation-pr-read-');
+let LANDING = null;
 before(installAppKey);
+before(async () => { await harness.connect(); LANDING = await landingRecordsStore(harness, { prUrl: PR_URL, ticket: 'LIN-1', urlKeys: ['ws-a'] }); });
+after(() => harness.close());
 
 const linearProvider = (comments = [{ id: 'c1', body: `opened ${PR_URL}`, createdAt: '2026-10-19T11:00:00.000Z' }]) => ({
   name: 'linear',
@@ -333,6 +340,7 @@ describe('readers: a Linear workspace reads with the minted token', () => {
   test('readRunEvidence: authenticated read, scoped to the urlKey', async () => {
     const { installationTokenFor, github } = owned();
     const out = await readRunEvidence({
+      recordsStore: LANDING,
       openFindings: FINDINGS_NONE,
       issueIdentifier: 'LIN-1', provider: linearProvider(), callScope: 'lin_key',
       urlKey: 'ws-a', workspaceId: WS, installationTokenFor, githubFetch: github,
@@ -344,6 +352,7 @@ describe('readers: a Linear workspace reads with the minted token', () => {
   test('without the seam the same read is anonymous and 403s (the failing case this ticket fixes)', async () => {
     const github = fakeGitHub();
     const out = await readRunEvidence({
+      recordsStore: LANDING,
       openFindings: FINDINGS_NONE,
       issueIdentifier: 'LIN-1', provider: linearProvider(), callScope: 'lin_key',
       urlKey: 'ws-a', workspaceId: WS, githubFetch: github,
@@ -355,6 +364,7 @@ describe('readers: a Linear workspace reads with the minted token', () => {
   test('a cross-account installation leaves the read anonymous', async () => {
     const { installationTokenFor, github } = makeSeam({ rows: [connection(OTHER, 'github', 'inst-1')] });
     await readRunEvidence({
+      recordsStore: LANDING,
       openFindings: FINDINGS_NONE,
       issueIdentifier: 'LIN-1', provider: linearProvider(), callScope: 'lin_key',
       urlKey: 'ws-a', workspaceId: WS, installationTokenFor, githubFetch: github,
@@ -379,12 +389,13 @@ describe('readers: a Linear workspace reads with the minted token', () => {
     assert.match(anon.reason, /\b403\b|rate limit/i);
   });
 
-  // LIN-4438 changed this pin on purpose: the ladder lane now reads the comments once (the blind-read
-  // gate), and still asks for no installation token, since it reads no PR.
-  test('C1: a close-out that does not stop at the PR makes zero installation calls and one provider (comment) read', async () => {
+  // LIN-4438 changed this pin on purpose: the ladder lane reads the ticket's records once (the blind-read gate), and still
+  // asks for no installation token, since it reads no PR. LIN-4518 step 3: it reads no comment either.
+  test('C1: a close-out that does not stop at the PR makes zero installation calls and no provider (comment) read', async () => {
     let asked = 0;
     let providerReads = 0;
     const state = await closeOutNotReady({
+      recordsStore: LANDING,
       openFindings: FINDINGS_NONE,
       workspace: { urlKey: 'ws-a', id: WS }, issueIdentifier: 'LIN-1', store: {},
       seam: {
@@ -395,7 +406,7 @@ describe('readers: a Linear workspace reads with the minted token', () => {
     });
     assert.equal(state, null);
     assert.equal(asked, 0);
-    assert.equal(providerReads, 1);
+    assert.equal(providerReads, 0);
   });
 
   test('C2: a guard read after a cached read still fetches the live head', async () => {
@@ -441,6 +452,7 @@ describe('readers: a Linear workspace reads with the minted token', () => {
     function loaderFor(github, installationTokenFor) {
       const prStateStore = createPrStateStore({ cache: new Map(), bucket: [], githubFetch: github });
       return createTaskPageLoader({
+      recordsStore: LANDING,
         dispatchStore: {}, agentStatusStore: {},
         briefCacheStore: { async get() { return null; } },
         recapCacheStore: { async get() { return null; } },

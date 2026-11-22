@@ -18,6 +18,7 @@ import { createWorkspaceApiRoutes } from '../../routes/workspace-api.js';
 import { registerProvider } from '../../lib/providers/registry.js';
 import { CloseOutEventsStore } from '../../lib/close-out-events-store.js';
 import { createOnTicketWrite } from '../../lib/ticket-close-closer.js';
+import { seededRecordsStore, ev } from '../helpers/records-scenario.js';
 import { createMangoTmpdir } from '../fixtures/mango-tmpdir.js';
 import { findRouteLayer } from './lib/route-layer.js';
 
@@ -195,8 +196,10 @@ describe('seam 3: close-out check Done write', () => {
   const merged = { readable: true, repo: 'acme/widget', number: 41, state: 'closed', merged: true, head: { ref: 'f', sha: 'aaaaaaa' }, ref: 'aaaaaaa', checks: [] };
   const reviewBody = '## Review\n\n### What CI Did Not Prove\n| # | Claim | In/Out | Discharge |\n| --- | --- | --- | --- |\n| 1 | one claim | In | none |\n\n**Verdict: Approve**';
   const comment = (body, createdAt) => ({ body, createdAt, user: 'reviewer' });
-  function build({ withMarkDone, onTicketWrite }) {
+  async function build({ withMarkDone, onTicketWrite }) {
     const collection = harness.freshDb().collection('close-out-events');
+    // LIN-4518 step 3: the gate reads the ticket's records: the PR, approved at its head, merged.
+    const recordsStore = await seededRecordsStore(harness, [ev.pr(1, PR_A, 'aaaaaaa'), ev.review(2, PR_A, { heads: { [PR_A]: 'aaaaaaa' } })], { urlKey: 'ws', tickets: ['LIN-1'] });
     const provider = {
       async fetchIssueComments() { return [comment(PR_A, '2026-07-01T00:00:00.000Z'), comment(reviewBody, '2026-07-02T00:00:00.000Z')]; },
       async fetchIssueContext() { return { issue: { id: 'iss-1', identifier: 'LIN-1', team: { id: 'team-1' }, state: { type: 'completed' } } }; },
@@ -208,6 +211,7 @@ describe('seam 3: close-out check Done write', () => {
       workspaceFromUrl: (req, res, next) => next(),
       closeOutEventsStore: new CloseOutEventsStore({ collection }),
       onTicketWrite,
+      recordsStore,
       closeOut: {
         // LIN-4495: a store that answered "none open" (an unmeasured reading holds Done, so the seam says what it read).
         openFindings: FINDINGS_NONE,
@@ -230,7 +234,7 @@ describe('seam 3: close-out check Done write', () => {
 
   test('fires with the default markDone (its {success, issue} payload is unwrapped; no read-back needed), and exactly once per merge', async () => {
     const { onTicketWrite, closed } = makeCloser();
-    const router = build({ onTicketWrite });
+    const router = await build({ onTicketWrite });
     const first = await check(router);
     await check(router);
     await check(router);
@@ -240,13 +244,13 @@ describe('seam 3: close-out check Done write', () => {
   });
   test('fires with a seam.markDone that returns nothing (one read-back), and not when Done was not written', async () => {
     const { onTicketWrite, closed } = makeCloser();
-    await check(build({ onTicketWrite, withMarkDone: async () => undefined }));
+    await check(await build({ onTicketWrite, withMarkDone: async () => undefined }));
     await tick();
     assert.equal(closed.length, 1);
   });
   test('a failed Done write does not fire the closer', async () => {
     const { onTicketWrite, closed } = makeCloser();
-    const res = await check(build({ onTicketWrite, withMarkDone: async () => { throw new Error('down'); } }));
+    const res = await check(await build({ onTicketWrite, withMarkDone: async () => { throw new Error('down'); } }));
     await tick();
     assert.equal(res.jsonBody.done, false);
     assert.deepEqual(closed, []);

@@ -8,10 +8,17 @@
 // (any repo — LIN-3333 retired the allowlist filter), and the zero / one /
 // many / unreadable derivation.
 
-import { test, describe, before } from 'node:test';
+import { test, describe, before, after } from 'node:test';
 import assert from 'node:assert/strict';
 import { createWorkspaceApiRoutes } from '../../routes/workspace-api.js';
 import { findRouteLayer } from './lib/route-layer.js';
+import { createMangoTmpdir } from '../fixtures/mango-tmpdir.js';
+import { seededRecordsStore, ev } from '../helpers/records-scenario.js';
+
+// LIN-4518 step 3: the box reads the ticket's records (the trail); the comments give the picker's cited links.
+const harness = createMangoTmpdir('lin-3247-run-evidence-route-');
+before(() => harness.connect());
+after(() => harness.close());
 
 const PATH = '/workspace/:urlKey/api/run-evidence/:issueIdentifier';
 const PR_A = 'https://github.com/acme/widget/pull/12';
@@ -29,9 +36,10 @@ function fakeProvider({ comments = [] } = {}) {
   };
 }
 
-function makeRouter({ comments = [], readPrStatus = null, owner = true } = {}) {
+async function makeRouter({ comments = [], readPrStatus = null, owner = true, events = [] } = {}) {
   return createWorkspaceApiRoutes({
     workspaceFromUrl: (req, res, next) => next(),
+    recordsStore: await seededRecordsStore(harness, events, { urlKey: 'ws', tickets: ['LIN-1'] }),
     runEvidence: {
       resolveProvider: () => ({ provider: fakeProvider({ comments }), callScope: 'scope' }),
       viewerIsOwner: () => owner,
@@ -57,8 +65,9 @@ const reviewBody = '## Review\n\n### What CI Did Not Prove\n- one claim\n\n**Ver
 
 describe('GET /api/run-evidence/:issueIdentifier', () => {
   test('one open PR in the comments → ready, with the contracted response shape', async () => {
-    const res = await callRoute(makeRouter({
+    const res = await callRoute(await makeRouter({
       comments: [comment(`opened ${PR_A}`, '2026-07-01T00:00:00.000Z'), comment(reviewBody, '2026-07-02T00:00:00.000Z')],
+      events: [ev.pr(1, PR_A, 'abc1234'), ev.review(2, PR_A, { heads: { [PR_A]: 'abc1234' } })],
       readPrStatus: async () => ({ readable: true, repo: 'acme/widget', number: 12, state: 'open', merged: false, head: { ref: 'f', sha: 'abc1234' }, ref: 'abc1234', checks: [{ name: 'unit', conclusion: 'success' }] }),
     }));
     assert.equal(res.statusCode, 200);
@@ -66,25 +75,26 @@ describe('GET /api/run-evidence/:issueIdentifier', () => {
     assert.equal(res.jsonBody.state.pr.state, 'open');
     assert.equal(res.jsonBody.state.pr.number, 12);
     assert.equal(res.jsonBody.evidence.checked.now.state, 'passing');
-    assert.equal(res.jsonBody.ledger.verdict, 'approve-conditional');
+    // The records word for a conditional approval is `approve`; its conditions are findings to close-out (step 2's writer).
+    assert.equal(res.jsonBody.ledger.verdict, 'approve');
   });
 
   test('zero PR URLs → no-pr (withholds)', async () => {
-    const res = await callRoute(makeRouter({ comments: [comment('no PR here', '2026-07-01T00:00:00.000Z')] }));
+    const res = await callRoute(await makeRouter({ comments: [comment('no PR here', '2026-07-01T00:00:00.000Z')] }));
     assert.equal(res.statusCode, 200);
     assert.equal(res.jsonBody.closeOut.status, 'no-pr');
   });
 
   test('more than one PR URL → multiple-prs (withholds, says what is known)', async () => {
     const PR_A2 = 'https://github.com/acme/widget/pull/13';
-    const res = await callRoute(makeRouter({ comments: [comment(`${PR_A} and ${PR_A2}`, '2026-07-01T00:00:00.000Z')] }));
+    const res = await callRoute(await makeRouter({ comments: [comment(`${PR_A} and ${PR_A2}`, '2026-07-01T00:00:00.000Z')], events: [ev.pr(1, PR_A, 'abc1234'), ev.pr(1, PR_A2, 'abc1234')] }));
     assert.equal(res.jsonBody.closeOut.status, 'multiple-prs');
     assert.match(res.jsonBody.closeOut.message, /more than one PR/);
   });
 
   test('an unreadable PR read → unknown, never a 500', async () => {
-    const res = await callRoute(makeRouter({
-      comments: [comment(PR_A, '2026-07-01T00:00:00.000Z')],
+    const res = await callRoute(await makeRouter({
+      comments: [comment(PR_A, '2026-07-01T00:00:00.000Z')], events: [ev.pr(1, PR_A, 'abc1234')],
       readPrStatus: async () => ({ readable: false, state: 'unknown', reason: 'not readable: private or unknown repository' }),
     }));
     assert.equal(res.statusCode, 200);
@@ -94,8 +104,8 @@ describe('GET /api/run-evidence/:issueIdentifier', () => {
 
   test('a PR for any repo is accepted — the workspace allowlist is gone (LIN-3333)', async () => {
     const PR_FOREIGN = 'https://github.com/acme/other/pull/12';
-    const res = await callRoute(makeRouter({
-      comments: [comment(PR_FOREIGN, '2026-07-01T00:00:00.000Z')],
+    const res = await callRoute(await makeRouter({
+      comments: [comment(PR_FOREIGN, '2026-07-01T00:00:00.000Z')], events: [ev.pr(1, PR_FOREIGN, 'abc1234')],
       readPrStatus: async () => ({ readable: true, repo: 'acme/other', number: 12, state: 'open', merged: false, head: { ref: 'f', sha: 'abc1234' }, ref: 'abc1234', checks: [] }),
     }));
     assert.equal(res.jsonBody.state.pr.state, 'open');
@@ -103,17 +113,17 @@ describe('GET /api/run-evidence/:issueIdentifier', () => {
   });
 
   test('a non-owner viewer gets closeOut.owner=false (the box will be omitted)', async () => {
-    const res = await callRoute(makeRouter({ owner: false }));
+    const res = await callRoute(await makeRouter({ owner: false }));
     assert.equal(res.jsonBody.closeOut.owner, false);
   });
 
   // LIN-3913: validCloseOutIdentifier's `<= 100` bound, pinned on the GET route.
   test('identifier bound: 100 chars is read, 101 chars is refused with 400 (LIN-3913)', async () => {
-    const atBound = await callRoute(makeRouter(), 'L'.repeat(100));
+    const atBound = await callRoute(await makeRouter(), 'L'.repeat(100));
     assert.equal(atBound.statusCode, 200);
     assert.equal(atBound.jsonBody.closeOut.status, 'no-pr');
 
-    const overBound = await callRoute(makeRouter(), 'L'.repeat(101));
+    const overBound = await callRoute(await makeRouter(), 'L'.repeat(101));
     assert.equal(overBound.statusCode, 400);
     assert.equal(overBound.jsonBody.error, 'Invalid issue identifier');
   });

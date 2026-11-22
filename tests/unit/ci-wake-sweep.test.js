@@ -13,6 +13,7 @@
 import { test, describe, before, after, beforeEach } from 'node:test';
 import assert from 'node:assert/strict';
 import { createMangoTmpdir } from '../fixtures/mango-tmpdir.js';
+import { seededRecordsStore, ev } from '../helpers/records-scenario.js';
 import { DispatchQueueStore } from '../../lib/dispatch-store.js';
 import {
   createCiWakeSweepRun,
@@ -187,6 +188,16 @@ describe('ci-wake-sweep: over a real DispatchQueueStore', () => {
     assert.equal(prReads[0].callScope, 'scope-tok');
     assert.deepEqual(prReads[0].workspace, { urlKey: URL_KEY });
     assert.equal(posted.length, 1);
+  });
+
+  // LIN-4518 step 3: a bare number resolves against the task's change records first, so the comments are not read for it.
+  test('LIN-4518 step 3: a bare #N resolves against the task\'s change records, with no comment read', async () => {
+    const recordsStore = await seededRecordsStore(harness, [ev.pr(1, PR_URL, 'abc1234')], { urlKey: URL_KEY, tickets: ['LIN-3651'] });
+    await seedParked({ message: '[pending] PR #1944 CI is running', issue: 'LIN-3651' });
+    await buildRun({ extra: { recordsStore } })();
+    assert.deepEqual(commentFetches, [], 'the records answer; no comment is read for the number');
+    assert.equal(posted.length, 1);
+    assert.equal(prReads[0].number, 1944);
   });
 
   test('the issue source is forwarded to resolveWorkspaceAccess when the row carries it', async () => {

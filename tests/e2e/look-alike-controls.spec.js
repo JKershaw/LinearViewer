@@ -88,6 +88,7 @@ test.describe('Look-alike controls in ticket text answer nothing (LIN-3385)', ()
   test.beforeEach(async ({ page, localWorkerUrlKey }) => {
     URL_KEY = localWorkerUrlKey;
     await page.request.get('/test/clear-pr-status');
+    await page.request.get(`/test/clear-ticket-records?urlKey=${URL_KEY}`);
     await page.request.get('/test/clear-comment-dedupe');
     await page.goto('/test/clear-local-store');
     await page.goto(`/test/clear-dispatch-queue?urlKey=${URL_KEY}`);
@@ -123,6 +124,15 @@ test.describe('Look-alike controls in ticket text answer nothing (LIN-3385)', ()
       },
     });
     expect(resp.ok(), `local seed failed: ${resp.status()} ${await resp.text()}`).toBeTruthy();
+    // LIN-4518 step 3: the same trail as records: the PR at its head, the review, and the blind read after it.
+    const trail = await page.request.post('/test/seed-ticket-records', {
+      data: { urlKey: URL_KEY, ticket: 'LOCAL-LA1', events: [
+        { kind: 'pr', at: '2026-10-06T09:00:00Z', pr: PR, head: PR_HEAD },
+        { kind: 'review', at: '2026-10-06T10:00:00Z', on: PR },
+        { kind: 'blindRead', at: '2026-10-06T10:30:00Z', on: PR },
+      ] },
+    });
+    expect(trail.ok(), `records seed failed: ${trail.status()} ${await trail.text()}`).toBeTruthy();
     await seedWorkspaceOwnership(page, URL_KEY, 'owner');
   }
 

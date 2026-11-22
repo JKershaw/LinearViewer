@@ -12,7 +12,9 @@
  * Run with: node --test tests/unit/task-page-finished-story.test.js
  */
 import { FINDINGS_NONE } from '../../lib/close-out-findings.js';
-import { test, describe } from 'node:test';
+import { test, describe, before, after } from 'node:test';
+import { createMangoTmpdir } from '../fixtures/mango-tmpdir.js';
+import { seededRecordsStore, ev } from '../helpers/records-scenario.js';
 import assert from 'node:assert/strict';
 import { createTaskPageLoader } from '../../lib/task-page-loader.js';
 import { renderTaskPage, renderTaskPullRequest, sessionsLine } from '../../lib/render-task-page.js';
@@ -25,6 +27,14 @@ import { enrichLoop, deriveSessionWaiting } from '../../routes/dashboard.js';
 const NOW = new Date('2026-10-08T21:00:00.000Z');
 const UUID = '11111111-2222-3333-4444-555555555555';
 const PR_URL = 'https://github.com/acme/app/pull/41';
+// LIN-4518 step 3: the default finished trail (the PR, its approve, the close-out that merged it) as the ticket's records.
+const harness = createMangoTmpdir('lin-3379-task-page-finished-story-');
+let RECORDS = null;
+before(async () => {
+  await harness.connect();
+  RECORDS = await seededRecordsStore(harness, [ev.pr(1, PR_URL, 'abc1234'), ev.review(2, PR_URL, { heads: { [PR_URL]: 'abc1234' } }), ev.close(3), ev.merged(3, PR_URL)], { urlKey: 'ws', tickets: ['LIN-51'] });
+});
+after(() => harness.close());
 const OTHER_PR_URL = 'https://github.com/acme/app/pull/99';
 
 const REVIEW = {
@@ -84,8 +94,9 @@ function loop(over = {}) {
 
 const MERGED_PR = { readable: true, state: 'closed', merged: true, head: { sha: 'abc1234' }, checks: [{ conclusion: 'success' }] };
 
-function makeLoader({ ctx, brief = null, recap = null, events = [], loops = [loop()], stopAt = 'pr' } = {}) {
+function makeLoader({ ctx, brief = null, recap = null, events = [], loops = [loop()], stopAt = 'pr', recordsOverride = null } = {}) {
   const loader = createTaskPageLoader({
+    recordsStore: recordsOverride ?? RECORDS,
     dispatchStore: {},
     agentStatusStore: {},
     briefCacheStore: { async get() { return brief; } },
@@ -270,8 +281,8 @@ describe('B1 freshness gate', () => {
 });
 
 describe('B4 merger rule', () => {
-  async function leadFor(events, { comments } = {}) {
-    const { loader, access } = makeLoader({ ctx: ctxFor(comments ? { comments } : {}), events });
+  async function leadFor(events, { comments, records } = {}) {
+    const { loader, access } = makeLoader({ ctx: ctxFor(comments ? { comments } : {}), events, ...(records ? { recordsOverride: records } : {}) });
     const { model } = await loader.loadTaskPage({ urlKey: 'ws', identifier: 'LIN-51', access });
     return renderTaskPullRequest(model, '', NOW).match(/data-testid="task-page-pr-lead">([^<]*)</)[1];
   }
@@ -294,7 +305,9 @@ describe('B4 merger rule', () => {
   });
 
   test('multiple PRs name no merger', async () => {
-    const lead = await leadFor([{ by: 'press', prUrl: PR_URL, merged: true }], { comments: [OPENED, REVIEW, { id: 'x', createdAt: '2026-10-08T16:30:00.000Z', body: `also ${OTHER_PR_URL}` }] });
+    // The ticket's landing is two PRs: the finished one, and another the trail cites (an open change on the task).
+    const records = await seededRecordsStore(harness, [ev.pr(1, PR_URL, 'abc1234'), ev.pr(1, OTHER_PR_URL, 'abc1234'), ev.review(2, [PR_URL, OTHER_PR_URL], { heads: { [PR_URL]: 'abc1234', [OTHER_PR_URL]: 'abc1234' } }), ev.close(3), ev.merged(3, PR_URL)], { urlKey: 'ws', tickets: ['LIN-51'] });
+    const lead = await leadFor([{ by: 'press', prUrl: PR_URL, merged: true }], { comments: [OPENED, REVIEW, { id: 'x', createdAt: '2026-10-08T16:30:00.000Z', body: `also ${OTHER_PR_URL}` }], records });
     assert.doesNotMatch(lead, /merged by/);
   });
 });

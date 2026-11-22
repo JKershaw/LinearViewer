@@ -60,7 +60,8 @@ import { appendBlock, replace as replaceInDescription, DescriptionEditError } fr
 import { checkSizeRecord, recordShape, SIZE_OF_MOVE_HEADING, SIZE_RECORD_CODES, DECIDED_BY, WRONG_WORK } from '../lib/size-of-move.js';
 import { addedPlanHeadings, PLAN_HEADING_WORDS, PLAN_IN_DESCRIPTION } from '../lib/legacy-plan-text.js';
 import { blindReadRefusal } from '../lib/run-ledger.js';
-import { checkBlindRead, landingPrUrls } from '../lib/run-trail.js';
+import { checkBlindRead } from '../lib/run-trail.js';
+import { landingOfTicket } from '../lib/records/landing.js';
 import { isRestrictedStamp, sameTicketKey, ISSUE_PATCH_FIELDS } from '../lib/stage-writes.js';
 import { jsonError } from '../lib/errors.js';
 import { parseFeedbackImage } from '../lib/attachment-upload.js';
@@ -714,12 +715,13 @@ export function createProxyWriteRoutes({
     const shape = checkBlindRead(body);
     if (shape.ok && !shape.applies) return false;
     if (!shape.ok) return refuseBlindRead(ctx, shape);
+    // LIN-4518 step 3: the landing is the task's records landing (lib/records/landing.js), the one every gate reads.
     let landing = null;
     try {
-      if (typeof ctx.provider.fetchIssueComments !== 'function') throw new Error('the provider reads no comment trail');
-      landing = landingPrUrls(await ctx.provider.fetchIssueComments(ctx.token, ctx.req.params.issueId));
+      if (!recordsStore) throw new Error('no records store');
+      landing = await landingOfTicket({ recordsStore, urlKey: ctx.req.proxyUrlKey, ticket: ctx.req.params.issueId });
     } catch (err) {
-      console.warn(`[blind-read] ${ctx.req.params.issueId}: PR-set check skipped, the trail could not be read whole (${err?.message || err}); the shape check held`);
+      console.warn(`[blind-read] ${ctx.req.params.issueId}: PR-set check skipped, the landing could not be read (${err?.message || err}); the shape check held`);
     }
     if (landing === null) return false;
     const check = checkBlindRead(body, { landing });

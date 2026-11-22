@@ -219,9 +219,9 @@ export function createDispatchRoutes({
   const lane = {
     // LIN-4503: the child-ticket retry each dispatch of a ticket runs (lib/records-tracker.js childTicketRetryOf).
     childTickets,
-    // LIN-4518 step 2: the landing's change records a kind-override blind read is handed. Named apart from closeOut's
-    // recordsStore (the close-out guard's open-findings read), which this route has never passed.
-    landingRecords: recordsStore,
+    // LIN-4518 step 3 (finding 07bf7b8f): one name for the records store. The close-out guard reads the ticket's trail from
+    // it (lib/close-out-readiness.js), and a kind-override blind read is handed its landing's change records from it.
+    recordsStore,
     dispatchQueueStore,
     dispatchTokenStore,
     workspacePreferencesStore,

@@ -7,6 +7,7 @@ import { createPipelineMergeRecorder, createSessionWorkspaceIdResolver, openFind
 import { findingsNotRead, findingsRead } from '../../lib/close-out-findings.js';
 import { CloseOutEventsStore } from '../../lib/close-out-events-store.js';
 import { createMangoTmpdir } from '../fixtures/mango-tmpdir.js';
+import { seededRecordsStore, ev } from '../helpers/records-scenario.js';
 
 before(() => { process.env.NODE_ENV = 'test'; });
 const harness = createMangoTmpdir('lin-3756-close-out-merges-');
@@ -20,10 +21,12 @@ const mergedStatus = { readable: true, repo: 'acme/widget', number: 41, state: '
 const openStatus = { ...mergedStatus, state: 'open', merged: false, created_at: OPENED, merged_at: null };
 const doneIssue = { id: 'iss-1', identifier: 'LIN-1', state: { type: 'completed' } };
 
-function setup({ stopAt = null, comments = [{ body: PR, createdAt: '2026-10-20T11:00:00Z', user: 'w' }], token = 'ghs_token', status = mergedStatus, workspaceResolver = null, listOwnerInstall = null } = {}) {
+// LIN-4518 step 3: the recorder reads the ticket's landing from records. The default ticket holds PR 41 and no review.
+async function setup({ stopAt = null, events = [ev.pr(1, PR, 'abc1234')], recordsOverride = null, comments = [], token = 'ghs_token', status = mergedStatus, workspaceResolver = null, listOwnerInstall = null } = {}) {
   const collection = harness.freshDb().collection('close-out-events');
   const store = new CloseOutEventsStore({ collection });
   const reads = [];
+  const recordsStore = recordsOverride ?? await seededRecordsStore(harness, events, { urlKey: 'ws', tickets: ['LIN-1'] });
   const provider = { name: 'github', async fetchIssueComments() { return comments; } };
   const dispatchStore = {
     async listItems() { return stopAt ? [{ issueIdentifier: 'LIN-1', stopAt }] : []; },
@@ -32,7 +35,7 @@ function setup({ stopAt = null, comments = [{ body: PR, createdAt: '2026-10-20T1
   };
   const readPrStatus = async (args) => { reads.push(args); return status; };
   const record = createPipelineMergeRecorder({
-    closeOutEventsStore: store, dispatchStore, readPrStatus, log: () => {},
+    closeOutEventsStore: store, dispatchStore, recordsStore, readPrStatus, log: () => {},
     installationTokenFor: listOwnerInstall,
     ...(workspaceResolver ? { resolveWorkspaceId: workspaceResolver } : {}),
   });
@@ -47,8 +50,8 @@ const rows = (c) => c.collection.find({}).toArray();
 describe('createPipelineMergeRecorder', () => {
   test('a Linear-bound workspace reads through the owner installation, and without a workspace id records nothing', async () => {
     const asked = [];
-    const c = setup({ workspaceResolver: async () => null, listOwnerInstall: async (a) => { asked.push(a); return 'ghs_install'; } });
-    const linear = { name: 'linear', async fetchIssueComments() { return [{ body: PR, createdAt: '2026-10-20T11:00:00Z', user: 'w' }]; } };
+    const c = await setup({ workspaceResolver: async () => null, listOwnerInstall: async (a) => { asked.push(a); return 'ghs_install'; } });
+    const linear = { name: 'linear', async fetchIssueComments() { return []; } };
     await c.run({ provider: linear, callScope: 'linear-token', workspaceId: null });
     assert.equal((await rows(c)).length, 0, 'no workspace id: owner installation skipped, no token, no read');
     assert.equal(c.reads.length, 0);
@@ -58,7 +61,7 @@ describe('createPipelineMergeRecorder', () => {
   });
 
   test('every run reads PR status through its own fresh cache, never the shared 60 s one', async () => {
-    const c = setup();
+    const c = await setup();
     await c.run();
     await c.run();
     assert.equal(c.reads.length, 2);
@@ -69,7 +72,7 @@ describe('createPipelineMergeRecorder', () => {
   });
 
   test('a Done write on a merged PR records exactly one event with both forge times; a repeat adds nothing', async () => {
-    const c = setup();
+    const c = await setup();
     const first = await c.run();
     assert.equal(first.recorded.length, 1);
     const [ev] = await rows(c);
@@ -84,7 +87,7 @@ describe('createPipelineMergeRecorder', () => {
   });
 
   test('a person Done (writer: person) on an ordinary task records by person, once, with both forge times', async () => {
-    const c = setup();
+    const c = await setup();
     const first = await c.run({ writer: 'person' });
     assert.equal(first.recorded.length, 1);
     const [ev] = await rows(c);
@@ -99,14 +102,14 @@ describe('createPipelineMergeRecorder', () => {
   });
 
   test('a person Done with no GitHub token records nothing and never reads the PR', async () => {
-    const c = setup({ token: null });
+    const c = await setup({ token: null });
     await c.run({ writer: 'person' });
     assert.equal((await rows(c)).length, 0);
     assert.equal(c.reads.length, 0);
   });
 
   test('a person Done on a stop-at-PR task records by person and stamps doneAt', async () => {
-    const c = setup({ stopAt: 'pr' });
+    const c = await setup({ stopAt: 'pr' });
     await c.run({ writer: 'person' });
     const [ev] = await rows(c);
     assert.equal(ev.by, 'person');
@@ -114,27 +117,27 @@ describe('createPipelineMergeRecorder', () => {
   });
 
   test('a non-completed write records nothing and reads nothing', async () => {
-    const c = setup();
+    const c = await setup();
     await c.run({ written: { ...doneIssue, state: { type: 'canceled' } } });
     assert.equal((await rows(c)).length, 0);
     assert.equal(c.reads.length, 0);
   });
 
   test('no GitHub token: nothing recorded and the PR reader is never called', async () => {
-    const c = setup({ token: null });
+    const c = await setup({ token: null });
     await c.run();
     assert.equal((await rows(c)).length, 0);
     assert.equal(c.reads.length, 0);
   });
 
   test('a still-open PR records nothing', async () => {
-    const c = setup({ status: openStatus });
+    const c = await setup({ status: openStatus });
     await c.run();
     assert.equal((await rows(c)).length, 0);
   });
 
   test('a stop-at-PR task keeps the check route rule: person, with doneAt stamped', async () => {
-    const c = setup({ stopAt: 'pr' });
+    const c = await setup({ stopAt: 'pr' });
     await c.run();
     const [ev] = await rows(c);
     assert.equal(ev.by, 'person');
@@ -142,7 +145,7 @@ describe('createPipelineMergeRecorder', () => {
   });
 
   test('a stop-at-PR task with a prior press records close-out', async () => {
-    const c = setup({ stopAt: 'pr' });
+    const c = await setup({ stopAt: 'pr' });
     await c.store.record({ accountId: 'acct-1', urlKey: 'ws', issueIdentifier: 'LIN-1', by: 'press', dispatchId: 'd-1', prUrl: PR, headSha: 'old', merged: false, openFindings: { state: 'read', count: 0 } });
     await c.run();
     const merged = (await rows(c)).filter(e => e.merged);
@@ -152,17 +155,18 @@ describe('createPipelineMergeRecorder', () => {
 
   test('a missing workspace id is resolved through resolveWorkspaceId', async () => {
     const seen = [];
-    const c = setup({ workspaceResolver: async (k) => { seen.push(k); return 'resolved-id'; } });
+    const c = await setup({ workspaceResolver: async (k) => { seen.push(k); return 'resolved-id'; } });
     await c.run({ workspaceId: null });
     assert.deepEqual(seen, ['ws']);
     assert.equal((await rows(c)).length, 1);
   });
 
-  test('a throwing resolver or provider is swallowed', async () => {
-    const c = setup({ workspaceResolver: async () => { throw new Error('boom'); } });
+  test('a throwing resolver or a records read that throws is swallowed', async () => {
+    const c = await setup({ workspaceResolver: async () => { throw new Error('boom'); } });
     await assert.doesNotReject(c.run({ workspaceId: null }));
-    const bad = await c.run({ provider: { name: 'github', async fetchIssueComments() { throw new Error('down'); } } });
-    assert.deepEqual(bad, { recorded: [] });
+    // The landing is read from records (LIN-4518 step 3): a records fault records nothing and does not throw.
+    const down = await setup({ recordsOverride: { async taskForTicket() { throw new Error('down'); } } });
+    assert.deepEqual(await down.run(), { recorded: [] });
   });
 });
 

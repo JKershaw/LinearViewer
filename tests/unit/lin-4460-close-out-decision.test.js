@@ -28,6 +28,14 @@ import { readRunEvidence } from '../../lib/run-evidence.js';
 import { readCloseOutChain, closeOutNotReady } from '../../lib/close-out-readiness.js';
 import { blindReadStep } from '../../lib/recommendation-blind-read.js';
 import { RUN_COMMENT_TRAILS } from '../fixtures/run-ledger-trails.js';
+import { createMangoTmpdir } from '../fixtures/mango-tmpdir.js';
+import { seededRecordsStore, ev } from '../helpers/records-scenario.js';
+import { trailForTicket } from '../../lib/task-standing.js';
+import { before, after } from 'node:test';
+
+const harness = createMangoTmpdir('lin-4460-close-out-decision-');
+before(() => harness.connect());
+after(() => harness.close());
 
 const REPO = 'acme/widget';
 const PR = (n) => `https://github.com/${REPO}/pull/${n}`;
@@ -66,22 +74,31 @@ function seamFor(comments, readOne, stopAt) {
 }
 const WORKSPACE = { urlKey: 'acme' };
 
-async function surfaces(comments, { shape = 'full', issue = STARTED, merged = [], movedHead = false } = {}) {
+// LIN-4518 step 3: the same trails as records (the gates read records). Every PR is at REVIEWED when its event is written.
+const evPr = (n, url = PR1) => ev.pr(n, url, REVIEWED);
+const evReview = (n, outcome = 'approve', url = PR1) => ev.review(n, url, { outcome, heads: { [url]: REVIEWED } });
+const evRead = (n, ...urls) => ev.read(n, urls.length ? urls : PR1);
+
+/** The surfaces over one ticket's records (`events`, LIN-4518 step 3): each reads the same store. */
+async function surfaces(events, { shape = 'full', issue = STARTED, merged = [], movedHead = false } = {}) {
+  const recordsStore = await seededRecordsStore(harness, events, { urlKey: WORKSPACE.urlKey, tickets: ['LIN-1'] });
+  const trail = await trailForTicket({ recordsStore, urlKey: WORKSPACE.urlKey, ticket: 'LIN-1' });
   const readOne = (url) => (shape === 'unreadable' ? statusOf.unreadable()
     : (merged.includes(prOf(url).number) ? statusOf.merged(url) : statusOf.open(url, movedHead ? MOVED : REVIEWED)));
+  const comments = [];
   const box = await readRunEvidence({
     openFindings: FINDINGS_NONE,
-    issueIdentifier: 'LIN-1', comments, readPrStatus: async ({ repo, number }) => readOne(`https://github.com/${repo}/pull/${number}`),
+    issueIdentifier: 'LIN-1', comments, urlKey: WORKSPACE.urlKey, recordsStore, readPrStatus: async ({ repo, number }) => readOne(`https://github.com/${repo}/pull/${number}`),
     stopAt: 'pr', runnerReady: true, viewerIsOwner: true,
   });
   const check = await readCloseOutChain({
-    openFindings: FINDINGS_NONE,
+    openFindings: FINDINGS_NONE, recordsStore,
     workspace: WORKSPACE, issueIdentifier: 'LIN-1', seam: seamFor(comments, readOne, 'pr'), stopAt: 'pr',
     runnerReady: true, owner: true, actor: CLOSE_OUT_ACTOR.PERSON, prStatusCache: new Map(),
   });
-  const stopAtGuard = await closeOutNotReady({ openFindings: FINDINGS_NONE, workspace: WORKSPACE, issueIdentifier: 'LIN-1', seam: seamFor(comments, readOne, 'pr') });
-  const ladderGuard = await closeOutNotReady({ openFindings: FINDINGS_NONE, workspace: WORKSPACE, issueIdentifier: 'LIN-1', seam: seamFor(comments, readOne, null) });
-  const step = blindReadStep({ state: issue }, { comments, allRuns: [] });
+  const stopAtGuard = await closeOutNotReady({ openFindings: FINDINGS_NONE, recordsStore, workspace: WORKSPACE, issueIdentifier: 'LIN-1', seam: seamFor(comments, readOne, 'pr') });
+  const ladderGuard = await closeOutNotReady({ openFindings: FINDINGS_NONE, recordsStore, workspace: WORKSPACE, issueIdentifier: 'LIN-1', seam: seamFor(comments, readOne, null) });
+  const step = blindReadStep({ state: issue }, { trail, allRuns: [] });
   return {
     box: box.closeOut,
     check: check.state,
@@ -102,44 +119,46 @@ const refusedOn = (guardAnswer) => (guardAnswer ? guardAnswer.reason : null);
 const SYNTHETIC = [
   {
     name: 'approved, merged, no read on record',
-    comments: [summary(1), review(2)], merged: [41],
+    comments: [summary(1), review(2)], events: [evPr(1), evReview(2)], merged: [41],
     full: { box: ['merged', null], check: ['merged', true], stopAt: null, ladder: 'blind-read-missing', routesRead: true },
     unreadable: { box: ['not-ready', 'blind-read-missing'], check: ['not-ready', false], stopAt: 'blind-read-missing', ladder: 'blind-read-missing', routesRead: true },
   },
   {
     name: 'approved, open, a read names the PR',
-    comments: [summary(1), review(2), read(3, PR1)],
+    comments: [summary(1), review(2), read(3, PR1)], events: [evPr(1), evReview(2), evRead(3, PR1)],
     full: { box: ['ready', null], check: ['ready', false], stopAt: null, ladder: null, routesRead: false },
     unreadable: { box: ['unknown', null], check: ['unknown', false], stopAt: null, ladder: null, routesRead: false },
   },
   {
     name: 'approved, open, no read on record',
-    comments: [summary(1), review(2)],
+    comments: [summary(1), review(2)], events: [evPr(1), evReview(2)],
     full: { box: ['not-ready', 'blind-read-missing'], check: ['not-ready', false], stopAt: 'blind-read-missing', ladder: 'blind-read-missing', routesRead: true },
     unreadable: { box: ['not-ready', 'blind-read-missing'], check: ['not-ready', false], stopAt: 'blind-read-missing', ladder: 'blind-read-missing', routesRead: true },
   },
   {
     name: 'request changes, open, no read',
-    comments: [summary(1), review(2, 'Request Changes')],
+    comments: [summary(1), review(2, 'Request Changes')], events: [evPr(1), evReview(2, 'request-changes')],
     full: { box: ['not-ready', null], check: ['not-ready', false], stopAt: null, ladder: null, routesRead: false },
     unreadable: { box: ['unknown', null], check: ['unknown', false], stopAt: null, ladder: null, routesRead: false },
   },
   {
     name: 'approved, one landing PR merged and one open, no read (partial)',
-    comments: [summary(1), review(2), link(3)], merged: [41],
+    comments: [summary(1), review(2), link(3)], events: [evPr(1), evReview(2), evPr(3, PR2)], merged: [41],
     // Multi-PR: the box reads no PR (LIN-4458), so it reads the gate as not known merged.
     full: { box: ['not-ready', 'blind-read-missing'], check: ['partial', false], stopAt: 'blind-read-missing', ladder: 'blind-read-missing', routesRead: false },
     unreadable: { box: ['not-ready', 'blind-read-missing'], check: ['not-ready', false], stopAt: 'blind-read-missing', ladder: 'blind-read-missing', routesRead: false },
   },
   {
     name: 'approved, open at a moved head, a read names the PR (head-moved)',
-    comments: [summary(1), review(2), read(3, PR1)], movedHead: true,
+    comments: [summary(1), review(2), read(3, PR1)], events: [evPr(1), evReview(2), evRead(3, PR1)], movedHead: true,
     full: { box: ['not-ready', 'head-moved'], check: ['not-ready', false], stopAt: 'head-moved', ladder: null, routesRead: false },
     unreadable: { box: ['unknown', null], check: ['unknown', false], stopAt: null, ladder: null, routesRead: false },
   },
   {
     name: 'empty landing: a review, and a PR named only as #N',
     comments: [c(1, 'Implementation done, CI green.'), review(2, 'Approve', 'the change')],
+    // A verdict rests on a change, so the records of this row hold no PR and no review.
+    events: [],
     full: { box: ['no-pr', null], check: ['no-pr', false], stopAt: null, ladder: null, routesRead: false },
     unreadable: { box: ['no-pr', null], check: ['no-pr', false], stopAt: null, ladder: null, routesRead: false },
   },
@@ -149,18 +168,23 @@ const REAL = [
   {
     name: 'LIN-3245: merged, approved, closed out on the trail (real trail)',
     comments: RUN_COMMENT_TRAILS['lin-3245'].comments, merged: [1716], ticket: DONE,
+    // The PR's review (approve) and its close-out, which merged it (the trail's own order).
+    events: [ev.pr(1, PR(1716), REVIEWED), ev.review(2, PR(1716), { outcome: 'approve', heads: { [PR(1716)]: REVIEWED } }), ev.close(3), ev.merged(3, PR(1716))],
     full: { box: ['merged', null], check: ['merged', true], stopAt: null, ladder: 'blind-read-missing', routesRead: false },
     unreadable: { box: ['not-ready', 'blind-read-missing'], check: ['not-ready', false], stopAt: 'blind-read-missing', ladder: 'blind-read-missing', routesRead: false },
   },
   {
     name: 'LIN-3247: request changes on a open PR (real trail)',
     comments: RUN_COMMENT_TRAILS['lin-3247'].comments,
+    events: [ev.pr(1, PR(1723), REVIEWED), ev.review(2, PR(1723), { outcome: 'request-changes', heads: { [PR(1723)]: REVIEWED } })],
     full: { box: ['not-ready', null], check: ['not-ready', false], stopAt: null, ladder: null, routesRead: false },
     unreadable: { box: ['unknown', null], check: ['unknown', false], stopAt: null, ladder: null, routesRead: false },
   },
   {
     name: 'LIN-3098: a review that names no PR by full URL (real trail)',
     comments: RUN_COMMENT_TRAILS['lin-3098-pair'].comments,
+    // Its review names no PR by full URL, so the records of the ticket hold no PR to rest a verdict on.
+    events: [],
     full: { box: ['no-pr', null], check: ['no-pr', false], stopAt: null, ladder: null, routesRead: false },
     unreadable: { box: ['no-pr', null], check: ['no-pr', false], stopAt: null, ladder: null, routesRead: false },
   },
@@ -180,8 +204,7 @@ describe('the agreement table: every surface, over the same trails, with the exp
     for (const shape of ['full', 'unreadable']) {
       test(`${row.name} — ${shape} reads`, async () => {
         const merged = row.merged || [];
-        const comments = row.comments;
-        const got = await surfacesFor(row, shape, comments, merged);
+        const got = await surfacesFor(row, shape, merged);
         assertCell(row, shape, got, row[shape]);
       });
     }
@@ -190,15 +213,15 @@ describe('the agreement table: every surface, over the same trails, with the exp
   test('surfaces that hold the same facts agree: the box and the stop-at lane refuse the same way on every single-PR row', async () => {
     for (const row of SYNTHETIC.filter(r => !r.name.includes('partial') && !r.name.includes('empty'))) {
       for (const shape of ['full', 'unreadable']) {
-        const got = await surfacesFor(row, shape, row.comments, row.merged || []);
+        const got = await surfacesFor(row, shape, row.merged || []);
         assert.equal(got.box.refuses ?? null, refusedOn(got.stopAtGuard), `${row.name} [${shape}]: box and stop-at lane agree`);
       }
     }
   });
 });
 
-async function surfacesFor(row, shape, comments, merged) {
-  return surfaces(comments, { shape, merged, issue: row.ticket || STARTED, movedHead: row.movedHead });
+async function surfacesFor(row, shape, merged) {
+  return surfaces(row.events, { shape, merged, issue: row.ticket || STARTED, movedHead: row.movedHead });
 }
 
 describe('dropping a fact never moves the passenger fact or the gate the wrong way (LIN-4460, Constraints)', () => {
@@ -235,15 +258,14 @@ describe('the decision\'s rules, one per named case', () => {
     assert.equal(decision.setDone, true);
     assert.equal(decision.followsPerson, 'merged');
     assert.equal(decision.refuses, null, 'the gate stands aside on a merged landing');
-    const got = await surfaces(comments, { merged: [41] });
+    const got = await surfaces([evPr(1), evReview(2)], { merged: [41] });
     assert.equal(got.check.setDone, true, 'the check route sets Done');
     assert.equal(got.stopAtGuard, null, 'the stop-at lane admits');
   });
 
   test('approved, unmerged, unread: both guard lanes refuse blind-read-missing, whether or not the ticket is Done', async () => {
-    const comments = [summary(1), review(2)];
     for (const issue of [STARTED, DONE]) {
-      const got = await surfaces(comments, { issue });
+      const got = await surfaces([evPr(1), evReview(2)], { issue });
       assert.equal(refusedOn(got.stopAtGuard), 'blind-read-missing', `stop-at lane, ${issue.type}`);
       assert.equal(refusedOn(got.ladderGuard), 'blind-read-missing', `ladder lane, ${issue.type}`);
       assert.equal(got.check.setDone, false, `no Done from an unmerged landing, ${issue.type}`);
@@ -337,7 +359,7 @@ describe('the recommendation\'s read: the decision\'s advice answer (LIN-4460, r
   });
 
   test('Done alone does not stand the enforcement gate aside: an approved, unmerged, unread landing is still refused (both lanes)', async () => {
-    const got = await surfaces(approved, { issue: DONE });
+    const got = await surfaces([evPr(1), evReview(2)], { issue: DONE });
     assert.equal(refusedOn(got.stopAtGuard), 'blind-read-missing');
     assert.equal(refusedOn(got.ladderGuard), 'blind-read-missing');
     assert.equal(got.routesRead, false, 'the recommendation stands aside, the enforcement still holds');
@@ -348,7 +370,7 @@ describe('the recommendation\'s read: the decision\'s advice answer (LIN-4460, r
     // "Accept: no new GitHub reads on the recommend path or ladder lane; add the fact later if a stuck case shows up").
     const step = blindReadStep({ state: STARTED }, { comments: approved, allRuns: [] });
     assert.equal(step?.step, 'blind-read', 'the read is routed');
-    const ladder = await surfaces(approved, { issue: STARTED, merged: [41] });
+    const ladder = await surfaces([evPr(1), evReview(2)], { issue: STARTED, merged: [41] });
     assert.equal(refusedOn(ladder.ladderGuard), 'blind-read-missing', 'the ladder lane still refuses');
     // A stop-at lane that reads the PR does see the merge and stands aside: the limit is the recommend path and ladder only.
     assert.equal(ladder.stopAtGuard, null, 'the stop-at lane, which reads the landing, stands aside');

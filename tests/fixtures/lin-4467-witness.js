@@ -72,7 +72,9 @@ const contextFor = (comments) => ({
   children: [],
   project: { name: 'Witness project' },
   comments,
-  attachments: [{ id: 'att:1', title: 'Witness spec', kind: 'file', contentType: 'text/markdown' }]
+  attachments: [{ id: 'att:1', title: 'Witness spec', kind: 'file', contentType: 'text/markdown' }],
+  // LIN-4518 step 3: the blind read is handed its landing's change records (the entrances do; a blind read reads no records).
+  landingChanges: [{ id: 'change-witness-2400', ref: PR, head: 'witness' }]
 });
 
 export const MODES = {

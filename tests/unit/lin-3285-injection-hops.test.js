@@ -34,12 +34,20 @@ import { InMemorySessionSummaryCacheStore } from '../../lib/session-summary-cach
 import { InMemoryRunParagraphStore } from '../../lib/run-paragraph-store.js';
 import { createMockCollection } from '../fixtures/mock-collection.js';
 import { createMangoTmpdir } from '../fixtures/mango-tmpdir.js';
+import { seededRecordsStore, ev } from '../helpers/records-scenario.js';
 import { findRouteLayer } from './lib/route-layer.js';
 import {
   PR_URL, MINTED_AUTH, OWNER, WS, installAppKey, fakeGitHub, connection, makeSeam,
 } from '../fixtures/lin-3285-seam.js';
 
 const URL_KEY = 'ws-a';
+// LIN-4518 step 3: the ticket's records, the landing the readers take: PR_URL approved at its reviewed head, on LIN-1.
+const REVIEWED_HEAD = 'aaaaaaa1111111';
+const RECORDS = [ev.pr(1, PR_URL, REVIEWED_HEAD), ev.review(2, PR_URL, { heads: { [PR_URL]: REVIEWED_HEAD } })];
+let recordsStore = null;
+const recordsHarness = createMangoTmpdir('lin-3285-injection-hops-records-');
+before(async () => { await recordsHarness.connect(); recordsStore = await seededRecordsStore(recordsHarness, RECORDS, { urlKey: URL_KEY, tickets: ['LIN-1'] }); });
+after(() => recordsHarness.close());
 const COMMENTS = [{ id: 'c1', body: `opened ${PR_URL}`, createdAt: '2026-10-19T11:00:00.000Z' }];
 const reviewBody = '## Review\n\nReviewed head `aaaaaaa1111111`.\n\n### What CI Did Not Prove\n| # | Claim | In/Out | Discharge |\n| --- | --- | --- | --- |\n| 1 | one claim | In | none |\n\n**Verdict: Approve**';
 const CLOSE_OUT_COMMENTS = [...COMMENTS, { id: 'c2', body: reviewBody, createdAt: '2026-10-19T11:30:00.000Z' }];
@@ -117,6 +125,7 @@ async function listen(app) {
 describe('hop 1: routes/dashboard.js', () => {
   function dashboardRouter({ installationTokenFor, github, readRunEvidenceFn = null }) {
     return createDashboardRoutes({
+      recordsStore,
       workspaceFromUrl: (req, res, next) => next(),
       dispatchQueueStore: { async listItems() { return []; }, async listHistory() { return { items: [] }; } },
       agentStatusStore: { async listStatus() { return { items: [] }; } },
@@ -162,6 +171,7 @@ describe('hop 2: routes/workspace-api.js', () => {
 
   function router({ installationTokenFor, github }) {
     return createWorkspaceApiRoutes({
+      recordsStore,
       workspaceFromUrl: (req, res, next) => next(),
       installationTokenFor,
       // Neither `readPrStatus` nor `markDone` is overridden: the real default reader runs.
@@ -223,6 +233,7 @@ describe('hop 3: routes/dispatch.js → enterSessionDispatch → closeOutNotRead
     const app = express();
     app.use(express.json());
     app.use(createDispatchRoutes({
+      recordsStore,
       workspaceOwnerCheck: async () => ({ status: 'owner' }),
       dispatchQueueStore: store,
       dispatchTokenStore: {},
@@ -258,6 +269,7 @@ describe('hop 3: routes/dispatch.js → enterSessionDispatch → closeOutNotRead
 describe('hop 4: routes/task-page.js and routes/task-share.js', () => {
   function loaderFor(github, installationTokenFor) {
     return createTaskPageLoader({
+      recordsStore,
       dispatchStore: {}, agentStatusStore: {},
       briefCacheStore: { async get() { return null; } },
       recapCacheStore: { async get() { return null; } },

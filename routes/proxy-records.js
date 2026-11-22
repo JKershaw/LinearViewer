@@ -249,7 +249,8 @@ export function createProxyRecordsRoutes({ recordsStore, proxyLimiter, authentic
       // `in` is any record's field, so no kind changes (lib/records/kinds.json).
       if (isVerdict && pin.tasks.length === 1 && input.in === undefined) input.in = pin.tasks[0];
       // LIN-4518 step 2 (finding 798836ce): a change for a PR the task already holds open is a new version of that change.
-      const versioned = await versionChangeWrite({ urlKey: req.proxyUrlKey, body, writes, recordsStore, by: writer.by, run: writer.run ?? null });
+      // It takes the same `input` the add takes, so one list (bodyWithout above) says which keys are not fields (finding 5a1dcdd1).
+      const versioned = await versionChangeWrite({ urlKey: req.proxyUrlKey, kind: body.kind, input, writes, recordsStore, by: writer.by, run: writer.run ?? null });
       const result = versioned ?? await writes.add({ ctx: req, urlKey: req.proxyUrlKey, kind: body.kind, input, by: writer.by, run: writer.run ?? null });
       if (!result.problems) await refreshAfterPin(req.proxyUrlKey, pin.tasks);
       return answer(req, res, endpoint, 201, result);

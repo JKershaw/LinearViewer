@@ -32,6 +32,7 @@ let URL_KEY;
 test.beforeEach(async ({ page, localWorkerUrlKey }) => {
   URL_KEY = localWorkerUrlKey;
   await page.request.get('/test/clear-pr-status');
+  await page.request.get(`/test/clear-ticket-records?urlKey=${URL_KEY}`);
   await page.goto(`/test/clear-local-store`);
   await page.goto(`/test/clear-dispatch-queue?urlKey=${URL_KEY}`);
   await page.goto(`/test/clear-dispatch-history?urlKey=${URL_KEY}`);
@@ -69,6 +70,16 @@ async function seedLocalWorkspaceWithEvidence(page) {
   // LIN-4527: a dispatched ticket has its task (every dispatch seats it); the findings reading reads "not read" without it.
   const seat = await page.request.get(`/test/seed-ticket-task?urlKey=${URL_KEY}&ticket=LOCAL-CO1`);
   expect(seat.ok(), `task seed failed: ${seat.status()} ${await seat.text()}`).toBeTruthy();
+  // LIN-4518 step 3: the same trail as records, which the box reads: the PR, approved at the head the review read, and the
+  // blind read after the review.
+  const trail = await page.request.post('/test/seed-ticket-records', {
+    data: { urlKey: URL_KEY, ticket: 'LOCAL-CO1', events: [
+      { kind: 'pr', at: '2026-07-01T10:00:00Z', pr: PR, head: REVIEW_SHA },
+      { kind: 'review', at: '2026-07-02T10:00:00Z', on: PR, head: REVIEW_SHA },
+      { kind: 'blindRead', at: '2026-07-02T11:00:00Z', on: PR },
+    ] },
+  });
+  expect(trail.ok(), `records seed failed: ${trail.status()} ${await trail.text()}`).toBeTruthy();
   // LIN-3383: queueing work for a runner is owner-only; state the owner explicitly
   // rather than inheriting it from first-binder order.
   await seedWorkspaceOwnership(page, URL_KEY, 'owner');
@@ -155,7 +166,10 @@ test.describe('Close-out box on the session page (LIN-3248)', () => {
     const nowLine = page.locator('[data-testid="run-evidence-checked-now"]');
     await expect(reviewLine).toBeVisible();
     await expect(nowLine).toBeVisible();
-    await expect(reviewLine).toContainText('Approve — conditional on close-out settling the findings.');
+    // LIN-4518 step 3: the review line reads the verdict record (its word and the head it read); a conditional approval's
+    // conditions are findings to close-out, counted in the ledger, not the review's wording.
+    await expect(reviewLine).toContainText('Approve');
+    await expect(reviewLine).toContainText('sha abc1234');
 
     const ledger = page.locator('[data-testid="run-evidence-ledger"]');
     await expect(ledger).toBeAttached();

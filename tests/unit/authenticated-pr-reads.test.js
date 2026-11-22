@@ -10,7 +10,7 @@
 // Run with: node --test tests/unit/authenticated-pr-reads.test.js
 
 import { FINDINGS_NONE } from '../../lib/close-out-findings.js';
-import { test, describe, beforeEach, before } from 'node:test';
+import { test, describe, beforeEach, before, after } from 'node:test';
 import assert from 'node:assert/strict';
 import {
   fetchGitHubJson,
@@ -27,9 +27,16 @@ import { renderTaskPullRequest } from '../../lib/render-task-page.js';
 import { enrichLoop, deriveSessionWaiting } from '../../routes/dashboard.js';
 import { createWorkspaceApiRoutes } from '../../routes/workspace-api.js';
 import { findRouteLayer } from './lib/route-layer.js';
+import { createMangoTmpdir } from '../fixtures/mango-tmpdir.js';
+import { landingRecordsStore } from '../helpers/records-scenario.js';
 
 const REPO = 'acme/widget';
 const PR_URL = `https://github.com/${REPO}/pull/12`;
+// LIN-4518 step 3: the landing the readers take is the ticket's records; this is PR_URL, open, on GH-12.
+const harness = createMangoTmpdir('lin-3443-authenticated-pr-reads-');
+let LANDING = null;
+before(async () => { await harness.connect(); LANDING = await landingRecordsStore(harness, { prUrl: PR_URL, ticket: 'GH-12', urlKeys: ['ws-a', 'ws-b'] }); });
+after(() => harness.close());
 const TOKEN = 'ghs_workspace_token';
 const AUTH = `Bearer ${TOKEN}`;
 
@@ -233,6 +240,7 @@ describe('task page loader', () => {
   function loaderFor(stub) {
     const prStateStore = createPrStateStore({ cache: new Map(), bucket: [], githubFetch: stub });
     return createTaskPageLoader({
+      recordsStore: LANDING,
       dispatchStore: {}, agentStatusStore: {},
       briefCacheStore: { async get() { return null; } },
       recapCacheStore: { async get() { return null; } },
@@ -285,26 +293,26 @@ describe('task page loader', () => {
 });
 
 describe('readRunEvidence default reader (run page / run-evidence route path)', () => {
-  const base = { issueIdentifier: 'GH-12', provider: null, comments: [{ body: PR_URL, createdAt: '2026-10-06T11:00:00.000Z' }] };
+  const base = () => ({ issueIdentifier: 'GH-12', provider: null, comments: [{ body: PR_URL, createdAt: '2026-10-06T11:00:00.000Z' }], recordsStore: LANDING });
 
   test('threads the token and urlKey into the default fail-open reader', async () => {
     const stub = githubStub();
-    const model = await readRunEvidence({ openFindings: FINDINGS_NONE, ...base, callScope: GH_SCOPE, urlKey: 'ws-a', githubFetch: stub });
+    const model = await readRunEvidence({ openFindings: FINDINGS_NONE, ...base(), callScope: GH_SCOPE, urlKey: 'ws-a', githubFetch: stub });
     assert.equal(model.state.pr.state, 'open');
   });
 
-  test('without a urlKey it reads anonymously rather than tripping the scope-key guard', async () => {
+  test('a call scope with no GitHub token reads anonymously, never tripping the scope-key guard', async () => {
     const stub = githubStub();
-    const model = await readRunEvidence({ openFindings: FINDINGS_NONE, ...base, callScope: GH_SCOPE, githubFetch: stub });
+    const model = await readRunEvidence({ openFindings: FINDINGS_NONE, ...base(), urlKey: 'ws-a', callScope: 'lin', githubFetch: stub });
     assert.equal(model.closeOut.status, 'unknown');
     assert.ok(stub.calls.every(c => !c.headers.Authorization));
   });
 
   test('copy flag: a readable PR with no checks is read:true; unreadable is read:false', async () => {
-    const readable = await readRunEvidence({ openFindings: FINDINGS_NONE, ...base, callScope: GH_SCOPE, urlKey: 'ws-a', githubFetch: githubStub({ checkRuns: [] }) });
+    const readable = await readRunEvidence({ openFindings: FINDINGS_NONE, ...base(), callScope: GH_SCOPE, urlKey: 'ws-a', githubFetch: githubStub({ checkRuns: [] }) });
     assert.equal(readable.evidence.checked.now.state, 'unknown');
     assert.equal(readable.evidence.checked.now.read, true);
-    const unreadable = await readRunEvidence({ openFindings: FINDINGS_NONE, ...base, callScope: 'lin', urlKey: 'ws-a', githubFetch: githubStub() });
+    const unreadable = await readRunEvidence({ openFindings: FINDINGS_NONE, ...base(), callScope: 'lin', urlKey: 'ws-a', githubFetch: githubStub() });
     assert.equal(unreadable.evidence.checked.now.read, false);
   });
 });
@@ -327,6 +335,7 @@ describe('routes', () => {
   test('GET run-evidence: authenticated, and a second workspace on the same repo does not reuse the first one\'s cache entry', async () => {
     const stub = githubStub();
     const router = createWorkspaceApiRoutes({
+      recordsStore: LANDING,
       workspaceFromUrl: (req, res, next) => next(),
       runEvidence: { resolveProvider: () => ({ provider, callScope: GH_SCOPE }), githubFetch: stub },
     });
@@ -348,6 +357,7 @@ describe('routes', () => {
   test('POST close-out check: threads token and scopeKey; other repos and non-GitHub scopes get none', async () => {
     const seen = [];
     const build = callScope => createWorkspaceApiRoutes({
+      recordsStore: LANDING,
       workspaceFromUrl: (req, res, next) => next(),
       closeOut: {
         resolveProvider: () => ({ provider, callScope }),

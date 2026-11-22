@@ -23,8 +23,11 @@
 process.env.NODE_ENV = 'test';
 
 import { FINDINGS_NONE } from '../../lib/close-out-findings.js';
-import { test, describe, afterEach } from 'node:test';
+import { test, describe, afterEach, before, after } from 'node:test';
 import assert from 'node:assert/strict';
+import { createMangoTmpdir } from '../fixtures/mango-tmpdir.js';
+import { recordsStoreFor, seedTicketRecords } from '../helpers/records-scenario.js';
+import { trailForTicket } from '../../lib/task-standing.js';
 import { getRecommendation, setFetchImpl, setPromptTraceRecorder } from '../../lib/openrouter.js';
 import { readCloseOutChain, closeOutNotReady } from '../../lib/close-out-readiness.js';
 import { readRunEvidence } from '../../lib/run-evidence.js';
@@ -36,6 +39,11 @@ import { generatePrompt } from '../../lib/prompt-templates.js';
 import { SURVEY_HEADINGS } from '../../lib/prompts/survey-words.js';
 
 afterEach(() => { setFetchImpl(null); setPromptTraceRecorder(null); });
+
+const harness = createMangoTmpdir('lin-4438-blind-read-gate-');
+before(() => harness.connect());
+after(() => harness.close());
+const URL_KEY = 'acme';
 
 const REPO = 'acme/widget';
 const PR = (n) => `https://github.com/${REPO}/pull/${n}`;
@@ -58,6 +66,15 @@ const link = (n) => c(n, LINK_BODY);
 const audit = (n) => c(n, `## Retrospective audit — LIN-1\n\nThe landing ${PR1} holds; one note entry is wrong. Notes PR: ${PR2}.`);
 const research = (n) => c(n, `## Research notes\n\nAn earlier attempt elsewhere is ${FOREIGN}; this ticket starts fresh.`);
 
+// The same trails as records (LIN-4518 step 3): what each comment above says, written as the records a stage writes.
+const evPr = (n, url = PR1, head = REVIEWED) => ({ kind: 'pr', at: T(n), pr: url, head });
+const evReview = (n, outcome = 'approve', url = PR1) => ({ kind: 'review', at: T(n), on: [url], outcome, heads: { [url]: REVIEWED } });
+const evRead = (n, ...urls) => ({ kind: 'blindRead', at: T(n), on: urls });
+const evClose = (n) => ({ kind: 'closeOut', at: T(n) });
+const evMerged = (n, url) => ({ kind: 'merged', at: T(n), pr: url });
+const evAudit = (n, url, head = REVIEWED) => ({ kind: 'audit', at: T(n), pr: url, head });
+const evRun = (stage, n, state) => ({ kind: 'run', at: T(n), stage, state });
+
 const STARTED = { name: 'In Progress', type: 'started' };
 const DONE = { name: 'Done', type: 'completed' };
 const run = (stage, n, outcome = 'done') => ({ stage, at: T(n), outcome, dispatchedAt: T(n), id: `r${n}` });
@@ -71,25 +88,30 @@ const merged = (number) => ({ ...open(number), state: 'closed', merged: true });
  * or 'admit' (no lane refuses on the gate). `merged`: PR numbers GitHub reports merged.
  */
 const ROWS = [
-  { n: 1, name: 'approve, no read', comments: [summary(1), review(2)], route: 'blind-read', gate: 'wait' },
-  { n: 2, name: 'approve, then a read naming the PR', comments: [summary(1), review(2), read(3, PR1)], route: 'aside', gate: 'admit', ready: true },
-  { n: 3, name: 'a read naming an older PR only', comments: [summary(1), review(2), read(3, PR_OLD)], route: 'blind-read', gate: 'wait' },
-  { n: 4, name: 'a read, then a new review', comments: [summary(1), review(2), read(3, PR1), review(4)], route: 'blind-read', gate: 'wait' },
-  { n: 5, name: 'request changes', comments: [summary(1), review(2, 'Request Changes')], route: 'aside', gate: 'admit' },
-  { n: 6, name: 'two ended attempts, runs known', comments: [summary(1), review(2)], allRuns: [run('review', 2), run('blind-read', 3, 'done'), run('blind-read', 4, 'failed')], route: 'blocked', gate: 'wait' },
-  { n: 7, name: 'runs unknown', comments: [summary(1), review(2)], allRuns: null, route: 'blind-read', gate: 'wait' },
-  { n: 8, name: 'no PR on the trail', comments: [c(1, 'Implementation done, CI green.'), review(2, 'Approve', 'the change')], route: 'aside', gate: 'admit' },
-  { n: 9, name: 'no review', comments: [summary(1)], route: 'aside', gate: 'admit' },
-  { n: 10, name: 'approve, then a not-ready close-out citing the PR', comments: [summary(1), review(2), closeOut(3, `Not ready: no blind read yet for ${PR1}. Next: blind-read.`)], route: 'blind-read', gate: 'wait' },
-  { n: 11, name: 'approve, then a plain link comment naming a new PR', comments: [summary(1), review(2), link(3)], route: 'aside', gate: 'wait' },
-  { n: 12, name: 'approve, a read, then a merging close-out on a Done ticket', state: DONE, comments: [summary(1), review(2), read(3, PR1), closeOut(4, `Merged ${PR1}; set Done.`)], merged: [41], route: 'aside', gate: 'admit' },
-  { n: 13, name: 'approve, a not-ready close-out, a fix round re-naming the PR, then a re-review', comments: [summary(1), review(2), closeOut(3, `Not ready: CI red on ${PR1}. Next: implementation.`), summary(4), review(5)], route: 'blind-read', gate: 'wait' },
-  { n: 14, name: 'a Done ticket: landing close-out, then an audit notes PR and its own review', state: DONE, comments: [summary(1), review(2), read(3, PR1), closeOut(4, `Merged ${PR1}; set Done.`), audit(5), review(6, 'Approve', PR2)], merged: [41], route: 'blind-read', gate: 'wait', landing: [PR2] },
-  { n: 15, name: 'a pre-review comment cites a foreign PR by full URL', comments: [research(1), summary(2), review(3), read(4, PR1)], route: 'blind-read', gate: 'wait', landing: [FOREIGN, PR1] },
+  { n: 1, name: 'approve, no read', comments: [summary(1), review(2)], events: [evPr(1), evReview(2)], route: 'blind-read', gate: 'wait' },
+  { n: 2, name: 'approve, then a read naming the PR', comments: [summary(1), review(2), read(3, PR1)], events: [evPr(1), evReview(2), evRead(3, PR1)], route: 'aside', gate: 'admit', ready: true },
+  // The older PR was the previous round's: merged by a close-out before the review, so it is not in this landing.
+  { n: 3, name: 'a read naming an older PR only', comments: [summary(1), review(2), read(3, PR_OLD)], events: [evPr(0, PR_OLD), evClose(0), evMerged(0, PR_OLD), evPr(1), evReview(2), evRead(3, PR_OLD)], route: 'blind-read', gate: 'wait' },
+  { n: 4, name: 'a read, then a new review', comments: [summary(1), review(2), read(3, PR1), review(4)], events: [evPr(1), evReview(2), evRead(3, PR1), evReview(4)], route: 'blind-read', gate: 'wait' },
+  { n: 5, name: 'request changes', comments: [summary(1), review(2, 'Request Changes')], events: [evPr(1), evReview(2, 'request-changes')], route: 'aside', gate: 'admit' },
+  { n: 6, name: 'two ended attempts, runs known', comments: [summary(1), review(2)], events: [evPr(1), evReview(2), evRun('blind-read', 3, 'done'), evRun('blind-read', 4, 'failed')], allRuns: [run('review', 2), run('blind-read', 3, 'done'), run('blind-read', 4, 'failed')], route: 'blocked', gate: 'wait' },
+  { n: 7, name: 'runs unknown', comments: [summary(1), review(2)], events: [evPr(1), evReview(2)], allRuns: null, route: 'blind-read', gate: 'wait' },
+  // A review needs a change to rest on (records refuse a verdict with no `on`), so the records of this row hold none.
+  { n: 8, name: 'no PR on the trail', comments: [c(1, 'Implementation done, CI green.'), review(2, 'Approve', 'the change')], events: [], route: 'aside', gate: 'admit' },
+  { n: 9, name: 'no review', comments: [summary(1)], events: [evPr(1)], route: 'aside', gate: 'admit' },
+  { n: 10, name: 'approve, then a not-ready close-out citing the PR', comments: [summary(1), review(2), closeOut(3, `Not ready: no blind read yet for ${PR1}. Next: blind-read.`)], events: [evPr(1), evReview(2), evClose(3)], route: 'blind-read', gate: 'wait' },
+  { n: 11, name: 'approve, then a plain link comment naming a new PR', comments: [summary(1), review(2), link(3)], events: [evPr(1), evReview(2), evPr(3, PR2)], route: 'aside', gate: 'wait' },
+  { n: 12, name: 'approve, a read, then a merging close-out on a Done ticket', state: DONE, comments: [summary(1), review(2), read(3, PR1), closeOut(4, `Merged ${PR1}; set Done.`)], events: [evPr(1), evReview(2), evRead(3, PR1), evClose(4), evMerged(4, PR1)], merged: [41], route: 'aside', gate: 'admit' },
+  // The fix round re-cites PR1 at the same head, so it adds no record: the landing keeps PR1 (LIN-4438 row 13).
+  { n: 13, name: 'approve, a not-ready close-out, a fix round re-naming the PR, then a re-review', comments: [summary(1), review(2), closeOut(3, `Not ready: CI red on ${PR1}. Next: implementation.`), summary(4), review(5)], events: [evPr(1), evReview(2), evClose(3), evReview(5)], route: 'blind-read', gate: 'wait' },
+  { n: 14, name: 'a Done ticket: landing close-out, then an audit notes PR and its own review', state: DONE, comments: [summary(1), review(2), read(3, PR1), closeOut(4, `Merged ${PR1}; set Done.`), audit(5), review(6, 'Approve', PR2)], events: [evPr(1), evReview(2), evRead(3, PR1), evClose(4), evMerged(4, PR1), evAudit(5, PR2), evReview(6, 'approve', PR2)], merged: [41], route: 'blind-read', gate: 'wait', landing: [PR2] },
+  // Flipped by LIN-4518 step 3: a comment that cites a foreign PR is not a change of this task, so the records landing
+  // holds PR1 alone and the read of PR1 clears the gate. (The stray-change ruling, finding b00a848c, owns the records case.)
+  { n: 15, name: 'a pre-review comment cites a foreign PR by full URL', comments: [research(1), summary(2), review(3), read(4, PR1)], events: [evPr(2), evReview(3), evRead(4, PR1)], route: 'aside', gate: 'admit', landing: [PR1] },
 ];
 
 const SELECTOR_REPLY = { choices: [{ message: { content: '## Reasoning\n→ **close-out**' }, finish_reason: 'stop' }], usage: { completion_tokens: 3 } };
-const context = (row) => ({ parent: null, siblings: [], project: null, children: [], comments: row.comments, focusedChild: null, attachments: [], runs: [], allRuns: Object.hasOwn(row, 'allRuns') ? row.allRuns : [] });
+const context = (row, trail) => ({ parent: null, siblings: [], project: null, children: [], comments: row.comments, focusedChild: null, attachments: [], runs: [], allRuns: Object.hasOwn(row, 'allRuns') ? row.allRuns : [], trail });
 const issueOf = (row) => ({ identifier: 'LIN-1', title: 'Gate fixture', description: '', state: row.state || STARTED, labels: [] });
 
 function statusFor(row, url) {
@@ -105,10 +127,10 @@ function seamFor(row, stopAt) {
   };
 }
 
-async function routeLane(row) {
+async function routeLane(row, trail) {
   setPromptTraceRecorder(() => {});
   setFetchImpl(async () => ({ ok: true, json: async () => SELECTOR_REPLY }));
-  const rec = await getRecommendation(issueOf(row), context(row), { apiKey: 'stub', model: 'x' });
+  const rec = await getRecommendation(issueOf(row), context(row, trail), { apiKey: 'stub', model: 'x' });
   if (rec.codeRoute === 'blind-read' || rec.codeRoute === 'blocked') {
     assert.equal(rec.recommendedAction, rec.codeRoute, `row ${row.n}: the code route sends its own step`);
     return rec.codeRoute;
@@ -118,13 +140,17 @@ async function routeLane(row) {
 }
 
 async function lanes(row) {
-  const workspace = { urlKey: 'acme' };
-  const { state } = await readCloseOutChain({ openFindings: FINDINGS_NONE, workspace, issueIdentifier: 'LIN-1', seam: seamFor(row, 'pr'), stopAt: 'pr', runnerReady: true, owner: true, actor: 'harbour', prStatusCache: new Map() });
+  // LIN-4518 step 3: the rows are records. Each row is seeded into its own store, and every lane reads that store.
+  const recordsStore = await recordsStoreFor(harness);
+  await seedTicketRecords(recordsStore, URL_KEY, 'LIN-1', row.events);
+  const trail = await trailForTicket({ recordsStore, urlKey: URL_KEY, ticket: 'LIN-1' });
+  const workspace = { urlKey: URL_KEY };
+  const { state } = await readCloseOutChain({ openFindings: FINDINGS_NONE, workspace, issueIdentifier: 'LIN-1', seam: seamFor(row, 'pr'), stopAt: 'pr', runnerReady: true, owner: true, actor: 'harbour', prStatusCache: new Map(), recordsStore });
   // LIN-4458: the box is read the way the page reads it (readRunEvidence: one read, of the landing's sole PR).
-  const box = (await readRunEvidence({ openFindings: FINDINGS_NONE, issueIdentifier: 'LIN-1', comments: row.comments, readPrStatus: async ({ repo, number }) => statusFor(row, `https://github.com/${repo}/pull/${number}`), stopAt: 'pr', runnerReady: true, viewerIsOwner: true })).closeOut;
-  const stopAtGuard = await closeOutNotReady({ openFindings: FINDINGS_NONE, workspace, issueIdentifier: 'LIN-1', seam: seamFor(row, 'pr') });
-  const ladderGuard = await closeOutNotReady({ openFindings: FINDINGS_NONE, workspace, issueIdentifier: 'LIN-1', seam: seamFor(row, null) });
-  return { route: await routeLane(row), state, box, stopAtGuard, ladderGuard };
+  const box = (await readRunEvidence({ openFindings: FINDINGS_NONE, issueIdentifier: 'LIN-1', comments: [], urlKey: URL_KEY, recordsStore, readPrStatus: async ({ repo, number }) => statusFor(row, `https://github.com/${repo}/pull/${number}`), stopAt: 'pr', runnerReady: true, viewerIsOwner: true })).closeOut;
+  const stopAtGuard = await closeOutNotReady({ openFindings: FINDINGS_NONE, workspace, issueIdentifier: 'LIN-1', seam: seamFor(row, 'pr'), recordsStore });
+  const ladderGuard = await closeOutNotReady({ openFindings: FINDINGS_NONE, workspace, issueIdentifier: 'LIN-1', seam: seamFor(row, null), recordsStore });
+  return { route: await routeLane(row, trail), state, box, stopAtGuard, ladderGuard, trail };
 }
 
 /** A box or state model that does not advertise a close-out the gate refuses. */
@@ -157,7 +183,7 @@ describe('the shared-trail table: every lane agrees (LIN-4438)', () => {
         assert.equal(got.state.status, 'ready', `row ${row.n}: the state is ready`);
         assert.equal(got.box.status, 'ready', `row ${row.n}: the box is ready`);
       }
-      if (row.landing) assert.deepEqual([...landingPrUrls(row.comments)].sort(), [...row.landing].sort(), `row ${row.n}: the landing, written down`);
+      if (row.landing) assert.deepEqual([...got.trail.landing].sort(), [...row.landing].sort(), `row ${row.n}: the landing, written down`);
     });
   }
 });
@@ -183,7 +209,8 @@ describe('rows that need more than the lanes', () => {
     assert.deepEqual(landingPrUrls(row.comments), [PR2]);
     assert.equal(closeOutWaitsOn({ ...facts.review, blindRead: { prs: [PR2] } }, landingPrUrls(row.comments)), null, 'a read of the notes PR alone clears it');
     assert.equal(closeOutWaitsOn({ ...facts.review, blindRead: { prs: [PR1] } }, landingPrUrls(row.comments)), 'blind-read', 'a read of the merged landing alone does not');
-    const prompt = generatePrompt('blind-read', issueOf(row), context(row)).prompt;
+    // The prompt names the landing's change records (LIN-4518 step 3, finding 75b33054): the notes PR's change alone.
+    const prompt = generatePrompt('blind-read', issueOf(row), { ...context(row), landingChanges: [{ id: 'change-notes', ref: PR2, head: REVIEWED }] }).prompt;
     assert.ok(prompt.includes(`**The change:** ${PR2}`) && !prompt.includes(`**The change:** ${PR1}`), 'the reader is told to read the notes PR only');
   });
 

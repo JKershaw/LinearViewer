@@ -44,6 +44,11 @@ import { CloseOutEventsStore } from '../../lib/close-out-events-store.js';
 import { createMangoTmpdir } from '../fixtures/mango-tmpdir.js';
 import { findRouteLayer } from './lib/route-layer.js';
 import * as trail from '../../lib/run-trail.js';
+import { seededRecordsStore, ev } from '../helpers/records-scenario.js';
+
+const harness = createMangoTmpdir('lin-4458-trail-characterization-');
+before(() => harness.connect());
+after(() => harness.close());
 
 const REPO = 'acme/widget';
 const PR = (n) => `https://github.com/${REPO}/pull/${n}`;
@@ -82,11 +87,19 @@ const ROWS = {
 
 const facts = (comments) => assembleTrailFacts(comments, '', { leaf: false });
 const step = (comments, state = STARTED) => blindReadStep({ state }, { comments, allRuns: [] })?.step ?? null;
-const ladderSeam = (comments) => ({
-  resolveProvider: () => ({ provider: { name: 'local', async fetchIssueComments() { return comments; } }, callScope: 'scope' }),
-  isStopAtRun: async () => null,
+// LIN-4518 step 3: the lanes read the ticket's records. The same rows, as records (the comment readers above stay on comments).
+const REVIEWED_AT = { heads: { [PR1]: REVIEWED } };
+const ROW_EVENTS = {
+  13: [ev.pr(1, PR1, REVIEWED), ev.review(2, PR1, REVIEWED_AT), ev.close(3), ev.review(5, PR1, REVIEWED_AT)],
+  14: [ev.pr(1, PR1, REVIEWED), ev.review(2, PR1, REVIEWED_AT), ev.read(3, PR1), ev.close(4), ev.merged(4, PR1), ev.audit(5, PR2, REVIEWED), ev.review(6, PR2, { heads: { [PR2]: REVIEWED } })],
+};
+// CITED_NOT_LANDED as records: B closed unmerged (its change ends abandoned) before the close-out; A is the landing.
+const CITED_EVENTS = [ev.pr(1, PR2, REVIEWED), ev.review(2, PR2, { outcome: 'request-changes', heads: { [PR2]: REVIEWED } }), ev.close(3), ev.abandoned(3, PR2), ev.pr(4, PR1, REVIEWED), ev.review(5, PR1, REVIEWED_AT), ev.read(6, PR1)];
+const ladderGuard = async (events) => closeOutNotReady({
+  openFindings: FINDINGS_NONE, workspace: { urlKey: 'acme' }, issueIdentifier: 'LIN-1',
+  recordsStore: await seededRecordsStore(harness, events, { urlKey: 'acme', tickets: ['LIN-1'] }),
+  seam: { resolveProvider: () => ({ provider: { name: 'local', async fetchIssueComments() { return []; } }, callScope: 'scope' }), isStopAtRun: async () => null },
 });
-const ladderGuard = (comments) => closeOutNotReady({ openFindings: FINDINGS_NONE, workspace: { urlKey: 'acme' }, issueIdentifier: 'LIN-1', seam: ladderSeam(comments) });
 
 describe('pins: rows that hold today and after the one trail pass (LIN-4458)', () => {
   test('row 3: a read naming an older PR is not work after review; the landing is the reviewed PR; the route sends blind-read', () => {
@@ -111,7 +124,7 @@ describe('pins: rows that hold today and after the one trail pass (LIN-4458)', (
     assert.deepEqual(landingPrUrls(comments), [PR1], 'first-appearance order after the anchor, not first-ever citation');
     assert.equal(closeOutWaitsOn(facts(comments).review, landingPrUrls(comments)), 'blind-read');
     assert.equal(step(comments), 'blind-read');
-    assert.equal((await ladderGuard(comments))?.reason, 'blind-read-missing', 'the ladder guard refuses the re-reviewed PR');
+    assert.equal((await ladderGuard(ROW_EVENTS[13]))?.reason, 'blind-read-missing', 'the ladder guard refuses the re-reviewed PR');
   });
 
   test('row 15: a foreign PR cited before the first review stays in a first landing (a stated limit: no caller holds the repository)', () => {
@@ -122,7 +135,7 @@ describe('pins: rows that hold today and after the one trail pass (LIN-4458)', (
     const comments = ROWS[14];
     assert.equal(step(comments, DONE), 'blind-read');
     assert.equal(closeOutWaitsOn(facts(comments).review, landingPrUrls(comments)), 'blind-read');
-    assert.equal((await ladderGuard(comments))?.reason, 'blind-read-missing');
+    assert.equal((await ladderGuard(ROW_EVENTS[14]))?.reason, 'blind-read-missing');
   });
 
   test('an agent note after review that re-cites the reviewed PR is not work after review', () => {
@@ -139,7 +152,7 @@ describe('the new rule (LIN-4458)', () => {
     const { review: rv } = facts(comments);
     assert.equal(closeOutWaitsOn({ ...rv, blindRead: { prs: [PR2] } }, landingPrUrls(comments)), null, 'a read of the notes PR alone clears it');
     const prompt = generatePrompt('blind-read', { identifier: 'LIN-1', title: 'Gate fixture', description: '', state: DONE, labels: [] },
-      { parent: null, siblings: [], project: null, children: [], comments, focusedChild: null, attachments: [], runs: [], allRuns: [] }).prompt;
+      { parent: null, siblings: [], project: null, children: [], comments, focusedChild: null, attachments: [], runs: [], allRuns: [], landingChanges: [{ id: 'change-notes', ref: PR2, head: REVIEWED }] }).prompt;
     assert.ok(prompt.includes(`**The change:** ${PR2}`) && !prompt.includes(`**The change:** ${PR1}`), 'the reader is told to read the notes PR only');
   });
 
@@ -201,7 +214,7 @@ describe('the box: a landing of [A] cited beside B', () => {
   });
 
   test('pin: the picker withholds, because it chooses from every cited URL', async () => {
-    const model = await readRunEvidence({ openFindings: FINDINGS_NONE, issueIdentifier: 'LIN-1', comments: CITED_NOT_LANDED, readPrStatus: async ({ number }) => openPr(number), stopAt: 'pr', runnerReady: true, viewerIsOwner: true });
+    const model = await readRunEvidence({ openFindings: FINDINGS_NONE, issueIdentifier: 'LIN-1', comments: CITED_NOT_LANDED, recordsStore: await seededRecordsStore(harness, CITED_EVENTS, { urlKey: 'acme', tickets: ['LIN-1'] }), urlKey: 'acme', readPrStatus: async ({ number }) => openPr(number), stopAt: 'pr', runnerReady: true, viewerIsOwner: true });
     assert.deepEqual(model.state.prUrls.map(p => p.url), [B, A]);
     assert.equal(resolveRunPrRef(model).status, 'multiple');
   });
@@ -211,7 +224,7 @@ describe('the box: a landing of [A] cited beside B', () => {
   test('a landing of [A] cited beside B reads A in the box and withholds in the picker', async () => {
     const reads = [];
     const model = await readRunEvidence({
-      openFindings: FINDINGS_NONE,
+      openFindings: FINDINGS_NONE, recordsStore: await seededRecordsStore(harness, CITED_EVENTS, { urlKey: 'acme', tickets: ['LIN-1'] }), urlKey: 'acme',
       issueIdentifier: 'LIN-1', comments: CITED_NOT_LANDED, stopAt: 'pr', runnerReady: true, viewerIsOwner: true,
       readPrStatus: async ({ repo, number }) => { reads.push(`${repo}#${number}`); return number === 41 ? openPr(41) : closedPr(number); },
     });
@@ -224,20 +237,18 @@ describe('the box: a landing of [A] cited beside B', () => {
 
 describe('the owner\'s Done check: the same trail through the check route', () => {
   const CHECK_PATH = '/workspace/:urlKey/api/run-evidence/:issueIdentifier/check';
-  const harness = createMangoTmpdir('lin-4458-trail-characterization-');
-  before(() => harness.connect());
-  after(() => harness.close());
 
-  async function check(statuses, comments = CITED_NOT_LANDED) {
+  async function check(statuses, events = CITED_EVENTS) {
     const collection = harness.freshDb().collection('close-out-events');
     const calls = { markDone: 0, reads: [] };
     const router = createWorkspaceApiRoutes({
       workspaceFromUrl: (req, res, next) => next(),
       closeOutEventsStore: new CloseOutEventsStore({ collection }),
+      recordsStore: await seededRecordsStore(harness, events, { urlKey: 'ws', tickets: ['LIN-1'] }),
       closeOut: {
         // LIN-4495: a store that answered "none open" (an unmeasured reading holds Done, so the seam says what it read).
         openFindings: FINDINGS_NONE,
-        resolveProvider: () => ({ provider: { async fetchIssueComments() { return comments; } }, callScope: 'scope' }),
+        resolveProvider: () => ({ provider: { async fetchIssueComments() { return []; } }, callScope: 'scope' }),
         readPrStatus: async ({ number }) => { calls.reads.push(number); return statuses[number]; },
         isStopAtRun: async () => 'pr',
         runnerReady: () => true,
@@ -269,9 +280,8 @@ describe('the owner\'s Done check: the same trail through the check route', () =
   // Not widened: a PR INSIDE the landing that is closed unmerged still withholds the person's Done.
   test('a landing of [A, C] with C closed unmerged still sets no Done (the bound holds over the landing)', async () => {
     const C = PR(43);
-    const trail = [summary(1, `${A} and ${C}`), review(2, 'Approve', A), read(3, A, C)];
-    assert.deepEqual(landingPrUrls(trail), [A, C]);
-    const { res, calls } = await check({ 41: mergedPr(41), 43: closedPr(43) }, trail);
+    const events = [ev.pr(1, A, REVIEWED), ev.pr(1, C, REVIEWED), ev.review(2, A, REVIEWED_AT), ev.read(3, [A, C])];
+    const { res, calls } = await check({ 41: mergedPr(41), 43: closedPr(43) }, events);
     assert.equal(res.jsonBody.state.status, 'partial');
     assert.equal(calls.markDone, 0);
   });

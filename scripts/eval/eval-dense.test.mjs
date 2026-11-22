@@ -74,14 +74,30 @@ test('STUB runs with OPENROUTER_API_KEY unset (reaches the stub transport)', (t)
   assert.equal(r.res.status, 0, r.res.stderr);
   assert.ok(r.summary, 'summary.json was written');
   assert.equal(r.summary.production.errors, 0, 'no run may error without a key under STUB');
-  // 56 targets × 5 models. LIN-3309 added the next-stage-choice bundle and
-  // plan-review-gate request-changes-3; the review fix round rebuilt those fixtures on
-  // the real LIN-3309 / PR-1603 trails and added the newest-reply, count-2+revision and
-  // FC-ruling carry-ins, and the last round added the two implementation-landed cases.
-  // All hit under the stub, so the counts move to 255/280. The 25 remaining misses are
-  // the pre-existing LIN-385 / LIN-389 / LIN-428 descent cases.
-  assert.equal(r.summary.production.hit, 255);
+  // 56 targets × 5 models. Under the stub the answer is a code route's or the stub's expected
+  // action, so the hit count moves only where a route's action moves. LIN-4518 (finding-004175cc)
+  // hands every hop its trail, landing and plan-review loop from records: 250/280. The FIX-812 approve hops are
+  // read from records now (a no-PR review on the plan), and the stub answers every model hop with its expected
+  // action, so their hits are unchanged, not re-earned. The 25 misses
+  // the previous count held are the pre-existing LIN-385 / LIN-389 / LIN-428 descent cases; the
+  // other 5 are LIN-3135, whose review comment reads as `unknown` on the comment path. Its records
+  // hold the approval, so the blind read is owed and the route sends it (the expectation there was
+  // written from the unreadable verdict).
+  assert.equal(r.summary.production.hit, 250);
   assert.equal(r.summary.production.n, 280);
+});
+
+test('the sweep reads its trail, landing and plan-review loop from records, never from a comment', (t) => {
+  const r = runHarness({ STUB: '1' });
+  t.after(r.cleanup);
+  assert.equal(r.res.status, 0, r.res.stderr);
+  const { records } = r.summary;
+  assert.ok(records.seeded > 0, 'the authored records are seeded into a records store');
+  assert.equal(records.hops.comments, 0, 'no hop is handed a comment-only context');
+  assert.ok(records.hops.records > 0, 'every hop is handed a records context');
+  // 29 targets are seeded from their authored events. FIX-812 x2 are among them: a review with no PR is a verdict on
+  // the task's plan (LIN-4518 finding-d3b5b9de), so no target is handed "not read" for its trail.
+  assert.equal(records.seeded, 29);
 });
 
 test('cost of a failed attempt that is then retried is counted', (t) => {

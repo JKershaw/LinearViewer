@@ -57,6 +57,7 @@ import { stubLineageIdentity } from '../fixtures/lineage-identity.js';
 import { PromptTraceStore } from '../../lib/prompt-trace-store.js';
 import { NO_REQUEST_RECORDS, withDefaults } from '../fixtures/request-usage-loader.js';
 import { planFactsOf, planFactsNotMeasured } from '../../lib/records/plan-facts.js';
+import { planRound, loopFactsFor } from '../helpers/plan-review-loop.js';
 
 afterEach(() => { setFetchImpl(null); setPromptTraceRecorder(null); });
 
@@ -79,7 +80,8 @@ const WORDS = 'Make the export button download a CSV.';
 const NO_PLAN = planFactsOf({ task: { id: 'task-t1', kind: 'task', state: 'open' } });
 const A_PLAN = planFactsOf({ task: { id: 'task-t1', kind: 'task', state: 'open' }, inside: [{ id: 'plan-t1', v: 1, kind: 'plan', state: 'kept', in: 'task-t1', to: 'implementation', at: T('09:00') }] });
 const A_PIECE = planFactsOf({ task: { id: 'task-t1', kind: 'task', state: 'open', links: { piece: 'plan-t0' } }, piece: { id: 'plan-t0', v: 1, kind: 'plan', state: 'kept', in: 'task-t0', to: 'implementation', at: T('09:00') } });
-const ctx = (comments = [], allRuns = [], over = {}) => ({ parent: null, siblings: [], project: null, children: [], comments, focusedChild: null, attachments: [], runs: [], allRuns, asked: WORDS, planFacts: NO_PLAN, ...over });
+// The loop's facts are records (LIN-4518 finding-527b8237): no plan-review verdict on record here, so the run is empty.
+const ctx = (comments = [], allRuns = [], over = {}) => ({ parent: null, siblings: [], project: null, children: [], comments, planReviewLoop: loopFactsFor([], comments), focusedChild: null, attachments: [], runs: [], allRuns, asked: WORDS, planFacts: NO_PLAN, ...over });
 const stepOf = (issue, context) => lookFirstStep(issue, context)?.step ?? null;
 
 describe('step choice: survey-task, then survey-place, then scoping, each once', () => {
@@ -338,7 +340,9 @@ describe('both seams take the same code route, with no model call', () => {
   test('the review loop bound still comes first, and keeps its own trace name', async () => {
     noModel();
     const rc = (at) => comment(at, '### Plan Review Verdict\n\nFinding.\n\n**Verdict: Request Changes.**');
-    const rec = await getRecommendation(leaf(), ctx([rc('10:00'), rc('11:00'), rc('12:00')]), { apiKey: 'stub', model: 'x' });
+    // Three plan-review verdicts on record (no findings counted): the loop's facts are the records, not the comments above.
+    const rounds = ['10:00', '11:00', '12:00'].map((hm) => planRound(T(hm), 'request-changes'));
+    const rec = await getRecommendation(leaf(), ctx([rc('10:00'), rc('11:00'), rc('12:00')], [], { planReviewLoop: loopFactsFor(rounds) }), { apiKey: 'stub', model: 'x' });
     assert.equal(rec.codeRoute, 'blocked');
   });
 
