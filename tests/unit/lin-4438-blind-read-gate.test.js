@@ -112,7 +112,7 @@ const ROWS = [
   { n: 8, name: 'no PR on the trail', comments: [c(1, 'Implementation done, CI green.'), review(2, 'Approve', 'the change')], events: [], route: 'aside', gate: 'admit' },
   { n: 9, name: 'no review', comments: [summary(1)], events: [evPr(1)], route: 'aside', gate: 'admit' },
   { n: 10, name: 'approve, then a not-ready close-out citing the PR', comments: [summary(1), review(2), closeOut(3, `Not ready: no blind read yet for ${PR1}. Next: blind-read.`)], events: [evPr(1), evReview(2), evClose(3)], route: 'blind-read', gate: 'wait' },
-  { n: 11, name: 'approve, then a plain link comment naming a new PR', comments: [summary(1), review(2), link(3)], events: [evPr(1), evReview(2), evPr(3, PR2)], route: 'aside', gate: 'wait' },
+  { n: 11, name: 'approve, then a plain link comment naming a new PR', comments: [summary(1), review(2), link(3)], events: [evPr(1), evReview(2), evPr(3, PR2)], route: 're-review', gate: 'wait' }, // LIN-4521 (finding-3df7a963): a PR the review never judged is re-reviewed by code, not left to the selector
   { n: 12, name: 'approve, a read, then a merging close-out on a Done ticket', state: DONE, comments: [summary(1), review(2), read(3, PR1), closeOut(4, `Merged ${PR1}; set Done.`)], events: [evPr(1), evReview(2), evRead(3, PR1), evClose(4), evMerged(4, PR1)], merged: [41], route: 'aside', gate: 'admit' },
   // The fix round re-cites PR1 at the same head, so it adds no record: the landing keeps PR1 (LIN-4438 row 13).
   { n: 13, name: 'approve, a not-ready close-out, a fix round re-naming the PR, then a re-review', comments: [summary(1), review(2), closeOut(3, `Not ready: CI red on ${PR1}. Next: implementation.`), summary(4), review(5)], events: [evPr(1), evReview(2), evClose(3), evReview(5)], route: 'blind-read', gate: 'wait' },
@@ -145,6 +145,10 @@ async function routeLane(row, trail) {
   const rec = await getRecommendation(issueOf(row), context(row, trail), { apiKey: 'stub', model: 'x' });
   if (rec.codeRoute === 'blind-read' || rec.codeRoute === 'blocked') {
     assert.equal(rec.recommendedAction, rec.codeRoute, `row ${row.n}: the code route sends its own step`);
+    return rec.codeRoute;
+  }
+  if (rec.codeRoute === 're-review') {
+    assert.equal(rec.recommendedAction, 'review', `row ${row.n}: the re-review route sends review`);
     return rec.codeRoute;
   }
   assert.equal(rec.codeRoute, undefined, `row ${row.n}: no other code route fires`);
