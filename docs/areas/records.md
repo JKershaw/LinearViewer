@@ -31,8 +31,8 @@ routes/task-records.js, routes/project-page.js, routes/dispatch.js, server.js).
 - Reads are by the indexed fields. A write reads only the records it names (`versionsOf`, `lookup`), and a find
   picks candidates by `{urlKey, kind, state, to}` or `{urlKey, in}` and reduces each to its current version
   (`find`). A write's body is checked as a dry run before any ticket is made, so a refused body makes no task.
-- The query log has no TTL index (lib/db-indexes.js bans them). Its rows carry `expiresAt`, and the hourly cleanup
-  removes them (lib/hourly-cleanup.js). Retention is 90 days; piece 5's readings need at least that.
+- The query log has no TTL index (lib/db-indexes.js bans them): rows carry `expiresAt`, and the hourly cleanup removes
+  them after 90 days (lib/hourly-cleanup.js).
 - A record id can have a ticket's shape (`finding-12345678`, `row-12345`). `looksLikeTicket` reads only an upper-case
   team key and a number, and a record id that exists is never read as a ticket (`checkWrite`). A new reference path
   resolves against the records first and sends only the rest to the tracker, or a valid record is refused as unreadable.
@@ -66,11 +66,7 @@ routes/task-records.js, routes/project-page.js, routes/dispatch.js, server.js).
   session page reads evidence through `readRunEvidenceFn` (`routes/dashboard.js`), missed the store at LIN-4495, and
   every session page read "not measured". Search the aliases too, and keep a missing store reading "not measured",
   never zero, so a missed caller shows instead of passing.
-- A verdict rests on the head its judge read (LIN-4516): `heads` names it per change in `on`, is never stored, and pins
-  before the refresh (`routes/proxy-records.js`; `pinVerdictToHeads` in `lib/change-records.js`).
-- A stage's change write for a PR its task already holds open is a new version of that change, never a second record
-  (`versionChangeWrite`, `routes/proxy-records.js`, LIN-4518 finding 798836ce): the fixed-id add returns the first record
-  unchanged, so a new head has to revise it. A blind read reads no records, so the ids it judges are handed in its prompt
-  (`landingChangesFor`, `lib/records/landing.js`) and its verdict is `on` them.
+- A verdict rests on the head its judge read (LIN-4516): `heads` pins it per change before the refresh (`pinVerdictToHeads`).
+  A change write for an open PR revises that change (`versionChangeWrite`); a blind read gets its ids in its prompt.
 - A task written with a ticket `ref` claims that ticket (`lib/records/writes.js`), as `ensureTask` does; else the ticket's
   references make a second task. A ticket's task id has one rule, `ticketTaskIdOf` (`lib/records/refs.js`). A revise that changes a claimed `ref` is refused (422).
