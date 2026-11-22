@@ -20,6 +20,7 @@ import { truncationFailureOf } from '../lib/openrouter.js';
 import { extractPrUrls } from '../lib/run-evidence.js';
 import { buildMockBrief } from '../lib/workspace-api-mocks.js';
 import { attachAsked } from '../lib/brief-quote.js';
+import { attachLandingChanges } from '../lib/change-records.js';
 import { fixtureParent } from '../lib/sample-data/fixture-parent.js';
 import { hashContext } from '../lib/recap-cache.js';
 import { isTerminalState } from '../lib/providers/state-map.js';
@@ -338,7 +339,8 @@ export function createComputeRoutes({
       // formatAttachmentsSection post-pass surfaces the worker-facing Attachments
       // section (LIN-776) — fetchIssueContext now carries it at top-level (LIN-772),
       // and dropping it here is what silently hid the section on this route.
-      const result = generatePrompt(templateKey, issue, promptContextOf(ctx), {}, provider?.ui || null);
+      const handed = await attachLandingChanges(ctx, { kind: templateKey, urlKey: req.proxyUrlKey, recordsStore, ticket: issue.identifier });
+      const result = generatePrompt(templateKey, issue, promptContextOf(handed), {}, provider?.ui || null);
 
       if (!result) {
         logEvent(req, '/api/proxy/prompt', 500);
@@ -492,7 +494,8 @@ export function createComputeRoutes({
             return keepaliveError(keepalive, 404, 'Issue not found');
           }
           const { issue } = ctx;
-          const generated = generatePrompt(kind, issue, promptContextOf(ctx), {}, provider?.ui || null);
+          const handed = await attachLandingChanges(ctx, { kind, urlKey: req.proxyUrlKey, recordsStore, ticket: issue.identifier });
+          const generated = generatePrompt(kind, issue, promptContextOf(handed), {}, provider?.ui || null);
           if (!generated) {
             logEvent(req, '/api/proxy/recommend', 500);
             return keepaliveError(keepalive, 500, 'Failed to generate prompt');

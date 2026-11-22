@@ -219,7 +219,7 @@ export function createWorkspaceApiRoutes({ workspaceFromUrl, freeTierStore, getO
   // LIN-3842: extracted to workspace-api-prompts.js). Mounted first; the groups'
   // literal path prefixes (/prompt-traces, /prompts/custom, /prompt/, /autopilot-prompt)
   // are disjoint from every other group's, so mount order is not load-bearing here.
-  router.use(createPromptsRoutes({ workspaceFromUrl, promptTraceStore, customPromptsStore }));
+  router.use(createPromptsRoutes({ workspaceFromUrl, promptTraceStore, customPromptsStore, recordsStore }));
 
   registerAuditRoutes(router, { workspaceFromUrl });
 

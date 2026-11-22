@@ -17,6 +17,7 @@ import { getProviderForWorkspace } from '../lib/providers/registry.js';
 import { EMPTY_PROVIDER_CONTEXT } from '../lib/prompt-trace-store.js';
 import { generatePrompt, generateCustomPrompt, hasPrompt } from '../lib/prompt-templates.js';
 import { promptContextOf } from '../lib/prompts/prompt-context.js';
+import { attachLandingChanges } from '../lib/change-records.js';
 import { buildPromptFilename } from '../lib/prompt-formatters.js';
 import { buildAutopilotKickoff, AUTOPILOT_MODES, AUTOPILOT_MODE_DEFAULT, AUTOPILOT_VARIANTS, AUTOPILOT_VARIANT_DEFAULT } from '../lib/prompts/autopilot-kickoff.js';
 import { validateRunField } from '../lib/dispatch-fields.js';
@@ -79,7 +80,7 @@ const autopilotTitle = (stepper) => (stepper ? 'Autopilot (stepped)' : 'Autopilo
  * @param {Object} deps.promptTraceStore - Debug/eval trace store (optional; 503-free empty read when absent)
  * @param {Object} deps.customPromptsStore - Custom prompt template CRUD store
  */
-export function createPromptsRoutes({ workspaceFromUrl, promptTraceStore, customPromptsStore }) {
+export function createPromptsRoutes({ workspaceFromUrl, promptTraceStore, customPromptsStore, recordsStore = null }) {
   const router = Router();
 
   /**
@@ -245,6 +246,9 @@ export function createPromptsRoutes({ workspaceFromUrl, promptTraceStore, custom
         // worker-facing Attachments section, matching the proxy /prompt route.
         context = promptContextOf(fetchedCtx);
       }
+
+      // LIN-4518 step 2: a blind read is handed the change records its landing names (its verdict is `on` them). Other labels pass through.
+      context = await attachLandingChanges(context, { kind: labelName, urlKey: workspace.urlKey, recordsStore, ticket: identifier });
 
       let result;
       if (isCustomPrompt) {
