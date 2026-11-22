@@ -26,7 +26,8 @@ afterEach(() => { setFetchImpl(null); setPromptTraceRecorder(null); });
 const read = (rel) => readFileSync(new URL(`../../${rel}`, import.meta.url), 'utf8');
 
 /** The order, pinned here and in the docs. Changing it is a change to the contract. */
-const ORDER = ['live-wait', 'review-bound', 'blind-read', 'look-first'];
+// LIN-4521: `re-review` sits between the bound and the blind read (a stale approval is re-judged before a read is sent).
+const ORDER = ['live-wait', 'review-bound', 're-review', 'blind-read', 'look-first'];
 
 const REPO = 'acme/widget';
 const PR1 = `https://github.com/${REPO}/pull/41`;
