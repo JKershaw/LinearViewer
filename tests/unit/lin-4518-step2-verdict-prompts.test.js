@@ -36,6 +36,9 @@ describe('the review contract asks for a verdict record on the change it read, a
     const line = contract.split('\n').find((l) => l.includes('An Approve with conditions'));
     assert.ok(line, 'the conditional-approval line is in the contract');
     assert.match(line, /"to": "close-out"/);
+    // finding-53f10ec3: the close-out gate reads findings by their task (`in`), and a condition names the check that settles it (`how`).
+    assert.match(line, /"in": "LIN-1"/);
+    assert.match(line, /"how"` the check that settles it/);
     assert.match(line, /Write them before the approval record/);
   });
 
@@ -72,6 +75,8 @@ describe('the blind read is handed the change records it judges, and writes its 
     assert.match(p, /"on"` the change records below/);
     assert.match(p, /"heads"` naming the \{HEAD\} you read for each, as `\{"<change id>": "<sha>"\}`/);
     assert.match(p, /`change-abc123` is the change record for https:\/\/github\.com\/acme\/widget\/pull\/7\./);
+    // finding-53f10ec3 (4): a space after the comma that ends the clause.
+    assert.match(p, /the same word as the comment, `"in": "LIN-1"`/);
   });
 
   test('with no landing handed in: the prompt says the record cannot be written, and names no id', () => {
