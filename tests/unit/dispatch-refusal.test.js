@@ -55,13 +55,6 @@ describe('mapDispatchRefusal', () => {
     });
   });
 
-  test('TASK_SESSION_RUNAWAY: 409 under its own code, never BUDGET_EXHAUSTED', () => {
-    const refusal = { code: 'TASK_SESSION_RUNAWAY', sessionId: 's-3' };
-    assert.deepEqual(mapDispatchRefusal(tagged('taskSessionRunaway', refusal, 'runaway')), {
-      status: 409, message: 'runaway', body: refusal, retryAfter: null, note: 'TASK_SESSION_RUNAWAY s-3'
-    });
-  });
-
   test('untagged, grant-refusal and nullish errors yield null (pass through to the caller)', () => {
     assert.equal(mapDispatchRefusal(null), null);
     assert.equal(mapDispatchRefusal(undefined), null);

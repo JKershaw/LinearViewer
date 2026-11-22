@@ -148,9 +148,10 @@ describe('LIN-1737 Beat 1 — POST /workspace/:urlKey/api/dispatch maxTasks', ()
   });
 });
 
-describe('LIN-3461 — the runaway failsafe, relayed by the session dispatch route', () => {
+describe('LIN-4528 — no per-task session cap, relayed by the session dispatch route', () => {
   async function seedRun() {
-    const store = new DispatchQueueStore({ collection: createMockCollection(), historyCollection: createMockCollection() });
+    const collection = createMockCollection();
+    const store = new DispatchQueueStore({ collection, historyCollection: createMockCollection() });
     const app = buildRealApp(store);
     const kickoff = await call(app, 'post', PATH, { prompt: 'launch the runner', kind: 'custom', target: 'cli' });
     assert.equal(kickoff.status, 201, JSON.stringify(kickoff.body));
@@ -158,20 +159,24 @@ describe('LIN-3461 — the runaway failsafe, relayed by the session dispatch rou
     for (let i = 0; i < 30; i++) {
       await store.addItem('acme', { prompt: `worker ${i}`, kind: 'implementation', issueIdentifier: 'LIN-1', sessionId });
     }
+    // Age the prior sessions past the five-minute duplicate window, so the 31st is
+    // decided by the budget guards alone (no force needed).
+    await collection.updateMany(
+      { sessionId, issueIdentifier: 'LIN-1' },
+      { $set: { dispatchedAt: new Date(Date.now() - 10 * 60 * 1000) } }
+    );
     return { app, sessionId };
   }
 
-  test('the 31st fresh session to one task is refused 409 TASK_SESSION_RUNAWAY (not BUDGET_EXHAUSTED), even with force: true', async () => {
+  test('the 31st fresh session to one task is admitted 201, without force, like the 30th', async () => {
     const { app, sessionId } = await seedRun();
 
-    const refused = await call(app, 'post', PATH, {
-      prompt: 'one more', kind: 'implementation', issueIdentifier: 'LIN-1', target: 'cli', sessionId, force: true
+    const thirtyFirst = await call(app, 'post', PATH, {
+      prompt: 'one more', kind: 'implementation', issueIdentifier: 'LIN-1', target: 'cli', sessionId
     });
-    assert.equal(refused.status, 409, JSON.stringify(refused.body));
-    assert.equal(refused.body.code, 'TASK_SESSION_RUNAWAY');
-    assert.equal(refused.body.limit, 30);
-    assert.equal(refused.body.taskDispatches, 30);
-    assert.match(refused.body.error, /30 fresh sessions in this run/);
+    assert.equal(thirtyFirst.status, 201, JSON.stringify(thirtyFirst.body));
+    assert.equal(thirtyFirst.body.code, undefined, 'no refusal code on an admitted dispatch');
+    assert.ok(!('budgetPosition' in thirtyFirst.body.item), 'no maxTasks declared, so no budget position');
   });
 
   test('a different task in the same run is still admitted, and no budgetPosition appears without maxTasks', async () => {

@@ -798,7 +798,7 @@ export function createProxyRoutes({ proxyTokenStore, proxyEventStore, agentStatu
 
   /**
    * The proxy entrance's relay for a tagged dispatch-factory refusal (duplicate,
-   * run-limit 429/503, budget, close-out, per-task runaway). The status/body/
+   * run-limit 429/503, budget, close-out). The status/body/
    * `Retry-After`/log-note mapping lives in `mapDispatchRefusal`
    * (lib/dispatch-refusal.js), shared with the session `/dispatch` route; this
    * keeps only what is the proxy's own: the audit `logEvent`, the keepalive-aware

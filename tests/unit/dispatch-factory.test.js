@@ -11,7 +11,7 @@
  */
 import { test, describe } from 'node:test';
 import assert from 'node:assert/strict';
-import { createDispatchItem, DUPLICATE_DISPATCH_WINDOW_MS, ANCHOR_TERMINAL_CODE, MAX_FRESH_SESSIONS_PER_TASK, TASK_SESSION_RUNAWAY_CODE, BUDGET_EXHAUSTED_CODE } from '../../lib/dispatch-factory.js';
+import { createDispatchItem, DUPLICATE_DISPATCH_WINDOW_MS, ANCHOR_TERMINAL_CODE, BUDGET_EXHAUSTED_CODE } from '../../lib/dispatch-factory.js';
 import { WorkspacePreferencesStore } from '../../lib/workspace-preferences.js';
 import { DispatchQueueStore } from '../../lib/dispatch-store.js';
 import { createMockCollection as createDocCollection } from '../fixtures/mock-collection.js';
@@ -1210,14 +1210,14 @@ function budgetStore({ runs = {}, countResult = null, countError = null, hasCoun
 }
 
 describe('createDispatchItem — task-budget guard, admitted (LIN-1751)', () => {
-  test('maxTasks absent on the resolved run: one count read (the runaway failsafe\'s), dispatch proceeds identically', async () => {
+  test('maxTasks absent on the resolved run: no count read, dispatch proceeds identically', async () => {
     const store = budgetStore({
       runs: { 'run-1': { maxTasks: null } },
-      countResult: { count: 3, alreadyCounted: false, taskDispatches: 2 }
+      countResult: { count: 3, alreadyCounted: false }
     });
     await freshDispatch(store, { fields: { sessionId: 'run-1' } });
-    assert.equal(store.getItemStatusCalls, 1, 'the run row is still read once');
-    assert.equal(store.countCalls, 1, 'the failsafe reads the count for every run, declared budget or not (LIN-3461)');
+    assert.equal(store.getItemStatusCalls, 1, 'the run row is still read once: it is what reveals maxTasks');
+    assert.equal(store.countCalls, 0, 'an undeclared budget is never counted (LIN-4528)');
     assert.equal(store.captured.item.issueIdentifier, 'LIN-1');
   });
 
@@ -1249,11 +1249,11 @@ describe('createDispatchItem — task-budget guard, admitted (LIN-1751)', () => 
     assert.equal(item.issueIdentifier, 'LIN-1');
   });
 
-  test('a run row with no resolvable maxTasks field (unreadable run): admitted, and the failsafe still reads the count', async () => {
-    const store = budgetStore({ runs: {}, countResult: { count: 0, alreadyCounted: false, taskDispatches: 0 } }); // 'run-1' resolves to null
+  test('a run row with no resolvable maxTasks field (unreadable run): admitted, with no count read', async () => {
+    const store = budgetStore({ runs: {}, countResult: { count: 0, alreadyCounted: false } }); // 'run-1' resolves to null
     const item = await freshDispatch(store, { fields: { sessionId: 'run-1' } });
     assert.equal(item.issueIdentifier, 'LIN-1');
-    assert.equal(store.countCalls, 1, 'the failsafe keys on fields.sessionId, not on the run row (LIN-3461)');
+    assert.equal(store.countCalls, 0, 'no declared maxTasks on the run, so nothing to count against (LIN-4528)');
   });
 
   test('maxTasks set on the resolved run, but this dispatch carries no fields.sessionId: admitted', async () => {
@@ -1311,124 +1311,90 @@ describe('createDispatchItem — task-budget guard, refusals (LIN-1751)', () => 
 
 });
 
-describe('createDispatchItem — per-task runaway failsafe (LIN-3461)', () => {
+describe('createDispatchItem — no per-task session cap (LIN-4528)', () => {
+  // Sessions per task are unbounded. The factory counts distinct tasks against a
+  // DECLARED maxTasks and nothing else, so a 31st fresh session to one task is
+  // admitted under the same rules as the 1st. The real-row witnesses (31 seeded
+  // dispatches) live in proxy-dispatch-max-tasks and dispatch-route-max-tasks.
   const RUN = { 'run-1': {} };
-  const at = (taskDispatches, extra = {}) => ({ count: 1, alreadyCounted: true, taskDispatches, ...extra });
 
-  test('the limit is the fixed constant 30', () => {
-    assert.equal(MAX_FRESH_SESSIONS_PER_TASK, 30);
+  test('an unbudgeted run: a fresh session to a task already run 30 times is admitted, and the count is never read', async () => {
+    const store = budgetStore({ runs: RUN, countResult: { count: 1, alreadyCounted: true } });
+    const item = await freshDispatch(store, { fields: { sessionId: 'run-1' } });
+    assert.equal(item.issueIdentifier, 'LIN-1');
+    assert.equal(store.countCalls, 0, 'no declared budget, so no count read');
+    assert.ok(!('budgetPosition' in item), 'an unbudgeted 201 carries no budgetPosition');
   });
 
-  test('30 prior fresh sessions to the task: the 31st is refused with TASK_SESSION_RUNAWAY, never BUDGET_EXHAUSTED', async () => {
-    const store = budgetStore({ runs: RUN, countResult: at(30) });
-    const err = await freshDispatch(store, { fields: { sessionId: 'run-1' } }).then(() => null, e => e);
-    assert.ok(err, 'expected a refusal');
-    assert.equal(err.status, 409);
-    assert.ok(!err.budgetExhausted, 'a runaway is not a budget finish');
-    assert.deepEqual(err.taskSessionRunaway, {
-      code: TASK_SESSION_RUNAWAY_CODE,
-      taskDispatches: 30,
-      limit: 30,
-      issueIdentifier: 'LIN-1',
-      sessionId: 'run-1'
-    });
-    assert.equal(err.taskSessionRunaway.code, 'TASK_SESSION_RUNAWAY');
-    assert.notEqual(err.taskSessionRunaway.code, BUDGET_EXHAUSTED_CODE);
-    assert.equal(
-      err.message,
-      'This task has had 30 fresh sessions in this run. That looks like a runaway, not a normal finish: stop the run and report [blocked] so a person can look at it.'
-    );
-    assert.equal(store.captured.item, undefined, 'a refusal writes no row (and so mints no credential)');
+  test('a declared budget: a fresh session to an already-counted task is admitted however many sessions it has had', async () => {
+    const store = budgetStore({ runs: { 'run-1': { maxTasks: 50 } }, countResult: { count: 10, alreadyCounted: true } });
+    const item = await freshDispatch(store, { fields: { sessionId: 'run-1' } });
+    assert.equal(item.issueIdentifier, 'LIN-1');
+    assert.equal(store.countCalls, 1, 'a declared budget is counted');
+    assert.deepEqual(item.budgetPosition, { tasks: { count: 10, maxTasks: 50 } });
   });
 
-  test('29 prior fresh sessions: the 30th is admitted', async () => {
-    const store = budgetStore({ runs: RUN, countResult: at(29) });
+  test('a legacy store that still reports taskDispatches: 30 is ignored: the factory admits the 31st fresh session', async () => {
+    // WITNESS (LIN-4528). `taskDispatches` was the field the removed cap read. This
+    // fixture keeps it on purpose: on the code before the change it refuses with
+    // TASK_SESSION_RUNAWAY, and after it admits. No current store returns the field.
+    const store = budgetStore({ runs: RUN, countResult: { count: 1, alreadyCounted: true, taskDispatches: 30 } });
     const item = await freshDispatch(store, { fields: { sessionId: 'run-1' } });
     assert.equal(item.issueIdentifier, 'LIN-1');
   });
 
-  test('the refusal holds when the run row is unresolvable (no run row is needed)', async () => {
-    const store = budgetStore({ runs: {}, countResult: at(30) });
-    await assert.rejects(
-      () => freshDispatch(store, { fields: { sessionId: 'run-1' } }),
-      err => err.status === 409 && err.taskSessionRunaway?.code === TASK_SESSION_RUNAWAY_CODE
-    );
+  test('the store cannot read run rows: admitted, with no count read', async () => {
+    const store = budgetStore({ hasGetItemStatus: false, countResult: { count: 1, alreadyCounted: true } });
+    const item = await freshDispatch(store, { fields: { sessionId: 'run-1' } });
+    assert.equal(item.issueIdentifier, 'LIN-1');
+    assert.equal(store.countCalls, 0);
   });
 
-  test('the refusal holds when the store cannot read run rows at all', async () => {
-    const store = budgetStore({ hasGetItemStatus: false, countResult: at(30) });
-    await assert.rejects(
-      () => freshDispatch(store, { fields: { sessionId: 'run-1' } }),
-      err => err.taskSessionRunaway?.code === TASK_SESSION_RUNAWAY_CODE
-    );
+  test('an unbudgeted run whose count read would fail is admitted: the count is never asked', async () => {
+    const store = budgetStore({ runs: RUN, countError: new Error('db unavailable') });
+    const item = await freshDispatch(store, { fields: { sessionId: 'run-1' } });
+    assert.equal(item.issueIdentifier, 'LIN-1');
+    assert.equal(store.countCalls, 0);
+    assert.ok(!('budgetPosition' in item));
   });
 
-  test('the refusal holds under a declared maxTasks too, even for an already-counted task', async () => {
-    const store = budgetStore({ runs: { 'run-1': { maxTasks: 50 } }, countResult: at(30, { count: 10 }) });
-    await assert.rejects(
-      () => freshDispatch(store, { fields: { sessionId: 'run-1' } }),
-      err => err.status === 409 && err.taskSessionRunaway?.code === TASK_SESSION_RUNAWAY_CODE
-    );
+  test('an unbudgeted run whose count would be null is admitted without a null dereference', async () => {
+    const store = budgetStore({ runs: RUN, countResult: null });
+    const item = await freshDispatch(store, { fields: { sessionId: 'run-1' } });
+    assert.equal(item.issueIdentifier, 'LIN-1');
+    assert.equal(store.countCalls, 0);
   });
 
-  test('force: true does not bypass it', async () => {
-    const store = budgetStore({ runs: RUN, countResult: at(30) });
-    await assert.rejects(
-      () => freshDispatch(store, { fields: { sessionId: 'run-1', force: true } }),
-      err => err.taskSessionRunaway?.code === TASK_SESSION_RUNAWAY_CODE
-    );
+  test('a store lacking the count capability: admitted', async () => {
+    const store = budgetStore({ runs: RUN, hasCountMethod: false });
+    const item = await freshDispatch(store, { fields: { sessionId: 'run-1' } });
+    assert.equal(item.issueIdentifier, 'LIN-1');
   });
 
-  test('a follow-up and an abort at 30 rows are admitted, and never reach the count', async () => {
+  test('a follow-up and an abort are admitted, and never reach the count', async () => {
     for (const fields of [{ sessionId: 'run-1', followUpTo: 'beat-1' }, { sessionId: 'run-1', abort: true, abortTo: 'beat-1' }]) {
-      const store = budgetStore({ runs: RUN, countResult: at(30) });
+      const store = budgetStore({ runs: RUN, countResult: { count: 1, alreadyCounted: true } });
       await freshDispatch(store, { fields });
       assert.equal(store.countCalls, 0);
     }
   });
 
   test('a dispatch with no sessionId cannot be tied to a run and is admitted (cooperating-orchestrator caveat)', async () => {
-    const store = budgetStore({ runs: RUN, countResult: at(30) });
+    const store = budgetStore({ runs: RUN, countResult: { count: 1, alreadyCounted: true } });
     const item = await freshDispatch(store);
     assert.equal(item.issueIdentifier, 'LIN-1');
     assert.equal(store.countCalls, 0);
   });
 
-  test('a count-read error with no maxTasks fails OPEN (the failsafe never becomes an outage)', async () => {
-    const store = budgetStore({ runs: RUN, countError: new Error('db unavailable') });
-    const item = await freshDispatch(store, { fields: { sessionId: 'run-1' } });
-    assert.equal(item.issueIdentifier, 'LIN-1');
-    assert.ok(!('budgetPosition' in item));
-  });
-
-  test('a count that cannot be read (null result) with no maxTasks does not throw on a null dereference', async () => {
-    const store = budgetStore({ runs: RUN, countResult: null });
-    const item = await freshDispatch(store, { fields: { sessionId: 'run-1' } });
-    assert.equal(item.issueIdentifier, 'LIN-1');
-  });
-
-  test('a store lacking the count capability skips the failsafe (fail-open on capability absence)', async () => {
-    const store = budgetStore({ runs: RUN, hasCountMethod: false });
-    const item = await freshDispatch(store, { fields: { sessionId: 'run-1' } });
-    assert.equal(item.issueIdentifier, 'LIN-1');
-  });
-
-  test('maxTasks behaviour is unchanged beside the failsafe: a NEW task past maxTasks is still BUDGET_EXHAUSTED, bound tasks', async () => {
+  test('maxTasks behaviour is unchanged: a NEW task past maxTasks is still BUDGET_EXHAUSTED, bound tasks', async () => {
     const store = budgetStore({
       runs: { 'run-1': { maxTasks: 5 } },
-      countResult: { count: 5, alreadyCounted: false, taskDispatches: 0 }
+      countResult: { count: 5, alreadyCounted: false }
     });
     await assert.rejects(
       () => freshDispatch(store, { fields: { sessionId: 'run-1' } }),
-      err => err.budgetExhausted?.code === 'BUDGET_EXHAUSTED' && err.budgetExhausted.bound === 'tasks' && !err.taskSessionRunaway
+      err => err.budgetExhausted?.code === 'BUDGET_EXHAUSTED' && err.budgetExhausted.bound === 'tasks'
     );
-  });
-
-  test('an unbudgeted run\'s 201 carries no budgetPosition even though the count now runs for it', async () => {
-    const store = budgetStore({ runs: RUN, countResult: at(3) });
-    const item = await freshDispatch(store, { fields: { sessionId: 'run-1' } });
-    assert.equal(store.countCalls, 1);
-    assert.ok(!('budgetPosition' in item));
   });
 });
 
@@ -1555,7 +1521,7 @@ describe('createDispatchItem — budgetPosition snapshot (LIN-2934)', () => {
   test('budgetPosition.tasks.count gates on alreadyCounted (a distinct-task count), unaffected by this revision', async () => {
     const store = budgetStore({
       runs: { 'run-1': { maxTasks: 8 } },
-      countResult: { count: 3, alreadyCounted: false, taskDispatches: 0 }
+      countResult: { count: 3, alreadyCounted: false }
     });
     const item = await freshDispatch(store, { fields: { sessionId: 'run-1' } });
     assert.deepEqual(item.budgetPosition.tasks, { count: 4, maxTasks: 8 }, 'a genuinely new task advances the distinct count by one');
@@ -1565,7 +1531,7 @@ describe('createDispatchItem — budgetPosition snapshot (LIN-2934)', () => {
   test('budgetPosition.tasks.count does NOT advance for an already-counted task', async () => {
     const store = budgetStore({
       runs: { 'run-1': { maxTasks: 8 } },
-      countResult: { count: 3, alreadyCounted: true, taskDispatches: 2 }
+      countResult: { count: 3, alreadyCounted: true }
     });
     const item = await freshDispatch(store, { fields: { sessionId: 'run-1' } });
     assert.deepEqual(item.budgetPosition.tasks, { count: 3, maxTasks: 8 }, 'continuing an already-counted task does not grow the distinct count');
@@ -1574,7 +1540,7 @@ describe('createDispatchItem — budgetPosition snapshot (LIN-2934)', () => {
   test('budgetPosition is never passed to store.addItem (non-persisted)', async () => {
     const store = budgetStore({
       runs: { 'run-1': { maxTasks: 8 } },
-      countResult: { count: 3, alreadyCounted: false, taskDispatches: 0 }
+      countResult: { count: 3, alreadyCounted: false }
     });
     await freshDispatch(store, { fields: { sessionId: 'run-1' } });
     assert.ok(!('budgetPosition' in store.captured.item), 'budgetPosition must be attached to the RETURNED item only, never sent to addItem');

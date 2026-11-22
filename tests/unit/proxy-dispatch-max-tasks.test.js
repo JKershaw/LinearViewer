@@ -216,7 +216,7 @@ describe('LIN-2934 R4 — fail-closed budget-read failure, end to end (N3)', () 
     assert.equal(refusalEvent.note, `BUDGET_EXHAUSTED tasks ${sessionId}`);
   });
 
-  test('a real count-read error with NO maxTasks declared fails OPEN: the failsafe never turns a read blip into an outage (LIN-3461)', async () => {
+  test('a real count-read error with NO maxTasks declared is never read: the dispatch is admitted (LIN-4528)', async () => {
     const store = makeBudgetReadFailureStore();
     const app = buildApp({ dispatchQueueStore: store });
 
@@ -230,33 +230,52 @@ describe('LIN-2934 R4 — fail-closed budget-read failure, end to end (N3)', () 
   });
 });
 
-describe('LIN-3461 — the runaway failsafe, relayed by the proxy dispatch route', () => {
-  test('the 31st fresh session to one task in a run is refused 409 TASK_SESSION_RUNAWAY, not BUDGET_EXHAUSTED, and the durable note names the code', async () => {
-    const recordedEvents = [];
-    const { store } = makeSpiedStore();
-    const app = buildApp({ dispatchQueueStore: store, recordedEvents });
+describe('LIN-4528 — no per-task session cap, relayed by the proxy dispatch route', () => {
+  // Seeds n prior fresh worker dispatches to LIN-1 under the run, then ages them
+  // more than five minutes, so the duplicate-dispatch guard (same issue and kind,
+  // five minutes) never fires and the next dispatch is decided by the budget guards alone.
+  async function ageSessions(collection, store, sessionId, n) {
+    for (let i = 0; i < n; i++) {
+      await store.addItem('acme', { prompt: `worker ${i}`, kind: 'implementation', issueIdentifier: 'LIN-1', sessionId });
+    }
+    await collection.updateMany(
+      { sessionId, issueIdentifier: 'LIN-1' },
+      { $set: { dispatchedAt: new Date(Date.now() - 10 * 60 * 1000) } }
+    );
+  }
+
+  test('the 31st fresh session to one task in a run is admitted 201 without force, like the 30th', async () => {
+    const collection = createMockCollection();
+    const store = new DispatchQueueStore({ collection, historyCollection: createMockCollection() });
+    const app = buildApp({ dispatchQueueStore: store });
 
     const run = await call(app, 'post', DISPATCH, { prompt: 'launch the runner', target: 'cli' });
     assert.equal(run.status, 201, JSON.stringify(run.body));
     const sessionId = run.body.id;
+    await ageSessions(collection, store, sessionId, 30);
 
-    for (let i = 0; i < 30; i++) {
-      await store.addItem('acme', { prompt: `worker ${i}`, kind: 'implementation', issueIdentifier: 'LIN-1', sessionId });
-    }
-
-    const refused = await call(app, 'post', DISPATCH, {
-      prompt: 'one more', promptName: 'implementation', issueIdentifier: 'LIN-1', target: 'cli', sessionId, force: true
+    const thirtyFirst = await call(app, 'post', DISPATCH, {
+      prompt: 'one more', promptName: 'implementation', issueIdentifier: 'LIN-1', target: 'cli', sessionId
     });
-    assert.equal(refused.status, 409, JSON.stringify(refused.body));
-    assert.equal(refused.body.code, 'TASK_SESSION_RUNAWAY');
-    assert.equal(refused.body.limit, 30);
-    assert.equal(refused.body.taskDispatches, 30);
-    assert.match(refused.body.error, /30 fresh sessions in this run/);
-    assert.match(refused.body.error, /runaway/);
-    assert.match(refused.body.error, /report \[blocked\]/);
+    assert.equal(thirtyFirst.status, 201, JSON.stringify(thirtyFirst.body));
+    assert.equal(thirtyFirst.body.code, undefined, 'no refusal code on an admitted dispatch');
+    assert.equal(thirtyFirst.body.budgetPosition, undefined, 'no maxTasks declared, so no budget position');
+  });
 
-    const refusalEvent = recordedEvents.find(e => e.status === 409);
-    assert.ok(refusalEvent);
-    assert.equal(refusalEvent.note, `TASK_SESSION_RUNAWAY ${sessionId}`);
+  test('with maxTasks declared, the 31st fresh session to an already-counted task is admitted and echoes its budget position', async () => {
+    const collection = createMockCollection();
+    const store = new DispatchQueueStore({ collection, historyCollection: createMockCollection() });
+    const app = buildApp({ dispatchQueueStore: store });
+
+    const run = await call(app, 'post', DISPATCH, { prompt: 'launch the runner', target: 'cli', maxTasks: 5 });
+    assert.equal(run.status, 201, JSON.stringify(run.body));
+    const sessionId = run.body.id;
+    await ageSessions(collection, store, sessionId, 30);
+
+    const thirtyFirst = await call(app, 'post', DISPATCH, {
+      prompt: 'one more', promptName: 'implementation', issueIdentifier: 'LIN-1', target: 'cli', sessionId
+    });
+    assert.equal(thirtyFirst.status, 201, JSON.stringify(thirtyFirst.body));
+    assert.deepEqual(thirtyFirst.body.budgetPosition, { tasks: { count: 1, maxTasks: 5 } });
   });
 });
