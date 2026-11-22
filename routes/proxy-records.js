@@ -54,7 +54,7 @@ import { TOKEN_ORIGIN, WRITES } from '../lib/stage-writes.js';
 import { RecordsVersionConflict, RecordsNotFound } from '../lib/records-store.js';
 import { refusalOf, KINDS, PLAN_ADDRESSEES, planAddresseeProblem } from '../lib/records/check.js';
 import { createRecordWrites } from '../lib/records/writes.js';
-import { pinVerdictToHeads, refreshTaskChanges, blindReadSetProblems } from '../lib/change-records.js';
+import { pinVerdictToHeads, refreshTaskChanges, blindReadSetProblems, versionChangeWrite } from '../lib/change-records.js';
 import { BLIND_READ_KIND } from '../lib/prompts/blind-read-words.js';
 import { isTerminalState } from '../lib/providers/state-map.js';
 
@@ -248,7 +248,9 @@ export function createProxyRecordsRoutes({ recordsStore, proxyLimiter, authentic
       // LIN-4516: a verdict belongs to the task its changes are on, so the task's records and its round cut can find it.
       // `in` is any record's field, so no kind changes (lib/records/kinds.json).
       if (isVerdict && pin.tasks.length === 1 && input.in === undefined) input.in = pin.tasks[0];
-      const result = await writes.add({ ctx: req, urlKey: req.proxyUrlKey, kind: body.kind, input, by: writer.by, run: writer.run ?? null });
+      // LIN-4518 step 2 (finding 798836ce): a change for a PR the task already holds open is a new version of that change.
+      const versioned = await versionChangeWrite({ urlKey: req.proxyUrlKey, body, writes, recordsStore, by: writer.by, run: writer.run ?? null });
+      const result = versioned ?? await writes.add({ ctx: req, urlKey: req.proxyUrlKey, kind: body.kind, input, by: writer.by, run: writer.run ?? null });
       if (!result.problems) await refreshAfterPin(req.proxyUrlKey, pin.tasks);
       return answer(req, res, endpoint, 201, result);
     } catch (err) {

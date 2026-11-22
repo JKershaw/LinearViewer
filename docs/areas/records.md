@@ -68,5 +68,9 @@ routes/task-records.js, routes/project-page.js, routes/dispatch.js, server.js).
   never zero, so a missed caller shows instead of passing.
 - A verdict rests on the head its judge read (LIN-4516): `heads` names it per change in `on`, is never stored, and pins
   before the refresh (`routes/proxy-records.js`; `pinVerdictToHeads` in `lib/change-records.js`).
+- A stage's change write for a PR its task already holds open is a new version of that change, never a second record
+  (`versionChangeWrite`, `routes/proxy-records.js`, LIN-4518 finding 798836ce): the fixed-id add returns the first record
+  unchanged, so a new head has to revise it. A blind read reads no records, so the ids it judges are handed in its prompt
+  (`landingChangesFor`, `lib/records/landing.js`) and its verdict is `on` them.
 - A task written with a ticket `ref` claims that ticket (`lib/records/writes.js`), as `ensureTask` does; else the ticket's
   references make a second task. A ticket's task id has one rule, `ticketTaskIdOf` (`lib/records/refs.js`). A revise that changes a claimed `ref` is refused (422).
