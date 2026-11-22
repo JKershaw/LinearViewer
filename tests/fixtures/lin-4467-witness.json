@@ -247,7 +247,7 @@
       "  },",
       "  \"close-out\": {",
       "    \"coreOutcome\": \"Approved work finished: the fixes review asked for made, the findings to close-out settled, the PR merged, the post-deploy steps done once the deploy landed, the task Done, the summary posted, and related tickets tidied and each outside find recorded to the project backlog\",",
-      "    \"readinessCheck\": \"Did the review record an Approve, and is the work then finished: the fixes review asked for made, every finding to close-out settled (with none recorded under an Approve, nothing waits; a missing verdict goes back to review), merged, the post-deploy steps done once the deploy landed, set Done, summarized (with how the work meets what was asked), and each outside find recorded to project?\",",
+      "    \"readinessCheck\": \"Did the review record an Approve, and is the work then finished: the fixes review asked for made, every finding to close-out settled (with none recorded under an Approve, nothing waits; a missing verdict, or a commit pushed after the approval, goes back to review), merged, the post-deploy steps done once the deploy landed, set Done, summarized (with how the work meets what was asked), and each outside find recorded to project?\",",
       "    \"signals\": [",
       "      \"Review verdict read from its verdict record on the task (in the brief); any finding to close-out settled, none recorded passing through, and a missing verdict sent back to review to confirm\",",
       "      \"The fixes review asked for made by close-out itself, each the size of a fix (new design or new behaviour handed back to review), listed in the summary with its commit, and CI green on the new head\",",
