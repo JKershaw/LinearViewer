@@ -24,7 +24,7 @@
 - Answering is one route, used by the Rulings page, the task page card and Home.
   - It writes a `decision` (`by` the person, `answers` the question). The answer holds the chosen option and the person's own words, both.
   - The question ends `answered`.
-  - The answer resumes the asking run, whose prompt carries the question, the chosen option and the person's words. If that run can't be resumed, the decision stands in the task, and the next stage reads it in its brief. The per-ruling effect choice (resume, record, dispatch) retires.
+  - The answer resumes the asking run, whose prompt carries the question, the chosen option and the person's words. A run that was stopped stays stopped, and the page says it wasn't resumed, as today; the decision stands in the task for the next stage to read. The per-ruling effect choice (resume, record, dispatch) retires.
   - A question that has already ended is refused, as the 409 does today.
 - **Dismissing ends the question `withdrawn`, `by` the person,** with the reason "not worth asking". If the asking run is waiting, it resumes with "proceed on your best judgment". It is the same on every surface. The false-escalation measure counts questions a person withdrew.
 - The Rulings page shows what is open for the signed-in person: questions and findings addressed to them.
@@ -40,7 +40,7 @@
 
   Every reader moves onto question and decision records: the ticket closer, the observer sweep, the KPIs, session and Home row states, account erasure, and the chat tools' `list_pending_decisions` (still read-only).
 - The scan retires, with its routes, page, fingerprint and the `harbour-comments` ledger it alone reads: stages raise their own questions.
-- **The size of the move is an ordinary question.** Scoping asks the person how big a move to make: a few reasonable options, its recommendation, and always room to go bigger. It's meant to be fuzzy. The answer, in the person's words, is a decision on the task. If it's unanswered, the standing policy (err larger) applies, as today. The `## Size of the move` section, its fixed shape, its guard and its vocabulary module retire.
+- **The size of the move is an ordinary question.** Scoping asks the person how big a move to make: a few reasonable options, its recommendation, and always room to go bigger. It's meant to be fuzzy. The answer, in the person's words, is a decision on the task. Until the person answers, the work goes ahead on the standing policy (err larger), as today. The `## Size of the move` section, its fixed shape, its guard and its vocabulary module retire.
 
 **The brief**
 - The brief is built from records, parts 1–8, for the run the dispatch credential names. No `?run=` is needed.
