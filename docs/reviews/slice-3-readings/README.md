@@ -13,6 +13,9 @@ that is gone (lesson LIN-4505, `docs/areas/reports-and-operator-tools.md`).
 | `cutover-query.mjs` | LIN-4517 (P4): the read-only cutover query. Open tasks whose latest review, plan review or blind read is a comment with no verdict record, open tasks whose latest review's ledger carries items (including those `isEmptyStatement` misreads as empty), and open tasks with no verdict record at all. Its `dump` step runs in `harbour-cat` through `railway ssh` (records); its `query` step runs locally through the workspace proxy (ticket states and comments). It prints counts, task ids and ticket ids only. Tested in `tests/unit/lin-4517-cutover-query.test.js`; run again inside P5's fleet pause. Its `needsImportOrReReview` is the selection of the one-off verdict import, `scripts/records/slice-3-verdict-import.mjs` (LIN-4517; runs only if John rules "import") |
 | `cutover-2026-11-21.json` | That query's first production reading (21 Nov 04:09Z), the "before" count for P5's pause |
 | `cutover-2026-11-21-after-import.json` | The query rerun after the one-off verdict import was applied in production (21 Nov 08:06Z dump): 9 tasks remain, exactly the import's named skips (LIN-2153, LIN-2919, LIN-751, LIN-2626, LIN-2627, LIN-2634, LIN-4452, LIN-4441, LIN-4491). 21 verdicts are marked `via: import`. P5 reruns the query and the import inside its fleet pause |
+| `blind-queries-since-cutover.mjs` | LIN-4519 (P6, review fix): the blind-read queries since the cutover (`VERDICT_RECORDS_SINCE`, 22 Nov 04:20:39Z). Read-only, run inside `harbour-cat` through `railway ssh` from `/dev/shm` and deleted after; its output is `blind-queries-since-cutover-2026-11-22.json` (counts and record ids only) |
+| `lin-4519-window-readings.mjs` (in `scripts/`) | LIN-4519: the review round trips over the window's tickets only, read from verdict records. Its output is `round-trips-window-2026-11-22.json` |
+| `stability-2026-11-22.json` | LIN-4519: the Stability reading over `eb14b7fff..origin/main` (`scripts/stability-measures.mjs --api`), taken after the cutover moved. See the section below |
 
 The same readers, applied to the frozen walk-8 trails and seeds, are in `tests/fixtures/walk-8/comment-path/goldens/readings.json`.
 
@@ -37,3 +40,19 @@ printed.
 Blind-read results and round trips follow slice 1's and 2's posture: the existing readers, unchanged, over a stated
 window. The window starts at measure 1's own gate, so that every landing in it could have had a blind read. The
 query-log count is new in this slice, as the design says (§3).
+
+## Taken after the cutover moved (LIN-4519, 22 Nov)
+
+The cutover is the production go-live of the P5 writers (#2491, `d9c0e9eba`): `VERDICT_RECORDS_SINCE` = **22 Nov 04:20:39.504Z**, from harbour-cat's deploy log for deployment `8c9182ee` (`Harbour running at http://localhost:8080`). It replaces the 21 Nov verdict import as the instant, because the stages wrote verdicts as comments until the go-live, even where the import had a record for an open task. The 21 Nov readings above stay as the baseline. These are taken from the cutover on.
+
+| Reading | Value | Source and window |
+|---|---|---|
+| Blind-read results (measure 1) | 78 landings: 2 read before merge (better 2, same 0, worse 0); **59 before the verdict records** (not read from them); 13 not ordinary landings; 4 with no ticket; **0 no read on record**. Partial: 59 unreadable | `scripts/stability-measures.mjs` (`blind`) over `eb14b7fff..origin/main`, with the proxy. Output `stability-2026-11-22.json`. The two read landings are the only ones merged after the cutover (#2493, #2492, both better) |
+| Blind-read queries since the cutover | 0 query-log rows from blind-read runs. 346 query-log rows of all runs since the cutover; 28 blind-read run records on record (all time) | `blind-queries-since-cutover.mjs` in harbour-cat, asOf 22 Nov 14:43Z. Output `blind-queries-since-cutover-2026-11-22.json`. The 19 Nov–21 Nov baseline above is unchanged |
+| Review round trips, plan review (plan-review → plan) | 2 landings at or after the cutover, so 2 tickets read. Reached plan review 1; primary 1 of 1 (not sufficient); round trips n=1, mean 0 | `scripts/lin-4519-window-readings.mjs`, window tickets only, verdicts from records (8 verdict-record reads). Output `round-trips-window-2026-11-22.json` |
+| Review round trips, code review (review → implementation) | Same two tickets. Primary 1 of 1 (not sufficient); round trips n=1, mean 0; 1 verdict not measured | As above |
+| Review round trips, full workspace | **Not taken.** The window reading above replaces the full crawl that was cut off at 1,325 of 4,467 issues (finding-b3b544a9). A full read is still open if wanted | scripts/plan-review-round-trips.mjs |
+| Round trips, gate-due series | not measured: plan facts were not read by these readings | the reader alone would count the issues outside the window as not due |
+| Effort read-out survival (`/api/effort-readout`) against production records | **Not taken: needs the deployed build.** Production runs `9a4f3c795`, which predates this change. This is the post-deploy check of finding-2eb4b3e8 | after the merge and deploy |
+
+The window is small (two landings), so the round-trip numbers are a single measurement each and say little about the process. They are reported beside the baseline, not read as a trend.

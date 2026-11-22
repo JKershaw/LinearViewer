@@ -1,0 +1,2008 @@
+{
+ "tool": "stability-measures",
+ "repo": "/Users/autopilot/development/simple-dispatcher-workspaces/9c70e143-ae2e-4bf9-9619-3a5b39e9fed0/LinearViewer",
+ "scope": {
+  "include": "^(server\\.js$|(lib|routes|public)/.*\\.[cm]?js$)",
+  "exclude": "(^|/)node_modules/|(^|/)vendor(ed)?/|\\.min\\.js$|(^|/)(tests?|__tests__)/|\\.(test|spec)\\.|^experiments/[^/]+/replay/(pinned|work)/"
+ },
+ "inputs": {
+  "runner": null,
+  "api": "http://127.0.0.1:57884/api/proxy",
+  "lookbackDays": 3,
+  "reference": null
+ },
+ "sources": {
+  "runner": {
+   "dir": null
+  },
+  "ci": {
+   "workflow": "test.yml",
+   "branch": "main",
+   "created": "2026-11-12..2026-11-23"
+  },
+  "tracker": {
+   "readOn": "2026-11-22",
+   "lookback": {
+    "days": 3,
+    "since": "2026-11-09T21:06:21.000Z"
+   },
+   "priorLandings": 30,
+   "calls": {
+    "calls": 1300,
+    "retries429": 0,
+    "waitedMs": 1467928
+   }
+  }
+ },
+ "window": {
+  "base": "eb14b7fff9f1b0e0de623add1b1fc61fd924021a",
+  "head": "9a4f3c7952049ede578cc7fa2b65849be2a8e99f",
+  "baseDate": "2026-11-12T21:06:21Z",
+  "headDate": "2026-11-22T11:29:40Z",
+  "landings": 78
+ },
+ "measures": [
+  {
+   "rank": 1,
+   "key": "no-new-mess",
+   "title": "No new mess",
+   "rows": [
+    {
+     "key": "blind",
+     "value": {
+      "landings": 78,
+      "read": 2,
+      "verdicts": {
+       "better": 2,
+       "same": 0,
+       "worse": 0
+      },
+      "unread": {
+       "no ticket": 4,
+       "not an ordinary landing": 13,
+       "landed before the gate": 0,
+       "before the verdict records": 59,
+       "no read on record": 0
+      },
+      "gate": {
+       "commit": "eb14b7fff9f1b0e0de623add1b1fc61fd924021a",
+       "pr": 2413,
+       "mergedAt": "2026-11-12T21:06:21Z"
+      },
+      "verdictRecordsSince": "2026-11-22T04:20:39.504Z",
+      "repo": "JKershaw/LinearViewer",
+      "perLanding": [
+       {
+        "commit": "e3a3268a17609e035a64c62d52fb6f827331e90d",
+        "ticket": "LIN-4441",
+        "pr": 2414,
+        "mergedAt": "2026-11-12T21:22:35Z",
+        "status": "before the verdict records"
+       },
+       {
+        "commit": "ceda351273fb63a6e975cf589accf7b1b1c2ef45",
+        "ticket": "LIN-4424",
+        "pr": 2411,
+        "mergedAt": "2026-11-12T22:35:24Z",
+        "status": "before the verdict records"
+       },
+       {
+        "commit": "aebe6108191db720787d440e940c06cb6a00807f",
+        "ticket": "LIN-4439",
+        "pr": 2415,
+        "mergedAt": "2026-11-12T22:46:23Z",
+        "status": "before the verdict records"
+       },
+       {
+        "commit": "163efc0698934c3e8a5f3c30e48dc15b51ac3a24",
+        "ticket": "LIN-4396",
+        "pr": 2416,
+        "mergedAt": "2026-11-12T23:17:49Z",
+        "status": "before the verdict records"
+       },
+       {
+        "commit": "e2d4659c4bf07ed266735f718e85232e5f2a6458",
+        "ticket": "LIN-4442",
+        "pr": 2417,
+        "mergedAt": "2026-11-13T00:58:41Z",
+        "status": "not an ordinary landing"
+       },
+       {
+        "commit": "0072d1b78c71061b5a5674b36d4e79cb97290e72",
+        "ticket": "LIN-4443",
+        "pr": 2418,
+        "mergedAt": "2026-11-13T08:12:25Z",
+        "status": "not an ordinary landing"
+       },
+       {
+        "commit": "5e09b564340c31dda02f19a097037a1e164a5231",
+        "ticket": "LIN-4444",
+        "pr": 2419,
+        "mergedAt": "2026-11-13T08:31:33Z",
+        "status": "not an ordinary landing"
+       },
+       {
+        "commit": "4b5001ddfa185eed683ccb8b9805d493c8c380da",
+        "ticket": null,
+        "pr": 2420,
+        "mergedAt": "2026-11-13T12:01:48Z",
+        "status": "no ticket"
+       },
+       {
+        "commit": "cfd152fa477d047c670a2ab59672b8cc79d8e17b",
+        "ticket": "LIN-4453",
+        "pr": 2422,
+        "mergedAt": "2026-11-13T14:54:55Z",
+        "status": "not an ordinary landing"
+       },
+       {
+        "commit": "92676b1febeb5407878d69b5e7a8f166a9371777",
+        "ticket": "LIN-4446",
+        "pr": 2423,
+        "mergedAt": "2026-11-13T15:22:55Z",
+        "status": "before the verdict records"
+       },
+       {
+        "commit": "2bf788b6da71c82db6a1d84b361da98ef9cdedbb",
+        "ticket": "LIN-4450",
+        "pr": 2421,
+        "mergedAt": "2026-11-13T15:32:12Z",
+        "status": "before the verdict records"
+       },
+       {
+        "commit": "c205190fdd0628e36f6fcfd26fb333f66a6a6e0b",
+        "ticket": "LIN-4454",
+        "pr": 2425,
+        "mergedAt": "2026-11-13T15:39:20Z",
+        "status": "before the verdict records"
+       },
+       {
+        "commit": "5dcf5bcda359846d695ecb52a49e9b022c6ec089",
+        "ticket": "LIN-4457",
+        "pr": 2424,
+        "mergedAt": "2026-11-13T15:49:16Z",
+        "status": "before the verdict records"
+       },
+       {
+        "commit": "e8e92d50afbad748587ba0fb884cb1e57d5af49c",
+        "ticket": "LIN-4456",
+        "pr": 2426,
+        "mergedAt": "2026-11-13T15:59:05Z",
+        "status": "before the verdict records"
+       },
+       {
+        "commit": "192e1f81fa9ea13d16c3b34eab9303d4a67ebebe",
+        "ticket": "LIN-4455",
+        "pr": 2427,
+        "mergedAt": "2026-11-13T16:09:25Z",
+        "status": "before the verdict records"
+       },
+       {
+        "commit": "0092d8d9e8fef6feb878809d1a215c3e55681304",
+        "ticket": "LIN-4456",
+        "pr": 2428,
+        "mergedAt": "2026-11-13T16:19:20Z",
+        "status": "not an ordinary landing"
+       },
+       {
+        "commit": "2aab32bf03ab5ad00e0d93a7d2d8997b8e44b9d8",
+        "ticket": "LIN-4464",
+        "pr": 2430,
+        "mergedAt": "2026-11-13T16:48:24Z",
+        "status": "not an ordinary landing"
+       },
+       {
+        "commit": "c174185f64af0238ee875f66dc84d5bd43a3d758",
+        "ticket": "LIN-4459",
+        "pr": 2432,
+        "mergedAt": "2026-11-13T17:12:48Z",
+        "status": "before the verdict records"
+       },
+       {
+        "commit": "17faa83f4807ea7c8c8db52faf492607d06fdcb0",
+        "ticket": "LIN-4471",
+        "pr": 2431,
+        "mergedAt": "2026-11-13T17:13:01Z",
+        "status": "before the verdict records"
+       },
+       {
+        "commit": "904719353b71595152b24260b357c1629c80b1e1",
+        "ticket": "LIN-4451",
+        "pr": 2429,
+        "mergedAt": "2026-11-13T17:25:00Z",
+        "status": "before the verdict records"
+       },
+       {
+        "commit": "5cf4f6aa23b2483d2f8de569505dca38234319d2",
+        "ticket": "LIN-4459",
+        "pr": 2434,
+        "mergedAt": "2026-11-13T17:29:01Z",
+        "status": "not an ordinary landing"
+       },
+       {
+        "commit": "0dbf2d4eac531e6f8f85b6a129ba160ebec63110",
+        "ticket": "LIN-4458",
+        "pr": 2435,
+        "mergedAt": "2026-11-13T18:08:40Z",
+        "status": "before the verdict records"
+       },
+       {
+        "commit": "0cf05ce8f5234277e5aecde1800f50f652131e33",
+        "ticket": "LIN-4472",
+        "pr": 2436,
+        "mergedAt": "2026-11-13T18:29:57Z",
+        "status": "before the verdict records"
+       },
+       {
+        "commit": "49d4c880e000d440a49fc350bed62104b5e1c4ae",
+        "ticket": "LIN-4452",
+        "pr": 2437,
+        "mergedAt": "2026-11-13T18:40:12Z",
+        "status": "before the verdict records"
+       },
+       {
+        "commit": "091c8c934738df556b29d628f5fbb8a813330b6f",
+        "ticket": "LIN-4452",
+        "pr": 2440,
+        "mergedAt": "2026-11-13T18:54:37Z",
+        "status": "not an ordinary landing"
+       },
+       {
+        "commit": "23ebfcb4ad883b017a637fd4cb6d582239f9cc49",
+        "ticket": "LIN-4463",
+        "pr": 2439,
+        "mergedAt": "2026-11-13T19:22:53Z",
+        "status": "not an ordinary landing"
+       },
+       {
+        "commit": "d52c676fabb1623d4d65417afa3ab96e2c7448f2",
+        "ticket": "LIN-4460",
+        "pr": 2438,
+        "mergedAt": "2026-11-13T19:27:57Z",
+        "status": "before the verdict records"
+       },
+       {
+        "commit": "e666c4b609f1779efec16f507bdf47abcdb6fd05",
+        "ticket": "LIN-4465",
+        "pr": 2433,
+        "mergedAt": "2026-11-13T19:44:59Z",
+        "status": "before the verdict records"
+       },
+       {
+        "commit": "dc12ca51b2275caabda68af077b7fef98a3ed2a4",
+        "ticket": "LIN-4466",
+        "pr": 2441,
+        "mergedAt": "2026-11-13T20:42:28Z",
+        "status": "before the verdict records"
+       },
+       {
+        "commit": "b8e2a0aad2e4990524d5e7213ba48cac9c512a08",
+        "ticket": "LIN-4463",
+        "pr": 2442,
+        "mergedAt": "2026-11-13T20:55:42Z",
+        "status": "before the verdict records"
+       },
+       {
+        "commit": "8fea3869f019530c0e3ec7847e138d3b25718d98",
+        "ticket": "LIN-4467",
+        "pr": 2444,
+        "mergedAt": "2026-11-13T21:58:11Z",
+        "status": "before the verdict records"
+       },
+       {
+        "commit": "6348e57810df58682100f42cc3869d2889f40f35",
+        "ticket": "LIN-4463",
+        "pr": 2445,
+        "mergedAt": "2026-11-13T22:01:09Z",
+        "status": "before the verdict records"
+       },
+       {
+        "commit": "b937237a414ece3affc57ebaaf6273834aea85a7",
+        "ticket": "LIN-4468",
+        "pr": 2443,
+        "mergedAt": "2026-11-13T22:29:42Z",
+        "status": "before the verdict records"
+       },
+       {
+        "commit": "ca77a891e8e32f8132b9d3d0da0c860bfd0b213b",
+        "ticket": "LIN-4469",
+        "pr": 2447,
+        "mergedAt": "2026-11-13T23:51:43Z",
+        "status": "before the verdict records"
+       },
+       {
+        "commit": "302edafc3a27a8d0d64a88435766625ab8d24cb5",
+        "ticket": "LIN-4475",
+        "pr": 2448,
+        "mergedAt": "2026-11-14T00:51:43Z",
+        "status": "before the verdict records"
+       },
+       {
+        "commit": "a886fb50691383b02cd230d4dfd685aca6b4a9b4",
+        "ticket": "LIN-4462",
+        "pr": 2449,
+        "mergedAt": "2026-11-14T02:27:00Z",
+        "status": "not an ordinary landing"
+       },
+       {
+        "commit": "fb358dbda7f26ab44b3f58acb15886b21ac20950",
+        "ticket": "LIN-4470",
+        "pr": 2450,
+        "mergedAt": "2026-11-14T09:49:26Z",
+        "status": "before the verdict records"
+       },
+       {
+        "commit": "06a7da871be73dd60e857b11f849dcbb6236360c",
+        "ticket": "LIN-4448",
+        "pr": 2457,
+        "mergedAt": "2026-11-14T10:52:31Z",
+        "status": "before the verdict records"
+       },
+       {
+        "commit": "0a1adcf9bedb859ffefc1859a411dc721771826a",
+        "ticket": "LIN-4482",
+        "pr": 2454,
+        "mergedAt": "2026-11-14T11:00:30Z",
+        "status": "not an ordinary landing"
+       },
+       {
+        "commit": "f0d19bdf1114d60908c5073d6bc941a965a4c114",
+        "ticket": "LIN-4481",
+        "pr": 2455,
+        "mergedAt": "2026-11-14T11:09:39Z",
+        "status": "not an ordinary landing"
+       },
+       {
+        "commit": "2c58c6517d7722b89b2280858ef443081c2ea067",
+        "ticket": "LIN-4483",
+        "pr": 2456,
+        "mergedAt": "2026-11-14T11:20:32Z",
+        "status": "not an ordinary landing"
+       },
+       {
+        "commit": "8fe48492932ff83e9a79f19c6fa7c2d72e854e46",
+        "ticket": "LIN-4478",
+        "pr": 2451,
+        "mergedAt": "2026-11-14T12:00:27Z",
+        "status": "before the verdict records"
+       },
+       {
+        "commit": "5f6de1eb78bd76cbe1c573ddb8a3e750be2c5681",
+        "ticket": "LIN-4479",
+        "pr": 2452,
+        "mergedAt": "2026-11-14T12:48:50Z",
+        "status": "before the verdict records"
+       },
+       {
+        "commit": "993f618bcd1d85d3466eceb3ee755383a3675bfb",
+        "ticket": "LIN-4480",
+        "pr": 2453,
+        "mergedAt": "2026-11-14T12:56:26Z",
+        "status": "before the verdict records"
+       },
+       {
+        "commit": "af0e2d5c9c072eae3796c3e2c3f8d348956f247d",
+        "ticket": "LIN-4485",
+        "pr": 2458,
+        "mergedAt": "2026-11-14T13:50:45Z",
+        "status": "before the verdict records"
+       },
+       {
+        "commit": "160f9b99565f5af306e3da526b1a2ab732608f40",
+        "ticket": "LIN-4484",
+        "pr": 2459,
+        "mergedAt": "2026-11-14T14:03:49Z",
+        "status": "before the verdict records"
+       },
+       {
+        "commit": "6f6c5d2e26b58db9c2b662f110f6f2ba053b03b0",
+        "ticket": "LIN-4486",
+        "pr": 2460,
+        "mergedAt": "2026-11-14T14:14:38Z",
+        "status": "before the verdict records"
+       },
+       {
+        "commit": "68b5d8f3a8c6ee3d4d3dfea87a705d703c7a0192",
+        "ticket": "LIN-4487",
+        "pr": 2461,
+        "mergedAt": "2026-11-18T14:10:42Z",
+        "status": "before the verdict records"
+       },
+       {
+        "commit": "945defb09efa818575f17d54f829f6ecd3def0dd",
+        "ticket": "LIN-4489",
+        "pr": 2462,
+        "mergedAt": "2026-11-19T11:21:20Z",
+        "status": "before the verdict records"
+       },
+       {
+        "commit": "bf2d1575ff19cce99fefa0307b556d0a3f625726",
+        "ticket": null,
+        "pr": 2463,
+        "mergedAt": "2026-11-19T11:45:42Z",
+        "status": "no ticket"
+       },
+       {
+        "commit": "079f0b6ff06f96eca753514a8b6509727088a30c",
+        "ticket": "LIN-4492",
+        "pr": 2464,
+        "mergedAt": "2026-11-19T13:43:46Z",
+        "status": "before the verdict records"
+       },
+       {
+        "commit": "a475c464ffdae9abc11fb4a342b4b97c7616068f",
+        "ticket": "LIN-4493",
+        "pr": 2465,
+        "mergedAt": "2026-11-19T16:24:20Z",
+        "status": "before the verdict records"
+       },
+       {
+        "commit": "2024de6208900cebd3da7d53a8bf788b1c6a1864",
+        "ticket": "LIN-4497",
+        "pr": 2466,
+        "mergedAt": "2026-11-19T16:37:41Z",
+        "status": "before the verdict records"
+       },
+       {
+        "commit": "4f6fe01a2c0737647bac2dc6b2f4993175a05953",
+        "ticket": "LIN-4494",
+        "pr": 2467,
+        "mergedAt": "2026-11-19T18:28:10Z",
+        "status": "before the verdict records"
+       },
+       {
+        "commit": "e942c1031d4dd74ed2acf19bab784592406a5df0",
+        "ticket": "LIN-4495",
+        "pr": 2468,
+        "mergedAt": "2026-11-19T21:26:52Z",
+        "status": "before the verdict records"
+       },
+       {
+        "commit": "0d56aabdfced1257ed38da656dbe25096980d9c5",
+        "ticket": "LIN-4496",
+        "pr": 2469,
+        "mergedAt": "2026-11-20T01:19:10Z",
+        "status": "before the verdict records"
+       },
+       {
+        "commit": "e44a842d16ffba258c5354580420b583d39f4e14",
+        "ticket": "LIN-4491",
+        "pr": 2470,
+        "mergedAt": "2026-11-20T01:50:50Z",
+        "status": "before the verdict records"
+       },
+       {
+        "commit": "df1e8ef3c4ddaa8afdf21ff109f2f9d3840cdf35",
+        "ticket": "LIN-4500",
+        "pr": 2471,
+        "mergedAt": "2026-11-20T09:35:54Z",
+        "status": "before the verdict records"
+       },
+       {
+        "commit": "c08a9a898931902db808422b605b9ac79faaed3e",
+        "ticket": "LIN-4503",
+        "pr": 2473,
+        "mergedAt": "2026-11-20T12:28:55Z",
+        "status": "before the verdict records"
+       },
+       {
+        "commit": "3002092e5c9e38f2fcf45d22e97e54e3d2be0024",
+        "ticket": "LIN-4505",
+        "pr": 2474,
+        "mergedAt": "2026-11-20T13:49:57Z",
+        "status": "before the verdict records"
+       },
+       {
+        "commit": "09512c620f15c29fc948a71380551a212ed993c1",
+        "ticket": "LIN-4501",
+        "pr": 2472,
+        "mergedAt": "2026-11-20T15:02:33Z",
+        "status": "before the verdict records"
+       },
+       {
+        "commit": "9e562cfc3ed1fd357272c22f783cb7a72ce38a75",
+        "ticket": "LIN-4502",
+        "pr": 2475,
+        "mergedAt": "2026-11-20T17:02:58Z",
+        "status": "before the verdict records"
+       },
+       {
+        "commit": "ebc89d7e70d8e887798e5ad7bf33fe951b91a872",
+        "ticket": "LIN-4504",
+        "pr": 2476,
+        "mergedAt": "2026-11-20T20:48:24Z",
+        "status": "before the verdict records"
+       },
+       {
+        "commit": "3bccb8aa8e6c1eb8f1b498f57b4a1412973ed42b",
+        "ticket": "LIN-4506",
+        "pr": 2477,
+        "mergedAt": "2026-11-20T21:55:22Z",
+        "status": "before the verdict records"
+       },
+       {
+        "commit": "bc0535b5cf41a6942568b5614f7f27b1fbfc9389",
+        "ticket": "LIN-4499",
+        "pr": 2478,
+        "mergedAt": "2026-11-20T23:04:07Z",
+        "status": "before the verdict records"
+       },
+       {
+        "commit": "9b4d2274a78dcf173a2cfcf4e67f8682f1429c93",
+        "ticket": "LIN-4514",
+        "pr": 2480,
+        "mergedAt": "2026-11-21T01:52:19Z",
+        "status": "before the verdict records"
+       },
+       {
+        "commit": "69b10fde9b35ce636519e27a2a5eb46b77b218f7",
+        "ticket": "LIN-4515",
+        "pr": 2479,
+        "mergedAt": "2026-11-21T02:01:16Z",
+        "status": "before the verdict records"
+       },
+       {
+        "commit": "110b879890d3a1be2d4fc21c0e960eb94435b7e0",
+        "ticket": "LIN-4516",
+        "pr": 2481,
+        "mergedAt": "2026-11-21T03:24:45Z",
+        "status": "before the verdict records"
+       },
+       {
+        "commit": "75b0eea9517a962cc2fc0da5517e0db29ef7cdde",
+        "ticket": "LIN-4517",
+        "pr": 2482,
+        "mergedAt": "2026-11-21T08:36:24Z",
+        "status": "before the verdict records"
+       },
+       {
+        "commit": "2994d1247be05179f27e1c33b7b7abe27a7633e6",
+        "ticket": null,
+        "pr": 2485,
+        "mergedAt": "2026-11-21T21:01:33Z",
+        "status": "no ticket"
+       },
+       {
+        "commit": "815daa34579797a6dd0de56b3a16ff7ef8936526",
+        "ticket": null,
+        "pr": 2486,
+        "mergedAt": "2026-11-21T21:11:10Z",
+        "status": "no ticket"
+       },
+       {
+        "commit": "3df770e92c7b704c0e92a6aa219e94216ae3feec",
+        "ticket": "LIN-4527",
+        "pr": 2487,
+        "mergedAt": "2026-11-21T23:53:37Z",
+        "status": "before the verdict records"
+       },
+       {
+        "commit": "96be514e23c95d00d0feb89a50fc0a5ab8744b4f",
+        "ticket": "LIN-4518",
+        "pr": 2488,
+        "mergedAt": "2026-11-22T01:13:35Z",
+        "status": "before the verdict records"
+       },
+       {
+        "commit": "04769b666cdccdd56d79ea992540270f48b50798",
+        "ticket": "LIN-4518",
+        "pr": 2489,
+        "mergedAt": "2026-11-22T01:42:55Z",
+        "status": "before the verdict records"
+       },
+       {
+        "commit": "7d54b0eed72701ff38c3136faac450e95d27c9e5",
+        "ticket": "LIN-4518",
+        "pr": 2490,
+        "mergedAt": "2026-11-22T03:02:31Z",
+        "status": "before the verdict records"
+       },
+       {
+        "commit": "d9c0e9ebaa5fcb12f48154e76356ccf7ea180397",
+        "ticket": "LIN-4518",
+        "pr": 2491,
+        "mergedAt": "2026-11-22T04:14:35Z",
+        "status": "before the verdict records"
+       },
+       {
+        "commit": "f513b28f3784d287b55a9fd278c5c7e5fb6d66d4",
+        "ticket": "LIN-4528",
+        "pr": 2493,
+        "mergedAt": "2026-11-22T09:52:21Z",
+        "status": "read",
+        "verdict": "better",
+        "readAt": "2026-11-22T09:40:46.465Z",
+        "verdictId": "verdict-81fd1daa",
+        "prUrl": "https://github.com/JKershaw/LinearViewer/pull/2493"
+       },
+       {
+        "commit": "9a4f3c7952049ede578cc7fa2b65849be2a8e99f",
+        "ticket": "LIN-4518",
+        "pr": 2492,
+        "mergedAt": "2026-11-22T11:29:40Z",
+        "status": "read",
+        "verdict": "better",
+        "readAt": "2026-11-22T11:16:07.899Z",
+        "verdictId": "verdict-166c2630",
+        "prUrl": "https://github.com/JKershaw/LinearViewer/pull/2492"
+       }
+      ]
+     },
+     "reference": null,
+     "status": "partial",
+     "reason": "59 landing(s) merged before the verdict records began (2026-11-22T04:20:39.504Z), not read from them",
+     "unreadable": 59
+    }
+   ]
+  },
+  {
+   "rank": 2,
+   "key": "curve",
+   "title": "The curve",
+   "rows": [
+    {
+     "key": "lines",
+     "value": {
+      "base": {
+       "code": 111241,
+       "comment": 83064,
+       "blank": 14737,
+       "total": 209042,
+       "commentShare": 39.74
+      },
+      "head": {
+       "code": 113878,
+       "comment": 85038,
+       "blank": 15066,
+       "total": 213982,
+       "commentShare": 39.74
+      },
+      "net": {
+       "total": 4940,
+       "code": 2637,
+       "comment": 1974,
+       "blank": 329
+      },
+      "perLanding": {
+       "total": 63.3,
+       "code": 33.8,
+       "comment": 25.3,
+       "blank": 4.2
+      }
+     },
+     "reference": null,
+     "status": "measured",
+     "reason": null,
+     "unreadable": 0
+    },
+    {
+     "key": "churn",
+     "value": {
+      "landings": 78,
+      "added": 17536,
+      "deleted": 12596,
+      "net": 4940,
+      "perLanding": {
+       "added": 224.8,
+       "deleted": 161.5,
+       "net": 63.3
+      },
+      "deletedPerAdded": 0.72
+     },
+     "reference": null,
+     "status": "measured",
+     "reason": null,
+     "unreadable": 0
+    },
+    {
+     "key": "ci",
+     "value": {
+      "medianMinutes": 5.85,
+      "runs": 77,
+      "landingsWithRun": 77,
+      "landings": 78,
+      "listingCapped": false
+     },
+     "reference": null,
+     "status": "partial",
+     "reason": "1 landing(s) have no successful run",
+     "unreadable": 1
+    },
+    {
+     "key": "waiting.harbour",
+     "value": {
+      "base": 91,
+      "head": 212,
+      "change": 121,
+      "perLanding": 1.55
+     },
+     "reference": null,
+     "status": "measured",
+     "reason": null,
+     "unreadable": 0
+    },
+    {
+     "key": "waiting.runner",
+     "value": null,
+     "reference": null,
+     "status": "not measured",
+     "reason": "no --runner given",
+     "unreadable": null
+    },
+    {
+     "key": "waiting.total",
+     "value": null,
+     "reference": null,
+     "status": "not measured",
+     "reason": "waiting.runner not measured",
+     "unreadable": null
+    },
+    {
+     "key": "minted",
+     "value": {
+      "label": "ID-span estimate",
+      "base": "LIN-4441",
+      "head": "LIN-4528",
+      "span": 87,
+      "perLanding": 1.12,
+      "bracket": "LIN-4528",
+      "headAtBracket": true,
+      "probes": {
+       "base": [
+        4528,
+        2264,
+        3396,
+        3962,
+        4245,
+        4386,
+        4457,
+        4421,
+        4439,
+        4448,
+        4443,
+        4441,
+        4442
+       ],
+       "head": [
+        4528
+       ],
+       "detail": [
+        {
+         "n": 4528,
+         "status": "ok",
+         "createdAt": "2026-11-22T08:49:59.463Z"
+        },
+        {
+         "n": 2264,
+         "status": "ok",
+         "createdAt": "2026-08-24T18:30:19.910Z"
+        },
+        {
+         "n": 3396,
+         "status": "ok",
+         "createdAt": "2026-10-08T21:58:39.513Z"
+        },
+        {
+         "n": 3962,
+         "status": "ok",
+         "createdAt": "2026-10-25T17:17:27.811Z"
+        },
+        {
+         "n": 4245,
+         "status": "ok",
+         "createdAt": "2026-11-05T00:10:45.168Z"
+        },
+        {
+         "n": 4386,
+         "status": "ok",
+         "createdAt": "2026-11-08T11:22:24.947Z"
+        },
+        {
+         "n": 4457,
+         "status": "ok",
+         "createdAt": "2026-11-13T14:01:56.961Z"
+        },
+        {
+         "n": 4421,
+         "status": "ok",
+         "createdAt": "2026-11-12T07:39:04.737Z"
+        },
+        {
+         "n": 4439,
+         "status": "ok",
+         "createdAt": "2026-11-12T16:26:15.515Z"
+        },
+        {
+         "n": 4448,
+         "status": "ok",
+         "createdAt": "2026-11-13T12:08:14.585Z"
+        },
+        {
+         "n": 4443,
+         "status": "ok",
+         "createdAt": "2026-11-13T07:28:14.526Z"
+        },
+        {
+         "n": 4441,
+         "status": "ok",
+         "createdAt": "2026-11-12T20:02:47.016Z"
+        },
+        {
+         "n": 4442,
+         "status": "ok",
+         "createdAt": "2026-11-12T22:51:11.223Z"
+        },
+        {
+         "n": 4528,
+         "status": "ok",
+         "createdAt": "2026-11-22T08:49:59.463Z"
+        }
+       ]
+      }
+     },
+     "reference": null,
+     "status": "measured",
+     "reason": null,
+     "unreadable": 0
+    }
+   ]
+  },
+  {
+   "rank": 3,
+   "key": "speed",
+   "title": "Speed",
+   "rows": [
+    {
+     "key": "tasks",
+     "value": {
+      "finished": 54,
+      "finishedLandedBefore": 1,
+      "windowTickets": 65,
+      "landedUnfinished": 11,
+      "landedDoneOutside": 1,
+      "unownedLandings": 4,
+      "lookback": {
+       "days": 3,
+       "since": "2026-11-09T21:06:21.000Z"
+      },
+      "ids": {
+       "finished": [
+        "LIN-4396",
+        "LIN-4424",
+        "LIN-4438",
+        "LIN-4439",
+        "LIN-4442",
+        "LIN-4443",
+        "LIN-4444",
+        "LIN-4446",
+        "LIN-4448",
+        "LIN-4450",
+        "LIN-4451",
+        "LIN-4453",
+        "LIN-4454",
+        "LIN-4455",
+        "LIN-4456",
+        "LIN-4457",
+        "LIN-4458",
+        "LIN-4459",
+        "LIN-4460",
+        "LIN-4462",
+        "LIN-4464",
+        "LIN-4465",
+        "LIN-4466",
+        "LIN-4467",
+        "LIN-4468",
+        "LIN-4469",
+        "LIN-4470",
+        "LIN-4471",
+        "LIN-4472",
+        "LIN-4475",
+        "LIN-4481",
+        "LIN-4482",
+        "LIN-4483",
+        "LIN-4487",
+        "LIN-4492",
+        "LIN-4493",
+        "LIN-4494",
+        "LIN-4495",
+        "LIN-4496",
+        "LIN-4497",
+        "LIN-4499",
+        "LIN-4500",
+        "LIN-4501",
+        "LIN-4502",
+        "LIN-4503",
+        "LIN-4504",
+        "LIN-4505",
+        "LIN-4506",
+        "LIN-4514",
+        "LIN-4515",
+        "LIN-4516",
+        "LIN-4517",
+        "LIN-4527",
+        "LIN-4528"
+       ],
+       "landedUnfinished": [
+        {
+         "id": "LIN-4441",
+         "state": "In Progress"
+        },
+        {
+         "id": "LIN-4452",
+         "state": "In Progress"
+        },
+        {
+         "id": "LIN-4463",
+         "state": "In Progress"
+        },
+        {
+         "id": "LIN-4478",
+         "state": "In Progress"
+        },
+        {
+         "id": "LIN-4479",
+         "state": "In Progress"
+        },
+        {
+         "id": "LIN-4480",
+         "state": "In Progress"
+        },
+        {
+         "id": "LIN-4484",
+         "state": "In Progress"
+        },
+        {
+         "id": "LIN-4485",
+         "state": "In Progress"
+        },
+        {
+         "id": "LIN-4486",
+         "state": "In Progress"
+        },
+        {
+         "id": "LIN-4489",
+         "state": "Backlog"
+        },
+        {
+         "id": "LIN-4491",
+         "state": "In Progress"
+        }
+       ],
+       "landedDoneOutside": [
+        {
+         "id": "LIN-4518",
+         "completedAt": "2026-11-22T11:37:41.588Z"
+        }
+       ],
+       "unreadable": [],
+       "unownedLandings": [
+        "815daa34579797a6dd0de56b3a16ff7ef8936526",
+        "2994d1247be05179f27e1c33b7b7abe27a7633e6",
+        "bf2d1575ff19cce99fefa0307b556d0a3f625726",
+        "4b5001ddfa185eed683ccb8b9805d493c8c380da"
+       ]
+      }
+     },
+     "reference": null,
+     "status": "measured",
+     "reason": null,
+     "unreadable": 0
+    },
+    {
+     "key": "speed",
+     "value": {
+      "tasks": 54,
+      "read": 54,
+      "medianMinutes": 79.6,
+      "meanMinutes": 159.4,
+      "medianSessions": 8,
+      "meanSessions": 8.31,
+      "perTask": [
+       {
+        "id": "LIN-4396",
+        "minutes": 468.2,
+        "sessions": 14
+       },
+       {
+        "id": "LIN-4424",
+        "minutes": 212.2,
+        "sessions": 7
+       },
+       {
+        "id": "LIN-4438",
+        "minutes": 86.5,
+        "sessions": 6
+       },
+       {
+        "id": "LIN-4439",
+        "minutes": 89,
+        "sessions": 4
+       },
+       {
+        "id": "LIN-4442",
+        "minutes": 69.5,
+        "sessions": 7
+       },
+       {
+        "id": "LIN-4443",
+        "minutes": 44.1,
+        "sessions": 6
+       },
+       {
+        "id": "LIN-4444",
+        "minutes": 62.8,
+        "sessions": 8
+       },
+       {
+        "id": "LIN-4446",
+        "minutes": 131.4,
+        "sessions": 12
+       },
+       {
+        "id": "LIN-4448",
+        "minutes": 1298.9,
+        "sessions": 11
+       },
+       {
+        "id": "LIN-4450",
+        "minutes": 107.3,
+        "sessions": 7
+       },
+       {
+        "id": "LIN-4451",
+        "minutes": 103.6,
+        "sessions": 7
+       },
+       {
+        "id": "LIN-4453",
+        "minutes": 51.4,
+        "sessions": 8
+       },
+       {
+        "id": "LIN-4454",
+        "minutes": 42.1,
+        "sessions": 8
+       },
+       {
+        "id": "LIN-4455",
+        "minutes": 72.1,
+        "sessions": 8
+       },
+       {
+        "id": "LIN-4456",
+        "minutes": 82,
+        "sessions": 9
+       },
+       {
+        "id": "LIN-4457",
+        "minutes": 52,
+        "sessions": 8
+       },
+       {
+        "id": "LIN-4458",
+        "minutes": 106.7,
+        "sessions": 8
+       },
+       {
+        "id": "LIN-4459",
+        "minutes": 67,
+        "sessions": 8
+       },
+       {
+        "id": "LIN-4460",
+        "minutes": 69.5,
+        "sessions": 9
+       },
+       {
+        "id": "LIN-4462",
+        "minutes": 37.1,
+        "sessions": 8
+       },
+       {
+        "id": "LIN-4464",
+        "minutes": 51.9,
+        "sessions": 7
+       },
+       {
+        "id": "LIN-4465",
+        "minutes": 175.2,
+        "sessions": 7
+       },
+       {
+        "id": "LIN-4466",
+        "minutes": 49.9,
+        "sessions": 7
+       },
+       {
+        "id": "LIN-4467",
+        "minutes": 74,
+        "sessions": 7
+       },
+       {
+        "id": "LIN-4468",
+        "minutes": 115,
+        "sessions": 10
+       },
+       {
+        "id": "LIN-4469",
+        "minutes": 72.4,
+        "sessions": 6
+       },
+       {
+        "id": "LIN-4470",
+        "minutes": 588.4,
+        "sessions": 7
+       },
+       {
+        "id": "LIN-4471",
+        "minutes": 66.7,
+        "sessions": 7
+       },
+       {
+        "id": "LIN-4472",
+        "minutes": 67.3,
+        "sessions": 7
+       },
+       {
+        "id": "LIN-4475",
+        "minutes": 103.3,
+        "sessions": 8
+       },
+       {
+        "id": "LIN-4481",
+        "minutes": 67.9,
+        "sessions": 6
+       },
+       {
+        "id": "LIN-4482",
+        "minutes": 57.5,
+        "sessions": 6
+       },
+       {
+        "id": "LIN-4483",
+        "minutes": 77.2,
+        "sessions": 10
+       },
+       {
+        "id": "LIN-4487",
+        "minutes": 44.6,
+        "sessions": 9
+       },
+       {
+        "id": "LIN-4492",
+        "minutes": 67,
+        "sessions": 7
+       },
+       {
+        "id": "LIN-4493",
+        "minutes": 152,
+        "sessions": 10
+       },
+       {
+        "id": "LIN-4494",
+        "minutes": 114.4,
+        "sessions": 9
+       },
+       {
+        "id": "LIN-4495",
+        "minutes": 170.3,
+        "sessions": 9
+       },
+       {
+        "id": "LIN-4496",
+        "minutes": 137.6,
+        "sessions": 13
+       },
+       {
+        "id": "LIN-4497",
+        "minutes": 82.3,
+        "sessions": 13
+       },
+       {
+        "id": "LIN-4499",
+        "minutes": 1286.9,
+        "sessions": 13
+       },
+       {
+        "id": "LIN-4500",
+        "minutes": 61.9,
+        "sessions": 9
+       },
+       {
+        "id": "LIN-4501",
+        "minutes": 240.5,
+        "sessions": 8
+       },
+       {
+        "id": "LIN-4502",
+        "minutes": 110.7,
+        "sessions": 9
+       },
+       {
+        "id": "LIN-4503",
+        "minutes": 86.8,
+        "sessions": 8
+       },
+       {
+        "id": "LIN-4504",
+        "minutes": 336.1,
+        "sessions": 13
+       },
+       {
+        "id": "LIN-4505",
+        "minutes": 167.8,
+        "sessions": 8
+       },
+       {
+        "id": "LIN-4506",
+        "minutes": 47.5,
+        "sessions": 10
+       },
+       {
+        "id": "LIN-4514",
+        "minutes": 55,
+        "sessions": 5
+       },
+       {
+        "id": "LIN-4515",
+        "minutes": 63.9,
+        "sessions": 5
+       },
+       {
+        "id": "LIN-4516",
+        "minutes": 73.5,
+        "sessions": 5
+       },
+       {
+        "id": "LIN-4517",
+        "minutes": 302.1,
+        "sessions": 7
+       },
+       {
+        "id": "LIN-4527",
+        "minutes": 121.8,
+        "sessions": 10
+       },
+       {
+        "id": "LIN-4528",
+        "minutes": 62.3,
+        "sessions": 11
+       }
+      ]
+     },
+     "reference": null,
+     "status": "measured",
+     "reason": null,
+     "unreadable": 0
+    }
+   ]
+  },
+  {
+   "rank": 4,
+   "key": "seat",
+   "title": "The person's seat",
+   "rows": [
+    {
+     "key": "rulings",
+     "value": {
+      "label": "loop rulings only",
+      "finished": 54,
+      "raised": 28,
+      "perFinishedTask": 0.52,
+      "tasksWithRuling": 16,
+      "outcomes": {
+       "answered": 23,
+       "dismissed": 1,
+       "withdrawn": 4,
+       "self-resolved": 0,
+       "unknown": 0,
+       "open": 0
+      },
+      "answeredShare": 95.8,
+      "rules": {
+       "raised": "distinct decisions: a re-ask in one lineage collapses into one ruling row",
+       "answeredShare": "answered / (answered + dismissed), as lib/escalation-kpis.js; withdrawn and self-resolved are neither; a null outcome is unreadable"
+      },
+      "notRead": [
+       "answered task-bound rulings (anchor.taskDecisionId): no proxy read returns them",
+       "rulings anchored on a parent or another unfinished ticket are not counted against a finished task (15 on a finished task's parent)"
+      ],
+      "onParents": 15,
+      "perTaskCounts": {
+       "LIN-4528": 1,
+       "LIN-4516": 1,
+       "LIN-4499": 5,
+       "LIN-4504": 3,
+       "LIN-4501": 1,
+       "LIN-4505": 1,
+       "LIN-4493": 1,
+       "LIN-4497": 2,
+       "LIN-4448": 5,
+       "LIN-4469": 1,
+       "LIN-4468": 1,
+       "LIN-4460": 1,
+       "LIN-4472": 1,
+       "LIN-4456": 1,
+       "LIN-4443": 1,
+       "LIN-4396": 2
+      }
+     },
+     "reference": null,
+     "status": "measured",
+     "reason": null,
+     "unreadable": 0
+    },
+    {
+     "key": "origin",
+     "value": null,
+     "reference": null,
+     "status": "not measured",
+     "reason": "dispatchedBy is the workspace account for autopilot and person alike",
+     "unreadable": null
+    },
+    {
+     "key": "operator-free",
+     "value": {
+      "label": "upper bound",
+      "conditions": [
+       "no loop ruling",
+       "no [blocked] marker in any lineage member's feedback",
+       "no dispatch row closed with closedReason 'operator'"
+      ],
+      "missingCondition": "no person-started dispatch (not measured: dispatchedBy is the workspace account for autopilot and person alike)",
+      "caveats": [
+       "rulings not read (answered task-bound, parent-anchored) can only lower the true share",
+       "closedReason 'operator' is a catch-all for any close outside handed-on, lineage-terminal and ticket-closed (bulk fossil passes included), so it may count tasks no person touched and push the share down"
+      ],
+      "tasks": 54,
+      "read": 54,
+      "operatorFree": 36,
+      "share": 66.7,
+      "failing": {
+       "ruling": 16,
+       "blocked": 11,
+       "operatorClosed": 0
+      },
+      "rootOnlyLineages": 0,
+      "perTask": [
+       {
+        "id": "LIN-4396",
+        "ruling": true,
+        "blocked": true,
+        "operatorClosed": false,
+        "free": false
+       },
+       {
+        "id": "LIN-4424",
+        "ruling": false,
+        "blocked": false,
+        "operatorClosed": false,
+        "free": true
+       },
+       {
+        "id": "LIN-4438",
+        "ruling": false,
+        "blocked": false,
+        "operatorClosed": false,
+        "free": true
+       },
+       {
+        "id": "LIN-4439",
+        "ruling": false,
+        "blocked": false,
+        "operatorClosed": false,
+        "free": true
+       },
+       {
+        "id": "LIN-4442",
+        "ruling": false,
+        "blocked": false,
+        "operatorClosed": false,
+        "free": true
+       },
+       {
+        "id": "LIN-4443",
+        "ruling": true,
+        "blocked": false,
+        "operatorClosed": false,
+        "free": false
+       },
+       {
+        "id": "LIN-4444",
+        "ruling": false,
+        "blocked": false,
+        "operatorClosed": false,
+        "free": true
+       },
+       {
+        "id": "LIN-4446",
+        "ruling": false,
+        "blocked": false,
+        "operatorClosed": false,
+        "free": true
+       },
+       {
+        "id": "LIN-4448",
+        "ruling": true,
+        "blocked": true,
+        "operatorClosed": false,
+        "free": false
+       },
+       {
+        "id": "LIN-4450",
+        "ruling": false,
+        "blocked": false,
+        "operatorClosed": false,
+        "free": true
+       },
+       {
+        "id": "LIN-4451",
+        "ruling": false,
+        "blocked": false,
+        "operatorClosed": false,
+        "free": true
+       },
+       {
+        "id": "LIN-4453",
+        "ruling": false,
+        "blocked": false,
+        "operatorClosed": false,
+        "free": true
+       },
+       {
+        "id": "LIN-4454",
+        "ruling": false,
+        "blocked": false,
+        "operatorClosed": false,
+        "free": true
+       },
+       {
+        "id": "LIN-4455",
+        "ruling": false,
+        "blocked": false,
+        "operatorClosed": false,
+        "free": true
+       },
+       {
+        "id": "LIN-4456",
+        "ruling": true,
+        "blocked": true,
+        "operatorClosed": false,
+        "free": false
+       },
+       {
+        "id": "LIN-4457",
+        "ruling": false,
+        "blocked": false,
+        "operatorClosed": false,
+        "free": true
+       },
+       {
+        "id": "LIN-4458",
+        "ruling": false,
+        "blocked": false,
+        "operatorClosed": false,
+        "free": true
+       },
+       {
+        "id": "LIN-4459",
+        "ruling": false,
+        "blocked": false,
+        "operatorClosed": false,
+        "free": true
+       },
+       {
+        "id": "LIN-4460",
+        "ruling": true,
+        "blocked": false,
+        "operatorClosed": false,
+        "free": false
+       },
+       {
+        "id": "LIN-4462",
+        "ruling": false,
+        "blocked": false,
+        "operatorClosed": false,
+        "free": true
+       },
+       {
+        "id": "LIN-4464",
+        "ruling": false,
+        "blocked": false,
+        "operatorClosed": false,
+        "free": true
+       },
+       {
+        "id": "LIN-4465",
+        "ruling": false,
+        "blocked": false,
+        "operatorClosed": false,
+        "free": true
+       },
+       {
+        "id": "LIN-4466",
+        "ruling": false,
+        "blocked": false,
+        "operatorClosed": false,
+        "free": true
+       },
+       {
+        "id": "LIN-4467",
+        "ruling": false,
+        "blocked": false,
+        "operatorClosed": false,
+        "free": true
+       },
+       {
+        "id": "LIN-4468",
+        "ruling": true,
+        "blocked": false,
+        "operatorClosed": false,
+        "free": false
+       },
+       {
+        "id": "LIN-4469",
+        "ruling": true,
+        "blocked": true,
+        "operatorClosed": false,
+        "free": false
+       },
+       {
+        "id": "LIN-4470",
+        "ruling": false,
+        "blocked": false,
+        "operatorClosed": false,
+        "free": true
+       },
+       {
+        "id": "LIN-4471",
+        "ruling": false,
+        "blocked": false,
+        "operatorClosed": false,
+        "free": true
+       },
+       {
+        "id": "LIN-4472",
+        "ruling": true,
+        "blocked": false,
+        "operatorClosed": false,
+        "free": false
+       },
+       {
+        "id": "LIN-4475",
+        "ruling": false,
+        "blocked": false,
+        "operatorClosed": false,
+        "free": true
+       },
+       {
+        "id": "LIN-4481",
+        "ruling": false,
+        "blocked": false,
+        "operatorClosed": false,
+        "free": true
+       },
+       {
+        "id": "LIN-4482",
+        "ruling": false,
+        "blocked": false,
+        "operatorClosed": false,
+        "free": true
+       },
+       {
+        "id": "LIN-4483",
+        "ruling": false,
+        "blocked": false,
+        "operatorClosed": false,
+        "free": true
+       },
+       {
+        "id": "LIN-4487",
+        "ruling": false,
+        "blocked": false,
+        "operatorClosed": false,
+        "free": true
+       },
+       {
+        "id": "LIN-4492",
+        "ruling": false,
+        "blocked": false,
+        "operatorClosed": false,
+        "free": true
+       },
+       {
+        "id": "LIN-4493",
+        "ruling": true,
+        "blocked": false,
+        "operatorClosed": false,
+        "free": false
+       },
+       {
+        "id": "LIN-4494",
+        "ruling": false,
+        "blocked": false,
+        "operatorClosed": false,
+        "free": true
+       },
+       {
+        "id": "LIN-4495",
+        "ruling": false,
+        "blocked": true,
+        "operatorClosed": false,
+        "free": false
+       },
+       {
+        "id": "LIN-4496",
+        "ruling": false,
+        "blocked": true,
+        "operatorClosed": false,
+        "free": false
+       },
+       {
+        "id": "LIN-4497",
+        "ruling": true,
+        "blocked": false,
+        "operatorClosed": false,
+        "free": false
+       },
+       {
+        "id": "LIN-4499",
+        "ruling": true,
+        "blocked": true,
+        "operatorClosed": false,
+        "free": false
+       },
+       {
+        "id": "LIN-4500",
+        "ruling": false,
+        "blocked": false,
+        "operatorClosed": false,
+        "free": true
+       },
+       {
+        "id": "LIN-4501",
+        "ruling": true,
+        "blocked": true,
+        "operatorClosed": false,
+        "free": false
+       },
+       {
+        "id": "LIN-4502",
+        "ruling": false,
+        "blocked": false,
+        "operatorClosed": false,
+        "free": true
+       },
+       {
+        "id": "LIN-4503",
+        "ruling": false,
+        "blocked": false,
+        "operatorClosed": false,
+        "free": true
+       },
+       {
+        "id": "LIN-4504",
+        "ruling": true,
+        "blocked": true,
+        "operatorClosed": false,
+        "free": false
+       },
+       {
+        "id": "LIN-4505",
+        "ruling": true,
+        "blocked": true,
+        "operatorClosed": false,
+        "free": false
+       },
+       {
+        "id": "LIN-4506",
+        "ruling": false,
+        "blocked": false,
+        "operatorClosed": false,
+        "free": true
+       },
+       {
+        "id": "LIN-4514",
+        "ruling": false,
+        "blocked": false,
+        "operatorClosed": false,
+        "free": true
+       },
+       {
+        "id": "LIN-4515",
+        "ruling": false,
+        "blocked": false,
+        "operatorClosed": false,
+        "free": true
+       },
+       {
+        "id": "LIN-4516",
+        "ruling": true,
+        "blocked": false,
+        "operatorClosed": false,
+        "free": false
+       },
+       {
+        "id": "LIN-4517",
+        "ruling": false,
+        "blocked": false,
+        "operatorClosed": false,
+        "free": true
+       },
+       {
+        "id": "LIN-4527",
+        "ruling": false,
+        "blocked": false,
+        "operatorClosed": false,
+        "free": true
+       },
+       {
+        "id": "LIN-4528",
+        "ruling": true,
+        "blocked": true,
+        "operatorClosed": false,
+        "free": false
+       }
+      ]
+     },
+     "reference": null,
+     "status": "measured",
+     "reason": null,
+     "unreadable": 0
+    }
+   ]
+  },
+  {
+   "rank": 5,
+   "key": "cost",
+   "title": "Cost per finished task",
+   "rows": [
+    {
+     "key": "cost",
+     "value": {
+      "tasks": 54,
+      "priced": 54,
+      "medianUsd": 18.02,
+      "meanUsd": 21.63,
+      "nullTotal": {
+       "unpriced": 0,
+       "noTelemetry": 0,
+       "unreadable": 0,
+       "noLineage": 0,
+       "other": 0
+      },
+      "readFailures": [],
+      "counters": {
+       "unpriced": 0,
+       "noTelemetryCount": 0,
+       "unreadableCount": 0,
+       "noLineage": 0
+      },
+      "perTask": [
+       {
+        "id": "LIN-4396",
+        "usd": 32.24
+       },
+       {
+        "id": "LIN-4424",
+        "usd": 12.44
+       },
+       {
+        "id": "LIN-4438",
+        "usd": 27.26
+       },
+       {
+        "id": "LIN-4439",
+        "usd": 18.06
+       },
+       {
+        "id": "LIN-4442",
+        "usd": 17.55
+       },
+       {
+        "id": "LIN-4443",
+        "usd": 20.75
+       },
+       {
+        "id": "LIN-4444",
+        "usd": 13.44
+       },
+       {
+        "id": "LIN-4446",
+        "usd": 17.98
+       },
+       {
+        "id": "LIN-4448",
+        "usd": 37.7
+       },
+       {
+        "id": "LIN-4450",
+        "usd": 16.03
+       },
+       {
+        "id": "LIN-4451",
+        "usd": 18.11
+       },
+       {
+        "id": "LIN-4453",
+        "usd": 11.02
+       },
+       {
+        "id": "LIN-4454",
+        "usd": 10.72
+       },
+       {
+        "id": "LIN-4455",
+        "usd": 20.33
+       },
+       {
+        "id": "LIN-4456",
+        "usd": 8.78
+       },
+       {
+        "id": "LIN-4457",
+        "usd": 9.27
+       },
+       {
+        "id": "LIN-4458",
+        "usd": 38.06
+       },
+       {
+        "id": "LIN-4459",
+        "usd": 13.06
+       },
+       {
+        "id": "LIN-4460",
+        "usd": 20.23
+       },
+       {
+        "id": "LIN-4462",
+        "usd": 15.25
+       },
+       {
+        "id": "LIN-4464",
+        "usd": 8.02
+       },
+       {
+        "id": "LIN-4465",
+        "usd": 12.19
+       },
+       {
+        "id": "LIN-4466",
+        "usd": 10.21
+       },
+       {
+        "id": "LIN-4467",
+        "usd": 17.7
+       },
+       {
+        "id": "LIN-4468",
+        "usd": 27.93
+       },
+       {
+        "id": "LIN-4469",
+        "usd": 13.1
+       },
+       {
+        "id": "LIN-4470",
+        "usd": 15.21
+       },
+       {
+        "id": "LIN-4471",
+        "usd": 14.38
+       },
+       {
+        "id": "LIN-4472",
+        "usd": 14.18
+       },
+       {
+        "id": "LIN-4475",
+        "usd": 28.81
+       },
+       {
+        "id": "LIN-4481",
+        "usd": 34.11
+       },
+       {
+        "id": "LIN-4482",
+        "usd": 21.13
+       },
+       {
+        "id": "LIN-4483",
+        "usd": 10.84
+       },
+       {
+        "id": "LIN-4487",
+        "usd": 9.15
+       },
+       {
+        "id": "LIN-4492",
+        "usd": 18.56
+       },
+       {
+        "id": "LIN-4493",
+        "usd": 33.43
+       },
+       {
+        "id": "LIN-4494",
+        "usd": 25.03
+       },
+       {
+        "id": "LIN-4495",
+        "usd": 40.21
+       },
+       {
+        "id": "LIN-4496",
+        "usd": 22.91
+       },
+       {
+        "id": "LIN-4497",
+        "usd": 20.19
+       },
+       {
+        "id": "LIN-4499",
+        "usd": 49.76
+       },
+       {
+        "id": "LIN-4500",
+        "usd": 13.51
+       },
+       {
+        "id": "LIN-4501",
+        "usd": 42.26
+       },
+       {
+        "id": "LIN-4502",
+        "usd": 54.65
+       },
+       {
+        "id": "LIN-4503",
+        "usd": 20.36
+       },
+       {
+        "id": "LIN-4504",
+        "usd": 74.45
+       },
+       {
+        "id": "LIN-4505",
+        "usd": 16.06
+       },
+       {
+        "id": "LIN-4506",
+        "usd": 14.4
+       },
+       {
+        "id": "LIN-4514",
+        "usd": 22.44
+       },
+       {
+        "id": "LIN-4515",
+        "usd": 9.45
+       },
+       {
+        "id": "LIN-4516",
+        "usd": 12.25
+       },
+       {
+        "id": "LIN-4517",
+        "usd": 21.88
+       },
+       {
+        "id": "LIN-4527",
+        "usd": 25.35
+       },
+       {
+        "id": "LIN-4528",
+        "usd": 15.37
+       }
+      ]
+     },
+     "reference": null,
+     "status": "measured",
+     "reason": null,
+     "unreadable": 0
+    }
+   ]
+  }
+ ]
+}

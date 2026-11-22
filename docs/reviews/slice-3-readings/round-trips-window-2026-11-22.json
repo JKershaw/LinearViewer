@@ -1,0 +1,170 @@
+{
+  "_about": "LIN-4519: review round trips over the cutover window, read from verdict records (scripts/lin-4519-window-readings.mjs). Never edit by hand.",
+  "window": {
+    "cutover": "2026-11-22T04:20:39.504Z",
+    "from": {
+      "commit": "eb14b7fff9f1b0e0de623add1b1fc61fd924021a",
+      "mergedAt": "2026-11-12T21:06:21Z",
+      "why": "the blind-read gate (LIN-4438, GATE_LANDING); the tickets read are those the cutover covers"
+    },
+    "to": {
+      "commit": "9a4f3c7952049ede578cc7fa2b65849be2a8e99f"
+    },
+    "asOf": "2026-11-22T14:44:13.746Z",
+    "landings": 78,
+    "landingsAtOrAfterCutover": 2,
+    "tickets": 2
+  },
+  "reviewRoundTrips": {
+    "planReview": {
+      "window": {
+        "asOf": "2026-11-22T14:44:13.746Z",
+        "rulerChangeAt": null,
+        "windowDays": null,
+        "verdictSource": "records",
+        "verdictRecordsSince": "2026-11-22T04:20:39.504Z"
+      },
+      "scale": {
+        "issuesRead": 2,
+        "reachedPlanReviewAny": 1,
+        "issuesExcludedByWindow": 0
+      },
+      "primary": {
+        "numerator": 1,
+        "denominator": 1,
+        "rate": 1,
+        "sufficient": false
+      },
+      "roundTrips": {
+        "n": 1,
+        "mean": 0,
+        "distribution": {
+          "0": 1
+        }
+      },
+      "diagnostics": {
+        "noGenuineAttempt": 0,
+        "noGenuineAttemptIssues": 1,
+        "rightCensoredFirstPass": 0,
+        "reachedButUnresolvedFirstPass": 0,
+        "verdictTier": {
+          "a": 1,
+          "b": 0,
+          "c": 0,
+          "none": 0
+        },
+        "verdictNotMeasured": 0,
+        "crossTierDisagreements": {
+          "aVsB": 0,
+          "aVsC": 0,
+          "bVsC": 0
+        },
+        "lineageBleed": 0,
+        "subWindows": 0
+      },
+      "completeness": {
+        "attempted": 2,
+        "read": 2,
+        "skipped": 0,
+        "complete": true
+      },
+      "definition": {
+        "pinnedOn": "LIN-1883 (plan v3, approved b44b782f)",
+        "primaryRule": "resolved(R0) && verdict(R0) === 'approve'; denominator = issues whose R0 walk settled RESOLVED (excludes right-censored, reached-but-unresolved, and no-genuine-attempt issues, each counted separately in diagnostics)",
+        "r0EligibilityRule": "extraction-first, state-second — see module header",
+        "verdictExtraction": "tier A verdict record of the gate judgement (plan-review) written in the row's window, latest wins, withdrawn excluded; a row dispatched before 2026-11-22T04:20:39.504Z is not measured; tier B is not read; tier C structural (next pipeline row kind) for a done row with no verdict record",
+        "windowBound": "windowStart = row-own dispatchedAt (never lineage-merged); windowEnd = next pipeline row dispatchedAt, else completedAt ?? asOf",
+        "roundTripsRule": "n/mean/distribution computed over issues with reachedPlanReviewAny === true only (LIN-1883 §2.3, conditional on reaching the gate) — see scale.reachedPlanReviewAny",
+        "sufficiencyFormula": "two-proportion power calc: N ≥ [z(α/2)·√(2p̄(1-p̄)) + z(β)·√(p1(1-p1)+p2(1-p2))]² / (p2-p1)² ≈ 47093235, numerator ≥ N·p1 ≈ 47093235 (p1 = 1.0000 measured at read time, p2 = 1.0000 = min(2·p1, 1−(1−p1)/2) — the more conservative of doubling the rate and halving the shortfall — a 1.000× realised relative effect, α = 0.05, power = 0.80)",
+        "measuredP1": 1
+      },
+      "gate": {
+        "key": "gate",
+        "value": null,
+        "reference": null,
+        "status": "not measured",
+        "reason": "plan facts were not read by this reading, so the gate-due series is not measured (the reader alone would count the issues outside the window as not due)",
+        "unreadable": null
+      }
+    },
+    "codeReview": {
+      "window": {
+        "asOf": "2026-11-22T14:44:13.746Z",
+        "rulerChangeAt": null,
+        "windowDays": null,
+        "verdictSource": "records",
+        "verdictRecordsSince": "2026-11-22T04:20:39.504Z"
+      },
+      "scale": {
+        "issuesRead": 2,
+        "reachedPlanReviewAny": 1,
+        "issuesExcludedByWindow": 0
+      },
+      "primary": {
+        "numerator": 1,
+        "denominator": 1,
+        "rate": 1,
+        "sufficient": false
+      },
+      "roundTrips": {
+        "n": 1,
+        "mean": 0,
+        "distribution": {
+          "0": 1
+        }
+      },
+      "diagnostics": {
+        "noGenuineAttempt": 1,
+        "noGenuineAttemptIssues": 0,
+        "rightCensoredFirstPass": 0,
+        "reachedButUnresolvedFirstPass": 0,
+        "verdictTier": {
+          "a": 1,
+          "b": 0,
+          "c": 0,
+          "none": 0
+        },
+        "verdictNotMeasured": 1,
+        "crossTierDisagreements": {
+          "aVsB": 0,
+          "aVsC": 0,
+          "bVsC": 0
+        },
+        "lineageBleed": 0,
+        "subWindows": 0
+      },
+      "completeness": {
+        "attempted": 2,
+        "read": 2,
+        "skipped": 0,
+        "complete": true
+      },
+      "definition": {
+        "pinnedOn": "LIN-1883 (plan v3, approved b44b782f)",
+        "primaryRule": "resolved(R0) && verdict(R0) === 'approve'; denominator = issues whose R0 walk settled RESOLVED (excludes right-censored, reached-but-unresolved, and no-genuine-attempt issues, each counted separately in diagnostics)",
+        "r0EligibilityRule": "extraction-first, state-second — see module header",
+        "verdictExtraction": "tier A verdict record of the gate judgement (review) written in the row's window, latest wins, withdrawn excluded; a row dispatched before 2026-11-22T04:20:39.504Z is not measured; tier B is not read; tier C structural (next pipeline row kind) for a done row with no verdict record",
+        "windowBound": "windowStart = row-own dispatchedAt (never lineage-merged); windowEnd = next pipeline row dispatchedAt, else completedAt ?? asOf",
+        "roundTripsRule": "n/mean/distribution computed over issues with reachedPlanReviewAny === true only (LIN-1883 §2.3, conditional on reaching the gate) — see scale.reachedPlanReviewAny",
+        "sufficiencyFormula": "two-proportion power calc: N ≥ [z(α/2)·√(2p̄(1-p̄)) + z(β)·√(p1(1-p1)+p2(1-p2))]² / (p2-p1)² ≈ 47093235, numerator ≥ N·p1 ≈ 47093235 (p1 = 1.0000 measured at read time, p2 = 1.0000 = min(2·p1, 1−(1−p1)/2) — the more conservative of doubling the rate and halving the shortfall — a 1.000× realised relative effect, α = 0.05, power = 0.80)",
+        "measuredP1": 1
+      },
+      "gate": {
+        "key": "gate",
+        "value": null,
+        "reference": null,
+        "status": "not measured",
+        "reason": "plan facts were not read by this reading, so the gate-due series is not measured (the reader alone would count the issues outside the window as not due)",
+        "unreadable": null
+      }
+    }
+  },
+  "meta": {
+    "proxyCalls": {
+      "roundTrips": 5,
+      "verdictRecordReads": 8
+    },
+    "issuesRead": 2,
+    "skipped": 0
+  }
+}
