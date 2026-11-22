@@ -22,6 +22,16 @@ import { scanFiles, CENSUS_ROOTS, EXCLUDED_PREFIXES } from './helpers/retirement
 
 const ROOT = fileURLToPath(new URL('../../', import.meta.url));
 
+/**
+ * This census's exclusions: the shared list, plus recorded history the standing answer keeps as it is (LIN-4529 plan
+ * item 4). Local to this census: the shared helper and the LIN-4495/LIN-4502 censuses are left alone.
+ */
+export const EXCLUDED = Object.freeze({
+  ...EXCLUDED_PREFIXES,
+  'docs/archive/': 'archived docs: recorded history, kept as it is (standing answer)',
+  'scripts/eval/fixtures/': 'recorded eval history, kept as it is (standing answer)',
+});
+
 /** The words this slice retires, each with the spelling the census matches. Empty until a piece retires something. */
 export const RETIRED = Object.freeze([]);
 
@@ -38,7 +48,7 @@ export const ALLOW = Object.freeze({});
 export function findRetired(files, { retired = RETIRED, allow = ALLOW } = {}) {
   const hits = [];
   for (const [file, text] of Object.entries(files)) {
-    if (Object.keys(EXCLUDED_PREFIXES).some((p) => file.startsWith(p))) continue;
+    if (Object.keys(EXCLUDED).some((p) => file.startsWith(p))) continue;
     for (const { word, re } of retired) {
       if (allow[file]?.words.includes(word)) continue;
       const m = re.exec(text);
@@ -49,7 +59,7 @@ export function findRetired(files, { retired = RETIRED, allow = ALLOW } = {}) {
   return hits;
 }
 
-const censusFiles = () => scanFiles(ROOT, CENSUS_ROOTS, EXCLUDED_PREFIXES);
+const censusFiles = () => scanFiles(ROOT, CENSUS_ROOTS, EXCLUDED);
 const readAll = (files) => Object.fromEntries(files.map((f) => [f, readFileSync(join(ROOT, f), 'utf8')]));
 
 describe('LIN-4529 retirement census: what the slice retires is gone from the tree', () => {
@@ -63,6 +73,8 @@ describe('LIN-4529 retirement census: what the slice retires is gone from the tr
     assert.ok(files.includes('lib/records/check.js'), 'the records code is scanned');
     assert.ok(files.includes('routes/proxy-records.js'), 'the records routes are scanned');
     assert.ok(!files.some((f) => f.startsWith('docs/plans/')), 'designs and plans of record are excluded, with their reason');
+    assert.ok(!files.some((f) => f.startsWith('docs/archive/')), 'archived docs are recorded history and are not scanned');
+    assert.ok(!files.some((f) => f.startsWith('scripts/eval/fixtures/')), 'recorded eval fixtures are history and are not scanned');
   });
 
   test('every allowance is scanned, still holds each word it allows, and carries a reason (a stale allowance fails)', () => {
@@ -129,6 +141,9 @@ describe('LIN-4529 retirement census: what the slice retires is gone from the tr
     const excluded = ['docs', 'plans', 'x.md'].join('/');
     const retired = [{ word: 'word A', re: /wordA/ }];
     assert.deepStrictEqual(findRetired({ [excluded]: 'wordA\n' }, { retired }), []);
+    for (const prefix of ['docs/archive/', 'scripts/eval/fixtures/']) {
+      assert.deepStrictEqual(findRetired({ [`${prefix}x.json`]: 'wordA\n' }, { retired }), [], `${prefix} is skipped`);
+    }
   });
 
   test('a planted word in a real file is seen: the scan of the records check module, with one line added, fails', () => {

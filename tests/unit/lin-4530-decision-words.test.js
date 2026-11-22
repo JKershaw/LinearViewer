@@ -144,6 +144,19 @@ describe('a decision holds the option, the words, or both (LIN-4530 plan D1)', (
     refused(checkAdd('decision', { answer: 'x'.repeat(KINDS.limits.decision.answer + 1) }, ctx()).problems, 'answer');
   });
 
+  test('limits are by kind and field: a limit added for another kind is enforced too', () => {
+    const had = KINDS.limits.finding;
+    KINDS.limits.finding = { says: 5 };
+    try {
+      const body = { to: 'review', says: 'longer than five' };
+      const problems = refused(checkAdd('finding', body, ctx()).problems, 'says');
+      assert.match(problems[0].message, /of finding is 16 characters; the limit is 5/);
+      assert.ok(!(checkAdd('finding', { to: 'review', says: 'short' }, ctx()).problems || []).some((p) => p.field === 'says'), 'a value within the limit raises no problem on the limited field');
+    } finally {
+      if (had === undefined) delete KINDS.limits.finding; else KINDS.limits.finding = had;
+    }
+  });
+
   test('exactly at the limit is accepted, and stored whole, never cut', async () => {
     const words = 'w'.repeat(LIMIT);
     const id = await add('decision', { words, scope: 'project' }, JOHN);
@@ -205,6 +218,7 @@ describe('the brief shows the question, the option and the words together', () =
     assert.ok(brief.text.includes('answered by'), 'the question reads answered');
     assert.ok(brief.text.includes('    option: count'), 'the option is shown');
     assert.ok(brief.text.includes(VERBATIM.split('\n')[0]), 'the first line of the words is shown');
+    assert.ok(brief.text.includes('    words: ' + VERBATIM.split('\n')[0]), "the answered block prints the words under the question (four-space form, not the decision's own field line)");
     const part4 = brief.parts.stands.find((r) => r.kind === 'decision');
     assert.equal(part4.fields.words, VERBATIM, 'the record the brief carries holds the words exactly');
     assert.equal(part4.fields.answer, 'count');
@@ -216,5 +230,15 @@ describe('the brief shows the question, the option and the words together', () =
     const brief = buildBrief({ actor: 'implementation', taskId: t, idx });
     assert.ok(brief.text.includes('words: Keep it as it is.'));
     assert.ok(!brief.text.includes('    option:'));
+  });
+
+  test('a words-only decision that answers a question: the answered block prints the words and no option', async () => {
+    const t = await add('task', { asked: 'x' }, JOHN);
+    const q = await add('question', { in: t, to: JOHN, asks: 'Which one?', options: ['a', 'b'], recommended: 'a', 'if-unanswered': 'a' }, 'implementation');
+    await add('decision', { in: t, words: 'Neither: show it on Home.', answers: q }, JOHN);
+    const brief = buildBrief({ actor: 'implementation', taskId: t, idx });
+    assert.ok(!brief.problem, brief.problem);
+    assert.ok(brief.text.includes('    words: Neither: show it on Home.'), 'the answered block carries the words');
+    assert.ok(!brief.text.includes('    option:'), 'and no option line');
   });
 });
