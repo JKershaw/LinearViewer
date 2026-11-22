@@ -1,5 +1,5 @@
 {
- "_about": "Records for the eval harness (LIN-4518 finding-004175cc). Each target's events are authored from its comment history, reduced to the facts the gates read: the plan-review verdicts and their stated blocking counts, the latest code review per PR with the head it judged, the PRs of the landing, and the close-outs after the review. The harness seeds them into a real records store and hands the trail, landing changes and plan-review loop to getRecommendation. A target with `unrepresentable` has a fact records cannot hold (a review with no PR names no change), so it is handed as not read.",
+ "_about": "Records for the eval harness (LIN-4518 finding-004175cc). Each target's events are authored from its comment history, reduced to the facts the gates read: the plan-review verdicts and their stated blocking counts, the latest code review per PR with the head it judged, the PRs of the landing, and the close-outs after the review. The harness seeds them into a real records store and hands the trail, landing changes and plan-review loop to getRecommendation. A review of a task with no PR is a verdict on the task's plan, since a verdict needs an `on` but not a change (LIN-4518 finding-d3b5b9de).",
  "NSC-LIN-2950-R2": {
   "events": [
    {

@@ -17,10 +17,6 @@ import {
 } from '../../lib/recommendation-facts.js';
 import { formatIssueContext, getRecommendation, getRecommendationStream, setFetchImpl } from '../../lib/openrouter.js';
 
-// LIN-4518 (finding-55356e66): the loop reads its facts from records (planReviewLoop). These tests drive the bound's
-// arithmetic with the comment fold as the facts, which is the same run and the same person/landed reading.
-const exhausted = (issue, comments) => reviewLoopExhausted(issue, assemblePlanReviewFacts(comments));
-const stop = (issue, comments) => reviewLoopStop(issue, assemblePlanReviewFacts(comments));
 import { routeStage, parseRouteDecision, parseRecommendedAction } from '../../lib/stage-router.js';
 import { formatStageContract } from '../../lib/prompt-contract.js';
 import { generatePrompt } from '../../lib/prompt-templates.js';
@@ -29,6 +25,17 @@ import { isRequestChangesRound } from '../../lib/prompts/revision-brief.js';
 import { fetchIssueContext } from '../../lib/providers/linear/index.js';
 import { LocalProvider } from '../../lib/providers/local/index.js';
 import { createLocalProvider } from '../fixtures/local-harness.js';
+import { planRound, loopFactsFor } from '../helpers/plan-review-loop.js';
+
+// LIN-4518 (finding-527b8237): the loop's facts are built from records (tests/helpers/plan-review-loop.js): a round is a
+// plan-review verdict on record with its own run's `to: plan` findings. `rr`, `ndr` and `apr` are those rounds, `n` being
+// the blocking findings the round wrote. The comments (RC, ND, APP, RCn below) are the thread, and a person's speech or
+// landed work since the latest verdict is read from them by loopFactsOf.
+const rr = (at, n = 0) => planRound(at, 'request-changes', n);
+const ndr = (at, n = 0) => planRound(at, 'needs-discussion', n);
+const apr = (at) => planRound(at, 'approve');
+const exhausted = (issue, rounds, comments = []) => reviewLoopExhausted(issue, loopFactsFor(rounds, comments));
+const stop = (issue, rounds, comments = []) => reviewLoopStop(issue, loopFactsFor(rounds, comments));
 
 const RC = (at, id = at) => ({ id, createdAt: at, body: `### Plan Review Verdict\n\nFinding.\n\n**Verdict: Request Changes.**` });
 const ND = (at, id = at) => ({ id, createdAt: at, body: `### Plan Review Verdict\n\n**Verdict: Needs Discussion.**` });
@@ -244,26 +251,29 @@ describe('D2: excluded kinds are refused (LIN-3309 S5)', () => {
 describe('the review loop bound: the first route code settles (LIN-3309; the look-first sequence is LIN-4370)', () => {
   const open = { name: 'In Progress', type: 'started' };
   const leaf = (over = {}) => ({ identifier: 'T-9', title: 't', description: 'A plan.', state: open, labels: [], ...over });
-  const bundle = (comments) => ({ parent: null, siblings: [], project: null, children: [], comments, planReviewLoop: assemblePlanReviewFacts(comments), focusedChild: null });
-  const rcs = (n) => Array.from({ length: n }, (_, i) => RC(`2026-01-0${i + 1}T00:00:00Z`));
+  // The loop's facts are the rounds on record; the comments carry the thread (the selector's facts still read it) and a
+  // person's speech and landed work since the latest verdict (LIN-4518 finding-527b8237).
+  const bundle = (rounds, comments = []) => ({ parent: null, siblings: [], project: null, children: [], comments, planReviewLoop: loopFactsFor(rounds, comments), focusedChild: null });
+  const rcs = (n) => Array.from({ length: n }, (_, i) => rr(`2026-01-0${i + 1}T00:00:00Z`));
+  const rcComments = (n) => Array.from({ length: n }, (_, i) => RC(`2026-01-0${i + 1}T00:00:00Z`));
   const after = (body) => ({ createdAt: '2026-01-09T00:00:00Z', body });
 
   test(`${REVIEW_LOOP_BOUND} verdicts asking for changes since the latest Approve stop the loop`, () => {
     assert.equal(REVIEW_LOOP_BOUND, 3);
     assert.equal(exhausted(leaf(), rcs(2)), false);
     assert.equal(exhausted(leaf(), rcs(3)), true);
-    assert.equal(exhausted(leaf(), [RC('2026-01-01T00:00:00Z'), ND('2026-01-02T00:00:00Z'), RC('2026-01-03T00:00:00Z')]), true);
-    assert.equal(exhausted(leaf(), [...rcs(3), APP('2026-01-08T00:00:00Z')]), false, 'an Approve resets it');
+    assert.equal(exhausted(leaf(), [rr('2026-01-01T00:00:00Z'), ndr('2026-01-02T00:00:00Z'), rr('2026-01-03T00:00:00Z')]), true);
+    assert.equal(exhausted(leaf(), [...rcs(3), apr('2026-01-08T00:00:00Z')]), false, 'an Approve resets it');
   });
 
   test('a person\'s comment since the latest verdict lifts it; an agent note does not', () => {
-    assert.equal(exhausted(leaf(), [...rcs(3), after('go on, take it to implementation')]), false);
-    assert.equal(exhausted(leaf(), [...rcs(3), after('Hold until LIN-3098 ships.')]), false);
-    assert.equal(exhausted(leaf(), [...rcs(3), after('**Plan posted** — plan revision written.')]), true);
+    assert.equal(exhausted(leaf(), rcs(3), [after('go on, take it to implementation')]), false);
+    assert.equal(exhausted(leaf(), rcs(3), [after('Hold until LIN-3098 ships.')]), false);
+    assert.equal(exhausted(leaf(), rcs(3), [after('**Plan posted** — plan revision written.')]), true);
   });
 
   test('landed work since the latest verdict, or a terminal task, is not a running loop', () => {
-    assert.equal(exhausted(leaf(), [...rcs(3), after('Implementation landed: https://github.com/o/r/pull/7')]), false);
+    assert.equal(exhausted(leaf(), rcs(3), [after('Implementation landed: https://github.com/o/r/pull/7')]), false);
     assert.equal(exhausted(leaf({ state: { name: 'Canceled', type: 'canceled' } }), rcs(3)), false);
     assert.equal(exhausted(leaf({ state: { name: 'Done', type: 'completed' } }), rcs(3)), false);
   });
@@ -271,10 +281,10 @@ describe('the review loop bound: the first route code settles (LIN-3309; the loo
   test('getRecommendation stops at blocked without a routing call, with the blocked stage prompt', async () => {
     setFetchImpl(async () => { throw new Error('the model must not be called at the bound'); });
     try {
-      const rec = await getRecommendation(leaf(), bundle(rcs(3)), { apiKey: 'stub', model: 'x' });
+      const rec = await getRecommendation(leaf(), bundle(rcs(3), rcComments(3)), { apiKey: 'stub', model: 'x' });
       assert.equal(rec.codeRoute, 'blocked');
       assert.equal(rec.recommendedAction, 'blocked');
-      assert.equal(rec.prompt, generatePrompt('blocked', leaf(), bundle(rcs(3))).prompt);
+      assert.equal(rec.prompt, generatePrompt('blocked', leaf(), bundle(rcs(3), rcComments(3))).prompt);
     } finally {
       setFetchImpl(null);
     }
@@ -284,7 +294,7 @@ describe('the review loop bound: the first route code settles (LIN-3309; the loo
     setFetchImpl(async () => { throw new Error('the model must not be called at the bound'); });
     const events = [];
     try {
-      const rec = await getRecommendationStream(leaf(), bundle(rcs(3)), { apiKey: 'stub', model: 'x' }, (type, data) => events.push([type, data]));
+      const rec = await getRecommendationStream(leaf(), bundle(rcs(3), rcComments(3)), { apiKey: 'stub', model: 'x' }, (type, data) => events.push([type, data]));
       assert.equal(rec.codeRoute, 'blocked');
       assert.deepEqual(events.filter(([t]) => t === 'delta').map(([, d]) => d.section), ['reasoning', 'prompt']);
       assert.equal(events.at(-1)[0], 'done');
@@ -300,8 +310,13 @@ describe('the review loop bound: the first route code settles (LIN-3309; the loo
       return { ok: true, json: async () => ({ choices: [{ message: { content: '## Reasoning\n→ **plan**' }, finish_reason: 'stop' }], usage: { completion_tokens: 3 } }) };
     });
     try {
-      for (const comments of [rcs(1), rcs(2), [...rcs(3), after('Decision: go on with the revision.')]]) {
-        const rec = await getRecommendation(leaf(), bundle(comments), { apiKey: 'stub', model: 'x' });
+      const cases = [
+        { rounds: rcs(1), comments: rcComments(1) },
+        { rounds: rcs(2), comments: rcComments(2) },
+        { rounds: rcs(3), comments: [...rcComments(3), after('Decision: go on with the revision.')] },
+      ];
+      for (const { rounds, comments } of cases) {
+        const rec = await getRecommendation(leaf(), bundle(rounds, comments), { apiKey: 'stub', model: 'x' });
         assert.equal(rec.codeRoute, undefined);
         assert.equal(rec.recommendedAction, 'plan');
       }
@@ -317,8 +332,9 @@ describe('the review loop bound: the first route code settles (LIN-3309; the loo
 describe('a converging plan gets another round, up to a ceiling (LIN-3651)', () => {
   const open = { name: 'In Progress', type: 'started' };
   const leaf = () => ({ identifier: 'T-9', title: 't', description: 'A plan.', state: open, labels: [] });
-  const bundle = (comments) => ({ parent: null, siblings: [], project: null, children: [], comments, planReviewLoop: assemblePlanReviewFacts(comments), focusedChild: null });
-  const counted = (...ns) => ns.map((n, i) => RCn(`2026-01-0${i + 1}T00:00:00Z`, n));
+  const bundle = (rounds, comments = []) => ({ parent: null, siblings: [], project: null, children: [], comments, planReviewLoop: loopFactsFor(rounds, comments), focusedChild: null });
+  // Rounds on record: `counted(3, 2, 1)` is three request-changes verdicts with 3, 2 and 1 `to: plan` findings.
+  const counted = (...ns) => ns.map((n, i) => rr(`2026-01-0${i + 1}T00:00:00Z`, n));
   const after = (body) => ({ createdAt: '2026-01-09T00:00:00Z', body });
 
   test('the ceiling is separate from the bound', () => {
@@ -338,8 +354,8 @@ describe('a converging plan gets another round, up to a ceiling (LIN-3651)', () 
       assert.equal(exhausted(leaf(), counted(...ns)), true, ns.join(','));
       assert.equal(stop(leaf(), counted(...ns)), 'not-converging');
     }
-    const plain = [RC('2026-01-01T00:00:00Z'), RC('2026-01-02T00:00:00Z'), RC('2026-01-03T00:00:00Z')];
-    assert.equal(exhausted(leaf(), plain), true, 'no count lines: today\'s behaviour');
+    const plain = [rr('2026-01-01T00:00:00Z'), rr('2026-01-02T00:00:00Z'), rr('2026-01-03T00:00:00Z')];
+    assert.equal(exhausted(leaf(), plain), true, 'no findings on record for the verdicts: today\'s behaviour');
   });
 
   test('five verdicts stop at the ceiling even while narrowing', () => {
@@ -349,32 +365,31 @@ describe('a converging plan gets another round, up to a ceiling (LIN-3651)', () 
   });
 
   test('a Needs Discussion latest verdict is not converging', () => {
-    const run = [RCn('2026-01-01T00:00:00Z', 3), RCn('2026-01-02T00:00:00Z', 1), ND('2026-01-03T00:00:00Z')];
+    const run = [rr('2026-01-01T00:00:00Z', 3), rr('2026-01-02T00:00:00Z', 1), ndr('2026-01-03T00:00:00Z')];
     assert.equal(exhausted(leaf(), run), true);
-    assert.equal(reviewLoopConverging(assemblePlanReviewFacts(run).run), false);
+    assert.equal(reviewLoopConverging(loopFactsFor(run).run), false);
   });
 
-  test('a Needs Discussion latest verdict that carries a count line is still not converging (LIN-3651)', () => {
-    const nd = { createdAt: '2026-01-03T00:00:00Z', body: '### Plan Review Verdict\n\n**Verdict: Needs Discussion.**\n\nBlocking findings: 1' };
-    const run = [RCn('2026-01-01T00:00:00Z', 3), RCn('2026-01-02T00:00:00Z', 2), nd];
+  test('a Needs Discussion latest verdict that carries findings is still not converging (LIN-3651)', () => {
+    const run = [rr('2026-01-01T00:00:00Z', 3), rr('2026-01-02T00:00:00Z', 2), ndr('2026-01-03T00:00:00Z', 1)];
     assert.equal(exhausted(leaf(), run), true);
-    assert.equal(assemblePlanReviewFacts(run).run[2].blocking, null);
+    assert.equal(loopFactsFor(run).run[2].blocking, null);
   });
 
   test('person comment, landed work and Approve still lift it, at the ceiling too', () => {
     const five = counted(3, 2, 2, 1, 1);
-    assert.equal(exhausted(leaf(), [...five, after('go on, take it to implementation')]), false);
-    assert.equal(exhausted(leaf(), [...five, after('Implementation landed: https://github.com/o/r/pull/7')]), false);
-    assert.equal(exhausted(leaf(), [...five, APP('2026-01-08T00:00:00Z')]), false);
-    assert.equal(exhausted(leaf(), [...counted(3, 3, 3), APP('2026-01-08T00:00:00Z')]), false);
+    assert.equal(exhausted(leaf(), five, [after('go on, take it to implementation')]), false);
+    assert.equal(exhausted(leaf(), five, [after('Implementation landed: https://github.com/o/r/pull/7')]), false);
+    assert.equal(exhausted(leaf(), [...five, apr('2026-01-08T00:00:00Z')]), false);
+    assert.equal(exhausted(leaf(), [...counted(3, 3, 3), apr('2026-01-08T00:00:00Z')]), false);
   });
 
   test('the run since the latest Approve carries each verdict\'s count; only Request Changes has one', () => {
-    const f = assemblePlanReviewFacts([RCn('2026-01-01T00:00:00Z', 4), APP('2026-01-02T00:00:00Z'), RCn('2026-01-03T00:00:00Z', 2), ND('2026-01-04T00:00:00Z')]);
-    assert.deepEqual(f.run, [{ verdict: 'request changes', blocking: 2 }, { verdict: 'needs discussion', blocking: null }]);
-    assert.equal(f.count, 2);
+    const f = loopFactsFor([rr('2026-01-01T00:00:00Z', 4), apr('2026-01-02T00:00:00Z'), rr('2026-01-03T00:00:00Z', 2), ndr('2026-01-04T00:00:00Z')]);
+    assert.deepEqual(f.run.map(({ verdict, blocking }) => ({ verdict, blocking })), [{ verdict: 'request changes', blocking: 2 }, { verdict: 'needs discussion', blocking: null }]);
   });
 
+  // The comment fold's own reading (the selector's display line, retired in P7): a fold test, not a loop fact.
   test('the count line parses from the contract\'s own wording; zero, junk and quoted lines do not mislead', () => {
     const wording = formatStageContract('plan-review', 'LIN-1').match(/`(Blocking findings: <n>)`/)?.[1];
     assert.ok(wording, 'the contract names the line');
@@ -389,9 +404,10 @@ describe('a converging plan gets another round, up to a ceiling (LIN-3651)', () 
     assert.equal(verdict('> Blocking findings: 2\n\nBlocking findings: 1'), 2, 'first line match wins');
   });
 
+
   test('order does not matter to the run', () => {
     const trail = counted(3, 3, 1);
-    assert.deepEqual(assemblePlanReviewFacts(trail), assemblePlanReviewFacts([...trail].reverse()));
+    assert.deepEqual(loopFactsFor(trail), loopFactsFor([...trail].reverse()));
   });
 
   test('getRecommendation: 3,3,1 makes its routing call; 1,3,4 and the ceiling stop at blocked, naming the stop', async () => {

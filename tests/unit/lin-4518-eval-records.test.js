@@ -70,16 +70,25 @@ const prsOf = (urls) => [...new Set(urls)].sort();
 const isApproval = (word) => /^approve/.test(String(word || ''));
 
 describe('the authored records agree with the comment history they were written from', () => {
-  test('every sidecar bundle is seeded or deliberately unrepresentable', () => {
+  test('every sidecar bundle carries its authored events, and each is seeded', () => {
     assert.ok(bundlesOf.length >= 25, `expected the authored bundles, got ${bundlesOf.length}`);
     for (const { id, entry } of bundlesOf) {
-      assert.ok(entry.unrepresentable || Array.isArray(entry.events), `${id} has neither events nor an unrepresentable reason`);
+      assert.ok(Array.isArray(entry.events), `${id} has no events`);
+    }
+  });
+
+  test('a review of a task with no PR is on record as a review of its plan, not "not read" (LIN-4518 finding-d3b5b9de)', () => {
+    for (const id of ['FIX-812-approve-ledger', 'FIX-812-approve-empty']) {
+      const { bundle } = bundlesOf.find((b) => b.id === id);
+      const trail = bundle.recordsContext.trail;
+      assert.ok(trail, `${id}: the trail is read from records, not handed as null`);
+      assert.ok(isApproval(trail.review?.verdict), `${id}: the approve is on record, got ${trail.review?.verdict}`);
+      assert.deepEqual(trail.landing, [], `${id}: no change, so no landing`);
     }
   });
 
   test('the trail gate facts (review, landing, close-out after the review) agree with the comments', () => {
-    for (const { id, bundle, entry } of bundlesOf) {
-      if (entry.unrepresentable) continue;
+    for (const { id, bundle } of bundlesOf) {
       const ctx = bundle.recordsContext;
       const oracle = readTrail(bundle.comments || []);
       const exc = EXCEPTIONS[id] || {};
@@ -98,8 +107,8 @@ describe('the authored records agree with the comment history they were written 
   });
 
   test('the plan-review run agrees with the comments: the same verdicts since the latest Approve', () => {
-    for (const { id, bundle, entry } of bundlesOf) {
-      if (entry.unrepresentable || EXCEPTIONS[id]?.planReview) continue;
+    for (const { id, bundle } of bundlesOf) {
+      if (EXCEPTIONS[id]?.planReview) continue;
       const comment = assemblePlanReviewFacts(bundle.comments || []).run.map((r) => r.verdict);
       const records = bundle.recordsContext.planReviewLoop.run.map((r) => r.verdict);
       assert.deepEqual(records, comment, `${id}: plan-review run`);

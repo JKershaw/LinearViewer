@@ -6,7 +6,9 @@
  *     wrote (lib/records/plan-review-run.js);
  *   - the loop's stop, through reviewLoopStop over loopFactsOf: three request-changes verdicts carrying 3, 2, 1 findings
  *     converge (no stop), 2, 2, 2 stop at the bound, and five verdicts stop at the ceiling;
- *   - the store's reader (RecordsStore.planReviewRunForTicket) folds the same run from the task's records.
+ *   - the store's reader (RecordsStore.planReviewRunForTicket) folds the same run from the task's records;
+ *   - loopFactsOf: a person's speech and landed work lift the bound only when they come after the latest verdict
+ *     (LIN-4518 finding-5cdbcb2b; the entrance's own witnesses are in tests/unit/recommendation-input.test.js).
  *
  * Mutation (recorded in the commit): making the reader count zero findings turns the converging witness red.
  *
@@ -142,5 +144,34 @@ describe('RecordsStore.planReviewRunForTicket folds the same run from the task r
     const none = await store.planReviewRunForTicket(URL_KEY, 'LIN-NOPE');
     assert.deepEqual(none.run, []);
     assert.equal(none.verdicts, 0);
+  });
+});
+
+// LIN-4518 (finding-5cdbcb2b): the loop's comment-side facts. A person's speech and landed work lift the bound only when
+// they come after the latest verdict; the run and that instant come from the records.
+describe('loopFactsOf: a person\'s speech and landed work since the latest verdict', () => {
+  const latestAt = at(3);
+  const speech = (day) => ({ createdAt: at(day), body: 'go on, take it to implementation' });
+  const landed = (day) => ({ createdAt: at(day), body: '**Implementation complete — PR opened: https://github.com/JKershaw/LinearViewer/pull/1748** (commit e1287c0c).' });
+
+  test('a person\'s comment after the latest verdict sets personSince; one before it, or none, does not', () => {
+    assert.equal(loopFactsOf({ run: [], latestAt }, [speech(4)]).personSince, true);
+    assert.equal(loopFactsOf({ run: [], latestAt }, [speech(2)]).personSince, false);
+    assert.equal(loopFactsOf({ run: [], latestAt }, []).personSince, false);
+  });
+
+  test('landed work after the latest verdict sets landed to its PR; before it does not', () => {
+    assert.equal(loopFactsOf({ run: [], latestAt }, [landed(4)]).landed, 'https://github.com/JKershaw/LinearViewer/pull/1748');
+    assert.equal(loopFactsOf({ run: [], latestAt }, [landed(2)]).landed, null);
+  });
+
+  test('with no verdict on record there is no "since": no speech and no landed work is read', () => {
+    assert.equal(loopFactsOf({ run: [], latestAt: null }, [speech(4), landed(4)]).personSince, false);
+    assert.equal(loopFactsOf({ run: [], latestAt: null }, [speech(4), landed(4)]).landed, null);
+  });
+
+  test('the run it returns is the records\' run, untouched by the comments', () => {
+    const run = [{ verdict: 'request changes', blocking: 2, at: latestAt }];
+    assert.deepEqual(loopFactsOf({ run, latestAt }, [speech(4)]).run, run);
   });
 });

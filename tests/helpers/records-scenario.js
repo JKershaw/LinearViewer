@@ -11,6 +11,9 @@
  *   { kind: 'abandoned', at, pr }                   the PR closes unmerged: its change ends `abandoned`
  *   { kind: 'review', at, on, outcome?, heads? }    a review verdict on the PR URLs in `on`; `heads` pins each to the
  *                                                   head its judge read (default: the change's head at `at`)
+ *   { kind: 'review', at, on: [], onPlan: true, outcome? }  a review of a task with no PR (LIN-4518 finding-d3b5b9de): its
+ *                                                   verdict is on the task's plan, since a verdict needs an `on` but no
+ *                                                   change; it reads as a review with an empty landing
  *   { kind: 'blindRead', at, on, outcome? }         a blind-read verdict on the PR URLs in `on` (default outcome 'same')
  *   { kind: 'closeOut', at, state? }                a close-out run, ended `state` (default 'done') at `at`
  *   { kind: 'audit', at, pr }                       an audit run that writes the notes change `pr` (its first version)
@@ -141,6 +144,12 @@ export async function seedTicketRecords(store, urlKey, ticket, events) {
         break;
       }
       case 'review': {
+        if (ev.onPlan) {
+          // A review of no change: its verdict is on the task's plan (LIN-4518 finding-d3b5b9de).
+          const p = await planOf(at);
+          await verdict(at, REVIEW_JUDGEMENT, ev.outcome ?? 'approve', [`${p.id}@${p.v}`], 'read at the plan: the task has no PR');
+          break;
+        }
         const refs = await onRefs(ev.on, ev.heads);
         await verdict(at, REVIEW_JUDGEMENT, ev.outcome ?? 'approve', refs, 'read at the head named');
         break;

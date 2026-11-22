@@ -5,7 +5,8 @@
  * (scripts/eval/fixtures/recommend-records/<fixture>.json, authored per target; see that folder's `_about`) into a real
  * records store, then reads the context exactly as the entrance does: trailForTicket (lib/task-standing.js, standingOf then
  * trailOfStanding), landingChangesFor (lib/records/landing.js) and the plan-review run (planReviewRunForTicket, folded by
- * loopFactsOf). A target with `unrepresentable` is handed `null` for its trail: "not read", as a records fault is.
+ * loopFactsOf). Every target is read from records: a review of a task with no PR is a verdict on its plan (LIN-4518
+ * finding-d3b5b9de), so no target is handed "not read" for its trail.
  *
  * The store is a temporary MangoDB (the one the records tests use), removed when the sweep closes it.
  */
@@ -24,8 +25,8 @@ function sidecarOf(recordsDir, fileName) {
 }
 
 /**
- * Seed every target's records and attach `recordsContext` to each bundle: { trail, landingChanges, planReviewLoop }, or
- * { trail: null, ... } for an unrepresentable target. Returns the harness to close, and the counts the summary reports.
+ * Seed every target's records and attach `recordsContext` to each bundle: { trail, landingChanges, planReviewLoop }.
+ * Returns the harness to close, and the counts the summary reports.
  * @param {Array<{file: string, targets: Array<{id: string}>, bundles: Object<string, object>}>} workspaces
  * @param {string} recordsDir
  */
@@ -33,7 +34,7 @@ export async function attachRecordsContext(workspaces, recordsDir) {
   const harness = createMangoTmpdir('eval-dense-records-');
   await harness.connect();
   const store = await recordsStoreFor(harness);
-  const counts = { bundles: 0, seeded: 0, unrepresentable: 0 };
+  const counts = { bundles: 0, seeded: 0 };
   for (const ws of workspaces) {
     const sidecar = sidecarOf(recordsDir, ws.file);
     // Every bundle, not only the targets: a descent reaches children that are bundles but not targets.
@@ -45,12 +46,7 @@ export async function attachRecordsContext(workspaces, recordsDir) {
       // tickets sharing a partition would collide on run ids.
       const urlKey = `eval:${ws.file}:${id}`;
       const entry = sidecar[id];
-      if (entry?.unrepresentable) {
-        counts.unrepresentable += 1;
-        b.recordsContext = { trail: null, landingChanges: null, planReviewLoop: null, unrepresentable: entry.unrepresentable };
-        continue;
-      }
-      const ticket = b.issue?.identifier || t.id;
+      const ticket = b.issue?.identifier || id;
       if (entry?.events?.length) {
         await seedTicketRecords(store, urlKey, ticket, entry.events);
         counts.seeded += 1;
