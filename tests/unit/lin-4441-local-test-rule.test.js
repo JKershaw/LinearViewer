@@ -17,7 +17,8 @@ const ctx = (comments) => ({ parent: null, siblings: [], project: { name: 'P' },
 const REQUEST_CHANGES = { createdAt: '2026-01-01T00:00:00Z', body: '## Review: LIN-4441 PR (#1)\n\nCI: green\n\n### Verdict\nRequest Changes — one finding' };
 
 const FRESH = generatePrompt('implementation', issue, ctx([])).prompt;
-const FIX_ROUND = generatePrompt('implementation', issue, ctx([REQUEST_CHANGES])).prompt;
+// LIN-4520: the fix round is the records verdict (reviewRound), not a review comment.
+const FIX_ROUND = generatePrompt('implementation', issue, { ...ctx([REQUEST_CHANGES]), reviewRound: { fixRound: true, prUrl: null } }).prompt;
 const COMMAND = 'node scripts/run-unit-tests.mjs tests/unit/<files>';
 
 describe('the implementation brief states the local-testing rule once (LIN-4441)', () => {
