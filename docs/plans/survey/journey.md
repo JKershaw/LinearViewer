@@ -301,3 +301,24 @@ A fresh reader checked this page against the log from 18 Nov, the designs, the r
 **Then, as planned:** slice 3 lands; slice 4 (rulings); the parked work, one item at a time (LIN-4416 with the seven safety findings, LIN-4441, LIN-4463); slice 5 (lessons); slice 6 (wakes); then John orders the horizon list. Later: Yap and John's own projects, then Jira (LIN-4445 set aside for now).
 
 **Token:** the scratchpad token expires 22 Nov 13:37 UTC; John is sorting a new one.
+
+## 22 Nov, 20:30: handover for compaction (slice 3 complete; slice 4 next)
+
+**The story.** Harbour is John's control plane: it reads an issue backend, picks each next step for a ticket, dispatches agent sessions, and judges the work on evidence. Its working memory was scattered: ledgers inside review comments, Waiting lists, plans written into descriptions, verdicts guessed from comment text, lessons in notes files. Each stage re-read and re-parsed that text, briefs grew, and decisions rested on guesses. The survey work (trials, Periodicals, papers) showed this was the drag. John chose an MVP route: design a records layer, prove it on paper walks, then build it through Harbour's own loop.
+
+**How we arrived here.** The layer design (`layer/design.md`) went through eight walks: a store, not a workflow, with record kinds task, plan, finding, question, decision, verdict, lesson, change and run, each with `in`, `to` and links, and briefs built from records. The integration design (`integration/design.md`) mapped every reader of the old text (census C1–C5) into six slices, each retiring what it replaces. Its principle (added 21 Nov): a reader stays only while it serves a decision that still matters; keep the needed behaviour, remove readers whose job has gone. Each slice is a Harbour ticket run by autopilot; I drive at altitude and Harbour's runs do the engineering.
+
+**Done.**
+- Slice 1 (store, runs, hand-offs) and slice 2 (plans) landed 20–21 Nov. LIN-4527 removed what they left behind (22 Nov 00:01, #2487).
+- Slice 3 (verdicts and changes) complete 22 Nov 20:07, LIN-4513 Done. P1–P4 (#2479–#2482), P5 (#2488–#2492: own-PR-only change records, standing reader, writers and prompts, consumers on records), P6 (#2494: measures on records), P7 (#2495: about 4,100 lines of comment-reading machinery retired), P8 (#2496: close-out's own commits go back to review).
+- John's decisions settled on the way: nothing in code requires a PR (prompts may assume Git; John will make that optional later); no comment marker (authorship stays on today's text rule until slice 4); the stray #1622/#2447 records are excluded as merged; the fix-round brief retired, its continue-the-same-PR switch kept on records; the per-task session cap removed (#2493, LIN-4528).
+
+**What remains.**
+1. Slice 4: rulings become question and decision records; John's full answer, qualifications included, reaches the worker; the brief's ticket section (cache, model, replay scripts) and the temporary plan display go; agents post only Harbour's labelled summaries, so any other comment is John's and becomes a finding; the authorship text rule goes; the blind read's comment-based PR check goes. To be drafted with John, correct before kickoff.
+2. The parked work, one at a time, read against the 13–14 Nov baselines: LIN-4416 (safety, with the seven safety findings), LIN-4441 (test wait time), LIN-4463 (front-end pages as modules).
+3. Slice 5 (lessons as records) and slice 6 (wakes, held unless slice 1's count shows the need). Then final readings and a report; the horizon list is John's to order.
+4. After slice 4, one clean-up ticket: close-out's hand-back findings `to: review` have no owner (finding-145b1665); edited piece plans owe no fresh plan review; backlog tidy-ups. John's three signed-in checks (findings 598a59f0, b89ac5a3, da5bc495) whenever suits.
+
+**Lessons that shape slice 4.** A task keeps its ticket as filed (`asked`), so the ticket must be right before kickoff. Child pieces build straight from their piece plan, so a piece edited after plan review needs a plan-review note. A ruling option needs a real mechanism behind it. Slow is not stalled: read timestamps before calling a run hung.
+
+**Running state.** Token in the scratchpad `harbour-token`, valid to 24 Nov 14:03 UTC. Hourly check trig_01XCTpQoZb2V1vqMFvzXKStm (27 past), two sentences. Halt clear; nothing running. Branches feat/lin-4524-* and feat/lin-4518-records-standing left by John's choice.
