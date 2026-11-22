@@ -451,7 +451,7 @@
 
   // Disposition → caption text (LIN-1728 Phase 4, decision 4/F8). The SAME
   // button-press means two different things depending on the anchor's
-  // press-time liveness (`lib/unanswered-decisions.js`'s `resolveDisposition`,
+  // press-time liveness (`lib/run-liveness.js`'s `resolveDisposition`,
   // resolved server-side and passed straight through, never re-derived here):
   // resumable/gone both admit a reply (a follow-up vs. a fresh run — a
   // different action under the hood, so the caption says so honestly);

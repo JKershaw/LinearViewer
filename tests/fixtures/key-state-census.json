@@ -467,13 +467,17 @@
     "disposition": "registered",
     "holder": "workspace-token"
   },
-  "lib/records/writes.js::inLine": {
+  "lib/records/serial-line.js::inLine": {
     "disposition": "not-state",
-    "why": "LIN-4503: an in-flight lock per task (the ticket step runs one at a time per task in this process). Each entry is the step's tail promise, removed when that step settles (serially's finally), so it holds nothing between steps; the cross-request guard is the ticket claim, not this map."
+    "why": "LIN-4531 leftover: the shared in-process line (createSerialLine). Each instance's map holds the running step's tail promise per key, removed when that step settles, so it holds nothing between steps; each caller names its own cross-request guard."
   },
-  "lib/question-answers.js::inLine": {
+  "lib/records/writes.js::serially": {
     "disposition": "not-state",
-    "why": "LIN-4531: an in-flight lock per question (the answer and the dismiss of one question run one at a time in this process). Each entry is the step's tail promise, removed when that step settles (the finally in serialisedOn), so it holds nothing between requests; the cross-request guard is the question's own state (an ended question answers 409) and the follow-up marker, not this map."
+    "why": "LIN-4503: the ticket step's line per task (a createSerialLine instance, lib/records/serial-line.js). It holds only in-flight tails, emptied as each step settles; the cross-request guard is the ticket claim, not this line."
+  },
+  "lib/question-answers.js::serialisedOn": {
+    "disposition": "not-state",
+    "why": "LIN-4531: the answer and dismiss line per question (a createSerialLine instance, lib/records/serial-line.js). It holds only in-flight tails, emptied as each step settles; the cross-request guard is the question's own state (an ended question answers 409) and the follow-up marker."
   },
   "server.js::ticketWriter": {
     "disposition": "not-state",

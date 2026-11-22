@@ -4,8 +4,8 @@
  *   POST /workspace/:urlKey/questions/:id/answer    body {option?, words?}  — the option chosen and/or the person's own words
  *   POST /workspace/:urlKey/questions/:id/dismiss                          — no answer; the asking run takes its fallback
  *
- * The session is the person (lib/records... personWriterOf, routes/task-records.js): `by` is `person:<account>`, read from the
- * session, never from the body. The answer and dismiss logic is lib/question-answers.js (the behaviour table is in its header).
+ * The session is the person (`personWriterOf`, routes/task-records.js): `by` is `person:<account>`, read from the session,
+ * never from the body. The answer and dismiss logic is lib/question-answers.js (the behaviour table is in its header).
  * This file only binds it to the request: the resume goes through lib/follow-up-dispatch.js enqueueFollowUp with the
  * workspace's owner gate and credential finalize, as the proposal-apply route does. Answers are JSON: the page reads the
  * status and the `notResumedBecause` note.
