@@ -15,7 +15,7 @@ import { createFakeTracker } from '../helpers/fake-records-tracker.js';
 import { createRecordWrites } from '../../lib/records/writes.js';
 import { isTerminalState } from '../../lib/providers/state-map.js';
 import { refreshTaskChanges } from '../../lib/change-records.js';
-import { readStandingRecords } from '../../lib/records/standing.js';
+import { readStandingRecords, trailOfStanding } from '../../lib/records/standing.js';
 import { BLIND_READ_KIND } from '../../lib/prompts/blind-read-words.js';
 import { standingForTicket, setStandingPrReaderFor } from '../../lib/task-standing.js';
 
@@ -299,5 +299,122 @@ describe('witness 9: a ticket with no task, or no store, is the empty standing o
 
   test('no records store is "not read" (null), so a caller can tell it from an empty ticket', async () => {
     assert.equal(await standingForTicket({ recordsStore: null, urlKey: URL_KEY, ticket: TICKET }), null);
+  });
+});
+
+describe('witness 10 (finding d115ccd8): staleness and judged heads are per PR on a two-PR landing', () => {
+  test('one review on two PRs; only the PR whose head moved is named stale, and the heads are per PR', async () => {
+    clock('2026-11-21T11:00:00.000Z');
+    const a = await addChange(201, 'A1');
+    const b = await addChange(202, 'B1');
+    await reviewOn([a, b], { [a]: 'A1', [b]: 'B1' });
+    prs.set(202, { sha: 'B2', merged: false });
+    clock('2026-11-21T11:30:00.000Z');
+    await refresh();
+    const s = await standing();
+    assert.equal(s.review.stale, true);
+    assert.deepEqual(s.review.staleUrls, [prUrl(202)], 'exactly the PR that moved is named; the unmoved PR is not');
+    assert.equal(s.review.sha, null, 'a two-PR review has no single judged head');
+    assert.deepEqual(s.review.heads, { [prUrl(201)]: 'A1', [prUrl(202)]: 'B1' }, 'each PR carries the head its pinned version held');
+  });
+
+  test('one review on two PRs with no move: no stale URLs, not stale', async () => {
+    clock('2026-11-21T11:00:00.000Z');
+    const a = await addChange(203, 'A1');
+    const b = await addChange(204, 'B1');
+    await reviewOn([a, b], { [a]: 'A1', [b]: 'B1' });
+    clock('2026-11-21T11:30:00.000Z');
+    await refresh();
+    const s = await standing();
+    assert.equal(s.review.stale, false);
+    assert.deepEqual(s.review.staleUrls, []);
+  });
+
+  test('stored staleness and live movement are independent: a live head move is seen only once it is refreshed into a version', async () => {
+    clock('2026-11-21T11:00:00.000Z');
+    const a = await addChange(205, 'A1');
+    const b = await addChange(206, 'B1');
+    await reviewOn([a, b], { [a]: 'A1', [b]: 'B1' });
+    // The PR moved on GitHub, but no refresh has written it: the stored record still says A1.
+    prs.set(205, { sha: 'A2', merged: false });
+    let s = await standing();
+    assert.deepEqual(s.review.staleUrls, [], 'the stored records have not seen the live move yet');
+    assert.equal(s.review.stale, false);
+    clock('2026-11-21T11:30:00.000Z');
+    await refresh();
+    s = await standing();
+    assert.deepEqual(s.review.staleUrls, [prUrl(205)], 'once refreshed, the moved PR is the stale one');
+  });
+
+  test('a one-PR review carries its single judged head as sha, and the head stays the judged one after a move', async () => {
+    clock('2026-11-21T11:00:00.000Z');
+    const c = await addChange(207, 'H1');
+    await reviewOn([c], { [c]: 'H1' });
+    prs.set(207, { sha: 'H2', merged: false });
+    clock('2026-11-21T11:30:00.000Z');
+    await refresh();
+    const s = await standing();
+    assert.equal(s.review.sha, 'H1', 'the head the judge read, not the head the PR has now');
+    assert.deepEqual(s.review.heads, { [prUrl(207)]: 'H1' });
+    assert.deepEqual(s.review.staleUrls, [prUrl(207)]);
+  });
+});
+
+describe('witness 11 (finding d115ccd8): trailOfStanding carries the verdict, stale PRs, per-PR heads and blind-read PRs', () => {
+  test('a two-PR landing with a blind read: the trail names the verdict, the stale PR, the heads per PR and the blind-read PRs', async () => {
+    clock('2026-11-21T11:00:00.000Z');
+    const a = await addChange(211, 'A1');
+    const b = await addChange(212, 'B1');
+    await reviewOn([a, b], { [a]: 'A1', [b]: 'B1' });
+    clock('2026-11-21T11:10:00.000Z');
+    const bl = await post(tokens.blind, { kind: 'verdict', judgement: 'blind-read', outcome: 'same', reasoning: 'read both', on: [a, b], heads: { [a]: 'A1', [b]: 'B1' }, run: 'row-blind' });
+    assert.equal(bl.status, 201, `blind read refused: ${JSON.stringify(bl.body)}`);
+    prs.set(212, { sha: 'B2', merged: false });
+    clock('2026-11-21T11:30:00.000Z');
+    await refresh();
+    const s = await standing();
+    const trail = trailOfStanding(s);
+    assert.equal(trail.review.verdict, 'approve', 'the review\'s outcome is the verdict the trail reports');
+    assert.deepEqual(trail.review.staleUrls, [prUrl(212)], 'the trail names the stale PR');
+    assert.equal(trail.review.sha, null, 'no single head across a two-PR landing');
+    assert.deepEqual(trail.review.heads, { [prUrl(211)]: 'A1', [prUrl(212)]: 'B1' });
+    assert.deepEqual(trail.review.blindRead.prs, [prUrl(211), prUrl(212)], 'the blind read names both PRs');
+    assert.equal(trail.review.blindRead.verdict, 'same');
+    assert.deepEqual(trail.landing, [prUrl(211), prUrl(212)], 'the landing, in the order the changes were first written');
+    assert.equal(trail.workAfterReview, true, 'a stale PR is work after the review');
+  });
+
+  test('a one-PR review: the trail carries the judged head as sha', async () => {
+    clock('2026-11-21T11:00:00.000Z');
+    const c = await addChange(213, 'H1');
+    await reviewOn([c], { [c]: 'H1' });
+    const trail = trailOfStanding(await standing());
+    assert.equal(trail.review.verdict, 'approve');
+    assert.equal(trail.review.sha, 'H1');
+    assert.deepEqual(trail.review.staleUrls, []);
+  });
+});
+
+describe('witness 12 (finding 6d32cb5a): an audit\'s notes PR is the change its audit run first wrote, not the change\'s author', () => {
+  test('a change the backstop wrote for an audit run is the notes PR and is in the landing; an implementation run\'s change is not', async () => {
+    clock('2026-11-21T10:00:00.000Z');
+    await store.openRun(URL_KEY, { id: 'row-audit', stage: 'retrospective-audit', taskId, lineage: 'row-root', at: '2026-11-21T10:00:00.000Z' });
+    // The backstop's shape: written under the backstop's name (not the audit), with the audit run as its run.
+    const notes = await writes.add({ urlKey: URL_KEY, kind: 'change', input: { in: taskId, ref: prUrl(301), head: 'N1' }, by: 'harbour', run: 'row-audit' });
+    assert.equal(notes.problems, undefined, `the audit's change was refused: ${JSON.stringify(notes.problems)}`);
+    const impl = await addChange(302, 'I1');
+    assert.ok(impl);
+    const s = await standing();
+    assert.deepEqual(s.notesPrs, [prUrl(301)], 'only the change the audit run first wrote is a notes PR');
+    assert.ok(s.landing.includes(prUrl(301)));
+    assert.equal(s.landingHasNotesPr, true, 'the landing holds the audit\'s notes PR');
+  });
+
+  test('an audit change that is not in the landing does not make it hold a notes PR', async () => {
+    await store.openRun(URL_KEY, { id: 'row-audit-2', stage: 'retrospective-audit', taskId, lineage: 'row-root', at: '2026-11-21T10:00:00.000Z' });
+    await addChange(303, 'I1');
+    const s = await standing();
+    assert.deepEqual(s.notesPrs, [], 'no change was written by an audit run');
+    assert.equal(s.landingHasNotesPr, false);
   });
 });
