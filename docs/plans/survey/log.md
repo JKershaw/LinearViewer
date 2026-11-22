@@ -5203,3 +5203,11 @@ The full stop holds: the fleet is paused, and the drive is only reporting. The o
 - Behaviour change: a ticket with no task record reads as "findings not read". Close-out checked outside tests that a local workspace in production seats a task at dispatch; only the E2E harness differs (finding-0d0ea9bd, to project).
 - Open after it: finding-0bb50a0d to LIN-4520 (what slice 3 tooling still imports); project findings 09e34102 (the eval script now exits early), 3c29963d, 3f64b084, 0d0ea9bd. The PR has four duplicate change records, counted once, which is the record-writing P5 tidies.
 - 00:29: LIN-4513 autopilot kicked off (plain), per John's overnight standing. P5 picks up from main.
+
+## 22 Nov, 06:30: slice 3 P5 stopped at Harbour's 30-session cap (overnight summary)
+
+- Merged overnight, CI green on each: #2488 (the PR fallback reads only the run's own reported PR), #2489 (one terminal cut), #2490 (step 1: records standing reader and stale flag), #2491 (step 2: verdict and change writers, stage prompts; deployed d9c0e9eba). #2492 (step 3: close-out, selector and run evidence read records; parked close-out no longer holds the ticket) is open, 56 files, CI 8/8, not yet reviewed.
+- 05:58: Harbour refused the next LIN-4518 step with TASK_SESSION_RUNAWAY (30 fresh sessions on the task in this run). The guard worked as designed. Nothing is running. Ruling lin4513-session-cap asks John to lift the cap.
+- Waiting for John: lin4513-session-cap (lift); lin4518-p5-scope (my suggested reshape: P5 is steps 1–3; rulings already decided; readings are P6's, retirements and replay P7's, the import ran in P4); lin4518-stray-changes (my lean: option 3, excluded as merged before the work began); a signed-in check of the blind-read prompt route (finding-598a59f0); the fleet pause for #2492's deploy if the run asks.
+- Cause of stale asks found: LIN-4513's task keeps the original ticket as filed ("two questions for John", walk-8 replay, readings, cutover), and runs read it beside the corrected plan.
+- 01:28: ended 8 blind-read findings that described #2483-only code (not on main).
