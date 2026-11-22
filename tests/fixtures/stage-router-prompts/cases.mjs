@@ -47,7 +47,7 @@ const COMPLETE_NODE = {
   context: {
     parent: null, siblings: [], project: null, focusedChild: null,
     // The approving review and the landed PR are records (the trail); the comments above stay for the authorship text rule.
-    trail: { ...NO_TRAIL, review: { verdict: 'approve-conditional', at: at(2), sha: null, heads: undefined, commentId: 'review-abc20aa', blindRead: null, staleUrls: [] } },
+    trail: { ...NO_TRAIL, review: { verdict: 'approve', at: at(2), sha: null, heads: undefined, commentId: 'review-abc20aa', blindRead: null, staleUrls: [] } },
     planReviewRun: NO_PLAN_RUN,
     planFacts: planFactsOf({
       task: task('task-abc20'),

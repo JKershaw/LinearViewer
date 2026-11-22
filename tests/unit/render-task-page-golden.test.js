@@ -106,7 +106,7 @@ const EVIDENCE = {
 // LIN-3379: merged, not Done yet — a review ledger with two open items and a close-out summary.
 const SETTLING_EVIDENCE = {
   state: { status: 'merged', pr: { url: 'https://github.com/acme/app/pull/41', number: 41, headSha: 'abc1234' } },
-  evidence: { asked: 'Build the task page', done: 'PR #41', checked: { review: { verdict: 'approve-conditional', at: '2026-10-06T11:40:00.000Z' }, now: { state: 'passing', checks: [], headSha: 'abc1234', prUrl: 'https://github.com/acme/app/pull/41', checksUrl: 'https://github.com/acme/app/pull/41/checks', headMoved: false } } },
+  evidence: { asked: 'Build the task page', done: 'PR #41', checked: { review: { verdict: 'approve', at: '2026-10-06T11:40:00.000Z' }, now: { state: 'passing', checks: [], headSha: 'abc1234', prUrl: 'https://github.com/acme/app/pull/41', checksUrl: 'https://github.com/acme/app/pull/41/checks', headMoved: false } } },
   ledger: { ledger: { present: true, empty: false, unparsed: false, items: [
     { id: 'F1', scope: 'inside', claim: 'the first claim', discharged: false },
     { id: 'F2', scope: 'inside', claim: 'the second claim', discharged: false },
@@ -349,7 +349,7 @@ describe('task page structure', () => {
             ...m.evidence.evidence,
             checked: {
               ...(m.evidence.evidence && m.evidence.evidence.checked),
-              review: { verdict: 'approve', verdictText: 'Approve', at: '2026-10-06T10:00:00.000Z', sha: 'd34db33f'.repeat(5) },
+              review: { verdict: 'approve', at: '2026-10-06T10:00:00.000Z', sha: 'd34db33f'.repeat(5) },
             },
           },
           ledger: { ledger: { present: true, empty: false, items: [
@@ -408,7 +408,7 @@ describe('task page structure', () => {
       prStatuses: new Map([[`https://github.com/${REPO}/pull/41`, { repo: REPO, readable: true, number: 41, state: 'open', merged: false, head: { ref: 'x', sha: 'aaaaaaa' }, ref: 'aaaaaaa', checks: [] }]]),
       // LIN-4438: a blind read naming the PR is on record, so the gate is met and the runner decides.
       landingPrs: [`https://github.com/${REPO}/pull/41`],
-      review: { verdict: 'approve', verdictText: 'Approve', sha: 'aaaaaaa', heads: { [`https://github.com/${REPO}/pull/41`]: 'aaaaaaa' }, blindRead: { prs: [`https://github.com/${REPO}/pull/41`] } },
+      review: { verdict: 'approve', sha: 'aaaaaaa', heads: { [`https://github.com/${REPO}/pull/41`]: 'aaaaaaa' }, blindRead: { prs: [`https://github.com/${REPO}/pull/41`] } },
       stopAt: 'pr', variant: 'standard', urlKey: 'acme', issueIdentifier: 'LIN-50',
       ...over,
     });
@@ -433,7 +433,7 @@ describe('task page structure', () => {
     assert.equal(lead(movedOwner, 'owner'), notReady);
     assert.equal(lead(derive({ owner: false, runnerReady: false, ...moved }), 'guest'), notReady, 'the guest reads the owner\'s sentence on a moved head');
     // Other not-ready reasons keep their wording.
-    assert.match(lead(derive({ owner: false, runnerReady: false, review: { verdict: 'request-changes', verdictText: 'Request changes', sha: 'aaaaaaa' } }), 'guest'), /isn&#039;t ready to merge yet/);
+    assert.match(lead(derive({ owner: false, runnerReady: false, review: { verdict: 'request-changes', sha: 'aaaaaaa' } }), 'guest'), /isn&#039;t ready to merge yet/);
   });
 
   test('header answers running / waiting / done', () => {

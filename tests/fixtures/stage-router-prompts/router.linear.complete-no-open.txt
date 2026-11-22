@@ -26,7 +26,7 @@ Approve — conditional on close-out.
 ## Facts computed in code
 
 **TRAIL FACTS (computed in code from all 2 comments — do not re-derive):**
-- Latest code review: approve-conditional (2026-10-02 10:00; open findings to close-out: not measured)
+- Latest code review: approve (2026-10-02 10:00; open findings to close-out: not measured)
 - Work reported after it (a later comment links a PR): no
 - Close-out reported after it: no
 - Audit reported after the landing close-out: no

@@ -63,7 +63,7 @@ const setsDone = ({ statuses, landing = [...statuses.keys()], review = approve()
 // own cases are in the describe at the end.
 const NO_LANDING = [];
 
-const approve = (verdict = 'approve') => ({ verdict, verdictText: verdict === 'approve' ? 'Approve' : 'Approve — conditional', sha: 'aaaaaaa' });
+const approve = (verdict = 'approve') => ({ verdict, sha: 'aaaaaaa' });
 
 describe('sameHead', () => {
   test('an abbreviated sha equals its full form; a different sha does not', () => {
@@ -118,9 +118,9 @@ describe('deriveCloseOutState — variant is preserved fail-closed', () => {
 });
 
 describe('isApprovedReview', () => {
-  test('accepts Approve and Approve — conditional, nothing else', () => {
+  test('accepts Approve, nothing else (a conditional approve is an approve with open findings to close-out; finding-ba76decd)', () => {
     assert.strictEqual(isApprovedReview(approve('approve')), true);
-    assert.strictEqual(isApprovedReview(approve('approve-conditional')), true);
+    assert.strictEqual(isApprovedReview(approve('approve-conditional')), false, 'the comment-era conditional verdict is retired');
     assert.strictEqual(isApprovedReview(approve('request-changes')), false);
     assert.strictEqual(isApprovedReview(approve('needs-discussion')), false);
     assert.strictEqual(isApprovedReview(approve('unknown')), false);
@@ -495,7 +495,6 @@ describe('LIN-4438: closeOutWaitsOn and the blind-read gate in the box state', (
 
   test('waits only when the review approves, the landing has a PR, and a landing PR is unnamed', () => {
     assert.strictEqual(closeOutWaitsOn(withRead('approve', null), [URL41]), 'blind-read');
-    assert.strictEqual(closeOutWaitsOn(withRead('approve-conditional', null), [URL41]), 'blind-read');
     assert.strictEqual(closeOutWaitsOn(withRead('approve', read(URL41)), [URL41]), null);
     assert.strictEqual(closeOutWaitsOn(withRead('approve', read(URL40)), [URL41]), 'blind-read', 'an older PR only');
     assert.strictEqual(closeOutWaitsOn(withRead('approve', read(URL41)), [URL40, URL41]), 'blind-read', 'every landing PR, not any');

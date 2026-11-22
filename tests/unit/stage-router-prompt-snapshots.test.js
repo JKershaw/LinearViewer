@@ -48,7 +48,7 @@ describe('stage-router prompt byte snapshots (LIN-3304)', () => {
   });
 
   test('the ticket shapes are distinct where the rules branch', () => {
-    assert.ok(snapshot('router.linear.complete-no-open').includes('- Latest code review: approve-conditional'), 'the finished node carries its code review');
+    assert.ok(snapshot('router.linear.complete-no-open').includes('- Latest code review: approve ('), 'the finished node carries its code review');
     assert.ok(snapshot('router.linear.terminal-open-child').includes('- Frontier next child'), 'the open-child node carries its frontier');
     assert.ok(snapshot('router.linear.plan-reviewed').includes('- Plan-review verdicts: 1 (1 request changes)'), 'the planned leaf carries its verdicts');
   });

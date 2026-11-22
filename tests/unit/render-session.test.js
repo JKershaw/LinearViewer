@@ -1604,11 +1604,11 @@ function runEvidenceFixture(overrides = {}) {
     evidence: {
       asked: 'Do the thing', done: 'PR #12',
       checked: {
-        review: { verdict: 'approve-conditional', verdictText: 'Approve — conditional on close-out discharging the ledger.', ciLine: 'CI is green.', at: '2026-07-02T00:00:00.000Z', sha: 'abc1234' },
+        review: { verdict: 'approve', at: '2026-07-02T00:00:00.000Z', sha: 'abc1234' },
         now: { state: 'passing', checks: [], headSha: 'deadbeef', prUrl: 'https://github.com/acme/widget/pull/12', checksUrl: 'https://github.com/acme/widget/pull/12/checks', headMoved: false },
       },
     },
-    ledger: { verdict: 'approve-conditional', verdictText: 'Approve — conditional on close-out discharging the ledger.', ciLine: 'CI is green.', at: '2026-07-02T00:00:00.000Z', sha: 'abc1234', ledger: { present: true, empty: false, unparsed: false, items: [{ id: 'L1', claim: 'a claim', scope: 'inside', discharge: 'check it', dischargedBy: null, discharged: false, followUp: null, raw: '' }], raw: '' } },
+    ledger: { verdict: 'approve', at: '2026-07-02T00:00:00.000Z', sha: 'abc1234', ledger: { present: true, empty: false, unparsed: false, items: [{ id: 'L1', claim: 'a claim', scope: 'inside', discharge: 'check it', dischargedBy: null, discharged: false, followUp: null, raw: '' }], raw: '' } },
     closeOut: { owner: true, status: 'ready', pr: { url: 'https://github.com/acme/widget/pull/12', number: 12 }, message: null },
     ...overrides,
   };
