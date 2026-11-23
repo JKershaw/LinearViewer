@@ -16,14 +16,10 @@
  */
 import { Router, json } from 'express';
 import { jsonError } from '../lib/errors.js';
-import { createRecordWrites } from '../lib/records/writes.js';
-import { askedOf } from '../lib/asked-of.js';
 import { createQuestionAnswers } from '../lib/question-answers.js';
 import { enqueueFollowUp, ownerRefusalReply } from '../lib/follow-up-dispatch.js';
 import { resolveRunnerOwnerRefusal } from '../lib/runner-owner-gate.js';
-import { isTerminalState } from '../lib/providers/state-map.js';
-import { STAGE_KINDS } from '../lib/prompts/stage-kinds.js';
-import { personWriterOf, readSessionTicket, sessionTrackerFor } from './task-records.js';
+import { personWriterOf, sessionRecordWrites } from './task-records.js';
 import { dispatchQueueLimiter } from './dispatch.js';
 import { publicOrigin } from '../lib/public-origin.js';
 
@@ -43,15 +39,7 @@ export function createQuestionAnswerRoutes({ workspaceFromUrl, recordsStore, dis
   const router = Router();
 
   // Nothing the record writer is built from depends on the request (the tracker and ticket reads take a per-call ctx, which a decision write never passes), so it is built once, as routes/task-records.js does.
-  const writes = createRecordWrites({
-    recordsStore,
-    isTerminalState,
-    readTicket: readSessionTicket,
-    askedText: askedOf,
-    stageKinds: Object.keys(STAGE_KINDS),
-    listPeople,
-    tracker: sessionTrackerFor,
-  });
+  const writes = sessionRecordWrites({ recordsStore, listPeople });
 
   /** The request's own service: its resume carries the request's owner gate and origin. */
   function serviceFor(req) {

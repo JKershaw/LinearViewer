@@ -67,6 +67,27 @@ export function sessionTrackerFor(req) {
 }
 
 /**
+ * The record writer a session's routes share (this file's and routes/question-answers.js): one place for how it is configured, so
+ * a new option reaches every session route at once.
+ * @param {Object} deps
+ * @param {import('../lib/records-store.js').RecordsStore} deps.recordsStore
+ * @param {(urlKey: string) => Promise<{accountId: string, name: string}[]>} [deps.listPeople]
+ * @param {(req: object, ref: string) => Promise<object|null>} [deps.readTicket]
+ * @param {(req: object) => object} [deps.tracker]
+ */
+export function sessionRecordWrites({ recordsStore, listPeople = async () => [], readTicket = readSessionTicket, tracker = sessionTrackerFor }) {
+  return createRecordWrites({
+    recordsStore,
+    isTerminalState,
+    readTicket,
+    askedText: askedOf,
+    stageKinds: Object.keys(STAGE_KINDS),
+    listPeople,
+    tracker,
+  });
+}
+
+/**
  * @param {Object} deps
  * @param {Function} deps.workspaceFromUrl - the workspace middleware (lib/workspace.js)
  * @param {import('../lib/records-store.js').RecordsStore} deps.recordsStore
@@ -78,15 +99,7 @@ export function sessionTrackerFor(req) {
 export function createTaskRecordsRoutes({ workspaceFromUrl, recordsStore, accountStore = null, listPeople = async () => [], readTicket = readSessionTicket, tracker = sessionTrackerFor }) {
   if (!recordsStore) throw new Error('task records routes: recordsStore is required');
   const router = Router();
-  const writes = createRecordWrites({
-    recordsStore,
-    isTerminalState,
-    readTicket,
-    askedText: askedOf,
-    stageKinds: Object.keys(STAGE_KINDS),
-    listPeople,
-    tracker,
-  });
+  const writes = sessionRecordWrites({ recordsStore, listPeople, readTicket, tracker });
 
   const backTo = (urlKey, identifier, query = '') => `${taskPageHref({ urlKey, identifier })}${query}#task-records`;
   const refusedTo = (urlKey, identifier, problems) => backTo(urlKey, identifier, `?records_refused=${encodeURIComponent(problems[0]?.message || 'refused').slice(0, 300)}`);
