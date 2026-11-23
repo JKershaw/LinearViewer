@@ -1,5 +1,6 @@
 import { test, expect } from '../fixtures/test-base.js';
 import { localSeedId } from '../fixtures/local-harness.js';
+import { seedQuestion } from '../fixtures/question-records.js';
 
 // LIN-4009: one shared look across the pages a new user meets. Witnesses in a real browser:
 // titles are left-aligned on Home, Settings and Live Console; a state has its own colour on Home (needs you,
@@ -24,6 +25,7 @@ test.beforeEach(async ({ page, localWorkerUrlKey }) => {
   await page.goto(`/test/clear-agent-status?urlKey=${URL_KEY}`);
   await page.goto(`/test/clear-observation-sessions?urlKey=${URL_KEY}`);
   await page.goto(`/test/clear-sessions-feed-cache?urlKey=${URL_KEY}`);
+  await page.request.get(`/test/clear-ticket-records?urlKey=${URL_KEY}`);
 });
 
 /** Four In Progress tasks under one project; sessions are seeded through the consumer API below. */
@@ -72,13 +74,10 @@ async function seedSession(page, token, identifier, { kind, feedback = [] }) {
 
 async function seedStates(page) {
   const token = await runnerToken(page);
-  // LIN-4010: "needs you" is an open ruling, so the waiting session carries a structured decision (a bare [blocked] is a park).
+  // LIN-4010: "needs you" is an open question to the person (a bare [blocked] is a park). LIN-4538 (P7a): the ask is a question
+  // record the waiting run asked, which is what Home reads now.
   const itemId = await seedSession(page, token, TASKS.needsYou, { kind: 'implementation', feedback: ['[blocked] which API key?'] });
-  const decision = await page.request.post(`/api/dispatch/feedback/${itemId}`, {
-    headers: { Authorization: `Bearer ${token}`, 'Content-Type': 'application/json' },
-    data: { kind: 'decision', message: JSON.stringify({ decision_id: 'd-shared-look', question: 'Which API key?', options: [{ id: 'a', label: 'Use the staging key' }] }) },
-  });
-  expect(decision.status(), `decision failed: ${await decision.text()}`).toBe(200);
+  await seedQuestion(page, URL_KEY, { ticket: TASKS.needsYou, runId: itemId, asks: 'Which API key?', options: ['Use the staging key', 'Use the live key'], recommended: 'Use the staging key' });
   await seedSession(page, token, TASKS.failed, { kind: 'implementation', feedback: ['[failed] the build broke'] });
   await seedSession(page, token, TASKS.running, { kind: 'implementation' });
 }
@@ -117,7 +116,7 @@ test.describe('one shared look (LIN-4009)', () => {
       return { tone: el.dataset.tone, color: cs.color, weight: cs.fontWeight, background: cs.backgroundColor };
     });
     const style = async (identifier) => styleOf(rowState(page, identifier));
-    // LIN-4114: a task with an open ruling is a Waiting on you card; its needs-you state reads on that card's task line.
+    // LIN-4114: a task with an open question is a Waiting on you card; its needs-you state reads on that card's task line.
     const needsYou = await styleOf(page.locator('[data-testid="waiting-task-line"]', { hasText: TASKS.needsYou }).locator('[data-testid="issue-row-state"]'));
     const failed = await style(TASKS.failed);
     const running = await style(TASKS.running);
@@ -144,8 +143,8 @@ test.describe('one shared look (LIN-4009)', () => {
     await page.waitForLoadState('networkidle');
 
     const count = page.locator('[data-testid="in-progress-count"]');
-    // LIN-4024: the count line counts rulings as waiting on you, failed tasks as failed, running tasks as running.
-    // One ruling is open here (the blocked task), so the failed task is not waiting on you.
+    // LIN-4024: the count line counts open questions as waiting on you, failed tasks as failed, running tasks as running.
+    // One question is open here (the blocked task), so the failed task is not waiting on you.
     await expect(count).toContainText('1 waiting on you');
     await expect(count).toContainText('1 failed');
     await expect(count).toContainText('1 running');

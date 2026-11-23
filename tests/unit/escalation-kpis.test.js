@@ -318,7 +318,7 @@ describe('computeEscalationKpis — question records (LIN-4538)', () => {
 
   test('a closed ticket\'s open question is self-resolved and is NOT a false escalation', async () => {
     await askQuestion('LIN-102');
-    const ended = await endOpenQuestionsOfTicket({ recordsStore: records, urlKey: URL_KEY, ticket: 'LIN-102' });
+    const ended = await endOpenQuestionsOfTicket({ recordsStore: records, writes, urlKey: URL_KEY, ticket: 'LIN-102' });
     assert.strictEqual(ended.ended, 1);
     const kpis = await kpisNow();
     assert.strictEqual(kpis.selfResolved.count, 1, 'the ticket-closed question is self-resolved');

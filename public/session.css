@@ -77,6 +77,9 @@
   font-weight: 600;
   font-size: var(--font-size-base);
   color: var(--text);
+  /* LIN-4538: a question record carries its whole ask here (no case prose below it), so an unbroken token (a URL) must
+     wrap inside the card, as the case chunks do (LIN-2184). */
+  overflow-wrap: anywhere;
 }
 .sess-qcard-why-summary {
   cursor: pointer;

@@ -136,7 +136,7 @@ describe('false-live-rows (LIN-3365)', () => {
     assert.equal(w(before).clause3, 1);
     assert.equal(w(before).clause4, 1);
     await closeTicketRows({ urlKey: 'acme', ticket: { issueId: 'iid-1', identifier: 'LIN-1', stateType: 'completed' }, dispatchStore: store, agentStatusStore, now, log: () => {} });
-    await endOpenQuestionsOfTicket({ recordsStore: records, urlKey: 'acme', ticket: 'LIN-1' });
+    await endOpenQuestionsOfTicket({ recordsStore: records, writes, urlKey: 'acme', ticket: 'LIN-1' });
     const after = await runFalseLiveRows({ dispatchStore: store, recordsStore: records, urlKeys: ['acme'], now, readLoops, readTicketState });
     assert.equal(w(after).clause3, 0);
     assert.equal(w(after).clause4, 0);
@@ -162,7 +162,7 @@ describe('false-live-rows (LIN-3365)', () => {
     await seed('reopened', { rootItemId: 'Z', bookkeeping: { at: ago(1), by: 'x', reason: 'ticket-closed' } });
     // A question the closer ended "ticket closed" on a ticket that is open now (LIN-4538): a false close.
     const closed = await askOpen('LIN-W', ago(1));
-    await endOpenQuestionsOfTicket({ recordsStore: records, urlKey: 'acme', ticket: 'LIN-W' });
+    await endOpenQuestionsOfTicket({ recordsStore: records, writes, urlKey: 'acme', ticket: 'LIN-W' });
     const r = await run({ readTicketState: async () => ({ issueId: 'x', stateType: 'started' }) });
     const fc = w(r).falseCloses;
     assert.deepEqual(fc['handed-on'], ['bad-handed']);

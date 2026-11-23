@@ -1445,7 +1445,7 @@ describe('GET /api/escalation-kpis (LIN-1736; question records, LIN-4538)', () =
 
   test('a closed ticket\'s open question is "ticket closed": self-resolved, never a false escalation', async () => {
     await askQuestion('ws-a', 'LIN-9');
-    const ended = await endOpenQuestionsOfTicket({ recordsStore: records, urlKey: 'ws-a', ticket: 'LIN-9' });
+    const ended = await endOpenQuestionsOfTicket({ recordsStore: records, writes, urlKey: 'ws-a', ticket: 'LIN-9' });
     assert.equal(ended.ended, 1);
     const handler = getHandler(makeKpiRouter(records), 'get', '/workspace/:urlKey/api/escalation-kpis');
     const { req, res } = kpiReq();

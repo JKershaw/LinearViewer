@@ -545,6 +545,7 @@ function parsePendingResult(resultString) {
       // (lib/question-record-card.js). Mapped here so the card shows the question text, not an empty line.
       return {
         questionId: q.questionId,
+        issueIdentifier: typeof q.issueIdentifier === 'string' ? q.issueIdentifier : null,
         asks: typeof q.question === 'string' ? q.question : '',
         options: q.options,
         recommended: typeof q.recommended === 'string' ? q.recommended : null,
@@ -1183,6 +1184,19 @@ function renderDecisions(resultString, beforeLi) {
     qli.className = 'fc-decision fc-question';
     qli.setAttribute('data-testid', 'fc-question');
     qli.innerHTML = renderQuestionRecordCard(question, { urlKey: urlKey || '' });
+    // LIN-3361: the question's task, linked above its card (the task page), as the decision rows had it.
+    var taskHref = question.issueIdentifier && window.taskPageHref ? window.taskPageHref({ urlKey: urlKey, identifier: question.issueIdentifier }) : '';
+    if (taskHref) {
+      var ref = document.createElement('p');
+      ref.className = 'fc-decision-ref';
+      var refLink = document.createElement('a');
+      refLink.className = 'chat-task-link';
+      refLink.setAttribute('data-testid', 'fc-decision-task-link');
+      refLink.setAttribute('href', taskHref);
+      refLink.textContent = question.issueIdentifier;
+      ref.appendChild(refLink);
+      qli.insertBefore(ref, qli.firstChild);
+    }
     list.appendChild(qli);
   });
   thread.hidden = false;

@@ -1,4 +1,5 @@
 import { test, expect } from '../fixtures/test-base.js';
+import { askingRun, seedQuestion, questionState, decisionFor } from '../fixtures/question-records.js';
 
 // LIN-1003 (Phase 1 of LIN-950): the dedicated per-session page
 // (GET /workspace/:urlKey/observation/session/:sessionId) — the Observation
@@ -25,6 +26,7 @@ test.beforeEach(async ({ page, workerUrlKey }) => {
 });
 
 async function clearRuns(page) {
+  await page.goto(`/test/clear-ticket-records?urlKey=${URL_KEY}`);
   await page.goto(`/test/clear-dispatch-queue?urlKey=${URL_KEY}`);
   await page.goto(`/test/clear-dispatch-history?urlKey=${URL_KEY}`);
   await page.goto(`/test/clear-agent-status?urlKey=${URL_KEY}`);
@@ -274,56 +276,26 @@ async function seedSessionWithDecision(page) {
   return { workerId, decisionId };
 }
 
-// LIN-2948 R1: one decision-bearing run that ALSO carries a run-chat proposal,
+// LIN-2948 R1: one run waiting on a question that ALSO carries a run-chat proposal,
 // so the dark-contrast check sees every control this ticket added in a single
 // render (card Answer + dismiss, chat link, proposal Apply/Decline). Uses
 // TEST-1 (a mockAi-resolvable fixture task, lib/sample-data/mock-data.js) so the
 // run-scoped chat turn takes the propose path with no live LLM — the same seam
-// session-proposals.spec.js uses. Returns the anchor id (the run's session id).
+// session-proposals.spec.js uses. LIN-4538 (P7a): the run page pins the question
+// RECORDS a run asked, so the run is a root run parked on `[blocked]` (its card is
+// answerable) and the question is a record it asked. Returns the run's id (its session id).
 async function seedDecisionRunWithProposal(page) {
-  const anchor = await page.request.post(`/workspace/${URL_KEY}/api/dispatch`, {
-    data: { prompt: 'orchestrate', promptName: 'autopilot', kind: 'autopilot', issueIdentifier: 'TEST-1', issueTitle: 'Run-controls seed', target: 'cli' }
-  });
-  expect(anchor.status(), `anchor seed failed: ${await anchor.text()}`).toBe(201);
-  const anchorId = (await anchor.json()).item.id;
-
-  const worker = await page.request.post(`/workspace/${URL_KEY}/api/dispatch`, {
-    data: { prompt: 'implement', promptName: 'implementation', kind: 'implementation', issueIdentifier: 'TEST-1', issueTitle: 'Run-controls worker', target: 'cli', sessionId: anchorId }
-  });
-  expect(worker.status(), `worker seed failed: ${await worker.text()}`).toBe(201);
-  const workerId = (await worker.json()).item.id;
-
-  const tokenResp = await page.request.get(`/test/create-dispatch-token?label=runner&urlKey=${URL_KEY}`);
-  const { token } = await tokenResp.json();
-  const auth = { Authorization: `Bearer ${token}`, 'Content-Type': 'application/json' };
-  const take = await page.request.post(`/api/dispatch/take/${workerId}`, { headers: auth });
-  expect(take.status(), `take failed: ${await take.text()}`).toBe(200);
-  const blocked = await page.request.post(`/api/dispatch/feedback/${workerId}`, {
-    headers: auth, data: { message: '[blocked] need a ruling before continuing' }
-  });
-  expect(blocked.status(), `blocked feedback failed: ${await blocked.text()}`).toBe(200);
-  const decision = await page.request.post(`/api/dispatch/feedback/${workerId}`, {
-    headers: auth,
-    data: {
-      kind: 'decision',
-      message: JSON.stringify({
-        decision_id: 'd-r1-dark-controls',
-        question: 'Proceed with the rollout?',
-        options: [{ id: 'a', label: 'Approve' }],
-        if_unanswered: { summary: 'Nothing further runs; the run has already ended.' }
-      })
-    }
-  });
-  expect(decision.status(), `decision feedback failed: ${await decision.text()}`).toBe(200);
+  const runId = await askingRun(page, URL_KEY, 'TEST-1');
+  await seedQuestion(page, URL_KEY, { ticket: 'TEST-1', runId, asks: 'Proceed with the rollout?', options: ['Approve'], ifUnanswered: 'Nothing further runs; the run has already ended.' });
 
   // One run-scoped chat turn → one pending proposal under the run's step.
-  await page.goto(`/workspace/${URL_KEY}/task-chat?task=TEST-1&run=${encodeURIComponent(anchorId)}`);
+  await page.goto(`/workspace/${URL_KEY}/task-chat?task=TEST-1&run=${encodeURIComponent(runId)}`);
   await page.waitForLoadState('networkidle');
   await page.locator('#task-chat-question').fill('Please follow up on this run.');
   await page.locator('#task-chat-send').click();
   await expect(page.locator('.task-chat-tool', { hasText: 'proposed a follow-up' })).toBeVisible({ timeout: 5000 });
 
-  return anchorId;
+  return runId;
 }
 
 // Read the sessions feed and return the first session's id.
@@ -834,58 +806,58 @@ test.describe('Dedicated per-session page (LIN-1003)', () => {
     expect(dispatchFired).toBe(false);
   });
 
-  test('the pinned card answers a decision: comment carries the decision ids + chosen option, and the run resumes (LIN-3252 S2)', async ({ page }) => {
+  test('the pinned card answers a question through the one route: the decision holds the option and the words, and the run resumes (LIN-3252 S2, LIN-4538)', async ({ page }) => {
     await page.goto(`/test/set-session?urlKey=${URL_KEY}`);
     await clearRuns(page);
-    const { workerId, decisionId } = await seedSessionWithDecision(page);
-    const sessionId = await discoverSessionId(page);
+    const runId = await askingRun(page, URL_KEY, 'LIN-1728');
+    const questionId = await seedQuestion(page, URL_KEY, { ticket: 'LIN-1728', runId, asks: 'Proceed with option A?', options: ['Approve', 'Hold'] });
 
-    await page.goto(`/workspace/${URL_KEY}/observation/session/${encodeURIComponent(sessionId)}`);
+    await page.goto(`/workspace/${URL_KEY}/observation/session/${encodeURIComponent(runId)}`);
     await page.waitForLoadState('networkidle');
 
-    const card = page.locator('[data-testid="session-question-card"]');
+    const card = page.locator(`[data-testid="session-question-records"] [data-testid="question-record-card"][data-question-id="${questionId}"]`);
     await expect(card).toBeVisible();
-    // LIN-4114: a press on a declared option answers at once with its own label and option id (no separate Answer click),
-    // so the option id rides the write. The "own answer" box stays empty.
-    const [commentReq, dispatchReq] = await Promise.all([
-      page.waitForRequest(r => r.url().includes('/api/comments/') && r.method() === 'POST'),
-      page.waitForRequest(r => r.url().includes('/api/dispatch') && r.method() === 'POST'),
-      card.locator('[data-testid="session-question-card-option"]').first().click()
+    await card.locator('[data-option-id="Approve"]').click();
+    await card.locator('[data-testid="question-record-card-input"]').fill('approve it, and keep the old flag');
+    const [answerReq] = await Promise.all([
+      page.waitForRequest(r => /\/questions\/[^/]+\/answer$/.test(r.url()) && r.method() === 'POST'),
+      card.locator('[data-testid="question-record-card-answer"]').click(),
     ]);
+    expect(answerReq.postDataJSON()).toEqual({ option: 'Approve', words: 'approve it, and keep the old flag' });
+    const answered = await (await answerReq.response()).json();
+    expect(answered.resumed, 'the asking run resumes').toBe(true);
+    await expect(card.locator('[data-testid="question-record-card-feedback"]')).toHaveText('Answered. The run resumes with your answer.');
 
-    const commentBody = commentReq.postDataJSON();
-    expect(commentBody.decisionLoopId).toBe(workerId);
-    expect(commentBody.decisionId).toBe(decisionId);
-    expect(commentBody.optionId).toBe('a');
-    expect((await commentReq.response()).status()).toBe(201);
-
-    // Answer → the run resumes: the follow-up dispatch targets the decision's loop.
-    expect(dispatchReq.postDataJSON().followUpTo).toBe(workerId);
-    expect((await dispatchReq.response()).status()).toBeLessThan(300);
+    const decision = await decisionFor(page, URL_KEY, questionId);
+    expect(decision?.fields.answer).toBe('Approve');
+    expect(decision?.fields.words).toBe('approve it, and keep the old flag');
+    expect(await questionState(page, URL_KEY, questionId)).toBe('answered');
   });
 
-  test('the pinned card dismisses a decision and the false-escalation KPI counts it (LIN-3252 S2/C2)', async ({ page }) => {
+  test('the pinned card dismisses a question and the false-escalation KPI counts it (LIN-3252 S2/C2, LIN-4538)', async ({ page }) => {
     await page.goto(`/test/set-session?urlKey=${URL_KEY}`);
     await clearRuns(page);
-    const { decisionId } = await seedSessionWithDecision(page);
-    const sessionId = await discoverSessionId(page);
+    const runId = await askingRun(page, URL_KEY, 'LIN-1728');
+    const questionId = await seedQuestion(page, URL_KEY, { ticket: 'LIN-1728', runId, asks: 'Proceed with option A?', options: ['Approve'] });
 
-    await page.goto(`/workspace/${URL_KEY}/observation/session/${encodeURIComponent(sessionId)}`);
+    await page.goto(`/workspace/${URL_KEY}/observation/session/${encodeURIComponent(runId)}`);
     await page.waitForLoadState('networkidle');
 
-    const card = page.locator('[data-testid="session-question-card"]');
+    const card = page.locator(`[data-testid="session-question-records"] [data-testid="question-record-card"][data-question-id="${questionId}"]`);
     await expect(card).toBeVisible();
     const [dismissReq] = await Promise.all([
-      page.waitForRequest(r => r.url().includes('/api/dashboard/rulings/dismiss') && r.method() === 'POST'),
-      card.locator('[data-testid="session-question-card-dismiss"]').click()
+      page.waitForRequest(r => /\/questions\/[^/]+\/dismiss$/.test(r.url()) && r.method() === 'POST'),
+      card.locator('[data-testid="question-record-card-dismiss"]').click(),
     ]);
-    expect(dismissReq.postDataJSON().decisionId).toBe(decisionId);
     expect((await dismissReq.response()).status()).toBe(200);
+    await expect(card).toHaveAttribute('data-settled', 'true');
+    expect(await questionState(page, URL_KEY, questionId)).toBe('withdrawn');
 
-    // The card goes away and does not come back.
-    await expect(page.locator('[data-testid="session-question-card"]')).toHaveCount(0);
+    // A reload does not bring it back as an open question.
+    await page.reload();
+    await expect(page.locator(`[data-question-id="${questionId}"]`)).toHaveCount(0);
 
-    // The dismissal is counted by the false-escalation KPI.
+    // The dismissal is counted by the false-escalation KPI (LIN-4538: read from the question's end, by a person, "dismissed").
     const kpiResp = await page.request.get(`/workspace/${URL_KEY}/api/escalation-kpis`);
     expect(kpiResp.status()).toBe(200);
     const kpi = await kpiResp.json();
@@ -1096,8 +1068,8 @@ test.describe('Dedicated per-session page (LIN-1003)', () => {
     const sessionId = await seedDecisionRunWithProposal(page);
 
     const selectors = [
-      '[data-testid="session-question-card-answer"]',
-      '[data-testid="session-question-card-dismiss"]',
+      '[data-testid="question-record-card-answer"]',
+      '[data-testid="question-record-card-dismiss"]',
       '[data-testid="session-run-chat"]',
       '[data-testid="session-proposal"][data-proposal-status="proposed"] [data-proposal-action="apply"]',
       '[data-testid="session-proposal"][data-proposal-status="proposed"] [data-proposal-action="decline"]',

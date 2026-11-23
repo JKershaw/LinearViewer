@@ -2182,7 +2182,7 @@ describe('flight-companion.js — LIN-4538: the open questions the companion sho
     const parsed = m.parsePendingResult(questionsResult([question()]));
     assert.strictEqual(parsed.ok, true);
     assert.deepStrictEqual(parsed.questions, [{
-      questionId: 'q-1', asks: 'Should we ship it?', options: ['Ship it', 'Hold'], recommended: 'Ship it',
+      questionId: 'q-1', issueIdentifier: 'LIN-100', asks: 'Should we ship it?', options: ['Ship it', 'Hold'], recommended: 'Ship it',
       ifUnanswered: null, state: 'resumable', interactive: true,
     }]);
     assert.deepStrictEqual(m.parsePendingResult(JSON.stringify({ count: 0, truncated: false, questions: [] })), { ok: true, questions: [] });

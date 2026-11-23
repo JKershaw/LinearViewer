@@ -1,9 +1,14 @@
 import { test, expect } from '../fixtures/test-base.js';
+import { askingRun, seedQuestion } from '../fixtures/question-records.js';
 
 // LIN-1736 — the operator-facing escalation KPI audit page: escalation rate,
 // time-to-response, false-escalation rate, unanswered age
 // (docs/escalation-philosophy.md §7). Session-authed, cross-workspace like
 // the rest of Observation — never the public /kpis surface.
+//
+// LIN-4538 (P7a): the KPIs are read from question records (lib/records/question-facts.js):
+// an open question is unanswered, an answered one is resolved, and only a person's
+// "dismissed" withdrawal is a false escalation. The fixtures ask through a question record.
 
 let URL_KEY;
 let KPIS_URL;
@@ -21,43 +26,17 @@ test.beforeEach(async ({ page, workerUrlKey }) => {
 });
 
 async function clearRuns(page) {
+  await page.goto(`/test/clear-ticket-records?urlKey=${URL_KEY}`);
   await page.goto(`/test/clear-dispatch-queue?urlKey=${URL_KEY}`);
   await page.goto(`/test/clear-dispatch-history?urlKey=${URL_KEY}`);
   await page.goto(`/test/clear-agent-status?urlKey=${URL_KEY}`);
 }
 
-// Seed a taken worker carrying a `kind: 'decision'` entry — the same real
-// take+feedback flow observation-rulings.spec.js's seedDecisionWorker uses.
-async function seedDecisionWorker(page, { issueIdentifier, decisionId }) {
-  const anchor = await page.request.post(`/workspace/${URL_KEY}/api/dispatch`, {
-    data: { prompt: 'orchestrate', promptName: 'autopilot', kind: 'autopilot', issueIdentifier, issueTitle: 'KPI fixture', target: 'cli' }
-  });
-  expect(anchor.status()).toBe(201);
-  const anchorId = (await anchor.json()).item.id;
-
-  const worker = await page.request.post(`/workspace/${URL_KEY}/api/dispatch`, {
-    data: { prompt: 'implement', promptName: 'implementation', kind: 'implementation', issueIdentifier, issueTitle: 'KPI fixture', target: 'cli', sessionId: anchorId }
-  });
-  expect(worker.status()).toBe(201);
-  const workerId = (await worker.json()).item.id;
-
-  const tokenResp = await page.request.get(`/test/create-dispatch-token?label=runner&urlKey=${URL_KEY}`);
-  const { token } = await tokenResp.json();
-  const auth = { Authorization: `Bearer ${token}`, 'Content-Type': 'application/json' };
-  const take = await page.request.post(`/api/dispatch/take/${workerId}`, { headers: auth });
-  expect(take.status()).toBe(200);
-
-  const blocked = await page.request.post(`/api/dispatch/feedback/${workerId}`, {
-    headers: auth, data: { message: '[blocked] need a ruling before continuing' }
-  });
-  expect(blocked.status()).toBe(200);
-
-  const decision = await page.request.post(`/api/dispatch/feedback/${workerId}`, {
-    headers: auth,
-    data: { kind: 'decision', message: JSON.stringify({ decision_id: decisionId, question: 'Proceed?', options: [{ id: 'a', label: 'Approve' }] }) }
-  });
-  expect(decision.status()).toBe(200);
-  return { workerId };
+// A run parked on `[blocked]` and the question it asked the person (tests/fixtures/question-records.js).
+async function seedQuestionRun(page, { issueIdentifier }) {
+  const runId = await askingRun(page, URL_KEY, issueIdentifier);
+  const questionId = await seedQuestion(page, URL_KEY, { ticket: issueIdentifier, runId, asks: 'Proceed?', options: ['Approve'] });
+  return { runId, questionId };
 }
 
 test.describe('Escalation KPIs page (LIN-1736)', () => {
@@ -74,24 +53,27 @@ test.describe('Escalation KPIs page (LIN-1736)', () => {
     await expect(page.locator('[data-testid="kpi-time-to-response"]')).toContainText('no rulings resolved in this window');
   });
 
-  test('a real unanswered decision is reflected in the unanswered-age card', async ({ page }) => {
+  test('a real unanswered question is reflected in the unanswered-age card', async ({ page }) => {
     await page.goto(`/test/set-session?urlKey=${URL_KEY}`);
     await clearRuns(page);
-    await seedDecisionWorker(page, { issueIdentifier: 'LIN-KPI-1', decisionId: 'd-kpi-1' });
+    await seedQuestionRun(page, { issueIdentifier: 'LIN-KPI-1' });
 
     await page.goto(KPIS_URL);
     await expect(page.locator('[data-testid="kpi-unanswered-age"]')).toContainText('1 waiting');
   });
 
-  test('a resolved decision (answered) is reflected in time-to-response, not false-escalation', async ({ page }) => {
+  test('a resolved question (answered) is reflected in time-to-response, not false-escalation', async ({ page }) => {
     await page.goto(`/test/set-session?urlKey=${URL_KEY}`);
     await clearRuns(page);
-    const { workerId } = await seedDecisionWorker(page, { issueIdentifier: 'LIN-KPI-2', decisionId: 'd-kpi-2' });
+    const { questionId } = await seedQuestionRun(page, { issueIdentifier: 'LIN-KPI-2' });
 
-    const commentResp = await page.request.post(`/workspace/${URL_KEY}/api/comments/LIN-KPI-2`, {
-      data: { body: 'Approve', decisionLoopId: workerId, decisionId: 'd-kpi-2' }
+    // Answered through the one answer route (routes/question-answers.js), as every surface answers.
+    const answerResp = await page.request.post(`/workspace/${URL_KEY}/questions/${encodeURIComponent(questionId)}/answer`, {
+      data: { option: 'Approve' }
     });
-    expect(commentResp.status()).toBe(201);
+    expect(answerResp.status()).toBe(200);
+    const kpi = await (await page.request.get(`/workspace/${URL_KEY}/api/escalation-kpis`)).json();
+    expect(kpi.falseEscalation.dismissed, 'an answer is not a dismissal').toBe(0);
 
     await page.goto(KPIS_URL);
     await expect(page.locator('[data-testid="kpi-time-to-response"]')).toContainText('resolved');

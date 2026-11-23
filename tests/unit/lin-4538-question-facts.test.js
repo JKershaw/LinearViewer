@@ -92,7 +92,7 @@ describe('questionFacts', () => {
 describe('endOpenQuestionsOfTicket: the ticket closer', () => {
   test('a closed ticket\'s open question ends withdrawn, "ticket closed", by Harbour, and is self-resolved, not a dismissal', async () => {
     const id = await askQuestion({ task: 'LIN-20' });
-    const out = await endOpenQuestionsOfTicket({ recordsStore: records, urlKey: URL_KEY, ticket: 'LIN-20' });
+    const out = await endOpenQuestionsOfTicket({ recordsStore: records, writes, urlKey: URL_KEY, ticket: 'LIN-20' });
     assert.equal(out.ended, 1);
     const row = byId(await questionFacts(records, URL_KEY), id);
     assert.equal(row.state, 'withdrawn');
@@ -104,9 +104,9 @@ describe('endOpenQuestionsOfTicket: the ticket closer', () => {
   test('a second close ends nothing more; a ticket with no task, or another ticket\'s question, is untouched', async () => {
     const mine = await askQuestion({ task: 'LIN-21' });
     const other = await askQuestion({ task: 'LIN-22' });
-    await endOpenQuestionsOfTicket({ recordsStore: records, urlKey: URL_KEY, ticket: 'LIN-21' });
-    assert.equal((await endOpenQuestionsOfTicket({ recordsStore: records, urlKey: URL_KEY, ticket: 'LIN-21' })).ended, 0);
-    assert.equal((await endOpenQuestionsOfTicket({ recordsStore: records, urlKey: URL_KEY, ticket: 'LIN-404' })).ended, 0);
+    await endOpenQuestionsOfTicket({ recordsStore: records, writes, urlKey: URL_KEY, ticket: 'LIN-21' });
+    assert.equal((await endOpenQuestionsOfTicket({ recordsStore: records, writes, urlKey: URL_KEY, ticket: 'LIN-21' })).ended, 0);
+    assert.equal((await endOpenQuestionsOfTicket({ recordsStore: records, writes, urlKey: URL_KEY, ticket: 'LIN-404' })).ended, 0);
     const rows = await questionFacts(records, URL_KEY);
     assert.equal(byId(rows, mine).state, 'withdrawn');
     assert.equal(byId(rows, other).state, 'open');

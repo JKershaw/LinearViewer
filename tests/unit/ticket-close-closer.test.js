@@ -208,12 +208,15 @@ describe('ticket-close-closer (LIN-3366)', () => {
       const order = [];
       const spy = Object.create(store);
       spy.closeIssueRows = async (...a) => { order.push('close'); return store.closeIssueRows(...a); };
-      // A wrapper, not Object.create: RecordsStore keeps private fields, which a prototype-derived spy cannot read.
-      const spyRecords = {
-        find: (...a) => records.find(...a),
-        taskForTicket: (...a) => records.taskForTicket(...a),
-        end: async (...a) => { order.push('end'); return records.end(...a); },
-      };
+      // A forwarding proxy, not Object.create: RecordsStore keeps private fields, which a prototype-derived spy cannot read.
+      // Every method reaches the real store bound to it; only `end` (the store write the checked writes.end makes) is observed.
+      const spyRecords = new Proxy(records, {
+        get(target, prop) {
+          if (prop === 'end') return async (...a) => { order.push('end'); return target.end(...a); };
+          const v = target[prop];
+          return typeof v === 'function' ? v.bind(target) : v;
+        },
+      });
       const candidates = await prep(); // read with the real store; the spy only observes the writes
       const r = await close({ dispatchStore: spy, recordsStore: spyRecords, candidates });
       assert.deepEqual(order, ['close', 'end']);

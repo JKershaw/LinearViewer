@@ -888,6 +888,10 @@
   // this container, so the container-level click handler must not treat a button
   // in it as a control. Ticket text can carry `data-action`/`data-prompt`.
   const MARKDOWN_SINK = '[data-prompt-body], .swipe-reasoning';
+  // LIN-4538 (P7a): the opened task's question card (keepTypedQuestion, readerFocusIn). The task's open question is a question
+  // record card now (lib/question-record-card.js); a ruling card is still read where one is drawn. Both are keyed by the one
+  // QuestionCards.rulingKeyOf (a question card by its question id).
+  const QUESTION_CARD = '[data-testid="session-question-card"], [data-testid="question-record-card"]';
 
   /**
    * Initialise a prompt section inside the given container.
@@ -1028,8 +1032,8 @@
       const fresh = container.querySelector('[data-question-slot]');
       if (!fresh) return;
       const QC = window.QuestionCards;
-      const oldCard = oldQuestion ? oldQuestion.querySelector('[data-testid="session-question-card"]') : null;
-      const freshCard = fresh.querySelector('[data-testid="session-question-card"]');
+      const oldCard = oldQuestion ? oldQuestion.querySelector(QUESTION_CARD) : null;
+      const freshCard = fresh.querySelector(QUESTION_CARD);
       const keepsPlace = !!(QC && typeof QC.keepsReaderPlace === 'function' && QC.keepsReaderPlace(oldCard, freshCard, focus ? focus.el : null));
       if (oldQuestion && keepsPlace) { fresh.replaceWith(oldQuestion); restoreReaderFocus(focus); return; }
       if (QC && typeof QC.initQuestionCards === 'function') QC.initQuestionCards(container);
@@ -1041,7 +1045,7 @@
     // there is no keep at all (keepTypedQuestion), so there is nothing to capture for.
     function readerFocusIn(oldQuestion) {
       const QC = window.QuestionCards;
-      const card = oldQuestion ? oldQuestion.querySelector('[data-testid="session-question-card"]') : null;
+      const card = oldQuestion ? oldQuestion.querySelector(QUESTION_CARD) : null;
       if (!QC || typeof QC.focusInCard !== 'function' || !QC.focusInCard(card)) return null;
       const active = document.activeElement;
       return { el: active, start: active.selectionStart, end: active.selectionEnd };

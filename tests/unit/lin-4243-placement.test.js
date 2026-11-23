@@ -201,7 +201,8 @@ describe('sectionFacts: the DOM facts that make the swap wait', () => {
   function section({ present = [], cards = [], contains = () => false } = {}) {
     return {
       querySelector: (sel) => (present.includes(sel) ? {} : null),
-      querySelectorAll: (sel) => (sel === '[data-testid="session-question-card"]' ? cards : []),
+      // LIN-4538: the cards are a ruling card or a question record card; the fake answers the selector naming both, and only it.
+      querySelectorAll: (sel) => (sel === '[data-testid="session-question-card"], [data-testid="question-record-card"]' ? cards : []),
       contains,
     };
   }

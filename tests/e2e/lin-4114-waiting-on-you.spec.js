@@ -11,19 +11,28 @@
  *   [data-testid="waiting-header"]        the section header (the DESK_SECTIONS toggle)
  * The card, its options, Answer and the count line use the selectors the shared card already has.
  *
- * LIN-4242: the owner's section is always on Home, hidden when empty (W12b and W14 assert hidden, not removed). Witness 16
+ * LIN-4538 (P7a): Home's waiting rows are open question records a run asked the person (seeded through
+ * tests/fixtures/question-records.js), drawn as the question record card (lib/question-record-card.js): an option chooses,
+ * Answer sends the option and the person's words together, and a card answered here stays, settled, out of the count and the
+ * badge (LIN-4532). A scan-raised ruling is not drawn on Home any more (W11); the Rulings page serves it until P7b retires it.
+ *
+ * LIN-4242: the owner's section is always on Home, hidden when empty (W12b asserts hidden after a reload). Witness 16
  * (a member and a keyless owner see no section, and no card text leaks through /api/home-rows) needs a
  * second session, and is not in this file yet (noted in the PR, to be written with its session helper).
  */
 import { randomUUID } from 'node:crypto';
 import { test, expect } from '../fixtures/test-base.js';
 import { localSeedId } from '../fixtures/local-harness.js';
+import { askingRun, seedQuestion } from '../fixtures/question-records.js';
 
 const OLD = '2020-01-01T00:00:00Z';
 const SECTION = '[data-testid="waiting-on-you"]';
-const CARD = `${SECTION} [data-testid="session-question-card"]`;
+const CARD = `${SECTION} [data-testid="question-record-card"]`;
+const OPEN_CARD = `${CARD}:not([data-settled="true"])`;
 // A waiting card's wrapper: the task line and the shared card are its children, so the task filter runs on the wrapper.
-const WAIT_CARD = `${SECTION} .waiting-card`;
+const WAIT_CARD = `${SECTION} .waiting-question`;
+const ANSWER = '[data-testid="question-record-card-answer"]';
+const FEEDBACK = '[data-testid="question-record-card-feedback"]';
 const COUNT = '[data-testid="in-progress-count"]';
 const BADGE = '.rulings-badge .rulings-count';
 
@@ -49,8 +58,10 @@ test.beforeEach(async ({ page, localWorkerUrlKey }) => {
   await page.request.get(`/test/clear-dispatch-queue?urlKey=${URL_KEY}`);
   await page.request.get(`/test/clear-dispatch-history?urlKey=${URL_KEY}`);
   await page.request.get(`/test/clear-sessions-feed-cache?urlKey=${URL_KEY}`);
-  // TaskDecisionsStore is durable: a scan ruling from an earlier test would otherwise stay on Home (LIN-2212's clear route).
+  // TaskDecisionsStore is durable: a scan ruling from an earlier test would otherwise stay (LIN-2212's clear route).
   await page.request.get(`/test/clear-task-decisions?urlKey=${URL_KEY}`);
+  // Question records are durable too: one from an earlier test would otherwise stay on Home.
+  await page.request.get(`/test/clear-ticket-records?urlKey=${URL_KEY}`);
 });
 
 /** A small tree: a started charter, a started middle, a Todo task three levels down, and a Todo task on its own. */
@@ -69,29 +80,21 @@ async function seedTree(page, { extraIssues = [] } = {}) {
   expect(resp.ok()).toBeTruthy();
 }
 
-/** A worker waiting on a ruling, written through the dispatch API the way a runner writes it (enqueue, take, `[decision]`). */
-async function seedRuling(page, identifier, decision) {
+/** A run on `identifier` parked on `[blocked]`, and the open question it asked the person. Returns the question id. */
+async function seedWaiting(page, identifier, { options, recommended = null }) {
   if (!RUNNER_TOKEN) RUNNER_TOKEN = (await (await page.request.get(`/test/create-dispatch-token?label=runner&urlKey=${URL_KEY}`)).json()).token;
-  const token = RUNNER_TOKEN;
-  const res = await page.request.post(`/workspace/${URL_KEY}/api/dispatch`, {
-    data: { prompt: 'implementation prompt', promptName: 'implementation', kind: 'implementation', issueIdentifier: identifier, issueTitle: identifier, target: 'cli' },
-  });
-  expect(res.status(), `dispatch seed failed: ${await res.text()}`).toBe(201);
-  const itemId = (await res.json()).item.id;
-  const taken = await page.request.post(`/api/dispatch/take/${itemId}`, { headers: { Authorization: `Bearer ${token}` } });
-  expect(taken.status(), `take failed: ${await taken.text()}`).toBe(200);
-  const feedback = (data) => page.request.post(`/api/dispatch/feedback/${itemId}`, {
-    headers: { Authorization: `Bearer ${token}`, 'Content-Type': 'application/json' }, data,
-  });
-  expect((await feedback({ message: '[blocked] which way?' })).status()).toBe(200);
-  const res2 = await feedback({ kind: 'decision', message: JSON.stringify({ decision_id: `d-${identifier}`, question: `Which for ${identifier}?`, ...decision }) });
-  expect(res2.status(), `decision failed: ${await res2.text()}`).toBe(200);
+  const runId = await askingRun(page, URL_KEY, identifier, { token: RUNNER_TOKEN });
+  return seedQuestion(page, URL_KEY, { ticket: identifier, runId, asks: `Which for ${identifier}?`, options, recommended });
 }
 
-const THREE_OPTIONS = {
-  options: [{ id: 'ship', label: 'Ship it now' }, { id: 'wait', label: 'Wait for review' }, { id: 'split', label: 'Split the change' }],
-  recommended: 'wait',
-};
+/** Answer one question card as the person does: choose the option, then press Answer. */
+async function answerWith(card, option) {
+  await card.locator(`[data-option-id="${option}"]`).click();
+  await card.locator(ANSWER).click();
+}
+
+const THREE_OPTIONS = { options: ['Ship it now', 'Wait for review', 'Split the change'], recommended: 'Wait for review' };
+const ONE_OPTION = { options: ['Yes'] };
 
 /** The count line's "N waiting on you", or '' when the line says no such thing. */
 async function waitingCount(page) {
@@ -102,15 +105,15 @@ async function waitingCount(page) {
 
 // ---- witness 7: one card per ruling, deep in the tree, equal to the count line and the badge -----------------------
 
-test('W7: a ruling three levels down and a solo ruling each get one card, and the count line and the badge agree', async ({ page }) => {
+test('W7: a question three levels down and a solo question each get one card, and the count line and the badge agree', async ({ page }) => {
   await seedTree(page, { runnerKey: true });
-  await seedRuling(page, 'LOCAL-D', THREE_OPTIONS);
-  await seedRuling(page, 'LOCAL-S', { options: [{ id: 'a', label: 'Yes' }] });
+  await seedWaiting(page, 'LOCAL-D', THREE_OPTIONS);
+  await seedWaiting(page, 'LOCAL-S', ONE_OPTION);
   await page.goto(`/workspace/${URL_KEY}/`);
 
   const section = page.locator(SECTION);
   await expect(section).toBeVisible();
-  await expect(section.locator('[data-testid="session-question-card"]')).toHaveCount(2);
+  await expect(section.locator('[data-testid="question-record-card"]')).toHaveCount(2);
   await expect(section.locator('[data-testid="waiting-task-line"]', { hasText: 'LOCAL-D' })).toHaveCount(1);
   await expect(section.locator('[data-testid="waiting-task-line"]', { hasText: 'LOCAL-S' })).toHaveCount(1);
   await expect(page.locator(COUNT)).toContainText('2 waiting on you');
@@ -120,9 +123,9 @@ test('W7: a ruling three levels down and a solo ruling each get one card, and th
 
 // ---- witness 1 (press semantics), 3 (double press, in-flight lock): browser behaviour -----------------------------
 
-test('W1: the recommended answer is the main button; a press sends its own label even when text is typed', async ({ page }) => {
+test('W1: the recommended answer is the main button; a press chooses an option, and Answer sends it with the typed words in one request', async ({ page }) => {
   await seedTree(page, { runnerKey: true });
-  await seedRuling(page, 'LOCAL-S', THREE_OPTIONS);
+  await seedWaiting(page, 'LOCAL-S', THREE_OPTIONS);
   await page.goto(`/workspace/${URL_KEY}/`);
 
   const card = page.locator(CARD).first();
@@ -130,64 +133,72 @@ test('W1: the recommended answer is the main button; a press sends its own label
   await expect(card.locator('input[type="radio"]')).toHaveCount(0);
   const primary = card.locator('.btn--primary');
   await expect(primary, 'the recommended option is the main button').toHaveCount(1, { timeout: 5000 });
-  await expect(primary).toHaveAttribute('data-option-id', 'wait');
+  await expect(primary).toHaveAttribute('data-option-id', 'Wait for review');
   await expect(primary).toHaveAttribute('data-recommended', 'true');
 
-  await card.locator('[data-testid="session-question-card-input"]').fill('my own words');
-  const commentBody = page.waitForRequest(req => req.method() === 'POST' && /\/api\/comments\//.test(req.url()));
-  await card.locator('[data-option-id="split"]').click();
-  const body = (await commentBody).postDataJSON();
-  expect(body.prompt ?? body.body ?? JSON.stringify(body)).toContain('Split the change');
-  expect(JSON.stringify(body)).not.toContain('my own words');
+  // A press on an option only chooses it: nothing is sent until Answer.
+  let answers = 0;
+  page.on('request', req => { if (req.method() === 'POST' && /\/questions\/[^/]+\/answer$/.test(req.url())) answers++; });
+  await card.locator('[data-option-id="Split the change"]').click();
+  await expect(card.locator('[data-option-id="Split the change"]')).toHaveAttribute('aria-pressed', 'true');
+  await card.locator('[data-testid="question-record-card-input"]').fill('my own words');
+  expect(answers, 'choosing an option sends nothing').toBe(0);
+  const sent = page.waitForRequest(req => req.method() === 'POST' && /\/questions\/[^/]+\/answer$/.test(req.url()));
+  await card.locator(ANSWER).click();
+  expect((await sent).postDataJSON()).toEqual({ option: 'Split the change', words: 'my own words' });
+  await expect(card).toHaveAttribute('data-settled', 'true');
 });
 
 test('W3: while an answer is in flight, no button on the card can send a second one (a double press, another option, Answer)', async ({ page }) => {
   await seedTree(page, { runnerKey: true });
-  await seedRuling(page, 'LOCAL-S', THREE_OPTIONS);
+  await seedWaiting(page, 'LOCAL-S', THREE_OPTIONS);
   await page.goto(`/workspace/${URL_KEY}/`);
 
   const card = page.locator(CARD).first();
-  // Hold the comment write open, so the card is genuinely in flight when the second presses land.
-  let comments = 0;
+  // Hold the answer open, so the card is genuinely in flight when the second presses land.
+  let answers = 0;
   let release;
   const gate = new Promise(resolve => { release = resolve; });
-  await page.route(/\/api\/comments\//, async route => {
-    if (route.request().method() === 'POST') comments++;
+  await page.route(/\/questions\/[^/]+\/answer$/, async route => {
+    if (route.request().method() === 'POST') answers++;
     await gate;
     await route.continue();
   });
-  const primary = card.locator('.btn--primary');
-  await expect(primary, 'the recommended option is the main button').toHaveCount(1, { timeout: 5000 });
-  await primary.click();
-  await expect.poll(() => comments, { timeout: 5000 }).toBe(1);
+  await answerWith(card, 'Wait for review');
+  await expect.poll(() => answers, { timeout: 5000 }).toBe(1);
   // Every control on the card is off while the answer is in flight.
   for (const button of await card.locator('[data-option-id]').all()) await expect(button).toBeDisabled();
-  await expect(card.locator('[data-testid="session-question-card-answer"]')).toBeDisabled();
-  // Second presses are refused: a disabled button takes no click, so force-clicking one must not send a comment.
+  await expect(card.locator(ANSWER)).toBeDisabled();
+  // Second presses are refused: a disabled button takes no click, so force-clicking one must not send a second answer.
   await card.locator('[data-option-id]').nth(1).click({ force: true });
-  await card.locator('[data-testid="session-question-card-answer"]').click({ force: true });
+  await card.locator(ANSWER).click({ force: true });
+  await card.locator(ANSWER).click({ force: true });
   await page.waitForTimeout(500);
-  expect(comments, 'one comment for the whole sequence of presses').toBe(1);
+  expect(answers, 'one answer for the whole sequence of presses').toBe(1);
   release();
+  // Settled, the controls stay off.
+  await expect(card).toHaveAttribute('data-settled', 'true');
+  await expect(card.locator(ANSWER)).toBeDisabled();
 });
-// The "stays off after success" half is a unit witness (tests/unit/lin-4114-inflight-lock.test.js): a delivered answer
-// removes the card from Home, so there is no card left here to check.
 
-// ---- witnesses 12, 15: a run-raised ruling answered in place, count line and badge fall ---------------------------
+// ---- witnesses 12, 15: a run's question answered in place, count line and badge fall ------------------------------
 
-test('W12: pressing the recommended button answers in place; the card goes, the count line and the badge drop, and a reload agrees', async ({ page }) => {
+test('W12: answering with the recommended button settles the card in place; the count line and the badge drop, and a reload agrees', async ({ page }) => {
   await seedTree(page, { runnerKey: true });
-  await seedRuling(page, 'LOCAL-D', THREE_OPTIONS);
-  await seedRuling(page, 'LOCAL-S', { options: [{ id: 'a', label: 'Yes' }] });
+  await seedWaiting(page, 'LOCAL-D', THREE_OPTIONS);
+  await seedWaiting(page, 'LOCAL-S', ONE_OPTION);
   await page.goto(`/workspace/${URL_KEY}/`);
   await expect(page.locator(COUNT)).toContainText('2 waiting on you');
   await syncBadge(page);
   await expect(page.locator(BADGE)).toHaveText('2', { timeout: 15000 });
 
-  const deep = page.locator(WAIT_CARD, { has: page.locator('[data-testid="waiting-task-line"]', { hasText: 'LOCAL-D' }) });
+  const deep = page.locator(WAIT_CARD, { has: page.locator('[data-testid="waiting-task-line"]', { hasText: 'LOCAL-D' }) }).locator('[data-testid="question-record-card"]');
   await expect(deep.locator('.btn--primary'), 'the recommended option is the main button').toHaveCount(1, { timeout: 5000 });
   await deep.locator('.btn--primary').click();
-  await expect(deep).toHaveCount(0);
+  await deep.locator(ANSWER).click();
+  await expect(deep).toHaveAttribute('data-settled', 'true');
+  await expect(deep.locator(FEEDBACK)).toHaveText('Answered. The run resumes with your answer.');
+  await expect(page.locator(OPEN_CARD)).toHaveCount(1);
   await expect(page.locator(COUNT)).toContainText('1 waiting on you');
   await syncBadge(page);
   await expect(page.locator(BADGE)).toHaveText('1', { timeout: 15000 });
@@ -197,49 +208,56 @@ test('W12: pressing the recommended button answers in place; the card goes, the 
   await expect(page.locator(COUNT)).toContainText('1 waiting on you');
 });
 
-test('W12b: a press on a non-recommended option answers the same way, and the last card removes the section and the count line part', async ({ page }) => {
+test('W12b: answering a non-recommended option the same way; with the last card answered the count line part goes, and a reload hides the section', async ({ page }) => {
   await seedTree(page, { runnerKey: true });
-  await seedRuling(page, 'LOCAL-S', THREE_OPTIONS);
+  await seedWaiting(page, 'LOCAL-S', THREE_OPTIONS);
   await page.goto(`/workspace/${URL_KEY}/`);
   const card = page.locator(CARD).first();
-  await card.locator('[data-option-id="ship"]').click();
-  // LIN-4242: the owner's section and count line are hidden, not removed, so a ruling raised later can land in them.
-  await expect(page.locator(SECTION)).toBeHidden();
-  await expect(page.locator(WAIT_CARD)).toHaveCount(0);
+  await answerWith(card, 'Ship it now');
+  await expect(card).toHaveAttribute('data-settled', 'true');
+  await expect(page.locator(OPEN_CARD)).toHaveCount(0);
   await expect(page.locator(COUNT).filter({ hasText: 'waiting on you' })).toHaveCount(0);
   await syncBadge(page);
   await expect(page.locator(BADGE)).toHaveText('0', { timeout: 15000 });
+  // LIN-4242: the owner's section and count line are hidden, not removed, so a question asked later can land in them.
+  await page.reload();
+  await expect(page.locator(SECTION)).toBeHidden();
+  await expect(page.locator(WAIT_CARD)).toHaveCount(0);
 });
 
-// ---- witness 13: partial failure keeps the card; retry removes it ------------------------------------------------
+// ---- witness 13: a failed answer keeps the card open; a retry settles it ------------------------------------------
 
-test('W13: comment written, run fails: the card stays with "Retry delivery"; after a successful retry it goes and the count drops', async ({ page }) => {
+test('W13: an answer the server could not record leaves the card open and counted, saying so; a retry settles it and the count drops', async ({ page }) => {
   await seedTree(page, { runnerKey: true });
-  await seedRuling(page, 'LOCAL-S', { options: [{ id: 'a', label: 'Yes' }] });
-  await seedRuling(page, 'LOCAL-D', { options: [{ id: 'a', label: 'Yes' }] });
+  await seedWaiting(page, 'LOCAL-S', ONE_OPTION);
+  await seedWaiting(page, 'LOCAL-D', ONE_OPTION);
   await page.goto(`/workspace/${URL_KEY}/`);
   await expect(page.locator(COUNT)).toContainText('2 waiting on you');
 
-  let failDispatch = true;
-  await page.route('**/api/dispatch**', route => {
-    if (failDispatch && route.request().method() === 'POST') return route.fulfill({ status: 500, body: '{"error":"boom"}', contentType: 'application/json' });
+  let fail = true;
+  await page.route(/\/questions\/[^/]+\/answer$/, route => {
+    if (fail && route.request().method() === 'POST') return route.fulfill({ status: 500, body: '{"error":"boom"}', contentType: 'application/json' });
     return route.continue();
   });
-  const card = page.locator(WAIT_CARD, { has: page.locator('[data-testid="waiting-task-line"]', { hasText: 'LOCAL-S' }) });
-  await card.locator('[data-option-id="a"]').click();
-  await expect(card.locator('.sess-reply-retry-delivery')).toBeVisible({ timeout: 15000 });
-  await expect(card).toHaveCount(1);
+  const card = page.locator(WAIT_CARD, { has: page.locator('[data-testid="waiting-task-line"]', { hasText: 'LOCAL-S' }) }).locator('[data-testid="question-record-card"]');
+  await answerWith(card, 'Yes');
+  await expect(card.locator(FEEDBACK)).toHaveText('boom', { timeout: 15000 });
+  await expect(card).not.toHaveAttribute('data-settled', 'true');
+  await expect(card.locator(ANSWER)).toBeEnabled();
+  await expect(page.locator(COUNT)).toContainText('2 waiting on you');
 
-  failDispatch = false;
-  await card.locator('.sess-reply-retry-delivery').click();
-  await expect(card).toHaveCount(0, { timeout: 15000 });
+  fail = false;
+  await card.locator(ANSWER).click();
+  await expect(card).toHaveAttribute('data-settled', 'true', { timeout: 15000 });
   await expect(page.locator(COUNT)).toContainText('1 waiting on you');
-  await page.unroute('**/api/dispatch**');
+  await page.unroute(/\/questions\/[^/]+\/answer$/);
 });
 
-// ---- witness 11: a scan-raised (task-bound) ruling answered and dismissed through Home --------------------------
+// ---- witness 11: a scan-raised (task-bound) ruling is not Home's ---------------------------------------------------
 
-test('W11: a scan-raised ruling answered by pressing an option closes: the card goes, count and badge drop', async ({ page, seedLocal }) => {
+test('W11: a scan-raised ruling is not drawn on Home or counted there; the Rulings page lists it until P7b retires the scan', async ({ page, seedLocal }) => {
+  // LIN-4538 (P7a): Home reads question records only. A scan ruling lives in the old task-decisions store, which only the ruling
+  // machinery reads now (the Rulings page and its feed), so it is answered or dismissed there, not on Home.
   const issueId = randomUUID();
   await seedLocal({
     projects: [],
@@ -251,38 +269,19 @@ test('W11: a scan-raised ruling answered by pressing an option closes: the card 
   }, { runnerKey: true });
   const scan = await page.request.post(`/workspace/${URL_KEY}/api/scan/${issueId}`);
   expect(scan.status(), `scan seed failed: ${await scan.text()}`).toBe(200);
+  const rulings = await page.request.get(`/workspace/${URL_KEY}/api/dashboard/rulings`);
+  expect(await rulings.text(), 'the Rulings feed lists the scan ruling').toContain('SCAN-H1');
   await page.goto(`/workspace/${URL_KEY}/`);
-  const card = page.locator(WAIT_CARD, { has: page.locator('[data-testid="waiting-task-line"]', { hasText: 'SCAN-H1' }) });
-  await expect(card).toHaveCount(1);
-  await card.locator('[data-option-id]').first().click();
-  await expect(card).toHaveCount(0, { timeout: 15000 });
+  await expect(page.locator('[data-testid="waiting-task-line"]', { hasText: 'SCAN-H1' })).toHaveCount(0);
+  await expect(page.locator('[data-testid="session-question-card"]')).toHaveCount(0);
   await expect(page.locator(COUNT).filter({ hasText: 'waiting on you' })).toHaveCount(0);
 });
 
-test('W11b: a scan-raised ruling dismissed on Home closes the same way', async ({ page, seedLocal }) => {
-  const issueId = randomUUID();
-  await seedLocal({
-    projects: [],
-    issues: [{
-      id: issueId, identifier: 'SCAN-H2', title: 'Task-bound scan fixture to dismiss',
-      description: `This task is blocked pending an operator decision. (${issueId})`,
-      state: { name: 'In Progress', type: 'started' }, url: `/workspace/${URL_KEY}/issue/${issueId}`,
-    }],
-  }, { runnerKey: true });
-  const scan = await page.request.post(`/workspace/${URL_KEY}/api/scan/${issueId}`);
-  expect(scan.status()).toBe(200);
-  await page.goto(`/workspace/${URL_KEY}/`);
-  const card = page.locator(WAIT_CARD, { has: page.locator('[data-testid="waiting-task-line"]', { hasText: 'SCAN-H2' }) });
-  await card.locator('[data-testid="session-question-card-dismiss"]').click();
-  await expect(card).toHaveCount(0, { timeout: 15000 });
-  await expect(page.locator(COUNT).filter({ hasText: 'waiting on you' })).toHaveCount(0);
-});
+// ---- witness 14: the same question twice on a page; search and the opened task are the other copies ----------------
 
-// ---- witness 14: the same ruling twice on a page; search and the opened task are the other copies ------------------
-
-test('W14: answering a waiting task\'s card inside search removes the Waiting card too, and the count line and badge drop', async ({ page }) => {
+test('W14: answering a waiting task\'s card inside search settles the Waiting card too, and the count line and badge drop', async ({ page }) => {
   await seedTree(page, { runnerKey: true });
-  await seedRuling(page, 'LOCAL-S', THREE_OPTIONS);
+  await seedWaiting(page, 'LOCAL-S', THREE_OPTIONS);
   await page.goto(`/workspace/${URL_KEY}/`);
   await expect(page.locator(CARD)).toHaveCount(1);
 
@@ -292,14 +291,15 @@ test('W14: answering a waiting task\'s card inside search removes the Waiting ca
   await expect(results.locator('[data-identifier="LOCAL-S"]').first()).toBeVisible();
   await expect(page.locator(SECTION)).toBeHidden({ timeout: 5000 });
   await results.locator('[data-identifier="LOCAL-S"]').first().click();
-  const opened = page.locator('[data-testid="opened-task"]').first();
-  await opened.locator('[data-option-id="wait"]').click();
-  await expect(opened.locator('[data-option-id]').first()).toBeDisabled({ timeout: 15000 });
+  const opened = page.locator('[data-testid="opened-task"]').first().locator('[data-testid="question-record-card"]');
+  await answerWith(opened, 'Wait for review');
+  await expect(opened).toHaveAttribute('data-settled', 'true', { timeout: 15000 });
 
   await page.locator('#search-input').fill('');
-  // LIN-4242: empty, so hidden (not removed); clearing the search does not un-hide an empty section.
-  await expect(page.locator(SECTION)).toBeHidden();
-  await expect(page.locator(WAIT_CARD)).toHaveCount(0);
+  // The Waiting copy of the same question settled with it: nothing is left open or counted.
+  await expect(page.locator(CARD)).toHaveCount(1);
+  await expect(page.locator(OPEN_CARD)).toHaveCount(0);
+  await expect(page.locator(CARD).locator(FEEDBACK)).toHaveText('Answered. The run resumes with your answer.');
   await expect(page.locator(COUNT).filter({ hasText: 'waiting on you' })).toHaveCount(0);
   await syncBadge(page);
   await expect(page.locator(BADGE)).toHaveText('0', { timeout: 15000 });
@@ -309,7 +309,7 @@ test('W14: answering a waiting task\'s card inside search removes the Waiting ca
 
 test('W9: no task is drawn twice on Home across its sections, a waiting task included', async ({ page }) => {
   await seedTree(page, { runnerKey: true });
-  await seedRuling(page, 'LOCAL-D', THREE_OPTIONS);
+  await seedWaiting(page, 'LOCAL-D', THREE_OPTIONS);
   await page.goto(`/workspace/${URL_KEY}/`);
   await expect(page.locator(SECTION)).toBeVisible();
 
@@ -327,10 +327,10 @@ test('W9: no task is drawn twice on Home across its sections, a waiting task inc
 
 test('W9b: a started waiting task with a running child is the named context row: its card is in Waiting, the row is drawn once with no state words, and the count and badge match the cards', async ({ page }) => {
   await seedTree(page, { runnerKey: true });
-  await seedRuling(page, 'LOCAL-M', THREE_OPTIONS);
+  await seedWaiting(page, 'LOCAL-M', THREE_OPTIONS);
   await page.goto(`/workspace/${URL_KEY}/`);
   await expect(page.locator(COUNT)).toContainText('waiting on you');
-  // One ruling, one card: the card for LOCAL-M is in Waiting.
+  // One question, one card: the card for LOCAL-M is in Waiting.
   await expect(page.locator(WAIT_CARD, { has: page.locator('[data-testid="waiting-task-line"]', { hasText: 'LOCAL-M' }) })).toHaveCount(1);
   await expect(page.locator(WAIT_CARD)).toHaveCount(1);
   // The context row in Running is the only place the task is drawn outside Waiting, and it has no state words.
@@ -380,7 +380,7 @@ test('W16: a viewer without run controls (a member, or a keyless owner) gets no 
 
 test('W17: search hides the section and clearing it restores it; collapsing persists across reload and "reset" opens it', async ({ page }) => {
   await seedTree(page, { runnerKey: true });
-  await seedRuling(page, 'LOCAL-S', THREE_OPTIONS);
+  await seedWaiting(page, 'LOCAL-S', THREE_OPTIONS);
   await page.goto(`/workspace/${URL_KEY}/`);
   await expect(page.locator(SECTION)).toBeVisible();
 

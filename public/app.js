@@ -606,7 +606,7 @@ function initWaitingOnYou() {
   })
   // LIN-4532 (P2b): a question record answered or dismissed on this desk stays on the page, settled; the count takes it out.
   main.addEventListener('harbour:question-record-settled', (e) => {
-    onQuestionRecordSettled({ main, countLine, live, detail: e.detail || {} })
+    onQuestionRecordSettled({ main, countLine, live, detail: e.detail || {}, source: e.target })
   })
   // The cards are server-rendered: bind their answer, option and dismiss controls now, scoped to the section.
   if (window.QuestionCards && typeof window.QuestionCards.setDeskRoot === 'function') window.QuestionCards.setDeskRoot(main)
@@ -669,11 +669,26 @@ function waitingCountIn(main) {
 }
 
 /** LIN-4532 (P2b): a question record card was answered or dismissed here. The card stays (settled, with its outcome); the count
- *  and the nav badge take it out. */
-function onQuestionRecordSettled({ main, countLine, live, detail }) {
+ *  and the nav badge take it out. LIN-4538 (P7a): every other copy of the same question on the page (the Waiting card, the
+ *  opened task's card, a search result's) settles with it, showing the same outcome, so a copy answered in the opened task
+ *  is not left open and counted in Waiting until the next refresh. */
+function onQuestionRecordSettled({ main, countLine, live, detail, source = null }) {
+  if (detail.questionId) settleQuestionCopies(main, detail.questionId, source)
   setWaitingCount(countLine, waitingCountIn(main))
   if (detail.urlKey && typeof window.updateRulingsBadge === 'function') window.updateRulingsBadge(detail.urlKey)
   live.textContent = 'Answered'
+}
+
+/** The other open copies of one question's card under `main`: settled, controls off, with the source card's outcome text. */
+function settleQuestionCopies(main, questionId, source) {
+  const text = source?.querySelector?.('[data-testid="question-record-card-feedback"]')?.textContent || ''
+  main.querySelectorAll('[data-testid="question-record-card"]').forEach(card => {
+    if (card === source || card.dataset.questionId !== questionId || card.dataset.settled === 'true') return
+    card.dataset.settled = 'true'
+    card.querySelectorAll('button, textarea').forEach(el => { el.disabled = true })
+    const feedback = card.querySelector('[data-testid="question-record-card-feedback"]')
+    if (feedback) feedback.textContent = text
+  })
 }
 
 function onRulingGone({ main, countLine, live, detail }) {
@@ -708,11 +723,16 @@ function onRulingGone({ main, countLine, live, detail }) {
   live.textContent = detail.message || 'Answered'
 }
 
-/** LIN-4243: the ruling keys of the Waiting cards under `body`, sorted (one per card, by the one `rulingKeyOf`). */
+/**
+ * LIN-4243: the keys of the Waiting cards under `body`, sorted (one per card, by the one `rulingKeyOf`). LIN-4538 (P7a): Home's
+ * waiting rows are open question records now, so an open question card is keyed too (`question:<id>`); a card settled here is
+ * not, the same cards `waitingCountIn` counts. Without them the key set never changed and Running and Up next never followed.
+ */
 function waitingKeysIn(body) {
   const keyOf = window.QuestionCards?.rulingKeyOf
   if (!body || !keyOf) return []
-  return [...body.querySelectorAll('[data-testid="session-question-card"]')].map(keyOf).filter(Boolean).sort()
+  const cards = body.querySelectorAll('[data-testid="session-question-card"], .waiting-question [data-testid="question-record-card"]:not([data-settled="true"])')
+  return [...cards].map(keyOf).filter(Boolean).sort()
 }
 
 /**
