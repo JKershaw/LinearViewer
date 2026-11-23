@@ -5275,3 +5275,5 @@ The full stop holds: the fleet is paused, and the drive is only reporting. The o
 **John on models (23 Nov, ~19:35).** "Haiku is fine, if the preparation has been done for it. Where we expect the agent to do more than follow a plan, we stick to stronger models." (Builds moved to Opus earlier today.)
 
 **After slice 4, John (23 Nov, ~21:40).** If slice 4 finishes before he's back, roll on to the queued work one item at a time. LIN-4463 (front-end pages as modules) runs: his UI rebuild uses the better modules. The safety findings are "less about actual security as they are nice test tasks"; when LIN-4416 comes up, a subagent looks at them and prioritises/groups them as needed, "not too essential". A nav rebuild task would be nice after the module work, but not now; we'll pause and discuss when he's around.
+
+**John (~21:50):** after slice 4, happy to run a few lanes in parallel; one at a time was only for the core work, to avoid trouble.
