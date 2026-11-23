@@ -11,7 +11,8 @@
       "name": "Front end: server-rendered pages",
       "slug": "front-end-pages",
       "match": [
-        "^lib/(render[^/]*|components/.*|tree|task-board-view|ship-layout|swim-graph|swim-lanes|timeline-zoom|parse-landing|mask-secrets-in-html|task-page-href|cost-format|time-words|question-card|security-headers|ship-journey|settings-areas|settings-copy-first-card)\\.js$"
+        "^lib/(render[^/]*|components/.*|tree|task-board-view|ship-layout|swim-graph|swim-lanes|timeline-zoom|parse-landing|mask-secrets-in-html|task-page-href|cost-format|time-words|question-card|security-headers|ship-journey|settings-areas|settings-copy-first-card)\\.js$",
+        "^lib/question-record-card\\.js$"
       ]
     },
     {
@@ -93,7 +94,8 @@
       "name": "Records",
       "slug": "records",
       "match": [
-        "^lib/records/|^lib/records-store\\.js$|^lib/records-tracker\\.js$|^lib/change-records\\.js$|^lib/task-standing\\.js$"
+        "^lib/records/|^lib/records-store\\.js$|^lib/records-tracker\\.js$|^lib/change-records\\.js$|^lib/task-standing\\.js$",
+        "^lib/open-questions\\.js$"
       ]
     },
     {

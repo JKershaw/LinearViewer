@@ -36,6 +36,7 @@
 
 import { formatUsd } from '../lib/cost-format.js';
 import { fmtDuration } from '../lib/time-words.js';
+import { renderQuestionRecordCard } from '../lib/question-record-card.js';
 
 let observationData = null;
 let pollId = null;
@@ -1995,7 +1996,15 @@ function renderRulings(rulings, host = rulingsTabHost()) {
 
   const seen = new Set();
   const nodes = [];
+  const seenQuestions = new Set();
   for (const row of rulings) {
+    // LIN-4532 (P2b): a question row is keyed by its question id, not a decision key, so it takes its own path here.
+    if (row?.kind === 'question') {
+      seenQuestions.add(row.questionId);
+      const qli = questionRowNode(row);
+      if (nodes.length < host.limit) nodes.push(qli);
+      continue;
+    }
     const decisionId = row?.decision?.decision_id;
     const urlKey = row?.anchor?.workspaceUrlKey;
     const key = rulingKey(urlKey, row?.anchor, decisionId);
@@ -2035,6 +2044,11 @@ function renderRulings(rulings, host = rulingsTabHost()) {
       // ruling the human just said to keep.
       if (!row?.suggestedDismissal) rulingsSelected.delete(key);
     }
+  }
+
+  // A question no longer in the payload (answered, dismissed, or ended elsewhere) is forgotten, so a later one is drawn fresh.
+  for (const questionId of Array.from(renderedQuestionRows.keys())) {
+    if (!seenQuestions.has(questionId)) renderedQuestionRows.delete(questionId);
   }
 
   // Release a settled key (review F2 / LIN-2444 Phase 5) once its row has
@@ -2263,6 +2277,41 @@ function resolveRulingOptionLabel(decision, optionId) {
 // question + options below) / options with recommendation (appendOptions
 // marks the recommended one) / cost of doing nothing (if_unanswered, when the
 // producing session declared one).
+// LIN-4532 (P2b): an open question record, as a ruling row. Its card is the shared one (lib/question-record-card.js); the answer
+// and the dismissal go through the one route each (public/question-records.js). A question row has no decision key, so rulingKey
+// is null for it and it takes no part in the selection, settle and pending machinery of this page.
+function renderQuestionRulingRow(row) {
+  const li = document.createElement('li');
+  li.className = 'obs-ruling obs-ruling-question';
+  li.dataset.testid = 'ruling-question-row';
+  li.innerHTML = renderQuestionRecordCard(row, { urlKey: row?.anchor?.workspaceUrlKey || '' });
+  return li;
+}
+
+// questionId -> the <li> on the page. A card holding an answer in progress (typed words, a chosen option, focus) or one already
+// settled is kept across the poll's repaint, as a keyed row is (rulingRowHoldsInput); any other card is rebuilt from the payload.
+const renderedQuestionRows = new Map();
+function questionCardOf(li) {
+  return li ? li.querySelector('[data-testid="question-record-card"]') : null;
+}
+function questionCardHoldsAnswer(li) {
+  const card = questionCardOf(li);
+  if (!card) return false;
+  if (card.dataset.settled === 'true') return true;
+  const input = card.querySelector('[data-testid="question-record-card-input"]');
+  if (input && input.value) return true;
+  if (card.querySelector('[data-testid="question-record-card-option"][aria-pressed="true"]')) return true;
+  const active = document.activeElement;
+  return !!(active && card.contains(active));
+}
+function questionRowNode(row) {
+  const existing = renderedQuestionRows.get(row.questionId);
+  if (existing && questionCardHoldsAnswer(existing)) return existing;
+  const li = renderQuestionRulingRow(row);
+  renderedQuestionRows.set(row.questionId, li);
+  return li;
+}
+
 function renderRulingRow(row) {
   const { decision, decisionCase, anchor, disposition, canReply } = row || {};
   const li = document.createElement('li');
