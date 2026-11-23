@@ -345,7 +345,7 @@ export function registerRunEvidenceRoutes(router, { workspaceFromUrl, dispatchQu
       // LIN-3657: the press asks the dispatch lane's question (LIN-3634), so it never
       // records a close-out that lane would refuse: a head-moved close-out on a
       // stop-at-PR task (scoped to the task's sole open PR, not `prUrl`), and, on any
-      // task, a landing PR with no blind read since the review (`blind-read-missing`,
+      // task, a landing PR with no blind read on record naming it (`blind-read-missing`,
       // read from the trail, LIN-4438). It fails open on an unreadable read. Source: the request's, else the named dispatch
       // row's (the clients' press body carries none; the row is what their dispatch
       // call stamped), and only when that row is this task's.

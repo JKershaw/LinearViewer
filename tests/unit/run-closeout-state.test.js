@@ -518,7 +518,7 @@ describe('LIN-4438: closeOutWaitsOn and the blind-read gate in the box state', (
     assert.strictEqual(missing.status, CLOSE_OUT_STATUS.NOT_READY);
     assert.strictEqual(missing.reason, 'blind-read-missing');
     assert.strictEqual(missing.message, BLIND_READ_MISSING_COPY);
-    assert.strictEqual(missing.message, 'no blind read on record since the review');
+    assert.strictEqual(missing.message, 'no blind read on record naming the pull requests');
     assert.strictEqual(missing.pressable, false);
     const ready = derive(gateArgs({ review: withRead('approve', read(URL41)) }));
     assert.strictEqual(ready.status, CLOSE_OUT_STATUS.READY);

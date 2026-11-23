@@ -107,14 +107,15 @@ describe('the landing is the records landing, which decides the PR set of a read
   });
 });
 
-describe('the blind read on record is the one after the latest review (LIN-4520; was latestBlindRead over the comments)', () => {
-  test('the newest read after the latest review is the one on record', async () => {
+describe('the blind read on record is the latest one (LIN-4520, LIN-4544; was latestBlindRead over the comments)', () => {
+  test('the newest read is the one on record', async () => {
     const trail = await trailOf([ev.pr(1, PR, 'h'), ev.review(2, PR), ev.read(3, PR, { outcome: 'worse' }), ev.read(4, PR, { outcome: 'same' })]);
     assert.equal(trail.review.blindRead.verdict, 'same');
   });
-  test('a read before the latest review is not on record for it', async () => {
+  test('a read before the latest review stands for it while it names the landing: one read per change (LIN-4544)', async () => {
     const trail = await trailOf([ev.pr(1, PR, 'h'), ev.review(2, PR), ev.read(3, PR), ev.review(5, PR)]);
-    assert.equal(trail.review.blindRead, null);
+    assert.equal(trail.review.blindRead.verdict, 'same');
+    assert.deepEqual(trail.review.blindRead.prs, [PR]);
   });
 });
 
@@ -256,7 +257,7 @@ describe('the prompt is the piloted text', () => {
 
 describe('the records carry the read (LIN-4520: the box and the route read the review\'s blind read)', () => {
   const withRead = [ev.pr(1, PR), ev.review(2, PR), ev.read(3, PR, { outcome: 'same' })];
-  test('the records review carries its blind read; no review, or no read after it, carries none', async () => {
+  test('the records review carries its blind read; with no read on record it carries none', async () => {
     assert.equal((await trailOf(withRead)).review.blindRead.verdict, 'same');
     assert.equal((await trailOf([ev.pr(1, PR), ev.review(2, PR)])).review.blindRead, null);
   });
@@ -292,11 +293,12 @@ describe('the run readers place a blind read', () => {
     assert.equal(out.R0.nextRow.kind, 'implementation');
     assert.equal(out.R0.verdict, 'request changes');
   });
-  test('churn: one blind read per review is the stage path, a second is a repeat; a Survey is a first pass', () => {
+  test('churn: one blind read per change is the stage path, a second (even after a review) is a repeat; a Survey is a first pass', () => {
     const row = (id, kind, h) => ({ id, kind, status: 'taken', dispatchedAt: at(h), feedback: [{ message: '[done]', timestamp: at(h).replace(':00:00', ':30:00') }] });
     const { entries } = classifyTicket({ identifier: 'LIN-1', rows: [row('s', 'survey-task', 0), row('r', 'review', 1), row('b1', 'blind-read', 2), row('b2', 'blind-read', 3), row('r2', 'review', 4), row('b3', 'blind-read', 5)] });
     const cause = Object.fromEntries(entries.map(e => [e.id, e.cause]));
-    assert.deepEqual([cause.s, cause.b1, cause.b2, cause.b3], ['first-pass-stage', 'stage-path', 'repeat-stage', 'stage-path']);
+    // LIN-4544: a read stands through a review, so the read after the second review is a repeat too.
+    assert.deepEqual([cause.s, cause.b1, cause.b2, cause.b3], ['first-pass-stage', 'stage-path', 'repeat-stage', 'repeat-stage']);
   });
 });
 

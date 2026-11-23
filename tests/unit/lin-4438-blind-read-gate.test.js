@@ -104,7 +104,8 @@ const ROWS = [
   { n: 2, name: 'approve, then a read naming the PR', comments: [summary(1), review(2), read(3, PR1)], events: [evPr(1), evReview(2), evRead(3, PR1)], route: 'aside', gate: 'admit', ready: true },
   // The older PR was the previous round's: merged by a close-out before the review, so it is not in this landing.
   { n: 3, name: 'a read naming an older PR only', comments: [summary(1), review(2), read(3, PR_OLD)], events: [evPr(0, PR_OLD), evClose(0), evMerged(0, PR_OLD), evPr(1), evReview(2), evRead(3, PR_OLD)], route: 'blind-read', gate: 'wait' },
-  { n: 4, name: 'a read, then a new review', comments: [summary(1), review(2), read(3, PR1), review(4)], events: [evPr(1), evReview(2), evRead(3, PR1), evReview(4)], route: 'blind-read', gate: 'wait' },
+  // LIN-4544: the read names the landing, so it stands through the new review: nothing is sent and the gate admits.
+  { n: 4, name: 'a read, then a new review (the read stands)', comments: [summary(1), review(2), read(3, PR1), review(4)], events: [evPr(1), evReview(2), evRead(3, PR1), evReview(4)], route: 'aside', gate: 'admit', ready: true },
   { n: 5, name: 'request changes', comments: [summary(1), review(2, 'Request Changes')], events: [evPr(1), evReview(2, 'request-changes')], route: 'aside', gate: 'admit' },
   { n: 6, name: 'two ended attempts, runs known', comments: [summary(1), review(2)], events: [evPr(1), evReview(2), evRun('blind-read', 3, 'done'), evRun('blind-read', 4, 'failed')], allRuns: [run('review', 2), run('blind-read', 3, 'done'), run('blind-read', 4, 'failed')], route: 'blocked', gate: 'wait' },
   { n: 7, name: 'runs unknown', comments: [summary(1), review(2)], events: [evPr(1), evReview(2)], allRuns: null, route: 'blind-read', gate: 'wait' },
@@ -250,21 +251,21 @@ describe('the route\'s own edges', () => {
     assert.equal(blindReadStep({ state: DONE }, { trail: audited, allRuns: [] }).step, 'blind-read', 'a post-Done audit notes PR is still read');
   });
 
-  test('a live blind read is not an ended attempt; runs before the review do not count', async () => {
+  test('a live blind read is not an ended attempt; with no read on record, every ended attempt counts, across a review (LIN-4544)', async () => {
     assert.equal(BLIND_READ_ATTEMPT_BOUND, 2);
     const trail = await trailOfEvents(approved);
     const step = (allRuns) => blindReadStep({ state: STARTED }, { trail, allRuns }).step;
     assert.equal(step([run('blind-read', 3, 'done')]), 'blind-read', 'one ended attempt');
     assert.equal(step([run('blind-read', 3, 'done'), { ...run('blind-read', 4, 'running') }]), 'blind-read', 'one ended, one live');
-    assert.equal(step([run('blind-read', 0, 'done'), run('blind-read', 1, 'failed'), run('blind-read', 3, 'done')]), 'blind-read', 'two before the review');
+    assert.equal(step([run('blind-read', 0, 'done'), run('blind-read', 1, 'failed'), run('blind-read', 3, 'done')]), 'blocked', 'no read on record: the attempts before the review count too');
     for (const outcome of ['skipped', 'aborted', 'closed', 'waiting on a person']) {
       assert.equal(step([run('blind-read', 3, 'done'), run('blind-read', 4, outcome)]), 'blocked', outcome);
     }
   });
 
-  test('the route reads the ledger whole: a read written before the review is not its read', async () => {
+  test('a read written before the review names the landing and stands: no second read is sent (LIN-4544)', async () => {
     const trail = await trailOfEvents([evPr(1), evRead(2, PR1), evReview(3)]);
-    assert.equal(blindReadStep({ state: STARTED }, { trail, allRuns: [] }).step, 'blind-read');
+    assert.equal(blindReadStep({ state: STARTED }, { trail, allRuns: [] }), null);
   });
 });
 

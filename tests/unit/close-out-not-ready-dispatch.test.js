@@ -311,7 +311,7 @@ describe('LIN-4438: the session lane holds the blind-read gate', () => {
     assert.equal(res.status, 409, JSON.stringify(res.body));
     assert.equal(res.body.code, CLOSE_OUT_NOT_READY_CODE);
     assert.equal(res.body.reason, 'blind-read-missing');
-    assert.equal(res.body.error, 'No blind read on record since the review');
+    assert.equal(res.body.error, 'No blind read on record naming the pull requests');
     assert.equal(getInsertCount(), 0);
     assert.deepEqual(seam.calls, { resolveProvider: 0, fetchIssueComments: 0, readPrStatus: 0 });
   });

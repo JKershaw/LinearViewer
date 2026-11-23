@@ -45,9 +45,9 @@ Area notes for `runs-and-dispatch` in the registry. Format and rules: README.md.
   complete" (LIN-4405, `lib/task-timeline.js`).
 - A close-out test seeds the ticket's records (`tests/helpers/records-scenario.js`): the guard reads the records
   trail, not comments (LIN-4520). An E2E spec reading findings seeds the ticket's task (`/test/seed-ticket-task`, LIN-4527).
-- Close-out readiness is one decision, `closeOutDecision` (`lib/run-closeout-state.js`, LIN-4460): every surface
-  renders or enforces its answer. A new reason is a row of `CLOSE_OUT_REASONS` plus a row in
-  `lin-4438-blind-read-gate` and `lin-4460-close-out-decision`, whose census reads code, not comments.
+- Close-out readiness is one decision, `closeOutDecision` (`lib/run-closeout-state.js`, LIN-4460). A new reason is
+  a `CLOSE_OUT_REASONS` row and one per code census (`lin-4438-blind-read-gate`, `lin-4460-close-out-decision`).
+  A blind read counts by the PRs it names, not by review time (LIN-4544).
 - When a person acts, Harbour follows (LIN-4447): an all-merged landing stands the refusals aside, not Done:
   the check sets Done only on a findings read of zero (LIN-4527); a Done ticket with no close-out stands only the
   read aside. Harbour never sets Done.
