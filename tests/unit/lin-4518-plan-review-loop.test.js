@@ -153,7 +153,8 @@ describe('RecordsStore.planReviewRunForTicket folds the same run from the task r
 describe('loopFactsOf: a person\'s speech and landed work since the latest verdict', () => {
   const latestAt = at(3);
   const PR_1748 = 'https://github.com/JKershaw/LinearViewer/pull/1748';
-  const speech = (day) => ({ createdAt: at(day), body: 'go on, take it to implementation' });
+  // LIN-4535: a person's speech is a person finding (its `at`); the loop reads findings, never comment text.
+  const speech = (day) => ({ id: `finding-${day}`, at: at(day), accountId: 'john', says: 'go on, take it to implementation', ruling: false });
   const landed = (day) => ({ url: PR_1748, at: at(day) });
   const citing = (day) => ({ createdAt: at(day), body: `**Implementation complete — PR opened: ${PR_1748}** (commit e1287c0c).` });
 
@@ -161,6 +162,10 @@ describe('loopFactsOf: a person\'s speech and landed work since the latest verdi
     assert.equal(loopFactsOf({ run: [], latestAt }, [speech(4)]).personSince, true);
     assert.equal(loopFactsOf({ run: [], latestAt }, [speech(2)]).personSince, false);
     assert.equal(loopFactsOf({ run: [], latestAt }, []).personSince, false);
+  });
+
+  test('a comment that reads like a person\'s words is not speech: only a person finding lifts the bound (LIN-4535)', () => {
+    assert.equal(loopFactsOf({ run: [], latestAt }, []).personSince, false, 'no finding, no speech, whatever the words');
   });
 
   test('a change version written after the latest verdict sets landed to its PR; one written before it does not', () => {

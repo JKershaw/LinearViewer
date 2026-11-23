@@ -18,11 +18,19 @@ import assert from 'node:assert/strict';
 import { assembleTrailFacts, formatTrailFactsBlock } from '../../lib/recommendation-facts.js';
 import { planFactsOf } from '../../lib/records/plan-facts.js';
 import { planReviewRunOf } from '../../lib/records/plan-review-run.js';
-import { RULING_MARK, isRuling } from '../../lib/run-trail.js';
+import { RULING_MARK } from '../../lib/run-trail.js';
+import { personFindingsOf } from '../../lib/comment-ingest.js';
+import { fixedIdOf } from '../../lib/records/refs.js';
 import { formatSelectorView, formatIssueContext, buildSelectorArgs } from '../../lib/openrouter.js';
 
 const at = (d) => `2026-10-0${d}T10:00:00.000Z`;
 const PR = 'https://github.com/JKershaw/LinearViewer/pull/1747';
+// LIN-4535: a person's comment is its finding (lib/comment-ingest.js personFindingsOf). The facts read findings, never a
+// comment's words: a comment that reads like an agent's note is still a person's when it has a person's finding.
+const personFinding = (d, says) => personFindingsOf([{ id: `finding-${d}`, by: 'person:john', via: 'comment', at: at(d), fields: { says } }])[0];
+// The finding a comment's id makes (lib/comment-ingest.js: fixedIdOf('finding', 'comment', commentId)).
+const findingFor = (commentId, d, says) => personFindingsOf([{ id: fixedIdOf('finding', 'comment', commentId), by: 'person:john', via: 'comment', at: at(d), fields: { says } }]);
+
 const review = (verdict, d) => ({ createdAt: at(d), body: `## Review — LIN-1\n\nReviewed ${PR}.\n\n### Verdict\n${verdict}\n\n### What CI Did Not Prove\n- L1 (inside): the live run.` });
 const planReview = (d) => ({ createdAt: at(d), body: '### Plan Review Verdict\n\n**Verdict:** Approve.' });
 // LIN-4520: the review, its work and close-out facts are records: the trail a records read gives (lib/task-standing.js
@@ -60,83 +68,70 @@ describe('trail facts (LIN-3300)', () => {
     assert.equal(closed.closeOutAfterReview, true);
   });
 
-  test('PR links and the latest ruling are read from every comment, in time order', () => {
+  test('PR links are read from every comment, in time order; the latest person and ruling are the latest person findings', () => {
     const facts = assembleTrailFacts([
       { createdAt: at(3), body: `Go to implementation.\n\n${RULING_MARK}` },
       { createdAt: at(1), body: `Opened https://github.com/a/b/pull/1` },
       { createdAt: at(2), body: `Hold.\n\n${RULING_MARK}` },
       { createdAt: at(4), body: `Now ${PR}` }
-    ], '');
+    ], '', { personFindings: [personFinding(2, `Hold.\n\n${RULING_MARK}`), personFinding(3, `Go to implementation.\n\n${RULING_MARK}`)] });
     assert.deepEqual(facts.prUrls, ['https://github.com/a/b/pull/1', PR]);
     assert.equal(facts.latestPerson.at, at(3));
     assert.equal(facts.latestPerson.ruling, true);
+    assert.equal(facts.latestRuling.at, at(3));
   });
 
-  // Fix round: a ruling is a person's comment that ENDS with the mark the in-app route
-  // appends. Quoting the mark, or an agent's own note, is not a ruling (LIN-3309's
-  // agent-note predicate decides person vs agent in code).
-  test('a ruling ends with the mark and is a person\'s comment; a quote or an agent note is not', () => {
-    assert.equal(isRuling(`Go to implementation.\n\n${RULING_MARK}`), true);
-    assert.equal(isRuling(`Go.\n\n${RULING_MARK}\n`), true, 'trailing whitespace is fine');
-    assert.equal(isRuling(`### Plan Review Verdict\n\nThe suffix "${RULING_MARK}" is not a ruling mark.\n\n**Verdict:** Request Changes.`), false);
-    assert.equal(isRuling(`**Autopilot step record — parked.**\n\n${RULING_MARK}`), false, 'an agent note is not a person');
-    assert.equal(isRuling(`Plan revised in the description.\n\n${RULING_MARK}`), false);
+  test('a ruling is a finding whose words end with the mark; a quote of the mark mid-text is a person\'s words, not a ruling', () => {
+    assert.equal(personFinding(1, `Go.\n\n${RULING_MARK}\n`).ruling, true, 'trailing whitespace is fine');
+    assert.equal(personFinding(1, `Quotes "${RULING_MARK}" mid-text.`).ruling, false);
+    const facts = assembleTrailFacts([{ createdAt: at(1), body: 'x' }, { createdAt: at(2), body: 'y' }], '', {
+      personFindings: [personFinding(1, `Quotes "${RULING_MARK}" mid-text.`), personFinding(2, 'Plain words.')]
+    });
+    assert.equal(facts.latestPerson.at, at(2));
+    assert.equal(facts.latestPerson.ruling, false);
+    assert.equal(facts.latestRuling, null, 'no ruling: the quote does not make one');
+  });
+
+  test('no person finding means no latest person, even when a comment reads like a person\'s words', () => {
+    const facts = assembleTrailFacts([{ createdAt: at(1), body: 'Go on with the narrow revision.' }], '', { personFindings: [] });
+    assert.equal(facts.latestPerson, null);
+  });
+
+  test('a person\'s finding whose words look like an agent note is still the person\'s', () => {
     const facts = assembleTrailFacts([
-      { createdAt: at(1), body: `Hold.\n\n${RULING_MARK}` },
-      { createdAt: at(2), body: `### Plan Review Verdict\n\nQuotes "${RULING_MARK}" mid-text.\n\n**Verdict:** Approve.` }
-    ], '');
-    assert.equal(facts.latestPerson.at, at(1), 'the quoting verdict is skipped');
-  });
-
-  test('TRAIL FACTS names the latest person\'s comment, whether it is a ruling, and whether an agent acted after it', () => {
-    const withRuling = formatTrailFactsBlock(assembleTrailFacts([{ createdAt: at(3), body: `Go.\n\n${RULING_MARK}` }], ''), 1);
-    assert.match(withRuling, /- Latest person's comment[^:]*: 2026-10-03 10:00, a ruling recorded via Harbour \(shown with the comments\); an agent acted after it \(a note, landed work or a close-out\): no/);
-    assert.match(formatTrailFactsBlock(assembleTrailFacts([], ''), 0), /- Latest person's comment[^:]*: none/);
-  });
-
-  // Eval fix round (K=3 on sol): the person-vs-agent read is LIN-3309's, in code.
-  test('the latest person\'s comment skips agent notes, landing reports, reviews, verdicts and close-outs', () => {
-    const facts = assembleTrailFacts([
-      { createdAt: at(1), body: '**Last round before re-review (FC, an engineering call):**\n- land F1.' },
-      { createdAt: at(2), body: '**Autopilot run summary: P0 landed.** https://github.com/o/r/pull/1' },
-      { createdAt: at(3), body: '### Plan Review Verdict\n\n**Verdict:** Approve.' }
-    ], '');
+      { createdAt: at(1), body: '**Last round before re-review (FC, an engineering call):**\n- land F1.' }
+    ], '', { personFindings: [personFinding(1, '**Last round before re-review (FC, an engineering call):**\n- land F1.')] });
     assert.equal(facts.latestPerson.at, at(1));
     assert.equal(facts.latestPerson.ruling, false);
-    assert.equal(facts.latestPerson.actedAfter, true, 'an autopilot run summary after it is an agent acting');
-    const headed = assembleTrailFacts([
-      { createdAt: at(1), body: 'Go on with the narrow revision.' },
-      { createdAt: at(2), body: '## Plan finalized — next action: breakdown' }
-    ], '');
-    assert.equal(headed.latestPerson.at, at(1), 'a headed stage report is not a person\'s comment');
-    const closed = assembleTrailFacts([
-      { createdAt: at(1), body: `Yes: merge #1616.\n\n${RULING_MARK}` },
-      { createdAt: at(2), body: '**Close-out: PR #1616 merged. The ticket stays open for L2.**' }
-    ], '');
-    assert.equal(closed.latestPerson.at, at(1), 'a close-out is not a person\'s comment');
-    assert.equal(closed.latestPerson.actedAfter, true, 'a close-out after it carries out the ruling');
-    // Coordinator fix: an agent's own note after the person's comment means the comment
-    // was acted on, so rule 1 does not pick its stage again on every pass.
-    const revised = assembleTrailFacts([
-      { createdAt: at(1), body: '### Plan Review Verdict\n\n**Verdict:** Request Changes.' },
-      { createdAt: at(2), body: 'Take the narrow revision.' },
-      { createdAt: at(3), body: '**Plan revised in the description (`## Implementation Plan`), answering the plan-review.**' }
-    ], '');
-    assert.equal(revised.latestPerson.at, at(2));
-    assert.equal(revised.latestPerson.actedAfter, true, 'the planner acted on it');
-    assert.match(formatTrailFactsBlock(revised, 3), /an agent acted after it \(a note, landed work or a close-out\): yes/);
-    // LIN-4520 (finding-ca44ecba): landed work is a change record version that wrote a head after the person's comment, not a comment
-    // that cites a PR. A landing report in a comment alone is not acted-on work; the change record is.
+  });
+
+  test('actedAfter: a dispatched run after the person\'s finding; a run before it does not count', () => {
+    const finding = personFinding(2, 'Take the narrow revision.');
+    const after = assembleTrailFacts([], '', { personFindings: [finding], runTimes: [Date.parse(at(3))] });
+    assert.equal(after.latestPerson.actedAfter, true, 'a run dispatched after the finding');
+    const before = assembleTrailFacts([], '', { personFindings: [finding], runTimes: [Date.parse(at(1))] });
+    assert.equal(before.latestPerson.actedAfter, false, 'a run dispatched before the finding is not acting on it');
+    const unknown = assembleTrailFacts([], '', { personFindings: [finding], runTimes: null });
+    assert.equal(unknown.latestPerson.actedAfter, false);
+  });
+
+  test('a landing report in a comment is not landed work; a change record version written after the finding is', () => {
     const reportOnly = assembleTrailFacts([
-      { createdAt: at(1), body: 'Addendum: two more items for this round.' },
       { createdAt: at(2), body: `## Review fixes landed — PR updated\n\n${PR}` }
-    ], '');
+    ], '', { personFindings: [personFinding(1, 'Addendum: two more items for this round.')] });
     assert.equal(reportOnly.latestPerson.actedAfter, false, 'a landing report in a comment is not landed work');
     const landed = assembleTrailFacts([
-      { createdAt: at(1), body: 'Addendum: two more items for this round.' },
       { createdAt: at(2), body: `## Review fixes landed — PR updated\n\n${PR}` }
-    ], '', { planReviewRun: planReviewRunOf({ changes: [{ at: at(3), fields: { ref: PR } }] }) });
+    ], '', { personFindings: [personFinding(1, 'Addendum: two more items for this round.')], planReviewRun: planReviewRunOf({ changes: [{ at: at(3), fields: { ref: PR } }] }) });
     assert.equal(landed.latestPerson.actedAfter, true, 'a change record version written after it is landed work');
+  });
+
+  test('TRAIL FACTS names the latest person\'s finding, whether it is a ruling, and whether a run was dispatched after it', () => {
+    const withRuling = formatTrailFactsBlock(assembleTrailFacts([], '', { personFindings: [personFinding(3, `Go.\n\n${RULING_MARK}`)] }), 1);
+    assert.match(withRuling, /- Latest person's comment[^:]*: 2026-10-03 10:00, a ruling recorded via Harbour \(shown with the comments\); a run was dispatched after it, or landed work followed: no/);
+    assert.match(formatTrailFactsBlock(assembleTrailFacts([], '', { personFindings: [] }), 0), /- Latest person's comment[^:]*: none/);
+    assert.match(formatTrailFactsBlock(assembleTrailFacts([], ''), 0), /- Latest person's comment[^:]*: not measured/, 'no findings read: not measured, never none');
+    assert.equal(assembleTrailFacts([], '').personRead, false);
   });
 
   // LIN-4520: the agent notes and the unheaded close-out are not work: the trail (records) decides, and the comments do not.
@@ -224,7 +219,7 @@ describe('the selector view (LIN-3300)', () => {
     blockedBy: [{ identifier: 'LIN-2', title: 'b', state: { name: 'Todo', type: 'unstarted' } }, { identifier: 'LIN-3', title: 'c', state: { name: 'Done', type: 'completed' } }]
   };
   const comments = [
-    { user: 'John', createdAt: at(1), body: `Ruling: plan first.\n\n${RULING_MARK}` },
+    { user: 'John', commentId: 'c1', createdAt: at(1), body: `Ruling: plan first.\n\n${RULING_MARK}` },
     { user: 'Agent', createdAt: at(2), body: 'Older note one.' },
     { user: 'Agent', createdAt: at(3), body: 'Newer note two.' },
     { user: 'Agent', createdAt: at(4), body: 'y'.repeat(2500) },
@@ -234,7 +229,9 @@ describe('the selector view (LIN-3300)', () => {
     parent: { identifier: 'LIN-0', title: 'Epic', state: { name: 'In Progress' } }, parentChildCount: 30,
     siblings: [{ identifier: 'LIN-4', title: 's', state: { name: 'Todo' } }], siblingsTotal: 9,
     cousins: [{ identifier: 'LIN-5', title: 'cousin', state: { name: 'Todo' } }], cousinsTotal: 40,
-    project: { name: 'Harbour' }, children: [], comments
+    project: { name: 'Harbour' }, children: [], comments,
+    // LIN-4535: the person's findings, keyed by the comment's fixed id (the ingest's rule); the selector reads these, not the words.
+    personFindings: findingFor('c1', 1, `Ruling: plan first.\n\n${RULING_MARK}`)
   };
 
   test('only the latest 3 comment bodies, capped, plus the latest ruling wherever it sits', () => {
@@ -265,8 +262,8 @@ describe('the selector view (LIN-3300)', () => {
   });
 
   test('a comment that only quotes the mark is never shown as the latest ruling', () => {
-    const quoting = { user: 'John', createdAt: at(6), body: `### Plan Review Verdict\n\nThe suffix "${RULING_MARK}" is quoted here.\n\n**Verdict:** Request Changes.` };
-    const view = formatSelectorView(issue, { ...context, comments: [...comments, ...[7, 8, 9].map(d => ({ user: 'A', createdAt: `2026-10-0${d}T10:00:00.000Z`, body: `n${d}` })), quoting].sort((a, b) => a.createdAt.localeCompare(b.createdAt)) });
+    const quoting = { user: 'John', commentId: 'c6', createdAt: at(6), body: `### Plan Review Verdict\n\nThe suffix "${RULING_MARK}" is quoted here.\n\n**Verdict:** Request Changes.` };
+    const view = formatSelectorView(issue, { ...context, personFindings: [...context.personFindings, ...findingFor('c6', 6, quoting.body)], comments: [...comments, ...[7, 8, 9].map(d => ({ user: 'A', createdAt: `2026-10-0${d}T10:00:00.000Z`, body: `n${d}` })), quoting].sort((a, b) => a.createdAt.localeCompare(b.createdAt)) });
     assert.match(view, /Latest ruling recorded via Harbour[^\n]*\n+Ruling: plan first\./, 'the real ruling, not the quoting verdict');
   });
 
@@ -274,7 +271,7 @@ describe('the selector view (LIN-3300)', () => {
     const view = formatSelectorView(issue, { ...context, comments: comments.slice(0, 2) });
     assert.match(view, /Latest 2 of 2 comments/);
     assert.doesNotMatch(view, /Latest ruling recorded via Harbour/, 'not repeated above the comments');
-    assert.match(view, /\*\*Agent, the latest person's comment\*\*/, 'the latest person\'s comment is marked where it sits');
+    assert.match(view, /\*\*John, the latest person's comment \(a ruling recorded via Harbour\)\*\*/, 'the latest person\'s finding is marked where its comment sits; an unfiled comment is not a person\'s');
     assert.equal(view.split('Ruling: plan first.').length, 2, 'shown once');
   });
 });

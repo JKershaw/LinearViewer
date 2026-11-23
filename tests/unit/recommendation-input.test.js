@@ -21,7 +21,7 @@ describe('prepareRecommendationInput (LIN-3469)', () => {
   test('forwards exactly the prompt-read fields plus the task\'s runs', async () => {
     const input = await prepareRecommendationInput(ctx, { dispatchQueueStore: store, urlKey: 'acme', identifier: 'LIN-1' });
     assert.deepEqual(Object.keys(input).sort(),
-      ['allRuns', 'asked', 'attachments', 'children', 'comments', 'focusedChild', 'landingChanges', 'openFindings', 'parent', 'planFacts', 'planReviewLoop', 'planReviewRun', 'project', 'reviewRound', 'runs', 'siblings', 'trail']);
+      ['allRuns', 'asked', 'attachments', 'children', 'comments', 'focusedChild', 'landingChanges', 'openFindings', 'parent', 'personFindings', 'planFacts', 'planReviewLoop', 'planReviewRun', 'project', 'reviewRound', 'runTimes', 'runs', 'siblings', 'trail']);
     assert.equal(input.asked, null, 'no records store: no words on record');
     assert.equal(input.trail, null, 'LIN-4518 step 3: no records store: the trail is not read, so no gate reads a comment for it');
     assert.equal(input.landingChanges, null, 'LIN-4518 step 2: no records store: the landing is not read, so a blind read names no id');
@@ -88,10 +88,22 @@ describe('the plan-review loop enters the route from the records (LIN-4518 findi
     assert.equal(reviewLoopStep(ISSUE, input.planReviewLoop), null);
   });
 
-  test('a person\'s comment after the latest verdict, read by the entrance, lifts the bound', async () => {
-    const input = await entrance(rounds(2, 2, 2), [{ createdAt: scenarioAt(4), body: 'go on, take it to implementation' }]);
+  // LIN-4535: a person's speech is the task's person finding (lib/comment-ingest.js), read by the entrance, never a comment's text.
+  test('a person\'s finding after the latest verdict, read by the entrance, lifts the bound', async () => {
+    const records = await seededRecordsStore(harness, rounds(2, 2, 2));
+    const realFind = records.find.bind(records);
+    assert.ok(await records.taskForTicket('ws', 'LIN-1'), 'the seeded store has the ticket\'s task');
+    records.find = async (urlKey, q) => (q.kind === 'finding'
+      ? [{ id: 'finding-1', kind: 'finding', by: 'person:john', via: 'comment', at: scenarioAt(4), fields: { says: 'go on, take it to implementation' } }]
+      : realFind(urlKey, q));
+    const input = await prepareRecommendationInput({ ...ctx, comments: [] }, { dispatchQueueStore: store, urlKey: 'ws', identifier: 'LIN-1', recordsStore: records });
     assert.equal(input.planReviewLoop.personSince, true);
     assert.equal(reviewLoopStep(ISSUE, input.planReviewLoop), null);
+  });
+
+  test('a comment that reads like a person\'s words, with no person finding, does not lift the bound', async () => {
+    const input = await entrance(rounds(2, 2, 2), [{ createdAt: scenarioAt(4), body: 'go on, take it to implementation' }]);
+    assert.equal(input.planReviewLoop.personSince, false);
   });
 
   test('with no records store the loop is not read, so the bound stands aside (never read from the comments)', async () => {

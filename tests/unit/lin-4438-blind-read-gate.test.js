@@ -25,6 +25,7 @@
  */
 process.env.NODE_ENV = 'test';
 
+import { personCommentsOf } from '../../lib/comment-ingest.js';
 import { FINDINGS_NONE } from '../../lib/close-out-findings.js';
 import { test, describe, afterEach, before, after } from 'node:test';
 import assert from 'node:assert/strict';
@@ -37,7 +38,6 @@ import { readCloseOutChain, closeOutNotReady } from '../../lib/close-out-readine
 import { readRunEvidence } from '../../lib/run-evidence.js';
 import { closeOutWaitsOn } from '../../lib/run-closeout-state.js';
 import { assembleTrailFacts } from '../../lib/recommendation-facts.js';
-import { isPersonComment } from '../../lib/run-trail.js';
 import { blindReadStep, BLIND_READ_ATTEMPT_BOUND } from '../../lib/recommendation-blind-read.js';
 import { planReviewRunOf } from '../../lib/records/plan-review-run.js';
 import { generatePrompt } from '../../lib/prompt-templates.js';
@@ -210,7 +210,9 @@ describe('rows that need more than the lanes', () => {
     const row = ROWS.find(r => r.n === 11);
     const trail = await trailOfEvents(row.events);
     const facts = assembleTrailFacts(row.comments, '', { leaf: false, trail });
-    assert.equal(isPersonComment(LINK_BODY), false, 'never read as a person waiting for an answer');
+    // LIN-4535: the blind read's comment is Harbour's post, so the ledger keeps it from the ingest (never a person waiting for an answer).
+    assert.deepEqual(personCommentsOf([{ id: 'link', createdAt: '2026-11-21T10:00:00Z', body: LINK_BODY, authorId: 'u1' }],
+      { recorded: new Set(['link']), people: [{ accountId: 'john', trackerUserId: 'u1' }] }), [], 'never read as a person waiting for an answer');
     assert.equal(facts.workAfterReview, true, 'the selector facts show work after review');
     assert.equal(facts.closeOutAfterReview, false);
     assert.equal(closeOutWaitsOn(trail.review, trail.landing), 'blind-read');

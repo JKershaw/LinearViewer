@@ -37,7 +37,8 @@ import { refreshTaskChanges } from '../../lib/change-records.js';
 import { SUMMARY_LEAD, summaryBodyOf } from '../../lib/records/summary.js';
 import { computeIssueRoundTrips } from '../../lib/plan-review-round-trips.js';
 import { readOpenFindings, findingsHold } from '../../lib/close-out-findings.js';
-import { withoutHarbourSummaries, isHarbourSummary, isPersonComment, opensAsBlindRead } from '../../lib/run-trail.js';
+import { withoutHarbourSummaries, isHarbourSummary, opensAsBlindRead } from '../../lib/run-trail.js';
+import { personCommentsOf } from '../../lib/comment-ingest.js';
 
 const URL_KEY = 'lin-4516-workspace';
 const TICKET = 'LIN-4516';
@@ -288,7 +289,8 @@ describe('witness 5: a verdict summary of every kind changes nothing for any com
     for (const body of summaries) {
       const comment = { body, createdAt: '2026-11-21T10:00:00Z' };
       assert.ok(isHarbourSummary(comment), `not read as a harbour summary: ${body.split('\n')[0]}`);
-      assert.equal(isPersonComment(comment), false, `read as a person's comment: ${body.split('\n')[0]}`);
+      assert.deepEqual(personCommentsOf([{ id: 'summary', createdAt: comment.createdAt, body, authorId: 'u1' }],
+        { recorded: new Set(['summary']), people: [{ accountId: 'john', trackerUserId: 'u1' }] }), [], `read as a person's comment: ${body.split('\n')[0]}`);
       assert.equal(opensAsBlindRead(comment), false, `opened as a blind read: ${body.split('\n')[0]}`);
       assert.deepEqual(withoutHarbourSummaries([...human, comment]), human, 'the summary is filtered out of the discussed comments');
     }

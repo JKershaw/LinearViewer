@@ -13,7 +13,7 @@ You choose the next stage of work for one Linear ticket. You do not do the work 
 
 **Verdict:** Request Changes.
 
-**John, the latest person's comment** (2026-10-02):
+**John** (2026-10-02):
 F1 is right; take the narrow revision.
 
 ## Facts computed in code
@@ -21,10 +21,10 @@ F1 is right; take the narrow revision.
 **TRAIL FACTS (computed in code from all 2 comments — do not re-derive):**
 - Latest code review: none (a plan-review verdict, a bug write-up or a run summary is not one)
 - PRs linked on the trail: none
-- Latest person's comment (not an agent note, landing report, review, verdict or close-out): 2026-10-02 10:00 (shown with the comments)
+- Latest person's comment: not measured (the ticket's findings could not be read)
 - Latest ruling recorded via Harbour: none
 - Plan-review verdicts: 1 (1 request changes); latest: request changes (2026-10-01 10:00)
-- Since the latest plan-review verdict: a person's comment: yes; landed work: none
+- Since the latest plan-review verdict: a person's comment: no; landed work: none
 - Plan records on this task: plan-abc40aa v2 to implementation (changed 2026-10-03 10:00)
 - Session fit (the plan records' addressee): one session (addressed to implementation)
 - Plan review owed: yes (open finding finding-abc40aa to plan-review about plan-abc40aa)

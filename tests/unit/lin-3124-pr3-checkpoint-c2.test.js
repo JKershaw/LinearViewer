@@ -18,6 +18,7 @@ import { withFreshDigests } from '../fixtures/with-fresh-digests.js';
 import { InMemoryRunSummaryCacheStore } from '../../lib/run-summary-cache.js';
 import { InMemorySessionSummaryCacheStore } from '../../lib/session-summary-cache.js';
 import { appAround, request } from './lib/entrance-route-sweep.js';
+import { setLinearFetchImpl, getLinearFetchImpl } from '../../lib/linear-fetch.js';
 
 const __dirname = dirname(fileURLToPath(import.meta.url));
 const SERVER_SRC = readFileSync(join(__dirname, '../../server.js'), 'utf8');
@@ -199,9 +200,20 @@ describe('LIN-3124 PR3 checkpoint C2 — D16 owner-blind threading (source-text 
         next();
       }
     });
-    const res = await request(appAround(router), 'POST', '/workspace/acme/api/dispatch', {
-      body: { prompt: 'p', target: 'cli', issueIdentifier: 'LIN-1', composedRunMarker: 'ruling-composed-run' }
-    });
+    // LIN-4535: the dispatch seat reads the ticket's comments through the Linear transport. The workspace token here is not
+    // the hermetic one, so the read goes to the transport this test installs (lib/linear-fetch.js), never the network.
+    const keptFetch = getLinearFetchImpl();
+    setLinearFetchImpl(async () => new Response(JSON.stringify({ data: null, errors: [{ message: 'comments read stubbed for the dispatch seat' }] }), {
+      status: 200, headers: { 'content-type': 'application/json' },
+    }));
+    let res;
+    try {
+      res = await request(appAround(router), 'POST', '/workspace/acme/api/dispatch', {
+        body: { prompt: 'p', target: 'cli', issueIdentifier: 'LIN-1', composedRunMarker: 'ruling-composed-run' }
+      });
+    } finally {
+      setLinearFetchImpl(keptFetch);
+    }
     assert.equal(res.status, 201, res.text);
     assert.ok(seen.length >= 1, 'the done-guard asked for the workspace access token');
     for (const [urlKey, sess] of seen) {

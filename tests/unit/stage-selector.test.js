@@ -12,6 +12,7 @@
  *
  * Run with: node --test tests/unit/stage-selector.test.js
  */
+import { withPersonFindings } from './helpers/person-findings.js';
 import { test, describe } from 'node:test';
 import assert from 'node:assert/strict';
 import { buildRouterPrompt, routeStage, parseWhyNow } from '../../lib/stage-router.js';
@@ -22,7 +23,11 @@ import { planReviewRunOf } from '../../lib/records/plan-review-run.js';
 
 const open = { name: 'In Progress', type: 'started' };
 const leaf = (over = {}) => ({ identifier: 'LIN-1', title: 'A task', description: 'Do it.', state: open, labels: [], ...over });
-const ctx = (over = {}) => ({ parent: null, siblings: [], project: null, children: [], comments: [], focusedChild: null, ...over });
+// LIN-4535: a fixture's person comments (`person: true`) are its findings, as the ticket reads them (tests/unit/helpers/person-findings.js).
+const ctx = (over = {}) => {
+  const { comments = [], personFindings } = withPersonFindings(over.comments ?? []);
+  return { parent: null, siblings: [], project: null, children: [], focusedChild: null, ...over, comments, personFindings: over.personFindings ?? personFindings };
+};
 const prompt = (issue = leaf(), context = ctx()) => buildRouterPrompt(buildSelectorArgs(issue, context));
 
 describe('the selector prompt (LIN-3300)', () => {
@@ -129,7 +134,7 @@ describe('the selector prompt (LIN-3300)', () => {
     // LIN-4520: the verdicts are records (the plan-review run, folded from the verdict records); the person's comment is read.
     const verdict = (id, at, outcome) => ({ id, at, run: `run-${id}`, fields: { judgement: 'plan-review', outcome } });
     const planReviewRun = planReviewRunOf({ verdicts: [verdict('v-app', '2026-01-01T00:00:00Z', 'approve'), verdict('v-2', '2026-01-02T00:00:00Z', 'request-changes'), verdict('v-3', '2026-01-03T00:00:00Z', 'request-changes')] });
-    const p = prompt(leaf(), ctx({ comments: [{ createdAt: '2026-01-04T00:00:00Z', body: 'Go on with the narrow revision.' }], planReviewRun }));
+    const p = prompt(leaf(), ctx({ comments: [{ createdAt: '2026-01-04T00:00:00Z', body: 'Go on with the narrow revision.', person: true }], planReviewRun }));
     assert.match(p, /- Plan-review verdicts: 3 \(1 approve, 2 request changes\); latest: request changes \(2026-01-03 00:00\)/);
     assert.match(p, /- Since the latest plan-review verdict: a person's comment: yes; landed work: none/);
     assert.doesNotMatch(p, /PLAN-REVIEW FACTS|first match wins|since the latest Approve|Count \d|third|escalat/i);
@@ -175,7 +180,7 @@ describe('the selector prompt (LIN-3300)', () => {
 
   test('a ruling older than the latest comments still reaches the selector', () => {
     const comments = [
-      { user: 'John', createdAt: '2026-10-01T00:00:00Z', body: `Dispatch implement for N4.\n\n${RULING_MARK}` },
+      { user: 'John', person: true, createdAt: '2026-10-01T00:00:00Z', body: `Dispatch implement for N4.\n\n${RULING_MARK}` },
       ...[2, 3, 4].map(n => ({ user: 'A', createdAt: `2026-10-0${n}T00:00:00Z`, body: `Note ${n}.` }))
     ];
     assert.match(prompt(leaf(), ctx({ comments })), /Latest ruling recorded via Harbour[^\n]*\n+Dispatch implement for N4\./);

@@ -61,6 +61,7 @@ import { checkSizeRecord, recordShape, SIZE_OF_MOVE_HEADING, SIZE_RECORD_CODES, 
 import { addedPlanHeadings, PLAN_HEADING_WORDS, PLAN_IN_DESCRIPTION } from '../lib/legacy-plan-text.js';
 import { blindReadRefusal, checkBlindReadPrs } from '../lib/run-ledger.js';
 import { opensAsBlindRead } from '../lib/run-trail.js';
+import { postHarbourComment, repairHarbourCommentRecord } from '../lib/harbour-comment-post.js';
 import { landingOfTicket } from '../lib/records/landing.js';
 import { isRestrictedStamp, sameTicketKey, ISSUE_PATCH_FIELDS } from '../lib/stage-writes.js';
 import { jsonError } from '../lib/errors.js';
@@ -308,31 +309,14 @@ export function createProxyWriteRoutes({
       .catch(e => console.error(`[ticket-closer] seam ${seam} failure:`, e?.message || e));
   }
 
-  /**
-   * Best-effort Harbour-comments ledger record (LIN-2648, WS1 of LIN-2241): one
-   * attempt, caught and logged, never propagated, never retried. The comment
-   * already succeeded and is the durable half of the write; a ledger failure must
-   * never fail it. Also used to repair a dedupe hit (LIN-2649 S1, F2): the
-   * original create's own attempt may have failed silently, and the upsert is
-   * idempotent.
-   */
-  async function recordInLedger(req, payload, what) {
-    if (!harbourCommentsStore) return;
-    try {
-      const commentId = payload.comment?.id;
-      if (commentId) await harbourCommentsStore.record({ urlKey: req.proxyUrlKey, commentId });
-    } catch (ledgerErr) {
-      console.error(`Harbour-comments ledger ${what} failed:`, ledgerErr.message);
-    }
-  }
-
   /** Create a comment and answer 201; `remember` sees the payload once the write is accepted. */
   async function postComment({ req, res, endpoint, token, provider }, text, remember) {
-    const created = normalizeWritePayload(await provider.createComment(token, req.params.issueId, text), 'comment');
+    // LIN-4535 (D4): the post and its ledger record are one seam (lib/harbour-comment-post.js); a failed record never fails the post.
+    const posted = await postHarbourComment({ urlKey: req.proxyUrlKey, store: harbourCommentsStore, clientIds: provider.clientCommentIds === true, post: (commentId) => provider.createComment(token, req.params.issueId, text, commentId) });
+    const created = normalizeWritePayload(posted, 'comment');
     // A clear failure instead of a misleading 201 when the provider reports the write did not land.
     if (writeRejected(req, res, endpoint, created, 'Comment was not created')) return;
     remember?.(created);
-    await recordInLedger(req, created, 'record');
     logEvent(req, endpoint, 201);
     res.status(201).json(created);
   }
@@ -764,7 +748,9 @@ export function createProxyWriteRoutes({
       // from the provider, so it is not evidence the provider accepted anything
       // on THIS request.
       logEvent(req, endpoint, 200, null, { skipWitness: true });
-      await recordInLedger(req, prior, 'repair');
+      // Dedupe-hit ledger repair (LIN-2649 S1, F2): the original post's own record may have failed. The seam repairs it
+      // (lib/harbour-comment-post.js, LIN-4535), so the ledger is written one way; it never gates this response.
+      if (harbourCommentsStore) await repairHarbourCommentRecord({ urlKey: req.proxyUrlKey, commentId: prior.comment?.id ?? null, store: harbourCommentsStore });
       return res.status(200).json({ ...prior, deduped: true });
     }
     await postComment(ctx, body, (created) => commentDedupe.set(key, created));

@@ -104,6 +104,8 @@ import { createRunRecords } from './lib/run-records.js'
 import { createChangeBackstop, createChangePrReaders } from './lib/change-records.js'
 import { setStandingPrReaderFor } from './lib/task-standing.js'
 import { createRecordWrites } from './lib/records/writes.js'
+import { configureHarbourCommentLedger } from './lib/harbour-comment-post.js'
+import { configureCommentIngest } from './lib/comment-ingest.js'
 import { askedOf } from './lib/asked-of.js'
 import { flattenIssue as flattenRecordsIssue } from './lib/proxy-wire.js'
 import { createListWorkspacePeople, storedNameOf } from './lib/workspace-people.js'
@@ -733,6 +735,21 @@ const harbourCommentsCollection = db.collection('harbour-comments')
 const harbourCommentsStore = new HarbourCommentsStore({
   collection: harbourCommentsCollection
 })
+// LIN-4535 (P5): Harbour's own comment posts are recorded in the ledger (lib/harbour-comment-post.js), and a person's comment
+// reaches its task as a finding (lib/comment-ingest.js), the only reader that decides who wrote a comment. The cutover
+// (set at boot below for the workspaces that exist; at creation for a new one) keeps older comments out of the ingest.
+configureHarbourCommentLedger(harbourCommentsStore)
+configureCommentIngest({
+  writes: ticketWriter,
+  listPeople: (urlKey) => listWorkspacePeople(urlKey),
+  cutoffOf: async (urlKey) => {
+    const at = (await workspaceStore.getWorkspaceByUrlKey(urlKey))?.commentCutoverAt;
+    return at ? new Date(at).getTime() : null;
+  },
+  ledger: harbourCommentsStore,
+  taskForTicket: (urlKey, ticket) => recordsStore.taskForTicket(urlKey, ticket),
+  taskOfTicket: async (ctx, urlKey, ticket) => (await ticketWriter.taskOfTicket(ctx, urlKey, ticket, 'harbour'))?.id ?? null,
+})
 
 // Saved chats (LIN-1008): durable, resumable task-chat transcripts, private per
 // {urlKey, accountId}. Content-bearing → session-auth only, with ONE narrow,
@@ -799,6 +816,9 @@ const accountMergeLogStore = new AccountMergeLogStore({ collection: accountMerge
 // whether a durable `Workspace` document exists yet.
 const workspacesCollection = db.collection('workspaces')
 const workspaceStore = new WorkspaceStore({ collection: workspacesCollection })
+// LIN-4535 (P5, D5): the comment-ingest cutover, set-if-absent for every workspace at this boot. A workspace made after
+// this boot gets its cutover at creation (WorkspaceStore.createWorkspace), so its older comments never count.
+await workspaceStore.setCommentCutoversIfAbsent(new Date())
 const accountWorkspacesCollection = db.collection('account-workspaces')
 const accountWorkspaceStore = new AccountWorkspaceStore({ collection: accountWorkspacesCollection })
 

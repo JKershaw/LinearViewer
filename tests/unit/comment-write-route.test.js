@@ -18,6 +18,7 @@
 //     confirms the 'human-comment' salt keeps the two lanes' dedupe windows
 //     independent, sharing only the cache instance and generation tracker.
 
+import { LEDGER_ATTEMPTS } from '../../lib/harbour-comment-post.js';
 import { test, describe } from 'node:test';
 import assert from 'node:assert/strict';
 import { readFileSync } from 'node:fs';
@@ -181,9 +182,9 @@ function makeRecoverySession({ accountId = 'acct-1', saveError = null } = {}) {
   return { accountId, save: (cb) => cb(saveError) };
 }
 
-// LIN-2664 F2: the ORIGINAL create's ledger write fails once, then heals on
-// any later attempt — models a transient harbour-comments ledger outage that
-// has cleared by the time a dedupe-hit resubmission re-attempts the record.
+// LIN-2664 F2: the ORIGINAL create's ledger write fails every attempt of its
+// bounded retry (LIN-4535), then heals — models a harbour-comments ledger outage
+// that has cleared by the time a dedupe-hit resubmission re-attempts the record.
 function makeFlakyHarbourCommentsStore() {
   const calls = [];
   let attempt = 0;
@@ -192,7 +193,7 @@ function makeFlakyHarbourCommentsStore() {
     async record({ urlKey, commentId }) {
       attempt += 1;
       calls.push({ urlKey, commentId, attempt });
-      if (attempt === 1) throw new Error('ledger down (first attempt)');
+      if (attempt <= LEDGER_ATTEMPTS) throw new Error('ledger down (the original create\'s attempts)');
       return { urlKey, commentId, recordedAt: new Date().toISOString() };
     },
   };
@@ -1197,13 +1198,13 @@ describe('POST /workspace/:urlKey/api/comments/:issueId — harbour-comments led
     const payload = { body: 'the same text — ledger repair' };
     const first = await postComment(app, ISSUE_ID, payload);
     assert.strictEqual(first.status, 201);
-    assert.strictEqual(harbourCommentsStore.calls.length, 1, 'the original create attempted (and failed) its ledger record');
+    assert.strictEqual(harbourCommentsStore.calls.length, LEDGER_ATTEMPTS, 'the original create attempted (and failed) its ledger record every time');
 
     const second = await postComment(app, ISSUE_ID, payload);
     assert.strictEqual(second.status, 200);
     assert.strictEqual(second.body.deduped, true, 'still served from the dedupe cache — no second comment minted');
     assert.strictEqual(calls.createComment.length, 1, 'no second provider write on the dedupe hit');
-    assert.strictEqual(harbourCommentsStore.calls.length, 2, 'the dedupe hit re-attempted the ledger record');
+    assert.strictEqual(harbourCommentsStore.calls.length, LEDGER_ATTEMPTS + 1, 'the dedupe hit re-attempted the ledger record');
     assert.strictEqual(
       harbourCommentsStore.calls[1].commentId,
       first.body.comment.id,

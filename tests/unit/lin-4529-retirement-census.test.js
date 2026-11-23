@@ -33,7 +33,14 @@ export const EXCLUDED = Object.freeze({
 });
 
 /** The words this slice retires, each with the spelling the census matches. Empty until a piece retires something. */
-export const RETIRED = Object.freeze([]);
+export const RETIRED = Object.freeze([
+  // LIN-4535 (P5): the text authorship readers. A person's comment is its finding (lib/comment-ingest.js), never a comment's words.
+  { word: 'isPersonComment', re: /\bisPersonComment\b/ },
+  { word: 'isAgentActivity', re: /\bisAgentActivity\b/ },
+  { word: 'reportsLandedWork', re: /\breportsLandedWork\b/ },
+  { word: 'opensAsAgentNote', re: /\bopensAsAgentNote\b/ },
+  { word: 'holdingComment', re: /\bholdingComment\b/ },
+]);
 
 /** Files that keep a retired word, each with the words it may keep and the reason. Empty until RETIRED has rows. */
 export const ALLOW = Object.freeze({});

@@ -82,7 +82,7 @@ describe('CODE_ROUTES: each route fires on its fixture and records a declared tr
     'live-wait': { issue: { identifier: 'T-1', state: STARTED, description: '' }, context: { comments: [], allRuns: [run('implementation', 3, 'running')] } },
     'review-bound': { issue: { identifier: 'T-1', state: STARTED, description: '' }, context: { planReviewLoop: loopFactsFor(ROUNDS(3, 3, 3)), allRuns: [] } },
     // LIN-4501: the person's words are the task's `asked` on the recommendation input, not the description's block.
-    'look-first': { issue: { identifier: 'T-1', state: OPEN, description: ASKED }, context: { comments: [], allRuns: [], asked: 'Make the export button download a CSV.', planFacts: { measured: true, hasPlan: false } } },
+    'look-first': { issue: { identifier: 'T-1', state: OPEN, description: ASKED }, context: { comments: [], personFindings: [], allRuns: [], asked: 'Make the export button download a CSV.', planFacts: { measured: true, hasPlan: false } } },
   };
 
   for (const name of ['live-wait', 'review-bound', 'look-first']) {

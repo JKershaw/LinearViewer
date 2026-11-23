@@ -66,10 +66,12 @@ describe('RecordsStore.planReviewRunForTicket: landed work from the task\'s chan
 describe('a revision pushed after a person\'s comment is an agent acting after it (finding-5d38c050)', () => {
   test('actedAfter is true when the change was first recorded before the comment and revised after it', async () => {
     const run = await runOf([ev.pr(1, PR, 'aaa1111'), planReview(2), ev.head(12, PR, 'bbb2222')]);
+    // LIN-4535: the person's words are their finding (a person finding, never the comment's text).
     const person = { createdAt: scenarioAt(10), body: 'Addendum: two more items for this round.' };
+    const personFinding = { id: 'finding-addendum', at: scenarioAt(10), accountId: 'john', says: person.body, ruling: false };
     const report = { createdAt: scenarioAt(12), body: `Fixes pushed: ${PR} at bbb2222` };
-    assert.equal(assembleTrailFacts([person, report], '', { planReviewRun: run }).latestPerson.actedAfter, true);
+    assert.equal(assembleTrailFacts([person, report], '', { planReviewRun: run, personFindings: [personFinding] }).latestPerson.actedAfter, true);
     const noPush = await runOf([ev.pr(1, PR, 'aaa1111'), planReview(2)]);
-    assert.equal(assembleTrailFacts([person, report], '', { planReviewRun: noPush }).latestPerson.actedAfter, false, 'the comment citing the PR alone is not work');
+    assert.equal(assembleTrailFacts([person, report], '', { planReviewRun: noPush, personFindings: [personFinding] }).latestPerson.actedAfter, false, 'the comment citing the PR alone is not work');
   });
 });
