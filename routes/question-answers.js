@@ -19,7 +19,7 @@ import { jsonError } from '../lib/errors.js';
 import { createRecordWrites } from '../lib/records/writes.js';
 import { askedOf } from '../lib/asked-of.js';
 import { createQuestionAnswers } from '../lib/question-answers.js';
-import { enqueueFollowUp } from '../lib/follow-up-dispatch.js';
+import { enqueueFollowUp, ownerRefusalReply } from '../lib/follow-up-dispatch.js';
 import { resolveRunnerOwnerRefusal } from '../lib/runner-owner-gate.js';
 import { isTerminalState } from '../lib/providers/state-map.js';
 import { STAGE_KINDS } from '../lib/prompts/stage-kinds.js';
@@ -31,7 +31,7 @@ import { publicOrigin } from '../lib/public-origin.js';
  * @param {Object} deps
  * @param {Function} deps.workspaceFromUrl - the workspace middleware (lib/workspace.js)
  * @param {import('../lib/records-store.js').RecordsStore} deps.recordsStore
- * @param {Object} deps.dispatchQueueStore - the dispatch store (isRunStopped, rowForRunRecords, followUpPromptsOf, enqueue)
+ * @param {Object} deps.dispatchQueueStore - the dispatch store (isRunStopped, runTailOf, followUpPromptsOf, and the rows enqueueFollowUp reads and writes)
  * @param {Object} [deps.workspacePreferencesStore]
  * @param {Object} [deps.proxyTokenStore]
  * @param {Function} deps.workspaceOwnerCheck - the hoisted owner seam (LIN-3383); absent means the resume is refused (fail closed)
@@ -42,17 +42,19 @@ export function createQuestionAnswerRoutes({ workspaceFromUrl, recordsStore, dis
   if (!recordsStore || !dispatchQueueStore) throw new Error('question answer routes: recordsStore and dispatchQueueStore are required');
   const router = Router();
 
-  /** The request's own service: its writes carry the request's tracker, its resume carries the request's owner gate and origin. */
+  // Nothing the record writer is built from depends on the request (the tracker and ticket reads take a per-call ctx, which a decision write never passes), so it is built once, as routes/task-records.js does.
+  const writes = createRecordWrites({
+    recordsStore,
+    isTerminalState,
+    readTicket: readSessionTicket,
+    askedText: askedOf,
+    stageKinds: Object.keys(STAGE_KINDS),
+    listPeople,
+    tracker: sessionTrackerFor,
+  });
+
+  /** The request's own service: its resume carries the request's owner gate and origin. */
   function serviceFor(req) {
-    const writes = createRecordWrites({
-      recordsStore,
-      isTerminalState,
-      readTicket: readSessionTicket,
-      askedText: askedOf,
-      stageKinds: Object.keys(STAGE_KINDS),
-      listPeople,
-      tracker: sessionTrackerFor,
-    });
     const { urlKey, id: workspaceId } = req.workspace;
     const baseUrl = publicOrigin(req);
     return createQuestionAnswers({
@@ -74,17 +76,15 @@ export function createQuestionAnswerRoutes({ workspaceFromUrl, recordsStore, dis
         force,
         sessionId: runId,
       }),
+      // The refusal enqueueFollowUp makes (LIN-3383), read before any write.
       refuseResume: async ({ target, dispatchedBy }) => {
-        // The same refusal enqueueFollowUp makes (LIN-3383), mapped the same way (a not-owner is 422, never 403), read before any write.
         const refusal = await resolveRunnerOwnerRefusal({ ownerCheck: workspaceOwnerCheck, workspaceId, accountId: dispatchedBy, target });
-        if (!refusal) return null;
-        const status = refusal.status === 403 ? 422 : refusal.status;
-        return { status, body: { error: refusal.error, code: refusal.code, category: refusal.category, retryable: refusal.retryable } };
+        return refusal ? ownerRefusalReply(refusal) : null;
       },
     });
   }
 
-  const trimmed = (x) => (typeof x === 'string' ? x : null);
+  const stringOrNull = (x) => (typeof x === 'string' ? x : null);
 
   router.post('/workspace/:urlKey/questions/:id/answer', dispatchQueueLimiter, workspaceFromUrl, json(), async (req, res) => {
     const writer = await personWriterOf(req, accountStore);
@@ -94,8 +94,8 @@ export function createQuestionAnswerRoutes({ workspaceFromUrl, recordsStore, dis
       const out = await serviceFor(req).answer({
         urlKey: req.workspace.urlKey,
         questionId: req.params.id,
-        option: trimmed(req.body?.option),
-        words: trimmed(req.body?.words),
+        option: stringOrNull(req.body?.option),
+        words: stringOrNull(req.body?.words),
         by: writer.by,
         dispatchedBy: accountId,
       });
