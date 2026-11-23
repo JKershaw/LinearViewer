@@ -122,7 +122,7 @@ describe('scoping writes the size record (LIN-4369)', () => {
 
   test('it reads both Surveys\' reports on their run records, the filed findings, and a subtask\'s parent record (LIN-4520, LIN-4533: no Survey comment)', () => {
     const p = processOf(render());
-    assert.match(p, /the two Surveys' reports \(their run records: `survey-task`, `survey-place`\)/);
+    assert.match(p, /the two Surveys' reports \(the `account` on each of their run records, `survey-task` and `survey-place`: `GET \/api\/proxy\/records\?kind=run&in=<this ticket>`\)/);
     assert.match(p, /the findings filed with the ticket/);
     assert.match(p, /for a subtask its parent's size record/);
     assert.match(p, new RegExp(`A person's size comment on the trail is their ruling: record it as decided by ${DECIDED_BY.ruling}\\.`));

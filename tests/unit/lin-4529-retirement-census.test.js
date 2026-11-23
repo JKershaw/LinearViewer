@@ -6,8 +6,8 @@
  *
  * It is built on the LIN-4495 and LIN-4502 censuses: the same file scan (tests/unit/helpers/retirement-census.js, with
  * its roots and reasoned exclusions: dated papers, plans and designs of record, reviews, the walk-8 stores, the runner
- * kit), the same per-word, per-file allowance, and the same planted-mutation proof. It starts with RETIRED empty on
- * purpose: P1 retires nothing yet. An empty list is not a pass for free, so the proof below shows the scan sees a planted
+ * kit), the same per-word, per-file allowance, and the same planted-mutation proof. It started with RETIRED empty (P1
+ * retired nothing); LIN-4535 and LIN-4533 added the first words. A list is not a pass for free, so the proof below shows the scan sees a planted
  * word in a synthetic file and in a real file's text, and that an allowance hides only its word in only its file.
  *
  * Designs and plans of record (docs/plans/, including the integration design this slice revises) are excluded by the

@@ -72,13 +72,13 @@
     },
     "scoping:fresh": {
       "name": "scoping",
-      "bytes": 6075,
-      "sha256": "3991fb95529e102980824011272275534fc1efe21890f92c942f7179473f4a84"
+      "bytes": 6155,
+      "sha256": "86c021b9d838b5e2e1faf50ff2a40185d009485f0cefaba4c38553b13475ba75"
     },
     "scoping:fix": {
       "name": "scoping",
-      "bytes": 6075,
-      "sha256": "3991fb95529e102980824011272275534fc1efe21890f92c942f7179473f4a84"
+      "bytes": 6155,
+      "sha256": "86c021b9d838b5e2e1faf50ff2a40185d009485f0cefaba4c38553b13475ba75"
     },
     "design:fresh": {
       "name": "design",
