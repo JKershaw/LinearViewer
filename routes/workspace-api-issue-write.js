@@ -38,7 +38,7 @@ import { commentDedupe, commentDedupeGenerations } from './proxy.js';
 import { isHermeticTestToken } from '../lib/should-mock-ai.js';
 import { refuseCapability } from './workspace-api-steps.js';
 import { RULING_MARK } from '../lib/run-trail.js';
-import { postHarbourComment } from '../lib/harbour-comment-post.js';
+import { postHarbourComment, repairHarbourCommentRecord } from '../lib/harbour-comment-post.js';
 import { recordPersonReplyFinding } from '../lib/comment-ingest.js';
 import { looksLikeTicket } from '../lib/records/refs.js';
 
@@ -473,20 +473,6 @@ export function registerIssueWriteRoutes(router, { workspaceFromUrl, dispatchQue
       return settledElsewhere;
     };
 
-    // Best-effort Harbour-comments ledger record (LIN-2648, WS1 of LIN-2241):
-    // mirrors the stampDecisionAnswers discipline — a single attempt, caught and
-    // logged, never propagated, never retried. The comment already succeeded and is
-    // the durable half of this write; a ledger-write failure must never fail it.
-    const recordInLedger = async (commentId, failureLabel) => {
-      if (!harbourCommentsStore) return;
-      try {
-        if (commentId) {
-          await harbourCommentsStore.record({ urlKey: workspace.urlKey, commentId });
-        }
-      } catch (ledgerErr) {
-        console.error(failureLabel, ledgerErr.message);
-      }
-    };
 
     // Shared success tail (dedupe write + best-effort ledger + best-effort
     // stamp + the 201 response). Used by both the original attempt and a
@@ -636,10 +622,10 @@ export function registerIssueWriteRoutes(router, { workspaceFromUrl, dispatchQue
 
         // Dedupe-hit ledger repair (LIN-2649 S1, F2): a dedupe hit means the
         // ORIGINAL create's own ledger-record attempt may have failed
-        // silently, leaving a Harbour-written comment unrecorded. Re-attempt
-        // it here before returning — idempotent upsert, same best-effort
-        // discipline as the non-dedupe path, never gates the response.
-        await recordInLedger(prior.comment?.id, 'Harbour-comments ledger repair failed:');
+        // silently, leaving a Harbour-written comment unrecorded. The seam
+        // repairs it (lib/harbour-comment-post.js, LIN-4535): idempotent upsert,
+        // the post's bounded retries, never gates the response.
+        if (harbourCommentsStore) await repairHarbourCommentRecord({ urlKey: workspace.urlKey, commentId: prior.comment?.id ?? null, store: harbourCommentsStore });
 
         if (secondSubmission || settledElsewhere) return jsonError(res, ...RULING_SETTLED_REFUSAL);
         return res.status(200).json({ ...prior, deduped: true });

@@ -737,7 +737,7 @@ const harbourCommentsStore = new HarbourCommentsStore({
 })
 // LIN-4535 (P5): Harbour's own comment posts are recorded in the ledger (lib/harbour-comment-post.js), and a person's comment
 // reaches its task as a finding (lib/comment-ingest.js), the only reader that decides who wrote a comment. The cutover
-// (set at boot, below) keeps comments posted before this deploy out of the ingest.
+// (set at boot below for the workspaces that exist; at creation for a new one) keeps older comments out of the ingest.
 configureHarbourCommentLedger(harbourCommentsStore)
 configureCommentIngest({
   writes: ticketWriter,
@@ -817,7 +817,7 @@ const accountMergeLogStore = new AccountMergeLogStore({ collection: accountMerge
 const workspacesCollection = db.collection('workspaces')
 const workspaceStore = new WorkspaceStore({ collection: workspacesCollection })
 // LIN-4535 (P5, D5): the comment-ingest cutover, set-if-absent for every workspace at this boot. A workspace made after
-// this boot has none, so all its comments count.
+// this boot gets its cutover at creation (WorkspaceStore.createWorkspace), so its older comments never count.
 await workspaceStore.setCommentCutoversIfAbsent(new Date())
 const accountWorkspacesCollection = db.collection('account-workspaces')
 const accountWorkspaceStore = new AccountWorkspaceStore({ collection: accountWorkspacesCollection })

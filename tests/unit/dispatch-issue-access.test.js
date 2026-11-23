@@ -1,10 +1,11 @@
 /**
- * One issue access per dispatch, and no issue read (LIN-4361; LIN-4504).
+ * One issue access per dispatch, and no description read (LIN-4361; LIN-4504; LIN-4535 adds the seat's comment read).
  *
  * `createDispatchItem` takes one `issueAccess` resolver (`() => { provider, token } | null`).
  * The factory resolves it once, for the dispatch seat: the ticket's task (LIN-4501) and the child-ticket retry
  * (LIN-4503). LIN-4504 retired the file-pointer pilot, whose plan read was the one place the factory read the row's
- * issue, so a dispatch now reads no issue text at all:
+ * issue, so a dispatch reads no description. Its one tracker read is the ticket's comments, for the person-finding ingest
+ * (LIN-4535):
  *   - a counting provider with `issueDescription` is never read, the seat gets the resolved access, the prompt is the
  *     prompt as finalized, and nothing is written back;
  *   - a provider that declares `testTransport` (a plain, fixed property declared on the provider class) has no access
@@ -88,7 +89,7 @@ function countingProvider({ identifier, id, description, trashed = false, testTr
   };
 }
 
-describe('one access per dispatch, for the seat, and no issue read (LIN-4504)', () => {
+describe('one access per dispatch, for the seat, and no description read (LIN-4504)', () => {
   test('a provider with issueDescription is never read; the seat gets the access; the prompt is as finalized', async () => {
     const fake = countingProvider({ identifier: 'FAKE-7', id: 'uuid-7', description: PLAN });
     await dispatch({ issueIdentifier: 'FAKE-7', issueAccess: () => ({ provider: fake.provider, token: 't' }) });
