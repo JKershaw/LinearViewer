@@ -1,7 +1,7 @@
 /**
  * Unit tests for `openDecisionLoopIds` (LIN-4003), the one reader for "is this
  * loop's question open?". Every case also asserts agreement with
- * `collectUnansweredDecisions` (no shelf): the set is empty exactly when no row
+ * `collectUnansweredDecisions`: the set is empty exactly when no row
  * is emitted, and every stamp a row carries is in the set. The rule itself is
  * shared with the row builder, so these cases are the tripwire against drift.
  */
@@ -159,17 +159,7 @@ describe('openDecisionLoopIds (LIN-4003: the worker/autopilot join, LIN-3959)', 
   });
 });
 
-describe('openDecisionLoopIds (LIN-4003: shelf-free and clock-free)', () => {
-  test('a shelved question is still open here, though the row builder hides it', () => {
-    const loops = [loop({ loopId: 'loop-1' })];
-    const shelvedRulings = [{
-      urlKey: 'acme', decisionId: 'd-1', decisionLoopId: 'loop-1',
-      resurfaceAt: '2099-01-01T00:00:00.000Z', lapseCount: 0
-    }];
-    assert.deepStrictEqual([...openDecisionLoopIds(loops)], ['loop-1']);
-    assert.deepStrictEqual(collectUnansweredDecisions({ loops, shelvedRulings }, { now: NOW }), []);
-  });
-
+describe('openDecisionLoopIds (LIN-4003: clock-free)', () => {
   test('the reader does not mutate its input', () => {
     const loops = joinedPair({ worker: { withdrawal: withdrawnFor('d-1') } });
     const before = JSON.stringify(loops);

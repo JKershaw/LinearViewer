@@ -105,8 +105,7 @@ function attributionFromToken(req) {
  *
  * A `reason` is mandatory. That is not ceremony: the operator's whole
  * interaction with a proposal is a one-click Agree, so one with no stated
- * reason turns that click into a rubber stamp. It is the same rule shelving
- * already enforces — silent muting is forbidden
+ * reason turns that click into a rubber stamp. Silent muting is forbidden
  * (docs/escalation-philosophy.md §6) — applied to the same class of act.
  */
 function proposalProblem(spec, { decisionId, decisionLoopId, optionId, reason }) {
@@ -154,8 +153,7 @@ function optionRefusal(row, optionId) {
  * @param {Function} deps.logEvent - Proxy event/audit logger
  * @param {Object} deps.dispatchQueueStore - Dispatch storage (loop reconstruction input)
  * @param {Object} deps.agentStatusStore - Agent status storage (loop reconstruction input)
- * @param {Object} [deps.taskDecisionsStore] - Scan-produced decisions (null → that input is skipped)
- * @param {Object} [deps.shelvedRulingsStore] - Shelved rulings (null → that input is skipped)
+ * @param {Object} [deps.taskDecisionsStore] - Task-bound decisions the retired comment scan wrote; read only, no writer until LIN-4541 removes the store (null → that input is skipped)
  * @param {Object} [deps.dismissalSuggestionsStore] - Proposed dismissals (null → the propose route 503s)
  * @param {Object} [deps.sessionsFeedCache] - Shared SWR cache for the loop read (null → uncached)
  */
@@ -167,7 +165,6 @@ export function createRulingsRoutes({
   dispatchQueueStore,
   agentStatusStore,
   taskDecisionsStore = null,
-  shelvedRulingsStore = null,
   dismissalSuggestionsStore = null,
   sessionsFeedCache = null
 }) {
@@ -227,9 +224,8 @@ export function createRulingsRoutes({
       ? await sessionsFeedCache.get(sessionsFeedCache.keyFor([{ urlKey }], 'proxy-rulings'), loadLoops)
       : await loadLoops();
 
-    const [taskDecisions, shelvedRulings, newestScanByTask] = await Promise.all([
+    const [taskDecisions, newestScanByTask] = await Promise.all([
       taskDecisionsStore ? taskDecisionsStore.listUnansweredForWorkspaces([urlKey]) : Promise.resolve([]),
-      shelvedRulingsStore ? shelvedRulingsStore.listForWorkspaces([urlKey]) : Promise.resolve([]),
       // LIN-2729 / LIN-2893 Step 5: same `[urlKey]` scope as `taskDecisions`
       // above — see `listNewestScanPerTask`'s own doc for why this read
       // needs it too.
@@ -243,7 +239,7 @@ export function createRulingsRoutes({
     //
     // LIN-2934 (S4): guard against a null anchor matching another null
     // anchor — see the identical comment in routes/dashboard.js.
-    return collectUnansweredDecisions({ loops, taskDecisions, shelvedRulings, newestScanByTask }, {
+    return collectUnansweredDecisions({ loops, taskDecisions, newestScanByTask }, {
       now: new Date(),
       liveDispatchOnAnchor: (issueIdentifier) =>
         issueIdentifier != null &&

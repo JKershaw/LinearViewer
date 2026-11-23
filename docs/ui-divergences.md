@@ -30,7 +30,6 @@ is changed for another reason.
 - `public/common.js` (`form[data-confirm]` submit guard, comment at 2734), used by `lib/components/navbar.js` to remove a workspace;
 - `public/custom-prompts.js` (delete a custom prompt);
 - `public/observation.js` (bulk agree);
-- `public/scan.js` (retire and unretire);
 - `public/session.js` (`window.confirm`);
 
 An entry here is removed when its site moves in place. The four sites the LIN-511 rule named

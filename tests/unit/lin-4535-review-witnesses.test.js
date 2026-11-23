@@ -451,12 +451,9 @@ describe('I. a ledger read that fails skips the batch, never crediting Harbour\'
       listPeople: async () => PEOPLE,
       cutoffOf: async () => null,
       ledger: {
-        async wereRecordedByHarbour(_urlKey, comments, options) {
-          if (!ledgerUp) {
-            // The real store throws a fault only for a strict read; the ingest must ask for one.
-            if (options?.strict) throw new Error('ledger read fault');
-            return new Set();
-          }
+        async wereRecordedByHarbour() {
+          // The real store throws on a read fault (LIN-4540: every read is strict); the ingest must not take an empty answer.
+          if (!ledgerUp) throw new Error('ledger read fault');
           return new Set();
         }
       },
@@ -467,7 +464,7 @@ describe('I. a ledger read that fails skips the batch, never crediting Harbour\'
     try {
       const first = await ingestPersonComments({ urlKey: URL_KEY, ticket: 'LIN-1', comments });
       assert.deepEqual(first, { ingested: 0, failed: 0 });
-      assert.equal(written.length, 0, 'a ledger that cannot be read writes no finding (remove the strict read and the comment is written as the owner\'s)');
+      assert.equal(written.length, 0, 'a ledger that cannot be read writes no finding (take an empty answer on a fault and the comment is written as the owner\'s)');
       ledgerUp = true;
       const second = await ingestPersonComments({ urlKey: URL_KEY, ticket: 'LIN-1', comments });
       assert.equal(second.ingested, 1, 'the next read, with the ledger up, takes it');

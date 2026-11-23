@@ -12,10 +12,9 @@
  *   GET      /workspace/:urlKey/api/dashboard/sessions             — sessionId-grouped feed (observation poll source; LIN-595)
  *   GET      /workspace/:urlKey/api/dashboard/loops                — merged cross-workspace runs (flat poll source)
  *   GET      /workspace/:urlKey/api/dashboard/rulings              — unanswered-decision feed (ambient count + rulings tab; LIN-1728)
- *   POST     /workspace/:urlKey/api/dashboard/rulings/dismiss      — dismiss a loop-backed ruling with no comment (LIN-2225; the task-bound sibling reuses the existing scan dismiss route instead)
+ *   POST     /workspace/:urlKey/api/dashboard/rulings/dismiss      — dismiss a loop-backed ruling with no comment (LIN-2225)
  *   POST     /workspace/:urlKey/api/dashboard/rulings/reverse-withdrawal — reverse a `decision-withdrawn` stamp, terminal (LIN-2891/LIN-3035; session-auth-only, no UI button yet)
  *   POST     /workspace/:urlKey/api/dashboard/rulings/answer       — stamp a TASK-BOUND ruling answered with no comment, durable optionId (LIN-2754 Track B; the answer already lives on the ticket, this is bookkeeping only)
- *   POST     /workspace/:urlKey/api/dashboard/rulings/shelve       — shelve any ruling with a reason + re-surface timer (LIN-1727; view-only, works uniformly for loop-backed and task-bound)
  *   POST     /workspace/:urlKey/api/dashboard/rulings/keep         — withdraw a proposed dismissal (LIN-2444; view-only — never touches answer state, arms no keepalive)
  *   GET      /workspace/:urlKey/escalation-kpis                    — operator-facing escalation KPI audit page (LIN-1736; rate, time-to-response, false-escalation, unanswered age); ?windowDays= (default 30), ?targetPerDay= (optional)
  *   GET      /workspace/:urlKey/api/escalation-kpis                — the same KPIs as JSON
@@ -163,30 +162,20 @@ const DEP_DEFAULTS = {
   // test can supply an injectable-clock cache and drive the cross-TTL boundary
   // directly (LIN-1259, item 2 hardening).
   taskDoneCache: createTaskDoneCache,
-  // Scan-produced task decisions (LIN-2215), the rulings feed's second input
+  // Task decisions (LIN-2215), the rulings feed's second input
   // alongside `loops` — see the rulings GET (dashboard-rulings.js). Default
   // null → the taskDecisions branch is simply skipped (collectUnansweredDecisions
   // defaults it to []), same degrade-gracefully convention as briefCacheStore/
   // recapCacheStore/proxyEventStore above, so an unwired test sees no behaviour change.
   taskDecisionsStore: () => null,
-  // Shelved rulings (LIN-1727), the rulings feed's THIRD input, alongside
-  // `loops` and `taskDecisions`. Default null → the shelving branch is simply
-  // skipped (collectUnansweredDecisions defaults it to []), same
-  // degrade-gracefully convention as taskDecisionsStore above.
-  shelvedRulingsStore: () => null,
-  // Proposed dismissals (LIN-2444), the rulings feed's FOURTH input. An agent
+  // Proposed dismissals (LIN-2444), the rulings feed's THIRD input. An agent
   // may PROPOSE that a ruling be dismissed and never perform one, so the
   // proposal has to reach the surface where a human can agree to it — the
   // rulings feed. Without it the whole feature is write-only. Default null → the
   // suggestion join is skipped and every row reports
   // `suggestedDismissal: null`, same degrade-gracefully convention as the
-  // three stores above.
+  // stores above.
   dismissalSuggestionsStore: () => null,
-  // Per-LLM-call cost log (LIN-418), read ONLY by the Observation page load
-  // (LIN-2706) to derive the Scan-due tab's pre-run cost estimate. Default
-  // null -> the estimate degrades to `unknown` via the `.catch(() => null)`
-  // in the page handler, same degrade-gracefully convention as the stores above.
-  llmCallLogStore: () => null,
   // Run proposals (LIN-3254): the "Proposed in chat" rows on the run page and
   // the Apply / Decline actions. Default null → no rows render and Apply /
   // Decline 503, same degrade-gracefully convention as the stores above.
@@ -274,8 +263,7 @@ export async function readRunAccount(recordsStore, readRow, urlKey, session) {
  * @param {Function} deps.getDeployInfo            - () → deploy metadata
  * @param {number}   [deps.recentLimit=120]        - cap on terminal runs returned by /loops
  * @param {Object}   [deps.sessionsFeedCache]      - short-TTL SWR cache for the /sessions feed (LIN-617)
- * @param {Object}   [deps.taskDecisionsStore]     - scan-produced task decisions store (LIN-2215), threaded into /api/dashboard/rulings
- * @param {Object}   [deps.shelvedRulingsStore]    - shelved-rulings store (LIN-1727), threaded into /api/dashboard/rulings
+ * @param {Object}   [deps.taskDecisionsStore]     - task decisions store (LIN-2215), threaded into /api/dashboard/rulings; retired with the old stores (LIN-4541)
  * @returns {Router}
  */
 export function createDashboardRoutes(deps) {

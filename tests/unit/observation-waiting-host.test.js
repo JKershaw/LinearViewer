@@ -2,8 +2,7 @@
  * LIN-3983 PR 1: the ruling rows have two hosts — the Rulings tab and the
  * "waiting on you" block above the Observation feed — and one set of row
  * nodes. These tests pin the host seam: a row keeps its state when it moves
- * between hosts, the block caps what it attaches, and a row that lands on the
- * Rulings tab after being built elsewhere is basis-checked there.
+ * between hosts, and the block caps what it attaches.
  *
  * `public/observation.js` is a native ES module (LIN-4463 piece 4), loaded fresh per test through `importWorld`
  * (tests/unit/helpers/import-world.js) over the shared fake DOM (tests/unit/helpers/fake-dom.js). The Rulings tab and
@@ -76,22 +75,18 @@ const flush = async (times = 8) => {
 };
 
 describe('renderRulings host seam (LIN-3983)', () => {
-  test('a row reused from the waiting block re-arms its basis check on the Rulings tab', async () => {
-    // A row built while the block is on screen is not checked (the check is
-    // gated on the Rulings view at creation). If it is then reused on the tab
-    // (here because a reply is pending), only the re-arm can check it.
-    const calls = [];
-    const world = await makeWorld({
-      api: async (url) => { calls.push(url); return { basisChanged: false }; }
-    });
+  test('a pending row built in the waiting block moves to the Rulings tab as the same node', async () => {
+    // A row with a reply in flight is reused, not rebuilt, so moving it between
+    // hosts keeps its state: the tab must attach the very node the block held.
+    const world = await makeWorld();
     const tabList = byId(world, 'obs-rulings');
     const blockList = byId(world, 'obs-waiting-rulings');
     const { renderRulings, rulingKey, rulingsPending, switchView } = world.page;
     const row = taskBoundRow(1);
     const key = rulingKey(row.anchor.workspaceUrlKey, row.anchor, row.decision.decision_id);
-    renderRulings([row], { list: blockList, empty: null, limit: 3, onTab: false });
-    await flush();
-    assert.equal(calls.length, 0, 'no basis check while the block is on screen');
+    renderRulings([row], { list: blockList, empty: null, limit: 3 });
+    const built = blockList.children[0];
+    assert.ok(built, 'the block attaches the row');
 
     rulingsPending.add(key);
     switchView('rulings');
@@ -99,9 +94,8 @@ describe('renderRulings host seam (LIN-3983)', () => {
     await flush();
     rulingsPending.delete(key);
 
-    assert.equal(calls.length, 1, 'the reused row must be checked once it sits on the Rulings tab');
-    assert.match(calls[0], /\/api\/scan\/issue-1/);
     assert.equal(tabList.children.length, 1, 'the row is attached to the Rulings tab');
+    assert.equal(tabList.children[0], built, 'the same node, not a rebuilt one');
     assert.equal(blockList.children.length, 0, 'and detached from the block');
   });
 
@@ -112,7 +106,7 @@ describe('renderRulings host seam (LIN-3983)', () => {
     const blockList = byId(world, 'obs-waiting-rulings');
     const { renderRulings, renderedRulingRows, switchView } = world.page;
     const rows = [1, 2, 3].map(taskBoundRow);
-    renderRulings(rows, { list: blockList, empty: null, limit: 2, onTab: false });
+    renderRulings(rows, { list: blockList, empty: null, limit: 2 });
     assert.equal(blockList.children.length, 2, 'the block shows the first two rows only');
     assert.equal(renderedRulingRows.size, 3, 'the rest stay tracked, so the tab reuses them');
 

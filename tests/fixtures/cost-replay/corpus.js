@@ -170,8 +170,8 @@ export function buildCorpus() {
     { _id: 'c4', urlKey: null, issueIdentifier: null, feature: 'review', model: SONNET, cost: 1.1, timestamp: ago(1) },
     { _id: 'c5', urlKey: 'acme', issueIdentifier: 'LIN-42', feature: 'proxy-x', model: SONNET, cost: 0.9, timestamp: ago(60) },
     { _id: 'c6', urlKey: 'acme', issueIdentifier: 'LIN-2', feature: 'proxy-x', model: SONNET, cost: 0.05, timestamp: ago(4) },
-    // Observation's scan estimate (S4): two priced scans and one unpriced in the horizon (mean of the priced
-    // is 0.04 over 2), and one scan outside it.
+    // Harbour calls for S2, S3 and S7 (they were S4's scan estimate before LIN-4540 retired it): two priced and one unpriced in the horizon (mean of the priced
+    // is 0.04 over 2), and one outside it. Old `scan` rows stay as recorded call history.
     { _id: 'c7', urlKey: 'acme', issueIdentifier: null, feature: 'scan', model: SONNET, cost: 0.03, timestamp: ago(1) },
     { _id: 'c8', urlKey: 'acme', issueIdentifier: null, feature: 'scan', model: SONNET, cost: 0.05, timestamp: ago(5) },
     { _id: 'c9', urlKey: 'acme', issueIdentifier: null, feature: 'scan', model: SONNET, cost: null, timestamp: ago(6) },

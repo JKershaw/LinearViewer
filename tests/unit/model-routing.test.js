@@ -31,9 +31,9 @@ describe('migration: the switch changes nothing', () => {
     assert.deepEqual(t.defaults, { 'agent-session': { model: 'top', harness: 'claude-code' }, 'harbour-call': { model: 'a/b' } });
   });
 
-  test('an override becomes the job\'s own model, and scan also seeds scan-retire', () => {
+  test('an override becomes the job\'s own model; a stored scan override is read by no job (the scan retired, LIN-4540)', () => {
     const t = tableFromPreferences({ aiModelOverrides: { byKind: { scan: { model: 's' }, recap: { model: 'r' }, 'feedback-title': { model: 'ignored' } } } });
-    assert.deepEqual([t.jobs.scan, t.jobs['scan-retire'], t.jobs.recap, t.jobs['feedback-title']], [{ model: 's' }, { model: 's' }, { model: 'r' }, undefined]);
+    assert.deepEqual([t.jobs.scan, t.jobs['scan-retire'], t.jobs.recap, t.jobs['feedback-title']], [undefined, undefined, { model: 'r' }, undefined]);
   });
 
   test('a blank stays blank (no key), and stray byKind for custom/periodical is ignored', () => {
@@ -47,7 +47,7 @@ describe('the old forms are the migration run in reverse', () => {
   const FORM_PREFS = [
     {},
     { modelId: 'a/b' },
-    { modelId: 'a/b', dispatchDefaults: { model: 'm', harness: 'opencode', effort: 'high', byKind: { review: { model: 'r' }, autopilot: { harness: 'claude-code', effort: 'low' } } }, aiModelOverrides: { byKind: { recommend: { model: 'a/rec' }, scan: { model: 'a/scan' } } } }
+    { modelId: 'a/b', dispatchDefaults: { model: 'm', harness: 'opencode', effort: 'high', byKind: { review: { model: 'r' }, autopilot: { harness: 'claude-code', effort: 'low' } } }, aiModelOverrides: { byKind: { recommend: { model: 'a/rec' }, recap: { model: 'a/recap' } } } }
   ];
   for (const [i, prefs] of FORM_PREFS.entries()) {
     test(`projectLegacy(tableFromPreferences(p)) equals the form-shaped p (${i})`, () => {

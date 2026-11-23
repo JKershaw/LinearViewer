@@ -11,7 +11,6 @@
  */
 import { test, describe } from 'node:test';
 import assert from 'node:assert/strict';
-import { ShelvedRulingsStore } from '../../lib/shelved-rulings-store.js';
 import { TaskDecisionsStore } from '../../lib/task-decisions-store.js';
 
 // One generic in-memory collection: equality, $in, $ne on top-level fields.
@@ -58,15 +57,6 @@ const T1 = new Date('2026-10-01T00:00:00.000Z');
 const T2 = new Date('2026-10-02T00:00:00.000Z');
 
 describe('null is missing, not epoch 0 (LIN-3453)', () => {
-  test('shelved-rulings-store: a null resurfaceAt is not a lapse (it counted one as epoch 0)', async () => {
-    const NOW = new Date('2026-10-10T12:00:00.000Z');
-    const collection = createMockCollection();
-    const store = new ShelvedRulingsStore({ collection });
-    await store.shelve({ urlKey: 'acme', decisionId: 'd-1', reason: 'waiting', resurfaceInMs: 3600000, now: NOW });
-    collection._docs[0].resurfaceAt = null;
-    const again = await store.shelve({ urlKey: 'acme', decisionId: 'd-1', reason: 'waiting', resurfaceInMs: 3600000, now: NOW });
-    assert.equal(again.lapseCount, 0);
-  });
 
   describe('task-decisions-store', () => {
     const ISSUE = '11111111-1111-4111-8111-111111111111';

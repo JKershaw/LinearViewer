@@ -76928,12 +76928,6 @@
         }
       ]
     },
-    "S4": {
-      "calls": 3,
-      "pricedCalls": 2,
-      "meanUsd": 0.04,
-      "unknown": false
-    },
     "S5": {
       "total": 4029,
       "rows": 2000,
@@ -79376,12 +79370,6 @@
           "complete": false,
           "byFeature": []
         },
-        "S4": {
-          "calls": 0,
-          "pricedCalls": 0,
-          "meanUsd": null,
-          "unknown": true
-        },
         "S5": {
           "total": 1,
           "rows": 1,
@@ -80463,12 +80451,6 @@
           "totalUsd": null,
           "complete": false,
           "byFeature": []
-        },
-        "S4": {
-          "calls": 0,
-          "pricedCalls": 0,
-          "meanUsd": null,
-          "unknown": true
         },
         "S5": {
           "total": 1,
@@ -81557,12 +81539,6 @@
           "complete": false,
           "byFeature": []
         },
-        "S4": {
-          "calls": 0,
-          "pricedCalls": 0,
-          "meanUsd": null,
-          "unknown": true
-        },
         "S5": {
           "total": 1,
           "rows": 1,
@@ -82644,12 +82620,6 @@
           "totalUsd": null,
           "complete": false,
           "byFeature": []
-        },
-        "S4": {
-          "calls": 0,
-          "pricedCalls": 0,
-          "meanUsd": null,
-          "unknown": true
         },
         "S5": {
           "total": 1,
@@ -83738,12 +83708,6 @@
           "complete": false,
           "byFeature": []
         },
-        "S4": {
-          "calls": 0,
-          "pricedCalls": 0,
-          "meanUsd": null,
-          "unknown": true
-        },
         "S5": {
           "total": 1,
           "rows": 1,
@@ -84830,12 +84794,6 @@
           "totalUsd": null,
           "complete": false,
           "byFeature": []
-        },
-        "S4": {
-          "calls": 0,
-          "pricedCalls": 0,
-          "meanUsd": null,
-          "unknown": true
         },
         "S5": {
           "total": 1,
@@ -85924,12 +85882,6 @@
           "complete": false,
           "byFeature": []
         },
-        "S4": {
-          "calls": 0,
-          "pricedCalls": 0,
-          "meanUsd": null,
-          "unknown": true
-        },
         "S5": {
           "total": 1,
           "rows": 1,
@@ -87017,12 +86969,6 @@
           "complete": false,
           "byFeature": []
         },
-        "S4": {
-          "calls": 0,
-          "pricedCalls": 0,
-          "meanUsd": null,
-          "unknown": true
-        },
         "S5": {
           "total": 1,
           "rows": 1,
@@ -88109,12 +88055,6 @@
           "totalUsd": null,
           "complete": false,
           "byFeature": []
-        },
-        "S4": {
-          "calls": 0,
-          "pricedCalls": 0,
-          "meanUsd": null,
-          "unknown": true
         },
         "S5": {
           "total": 1,
@@ -89213,12 +89153,6 @@
         "complete": false,
         "byFeature": []
       },
-      "S4": {
-        "calls": 0,
-        "pricedCalls": 0,
-        "meanUsd": null,
-        "unknown": true
-      },
       "S5": {
         "total": 1,
         "rows": 1,
@@ -90313,12 +90247,6 @@
         "totalUsd": null,
         "complete": false,
         "byFeature": []
-      },
-      "S4": {
-        "calls": 0,
-        "pricedCalls": 0,
-        "meanUsd": null,
-        "unknown": true
       },
       "S5": {
         "total": 4,

@@ -1,9 +1,8 @@
 /**
  * LIN-4114 — Home's "Waiting on you" section, end to end through the local harness.
  *
- * Witnesses 7, 9 (rendered Home), 11, 12, 13, 14, 15 (count line, read off the page), 17 (plan rev 2). Each test seeds
- * through the real routes (the seed endpoint, the dispatch API for a run-raised ruling, the scan route for a task-bound
- * one). All of these are NEW and must FAIL against the unmodified code: there is no Waiting section yet.
+ * Witnesses 7, 9 (rendered Home), 12, 13, 14, 15 (count line, read off the page), 17 (plan rev 2). Each test seeds
+ * through the real routes (the seed endpoint and the dispatch API for a run-raised ruling). All of these are NEW and must FAIL against the unmodified code: there is no Waiting section yet.
  *
  * Selectors this spec expects (new; to be added to SELECTORS.homeDesk in tests/helpers.js when the section is built):
  *   [data-testid="waiting-on-you"]        the section (role="region"), first desk section on Home
@@ -14,13 +13,13 @@
  * LIN-4538 (P7a): Home's waiting rows are open question records a run asked the person (seeded through
  * tests/fixtures/question-records.js), drawn as the question record card (lib/question-record-card.js): an option chooses,
  * Answer sends the option and the person's words together, and a card answered here stays, settled, out of the count and the
- * badge (LIN-4532). A scan-raised ruling is not drawn on Home any more (W11); the Rulings page serves it until P7b retires it.
+ * badge (LIN-4532).
  *
  * LIN-4242: the owner's section is always on Home, hidden when empty (W12b asserts hidden after a reload). Witness 16
- * (a member and a keyless owner see no section, and no card text leaks through /api/home-rows) needs a
- * second session, and is not in this file yet (noted in the PR, to be written with its session helper).
+ * (a keyless owner sees no section, and no card text leaks through /api/home-rows) seeds its open question through
+ * /test/seed-question-record with no run, which needs only the signed-in session and mints no token (LIN-4540: it used to
+ * seed through the retired comment scan).
  */
-import { randomUUID } from 'node:crypto';
 import { test, expect } from '../fixtures/test-base.js';
 import { localSeedId } from '../fixtures/local-harness.js';
 import { askingRun, seedQuestion } from '../fixtures/question-records.js';
@@ -58,8 +57,6 @@ test.beforeEach(async ({ page, localWorkerUrlKey }) => {
   await page.request.get(`/test/clear-dispatch-queue?urlKey=${URL_KEY}`);
   await page.request.get(`/test/clear-dispatch-history?urlKey=${URL_KEY}`);
   await page.request.get(`/test/clear-sessions-feed-cache?urlKey=${URL_KEY}`);
-  // TaskDecisionsStore is durable: a scan ruling from an earlier test would otherwise stay (LIN-2212's clear route).
-  await page.request.get(`/test/clear-task-decisions?urlKey=${URL_KEY}`);
   // Question records are durable too: one from an earlier test would otherwise stay on Home.
   await page.request.get(`/test/clear-ticket-records?urlKey=${URL_KEY}`);
 });
@@ -253,30 +250,6 @@ test('W13: an answer the server could not record leaves the card open and counte
   await page.unroute(/\/questions\/[^/]+\/answer$/);
 });
 
-// ---- witness 11: a scan-raised (task-bound) ruling is not Home's ---------------------------------------------------
-
-test('W11: a scan-raised ruling is not drawn on Home or counted there; the Rulings page lists it until P7b retires the scan', async ({ page, seedLocal }) => {
-  // LIN-4538 (P7a): Home reads question records only. A scan ruling lives in the old task-decisions store, which only the ruling
-  // machinery reads now (the Rulings page and its feed), so it is answered or dismissed there, not on Home.
-  const issueId = randomUUID();
-  await seedLocal({
-    projects: [],
-    issues: [{
-      id: issueId, identifier: 'SCAN-H1', title: 'Task-bound scan fixture for Home',
-      description: `This task is blocked pending an operator decision. (${issueId})`,
-      state: { name: 'In Progress', type: 'started' }, url: `/workspace/${URL_KEY}/issue/${issueId}`,
-    }],
-  }, { runnerKey: true });
-  const scan = await page.request.post(`/workspace/${URL_KEY}/api/scan/${issueId}`);
-  expect(scan.status(), `scan seed failed: ${await scan.text()}`).toBe(200);
-  const rulings = await page.request.get(`/workspace/${URL_KEY}/api/dashboard/rulings`);
-  expect(await rulings.text(), 'the Rulings feed lists the scan ruling').toContain('SCAN-H1');
-  await page.goto(`/workspace/${URL_KEY}/`);
-  await expect(page.locator('[data-testid="waiting-task-line"]', { hasText: 'SCAN-H1' })).toHaveCount(0);
-  await expect(page.locator('[data-testid="session-question-card"]')).toHaveCount(0);
-  await expect(page.locator(COUNT).filter({ hasText: 'waiting on you' })).toHaveCount(0);
-});
-
 // ---- witness 14: the same question twice on a page; search and the opened task are the other copies ----------------
 
 test('W14: answering a waiting task\'s card inside search settles the Waiting card too, and the count line and badge drop', async ({ page }) => {
@@ -345,25 +318,23 @@ test('W9b: a started waiting task with a running child is the named context row:
 
 // ---- witness 16 (browser): a viewer without run controls gets no Waiting section, no card and no ruling text -------------
 
-test('W16: a viewer without run controls (a member, or a keyless owner) gets no Waiting section and no question card in the page', async ({ page, seedLocal }) => {
-  // No runner key and no queue token, so the viewer has no run controls. The ruling is a scan-raised one (no dispatch token is
-  // minted, because a live queue token would itself turn run controls on). The header badge is the control that the ruling is
-  // there; the section must be off by the owner gate alone.
-  const issueId = randomUUID();
+test('W16: a viewer without run controls (a keyless owner) gets no Waiting section and no question card in the page', async ({ page, seedLocal }) => {
+  // No runner key and no queue token, so the viewer has no run controls. The question has no run (runId null), so no dispatch
+  // token is minted, because a live queue token would itself turn run controls on. The rulings feed is the control that the
+  // question is there; the section must be off by the owner gate alone.
   await seedLocal({
     projects: [],
     issues: [{
-      id: issueId, identifier: 'SCAN-M1', title: 'Task-bound scan fixture for the member gate',
-      description: `This task is blocked pending an operator decision. (${issueId})`,
-      state: { name: 'In Progress', type: 'started' }, url: `/workspace/${URL_KEY}/issue/${issueId}`,
+      id: localSeedId(URL_KEY, 'm1'), identifier: 'LOCAL-M1', title: 'Task for the owner gate',
+      state: { name: 'In Progress', type: 'started' }, createdAt: OLD,
     }],
   }, { runnerKey: false });
-  const scan = await page.request.post(`/workspace/${URL_KEY}/api/scan/${issueId}`);
-  expect(scan.status(), `scan seed failed: ${await scan.text()}`).toBe(200);
-  // The control: the ruling is open in the workspace and this viewer can read it (the rulings API lists it).
+  const asks = 'Which for LOCAL-M1?';
+  await seedQuestion(page, URL_KEY, { ticket: 'LOCAL-M1', runId: null, asks });
+  // The control: the question is open in the workspace and this viewer can read it (the rulings API lists it).
   const rulings = await page.request.get(`/workspace/${URL_KEY}/api/dashboard/rulings`);
   expect(rulings.status()).toBe(200);
-  expect(await rulings.text(), 'the open ruling exists for this viewer').toContain('SCAN-M1');
+  expect(await rulings.text(), 'the open question exists for this viewer').toContain(asks);
   await page.goto(`/workspace/${URL_KEY}/`);
   await expect(page.locator(SECTION)).toHaveCount(0);
   await expect(page.locator('[data-testid="session-question-card"]')).toHaveCount(0);
@@ -373,7 +344,7 @@ test('W16: a viewer without run controls (a member, or a keyless owner) gets no 
   // LIN-4242: the live fragment is owner-only by the same predicate: a 403, and no card text.
   const fragment = await page.request.get(`/workspace/${URL_KEY}/api/home-waiting`);
   expect(fragment.status(), 'the live fragment refuses a viewer without run controls').toBe(403);
-  expect(await fragment.text()).not.toContain('SCAN-M1');
+  expect(await fragment.text()).not.toContain(asks);
 });
 
 // ---- witness 17: search hides the section; collapse persists across a reload; reset opens it ------------------------

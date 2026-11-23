@@ -57,6 +57,19 @@ export const RETIRED = Object.freeze([
   { word: 'the quote end line constants', re: /\bASKED_(?:END|END_SHORT|PARENT_HEADING|PARENT_END)\b/ },
   { word: 'withRunRecords', re: /\bwithRunRecords\b/ },
   { word: 'the brief ?run= door', re: /brief\/[^\s`'"()]*\?run=/ },
+  // LIN-4540 (P7b-1): the comment scan, with its routes, page section, Scan-due tab, jobs and fingerprint, and shelving, with
+  // its store, route and page controls. A question is answered or dismissed; the Harbour-comments ledger stays for the
+  // comment ingest (lib/harbour-comments-store.js keeps resolveCommentId). The shelved-rulings collection stays as history
+  // in the erasure inventories (tests/unit/lin-4540-scan-shelving-retired.test.js).
+  { word: 'the scan module', re: /\blib\/scan\.js\b|from ['"]\.\/scan\.js['"]/ },
+  { word: 'the scan page script', re: /public\/scan\.js|['"]\/scan\.js['"]/ },
+  { word: 'the scan fingerprint', re: /scan-fingerprint|\b(?:scanBasisFromContext|scanBasisHashFromContext|dueBasisFromContext|dueBasisHashFromContext)\b/ },
+  { word: 'the scan routes', re: /workspace-api-scan|\bregisterScanRoutes\b|\/api\/scan\b/ },
+  { word: 'the scan section', re: /\bScanSection\b|data-scan-placeholder|data-toggle="scan"/ },
+  { word: 'the scan calls', re: /\b(?:generateScan|buildScanMessages|parseScanResponse|buildMockScanText)\b|['"]scan-retire['"]/ },
+  { word: 'the Scan-due tab', re: /obs-tab-due|obs-due-|\bscanDue\b|\b(?:startBulkScan|stopBulkScan|startDueBulkScan)\b|BULK_SCAN_|\bscanEstimateOf\b|\bscanCostEstimate\b/ },
+  { word: 'the shelving store', re: /shelved-rulings-store|\b[Ss]helvedRulingsStore\b/ },
+  { word: 'shelving on a ruling', re: /\bshelvedLapseCount\b|\bshelvedTaskIdentifiers\b|rulings\/shelve\b|clear-shelved-rulings|obs-ruling-shelve|\b(?:shelveRulingRow|makeShelveButton|toggleShelvePanel)\b|\bSHELVE_DURATIONS\b/ },
 ]);
 
 /** Files that keep a retired word, each with the words it may keep and the reason. */
@@ -66,6 +79,10 @@ export const ALLOW = Object.freeze({
   'scripts/prompt-template-change-log.md': { words: ['DECISION: block taught', 'the brief quote module'], reason: 'the dated log of prompt-template changes: its earlier entries quote the DECISION: block and name the brief quote module they changed, which is recorded history (LIN-4533 and LIN-4536 add their own entries)' },
   // LIN-4533 (P3): a recorded liveness fixture of a past cycle (LIN-3238). Its messages are the transcript as it was, not taught text.
   'tests/fixtures/liveness/lin-3238-cycle.json': { words: ['DECISION: block taught'], reason: 'a recorded liveness fixture of the LIN-3238 cycle: its messages are the transcript as it was, kept as history' },
+  // LIN-4540 (P7b-1): the task-decisions store is the old ruling store the scan wrote; its schema docs and write methods
+  // name the scan and its fingerprint. The predicate still reads the store until LIN-4541 (P7b-2) deletes it whole, with
+  // its allowance.
+  'lib/task-decisions-store.js': { words: ['the scan module', 'the scan fingerprint'], reason: 'the old ruling store the scan wrote: its schema docs name the scan and its fingerprint; deleted whole with the other ruling stores in LIN-4541 (P7b-2)' },
 });
 
 /**

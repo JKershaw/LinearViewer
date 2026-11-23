@@ -1,7 +1,6 @@
 import { test, describe } from 'node:test';
 import assert from 'node:assert/strict';
 import { renderObservationPage } from '../../lib/render-observation.js';
-import { extractEmbeddedData, embeddedDataText } from '../helpers/embedded-data.js';
 
 describe('render-observation: poll-status banner', () => {
   test('initial banner placeholder is "loading…", not "connecting…" (LIN-617)', () => {
@@ -38,303 +37,42 @@ describe('render-observation: Active-section eyebrow count (LIN-929)', () => {
   });
 });
 
-describe('render-observation: rulings-tab limits disclaimer (LIN-2241 criterion 5)', () => {
+describe('render-observation: rulings-tab copy', () => {
   const html = () => renderObservationPage(
     { workspaces: [{ urlKey: 'ws-a', name: 'Alpha' }] },
     { urlKey: 'ws-a' }
   );
 
-  test('the rulings section says in plain words that some questions are automatic, can be wrong and can be missed', () => {
-    // LIN-2241's "Honest framing" (it will miss things and raise noise, and must not be relied on as a
-    // guarantee that nothing is missed) holds, in the words a person reads (LIN-3983 PR 2): one plain
-    // sentence carrying both halves, no internal term.
+  // LIN-4540: the disclaimer that some questions are raised by a model reading a task was the scan's own (LIN-2241). The scan
+  // is gone, so every question on the tab was asked by a run, and the sentence would be untrue.
+  test('the rulings section no longer carries the scan\'s limits disclaimer (LIN-4540)', () => {
     const out = html();
-    assert.match(out, /id="obs-rulings-limits"/);
-    assert.match(out, /Some questions are raised automatically by a model reading a task, so some can be wrong and some can be missed\./);
-    assert.match(out, /can be wrong/);
-    assert.match(out, /can be missed/);
+    assert.doesNotMatch(out, /id="obs-rulings-limits"/);
+    assert.doesNotMatch(out, /raised automatically by a model reading a task/);
   });
 
-  test('the disclaimer sits inside the rulings section, above the feed it qualifies', () => {
-    // A limits statement rendered somewhere else on the page would not be the
-    // surface stating its own limits.
-    const out = html();
-    const sectionAt = out.indexOf('id="obs-rulings-section"');
-    const limitsAt = out.indexOf('id="obs-rulings-limits"');
-    const feedAt = out.indexOf('id="obs-rulings"');
-    assert.ok(sectionAt > -1 && limitsAt > sectionAt, 'the disclaimer is inside the rulings section');
-    assert.ok(feedAt > limitsAt, 'it is read before the feed, not buried under it');
-  });
-
-  test('no Rulings or Scan-due copy names the internal Principle 0 gate (LIN-3983 PR 2)', () => {
+  test('no Rulings copy names the internal Principle 0 gate (LIN-3983 PR 2)', () => {
     const out = html();
     const rulingsAt = out.indexOf('id="obs-rulings-section"');
-    const dueAt = out.indexOf('id="obs-due-section"');
-    const rulingsAndDue = out.slice(rulingsAt, out.indexOf('</main>'));
-    assert.ok(rulingsAt > -1 && dueAt > rulingsAt);
-    assert.doesNotMatch(rulingsAndDue, /Principle(&nbsp;| )0/);
-    assert.doesNotMatch(rulingsAndDue, /BASIS_VERSION|fingerprint/i);
+    const rulings = out.slice(rulingsAt, out.indexOf('</main>'));
+    assert.ok(rulingsAt > -1);
+    assert.doesNotMatch(rulings, /Principle(&nbsp;| )0/);
+    assert.doesNotMatch(rulings, /BASIS_VERSION|fingerprint/i);
   });
 });
 
-describe('render-observation: scan-due tab (LIN-2649 S4 / LIN-2667)', () => {
+describe('render-observation: the view strip (LIN-3983, LIN-4540)', () => {
   const html = () => renderObservationPage(
     { workspaces: [{ urlKey: 'ws-a', name: 'Alpha' }] },
     { urlKey: 'ws-a' }
   );
 
-  test('the Scan-due tab renders in the shared tab strip, after Runs and Rulings (LIN-3983)', () => {
+  test('the shared tab strip holds Runs and Rulings only', () => {
     const out = html();
-    assert.match(out, /data-tab="due"[^>]*data-testid="obs-tab-due"[^>]*>Scan-due</);
     const tabCount = (out.match(/class="tabs__tab( is-active)?"/g) || []).length;
-    assert.strictEqual(tabCount, 3, 'Runs, Rulings and Scan-due');
+    assert.strictEqual(tabCount, 2, 'Runs and Rulings');
     assert.match(out, /data-tab="runs"[^>]*aria-selected="true"/, 'the runs tab is selected on a bare load');
-  });
-
-  test('the due section states its own backstop-not-guarantee disclaimer, distinct from the rulings one', () => {
-    const out = html();
-    const sectionAt = out.indexOf('id="obs-due-section"');
-    const limitsAt = out.indexOf('id="obs-due-limits"');
-    assert.ok(sectionAt > -1 && limitsAt > sectionAt, 'the disclaimer is inside the due section');
-    assert.match(out, /Due means the task&rsquo;s content has changed since its last scan/);
-    assert.match(out, /not whether the change matters/);
-    assert.doesNotMatch(out.slice(sectionAt), /fingerprint|BASIS_VERSION|Principle/);
-  });
-
-  test('the due section never shares markup with #obs-session-views', () => {
-    const out = html();
-    const sessionViewsAt = out.indexOf('id="obs-session-views"');
-    const sessionViewsCloseAt = out.indexOf('</div>', sessionViewsAt);
-    const dueSectionAt = out.indexOf('id="obs-due-section"');
-    assert.ok(dueSectionAt > sessionViewsCloseAt, 'the due section sits outside #obs-session-views entirely');
-  });
-
-  test('states the check-vs-scan cost distinction, in plain words', () => {
-    assert.match(html(), /Checking is free: it reads each task but calls no model\. Scanning a task calls a model/);
-  });
-
-  test('carries the pagination/readout hooks: feed list, empty state, load-more, progress readout', () => {
-    const out = html();
-    assert.match(out, /id="obs-due-list"/);
-    assert.match(out, /id="obs-due-empty"/);
-    assert.match(out, /id="obs-due-more"[^>]*hidden/);
-    assert.match(out, /id="obs-due-progress"/);
-  });
-});
-
-describe('render-observation: bulk-scan script wiring (LIN-2700 / LIN-2651 Phase 2)', () => {
-  const html = () => renderObservationPage(
-    { workspaces: [{ urlKey: 'ws-a', name: 'Alpha' }] },
-    { urlKey: 'ws-a' }
-  );
-
-  // This guards LIN-2700's single documented deviation from its "public/
-  // observation.js and nothing else" scope: the bulk-scan pool calls
-  // window.ScanSection.postScan, which public/scan.js defines and which was
-  // NOT loaded on this page before LIN-2700 added it to the script list.
-  //
-  // Nothing else covers that one line. The bulk-scan witnesses
-  // (tests/unit/observation-bulk-scan.test.js) stub window.ScanSection inside
-  // their vm sandbox, so they can never observe the real page wiring, and no
-  // E2E navigates to /observation and touches ScanSection. Removing /scan.js
-  // from the list left 82/82 of the related unit tests green (review mutation
-  // M8) while the pool would TypeError at runtime in a browser — and that
-  // error would be swallowed into classifyBulkScanError's 'other' bucket, so
-  // it would not even be loud. Hence this assertion.
-  test('the Observation page loads /scan.js, so window.ScanSection exists for the bulk-scan pool', () => {
-    assert.match(
-      html(),
-      /<script src="\/scan\.js"><\/script>/,
-      'the bulk-scan pool calls window.ScanSection.postScan, which only exists if /scan.js is in the page script list'
-    );
-  });
-
-  test('/scan.js loads after /common.js and before /observation.js', () => {
-    // Order is load-bearing in both directions, per the justification comment
-    // in lib/render-observation.js: scan.js reads window.escapeHtml and
-    // window.relativeTime at top level (common.js defines them), and
-    // observation.js is the consumer of window.ScanSection.
-    const out = html();
-    // observation.js is a native module (LIN-4463 piece 4), emitted as `<script type="module">`. A module runs after every
-    // classic script, so its place in the list is not what orders it; the indexOf below still pins where it is written.
-    const commonAt = out.indexOf('<script src="/common.js"></script>');
-    const scanAt = out.indexOf('<script src="/scan.js"></script>');
-    const observationAt = out.indexOf('<script type="module" src="/observation.js"></script>');
-    assert.ok(commonAt > -1 && scanAt > -1 && observationAt > -1, 'all three scripts are present');
-    assert.ok(scanAt > commonAt, '/scan.js must load after /common.js (it reads escapeHtml/relativeTime at top level)');
-    // A layout pin only: the module's execution order comes from `type="module"`, not from this position.
-    assert.ok(scanAt < observationAt, '/scan.js is written before /observation.js in the page (layout pin, not an execution-order witness)');
-    assert.equal(out.includes('/cost-format-global.js'), false, 'the page takes no bridge');
-  });
-});
-
-describe('render-observation: scan cost estimate wiring (LIN-2706 §B.1)', () => {
-  // window.__OBSERVATION_DATA__ is embedded via embedJson (lib/components/page.js),
-  // plain JSON.stringify plus a few XSS-hardening char escapes that don't touch
-  // any of these fixtures, so a straight JSON.parse round-trips it.
-  function embeddedData(html) {
-    return extractEmbeddedData(html, '__OBSERVATION_DATA__');
-  }
-
-  test('an unknown estimate reaches the embedded JSON with unknown:true, never collapsed to $0.00 or a number', () => {
-    const html = renderObservationPage(
-      { workspaces: [{ urlKey: 'ws-a', name: 'Alpha' }] },
-      { urlKey: 'ws-a', scanCostEstimate: { calls: 0, pricedCalls: 0, meanUsd: null, unknown: true } }
-    );
-    assert.deepEqual(
-      embeddedData(html).scanCostEstimate,
-      { calls: 0, pricedCalls: 0, meanUsd: null, unknown: true }
-    );
-  });
-
-  test('a priced estimate reaches the embedded JSON verbatim, unknown:false', () => {
-    const html = renderObservationPage(
-      { workspaces: [{ urlKey: 'ws-a', name: 'Alpha' }] },
-      { urlKey: 'ws-a', scanCostEstimate: { calls: 5, pricedCalls: 5, meanUsd: 0.0123, unknown: false } }
-    );
-    assert.deepEqual(
-      embeddedData(html).scanCostEstimate,
-      { calls: 5, pricedCalls: 5, meanUsd: 0.0123, unknown: false }
-    );
-  });
-
-  test('a priced estimate averaging exactly zero stays unknown:false, distinct from the unknown state', () => {
-    const html = renderObservationPage(
-      { workspaces: [{ urlKey: 'ws-a', name: 'Alpha' }] },
-      { urlKey: 'ws-a', scanCostEstimate: { calls: 3, pricedCalls: 3, meanUsd: 0, unknown: false } }
-    );
-    assert.deepEqual(
-      embeddedData(html).scanCostEstimate,
-      { calls: 3, pricedCalls: 3, meanUsd: 0, unknown: false }
-    );
-  });
-
-  test('an absent estimate embeds as null (the route\'s own store-absent/rejected degrade path), not a fabricated number', () => {
-    const html = renderObservationPage(
-      { workspaces: [{ urlKey: 'ws-a', name: 'Alpha' }] },
-      { urlKey: 'ws-a' }
-    );
-    assert.equal(embeddedData(html).scanCostEstimate, null);
-  });
-});
-
-describe('render-observation: third due-tab disclaimer — bulk-scan (LIN-2706 §B.9)', () => {
-  const html = (openRouterSource) => renderObservationPage(
-    { workspaces: [{ urlKey: 'ws-a', name: 'Alpha' }] },
-    { urlKey: 'ws-a', openRouterSource }
-  );
-
-  test('the unconditional (dollar-estimate) branch always renders, regardless of tier', () => {
-    for (const source of [null, 'oauth', 'env', 'free']) {
-      const out = html(source);
-      assert.match(out, /id="obs-due-bulk-disclaimer"/, `unconditional disclaimer missing for openRouterSource=${source}`);
-      assert.match(out, /Stop ends the queue and frees the browser\. Scans already sent finish and are billed, and may still raise a question for you\./, `plain stop text missing for openRouterSource=${source}`);
-      assert.match(out, /average of the last 30 days, not a quote/, `dollar-estimate framing missing for openRouterSource=${source}`);
-    }
-  });
-
-  test('the conditional (quota) branch renders ONLY when isFreeTier (openRouterSource === "free")', () => {
-    assert.doesNotMatch(html(null), /id="obs-due-bulk-quota-note"/, 'no session/env/free source: no quota note');
-    assert.doesNotMatch(html('oauth'), /id="obs-due-bulk-quota-note"/, 'a paid OAuth key: no quota note');
-    assert.doesNotMatch(html('env'), /id="obs-due-bulk-quota-note"/, 'a paid env key: no quota note');
-    assert.match(html('free'), /id="obs-due-bulk-quota-note"/, 'free tier: the quota note must render');
-    assert.match(html('free'), /hourly free quota/, 'the quota note must name the quota, not just repeat the dollar disclaimer');
-    assert.doesNotMatch(html('free'), /daily\/hourly|daily free quota|daily prompt/, 'the retired daily prompt quota must not be named (LIN-3239)');
-  });
-
-  test('the two budget gates are disclosed as separate sentences, never merged into one', () => {
-    const out = html('free');
-    const dollarAt = out.indexOf('id="obs-due-bulk-disclaimer"');
-    const dollarCloseAt = out.indexOf('</p>', dollarAt);
-    const quotaAt = out.indexOf('id="obs-due-bulk-quota-note"');
-    assert.ok(dollarAt > -1 && quotaAt > -1, 'both notes are present');
-    assert.ok(quotaAt > dollarCloseAt, 'the quota note is its OWN <p>, not appended inside the dollar-estimate paragraph');
-  });
-
-  test('mounted inside the due section, alongside the existing #obs-due-limits/#obs-due-cost-note block', () => {
-    const out = html('free');
-    const sectionAt = out.indexOf('id="obs-due-section"');
-    const costNoteAt = out.indexOf('id="obs-due-cost-note"');
-    const disclaimerAt = out.indexOf('id="obs-due-bulk-disclaimer"');
-    const dueListAt = out.indexOf('id="obs-due-list"');
-    assert.ok(sectionAt < costNoteAt, 'inside the due section');
-    assert.ok(costNoteAt < disclaimerAt && disclaimerAt < dueListAt, 'alongside the existing limits/cost-note block, above the feed it qualifies');
-  });
-
-  test('the disclaimer points at the estimate correctly: "below", never "above" (review finding 2, PR #1424)', () => {
-    // This partial mounts BEFORE #obs-due-bulk-bar (the element that actually
-    // carries the estimate), so a live render puts the bar visually below
-    // this text -- "above" was measured backwards. A mutation flipping the
-    // wording back to "above" must turn this red.
-    const out = html('free');
-    assert.doesNotMatch(out, /estimate above/i, 'must not claim the estimate is above this text');
-    assert.match(out, /estimate below/i, 'must claim the estimate is below this text, matching the real mount order');
-  });
-
-  test('bounded copy: the disclaimer paragraph does not balloon (review finding 5, §B.5)', () => {
-    // §B.5's own rule ("copy length is bounded ... its witness must measure
-    // rendered output, not font metrics") was never landed for this partial;
-    // the review measured it as the longest paragraph on the tab (361 chars
-    // vs #obs-due-limits' 217). Pin a generous but real ceiling on the
-    // RENDERED text, both branches.
-    for (const source of [null, 'free']) {
-      const out = html(source);
-      const disclaimerAt = out.indexOf('id="obs-due-bulk-disclaimer"');
-      const disclaimerClose = out.indexOf('</p>', disclaimerAt);
-      const disclaimerText = out.slice(disclaimerAt, disclaimerClose);
-      assert.ok(disclaimerText.length < 500, `dollar-estimate disclaimer too long: ${disclaimerText.length} chars`);
-      if (source === 'free') {
-        const quotaAt = out.indexOf('id="obs-due-bulk-quota-note"');
-        const quotaClose = out.indexOf('</p>', quotaAt);
-        const quotaText = out.slice(quotaAt, quotaClose);
-        assert.ok(quotaText.length < 400, `quota note too long: ${quotaText.length} chars`);
-      }
-    }
-  });
-});
-
-describe('render-observation: the three disclaimers stay textually distinct (LIN-2706 §B.9 no-shared-partial)', () => {
-  // A regression guard against a future "helpful" consolidation into one
-  // shared partial — the parent ticket's explicit constraint is that these
-  // three stay separate, own-wording partials. If someone later merges them,
-  // this test (comparing the rendered text of all three) must fail.
-  function extractParagraph(html, id) {
-    const at = html.indexOf(`id="${id}"`);
-    assert.ok(at > -1, `#${id} must be present`);
-    const openAt = html.lastIndexOf('<p', at);
-    const closeAt = html.indexOf('</p>', at);
-    return html.slice(openAt, closeAt + 4);
-  }
-
-  test('the rulings, due-tab, and bulk-scan disclaimers are three DIFFERENT strings', () => {
-    const out = renderObservationPage(
-      { workspaces: [{ urlKey: 'ws-a', name: 'Alpha' }] },
-      { urlKey: 'ws-a', openRouterSource: 'free' }
-    );
-    const rulings = extractParagraph(out, 'obs-rulings-limits');
-    const dueTab = extractParagraph(out, 'obs-due-limits');
-    const bulkScan = extractParagraph(out, 'obs-due-bulk-disclaimer');
-
-    assert.notEqual(rulings, dueTab, 'rulings and due-tab disclaimers must differ');
-    assert.notEqual(rulings, bulkScan, 'rulings and bulk-scan disclaimers must differ');
-    assert.notEqual(dueTab, bulkScan, 'due-tab and bulk-scan disclaimers must differ');
-  });
-
-  test('none of the three disclaimers is a substring of another (guards a partial/prefix-shared merge too)', () => {
-    const out = renderObservationPage(
-      { workspaces: [{ urlKey: 'ws-a', name: 'Alpha' }] },
-      { urlKey: 'ws-a', openRouterSource: 'free' }
-    );
-    const rulings = extractParagraph(out, 'obs-rulings-limits');
-    const dueTab = extractParagraph(out, 'obs-due-limits');
-    const bulkScan = extractParagraph(out, 'obs-due-bulk-disclaimer');
-    const texts = [rulings, dueTab, bulkScan];
-    for (let i = 0; i < texts.length; i++) {
-      for (let j = 0; j < texts.length; j++) {
-        if (i === j) continue;
-        assert.ok(!texts[i].includes(texts[j]), `disclaimer ${i} must not fully contain disclaimer ${j}`);
-      }
-    }
+    assert.match(out, /data-tab="rulings"/);
   });
 });
 

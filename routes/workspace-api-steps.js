@@ -2,8 +2,7 @@
  * Shared steps for the workspace API routers (LIN-2246: extracted from
  * workspace-api.js). routes/workspace-api.js, routes/workspace-api-prompts.js
  * (failureOf) and routes/workspace-api-issue-read.js (failureOf, openIssue) and
- * routes/workspace-api-issue-write.js (refuseCapability) and routes/workspace-api-scan.js (failureOf, openIssue,
- * refuseCapability, refuseFreeTier, aiNotConfigured, keepaliveFailure, loadContext) and
+ * routes/workspace-api-issue-write.js (refuseCapability) and
  * routes/workspace-api-feedback.js (refuseCapability) import them; each is defined here once. `openIssue` and
  * `refuseCapability` moved here with LIN-3872; `refuseFreeTier`, `aiNotConfigured`,
  * `keepaliveFailure` and `loadContext` with LIN-3877 (the composer reads them too).
@@ -45,27 +44,22 @@ export function refuseCapability(res, providerName, capability, doing) {
 /**
  * The preamble every issue-addressed route opens with: resolve the issue's own binding
  * (LIN-1904: per the `source` provenance stamp, not always the workspace's active
- * provider), then refuse, in this order, a malformed id, a missing scan-record id, an
+ * provider), then refuse, in this order, a malformed id, an
  * unconfigured store, and a provider without recommendation context (LIN-1910). Replies
  * and returns null when it refuses.
  * @param {Object} [checks]
- * @param {boolean} [checks.recordId] - the body must carry a scan record `id`
  * @param {*} [checks.store] - the store the route needs, checked with `storeName`
  * @param {string} [checks.storeName] - "<storeName> not configured" (503)
  * @param {string} [checks.capability] - require `fetchRecommendationContext`, worded "<capability> for this issue"
  * @param {boolean} [checks.bind=true] - false where the route resolves the binding only on a branch
  */
-export function openIssue(req, res, { recordId = false, store, storeName, capability, bind = true } = {}) {
+export function openIssue(req, res, { store, storeName, capability, bind = true } = {}) {
   const workspace = req.workspace;
   const { issueId } = req.params;
   const binding = bind ? resolveIssueBinding(workspace, req.query.source) : null;
 
   if (!isValidIssueId(issueId)) {
     badRequest.json(res, 'Invalid issue ID format');
-    return null;
-  }
-  if (recordId && (typeof req.body?.id !== 'string' || !req.body.id)) {
-    badRequest.json(res, 'A scan record id is required');
     return null;
   }
   if (storeName && !store) {
@@ -76,7 +70,7 @@ export function openIssue(req, res, { recordId = false, store, storeName, capabi
     refuseCapability(res, binding.provider.name, 'fetchRecommendationContext', `${capability} for this issue`);
     return null;
   }
-  return { workspace, issueId, recordId: req.body?.id, provider: binding?.provider, callScope: binding?.callScope };
+  return { workspace, issueId, provider: binding?.provider, callScope: binding?.callScope };
 }
 
 export const refuseFreeTier = (res, check) => jsonError(res, 429, check.reason, freeTierRefusalBlock(check));

@@ -31,10 +31,9 @@ const SEARCHED = ['lib', 'routes', 'scripts', 'public'];
 /** Importers that stay until P7b, each with the reason it stays. */
 export const ALLOWED_IMPORTERS = Object.freeze({
   'lib/dismissal-suggestions-store.js': 'machinery: the suggestion store reads the predicate; retired with the ruling stores in P7b',
-  'lib/scan.js': 'machinery: the scan writes task decisions; retired with the scan in P7b',
   'routes/proxy-rulings.js': 'machinery: the agents\' rulings route and its suggest routes; retired in P7b (LIN-4541)',
-  'routes/dashboard-rulings.js': 'old answer path: the Rulings page feed and its answer, dismiss, shelve and keep routes; retired with the page in P7b',
-  'routes/workspace-api-issue-write.js': 'old answer path: answers posted as comments and the scan outcome; retired in P7b',
+  'routes/dashboard-rulings.js': 'old answer path: the Rulings page feed and its answer, dismiss and keep routes; retired with the page in P7b (shelve went in LIN-4540)',
+  'routes/workspace-api-issue-write.js': 'old answer path: answers posted as comments and the task-decision outcome; retired in P7b',
   'server.js': 'wiring: constructs the ruling stores for the routes above; the constructors go with them in P7b',
 });
 

@@ -7,21 +7,20 @@
  * - Recommendations: AI-generated prompts via OpenRouter
  * - Issue reads (GET comments, detail, image): moved to workspace-api-issue-read.js (LIN-3872)
  * - Issue writes (POST comments, POST issues, PATCH issues): moved to workspace-api-issue-write.js (LIN-3876)
- * - Scan (GET and POST scan, dismiss, retire, unretire, scan-due): moved to workspace-api-scan.js (LIN-3877), registered on this router where the block sat
  * - Sessions (GET sessions) and run evidence / close-out (GET run-evidence, POST check, POST close-out-press): moved to workspace-api-run-evidence.js (LIN-3894), registered on this router where the blocks sat
  * - Feedback intake (POST feedback): moved to workspace-api-feedback.js (LIN-3893), registered on this router where the block sat; its limiter is re-exported from here
  *
  * Shape (LIN-3596): every route is registered explicitly, in the order below, as a
  * thin handler over a small set of shared steps. The steps sit in two places:
  *   - module level, where they need no dependency (`recommendCallOptions`, `toHopRecord`, ...;
- *     `openIssue`, `refuseCapability`, `failureOf`, `refuseFreeTier`, `aiNotConfigured`, `keepaliveFailure` and `loadContext` live in workspace-api-steps.js, shared with workspace-api-prompts.js, workspace-api-issue-read.js, workspace-api-issue-write.js, workspace-api-scan.js, workspace-api-audit.js and workspace-api-feedback.js);
+ *     `openIssue`, `refuseCapability`, `failureOf`, `refuseFreeTier`, `aiNotConfigured`, `keepaliveFailure` and `loadContext` live in workspace-api-steps.js, shared with workspace-api-prompts.js, workspace-api-issue-read.js, workspace-api-issue-write.js, workspace-api-audit.js and workspace-api-feedback.js);
  *   - inside `createWorkspaceApiRoutes`, where they close over the injected stores.
  * The AI pre-flight calls (`resolveChatCredential`, `checkFreeTierGate`, the
  * `forceDefault` model clamp) are deliberately NOT shared: each route names its own,
  * because the source-text censuses scan the workspace-API unit (this file and
  * routes/workspace-api-*.js) for every one of them.
  *
- * Test-mode builders (mock recommendation, recap, brief, scan, audit data, ...) live
+ * Test-mode builders (mock recommendation, recap, brief, audit data, ...) live
  * in lib/workspace-api-mocks.js.
  */
 import { Router } from 'express';
@@ -32,7 +31,6 @@ import { createPromptsRoutes } from './workspace-api-prompts.js';
 import { registerIssueReadRoutes } from './workspace-api-issue-read.js';
 import { registerIssueWriteRoutes } from './workspace-api-issue-write.js';
 import { registerAuditRoutes } from './workspace-api-audit.js';
-import { registerScanRoutes } from './workspace-api-scan.js';
 import { registerFeedbackRoutes } from './workspace-api-feedback.js';
 import { registerSessionsRoutes, registerRunEvidenceRoutes } from './workspace-api-run-evidence.js';
 export { feedbackSubmitLimiter } from './workspace-api-feedback.js';
@@ -193,7 +191,7 @@ export function streamMockFixture(res, mockIssue) {
  * @param {Function} options.workspaceFromUrl - Middleware to extract workspace from URL
  * @param {Object} options.freeTierStore - Free tier usage store
  * @param {Function} options.getOpenRouterSource - Helper to determine OpenRouter source
- * @param {Object} [options.taskDecisionsStore] - Task-keyed scan-decision store (LIN-2197)
+ * @param {Object} [options.taskDecisionsStore] - Task-keyed decision store (LIN-2197): the old answer path's stamp, retired with the store (LIN-4541)
  * @param {Object} [options.sessionsFeedCache] - Shared SWR cache for the rulings/sessions feed (LIN-2755); null → uncached deployment, invalidation is a no-op
  * @param {Object} [options.ownerCredentialStore] - Durable owner-credential store (LIN-2933); null → the comment route's one-shot auth-recovery is disabled, not a hard dependency
  * @param {Function} [options.adoptConnectionCredential] - LIN-3124 PR3 (D7): connection-keyed adopt read (injected; protected module imports no connection seam)
@@ -864,9 +862,6 @@ export function createWorkspaceApiRoutes({ workspaceFromUrl, freeTierStore, getO
     return generateCachedDocument('brief', briefCacheStore, res, issue, { mockAi, apiKey: apiKeyToUse, isFreeTier }, { generate: generateBrief, buildMock: buildMockBrief });
   });
 
-  // The scan routes (LIN-3877): registered on this router, here, so the route table's order is unchanged.
-  registerScanRoutes(router, { workspaceFromUrl, freeTierStore, workspacePreferencesStore, taskDecisionsStore, harbourCommentsStore, sessionsFeedCache });
-
   // The feedback intake route (LIN-3893): registered on this router, here, so the route table's order is unchanged.
   registerFeedbackRoutes(router, { workspaceFromUrl, freeTierStore, workspacePreferencesStore, dispatchQueueStore, proxyTokenStore, accountStore, workspaceOwnerCheck });
 
@@ -907,7 +902,7 @@ export function createWorkspaceApiRoutes({ workspaceFromUrl, freeTierStore, getO
   // Roadmap API endpoints (LIN-2246: extracted to workspace-api-roadmap.js).
   // Mounted at this same position in the registration sequence it previously
   // occupied inline; every /api/roadmap/* path is disjoint from every other
-  // group's literal prefix (recap/brief/scan/comments/...), so no dynamic
+  // group's literal prefix (recap/brief/comments/...), so no dynamic
   // :param route in another group can ever swallow a /roadmap/* request —
   // the mount position is not load-bearing here (unlike task-chat.js's
   // /saved-before-/:issueId case), but is kept for a minimal diff.

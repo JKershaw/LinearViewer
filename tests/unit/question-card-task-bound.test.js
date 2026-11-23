@@ -1,5 +1,5 @@
 /**
- * LIN-4140 — the shared question card answers and dismisses a scan-raised
+ * LIN-4140 — the shared question card answers (and, until LIN-4540 retired the scan route, dismissed) a scan-raised
  * (task-bound) ruling, and loop-backed cards stay byte-for-byte unchanged.
  *
  * Beat 1 (witnesses first): the `LOOP-BACKED` and `GUARD` tests pin today's
@@ -330,37 +330,18 @@ test('NEW differential: a stray record_on on a scan row never redirects the comm
   assert.deepEqual(withoutAttemptId(comment.body), tab.body);
 });
 
-// ── NEW: dismissal of a scan row goes to the scan route ─────────────────────
+// ── LIN-4540: the scan dismiss route is gone ───────────────────────────────
+// The scan was the only writer of task-bound rulings, and its dismiss went with it. The rulings dismiss route refuses a card
+// with no loop (400), so a task-bound card offers no dismiss at all, and a loop-backed card keeps it. LIN-4541 retires the tier.
 
-test('NEW dismiss: a task-bound dismiss makes exactly one request, to the scan dismiss route by issue UUID with the source, body {id}', async () => {
-  const f = answerable(taskBoundMarkup());
-  await clickOn(f.dismissBtn);
-  await flush();
-  assert.equal(f.calls.length, 1, 'one request — no rulings dismiss, no follow-up');
-  assert.equal(f.calls[0].url, `/workspace/w/api/scan/${TASK_ISSUE_UUID}/dismiss?source=github`);
-  assert.deepEqual(f.calls[0].body, { id: TASK_DECISION_ID });
-  assert.equal(f.runStarts(), 0);
-  assert.equal(f.card.isConnected, false, 'the card is removed on success');
-});
-
-test('NEW dismiss: a failed scan dismiss leaves the card in place, re-enables its buttons and says so', async () => {
-  const f = answerable(taskBoundMarkup(), { dismissOk: false });
-  await clickOn(f.dismissBtn);
-  await flush();
-  assert.equal(f.calls[0].url, `/workspace/w/api/scan/${TASK_ISSUE_UUID}/dismiss?source=github`);
-  assert.equal(f.card.isConnected, true, 'the card stays');
-  assert.equal(f.dismissBtn.disabled, false);
-  assert.equal(f.btn.disabled, false);
-  assert.match(f.feedback.textContent, /dismiss failed/);
-});
-
-test('NEW dismiss: a task-bound dismiss sends no follow-up even when the disposition reads resumable', async () => {
-  const f = answerable(taskBoundMarkup());
-  f.card.dataset.disposition = 'resumable';
-  await clickOn(f.dismissBtn);
-  await flush();
-  assert.equal(f.calls.length, 1, 'the scan dismiss is the only request');
-  assert.equal(f.runStarts(), 0, 'no run is started for a scan row');
+test('LIN-4540 dismiss: a task-bound card renders no dismiss control; a loop-backed card still does', () => {
+  const dismiss = 'data-testid="session-question-card-dismiss"';
+  const taskBound = renderDecisionCard(structuredClone(TASK_BOUND_ROW), RENDER_OPTS);
+  assert.ok(taskBound.includes('data-testid="session-question-card"'), 'the card itself still renders');
+  assert.equal(taskBound.includes(dismiss), false, 'no dismiss on a task-bound card');
+  // The read-only loop fixtures render no dismiss by their own rule, so the control case is the ordinary interactive one.
+  const loopBacked = renderDecisionCard(structuredClone(LOOP_BACKED_ROWS['loop-plain-no-options']), RENDER_OPTS);
+  assert.ok(loopBacked.includes(dismiss), 'a loop-backed card keeps its dismiss');
 });
 
 // ── NEW: the delivered-effect rule ─────────────────────────────────────────
@@ -400,8 +381,7 @@ test('NEW search guard: every postComment( call under public/ is one of the name
   assert.deepEqual(perFile, {
     'public/common.js': 4,        // deliverReply (record-only + resume), deliverRulingRecord, deliverRulingDispatch
     'public/session.js': 1,       // sendSave — a loop-box comment save, not a ruling answer
-    'public/observation.js': 1,   // the Rulings tab's task-bound branch (already sends the pair)
-    'public/scan.js': 1           // already sends the pair
+    'public/observation.js': 1    // the Rulings tab's task-bound branch (already sends the pair)
   }, 'a new postComment( call site must be named here and in the PR');
 });
 

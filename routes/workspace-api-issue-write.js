@@ -344,8 +344,8 @@ export function registerIssueWriteRoutes(router, { workspaceFromUrl, dispatchQue
    *
    * LIN-2197 Phase 5 (Phase 4 close-out ledger item L4): the task-decision
    * sibling of the pair above — an optional `{taskDecisionId, taskDecisionIssueId}`
-   * pair, both required together, threaded from `public/scan.js`'s answer
-   * form via the same `window.ReplyDelivery.postComment`. After a successful
+   * pair, both required together, threaded from a task-bound ruling's answer
+   * via the same `window.ReplyDelivery.postComment`. After a successful
    * comment write, best-effort stamps `outcome: 'answered'` onto the scanned
    * row via `taskDecisionsStore.markOutcome` — logged on failure, never
    * thrown, mirroring the loop-decision stamp's discipline exactly. This is

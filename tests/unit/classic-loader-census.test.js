@@ -95,8 +95,6 @@ export const CLASSIC_LOADER_SUITES = [
   'rulings-badge-client.test.js',
   'run-limit-gating.test.js',
   'runner-link-surfaces.test.js',
-  'scan-post-signal.test.js',
-  'scan-retire-ui.test.js',
   'segment-bar-pill-parity.test.js',
   'session-pr-state-poll.test.js',
   'session-question-card-effect.test.js',
@@ -145,8 +143,8 @@ test('the classic-loader census matches its baseline: no new classic suite, and 
   assert.deepEqual(gone, [], `listed suites no longer load browser scripts as classic: lower the baseline in this change: ${gone.join(', ')}`);
 });
 
-test('the baseline is recorded at 88 suites (the count that must not rise)', () => {
-  assert.equal(CLASSIC_LOADER_SUITES.length, 88);
+test('the baseline is recorded at 86 suites (the count that must not rise; LIN-4540 deleted the two scan suites)', () => {
+  assert.equal(CLASSIC_LOADER_SUITES.length, 86);
 });
 
 test('runClassic is counted unless it runs a named sibling: observation.js counts, chart-helpers.js does not', () => {

@@ -79,7 +79,9 @@ export const URLKEY_SOURCES = Object.freeze([
     'task-mode-events', 'close-out-events', 'liveness-alarms', 'custom-prompts', 'report-history',
     'task-snapshots', 'task-decisions', 'run-paragraph', 'workspaces', 'task_share_links',
     'observer-shadow-log', 'saved-chats', 'credential-lifecycle-events',
-    'owner-credentials', 'dismissal-suggestions', 'dispatch-presets', 'run-proposals', 'shelved-rulings',
+    'owner-credentials', 'dismissal-suggestions', 'dispatch-presets', 'run-proposals',
+    // LIN-4540: shelving retired and no code reads it, but its old rows still carry a urlKey, so the count reads it.
+    'shelved-rulings',
     'ship-biscuit-editions', 'collective-characters', 'collective-presets', 'consumer-heartbeats', 'kpi-daily-rollup',
     // LIN-3853. The log is NOT in ACTOR_SOURCES: its actor.id may be a token label (item 3),
     // which the field branch would count as an actor account. Presets hold account ids only.

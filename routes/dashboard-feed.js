@@ -24,7 +24,6 @@ import { armKeepalive } from '../lib/http-keepalive.js';
 import { toEpochMs } from '../lib/utils/time.js';
 import { stageLabel, ORCHESTRATION_KINDS } from '../lib/run-view.js';
 import { requestFeatureFlags } from '../lib/run-controls.js';
-import { scanEstimateOf } from '../lib/model-routing-spend.js';
 import { findAnchorLoop, childLoops } from '../lib/session-summary.js';
 import { STALE_AFTER_MS, WORKSPACE_FANOUT_CONCURRENCY, settleWithConcurrency, isStandaloneSession, deriveSessionStatus, deriveSessionWaiting, waitingLoops, loopActivityMs, peakToolCount, deriveFeedStatusLine, connectedWorkspaces } from './dashboard-session-state.js';
 
@@ -642,23 +641,16 @@ function rollupDescendantActivity(built) {
 
 // First-class observation page (LIN-595): no feature flag (mirrors swim).
 //
-// Async since LIN-2706, to await the scan cost estimate read below.
-// Express ^4.18.2 never awaits a route handler's returned promise, so the
-// entire body -- the store read, renderObservationPage, and res.send --
-// stays inside one try/catch: an uncaught rejection anywhere here would
-// otherwise become an unhandled rejection that server.js's process-level
+// Async for the feature-flag read below. Express ^4.18.2 never awaits a route
+// handler's returned promise, so the entire body -- renderObservationPage and
+// res.send -- stays inside one try/catch: an uncaught rejection anywhere here
+// would otherwise become an unhandled rejection that server.js's process-level
 // net logs but never answers, hanging the request instead of 500ing it
 // (mirrors /escalation-kpis and /effort-readout).
-function observationPage({ llmCallLogStore, renderObservationPage, getDeployInfo, getOpenRouterSource }) {
+function observationPage({ renderObservationPage, getDeployInfo, getOpenRouterSource }) {
   return async (req, res) => {
     const workspace = req.workspace;
     try {
-      // Observation's scan estimate (plan S4): the scan job's typical call, read by the one calls read (LIN-4179).
-      // A rejected read degrades to null (the page shows "unknown"), as it always has.
-      const scanCallDocs = llmCallLogStore
-        ? await llmCallLogStore.listInHorizon(workspace.urlKey, { feature: 'scan' }).catch(() => null)
-        : null;
-      const scanCostEstimate = scanCallDocs ? scanEstimateOf(scanCallDocs) : null;
       const html = renderObservationPage(
         {
           workspaces: connectedWorkspaces(req.session)
@@ -668,8 +660,7 @@ function observationPage({ llmCallLogStore, renderObservationPage, getDeployInfo
           urlKey: workspace.urlKey,
           openRouterSource: getOpenRouterSource(req),
           workspaces: req.session.workspaces,
-          featureFlags: await requestFeatureFlags(req),
-          scanCostEstimate
+          featureFlags: await requestFeatureFlags(req)
         }
       );
       res.send(html);

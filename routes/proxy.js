@@ -479,7 +479,7 @@ async function fetchWithTimeout(workFn, ms) {
  *   workspace selects it, and via this injection.
  * @returns {Router} Express router with proxy routes
  */
-export function createProxyRoutes({ proxyTokenStore, proxyEventStore, agentStatusStore, recapCacheStore, briefCacheStore, dispatchQueueStore, dispatchTokenStore = null, closeOutEventsStore = null, llmCallLogStore, taskDecisionsStore = null, shelvedRulingsStore = null, dismissalSuggestionsStore = null, harbourCommentsStore = null, changePrReaderFor = null, sessionsFeedCache = null, workspaceFromUrl, resolveWorkspaceAccess, getWorkspaceOpenRouterKey, getWorkspaceNorthStar, getNorthStarDocVersionForWorkspace = null, reportHistoryStore, workspacePreferencesStore, dispatchPresetsStore, freeTierStore, accountStore = null, provider: injectedProvider = null, rejectedCredentialRegistry = null, observerStateStore, flightCompanionChatClient = undefined, flightCompanionCreateToolCatalog = undefined, savedChatStore = null, workspaceHaltStore = null, workspaceOwnerCheck = null, modelRoutingStore = null, livenessAlarmStore = null, onTicketWrite = null, recordPipelineMerge = null, consumerHeartbeatStore = null, requestUsageStore = null, requestUsageLoader = null, leftoverStep = null, recordsStore = null, listRecordPeople = undefined }) {
+export function createProxyRoutes({ proxyTokenStore, proxyEventStore, agentStatusStore, recapCacheStore, briefCacheStore, dispatchQueueStore, dispatchTokenStore = null, closeOutEventsStore = null, llmCallLogStore, taskDecisionsStore = null, dismissalSuggestionsStore = null, harbourCommentsStore = null, changePrReaderFor = null, sessionsFeedCache = null, workspaceFromUrl, resolveWorkspaceAccess, getWorkspaceOpenRouterKey, getWorkspaceNorthStar, getNorthStarDocVersionForWorkspace = null, reportHistoryStore, workspacePreferencesStore, dispatchPresetsStore, freeTierStore, accountStore = null, provider: injectedProvider = null, rejectedCredentialRegistry = null, observerStateStore, flightCompanionChatClient = undefined, flightCompanionCreateToolCatalog = undefined, savedChatStore = null, workspaceHaltStore = null, workspaceOwnerCheck = null, modelRoutingStore = null, livenessAlarmStore = null, onTicketWrite = null, recordPipelineMerge = null, consumerHeartbeatStore = null, requestUsageStore = null, requestUsageLoader = null, leftoverStep = null, recordsStore = null, listRecordPeople = undefined }) {
   const router = Router();
 
   // =========================================================================
@@ -1607,7 +1607,7 @@ export function createProxyRoutes({ proxyTokenStore, proxyEventStore, agentStatu
   // never perform one, so `decision-answer` stays absent from
   // FEEDBACK_ENTRY_KINDS (LIN-1728) and this router never reaches
   // markDecisionAnswered. See routes/proxy-rulings.js.
-  router.use(createRulingsRoutes({ proxyLimiter, authenticateProxyToken, requireWriteScope, logEvent, dispatchQueueStore, agentStatusStore, taskDecisionsStore, shelvedRulingsStore, dismissalSuggestionsStore, sessionsFeedCache }));
+  router.use(createRulingsRoutes({ proxyLimiter, authenticateProxyToken, requireWriteScope, logEvent, dispatchQueueStore, agentStatusStore, taskDecisionsStore, dismissalSuggestionsStore, sessionsFeedCache }));
 
   // Group H kickoff (LIN-679 Stage 5 / LIN-2539): extracted to
   // routes/proxy-kickoff.js, mounted at its original position.

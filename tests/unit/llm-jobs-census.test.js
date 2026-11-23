@@ -18,11 +18,11 @@
  *    come from a builder CALL_PATHS names (LIN-3870);
  *  - every `feature:` / `opKind:` string literal is a registered job id, and every
  *    Harbour-call job is used by at least one of them;
- *  - the wrappers that take their `callMeta` from the caller (brief, recap, scan,
+ *  - the wrappers that take their `callMeta` from the caller (brief, recap,
  *    feedback title, run summary, session summary, run paragraph) are only ever
  *    called with a `callMeta` that carries `urlKey`.
  * It reads the LITERAL provenance. A caller can still override `feature` through the
- * `...(options.callMeta || {})` spread at run time (as brief, recap and scan always
+ * `...(options.callMeta || {})` spread at run time (as brief and recap always
  * could); a static test cannot see values, so a `urlKey` that is present in code but
  * falsy at run time (`urlKey || null` in the roadmap routes) is the residual. The caller's-callMeta
  * test (LIN-3929) matches the spread's argument by name too: `...(other.callMeta || {})` in a
@@ -62,7 +62,7 @@ const OPENROUTER_MODULE = /(^|\/)openrouter\.js$/;
 // (routes/workspace-api.js); `generateSummary` / `generateParagraph` are the
 // precompute seams (lib/session-materializer-precompute.js, lib/run-paragraph-hook.js).
 const WRAPPERS = {
-  generateBrief: 'brief', generateRecap: 'recap', generateScan: 'scan',
+  generateBrief: 'brief', generateRecap: 'recap',
   generateFeedbackTitle: 'feedback-title',
   generateRunSummary: 'run-summary', generateSessionSummary: 'session-summary',
   generateRunParagraph: 'run-paragraph',
@@ -85,14 +85,13 @@ const CALL_PATHS = {
   'lib/recap.js': { sites: 1, passthrough: true },
   'lib/run-paragraph.js': { sites: 1, passthrough: true },
   'lib/run-summary.js': { sites: 1, passthrough: true },
-  'lib/scan.js': { sites: 1, passthrough: true },
   'lib/session-summary.js': { sites: 1, passthrough: true },
   'routes/proxy.js': { sites: 1 },
   'routes/ship-biscuit.js': { sites: 1 },
-  // The workspace-API unit (LIN-3861) is judged as a whole: 4 sites in the
-  // recommend/feedback groups plus the roadmap's 3, and the builder may live in any
+  // The workspace-API unit (LIN-3861) is judged as a whole: 3 sites in the
+  // recommend/feedback groups plus the roadmap's 3 (the scan's retire site left with LIN-4540), and the builder may live in any
   // unit file, so the route groups can move between them. Keyed by the unit, not a file.
-  [WORKSPACE_API_UNIT]: { sites: 7, builders: ['recommendCallOptions'] },
+  [WORKSPACE_API_UNIT]: { sites: 6, builders: ['recommendCallOptions'] },
 };
 
 const SCAN_DIRS = ['lib', 'routes'];
@@ -394,7 +393,7 @@ describe('LIN-3852: every LLM use is a registered job', () => {
   // LIN-4248: + survey-task, survey-place (agent sessions, hand-triggered, read-only). LIN-4437: + blind-read.
   test('the registry has the 23 agent-session and 16 Harbour-call jobs (20 of the design note, + the two Surveys, + the blind read)', () => {
     assert.equal(JOBS.filter((j) => j.surface === SURFACES.AGENT_SESSION).length, 23);
-    assert.equal(JOBS.filter((j) => j.surface === SURFACES.HARBOUR_CALL).length, 16);
+    assert.equal(JOBS.filter((j) => j.surface === SURFACES.HARBOUR_CALL).length, 14);
   });
 
   // ─── Failure witnesses: the checker names what it finds ───────────────────
@@ -487,7 +486,7 @@ describe('LIN-3852: every LLM use is a registered job', () => {
     assert.deepEqual(checkCensus({ ...inputs, sources: moved }), []);
     const extra = { ...moved, 'routes/workspace-api-extra.js': "import { streamChat } from '../lib/openrouter.js';\nexport const g = () => streamChat([], { callMeta: { urlKey: 'u' } }, () => {});\n" };
     const problems = checkCensus({ ...inputs, sources: extra });
-    assert.ok(problems.some((p) => p.includes(`${WORKSPACE_API_UNIT} has 8 model call(s)`)), problems.join('\n'));
+    assert.ok(problems.some((p) => p.includes(`${WORKSPACE_API_UNIT} has 7 model call(s)`)), problems.join('\n'));
   });
 
   test('a job with no group or an empty description fails', () => {
@@ -512,8 +511,8 @@ describe('LIN-3852: every LLM use is a registered job', () => {
   });
 
   // LIN-3870 hole 2: an unresolved callMeta in the workspace-API unit is excused only when its
-  // options come from the named builder. The unit is rebuilt as one synthetic file of seven sites
-  // and one builder, so the count stays at the real tree's 7 and only the site under test changes.
+  // options come from the named builder. The unit is rebuilt as one synthetic file of six sites
+  // and one builder, so the count stays at the real tree's 6 and only the site under test changes.
   // The three shapes the unit uses to reach the builder are the direct call, a bound identifier,
   // and a spread of a same-file function that returns the builder's call in its argument list.
   const UNIT_FIXTURE = 'routes/workspace-api-fixture.js';
@@ -527,7 +526,6 @@ describe('LIN-3852: every LLM use is a registered job', () => {
     '  await streamChat([], bound, () => {});',
     '  await getRecommendation(...await modelCallArgs(w));',
     `  await streamChat(${fourthHead}, ${fourth}, () => {});`,
-    "  await streamChat([], { callMeta: { urlKey: w.urlKey, feature: 'roadmap-chat' } }, () => {});",
     "  await streamChat([], { callMeta: { urlKey: w.urlKey, feature: 'roadmap-chat' } }, () => {});",
     '}',
     '',
