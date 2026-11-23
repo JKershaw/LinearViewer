@@ -4,23 +4,22 @@
  * click opens a task once; its opened task mounts once), and the reader's fold state survives (a collapsed desk section
  * stays collapsed; the persisted expanded rows open as on a reload). Reads are counted from the page's own Home requests.
  *
- * The refresh is `window.refreshWaitingOnYou()`, which runs the Waiting merge and then the placement check. Seeding mirrors
- * tests/e2e/lin-4242-waiting-live.spec.js.
+ * The refresh is `window.refreshWaitingOnYou()`, which runs the Waiting merge and then the placement check. What waits is an
+ * open question record the task's run asked the person (LIN-4538: what Home reads), seeded through
+ * tests/fixtures/question-records.js.
  */
 import { test, expect } from '../fixtures/test-base.js';
 import { localSeedId } from '../fixtures/local-harness.js';
+import { askingRun, seedQuestion } from '../fixtures/question-records.js';
 
 const OLD = '2020-01-01T00:00:00Z';
 const SECTION = '[data-testid="waiting-on-you"]';
-const WAIT_CARD = `${SECTION} .waiting-card`;
+const WAIT_CARD = `${SECTION} .waiting-question`;
 const RUNNING = '[data-testid="running-section"]';
 const UP_NEXT = '[data-testid="home-up-next-section"]';
 const COUNT = '[data-testid="in-progress-count"]';
 const LIVE = '[data-testid="home-desk-live"]';
-const THREE_OPTIONS = {
-  options: [{ id: 'ship', label: 'Ship it now' }, { id: 'wait', label: 'Wait for review' }, { id: 'split', label: 'Split the change' }],
-  recommended: 'wait',
-};
+const THREE_OPTIONS = { options: ['Ship it now', 'Wait for review', 'Split the change'], recommended: 'Wait for review' };
 
 let URL_KEY;
 let RUNNER_TOKEN = null;
@@ -36,6 +35,7 @@ test.beforeEach(async ({ page, localWorkerUrlKey }) => {
   await page.request.get(`/test/clear-dispatch-history?urlKey=${URL_KEY}`);
   await page.request.get(`/test/clear-sessions-feed-cache?urlKey=${URL_KEY}`);
   await page.request.get(`/test/clear-task-decisions?urlKey=${URL_KEY}`);
+  await page.request.get(`/test/clear-ticket-records?urlKey=${URL_KEY}`);
 });
 
 /** Two started tasks (Running) and two Todo tasks (Up next), nothing waiting. */
@@ -62,22 +62,11 @@ async function seedDesk(page) {
   return { idOf: id };
 }
 
-async function seedRuling(page, identifier, decision) {
+/** A run on `identifier` parked on `[blocked]`, and the open question it asked the person (a question record). */
+async function seedQuestionOn(page, identifier, { options, recommended }) {
   if (!RUNNER_TOKEN) RUNNER_TOKEN = (await (await page.request.get(`/test/create-dispatch-token?label=runner&urlKey=${URL_KEY}`)).json()).token;
-  const token = RUNNER_TOKEN;
-  const res = await page.request.post(`/workspace/${URL_KEY}/api/dispatch`, {
-    data: { prompt: 'implementation prompt', promptName: 'implementation', kind: 'implementation', issueIdentifier: identifier, issueTitle: identifier, target: 'cli' },
-  });
-  expect(res.status(), `dispatch seed failed: ${await res.text()}`).toBe(201);
-  const itemId = (await res.json()).item.id;
-  const taken = await page.request.post(`/api/dispatch/take/${itemId}`, { headers: { Authorization: `Bearer ${token}` } });
-  expect(taken.status(), `take failed: ${await taken.text()}`).toBe(200);
-  const feedback = (data) => page.request.post(`/api/dispatch/feedback/${itemId}`, {
-    headers: { Authorization: `Bearer ${token}`, 'Content-Type': 'application/json' }, data,
-  });
-  expect((await feedback({ message: '[blocked] which way?' })).status()).toBe(200);
-  const res2 = await feedback({ kind: 'decision', message: JSON.stringify({ decision_id: `d-${identifier}`, question: `Which for ${identifier}?`, ...decision }) });
-  expect(res2.status(), `decision failed: ${await res2.text()}`).toBe(200);
+  const runId = await askingRun(page, URL_KEY, identifier, { token: RUNNER_TOKEN });
+  return seedQuestion(page, URL_KEY, { ticket: identifier, runId, asks: `Which for ${identifier}?`, options, recommended });
 }
 
 const refresh = (page) => page.evaluate(() => window.refreshWaitingOnYou());
@@ -98,12 +87,15 @@ const waitingCard = (page, identifier) => page.locator(WAIT_CARD, {
 async function answerElsewhere(context, identifier) {
   const elsewhere = await context.newPage();
   await elsewhere.goto(`/workspace/${URL_KEY}/`);
-  await waitingCard(elsewhere, identifier).locator('[data-option-id="ship"]').click();
-  await expect(waitingCard(elsewhere, identifier)).toHaveCount(0, { timeout: 15000 });
+  // The question record card: an option chosen, then Answer sends it (lib/question-record-card.js). The card stays, settled.
+  const card = waitingCard(elsewhere, identifier).locator('[data-testid="question-record-card"]');
+  await card.locator('[data-option-id="Ship it now"]').click();
+  await card.locator('[data-testid="question-record-card-answer"]').click();
+  await expect(card).toHaveAttribute('data-settled', 'true', { timeout: 15000 });
   await elsewhere.close();
 }
 
-test('a ruling on a Running task moves it to Waiting only, with one Home read; answered elsewhere, it comes back', async ({ page, context }) => {
+test('a question on a Running task moves it to Waiting only, with one Home read; answered elsewhere, it comes back', async ({ page, context }) => {
   await seedDesk(page);
   await page.goto(`/workspace/${URL_KEY}/`);
   const docReads = homeDocReads(page, URL_KEY);
@@ -111,7 +103,7 @@ test('a ruling on a Running task moves it to Waiting only, with one Home read; a
   await expect(row(page, RUNNING, 'LOCAL-B')).toHaveCount(1);
   const countBefore = await page.locator(COUNT).textContent();
 
-  await seedRuling(page, 'LOCAL-A', THREE_OPTIONS);
+  await seedQuestionOn(page, 'LOCAL-A', THREE_OPTIONS);
   await refresh(page);
   // Waiting only: the card is in Waiting and the row has left Running (the 4117 reachability property, on the live page).
   await expect(waitingCard(page, 'LOCAL-A')).toHaveCount(1);
@@ -142,7 +134,7 @@ test('an opened task defers the swap and says so; closing it lets the next tick 
   await row(page, UP_NEXT, 'LOCAL-T').click();
   await expect(page.locator(`${UP_NEXT} .details:not(.hidden) [data-prompt-mount][data-mounted="true"]`)).toHaveCount(1, { timeout: 15000 });
 
-  await seedRuling(page, 'LOCAL-A', THREE_OPTIONS);
+  await seedQuestionOn(page, 'LOCAL-A', THREE_OPTIONS);
   await refresh(page);
   await expect(waitingCard(page, 'LOCAL-A')).toHaveCount(1);
   // Deferred: nothing swapped, nothing read, and the live region says so.
@@ -188,7 +180,7 @@ test('after a swap rows are bound once, the opened task mounts once, and fold st
   });
   expect(tangoKey).toBeTruthy();
 
-  await seedRuling(page, 'LOCAL-A', THREE_OPTIONS);
+  await seedQuestionOn(page, 'LOCAL-A', THREE_OPTIONS);
   await refresh(page);
   await expect(row(page, RUNNING, 'LOCAL-A')).toHaveCount(0);
   await expect(row(page, RUNNING, 'LOCAL-B')).toHaveCount(1);

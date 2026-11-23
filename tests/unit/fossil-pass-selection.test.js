@@ -745,7 +745,7 @@ describe('fossil pass — answered-decision guard (LIN-2991 §2, plan-review 18a
   // per A2/A3), which would let this old, still-`[blocked]` row become
   // eligible for a `--execute` bookkeeping stamp — a real widening of an
   // operator write script's selection set.
-  test('an old, [blocked] row whose decision is answered on its own feedback (no follow-up) is resolved, not eligible', () => {
+  test('an old, [blocked] row is resolved, not eligible, once its lineage\'s question has settled; its own answer stamp alone no longer discharges it (LIN-4538)', () => {
     const rows = [
       historyItem({
         id: 'h-ans-fossil', issueIdentifier: 'LIN-994', dispatchedAt: daysAgo(20), resolvedAt: daysAgo(20),
@@ -761,12 +761,16 @@ describe('fossil pass — answered-decision guard (LIN-2991 §2, plan-review 18a
     ];
     const loops = build({ historyItems: rows });
     const superseded = computeSupersededLoopIds(loops);
-    const lane = classifyLoop(loops[0], { superseded, now: NOW_MS, staleMs: DEFAULT_LANE_STALE_MS });
-    assert.equal(lane, 'resolved', 'answered on its own feedback, no follow-up — resolved via the own-loop fallback (no answeredByLineage map passed)');
+    const standing = new Map([[loops[0].lineageId ?? loops[0].loopId, 'settled']]);
+    assert.equal(
+      classifyLoop(loops[0], { superseded, now: NOW_MS, staleMs: DEFAULT_LANE_STALE_MS }), 'blocked',
+      'the answer stamp on the row\'s own feedback no longer discharges it: the question record does'
+    );
+    assert.equal(classifyLoop(loops[0], { superseded, now: NOW_MS, staleMs: DEFAULT_LANE_STALE_MS, questionStanding: standing }), 'resolved');
 
-    const result = select(loops);
+    const result = selectFossilRows({ loops, now: NOW_MS, questionStanding: standing });
     assert.deepEqual(result.eligible, [], 'a resolved row is not silent-or-blocked, so it must never reach eligible');
-    assert.equal(reasonFor(loops, 'h-ans-fossil'), 'not-silent-or-blocked');
+    assert.equal(result.skipped.find((s) => s.loopId === 'h-ans-fossil')?.reason, 'not-silent-or-blocked');
   });
 });
 
@@ -781,7 +785,7 @@ describe('fossil pass — withdrawn-decision guard (LIN-2891/LIN-3036 Surface 6 
   // `not-silent-or-blocked` and never eligible for a stamp. Dropping
   // `|| isDecisionWithdrawn(loop)` from `classifyLoop` (mutation M10) leaves the
   // row `blocked` here, so it falls through the lane gate into `eligible`.
-  test('an old, [blocked] row whose decision is WITHDRAWN on its own feedback (no follow-up) is resolved, not eligible', () => {
+  test('an old, [blocked] row is resolved, not eligible, once its lineage\'s question has settled; a withdrawal stamp alone no longer discharges it (LIN-4538)', () => {
     const rows = [
       historyItem({
         id: 'h-withdrawn-fossil', issueIdentifier: 'LIN-995', dispatchedAt: daysAgo(20), resolvedAt: daysAgo(20),
@@ -799,11 +803,15 @@ describe('fossil pass — withdrawn-decision guard (LIN-2891/LIN-3036 Surface 6 
     assert.equal(loops[0].wakeMarker, 'blocked', 'sanity: the blocked marker is really present');
     assert.equal(loops[0].withdrawal?.decisionId, 'h-wd', 'sanity: the withdrawal derives onto the loop');
     const superseded = computeSupersededLoopIds(loops);
-    const lane = classifyLoop(loops[0], { superseded, now: NOW_MS, staleMs: DEFAULT_LANE_STALE_MS });
-    assert.equal(lane, 'resolved', 'withdrawn on its own feedback, no follow-up — resolved via the item-scoped withdrawal read (no answeredByLineage map passed)');
+    const standing = new Map([[loops[0].lineageId ?? loops[0].loopId, 'settled']]);
+    assert.equal(
+      classifyLoop(loops[0], { superseded, now: NOW_MS, staleMs: DEFAULT_LANE_STALE_MS }), 'blocked',
+      'a withdrawal on the row\'s own feedback no longer discharges it: the question record does (LIN-4538)'
+    );
+    assert.equal(classifyLoop(loops[0], { superseded, now: NOW_MS, staleMs: DEFAULT_LANE_STALE_MS, questionStanding: standing }), 'resolved');
 
-    const result = select(loops);
+    const result = selectFossilRows({ loops, now: NOW_MS, questionStanding: standing });
     assert.deepEqual(result.eligible, [], 'a resolved row is not silent-or-blocked, so it must never reach eligible (never stamped)');
-    assert.equal(reasonFor(loops, 'h-withdrawn-fossil'), 'not-silent-or-blocked');
+    assert.equal(result.skipped.find((s) => s.loopId === 'h-withdrawn-fossil')?.reason, 'not-silent-or-blocked');
   });
 });

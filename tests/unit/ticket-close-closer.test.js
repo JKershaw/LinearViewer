@@ -13,12 +13,16 @@ import { join } from 'node:path';
 import { MangoClient } from '@jkershaw/mangodb';
 import { DispatchQueueStore } from '../../lib/dispatch-store.js';
 import { AgentStatusStore } from '../../lib/agent-status-store.js';
-import { TaskDecisionsStore } from '../../lib/task-decisions-store.js';
 import { getLoopsForWorkspace } from '../../lib/pipeline-loops.js';
 import { TICKET_CLOSED_GRACE_MS } from '../../lib/lineage-closure.js';
+import { RecordsStore, RECORDS_COLLECTION, REFS_COLLECTION, QUERY_LOG_COLLECTION } from '../../lib/records-store.js';
+import { createRecordWrites } from '../../lib/records/writes.js';
+import { isTerminalState } from '../../lib/providers/state-map.js';
+import { questionFacts } from '../../lib/records/question-facts.js';
+import { questionStandingOf } from '../../lib/records/question-standing.js';
 import {
-  reversalState, isSettledForCloser, closerCandidates, prepareCloserCandidates, selectTicketCloseWork,
-  closeTicketRows, ticketFromWrite, createOnTicketWrite, ticketClosedBasisHash, LEGACY_VERIFY_CAP
+  reversalState, closerCandidates, prepareCloserCandidates, selectTicketCloseWork,
+  closeTicketRows, ticketFromWrite, createOnTicketWrite, LEGACY_VERIFY_CAP
 } from '../../lib/ticket-close-closer.js';
 
 const URL_KEY = 'acme';
@@ -26,9 +30,11 @@ const ISSUE_UUID = '11111111-2222-3333-4444-555555555555';
 const OTHER_UUID = '99999999-2222-3333-4444-555555555555';
 const mins = (m) => new Date(Date.now() - m * 60000);
 const done = { issueId: 'iid-1', identifier: 'LIN-1', stateType: 'completed' };
+const ACCOUNT = 'acct-owner';
+const PEOPLE = [{ accountId: ACCOUNT, name: 'Owner' }];
 
 describe('ticket-close-closer (LIN-3366)', () => {
-  let dbDir, client, store, history, agentStatusStore, tdCollection, tdStore, counter = 0, logs, infos;
+  let dbDir, client, store, history, agentStatusStore, records, writes, counter = 0, logs;
   before(async () => {
     dbDir = mkdtempSync(join(tmpdir(), 'ticket-closer-'));
     client = new MangoClient(dbDir);
@@ -38,19 +44,31 @@ describe('ticket-close-closer (LIN-3366)', () => {
     if (client?.close) await client.close();
     if (dbDir) rmSync(dbDir, { recursive: true, force: true });
   });
-  beforeEach(() => {
+  beforeEach(async () => {
     const db = client.db(`tc_${counter++}`);
     history = db.collection('dispatch-history');
     store = new DispatchQueueStore({ collection: db.collection('dispatch-queue'), historyCollection: history });
     store._notifyWriteForDoc = () => {};
     agentStatusStore = new AgentStatusStore({ collection: db.collection('status') });
-    tdCollection = db.collection('task-decisions');
-    tdStore = new TaskDecisionsStore({ collection: tdCollection });
-    logs = []; infos = [];
+    await db.collection(RECORDS_COLLECTION).createIndex({ urlKey: 1, id: 1, v: 1 }, { unique: true });
+    records = new RecordsStore({ records: db.collection(RECORDS_COLLECTION), refs: db.collection(REFS_COLLECTION), queryLog: db.collection(QUERY_LOG_COLLECTION) });
+    writes = createRecordWrites({ recordsStore: records, isTerminalState, readTicket: null, askedText: () => '', stageKinds: ['implementation'], listPeople: async () => PEOPLE });
+    logs = [];
   });
 
+  /** An open question on a ticket's task, asked by no run (as a stage's question is filed). */
+  async function askOn(task, asks = 'Which way?', run = null) {
+    const made = await records.ensureTask(URL_KEY, { identifier: task, title: task }, { by: 'implementation' });
+    assert.ok(made.id, `task refused: ${JSON.stringify(made)}`);
+    const snap = await writes.add({
+      urlKey: URL_KEY, kind: 'question', by: 'implementation', run,
+      input: { asks, options: ['left', 'right'], recommended: 'left', 'if-unanswered': 'pick left', to: `person:${ACCOUNT}`, in: task },
+    });
+    assert.ok(snap.record, `question refused: ${JSON.stringify(snap.problems)}`);
+    return snap.record.id;
+  }
+
   const log = (m) => logs.push(m);
-  const info = (m) => infos.push(m);
 
   // A blocked history row with a decision; quiet for `quietMin` minutes.
   const seedBlocked = (id, { identifier = 'LIN-1', issueId = 'iid-1', decisionId = `dec-${id}`, quietMin = 120, dispatchedAgoMin = quietMin + 20, extra = [], decision = true } = {}) => history.insertOne({
@@ -65,15 +83,15 @@ describe('ticket-close-closer (LIN-3366)', () => {
   const loopsOf = () => getLoopsForWorkspace(URL_KEY, { lean: true, dispatchStore: store, agentStatusStore });
   const prep = async (o = {}) => {
     const loops = o.loops || await loopsOf();
-    return prepareCloserCandidates({ loops, taskDecisions: o.taskDecisions || [], newestScanByTask: o.newestScanByTask || {}, now: Date.now(), dispatchStore: store, log, ...o.extra });
+    return prepareCloserCandidates({ loops, questionStanding: o.questionStanding || new Map(), now: Date.now(), dispatchStore: store, log, ...o.extra });
   };
   const close = (o = {}) => closeTicketRows({
-    urlKey: URL_KEY, ticket: done, dispatchStore: store, taskDecisionsStore: tdStore, agentStatusStore, log, info, ...o
+    urlKey: URL_KEY, ticket: done, dispatchStore: store, recordsStore: records, agentStatusStore, log, ...o
   });
   const row = (id) => history.findOne({ _id: id });
   const reverse = (id, decisionId) => store.markDecisionWithdrawalReversed(id, URL_KEY, decisionId);
 
-  describe('reversalState / isSettledForCloser (three states)', () => {
+  describe('reversalState (three states)', () => {
     const cells = [
       ['no digest => loop has no decision', { decision: null, withdrawalReversed: false }, 'clear'],
       ['key true', { decision: { decision_id: 'd' }, withdrawalReversed: true }, 'reversed'],
@@ -83,23 +101,12 @@ describe('ticket-close-closer (LIN-3366)', () => {
       ['key true + no decision', { decision: null, withdrawalReversed: true }, 'clear']
     ];
     for (const [name, loop, want] of cells) test(name, () => assert.equal(reversalState(loop), want));
-    test('a scan row carrying ticketClosedAt is settled; a reversed loop is settled; a clear one is not', () => {
-      assert.equal(isSettledForCloser({ ticketClosedAt: '2026-10-01T00:00:00Z' }), true);
-      assert.equal(isSettledForCloser({ decision: { decision_id: 'd' }, withdrawalReversed: true }), true);
-      assert.equal(isSettledForCloser({ decision: { decision_id: 'd' }, withdrawalReversed: false }), false);
-      assert.equal(isSettledForCloser({ ticketClosedAt: null }), false);
-    });
   });
 
   describe('the digest fact feeds the loop (lean read)', () => {
-    test('a freshly digested row reads false; a reversed current decision reads true', async () => {
+    test('a freshly digested row reads false', async () => {
       await seedBlocked('a');
-      await seedBlocked('b');
       assert.equal((await loopsOf()).find(l => l.loopId === 'a').withdrawalReversed, false);
-      await store.markDecisionWithdrawn('b', URL_KEY, 'dec-b', 'ticket-closed: LIN-1 reached completed');
-      await reverse('b', 'dec-b');
-      const loops = await loopsOf();
-      assert.equal(loops.find(l => l.loopId === 'b').withdrawalReversed, true);
     });
     test('a legacy digest with the key deleted reads undefined, NOT false', async () => {
       await seedBlocked('a');
@@ -143,33 +150,73 @@ describe('ticket-close-closer (LIN-3366)', () => {
     });
   });
 
+  describe('questions decide a blocked row\'s lane (LIN-4538)', () => {
+    test('a blocked row whose run asked a question that was answered is resolved: not a candidate, not closed', async () => {
+      await seedBlocked('a');
+      const q = await askOn('LIN-1', 'Which way?', 'a');
+      await records.end(URL_KEY, q, { state: 'answered', reason: 'answered by dec-x' }, { by: `person:${ACCOUNT}` });
+      const standing = await questionStandingOf(records, URL_KEY);
+      const c = await prep({ questionStanding: standing });
+      assert.deepEqual(c.rows, []);
+      const r = await close({ candidates: c });
+      assert.equal(r.closedRows, 0);
+      assert.equal((await row('a')).bookkeeping, null);
+    });
+    test('a blocked row whose run has an OPEN question stays blocked: it is a candidate, and the question ends with its ticket', async () => {
+      await seedBlocked('a');
+      const q = await askOn('LIN-1', 'Which way?', 'a');
+      const standing = await questionStandingOf(records, URL_KEY);
+      const c = await prep({ questionStanding: standing });
+      assert.deepEqual(c.rows.map(x => x.loopId), ['a']);
+      const r = await close({ candidates: c });
+      assert.equal(r.closedRows, 1);
+      assert.equal(r.withdrawn, 1);
+      const facts = (await questionFacts(records, URL_KEY)).find(f => f.questionId === q);
+      assert.equal(facts.outcome, 'self-resolved');
+    });
+  });
+
   describe('closeTicketRows', () => {
-    test('a Done ticket: rows closed, decision withdrawn with the ticket-closed reason, digest fresh, cache cleared once', async () => {
+    test('a Done ticket: rows closed, the open question on it ends "ticket closed" by Harbour, cache cleared once', async () => {
       await seedBlocked('a');
       await seedBlocked('b', { identifier: 'LIN-1' });
+      const q = await askOn('LIN-1');
       let cleared = 0;
       const r = await close({ sessionsFeedCache: { clear: (k) => { assert.equal(k, URL_KEY); cleared += 1; } } });
       assert.equal(r.closedRows, 2);
-      assert.equal(r.withdrawn, 2);
+      assert.equal(r.withdrawn, 1, 'one question ended');
       assert.equal(r.failures, 0);
       assert.equal(cleared, 1);
       const a = await row('a');
       assert.equal(a.bookkeeping.reason, 'ticket-closed');
       assert.equal(a.bookkeeping.by, 'ticket-closer');
-      const w = a.feedback.find(f => f.kind === 'decision-withdrawn');
-      assert.match(JSON.parse(w.message).reason, /^ticket-closed: LIN-1 reached completed$/);
-      assert.equal(a.feedbackDigest.version, a.feedbackVersion, 'digest is fresh');
-      assert.equal(a.feedbackDigest.withdrawal.decisionId, 'dec-a');
+      assert.ok(!a.feedback.some(f => f.kind === 'decision-withdrawn'), 'no decision is withdrawn on the old path');
+      const facts = (await questionFacts(records, URL_KEY)).find(f => f.questionId === q);
+      assert.equal(facts.state, 'withdrawn');
+      assert.equal(facts.reason, 'ticket closed');
+      assert.equal(facts.endedBy, 'harbour');
+      assert.equal(facts.outcome, 'self-resolved');
     });
-    test('ORDER WITNESS: the row is closed even though the withdrawal appends fresh feedback (close first, then withdraw)', async () => {
+    test('ORDER WITNESS: the row is closed even though the question end follows (close first, then end)', async () => {
       await seedBlocked('a');
+      await askOn('LIN-1');
       const order = [];
       const spy = Object.create(store);
       spy.closeIssueRows = async (...a) => { order.push('close'); return store.closeIssueRows(...a); };
-      spy.markDecisionWithdrawn = async (...a) => { order.push('withdraw'); return store.markDecisionWithdrawn(...a); };
-      const r = await close({ dispatchStore: spy });
-      assert.deepEqual(order, ['close', 'withdraw']);
+      // A forwarding proxy, not Object.create: RecordsStore keeps private fields, which a prototype-derived spy cannot read.
+      // Every method reaches the real store bound to it; only `end` (the store write the checked writes.end makes) is observed.
+      const spyRecords = new Proxy(records, {
+        get(target, prop) {
+          if (prop === 'end') return async (...a) => { order.push('end'); return target.end(...a); };
+          const v = target[prop];
+          return typeof v === 'function' ? v.bind(target) : v;
+        },
+      });
+      const candidates = await prep(); // read with the real store; the spy only observes the writes
+      const r = await close({ dispatchStore: spy, recordsStore: spyRecords, candidates });
+      assert.deepEqual(order, ['close', 'end']);
       assert.equal(r.closedRows, 1);
+      assert.equal(r.withdrawn, 1);
       assert.ok((await row('a')).bookkeeping);
     });
     test('ids and quietSince reach closeIssueRows', async () => {
@@ -213,7 +260,6 @@ describe('ticket-close-closer (LIN-3366)', () => {
       await seedBlocked('mine', { quietMin: 1, dispatchedAgoMin: 2 });
       const c = await prep();
       assert.deepEqual(c.rows, [], 'not even selected');
-      assert.deepEqual(c.loopDecisions, []);
       assert.equal((await close()).closedRows, 0);
     });
   });
@@ -222,7 +268,8 @@ describe('ticket-close-closer (LIN-3366)', () => {
     test('a reversed withdrawal is not selected, its carrier row stays open, and two runs log zero failures', async () => {
       await seedBlocked('a', { decisionId: 'dec-a' });
       await seedBlocked('b');
-      await close(); // closes both and withdraws both
+      await store.markDecisionWithdrawn('a', URL_KEY, 'dec-a', 'ticket-closed: LIN-1 reached completed');
+      await close(); // closes both rows
       await reverse('a', 'dec-a');
       // Human re-opens the ruling: un-retire the carrier row too (as the dashboard does by deleting bookkeeping).
       await history.updateOne({ _id: 'a' }, { $set: { bookkeeping: null } });
@@ -236,7 +283,6 @@ describe('ticket-close-closer (LIN-3366)', () => {
       const c = await prep();
       assert.ok(c.settled.some(s => s.loopId === 'a'));
       assert.ok(!c.rows.some(r => r.loopId === 'a'));
-      assert.ok(!c.loopDecisions.some(d => d.loopId === 'a'));
     });
     test('a newer decision (new id) on the row makes it eligible again', async () => {
       await seedBlocked('a', { decisionId: 'dec-a' });
@@ -246,14 +292,6 @@ describe('ticket-close-closer (LIN-3366)', () => {
       await history.updateOne({ _id: 'a' }, { $inc: { feedbackVersion: 1 } });
       const c = await prep();
       assert.ok(c.rows.some(r => r.loopId === 'a'));
-    });
-    test('collectUnansweredDecisions still lists a reversed ruling as open for the human (consumers unchanged)', async () => {
-      await seedBlocked('a', { decisionId: 'dec-a' });
-      await store.markDecisionWithdrawn('a', URL_KEY, 'dec-a', 'ticket-closed: x');
-      await reverse('a', 'dec-a');
-      const { collectUnansweredDecisions } = await import('../../lib/unanswered-decisions.js');
-      const open = collectUnansweredDecisions({ loops: await loopsOf() }, { now: new Date() });
-      assert.equal(open.length, 1);
     });
   });
 
@@ -294,7 +332,7 @@ describe('ticket-close-closer (LIN-3366)', () => {
       await stripKey('a');
       const r = await close();
       assert.equal(r.closedRows, 1);
-      assert.equal(r.withdrawn, 1);
+      assert.equal(r.withdrawn, 0, 'no question on it');
       assert.equal((await row('a')).feedbackDigest.withdrawalReversed, false);
     });
     test('a raw re-read that throws closes nothing for the unknown loops and logs verify failure; other loops still close', async () => {
@@ -304,7 +342,7 @@ describe('ticket-close-closer (LIN-3366)', () => {
       await stripKey('legacy');
       const loops = await loopsOf();
       const r = await closeTicketRows({
-        urlKey: URL_KEY, ticket: done, dispatchStore: store, taskDecisionsStore: tdStore, log, info,
+        urlKey: URL_KEY, ticket: done, dispatchStore: store, log,
         getLoops: async () => loops, redigest: async () => { throw new Error('mongo down'); }
       });
       assert.ok(logs.some(l => /\[ticket-closer\] verify failure/.test(l)));
@@ -335,167 +373,16 @@ describe('ticket-close-closer (LIN-3366)', () => {
       assert.equal(JSON.stringify(await row('a')), before);
       assert.ok(c.settled.some(s => s.loopId === 'a'));
     });
-    test('unverified covers a decision/content-loop-eligible unknown that is NOT row-eligible ([done]-stamped content loop)', async () => {
-      await seedBlocked('a', { extra: [{ message: '[done] finished', timestamp: mins(100) }] });
-      await loopsOf();
-      await stripKey('a');
-      const loops = await loopsOf();
-      const c = closerCandidates({ loops, now: Date.now() });
-      assert.deepEqual(c.rows, [], 'terminal row is not row-eligible');
-      // the decision is still open (nothing answered it) and its content loop is unknown => held out and listed
-      assert.deepEqual(c.unverified, ['a']);
-      // resolved from raw it becomes an eligible loop decision on a [done] content loop
-      const p = await prep({ loops });
-      assert.deepEqual(p.unverified, []);
-      assert.deepEqual(p.loopDecisions.map(d => d.loopId), ['a']);
-    });
     test('LEGACY_VERIFY_CAP bounds the batch', () => {
       assert.equal(LEGACY_VERIFY_CAP, 200);
     });
   });
 
-  describe('legacy key-less digest on a terminal / bookkeeping-stamped content loop (FC call item 2)', () => {
-    const stripKey = async (id) => {
-      const doc = await row(id);
-      delete doc.feedbackDigest.withdrawalReversed;
-      await history.replaceOne({ _id: id }, doc);
-    };
-    // variant: a content loop that raised a decision and then posted [done], or one already bookkeeping-stamped
-    const variants = [
-      ['[done]', () => seedBlocked('a', { extra: [{ message: '[done] finished', timestamp: mins(100) }] })],
-      ['bookkeeping-stamped', async () => { await seedBlocked('a'); await history.updateOne({ _id: 'a' }, { $set: { bookkeeping: { reason: 'handed-on', by: 'lineage-closer', at: mins(90) } } }); }]
-    ];
-    for (const [name, seedIt] of variants) {
-      const reverseIt = async () => { await store.markDecisionWithdrawn('a', URL_KEY, 'dec-a', 'ticket-closed: x'); await reverse('a', 'dec-a'); };
-      test(`${name}, no reversal: the decision is verified and withdrawn in the same run; the row is not stamped (existing bookkeeping unchanged)`, async () => {
-        await seedIt();
-        await loopsOf();
-        await stripKey('a');
-        const before = (await row('a')).bookkeeping;
-        const r = await close();
-        assert.equal(r.withdrawn, 1);
-        assert.equal(r.closedRows, 0);
-        assert.equal(r.failures, 0);
-        const after = await row('a');
-        assert.deepEqual(after.bookkeeping, before, 'row bookkeeping untouched');
-        assert.notEqual(after.bookkeeping?.reason, 'ticket-closed');
-        assert.ok(after.feedback.some(f => f.kind === 'decision-withdrawn'));
-        assert.equal(after.feedbackDigest.withdrawalReversed, false);
-        const again = await close();
-        assert.deepEqual([again.closedRows, again.withdrawn, again.failures], [0, 0, 0], 'second run is a no-op');
-      });
-      test(`${name}, reversed: nothing is written, the loop is settled`, async () => {
-        await seedIt();
-        await reverseIt();
-        await stripKey('a');
-        const feedbackBefore = (await row('a')).feedback.length;
-        const calls = [];
-        const spy = Object.create(store);
-        spy.closeIssueRows = async (...a) => { calls.push('close'); return store.closeIssueRows(...a); };
-        spy.markDecisionWithdrawn = async (...a) => { calls.push('withdraw'); return store.markDecisionWithdrawn(...a); };
-        const r = await close({ dispatchStore: spy });
-        assert.deepEqual(calls, []);
-        assert.equal(r.withdrawn, 0);
-        assert.equal((await row('a')).feedback.length, feedbackBefore, 'no feedback append');
-        const c = await prep();
-        assert.ok(c.settled.some(s => s.loopId === 'a'));
-        assert.deepEqual(c.unverified, []);
-      });
-    }
-  });
-
-  describe('write results: refusal vs failure', () => {
-    test('a {refused} withdrawal is counted and logged at info level, never as a failure; null is a failure', async () => {
-      await seedBlocked('a');
-      await seedBlocked('b');
-      const spy = Object.create(store);
-      spy.markDecisionWithdrawn = async (id) => (id === 'a' ? { refused: 'reversed' } : null);
-      const r = await close({ dispatchStore: spy });
-      assert.equal(r.refused, 1);
-      assert.equal(r.failures, 1);
-      assert.equal(logs.filter(l => /failure/.test(l)).length, 1);
-      assert.equal(infos.filter(l => /refused \(reversed\)/.test(l)).length, 1);
-      assert.ok(!logs.some(l => /refused/.test(l)));
-    });
-    test('a throw is a failure and does not stop the other writes', async () => {
-      await seedBlocked('a');
-      await seedBlocked('b');
-      const spy = Object.create(store);
-      spy.markDecisionWithdrawn = async (id) => { if (id === 'a') throw new Error('boom'); return store.markDecisionWithdrawn(id, URL_KEY, 'dec-b', 'ticket-closed: x'); };
-      const r = await close({ dispatchStore: spy });
-      assert.equal(r.failures, 1);
-      assert.equal(r.withdrawn, 1);
-    });
-    test('a closeIssueRows failure is logged and the withdrawals still run', async () => {
-      await seedBlocked('a');
-      const spy = Object.create(store);
-      spy.closeIssueRows = async () => ({ ok: false, closedIds: [] });
-      const r = await close({ dispatchStore: spy });
-      assert.equal(r.failures, 1);
-      assert.equal(r.withdrawn, 1);
-    });
+  describe('write results', () => {
     test('a null feed cache is a no-op', async () => {
       await seedBlocked('a');
       const r = await close({ sessionsFeedCache: null });
       assert.equal(r.failures, 0);
-    });
-  });
-
-  describe('scan decisions', () => {
-    const scanDoc = (id, o = {}) => ({
-      _id: id, urlKey: URL_KEY, issueId: ISSUE_UUID, issueIdentifier: 'LIN-1', inputHash: 'h', basisHash: null,
-      decision: { decision_id: `d-${id}`, question: 'q', options: [] }, scannedAt: new Date(Date.now() - 3600000), outcome: null, ...o
-    });
-    const withScans = async () => ({ taskDecisions: await tdStore.listUnansweredForWorkspaces([URL_KEY]), newestScanByTask: await tdStore.listNewestScanPerTask([URL_KEY]) });
-    const ticket = { issueId: ISSUE_UUID, identifier: 'LIN-1', stateType: 'completed' };
-
-    test('stamped self-resolved with the exact basis hash and ticketClosedAt; a non-null record is asserted', async () => {
-      await tdCollection.insertOne(scanDoc('s1'));
-      const c = await prep(await withScans());
-      const r = await close({ ticket, candidates: c });
-      assert.equal(r.resolved, 1);
-      const rec = await tdCollection.findOne({ _id: 's1' });
-      assert.equal(rec.outcome, 'self-resolved');
-      assert.equal(rec.outcomeBasisHash, ticketClosedBasisHash(ISSUE_UUID, 'completed'));
-      assert.ok(rec.ticketClosedAt);
-      assert.match(rec.outcomeReason, /^Ticket LIN-1 reached completed on \d{4}-\d{2}-\d{2}$/);
-    });
-    test('a scan row with a mismatched issueId is not selected, markOutcome is not called, and it is counted', async () => {
-      await tdCollection.insertOne(scanDoc('s1', { issueId: OTHER_UUID }));
-      let called = 0;
-      const spy = Object.create(tdStore);
-      spy.markOutcome = async () => { called += 1; return null; };
-      const c = await prep(await withScans());
-      const r = await close({ ticket, candidates: c, taskDecisionsStore: spy });
-      assert.equal(called, 0);
-      assert.equal(r.skipped.issueIdMismatch, 1);
-      assert.equal(r.failures, 0);
-    });
-    test('a scan row un-retired by reverseOutcome keeps ticketClosedAt, is settled, and is not re-resolved', async () => {
-      await tdCollection.insertOne(scanDoc('s1'));
-      await close({ ticket, candidates: await prep(await withScans()) });
-      await tdStore.reverseOutcome({ urlKey: URL_KEY, issueId: ISSUE_UUID, id: 's1' });
-      const reopened = await tdCollection.findOne({ _id: 's1' });
-      assert.equal(reopened.outcome, null);
-      assert.ok(reopened.ticketClosedAt, 'ticketClosedAt survives reverseOutcome');
-      const c = await prep(await withScans());
-      assert.ok(c.settled.some(s => s.type === 'scanDecision' && s.id === 's1'));
-      assert.deepEqual(c.scanDecisions, []);
-      const r = await close({ ticket, candidates: c });
-      assert.equal(r.resolved, 0);
-      assert.equal(r.failures, 0);
-    });
-    test('a zero-finding scan row is left alone', async () => {
-      await tdCollection.insertOne(scanDoc('s1', { decision: null }));
-      const c = await prep(await withScans());
-      assert.deepEqual(c.scanDecisions, []);
-    });
-    test('a null from markOutcome is a failure', async () => {
-      await tdCollection.insertOne(scanDoc('s1'));
-      const spy = Object.create(tdStore);
-      spy.markOutcome = async () => null;
-      const r = await close({ ticket, candidates: await prep(await withScans()), taskDecisionsStore: spy });
-      assert.equal(r.failures, 1);
     });
   });
 

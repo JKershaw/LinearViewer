@@ -6,22 +6,24 @@
  * are hidden, not removed, when the set is empty. The refresh is `window.refreshWaitingOnYou()`, the same function the
  * rulings tick runs, so the tests need no timed waits: each step waits on the page's own state.
  *
- * The seeding helpers mirror tests/e2e/lin-4114-waiting-on-you.spec.js (a run-raised ruling through the dispatch API).
+ * LIN-4538 (P7a): what waits is an open question record a run asked the person, which is what Home reads now. It is seeded
+ * through tests/fixtures/question-records.js (a run parked on `[blocked]`, then the question it asked). A question card is
+ * answered by choosing an option and pressing Answer, and a card answered on this page stays, settled, out of the count
+ * (LIN-4532, lib/question-record-card.js); a card answered elsewhere leaves on the next refresh.
  */
 import { test, expect } from '../fixtures/test-base.js';
 import { localSeedId } from '../fixtures/local-harness.js';
+import { askingRun, seedQuestion } from '../fixtures/question-records.js';
 
 const OLD = '2020-01-01T00:00:00Z';
 const SECTION = '[data-testid="waiting-on-you"]';
-const CARD = `${SECTION} [data-testid="session-question-card"]`;
-const WAIT_CARD = `${SECTION} .waiting-card`;
+const CARD = `${SECTION} [data-testid="question-record-card"]`;
+const OPEN_CARD = `${CARD}:not([data-settled="true"])`;
+const WAIT_CARD = `${SECTION} .waiting-question`;
 const COUNT = '[data-testid="in-progress-count"]';
 const LIVE = '[data-testid="home-desk-live"]';
 const BADGE = '.rulings-badge .rulings-count';
-const THREE_OPTIONS = {
-  options: [{ id: 'ship', label: 'Ship it now' }, { id: 'wait', label: 'Wait for review' }, { id: 'split', label: 'Split the change' }],
-  recommended: 'wait',
-};
+const THREE_OPTIONS = { options: ['Ship it now', 'Wait for review', 'Split the change'], recommended: 'Wait for review' };
 
 let URL_KEY;
 let RUNNER_TOKEN = null;
@@ -37,6 +39,7 @@ test.beforeEach(async ({ page, localWorkerUrlKey }) => {
   await page.request.get(`/test/clear-dispatch-history?urlKey=${URL_KEY}`);
   await page.request.get(`/test/clear-sessions-feed-cache?urlKey=${URL_KEY}`);
   await page.request.get(`/test/clear-task-decisions?urlKey=${URL_KEY}`);
+  await page.request.get(`/test/clear-ticket-records?urlKey=${URL_KEY}`);
 });
 
 /** A started charter with two Todo tasks under it, and nothing waiting. */
@@ -53,23 +56,17 @@ async function seedTree(page) {
   expect(resp.ok()).toBeTruthy();
 }
 
-/** A worker waiting on a ruling, written through the dispatch API the way a runner writes it (enqueue, take, `[decision]`). */
-async function seedRuling(page, identifier, decision) {
+/** A run on `identifier` parked on `[blocked]`, and the open question it asked the person. Returns the question id. */
+async function seedWaiting(page, identifier, { options, recommended }) {
   if (!RUNNER_TOKEN) RUNNER_TOKEN = (await (await page.request.get(`/test/create-dispatch-token?label=runner&urlKey=${URL_KEY}`)).json()).token;
-  const token = RUNNER_TOKEN;
-  const res = await page.request.post(`/workspace/${URL_KEY}/api/dispatch`, {
-    data: { prompt: 'implementation prompt', promptName: 'implementation', kind: 'implementation', issueIdentifier: identifier, issueTitle: identifier, target: 'cli' },
-  });
-  expect(res.status(), `dispatch seed failed: ${await res.text()}`).toBe(201);
-  const itemId = (await res.json()).item.id;
-  const taken = await page.request.post(`/api/dispatch/take/${itemId}`, { headers: { Authorization: `Bearer ${token}` } });
-  expect(taken.status(), `take failed: ${await taken.text()}`).toBe(200);
-  const feedback = (data) => page.request.post(`/api/dispatch/feedback/${itemId}`, {
-    headers: { Authorization: `Bearer ${token}`, 'Content-Type': 'application/json' }, data,
-  });
-  expect((await feedback({ message: '[blocked] which way?' })).status()).toBe(200);
-  const res2 = await feedback({ kind: 'decision', message: JSON.stringify({ decision_id: `d-${identifier}`, question: `Which for ${identifier}?`, ...decision }) });
-  expect(res2.status(), `decision failed: ${await res2.text()}`).toBe(200);
+  const runId = await askingRun(page, URL_KEY, identifier, { token: RUNNER_TOKEN });
+  return seedQuestion(page, URL_KEY, { ticket: identifier, runId, asks: `Which for ${identifier}?`, options, recommended });
+}
+
+/** Answer one question card as the person does: choose the option, then press Answer (lib/question-record-card.js). */
+async function answerWith(card, option) {
+  await card.locator(`[data-option-id="${option}"]`).click();
+  await card.locator('[data-testid="question-record-card-answer"]').click();
 }
 
 /** Runs one refresh on the page and resolves when it has finished (the function returns its promise). */
@@ -87,15 +84,25 @@ async function syncBadge(page) {
 const waitingCard = (page, identifier) => page.locator(WAIT_CARD, {
   has: page.locator('[data-testid="waiting-task-line"]', { hasText: identifier }),
 });
+const cardOf = (page, identifier) => waitingCard(page, identifier).locator('[data-testid="question-record-card"]');
 
-test('a ruling raised after load gets its card on refresh; the count line and badge agree; answering it hides the section again', async ({ page }) => {
+/** Another tab answers `identifier`'s question; this page's copy stays until it refreshes. */
+async function answerElsewhere(context, identifier, option) {
+  const elsewhere = await context.newPage();
+  await elsewhere.goto(`/workspace/${URL_KEY}/`);
+  await answerWith(cardOf(elsewhere, identifier), option);
+  await expect(cardOf(elsewhere, identifier)).toHaveAttribute('data-settled', 'true', { timeout: 15000 });
+  await elsewhere.close();
+}
+
+test('a question asked after load gets its card on refresh; the count line and badge agree; answering it takes it out of both', async ({ page }) => {
   await seedTree(page);
   await page.goto(`/workspace/${URL_KEY}/`);
-  // Zero rulings: the owner's section is on the page, hidden, and the count line has no waiting part.
+  // Nothing waiting: the owner's section is on the page, hidden, and the count line has no waiting part.
   await expect(page.locator(SECTION)).toBeHidden();
   await expect(page.locator(CARD)).toHaveCount(0);
 
-  await seedRuling(page, 'LOCAL-S', THREE_OPTIONS);
+  await seedWaiting(page, 'LOCAL-S', THREE_OPTIONS);
   await refresh(page);
   // The fragment's task line takes its title from the held task facts (the route's `waitingTitlesOf`), not the dispatch's issueTitle.
   // Witness: force the route's titles off → the line reads the seeded issueTitle `LOCAL-S`.
@@ -106,18 +113,16 @@ test('a ruling raised after load gets its card on refresh; the count line and ba
   await syncBadge(page);
   await expect(page.locator(BADGE)).toHaveText('1');
 
-  // The answer's own feed read (the card leaving starts one) lands before the badge is read again.
-  const feedRead = page.waitForResponse(r => r.url().includes('/api/dashboard/rulings'));
-  await waitingCard(page, 'LOCAL-S').locator('[data-option-id="wait"]').click();
-  await expect(page.locator(CARD)).toHaveCount(0);
-  await feedRead;
-  await expect(page.locator(SECTION)).toBeHidden();
+  // Answered here: the card stays, settled with its outcome, and leaves the count line and the badge.
+  await answerWith(cardOf(page, 'LOCAL-S'), 'Wait for review');
+  await expect(cardOf(page, 'LOCAL-S')).toHaveAttribute('data-settled', 'true');
+  await expect(page.locator(OPEN_CARD)).toHaveCount(0);
   await expect(page.locator(COUNT).filter({ hasText: 'waiting on you' })).toHaveCount(0);
   await syncBadge(page);
   await expect(page.locator(BADGE)).toHaveText('0');
 
-  // One to zero to one: a new ruling lands in the hidden section and the count line, and the section shows again.
-  await seedRuling(page, 'LOCAL-D', THREE_OPTIONS);
+  // One to zero to one: a new question lands in the section and the count line.
+  await seedWaiting(page, 'LOCAL-D', THREE_OPTIONS);
   await refresh(page);
   await expect(waitingCard(page, 'LOCAL-D')).toHaveCount(1);
   await expect(page.locator(SECTION)).toBeVisible();
@@ -126,23 +131,19 @@ test('a ruling raised after load gets its card on refresh; the count line and ba
 
 test('a card answered elsewhere leaves on refresh and says so; a half-typed answer on a card still open survives as the same node', async ({ page, context }) => {
   await seedTree(page);
-  await seedRuling(page, 'LOCAL-S', THREE_OPTIONS);
-  await seedRuling(page, 'LOCAL-D', THREE_OPTIONS);
+  await seedWaiting(page, 'LOCAL-S', THREE_OPTIONS);
+  await seedWaiting(page, 'LOCAL-D', THREE_OPTIONS);
   await page.goto(`/workspace/${URL_KEY}/`);
   await expect(page.locator(COUNT)).toContainText('2 waiting on you');
 
-  const typed = waitingCard(page, 'LOCAL-S').locator('[data-testid="session-question-card-input"]');
+  const typed = cardOf(page, 'LOCAL-S').locator('[data-testid="question-record-card-input"]');
   await typed.fill('half a sentence about the solo task');
   await typed.focus();
   // Mark the kept card's node: a refresh that re-renders it would drop the mark.
-  await waitingCard(page, 'LOCAL-S').locator('[data-testid="session-question-card"]').evaluate(el => { el.dataset.keepMark = 'yes'; });
+  await cardOf(page, 'LOCAL-S').evaluate(el => { el.dataset.keepMark = 'yes'; });
 
   // The other tab answers LOCAL-D. This page's copy is still there until it refreshes.
-  const elsewhere = await context.newPage();
-  await elsewhere.goto(`/workspace/${URL_KEY}/`);
-  await waitingCard(elsewhere, 'LOCAL-D').locator('[data-option-id="split"]').click();
-  await expect(waitingCard(elsewhere, 'LOCAL-D')).toHaveCount(0, { timeout: 15000 });
-  await elsewhere.close();
+  await answerElsewhere(context, 'LOCAL-D', 'Split the change');
 
   await refresh(page);
   await expect(waitingCard(page, 'LOCAL-D')).toHaveCount(0);
@@ -153,29 +154,29 @@ test('a card answered elsewhere leaves on refresh and says so; a half-typed answ
   await expect(page.locator(`${SECTION} [data-keep-mark="yes"]`)).toHaveCount(1);
 });
 
-test('a stale card that answers a settled ruling is refused and its card goes with "Answered elsewhere"', async ({ page, context }) => {
+test('a stale card that answers a settled question is refused, says so, and leaves with "Answered elsewhere" on the next refresh', async ({ page, context }) => {
   await seedTree(page);
-  await seedRuling(page, 'LOCAL-S', THREE_OPTIONS);
+  await seedWaiting(page, 'LOCAL-S', THREE_OPTIONS);
   await page.goto(`/workspace/${URL_KEY}/`);
   await expect(waitingCard(page, 'LOCAL-S')).toHaveCount(1);
 
-  const elsewhere = await context.newPage();
-  await elsewhere.goto(`/workspace/${URL_KEY}/`);
-  await waitingCard(elsewhere, 'LOCAL-S').locator('[data-option-id="ship"]').click();
-  await expect(waitingCard(elsewhere, 'LOCAL-S')).toHaveCount(0, { timeout: 15000 });
-  await elsewhere.close();
+  await answerElsewhere(context, 'LOCAL-S', 'Ship it now');
 
-  // This page still shows the card (no refresh yet). Its answer is refused as settled: the card leaves, no failure copy.
-  await waitingCard(page, 'LOCAL-S').locator('[data-option-id="wait"]').click();
-  await expect(waitingCard(page, 'LOCAL-S')).toHaveCount(0, { timeout: 15000 });
+  // This page still shows the card (no refresh yet). Its answer is refused as settled (the route's 409): the card says so and
+  // is not settled by this page, so it claims no answer of its own.
+  await answerWith(cardOf(page, 'LOCAL-S'), 'Wait for review');
+  await expect(cardOf(page, 'LOCAL-S').locator('[data-testid="question-record-card-feedback"]')).toHaveText('This ruling was already answered or dismissed.');
+  await expect(cardOf(page, 'LOCAL-S')).not.toHaveAttribute('data-settled', 'true');
+  await refresh(page);
+  await expect(waitingCard(page, 'LOCAL-S')).toHaveCount(0);
   await expect(page.locator(LIVE)).toHaveText('Answered elsewhere');
   await expect(page.locator('body')).not.toContainText('reply failed');
 });
 
-test('a refresh requested before a ruling was answered here does not bring its card back', async ({ page }) => {
-  // Witness: drop the `settledKeys.has(key)` skip in mergeWaitingCards → the held response re-adds LOCAL-S's card after the answer.
+test('a refresh requested before a question was answered here does not replace its settled card', async ({ page }) => {
+  // Witness: let mergeWaitingCards replace a card the server still lists → the held response swaps in an open, unsettled copy.
   await seedTree(page);
-  await seedRuling(page, 'LOCAL-S', THREE_OPTIONS);
+  await seedWaiting(page, 'LOCAL-S', THREE_OPTIONS);
   await page.goto(`/workspace/${URL_KEY}/`);
   await expect(waitingCard(page, 'LOCAL-S')).toHaveCount(1);
 
@@ -191,31 +192,32 @@ test('a refresh requested before a ruling was answered here does not bring its c
     return route.fulfill({ response: real });
   });
   const pending = refresh(page);
-  await waitingCard(page, 'LOCAL-S').locator('[data-option-id="wait"]').click();
-  await expect(waitingCard(page, 'LOCAL-S')).toHaveCount(0);
+  await answerWith(cardOf(page, 'LOCAL-S'), 'Wait for review');
+  await expect(cardOf(page, 'LOCAL-S')).toHaveAttribute('data-settled', 'true');
   release();
   await pending;
-  // Read once, straight after the merge: a retrying expect would give the next 5s tick time to remove a card that came back.
+  // Read once, straight after the merge: a retrying expect would give the next 5s tick time to change the section.
   const after = await page.evaluate(() => ({
-    cards: document.querySelectorAll('[data-testid="waiting-on-you"] .waiting-card').length,
-    hidden: document.querySelector('[data-testid="waiting-on-you"]').classList.contains('hidden'),
+    cards: document.querySelectorAll('[data-testid="waiting-on-you"] .waiting-question').length,
+    open: document.querySelectorAll('[data-testid="waiting-on-you"] .waiting-question [data-testid="question-record-card"]:not([data-settled="true"])').length,
+    waitingPart: /waiting on you/.test(document.querySelector('[data-testid="in-progress-count"]')?.textContent || ''),
   }));
-  expect(after).toEqual({ cards: 0, hidden: true });
+  expect(after).toEqual({ cards: 1, open: 0, waitingPart: false });
   await page.unroute('**/api/home-waiting');
 });
 
 test('a card whose answer is in flight survives a refresh that no longer lists it, as the same node', async ({ page }) => {
-  // Witness: drop the `answerInFlight` exception in mergeWaitingCards' removal → the card is removed while its answer is out.
+  // Witness: drop the in-flight exception in mergeWaitingCards' removal (questionCardHeld) → the card is removed while its answer is out.
   await seedTree(page);
-  await seedRuling(page, 'LOCAL-S', THREE_OPTIONS);
+  await seedWaiting(page, 'LOCAL-S', THREE_OPTIONS);
   await page.goto(`/workspace/${URL_KEY}/`);
   await expect(waitingCard(page, 'LOCAL-S')).toHaveCount(1);
-  await waitingCard(page, 'LOCAL-S').locator('[data-testid="session-question-card"]').evaluate(el => { el.dataset.keepMark = 'yes'; });
+  await cardOf(page, 'LOCAL-S').evaluate(el => { el.dataset.keepMark = 'yes'; });
 
-  // Hold this card's answer write until the refresh below has run.
+  // Hold this card's answer until the refresh below has run.
   let releaseAnswer;
   const answerHeld = new Promise(resolve => { releaseAnswer = resolve; });
-  await page.route('**/api/comments/**', async route => {
+  await page.route('**/questions/*/answer', async route => {
     await answerHeld;
     return route.continue();
   });
@@ -225,16 +227,17 @@ test('a card whose answer is in flight survives a refresh that no longer lists i
     body: JSON.stringify({ html: '<div class="waiting-body" data-testid="waiting-body"></div>', count: 0 }),
   }));
 
-  await waitingCard(page, 'LOCAL-S').locator('[data-option-id="wait"]').click();
-  await expect(waitingCard(page, 'LOCAL-S').locator('[data-testid="session-question-card"]')).toHaveAttribute('data-answer-in-flight', 'true');
+  await answerWith(cardOf(page, 'LOCAL-S'), 'Wait for review');
+  await expect(cardOf(page, 'LOCAL-S').locator('[data-testid="question-record-card-answer"]')).toBeDisabled();
   await refresh(page);
   await expect(waitingCard(page, 'LOCAL-S')).toHaveCount(1);
   await expect(page.locator(`${SECTION} [data-keep-mark="yes"]`)).toHaveCount(1);
   await expect(page.locator(LIVE)).not.toHaveText('Answered elsewhere');
 
   releaseAnswer();
-  await expect(waitingCard(page, 'LOCAL-S')).toHaveCount(0, { timeout: 15000 });
-  await page.unroute('**/api/comments/**');
+  await expect(cardOf(page, 'LOCAL-S')).toHaveAttribute('data-settled', 'true', { timeout: 15000 });
+  await expect(page.locator(`${SECTION} [data-keep-mark="yes"]`)).toHaveCount(1);
+  await page.unroute('**/questions/*/answer');
   await page.unroute('**/api/home-waiting');
 });
 
@@ -264,14 +267,14 @@ test('one refresh is in flight at a time: calls made while it is out share one q
 });
 
 test.describe('the opened task keeps its typed question across a state repaint (keepTypedQuestion)', () => {
-  const OPENED_CARD = '[data-question-slot] [data-testid="session-question-card"]';
-  const OPENED_INPUT = `${OPENED_CARD} [data-testid="session-question-card-input"]`;
+  const OPENED_CARD = '[data-question-slot] [data-testid="question-record-card"]';
+  const OPENED_INPUT = `${OPENED_CARD} [data-testid="question-record-card-input"]`;
   const STATE_URL = '**/api/task/LOCAL-S/state**';
 
   /**
-   * Home with LOCAL-S started and running (a session taken, no ruling yet), opened, and the page clock held, so the
-   * opened task's 10s state poll runs only when the test says. Then the worker raises a ruling and one poll paints it.
-   * A task with a ruling is not a Home row (it is Waiting on you), so the task is opened before the ruling exists.
+   * Home with LOCAL-S started and running (a session taken, no question yet), opened, and the page clock held, so the
+   * opened task's 10s state poll runs only when the test says. Then the worker asks a question and one poll paints it.
+   * A task with an open question is not a Home row (it is Waiting on you), so the task is opened before the question exists.
    */
   async function openRunningThenRaise(page) {
     const started = await page.request.post('/test/set-local-session', {
@@ -297,7 +300,7 @@ test.describe('the opened task keeps its typed question across a state repaint (
     await expect(page.locator('.opened-task').first()).toBeVisible();
 
     expect((await feedback({ message: '[blocked] which way?' })).status()).toBe(200);
-    expect((await feedback({ kind: 'decision', message: JSON.stringify({ decision_id: 'd-LOCAL-S', question: 'Which for LOCAL-S?', ...THREE_OPTIONS }) })).status()).toBe(200);
+    await seedQuestion(page, URL_KEY, { ticket: 'LOCAL-S', runId: itemId, asks: 'Which for LOCAL-S?', ...THREE_OPTIONS });
     await pollOnce(page);
     await expect(page.locator(OPENED_INPUT)).toHaveCount(1);
   }
@@ -321,17 +324,17 @@ test.describe('the opened task keeps its typed question across a state repaint (
     });
   }
 
-  test('a card whose markup changed is kept for the same ruling while it holds typed text', async ({ page }) => {
+  test('a card whose markup changed is kept for the same question while it holds typed text', async ({ page }) => {
     // Witness: drop `|| keepsPlace` from keepTypedQuestion → the repaint writes the new card and the typed text is gone.
     await openRunningThenRaise(page);
     await page.locator(OPENED_INPUT).fill('half a sentence in the opened task');
     // fill() leaves the textarea focused, and focus alone keeps a card (cardHoldsInput). Blur first, so this test
     // witnesses the typed text and not the focus: the card must hold no focus when the poll paints.
     await page.locator(OPENED_INPUT).blur();
-    expect(await page.evaluate(() => !document.querySelector('[data-question-slot] [data-testid="session-question-card"]').contains(document.activeElement))).toBe(true);
+    expect(await page.evaluate(() => !document.querySelector('[data-question-slot] [data-testid="question-record-card"]').contains(document.activeElement))).toBe(true);
     await page.locator(OPENED_CARD).evaluate(el => { el.dataset.keepMark = 'yes'; });
 
-    await editNextStateCard(page, html => html.replace('data-testid="session-question-card"', 'data-testid="session-question-card" data-repainted="yes"'));
+    await editNextStateCard(page, html => html.replace('data-testid="question-record-card"', 'data-testid="question-record-card" data-repainted="yes"'));
     await pollOnce(page);
 
     await expect(page.locator(OPENED_INPUT)).toHaveValue('half a sentence in the opened task');
@@ -347,7 +350,7 @@ test.describe('the opened task keeps its typed question across a state repaint (
     await expect(page.locator(OPENED_INPUT)).toBeFocused();
     await page.locator(OPENED_CARD).evaluate(el => { el.dataset.keepMark = 'yes'; });
 
-    await editNextStateCard(page, html => html.replace('data-testid="session-question-card"', 'data-testid="session-question-card" data-repainted="yes"'));
+    await editNextStateCard(page, html => html.replace('data-testid="question-record-card"', 'data-testid="question-record-card" data-repainted="yes"'));
     await pollOnce(page);
 
     await expect(page.locator(OPENED_INPUT)).toBeFocused();
@@ -355,16 +358,16 @@ test.describe('the opened task keeps its typed question across a state repaint (
     await expect(page.locator(`${OPENED_CARD}[data-repainted="yes"]`)).toHaveCount(0);
   });
 
-  test('a different ruling\'s card replaces the typed one: the ruling key gates the keep', async ({ page }) => {
-    // Witness: drop the ruling-key comparison in keepsReaderPlace → the typed card of the old ruling is kept over the new one.
+  test('a different question\'s card replaces the typed one: the question key gates the keep', async ({ page }) => {
+    // Witness: drop the key comparison in keepsReaderPlace → the typed card of the old question is kept over the new one.
     await openRunningThenRaise(page);
-    await page.locator(OPENED_INPUT).fill('an answer to the first ruling');
+    await page.locator(OPENED_INPUT).fill('an answer to the first question');
     await page.locator(OPENED_CARD).evaluate(el => { el.dataset.keepMark = 'yes'; });
 
-    await editNextStateCard(page, html => html.replace(/data-decision-id="[^"]*"/, 'data-decision-id="d-another-ruling"'));
+    await editNextStateCard(page, html => html.replace(/data-question-id="[^"]*"/, 'data-question-id="question-another"'));
     await pollOnce(page);
 
-    await expect(page.locator(`${OPENED_CARD}[data-decision-id="d-another-ruling"]`)).toHaveCount(1);
+    await expect(page.locator(`${OPENED_CARD}[data-question-id="question-another"]`)).toHaveCount(1);
     await expect(page.locator(`${OPENED_CARD}[data-keep-mark="yes"]`)).toHaveCount(0);
     await expect(page.locator(OPENED_INPUT)).toHaveValue('');
   });

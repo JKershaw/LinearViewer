@@ -41,10 +41,11 @@ import {
 } from '../../lib/records/verdict-facts.js';
 import { codeBalance } from '../../docs/papers/harbour/cleaner-than-it-started-scripts/balance-sign.mjs';
 import {
-  MISSING_CONDITION, ORIGIN_UNREADABLE, UPPER_BOUND, LOOP_ONLY, hasBlockedMarker, membersOf, operatorFreeRow, rulingsRow,
+  MISSING_CONDITION, ORIGIN_UNREADABLE, UPPER_BOUND, RECORDS_ONLY, hasBlockedMarker, membersOf, operatorFreeRow, rulingsRow,
   seatNotMeasured, seatRows, taskConditions,
 } from '../../scripts/stability-measures-seat.mjs';
 import { deriveBlockedStatus } from '../../lib/dispatch-terminal.js';
+import { ticketTaskIdOf } from '../../lib/records/refs.js';
 
 const inScope = compileScope({ include: SCOPE_INCLUDE });
 
@@ -810,43 +811,54 @@ test('measure 1 reads no comment: no comment parser or trail read in its module,
 });
 
 // ── LIN-4422: measure 4, the person's seat ──────────────────────────────────
-const ruling = (issue, outcome, extra = {}) => ({
-  decision: { decision_id: `${issue}-${outcome}` }, anchor: { issueIdentifier: issue, ...extra.anchor },
-  ...(outcome === 'open' ? {} : { resolution: { decisionId: `${issue}-${outcome}`, outcome } }),
-});
+// LIN-4538: a question record view (GET /api/proxy/records?kind=question). `in` is the task record id a ticket claims.
+const QUESTION_END = {
+  answered: { state: 'answered', ended: { reason: 'answered by decision-x' }, by: 'person:acct' },
+  dismissed: { state: 'withdrawn', ended: { reason: 'dismissed' }, by: 'person:acct' },
+  withdrawn: { state: 'withdrawn', ended: { reason: 'superseded' }, by: 'implementation' },
+  'self-resolved': { state: 'withdrawn', ended: { reason: 'ticket closed' }, by: 'harbour' },
+  'handed-on': { state: 'handed-on', ended: { reason: 'handed on' }, by: 'implementation' },
+  open: { state: 'open', by: 'implementation' },
+};
+const question = (issue, outcome) => ({ id: `question-${issue}-${outcome}`, kind: 'question', in: ticketTaskIdOf(issue), ...QUESTION_END[outcome] });
 const fb = (...messages) => messages.map((message, i) => ({ message, timestamp: `2026-11-08T10:0${i}:00Z` }));
 const quiet = (over = {}) => ({ membership: { memberIds: ['r1'], rootOnly: 0 }, list: { items: [{ id: 'r1', closedReason: null }], total: 1 }, details: [{ itemId: 'r1', body: { feedback: fb('[working] x', '[done] ok'), closedReason: null } }], ...over });
 
-describe('seat: loop rulings per finished task and the answered share', () => {
+describe('seat: question records per finished task and the answered share', () => {
   const finished = [{ id: 'LIN-1', parent: 'LIN-9' }, { id: 'LIN-2', parent: 'LIN-9' }, { id: 'LIN-3', parent: null }];
 
-  test('an unreadable rulings read is never 0: both the rulings row and the operator-free share are not measured', () => {
-    const [rulings, origin, free] = seatRows({ finished, rulings: { reason: 'HTTP 503' }, dispatch: new Map() });
-    assert.deepStrictEqual([rulings.status, rulings.value, rulings.reason], [STATUS.NOT_MEASURED, null, 'rulings read failed: HTTP 503']);
+  test('an unreadable questions read is never 0: both the rulings row and the operator-free share are not measured', () => {
+    const [rulings, origin, free] = seatRows({ finished, questions: { reason: 'HTTP 503' }, dispatch: new Map() });
+    assert.deepStrictEqual([rulings.status, rulings.value, rulings.reason], [STATUS.NOT_MEASURED, null, 'questions read failed: HTTP 503']);
     assert.deepStrictEqual([free.status, free.value], [STATUS.NOT_MEASURED, null]);
-    assert.match(free.reason, /no-ruling condition is unreadable/);
+    assert.match(free.reason, /no-question condition is unreadable/);
     assert.deepStrictEqual([origin.status, origin.reason], [STATUS.NOT_MEASURED, ORIGIN_UNREADABLE]);
   });
 
-  test('outcome buckets as escalation-kpis: answered / (answered + dismissed); withdrawn and self-resolved are neither; null is unreadable', () => {
-    const rulings = { rulings: [
-      ruling('LIN-1', 'answered'), ruling('LIN-1', 'answered'), ruling('LIN-2', 'dismissed'), ruling('LIN-2', 'withdrawn'),
-      ruling('LIN-3', 'self-resolved'), ruling('LIN-3', null), ruling('LIN-3', 'open'),
-      ruling('LIN-9', 'answered'), ruling('LIN-500', 'dismissed'),
+  test('outcome buckets as escalation-kpis: answered / (answered + dismissed); withdrawn, handed-on and self-resolved are neither; an open question is open', () => {
+    const questions = { questions: [
+      question('LIN-1', 'answered'), question('LIN-1', 'answered'), question('LIN-2', 'dismissed'), question('LIN-2', 'withdrawn'),
+      question('LIN-3', 'self-resolved'), question('LIN-3', 'handed-on'), question('LIN-3', 'open'),
+      question('LIN-9', 'answered'), question('LIN-500', 'dismissed'),
     ] };
-    const r = rulingsRow({ finished, rulings });
-    assert.deepStrictEqual([r.status, r.unreadable, r.value.raised, r.value.perFinishedTask, r.value.answeredShare], [STATUS.PARTIAL, 1, 7, 2.33, 66.7]);
-    assert.deepStrictEqual(r.value.outcomes, { answered: 2, dismissed: 1, withdrawn: 1, 'self-resolved': 1, unknown: 1, open: 1 });
-    assert.match(r.reason, /1 resolved ruling\(s\) have outcome null/);
-    assert.strictEqual(r.value.onParents, 1, 'the parent\'s ruling is named, not counted against its pieces');
-    assert.strictEqual(r.value.label, LOOP_ONLY);
-    assert.match(r.value.notRead.join(' '), /answered task-bound rulings \(anchor\.taskDecisionId\)/);
+    const r = rulingsRow({ finished, questions });
+    assert.deepStrictEqual([r.status, r.unreadable, r.value.raised, r.value.perFinishedTask, r.value.answeredShare], [STATUS.MEASURED, 0, 7, 2.33, 66.7]);
+    assert.deepStrictEqual(r.value.outcomes, { answered: 2, dismissed: 1, withdrawn: 1, 'self-resolved': 1, 'handed-on': 1, open: 1 });
+    assert.strictEqual(r.value.onParents, 1, 'the parent\'s question is named, not counted against its pieces');
+    assert.strictEqual(r.value.label, RECORDS_ONLY);
+    assert.match(r.value.notRead.join(' '), /questions asked before the records path \(LIN-4531\)/);
     assert.match(r.value.notRead.join(' '), /parent or another unfinished ticket .*1 on a finished task's parent/);
-    assert.match(r.value.rules.raised, /distinct decisions/);
+    assert.match(r.value.rules.raised, /one question record is one question/);
   });
 
-  test('read rulings with none on the finished tasks is a measured zero, with no share', () => {
-    const r = rulingsRow({ finished, rulings: { rulings: [ruling('LIN-500', 'answered')] } });
+  test('a question whose state settles to no known outcome is unreadable, never counted', () => {
+    const r = rulingsRow({ finished, questions: { questions: [{ id: 'question-x', kind: 'question', in: ticketTaskIdOf('LIN-1'), state: 'superseded', by: 'harbour' }] } });
+    assert.deepStrictEqual([r.status, r.unreadable], [STATUS.PARTIAL, 1]);
+    assert.match(r.reason, /1 question\(s\) have an unknown outcome \(superseded\)/);
+  });
+
+  test('read questions with none on the finished tasks is a measured zero, with no share', () => {
+    const r = rulingsRow({ finished, questions: { questions: [question('LIN-500', 'answered')] } });
     assert.deepStrictEqual([r.status, r.value.raised, r.value.perFinishedTask, r.value.answeredShare], [STATUS.MEASURED, 0, 0, null]);
   });
 });
@@ -892,10 +904,10 @@ describe('seat: the operator-free share, an upper bound with its missing conditi
     ['LIN-5', quiet({ details: [{ itemId: 'r1', reason: 'HTTP 500' }] })], // unreadable reads, but a ruling already shows the operator
     ['LIN-6', quiet({ membership: { reason: 'no lineage: no dispatch ran for this issue' }, details: [] })],
   ]);
-  const rulings = { rulings: [ruling('LIN-2', 'answered'), ruling('LIN-5', 'dismissed')] };
+  const questions = { questions: [question('LIN-2', 'answered'), question('LIN-5', 'dismissed')] };
 
   test('three readable conditions; a task whose reads failed is unreadable unless a read already shows the operator', () => {
-    const r = operatorFreeRow({ finished, rulings, dispatch });
+    const r = operatorFreeRow({ finished, questions, dispatch });
     assert.deepStrictEqual([r.status, r.value.read, r.value.operatorFree, r.value.share, r.unreadable], [STATUS.PARTIAL, 4, 1, 25, 2]);
     assert.deepStrictEqual(r.value.failing, { ruling: 2, blocked: 0, operatorClosed: 1 });
     assert.deepStrictEqual(r.value.perTask.find((t) => t.id === 'LIN-5'), { id: 'LIN-5', ruling: true, blocked: null, operatorClosed: null, free: false });
@@ -903,14 +915,14 @@ describe('seat: the operator-free share, an upper bound with its missing conditi
   });
 
   test('the row says upper bound, names the missing condition, and discloses the catch-all closes', () => {
-    const r = operatorFreeRow({ finished, rulings, dispatch });
+    const r = operatorFreeRow({ finished, questions, dispatch });
     assert.strictEqual(r.value.label, UPPER_BOUND);
     assert.strictEqual(r.value.missingCondition, MISSING_CONDITION);
     assert.match(MISSING_CONDITION, /no person-started dispatch \(not measured: dispatchedBy is the workspace account for autopilot and person alike\)/);
     assert.match(r.value.caveats.join(' '), /catch-all .*bulk fossil passes/);
     const w = { base: 'b'.repeat(40), head: 'h'.repeat(40), baseDate: 'x', headDate: 'y', landings: 6 };
-    const table = formatTable(buildReading({ window: w, rows: { seat: seatRows({ finished, rulings, dispatch }) } }));
-    assert.match(table, /^4\. The person's seat\n {3}rulings +loop rulings only: 2 raised over 6 finished tasks.*\n {3}origin +not measured: dispatchedBy is the workspace account for autopilot and person alike\n {3}operator-free +upper bound: 25% \(1 of 4 tasks\).*missing condition: no person-started dispatch/m);
+    const table = formatTable(buildReading({ window: w, rows: { seat: seatRows({ finished, questions, dispatch }) } }));
+    assert.match(table, /^4\. The person's seat\n {3}rulings +question records only: 2 raised over 6 finished tasks.*\n {3}origin +not measured: dispatchedBy is the workspace account for autopilot and person alike\n {3}operator-free +upper bound: 25% \(1 of 4 tasks\).*missing condition: no person-started dispatch/m);
     assert.doesNotMatch(table, /\{"/);
   });
 
@@ -935,7 +947,7 @@ describe('the seat read end to end, through a fake proxy', () => {
     return { paths, client: createProxyClient({ base: 'http://p/api/proxy', fetch, now: () => t, sleep: async (ms) => { t += ms; } }) };
   };
   const routes = {
-    '/rulings?includeResolved=true': { status: 200, body: { rulings: [ruling('LIN-31', 'answered')] } },
+    '/records?kind=question': { status: 200, body: { records: [question('LIN-31', 'answered')] } },
     [`/dispatch?issueIdentifier=LIN-30&limit=${DISPATCH_LIST_LIMIT}`]: { status: 200, body: { items: [{ id: 'root-1', closedReason: null }], total: 1 } },
     [`/dispatch?issueIdentifier=LIN-31&limit=${DISPATCH_LIST_LIMIT}`]: { status: 200, body: { items: [], total: 0 } },
     '/dispatch/root-1': { status: 200, body: { feedback: fb('[done] ok'), closedReason: null } },
@@ -945,20 +957,20 @@ describe('the seat read end to end, through a fake proxy', () => {
   const finished = [{ id: 'LIN-30', parent: null }, { id: 'LIN-31', parent: null }];
   const tasks = [{ id: 'LIN-30', cost: { body: cost } }, { id: 'LIN-31', cost: { body: { workerSessions: [{ rootItemId: 'root-2', dispatches: null }] } } }];
 
-  test('rulings once, then each task\'s list and every member\'s detail; the member\'s marker blocks LIN-30', async () => {
+  test('questions once, then each task\'s list and every member\'s detail; the member\'s marker blocks LIN-30', async () => {
     const { client, paths } = fetchFrom(routes);
     const { rows } = await readSeat({ client, finished, tasks });
-    assert.strictEqual(paths.filter((p) => p.startsWith('/rulings')).length, 1, 'one rulings read for every task');
+    assert.strictEqual(paths.filter((p) => p.startsWith('/records')).length, 1, 'one questions read for every task');
     assert.ok(paths.includes('/dispatch/member-1'), 'a lineage member, not only its root');
     const [rulingsR, , free] = rows;
     assert.deepStrictEqual([rulingsR.value.raised, rulingsR.value.answeredShare], [1, 100]);
     assert.deepStrictEqual([free.status, free.value.read, free.value.operatorFree, free.value.failing.blocked, free.value.rootOnlyLineages], [STATUS.MEASURED, 2, 0, 1, 1]);
   });
 
-  test('a failed rulings read skips every dispatch read: no share can be read without the no-ruling condition', async () => {
-    const { client, paths } = fetchFrom({ ...routes, '/rulings?includeResolved=true': { status: 503 } });
+  test('a failed questions read skips every dispatch read: no share can be read without the no-question condition', async () => {
+    const { client, paths } = fetchFrom({ ...routes, '/records?kind=question': { status: 503 } });
     const { rows } = await readSeat({ client, finished, tasks });
-    assert.deepStrictEqual(paths, ['/rulings?includeResolved=true']);
+    assert.deepStrictEqual(paths, ['/records?kind=question']);
     assert.deepStrictEqual(rows.map((r) => r.status), [STATUS.NOT_MEASURED, STATUS.NOT_MEASURED, STATUS.NOT_MEASURED]);
   });
 

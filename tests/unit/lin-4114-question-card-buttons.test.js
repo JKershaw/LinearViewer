@@ -125,8 +125,9 @@ describe('LIN-4114 witness 3: an invalid recommended reads as none, and a non-in
 describe('LIN-4114 witness 4: the task-page golden carries a deliberate open-ruling-with-recommended case', () => {
   test('NEW: some golden case renders an option card whose recommended option is the main button', () => {
     const golden = JSON.parse(readFileSync(join(ROOT, 'tests/fixtures/render-task-page-golden.json'), 'utf8'));
-    const withCard = Object.entries(golden).filter(([, html]) => html.includes('session-question-card-option'));
-    assert.ok(withCard.length > 0, 'the task-page golden has an open-ruling case with options (none today)');
+    // LIN-4538: the open question's card is the question-record card (lib/question-record-card.js) now.
+    const withCard = Object.entries(golden).filter(([, html]) => html.includes('question-record-card-option'));
+    assert.ok(withCard.length > 0, 'the task-page golden has an open-question case with options');
     assert.ok(
       withCard.some(([, html]) => /btn--primary[^>]*data-option-id=|data-option-id="[^"]*"[^>]*btn--primary/.test(html)),
       'that case renders the recommended option as btn--primary'

@@ -11,11 +11,9 @@
  */
 import { test, describe } from 'node:test';
 import assert from 'node:assert/strict';
-import { createHomeRowStates } from '../../lib/home-row-states.js';
-import { readRulingStanding } from '../../lib/ruling-standing.js';
-import { collectUnansweredDecisions } from '../../lib/unanswered-decisions.js';
+import { createHomeRowStates, createWaitingStanding } from '../../lib/home-row-states.js';
 import { enrichLoop, deriveSessionWaiting } from '../../routes/dashboard.js';
-import { liveOnAnchor } from '../../routes/dashboard-session-state.js';
+import { questionRecordsOf, questionsFromLoops } from './helpers/question-records.js';
 import { buildHomeView } from '../../lib/home-view.js';
 import { homeRowsFor } from '../../lib/home-rows.js';
 import { isCompleted } from '../../lib/providers/state-map.js';
@@ -54,20 +52,21 @@ const goneRulingLoop = (identifier) => loop({
 /** A live run on the same task as a ruling: non-terminal, so it is the "live run already exists on this anchor" case. */
 const liveLoop = (identifier) => loop({ loopId: `live-${identifier}`, lineageId: `live-${identifier}`, issueIdentifier: identifier });
 
-function assemblyWith({ loops = [], decisions = [] } = {}) {
+// LIN-4538: a ruling is an open question record its run asked (the loop's decision), read from records.
+function assemblyWith({ loops = [], questions = questionsFromLoops(loops) } = {}) {
+  const getLoopsForWorkspace = async () => loops;
   return createHomeRowStates({
-    getLoopsForWorkspace: async () => loops,
+    getLoopsForWorkspace,
     dispatchStore: {},
     agentStatusStore: {},
-    taskDecisionsStore: {
-      listUnansweredForWorkspaces: async () => decisions,
-      listNewestScanPerTask: async () => ({}),
-    },
-    shelvedRulingsStore: { listForWorkspaces: async () => [] },
     enrichLoop,
     deriveSessionWaiting,
     now: () => NOW,
     onError: () => {},
+    waitingStanding: createWaitingStanding({
+      getLoopsForWorkspace, dispatchStore: {}, agentStatusStore: {}, enrichLoop, now: () => NOW,
+      recordsStore: questionRecordsOf(questions),
+    }),
   });
 }
 const issueNode = (identifier, type = 'started') => ({
@@ -102,42 +101,23 @@ describe('LIN-4114 witness 5: homeRowStates passes the ruling rows through, besi
   });
 });
 
-// ---- witness 6: the live-run guard, through Home, equals the feed's effect ---------------------------------------
+// ---- witness 6 (LIN-4538): an open question on a run is Home's waiting row; answering it ends the row ------------------
 
-describe('LIN-4114 witness 6: a ruling with a live run on its task reads as "record" on Home, as it does on the feed', () => {
-  test('NEW: Home\'s row for a ruling with a live run on its task has effect "record"', async () => {
-    const assembly = assemblyWith({ loops: [goneRulingLoop('LIN-1'), liveLoop('LIN-1')] });
-    const out = await assembly({ urlKey: 'acme', issues: [issueNode('LIN-1').issue], runControls: true });
-    const row = (out.rulingRows || []).find(r => r.anchor.issueIdentifier === 'LIN-1');
-    assert.ok(row, 'the ruling has a row');
-    assert.equal(row.effect, 'record', 'answering must not start a second run');
+describe('LIN-4538 witness 6: an open question on a run is a waiting row on Home, and ending it removes the row', () => {
+  test('a question its run asked is a waiting row; once answered it is not, and the count falls with it', async () => {
+    const loops = [rulingLoop('LIN-1')];
+    const open = await assemblyWith({ loops })({ urlKey: 'acme', issues: [issueNode('LIN-1').issue], runControls: true });
+    assert.equal(open.rulingCount, 1);
+    assert.deepEqual(open.rulingRows.map((r) => r.anchor.issueIdentifier), ['LIN-1']);
+    const answered = await assemblyWith({ loops, questions: [{ id: 'q-r-LIN-1', ticket: 'LIN-1', run: 'r-LIN-1', ended: { state: 'answered', by: 'person:acct-owner', reason: 'answered by decision-1' } }] })({ urlKey: 'acme', issues: [issueNode('LIN-1').issue], runControls: true });
+    assert.equal(answered.rulingCount, 0);
+    assert.deepEqual(answered.rulingRows, []);
   });
 
-  test('NEW: Home\'s effects equal the feed\'s effects for the same loops (a differential over the same predicate)', async () => {
-    const loops = [goneRulingLoop('LIN-1'), liveLoop('LIN-1'), goneRulingLoop('LIN-2')];
-    const assembly = assemblyWith({ loops });
-    const home = await assembly({ urlKey: 'acme', issues: [issueNode('LIN-1').issue, issueNode('LIN-2').issue], runControls: true });
-    // The feed (routes/dashboard-rulings.js) builds the same predicate over the enriched loops it holds.
-    const enriched = loops.map(l => enrichLoop(l));
-    const feed = collectUnansweredDecisions(
-      { loops: enriched.map(l => ({ ...l, workspaceUrlKey: 'acme' })), taskDecisions: [], shelvedRulings: [], newestScanByTask: {} },
-      { now: NOW, liveDispatchOnAnchor: liveOnAnchor(enriched) }
-    );
-    const effectsOf = rows => rows.map(r => `${r.anchor.issueIdentifier}:${r.effect}`).sort();
-    assert.deepEqual(effectsOf(home.rulingRows || []), effectsOf(feed), 'Home and the feed agree row for row');
-    assert.ok(effectsOf(feed).includes('LIN-1:record'), 'the feed says record for the task with a live run');
-    assert.ok(effectsOf(feed).includes('LIN-2:dispatch'), 'the feed says dispatch for the task with no live run');
-  });
-
-  // LIN-4143 changed this: the live-run guard is unconditional in every standing read, so the task page's standing read
-  // reads the same effect as Home and the feed. Nothing on the task page renders a standing row's effect (its card is
-  // built from the run page's guarded read), so the page's output is unchanged; tests/unit/lin-4143-task-page-guard.test.js
-  // pins that the card's effect matches the feed's.
-  test('GUARD (LIN-4143): the task page\'s ruling read is guarded by default, so a live run\'s ruling reads "record" there too', async () => {
-    const loops = [goneRulingLoop('LIN-1'), liveLoop('LIN-1')];
-    const standing = await readRulingStanding({ urlKey: 'acme', loops, at: NOW, enrichLoop });
-    const row = standing.rows.find(r => r.anchor.issueIdentifier === 'LIN-1');
-    assert.equal(row.effect, 'record', 'the standing read is the feed\'s read, with no flag to leave it unguarded');
+  test('a dismissed question is no longer waiting either: the state is the same on every surface', async () => {
+    const loops = [rulingLoop('LIN-1')];
+    const dismissed = await assemblyWith({ loops, questions: [{ id: 'q-r-LIN-1', ticket: 'LIN-1', run: 'r-LIN-1', ended: { state: 'withdrawn', by: 'person:acct-owner', reason: 'dismissed' } }] })({ urlKey: 'acme', issues: [issueNode('LIN-1').issue], runControls: true });
+    assert.equal(dismissed.rulingCount, 0);
   });
 });
 

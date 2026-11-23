@@ -227,9 +227,12 @@
   var RULING_GONE_EVENT = 'harbour:question-answered';
   // Home registers its <main> here at startup (setDeskRoot), so an answer whose card has already left the page still reaches it.
   var deskRoot = null;
-  // The key every copy of one ruling's card shares: the scan decision id for a task-bound card, else the loop + decision.
+  // The key every copy of one question's card shares (LIN-4538): a question record's card by its question id; a ruling card by
+  // the scan decision id for a task-bound card, else the loop + decision. Question cards must not share the ruling key: they
+  // would all read 'loop:|', so a typed answer could be kept on a different question's card.
   function rulingKeyOf(card) {
     var d = card.dataset || {};
+    if (d.questionId) return 'question:' + d.questionId;
     return d.taskDecisionId ? 'task:' + d.taskDecisionId : 'loop:' + (d.stampLoopId || '') + '|' + (d.decisionId || '');
   }
   // In the unit suite `CustomEvent` stays absent because announceRulingGone exits without it: the typeof guard below
@@ -460,7 +463,10 @@
   // or dismissed here, or refused as settled) are remembered, so a response requested before that never re-adds one.
   var settledKeys = new Set();
   function noteSettled(key) { if (key) settledKeys.add(key); }
-  function innerCardOf(wrapper) { return wrapper.querySelector('[data-testid="session-question-card"]'); }
+  // A question record's wrapper holds the record card (LIN-4538: lib/question-record-card.js), a ruling wrapper the session card.
+  function innerCardOf(wrapper) {
+    return wrapper.querySelector('[data-testid="session-question-card"]') || wrapper.querySelector('[data-testid="question-record-card"]');
+  }
   // LIN-4532 (finding-dca7ac9d): a question record's wrapper (`.waiting-question`) is keyed by its question id, and its card is the
   // shared question-record card (lib/question-record-card.js), not a ruling card.
   function questionCardOf(wrapper) { return wrapper.querySelector('[data-testid="question-record-card"]'); }
@@ -493,7 +499,8 @@
   function cardHoldsInput(card, active) {
     if (!card) return false;
     if (card.dataset && card.dataset.answerInFlight === 'true') return true;
-    var textarea = card.querySelector('[data-testid="session-question-card-input"]');
+    // The typed answer: a ruling card's input, or a question record card's (LIN-4538).
+    var textarea = card.querySelector('[data-testid="session-question-card-input"]') || card.querySelector('[data-testid="question-record-card-input"]');
     if (textarea && textarea.value && textarea.value.length > 0) return true;
     return focusInCard(card, active);
   }

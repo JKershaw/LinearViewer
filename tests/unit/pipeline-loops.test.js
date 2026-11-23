@@ -29,7 +29,6 @@ import { createMockCollection } from '../fixtures/mock-collection.js';
 import { DispatchQueueStore } from '../../lib/dispatch-store.js';
 import { buildSessionCounts } from '../../lib/sessions-view.js';
 import { classifyLoop } from '../../lib/observer-sweep.js';
-import { isDecisionAnsweredInLineage } from '../../lib/unanswered-decisions.js';
 import { READ_HORIZON_MS } from '../../lib/read-horizon.js';
 
 const {
@@ -1606,7 +1605,7 @@ describe('answeredDecisions legacy-digest fallback (LIN-3022/LIN-2991 Surface 2,
   // §2's admit/discharge predicates must ALSO treat a legacy-fallback-derived
   // loop as answered, both standalone (isDecisionAnsweredInLineage with no
   // map) and through the census (classifyLoop).
-  test('a legacy digest loop resolves through classifyLoop/isDecisionAnsweredInLineage, exactly like a native answeredDecisions loop', async () => {
+  test('a legacy digest loop: its answer stamp alone does not discharge the row; a settled question on its lineage does (LIN-4538)', async () => {
     const legacyDigest = {
       version: 5,
       terminal: null,
@@ -1625,12 +1624,13 @@ describe('answeredDecisions legacy-digest fallback (LIN-3022/LIN-2991 Surface 2,
     const loop = loops[0];
     assert.strictEqual(loop.wakeMarker, 'blocked', 'sanity: the blocked marker derives from the digest');
 
+    // LIN-4538: the answer stamp on the digest no longer discharges a row; a settled question on its lineage does.
+    const opts = { superseded: new Set(), now: Date.now(), staleMs: DEFAULT_LANE_STALE_MS };
+    assert.strictEqual(classifyLoop(loop, opts), 'blocked', 'a legacy answered decision on the digest does not discharge the row');
     assert.strictEqual(
-      isDecisionAnsweredInLineage(loop, undefined), true,
-      'no answeredByLineage map (the fossil-script shape) falls back to isDecisionAnswered, which must read the synthesized legacy set'
+      classifyLoop(loop, { ...opts, questionStanding: new Map([[loop.lineageId ?? loop.loopId, 'settled']]) }), 'resolved',
+      'a settled question on its lineage discharges the row'
     );
-    const lane = classifyLoop(loop, { superseded: new Set(), now: Date.now(), staleMs: DEFAULT_LANE_STALE_MS });
-    assert.strictEqual(lane, 'resolved', 'the census must discharge a legacy-digest loop exactly like a native answeredDecisions one');
   });
 });
 

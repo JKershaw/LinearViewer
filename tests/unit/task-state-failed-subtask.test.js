@@ -8,6 +8,7 @@
  */
 import { test, describe } from 'node:test';
 import assert from 'node:assert/strict';
+import { standingOfLoops } from './helpers/question-records.js';
 import { buildRowStates } from '../../lib/task-page-loader.js';
 import { buildInProgressCountParts, rowDataByNodeKey } from '../../lib/task-board-view.js';
 import { buildHomeView } from '../../lib/home-view.js';
@@ -44,6 +45,7 @@ const issue = (identifier, type = 'started') => ({
 const node = (identifier, children = [], type = 'started') => ({ issue: issue(identifier, type), children, depth: 0 });
 
 /** Row states for a parent with the given children, and the loops each task holds (by identifier). */
+// LIN-4538: a ruling is an open question its run asked (the loop's decision), read as the question standing.
 function statesFor(parent, loops = {}) {
   return buildRowStates({
     roots: [parent],
@@ -52,6 +54,7 @@ function statesFor(parent, loops = {}) {
     deriveSessionWaiting,
     now: NOW,
     sessionsVisible: true,
+    ruling: standingOfLoops(Object.values(loops).flat()),
   });
 }
 

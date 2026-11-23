@@ -15,7 +15,7 @@ import { test, describe } from 'node:test';
 import assert from 'node:assert/strict';
 import { buildRowStates, buildTaskPageModel, createTaskPageLoader, sessionSummaryOf } from '../../lib/task-page-loader.js';
 import { buildInProgressCountParts, rowRecordOf } from '../../lib/task-board-view.js';
-import { rulingStandingOf } from '../../lib/unanswered-decisions.js';
+import { standingOfLoops, questionRecordsOf, questionsFromLoops, openQuestionRowsOf } from './helpers/question-records.js';
 import { renderHomeStatus } from '../../lib/render-task-page.js';
 import { pageStatusOf } from '../../lib/task-state.js';
 import { enrichLoop, deriveSessionWaiting } from '../../routes/dashboard.js';
@@ -71,6 +71,7 @@ const rowNode = (type) => ({
 function loaderFor(loops, node) {
   return createTaskPageLoader({
     dispatchStore: {}, agentStatusStore: {}, enrichLoop, deriveSessionWaiting,
+    recordsStore: questionRecordsOf(questionsFromLoops(loops)),
     getLoopsForIssue: async () => loops, getLoopsForIssues: async () => loops, now: () => NOW,
     ...heldLoaderDeps(heldTaskFacts({ issues: [node.issue], now: NOW })),
   });
@@ -81,14 +82,16 @@ async function surfacesOf({ loops, trackerType }) {
   const node = rowNode(trackerType);
   const rowStates = buildRowStates({
     roots: [node], loopsByIdentifier: new Map([[ID, loops]]), enrichLoop, deriveSessionWaiting, now: NOW, sessionsVisible: true,
+    ruling: standingOfLoops(loops),
   });
   const row = rowStates.get(ID);
   const { model, taskState } = await loaderFor(loops, node).loadTaskState({ urlKey: URL_KEY, identifier: ID });
   const pageModel = buildTaskPageModel({
     identifier: ID, loops, ctx: { issue: node.issue, parent: null, children: [] },
-    enrichLoop, deriveSessionWaiting, now: NOW,
+    enrichLoop, deriveSessionWaiting, ruling: standingOfLoops(loops), now: NOW,
   });
-  const rulingRows = rulingStandingOf({ urlKey: URL_KEY, loops }, { now: NOW, enrichLoop }).rows.length;
+  pageModel.questionRecords = openQuestionRowsOf(loops);
+  const rulingRows = standingOfLoops(loops).rows.length;
   return {
     row,
     taskState,
@@ -285,11 +288,13 @@ async function treeSurfacesOf(tree, { held = true } = {}) {
   const rootNode = nodeOf(tree);
   const rowStates = buildRowStates({
     roots: [rootNode], loopsByIdentifier: loopsById, enrichLoop, deriveSessionWaiting, now: NOW, sessionsVisible: true,
+    ruling: standingOfLoops(allLoops),
   });
   const issues = [];
   (function collect(n) { issues.push(n.issue); n.children.forEach(collect); })(rootNode);
   const loader = createTaskPageLoader({
     dispatchStore: {}, agentStatusStore: {}, enrichLoop, deriveSessionWaiting,
+    recordsStore: questionRecordsOf(questionsFromLoops(allLoops)),
     getLoopsForIssue: async (_url, id) => loopsById.get(id) || [],
     getLoopsForIssues: async (_url, ids) => ids.flatMap((id) => loopsById.get(id) || []),
     now: () => NOW,
@@ -298,7 +303,7 @@ async function treeSurfacesOf(tree, { held = true } = {}) {
       : heldLoaderDeps(heldTaskFacts({ issues, now: NOW, readAt: new Date(NOW.getTime() + 60 * 60 * 1000) }))),
   });
   const { taskState, incomplete } = await loader.loadTaskState({ urlKey: URL_KEY, identifier: tree.id });
-  const rulingCount = rulingStandingOf({ urlKey: URL_KEY, loops: allLoops }, { now: NOW, enrichLoop }).rows.length;
+  const rulingCount = standingOfLoops(allLoops).rows.length;
   return {
     row: rowStates.get(tree.id),
     rowOf: (id) => rowStates.get(id),

@@ -26,7 +26,6 @@ import { enrichLoop, deriveSessionWaiting } from '../../routes/dashboard.js';
 import { createHomeRowStates } from '../../lib/home-row-states.js';
 import { orderIssuesForSwipe } from '../../lib/task-board-view.js';
 import { sessionSummaryOf, createTaskPageLoader } from '../../lib/task-page-loader.js';
-import { deriveSessionDecisions } from '../../routes/dashboard.js';
 import { createTaskPageRoutes } from '../../routes/task-page.js';
 import { registerProvider } from '../../lib/providers/registry.js';
 import { createLocalProvider } from '../fixtures/local-harness.js';
@@ -233,7 +232,7 @@ describe('LIN-4039 — W4: the Swipe and task-page producers read the one contai
       fetchIssueComments: async () => [], fetchIssueFields: async () => null, fetchProjects: async () => ({ projects: [] }),
     });
     const loader = createTaskPageLoader({
-      dispatchStore: {}, agentStatusStore: {}, enrichLoop, deriveSessionWaiting, deriveSessionDecisions,
+      dispatchStore: {}, agentStatusStore: {}, enrichLoop, deriveSessionWaiting,
       getLoopsForIssue: async () => [], shelvedRulingsStore: null, now: () => NOW,
     });
     const router = createTaskPageRoutes({

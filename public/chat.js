@@ -582,7 +582,7 @@
         // above. Opt-in only: omitting opts.recommendedLabel (the default)
         // adds no DOM here, which is the whole guarantee that Flight
         // Companion's `.fc-decision` cards (public/flight-companion.js's
-        // renderOneDecision, which never sets this option) stay byte-
+        // question cards, which never set this option) stay byte-
         // identical to today.
         var marker = document.createElement('span');
         marker.className = 'chat-option-recommended-label';

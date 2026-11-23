@@ -12,6 +12,9 @@ import { DispatchQueueStore } from '../../lib/dispatch-store.js';
 import { AgentStatusStore } from '../../lib/agent-status-store.js';
 import { getLoopsForWorkspace } from '../../lib/pipeline-loops.js';
 import { closeTicketRows } from '../../lib/ticket-close-closer.js';
+import { RecordsStore, RECORDS_COLLECTION, REFS_COLLECTION, QUERY_LOG_COLLECTION } from '../../lib/records-store.js';
+import { createRecordWrites } from '../../lib/records/writes.js';
+import { isTerminalState } from '../../lib/providers/state-map.js';
 import { runTicketClosedClear, LineageBackfillPendingError, CLEAR_BY_DEFAULT } from '../../scripts/ticket-closed-clear-lin3399.js';
 import { runFalseLiveRows } from '../../scripts/false-live-rows.js';
 
@@ -19,7 +22,7 @@ const mins = (m) => new Date(Date.now() - m * 60000);
 const ticket = { issueId: 'iid-1', stateType: 'completed' };
 
 describe('ticket-closed-clear (LIN-3399)', () => {
-  let dbDir, client, store, history, agentStatusStore, counter = 0;
+  let dbDir, client, store, history, agentStatusStore, records, writes, counter = 0;
   before(async () => {
     dbDir = mkdtempSync(join(tmpdir(), 'ticket-clear-'));
     client = new MangoClient(dbDir);
@@ -29,13 +32,28 @@ describe('ticket-closed-clear (LIN-3399)', () => {
     if (client?.close) await client.close();
     if (dbDir) rmSync(dbDir, { recursive: true, force: true });
   });
-  beforeEach(() => {
+  beforeEach(async () => {
     const db = client.db(`tc_${counter++}`);
     history = db.collection('dispatch-history');
     store = new DispatchQueueStore({ collection: db.collection('dispatch-queue'), historyCollection: history });
     store._notifyWriteForDoc = () => {};
     agentStatusStore = new AgentStatusStore({ collection: db.collection('s') });
+    await db.collection(RECORDS_COLLECTION).createIndex({ urlKey: 1, id: 1, v: 1 }, { unique: true });
+    records = new RecordsStore({ records: db.collection(RECORDS_COLLECTION), refs: db.collection(REFS_COLLECTION), queryLog: db.collection(QUERY_LOG_COLLECTION) });
+    writes = createRecordWrites({ recordsStore: records, isTerminalState, readTicket: null, askedText: () => '', stageKinds: ['implementation'], listPeople: async () => [{ accountId: 'acct-owner', name: 'Owner' }] });
   });
+
+  /** An open question on LIN-1 (the seeded row's ticket), as a stage files one. */
+  async function askOnLin1() {
+    const made = await records.ensureTask('acme', { identifier: 'LIN-1', title: 'LIN-1' }, { by: 'implementation' });
+    assert.ok(made.id, `task refused: ${JSON.stringify(made)}`);
+    const snap = await writes.add({
+      urlKey: 'acme', kind: 'question', by: 'implementation', run: null,
+      input: { asks: 'Which way?', options: ['left', 'right'], recommended: 'left', 'if-unanswered': 'pick left', to: 'person:acct-owner', in: 'LIN-1' },
+    });
+    assert.ok(snap.record, `question refused: ${JSON.stringify(snap.problems)}`);
+    return snap.record.id;
+  }
 
   // A blocked, quiet row with an open ruling on LIN-1.
   const seedBlocked = (id = 'b1', o = {}) => history.insertOne({
@@ -45,7 +63,7 @@ describe('ticket-closed-clear (LIN-3399)', () => {
       { message: '[blocked] waiting', timestamp: mins(280) }], ...o
   });
   const run = (o = {}) => runTicketClosedClear({
-    dispatchStore: store, agentStatusStore, urlKeys: ['acme'],
+    dispatchStore: store, agentStatusStore, recordsStore: records, urlKeys: ['acme'],
     readTicketState: async () => ticket, log: () => {}, ...o
   });
   const readLoops = () => getLoopsForWorkspace('acme', { lean: true, dispatchStore: store, agentStatusStore });
@@ -61,7 +79,7 @@ describe('ticket-closed-clear (LIN-3399)', () => {
     assert.equal(await written(), before);
     assert.equal(r.execute, false);
     assert.equal(r.perWorkspace[0].rows, 1);
-    assert.equal(r.perWorkspace[0].loopDecisions, 1);
+    assert.equal(r.perWorkspace[0].questions, 0, 'no open question on LIN-1 in this fixture');
     assert.match(r.report, /DRY RUN/);
     assert.match(r.report, /blocked\/silent rows \(clause 3\)\s+1/);
   });
@@ -82,11 +100,11 @@ describe('ticket-closed-clear (LIN-3399)', () => {
     assert.equal(await whole(), before, 'a dry run leaves feedbackDigest byte-identical');
   });
 
-  test('--execute takes clauses 3 and 4 from N to 0, stamps the clear\'s own actor, and is idempotent', async () => {
+  test('--execute closes the blocked row and ends the open question on LIN-1 (ticket closed), stamps the clear\'s own actor, and is idempotent', async () => {
     await seedBlocked();
+    const q = await askOnLin1();
     const before = (await live()).perWorkspace[0];
     assert.equal(before.clause3, 1);
-    assert.equal(before.clause4, 1);
 
     const r = await run({ execute: true });
     assert.equal(r.remaining, 0);
@@ -95,15 +113,18 @@ describe('ticket-closed-clear (LIN-3399)', () => {
     const row = await history.findOne({ _id: 'b1' });
     assert.equal(row.bookkeeping.reason, 'ticket-closed');
     assert.equal(row.bookkeeping.by, CLEAR_BY_DEFAULT);
+    const question = (await records.find('acme', { kind: 'question' })).find(x => x.id === q);
+    assert.equal(question.state, 'withdrawn');
+    assert.equal(question.ended.reason, 'ticket closed');
 
     const after = (await live()).perWorkspace[0];
     assert.equal(after.clause3, 0);
-    assert.equal(after.clause4, 0);
     assert.equal(after.falseCloses['ticket-closed'].length, 0);
     assert.equal(after.falseCloses.reopened.length, 0);
 
     const again = await run({ execute: true });
     assert.equal(again.perWorkspace[0].closed.closedRows, 0);
+    assert.equal(again.perWorkspace[0].closed.withdrawn, 0);
   });
 
   test('--by overrides the recorded actor', async () => {

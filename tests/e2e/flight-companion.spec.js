@@ -1072,88 +1072,6 @@ test.describe('Flight Companion — no-census check-in (LIN-2487, page.clock)', 
   });
 });
 
-// LIN-2621 beat 4: waiting-on-you decisions as option buttons, reused
-// verbatim from the rulings tab's own primitive (public/chat.css's
-// `.chat-options*` rules, public/chat.js's window.ChatUI.appendOptions) — a
-// tap answers through window.ReplyDelivery.postComment, the existing
-// session-auth comment path, never a new write surface. Real DOM, real
-// client; the comment POST is intercepted here (never reaches Express) —
-// same "no model calls, no live writes" discipline as the rest of this file.
-test.describe('Decisions as option buttons (LIN-2621 beat 4)', () => {
-  const decisionsToolFrame = (decisions) => (
-    ['tool', { phase: 'result', id: 't1', name: 'list_pending_decisions', result: JSON.stringify({ count: decisions.length, truncated: false, decisions }) }]
-  );
-
-  test('an interactive decision renders its options with the recommended star; a tap posts a comment and the row settles', async ({ page }) => {
-    const decision = {
-      decisionId: 'dec-42', issueIdentifier: 'LIN-42', loopId: 'loop-42', sessionId: 'sess-42',
-      question: 'Ship the fix now?', options: [{ id: 'yes', label: 'Ship it' }, { id: 'no', label: 'Hold' }],
-      optionsTotal: 2, recommended: 'yes', since: null, disposition: 'resumable', canReply: true, shelvedLapseCount: 0,
-    };
-    await page.goto(`/test/set-session?${featuresParam({ flightCompanion: true })}&urlKey=${URL_KEY}`);
-
-    await page.clock.install();
-    await mockTurn(page, { toolFrames: [decisionsToolFrame([decision])] });
-
-    let commentRequest = null;
-    await page.route('**/api/comments/**', (route) => {
-      if (route.request().method() !== 'POST') return route.continue();
-      commentRequest = route.request().postDataJSON();
-      return route.fulfill({ status: 200, contentType: 'application/json', body: JSON.stringify({ id: 'c1' }) });
-    });
-
-    await page.goto(PAGE_URL);
-    await page.waitForLoadState('networkidle');
-    await page.clock.fastForward(30000);
-
-    // LIN-3361: the decisions start folded; open the fold to reach the cards.
-    await page.locator('.fc-decisions-fold > summary').click();
-    const card = page.locator('.fc-decision');
-    await expect(card).toHaveCount(1);
-    await expect(card.locator('.fc-decision-question')).toHaveText('Ship the fix now?');
-    const buttons = card.locator('.chat-options-row .chat-option-btn');
-    await expect(buttons).toHaveCount(2);
-    await expect(buttons.nth(0)).toHaveClass(/chat-option--recommended/);
-    await expect(buttons.nth(1)).not.toHaveClass(/chat-option--recommended/);
-
-    await buttons.nth(0).click();
-    await expect.poll(() => commentRequest).not.toBeNull();
-    expect(commentRequest.body).toBe('Ship it');
-    expect(commentRequest.decisionLoopId).toBe('loop-42');
-    expect(commentRequest.decisionId).toBe('dec-42');
-
-    await expect(card).toHaveClass(/fc-decision--resolved/);
-    await expect(buttons.nth(0)).toBeDisabled();
-    await expect(buttons.nth(1)).toBeDisabled();
-    await expect(card.locator('.fc-decision-feedback')).toContainText('Replied');
-  });
-
-  test('canReply: false / a read-only disposition renders the caption only — no tappable buttons', async ({ page }) => {
-    const decision = {
-      decisionId: 'dec-43', issueIdentifier: 'LIN-43', loopId: 'loop-43', sessionId: 'sess-43',
-      question: 'Still running', options: [{ id: 'yes', label: 'Ship it' }],
-      optionsTotal: 1, recommended: null, since: null, disposition: 'mid-turn', canReply: false, shelvedLapseCount: 0,
-    };
-    await page.goto(`/test/set-session?${featuresParam({ flightCompanion: true })}&urlKey=${URL_KEY}`);
-
-    await page.clock.install();
-    await mockTurn(page, { toolFrames: [decisionsToolFrame([decision])] });
-    await page.route('**/api/comments/**', (route) => {
-      if (route.request().method() === 'POST') throw new Error('a read-only decision must never post a comment');
-      return route.continue();
-    });
-
-    await page.goto(PAGE_URL);
-    await page.waitForLoadState('networkidle');
-    await page.clock.fastForward(30000);
-
-    const card = page.locator('.fc-decision');
-    await expect(card).toHaveCount(1);
-    await expect(card.locator('.chat-options--readonly')).toHaveCount(1);
-    await expect(card.locator('.chat-options-row')).toHaveCount(0);
-  });
-});
-
 // LIN-2716: before this landed, a page reload threw the conversation away —
 // chatHistory lived only in a browser-memory array, never written to
 // sessionStorage. These are the ticket's own headline acceptance criteria,
@@ -1662,21 +1580,22 @@ test.describe('LIN-3361: expandable grouped tool rows, folded decisions and read
     await expect(page.locator('#flight-companion-thread > li.chat-tool-row')).toHaveCount(1);
   });
 
-  test('decisions fold under "N decisions waiting"; opening it and tapping an option still replies and resolves', async ({ page }) => {
-    const decision = (n) => ({
-      decisionId: `dec-${n}`, issueIdentifier: `LIN-${n}`, loopId: `loop-${n}`, sessionId: `sess-${n}`,
-      question: `Q${n}?`, options: [{ id: 'yes', label: 'Ship it' }], optionsTotal: 1, recommended: 'yes',
-      since: null, disposition: 'resumable', canReply: true, shelvedLapseCount: 0,
+  test('open questions fold under "N decisions waiting"; opening it shows each question as the shared card, and answering one settles it', async ({ page }) => {
+    // LIN-4538: `list_pending_decisions` returns the open questions the person was asked (lib/chat-tools.js projectPendingQuestion),
+    // each drawn as the shared question card and answered through the one question route.
+    const question = (n) => ({
+      questionId: `q-${n}`, question: `Q${n}?`, options: ['Ship it', 'Hold'], recommended: 'Ship it',
+      issueIdentifier: `LIN-${n}`, state: 'resumable', interactive: true,
     });
     await openPage(page);
     await mockTurn(page, {
-      toolFrames: [['tool', { phase: 'result', id: 't1', name: 'list_pending_decisions', result: JSON.stringify({ count: 2, truncated: false, decisions: [decision(42), decision(43)] }) }]],
+      toolFrames: [['tool', { phase: 'result', id: 't1', name: 'list_pending_decisions', result: JSON.stringify({ count: 2, truncated: false, questions: [question(42), question(43)] }) }]],
     });
     let posted = null;
-    await page.route('**/api/comments/**', (route) => {
+    await page.route('**/questions/*/answer', (route) => {
       if (route.request().method() !== 'POST') return route.continue();
-      posted = route.request().postDataJSON();
-      return route.fulfill({ status: 200, contentType: 'application/json', body: JSON.stringify({ id: 'c1' }) });
+      posted = { url: route.request().url(), body: route.request().postDataJSON() };
+      return route.fulfill({ status: 200, contentType: 'application/json', body: JSON.stringify({ resumed: true }) });
     });
     await tick(page);
 
@@ -1689,13 +1608,18 @@ test.describe('LIN-3361: expandable grouped tool rows, folded decisions and read
     await expect(page.getByTestId('fc-decisions-rulings-link')).toHaveAttribute('href', `/workspace/${URL_KEY}/observation?view=rulings`);
 
     await fold.locator('> summary').click();
-    const card = fold.locator('.fc-decision').first();
-    await expect(card).toBeVisible();
-    await expect(card.getByTestId('fc-decision-task-link')).toHaveAttribute('href', `/workspace/${URL_KEY}/task/LIN-42`);
-    await card.locator('.chat-option-btn').click();
+    const row = fold.locator('.fc-decision').first();
+    await expect(row).toBeVisible();
+    await expect(row.getByTestId('fc-decision-task-link')).toHaveAttribute('href', `/workspace/${URL_KEY}/task/LIN-42`);
+    const card = row.locator('[data-testid="question-record-card"]');
+    await expect(card.getByTestId('question-record-card-question')).toHaveText('Q42?');
+    await card.locator('[data-option-id="Ship it"]').click();
+    await card.getByTestId('question-record-card-answer').click();
     await expect.poll(() => posted).not.toBeNull();
-    await expect(card).toHaveClass(/fc-decision--resolved/);
-    await expect(card.locator('.fc-decision-feedback')).toContainText('Replied');
+    expect(posted.url).toContain('/questions/q-42/answer');
+    expect(posted.body).toEqual({ option: 'Ship it', words: null });
+    await expect(card).toHaveAttribute('data-settled', 'true');
+    await expect(card.getByTestId('question-record-card-feedback')).toHaveText('Answered. The run resumes with your answer.');
   });
 
   test('a readout with a rule folds under "full readout"; the headline stays, the transcript stays intact', async ({ page }) => {

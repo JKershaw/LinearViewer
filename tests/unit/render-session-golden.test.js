@@ -201,7 +201,8 @@ const CASES = {
     session.loops[0].agentTokenLabel = 'dispatch-<bootstrap>';
     return { ...base, session, sessionTerminal: true, credentialByToken: { 'tok-1': 'credential_dead' } };
   },
-  'waiting-with-decision-card': () => {
+  // LIN-4538 (P7a): the waiting session's open question is its record card (the decision rows are retired from the run page).
+  'waiting-with-question-card': () => {
     const session = waitingSession();
     return {
       ...base,
@@ -210,7 +211,7 @@ const CASES = {
       waiting: true,
       waitingMessage: 'need a decision',
       producerLoopId: 'loop-2',
-      decisions: [decisionRow({ loopId: 'loop-2', options: ['yes', 'no'], ifUnanswered: 'I will wait', decisionCase: ['(recap 1/2) context', 'more'] })],
+      questionRecords: [{ questionId: 'q-902', asks: 'Which way?', options: ['yes', 'no'], recommended: 'yes', ifUnanswered: 'I will wait', taskId: 'task-901', ticket: 'LIN-901', runId: 'loop-2', askedAt: '2026-10-06T09:00:00.000Z', state: 'resumable', reason: null, interactive: true }],
       producer: { loopId: 'loop-2', target: 'cli', issueId: 'uuid-901', issueIdentifier: 'LIN-901', case: ['last words'] }
     };
   },

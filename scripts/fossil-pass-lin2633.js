@@ -105,6 +105,8 @@ import { execFileSync } from 'node:child_process';
 import { DispatchQueueStore } from '../lib/dispatch-store.js';
 import { AgentStatusStore } from '../lib/agent-status-store.js';
 import { getLoopsForWorkspace } from '../lib/pipeline-loops.js';
+import { RecordsStore, RECORDS_COLLECTION, REFS_COLLECTION, QUERY_LOG_COLLECTION } from '../lib/records-store.js';
+import { questionStandingOf } from '../lib/records/question-standing.js';
 import { computeSupersededLoopIds } from '../lib/loop-supersede.js';
 import { classifyLoop, FOSSIL_AGE_MS } from '../lib/observer-sweep.js';
 import { loopLastActivityMs, DEFAULT_LANE_STALE_MS } from '../lib/live-console.js';
@@ -315,7 +317,7 @@ export function bucketForAge(ageMs) {
  * @param {number} [params.staleMs] - classifyLoop's working→silent threshold
  * @returns {{eligible: Array<Object>, skipped: Array<Object>, skippedCounts: Object, laneCounts: Object, bucketCounts: Object}}
  */
-export function selectFossilRows({ loops, now, staleMs = DEFAULT_LANE_STALE_MS }) {
+export function selectFossilRows({ loops, now, staleMs = DEFAULT_LANE_STALE_MS, questionStanding = new Map() }) {
   const all = Array.isArray(loops) ? loops : [];
   const superseded = computeSupersededLoopIds(all);
 
@@ -359,7 +361,7 @@ export function selectFossilRows({ loops, now, staleMs = DEFAULT_LANE_STALE_MS }
       continue;
     }
 
-    const lane = classifyLoop(loop, { superseded, now, staleMs });
+    const lane = classifyLoop(loop, { superseded, now, staleMs, questionStanding });
     if (lane !== 'silent' && lane !== 'blocked') {
       skip(loop, 'not-silent-or-blocked', { lane });
       continue;
@@ -530,6 +532,8 @@ export function buildFossilReport({ perWorkspace, now, headSha = null, execute =
  * @param {Object} params
  * @param {Object} params.dispatchStore
  * @param {Object} params.agentStatusStore
+ * @param {Object} params.recordsStore - the question records the lane reads (LIN-4538); required, since a blocked run's
+ *   standing comes from them. Without it a blocked row would read as waiting on nothing it asked, and be selected wrongly.
  * @param {Array<string>} [params.urlKeys] - defaults to listObservedWorkspaceKeys()
  * @param {number} [params.now] - epoch ms, read ONCE and reused for the whole pass
  * @param {boolean} [params.execute=false] - false (default) writes nothing
@@ -541,6 +545,7 @@ export function buildFossilReport({ perWorkspace, now, headSha = null, execute =
 export async function runFossilPass({
   dispatchStore,
   agentStatusStore,
+  recordsStore,
   urlKeys = null,
   now = Date.now(),
   execute = false,
@@ -548,6 +553,7 @@ export async function runFossilPass({
   headSha = null,
   log = () => {}
 }) {
+  if (!recordsStore) throw new Error('runFossilPass: recordsStore is required (LIN-4538: the lane reads question records)');
   const keys = urlKeys || await dispatchStore.listObservedWorkspaceKeys();
   log(`[fossil-pass] ${execute ? 'EXECUTE' : 'DRY RUN'} over ${keys.length} workspace(s)`);
 
@@ -556,19 +562,21 @@ export async function runFossilPass({
 
   for (const urlKey of keys) {
     let loops;
+    let questionStanding;
     try {
       // The same call sweepOneWorkspace makes (lib/observer-sweep.js:358),
       // but NON-lean: gate 3 needs raw feedback[]. A rejection here throws
       // out of the try and this workspace stamps NOTHING — there is no
       // partial-read path that could stamp against half a picture (N4).
       loops = await getLoopsForWorkspace(urlKey, { lean: false, dispatchStore, agentStatusStore });
+      questionStanding = await questionStandingOf(recordsStore, urlKey);
     } catch (err) {
       log(`[fossil-pass] ${urlKey}: READ FAILED (${err?.message || err}) — stamping nothing for this workspace`);
       perWorkspace.push({ urlKey, readFailed: true, error: err?.message || String(err), selection: null });
       continue;
     }
 
-    const selection = selectFossilRows({ loops, now });
+    const selection = selectFossilRows({ loops, now, questionStanding });
     perWorkspace.push({ urlKey, readFailed: false, selection });
     log(`[fossil-pass] ${urlKey}: ${selection.eligible.length} eligible of ${loops.length} loop(s)`);
 
@@ -644,10 +652,16 @@ async function main() {
       historyCollection: db.collection('dispatch-history')
     });
     const agentStatusStore = new AgentStatusStore({ collection: db.collection('foreman-status') });
+    const recordsStore = new RecordsStore({
+      records: db.collection(RECORDS_COLLECTION),
+      refs: db.collection(REFS_COLLECTION),
+      queryLog: db.collection(QUERY_LOG_COLLECTION),
+    });
 
     const { report } = await runFossilPass({
       dispatchStore,
       agentStatusStore,
+      recordsStore,
       execute,
       by,
       headSha: readHeadSha(),

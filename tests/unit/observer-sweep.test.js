@@ -62,7 +62,8 @@ import { stableStringify } from '../../lib/recap-cache.js';
 import { DispatchQueueStore } from '../../lib/dispatch-store.js';
 import { AgentStatusStore } from '../../lib/agent-status-store.js';
 import { isWakeEvent } from '../../lib/dispatch-terminal.js';
-import { isDecisionAnsweredInLineage, answeredDecisionIdsByLineage, isDecisionWithdrawn } from '../../lib/unanswered-decisions.js';
+import { RecordsStore, RECORDS_COLLECTION, REFS_COLLECTION, QUERY_LOG_COLLECTION } from '../../lib/records-store.js';
+import { QUESTION_SETTLED, questionStandingByRun } from '../../lib/records/question-standing.js';
 import { guardNetwork } from '../fixtures/network-guard.js';
 import { digestFeedback } from '../../lib/digest-feedback.js';
 import { projectActiveSession } from '../../lib/chat-tools.js';
@@ -388,387 +389,148 @@ describe('observer-sweep: classification (LIN-2131)', () => {
     assert.strictEqual(withExclusion, 'silent', 'excluded from blocked, x1 falls through to its own (stale) activity signal');
   });
 
-  // ── LIN-2671: an answered decision discharges the blocked lifecycle ───────
-  //
-  // The independent signal the sweep never consulted before: a loop can carry
-  // a `[blocked]` marker AND an answered decision at once — the LIN-2632
-  // dispatch `67b7b85a` shape, answered out of band and merged without a
-  // follow-up resume. `answeredDecisionId` is derived onto the lean loop the
-  // same way `wakeMarker`/`decision` are (LIN-1728), so these fixture-driven
-  // tests fail on a lean-conditional threading.
-  //
-  // The answer's lane is `resolved`, NOT `silent`: both `silent` and `blocked`
-  // are attention lanes, so a `silent` lane would keep the row on the
-  // waiting-on-a-human list this ticket exists to remove it from.
+  // ── LIN-4538: a settled question on a lineage discharges its blocked rows; an open one keeps them blocked ───────
+  // The person's answer, dismissal or the ticket's closing is a question record's end (lib/records/question-standing.js).
 
-  test('LIN-2671: a blocked row whose decision has been answered out of band lands resolved', () => {
+  test('LIN-4538: a blocked row whose lineage has a SETTLED question lands resolved, never silent', () => {
     const hist = historyItem({
-      id: 'h-answered', issueIdentifier: 'LIN-320',
-      dispatchedAt: '2026-04-11T11:00:00.000Z',
-      feedback: [
-        { message: '[blocked] need a decision', timestamp: '2026-04-11T11:05:00.000Z' },
-        decisionFeedbackEntry('dec-1'),
-        answerFeedbackEntry('dec-1')
-      ]
+      id: 'q-settled', issueIdentifier: 'LIN-320', dispatchedAt: '2026-04-11T11:00:00.000Z',
+      feedback: [{ message: '[blocked] need a person', timestamp: '2026-04-11T11:05:00.000Z' }]
     });
     const loops = _buildLoops({ historyItems: [hist], now: NOW, lean: true });
     const loop = loops[0];
     assert.strictEqual(loop.wakeMarker, 'blocked', 'sanity: the blocked marker is really present');
-    assert.strictEqual(loop.decision.decision_id, 'dec-1', 'sanity: the decision derives onto the lean loop');
-    assert.strictEqual(loop.answeredDecisionId, 'dec-1', 'sanity: the matching answer derives onto the lean loop');
 
-    const lane = classifyLoop(loop, { superseded: computeSupersededLoopIds(loops), now: NOW_MS, staleMs: STALE_MS });
-    assert.strictEqual(lane, 'resolved', 'the human answered — this row is done-with, not waiting on anyone');
+    const lane = classifyLoop(loop, {
+      superseded: computeSupersededLoopIds(loops), now: NOW_MS, staleMs: STALE_MS,
+      questionStanding: new Map([['q-settled', 'settled']])
+    });
+    assert.strictEqual(lane, 'resolved', 'the person settled the question — this row is done-with, not waiting on anyone');
     assert.notStrictEqual(lane, 'silent', 'silent is still a waiting-on-a-human lane and would keep the row in attention');
   });
 
-  test('LIN-2671: the same blocked row with a MISMATCHED answeredDecisionId stays blocked', () => {
+  test('LIN-4538: a blocked row whose lineage has an OPEN question stays blocked', () => {
     const hist = historyItem({
-      id: 'h-answered-stale', issueIdentifier: 'LIN-321',
-      dispatchedAt: '2026-04-11T11:00:00.000Z',
-      feedback: [
-        { message: '[blocked] need a decision', timestamp: '2026-04-11T11:05:00.000Z' },
-        decisionFeedbackEntry('dec-new'),
-        answerFeedbackEntry('dec-old')
-      ]
+      id: 'q-open', issueIdentifier: 'LIN-321', dispatchedAt: '2026-04-11T11:00:00.000Z',
+      feedback: [{ message: '[blocked] need a person', timestamp: '2026-04-11T11:05:00.000Z' }]
     });
     const loops = _buildLoops({ historyItems: [hist], now: NOW, lean: true });
-    const loop = loops[0];
-    assert.strictEqual(loop.decision.decision_id, 'dec-new', 'sanity: the CURRENT decision is the new, unanswered one');
-    assert.strictEqual(loop.answeredDecisionId, 'dec-old', 'sanity: the answer stamp names the OLD decision');
-
-    const lane = classifyLoop(loop, { superseded: computeSupersededLoopIds(loops), now: NOW_MS, staleMs: STALE_MS });
-    assert.strictEqual(lane, 'blocked', 'a stale answer for an older decision must not discharge a newer, unanswered one');
+    const lane = classifyLoop(loops[0], {
+      superseded: computeSupersededLoopIds(loops), now: NOW_MS, staleMs: STALE_MS,
+      questionStanding: new Map([['q-open', 'waiting']])
+    });
+    assert.strictEqual(lane, 'blocked', 'a question still open is a person still asked: the row stays waiting on them');
   });
 
-  test('LIN-2671: an answered decision does NOT override supersession — a follow-up still wins', () => {
+  test('LIN-4538: a blocked row whose lineage asked no question stays blocked (it parked without asking)', () => {
+    const hist = historyItem({
+      id: 'q-none', issueIdentifier: 'LIN-322', dispatchedAt: '2026-04-11T11:00:00.000Z',
+      feedback: [{ message: '[blocked] need a person', timestamp: '2026-04-11T11:05:00.000Z' }]
+    });
+    const loops = _buildLoops({ historyItems: [hist], now: NOW, lean: true });
+    const lane = classifyLoop(loops[0], {
+      superseded: computeSupersededLoopIds(loops), now: NOW_MS, staleMs: STALE_MS,
+      questionStanding: new Map()
+    });
+    assert.strictEqual(lane, 'blocked');
+  });
+
+  test('LIN-4538: a settled question does NOT override supersession — a follow-up still wins', () => {
     const original = historyItem({
-      id: 'z1', issueIdentifier: 'LIN-322', dispatchedAt: '2026-04-11T10:00:00.000Z',
-      feedback: [
-        { message: '[blocked] need a decision', timestamp: '2026-04-11T10:05:00.000Z' },
-        decisionFeedbackEntry('dec-1', '2026-04-11T10:06:00.000Z'),
-        answerFeedbackEntry('dec-1', '2026-04-11T10:08:00.000Z')
-      ]
+      id: 'z1', issueIdentifier: 'LIN-323', dispatchedAt: '2026-04-11T10:00:00.000Z',
+      feedback: [{ message: '[blocked] need a person', timestamp: '2026-04-11T10:05:00.000Z' }]
     });
     const followUp = historyItem({
-      id: 'z2', issueIdentifier: 'LIN-322', followUpTo: 'z1',
+      id: 'z2', issueIdentifier: 'LIN-323', followUpTo: 'z1',
       feedback: [{ message: '[done] resumed and finished', timestamp: '2026-04-11T11:40:00.000Z' }]
     });
     const loops = _buildLoops({ historyItems: [original, followUp], now: NOW, lean: true });
     const loopZ = loops.find((l) => l.loopId === 'z1');
-    assert.strictEqual(loopZ.answeredDecisionId, 'dec-1', 'sanity: the row is answered too');
     const superseded = computeSupersededLoopIds(loops);
-    assert.ok(superseded.has('z1'), 'sanity: and a follow-up names it');
+    assert.ok(superseded.has('z1'), 'sanity: a follow-up names it');
 
-    const lane = classifyLoop(loopZ, { superseded, now: NOW_MS, staleMs: STALE_MS });
+    const lane = classifyLoop(loopZ, { superseded, now: NOW_MS, staleMs: STALE_MS, questionStanding: new Map([['z1', 'settled']]) });
     assert.strictEqual(
       lane, 'silent',
-      'supersession keeps its prior path — an answered decision only clears blocked when nothing supersedes it'
+      'supersession keeps its prior path — a settled question only clears blocked when nothing supersedes it'
     );
   });
 });
 
-describe('LIN-2991: classifyLoop discharges every member of every answered decision group in a lineage, independently', () => {
-  test('two distinct decisions in one lineage each discharge on their own — an unanswered sibling decision stays blocked', () => {
-    const root = historyItem({
-      id: 'lin-root', issueIdentifier: 'LIN-330', dispatchedAt: '2026-04-11T10:00:00.000Z',
-      feedback: [
-        { message: '[blocked] need a decision', timestamp: '2026-04-11T10:05:00.000Z' },
-        decisionFeedbackEntry('dec-a', '2026-04-11T10:06:00.000Z')
-      ]
-    });
-    const follow1 = historyItem({
-      id: 'lin-follow-1', issueIdentifier: 'LIN-330', rootItemId: 'lin-root', dispatchedAt: '2026-04-11T10:30:00.000Z',
-      feedback: [
-        answerFeedbackEntry('dec-a', '2026-04-11T10:31:00.000Z'),
-        { message: '[blocked] a second question', timestamp: '2026-04-11T10:35:00.000Z' },
-        decisionFeedbackEntry('dec-b', '2026-04-11T10:36:00.000Z')
-      ]
-    });
-    const follow2 = historyItem({
-      id: 'lin-follow-2', issueIdentifier: 'LIN-330', rootItemId: 'lin-root', dispatchedAt: '2026-04-11T11:00:00.000Z',
-      feedback: [
-        answerFeedbackEntry('dec-b', '2026-04-11T11:01:00.000Z'),
-        { message: '[blocked] a third, still-open question', timestamp: '2026-04-11T11:05:00.000Z' },
-        decisionFeedbackEntry('dec-c', '2026-04-11T11:06:00.000Z')
-      ]
-    });
-    const loops = _buildLoops({ historyItems: [root, follow1, follow2], now: NOW, lean: true });
-    const rootLoop = loops.find((l) => l.loopId === 'lin-root');
-    const followLoop1 = loops.find((l) => l.loopId === 'lin-follow-1');
-    const followLoop2 = loops.find((l) => l.loopId === 'lin-follow-2');
-    assert.strictEqual(rootLoop.decision.decision_id, 'dec-a', 'sanity');
-    assert.strictEqual(followLoop1.decision.decision_id, 'dec-b', 'sanity');
-    assert.strictEqual(followLoop2.decision.decision_id, 'dec-c', 'sanity');
-
-    const superseded = computeSupersededLoopIds(loops);
-    const answeredByLineage = answeredDecisionIdsByLineage(loops);
-    assert.deepStrictEqual(answeredByLineage.get('lin-root'), new Set(['dec-a', 'dec-b']), 'sanity: the union carries exactly the two answered ids, never the still-open dec-c');
-
-    const opts = { superseded, now: NOW_MS, staleMs: STALE_MS, answeredByLineage };
-    assert.strictEqual(classifyLoop(rootLoop, opts), 'resolved', 'dec-a, answered on a LATER sibling loop, must discharge the root');
-    assert.strictEqual(classifyLoop(followLoop1, opts), 'resolved', 'dec-b, answered on a LATER sibling loop, discharges follow-1 too — the sibling stamp for dec-b does not erase dec-a’s own discharge');
-    assert.strictEqual(classifyLoop(followLoop2, opts), 'blocked', 'dec-c is still genuinely unanswered anywhere in the lineage and must stay blocked');
+describe('LIN-4538: question standing discharges a blocked lineage, its siblings, and the payload', () => {
+  const blockedRow = (id, extra = {}) => historyItem({
+    id, issueIdentifier: 'LIN-330', dispatchedAt: '2026-04-11T10:00:00.000Z',
+    feedback: [{ message: '[blocked] need a person', timestamp: '2026-04-11T10:05:00.000Z' }],
+    ...extra,
   });
 
-  test('LIN-3022 L1 — buildSweepPayload itself threads answeredByLineage: a root blocked on a decision answered on a SIBLING loop leaves lanes.blocked and attention', () => {
-    // The test above hands `classifyLoop` a hand-built map, so it cannot see
-    // `buildSweepPayload` stop computing/threading one (review mutation M12
-    // stayed green). This drives the production entry point instead.
-    const root = historyItem({
-      id: 'l1-root', issueIdentifier: 'LIN-340', dispatchedAt: '2026-04-11T11:50:00.000Z',
-      feedback: [
-        { message: '[blocked] need a decision', timestamp: '2026-04-11T11:51:00.000Z' },
-        decisionFeedbackEntry('l1-dec', '2026-04-11T11:52:00.000Z')
-      ]
-    });
-    const sibling = historyItem({
-      id: 'l1-sibling', issueIdentifier: 'LIN-340', rootItemId: 'l1-root', dispatchedAt: '2026-04-11T11:54:00.000Z',
-      feedback: [
-        answerFeedbackEntry('l1-dec', '2026-04-11T11:55:00.000Z'),
-        { message: '[done] finished after the answer', timestamp: '2026-04-11T11:56:00.000Z' }
-      ]
-    });
-    const loops = _buildLoops({ historyItems: [root, sibling], now: NOW, lean: true });
-    const rootLoop = loops.find((l) => l.loopId === 'l1-root');
-    assert.strictEqual(rootLoop.decision.decision_id, 'l1-dec', 'sanity');
-    assert.ok(!computeSupersededLoopIds(loops).has('l1-root'), 'sanity: the root is not excluded as superseded, so only the lineage map can discharge it');
-    // Control: the root's OWN loop carries no answer, so without the map it
-    // reads blocked — the payload assertions below are discriminating.
-    assert.strictEqual(
-      classifyLoop(rootLoop, { superseded: new Set(), now: NOW_MS, staleMs: STALE_MS }),
-      'blocked',
-      'control: with no lineage map, the own-loop fallback leaves the root blocked'
-    );
-
-    const payload = buildSweepPayload(loops, { now: NOW_MS, staleMs: STALE_MS });
-    assert.strictEqual(payload.lanes.blocked, 0, 'buildSweepPayload must compute and thread the lineage map itself');
-    assert.strictEqual(payload.lanes.resolved, 1, 'the root is discharged by its sibling\'s answer stamp');
-    assert.ok(!payload.attention.some((row) => row.loopId === 'l1-root'), 'a sibling-answered root must never be surfaced as waiting on a human');
+  test('a question asked on the root settles the blocked follow-ups of its lineage too (the lineage is the key, not the loop)', () => {
+    const root = blockedRow('lin-root');
+    const follow = blockedRow('lin-follow', { rootItemId: 'lin-root', dispatchedAt: '2026-04-11T10:30:00.000Z' });
+    const loops = _buildLoops({ historyItems: [root, follow], now: NOW, lean: true });
+    const standing = new Map([['lin-root', 'settled']]);
+    const opts = { superseded: computeSupersededLoopIds(loops), now: NOW_MS, staleMs: STALE_MS, questionStanding: standing };
+    assert.strictEqual(classifyLoop(loops.find((l) => l.loopId === 'lin-root'), opts), 'resolved');
+    assert.strictEqual(classifyLoop(loops.find((l) => l.loopId === 'lin-follow'), opts), 'resolved');
   });
-});
 
-describe('observer-sweep: withdrawal discharge (LIN-2891/LIN-3036 Surface 6)', () => {
-  // `classifyLoop` is the ONE shared classifier. The three production callers
-  // are: `buildSweepPayload` (lib/observer-sweep.js:310, the 60s census — tested
-  // below), `projectActiveSession` (lib/chat-tools.js:1115, list_pending_decisions
-  // / fleet read — tested below), and the fossil pass
-  // (scripts/fossil-pass-lin2633.js:361 — the direct `classifyLoop` calls here,
-  // which pass no `answeredByLineage`, exercise exactly that option shape).
-  // Withdrawal is read item-scoped from the loop itself, so it needs no map.
-
-  test('a blocked row whose OWN decision is withdrawn lands resolved — not blocked (fossil-pass caller shape: no lineage map)', () => {
-    const hist = historyItem({
-      id: 'w-blocked', issueIdentifier: 'LIN-350', dispatchedAt: '2026-04-11T11:50:00.000Z',
-      feedback: [
-        { message: '[blocked] need a decision', timestamp: '2026-04-11T11:51:00.000Z' },
-        decisionFeedbackEntry('wdec-1', '2026-04-11T11:52:00.000Z'),
-        withdrawalFeedbackEntry('wdec-1', 'the asker retracted it', '2026-04-11T11:53:00.000Z')
-      ]
-    });
+  test('a question on another lineage does not discharge this row', () => {
+    const hist = blockedRow('lin-mine');
     const loops = _buildLoops({ historyItems: [hist], now: NOW, lean: true });
-    const loop = loops[0];
-    assert.strictEqual(loop.wakeMarker, 'blocked', 'sanity: the blocked marker is really present');
-    assert.strictEqual(loop.withdrawal?.decisionId, 'wdec-1', 'sanity: the withdrawal derives onto the lean loop');
-    assert.strictEqual(isDecisionWithdrawn(loop), true, 'sanity: the item-scoped predicate reads true on this loop');
-
-    // Control: strip the withdrawal and the same blocked row reads blocked, so
-    // the assertion below is discriminating (mutation M1 witnesses this too).
-    const preWithdrawal = _buildLoops({
-      historyItems: [historyItem({
-        id: 'w-blocked', issueIdentifier: 'LIN-350', dispatchedAt: '2026-04-11T11:50:00.000Z',
-        feedback: hist.feedback.filter((e) => e.kind !== 'decision-withdrawn')
-      })],
-      now: NOW, lean: true
+    const lane = classifyLoop(loops[0], {
+      superseded: computeSupersededLoopIds(loops), now: NOW_MS, staleMs: STALE_MS,
+      questionStanding: new Map([['lin-someone-else', 'settled']])
     });
-    assert.strictEqual(
-      classifyLoop(preWithdrawal[0], { superseded: computeSupersededLoopIds(preWithdrawal), now: NOW_MS, staleMs: STALE_MS }),
-      'blocked',
-      'control: without the withdrawal the row is genuinely blocked'
-    );
-
-    const lane = classifyLoop(loop, { superseded: computeSupersededLoopIds(loops), now: NOW_MS, staleMs: STALE_MS });
-    assert.strictEqual(lane, 'resolved', 'a withdrawn decision is done-with, not waiting on anyone');
-    assert.notStrictEqual(lane, 'silent', 'silent is still a waiting-on-a-human lane and would keep the row in attention');
+    assert.strictEqual(lane, 'blocked');
   });
 
-  test('item-scoped: a withdrawal on a SIBLING loop does not clear this blocked loop', () => {
-    const root = historyItem({
-      id: 'w-sib-root', issueIdentifier: 'LIN-351', dispatchedAt: '2026-04-11T11:50:00.000Z',
-      feedback: [
-        { message: '[blocked] need a decision', timestamp: '2026-04-11T11:51:00.000Z' },
-        decisionFeedbackEntry('wdec-shared', '2026-04-11T11:52:00.000Z')
-      ]
-    });
-    // The sibling carries the withdrawal for the SAME decision id, but it is a
-    // different loop — the read is per-loop (Choice C), so the root stays blocked.
-    const sibling = historyItem({
-      id: 'w-sib-other', issueIdentifier: 'LIN-351', rootItemId: 'w-sib-root', dispatchedAt: '2026-04-11T11:54:00.000Z',
-      feedback: [withdrawalFeedbackEntry('wdec-shared', 'sibling stamp', '2026-04-11T11:55:00.000Z')]
-    });
-    const loops = _buildLoops({ historyItems: [root, sibling], now: NOW, lean: true });
-    const rootLoop = loops.find((l) => l.loopId === 'w-sib-root');
-    const siblingLoop = loops.find((l) => l.loopId === 'w-sib-other');
-    assert.strictEqual(isDecisionWithdrawn(rootLoop), false, 'sanity: the root has no withdrawal of its own');
-    assert.strictEqual(isDecisionWithdrawn(siblingLoop), false, 'sanity: the sibling has no decision, so its withdrawal can never match one');
-    assert.ok(!computeSupersededLoopIds(loops).has('w-sib-root'), 'sanity: the root is not superseded, so only withdrawal could clear it');
-
-    assert.strictEqual(
-      classifyLoop(rootLoop, { superseded: computeSupersededLoopIds(loops), now: NOW_MS, staleMs: STALE_MS }),
-      'blocked',
-      'a withdrawal on a sibling cannot discharge this loop — the predicate reads only the loop\'s own field'
-    );
-  });
-
-  test('item-scoped: a withdrawal naming a MISMATCHED decision id leaves the blocked loop blocked', () => {
-    const hist = historyItem({
-      id: 'w-mismatch', issueIdentifier: 'LIN-352', dispatchedAt: '2026-04-11T11:50:00.000Z',
-      feedback: [
-        { message: '[blocked] need a decision', timestamp: '2026-04-11T11:51:00.000Z' },
-        decisionFeedbackEntry('wdec-new', '2026-04-11T11:52:00.000Z'),
-        withdrawalFeedbackEntry('wdec-old', 'stale', '2026-04-11T11:53:00.000Z')
-      ]
-    });
+  test('buildSweepPayload threads the standing itself: a settled root leaves lanes.blocked and attention', () => {
+    const hist = blockedRow('l1-root');
     const loops = _buildLoops({ historyItems: [hist], now: NOW, lean: true });
-    const loop = loops[0];
-    assert.strictEqual(loop.decision.decision_id, 'wdec-new', 'sanity: the CURRENT decision is the new one');
-    assert.strictEqual(loop.withdrawal, null, 'sanity (LIN-2891 F1): the decision-aware read drops the mismatched wdec-old withdrawal entirely');
-    assert.strictEqual(isDecisionWithdrawn(loop), false);
-
     assert.strictEqual(
-      classifyLoop(loop, { superseded: computeSupersededLoopIds(loops), now: NOW_MS, staleMs: STALE_MS }),
+      classifyLoop(loops[0], { superseded: new Set(), now: NOW_MS, staleMs: STALE_MS }),
       'blocked',
-      'a withdrawal for a different decision id must not discharge a newer, un-withdrawn one'
+      'control: with no standing, the row is blocked'
     );
+    const payload = buildSweepPayload(loops, { now: NOW_MS, staleMs: STALE_MS, questionStanding: new Map([['l1-root', 'settled']]) });
+    assert.strictEqual(payload.lanes.blocked, 0, 'buildSweepPayload must pass the standing through to every classification');
+    assert.strictEqual(payload.lanes.resolved, 1, 'the root is discharged by its settled question');
+    assert.ok(!payload.attention.some((row) => row.loopId === 'l1-root'), 'a settled row is never surfaced as waiting on a human');
   });
 
-  test('answered + withdrawn on the same blocked loop still lands resolved (the two discharge signals agree)', () => {
-    const hist = historyItem({
-      id: 'w-both', issueIdentifier: 'LIN-353', dispatchedAt: '2026-04-11T11:50:00.000Z',
-      feedback: [
-        { message: '[blocked] need a decision', timestamp: '2026-04-11T11:51:00.000Z' },
-        decisionFeedbackEntry('wdec-both', '2026-04-11T11:52:00.000Z'),
-        answerFeedbackEntry('wdec-both', '2026-04-11T11:53:00.000Z'),
-        withdrawalFeedbackEntry('wdec-both', 'also retracted', '2026-04-11T11:54:00.000Z')
-      ]
-    });
-    const loops = _buildLoops({ historyItems: [hist], now: NOW, lean: true });
-    const loop = loops[0];
-    assert.strictEqual(loop.answeredDecisionId, 'wdec-both', 'sanity: answered too');
-    assert.strictEqual(loop.withdrawal?.decisionId, 'wdec-both', 'sanity: and withdrawn too');
+  test('LIN-4538 — a blocked row whose question settled leaves lanes.blocked AND attentionKeysFull, so the companion gate reads a genuine delta', () => {
+    const answered = blockedRow('ans-blocked', { issueIdentifier: 'LIN-441', dispatchedAt: '2026-04-11T11:55:00.000Z' });
+    const open = blockedRow('open-blocked', { issueIdentifier: 'LIN-442', dispatchedAt: '2026-04-11T11:55:00.000Z' });
+    const loops = _buildLoops({ historyItems: [answered, open], now: NOW, lean: true });
 
-    assert.strictEqual(
-      classifyLoop(loop, { superseded: computeSupersededLoopIds(loops), now: NOW_MS, staleMs: STALE_MS }),
-      'resolved',
-      'both independent signals agree on resolved; no special ordering is needed'
-    );
+    // Control for the DELTA: with no question standing the settled row is still waiting on a human, and IS in attentionKeysFull.
+    const before = buildSweepPayload(loops, { now: NOW_MS, staleMs: STALE_MS });
+    assert.ok(before.attentionKeysFull.some((tuple) => tuple[0] === 'ans-blocked'), 'control: before the question settles, the row IS waiting on a human');
+
+    const standing = new Map([['ans-blocked', 'settled'], ['open-blocked', 'waiting']]);
+    const payload = buildSweepPayload(loops, { now: NOW_MS, staleMs: STALE_MS, questionStanding: standing });
+    assert.strictEqual(payload.lanes.blocked, 1, 'only the open question is still blocked');
+    assert.strictEqual(payload.lanes.resolved, 1, 'the settled row is done-with');
+    assert.ok(payload.attention.some((row) => row.loopId === 'open-blocked'), 'an open question keeps its row waiting on a human');
+    assert.ok(!payload.attentionKeysFull.some((tuple) => tuple[0] === 'ans-blocked'), 'the settled row leaves the gate\'s key set');
   });
 
-  test('a withdrawn decision does NOT override supersession — a follow-up still wins (withdrawn sibling of the answered pin)', () => {
-    // LIN-3036 review L1: the answered side has this pin
-    // (`observer-sweep: an answered decision does NOT override supersession`);
-    // the withdrawn side needs its own. Withdrawal discharge must sit INSIDE the
-    // `!supersededIds.has(loopId)` guard exactly as the answered check does, so a
-    // superseded blocked row keeps its prior fall-through — never a
-    // newly-minted `resolved` (mutation M11 moves the check outside this guard
-    // and this test is the witness that dies).
-    const original = historyItem({
-      id: 'wz1', issueIdentifier: 'LIN-357', dispatchedAt: '2026-04-11T10:00:00.000Z',
-      feedback: [
-        { message: '[blocked] need a decision', timestamp: '2026-04-11T10:05:00.000Z' },
-        decisionFeedbackEntry('wdec-sup', '2026-04-11T10:06:00.000Z'),
-        withdrawalFeedbackEntry('wdec-sup', 'retracted before the follow-up', '2026-04-11T10:08:00.000Z')
-      ]
-    });
-    const followUp = historyItem({
-      id: 'wz2', issueIdentifier: 'LIN-357', followUpTo: 'wz1',
-      feedback: [{ message: '[done] resumed and finished', timestamp: '2026-04-11T11:40:00.000Z' }]
-    });
-    const loops = _buildLoops({ historyItems: [original, followUp], now: NOW, lean: true });
-    const loopZ = loops.find((l) => l.loopId === 'wz1');
-    assert.strictEqual(loopZ.wakeMarker, 'blocked', 'sanity: the blocked marker is present');
-    assert.strictEqual(loopZ.withdrawal?.decisionId, 'wdec-sup', 'sanity: the row is withdrawn too');
-    assert.strictEqual(isDecisionWithdrawn(loopZ), true, 'sanity: the item-scoped predicate reads true');
-    const superseded = computeSupersededLoopIds(loops);
-    assert.ok(superseded.has('wz1'), 'sanity: and a follow-up names it');
-
-    const lane = classifyLoop(loopZ, { superseded, now: NOW_MS, staleMs: STALE_MS });
-    assert.strictEqual(
-      lane, 'silent',
-      'supersession keeps its prior path — a withdrawn decision only clears blocked when nothing supersedes it'
-    );
-    assert.notStrictEqual(lane, 'resolved', 'a superseded withdrawn row must never be newly minted resolved');
-  });
-
-  test('a withdrawal on a NON-blocked lifecycle does not force resolved — the discharge is scoped to the blocked lane', () => {
-    // LIN-3036 review L1: withdrawal only discharges the blocked lane. A fresh
-    // active row that happens to carry a matching decision + withdrawal must
-    // keep its own lifecycle lane (mutation M12 hoists a `resolved` return for
-    // ANY lifecycle above the blocked branch, and this test is the witness).
-    const hist = historyItem({
-      id: 'w-working', issueIdentifier: 'LIN-358', dispatchedAt: '2026-04-11T11:55:00.000Z',
-      feedback: [
-        decisionFeedbackEntry('wdec-working', '2026-04-11T11:52:00.000Z'),
-        withdrawalFeedbackEntry('wdec-working', 'retracted', '2026-04-11T11:53:00.000Z')
-      ]
-    });
-    const loops = _buildLoops({ historyItems: [hist], now: NOW, lean: true });
-    const loop = loops[0];
-    assert.strictEqual(loop.wakeMarker, null, 'sanity: no blocked marker — the lifecycle is not blocked');
-    assert.notStrictEqual(loop.agentState, 'waiting', 'sanity: the agent-status channel is not blocked either');
-    assert.strictEqual(loop.decision.decision_id, 'wdec-working', 'sanity: the decision derives onto the lean loop');
-    assert.strictEqual(isDecisionWithdrawn(loop), true, 'sanity: the withdrawal predicate is true on this loop');
-
-    const lane = classifyLoop(loop, { superseded: computeSupersededLoopIds(loops), now: NOW_MS, staleMs: STALE_MS });
-    assert.strictEqual(lane, 'working', 'a fresh active row stays working — withdrawal only discharges the blocked lane');
-    assert.notStrictEqual(lane, 'resolved', 'a withdrawal on a non-blocked lifecycle must not force resolved');
-  });
-
-  test('caller 1 — buildSweepPayload: a withdrawn blocked row leaves lanes.blocked AND attention, the open row stays', () => {
-    const withdrawn = historyItem({
-      id: 'w-census', issueIdentifier: 'LIN-354', dispatchedAt: '2026-04-11T11:55:00.000Z',
-      feedback: [
-        { message: '[blocked] need a decision', timestamp: '2026-04-11T11:56:00.000Z' },
-        decisionFeedbackEntry('wdec-census', '2026-04-11T11:57:00.000Z'),
-        withdrawalFeedbackEntry('wdec-census', 'retracted', '2026-04-11T11:58:00.000Z')
-      ]
-    });
-    const open = historyItem({
-      id: 'w-open', issueIdentifier: 'LIN-355', dispatchedAt: '2026-04-11T11:55:00.000Z',
-      feedback: [
-        { message: '[blocked] need a decision', timestamp: '2026-04-11T11:56:00.000Z' },
-        decisionFeedbackEntry('wdec-open', '2026-04-11T11:57:00.000Z')
-      ]
-    });
-    const loops = _buildLoops({ historyItems: [withdrawn, open], now: NOW, lean: true });
-
-    const payload = buildSweepPayload(loops, { now: NOW_MS, staleMs: STALE_MS });
-    assert.strictEqual(payload.lanes.blocked, 1, 'only the genuinely open decision is still blocked');
-    assert.strictEqual(payload.lanes.resolved, 1, 'the withdrawn row is done-with');
-    assert.ok(payload.attention.some((row) => row.loopId === 'w-open'), 'an un-withdrawn blocked row is still waiting on a human');
-    assert.ok(!payload.attention.some((row) => row.loopId === 'w-census'), 'a withdrawn blocked row must never be surfaced as waiting');
-  });
-
-  test('caller 2 — projectActiveSession: a withdrawn blocked session reads lifecycle resolved, waitingOnHuman false', () => {
-    const mkSession = (withWithdrawal) => {
-      const feedback = [
-        { message: '[blocked] need a decision', timestamp: '2026-04-11T11:56:00.000Z' },
-        decisionFeedbackEntry('wdec-session', '2026-04-11T11:57:00.000Z'),
-        ...(withWithdrawal ? [withdrawalFeedbackEntry('wdec-session', 'retracted', '2026-04-11T11:58:00.000Z')] : [])
-      ];
+  test('caller — projectActiveSession: a blocked session whose question settled reads lifecycle resolved, waitingOnHuman false', () => {
+    const mkSession = () => {
       const loops = _buildLoops({
-        historyItems: [historyItem({ id: 'w-session', issueIdentifier: 'LIN-356', dispatchedAt: '2026-04-11T11:55:00.000Z', feedback })],
+        historyItems: [historyItem({ id: 'w-session', issueIdentifier: 'LIN-356', dispatchedAt: '2026-04-11T11:55:00.000Z',
+          feedback: [{ message: '[blocked] need a person', timestamp: '2026-04-11T11:56:00.000Z' }] })],
         now: NOW, lean: true
       });
       return { sessionId: 'sess-w', seedIssue: 'LIN-356', dispatchedAt: NOW.toISOString(), tasksTouched: [], loops };
     };
 
-    const control = projectActiveSession(mkSession(false), { superseded: new Set(), now: NOW_MS, staleMs: STALE_MS });
-    assert.strictEqual(control.lifecycle, 'blocked', 'control: without the withdrawal the session is waiting on a human');
-    assert.strictEqual(control.waitingOnHuman, true, 'control: the open blocked loop keeps the session on the waiting list');
+    const control = projectActiveSession(mkSession(), { superseded: new Set(), now: NOW_MS, staleMs: STALE_MS, questionStanding: new Map() });
+    assert.strictEqual(control.lifecycle, 'blocked', 'control: with no settled question the session is waiting on a human');
+    assert.strictEqual(control.waitingOnHuman, true);
 
-    const row = projectActiveSession(mkSession(true), { superseded: new Set(), now: NOW_MS, staleMs: STALE_MS });
-    assert.strictEqual(row.lifecycle, 'resolved', 'the withdrawn decision is done-with — the fleet read must not show it blocked');
+    const row = projectActiveSession(mkSession(), { superseded: new Set(), now: NOW_MS, staleMs: STALE_MS, questionStanding: new Map([['w-session', 'settled']]) });
+    assert.strictEqual(row.lifecycle, 'resolved', 'the settled question is done-with — the fleet read must not show it blocked');
     assert.strictEqual(row.waitingOnHuman, false, 'and it must not count as waiting on a human');
   });
 });
@@ -843,71 +605,6 @@ describe('observer-sweep: payload contract (LIN-2131)', () => {
     assert.strictEqual(payload.lanes.blocked, 0, 'exclusion must apply to the agent-status channel exactly as it does to the feedback-marker one');
     assert.strictEqual(payload.lanes.unknown, 1, 'an excluded waiting row is not active (agentState "waiting"), so it falls to unknown');
     assert.ok(!payload.attention.some((row) => row.loopId === 'a1'), 'an answered row must never be surfaced as waiting on a human');
-  });
-
-  test('LIN-2671 — an answered blocked row leaves lanes.blocked AND attentionKeysFull, so the companion gate reads a genuine delta', () => {
-    const answered = historyItem({
-      id: 'ans-blocked', issueIdentifier: 'LIN-441', dispatchedAt: '2026-04-11T11:55:00.000Z',
-      feedback: [
-        { message: '[blocked] need a decision', timestamp: '2026-04-11T11:56:00.000Z' },
-        decisionFeedbackEntry('gate-dec', '2026-04-11T11:57:00.000Z'),
-        answerFeedbackEntry('gate-dec', '2026-04-11T11:58:00.000Z')
-      ]
-    });
-    const open = historyItem({
-      id: 'open-blocked', issueIdentifier: 'LIN-442', dispatchedAt: '2026-04-11T11:55:00.000Z',
-      feedback: [
-        { message: '[blocked] need a decision', timestamp: '2026-04-11T11:56:00.000Z' },
-        decisionFeedbackEntry('open-dec', '2026-04-11T11:57:00.000Z')
-      ]
-    });
-    const loops = _buildLoops({ historyItems: [answered, open], now: NOW, lean: true });
-
-    // Control for the DELTA: before the answer stamp exists, the same row is
-    // blocked and IS in attentionKeysFull. A payload assertion alone would be
-    // satisfiable by the row simply never having been attention-eligible.
-    //
-    // LIN-3011: rebuilt via `historyItem(...)` (not a raw `{...answered}`
-    // spread) so the auto-attached digest is recomputed from the TRIMMED
-    // feedback — a spread would keep `answered`'s ORIGINAL digest, which
-    // was computed from feedback that INCLUDES the answer, silently
-    // contradicting the "not yet answered" fixture this control needs.
-    const preAnswer = _buildLoops({
-      historyItems: [
-        historyItem({
-          id: 'ans-blocked', issueIdentifier: 'LIN-441', dispatchedAt: '2026-04-11T11:55:00.000Z',
-          feedback: answered.feedback.filter((e) => e.kind !== 'decision-answer')
-        }),
-        open
-      ],
-      now: NOW, lean: true
-    });
-    const before = buildSweepPayload(preAnswer, { now: NOW_MS, staleMs: STALE_MS });
-    assert.ok(
-      before.attentionKeysFull.some((tuple) => tuple[0] === 'ans-blocked'),
-      'control: before the answer lands, the row IS waiting on a human'
-    );
-
-    const payload = buildSweepPayload(loops, { now: NOW_MS, staleMs: STALE_MS });
-    assert.strictEqual(payload.lanes.blocked, 1, 'only the genuinely open decision is still blocked');
-    assert.strictEqual(payload.lanes.resolved, 1, 'the answered row is done-with');
-
-    assert.ok(
-      payload.attention.some((row) => row.loopId === 'open-blocked'),
-      'an unanswered blocked row is still waiting on a human'
-    );
-    assert.ok(
-      !payload.attention.some((row) => row.loopId === 'ans-blocked'),
-      'an answered blocked row must never be surfaced as waiting'
-    );
-    assert.ok(
-      !payload.attentionKeysFull.some((tuple) => tuple[0] === 'ans-blocked'),
-      'attentionKeysFull membership must reflect the lifecycle transition, or the companion gate sees no delta'
-    );
-    assert.ok(
-      payload.attentionKeysFull.some((tuple) => tuple[0] === 'open-blocked'),
-      'the untouched open row stays in the gate key — the delta is the answered row alone'
-    );
   });
 
   test('ledger 3 — attention is deterministically sorted, from a fixture whose insertion order is NOT already sorted (LIN-2619: by recency, not loopId — attentionKeysFull stays loopId-sorted)', () => {
@@ -1251,11 +948,12 @@ describe('observer-sweep: idempotency (real MangoDB tmpdir, LIN-2131 / LIN-2128 
     });
     const agentStatusStore = new AgentStatusStore({ collection: db.collection('foreman-status') });
     const observerStateStore = new ObserverStateStore({ collection: db.collection('observer-state') });
-    return { dispatchStore, agentStatusStore, observerStateStore };
+    const recordsStore = new RecordsStore({ records: db.collection(RECORDS_COLLECTION), refs: db.collection(REFS_COLLECTION), queryLog: db.collection(QUERY_LOG_COLLECTION) });
+    return { dispatchStore, agentStatusStore, observerStateStore, recordsStore };
   }
 
   test('firing the sweep repeatedly over identical input converges — same rev, no ledger growth, attention self-sorted, including a tick taken at a LATER clock', async () => {
-    const { dispatchStore, agentStatusStore, observerStateStore } = freshStores();
+    const { dispatchStore, agentStatusStore, observerStateStore, recordsStore } = freshStores();
     const urlKey = `ws-idem-${randomUUID()}`;
 
     // One still-queued row, plus two agent-status-blocked rows (F2 path) so
@@ -1269,7 +967,7 @@ describe('observer-sweep: idempotency (real MangoDB tmpdir, LIN-2131 / LIN-2128 
     await agentStatusStore.recordStatus({ urlKey, taskIdentifier: 'LIN-3', action: 'implementation', status: 'blocked', summary: 'blocked B', dispatchId: archivedB.id, timestamp: new Date() });
 
     const now = Date.now();
-    const deps = { dispatchStore, agentStatusStore, observerStateStore, now };
+    const deps = { dispatchStore, agentStatusStore, observerStateStore, recordsStore, now };
     const instanceKey = `sweep:v1:${urlKey}`;
 
     await sweepOneWorkspace(urlKey, deps);
@@ -1322,7 +1020,7 @@ describe('observer-sweep: idempotency (real MangoDB tmpdir, LIN-2131 / LIN-2128 
   });
 
   test('LIN-2619: stateHash (via the real ObserverStateStore advance()/stableStringify path) is unchanged for an unchanged census, with the new staleAttentionCount/staleAttentionThresholdMs/attentionKeysFull fields present', async () => {
-    const { dispatchStore, agentStatusStore, observerStateStore } = freshStores();
+    const { dispatchStore, agentStatusStore, observerStateStore, recordsStore } = freshStores();
     const urlKey = `ws-fossil-hash-${randomUUID()}`;
 
     const item = await dispatchStore.addItem(urlKey, { prompt: 'p', issueIdentifier: 'LIN-7', promptName: 'implementation' });
@@ -1330,7 +1028,7 @@ describe('observer-sweep: idempotency (real MangoDB tmpdir, LIN-2131 / LIN-2128 
     await agentStatusStore.recordStatus({ urlKey, taskIdentifier: 'LIN-7', action: 'implementation', status: 'blocked', summary: 'blocked', dispatchId: taken.id, timestamp: new Date() });
 
     const now = Date.now();
-    const deps = { dispatchStore, agentStatusStore, observerStateStore, now };
+    const deps = { dispatchStore, agentStatusStore, observerStateStore, recordsStore, now };
     const instanceKey = `sweep:v1:${urlKey}`;
 
     await sweepOneWorkspace(urlKey, deps);
@@ -1347,12 +1045,12 @@ describe('observer-sweep: idempotency (real MangoDB tmpdir, LIN-2131 / LIN-2128 
   });
 
   test('interleaved/duplicate ticks (MangoDB gives no cross-process exclusivity — the sweep is the safety net)', async () => {
-    const { dispatchStore, agentStatusStore, observerStateStore } = freshStores();
+    const { dispatchStore, agentStatusStore, observerStateStore, recordsStore } = freshStores();
     const urlKey = `ws-interleaved-${randomUUID()}`;
     await dispatchStore.addItem(urlKey, { prompt: 'p', issueIdentifier: 'LIN-9', promptName: 'implementation' });
 
     const now = Date.now();
-    const deps = { dispatchStore, agentStatusStore, observerStateStore, now };
+    const deps = { dispatchStore, agentStatusStore, observerStateStore, recordsStore, now };
     const instanceKey = `sweep:v1:${urlKey}`;
 
     await Promise.all([sweepOneWorkspace(urlKey, deps), sweepOneWorkspace(urlKey, deps)]);
@@ -1388,12 +1086,12 @@ describe('observer-sweep: idempotency (real MangoDB tmpdir, LIN-2131 / LIN-2128 
   // sweep run. These tests are what make that measurement valid.
 
   test('LIN-2438 T10: a DUPLICATE tick (byte-identical census, advance() no-op) still refreshes the sweep instance\'s lastSeenAt', async () => {
-    const { dispatchStore, agentStatusStore, observerStateStore } = freshStores();
+    const { dispatchStore, agentStatusStore, observerStateStore, recordsStore } = freshStores();
     const urlKey = `ws-heartbeat-${randomUUID()}`;
     await dispatchStore.addItem(urlKey, { prompt: 'p', issueIdentifier: 'LIN-1', promptName: 'implementation' });
 
     const now = Date.now();
-    const deps = { dispatchStore, agentStatusStore, observerStateStore, now };
+    const deps = { dispatchStore, agentStatusStore, observerStateStore, recordsStore, now };
     const instanceKey = `sweep:v1:${urlKey}`;
 
     await sweepOneWorkspace(urlKey, deps);
@@ -1415,12 +1113,12 @@ describe('observer-sweep: idempotency (real MangoDB tmpdir, LIN-2131 / LIN-2128 
   });
 
   test('LIN-2438 T11: the heartbeat leaves rev, state, stateHash, updatedAt and ledger untouched', async () => {
-    const { dispatchStore, agentStatusStore, observerStateStore } = freshStores();
+    const { dispatchStore, agentStatusStore, observerStateStore, recordsStore } = freshStores();
     const urlKey = `ws-heartbeat-inert-${randomUUID()}`;
     await dispatchStore.addItem(urlKey, { prompt: 'p', issueIdentifier: 'LIN-1', promptName: 'implementation' });
 
     const now = Date.now();
-    const deps = { dispatchStore, agentStatusStore, observerStateStore, now };
+    const deps = { dispatchStore, agentStatusStore, observerStateStore, recordsStore, now };
     const instanceKey = `sweep:v1:${urlKey}`;
 
     await sweepOneWorkspace(urlKey, deps);
@@ -1441,12 +1139,12 @@ describe('observer-sweep: idempotency (real MangoDB tmpdir, LIN-2131 / LIN-2128 
   });
 
   test('LIN-2438 T12: a tick that throws before advance() (rejecting getLoopsForWorkspace) writes no heartbeat', async () => {
-    const { dispatchStore, agentStatusStore, observerStateStore } = freshStores();
+    const { dispatchStore, agentStatusStore, observerStateStore, recordsStore } = freshStores();
     const urlKey = `ws-heartbeat-throw-${randomUUID()}`;
     await dispatchStore.addItem(urlKey, { prompt: 'p', issueIdentifier: 'LIN-1', promptName: 'implementation' });
 
     const now = Date.now();
-    const deps = { dispatchStore, agentStatusStore, observerStateStore, now };
+    const deps = { dispatchStore, agentStatusStore, observerStateStore, recordsStore, now };
     const instanceKey = `sweep:v1:${urlKey}`;
 
     // Seed the instance with a normal, successful tick first.
@@ -1460,7 +1158,7 @@ describe('observer-sweep: idempotency (real MangoDB tmpdir, LIN-2131 / LIN-2128 
       listHistory: async () => []
     };
     await assert.rejects(
-      () => sweepOneWorkspace(urlKey, { dispatchStore: brokenDispatchStore, agentStatusStore, observerStateStore, now }),
+      () => sweepOneWorkspace(urlKey, { dispatchStore: brokenDispatchStore, agentStatusStore, observerStateStore, recordsStore, now }),
       /boom: dispatch read failed/
     );
 
@@ -1469,7 +1167,7 @@ describe('observer-sweep: idempotency (real MangoDB tmpdir, LIN-2131 / LIN-2128 
   });
 
   test('LIN-2438 T13: advance() === false (lost race) and === null (backend error) each write no heartbeat', async () => {
-    const { dispatchStore, agentStatusStore } = freshStores();
+    const { dispatchStore, agentStatusStore, recordsStore } = freshStores();
     const urlKey = `ws-heartbeat-noadvance-${randomUUID()}`;
 
     for (const advanceResult of [false, null]) {
@@ -1479,7 +1177,7 @@ describe('observer-sweep: idempotency (real MangoDB tmpdir, LIN-2131 / LIN-2128 
         ensureSeeded: async () => { calls.push('ensureSeeded'); return { rev: 1 }; },
         advance: async () => { calls.push('advance'); return advanceResult; }
       };
-      await sweepOneWorkspace(urlKey, { dispatchStore, agentStatusStore, observerStateStore, now: Date.now() });
+      await sweepOneWorkspace(urlKey, { dispatchStore, agentStatusStore, observerStateStore, recordsStore, now: Date.now() });
       assert.deepStrictEqual(calls, ['readCurrent', 'advance'], `advance() === ${advanceResult} must not be followed by a heartbeat ensureSeeded call`);
     }
   });
@@ -1593,6 +1291,7 @@ describe('observer-sweep: negative capability — no automated-intervention path
     const realDispatchStore = new DispatchQueueStore({ collection: dispatchQueueCollection, historyCollection: dispatchHistoryCollection, ttl: 86400 });
     const realAgentStatusStore = new AgentStatusStore({ collection: agentStatusCollection });
     const realObserverStateStore = new ObserverStateStore({ collection: db.collection('observer-state') });
+    const recordsStore = new RecordsStore({ records: db.collection(RECORDS_COLLECTION), refs: db.collection(REFS_COLLECTION), queryLog: db.collection(QUERY_LOG_COLLECTION) });
 
     const urlKey = `ws-negative-${randomUUID()}`;
     // Seed real fleet data through the REAL (unguarded) stores — setup, not
@@ -1623,7 +1322,7 @@ describe('observer-sweep: negative capability — no automated-intervention path
 
     const net = guardNetwork();
     const now = Date.now();
-    const deps = { dispatchStore, agentStatusStore, observerStateStore, now };
+    const deps = { dispatchStore, agentStatusStore, observerStateStore, recordsStore, now };
 
     // Run twice — also re-proves idempotency under this exact capability
     // boundary, discharging LIN-2128 ledger item B: a harness that only sees
@@ -1664,6 +1363,7 @@ describe('observer-sweep: negative capability — no automated-intervention path
     const realDispatchStore = new DispatchQueueStore({ collection: dispatchQueueCollection, historyCollection: dispatchHistoryCollection, ttl: 86400 });
     const realAgentStatusStore = new AgentStatusStore({ collection: agentStatusCollection });
     const realObserverStateStore = new ObserverStateStore({ collection: db.collection('observer-state') });
+    const recordsStore = new RecordsStore({ records: db.collection(RECORDS_COLLECTION), refs: db.collection(REFS_COLLECTION), queryLog: db.collection(QUERY_LOG_COLLECTION) });
     const realShadowLogStore = new ObserverShadowLogStore({ collection: shadowLogCollection });
 
     const urlKey = `ws-shadow-${randomUUID()}`;
@@ -1699,7 +1399,7 @@ describe('observer-sweep: negative capability — no automated-intervention path
 
     const net = guardNetwork();
     const now = Date.now();
-    await sweepOneWorkspace(urlKey, { dispatchStore, agentStatusStore, observerStateStore, observerShadowLogStore, now });
+    await sweepOneWorkspace(urlKey, { dispatchStore, agentStatusStore, observerStateStore, observerShadowLogStore, recordsStore, now });
     assert.strictEqual(net.attempts.length, 0, 'this tier makes no /api/proxy call and no model call');
     net.restore();
 
@@ -1747,43 +1447,28 @@ describe('observer-sweep: negative capability — no automated-intervention path
     const specifiers = [...src.matchAll(/^import\s+(?:[^;]*?from\s+)?['"](.+?)['"]\s*;?\s*$/gm)].map((m) => m[1]);
     assert.deepStrictEqual(
       specifiers.sort(),
-      ['./dispatch-terminal.js', './live-console.js', './loop-supersede.js', './pipeline-loops.js', './observer-shadow-log.js', './unanswered-decisions.js', './session-row-live.js'].sort(),
+      ['./dispatch-terminal.js', './live-console.js', './loop-supersede.js', './pipeline-loops.js', './observer-shadow-log.js', './records/question-standing.js', './session-row-live.js'].sort(),
       'a new import here (e.g. a direct dispatch-store/agent-status-store import bypassing the injected deps seam, in EITHER statement form) must be caught by this assertion. ' +
       './observer-shadow-log.js (LIN-2132) is the one addition this ticket makes — it is itself pure (no dispatch-store/agent-status-store/linear-provider import; see its own static-import test in observer-shadow-log.test.js) and exports only the pure computeWouldBeActions, never a store instance. ' +
-      './unanswered-decisions.js (LIN-2671) is itself pure (imports ./loop-supersede.js and, since LIN-3364, ./dispatch-terminal.js; see unanswered-decisions.js) and exports the ONE answered-decision predicate classifyLoop must reuse rather than fork. ' +
+      './records/question-standing.js (LIN-4538) is itself pure (it reads a question record through its caller\'s store and imports only ./question-facts.js) and exports the ONE per-lineage question standing classifyLoop reads, so the lane and the question readers cannot disagree. ' +
       './dispatch-terminal.js (LIN-3602) is itself pure (imports only ./utils/time.js) and exports the ONE waiting-wake-marker predicate isWaitingWakeMarker that classifyLoop must reuse rather than fork. ' +
       './session-row-live.js (LIN-3506) is itself pure (imports only ./utils/time.js) and exports the ONE session-row liveness rule resolveRosterFromSessions must reuse rather than fork'
     );
   });
 
-  test('LIN-2671/LIN-2991/LIN-3036 import-by-reference: classifyLoop reuses isDecisionAnsweredInLineage and isDecisionWithdrawn from lib/unanswered-decisions.js, never forks the comparison', () => {
+  test('LIN-4538 import-by-reference: classifyLoop reads the question standing by reference, never a second derivation of the old predicate', () => {
     const modulePath = fileURLToPath(new URL('../../lib/observer-sweep.js', import.meta.url));
     const src = readFileSync(modulePath, 'utf8');
     assert.match(
       src,
-      /^import\s*\{\s*isDecisionAnsweredInLineage,\s*answeredDecisionIdsByLineage,\s*isDecisionWithdrawn\s*\}\s*from\s*'\.\/unanswered-decisions\.js';/m,
-      'both the answered and the withdrawn predicates must be imported by name from the shared module, not re-derived here'
+      /^import\s*\{[^}]*\bQUESTION_SETTLED\b[^}]*\}\s*from\s*'\.\/records\/question-standing\.js';/m,
+      'the settled marker must be imported by name from the shared question-standing module, not re-spelled here'
     );
-    assert.ok(
-      !/answeredDecisionId\s*===/.test(src),
-      'observer-sweep must NOT re-derive the comparison locally — a forked predicate is exactly how the census and the rulings feed disagreed (LIN-2671)'
-    );
-    assert.ok(
-      !/withdrawal\.decisionId\s*===/.test(src),
-      'observer-sweep must NOT re-derive the withdrawal comparison locally — it reuses isDecisionWithdrawn by reference (LIN-3036)'
-    );
-    // The names imported above are the shared module's real exports, not
-    // same-named locals; a renamed/re-exported shim would fail here.
-    assert.strictEqual(typeof isDecisionAnsweredInLineage, 'function');
-    assert.strictEqual(isDecisionAnsweredInLineage({ decision: { decision_id: 'd-1' } }, new Map([['loop-1', new Set(['d-1'])]])), false, 'no lineageId/loopId on this bare fixture — the map lookup misses');
-    const map = new Map([['lin-1', new Set(['d-1'])]]);
-    assert.strictEqual(isDecisionAnsweredInLineage({ decision: { decision_id: 'd-1' }, lineageId: 'lin-1' }, map), true);
-    assert.strictEqual(isDecisionAnsweredInLineage({ decision: { decision_id: 'd-2' }, lineageId: 'lin-1' }, map), false);
-    assert.strictEqual(isDecisionAnsweredInLineage({ decision: null, lineageId: 'lin-1' }, map), false);
-    assert.strictEqual(isDecisionAnsweredInLineage({ decision: { decision_id: 'd-1' }, lineageId: 'lin-1', answeredDecisions: [{ decisionId: 'd-1' }] }, undefined), true, 'map ABSENT falls back to the loop’s own answered set');
-    assert.strictEqual(typeof isDecisionWithdrawn, 'function');
-    assert.strictEqual(isDecisionWithdrawn({ decision: { decision_id: 'd-1' }, withdrawal: { decisionId: 'd-1' } }), true);
-    assert.strictEqual(isDecisionWithdrawn({ decision: { decision_id: 'd-1' }, withdrawal: { decisionId: 'd-2' } }), false);
+    assert.ok(!/unanswered-decisions/.test(src), 'observer-sweep must not import the retired ruling predicate');
+    assert.ok(!/answeredDecisionId|withdrawal\.decisionId/.test(src), 'observer-sweep must not read a decision or withdrawal field to discharge a row');
+    assert.strictEqual(QUESTION_SETTLED, 'settled');
+    assert.strictEqual(questionStandingByRun([{ runId: 'r', state: 'withdrawn' }]).get('r'), 'settled');
+    assert.strictEqual(questionStandingByRun([{ runId: 'r', state: 'withdrawn' }, { runId: 'r', state: 'open' }]).get('r'), 'waiting', 'an open question wins over an ended one');
   });
 });
 
@@ -1812,6 +1497,7 @@ describe('observer-sweep: createObserverSweepRun — the production tick closure
   const DISPATCH_STORE_STUB = { id: 'dispatchStore', listObservedWorkspaceKeys: async () => [] };
   const AGENT_STATUS_STORE_STUB = { id: 'agentStatusStore' };
   const OBSERVER_STATE_STORE_STUB = { id: 'observerStateStore' };
+  const RECORDS_STORE_STUB = { id: 'recordsStore' };
   function dispatchStoreOf(urlKeys) {
     return { id: 'dispatchStore', listObservedWorkspaceKeys: async () => urlKeys };
   }
@@ -1825,6 +1511,7 @@ describe('observer-sweep: createObserverSweepRun — the production tick closure
       dispatchStore,
       agentStatusStore: AGENT_STATUS_STORE_STUB,
       observerStateStore: OBSERVER_STATE_STORE_STUB,
+      recordsStore: RECORDS_STORE_STUB,
       intervalMs,
       now,
       sweep: async (urlKey, deps) => { calls.push({ urlKey, deps }); }
@@ -1872,8 +1559,9 @@ describe('observer-sweep: createObserverSweepRun — the production tick closure
       dispatchStore: DISPATCH_STORE_STUB,
       agentStatusStore: AGENT_STATUS_STORE_STUB,
       observerStateStore: OBSERVER_STATE_STORE_STUB,
+      recordsStore: RECORDS_STORE_STUB,
       now
-    }, 'the deps object handed to sweepOneWorkspace is exactly the three injected stores plus the tick clock');
+    }, 'the deps object handed to sweepOneWorkspace is exactly the injected stores plus the tick clock');
   });
 
   test('fail-soft: a rejecting roster read skips the tick — never a thrown job failure, never a sweep on a blank roster', async () => {

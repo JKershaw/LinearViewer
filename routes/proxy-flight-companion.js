@@ -35,7 +35,7 @@ import { filterChatTurns } from '../lib/chat-transcript.js';
 import { streamChat as defaultStreamChat, streamChatWithTools as defaultStreamChatWithTools } from '../lib/openrouter.js';
 import { createChatToolCatalog as defaultCreateChatToolCatalog } from '../lib/chat-tools.js';
 import { buildCensusSeedText } from '../lib/flight-companion-census-seed.js';
-import { sessionIsTerminal, enrichLoop } from '../lib/run-loop-state.js';
+import { sessionIsTerminal } from '../lib/run-loop-state.js';
 import { armKeepalive } from '../lib/http-keepalive.js';
 import { jsonError, keepaliveError } from '../lib/errors.js';
 import { CHAT_MESSAGE_MAX_LENGTH, resolveChatCredential, isAiUnavailable } from '../lib/chat-request.js';
@@ -136,8 +136,6 @@ function mergeToolEvents(events) {
  * @param {Object} deps.dispatchQueueStore - Tool dep: session/follow-up reads (turn-core dep)
  * @param {Object} deps.agentStatusStore - Tool dep: session reads (turn-core dep)
  * @param {Object} deps.proxyTokenStore - Tool dep: `send_follow_up`'s bootstrap-provisioning seam (turn-core dep; inert under propose mode, kept for parity with the session route)
- * @param {Object} [deps.taskDecisionsStore] - Optional tool dep (LIN-2617); absent → that one tool reports "not configured"
- * @param {Object} [deps.shelvedRulingsStore] - Optional tool dep (LIN-2617); absent → that one tool reports "not configured"
  * @param {Object} [deps.savedChatStore] - Optional (LIN-2634): backs GET .../flight-companion/transcripts,
  *   a creator-scoped read of the token creator's own saved companion chats (never wired for write here —
  *   see that route's own docstring). Absent → that one route 503s, matching GET /api/proxy/north-star's
@@ -164,8 +162,6 @@ export function createProxyFlightCompanionRoutes({
   dispatchQueueStore,
   agentStatusStore,
   proxyTokenStore,
-  taskDecisionsStore = null,
-  shelvedRulingsStore = null,
   savedChatStore = null,
   chatClient = { streamChat: defaultStreamChat, streamChatWithTools: defaultStreamChatWithTools },
   createToolCatalog = defaultCreateChatToolCatalog,
@@ -278,11 +274,8 @@ export function createProxyFlightCompanionRoutes({
             recordsStore,
             dispatchQueueStore,
             agentStatusStore,
-            taskDecisionsStore,
-            shelvedRulingsStore,
             proxyTokenStore,
             sessionIsTerminal,
-            enrichLoop,
             chatClient,
             createToolCatalog,
             getProvider: () => provider,

@@ -25,7 +25,8 @@ import { createTaskPageRoutes } from '../../routes/task-page.js';
 import { createTaskCreateRoutes } from '../../routes/task-create.js';
 import { createTaskEditRoutes } from '../../routes/task-edit.js';
 import { createTaskPageLoader } from '../../lib/task-page-loader.js';
-import { enrichLoop, deriveSessionWaiting, deriveSessionDecisions } from '../../routes/dashboard.js';
+import { enrichLoop, deriveSessionWaiting } from '../../routes/dashboard.js';
+import { questionRecordsOf, questionsFromLoops } from './helpers/question-records.js';
 import { registerProvider } from '../../lib/providers/registry.js';
 import { heldTaskFacts, heldLoaderDeps } from '../fixtures/held-task-facts.js';
 // Side-effect import: the shared nav resolves the legacy default provider.
@@ -68,16 +69,16 @@ function spyProvider({ read = async () => ISSUE_CTX } = {}) {
 }
 
 // LIN-4070: the state read is the held set's, so every loader here holds the task's tracker issue (the set `/state` reads).
-function makeLoader({ loops = [STORED_LOOP], calls = null, shelvedRulingsStore = null, issues = [ISSUE_CTX.issue] } = {}) {
+// LIN-4538: a loop's ruling is the open question its run asked, addressed to the test account (session accountId 'acct-1').
+function makeLoader({ loops = [STORED_LOOP], calls = null, issues = [ISSUE_CTX.issue] } = {}) {
   const loader = createTaskPageLoader({
     dispatchStore: {},
     agentStatusStore: {},
     enrichLoop,
     deriveSessionWaiting,
-    deriveSessionDecisions,
+    recordsStore: questionRecordsOf(questionsFromLoops(loops).map((q) => ({ ...q, to: 'person:acct-1' }))),
     getLoopsForIssue: async () => loops,
     getLoopsForIssues: async () => loops,
-    shelvedRulingsStore,
     now: () => NOW,
     ...heldLoaderDeps(heldTaskFacts({ issues, now: NOW })),
   });
@@ -92,8 +93,12 @@ function makeLoader({ loops = [STORED_LOOP], calls = null, shelvedRulingsStore =
 const OWNER_CHECK = async () => ({ status: 'owner' });
 const MEMBER_CHECK = async () => ({ status: 'not-owner' });
 
-function makeRouter(loader, workspaceFromUrl = (req, res, next) => next(), workspaceOwnerCheck = OWNER_CHECK) {
-  return createTaskPageRoutes({ workspaceFromUrl, getOpenRouterSource: () => 'env', getDeployInfo: () => ({}), loader, workspaceOwnerCheck, now: () => NOW });
+// `records`: the question records the owner's question section reads (LIN-4532); none by default.
+function makeRouter(loader, workspaceFromUrl = (req, res, next) => next(), workspaceOwnerCheck = OWNER_CHECK, records = null) {
+  return createTaskPageRoutes({
+    workspaceFromUrl, getOpenRouterSource: () => 'env', getDeployInfo: () => ({}), loader, workspaceOwnerCheck, now: () => NOW,
+    ...(records ? { recordsStore: records, dispatchStore: { isRunStopped: async () => false, runTailOf: async () => null }, accountStore: { resolveCanonicalAccountId: async (id) => id } } : {}),
+  });
 }
 
 function handlerFor(router, path) {
@@ -322,25 +327,26 @@ describe('LIN-4024 — GET …/api/task/:identifier/state sends the question car
   // An open ruling: a `[decision]` the worker is blocked on. Without the decision it reads parked, not a question.
   const WAITING_LOOP = {
     ...STORED_LOOP,
-    loopId: 'impl-2', wakeMarker: 'blocked', waitingMessage: '[blocked] which API key?',
+    loopId: 'impl-2', lineageId: 'impl-2', wakeMarker: 'blocked', waitingMessage: '[blocked] which API key?',
     feedback: [{ message: '[blocked] which API key?' }],
     decision: { decision_id: 'lin-50-rc', question: 'Which API key?' }, decisionCase: [], answeredDecisions: [], withdrawal: null,
   };
 
+  const ASKED = () => questionRecordsOf([{ id: 'q-impl-2', ticket: 'LIN-50', run: 'impl-2', to: 'person:acct-1' }]);
+
   test('the owner gets the question card; a member gets none', async () => {
-    const owner = await call(makeRouter(makeLoader({ loops: [WAITING_LOOP] })), STATE, { params: { identifier: 'LIN-50' }, query: { issueId: UUID } });
+    const owner = await call(makeRouter(makeLoader({ loops: [WAITING_LOOP] }), undefined, OWNER_CHECK, ASKED()), STATE, { params: { identifier: 'LIN-50' }, query: { issueId: UUID } });
     assert.equal(owner.jsonBody.status, 'waiting');
-    assert.match(owner.jsonBody.questionHtml, /data-testid="session-question-card"/, 'the owner sees the card');
-    const member = await call(makeRouter(makeLoader({ loops: [WAITING_LOOP] }), undefined, MEMBER_CHECK), STATE, { params: { identifier: 'LIN-50' }, query: { issueId: UUID } });
+    assert.match(owner.jsonBody.questionHtml, /data-testid="question-record-card"/, 'the owner sees the card');
+    const member = await call(makeRouter(makeLoader({ loops: [WAITING_LOOP] }), undefined, MEMBER_CHECK, ASKED()), STATE, { params: { identifier: 'LIN-50' }, query: { issueId: UUID } });
     assert.equal(member.jsonBody.status, 'waiting');
     assert.equal(member.jsonBody.questionHtml, '', 'a member has no answer box');
   });
 
-  // Finding 1 (LIN-4024 review): a shelved ruling reads parked and the badge hides it, so Home must not ask it.
-  test('a shelved ruling is parked and sends no question card, even to the owner', async () => {
-    const shelvedRulingsStore = { async listForWorkspaces() { return [{ urlKey: 'acme', decisionId: 'lin-50-rc', decisionLoopId: 'impl-2', resurfaceAt: '2026-11-05T00:00:00.000Z' }]; } };
-    const res = await call(makeRouter(makeLoader({ loops: [WAITING_LOOP], shelvedRulingsStore })), STATE, { params: { identifier: 'LIN-50' }, query: { issueId: UUID } });
-    assert.equal(res.jsonBody.status, 'waiting', 'the pill still says waiting');
-    assert.equal(res.jsonBody.questionHtml, '', 'a parked task asks nothing on Home');
+  // LIN-4538: an answered question is no longer asked, so the owner's card goes; the pill reads from the standing, not the card.
+  test('an answered question sends no question card, even to the owner', async () => {
+    const answered = questionRecordsOf([{ id: 'q-impl-2', ticket: 'LIN-50', run: 'impl-2', to: 'person:acct-1', ended: { state: 'answered', by: 'person:acct-1', reason: 'answered by d' } }]);
+    const res = await call(makeRouter(makeLoader({ loops: [WAITING_LOOP] }), undefined, OWNER_CHECK, answered), STATE, { params: { identifier: 'LIN-50' }, query: { issueId: UUID } });
+    assert.equal(res.jsonBody.questionHtml, '', 'no open question, no card');
   });
 });

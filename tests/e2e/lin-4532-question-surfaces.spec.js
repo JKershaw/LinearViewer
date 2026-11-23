@@ -142,12 +142,17 @@ test.describe('Home: Waiting on you draws the open question records', () => {
     expect((await decisionFor(page, URL_KEY, qid))?.fields.answer).toBe('left');
   });
 
-  test('with an old ruling and a question open, Home\'s count, the badge and the Rulings page rows agree', async ({ page }) => {
+  test('with an old ruling and a question open, Home counts and draws the question; the badge and the Rulings page also list the old ruling', async ({ page }) => {
+    // LIN-4538 (P7a): Home reads question records only. An old ruling still open is the ruling machinery's until P7b retires it
+    // (after the cutover answers every open one): the Rulings page lists and answers it, and the badge, which counts that page's
+    // rows, includes it. So during the cutover Home's count is its own cards, and the badge leads to the page that serves the rest.
     await seedTree(page);
     await seedRuling(page, URL_KEY, 'LOCAL-S', THREE_OPTIONS);
     await seedQuestion(page, URL_KEY, { ticket: 'LOCAL-D', runId: await askingRun(page, URL_KEY, 'LOCAL-D') });
     await page.goto(`/workspace/${URL_KEY}/`);
-    await expect(page.locator(COUNT)).toContainText('2 waiting on you');
+    await expect(page.locator(COUNT)).toContainText('1 waiting on you');
+    await expect(page.locator(WAITING_QCARD)).toHaveCount(1);
+    await expect(page.locator(`${SECTION} [data-testid="waiting-task-line"]`, { hasText: 'LOCAL-S' })).toHaveCount(0);
     await syncBadge(page);
     await expect(page.locator(BADGE)).toHaveText('2');
 

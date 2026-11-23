@@ -172,7 +172,6 @@ describe('the chat tool: list_pending_decisions carries the open questions (LIN-
       provider: { name: 'fake' }, scope: 'scope', recapCacheStore: null, briefCacheStore: null, urlKey: URL_KEY,
       recordsStore: records, dispatchQueueStore: dispatch, agentStatusStore: { async listStatus() { return { items: [], total: 0 }; } },
       sessionIsTerminal: () => false, dispatchedBy, resolveCanonicalAccountId,
-      taskDecisionsStore: NO_RULINGS, shelvedRulingsStore: NO_RULINGS, enrichLoop: (l) => l,
     });
     return executors.list_pending_decisions;
   }
@@ -188,10 +187,9 @@ describe('the chat tool: list_pending_decisions carries the open questions (LIN-
     assert.equal(out.questions[0].interactive, true);
   });
 
-  test('a person with no open question gets the result as before, with no `questions` key', async () => {
+  test('a person with no open question gets an empty `questions` list and a count of zero', async () => {
     const out = await catalogFor(OWNER)({});
-    assert.equal(out.count, 0);
-    assert.equal('questions' in out, false);
+    assert.deepEqual(out, { count: 0, truncated: false, questions: [] });
   });
 
   // finding-79815581: a merged account's alias is the session account; its questions are addressed to the canonical one.
@@ -207,7 +205,7 @@ describe('the chat tool: list_pending_decisions carries the open questions (LIN-
   test('without a resolver the session account is read as before, so an alias sees no question', async () => {
     await askQuestion({ run: await askingRun('run-alias-none') });
     const out = await catalogFor('acct-alias')({});
-    assert.equal('questions' in out, false, 'the unresolved alias has no open question (the case the resolver fixes)');
+    assert.deepEqual(out.questions, [], 'the unresolved alias has no open question (the case the resolver fixes)');
   });
 
   test('a resolver that throws reads the session account, and does not fail the tool', async () => {

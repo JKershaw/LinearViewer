@@ -2,15 +2,17 @@
 /**
  * Ticket-closed historical clear (LIN-3399, slice F of LIN-3358).
  *
- * One-off: closes the blocked/silent rows and withdraws the open rulings that
+ * One-off: closes the blocked/silent rows and ends the open questions that
  * sit on tickets that are ALREADY terminal, from before the source closers
  * (LIN-3365 handover/lineage-terminal, LIN-3366 seams) existed. The retired
  * `ticket-closed-sweep` was the only thing that would have reached them.
+ * (LIN-4538: questions are ended `withdrawn`, reason "ticket closed"; the
+ * ruling stores are no longer read.)
  *
  * Reuses the closer, no second write path: candidates come from
  * `prepareCloserCandidates`, the ticket is read through the instrument's paced,
  * memoised proxy reader, and the write is `closeTicketRows({candidates, by})`
- * (rows first, then decision withdrawals / scan self-resolves). The 30-day
+ * (rows first, then the tickets' open questions). The 30-day
  * horizon is the loop reader's own (`READ_HORIZON_MS`); there is no flag to widen it.
  *
  * NOT a route, NOT autopilot-reachable, no import site in the app.
@@ -36,7 +38,9 @@ import { MongoClient } from 'mongodb';
 import { MangoClient } from '@jkershaw/mangodb';
 import { DispatchQueueStore } from '../lib/dispatch-store.js';
 import { AgentStatusStore } from '../lib/agent-status-store.js';
-import { TaskDecisionsStore } from '../lib/task-decisions-store.js';
+import { RecordsStore, RECORDS_COLLECTION, REFS_COLLECTION, QUERY_LOG_COLLECTION } from '../lib/records-store.js';
+import { questionFacts, openQuestionFacts } from '../lib/records/question-facts.js';
+import { questionStandingOf } from '../lib/records/question-standing.js';
 import { getLoopsForWorkspace } from '../lib/pipeline-loops.js';
 import { prepareCloserCandidates, selectTicketCloseWork, closeTicketRows } from '../lib/ticket-close-closer.js';
 import { TERMINAL_TYPES } from '../lib/providers/models.js';
@@ -56,16 +60,27 @@ export class LineageBackfillPendingError extends Error {
   }
 }
 
-const count = (work) => work.rows.length + work.loopDecisions.length + work.scanDecisions.length;
+/** The open questions of one workspace, by ticket (LIN-4538): what closeTicketRows ends on a terminal ticket. */
+async function openQuestionsByTicket(recordsStore, urlKey) {
+  const byTicket = new Map();
+  if (!recordsStore) return byTicket;
+  for (const q of openQuestionFacts(await questionFacts(recordsStore, urlKey))) {
+    if (!q.ticket) continue;
+    byTicket.set(q.ticket, (byTicket.get(q.ticket) || 0) + 1);
+  }
+  return byTicket;
+}
 
-async function readCandidates({ urlKey, now, dispatchStore, agentStatusStore, taskDecisionsStore, readLoops, persist }) {
+/** What a terminal ticket would have written: its session rows and its open questions. */
+const countWork = (work, questions) => work.rows.length + (questions || 0);
+
+async function readCandidates({ urlKey, now, dispatchStore, agentStatusStore, recordsStore, readLoops, persist }) {
   const loops = readLoops
     ? await readLoops(urlKey)
     : await getLoopsForWorkspace(urlKey, { lean: true, dispatchStore, agentStatusStore });
-  const [taskDecisions, newestScanByTask] = taskDecisionsStore
-    ? await Promise.all([taskDecisionsStore.listUnansweredForWorkspaces([urlKey]), taskDecisionsStore.listNewestScanPerTask([urlKey])])
-    : [[], {}];
-  return prepareCloserCandidates({ loops, taskDecisions, newestScanByTask, now, dispatchStore, persist });
+  const questionStanding = recordsStore ? await questionStandingOf(recordsStore, urlKey) : new Map();
+  const candidates = await prepareCloserCandidates({ loops, questionStanding, now, dispatchStore, persist });
+  return { candidates, openQuestions: await openQuestionsByTicket(recordsStore, urlKey) };
 }
 
 /**
@@ -78,7 +93,7 @@ async function readCandidates({ urlKey, now, dispatchStore, agentStatusStore, ta
 export async function runTicketClosedClear({
   dispatchStore,
   agentStatusStore = null,
-  taskDecisionsStore = null,
+  recordsStore = null,
   sessionsFeedCache = null,
   readTicketState,
   urlKeys = null,
@@ -106,13 +121,13 @@ export async function runTicketClosedClear({
   let remaining = execute ? 0 : null;
   for (const urlKey of keys) {
     try {
-      const candidates = await readCandidates({ urlKey, now, dispatchStore, agentStatusStore, taskDecisionsStore, readLoops, persist: execute });
-      const tickets = [...new Set([...candidates.rows, ...candidates.loopDecisions, ...candidates.scanDecisions].map(c => c.issueIdentifier).filter(Boolean))];
+      const { candidates, openQuestions } = await readCandidates({ urlKey, now, dispatchStore, agentStatusStore, recordsStore, readLoops, persist: execute });
+      const tickets = [...new Set([...candidates.rows.map(c => c.issueIdentifier), ...openQuestions.keys()].filter(Boolean))];
       const w = {
         urlKey, readFailed: false, tickets: tickets.length, terminalTickets: 0, unknown: 0, notTerminal: 0,
-        rows: 0, loopDecisions: 0, scanDecisions: 0, issueIdMismatch: 0,
+        rows: 0, questions: 0,
         humanReopened: candidates.settled.length, unverified: candidates.unverified.length,
-        closed: { closedRows: 0, withdrawn: 0, resolved: 0, refused: 0, failures: 0 }
+        closed: { closedRows: 0, withdrawn: 0, failures: 0 }
       };
       const terminal = [];
       for (const issueIdentifier of tickets) {
@@ -121,24 +136,23 @@ export async function runTicketClosedClear({
         if (!TERMINAL_TYPES.includes(st.stateType)) { w.notTerminal += 1; continue; }
         const ticket = { issueId: st.issueId, identifier: issueIdentifier, stateType: st.stateType };
         const work = selectTicketCloseWork(candidates, ticket);
+        const questions = openQuestions.get(issueIdentifier) || 0;
         w.terminalTickets += 1;
         w.rows += work.rows.length;
-        w.loopDecisions += work.loopDecisions.length;
-        w.scanDecisions += work.scanDecisions.length;
-        w.issueIdMismatch += work.skipped.issueIdMismatch;
-        if (count(work)) terminal.push(ticket);
+        w.questions += questions;
+        if (countWork(work, questions)) terminal.push(ticket);
       }
-      log(`[ticket-clear] ${urlKey}: ${w.rows} row(s), ${w.loopDecisions + w.scanDecisions} decision(s) on ${w.terminalTickets} terminal ticket(s); ${w.unknown} unreadable`);
+      log(`[ticket-clear] ${urlKey}: ${w.rows} row(s), ${w.questions} open question(s) on ${w.terminalTickets} terminal ticket(s); ${w.unknown} unreadable`);
 
       if (execute) {
         for (const ticket of terminal) {
-          const r = await closeTicketRows({ urlKey, ticket, dispatchStore, taskDecisionsStore, sessionsFeedCache, agentStatusStore, candidates, now, by: actor, log, info: log });
+          const r = await closeTicketRows({ urlKey, ticket, dispatchStore, recordsStore, sessionsFeedCache, agentStatusStore, candidates, now, by: actor, log });
           for (const k of Object.keys(w.closed)) w.closed[k] += r[k] || 0;
         }
         // Idempotence: re-select; whatever is still selectable on a terminal ticket remains.
-        const after = await readCandidates({ urlKey, now, dispatchStore, agentStatusStore, taskDecisionsStore, readLoops, persist: false });
+        const again = await readCandidates({ urlKey, now, dispatchStore, agentStatusStore, recordsStore, readLoops, persist: false });
         let left = 0;
-        for (const ticket of terminal) left += count(selectTicketCloseWork(after, ticket));
+        for (const ticket of terminal) left += countWork(selectTicketCloseWork(again.candidates, ticket), again.openQuestions.get(ticket.identifier));
         w.remainingAfter = left;
         remaining += left;
       }
@@ -167,22 +181,20 @@ export function buildReport({ perWorkspace, now, headSha, execute, remaining }) 
   L.push('');
   L.push(`## ${execute ? 'Selected' : 'Would clear'}`);
   L.push(`  blocked/silent rows (clause 3)        ${String(sum(w => w.rows)).padStart(5)}`);
-  L.push(`  loop-backed rulings (clause 4)        ${String(sum(w => w.loopDecisions)).padStart(5)}`);
-  L.push(`  scan decisions (clause 4)             ${String(sum(w => w.scanDecisions)).padStart(5)}`);
+  L.push(`  open questions (ended withdrawn)      ${String(sum(w => w.questions)).padStart(5)}`);
   L.push('');
   L.push('## Would NOT clear (explain each remainder)');
   L.push(`  unreadable ticket                     ${String(sum(w => w.unknown)).padStart(5)}   fail closed; re-run the paced reader`);
-  L.push(`  human-reopened                        ${String(sum(w => w.humanReopened)).padStart(5)}   a reversed ruling / un-retired scan row: a decision, not staleness`);
+  L.push(`  human-reopened                        ${String(sum(w => w.humanReopened)).padStart(5)}   a reversed ruling: a decision, not staleness`);
   L.push(`  unverified legacy digest              ${String(sum(w => w.unverified)).padStart(5)}   held out until raw feedback resolves it`);
-  L.push(`  scan row, issueId mismatch            ${String(sum(w => w.issueIdMismatch)).padStart(5)}   never joined to a ticket it was not read from`);
   L.push('');
-  L.push('By workspace (rows, rulings+scans, unknown):');
-  for (const w of ok) L.push(`  ${w.urlKey.padEnd(28)} ${w.rows} ${w.loopDecisions + w.scanDecisions} ${w.unknown}`);
+  L.push('By workspace (rows, open questions, unknown):');
+  for (const w of ok) L.push(`  ${w.urlKey.padEnd(28)} ${w.rows} ${w.questions} ${w.unknown}`);
   if (execute) {
     const c = (k) => sum(w => w.closed[k]);
     L.push('');
-    L.push(`## Written: ${c('closedRows')} row(s) stamped, ${c('withdrawn')} ruling(s) withdrawn, ${c('resolved')} scan(s) resolved`);
-    L.push(`Refused by the store's write filter / already stamped: ${c('refused')}; failures: ${c('failures')}`);
+    L.push(`## Written: ${c('closedRows')} row(s) stamped, ${c('withdrawn')} question(s) ended withdrawn`);
+    L.push(`Failures: ${c('failures')}`);
     L.push('');
     L.push(`## Idempotence check: ${remaining} still selectable after the run${remaining === 0 ? ' (ok)' : ' — NOT 0: rows changed since select (write-filter refusal) or a write failed; bucket each before relying on this'}`);
   } else {
@@ -209,9 +221,13 @@ async function main() {
       historyCollection: db.collection('dispatch-history')
     });
     const agentStatusStore = new AgentStatusStore({ collection: db.collection('foreman-status') });
-    const taskDecisionsStore = new TaskDecisionsStore({ collection: db.collection('task-decisions') });
+    const recordsStore = new RecordsStore({
+      records: db.collection(RECORDS_COLLECTION),
+      refs: db.collection(REFS_COLLECTION),
+      queryLog: db.collection(QUERY_LOG_COLLECTION)
+    });
     const { report } = await runTicketClosedClear({
-      dispatchStore, agentStatusStore, taskDecisionsStore, execute, by, headSha: readHeadSha(),
+      dispatchStore, agentStatusStore, recordsStore, execute, by, headSha: readHeadSha(),
       // Only the proxied workspace is readable; paced (1.1s) with 429 retries.
       urlKeys: ticketUrlKey ? [ticketUrlKey] : null,
       readTicketState: createPacedMemoReader((k, issue) => defaultReadTicketState(k, issue, { ticketUrlKey })),

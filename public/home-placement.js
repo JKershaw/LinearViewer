@@ -51,7 +51,8 @@
       openedTask: !!el.querySelector('.details:not(.hidden)'),
       openFold: !!el.querySelector('.home-fetched'),
       fieldFocused: !!activeElement && el.contains(activeElement) && activeElement.matches(FIELD),
-      cardHoldsInput: [...el.querySelectorAll('[data-testid="session-question-card"]')].some(card => cardHoldsInput(card)),
+      // A ruling card or a question record card (LIN-4538); QuestionCards.cardHoldsInput reads either's typed answer.
+      cardHoldsInput: [...el.querySelectorAll('[data-testid="session-question-card"], [data-testid="question-record-card"]')].some(card => cardHoldsInput(card)),
     };
   }
 

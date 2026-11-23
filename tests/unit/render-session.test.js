@@ -219,218 +219,53 @@ describe('render-session: anchor issue title (LIN-1801)', () => {
   });
 });
 
-describe('render-session: pinned question card (LIN-3252 S2)', () => {
-  // A row shaped exactly as `collectUnansweredDecisions` emits (the route's
-  // `data.decisions`), so these exercise the render contract the route feeds.
-  function decisionRow({
-    loopId = 'loop-1', decisionId = 'd-1', question = 'Proceed with the migration?',
-    options = [], ifUnanswered = null, disposition = 'resumable', canReply = true, decisionCase = [],
-    effect = 'resume', recordOn = null
-  } = {}) {
-    const decision = { decision_id: decisionId };
-    if (question != null) decision.question = question;
-    if (options.length) decision.options = options;
-    if (ifUnanswered) decision.if_unanswered = ifUnanswered;
-    if (recordOn) decision.on_answer = { record_on: recordOn };
+describe('render-session: pinned question records (LIN-4532, LIN-4538)', () => {
+  // An open question record as the run page reads it (lib/open-questions.js openQuestionsForRun's row).
+  function questionRecordRow({ questionId = 'q-1', asks = 'Proceed with the migration?', options = ['Yes, proceed', 'No, hold off'], state = 'gone', interactive = true } = {}) {
     return {
-      decision, decisionCase,
-      anchor: { loopId, issueId: 'uuid-900', issueIdentifier: 'LIN-900', workspaceUrlKey: 'ws-a', target: 'cli', followUpTo: null },
-      stampLoopId: loopId, disposition, canReply, effect
+      questionId, asks, options, recommended: options[0], ifUnanswered: 'Harbour holds the migration.', taskId: 'task-LIN-900', ticket: 'LIN-900',
+      runId: 'loop-1', askedAt: '2026-10-30T10:05:00.000Z', state, reason: null, interactive,
     };
   }
 
-  test('renders the question, options as choices, a "your own answer" box and ONE "Answer" verb', () => {
-    const html = renderSessionPage(
-      {
-        session: fixtureSession(), urlKey: 'ws-a', issueContext: [], canReply: true, waiting: true, waitingMessage: 'awaiting your ruling',
-        decisions: [decisionRow({ options: [{ id: 'yes', label: 'Yes, proceed' }, { id: 'no', label: 'No, hold off' }] })]
-      },
-      {}
-    );
-    assert.match(html, /data-testid="session-question-card"/);
-    assert.match(html, /data-testid="session-question-card-question"[^>]*>Proceed with the migration\?</);
-    assert.match(html, /data-testid="session-question-card-options"/);
-    assert.match(html, /data-testid="session-question-card-option"[^>]*>Yes, proceed</);
-    assert.match(html, /data-testid="session-question-card-option"[^>]*>No, hold off</);
-    assert.match(html, /data-option-id="yes"/);
-    assert.match(html, /data-testid="session-question-card-input"/);
-    assert.match(html, /data-testid="session-question-card-answer"[^>]*>Answer</);
-    assert.match(html, /data-testid="session-question-card-dismiss"[^>]*>this wasn't worth asking</);
-    // The old waiting banner is gone.
-    assert.ok(!html.includes('session-waiting-banner'), 'no legacy banner');
-    // Decision ids are threaded for the stamp/answer path.
-    assert.match(html, /data-testid="session-question-card"[^>]*data-decision-id="d-1"/);
-    assert.match(html, /data-testid="session-question-card"[^>]*data-stamp-loop-id="loop-1"/);
+  test('an open question renders as its record card: question, options, answer box and the one Answer verb', () => {
+    const html = renderSessionPage({
+      session: fixtureSession(), urlKey: 'ws-a', issueContext: [], canReply: true, waiting: true, waitingMessage: 'awaiting your ruling',
+      questionRecords: [questionRecordRow()],
+    }, {});
+    assert.match(html, /data-testid="session-question-records"/);
+    assert.match(html, /data-testid="question-record-card-question"[^>]*>Proceed with the migration\?</);
+    assert.match(html, /data-testid="question-record-card-option"[^>]*>Yes, proceed</);
+    assert.match(html, /data-testid="question-record-card-option"[^>]*>No, hold off</);
+    assert.match(html, /data-testid="question-record-card-input"/);
+    assert.equal((html.match(/data-testid="question-record-card-answer"/g) || []).length, 1, 'one Answer verb');
+    assert.match(html, /data-question-id="q-1"/);
   });
 
-  test('"why is Harbour asking?" keeps each case chunk as its own node, including a baked-in (recap i/n) header', () => {
-    const decisionCase = [
-      'Part one of the case (recap 1/3)',
-      'Part two of the case (recap 2/3)',
-      'Part three of the case (recap 3/3)'
-    ];
-    const html = renderSessionPage(
-      { session: fixtureSession(), urlKey: 'ws-a', issueContext: [], waiting: true, decisions: [decisionRow({ decisionCase })] },
-      {}
-    );
-    assert.match(html, /data-testid="session-question-card-why"/);
-    const chunkMatches = html.match(/data-testid="session-question-card-why-chunk"/g) || [];
-    assert.equal(chunkMatches.length, 3, 'all three chunks render, none dropped or truncated');
-    assert.match(html, /Part one of the case \(recap 1\/3\)/);
-    assert.match(html, /Part two of the case \(recap 2\/3\)/);
-    assert.match(html, /Part three of the case \(recap 3\/3\)/);
+  test('a waiting session with no question record falls back to the bare-blocked card', () => {
+    const html = renderSessionPage({
+      session: fixtureSession(), urlKey: 'ws-a', issueContext: [], canReply: true, waiting: true, waitingMessage: 'awaiting your ruling',
+      questionRecords: [],
+    }, {});
+    assert.doesNotMatch(html, /data-testid="session-question-records"/);
+    assert.match(html, /awaiting your ruling/);
   });
 
-  test('an ENDED session\'s "if you don\'t answer" fallback says the run has ended', () => {
-    const html = renderSessionPage(
-      { session: fixtureSession(), urlKey: 'ws-a', issueContext: [], waiting: false, sessionTerminal: true, decisions: [decisionRow()] },
-      {}
-    );
-    assert.match(html, /data-testid="session-question-card-if-unanswered"[^>]*>if you don't answer: Nothing further runs; the run has ended\.</);
+  test('a waiting session that shows an open question does not repeat the bare-blocked card', () => {
+    const html = renderSessionPage({
+      session: fixtureSession(), urlKey: 'ws-a', issueContext: [], canReply: true, waiting: true, waitingMessage: 'awaiting your ruling',
+      questionRecords: [questionRecordRow()],
+    }, {});
+    assert.equal((html.match(/awaiting your ruling/g) || []).length, 0, 'the question card stands in for the bare-blocked card');
   });
 
-  test('a LIVE session\'s "if you don\'t answer" fallback says Harbour keeps waiting', () => {
-    const html = renderSessionPage(
-      { session: fixtureSession(), urlKey: 'ws-a', issueContext: [], waiting: false, sessionTerminal: false, decisions: [decisionRow()] },
-      {}
-    );
-    assert.match(html, /data-testid="session-question-card-if-unanswered"[^>]*>if you don't answer: Harbour keeps waiting for your answer\.</);
-  });
-
-  test("the agent's if_unanswered summary wins over the fallback", () => {
-    const html = renderSessionPage(
-      { session: fixtureSession(), urlKey: 'ws-a', issueContext: [], waiting: false, sessionTerminal: true, decisions: [decisionRow({ ifUnanswered: { summary: 'The import continues; the publish halts.' } })] },
-      {}
-    );
-    assert.match(html, /if you don't answer: The import continues; the publish halts\./);
-  });
-
-  test('a read-only disposition shows that Harbour is still working and offers NO input', () => {
-    // F3: isolate the disposition path — `canReply` at BOTH the page and row
-    // level is true, so the read-only rendering is guaranteed by
-    // `readOnly` alone. A mutation setting `readOnly = false` now turns this
-    // test red instead of being masked by a page-level `canReply: false`.
-    const html = renderSessionPage(
-      { session: fixtureSession(), urlKey: 'ws-a', issueContext: [], canReply: true, waiting: false, decisions: [decisionRow({ disposition: 'mid-turn', canReply: true })] },
-      {}
-    );
-    assert.match(html, /data-testid="session-question-card-readonly"[^>]*>Harbour is still working; you can answer when it pauses\.</);
-    assert.ok(!html.includes('data-testid="session-question-card-input"'), 'no own-answer box for a read-only disposition');
-    assert.ok(!html.includes('data-testid="session-question-card-answer"'), 'no Answer verb for a read-only disposition');
-    assert.ok(!html.includes('data-testid="session-question-card-options"'), 'no options for a read-only disposition');
-    assert.ok(!html.includes('session-question-card-dismiss'), 'no dismiss where no input is offered');
-  });
-
-  test('emits the resolved effect and record_on the card branches on (LIN-3252 F1)', () => {
-    const html = renderSessionPage(
-      {
-        session: fixtureSession(), urlKey: 'ws-a', issueContext: [], canReply: true, waiting: false,
-        decisions: [
-          decisionRow({ loopId: 'l-res', decisionId: 'd-res', disposition: 'resumable', effect: 'resume' }),
-          decisionRow({ loopId: 'l-gone', decisionId: 'd-gone', disposition: 'gone', effect: 'dispatch' }),
-          decisionRow({ loopId: 'l-rec', decisionId: 'd-rec', disposition: 'gone', effect: 'record', recordOn: 'LIN-SIB' })
-        ]
-      },
-      {}
-    );
-    // Each card carries its OWN resolved effect — the gone run must not
-    // collapse to a record-only answer.
-    const cards = html.match(/data-testid="session-question-card"[^>]*/g) || [];
-    assert.equal(cards.length, 3);
-    assert.match(cards.find(c => c.includes('data-decision-id="d-res"')), /data-effect="resume"/);
-    assert.match(cards.find(c => c.includes('data-decision-id="d-gone"')), /data-effect="dispatch"/);
-    assert.match(cards.find(c => c.includes('data-decision-id="d-rec"')), /data-effect="record"/);
-    // The declared record_on target rides the card so a `record` answer can
-    // resolve it the way the Rulings tab does.
-    assert.match(cards.find(c => c.includes('data-decision-id="d-rec"')), /data-record-on="LIN-SIB"/);
-  });
-
-  test('a bare [blocked] card carries effect="resume" (its only delivery)', () => {
-    const html = renderSessionPage(
-      { session: fixtureSession(), urlKey: 'ws-a', issueContext: [], canReply: true, waiting: true, waitingMessage: 'blocked', decision: null, decisions: [], producer: { loopId: 'loop-w' } },
-      {}
-    );
-    assert.match(html, /data-testid="session-question-card"[^>]*data-effect="resume"/);
-  });
-
-  test('the card renders on a non-waiting session that carries a decision', () => {
-    // LIN-2184 V1 boundary INVERTED (LIN-3252 S2): the old test asserted a
-    // decision on a non-waiting (terminal) session renders NEITHER the banner
-    // NOR any decision markup. The card now renders it.
-    const html = renderSessionPage(
-      {
-        session: fixtureSession(), urlKey: 'ws-a', issueContext: [], waiting: false, waitingMessage: null, sessionTerminal: true,
-        decisions: [decisionRow({ decisionId: 'd-3', question: 'Ship it?', options: [{ id: 'yes', label: 'Yes' }], decisionCase: ['The migration completed cleanly.'] })]
-      },
-      {}
-    );
-    assert.match(html, /data-testid="session-question-card"/);
-    assert.match(html, /data-testid="session-question-card-question"[^>]*>Ship it\?</);
-    assert.match(html, /data-testid="session-question-card-why-chunk"[^>]*>The migration completed cleanly\.</);
-    assert.ok(!html.includes('session-waiting-banner'), 'the legacy banner is never rendered');
-  });
-
-  test('no card when there are no decisions and the session is not waiting', () => {
-    const html = renderSessionPage({ session: fixtureSession(), urlKey: 'ws-a', issueContext: [] }, {});
-    assert.ok(!html.includes('data-testid="session-question-card"'), 'no card by default');
-  });
-
-  test('an answered OR dismissed decision (empty decisions) never reappears — and does not fall back to a bare card', () => {
-    // `collectUnansweredDecisions` subtracts both an answered and a dismissed
-    // decision (its predicate owns that); the render is handed an empty
-    // `decisions`. Even though the rollup still names a decision and the session
-    // is waiting, no second card is invented.
-    const html = renderSessionPage(
-      { session: fixtureSession(), urlKey: 'ws-a', issueContext: [], waiting: true, waitingMessage: 'awaiting your ruling', decision: { decision_id: 'd-ans', question: '?' }, decisions: [] },
-      {}
-    );
-    assert.ok(!html.includes('data-testid="session-question-card"'), 'no card for an answered/dismissed decision');
-  });
-
-  test('a bare BLOCKED (waiting loop, no ruling row) renders the message, why-text, routing attrs and "Answer" — no dismiss', () => {
-    const html = renderSessionPage(
-      {
-        session: fixtureSession(), urlKey: 'ws-a', issueContext: [], canReply: true,
-        waiting: true, waitingMessage: 'need your decision on the auth flow', decision: null, decisions: [],
-        // The route threads the waiting producer loop's own reply target and
-        // issue (so the follow-up resumes THAT run, never a hard-defaulted cli
-        // target) plus its latest assistant text for the "why" fallback.
-        producer: { loopId: 'loop-w', target: 'web', issueId: 'uuid-w', issueIdentifier: 'LIN-777', case: ['I compared the two rollout strategies and they diverge.'] }
-      },
-      {}
-    );
-    assert.match(html, /data-testid="session-question-card"/);
-    assert.match(html, /data-testid="session-question-card-question"[^>]*>need your decision on the auth flow</);
-    assert.match(html, /data-testid="session-question-card-input"/);
-    assert.match(html, /data-testid="session-question-card-answer"[^>]*>Answer</);
-    // "why" shows the producer's latest assistant text when there is no decisionCase.
-    assert.match(html, /data-testid="session-question-card-why-chunk"[^>]*>I compared the two rollout strategies and they diverge\.</);
-    // Routing attributes carry the producer's real target/issue/loop.
-    assert.match(html, /data-testid="session-question-card"[^>]*data-loop-id="loop-w"/);
-    assert.match(html, /data-testid="session-question-card"[^>]*data-stamp-loop-id="loop-w"/);
-    assert.match(html, /data-testid="session-question-card"[^>]*data-target="web"/);
-    assert.match(html, /data-testid="session-question-card"[^>]*data-issue-id="uuid-w"/);
-    assert.match(html, /data-testid="session-question-card"[^>]*data-issue-identifier="LIN-777"/);
-    assert.match(html, /data-testid="session-question-card"[^>]*data-disposition="resumable"/);
-    // Live-session default.
-    assert.match(html, /if you don't answer: Harbour keeps waiting for your answer\./);
-    // No dismiss control (S2.7) and no options for a bare blocker.
-    assert.ok(!html.includes('session-question-card-dismiss'), 'no dismiss on a bare blocker');
-    assert.ok(!html.includes('data-testid="session-question-card-options"'), 'no options for a bare blocker');
-  });
-
-  test('the card question, case and if_unanswered are HTML-escaped', () => {
-    const html = renderSessionPage(
-      {
-        session: fixtureSession(), urlKey: 'ws-a', issueContext: [], waiting: true,
-        decisions: [decisionRow({ question: '<script>alert(1)</script>', decisionCase: ['<b>x</b>'], ifUnanswered: { summary: '<img src=x onerror=1>' } })]
-      },
-      {}
-    );
-    assert.ok(!html.includes('<script>alert(1)</script>'), 'raw script must not leak');
-    assert.ok(!html.includes('<img src=x onerror=1>'), 'raw if_unanswered must not leak');
-    assert.match(html, /&lt;script&gt;/);
-    assert.match(html, /&lt;img src=x onerror=1&gt;/);
+  test('a read-only question (its run still working) carries no input', () => {
+    const html = renderSessionPage({
+      session: fixtureSession(), urlKey: 'ws-a', issueContext: [], canReply: true, waiting: false,
+      questionRecords: [questionRecordRow({ state: 'mid-turn', interactive: false })],
+    }, {});
+    assert.match(html, /data-testid="question-record-card-readonly"/);
+    assert.doesNotMatch(html, /data-testid="question-record-card-input"/);
   });
 });
 
@@ -1773,12 +1608,11 @@ describe('render-session: run-evidence mounts (LIN-3247/LIN-3251 §4)', () => {
 // ─── LIN-3251: the §4 page order and the header PR line ──────────────────────
 
 describe('render-session: page order (LIN-3251, LIN-2948 §4)', () => {
+  // LIN-4538: the pinned card is an open question record (lib/open-questions.js openQuestionsForRun's row).
   function orderDecisionRow() {
     return {
-      decision: { decision_id: 'd-1', question: 'Proceed?' },
-      decisionCase: [],
-      anchor: { loopId: 'loop-1', issueId: 'uuid-900', issueIdentifier: 'LIN-900', workspaceUrlKey: 'ws-a', target: 'cli', followUpTo: null },
-      stampLoopId: 'loop-1', disposition: 'resumable', canReply: true, effect: 'resume'
+      questionId: 'q-1', asks: 'Proceed?', options: ['yes', 'no'], recommended: 'yes', ifUnanswered: null, taskId: 'task-LIN-900', ticket: 'LIN-900',
+      runId: 'loop-1', askedAt: '2026-10-30T10:05:00.000Z', state: 'gone', reason: null, interactive: true,
     };
   }
 
@@ -1786,7 +1620,7 @@ describe('render-session: page order (LIN-3251, LIN-2948 §4)', () => {
     const html = renderSessionPage({
       session: fixtureSession(), urlKey: 'ws-a',
       issueContext: [{ issueIdentifier: 'LIN-900', issueId: 'uuid-900', brief: 'A brief.', recap: null }],
-      decisions: [orderDecisionRow()],
+      questionRecords: [orderDecisionRow()],
       runEvidence: runEvidenceFixture(),
     });
     const idx = (needle) => {
@@ -1796,7 +1630,7 @@ describe('render-session: page order (LIN-3251, LIN-2948 §4)', () => {
     };
     const heading = idx('data-testid="session-title"');
     const header = idx('sess-run-header');
-    const pinned = idx('sess-qcards');
+    const pinned = idx('session-question-records');
     const paragraph = idx('data-testid="session-paragraph"');
     // The evidence marker sits inside the evidence section; `run-evidence-closeout`
     // is only in the close-out box, so it unambiguously marks the later slot.

@@ -194,7 +194,7 @@ import { homeRowsFor, HOME_ROW_KINDS, HOME_SEARCH_MAX_LENGTH } from './lib/home-
 import { renderSwimPage } from './lib/render-swim.js'
 import { renderShipPage } from './lib/render-ship.js'
 import { createCollectiveRoutes } from './routes/collective.js'
-import { createDashboardRoutes, sessionIsTerminal, enrichLoop, deriveSessionWaiting, deriveSessionDecisions } from './routes/dashboard.js'
+import { createDashboardRoutes, sessionIsTerminal, enrichLoop, deriveSessionWaiting } from './routes/dashboard.js'
 import { readRunEvidence } from './lib/run-evidence.js'
 import { createPrStateStore } from './lib/pr-state-store.js'
 import { createSessionsFeedCache } from './lib/sessions-feed-cache.js'
@@ -977,6 +977,7 @@ scheduler.register({
     agentStatusStore,
     observerStateStore,
     observerShadowLogStore,
+    recordsStore,
     intervalMs: OBSERVER_SWEEP_INTERVAL_MS
   })
 // `register()` is async and its seed write can fail; close-out ledger item 7.
@@ -3335,7 +3336,7 @@ async function getNorthStarDocVersionForWorkspace(urlKey, accountId) {
 // Closes rows and withdraws decisions only for a ticket whose state type is terminal.
 const onTicketWrite = createOnTicketWrite({
   dispatchStore: dispatchQueueStore,
-  taskDecisionsStore,
+  recordsStore,
   sessionsFeedCache,
   agentStatusStore
 })
@@ -3383,11 +3384,8 @@ const dashboardTaskDoneCache = createTaskDoneCache();
 app.use(createDashboardRoutes({ installationTokenFor, workspaceFromUrl, dispatchQueueStore, agentStatusStore, observationSessionsStore, observationMaterializer, sessionsFeedCache, taskDoneCache: dashboardTaskDoneCache, runSummaryCacheStore, sessionSummaryCacheStore, runParagraphStore, recordsStore, briefCacheStore, recapCacheStore, proxyEventStore, freeTierStore, getWorkspaceAccessToken, fetchIssueContext, fetchWorkspaceIssues, getOpenRouterSource, getDeployInfo, workspacePreferencesStore, taskDecisionsStore, shelvedRulingsStore, dismissalSuggestionsStore, llmCallLogStore, runProposalsStore, proxyTokenStore, readRunEvidence, prStateStore, workspaceOwnerCheck, requestUsageLoader, accountStore }))
 
 // Mount task-chat routes (experimental "talk to a task" conversation).
-// LIN-2966: taskDecisionsStore + shelvedRulingsStore thread the
-// `list_pending_decisions` chat tool the same way createFlightCompanionRoutes
-// already does below (LIN-2617) — Task Chat now builds its catalog through the
-// same createChatToolCatalog call the turn core makes for every surface.
-app.use(createTaskChatRoutes({ installationTokenFor, workspaceFromUrl, freeTierStore, workspacePreferencesStore, getOpenRouterSource, getDeployInfo, savedChatStore, recapCacheStore, briefCacheStore, recordsStore, dispatchQueueStore, agentStatusStore, proxyTokenStore, taskDecisionsStore, shelvedRulingsStore, runProposalsStore, workspaceOwnerCheck, accountStore }))
+// Task Chat builds its catalog through the same createChatToolCatalog call the turn core makes for every surface.
+app.use(createTaskChatRoutes({ installationTokenFor, workspaceFromUrl, freeTierStore, workspacePreferencesStore, getOpenRouterSource, getDeployInfo, savedChatStore, recapCacheStore, briefCacheStore, recordsStore, dispatchQueueStore, agentStatusStore, proxyTokenStore, runProposalsStore, workspaceOwnerCheck, accountStore }))
 
 // Mount the task-edit page (LIN-1565) — the dedicated drill-down that replaces
 // the inline edit form formerly hidden inside a tree row's Details panel. No
@@ -3433,7 +3431,7 @@ registerKeyStateHolders(keyState, {
   workspaceKpisCache,
   timelineFragment,
 });
-const taskPageLoader = createTaskPageLoader({ dispatchStore: dispatchQueueStore, agentStatusStore, briefCacheStore, recapCacheStore, readRunEvidence, prStateStore, installationTokenFor, closeOutEventsStore, recordsStore, enrichLoop, deriveSessionWaiting, deriveSessionDecisions, taskDecisionsStore, shelvedRulingsStore, taskFacts: { read: taskFacts.read }, gatherTaskStates, readTaskTimeline })
+const taskPageLoader = createTaskPageLoader({ dispatchStore: dispatchQueueStore, agentStatusStore, briefCacheStore, recapCacheStore, readRunEvidence, prStateStore, installationTokenFor, closeOutEventsStore, recordsStore, enrichLoop, deriveSessionWaiting, taskFacts: { read: taskFacts.read }, gatherTaskStates, readTaskTimeline })
 // LIN-3833 / LIN-4016: Home's row states, assembled once for all three Home routes (lib/home-row-states.js): one lean
 // loop read for the workspace, grouped by task. A viewer who sees no sessions (copy-first, no `runControls`) reads
 // nothing and gets the tracker words alone. The states cover the Recent and project rows too, so a subtask that needs
@@ -3441,12 +3439,12 @@ const taskPageLoader = createTaskPageLoader({ dispatchStore: dispatchQueueStore,
 // caller falls back to plain rows, so a store hiccup never breaks the page.
 // LIN-4242: the Waiting on you reduction, shared by Home's page (above) and the live fragment route below.
 const waitingStanding = createWaitingStanding({
-  getLoopsForWorkspace, dispatchStore: dispatchQueueStore, agentStatusStore, taskDecisionsStore, shelvedRulingsStore, enrichLoop,
+  getLoopsForWorkspace, dispatchStore: dispatchQueueStore, agentStatusStore, enrichLoop,
   // LIN-4494: the person's open records ride on the same section (lib/home-row-states.js), canonical account first.
   recordsStore, canonicalAccountId: canonicalAccountIdOf,
 })
 const homeRowStates = createHomeRowStates({
-  getLoopsForWorkspace, dispatchStore: dispatchQueueStore, agentStatusStore, taskDecisionsStore, shelvedRulingsStore, enrichLoop, deriveSessionWaiting,
+  getLoopsForWorkspace, dispatchStore: dispatchQueueStore, agentStatusStore, enrichLoop, deriveSessionWaiting,
   waitingStanding,
 })
 // LIN-4118: the server's reads for the shared Home-view gather (lib/home-pipeline.js). Built per call, so each route
@@ -3502,11 +3500,7 @@ app.use(createTaskShareRoutes({
 // LIN-2432 §A.12: mirrors createTaskChatRoutes' set above, minus savedChatStore
 // (§A.11/LIN-2437's own concern — see routes/flight-companion.js's JSDoc for why
 // it is deliberately not threaded here yet).
-// LIN-2617 adds taskDecisionsStore + shelvedRulingsStore, the two inputs the
-// `list_pending_decisions` chat tool needs to return the same rows the rulings
-// feed returns. LIN-2966 threads the same pair into createTaskChatRoutes above,
-// so both surfaces' catalogs now answer that tool identically.
-app.use(createFlightCompanionRoutes({ installationTokenFor, workspaceFromUrl, getOpenRouterSource, getDeployInfo, observerStateStore, freeTierStore, workspacePreferencesStore, recapCacheStore, briefCacheStore, recordsStore, dispatchQueueStore, agentStatusStore, proxyTokenStore, taskDecisionsStore, shelvedRulingsStore, workspaceOwnerCheck, accountStore }))
+app.use(createFlightCompanionRoutes({ installationTokenFor, workspaceFromUrl, getOpenRouterSource, getDeployInfo, observerStateStore, freeTierStore, workspacePreferencesStore, recapCacheStore, briefCacheStore, recordsStore, dispatchQueueStore, agentStatusStore, proxyTokenStore, workspaceOwnerCheck, accountStore }))
 
 // Mount passage-planner routes (experimental one-click kickoff prompt, Flight Companion parity — LIN-1849).
 app.use(createPassagePlannerRoutes({ workspaceFromUrl, getOpenRouterSource, getDeployInfo }))

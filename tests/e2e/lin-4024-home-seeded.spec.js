@@ -1,5 +1,6 @@
 import { test, expect } from '../fixtures/test-base.js';
 import { localSeedId } from '../fixtures/local-harness.js';
+import { askingRun, seedQuestion } from '../fixtures/question-records.js';
 
 // LIN-4024 (witness D and E, the small seed): the opened charter, search under ancestors, and the lazy rows route's
 // authz and done-task witnesses. The full ~3,700-task shape is measured on its own (tests/perf/lin-4024-home-shape.spec.js),
@@ -19,6 +20,7 @@ test.beforeEach(async ({ page, localWorkerUrlKey }) => {
   await page.request.get(`/test/clear-dispatch-queue?urlKey=${URL_KEY}`);
   await page.request.get(`/test/clear-dispatch-history?urlKey=${URL_KEY}`);
   await page.request.get(`/test/clear-sessions-feed-cache?urlKey=${URL_KEY}`);
+  await page.request.get(`/test/clear-ticket-records?urlKey=${URL_KEY}`);
 });
 
 // The route's authz and done-task witnesses need a few tasks, not the whole shape. A small seed keeps this file's load on
@@ -70,46 +72,36 @@ test('the charter root opens with its own state, one opened task and no box insi
   expect(smallest.size).toBeGreaterThanOrEqual(12);
 });
 
-// A worker waiting on a ruling, written through the public dispatch API the way a runner writes it: enqueue, take, then the
-// `[blocked]` beat and the structured `[decision]`. The set-local-session seed cannot carry loops, so this is the seam.
-async function seedRuling(page, identifier) {
-  const token = (await (await page.request.get(`/test/create-dispatch-token?label=runner&urlKey=${URL_KEY}`)).json()).token;
-  const res = await page.request.post(`/workspace/${URL_KEY}/api/dispatch`, {
-    data: { prompt: 'implementation prompt', promptName: 'implementation', kind: 'implementation', issueIdentifier: identifier, issueTitle: identifier, target: 'cli' },
-  });
-  expect(res.status(), `dispatch seed failed: ${await res.text()}`).toBe(201);
-  const itemId = (await res.json()).item.id;
-  const taken = await page.request.post(`/api/dispatch/take/${itemId}`, { headers: { Authorization: `Bearer ${token}` } });
-  expect(taken.status(), `take failed: ${await taken.text()}`).toBe(200);
-  const feedback = (data) => page.request.post(`/api/dispatch/feedback/${itemId}`, {
-    headers: { Authorization: `Bearer ${token}`, 'Content-Type': 'application/json' }, data,
-  });
-  expect((await feedback({ message: '[blocked] which API key?' })).status()).toBe(200);
-  const decision = await feedback({ kind: 'decision', message: JSON.stringify({ decision_id: 'd-home-seeded', question: 'Which API key?', options: [{ id: 'a', label: 'Use the staging key' }] }) });
-  expect(decision.status(), `decision failed: ${await decision.text()}`).toBe(200);
+// A worker waiting on a question: the run is written through the public dispatch API the way a runner writes it (enqueue, take,
+// the `[blocked]` beat), and the question it asked the person is a question record (LIN-4538: what Home reads). The
+// set-local-session seed cannot carry loops, so this is the seam (tests/fixtures/question-records.js).
+async function seedWaiting(page, identifier) {
+  const runId = await askingRun(page, URL_KEY, identifier);
+  await seedQuestion(page, URL_KEY, { ticket: identifier, runId, asks: 'Which API key?', options: ['Use the staging key', 'Use the live key'], recommended: 'Use the staging key' });
 }
 
-test('a task waiting on a ruling reads the same on the count line, the card, and the header badge', async ({ page }) => {
+test('a task waiting on a question reads the same on the count line, the card, and the header badge', async ({ page }) => {
   await seedSmall(page, { runnerKey: true });
-  await seedRuling(page, 'LOCAL-T1');
+  await seedWaiting(page, 'LOCAL-T1');
   await page.goto(`/workspace/${URL_KEY}/`);
 
   const count = page.locator('[data-testid="in-progress-count"]');
   await expect(count).toContainText('1 waiting on you');
   await expect(count).not.toContainText('running');
 
-  // LIN-4114: the ruling is a card in Waiting on you (not a row in Running), labelled with its task.
-  const card = page.locator('[data-testid="waiting-on-you"] .waiting-card', { has: page.locator('[data-testid="waiting-task-line"]', { hasText: 'LOCAL-T1' }) });
+  // LIN-4114: the question is a card in Waiting on you (not a row in Running), labelled with its task.
+  const card = page.locator('[data-testid="waiting-on-you"] .waiting-question', { has: page.locator('[data-testid="waiting-task-line"]', { hasText: 'LOCAL-T1' }) });
   await expect(card).toHaveCount(1);
-  await expect(card.locator('[data-testid="session-question-card-question"]')).toContainText('Which API key?');
+  await expect(card.locator('[data-testid="question-record-card-question"]')).toContainText('Which API key?');
   await expect(page.locator('.running-section .line[data-identifier="LOCAL-T1"]')).toHaveCount(0);
 
   // The badge fills from a 5s client poll, so wait for it to settle before comparing it with the summary's number.
   const waiting = (await count.textContent()).match(/(\d+) waiting on you/)[1];
   await expect(page.locator('.rulings-badge .rulings-count')).toHaveText(waiting, { timeout: 15000 });
 
-  // The question is answered where it is shown, and no raw decision JSON reaches the page.
-  await expect(card.locator('text=decision_id')).toHaveCount(0);
+  // The question is answered where it is shown, and no raw record JSON reaches the page.
+  await expect(card.locator('text=questionId')).toHaveCount(0);
+  await expect(card.locator('[data-testid="question-record-card-answer"]')).toHaveCount(1);
 });
 
 test('search finds a Backlog task the page does not hold, under its ancestors', async ({ page }) => {

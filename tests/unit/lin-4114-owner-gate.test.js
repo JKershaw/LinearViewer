@@ -16,9 +16,14 @@ const WAITING_ROW = {
   effect: 'record',
   canReply: true,
 };
+// LIN-4538: the owner's open question is the card the section draws (lib/open-questions.js row); the standing rows are the same question.
+const OPEN_QUESTION = {
+  questionId: 'q-LIN-1', asks: 'Which for LIN-1 — a ruling a member must not see?', options: ['a', 'b'], recommended: 'a', ifUnanswered: null,
+  taskId: 'task-LIN-1', ticket: 'LIN-1', runId: 'r-LIN-1', askedAt: '2026-10-30T10:05:00.000Z', state: 'gone', reason: 'no-session', interactive: true,
+};
 const homeView = {
   inProgressTrees: [], trees: [], upNext: [], recent: { nodes: [], remaining: 0 },
-  waiting: { rows: [WAITING_ROW], ids: ['LIN-1'], contextIds: [] },
+  waiting: { rows: [WAITING_ROW], ids: ['LIN-1'], contextIds: [], questions: [OPEN_QUESTION] },
 };
 
 function homeHtml(featureFlags) {
@@ -30,14 +35,14 @@ describe('LIN-4114 witness 16: Waiting on you is owner only', () => {
     const html = homeHtml({ runControls: true });
     assert.match(html, /data-testid="waiting-on-you"/);
     assert.match(html, /data-testid="waiting-task-line"/);
-    assert.match(html, /data-testid="session-question-card"/);
+    assert.match(html, /data-testid="question-record-card"/);
     assert.match(html, /Which for LIN-1/);
   });
 
   test('a member (no run controls) gets no section, no card and no ruling text', () => {
     const html = homeHtml({});
     assert.doesNotMatch(html, /data-testid="waiting-on-you"/);
-    assert.doesNotMatch(html, /data-testid="session-question-card"/);
+    assert.doesNotMatch(html, /data-testid="question-record-card"/);
     assert.doesNotMatch(html, /Which for LIN-1/, 'the ruling text does not reach a member');
   });
 

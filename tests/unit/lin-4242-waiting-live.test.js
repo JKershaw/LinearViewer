@@ -26,7 +26,7 @@ import { createHomeRowStates, createWaitingStanding } from '../../lib/home-row-s
 import { renderWaitingSection, waitingTitlesOf } from '../../lib/waiting-section.js';
 import '../../lib/providers/linear/index.js';
 import { renderPage } from '../../lib/render.js';
-import { collectUnansweredDecisions } from '../../lib/unanswered-decisions.js';
+import { questionRecordsOf, questionsFromLoops } from './helpers/question-records.js';
 import { enrichLoop, deriveSessionWaiting } from '../../routes/dashboard.js';
 
 const REPO = join(dirname(fileURLToPath(import.meta.url)), '../..');
@@ -51,13 +51,14 @@ const rulingLoop = (identifier, over = {}) => loop({
   decision: { decision_id: `d-${identifier}`, question: `Which for ${identifier}?` }, decisionCase: [], answeredDecisions: [], withdrawal: null, ...over,
 });
 
+// LIN-4538: the standing and the person's question cards are read from question records (questionsFromLoops, one per loop
+// that carries a decision); the dispatch store answers the asking run's state as a gone run.
 function deps(loops) {
   return {
     getLoopsForWorkspace: async () => loops,
-    dispatchStore: {},
+    dispatchStore: { isRunStopped: async () => false, runTailOf: async () => null },
     agentStatusStore: {},
-    taskDecisionsStore: { listUnansweredForWorkspaces: async () => [], listNewestScanPerTask: async () => ({}) },
-    shelvedRulingsStore: { listForWorkspaces: async () => [] },
+    recordsStore: questionRecordsOf(questionsFromLoops(loops)),
     enrichLoop,
     deriveSessionWaiting,
     now: () => NOW,
@@ -79,7 +80,7 @@ describe('LIN-4242: the page and the live fragment read the Waiting set through 
     const keyOf = (row) => `${row.anchor.issueIdentifier}|${row.decision.decision_id}`;
     assert.deepEqual(page.rulingRows.map(keyOf), ruling.rows.map(keyOf),
       'the page and the fragment carry the same rulings, in the same order');
-    assert.ok(!ruling.rows.some(row => row.anchor.issueIdentifier === 'LIN-3'), 'the ruling outside the window is in neither');
+    assert.ok(ruling.rows.some(row => row.anchor.issueIdentifier === 'LIN-3'), 'a question still open is owed, whenever it was asked: counted, as P2b\'s question reads count it');
     assert.equal(page.rulingCount, ruling.rows.length);
   });
 
@@ -113,18 +114,18 @@ describe('LIN-4242: the owner section is always drawn, hidden when empty; a non-
     assert.doesNotMatch(html, /session-question-card/);
   });
 
-  test('the owner with rulings gets a visible section, one keyed card per ruling, in server order', () => {
-    const html = renderWaitingSection({ rows: [row('LIN-1'), row('LIN-2')] }, { urlKey: 'ws', owner: true });
+  test('the owner with open questions gets a visible section, one card per question, in server order (LIN-4538)', () => {
+    const html = renderWaitingSection({ rows: [], questions: [questionRow('LIN-1'), questionRow('LIN-2')] }, { urlKey: 'ws', owner: true });
     assert.doesNotMatch(html, /waiting-section hidden/);
-    const wrappers = html.match(/<div class="waiting-card">/g) || [];
+    const wrappers = html.match(/<div class="waiting-question"/g) || [];
     assert.equal(wrappers.length, 2);
     assert.ok(html.indexOf('LIN-1') < html.indexOf('LIN-2'), 'server order is kept');
-    assert.match(html, /data-testid="session-question-card"/);
+    assert.match(html, /data-testid="question-record-card"/);
   });
 
-  test('a member (not the owner) gets nothing at all, and no ruling text', () => {
-    assert.equal(renderWaitingSection({ rows: [row('LIN-1')] }, { urlKey: 'ws', owner: false }), '');
-    assert.equal(renderWaitingSection({ rows: [] }, { urlKey: 'ws', owner: false }), '');
+  test('a member (not the owner) gets nothing at all, and no question text', () => {
+    assert.equal(renderWaitingSection({ questions: [questionRow('LIN-1')] }, { urlKey: 'ws', owner: false }), '');
+    assert.equal(renderWaitingSection({ rows: [], questions: [] }, { urlKey: 'ws', owner: false }), '');
   });
 });
 
@@ -203,15 +204,13 @@ describe('LIN-4242: one rulings tick, through one path', () => {
 
 // ── Conformance: the page section and the live fragment (witness 3) ──────────
 
-/** A waiting ruling's row, as the reduction hands it to the section (the renderer's input). */
-const waitingRow = (identifier) => ({
-  decision: { decision_id: `d-${identifier}`, question: `Which for ${identifier}?` },
-  decisionCase: [],
-  anchor: { loopId: `r-${identifier}`, issueId: `id-${identifier}`, issueIdentifier: identifier, issueTitle: `Title ${identifier}`, workspaceUrlKey: 'ws', taskDecisionId: null },
-  disposition: 'resumable',
-  effect: 'resume',
-  canReply: true,
+/** An open question, as the owner's section draws it (lib/open-questions.js openQuestionsFor's row; LIN-4538). */
+const questionRow = (identifier) => ({
+  questionId: `q-${identifier}`, asks: `Which for ${identifier}?`, options: ['a', 'b'], recommended: 'a', ifUnanswered: 'pick a',
+  taskId: `task-${identifier}`, ticket: identifier, runId: `r-${identifier}`, askedAt: '2026-10-30T10:05:00.000Z',
+  state: 'gone', reason: 'no-session', interactive: true,
 });
+const waitingRow = questionRow;
 
 const SCENARIOS = {
   zero: { loops: [], expected: 0 },
@@ -220,18 +219,16 @@ const SCENARIOS = {
     loops: [rulingLoop('LIN-1'), rulingLoop('LIN-2', { dispatchedAt: '2026-10-30T09:00:00.000Z' }), rulingLoop('LIN-3')],
     expected: 3,
   },
-  outsideWindow: { loops: [rulingLoop('LIN-1'), rulingLoop('LIN-4', { dispatchedAt: '2020-01-01T00:00:00.000Z' })], expected: 1 },
-  // LIN-5's run is still live (a running loop, its ruling not yet waiting): the guard reads its effect as record, not null.
-  liveGuard: { loops: [rulingLoop('LIN-1'), rulingLoop('LIN-5', { agentState: 'running', wakeMarker: 'pending' })], expected: 2 },
+  outsideWindow: { loops: [rulingLoop('LIN-1'), rulingLoop('LIN-4', { dispatchedAt: '2020-01-01T00:00:00.000Z' })], expected: 2 },
 };
 
 /** Home's page with the given rulings, as the page is built: the owner's flag decides the section. */
-function pageHtmlFor(rulingRows, runControls) {
+function pageHtmlFor(page, runControls) {
   const homeView = {
     inProgressTrees: [], trees: [], upNext: [], recent: { nodes: [], remaining: 0 },
-    waiting: { rows: rulingRows, ids: rulingRows.map(r => r.anchor.issueIdentifier), contextIds: [] },
+    waiting: { rows: page.rulingRows, ids: page.rulingRows.map(r => r.anchor.issueIdentifier), contextIds: [], questions: page.questions },
   };
-  return renderPage([], [], [], 'Org', { urlKey: 'ws', workspaces: [], featureFlags: { runControls }, homeView, rulingCount: rulingRows.length });
+  return renderPage([], [], [], 'Org', { urlKey: 'ws', workspaces: [], featureFlags: { runControls }, homeView, rulingCount: page.rulingCount });
 }
 
 describe('LIN-4242 witness 3: the page section and the live fragment are one markup over one reduction', () => {
@@ -241,15 +238,16 @@ describe('LIN-4242 witness 3: the page section and the live fragment are one mar
       // carries the liveGuard scenario's ruling with effect null, so the page and the fragment differ and this fails.
       const d = deps(loops);
       const standing = createWaitingStanding(d);
-      const { ruling } = await standing({ urlKey: 'ws', at: NOW });
-      const page = await createHomeRowStates({ ...d, waitingStanding: standing })({ urlKey: 'ws', issues: [], runControls: true });
-      assert.equal(ruling.rows.length, expected, 'the fragment carries the expected rulings');
-      assert.equal(page.rulingRows.length, expected, 'the page carries the expected rulings');
-      // The route's answer: renderWaitingSection over the same rows, with the held titles (none here, so the fallback).
-      const fragment = renderWaitingSection({ rows: ruling.rows, titles: {} }, { urlKey: 'ws', owner: true });
-      const html = pageHtmlFor(page.rulingRows, true);
+      const { ruling, questions } = await standing({ urlKey: 'ws', at: NOW, accountId: 'acct-owner' });
+      const page = await createHomeRowStates({ ...d, waitingStanding: standing })({ urlKey: 'ws', issues: [], runControls: true, accountId: 'acct-owner' });
+      assert.equal(questions.length, expected, 'the owner is asked the expected questions');
+      assert.equal(page.questions.length, expected, 'the page carries the expected questions');
+      assert.equal(page.rulingCount, expected, 'the count is the open questions');
+      // The route's answer: renderWaitingSection over the same reads, with the held titles (none here, so the fallback).
+      const fragment = renderWaitingSection({ rows: ruling.rows, titles: {}, questions: page.questions }, { urlKey: 'ws', owner: true });
+      const html = pageHtmlFor(page, true);
       assert.ok(html.includes(fragment), 'the page section is the fragment markup, byte for byte');
-      assert.equal((html.match(/data-testid="session-question-card"/g) || []).length, expected);
+      assert.equal((html.match(/data-testid="waiting-question"/g) || []).length, expected);
       if (expected === 0) assert.match(html, /class="waiting-section hidden" role="region"/, 'the empty owner section is drawn hidden');
     });
   }
@@ -260,29 +258,11 @@ describe('LIN-4242 witness 3: the page section and the live fragment are one mar
     for (const runControls of [false, undefined]) {
       const page = await createHomeRowStates({ ...d, waitingStanding: standing })({ urlKey: 'ws', issues: [], runControls });
       assert.deepEqual(page.rulingRows, [], 'the page reads no rulings for them');
-      const html = pageHtmlFor([], runControls);
+      const html = pageHtmlFor(page, runControls);
       assert.doesNotMatch(html, /data-testid="waiting-on-you"/);
       assert.doesNotMatch(html, /session-question-card/);
-      assert.equal(renderWaitingSection({ rows: [waitingRow('LIN-1')] }, { urlKey: 'ws', owner: false }), '');
+      assert.equal(renderWaitingSection({ questions: [waitingRow('LIN-1')] }, { urlKey: 'ws', owner: false }), '');
     }
-  });
-});
-
-describe('LIN-4242 witness 3: the live-run guard is part of the one reduction the page and the fragment share', () => {
-  test('LIN-5 keeps its card under the guard with effect "record", and the raw reduction reads no effect: the page must carry the guarded one', async () => {
-    const d = deps(SCENARIOS.liveGuard.loops);
-    const standing = createWaitingStanding(d);
-    const { ruling } = await standing({ urlKey: 'ws', at: NOW });
-    // The raw reduction: the badge's collection with no live-run predicate, over the same enriched loops.
-    const raw = collectUnansweredDecisions(
-      { loops: SCENARIOS.liveGuard.loops.map(l => ({ ...enrichLoop(l), workspaceUrlKey: 'ws' })), taskDecisions: [], shelvedRulings: [], newestScanByTask: {} },
-      { now: NOW }
-    );
-    const effectOf = (rows, id) => rows.find(r => r.anchor.issueIdentifier === id)?.effect;
-    assert.equal(effectOf(ruling.rows, 'LIN-5'), 'record', 'the guarded read records the ruling');
-    assert.equal(effectOf(raw, 'LIN-5'), null, 'the raw reduction leaves its effect unset, so a page that skips the guard differs');
-    const page = await createHomeRowStates({ ...d, waitingStanding: standing })({ urlKey: 'ws', issues: [], runControls: true });
-    assert.equal(effectOf(page.rulingRows, 'LIN-5'), 'record', 'the page reads the same guarded effect');
   });
 });
 
@@ -299,9 +279,9 @@ describe('LIN-4242: the task lines take their titles from the held issue set whe
   });
 
   test('a waiting card reads its held title, and falls back to anchor.issueTitle with no titles', () => {
-    const held = renderWaitingSection({ rows: [waitingRow('LIN-1')], titles: waitingTitlesOf([{ identifier: 'LIN-1', title: 'Held title' }], ['LIN-1']) }, { urlKey: 'ws', owner: true });
+    const held = renderWaitingSection({ questions: [waitingRow('LIN-1')], titles: waitingTitlesOf([{ identifier: 'LIN-1', title: 'Held title' }], ['LIN-1']) }, { urlKey: 'ws', owner: true });
     assert.match(held, /class="waiting-task-title">Held title</);
-    const cold = renderWaitingSection({ rows: [waitingRow('LIN-1')], titles: {} }, { urlKey: 'ws', owner: true });
-    assert.match(cold, /class="waiting-task-title">Title LIN-1</);
+    const cold = renderWaitingSection({ questions: [waitingRow('LIN-1')], titles: {} }, { urlKey: 'ws', owner: true });
+    assert.match(cold, /class="waiting-task-title">LIN-1</, 'a question carries no task title of its own: the line names the ticket');
   });
 });

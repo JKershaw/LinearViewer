@@ -9,6 +9,7 @@
 import { test, describe } from 'node:test';
 import assert from 'node:assert/strict';
 import { buildRowStates } from '../../lib/task-page-loader.js';
+import { standingOfLoops } from './helpers/question-records.js';
 import { orderInProgress, buildInProgressCountParts } from '../../lib/task-board-view.js';
 
 // The count line's text, one entry per part (the parts are joined with ' · ' where the line is shown).
@@ -47,7 +48,9 @@ const node = (identifier, state = 'started', children = []) => ({
   depth: 0,
 });
 
+// LIN-4538: a ruling is an open question its run asked (the loop's decision), read as the question standing.
 function states({ roots, loops = {}, sessionsVisible = true }) {
+  const all = Object.values(loops).flat();
   return buildRowStates({
     roots,
     loopsByIdentifier: new Map(Object.entries(loops)),
@@ -55,6 +58,7 @@ function states({ roots, loops = {}, sessionsVisible = true }) {
     deriveSessionWaiting,
     now: NOW,
     sessionsVisible,
+    ruling: standingOfLoops(all),
   });
 }
 

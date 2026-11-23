@@ -1,4 +1,5 @@
 import { test, expect } from '../fixtures/test-base.js';
+import { askingRun, seedQuestion } from '../fixtures/question-records.js';
 
 // LIN-2193: real-Chromium, real-stylesheet coverage for a decision-bearing
 // waiting session. LIN-2184 shipped three CSS regressions in a row on this
@@ -25,9 +26,20 @@ import { test, expect } from '../fixtures/test-base.js';
 // `[blocked]` marker for `waitingMessage` — so every seed here posts exactly:
 // 2x assistant-text (the second carrying an unbroken long token, the
 // case-chunk-overflow fixture), 1x decision, 1x bare [blocked].
+//
+// LIN-4538 (P7a): the run page pins the question RECORDS the run asked
+// (lib/question-record-card.js), not the old decision card, so the three
+// run-page tests read a question record (QUESTION below) asked by a run of its
+// own, parked on `[blocked]` so the card is answerable (QUESTION_RUN; the
+// session's anchor above is never taken, so its run reads as still working
+// and its card would be read-only). A question record has no case prose: the unbroken-token
+// overflow fixture moves into the question's own text. The feed-card test
+// still reads the old `decision` feedback, which the Observation feed (the
+// ruling machinery, retired in P7b) shows.
 
 let URL_KEY;
 let SESSION_ID;
+let QUESTION_RUN;
 
 // An ~120-char token with no whitespace — the case-chunk overflow fixture
 // (an unbroken token with no break rule overflows its card at narrow width).
@@ -45,7 +57,16 @@ const DECISION_PAYLOAD = {
   ],
 };
 
+// The question the run page pins: five options (the chip-wrap fixture) and an
+// unbroken token in its text (the overflow fixture).
+const QUESTION = {
+  asks: `Which deployment strategy should we use for the rollout? Notes: ${UNBROKEN_TOKEN}`,
+  options: DECISION_PAYLOAD.options.map(o => o.label),
+  recommended: 'Canary rollout',
+};
+
 async function clearRuns(page) {
+  await page.goto(`/test/clear-ticket-records?urlKey=${URL_KEY}`);
   await page.goto(`/test/clear-dispatch-queue?urlKey=${URL_KEY}`);
   await page.goto(`/test/clear-dispatch-history?urlKey=${URL_KEY}`);
   await page.goto(`/test/clear-agent-status?urlKey=${URL_KEY}`);
@@ -150,42 +171,31 @@ test.beforeEach(async ({ page, workerUrlKey }) => {
   await clearRuns(page);
   await seedDecisionSession(page);
   SESSION_ID = await discoverSessionId(page);
+  // Its own ticket: the dispatch route refuses a second implementation run on LIN-2193 within moments of the first.
+  QUESTION_RUN = await askingRun(page, URL_KEY, 'LIN-2194');
+  await seedQuestion(page, URL_KEY, { ticket: 'LIN-2194', runId: QUESTION_RUN, ...QUESTION });
 });
 
 test.describe('Decision-bearing waiting-session layout (LIN-2193)', () => {
-  test('desktop: the question card spaces the question/case and resets the options list', async ({ page }) => {
+  test('desktop: the question card spaces the question and lays the options out as a chip row', async ({ page }) => {
     await page.setViewportSize({ width: 1280, height: 800 });
-    await page.goto(`/workspace/${URL_KEY}/observation/session/${encodeURIComponent(SESSION_ID)}`);
+    await page.goto(`/workspace/${URL_KEY}/observation/session/${encodeURIComponent(QUESTION_RUN)}`);
     await page.waitForLoadState('networkidle');
 
-    const card = page.locator('[data-testid="session-question-card"]');
-    const question = page.locator('[data-testid="session-question-card-question"]');
-    const why = page.locator('[data-testid="session-question-card-why"]');
-    const chunks = page.locator('[data-testid="session-question-card-why-chunk"]');
-    const optionsList = page.locator('[data-testid="session-question-card-options"]');
-    const options = page.locator('[data-testid="session-question-card-option"]');
+    const card = page.locator('[data-testid="question-record-card"]');
+    const question = card.locator('[data-testid="question-record-card-question"]');
+    const optionsList = card.locator('[data-testid="question-record-card-options"]');
+    const options = card.locator('[data-testid="question-record-card-option"]');
 
     await expect(card).toBeVisible();
     await expect(question).toBeVisible();
     await expect(question).not.toHaveText('');
-    await expect(why).toBeVisible();
-    // "why is Harbour asking? ›" is an expandable <details> — open it.
-    await why.locator('summary').click();
-    await expect(chunks).toHaveCount(2);
     await expect(optionsList).toBeVisible();
-    await expect(options).toHaveCount(DECISION_PAYLOAD.options.length);
+    await expect(options).toHaveCount(QUESTION.options.length);
 
-    // Question -> case spacing: the case starts strictly below the question.
-    const [questionBox, whyBox] = await Promise.all([question.boundingBox(), why.boundingBox()]);
-    expect(whyBox.y - (questionBox.y + questionBox.height)).toBeGreaterThan(0);
-
-    // Chunk-to-chunk gap: the second chunk starts strictly below the first
-    // chunk's bottom edge (the grid-gap repair, LIN-2184).
-    const chunkRects = await chunks.evaluateAll(els => els.map(el => {
-      const r = el.getBoundingClientRect();
-      return { top: r.top, bottom: r.bottom };
-    }));
-    expect(chunkRects[1].top - chunkRects[0].bottom).toBeGreaterThan(0);
+    // Question -> options spacing: the options start strictly below the question.
+    const [questionBox, optionsBox] = await Promise.all([question.boundingBox(), optionsList.boundingBox()]);
+    expect(optionsBox.y - (questionBox.y + questionBox.height)).toBeGreaterThan(0);
 
     // LIN-4114: the options are buttons in a labelled group (no list any more), laid out as a flex chip row.
     const [role, display] = await optionsList.evaluate(el => [el.getAttribute('role'), getComputedStyle(el).display]);
@@ -195,14 +205,14 @@ test.describe('Decision-bearing waiting-session layout (LIN-2193)', () => {
 
   test('360px: option chips wrap and stay painted where they render', async ({ page }) => {
     await page.setViewportSize({ width: 360, height: 640 });
-    await page.goto(`/workspace/${URL_KEY}/observation/session/${encodeURIComponent(SESSION_ID)}`);
+    await page.goto(`/workspace/${URL_KEY}/observation/session/${encodeURIComponent(QUESTION_RUN)}`);
     await page.waitForLoadState('networkidle');
 
-    const card = page.locator('[data-testid="session-question-card"]');
-    const options = page.locator('[data-testid="session-question-card-option"]');
+    const card = page.locator('[data-testid="question-record-card"]');
+    const options = card.locator('[data-testid="question-record-card-option"]');
     await expect(card).toBeVisible();
     const optionCount = await options.count();
-    expect(optionCount).toBe(DECISION_PAYLOAD.options.length);
+    expect(optionCount).toBe(QUESTION.options.length);
 
     // Paint-identity per chip (elementFromPoint at the chip's own centre):
     // toBeVisible()/boundingBox() describe the chip's own box and are blind
@@ -227,25 +237,23 @@ test.describe('Decision-bearing waiting-session layout (LIN-2193)', () => {
     }
   });
 
-  test('360px: the unbroken token in case prose stays inside the card', async ({ page }) => {
+  test('360px: the unbroken token in the question text stays inside the card', async ({ page }) => {
     await page.setViewportSize({ width: 360, height: 640 });
-    await page.goto(`/workspace/${URL_KEY}/observation/session/${encodeURIComponent(SESSION_ID)}`);
+    await page.goto(`/workspace/${URL_KEY}/observation/session/${encodeURIComponent(QUESTION_RUN)}`);
     await page.waitForLoadState('networkidle');
 
-    const card = page.locator('[data-testid="session-question-card"]');
-    const why = page.locator('[data-testid="session-question-card-why"]');
-    const chunks = page.locator('[data-testid="session-question-card-why-chunk"]');
+    const card = page.locator('[data-testid="question-record-card"]');
+    const question = card.locator('[data-testid="question-record-card-question"]');
     await expect(card).toBeVisible();
-    await why.locator('summary').click();
-    await expect(chunks).toHaveCount(2);
-    await expect(chunks.last()).toContainText(UNBROKEN_TOKEN);
+    await expect(question).toContainText(UNBROKEN_TOKEN);
 
     const cardBox = await card.boundingBox();
-    // Not scrollWidth/clientWidth on the document or the chunk — both
-    // measured dead against this regression (see file header). The honest
-    // signal is whether the chunk's own painted box stays inside the card.
-    const chunkRights = await chunks.evaluateAll(els => els.map(el => el.getBoundingClientRect().right));
-    for (const right of chunkRights) {
+    // Not scrollWidth/clientWidth on the document or the text — both
+    // measured dead against this kind of regression (see file header). The
+    // honest signal is whether the text's own painted lines stay inside the card.
+    const lineRights = await question.evaluate(el => [...el.getClientRects()].map(r => r.right));
+    expect(lineRights.length).toBeGreaterThan(0);
+    for (const right of lineRights) {
       expect(right).toBeLessThanOrEqual(cardBox.x + cardBox.width);
     }
   });

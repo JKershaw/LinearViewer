@@ -2,12 +2,13 @@ import { test, expect } from '../fixtures/test-base.js';
 import { localSeedId } from '../fixtures/local-harness.js';
 import { seedWorkspaceOwnership } from '../fixtures/workspace-ownership.js';
 import { SELECTORS } from '../helpers.js';
+import { seedQuestion } from '../fixtures/question-records.js';
 
 // LIN-4106 (S4): the opened task and the task page say one thing, in one line, in plain words.
 //
 //   - the task page has exactly one pill and one sentence, no "Tracker:" line and no "Harbour:" label, and says the last
 //     run in words ("Last run: Plan finished … · the only run");
-//   - a waiting task's ruling card comes before the run block ("Runs on", "Another step") in the DOM;
+//   - a waiting task's question card comes before the run block ("Runs on", "Another step") in the DOM;
 //   - Home's opened task carries the same state line, and its All-runs button, with no raw "Last:" words;
 //   - the Change drawer has a heading, the default choice in words with its figures, and house-page links.
 //
@@ -29,10 +30,11 @@ test.beforeEach(async ({ page, localWorkerUrlKey }) => {
   await page.goto(`/test/clear-observation-sessions?urlKey=${URL_KEY}`);
   await page.goto(`/test/clear-sessions-feed-cache?urlKey=${URL_KEY}`);
   await page.goto(`/test/clear-task-decisions?urlKey=${URL_KEY}`);
+  await page.request.get(`/test/clear-ticket-records?urlKey=${URL_KEY}`);
 });
 
 test.afterEach(async ({ page, localWorkerUrlKey }) => {
-  for (const reset of ['clear-dispatch-queue', 'clear-dispatch-history', 'clear-agent-status', 'clear-task-decisions']) {
+  for (const reset of ['clear-dispatch-queue', 'clear-dispatch-history', 'clear-agent-status', 'clear-task-decisions', 'clear-ticket-records']) {
     await page.request.get(`/test/${reset}?urlKey=${localWorkerUrlKey}`);
   }
 });
@@ -77,23 +79,13 @@ async function seedRun(page, token, identifier, { kind, feedback = [] }) {
   return itemId;
 }
 
-/** A worker waiting on an open ruling on `identifier`, written the way a runner writes it (`[blocked]`, then `[decision]`). */
-async function seedRuling(page, token, identifier) {
-  const itemId = await seedRun(page, token, identifier, { kind: 'implementation' });
-  const auth = { Authorization: `Bearer ${token}`, 'Content-Type': 'application/json' };
-  const blocked = await page.request.post(`/api/dispatch/feedback/${itemId}`, { headers: auth, data: { message: '[blocked] which way?' } });
-  expect(blocked.status()).toBe(200);
-  const decision = await page.request.post(`/api/dispatch/feedback/${itemId}`, {
-    headers: auth,
-    data: {
-      kind: 'decision',
-      message: JSON.stringify({
-        decision_id: `d-${identifier}`, question: `Which for ${identifier}?`,
-        options: [{ id: 'ship', label: 'Ship it now' }, { id: 'wait', label: 'Wait for review' }], recommended: 'wait',
-      }),
-    },
-  });
-  expect(decision.status(), `decision failed: ${await decision.text()}`).toBe(200);
+/**
+ * A worker waiting on an open question on `identifier`: the run is written the way a runner writes it (`[blocked]`), and the
+ * question it asked the person is a question record (LIN-4538: what the task page reads).
+ */
+async function seedWaiting(page, token, identifier) {
+  const runId = await seedRun(page, token, identifier, { kind: 'implementation', feedback: ['[blocked] which way?'] });
+  await seedQuestion(page, URL_KEY, { ticket: identifier, runId, asks: `Which for ${identifier}?`, options: ['Ship it now', 'Wait for review'], recommended: 'Wait for review' });
 }
 
 async function gotoTask(page, identifier) {
@@ -141,11 +133,11 @@ test.describe('LIN-4106 — the task page says one state, in one line', () => {
     await expect(page.locator(SELECTORS.taskPage.harbourLabel)).toHaveCount(0);
   });
 
-  test('a waiting task: the ruling card comes before the run block and the stages in the DOM', async ({ page }) => {
+  test('a waiting task: the question card comes before the run block and the stages in the DOM', async ({ page }) => {
     await seedTasks(page);
     await seedWorkspaceOwnership(page, URL_KEY, 'owner');
     const token = await runnerToken(page);
-    await seedRuling(page, token, WAITING);
+    await seedWaiting(page, token, WAITING);
 
     await gotoTask(page, WAITING);
     await expect(page.locator(SELECTORS.taskPage.question)).toHaveCount(1);
