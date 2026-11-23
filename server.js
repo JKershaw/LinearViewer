@@ -108,6 +108,7 @@ import { askedOf } from './lib/asked-of.js'
 import { flattenIssue as flattenRecordsIssue } from './lib/proxy-wire.js'
 import { createListWorkspacePeople, storedNameOf } from './lib/workspace-people.js'
 import { createTaskRecordsRoutes } from './routes/task-records.js'
+import { createQuestionAnswerRoutes } from './routes/question-answers.js'
 import { createProjectPageRoutes } from './routes/project-page.js'
 import { DismissalSuggestionsStore } from './lib/dismissal-suggestions-store.js'
 import { HarbourCommentsStore } from './lib/harbour-comments-store.js'
@@ -3455,6 +3456,7 @@ app.use(createTaskPageRoutes({
 // LIN-4494 (piece 3): a signed-in person's record writes from the task page, and the project page (its backlog and
 // the two actions on it). Both write through the one checked pipeline (lib/records/writes.js), filed by the session's account.
 app.use(createTaskRecordsRoutes({ workspaceFromUrl, recordsStore, accountStore, listPeople: listWorkspacePeople }))
+app.use(createQuestionAnswerRoutes({ workspaceFromUrl, recordsStore, dispatchQueueStore, workspacePreferencesStore, proxyTokenStore, workspaceOwnerCheck, accountStore, listPeople: listWorkspacePeople }))
 app.use(createProjectPageRoutes({ workspaceFromUrl, getDeployInfo, getOpenRouterSource, recordsStore, accountStore, listPeople: listWorkspacePeople }))
 
 // Mount the task share routes (LIN-3330) — the owner mint/list/revoke controls

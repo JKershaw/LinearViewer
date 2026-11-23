@@ -59,3 +59,7 @@ Area notes for `agent-api` in the registry. Format and rules: README.md.
   credential minted for the row name it; `addItem` takes that id only as its trusted third argument, never from a body field.
 - A new proxy route file adds a row per registration to `tests/unit/proxy-endpoint-inventory-witness.test.js`, and each write
   mount a `CENSUS` row in `tests/unit/lin-4468-stage-write-allowance.test.js`; both fail until it does (LIN-4493 added seven and four).
+- A dispatch credential files records only if its row names a run, so every finalizer passes the factory's `runRecordId`
+  to its mint. The feedback autopilot dropped it (`routes/workspace-api-feedback.js`) until LIN-4531 made a fresh kickoff
+  start a run (`startsRunRow`, `lib/run-identity.js`). Every `runRecordIdFor` caller passes `followUpTo` too, or a
+  kickoff's follow-up reads as a run of its own.

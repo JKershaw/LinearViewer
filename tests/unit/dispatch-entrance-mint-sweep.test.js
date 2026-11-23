@@ -216,8 +216,10 @@ describe('LIN-3601 mint sweep — World N (no declaration record)', () => {
     w.reset();
     const res = await w.viaProxy('/api/proxy/autopilot/kickoff', { goal: 'walk the stack', target: 'cli' });
     assert.equal(res.status, 201, res.text);
+    // LIN-4531: a fresh kickoff starts its own run, so its declared mint names the row.
     assert.deepEqual(w.grants(), [{
-      urlKey: URL_KEY, workspaceId: POSTER_WORKSPACE, ownerAccountId: POSTER, grants: ['dispatch'], label: 'kickoff-bootstrap', profile: 'worker', origin: 'dispatch'
+      urlKey: URL_KEY, workspaceId: POSTER_WORKSPACE, ownerAccountId: POSTER, grants: ['dispatch'], label: 'kickoff-bootstrap', profile: 'worker', origin: 'dispatch',
+      runRecordId: res.body.item?.id ?? res.body.id
     }]);
     assert.deepEqual(w.plains(), []);
   });
@@ -227,8 +229,10 @@ describe('LIN-3601 mint sweep — World N (no declaration record)', () => {
     w.reset();
     const res = await w.viaSession({ prompt: 'Run the autopilot on LIN-1.', promptName: 'Autopilot', kind: 'autopilot', issueIdentifier: 'LIN-1', attachProxy: true, target: 'cli', harness: 'claude-code' });
     assert.equal(res.status, 201, res.text);
+    // LIN-4531: a fresh autopilot kickoff starts its own run, so its declared mint names the row (`res.body`'s id).
     assert.deepEqual(w.grants(), [{
-      urlKey: URL_KEY, workspaceId: POSTER_WORKSPACE, ownerAccountId: POSTER, grants: ['dispatch'], label: 'dispatch-bootstrap', profile: 'worker', origin: 'dispatch'
+      urlKey: URL_KEY, workspaceId: POSTER_WORKSPACE, ownerAccountId: POSTER, grants: ['dispatch'], label: 'dispatch-bootstrap', profile: 'worker', origin: 'dispatch',
+      runRecordId: res.body.item?.id ?? res.body.id
     }]);
     assert.deepEqual(w.plains(), []);
   });

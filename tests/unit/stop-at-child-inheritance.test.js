@@ -184,7 +184,10 @@ describe('LIN-3245 N1 — child autopilot stopAt inheritance', () => {
 describe('LIN-3246 P1b — child autopilot stopAt PROMPT inheritance', () => {
   // addItem appends the child's own session-id self-ref block (whose id differs
   // per child), so compare the base prompt before that block.
-  const basePrompt = (prompt) => prompt.split('\n\n---\n\n## Your autopilot session id')[0];
+  // LIN-4531: a kickoff names its own run in its prompt, so each row's id is normalised before the comparison: what this
+  // test pins is the stop block and the inherited text, not the two rows' ids.
+  const UUID = /[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}/g;
+  const basePrompt = (prompt) => prompt.split('\n\n---\n\n## Your autopilot session id')[0].replace(UUID, '<row-id>');
 
   test('parent without stopAt: the child prompt is byte-identical to the no-sessionId kickoff, both without the stop block', async () => {
     const store = makeStore();

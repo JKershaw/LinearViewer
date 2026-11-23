@@ -394,6 +394,19 @@ describe('the brief (brief.js, parts 1–8)', () => {
     assert.deepEqual(b.parts.previous, { id: s.r13, stage: 'survey-task', first: 'Found the footer.' });
   });
 
+  test('part 8 and left-behind skip the coordinator: an ended autopilot run in the task is no stage (LIN-4531)', async () => {
+    const s = await scenario();
+    // A fresh autopilot kickoff opens a run in its ticket's task. It ends after the survey run, so by time alone it would be the previous stage.
+    const coordinator = await store.openRun(URL_KEY, { id: 'row-coordinator', stage: 'autopilot', taskId: s.t3, lineage: 'row-coordinator', at: at(++minute) });
+    await store.endRun(URL_KEY, coordinator.id, { state: 'done', account: 'Coordinated the work.', at: at(++minute) });
+    // A finding addressed to the coordinator in this task: its run ended, but it is no stage, so the finding is not "left behind" for any reader.
+    await add('finding', { in: s.t3, to: 'autopilot', says: 'For the coordinator.' }, 'review');
+    await refresh();
+    const b = buildBrief({ actor: 'close-out', taskId: s.t3, idx });
+    assert.deepEqual(b.parts.previous, { id: s.r13, stage: 'survey-task', first: 'Found the footer.' }, 'the previous stage is the survey run, not the coordinator');
+    assert.equal(JSON.stringify(b.parts.addressed).includes('For the coordinator.'), false, 'a finding to the coordinator is not left behind for the stage reading it');
+  });
+
   test('ended records are left out; and the brief as of an earlier time is the earlier brief', async () => {
     const s = await scenario();
     const b = buildBrief({ actor: 'implementation', taskId: s.t3, idx });

@@ -14,3 +14,7 @@ Area notes for `web-routes` in the registry. Format and rules: README.md.
   to 28 days old. Any read that counts finished work sees them: a spec that needs nothing
   landed picks a window shorter than two days, as `tests/e2e/ship-biscuit.spec.js` picks "day"
   (LIN-4500).
+- The question routes (`routes/question-answers.js`) only bind the request. The order decision, then resume, then
+  end lives in `lib/question-answers.js`, and a retry depends on it: it finds the decision by `fixedIdOf` and the
+  resume by its marker line (`lib/prompts/question-resume.js`). A new surface calls these routes and composes no
+  resume prompt of its own (LIN-4531).
