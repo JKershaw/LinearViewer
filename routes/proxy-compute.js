@@ -1275,8 +1275,8 @@ export function createComputeRoutes({
    *     person findings end when the run ends, LIN-4535);
    *   - a run's credential on another ticket: that ticket's task, read as the run's stage;
    *   - a person's copy (`origin: person`): the task read as that person;
-   *   - a credential with no run (a dispatch row that starts none, or one minted before run identity): read as the
-   *     coordinator;
+   *   - a dispatch row that starts no run: read as the coordinator;
+   *   - a credential minted before run identity (no origin): refused, 403, as the records routes refuse it;
    *   - a blind read: refused, 403. Its only read is the change it judges, given by its prompt (LIN-4437).
    * A ticket with no task on record yet has no brief: `status: 'missing'`, naming the raw issue read. A GET never
    * makes a task (records lesson).
@@ -1304,17 +1304,34 @@ export function createComputeRoutes({
         return jsonError(res, 503, 'Records store not configured');
       }
       const urlKey = req.proxyUrlKey;
-      const ownRunId = req.proxyOrigin === TOKEN_ORIGIN.DISPATCH ? req.proxyRunRecordId || null : null;
       const asker = proxyAskerOf(req);
+      // A credential minted before origin was recorded cannot read records (lib/stage-writes.js proxyAskerOf), and the
+      // brief is records now: the same refusal as the records routes (routes/proxy-records.js readable()).
+      if (!asker) {
+        logEvent(req, endpoint, 403);
+        return jsonError(res, 403, 'this credential predates run identity; mint a new one');
+      }
+      const ownRunId = req.proxyOrigin === TOKEN_ORIGIN.DISPATCH ? req.proxyRunRecordId || null : null;
 
-      const taskId = await recordsStore.taskForTicket(urlKey, identifier);
+      // The identifier a person types may carry a leading '#' or be lowercase (isValidIssueId accepts both); a task is
+      // claimed by the exact identifier, so find it under the written form, then without '#', then upper-cased.
+      let matched = identifier;
+      let taskId = await recordsStore.taskForTicket(urlKey, matched);
+      if (!taskId) {
+        for (const candidate of [identifier.replace(/^#/, ''), identifier.replace(/^#/, '').toUpperCase()]) {
+          if (candidate === matched) continue;
+          matched = candidate;
+          taskId = await recordsStore.taskForTicket(urlKey, matched);
+          if (taskId) break;
+        }
+      }
       if (!taskId) {
         logEvent(req, endpoint, 200);
         return res.json({
           status: 'missing',
           identifier,
           brief: null,
-          reason: `${identifier} has no task on record yet, so it has no brief. Read the ticket itself: GET /api/proxy/issues/${identifier}`,
+          reason: `${identifier} has no task on record yet, so it has no brief. Read the ticket itself: GET /api/proxy/issues/${identifier}, where this workspace's provider supports raw issue reads`,
         });
       }
 
@@ -1325,7 +1342,8 @@ export function createComputeRoutes({
           store: recordsStore,
           urlKey,
           taskId,
-          actor: run ? stageOf(run) : asker?.startsWith('person:') ? asker : COORDINATOR_STAGE,
+          // The reader comes from the credential's own fields, not from the log string proxyAskerOf returns.
+          actor: run ? stageOf(run) : req.proxyOrigin === TOKEN_ORIGIN.PERSON ? asker : COORDINATOR_STAGE,
           asker,
         });
       if (built.problem) {
@@ -1333,7 +1351,7 @@ export function createComputeRoutes({
         return jsonError(res, 500, 'Failed to compose brief', { detail: built.problem });
       }
       logEvent(req, endpoint, 200);
-      res.json({ status: 'fresh', identifier, task: built.task, reader: built.actor, brief: built.text, bytes: built.bytes });
+      res.json({ status: 'fresh', identifier: matched, task: built.task, reader: built.actor, brief: built.text, bytes: built.bytes });
     } catch (err) {
       logEvent(req, endpoint, 500);
       console.error('Proxy /brief error:', err.message);

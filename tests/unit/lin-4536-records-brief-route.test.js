@@ -220,13 +220,30 @@ describe('GET /api/proxy/brief/:identifier is the records brief for the credenti
     assert.equal((await store.carriedOfRun(URL_KEY, 'run-close-out')).size, 0);
   });
 
-  test('a credential with no run reads as the coordinator', async () => {
+  test('a dispatch credential with no run reads as the coordinator', async () => {
     await seed();
-    for (const as of [{ proxyOrigin: TOKEN_ORIGIN.DISPATCH, proxyRunRecordId: null, proxyCreatedBy: 'owner-1' }, { proxyOrigin: null, proxyRunRecordId: null, proxyCreatedBy: 'owner-1' }]) {
-      const res = await getBrief({ as });
-      assert.equal(res.statusCode, 200, JSON.stringify(res.jsonBody));
-      assert.equal(res.jsonBody.reader, 'autopilot');
+    const res = await getBrief({ as: { proxyOrigin: TOKEN_ORIGIN.DISPATCH, proxyRunRecordId: null, proxyCreatedBy: 'owner-1' } });
+    assert.equal(res.statusCode, 200, JSON.stringify(res.jsonBody));
+    assert.equal(res.jsonBody.reader, 'autopilot');
+  });
+
+  test('a credential minted before run identity is refused, as the records routes refuse it, and reads nothing', async () => {
+    await seed();
+    const res = await getBrief({ as: { proxyOrigin: null, proxyRunRecordId: null, proxyCreatedBy: 'owner-1' } });
+    assert.equal(res.statusCode, 403);
+    assert.match(res.jsonBody.error, /predates run identity/);
+  });
+
+  test('an identifier written with a leading # or in lower case finds the task it names', async () => {
+    const { task } = await seed();
+    for (const identifier of ['lin-9301', '#LIN-9301', '#lin-9301']) {
+      const res = await getBrief({ identifier });
+      assert.equal(res.statusCode, 200, identifier);
+      assert.equal(res.jsonBody.status, 'fresh', identifier);
+      assert.equal(res.jsonBody.identifier, TICKET, identifier);
+      assert.equal(res.jsonBody.task, task.id, identifier);
     }
+    assert.equal((await getBrief({ identifier: 'lin-9399' })).jsonBody.status, 'missing');
   });
 
   test('a run reading another ticket reads that ticket\'s task as its stage, and logs nothing under itself', async () => {

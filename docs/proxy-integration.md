@@ -1050,7 +1050,7 @@ POST /api/proxy/brief/{identifier}
 by a model, and it reads no tracker. It is read for your own credential: a dispatched run reads its own
 brief (its stage is the reader, so the records addressed to that stage are in it) with no `?run=`; a run
 reading another ticket reads that ticket's task as its stage; a person's copy reads as that person; a
-credential with no run reads as the coordinator (`autopilot`). A blind read is refused (`403`).
+dispatch credential with no run reads as the coordinator (`autopilot`); a credential minted before run identity is refused (`403`), as on the records routes. A blind read is refused (`403`).
 
 It opens with **the task as filed under `## As asked`**: the task's ref, its done-when and the person's
 words (the `asked` of the task and each ancestor task, fixed once written, so no description edit
