@@ -68,6 +68,19 @@ describe('LIN-4538 witness: an open question on a run is a waiting row; ending i
     assert.equal(ruling.rows[0].anchor.workspaceUrlKey, URL_KEY, 'each row names its workspace');
   });
 
+  test('scoped to a person (Home\'s viewer), another person\'s open question is not a row, a count or a waiting loop', () => {
+    const facts = [
+      { questionId: 'q-mine', state: 'open', to: 'person:acct-owner', ticket: 'LIN-70', runId: 'run-1', taskId: 'task-LIN-70' },
+      { questionId: 'q-theirs', state: 'open', to: 'person:acct-other', ticket: 'LIN-71', runId: 'run-9', taskId: 'task-LIN-71' },
+    ];
+    const loops = [loop(), loop({ loopId: 'run-9', lineageId: 'run-9', issueIdentifier: 'LIN-71' })];
+    const mine = rulingStandingFromQuestions({ urlKey: URL_KEY, loops, facts, to: 'person:acct-owner' });
+    assert.deepEqual(mine.rows.map((r) => r.questionId), ['q-mine']);
+    assert.deepEqual([...mine.openLoopIds], ['run-1']);
+    // Unscoped (the task page's read), both count.
+    assert.equal(rulingStandingFromQuestions({ urlKey: URL_KEY, loops, facts }).rows.length, 2);
+  });
+
   test('a question addressed to a deciding stage is not the person\'s: no waiting row, no count', () => {
     const facts = [{ questionId: 'q-s', state: 'open', to: 'implementation', ticket: 'LIN-70', runId: 'run-1', taskId: 'task-LIN-70' }];
     const ruling = rulingStandingFromQuestions({ urlKey: URL_KEY, loops: [loop()], facts });

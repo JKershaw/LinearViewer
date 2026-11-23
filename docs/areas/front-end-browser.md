@@ -55,3 +55,6 @@ Area notes for `front-end-browser` in the registry. Format and rules: README.md.
   becomes a named function (`getOpenLoopIds`/`setOpenLoopIds` in `public/observation.js`); a `let` read through the
   namespace is live. Keep each export's name from the old seam where it can stay a function (`lastRulingsRef`); an accessor named after its own state gains a verb (`openLoopIds` → `getOpenLoopIds`), so a suite changes how it loads and not what it asserts.
   A suite reaches module state through the seam, never by a script-scope probe. (LIN-4463 piece 4.)
+- Home's waiting cards are question record cards (`question-record-card`, LIN-4538), and one answered here stays, settled.
+  A selector that reads the Waiting set (keys, count, keep-typed, copies) names that card and skips `[data-settled]`;
+  one naming only `session-question-card` matches nothing on Home and fails silently (LIN-4538's four fixes).
