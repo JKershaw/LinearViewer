@@ -35,9 +35,10 @@ import { armKeepalive, clientGoneSignal } from '../lib/http-keepalive.js';
 import { UUID_REGEX, isValidIssueId } from '../lib/workspace.js';
 import { badRequest, jsonError, keepaliveError, notFound } from '../lib/errors.js';
 import { isHermeticTestToken } from '../lib/should-mock-ai.js';
-import { composeRunBrief, composeTaskBrief, readerOfRun } from '../lib/records/run-brief.js';
+import { composeRunBrief, composeTaskBrief } from '../lib/records/run-brief.js';
+import { stageOf } from '../lib/records/brief.js';
 import { COORDINATOR_STAGE } from '../lib/records/words.js';
-import { TOKEN_ORIGIN, WRITES } from '../lib/stage-writes.js';
+import { TOKEN_ORIGIN, WRITES, proxyAskerOf } from '../lib/stage-writes.js';
 
 /**
  * @param {Object} deps
@@ -1304,8 +1305,7 @@ export function createComputeRoutes({
       }
       const urlKey = req.proxyUrlKey;
       const ownRunId = req.proxyOrigin === TOKEN_ORIGIN.DISPATCH ? req.proxyRunRecordId || null : null;
-      const asker = ownRunId ? `run:${ownRunId}`
-        : req.proxyOrigin === TOKEN_ORIGIN.PERSON && req.proxyCreatedBy ? `person:${req.proxyCreatedBy}` : null;
+      const asker = proxyAskerOf(req);
 
       const taskId = await recordsStore.taskForTicket(urlKey, identifier);
       if (!taskId) {
@@ -1325,7 +1325,7 @@ export function createComputeRoutes({
           store: recordsStore,
           urlKey,
           taskId,
-          actor: run ? readerOfRun(run) : asker?.startsWith('person:') ? asker : COORDINATOR_STAGE,
+          actor: run ? stageOf(run) : asker?.startsWith('person:') ? asker : COORDINATOR_STAGE,
           asker,
         });
       if (built.problem) {

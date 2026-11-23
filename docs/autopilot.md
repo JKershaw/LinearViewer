@@ -120,7 +120,7 @@ later build/refactor decision should be scored against these:
 3. **Descriptive vs. normative firewall.** Periodicals and doc upkeep maintain the
    *descriptive* layer (architecture, API, what-the-code-does). The *normative* layer (the
    north star, the definition of intent) is human-authored, always.
-4. **Light orchestrator.** The driver reads distilled context (recap/brief/stack) and
+4. **Light orchestrator.** The driver reads compact context (recap, the records brief, stack) and
    dispatches; it never becomes the worker. The worker carries the heavy context and the
    full toolset.
 

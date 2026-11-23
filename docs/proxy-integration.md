@@ -362,7 +362,7 @@ Issue-scoped endpoints are canonical under `/issues/{id}/...`, so the read and w
 
 - `GET  /issues/{id}/relations` (read) pairs with `POST` / `DELETE /issues/{id}/relations[/{relationId}]` (write).
 - `POST /issues/{id}/comments` (write) pairs with `PATCH` / `DELETE /issues/{id}/comments/{commentId}` (write); reads of comments come back inside `GET /issues/{id}`.
-- `GET  /issues/{id}/recommend`, `/issues/{id}/recap`, `/issues/{id}/brief` (issue-derived AI reads).
+- `GET  /issues/{id}/recommend`, `/issues/{id}/recap` (issue-derived AI reads), `/issues/{id}/brief` (the records brief, LIN-4536).
 - Cycle detail is canonical as the plural by-id form `GET /cycles/{cycleId}`, mirroring the `GET /cycles` list.
 
 For backward compatibility the proxy also accepts **forgiving aliases** for the obvious alternate guesses — the older flat forms `GET /relations/{id}`, `GET /recap/{id}`, `GET /brief/{id}`, `GET /recommend/{id}`, `POST /comments/{id}`, and the singular `GET /cycle/{cycleId}` all still resolve to the same handlers. They are intentionally undocumented going forward; prefer the canonical paths above. The RPC-style verbs (`/stack`, `/dispatch*`, `/recommend-and-dispatch`, `/agent/status` (deprecated alias `/foreman/status`), `/autopilot/*`) are not issue-scoped and are unchanged.

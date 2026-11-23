@@ -63,3 +63,6 @@ Area notes for `agent-api` in the registry. Format and rules: README.md.
   to its mint. The feedback autopilot dropped it (`routes/workspace-api-feedback.js`) until LIN-4531 made a fresh kickoff
   start a run (`startsRunRow`, `lib/run-identity.js`). Every `runRecordIdFor` caller passes `followUpTo` too, or a
   kickoff's follow-up reads as a run of its own.
+- A records read logs who asked through one rule, `proxyAskerOf` (`lib/stage-writes.js`): the records routes and the brief
+  (`routes/proxy-compute.js`) both call it. The brief logs its carried ids under a run only for that run's own task, since
+  a run's end ends the person findings it carried; a run reading another ticket's brief carries nothing (LIN-4536).
