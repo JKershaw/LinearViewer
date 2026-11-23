@@ -12,7 +12,7 @@
  * is per file AND per word, so a file allowed one word still fails on any other retired word.
  *
  * What stays a word on purpose, and is not retired: `## As asked` (the brief's part-1 label, owned by
- * lib/brief-quote.js), `askedOf` (the one writer rule), `askedText` (the records pipeline's injected-reader name), the
+ * lib/records/words.js since LIN-4536), `askedOf` (the one writer rule), `askedText` (the records pipeline's injected-reader name), the
  * lower-case `harbour.asAsked` (the orphaned Jira property, left on older issues and named only to say so). The
  * `task-snapshots` collection name stays only where production data still needs it until the drop has run.
  */
@@ -42,8 +42,8 @@ export const RETIRED = Object.freeze([
   { word: 'hasMarkerLine', re: /\bhasMarkerLine\b/ },
   { word: 'the As-asked modules', re: /\bas-asked(?:-seal|-region)?\.js\b/ },
   { word: 'the [as-asked] log lines', re: /\[as-asked\]/ },
-  // The quote's reader may read a description in one place only: lib/brief-quote.js (see ALLOW). LIN-4527 removed
-  // the legacy block reader in lib/asked-of.js, the only other caller.
+  // The quote's reader. LIN-4527 removed the legacy block reader in lib/asked-of.js; LIN-4536 retired the brief's quote
+  // and its module, the last home (its allowance here is removed).
   { word: 'splitQuote', re: /\bsplitQuote\b/ },
   // The close-out prune and the route it wrote through.
   { word: 'belowDescription', re: /\bbelowDescription\b/ },
@@ -65,10 +65,6 @@ export const RETIRED = Object.freeze([
  * a reason here, and an allowance whose file no longer holds that word fails the stale-allowance test.
  */
 export const ALLOW = Object.freeze({
-  'lib/brief-quote.js': {
-    words: ['splitQuote'],
-    reason: 'the quote\'s home: splitQuote reads the brief\'s own quote (briefQuoteEnd), and the module defines it',
-  },
   'scripts/prompt-template-change-log.md': {
     words: ['AS_ASKED_*', 'the As-asked modules', 'the write-below route', 'Archive & Prune'],
     reason: 'the change log: each row names what it changed or retired, so the old names are the record itself',
@@ -200,10 +196,10 @@ describe('LIN-4502 retirement census: the seal, the guard, the Jira region, the 
 
   test('a per-word allowance hides only its word in only its file', () => {
     const files = {
-      'lib/brief-quote.js': 'splitQuote(x); sealAsAsked(y);\n',
-      'lib/other.js': 'splitQuote(x);\n',
+      'scripts/prompt-template-change-log.md': 'AS_ASKED_IMMUTABLE; splitQuote(x);\n',
+      'lib/other.js': 'AS_ASKED_IMMUTABLE;\n',
     };
-    assert.deepStrictEqual(findRetired(files).map((h) => `${h.file} ${h.word}`).sort(), ['lib/brief-quote.js *AsAsked* symbols', 'lib/other.js splitQuote']);
+    assert.deepStrictEqual(findRetired(files).map((h) => `${h.file} ${h.word}`).sort(), ['lib/other.js AS_ASKED_*', 'scripts/prompt-template-change-log.md splitQuote']);
   });
 
   test('the words that stay are not retired: the brief label, the writer rule, the injected-reader name, the orphaned property', () => {

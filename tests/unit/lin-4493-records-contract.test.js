@@ -417,10 +417,10 @@ describe('the brief (brief.js, parts 1–8)', () => {
     assert.equal(early.parts.addressed.length, 0);
   });
 
-  test('the text names all eight parts, and reports its bytes', async () => {
+  test('the text names all eight parts, part 1 under the heading the prompts name (LIN-4536), and reports its bytes', async () => {
     const s = await scenario();
     const b = buildBrief({ actor: 'implementation', taskId: s.t3, idx });
-    for (const n of ['1 The task', '2 Its plan', '3 Addressed', '4 What stands', '5 The project', '6 Other open runs', '7 Index', '8 The previous']) {
+    for (const n of ['As asked', '2 Its plan', '3 Addressed', '4 What stands', '5 The project', '6 Other open runs', '7 Index', '8 The previous']) {
       assert.match(b.text, new RegExp(`## ${n}`));
     }
     assert.equal(b.bytes, Buffer.byteLength(b.text));

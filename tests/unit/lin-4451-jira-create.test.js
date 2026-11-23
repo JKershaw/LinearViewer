@@ -29,7 +29,7 @@ const ASKED_PROPERTY_READ = { properties: [ASKED_PROPERTY] };
 import { RefResolutionError } from '../../lib/proxy-ref-resolver.js';
 import { PartialWriteError } from '../../lib/partial-write-error.js';
 import { registerProvider } from '../../lib/providers/registry.js';
-import { quoteAsked } from '../../lib/brief-quote.js';
+import { sealedDescription } from '../helpers/sealed-description.js';
 import { buildPeriodicalGateMarker, extractPeriodicalGateId } from '../../lib/periodicals.js';
 import { flattenIssue } from '../../lib/proxy-wire.js';
 
@@ -143,7 +143,7 @@ describe('Jira create contract (LIN-4451)', () => {
   });
 
   test('LIN-4502: a description holding an As asked block is filed as written, with no property', async () => {
-    const created = await provider.createIssue(SCOPE, { teamId: 'ENG', title: 'Block', description: quoteAsked(WORDS) });
+    const created = await provider.createIssue(SCOPE, { teamId: 'ENG', title: 'Block', description: sealedDescription(WORDS) });
     const stored = await fake.getIssue(created.identifier, ASKED_PROPERTY_READ);
     assert.equal(stored.properties?.[ASKED_PROPERTY], undefined);
   });
@@ -231,7 +231,7 @@ describe('Jira create contract (LIN-4451)', () => {
   test('LIN-4502: a long block is filed; there is no entity-property limit to refuse it', async () => {
     const creates = countCreates(fake);
     const huge = 'x'.repeat(40000);
-    const created = await provider.createIssue(SCOPE, { teamId: 'ENG', title: 'Long', description: quoteAsked(huge) });
+    const created = await provider.createIssue(SCOPE, { teamId: 'ENG', title: 'Long', description: sealedDescription(huge) });
     assert.equal(created.title, 'Long');
     assert.equal(creates.count, 1);
   });

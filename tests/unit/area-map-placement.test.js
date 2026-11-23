@@ -97,12 +97,12 @@ describe('code-shape area map placement (LIN-3729)', () => {
     assert.strictEqual(areaOf('lib/task-board-view.js'), 'Front end: server-rendered pages');
   });
 
-  // LIN-4371: the `## As asked` words' owner sits with the prompts that read it (the brief, the stage contract, stage
-  // intent's CUT). It used to fall through to the catch-all `^lib/` in "Other features", which filed every area note about
-  // the words under the catch-all. LIN-4502 retired the block's module and its seal: the quote's spellings live in
-  // lib/brief-quote.js and the legacy reader in lib/asked-of.js, and both stay in LLM & prompts.
-  test('the quote\'s owner and the legacy reader land in LLM & prompts', () => {
-    assert.strictEqual(areaOf('lib/brief-quote.js'), 'LLM & prompts');
+  // LIN-4371: the `## As asked` words' owner sits with what renders them. It used to fall through to the catch-all `^lib/`
+  // in "Other features", which filed every area note about the words under the catch-all. LIN-4502 retired the block's
+  // module and its seal; LIN-4536 retired the brief's quote, so the heading's owner is the records brief's words
+  // (lib/records/words.js, Records), and the legacy reader lib/asked-of.js stays in LLM & prompts.
+  test('the heading\'s owner lands in Records, and the legacy reader in LLM & prompts', () => {
+    assert.strictEqual(areaOf('lib/records/words.js'), 'Records');
     assert.strictEqual(areaOf('lib/asked-of.js'), 'LLM & prompts');
   });
 

@@ -16,7 +16,7 @@
  */
 import { test, describe, before, after } from 'node:test';
 import assert from 'node:assert/strict';
-import { createTaskPageLoader, buildTaskPageModel, sessionMessage, buildTaskStages, briefCurrentSection, deriveHeader, deriveReadyHeader, fmtWhen } from '../../lib/task-page-loader.js';
+import { createTaskPageLoader, buildTaskPageModel, sessionMessage, buildTaskStages, briefCurrentSection, briefWithoutCurrent, deriveHeader, deriveReadyHeader, fmtWhen } from '../../lib/task-page-loader.js';
 import { DISPATCH_KINDS } from '../../lib/prompt-templates.js';
 import { ROW_ONLY_KINDS } from '../../lib/dispatch-fields.js';
 import { ORCHESTRATION_KINDS } from '../../lib/effort-readout.js';
@@ -728,4 +728,27 @@ describe('deriveReadyHeader: the one owner of the ready-to-merge answer (LIN-344
   for (const [name, closeOut, expected] of cases) {
     test(name, () => assert.deepEqual(deriveReadyHeader(closeOut), expected));
   }
+});
+
+// LIN-4536: the summary has nothing quoted above it any more, but a summary cached before then opens with the person's
+// words, which can hold a `## Current` of their own. The model's `## Current` is the last one, so the header and the panel
+// read the model's, never the person's (the cache retires in LIN-4537).
+describe('the summary\'s `## Current` is the model\'s, the last one (LIN-4536)', () => {
+  const CACHED_WITH_WORDS = '## As asked\n\nPlease fix it.\n\n## Current\nThe person\'s own heading.\n\n*End of what was asked. Steps write below this line; nothing above it changes.*\n\n## Current\nThe model\'s present state.\n\n## Constraints\n- _None._';
+  const NOW = '## Current\nThe model\'s present state.\n\n## Constraints\n- _None._';
+
+  test('a summary cached with the words above it: the header reads the model\'s Current', () => {
+    assert.equal(briefCurrentSection(CACHED_WITH_WORDS), 'The model\'s present state.');
+  });
+
+  test('the panel drops the model\'s Current and keeps the person\'s words as they were', () => {
+    const panel = briefWithoutCurrent(CACHED_WITH_WORDS);
+    assert.ok(panel.includes('The person\'s own heading.'));
+    assert.equal(panel.includes('The model\'s present state.'), false);
+  });
+
+  test('a summary with nothing above it reads as before', () => {
+    assert.equal(briefCurrentSection(NOW), 'The model\'s present state.');
+    assert.equal(briefWithoutCurrent(NOW), '## Constraints\n- _None._');
+  });
 });

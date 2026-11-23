@@ -102,13 +102,17 @@ describe('buildProxyContextPreamble token-delivery modes (LIN-1155)', () => {
     // description's `## As asked` block, which the proxy refuses to change; the rest is the
     // present state. Every other line of the block is unchanged.
     //
-    // NOTE (LIN-4362): a deliberate re-pin of the same hint. Its wording is now BRIEF_HINT in
-    // lib/brief-quote.js, shared with the four other surfaces that point at the brief, so the two
+    // NOTE (LIN-4362): a deliberate re-pin of the same hint. Its wording is now BRIEF_HINT (since LIN-4536 in
+    // lib/records/words.js), shared with the four other surfaces that point at the brief, so the two
     // lines it was wrapped across join into one. The words are the same; every other line is unchanged.
     //
     // NOTE (LIN-4502): a deliberate re-pin of the same hint only. The quote comes from the task's record
     // (its `asked`), not from a block in the description: the seal that wrote that block is retired.
     // Every other line of the block is unchanged.
+    //
+    // NOTE (LIN-4536): a deliberate re-pin of the brief line and the hint only. The brief is the records brief, read
+    // for the credential's own run ("Start from your brief", no longer "the distilled brief"); it opens with the task
+    // as filed under `## As asked`. Every other line of the block is unchanged.
     const expected = [
       '',
       '',
@@ -128,8 +132,8 @@ describe('buildProxyContextPreamble token-delivery modes (LIN-1155)', () => {
       '',
       'Full endpoint catalog: GET https://host/api/proxy/instructions',
       '',
-      'Start from the distilled brief: GET https://host/api/proxy/brief/LIN-42',
-      "(it opens with the person's words under `## As asked`, from the task's record; no step may change them; the rest is the present state; read it before the raw",
+      'Start from your brief: GET https://host/api/proxy/brief/LIN-42',
+      "(it opens with the task as filed under `## As asked`, from the task's record; no step may change it; then the records addressed to you, what stands and the previous stage; read it before the raw",
       'description). Use GET https://host/api/proxy/issues/LIN-42 for full raw detail',
       'and /relations/LIN-42, and update the workspace as you work (status, labels).',
       '',
@@ -231,7 +235,7 @@ describe('buildProxyContextPreamble token-delivery modes (LIN-1155)', () => {
       assert.ok(!out.includes('/api/proxy/issues/LIN-42'), 'no /issues/{id} hint');
       assert.ok(!out.includes('/relations/LIN-42'), 'no /relations hint');
       assert.ok(out.includes('/api/proxy/search?q=… to find related tasks by text'), 'search alternative present');
-      assert.ok(out.includes('Start from the distilled brief: GET https://host/api/proxy/brief/LIN-42'), 'brief hint unchanged');
+      assert.ok(out.includes('Start from your brief: GET https://host/api/proxy/brief/LIN-42'), 'brief hint unchanged');
     });
 
     test('issueDetail: false — generic drops /issues/{id} from the discovery list, leaving stack/search', () => {
@@ -289,7 +293,7 @@ describe('buildProxyContextPreamble token-delivery modes (LIN-1155)', () => {
         assert.ok(!out.includes('/api/proxy/issues/LIN-42'), 'no /issues/{id} hint');
         assert.ok(!out.includes('/relations/LIN-42'), 'no /relations hint');
         assert.ok(!out.includes('/api/proxy/search'), 'no /search hint — it 422s too on this provider');
-        assert.ok(out.includes('Start from the distilled brief: GET https://host/api/proxy/brief/LIN-42'), 'brief hint unchanged');
+        assert.ok(out.includes('Start from your brief: GET https://host/api/proxy/brief/LIN-42'), 'brief hint unchanged');
         assert.ok(out.includes('update the workspace as you work (status, labels)'), 'the update-workspace close survives with no read-hint clause attached');
       });
 

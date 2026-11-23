@@ -378,15 +378,15 @@ const ROWS = [
     run: () => call(buildApp(), 'POST', '/api/proxy/recap/bad%20id', { body: {} }),
   },
   {
-    group: 'F', method: 'GET', url: '/api/proxy/issues/LIN-999999/brief', expect: 404,
-    note: 'canonical form, isTestMode "Issue not found" (:4783)',
-    expectBody: { error: 'Issue not found' },
+    group: 'F', method: 'GET', url: '/api/proxy/issues/LIN-999999/brief', expect: 503,
+    note: 'canonical form; LIN-4536: the records brief reads no tracker, so this app (no records store) answers 503',
+    expectBody: { error: 'Records store not configured' },
     run: () => call(buildApp(), 'GET', '/api/proxy/issues/LIN-999999/brief'),
   },
   {
-    group: 'F', method: 'GET', url: '/api/proxy/brief/LIN-999999', expect: 404,
-    note: 'flat alias form (:4783 array path)',
-    expectBody: { error: 'Issue not found' },
+    group: 'F', method: 'GET', url: '/api/proxy/brief/LIN-999999', expect: 503,
+    note: 'flat alias form (array path); LIN-4536: the records brief, no records store here',
+    expectBody: { error: 'Records store not configured' },
     run: () => call(buildApp(), 'GET', '/api/proxy/brief/LIN-999999'),
   },
   {

@@ -18,7 +18,7 @@ import { readFileSync } from 'node:fs';
 import { CODE_ROUTES } from '../../lib/code-routes.js';
 import { reviewLoopStep } from '../../lib/recommendation-facts.js';
 import { getRecommendation, setFetchImpl, setPromptTraceRecorder } from '../../lib/openrouter.js';
-import { quoteAsked } from '../../lib/brief-quote.js';
+import { sealedDescription } from '../helpers/sealed-description.js';
 import { planRound, loopFactsFor } from '../helpers/plan-review-loop.js';
 
 afterEach(() => { setFetchImpl(null); setPromptTraceRecorder(null); });
@@ -38,7 +38,7 @@ const RCn = (n, blocking) => c(n, `### Plan Review Verdict\n\nFinding.\n\n**Verd
 const run = (stage, n, outcome) => ({ stage, at: T(n), outcome, dispatchedAt: T(n), id: `r${n}` });
 const STARTED = { name: 'In Progress', type: 'started' };
 const OPEN = { name: 'Todo', type: 'unstarted' };
-const ASKED = quoteAsked('Make the export button download a CSV.');
+const ASKED = sealedDescription('Make the export button download a CSV.');
 // LIN-4518 (finding-527b8237): the loop's facts are records-built: `ROUNDS(3, 2, 1)` is three plan-review verdicts on
 // record, each with that many `to: plan` findings in its own run (tests/helpers/plan-review-loop.js).
 const ROUNDS = (...counts) => counts.map((n, i) => planRound(T(i + 1), 'request-changes', n));

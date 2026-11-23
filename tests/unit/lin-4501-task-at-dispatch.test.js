@@ -15,7 +15,6 @@ import { createMangoTmpdir } from '../fixtures/mango-tmpdir.js';
 import { RecordsStore, RECORDS_COLLECTION, REFS_COLLECTION, QUERY_LOG_COLLECTION } from '../../lib/records-store.js';
 import { createRunRecords } from '../../lib/run-records.js';
 import { createRecordWrites } from '../../lib/records/writes.js';
-import { splitQuote } from '../../lib/brief-quote.js';
 import { askedOf } from '../../lib/asked-of.js';
 import { isTerminalState } from '../../lib/providers/state-map.js';
 import { COMPLETED } from '../../lib/providers/models.js';
@@ -92,7 +91,6 @@ describe('askedOf: the one rule for a task\'s asked (LIN-4527: the description a
   test('a sealed description is taken whole, block and notes, as filed', () => {
     const description = '## As asked\n\nFix the footer.\n\n*End of what was asked. Steps write below this line; nothing above it changes.*\n\n## Notes\nplan here';
     assert.equal(askedOf(description), description);
-    assert.equal(splitQuote(description).words, 'Fix the footer.');
   });
 
   test('an unsealed description with a plan is taken whole: the plan is not cut from the request', () => {

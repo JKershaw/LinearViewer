@@ -1,6 +1,6 @@
 /**
- * LIN-4495 (piece 4): the records parts behind `GET /api/proxy/brief/:id?run=` (lib/records/run-brief.js), on a real
- * store. The findings a stage is addressed by are in its brief in full; an ended finding is gone from the next read
+ * LIN-4495 (piece 4): a run's records brief (lib/records/run-brief.js composeRunBrief), on a real store. Since LIN-4536 it
+ * is the whole of `GET /api/proxy/brief/:id` for the run's own credential, with no `?run=`. The findings a stage is addressed by are in its brief in full; an ended finding is gone from the next read
  * at once (no cache is involved); a run with no task, or an unknown run, says so instead of guessing.
  *
  * Run with: node scripts/run-unit-tests.mjs tests/unit/lin-4495-run-brief.test.js

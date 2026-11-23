@@ -1,6 +1,6 @@
 /**
  * Unit tests for LIN-1926: pins the route→resolver principal hop for
- * `getWorkspaceOpenRouterKey` across the six live AI-route call sites, plus
+ * `getWorkspaceOpenRouterKey` across the live AI-route call sites (five since LIN-4536: GET /brief calls no model), plus
  * the ownerless (fail-closed) case.
  *
  * Before this fix had a regression test, nothing verified that every AI route
@@ -255,14 +255,16 @@ describe('req.proxyCreatedBy -> getWorkspaceOpenRouterKey principal hop (LIN-192
     assertPrincipalThreaded(spy);
   });
 
-  test('4: GET /api/proxy/issues/:identifier/brief', async () => {
+  // LIN-4536: GET /brief is the records brief. It calls no model, so it resolves no OpenRouter key at all: no principal
+  // to thread. (This setup has no records store, so it answers 503 before reading anything.)
+  test('4: GET /api/proxy/issues/:identifier/brief resolves no OpenRouter key (the records brief calls no model)', async () => {
     const { spy, app, proxyTokenStore } = await setup();
     const { token } = await proxyTokenStore.createToken(WORKSPACE_URL_KEY, { scope: 'read', createdBy: ACCOUNT_A });
 
     const { status, body } = await requestJson(app, `/api/proxy/issues/${ISSUE_IDENTIFIER}/brief`, { token });
 
-    assert.equal(status, 200, JSON.stringify(body));
-    assertPrincipalThreaded(spy);
+    assert.equal(status, 503, JSON.stringify(body));
+    assert.deepEqual(spy.calls, [], 'no model key is resolved for the records brief');
   });
 
   test('5: POST /api/proxy/brief/:identifier', async () => {

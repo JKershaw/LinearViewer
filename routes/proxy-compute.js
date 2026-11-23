@@ -19,7 +19,6 @@ import { generateBrief } from '../lib/brief.js';
 import { truncationFailureOf } from '../lib/openrouter.js';
 import { extractPrUrls } from '../lib/run-evidence.js';
 import { buildMockBrief } from '../lib/workspace-api-mocks.js';
-import { attachAsked } from '../lib/brief-quote.js';
 import { attachLandingChanges } from '../lib/change-records.js';
 import { fixtureParent } from '../lib/sample-data/fixture-parent.js';
 import { hashContext } from '../lib/recap-cache.js';
@@ -36,7 +35,8 @@ import { armKeepalive, clientGoneSignal } from '../lib/http-keepalive.js';
 import { UUID_REGEX, isValidIssueId } from '../lib/workspace.js';
 import { badRequest, jsonError, keepaliveError, notFound } from '../lib/errors.js';
 import { isHermeticTestToken } from '../lib/should-mock-ai.js';
-import { composeRunBrief } from '../lib/records/run-brief.js';
+import { composeRunBrief, composeTaskBrief, readerOfRun } from '../lib/records/run-brief.js';
+import { COORDINATOR_STAGE } from '../lib/records/words.js';
 import { TOKEN_ORIGIN, WRITES } from '../lib/stage-writes.js';
 
 /**
@@ -641,7 +641,7 @@ export function createComputeRoutes({
       }
       // Dispatch rows and call-log rows are joined on the human issue
       // identifier (e.g. "LIN-1770"), never the issue UUID — unlike
-      // /recap and /brief, this route does no provider lookup to resolve
+      // /recap, this route does no provider lookup to resolve
       // one to the other. A UUID passes isValidIssueId's shape check but
       // matches no row, so it must be rejected loudly here rather than
       // silently returning an authoritative-looking $0.00 (LIN-1775 R1).
@@ -1266,168 +1266,85 @@ export function createComputeRoutes({
   /**
    * GET /api/proxy/issues/:identifier/brief  (canonical — nested issue-scoped)
    * GET /api/proxy/brief/:identifier           (forgiving alias, flat form)
-   * Returns the current-state task brief (fixed-section Markdown) for an issue.
-   * Auto-regenerates when missing or stale unless `?noRefresh=1` is passed.
-   * Shared :identifier param across both forms (LIN-528). POST /brief/:identifier
-   * (force-regenerate) is intentionally left flat-only — out of scope for LIN-528.
+   *
+   * LIN-4536: the records brief (lib/records/run-brief.js), read for the credential itself, with no `?run=`. Nothing in it
+   * is written by a model, and it reads no tracker: part 1 is the task as filed (its `asked` is fixed once written), so a
+   * later description edit never changes it.
+   *   - a dispatch credential whose run is on this ticket's task: that run's own brief, read as its stage (its carried
+   *     person findings end when the run ends, LIN-4535);
+   *   - a run's credential on another ticket: that ticket's task, read as the run's stage;
+   *   - a person's copy (`origin: person`): the task read as that person;
+   *   - a credential with no run (a dispatch row that starts none, or one minted before run identity): read as the
+   *     coordinator;
+   *   - a blind read: refused, 403. Its only read is the change it judges, given by its prompt (LIN-4437).
+   * A ticket with no task on record yet has no brief: `status: 'missing'`, naming the raw issue read. A GET never
+   * makes a task (records lesson).
    */
-  /**
-   * LIN-4495: the records parts for `?run=` (lib/records/run-brief.js), above the distilled brief. A dispatch credential
-   * reads only its own run; a blind read may not read records at all (its only read is its change, LIN-4437). A refusal
-   * or a missing run is a one-line note above the distilled brief, never a silent omission.
-   */
-  async function withRunRecords(req, distilled) {
-    const runId = typeof req.query?.run === 'string' && req.query.run ? req.query.run : null;
-    if (!runId) return distilled;
-    let head;
-    if (!recordsStore) head = '(records parts: the records store is not configured)';
-    else if (req.proxyWrites === WRITES.BLIND_COMMENT) head = '(records parts: a blind read may not read records)';
-    else if (req.proxyOrigin === TOKEN_ORIGIN.DISPATCH && req.proxyRunRecordId !== runId) head = '(records parts: a dispatch credential reads only its own run)';
-    else {
-      const asker = req.proxyOrigin === TOKEN_ORIGIN.DISPATCH ? `run:${req.proxyRunRecordId}` : (req.proxyCreatedBy ? `person:${req.proxyCreatedBy}` : null);
-      const built = await composeRunBrief({ store: recordsStore, urlKey: req.proxyUrlKey, runId, asker });
-      head = built.problem ? `(records parts: ${built.problem})` : built.text;
-    }
-    return `${head}\n\n${distilled}`;
-  }
-
   router.get(['/api/proxy/issues/:identifier/brief', '/api/proxy/brief/:identifier'], proxyLimiter, authenticateProxyToken, async (req, res) => {
+    const endpoint = '/api/proxy/brief';
     try {
-      const { token: accessToken, reason, provider } = await resolveProviderAccess(req.proxyUrlKey, req.proxyCreatedBy, req, { source: req.query?.source });
-      // LIN-1980: stamp before any other logic (incl. the !accessToken early
-      // return below) so the fingerprint is present even when this request
-      // later 401s from a shared credential another site marked suspect.
-      if (!accessToken) {
-        return workspaceUnavailable(req, res, '/api/proxy/brief', reason);
-      }
-      if (denyIfUnsupported(provider, 'fetchRecommendationContext', req, res, '/api/proxy/brief')) return;
-      if (!briefCacheStore) {
-        logEvent(req, '/api/proxy/brief', 503);
-        return jsonError(res, 503, 'Brief cache not configured');
-      }
-
       const { identifier } = req.params;
       if (!isValidIssueId(identifier)) {
-        logEvent(req, '/api/proxy/brief', 400);
+        logEvent(req, endpoint, 400);
         return badRequest.json(res, 'Invalid identifier format');
       }
+      // A ticket's task is claimed by its identifier (records-refs); the brief reads no tracker to resolve a UUID, so a
+      // UUID would read as "no task on record". Refused loudly instead, as /cost does.
+      if (UUID_REGEX.test(identifier)) {
+        logEvent(req, endpoint, 400);
+        return badRequest.json(res, 'The brief needs the issue identifier (e.g. LIN-123), not a UUID: a ticket\'s task is found by its identifier');
+      }
+      if (req.proxyWrites === WRITES.BLIND_COMMENT) {
+        logEvent(req, endpoint, 403);
+        return jsonError(res, 403, 'a blind read may not read the brief: its only read is the change it judges, given by its prompt (LIN-4437)');
+      }
+      if (!recordsStore) {
+        logEvent(req, endpoint, 503);
+        return jsonError(res, 503, 'Records store not configured');
+      }
+      const urlKey = req.proxyUrlKey;
+      const ownRunId = req.proxyOrigin === TOKEN_ORIGIN.DISPATCH ? req.proxyRunRecordId || null : null;
+      const asker = ownRunId ? `run:${ownRunId}`
+        : req.proxyOrigin === TOKEN_ORIGIN.PERSON && req.proxyCreatedBy ? `person:${req.proxyCreatedBy}` : null;
 
-      const noRefresh = req.query.noRefresh === '1' || req.query.noRefresh === 'true';
-      // LIN-4495: `?run=` puts the run's records parts before today's brief, which is returned unchanged after them.
-      const withRecords = (distilled) => withRunRecords(req, distilled);
-      const isTestMode = isHermeticTestToken(accessToken);
-      const sessionApiKey = await getWorkspaceOpenRouterKey(req.proxyUrlKey, req.proxyCreatedBy);
-
-      // Regenerate path calls OpenRouter; arm a Heroku H12 guard.
-      const keepalive = armKeepalive(res);
-      try {
-        let context;
-        if (isTestMode) {
-          context = await buildMockRecapContextFromFixtures(identifier);
-          if (!context) {
-            logEvent(req, '/api/proxy/brief', 404);
-            return keepaliveError(keepalive, 404, 'Issue not found');
-          }
-        } else {
-          context = await fetchWithTimeout((signal) => provider.fetchRecommendationContext(accessToken, identifier, { signal }), CONTEXT_FETCH_TIMEOUT_MS);
-        }
-
-        const canonicalId = context.issue?.id || identifier;
-        const inputHash = hashContext(context);
-        const cached = await briefCacheStore.get(req.proxyUrlKey, canonicalId);
-
-        if (cached && cached.inputHash === inputHash) {
-          logEvent(req, '/api/proxy/brief', 200);
-          return keepalive.send(200, {
-            status: 'fresh',
-            identifier: context.issue?.identifier || identifier,
-            brief: await withRecords(cached.brief),
-            generatedAt: cached.generatedAt,
-            model: cached.model
-          });
-        }
-
-        if (noRefresh) {
-          logEvent(req, '/api/proxy/brief', 200);
-          return keepalive.send(200, {
-            status: cached ? 'stale' : 'missing',
-            identifier: context.issue?.identifier || identifier,
-            generatedAt: cached?.generatedAt,
-            model: cached?.model
-          });
-        }
-
-        // Free-tier-only deployments accepted via isFreeTier. The gate sits after
-        // the cache-hit / noRefresh returns, so a fresh-cache read never charges.
-        const credential = resolveChatCredential({ sessionApiKey });
-        const { apiKey: resolvedApiKey, isFreeTier } = credential;
-        if (isAiUnavailable({ credential, mockAi: isTestMode })) {
-          logEvent(req, '/api/proxy/brief', 503);
-          return keepaliveError(keepalive, 503, 'AI brief is not configured. Connect OpenRouter via OAuth or set OPENROUTER_API_KEY on the server.');
-        }
-
-        // LIN-1458: witness which credential source served this request.
-        if (!isTestMode) {
-          logOpenRouterCredentialSource(req, '/api/proxy/brief', { sessionApiKey, isFreeTier });
-        }
-
-        // Charge one free-tier unit only now that generation is guaranteed.
-        if (isFreeTier && !isTestMode) {
-          const rejection = await chargeFreeTierOrReject(req, '/api/proxy/brief');
-          if (rejection) {
-          logEvent(req, '/api/proxy/brief', 429);
-          return keepalive.send(rejection.status, rejection.body);
-        }
+      const taskId = await recordsStore.taskForTicket(urlKey, identifier);
+      if (!taskId) {
+        logEvent(req, endpoint, 200);
+        return res.json({
+          status: 'missing',
+          identifier,
+          brief: null,
+          reason: `${identifier} has no task on record yet, so it has no brief. Read the ticket itself: GET /api/proxy/issues/${identifier}`,
+        });
       }
 
-        // LIN-4501: the brief quotes the task's `asked`, read here just before it is composed (lib/brief-quote.js).
-        await attachAsked(context, { recordsStore, urlKey: req.proxyUrlKey });
-        const selectedModel = await resolveAiOperationModel({ urlKey: req.proxyUrlKey, workspacePreferencesStore, opKind: 'brief', forceDefault: isFreeTier });
-        let brief;
-        let modelUsed;
-        if (isTestMode) {
-          brief = buildMockBrief(context);
-          modelUsed = selectedModel;
-        } else {
-          const result = await withTimeout(
-            generateBrief(context.issue, context, { apiKey: resolvedApiKey, model: selectedModel, callMeta: { urlKey: req.proxyUrlKey } }),
-            LLM_TIMEOUT_MS
-          );
-          brief = result.brief;
-          modelUsed = result.model;
-        }
-
-        await briefCacheStore.put(req.proxyUrlKey, canonicalId, {
-          inputHash,
-          brief,
-          model: modelUsed
+      const run = ownRunId ? await recordsStore.run(urlKey, ownRunId) : null;
+      const built = run && run.in === taskId
+        ? await composeRunBrief({ store: recordsStore, urlKey, runId: ownRunId, asker })
+        : await composeTaskBrief({
+          store: recordsStore,
+          urlKey,
+          taskId,
+          actor: run ? readerOfRun(run) : asker?.startsWith('person:') ? asker : COORDINATOR_STAGE,
+          asker,
         });
-        const stored = await briefCacheStore.get(req.proxyUrlKey, canonicalId);
-
-        logEvent(req, '/api/proxy/brief', 200);
-        keepalive.send(200, {
-          status: 'fresh',
-          identifier: context.issue?.identifier || identifier,
-          brief: await withRecords(stored?.brief ?? brief),
-          generatedAt: stored?.generatedAt ?? new Date(),
-          model: modelUsed
-        });
-      } catch (err) {
-        keepalive.stop();
-        const { status, body } = streamedFailureReply(err, req, { route: '/brief', failure: 'Failed to fetch brief' });
-        logEvent(req, '/api/proxy/brief', status);
-        keepalive.send(status, body);
+      if (built.problem) {
+        logEvent(req, endpoint, 500);
+        return jsonError(res, 500, 'Failed to compose brief', { detail: built.problem });
       }
+      logEvent(req, endpoint, 200);
+      res.json({ status: 'fresh', identifier, task: built.task, reader: built.actor, brief: built.text, bytes: built.bytes });
     } catch (err) {
-      logEvent(req, '/api/proxy/brief', 500);
-      console.error('Proxy /brief outer error:', err.message);
+      logEvent(req, endpoint, 500);
+      console.error('Proxy /brief error:', err.message);
       jsonError(res, 500, 'Failed to fetch brief', { detail: err.message });
     }
   });
 
   /**
    * POST /api/proxy/brief/:identifier
-   * Force-regenerate the brief and return it.
+   * Force-regenerate the model-written summary the task page shows, and return it. LIN-4536: this is not the brief GET
+   * answers (the records brief); the summary, its cache and this route retire in LIN-4537.
    */
   router.post('/api/proxy/brief/:identifier', proxyLimiter, authenticateProxyToken, async (req, res) => {
     try {
@@ -1492,8 +1409,6 @@ export function createComputeRoutes({
         const canonicalId = context.issue?.id || identifier;
         const inputHash = hashContext(context);
 
-        // LIN-4501: the brief quotes the task's `asked`, read here just before it is composed (lib/brief-quote.js).
-        await attachAsked(context, { recordsStore, urlKey: req.proxyUrlKey });
         const selectedModel = await resolveAiOperationModel({ urlKey: req.proxyUrlKey, workspacePreferencesStore, opKind: 'brief', forceDefault: isFreeTier });
         let brief;
         let modelUsed;

@@ -156,7 +156,7 @@ describe('LIN-4251 — each non-work value gets its own mandate and closing, in 
           assert.ok(!block.includes('/brief/') && !block.includes('/issues/') && !block.includes('/relations/'), 'no ticket-read hint');
           assert.ok(block.includes(`POST ${apiBase}/api/proxy/records`), 'the records destination, not a comment');
           assert.ok(!block.includes('/comments/'), 'no comment destination (LIN-4533)');
-        } else assert.ok(block.includes(`Start from the distilled brief: GET ${apiBase}/api/proxy/brief/${ISSUE}`), 'brief line');
+        } else assert.ok(block.includes(`Start from your brief: GET ${apiBase}/api/proxy/brief/${ISSUE}`), 'brief line');
         assert.ok(block.includes(`Full endpoint catalog: GET ${apiBase}/api/proxy/instructions`), 'endpoint catalog line');
       });
     }

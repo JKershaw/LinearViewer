@@ -184,12 +184,13 @@ describe('Proxy compute routes decline cleanly when the resolved provider lacks 
     assert.deepEqual(provider.calls, []);
   });
 
-  test('GET .../brief: a provider without fetchRecommendationContext declines with 422 CAPABILITY_NOT_SUPPORTED', async () => {
+  // LIN-4536: GET /brief is the records brief. It reads no tracker, so a provider's capabilities do not reach it: no 422,
+  // and nothing is called on the provider. (This app has no records store, so it answers 503.)
+  test('GET .../brief reads no provider: a provider without fetchRecommendationContext is not asked, and nothing is called', async () => {
     const provider = new FakeComputeProvider();
     const { status, body } = await call(buildApp({ provider }), 'GET', '/api/proxy/issues/ENG-9/brief');
-    assert.equal(status, 422, JSON.stringify(body));
-    assert.equal(body.code, 'CAPABILITY_NOT_SUPPORTED');
-    assert.equal(body.capability, 'fetchRecommendationContext');
+    assert.notEqual(body.code, 'CAPABILITY_NOT_SUPPORTED', JSON.stringify(body));
+    assert.equal(status, 503, JSON.stringify(body));
     assert.deepEqual(provider.calls, []);
   });
 
@@ -246,16 +247,5 @@ describe('Proxy compute routes call the RESOLVED provider\'s own method — neve
     assert.equal(provider.calls[0].args[1], 'ENG-9');
     assert.equal(body.status, 'missing', 'a never-cached issue with noRefresh=1 short-circuits before any LLM call');
     assert.equal(body.identifier, 'ENG-9');
-  });
-
-  test('GET .../brief mirrors the recap seam: calls provider.fetchRecommendationContext, reflects that provider\'s own identifier', async () => {
-    const provider = new FakeComputeProvider({
-      fetchRecommendationContext: async () => fakeContext({ id: 'jira-uuid-2', identifier: 'ENG-10', title: 'irrelevant' }),
-    });
-    const { status, body } = await call(buildApp({ provider }), 'GET', '/api/proxy/issues/ENG-10/brief?noRefresh=1');
-    assert.equal(status, 200, JSON.stringify(body));
-    assert.equal(provider.calls.length, 1);
-    assert.equal(provider.calls[0].fn, 'fetchRecommendationContext');
-    assert.equal(body.identifier, 'ENG-10');
   });
 });

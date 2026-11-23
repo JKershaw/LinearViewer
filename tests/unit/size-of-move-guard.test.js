@@ -24,13 +24,13 @@ import { createProxyRoutes } from '../../routes/proxy.js';
 import { createWorkspaceApiRoutes } from '../../routes/workspace-api.js';
 import { localProvider } from '../../lib/providers/local/index.js';
 import { createLocalStore } from '../fixtures/local-harness.js';
-import { quoteAsked } from '../../lib/brief-quote.js';
+import { sealedDescription } from '../helpers/sealed-description.js';
 import { SIZE_OF_MOVE_HEADING, SIZE_RECORD_CODES, DECIDED_BY, WRONG_WORK, recordShape } from '../../lib/size-of-move.js';
 
 // Must match TEST_LOCAL_URL_KEY in routes/proxy.js (and LOCAL_WORKSPACE_URL_KEY).
 const LOCAL_URL_KEY = 'local-workspace';
 
-const SEALED = quoteAsked('Keep it advice (on main: `docs/plans/survey.md`). Write a full guide.');
+const SEALED = sealedDescription('Keep it advice (on main: `docs/plans/survey.md`). Write a full guide.');
 const RECORD = [
   SIZE_OF_MOVE_HEADING,
   '',

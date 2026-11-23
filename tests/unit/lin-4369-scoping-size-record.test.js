@@ -14,7 +14,7 @@ import { readFileSync } from 'node:fs';
 import { generatePrompt } from '../../lib/prompt-templates.js';
 import { CUT } from '../../lib/prompts/stage-kinds.js';
 import { COMPLETION_SIGNALS } from '../../lib/completion-signals.js';
-import { ASKED_HEADING } from '../../lib/brief-quote.js';
+import { ASKED_HEADING } from '../../lib/records/words.js';
 import {
   SIZE_OF_MOVE_HEADING, SIZES, DECIDED_BY, SIZE_LABEL, WHY_LABEL, CUTS_LABEL, DECIDED_BY_LABEL, RECORD_LINES, NO_CUTS, WRONG_WORK,
   readSizeRecord, checkSizeRecord, recordShape, STANDING_POLICY_LINE

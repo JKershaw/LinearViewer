@@ -26,7 +26,7 @@ import { jiraProvider } from '../../lib/providers/jira/index.js';
 import { createFakeJiraClient } from '../../lib/providers/jira/fake-client.js';
 import { adfToMarkdown, markdownToAdf } from '../../lib/providers/jira/adf.js';
 import { createLocalStore } from '../fixtures/local-harness.js';
-import { quoteAsked, ASKED_HEADING, ASKED_END } from '../../lib/brief-quote.js';
+import { sealedDescription, SEALED_HEADING, SEALED_END } from '../helpers/sealed-description.js';
 
 // Must match TEST_LOCAL_URL_KEY in routes/proxy.js (and LOCAL_WORKSPACE_URL_KEY).
 const LOCAL_URL_KEY = 'local-workspace';
@@ -84,7 +84,7 @@ async function call(app, method, path, body) {
 
 for (const variant of VARIANTS) {
   describe(`description writes on LocalStore — ${variant.name}`, () => {
-    const sealed = variant.store(`${quoteAsked(WORDS)}\n\n${BELOW}`);
+    const sealed = variant.store(`${sealedDescription(WORDS)}\n\n${BELOW}`);
     const unsealed = variant.store(`${WORDS}\n\n${BELOW}`);
     let store;
 
@@ -123,7 +123,7 @@ for (const variant of VARIANTS) {
     });
 
     test('a PATCH that adds a block to a ticket with none is written as sent', async () => {
-      const added = variant.store(quoteAsked('new words'));
+      const added = variant.store(sealedDescription('new words'));
       const res = await call(proxyApp(), 'PATCH', '/api/proxy/issues/i2', { description: added });
       assert.equal(res.status, 200, JSON.stringify(res.body));
       assert.equal(await storedDescription('i2'), added);
@@ -144,7 +144,7 @@ for (const variant of VARIANTS) {
 
     test('a create whose body holds the heading or the end line is filed as written, with no block sealed around it', async () => {
       const app = proxyApp();
-      for (const marker of [ASKED_HEADING, ASKED_END]) {
+      for (const marker of [SEALED_HEADING, SEALED_END]) {
         const description = `intro\n${variant.store(marker)}\nmore`;
         const res = await call(app, 'POST', '/api/proxy/issues', { title: `Filed ${marker.slice(0, 5)}`, description });
         assert.equal(res.status, 201, JSON.stringify(res.body));
@@ -164,7 +164,7 @@ describe('description writes on LocalStore — the one description read', () => 
     ({ store } = createLocalStore());
     await store.seed(LOCAL_URL_KEY, {
       projects: [{ id: 'p1', name: 'Alpha', content: 'a', sortOrder: 1 }],
-      issues: [{ id: 'i1', identifier: 'LOCAL-1', title: 'Sealed', description: quoteAsked(WORDS), projectId: 'p1', state: { name: 'Todo', type: 'unstarted' } }],
+      issues: [{ id: 'i1', identifier: 'LOCAL-1', title: 'Sealed', description: sealedDescription(WORDS), projectId: 'p1', state: { name: 'Todo', type: 'unstarted' } }],
     });
     localProvider.configure({ store });
   });
@@ -215,7 +215,7 @@ describe('description writes against the Jira fake', () => {
       issues: [
         issue('30001', 'ENG-1', `${WORDS}\n\n${BELOW}`),
         // A ticket the retired region wrote: the block in its ADF, and the property beside it.
-        issue('30002', 'ENG-2', `${quoteAsked(WORDS)}\n\n${BELOW}`, { _properties: { 'harbour.asAsked': ORPHAN } }),
+        issue('30002', 'ENG-2', `${sealedDescription(WORDS)}\n\n${BELOW}`, { _properties: { 'harbour.asAsked': ORPHAN } }),
       ],
     });
     jiraProvider.configure({ client: fake, clientFactory: () => fake, site: SITE });
@@ -243,9 +243,9 @@ describe('description writes against the Jira fake', () => {
   }
 
   test('a PATCH that adds a block to a Jira ticket is written as markdownToAdf of what was sent', async () => {
-    const res = await call(jiraApp(), 'PATCH', '/api/proxy/issues/ENG-1', { description: quoteAsked('new words') });
+    const res = await call(jiraApp(), 'PATCH', '/api/proxy/issues/ENG-1', { description: sealedDescription('new words') });
     assert.equal(res.status, 200, JSON.stringify(res.body));
-    assert.deepEqual((await fake.getIssue('ENG-1')).fields.description, markdownToAdf(quoteAsked('new words')));
+    assert.deepEqual((await fake.getIssue('ENG-1')).fields.description, markdownToAdf(sealedDescription('new words')));
   });
 
   test('append, replace and an ordinary PATCH on a Jira ticket are written', async () => {
@@ -258,7 +258,7 @@ describe('description writes against the Jira fake', () => {
 
   test('a block the region wrote reads back as the plain rendering of its ADF; the orphaned property is never read', async () => {
     const { description } = await jiraProvider.issueDescription(SCOPE, 'ENG-2');
-    assert.equal(description, adfToMarkdown(markdownToAdf(`${quoteAsked(WORDS)}\n\n${BELOW}`)), 'the one adfToMarkdown reader');
+    assert.equal(description, adfToMarkdown(markdownToAdf(`${sealedDescription(WORDS)}\n\n${BELOW}`)), 'the one adfToMarkdown reader');
     assert.ok(!description.includes(ORPHAN.words), 'the property\'s words are not served');
     const context = await jiraProvider.fetchIssueContext(SCOPE, 'ENG-2');
     assert.equal(context.issue.description, description, 'the context read agrees');
