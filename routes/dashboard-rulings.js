@@ -340,7 +340,7 @@ function answerSpec({ taskDecisionsStore }) {
     validate: (body) => answerFields(body).every(v => typeof v === 'string' && v.trim())
       ? null
       : 'taskDecisionId, taskDecisionIssueId and optionId are all required',
-    unavailable: { store: taskDecisionsStore, message: 'Scan store not configured' },
+    unavailable: { store: taskDecisionsStore, message: 'Task-decisions store not configured' },
     run: async (workspace, { taskDecisionId, taskDecisionIssueId, optionId }) => {
       const { record, firstStampWins } = await taskDecisionsStore.answer({
         urlKey: workspace.urlKey, issueId: taskDecisionIssueId, id: taskDecisionId, optionId
