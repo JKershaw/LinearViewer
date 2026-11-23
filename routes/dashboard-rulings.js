@@ -53,7 +53,8 @@ async function openQuestionRowsFor({ session, workspaces, recordsStore, dispatch
         state: q.state,
         reason: q.reason,
         askedAt: q.askedAt,
-        anchor: { workspaceUrlKey: w.urlKey, taskId: q.taskId, runId: q.runId, loopId: null, issueId: null, issueIdentifier: null, target: null },
+        // The task by its identifier (`ticket`, what a task page is keyed by), so the row heads like a ruling row (finding-9221fb7a).
+        anchor: { workspaceUrlKey: w.urlKey, taskId: q.taskId, runId: q.runId, loopId: null, issueId: null, issueIdentifier: q.ticket ?? null, target: null },
       });
     }
   }

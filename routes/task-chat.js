@@ -240,7 +240,7 @@ export function buildMockAnswer(context, question, related) {
  *   route's real (non-mockAi) run-scoped propose path is pinned end to end.
  * @returns {Router}
  */
-export function createTaskChatRoutes({ workspaceFromUrl, freeTierStore, workspacePreferencesStore, getOpenRouterSource, getDeployInfo, savedChatStore, recapCacheStore, briefCacheStore, dispatchQueueStore, agentStatusStore, proxyTokenStore, taskDecisionsStore, shelvedRulingsStore, runProposalsStore, chatClient, workspaceOwnerCheck = null, installationTokenFor = null, recordsStore = null }) {
+export function createTaskChatRoutes({ workspaceFromUrl, freeTierStore, workspacePreferencesStore, getOpenRouterSource, getDeployInfo, savedChatStore, recapCacheStore, briefCacheStore, dispatchQueueStore, agentStatusStore, proxyTokenStore, taskDecisionsStore, shelvedRulingsStore, runProposalsStore, chatClient, workspaceOwnerCheck = null, installationTokenFor = null, recordsStore = null, accountStore = null }) {
   const router = Router();
 
   // ─── HTML page ──────────────────────────────────────────────────────────────
@@ -658,6 +658,8 @@ export function createTaskChatRoutes({ workspaceFromUrl, freeTierStore, workspac
         deps: {
           chatClient: chatClient || { streamChat, streamChatWithTools },
           createToolCatalog: createChatToolCatalog,
+          // LIN-4532 (finding-79815581): the person's canonical account, for the question read in list_pending_decisions.
+          resolveCanonicalAccountId: accountStore ? (id) => accountStore.resolveCanonicalAccountId(id) : null,
           // LIN-3285: the owner's installation token for `get_pr_status` (Linear/Jira workspaces).
           installationTokenFor,
           // Bound to the SAME row binding (issueProvider/issueCallScope,

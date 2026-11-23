@@ -630,9 +630,10 @@ function initWaitingOnYou() {
       .then(response => (response.ok ? response.json() : null))
       .then(data => {
         if (!data || typeof data.html !== 'string' || !window.QuestionCards?.mergeWaitingCards) return
-        const { count: cards, removed } = window.QuestionCards.mergeWaitingCards(body, data.html)
-        // LIN-4532 (P2b): the open question cards drawn on the page load stay in the body, so they count too.
-        const count = cards + body.querySelectorAll(':scope > .waiting-question').length
+        const { removed } = window.QuestionCards.mergeWaitingCards(body, data.html)
+        // LIN-4532 (P2b): the count is read off the page, the one count the question cards settle through (waitingCountIn), so
+        // a merged question card and a settled one count the same way as a ruling card.
+        const count = waitingCountIn(main)
         // Removed cards were answered or dismissed elsewhere: say so. The badge is not written from this count (the tick
         // sets it from the feed's own count, and the two reductions differ by design).
         if (removed.length > 0) live.textContent = 'Answered elsewhere'

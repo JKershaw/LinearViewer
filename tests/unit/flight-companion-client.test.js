@@ -4327,6 +4327,30 @@ describe('flight-companion.js — scannable thread (LIN-3361)', () => {
     looseDeepEqual(m.loadStoredSession('acme').seenIdentifiers, ['LIN-9']);
   });
 
+  // LIN-4532 (finding-89c7a7a5, M5): an open question in the result is drawn as the shared question card, in the same fold. The
+  // mutation witness: without the `parsed.questions.forEach` draw, the fold counts the question and draws no card for it.
+  test('decisions: an open question is the shared question card in the fold, and counts with the decisions', async () => {
+    const question = { questionId: 'q-7', asks: 'Which way?', options: ['left', 'right'], recommended: 'left', ifUnanswered: 'pick left', state: 'resumable', interactive: true, ticket: 'LIN-9', taskId: 'task-9', runId: 'run-1', askedAt: '2026-11-23T09:00:00.000Z', reason: null };
+    const result = JSON.stringify({ count: 1, truncated: false, decisions: [], questions: [question] });
+    const { exports: m, thread } = await loadClient({
+      fetchImpl: () => sseResponse([
+        sseFrame('tool', { phase: 'result', id: 't', name: 'list_pending_decisions', result }),
+        sseFrame('done', { surface: true }),
+      ]),
+    });
+    m.autoWakeTick();
+    await flush();
+    const fold = findByClass(thread, 'fc-decisions-fold');
+    assert.ok(fold, 'the fold renders for a question alone');
+    assert.strictEqual(fold.children[0].textContent, '1 decision waiting');
+    const qli = findAllByClass(fold, 'fc-question')[0];
+    assert.ok(qli, 'the question is a row of the fold');
+    // The row's markup is the shared card's (the fake DOM keeps an innerHTML string, so the card is read from that markup).
+    assert.match(qli.innerHTML, /data-testid="question-record-card" data-question-id="q-7"/, 'the row carries the shared question-record card');
+    assert.match(qli.innerHTML, /data-testid="question-record-card-question"[^>]*>Which way\?</);
+    assert.strictEqual((qli.innerHTML.match(/data-testid="question-record-card-option"/g) || []).length, 2, 'one button per option');
+  });
+
   test('decisions: one closed fold "N decisions waiting" with a Rulings link, rows all in the DOM', async () => {
     const { exports: m, thread } = await loadClient({
       fetchImpl: () => sseResponse([

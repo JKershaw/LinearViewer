@@ -167,11 +167,11 @@ describe('the task page: a question record with no ruling (LIN-4532 P2b)', () =>
 });
 
 describe('the chat tool: list_pending_decisions carries the open questions (LIN-4532 P2b)', () => {
-  function catalogFor(dispatchedBy) {
+  function catalogFor(dispatchedBy, resolveCanonicalAccountId = null) {
     const { executors } = createChatToolCatalog({
       provider: { name: 'fake' }, scope: 'scope', recapCacheStore: null, briefCacheStore: null, urlKey: URL_KEY,
       recordsStore: records, dispatchQueueStore: dispatch, agentStatusStore: { async listStatus() { return { items: [], total: 0 }; } },
-      sessionIsTerminal: () => false, dispatchedBy,
+      sessionIsTerminal: () => false, dispatchedBy, resolveCanonicalAccountId,
       taskDecisionsStore: NO_RULINGS, shelvedRulingsStore: NO_RULINGS, enrichLoop: (l) => l,
     });
     return executors.list_pending_decisions;
@@ -192,5 +192,27 @@ describe('the chat tool: list_pending_decisions carries the open questions (LIN-
     const out = await catalogFor(OWNER)({});
     assert.equal(out.count, 0);
     assert.equal('questions' in out, false);
+  });
+
+  // finding-79815581: a merged account's alias is the session account; its questions are addressed to the canonical one.
+  test('a session account that is an alias of a merged account reads the questions addressed to the canonical account', async () => {
+    const qid = await askQuestion({ run: await askingRun('run-alias') });
+    const ALIAS = 'acct-alias';
+    const canonical = async (id) => (id === ALIAS ? OWNER : id);
+    const out = await catalogFor(ALIAS, canonical)({});
+    assert.equal(out.questions?.[0]?.questionId, qid, 'the alias sees the question the Rulings page shows');
+    assert.equal(out.count, 1);
+  });
+
+  test('without a resolver the session account is read as before, so an alias sees no question', async () => {
+    await askQuestion({ run: await askingRun('run-alias-none') });
+    const out = await catalogFor('acct-alias')({});
+    assert.equal('questions' in out, false, 'the unresolved alias has no open question (the case the resolver fixes)');
+  });
+
+  test('a resolver that throws reads the session account, and does not fail the tool', async () => {
+    const qid = await askQuestion({ run: await askingRun('run-throw') });
+    const out = await catalogFor(OWNER, async () => { throw new Error('store down'); })({});
+    assert.equal(out.questions?.[0]?.questionId, qid);
   });
 });

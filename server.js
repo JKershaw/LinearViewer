@@ -3367,7 +3367,7 @@ app.use(createDashboardRoutes({ installationTokenFor, workspaceFromUrl, dispatch
 // `list_pending_decisions` chat tool the same way createFlightCompanionRoutes
 // already does below (LIN-2617) — Task Chat now builds its catalog through the
 // same createChatToolCatalog call the turn core makes for every surface.
-app.use(createTaskChatRoutes({ installationTokenFor, workspaceFromUrl, freeTierStore, workspacePreferencesStore, getOpenRouterSource, getDeployInfo, savedChatStore, recapCacheStore, briefCacheStore, recordsStore, dispatchQueueStore, agentStatusStore, proxyTokenStore, taskDecisionsStore, shelvedRulingsStore, runProposalsStore, workspaceOwnerCheck }))
+app.use(createTaskChatRoutes({ installationTokenFor, workspaceFromUrl, freeTierStore, workspacePreferencesStore, getOpenRouterSource, getDeployInfo, savedChatStore, recapCacheStore, briefCacheStore, recordsStore, dispatchQueueStore, agentStatusStore, proxyTokenStore, taskDecisionsStore, shelvedRulingsStore, runProposalsStore, workspaceOwnerCheck, accountStore }))
 
 // Mount the task-edit page (LIN-1565) — the dedicated drill-down that replaces
 // the inline edit form formerly hidden inside a tree row's Details panel. No
@@ -3486,7 +3486,7 @@ app.use(createTaskShareRoutes({
 // `list_pending_decisions` chat tool needs to return the same rows the rulings
 // feed returns. LIN-2966 threads the same pair into createTaskChatRoutes above,
 // so both surfaces' catalogs now answer that tool identically.
-app.use(createFlightCompanionRoutes({ installationTokenFor, workspaceFromUrl, getOpenRouterSource, getDeployInfo, observerStateStore, freeTierStore, workspacePreferencesStore, recapCacheStore, briefCacheStore, recordsStore, dispatchQueueStore, agentStatusStore, proxyTokenStore, taskDecisionsStore, shelvedRulingsStore, workspaceOwnerCheck }))
+app.use(createFlightCompanionRoutes({ installationTokenFor, workspaceFromUrl, getOpenRouterSource, getDeployInfo, observerStateStore, freeTierStore, workspacePreferencesStore, recapCacheStore, briefCacheStore, recordsStore, dispatchQueueStore, agentStatusStore, proxyTokenStore, taskDecisionsStore, shelvedRulingsStore, workspaceOwnerCheck, accountStore }))
 
 // Mount passage-planner routes (experimental one-click kickoff prompt, Flight Companion parity — LIN-1849).
 app.use(createPassagePlannerRoutes({ workspaceFromUrl, getOpenRouterSource, getDeployInfo }))
@@ -3893,8 +3893,10 @@ app.get('/workspace/:urlKey/api/home-waiting', workspaceFromUrl, async (req, res
     // The task titles come from the held issue set when it is warm (a read, no provider call); a cold set leaves them to
     // `anchor.issueTitle`, the same fallback the section always had.
     const held = taskFacts.read(workspace.urlKey);
-    const titles = held.complete ? waitingTitlesOf(held.issues, rows.map(row => row?.anchor?.issueIdentifier).filter(Boolean)) : {};
-    const html = renderWaitingSection({ rows, titles }, { urlKey: workspace.urlKey, owner: true });
+    // LIN-4532 (finding-dca7ac9d): the question cards come in the fragment too, so a question asked after the page load is merged
+    // in by the refresh (public/question-cards.js mergeWaitingCards), as a ruling is.
+    const titles = held.complete ? waitingTitlesOf(held.issues, [...rows.map(row => row?.anchor?.issueIdentifier), ...questions.map(q => q.ticket)].filter(Boolean)) : {};
+    const html = renderWaitingSection({ rows, titles, questions }, { urlKey: workspace.urlKey, owner: true });
     res.json({ html, count: rows.length + questions.length });
   } catch (error) {
     if (isAuthError(error)) return unauthorized.json(res, 'Not authenticated');

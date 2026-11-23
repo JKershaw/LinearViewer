@@ -2284,7 +2284,9 @@ function renderQuestionRulingRow(row) {
   const li = document.createElement('li');
   li.className = 'obs-ruling obs-ruling-question';
   li.dataset.testid = 'ruling-question-row';
-  li.innerHTML = renderQuestionRecordCard(row, { urlKey: row?.anchor?.workspaceUrlKey || '' });
+  // The same task head a ruling row carries (its identifier and title, the workspace name when several show): finding-9221fb7a.
+  li.appendChild(rulingHeadOf(row?.anchor || {}));
+  li.insertAdjacentHTML('beforeend', renderQuestionRecordCard(row, { urlKey: row?.anchor?.workspaceUrlKey || '' }));
   return li;
 }
 
@@ -2312,24 +2314,30 @@ function questionRowNode(row) {
   return li;
 }
 
-function renderRulingRow(row) {
-  const { decision, decisionCase, anchor, disposition, canReply } = row || {};
-  const li = document.createElement('li');
-  li.className = 'obs-ruling';
-  li.dataset.testid = 'obs-ruling-row';
-  if (decision && decision.decision_id) li.dataset.decisionId = decision.decision_id;
-
+// The task head of a ruling row or a question row: the task by its id and its title (LIN-3983 PR 2). The workspace key is never
+// shown; the workspace's name is, and only when more than one workspace is showing.
+function rulingHeadOf(anchor) {
   const head = document.createElement('div');
   head.className = 'obs-ruling-head';
-  // The task by its id and its title (LIN-3983 PR 2). The workspace key is never shown; the workspace's
-  // name is, and only when more than one workspace is showing.
   const idLabel = anchor?.issueIdentifier || 'Question';
   const workspaces = observationData?.workspaces || [];
   const wsName = workspaces.find(w => w.urlKey === anchor?.workspaceUrlKey)?.name || anchor?.workspaceUrlKey;
   head.innerHTML = `<span class="obs-ruling-issue">${escapeHtml(String(idLabel))}</span>`
     + (anchor?.issueTitle ? ` <span class="obs-ruling-title">${escapeHtml(String(anchor.issueTitle))}</span>` : '')
     + (workspaces.length > 1 && wsName ? ` <span class="obs-ruling-ws" data-testid="obs-ruling-ws">${escapeHtml(String(wsName))}</span>` : '');
-  li.appendChild(head);
+  return head;
+}
+
+function renderRulingRow(row) {
+  const { decision, decisionCase, anchor, disposition, canReply } = row || {};
+  const li = document.createElement('li');
+  li.className = 'obs-ruling';
+  li.dataset.testid = 'obs-ruling-row';
+  if (decision && decision.decision_id) li.dataset.decisionId = decision.decision_id;
+  // The task's label, the head's and the bulk checkbox's (the same value rulingHeadOf names it by).
+  const idLabel = anchor?.issueIdentifier || 'Question';
+
+  li.appendChild(rulingHeadOf(anchor));
 
   if (decision?.question) {
     const q = document.createElement('p');

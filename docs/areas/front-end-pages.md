@@ -19,4 +19,5 @@ Area notes for `front-end-pages` in the registry. Format and rules: README.md.
   filtered the task page on `taskId` against `LIN-n` and matched nothing.
 - On Home a question card is a `.waiting-question`, not a `.waiting-card`: the live merge (`public/question-cards.js`
   mergeWaitingCards) removes every `.waiting-card` the fragment does not list, so a card the fragment does not draw must not
-  wear that class (LIN-4532).
+  wear that class (LIN-4532). The live merge keys a question wrapper by its question id (`question:<id>`), and holds one that is
+  settled or has an answer in flight, so a refresh never takes out a card the person is answering.
