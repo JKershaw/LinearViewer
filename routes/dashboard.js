@@ -49,7 +49,8 @@ import { buildRunView } from '../lib/run-view.js';
 import { requireRequestUsageLoader } from '../lib/request-usage-loader.js';
 import { pointReadSession as pointReadSessionFor, readSessionById } from '../lib/dispatch-session-read.js';
 import { resolveIssueBinding } from '../lib/workspace.js';
-import { readRunEvidence, extractPrUrls } from '../lib/run-evidence.js';
+import { readRunEvidence, landingPrRefs } from '../lib/run-evidence.js';
+import { landingOfTicket } from '../lib/records/landing.js';
 import { createPrStateStore, resolveRunPrRef } from '../lib/pr-state-store.js';
 import { resolvePrReadToken } from '../lib/github-pr-status.js';
 import { prStateCopy } from '../lib/pr-state-copy.js';
@@ -532,11 +533,12 @@ export function createDashboardRoutes(deps) {
         return res.json({ state: 'none', number: null, checks: null, url: null, message: prStateCopy({ state: 'none' }) });
       }
       const { provider, callScope } = prStateSeams.resolveProvider(workspace, null);
-      const comments = await provider.fetchIssueComments(callScope, run.issueIdentifier);
-      // LIN-4520 (finding-27957095): the picker chooses among the PRs the comments cite (the page's links, for display). It
-      // reads no verdict and no landing, so it reads no records trail and builds no evidence model: resolveRunPrRef takes
-      // only the cited URLs, which extractPrUrls (LIN-2949's reader of them) already gives.
-      const { status, ref } = resolveRunPrRef({ state: { prUrls: extractPrUrls(comments, run.evidenceUrls || []) } });
+      // LIN-4533 (finding-84f02273): a stage run posts no tracker comment, so the run's PR is its task's change record. The
+      // picker chooses among the PRs of the task's landing (lib/records/landing.js, the one reader every gate takes it from).
+      // It reads no verdict and builds no evidence model: resolveRunPrRef takes only the PR URLs. With no store, or no task
+      // on record, there is no PR to show; a records fault lands in the catch below, as 'unknown'.
+      const landing = recordsStore ? await landingOfTicket({ recordsStore, urlKey: workspace.urlKey, ticket: run.issueIdentifier }) : [];
+      const { status, ref } = resolveRunPrRef({ state: { prUrls: landingPrRefs(landing) } });
       if (status !== 'one') {
         // zero PRs -> "none"; several -> withhold (never pick one silently)
         const state = status === 'none' ? 'none' : 'unknown';

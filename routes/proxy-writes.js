@@ -494,7 +494,7 @@ export function createProxyWriteRoutes({
       targetStateType = null; // provider without a states() capability — the gate cannot apply
     }
     const standing = targetStateType === 'completed'
-      ? await standingForTicket({ recordsStore, urlKey: ctx.req.proxyUrlKey, ticket: ctx.req.params.issueId })
+      ? await standingForTicket({ recordsStore, urlKey: ctx.req.proxyUrlKey, ticket: guard?.identifier || ctx.req.params.issueId })
       : null;
     const gate = checkPeriodicalReportGate({
       description: guard?.description,

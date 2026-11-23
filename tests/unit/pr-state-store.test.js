@@ -27,6 +27,7 @@ import {
   PR_STATE_CLOSED_TTL_MS
 } from '../../lib/pr-state-store.js';
 import * as dashboard from '../../routes/dashboard.js';
+import { recordsStoreOfChanges } from '../fixtures/dashboard-router.js';
 import { InMemoryRunSummaryCacheStore } from '../../lib/run-summary-cache.js';
 import { InMemorySessionSummaryCacheStore } from '../../lib/session-summary-cache.js';
 import { InMemoryRunParagraphStore } from '../../lib/run-paragraph-store.js';
@@ -226,6 +227,8 @@ describe('pr-state-store: one instance serves the dashboard router and a second 
       getOpenRouterSource: () => 'env',
       getDeployInfo: () => ({}),
       prStateStore,
+      // LIN-4533: the run's PR is its task's change record.
+      recordsStore: recordsStoreOfChanges([REF.url], { ticket: 'LIN-1' }),
       // The bag's store fields lose to the injected store; its route seams apply.
       prState: {
         bucket: Array(36).fill(0),
@@ -247,9 +250,7 @@ describe('pr-state-store: one instance serves the dashboard router and a second 
   test('the route fills and spends the injected store; a second caller sees the same cache and budget', async () => {
     const clock = { t: 12_000_000 };
     const counts = { github: 0 };
-    const provider = {
-      async fetchIssueComments() { return [{ body: REF.url, createdAt: '2026-07-01T00:00:00.000Z', user: 'worker' }]; }
-    };
+    const provider = {};
     const store = createPrStateStore({ cache: new Map(), now: () => clock.t, githubFetch: githubStub(counts) });
     const r = router(store, provider);
 

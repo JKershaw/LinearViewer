@@ -128,10 +128,10 @@ describe('trail facts (LIN-3300)', () => {
   });
 
   test('TRAIL FACTS names the latest person\'s finding, whether it is a ruling, and whether a run was dispatched after it', () => {
-    const withRuling = formatTrailFactsBlock(assembleTrailFacts([], '', { personFindings: [personFinding(3, `Go.\n\n${RULING_MARK}`)] }), 1);
+    const withRuling = formatTrailFactsBlock(assembleTrailFacts([], '', { personFindings: [personFinding(3, `Go.\n\n${RULING_MARK}`)] }));
     assert.match(withRuling, /- Latest person's comment[^:]*: 2026-10-03 10:00, a ruling recorded via Harbour \(shown with the comments\); a run was dispatched after it, or landed work followed: no/);
-    assert.match(formatTrailFactsBlock(assembleTrailFacts([], '', { personFindings: [] }), 0), /- Latest person's comment[^:]*: none/);
-    assert.match(formatTrailFactsBlock(assembleTrailFacts([], ''), 0), /- Latest person's comment[^:]*: not measured/, 'no findings read: not measured, never none');
+    assert.match(formatTrailFactsBlock(assembleTrailFacts([], '', { personFindings: [] })), /- Latest person's comment[^:]*: none/);
+    assert.match(formatTrailFactsBlock(assembleTrailFacts([], '')), /- Latest person's comment[^:]*: not measured/, 'no findings read: not measured, never none');
     assert.equal(assembleTrailFacts([], '').personRead, false);
   });
 
@@ -165,7 +165,7 @@ describe('trail facts (LIN-3300)', () => {
     const none = planFactsOf({ task: TASK });
     const facts = assembleTrailFacts([plan], description, { leaf: true, planFacts: none });
     assert.equal(facts.plan, none);
-    const block = formatTrailFactsBlock(facts, 1);
+    const block = formatTrailFactsBlock(facts);
     assert.match(block, /- Plan records on this task: none/);
     assert.match(block, /- Session fit \(the plan records' addressee\): none/);
     assert.match(block, /- Plan review owed: no/);
@@ -173,20 +173,20 @@ describe('trail facts (LIN-3300)', () => {
 
   test('a leaf gets its plan facts from records: addressee, version, last change and whether a review is owed', () => {
     const one = assembleTrailFacts([], 'Goal.', { leaf: true, planFacts: PLANNED('implementation') });
-    const block = formatTrailFactsBlock(one, 0);
+    const block = formatTrailFactsBlock(one);
     assert.match(block, /- Plan records on this task: plan-aa v1 to implementation \(changed 2026-10-01 10:00\)/);
     assert.match(block, /- Session fit \(the plan records' addressee\): one session \(addressed to implementation\)/);
     assert.match(block, /- Plan review owed: no/);
-    const several = formatTrailFactsBlock(assembleTrailFacts([], 'Goal.', { leaf: true, planFacts: PLANNED('breakdown') }), 0);
+    const several = formatTrailFactsBlock(assembleTrailFacts([], 'Goal.', { leaf: true, planFacts: PLANNED('breakdown') }));
     assert.match(several, /several sessions \(a plan is addressed to breakdown\)/);
     assert.match(several, /- Plan review owed: yes \(plan-aa is addressed to breakdown and no plan-review finding is about it\)/);
     const asked = PLANNED('implementation', [{ id: 'finding-r1', kind: 'finding', state: 'open', to: 'plan-review', links: { about: ['plan-aa'] } }]);
-    assert.match(formatTrailFactsBlock(assembleTrailFacts([], '', { leaf: true, planFacts: asked }), 0), /- Plan review owed: yes \(open finding finding-r1 to plan-review about plan-aa\)/);
+    assert.match(formatTrailFactsBlock(assembleTrailFacts([], '', { leaf: true, planFacts: asked })), /- Plan review owed: yes \(open finding finding-r1 to plan-review about plan-aa\)/);
     assert.equal(assembleTrailFacts([], 'Goal.', { leaf: false, planFacts: PLANNED('breakdown') }).plan, null, 'a node reads its plan facts in the node facts instead');
   });
 
   test('plan facts not read say so, and claim no plan', () => {
-    const block = formatTrailFactsBlock(assembleTrailFacts([], 'Goal.\n\n## Implementation Plan\n\nfits one session', { leaf: true }), 0);
+    const block = formatTrailFactsBlock(assembleTrailFacts([], 'Goal.\n\n## Implementation Plan\n\nfits one session', { leaf: true }));
     assert.match(block, /- Plan records: not measured \(no records read for this trail\); ticket text is not read for a plan/);
     assert.doesNotMatch(block, /Session fit|Plan review owed/);
   });
@@ -295,7 +295,7 @@ describe('trail facts: the misroute fixes (LIN-3378)', () => {
   // an approve with open findings to close-out, so the comment-era `approve-conditional` word is retired.
   test('d: under an approving review the open findings to close-out are left for close-out to settle; otherwise not settled (LIN-4495)', () => {
     const one = { state: 'read', count: 1, ids: ['finding-aaaaaaaa'] };
-    const line = (outcome, reading) => formatTrailFactsBlock(assembleTrailFacts([], '', { openFindings: reading, trail: trailOf({ review: reviewOf(outcome, 1) }) }), 1)
+    const line = (outcome, reading) => formatTrailFactsBlock(assembleTrailFacts([], '', { openFindings: reading, trail: trailOf({ review: reviewOf(outcome, 1) }) }))
       .split('\n').find(l => l.startsWith('- Latest code review'));
     assert.match(line('approve', one), /Latest code review: approve \(.*open findings to close-out: 1, left for close-out to settle\)/);
     assert.match(line('request-changes', one), /open findings to close-out: 1, not settled\)/);
@@ -307,7 +307,7 @@ describe('trail facts: the misroute fixes (LIN-3378)', () => {
   const PIECE = planFactsOf({ task: { ...TASK, links: { piece: 'plan-p9' } }, piece: { id: 'plan-p9', v: 2, kind: 'plan', state: 'kept', in: 'task-9', to: 'implementation', at: at(2) } });
 
   test('c: a leaf with a piece names its parent\'s plan record, reads one session and owes no review', () => {
-    const block = formatTrailFactsBlock(assembleTrailFacts([], 'Do step 2.', { leaf: true, planFacts: PIECE }), 0);
+    const block = formatTrailFactsBlock(assembleTrailFacts([], 'Do step 2.', { leaf: true, planFacts: PIECE }));
     assert.match(block, /- Plan records on this task: none of its own; it is a piece of its parent's plan: plan-p9 v2 to implementation \(changed 2026-10-02 10:00\)/);
     assert.match(block, /one session/);
     assert.match(block, /- Plan review owed: no/);

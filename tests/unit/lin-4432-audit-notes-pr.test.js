@@ -90,8 +90,8 @@ describe('(a) trail facts around an audit notes PR on a Done ticket (LIN-4432, v
   });
 
   test('the trail block states the audit fact beside the close-out fact, on landing day and after the notes PR', async () => {
-    const landing = formatTrailFactsBlock(await factsFor([landingReview, landingCloseOut], LANDING_EVENTS), 2);
-    const afterNotes = formatTrailFactsBlock(await factsFor([landingReview, landingCloseOut, audit, notesReview, notesCloseOut], [...LANDING_EVENTS, ...NOTES_EVENTS]), 5);
+    const landing = formatTrailFactsBlock(await factsFor([landingReview, landingCloseOut], LANDING_EVENTS));
+    const afterNotes = formatTrailFactsBlock(await factsFor([landingReview, landingCloseOut, audit, notesReview, notesCloseOut], [...LANDING_EVENTS, ...NOTES_EVENTS]));
     assert.match(landing, /- Audit reported after the landing close-out: no/);
     assert.match(afterNotes, /- Audit reported after the landing close-out: yes/);
   });

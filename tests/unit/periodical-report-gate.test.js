@@ -144,6 +144,9 @@ describe('checkPeriodicalReportGate', () => {
     assert.equal(result.applies, true);
     assert.equal(result.ok, false);
     assert.equal(result.code, 'PERIODICAL_REPORT_NOT_PERSISTED');
+    // finding-afaea57d: an outage is not a missing record, so it does not tell the caller to write a change record.
+    assert.match(result.message, /could not be read/);
+    assert.doesNotMatch(result.message, /kind change/);
   });
 
   test('a comment is not evidence: a PR in a comment does not stand in for the change record', () => {

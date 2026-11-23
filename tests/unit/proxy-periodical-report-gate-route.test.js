@@ -31,7 +31,7 @@ function makeProvider({ description, comments = [] }) {
     name: 'fake',
     supports: () => true,
     async issueWriteGuard() {
-      return { id: 'iss-1', trashed: false, team: { id: TEAM_UUID }, description, comments: { nodes: comments } };
+      return { id: 'iss-1', identifier: 'ACME-1', trashed: false, team: { id: TEAM_UUID }, description, comments: { nodes: comments } };
     },
     async states() {
       return STATES;
@@ -49,7 +49,8 @@ function makeProvider({ description, comments = [] }) {
 const PR = 'https://github.com/JKershaw/LinearViewer/pull/1223';
 function recordsStoreOf(versions) {
   return {
-    taskForTicket: async () => 'task-1',
+    // A task's claim is keyed by the ticket identifier, as lib/records-store.js keys it: a UUID names no task.
+    taskForTicket: async (_urlKey, ticket) => (ticket === 'ACME-1' ? 'task-1' : null),
     find: async (_urlKey, { kind, inRef }) => versions.filter((v) => v.kind === kind && v.in === inRef),
     versionsOf: async (_urlKey, ids) => versions.filter((v) => ids.includes(v.id)),
   };
