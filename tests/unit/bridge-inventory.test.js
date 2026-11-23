@@ -66,8 +66,8 @@ describe('the bridge over the real repo', () => {
     assert.deepEqual(Object.keys(inputs.emitted).filter((f) => bridgeWrites(inputs.emitted[f]).size), ['cost-format-global.js']);
   });
 
-  test('the emitted modules are the shim and the four page modules that import the formatter or read no bridge (workspace-kpis.js, task-page.js, flight-companion.js, observation.js)', () => {
-    assert.deepEqual(Object.keys(inputs.emitted).sort(), ['cost-format-global.js', 'flight-companion.js', 'observation.js', 'task-page.js', 'workspace-kpis.js']);
+  test('the emitted modules are the shim and the five page modules that import the formatter or read no bridge (workspace-kpis.js, task-page.js, flight-companion.js, observation.js, and question-records.js, LIN-4532)', () => {
+    assert.deepEqual(Object.keys(inputs.emitted).sort(), ['cost-format-global.js', 'flight-companion.js', 'observation.js', 'question-records.js', 'task-page.js', 'workspace-kpis.js']);
   });
 
   test('the renderer lists the check read are the three that name a consumer, so a list the reader cannot match fails here', () => {
