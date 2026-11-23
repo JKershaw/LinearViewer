@@ -979,8 +979,8 @@ window.ReplyDelivery = (function () {
   // `markDecisionAnswered` alongside this same comment write. LIN-2197
   // Phase 5 adds the task-decision sibling pair on the SAME `decision`
   // object — `{taskDecisionId, taskDecisionIssueId}`, also both-or-neither —
-  // so `public/scan.js`'s answer flow can best-effort stamp a scanned row
-  // 'answered' via the same route, without a second postComment variant.
+  // so a task-bound ruling's answer can best-effort stamp its row 'answered'
+  // via the same route, without a second postComment variant.
   // LIN-2792: `optionId` is a THIRD, independent conditional key on the same
   // object — forwarded alone whenever it's a non-blank string, regardless of
   // which (or neither) of the two pairs above is also present, so a
@@ -1052,8 +1052,8 @@ window.ReplyDelivery = (function () {
   // LIN-2933: additively carries the route's classified error fields
   // (`code`/`detail`/`category`/`retryable`, when the server sent them) onto
   // the constructed Error, without changing `.message` — every existing
-  // caller that reads only `.message` is unaffected, and `session.js`/
-  // `scan.js` inherit the new fields for free.
+  // caller that reads only `.message` is unaffected, and `session.js`
+  // inherits the new fields for free.
   function errorFromResult(result) {
     var data = result.data || {};
     var err = new Error(data.error || ('HTTP ' + result.status));
@@ -1209,23 +1209,6 @@ window.ReplyDelivery = (function () {
    * @returns {Promise<void>}
    */
   function dismissRuling(opts, handlers) {
-    // LIN-4140: a scan-raised ruling is dismissed on the scan route, by the
-    // issue's UUID (never an identifier, which would force a provider lookup),
-    // with the scan decision id as the only body field. No follow-up run.
-    if (isTaskBoundOpts(opts)) {
-      if (!opts.taskDecisionIssueId) return Promise.reject(new Error('cannot dismiss a task-bound ruling: no issue id'));
-      return fetch('/workspace/' + encodeURIComponent(opts.urlKey) + '/api/scan/' + encodeURIComponent(opts.taskDecisionIssueId) + '/dismiss' + window.sourceQuery(opts.source), {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        credentials: 'same-origin',
-        body: JSON.stringify({ id: opts.taskDecisionId })
-      }).then(function (resp) {
-        return resp.json().catch(function () { return {}; }).then(function (data) {
-          if (!resp.ok) throw errorFromResult({ status: resp.status, data: data });
-          return data;
-        });
-      }).then(function () {});
-    }
     // LIN-3959: `stampLoopIds` (the joined row's copies) rides the stamp only.
     var body = { decisionLoopId: opts.stampLoopId || opts.followUpTo, decisionLoopIds: opts.stampLoopIds, decisionId: opts.decisionId };
     return fetch('/workspace/' + encodeURIComponent(opts.urlKey) + '/api/dashboard/rulings/dismiss', {

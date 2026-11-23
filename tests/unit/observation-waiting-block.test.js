@@ -3,7 +3,7 @@
  *
  *   - compactWaitSessions: which waiting runs get a compact row, and its text.
  *     The rule is the one the block ships, so the cases here are the ones the
- *     plan named (day-dead, shelved-free open questions, message-less waits,
+ *     plan named (day-dead, open questions, message-less waits,
  *     a producer covered while another loop waits).
  *   - viewFromParams: the URL contract, including the old `?view=` values.
  *   - the block's paint, the three openLoopIds states, and the URL written
@@ -45,7 +45,6 @@ const REGIONS_MARKUP = `
   <div id="obs-rulings-empty"></div>
   <div id="obs-session-views"></div>
   <div id="obs-rulings-section"></div>
-  <div id="obs-due-section"></div>
   <div id="obs-poll-status"></div>
   <div id="obs-view-hint"></div>
   <div id="obs-scope">
@@ -206,9 +205,12 @@ describe('viewFromParams — the URL contract, with the old tab names (LIN-3983)
     assert.deepEqual(plain(parse('')), { view: 'runs', filter: 'autopilot' });
   });
 
-  test('the rulings and due views keep their names', async () => {
+  test('the rulings view keeps its name', async () => {
     assert.deepEqual(plain(parse('view=rulings')), { view: 'rulings', filter: 'autopilot' });
-    assert.deepEqual(plain(parse('view=due')), { view: 'due', filter: 'autopilot' });
+  });
+
+  test('a link to a retired tab opens on runs (LIN-4540)', async () => {
+    assert.deepEqual(plain(parse('view=due')), { view: 'runs', filter: 'autopilot' });
   });
 
   test('?view=sessions (the old Sessions tab) opens on runs with the all filter', async () => {
@@ -433,7 +435,7 @@ describe('the runs filter and the URL (LIN-3983)', () => {
   });
 
   test('the URL keeps the other parameters the page was opened with', async () => {
-    const world = await makeWorld({ href: 'https://harbour.test/workspace/acme/observation?source=x&view=due' });
+    const world = await makeWorld({ href: 'https://harbour.test/workspace/acme/observation?source=x' });
     const { switchView } = world.page;
     switchView('rulings');
     assert.match(world.replaced.at(-1), /source=x/);
@@ -462,7 +464,7 @@ describe('the standalone waiting read (decision 8, LIN-3983)', () => {
     const world = await makeWorld({ fetchImpl: async () => { calls++; return jsonResponse({ active: [] }); } });
     const { pollWaitingSupplement, setFilter, switchView } = world.page;
     setFilter('standalone');
-    switchView('due');
+    switchView('rulings');
     await flush();
     calls = 0; // count only the supplement's own reads below
     await pollWaitingSupplement();
@@ -471,11 +473,11 @@ describe('the standalone waiting read (decision 8, LIN-3983)', () => {
     switchView('runs');
     setFilter('autopilot');
     await flush();
-    switchView('due');
+    switchView('rulings');
     await flush();
-    calls = 0; // the due tab's own one-shot load is not the supplement's
+    calls = 0; // the rulings tab's own poll is not the supplement's
     await pollWaitingSupplement();
-    assert.equal(calls, 0, 'on the due view the supplement never fetches');
+    assert.equal(calls, 0, 'on the rulings view the supplement never fetches');
   });
 
   test('on the autopilot filter it adds the standalone waits, and keeps the block as it was when it fails', async () => {
@@ -529,10 +531,6 @@ const PLAIN_TEXT = 'need a ruling before removing the route';
 const decision = (decisionId = 'd-1') => ({ decision_id: decisionId, question: 'Remove the route now?' });
 const answered = (decisionId, outcome = 'answered') => [{ decisionId, raisedAt: null, resolvedAt: RECENT, outcome }];
 const withdrawnFor = (decisionId) => ({ decisionId, timestamp: RECENT, reason: 'no longer needed' });
-const shelfFor = (decisionId, loopId) => ({
-  urlKey: 'acme', decisionId, decisionLoopId: loopId, lapseCount: 0,
-  resurfaceAt: new Date(Date.now() + 7 * 24 * 60 * 60 * 1000).toISOString()
-});
 
 // One loop of session S. A `blocked` loop carries the runner's [blocked] wake and its message.
 function loop(over = {}) {
@@ -556,7 +554,6 @@ const joinedWorker = (over = {}) => loop({
 
 const FIXTURES = {
   dayDead: () => ({ loops: [blocked({ loopId: 'p', dispatchedAt: LONG_AGO, resolvedAt: LONG_AGO })] }),
-  shelved: () => ({ loops: [blocked({ loopId: 'p', decision: decision() })], shelved: [shelfFor('d-1', 'p')] }),
   messageLessOpen: () => ({ loops: [blocked({ loopId: 'p', decision: decision(), waitingMessage: null })] }),
   messageLessPlain: () => ({ loops: [blocked({ loopId: 'p', waitingMessage: null })] }),
   producerPlainOtherOpen: () => ({
@@ -593,7 +590,7 @@ const FIXTURES = {
 
 // The agreement property, written against outputs only: every waiting loop of a
 // waiting run is open (its ruling row speaks for it) or its run gets a compact row,
-// and every loop a ruling row stamps is open. Shelving hides a row, never the loop.
+// and every loop a ruling row stamps is open.
 function assertAgreement(payloads, rows, openIds, compact) {
   const compactRuns = new Set(compact.map(r => String(r.sessionId)));
   for (const s of payloads) {
@@ -610,7 +607,7 @@ function assertAgreement(payloads, rows, openIds, compact) {
 const { compactWaitSessions: compactOverBuilder } = (await makeWorld()).page;
 
 // Runs the block's whole rule over one loop set, and checks agreement before returning.
-function runBlock({ loops, shelved = [] }) {
+function runBlock({ loops }) {
   const bySession = new Map();
   for (const l of loops) {
     if (!bySession.has(l.sessionId)) bySession.set(l.sessionId, []);
@@ -618,7 +615,7 @@ function runBlock({ loops, shelved = [] }) {
   }
   const payloads = plain([...bySession].map(([sessionId, sessionLoops]) =>
     buildSessionPayload({ sessionId, loops: sessionLoops }, WS, false)));
-  const rows = collectUnansweredDecisions({ loops, shelvedRulings: shelved }, { now: NOW });
+  const rows = collectUnansweredDecisions({ loops }, { now: NOW });
   const openIds = openDecisionLoopIds(loops);
   const compact = plain(compactOverBuilder(payloads, openIds));
   assertAgreement(payloads, rows, openIds, compact);
@@ -633,24 +630,10 @@ describe('the waiting block over the real builder (LIN-3983, step 8)', () => {
     assert.deepEqual(compact, []);
   });
 
-  test('(2) a shelved question: no ruling row and no compact row, the same as before the shelve (F1)', async () => {
-    const before = runBlock({ loops: FIXTURES.shelved().loops });
-    const after = runBlock(FIXTURES.shelved());
-    assert.equal(before.rows.length, 1);
-    assert.equal(after.rows.length, 0, 'the shelve hides the row');
-    assert.deepEqual(after.openIds, ['p'], 'the open set is shelf-free');
-    assert.deepEqual(after.openIds, before.openIds);
-    assert.deepEqual(after.compact, before.compact);
-    assert.deepEqual(after.compact, [], 'the shelved wait is not a compact row');
-  });
-
-  test('(3) a message-less open question: one ruling row, no compact row, and still none once shelved (F5.2)', async () => {
+  test('(3) a message-less open question: one ruling row, no compact row (F5.2)', async () => {
     const open = runBlock(FIXTURES.messageLessOpen());
     assert.equal(open.rows.length, 1);
     assert.deepEqual(open.compact, []);
-    const shelvedNow = runBlock({ ...FIXTURES.messageLessOpen(), shelved: [shelfFor('d-1', 'p')] });
-    assert.equal(shelvedNow.rows.length, 0);
-    assert.deepEqual(shelvedNow.compact, []);
   });
 
   test('(4) a message-less wait with no question: one compact row with the fixed fallback (no message)', async () => {

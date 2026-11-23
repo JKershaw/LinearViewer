@@ -82,8 +82,8 @@ test('missing urlKey or store still returns DEFAULT_MODEL (unchanged guard)', as
 // resolveAiOperationModel (LIN-1145)
 // =============================================================================
 
-test('AI_OPERATION_KINDS covers the scoped operations, including flight-companion, ship-biscuit and task-chat (LIN-2623, LIN-2966; LIN-3300 removed recommend-write with the brief writer)', () => {
-  assert.deepEqual(AI_OPERATION_KINDS, ['recommend', 'recap', 'brief', 'scan', 'run-summary', 'session-summary', 'flight-companion', 'ship-biscuit', 'task-chat']);
+test('AI_OPERATION_KINDS covers the scoped operations, including flight-companion, ship-biscuit and task-chat (LIN-2623, LIN-2966; LIN-3300 removed recommend-write with the brief writer; LIN-4540 removed scan with the scan)', () => {
+  assert.deepEqual(AI_OPERATION_KINDS, ['recommend', 'recap', 'brief', 'run-summary', 'session-summary', 'flight-companion', 'ship-biscuit', 'task-chat']);
 });
 
 // Every AI operation kind is a job in the registry, so the Models page can show it (LIN-3855 retired the

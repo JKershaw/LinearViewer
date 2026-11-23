@@ -1544,7 +1544,9 @@ describe('agreeRulingRow / keepRulingRow (LIN-2444 Phase 3)', () => {
     assert.deepEqual(JSON.parse(captured.opts.body), { decisionLoopId: 'loop-gone-1', decisionId: 'd-gone-1' });
   });
 
-  test('Agree on a task-bound row posts to the scan dismiss route with {id: taskDecisionId}', async () => {
+  // LIN-4540: the task-bound dismiss route went with the comment scan, so every
+  // dismiss, a task-bound row's included, goes to the rulings dismiss route.
+  test('Agree on a task-bound row posts to the rulings dismiss route, never a task-scoped one', async () => {
     let captured = null;
     const page = await makeSandbox({
       api: async (url, opts) => { captured = { url, opts }; return { success: true }; }
@@ -1561,8 +1563,8 @@ describe('agreeRulingRow / keepRulingRow (LIN-2444 Phase 3)', () => {
     await new Promise((r) => setImmediate(r));
 
     assert.ok(captured, 'expected window.api to be called');
-    assert.equal(captured.url, '/workspace/the-ruling-workspace/api/scan/issue-1/dismiss');
-    assert.deepEqual(JSON.parse(captured.opts.body), { id: 'td-1' });
+    assert.equal(captured.url, '/workspace/the-ruling-workspace/api/dashboard/rulings/dismiss');
+    assert.deepEqual(JSON.parse(captured.opts.body), { decisionLoopId: null, decisionId: 'd-gone-1' });
   });
 
   test('Agree targets anchor.workspaceUrlKey, never a page urlKey', async () => {
@@ -1994,94 +1996,6 @@ describe('dismissRulingRow selection-clearing (LIN-2444 review — third open in
   });
 });
 
-// ─── Third review (LIN-2444, `0708a260`) — F8: sixth open instance ────────
-//
-// shelveRulingRow belongs to the class by the same reasoning Dismiss did:
-// shelving does not withdraw the suggestion (`suggestedDismissal` stays
-// set), so `rulingsRowByKey` still holds the row as live and a same-tab
-// bulk-agree can dismiss a ruling the operator just deferred with a
-// re-surface timer (LIN-1727: no silent muting).
-describe('shelveRulingRow selection-clearing (LIN-2444 review F8 — sixth open instance)', () => {
-  const SUGGESTION = { reason: 'shipped', suggestedBy: 'lane-e', suggestedAt: '2026-09-05T00:00:00.000Z' };
-
-  test('a successful Shelve clears the row from rulingsSelected at the moment of success', async () => {
-    const page = await makeSandbox({ api: async () => ({ success: true }) });
-    const { shelveRulingRow, rulingsSelected, rulingKey } = page;
-    const li = makeLi(page);
-    const key = rulingKey('the-ruling-workspace', ANCHOR, 'd-gone-1');
-    rulingsSelected.add(key);
-
-    shelveRulingRow(makeRow({ suggestedDismissal: SUGGESTION }), li, 'deferred pending upstream fix', 24 * 60 * 60 * 1000);
-    await new Promise((r) => setImmediate(r));
-    await new Promise((r) => setImmediate(r));
-
-    assert.equal(rulingsSelected.has(key), false, 'a shelved row must not survive selection into the next bulk-agree batch');
-  });
-
-  test('a same-tab bulk-agree press after Shelve does not dismiss the shelved row', async () => {
-    const world = makeWorld();
-    const list = world.document.createElement('ul');
-    const empty = world.document.createElement('p'); empty.hidden = false;
-    const posted = { shelve: [], dismiss: [] };
-    const api = async (url, opts) => {
-      const body = JSON.parse(opts.body);
-      if (url.includes('/shelve')) { posted.shelve.push(body.decisionId); return { success: true }; }
-      posted.dismiss.push(body.decisionId);
-      return { success: true };
-    };
-    const page = await makeSandbox({ world, api, elements: { 'obs-rulings': list, 'obs-rulings-empty': empty } });
-    const { renderRulings, shelveRulingRow, toggleRulingSelection, bulkAgreeSelected, rulingKey } = page;
-
-    const shelved = makeRow({ suggestedDismissal: SUGGESTION });
-    const other = makeRow({ decision: { decision_id: 'd-other' }, suggestedDismissal: SUGGESTION });
-    renderRulings([shelved, other]);
-    const li = list.children[0];
-    toggleRulingSelection(rulingKey('the-ruling-workspace', ANCHOR, 'd-gone-1'), true);
-    toggleRulingSelection(rulingKey('the-ruling-workspace', ANCHOR, 'd-other'), true);
-
-    shelveRulingRow(shelved, li, 'deferred pending upstream fix', 24 * 60 * 60 * 1000);
-    await new Promise((r) => setImmediate(r));
-    await new Promise((r) => setImmediate(r));
-    assert.deepEqual(posted.shelve, ['d-gone-1']);
-
-    // NO poll has landed yet — rulingsRowByKey still holds the pre-shelve row,
-    // exactly the window the review's PROBE reproduced.
-    await answerBulk(page, bulkAgreeSelected());
-
-    assert.deepEqual(posted.dismiss, ['d-other'], 'the shelved ruling must never be dismissed by a same-tab bulk press');
-  });
-
-  // LIN-2756 close-out (review N1): the Keep sibling is pinned at :1017, the
-  // shelve half was not — a mutation that dropped `decisionLoopId` from this
-  // POST body survived the whole suite. The regression it hides is silent and
-  // is this ticket's own bug class: a shelve that loses its loop segment
-  // writes the legacy two-segment `_id`, which `shelfGate` then fans out
-  // across every loop sharing that `decision_id`, so one loop's deferral
-  // suppresses another loop's unshelved ruling with no error anywhere.
-  test('Shelve posts to the shelve route with the row\'s own decisionLoopId (review N1)', async () => {
-    let captured = null;
-    const page = await makeSandbox({
-      api: async (url, opts) => { captured = { url, opts }; return { success: true }; }
-    });
-    const { shelveRulingRow } = page;
-    const li = makeLi(page);
-
-    shelveRulingRow(makeRow({ suggestedDismissal: SUGGESTION }), li, 'deferred pending upstream fix', 24 * 60 * 60 * 1000);
-    await new Promise((r) => setImmediate(r));
-    await new Promise((r) => setImmediate(r));
-
-    assert.ok(captured, 'expected window.api to be called');
-    assert.equal(captured.url, '/workspace/the-ruling-workspace/api/dashboard/rulings/shelve');
-    assert.equal(captured.opts.method, 'POST');
-    assert.deepEqual(JSON.parse(captured.opts.body), {
-      decisionId: 'd-gone-1',
-      decisionLoopId: 'loop-gone-1',
-      reason: 'deferred pending upstream fix',
-      resurfaceInMs: 24 * 60 * 60 * 1000
-    });
-  });
-});
-
 // ─── Second review (LIN-2444) — fifth instance, found closing F6/F7 ────────
 //
 // appendSuggestionActions renders Agree/Keep on a suggested row REGARDLESS
@@ -2165,7 +2079,6 @@ describe('rulingRowControls widened for Agree/Keep (LIN-2444 Phase 4)', () => {
     const agreeBtn = li.querySelector('.obs-ruling-agree');
     const keepBtn = li.querySelector('.obs-ruling-keep');
     const dismissBtn = li.querySelector('.obs-ruling-dismiss');
-    const shelveBtn = li.querySelector('.obs-ruling-shelve');
     assert.ok(agreeBtn && keepBtn, 'Agree/Keep must render on a suggested row');
 
     clickOn(agreeBtn);
@@ -2173,7 +2086,6 @@ describe('rulingRowControls widened for Agree/Keep (LIN-2444 Phase 4)', () => {
     assert.equal(agreeBtn.disabled, true, 'Agree itself must disable while its own request is in flight');
     assert.equal(keepBtn.disabled, true, 'Keep must be disabled too — the double-fire hole this phase closes');
     assert.equal(dismissBtn.disabled, true);
-    assert.equal(shelveBtn.disabled, true);
 
     resolveApi({ success: true });
     await new Promise((r) => setImmediate(r));
@@ -3050,7 +2962,7 @@ describe('bulk-agree / single-agree — same-workspace, different-loop decision_
     // (`rulingsSettled.has(key)`) then silently no-ops the close-out loop's
     // press: no second API call, no error, no feedback. A suggestion/agree
     // on one loop's row must never suppress the other's — this is the
-    // ticket's "a suggestion or shelve addresses one loop's row without
+    // ticket's "a suggestion addresses one loop's row without
     // touching the other" acceptance limb.
     await agreeRulingRow(rowCloseout, liCloseout);
     assert.deepEqual(
@@ -3120,7 +3032,7 @@ describe('issueDismissRequest carries stampLoopId from all three callers (LIN-29
 // ─── The selection-clearing INVARIANT, not just its six known instances ───
 //
 // Three review rounds each closed the *named* instances and a new one kept
-// turning up (F1/F2 → F6/F7/Dismiss/deliverRulingReply → F8/shelve). Rather
+// turning up (F1/F2 → F6/F7/Dismiss/deliverRulingReply → F8). Rather
 // than trust the next reader to re-derive "every terminal rulings-row
 // action" by eye again, this pins the REPRODUCIBLE QUERY that enumeration
 // was built from (the LIN-1873 cited-sweep convention this repo already
@@ -3184,7 +3096,7 @@ describe('the rulings selection-clearing invariant (LIN-2444 review — closing 
       // follows the same guard-in-flight idiom every other verb here does,
       // and clears `rulingsSelected.delete(key)` on success exactly like
       // its siblings.
-      ['agreeRulingRow', 'bulkAgreeRow', 'deliverRulingReply', 'deliverRulingStampOnly', 'dismissRulingRow', 'keepRulingRow', 'shelveRulingRow'].sort(),
+      ['agreeRulingRow', 'bulkAgreeRow', 'deliverRulingReply', 'deliverRulingStampOnly', 'dismissRulingRow', 'keepRulingRow'].sort(),
       'the enumerated population of per-row rulings write handlers changed — update this list deliberately, or a new/renamed handler slipped past unexamined'
     );
     assert.deepEqual(guardedWithoutClear, [], `every rulingsPending.add(key)-guarded handler must also call rulingsSelected.delete(key) on success — missing in: ${guardedWithoutClear.join(', ')}`);
@@ -3200,7 +3112,7 @@ describe('the rulings selection-clearing invariant (LIN-2444 review — closing 
 // simply reuses whatever <li> is already attached. The staleness prune must
 // therefore run in renderRulings itself, ahead of that branch, not only
 // inside renderRulingRow — S12's mechanism correction, and the exact bug
-// class `8feb02c7`/LIN-2262 already fixed once in the shelf-gate keying.
+// class `8feb02c7`/LIN-2262 already fixed once in the server's per-loop ruling keying.
 describe('rulingEffectOverride lifecycle (LIN-2775 Area 5)', () => {
   async function makeRenderSandbox() {
     const world = makeWorld();
@@ -4343,8 +4255,8 @@ describe('LIN-3126 residual — the ruling anchors forward source to ReplyDelive
 // LIN-3631 — a poll must never wipe what the operator is typing. The Rulings
 // tab repaints on every 5s poll, and before this fix renderRulings rebuilt
 // every row that was not pending/preserved/settled: a half-typed free-text
-// answer, the focus in an empty answer box, and an open shelve panel (with
-// its reason) were all replaced by fresh empty controls. These pin the
+// answer and the focus in an empty answer box were both replaced by fresh
+// empty controls. These pin the
 // repaint deferral: a row holding unsent input is reused as-is, and is
 // rebuilt again as soon as it holds none.
 describe('renderRulings — a poll keeps unsent input (LIN-3631)', () => {
@@ -4392,68 +4304,6 @@ describe('renderRulings — a poll keeps unsent input (LIN-3631)', () => {
 
     assert.equal(list.children[0].querySelector('.obs-ruling-answer-input'), box,
       'replacing a focused field drops the keystrokes that follow');
-  });
-
-  // `<select>` is not modelled by the shared fake (LIN-4255 keeps it out), and the shelve panel writes `.value` on
-  // each new `<option>` and then on its `<select>` as it draws them (observation.js:2586-2592), before a test can
-  // reach either node. So this one test gives every `<select>`/`<option>` its own document creates a `.value` of its
-  // own at creation, ahead of the client's first write (LIN-4282; review note 5 on LIN-4271). Only this test's world
-  // is touched, and the fake itself still refuses `select`.
-  function giveSelectsAValue(document) {
-    const create = document.createElement.bind(document);
-    document.createElement = (name) => {
-      const el = create(name);
-      if (el.localName === 'option') {
-        let value = null;
-        Object.defineProperty(el, 'value', {
-          get: () => (value === null ? el.textContent : value),
-          set: (v) => { value = String(v); },
-          configurable: true
-        });
-      } else if (el.localName === 'select') {
-        let chosen = null;
-        const options = () => el.children.filter((c) => c.localName === 'option');
-        Object.defineProperty(el, 'value', {
-          // As a browser does: the chosen option's value, else the first option's; setting a value no option has
-          // leaves nothing chosen.
-          get: () => {
-            const opts = options();
-            if (chosen === null) return opts.length ? opts[0].value : '';
-            return opts.includes(chosen) ? chosen.value : '';
-          },
-          set: (v) => { chosen = options().find((o) => o.value === String(v)) || false; },
-          configurable: true
-        });
-      }
-      return el;
-    };
-  }
-
-  test('an open shelve panel and its reason survive a repaint', async () => {
-    const { page, list } = await makeDraftSandbox();
-    giveSelectsAValue(worldOf(page).document);
-    const { renderRulings } = page;
-    const row = draftRow();
-
-    renderRulings([row]);
-    clickOn(list.children[0].querySelector('.obs-ruling-shelve'));
-    const reason = list.children[0].querySelector('.obs-ruling-shelve-reason');
-    assert.ok(reason, 'shelve opens its reason panel');
-    const duration = list.children[0].querySelector('.obs-ruling-shelve-duration');
-    assert.equal(duration.value, String(24 * 60 * 60 * 1000), 'the panel draws its duration with the 1-day default');
-    reason.value = 'waiting on the vendor';
-    // Opening the panel focuses its reason box (observation.js:2608), and a focused field holds the row on its own
-    // (:2144). Blur it, so the open panel (:2142) is the only thing holding the row through this repaint.
-    reason.blur();
-    assert.notEqual(worldOf(page).document.activeElement, reason);
-
-    renderRulings([row]);
-
-    assert.equal(list.children[0].querySelector('.obs-ruling-shelve-reason'), reason);
-    assert.equal(reason.value, 'waiting on the vendor');
-    // The held row keeps its nodes, so the duration <select> is the one drawn above, with its accessor and choice.
-    assert.equal(list.children[0].querySelector('.obs-ruling-shelve-duration'), duration);
-    assert.equal(duration.value, String(24 * 60 * 60 * 1000));
   });
 
   test('a row holding no input is still rebuilt, and is rebuilt again once its draft is cleared', async () => {
@@ -4568,18 +4418,21 @@ describe('Rulings in plain words (LIN-3983 PR 2)', () => {
     assert.ok(!head.innerHTML.includes('proto'), 'the raw workspace key is not shown');
   });
 
-  test('the row says what each action does, and when a shelved question comes back, before it is pressed', async () => {
+  test('the row says what each action does before it is pressed, and offers only Answer and Dismiss', async () => {
     const page = await makeSandbox({ postComment: async () => ({ ok: true, status: 201, data: {} }), dispatchPrompt: async () => ({ id: 'd' }) });
     const { renderRulingRow } = page;
     const li = renderRulingRow(makeRow());
     const note = li.children.find(c => c.className === 'obs-ruling-actions-note');
     assert.ok(note, 'an actions note is rendered');
-    assert.match(note.textContent, /Dismiss: this wasn't worth asking\./);
-    assert.match(note.textContent, /Shelve: hides it, and it comes back in 1 day\./);
+    assert.match(note.textContent, /^(Answer sends your reply\. )?Dismiss: this wasn't worth asking\.$/);
     const labels = [];
-    const walk = (n) => { if (n.className && /obs-ruling-(dismiss|shelve)\b/.test(n.className)) labels.push(n.textContent); (n.children || []).forEach(walk); };
-    walk(li);
-    assert.deepEqual(labels.sort(), ['Dismiss', 'Shelve']);
+    const walk = (n) => {
+      if (n.localName === 'button' && /\baction-btn\b/.test(n.className || '')) labels.push(n.textContent);
+      (n.children || []).forEach(walk);
+    };
+    walk(li.querySelector('.obs-ruling-answer-actions'));
+    assert.ok(labels.includes('Dismiss'), 'Dismiss is offered');
+    assert.deepEqual(labels.filter(l => l !== 'Answer' && l !== 'Dismiss'), [], `only Answer and Dismiss are row actions, got ${labels.join(', ')}`);
   });
 
   test('a bulk apply asks in the page: the question is the page\'s own, Apply resolves true, Cancel false, and confirm() is never called', async () => {

@@ -94,8 +94,8 @@ describe('controls: asserted unchanged', () => {
     assert.deepEqual(diffReplay(before.existingCorpusAtHead, after.existingCorpusAtHead), []);
   });
 
-  test('S2, S3, S4 and S7 (Harbour calls) do not move in any section', () => {
-    assert.deepEqual(diffPaths.filter(path => /(^|\.)S(2|3|4|7)\./.test(path)), []);
+  test('S2, S3 and S7 (Harbour calls) do not move in any section (S4 retired with the scan, LIN-4540)', () => {
+    assert.deepEqual(diffPaths.filter(path => /(^|\.)S(2|3|7)\./.test(path)), []);
   });
 
   for (const key of ['killed-before-stop/final', 'reap-tail/atStop', 'reap-tail/atReap', 'resumed-across-deploy/earlier', 'resumed-across-deploy/later']) {

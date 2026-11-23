@@ -2,8 +2,8 @@
  * LIN-4463 piece 4: public/observation.js is a native ES module. These witnesses pin what the conversion is for, so that a
  * change back to the bridge, to a restated duration rule, or to the classic `module.exports` seam fails here, not only in
  * a blind read:
- *  - the page imports the formatter and the duration leaf from /lib/ by a relative specifier, and reads no bridge global;
- *  - it loads and prices a scan estimate with `window.CostFormat` absent (the bridge is not needed by this page any more);
+ *  - the page imports the duration leaf from /lib/ by a relative specifier, and reads no bridge global;
+ *  - it loads with `window.CostFormat` absent (the bridge is not needed by this page any more);
  *  - its runtime wording is the shared leaf's, with the one deliberate difference: a non-finite ms reads '' (the copy printed
  *    `NaNh`).
  *
@@ -15,7 +15,6 @@ import { readFileSync } from 'node:fs';
 import { dirname, join } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { importWorld } from './helpers/import-world.js';
-import { formatUsd } from '../../lib/cost-format.js';
 import { fmtDuration } from '../../lib/time-words.js';
 
 const ROOT = join(dirname(fileURLToPath(import.meta.url)), '../..');
@@ -35,8 +34,7 @@ async function loadPage() {
 }
 
 describe('observation.js is a native module (LIN-4463 piece 4)', () => {
-  test('it imports the formatter and the duration leaf from /lib/ by relative specifier', () => {
-    assert.match(CODE, /^import \{ formatUsd \} from '\.\.\/lib\/cost-format\.js';$/m);
+  test('it imports the duration leaf from /lib/ by relative specifier', () => {
     assert.match(CODE, /^import \{ fmtDuration \} from '\.\.\/lib\/time-words\.js';$/m);
   });
 
@@ -49,7 +47,7 @@ describe('observation.js is a native module (LIN-4463 piece 4)', () => {
   test('its test seams are named exports: the namespace carries the helpers the suites read', async () => {
     const { world, page } = await loadPage();
     try {
-      for (const name of ['renderActivityLog', 'diffSessionList', 'fillSessionHead', 'formatDueScanCostEstimate', 'getOpenLoopIds', 'setOpenLoopIds']) {
+      for (const name of ['renderActivityLog', 'diffSessionList', 'fillSessionHead', 'getOpenLoopIds', 'setOpenLoopIds']) {
         assert.equal(typeof page[name], 'function', `${name} is exported as a function`);
       }
     } finally {
@@ -72,15 +70,11 @@ describe('observation.js is a native module (LIN-4463 piece 4)', () => {
 });
 
 describe('the converted page works with no bridge (window.CostFormat absent)', () => {
-  test('a scan estimate is priced by the shared formatter, the same words /lib/cost-format.js gives', async () => {
+  test('it loads and exports its seams with no bridge global installed', async () => {
     const { world, page } = await loadPage();
     try {
       assert.equal(world.window.CostFormat, undefined, 'the bridge global is not installed for this page');
-      const estimate = { calls: 3, pricedCalls: 3, meanUsd: 0.01, unknown: false };
-      const words = formatUsd(0.03, { fine: true });
-      assert.ok(words, 'the formatter prices 0.03 (the oracle is not null)');
-      assert.equal(page.formatDueScanCostEstimate(estimate, 3), `est. ${words}`);
-      assert.equal(page.formatDueScanCostEstimate({ meanUsd: 0.01, unknown: true }, 3), 'est. unknown');
+      assert.equal(typeof page.fillSessionHead, 'function');
     } finally {
       world.restore();
     }

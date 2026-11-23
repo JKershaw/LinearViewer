@@ -2,20 +2,19 @@
  * The rulings routes (LIN-3742 split of routes/dashboard.js):
  *
  *   GET  /workspace/:urlKey/api/dashboard/rulings                    — unanswered-decision feed (ambient count + rulings tab; LIN-1728)
- *   POST /workspace/:urlKey/api/dashboard/rulings/dismiss            — dismiss a loop-backed ruling with no comment (LIN-2225; the task-bound sibling reuses the existing scan dismiss route instead)
+ *   POST /workspace/:urlKey/api/dashboard/rulings/dismiss            — dismiss a loop-backed ruling with no comment (LIN-2225)
  *   POST /workspace/:urlKey/api/dashboard/rulings/reverse-withdrawal — reverse a `decision-withdrawn` stamp, terminal (LIN-2891/LIN-3035; session-auth-only, no UI button yet)
  *   POST /workspace/:urlKey/api/dashboard/rulings/answer             — stamp a TASK-BOUND ruling answered with no comment, durable optionId (LIN-2754 Track B)
- *   POST /workspace/:urlKey/api/dashboard/rulings/shelve             — shelve any ruling with a reason + re-surface timer (LIN-1727; view-only)
  *   POST /workspace/:urlKey/api/dashboard/rulings/keep               — withdraw a proposed dismissal (LIN-2444; view-only — never touches answer state, arms no keepalive)
  *
  * The feed cache and `mergeLoops` arrive in `ctx` from the composer: the GET fills
  * the very `sessionsFeedCache` instance the feed and the run page read, and every
  * successful write clears it (LIN-2755).
  *
- * The five writes share one frame (`rulingWrite`): validate (400), the store gate
+ * The four writes share one frame (`rulingWrite`): validate (400), the store gate
  * (503), then one try around the write. What differs per route is data in its
  * spec, including `storeFault`: dismiss and reverse-withdrawal answer a store
- * fault with `replyStoreFault` (503, LIN-3805); answer, shelve and keep still
+ * fault with `replyStoreFault` (503, LIN-3805); answer and keep still
  * answer it with their own 500. That inconsistency is today's behaviour and is
  * kept as it is; it is an open question for the owner, not a fix made here.
  */
@@ -70,7 +69,7 @@ async function openQuestionRowsFor({ session, workspaces, recordsStore, dispatch
 // Cross-workspace by design (decision 2's "third obs-tab" host), but per the
 // plan's constraint the ambient count stays scoped to `req.session.workspaces`
 // like every other Observation read here — never fleet-wide.
-function rulingsFeed({ sessionsFeedCache, mergeLoops, taskDecisionsStore, shelvedRulingsStore, dismissalSuggestionsStore, recordsStore, dispatchQueueStore, accountStore }) {
+function rulingsFeed({ sessionsFeedCache, mergeLoops, taskDecisionsStore, dismissalSuggestionsStore, recordsStore, dispatchQueueStore, accountStore }) {
   return async (req, res) => {
     const workspaces = connectedWorkspaces(req.session);
 
@@ -96,14 +95,7 @@ function rulingsFeed({ sessionsFeedCache, mergeLoops, taskDecisionsStore, shelve
       const newestScanByTask = taskDecisionsStore
         ? await taskDecisionsStore.listNewestScanPerTask(urlKeys)
         : {};
-      // Additive THIRD input (LIN-1727) — same `workspaces` scope, same
-      // local/fast-read discipline as taskDecisions above; no new caching
-      // layer. Raw rows; collectUnansweredDecisions owns the active/lapsed
-      // reduction.
-      const shelvedRulings = shelvedRulingsStore
-        ? await shelvedRulingsStore.listForWorkspaces(urlKeys)
-        : [];
-      // Additive FOURTH input (LIN-2444). Scoped to the same `workspaces` set
+      // Additive input (LIN-2444). Scoped to the same `workspaces` set
       // as every other read here, never fleet-wide; a WITHDRAWN row is not a
       // standing proposal (the human already pressed Keep) and is excluded
       // here rather than in the store, which returns raw rows so exactly one
@@ -133,7 +125,7 @@ function rulingsFeed({ sessionsFeedCache, mergeLoops, taskDecisionsStore, shelve
       const rulings = [
         ...attachStandingSuggestions(
           collectUnansweredDecisions(
-            { loops: merged, taskDecisions, shelvedRulings, newestScanByTask },
+            { loops: merged, taskDecisions, newestScanByTask },
             {
               now: new Date(),
               liveDispatchOnAnchor: liveOnAnchor(merged)
@@ -216,12 +208,9 @@ const nonEmptyString = (v) => typeof v === 'string' && v !== '';
 
 // ─── Dismiss a loop-backed ruling (LIN-2225) ──────────────────────────────
 //
-// The task-bound sibling already has a dismiss path — a scan-produced
-// decision's own `outcome: 'dismissed'` column
-// (`POST /workspace/:urlKey/api/scan/:issueId/dismiss`, LIN-2211/LIN-2197
-// Phase 4) — so the Rulings page client calls that route directly for a
-// task-bound row rather than duplicating it here. A loop-backed decision has
-// no such column: `dispatchQueueStore` only ever carries the single
+// Loop-backed only. A task-bound ruling's own dismiss went with the scan
+// (LIN-4540): the scan was its only writer, and none was open at the cutover
+// (LIN-4539). A loop-backed decision has no `outcome` column of its own: `dispatchQueueStore` only ever carries the single
 // `decision-answer` stamp, so dismiss reuses `markDecisionAnswered` verbatim
 // with an explicit `'dismissed'` outcome tagged into that same stamp
 // (`lib/dispatch-store.js`) — the ruling clears from the unanswered queue
@@ -318,8 +307,8 @@ function reverseWithdrawalSpec({ dispatchQueueStore }) {
 // run, and resumes nothing.
 //
 // No canonical-id re-resolution: every `taskDecisionsStore` row's `issueId`
-// is canonical by construction (`routes/workspace-api-scan.js`'s scan/dismiss
-// routes only ever write a UUID there), and `taskDecisionAnchor`
+// is canonical by construction (the retired scan routes, LIN-4540, only ever
+// wrote a UUID there), and `taskDecisionAnchor`
 // (`lib/unanswered-decisions.js`) hands this route's caller that same
 // already-canonical id unchanged — `markOutcome`'s own canonical-UUID guard
 // is belt-and-braces behind it.
@@ -383,70 +372,19 @@ function answerSpec({ taskDecisionsStore }) {
   };
 }
 
-// ─── Shelve a ruling (LIN-1727) ──────────────────────────────────────────
-//
-// A deliberate, designed defer — a reason and a re-surface timer are both
-// required (docs/escalation-philosophy.md §6: silent muting is forbidden).
-// Works uniformly for a loop-backed OR task-bound ruling — unlike answer/
-// dismiss, a shelve never writes to the underlying loop/task-decision row
-// at all (it is a VIEW operation only, keyed on `(urlKey, decisionId)` in
-// `lib/shelved-rulings-store.js`), so this route needs no anchor/disposition
-// branching the way `.../rulings/dismiss` above does.
-const MIN_SHELVE_MS = 5 * 60 * 1000; // 5 minutes
-const MAX_SHELVE_MS = 30 * 24 * 60 * 60 * 1000; // 30 days
-
-// LIN-2756: `decisionLoopId` is OPTIONAL on shelve and keep — see
-// lib/shelved-rulings-store.js's back-compat note. `public/observation.js`'s
-// shelveRulingRow always sends the row's own anchor.loopId/taskDecisionId, but
-// these routes stay tolerant of an omitted one (a stale cached tab mid-deploy, a
-// future non-upgraded caller) rather than 400ing a previously-working call.
+// LIN-2756: `decisionLoopId` is OPTIONAL on keep. `public/observation.js`
+// always sends the row's own anchor.loopId/taskDecisionId, but the route stays
+// tolerant of an omitted one (a stale cached tab mid-deploy, a future
+// non-upgraded caller) rather than 400ing a previously-working call.
 const badOptionalLoopId = ({ decisionLoopId }) =>
   decisionLoopId !== undefined && !nonEmptyString(decisionLoopId);
 const OPTIONAL_LOOP_ID_MESSAGE = 'decisionLoopId, when given, must be a non-empty string';
 const loopIdField = (decisionLoopId) => (decisionLoopId ? { decisionLoopId } : {});
 
-function shelveInvalid(body) {
-  const { decisionId, reason, resurfaceInMs } = body;
-  if (!nonEmptyString(decisionId)) return 'decisionId is required';
-  if (badOptionalLoopId(body)) return OPTIONAL_LOOP_ID_MESSAGE;
-  if (typeof reason !== 'string' || !reason.trim()) {
-    return 'A shelve reason is required — silent muting is not allowed';
-  }
-  if (typeof resurfaceInMs !== 'number' || !Number.isFinite(resurfaceInMs) || resurfaceInMs < MIN_SHELVE_MS || resurfaceInMs > MAX_SHELVE_MS) {
-    return `resurfaceInMs must be between ${MIN_SHELVE_MS} and ${MAX_SHELVE_MS}`;
-  }
-  return null;
-}
-
-function shelveSpec({ shelvedRulingsStore }) {
-  return {
-    path: '/workspace/:urlKey/api/dashboard/rulings/shelve',
-    validate: shelveInvalid,
-    unavailable: { store: shelvedRulingsStore, message: 'Shelved-rulings store not configured' },
-    // LIN-2755: uniform invalidation on every ruling write, per the
-    // ticket's Proposal — shelve never touches loop/task-decision data
-    // itself (shelvedRulingsStore is read live, not cached), so the frame's
-    // clear is defensive/uniform rather than fixing an observable staleness bug.
-    run: async (workspace, { decisionId, decisionLoopId, reason, resurfaceInMs }) => {
-      const record = await shelvedRulingsStore.shelve({
-        urlKey: workspace.urlKey,
-        decisionId,
-        ...loopIdField(decisionLoopId),
-        reason,
-        resurfaceInMs
-      });
-      return record ? { ok: { success: true, shelf: record } } : { fail: [500, 'Failed to shelve ruling'] };
-    },
-    logLabel: 'Ruling shelve error:',
-    failure: 'Failed to shelve ruling',
-    storeFault: false
-  };
-}
-
 // ─── Keep a ruling — withdraw a proposed dismissal (LIN-2444) ───────────────
 //
 // A proxy token may PROPOSE a dismissal but never perform one; "Keep" is the
-// human declining that proposal. Like shelve, this is a VIEW operation only
+// human declining that proposal. This is a VIEW operation only
 // — it never touches the underlying loop/task-decision row, so it needs no
 // anchor/disposition branching and, unlike a dismiss/answer route, must NOT
 // arm keepalive (verified: neither sibling write route above arms it either).
@@ -462,8 +400,9 @@ function keepSpec({ dismissalSuggestionsStore }) {
       return badOptionalLoopId(body) ? OPTIONAL_LOOP_ID_MESSAGE : null;
     },
     unavailable: { store: dismissalSuggestionsStore, message: 'Dismissal-suggestions store not configured' },
-    // LIN-2755: uniform invalidation, same reasoning as shelve above —
-    // dismissalSuggestionsStore is read live, not cached.
+    // LIN-2755: uniform invalidation on every ruling write —
+    // dismissalSuggestionsStore is read live, not cached, so the frame's
+    // clear is defensive/uniform rather than fixing an observable staleness bug.
     run: async (workspace, { decisionId, decisionLoopId }) => {
       const record = await dismissalSuggestionsStore.withdraw({
         urlKey: workspace.urlKey,
@@ -486,7 +425,7 @@ export function createDashboardRulingsRoutes(ctx) {
   const { workspaceFromUrl } = ctx;
   const router = Router();
   router.get('/workspace/:urlKey/api/dashboard/rulings', workspaceFromUrl, rulingsFeed(ctx));
-  for (const spec of [dismissSpec, reverseWithdrawalSpec, answerSpec, shelveSpec, keepSpec]) {
+  for (const spec of [dismissSpec, reverseWithdrawalSpec, answerSpec, keepSpec]) {
     rulingWrite(router, ctx, spec(ctx));
   }
   return router;

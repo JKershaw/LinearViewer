@@ -98,7 +98,6 @@ import { ReportHistoryStore } from './lib/report-history-store.js'
 import { ShipBiscuitHistoryStore } from './lib/ship-biscuit-history-store.js'
 import { TaskDecisionsStore } from './lib/task-decisions-store.js'
 import { createOnTicketWrite } from './lib/ticket-close-closer.js'
-import { ShelvedRulingsStore } from './lib/shelved-rulings-store.js'
 import { RecordsStore, RECORDS_COLLECTION, REFS_COLLECTION, QUERY_LOG_COLLECTION } from './lib/records-store.js'
 import { createRunRecords } from './lib/run-records.js'
 import { createChangeBackstop, createChangePrReaders } from './lib/change-records.js'
@@ -663,16 +662,9 @@ const taskDecisionsStore = new TaskDecisionsStore({
   collection: taskDecisionsCollection
 })
 
-// Shelved rulings (LIN-1727): a designed defer with a reason and a re-surface
-// timer, so a deferred ruling can never be silently lost. View-only — never
-// mutates the underlying loop/task-decision row. Durable, no TTL, like
-// task-decisions above: a TTL could silently erase the lapse-count history
-// (docs/escalation-philosophy.md §4/§6).
-const shelvedRulingsCollection = db.collection('shelved-rulings')
+// The shelved-rulings collection (LIN-1727) is history since shelving retired (LIN-4540): no code reads or
+// writes it, and it stays in the erasure inventory (INVENTORY) so an erasure still reaches it.
 const dismissalSuggestionsCollection = db.collection('dismissal-suggestions')
-const shelvedRulingsStore = new ShelvedRulingsStore({
-  collection: shelvedRulingsCollection
-})
 // LIN-4493: the records store (lib/records-store.js) behind /api/proxy/records. Versions are kept, so the
 // unique version index (lib/db-indexes.js) is what makes a concurrent write of one version a conflict.
 const recordsStore = new RecordsStore({
@@ -721,9 +713,7 @@ const changePrReaderFor = createChangePrReaders({
 setStandingPrReaderFor(changePrReaderFor)
 dispatchQueueStore.runRecords = createRunRecords({ recordsStore, readRow: (urlKey, id) => dispatchQueueStore.rowForRunRecords(urlKey, id), taskOfTicket: (urlKey, ticket) => taskForTicketAt(urlKey, ticket), changeBackstop: createChangeBackstop({ recordsStore, prReaderFor: changePrReaderFor }) })
 // LIN-2444: proposed dismissals — a view annotation on a ruling, never an
-// answer to it. Separate collection from shelved-rulings because the two are
-// different acts with different lifecycles (a shelve defers a decision the
-// operator still owns; a suggestion offers them a one-click way to close it).
+// answer to it: a suggestion offers the operator a one-click way to close it.
 const dismissalSuggestionsStore = new DismissalSuggestionsStore({
   collection: dismissalSuggestionsCollection
 })
@@ -1335,7 +1325,7 @@ if (process.env.NODE_ENV === 'test') {
   // additive, test-only seam so a spec can inject a rejecting aggregate() on
   // the exact two collections /kpis' loaders read, without touching /kpis'
   // own route logic. See routes/test.js's kpis-fail-next-aggregate handler.
-  app.use(createTestRoutes({ dispatchQueueStore, dispatchTokenStore, freeTierStore, userPreferencesStore, workspacePreferencesStore, modelRoutingStore, customPromptsStore, collectiveCharactersStore, collectivePresetsStore, dispatchPresetsStore, proxyTokenStore, proxyEventStore, agentStatusStore, observationSessionsStore, sessionsFeedCache, recapCacheStore, briefCacheStore, runSummaryCacheStore, sessionSummaryCacheStore, reportHistoryStore, shipBiscuitHistoryStore, taskDecisionsStore, shelvedRulingsStore, dismissalSuggestionsStore, savedChatStore, localStore, recordsStore, getWorkspaceAccessToken, accountStore, accountWorkspaceStore, ownerCredentialStore, connectionStore, clearWorkspaceIssuesMemo, resetKeyState: (ctx) => keyState.resetKey(ctx), observerStateStore, dispatchHistoryCollection, proxyEventsCollection, resetKpiCache: (mode) => kpiPage.reset(mode), workspaceHaltStore, emailTransport: emailTransport?.kind === 'capture' ? emailTransport : null, commentDedupe, decisionStampDedupe, taskModeStore, taskShareCollection: db.collection('task_share_links'), kpiDailyRollupCollection, clearWorkspaceKpis: (urlKey) => workspaceKpisCache.clear({ urlKey }) }))
+  app.use(createTestRoutes({ dispatchQueueStore, dispatchTokenStore, freeTierStore, userPreferencesStore, workspacePreferencesStore, modelRoutingStore, customPromptsStore, collectiveCharactersStore, collectivePresetsStore, dispatchPresetsStore, proxyTokenStore, proxyEventStore, agentStatusStore, observationSessionsStore, sessionsFeedCache, recapCacheStore, briefCacheStore, runSummaryCacheStore, sessionSummaryCacheStore, reportHistoryStore, shipBiscuitHistoryStore, taskDecisionsStore, dismissalSuggestionsStore, savedChatStore, localStore, recordsStore, getWorkspaceAccessToken, accountStore, accountWorkspaceStore, ownerCredentialStore, connectionStore, clearWorkspaceIssuesMemo, resetKeyState: (ctx) => keyState.resetKey(ctx), observerStateStore, dispatchHistoryCollection, proxyEventsCollection, resetKpiCache: (mode) => kpiPage.reset(mode), workspaceHaltStore, emailTransport: emailTransport?.kind === 'capture' ? emailTransport : null, commentDedupe, decisionStampDedupe, taskModeStore, taskShareCollection: db.collection('task_share_links'), kpiDailyRollupCollection, clearWorkspaceKpis: (urlKey) => workspaceKpisCache.clear({ urlKey }) }))
 }
 
 // =============================================================================
@@ -3355,7 +3345,7 @@ const recordPipelineMerge = createPipelineMergeRecorder({
 // LIN-4494: one reader, built once, for the proxy, the task and project pages, Home's Waiting section and `?assignee=me`.
 const listWorkspacePeople = createListWorkspacePeople({ workspaceStore, accountStore, accountWorkspaceStore })
 const canonicalAccountIdOf = (accountId) => accountStore.resolveCanonicalAccountId(accountId)
-app.use(createProxyRoutes({ proxyTokenStore, proxyEventStore, agentStatusStore, recapCacheStore, briefCacheStore, dispatchQueueStore, dispatchTokenStore, closeOutEventsStore, llmCallLogStore, taskDecisionsStore, shelvedRulingsStore, dismissalSuggestionsStore, harbourCommentsStore, recordsStore, changePrReaderFor, listRecordPeople: listWorkspacePeople, sessionsFeedCache, workspaceFromUrl, resolveWorkspaceAccess, getWorkspaceOpenRouterKey, getWorkspaceNorthStar, getNorthStarDocVersionForWorkspace, reportHistoryStore, workspacePreferencesStore, dispatchPresetsStore, freeTierStore, accountStore, rejectedCredentialRegistry, observerStateStore, savedChatStore, workspaceHaltStore, workspaceOwnerCheck, modelRoutingStore, livenessAlarmStore, onTicketWrite, recordPipelineMerge, consumerHeartbeatStore, requestUsageStore, requestUsageLoader, leftoverStep }))
+app.use(createProxyRoutes({ proxyTokenStore, proxyEventStore, agentStatusStore, recapCacheStore, briefCacheStore, dispatchQueueStore, dispatchTokenStore, closeOutEventsStore, llmCallLogStore, taskDecisionsStore, dismissalSuggestionsStore, harbourCommentsStore, recordsStore, changePrReaderFor, listRecordPeople: listWorkspacePeople, sessionsFeedCache, workspaceFromUrl, resolveWorkspaceAccess, getWorkspaceOpenRouterKey, getWorkspaceNorthStar, getNorthStarDocVersionForWorkspace, reportHistoryStore, workspacePreferencesStore, dispatchPresetsStore, freeTierStore, accountStore, rejectedCredentialRegistry, observerStateStore, savedChatStore, workspaceHaltStore, workspaceOwnerCheck, modelRoutingStore, livenessAlarmStore, onTicketWrite, recordPipelineMerge, consumerHeartbeatStore, requestUsageStore, requestUsageLoader, leftoverStep }))
 
 // LIN-3098 S3: the runner kit (lib/runner-kit/*.mjs), public, for the served
 // runner prompt to fetch and verify against its sha256 pins (routes/runner-kit.js).
@@ -3381,7 +3371,7 @@ app.use(createCollectiveRoutes({ workspaceFromUrl, dispatchQueueStore, proxyToke
 // LIN-4168: the dashboard’s touched-task done cache, built here (not by the router’s default) so the key-state registry
 // can reach the same instance the feed reads.
 const dashboardTaskDoneCache = createTaskDoneCache();
-app.use(createDashboardRoutes({ installationTokenFor, workspaceFromUrl, dispatchQueueStore, agentStatusStore, observationSessionsStore, observationMaterializer, sessionsFeedCache, taskDoneCache: dashboardTaskDoneCache, runSummaryCacheStore, sessionSummaryCacheStore, runParagraphStore, recordsStore, briefCacheStore, recapCacheStore, proxyEventStore, freeTierStore, getWorkspaceAccessToken, fetchIssueContext, fetchWorkspaceIssues, getOpenRouterSource, getDeployInfo, workspacePreferencesStore, taskDecisionsStore, shelvedRulingsStore, dismissalSuggestionsStore, llmCallLogStore, runProposalsStore, proxyTokenStore, readRunEvidence, prStateStore, workspaceOwnerCheck, requestUsageLoader, accountStore }))
+app.use(createDashboardRoutes({ installationTokenFor, workspaceFromUrl, dispatchQueueStore, agentStatusStore, observationSessionsStore, observationMaterializer, sessionsFeedCache, taskDoneCache: dashboardTaskDoneCache, runSummaryCacheStore, sessionSummaryCacheStore, runParagraphStore, recordsStore, briefCacheStore, recapCacheStore, proxyEventStore, freeTierStore, getWorkspaceAccessToken, fetchIssueContext, fetchWorkspaceIssues, getOpenRouterSource, getDeployInfo, workspacePreferencesStore, taskDecisionsStore, dismissalSuggestionsStore, runProposalsStore, proxyTokenStore, readRunEvidence, prStateStore, workspaceOwnerCheck, requestUsageLoader, accountStore }))
 
 // Mount task-chat routes (experimental "talk to a task" conversation).
 // Task Chat builds its catalog through the same createChatToolCatalog call the turn core makes for every surface.

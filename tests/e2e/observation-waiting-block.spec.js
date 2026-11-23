@@ -12,7 +12,6 @@ test.beforeEach(async ({ page, workerUrlKey, localWorkerUrlKey }) => {
   URL_KEY = workerUrlKey;
   OBSERVATION_URL = `/workspace/${URL_KEY}/observation`;
   await page.request.get(`/test/clear-task-decisions?urlKey=${localWorkerUrlKey}`);
-  await page.goto(`/test/clear-shelved-rulings?urlKey=${URL_KEY}`);
   await page.request.get('/test/clear-comment-dedupe');
   await page.goto(`/test/set-session?urlKey=${URL_KEY}`);
   await clearRuns(page, URL_KEY);
@@ -102,7 +101,7 @@ test.describe('the phone layout (LIN-3983)', () => {
         pageScrolls: document.documentElement.scrollWidth > window.innerWidth
       };
     });
-    expect(measures.tabCount).toBe(3);
+    expect(measures.tabCount).toBe(2);
     expect(measures.wrapped, 'no tab label wraps').toEqual([]);
     expect(measures.strip[0], 'the tab strip fits without scrolling').toBeLessThanOrEqual(measures.strip[1]);
     expect(measures.pageScrolls, 'the page does not scroll sideways').toBe(false);

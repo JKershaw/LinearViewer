@@ -20,7 +20,6 @@ import { CollectiveCharactersStore } from '../../lib/collective-characters-store
 import { RunProposalsStore } from '../../lib/run-proposals-store.js';
 import { SavedChatStore } from '../../lib/saved-chat-store.js';
 import { ReportHistoryStore } from '../../lib/report-history-store.js';
-import { ShelvedRulingsStore } from '../../lib/shelved-rulings-store.js';
 import { ShipBiscuitHistoryStore } from '../../lib/ship-biscuit-history-store.js';
 import { TaskDecisionsStore } from '../../lib/task-decisions-store.js';
 import { collectUnansweredDecisions } from '../../lib/unanswered-decisions.js';
@@ -146,37 +145,6 @@ describe('LIN-3455 characterization: plain-sort history stores', () => {
       assert.deepEqual(docs.map(d => d._id).sort(), ['h-junk', 'h-new', 'h-old']);
     });
   }
-});
-
-// ---------------------------------------------------------------------------
-// shelved-rulings-store:122 — `NaN <= now` is false, so a junk resurfaceAt is
-// NOT a lapse.
-// ---------------------------------------------------------------------------
-describe('LIN-3455 characterization: shelved-rulings-store lapseCount', () => {
-  const NOW = new Date('2026-10-10T12:00:00.000Z');
-  const HOUR = 3600 * 1000;
-  async function lapseAfterRewriting(resurfaceAt) {
-    const collection = createMockCollection();
-    const store = new ShelvedRulingsStore({ collection });
-    await store.shelve({ urlKey: 'acme', decisionId: 'd-1', reason: 'waiting', resurfaceInMs: HOUR, now: NOW });
-    collection._docs[0].resurfaceAt = resurfaceAt;
-    if (resurfaceAt === undefined) delete collection._docs[0].resurfaceAt;
-    const again = await store.shelve({ urlKey: 'acme', decisionId: 'd-1', reason: 'waiting', resurfaceInMs: HOUR, now: NOW });
-    return again.lapseCount;
-  }
-
-  test('control: a resurfaceAt in the past counts a lapse', async () => {
-    assert.equal(await lapseAfterRewriting(new Date(NOW.getTime() - HOUR)), 1);
-  });
-  test('control: a resurfaceAt in the future does not', async () => {
-    assert.equal(await lapseAfterRewriting(new Date(NOW.getTime() + HOUR)), 0);
-  });
-  test("junk resurfaceAt ('not-a-date') does not count a lapse", async () => {
-    assert.equal(await lapseAfterRewriting('not-a-date'), 0);
-  });
-  test('absent resurfaceAt (undefined) does not count a lapse', async () => {
-    assert.equal(await lapseAfterRewriting(undefined), 0);
-  });
 });
 
 // ---------------------------------------------------------------------------

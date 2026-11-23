@@ -759,8 +759,8 @@ function init(doc) {
 
   // LIN-3499 / LIN-4038: the question card shows exactly while the server says
   // the owner is being asked, which is `state.questionHtml` (non-empty) — not
-  // the pill's status, which a shelved or bare-blocked wait also carries. A poll
-  // that says no question (answered, shelved, or the run moved on) removes the
+  // the pill's status, which a bare-blocked wait also carries. A poll
+  // that says no question (answered, or the run moved on) removes the
   // card. A poll that says a question while the card is missing reloads the page
   // once, since the card is server-rendered for the owner and the poll does not
   // paint it. Both are captured at init, before any markdown renders (LIN-3385).

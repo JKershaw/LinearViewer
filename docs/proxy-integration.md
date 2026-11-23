@@ -1566,7 +1566,6 @@ this read would hand it a cross-workspace view). Read scope is sufficient.
       "declaredEffect": "resume|dispatch|record" | null,
       "alternate": "resume|dispatch|record" | null,
       "canReply": true,
-      "shelvedLapseCount": 0,
       "suggestedDismissal": null
     }
   ],

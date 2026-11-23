@@ -163,7 +163,9 @@ const COLLECTION_CLASSES = {
   // Key inside `_id` or a non-`urlKey` field: read by the no-holder count through URLKEY_SOURCES.
   'brief-cache': 'C', 'recap-cache': 'C', 'workspace-preferences': 'C', 'harbour-comments': 'C',
   'observer-state': 'C', 'local-issues': 'C',
-  'consumer-heartbeats': 'C', 'kpi-daily-rollup': 'C', 'dismissal-suggestions': 'C', 'dispatch-presets': 'C', 'run-proposals': 'C', 'shelved-rulings': 'C',
+  'consumer-heartbeats': 'C', 'kpi-daily-rollup': 'C', 'dismissal-suggestions': 'C', 'dispatch-presets': 'C', 'run-proposals': 'C',
+  // LIN-4540: shelving retired and no code reads it; its old rows are history and still carry a urlKey.
+  'shelved-rulings': 'C',
   'ship-biscuit-editions': 'C', 'collective-characters': 'C', 'collective-presets': 'C',
   // LIN-3853: the table (key in `_id`), the log (urlKey; actor.id may be a token label so not an actor source), the presets (urlKey and createdBy).
   'model-routing': 'C', 'model-routing-log': 'C', 'model-routing-presets': 'BC',

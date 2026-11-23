@@ -277,7 +277,7 @@ export function createTaskPageRoutes({ workspaceFromUrl, getOpenRouterSource, ge
         });
       }
       // LIN-4024: the question card carries an answer box, so only the owner gets one. Whether it shows at all is
-      // `renderTaskQuestion`'s gate (LIN-4038: an open ruling only, not a shelved or bare `[blocked]` wait), the same
+      // `renderTaskQuestion`'s gate (LIN-4038: an open ruling only, not a bare `[blocked]` wait), the same
       // one the page-load card uses, so this read and the page cannot disagree. The poll keys on this string.
       // LIN-4532 (P2b): the open question records of this task ride in the same section (`questionRecords`).
       const questionHtml = (await viewerOf(req)) === 'owner'

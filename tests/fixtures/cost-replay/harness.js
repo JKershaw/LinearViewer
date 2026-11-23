@@ -10,8 +10,7 @@
  *  - S1  `/api/proxy/cost/:id`, through `createProxyRoutes` (routes/proxy.js) over Express.
  *  - S2  Settings › Health's workspace calls: `listInHorizon` then `callsSurfaceOf` (routes/settings.js, LIN-4179).
  *  - S3  Ship's Biscuit's Weather line: the same calls read (routes/ship-biscuit.js).
- *  - S4  Observation's scan estimate: `listInHorizon(urlKey, {feature: 'scan'})` then `scanEstimateOf`, in the
- *        shape the page reads (routes/dashboard-feed.js); it is S7's scan `typicalUsd`.
+ *  - S4  retired with the scan (LIN-4540): Observation no longer shows a scan estimate.
  *  - S5  `readModelsHistory` (the 30-day read, capped; LIN-4226: its `workerSessions`), then `agentSpendByJob`.
  *  - S6  `typicalByModel` per job (the decision panel's per-model typicals).
  *  - S7  Settings › Models' Harbour spend per job: `listInHorizon`, then `harbourSpendByJob`.
@@ -33,7 +32,7 @@ import { lineageRecords } from '../../../lib/cost-read.js';
 import { callsSurfaceOf } from '../../../lib/cost-read-calls.js';
 import { groupDispatchLineages } from '../../../lib/dispatch-lineage.js';
 import { readModelsHistory } from '../../../lib/model-routing-history.js';
-import { agentSpendByJob, typicalByModel, harbourSpendByJob, spendByEffectiveModel, scanEstimateOf } from '../../../lib/model-routing-spend.js';
+import { agentSpendByJob, typicalByModel, harbourSpendByJob, spendByEffectiveModel } from '../../../lib/model-routing-spend.js';
 import { computeEffortReadout } from '../../../lib/effort-readout.js';
 import { parseUsage } from '../../../lib/session-telemetry.js';
 import { isRunningTotal } from '../../../lib/row-usage.js';
@@ -314,9 +313,6 @@ export async function runReplay(corpusOverride, { readRecords = false } = {}) {
     // docs, summed by the one calls read (LIN-4179).
     out.S2 = callsSurfaceOf(await llmStore.listInHorizon(URL_KEY));
     out.S3 = callsSurfaceOf(await llmStore.listInHorizon(URL_KEY));
-
-    // S4: the scan estimate Observation renders, from the scan feature's docs.
-    out.S4 = scanEstimateOf(await llmStore.listInHorizon(URL_KEY, { feature: 'scan' }));
 
     // S5 / S6 / S8 / S9 share the 30-day models read, capped at its own row limit. The read carries the
     // founder lookup for its own lineages, and the cost read over them (LIN-4226: the page carries the read's

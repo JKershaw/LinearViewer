@@ -282,8 +282,7 @@
    ARE the phone-width form (mobile-first, per this file's own convention —
    the one width query below is a desktop enhancement, not a rewrite); the
    reason wraps rather than clips, since it is the full argument being agreed
-   to, never a truncated excerpt like .obs-ruling-case above. Own names per
-   the plan (LIN-2711's ruleless bulk-scan classes are not reused here). */
+   to, never a truncated excerpt like .obs-ruling-case above. */
 .obs-ruling-suggestion {
   margin: 0.4rem 0;
   padding: 0.5rem 0.6rem;
@@ -314,8 +313,7 @@
   margin: 0;
 }
 /* Selection checkbox + label row (LIN-2444 Phase 5) — the checkbox itself
-   needs no rule of its own, same as .obs-due-select needs none; only the
-   row it sits in does. */
+   needs no rule of its own; only the row it sits in does. */
 .obs-ruling-suggestion-head {
   display: flex;
   align-items: center;
@@ -366,21 +364,11 @@
 .obs-ruling-dismiss:hover { background: color-mix(in srgb, var(--muted) 20%, transparent); }
 .obs-ruling-dismiss:disabled { opacity: 0.5; cursor: default; }
 
-/* Shelve (LIN-1727) — a designed defer, distinct from Dismiss: amber-toned
-   like the ruling's own left accent, since it is a deliberate hold, not a
-   clearance. */
-.obs-ruling-shelve {
-  color: var(--amber);
-  background: color-mix(in srgb, var(--amber) 12%, transparent);
-}
-.obs-ruling-shelve:hover { background: color-mix(in srgb, var(--amber) 22%, transparent); }
-.obs-ruling-shelve:disabled { opacity: 0.5; cursor: default; }
-
 /* Agree/Keep (LIN-2444 Phase 3/4) — same base/hover/disabled triplet as
-   dismiss/shelve above. Agree is green-toned like .obs-ruling-answer-send
+   dismiss above. Agree is green-toned like .obs-ruling-answer-send
    (it IS a dismiss, just of the accepted-suggestion kind); Keep is neutral,
-   matching .obs-ruling-dismiss's weight rather than shelve's amber (Keep
-   discards a proposal, it does not raise or defer anything). Both append
+   matching .obs-ruling-dismiss's weight (Keep discards a proposal, it does
+   not raise or defer anything). Both append
    into the existing .obs-ruling-answer-actions flex row, so no new layout
    is needed at any width. */
 .obs-ruling-agree {
@@ -415,7 +403,7 @@
 
 /* Same 44px-ladder tap-target bump `.detail-toggle` gets at this breakpoint
    (public/style.css:1315-1319) — scoped to just these two new buttons; the
-   pre-existing dismiss/shelve buttons are untouched, out of this phase. */
+   pre-existing dismiss button is untouched, out of this phase. */
 @media (max-width: 640px) {
   .obs-ruling-agree,
   .obs-ruling-keep {
@@ -425,12 +413,9 @@
 
 /* Bulk-agree bar (LIN-2444 Phase 5) — select-all-suggested + exact count +
    Agree selected, inline above the feed. Own .obs-ruling-bulk-* names with
-   REAL rules: LIN-2711 found the Scan-due bulk bar's nine class names ship
-   with zero CSS between them, and reusing those names would inherit that
-   gap along with the unstyled controls. Same flex/wrap/margin idiom as
-   .obs-bulk-scan-bar (base rules ARE the phone form, per this file's own
+   real rules. Base rules ARE the phone form, per this file's own
    mobile-first convention — the file's one width query is a desktop
-   enhancement, never a rewrite). */
+   enhancement, never a rewrite. */
 .obs-ruling-bulk-bar {
   display: flex;
   align-items: center;
@@ -459,9 +444,8 @@
 .obs-ruling-bulk-agree:hover { background: color-mix(in srgb, var(--green) 22%, transparent); }
 .obs-ruling-bulk-agree:disabled { opacity: 0.5; cursor: default; }
 
-/* LIN-2758: batch progress, above the bar (mirrors .obs-due-progress,
-   :1294 below — same machine-fact typographic convention: a per-row count
-   is a machine fact, not prose). Plain text node, no animation, so no
+/* LIN-2758: batch progress, above the bar (machine-fact typographic
+   convention: a per-row count is a machine fact, not prose). Plain text node, no animation, so no
    prefers-reduced-motion carve-out is needed. */
 .obs-ruling-bulk-progress {
   font-family: var(--font-structural);
@@ -469,10 +453,9 @@
   color: var(--muted);
   margin: 0 0 var(--space-2);
 }
-/* Stop mirrors .obs-ruling-shelve's amber caution treatment (:409 above) --
-   both halt/pause an otherwise-destructive-reaching action mid-flight,
-   distinct from the green "commit" affordance .obs-ruling-bulk-agree
-   carries. */
+/* Stop takes the amber caution treatment -- it halts an
+   otherwise-destructive-reaching action mid-flight, distinct from the green
+   "commit" affordance .obs-ruling-bulk-agree carries. */
 .obs-ruling-bulk-stop {
   color: var(--amber);
   background: color-mix(in srgb, var(--amber) 12%, transparent);
@@ -490,8 +473,7 @@
    convention, public/style.css) — it is a real tappable action button, same
    as they are. The select-all affordance needs no bump of its own: it is a
    <label> wrapping the checkbox, so the whole label — not just the small
-   native checkbox — is already the tap target, the same zero-extra-CSS
-   shape `.obs-bulk-scan-select-all` (Scan-due) relies on. */
+   native checkbox — is already the tap target. */
 @media (max-width: 640px) {
   .obs-ruling-bulk-agree {
     padding: 0.5rem 0.7rem;
@@ -506,67 +488,6 @@
    more compactly. */
 @media (max-width: 400px) {
   .obs-ruling-bulk-select-all-text { display: none; }
-}
-
-.obs-ruling-shelve-panel {
-  display: flex;
-  flex-wrap: wrap;
-  align-items: center;
-  gap: 0.4rem;
-  margin-top: 0.4rem;
-  padding: var(--space-2);
-  border: 1px dashed var(--line);
-  border-radius: var(--radius-sm);
-}
-.obs-ruling-shelve-reason {
-  flex: 1 1 12rem;
-  padding: 0.3rem 0.5rem;
-  font-family: var(--font-structural);
-  font-size: 0.8rem;
-  color: var(--text);
-  background: var(--card);
-  border: 1px solid var(--line);
-  border-radius: var(--radius-sm);
-}
-.obs-ruling-shelve-duration {
-  font-family: var(--font-structural);
-  font-size: 0.8rem;
-  color: var(--text);
-  background: var(--card);
-  border: 1px solid var(--line);
-  border-radius: var(--radius-sm);
-  padding: 0.3rem 0.4rem;
-}
-.obs-ruling-shelve-confirm {
-  color: var(--amber);
-  background: color-mix(in srgb, var(--amber) 12%, transparent);
-}
-.obs-ruling-shelve-confirm:hover { background: color-mix(in srgb, var(--amber) 22%, transparent); }
-
-.obs-ruling-lapse-note {
-  color: var(--amber);
-  font-size: 0.8rem;
-  margin: 0.4rem 0 0;
-}
-
-/* LIN-2241 tier 1. Deliberately the MUTED foreground, not the amber the lapse
-   note above uses: a moved basis is an observation the operator may want, not a
-   warning that something is wrong, and spending the alert colour on it would
-   make the genuine escalation signals next to it read as less urgent. */
-.obs-ruling-stale-note {
-  color: var(--muted);
-  font-size: 0.8rem;
-  margin: 0.4rem 0 0;
-}
-
-/* The backstop disclaimer at the head of the rulings tab (LIN-2241 acceptance
-   criterion 5: the surface states its own limits). */
-.obs-rulings-limits {
-  color: var(--muted);
-  font-family: var(--font-content);
-  font-size: 0.78rem;
-  margin: 0 0 0.6rem;
-  max-width: 62ch;
 }
 
 .obs-session {
@@ -1262,126 +1183,6 @@ a.obs-task-ident:hover { text-decoration: underline; }
   100% { background: var(--raised); }
 }
 
-/* Scan-due tab (LIN-2649 S4 / LIN-2667). The backstop disclaimer + day-one
-   copy mirror .obs-rulings-limits' idiom (own wording, own mechanism). */
-.obs-due-limits, .obs-due-dayone {
-  color: var(--muted);
-  font-size: 0.78rem;
-  margin: 0 0 0.6rem;
-  max-width: 62ch;
-}
-.obs-due-dayone[hidden] { display: none; }
-.obs-due-cost-note {
-  color: var(--muted);
-  font-size: 0.75rem;
-  margin: 0 0 0.8rem;
-}
-.obs-due-progress {
-  font-family: var(--font-structural);
-  font-size: 0.78rem;
-  color: var(--muted);
-  margin: 0 0 var(--space-2);
-}
-.obs-due-row {
-  display: flex;
-  align-items: center;
-  gap: var(--space-2);
-  flex-wrap: wrap;
-  padding: 0.4rem 0;
-  border-bottom: 1px solid var(--line-soft);
-  font-size: 0.85rem;
-}
-.obs-due-issue { font-family: var(--font-structural); color: var(--text); }
-/* The provider-read badge is deliberately distinct from a scan button's own
-   affordance — the two costs (a due-check's provider read vs. a scan's LLM
-   call) must stay visually and mechanically separate. */
-.obs-due-badge {
-  font-family: var(--font-structural);
-  font-size: 0.7rem;
-  color: var(--muted);
-  border: 1px solid var(--line);
-  border-radius: var(--radius-sm);
-  padding: 0.05rem 0.4rem;
-}
-.obs-due-status { color: var(--muted); }
-.obs-due-row.obs-due-yes .obs-due-status { color: var(--amber); }
-.obs-due-row.obs-due-error .obs-due-status { color: var(--red-dim); }
-.obs-due-retry {
-  margin-left: auto;
-  padding: 0.15rem 0.6rem;
-  border: 1px solid var(--line);
-  border-radius: var(--radius-sm);
-  background: none;
-  font: inherit;
-  font-size: 0.75rem;
-  color: var(--muted);
-  cursor: pointer;
-}
-.obs-due-retry:hover { color: var(--text); border-color: var(--border-strong); }
-
-/* Bulk-scan bar (LIN-2706 §B.3/§B.10): select-all-loaded + exact count + cost
-   estimate. Same flex/gap idiom as .obs-due-row above -- the per-row
-   checkbox itself needs no rule of its own, since .obs-due-row already sets
-   display:flex/align-items:center/gap:0.5rem. Additive only -- no existing
-   due-tab rule above this line is touched. */
-.obs-bulk-scan-bar {
-  display: flex;
-  align-items: center;
-  gap: var(--space-2);
-  flex-wrap: wrap;
-  margin: 0 0 0.6rem;
-}
-/* [hidden] beats an author-origin `display` rule only when it is declared for
-   the exact selector carrying the attribute (the UA sheet's `[hidden] {
-   display: none }` loses to the flex rule above without this). Same idiom
-   this file already uses for .obs-archive-body/.obs-archive-more/
-   .obs-due-dayone above -- review finding 1 (LIN-2706 PR #1424): without
-   this line the bar rendered on an empty Scan-due tab despite carrying
-   `hidden`. */
-.obs-bulk-scan-bar[hidden] { display: none; }
-/* Machine-fact typographic convention (mirrors .obs-due-progress above): a
-   computed dollar figure is a machine fact, not prose. */
-.obs-bulk-scan-estimate {
-  font-family: var(--font-structural);
-  font-size: 0.78rem;
-  color: var(--muted);
-}
-/* The exact-count and refusal readouts share the same muted, small-print
-   treatment as the estimate above -- review finding 3 (LIN-2706 PR #1424):
-   left unstyled, the quota note (16px near-black) and these outshouted the
-   disclaimer they belong beside. */
-.obs-bulk-scan-count {
-  font-family: var(--font-structural);
-  font-size: 0.78rem;
-  color: var(--muted);
-}
-.obs-bulk-scan-refusal {
-  color: var(--muted);
-  font-size: 0.78rem;
-  max-width: 62ch;
-}
-/* The third due-tab disclaimer (LIN-2706 §B.9) -- same declarations as
-   .obs-rulings-limits / .obs-due-limits above. Its own class: the
-   no-shared-partial constraint governs markup/text reuse between the three
-   disclaimers, not that unrelated classes may declare identical CSS. */
-.obs-bulk-scan-limits {
-  color: var(--muted);
-  font-size: 0.78rem;
-  margin: 0 0 0.6rem;
-  max-width: 62ch;
-}
-/* The free-tier quota note (§B.9's conditional branch) -- same declarations
-   as .obs-bulk-scan-limits above. Its own class for the same no-shared-
-   *partial* reason .obs-bulk-scan-limits's own comment gives; review finding
-   3 flagged it as unstyled (16px/near-black/max-width:none), the single most
-   prominent block of copy on the tab. */
-.obs-bulk-scan-quota-note {
-  color: var(--muted);
-  font-size: 0.78rem;
-  margin: 0 0 0.6rem;
-  max-width: 62ch;
-}
-
 /* ─── Waiting block (LIN-3983) ────────────────────────────────────────────────
    What waits on you, above the runs feed. The strongest accent on the page: a
    waiting run is the one card that needs a person, so it is not the quietest.
@@ -1495,8 +1296,7 @@ a.obs-task-ident:hover { text-decoration: underline; }
 }
 .obs-ruling-bulk-confirm-no:hover { color: var(--text); }
 
-/* Retry delivery on a partial failure (the Rulings row's own control). Styled as
-   the Scan-due retry, the other place a person retries a failed step. */
+/* Retry delivery on a partial failure (the Rulings row's own control). */
 .obs-ruling-retry-delivery {
   border: 1px solid var(--border-strong);
   background: transparent;
@@ -1508,50 +1308,6 @@ a.obs-task-ident:hover { text-decoration: underline; }
 }
 .obs-ruling-retry-delivery:hover { background: color-mix(in srgb, var(--amber) 18%, transparent); }
 .obs-ruling-retry-delivery:disabled { opacity: 0.5; cursor: default; }
-
-/* Scan-due's own bulk controls: Scan selected and Stop. Scan selected is the
-   primary action of the bar; Stop is the quiet interruption beside it. */
-.obs-bulk-scan-run {
-  border: 1px solid var(--border-strong);
-  background: transparent;
-  color: var(--text);
-  border-radius: var(--radius-sm);
-  font-size: 0.82rem;
-  padding: var(--space-1) var(--space-2);
-  cursor: pointer;
-}
-.obs-bulk-scan-run:hover { background: color-mix(in srgb, var(--green) 18%, transparent); }
-.obs-bulk-scan-run:disabled { opacity: 0.5; cursor: default; }
-.obs-bulk-scan-stop {
-  border: 0;
-  background: transparent;
-  color: var(--amber);
-  font-size: 0.82rem;
-  padding: var(--space-1) var(--space-2);
-  cursor: pointer;
-  text-decoration: underline;
-}
-.obs-bulk-scan-stop[hidden] { display: none; }
-
-/* One result badge per settled bulk-scan outcome, painted into its due row. Each
-   names its outcome in words (the text carries the meaning, the colour adds to it). */
-.obs-bulk-result-failed,
-.obs-bulk-result-noop,
-.obs-bulk-result-decision,
-.obs-bulk-result-zero,
-.obs-bulk-result-quota,
-.obs-bulk-result-unavailable,
-.obs-bulk-result-cancelled {
-  display: inline-block;
-  font-family: var(--font-structural);
-  font-size: 0.72rem;
-  padding: 0 var(--space-1);
-  border-radius: var(--radius-sm);
-  border: 1px solid var(--line-soft);
-  color: var(--muted);
-}
-.obs-bulk-result-failed { color: var(--red); border-color: var(--red); }
-.obs-bulk-result-decision { color: var(--amber); border-color: var(--amber); }
 
 /* The run's own meta chips for a task budget and its ticket walk (the same
    muted, machine-fact face as the other meta). */
@@ -1565,11 +1321,6 @@ a.obs-task-ident:hover { text-decoration: underline; }
 /* A "ran …" duration in an error box, and a produced pull-request link. */
 .obs-error-rt { font-family: var(--font-structural); font-size: 0.78rem; color: var(--muted); }
 .obs-artifact-pr { color: var(--brand); }
-
-/* Scan-due's per-row outcome text: "not due" and "not checked yet" are quiet, as
-   "due" is amber (the row's own rule above). */
-.obs-due-row.obs-due-no .obs-due-status,
-.obs-due-row.obs-due-unknown .obs-due-status { color: var(--muted); }
 
 /* The workspace chips start hidden under This workspace; the author rule above would
    otherwise beat the attribute (LIN-3983 PR 2). */
@@ -1586,12 +1337,11 @@ a.obs-task-ident:hover { text-decoration: underline; }
 .obs-session-started { color: var(--muted); font-size: 0.82rem; }
 .obs-session-time time { color: inherit; }
 
-/* Phone (LIN-3983 PR 2): the answer, dismiss and shelve controls are at least 44px
+/* Phone (LIN-3983 PR 2): the answer and dismiss controls are at least 44px
    tall, so each is a real tap target. */
 @media (max-width: 640px) {
   .obs-ruling-answer-send,
   .obs-ruling-dismiss,
-  .obs-ruling-shelve,
   .obs-ruling-agree,
   .obs-ruling-keep,
   .obs-ruling-bulk-confirm-yes,

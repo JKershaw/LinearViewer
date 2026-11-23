@@ -316,13 +316,6 @@
       source: card.dataset.source || undefined,
       prompt: DISMISS_PROMPT
     };
-    // LIN-4140: a task-bound card dismisses on the scan route, addressed by the
-    // issue's UUID (data-issue-id), never by its identifier. Absent the scan
-    // attribute, dismissOpts is exactly what it was before.
-    if (card.dataset.taskDecisionId) {
-      dismissOpts.taskDecisionId = card.dataset.taskDecisionId;
-      dismissOpts.taskDecisionIssueId = card.dataset.issueId || '';
-    }
     window.ReplyDelivery.dismissRuling(dismissOpts, DISMISS_NOOP_HANDLERS).then(function () {
       delete card.dataset.answerInFlight;
       announceRulingGone(card, 'Dismissed');

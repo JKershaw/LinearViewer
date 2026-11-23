@@ -165,17 +165,18 @@ describe('HarbourCommentsStore.wereRecordedByHarbour — batch/set-membership re
     assert.deepStrictEqual(await store.wereRecordedByHarbour('acme', undefined), new Set());
   });
 
-  test('a strict read (the comment ingest, LIN-4535) throws on a fault where the default read answers an empty Set', async () => {
+  // LIN-4540: the comment ingest is the ledger's one reader since the scan's lenient due-ness read retired, so every read is
+  // the strict one LIN-4535 needed: an empty answer would read as "no comment is Harbour's".
+  test('a read that cannot be made throws, never answering an empty Set (the comment ingest, LIN-4535)', async () => {
     const failing = new HarbourCommentsStore({ collection: { find() { throw new Error('read fault'); } } });
-    assert.deepStrictEqual(await failing.wereRecordedByHarbour('acme', ['recorded-1']), new Set(), 'the default read stays lenient');
-    await assert.rejects(() => failing.wereRecordedByHarbour('acme', ['recorded-1'], { strict: true }), /read fault/);
-    await assert.rejects(() => new HarbourCommentsStore({}).wereRecordedByHarbour('acme', ['recorded-1'], { strict: true }), /no collection/);
-    assert.deepStrictEqual(await store.wereRecordedByHarbour('acme', ['recorded-1'], { strict: true }), new Set(['recorded-1']), 'a healthy strict read answers as usual');
+    await assert.rejects(() => failing.wereRecordedByHarbour('acme', ['recorded-1']), /read fault/);
+    await assert.rejects(() => new HarbourCommentsStore({}).wereRecordedByHarbour('acme', ['recorded-1']), /no collection/);
+    assert.deepStrictEqual(await store.wereRecordedByHarbour('acme', ['recorded-1']), new Set(['recorded-1']), 'a healthy read answers as usual');
   });
 
-  test('an unconfigured store degrades to an empty Set, never throws', async () => {
+  test('an unconfigured store with nothing to look up answers an empty Set without reading', async () => {
     const unconfigured = new HarbourCommentsStore({});
-    assert.deepStrictEqual(await unconfigured.wereRecordedByHarbour('acme', ['recorded-1']), new Set());
+    assert.deepStrictEqual(await unconfigured.wereRecordedByHarbour('acme', []), new Set());
   });
 
   test('queries the collection by `_id` using the `${urlKey}::${commentId}` composition, not a field-filter (LIN-2664 F1)', async () => {
@@ -215,7 +216,7 @@ describe('HarbourCommentsStore.wereRecordedByHarbour — the id || commentId pre
     assert.ok(result.has('linear-comment-id'));
   });
 
-  test('prefers `id` over `commentId` when both are present, matching scanBasisFromContext exactly', async () => {
+  test('prefers `id` over `commentId` when both are present, as resolveCommentId does', async () => {
     // Acceptance witness (mutation, since a direct pre-fix failure needs no
     // provider to emit both fields in practice): swapping the store's
     // `resolveCommentId` import for a bare `c => c?.commentId` (dropping the

@@ -391,7 +391,6 @@ describe('collectUnansweredDecisions (LIN-1728)', () => {
       stampLoopId: 'loop-a',
       disposition: 'resumable',
       canReply: true,
-      shelvedLapseCount: 0,
       effect: 'resume',
       declaredEffect: null,
       alternate: null
@@ -693,139 +692,7 @@ describe('canReplyFor via collectUnansweredDecisions — task-bound always admit
   });
 });
 
-// LIN-1727: shelve is a VIEW operation — a decision with an active shelf row
-// (resurfaceAt in the future) is excluded from the feed entirely; once it
-// passes, the (never-mutated) decision reappears like any other unanswered
-// one, carrying its lapse history.
-describe('collectUnansweredDecisions — shelving (LIN-1727)', () => {
-  function shelf(decisionId, overrides = {}) {
-    return { decisionId, urlKey: 'acme', reason: 'waiting on a stakeholder', shelvedAt: '2026-08-22T00:00:00.000Z', resurfaceAt: '2026-08-23T00:00:00.000Z', lapseCount: 0, ...overrides };
-  }
-
-  test('an actively-shelved loop-backed decision is excluded from the feed', () => {
-    const l = loop({ wakeMarker: 'blocked', decision: decision('d-1') });
-    const rows = collectUnansweredDecisions({ loops: [l], shelvedRulings: [shelf('d-1', { resurfaceAt: '2026-08-23T00:00:00.000Z' })] }, { now: NOW });
-    assert.deepStrictEqual(rows, []);
-  });
-
-  test('an actively-shelved task-bound decision is excluded from the feed', () => {
-    const t = taskDecision();
-    const rows = collectUnansweredDecisions({ taskDecisions: [t], shelvedRulings: [shelf(t.decision.decision_id, { resurfaceAt: '2026-08-23T00:00:00.000Z' })] }, { now: NOW });
-    assert.deepStrictEqual(rows, []);
-  });
-
-  test('a LAPSED shelf (resurfaceAt in the past) no longer excludes the row — it reappears, carrying shelvedLapseCount', () => {
-    const l = loop({ wakeMarker: 'blocked', decision: decision('d-1') });
-    const rows = collectUnansweredDecisions({ loops: [l], shelvedRulings: [shelf('d-1', { resurfaceAt: '2026-08-20T00:00:00.000Z', lapseCount: 2 })] }, { now: NOW });
-    assert.strictEqual(rows.length, 1);
-    assert.strictEqual(rows[0].shelvedLapseCount, 2);
-  });
-
-  test('a decision never shelved carries shelvedLapseCount: 0', () => {
-    const l = loop({ wakeMarker: 'blocked', decision: decision('d-1') });
-    const rows = collectUnansweredDecisions({ loops: [l] }, { now: NOW });
-    assert.strictEqual(rows[0].shelvedLapseCount, 0);
-  });
-
-  test('shelving one decision does not affect an unrelated one', () => {
-    const l1 = loop({ loopId: 'loop-1', wakeMarker: 'blocked', decision: decision('d-1') });
-    const l2 = loop({ loopId: 'loop-2', wakeMarker: 'blocked', decision: decision('d-2') });
-    const rows = collectUnansweredDecisions({ loops: [l1, l2], shelvedRulings: [shelf('d-1', { resurfaceAt: '2026-08-23T00:00:00.000Z' })] }, { now: NOW });
-    assert.strictEqual(rows.length, 1);
-    assert.strictEqual(rows[0].decision.decision_id, 'd-2');
-  });
-
-  test('a shelf row exactly at resurfaceAt (not strictly future) is treated as lapsed, not active', () => {
-    const l = loop({ wakeMarker: 'blocked', decision: decision('d-1') });
-    const rows = collectUnansweredDecisions({ loops: [l], shelvedRulings: [shelf('d-1', { resurfaceAt: NOW.toISOString() })] }, { now: NOW });
-    assert.strictEqual(rows.length, 1);
-  });
-
-  // LIN-2262: decision_id is agent-invented free text, not a UUID — two
-  // workspaces inventing the same short id is ordinary, not exotic. The
-  // shelf gate must key on (urlKey, decisionId), matching the store's own
-  // composite key, so shelving in one workspace cannot suppress an entirely
-  // unshelved decision in another that happens to share a decision_id.
-  test('shelving a decision in one workspace does not suppress the same decision_id, unshelved, in another workspace', () => {
-    const acme = loop({ loopId: 'loop-acme', workspaceUrlKey: 'acme', wakeMarker: 'blocked', decision: decision('proceed-or-abort') });
-    const globex = loop({ loopId: 'loop-globex', workspaceUrlKey: 'globex', wakeMarker: 'blocked', decision: decision('proceed-or-abort') });
-    const rows = collectUnansweredDecisions(
-      { loops: [acme, globex], shelvedRulings: [shelf('proceed-or-abort', { urlKey: 'acme', resurfaceAt: '2026-08-23T00:00:00.000Z' })] },
-      { now: NOW }
-    );
-    assert.strictEqual(rows.length, 1);
-    assert.strictEqual(rows[0].anchor.workspaceUrlKey, 'globex');
-  });
-
-  test('shelving a task-bound decision in one workspace does not suppress the same decision_id, unshelved, in another workspace', () => {
-    const acmeTask = taskDecision({ urlKey: 'acme', issueId: 'uuid-acme-task', decision: decision('proceed-or-abort') });
-    const globexTask = taskDecision({ urlKey: 'globex', issueId: 'uuid-globex-task', decision: decision('proceed-or-abort') });
-    const rows = collectUnansweredDecisions(
-      { taskDecisions: [acmeTask, globexTask], shelvedRulings: [shelf('proceed-or-abort', { urlKey: 'acme', resurfaceAt: '2026-08-23T00:00:00.000Z' })] },
-      { now: NOW }
-    );
-    assert.strictEqual(rows.length, 1);
-    assert.strictEqual(rows[0].anchor.workspaceUrlKey, 'globex');
-  });
-
-  // LIN-2756 — the ticket's live repro at the shelfGate layer: session
-  // `74869c9c`'s review loop `07509b1e` and close-out loop `0c912018` emit
-  // the SAME decision_id in the SAME workspace. A shelve on one loop's row
-  // must not suppress the other's — the same collision LIN-2293 already
-  // fixed across workspaces, one dimension over.
-  test('shelving one loop’s row does not suppress a DIFFERENT loop sharing the same decision_id in the same workspace', () => {
-    const reviewLoop = loop({ loopId: '07509b1e', wakeMarker: 'blocked', decision: decision('lin2384-f6-gate') });
-    const closeoutLoop = loop({ loopId: '0c912018', wakeMarker: 'blocked', decision: decision('lin2384-f6-gate') });
-    const rows = collectUnansweredDecisions(
-      {
-        loops: [reviewLoop, closeoutLoop],
-        shelvedRulings: [shelf('lin2384-f6-gate', { decisionLoopId: '07509b1e', resurfaceAt: '2026-08-23T00:00:00.000Z' })]
-      },
-      { now: NOW }
-    );
-    assert.strictEqual(rows.length, 1, 'only the review loop is shelved — the close-out loop must still surface');
-    assert.strictEqual(rows[0].anchor.loopId, '0c912018');
-  });
-
-  test('a legacy/workspace-wide shelf (no decisionLoopId) still suppresses every loop sharing the decision_id — documented back-compat', () => {
-    const reviewLoop = loop({ loopId: '07509b1e', wakeMarker: 'blocked', decision: decision('lin2384-f6-gate') });
-    const closeoutLoop = loop({ loopId: '0c912018', wakeMarker: 'blocked', decision: decision('lin2384-f6-gate') });
-    const rows = collectUnansweredDecisions(
-      { loops: [reviewLoop, closeoutLoop], shelvedRulings: [shelf('lin2384-f6-gate', { resurfaceAt: '2026-08-23T00:00:00.000Z' })] },
-      { now: NOW }
-    );
-    assert.deepStrictEqual(rows, [], 'a decisionLoopId-less shelf applies to every loop carrying the id, exactly as it did pre-LIN-2756');
-  });
-
-  // LIN-2756 re-review F4: shelfGate picks the loop-scoped shelf over the
-  // legacy one by PRESENCE, before checking either one's activeness —
-  // unlike attachStandingSuggestions (dismissal-suggestions-store.js), which
-  // resolves standing-vs-withdrawn first. This pins the CURRENT behaviour
-  // (a lapsed loop-scoped shelf wins over a still-active legacy one, so the
-  // row resurfaces) — it is not a statement that this is the intended
-  // product semantics; see the F4 follow-up ticket for that open question.
-  test('F4: a LAPSED loop-scoped shelf overrides a still-ACTIVE legacy one — shelfGate checks precedence before activeness', () => {
-    const l = loop({ loopId: '07509b1e', wakeMarker: 'blocked', decision: decision('d-1') });
-    const rows = collectUnansweredDecisions(
-      {
-        loops: [l],
-        shelvedRulings: [
-          shelf('d-1', { decisionLoopId: '07509b1e', resurfaceAt: '2026-08-20T00:00:00.000Z', lapseCount: 3 }), // this loop's own shelf, lapsed
-          shelf('d-1', { resurfaceAt: '2026-08-23T00:00:00.000Z' }) // legacy/workspace-wide, still active
-        ]
-      },
-      { now: NOW }
-    );
-    assert.strictEqual(rows.length, 1, "the row's own loop-scoped shelf wins precedence over the legacy one, and it has lapsed, so the row surfaces even though a still-active legacy shelf also exists");
-    assert.strictEqual(rows[0].shelvedLapseCount, 3, 'the lapse count comes from the loop-scoped shelf that actually won precedence');
-  });
-});
-
 describe('collectUnansweredDecisions — lineage grouping (LIN-2991/LIN-3022 §2)', () => {
-  function groupedShelf(decisionId, overrides = {}) {
-    return { decisionId, urlKey: 'acme', reason: 'waiting on a stakeholder', shelvedAt: '2026-08-22T00:00:00.000Z', resurfaceAt: '2026-08-23T00:00:00.000Z', lapseCount: 0, ...overrides };
-  }
-
   // D1 (the C1/D1/Revision-3 bug this plan exists to fix): a lineage where
   // one decision (x) was answered on one loop and a LATER, DIFFERENT
   // decision (y) was raised and answered on the lineage's other loop must
@@ -883,42 +750,6 @@ describe('collectUnansweredDecisions — lineage grouping (LIN-2991/LIN-3022 §2
     assert.ok(resolved[0].resolution, 'the surfaced row must carry its resolution');
     assert.strictEqual(resolved[0].resolution.decisionId, 'd-2985');
     assert.strictEqual(resolved[0].resolution.outcome, 'answered');
-  });
-
-  // LIN-2991 F2 (the parent review's follow-up finding, same class as the
-  // supersession gate above): a decision answered while an active loop-scoped
-  // shelf still covers it must not vanish from `includeResolved`, exactly the
-  // same reasoning as the content-loop-supersession fix — the shelf gate at
-  // `:549-550` ran for answered groups too, before this fix.
-  test('F2: an answered decision under an active loop-scoped shelf stays hidden by default, and includeResolved surfaces it', () => {
-    const root = loop({ loopId: 'root-shelf', wakeMarker: 'blocked', decision: decision('d-shelf'), answeredDecisions: answered('d-shelf') });
-    const shelvedRulings = [{
-      decisionId: 'd-shelf', urlKey: 'acme', decisionLoopId: 'root-shelf',
-      reason: 'waiting on a stakeholder', shelvedAt: '2026-08-22T00:00:00.000Z',
-      resurfaceAt: '2026-08-23T00:00:00.000Z', lapseCount: 0
-    }];
-
-    const dflt = collectUnansweredDecisions({ loops: [root], shelvedRulings }, { now: NOW });
-    assert.deepStrictEqual(dflt, [], 'the default (unanswered) read must still omit the answered group — the shelf exemption must not widen it');
-
-    const resolved = collectUnansweredDecisions({ loops: [root], shelvedRulings }, { now: NOW, includeResolved: true });
-    assert.strictEqual(resolved.length, 1, 'includeResolved must surface the row even though it is still under an active shelf');
-    assert.strictEqual(resolved[0].decision.decision_id, 'd-shelf');
-    assert.ok(resolved[0].resolution, 'the surfaced row must carry its resolution');
-    assert.strictEqual(resolved[0].resolution.outcome, 'answered');
-  });
-
-  // Control for F2: the shelf gate must still apply to an UNANSWERED group,
-  // with or without includeResolved — only an answered group bypasses it.
-  test('F2 control: an UNANSWERED decision under an active loop-scoped shelf stays hidden, even with includeResolved', () => {
-    const root = loop({ loopId: 'root-shelf-open', wakeMarker: 'blocked', decision: decision('d-shelf-open') });
-    const shelvedRulings = [{
-      decisionId: 'd-shelf-open', urlKey: 'acme', decisionLoopId: 'root-shelf-open',
-      reason: 'waiting on a stakeholder', shelvedAt: '2026-08-22T00:00:00.000Z',
-      resurfaceAt: '2026-08-23T00:00:00.000Z', lapseCount: 0
-    }];
-    assert.deepStrictEqual(collectUnansweredDecisions({ loops: [root], shelvedRulings }, { now: NOW }), []);
-    assert.deepStrictEqual(collectUnansweredDecisions({ loops: [root], shelvedRulings }, { now: NOW, includeResolved: true }), [], 'an open shelved ruling stays hidden under includeResolved too — only an answered group bypasses the shelf gate');
   });
 
   test('duplicate carriers (the live LIN-2996/LIN-3002 shape): 4 members raising the same decision in one lineage collapse into exactly one row, anchored on the root, stamped on the content loop', () => {
@@ -980,18 +811,6 @@ describe('collectUnansweredDecisions — lineage grouping (LIN-2991/LIN-3022 §2
     assert.strictEqual(rows[0].decision.decision_id, 'd-2');
   });
 
-  test('a shelve persists across a content-loop shift — it is keyed on group identity (the anchor), not on whichever member is currently latest', () => {
-    const root = loop({ loopId: 'root-5', wakeMarker: null, decision: null });
-    const member1 = loop({ loopId: 'member-1', lineageId: 'root-5', wakeMarker: 'blocked', decision: decision('d-1'), dispatchedAt: '2026-08-20T00:00:00.000Z' });
-    const shelvedRulings = [groupedShelf('d-1', { decisionLoopId: 'root-5', resurfaceAt: '2026-08-23T00:00:00.000Z' })];
-
-    let rows = collectUnansweredDecisions({ loops: [root, member1], shelvedRulings }, { now: NOW });
-    assert.deepStrictEqual(rows, [], 'shelved via the anchor (root) while member-1 is the (only, hence current) content loop');
-
-    const member2 = loop({ loopId: 'member-2', lineageId: 'root-5', wakeMarker: 'blocked', decision: decision('d-1'), dispatchedAt: '2026-08-21T00:00:00.000Z' });
-    rows = collectUnansweredDecisions({ loops: [root, member1, member2], shelvedRulings }, { now: NOW });
-    assert.deepStrictEqual(rows, [], 'the SAME shelf (keyed on the anchor/root, unchanged) still suppresses the row once the content loop shifts to member-2');
-  });
 });
 
 describe('collectUnansweredDecisions — withdrawal discharge (LIN-2891/LIN-3036 Surface 5, Choice C)', () => {
@@ -1126,29 +945,9 @@ describe('collectUnansweredDecisions — withdrawal discharge (LIN-2891/LIN-3036
     assert.strictEqual(rows[0].resolution.outcome, 'withdrawn');
   });
 
-  // Resolved exemption, shelf leg: a withdrawn group under an active
-  // loop-scoped shelf stays hidden by default and surfaces under
-  // includeResolved — mirroring the F2 answered-group exemption.
-  test('resolved exemption: a withdrawn group under an active loop-scoped shelf surfaces under includeResolved', () => {
-    const l = loop({
-      loopId: 'root-shelf-w', wakeMarker: 'blocked', decision: decision('d-shelf-w'),
-      withdrawal: withdrawal('d-shelf-w', { reason: 'retracted' })
-    });
-    const shelvedRulings = [{
-      decisionId: 'd-shelf-w', urlKey: 'acme', decisionLoopId: 'root-shelf-w',
-      reason: 'waiting on a stakeholder', shelvedAt: '2026-08-22T00:00:00.000Z',
-      resurfaceAt: '2026-08-23T00:00:00.000Z', lapseCount: 0
-    }];
-
-    assert.deepStrictEqual(collectUnansweredDecisions({ loops: [l], shelvedRulings }, { now: NOW }), []);
-
-    const rows = collectUnansweredDecisions({ loops: [l], shelvedRulings }, { now: NOW, includeResolved: true });
-    assert.strictEqual(rows.length, 1, 'the shelf gate must exempt a withdrawn group exactly as it exempts an answered one');
-    assert.strictEqual(rows[0].resolution.outcome, 'withdrawn');
-  });
 });
 
-describe('buildRulingRef (LIN-3021: extracted from the inline shelfByKey/shelfGate + dismissal-suggestions-store key construction)', () => {
+describe('buildRulingRef (LIN-3021: extracted from the inline ruling-key + dismissal-suggestions-store key construction)', () => {
   test('loop-only (urlKey + loopId + decisionId) → 3-part loop ref', () => {
     assert.strictEqual(
       buildRulingRef({ urlKey: 'acme', loopId: 'loop-1', decisionId: 'd-1' }),
@@ -1245,9 +1044,8 @@ describe('collectUnansweredDecisions — worker/autopilot join (LIN-3959)', () =
     });
   }
 
-  // `shelvedRulings` is an input field; `includeResolved` is an option.
-  const rowsFor = (loops, { includeResolved = false, shelvedRulings = [] } = {}) =>
-    collectUnansweredDecisions({ loops, shelvedRulings }, { now: NOW, includeResolved });
+  const rowsFor = (loops, { includeResolved = false } = {}) =>
+    collectUnansweredDecisions({ loops }, { now: NOW, includeResolved });
   // Asserts exactly one row, then returns it: a destructured [row] alone passes on two rows.
   const oneRow = (loops, opts = {}) => {
     const rows = rowsFor(loops, opts);
@@ -1418,22 +1216,6 @@ describe('collectUnansweredDecisions — worker/autopilot join (LIN-3959)', () =
     assert.deepStrictEqual(rowsFor(loops), []);
     const row = oneRow(loops, { includeResolved: true });
     assert.strictEqual(row.resolution.outcome, 'withdrawn');
-  });
-
-  test('a shelf on the worker anchor hides the joined row', () => {
-    const shelvedRulings = [{ urlKey: 'acme', decisionId: 'd-1', decisionLoopId: 'wk-1', resurfaceAt: new Date(NOW.getTime() + 3600000).toISOString(), lapseCount: 0 }];
-    assert.deepStrictEqual(rowsFor([autopilot(), worker()], { shelvedRulings }), []);
-  });
-
-  test('a shelf on the autopilot anchor hides the joined row, even though the worker is the chosen side', () => {
-    const shelvedRulings = [{ urlKey: 'acme', decisionId: 'd-1', decisionLoopId: 'ap-1', resurfaceAt: new Date(NOW.getTime() + 3600000).toISOString(), lapseCount: 0 }];
-    assert.deepStrictEqual(rowsFor([autopilot(), worker()], { shelvedRulings }), []);
-  });
-
-  test('a lapsed shelf on the chosen anchor returns the joined row with its lapse count', () => {
-    const shelvedRulings = [{ urlKey: 'acme', decisionId: 'd-1', decisionLoopId: 'wk-1', resurfaceAt: new Date(NOW.getTime() - 3600000).toISOString(), lapseCount: 2 }];
-    const row = oneRow([autopilot(), worker()], { shelvedRulings });
-    assert.strictEqual(row.shelvedLapseCount, 2);
   });
 
   test('a superseded worker is dropped as a candidate; the autopilot side still carries the row', () => {

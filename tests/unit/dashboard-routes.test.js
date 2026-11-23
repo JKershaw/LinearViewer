@@ -1248,9 +1248,9 @@ describe('POST /api/dashboard/rulings/answer (LIN-2754 Track B)', () => {
   });
 });
 
-describe('POST /api/dashboard/rulings/shelve (LIN-1727)', () => {
-  function makeShelveRouter(shelvedRulingsStoreOverrides) {
-    return createDashboardRoutes({
+describe('POST /api/dashboard/rulings/shelve is gone (LIN-4540: shelving retired)', () => {
+  test('the rulings router registers no shelve route', () => {
+    const router = createDashboardRoutes({
       workspaceFromUrl: (req, res, next) => next(),
       dispatchQueueStore: { async listItems() { return []; }, async listHistory() { return { items: [] }; } },
       agentStatusStore: { async listStatus() { return { items: [] }; } },
@@ -1259,123 +1259,12 @@ describe('POST /api/dashboard/rulings/shelve (LIN-1727)', () => {
       getWorkspaceAccessToken: async () => 'token',
       fetchIssueContext: async () => ({}),
       getOpenRouterSource: () => 'env',
-      getDeployInfo: () => ({}),
-      shelvedRulingsStore: shelvedRulingsStoreOverrides
+      getDeployInfo: () => ({})
     });
-  }
-
-  test('shelves on the ruling\'s own workspace and returns the stored record', async () => {
-    const calls = [];
-    const router = makeShelveRouter({
-      async shelve({ urlKey, decisionId, reason, resurfaceInMs }) {
-        calls.push({ urlKey, decisionId, reason, resurfaceInMs });
-        return { urlKey, decisionId, reason, resurfaceAt: '2026-08-24T00:00:00.000Z', shelvedAt: '2026-08-23T00:00:00.000Z', lapseCount: 0 };
-      }
-    });
-    const handler = getHandler(router, 'post', '/workspace/:urlKey/api/dashboard/rulings/shelve');
-    const { req, res } = makeReqRes({ workspace: { urlKey: 'ws-a' } });
-    req.body = { decisionId: 'd-1', reason: 'waiting on legal', resurfaceInMs: 24 * 60 * 60 * 1000 };
-    await handler(req, res);
-
-    assert.equal(res.statusCode, 200);
-    assert.equal(res.jsonBody.success, true);
-    assert.equal(res.jsonBody.shelf.decisionId, 'd-1');
-    assert.equal(calls.length, 1);
-    assert.deepEqual(calls[0], { urlKey: 'ws-a', decisionId: 'd-1', reason: 'waiting on legal', resurfaceInMs: 24 * 60 * 60 * 1000 });
-  });
-
-  // LIN-2756: forwarded through to the store when the client sends it
-  // (public/observation.js's shelveRulingRow now always does), so the shelf's
-  // composite key can agree with the same row's client-side rulingKey.
-  test('LIN-2756: forwards decisionLoopId to the store when present', async () => {
-    const calls = [];
-    const router = makeShelveRouter({
-      async shelve(args) { calls.push(args); return { ...args, resurfaceAt: '2026-08-24T00:00:00.000Z', shelvedAt: '2026-08-23T00:00:00.000Z', lapseCount: 0 }; }
-    });
-    const handler = getHandler(router, 'post', '/workspace/:urlKey/api/dashboard/rulings/shelve');
-    const { req, res } = makeReqRes({ workspace: { urlKey: 'ws-a' } });
-    req.body = { decisionId: 'lin2384-f6-gate', decisionLoopId: '07509b1e', reason: 'waiting on legal', resurfaceInMs: 24 * 60 * 60 * 1000 };
-    await handler(req, res);
-    assert.equal(res.statusCode, 200);
-    assert.equal(calls[0].decisionLoopId, '07509b1e');
-  });
-
-  test('LIN-2756: an empty-string decisionLoopId is refused as a bad type, not silently omitted', async () => {
-    const router = makeShelveRouter({ async shelve() { return {}; } });
-    const handler = getHandler(router, 'post', '/workspace/:urlKey/api/dashboard/rulings/shelve');
-    const { req, res } = makeReqRes({ workspace: { urlKey: 'ws-a' } });
-    req.body = { decisionId: 'd-1', decisionLoopId: '', reason: 'x', resurfaceInMs: 60 * 60 * 1000 };
-    await handler(req, res);
-    assert.equal(res.statusCode, 400);
-  });
-
-  test('400 when decisionId is missing', async () => {
-    const router = makeShelveRouter({ async shelve() { return {}; } });
-    const handler = getHandler(router, 'post', '/workspace/:urlKey/api/dashboard/rulings/shelve');
-    const { req, res } = makeReqRes({ workspace: { urlKey: 'ws-a' } });
-    req.body = { reason: 'x', resurfaceInMs: 60 * 60 * 1000 };
-    await handler(req, res);
-    assert.equal(res.statusCode, 400);
-  });
-
-  test('400 when reason is missing or blank — silent muting is forbidden', async () => {
-    let called = false;
-    const router = makeShelveRouter({ async shelve() { called = true; return {}; } });
-    const handler = getHandler(router, 'post', '/workspace/:urlKey/api/dashboard/rulings/shelve');
-
-    const missing = makeReqRes({ workspace: { urlKey: 'ws-a' } });
-    missing.req.body = { decisionId: 'd-1', resurfaceInMs: 60 * 60 * 1000 };
-    await handler(missing.req, missing.res);
-    assert.equal(missing.res.statusCode, 400);
-
-    const blank = makeReqRes({ workspace: { urlKey: 'ws-a' } });
-    blank.req.body = { decisionId: 'd-1', reason: '   ', resurfaceInMs: 60 * 60 * 1000 };
-    await handler(blank.req, blank.res);
-    assert.equal(blank.res.statusCode, 400);
-
-    assert.equal(called, false);
-  });
-
-  test('400 when resurfaceInMs is missing, non-numeric, or outside [5min, 30days]', async () => {
-    const router = makeShelveRouter({ async shelve() { return {}; } });
-    const handler = getHandler(router, 'post', '/workspace/:urlKey/api/dashboard/rulings/shelve');
-
-    for (const bad of [undefined, 'nope', 1000, 31 * 24 * 60 * 60 * 1000]) {
-      const { req, res } = makeReqRes({ workspace: { urlKey: 'ws-a' } });
-      req.body = { decisionId: 'd-1', reason: 'x', resurfaceInMs: bad };
-      await handler(req, res);
-      assert.equal(res.statusCode, 400, `expected 400 for resurfaceInMs=${bad}`);
-    }
-  });
-
-  test('503 when no shelvedRulingsStore is configured', async () => {
-    const router = makeShelveRouter(null);
-    const handler = getHandler(router, 'post', '/workspace/:urlKey/api/dashboard/rulings/shelve');
-    const { req, res } = makeReqRes({ workspace: { urlKey: 'ws-a' } });
-    req.body = { decisionId: 'd-1', reason: 'x', resurfaceInMs: 60 * 60 * 1000 };
-    await handler(req, res);
-    assert.equal(res.statusCode, 503);
-  });
-
-  test('500 when the store returns null (failed to shelve)', async () => {
-    const router = makeShelveRouter({ async shelve() { return null; } });
-    const handler = getHandler(router, 'post', '/workspace/:urlKey/api/dashboard/rulings/shelve');
-    const { req, res } = makeReqRes({ workspace: { urlKey: 'ws-a' } });
-    req.body = { decisionId: 'd-1', reason: 'x', resurfaceInMs: 60 * 60 * 1000 };
-    await handler(req, res);
-    assert.equal(res.statusCode, 500);
-  });
-
-  test('500 when the store throws, never propagates the raw error', async () => {
-    const router = makeShelveRouter({ async shelve() { throw new Error('store down'); } });
-    const handler = getHandler(router, 'post', '/workspace/:urlKey/api/dashboard/rulings/shelve');
-    const { req, res } = makeReqRes({ workspace: { urlKey: 'ws-a' } });
-    req.body = { decisionId: 'd-1', reason: 'x', resurfaceInMs: 60 * 60 * 1000 };
-    await handler(req, res);
-    assert.equal(res.statusCode, 500);
+    assert.throws(() => findRouteLayer(router, 'post', '/workspace/:urlKey/api/dashboard/rulings/shelve'));
+    assert.ok(findRouteLayer(router, 'post', '/workspace/:urlKey/api/dashboard/rulings/dismiss'), 'the dismiss route stays');
   });
 });
-
 // ─── Escalation KPIs — operator-facing audit page (LIN-1736) ─────────────────
 
 describe('GET /api/escalation-kpis (LIN-1736; question records, LIN-4538)', () => {
@@ -5048,8 +4937,8 @@ describe('POST /api/dashboard/rulings/keep — real store, crossed with GET ruli
   });
 });
 
-describe('GET /workspace/:urlKey/observation — scan cost estimate wiring + async try/catch (LIN-2706 §B.1)', () => {
-  function makeObservationRouter({ llmCallLogStore, renderObservationPage } = {}) {
+describe('GET /workspace/:urlKey/observation — async try/catch (LIN-2706 §B.1; the scan estimate retired with the scan, LIN-4540)', () => {
+  function makeObservationRouter({ renderObservationPage } = {}) {
     const { dispatchQueueStore, agentStatusStore } = makeStores({});
     return createDashboardRoutes({
       workspaceFromUrl: (req, res, next) => next(),
@@ -5063,12 +4952,11 @@ describe('GET /workspace/:urlKey/observation — scan cost estimate wiring + asy
       fetchWorkspaceIssues: async () => [],
       getOpenRouterSource: () => 'env',
       getDeployInfo: () => ({}),
-      llmCallLogStore: llmCallLogStore || null,
       ...(renderObservationPage ? { renderObservationPage } : {})
     });
   }
 
-  test('llmCallLogStore absent (default null): the page still renders, degrading the estimate rather than throwing', async () => {
+  test('the page renders, and its embedded data carries no scan estimate (LIN-4540)', async () => {
     const router = makeObservationRouter();
     const handler = getHandler(router, 'get', '/workspace/:urlKey/observation');
     const { req, res } = makeReqRes({
@@ -5078,44 +4966,8 @@ describe('GET /workspace/:urlKey/observation — scan cost estimate wiring + asy
     await handler(req, res);
 
     assert.equal(res.statusCode, 200);
-    assert.ok(embeddedDataText(res.sentBody, '__OBSERVATION_DATA__') !== null);
     const data = extractEmbeddedData(res.sentBody, '__OBSERVATION_DATA__');
-    assert.ok('scanCostEstimate' in data, 'scanCostEstimate key is present in the embedded data');
-    assert.strictEqual(data.scanCostEstimate, null, 'an unwired store degrades to null (renders as "unknown"), never a fabricated number');
-  });
-
-  test('llmCallLogStore.listInHorizon rejects: the page still renders with unknown:true, never $0.00', async () => {
-    const llmCallLogStore = { async listInHorizon() { throw new Error('boom'); } };
-    const router = makeObservationRouter({ llmCallLogStore });
-    const handler = getHandler(router, 'get', '/workspace/:urlKey/observation');
-    const { req, res } = makeReqRes({
-      session: { workspaces: [{ urlKey: 'ws-a', name: 'Alpha' }] },
-      workspace: { urlKey: 'ws-a', name: 'Alpha' }
-    });
-    await handler(req, res);
-
-    assert.equal(res.statusCode, 200);
-    const data = extractEmbeddedData(res.sentBody, '__OBSERVATION_DATA__');
-    assert.ok('scanCostEstimate' in data, 'scanCostEstimate key is present in the embedded data');
-    assert.strictEqual(data.scanCostEstimate, null, 'the retained .catch(() => null) degrades a rejected read to null, rendered client-side as "unknown"');
-  });
-
-  test('llmCallLogStore.listInHorizon resolves: the scan estimate is the scan feature\'s typical call (LIN-4179)', async () => {
-    // Four priced scan calls at $0.05 and one call of another feature, which the scan estimate must not read.
-    const scan = { feature: 'scan', model: 'm', cost: 0.05 };
-    const estimate = { calls: 4, pricedCalls: 4, meanUsd: 0.05, unknown: false };
-    const llmCallLogStore = { async listInHorizon(urlKey, filters) { assert.equal(filters.feature, 'scan'); return [scan, scan, scan, scan]; } };
-    const router = makeObservationRouter({ llmCallLogStore });
-    const handler = getHandler(router, 'get', '/workspace/:urlKey/observation');
-    const { req, res } = makeReqRes({
-      session: { workspaces: [{ urlKey: 'ws-a', name: 'Alpha' }] },
-      workspace: { urlKey: 'ws-a', name: 'Alpha' }
-    });
-    await handler(req, res);
-
-    assert.equal(res.statusCode, 200);
-    const data = extractEmbeddedData(res.sentBody, '__OBSERVATION_DATA__');
-    assert.deepEqual(data.scanCostEstimate, estimate);
+    assert.ok(!('scanCostEstimate' in data), 'the Scan-due tab and its estimate are gone');
   });
 
   test('a throwing renderObservationPage (stubbed) yields a 500 rather than a hung request (F1)', async () => {
@@ -5267,15 +5119,15 @@ describe('GET /api/dashboard/hydrate/:wsUrlKey/:identifier — widened neighborh
 // Only `dashboard.js:1587` (dismiss) writes into data this cache actually
 // HOLDS: `mergeLoops` reconstructs loop/decision state from
 // `dispatchQueueStore`, which `markDecisionAnswered` mutates. `answer`
-// (task-bound), `shelve` and `keep` write to `taskDecisionsStore` /
-// `shelvedRulingsStore` / `dismissalSuggestionsStore`, all three read LIVE on
+// (task-bound) and `keep` write to `taskDecisionsStore` /
+// `dismissalSuggestionsStore`, both read LIVE on
 // every request — dashboard.js's own comment on the additive reads says so
 // plainly ("no second caching layer is introduced here"), and beat 1's sweep
 // independently confirmed it against the ticket's own measured incident
 // (task-bound rows were never stale — only the loop-backed rows were). So
 // dismiss alone gets the stronger STALE-ROW witness (2) below — a seeded row
 // actually disappearing from the response, not just a re-read; the other
-// three get invalidation+bound only, which is what proves the ticket's
+// two get invalidation+bound only (shelve went with LIN-4540), which is what proves the ticket's
 // uniform "clear after every write" Proposal without asserting a staleness
 // bug that cannot exist for them.
 describe('LIN-2755: ruling-write cache invalidation (RED until beat 3)', () => {
@@ -5472,37 +5324,6 @@ describe('LIN-2755: ruling-write cache invalidation (RED until beat 3)', () => {
     });
   }
 
-  test('shelve (dashboard.js:1697) invalidates the rulings cache — witness 1+3', async () => {
-    const { store, reads } = countingHistoryStore(() => []);
-    const router = createDashboardRoutes({
-      workspaceFromUrl: (req, res, next) => next(),
-      dispatchQueueStore: store,
-      agentStatusStore: { async listStatus() { return { items: [] }; } },
-      runSummaryCacheStore: new InMemoryRunSummaryCacheStore(),
-      freeTierStore: { async tryUse() { return { allowed: true }; } },
-      getWorkspaceAccessToken: async () => 'token',
-      fetchIssueContext: async () => ({}),
-      getOpenRouterSource: () => 'env',
-      getDeployInfo: () => ({}),
-      sessionsFeedCache: createSessionsFeedCache(),
-      shelvedRulingsStore: {
-        async listForWorkspaces() { return []; },
-        async shelve({ urlKey, decisionId, reason, resurfaceInMs }) {
-          return { urlKey, decisionId, reason, resurfaceAt: new Date(Date.now() + resurfaceInMs).toISOString(), shelvedAt: new Date().toISOString(), lapseCount: 0 };
-        }
-      }
-    });
-    await assertInvalidatesAndBounded({
-      router, historyReads: reads,
-      doWrite: async () => {
-        const shelve = getHandler(router, 'post', '/workspace/:urlKey/api/dashboard/rulings/shelve');
-        const { req, res } = makeReqRes({ workspace: { urlKey: 'ws-a' } });
-        req.body = { decisionId: 'd-1', reason: 'waiting on legal', resurfaceInMs: 24 * 60 * 60 * 1000 };
-        await shelve(req, res);
-        assert.equal(res.statusCode, 200);
-      }
-    });
-  });
 
   test('keep (dashboard.js:1739) invalidates the rulings cache — witness 1+3', async () => {
     const { store, reads } = countingHistoryStore(() => []);

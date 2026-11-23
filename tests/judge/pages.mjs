@@ -157,14 +157,13 @@ export const PAGES = [
   // LIN-3983 PR 2: Observation. `obs-two-runs` seeds one run waiting on a question and one working run (on the
   // own urlKey per entry: the seed is once per worker process, so two entries sharing a key can seed twice and the dispatch guard refuses the second;
   // real clock, so the times are masked). The Runs view shows the waiting block above the feed; the Rulings tab
-  // lists the same question with its proposal; Scan-due and a new user (nothing running) use the seeded local
-  // workspace with no runs of its own. The two tabs and the default view each name their own state in the list.
+  // lists the same question with its proposal; a new user (nothing running) uses the seeded local workspace with no
+  // runs of its own. The tab and the default view each name their own state in the list.
   { id: 'observation-runs', urlKey: 'judge-obs-runs', path: (k) => `/workspace/${k}/observation`, state: 'obs-two-runs', masks: OBS_TIMES, renderers: ['lib/render-observation.js'] },
   // The default filter (autopilot) hides the standalone working run, so its card and pill never reach the default shot.
   // The all-runs filter shows both cards, so a change to the pill words has somewhere to show.
   { id: 'observation-runs-all', urlKey: 'judge-obs-runs-all', path: (k) => `/workspace/${k}/observation?filter=all`, state: 'obs-two-runs', masks: OBS_TIMES, renderers: ['lib/render-observation.js'] },
   { id: 'observation-rulings', urlKey: 'judge-obs-rulings', path: (k) => `/workspace/${k}/observation?view=rulings`, state: 'obs-two-runs', masks: OBS_RULING_TIMES, renderers: ['lib/render-observation.js'] },
-  { id: 'observation-due', urlKey: 'judge', path: (k) => `/workspace/${k}/observation?view=due`, renderers: ['lib/render-observation.js'] },
   { id: 'observation-new-user', urlKey: 'judge', path: (k) => `/workspace/${k}/observation`, renderers: ['lib/render-observation.js'] },
   // LIN-3983 PR 2: the three pages that still load observation.css (Live Console no longer does). Each is behind its
   // experimental flag, so the seed turns the flag on. Their renderers are listed so a change to observation.css is

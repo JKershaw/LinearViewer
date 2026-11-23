@@ -627,17 +627,16 @@ test.describe('Sessions tab — in-flight standalone sessions (LIN-1194)', () =>
     return item;
   }
 
-  test('three view tabs render, Runs active by default, with the autopilot filter on (LIN-3983)', async ({ page }) => {
+  test('two view tabs render, Runs active by default, with the autopilot filter on (LIN-3983)', async ({ page }) => {
     await page.goto(`/test/set-session?urlKey=${URL_KEY}`);
     await page.goto(OBSERVATION_URL);
     await page.waitForLoadState('networkidle');
-    // Rulings (LIN-1728 Phase 4) and Scan-due (LIN-2667) keep their own coverage;
-    // this file's invariant is the strip's shape and the default selection. The
-    // old Autopilot and Sessions tabs are now the runs filter.
-    await expect(page.locator('[data-testid^="obs-tab-"]')).toHaveCount(3);
+    // Rulings (LIN-1728 Phase 4) keeps its own coverage; this file's invariant
+    // is the strip's shape and the default selection. The old Autopilot and
+    // Sessions tabs are now the runs filter.
+    await expect(page.locator('[data-testid^="obs-tab-"]')).toHaveCount(2);
     await expect(page.getByTestId('obs-tab-runs')).toHaveClass(/is-active/);
     await expect(page.getByTestId('obs-tab-rulings')).not.toHaveClass(/is-active/);
-    await expect(page.getByTestId('obs-tab-due')).not.toHaveClass(/is-active/);
     await expect(page.getByTestId('obs-filter-autopilot')).toHaveAttribute('aria-pressed', 'true');
   });
 
@@ -876,17 +875,5 @@ test.describe('LIN-3983: a run card keeps its id and title whole at phone width'
       const fits = await el.evaluate(node => node.scrollWidth <= node.clientWidth);
       expect(fits, `${await el.textContent()} is not truncated at 390px`).toBe(true);
     }
-  });
-
-  // Review finding B: the Rulings disclaimer inherited the structural (mono) face from
-  // the page body. It is a human sentence, so it takes the content (sans) face.
-  test('the Rulings disclaimer is set in the content face, not mono', async ({ page }) => {
-    await page.goto(`/test/set-session?urlKey=${URL_KEY}`);
-    await page.goto(`${OBSERVATION_URL}?view=rulings`);
-    await page.waitForLoadState('networkidle');
-
-    const fontFamily = await page.locator('#obs-rulings-limits').evaluate(node => getComputedStyle(node).fontFamily);
-    expect(fontFamily).toContain('Inter');
-    expect(fontFamily).not.toContain('JetBrains Mono');
   });
 });

@@ -29,12 +29,11 @@
  * Loaded only on the /observation page. Requires common.js (escapeHtml, window.api,
  * relativeTime).
  *
- * A native ES module (LIN-4463 piece 4): it imports the shared formatter and the duration leaf from /lib/ by a relative
- * specifier, and its test seams are named exports. A module runs after every classic script on the page, so the
+ * A native ES module (LIN-4463 piece 4): it imports the duration leaf and the question-record card from /lib/ by a
+ * relative specifier, and its test seams are named exports. A module runs after every classic script on the page, so the
  * common.js globals it reads are in place before its DOMContentLoaded listener (`init`) runs.
  */
 
-import { formatUsd } from '../lib/cost-format.js';
 import { fmtDuration } from '../lib/time-words.js';
 import { renderQuestionRecordCard } from '../lib/question-record-card.js';
 
@@ -84,12 +83,12 @@ let archiveOpen = false;
 // Active view (LIN-1194, LIN-1728, LIN-3983): 'runs' (the one feed of runs,
 // narrowed by `currentFilter`), 'rulings' (LIN-1728 Phase 4 — unanswered
 // decisions, a different payload shape entirely, polled from a different
-// endpoint) or 'due' (scan-due checks, one-shot). LIN-3983 folded the old
+// endpoint). LIN-3983 folded the old
 // Autopilot and Sessions tabs into 'runs' and a filter; `?view=autopilot` and
 // `?view=sessions` still load (viewFromParams). The tab is a pure in-page
 // switch: it flips the poll endpoint, and resets the feed state so the views'
 // distinct data sets never bleed together.
-const VIEWS = ['runs', 'rulings', 'due'];
+const VIEWS = ['runs', 'rulings'];
 // Which runs the feed shows (LIN-3983). 'autopilot' is the default and reads the
 // cheap materialized feed; 'standalone' and 'all' read the sessions source
 // (`?view=sessions`, live) and filter on each session's `standalone` flag.
@@ -154,14 +153,13 @@ let supplementId = null;
 // uses, so an anchor-less row degrades to "always rebuilt, never
 // selectable/reusable" rather than silently colliding with anything.
 //
-// The server side (lib/unanswered-decisions.js's shelfGate,
-// lib/dismissal-suggestions-store.js's attachStandingSuggestions/withdraw,
-// lib/shelved-rulings-store.js's own `_id`) keys on the SAME triple, with a
-// deliberate two-tier fallback: a loop-scoped suggest/shelve/keep addresses
+// The server side (lib/dismissal-suggestions-store.js's
+// attachStandingSuggestions/withdraw) keys on the SAME triple, with a
+// deliberate two-tier fallback: a loop-scoped suggest/keep addresses
 // exactly this row's `${urlKey}::${loopKey}::${decisionId}` document, while a
 // `decisionLoopId`-omitted write keeps the legacy, workspace-wide
-// `${urlKey}::${decisionId}` shape — documented back-compat for suggestion/
-// shelf documents written before this ticket, or by a caller that hasn't
+// `${urlKey}::${decisionId}` shape — documented back-compat for suggestion
+// documents written before this ticket, or by a caller that hasn't
 // upgraded (e.g. routes/proxy-rulings.js's decisionLoopId-optional
 // suggest-dismissal route). A legacy document therefore still fans out to
 // every loop sharing that decisionId, and `withdraw()` shares the SAME
@@ -204,16 +202,15 @@ const renderedRulingRows = new Map();
 // fresh-render branch, precisely because mustReuse skips renderRulingRow —
 // and with it any staleness check written only inside it — entirely for
 // pending/preserved/settled rows; `8feb02c7`/LIN-2262 fixed this exact class
-// of bug once already in the shelf-gate keying); and, same as every other
+// of bug once already in the server's per-loop ruling keying); and, same as every other
 // per-key map here, in the `seen` sweep once a key's row has genuinely left
 // the feed.
 const rulingEffectOverride = new Map();
 
 // ─── Bulk-agree selection (LIN-2444 Phase 5) ────────────────────────────────
 //
-// `rulingsSelected` is a module `Set` keyed `rulingKey(urlKey, anchor, decisionId)` —
-// mirrors the established `dueSelectedIds` discipline (below) for the SAME
-// reason: `renderRulings` rebuilds/reuses each <li> every 5s poll, so
+// `rulingsSelected` is a module `Set` keyed `rulingKey(urlKey, anchor, decisionId)`
+// because `renderRulings` rebuilds/reuses each <li> every 5s poll, so
 // checkbox DOM state can never be the source of truth, only a reflection of
 // this Set. A bare `decision_id` is not enough here either — the same
 // cross-workspace collision `rulingKey` exists to prevent (LIN-2293, see the
@@ -230,7 +227,7 @@ let rulingsBulkRunning = false;
 let rulingsBulkStopRequested = false;
 // A key moves here the instant its Agree succeeds — a single-click press
 // (review F2) or a row's turn inside a bulk batch (never a plain
-// Dismiss/Shelve/Keep — the plan's scope note keeps those untouched). This is
+// Dismiss/Keep — the plan's scope note keeps those untouched). This is
 // the plan-review finding's fix, and per the plan's own Phase 5 wording it
 // applies to "the Agree path" as a whole, not only bulk: a succeeded
 // loop-backed row is served from the stale feed cache for TTL + two reads, so
@@ -287,38 +284,6 @@ let archiveTotal = 0;                       // server-reported full archive size
 let archiveOffset = ARCHIVE_PAGE_SIZE;      // next offset to request via load-more
 let archiveLoading = false;
 const loadedArchiveIds = new Set();         // sessionIds pulled in via load-more
-
-// Scan-due tab state (LIN-2649 S4 / LIN-2667). On-demand only — the fetch
-// that fills these is NEVER driven by pollCurrentView's timer/visibility
-// dispatch (see the [F-1] early return in pollCurrentView below); it is
-// driven directly by switchView's `due` branch and the "load more" click
-// handler, both calling the same loadInitialDueCheckPage/loadMoreDueChecks.
-let dueNextCursor = null;       // opaque cursor string the route emits verbatim; null = no more pages
-let dueLoading = false;
-let dueCheckedCount = 0;        // cumulative rows rendered across every loaded page
-let dueTotalCandidateCount = 0; // the route's own totalCandidateCount field
-
-// Scan-due SELECTION state (LIN-2706 §B.2). `dueSelectedIds` is the single
-// owner of the Scan-due bulk-scan selection — every consumer (the exact
-// count and cost estimate, §B.4/§B.5; the over-ceiling refusal, §B.8; a
-// row's own checked attribute on repaint, §B.3) derives from this Set rather
-// than caching its own copy or reading checkbox DOM state back as truth.
-// Written ONLY by the delegated row-checkbox handler, the select-all
-// handler, and this module's own two lifecycle hooks below. A bare
-// `issueId` key is sufficient (deliberately not the composite `rulingKey()`
-// idiom `02e56b89`/LIN-2293 uses) — the due tab is single-workspace by
-// construction (one `data-url-key` on the page), unlike the rulings feed
-// the composite key exists to disambiguate.
-const dueSelectedIds = new Set();
-// `dueLoadedItems` mirrors exactly what is currently painted in
-// `#obs-due-list` (loaded-rows-only, §B.2) — replaced wholesale on a full
-// repaint (loadInitialDueCheckPage's `paintDuePage(..., {append:false})`
-// call), concatenated on load-more. It exists so select-all (LIN-2760:
-// due + unknown rows only) and the tri-state sync can iterate the loaded
-// population without a DOM query (rows are string-rendered, not held as
-// real elements) and so pruning a vanished row is a simple Set-membership
-// check rather than a DOM diff.
-let dueLoadedItems = [];
 
 // Live data + view state preserved across polls.
 const sessionIndex = new Map();            // sessionId → session payload
@@ -1737,19 +1702,7 @@ function startPolling() {
 // Dispatch to the right poll for the active tab (LIN-1728: the rulings tab reads
 // a different endpoint entirely, not /sessions with a `?view=` discriminator —
 // a ruling row is not a session).
-//
-// [F-1] LIN-2649 S4/LIN-2667: the due tab is an EARLY RETURN here, not a branch
-// that dispatches to a due-fetching function. pollCurrentView has THREE call
-// sites — the self-scheduling tick loop's setTimeout, the visibilitychange
-// handler, and switchView's trailing call — all of which are timers/recurring
-// triggers except the last. Naming a due-fetch function "one-shot" would not
-// make it one-shot if pollCurrentView called it: it would still run on every
-// tick and every tab-focus change, silently turning on-demand due-checking
-// into ambient polling load. The one-shot load is instead driven directly
-// from switchView's own `due` branch (below) and the load-more handler —
-// never from here.
 function pollCurrentView() {
-  if (currentView === 'due') return;
   if (currentView === 'rulings') return pollRulings();
   // The runs view makes two reads per tick: the feed, and the rulings that feed
   // the waiting block. The rulings read is not awaited, so the feed's own timing
@@ -1773,7 +1726,7 @@ function stripFeedbackMarkers(text) {
 // its waiting loops is not an open question, since the open ruling rows already
 // speak for the rest. Its text is the producer's message when the producer's own
 // question has no ruling row; otherwise the fixed fallback. Pure: the rulings
-// list and any shelve state are not inputs.
+// list is not an input.
 //
 // @param {Array<Object>} sessions - the feed's session payloads
 // @param {Set<string>} openIds - the rulings response's openLoopIds
@@ -1829,7 +1782,7 @@ function renderWaitingBlock() {
 
   const rulings = lastRulings || [];
   if (rulingsList && lastRulings) {
-    renderRulings(rulings, { list: rulingsList, empty: null, limit: WAITING_RULINGS_LIMIT, onTab: false });
+    renderRulings(rulings, { list: rulingsList, empty: null, limit: WAITING_RULINGS_LIMIT });
   }
   const compact = openLoopIds === null ? [] : compactWaitSessions(waitingSessions(), openLoopIds);
   const total = rulings.length + compact.length;
@@ -1963,7 +1916,7 @@ function repaintWaitingCardHeads() {
 //      error at all). Reusing the exact same <li> while pending means every
 //      write the closure makes lands on the node that stays attached.
 //   3. A row holding unsent input (LIN-3631, `rulingRowHoldsInput`): text in
-//      the free-text answer, a focused field, or an open shelve panel. A
+//      the free-text answer or a focused field. A
 //      rebuilt row hands back fresh empty controls, so a poll landing while
 //      the operator types wiped the answer and dropped focus mid-word. The
 //      row is reused until it holds no input; its payload catches up on the
@@ -1984,8 +1937,7 @@ function rulingsTabHost() {
   return {
     list: document.getElementById('obs-rulings'),
     empty: document.getElementById('obs-rulings-empty'),
-    limit: Infinity,
-    onTab: true
+    limit: Infinity
   };
 }
 
@@ -2016,7 +1968,7 @@ function renderRulings(rulings, host = rulingsTabHost()) {
     // renderRulingRow (and the restore inside it) even runs — a check
     // written only inside renderRulingRow would never see the mustReuse
     // reuse path at all (S12 mechanism correction; `8feb02c7`/LIN-2262 fixed
-    // the same class of bug once already in the shelf-gate keying). A
+    // the same class of bug once already in the server's per-loop ruling keying). A
     // hard-overridden row (row.alternate === null) can never carry a
     // surviving stale override, by construction.
     if (key && rulingEffectOverride.has(key) && rulingEffectOverride.get(key) !== row?.alternate) {
@@ -2129,134 +2081,18 @@ function renderRulings(rulings, host = rulingsTabHost()) {
   });
   if (empty) empty.hidden = nodes.length > 0;
   syncRulingsBulkBar();
-  if (host.onTab) armBasisChecksFor(nodes);
-}
-
-// Re-arm the basis check for rows that now sit on the Rulings tab (LIN-3983).
-// A row first built while the waiting block was on screen never checked (the
-// check is gated on the Rulings view at creation), so moving it here must ask
-// again. `requestBasisCheck` keeps its own once-per-row and cap guards, so a
-// repaint that finds a row already checked or queued does nothing.
-function armBasisChecksFor(nodes) {
-  if (currentView !== 'rulings') return;
-  for (const li of nodes) {
-    const basis = rulingBasisByRow.get(li);
-    if (basis) requestBasisCheck(basis.anchor, basis.noteEl);
-  }
 }
 
 // Does this attached ruling row hold input a repaint would discard
-// (LIN-3631)? Unsent free-text, an open shelve panel (its reason and
-// duration live only in the DOM), or focus on any field in the row: a
+// (LIN-3631)? Unsent free-text, or focus on any field in the row: a
 // rebuilt row loses the focus even when the box is still empty, and the
 // next keystrokes then land nowhere.
 function rulingRowHoldsInput(li) {
   if (!li) return false;
   const answer = li.querySelector('.obs-ruling-answer-input');
   if (answer && answer.value) return true;
-  if (li.querySelector('.obs-ruling-shelve-panel')) return true;
   const active = document.activeElement;
   return !!(active && /^(input|textarea|select)$/i.test(active.tagName) && li.contains(active));
-}
-
-// ─── Basis-freshness check for a task-bound ruling (LIN-2241 tier 1) ────────
-//
-// `GET /workspace/:urlKey/api/scan/:issueId` re-derives the basis digest from
-// LIVE task content and compares it to the digest recorded when the ruling was
-// raised. That call costs a provider read, so it is bounded three ways:
-//
-//   1. Cached per task-decision row for the life of the page. The rulings feed
-//      repaints wholesale on every poll (see the banner at the top of this
-//      file), so without a cache a 5s poll would re-issue every check forever.
-//      Stated plainly, because it is a real limit and not only an optimisation:
-//      this also FREEZES the answer. A task edited after its row resolved to
-//      `false` will not flag until the page is reloaded. The alternative — a
-//      TTL — buys a fresher flag with sustained provider reads on an ambient
-//      panel meant to be left open, which is the cost this whole design moved
-//      off the polling path to avoid. A stale-but-cheap advisory beats a live
-//      one that bills the operator continuously; a reload is the refresh.
-//   2. Serialized through a small concurrency gate, so opening the tab on a
-//      long queue does not fan out one request per row at once.
-//   3. Never started unless the Rulings tab is the active view.
-//
-// It is advisory: any failure resolves to "no flag" and is swallowed. A ruling
-// must never fail to render, or lose its actions, because an optional hint
-// could not be computed.
-const basisCheckCache = new Map();   // taskDecisionId → true | false | null
-const rulingBasisByRow = new WeakMap(); // <li> → { anchor, noteEl } for the re-arm on a host move (LIN-3983)
-const basisCheckStarted = new Set(); // taskDecisionId → already queued or in flight
-const basisCheckQueue = [];
-let basisChecksInFlight = 0;
-const BASIS_CHECK_CONCURRENCY = 3;
-// A ceiling on TOTAL checks per page load, not just on parallelism. The route
-// each check calls fetches live task context, so N rulings on screen is N
-// provider reads — and the unanswered set is the population that provably
-// accumulates (lib/task-decisions-store.js exempts unanswered rows from
-// pruning, with no TTL). Past this many, rows simply go unflagged: the flag is
-// an advisory nudge, and no nudge is a better failure than a queue that spends
-// the operator's rate limit on their own behalf.
-const BASIS_CHECK_MAX_PER_PAGE = 40;
-let basisChecksStartedCount = 0;
-
-function pumpBasisChecks() {
-  while (basisChecksInFlight < BASIS_CHECK_CONCURRENCY && basisCheckQueue.length) {
-    const job = basisCheckQueue.shift();
-    basisChecksInFlight++;
-    job().catch(() => {}).finally(() => {
-      basisChecksInFlight--;
-      pumpBasisChecks();
-    });
-  }
-}
-
-function applyBasisResult(noteEl, verdict) {
-  // Strictly `=== true`. The verdict is TRI-state: `false` means checked and
-  // unmoved, `null` means it could not be answered (a ruling raised before
-  // this landed, or a digest from an earlier BASIS_VERSION). Both render as
-  // "no flag" — the note is an additive nudge, never a "we verified this is
-  // current" badge, so its absence claims nothing either way.
-  if (noteEl) noteEl.hidden = verdict !== true;
-}
-
-function requestBasisCheck(anchor, noteEl) {
-  const cacheKey = anchor.taskDecisionId;
-  if (basisCheckCache.has(cacheKey)) {
-    applyBasisResult(noteEl, basisCheckCache.get(cacheKey));
-    return;
-  }
-  // AT MOST ONE attempt per row per page load. The rulings feed repaints
-  // wholesale on every poll, so without this guard each repaint would enqueue
-  // another job for every row still awaiting an answer — the queue would grow
-  // faster than a 3-wide gate drains it, and a slow or failing route would turn
-  // an advisory hint into a self-inflicted request flood against the operator's
-  // own workspace. A failed attempt is deliberately NOT retried for the same
-  // reason: a hint that silently gives up is strictly better than one that
-  // hammers.
-  if (basisCheckStarted.has(cacheKey)) return;
-  if (currentView !== 'rulings') return;
-  if (basisChecksStartedCount >= BASIS_CHECK_MAX_PER_PAGE) return;
-  basisCheckStarted.add(cacheKey);
-  basisChecksStartedCount++;
-
-  basisCheckQueue.push(async () => {
-    // `:urlKey` is the RULING's own workspace, not the page's — the rulings
-    // feed is cross-workspace, the same reason dismiss/reply target the anchor.
-    // LIN-3126 residual: the anchor's source rides the query so the scan
-    // read resolves the issue's provider on a multi-provider workspace.
-    const url = `/workspace/${encodeURIComponent(anchor.workspaceUrlKey)}/api/scan/${encodeURIComponent(anchor.issueId)}`
-      + window.sourceQuery(anchor.source);
-    try {
-      const data = await window.api(url, { on401: false });
-      const verdict = data && typeof data.basisChanged === 'boolean' ? data.basisChanged : null;
-      basisCheckCache.set(cacheKey, verdict);
-      applyBasisResult(noteEl, verdict);
-    } catch {
-      // Advisory only: record the attempt as unknown so the row settles rather
-      // than re-queueing on the next repaint.
-      basisCheckCache.set(cacheKey, null);
-    }
-  });
-  pumpBasisChecks();
 }
 
 // LIN-2792 Step 8: resolve a proposed answer's option id to its label off
@@ -2528,58 +2364,24 @@ function renderRulingRow(row) {
     });
     actions.appendChild(sendBtn);
     actions.appendChild(makeDismissButton(row, li));
-    actions.appendChild(makeShelveButton(row, li));
     appendSuggestionActions(actions, row, li);
     composer.appendChild(actions);
   } else {
     const actions = document.createElement('div');
     actions.className = 'obs-ruling-answer-actions chat-composer__actions';
     actions.appendChild(makeDismissButton(row, li));
-    actions.appendChild(makeShelveButton(row, li));
     appendSuggestionActions(actions, row, li);
     composer.appendChild(actions);
   }
 
   li.appendChild(composer);
-  // What each action does, in words, before it is pressed (LIN-3983 PR 2). Shelve's return time is the
-  // panel's default, which the note states.
+  // What each action does, in words, before it is pressed (LIN-3983 PR 2).
   const note = document.createElement('p');
   note.className = 'obs-ruling-actions-note';
   note.textContent = canReply
-    ? 'Answer sends your reply. Dismiss: this wasn\'t worth asking. Shelve: hides it, and it comes back in 1 day.'
-    : 'Dismiss: this wasn\'t worth asking. Shelve: hides it, and it comes back in 1 day.';
+    ? 'Answer sends your reply. Dismiss: this wasn\'t worth asking.'
+    : 'Dismiss: this wasn\'t worth asking.';
   li.appendChild(note);
-
-  // LIN-2241 tier 1: has the content this ruling was raised FROM moved since?
-  // Only a task-bound (scan-produced) ruling has a recorded basis to compare;
-  // a loop-backed one was not raised from a task scan at all.
-  //
-  // The answer is fetched per row rather than served on the feed payload, and
-  // that is deliberate. The feed backs an ambient badge that polls every few
-  // seconds, so anything computed there is paid for continuously by every open
-  // tab. The one place a CURRENT basis exists is the scan status route, which
-  // already holds live task content — so the check runs there, on demand, only
-  // for the rows on screen, and only while the Rulings tab is actually open.
-  if (anchor && !anchor.loopId && anchor.taskDecisionId && anchor.issueId && anchor.workspaceUrlKey) {
-    const staleNote = document.createElement('p');
-    staleNote.className = 'obs-ruling-stale-note';
-    staleNote.textContent = '↻ the task changed since this was raised — re-read before answering';
-    staleNote.hidden = true;
-    li.appendChild(staleNote);
-    rulingBasisByRow.set(li, { anchor, noteEl: staleNote });
-    requestBasisCheck(anchor, staleNote);
-  }
-
-  // LIN-1727: a decision that has lapsed out of a prior shelve (its timer
-  // expired without ever being decided) carries that history forward as a
-  // visible flag — repeated lapses should raise priority, not be silently
-  // tolerated forever (docs/escalation-philosophy.md §4/§6).
-  if (row.shelvedLapseCount > 0) {
-    const lapseNote = document.createElement('p');
-    lapseNote.className = 'obs-ruling-lapse-note';
-    lapseNote.textContent = `⚠ shelved ${row.shelvedLapseCount}× already — still not decided`;
-    li.appendChild(lapseNote);
-  }
 
   const feedback = document.createElement('p');
   feedback.className = 'obs-ruling-feedback';
@@ -2599,130 +2401,7 @@ function makeDismissButton(row, li) {
   return btn;
 }
 
-// Shelve (LIN-1727): a DESIGNED defer, not a dismiss — a reason and a
-// re-surface timer are both required (docs/escalation-philosophy.md §6:
-// silent muting is forbidden). Works for every disposition, same as
-// Dismiss, and needs no anchor/disposition branching server-side (it never
-// touches the underlying loop/task-decision row at all).
-const SHELVE_DURATIONS = [
-  ['1 hour', 60 * 60 * 1000],
-  ['4 hours', 4 * 60 * 60 * 1000],
-  ['1 day', 24 * 60 * 60 * 1000],
-  ['3 days', 3 * 24 * 60 * 60 * 1000],
-  ['1 week', 7 * 24 * 60 * 60 * 1000]
-];
-
-function makeShelveButton(row, li) {
-  const btn = document.createElement('button');
-  btn.type = 'button';
-  btn.className = 'action-btn obs-ruling-shelve';
-  btn.setAttribute('data-testid', 'obs-ruling-shelve');
-  btn.textContent = 'Shelve';
-  btn.addEventListener('click', () => toggleShelvePanel(row, li));
-  return btn;
-}
-
-function toggleShelvePanel(row, li) {
-  const existing = li.querySelector('.obs-ruling-shelve-panel');
-  if (existing) { existing.remove(); return; }
-
-  const panel = document.createElement('div');
-  panel.className = 'obs-ruling-shelve-panel';
-  panel.dataset.testid = 'obs-ruling-shelve-panel';
-
-  const reasonInput = document.createElement('input');
-  reasonInput.type = 'text';
-  reasonInput.className = 'obs-ruling-shelve-reason';
-  reasonInput.dataset.testid = 'obs-ruling-shelve-reason';
-  reasonInput.placeholder = 'Why are you shelving this?';
-  reasonInput.setAttribute('aria-label', 'Shelve reason');
-  panel.appendChild(reasonInput);
-
-  const durationSelect = document.createElement('select');
-  durationSelect.className = 'obs-ruling-shelve-duration';
-  durationSelect.setAttribute('aria-label', 'Re-surface after');
-  for (const [label, ms] of SHELVE_DURATIONS) {
-    const opt = document.createElement('option');
-    opt.value = String(ms);
-    opt.textContent = `comes back in ${label}`;
-    durationSelect.appendChild(opt);
-  }
-  durationSelect.value = String(24 * 60 * 60 * 1000); // 1 day default
-  panel.appendChild(durationSelect);
-
-  const confirmBtn = document.createElement('button');
-  confirmBtn.type = 'button';
-  confirmBtn.className = 'action-btn obs-ruling-shelve-confirm';
-  confirmBtn.setAttribute('data-testid', 'obs-ruling-shelve-confirm');
-  confirmBtn.textContent = 'Shelve it';
-  confirmBtn.addEventListener('click', () => {
-    const reason = reasonInput.value.trim();
-    if (!reason) { reasonInput.focus(); return; }
-    shelveRulingRow(row, li, reason, parseInt(durationSelect.value, 10));
-  });
-  panel.appendChild(confirmBtn);
-
-  li.appendChild(panel);
-  reasonInput.focus();
-}
-
-function shelveRulingRow(row, li, reason, resurfaceInMs) {
-  const { decision, anchor } = row || {};
-  const pageUrlKey = observationData?.urlKey;
-  const targetUrlKey = anchor?.workspaceUrlKey;
-  const decisionId = decision?.decision_id;
-  const key = rulingKey(targetUrlKey, anchor, decisionId);
-  if (!key || rulingsPending.has(key)) return;
-
-  rulingsPending.add(key);
-  const controls = rulingRowControls(li);
-  controls.forEach(el => { el.disabled = true; });
-
-  const feedback = li.querySelector('.obs-ruling-feedback');
-  const restore = () => {
-    rulingsPending.delete(key);
-    controls.forEach(el => { el.disabled = false; });
-  };
-  const setFeedback = (text, isError) => {
-    if (!feedback) return;
-    feedback.textContent = text;
-    feedback.classList.toggle('obs-ruling-feedback--error', !!isError);
-  };
-  const refreshBadge = () => { if (pageUrlKey && typeof window.updateRulingsBadge === 'function') window.updateRulingsBadge(pageUrlKey); };
-
-  window.api(`/workspace/${encodeURIComponent(targetUrlKey)}/api/dashboard/rulings/shelve`, {
-    method: 'POST',
-    headers: { 'Content-Type': 'application/json' },
-    on401: false,
-    // LIN-2756: same field/value the dismiss path already sends
-    // (`issueDismissRequest`'s `decisionLoopId: anchor.loopId`) — reused
-    // here, not forked, so the shelf store's composite key can agree with
-    // the client's own `rulingKey`. Optional server-side, so an anchor that
-    // somehow lost its loopId between render and click (should not happen —
-    // `key` above already refused a null-anchor row) still shelves under
-    // the wider, documented legacy shape rather than failing outright.
-    body: JSON.stringify({ decisionId, decisionLoopId: anchor?.loopId ?? anchor?.taskDecisionId, reason, resurfaceInMs })
-  }).then(() => {
-    restore();
-    const panel = li.querySelector('.obs-ruling-shelve-panel');
-    if (panel) panel.remove();
-    setFeedback('shelved', false);
-    // Review F8: same class as Dismiss/Agree/Keep/reply — a shelved row still
-    // carries `suggestedDismissal` (shelving doesn't withdraw the
-    // suggestion), so `rulingsRowByKey` keeps it live and a same-tab
-    // bulk-agree would otherwise re-dismiss a ruling the operator just
-    // deferred with a re-surface timer.
-    rulingsSelected.delete(key);
-    pollRulings();
-    refreshBadge();
-  }).catch((err) => {
-    console.error('Ruling shelve failed:', err);
-    restore();
-    setFeedback('shelve failed: ' + err.message, true);
-  });
-}
-
-// The set of controls a pending reply/dismiss/shelve/agree/keep must disable
+// The set of controls a pending reply/dismiss/agree/keep must disable
 // — every interactive element the row can carry, not just `.chat-option-btn`,
 // so any one of them in flight can't be double-fired by the OTHER control on
 // the same row either. Agree/Keep were added in LIN-2444 Phase 4 — omitting
@@ -2744,43 +2423,29 @@ function shelveRulingRow(row, li, reason, resurfaceInMs) {
 // into a now-detached node" hazard this whole function exists to prevent if
 // pressed while a delivery on this same row is already in flight.
 function rulingRowControls(li) {
-  return li.querySelectorAll('.chat-option-btn, .obs-ruling-answer-send, .obs-ruling-dismiss, .obs-ruling-answer-input, .obs-ruling-shelve, .obs-ruling-agree, .obs-ruling-keep, .obs-ruling-select, .obs-ruling-effect-flip');
+  return li.querySelectorAll('.chat-option-btn, .obs-ruling-answer-send, .obs-ruling-dismiss, .obs-ruling-answer-input, .obs-ruling-agree, .obs-ruling-keep, .obs-ruling-select, .obs-ruling-effect-flip');
 }
 
 // The actual dismiss request (LIN-2444 Phase 3, extracted from the body
 // `dismissRulingRow` used to build inline). This is the ONLY dismiss path —
 // Agree below reuses it verbatim rather than forking a second one, per the
 // ticket's central constraint (no proxy-token dismiss, no new discharge
-// route). Branches on anchor shape exactly like `deliverRulingReply`'s own
-// disposition branches, but only two-way: a task-bound row reuses the
-// EXISTING scan dismiss route/outcome (LIN-2211/LIN-2197 Phase 4, projecting
-// `anchor.taskDecisionId`/`anchor.issueId` per LIN-2704) verbatim, while a
-// loop-backed row (every other disposition) hits the rulings dismiss route
-// (routes/dashboard.js), which tags the same decision-answer stamp
-// `outcome: 'dismissed'`. Neither path posts a comment. Returns the pending
-// request promise; the caller owns the pending-guard/restore/feedback wiring.
+// route). Every row hits the rulings dismiss route (routes/dashboard.js),
+// which tags the decision-answer stamp `outcome: 'dismissed'`. A task-bound
+// row no longer has a dismiss route of its own: the comment scan was the only
+// writer of task-bound rulings and none are open, so nothing is left to
+// dismiss there. The path posts no comment. Returns the pending request
+// promise; the caller owns the pending-guard/restore/feedback wiring.
 // LIN-3959: `stampLoopIds` is the joined row's copies; the dismiss stamps each.
 function issueDismissRequest(anchor, decisionId, stampLoopId, stampLoopIds) {
-  const isTaskBound = !anchor?.loopId && !!anchor?.taskDecisionId;
-  // LIN-3126 residual: the task-bound dismiss carries the anchor's source
-  // so the scan dismiss route resolves the issue's provider, not the active one.
-  const dismissUrl = `/workspace/${encodeURIComponent(anchor.workspaceUrlKey)}/api/scan/${encodeURIComponent(anchor.issueId)}/dismiss`
-    + window.sourceQuery(anchor.source);
-  return isTaskBound
-    ? window.api(dismissUrl, {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        on401: false,
-        body: JSON.stringify({ id: anchor.taskDecisionId })
-      })
-    : window.api(`/workspace/${encodeURIComponent(anchor.workspaceUrlKey)}/api/dashboard/rulings/dismiss`, {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        on401: false,
-        // LIN-2991/LIN-3022 §4/D3: the STAMP target, never the reply target
-        // alone — see deliverRulingReply's own note on the same distinction.
-        body: JSON.stringify({ decisionLoopId: stampLoopId ?? anchor.loopId, decisionLoopIds: stampLoopIds, decisionId })
-      });
+  return window.api(`/workspace/${encodeURIComponent(anchor.workspaceUrlKey)}/api/dashboard/rulings/dismiss`, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    on401: false,
+    // LIN-2991/LIN-3022 §4/D3: the STAMP target, never the reply target
+    // alone — see deliverRulingReply's own note on the same distinction.
+    body: JSON.stringify({ decisionLoopId: stampLoopId ?? anchor.loopId, decisionLoopIds: stampLoopIds, decisionId })
+  });
 }
 
 // Dismiss (LIN-2225): the row's other exit, independent of `canReply` — a
@@ -2992,7 +2657,7 @@ function deliverRulingStampOnly(row, li, optionId, { bulkAgree = false } = {}) {
 }
 
 // Keep (LIN-2444 Phase 3) — withdraws the standing suggestion via the
-// Phase-1 route. This is NOT a dismiss, shelve, or answer: the ruling stays
+// Phase-1 route. This is NOT a dismiss or an answer: the ruling stays
 // exactly as unanswered as it was, and only the suggestion stops being
 // offered. No client suppression state and no confirm() — the banner
 // disappears on its own via the server's `!withdrawn` filter on the next
@@ -3026,7 +2691,9 @@ function keepRulingRow(row, li) {
     on401: false,
     // LIN-2756: must match whatever the standing suggestion was proposed
     // with (present or omitted) — a Keep addresses the SAME composite id a
-    // suggest() call would have. See shelveRulingRow's own note just above.
+    // suggest() call would have. Optional server-side, so an anchor that
+    // somehow lost its loopId still keeps under the wider, documented legacy
+    // shape rather than failing outright.
     body: JSON.stringify({ decisionId, decisionLoopId: anchor?.loopId ?? anchor?.taskDecisionId })
   }).then(() => {
     restore();
@@ -3082,7 +2749,7 @@ function makeKeepButton(row, li) {
 
 // Agree/Keep render only on a suggested row (LIN-2444 Phase 3), appended
 // into `.obs-ruling-answer-actions` in BOTH the canReply and non-canReply
-// branches, beside the existing dismiss/shelve buttons.
+// branches, beside the existing Dismiss button.
 function appendSuggestionActions(actions, row, li) {
   if (!row?.suggestedDismissal) return;
   actions.appendChild(makeAgreeButton(row, li));
@@ -3093,7 +2760,7 @@ function appendSuggestionActions(actions, row, li) {
 
 // The currently-selectable population: every key with a live suggestion
 // that has not already succeeded this stale-cache window. Recomputed fresh
-// on every call (the `syncDueBulkBar` discipline) rather than cached, so it
+// on every call rather than cached, so it
 // can never desync from `rulingsRowByKey`/`rulingsSettled`.
 function rulingsSelectableKeys() {
   const keys = [];
@@ -3106,7 +2773,7 @@ function rulingsSelectableKeys() {
 // Re-applies `rulingsSelected` membership onto every currently-rendered
 // checkbox (LIN-2444 Phase 5) — used after a change to the SELECTION alone
 // (select-all-suggested), when the underlying rows themselves haven't
-// changed, mirroring `repaintDueRows`' rationale exactly.
+// changed.
 function repaintRulingsSelection() {
   for (const [key, li] of renderedRulingRows) {
     const checkbox = li.querySelector('.obs-ruling-select');
@@ -3114,9 +2781,8 @@ function repaintRulingsSelection() {
   }
 }
 
-// The per-row checkbox's own entry point (mirrors `toggleDueSelection`'s
-// extraction rationale — directly callable without simulating a DOM change
-// event). A settled key refuses selection outright: it already succeeded
+// The per-row checkbox's own entry point, extracted so it is directly
+// callable without simulating a DOM change event. A settled key refuses selection outright: it already succeeded
 // and is only still visible because the feed cache hasn't caught up, so
 // re-selecting it would just re-open the double-post hole `rulingsSettled`
 // exists to close.
@@ -3127,7 +2793,7 @@ function toggleRulingSelection(key, checked) {
   syncRulingsBulkBar();
 }
 
-// Select-all-suggested (mirrors `setAllDueSelected`'s extraction rationale).
+// Select-all-suggested, extracted the same way.
 // Scoped to `rulingsSelectableKeys()`, so a settled row can never be swept
 // into the selection by this control either.
 function setAllRulingsSelected(checked) {
@@ -3142,7 +2808,7 @@ function setAllRulingsSelected(checked) {
 // Re-syncs the bulk bar's visibility, the select-all checkbox's tri-state,
 // the exact count, and the Agree-selected button's enabled state/label —
 // all DERIVED here, never stored, so none of them can desync from
-// `rulingsSelected` (the `syncDueBulkBar` discipline). Called after every
+// `rulingsSelected`. Called after every
 // rulings repaint and every selection change.
 function syncRulingsBulkBar() {
   const bar = document.getElementById('obs-ruling-bulk-bar');
@@ -3176,8 +2842,8 @@ function syncRulingsBulkBar() {
     // label template (`Apply 0 as proposed`) so the two can never drift.
     agreeBtn.textContent = `Apply ${selectedCount} as proposed`;
   }
-  // LIN-2758: visible only while a batch is actually running — mirrors
-  // #obs-due-stop's own hidden-toggle discipline.
+  // LIN-2758: visible only while a batch is actually running — derived from
+  // the run flag, never stored.
   if (stopBtn) stopBtn.hidden = !rulingsBulkRunning;
 }
 
@@ -3396,10 +3062,9 @@ function bulkAgreeRow(key, row, li) {
 }
 
 // Bulk-agree entry point — the confirmed, SEQUENTIAL loop over
-// `rulingsSelected`. Deliberately NOT `startBulkScan`/the pool: the pool now
-// contains a throwing callback (LIN-2709, `notifyBulkScanCallback`), but this
-// loop still needs sequencing — one row awaited at a time (LIN-2792) — and
-// needs no `AbortController`, no teardown, no module-level run pointer.
+// `rulingsSelected`. Deliberately not a concurrent pool: this loop needs
+// sequencing — one row awaited at a time (LIN-2792) — and needs no
+// `AbortController`, no teardown, no module-level run pointer.
 // Per-row failure cannot wedge this loop: `bulkAgreeRow` never
 // rejects (its own `.catch` swallows), so this `for…of` always reaches the
 // next key regardless of what happened to the last one. Awaiting each row in
@@ -3568,7 +3233,7 @@ function composeDispatchPrompt(row, chosenAnswer) {
 // already provider-attributed at the source, so this never hardcodes
 // "Linear" and never regresses to naming the wrong backend for a Jira/GitHub
 // workspace. Every other failure keeps its existing generic text —
-// `session.js`/`scan.js`/Flight Companion are untouched by this change and
+// `session.js`/Flight Companion are untouched by this change and
 // keep theirs too (this helper is only ever called from observation.js).
 function rulingReplyFailureMessage(err) {
   if (err && err.code === 'LINEAR_AUTH' && err.detail) {
@@ -3862,7 +3527,7 @@ function deliverRulingReply(row, prompt, li, optionId, { bulkAgree = false } = {
     // (the store rejects a non-UUID issueId at write time). The comment
     // TARGET itself (the route's own `:issueId` param, permissive of either
     // shape) still prefers the real id with an identifier fallback, mirroring
-    // the `gone` branch and `public/scan.js`'s own answer-form call.
+    // the `gone` branch.
     // Deliberately NOT widened with `optionId` — Agree on a task-bound
     // proposed answer routes through `deliverRulingStampOnly` instead (Step 7
     // branch 2), never this branch; no caller of this branch (the ordinary
@@ -3882,762 +3547,12 @@ function deliverRulingReply(row, prompt, li, optionId, { bulkAgree = false } = {
   }
 }
 
-// ─── Scan-due (LIN-2649 S4 / LIN-2667) ──────────────────────────────────────
-//
-// A due-check row is a provider-content fingerprint comparison, never an LLM
-// judgement — the tab reads GET /workspace/:urlKey/api/scan-due (LIN-2666),
-// paginated via an opaque `nextCursor` string the route emits and accepts
-// VERBATIM (LIN-2667's N-A discharge: emitted and accepted are the identical
-// value, so this client never inspects or re-encodes it).
-
-function dueUrl(urlKey, cursor) {
-  const qs = cursor ? `?cursor=${cursor}` : '';
-  return `/workspace/${encodeURIComponent(urlKey)}/api/scan-due${qs}`;
-}
-
-// Tri-state copy (design §3/§6/§8). Branches on `typeof dueStatus === 'boolean'`
-// BEFORE treating a value as due/not-due — the same guard requestBasisCheck's
-// `basisChanged` handling above already uses — so a plain `null` can only ever
-// reach the single "unknown" branch, never "not due". `error` is an orthogonal
-// flag: a `null` raised by a provider-read failure gets the retry copy, NEVER
-// the scan-baseline copy — scanning spends an LLM call and cannot fix a
-// transient read failure, so conflating the two would tell the operator
-// something false.
-function dueStatusCopy(item) {
-  if (item && item.error) {
-    return { cls: 'obs-due-error', text: "couldn't check this task right now — the provider read failed." };
-  }
-  if (typeof item?.dueStatus === 'boolean') {
-    return item.dueStatus
-      ? { cls: 'obs-due-yes', text: 'due — scanned content has changed' }
-      : { cls: 'obs-due-no', text: 'not due — no change since last scan' };
-  }
-  return { cls: 'obs-due-unknown', text: 'not checked yet — scan it once to set its baseline' };
-}
-
-// Pure string renderer (like renderActivityLog/renderArtifacts above) so the
-// tri-state branches are unit-testable without a DOM. The "checked · provider
-// read" badge is deliberately distinct from a scan button's own affordance —
-// the two costs (a due-check's provider read vs. a scan's LLM call) must stay
-// visually and mechanically separate.
-function renderDueRowHtml(item) {
-  const idLabel = item.issueIdentifier || item.issueId;
-  const status = dueStatusCopy(item);
-  const retryBtn = item && item.error
-    ? `<button type="button" class="obs-due-retry" data-issue-id="${escapeHtml(String(item.issueId))}">Retry</button>`
-    : '';
-  // LIN-2706 §B.3: reflects membership in dueSelectedIds (the Set is the
-  // single source of truth, never the checkbox DOM), so a repaint restores
-  // checked state rather than dropping it.
-  //
-  // The checkbox carries its own accessible name (review N3, LIN-2706 PR
-  // #1424): the row's identifier lives in a SIBLING span, so without
-  // `aria-label` a screen reader announces an unnamed checkbox and the
-  // operator cannot tell which task they are selecting. Every other checkbox
-  // in this codebase is named — swim's four and collective's rows sit inside
-  // a `<label>` with visible text, and this feature's own select-all is
-  // label-wrapped — so this is the existing convention, not a new one. It is
-  // `aria-label` rather than a wrapping `<label>` because the row is a flex
-  // container whose children are laid out by `.obs-due-row`; wrapping would
-  // change the layout the styling witness now pins. The attribute is placed
-  // BEFORE `class`/`data-issue-id` deliberately, so the `class="obs-due-select"
-  // data-issue-id="..." checked` sequence the selection tests match stays
-  // contiguous.
-  const checkedAttr = dueSelectedIds.has(String(item.issueId)) ? ' checked' : '';
-  return `<li class="obs-due-row ${status.cls}" data-issue-id="${escapeHtml(String(item.issueId))}" data-testid="obs-due-row">`
-    + `<input type="checkbox" aria-label="select ${escapeHtml(String(idLabel))}" class="obs-due-select" data-issue-id="${escapeHtml(String(item.issueId))}"${checkedAttr} data-testid="obs-due-select">`
-    + `<span class="obs-due-issue">${escapeHtml(String(idLabel))}</span>`
-    + `<span class="obs-due-badge">checked &middot; provider read</span>`
-    + `<span class="obs-due-status">${escapeHtml(status.text)}</span>`
-    + retryBtn
-    + `</li>`;
-}
-
-function updateDueProgress() {
-  const el = document.getElementById('obs-due-progress');
-  if (!el) return;
-  el.textContent = dueTotalCandidateCount > 0 ? `checked ${dueCheckedCount} of ${dueTotalCandidateCount}` : '';
-}
-
-// Day-one copy (design, non-negotiable wording — see lib/render-observation.js).
-// NOT a transient banner that clears itself: it is the actual, correct state
-// of the whole pre-WS2 population, so it renders whenever the just-loaded
-// first page's candidates are ALL `dueStatus: null` (never re-evaluated
-// against a later "load more" page — the first page is the honest population
-// sample). An `error: true` row also carries `dueStatus: null`, but that is a
-// provider-read failure, not an unestablished baseline — scanning spends an
-// LLM call and cannot fix a transient read failure, so an errored row must
-// never count toward "day one" (same rationale as dueStatusCopy's own
-// error-first branch above).
-function updateDueDayOneNotice(items) {
-  const el = document.getElementById('obs-due-dayone');
-  if (!el) return;
-  el.hidden = !(items.length > 0 && items.every(i => i.dueStatus === null && !i.error));
-}
-
-// `pageCandidateCount` is read directly off the route's own field (LIN-2666's
-// `pageCandidateCount: page.items.length`), rather than re-derived from
-// `items.length` here, so the readout is traceably "fed directly from the
-// route's response fields" per design §6/§8 — not a client recomputation
-// that happens to agree with it today.
-function paintDuePage(items, pageCandidateCount, { append } = {}) {
-  const list = document.getElementById('obs-due-list');
-  const empty = document.getElementById('obs-due-empty');
-  if (!list) return;
-  const html = items.map(renderDueRowHtml).join('');
-  if (append) {
-    list.insertAdjacentHTML('beforeend', html);
-    // Pagination is additive only — nothing already loaded ever vanishes on
-    // a load-more, so the selection needs no pruning here (LIN-2706 §B.2).
-    dueLoadedItems = dueLoadedItems.concat(items);
-  } else {
-    list.innerHTML = html;
-    dueLoadedItems = items.slice();
-    // Prune vanished rows (LIN-2706 §B.2): a full repaint replaces the
-    // loaded population wholesale, so any selected id no longer among it
-    // can never remain selected — the selection is loaded-rows-only, and
-    // its count can never exceed what is on screen.
-    const loadedIds = new Set(dueLoadedItems.map(i => String(i.issueId)));
-    for (const id of dueSelectedIds) {
-      if (!loadedIds.has(id)) dueSelectedIds.delete(id);
-    }
-  }
-  dueCheckedCount += Number.isFinite(pageCandidateCount) ? pageCandidateCount : items.length;
-  updateDueProgress();
-  if (empty) empty.hidden = dueCheckedCount > 0;
-  syncDueBulkBar();
-}
-
-// Re-renders #obs-due-list from dueLoadedItems alone (no counts/progress
-// touched) — used when the SELECTION changes without the underlying rows
-// changing (the select-all-loaded toggle, LIN-2706 §B.3), so every row's
-// checkbox reflects the new membership without re-fetching or re-counting.
-function repaintDueRows() {
-  const list = document.getElementById('obs-due-list');
-  if (!list) return;
-  list.innerHTML = dueLoadedItems.map(renderDueRowHtml).join('');
-}
-
-// LIN-2706 §B.4: the exact selected count — its own figure, labelled exact,
-// never merged with the cost estimate or phrased so the two read as one
-// number.
-function dueSelectedCountText() {
-  return `${dueSelectedIds.size} selected (exact)`;
-}
-
-// LIN-2706 §B.5: a SMALL LOCAL formatter — deliberately NOT `formatCost`
-// (lib/render-settings.js:667 / public/flight-companion.js:163). Both of
-// those fold a non-number to `$0.00`, which would destroy exactly the
-// `unknown` distinction this exists to preserve: an empty 30-day window is
-// genuine absence of history, not zero spend, and must never render the
-// same as a priced row that happens to average to zero. Mirrors their own
-// precision idiom (small per-call amounts keep 4 decimals; a larger total
-// rounds to 2). The formatter itself is the one shared copy (LIN-4446), read
-// from `../lib/cost-format.js` (LIN-4463 piece 4: this page is a module and imports it, not the bridge).
-//
-// Renders `meanUsd × selectedCount` as the estimate. `estimate` is
-// `observationData.scanCostEstimate`, threaded verbatim from the server
-// (LIN-2706 §B.1): `{calls, pricedCalls, meanUsd, unknown}`.
-function formatDueScanCostEstimate(estimate, selectedCount) {
-  // `est. ` prefix (review finding 4, LIN-2706 PR #1424): the exact count is
-  // explicitly labelled "(exact)"; without a label of its own a bare
-  // `$0.0600`/`unknown` sitting next to it read as one ambiguous figure
-  // rather than the textually-distinct estimate §B.5 requires.
-  if (!estimate || estimate.unknown || typeof estimate.meanUsd !== 'number' || !Number.isFinite(estimate.meanUsd)) {
-    return 'est. unknown';
-  }
-  // LIN-4179 / LIN-4446: the one formatter (`/lib/cost-format.js`, imported above). A per-call estimate keeps
-  // 4 decimals under $1; null (unknown) is the same "est. unknown", never a dollar figure.
-  const total = estimate.meanUsd * selectedCount;
-  const words = formatUsd(total, { fine: true });
-  return words === null ? 'est. unknown' : `est. ${words}`;
-}
-
-// LIN-2706 §B.8: over-ceiling refusal. CONSUMES checkBulkScanSelection /
-// BULK_SCAN_MAX_PER_RUN (Phase 2, above) rather than mirroring the ceiling
-// or reimplementing the check — the message itself already interpolates
-// the constant. Returns `null` when the selection is within the ceiling
-// (the message clears on the next selection change simply because this is
-// recomputed fresh, from the CURRENT dueSelectedIds, on every call).
-function dueBulkScanRefusalMessage() {
-  const check = checkBulkScanSelection([...dueSelectedIds]);
-  return check.refused ? check.message : null;
-}
-
-// Re-syncs the select-all-loaded checkbox's tri-state (none/some/all of the
-// currently loaded rows selected), the exact count, the cost estimate, the
-// over-ceiling refusal, and the bulk bar's visibility (LIN-2706 §B.3-§B.5,
-// §B.8). Called after every repaint and every selection change so none of
-// these can desync from dueSelectedIds. `indeterminate` is a DOM property,
-// not an HTML attribute, so this must run as script after paint rather than
-// being baked into renderDueRowHtml's string output.
-function syncDueBulkBar() {
-  const bar = document.getElementById('obs-due-bulk-bar');
-  const selectAll = document.getElementById('obs-due-select-all');
-  const countEl = document.getElementById('obs-due-selected-count');
-  const estimateEl = document.getElementById('obs-due-selected-cost');
-  const refusalEl = document.getElementById('obs-due-bulk-refusal');
-  const scanBtn = document.getElementById('obs-due-scan-selected');
-  const stopBtn = document.getElementById('obs-due-stop');
-  const total = dueLoadedItems.length;
-  const selectedCount = dueSelectedIds.size;
-  if (bar) bar.hidden = total === 0;
-  if (selectAll) {
-    // LIN-2760: the select-all tri-state is keyed on the select-all-coverable
-    // population (due + unknown), mirroring syncRulingsBulkBar's own
-    // selectable-keyed tri-state — the control's named outcome is "select all
-    // due + unknown", so checked means exactly "every due+unknown loaded row
-    // is selected": a not-due/errored row beside them neither satisfies nor
-    // defeats it. Without this the checkbox would snap back unchecked the
-    // moment a skipped row exists on screen, even though the click did
-    // exactly what its label says. (The bar's own visibility above stays
-    // keyed on ALL loaded rows — a not-due/errored row is still hand-pickable
-    // and the Scan-selected run control must stay reachable for it.)
-    const coverable = dueSelectableItems();
-    const coverableSelected = coverable.filter((item) => dueSelectedIds.has(String(item.issueId))).length;
-    if (coverable.length > 0) {
-      selectAll.checked = coverableSelected === coverable.length;
-      selectAll.indeterminate = coverableSelected > 0 && coverableSelected < coverable.length;
-    } else {
-      // LIN-2760 follow-up ruling (2026-09-13): with NOTHING coverable, the
-      // coverable keying above would render unchecked and not indeterminate
-      // even while hand-picked rows are selected — leaving "check" (a no-op
-      // with nothing coverable) as the only reachable click and stranding the
-      // uncheck branch ("clears every loaded row", deliberately preserved by
-      // the ruling) behind per-row unticks only. Fall back to the pre-ruling
-      // ALL-LOADED keying, the same keying the bar's own visibility above
-      // already uses and for the same reason: a skipped row is still
-      // hand-pickable, so the control that can clear it must stay reachable.
-      selectAll.checked = total > 0 && selectedCount === total;
-      selectAll.indeterminate = selectedCount > 0 && selectedCount < total;
-    }
-  }
-  if (countEl) countEl.textContent = dueSelectedCountText();
-  if (estimateEl) estimateEl.textContent = formatDueScanCostEstimate(observationData?.scanCostEstimate, selectedCount);
-  if (refusalEl) {
-    const message = dueBulkScanRefusalMessage();
-    refusalEl.hidden = !message;
-    refusalEl.textContent = message || '';
-  }
-  // LIN-2701 §B.7: the run control's enabled/visible state is DERIVED here,
-  // alongside the rest of this bar's readouts, never stored in a parallel
-  // flag. "(selection non-empty) AND (no live run)" reads dueSelectedIds
-  // (Session 1's selection owner) and `bulkScanStop` (the pool's own
-  // module-scope live-run pointer, same file, same closure) directly — no
-  // second `isRunning` boolean is introduced, so this can never disagree
-  // with what stopBulkScan() itself dispatches on.
-  const running = bulkScanStop !== null;
-  if (scanBtn) {
-    scanBtn.disabled = running || selectedCount === 0;
-    scanBtn.textContent = `Scan selected (${selectedCount})`;
-  }
-  if (stopBtn) stopBtn.hidden = !running;
-}
-
-/**
- * The "Scan selected (N)" button's click handler, extracted as a standalone
- * entry point (same rationale as toggleDueSelection/setAllDueSelected
- * above) so it is directly callable in tests without simulating a DOM
- * click. Drives the EXISTING pool over the CURRENT dueSelectedIds — no
- * second concurrency primitive, no re-tuned ceiling, no new scan invoker.
- * `onResult` paints each row as it settles (LIN-2701 §B.6); `onTeardown`
- * re-syncs the bar (re-enabling the button, hiding Stop) while leaving the
- * selection itself untouched — teardown deliberately does not clear it, so
- * the operator can see what ran and adjust before a re-run.
- *
- * The button's own disabled state is the ordinary presentation guard; the
- * authoritative refusal is `startBulkScan`'s own function-level check
- * (beat 1). A `run-in-progress` or over-ceiling refusal reaching here at all
- * means the button's disabled state raced a click — resyncing rather than
- * throwing is the correct response, not a bug to fix here.
- */
-function startDueBulkScan() {
-  const urlKey = observationData?.urlKey;
-  // LIN-3126 residual (LIN-3256): carry each selected due row's own source
-  // (emitted by the scan-due route from the row's recorded selector) so the
-  // per-item scan POST resolves the issue's provider, not the workspace's
-  // active one. Sparse — an unsourced row adds no keys.
-  const items = [...dueSelectedIds].map((issueId) => {
-    const row = dueLoadedItems.find((i) => String(i.issueId) === String(issueId));
-    const item = { urlKey, identifier: issueId };
-    if (row && row.source) item.source = row.source;
-    return item;
-  });
-  startBulkScan(items, {
-    onResult: paintBulkScanRowResult,
-    onTeardown: () => { syncDueBulkBar(); }
-  });
-  syncDueBulkBar();
-}
-
-// LIN-2706 §B.3: the per-row toggle, extracted to a standalone entry point —
-// mirrors this file's existing extraction of startBulkScan/stopBulkScan as
-// testable entry points rather than inline listener bodies — so it is
-// unit-testable directly, without simulating a DOM click event the fake
-// test DOM cannot dispatch.
-function toggleDueSelection(id, checked) {
-  if (!id) return;
-  if (checked) dueSelectedIds.add(id);
-  else dueSelectedIds.delete(id);
-  syncDueBulkBar();
-}
-
-// LIN-2760 (John's ruling on LIN-2241 F3, decision `lin2241-f3-selectall`):
-// the select-all-coverable population — loaded rows whose due status is due
-// or unknown. Not-due rows (`dueStatus === false`) are unchanged by
-// definition and errored rows (`error: true`) must not be re-billed blindly
-// — each selected row costs one billable LLM scan — so select-all skips
-// both. Unknown rows stay covered so day one is preserved: on day one every
-// previously-scanned task reads unknown until rescanned once, so a strict
-// due-only rule would select nothing on first use. Same classification
-// discipline as dueStatusCopy (`error` first, only an exact `false` is
-// not-due, any non-boolean dueStatus is unknown). Recomputed fresh on every
-// call — the `rulingsSelectableKeys` discipline, same file — rather than
-// cached, so it can never desync from `dueLoadedItems`. This bounds only
-// the select-all CONTROL; the per-row checkbox stays free, so an operator
-// can still hand-pick a not-due or errored row via toggleDueSelection.
-function dueSelectableItems() {
-  return dueLoadedItems.filter((item) => !item?.error && item?.dueStatus !== false);
-}
-
-// LIN-2706 §B.3: select-all-loaded, same extraction rationale as
-// toggleDueSelection above. "Select all loaded" iterates ONLY the rows
-// currently painted — never an implicit all-pages semantic (§B.2);
-// dueLoadedItems is exactly that population. LIN-2760 scopes CHECKING to
-// dueSelectableItems() (due + unknown only); UNCHECKING still clears every
-// loaded row, hand-picked ones included — the pre-LIN-2760 uncheck
-// semantics, unchanged by the ruling, because "off" means none of the
-// loaded rows.
-function setAllDueSelected(checked) {
-  if (checked) {
-    for (const item of dueSelectableItems()) dueSelectedIds.add(String(item.issueId));
-  } else {
-    dueLoadedItems.forEach((item) => dueSelectedIds.delete(String(item.issueId)));
-  }
-  repaintDueRows();
-  syncDueBulkBar();
-}
-
-function updateDueMoreButton() {
-  const more = document.getElementById('obs-due-more');
-  if (!more) return;
-  more.hidden = !dueNextCursor;
-}
-
-// The ONE-SHOT initial load, called ONLY from switchView's `due` branch below
-// — never from setTimeout/setInterval/pollCurrentView (see [F-1] there). Also
-// what the client-side chip-driven "reload" affordance (a per-row retry
-// falls back to this — see renderDueRowHtml's retry button) re-runs.
-async function loadInitialDueCheckPage() {
-  const urlKey = observationData?.urlKey;
-  if (!urlKey || dueLoading) return;
-  dueLoading = true;
-  dueCheckedCount = 0;
-  dueTotalCandidateCount = 0;
-  dueNextCursor = null;
-  // LIN-2706 §B.2: a fresh tab entry starts with an empty selection —
-  // unconditionally, not merely "cleared if the reloaded page happens to
-  // share no ids with the old one" (which is all paintDuePage's own
-  // prune-by-intersection would give it, since the same tasks are likely to
-  // reappear on a reload).
-  dueSelectedIds.clear();
-  setPollStatus('loading…');
-  try {
-    const res = await fetch(dueUrl(urlKey));
-    if (res.status === 401) { window.location.href = '/logout'; return; }
-    if (!res.ok) { setPollStatus('● disconnected'); return; }
-    const data = await res.json();
-    const items = Array.isArray(data.items) ? data.items : [];
-    dueTotalCandidateCount = Number.isFinite(data.totalCandidateCount) ? data.totalCandidateCount : 0;
-    dueNextCursor = data.nextCursor || null;
-    paintDuePage(items, data.pageCandidateCount, { append: false });
-    updateDueDayOneNotice(items);
-    updateDueMoreButton();
-    setPollStatus('● live');
-  } catch (e) {
-    setPollStatus('● disconnected');
-    console.warn('Scan-due load failed:', e);
-  } finally {
-    dueLoading = false;
-  }
-}
-
-// Subsequent pages, driven by the "load more" click handler only. Replays
-// `dueNextCursor` VERBATIM as `?cursor=` (LIN-2667 N-A) — no encode/decode
-// step on this side of the wire at all.
-async function loadMoreDueChecks() {
-  const urlKey = observationData?.urlKey;
-  if (!urlKey || dueLoading || !dueNextCursor) return;
-  dueLoading = true;
-  updateDueMoreButton();
-  try {
-    const res = await fetch(dueUrl(urlKey, dueNextCursor));
-    if (!res.ok) return;
-    const data = await res.json();
-    const items = Array.isArray(data.items) ? data.items : [];
-    dueNextCursor = data.nextCursor || null;
-    paintDuePage(items, data.pageCandidateCount, { append: true });
-    updateDueMoreButton();
-  } catch (e) {
-    console.warn('Scan-due load-more failed:', e);
-  } finally {
-    dueLoading = false;
-    updateDueMoreButton();
-  }
-}
-
-// ─── Bulk scan pool (LIN-2700 / LIN-2651 Phase 2) ───────────────────────────
-//
-// Client-orchestrated pool that fires POST /workspace/:urlKey/api/scan/:issueId
-// (via public/scan.js's postScan, reached as window.ScanSection.postScan) over
-// an operator-selected set of Scan-due rows. Mechanism only — no selection UI,
-// no controls, no result display; that is Phase 3 (LIN-2701). This pool owns
-// only: the queue/concurrency, the total-per-run refusal, the stop flag, the
-// shared AbortController, and enough error discrimination for Phase 3 to build
-// its later 7-way classification on top of.
-
-// Only the CURRENT run's stop is ever reachable from module scope — the
-// queue, in-flight counter, and AbortController below are per-run closure
-// state (see startBulkScan), never shared across runs. An earlier revision
-// kept those three at module scope, which reopened exactly the bug the stop
-// flag exists to prevent: stopping run 1 immediately zeroed the shared
-// in-flight counter, and run 1's own already-issued jobs still decremented
-// it (and re-pumped) as they settled — if run 2 had since started, THOSE
-// stale decrements freed "slots" run 2 never actually had, letting a second
-// run exceed BULK_SCAN_CONCURRENCY. Reproduced directly: stop run 1 with 2
-// jobs in flight, start run 2 in the same synchronous turn (no await between
-// them — the realistic "click Stop, click Start again" shape), and run 2's
-// observed peak in-flight was double BULK_SCAN_CONCURRENCY. Scoping the
-// counters per-run makes a stale run's stragglers structurally unable to
-// touch a newer run's bookkeeping.
-let bulkScanStop = null; // stop() for the currently active run, or null between runs
-
-// Own constant — deliberately NEVER BASIS_CHECK_CONCURRENCY (:1598). That one
-// bounds advisory provider reads a page load fires on its own initiative; a
-// bulk scan issues real, billable LLM calls against the same OpenRouter
-// budget every other feature draws from, so it gets its own — tighter —
-// number rather than inheriting one tuned for a cheaper resource.
-const BULK_SCAN_CONCURRENCY = 2;
-
-// A ceiling on TOTAL scans per run, in addition to the concurrency bound
-// above — the same "how fast" vs "how much total" split BASIS_CHECK_CONCURRENCY
-// / BASIS_CHECK_MAX_PER_PAGE already draw (:1598-1606). loadMoreDueChecks lets
-// an operator accumulate a selection across repeated "load more" pages before
-// running a scan over all of it; past this many in one run the selection is
-// REFUSED outright, never silently truncated — dropping rows from an
-// operator's explicit selection would be a worse failure than telling them to
-// split the run. Anchored to (never imported from — client code stays
-// independent of the server-side constant) DUE_CHECK_PAGE_SIZE
-// (routes/workspace-api.js:44): one page is the natural selection unit the UI
-// already establishes, so an ordinary single-page selection is never refused.
-// Deliberately NOT BASIS_CHECK_MAX_PER_PAGE — the two ceilings bound different
-// resources, and coupling them would let a change to one silently re-tune the
-// other.
-const BULK_SCAN_MAX_PER_RUN = 40;
-
-/**
- * Refuse an over-ceiling selection before anything is enqueued. Never
- * truncates — an explicit "scan N at a time; run again for the rest" refusal
- * is the whole point (Phase 3 owns where this is displayed; the pool owns the
- * refusal itself).
- */
-function checkBulkScanSelection(items) {
-  if (items.length > BULK_SCAN_MAX_PER_RUN) {
-    return {
-      refused: true,
-      limit: BULK_SCAN_MAX_PER_RUN,
-      requested: items.length,
-      message: `scan ${BULK_SCAN_MAX_PER_RUN} at a time; run again for the rest`
-    };
-  }
-  return { refused: false };
-}
-
-/**
- * Classify a postScan failure at the pool boundary — abort vs 429, never
- * conflated. A client abort surfaces as the native DOMException `fetch`
- * itself rejects with (window.api's own `.status`/`.body` wrapping happens
- * only after a response is received, so an aborted call never reaches it):
- * `err.name === 'AbortError'`, no `.status`. A 429 is window.api's own thrown
- * Error carrying `.status === 429` and — per its docstring — `.body.freeTier`
- * (public/common.js:497). Anything else is left as 'other': full per-row
- * classification is Phase 3's job: this just surfaces enough for it.
- */
-function classifyBulkScanError(err) {
-  if (err && err.name === 'AbortError') return 'aborted';
-  if (err && err.status === 429) return 'rate-limited';
-  return 'other';
-}
-
-/**
- * Start a bulk-scan run over `items` ({urlKey, identifier, source} rows,
- * e.g. from the Scan-due tab's selection). Refuses synchronously — before
- * enqueueing anything — if the selection exceeds BULK_SCAN_MAX_PER_RUN.
- *
- * The queue, in-flight counter, stop flag, and AbortController are all
- * LOCAL to this call — a fresh, independent set every run (see the module
- * comment above on why: a shared, module-level counter let a stopped run's
- * still-settling stragglers corrupt a subsequent run's bookkeeping). Only
- * `stop` itself is published to module scope (`bulkScanStop`), so
- * stopBulkScan() can always reach whichever run is currently active.
- *
- * `onTeardown(results)` fires once, on full settlement OR on stopBulkScan(),
- * whichever comes first — clearing in-flight counters and handing back
- * whatever re-enables the run control is the caller's job (the bulk-scan call
- * site's `onTeardown` re-runs `syncDueBulkBar`); this pool just calls the callback. Already-issued in-flight requests are LEFT TO
- * COMPLETE after a stop (the accepted abort gap — see LIN-2700/LIN-2651):
- * their eventual settlement still lands in `results`, but teardown does not
- * wait for it.
- *
- * `onResult(entry)` fires once per settled item, in runOne's own `finally` —
- * a per-row hook alongside the batch-level `onTeardown`, so Phase 3 (LIN-2701
- * §B.6/§B.7) can render a row's outcome as it settles instead of polling
- * `results`. Optional; omitting it changes nothing (Phase 2's tests keep
- * passing byte-identically). On abort, an already-issued item's `onResult`
- * fires AFTER `onTeardown` has already run for that run (teardown() is
- * synchronous inside stop(), the straggler's rejection is a later microtask)
- * — callers must accept a late `onResult` without reviving a torn-down run.
- *
- * Refuses synchronously, before touching the selection ceiling, when a run
- * is already live (`bulkScanStop` non-null) — `reason: 'run-in-progress'`.
- * This is the authoritative guard: `bulkScanStop = stop` below is
- * unconditional, so an unguarded second call would silently overwrite the
- * pointer, orphaning run 1 (unreachable from stopBulkScan() thereafter) while
- * doubling global in-flight past BULK_SCAN_CONCURRENCY. See LIN-2700's
- * hand-off (ledger item 4) and LIN-2701 §B.7.
- *
- * @param {Array<{urlKey:string, identifier:string, source?:string}>} items
- * @param {{onTeardown?: (results: Array) => void, onResult?: (entry: object) => void}} [opts]
- * @returns {{refused:true, reason:'run-in-progress'}
- *          |{refused:true, limit:number, requested:number, message:string}
- *          |{refused:false, results: Array}}
- */
-function startBulkScan(items, { onTeardown, onResult } = {}) {
-  if (bulkScanStop) return { refused: true, reason: 'run-in-progress' };
-
-  const check = checkBulkScanSelection(items);
-  if (check.refused) return check;
-
-  const queue = items.slice();
-  let inFlight = 0;
-  let stopped = false;
-  const controller = new AbortController();
-
-  const results = [];
-  const total = items.length;
-  let settledCount = 0;
-  let tornDown = false;
-
-  function teardown() {
-    if (tornDown) return;
-    tornDown = true;
-    if (bulkScanStop === stop) bulkScanStop = null;
-    if (onTeardown) notifyBulkScanCallback(onTeardown, results);
-  }
-
-  /**
-   * Drain this run's own queue up to BULK_SCAN_CONCURRENCY at a time.
-   * Mirrors pumpBasisChecks's (:1609) at-most-once/drain-on-settle `finally`
-   * shape, but adds a stop check INSIDE the loop body, immediately before a
-   * dequeued item is issued. That is the whole point: it closes the
-   * dequeue-but-not-yet-issued window pumpBasisChecks has no equivalent of
-   * (lib/openrouter.js:1786 guards the same class of gap server-side).
-   * Because dequeue and issue happen synchronously in the same turn with no
-   * await between them, checking right here means an item can never be
-   * shifted off the queue without the check having just passed — the window
-   * is closed by construction, not by timing.
-   */
-  function pump() {
-    while (inFlight < BULK_SCAN_CONCURRENCY && queue.length) {
-      if (stopped) return;
-      const item = queue.shift();
-      inFlight++;
-      runOne(item);
-    }
-  }
-
-  async function runOne(item) {
-    let entry;
-    try {
-      const value = await window.ScanSection.postScan(item.urlKey, item.identifier, item.source, { signal: controller.signal });
-      entry = { item, outcome: 'fulfilled', value };
-    } catch (err) {
-      entry = { item, outcome: classifyBulkScanError(err), error: err };
-    } finally {
-      results.push(entry);
-      inFlight--;
-      settledCount++;
-      // onResult is a notification, not bookkeeping: notifyBulkScanCallback
-      // contains a throw so it cannot skip teardown() and pump() below (LIN-2709).
-      if (onResult) notifyBulkScanCallback(onResult, entry);
-      if (settledCount === total) teardown();
-      pump();
-    }
-  }
-
-  function stop() {
-    stopped = true;
-    controller.abort();
-    teardown();
-  }
-  bulkScanStop = stop;
-
-  if (total === 0) {
-    teardown();
-    return { refused: false, results };
-  }
-
-  pump();
-  return { refused: false, results };
-}
-
-/**
- * Stop the current bulk-scan run: sets that run's own stop flag (closing the
- * dequeue-but-not-yet-issued window in its pump() above) and aborts its own
- * AbortController (canceling in-flight HTTP calls client-side — see the
- * abort-gap note above for what "canceling" does and does not mean
- * server-side), then tears down immediately rather than waiting for
- * already-issued requests to settle. A no-op between runs (bulkScanStop is
- * null once the active run has torn down).
- */
-function stopBulkScan() {
-  if (bulkScanStop) bulkScanStop();
-}
-
-/**
- * Invoke one of startBulkScan's caller callbacks (onResult / onTeardown)
- * without letting its failure reach the pool (LIN-2709). Both callbacks sit
- * inside the pool's bookkeeping path — onResult runs in runOne's `finally`
- * ahead of teardown()/pump(), and teardown() runs ahead of stop()'s return.
- * An unguarded throw there skipped pump(), so the rest of the batch never
- * posted, onTeardown never fired, and bulkScanStop stayed set until Stop, which
- * refused the next run as 'run-in-progress'. This matches pumpBasisChecks,
- * which keeps its job's failure out of the pump (`.catch(() => {})`); the
- * difference is that a callback throw here is reported to the console, not
- * dropped, so a real bug stays visible.
- */
-function notifyBulkScanCallback(fn, arg) {
-  try {
-    fn(arg);
-  } catch (err) {
-    console.error('bulk scan: a result/teardown callback threw; the run continues', err);
-  }
-}
-
-// ─── Bulk scan result classification + row paint (LIN-2701 §B.6) ───────────
-//
-// Presentation only: reads an already-settled pool entry ({item, outcome,
-// value|error}) and paints one row. Never mutates dueSelectedIds, never
-// re-enqueues, never feeds anything back into the pool above. The bulk-scan
-// run control wires this in as the pool's onResult callback (the `startBulkScan`
-// call).
-
-/**
- * Classify one settled bulk-scan pool entry into exactly one of seven
- * mutually exclusive buckets. The predicates are implemented as written in
- * the plan-review-corrected table (LIN-2701 §B.6) and must NOT be
- * simplified back — that table is itself the fix for a blocking
- * plan-review finding.
- *
- * 'scan failed' is checked FIRST, by the PRESENCE of a `statusCode` field on
- * the resolved body — never by enumerating values — so it can never fall
- * through to 'zero-finding'. `armKeepalive` (lib/http-keepalive.js:43)
- * commits HTTP 200 once its 25s flush fires and then delivers errors as
- * `{...body, statusCode}` *inside* that 200; `window.api` (public/common.js)
- * throws only on `!response.ok`, so a resolved body's `statusCode` is
- * otherwise invisible to the caller. The scan route's own healthy 200 body
- * (routes/workspace-api.js) is exactly `{status, id, issueId, decision,
- * scannedAt, outcome, outcomeAt, model}` — no `statusCode` key — so presence
- * has no false positive.
- *
- * 'scan failed' also absorbs `outcome === 'other'` that is NOT the
- * AI_NOT_CONFIGURED shape: a fast (pre-flush) 404/422/500/502, or a 503
- * that isn't AI_NOT_CONFIGURED (e.g. PRINCIPLE_ZERO_UNAVAILABLE), would
- * otherwise match no bucket — and every settled row must land in exactly
- * one.
- *
- * @param {{item: object, outcome: 'fulfilled'|'aborted'|'rate-limited'|'other', value?: object, error?: Error}} entry
- * @returns {'scan-failed'|'terminal-row-no-op'|'new-decision'|'zero-finding'|'skipped-quota'|'unavailable'|'cancelled'}
- */
-function classifyBulkScanResult(entry) {
-  const { outcome, value, error } = entry || {};
-
-  if (outcome === 'fulfilled') {
-    if (value && Object.prototype.hasOwnProperty.call(value, 'statusCode')) return 'scan-failed';
-    if (value && value.outcome != null) return 'terminal-row-no-op';
-    if (value && value.decision != null) return 'new-decision';
-    return 'zero-finding';
-  }
-  if (outcome === 'rate-limited') return 'skipped-quota';
-  if (outcome === 'aborted') return 'cancelled';
-  // outcome === 'other': the ONLY other named shape is AI_NOT_CONFIGURED
-  // (unavailable); every remaining fast throw must still land somewhere, and
-  // 'scan failed' is that catch-all — see the doc comment above.
-  if (error && error.status === 503 && error.body && error.body.code === 'AI_NOT_CONFIGURED') return 'unavailable';
-  return 'scan-failed';
-}
-
-// Copy per bucket. Terminal-row no-op is deliberately NOT worded like a
-// success (it burned a billed LLM call and raised nothing — conflating it
-// with new-decision/zero-finding would overstate the batch's productivity),
-// and quota/unavailable are deliberately distinct from each other (different
-// cause, same "didn't scan" effect — conflating them mislabels a config
-// problem as budget exhaustion).
-const BULK_SCAN_RESULT_COPY = {
-  'scan-failed': { cls: 'obs-bulk-result-failed', text: 'scan failed' },
-  'terminal-row-no-op': { cls: 'obs-bulk-result-noop', text: 'scanned — already ruled on, nothing changed' },
-  'new-decision': { cls: 'obs-bulk-result-decision', text: 'scanned — new decision raised' },
-  'zero-finding': { cls: 'obs-bulk-result-zero', text: 'scanned — nothing found' },
-  'skipped-quota': { cls: 'obs-bulk-result-quota', text: 'skipped — quota' },
-  'unavailable': { cls: 'obs-bulk-result-unavailable', text: 'unavailable — AI not configured' },
-  'cancelled': { cls: 'obs-bulk-result-cancelled', text: 'cancelled' }
-};
-
-/**
- * Paint one settled bulk-scan result into its due row, keyed by `issueId`
- * (`entry.item.identifier` — the same id `renderDueRowHtml` stamps onto the
- * row's own `data-issue-id`). Idempotent: painting the SAME issueId again
- * (including a late `onResult` arriving after `stopBulkScan()`'s teardown,
- * per §B.7's ordering note — teardown runs synchronously, ahead of any
- * already-issued job's rejection) replaces this row's ONE result badge
- * in place rather than appending a duplicate. A row that has left the DOM
- * (repainted away, scrolled out of a wholesale re-render) is simply not
- * painted — presentation-only, so the run itself is unaffected either way.
- * Never touches dueSelectedIds or any run-control state — see stopBulkScan's
- * own note that a late arrival must not revive a torn-down run; this
- * function has no access to that state at all, by construction.
- *
- * @param {{item: {identifier: string}}} entry
- */
-function paintBulkScanRowResult(entry) {
-  const issueId = entry && entry.item && entry.item.identifier != null ? String(entry.item.identifier) : null;
-  if (!issueId) return;
-  const list = document.getElementById('obs-due-list');
-  if (!list) return;
-  let row = null;
-  for (const child of list.children) {
-    if (child.dataset && child.dataset.issueId === issueId) { row = child; break; }
-  }
-  if (!row) return;
-
-  const bucket = classifyBulkScanResult(entry);
-  const copy = BULK_SCAN_RESULT_COPY[bucket];
-
-  let badge = row.querySelector('.obs-bulk-scan-result');
-  if (!badge) {
-    badge = document.createElement('span');
-    row.appendChild(badge);
-  }
-  badge.className = `obs-bulk-scan-result ${copy.cls}`;
-  badge.textContent = copy.text;
-}
-
 // ─── Controls ──────────────────────────────────────────────────────────────────
 
-// Switch the active Observation tab (LIN-1194, extended LIN-1728/LIN-2667).
-// The four views carry different data sets entirely (Autopilot excludes
+// Switch the active Observation tab (LIN-1194, extended LIN-1728).
+// The views carry different data sets entirely (Autopilot excludes
 // standalone; Sessions includes standalone but is running-only; Rulings is
-// unanswered decisions; Scan-due is due-check rows), so the feed state is
+// unanswered decisions), so the feed state is
 // reset before re-polling to keep them from bleeding together, and the
 // collapsed cards are torn down so a fresh poll rebuilds them for the new view.
 // Clear the feed's per-view state, so the views' distinct data sets never bleed
@@ -4663,8 +3578,7 @@ const VIEW_HINTS = {
   'runs:autopilot': 'Autopilot runs touched in the last 24 hours. Older runs are in the archive below.',
   'runs:standalone': 'Standalone runs, dispatched on their own rather than by autopilot, touched in the last 24 hours. Older ones are in the archive below.',
   'runs:all': 'Every run touched in the last 24 hours. Older runs are in the archive below.',
-  rulings: 'Every question waiting on you. Answer, dismiss or shelve each one here.',
-  due: 'Tasks checked for changed content since their last scan.'
+  rulings: 'Every question waiting on you. Answer or dismiss each one here.'
 };
 
 function syncViewChrome() {
@@ -4679,10 +3593,8 @@ function syncViewChrome() {
 
   const sessionViews = document.getElementById('obs-session-views');
   const rulingsSection = document.getElementById('obs-rulings-section');
-  const dueSection = document.getElementById('obs-due-section');
   if (sessionViews) sessionViews.hidden = currentView !== 'runs';
   if (rulingsSection) rulingsSection.hidden = currentView !== 'rulings';
-  if (dueSection) dueSection.hidden = currentView !== 'due';
 
   for (const btn of document.querySelectorAll('#obs-filter [data-filter]')) {
     const on = btn.dataset.filter === currentFilter;
@@ -4715,7 +3627,7 @@ function writeViewToUrl() {
 // all-runs filter unless a filter is given. Anything unknown opens on runs.
 function viewFromParams(params) {
   const view = params.get('view');
-  if (view === 'rulings' || view === 'due') return { view, filter: 'autopilot' };
+  if (view === 'rulings') return { view, filter: 'autopilot' };
   const explicit = params.get('filter');
   const fallback = view === 'sessions' ? 'all' : 'autopilot';
   return { view: 'runs', filter: FILTERS.includes(explicit) ? explicit : fallback };
@@ -4735,14 +3647,6 @@ function switchView(view) {
   renderWaitingBlock();
 
   setPollStatus('loading…');
-  // [C-2] pollCurrentView() no-ops for `due` (the [F-1] early return above),
-  // so the pill set to 'loading…' on the line above would otherwise strand
-  // there for as long as the tab is open. loadInitialDueCheckPage drives
-  // setPollStatus itself (● live / ● disconnected) on completion, exactly
-  // like the two pollers, so calling it here — alongside the now-harmless-
-  // for-`due` pollCurrentView() call — closes that gap rather than leaving it
-  // to a later discovery.
-  if (view === 'due') loadInitialDueCheckPage();
   pollCurrentView();
 }
 
@@ -4794,53 +3698,8 @@ function initControls() {
   const waitingMore = document.getElementById('obs-waiting-more');
   if (waitingMore) waitingMore.addEventListener('click', () => switchView('rulings'));
 
-  const dueMore = document.getElementById('obs-due-more');
-  if (dueMore) dueMore.addEventListener('click', loadMoreDueChecks);
-
-  // Retry affordance for an `error: true` row (LIN-2667): there is no
-  // per-row re-check endpoint, so retry re-runs the one-shot initial load —
-  // "leave it for the next load/reload", one of the two acceptable shapes
-  // the design calls out, via event delegation since rows are string-rendered.
-  //
-  // LIN-2706 §B.3 extends this SAME delegated listener with a second
-  // branch for the per-row `.obs-due-select` checkbox, rather than adding a
-  // separate listener — the feed repaints wholesale (loadInitialDueCheckPage/
-  // loadMoreDueChecks), so a per-row listener would accumulate across
-  // repaints; delegation on the list container is the one-attempt-only
-  // discipline `6be2857f` installed. A checkbox's native toggle happens
-  // BEFORE its `click` event fires, so `e.target.checked` already reflects
-  // the new state by the time this handler runs.
-  const dueList = document.getElementById('obs-due-list');
-  if (dueList) {
-    dueList.addEventListener('click', (e) => {
-      const retryBtn = e.target.closest('.obs-due-retry');
-      if (retryBtn) { loadInitialDueCheckPage(); return; }
-      const checkbox = e.target.closest('.obs-due-select');
-      if (!checkbox) return;
-      toggleDueSelection(checkbox.dataset.issueId, checkbox.checked);
-    });
-  }
-
-  // Select-all-loaded (LIN-2706 §B.3): a single static control, attached
-  // once — never repainted, so a plain listener (not delegation) is safe
-  // here, unlike the per-row checkboxes above.
-  const dueSelectAll = document.getElementById('obs-due-select-all');
-  if (dueSelectAll) {
-    dueSelectAll.addEventListener('click', (e) => {
-      setAllDueSelected(!!e.target.checked);
-    });
-  }
-
-  // LIN-2701 §B.7: rendered already wired (plan-review N3) — both static
-  // controls, attached once, same rationale as select-all-loaded above.
-  const dueScanSelected = document.getElementById('obs-due-scan-selected');
-  if (dueScanSelected) dueScanSelected.addEventListener('click', startDueBulkScan);
-
-  const dueStop = document.getElementById('obs-due-stop');
-  if (dueStop) dueStop.addEventListener('click', stopBulkScan);
-
   // Bulk-agree bar (LIN-2444 Phase 5) — both static controls, attached
-  // once, same rationale as the Scan-due pair just above.
+  // once: never repainted, so a plain listener (not delegation) is safe.
   const rulingSelectAll = document.getElementById('obs-ruling-select-all');
   if (rulingSelectAll) {
     rulingSelectAll.addEventListener('click', (e) => {
@@ -4909,7 +3768,6 @@ function init() {
   currentView = opened.view;
   currentFilter = opened.filter;
   syncViewChrome();
-  if (currentView === 'due') loadInitialDueCheckPage();
   renderWaitingBlock();
   startPolling();
 }
@@ -4983,10 +3841,8 @@ export {
     // control-disable set — each unit-testable without simulating a DOM click.
     // dismissRulingRow (LIN-2225, pre-existing) is exposed alongside them so
     // the review's third open selection-clearing instance is directly
-    // testable, not just inferred from Agree/Keep's coverage. shelveRulingRow
-    // is exposed the same way (review F8, `0708a260`) — the sixth instance
-    // of the class, found in the round-3 review.
-    issueDismissRequest, agreeRulingRow, keepRulingRow, dismissRulingRow, shelveRulingRow, rulingRowControls,
+    // testable, not just inferred from Agree/Keep's coverage.
+    issueDismissRequest, agreeRulingRow, keepRulingRow, dismissRulingRow, rulingRowControls,
     // Review F2: rulingsSettled is exposed below (shared with LIN-2444
     // Phase 5's own export block) so the settled-state regression pins the
     // same seam both the single-click and bulk fixes read/write.
@@ -5029,10 +3885,6 @@ export {
     // LIN-2244: expose the parked-wait seam (same lean-feed reasoning) for
     // unit testing.
     sessionParkedWait,
-    // LIN-2241 tier 1: expose the basis-check seam — the request-volume guards
-    // (one attempt per row, the concurrency gate, the per-page ceiling) and the
-    // strict `=== true` render are the parts most likely to regress silently.
-    requestBasisCheck, applyBasisResult, basisCheckCache, basisCheckStarted, BASIS_CHECK_MAX_PER_PAGE,
     // LIN-3983: the waiting block's pure rule, the view/filter URL contract, and
     // the poll/switch seams the view model is unit-tested through.
     compactWaitSessions, stripFeedbackMarkers, viewFromParams, scopeFromParams, renderWaitingBlock,
@@ -5040,46 +3892,4 @@ export {
     repaintWaitingCardHeads,
     getOpenLoopIds, setOpenLoopIds,
     lastRulingsRef, standaloneWaitSupplement, sessionIndex,
-    // LIN-2649 S4 / LIN-2667: the scan-due tab seam — tri-state copy/rendering,
-    // the never-ambient dispatch (pollCurrentView, switchView), and pagination
-    // (loadInitialDueCheckPage/loadMoreDueChecks, dueUrl) are all unit-testable
-    // without a DOM via this export.
-    dueStatusCopy, renderDueRowHtml, dueUrl, updateDueDayOneNotice, paintDuePage,
-    loadInitialDueCheckPage, loadMoreDueChecks,
-    // LIN-2706 §B.2/§B.3: the selection lifecycle + selection-UI seam.
-    // `dueSelectedIds` is exported directly (a `const` Set, mutated in
-    // place — never reassigned, so this reference stays live) so a test can
-    // assert lifecycle behaviour (clear/survive/prune) against the SAME Set
-    // the render/toggle functions read and write, not a hand-rolled copy.
-    // `toggleDueSelection`/`setAllDueSelected` are extracted, like
-    // startBulkScan/stopBulkScan below, so the delegated-listener bodies are
-    // directly callable without simulating a DOM click event.
-    dueSelectedIds, toggleDueSelection, setAllDueSelected, syncDueBulkBar, repaintDueRows,
-    // LIN-2760: the select-all-coverable population (due + unknown) — exposed
-    // so the ruling's four-status boundary is directly unit-testable, the
-    // same seam `rulingsSelectableKeys` already opens for the rulings tab.
-    dueSelectableItems,
-    // LIN-2701 §B.7: the run control's own entry point, extracted like
-    // toggleDueSelection/setAllDueSelected above, so a test can drive a run
-    // directly without simulating a DOM click.
-    startDueBulkScan,
-    // LIN-2706 §B.4/§B.5/§B.8: exact count, honest cost estimate, and the
-    // over-ceiling refusal — each a standalone pure(ish) function so its
-    // states (unknown vs $0.00, refused vs within-ceiling) are directly
-    // unit-testable without a DOM.
-    dueSelectedCountText, formatDueScanCostEstimate, dueBulkScanRefusalMessage,
-    // LIN-2700 / LIN-2651 Phase 2: the bulk-scan pool seam — the concurrency/
-    // ceiling constants, the run entry point + stop, and the two pure helpers
-    // (selection refusal, error classification) are the parts a regression
-    // would be invisible without a direct test for. pump() itself is now
-    // per-run closure state (not exported) — see startBulkScan's own comment
-    // on why the queue/in-flight counter/AbortController had to stop being
-    // module-level to fix a cross-run corruption bug found in beat 4.
-    startBulkScan, stopBulkScan, checkBulkScanSelection, classifyBulkScanError,
-    BULK_SCAN_CONCURRENCY, BULK_SCAN_MAX_PER_RUN,
-    // LIN-2701 §B.6: the seven-way result classifier + its per-row paint —
-    // exposed so the predicate chain is directly unit-testable without a
-    // DOM, and so the bulk-scan run control passes paintBulkScanRowResult
-    // straight into startBulkScan's onResult.
-    classifyBulkScanResult, paintBulkScanRowResult, BULK_SCAN_RESULT_COPY,
 };

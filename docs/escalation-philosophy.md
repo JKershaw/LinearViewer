@@ -179,6 +179,8 @@ EEMUA sanctions two forms of deliberate silence, and it is important they are
 - **Shelving** — temporarily removing an alarm the operator has consciously
   chosen to defer. The agent equivalent is a **snooze/defer with a reason and a
   re-surface timer**, so a deferred escalation cannot be silently lost.
+  (Harbour built this as LIN-1727 and retired it unused in LIN-4540: a question
+  is answered or dismissed.)
 - **Mode-based suppression** — not alarming on low flow when the unit is
   deliberately shut down. The agent equivalent is suppressing escalations that
   are *expected for the run mode*: a research/spike run that is *supposed* to

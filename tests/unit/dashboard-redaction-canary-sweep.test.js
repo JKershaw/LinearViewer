@@ -17,7 +17,7 @@
  *
  * Exhaustiveness comes from the router's own registry (`enumerateRoutes`, which
  * descends nested routers and throws on a layer it cannot classify), asserted
- * at 24 routes, with a per-route row saying whether the route reads dispatch rows.
+ * at 23 routes (LIN-4540 removed the shelve route), with a per-route row saying whether the route reads dispatch rows.
  * The positive control: a "reads" route must reach at least one fake read
  * (`listItems`, `listHistory`, `getItemStatus`; the `...WithPrompt` /
  * `...WithBodies` variants are left undefined so lib/pipeline-loops.js's lean
@@ -57,7 +57,7 @@ const NOW_ISO = new Date().toISOString();
 const WORKER_ID = '22222222-3333-4444-8555-666666666666';
 const URL_VALUES = { wsUrlKey: 'alpha', identifier: 'LIN-1' };
 
-const EXPECTED_ROUTES = 24;
+const EXPECTED_ROUTES = 23;
 
 // Which routes read dispatch rows through the queue store. `run-page` marks the
 // four routes LIN-3349 owns. A route that does not read says why.
@@ -74,7 +74,6 @@ const ROUTE_TABLE = {
   'POST /workspace/:urlKey/api/dashboard/rulings/dismiss': { reads: false, why: 'stamps a decision (a write); returns {success}' },
   'POST /workspace/:urlKey/api/dashboard/rulings/reverse-withdrawal': { reads: false, why: 'stamps a decision (a write); returns {success}' },
   'POST /workspace/:urlKey/api/dashboard/rulings/answer': { reads: false, why: 'task-decisions store only' },
-  'POST /workspace/:urlKey/api/dashboard/rulings/shelve': { reads: false, why: 'shelved-rulings store only' },
   'POST /workspace/:urlKey/api/dashboard/rulings/keep': { reads: false, why: 'dismissal-suggestions store only' },
   'GET /workspace/:urlKey/escalation-kpis': { reads: false, why: 'LIN-4538: counts from question records, no dispatch row' },
   'GET /workspace/:urlKey/api/escalation-kpis': { reads: false, why: 'LIN-4538: counts from question records, no dispatch row' },

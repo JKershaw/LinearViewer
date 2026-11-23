@@ -106,8 +106,6 @@ const ANCHORS = [
 const WORKSPACE_WIDE_ONLY = ['feedback-title', 'roadmap', 'roadmap-orientation', 'roadmap-chat', 'observer-pass'];
 const HARBOUR_OLD = {
   ...Object.fromEntries(AI_OPERATION_KINDS.map((op) => [op, (args) => frozen.resolveAiOperationModel({ ...args, opKind: op })])),
-  // workspace-api.js read the `scan` override for the retire re-scan as well.
-  'scan-retire': (args) => frozen.resolveAiOperationModel({ ...args, opKind: 'scan' }),
   ...Object.fromEntries(WORKSPACE_WIDE_ONLY.map((id) => [id, (args) => frozen.resolveWorkspaceModel(args)])),
   // Frozen old side (LIN-3856): run-paragraph was hard-coded, no clamp, no store.
   'run-paragraph': async () => DEFAULT_MODEL
@@ -300,10 +298,13 @@ describe('witness: the store answers as the resolvers did at 6ea1371e', () => {
     }
   });
 
-  test('a scan override also reaches scan-retire, as the retire route read it', async () => {
+  // LIN-4540: the scan and its jobs retired. A stored scan override stays as history; the fixtures above keep it as a
+  // stray key, and no job resolves through it.
+  test('a stored scan override is read by no job (the scan retired, LIN-4540)', async () => {
     const fx = await fixtureFor(300, PREFS['a scan override']);
-    for (const opKind of ['scan', 'scan-retire']) {
-      assert.equal(await resolveAiOperationModel({ urlKey: fx.urlKey, workspacePreferencesStore: fx.preferencesStore, opKind }), 'anthropic/scan-m');
+    assert.equal(JOBS.some((j) => j.id === 'scan' || j.id === 'scan-retire'), false);
+    for (const job of JOBS.filter((j) => j.surface === 'harbour-call')) {
+      assert.notEqual(await resolveAiOperationModel({ urlKey: fx.urlKey, workspacePreferencesStore: fx.preferencesStore, opKind: job.id }), 'anthropic/scan-m', job.id);
     }
   });
 
