@@ -426,7 +426,8 @@ export function registerIssueWriteRoutes(router, { workspaceFromUrl, dispatchQue
       const answer = normalizeCommentWrite(await postHarbourComment({
         urlKey: workspace.urlKey,
         store: harbourCommentsStore,
-        post: () => writer.createComment(callScope, issueId, attributedBody)
+        clientIds: writer.clientCommentIds === true,
+        post: (commentId) => writer.createComment(callScope, issueId, attributedBody, commentId)
       }));
       const commentId = answer.comment?.id;
       if (answer.success !== false && commentId) {
@@ -434,7 +435,7 @@ export function registerIssueWriteRoutes(router, { workspaceFromUrl, dispatchQue
         try {
           const ticket = looksLikeTicket(issueId) ? issueId : (await writer.issueDetail(callScope, issueId))?.identifier;
           const filed = ticket
-            ? await recordPersonReplyFinding({ ctx: { provider: writer, token: callScope }, urlKey: workspace.urlKey, ticket, accountId: req.session.accountId, commentId, body })
+            ? await recordPersonReplyFinding({ ctx: { provider: writer, token: callScope }, urlKey: workspace.urlKey, ticket, accountId: req.session.accountId, commentId, body, createdAt: answer.comment?.createdAt })
             : { ok: false, reason: `${issueId} could not be read to name its ticket` };
           if (!filed.ok) console.error(`[comment-ingest] the reply ${commentId} on ${issueId} (${workspace.urlKey}) has no finding: ${filed.reason}`);
         } catch (err) {

@@ -109,7 +109,7 @@ describe('the hermetic test token: a declared testTransport is skipped, an undec
     calls = [];
     kept = getLinearFetchImpl();
     setLinearFetchImpl(async (url, options = {}) => {
-      calls.push({ url: String(url), authorization: new Headers(options.headers).get('authorization') });
+      calls.push({ url: String(url), authorization: new Headers(options.headers).get('authorization'), query: String(options.body ?? '') });
       return new Response(JSON.stringify({ data: null, errors: [{ message: 'refused by the counting transport' }] }), {
         status: 200, headers: { 'content-type': 'application/json' },
       });
@@ -124,10 +124,14 @@ describe('the hermetic test token: a declared testTransport is skipped, an undec
     assert.equal((await queuedRows()).length, 1, 'the dispatch enqueued');
   });
 
-  test('the control: Linear with any other token keeps its access (and still reads nothing)', async () => {
+  test('the control: Linear with any other token keeps its access, and its one read is the comments (never the description)', async () => {
     await dispatch({ issueIdentifier: 'LIN-9', issueAccess: () => ({ provider: linearProvider, token: 'real-token' }) });
     assert.equal(seat[0].access?.token, 'real-token');
-    assert.deepEqual(calls, [], 'the dispatch itself makes no issue read');
+    // LIN-4535 (finding-83a0ca32): the seat ingests the ticket's person comments, so its one tracker read is the comments query.
+    // The description is still read by no dispatch (LIN-4504).
+    assert.equal(calls.length, 1, 'the seat\'s one tracker read');
+    assert.match(calls[0].query, /comments/, 'the read is the comments');
+    assert.doesNotMatch(calls[0].query, /description/, 'the description is never read at dispatch');
     assert.equal((await queuedRows()).length, 1);
   });
 

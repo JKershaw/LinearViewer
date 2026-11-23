@@ -330,7 +330,7 @@ export function createProxyWriteRoutes({
   /** Create a comment and answer 201; `remember` sees the payload once the write is accepted. */
   async function postComment({ req, res, endpoint, token, provider }, text, remember) {
     // LIN-4535 (D4): the post and its ledger record are one seam (lib/harbour-comment-post.js); a failed record never fails the post.
-    const posted = await postHarbourComment({ urlKey: req.proxyUrlKey, store: harbourCommentsStore, post: () => provider.createComment(token, req.params.issueId, text) });
+    const posted = await postHarbourComment({ urlKey: req.proxyUrlKey, store: harbourCommentsStore, clientIds: provider.clientCommentIds === true, post: (commentId) => provider.createComment(token, req.params.issueId, text, commentId) });
     const created = normalizeWritePayload(posted, 'comment');
     // A clear failure instead of a misleading 201 when the provider reports the write did not land.
     if (writeRejected(req, res, endpoint, created, 'Comment was not created')) return;

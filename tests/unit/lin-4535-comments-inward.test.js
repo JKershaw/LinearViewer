@@ -250,7 +250,7 @@ describe('a person\'s comment reaches its task once, as a finding (ingestPersonC
   });
 });
 
-describe('the ender: a run ends the person findings it carried (endCarriedPersonFindings)', () => {
+describe('the ender: a run ends the person findings its brief carried (endCarriedPersonFindings)', () => {
   let writes;
   let ended;
   beforeEach(() => {
@@ -264,21 +264,21 @@ describe('the ender: a run ends the person findings it carried (endCarriedPerson
     configureCommentIngest({ writes, listPeople: async () => [], cutoffOf: async () => null, ledger: fakeLedger(), taskForTicket: async () => null, taskOfTicket: async () => null });
   });
 
-  test('a finding written before the run opened is ended done, by harbour; one written after it stays open', async () => {
+  test('a finding the run\'s brief carried is ended done, by harbour; one it did not carry stays open', async () => {
     const findings = [
-      { id: 'f-before', by: 'person:mo', via: 'comment', at: T('09:30') },
-      { id: 'f-after', by: 'person:mo', via: 'comment', at: T('10:30') },
+      { id: 'f-carried', by: 'person:mo', via: 'comment', at: T('09:30') },
+      { id: 'f-not-carried', by: 'person:mo', via: 'comment', at: T('09:40') },
       { id: 'f-agent', by: 'stage:implementation', via: null, at: T('09:00') }
     ];
-    const out = await endCarriedPersonFindings({ urlKey: URL_KEY, runId: 'run-1', taskId: 'task-1', openedAt: T('10:00'), findings });
-    assert.deepEqual(out, ['f-before']);
-    assert.deepEqual(ended, [{ id: 'f-before', state: 'done', by: 'harbour' }]);
+    const out = await endCarriedPersonFindings({ urlKey: URL_KEY, runId: 'run-1', carried: new Set(['f-carried', 'f-agent']), findings });
+    assert.deepEqual(out, ['f-carried']);
+    assert.deepEqual(ended, [{ id: 'f-carried', state: 'done', by: 'harbour' }]);
   });
 
-  test('no task, or no opening time: nothing is ended', async () => {
+  test('nothing carried, or no ingest configured: nothing is ended', async () => {
     const findings = [{ id: 'f', by: 'person:mo', via: 'comment', at: T('09:00') }];
-    assert.deepEqual(await endCarriedPersonFindings({ urlKey: URL_KEY, runId: 'r', taskId: null, openedAt: T('10:00'), findings }), []);
-    assert.deepEqual(await endCarriedPersonFindings({ urlKey: URL_KEY, runId: 'r', taskId: 't', openedAt: null, findings }), []);
+    assert.deepEqual(await endCarriedPersonFindings({ urlKey: URL_KEY, runId: 'r', carried: new Set(), findings }), []);
+    assert.deepEqual(await endCarriedPersonFindings({ urlKey: URL_KEY, runId: 'r', carried: null, findings }), []);
     assert.equal(ended.length, 0);
   });
 });
@@ -319,9 +319,9 @@ describe('census: the comment seam and the authorship reader (LIN-4535)', () => 
     }
   });
 
-  test('only the comment-ingest and the Linear mapping read a comment\'s author id, and only the workspace-people reader holds a tracker user id', () => {
+  test('only the comment-ingest and the providers\' comment mappings carry a comment\'s author id, and only the workspace-people reader holds a tracker user id', () => {
     const readers = sourceFiles().filter((f) => /\bauthorId\b/.test(readSrc(f))).sort();
-    assert.deepEqual(readers, ['lib/comment-ingest.js', 'lib/providers/linear/index.js'], 'authorship is decided in one reader');
+    assert.deepEqual(readers, ['lib/comment-ingest.js', 'lib/providers/github/index.js', 'lib/providers/jira/index.js', 'lib/providers/linear/index.js'], 'authorship is decided in one reader; the providers only map their author id onto the comment');
     const holders = sourceFiles().filter((f) => /trackerUserId/.test(readSrc(f))).sort();
     assert.deepEqual(holders, ['lib/comment-ingest.js', 'lib/workspace-people.js'].sort());
   });
