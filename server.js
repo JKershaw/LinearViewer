@@ -3887,7 +3887,7 @@ app.get('/workspace/:urlKey/api/home-waiting', workspaceFromUrl, async (req, res
   try {
     const featureFlags = await requestFeatureFlags(req);
     if (featureFlags.runControls !== true) return jsonError(res, 403, 'Waiting on you is for the workspace owner');
-    // LIN-4532 (P2b): the open questions are counted with the rulings (the count and the badge), drawn on the page load only.
+    // LIN-4532 (P2b): the open questions are counted with the rulings (the count and the badge).
     const { ruling, questions = [] } = await waitingStanding({ urlKey: workspace.urlKey, accountId: req.session.accountId });
     const rows = ruling ? ruling.rows : [];
     // The task titles come from the held issue set when it is warm (a read, no provider call); a cold set leaves them to

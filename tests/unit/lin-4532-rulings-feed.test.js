@@ -137,4 +137,22 @@ describe('the rulings feed carries open questions', () => {
     assert.equal(body.workspaceCount, body.rulings.filter((r) => r.anchor?.workspaceUrlKey === URL_KEY).length);
     assert.ok(body.rulings.every((r) => r.kind === 'question'));
   });
+
+  test('a failed question read costs only the questions: the feed still answers 200 with no rows (finding-ab3270e4)', async () => {
+    const run = await askingRun('run-feed-5');
+    await askQuestion({ run, asks: 'Unreadable' });
+    const realFind = records.find.bind(records);
+    records.find = async (urlKey, query) => {
+      if (query?.kind === 'question') throw new Error('records store unavailable');
+      return realFind(urlKey, query);
+    };
+    try {
+      const body = await feed();
+      assert.deepEqual(body.rulings, []);
+      assert.equal(body.count, 0);
+      assert.equal(body.workspaceCount, 0);
+    } finally {
+      records.find = realFind;
+    }
+  });
 });

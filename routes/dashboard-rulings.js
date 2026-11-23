@@ -127,7 +127,9 @@ function rulingsFeed({ sessionsFeedCache, mergeLoops, taskDecisionsStore, shelve
       // 5s ambient nav-badge poll (see the comment atop this handler), which
       // must never evaluate it — full stop, not merely omitted by convention.
       // LIN-4532 (P2b): the person's open questions, appended as rows of this same list, so count, workspaceCount and the page agree.
-      const questionRows = await openQuestionRowsFor({ session: req.session, workspaces, recordsStore, dispatchQueueStore, accountStore });
+      // A failed records or dispatch-store read costs only the questions, never the feed the 5s badge poll reads (finding-ab3270e4).
+      const questionRows = await openQuestionRowsFor({ session: req.session, workspaces, recordsStore, dispatchQueueStore, accountStore })
+        .catch(() => []);
       const rulings = [
         ...attachStandingSuggestions(
           collectUnansweredDecisions(

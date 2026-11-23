@@ -116,4 +116,24 @@ describe('openQuestionsFor', () => {
     await askQuestion({ run: null });
     assert.deepEqual(await openQuestionsFor({ recordsStore: records, dispatchStore: dispatch, urlKey: URL_KEY, accountId: null }), []);
   });
+
+  test('each question\'s versions are read once, not twice (finding-de388107)', async () => {
+    const run = await askingRun('run-open-reads', { feedback: blocked() });
+    const ids = [await askQuestion({ run, asks: 'One' }), await askQuestion({ run, asks: 'Two' })];
+    const realVersionsOf = records.versionsOf.bind(records);
+    let reads = 0;
+    // The per-question reads: one question id on its own. `find` reads every candidate in one batched call, which is not counted.
+    records.versionsOf = async (urlKey, recordIds, ...rest) => {
+      if (recordIds?.length === 1 && ids.includes(recordIds[0])) reads += 1;
+      return realVersionsOf(urlKey, recordIds, ...rest);
+    };
+    try {
+      const rows = await listed();
+      assert.equal(rows.length, 2);
+      assert.ok(rows.every((r) => r.runId === run && r.askedAt), 'run and askedAt still come from the v1 snapshot');
+      assert.equal(reads, 2, 'one versionsOf read per question');
+    } finally {
+      records.versionsOf = realVersionsOf;
+    }
+  });
 });
