@@ -94,6 +94,9 @@ const runStore = (rows, live = [], { failRead = false } = {}) => ({
 const TASK_WORDS = {};
 const askedRecords = () => ({
   askedForTicket: async (_urlKey, ticket) => TASK_WORDS[ticket] ?? null,
+  // LIN-4535: the ticket's task and its person findings (none: no person comment in this harness).
+  taskForTicket: async (_urlKey, ticket) => (TASK_WORDS[ticket] ? `task-${ticket}` : null),
+  find: async () => [],
   askedForTickets: async (_urlKey, tickets) => new Map(tickets.filter((t) => TASK_WORDS[t]).map((t) => [t, TASK_WORDS[t]])),
   // LIN-4504: the plan facts the same entrance reads; no plan record on any of these tickets.
   planFactsForTickets: async (_urlKey, tickets) => new Map(tickets.map((t) => [t, planFactsOf({ task: { id: `task-${t}`, kind: 'task' } })]))

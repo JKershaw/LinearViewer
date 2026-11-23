@@ -10,6 +10,7 @@ import { recentRuns, loadRecentRuns, formatRecentRuns, RECENT_RUNS } from '../..
 import { buildRouterPrompt } from '../../lib/stage-router.js';
 import { buildSelectorArgs } from '../../lib/openrouter.js';
 import { planReviewRunOf } from '../../lib/records/plan-review-run.js';
+import { withPersonFindings } from './helpers/person-findings.js';
 
 const fb = (message, timestamp) => ({ message, timestamp });
 const row = (kind, over = {}) => ({ kind, status: 'taken', dispatchedAt: '2026-10-04T14:00:00.000Z', feedback: [], ...over });
@@ -112,9 +113,13 @@ describe('the selector sees a revised plan from the runs alone (LIN-3300)', () =
   // folds it), not a comment; the person's comment is still read from the ticket. No review and no landing on record.
   const planReviewRun = planReviewRunOf({ verdicts: [{ id: 'verdict-1', at: '2026-10-04T14:46:17.000Z', run: 'run-plan-review', fields: { judgement: 'plan-review', outcome: 'request-changes' } }] });
   const trail = { review: null, landing: [], workAfterReview: false, closeOutAfterReview: false, closeOutOnTrail: false, landingHasNotesPr: false, notesPrs: [], auditAfterCloseOut: false };
-  const person = { user: 'John', createdAt: '2026-10-04T14:48:05.000Z', body: 'F3 is right; take the narrow revision.' };
+  const person = { user: 'John', person: true, createdAt: '2026-10-04T14:48:05.000Z', body: 'F3 is right; take the narrow revision.' };
   const runs = recentRuns([done('plan', '2026-10-04T14:34:25.000Z'), done('plan-review', '2026-10-04T14:46:34.000Z'), done('plan', '2026-10-04T14:51:34.000Z')]);
-  const prompt = (context) => buildRouterPrompt(buildSelectorArgs(issue, { comments: [person], trail, planReviewRun, ...context }));
+  // LIN-4535: the person's comment is read as its finding (tests/unit/helpers/person-findings.js).
+  const prompt = (context) => {
+    const { comments, personFindings } = withPersonFindings([person]);
+    return buildRouterPrompt(buildSelectorArgs(issue, { comments, personFindings, trail, planReviewRun, ...context }));
+  };
 
   test('a plan run after the verdict, with nothing in the comments, is a visible fact', () => {
     const p = prompt({ runs });
@@ -128,6 +133,6 @@ describe('the selector sees a revised plan from the runs alone (LIN-3300)', () =
   test('with no runs the selector decides from the ticket, as before', () => {
     const p = prompt({});
     assert.doesNotMatch(p, /Recent runs/);
-    assert.match(p, /an agent acted after it \(a note, landed work or a close-out\): no/);
+    assert.match(p, /a run was dispatched after it, or landed work followed: no/);
   });
 });

@@ -197,7 +197,8 @@ describe('fetchIssueContext comment projection carries commentId, never id (LIN-
     const context = await fetchIssueContext(API_KEY, 'LIN-1');
     const keys = Object.keys(context.comments[0]);
     assert.ok(!keys.includes('id'), `projected comment must never carry a literal "id" key, got: ${keys.join(', ')}`);
-    assert.deepStrictEqual(keys.sort(), ['body', 'commentId', 'createdAt', 'user'].sort());
+    // LIN-4535: authorId is the author's tracker user id, read only by the comment-ingest (lib/comment-ingest.js).
+    assert.deepStrictEqual(keys.sort(), ['authorId', 'body', 'commentId', 'createdAt', 'user'].sort());
   });
 });
 

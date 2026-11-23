@@ -24,6 +24,7 @@ import { createWorkspaceApiRoutes } from '../../routes/workspace-api.js';
 import { registerProvider } from '../../lib/providers/registry.js';
 import { ProviderInterface } from '../../lib/providers/interface.js';
 import { HarbourCommentsStore } from '../../lib/harbour-comments-store.js';
+import { LEDGER_ATTEMPTS } from '../../lib/harbour-comment-post.js';
 
 const ISSUE_ID = '11111111-1111-1111-1111-111111111111';
 // Minimal but valid PNG magic bytes (≥12 bytes), matching the fixtures in
@@ -64,9 +65,9 @@ function makeFakeLedger({ throwOnRecord = false } = {}) {
   };
 }
 
-// LIN-2664 F2: the ORIGINAL create's ledger write fails once, then heals on
-// any later attempt — models a transient ledger outage that has cleared by
-// the time a dedupe-hit resubmission re-attempts the record.
+// LIN-2664 F2: the ORIGINAL create's ledger write fails every attempt of its
+// bounded retry (LIN-4535), then heals — models a ledger outage that has cleared
+// by the time a dedupe-hit resubmission re-attempts the record.
 function makeFlakyLedger() {
   const calls = [];
   let attempt = 0;
@@ -75,7 +76,7 @@ function makeFlakyLedger() {
     async record({ urlKey, commentId }) {
       attempt += 1;
       calls.push({ urlKey, commentId, attempt });
-      if (attempt === 1) throw new Error('ledger down (first attempt)');
+      if (attempt <= LEDGER_ATTEMPTS) throw new Error('ledger down (the original create\'s attempts)');
       return { urlKey, commentId, recordedAt: new Date().toISOString() };
     },
   };
@@ -205,10 +206,10 @@ describe('seam 1 — POST /api/proxy/issues/:issueId/comments (routes/proxy-writ
     assert.strictEqual(status, 201);
     assert.strictEqual(body.success, true);
     assert.ok(body.comment?.id);
-    assert.strictEqual(ledger.calls.length, 1, 'the single (failed) attempt still happened');
+    assert.strictEqual(ledger.calls.length, LEDGER_ATTEMPTS, 'every attempt at the failed record still happened, then the write answered');
   });
 
-  test('no retry: a failed ledger write is attempted exactly once and never re-entered', async () => {
+  test('LIN-4535: a failed ledger write is retried LEDGER_ATTEMPTS times, then the write is not re-entered', async () => {
     const provider = new FakeWriteProvider({ name: 'seam1-noretry' });
     const ledger = makeFakeLedger({ throwOnRecord: true });
     const app = buildProxyApp({ provider, harbourCommentsStore: ledger });
@@ -216,7 +217,7 @@ describe('seam 1 — POST /api/proxy/issues/:issueId/comments (routes/proxy-writ
     await postProxyComment(app, ISSUE_ID, { body: 'seam1-noretry body' });
     await new Promise(r => setTimeout(r, 20)); // give any stray retry timer a chance to fire
 
-    assert.strictEqual(ledger.calls.length, 1);
+    assert.strictEqual(ledger.calls.length, LEDGER_ATTEMPTS);
   });
 
   test('no harbourCommentsStore configured → route still 201s (optional dependency, never a hard failure)', async () => {
@@ -238,13 +239,13 @@ describe('seam 1 — POST /api/proxy/issues/:issueId/comments (routes/proxy-writ
 
     const first = await postProxyComment(app, ISSUE_ID, { body });
     assert.strictEqual(first.status, 201);
-    assert.strictEqual(ledger.calls.length, 1, 'the original create attempted (and failed) its ledger record');
+    assert.strictEqual(ledger.calls.length, LEDGER_ATTEMPTS, 'the original create attempted (and failed) its ledger record every time');
 
     const second = await postProxyComment(app, ISSUE_ID, { body });
     assert.strictEqual(second.status, 200);
     assert.strictEqual(second.body.deduped, true, 'still served from the dedupe cache — no second comment minted');
     assert.strictEqual(provider.calls.createComment.length, 1, 'no second provider write on the dedupe hit');
-    assert.strictEqual(ledger.calls.length, 2, 'the dedupe hit re-attempted the ledger record');
+    assert.strictEqual(ledger.calls.length, LEDGER_ATTEMPTS + 1, 'the dedupe hit re-attempted the ledger record');
     assert.strictEqual(
       ledger.calls[1].commentId,
       first.body.comment.id,
@@ -276,7 +277,7 @@ describe('seam 2 — POST /api/proxy/issues/:issueId/attachments, comment target
 
     assert.strictEqual(status, 201);
     assert.strictEqual(body.success, true);
-    assert.strictEqual(ledger.calls.length, 1);
+    assert.strictEqual(ledger.calls.length, LEDGER_ATTEMPTS);
   });
 });
 
@@ -305,7 +306,7 @@ describe('seam 3 — POST /workspace/:urlKey/api/comments/:issueId (routes/works
     assert.strictEqual(status, 201);
     assert.strictEqual(body.success, true);
     assert.match(body.comment.body, /Ruling recorded via Harbour/);
-    assert.strictEqual(ledger.calls.length, 1);
+    assert.strictEqual(ledger.calls.length, LEDGER_ATTEMPTS);
   });
 
   test('no harbourCommentsStore configured → route still 201s (optional dependency, never a hard failure)', async () => {

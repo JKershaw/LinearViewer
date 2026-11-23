@@ -15,6 +15,8 @@ import { join } from 'node:path';
 import { createMangoTmpdir } from '../../tests/fixtures/mango-tmpdir.js';
 import { recordsStoreFor, seedTicketRecords } from '../../tests/helpers/records-scenario.js';
 import { trailForTicket } from '../../lib/task-standing.js';
+import { personFindingsOf } from '../../lib/comment-ingest.js';
+import { fixedIdOf } from '../../lib/records/refs.js';
 import { landingChangesFor } from '../../lib/records/landing.js';
 import { loopFactsOf } from '../../lib/recommendation-facts.js';
 
@@ -30,6 +32,22 @@ function sidecarOf(recordsDir, fileName) {
  * @param {Array<{file: string, targets: Array<{id: string}>, bundles: Object<string, object>}>} workspaces
  * @param {string} recordsDir
  */
+/**
+ * LIN-4535: the person findings a fixture's comments make, by the rule the ingest applies to a comment: a comment by John is
+ * the person's (the fixture's author names the person, standing in for the tracker user id). Each comment is given a
+ * commentId (its index, when it has none), so the findings carry the ids the selector matches on.
+ */
+function personFindingsOfFixture(comments) {
+  const findings = [];
+  comments.forEach((c, i) => {
+    if (!c) return;
+    if (!c.commentId) c.commentId = `fixture-comment-${i}`;
+    if (typeof c.user !== 'string' || !/John/.test(c.user)) return;
+    findings.push({ id: fixedIdOf('finding', 'comment', c.commentId), by: 'person:john', via: 'comment', at: c.createdAt, fields: { says: c.body } });
+  });
+  return personFindingsOf(findings);
+}
+
 export async function attachRecordsContext(workspaces, recordsDir) {
   const harness = createMangoTmpdir('eval-dense-records-');
   await harness.connect();
@@ -51,10 +69,14 @@ export async function attachRecordsContext(workspaces, recordsDir) {
         await seedTicketRecords(store, urlKey, ticket, entry.events);
         counts.seeded += 1;
       }
+      // LIN-4535: a person's comment is its finding (lib/comment-ingest.js). A fixture's comment is the person's when its author
+      // is John, and each gets the id the ingest would have given it, so the selector reads the same findings it reads live.
+      const personFindings = personFindingsOfFixture(b.comments || []);
       b.recordsContext = {
         trail: await trailForTicket({ recordsStore: store, urlKey, ticket }),
         landingChanges: await landingChangesFor({ urlKey, ticket, recordsStore: store }),
-        planReviewLoop: loopFactsOf(await store.planReviewRunForTicket(urlKey, ticket), b.comments || []),
+        personFindings,
+        planReviewLoop: loopFactsOf(await store.planReviewRunForTicket(urlKey, ticket), personFindings),
       };
     }
   }

@@ -33,7 +33,8 @@ import { taskMarkOf, markedTaskOf, childTicketDescriptionOf } from '../../lib/re
 import { summaryOpeningOf } from '../../lib/records/summary.js';
 import { isTerminalState } from '../../lib/providers/state-map.js';
 import { STAGE_KINDS } from '../../lib/prompts/stage-kinds.js';
-import { isPersonComment, withoutHarbourSummaries, isHarbourSummary } from '../../lib/run-trail.js';
+import { withoutHarbourSummaries, isHarbourSummary } from '../../lib/run-trail.js';
+import { personCommentsOf } from '../../lib/comment-ingest.js';
 import { assembleTrailFacts } from '../../lib/recommendation-facts.js';
 import { trackerPortOf } from '../../lib/records-tracker.js';
 import { LocalStore } from '../../lib/local-store.js';
@@ -246,7 +247,8 @@ describe('LIN-4503: child tickets and plan summaries', () => {
   test('10. a summary is not a person\'s comment nor a plan comment, even with an Implementation Plan heading', async () => {
     const summary = `${summaryOpeningOf('plan-1a2b3c4d', 1)}\n\nFirst version.\n\n## Implementation Plan\n\n**Session fit:** needs multiple sessions.\n\nplan-review due: yes`;
     assert.equal(isHarbourSummary(summary), true);
-    assert.equal(isPersonComment(summary), false);
+    assert.deepEqual(personCommentsOf([{ id: 'summary', createdAt: '2026-11-21T10:00:00Z', body: summary, authorId: 'u1' }],
+      { recorded: new Set(['summary']), people: [{ accountId: 'john', trackerUserId: 'u1' }] }), [], 'Harbour\'s summary is ledgered, so never a person\'s');
     assert.deepEqual(withoutHarbourSummaries([{ body: summary }, { body: 'A person\'s reply.' }]).map((c) => c.body), ['A person\'s reply.']);
 
     const comments = [{ body: summary, createdAt: '2026-11-20T10:00:00Z', user: { name: 'Harbour' } }];

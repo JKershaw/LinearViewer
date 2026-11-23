@@ -61,6 +61,7 @@ import { checkSizeRecord, recordShape, SIZE_OF_MOVE_HEADING, SIZE_RECORD_CODES, 
 import { addedPlanHeadings, PLAN_HEADING_WORDS, PLAN_IN_DESCRIPTION } from '../lib/legacy-plan-text.js';
 import { blindReadRefusal, checkBlindReadPrs } from '../lib/run-ledger.js';
 import { opensAsBlindRead } from '../lib/run-trail.js';
+import { postHarbourComment } from '../lib/harbour-comment-post.js';
 import { landingOfTicket } from '../lib/records/landing.js';
 import { isRestrictedStamp, sameTicketKey, ISSUE_PATCH_FIELDS } from '../lib/stage-writes.js';
 import { jsonError } from '../lib/errors.js';
@@ -328,11 +329,12 @@ export function createProxyWriteRoutes({
 
   /** Create a comment and answer 201; `remember` sees the payload once the write is accepted. */
   async function postComment({ req, res, endpoint, token, provider }, text, remember) {
-    const created = normalizeWritePayload(await provider.createComment(token, req.params.issueId, text), 'comment');
+    // LIN-4535 (D4): the post and its ledger record are one seam (lib/harbour-comment-post.js); a failed record never fails the post.
+    const posted = await postHarbourComment({ urlKey: req.proxyUrlKey, store: harbourCommentsStore, post: () => provider.createComment(token, req.params.issueId, text) });
+    const created = normalizeWritePayload(posted, 'comment');
     // A clear failure instead of a misleading 201 when the provider reports the write did not land.
     if (writeRejected(req, res, endpoint, created, 'Comment was not created')) return;
     remember?.(created);
-    await recordInLedger(req, created, 'record');
     logEvent(req, endpoint, 201);
     res.status(201).json(created);
   }

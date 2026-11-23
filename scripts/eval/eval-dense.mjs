@@ -215,7 +215,7 @@ function makeComputeOne(bundles, model, onCall, hopLog) {
       // from records, so the hop reads none of them from a comment. A bundle with no context is counted as a comment hop.
       const rc = b.recordsContext;
       if (rc) hops.records += 1; else hops.comments += 1;
-      const recordsFields = rc ? { trail: rc.trail, landingChanges: rc.landingChanges, planReviewLoop: rc.planReviewLoop } : {};
+      const recordsFields = rc ? { trail: rc.trail, landingChanges: rc.landingChanges, planReviewLoop: rc.planReviewLoop, personFindings: rc.personFindings } : {};
       const recommendation = await getRecommendation(
         b.issue,
         {

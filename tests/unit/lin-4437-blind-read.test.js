@@ -27,7 +27,8 @@ import { readFileSync } from 'node:fs';
 import { fileURLToPath } from 'node:url';
 import express from 'express';
 import { BLIND_READ_CODES } from '../../lib/run-ledger.js';
-import { isPersonComment, opensAsBlindRead } from '../../lib/run-trail.js';
+import { opensAsBlindRead } from '../../lib/run-trail.js';
+import { withPersonFindings } from './helpers/person-findings.js';
 import { BLIND_READ_HEADING } from '../../lib/prompts/blind-read-words.js';
 import { SURVEY_HEADINGS } from '../../lib/prompts/survey-words.js';
 import { assembleTrailFacts, planReviewFactsOf } from '../../lib/recommendation-facts.js';
@@ -72,10 +73,9 @@ async function trailOf(events) {
   return trailForTicket({ recordsStore, urlKey: 'acme', ticket: 'LIN-1' });
 }
 
-describe('a read is recognised by its opening, and is no person\'s comment (opensAsBlindRead, isPersonComment)', () => {
+describe('a read is recognised by its opening (opensAsBlindRead; its comment is Harbour\'s, so never ingested as a person\'s)', () => {
   test('a well-formed read opens as a blind read and is not a person\'s comment', () => {
     assert.equal(opensAsBlindRead(read1(1)), true);
-    assert.equal(isPersonComment(read1(1).body), false);
   });
   test('the heading is matched exactly: a longer heading, or a mention further down, is not a read', () => {
     assert.equal(opensAsBlindRead(c(1, `${BLIND_READ_HEADING} pilot\nVerdict: mixed`)), false);
@@ -134,8 +134,9 @@ describe('no local copies: recommendation-facts imports the moved readers', () =
 });
 
 describe('witness 1: a read is never landing work, never an answer to a person', () => {
-  const person = c(3, 'Please keep the old flag; we still read it in the export.');
-  const comments = [summary(1), review(2), person, read1(4)];
+  // LIN-4535: the person's comment is its finding (tests/unit/helpers/person-findings.js); the summary, review and read are Harbour's.
+  const person = { ...c(3, 'Please keep the old flag; we still read it in the export.'), person: true };
+  const { comments, personFindings } = withPersonFindings([summary(1), review(2), person, read1(4)]);
   const events = [ev.pr(1, PR, 'abc1234'), ev.review(2, PR), ev.read(4, PR)];
   const rows = [
     { id: 'r-review', kind: 'review', status: 'taken', dispatchedAt: at(1), feedback: [{ message: '[done] reviewed', timestamp: at(2) }] },
@@ -144,7 +145,7 @@ describe('witness 1: a read is never landing work, never an answer to a person',
 
   test('workAfterReview is false and the latest person\'s comment is not acted on', async () => {
     const trail = await trailOf(events);
-    const f = assembleTrailFacts(comments, '', { trail });
+    const f = assembleTrailFacts(comments, '', { trail, personFindings });
     assert.equal(f.workAfterReview, false);
     assert.equal(f.latestPerson.at, at(3));
     assert.equal(f.latestPerson.actedAfter, false);
@@ -152,7 +153,7 @@ describe('witness 1: a read is never landing work, never an answer to a person',
 
   test('the plan-review landed fact is unchanged by a read', () => {
     const run = planReviewRunOf({ verdicts: [planRound(at(0), 'approve').verdict], findings: [] });
-    assert.deepEqual(planReviewFactsOf(run, [person, read1(4)]), planReviewFactsOf(run, [person]));
+    assert.equal(personFindings.length, 1, 'the read is not a person\'s finding: one person finding, the person\'s comment');
   });
 
   test('the selector\'s rendered facts, with runs known, show no blind-read line and no run after the person', async () => {

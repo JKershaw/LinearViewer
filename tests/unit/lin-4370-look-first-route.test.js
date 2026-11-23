@@ -41,7 +41,7 @@ process.env.NODE_ENV = 'test';
 import { test, describe, afterEach } from 'node:test';
 import assert from 'node:assert/strict';
 import express from 'express';
-import { lookFirstStep, lookFirstOff, lookFirstSteps, holdingComment, LOOK_FIRST_STEPS } from '../../lib/recommendation-look-first.js';
+import { lookFirstStep, lookFirstOff, lookFirstSteps, holdingFinding, LOOK_FIRST_STEPS } from '../../lib/recommendation-look-first.js';
 import { buildPeriodicalGateMarker, isPeriodicalReview } from '../../lib/periodicals.js';
 import { liveWaitOf, STAGE_IN_FLIGHT_CODE } from '../../lib/run-live-wait.js';
 import { getRecommendation, getRecommendationStream, setFetchImpl, setPromptTraceRecorder, buildSelectorArgs } from '../../lib/openrouter.js';
@@ -72,7 +72,10 @@ const T = (hm) => `2026-11-08T${hm}:00.000Z`;
 const comment = (at, body) => ({ user: 'John', createdAt: T(at), body });
 const surveyTask = (at, verdict = 'Just drill: the change is small.') => comment(at, `${SURVEY_HEADINGS['survey-task']}: T-1 @ abc123def\n\n${verdict}`);
 const surveyPlace = (at, verdict = 'The place is fine.') => comment(at, `${SURVEY_HEADINGS['survey-place']}: T-1 @ abc123def\n\n${verdict}`);
-const person = (at, body = 'Hold this until the auth change lands.') => comment(at, body);
+// LIN-4535: a person's comment is its finding (lib/comment-ingest.js). A test comment made by `person` carries the flag the
+// ctx helper reads as its finding; no comment's words decide it.
+const person = (at, body = 'Hold this until the auth change lands.') => ({ ...comment(at, body), __person: true });
+const findingsOf = (comments) => comments.filter(c => c.__person).map(c => ({ id: `finding-${c.createdAt}`, at: c.createdAt, accountId: 'john', says: c.body, ruling: c.body.trimEnd().endsWith('— Ruling recorded via Harbour') }));
 const sizeRuling = (at) => comment(at, "## Size of the move (the person's call)\n\nJust the task, please.");
 // A run fact as loadRecentRuns' allRuns carries it.
 const run = (stage, dispatched, outcome = 'done', ended = dispatched) => ({ stage, at: T(outcome === 'queued' || outcome === 'running' ? dispatched : ended), outcome, dispatchedAt: T(dispatched) });
@@ -83,7 +86,7 @@ const NO_PLAN = planFactsOf({ task: { id: 'task-t1', kind: 'task', state: 'open'
 const A_PLAN = planFactsOf({ task: { id: 'task-t1', kind: 'task', state: 'open' }, inside: [{ id: 'plan-t1', v: 1, kind: 'plan', state: 'kept', in: 'task-t1', to: 'implementation', at: T('09:00') }] });
 const A_PIECE = planFactsOf({ task: { id: 'task-t1', kind: 'task', state: 'open', links: { piece: 'plan-t0' } }, piece: { id: 'plan-t0', v: 1, kind: 'plan', state: 'kept', in: 'task-t0', to: 'implementation', at: T('09:00') } });
 // The loop's facts are records (LIN-4518 finding-527b8237): no plan-review verdict on record here, so the run is empty.
-const ctx = (comments = [], allRuns = [], over = {}) => ({ parent: null, siblings: [], project: null, children: [], comments, planReviewLoop: loopFactsFor([], comments), focusedChild: null, attachments: [], runs: [], allRuns, asked: WORDS, planFacts: NO_PLAN, ...over });
+const ctx = (comments = [], allRuns = [], over = {}) => ({ parent: null, siblings: [], project: null, children: [], comments, personFindings: findingsOf(comments), planReviewLoop: loopFactsFor([], findingsOf(comments)), focusedChild: null, attachments: [], runs: [], allRuns, asked: WORDS, planFacts: NO_PLAN, ...over });
 const stepOf = (issue, context) => lookFirstStep(issue, context)?.step ?? null;
 
 describe('step choice: survey-task, then survey-place, then scoping, each once', () => {
@@ -194,7 +197,7 @@ describe('the hold: a person\'s word after work started outranks the sequence', 
     const comments = [person('10:10')];
     const midRun = [run('survey-task', '10:00', 'done', '10:30')];
     assert.equal(stepOf(leaf(), ctx(comments, midRun)), null);
-    assert.ok(holdingComment(comments, midRun));
+    assert.ok(holdingFinding(findingsOf(comments), midRun));
   });
 
   test('a Survey\'s own headed comment never holds, and neither does a headed size ruling', () => {
@@ -272,7 +275,7 @@ describe('when the route is off', () => {
 describe('a pending record plus an answered ruling, and the in-flight shapes', () => {
   test('the facts line reads "pending a ruling" and scoping\'s `when` covers the answered ruling', () => {
     const issue = leaf({ description: ASKED + RECORD('pending a ruling') });
-    const comments = [surveyTask('10:00'), surveyPlace('10:30'), comment('12:00', 'Err larger on this one.\n\n— Ruling recorded via Harbour')];
+    const comments = [surveyTask('10:00'), surveyPlace('10:30'), person('12:00', 'Err larger on this one.\n\n— Ruling recorded via Harbour')];
     const prompt = buildRouterPrompt(buildSelectorArgs(issue, ctx(comments)));
     assert.match(prompt, /- Size of the move: pending a ruling\n/);
     assert.match(PROMPT_TEMPLATES.scoping.route.when, /has answered the size ruling and the size of the move still reads pending a ruling/);
@@ -393,6 +396,9 @@ const runStore = (rows, live = []) => ({
 // words: every other records read fails inside its own guard, so the open findings stay "not read", as before records.
 const askedRecords = (words = WORDS) => ({
   askedForTicket: async () => words,
+  // LIN-4535: the ticket's task and its person findings (none here: the harness's comments are not ingested).
+  taskForTicket: async (_urlKey, ticket) => `task-${ticket}`,
+  find: async () => [],
   askedForTickets: async (_urlKey, tickets) => new Map(tickets.filter(Boolean).map((t) => [t, words])),
   // LIN-4504: the ticket's plan facts, read by the same entrance; no plan record here.
   planFactsForTickets: async (_urlKey, tickets) => new Map(tickets.filter(Boolean).map((t) => [t, NO_PLAN]))

@@ -38,6 +38,9 @@ import { commentDedupe, commentDedupeGenerations } from './proxy.js';
 import { isHermeticTestToken } from '../lib/should-mock-ai.js';
 import { refuseCapability } from './workspace-api-steps.js';
 import { RULING_MARK } from '../lib/run-trail.js';
+import { postHarbourComment } from '../lib/harbour-comment-post.js';
+import { recordPersonReplyFinding } from '../lib/comment-ingest.js';
+import { looksLikeTicket } from '../lib/records/refs.js';
 
 
 // LIN-2208: whether the decision-answer stamp(s) for a given comment-dedupe
@@ -413,9 +416,33 @@ export function registerIssueWriteRoutes(router, { workspaceFromUrl, dispatchQue
     // Deliberately identifier-agnostic in test mode — it echoes whichever
     // :issueId the caller sent, so every spec's own seeded issueIdentifier
     // is accepted, not one hardcoded fixture.
-    const writeComment = async ({ provider: writer, callScope }) => (isTestMode
-      ? { success: true, comment: { id: `test-comment-${key}`, body: attributedBody, createdAt: new Date().toISOString(), user: { name: 'Harbour' } } }
-      : normalizeCommentWrite(await writer.createComment(callScope, issueId, attributedBody)));
+    // LIN-4535 (D4, plan note 2): the reply goes out under the workspace's binding (resolveIssueBinding), which may be the
+    // owner's credential, so the tracker would credit the owner. The post is ledgered as Harbour's (the seam), and the
+    // reply's finding is written here, under the member's own account, so the ingest never has to guess its author.
+    const writeComment = async ({ provider: writer, callScope }) => {
+      if (isTestMode) {
+        return { success: true, comment: { id: `test-comment-${key}`, body: attributedBody, createdAt: new Date().toISOString(), user: { name: 'Harbour' } } };
+      }
+      const answer = normalizeCommentWrite(await postHarbourComment({
+        urlKey: workspace.urlKey,
+        store: harbourCommentsStore,
+        post: () => writer.createComment(callScope, issueId, attributedBody)
+      }));
+      const commentId = answer.comment?.id;
+      if (answer.success !== false && commentId) {
+        // The finding is best effort after a landed post: a failure is logged, never a failed reply (the comment is written).
+        try {
+          const ticket = looksLikeTicket(issueId) ? issueId : (await writer.issueDetail(callScope, issueId))?.identifier;
+          const filed = ticket
+            ? await recordPersonReplyFinding({ ctx: { provider: writer, token: callScope }, urlKey: workspace.urlKey, ticket, accountId: req.session.accountId, commentId, body })
+            : { ok: false, reason: `${issueId} could not be read to name its ticket` };
+          if (!filed.ok) console.error(`[comment-ingest] the reply ${commentId} on ${issueId} (${workspace.urlKey}) has no finding: ${filed.reason}`);
+        } catch (err) {
+          console.error(`[comment-ingest] the reply ${commentId} on ${issueId} (${workspace.urlKey}) has no finding: ${err?.message || err}`);
+        }
+      }
+      return answer;
+    };
 
     const refuseTrashed = () => jsonError(res, 409, 'Issue is trashed; refusing to comment on a deleted issue');
 
@@ -466,7 +493,6 @@ export function registerIssueWriteRoutes(router, { workspaceFromUrl, dispatchQue
     // once per request, on whichever attempt produced it — never duplicated.
     const finishCommentSuccess = async (commentCreate) => {
       commentDedupe.set(key, commentCreate);
-      await recordInLedger(commentCreate.comment?.id, 'Harbour-comments ledger record failed:');
       // LIN-4241: the comment is already written, so a lost race cannot undo it. But
       // when the stamp finds the ruling settled by another write, this request must
       // not start a run. A 409 is the signal: the client dispatches only on a 2xx.

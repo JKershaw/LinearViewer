@@ -31,7 +31,7 @@ Approve — conditional on close-out.
 - Close-out reported after it: no
 - Audit reported after the landing close-out: no
 - PRs linked on the trail: https://github.com/o/r/pull/7
-- Latest person's comment (not an agent note, landing report, review, verdict or close-out): none
+- Latest person's comment: not measured (the ticket's findings could not be read)
 - Latest ruling recorded via Harbour: none
 - Size of the move: not recorded
 - Subtasks: 2 (2 done, 0 in progress, 0 remaining)
