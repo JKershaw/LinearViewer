@@ -5,8 +5,9 @@
  * "owns merging its own report PR"), while the dispatch gate the run works under gives merge and
  * Done to close-out after review approves. Runs resolved the clash differently (PR #2372 declined
  * to merge). The decision (LIN-4390 comment 8810f969): the run stops at a green, rebased PR with its
- * link and second-read comments posted, and its closing comment names review as approver and
- * close-out as the stage that merges, sets Done and posts the final summary.
+ * change and second-read verdict recorded, and its final message names review as approver and
+ * close-out as the stage that merges, sets Done and ends with the final summary. LIN-4533: no comment is posted; the run's
+ * change and verdict are records.
  *
  * This is the first test that reads both sides: every Periodical render (16 plain + 16 Mint +
  * Autopilot) and the gate prose (close-out, review, the proxy preamble). The retired phrases are
@@ -49,16 +50,16 @@ for (const p of PERIODICALS) {
       for (const re of RETIRED) assert.doesNotMatch(text, re, `${p.id} still carries retired self-finish wording ${re}`);
 
       // The hand-off bullet (handOff / handOffAdvisory): the run neither merges nor sets Done,
-      // and the closing comment names who finishes.
+      // and the final message names who finishes.
       assert.match(text, /Then hand off — do not stop silently, and do not merge or set Done yourself/);
       assert.match(text, /it neither merges nor moves the task to Done, and the task stays In Progress until close-out finishes/);
-      assert.match(text, /review approves, then close-out merges (?:that|any report|that report) pull request, sets this task to Done and posts the final summary/);
-      assert.match(text, /if the pull request cannot be made green, name the blocker in the closing comment/);
+      assert.match(text, /review approves, then close-out merges (?:that|any report|that report) pull request, sets this task to Done and ends with its final summary/);
+      assert.match(text, /if the pull request cannot be made green, name the blocker in the final message/);
 
       // The second read (adversarialRead, all 16): comes before the hand-off, so close-out's Done is
       // not refused; the run leaves the PR green for close-out; an open PR is never a Done state.
       assert.match(text, /second-read before you hand off/);
-      assert.match(text, /before the hand-off described above \(close-out's Done transition is refused until this comment exists\)/);
+      assert.match(text, /before the hand-off described above \(close-out's Done transition is refused until that verdict record exists\)/);
       assert.match(text, /This run neither merges its report pull request, if it opened one, nor sets Done: it leaves that pull request rebased and green for close-out, which merges it and then sets Done/);
       assert.match(text, /never Done with the pull request open/);
       assert.match(text, /AGREE and DISAGREE both end in the normal hand-off/);
@@ -66,16 +67,16 @@ for (const p of PERIODICALS) {
       if (p.mode === 'advisory') {
         // handOffAdvisory: no area-notes PR is required of the three advisory templates.
         assert.doesNotMatch(text, /area-notes pull request|area notes/i, `${p.id} gained the area-notes wording`);
-        assert.match(text, /If you open a pull request for the report, post its full URL as a comment on this task/);
+        assert.match(text, /If you open a pull request for the report, record it as a change record \(kind `change`, ref its full URL, head its head sha\)/);
         assert.match(text, /hands its decision to the human through that summary/);
       } else {
         // areaNotes: the notes PR is handed off, never merged by the run.
         assert.match(text, /Record each finding for the project/);
         assert.match(text, /`kind: finding` with `to: project`/);
-        // conclude: the PR link comes first (the gate's evidence), then the closing comment.
-        assert.match(text, /As soon as the report pull request is open, post its full URL as a comment on this task/);
+        // conclude: the change record comes first (the gate's evidence), then the final message.
+        assert.match(text, /As soon as the report pull request is open, record it as a change record \(kind `change`, ref its full URL, head its head sha\)/);
         assert.match(text, /the findings it names are records in the project backlog/);
-        // Findings stay in the notes and the closing comment; close-out is not handed them as tickets.
+        // Findings stay in the notes and the final message; close-out is not handed them as tickets.
         assert.doesNotMatch(text, /close-out[^.]*(?:files?|mints?|turns?)[^.]*(?:findings|tickets)/i);
       }
     });
@@ -100,3 +101,14 @@ test('every dispatched session, a Periodical run included, reads that merge and 
   const preamble = buildProxyContextPreamble({ baseUrl: 'https://host', token: 'T', issueIdentifier: 'LIN-42' });
   assert.match(preamble, /merge and Done are gated separately on a recorded review Approve/);
 });
+
+// LIN-4533 (finding da85432d): a run posts no tracker comment, so no Periodical bullet asks for one. Its change and its
+// second read are records, and close-out's summary is its final message.
+for (const p of PERIODICALS) {
+  test(`${p.id}: no bullet asks the run to post a comment (LIN-4533)`, () => {
+    const plain = p.generatePrompt();
+    for (const text of [plain, withAutopilotTail(plain)]) {
+      assert.doesNotMatch(text, /(?:post|write|leave|add) (?:a |an |the |its |one |your )?(?:closing |second-read |summary |final )?comment (?:on|on this task|that|naming|carrying|recording|with)/i);
+    }
+  });
+}

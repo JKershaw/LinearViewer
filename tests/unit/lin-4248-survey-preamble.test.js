@@ -28,7 +28,7 @@ const NON_WORK = WRITES_VALUES.filter(value => value !== WRITES.WORK);
 // The exact sentences each value's block carries. Literal copies, so a drift in the constant text
 // fails here rather than passing silently.
 const MANDATE = {
-  [WRITES.WORK]: 'Being dispatched here is your mandate for the reversible work — investigate, edit, open PRs, comment: do not hold your first call, or any call, waiting for a live reply before you start.',
+  [WRITES.WORK]: 'Being dispatched here is your mandate for the reversible work — investigate, edit, open PRs, write records: do not hold your first call, or any call, waiting for a live reply before you start.',
   [WRITES.NONE]: 'Being dispatched here is a reading pass: investigate and read freely, but do not change code, branches or pull requests; report your findings in this session, record each hand-off your run owes as a finding (below), and do not hold your first call, or any call, waiting for a live reply before you start.',
   [WRITES.ONE_COMMENT]: 'Being dispatched here is a read-only stage: investigate and read freely, but do not change code, branches or pull requests; your writes are the hand-offs your run records (findings, below), and no comment on the ticket: your report is your final message, kept on your run\'s record. Do not hold your first call, or any call, waiting for a live reply before you start.',
   [WRITES.BLIND_COMMENT]: 'Being dispatched here is a blind read: read the repository as your task says, and nothing on the tracker; do not change code, branches or pull requests; your writes are your verdict record (LIN-4520: the verdict lives only there) and the hand-offs your run records (findings, below), and no comment on the ticket; do not hold your first call, or any call, waiting for a live reply before you start.',
@@ -268,9 +268,9 @@ describe('LIN-4248 — the factory hands the resolved kind to finalizePrompt', (
 const normalise = (text) => text.replace(/\s+/g, ' ').trim();
 // Longest first: ", and update…" contains " and update…", so the comma form must go before the bare one.
 const CLAUSE_FORMS = [
-  ' and to update the workspace as you work (status, comments, labels)',
-  ', and update the workspace as you work (status, comments, labels)',
-  ' and update the workspace as you work (status, comments, labels)',
+  ' and to update the workspace as you work (status, labels)',
+  ', and update the workspace as you work (status, labels)',
+  ' and update the workspace as you work (status, labels)',
 ];
 const ENDPOINT_VARIANTS = [];
 for (const issueIdentifier of [ISSUE, undefined]) {

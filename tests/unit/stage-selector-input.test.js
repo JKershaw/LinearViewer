@@ -68,14 +68,15 @@ describe('trail facts (LIN-3300)', () => {
     assert.equal(closed.closeOutAfterReview, true);
   });
 
-  test('PR links are read from every comment, in time order; the latest person and ruling are the latest person findings', () => {
+  test('PR links are the trail landing, oldest first, never a comment\'s text; the latest person and ruling are the latest person findings', () => {
     const facts = assembleTrailFacts([
       { createdAt: at(3), body: `Go to implementation.\n\n${RULING_MARK}` },
       { createdAt: at(1), body: `Opened https://github.com/a/b/pull/1` },
       { createdAt: at(2), body: `Hold.\n\n${RULING_MARK}` },
       { createdAt: at(4), body: `Now ${PR}` }
-    ], '', { personFindings: [personFinding(2, `Hold.\n\n${RULING_MARK}`), personFinding(3, `Go to implementation.\n\n${RULING_MARK}`)] });
+    ], '', { trail: trailOf({ landing: ['https://github.com/a/b/pull/1', PR] }), personFindings: [personFinding(2, `Hold.\n\n${RULING_MARK}`), personFinding(3, `Go to implementation.\n\n${RULING_MARK}`)] });
     assert.deepEqual(facts.prUrls, ['https://github.com/a/b/pull/1', PR]);
+    assert.deepEqual(assembleTrailFacts([{ createdAt: at(1), body: `Opened ${PR}` }], '').prUrls, [], 'no trail read: no PR, and a comment does not supply one');
     assert.equal(facts.latestPerson.at, at(3));
     assert.equal(facts.latestPerson.ruling, true);
     assert.equal(facts.latestRuling.at, at(3));
@@ -134,6 +135,19 @@ describe('trail facts (LIN-3300)', () => {
     assert.equal(assembleTrailFacts([], '').personRead, false);
   });
 
+  // LIN-4533: a stage run posts no comment, so its PR is on its change record: the selector reads the trail's landing, and a PR
+  // named only in a comment is not on the trail.
+  test('PRs on the trail come from the records landing, never from comment text', () => {
+    const OTHER = 'https://github.com/JKershaw/LinearViewer/pull/2502';
+    const comments = [{ createdAt: at(2), body: `Implementation done: ${OTHER}` }];
+    const landed = formatTrailFactsBlock(assembleTrailFacts(comments, '', { trail: trailOf({ review: reviewOf('request-changes', 1), landing: [PR] }) }));
+    assert.match(landed, /PRs linked on the trail: https:\/\/github\.com\/JKershaw\/LinearViewer\/pull\/1747$/m);
+    assert.doesNotMatch(landed, /pull\/2502/);
+    const onlyComment = formatTrailFactsBlock(assembleTrailFacts(comments, '', { trail: trailOf() }));
+    assert.match(onlyComment, /PRs linked on the trail: none/);
+    assert.match(formatTrailFactsBlock(assembleTrailFacts(comments, '', { trail: trailOf({ landing: [OTHER] }) })), /PRs linked on the trail: https:\/\/github\.com\/JKershaw\/LinearViewer\/pull\/2502$/m);
+  });
+
   // LIN-4520: the agent notes and the unheaded close-out are not work: the trail (records) decides, and the comments do not.
   test('work after the review ignores agent notes and an unheaded close-out', () => {
     const facts = assembleTrailFacts([
@@ -177,14 +191,14 @@ describe('trail facts (LIN-3300)', () => {
     assert.doesNotMatch(block, /Session fit|Plan review owed/);
   });
 
-  test('the block states each fact once and says which comments it read', () => {
-    const block = formatTrailFactsBlock(assembleTrailFacts([review('Approve — conditional on close-out.', 1)], 'x', { leaf: true, trail: trailOf({ review: reviewOf('approve', 1) }) }), 7);
-    assert.match(block, /TRAIL FACTS \(computed in code from all 7 comments — do not re-derive\)/);
+  test('the block states each fact once and reads the records, not the comments', () => {
+    const block = formatTrailFactsBlock(assembleTrailFacts([review('Approve — conditional on close-out.', 1)], 'x', { leaf: true, trail: trailOf({ review: reviewOf('approve', 1), landing: [PR] }) }));
+    assert.match(block, /TRAIL FACTS \(computed in code from the ticket's records — do not re-derive\)/);
     assert.match(block, /Latest code review: approve \(/);
     assert.match(block, /Work reported after it \(a later comment links a PR\): no/);
     assert.match(block, /PRs linked on the trail: https:\/\/github\.com\/JKershaw\/LinearViewer\/pull\/1747/);
     assert.match(block, /- Plan records: not measured/);
-    const none = formatTrailFactsBlock(assembleTrailFacts([], '', { leaf: false, trail: trailOf() }), 0);
+    const none = formatTrailFactsBlock(assembleTrailFacts([], '', { leaf: false, trail: trailOf() }));
     assert.match(none, /Latest code review: none/);
     assert.doesNotMatch(none, /Plan records/);
   });

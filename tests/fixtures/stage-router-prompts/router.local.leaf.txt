@@ -9,7 +9,7 @@ You choose the next stage of work for one Local ticket. You do not do the work o
 
 ## Facts computed in code
 
-**TRAIL FACTS (computed in code from all 0 comments — do not re-derive):**
+**TRAIL FACTS (computed in code from the ticket's records — do not re-derive):**
 - Latest code review: none (a plan-review verdict, a bug write-up or a run summary is not one)
 - PRs linked on the trail: none
 - Latest person's comment: not measured (the ticket's findings could not be read)

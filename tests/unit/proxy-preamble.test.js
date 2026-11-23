@@ -122,7 +122,7 @@ describe('buildProxyContextPreamble token-delivery modes (LIN-1155)', () => {
       '  → { "token": "<WORKING_TOKEN>", "scope": "readWrite", "expiresAt": "...", "notes": "…" }',
       'Then send `Authorization: Bearer <WORKING_TOKEN>` (read+write) on every call below.',
       'The token above is single-use — this exchange spends it — so treat the working token as your credential from here on.',
-      'Being dispatched here is your mandate for the reversible work — investigate, edit, open PRs, comment: do not hold your first call, or any call, waiting for a live reply before you start.',
+      'Being dispatched here is your mandate for the reversible work — investigate, edit, open PRs, write records: do not hold your first call, or any call, waiting for a live reply before you start.',
       "You have this bootstrap because a real dispatch just happened; the exchange response is your first call against this workspace's own Harbour control-plane, not a third-party service. That authenticates the channel; it does not by itself authorize irreversible actions: merge and Done are gated separately on a recorded review Approve and no open findings to close-out.",
       'This dispatch starts no run, so records writes are refused for it: name each hand-off in your final message instead.',
       '',
@@ -131,7 +131,7 @@ describe('buildProxyContextPreamble token-delivery modes (LIN-1155)', () => {
       'Start from the distilled brief: GET https://host/api/proxy/brief/LIN-42',
       "(it opens with the person's words under `## As asked`, from the task's record; no step may change them; the rest is the present state; read it before the raw",
       'description). Use GET https://host/api/proxy/issues/LIN-42 for full raw detail',
-      'and /relations/LIN-42, and update the workspace as you work (status, comments, labels).',
+      'and /relations/LIN-42, and update the workspace as you work (status, labels).',
       '',
       'Your runner reports back automatically when this session stops — you do not',
       'need to curl anything to phone home. Just END with a concise summary that',
@@ -153,7 +153,7 @@ describe('buildProxyContextPreamble token-delivery modes (LIN-1155)', () => {
     // the affirmative mandate is present, and that it is paired with (immediately
     // precedes, nothing interposed) the existing negative gate sentence — ordering
     // is the fix itself: the negative previously landed with no counterpart at all.
-    const mandateLine = 'Being dispatched here is your mandate for the reversible work — investigate, edit, open PRs, comment: do not hold your first call, or any call, waiting for a live reply before you start.';
+    const mandateLine = 'Being dispatched here is your mandate for the reversible work — investigate, edit, open PRs, write records: do not hold your first call, or any call, waiting for a live reply before you start.';
     const gateLine = "You have this bootstrap because a real dispatch just happened; the exchange response is your first call against this workspace's own Harbour control-plane, not a third-party service. That authenticates the channel; it does not by itself authorize irreversible actions: merge and Done are gated separately on a recorded review Approve and no open findings to close-out.";
     const lines = actual.split('\n');
     const mandateIdx = lines.indexOf(mandateLine);
@@ -205,7 +205,7 @@ describe('buildProxyContextPreamble token-delivery modes (LIN-1155)', () => {
   // provider's capability — exchangeLines (credential delivery, asserted
   // throughout this file) must stay untouched regardless of providerUi.
   describe('providerUi (LIN-2804)', () => {
-    const EXCHANGE_MANDATE = 'Being dispatched here is your mandate for the reversible work — investigate, edit, open PRs, comment: do not hold your first call, or any call, waiting for a live reply before you start.';
+    const EXCHANGE_MANDATE = 'Being dispatched here is your mandate for the reversible work — investigate, edit, open PRs, write records: do not hold your first call, or any call, waiting for a live reply before you start.';
     const PROSE_GATE_LINE = "You have this bootstrap because a real dispatch just happened; the exchange response is your first call against this workspace's own Harbour control-plane, not a third-party service. That authenticates the channel; it does not by itself authorize irreversible actions: merge and Done are gated separately on a recorded review Approve and no open findings to close-out.";
     const MCP_GATE_LINE = "That local proxy was provisioned by this workspace's own Harbour control-plane out-of-band before this session started; it is not a third-party service. Reaching it authenticates the channel; it does not by itself authorize irreversible actions: merge and Done are gated separately on a recorded review Approve and no open findings to close-out.";
 
@@ -290,7 +290,7 @@ describe('buildProxyContextPreamble token-delivery modes (LIN-1155)', () => {
         assert.ok(!out.includes('/relations/LIN-42'), 'no /relations hint');
         assert.ok(!out.includes('/api/proxy/search'), 'no /search hint — it 422s too on this provider');
         assert.ok(out.includes('Start from the distilled brief: GET https://host/api/proxy/brief/LIN-42'), 'brief hint unchanged');
-        assert.ok(out.includes('update the workspace as you work (status, comments, labels)'), 'the update-workspace close survives with no read-hint clause attached');
+        assert.ok(out.includes('update the workspace as you work (status, labels)'), 'the update-workspace close survives with no read-hint clause attached');
       });
 
       test('issueDetail: false, search: true (e.g. GitHub) — /search fallback still offered', () => {
@@ -381,7 +381,7 @@ describe('buildProxyContextPreamble token-delivery modes (LIN-1155)', () => {
       'the block separates authentication from authorization (mcp path)');
     // LIN-1409: same pairing/ordering guarantee as the prose path — the mandate
     // is present and immediately precedes the negative gate sentence.
-    const mandateLine = 'Being dispatched here is your mandate for the reversible work — investigate, edit, open PRs, comment: do not hold your first call, or any call, waiting for a live reply before you start.';
+    const mandateLine = 'Being dispatched here is your mandate for the reversible work — investigate, edit, open PRs, write records: do not hold your first call, or any call, waiting for a live reply before you start.';
     const gateLine = "That local proxy was provisioned by this workspace's own Harbour control-plane out-of-band before this session started; it is not a third-party service. Reaching it authenticates the channel; it does not by itself authorize irreversible actions: merge and Done are gated separately on a recorded review Approve and no open findings to close-out.";
     const mcpLines = out.split('\n');
     const mandateIdx = mcpLines.indexOf(mandateLine);

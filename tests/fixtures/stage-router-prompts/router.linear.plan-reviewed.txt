@@ -18,7 +18,7 @@ F1 is right; take the narrow revision.
 
 ## Facts computed in code
 
-**TRAIL FACTS (computed in code from all 2 comments — do not re-derive):**
+**TRAIL FACTS (computed in code from the ticket's records — do not re-derive):**
 - Latest code review: none (a plan-review verdict, a bug write-up or a run summary is not one)
 - PRs linked on the trail: none
 - Latest person's comment: not measured (the ticket's findings could not be read)

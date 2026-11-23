@@ -137,7 +137,7 @@ describe('shared two-stage contract (all periodicals)', () => {
         // close-out merges and sets Done. lin-4390-periodical-hand-off.test.js holds the full shape.
         assert.match(prompt, /Then hand off — do not stop silently, and do not merge or set Done yourself/);
         assert.match(prompt, /summary of the report/i);
-        assert.match(prompt, /close-out [^.]*sets this task to Done and posts the final summary/i);
+        assert.match(prompt, /close-out [^.]*sets this task to Done and ends with its final summary/i);
         assert.doesNotMatch(prompt, /move the task to its done|done\/completed state/i);
         // Producing the report still changes no code.
         assert.match(prompt, /review-only/i);
@@ -157,7 +157,7 @@ describe('shared two-stage contract (all periodicals)', () => {
       // LIN-1692: discovery finding no report-location convention is not the
       // same as no fallback existing — the prompt must say what to do then.
       test('discovery-failure fallback: report-in-comment is a valid terminal artifact when no location is found', () => {
-        assert.match(prompt, /if discovery genuinely turns up no such place, put the full report in this task's own comment/i);
+        assert.match(prompt, /if discovery genuinely turns up no such place, put the full report in the final message/i);
         // The close-out bullet must accept a comment-only report as a legitimate
         // terminal artifact, not just a pointer to a file — the other half of the
         // discovery-failure contract (review finding on LIN-1692/#1093).
@@ -212,17 +212,18 @@ describe('shared two-stage contract (all periodicals)', () => {
         assert.match(prompt, /state which of Tier 1 or Tier 2 you used/i);
       });
 
-      test('LIN-2323: pins the exact appendix header and all three gate-checked comment tokens', () => {
+      test('LIN-2323 / LIN-4533: pins the exact appendix header and the three gate-checked fields of one verdict record', () => {
         assert.match(prompt, /## Adversarial Second-Read/);
-        assert.match(prompt, /Adversarial second-read verdict: AGREE/);
-        assert.match(prompt, /Adversarial second-read verdict: DISAGREE/);
-        assert.match(prompt, /Differed from top finding: YES/);
-        assert.match(prompt, /Differed from top finding: NO/);
-        assert.match(prompt, /Disposition: fixed in place/);
-        assert.match(prompt, /Disposition: escalated/);
-        assert.match(prompt, /Disposition: no change/);
-        // All three must land in ONE comment body — not three separate posts.
-        assert.match(prompt, /together in a single comment body/i);
+        assert.match(prompt, /"judgement": "adversarial-read"/);
+        assert.match(prompt, /"outcome": "agree"/);
+        assert.match(prompt, /"outcome": "disagree"/);
+        assert.match(prompt, /"differed": "yes"/);
+        assert.match(prompt, /"differed": "no"/);
+        assert.match(prompt, /"disposition": "fixed in place"/);
+        assert.match(prompt, /"disposition": "escalated"/);
+        assert.match(prompt, /"disposition": "no change"/);
+        // All three must land in ONE record — not three separate writes.
+        assert.match(prompt, /all three in that one record/i);
       });
 
       test('LIN-2323: the comment is mandatory and gate-enforced, the appendix is a human-readable duplicate only', () => {
@@ -242,7 +243,7 @@ describe('shared two-stage contract (all periodicals)', () => {
         assert.match(prompt, /is not a normal terminal state/i);
         assert.match(prompt, /never Done with the pull request open/i);
         assert.match(prompt, /genuinely cannot be made green.*name that blocker/i);
-        assert.match(prompt, /close-out's Done transition is refused until this comment exists/);
+        assert.match(prompt, /close-out's Done transition is refused until that verdict record exists/);
       });
     });
   }
@@ -1493,7 +1494,7 @@ describe('Seams & Tangles feeds the area notes, mints nothing (LIN-4379)', () =>
       /larger tidy/i, /size of move/i,
       /urgent breakage/i, /live secret/i, /the person/i,
       /cross-area seam/i, /naming both areas/i,
-      /no registry or area code/i, /closing comment/i,
+      /no registry or area code/i, /final message/i,
       /never (?:to|in) a ticket/i
     ]) assert.match(routesBullet, re);
   });

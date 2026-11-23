@@ -25,7 +25,7 @@ import { test, describe } from 'node:test';
 import assert from 'node:assert/strict';
 import crypto from 'node:crypto';
 import { ProxyTokenStore } from '../../lib/proxy-tokens.js';
-import { provisionBootstrapToken } from '../../lib/proxy-preamble.js';
+import { provisionBootstrapToken, buildProxyContextPreamble } from '../../lib/proxy-preamble.js';
 import {
   WRITES,
   STAGE_WRITE_OPS,
@@ -35,7 +35,8 @@ import {
   normalizeWritesStamp,
   isRestrictedStamp,
   sameTicketKey,
-  stampMintOptions
+  stampMintOptions,
+  isStageRunToken
 } from '../../lib/stage-writes.js';
 import { requireWriteScope, requireStageWrite } from '../../lib/stage-write-gate.js';
 import { createProxyRoutes } from '../../routes/proxy.js';
@@ -95,6 +96,27 @@ describe('LIN-4468 — the allowance table (lib/stage-writes.js)', () => {
       assert.equal(stageWriteAllows(null, op), true, `unstamped ${op}`);
       assert.equal(stageWriteAllows(undefined, op), true, `undefined ${op}`);
     }
+  });
+
+  // LIN-4533: the work stamp is shared by every dispatched run, so the one comment it may not post is a stage run's: a
+  // dispatch token that names its run. A person's token, and a dispatch token with no run, keep it.
+  test('LIN-4533: a stage run\'s work token posts no comment; every other operation it keeps; a person or runless token keeps the comment', () => {
+    const run = { origin: 'dispatch', runRecordId: 'run-1' };
+    assert.equal(isStageRunToken(run), true);
+    assert.equal(stageWriteAllows(WRITES.WORK, 'createComment', run), false, 'a run posts no comment');
+    assert.equal(stageWriteAllows(WRITES.WORK, 'updateIssue', { ...run, fields: ['title'] }), true, 'a run keeps every other operation');
+    assert.equal(stageWriteAllows(WRITES.WORK, 'createComment', { origin: 'person', runRecordId: null }), true, 'a person comments');
+    assert.equal(stageWriteAllows(WRITES.WORK, 'createComment', { origin: 'dispatch', runRecordId: null }), true, 'a dispatch token with no run keeps the comment');
+    assert.equal(stageWriteAllows(null, 'createComment', run), true, 'an unstamped token is unrestricted');
+    assert.equal(isStageRunToken({ origin: 'dispatch', runRecordId: '' }), false);
+  });
+
+  // LIN-4533 (finding f24adf95): the text a work stage reads says write records, never comment. The stamp refuses the
+  // comment (above); the words must not invite it.
+  test('LIN-4533: the work-stage preamble asks for no tracker comment', () => {
+    const text = buildProxyContextPreamble({ baseUrl: 'https://host', token: 'T', issueIdentifier: 'LIN-42', writes: 'work', runRecordId: 'run-1' });
+    assert.doesNotMatch(text, /open PRs, comment|status, comments, labels|post (?:a|the|its|your) (?:closing )?comment/i);
+    assert.match(text, /write records/);
   });
 
   test('a stamp outside WRITES_VALUES fails closed to none, including prototype names', () => {
@@ -409,9 +431,9 @@ function targetProvider() {
 }
 
 /** An app whose proxy token resolves to the given stamp, on the given provider. */
-function stageApp({ writes, writesTarget, scope = 'readWrite', grants = ['take', 'dispatch'] } = {}) {
+function stageApp({ writes, writesTarget, scope = 'readWrite', grants = ['take', 'dispatch'], origin, runRecordId } = {}) {
   const { provider, calls } = targetProvider();
-  const identity = { tokenId: 't1', urlKey: ACME, label: 'stage', scope, createdBy: 'u1', grants, workspaceId: 'ws-acme', writes, writesTarget };
+  const identity = { tokenId: 't1', urlKey: ACME, label: 'stage', scope, createdBy: 'u1', grants, workspaceId: 'ws-acme', writes, writesTarget, origin, runRecordId };
   const proxyTokenStore = { ...BASE_DEPS().proxyTokenStore, validateToken: async () => identity };
   return { app: buildApp({ proxyTokenStore, provider }), calls };
 }
@@ -573,6 +595,26 @@ describe('LIN-4468 — over HTTP: a stamp that is absent, work, or unknown', () 
     assert.equal(res.status, 403, JSON.stringify(res.body));
     assert.equal(res.body.error, "This stage's write allowance (none) does not permit createComment.");
     assert.deepEqual(calls.createComment, []);
+  });
+
+  test('LIN-4533: over HTTP, a stage run\'s work token is refused a comment, with its reason, on any ticket', async () => {
+    const { app, calls } = stageApp({ writes: 'work', origin: 'dispatch', runRecordId: 'run-1' });
+    const res = await call(app, 'POST', '/api/proxy/issues/LIN-10/comments', { body: { body: 'report' } });
+    assert.equal(res.status, 403, JSON.stringify(res.body));
+    assert.match(res.body.error, /does not permit createComment\. A run posts no tracker comment: its report goes into records/);
+    assert.deepEqual(calls.createComment, [], 'nothing written');
+    const patched = await call(app, 'PATCH', '/api/proxy/issues/LIN-10', { body: { title: 'renamed' } });
+    assert.ok(patched.status < 300, 'the same run keeps its other writes');
+  });
+
+  test('LIN-4533: over HTTP, a person\'s work token, and a runless dispatch token, still post a comment', async () => {
+    const person = stageApp({ writes: 'work', origin: 'person', runRecordId: null });
+    const personRes = await call(person.app, 'POST', '/api/proxy/issues/LIN-10/comments', { body: { body: 'a person writes' } });
+    assert.ok(personRes.status < 300, JSON.stringify(personRes.body));
+    const runless = stageApp({ writes: 'work', origin: 'dispatch', runRecordId: null });
+    const runlessRes = await call(runless.app, 'POST', '/api/proxy/issues/LIN-10/comments', { body: { body: 'a runless dispatch writes' } });
+    assert.ok(runlessRes.status < 300, JSON.stringify(runlessRes.body));
+    assert.deepEqual(runless.calls.createComment, ['LIN-10']);
   });
 
   test('a read-scoped token is still refused by the scope gate, whatever its stamp', async () => {

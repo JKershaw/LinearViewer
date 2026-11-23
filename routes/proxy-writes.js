@@ -53,6 +53,7 @@ import {
 import { canonicalPriorityToLinear } from '../lib/providers/models.js';
 import { isTrashed } from '../lib/trashed-signal.js';
 import { checkPeriodicalReportGate } from '../lib/periodical-report-gate.js';
+import { standingForTicket } from '../lib/task-standing.js';
 import { extractPeriodicalGateId } from '../lib/periodicals.js';
 import { flattenIssue, MAX_ATTACHMENT_BYTES } from '../lib/proxy-wire.js';
 import { UUID_REGEX, isValidIssueId } from '../lib/workspace.js';
@@ -479,8 +480,9 @@ export function createProxyWriteRoutes({
   /**
    * LIN-694: report-persistence gate for periodical review tasks. The marker check
    * is free (the guard read already carries the description); a states() lookup to
-   * learn the target's `type` only runs for the rare marked issue. Returns true
-   * once it has refused with 409.
+   * learn the target's `type` only runs for the rare marked issue. LIN-4533: the evidence is the
+   * task's standing from records (its landing and its adversarial-read verdict), not its comments;
+   * an unread standing is passed as null, so the gate refuses. Returns true once it has refused with 409.
    */
   async function refusedByPeriodicalGate(ctx, guard, teamId, stateId) {
     if (!extractPeriodicalGateId(guard?.description)) return false;
@@ -491,9 +493,13 @@ export function createProxyWriteRoutes({
     } catch {
       targetStateType = null; // provider without a states() capability — the gate cannot apply
     }
+    const standing = targetStateType === 'completed'
+      ? await standingForTicket({ recordsStore, urlKey: ctx.req.proxyUrlKey, ticket: ctx.req.params.issueId })
+      : null;
     const gate = checkPeriodicalReportGate({
       description: guard?.description,
-      comments: guard?.comments?.nodes,
+      landing: standing ? standing.landing : null,
+      adversarialRead: standing ? standing.adversarialRead : null,
       targetStateType,
     });
     return gate.applies && !gate.ok && refuse(ctx, 409, gate.message, { code: gate.code });
