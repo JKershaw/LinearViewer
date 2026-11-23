@@ -153,7 +153,7 @@ function optionRefusal(row, optionId) {
  * @param {Function} deps.logEvent - Proxy event/audit logger
  * @param {Object} deps.dispatchQueueStore - Dispatch storage (loop reconstruction input)
  * @param {Object} deps.agentStatusStore - Agent status storage (loop reconstruction input)
- * @param {Object} [deps.taskDecisionsStore] - Scan-produced decisions (null → that input is skipped)
+ * @param {Object} [deps.taskDecisionsStore] - Task-bound decisions the retired comment scan wrote; read only, no writer until LIN-4541 removes the store (null → that input is skipped)
  * @param {Object} [deps.dismissalSuggestionsStore] - Proposed dismissals (null → the propose route 503s)
  * @param {Object} [deps.sessionsFeedCache] - Shared SWR cache for the loop read (null → uncached)
  */

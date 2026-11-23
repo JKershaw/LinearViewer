@@ -2337,6 +2337,11 @@ function renderRulingRow(row) {
   // as the option buttons — but Dismiss always renders: clearing a ruling the
   // operator has nothing to say about must not depend on the row being
   // otherwise repliable (this is the ticket's OTHER named gap).
+  // LIN-4540: a task-bound row has no dismiss route (it went with the comment
+  // scan, the only writer of task-bound rulings), and the rulings dismiss route
+  // refuses a null decisionLoopId, so it renders no Dismiss and no Agree on a
+  // dismissal proposal. An answer proposal still agrees through the answer route.
+  const taskBound = row?.disposition === 'task-bound';
   const composer = document.createElement('div');
   composer.className = 'chat-composer obs-ruling-answer';
 
@@ -2363,25 +2368,27 @@ function renderRulingRow(row) {
       deliverRulingReply(row, text, li);
     });
     actions.appendChild(sendBtn);
-    actions.appendChild(makeDismissButton(row, li));
+    if (!taskBound) actions.appendChild(makeDismissButton(row, li));
     appendSuggestionActions(actions, row, li);
     composer.appendChild(actions);
   } else {
     const actions = document.createElement('div');
     actions.className = 'obs-ruling-answer-actions chat-composer__actions';
-    actions.appendChild(makeDismissButton(row, li));
+    if (!taskBound) actions.appendChild(makeDismissButton(row, li));
     appendSuggestionActions(actions, row, li);
-    composer.appendChild(actions);
+    if (actions.children.length) composer.appendChild(actions);
   }
 
   li.appendChild(composer);
   // What each action does, in words, before it is pressed (LIN-3983 PR 2).
   const note = document.createElement('p');
   note.className = 'obs-ruling-actions-note';
-  note.textContent = canReply
-    ? 'Answer sends your reply. Dismiss: this wasn\'t worth asking.'
-    : 'Dismiss: this wasn\'t worth asking.';
-  li.appendChild(note);
+  note.textContent = taskBound
+    ? 'Answer sends your reply.'
+    : canReply
+      ? 'Answer sends your reply. Dismiss: this wasn\'t worth asking.'
+      : 'Dismiss: this wasn\'t worth asking.';
+  if (!taskBound || canReply) li.appendChild(note);
 
   const feedback = document.createElement('p');
   feedback.className = 'obs-ruling-feedback';
@@ -2726,6 +2733,13 @@ function keepRulingRow(row, li) {
 // `?? 'dismissed'` legacy-default arm `agreeRulingRow`/`bulkAgreeRow` already
 // use — a legacy row with no `proposedOutcome` at all still reads as a
 // dismissal, matching the banner above it.
+// A dismissal proposal on a task-bound row cannot be agreed: its dismiss went
+// with the comment scan (LIN-4540). Answer proposals and loop-backed rows can.
+function rulingAgreeable(row) {
+  if (row?.disposition !== 'task-bound') return true;
+  return (row?.suggestedDismissal?.proposedOutcome ?? 'dismissed') === 'answered';
+}
+
 function makeAgreeButton(row, li) {
   const btn = document.createElement('button');
   btn.type = 'button';
@@ -2752,6 +2766,10 @@ function makeKeepButton(row, li) {
 // branches, beside the existing Dismiss button.
 function appendSuggestionActions(actions, row, li) {
   if (!row?.suggestedDismissal) return;
+  if (!rulingAgreeable(row)) {
+    actions.appendChild(makeKeepButton(row, li));
+    return;
+  }
   actions.appendChild(makeAgreeButton(row, li));
   actions.appendChild(makeKeepButton(row, li));
 }
@@ -2891,6 +2909,7 @@ function computeBulkAgreeBreakdown() {
     const suggestion = row?.suggestedDismissal;
     if (!suggestion) continue;
     const proposedOutcome = suggestion.proposedOutcome ?? 'dismissed';
+    if (!rulingAgreeable(row)) { breakdown.refused += 1; continue; }
     if (proposedOutcome !== 'answered') { breakdown.dismiss += 1; continue; }
     if (!row.canReply) { breakdown.refused += 1; continue; }
     if (row.disposition === 'task-bound') { breakdown.answer += 1; continue; }
@@ -2966,6 +2985,15 @@ function bulkAgreeRow(key, row, li) {
   }
 
   const proposedOutcome = row.suggestedDismissal.proposedOutcome ?? 'dismissed';
+
+  if (!rulingAgreeable(row)) {
+    const feedback = li.querySelector('.obs-ruling-feedback');
+    if (feedback) {
+      feedback.textContent = 'skipped — a task-bound ruling has nothing to dismiss';
+      feedback.classList.add('obs-ruling-feedback--error');
+    }
+    return Promise.resolve('skipped');
+  }
 
   if (proposedOutcome !== 'answered') {
     rulingsPending.add(key);

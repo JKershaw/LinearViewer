@@ -16,9 +16,9 @@
  * badge (LIN-4532).
  *
  * LIN-4242: the owner's section is always on Home, hidden when empty (W12b asserts hidden after a reload). Witness 16
- * (a member and a keyless owner see no section, and no card text leaks through /api/home-rows) is not in this file: its
- * browser form seeded its open ruling through the retired comment scan (LIN-4540), and a question record needs a runner
- * token, which itself turns run controls on. It needs a second session, to be written with its session helper.
+ * (a keyless owner sees no section, and no card text leaks through /api/home-rows) seeds its open question through
+ * /test/seed-question-record with no run, which needs only the signed-in session and mints no token (LIN-4540: it used to
+ * seed through the retired comment scan).
  */
 import { test, expect } from '../fixtures/test-base.js';
 import { localSeedId } from '../fixtures/local-harness.js';
@@ -314,6 +314,37 @@ test('W9b: a started waiting task with a running child is the named context row:
   await syncBadge(page);
   await expect(page.locator(BADGE)).toHaveText('1', { timeout: 15000 });
   await expect(page.locator(COUNT)).toContainText('1 waiting on you');
+});
+
+// ---- witness 16 (browser): a viewer without run controls gets no Waiting section, no card and no ruling text -------------
+
+test('W16: a viewer without run controls (a keyless owner) gets no Waiting section and no question card in the page', async ({ page, seedLocal }) => {
+  // No runner key and no queue token, so the viewer has no run controls. The question has no run (runId null), so no dispatch
+  // token is minted, because a live queue token would itself turn run controls on. The rulings feed is the control that the
+  // question is there; the section must be off by the owner gate alone.
+  await seedLocal({
+    projects: [],
+    issues: [{
+      id: localSeedId(URL_KEY, 'm1'), identifier: 'LOCAL-M1', title: 'Task for the owner gate',
+      state: { name: 'In Progress', type: 'started' }, createdAt: OLD,
+    }],
+  }, { runnerKey: false });
+  const asks = 'Which for LOCAL-M1?';
+  await seedQuestion(page, URL_KEY, { ticket: 'LOCAL-M1', runId: null, asks });
+  // The control: the question is open in the workspace and this viewer can read it (the rulings API lists it).
+  const rulings = await page.request.get(`/workspace/${URL_KEY}/api/dashboard/rulings`);
+  expect(rulings.status()).toBe(200);
+  expect(await rulings.text(), 'the open question exists for this viewer').toContain(asks);
+  await page.goto(`/workspace/${URL_KEY}/`);
+  await expect(page.locator(SECTION)).toHaveCount(0);
+  await expect(page.locator('[data-testid="session-question-card"]')).toHaveCount(0);
+  await expect(page.locator('[data-testid="waiting-task-line"]')).toHaveCount(0);
+  const html = await page.content();
+  expect(html, 'no Waiting section in the page').not.toContain('data-testid="waiting-on-you"');
+  // LIN-4242: the live fragment is owner-only by the same predicate: a 403, and no card text.
+  const fragment = await page.request.get(`/workspace/${URL_KEY}/api/home-waiting`);
+  expect(fragment.status(), 'the live fragment refuses a viewer without run controls').toBe(403);
+  expect(await fragment.text()).not.toContain(asks);
 });
 
 // ---- witness 17: search hides the section; collapse persists across a reload; reset opens it ------------------------

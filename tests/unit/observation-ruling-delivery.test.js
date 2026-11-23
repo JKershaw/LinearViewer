@@ -1544,29 +1544,6 @@ describe('agreeRulingRow / keepRulingRow (LIN-2444 Phase 3)', () => {
     assert.deepEqual(JSON.parse(captured.opts.body), { decisionLoopId: 'loop-gone-1', decisionId: 'd-gone-1' });
   });
 
-  // LIN-4540: the task-bound dismiss route went with the comment scan, so every
-  // dismiss, a task-bound row's included, goes to the rulings dismiss route.
-  test('Agree on a task-bound row posts to the rulings dismiss route, never a task-scoped one', async () => {
-    let captured = null;
-    const page = await makeSandbox({
-      api: async (url, opts) => { captured = { url, opts }; return { success: true }; }
-    });
-    const { agreeRulingRow } = page;
-    const li = makeLi(page);
-    const taskBoundRow = makeRow({
-      anchor: { loopId: null, taskDecisionId: 'td-1' },
-      disposition: 'task-bound'
-    });
-
-    agreeRulingRow(taskBoundRow, li);
-    await new Promise((r) => setImmediate(r));
-    await new Promise((r) => setImmediate(r));
-
-    assert.ok(captured, 'expected window.api to be called');
-    assert.equal(captured.url, '/workspace/the-ruling-workspace/api/dashboard/rulings/dismiss');
-    assert.deepEqual(JSON.parse(captured.opts.body), { decisionLoopId: null, decisionId: 'd-gone-1' });
-  });
-
   test('Agree targets anchor.workspaceUrlKey, never a page urlKey', async () => {
     let capturedUrl = null;
     const page = await makeSandbox({
@@ -2131,6 +2108,31 @@ describe('rulingRowControls widened for Agree/Keep (LIN-2444 Phase 4)', () => {
     const li = list.children[0];
     assert.equal(li.querySelector('.obs-ruling-agree'), null);
     assert.equal(li.querySelector('.obs-ruling-keep'), null);
+  });
+
+  // LIN-4540: the task-bound dismiss route went with the comment scan, and the
+  // rulings dismiss route refuses a null decisionLoopId (400), so a task-bound
+  // row renders no Dismiss, Agree or Keep: a button that always fails is worse
+  // than none. A loop-backed row keeps them.
+  test('a task-bound row renders no Dismiss and no Agree-to-dismiss; a loop-backed row still does', async () => {
+    const { page, list } = await makeRenderSandbox(async () => ({ success: true }));
+    const { renderRulings } = page;
+    const suggestion = { reason: 'x', suggestedBy: 'y', suggestedAt: '2026-09-05T00:00:00.000Z' };
+
+    renderRulings([makeRow({
+      anchor: { loopId: null, taskDecisionId: 'td-1' },
+      disposition: 'task-bound',
+      suggestedDismissal: suggestion
+    })]);
+    const taskBoundLi = list.children[0];
+    assert.equal(taskBoundLi.querySelector('.obs-ruling-dismiss'), null, 'no Dismiss on a task-bound row');
+    assert.equal(taskBoundLi.querySelector('.obs-ruling-agree'), null, 'no Agree on a task-bound dismissal proposal');
+    assert.ok(taskBoundLi.querySelector('.obs-ruling-keep'), 'Keep (withdraw the suggestion) is its own route and stays');
+
+    renderRulings([makeRow({ suggestedDismissal: suggestion })]);
+    const loopLi = list.children[0];
+    assert.ok(loopLi.querySelector('.obs-ruling-dismiss'), 'a loop-backed row keeps Dismiss');
+    assert.ok(loopLi.querySelector('.obs-ruling-agree'), 'a loop-backed row keeps Agree');
   });
 });
 
