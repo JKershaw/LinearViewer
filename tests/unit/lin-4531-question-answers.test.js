@@ -13,6 +13,8 @@
  *   - liveness lives in its own leaf (lib/run-liveness.js), and the old module re-exports the same values.
  *   - review finding 76818702: liveness and the follow-up target come from the run's lineage tail, not its first row;
  *   - review finding b6e34489: a non-owner's answer to a resumable question is refused before any write.
+ *   - LIN-4545: the decision sits `in` the question's task for a resumable, a stopped and a gone run; a gone run's answer is
+ *     under "what stands" in the next run's brief on that task; a retry over a decision written with no task moves it onto it.
  * The HTTP side (session auth, `by` from the session, the kickoff witness through the real factory) is in
  * tests/unit/lin-4531-question-answer-routes.test.js.
  */
@@ -28,6 +30,8 @@ import { REAP_INACTIVITY_MS, resolveDisposition } from '../../lib/unanswered-dec
 import { questionAnsweredPrompt, questionDismissedPrompt, resumesQuestion, RESUME_ACTION } from '../../lib/prompts/question-resume.js';
 import { isTerminalState } from '../../lib/providers/state-map.js';
 import { fixedIdOf } from '../../lib/records/refs.js';
+import { composeRunBrief } from '../../lib/records/run-brief.js';
+import { ANSWER_ON_TASK_REASON } from '../../lib/question-answers.js';
 
 const URL_KEY = 'lin-4531-workspace';
 const NOW = new Date('2026-11-22T12:00:00.000Z');
@@ -97,10 +101,10 @@ async function askingRun(id, { feedback = [], status = 'taken', target = 'cli', 
 }
 
 /** A question asked by the run, its v1 `run` set to the run's id. */
-async function askQuestion({ run, asks = 'Which way?', options = ['left', 'right'], ifUnanswered = 'pick left' } = {}) {
+async function askQuestion({ run, asks = 'Which way?', options = ['left', 'right'], ifUnanswered = 'pick left', inTask = null } = {}) {
   const snap = await writes.add({
     urlKey: URL_KEY, kind: 'question', by: 'implementation', run,
-    input: { asks, options, recommended: options[0], 'if-unanswered': ifUnanswered, to: 'project' },
+    input: { ...(inTask ? { in: inTask } : {}), asks, options, recommended: options[0], 'if-unanswered': ifUnanswered, to: 'project' },
   });
   assert.ok(snap.record, `question refused: ${JSON.stringify(snap.problems)}`);
   return snap.record.id;
@@ -555,5 +559,90 @@ describe('the owner gate is read before any write (review finding b6e34489)', ()
     const out = await service.answer({ urlKey: URL_KEY, questionId: q, option: 'left', by: PERSON, dispatchedBy: 'acct-other' });
     assert.equal(out.status, 200, JSON.stringify(out.body));
     assert.equal(out.body.notResumedBecause, 'stopped');
+  });
+});
+
+describe('LIN-4545: the answer sits on its question\'s task, whatever the run\'s state', () => {
+  /** The task for LIN-9, as a ticket's task is made, and a question asked in it by `run`. */
+  async function taskQuestion(run) {
+    const task = (await records.ensureTask(URL_KEY, { identifier: 'LIN-9', asked: 'LIN-9 asked', closed: false, closedReason: null }, { by: 'harbour' })).id;
+    return { task, q: await askQuestion({ run, inTask: task }) };
+  }
+
+  /** The brief's "4 What stands" part, as text. */
+  const standsPart = (text) => text.split('## 4 What stands')[1].split('## 5 ')[0];
+
+  test('resumable: the decision is in the question\'s task', async () => {
+    const run = await askingRun('run-t1', { feedback: blocked() });
+    const { task, q } = await taskQuestion(run);
+    const out = await service.answer({ urlKey: URL_KEY, questionId: q, option: 'left', words: 'and say why', by: PERSON, dispatchedBy: 'acct-owner' });
+    assert.equal(out.status, 200, JSON.stringify(out.body));
+    assert.equal(out.body.resumed, true);
+    assert.equal((await records.current(URL_KEY, out.body.decisionId)).in, task);
+  });
+
+  test('stopped: the decision is in the question\'s task, for the next stage to read', async () => {
+    const run = await askingRun('run-t2', { feedback: blocked() });
+    await dispatch.collection.insertOne({ _id: 'abort-t2', urlKey: URL_KEY, abort: true, abortTo: run, feedback: [{ message: '[aborted] stopped', timestamp: NOW.toISOString() }], status: 'done', feedbackAt: NOW, expiresAt: new Date('2099-01-01T00:00:00.000Z') });
+    const { task, q } = await taskQuestion(run);
+    const out = await service.answer({ urlKey: URL_KEY, questionId: q, option: 'right', by: PERSON, dispatchedBy: 'acct-owner' });
+    assert.equal(out.body.notResumedBecause, 'stopped');
+    assert.equal((await records.current(URL_KEY, out.body.decisionId)).in, task);
+  });
+
+  test('gone: the ended run\'s answer is in its task, and the next run\'s brief on that task lists it under what stands', async () => {
+    const run = await askingRun('run-t3', { status: 'done', feedback: doneAt(new Date(NOW.getTime() - 8 * DAY)) });
+    const { task, q } = await taskQuestion(run);
+    const out = await service.answer({ urlKey: URL_KEY, questionId: q, option: 'left', words: 'Keep the old flag too.', by: PERSON, dispatchedBy: 'acct-owner' });
+    assert.equal(out.body.notResumedBecause, 'no-session');
+    const decision = await records.current(URL_KEY, out.body.decisionId);
+    assert.equal(decision.in, task);
+    // The next stage on the task: a fresh run, never resumed, so the brief is the only way the answer reaches it.
+    await records.openRun(URL_KEY, { id: 'run-next', stage: 'review', taskId: task, lineage: 'run-next' });
+    const brief = await composeRunBrief({ store: records, urlKey: URL_KEY, runId: 'run-next' });
+    assert.ok(brief.text, JSON.stringify(brief));
+    const stands = standsPart(brief.text);
+    assert.match(stands, new RegExp(out.body.decisionId), `the answer is not under what stands:\n${brief.text}`);
+    assert.match(stands, /Keep the old flag too\./);
+  });
+
+  test('a question with no task gives its decision none: nothing is guessed', async () => {
+    const run = await askingRun('run-t4', { status: 'done', feedback: doneAt(new Date(NOW.getTime() - 8 * DAY)) });
+    const q = await askQuestion({ run });
+    const out = await service.answer({ urlKey: URL_KEY, questionId: q, option: 'left', by: PERSON, dispatchedBy: 'acct-owner' });
+    assert.equal(out.status, 200, JSON.stringify(out.body));
+    assert.equal((await records.current(URL_KEY, out.body.decisionId)).in, undefined);
+  });
+
+  test('a retry over a decision written before the fix (no task) is the same answer: it moves onto the task as v2, v1 kept', async () => {
+    const run = await askingRun('run-t5', { status: 'done', feedback: doneAt(new Date(NOW.getTime() - 8 * DAY)) });
+    const { task, q } = await taskQuestion(run);
+    const decisionId = fixedIdOf('decision', q, 'answer');
+    // The decision as the old route wrote it, before its question ended: no `in`.
+    await writes.add({ urlKey: URL_KEY, kind: 'decision', input: { links: { answers: q }, answer: 'left' }, by: PERSON, run: null, fixedId: decisionId });
+    const out = await service.answer({ urlKey: URL_KEY, questionId: q, option: 'left', by: PERSON, dispatchedBy: 'acct-owner' });
+    assert.equal(out.status, 200, JSON.stringify(out.body));
+    const { snap, versions } = await records.read(URL_KEY, decisionId);
+    assert.equal(snap.v, 2);
+    assert.equal(snap.in, task);
+    assert.equal(snap.reason, ANSWER_ON_TASK_REASON);
+    assert.equal(snap.fields.answer, 'left');
+    assert.equal(versions.find((x) => x.v === 1).in, undefined, 'v1 stays as it was written');
+    assert.equal((await records.current(URL_KEY, q)).state, 'answered');
+  });
+
+  test('a retry over a decision the fixed route already put on the task adds no version: the has-task guard', async () => {
+    const run = await askingRun('run-t6', { status: 'done', feedback: doneAt(new Date(NOW.getTime() - 8 * DAY)) });
+    const { task, q } = await taskQuestion(run);
+    const decisionId = fixedIdOf('decision', q, 'answer');
+    // A partial failure of the fixed route: the decision was written `in` its task, the question not yet ended.
+    await writes.add({ urlKey: URL_KEY, kind: 'decision', input: { in: task, links: { answers: q }, answer: 'left' }, by: PERSON, run: null, fixedId: decisionId });
+    assert.equal((await records.current(URL_KEY, q)).state, 'open');
+    const out = await service.answer({ urlKey: URL_KEY, questionId: q, option: 'left', by: PERSON, dispatchedBy: 'acct-owner' });
+    assert.equal(out.status, 200, JSON.stringify(out.body));
+    const { snap } = await records.read(URL_KEY, decisionId);
+    assert.equal(snap.v, 1, 'no redundant v2 on a decision already on its task');
+    assert.equal(snap.in, task);
+    assert.equal((await records.current(URL_KEY, q)).state, 'answered');
   });
 });

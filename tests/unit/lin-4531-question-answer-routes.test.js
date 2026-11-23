@@ -7,7 +7,7 @@
  *   - signed out is 403 and writes nothing (the session is the person; a body can't name one);
  *   - `by` is read from the session, never the body (the decision is filed under the owner's account);
  *   - an owner's answer to a parked run creates ONE follow-up row, following up on the run, carrying the question, option and words;
- *   - a stopped run's answer creates no row, and says it was not resumed;
+ *   - a stopped run's answer creates no row, says it was not resumed, and its decision is in the question's task (LIN-4545);
  *   - a non-owner's answer is refused 422 before anything is written;
  *   - the kickoff witness: a fresh autopilot kickoff starts its own run (`startsRunRow`), it asks a question under that run, and the
  *     answer resumes it with the question, option and words. Without the kickoff's run the question has no run and is never resumed.
@@ -92,8 +92,8 @@ async function askingRun(id, { feedback = [], status = 'taken' } = {}) {
   return id;
 }
 
-async function askQuestion({ run, asks = 'Which way?', options = ['left', 'right'] }) {
-  const snap = await writes.add({ urlKey: URL_KEY, kind: 'question', by: 'implementation', run, input: { asks, options, recommended: options[0], 'if-unanswered': 'pick left', to: 'project' } });
+async function askQuestion({ run, asks = 'Which way?', options = ['left', 'right'], inTask = null }) {
+  const snap = await writes.add({ urlKey: URL_KEY, kind: 'question', by: 'implementation', run, input: { ...(inTask ? { in: inTask } : {}), asks, options, recommended: options[0], 'if-unanswered': 'pick left', to: 'project' } });
   assert.ok(snap.record, `question refused: ${JSON.stringify(snap.problems)}`);
   return snap.record.id;
 }
@@ -132,14 +132,16 @@ describe('the answer and dismiss routes', () => {
     assert.ok(follow[0].prompt.includes('Go right, keep the logs.'));
   });
 
-  test('a stopped run\'s answer makes no follow-up and says it was not resumed', async () => {
+  test('a stopped run\'s answer makes no follow-up, says it was not resumed, and sits on the question\'s task (LIN-4545)', async () => {
     const run = await askingRun('run-r3', { feedback: blocked() });
     await dispatch.collection.insertOne({ _id: 'abort-r3', urlKey: URL_KEY, abort: true, abortTo: run, feedback: [{ message: '[aborted] stopped', timestamp: new Date().toISOString() }], status: 'done', feedbackAt: new Date(), expiresAt: new Date('2099-01-01T00:00:00.000Z') });
-    const q = await askQuestion({ run });
+    const task = (await records.ensureTask(URL_KEY, { identifier: 'LIN-9', asked: 'LIN-9 asked', closed: false, closedReason: null }, { by: 'harbour' })).id;
+    const q = await askQuestion({ run, inTask: task });
     const out = await post(`/questions/${q}/answer`, { option: 'left' });
     assert.equal(out.status, 200, JSON.stringify(out.body));
     assert.equal(out.body.notResumedBecause, 'stopped');
     assert.equal((await followUpsOf(run)).length, 0);
+    assert.equal((await records.current(URL_KEY, fixedIdOf('decision', q, 'answer'))).in, task, 'the next stage reads it on the task');
   });
 
   test('a non-owner\'s answer is refused 422 before anything is written, and the question stays open for the owner', async () => {
