@@ -2201,7 +2201,15 @@ describe('flight-companion.js — LIN-2621 beat 4: decisions as option buttons',
   test('parseDecisionsResult: valid shape, malformed JSON, non-array decisions, and per-row shape filtering', async () => {
     const { exports: m } = await loadClient();
     const d = decision();
-    looseDeepEqual(m.parseDecisionsResult(decisionsResult([d])), { ok: true, decisions: [d] });
+    // LIN-4532 (P2b): a result with no open questions parses to an empty `questions` list (the key is absent from the tool's result).
+    looseDeepEqual(m.parseDecisionsResult(decisionsResult([d])), { ok: true, decisions: [d], questions: [] });
+    // LIN-4532 (P2b): open question rows ride in `questions`; a row with no questionId or no options is dropped, as a decision row is.
+    const withQuestions = JSON.stringify({ count: 2, truncated: false, decisions: [], questions: [
+      { questionId: 'q-1', question: 'Which?', options: ['left'], recommended: 'left', ifUnanswered: null, state: 'resumable', interactive: true },
+      { question: 'no id', options: ['x'] },
+    ] });
+    assert.strictEqual(m.parseDecisionsResult(withQuestions).questions.length, 1);
+    assert.strictEqual(m.parseDecisionsResult(withQuestions).questions[0].questionId, 'q-1');
     assert.strictEqual(m.parseDecisionsResult('not json').ok, false);
     assert.strictEqual(m.parseDecisionsResult('{}').ok, false, 'decisions must be an array');
     assert.strictEqual(m.parseDecisionsResult(JSON.stringify({ decisions: 'x' })).ok, false);

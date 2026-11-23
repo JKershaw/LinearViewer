@@ -214,6 +214,14 @@ const CASES = {
       producer: { loopId: 'loop-2', target: 'cli', issueId: 'uuid-901', issueIdentifier: 'LIN-901', case: ['last words'] }
     };
   },
+  // LIN-4532 (P2b): an open question record this run asked the person, pinned as its card beside the Steps (answerable: the run is parked).
+  'question-records-pinned': () => ({
+    ...base, session: fixtureSession({ sessionId: 'sess-abc' }), sessionTerminal: true,
+    questionRecords: [{
+      questionId: 'q-7', asks: 'Keep the old route?', options: ['keep', 'drop'], recommended: 'drop', ifUnanswered: 'keep it',
+      taskId: 'task-901', ticket: 'LIN-901', runId: 'sess-abc', askedAt: '2026-10-06T09:00:00.000Z', state: 'resumable', reason: null, interactive: true,
+    }],
+  }),
   'running-no-pr-state': () => ({ ...base, session: fixtureSession({ completedAt: null, loops: [costLoop({ loopId: 'r1', terminalStatus: null })] }) }),
   'pr-state-open': () => ({ ...base, session: fixtureSession(), sessionTerminal: true, prState: { state: 'open', number: 12, checks: 'passing' } }),
   'pr-state-merged': () => ({ ...base, session: fixtureSession(), sessionTerminal: true, prState: { state: 'merged', number: 12, checks: null } }),

@@ -74,6 +74,8 @@ import { createDashboardEffortRoutes } from './dashboard-effort.js';
 import { createDashboardSummariesRoutes, buildTestSummary, buildTestSessionSummary } from './dashboard-summaries.js';
 import { createDashboardDrilldownRoutes } from './dashboard-drilldown.js';
 import { deriveSessionWaiting, deriveSessionDecisions, settleWithConcurrency, isStandaloneSession, deriveSessionStatus } from './dashboard-session-state.js';
+import { openQuestionsForRun } from '../lib/open-questions.js';
+import { personWriterOf } from './task-records.js';
 export { settleWithConcurrency, isStandaloneSession, deriveSessionStatus, deriveSessionWaiting, deriveSessionDecisions, buildTestSummary, buildTestSessionSummary };
 
 
@@ -284,6 +286,7 @@ export function createDashboardRoutes(deps) {
     agentStatusStore,
     runParagraphStore,
     recordsStore,
+    accountStore,
     briefCacheStore,
     recapCacheStore,
     proxyEventStore,
@@ -421,6 +424,14 @@ export function createDashboardRoutes(deps) {
         : enrichedLoops;
       const sessionDecisions = deriveSessionDecisions(enrichedLoops, { now: new Date(), liveLoops });
 
+      // LIN-4532 (P2b): the open question RECORDS this run asked the signed-in person, pinned beside the decision card. Read for the
+      // owner's canonical account (the id the answer route files under); a failed read costs only these cards.
+      const questionRecords = await (async () => {
+        const writer = recordsStore && req.session?.accountId ? await personWriterOf(req, accountStore) : null;
+        if (!writer) return [];
+        return openQuestionsForRun({ recordsStore, dispatchStore: dispatchQueueStore, urlKey: workspace.urlKey, accountId: writer.by.slice('person:'.length), runId: session.sessionId });
+      })().catch(() => []);
+
       // Per-run inline reply (LIN-1004/LIN-1133; LIN-1163 removed the page-level
       // box): gated to cli/web sessions (never dash/local — the dispatch route
       // rejects followUpTo for those anyway). Each run's own box replies via its
@@ -481,7 +492,7 @@ export function createDashboardRoutes(deps) {
       // session's own rows. A follow-up or wake row reads the run it resumes (`readRunAccount`, via `runRecordIdFor`).
       const runAccount = recordsStore ? await readRunAccount(recordsStore, (urlKey, id) => dispatchQueueStore.rowForRunRecords(urlKey, id), workspace.urlKey, session) : null;
       const html = renderSessionPage(
-        { session, sessionId, issueContext, waiting, waitingMessage, producerLoopId, decision, decisionCase, decisions: sessionDecisions, producer, urlKey: workspace.urlKey, canReply, sessionTerminal, credentialByToken, anchorIssueTitle, runView, proposals, runEvidence, runParagraph, runAccount },
+        { session, sessionId, issueContext, waiting, waitingMessage, producerLoopId, decision, decisionCase, decisions: sessionDecisions, questionRecords, producer, urlKey: workspace.urlKey, canReply, sessionTerminal, credentialByToken, anchorIssueTitle, runView, proposals, runEvidence, runParagraph, runAccount },
         pageOptions
       );
       res.send(html);

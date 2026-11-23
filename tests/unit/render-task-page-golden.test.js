@@ -153,6 +153,12 @@ const LIN3351_LOOPS = [
   loop({ loopId: 'w9', kind: 'wake', agentState: 'queued', dispatchedAt: T(10, 58), takenAt: null }),
 ];
 
+// LIN-4532 (P2b): an open question record the owner is asked on this task (lib/open-questions.js's row shape, as the route reads it).
+const QUESTION_ROW = {
+  questionId: 'q-1', asks: 'Which way should the migration go?', options: ['in place', 'copy over'], recommended: 'copy over',
+  ifUnanswered: 'copy over', taskId: 'task-50', ticket: 'LIN-50', runId: 'impl-2', askedAt: '2026-10-06T09:00:00.000Z', state: 'resumable', reason: null, interactive: true,
+};
+
 /** Each case's inputs, shared by its page model and its gathered state (LIN-4071: the page is rendered with the state the
  *  route sends, so the golden pins the same picture production paints). */
 function caseOf(name) {
@@ -174,13 +180,19 @@ function caseOf(name) {
       return { loops: LIN3351_LOOPS, ctx: ctx(), evidence: EVIDENCE };
     case 'no-sessions':
       return { loops: [], ctx: ctx({ stateType: 'unstarted', stateName: 'Todo' }) };
+    case 'open-question-records':
+      // LIN-4532 (P2b): no ruling, one open question record on the task: the question section carries its card, not a ruling.
+      return { loops: [done({ loopId: 'plan-1', kind: 'plan' })], ctx: ctx(), questionRecords: [QUESTION_ROW] };
     default:
       throw new Error(name);
   }
 }
 
 function model(name) {
-  return buildTaskPageModel({ identifier: 'LIN-50', enrichLoop, deriveSessionWaiting, deriveSessionDecisions, now: NOW, ...caseOf(name) });
+  const { questionRecords = null, ...inputs } = caseOf(name);
+  const built = buildTaskPageModel({ identifier: 'LIN-50', enrichLoop, deriveSessionWaiting, deriveSessionDecisions, now: NOW, ...inputs });
+  // The route attaches the owner's open question records to the model (routes/task-page.js); a case that has some does the same.
+  return questionRecords ? { ...built, questionRecords } : built;
 }
 
 /**
@@ -193,7 +205,7 @@ function stateOf(name) {
   return gatherTaskStates({ roots: [root], loops, at: NOW, enrichLoop, deriveSessionWaiting }).states.get('LIN-50');
 }
 
-const CASES = ['running-blocked-repeat', 'waiting', 'done', 'no-sessions', 'lin-3351', 'settling', 'open-ruling-recommended'];
+const CASES = ['running-blocked-repeat', 'waiting', 'done', 'no-sessions', 'lin-3351', 'settling', 'open-ruling-recommended', 'open-question-records'];
 
 // LIN-3975: the owner's run-control options, as routes/task-page.js builds them (a runner set up, so the run control
 // is the shared PromptSection, not the copy-first view; the copy-first view is covered in its own test).

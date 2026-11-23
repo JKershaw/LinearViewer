@@ -9,6 +9,9 @@
  */
 import { questionActionPath, questionOutcomeText } from '../lib/question-record-card.js';
 
+/** The event a settled question card fires (bubbling). Named once here; app.js listens for it on the Home desk. */
+export const SETTLED_EVENT = 'harbour:question-record-settled';
+
 const CARD = '[data-testid="question-record-card"]';
 const OPTION = '[data-testid="question-record-card-option"]';
 const ANSWER = '[data-testid="question-record-card-answer"]';
@@ -25,11 +28,17 @@ function say(card, text) {
   if (feedback) feedback.textContent = text;
 }
 
-/** The card is answered: its controls stay off, and the outcome it was given stays on it. */
+/**
+ * The card is answered: its controls stay off, and the outcome it was given stays on it. It then tells the page it sits on
+ * (`harbour:question-record-settled`, bubbling), so a count line can take the open question out of its number (public/app.js).
+ */
 function settle(card, text) {
   card.dataset.settled = 'true';
   setBusy(card, true);
   say(card, text);
+  if (typeof card.dispatchEvent === 'function' && typeof CustomEvent === 'function') {
+    card.dispatchEvent(new CustomEvent(SETTLED_EVENT, { bubbles: true, detail: { urlKey: card.dataset.urlKey || '', questionId: card.dataset.questionId || '' } }));
+  }
 }
 
 async function send(card, action, payload) {

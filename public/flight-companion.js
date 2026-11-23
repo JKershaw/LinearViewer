@@ -45,6 +45,7 @@
  * live proposal id, so the card must never be interactive again.
  */
 import { formatUsd } from '../lib/cost-format.js';
+import { renderQuestionRecordCard } from '../lib/question-record-card.js';
 
 
 var CADENCE_BASE_MS = 30000;
@@ -544,7 +545,11 @@ function parseDecisionsResult(resultString) {
     var decisions = parsed.decisions.filter(function (d) {
       return d && typeof d.decisionId === 'string' && d.decisionId && Array.isArray(d.options);
     });
-    return { ok: true, decisions: decisions };
+    // LIN-4532 (P2b): the open question records, each answered through the one question route (public/question-records.js).
+    var questions = Array.isArray(parsed.questions) ? parsed.questions.filter(function (q) {
+      return q && typeof q.questionId === 'string' && q.questionId && Array.isArray(q.options);
+    }) : [];
+    return { ok: true, decisions: decisions, questions: questions };
   } catch (e) {
     return { ok: false };
   }
@@ -1151,7 +1156,7 @@ function renderDecisions(resultString, beforeLi) {
     return;
   }
   // Nothing pending: the model's own prose says so — no dead UI to add.
-  if (!parsed.decisions.length) return;
+  if (!parsed.decisions.length && !parsed.questions.length) return;
   // LIN-3361: one closed fold per result. Every row is built and appended
   // up front (nothing lazy, nothing removed), so the option buttons' click
   // handlers and `fc-decision--resolved` work the same once it is opened.
@@ -1161,7 +1166,7 @@ function renderDecisions(resultString, beforeLi) {
   fold.className = 'fc-decisions-fold';
   fold.setAttribute('data-testid', 'fc-decisions-fold');
   var summary = document.createElement('summary');
-  var count = parsed.decisions.length;
+  var count = parsed.decisions.length + parsed.questions.length;
   summary.textContent = count + (count === 1 ? ' decision waiting' : ' decisions waiting');
   fold.appendChild(summary);
   var rulingsHref = urlKey ? '/workspace/' + encodeURIComponent(urlKey) + '/observation?view=rulings' : '';
@@ -1181,6 +1186,14 @@ function renderDecisions(resultString, beforeLi) {
   else thread.appendChild(foldLi);
   parsed.decisions.forEach(function (decision) {
     renderOneDecision(decision, null, list);
+  });
+  // LIN-4532 (P2b): an open question is the shared question card, in the same list, answered with its option and words.
+  parsed.questions.forEach(function (question) {
+    var qli = document.createElement('li');
+    qli.className = 'fc-decision fc-question';
+    qli.setAttribute('data-testid', 'fc-question');
+    qli.innerHTML = renderQuestionRecordCard(question, { urlKey: urlKey || '' });
+    list.appendChild(qli);
   });
   thread.hidden = false;
   thread.scrollTop = thread.scrollHeight;

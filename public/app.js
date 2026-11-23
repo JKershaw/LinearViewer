@@ -604,6 +604,10 @@ function initWaitingOnYou() {
   main.addEventListener(window.QuestionCards?.RULING_GONE_EVENT || 'harbour:question-answered', (e) => {
     onRulingGone({ main, countLine, live, detail: e.detail || {} })
   })
+  // LIN-4532 (P2b): a question record answered or dismissed on this desk stays on the page, settled; the count takes it out.
+  main.addEventListener('harbour:question-record-settled', (e) => {
+    onQuestionRecordSettled({ main, countLine, live, detail: e.detail || {} })
+  })
   // The cards are server-rendered: bind their answer, option and dismiss controls now, scoped to the section.
   if (window.QuestionCards && typeof window.QuestionCards.setDeskRoot === 'function') window.QuestionCards.setDeskRoot(main)
   if (window.QuestionCards && typeof window.QuestionCards.initQuestionCards === 'function') {
@@ -626,7 +630,9 @@ function initWaitingOnYou() {
       .then(response => (response.ok ? response.json() : null))
       .then(data => {
         if (!data || typeof data.html !== 'string' || !window.QuestionCards?.mergeWaitingCards) return
-        const { count, removed } = window.QuestionCards.mergeWaitingCards(body, data.html)
+        const { count: cards, removed } = window.QuestionCards.mergeWaitingCards(body, data.html)
+        // LIN-4532 (P2b): the open question cards drawn on the page load stay in the body, so they count too.
+        const count = cards + body.querySelectorAll(':scope > .waiting-question').length
         // Removed cards were answered or dismissed elsewhere: say so. The badge is not written from this count (the tick
         // sets it from the feed's own count, and the two reductions differ by design).
         if (removed.length > 0) live.textContent = 'Answered elsewhere'
@@ -654,6 +660,21 @@ function initWaitingOnYou() {
   if (typeof window.onRulingsTick === 'function') window.onRulingsTick(() => refreshWaitingOnYou())
 }
 
+/** The Waiting count's number: the ruling cards left in Waiting, plus the open question cards (not yet settled). */
+function waitingCountIn(main) {
+  const rulings = main.querySelectorAll('[data-testid="waiting-on-you"] [data-testid="session-question-card"]').length
+  const questions = main.querySelectorAll('[data-testid="waiting-on-you"] .waiting-question [data-testid="question-record-card"]:not([data-settled="true"])').length
+  return rulings + questions
+}
+
+/** LIN-4532 (P2b): a question record card was answered or dismissed here. The card stays (settled, with its outcome); the count
+ *  and the nav badge take it out. */
+function onQuestionRecordSettled({ main, countLine, live, detail }) {
+  setWaitingCount(countLine, waitingCountIn(main))
+  if (detail.urlKey && typeof window.updateRulingsBadge === 'function') window.updateRulingsBadge(detail.urlKey)
+  live.textContent = 'Answered'
+}
+
 function onRulingGone({ main, countLine, live, detail }) {
   const key = detail.key
   if (!key) return
@@ -668,7 +689,7 @@ function onRulingGone({ main, countLine, live, detail }) {
   // The count line's "N waiting on you" counts the cards left inside Waiting only, one per ruling.
   const section = main.querySelector('[data-testid="waiting-on-you"]')
   const waitingCards = main.querySelectorAll('[data-testid="waiting-on-you"] [data-testid="session-question-card"]').length
-  setWaitingCount(countLine, waitingCards)
+  setWaitingCount(countLine, waitingCountIn(main))
   if (detail.urlKey && typeof window.updateRulingsBadge === 'function') window.updateRulingsBadge(detail.urlKey)
   // LIN-4242: an empty section is hidden, not removed, so the live refresh can merge a new card into it.
   syncWaitingSection(section)
@@ -828,7 +849,8 @@ function createDeskPlacement({ main, countLine, live, searchResults, searchInput
 function syncWaitingSection(section) {
   if (!section) return
   // LIN-4494: a person's record is a reason to show the section too (`.waiting-record`, drawn on the page load).
-  const empty = !section.querySelector('.waiting-card, .waiting-record')
+  // LIN-4532 (P2b): an open question record (`.waiting-question`) is one too.
+  const empty = !section.querySelector('.waiting-card, .waiting-record, .waiting-question')
   section.classList.toggle('hidden', empty || section.dataset.searchHidden === 'true')
 }
 

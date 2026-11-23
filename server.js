@@ -3451,6 +3451,8 @@ app.use(createTaskPageRoutes({
   timelineFragment,
   // LIN-4494: the Records section, for a signed-in owner or member (never a guest).
   recordsStore,
+  // LIN-4532 (P2b): the open question records the owner is asked on this task (the question section), read with the dispatch rows.
+  dispatchStore: dispatchQueueStore,
 }))
 
 // LIN-4494 (piece 3): a signed-in person's record writes from the task page, and the project page (its backlog and
@@ -3885,14 +3887,15 @@ app.get('/workspace/:urlKey/api/home-waiting', workspaceFromUrl, async (req, res
   try {
     const featureFlags = await requestFeatureFlags(req);
     if (featureFlags.runControls !== true) return jsonError(res, 403, 'Waiting on you is for the workspace owner');
-    const { ruling } = await waitingStanding({ urlKey: workspace.urlKey });
+    // LIN-4532 (P2b): the open questions are counted with the rulings (the count and the badge), drawn on the page load only.
+    const { ruling, questions = [] } = await waitingStanding({ urlKey: workspace.urlKey, accountId: req.session.accountId });
     const rows = ruling ? ruling.rows : [];
     // The task titles come from the held issue set when it is warm (a read, no provider call); a cold set leaves them to
     // `anchor.issueTitle`, the same fallback the section always had.
     const held = taskFacts.read(workspace.urlKey);
     const titles = held.complete ? waitingTitlesOf(held.issues, rows.map(row => row?.anchor?.issueIdentifier).filter(Boolean)) : {};
     const html = renderWaitingSection({ rows, titles }, { urlKey: workspace.urlKey, owner: true });
-    res.json({ html, count: rows.length });
+    res.json({ html, count: rows.length + questions.length });
   } catch (error) {
     if (isAuthError(error)) return unauthorized.json(res, 'Not authenticated');
     console.error('Home waiting error:', error);
