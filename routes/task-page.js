@@ -37,7 +37,7 @@ import { pageStatusOf } from '../lib/task-state.js';
 import { isHiddenState } from '../lib/providers/state-map.js';
 import { renderTaskQuestion } from '../lib/render-task-page.js';
 import { openQuestionsForTask } from '../lib/open-questions.js';
-import { personWriterOf } from './task-records.js';
+import { personAccountIdOf } from './task-records.js';
 import { requestFeatureFlags } from '../lib/run-controls.js';
 import { resolveIssueBinding, isValidIssueId } from '../lib/workspace.js';
 import { jsonError } from '../lib/errors.js';
@@ -93,9 +93,9 @@ export function createTaskPageRoutes({ workspaceFromUrl, getOpenRouterSource, ge
    */
   async function questionRecordsOf(req, workspace, identifier) {
     if (!recordsStore || !dispatchStore || !identifier) return [];
-    const writer = await personWriterOf(req, accountStore);
-    if (!writer) return [];
-    return openQuestionsForTask({ recordsStore, dispatchStore, urlKey: workspace.urlKey, accountId: writer.by.slice('person:'.length), ticket: identifier })
+    const accountId = await personAccountIdOf(req, accountStore);
+    if (!accountId) return [];
+    return openQuestionsForTask({ recordsStore, dispatchStore, urlKey: workspace.urlKey, accountId, ticket: identifier })
       .catch(() => []);
   }
 

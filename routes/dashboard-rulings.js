@@ -27,18 +27,17 @@ import { attachStandingSuggestions } from '../lib/dismissal-suggestions-store.js
 import { RULING_SETTLED_REFUSAL } from '../lib/ruling-settled.js';
 import { connectedWorkspaces, liveOnAnchor } from './dashboard-session-state.js';
 import { openQuestionsFor } from '../lib/open-questions.js';
-import { personWriterOf } from './task-records.js';
+import { personAccountIdOf } from './task-records.js';
 
 /**
  * LIN-4532 (P2b): the open question records addressed to the signed-in person, in each connected workspace, as rows of this feed
  * (`kind: 'question'`). They are read here, not in the loop/decision reduction, so the page, the count and the badge read one list.
- * The person is the canonical account (personWriterOf), the id the answer route files its decision under.
+ * The person is the canonical account (personAccountIdOf), the id the answer route files its decision under.
  */
 async function openQuestionRowsFor({ session, workspaces, recordsStore, dispatchQueueStore, accountStore }) {
   if (!recordsStore || !dispatchQueueStore || !session?.accountId) return [];
-  const writer = await personWriterOf({ session }, accountStore);
-  if (!writer) return [];
-  const accountId = writer.by.slice('person:'.length);
+  const accountId = await personAccountIdOf({ session }, accountStore);
+  if (!accountId) return [];
   const rows = [];
   for (const w of workspaces) {
     const questions = await openQuestionsFor({ recordsStore, dispatchStore: dispatchQueueStore, urlKey: w.urlKey, accountId });

@@ -44,6 +44,15 @@ export async function personWriterOf(req, accountStore) {
   return { by: `person:${canonical}`, run: null };
 }
 
+/**
+ * LIN-4532: the session person's canonical account id (the `<account>` of `personWriterOf`'s `person:<account>`), the id a
+ * question record is addressed to and the answer route files under. null without a signed-in session.
+ */
+export async function personAccountIdOf(req, accountStore) {
+  const writer = await personWriterOf(req, accountStore);
+  return writer ? writer.by.slice('person:'.length) : null;
+}
+
 const trimmed = (x) => (typeof x === 'string' ? x.trim() : '');
 
 /**

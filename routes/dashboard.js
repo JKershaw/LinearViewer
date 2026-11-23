@@ -75,7 +75,7 @@ import { createDashboardSummariesRoutes, buildTestSummary, buildTestSessionSumma
 import { createDashboardDrilldownRoutes } from './dashboard-drilldown.js';
 import { deriveSessionWaiting, deriveSessionDecisions, settleWithConcurrency, isStandaloneSession, deriveSessionStatus } from './dashboard-session-state.js';
 import { openQuestionsForRun } from '../lib/open-questions.js';
-import { personWriterOf } from './task-records.js';
+import { personAccountIdOf } from './task-records.js';
 export { settleWithConcurrency, isStandaloneSession, deriveSessionStatus, deriveSessionWaiting, deriveSessionDecisions, buildTestSummary, buildTestSessionSummary };
 
 
@@ -427,9 +427,9 @@ export function createDashboardRoutes(deps) {
       // LIN-4532 (P2b): the open question RECORDS this run asked the signed-in person, pinned beside the decision card. Read for the
       // owner's canonical account (the id the answer route files under); a failed read costs only these cards.
       const questionRecords = await (async () => {
-        const writer = recordsStore && req.session?.accountId ? await personWriterOf(req, accountStore) : null;
-        if (!writer) return [];
-        return openQuestionsForRun({ recordsStore, dispatchStore: dispatchQueueStore, urlKey: workspace.urlKey, accountId: writer.by.slice('person:'.length), runId: session.sessionId });
+        const accountId = recordsStore ? await personAccountIdOf(req, accountStore) : null;
+        if (!accountId) return [];
+        return openQuestionsForRun({ recordsStore, dispatchStore: dispatchQueueStore, urlKey: workspace.urlKey, accountId, runId: session.sessionId });
       })().catch(() => []);
 
       // Per-run inline reply (LIN-1004/LIN-1133; LIN-1163 removed the page-level
