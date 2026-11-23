@@ -147,7 +147,7 @@ describe('the blind read waits for a re-review of a stale approval', () => {
     assert.equal(blindReadStep(issue, { trail: trailOf({ staleUrls: [PR1] }), allRuns: [] }), null);
   });
 
-  test('once the approval is current, blind-read is sent again (the same route as before)', () => {
+  test('once the approval is current and no read is on record, blind-read is sent (the same route as before)', () => {
     assert.equal(blindReadStep(issue, { trail: trailOf(), allRuns: [] })?.codeRoute, 'blind-read');
   });
 });

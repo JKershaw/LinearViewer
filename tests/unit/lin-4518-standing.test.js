@@ -179,7 +179,7 @@ describe('witness 4: a new PR after the review is work; re-stating the reviewed 
   });
 });
 
-describe('witness 5: close-out and blind-read standing read from records, after the review', () => {
+describe('witness 5: close-out after the review, and the blind read on record, read from records', () => {
   test('a close-out run ended after the review is seen; one ended before is not', async () => {
     clock('2026-11-21T10:30:00.000Z');
     await store.openRun(URL_KEY, { id: 'row-close-early', stage: 'close-out', taskId, lineage: 'row-root', at: '2026-11-21T10:20:00.000Z' });

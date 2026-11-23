@@ -67,7 +67,7 @@ const press = (trail, statuses) => closeOutDecision({
   stopAt: 'pr', runnerReady: true, actor: CLOSE_OUT_ACTOR.HARBOUR, openFindings: FINDINGS_NONE,
 });
 
-describe('the loop: close-out pushes, review judges again, the blind read follows, the merge is at the reviewed head', () => {
+describe('the loop: close-out pushes, review judges again, the one blind read stands, the merge is at the reviewed head', () => {
   const approved = [ev.pr(1, A, H1), ev.review(2, A, { heads: { [A]: H1 } }), ev.read(3, A), ev.close(4)];
 
   test('step 1: approve at H1, read, close-out done, a push to H2: code sends the re-review, and the press is refused head-moved', async () => {

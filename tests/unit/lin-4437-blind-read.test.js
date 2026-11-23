@@ -107,8 +107,8 @@ describe('the landing is the records landing, which decides the PR set of a read
   });
 });
 
-describe('the blind read on record is the one after the latest review (LIN-4520; was latestBlindRead over the comments)', () => {
-  test('the newest read after the latest review is the one on record', async () => {
+describe('the blind read on record is the latest one (LIN-4520, LIN-4544; was latestBlindRead over the comments)', () => {
+  test('the newest read is the one on record', async () => {
     const trail = await trailOf([ev.pr(1, PR, 'h'), ev.review(2, PR), ev.read(3, PR, { outcome: 'worse' }), ev.read(4, PR, { outcome: 'same' })]);
     assert.equal(trail.review.blindRead.verdict, 'same');
   });
@@ -257,7 +257,7 @@ describe('the prompt is the piloted text', () => {
 
 describe('the records carry the read (LIN-4520: the box and the route read the review\'s blind read)', () => {
   const withRead = [ev.pr(1, PR), ev.review(2, PR), ev.read(3, PR, { outcome: 'same' })];
-  test('the records review carries its blind read; no review, or no read after it, carries none', async () => {
+  test('the records review carries its blind read; with no read on record it carries none', async () => {
     assert.equal((await trailOf(withRead)).review.blindRead.verdict, 'same');
     assert.equal((await trailOf([ev.pr(1, PR), ev.review(2, PR)])).review.blindRead, null);
   });
