@@ -9,6 +9,10 @@
  * This file only binds it to the request: the resume goes through lib/follow-up-dispatch.js enqueueFollowUp with the
  * workspace's owner gate and credential finalize, as the proposal-apply route does. Answers are JSON: the page reads the
  * status and the `notResumedBecause` note.
+ *
+ * Not a proxy route: a proxy bearer never reaches it, so it has no STAGE_WRITE_OPS entry and no census row
+ * (tests/unit/lin-4468-stage-write-allowance.test.js walks the proxy router only), as routes/task-records.js has none.
+ * The owner gate is checked before the service writes anything (`refuseResume`), so a non-owner's answer changes nothing.
  */
 import { Router, json } from 'express';
 import { jsonError } from '../lib/errors.js';
@@ -16,6 +20,7 @@ import { createRecordWrites } from '../lib/records/writes.js';
 import { askedOf } from '../lib/asked-of.js';
 import { createQuestionAnswers } from '../lib/question-answers.js';
 import { enqueueFollowUp } from '../lib/follow-up-dispatch.js';
+import { resolveRunnerOwnerRefusal } from '../lib/runner-owner-gate.js';
 import { isTerminalState } from '../lib/providers/state-map.js';
 import { STAGE_KINDS } from '../lib/prompts/stage-kinds.js';
 import { personWriterOf, readSessionTicket, sessionTrackerFor } from './task-records.js';
@@ -54,7 +59,7 @@ export function createQuestionAnswerRoutes({ workspaceFromUrl, recordsStore, dis
       recordsStore,
       writes,
       dispatchStore: dispatchQueueStore,
-      enqueueResume: ({ runId, prompt, target, force, dispatchedBy }) => enqueueFollowUp({
+      enqueueResume: ({ runId, followUpTo, prompt, target, force, dispatchedBy }) => enqueueFollowUp({
         dispatchQueueStore,
         workspacePreferencesStore,
         proxyTokenStore,
@@ -64,11 +69,18 @@ export function createQuestionAnswerRoutes({ workspaceFromUrl, recordsStore, dis
         dispatchedBy,
         ownerCheck: workspaceOwnerCheck,
         workspaceId,
-        followUpTo: runId,
+        followUpTo,
         target,
         force,
         sessionId: runId,
       }),
+      refuseResume: async ({ target, dispatchedBy }) => {
+        // The same refusal enqueueFollowUp makes (LIN-3383), mapped the same way (a not-owner is 422, never 403), read before any write.
+        const refusal = await resolveRunnerOwnerRefusal({ ownerCheck: workspaceOwnerCheck, workspaceId, accountId: dispatchedBy, target });
+        if (!refusal) return null;
+        const status = refusal.status === 403 ? 422 : refusal.status;
+        return { status, body: { error: refusal.error, code: refusal.code, category: refusal.category, retryable: refusal.retryable } };
+      },
     });
   }
 

@@ -11,6 +11,10 @@
  *   - two answers, and an answer racing a dismissal, give one 409;
  *   - the resume prompt holds the question, the option and the words verbatim, in that order, with markup and a long sentence;
  *   - liveness lives in its own leaf (lib/run-liveness.js), and the old module re-exports the same values.
+ *   - review finding 76818702: liveness and the follow-up target come from the run's lineage tail, not its first row;
+ *   - review finding b6e34489: a non-owner's answer to a resumable question is refused before any write.
+ * The HTTP side (session auth, `by` from the session, the kickoff witness through the real factory) is in
+ * tests/unit/lin-4531-question-answer-routes.test.js.
  */
 import { describe, test, before, after, beforeEach } from 'node:test';
 import assert from 'node:assert/strict';
@@ -36,6 +40,7 @@ let dispatch;
 let writes;
 let enqueueCalls;
 let enqueueResult;
+let resumeRefusal;
 let service;
 
 before(() => harness.connect());
@@ -49,12 +54,14 @@ beforeEach(async () => {
   writes = createRecordWrites({ recordsStore: records, isTerminalState, readTicket: null, askedText: () => '', stageKinds: ['implementation'], listPeople: async () => [] });
   enqueueCalls = [];
   enqueueResult = null; // null: a 200 that writes the follow-up row, as the factory does
+  resumeRefusal = null; // null: the owner gate allows the resume (the route's refuseResume)
   service = makeService();
 });
 
 /** A follow-up row, as the factory writes one: `followUpTo` the run, the prompt verbatim. */
-async function writeFollowUp({ runId, prompt, id = `fu-${enqueueCalls.length}` }) {
-  await dispatch.collection.insertOne({ _id: id, urlKey: URL_KEY, followUpTo: runId, prompt, feedback: [], status: 'queued', dispatchedAt: NOW });
+async function writeFollowUp({ runId, prompt, id = `fu-${enqueueCalls.length}`, status = 'queued', feedback = [], dispatchedAt = NOW }) {
+  // As the factory writes one (lib/dispatch-factory.js inherits rootItemId from the parent): rooted at the run, following up on the tail.
+  await dispatch.collection.insertOne({ _id: id, urlKey: URL_KEY, followUpTo: runId, rootItemId: runId, prompt, feedback, status, dispatchedAt, target: 'cli', expiresAt: new Date('2099-01-01T00:00:00.000Z') });
   return id;
 }
 
@@ -64,6 +71,7 @@ function makeService() {
     writes,
     dispatchStore: dispatch,
     now: () => NOW,
+    refuseResume: async (args) => (resumeRefusal ? resumeRefusal(args) : null),
     enqueueResume: async (args) => {
       enqueueCalls.push(args);
       if (enqueueResult) return enqueueResult(args);
@@ -387,5 +395,106 @@ describe('liveness lives in its own leaf', () => {
     assert.equal(blockedFacts.wakeMarker, 'blocked');
     assert.equal(leafDisposition(blockedFacts, { now: NOW }), 'resumable');
     assert.equal(leafDisposition(runLoopFactsOf({ status: 'done', bookkeeping: { at: new Date(NOW.getTime() - 8 * DAY), reason: 'operator' }, feedback: [] }), { now: NOW }), 'gone');
+  });
+});
+
+describe('the lineage tail decides liveness and the follow-up target (review finding 76818702)', () => {
+  test('a run resumed once and now mid-turn on its follow-up is 409 for a second question, and no second follow-up is made', async () => {
+    const run = await askingRun('run-t1', { feedback: blocked() });
+    enqueueResult = async (args) => {
+      // The first resume is taken by the runner: the tail is now running.
+      const itemId = await writeFollowUp({ runId: args.runId, prompt: args.prompt, status: 'taken', feedback: [] });
+      return { status: 200, body: { queued: true, itemId } };
+    };
+    const q1 = await askQuestion({ run, asks: 'First?' });
+    const first = await service.answer({ urlKey: URL_KEY, questionId: q1, option: 'left', by: PERSON, dispatchedBy: 'acct-owner' });
+    assert.equal(first.status, 200, JSON.stringify(first.body));
+    const q2 = await askQuestion({ run, asks: 'Second?' });
+    const second = await service.answer({ urlKey: URL_KEY, questionId: q2, option: 'right', by: PERSON, dispatchedBy: 'acct-owner' });
+    assert.equal(second.status, 409, JSON.stringify(second.body));
+    assert.equal(second.body.code, 'not-answerable');
+    assert.equal(second.body.reason, 'mid-turn');
+    assert.equal(enqueueCalls.length, 1, 'the second answer enqueued nothing into the live session');
+    assert.equal(await records.current(URL_KEY, fixedIdOf('decision', q2, 'answer')), null, 'and wrote no decision');
+    assert.equal((await records.current(URL_KEY, q2)).state, 'open');
+  });
+
+  test('a parked follow-up under an old head row is resumable, and its resume goes to that follow-up', async () => {
+    const run = await askingRun('run-t2', { status: 'done', feedback: doneAt(new Date(NOW.getTime() - 8 * DAY)) });
+    const parked = await writeFollowUp({ runId: run, prompt: 'an earlier turn', id: 'fu-parked', status: 'taken', feedback: blocked(), dispatchedAt: new Date(NOW.getTime() - DAY) });
+    const q = await askQuestion({ run });
+    const out = await service.answer({ urlKey: URL_KEY, questionId: q, option: 'left', by: PERSON, dispatchedBy: 'acct-owner' });
+    assert.equal(out.status, 200, JSON.stringify(out.body));
+    assert.equal(out.body.resumed, true, 'the head row is eight days old, but the run is parked now');
+    assert.equal(enqueueCalls.length, 1);
+    assert.equal(enqueueCalls[0].followUpTo, parked, 'the resume follows up on the tail, not the run\'s own row');
+    assert.equal(enqueueCalls[0].force, false, 'a parked tail is not forced');
+  });
+
+  test('a follow-up cancelled or expired never ran, so it is not the tail', async () => {
+    const run = await askingRun('run-t3', { feedback: blocked() });
+    await writeFollowUp({ runId: run, prompt: 'never ran', id: 'fu-cancelled', status: 'cancelled', feedback: [], dispatchedAt: new Date(NOW.getTime() + 1000) });
+    const q = await askQuestion({ run });
+    const out = await service.answer({ urlKey: URL_KEY, questionId: q, option: 'left', by: PERSON, dispatchedBy: 'acct-owner' });
+    assert.equal(out.status, 200, JSON.stringify(out.body));
+    assert.equal(enqueueCalls[0].followUpTo, run, 'the run\'s own row is the tail');
+  });
+
+  test('a retry finds an earlier resume made on a follow-up of a follow-up, and makes no second one', async () => {
+    const run = await askingRun('run-t4', { feedback: blocked() });
+    const q = await askQuestion({ run });
+    const realEnd = writes.end;
+    writes.end = async () => { throw new Error('store down'); };
+    await assert.rejects(service.answer({ urlKey: URL_KEY, questionId: q, option: 'left', by: PERSON, dispatchedBy: 'acct-owner' }), /store down/);
+    writes.end = realEnd;
+    assert.equal(enqueueCalls.length, 1);
+    // The resume was made, then the runner's follow-up took it on: the marker sits on a row that follows up on the first follow-up.
+    const made = enqueueCalls[0].prompt;
+    await dispatch.collection.updateOne({ _id: 'fu-0' }, { $set: { status: 'done', feedback: [{ message: '[done] took the answer', timestamp: NOW.toISOString() }] } });
+    await dispatch.collection.insertOne({ _id: 'fu-1', urlKey: URL_KEY, followUpTo: 'fu-0', rootItemId: run, prompt: made, feedback: [], status: 'taken', dispatchedAt: new Date(NOW.getTime() + 1000), target: 'cli', expiresAt: new Date('2099-01-01T00:00:00.000Z') });
+    const retry = await service.answer({ urlKey: URL_KEY, questionId: q, option: 'left', by: PERSON, dispatchedBy: 'acct-owner' });
+    assert.equal(retry.status, 200, JSON.stringify(retry.body));
+    assert.equal(retry.body.resumed, true);
+    assert.equal(enqueueCalls.length, 1, 'the marker on the later row stops a second resume');
+  });
+});
+
+describe('the owner gate is read before any write (review finding b6e34489)', () => {
+  test('a non-owner answer to a resumable question is refused whole: no decision, the question stays open for the owner', async () => {
+    const run = await askingRun('run-u1', { feedback: blocked() });
+    const q = await askQuestion({ run });
+    resumeRefusal = async () => ({ status: 422, body: { error: 'Only the workspace owner can run this', code: 'RUNNER_OWNER_ONLY', category: 'owner', retryable: false } });
+    const refused = await service.answer({ urlKey: URL_KEY, questionId: q, option: 'left', words: 'my words', by: PERSON, dispatchedBy: 'acct-other' });
+    assert.equal(refused.status, 422);
+    assert.equal(refused.body.code, 'RUNNER_OWNER_ONLY');
+    assert.equal(await records.current(URL_KEY, fixedIdOf('decision', q, 'answer')), null, 'no decision was written');
+    assert.equal((await records.current(URL_KEY, q)).state, 'open', 'the question is still open');
+    assert.equal(enqueueCalls.length, 0);
+
+    resumeRefusal = null;
+    const owner = await service.answer({ urlKey: URL_KEY, questionId: q, option: 'right', words: 'the owner\'s words', by: PERSON, dispatchedBy: 'acct-owner' });
+    assert.equal(owner.status, 200, JSON.stringify(owner.body));
+    const decision = await records.current(URL_KEY, fixedIdOf('decision', q, 'answer'));
+    assert.equal(decision.fields.answer, 'right', 'the owner\'s own answer is the one recorded');
+    assert.equal(decision.fields.words, 'the owner\'s words');
+  });
+
+  test('a non-owner dismissal of a resumable question is refused whole too', async () => {
+    const run = await askingRun('run-u2', { feedback: blocked() });
+    const q = await askQuestion({ run });
+    resumeRefusal = async () => ({ status: 422, body: { error: 'Only the workspace owner can run this', code: 'RUNNER_OWNER_ONLY' } });
+    const refused = await service.dismiss({ urlKey: URL_KEY, questionId: q, by: PERSON, dispatchedBy: 'acct-other' });
+    assert.equal(refused.status, 422);
+    assert.equal((await records.current(URL_KEY, q)).state, 'open');
+  });
+
+  test('a stopped run is not resumed, so the owner gate does not apply to its answer', async () => {
+    const run = await askingRun('run-u3', { feedback: blocked() });
+    await dispatch.collection.insertOne({ _id: 'abort-u3', urlKey: URL_KEY, abort: true, abortTo: run, feedback: [{ message: '[aborted] stopped', timestamp: NOW.toISOString() }], status: 'done', feedbackAt: NOW, expiresAt: new Date('2099-01-01T00:00:00.000Z') });
+    const q = await askQuestion({ run });
+    resumeRefusal = async () => ({ status: 422, body: { error: 'Only the workspace owner can run this', code: 'RUNNER_OWNER_ONLY' } });
+    const out = await service.answer({ urlKey: URL_KEY, questionId: q, option: 'left', by: PERSON, dispatchedBy: 'acct-other' });
+    assert.equal(out.status, 200, JSON.stringify(out.body));
+    assert.equal(out.body.notResumedBecause, 'stopped');
   });
 });
