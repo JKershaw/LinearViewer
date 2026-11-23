@@ -77,9 +77,10 @@ describe('readCloseOutChain carries the blind read (LIN-4437)', () => {
     assert.deepEqual(ledger.blindRead.prs, [PR]);
   });
 
-  test('a read before the review is not this review\'s read: ledger.blindRead is null', async () => {
+  test('a read before the review that names the landing stands for it: one read per change (LIN-4544)', async () => {
     const { ledger } = await chainFor([ev.pr(0, PR, REVIEWED), ev.read(1, PR, { outcome: 'worse' }), approve(2)]);
-    assert.equal(ledger.blindRead, null);
+    assert.equal(ledger.blindRead.verdict, 'worse');
+    assert.deepEqual(ledger.blindRead.prs, [PR]);
   });
 });
 

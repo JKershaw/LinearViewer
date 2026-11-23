@@ -738,7 +738,7 @@ describe('LIN-3657: close-out-press on a head-moved close-out', () => {
     assert.equal(res.statusCode, 409, JSON.stringify(res.jsonBody));
     assert.equal(res.jsonBody.code, 'CLOSE_OUT_NOT_READY');
     assert.equal(res.jsonBody.reason, 'blind-read-missing');
-    assert.equal(res.jsonBody.error, 'No blind read on record since the review');
+    assert.equal(res.jsonBody.error, 'No blind read on record naming the pull requests');
     assert.equal((await rows(built.collection)).length, 0);
   });
 

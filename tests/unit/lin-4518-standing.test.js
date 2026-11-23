@@ -195,7 +195,7 @@ describe('witness 5: close-out and blind-read standing read from records, after 
     assert.equal(s.closeOutAfterReview, true);
   });
 
-  test('a blind read written after the review is the blind read on record; none before it counts', async () => {
+  test('the latest blind read on record is the blind read on record, wherever it falls against the review (LIN-4544)', async () => {
     clock('2026-11-21T11:00:00.000Z');
     const c = await addChange(108, 'H1');
     const b0 = await post(tokens.blind, { kind: 'verdict', judgement: 'blind-read', outcome: 'same', reasoning: 'early', on: [c], heads: { [c]: 'H1' }, run: 'row-blind' });
@@ -205,7 +205,7 @@ describe('witness 5: close-out and blind-read standing read from records, after 
     assert.equal(s.blindRead.outcome, 'same');
     await reviewOn([c], { [c]: 'H1' });
     s = await standing();
-    assert.equal(s.blindRead, null, 'a blind read written before the review does not answer it');
+    assert.equal(s.blindRead.outcome, 'same', 'a read on record stands through a later review: one read per change');
     clock('2026-11-21T11:50:00.000Z');
     const b1 = await post(tokens.blind, { kind: 'verdict', judgement: 'blind-read', outcome: 'better', reasoning: 'late', on: [c], heads: { [c]: 'H1' }, run: 'row-blind' });
     assert.equal(b1.status, 201, `late blind read refused: ${JSON.stringify(b1.body)}`);

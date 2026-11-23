@@ -370,3 +370,20 @@ test('a re-plan before the cutover is not measured, with the reason', () => {
   assert.equal(r.entries[3].cause, 'not-measured');
   assert.match(r.entries[3].note, /no verdict records before 2026-11-22 04:20Z/);
 });
+
+// LIN-4544: a blind read is one per change, so a second read on the ticket is a repeat even after a re-review, and a
+// retrospective audit (its notes PR is a new landing with its own read) starts the count again.
+test('a second blind read after a re-review is a repeat-stage; the audit\'s notes PR read is a stage path again', () => {
+  const ap = autopilot();
+  const rows = [
+    ap, worker('implementation', 1, 5), worker('review', 6, 8, { text: 'DONE: verdict Approve.' }),
+    worker('blind-read', 9, 10, { text: 'DONE: Verdict: same.' }), worker('review', 11, 13, { text: 'DONE: verdict Approve.' }),
+    worker('blind-read', 14, 15, { text: 'DONE: Verdict: same.' }), worker('retrospective-audit', 16, 18),
+    worker('blind-read', 19, 20, { text: 'DONE: Verdict: same.' }),
+  ].map(late);
+  const r = classifyTicket({ identifier: 'LIN-1', rows });
+  assert.equal(r.entries[3].cause, 'stage-path', 'the first read of the change');
+  assert.equal(r.entries[5].cause, 'repeat-stage', 'a second read after a re-review is the repeat, not a path stage');
+  assert.equal(r.entries[6].cause, 'audit');
+  assert.equal(r.entries[7].cause, 'stage-path', 'the audit\'s notes PR is a new landing: its read is the path');
+});

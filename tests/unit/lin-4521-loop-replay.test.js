@@ -5,8 +5,8 @@
  * (tests/helpers/records-scenario.js, trailForTicket, getRecommendation, closeOutDecision), as the live loop would.
  *
  *   - the loop (finding-c898b6cc): approve at H1, blind read, close-out, a push to H2 -> code sends the re-review and the
- *     press is refused head-moved; a review at H2 -> code sends the blind read; the read -> the selector is asked (no code
- *     route) and the press is not refused;
+ *     press is refused head-moved; a review at H2 -> the read on record stands (LIN-4544), so no code route is sent and the
+ *     selector decides; the read of H2 -> the selector is asked too and the press is not refused;
  *   - a PR opened after the approval (finding-3df7a963): the review never judged it, so it is re-reviewed as a moved head
  *     is, not left to the selector and a refusing close-out;
  *   - a Done ticket whose landing is an audit notes PR, with a close-out on the trail: neither advice answer routes
@@ -80,12 +80,12 @@ describe('the loop: close-out pushes, review judges again, the blind read follow
     assert.equal(press(trail, { [A]: H2 }).refuses, 'head-moved');
   });
 
-  test('step 2: a review of H2: the approval is current, and code sends the blind read for it', async () => {
+  test('step 2: a review of H2: the approval is current, and the read on record stands, so no read is sent for it (LIN-4544)', async () => {
     const trail = await trailOf([...approved, ev.head(5, A, H2), ev.review(6, A, { heads: { [A]: H2 } })]);
     const asked = { n: 0 };
     const rec = await recommend(trail, asked);
-    assert.equal(rec.codeRoute, 'blind-read');
-    assert.equal(asked.n, 0, 'the selector was not asked');
+    assert.equal(rec.codeRoute, undefined, 'no code route: the read covering the landing is on record');
+    assert.equal(asked.n, 1, 'the selector was asked');
     assert.deepEqual(trail.review.staleUrls, [], 'the new approval is not stale');
   });
 
