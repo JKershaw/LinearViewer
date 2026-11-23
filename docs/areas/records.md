@@ -39,10 +39,9 @@ routes/task-records.js, routes/project-page.js, routes/dispatch.js, server.js).
   resolves against the records first and sends only the rest to the tracker, or a valid record is refused as unreadable.
 - A new collection is inventoried three times: `INVENTORY` in `lib/account-erasure.js`, `COLLECTION_CLASSES` in
   `tests/unit/urlkey-holders.test.js`, and the dry-run's `URLKEY_SOURCES` (`scripts/dry-run-urlkey-duplicates.mjs`).
-  The second is the one a local run of the area's tests misses; CI's full suite caught it.
-
-- Every writer goes through one checked pipeline, `lib/records/writes.js` (`createRecordWrites`): the proxy routes and the
-  task-page and project-page routes. It checks the body, dry-runs the tickets it names, makes their
+  A local run of the area's tests misses the second; CI's full suite caught it.
+- Every writer (proxy, task page, project page) goes through one checked pipeline, `lib/records/writes.js`
+  (`createRecordWrites`). It checks the body, dry-runs the tickets it names, makes their
   tasks only when that is clean, then checks again. `by` is the writer's own (a stage kind, `person:<account>`,
   `import`, `harbour`), never read from a body; a new writer calls the pipeline, never the store's add, revise, end or link.
 - Outward steps run after a record persists, through one injected `tracker(ctx)` port (lib/records-tracker.js),
@@ -53,22 +52,23 @@ routes/task-records.js, routes/project-page.js, routes/dispatch.js, server.js).
   reaches the network and the hermetic run fails. Censuses read `git ls-files`: stage a new file before running them.
 - A write that makes one record and then ends another is two writes. Name the first with `fixedIdOf` (lib/records/refs.js,
   the one derived-id rule) from the second, as make-a-task and supersede do, so a retry after a failed end finds the
-  record it made. Imports use the same rule, which holds after an imported record ends. Never hash an id by hand.
+  record it made. Never hash an id by hand.
 - Open questions are rows of the rulings feed (LIN-4532): `openQuestionsFor` (lib/open-questions.js) adds `kind: 'question'`
   rows, so the page, `count` and the badge read one list. Other records stay out: Home draws them
   (`createWaitingStanding` `records`) on page load only, uncounted.
 - A page GET never makes a task. The task page reads its task record by the ticket's claim (`taskForTicket`) and offers
   its add and child-task forms before one exists; the first write through the checked pipeline makes the task
   (routes/task-records.js sends `in: <ticket>`). The project page's actions and the proxy make tasks the same way.
-- Imported records (LIN-4505) keep `via: import` and their fixed ids: never re-import or re-id them; the importer is gone.
+- Imported records (LIN-4505) keep `via: import` and their fixed ids: never re-id them.
 - A records reading has one caller per surface, and an injected alias hides a caller from a search by name: the
-  session page reads evidence through `readRunEvidenceFn` (`routes/dashboard.js`), missed the store at LIN-4495, and
-  every session page read "not measured". Search the aliases too, and keep a missing store reading "not measured",
+  session page's `readRunEvidenceFn` (`routes/dashboard.js`) missed the store at LIN-4495, and every session page read
+  "not measured". Search the aliases too, and keep a missing store reading "not measured",
   never zero, so a missed caller shows instead of passing.
 - A verdict rests on the head its judge read: `heads` pins it before the refresh (`pinVerdictToHeads`). A merge
   revises the head (`recordChangeMerged`), so a PR merged after an unseen push is in `staleUrls` but not
   `movedUrls`: re-review on that.
 - A task written with a ticket `ref` claims that ticket (`lib/records/writes.js`), as `ensureTask` does; else the ticket's
   references make a second task. A ticket's task id has one rule, `ticketTaskIdOf` (`lib/records/refs.js`). A revise that changes a claimed `ref` is refused (422).
-- A decision's `answer` and `words` are stored as written, never trimmed. Part 3 shows a question
-  only to its addressee; part 4 (lib/records/brief.js) adds the question a decision answers.
+- A decision's `answer` and `words` are stored as written, never trimmed. Part 3 shows a question only to its
+  addressee; part 4 (lib/records/brief.js) adds the question a decision answers. An answer is `in` its question's task
+  (LIN-4545): a person's write has no run to supply one, and resume tests hid the gap.
