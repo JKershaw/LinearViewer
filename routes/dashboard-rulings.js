@@ -26,6 +26,40 @@ import { collectUnansweredDecisions, openDecisionLoopIds, parseStampLoopIds, STA
 import { attachStandingSuggestions } from '../lib/dismissal-suggestions-store.js';
 import { RULING_SETTLED_REFUSAL } from '../lib/ruling-settled.js';
 import { connectedWorkspaces, liveOnAnchor } from './dashboard-session-state.js';
+import { openQuestionsFor } from '../lib/open-questions.js';
+import { personAccountIdOf } from './task-records.js';
+
+/**
+ * LIN-4532 (P2b): the open question records addressed to the signed-in person, in each connected workspace, as rows of this feed
+ * (`kind: 'question'`). They are read here, not in the loop/decision reduction, so the page, the count and the badge read one list.
+ * The person is the canonical account (personAccountIdOf), the id the answer route files its decision under.
+ */
+async function openQuestionRowsFor({ session, workspaces, recordsStore, dispatchQueueStore, accountStore }) {
+  if (!recordsStore || !dispatchQueueStore || !session?.accountId) return [];
+  const accountId = await personAccountIdOf({ session }, accountStore);
+  if (!accountId) return [];
+  const rows = [];
+  for (const w of workspaces) {
+    const questions = await openQuestionsFor({ recordsStore, dispatchStore: dispatchQueueStore, urlKey: w.urlKey, accountId });
+    for (const q of questions) {
+      rows.push({
+        kind: 'question',
+        questionId: q.questionId,
+        question: q.asks,
+        options: q.options,
+        recommended: q.recommended,
+        ifUnanswered: q.ifUnanswered,
+        interactive: q.interactive,
+        state: q.state,
+        reason: q.reason,
+        askedAt: q.askedAt,
+        // The task by its identifier (`ticket`, what a task page is keyed by), so the row heads like a ruling row (finding-9221fb7a).
+        anchor: { workspaceUrlKey: w.urlKey, taskId: q.taskId, runId: q.runId, loopId: null, issueId: null, issueIdentifier: q.ticket ?? null, target: null },
+      });
+    }
+  }
+  return rows;
+}
 
 // ─── Filtered rulings feed (LIN-1728 Phase 2) ─────────────────────────────────
 
@@ -36,7 +70,7 @@ import { connectedWorkspaces, liveOnAnchor } from './dashboard-session-state.js'
 // Cross-workspace by design (decision 2's "third obs-tab" host), but per the
 // plan's constraint the ambient count stays scoped to `req.session.workspaces`
 // like every other Observation read here — never fleet-wide.
-function rulingsFeed({ sessionsFeedCache, mergeLoops, taskDecisionsStore, shelvedRulingsStore, dismissalSuggestionsStore }) {
+function rulingsFeed({ sessionsFeedCache, mergeLoops, taskDecisionsStore, shelvedRulingsStore, dismissalSuggestionsStore, recordsStore, dispatchQueueStore, accountStore }) {
   return async (req, res) => {
     const workspaces = connectedWorkspaces(req.session);
 
@@ -92,16 +126,23 @@ function rulingsFeed({ sessionsFeedCache, mergeLoops, taskDecisionsStore, shelve
       // `anchorTerminal` is deliberately NOT passed here: this route backs the
       // 5s ambient nav-badge poll (see the comment atop this handler), which
       // must never evaluate it — full stop, not merely omitted by convention.
-      const rulings = attachStandingSuggestions(
-        collectUnansweredDecisions(
-          { loops: merged, taskDecisions, shelvedRulings, newestScanByTask },
-          {
-            now: new Date(),
-            liveDispatchOnAnchor: liveOnAnchor(merged)
-          }
+      // LIN-4532 (P2b): the person's open questions, appended as rows of this same list, so count, workspaceCount and the page agree.
+      // A failed records or dispatch-store read costs only the questions, never the feed the 5s badge poll reads (finding-ab3270e4).
+      const questionRows = await openQuestionRowsFor({ session: req.session, workspaces, recordsStore, dispatchQueueStore, accountStore })
+        .catch(() => []);
+      const rulings = [
+        ...attachStandingSuggestions(
+          collectUnansweredDecisions(
+            { loops: merged, taskDecisions, shelvedRulings, newestScanByTask },
+            {
+              now: new Date(),
+              liveDispatchOnAnchor: liveOnAnchor(merged)
+            }
+          ),
+          suggestions
         ),
-        suggestions
-      );
+        ...questionRows,
+      ];
 
       // LIN-3983: the loop ids whose question is open, by the builder's own
       // cluster rule (LIN-4003), over the SAME `merged` set as the rows above.

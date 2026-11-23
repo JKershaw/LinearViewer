@@ -36,6 +36,7 @@
 
 import { formatUsd } from '../lib/cost-format.js';
 import { fmtDuration } from '../lib/time-words.js';
+import { renderQuestionRecordCard } from '../lib/question-record-card.js';
 
 let observationData = null;
 let pollId = null;
@@ -1995,7 +1996,15 @@ function renderRulings(rulings, host = rulingsTabHost()) {
 
   const seen = new Set();
   const nodes = [];
+  const seenQuestions = new Set();
   for (const row of rulings) {
+    // LIN-4532 (P2b): a question row is keyed by its question id, not a decision key, so it takes its own path here.
+    if (row?.kind === 'question') {
+      seenQuestions.add(row.questionId);
+      const qli = questionRowNode(row);
+      if (nodes.length < host.limit) nodes.push(qli);
+      continue;
+    }
     const decisionId = row?.decision?.decision_id;
     const urlKey = row?.anchor?.workspaceUrlKey;
     const key = rulingKey(urlKey, row?.anchor, decisionId);
@@ -2035,6 +2044,11 @@ function renderRulings(rulings, host = rulingsTabHost()) {
       // ruling the human just said to keep.
       if (!row?.suggestedDismissal) rulingsSelected.delete(key);
     }
+  }
+
+  // A question no longer in the payload (answered, dismissed, or ended elsewhere) is forgotten, so a later one is drawn fresh.
+  for (const questionId of Array.from(renderedQuestionRows.keys())) {
+    if (!seenQuestions.has(questionId)) renderedQuestionRows.delete(questionId);
   }
 
   // Release a settled key (review F2 / LIN-2444 Phase 5) once its row has
@@ -2263,24 +2277,67 @@ function resolveRulingOptionLabel(decision, optionId) {
 // question + options below) / options with recommendation (appendOptions
 // marks the recommended one) / cost of doing nothing (if_unanswered, when the
 // producing session declared one).
-function renderRulingRow(row) {
-  const { decision, decisionCase, anchor, disposition, canReply } = row || {};
+// LIN-4532 (P2b): an open question record, as a ruling row. Its card is the shared one (lib/question-record-card.js); the answer
+// and the dismissal go through the one route each (public/question-records.js). A question row has no decision key, so rulingKey
+// is null for it and it takes no part in the selection, settle and pending machinery of this page.
+function renderQuestionRulingRow(row) {
   const li = document.createElement('li');
-  li.className = 'obs-ruling';
-  li.dataset.testid = 'obs-ruling-row';
-  if (decision && decision.decision_id) li.dataset.decisionId = decision.decision_id;
+  li.className = 'obs-ruling obs-ruling-question';
+  li.dataset.testid = 'ruling-question-row';
+  // The same task head a ruling row carries (its identifier and title, the workspace name when several show): finding-9221fb7a.
+  li.appendChild(rulingHeadOf(row?.anchor || {}));
+  li.insertAdjacentHTML('beforeend', renderQuestionRecordCard(row, { urlKey: row?.anchor?.workspaceUrlKey || '' }));
+  return li;
+}
 
+// questionId -> the <li> on the page. A card holding an answer in progress (typed words, a chosen option, focus) or one already
+// settled is kept across the poll's repaint, as a keyed row is (rulingRowHoldsInput); any other card is rebuilt from the payload.
+const renderedQuestionRows = new Map();
+function questionCardOf(li) {
+  return li ? li.querySelector('[data-testid="question-record-card"]') : null;
+}
+function questionCardHoldsAnswer(li) {
+  const card = questionCardOf(li);
+  if (!card) return false;
+  if (card.dataset.settled === 'true') return true;
+  const input = card.querySelector('[data-testid="question-record-card-input"]');
+  if (input && input.value) return true;
+  if (card.querySelector('[data-testid="question-record-card-option"][aria-pressed="true"]')) return true;
+  const active = document.activeElement;
+  return !!(active && card.contains(active));
+}
+function questionRowNode(row) {
+  const existing = renderedQuestionRows.get(row.questionId);
+  if (existing && questionCardHoldsAnswer(existing)) return existing;
+  const li = renderQuestionRulingRow(row);
+  renderedQuestionRows.set(row.questionId, li);
+  return li;
+}
+
+// The task head of a ruling row or a question row: the task by its id and its title (LIN-3983 PR 2). The workspace key is never
+// shown; the workspace's name is, and only when more than one workspace is showing.
+function rulingHeadOf(anchor) {
   const head = document.createElement('div');
   head.className = 'obs-ruling-head';
-  // The task by its id and its title (LIN-3983 PR 2). The workspace key is never shown; the workspace's
-  // name is, and only when more than one workspace is showing.
   const idLabel = anchor?.issueIdentifier || 'Question';
   const workspaces = observationData?.workspaces || [];
   const wsName = workspaces.find(w => w.urlKey === anchor?.workspaceUrlKey)?.name || anchor?.workspaceUrlKey;
   head.innerHTML = `<span class="obs-ruling-issue">${escapeHtml(String(idLabel))}</span>`
     + (anchor?.issueTitle ? ` <span class="obs-ruling-title">${escapeHtml(String(anchor.issueTitle))}</span>` : '')
     + (workspaces.length > 1 && wsName ? ` <span class="obs-ruling-ws" data-testid="obs-ruling-ws">${escapeHtml(String(wsName))}</span>` : '');
-  li.appendChild(head);
+  return head;
+}
+
+function renderRulingRow(row) {
+  const { decision, decisionCase, anchor, disposition, canReply } = row || {};
+  const li = document.createElement('li');
+  li.className = 'obs-ruling';
+  li.dataset.testid = 'obs-ruling-row';
+  if (decision && decision.decision_id) li.dataset.decisionId = decision.decision_id;
+  // The task's label, the head's and the bulk checkbox's (the same value rulingHeadOf names it by).
+  const idLabel = anchor?.issueIdentifier || 'Question';
+
+  li.appendChild(rulingHeadOf(anchor));
 
   if (decision?.question) {
     const q = document.createElement('p');

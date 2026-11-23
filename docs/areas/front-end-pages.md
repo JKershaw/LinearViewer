@@ -12,3 +12,12 @@ Area notes for `front-end-pages` in the registry. Format and rules: README.md.
 - The task page's desktop grid (`public/task-page.css`, ≥1024px) places every child by `grid-area`. A new section needs
   its own area in both templates, or it renders at the top of the page (LIN-4405).
 - A landing band (`lib/render-landing.js`) is named in more places than its renderer: its `data-testid`, its `.lx-*` classes in `public/landing.css`, the unit and e2e specs, the test-id list in `public/llms.txt`, `docs/architecture/source-map.md`, `docs/architecture/ui-pieces.md` and the `landing` baselines in `tests/screenshots/pages/`. When a band changes, grep its old name in comments too. LIN-4487's first pass left two comments naming the removed band (`tests/e2e/landing.spec.js`, `public/landing.css`).
+- An open question record reaches a page through one reader, `openQuestionsFor` (`lib/open-questions.js`), and one card,
+  `renderQuestionRecordCard` (`lib/question-record-card.js`); a new surface uses both and loads `public/question-records.js`
+  as a module, never a second card or handler (LIN-4532). A question's `in` is its task RECORD id, not the ticket: a page
+  keyed by identifier matches on the row's `ticket` (`ticketOfTask` in `lib/records-store.js`). LIN-4532's first pass
+  filtered the task page on `taskId` against `LIN-n` and matched nothing.
+- On Home a question card is a `.waiting-question`, not a `.waiting-card`: the live merge (`public/question-cards.js`
+  mergeWaitingCards) removes every `.waiting-card` the fragment does not list, so a card the fragment does not draw must not
+  wear that class (LIN-4532). The live merge keys a question wrapper by its question id (`question:<id>`), and holds one that is
+  settled or has an answer in flight, so a refresh never takes out a card the person is answering.

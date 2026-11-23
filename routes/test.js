@@ -648,6 +648,40 @@ export function createTestRoutes({ dispatchQueueStore, dispatchTokenStore, freeT
     res.json({ id: made.id });
   });
 
+  // LIN-4532 (P2b, finding-89c7a7a5): one open question record, asked by the dispatch run `runId` (a run parked on `[blocked]`) to the
+  // signed-in person, filed under `ticket`. Written by the checked pipeline, as a stage writes it (lib/records/writes.js).
+  router.post('/test/seed-question-record', express.json(), async (req, res) => {
+    if (!recordsStore) return res.status(503).send('no records store wired into test routes');
+    const { urlKey, ticket, runId = null, asks, options = [], recommended = null, ifUnanswered = null, to = null } = req.body || {};
+    const accountId = req.session?.accountId;
+    if (typeof urlKey !== 'string' || typeof ticket !== 'string' || typeof asks !== 'string') {
+      return res.status(400).send('urlKey, ticket and asks are required');
+    }
+    if (!to && !accountId) return res.status(400).send('no signed-in account to ask');
+    const at = new Date().toISOString();
+    // `in` names the task RECORD (the id ensureTask returns): this seam has no tracker to resolve a ticket through.
+    const { id: taskId } = await recordsStore.ensureTask(urlKey, { identifier: ticket, title: ticket, closed: false }, { by: 'Harbour', at });
+    // The addressee is the signed-in account, the only person this local workspace has in the seed.
+    const listPeople = async () => (accountId ? [{ accountId, name: 'Owner' }] : []);
+    const writes = createRecordWrites({ recordsStore, isTerminalState, listPeople });
+    const out = await writes.add({
+      urlKey, kind: 'question', by: 'implementation', run: runId,
+      input: { asks, options, recommended, 'if-unanswered': ifUnanswered, to: to || `person:${accountId}`, in: taskId },
+    });
+    if (out.problems) return res.status(422).json(out.problems);
+    res.json({ id: out.record.id });
+  });
+
+  // LIN-4532 (finding-89c7a7a5): the records of one kind in a workspace, as the store reads them (state, addressee, fields, links),
+  // so a spec can read what an answer or a dismissal wrote.
+  router.get('/test/records-of', async (req, res) => {
+    if (!recordsStore) return res.status(503).send('no records store wired into test routes');
+    const { urlKey, kind } = req.query;
+    if (typeof urlKey !== 'string' || typeof kind !== 'string') return res.status(400).send('urlKey and kind are required');
+    const rows = await recordsStore.find(urlKey, { kind });
+    res.json(rows.map((r) => ({ id: r.id, kind: r.kind, state: r.state, to: r.to ?? null, in: r.in ?? null, fields: r.fields || {}, links: r.links || {} })));
+  });
+
   // LIN-4518 step 3: clear one workspace's records (and its ticket claims), so each E2E spec seeds its own trail.
   router.get('/test/clear-ticket-records', async (req, res) => {
     if (!recordsStore) return res.status(503).send('no records store wired into test routes');

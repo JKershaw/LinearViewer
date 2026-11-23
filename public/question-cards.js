@@ -461,7 +461,24 @@
   var settledKeys = new Set();
   function noteSettled(key) { if (key) settledKeys.add(key); }
   function innerCardOf(wrapper) { return wrapper.querySelector('[data-testid="session-question-card"]'); }
-  function cardKeyOf(wrapper) { var inner = innerCardOf(wrapper); return inner ? rulingKeyOf(inner) : ''; }
+  // LIN-4532 (finding-dca7ac9d): a question record's wrapper (`.waiting-question`) is keyed by its question id, and its card is the
+  // shared question-record card (lib/question-record-card.js), not a ruling card.
+  function questionCardOf(wrapper) { return wrapper.querySelector('[data-testid="question-record-card"]'); }
+  function isQuestionWrapper(wrapper) { return !!(wrapper.classList && wrapper.classList.contains('waiting-question')); }
+  function cardKeyOf(wrapper) {
+    if (isQuestionWrapper(wrapper)) { var qcard = questionCardOf(wrapper); return qcard && qcard.dataset.questionId ? 'question:' + qcard.dataset.questionId : ''; }
+    var inner = innerCardOf(wrapper); return inner ? rulingKeyOf(inner) : '';
+  }
+  // A question card answered here (settled) or with a request in flight (its controls disabled) stays where it is: the refresh
+  // does not take it out, the same as a ruling card held for its answer.
+  function questionCardHeld(wrapper) {
+    var qcard = questionCardOf(wrapper);
+    if (!qcard) return false;
+    if (qcard.dataset.settled === 'true') return true;
+    var controls = qcard.querySelectorAll('button, textarea');
+    for (var c = 0; c < controls.length; c++) { if (controls[c].disabled) return true; }
+    return false;
+  }
   // LIN-4293: "focus inside the card", the one rule. `active` is the element that had focus BEFORE a write that may detach the
   // card: a repaint detaches it, which blurs it, so after the write only the caller can know. Omitted (undefined) it is
   // document.activeElement, the live Waiting section's and Home placement's reading; null says nothing was focused. The card's
@@ -493,7 +510,7 @@
     var out = [];
     var kids = body.children || [];
     for (var i = 0; i < kids.length; i++) {
-      if (kids[i].classList && kids[i].classList.contains('waiting-card')) out.push(kids[i]);
+      if (kids[i].classList && (kids[i].classList.contains('waiting-card') || kids[i].classList.contains('waiting-question'))) out.push(kids[i]);
     }
     return out;
   }
@@ -512,7 +529,7 @@
     template.innerHTML = freshHtml || '';
     var fresh = [];
     var freshKeys = new Set();
-    var found = template.content ? template.content.querySelectorAll('.waiting-card') : [];
+    var found = template.content ? template.content.querySelectorAll('.waiting-card, .waiting-question') : [];
     for (var f = 0; f < found.length; f++) {
       var key = cardKeyOf(found[f]);
       if (!key || freshKeys.has(key) || settledKeys.has(key)) continue;
@@ -523,8 +540,11 @@
     waitingWrappersIn(body).forEach(function (wrapper) {
       var key = cardKeyOf(wrapper);
       if (freshKeys.has(key)) return;
-      var inner = innerCardOf(wrapper);
-      if (inner && inner.dataset && inner.dataset.answerInFlight === 'true') return;
+      if (isQuestionWrapper(wrapper)) { if (questionCardHeld(wrapper)) return; }
+      else {
+        var inner = innerCardOf(wrapper);
+        if (inner && inner.dataset && inner.dataset.answerInFlight === 'true') return;
+      }
       // Not settled here: a card that leaves one response may return in a later one (a live run on its task comes and goes).
       // Only an answer or dismiss on this page settles a key, through RULING_GONE_EVENT (app.js onRulingGone -> noteSettled).
       removed.push(key);

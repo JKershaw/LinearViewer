@@ -8,7 +8,8 @@
  * never from the body. The answer and dismiss logic is lib/question-answers.js (the behaviour table is in its header).
  * This file only binds it to the request: the resume goes through lib/follow-up-dispatch.js enqueueFollowUp with the
  * workspace's owner gate and credential finalize, as the proposal-apply route does. Answers are JSON: the status and the
- * `notResumedBecause` note are for a page to read. No page calls these routes yet; the rulings surfaces that will are LIN-4532 (P2b).
+ * `notResumedBecause` note are for a page to read. Every rulings surface calls them through one browser handler,
+ * public/question-records.js (LIN-4532, P2b): the Rulings page, Home, the run page, the task page and Flight Companion.
  *
  * Not a proxy route: a proxy bearer never reaches it, so it has no STAGE_WRITE_OPS entry and no census row
  * (tests/unit/lin-4468-stage-write-allowance.test.js walks the proxy router only), as routes/task-records.js has none.

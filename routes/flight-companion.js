@@ -393,6 +393,8 @@ export function createFlightCompanionRoutes({
   taskDecisionsStore, shelvedRulingsStore,
   chatClient = { streamChat: defaultStreamChat, streamChatWithTools: defaultStreamChatWithTools },
   createToolCatalog = defaultCreateChatToolCatalog,
+  // LIN-4532: the account store, for a person's canonical account id (the questions addressed to it). Absent: the session account.
+  accountStore = null,
   // LIN-3363: the model-catalog seam (cached, never throws). A dep so route
   // fixtures stay hermetic — their workspaces do not satisfy `shouldMockAi`.
   getModelCatalog = defaultGetModelCatalog,
@@ -623,6 +625,8 @@ export function createFlightCompanionRoutes({
           dispatchQueueStore, agentStatusStore, taskDecisionsStore, shelvedRulingsStore,
           proxyTokenStore, sessionIsTerminal, enrichLoop,
           chatClient, createToolCatalog,
+          // LIN-4532 (finding-79815581): the person's canonical account, for the question read in list_pending_decisions.
+          resolveCanonicalAccountId: accountStore ? (id) => accountStore.resolveCanonicalAccountId(id) : null,
           installationTokenFor,
           getProvider: getProviderForWorkspace,
           getScope: getWorkspaceCallScope,
@@ -782,6 +786,8 @@ export function createFlightCompanionRoutes({
           dispatchQueueStore, agentStatusStore, taskDecisionsStore, shelvedRulingsStore,
           proxyTokenStore, sessionIsTerminal, enrichLoop,
           chatClient, createToolCatalog,
+          // LIN-4532 (finding-79815581): the person's canonical account, for the question read in list_pending_decisions.
+          resolveCanonicalAccountId: accountStore ? (id) => accountStore.resolveCanonicalAccountId(id) : null,
           installationTokenFor,
           getProvider: getProviderForWorkspace,
           getScope: getWorkspaceCallScope,

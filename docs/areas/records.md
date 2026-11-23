@@ -20,7 +20,7 @@ routes/task-records.js, routes/project-page.js, routes/dispatch.js, server.js).
   that must be atomic (a ticket's task, `records-refs`) is keyed on its own unique index, not on `_id`.
 - A run record is written from the dispatch row's own id and lineage (`rootItemId`, else its own id), the same
   lineage lib/run-lineage.js reads. Every version of a run is kept: a resume or a wake reopens it as a new `open`
-  version (a wake reopens the run it wakes, as a custom resume does: LIN-4493 review, gap 3).
+  version (a wake reopens the run it wakes, as a custom resume does).
 - A run ends when its row stops being live: its terminal marker, an abort row's `[aborted]` (which ends the run it
   targets, `abortTo`), or a bookkeeping stamp (lineage closer, ticket closer, operator), which ends it as the lineage's
   terminal status or `aborted`. A `handed-on` closure ends nothing. Hooks: lib/dispatch-store.js (`takeItem`,
@@ -45,7 +45,7 @@ routes/task-records.js, routes/project-page.js, routes/dispatch.js, server.js).
   task-page and project-page routes. It checks the body, dry-runs the tickets it names, makes their
   tasks only when that is clean, then checks again. `by` is the writer's own (a stage kind, `person:<account>`,
   `import`, `harbour`), never read from a body; a new writer calls the pipeline, never the store's add, revise, end or link.
-- Outward steps (LIN-4503) run after a record persists, through one injected `tracker(ctx)` port (lib/records-tracker.js),
+- Outward steps run after a record persists, through one injected `tracker(ctx)` port (lib/records-tracker.js),
   never on a dry run or an import. A child ticket is made only when the parent's children read whole (`capped === false`;
   unknown fails closed) and no child carries the task's mark (lib/records/ticket-stub.js); a mark another task holds is
   refused, not taken. A plan's or verdict's summary is one comment per version, never retried; `isSummaryBody` is the one mark.
@@ -54,8 +54,9 @@ routes/task-records.js, routes/project-page.js, routes/dispatch.js, server.js).
 - A write that makes one record and then ends another is two writes. Name the first with `fixedIdOf` (lib/records/refs.js,
   the one derived-id rule) from the second, as make-a-task and supersede do, so a retry after a failed end finds the
   record it made. Imports use the same rule, which holds after an imported record ends. Never hash an id by hand.
-- Records stay outside `ruling.rows`. Home's Waiting on you draws the person's records beside the rulings
-  (`createWaitingStanding` returns `records`); the count, the badge and the live merge keep reading rulings only.
+- Open questions are rows of the rulings feed (LIN-4532): `openQuestionsFor` (lib/open-questions.js) adds `kind: 'question'`
+  rows, so the page, `count` and the badge read one list. Other records stay out: Home draws them
+  (`createWaitingStanding` `records`) on page load only, uncounted.
 - A page GET never makes a task. The task page reads its task record by the ticket's claim (`taskForTicket`) and offers
   its add and child-task forms before one exists; the first write through the checked pipeline makes the task
   (routes/task-records.js sends `in: <ticket>`). The project page's actions and the proxy make tasks the same way.
@@ -64,10 +65,10 @@ routes/task-records.js, routes/project-page.js, routes/dispatch.js, server.js).
   session page reads evidence through `readRunEvidenceFn` (`routes/dashboard.js`), missed the store at LIN-4495, and
   every session page read "not measured". Search the aliases too, and keep a missing store reading "not measured",
   never zero, so a missed caller shows instead of passing.
-- A verdict rests on the head its judge read: `heads` pins it before the refresh (`pinVerdictToHeads`, LIN-4516). A merge
+- A verdict rests on the head its judge read: `heads` pins it before the refresh (`pinVerdictToHeads`). A merge
   revises the head (`recordChangeMerged`), so a PR merged after an unseen push is in `staleUrls` but not
-  `movedUrls`: re-review on that (LIN-4521).
+  `movedUrls`: re-review on that.
 - A task written with a ticket `ref` claims that ticket (`lib/records/writes.js`), as `ensureTask` does; else the ticket's
   references make a second task. A ticket's task id has one rule, `ticketTaskIdOf` (`lib/records/refs.js`). A revise that changes a claimed `ref` is refused (422).
-- A decision's `answer` and `words` are stored as written, never trimmed (LIN-4530). Part 3 shows a question
+- A decision's `answer` and `words` are stored as written, never trimmed. Part 3 shows a question
   only to its addressee; part 4 (lib/records/brief.js) adds the question a decision answers.

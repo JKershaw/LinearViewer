@@ -36,6 +36,8 @@ import { rowRecordOf } from '../lib/task-board-view.js';
 import { pageStatusOf } from '../lib/task-state.js';
 import { isHiddenState } from '../lib/providers/state-map.js';
 import { renderTaskQuestion } from '../lib/render-task-page.js';
+import { openQuestionsForTask } from '../lib/open-questions.js';
+import { personAccountIdOf } from './task-records.js';
 import { requestFeatureFlags } from '../lib/run-controls.js';
 import { resolveIssueBinding, isValidIssueId } from '../lib/workspace.js';
 import { jsonError } from '../lib/errors.js';
@@ -81,9 +83,21 @@ function sessionsOfState(model, taskState, runWords = null) {
  * @param {Function} [deps.now] - () → Date
  * @returns {Router}
  */
-export function createTaskPageRoutes({ workspaceFromUrl, getOpenRouterSource, getDeployInfo, loader, workspaceOwnerCheck = null, runProposalsStore = null, taskFacts = null, refreshTaskFacts = null, taskModeStore = null, accountStore = null, timelineFragment = null, recordsStore = null, now = () => new Date() }) {
+export function createTaskPageRoutes({ workspaceFromUrl, getOpenRouterSource, getDeployInfo, loader, workspaceOwnerCheck = null, runProposalsStore = null, taskFacts = null, refreshTaskFacts = null, taskModeStore = null, accountStore = null, timelineFragment = null, recordsStore = null, dispatchStore = null, now = () => new Date() }) {
   if (!loader) throw new Error('task-page routes: loader is required');
   const router = Router();
+
+  /**
+   * LIN-4532 (P2b): the open question records on this task that the signed-in owner is asked, for the question section. Read for
+   * the owner's canonical account; a failed read costs only these cards. [] when the stores are not wired.
+   */
+  async function questionRecordsOf(req, workspace, identifier) {
+    if (!recordsStore || !dispatchStore || !identifier) return [];
+    const accountId = await personAccountIdOf(req, accountStore);
+    if (!accountId) return [];
+    return openQuestionsForTask({ recordsStore, dispatchStore, urlKey: workspace.urlKey, accountId, ticket: identifier })
+      .catch(() => []);
+  }
 
   // LIN-4070: the private handlers' only route to the holder. An incomplete read starts the background refresh (the
   // holder's trigger is rate-limited and single-flight), and a read the page's own tracker contradicts drops the stale
@@ -184,7 +198,9 @@ export function createTaskPageRoutes({ workspaceFromUrl, getOpenRouterSource, ge
           { action: 'Back to tasks', actionUrl: `/workspace/${encodeURIComponent(workspace.urlKey)}/` }
         ));
       }
-      const model = owner ? { ...result.model, proposals: await pendingProposalsOf(workspace.urlKey, result.model) } : result.model;
+      const model = owner
+        ? { ...result.model, proposals: await pendingProposalsOf(workspace.urlKey, result.model), questionRecords: await questionRecordsOf(req, workspace, result.model.identifier) }
+        : result.model;
       const stateQuery = model.issueId ? [`issueId=${encodeURIComponent(model.issueId)}`] : [];
       const stateUrl = `/workspace/${encodeURIComponent(workspace.urlKey)}/api/task/${encodeURIComponent(model.identifier)}/state${stateQuery.length ? `?${stateQuery.join('&')}` : ''}`;
       // LIN-4405: the timeline fragment, re-read by the page script while a session runs.
@@ -263,8 +279,9 @@ export function createTaskPageRoutes({ workspaceFromUrl, getOpenRouterSource, ge
       // LIN-4024: the question card carries an answer box, so only the owner gets one. Whether it shows at all is
       // `renderTaskQuestion`'s gate (LIN-4038: an open ruling only, not a shelved or bare `[blocked]` wait), the same
       // one the page-load card uses, so this read and the page cannot disagree. The poll keys on this string.
+      // LIN-4532 (P2b): the open question records of this task ride in the same section (`questionRecords`).
       const questionHtml = (await viewerOf(req)) === 'owner'
-        ? renderTaskQuestion(model, { urlKey: workspace.urlKey })
+        ? renderTaskQuestion({ ...model, questionRecords: await questionRecordsOf(req, workspace, model.identifier) }, { urlKey: workspace.urlKey })
         : '';
       const body = {
         // LIN-4071: the page's status is the gathered state's (the poll stops on a Done task only when the gather says done).
