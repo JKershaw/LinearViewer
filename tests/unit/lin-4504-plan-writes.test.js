@@ -163,10 +163,10 @@ describe('the design stage writes no plan record (ruling d1d5ab31): design, then
   const issue = { identifier: 'LIN-70', title: 'Pick a shape', description: summary, state: { name: 'Todo', type: 'unstarted' }, labels: [] };
   const comments = [{ user: 'Agent', createdAt: '2026-11-20T09:00:00.000Z', body: '## Design analysis\n\nThree shapes; the second wins.' }];
 
-  test('design\'s prompt keeps its comment and description summary, sends the plan to the plan stage, and has no contract', () => {
+  test('design\'s prompt reports in its final message, sends the plan to the plan stage, and has no contract', () => {
     const p = generatePrompt('design', issue, { comments: [] }).prompt;
-    assert.match(p, /Add full design analysis as comment, then update description with chosen approach/);
-    assert.match(p, /- \*\*Description\*\*: Summary of chosen approach and key implementation details/);
+    assert.match(p, /\*\*Report\*\*: Your final message holds the full design analysis and the chosen approach/);
+    assert.match(p, /- \*\*Report\*\* \(your final message, kept on your run's record\): Full design analysis with all approaches evaluated, the chosen approach and its key implementation details/);
     assert.ok(p.includes(DESIGN_PLAN_LINE), 'the one line saying the plan goes to the plan stage');
     assert.doesNotMatch(p, /"kind": "plan"/, 'no plan-record call');
     assert.equal(formatStageContract('design', 'LIN-70'), '', 'design\'s contract is null');

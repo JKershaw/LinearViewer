@@ -236,7 +236,7 @@ describe('stage leads and scope lines', () => {
     const licence = /fixing at the cause and refactoring included, are yours/;
     for (const kind of ['plan-review', 'bug', 'review', 'close-out', 'retrospective-audit']) {
       assert.ok(!STAGE_INTENT[kind].some(l => licence.test(l)), kind);
-      assert.match(STAGE_INTENT[kind][0], /one clear question with your recommendation/, kind);
+      assert.match(STAGE_INTENT[kind][0], /one `question` record with your recommendation/, kind);
     }
     for (const kind of ['triage', 'context', 'look-into', 'retro']) assert.ok(!STAGE_INTENT[kind].some(l => licence.test(l)), kind);
     for (const kind of ['research', 'scoping', 'design', 'spike', 'plan', 'breakdown', 'implementation', 'blocked']) {
@@ -260,7 +260,7 @@ describe('stage leads and scope lines', () => {
     for (const bad of [/\bwe\b/i, /\bsomeone\b/i, /pair of (eyes|hands)/i, /\bhonestly\b/i, /skilled lead/i, /\bLIN-\d+/, /\bact as\b/i]) {
       assert.deepEqual(text.split('\n').filter(l => bad.test(l)), [], String(bad));
     }
-    assert.match(STAGE_INTENT.review.join(' '), /one clear question with your recommendation/, 'escalation is a decision point');
+    assert.match(STAGE_INTENT.review.join(' '), /one `question` record with your recommendation/, 'escalation is a decision point');
   });
 
   // LIN-3299: one intent per stage, the lead, with no role line beside it.
