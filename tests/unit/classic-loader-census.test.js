@@ -109,7 +109,6 @@ export const CLASSIC_LOADER_SUITES = [
   'task-chat-flight-companion-sentinel-mask.test.js',
   'task-page-href.test.js',
   'task-page-link-client-surfaces.test.js',
-  'task-page-question.test.js',
   'vendor-assets.test.js',
 ];
 
@@ -146,8 +145,8 @@ test('the classic-loader census matches its baseline: no new classic suite, and 
   assert.deepEqual(gone, [], `listed suites no longer load browser scripts as classic: lower the baseline in this change: ${gone.join(', ')}`);
 });
 
-test('the baseline is recorded at 89 suites (the count that must not rise)', () => {
-  assert.equal(CLASSIC_LOADER_SUITES.length, 89);
+test('the baseline is recorded at 88 suites (the count that must not rise)', () => {
+  assert.equal(CLASSIC_LOADER_SUITES.length, 88);
 });
 
 test('runClassic is counted unless it runs a named sibling: observation.js counts, chart-helpers.js does not', () => {

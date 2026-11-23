@@ -132,6 +132,8 @@ function noWriteStore({ loopsByWorkspace, urlKeys }) {
 }
 
 const emptyAgentStatusStore = { listStatus: async () => ({ items: [] }) };
+// LIN-4538: the lane's question standing is read from records; no questions here, so no run is waiting on one.
+const emptyRecordsStore = { find: async () => [] };
 
 describe('fossil pass T20 — dry run is the default and writes nothing', () => {
   test('runFossilPass with no execute flag never calls stampBookkeeping, even with eligible rows', async () => {
@@ -142,7 +144,7 @@ describe('fossil pass T20 — dry run is the default and writes nothing', () => 
 
     const result = await runFossilPass({
       dispatchStore: store,
-      agentStatusStore: emptyAgentStatusStore,
+      agentStatusStore: emptyAgentStatusStore, recordsStore: emptyRecordsStore,
       now: NOW_MS
     });
 
@@ -182,7 +184,7 @@ describe('fossil pass T20 — dry run is the default and writes nothing', () => 
 
     const { report } = await runFossilPass({
       dispatchStore: store,
-      agentStatusStore: emptyAgentStatusStore,
+      agentStatusStore: emptyAgentStatusStore, recordsStore: emptyRecordsStore,
       now: NOW_MS,
       headSha: 'deadbeef'
     });
@@ -296,7 +298,7 @@ describe('fossil pass T20 — --execute writes, against a real MangoDB tmpdir', 
 
     const first = await runFossilPass({
       dispatchStore: store,
-      agentStatusStore: emptyAgentStatusStore,
+      agentStatusStore: emptyAgentStatusStore, recordsStore: emptyRecordsStore,
       urlKeys: [URL_KEY],
       now: NOW_MS,
       execute: true,
@@ -318,7 +320,7 @@ describe('fossil pass T20 — --execute writes, against a real MangoDB tmpdir', 
     // so they are skipped at selection and never re-attempted.
     const second = await runFossilPass({
       dispatchStore: store,
-      agentStatusStore: emptyAgentStatusStore,
+      agentStatusStore: emptyAgentStatusStore, recordsStore: emptyRecordsStore,
       urlKeys: [URL_KEY],
       now: NOW_MS,
       execute: true,
@@ -336,7 +338,7 @@ describe('fossil pass T20 — --execute writes, against a real MangoDB tmpdir', 
 
     const result = await runFossilPass({
       dispatchStore: store,
-      agentStatusStore: emptyAgentStatusStore,
+      agentStatusStore: emptyAgentStatusStore, recordsStore: emptyRecordsStore,
       urlKeys: [URL_KEY],
       now: NOW_MS
     });
@@ -370,7 +372,7 @@ describe('fossil pass T20 — --execute writes, against a real MangoDB tmpdir', 
 
     const { perWorkspace } = await runFossilPass({
       dispatchStore: store,
-      agentStatusStore: emptyAgentStatusStore,
+      agentStatusStore: emptyAgentStatusStore, recordsStore: emptyRecordsStore,
       urlKeys: [URL_KEY],
       now: NOW_MS
     });
@@ -416,7 +418,7 @@ describe('fossil pass — a failed workspace read stamps nothing for that worksp
 
     const result = await runFossilPass({
       dispatchStore: store,
-      agentStatusStore: emptyAgentStatusStore,
+      agentStatusStore: emptyAgentStatusStore, recordsStore: emptyRecordsStore,
       now: NOW_MS,
       execute: true
     });
@@ -455,7 +457,7 @@ describe('fossil pass F4 (LIN-2653 close-out) — a write error is reported as a
   test('a row still eligible after the failed write is disposition "write-error"', async () => {
     const store = storeWithStampFailure({ postFailureStatus: 'taken', postFailureBookkeeping: null });
     const result = await runFossilPass({
-      dispatchStore: store, agentStatusStore: emptyAgentStatusStore, now: NOW_MS, execute: true
+      dispatchStore: store, agentStatusStore: emptyAgentStatusStore, recordsStore: emptyRecordsStore, now: NOW_MS, execute: true
     });
     assert.equal(result.stamped.length, 1);
     assert.equal(result.stamped[0].disposition, 'write-error');
@@ -467,7 +469,7 @@ describe('fossil pass F4 (LIN-2653 close-out) — a write error is reported as a
     const store = storeWithStampFailure({ postFailureStatus: 'taken', postFailureBookkeeping: null });
     store.stampBookkeeping = async () => { throw Object.assign(new Error('Dispatch store unavailable'), { code: 'DISPATCH_STORE_UNAVAILABLE', retryable: true }); };
     const result = await runFossilPass({
-      dispatchStore: store, agentStatusStore: emptyAgentStatusStore, now: NOW_MS, execute: true, log: () => {}
+      dispatchStore: store, agentStatusStore: emptyAgentStatusStore, recordsStore: emptyRecordsStore, now: NOW_MS, execute: true, log: () => {}
     });
     assert.equal(result.stamped.length, 1, 'the run was not aborted');
     assert.equal(result.stamped[0].ok, false);
@@ -481,7 +483,7 @@ describe('fossil pass F4 (LIN-2653 close-out) — a write error is reported as a
       postFailureBookkeeping: { at: NOW.toISOString(), by: 'someone-else', reason: 'raced' }
     });
     const result = await runFossilPass({
-      dispatchStore: store, agentStatusStore: emptyAgentStatusStore, now: NOW_MS, execute: true
+      dispatchStore: store, agentStatusStore: emptyAgentStatusStore, recordsStore: emptyRecordsStore, now: NOW_MS, execute: true
     });
     assert.equal(result.stamped.length, 1);
     assert.equal(result.stamped[0].disposition, 'refused');

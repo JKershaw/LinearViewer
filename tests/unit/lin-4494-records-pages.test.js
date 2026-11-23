@@ -246,23 +246,17 @@ describe('a records-store failure costs the records, not the page', () => {
     }
   });
 
-  test("Home's waiting standing keeps its rulings and loops when the records read throws", async () => {
+  test("Home's waiting standing reads the question records for its standing: a records read that throws fails the standing as a whole (LIN-4538)", async () => {
     const loops = [{ loopId: 'l1' }];
     const standing = createWaitingStanding({
       getLoopsForWorkspace: async () => loops,
       dispatchStore: {}, agentStatusStore: {}, enrichLoop: (l) => l,
-      taskDecisionsStore: { listUnansweredForWorkspaces: async () => [], listNewestScanPerTask: async () => ({}) },
-      shelvedRulingsStore: { listForWorkspaces: async () => [] },
       recordsStore: { find: async () => { throw new Error('records down'); } },
     });
-    const out = await standing({ urlKey: URL_KEY, accountId: ACCOUNT });
-    assert.deepEqual(out.records, []);
-    assert.ok(out.ruling, 'the ruling standing is still there');
+    await assert.rejects(standing({ urlKey: URL_KEY, accountId: ACCOUNT }), /records down/, 'Home falls back to plain rows (lib/home-row-states.js)');
     const brokenCanonical = createWaitingStanding({
       getLoopsForWorkspace: async () => [],
       dispatchStore: {}, agentStatusStore: {}, enrichLoop: (l) => l,
-      taskDecisionsStore: { listUnansweredForWorkspaces: async () => [], listNewestScanPerTask: async () => ({}) },
-      shelvedRulingsStore: { listForWorkspaces: async () => [] },
       recordsStore: store, canonicalAccountId: async () => { throw new Error('accounts down'); },
     });
     assert.deepEqual((await brokenCanonical({ urlKey: URL_KEY, accountId: ACCOUNT })).records, []);

@@ -108,16 +108,12 @@ test('a close-out re-dispatched after its predecessor merged and then held again
 test('a resume after an answer is a ruling resume; two rulings open at once share their person-wait', () => {
   const ap = autopilot();
   const impl = worker('implementation', 1, 10, { marker: 'blocked', text: 'BLOCKED: need the rates.' });
-  const rulings = [
-    { decision: { decision_id: 'rates-a', question: 'How?', options: [{ id: 'p', label: 'Operator pastes the rates' }] },
-      anchor: { loopId: impl.id }, stampLoopId: impl.id,
-      resolution: { raisedAt: at(10), resolvedAt: at(40), outcome: 'answered' } },
-    { decision: { decision_id: 'rates-b', question: 'How, again?', options: [{ id: 'p', label: 'Paste' }] },
-      anchor: { loopId: ap.id }, stampLoopId: ap.id,
-      resolution: { raisedAt: at(20), resolvedAt: at(41), outcome: 'answered' } },
+  const questions = [
+    { id: 'rates-a', asks: 'How?', options: ['Operator pastes the rates'], runId: impl.id, raisedAt: at(10), resolvedAt: at(40), outcome: 'answered' },
+    { id: 'rates-b', asks: 'How, again?', options: ['Paste'], runId: ap.id, raisedAt: at(20), resolvedAt: at(41), outcome: 'answered' },
   ];
   const resume = custom(40.1, 'Operator pastes the rates', { followUpTo: impl.id });
-  const r = classifyTicket({ identifier: 'LIN-1', rows: [ap, impl, resume], rulings });
+  const r = classifyTicket({ identifier: 'LIN-1', rows: [ap, impl, resume], questions });
   assert.equal(r.entries[2].cause, 'ruling-resume');
   assert.equal(r.entries[2].note, 'rates-a');
   assert.deepEqual(r.rulings.find((x) => x.decisionId === 'rates-b').openAtRaise, ['rates-a']);
@@ -167,11 +163,9 @@ test('an answer resumed into a close-out while a newer close-out is live runs th
   const ap = autopilot();
   const held = worker('close-out', 6, 8, { marker: 'blocked', text: 'BLOCKED: the merge is held on a ruling.' });
   const fresh = worker('close-out', 30, 40);
-  const rulings = [{ decision: { decision_id: 'merge-ok', question: 'Merge?', options: [{ id: 'y', label: 'Merge it' }] },
-    anchor: { loopId: held.id }, stampLoopId: held.id,
-    resolution: { raisedAt: at(8), resolvedAt: at(34.9), outcome: 'answered' } }];
+  const questions = [{ id: 'merge-ok', asks: 'Merge?', options: ['Merge it'], runId: held.id, raisedAt: at(8), resolvedAt: at(34.9), outcome: 'answered' }];
   const resume = custom(35, 'Merge it', { followUpTo: held.id });
-  const r = classifyTicket({ identifier: 'LIN-1', rows: [ap, worker('implementation', 1, 5), held, fresh, resume], rulings });
+  const r = classifyTicket({ identifier: 'LIN-1', rows: [ap, worker('implementation', 1, 5), held, fresh, resume], questions });
   assert.equal(r.entries[3].cause, 'close-out-held');
   assert.equal(r.entries[4].cause, 'concurrent-duplicate');
   assert.match(r.entries[4].note, /^merge-ok resumed close-out .* while .* was live$/);

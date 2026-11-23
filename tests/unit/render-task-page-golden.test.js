@@ -27,7 +27,8 @@ import { buildPromptOpts } from '../../lib/render-prompt-opts.js';
 import { renderCloseOutBox } from '../../lib/render-run-evidence.js';
 import { buildTaskPageModel } from '../../lib/task-page-loader.js';
 import { gatherTaskStates } from '../../lib/home-row-states.js';
-import { enrichLoop, deriveSessionWaiting, deriveSessionDecisions } from '../../routes/dashboard.js';
+import { enrichLoop, deriveSessionWaiting } from '../../routes/dashboard.js';
+import { standingOfLoops } from './helpers/question-records.js';
 import { buildRunEvidence } from '../../lib/run-evidence.js';
 import { CLOSE_OUT_STATUS, deriveCloseOutState } from '../../lib/run-closeout-state.js';
 
@@ -170,8 +171,8 @@ function caseOf(name) {
     case 'waiting':
       return { loops: [done({ loopId: 'plan-1', kind: 'plan' }), loop({ loopId: 'impl-2', wakeMarker: 'blocked', waitingMessage: '[blocked] which API key?', feedback: [{ message: '[blocked] which API key?' }] })], ctx: ctx() };
     case 'open-ruling-recommended':
-      // LIN-4114: an open ruling whose decision names a valid `recommended` option. The card shows that option as the one main button.
-      return { loops: [done({ loopId: 'plan-1', kind: 'plan' }), loop({ loopId: 'impl-2', wakeMarker: 'blocked', waitingMessage: '[blocked] which path?', feedback: [{ message: '[blocked] which path?' }], decision: { decision_id: 'd-rec', question: 'Which path should Harbour take?', options: [{ id: 'ship', label: 'Ship it now' }, { id: 'wait', label: 'Wait for review' }, { id: 'split', label: 'Split the change' }], recommended: 'wait' }, decisionCase: ['Two paths were considered.'], answeredDecisions: [], withdrawal: null })], ctx: ctx() };
+      // LIN-4114 / LIN-4538: an open question whose record names a valid `recommended` option. The card shows that option as the one main button.
+      return { loops: [done({ loopId: 'plan-1', kind: 'plan' }), loop({ loopId: 'impl-2', wakeMarker: 'blocked', waitingMessage: '[blocked] which path?', feedback: [{ message: '[blocked] which path?' }], decision: { decision_id: 'd-rec', question: 'Which path should Harbour take?' }, decisionCase: ['Two paths were considered.'], answeredDecisions: [], withdrawal: null })], ctx: ctx(), questionRecords: [{ questionId: 'q-impl-2', asks: 'Which path should Harbour take?', options: ['Ship it now', 'Wait for review', 'Split the change'], recommended: 'Wait for review', ifUnanswered: null, taskId: 'task-LIN-50', ticket: 'LIN-50', runId: 'impl-2', askedAt: '2026-10-30T10:05:00.000Z', state: 'gone', reason: 'no-session', interactive: true }] };
     case 'done':
       return { loops: [done({ loopId: 'impl-1' }), loop({ loopId: 'rev-stale', kind: 'review' })], ctx: ctx({ stateType: 'completed', stateName: 'Done' }), evidence: EVIDENCE };
     case 'settling':
@@ -190,7 +191,8 @@ function caseOf(name) {
 
 function model(name) {
   const { questionRecords = null, ...inputs } = caseOf(name);
-  const built = buildTaskPageModel({ identifier: 'LIN-50', enrichLoop, deriveSessionWaiting, deriveSessionDecisions, now: NOW, ...inputs });
+  // LIN-4538: a loop's open decision is the question its run asked; the standing reads it, the card reads the question record.
+  const built = buildTaskPageModel({ identifier: 'LIN-50', enrichLoop, deriveSessionWaiting, ruling: standingOfLoops(inputs.loops), now: NOW, ...inputs });
   // The route attaches the owner's open question records to the model (routes/task-page.js); a case that has some does the same.
   return questionRecords ? { ...built, questionRecords } : built;
 }
@@ -202,7 +204,7 @@ function model(name) {
 function stateOf(name) {
   const { ctx: c, loops } = caseOf(name);
   const root = { issue: c.issue, children: c.children.map((child) => ({ issue: child, children: [] })) };
-  return gatherTaskStates({ roots: [root], loops, at: NOW, enrichLoop, deriveSessionWaiting }).states.get('LIN-50');
+  return gatherTaskStates({ roots: [root], loops, ruling: standingOfLoops(loops), at: NOW, enrichLoop, deriveSessionWaiting }).states.get('LIN-50');
 }
 
 const CASES = ['running-blocked-repeat', 'waiting', 'done', 'no-sessions', 'lin-3351', 'settling', 'open-ruling-recommended', 'open-question-records'];
@@ -457,7 +459,7 @@ describe('task page structure', () => {
     assert.equal(stateOf('done').action.kind, 'none', 'a finished task offers no run, whatever still runs');
     // LIN-3991: a finished task with nothing running says so, the sentence relative, the exact time beside it.
     const ended = { ...caseOf('done'), loops: [done({ loopId: 'impl-1' })] };
-    const endedModel = buildTaskPageModel({ identifier: 'LIN-50', enrichLoop, deriveSessionWaiting, deriveSessionDecisions, now: NOW, ...ended });
+    const endedModel = buildTaskPageModel({ identifier: 'LIN-50', enrichLoop, deriveSessionWaiting, ruling: standingOfLoops(ended.loops), now: NOW, ...ended });
     const endedState = gatherTaskStates({ roots: [{ issue: ended.ctx.issue, children: [] }], loops: ended.loops, at: NOW, enrichLoop, deriveSessionWaiting }).states.get('LIN-50');
     assert.match(renderTaskStatus(endedModel, { now: NOW, taskState: endedState }), /data-status="done"[\s\S]*task-page-sentence">Finished 3 hours ago\.<span/);
     assert.match(renderTaskStatus(endedModel, { now: NOW, taskState: endedState }), /data-testid="task-page-sentence-at" datetime="2026-10-06T12:00:00\.000Z" data-local-time="zoned">6 Oct, 12:00 UTC</);

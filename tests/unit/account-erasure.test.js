@@ -319,6 +319,28 @@ describe('model-routing rows at a Full wipe (LIN-3853)', () => {
   });
 });
 
+// LIN-4538 (P7a): the rulings are question and decision records now, in the `records` collection, which names an account as
+// `person:<accountId>` in `by` and `to` (INVENTORY's `records` row). A Full wipe must reach them in a shared workspace; the
+// old ruling collections stay as history (their rows are kept in INVENTORY), and no reader of them is left to erase.
+describe('question and decision records at a Full wipe (LIN-4538)', () => {
+  test('a question to the person and a decision by the person name the erased id in a shared workspace; a co-member\'s question keeps theirs', async () => {
+    const { db } = await fresh();
+    const urlKey = WORKSPACES.shared.urlKey;
+    const doc = (id, fields) => ({ _id: `${urlKey}::${id}::1`, urlKey, id, v: 1, op: 'add', at: '2026-11-20T10:00:00.000Z', fields: {}, links: {}, ...fields });
+    await db.collection('records').insertMany([
+      doc('question-mine', { kind: 'question', by: 'implementation', to: `person:${PERSON.accountId}`, state: 'open' }),
+      doc('decision-mine', { kind: 'decision', by: `person:${PERSON.accountId}`, state: 'stands' }),
+      doc('question-theirs', { kind: 'question', by: 'implementation', to: `person:${BYSTANDER.accountId}`, state: 'open' }),
+    ]);
+    const plan = await planOf(db, 'full');
+    await applyOf(db, plan);
+    const after = async (id) => db.collection('records').findOne({ _id: `${urlKey}::${id}::1` });
+    assert.strictEqual((await after('question-mine')).to, `person:${ERASED_ACCOUNT_ID}`, 'a question to the person is erased');
+    assert.strictEqual((await after('decision-mine')).by, `person:${ERASED_ACCOUNT_ID}`, 'a decision by the person is erased');
+    assert.strictEqual((await after('question-theirs')).to, `person:${BYSTANDER.accountId}`, 'a co-member\'s question is untouched');
+  });
+});
+
 // LIN-3846: the change log for everyone-changes names accounts by id only, like the routing log.
 describe('workspace-change-log rows at a Full wipe (LIN-3846)', () => {
   test('actor.id becomes the erased id in a shared workspace and the row goes with an Alone one', async () => {

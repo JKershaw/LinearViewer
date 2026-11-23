@@ -9,6 +9,7 @@
  */
 import { test, describe } from 'node:test';
 import assert from 'node:assert/strict';
+import { standingOfLoops } from './helpers/question-records.js';
 import { buildRowStates, buildTaskPageModel, nextStepOf } from '../../lib/task-page-loader.js';
 import { taskStateOf, taskFactsOf, rollUpRow, needsAPerson } from '../../lib/task-state.js';
 import { parentNextOf } from '../../lib/recommendation-facts.js';
@@ -42,6 +43,7 @@ const node = (identifier, type = 'started', children = []) => ({
   depth: 0,
 });
 
+// LIN-4538: a ruling is an open question its run asked (the loop's decision), read as the question standing.
 function states(roots, loops = {}) {
   return buildRowStates({
     roots,
@@ -50,6 +52,7 @@ function states(roots, loops = {}) {
     deriveSessionWaiting,
     now: NOW,
     sessionsVisible: true,
+    ruling: standingOfLoops(Object.values(loops).flat()),
   });
 }
 
@@ -61,7 +64,7 @@ function modelOf(identifier, loops, trackerType = 'started') {
     ctx: { issue: { identifier, title: identifier, state: { type: trackerType } }, parent: null, children: [] },
     enrichLoop,
     deriveSessionWaiting,
-    ruling: null,
+    ruling: standingOfLoops(loops),
     now: NOW,
   });
 }

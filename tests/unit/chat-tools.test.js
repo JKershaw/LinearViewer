@@ -14,12 +14,12 @@ import { createChatToolCatalog, CHAT_TOOL_SCHEMAS, CHAT_TOOL_SCOPE_TIERS, CHAT_T
 import { deriveFollowUpDispatch } from '../../lib/follow-up-dispatch.js';
 import { TOOL_RESULT_MAX_CHARS } from '../../lib/openrouter.js';
 import { hashContext } from '../../lib/recap-cache.js';
-import { getSessionsForWorkspace, getLoopsForWorkspace } from '../../lib/pipeline-loops.js';
+import { getSessionsForWorkspace } from '../../lib/pipeline-loops.js';
 import { classifyLoop } from '../../lib/observer-sweep.js';
 import { computeSupersededLoopIds } from '../../lib/loop-supersede.js';
 import { DEFAULT_LANE_STALE_MS } from '../../lib/live-console.js';
 import { withFreshDigests } from '../fixtures/with-fresh-digests.js';
-import { collectUnansweredDecisions, answeredDecisionIdsByLineage } from '../../lib/unanswered-decisions.js';
+import { questionStandingOf } from '../../lib/records/question-standing.js';
 import { TaskDecisionsStore } from '../../lib/task-decisions-store.js';
 import { sessionIsTerminal } from '../../routes/dashboard.js';
 import { createMockCollection } from '../fixtures/mock-collection.js';
@@ -182,7 +182,7 @@ describe('createChatToolCatalog — construction', () => {
     assert.strictEqual(typeof executors.lookup_task, 'function');
   });
 
-  test('LIN-2617: list_pending_decisions is advertised only when its stores are wired', () => {
+  test('LIN-2617 / LIN-4538: list_pending_decisions is advertised only when the records store is wired', () => {
     const has = (tools) => tools.some(t => t.function.name === 'list_pending_decisions');
 
     const bare = createChatToolCatalog({ provider: makeFakeProvider(), scope: SCOPE });
@@ -190,17 +190,7 @@ describe('createChatToolCatalog — construction', () => {
     // Still reachable by a direct caller, who gets a real error rather than silence.
     assert.strictEqual(typeof bare.executors.list_pending_decisions, 'function');
 
-    const halfWired = createChatToolCatalog({
-      provider: makeFakeProvider(), scope: SCOPE,
-      taskDecisionsStore: { async listUnansweredForWorkspaces() { return []; } },
-    });
-    assert.strictEqual(has(halfWired.tools), false, 'both stores are required, not either');
-
-    const wired = createChatToolCatalog({
-      provider: makeFakeProvider(), scope: SCOPE,
-      taskDecisionsStore: { async listUnansweredForWorkspaces() { return []; } },
-      shelvedRulingsStore: { async listForWorkspaces() { return []; } },
-    });
+    const wired = createChatToolCatalog({ provider: makeFakeProvider(), scope: SCOPE, recordsStore: {} });
     assert.strictEqual(has(wired.tools), true);
     // The fleet read needs no new stores, so it is always advertised.
     assert.ok(bare.tools.some(t => t.function.name === 'list_active_sessions'));
@@ -1978,15 +1968,6 @@ const T_FLEET_OLD = new Date(Date.now() - 5 * 60 * 60 * 1000).toISOString();
 const T_FLEET_MID = new Date(Date.now() - 3 * 60 * 60 * 1000).toISOString();
 const T_FLEET_FRESH = new Date(Date.now() - 10 * 60 * 1000).toISOString();
 
-// LIN-2704: genuinely UUID-shaped, so a `markOutcome` stamp against the
-// projected `issueId` is not a silent no-op (`lib/task-decisions-store.js`'s
-// canonical-UUID guard, `UUID_REGEX.test(issueId)`). The prior fixture value
-// ('uuid-802') was NOT UUID-shaped — `grep -n "uuid-802" tests/unit/chat-
-// tools.test.js` (verified at this ticket's HEAD, 4f59a79a) returned only the
-// fixture assignment itself; every other reference keys on `decision_id:
-// 'dec-task'` instead, so replacing it in place changes no other assertion.
-const TASK_DECISION_UUID = '3fa85f64-5717-4562-b3fc-2c963f66afa6';
-
 // A fleet with one of each thing the tool has to get right: a session still
 // moving, a session parked on a human, a finished session, and a bare `wake`
 // loop that — with no sessionId and no followUpTo — would otherwise surface as
@@ -2104,12 +2085,32 @@ function answeredDecisionHistory() {
   ];
 }
 
-function makeFleetCatalog(history) {
+/**
+ * A question the run `runId` asked and that a person has since answered (LIN-4538). `first` is its v1 (the asking run is its
+ * `run`), `current` its answered version: what lib/records/question-facts.js reads to settle the lineage.
+ */
+function settledQuestion(runId, id = `q-${runId}`) {
+  const first = { id, v: 1, op: 'add', kind: 'question', at: T_FLEET_OLD, by: 'implementation', run: runId, state: 'open', fields: {}, links: {} };
+  const current = { ...first, v: 2, op: 'end', at: T_FLEET_MID, by: 'person:acct-owner', state: 'answered', ended: { reason: 'answered by dec-x' } };
+  return { first, current };
+}
+
+/** A records store over fixed question records: the reads questionFacts makes, and nothing else. */
+function questionRecordsStore(questions = []) {
+  return {
+    find: async (_urlKey, { kind } = {}) => (kind === 'question' ? questions.map((q) => q.current) : []),
+    versionsOf: async (_urlKey, ids) => questions.filter((q) => ids.includes(q.current.id)).map((q) => q.first),
+    ticketOfTask: async () => null,
+  };
+}
+
+function makeFleetCatalog(history, questions = []) {
   const stores = makeMockSessionStores({ history });
   const { executeTool } = createChatToolCatalog({
     provider: makeFakeProvider(), scope: SCOPE, urlKey: URL_KEY,
     dispatchQueueStore: stores.dispatchQueueStore, agentStatusStore: stores.agentStatusStore,
     sessionIsTerminal: (session) => (session.loops || []).some(l => l.terminalStatus === 'done'),
+    recordsStore: questionRecordsStore(questions),
   });
   return { executeTool, stores };
 }
@@ -2153,18 +2154,17 @@ describe('pass-4 fleet read — list_active_sessions (LIN-2617)', () => {
 
     // Re-derive the expectation through the IMPORTED classifier with the SAME
     // inputs production's `list_active_sessions` handler passes it, including
-    // `answeredByLineage` (LIN-2991) — dropping any input, or hand-rolling the
-    // rule, diverges from this. This fixture carries no answered decision, so
-    // threading the map is a hygiene fix restoring genuine (not accidental)
-    // parity, not a red-first case.
+    // `questionStanding` (LIN-4538) — dropping any input, or hand-rolling the
+    // rule, diverges from this. This fixture carries no question, so the standing
+    // is empty and threading it is a parity check, not a red-first case.
     const sessions = await getSessionsForWorkspace(URL_KEY, {
       dispatchStore: stores.dispatchQueueStore, agentStatusStore: stores.agentStatusStore,
     });
     const allLoops = sessions.flatMap(s => s.loops || []);
     const superseded = computeSupersededLoopIds(allLoops);
-    const answeredByLineage = answeredDecisionIdsByLineage(allLoops);
+    const questionStanding = await questionStandingOf(questionRecordsStore([]), URL_KEY);
     const now = Date.now();
-    const laneOf = (loop) => classifyLoop(loop, { superseded, now, staleMs: DEFAULT_LANE_STALE_MS, answeredByLineage });
+    const laneOf = (loop) => classifyLoop(loop, { superseded, now, staleMs: DEFAULT_LANE_STALE_MS, questionStanding });
 
     assert.ok(superseded.size > 0, 'the fixture must actually exercise supersession');
     let sawMultiLoop = false;
@@ -2234,7 +2234,7 @@ describe('pass-4 fleet read — list_active_sessions (LIN-2617)', () => {
     // answered and merged, but no follow-up ever named it, so supersession
     // alone could not discharge it. `projectActiveSession` consumes
     // `classifyLoop`, so the fix must move this surface with it.
-    const { executeTool } = makeFleetCatalog(answeredDecisionHistory());
+    const { executeTool } = makeFleetCatalog(answeredDecisionHistory(), [settledQuestion('sess-dec-answered')]);
 
     const all = await executeTool({ name: 'list_active_sessions', arguments: { lane: 'all' } });
     const row = all.sessions.find(r => r.sessionId === 'sess-dec-answered');
@@ -2422,9 +2422,10 @@ describe('pass-4 fleet read — list_active_sessions (LIN-2617)', () => {
     };
     const session = { sessionId: 'g-root', seedIssue: 'LIN-741', tasksTouched: [], dispatchedAt: T_FLEET_OLD, loops: [answeringSibling, tailWithDecision] };
     const superseded = new Set();
-    const answeredByLineage = answeredDecisionIdsByLineage(session.loops);
+    // The lineage's question was asked by its root run and has been answered (question records, LIN-4538).
+    const questionStanding = new Map([['g-lineage', 'settled']]);
 
-    const row = projectActiveSession(session, { superseded, now: Date.now(), staleMs: DEFAULT_LANE_STALE_MS, answeredByLineage });
+    const row = projectActiveSession(session, { superseded, now: Date.now(), staleMs: DEFAULT_LANE_STALE_MS, questionStanding });
     assert.strictEqual(row.lifecycle, 'resolved', 'the lineage tail’s own decision, answered on a sibling loop, must discharge the session');
     assert.strictEqual(row.waitingOnHuman, false);
   });
@@ -2433,7 +2434,7 @@ describe('pass-4 fleet read — list_active_sessions (LIN-2617)', () => {
   // a hand-built map, so it cannot see the `list_active_sessions` HANDLER stop
   // computing/threading one (review mutation M11 stayed green). This drives
   // the tool end to end over the same sibling-answered lineage shape.
-  test('L2: list_active_sessions itself threads answeredByLineage — a tail decision answered on a SIBLING loop reads resolved', async () => {
+  test('L2: list_active_sessions itself threads the lineage standing — a tail question answered on a SIBLING loop reads resolved', async () => {
     const { executeTool } = makeFleetCatalog([
       sessionHistoryItem({
         id: 'sess-l2', kind: 'autopilot', issueIdentifier: 'LIN-743', target: 'cli',
@@ -2448,7 +2449,7 @@ describe('pass-4 fleet read — list_active_sessions (LIN-2617)', () => {
           decisionEntry('dec-l2', 'which option?', T_FLEET_FRESH),
         ],
       }),
-    ]);
+    ], [settledQuestion('sess-l2')]);
     const result = await executeTool({ name: 'list_active_sessions', arguments: { lane: 'all' } });
     const row = result.sessions.find(r => r.sessionId === 'sess-l2');
     assert.ok(row, 'sanity: the session is reported');
@@ -2457,7 +2458,7 @@ describe('pass-4 fleet read — list_active_sessions (LIN-2617)', () => {
     assert.strictEqual(row.waitingOnHuman, false);
   });
 
-  test('F2 pin: a single-loop answered decision (no grouping at all) still resolves — the map-threading must not regress it', () => {
+  test('F2 pin: a single-loop answered question (no grouping at all) still resolves — the standing-threading must not regress it', () => {
     const solo = {
       loopId: 'solo-1', kind: 'autopilot', dispatchedAt: T_FLEET_OLD,
       terminalStatus: null, wakeMarker: 'blocked', agentState: null, decision: { decision_id: 'dec-solo' },
@@ -2466,9 +2467,9 @@ describe('pass-4 fleet read — list_active_sessions (LIN-2617)', () => {
     };
     const session = { sessionId: 'solo-1', seedIssue: 'LIN-742', tasksTouched: [], dispatchedAt: T_FLEET_OLD, loops: [solo] };
     const superseded = new Set();
-    const answeredByLineage = answeredDecisionIdsByLineage(session.loops);
+    const questionStanding = new Map([['solo-1', 'settled']]);
 
-    const row = projectActiveSession(session, { superseded, now: Date.now(), staleMs: DEFAULT_LANE_STALE_MS, answeredByLineage });
+    const row = projectActiveSession(session, { superseded, now: Date.now(), staleMs: DEFAULT_LANE_STALE_MS, questionStanding });
     assert.strictEqual(row.lifecycle, 'resolved');
     assert.strictEqual(row.waitingOnHuman, false);
   });
@@ -2495,225 +2496,7 @@ function answerEntry(decisionId, timestamp) {
   return { kind: 'decision-answer', message: JSON.stringify({ decision_id: decisionId }), timestamp };
 }
 
-// One of each of the predicate's three inputs, exactly as the acceptance names
-// them: a dispatch-loop decision, a task-bound decision, and a decision that is
-// actively shelved (which must NOT come back).
-function decisionsFixture() {
-  const history = [
-    sessionHistoryItem({
-      id: 'sess-dec', kind: 'autopilot', issueIdentifier: 'LIN-800', target: 'cli',
-      dispatchedAt: T_FLEET_OLD, resolvedAt: null, status: 'taken',
-      feedback: [
-        { message: '[blocked] waiting on a ruling', timestamp: T_FLEET_OLD },
-        decisionEntry('dec-loop', 'Merge PR #219 before or after the witness?', T_FLEET_OLD),
-      ],
-    }),
-    sessionHistoryItem({
-      id: 'sess-shelved', kind: 'autopilot', issueIdentifier: 'LIN-801', target: 'cli',
-      dispatchedAt: T_FLEET_MID, resolvedAt: null, status: 'taken',
-      feedback: [
-        { message: '[blocked] parked', timestamp: T_FLEET_MID },
-        decisionEntry('dec-shelved', 'Should we rename the flag?', T_FLEET_MID),
-      ],
-    }),
-  ];
-  const taskDecisions = [{
-    id: 'td-1', urlKey: URL_KEY, issueId: TASK_DECISION_UUID, issueIdentifier: 'LIN-802',
-    scannedAt: T_FLEET_FRESH, outcome: null,
-    decision: {
-      decision_id: 'dec-task',
-      question: 'This ticket has two conflicting acceptance criteria — which holds?',
-      options: [{ id: 'a', label: 'The description' }, { id: 'b', label: 'The review comment' }],
-      recommended: 'b',
-    },
-  }];
-  const shelvedRulings = [{
-    urlKey: URL_KEY, decisionId: 'dec-shelved',
-    resurfaceAt: new Date(Date.now() + 24 * 60 * 60 * 1000).toISOString(),
-    lapseCount: 1,
-  }];
-  return { history, taskDecisions, shelvedRulings };
-}
 
-function makeDecisionsCatalog({ history, taskDecisions, shelvedRulings }) {
-  const stores = makeMockSessionStores({ history });
-  const { executeTool } = createChatToolCatalog({
-    provider: makeFakeProvider(), scope: SCOPE, urlKey: URL_KEY,
-    dispatchQueueStore: stores.dispatchQueueStore, agentStatusStore: stores.agentStatusStore,
-    sessionIsTerminal: () => false,
-    taskDecisionsStore: {
-      async listUnansweredForWorkspaces() { return taskDecisions; },
-      async listNewestScanPerTask() { return {}; }
-    },
-    shelvedRulingsStore: { async listForWorkspaces() { return shelvedRulings; } },
-  });
-  return { executeTool, stores };
-}
-
-describe('pass-4 fleet read — list_pending_decisions (LIN-2617)', () => {
-  test('returns exactly the rows the rulings feed returns for the same three inputs', async () => {
-    const fixture = decisionsFixture();
-    const { executeTool, stores } = makeDecisionsCatalog(fixture);
-    const result = await executeTool({ name: 'list_pending_decisions', arguments: {} });
-
-    // The feed's own call, on the same inputs — not a hand-written expectation.
-    // If this tool ever grows a second classifier, the two diverge here.
-    const rawLoops = await getLoopsForWorkspace(URL_KEY, {
-      dispatchStore: stores.dispatchQueueStore, agentStatusStore: stores.agentStatusStore, lean: true,
-    });
-    const loops = rawLoops.map(l => ({ ...l, workspaceUrlKey: URL_KEY }));
-    const feedRows = collectUnansweredDecisions(
-      { loops, taskDecisions: fixture.taskDecisions, shelvedRulings: fixture.shelvedRulings },
-      { now: new Date() }
-    );
-
-    assert.deepStrictEqual(
-      result.decisions.map(d => d.decisionId).sort(),
-      feedRows.map(r => r.decision.decision_id).sort()
-    );
-    assert.strictEqual(result.count, feedRows.length);
-  });
-
-  test('an actively shelved ruling stays out, and a shelve is what keeps it out', async () => {
-    const fixture = decisionsFixture();
-
-    const withShelf = await (await makeDecisionsCatalog(fixture)).executeTool(
-      { name: 'list_pending_decisions', arguments: {} }
-    );
-    assert.strictEqual(withShelf.decisions.some(d => d.decisionId === 'dec-shelved'), false);
-
-    // Drop the shelf row and the same decision reappears — so the exclusion is
-    // the shelvedRulings input doing its job, not the fixture being empty.
-    const noShelf = await (await makeDecisionsCatalog({ ...fixture, shelvedRulings: [] })).executeTool(
-      { name: 'list_pending_decisions', arguments: {} }
-    );
-    assert.strictEqual(noShelf.decisions.some(d => d.decisionId === 'dec-shelved'), true);
-  });
-
-  test('rows carry the question, options and recommendation, oldest first', async () => {
-    const { executeTool } = makeDecisionsCatalog(decisionsFixture());
-    const result = await executeTool({ name: 'list_pending_decisions', arguments: {} });
-
-    const loopRow = result.decisions.find(d => d.decisionId === 'dec-loop');
-    assert.strictEqual(loopRow.issueIdentifier, 'LIN-800');
-    assert.strictEqual(loopRow.sessionId, 'sess-dec');
-    assert.match(loopRow.question, /Merge PR #219/);
-    assert.deepStrictEqual(loopRow.options.map(o => o.id), ['a', 'b']);
-    assert.strictEqual(loopRow.recommended, 'b');
-    assert.strictEqual(loopRow.canReply, true);
-    assert.ok(loopRow.since, 'a parked-since lower bound is reported');
-
-    const taskRow = result.decisions.find(d => d.decisionId === 'dec-task');
-    assert.strictEqual(taskRow.disposition, 'task-bound');
-    assert.strictEqual(taskRow.sessionId, null, 'a task decision has no run behind it');
-
-    // Oldest first: the loop decision (5h) precedes the task scan (10m).
-    const order = result.decisions.map(d => d.decisionId);
-    assert.ok(order.indexOf('dec-loop') < order.indexOf('dec-task'), `got ${order.join(',')}`);
-  });
-
-  test('fails cleanly as not-configured when the shelved-rulings store is absent', async () => {
-    const stores = makeMockSessionStores({ history: decisionsFixture().history });
-    const { executeTool } = createChatToolCatalog({
-      provider: makeFakeProvider(), scope: SCOPE, urlKey: URL_KEY,
-      dispatchQueueStore: stores.dispatchQueueStore, agentStatusStore: stores.agentStatusStore,
-      taskDecisionsStore: { async listUnansweredForWorkspaces() { return []; } },
-    });
-    // Without it, a decision a human deliberately shelved would resurface — so
-    // this degrades to "not configured" rather than to a wrong answer.
-    await assert.rejects(
-      () => executeTool({ name: 'list_pending_decisions', arguments: {} }),
-      /not configured/
-    );
-  });
-
-  test('is read-only: it never answers or dismisses, and calls no store method that could', async () => {
-    const fixture = decisionsFixture();
-    const calls = [];
-    const stores = makeMockSessionStores({ history: fixture.history });
-    const { executeTool } = createChatToolCatalog({
-      provider: makeFakeProvider(), scope: SCOPE, urlKey: URL_KEY,
-      dispatchQueueStore: stores.dispatchQueueStore, agentStatusStore: stores.agentStatusStore,
-      taskDecisionsStore: new Proxy({
-        async listUnansweredForWorkspaces() { return fixture.taskDecisions; },
-        async listNewestScanPerTask() { return {}; },
-      }, { get(t, k) { calls.push(String(k)); return t[k]; } }),
-      shelvedRulingsStore: new Proxy({
-        async listForWorkspaces() { return fixture.shelvedRulings; },
-      }, { get(t, k) { calls.push(String(k)); return t[k]; } }),
-    });
-    await executeTool({ name: 'list_pending_decisions', arguments: {} });
-    assert.deepStrictEqual(
-      [...new Set(calls)].sort(), ['listForWorkspaces', 'listNewestScanPerTask', 'listUnansweredForWorkspaces'],
-      'only the three list reads — never markDecisionAnswered/dismiss/shelve'
-    );
-  });
-
-  // LIN-2729 / LIN-2893 Step 5, site 4: proves this tool doesn't just CALL
-  // `listNewestScanPerTask` (the call-set test above) but actually threads
-  // its result into `collectUnansweredDecisions` — a task's true newest
-  // outcome-bearing scan discharges the older candidate row this tool would
-  // otherwise still list.
-  test('LIN-2729 fix: a newer, outcome-bearing scan the candidate query filtered out drops the older task-bound row from the pending list', async () => {
-    const fixture = decisionsFixture();
-    const taskKey = `${URL_KEY}::${TASK_DECISION_UUID}`;
-
-    const stores = makeMockSessionStores({ history: fixture.history });
-    const { executeTool } = createChatToolCatalog({
-      provider: makeFakeProvider(), scope: SCOPE, urlKey: URL_KEY,
-      dispatchQueueStore: stores.dispatchQueueStore, agentStatusStore: stores.agentStatusStore,
-      sessionIsTerminal: () => false,
-      taskDecisionsStore: {
-        async listUnansweredForWorkspaces() { return fixture.taskDecisions; }, // still just the older, unanswered candidate
-        async listNewestScanPerTask() {
-          return { [taskKey]: { urlKey: URL_KEY, issueId: TASK_DECISION_UUID, outcome: 'answered', scannedAt: new Date().toISOString() } };
-        }
-      },
-      shelvedRulingsStore: { async listForWorkspaces() { return fixture.shelvedRulings; } },
-    });
-
-    const result = await executeTool({ name: 'list_pending_decisions', arguments: {} });
-    assert.strictEqual(
-      result.decisions.some(d => d.decisionId === 'dec-task'), false,
-      'the task-bound row must be discharged — its task\'s true newest scan is answered'
-    );
-    // Control: the loop-backed row is untouched by this task-only fix.
-    assert.strictEqual(result.decisions.some(d => d.decisionId === 'dec-loop'), true);
-  });
-
-  // LIN-2991/LIN-3022 §4: loopId/since must report the CONTENT loop
-  // (stampLoopId), not the anchor — they diverge for any decision raised on
-  // a non-root turn, which a grouped/duplicate-carrier decision always is.
-  test('§4: a grouped decision reports the content loop, not the anchor, for loopId/since', async () => {
-    const history = [
-      sessionHistoryItem({
-        id: 'sess-grouped', kind: 'autopilot', issueIdentifier: 'LIN-810', target: 'cli',
-        dispatchedAt: T_FLEET_OLD, resolvedAt: null, status: 'taken',
-        feedback: [
-          { message: '[blocked] waiting on a ruling', timestamp: T_FLEET_OLD },
-          decisionEntry('dec-grouped', 'Proceed?', T_FLEET_OLD),
-        ],
-      }),
-      sessionHistoryItem({
-        id: 'child-grouped', sessionId: 'sess-grouped', issueIdentifier: 'LIN-810', target: 'cli',
-        rootItemId: 'sess-grouped', dispatchedAt: T_FLEET_FRESH, resolvedAt: null, status: 'taken',
-        feedback: [
-          { message: '[blocked] re-asked', timestamp: T_FLEET_FRESH },
-          decisionEntry('dec-grouped', 'Proceed?', T_FLEET_FRESH),
-        ],
-      }),
-    ];
-    const { executeTool } = makeDecisionsCatalog({ history, taskDecisions: [], shelvedRulings: [] });
-    const result = await executeTool({ name: 'list_pending_decisions', arguments: {} });
-    const row = result.decisions.find(d => d.decisionId === 'dec-grouped');
-    assert.ok(row, 'the grouped decision must appear exactly once, not once per carrier');
-    assert.strictEqual(row.loopId, 'child-grouped', 'loopId must be the CONTENT loop (stampLoopId), not the anchor (sess-grouped)');
-    assert.strictEqual(row.sessionId, 'sess-grouped', 'sessionId still resolves correctly off the content loop');
-    // LIN-3022 L3: `since` must come from the content loop too
-    // (`decisionSinceMs`, which also feeds flight-companion.js).
-    assert.strictEqual(row.since, T_FLEET_FRESH, 'since must be the CONTENT loop\'s activity, not the anchor\'s');
-  });
-});
 
 // LIN-2704: the pending-set exit is the acceptance criterion, not "a tap
 // posts" (§4 of the plan). Unlike the rest of this describe block, these
@@ -2722,95 +2505,6 @@ describe('pass-4 fleet read — list_pending_decisions (LIN-2617)', () => {
 // thing being proven is the real `markOutcome` path the projected ids feed —
 // a stub that only ever returns the seeded array can't demonstrate a row
 // actually leaving the pending set.
-describe('pass-4 fleet read — list_pending_decisions pending-set exit (LIN-2704)', () => {
-  function makeRealTaskDecisionsStore(fixtureTaskDecisions) {
-    const collection = createMockCollection();
-    for (const entry of fixtureTaskDecisions) {
-      collection._docs.push({
-        _id: entry.id, urlKey: entry.urlKey, issueId: entry.issueId,
-        issueIdentifier: entry.issueIdentifier, decision: entry.decision,
-        scannedAt: new Date(entry.scannedAt), outcome: entry.outcome ?? null, outcomeAt: null,
-      });
-    }
-    return new TaskDecisionsStore({ collection });
-  }
-
-  test('the projection carries the anchor\'s raw issueId and taskDecisionId, additive to issueIdentifier', async () => {
-    const fixture = decisionsFixture();
-    const { executeTool } = makeDecisionsCatalog(fixture);
-    const result = await executeTool({ name: 'list_pending_decisions', arguments: {} });
-    const taskRow = result.decisions.find(d => d.decisionId === 'dec-task');
-    assert.strictEqual(taskRow.issueId, TASK_DECISION_UUID);
-    assert.strictEqual(taskRow.taskDecisionId, 'td-1');
-    assert.strictEqual(taskRow.issueIdentifier, 'LIN-802', 'additive, never a replacement');
-  });
-
-  test('stamping a task-bound decision with the projected ids removes it from the next listing — the real markOutcome path', async () => {
-    const fixture = decisionsFixture();
-    const taskDecisionsStore = makeRealTaskDecisionsStore(fixture.taskDecisions);
-    const stores = makeMockSessionStores({ history: fixture.history });
-    const { executeTool } = createChatToolCatalog({
-      provider: makeFakeProvider(), scope: SCOPE, urlKey: URL_KEY,
-      dispatchQueueStore: stores.dispatchQueueStore, agentStatusStore: stores.agentStatusStore,
-      taskDecisionsStore,
-      shelvedRulingsStore: { async listForWorkspaces() { return fixture.shelvedRulings; } },
-    });
-
-    const before = await executeTool({ name: 'list_pending_decisions', arguments: {} });
-    const taskRow = before.decisions.find(d => d.decisionId === 'dec-task');
-    assert.ok(taskRow, 'the task-bound row is present before stamping');
-
-    // The real path a client tap drives (routes/workspace-api.js's
-    // stampDecisionAnswers -> taskDecisionsStore.markOutcome), fed EXACTLY the
-    // ids this tool's own projection produced — never re-derived.
-    const stamped = await taskDecisionsStore.markOutcome({
-      urlKey: URL_KEY, issueId: taskRow.issueId, id: taskRow.taskDecisionId, outcome: 'answered',
-    });
-    assert.ok(stamped, 'markOutcome must return the stamped record, not null — the mutation witness that the stamp actually happened');
-    assert.strictEqual(stamped.outcome, 'answered');
-
-    const after = await executeTool({ name: 'list_pending_decisions', arguments: {} });
-    assert.strictEqual(
-      after.decisions.some(d => d.decisionId === 'dec-task'), false,
-      'the row must be ABSENT from the next listing — a tap posting is not the criterion, leaving the pending set is'
-    );
-    // Only the stamped row exits; the loop-anchored row is untouched by this.
-    assert.strictEqual(after.decisions.some(d => d.decisionId === 'dec-loop'), true);
-  });
-
-  test('a non-UUID issueId cannot stamp — markOutcome no-ops and the row stays in the pending set', async () => {
-    // Same row shape the happy-path test above uses, but keyed under the
-    // historically non-UUID-shaped issueId this fixture used to carry before
-    // LIN-2704 (`uuid-802`) — pins that the canonical-UUID guard itself is
-    // still enforced, not merely unexercised now that the happy path uses a
-    // real UUID.
-    const fixture = decisionsFixture();
-    const nonUuidTaskDecisions = [{ ...fixture.taskDecisions[0], id: 'td-2', issueId: 'uuid-802' }];
-    const taskDecisionsStore = makeRealTaskDecisionsStore(nonUuidTaskDecisions);
-    const stores = makeMockSessionStores({ history: fixture.history });
-    const { executeTool } = createChatToolCatalog({
-      provider: makeFakeProvider(), scope: SCOPE, urlKey: URL_KEY,
-      dispatchQueueStore: stores.dispatchQueueStore, agentStatusStore: stores.agentStatusStore,
-      taskDecisionsStore,
-      shelvedRulingsStore: { async listForWorkspaces() { return []; } },
-    });
-
-    const before = await executeTool({ name: 'list_pending_decisions', arguments: {} });
-    const taskRow = before.decisions.find(d => d.decisionId === 'dec-task');
-    assert.strictEqual(taskRow.issueId, 'uuid-802');
-
-    const stamped = await taskDecisionsStore.markOutcome({
-      urlKey: URL_KEY, issueId: taskRow.issueId, id: taskRow.taskDecisionId, outcome: 'answered',
-    });
-    assert.strictEqual(stamped, null, 'the canonical-UUID guard refuses the write outright, never a silent partial stamp');
-
-    const after = await executeTool({ name: 'list_pending_decisions', arguments: {} });
-    assert.strictEqual(
-      after.decisions.some(d => d.decisionId === 'dec-task'), true,
-      'a no-op stamp must leave the row in the pending set, not silently drop it'
-    );
-  });
-});
 
 describe('pass-4 fleet reads — partial lists say so (LIN-2617)', () => {
   test('a capped list reports the full matching count AND flags itself truncated', async () => {
@@ -2825,118 +2519,11 @@ describe('pass-4 fleet reads — partial lists say so (LIN-2617)', () => {
     assert.strictEqual(whole.truncated, false);
   });
 
-  test('the decisions list flags truncation the same way', async () => {
-    const { executeTool } = makeDecisionsCatalog(decisionsFixture());
-    const capped = await executeTool({ name: 'list_pending_decisions', arguments: { limit: 1 } });
-    assert.strictEqual(capped.count, 2);
-    assert.strictEqual(capped.decisions.length, 1);
-    assert.strictEqual(capped.truncated, true);
-    // Oldest-first survives the cap: the longest-parked decision is the one
-    // that must not be truncated away.
-    assert.strictEqual(capped.decisions[0].decisionId, 'dec-loop');
-  });
 });
 
 describe('pass-4 fleet reads — review-ledger witnesses (LIN-2617)', () => {
-  test('a decision names the SESSION get_session can resolve, alongside the run that raised it', async () => {
-    // The child of an orchestrated session raises the decision. Its anchor
-    // carries the CHILD's loopId — reporting that as `sessionId` would hand the
-    // model an id `get_session` rejects, and would contradict what
-    // list_active_sessions calls the same work in the same turn.
-    const history = [
-      sessionHistoryItem({
-        id: 'orc', kind: 'autopilot', issueIdentifier: 'LIN-900', target: 'cli',
-        dispatchedAt: T_FLEET_OLD, resolvedAt: null, status: 'taken',
-        feedback: [{ message: '[working] orchestrating', timestamp: T_FLEET_OLD }],
-      }),
-      sessionHistoryItem({
-        id: 'orc-child', sessionId: 'orc', issueIdentifier: 'LIN-901', target: 'cli',
-        dispatchedAt: T_FLEET_MID, resolvedAt: null, status: 'taken',
-        feedback: [
-          { message: '[blocked] parked', timestamp: T_FLEET_MID },
-          decisionEntry('dec-child', 'Which option?', T_FLEET_MID),
-        ],
-      }),
-    ];
-    const { executeTool } = makeDecisionsCatalog({ history, taskDecisions: [], shelvedRulings: [] });
-    const row = (await executeTool({ name: 'list_pending_decisions', arguments: {} }))
-      .decisions.find(d => d.decisionId === 'dec-child');
 
-    assert.strictEqual(row.loopId, 'orc-child', 'the run that raised it');
-    assert.strictEqual(row.sessionId, 'orc', 'the session that run belongs to');
 
-    // The drill-down the tool description promises actually resolves...
-    const session = await executeTool({ name: 'get_session', arguments: { sessionId: row.sessionId } });
-    assert.strictEqual(session.sessionId, 'orc');
-    // ...and the loopId does NOT, which is exactly why the two are distinct.
-    await assert.rejects(
-      () => executeTool({ name: 'get_session', arguments: { sessionId: row.loopId } }),
-      /not found/
-    );
-
-    // The two tools name the same work the same way in one turn.
-    const fleet = await executeTool({ name: 'list_active_sessions', arguments: { lane: 'all' } });
-    assert.ok(fleet.sessions.some(r => r.sessionId === row.sessionId));
-  });
-
-  test('enrichLoop is genuinely applied — it changes a disposition this tool reports', async () => {
-    const fixture = decisionsFixture();
-    const stores = makeMockSessionStores({ history: fixture.history });
-    const build = (enrichLoop) => createChatToolCatalog({
-      provider: makeFakeProvider(), scope: SCOPE, urlKey: URL_KEY,
-      dispatchQueueStore: stores.dispatchQueueStore, agentStatusStore: stores.agentStatusStore,
-      taskDecisionsStore: { async listUnansweredForWorkspaces() { return []; }, async listNewestScanPerTask() { return {}; } },
-      shelvedRulingsStore: { async listForWorkspaces() { return []; } },
-      ...(enrichLoop ? { enrichLoop } : {}),
-    }).executeTool;
-
-    // `resolveDisposition` branches on agentState === 'running' → 'mid-turn'.
-    // The rulings feeds shape their loops through enrichLoop before collecting,
-    // so a catalog that ignored the injection would report a different
-    // disposition than the feed it claims parity with.
-    const shaped = await build(loop => ({ ...loop, agentState: 'running', terminalStatus: null, wakeMarker: null }))(
-      { name: 'list_pending_decisions', arguments: {} }
-    );
-    assert.ok(shaped.decisions.length > 0);
-    assert.ok(shaped.decisions.every(d => d.disposition === 'mid-turn'), 'the injected shaping must reach the predicate');
-
-    const unshaped = await build(null)({ name: 'list_pending_decisions', arguments: {} });
-    assert.ok(unshaped.decisions.some(d => d.disposition !== 'mid-turn'), 'and identity must differ from it');
-  });
-
-  test('a full-cap payload of either list fits inside its declared result budget', async () => {
-    // The budget comment claims twenty rows fit. `truncateToolResult`
-    // JSON-stringifies then hard-slices, so an over-budget result reaches the
-    // model as invalid JSON — and `truncated` reports only the row cap, so the
-    // overrun would be silent. Measure it rather than assert a number.
-    const long = 'x'.repeat(4000);
-    const history = [];
-    for (let i = 0; i < 25; i += 1) {
-      history.push(sessionHistoryItem({
-        id: `bulk-${i}`, kind: 'autopilot', issueIdentifier: `LIN-9${i}`, target: 'cli',
-        dispatchedAt: T_FLEET_MID, resolvedAt: null, status: 'taken',
-        feedback: [
-          { message: `[working] ${long}`, timestamp: T_FLEET_FRESH },
-          decisionEntry(`bulk-dec-${i}`, long, T_FLEET_MID, 8),
-        ],
-      }));
-    }
-    const { executeTool } = makeDecisionsCatalog({ history, taskDecisions: [], shelvedRulings: [] });
-
-    const fleet = await executeTool({ name: 'list_active_sessions', arguments: { lane: 'all' } });
-    assert.strictEqual(fleet.sessions.length, 20, 'the default cap');
-    assert.ok(
-      JSON.stringify(fleet).length <= CHAT_TOOL_RESULT_BUDGETS.list_active_sessions,
-      `20 session rows serialize to ${JSON.stringify(fleet).length}, over the declared budget`
-    );
-
-    const decisions = await executeTool({ name: 'list_pending_decisions', arguments: {} });
-    assert.strictEqual(decisions.decisions.length, 20);
-    assert.ok(
-      JSON.stringify(decisions).length <= CHAT_TOOL_RESULT_BUDGETS.list_pending_decisions,
-      `20 decision rows serialize to ${JSON.stringify(decisions).length}, over the declared budget`
-    );
-  });
 
   // LIN-2704 review ledger L1 (finding F1). The full-cap fixture ABOVE is 20
   // LOOP-anchored rows, where both fields LIN-2704 added are at their cheapest:
@@ -2951,58 +2538,6 @@ describe('pass-4 fleet reads — review-ledger witnesses (LIN-2617)', () => {
   // rows where the raise is actually spent. Sizing the cap on the loop shape
   // and asserting the margin in a prose comment is what F1 objected to, so the
   // task-bound figure is measured HERE, by the suite, instead.
-  test('a full-cap TASK-BOUND payload — the row class LIN-2704 enables — still fits the raised budget', async () => {
-    // Faithful id shapes, not stubs: TaskDecisionsStore's `_id` and the
-    // decision's own `decision_id` are the SAME 26-char value
-    // (`scan_<issueId8>_<inputHash12>` — lib/task-decisions-store.js:26, reused
-    // as decision_id at lib/scan.js:148), and `issueId` is a canonical UUID
-    // because `markOutcome` rejects anything else. Content is the worst case
-    // the field caps admit, matching the loop fixture above.
-    const long = 'x'.repeat(4000);
-    const taskDecisions = Array.from({ length: 25 }, (_, i) => {
-      // Distinct issueIds: collectUnansweredDecisions keeps only the latest row
-      // per (urlKey, issueId), so a shared id would collapse 25 rows into 1.
-      const issueId = `3fa85f64-5717-4562-b3fc-2c963f66af${String(i).padStart(2, '0')}`;
-      const rowId = `scan_${issueId.slice(0, 8)}_${String(i).padStart(2, '0')}c1170e5832`;
-      return {
-        id: rowId, urlKey: URL_KEY, issueId, issueIdentifier: `LIN-27${i}`,
-        scannedAt: T_FLEET_MID, outcome: null,
-        decision: {
-          decision_id: rowId, question: long, recommended: 'o1',
-          options: Array.from({ length: 8 }, (_, j) => ({ id: `o${j}`, label: 'y'.repeat(400) })),
-        },
-      };
-    });
-    const { executeTool } = makeDecisionsCatalog({ history: [], taskDecisions, shelvedRulings: [] });
-
-    const result = await executeTool({ name: 'list_pending_decisions', arguments: {} });
-    const size = JSON.stringify(result).length;
-    const budget = CHAT_TOOL_RESULT_BUDGETS.list_pending_decisions;
-
-    // Structural, as everywhere else in this file: whatever the rows contain,
-    // what reaches the model is valid JSON inside the budget.
-    assert.ok(size <= budget, `task-bound rows serialize to ${size}, over the ${budget} budget`);
-    assert.doesNotThrow(() => JSON.parse(JSON.stringify(result)));
-
-    // THE ledger assertion. Measured at this commit: 19993 bytes against the
-    // 20000 cap — 7 bytes of headroom, i.e. the raise is spent almost exactly
-    // by the task-bound class and NOT the ~6.5% margin a loop-shaped
-    // measurement suggests. If any future field widens a decision row, this
-    // fails rather than silently withholding a pending decision from the one
-    // page whose whole job is "what needs me?" — fitToBudget pops from the
-    // TAIL and the sort is oldest-first, so the row lost is the newest-parked.
-    // A failure here is not "bump the number": it is a prompt to re-derive the
-    // cap from this class and re-record it, the way LIN-2704 had to.
-    assert.strictEqual(
-      result.decisions.length, 20,
-      `all 20 task-bound rows must survive the byte trim; serialized to ${size} against ${budget} `
-      + `(headroom ${budget - size}B). A dropped row means the raised cap no longer covers the row class LIN-2704 enabled.`
-    );
-    // `truncated` is honest here about the ROW CAP (25 pending, 20 returned),
-    // which is the pre-existing limit — not about a byte trim.
-    assert.strictEqual(result.truncated, true);
-    assert.strictEqual(result.count, 25);
-  });
 
   test('noise.terminalOmitted counts what THIS read withheld, never the fleet', async () => {
     const { executeTool } = makeFleetCatalog(fleetHistory());
@@ -3029,98 +2564,9 @@ describe('pass-4 fleet reads — review-ledger witnesses (LIN-2617)', () => {
   });
 });
 
-describe('pass-4 — the decision row resolves the session get_session actually keys by (LIN-2617)', () => {
-  test('a follow-up loop resolves to its CHAIN ROOT session, not its own id or its group key', async () => {
-    // `_buildSessions` pass 2.5 stitches a follow-up into the session of the
-    // loop at the root of its followUpTo chain. A precedence that read
-    // `sessionGroupId` first would answer 'hop' here — which is itself only an
-    // intermediate follow-up (LIN-1393), not a session key.
-    const history = [
-      sessionHistoryItem({
-        id: 'root', issueIdentifier: 'LIN-910', target: 'cli',
-        dispatchedAt: T_FLEET_OLD, resolvedAt: null, status: 'taken',
-        feedback: [{ message: '[working] started', timestamp: T_FLEET_OLD }],
-      }),
-      sessionHistoryItem({
-        id: 'hop', issueIdentifier: 'LIN-910', target: 'cli', followUpTo: 'root',
-        dispatchedAt: T_FLEET_MID, resolvedAt: null, status: 'taken',
-        feedback: [{ message: '[working] continued', timestamp: T_FLEET_MID }],
-      }),
-      sessionHistoryItem({
-        id: 'leaf', issueIdentifier: 'LIN-910', target: 'cli',
-        followUpTo: 'hop', sessionGroupId: 'hop',
-        dispatchedAt: T_FLEET_FRESH, resolvedAt: null, status: 'taken',
-        feedback: [
-          { message: '[blocked] parked', timestamp: T_FLEET_FRESH },
-          decisionEntry('dec-leaf', 'Which way?', T_FLEET_FRESH),
-        ],
-      }),
-    ];
-    const { executeTool } = makeDecisionsCatalog({ history, taskDecisions: [], shelvedRulings: [] });
-    const row = (await executeTool({ name: 'list_pending_decisions', arguments: {} }))
-      .decisions.find(d => d.decisionId === 'dec-leaf');
+describe('pass-4 — the session read keeps its own budget (LIN-2617)', () => {
 
-    assert.strictEqual(row.loopId, 'leaf');
-    assert.strictEqual(row.sessionId, 'root', 'the chain root, not the loop and not the group key');
 
-    // The id it reports is one get_session can actually resolve — which is the
-    // whole point of reporting it separately from the loopId.
-    const session = await executeTool({ name: 'get_session', arguments: { sessionId: row.sessionId } });
-    assert.strictEqual(session.sessionId, 'root');
-  });
-
-  test('a follow-up whose predecessor aged out reports the session the reconstruction actually gives it', async () => {
-    // Nothing in this read can walk the chain — the predecessor is outside the
-    // 30-day window — so `_buildSessions` falls through to its standalone pass
-    // and keys the loop by its own id. Reading the index off the reconstruction
-    // gets that right for free; the field-inference draft this replaced had to
-    // guess, and guessed the same answer for the WRONG reason.
-    const history = [
-      sessionHistoryItem({
-        id: 'orphan', issueIdentifier: 'LIN-911', target: 'cli', followUpTo: 'aged-out-of-window',
-        dispatchedAt: T_FLEET_MID, resolvedAt: null, status: 'taken',
-        feedback: [
-          { message: '[blocked] parked', timestamp: T_FLEET_MID },
-          decisionEntry('dec-orphan', 'Still?', T_FLEET_MID),
-        ],
-      }),
-    ];
-    const { executeTool } = makeDecisionsCatalog({ history, taskDecisions: [], shelvedRulings: [] });
-    const row = (await executeTool({ name: 'list_pending_decisions', arguments: {} }))
-      .decisions.find(d => d.decisionId === 'dec-orphan');
-
-    assert.strictEqual(row.loopId, 'orphan');
-    // The claim that matters is not which id it is, but that it RESOLVES.
-    const session = await executeTool({ name: 'get_session', arguments: { sessionId: row.sessionId } });
-    assert.strictEqual(session.sessionId, row.sessionId);
-  });
-
-  test("a decision on a loop the reconstruction never groups reports sessionId null, not an id that throws", async () => {
-    // `_buildSessions` claims no unclaimed `dash`/`local` loop
-    // (lib/pipeline-loops.js:1234), so this decision has no session at all. The
-    // rulings feed still shows it, so this tool must too — with an honest null
-    // rather than the loop's own id, which get_session would reject.
-    const history = [
-      sessionHistoryItem({
-        id: 'dash-run', issueIdentifier: 'LIN-912', target: 'dash',
-        dispatchedAt: T_FLEET_MID, resolvedAt: null, status: 'taken',
-        feedback: [
-          { message: '[blocked] parked', timestamp: T_FLEET_MID },
-          decisionEntry('dec-dash', 'Which?', T_FLEET_MID),
-        ],
-      }),
-    ];
-    const { executeTool } = makeDecisionsCatalog({ history, taskDecisions: [], shelvedRulings: [] });
-    const row = (await executeTool({ name: 'list_pending_decisions', arguments: {} }))
-      .decisions.find(d => d.decisionId === 'dec-dash');
-
-    assert.ok(row, 'the decision must still be reported — this is the parity case');
-    assert.strictEqual(row.loopId, 'dash-run');
-    assert.strictEqual(row.sessionId, null);
-    await assert.rejects(
-      () => executeTool({ name: 'get_session', arguments: { sessionId: 'dash-run' } }), /not found/
-    );
-  });
 
   test('the session read also fits its budget at a full cap of worst-case rows', async () => {
     // The decisions side was measured; this is the other half. `tasksTouched`
@@ -3154,45 +2600,8 @@ describe('pass-4 — the decision row resolves the session get_session actually 
 });
 
 describe('pass-4 — bounds that must hold on real data, not just fixtures (LIN-2617)', () => {
-  test("a child absorbed by _buildSessions' INFERENCE fallback still reports a resolvable session", async () => {
-    // The case that defeated a field-inference map: this child carries no
-    // sessionId, no sessionGroupId and no followUpTo. Pass 1 absorbs it into
-    // the orchestrator's session by issue + time window alone, and none of
-    // those inputs exist on the loop — so only reading the reconstruction's own
-    // output gets it right.
-    const history = [
-      sessionHistoryItem({
-        id: 'orc-1', kind: 'autopilot', issueIdentifier: 'LIN-920', target: 'cli',
-        dispatchedAt: T_FLEET_OLD, resolvedAt: null, status: 'taken',
-        feedback: [{ message: '[working] orchestrating', timestamp: T_FLEET_OLD }],
-      }),
-      sessionHistoryItem({
-        id: 'inferred-child', issueIdentifier: 'LIN-920', target: 'cli',
-        dispatchedAt: T_FLEET_MID, resolvedAt: null, status: 'taken',
-        feedback: [
-          { message: '[blocked] parked', timestamp: T_FLEET_MID },
-          decisionEntry('dec-inferred', 'Which option?', T_FLEET_MID),
-        ],
-      }),
-    ];
-    const { executeTool, stores } = makeDecisionsCatalog({ history, taskDecisions: [], shelvedRulings: [] });
 
-    // Ground the premise: the reconstruction really does absorb it.
-    const sessions = await getSessionsForWorkspace(URL_KEY, {
-      dispatchStore: stores.dispatchQueueStore, agentStatusStore: stores.agentStatusStore,
-    });
-    const owner = sessions.find(s => (s.loops || []).some(l => l.loopId === 'inferred-child'));
-    assert.strictEqual(owner.sessionId, 'orc-1', 'fixture must exercise the inference fallback');
-
-    const row = (await executeTool({ name: 'list_pending_decisions', arguments: {} }))
-      .decisions.find(d => d.decisionId === 'dec-inferred');
-    assert.strictEqual(row.loopId, 'inferred-child');
-    assert.strictEqual(row.sessionId, 'orc-1', 'not the child loop id, which get_session rejects');
-    const session = await executeTool({ name: 'get_session', arguments: { sessionId: row.sessionId } });
-    assert.strictEqual(session.sessionId, 'orc-1');
-  });
-
-  test('neither list can exceed its result budget at the largest limit its schema advertises', async () => {
+  test('list_active_sessions cannot exceed its result budget at the largest limit its schema advertises', async () => {
     // The schema advertises `maximum: 50`. `truncateToolResult` hard-slices an
     // over-budget payload, so the model would receive invalid JSON — and
     // `truncated` would still be reporting only the row-count cap. The fit is
@@ -3204,11 +2613,10 @@ describe('pass-4 — bounds that must hold on real data, not just fixtures (LIN-
         dispatchedAt: T_FLEET_MID, resolvedAt: null, status: 'taken',
         feedback: [
           { message: `[working] ${'q'.repeat(5000)}`, timestamp: T_FLEET_FRESH },
-          decisionEntry(`big-dec-${i}`, 'w'.repeat(5000), T_FLEET_MID, 9),
         ],
       }));
     }
-    const { executeTool } = makeDecisionsCatalog({ history, taskDecisions: [], shelvedRulings: [] });
+    const { executeTool } = makeFleetCatalog(history);
 
     const fleet = await executeTool({ name: 'list_active_sessions', arguments: { lane: 'all', limit: 50 } });
     const fleetSize = JSON.stringify(fleet).length;
@@ -3216,46 +2624,9 @@ describe('pass-4 — bounds that must hold on real data, not just fixtures (LIN-
     assert.strictEqual(fleet.truncated, true, 'and it says so');
     assert.doesNotThrow(() => JSON.parse(JSON.stringify(fleet)), 'what the model receives is valid JSON');
 
-    const decisions = await executeTool({ name: 'list_pending_decisions', arguments: { limit: 20 } });
-    const decSize = JSON.stringify(decisions).length;
-    assert.ok(decSize <= CHAT_TOOL_RESULT_BUDGETS.list_pending_decisions, `decisions serialized to ${decSize}`);
-    assert.strictEqual(decisions.truncated, true);
   });
 
-  test('a malformed task decision degrades instead of taking out the whole call', async () => {
-    // Task decisions are stored raw — `taskDecisionsStore` documents
-    // parseDecision's shape in a comment but does not enforce it, so a
-    // non-array `options` and a non-string `question` are both reachable.
-    const taskDecisions = [{
-      id: 'td-bad', urlKey: URL_KEY, issueId: 'uuid-930', issueIdentifier: 'LIN-930',
-      scannedAt: T_FLEET_FRESH, outcome: null,
-      decision: { decision_id: 'dec-bad', question: { not: 'a string' }, options: 'not an array' },
-    }];
-    const { executeTool } = makeDecisionsCatalog({ history: [], taskDecisions, shelvedRulings: [] });
 
-    const result = await executeTool({ name: 'list_pending_decisions', arguments: {} });
-    const row = result.decisions.find(d => d.decisionId === 'dec-bad');
-    assert.ok(row, 'the row still rides — the rulings feed shows it too');
-    assert.deepStrictEqual(row.options, []);
-    assert.strictEqual(row.optionsTotal, 0);
-    assert.strictEqual(row.question, null, 'an unrenderable question is null, never 3000 uncapped chars');
-  });
-
-  test('the option cap reports what it withheld', async () => {
-    const history = [sessionHistoryItem({
-      id: 'many-opts', kind: 'autopilot', issueIdentifier: 'LIN-931', target: 'cli',
-      dispatchedAt: T_FLEET_MID, resolvedAt: null, status: 'taken',
-      feedback: [
-        { message: '[blocked] parked', timestamp: T_FLEET_MID },
-        decisionEntry('dec-many', 'Pick one', T_FLEET_MID, 9),
-      ],
-    })];
-    const { executeTool } = makeDecisionsCatalog({ history, taskDecisions: [], shelvedRulings: [] });
-    const row = (await executeTool({ name: 'list_pending_decisions', arguments: {} }))
-      .decisions.find(d => d.decisionId === 'dec-many');
-    assert.strictEqual(row.options.length, 4, 'capped');
-    assert.strictEqual(row.optionsTotal, 9, 'and the true count still rides, computed before the slice');
-  });
 
   test('a live wake INSIDE a real session is the tail and decides the lane (LIN-3368)', async () => {
     const history = [
@@ -3288,168 +2659,8 @@ describe('pass-4 — bounds that must hold on real data, not just fixtures (LIN-
     assert.strictEqual(blocked.noise.omittedByFilter, 3);
   });
 
-  test('both lists are actually ordered, not merely non-reversed', async () => {
-    // Built so the reconstruction's own order (most-recent DISPATCH first) and
-    // this tool's order (most-recent ACTIVITY first) genuinely disagree: 'quiet'
-    // was dispatched more recently but has not moved since, while 'busy' was
-    // dispatched earlier and beat ten minutes ago. A comparator returning 0
-    // leaves the reconstruction's order and fails here — a flip test alone
-    // would not catch that.
-    const { executeTool } = makeFleetCatalog([
-      sessionHistoryItem({
-        id: 'quiet', kind: 'autopilot', issueIdentifier: 'LIN-960', target: 'cli',
-        dispatchedAt: T_FLEET_MID, resolvedAt: null, status: 'taken', feedback: [],
-      }),
-      sessionHistoryItem({
-        id: 'busy', kind: 'autopilot', issueIdentifier: 'LIN-961', target: 'cli',
-        dispatchedAt: T_FLEET_OLD, resolvedAt: null, status: 'taken',
-        feedback: [{ message: '[working] 9 tools/30s · alive', timestamp: T_FLEET_FRESH }],
-      }),
-    ]);
-    const fleet = await executeTool({ name: 'list_active_sessions', arguments: { lane: 'all' } });
-    assert.deepStrictEqual(fleet.sessions.map(r => r.sessionId), ['busy', 'quiet']);
-    const stamps = fleet.sessions.map(r => r.lastActivityAt);
-    assert.deepStrictEqual(stamps, [...stamps].sort().reverse());
-    assert.ok(new Set(stamps).size > 1, 'the fixture must have something to order');
-
-    const { executeTool: dec } = makeDecisionsCatalog({
-      history: [
-        sessionHistoryItem({
-          id: 'newer', kind: 'autopilot', issueIdentifier: 'LIN-951', target: 'cli',
-          dispatchedAt: T_FLEET_FRESH, resolvedAt: null, status: 'taken',
-          feedback: [{ message: '[blocked] b', timestamp: T_FLEET_FRESH }, decisionEntry('d-new', 'new?', T_FLEET_FRESH)],
-        }),
-        sessionHistoryItem({
-          id: 'older', kind: 'autopilot', issueIdentifier: 'LIN-950', target: 'cli',
-          dispatchedAt: T_FLEET_OLD, resolvedAt: null, status: 'taken',
-          feedback: [{ message: '[blocked] a', timestamp: T_FLEET_OLD }, decisionEntry('d-old', 'old?', T_FLEET_OLD)],
-        }),
-      ],
-      taskDecisions: [], shelvedRulings: [],
-    });
-    // Reconstruction order is most-recent-session-first, so oldest-first is a
-    // real re-ordering the comparator has to perform.
-    const ids = (await dec({ name: 'list_pending_decisions', arguments: {} })).decisions.map(d => d.decisionId);
-    assert.deepStrictEqual(ids, ['d-old', 'd-new']);
-  });
 });
 
-describe('pass-4 — review-ledger discharge (LIN-2617)', () => {
-  test('no single row can escape the byte bound, however long its identifier fields are', async () => {
-    // The one path that could outgrow the whole budget in ONE row: the id
-    // fields are agent-authored free text and nothing upstream bounds their
-    // length. A payload that still exceeded the budget would reach the model
-    // hard-sliced into invalid JSON.
-    const huge = 'k'.repeat(30000);
-    const taskDecisions = [{
-      id: 'td-huge', urlKey: URL_KEY, issueId: 'uuid-970', issueIdentifier: huge,
-      scannedAt: T_FLEET_FRESH, outcome: null,
-      decision: {
-        decision_id: huge, question: 'short', recommended: huge,
-        options: [{ id: huge, label: huge }],
-      },
-    }];
-    const { executeTool } = makeDecisionsCatalog({ history: [], taskDecisions, shelvedRulings: [] });
-    const result = await executeTool({ name: 'list_pending_decisions', arguments: {} });
-
-    const size = JSON.stringify(result).length;
-    assert.ok(size <= CHAT_TOOL_RESULT_BUDGETS.list_pending_decisions, `serialized to ${size}`);
-    assert.doesNotThrow(() => JSON.parse(JSON.stringify(result)));
-    // The row survives, capped — reaching zero rows is the last resort, not the
-    // first response to a long identifier.
-    assert.strictEqual(result.decisions.length, 1);
-    assert.strictEqual(result.count, 1);
-    const row = result.decisions[0];
-    for (const [field, value] of Object.entries({
-      decisionId: row.decisionId, issueIdentifier: row.issueIdentifier, recommended: row.recommended,
-      optionId: row.options[0].id, optionLabel: row.options[0].label,
-    })) {
-      assert.ok(value.length <= 501, `${field} must be capped, got ${value.length}`);
-    }
-  });
-
-  test('fitToBudget reports the truncation it performs, even under the row cap', async () => {
-    // Under the row cap (5 < 20) but over the byte budget, so ONLY the byte
-    // trim can set the flag — the row-count cap cannot mask a missing one here.
-    // Fifteen rows, each at its per-field caps — under the 20-row cap, over the
-    // 18000-byte budget.
-    const taskDecisions = [];
-    for (let i = 0; i < 15; i += 1) {
-      taskDecisions.push({
-        id: `td-fat-${i}`, urlKey: URL_KEY, issueId: `uuid-97${i}`, issueIdentifier: 'L'.repeat(400),
-        scannedAt: new Date(Date.now() - (100 - i) * 60000).toISOString(), outcome: null,
-        decision: {
-          decision_id: `fat-dec-${i}${'z'.repeat(400)}`,
-          question: 'p'.repeat(2000),
-          options: Array.from({ length: 4 }, (_, j) => ({ id: `${j}${'q'.repeat(400)}`, label: 'r'.repeat(400) })),
-        },
-      });
-    }
-    const { executeTool } = makeDecisionsCatalog({ history: [], taskDecisions, shelvedRulings: [] });
-
-    const decisions = await executeTool({ name: 'list_pending_decisions', arguments: {} });
-    assert.ok(decisions.count <= 20, 'the row cap is NOT what trimmed this');
-    assert.ok(decisions.decisions.length < decisions.count, 'rows were dropped by the byte trim');
-    assert.strictEqual(decisions.truncated, true, 'and the payload says so');
-  });
-
-  test('a decision whose parked-since cannot be resolved sorts last, never first', async () => {
-    // An unresolvable `since` must not masquerade as the longest wait and
-    // displace a genuinely old decision from the top of the list.
-    const history = [sessionHistoryItem({
-      id: 'aged', kind: 'autopilot', issueIdentifier: 'LIN-980', target: 'cli',
-      dispatchedAt: T_FLEET_OLD, resolvedAt: null, status: 'taken',
-      feedback: [
-        { message: '[blocked] parked', timestamp: T_FLEET_OLD },
-        decisionEntry('dec-aged', 'Oldest?', T_FLEET_OLD),
-      ],
-    })];
-    const taskDecisions = [{
-      id: 'td-nostamp', urlKey: URL_KEY, issueId: 'uuid-981', issueIdentifier: 'LIN-981',
-      scannedAt: 'not a date', outcome: null,
-      decision: { decision_id: 'dec-nostamp', question: 'When?', options: [] },
-    }];
-    const { executeTool } = makeDecisionsCatalog({ history, taskDecisions, shelvedRulings: [] });
-    const result = await executeTool({ name: 'list_pending_decisions', arguments: {} });
-
-    assert.deepStrictEqual(result.decisions.map(d => d.decisionId), ['dec-aged', 'dec-nostamp']);
-    assert.strictEqual(result.decisions[1].since, null);
-  });
-
-  test('the session index read is lean — it exists only to map short ids', async () => {
-    const fixture = decisionsFixture();
-    const leanFlags = [];
-    const base = makeMockSessionStores({ history: fixture.history });
-    const { executeTool } = createChatToolCatalog({
-      provider: makeFakeProvider(), scope: SCOPE, urlKey: URL_KEY,
-      dispatchQueueStore: {
-        ...base.dispatchQueueStore,
-        async listHistory(urlKey, options) {
-          // LIN-3812: lean is the store's DEFAULT read (it drops `prompt` and `feedback` at the
-          // query, so a real DB never transfers 30 days of prompt text — the LIN-623 read the
-          // LIN-608 OOM is blamed on). A lean build asks for it by passing NO projection and
-          // calling the plain `listHistory`; the whole-document read is `listHistoryWithBodies`.
-          leanFlags.push(options?.projection === undefined);
-          return base.dispatchQueueStore.listHistory(urlKey, options);
-        },
-        async listHistoryWithBodies(urlKey, options) {
-          leanFlags.push('bodies');
-          return base.dispatchQueueStore.listHistory(urlKey, options);
-        },
-      },
-      agentStatusStore: base.agentStatusStore,
-      taskDecisionsStore: {
-        async listUnansweredForWorkspaces() { return fixture.taskDecisions; },
-        async listNewestScanPerTask() { return {}; }
-      },
-      shelvedRulingsStore: { async listForWorkspaces() { return fixture.shelvedRulings; } },
-    });
-    await executeTool({ name: 'list_pending_decisions', arguments: {} });
-    assert.strictEqual(leanFlags.length, 2, 'the loop read for the predicate, and the session read for the index');
-    // BOTH reads are the lean default — the index read has no use for the prompt at all.
-    assert.deepStrictEqual(leanFlags, [true, true], 'neither read drags prompt text along');
-  });
-});
 
 // ─── LIN-2967: scope per tier ────────────────────────────────────────────────
 

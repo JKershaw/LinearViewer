@@ -244,7 +244,7 @@ describe('window.ChatUI.appendOptions — effect captions (LIN-2775 Area 5)', ()
 
 // LIN-2757 Step 1 — opt-in `opts.recommendedLabel` marker text on the
 // recommended option. Flight Companion's `.fc-decision` cards (public/
-// flight-companion.js's renderOneDecision) call appendOptions with no
+// the retired Flight Companion decision card) called appendOptions with no
 // `recommendedLabel` key at all, so the "absent by default" case below is
 // that call site's own guarantee expressed as an assertion, not a
 // hypothetical.

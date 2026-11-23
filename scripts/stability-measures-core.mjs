@@ -239,7 +239,7 @@ const inWindow = (at, baseDate, headDate) => at != null && new Date(at) > new Da
  *
  * `window` and `prior` are landingOwners() of the window's landings and of the landings read before base.
  * `issues` maps id → { state: { type }, completedAt, parent? } or { reason } (an issue read that failed). A finished
- * task carries its parent's id (or null), so the seat row can name rulings anchored on a parent (LIN-4422).
+ * task carries its parent's id (or null), so the seat row can name questions anchored on a parent (LIN-4422).
  * Window tickets not finished here are counted by why, never dropped. A prior-only ticket not finished here belongs
  * to another window and is not reported. Any failed read is unreadable: it might have been finished here.
  */
@@ -473,8 +473,8 @@ const summarise = (r) => {
   const v = r.value;
   switch (r.key) {
     case 'blind': return `${v.read} of ${v.landings} landings read blind before merge (better ${v.verdicts.better}, same ${v.verdicts.same}, worse ${v.verdicts.worse}); unread: ${Object.entries(v.unread).map(([why, n]) => `${why} ${n}`).join(', ')}`;
-    case 'rulings': return `${v.label}: ${v.raised} raised over ${v.finished} finished tasks, ${v.perFinishedTask} per task (distinct decisions); answered ${v.answeredShare == null ? '—' : `${v.answeredShare}%`} of answered + dismissed (answered ${v.outcomes.answered}, dismissed ${v.outcomes.dismissed}, withdrawn ${v.outcomes.withdrawn}, open ${v.outcomes.open}); not read: ${v.notRead.join('; ')}`;
-    case 'operator-free': return `${v.label}: ${v.share}% (${v.operatorFree} of ${v.read} tasks) with ${v.conditions.join(', ')}; failing: ruling ${v.failing.ruling}, blocked ${v.failing.blocked}, operator-closed ${v.failing.operatorClosed}; missing condition: ${v.missingCondition}; closedReason 'operator' is a catch-all and may push the share down`;
+    case 'rulings': return `${v.label}: ${v.raised} raised over ${v.finished} finished tasks, ${v.perFinishedTask} per task (question records); answered ${v.answeredShare == null ? '—' : `${v.answeredShare}%`} of answered + dismissed (answered ${v.outcomes.answered}, dismissed ${v.outcomes.dismissed}, withdrawn ${v.outcomes.withdrawn}, open ${v.outcomes.open}); not read: ${v.notRead.join('; ')}`;
+    case 'operator-free': return `${v.label}: ${v.share}% (${v.operatorFree} of ${v.read} tasks) with ${v.conditions.join(', ')}; failing: question ${v.failing.ruling}, blocked ${v.failing.blocked}, operator-closed ${v.failing.operatorClosed}; missing condition: ${v.missingCondition}; closedReason 'operator' is a catch-all and may push the share down`;
     case 'lines': return `net ${signed(v.net.total)} (code ${signed(v.net.code)}, comment-only ${signed(v.net.comment)}, blank ${signed(v.net.blank)}); ${signed(v.perLanding.total)} per landing; totals ${num(v.base.total)} → ${num(v.head.total)}; comment-only share ${v.base.commentShare}% → ${v.head.commentShare}%`;
     case 'churn': return `${num(v.added)} added, ${num(v.deleted)} deleted over ${v.landings} landings; ${v.perLanding.added} added and ${v.perLanding.deleted} deleted per landing; ${v.deletedPerAdded} deleted per added`;
     case 'ci': return `median ${v.medianMinutes} min over ${v.runs} runs (${v.landingsWithRun} of ${v.landings} landings)`;

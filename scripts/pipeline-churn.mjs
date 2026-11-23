@@ -14,7 +14,8 @@
  *   2. `GET /dispatch/{rowId}` per row                         feedback, sessionId, followUpTo
  *   3. `GET /dispatch/{rowId}/prompt` per `custom` row whose feedback names no task
  *      (an aborted row never posts `[started]`)                its first line
- *   4. `GET /rulings?issueIdentifier={id}&includeResolved=true` raise/answer times
+ *   4. `GET /records?kind=question&in={task}` and `GET /records/{id}@1` per question: what was asked, by which run, when
+ *      it was asked and when it ended (LIN-4538: the question records replace the retired rulings read)
  *   5. the verdict records, once for every ticket (scripts/verdict-facts-proxy.mjs):
  *      `GET /records?kind=task|verdict|change` and `GET /records/{id}` per verdict whose
  *      current version is not its first. A review or plan-review cause reads the verdict
@@ -44,6 +45,8 @@ import { mkdirSync, readFileSync, writeFileSync, existsSync } from 'node:fs';
 import { join } from 'node:path';
 import { tmpdir } from 'node:os';
 import { classifyTicket, summarizeChurn, taskHead } from '../lib/pipeline-churn.js';
+import { ticketTaskIdOf } from '../lib/records/refs.js';
+import { questionOutcomeOf } from '../lib/records/question-facts.js';
 import { readVerdictFactsThroughProxy } from './verdict-facts-proxy.mjs';
 
 function parseArgs(argv) {
@@ -100,8 +103,30 @@ async function readTicket(get, identifier) {
     }
     rows.push(row);
   }
-  const r = await get(`/rulings?issueIdentifier=${encodeURIComponent(identifier)}&includeResolved=true`);
-  return { identifier, rows, rulings: r.rulings || [] };
+  return { identifier, rows, questions: await readQuestions(get, identifier) };
+}
+
+/**
+ * The ticket's question records (LIN-4538), in the shape lib/pipeline-churn.js reads: the current version gives the state, the
+ * end and the outcome; the first version gives what was asked, the asking run and when. The first version never changes, so it is cached.
+ */
+async function readQuestions(get, identifier) {
+  const list = await get(`/records?kind=question&in=${encodeURIComponent(ticketTaskIdOf(identifier))}`);
+  const questions = [];
+  for (const r of list.records || []) {
+    const first = await get(`/records/${r.id}@1`, { cacheKey: `record-${r.id}@1`, keep: () => true });
+    const open = r.state === 'open';
+    questions.push({
+      id: r.id,
+      asks: first.fields?.asks ?? '',
+      options: Array.isArray(first.fields?.options) ? first.fields.options : [],
+      runId: first.run ?? null,
+      raisedAt: first.at ?? null,
+      resolvedAt: open ? null : (r.at ?? null),
+      outcome: open ? null : (questionOutcomeOf({ state: r.state, reason: r.ended?.reason ?? null, by: r.by ?? null }) ?? r.state),
+    });
+  }
+  return questions;
 }
 
 const fmt = (msVal) => {

@@ -529,27 +529,31 @@ function parseProposalResult(resultString) {
   }
 }
 
-// LIN-2621 beat 4: `list_pending_decisions`' tool result (lib/chat-tools.js's
-// `projectPendingDecision` shape: `{count, truncated, decisions: [{decisionId,
-// question, options: [{id,label}], recommended, disposition, canReply,
-// loopId, issueIdentifier, ...}]}`), parsed with the SAME defensive posture
-// as parseProposalResult above — a truncated/malformed payload fails
-// JSON.parse or the shape check honestly, never throws uncaught. A row
-// missing `decisionId` or a non-array `options` is dropped rather than
-// rendered half-built; `appendOptions` (public/chat.js) already drops any
-// individual malformed OPTION the same way, one level down.
-function parseDecisionsResult(resultString) {
+// LIN-2621 beat 4, LIN-4538: `list_pending_decisions`' tool result (lib/chat-tools.js's `projectPendingQuestion` rows:
+// `{count, truncated, questions: [{questionId, question, options: [label], recommended, issueIdentifier, interactive}]}`),
+// parsed with the SAME defensive posture as parseProposalResult below — a truncated or malformed payload fails JSON.parse or
+// the shape check honestly, never throws uncaught. A row missing `questionId` or a non-array `options` is dropped rather than
+// rendered half-built; the question card drops any malformed option the same way.
+function parsePendingResult(resultString) {
   try {
     var parsed = JSON.parse(resultString);
-    if (!parsed || typeof parsed !== 'object' || !Array.isArray(parsed.decisions)) return { ok: false };
-    var decisions = parsed.decisions.filter(function (d) {
-      return d && typeof d.decisionId === 'string' && d.decisionId && Array.isArray(d.options);
-    });
-    // LIN-4532 (P2b): the open question records, each answered through the one question route (public/question-records.js).
-    var questions = Array.isArray(parsed.questions) ? parsed.questions.filter(function (q) {
+    if (!parsed || typeof parsed !== 'object' || !Array.isArray(parsed.questions)) return { ok: false };
+    var questions = parsed.questions.filter(function (q) {
       return q && typeof q.questionId === 'string' && q.questionId && Array.isArray(q.options);
-    }) : [];
-    return { ok: true, decisions: decisions, questions: questions };
+    }).map(function (q) {
+      // The chat row names the question `question` (the model's word); the shared card reads the record's own `asks`
+      // (lib/question-record-card.js). Mapped here so the card shows the question text, not an empty line.
+      return {
+        questionId: q.questionId,
+        asks: typeof q.question === 'string' ? q.question : '',
+        options: q.options,
+        recommended: typeof q.recommended === 'string' ? q.recommended : null,
+        ifUnanswered: null,
+        state: typeof q.state === 'string' ? q.state : null,
+        interactive: q.interactive === true,
+      };
+    });
+    return { ok: true, questions: questions };
   } catch (e) {
     return { ok: false };
   }
@@ -1135,28 +1139,17 @@ function renderProposal(resultString, beforeLi, opts) {
   }
 }
 
-// LIN-2621 beat 4: a waiting-on-you decision, rendered as the SAME option-
-// button row the rulings tab uses (public/chat.js's window.ChatUI.
-// appendOptions — composed here, never forked: no new CSS rule, no copied
-// button markup). `renderDecisions` handles the tool result's `decisions`
-// array; `renderOneDecision` builds one row.
-//
-// A tap answers through `window.ReplyDelivery.postComment` ONLY — never
-// `deliverReply` (which also resumes/dispatches a run for a `resumable`/
-// `gone` disposition on the rulings tab). That is a deliberately NARROWER
-// write surface than rulings has: a human click posting a comment through
-// the existing session-auth reply path is exactly the write posture
-// Flight Companion already has (LIN-2434's approve card), so no new one is
-// introduced; starting/resuming a run from here would be, so it never
-// happens from this control regardless of disposition.
+// LIN-2621 beat 4, LIN-4538: the open questions the person was asked, rendered as the shared question card
+// (public/question-records.js) and answered through the one question route. The old decision rows left this tool with
+// LIN-4538, so a ruling that is still open is answered on the Rulings page (until the cutover), not in the companion.
 function renderDecisions(resultString, beforeLi) {
-  var parsed = parseDecisionsResult(resultString);
+  var parsed = parsePendingResult(resultString);
   if (!parsed.ok) {
     showInlineNote('The companion checked pending decisions, but the details were too long to show in full.', beforeLi);
     return;
   }
   // Nothing pending: the model's own prose says so — no dead UI to add.
-  if (!parsed.decisions.length && !parsed.questions.length) return;
+  if (!parsed.questions.length) return;
   // LIN-3361: one closed fold per result. Every row is built and appended
   // up front (nothing lazy, nothing removed), so the option buttons' click
   // handlers and `fc-decision--resolved` work the same once it is opened.
@@ -1166,7 +1159,7 @@ function renderDecisions(resultString, beforeLi) {
   fold.className = 'fc-decisions-fold';
   fold.setAttribute('data-testid', 'fc-decisions-fold');
   var summary = document.createElement('summary');
-  var count = parsed.decisions.length + parsed.questions.length;
+  var count = parsed.questions.length;
   summary.textContent = count + (count === 1 ? ' decision waiting' : ' decisions waiting');
   fold.appendChild(summary);
   var rulingsHref = urlKey ? '/workspace/' + encodeURIComponent(urlKey) + '/observation?view=rulings' : '';
@@ -1184,10 +1177,7 @@ function renderDecisions(resultString, beforeLi) {
   foldLi.appendChild(fold);
   if (beforeLi && beforeLi.parentNode === thread) thread.insertBefore(foldLi, beforeLi);
   else thread.appendChild(foldLi);
-  parsed.decisions.forEach(function (decision) {
-    renderOneDecision(decision, null, list);
-  });
-  // LIN-4532 (P2b): an open question is the shared question card, in the same list, answered with its option and words.
+  // LIN-4532 (P2b): an open question is the shared question card, answered with its option and words.
   parsed.questions.forEach(function (question) {
     var qli = document.createElement('li');
     qli.className = 'fc-decision fc-question';
@@ -1195,122 +1185,6 @@ function renderDecisions(resultString, beforeLi) {
     qli.innerHTML = renderQuestionRecordCard(question, { urlKey: urlKey || '' });
     list.appendChild(qli);
   });
-  thread.hidden = false;
-  thread.scrollTop = thread.scrollHeight;
-  setEmptyVisible(false);
-}
-
-// `container` (LIN-3361): the list the row is appended to; absent, the row
-// goes into the thread before `beforeLi` as it always did.
-function renderOneDecision(decision, beforeLi, container) {
-  var wrap = document.createElement('div');
-  wrap.className = 'fc-decision';
-
-  // LIN-3361: the decision's task is a structured field, so it is both
-  // linked here and added to the set the thread's text links against.
-  if (decision.issueIdentifier && IDENTIFIER_SHAPE.test(decision.issueIdentifier)) {
-    noteSeenIdentifiers([decision.issueIdentifier]);
-    var taskHref = window.taskPageHref ? window.taskPageHref({ urlKey: urlKey, identifier: decision.issueIdentifier }) : '';
-    if (taskHref) {
-      var ref = document.createElement('p');
-      ref.className = 'fc-decision-ref';
-      var refLink = document.createElement('a');
-      refLink.className = 'chat-task-link';
-      refLink.setAttribute('data-testid', 'fc-decision-task-link');
-      refLink.setAttribute('href', taskHref);
-      refLink.textContent = decision.issueIdentifier;
-      ref.appendChild(refLink);
-      wrap.appendChild(ref);
-    }
-  }
-
-  if (decision.question) {
-    var q = document.createElement('p');
-    q.className = 'fc-decision-question';
-    // Model/task-authored text — textContent only.
-    q.textContent = decision.question;
-    wrap.appendChild(q);
-  }
-
-  var feedback = document.createElement('span');
-  feedback.className = 'fc-decision-feedback';
-
-  // Reused verbatim: the rulings tab's own option-button row primitive.
-  // `disposition` alone decides interactive vs. read-only inside
-  // appendOptions via the SAME allow-list `canReplyFor` (lib/unanswered-
-  // decisions.js) computes `decision.canReply` from — the two predicates
-  // are structurally identical, so they cannot disagree for a row this
-  // tool actually produced. `resolved`/`replying` guard against a double
-  // tap firing two posts for the same row.
-  var resolved = false;
-  window.ChatUI.appendOptions(wrap, {
-    options: decision.options,
-    recommended: decision.recommended,
-    disposition: decision.disposition,
-    onSelect: function (optionId, optionLabel) {
-      // Second, structural guard (mirrors public/observation.js's rulings
-      // row handler) — belt-and-braces alongside appendOptions' own
-      // disposition-driven readOnly branch, which already omits buttons
-      // entirely for a non-interactive disposition.
-      if (!decision.canReply || resolved) return;
-      resolved = true;
-      // `.children` of the shared row rather than querySelectorAll (not
-      // part of this codebase's minimal DOM-shim surface, see
-      // tests/unit/flight-companion-client.test.js's own header) — every
-      // child of `.chat-options-row` is one option button, by
-      // appendOptions' own construction (public/chat.js).
-      var optionsRow = wrap.querySelector('.chat-options-row');
-      var buttons = optionsRow ? Array.prototype.slice.call(optionsRow.children) : [];
-      buttons.forEach(function (b) { b.disabled = true; });
-      feedback.textContent = 'Replying…';
-
-      // Loop-anchored (resumable/gone): both fields the comment route
-      // needs for a best-effort `markDecisionAnswered` stamp are present
-      // in this tool's own projection. Task-bound: the tool now projects
-      // the raw issue UUID and the scan store's own record id
-      // (lib/chat-tools.js's `projectPendingDecision`), so the same
-      // best-effort stamp pair reaches `taskDecisionsStore.markOutcome`,
-      // mirroring public/observation.js's rulings-tab task-bound branch.
-      var extra = decision.loopId
-        ? { decisionLoopId: decision.loopId, decisionId: decision.decisionId }
-        : { taskDecisionId: decision.taskDecisionId, taskDecisionIssueId: decision.issueId };
-
-      window.ReplyDelivery.postComment(urlKey, decision.issueId || decision.issueIdentifier, optionLabel, extra)
-        .then(function (commentResult) {
-          if (!commentResult.ok) {
-            var status = commentResult.status;
-            var message = (commentResult.data && commentResult.data.error) || ('HTTP ' + status);
-            if (status >= 400 && status < 500) {
-              // Terminal client error — leave the row disabled; retrying
-              // the same request would only fail the same way.
-              feedback.textContent = message;
-            } else {
-              // 5xx — retryable.
-              resolved = false;
-              buttons.forEach(function (b) { b.disabled = false; });
-              feedback.textContent = message + ' — try again.';
-            }
-            return;
-          }
-          feedback.textContent = 'Replied ✓';
-          wrap.classList.add('fc-decision--resolved');
-        })
-        .catch(function () {
-          // Network failure — retryable.
-          resolved = false;
-          buttons.forEach(function (b) { b.disabled = false; });
-          feedback.textContent = 'Network failure — try again.';
-        });
-    },
-  });
-  wrap.appendChild(feedback);
-
-  var li = document.createElement('li');
-  li.className = 'chat-msg fc-decision-msg';
-  li.appendChild(wrap);
-  if (container) container.appendChild(li);
-  else if (beforeLi && beforeLi.parentNode === thread) thread.insertBefore(li, beforeLi);
-  else thread.appendChild(li);
   thread.hidden = false;
   thread.scrollTop = thread.scrollHeight;
   setEmptyVisible(false);
@@ -2197,7 +2071,7 @@ if (mounted) {
 export {
   capHistory, nextCadenceDelay, doneCadenceEffect, autoWakeErrorCadenceEffect,
   advanceCadence, classifyTurnResponse, parseProposalResult, formatCheckIn, formatSweepNotSeen,
-  formatNoCensus, formatNextCheckIn, formatCost, formatTurnMeta, formatTabTotal, parseDecisionsResult,
+  formatNoCensus, formatNextCheckIn, formatCost, formatTurnMeta, formatTabTotal, parsePendingResult,
   applyCadenceEffect, scheduleAutoWake, autoWakeTick, sendTurn, submitQuestion, startBoot,
   resizeComposer,
   shouldReArmOnLoad,

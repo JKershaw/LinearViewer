@@ -9,7 +9,8 @@
  */
 import { test, describe } from 'node:test';
 import assert from 'node:assert/strict';
-import { createHomeRowStates } from '../../lib/home-row-states.js';
+import { createHomeRowStates, createWaitingStanding } from '../../lib/home-row-states.js';
+import { questionRecordsOf, questionsFromLoops } from './helpers/question-records.js';
 import { enrichLoop, deriveSessionWaiting } from '../../routes/dashboard.js';
 
 const NOW = new Date('2026-10-30T10:06:00.000Z');
@@ -36,23 +37,27 @@ const node = (identifier) => ({
   children: [], depth: 0,
 });
 
-/** The assembly over a fixed set of loops and stores. */
-function assemblyWith({ loops = [], decisions = [], throwOn = null } = {}) {
-  const maybeThrow = (name) => { if (throwOn === name) throw new Error(`${name} unavailable`); };
+/** The assembly over a fixed set of loops and their question records (LIN-4538); `throwOn` fails the records read. */
+function assemblyWith({ loops = [], throwOn = false, recordsStore = null } = {}) {
+  const records = recordsStore ?? failingOr(questionRecordsOf(questionsFromLoops(loops)), throwOn);
+  const getLoopsForWorkspace = async () => loops;
   return createHomeRowStates({
-    getLoopsForWorkspace: async () => loops,
+    getLoopsForWorkspace,
     dispatchStore: {},
     agentStatusStore: {},
-    taskDecisionsStore: {
-      listUnansweredForWorkspaces: async () => { maybeThrow('listUnansweredForWorkspaces'); return decisions; },
-      listNewestScanPerTask: async () => { maybeThrow('listNewestScanPerTask'); return {}; },
-    },
-    shelvedRulingsStore: { listForWorkspaces: async () => { maybeThrow('listForWorkspaces'); return []; } },
     enrichLoop,
     deriveSessionWaiting,
     now: () => NOW,
     onError: () => {},
+    waitingStanding: createWaitingStanding({ getLoopsForWorkspace, dispatchStore: {}, agentStatusStore: {}, enrichLoop, now: () => NOW, recordsStore: records }),
   });
+}
+
+/** The records reader, or one whose every read throws (a store failure). */
+function failingOr(records, throwOn) {
+  if (!throwOn) return records;
+  const boom = async () => { throw new Error('records unavailable'); };
+  return { find: boom, versionsOf: boom, ticketOfTask: boom, taskForTicket: boom };
 }
 
 describe('LIN-4016 W6 — the count line counts every open ruling in the workspace, whatever Home shows', () => {
@@ -80,9 +85,9 @@ describe('LIN-4016 W6 — the count line counts every open ruling in the workspa
 });
 
 describe('LIN-4016 W7 — a store failure leaves Home plain: no states, no count, and no throw', () => {
-  for (const throwOn of ['listUnansweredForWorkspaces', 'listForWorkspaces']) {
-    test(`with ${throwOn} throwing, the assembly returns null, so every Home route falls back to plain rows`, async () => {
-      const assembly = assemblyWith({ loops: [rulingLoop('LIN-1')], throwOn });
+  {
+    test('with the question records unreadable, the assembly returns null, so every Home route falls back to plain rows', async () => {
+      const assembly = assemblyWith({ loops: [rulingLoop('LIN-1')], throwOn: true });
       const out = await assembly({ urlKey: 'acme', issues: [node('LIN-1').issue], runControls: true });
       assert.equal(out, null);
     });
@@ -92,9 +97,11 @@ describe('LIN-4016 W7 — a store failure leaves Home plain: no states, no count
     const seen = [];
     const assembly = createHomeRowStates({
       getLoopsForWorkspace: async () => [], dispatchStore: {}, agentStatusStore: {},
-      taskDecisionsStore: { listUnansweredForWorkspaces: async () => { throw new Error('boom'); }, listNewestScanPerTask: async () => ({}) },
-      shelvedRulingsStore: { listForWorkspaces: async () => [] },
       enrichLoop, deriveSessionWaiting, now: () => NOW, onError: (message) => seen.push(message),
+      waitingStanding: createWaitingStanding({
+        getLoopsForWorkspace: async () => [], dispatchStore: {}, agentStatusStore: {}, enrichLoop, now: () => NOW,
+        recordsStore: { find: async () => { throw new Error('boom'); } },
+      }),
     });
     const out = await assembly({ urlKey: 'acme', issues: [], runControls: true });
     assert.equal(out, null);

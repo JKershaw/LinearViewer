@@ -34,9 +34,9 @@
  *      past TICKET_CLOSED_GRACE_MS (a quiet bound on the lineage, not a
  *      ticket-terminal age), whose ticket state type is in TERMINAL_TYPES
  *      (imported, never re-listed). Canceled and duplicate tickets count.
- *   4. an open decision (loop-backed, quiet past the grace; or a scan row)
- *      whose ticket type is in TERMINAL_TYPES. NO "a newer decision
- *      supersedes" half (revision 3).
+ *   4. an open question (a question record, LIN-4538; before that a loop-backed
+ *      decision or a scan row) whose ticket type is in TERMINAL_TYPES. NO "a newer
+ *      decision supersedes" half (revision 3).
  * Informational, not counted: a non-wake row with a later lineage row, no
  * lineage terminal (the ticket's state is not consulted here).
  * False closes (target 0): `handed-on` with no later tagged lineage row;
@@ -44,8 +44,7 @@
  * ticket that is not terminal now (reported as "non-terminal now (reopened or
  * false close)", unsplit, because Linear clears completedAt on reopen: it only
  * counts toward target 0 once the issue read can show it was never terminal);
- * the same test on decision-withdrawn records whose reason starts with
- * `ticket-closed` and on scan rows whose outcomeBasisHash is the closer's.
+ * the same test on question records a ticket closer ended "ticket closed" (LIN-4538).
  *
  * Paired measure (LIN-3433, slice I of LIN-3358). c1, c2, c4 and the false-close
  * lines are unchanged:
@@ -78,8 +77,9 @@ import { execFileSync } from 'node:child_process';
 import { DispatchQueueStore } from '../lib/dispatch-store.js';
 import { AgentStatusStore } from '../lib/agent-status-store.js';
 import { getLoopsForWorkspace } from '../lib/pipeline-loops.js';
-import { TaskDecisionsStore } from '../lib/task-decisions-store.js';
-import { prepareCloserCandidates, ticketClosedBasisHash, TICKET_CLOSED_REASON } from '../lib/ticket-close-closer.js';
+import { RecordsStore, RECORDS_COLLECTION, REFS_COLLECTION, QUERY_LOG_COLLECTION } from '../lib/records-store.js';
+import { questionFacts, openQuestionFacts, TICKET_CLOSED_QUESTION_REASON } from '../lib/records/question-facts.js';
+import { prepareCloserCandidates, TICKET_CLOSED_REASON } from '../lib/ticket-close-closer.js';
 import { isDecisionLifecycleStampEntry } from '../lib/digest-feedback.js';
 import { TERMINAL_TYPES } from '../lib/providers/models.js';
 import { READ_HORIZON_MS } from '../lib/read-horizon.js';
@@ -174,9 +174,9 @@ export function createPacedMemoReader(read, { paceMs = TICKET_READ_PACE_MS, slee
  * terminal ticket (a decision, not staleness); `unverified` counts loops whose
  * legacy digest could not be resolved (never counted as false-live).
  */
-async function ticketClauses({ urlKey, loops, taskDecisions, newestScanByTask, now, readTicket, dispatchStore }) {
+async function ticketClauses({ urlKey, loops, now, readTicket, dispatchStore, recordsStore }) {
   const out = { clause3: [], clause3NoStamp: [], clause4: [], humanReopened: [], unverified: 0, unknown: new Set(), checked: new Set() };
-  const c = await prepareCloserCandidates({ loops, taskDecisions, newestScanByTask, now, dispatchStore, persist: false });
+  const c = await prepareCloserCandidates({ loops, now, dispatchStore, persist: false });
   out.unverified = c.unverified.length;
 
   // `readTicket` is memoised per run by `runFalseLiveRows`, shared with `falseCloses`.
@@ -193,18 +193,18 @@ async function ticketClauses({ urlKey, loops, taskDecisions, newestScanByTask, n
     if (await terminal(r.issueIdentifier)) out.clause3.push({ loopId: r.loopId, issue: r.issueIdentifier });
   }
   // c3 with C's row stamp disabled: same selector over the loops as if no `ticket-closed` stamp existed.
-  const cNo = await prepareCloserCandidates({ loops: withoutTicketClosedStamp(loops), taskDecisions, newestScanByTask, now, dispatchStore, persist: false });
+  const cNo = await prepareCloserCandidates({ loops: withoutTicketClosedStamp(loops), now, dispatchStore, persist: false });
   out.clause3NoStamp = [];
   for (const r of cNo.rows) {
     if (await terminal(r.issueIdentifier)) out.clause3NoStamp.push({ loopId: r.loopId, issue: r.issueIdentifier });
   }
-  for (const d of c.loopDecisions) {
-    if (await terminal(d.issueIdentifier)) out.clause4.push({ issue: d.issueIdentifier, decisionId: d.decisionId });
-  }
-  for (const s of c.scanDecisions) {
-    const st = await terminal(s.issueIdentifier);
-    // The scan join is on issueId equality with the ticket that was read.
-    if (st && st.issueId && st.issueId === s.issueId) out.clause4.push({ issue: s.issueIdentifier, decisionId: s.id });
+  // Clause 4 (LIN-4538): the open questions on a terminal ticket, read from the question records.
+  if (recordsStore) {
+    // Quiet past the grace, as the loop-backed decisions were: a question asked just before its ticket closed may still be live.
+    for (const q of openQuestionFacts(await questionFacts(recordsStore, urlKey))) {
+      if (!q.ticket || toMs(q.raisedAt) > now - TICKET_CLOSED_GRACE_MS) continue;
+      if (await terminal(q.ticket)) out.clause4.push({ issue: q.ticket, decisionId: q.questionId });
+    }
   }
   for (const s of c.settled) {
     if (await terminal(s.issueIdentifier)) out.humanReopened.push({ type: s.type, issue: s.issueIdentifier });
@@ -213,7 +213,7 @@ async function ticketClauses({ urlKey, loops, taskDecisions, newestScanByTask, n
 }
 
 /** False closes among rows already stamped / decision records already written. */
-async function falseCloses({ dispatchStore, taskDecisionsStore, urlKey, now, readTicket }) {
+async function falseCloses({ dispatchStore, recordsStore, urlKey, now, readTicket }) {
   const history = dispatchStore.historyCollection;
   const horizon = new Date(now - READ_HORIZON_MS);
   const stamped = await history.find({ urlKey, 'bookkeeping.reason': { $in: ['handed-on', 'lineage-terminal', 'ticket-closed'] }, dispatchedAt: { $gte: horizon } }).toArray();
@@ -243,26 +243,13 @@ async function falseCloses({ dispatchStore, taskDecisionsStore, urlKey, now, rea
       if (st && !TERMINAL_TYPES.includes(st.stateType)) found.reopened.push(r._id);
     }
   }
-  // decision-withdrawn records written with a `ticket-closed` reason (prefix, not equality).
-  const withdrawals = await history.find({ urlKey, dispatchedAt: { $gte: horizon }, feedback: { $elemMatch: { kind: 'decision-withdrawn' } } }).toArray();
-  for (const r of withdrawals) {
-    for (const f of r.feedback || []) {
-      if (f.kind !== 'decision-withdrawn') continue;
-      let reason = f.reason;
-      if (!reason) { try { reason = JSON.parse(f.message)?.reason; } catch { /* free text */ } }
-      if (typeof reason !== 'string' || !reason.startsWith('ticket-closed')) continue;
-      const st = await ticketOutcome(r.issueIdentifier);
-      if (st && !TERMINAL_TYPES.includes(st.stateType)) found.reopened.push(`${r._id}:${f.kind}`);
-    }
-  }
-  // Scan rows the closer self-resolved: a basis hash equal to the closer's for ANY terminal type.
-  if (taskDecisionsStore?.collection) {
-    const scans = await taskDecisionsStore.collection.find({ urlKey, outcome: 'self-resolved' }).toArray();
-    for (const r of scans) {
-      const closerWritten = TERMINAL_TYPES.some(t => r.outcomeBasisHash === ticketClosedBasisHash(r.issueId, t));
-      if (!closerWritten) continue;
-      const st = await ticketOutcome(r.issueIdentifier);
-      if (st && !TERMINAL_TYPES.includes(st.stateType)) found.reopened.push(`${r._id}:self-resolved`);
+  // Questions a ticket closer ended "ticket closed" (LIN-4538), whose ticket is not terminal now. Ended in the horizon only.
+  if (recordsStore) {
+    for (const q of await questionFacts(recordsStore, urlKey)) {
+      if (q.reason !== TICKET_CLOSED_QUESTION_REASON || !q.ticket) continue;
+      if (q.resolvedAt && toMs(q.resolvedAt) < horizon.getTime()) continue;
+      const st = await ticketOutcome(q.ticket);
+      if (st && !TERMINAL_TYPES.includes(st.stateType)) found.reopened.push(`${q.questionId}:question`);
     }
   }
   return found;
@@ -387,13 +374,13 @@ export function withoutTicketClosedStamp(loops) {
  * @param {Object} p.dispatchStore
  * @param {Object} [p.agentStatusStore]
  * @param {(urlKey:string, issue:string)=>Promise<{issueId:string|null, stateType:string}|null>} [p.readTicketState]
- * @param {Object} [p.taskDecisionsStore] - for scan decisions (clause 4) and the scan-row false-close check
+ * @param {Object} [p.recordsStore] - the question records: clause 4 (open questions on a terminal ticket) and the false closes
  * @param {(urlKey:string)=>Promise<Array<Object>>} [p.readLoops] - defaults to getLoopsForWorkspace (lean)
  */
 export async function runFalseLiveRows({
   dispatchStore,
   agentStatusStore = null,
-  taskDecisionsStore = null,
+  recordsStore = null,
   urlKeys = null,
   now = Date.now(),
   headSha = null,
@@ -414,11 +401,8 @@ export async function runFalseLiveRows({
       const clause1 = sel.writable.filter(c => c.reason === 'handed-on');
       const clause2 = sel.writable.filter(c => c.reason === 'lineage-terminal');
       const loops = await loopsOf(urlKey);
-      const [taskDecisions, newestScanByTask] = taskDecisionsStore
-        ? await Promise.all([taskDecisionsStore.listUnansweredForWorkspaces([urlKey]), taskDecisionsStore.listNewestScanPerTask([urlKey])])
-        : [[], {}];
-      const t = await ticketClauses({ urlKey, loops, taskDecisions, newestScanByTask, now, readTicket: readTicketMemo, dispatchStore });
-      const fc = await falseCloses({ dispatchStore, taskDecisionsStore, urlKey, now, readTicket: readTicketMemo });
+      const t = await ticketClauses({ urlKey, loops, now, readTicket: readTicketMemo, dispatchStore, recordsStore });
+      const fc = await falseCloses({ dispatchStore, recordsStore, urlKey, now, readTicket: readTicketMemo });
       const pae = postsAfterEnd(await dispatchStore.historyCollection.find(
         { urlKey, dispatchedAt: { $gte: new Date(now - READ_HORIZON_MS) } },
         { projection: { feedback: 1, bookkeeping: 1 } }).toArray());
@@ -472,9 +456,9 @@ export function buildReport({ perWorkspace, now, headSha, runner = null }) {
   L.push(`  1 wake row, a later lineage row has posted (B(a))         ${String(sum(w => w.clause1)).padStart(5)}`);
   L.push(`  2 un-terminated row taken before a lineage terminal (B(b)) ${String(sum(w => w.clause2)).padStart(5)}`);
   L.push(`  3 blocked/silent row on a terminal ticket past grace, C's stamp disabled ${String(sum(w => w.clause3NoStamp)).padStart(5)}`);
-  L.push(`  4 open decision on a terminal ticket                      ${String(sum(w => w.clause4)).padStart(5)}`);
+  L.push(`  4 open question on a terminal ticket                      ${String(sum(w => w.clause4)).padStart(5)}`);
   L.push('');
-  L.push(`Human-reopened (a reversed ruling / un-retired scan row on a terminal ticket; a decision, not staleness, not counted): ${sum(w => w.humanReopened)}`);
+  L.push(`Human-reopened (a reversed row on a terminal ticket; a decision, not staleness, not counted): ${sum(w => w.humanReopened)}`);
   L.push(`Unverified (legacy digest not resolvable from raw feedback; held out, not counted): ${sum(w => w.unverified)}`);
   L.push('');
   if (runner) {
@@ -537,11 +521,11 @@ async function main() {
       historyCollection: db.collection('dispatch-history')
     });
     const agentStatusStore = new AgentStatusStore({ collection: db.collection('foreman-status') });
-    const taskDecisionsStore = new TaskDecisionsStore({ collection: db.collection('task-decisions') });
+    const recordsStore = new RecordsStore({ records: db.collection(RECORDS_COLLECTION), refs: db.collection(REFS_COLLECTION), queryLog: db.collection(QUERY_LOG_COLLECTION) });
     const { report } = await runFalseLiveRows({
       dispatchStore,
       agentStatusStore,
-      taskDecisionsStore,
+      recordsStore,
       headSha: readHeadSha(),
       sessionsPath: parseSessionsPath(process.argv) || process.env.FALSE_LIVE_SESSIONS_PATH || null,
       readTicketState: createPacedMemoReader((k, issue) => defaultReadTicketState(k, issue, { ticketUrlKey })),

@@ -401,7 +401,6 @@ test('NEW search guard: every postComment( call under public/ is one of the name
     'public/common.js': 4,        // deliverReply (record-only + resume), deliverRulingRecord, deliverRulingDispatch
     'public/session.js': 1,       // sendSave — a loop-box comment save, not a ruling answer
     'public/observation.js': 1,   // the Rulings tab's task-bound branch (already sends the pair)
-    'public/flight-companion.js': 1, // already sends the pair
     'public/scan.js': 1           // already sends the pair
   }, 'a new postComment( call site must be named here and in the PR');
 });

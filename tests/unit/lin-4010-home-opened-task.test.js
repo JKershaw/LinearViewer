@@ -13,6 +13,7 @@
 import { test, describe } from 'node:test';
 import assert from 'node:assert/strict';
 import { USUAL_STAGES, SPINE } from '../../lib/run-view.js';
+import { standingOfLoops } from './helpers/question-records.js';
 import { buildRowStates, buildTaskPageModel, nextStepOf, waitingForOf, sessionSummaryOf } from '../../lib/task-page-loader.js';
 import { buildInProgressCountParts } from '../../lib/task-board-view.js';
 import { renderHomeStatus } from '../../lib/render-task-page.js';
@@ -71,6 +72,7 @@ const node = (identifier, stateType = 'started', children = [], extra = {}) => (
   depth: 0,
 });
 
+// LIN-4538: a ruling is an open question its run asked (the loop's decision), read as the question standing.
 function states({ roots, loops = {}, sessionsVisible = true }) {
   return buildRowStates({
     roots,
@@ -79,6 +81,7 @@ function states({ roots, loops = {}, sessionsVisible = true }) {
     deriveSessionWaiting,
     now: NOW,
     sessionsVisible,
+    ruling: standingOfLoops(Object.values(loops).flat()),
   });
 }
 
@@ -120,13 +123,13 @@ describe('LIN-4010 — Plan review is a usual stage, after Plan', () => {
 
 describe('LIN-4010 — a waiting task is a ruling or a park', () => {
   test('a waiting session with an open ruling is "ruling"', () => {
-    const model = buildTaskPageModel({ identifier: 'LIN-60', loops: [rulingLoop({ issueIdentifier: 'LIN-60' })], ctx: null, enrichLoop, deriveSessionWaiting, now: NOW });
+    const model = buildTaskPageModel({ identifier: 'LIN-60', loops: [rulingLoop({ issueIdentifier: 'LIN-60' })], ctx: null, enrichLoop, deriveSessionWaiting, ruling: standingOfLoops([rulingLoop({ issueIdentifier: 'LIN-60' })]), now: NOW });
     assert.equal(stateOf(model).state, 'needs-you', 'the gathered state is the wait');
     assert.equal(model.waitingFor, 'ruling');
   });
 
   test('a waiting session with no structured question is "parked"', () => {
-    const model = buildTaskPageModel({ identifier: 'LIN-61', loops: [parkLoop({ issueIdentifier: 'LIN-61' })], ctx: null, enrichLoop, deriveSessionWaiting, now: NOW });
+    const model = buildTaskPageModel({ identifier: 'LIN-61', loops: [parkLoop({ issueIdentifier: 'LIN-61' })], ctx: null, enrichLoop, deriveSessionWaiting, ruling: standingOfLoops([parkLoop({ issueIdentifier: 'LIN-61' })]), now: NOW });
     assert.equal(stateOf(model).state, 'parked', 'the gathered state is the park');
     assert.equal(model.waitingFor, 'parked');
   });

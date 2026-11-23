@@ -400,30 +400,6 @@ export function createDashboardRoutes(deps) {
       const waiting = !sessionTerminal && rawWaiting;
       const waitingMessage = waiting ? rawWaitingMessage : null;
 
-      // Pinned question card (LIN-3252 S2 / LIN-3260): the session's unanswered
-      // decisions, read independently of `waiting` so the card shows on a
-      // non-waiting or finished session too. Rows stay session-membership scoped
-      // (no shelves, no task-decisions), but the liveness predicate must see a
-      // live run on the anchor in ANOTHER session — so feed `deriveSessionDecisions`
-      // the workspace-wide loop set from the warm `rulings` entry (the SAME cache
-      // the Rulings feed / nav-badge poll fills). This is a NON-producing `peek`:
-      // the run page must never trigger the whole-workspace reconstruction a
-      // producing `get` would (LIN-1021/H12). A cold cache falls back to the
-      // session's own loops (the prior behaviour).
-      //
-      // The `rulings` entry is merged across `req.session.workspaces`, and issue
-      // identifiers are only per-TEAM unique, so the SAME identifier can exist in
-      // two connected workspaces — scope the set to the workspace being viewed
-      // (`workspaceUrlKey`) so a same-named issue elsewhere cannot force `record`
-      // on this card.
-      const sessionWorkspaces = (req.session.workspaces || []).map(w => ({ urlKey: w.urlKey, name: w.name }));
-      const cachedLoopSet = typeof sessionsFeedCache.peek === 'function'
-        ? sessionsFeedCache.peek(sessionsFeedCache.keyFor(sessionWorkspaces, 'rulings'))
-        : undefined;
-      const liveLoops = Array.isArray(cachedLoopSet)
-        ? enrichedLoops.concat(cachedLoopSet.filter(l => l && l.workspaceUrlKey === workspace.urlKey))
-        : enrichedLoops;
-      const sessionDecisions = deriveSessionDecisions(enrichedLoops, { now: new Date(), liveLoops });
 
       // LIN-4532 (P2b): the open question RECORDS this run asked the signed-in person, pinned beside the decision card. Read for the
       // owner's canonical account (the id the answer route files under); a failed read costs only these cards.
@@ -493,7 +469,7 @@ export function createDashboardRoutes(deps) {
       // session's own rows. A follow-up or wake row reads the run it resumes (`readRunAccount`, via `runRecordIdFor`).
       const runAccount = recordsStore ? await readRunAccount(recordsStore, (urlKey, id) => dispatchQueueStore.rowForRunRecords(urlKey, id), workspace.urlKey, session) : null;
       const html = renderSessionPage(
-        { session, sessionId, issueContext, waiting, waitingMessage, producerLoopId, decision, decisionCase, decisions: sessionDecisions, questionRecords, producer, urlKey: workspace.urlKey, canReply, sessionTerminal, credentialByToken, anchorIssueTitle, runView, proposals, runEvidence, runParagraph, runAccount },
+        { session, sessionId, issueContext, waiting, waitingMessage, producerLoopId, decision, decisionCase, questionRecords, producer, urlKey: workspace.urlKey, canReply, sessionTerminal, credentialByToken, anchorIssueTitle, runView, proposals, runEvidence, runParagraph, runAccount },
         pageOptions
       );
       res.send(html);

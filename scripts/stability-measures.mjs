@@ -13,7 +13,7 @@
 // --api (default $HARBOUR_LOCAL_BASE/api/proxy) is the workspace proxy for finished tasks, speed, cost and tickets
 // minted (scripts/stability-measures-tracker.mjs: paced, honours 429 Retry-After). Finished tasks may have landed
 // before base, so the landings of the --lookback-days (default 3) before base are read for their tickets too. The same
-// proxy reads the person's seat over those finished tasks (scripts/stability-measures-seat.mjs: loop rulings only;
+// proxy reads the person's seat over those finished tasks (scripts/stability-measures-seat.mjs: question records only;
 // person origin not measured; the operator-free share an upper bound).
 // Measure 1 (scripts/stability-measures-blind.mjs) counts the window's landings that have a blind-read verdict naming
 // their PR, written before their merge, with its outcome, and the unread by named reason. It reads verdict records

@@ -3,13 +3,15 @@
  *
  * Run with: node --test tests/unit/escalation-kpis.test.js
  */
-import { test, describe } from 'node:test';
+import { test, describe, before, after, beforeEach } from 'node:test';
 import assert from 'node:assert';
 import { computeEscalationKpis } from '../../lib/escalation-kpis.js';
-import { createMockCollection } from '../fixtures/mock-collection.js';
-import { DispatchQueueStore } from '../../lib/dispatch-store.js';
-import { TaskDecisionsStore } from '../../lib/task-decisions-store.js';
-import { resolvedDecisionEvents } from '../../lib/pipeline-loops.js';
+import { escalationEventsOfQuestions } from '../../lib/escalation-kpis.js';
+import { createMangoTmpdir } from '../fixtures/mango-tmpdir.js';
+import { RecordsStore, RECORDS_COLLECTION, REFS_COLLECTION, QUERY_LOG_COLLECTION } from '../../lib/records-store.js';
+import { createRecordWrites } from '../../lib/records/writes.js';
+import { isTerminalState } from '../../lib/providers/state-map.js';
+import { questionFacts, endOpenQuestionsOfTicket, DISMISSED_REASON } from '../../lib/records/question-facts.js';
 
 const NOW = new Date('2026-08-23T12:00:00.000Z');
 const DAY_MS = 24 * 60 * 60 * 1000;
@@ -263,112 +265,77 @@ describe('computeEscalationKpis — windowMs is echoed back', () => {
   });
 });
 
-// ─── LIN-2754 close-out, ledger L2 — Acceptance clause 2's KPI half ───────
-// Plan Step 11 witness 3, landed. Until now nothing in this file observed
-// the thing the whole ticket exists to fix: a relayed human ruling that is
-// cleared via Agree must book as ANSWERED, not inflate the false-escalation
-// numerator the way a bulk dismissal did (`lib/escalation-kpis.js`'s
-// `dismissed / (answered + dismissed)`).
-//
-// Deliberately NOT hand-built event literals: both stamps below come out of
-// the REAL writers the Agree paths call — `DispatchQueueStore#markDecisionAnswered`
-// for a loop-backed ruling and `TaskDecisionsStore#markOutcome` for a
-// task-bound one — read back through the REAL readers the KPI route uses
-// (`resolvedDecisionEvents` / `listResolvedForWorkspaces`), so the witness
-// covers the whole chain rather than the arithmetic alone.
-describe('computeEscalationKpis — a relayed answer books as answered, not a false escalation (LIN-2754 L2)', () => {
-  const KPI_URL_KEY = 'acme';
-  const TASK_ISSUE_ID = '11111111-2222-3333-4444-555555555555';
-  const TASK_HASH = 'c'.repeat(64);
+// ─── LIN-4538 (P7a): the KPIs read question records ─────────────────────────
+// The real question writers and ends, read back through the real fact reader the KPI route uses (questionFacts) and mapped by
+// escalationEventsOfQuestions, so each witness covers the whole chain. A dismissal is a question ended `withdrawn` by a person
+// with reason "dismissed"; a question whose ticket closed is self-resolved, never a dismissal.
+describe('computeEscalationKpis — question records (LIN-4538)', () => {
+  const URL_KEY = 'kpi-workspace';
+  const ACCOUNT = 'acct-owner';
+  const PERSON = `person:${ACCOUNT}`;
+  const PEOPLE = [{ accountId: ACCOUNT, name: 'Owner' }];
+  const harness = createMangoTmpdir('lin-4538-kpi-');
+  let records;
+  let writes;
 
-  // The real writers stamp `outcomeAt`/`timestamp` with `new Date()`, so
-  // these tests run on the real clock rather than this file's frozen NOW —
-  // `now` is read AFTER the stamps so every resolution sits inside the
-  // window (`resolvedMs <= nowMs`), with raise times backdated by hand.
-  const afterStamps = () => new Date(Date.now() + 1000);
+  before(() => harness.connect());
+  after(() => harness.close());
+  beforeEach(async () => {
+    const db = harness.freshDb();
+    await db.collection(RECORDS_COLLECTION).createIndex({ urlKey: 1, id: 1, v: 1 }, { unique: true });
+    records = new RecordsStore({ records: db.collection(RECORDS_COLLECTION), refs: db.collection(REFS_COLLECTION), queryLog: db.collection(QUERY_LOG_COLLECTION) });
+    writes = createRecordWrites({ recordsStore: records, isTerminalState, readTicket: null, askedText: () => '', stageKinds: ['implementation'], listPeople: async () => PEOPLE });
+  });
 
-  async function loopWithDecision(store, { decisionId, raisedAt }) {
-    const item = await store.addItem(KPI_URL_KEY, { prompt: 'do the thing', kind: 'implementation', issueIdentifier: 'LIN-2754' });
-    await store.takeItem(item._id, KPI_URL_KEY, 'token-a');
-    const doc = store.historyCollection._docs.find(d => d._id === item._id);
-    doc.feedback = doc.feedback || [];
-    // The raise side: a `decision` feedback entry, exactly the kind a runner
-    // writes (`FEEDBACK_ENTRY_KINDS` includes 'decision'), so `raisedAt` is
-    // read off real stored data rather than asserted.
-    doc.feedback.push({ kind: 'decision', message: JSON.stringify({ decision_id: decisionId, question: 'Ship it?' }), timestamp: raisedAt });
-    return item._id;
+  async function askQuestion(task) {
+    const made = await records.ensureTask(URL_KEY, { identifier: task, title: task }, { by: 'implementation' });
+    assert.ok(made.id, `task refused: ${JSON.stringify(made)}`);
+    const snap = await writes.add({
+      urlKey: URL_KEY, kind: 'question', by: 'implementation', run: null,
+      input: { asks: 'Ship it?', options: ['yes', 'no'], recommended: 'yes', 'if-unanswered': 'hold', to: PERSON, in: task },
+    });
+    assert.ok(snap.record, `question refused: ${JSON.stringify(snap.problems)}`);
+    return snap.record.id;
   }
 
-  test('a loop-backed Agree-as-answer stamp (with option_id) lands in the ANSWERED bucket, and a dismissal still lands in the false-escalation numerator', async () => {
-    const store = new DispatchQueueStore({ collection: createMockCollection(), historyCollection: createMockCollection() });
+  async function kpisNow() {
+    const facts = await questionFacts(records, URL_KEY);
+    return computeEscalationKpis({ ...escalationEventsOfQuestions(facts), windowMs: 30 * DAY_MS, now: new Date(Date.now() + 1000) });
+  }
 
-    const answeredLoop = await loopWithDecision(store, { decisionId: 'd-relayed-answer', raisedAt: new Date(Date.now() - 2 * DAY_MS) });
-    const dismissedLoop = await loopWithDecision(store, { decisionId: 'd-noise', raisedAt: new Date(Date.now() - 2 * DAY_MS) });
-
-    // The new path: Agree on a PROPOSED ANSWER — no `outcome` argument, and a
-    // chosen option id (LIN-2754 Shape B). This is the exact call
-    // routes/workspace-api.js's comment route makes for a relayed ruling.
-    await store.markDecisionAnswered(answeredLoop, KPI_URL_KEY, 'd-relayed-answer', undefined, 'opt-yes');
-    // The old-and-still-correct path for genuine noise: Agree on a proposed
-    // DISMISSAL, which is what every relayed ruling used to be cleared as.
-    await store.markDecisionAnswered(dismissedLoop, KPI_URL_KEY, 'd-noise', 'dismissed');
-
-    const events = store.historyCollection._docs.flatMap(d => resolvedDecisionEvents(d.feedback));
-    assert.strictEqual(events.length, 2);
-
-    const answerEvent = events.find(e => e.decisionId === 'd-relayed-answer');
-    assert.strictEqual(answerEvent.outcome, 'answered', 'the relayed answer must read back as answered — an option_id on the stamp must not change how it books');
-
-    // Shape B, on the stored stamp itself: the chosen option rides the
-    // durable message, so the resolution is self-contained rather than
-    // inferred from the suggestion row.
-    const stamp = store.historyCollection._docs
-      .flatMap(d => d.feedback || [])
-      .find(f => f.kind === 'decision-answer' && f.message.includes('d-relayed-answer'));
-    assert.deepStrictEqual(JSON.parse(stamp.message), { decision_id: 'd-relayed-answer', option_id: 'opt-yes' });
-
-    const kpis = computeEscalationKpis({ resolvedEvents: events, windowMs: 30 * DAY_MS, now: afterStamps() });
+  test('an answered question books as answered; a person\'s dismissal books as a dismissal; the rate is the dismissals over both', async () => {
+    const answered = await askQuestion('LIN-100');
+    const dismissed = await askQuestion('LIN-101');
+    await records.end(URL_KEY, answered, { state: 'answered', reason: 'answered by decision-a' }, { by: PERSON });
+    await records.end(URL_KEY, dismissed, { state: 'withdrawn', reason: DISMISSED_REASON }, { by: PERSON });
+    const kpis = await kpisNow();
     assert.strictEqual(kpis.falseEscalation.answered, 1);
     assert.strictEqual(kpis.falseEscalation.dismissed, 1);
     assert.strictEqual(kpis.falseEscalation.total, 2);
     assert.strictEqual(kpis.falseEscalation.rate, 0.5);
+    assert.strictEqual(kpis.escalationRate.raisedInWindow, 2);
   });
 
-  test('the pre-LIN-2754 behaviour is the contrast: clearing the SAME relayed ruling as a dismissal doubles the false-escalation rate', async () => {
-    const store = new DispatchQueueStore({ collection: createMockCollection(), historyCollection: createMockCollection() });
-    const answeredLoop = await loopWithDecision(store, { decisionId: 'd-relayed-answer', raisedAt: new Date(Date.now() - 2 * DAY_MS) });
-    const dismissedLoop = await loopWithDecision(store, { decisionId: 'd-noise', raisedAt: new Date(Date.now() - 2 * DAY_MS) });
-
-    // Both cleared as dismissals — the only bulk exit that existed before.
-    await store.markDecisionAnswered(answeredLoop, KPI_URL_KEY, 'd-relayed-answer', 'dismissed');
-    await store.markDecisionAnswered(dismissedLoop, KPI_URL_KEY, 'd-noise', 'dismissed');
-
-    const kpis = computeEscalationKpis({
-      resolvedEvents: store.historyCollection._docs.flatMap(d => resolvedDecisionEvents(d.feedback)),
-      windowMs: 30 * DAY_MS,
-      now: afterStamps()
-    });
-    assert.strictEqual(kpis.falseEscalation.rate, 1, 'every relayed ruling used to count as a false escalation — this is the number the ticket exists to fix');
+  test('a closed ticket\'s open question is self-resolved and is NOT a false escalation', async () => {
+    await askQuestion('LIN-102');
+    const ended = await endOpenQuestionsOfTicket({ recordsStore: records, urlKey: URL_KEY, ticket: 'LIN-102' });
+    assert.strictEqual(ended.ended, 1);
+    const kpis = await kpisNow();
+    assert.strictEqual(kpis.selfResolved.count, 1, 'the ticket-closed question is self-resolved');
+    assert.strictEqual(kpis.falseEscalation.dismissed, 0, 'a ticket closing is not a dismissal');
+    assert.strictEqual(kpis.falseEscalation.total, 0);
+    assert.strictEqual(kpis.falseEscalation.rate, null);
+    assert.strictEqual(kpis.escalationRate.raisedInWindow, 1, 'it was still raised in the window');
   });
 
-  test('a task-bound Agree-as-answer (markOutcome + option_id) also books as answered through listResolvedForWorkspaces', async () => {
-    const store = new TaskDecisionsStore({ collection: createMockCollection() });
-    await store.recordScan({
-      urlKey: KPI_URL_KEY, issueId: TASK_ISSUE_ID, issueIdentifier: 'LIN-2754',
-      inputHash: TASK_HASH,
-      decision: { decision_id: 'scan_11111111_cccccccccccc', question: 'Ship it?', options: [{ id: 'opt-yes', label: 'Yes' }], free_text: false }
-    });
-    const id = TaskDecisionsStore.buildId(TASK_ISSUE_ID, TASK_HASH);
-    const record = await store.markOutcome({ urlKey: KPI_URL_KEY, issueId: TASK_ISSUE_ID, id, outcome: 'answered', optionId: 'opt-yes' });
-    assert.strictEqual(record.optionId, 'opt-yes');
-
-    // The same normalisation routes/dashboard.js applies before the KPI call.
-    const rows = await store.listResolvedForWorkspaces([KPI_URL_KEY], Date.now() - 30 * DAY_MS);
-    const events = rows.map(r => ({ decisionId: r.id, raisedAt: r.scannedAt, resolvedAt: r.outcomeAt, outcome: r.outcome }));
-
-    const kpis = computeEscalationKpis({ resolvedEvents: events, windowMs: 30 * DAY_MS, now: afterStamps() });
-    assert.strictEqual(kpis.falseEscalation.answered, 1, 'a task-bound relayed answer must book as answered');
+  test('an agent\'s withdrawal, even with the reason "dismissed", is not a dismissal; an open question is unanswered age, not an outcome', async () => {
+    const byAgent = await askQuestion('LIN-103');
+    await askQuestion('LIN-104');
+    await records.end(URL_KEY, byAgent, { state: 'withdrawn', reason: DISMISSED_REASON }, { by: 'implementation' });
+    const kpis = await kpisNow();
     assert.strictEqual(kpis.falseEscalation.dismissed, 0);
-    assert.strictEqual(kpis.falseEscalation.rate, 0, 'no false escalation is recorded for a ruling the human actually answered');
+    assert.strictEqual(kpis.falseEscalation.total, 0, 'an agent withdrawal settles no outcome');
+    assert.strictEqual(kpis.unansweredAge.count, 1, 'the open question is the one unanswered row');
+    assert.strictEqual(kpis.escalationRate.raisedInWindow, 2, 'both were raised');
   });
 });

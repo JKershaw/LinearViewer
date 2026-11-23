@@ -12,7 +12,7 @@
  * NOTE: the experimental `dashboard` feature flag was retired in LIN-595 (the page
  * is first-class), so these endpoints are session-authed only — no flag gate.
  */
-import { test, describe, before } from 'node:test';
+import { test, describe, before, after, beforeEach } from 'node:test';
 import assert from 'node:assert';
 import { buildTestSummary, buildTestSessionSummary, deriveSessionStatus, deriveSessionDecisions } from '../../routes/dashboard.js';
 import { NOW_ISO, createDashboardRoutes, makeStores, findRouteLayer, getHandler, makeReqRes, makeRouter, decisionItem, recordsStoreOfChanges } from '../fixtures/dashboard-router.js';
@@ -20,10 +20,15 @@ import { createSessionsFeedCache } from '../../lib/sessions-feed-cache.js';
 import { InMemoryRunSummaryCacheStore } from '../../lib/run-summary-cache.js';
 import { InMemorySessionSummaryCacheStore } from '../../lib/session-summary-cache.js';
 import { createTaskDoneCache } from '../../lib/task-done-cache.js';
-import { DismissalSuggestionsStore } from '../../lib/dismissal-suggestions-store.js';
-import { TaskDecisionsStore } from '../../lib/task-decisions-store.js';
 import { withFreshDigests } from '../fixtures/with-fresh-digests.js';
 import { extractEmbeddedData, embeddedDataText } from '../helpers/embedded-data.js';
+import { createMangoTmpdir } from '../fixtures/mango-tmpdir.js';
+import { RecordsStore, RECORDS_COLLECTION, REFS_COLLECTION, QUERY_LOG_COLLECTION } from '../../lib/records-store.js';
+import { createRecordWrites } from '../../lib/records/writes.js';
+import { isTerminalState } from '../../lib/providers/state-map.js';
+import { endOpenQuestionsOfTicket } from '../../lib/records/question-facts.js';
+import { DismissalSuggestionsStore } from '../../lib/dismissal-suggestions-store.js';
+import { TaskDecisionsStore } from '../../lib/task-decisions-store.js';
 import { REAP_INACTIVITY_MS } from '../../lib/unanswered-decisions.js';
 
 // A timestamp safely past the record window (SD's 7-day REAP_INACTIVITY_MS), so the fixture is `gone`.
@@ -1373,12 +1378,28 @@ describe('POST /api/dashboard/rulings/shelve (LIN-1727)', () => {
 
 // ─── Escalation KPIs — operator-facing audit page (LIN-1736) ─────────────────
 
-describe('GET /api/escalation-kpis (LIN-1736)', () => {
-  function makeKpiRouter(perWorkspace, taskDecisionsStore, shelvedRulingsStore) {
-    const { dispatchQueueStore, agentStatusStore } = makeStores(perWorkspace);
+describe('GET /api/escalation-kpis (LIN-1736; question records, LIN-4538)', () => {
+  const harness = createMangoTmpdir('lin-4538-kpi-route-');
+  const ACCOUNT = 'acct-owner';
+  const PERSON = `person:${ACCOUNT}`;
+  const PEOPLE = [{ accountId: ACCOUNT, name: 'Owner' }];
+  const DAY = 24 * 60 * 60 * 1000;
+  let records;
+  let writes;
+
+  before(() => harness.connect());
+  after(() => harness.close());
+  beforeEach(async () => {
+    const db = harness.freshDb();
+    await db.collection(RECORDS_COLLECTION).createIndex({ urlKey: 1, id: 1, v: 1 }, { unique: true });
+    records = new RecordsStore({ records: db.collection(RECORDS_COLLECTION), refs: db.collection(REFS_COLLECTION), queryLog: db.collection(QUERY_LOG_COLLECTION) });
+    writes = createRecordWrites({ recordsStore: records, isTerminalState, readTicket: null, askedText: () => '', stageKinds: ['implementation'], listPeople: async () => PEOPLE });
+  });
+
+  function makeKpiRouter(recordsStore) {
     return createDashboardRoutes({
       workspaceFromUrl: (req, res, next) => next(),
-      dispatchQueueStore, agentStatusStore,
+      ...makeStores({}),
       runSummaryCacheStore: new InMemoryRunSummaryCacheStore(),
       sessionSummaryCacheStore: new InMemorySessionSummaryCacheStore(),
       freeTierStore: { async tryUse() { return { allowed: true }; } },
@@ -1387,524 +1408,92 @@ describe('GET /api/escalation-kpis (LIN-1736)', () => {
       fetchWorkspaceIssues: async () => [],
       getOpenRouterSource: () => 'env',
       getDeployInfo: () => ({}),
-      taskDecisionsStore: taskDecisionsStore || null,
-      shelvedRulingsStore: shelvedRulingsStore || null
+      recordsStore,
     });
   }
 
-  test('LIN-1727: an actively-shelved decision still counts toward unansweredAge — KPI must stay monotonic regardless of shelving', async () => {
-    const raisedMs = Date.now() - 2 * 60 * 60 * 1000;
-    const loop = {
-      id: 'w-shelved', issueIdentifier: 'LIN-5', issueTitle: 'shelved one', promptName: 'implementation', prompt: 'p',
-      dispatchedAt: new Date(raisedMs).toISOString(), resolvedAt: new Date(raisedMs).toISOString(), status: 'taken',
-      feedback: [
-        { message: '[blocked] need a decision', timestamp: new Date(raisedMs).toISOString() },
-        { kind: 'decision', message: JSON.stringify({ decision_id: 'd-shelved', question: 'Proceed?' }), timestamp: new Date(raisedMs).toISOString() }
-      ]
-    };
-    const perWorkspace = { 'ws-a': { live: [], history: [loop], agentStatus: [] } };
-    // The live rulings feed would hide this row (it's actively shelved, well
-    // within its resurfaceAt window) — the KPI route must NOT be given the
-    // means to do the same: shelvedRulingsStore is wired here to prove the
-    // KPI closure ignores it even when a store IS configured, not merely
-    // because the store happens to be absent.
-    const shelvedRulingsStore = {
-      async listForWorkspaces() {
-        return [{ urlKey: 'ws-a', decisionId: 'd-shelved', reason: 'waiting on design', resurfaceAt: new Date(Date.now() + 60 * 60 * 1000).toISOString(), lapseCount: 0 }];
-      }
-    };
-    const router = makeKpiRouter(perWorkspace, null, shelvedRulingsStore);
-    const handler = getHandler(router, 'get', '/workspace/:urlKey/api/escalation-kpis');
-    const { req, res } = makeReqRes({ session: { workspaces: [{ urlKey: 'ws-a', name: 'Alpha' }] } });
+  async function askQuestion(urlKey, task) {
+    const made = await records.ensureTask(urlKey, { identifier: task, title: task }, { by: 'implementation' });
+    assert.ok(made.id, `task refused: ${JSON.stringify(made)}`);
+    const snap = await writes.add({
+      urlKey, kind: 'question', by: 'implementation', run: null,
+      input: { asks: 'Which way?', options: ['left', 'right'], recommended: 'left', 'if-unanswered': 'pick left', to: PERSON, in: task },
+    });
+    assert.ok(snap.record, `question refused: ${JSON.stringify(snap.problems)}`);
+    return snap.record.id;
+  }
+
+  const WS = [{ urlKey: 'ws-a', name: 'Alpha' }];
+  const kpiReq = (query = {}) => makeReqRes({ session: { workspaces: WS }, query });
+
+  test('an answer is answered, a person\'s dismissal is a false escalation, an open question is unanswered age', async () => {
+    const answered = await askQuestion('ws-a', 'LIN-1');
+    const dismissed = await askQuestion('ws-a', 'LIN-2');
+    await askQuestion('ws-a', 'LIN-3');
+    await records.end('ws-a', answered, { state: 'answered', reason: 'answered by decision-x' }, { by: PERSON });
+    await records.end('ws-a', dismissed, { state: 'withdrawn', reason: 'dismissed' }, { by: PERSON });
+    const handler = getHandler(makeKpiRouter(records), 'get', '/workspace/:urlKey/api/escalation-kpis');
+    const { req, res } = kpiReq();
     await handler(req, res);
-
-    assert.equal(res.statusCode, 200);
-    assert.equal(res.jsonBody.unansweredAge.count, 1, 'a shelved-but-unanswered decision must still count toward the KPI');
-  });
-
-  // LIN-2991/LIN-3022 §4: a decision raised on a non-root (wake) loop, whose
-  // root carries no decision of its own, must still be found and counted —
-  // looking up `row.anchor?.loopId` alone (the root) finds no matching
-  // feedback and silently drops the row from unansweredAge.
-  test('§4: unansweredAge does not drop a grouped, wake-raised decision whose root carries no decision of its own', async () => {
-    const rootMs = Date.now() - 6 * 60 * 60 * 1000;
-    const wakeMs = Date.now() - 3 * 60 * 60 * 1000;
-    const root = {
-      id: 'root-wake', issueIdentifier: 'LIN-6', issueTitle: 'root', promptName: 'implementation', prompt: 'p',
-      dispatchedAt: new Date(rootMs).toISOString(), resolvedAt: new Date(rootMs).toISOString(), status: 'taken',
-      feedback: [{ message: '[working] dispatched a wake follow-up', timestamp: new Date(rootMs).toISOString() }]
-    };
-    const wakeChild = {
-      id: 'child-wake', rootItemId: 'root-wake', issueIdentifier: 'LIN-6', issueTitle: 'child', promptName: 'implementation', prompt: 'p',
-      dispatchedAt: new Date(wakeMs).toISOString(), resolvedAt: new Date(wakeMs).toISOString(), status: 'taken',
-      feedback: [
-        { message: '[blocked] need a decision', timestamp: new Date(wakeMs).toISOString() },
-        { kind: 'decision', message: JSON.stringify({ decision_id: 'd-wake', question: 'Proceed?' }), timestamp: new Date(wakeMs).toISOString() }
-      ]
-    };
-    const perWorkspace = { 'ws-a': { live: [], history: [root, wakeChild], agentStatus: [] } };
-    const router = makeKpiRouter(perWorkspace);
-    const handler = getHandler(router, 'get', '/workspace/:urlKey/api/escalation-kpis');
-    const { req, res } = makeReqRes({ session: { workspaces: [{ urlKey: 'ws-a', name: 'Alpha' }] } });
-    await handler(req, res);
-
-    assert.equal(res.statusCode, 200);
-    assert.equal(
-      res.jsonBody.unansweredAge.count, 1,
-      'the row is anchored on the root (no decision of its own), but its raisedAt must come from the CONTENT loop (child-wake) that actually raised it'
-    );
-  });
-
-  test('computes time-to-response and false-escalation from a resolved loop-backed decision, and counts an unresolved one as unanswered', async () => {
-    const raisedMs = Date.now() - 5 * 24 * 60 * 60 * 1000; // 5 days ago
-    const resolvedMs = raisedMs + 24 * 60 * 60 * 1000; // 1 day to resolve
-    const unansweredRaisedMs = Date.now() - 2 * 60 * 60 * 1000; // 2h ago — not stale (< 24h default)
-
-    const resolvedLoop = {
-      id: 'w-resolved', issueIdentifier: 'LIN-1', issueTitle: 'x', promptName: 'implementation', prompt: 'p',
-      dispatchedAt: new Date(raisedMs).toISOString(), resolvedAt: new Date(raisedMs).toISOString(), status: 'taken',
-      feedback: [
-        { message: '[blocked] need a decision', timestamp: new Date(raisedMs).toISOString() },
-        { kind: 'decision', message: JSON.stringify({ decision_id: 'd-1', question: 'Proceed?' }), timestamp: new Date(raisedMs).toISOString() },
-        { kind: 'decision-answer', message: JSON.stringify({ decision_id: 'd-1' }), timestamp: new Date(resolvedMs).toISOString() }
-      ]
-    };
-    const unansweredLoop = {
-      id: 'w-unanswered', issueIdentifier: 'LIN-2', issueTitle: 'y', promptName: 'implementation', prompt: 'p',
-      dispatchedAt: new Date(unansweredRaisedMs).toISOString(), resolvedAt: new Date(unansweredRaisedMs).toISOString(), status: 'taken',
-      feedback: [
-        { message: '[blocked] need a decision', timestamp: new Date(unansweredRaisedMs).toISOString() },
-        { kind: 'decision', message: JSON.stringify({ decision_id: 'd-2', question: 'Proceed?' }), timestamp: new Date(unansweredRaisedMs).toISOString() }
-      ]
-    };
-    const perWorkspace = { 'ws-a': { live: [], history: [resolvedLoop, unansweredLoop], agentStatus: [] } };
-
-    const router = makeKpiRouter(perWorkspace);
-    const handler = getHandler(router, 'get', '/workspace/:urlKey/api/escalation-kpis');
-    const session = { workspaces: [{ urlKey: 'ws-a', name: 'Alpha' }] };
-    const { req, res } = makeReqRes({ session, query: { windowDays: '30' } });
-    await handler(req, res);
-
-    assert.equal(res.statusCode, 200);
     const body = res.jsonBody;
-    assert.equal(body.windowDays, 30);
-    assert.equal(body.timeToResponse.count, 1);
-    assert.equal(body.timeToResponse.medianMs, 24 * 60 * 60 * 1000);
     assert.equal(body.falseEscalation.answered, 1);
-    assert.equal(body.falseEscalation.dismissed, 0);
-    assert.equal(body.unansweredAge.count, 1);
-    assert.equal(body.unansweredAge.staleCount, 0, 'a 2h-old ruling is not stale under the 24h default threshold');
-    assert.equal(body.escalationRate.raisedInWindow, 2, 'both decisions were raised within the 30-day window');
+    assert.equal(body.falseEscalation.dismissed, 1);
+    assert.equal(body.falseEscalation.rate, 0.5);
+    assert.equal(body.unansweredAge.count, 1, 'the open question is the one unanswered row');
+    assert.equal(body.escalationRate.raisedInWindow, 3, 'all three were raised within the window');
   });
 
-  // LIN-2891/LIN-3036 Rev 8: the named `computeWorkspaceEscalationKpis`
-  // INTERIM GAP, pinned here so it stays intentional and visible. A withdrawn
-  // decision drops out of `unansweredRows` (Surface 5's `resolved` exclusion)
-  // AND is NOT added to `resolvedEvents` (Surface 2 deliberately leaves
-  // `resolvedDecisionEvents` untouched), so it silently leaves `raisedInWindow`
-  // entirely — neither a live escalation nor a false one. This is the ACCEPTED
-  // interim behaviour, not a defect: it is safer than booking the row either
-  // way, and it has a direct precedent in the `'self-resolved'` early-`continue`
-  // bucket (lib/escalation-kpis.js:113-117). The proper third bucket is
-  // LIN-2895's own surface — do NOT implement it here.
-  test('LIN-3036 interim gap (owned by LIN-2895): a withdrawn decision is in NEITHER unansweredRows NOR resolvedEvents, so it drops out of raisedInWindow', async () => {
-    const raisedMs = Date.now() - 2 * 60 * 60 * 1000;
-    const ts = new Date(raisedMs).toISOString();
-    const withdrawnLoop = {
-      id: 'w-withdrawn', issueIdentifier: 'LIN-7', issueTitle: 'withdrawn', promptName: 'implementation', prompt: 'p',
-      dispatchedAt: ts, resolvedAt: ts, status: 'taken',
-      feedback: [
-        { message: '[blocked] need a decision', timestamp: ts },
-        { kind: 'decision', message: JSON.stringify({ decision_id: 'd-withdrawn', question: 'Proceed?' }), timestamp: ts },
-        { kind: 'decision-withdrawn', message: JSON.stringify({ decision_id: 'd-withdrawn', reason: 'asker retracted it' }), timestamp: ts }
-      ]
-    };
-    const openLoop = {
-      id: 'w-open', issueIdentifier: 'LIN-8', issueTitle: 'open', promptName: 'implementation', prompt: 'p',
-      dispatchedAt: ts, resolvedAt: ts, status: 'taken',
-      feedback: [
-        { message: '[blocked] need a decision', timestamp: ts },
-        { kind: 'decision', message: JSON.stringify({ decision_id: 'd-open', question: 'Proceed?' }), timestamp: ts }
-      ]
-    };
-
-    // Control: BEFORE the withdrawal lands, the same decision is unanswered and
-    // counts — so the drop asserted below is caused by the withdrawal, not by
-    // the fixture having never been counted in the first place.
-    const controlLoops = [
-      { ...withdrawnLoop, feedback: withdrawnLoop.feedback.filter((e) => e.kind !== 'decision-withdrawn') },
-      openLoop
-    ];
-    const controlRouter = makeKpiRouter({ 'ws-a': { live: [], history: controlLoops, agentStatus: [] } });
-    const controlHandler = getHandler(controlRouter, 'get', '/workspace/:urlKey/api/escalation-kpis');
-    const control = makeReqRes({ session: { workspaces: [{ urlKey: 'ws-a', name: 'Alpha' }] } });
-    await controlHandler(control.req, control.res);
-    assert.equal(control.res.jsonBody.unansweredAge.count, 2, 'control: without the withdrawal both decisions count as unanswered');
-    assert.equal(control.res.jsonBody.escalationRate.raisedInWindow, 2, 'control: both are raised in-window');
-
-    const router = makeKpiRouter({ 'ws-a': { live: [], history: [withdrawnLoop, openLoop], agentStatus: [] } });
-    const handler = getHandler(router, 'get', '/workspace/:urlKey/api/escalation-kpis');
-    const { req, res } = makeReqRes({ session: { workspaces: [{ urlKey: 'ws-a', name: 'Alpha' }] } });
+  test('a closed ticket\'s open question is "ticket closed": self-resolved, never a false escalation', async () => {
+    await askQuestion('ws-a', 'LIN-9');
+    const ended = await endOpenQuestionsOfTicket({ recordsStore: records, urlKey: 'ws-a', ticket: 'LIN-9' });
+    assert.equal(ended.ended, 1);
+    const handler = getHandler(makeKpiRouter(records), 'get', '/workspace/:urlKey/api/escalation-kpis');
+    const { req, res } = kpiReq();
     await handler(req, res);
+    assert.equal(res.jsonBody.selfResolved.count, 1);
+    assert.equal(res.jsonBody.falseEscalation.dismissed, 0, 'the ticket closing is not a dismissal');
+    assert.equal(res.jsonBody.falseEscalation.total, 0);
+    assert.equal(res.jsonBody.escalationRate.raisedInWindow, 1);
+  });
 
+  test('one workspace whose records read fails degrades to a partial computation, not a 500', async () => {
+    await askQuestion('ws-a', 'LIN-5');
+    const flaky = Object.create(records);
+    flaky.find = (urlKey, q) => (urlKey === 'ws-bad' ? Promise.reject(new Error('store down')) : records.find(urlKey, q));
+    const handler = getHandler(makeKpiRouter(flaky), 'get', '/workspace/:urlKey/api/escalation-kpis');
+    const { req, res } = makeReqRes({ session: { workspaces: [{ urlKey: 'ws-bad', name: 'Bad' }, { urlKey: 'ws-a', name: 'Alpha' }] } });
+    await handler(req, res);
     assert.equal(res.statusCode, 200);
-    assert.equal(res.jsonBody.unansweredAge.count, 1, 'only the still-open decision remains unanswered');
-    assert.equal(res.jsonBody.timeToResponse.count, 0, 'the withdrawn decision is NOT a resolved event — no duration is recorded');
-    assert.equal(res.jsonBody.falseEscalation.answered, 0, 'nor does it book as answered');
-    assert.equal(res.jsonBody.falseEscalation.dismissed, 0, 'nor dismissed');
-    assert.equal(
-      res.jsonBody.escalationRate.raisedInWindow, 1,
-      'INTERIM GAP (LIN-2895): the withdrawn decision leaves raisedInWindow entirely — neither unanswered nor resolved'
-    );
-  });
-
-  test('a dismissed decision counts toward falseEscalation.dismissed, not answered', async () => {
-    const raisedMs = Date.now() - 2 * 24 * 60 * 60 * 1000;
-    const resolvedMs = raisedMs + 60 * 60 * 1000;
-    const loop = {
-      id: 'w-dismissed', issueIdentifier: 'LIN-3', issueTitle: 'z', promptName: 'implementation', prompt: 'p',
-      dispatchedAt: new Date(raisedMs).toISOString(), resolvedAt: new Date(raisedMs).toISOString(), status: 'taken',
-      feedback: [
-        { kind: 'decision', message: JSON.stringify({ decision_id: 'd-1', question: 'Proceed?' }), timestamp: new Date(raisedMs).toISOString() },
-        { kind: 'decision-answer', message: JSON.stringify({ decision_id: 'd-1', outcome: 'dismissed' }), timestamp: new Date(resolvedMs).toISOString() }
-      ]
-    };
-    const perWorkspace = { 'ws-a': { live: [], history: [loop], agentStatus: [] } };
-    const router = makeKpiRouter(perWorkspace);
-    const handler = getHandler(router, 'get', '/workspace/:urlKey/api/escalation-kpis');
-    const { req, res } = makeReqRes({ session: { workspaces: [{ urlKey: 'ws-a', name: 'Alpha' }] } });
-    await handler(req, res);
-
-    assert.equal(res.jsonBody.falseEscalation.dismissed, 1);
-    assert.equal(res.jsonBody.falseEscalation.answered, 0);
-    assert.equal(res.jsonBody.falseEscalation.rate, 1);
-  });
-
-  test('folds in the task-bound half via taskDecisionsStore (resolved + unanswered)', async () => {
-    const raisedMs = Date.now() - 3 * 24 * 60 * 60 * 1000;
-    const resolvedMs = raisedMs + 60 * 60 * 1000;
-    const taskDecisionsStore = {
-      async listResolvedForWorkspaces(urlKeys, sinceMs) {
-        assert.deepEqual(urlKeys, ['ws-a']);
-        return [{ id: 'scan_1', urlKey: 'ws-a', issueId: 'iss-1', scannedAt: new Date(raisedMs).toISOString(), outcome: 'answered', outcomeAt: new Date(resolvedMs).toISOString() }];
-      },
-      async listUnansweredForWorkspaces(urlKeys) {
-        return [{
-          id: 'scan_2', urlKey: 'ws-a', issueId: '11111111-2222-3333-4444-555555555555',
-          issueIdentifier: 'LIN-4', decision: { decision_id: 'scan_2', question: 'q?' },
-          scannedAt: new Date(Date.now() - 60 * 60 * 1000).toISOString(), outcome: null, outcomeAt: null
-        }];
-      },
-      async listNewestScanPerTask() { return {}; }
-    };
-    const perWorkspace = { 'ws-a': { live: [], history: [], agentStatus: [] } };
-    const router = makeKpiRouter(perWorkspace, taskDecisionsStore);
-    const handler = getHandler(router, 'get', '/workspace/:urlKey/api/escalation-kpis');
-    const { req, res } = makeReqRes({ session: { workspaces: [{ urlKey: 'ws-a', name: 'Alpha' }] } });
-    await handler(req, res);
-
-    assert.equal(res.statusCode, 200);
-    assert.equal(res.jsonBody.timeToResponse.count, 1);
-    assert.equal(res.jsonBody.falseEscalation.answered, 1);
-    assert.equal(res.jsonBody.unansweredAge.count, 1);
-  });
-
-  // LIN-2729 / LIN-2893 Step 5, site 2: proves computeWorkspaceEscalationKpis
-  // actually calls `listNewestScanPerTask` (with its OWN workspace-key
-  // scope — a bare array of urlKeys, not the `{urlKey,name}` shape site 1
-  // uses) and threads the result into the SAME predicate, so a task's true
-  // newest outcome-bearing scan discharges the KPI's own unansweredAge row
-  // too — never a divergent derivation from the live feed's.
-  test('LIN-2729 fix: listNewestScanPerTask is called with this site\'s own scope and discharges the KPI\'s unansweredAge row', async () => {
-    const newestScanCalls = [];
-    const taskDecisionsStore = {
-      async listResolvedForWorkspaces() { return []; },
-      async listUnansweredForWorkspaces(urlKeys) {
-        assert.deepEqual(urlKeys, ['ws-a']);
-        return [{
-          id: 'scan_nf_kpi', urlKey: 'ws-a', issueId: '88888888-1111-2222-3333-444444444444',
-          issueIdentifier: 'LIN-91', decision: { decision_id: 'd-task-nf-kpi', question: 'q?' },
-          scannedAt: new Date(Date.now() - 60 * 60 * 1000).toISOString(), outcome: null, outcomeAt: null
-        }];
-      },
-      async listNewestScanPerTask(urlKeys) {
-        newestScanCalls.push(urlKeys);
-        return {
-          'ws-a::88888888-1111-2222-3333-444444444444': {
-            urlKey: 'ws-a', issueId: '88888888-1111-2222-3333-444444444444',
-            outcome: 'dismissed', scannedAt: new Date().toISOString()
-          }
-        };
-      }
-    };
-    const perWorkspace = { 'ws-a': { live: [], history: [], agentStatus: [] } };
-    const router = makeKpiRouter(perWorkspace, taskDecisionsStore);
-    const handler = getHandler(router, 'get', '/workspace/:urlKey/api/escalation-kpis');
-    const { req, res } = makeReqRes({ session: { workspaces: [{ urlKey: 'ws-a', name: 'Alpha' }] } });
-    await handler(req, res);
-
-    assert.equal(res.statusCode, 200);
-    assert.equal(newestScanCalls.length, 1, 'listNewestScanPerTask must actually be called by this consumer');
-    assert.deepEqual(newestScanCalls[0], ['ws-a'], 'called with this site\'s own scope (bare urlKeys array, matching its candidate fetch)');
-    assert.equal(res.jsonBody.unansweredAge.count, 0, 'the older candidate must be discharged — its task\'s true newest row is dismissed');
-  });
-
-  test('LIN-2291: task-bound unansweredRows attributes raisedAt to the row\'s own workspace, not the first workspace sharing decision_id', async () => {
-    const staleMs = Date.now() - 30 * 60 * 60 * 1000; // 30h ago — stale under the 24h default
-    const freshMs = Date.now() - 60 * 60 * 1000; // 1h ago — not stale
-    const taskDecisionsStore = {
-      async listResolvedForWorkspaces() { return []; },
-      async listUnansweredForWorkspaces(urlKeys) {
-        assert.deepEqual(urlKeys, ['ws-a', 'ws-b']);
-        return [
-          {
-            id: 'scan_a', urlKey: 'ws-a', issueId: '11111111-1111-1111-1111-111111111111',
-            issueIdentifier: 'LIN-10', decision: { decision_id: 'proceed-or-abort', question: 'q?' },
-            scannedAt: new Date(staleMs).toISOString(), outcome: null, outcomeAt: null
-          },
-          {
-            id: 'scan_b', urlKey: 'ws-b', issueId: '22222222-2222-2222-2222-222222222222',
-            issueIdentifier: 'LIN-11', decision: { decision_id: 'proceed-or-abort', question: 'q?' },
-            scannedAt: new Date(freshMs).toISOString(), outcome: null, outcomeAt: null
-          }
-        ];
-      },
-      async listNewestScanPerTask() { return {}; }
-    };
-    const perWorkspace = { 'ws-a': { live: [], history: [], agentStatus: [] }, 'ws-b': { live: [], history: [], agentStatus: [] } };
-    const router = makeKpiRouter(perWorkspace, taskDecisionsStore);
-    const handler = getHandler(router, 'get', '/workspace/:urlKey/api/escalation-kpis');
-    const { req, res } = makeReqRes({ session: { workspaces: [{ urlKey: 'ws-a', name: 'Alpha' }, { urlKey: 'ws-b', name: 'Bravo' }] } });
-    await handler(req, res);
-
-    assert.equal(res.statusCode, 200);
-    assert.equal(res.jsonBody.unansweredAge.count, 2);
-    // Both rows share decision_id 'proceed-or-abort'. A decision_id-only .find
-    // resolves BOTH to ws-a's stale row (the first match in listUnansweredForWorkspaces'
-    // return order), reporting staleCount 2. The correct composite-key match
-    // attributes ws-b's row to its own fresh scannedAt, so only ws-a is stale.
-    assert.equal(res.jsonBody.unansweredAge.staleCount, 1, 'only the ws-a row is stale — ws-b must not inherit ws-a\'s raisedAt via a decision_id-only match');
-  });
-
-  test('LIN-2367: two tasks in the SAME workspace sharing a decision_id each keep their own raisedAt', async () => {
-    // The sibling LIN-2291's review recorded and deliberately left unfixed.
-    // LIN-2291 closed the CROSS-workspace half by moving to a
-    // `(urlKey, decision_id)` composite key, which is still not unique:
-    // `collectUnansweredDecisions` dedupes task decisions per
-    // `(urlKey, issueId)`, so ONE workspace can hold many unanswered rows.
-    //
-    // THESE FIXTURES ARE SYNTHETIC, and that is the honest description of
-    // them. No producer can emit a colliding `decision_id` on these rows:
-    // `lib/scan.js` sets it to `buildId(issueId, inputHash)`, the same value
-    // that becomes `_id`, so `decision_id === _id` and the primary key makes a
-    // collision impossible. Two earlier drafts of this comment claimed
-    // otherwise — first that the agent invents the string (true of dispatch
-    // -loop decisions, which take the other branch), then that legacy rows
-    // exist from before the overwrite landed (they do not; the commit that
-    // added the overwrite also added the store's first writer). See the join
-    // in routes/dashboard.js for both corrections.
-    //
-    // So this test does NOT reproduce a live bug. It pins the JOIN'S CONTRACT:
-    // given two rows that share a decision_id, each must keep its own
-    // raisedAt. That contract is worth pinning independently of whether
-    // today's producer can violate it — it is what makes the key correct by
-    // construction rather than by luck, and it is what a future producer
-    // would break. Said plainly so the next reader does not try to reproduce
-    // these rows through `runTaskScan` and conclude the test is fake.
-    const staleMs = Date.now() - 30 * 60 * 60 * 1000; // 30h — stale under the 24h default
-    const freshMs = Date.now() - 60 * 60 * 1000;      // 1h — not stale
-    const taskDecisionsStore = {
-      async listResolvedForWorkspaces() { return []; },
-      async listUnansweredForWorkspaces(urlKeys) {
-        assert.deepEqual(urlKeys, ['ws-a']);
-        return [
-          {
-            id: 'scan_stale', urlKey: 'ws-a', issueId: '11111111-1111-1111-1111-111111111111',
-            issueIdentifier: 'LIN-20', decision: { decision_id: 'proceed-or-abort', question: 'q?' },
-            scannedAt: new Date(staleMs).toISOString(), outcome: null, outcomeAt: null
-          },
-          {
-            id: 'scan_fresh', urlKey: 'ws-a', issueId: '22222222-2222-2222-2222-222222222222',
-            issueIdentifier: 'LIN-21', decision: { decision_id: 'proceed-or-abort', question: 'q?' },
-            scannedAt: new Date(freshMs).toISOString(), outcome: null, outcomeAt: null
-          }
-        ];
-      },
-      async listNewestScanPerTask() { return {}; }
-    };
-    const perWorkspace = { 'ws-a': { live: [], history: [], agentStatus: [] } };
-    const router = makeKpiRouter(perWorkspace, taskDecisionsStore);
-    const handler = getHandler(router, 'get', '/workspace/:urlKey/api/escalation-kpis');
-    const { req, res } = makeReqRes({ session: { workspaces: [{ urlKey: 'ws-a', name: 'Alpha' }] } });
-    await handler(req, res);
-
-    assert.equal(res.statusCode, 200);
-    // Precondition: both rows survive into the KPI at all. Without this a
-    // dedupe regression could drop one and make staleCount 1 vacuously.
-    assert.equal(res.jsonBody.unansweredAge.count, 2, 'both same-workspace rows must reach the KPI');
-    // Under the LIN-2291 composite key both rows resolve to the FIRST match —
-    // the 30h-stale one — so both count as stale. Matching on the store's own
-    // record identity gives each row its own scannedAt.
-    assert.equal(
-      res.jsonBody.unansweredAge.staleCount, 1,
-      'only the 30h row is stale; the 1h row must not inherit its raisedAt via a (urlKey, decision_id) match'
-    );
-  });
-
-  test('LIN-2367: a task-bound row with no resolvable record identity reports no raisedAt rather than borrowing one', async () => {
-    // The `|| null` degradation path on `taskDecisionAnchor`'s `taskDecisionId`.
-    // It cannot fire for a store-sourced row (`toRecord` always sets
-    // `id: doc._id`, and `_id` is the deterministic
-    // `scan_<issueId8>_<inputHash12>`), so this guards a future producer rather
-    // than a live case.
-    //
-    // What it pins is a POLICY, not a theft: an unmatchable row contributes no
-    // age at all. Without the `anchorId` ternary the row would match ITSELF
-    // (it is the only row with a null id) and contribute its own correct age —
-    // so the fix does not prevent it borrowing a neighbour's raisedAt, it
-    // chooses not to age it at all. That choice costs something, recorded on
-    // the join in routes/dashboard.js: `lib/escalation-kpis.js` skips
-    // null-raised rows, so the row vanishes from the KPI rather than being
-    // mis-aged.
-    const staleMs = Date.now() - 30 * 60 * 60 * 1000;
-    const taskDecisionsStore = {
-      async listResolvedForWorkspaces() { return []; },
-      async listUnansweredForWorkspaces() {
-        return [
-          {
-            id: 'scan_real', urlKey: 'ws-a', issueId: '11111111-1111-1111-1111-111111111111',
-            issueIdentifier: 'LIN-30', decision: { decision_id: 'shared', question: 'q?' },
-            scannedAt: new Date(staleMs).toISOString(), outcome: null, outcomeAt: null
-          },
-          {
-            id: null, urlKey: 'ws-a', issueId: '22222222-2222-2222-2222-222222222222',
-            issueIdentifier: 'LIN-31', decision: { decision_id: 'shared', question: 'q?' },
-            scannedAt: new Date(staleMs).toISOString(), outcome: null, outcomeAt: null
-          }
-        ];
-      },
-      async listNewestScanPerTask() { return {}; }
-    };
-    const perWorkspace = { 'ws-a': { live: [], history: [], agentStatus: [] } };
-    const router = makeKpiRouter(perWorkspace, taskDecisionsStore);
-    const handler = getHandler(router, 'get', '/workspace/:urlKey/api/escalation-kpis');
-    const { req, res } = makeReqRes({ session: { workspaces: [{ urlKey: 'ws-a', name: 'Alpha' }] } });
-    await handler(req, res);
-
-    assert.equal(res.statusCode, 200);
-    // The id-less row has no raisedAt, so it contributes no age: one stale row,
-    // not two. Under BOTH old predicates it resolved to scan_real and both
-    // counted stale; under a null-matching find it would resolve to itself and
-    // still count. Either way the assertion is a real witness — it just pins
-    // the policy rather than preventing a theft.
-    assert.equal(res.jsonBody.unansweredAge.staleCount, 1, 'an unmatchable row contributes no age rather than being aged from an unreliable key');
-  });
-
-  test('LIN-2367: two workspaces holding rows with the SAME record id do not cross-match', async () => {
-    // `_id` alone is not unique in this system, so the join keeps `urlKey`.
-    //
-    // `_id` is `scan_<issueId8>_<inputHash12>` and the store partitions by
-    // workspace: every store operation is `{_id, urlKey}`-scoped, and
-    // tests/unit/task-decisions-store.test.js deliberately records the same
-    // (issueId, inputHash) under `ws-a` and `ws-b` — two rows sharing an `_id`
-    // — and asserts both persist. The MangoDB dev backend does not enforce
-    // `_id` uniqueness either (its default `_id` index carries no `unique`).
-    //
-    // An identity-only join would therefore have traded LIN-2367's collision
-    // axis for LIN-2291's, quietly undoing that fix. This pins that it did not:
-    // the fixture is the exact shape the store's own test constructs.
-    const staleMs = Date.now() - 30 * 60 * 60 * 1000; // 30h — stale
-    const freshMs = Date.now() - 60 * 60 * 1000;      // 1h — not stale
-    const sharedId = 'scan_11111111_222222222222';
-    const taskDecisionsStore = {
-      async listResolvedForWorkspaces() { return []; },
-      async listUnansweredForWorkspaces(urlKeys) {
-        assert.deepEqual(urlKeys, ['ws-a', 'ws-b']);
-        return [
-          {
-            id: sharedId, urlKey: 'ws-a', issueId: '11111111-1111-1111-1111-111111111111',
-            issueIdentifier: 'LIN-40', decision: { decision_id: sharedId, question: 'q?' },
-            scannedAt: new Date(staleMs).toISOString(), outcome: null, outcomeAt: null
-          },
-          {
-            id: sharedId, urlKey: 'ws-b', issueId: '11111111-1111-1111-1111-111111111111',
-            issueIdentifier: 'LIN-40', decision: { decision_id: sharedId, question: 'q?' },
-            scannedAt: new Date(freshMs).toISOString(), outcome: null, outcomeAt: null
-          }
-        ];
-      },
-      async listNewestScanPerTask() { return {}; }
-    };
-    const perWorkspace = { 'ws-a': { live: [], history: [], agentStatus: [] }, 'ws-b': { live: [], history: [], agentStatus: [] } };
-    const router = makeKpiRouter(perWorkspace, taskDecisionsStore);
-    const handler = getHandler(router, 'get', '/workspace/:urlKey/api/escalation-kpis');
-    const { req, res } = makeReqRes({ session: { workspaces: [{ urlKey: 'ws-a', name: 'Alpha' }, { urlKey: 'ws-b', name: 'Bravo' }] } });
-    await handler(req, res);
-
-    assert.equal(res.statusCode, 200);
-    assert.equal(res.jsonBody.unansweredAge.count, 2, 'both rows must reach the KPI');
-    // An id-only join resolves BOTH to ws-a's 30h row (first match) and reports 2.
-    assert.equal(
-      res.jsonBody.unansweredAge.staleCount, 1,
-      'ws-b must keep its own fresh scannedAt — dropping urlKey from the join would re-open LIN-2291'
-    );
+    assert.equal(res.jsonBody.unansweredAge.count, 1, 'the healthy workspace still counts');
   });
 
   test('windowDays is clamped to [1, 365] and defaults to 30 when absent/invalid', async () => {
-    const router = makeKpiRouter({ 'ws-a': { live: [], history: [], agentStatus: [] } });
-    const handler = getHandler(router, 'get', '/workspace/:urlKey/api/escalation-kpis');
-
-    const noParam = makeReqRes({ session: { workspaces: [{ urlKey: 'ws-a', name: 'Alpha' }] } });
+    const handler = getHandler(makeKpiRouter(records), 'get', '/workspace/:urlKey/api/escalation-kpis');
+    const noParam = kpiReq();
     await handler(noParam.req, noParam.res);
     assert.equal(noParam.res.jsonBody.windowDays, 30);
-
-    const tooLarge = makeReqRes({ session: { workspaces: [{ urlKey: 'ws-a', name: 'Alpha' }] }, query: { windowDays: '9999' } });
+    const tooLarge = kpiReq({ windowDays: '9999' });
     await handler(tooLarge.req, tooLarge.res);
     assert.equal(tooLarge.res.jsonBody.windowDays, 365);
-
-    const invalid = makeReqRes({ session: { workspaces: [{ urlKey: 'ws-a', name: 'Alpha' }] }, query: { windowDays: 'nope' } });
+    const invalid = kpiReq({ windowDays: 'nope' });
     await handler(invalid.req, invalid.res);
     assert.equal(invalid.res.jsonBody.windowDays, 30);
   });
 
   test('targetPerDay is optional — omitted means no verdict, supplied produces a real one', async () => {
-    const router = makeKpiRouter({ 'ws-a': { live: [], history: [], agentStatus: [] } });
-    const handler = getHandler(router, 'get', '/workspace/:urlKey/api/escalation-kpis');
-
-    const noTarget = makeReqRes({ session: { workspaces: [{ urlKey: 'ws-a', name: 'Alpha' }] } });
+    await askQuestion('ws-a', 'LIN-6');
+    await askQuestion('ws-a', 'LIN-7');
+    const handler = getHandler(makeKpiRouter(records), 'get', '/workspace/:urlKey/api/escalation-kpis');
+    const noTarget = kpiReq();
     await handler(noTarget.req, noTarget.res);
     assert.equal(noTarget.res.jsonBody.escalationRate.targetPerDay, null);
     assert.equal(noTarget.res.jsonBody.escalationRate.overTarget, null);
-
-    const withTarget = makeReqRes({ session: { workspaces: [{ urlKey: 'ws-a', name: 'Alpha' }] }, query: { targetPerDay: '2' } });
+    const withTarget = kpiReq({ targetPerDay: '2' });
     await handler(withTarget.req, withTarget.res);
     assert.equal(withTarget.res.jsonBody.escalationRate.targetPerDay, 2);
     assert.equal(withTarget.res.jsonBody.escalationRate.overTarget, false);
   });
-
-  test('one failing workspace store degrades to a partial computation, not a 500', async () => {
-    const router = createDashboardRoutes({
-      workspaceFromUrl: (req, res, next) => next(),
-      dispatchQueueStore: {
-        async listItems(urlKey) { if (urlKey === 'bad') throw new Error('store down'); return []; },
-        async listHistory(urlKey) { if (urlKey === 'bad') throw new Error('store down'); return { items: [] }; }
-      },
-      agentStatusStore: { async listStatus() { return { items: [] }; } },
-      runSummaryCacheStore: new InMemoryRunSummaryCacheStore(),
-      freeTierStore: { async tryUse() { return { allowed: true }; } },
-      getWorkspaceAccessToken: async () => 'token',
-      fetchIssueContext: async () => ({}),
-      getOpenRouterSource: () => 'env',
-      getDeployInfo: () => ({})
-    });
-    const handler = getHandler(router, 'get', '/workspace/:urlKey/api/escalation-kpis');
-    const { req, res } = makeReqRes({ session: { workspaces: [{ urlKey: 'bad', name: 'Bad' }, { urlKey: 'good', name: 'Good' }] } });
-    await handler(req, res);
-    assert.equal(res.statusCode, 200);
-  });
 });
-
-// ─── Feed memory: lean projection + bounded fan-out (LIN-622) ─────────────────
 
 describe('feed memory (LIN-622)', () => {
   test('/api/dashboard/loops payload carries no promptText nor retained feedback[] (lean reconstruction)', async () => {
@@ -4398,127 +3987,32 @@ describe('GET /observation/session/:sessionId — waiting banner clears after a 
   });
 });
 
-// ─── LIN-3252 S2: the pinned question card read ────────────────────────────────
+// ─── LIN-3252 S2 / LIN-4538 (P7a): the pinned question read ─────────────────────
 //
-// The run page's card data comes from `deriveSessionDecisions` over the session's
-// OWN enriched loops (session-membership scope, no shelves, no task-decisions),
-// and is returned whether or not the session is `waiting` — including after it
-// finished. `collectUnansweredDecisions` stays the one predicate, so an answered
-// decision is subtracted and never reappears. The card RENDER is Beat 2; these pin
-// only the read path.
-describe('deriveSessionDecisions — pinned question card read (LIN-3252 S2)', () => {
-  function decisionLoop({ loopId, decisionId, terminalStatus = null, agentState = undefined, issueIdentifier = 'LIN-1', answeredDecisions = [] }) {
-    return {
-      loopId,
-      lineageId: loopId,
-      workspaceUrlKey: 'ws-a',
-      issueIdentifier,
-      target: 'cli',
-      dispatchedAt: NOW_ISO,
-      terminalStatus,
-      agentState,
-      decision: { decision_id: decisionId, question: 'Proceed with the migration?', options: [{ id: 'yes', label: 'Yes' }] },
-      decisionCase: ['The migration is reversible.'],
-      answeredDecisions
-    };
-  }
+// The run page's pinned cards are the session's OPEN question records (lib/open-questions.js openQuestionsForRun
+// through the route; deriveSessionDecisions is the pure read over the question facts). An answered or dismissed
+// question is never read here, and a question asked from another run is not this session's.
+describe('deriveSessionDecisions — the session\'s open question facts (LIN-4538)', () => {
+  const fact = (over = {}) => ({
+    questionId: 'q-1', state: 'open', to: 'person:acct-owner', ticket: 'LIN-1', runId: 'l-live', taskId: 'task-LIN-1', resolvedAt: null,
+    endedBy: null, reason: null, outcome: null, ...over,
+  });
+  const loopOf = (loopId, over = {}) => ({ loopId, lineageId: loopId, issueIdentifier: 'LIN-1', ...over });
 
-  test('returns an unanswered decision on a non-waiting (live) loop', () => {
-    const rows = deriveSessionDecisions([decisionLoop({ loopId: 'l-live', decisionId: 'd-live' })], { now: new Date() });
-    assert.equal(rows.length, 1, 'the live loop decision is returned');
-    assert.equal(rows[0].decision.decision_id, 'd-live');
-    assert.equal(rows[0].stampLoopId, 'l-live');
+  test('an open question asked from this session\'s lineage is the card; an ended one is not', () => {
+    const rows = deriveSessionDecisions([loopOf('l-live')], {
+      questions: [fact(), fact({ questionId: 'q-2', state: 'answered', resolvedAt: '2026-10-30T11:00:00.000Z', endedBy: 'person:acct-owner' })],
+    });
+    assert.deepEqual(rows.map((r) => r.questionId), ['q-1']);
   });
 
-  test('returns an unanswered decision on a FINISHED session (no waiting gate)', () => {
-    const rows = deriveSessionDecisions([decisionLoop({ loopId: 'l-done', decisionId: 'd-done', terminalStatus: 'done' })], { now: new Date() });
-    assert.equal(rows.length, 1, 'a finished session still surfaces its decision to the card');
-    assert.equal(rows[0].decision.decision_id, 'd-done');
+  test('a question asked from another run is not this session\'s, even on the same ticket', () => {
+    const rows = deriveSessionDecisions([loopOf('l-live')], { questions: [fact({ runId: 'l-other' })] });
+    assert.deepEqual(rows, []);
   });
 
-  test('an answered decision does not reappear', () => {
-    const rows = deriveSessionDecisions(
-      [decisionLoop({ loopId: 'l-ans', decisionId: 'd-ans', terminalStatus: 'done', answeredDecisions: [{ decisionId: 'd-ans' }] })],
-      { now: new Date() }
-    );
-    assert.equal(rows.length, 0, 'the answered decision is subtracted by the predicate');
-  });
-
-  test('G2: a gone row with a LIVE run on its anchor resolves effect "record" — the card must not race it', () => {
-    // The decision's own loop is terminal (gone: past the reap window), and a
-    // SEPARATE live loop in the same session carries the same issue — the same
-    // `liveDispatchOnAnchor` predicate the dashboard rulings feed injects.
-    const gone = decisionLoop({ loopId: 'l-gone', decisionId: 'd-gone', terminalStatus: 'done', agentState: 'complete' });
-    const liveOnAnchor = {
-      loopId: 'l-live', lineageId: 'l-live', workspaceUrlKey: 'ws-a',
-      issueIdentifier: 'LIN-1', target: 'cli', dispatchedAt: NOW_ISO, agentState: 'running'
-    };
-    const rows = deriveSessionDecisions([gone, liveOnAnchor], { now: new Date() });
-    const row = rows.find(r => r.decision && r.decision.decision_id === 'd-gone');
-    assert.ok(row, 'the gone decision is on the card');
-    assert.equal(row.disposition, 'gone');
-    assert.equal(row.effect, 'record', 'a live run on the anchor overrides dispatch with record (resolveEffect branch 3)');
-  });
-
-  test('G2: a gone row with NO live run on its anchor still resolves effect "dispatch"', () => {
-    const gone = decisionLoop({ loopId: 'l-gone', decisionId: 'd-gone', terminalStatus: 'done', agentState: 'complete' });
-    const otherIssue = {
-      loopId: 'l-other', lineageId: 'l-other', workspaceUrlKey: 'ws-a',
-      issueIdentifier: 'LIN-2', target: 'cli', dispatchedAt: NOW_ISO, agentState: 'running'
-    };
-    const rows = deriveSessionDecisions([gone, otherIssue], { now: new Date() });
-    const row = rows.find(r => r.decision && r.decision.decision_id === 'd-gone');
-    assert.equal(row.effect, 'dispatch', 'a live run on a DIFFERENT issue does not suppress dispatch');
-  });
-
-  test('no task-decisions input means a scan-sourced task-bound ruling stays out', () => {
-    const rows = deriveSessionDecisions([], { now: new Date() });
-    assert.deepEqual(rows, [], 'no loops → no card rows, regardless of scan store');
-  });
-
-  // ─── LIN-3260: cross-session live run on the anchor ──────────────────────────
-  //
-  // The G2 predicate above scans only the session's OWN loops, so a live run in
-  // ANOTHER session on the same issue is invisible and the gone row resolves
-  // `dispatch` — starting a second run that races the live one. The `liveLoops`
-  // opt lets the route hand `deriveSessionDecisions` the workspace-wide loop set
-  // (the warm `sessionsFeedCache` `rulings` entry) for the PREDICATE only; rows
-  // still come from `enrichedLoops` (session membership).
-  test('LIN-3260: a gone row with a live loop on its anchor from ANOTHER session (via liveLoops) resolves "record"', () => {
-    const gone = decisionLoop({ loopId: 'l-gone-a', decisionId: 'd-gone-a', terminalStatus: 'done', agentState: 'complete' });
-    const otherSessionLive = {
-      loopId: 'l-live-b', lineageId: 'l-live-b', workspaceUrlKey: 'ws-a',
-      issueIdentifier: 'LIN-1', target: 'cli', dispatchedAt: NOW_ISO, agentState: 'running'
-    };
-    // The session's OWN loops (enrichedLoops) carry NO live run on LIN-1.
-    const rows = deriveSessionDecisions([gone], { now: new Date(), liveLoops: [gone, otherSessionLive] });
-    const row = rows.find(r => r.decision && r.decision.decision_id === 'd-gone-a');
-    assert.ok(row, 'the gone decision is on the card');
-    assert.equal(row.disposition, 'gone');
-    assert.equal(row.effect, 'record', 'the workspace-wide liveLoops set supplies the other-session live run (resolveEffect branch 3)');
-  });
-
-  // Mutation M5 (LIN-3252 pass 3) survived because nothing exercised the
-  // `issueIdentifier != null` guard: a null anchor must never match another null
-  // anchor. The null-anchored live loop is present in BOTH the session's own
-  // loops and the workspace-wide `liveLoops`, so the guard is exercised on the
-  // session-scope predicate (where M5 lived) AND the workspace-wide one.
-  test('LIN-3260/null-pin: a null-anchored gone row beside a null-anchored live loop stays "dispatch", never "record"', () => {
-    const goneNull = {
-      loopId: 'l-gone-null', lineageId: 'l-gone-null', workspaceUrlKey: 'ws-a',
-      issueIdentifier: null, target: 'cli', dispatchedAt: NOW_ISO,
-      terminalStatus: 'done', agentState: 'complete',
-      decision: { decision_id: 'd-null-gone', question: 'Proceed?' }
-    };
-    const liveNull = {
-      loopId: 'l-live-null', lineageId: 'l-live-null', workspaceUrlKey: 'ws-a',
-      issueIdentifier: null, target: 'cli', dispatchedAt: NOW_ISO, agentState: 'running'
-    };
-    const rows = deriveSessionDecisions([goneNull, liveNull], { now: new Date(), liveLoops: [goneNull, liveNull] });
-    const row = rows.find(r => r.decision && r.decision.decision_id === 'd-null-gone');
-    assert.ok(row, 'the null-anchored decision is on the card');
-    assert.equal(row.disposition, 'gone');
-    assert.equal(row.effect, 'dispatch', 'a null anchor must never match another null anchor (LIN-2934 guard)');
+  test('no facts read: no card', () => {
+    assert.deepEqual(deriveSessionDecisions([loopOf('l-live')]), []);
   });
 });
 
@@ -4755,155 +4249,6 @@ describe('GET /observation/session/:sessionId — cross-session live anchor (LIN
   const cardFor = (html, decisionId) =>
     (html.match(/data-testid="session-question-card"[^>]*/g) || []).find(c => c.includes(`data-decision-id="${decisionId}"`));
 
-  test('acceptance: a gone row with a live run on the same issue in ANOTHER session renders data-effect="record"', async () => {
-    // Session A: terminal anchor + a reaped-decision worker on LIN-1. Its OWN
-    // loops carry NO live run on LIN-1 (both terminal), so before LIN-3260 the
-    // card would resolve `dispatch` and race session B's live run below.
-    // Session B: a DIFFERENT session with a live run on the same issue.
-    const { dispatchQueueStore, agentStatusStore } = makeStores({
-      'ws-a': {
-        live: [workerLiveItem('b-live', 'LIN-1', 'sess-B')],
-        history: [
-          autopilotHistoryItem('sess-B', 'LIN-1', NOW_ISO),
-          autopilotHistoryItem('sess-A', 'LIN-1', OLD_ISO),
-          goneDecisionWorker({ id: 'w-A', identifier: 'LIN-1', sessionId: 'sess-A', decisionId: 'd-gone-A' })
-        ],
-        agentStatus: [agentStatusDone('sess-A', 'LIN-1', OLD_ISO)]
-      }
-    });
-    // ONE real cache, shared by the Rulings route (which fills it) and the run
-    // page (which peeks it).
-    const cache = createSessionsFeedCache();
-    const router = makeSessionPageRouter({ dispatchQueueStore, agentStatusStore, sessionsFeedCache: cache });
-
-    // 1) Warm through the REAL Rulings path (its own keyFor over the raw,
-    //    extra-field workspace objects).
-    const warmed = await warmRulings(router);
-    assert.equal(warmed.statusCode, 200, 'the Rulings feed rendered');
-    // Key parity: the run page's mapped `{ urlKey, name }` must resolve to the
-    // entry the Rulings route actually filled.
-    const runPageKey = cache.keyFor([{ urlKey: 'ws-a', name: 'Alpha' }], 'rulings');
-    assert.notEqual(cache.peek(runPageKey), undefined, 'the real Rulings path warmed the key the run page peeks');
-
-    // 2) Render session A — the card must now see session B's live run.
-    const res = await renderSession(router, 'sess-A');
-    assert.equal(res.statusCode, 200, 'the run page rendered');
-    const card = cardFor(res.sentBody, 'd-gone-A');
-    assert.ok(card, 'the gone decision card rendered');
-    assert.match(card, /data-effect="record"/, 'a live run on the anchor in ANOTHER session forces record (no racing dispatch)');
-    assert.ok(!/data-effect="dispatch"/.test(card), 'must NOT render dispatch');
-  });
-
-  test('cold cache: no `rulings` entry → falls back to the session\'s own loops (same-session record) with NO unscoped whole-workspace read (LIN-1021 preserved)', async () => {
-    const stores = scopedStore({
-      live: [
-        { id: 'w-live-same', sessionId: 'sess-C', issueIdentifier: 'LIN-1', issueTitle: 'Title LIN-1', promptName: 'implementation', prompt: 'p', dispatchedAt: NOW_ISO }
-      ],
-      history: [
-        autopilotHistoryItem('sess-C', 'LIN-1', OLD_ISO),
-        goneDecisionWorker({ id: 'w-C', identifier: 'LIN-1', sessionId: 'sess-C', decisionId: 'd-gone-C' })
-      ],
-      agentStatus: [agentStatusDone('sess-C', 'LIN-1', OLD_ISO)]
-    });
-    const router = makeSessionPageRouter({
-      dispatchQueueStore: stores.dispatchQueueStore,
-      agentStatusStore: stores.agentStatusStore,
-      // A REAL cache that is never warmed — genuinely cold, so `peek` returns
-      // undefined and the route must fall back without a producing `get`.
-      sessionsFeedCache: createSessionsFeedCache()
-    });
-
-    const res = await renderSession(router, 'sess-C');
-    assert.equal(res.statusCode, 200, 'the run page rendered');
-    const card = cardFor(res.sentBody, 'd-gone-C');
-    assert.ok(card, 'the gone decision card rendered');
-    assert.match(card, /data-effect="record"/, 'the session-local live run still forces record on the cold-cache fallback');
-    assert.deepEqual(stores.unscoped, [], 'peek never produces: the run page does no unscoped whole-workspace read (LIN-1021)');
-  });
-
-  // E1 (review F1): the warm cached set must be ADDED to the session's own
-  // loops, not REPLACE them. `peek` never revalidates and starting a dispatch
-  // does not `clear()` the entry, so the cached set can be arbitrarily stale and
-  // can be missing a live run in THIS session on the anchor. With a replacement
-  // the card regresses to `dispatch`; the concat keeps the pre-PR `record`.
-  test('E1: a warm-but-stale rulings entry that lacks the session\'s own live loop still renders data-effect="record"', async () => {
-    const perWorkspace = {
-      'ws-a': {
-        live: [], // warmed while the session has NO live run …
-        history: [
-          autopilotHistoryItem('sess-A', 'LIN-1', OLD_ISO),
-          goneDecisionWorker({ id: 'w-A', identifier: 'LIN-1', sessionId: 'sess-A', decisionId: 'd-gone-A' })
-        ],
-        agentStatus: [agentStatusDone('sess-A', 'LIN-1', OLD_ISO)]
-      }
-    };
-    const { dispatchQueueStore, agentStatusStore } = makeStores(perWorkspace);
-    const cache = createSessionsFeedCache();
-    const router = makeSessionPageRouter({ dispatchQueueStore, agentStatusStore, sessionsFeedCache: cache });
-
-    const warmed = await warmRulings(router);
-    assert.equal(warmed.statusCode, 200, 'the Rulings feed rendered');
-    const runPageKey = cache.keyFor([{ urlKey: 'ws-a', name: 'Alpha' }], 'rulings');
-    // The warm set carries NO live run on LIN-1 (the session had none yet) …
-    assert.ok(!(cache.peek(runPageKey) || []).some(l => l.id === 'a-live'), 'sanity: the cached set is stale, lacking the run below');
-
-    // … then THIS session starts a live run on the anchor, without clearing the
-    // cached set. Only concat with the own loops can see it.
-    perWorkspace['ws-a'].live.push(workerLiveItem('a-live', 'LIN-1', 'sess-A'));
-
-    const res = await renderSession(router, 'sess-A');
-    assert.equal(res.statusCode, 200, 'the run page rendered');
-    const card = cardFor(res.sentBody, 'd-gone-A');
-    assert.ok(card, 'the gone decision card rendered');
-    assert.match(card, /data-effect="record"/, 'E1: the stale cached set must be ADDED to the session own loops, not replace them');
-  });
-
-  // E2 (review M3 survivor): the workspace filter must be pinned. The `rulings`
-  // entry spans every connected workspace, and identifiers are only per-team
-  // unique, so a same-identifier live loop in ANOTHER workspace must NOT force
-  // `record` on this card. Warm the cache over two workspaces with a live loop
-  // on LIN-1 tagged `ws-b`, then render `ws-a`: expect `dispatch`.
-  test('E2: a live loop on the same identifier in a DIFFERENT connected workspace is filtered out (data-effect="dispatch")', async () => {
-    const perWorkspace = {
-      'ws-a': {
-        live: [],
-        history: [
-          autopilotHistoryItem('sess-A', 'LIN-1', OLD_ISO),
-          goneDecisionWorker({ id: 'w-A', identifier: 'LIN-1', sessionId: 'sess-A', decisionId: 'd-gone-A' })
-        ],
-        agentStatus: [agentStatusDone('sess-A', 'LIN-1', OLD_ISO)]
-      },
-      'ws-b': {
-        live: [workerLiveItem('b-live', 'LIN-1', 'sess-B')],
-        history: [autopilotHistoryItem('sess-B', 'LIN-1', NOW_ISO)],
-        agentStatus: []
-      }
-    };
-    const { dispatchQueueStore, agentStatusStore } = makeStores(perWorkspace);
-    const cache = createSessionsFeedCache();
-    const router = makeSessionPageRouter({ dispatchQueueStore, agentStatusStore, sessionsFeedCache: cache });
-
-    const twoWsSession = {
-      ...ENABLED,
-      workspaces: [
-        { urlKey: 'ws-a', name: 'Alpha' },
-        { urlKey: 'ws-b', name: 'Beta' }
-      ]
-    };
-    const warmed = await warmRulings(router, twoWsSession);
-    assert.equal(warmed.statusCode, 200, 'the Rulings feed rendered');
-    const runPageKey = cache.keyFor([{ urlKey: 'ws-a', name: 'Alpha' }, { urlKey: 'ws-b', name: 'Beta' }], 'rulings');
-    const snapshot = cache.peek(runPageKey) || [];
-    assert.ok(snapshot.some(l => l.issueIdentifier === 'LIN-1' && l.workspaceUrlKey === 'ws-b'),
-      'the warm set really does carry the ws-b live loop on LIN-1');
-
-    const res = await renderSession(router, 'sess-A', twoWsSession);
-    assert.equal(res.statusCode, 200, 'the run page rendered');
-    const card = cardFor(res.sentBody, 'd-gone-A');
-    assert.ok(card, 'the gone decision card rendered');
-    assert.match(card, /data-effect="dispatch"/,
-      'a same-identifier loop from ANOTHER workspace must not force record (workspace filter pinned)');
-  });
 });
 
 // ─── LIN-1022: the sibling :id-keyed handlers are issue-scoped too ─────────────

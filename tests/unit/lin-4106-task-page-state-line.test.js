@@ -19,9 +19,9 @@ import { renderTaskPage, renderTaskStatus } from '../../lib/render-task-page.js'
 import { buildTaskPageModel, deriveHeader } from '../../lib/task-page-loader.js';
 import { gatherTaskStates } from '../../lib/home-row-states.js';
 import { pageStatusOf } from '../../lib/task-state.js';
-import { rulingStandingOf } from '../../lib/unanswered-decisions.js';
+import { standingOfLoops, openQuestionRowsOf } from './helpers/question-records.js';
 import { buildPromptOpts } from '../../lib/render-prompt-opts.js';
-import { enrichLoop, deriveSessionWaiting, deriveSessionDecisions } from '../../routes/dashboard.js';
+import { enrichLoop, deriveSessionWaiting } from '../../routes/dashboard.js';
 
 const NOW = new Date('2026-10-06T14:30:00.000Z');
 const URL_KEY = 'acme';
@@ -98,8 +98,9 @@ describe('LIN-4106 — the task page has one state line: one pill, one sentence,
   });
   // The page-load path: the loader gives the model the workspace's ruling standing, and the gather gives the state.
   function modelFor(loops, type = 'started') {
-    const ruling = rulingStandingOf({ urlKey: URL_KEY, loops, shelvedRulings: [] }, { now: NOW, enrichLoop });
-    const m = buildTaskPageModel({ identifier: 'LIN-50', loops, ctx: null, enrichLoop, deriveSessionWaiting, deriveSessionDecisions, ruling, now: NOW });
+    const ruling = standingOfLoops(loops, { urlKey: URL_KEY });
+    const m = buildTaskPageModel({ identifier: 'LIN-50', loops, ctx: null, enrichLoop, deriveSessionWaiting, ruling, now: NOW });
+    m.questionRecords = openQuestionRowsOf(loops);
     const state = gatherTaskStates({ roots: [{ issue: { identifier: 'LIN-50', state: { type } }, children: [] }], loops, ruling, at: NOW, enrichLoop, deriveSessionWaiting }).states.get('LIN-50');
     return { m, state };
   }
@@ -152,8 +153,9 @@ describe('LIN-4106 — the ruling card comes before the run control and the stag
 
   test('a waiting task: the question sits before the run control and the stages', () => {
     const loops = [blocked()];
-    const ruling = rulingStandingOf({ urlKey: URL_KEY, loops, shelvedRulings: [] }, { now: NOW, enrichLoop });
-    const m = buildTaskPageModel({ identifier: 'LIN-50', loops, ctx: null, enrichLoop, deriveSessionWaiting, deriveSessionDecisions, ruling, now: NOW });
+    const ruling = standingOfLoops(loops, { urlKey: URL_KEY });
+    const m = buildTaskPageModel({ identifier: 'LIN-50', loops, ctx: null, enrichLoop, deriveSessionWaiting, ruling, now: NOW });
+    m.questionRecords = openQuestionRowsOf(loops);
     const state = gatherTaskStates({ roots: [{ issue: { identifier: 'LIN-50', state: { type: 'started' } }, children: [] }], loops, ruling, at: NOW, enrichLoop, deriveSessionWaiting }).states.get('LIN-50');
     const html = renderTaskPage(m, {
       viewer: 'owner', urlKey: URL_KEY, binding: { source: 'linear' }, stateUrl: '/s', now: NOW, pageOptions: PAGE_OPTIONS, taskState: state, promptOpts: PROMPT_OPTS,

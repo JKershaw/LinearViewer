@@ -65,10 +65,10 @@ describe('LIN-4114 witness 2: cards that must render byte-for-byte as before', (
     assert.equal(html, PINS['bare-blocked-cannot-reply']);
   });
 
-  test('the wrapper around a free-text card is unchanged', () => {
-    const html = renderQuestionCards({
-      decisions: [LOOP_BACKED_ROWS['loop-plain-no-options']], waiting: true, urlKey: 'w', canReply: true, sessionTerminal: false
-    });
-    assert.equal(html, PINS['wrapper-free-text']);
+  test('the bare-blocked wrapper is drawn when no question record covers the wait, and not when one does (LIN-4538)', () => {
+    const bare = renderQuestionCards({ waiting: true, waitingMessage: 'awaiting', urlKey: 'w', canReply: true, sessionTerminal: false });
+    assert.match(bare, /sess-qcards/);
+    const covered = renderQuestionCards({ covered: true, waiting: true, waitingMessage: 'awaiting', urlKey: 'w', canReply: true, sessionTerminal: false });
+    assert.equal(covered, '');
   });
 });

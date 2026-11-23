@@ -1,5 +1,5 @@
 // The stability measures' tracker reads (LIN-4421): a paced workspace-proxy client and the reads behind the finished
-// tasks, speed, cost and minted rows, (LIN-4422) the seat's rulings and dispatch reads over the same finished set, and
+// tasks, speed, cost and minted rows, (LIN-4422) the seat's question-record and dispatch reads over the same finished set, and
 // (LIN-4519) the verdict records measure 1 counts blind reads from. Its own file because the CLI runs when imported and
 // the core does no I/O: here `fetch`, `sleep` and the clock are injected, so pacing, the 429 path and the whole read
 // are tested without a network (tests/unit/stability-measures.test.js). The decisions (ownership, selection, sessions,
@@ -186,18 +186,18 @@ export async function readVerdictRecords({ client, tickets }) {
 export const DISPATCH_LIST_LIMIT = 100;
 
 /**
- * The person's seat for the tracker read's finished tasks. Calls, in order: the rulings once (`includeResolved=true`,
- * filtered by anchor issue here, not one call per task); then per finished task its dispatch list (closedReason on
+ * The person's seat for the tracker read's finished tasks. Calls, in order: the questions once (`GET /records?kind=question`,
+ * the workspace's question records, matched to tasks here, not one call per task; LIN-4538); then per finished task its dispatch list (closedReason on
  * every row of the issue, including rows that never ran) and the detail of every lineage member /cost lists
  * (feedback, merged forward over its lineage, and closedReason for members filed under another issue).
- * A failed rulings read skips the dispatch reads: without the no-ruling condition no share can be read.
+ * A failed questions read skips the dispatch reads: without the no-question condition no share can be read.
  * `finished` is readTracker's selection.finished, `tasks` its [{ id, cost }].
  */
 export async function readSeat({ client, finished, tasks, references = {} }) {
-  const r = await client.get('/rulings?includeResolved=true');
-  const rulings = !r.ok ? { reason: r.reason } : Array.isArray(r.body?.rulings) ? { rulings: r.body.rulings } : { reason: 'rulings body has no list' };
+  const r = await client.get('/records?kind=question');
+  const questions = !r.ok ? { reason: r.reason } : Array.isArray(r.body?.records) ? { questions: r.body.records } : { reason: 'records body has no list' };
   const dispatch = new Map();
-  if (!rulings.reason) {
+  if (!questions.reason) {
     for (const t of tasks) {
       const membership = membersOf(t.cost);
       const l = await client.get(`/dispatch?issueIdentifier=${enc(t.id)}&limit=${DISPATCH_LIST_LIMIT}`);
@@ -210,5 +210,5 @@ export async function readSeat({ client, finished, tasks, references = {} }) {
       dispatch.set(t.id, { membership, list, details });
     }
   }
-  return { rows: seatRows({ finished, rulings, dispatch, references }), stats: client.stats };
+  return { rows: seatRows({ finished, questions, dispatch, references }), stats: client.stats };
 }

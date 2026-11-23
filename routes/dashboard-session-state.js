@@ -12,7 +12,8 @@
 import { computeSupersededLoopIds } from '../lib/loop-supersede.js';
 import { isTerminalLoop, loopIsWaiting } from '../lib/run-loop-state.js';
 import { liveOnAnchor } from '../lib/live-anchor.js';
-import { collectUnansweredDecisions } from '../lib/unanswered-decisions.js';
+import { lineageOfLoop } from '../lib/ruling-standing.js';
+import { openQuestionFacts } from '../lib/records/question-facts.js';
 import { findAnchorLoop } from '../lib/session-summary.js';
 import { toEpochMs } from '../lib/utils/time.js';
 
@@ -194,56 +195,18 @@ export function waitingLoops(enrichedLoops) {
 }
 
 /**
- * The run page's pinned-question-card read (LIN-3252 S2): every UNANSWERED,
- * session-scoped decision, whether or not the session is `waiting` — including
- * after it has finished. This is what lifts the LIN-2184 waiting-only render
- * gate: the predicate here never consults `waiting`, so a completion-path
- * decision (or one on a finished session) still reaches the card.
+ * The session's open question records, as the run page's pinned cards read them (LIN-3252 S2, LIN-4538 P7a): every OPEN
+ * question whose asking run is one of the session's own lineages, whether or not the session is `waiting`. Read from the
+ * question facts the caller passes (lib/records/question-facts.js questionFacts), so this is pure and reads no ruling store.
+ * A question's answer, dismissal or closure ends it here, so it never reappears.
  *
- * Scope is session MEMBERSHIP — the caller hands this the session's own enriched
- * loops, so there is no workspace-wide filter and no operator shelf is passed
- * (`shelvedRulings: []`): an operator's shelve must never hide the person's
- * card. Scan-sourced task-bound rulings have no loop and stay out
- * (`taskDecisions: []`). `collectUnansweredDecisions` remains the single
- * unanswered-decision predicate, so an answered/dismissed decision is already
- * subtracted and never reappears.
- *
- * Pure; exported for unit tests (mirrors `deriveSessionWaiting` above).
- *
- * LIN-3252 G2: injects the SAME `liveDispatchOnAnchor` predicate (`liveOnAnchor`
- * below) as the dashboard rulings feed; `routes/proxy-rulings.js` keeps an
- * identical inline copy — a live run already
- * on the anchor means `resolveEffect` branch 3, so a `gone` row answers
- * `record`, never a second run racing the live one.
- *
- * LIN-3260: the predicate scans the `liveLoops` opt when supplied — the
- * workspace-wide loop set the route reads from the warm `sessionsFeedCache`
- * `rulings` entry — so a live run on the same issue in ANOTHER session is seen.
- * Absent `liveLoops`, it scans the session's OWN loops (the prior behaviour,
- * and the route's cold-cache fallback).
- *
- * @param {Array<Object>} enrichedLoops - loops already run through `enrichLoop`
- * @param {{now?: Date, liveLoops?: Array<Object>}} [opts] - `liveLoops`: the
- *   loop set the liveness predicate scans (defaults to `enrichedLoops`)
- * @returns {Array<Object>} `collectUnansweredDecisions` rows
+ * @param {Array<Object>} enrichedLoops - the session's loops, already run through `enrichLoop`
+ * @param {{questions?: Array<Object>}} [opts] - the workspace's question facts
+ * @returns {Array<Object>} the open question facts asked from this session
  */
-export function deriveSessionDecisions(enrichedLoops, { now, liveLoops } = {}) {
-  const loops = Array.isArray(enrichedLoops) ? enrichedLoops : [];
-  // The rows still come from the session's own loops (session membership); only
-  // the liveness predicate widens to the workspace set when one is supplied.
-  const livenessScope = Array.isArray(liveLoops) ? liveLoops : loops;
-  return collectUnansweredDecisions(
-    {
-      loops,
-      taskDecisions: [],
-      shelvedRulings: [],
-      newestScanByTask: {}
-    },
-    {
-      now: now instanceof Date ? now : new Date(),
-      liveDispatchOnAnchor: liveOnAnchor(livenessScope)
-    }
-  );
+export function deriveSessionDecisions(enrichedLoops, { questions = [] } = {}) {
+  const lineages = new Set((Array.isArray(enrichedLoops) ? enrichedLoops : []).map(lineageOfLoop));
+  return openQuestionFacts(questions).filter((q) => q.runId && lineages.has(q.runId));
 }
 
 /** LIN-4114: the predicate lives in lib/live-anchor.js; re-exported here so every importer keeps its path. */

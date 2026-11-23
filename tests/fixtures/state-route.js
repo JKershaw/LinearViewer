@@ -12,6 +12,7 @@ import { createTaskPageRoutes } from '../../routes/task-page.js';
 import { enrichLoop, deriveSessionWaiting, deriveSessionDecisions } from '../../routes/dashboard.js';
 import { heldTaskFacts, heldLoaderDeps } from './held-task-facts.js';
 import { findRouteLayer } from '../unit/lib/route-layer.js';
+import { questionRecordsOf, questionsFromLoops } from '../unit/helpers/question-records.js';
 
 export const STATE_URL_KEY = 'acme';
 export const STATE_NOW = new Date('2026-10-31T12:00:00.000Z');
@@ -26,6 +27,8 @@ export async function stateBodyOf({ issues, loops = [], identifier, writtenAt = 
   const holder = heldTaskFacts({ urlKey: STATE_URL_KEY, issues, now: writtenAt, readAt });
   const loader = createTaskPageLoader({
     dispatchStore: {}, agentStatusStore: {}, enrichLoop, deriveSessionWaiting, deriveSessionDecisions,
+    // LIN-4538: a loop's ruling is the open question its run asked, read from question records (tests/unit/helpers/question-records.js).
+    recordsStore: questionRecordsOf(questionsFromLoops(loops)),
     getLoopsForIssue: async (_urlKey, id) => loops.filter((l) => l.issueIdentifier === id),
     getLoopsForIssues: async (_urlKey, ids) => loops.filter((l) => ids.includes(l.issueIdentifier)),
     now: () => readAt,

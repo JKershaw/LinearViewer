@@ -23,8 +23,9 @@ import { bodyOf } from './helpers/task-page-body.js';
 import { buildTaskPageModel } from '../../lib/task-page-loader.js';
 import { gatherTaskStates } from '../../lib/home-row-states.js';
 import { pageStatusOf } from '../../lib/task-state.js';
-import { rulingStandingOf } from '../../lib/unanswered-decisions.js';
-import { enrichLoop, deriveSessionWaiting, deriveSessionDecisions } from '../../routes/dashboard.js';
+import { enrichLoop, deriveSessionWaiting } from '../../routes/dashboard.js';
+import { standingOfLoops, openQuestionRowsOf } from './helpers/question-records.js';
+import { rulingStandingFromQuestions } from '../../lib/ruling-standing.js';
 import { NOW, PAGE_OPTIONS, loop } from './helpers/task-page-loop.js';
 
 const URL_KEY = 'acme';
@@ -39,19 +40,19 @@ const bareBlocked = (over) => loop({ loopId: 'impl-2', wakeMarker: 'blocked', wa
 
 // LIN-4071: each model's gathered state, as the route sends it (the one gatherer over the model's own loops and ruling).
 const STATES = new WeakMap();
-const stateOf = (loops, { shelvedRulings = [], ctx = null }) => {
-  const ruling = rulingStandingOf({ urlKey: URL_KEY, loops, shelvedRulings }, { now: NOW, enrichLoop });
+const stateOf = (loops, { ctx = null, ruling = standingOfLoops(loops, { urlKey: URL_KEY }) }) => {
   const type = ctx?.issue?.state?.type ?? 'started';
   return gatherTaskStates({ roots: [{ issue: { identifier: 'LIN-50', state: { type } }, children: [] }], loops, ruling, at: NOW, enrichLoop, deriveSessionWaiting }).states.get('LIN-50');
 };
 
 // The page-load path (LIN-4038): the loader gives the model the workspace's `rulingStandingOf`, so shelves count.
-function model(loops, { shelvedRulings = [], ...over } = {}) {
-  const ruling = rulingStandingOf({ urlKey: URL_KEY, loops, shelvedRulings }, { now: NOW, enrichLoop });
+// LIN-4538: the question section reads question records (questionRecords, routes/task-page.js); the standing reads the same questions.
+function model(loops, { ruling = standingOfLoops(loops, { urlKey: URL_KEY }), questionRecords = openQuestionRowsOf(loops), ...over } = {}) {
   const m = buildTaskPageModel({
-    identifier: 'LIN-50', loops, ctx: null, enrichLoop, deriveSessionWaiting, deriveSessionDecisions, ruling, now: NOW, ...over,
+    identifier: 'LIN-50', loops, ctx: null, enrichLoop, deriveSessionWaiting, ruling, now: NOW, ...over,
   });
-  STATES.set(m, stateOf(loops, { shelvedRulings, ctx: over.ctx ?? null }));
+  m.questionRecords = questionRecords;
+  STATES.set(m, stateOf(loops, { ctx: over.ctx ?? null, ruling }));
   return m;
 }
 const render = (m, viewer = 'owner', stateUrl = '/s') => renderTaskPage(m, {
@@ -68,35 +69,32 @@ describe('the card appears exactly when the owner is being asked (waiting on an 
     assert.equal(statusOf(m), 'waiting');
     const html = render(m);
     assert.match(html, /data-testid="task-page-question"/);
-    assert.match(html, /data-testid="session-question-card-input"/);
-    assert.match(html, /data-testid="session-question-card-answer"/);
-    assert.match(html, /data-loop-id="impl-2"/, 'the reply target is the waiting loop');
-    assert.match(html, /data-session-waiting="true"/);
-    assert.match(html, /session-question-card-question">which API key\?</, 'the [blocked] marker is dropped, as in the pill');
+    assert.match(html, /data-testid="question-record-card-input"/);
+    assert.match(html, /data-testid="question-record-card-answer"/);
+    assert.match(html, /question-record-card-question">which API key\?</, 'the [blocked] marker is dropped, as in the pill');
     // The poll replaces the answer section's innerHTML, so the card cannot be inside it.
     const answerStart = html.indexOf('data-testid="task-page-answer"');
     const answerEnd = html.indexOf('</section>', answerStart);
     assert.ok(html.indexOf('data-testid="task-page-question"') > answerEnd, 'after the answer section closes');
-    assert.doesNotMatch(html.slice(answerStart, answerEnd), /session-question-card/);
+    assert.doesNotMatch(html.slice(answerStart, answerEnd), /question-record-card/);
     assert.ok(html.indexOf('data-testid="task-page-question"') < html.indexOf('data-testid="task-page-track-mount"'), 'right under the pill');
   });
 
-  test('a decision on the waiting loop renders with its options, dismiss and "if you don\'t answer"', () => {
-    const decision = { decision_id: 'd1', question: 'Which API?', options: [{ id: 'a', label: 'v1' }, { id: 'b', label: 'v2' }], if_unanswered: { summary: 'v1 ships.' } };
-    const m = model([blocked({ decision, decisionCase: ['because of the old client'] })]);
+  test('an open question renders with its options, dismiss and "if you don\'t answer" (LIN-4538: the record is the card)', () => {
+    const q = { questionId: 'q1', asks: 'Which API?', options: ['v1', 'v2'], recommended: 'v1', ifUnanswered: 'v1 ships.', taskId: 'task-LIN-50', ticket: 'LIN-50', runId: 'impl-2', askedAt: '2026-10-30T10:05:00.000Z', state: 'gone', reason: 'no-session', interactive: true };
+    const m = model([blocked()], { questionRecords: [q] });
     const html = render(m);
-    assert.match(html, /session-question-card-question">Which API\?</);
-    assert.match(html, /data-decision-id="d1"/);
-    assert.equal((html.match(/data-testid="session-question-card-option"/g) || []).length, 2);
-    assert.match(html, /data-testid="session-question-card-dismiss"/);
-    assert.match(html, /because of the old client/);
+    assert.match(html, /question-record-card-question">Which API\?</);
+    assert.match(html, /data-question-id="q1"/);
+    assert.equal((html.match(/data-testid="question-record-card-option"/g) || []).length, 2);
+    assert.match(html, /data-testid="question-record-card-dismiss"/);
     assert.match(html, /if you don't answer: v1 ships\./);
   });
 
-  test('running, idle and done: no card, whatever the viewer', () => {
-    for (const m of [model([loop()]), model([]), model([blocked({ terminalStatus: 'done', terminalCompletedAt: '2026-10-06T11:00:00.000Z' })])]) {
+  test('running, idle and done with no open question: no card, whatever the viewer', () => {
+    for (const m of [model([loop()]), model([]), model([loop({ terminalStatus: 'done', terminalCompletedAt: '2026-10-06T11:00:00.000Z' })])]) {
       assert.notEqual(statusOf(m), 'waiting');
-      assert.doesNotMatch(render(m), /task-page-question|session-question-card/);
+      assert.doesNotMatch(render(m), /task-page-question|question-record-card/);
     }
   });
 
@@ -117,37 +115,26 @@ describe('the card appears exactly when the owner is being asked (waiting on an 
     assert.doesNotMatch(render(m), /task-page-question/);
   });
 
-  test('a loop on a non-session target (dash) renders the read-only form, no input', () => {
-    const html = render(model([blocked({ target: 'dash' })]));
-    assert.match(html, /data-testid="session-question-card-readonly"/);
-    assert.doesNotMatch(html, /session-question-card-input|session-question-card-answer/);
+  test('a question whose run is still working renders read-only: no input (LIN-4538)', () => {
+    const q = { questionId: 'q1', asks: 'Which API?', options: ['v1', 'v2'], recommended: 'v1', ifUnanswered: null, taskId: 'task-LIN-50', ticket: 'LIN-50', runId: 'impl-2', askedAt: '2026-10-30T10:05:00.000Z', state: 'mid-turn', reason: null, interactive: false };
+    const html = render(model([blocked()], { questionRecords: [q] }));
+    assert.match(html, /data-testid="question-record-card-readonly"/);
+    assert.doesNotMatch(html, /question-record-card-input|question-record-card-answer/);
   });
 
-  test('an older unanswered decision on a finished loop does not surface on a waiting page', () => {
-    const old = loop({ loopId: 'old', kind: 'plan', terminalStatus: 'done', terminalCompletedAt: '2026-10-06T09:00:00.000Z', agentState: 'done', decision: { decision_id: 'dold', question: 'Stale?' } });
-    const html = render(model([old, blocked()]));
-    assert.doesNotMatch(html, /Stale\?/);
-    assert.match(html, /which API key\?/);
-  });
 });
 
 describe('a parked wait is not a question on the task page, as on Home (LIN-4038)', () => {
-  const SHELF = (resurfaceAt) => [{ urlKey: URL_KEY, decisionId: 'd-key', resurfaceAt, lapseCount: 1 }];
-
-  test('a shelved ruling, built through the real model path, renders no question card even to the owner', () => {
-    const m = model([blocked()], { shelvedRulings: SHELF('2026-10-07T15:00:00.000Z') });
+  test('an answered question: the standing reads parked, the pill says waiting, and no card renders even to the owner (LIN-4538)', () => {
+    const loops = [blocked()];
+    const m = model(loops, { ruling: rulingStandingFromQuestions({ urlKey: URL_KEY, loops, facts: [] }), questionRecords: [] });
     assert.equal(statusOf(m), 'waiting', 'the pill still says waiting');
     assert.equal(m.waitingFor, 'parked');
     const html = render(m, 'owner');
-    assert.doesNotMatch(html, /task-page-question|session-question-card/);
-    assert.match(headerOf(m), /which API key\?/, 'the pill sentence is still shown');
-    const header = headerOf(m);
-    assert.match(header, /status-pill--queued/, 'the pill is in the queued tone, as Home\'s parked');
-    assert.match(header, />parked</);
-    assert.doesNotMatch(header, /status-pill--needs-you/);
-    assert.match(header, /data-status="waiting"/, 'data-status stays waiting: the client and Go key on it');
-    assert.match(render(m, 'owner'), /Nothing comes next while it is parked\./, 'no card above, so the next line does not point at one');
-    assert.doesNotMatch(render(m, 'owner'), /question above/);
+    assert.doesNotMatch(html, /task-page-question|question-record-card/);
+    assert.match(headerOf(m), /status-pill--queued/, 'the pill is in the queued tone, as Home\'s parked');
+    assert.match(headerOf(m), />parked</);
+    assert.match(headerOf(m), /data-status="waiting"/, 'data-status stays waiting: the client and Go key on it');
   });
 
   test('an open ruling still renders the card', () => {
@@ -158,17 +145,12 @@ describe('a parked wait is not a question on the task page, as on Home (LIN-4038
     assert.match(headerOf(m), />needs you</);
   });
 
-  test('a shelf that has lapsed (resurfaceAt passed) makes the ruling open again, and the card returns', () => {
-    const m = model([blocked()], { shelvedRulings: SHELF('2026-10-05T15:00:00.000Z') });
-    assert.equal(m.waitingFor, 'ruling');
-    assert.match(render(m, 'owner'), /data-testid="task-page-question"/);
-  });
 
   test('a bare [blocked] with no structured decision reads parked and renders no card', () => {
     const m = model([bareBlocked()]);
     assert.equal(statusOf(m), 'waiting');
     assert.equal(m.waitingFor, 'parked');
-    assert.doesNotMatch(render(m, 'owner'), /task-page-question|session-question-card/);
+    assert.doesNotMatch(render(m, 'owner'), /task-page-question|question-record-card/);
     assert.match(headerOf(m), /status-pill--queued/);
     assert.match(headerOf(m), />parked</);
   });
@@ -177,7 +159,7 @@ describe('a parked wait is not a question on the task page, as on Home (LIN-4038
 describe('only the owner sees controls (hidden, not disabled)', () => {
   test('a guest gets no card and no question markup at all', () => {
     const html = render(model([blocked()]), 'guest');
-    assert.doesNotMatch(html, /task-page-question|session-question-card|sess-qcard/);
+    assert.doesNotMatch(html, /task-page-question|question-record-card|sess-qcard/);
     assert.match(html, /data-testid="task-page-status-pill"/, 'the pill is still there');
   });
 
@@ -244,7 +226,7 @@ async function makePage(t, { m, owner = true, polls = [] }) {
     reloads,
     inits,
     textarea: card ? card.querySelector('textarea') : null,
-    optionBtn: card ? card.querySelector('[data-testid="session-question-card-option"]') : null,
+    optionBtn: card ? card.querySelector('[data-testid="question-record-card-option"]') : null,
     wasRemoved: () => doc.querySelector('[data-testid="task-page-question"]') === null,
     cardNode: () => doc.querySelector('[data-testid="task-page-question"]'),
     async pollOnce() { timers.shift().fn(); await settle(); },
@@ -265,7 +247,7 @@ describe('the poll leaves a half-typed answer alone and removes the card when th
     assert.equal(page.cardNode(), page.card, 'the very same card node, not a re-render');
     assert.equal(page.card.querySelector('textarea'), page.textarea, 'the same textarea object');
     assert.equal(page.textarea.value, 'half a typed answer', 'the typed text survives the poll');
-    assert.equal(page.card.querySelector('[data-testid="session-question-card-option"]'), page.optionBtn, 'the same option button, not a re-render');
+    assert.equal(page.card.querySelector('[data-testid="question-record-card-option"]'), page.optionBtn, 'the same option button, not a re-render');
     assert.equal(page.optionBtn.disabled, false, 'the option buttons are still live after the poll');
     assert.equal(page.reloads.length, 0);
   });
@@ -300,42 +282,6 @@ describe('the poll leaves a half-typed answer alone and removes the card when th
   });
 });
 
-describe('the press goes through the run page\'s ReplyDelivery entry', () => {
-  // `CustomEvent` is absent in this world, and the press does not need it: question-cards.js's announceRulingGone returns
-  // before any dispatchEvent when the global is missing (question-cards.js:235-238), so no bubbling event is built here.
-  test('the shared client hands the answer to window.ReplyDelivery.deliverRulingAnswer', async () => {
-    const calls = [];
-    const world = loadWorld({
-      scripts: ['question-cards.js'],
-      window: {
-        module: { exports: {} },
-        ReplyDelivery: { deliverRulingAnswer(opts, h) { calls.push(opts); h.onDispatchOk(); return Promise.resolve(); }, deliveredEffect: (o) => o.effect, composeDispatchPrompt: () => '' },
-        ChatUI: { appendMessage() {} },
-      },
-    });
-    world.document.body.innerHTML = renderTaskQuestion(ASKED(), { urlKey: URL_KEY, binding: { source: 'linear' } });
-    world.window.module.exports.initQuestionCards();
-    const doc = world.document;
-    const textarea = doc.querySelector('textarea');
-    const btn = doc.querySelector('[data-testid="session-question-card-answer"]');
-    textarea.value = 'ship it';
-    await clickOn(btn);
-    await Promise.resolve();
-    assert.equal(calls.length, 1);
-    assert.equal(calls[0].prompt, 'ship it');
-    assert.equal(calls[0].followUpTo, 'impl-2');
-    assert.equal(calls[0].force, true);
-  });
-});
 
 describe('a joined ruling row on the task page (LIN-3959)', () => {
-  test('the page of the autopilot copy keeps a joined row whose anchor is the worker', () => {
-    const rows = [
-      { anchor: { loopId: 'wk' }, stampLoopId: 'wk', stampLoopIds: ['wk', 'ap'], decision: { decision_id: 'd-1' } },
-      { anchor: { loopId: 'other' }, stampLoopId: 'other', decision: { decision_id: 'd-2' } },
-    ];
-    const m = model([blocked({ loopId: 'ap' })], { deriveSessionDecisions: () => rows });
-    assert.equal(m.question.decisions.length, 1, 'only the joined row is kept');
-    assert.equal(m.question.decisions[0].anchor.loopId, 'wk');
-  });
 });

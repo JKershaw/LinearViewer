@@ -1,19 +1,20 @@
-// Measure 4, the person's seat (LIN-4422). Pure, like the core: the rulings read, each finished task's /cost body and
+// Measure 4, the person's seat (LIN-4422). Pure, like the core: the questions read, each finished task's /cost body and
 // its dispatch reads come in as data (scripts/stability-measures-tracker.mjs readSeat does the reads), rows come out.
+// LIN-4538 (P7a): the questions are question records (GET /api/proxy/records?kind=question), not the retired rulings read.
 // The finished tasks are the tracker read's own selection (LIN-4421): one finished set, read by speed, cost and seat.
 //
 // Three rows, settled by LIN-4399's plan review (notes 1 and 2):
-//   rulings        rulings raised per finished task, and the share answered rather than dismissed. LOOP RULINGS ONLY:
-//                  GET /rulings?includeResolved=true never returns an answered task-bound ruling (anchor.taskDecisionId),
-//                  and no proxy read does. "Raised" counts distinct decisions: a re-ask collapses into one ruling row.
-//                  Outcome buckets as lib/escalation-kpis.js: answered share = answered / (answered + dismissed);
-//                  self-resolved and withdrawn are neither (LIN-2650); a null outcome (a legacy digest that recorded
-//                  "resolved" but not which) is unreadable, never answered. A ruling anchored on a finished task's parent
-//                  or on any other unfinished ticket is not counted against the task; whether a parent's questions
-//                  belong to its pieces is LIN-4399's call, so the row names the gap and counts the parent-anchored ones.
+//   rulings        questions raised per finished task, and the share answered rather than dismissed. QUESTION RECORDS ONLY:
+//                  the records read holds the questions asked since the records path (LIN-4531); rulings from before it are
+//                  not counted. "Raised" counts question records: one ask is one record. Outcome buckets as
+//                  lib/escalation-kpis.js (questionOutcomeOf, lib/records/question-facts.js): answered share =
+//                  answered / (answered + dismissed); a question ended "ticket closed" is self-resolved and a question
+//                  withdrawn by an agent is withdrawn: neither is judged (LIN-2650). A question on a finished task's parent
+//                  or on any other unfinished ticket is not counted against the task; whether a parent's questions belong
+//                  to its pieces is LIN-4399's call, so the row names the gap and counts the parent-anchored ones.
 //   origin         not measured: GET /dispatch/{id} dispatchedBy is the workspace account for autopilot and person
 //                  alike. Origin is never inferred from it. Exposing the server's person-origin signal is follow-up work.
-//   operator-free  the share of finished tasks with no loop ruling, no [blocked] marker in any lineage member's feedback
+//   operator-free  the share of finished tasks with no question record, no [blocked] marker in any lineage member's feedback
 //                  and no dispatch row closed with closedReason 'operator': an UPPER BOUND over the three readable
 //                  conditions, with the fourth (no person-started dispatch) named as missing. Blocking is read from the
 //                  feedback markers (WAKE_FEEDBACK_REGEX, any entry, not the last one), never from `status`, which reports
@@ -21,15 +22,17 @@
 //                  read, not only roots.
 
 import { WAKE_FEEDBACK_REGEX, isWaitingWakeMarker } from '../lib/dispatch-terminal.js';
+import { questionOutcomeOf } from '../lib/records/question-facts.js';
+import { ticketTaskIdOf } from '../lib/records/refs.js';
 import { notMeasured, percent, round, row } from './stability-measures-core.mjs';
 
-export const LOOP_ONLY = 'loop rulings only';
+export const RECORDS_ONLY = 'question records only';
 export const ORIGIN_UNREADABLE = 'dispatchedBy is the workspace account for autopilot and person alike';
 export const UPPER_BOUND = 'upper bound';
 export const MISSING_CONDITION = `no person-started dispatch (not measured: ${ORIGIN_UNREADABLE})`;
 export const SEAT_KEYS = Object.freeze(['rulings', 'origin', 'operator-free']);
 
-const OUTCOMES = ['answered', 'dismissed', 'withdrawn', 'self-resolved'];
+const OUTCOMES = ['answered', 'dismissed', 'withdrawn', 'self-resolved', 'handed-on'];
 
 /**
  * Whether any feedback entry is a `[blocked]` wake marker: the waiting marker of lib/dispatch-terminal.js, matched on
@@ -66,30 +69,45 @@ export function membersOf(cost) {
   return { memberIds: [...new Set(ids)], rootOnly };
 }
 
-const issueOf = (r) => r?.anchor?.issueIdentifier ?? null;
+/**
+ * The ticket each finished task and its parent claims, keyed by the task record id a question's `in` names
+ * (ticketTaskIdOf: the one id rule for a ticket's task, lib/records/refs.js).
+ */
+function ticketsByTaskId(finished) {
+  const out = new Map();
+  for (const t of finished) {
+    out.set(ticketTaskIdOf(t.id), t.id);
+    if (t.parent) out.set(ticketTaskIdOf(t.parent), t.parent);
+  }
+  return out;
+}
 
-/** Loop rulings per finished task and the answered share. `rulings` is { rulings: [...] } or { reason }. */
-export function rulingsRow({ finished, rulings, reference = null }) {
+/** A question record's settled outcome as the escalation KPIs book it (questionOutcomeOf), or its state when none settles it. */
+const outcomeOfQuestion = (q) => questionOutcomeOf({ state: q.state, reason: q.ended?.reason ?? null, by: q.by ?? null }) ?? q.state;
+
+/** Questions raised per finished task and the answered share. `questions` is { questions: [...] } or { reason }. */
+export function rulingsRow({ finished, questions, reference = null }) {
   if (!finished.length) return notMeasured('rulings', 'no finished tasks in the window', { reference });
-  if (rulings?.reason || !Array.isArray(rulings?.rulings)) return notMeasured('rulings', `rulings read failed: ${rulings?.reason ?? 'not read'}`, { reference });
+  if (questions?.reason || !Array.isArray(questions?.questions)) return notMeasured('rulings', `questions read failed: ${questions?.reason ?? 'not read'}`, { reference });
   const ids = new Set(finished.map((t) => t.id));
   const parents = new Set(finished.map((t) => t.parent).filter((p) => p && !ids.has(p)));
-  const onTasks = rulings.rulings.filter((r) => ids.has(issueOf(r)));
-  const outcomes = { answered: 0, dismissed: 0, withdrawn: 0, 'self-resolved': 0, unknown: 0, open: 0 };
+  const ticketOf = ticketsByTaskId(finished);
+  const ticketOfQ = (q) => ticketOf.get(q.in) ?? null;
+  const onTasks = questions.questions.filter((q) => ids.has(ticketOfQ(q)));
+  const outcomes = { answered: 0, dismissed: 0, withdrawn: 0, 'self-resolved': 0, 'handed-on': 0, open: 0 };
   const strange = [];
-  for (const r of onTasks) {
-    if (!('resolution' in r) || r.resolution == null) { outcomes.open++; continue; }
-    const o = r.resolution.outcome;
-    if (o == null) { outcomes.unknown++; continue; }
+  for (const q of onTasks) {
+    if (q.state === 'open') { outcomes.open++; continue; }
+    const o = outcomeOfQuestion(q);
     if (OUTCOMES.includes(o)) outcomes[o]++;
     else strange.push(o);
   }
   const perTaskCounts = {};
-  for (const r of onTasks) perTaskCounts[issueOf(r)] = (perTaskCounts[issueOf(r)] ?? 0) + 1;
-  const onParents = rulings.rulings.filter((r) => parents.has(issueOf(r))).length;
+  for (const q of onTasks) perTaskCounts[ticketOfQ(q)] = (perTaskCounts[ticketOfQ(q)] ?? 0) + 1;
+  const onParents = questions.questions.filter((q) => parents.has(ticketOfQ(q))).length;
   const judged = outcomes.answered + outcomes.dismissed;
   const value = {
-    label: LOOP_ONLY,
+    label: RECORDS_ONLY,
     finished: finished.length,
     raised: onTasks.length,
     perFinishedTask: round(onTasks.length / finished.length, 2),
@@ -97,21 +115,18 @@ export function rulingsRow({ finished, rulings, reference = null }) {
     outcomes,
     answeredShare: percent(outcomes.answered, judged),
     rules: {
-      raised: 'distinct decisions: a re-ask in one lineage collapses into one ruling row',
-      answeredShare: 'answered / (answered + dismissed), as lib/escalation-kpis.js; withdrawn and self-resolved are neither; a null outcome is unreadable',
+      raised: 'one question record is one question: a question is asked once, and its answer or end is its one outcome',
+      answeredShare: 'answered / (answered + dismissed), as lib/escalation-kpis.js; withdrawn, handed-on and self-resolved are neither',
     },
     notRead: [
-      'answered task-bound rulings (anchor.taskDecisionId): no proxy read returns them',
-      `rulings anchored on a parent or another unfinished ticket are not counted against a finished task (${onParents} on a finished task's parent)`,
+      'questions asked before the records path (LIN-4531): the ruling stores are not read (LIN-4538)',
+      `questions anchored on a parent or another unfinished ticket are not counted against a finished task (${onParents} on a finished task's parent)`,
     ],
     onParents,
     perTaskCounts,
   };
-  const unreadable = outcomes.unknown + strange.length;
-  const why = [
-    outcomes.unknown ? `${outcomes.unknown} resolved ruling(s) have outcome null (a legacy digest: answered or dismissed, not recorded)` : null,
-    strange.length ? `${strange.length} ruling(s) have an unknown outcome (${[...new Set(strange)].join(', ')})` : null,
-  ].filter(Boolean).join('; ');
+  const unreadable = strange.length;
+  const why = strange.length ? `${strange.length} question(s) have an unknown outcome (${[...new Set(strange)].join(', ')})` : null;
   return row('rulings', value, { unreadable, reason: unreadable ? why : null, reference });
 }
 
@@ -148,13 +163,17 @@ export function taskConditions(id, { rulingCount, d }) {
  * The operator-free share over the three readable conditions: an upper bound, the missing condition named. A task whose
  * reads failed counts as unreadable unless a read that did succeed already shows it needed the operator.
  */
-export function operatorFreeRow({ finished, rulings, dispatch, reference = null }) {
+export function operatorFreeRow({ finished, questions, dispatch, reference = null }) {
   if (!finished.length) return notMeasured('operator-free', 'no finished tasks in the window', { reference });
-  if (rulings?.reason || !Array.isArray(rulings?.rulings)) {
-    return notMeasured('operator-free', `the no-ruling condition is unreadable: rulings read failed: ${rulings?.reason ?? 'not read'}`, { reference });
+  if (questions?.reason || !Array.isArray(questions?.questions)) {
+    return notMeasured('operator-free', `the no-question condition is unreadable: questions read failed: ${questions?.reason ?? 'not read'}`, { reference });
   }
+  const ticketOf = ticketsByTaskId(finished);
   const counts = new Map();
-  for (const r of rulings.rulings) counts.set(issueOf(r), (counts.get(issueOf(r)) ?? 0) + 1);
+  for (const q of questions.questions) {
+    const ticket = ticketOf.get(q.in);
+    if (ticket) counts.set(ticket, (counts.get(ticket) ?? 0) + 1);
+  }
   const perTask = finished.map((t) => taskConditions(t.id, { rulingCount: counts.get(t.id) ?? 0, d: dispatch.get(t.id) }));
   const read = perTask.filter((t) => t.free !== null);
   const unread = perTask.filter((t) => t.free === null);
@@ -162,10 +181,10 @@ export function operatorFreeRow({ finished, rulings, dispatch, reference = null 
   const free = read.filter((t) => t.free).length;
   const value = {
     label: UPPER_BOUND,
-    conditions: ['no loop ruling', 'no [blocked] marker in any lineage member\'s feedback', "no dispatch row closed with closedReason 'operator'"],
+    conditions: ['no question record on the task', 'no [blocked] marker in any lineage member\'s feedback', "no dispatch row closed with closedReason 'operator'"],
     missingCondition: MISSING_CONDITION,
     caveats: [
-      'rulings not read (answered task-bound, parent-anchored) can only lower the true share',
+      'questions asked before the records path (LIN-4531) are not read, and can only lower the true share',
       "closedReason 'operator' is a catch-all for any close outside handed-on, lineage-terminal and ticket-closed (bulk fossil passes included), so it may count tasks no person touched and push the share down",
     ],
     tasks: finished.length, read: read.length, operatorFree: free, share: percent(free, read.length),
@@ -182,11 +201,11 @@ export function operatorFreeRow({ finished, rulings, dispatch, reference = null 
 }
 
 /** The seat's three rows, in order. */
-export function seatRows({ finished, rulings, dispatch = new Map(), references = {} }) {
+export function seatRows({ finished, questions, dispatch = new Map(), references = {} }) {
   return [
-    rulingsRow({ finished, rulings, reference: references.rulings }),
+    rulingsRow({ finished, questions, reference: references.rulings }),
     originRow({ reference: references.origin }),
-    operatorFreeRow({ finished, rulings, dispatch, reference: references['operator-free'] }),
+    operatorFreeRow({ finished, questions, dispatch, reference: references['operator-free'] }),
   ];
 }
 

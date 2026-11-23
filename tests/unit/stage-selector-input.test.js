@@ -74,12 +74,14 @@ describe('trail facts (LIN-3300)', () => {
       { createdAt: at(1), body: `Opened https://github.com/a/b/pull/1` },
       { createdAt: at(2), body: `Hold.\n\n${RULING_MARK}` },
       { createdAt: at(4), body: `Now ${PR}` }
-    ], '', { trail: trailOf({ landing: ['https://github.com/a/b/pull/1', PR] }), personFindings: [personFinding(2, `Hold.\n\n${RULING_MARK}`), personFinding(3, `Go to implementation.\n\n${RULING_MARK}`)] });
+    ], '', { trail: trailOf({ landing: ['https://github.com/a/b/pull/1', PR] }), personFindings: [personFinding(2, `Hold.\n\n${RULING_MARK}`), personFinding(3, `Go to implementation.\n\n${RULING_MARK}`)], answeredQuestions: [{ questionId: 'q-1', at: at(3) }] });
     assert.deepEqual(facts.prUrls, ['https://github.com/a/b/pull/1', PR]);
     assert.deepEqual(assembleTrailFacts([{ createdAt: at(1), body: `Opened ${PR}` }], '').prUrls, [], 'no trail read: no PR, and a comment does not supply one');
     assert.equal(facts.latestPerson.at, at(3));
     assert.equal(facts.latestPerson.ruling, true);
+    // LIN-4538 (P7a): the latest RULING is the latest question a person answered on the task (question records), not a comment mark.
     assert.equal(facts.latestRuling.at, at(3));
+    assert.equal(assembleTrailFacts([], '', { personFindings: [personFinding(3, `Go.\n\n${RULING_MARK}`)] }).latestRuling, null, 'a comment mark is not a ruling: no answered question, no ruling');
   });
 
   test('a ruling is a finding whose words end with the mark; a quote of the mark mid-text is a person\'s words, not a ruling', () => {

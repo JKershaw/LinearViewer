@@ -977,6 +977,7 @@ scheduler.register({
     agentStatusStore,
     observerStateStore,
     observerShadowLogStore,
+    recordsStore,
     intervalMs: OBSERVER_SWEEP_INTERVAL_MS
   })
 // `register()` is async and its seed write can fail; close-out ledger item 7.
@@ -3335,7 +3336,7 @@ async function getNorthStarDocVersionForWorkspace(urlKey, accountId) {
 // Closes rows and withdraws decisions only for a ticket whose state type is terminal.
 const onTicketWrite = createOnTicketWrite({
   dispatchStore: dispatchQueueStore,
-  taskDecisionsStore,
+  recordsStore,
   sessionsFeedCache,
   agentStatusStore
 })

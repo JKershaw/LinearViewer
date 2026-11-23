@@ -15,12 +15,16 @@ import { TICKET_CLOSED_GRACE_MS } from '../../lib/lineage-closure.js';
 import { AgentStatusStore } from '../../lib/agent-status-store.js';
 import { getLoopsForWorkspace } from '../../lib/pipeline-loops.js';
 import { closeTicketRows } from '../../lib/ticket-close-closer.js';
+import { RecordsStore, RECORDS_COLLECTION, REFS_COLLECTION, QUERY_LOG_COLLECTION } from '../../lib/records-store.js';
+import { createRecordWrites } from '../../lib/records/writes.js';
+import { isTerminalState } from '../../lib/providers/state-map.js';
+import { endOpenQuestionsOfTicket } from '../../lib/records/question-facts.js';
 
 const NOW = Date.UTC(2026, 9, 1);
 const ago = (days, min = 0) => new Date(NOW - days * 86400000 + min * 60000);
 
 describe('false-live-rows (LIN-3365)', () => {
-  let dbDir, client, store, history, counter = 0;
+  let dbDir, client, store, history, records, writes, counter = 0;
   before(async () => {
     dbDir = mkdtempSync(join(tmpdir(), 'false-live-'));
     client = new MangoClient(dbDir);
@@ -35,21 +39,29 @@ describe('false-live-rows (LIN-3365)', () => {
     history = db.collection('dispatch-history');
     store = new DispatchQueueStore({ collection: db.collection('dispatch-queue'), historyCollection: history });
     store._notifyWriteForDoc = () => {};
+    records = new RecordsStore({ records: db.collection(RECORDS_COLLECTION), refs: db.collection(REFS_COLLECTION), queryLog: db.collection(QUERY_LOG_COLLECTION) });
+    writes = createRecordWrites({ recordsStore: records, isTerminalState, readTicket: null, askedText: () => '', stageKinds: ['implementation'], listPeople: async () => [] });
   });
 
   const seed = (id, o = {}) => history.insertOne({
     _id: id, urlKey: 'acme', issueIdentifier: 'LIN-1', rootItemId: 'P', kind: 'implementation', status: 'taken',
     dispatchedAt: ago(2, 1), resolvedAt: ago(2, 2), followUpTo: 'P', feedback: [], bookkeeping: null, ...o
   });
+  // LIN-4538: an open question on a task, raised at `at` (default now). The task is made first, as the route makes it.
+  const askOpen = async (task, at = new Date()) => {
+    const made = await records.ensureTask('acme', { identifier: task, title: task }, { by: 'implementation' });
+    assert.ok(made.id, `task refused: ${JSON.stringify(made)}`);
+    const snap = await writes.add({
+      urlKey: 'acme', kind: 'question', by: 'implementation', run: null, at: at.toISOString(),
+      input: { asks: 'Which way?', options: ['left', 'right'], recommended: 'left', 'if-unanswered': 'pick left', to: 'project', in: made.id },
+    });
+    assert.ok(snap.record, `question refused: ${JSON.stringify(snap.problems)}`);
+    return snap.record.id;
+  };
   const blockedLoop = (loopId, issueIdentifier) => ({ loopId, issueIdentifier, terminalStatus: null, wakeMarker: 'blocked', agentState: null, historyStatus: 'taken', source: 'history', bookkeeping: null });
-  const decisionLoop = (loopId, issueIdentifier, extra = {}) => ({
-    ...blockedLoop(loopId, issueIdentifier), dispatchedAt: new Date(NOW - 3 * TICKET_CLOSED_GRACE_MS).toISOString(),
-    decision: { decision_id: `dec-${loopId}`, question: 'q', options: [] }, decisionCase: [], answeredDecisions: [],
-    withdrawal: null, withdrawalReversed: false, workspaceUrlKey: 'acme', ...extra
-  });
   const termTicket = { issueId: 'iid', stateType: 'completed' };
   const run = (o = {}) => runFalseLiveRows({
-    dispatchStore: store, urlKeys: ['acme'], now: NOW,
+    dispatchStore: store, recordsStore: records, urlKeys: ['acme'], now: NOW,
     readLoops: async () => [], readTicketState: async () => null, ...o
   });
   const w = (r) => r.perWorkspace[0];
@@ -94,115 +106,47 @@ describe('false-live-rows (LIN-3365)', () => {
     assert.equal(w(r).clause3, 3);
   });
 
-  test('clause 4 flags an open decision on a terminal ticket; a decision on an open ticket is not counted', async () => {
+  test('clause 4 flags an open question on a terminal ticket, raised past the grace; a question on an open ticket is not counted', async () => {
+    await askOpen('LIN-OLD', ago(0, -60));
+    await askOpen('LIN-OPEN', ago(0, -60));
     const r = await run({
-      readLoops: async () => [decisionLoop('a', 'LIN-OLD'), decisionLoop('b', 'LIN-OPEN')],
       readTicketState: async (_k, issue) => (issue === 'LIN-OLD' ? termTicket : { issueId: 'x', stateType: 'started' })
     });
-    // each blocked decision-bearing row is also a clause-3 row on the terminal ticket
     assert.equal(w(r).clause4, 1);
   });
 
-  test('a reversed ruling on a terminal ticket is humanReopened, not clause 3/4 (LIN-3366 Finding 1)', async () => {
-    const r = await run({
-      readLoops: async () => [decisionLoop('a', 'LIN-OLD', { withdrawalReversed: true })],
-      readTicketState: async () => termTicket
-    });
-    assert.equal(w(r).clause3, 0);
-    assert.equal(w(r).clause4, 0);
-    assert.equal(w(r).humanReopened, 2); // the carrier row and the decision
-    assert.match(r.report, /Human-reopened .*: 2/);
+  test('a question raised less than the grace before the run is not clause 4 (it may still be live); an ended question is not open', async () => {
+    const q = await askOpen('LIN-DONE', new Date(NOW - 1000));
+    const answered = await askOpen('LIN-DONE', new Date(NOW - 3 * TICKET_CLOSED_GRACE_MS));
+    await records.end('acme', answered, { state: 'answered', reason: 'answered by decision-z' }, { by: 'person:acct-owner' });
+    const r = await run({ readTicketState: async () => termTicket });
+    assert.equal(w(r).clause4, 0, `${q} is fresh and ${answered} is answered`);
   });
 
-  test('a legacy digest (no withdrawalReversed key) is verified from raw feedback: a reversed ruling reads humanReopened, and measuring writes nothing (persist:false)', async () => {
-    await seed('legacy', { feedback: [
-      { kind: 'decision', message: JSON.stringify({ decision_id: 'dec-legacy', question: 'q', options: [] }), timestamp: ago(2, 3) },
-      { kind: 'decision-withdrawn', message: JSON.stringify({ decision_id: 'dec-legacy', reason: 'ticket-closed: x' }), timestamp: ago(2, 4) },
-      { kind: 'decision-withdrawal-reversed', message: JSON.stringify({ decision_id: 'dec-legacy' }), timestamp: ago(2, 5) }
-    ] });
-    const before = JSON.stringify(await history.find({}).toArray());
-    const legacy = decisionLoop('legacy', 'LIN-1', { withdrawalReversed: undefined });
-    const r = await run({ readLoops: async () => [legacy], readTicketState: async () => termTicket });
-    assert.equal(JSON.stringify(await history.find({}).toArray()), before, 'no digest written back');
-    assert.equal(w(r).clause3, 0);
-    assert.equal(w(r).clause4, 0);
-    assert.equal(w(r).humanReopened, 2);
-  });
-
-  test('writer/measurer tie: closeTicketRows takes clauses 3 and 4 from N to 0, with 0 false closes', async () => {
+  test('writer/measurer tie: the closer takes clauses 3 and 4 from N to 0, with 0 false closes', async () => {
     const agentStatusStore = new AgentStatusStore({ collection: client.db('fl_status').collection('s') });
     const mins = (m) => new Date(Date.now() - m * 60000);
     await history.insertOne({ _id: 'b1', urlKey: 'acme', issueIdentifier: 'LIN-1', issueId: 'iid-1', rootItemId: 'b1', kind: 'implementation', status: 'taken', dispatchedAt: mins(300), resolvedAt: mins(299), bookkeeping: null, feedback: [
-      { kind: 'decision', message: JSON.stringify({ decision_id: 'dec-b1', question: 'q', options: [] }), timestamp: mins(290) },
       { message: '[blocked] waiting', timestamp: mins(280) }] });
+    await askOpen('LIN-1', mins(290));
     const readLoops = () => getLoopsForWorkspace('acme', { lean: true, dispatchStore: store, agentStatusStore });
     const readTicketState = async () => ({ issueId: 'iid-1', stateType: 'completed' });
     const now = Date.now();
-    const before = await runFalseLiveRows({ dispatchStore: store, urlKeys: ['acme'], now, readLoops, readTicketState });
+    const before = await runFalseLiveRows({ dispatchStore: store, recordsStore: records, urlKeys: ['acme'], now, readLoops, readTicketState });
     assert.equal(w(before).clause3, 1);
     assert.equal(w(before).clause4, 1);
     await closeTicketRows({ urlKey: 'acme', ticket: { issueId: 'iid-1', identifier: 'LIN-1', stateType: 'completed' }, dispatchStore: store, agentStatusStore, now, log: () => {} });
-    const after = await runFalseLiveRows({ dispatchStore: store, urlKeys: ['acme'], now, readLoops, readTicketState });
+    await endOpenQuestionsOfTicket({ recordsStore: records, urlKey: 'acme', ticket: 'LIN-1' });
+    const after = await runFalseLiveRows({ dispatchStore: store, recordsStore: records, urlKeys: ['acme'], now, readLoops, readTicketState });
     assert.equal(w(after).clause3, 0);
     assert.equal(w(after).clause4, 0);
     assert.equal(w(after).falseCloses.reopened.length, 0);
   });
 
-  describe('legacy key-less digest on a [done] / bookkeeping-stamped content loop (LIN-3366 FC call item 2)', () => {
-    const mins = (m) => new Date(Date.now() - m * 60000);
-    const variants = [
-      ['[done]', { feedbackExtra: [{ message: '[done] finished', timestamp: mins(100) }], bookkeeping: null }],
-      ['bookkeeping-stamped', { feedbackExtra: [], bookkeeping: { reason: 'handed-on', by: 'lineage-closer', at: mins(90) } }]
-    ];
-    const seedLegacy = async ({ feedbackExtra, bookkeeping }, { reversed = false } = {}) => {
-      await history.insertOne({ _id: 'a', urlKey: 'acme', issueIdentifier: 'LIN-1', issueId: 'iid-1', rootItemId: 'a', kind: 'implementation', status: 'taken', dispatchedAt: mins(300), resolvedAt: mins(299), bookkeeping, feedback: [
-        { kind: 'decision', message: JSON.stringify({ decision_id: 'dec-a', question: 'q', options: [] }), timestamp: mins(290) },
-        { message: '[blocked] waiting', timestamp: mins(280) },
-        ...feedbackExtra] });
-      const agentStatusStore = new AgentStatusStore({ collection: client.db('fl_status2').collection('s') });
-      await getLoopsForWorkspace('acme', { lean: true, dispatchStore: store, agentStatusStore }); // writes the digest
-      if (reversed) {
-        await store.markDecisionWithdrawn('a', 'acme', 'dec-a', 'ticket-closed: x');
-        await store.markDecisionWithdrawalReversed('a', 'acme', 'dec-a');
-      }
-      const doc = await history.findOne({ _id: 'a' });
-      delete doc.feedbackDigest.withdrawalReversed;
-      await history.replaceOne({ _id: 'a' }, doc);
-      return agentStatusStore;
-    };
-    const ticket = { issueId: 'iid-1', identifier: 'LIN-1', stateType: 'completed' };
-    const readTicketState = async () => ({ issueId: 'iid-1', stateType: 'completed' });
-
-    for (const [name, v] of variants) {
-      test(`${name}, no reversal: clause 4 counts the ruling before the run and 0 after`, async () => {
-        const agentStatusStore = await seedLegacy(v);
-        const readLoops = () => getLoopsForWorkspace('acme', { lean: true, dispatchStore: store, agentStatusStore });
-        const now = Date.now();
-        const before = await runFalseLiveRows({ dispatchStore: store, urlKeys: ['acme'], now, readLoops, readTicketState });
-        assert.equal(w(before).clause4, 1);
-        assert.equal(w(before).humanReopened, 0);
-        const r = await closeTicketRows({ urlKey: 'acme', ticket, dispatchStore: store, agentStatusStore, now, log: () => {} });
-        assert.equal(r.withdrawn, 1);
-        const after = await runFalseLiveRows({ dispatchStore: store, urlKeys: ['acme'], now, readLoops, readTicketState });
-        assert.equal(w(after).clause4, 0);
-        assert.equal(w(after).falseCloses.reopened.length, 0);
-      });
-      test(`${name}, reversed: counted as humanReopened (not clause 4) and nothing is written`, async () => {
-        const agentStatusStore = await seedLegacy(v, { reversed: true });
-        const readLoops = () => getLoopsForWorkspace('acme', { lean: true, dispatchStore: store, agentStatusStore });
-        const now = Date.now();
-        const snapshot = JSON.stringify(await history.find({}).toArray());
-        const r = await runFalseLiveRows({ dispatchStore: store, urlKeys: ['acme'], now, readLoops, readTicketState });
-        assert.equal(w(r).clause4, 0);
-        assert.ok(w(r).humanReopened >= 1);
-        assert.equal(JSON.stringify(await history.find({}).toArray()), snapshot, 'instrument writes nothing');
-      });
-    }
-  });
-
   test('an unreadable ticket is unknown, never false-live, and leads the headline', async () => {
+    await askOpen('LIN-Y', ago(0, -60));
     const r = await run({
-      readLoops: async () => [blockedLoop('l1', 'LIN-X'), decisionLoop('l2', 'LIN-Y')],
+      readLoops: async () => [blockedLoop('l1', 'LIN-X')],
       readTicketState: async () => null
     });
     assert.equal(w(r).unknown, 2);
@@ -216,12 +160,14 @@ describe('false-live-rows (LIN-3365)', () => {
     await seed('bad-handed', { bookkeeping: { at: ago(1), by: 'x', reason: 'handed-on' }, kind: 'wake' });
     await seed('bad-term', { bookkeeping: { at: ago(1), by: 'x', reason: 'lineage-terminal' }, rootItemId: 'Q' });
     await seed('reopened', { rootItemId: 'Z', bookkeeping: { at: ago(1), by: 'x', reason: 'ticket-closed' } });
-    await seed('withdrawn', { rootItemId: 'W', feedback: [{ kind: 'decision-withdrawn', message: JSON.stringify({ decision_id: 'd', reason: 'ticket-closed' }), timestamp: ago(1) }] });
+    // A question the closer ended "ticket closed" on a ticket that is open now (LIN-4538): a false close.
+    const closed = await askOpen('LIN-W', ago(1));
+    await endOpenQuestionsOfTicket({ recordsStore: records, urlKey: 'acme', ticket: 'LIN-W' });
     const r = await run({ readTicketState: async () => ({ issueId: 'x', stateType: 'started' }) });
     const fc = w(r).falseCloses;
     assert.deepEqual(fc['handed-on'], ['bad-handed']);
     assert.deepEqual(fc['lineage-terminal'], ['bad-term']);
-    assert.deepEqual(fc.reopened.sort(), ['reopened', 'withdrawn:decision-withdrawn']);
+    assert.deepEqual(fc.reopened.sort(), ['reopened', `${closed}:question`].sort());
   });
 
   test('a correct handed-on / lineage-terminal stamp is not a false close', async () => {

@@ -2157,310 +2157,67 @@ describe('flight-companion.js — tool-wire phases (F5) + the proposal control',
   });
 });
 
-// LIN-2621 beat 4: decisions as option buttons, reusing public/chat.js's
-// window.ChatUI.appendOptions (the rulings tab's own primitive) and
-// window.ReplyDelivery.postComment ONLY (never deliverReply, which also
-// dispatches/resumes a run for a resumable/gone row on the rulings tab —
-// deliberately narrower here, see renderOneDecision's own comment).
-describe('flight-companion.js — LIN-2621 beat 4: decisions as option buttons', () => {
-  // Matches lib/chat-tools.js's projectPendingDecision shape exactly —
-  // including `issueId`/`taskDecisionId` (LIN-2704), additive to
-  // `issueIdentifier`. `taskDecisionId: null` is the loop-anchored default
-  // (a loop anchor carries no `taskDecisionId` field at all,
-  // lib/unanswered-decisions.js's loop branch, so the real projection's
-  // `truncateText(undefined, ...)` resolves to `null`); a task-bound
-  // override sets both `issueId` (the raw UUID) and `taskDecisionId` (the
-  // scan store's own row id).
-  function decision(overrides) {
+// LIN-4538: the companion reads the open questions a person was asked (`list_pending_decisions`), and nothing else.
+// The old decision rows (answered as comments through ReplyDelivery) left this tool with the ruling stores, so their card and
+// its comment-answer path are gone; a question is answered through the question route on its card.
+describe('flight-companion.js — LIN-4538: the open questions the companion shows', () => {
+  // The chat row lib/chat-tools.js projects for one open question (projectPendingQuestion).
+  function question(overrides) {
     return Object.assign({
-      decisionId: 'dec-1',
-      issueIdentifier: 'LIN-100',
-      issueId: 'uuid-100',
-      taskDecisionId: null,
-      loopId: 'loop-1',
-      sessionId: 'sess-1',
-      question: 'Should we ship it?',
-      options: [{ id: 'yes', label: 'Ship it' }, { id: 'no', label: 'Hold' }],
-      optionsTotal: 2,
-      recommended: 'yes',
-      since: '2026-09-05T00:00:00.000Z',
-      disposition: 'resumable',
-      canReply: true,
-      shelvedLapseCount: 0,
+      questionId: 'q-1', question: 'Should we ship it?', options: ['Ship it', 'Hold'],
+      recommended: 'Ship it', issueIdentifier: 'LIN-100', state: 'resumable', interactive: true,
     }, overrides || {});
   }
 
-  function decisionsResult(decisions) {
-    return JSON.stringify({ count: decisions.length, truncated: false, decisions });
+  function questionsResult(questions) {
+    return JSON.stringify({ count: questions.length, truncated: false, questions });
   }
 
-  function decisionToolFrame(decisions) {
-    return sseFrame('tool', { phase: 'result', id: 't1', name: 'list_pending_decisions', result: decisionsResult(decisions) });
+  function questionToolFrame(questions) {
+    return sseFrame('tool', { phase: 'result', id: 't1', name: 'list_pending_decisions', result: questionsResult(questions) });
   }
 
-  test('parseDecisionsResult: valid shape, malformed JSON, non-array decisions, and per-row shape filtering', async () => {
+  test('parsePendingResult: question rows become the card\'s row; a result with no questions is empty; a malformed one fails', async () => {
     const { exports: m } = await loadClient();
-    const d = decision();
-    // LIN-4532 (P2b): a result with no open questions parses to an empty `questions` list (the key is absent from the tool's result).
-    looseDeepEqual(m.parseDecisionsResult(decisionsResult([d])), { ok: true, decisions: [d], questions: [] });
-    // LIN-4532 (P2b): open question rows ride in `questions`; a row with no questionId or no options is dropped, as a decision row is.
-    const withQuestions = JSON.stringify({ count: 2, truncated: false, decisions: [], questions: [
-      { questionId: 'q-1', question: 'Which?', options: ['left'], recommended: 'left', ifUnanswered: null, state: 'resumable', interactive: true },
-      { question: 'no id', options: ['x'] },
-    ] });
-    assert.strictEqual(m.parseDecisionsResult(withQuestions).questions.length, 1);
-    assert.strictEqual(m.parseDecisionsResult(withQuestions).questions[0].questionId, 'q-1');
-    assert.strictEqual(m.parseDecisionsResult('not json').ok, false);
-    assert.strictEqual(m.parseDecisionsResult('{}').ok, false, 'decisions must be an array');
-    assert.strictEqual(m.parseDecisionsResult(JSON.stringify({ decisions: 'x' })).ok, false);
-    // A truncation marker (lib/openrouter.js's truncateToolResult shape) fails
-    // JSON.parse honestly, mirroring parseProposalResult's own contract.
-    assert.strictEqual(m.parseDecisionsResult(decisionsResult([d]).slice(0, 20) + '\n… [truncated 400 chars]').ok, false);
-    // A row missing decisionId or options is dropped, not thrown on.
-    const parsed = m.parseDecisionsResult(decisionsResult([d, { question: 'no id' }, { decisionId: 'x', options: 'not-array' }]));
+    const parsed = m.parsePendingResult(questionsResult([question()]));
     assert.strictEqual(parsed.ok, true);
-    assert.strictEqual(parsed.decisions.length, 1);
+    assert.deepStrictEqual(parsed.questions, [{
+      questionId: 'q-1', asks: 'Should we ship it?', options: ['Ship it', 'Hold'], recommended: 'Ship it',
+      ifUnanswered: null, state: 'resumable', interactive: true,
+    }]);
+    assert.deepStrictEqual(m.parsePendingResult(JSON.stringify({ count: 0, truncated: false, questions: [] })), { ok: true, questions: [] });
+    // A row with no questionId or no options is dropped, not rendered half-built.
+    const withBad = m.parsePendingResult(JSON.stringify({ count: 3, truncated: false, questions: [
+      question(), { question: 'no id', options: ['x'] }, { questionId: 'q-2', question: 'no options', options: 'not-array' },
+    ] }));
+    assert.strictEqual(withBad.questions.length, 1);
+    assert.strictEqual(m.parsePendingResult('not json').ok, false);
+    assert.strictEqual(m.parsePendingResult('{}').ok, false, 'questions must be an array');
+    // A truncation marker (lib/openrouter.js truncateToolResult) fails JSON.parse honestly.
+    assert.strictEqual(m.parsePendingResult(questionsResult([question()]).slice(0, 20) + '\n… [truncated 400 chars]').ok, false);
   });
 
-  test('renders the question and one option button per option, with the recommended star on the recommended one', async () => {
-    const d = decision();
-    const { exports: m, thread } = await loadClient({ fetchImpl: () => sseResponse([decisionToolFrame([d]), sseFrame('done', { surface: true })]) });
+  test('a question in the result is the shared card, showing its question text, with one button per option', async () => {
+    const { exports: m, thread } = await loadClient({ fetchImpl: () => sseResponse([questionToolFrame([question()]), sseFrame('done', { surface: true })]) });
     m.autoWakeTick();
     await flush();
-
-    const decisionLi = thread.children.find(li => li.querySelector('.fc-decision'));
-    assert.ok(decisionLi, 'expected a rendered decision card');
-    const wrap = decisionLi.querySelector('.fc-decision');
-    assert.strictEqual(wrap.querySelector('.fc-decision-question').textContent, 'Should we ship it?');
-    const row = wrap.querySelector('.chat-options-row');
-    assert.strictEqual(row.children.length, 2, 'one button per option');
-    assert.strictEqual(row.children[0].textContent, 'Ship it');
-    assert.ok(row.children[0].classList.contains('chat-option--recommended'), 'the recommended option carries the star class');
-    assert.ok(!row.children[1].classList.contains('chat-option--recommended'));
+    const fold = findByClass(thread, 'fc-decisions-fold');
+    assert.ok(fold, 'the fold renders for a question');
+    assert.strictEqual(fold.children[0].textContent, '1 decision waiting');
+    const qli = findAllByClass(fold, 'fc-question')[0];
+    assert.ok(qli, 'the question is a row of the fold');
+    assert.match(qli.innerHTML, /data-testid="question-record-card" data-question-id="q-1"/);
+    assert.match(qli.innerHTML, /data-testid="question-record-card-question"[^>]*>Should we ship it\?</, 'the card shows the question text');
+    assert.strictEqual((qli.innerHTML.match(/data-testid="question-record-card-option"/g) || []).length, 2, 'one button per option');
   });
 
-  test('a read-only disposition (mid-turn) renders the caption only — no buttons, matching appendOptions\' own allow-list', async () => {
-    const d = decision({ disposition: 'mid-turn', canReply: false });
-    const { exports: m, thread } = await loadClient({ fetchImpl: () => sseResponse([decisionToolFrame([d]), sseFrame('done', { surface: true })]) });
+  test('no decision rows are rendered from the tool: the fold holds only questions', async () => {
+    const { exports: m, thread } = await loadClient({ fetchImpl: () => sseResponse([questionToolFrame([]), sseFrame('done', { surface: true })]) });
     m.autoWakeTick();
     await flush();
-    const wrap = thread.children.find(li => li.querySelector('.fc-decision')).querySelector('.fc-decision');
-    assert.ok(wrap.querySelector('.chat-options--readonly'), 'read-only wrapper class present');
-    assert.strictEqual(wrap.querySelector('.chat-options-row'), null, 'no button row at all');
-  });
-
-  test('multiple decisions in one result each render their own card', async () => {
-    const d1 = decision({ decisionId: 'dec-1', question: 'First?' });
-    const d2 = decision({ decisionId: 'dec-2', question: 'Second?' });
-    const { exports: m, thread } = await loadClient({ fetchImpl: () => sseResponse([decisionToolFrame([d1, d2]), sseFrame('done', { surface: true })]) });
-    m.autoWakeTick();
-    await flush();
-    // LIN-3361: both cards sit in ONE closed fold, all in the DOM.
-    assert.strictEqual(thread.children.filter(li => li.querySelector('.fc-decisions-fold')).length, 1);
-    const cards = findAllByClass(thread, 'fc-decision-msg');
-    assert.strictEqual(cards.length, 2);
-    assert.strictEqual(cards[0].querySelector('.fc-decision-question').textContent, 'First?');
-    assert.strictEqual(cards[1].querySelector('.fc-decision-question').textContent, 'Second?');
-  });
-
-  test('a malformed/truncated tool result shows an inline note and renders no decision card, without throwing', async () => {
-    const { exports: m, thread, chatUICalls } = await loadClient({
-      fetchImpl: () => sseResponse([
-        sseFrame('tool', { phase: 'result', id: 't1', name: 'list_pending_decisions', result: '{"decisions": [' }),
-        sseFrame('done', { surface: true }),
-      ]),
-    });
-    await assert.doesNotReject(async () => { m.autoWakeTick(); await flush(); });
-    assert.strictEqual(thread.children.find(li => li.querySelector('.fc-decision')), undefined);
-    assert.ok(chatUICalls.appendNote.some(c => /too long to show/.test(c.text)));
-  });
-
-  test('a tap on a loop-anchored (resumable) decision posts through window.ReplyDelivery.postComment ONLY, with decisionLoopId + decisionId, to the raw issueId target', async () => {
-    const d = decision({ disposition: 'resumable', loopId: 'loop-7', decisionId: 'dec-7', issueId: 'uuid-77', issueIdentifier: 'LIN-77' });
-    const { exports: m, thread, replyDeliveryCalls, apiCalls } = await loadClient({
-      fetchImpl: () => sseResponse([decisionToolFrame([d]), sseFrame('done', { surface: true })]),
-    });
-    m.autoWakeTick();
-    await flush();
-    const wrap = thread.children.find(li => li.querySelector('.fc-decision')).querySelector('.fc-decision');
-    const shipBtn = wrap.querySelector('.chat-options-row').children[0];
-    shipBtn.dispatch('click');
-    await flush();
-    assert.strictEqual(replyDeliveryCalls.length, 1);
-    // looseDeepEqual: the `decision` object is constructed INSIDE the vm
-    // sandbox, so it carries a different (but structurally identical)
-    // Object.prototype than this file's own literal — same cross-realm
-    // reason beat 3's getTabTotals() assertions use looseDeepEqual.
-    // LIN-2704: the comment target now prefers the raw `issueId` (with an
-    // `issueIdentifier` fallback), mirroring public/observation.js's
-    // rulings-tab precedence, now that the projection carries it for every
-    // row — never just the task-bound ones.
-    looseDeepEqual(replyDeliveryCalls[0], {
-      urlKey: 'acme', issueId: 'uuid-77', prompt: 'Ship it',
-      decision: { decisionLoopId: 'loop-7', decisionId: 'dec-7' },
-    });
-    assert.strictEqual(apiCalls.length, 0, 'never window.api — postComment is a raw fetch of its own');
-  });
-
-  // LIN-2704: the LIN-2621 beat-6 read-only mitigation (a fabricated
-  // 'task-bound-unlinked' disposition that deliberately fell outside
-  // appendOptions' resumable/gone/task-bound allow-list, forcing a
-  // loopId-less row read-only) is reverted. `lib/chat-tools.js`'s
-  // `projectPendingDecision` now projects the raw issue UUID and the scan
-  // store's own record id from the anchor, so a task-bound tap can carry the
-  // SAME best-effort stamp pair a loop-anchored tap always could — the real
-  // `'task-bound'` disposition reaches appendOptions' own (unchanged) allow-
-  // list, which is what makes the row interactive again.
-  test('a task-bound decision renders interactive — appendOptions\' real allow-list, not a fabricated disposition — and a tap posts the stamp pair to the raw issueId target', async () => {
-    const d = decision({
-      disposition: 'task-bound', loopId: null, decisionId: 'scan_abc123',
-      issueId: 'uuid-9', issueIdentifier: 'LIN-9', taskDecisionId: 'scan_abc123',
-    });
-    const { exports: m, thread, replyDeliveryCalls, apiCalls } = await loadClient({
-      fetchImpl: () => sseResponse([decisionToolFrame([d]), sseFrame('done', { surface: true })]),
-    });
-    m.autoWakeTick();
-    await flush();
-    const wrap = thread.children.find(li => li.querySelector('.fc-decision')).querySelector('.fc-decision');
-    assert.strictEqual(wrap.querySelector('.chat-options--readonly'), null, 'interactive, not read-only');
-    const row = wrap.querySelector('.chat-options-row');
-    assert.ok(row, 'a button row is rendered — appendOptions\' own allow-list includes task-bound');
-    row.children[0].dispatch('click'); // "Ship it"
-    await flush();
-    assert.strictEqual(replyDeliveryCalls.length, 1);
-    // looseDeepEqual: cross-realm object, see the loop-anchored test above.
-    looseDeepEqual(replyDeliveryCalls[0], {
-      urlKey: 'acme', issueId: 'uuid-9', prompt: 'Ship it',
-      decision: { taskDecisionId: 'scan_abc123', taskDecisionIssueId: 'uuid-9' },
-    });
-    assert.strictEqual(apiCalls.length, 0, 'never window.api — postComment is a raw fetch of its own');
-  });
-
-  test('the loop-bound and task-bound reply lanes do not cross-contaminate — each tap carries only its own stamp pair', async () => {
-    const loopBound = decision({
-      disposition: 'resumable', loopId: 'loop-9', decisionId: 'dec-9',
-      issueId: 'uuid-9-loop', issueIdentifier: 'LIN-9',
-    });
-    const taskBound = decision({
-      disposition: 'task-bound', loopId: null, decisionId: 'scan-9',
-      issueId: 'uuid-9-task', issueIdentifier: 'LIN-19', taskDecisionId: 'scan-9',
-    });
-    const { exports: m, thread, replyDeliveryCalls } = await loadClient({
-      fetchImpl: () => sseResponse([decisionToolFrame([loopBound, taskBound]), sseFrame('done', { surface: true })]),
-    });
-    m.autoWakeTick();
-    await flush();
-    const cards = findAllByClass(thread, 'fc-decision');
-    assert.strictEqual(cards.length, 2);
-
-    cards[0].querySelector('.chat-options-row').children[1].dispatch('click'); // loop-bound "Hold"
-    cards[1].querySelector('.chat-options-row').children[0].dispatch('click'); // task-bound "Ship it"
-    await flush();
-
-    assert.strictEqual(replyDeliveryCalls.length, 2);
-    const loopCall = replyDeliveryCalls.find(c => c.issueId === 'uuid-9-loop');
-    const taskCall = replyDeliveryCalls.find(c => c.issueId === 'uuid-9-task');
-    looseDeepEqual(loopCall.decision, { decisionLoopId: 'loop-9', decisionId: 'dec-9' });
-    assert.strictEqual('taskDecisionId' in loopCall.decision, false, 'the loop-bound tap never carries the task pair');
-    looseDeepEqual(taskCall.decision, { taskDecisionId: 'scan-9', taskDecisionIssueId: 'uuid-9-task' });
-    assert.strictEqual('decisionLoopId' in taskCall.decision, false, 'the task-bound tap never carries the loop pair');
-  });
-
-  test('the row settles visibly on a successful reply: buttons disabled, feedback shown, card marked resolved', async () => {
-    const d = decision();
-    const { exports: m, thread } = await loadClient({
-      fetchImpl: () => sseResponse([decisionToolFrame([d]), sseFrame('done', { surface: true })]),
-      postCommentImpl: () => ({ ok: true, status: 200, data: {} }),
-    });
-    m.autoWakeTick();
-    await flush();
-    const wrap = thread.children.find(li => li.querySelector('.fc-decision')).querySelector('.fc-decision');
-    const buttons = wrap.querySelector('.chat-options-row').children;
-    buttons[0].dispatch('click');
-    await flush();
-    assert.ok(buttons[0].disabled && buttons[1].disabled, 'both options disable together, not just the tapped one');
-    assert.ok(wrap.classList.contains('fc-decision--resolved'));
-    assert.match(wrap.querySelector('.fc-decision-feedback').textContent, /Replied/);
-  });
-
-  test('a double tap never posts twice — the second click on an already-disabled/resolved row is a no-op', async () => {
-    const d = decision();
-    const { exports: m, thread, replyDeliveryCalls } = await loadClient({
-      fetchImpl: () => sseResponse([decisionToolFrame([d]), sseFrame('done', { surface: true })]),
-    });
-    m.autoWakeTick();
-    await flush();
-    const wrap = thread.children.find(li => li.querySelector('.fc-decision')).querySelector('.fc-decision');
-    const btn = wrap.querySelector('.chat-options-row').children[0];
-    btn.dispatch('click');
-    btn.dispatch('click'); // synchronous second tap, before the first fetch resolves
-    await flush();
-    assert.strictEqual(replyDeliveryCalls.length, 1, 'the resolved-guard blocks re-entry even before the button\'s own disabled state can');
-  });
-
-  test('canReply: false is respected even on an (in practice unreachable) interactive-looking disposition — the onSelect guard is a real second gate, not decorative', async () => {
-    const d = decision({ disposition: 'resumable', canReply: false });
-    const { exports: m, thread, replyDeliveryCalls } = await loadClient({
-      fetchImpl: () => sseResponse([decisionToolFrame([d]), sseFrame('done', { surface: true })]),
-    });
-    m.autoWakeTick();
-    await flush();
-    const wrap = thread.children.find(li => li.querySelector('.fc-decision')).querySelector('.fc-decision');
-    wrap.querySelector('.chat-options-row').children[0].dispatch('click');
-    await flush();
-    assert.strictEqual(replyDeliveryCalls.length, 0);
-  });
-
-  test('a failed reply (4xx) is handled honestly, never silently swallowed, and stays disabled (retrying would fail the same way)', async () => {
-    const d = decision();
-    const { exports: m, thread } = await loadClient({
-      fetchImpl: () => sseResponse([decisionToolFrame([d]), sseFrame('done', { surface: true })]),
-      postCommentImpl: () => ({ ok: false, status: 422, data: { error: 'decision already answered' } }),
-    });
-    m.autoWakeTick();
-    await flush();
-    const wrap = thread.children.find(li => li.querySelector('.fc-decision')).querySelector('.fc-decision');
-    const buttons = wrap.querySelector('.chat-options-row').children;
-    buttons[0].dispatch('click');
-    await flush();
-    assert.strictEqual(wrap.querySelector('.fc-decision-feedback').textContent, 'decision already answered');
-    assert.ok(buttons[0].disabled, 'a 4xx is terminal — left disabled rather than inviting an identical retry');
-  });
-
-  test('a failed reply (5xx) re-enables the row for retry', async () => {
-    const d = decision();
-    const { exports: m, thread } = await loadClient({
-      fetchImpl: () => sseResponse([decisionToolFrame([d]), sseFrame('done', { surface: true })]),
-      postCommentImpl: () => ({ ok: false, status: 500, data: {} }),
-    });
-    m.autoWakeTick();
-    await flush();
-    const wrap = thread.children.find(li => li.querySelector('.fc-decision')).querySelector('.fc-decision');
-    const buttons = wrap.querySelector('.chat-options-row').children;
-    buttons[0].dispatch('click');
-    await flush();
-    assert.ok(!buttons[0].disabled, 'a 5xx is retryable — restored, matching renderProposal\'s own disable-then-restore idiom');
-    assert.match(wrap.querySelector('.fc-decision-feedback').textContent, /try again/);
-  });
-
-  test('a network failure (postComment rejects) re-enables the row for retry with an honest message', async () => {
-    const d = decision();
-    const { exports: m, thread } = await loadClient({
-      fetchImpl: () => sseResponse([decisionToolFrame([d]), sseFrame('done', { surface: true })]),
-      postCommentImpl: () => { throw new Error('offline'); },
-    });
-    m.autoWakeTick();
-    await flush();
-    const wrap = thread.children.find(li => li.querySelector('.fc-decision')).querySelector('.fc-decision');
-    const buttons = wrap.querySelector('.chat-options-row').children;
-    buttons[0].dispatch('click');
-    await flush();
-    assert.ok(!buttons[0].disabled);
-    assert.match(wrap.querySelector('.fc-decision-feedback').textContent, /Network failure — try again/);
+    assert.strictEqual(findByClass(thread, 'fc-decisions-fold'), null, 'nothing pending: no fold');
   });
 });
-
-// ─── Full response matrix (F4 + F6) ─────────────────────────────────────
 
 describe('flight-companion.js — response matrix outcomes end-to-end', () => {
   test('gate-silent (200 spent:false): silent, no DOM note, doubles', async () => {
@@ -4191,11 +3948,10 @@ describe('flight-companion.js — proposal persistence + read-only rehydrate (LI
 
 describe('flight-companion.js — scannable thread (LIN-3361)', () => {
   const rowsIn = (thread) => thread.children.filter((l) => l.className.includes('chat-tool-row') || l.className.includes('chat-tool-group'));
-  const decisionResult = (decisions) => JSON.stringify({ decisions });
+  const decisionResult = (questions) => JSON.stringify({ count: questions.length, truncated: false, questions });
   const dec = (over) => Object.assign({
-    decisionId: 'dec-1', issueIdentifier: 'LIN-100', issueId: 'uuid-100', loopId: 'loop-1', sessionId: 's',
-    question: 'Ship it?', options: [{ id: 'y', label: 'Yes' }, { id: 'n', label: 'No' }],
-    optionsTotal: 2, recommended: 'y', disposition: 'resumable', canReply: true,
+    questionId: 'q-1', question: 'Ship it?', options: ['Yes', 'No'],
+    recommended: 'Yes', issueIdentifier: 'LIN-100', state: 'resumable', interactive: true,
   }, over || {});
 
   test('two consecutive tool calls compact into one "checked 2 things" group', async () => {
@@ -4329,9 +4085,9 @@ describe('flight-companion.js — scannable thread (LIN-3361)', () => {
 
   // LIN-4532 (finding-89c7a7a5, M5): an open question in the result is drawn as the shared question card, in the same fold. The
   // mutation witness: without the `parsed.questions.forEach` draw, the fold counts the question and draws no card for it.
-  test('decisions: an open question is the shared question card in the fold, and counts with the decisions', async () => {
-    const question = { questionId: 'q-7', asks: 'Which way?', options: ['left', 'right'], recommended: 'left', ifUnanswered: 'pick left', state: 'resumable', interactive: true, ticket: 'LIN-9', taskId: 'task-9', runId: 'run-1', askedAt: '2026-11-23T09:00:00.000Z', reason: null };
-    const result = JSON.stringify({ count: 1, truncated: false, decisions: [], questions: [question] });
+  test('questions: an open question is the shared question card in the fold, and counts with the others', async () => {
+    const question = { questionId: 'q-7', question: 'Which way?', options: ['left', 'right'], recommended: 'left', issueIdentifier: 'LIN-9', state: 'resumable', interactive: true };
+    const result = JSON.stringify({ count: 1, truncated: false, questions: [question] });
     const { exports: m, thread } = await loadClient({
       fetchImpl: () => sseResponse([
         sseFrame('tool', { phase: 'result', id: 't', name: 'list_pending_decisions', result }),
@@ -4351,10 +4107,10 @@ describe('flight-companion.js — scannable thread (LIN-3361)', () => {
     assert.strictEqual((qli.innerHTML.match(/data-testid="question-record-card-option"/g) || []).length, 2, 'one button per option');
   });
 
-  test('decisions: one closed fold "N decisions waiting" with a Rulings link, rows all in the DOM', async () => {
+  test('questions: one closed fold "N decisions waiting" with a Rulings link, rows all in the DOM', async () => {
     const { exports: m, thread } = await loadClient({
       fetchImpl: () => sseResponse([
-        sseFrame('tool', { phase: 'result', id: 't', name: 'list_pending_decisions', result: decisionResult([dec(), dec({ decisionId: 'dec-2', issueIdentifier: 'LIN-101' })]) }),
+        sseFrame('tool', { phase: 'result', id: 't', name: 'list_pending_decisions', result: decisionResult([dec(), dec({ questionId: 'q-2', issueIdentifier: 'LIN-101' })]) }),
         sseFrame('done', { surface: true }),
       ]),
     });
@@ -4364,11 +4120,10 @@ describe('flight-companion.js — scannable thread (LIN-3361)', () => {
     assert.ok(fold, 'the fold renders');
     assert.strictEqual(fold.children[0].textContent, '2 decisions waiting');
     assert.strictEqual(findByClass(fold, 'fc-decisions-rulings-link').getAttribute('href'), '/workspace/acme/observation?view=rulings');
-    assert.strictEqual(findAllByClass(fold, 'fc-decision').length, 2);
-    assert.strictEqual(findAllByClass(thread, 'fc-decision-task-link').length, 0, 'testid is an attribute, not a class');
+    assert.strictEqual(findAllByClass(fold, 'fc-question').length, 2);
   });
 
-  test('a single decision reads "1 decision waiting"; zero decisions render nothing', async () => {
+  test('a single open question reads "1 decision waiting"; zero questions render nothing', async () => {
     const one = await loadClient({
       fetchImpl: () => sseResponse([
         sseFrame('tool', { phase: 'result', id: 't', name: 'list_pending_decisions', result: decisionResult([dec()]) }),
@@ -4390,27 +4145,6 @@ describe('flight-companion.js — scannable thread (LIN-3361)', () => {
     assert.strictEqual(findByClass(none.thread, 'fc-decisions-fold'), null);
   });
 
-  test('a decision row links its task and adds it to the persisted set; the option click still replies', async () => {
-    const storage = makeFakeStorage();
-    const { exports: m, thread, replyDeliveryCalls } = await loadClient({
-      storageImpl: storage,
-      fetchImpl: () => sseResponse([
-        sseFrame('tool', { phase: 'result', id: 't', name: 'list_pending_decisions', result: decisionResult([dec()]) }),
-        sseFrame('done', { surface: true }),
-      ]),
-    });
-    m.autoWakeTick();
-    await flush();
-    const card = findByClass(thread, 'fc-decision');
-    const link = findByClass(card, 'fc-decision-ref').children[0];
-    assert.strictEqual(link.getAttribute('href'), '/workspace/acme/task/LIN-100');
-    assert.strictEqual(link.textContent, 'LIN-100');
-    assert.deepStrictEqual(JSON.parse(storage.getItem('flight-companion-session:acme')).seenIdentifiers, ['LIN-100']);
-    findByClass(card, 'chat-options-row').children[0].dispatch('click');
-    await flush();
-    assert.strictEqual(replyDeliveryCalls.length, 1);
-    assert.ok(card.classList.contains('fc-decision--resolved'));
-  });
 
   test('readout headings come from the page attribute; a malformed attribute degrades to none', async () => {
     const ok = await loadClient({ pageDataset: { fcReadoutHeadings: '["The big thread"]' } });
