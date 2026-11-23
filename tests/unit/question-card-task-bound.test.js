@@ -331,18 +331,17 @@ test('NEW differential: a stray record_on on a scan row never redirects the comm
 });
 
 // ── LIN-4540: the scan dismiss route is gone ───────────────────────────────
-// The scan was the only writer of task-bound rulings and none was open at the cutover (LIN-4539), so the card has no
-// task-bound dismiss of its own any more: a dismiss goes the one way a dismiss goes. LIN-4541 retires the task-bound tier.
+// The scan was the only writer of task-bound rulings, and its dismiss went with it. The rulings dismiss route refuses a card
+// with no loop (400), so a task-bound card offers no dismiss at all, and a loop-backed card keeps it. LIN-4541 retires the tier.
 
-test('LIN-4540 dismiss: a task-bound card never calls the retired scan dismiss route', async () => {
-  const f = answerable(taskBoundMarkup());
-  await clickOn(f.dismissBtn);
-  await flush();
-  assert.equal(f.calls.length, 1, 'one request, no follow-up');
-  assert.doesNotMatch(f.calls[0].url, /\/api\/scan\//, 'the scan route is gone');
-  assert.equal(f.calls[0].url, '/workspace/w/api/dashboard/rulings/dismiss');
-  assert.equal('id' in f.calls[0].body, false, 'no scan decision id rides the dismiss');
-  assert.equal(f.runStarts(), 0);
+test('LIN-4540 dismiss: a task-bound card renders no dismiss control; a loop-backed card still does', () => {
+  const dismiss = 'data-testid="session-question-card-dismiss"';
+  const taskBound = renderDecisionCard(structuredClone(TASK_BOUND_ROW), RENDER_OPTS);
+  assert.ok(taskBound.includes('data-testid="session-question-card"'), 'the card itself still renders');
+  assert.equal(taskBound.includes(dismiss), false, 'no dismiss on a task-bound card');
+  // The read-only loop fixtures render no dismiss by their own rule, so the control case is the ordinary interactive one.
+  const loopBacked = renderDecisionCard(structuredClone(LOOP_BACKED_ROWS['loop-plain-no-options']), RENDER_OPTS);
+  assert.ok(loopBacked.includes(dismiss), 'a loop-backed card keeps its dismiss');
 });
 
 // ── NEW: the delivered-effect rule ─────────────────────────────────────────

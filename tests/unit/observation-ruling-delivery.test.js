@@ -2112,8 +2112,8 @@ describe('rulingRowControls widened for Agree/Keep (LIN-2444 Phase 4)', () => {
 
   // LIN-4540: the task-bound dismiss route went with the comment scan, and the
   // rulings dismiss route refuses a null decisionLoopId (400), so a task-bound
-  // row renders no Dismiss, Agree or Keep: a button that always fails is worse
-  // than none. A loop-backed row keeps them.
+  // row renders no Dismiss and no Agree; Keep stays (its own route). A button
+  // that always fails is worse than none. A loop-backed row keeps them.
   test('a task-bound row renders no Dismiss and no Agree-to-dismiss; a loop-backed row still does', async () => {
     const { page, list } = await makeRenderSandbox(async () => ({ success: true }));
     const { renderRulings } = page;
@@ -3756,6 +3756,51 @@ describe('bulkAgreeRow / bulkAgreeSelected — mixed dismiss/answer batch (LIN-2
     const { agreeRulingRow } = singlePage;
     await agreeRulingRow(answeredRow({ disposition: 'gone', effect: 'dispatch' }), makeLi(singlePage));
     assert.equal(dispatchCalls, 1, 'single-row Agree must still allow a dispatch-effect answer');
+  });
+});
+
+describe('bulk Agree on a task-bound dismissal proposal (LIN-4540)', () => {
+  const SUGGESTION = { reason: 'x', suggestedBy: 'y', suggestedAt: '2026-09-05T00:00:00.000Z' };
+  const taskBoundDismissal = () => makeRow({
+    decision: { decision_id: 'd-tb-dismiss' },
+    anchor: { loopId: null, taskDecisionId: 'td-tb' },
+    disposition: 'task-bound',
+    suggestedDismissal: SUGGESTION
+  });
+
+  test('computeBulkAgreeBreakdown counts the row as refused, not as a dismissal', async () => {
+    const world = makeWorld();
+    const list = world.document.createElement('ul');
+    const empty = world.document.createElement('p'); empty.hidden = false;
+    const page = await makeSandbox({ world, elements: { 'obs-rulings': list, 'obs-rulings-empty': empty } });
+    const { renderRulings, setAllRulingsSelected, computeBulkAgreeBreakdown } = page;
+
+    renderRulings([taskBoundDismissal()]);
+    setAllRulingsSelected(true);
+
+    const breakdown = computeBulkAgreeBreakdown();
+    assert.equal(breakdown.refused, 1);
+    assert.equal(breakdown.dismiss, 0);
+  });
+
+  test('bulk Agree skips the row, says so, and never calls window.api', async () => {
+    const calls = [];
+    const world = makeWorld();
+    const list = world.document.createElement('ul');
+    const empty = world.document.createElement('p'); empty.hidden = false;
+    const page = await makeSandbox({ world,
+      api: async (url, opts) => { calls.push({ url, opts }); return { success: true }; },
+      elements: { 'obs-rulings': list, 'obs-rulings-empty': empty }
+    });
+    const { renderRulings, setAllRulingsSelected, bulkAgreeSelected } = page;
+
+    renderRulings([taskBoundDismissal()]);
+    setAllRulingsSelected(true);
+    await answerBulk(page, bulkAgreeSelected());
+
+    assert.equal(calls.filter((c) => /\/rulings\//.test(String(c.url))).length, 0, 'no ruling request for a task-bound dismissal');
+    const feedback = list.children[0].querySelector('.obs-ruling-feedback');
+    assert.match(feedback.textContent, /skipped/);
   });
 });
 
