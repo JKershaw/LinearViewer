@@ -661,7 +661,8 @@ test.describe('Proxy API - Route Aliases (LIN-528)', () => {
       canonical: '/api/proxy/issues/LIN-999999/recommend', alias: '/api/proxy/recommend/LIN-999999' },
     { name: 'recap', method: 'get', token: () => readToken, status: 404,
       canonical: '/api/proxy/issues/LIN-999999/recap', alias: '/api/proxy/recap/LIN-999999' },
-    { name: 'brief', method: 'get', token: () => readToken, status: 404,
+    // LIN-4536: the records brief reads no tracker; a ticket with no task answers 200 { status: 'missing' }.
+    { name: 'brief', method: 'get', token: () => readToken, status: 200,
       canonical: '/api/proxy/issues/LIN-999999/brief', alias: '/api/proxy/brief/LIN-999999' },
     { name: 'prompt', method: 'get', token: () => readToken, status: 404,
       canonical: '/api/proxy/issues/LIN-999999/prompt/implement', alias: '/api/proxy/prompt/LIN-999999/implement' }
@@ -725,8 +726,9 @@ test.describe('Proxy API - Jira-active compute endpoints (LIN-2044)', () => {
     expect(recapBody.identifier).toBe('ENG-1');
   });
 
-  test('positive witness: GET /api/proxy/brief/ENG-1?noRefresh=1 also succeeds against Jira (mirrors the recap seam)', async ({ request }) => {
-    const briefResp = await request.get('/api/proxy/brief/ENG-1?noRefresh=1', {
+  // LIN-4536: the brief is the records brief and reads no tracker at all; a Jira ticket with no task answers `missing`.
+  test('positive witness: GET /api/proxy/brief/ENG-1 succeeds against Jira (a ticket with no task: missing)', async ({ request }) => {
+    const briefResp = await request.get('/api/proxy/brief/ENG-1', {
       headers: { Authorization: `Bearer ${jiraToken}` }
     });
     expect(briefResp.status(), await briefResp.text().catch(() => '')).toBe(200);
@@ -1601,7 +1603,7 @@ test.describe('Proxy API - Dispatch', () => {
     expect(item.prompt).toContain('fix the bug');
     expect(item.prompt).toContain('Workspace API access');
     expect(item.prompt).toContain('/api/proxy/instructions');
-    // Starting context is the distilled brief, not the raw issue dump (LIN-260).
+    // Starting context is the brief, not the raw issue dump (LIN-260; LIN-4536: the records brief).
     expect(item.prompt).toContain('/api/proxy/brief/LIN-288');
     // LIN-1159: a no-harness dispatch now defaults to claude-code, so the common
     // path takes LIN-1155's MCP token-field flow — the bootstrap travels as the

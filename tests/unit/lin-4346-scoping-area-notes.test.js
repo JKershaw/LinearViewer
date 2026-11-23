@@ -13,7 +13,7 @@ import assert from 'node:assert/strict';
 import { generatePrompt } from '../../lib/prompt-templates.js';
 import { formatAreaNotesPointer, formatScopingAreaNotesPointer } from '../../lib/prompt-formatters.js';
 import { REGISTRY_PATH } from '../../lib/prompts/area-registry-path.js';
-import { ASKED_HEADING } from '../../lib/brief-quote.js';
+import { ASKED_HEADING } from '../../lib/records/words.js';
 import {
   SIZE_OF_MOVE_HEADING, SIZES, SIZE_LABEL, WHY_LABEL, CUTS_LABEL, DECIDED_BY_LABEL, DECIDED_BY, NO_CUTS, checkSizeRecord
 } from '../../lib/size-of-move.js';

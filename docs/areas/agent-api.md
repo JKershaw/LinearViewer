@@ -63,3 +63,5 @@ Area notes for `agent-api` in the registry. Format and rules: README.md.
   to its mint. The feedback autopilot dropped it (`routes/workspace-api-feedback.js`) until LIN-4531 made a fresh kickoff
   start a run (`startsRunRow`, `lib/run-identity.js`). Every `runRecordIdFor` caller passes `followUpTo` too, or a
   kickoff's follow-up reads as a run of its own.
+- Records reads log who asked via `proxyAskerOf` (`lib/stage-writes.js`). The brief logs carried ids under a run only
+  on its own task: a run's end ends them (LIN-4536).

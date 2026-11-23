@@ -1,42 +1,35 @@
 /**
- * The As-asked quote's marker words have one owner: lib/brief-quote.js (`ASKED_HEADING`, `ASKED_END`
- * and the forms built from them; LIN-4502 moved them there when it retired the block's own module).
- * An agent-facing string anywhere else in lib/ or routes/ that spells the heading or the end line by
- * hand is a copy that can drift from the words the brief quotes, so this census fails on it. Such
- * strings interpolate the export instead (LIN-4362).
+ * LIN-4536 (moved from the As-asked marker census, LIN-4362/LIN-4502): the heading of the brief's part 1, `## As asked`,
+ * has one owner, lib/records/words.js (`ASKED_HEADING`). The records brief renders part 1 under it, and the stage
+ * prompts name "the `## As asked` block", so a hand spelling anywhere else in lib/ or routes/ is a copy that can drift
+ * from the heading the brief prints. This census fails on it; such strings interpolate the export instead.
  *
- * What counts as a spelling: `## As asked` (the heading, and the parent heading that starts with it) and
- * `*End of what was asked` (the full end line, its shortened `*End of what was asked. …*` form in the
- * proxy instructions, and the parent end line).
+ * The quote's end line (`*End of what was asked …*`) retired with the model-written brief it closed: the records brief's
+ * next part heading ends part 1. A hand spelling of it is caught too, so it does not come back.
  *
- * What is skipped: comments. Comments and docs keep the literal text, because a reader of the code needs
- * to see the words. A `//` line is skipped, and so is every line inside a `/* … *\/` block. The skip is by
- * block, not by a leading `*`: the end line itself starts with `*`, so a blanket `^\s*\*` skip would
- * also skip a prompt line that opens with the end line (the last fixture below shows it is caught).
+ * What is skipped: comments. A `//` line is skipped, and so is every line inside a `/* … *\/` block. The skip is by
+ * block, not by a leading `*`: the end line starts with `*`, so a blanket `^\s*\*` skip would also skip a prompt line
+ * that opens with it (the last fixture below shows it is caught).
  *
- * Modelled on cost-read-census.test.js: the check is a pure function over (path, text) pairs, and the
- * synthetic cases prove it fails on the spellings it names.
- *
- * Run with: node scripts/run-unit-tests.mjs tests/unit/as-asked-marker-census.test.js
+ * Run with: node scripts/run-unit-tests.mjs tests/unit/lin-4536-as-asked-heading-census.test.js
  */
 import { test, describe } from 'node:test';
 import assert from 'node:assert/strict';
 import fs from 'node:fs';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
-import { ASKED_HEADING, ASKED_END, ASKED_END_SHORT, BRIEF_HINT, splitQuote } from '../../lib/brief-quote.js';
+import { ASKED_HEADING, BRIEF_HINT } from '../../lib/records/words.js';
 import { buildProxyContextPreamble } from '../../lib/proxy-preamble.js';
 import { buildInstructions } from '../../lib/proxy-instructions.js';
-import { CHAT_TOOL_SCHEMAS } from '../../lib/chat-tools.js';
 import { buildAutopilotKickoff } from '../../lib/prompts/autopilot-kickoff.js';
 import { buildFlightCompanionKickoff } from '../../lib/prompts/flight-companion-kickoff.js';
 
 const REPO = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '../..');
 const SCANNED_DIRS = ['lib', 'routes'];
-/** The one owner of the words. */
-const OWNER = 'lib/brief-quote.js';
+/** The one owner of the heading. */
+const OWNER = 'lib/records/words.js';
 
-/** A hand spelling of the heading or of the end sentence (any of its forms). */
+/** A hand spelling of the heading, or of the retired end line. */
 export const MARKER_SPELLING = /## As asked|\*End of what was asked/;
 
 /**
@@ -76,10 +69,9 @@ function scannedFiles() {
   return out;
 }
 
-describe('As-asked marker census: the check itself', () => {
-  test('the pattern recognises the owner\'s own words, so it tracks what the brief quotes', () => {
+describe('As-asked heading census: the check itself', () => {
+  test('the pattern recognises the owner\'s heading, so it tracks what the brief prints', () => {
     assert.ok(MARKER_SPELLING.test(ASKED_HEADING));
-    assert.ok(MARKER_SPELLING.test(ASKED_END));
   });
 
   test('a string spelling the heading is caught', () => {
@@ -87,9 +79,9 @@ describe('As-asked marker census: the check itself', () => {
     assert.deepEqual(markerSpellings(src).map((h) => h.line), [1]);
   });
 
-  test('a string spelling the end sentence, or its shortened form, is caught', () => {
+  test('a string spelling the retired end line, or its shortened form, is caught', () => {
     const src = [
-      `const end = '${ASKED_END}';`,
+      "const end = '*End of what was asked. Steps write below this line; nothing above it changes.*';",
       'const hint = \'a marker line ("*End of what was asked. …*")\';',
     ].join('\n');
     assert.deepEqual(markerSpellings(src).map((h) => h.line), [1, 2]);
@@ -100,7 +92,7 @@ describe('As-asked marker census: the check itself', () => {
       '// Below the `## As asked` block wins.',
       '/**',
       ' * Seal the `## As asked` block onto a ticket.',
-      ` * ${ASKED_END}`,
+      ' * *End of what was asked.*',
       ' */',
       '/** A parent\'s `## As asked` words. */',
       '/* one-line block: ## As asked */',
@@ -114,11 +106,11 @@ describe('As-asked marker census: the check itself', () => {
     assert.deepEqual(markerSpellings(src).map((h) => h.line), [4]);
   });
 
-  test('a template line that starts with the end sentence is still caught', () => {
+  test('a template line that starts with the end line is still caught', () => {
     // Inside a template literal, outside any comment: a blanket leading-`*` skip would drop this line.
     const src = [
       'const prompt = `Write below the block.',
-      `${ASKED_END}`,
+      '*End of what was asked.*',
       '* a bullet naming the "## As asked" block',
       '`;',
     ].join('\n');
@@ -126,25 +118,19 @@ describe('As-asked marker census: the check itself', () => {
   });
 });
 
-describe('As-asked marker census: lib/ and routes/', () => {
-  test(`no agent-facing string outside ${OWNER} spells the heading or the end sentence by hand`, () => {
+describe('As-asked heading census: lib/ and routes/', () => {
+  test(`no agent-facing string outside ${OWNER} spells the heading or the retired end line by hand`, () => {
     const found = scannedFiles().flatMap(([rel, text]) =>
       markerSpellings(text).map((h) => `${rel}:${h.line}: ${h.text.slice(0, 120)}`)
     );
-    assert.deepEqual(found, [], `interpolate ASKED_HEADING / ASKED_END from ${OWNER} instead:\n${found.join('\n')}`);
+    assert.deepEqual(found, [], `interpolate ASKED_HEADING from ${OWNER} instead:\n${found.join('\n')}`);
   });
 });
 
-describe('the forms built from the owner\'s words keep their bytes', () => {
-  test('the short end form is the end sentence\'s first clause and an ellipsis, and is not a marker line', () => {
-    assert.equal(ASKED_END_SHORT, '*End of what was asked. …*');
-    assert.ok(ASKED_END.startsWith(ASKED_END_SHORT.slice(0, -' …*'.length)));
-    // It only names the line in prose; it never ends a quote.
-    assert.equal(splitQuote(`${ASKED_HEADING}\n\nwords\n\n${ASKED_END_SHORT}`), null);
-  });
-
-  test('the brief hint is one wording, naming the heading and the task as the words\' source (LIN-4502)', () => {
-    assert.equal(BRIEF_HINT, "the person's words under `## As asked`, from the task's record; no step may change them; the rest is the present state");
+describe('the brief hint names the records brief', () => {
+  test('one wording, naming the heading, the task as the words\' source, and no model-written part', () => {
+    assert.equal(BRIEF_HINT, "the task as filed under `## As asked`, from the task's record; no step may change it; then the records addressed to you, what stands and the previous stage");
+    assert.doesNotMatch(BRIEF_HINT, /present state|distilled/, 'no summary is promised');
   });
 });
 
@@ -154,7 +140,6 @@ describe('every surface that points an agent at the brief uses the one hint', ()
     'proxy preamble': () => buildProxyContextPreamble({ baseUrl: BASE, token: 'tok', issueIdentifier: 'LIN-9' }),
     'proxy preamble, no issue detail': () => buildProxyContextPreamble({ baseUrl: BASE, token: 'tok', issueIdentifier: 'LIN-9', providerUi: { issueDetail: false } }),
     'proxy instructions': () => buildInstructions({ baseUrl: BASE, scope: 'read' }),
-    'chat get_brief tool': () => CHAT_TOOL_SCHEMAS.find((t) => t.function.name === 'get_brief').function.description,
     'autopilot kickoff (scoped)': () => buildAutopilotKickoff({ baseUrl: BASE, issue: { identifier: 'LIN-42', title: 'X' } }),
     'Flight Companion kickoff': () => buildFlightCompanionKickoff({ baseUrl: BASE }),
   };

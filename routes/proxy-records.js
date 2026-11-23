@@ -50,7 +50,7 @@
 import { Router } from 'express';
 import { jsonError } from '../lib/errors.js';
 import { writerOf, WRITER_REFUSAL } from '../lib/run-lineage.js';
-import { TOKEN_ORIGIN, WRITES } from '../lib/stage-writes.js';
+import { TOKEN_ORIGIN, WRITES, proxyAskerOf } from '../lib/stage-writes.js';
 import { RecordsVersionConflict, RecordsNotFound } from '../lib/records-store.js';
 import { refusalOf, KINDS, PLAN_ADDRESSEES, planAddresseeProblem } from '../lib/records/check.js';
 import { createRecordWrites } from '../lib/records/writes.js';
@@ -330,12 +330,8 @@ export function createProxyRecordsRoutes({ recordsStore, proxyLimiter, authentic
 
   // ---- reads -------------------------------------------------------------
 
-  /** Who a read is logged as, or null for a credential that cannot read records (no origin). */
-  function askerOf(req) {
-    if (req.proxyOrigin === TOKEN_ORIGIN.DISPATCH) return req.proxyRunRecordId ? `run:${req.proxyRunRecordId}` : 'dispatch:no-run';
-    if (req.proxyOrigin === TOKEN_ORIGIN.PERSON && req.proxyCreatedBy) return `person:${req.proxyCreatedBy}`;
-    return null;
-  }
+  /** Who a read is logged as, or null for a credential that cannot read records (no origin): lib/stage-writes.js proxyAskerOf. */
+  const askerOf = proxyAskerOf;
 
   /** The read gate: an identified credential, and not a blind read (its only read is its ticket, LIN-4437). */
   function readable(req, res, endpoint) {

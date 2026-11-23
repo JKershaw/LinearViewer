@@ -295,11 +295,13 @@ describe('recommendation context fetch stops fighting the keepalive', () => {
     // /recommend-and-dispatch) stayed put when computeRecommendation itself
     // stayed; the other four (recap x2, brief x2) moved to
     // routes/proxy-compute.js. Split 4/1, not a single re-pointed 5.
+    // LIN-4536: 3/1. GET /brief is the records brief and fetches no recommendation context; POST /brief (the task
+    // page's summary, retiring in LIN-4537) still does.
     const pattern = /fetchWithTimeout\(\s*\(signal\)\s*=>\s*provider\.fetchRecommendationContext\(accessToken,\s*identifier,\s*\{\s*signal(?:,\s*noDescend)?\s*\}\),\s*CONTEXT_FETCH_TIMEOUT_MS\)/g;
     const computeCalls = proxyComputeSource.match(pattern) || [];
     const proxyCalls = proxySource.match(pattern) || [];
-    assert.strictEqual(computeCalls.length, 4,
-      `4 of the 5 recommendation-context fetches (recap x2, brief x2) must call provider.fetchRecommendationContext via the abortable backstop helper in routes/proxy-compute.js (found ${computeCalls.length})`);
+    assert.strictEqual(computeCalls.length, 3,
+      `3 of the 4 recommendation-context fetches (recap x2, POST brief) must call provider.fetchRecommendationContext via the abortable backstop helper in routes/proxy-compute.js (found ${computeCalls.length})`);
     assert.strictEqual(proxyCalls.length, 1,
       `the recommend site's recommendation-context fetch (inside computeRecommendation) must remain in routes/proxy.js (found ${proxyCalls.length})`);
   });

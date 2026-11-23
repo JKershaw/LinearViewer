@@ -28,7 +28,7 @@ import {
   RECORD_LINES, RECORD_PARTS, SIZE_LABEL, WHY_LABEL, CUTS_LABEL, DECIDED_BY_LABEL, NO_CUTS, WHY_MAX_WORDS, CUT_MAX_OTHER_WORDS,
   readSizeRecord, sizeFact, checkSizeRecord, STANDING_POLICY_LINE, recordShape
 } from '../../lib/size-of-move.js';
-import { quoteAsked } from '../../lib/brief-quote.js';
+import { sealedDescription } from '../helpers/sealed-description.js';
 import { askedOf } from '../../lib/asked-of.js';
 import { assembleTrailFacts, formatTrailFactsBlock } from '../../lib/recommendation-facts.js';
 import { generatePrompt } from '../../lib/prompt-templates.js';
@@ -37,7 +37,7 @@ const ROOT = join(dirname(fileURLToPath(import.meta.url)), '..', '..');
 const FIXTURES = join(ROOT, 'tests', 'fixtures', 'size-of-move');
 
 const ASK = 'Keep the look-first step as advice (on main: `docs/plans/survey.md`). Write a full guide.';
-const SEALED = quoteAsked(ASK);
+const SEALED = sealedDescription(ASK);
 
 /** A record body in the shape scoping writes (LIN-4369 arm 3: four lines and nothing else). */
 const PLAIN = [
@@ -94,12 +94,12 @@ describe('the parser reads the description outside the As-asked block, never com
     assert.equal(sizeFact(null), 'not recorded');
     // LIN-4527: the size record is read from the whole description, so the quotation guard carries the load: only the
     // exact heading line opens a section, and a `>`-quoted one never does.
-    const quoted = quoteAsked(`Please decide.\n\n> ${SIZE_OF_MOVE_HEADING}\n>\n> **Size:** rebuild the area`);
+    const quoted = sealedDescription(`Please decide.\n\n> ${SIZE_OF_MOVE_HEADING}\n>\n> **Size:** rebuild the area`);
     assert.equal(readSizeRecord(quoted), null, 'the person\'s quoted words are not a record');
   });
 
   test('the same heading unquoted, inside a sealed block, reads as a record (LIN-4527 residual: no production block holds one)', () => {
-    const unquoted = quoteAsked(`Please decide.\n\n${SIZE_OF_MOVE_HEADING}\n\n**Size:** rebuild the area`);
+    const unquoted = sealedDescription(`Please decide.\n\n${SIZE_OF_MOVE_HEADING}\n\n**Size:** rebuild the area`);
     assert.equal(sizeFact(readSizeRecord(unquoted)), 'chosen rebuild the area (by no one named)');
   });
 

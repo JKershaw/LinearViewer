@@ -121,7 +121,7 @@ describe('LIN-2804 — request-scoped idiom (req.resolvedProvider.ui via POST /a
     assert.ok(!prompt.includes('/api/proxy/issues/GH-42'), 'no preamble /issues/{id} hint');
     assert.ok(!prompt.includes('/relations/GH-42'), 'no preamble /relations hint');
     assert.ok(!/verify `GET \/issues\/\{id\}`/.test(prompt), 'no Setup guide /issues/{id} verify hint');
-    assert.ok(prompt.includes('this provider does not support raw issue-detail reads'), 'first-act replacement wording present');
+    assert.ok(prompt.includes('this provider does not support raw reads of a ticket'), 'first-act replacement wording present');
     assert.ok(prompt.includes('/api/proxy/search?q=… to find related tasks by text'), 'preamble search alternative present');
     assert.ok(!prompt.includes('/comments'), 'ticket-fidelity finding: no phantom /comments endpoint anywhere');
   });

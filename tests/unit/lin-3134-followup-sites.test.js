@@ -433,7 +433,7 @@ function assertPlainMint(world, out, createdBy, { runs = false } = {}) {
 
 function assertBriefAndProvider(branch, prompt, { mcp }) {
   const base = mcp ? '\\$HARBOUR_LOCAL_BASE' : 'http://127\\.0\\.0\\.1:\\d+';
-  assert.match(prompt, new RegExp(`Start from the distilled brief: GET ${base}/api/proxy/brief/${branch.brief}\\b`),
+  assert.match(prompt, new RegExp(`Start from your brief: GET ${base}/api/proxy/brief/${branch.brief}\\b`),
     `${branch.id} brief names ${branch.brief}`);
   assert.match(prompt, new RegExp(`You have a workspace API proxy for this workspace \\(source-neutral; ${branch.providerLine}\\)\\. Base: ${base}/api/proxy`),
     `${branch.id} provider line`);

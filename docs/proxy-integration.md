@@ -362,7 +362,7 @@ Issue-scoped endpoints are canonical under `/issues/{id}/...`, so the read and w
 
 - `GET  /issues/{id}/relations` (read) pairs with `POST` / `DELETE /issues/{id}/relations[/{relationId}]` (write).
 - `POST /issues/{id}/comments` (write) pairs with `PATCH` / `DELETE /issues/{id}/comments/{commentId}` (write); reads of comments come back inside `GET /issues/{id}`.
-- `GET  /issues/{id}/recommend`, `/issues/{id}/recap`, `/issues/{id}/brief` (issue-derived AI reads).
+- `GET  /issues/{id}/recommend`, `/issues/{id}/recap` (issue-derived AI reads), `/issues/{id}/brief` (the records brief, LIN-4536).
 - Cycle detail is canonical as the plural by-id form `GET /cycles/{cycleId}`, mirroring the `GET /cycles` list.
 
 For backward compatibility the proxy also accepts **forgiving aliases** for the obvious alternate guesses — the older flat forms `GET /relations/{id}`, `GET /recap/{id}`, `GET /brief/{id}`, `GET /recommend/{id}`, `POST /comments/{id}`, and the singular `GET /cycle/{cycleId}` all still resolve to the same handlers. They are intentionally undocumented going forward; prefer the canonical paths above. The RPC-style verbs (`/stack`, `/dispatch*`, `/recommend-and-dispatch`, `/agent/status` (deprecated alias `/foreman/status`), `/autopilot/*`) are not issue-scoped and are unchanged.
@@ -873,7 +873,7 @@ Key off `state.type` — `"canceled"` is terminal, so every consumer that alread
 The same asymmetry is handled on the other by-ID surfaces:
 
 - `GET /api/proxy/issues/{id}/relations` returns a top-level `"trashed": true` (it has no root state to override); the relations are still returned so you can see what a now-deleted issue was related to.
-- The task-automation context endpoints (`/recommend`, `/recap`, `/brief`, `/prompt`) **refuse** a trashed target with **`404`** rather than distilling or recommending work on a ghost.
+- The task-automation context endpoints (`/recommend`, `/recap`, `/prompt`) **refuse** a trashed target with **`404`** rather than distilling or recommending work on a ghost.
 - The write endpoints (`PATCH /issues/{id}`, comments, relation-create, labels, description `append`/`replace`) **refuse** a trashed target with **`409`** rather than silently mutating a deleted issue.
 
 Collection endpoints (`/issues`, `/search`, `/stack`) and nested `children`/`parent`/relation lists are unaffected — trash is already excluded from those.
@@ -1046,39 +1046,42 @@ GET  /api/proxy/issues/{identifier}/brief
 POST /api/proxy/brief/{identifier}
 ```
 
-A current-state **brief**: a distilled, present-tense version of the task —
-`## Current`, `## Constraints`, `## Open questions`, `## Changelog` — intended as the
-starting context for an agent picking up an aged task. As a description grows, drifts,
-and pivots, the brief folds in signal from comments and subtask state; on conflict
-the most recent/specific signal wins. The brief opens with the person's words (the
-ticket's task's `asked`, which no step may change), quoted verbatim by code under
-`## As asked` ahead of the four sections; the model's sections never restate them. A
-subtask whose parent's task has words also gets the parent's words, after its own,
-under `## As asked on the parent, <identifier>`. Read it before trusting the raw description.
+**`GET` is your brief on a task, built from its records alone (LIN-4536).** Nothing in it is written
+by a model, and it reads no tracker. It is read for your own credential: a dispatched run reads its own
+brief (its stage is the reader, so the records addressed to that stage are in it) with no `?run=`; a run
+reading another ticket reads that ticket's task as its stage; a person's copy reads as that person; a
+dispatch credential with no run reads as the coordinator (`autopilot`); a credential minted before run identity is refused (`403`), as on the records routes. A blind read is refused (`403`).
 
-`GET` returns the cached brief and auto-regenerates when missing or stale; pass
-`?noRefresh=1` to read without regenerating. `POST` force-regenerates (it keeps the
-flat form). Both accept a UUID or an identifier. Read scope is sufficient.
-
-Unlike the other endpoints, `brief` is **fixed-section Markdown**, not structured
-fields. The headings are stable, so a consumer can recover individual sections
-deterministically while still handing the whole string to an LLM verbatim.
+It opens with **the task as filed under `## As asked`**: the task's ref, its done-when and the person's
+words (the `asked` of the task and each ancestor task, fixed once written, so no description edit
+changes them). A correction made after filing reaches a stage as a person's finding (a comment a person
+writes is ingested as one, part 3) or a decision (part 4), never by editing the description. Then: the
+plan, what is addressed to the reader, what stands, the project, other open runs, an index of the
+task's other open records, and the previous stage. Read it before the raw description.
 
 Response:
 ```json
 {
   "status": "fresh",
   "identifier": "ENG-42",
-  "brief": "## Current\n...\n## Constraints\n...\n## Open questions\n...\n## Changelog\n...",
-  "generatedAt": "2026-04-20T12:00:00Z",
-  "model": "anthropic/claude-haiku-4.5"
+  "task": "task-1a2b3c4d",
+  "reader": "implementation",
+  "brief": "# Brief for implementation on task-1a2b3c4d\n\n## As asked\n...\n\n## 2 Its plan\n...",
+  "bytes": 2048
 }
 ```
 
-With `?noRefresh=1` and no cache, `status` is `"missing"` (or `"stale"`) and the
-`brief` field is omitted.
+A ticket with no task on record yet (never filed through Harbour, never dispatched) has no brief:
+`{ "status": "missing", "identifier": "ENG-42", "brief": null, "reason": "..." }`, naming
+`GET /api/proxy/issues/{id}` for the ticket itself. A `GET` never makes a task. The identifier is the
+ticket's (e.g. `ENG-42`); a UUID is refused (`400`), since a task is found by its identifier. Read scope is
+sufficient.
 
-> Both recap and brief share the in-app cache, so an artifact generated in the swipe
+`POST /api/proxy/brief/{identifier}` force-regenerates the model-written summary the task page shows
+(`## Current`, `## Constraints`, `## Open questions`, `## Changelog`). It is not the brief `GET` answers,
+and it retires with its cache in LIN-4537.
+
+> The recap and the task page's summary share the in-app cache, so an artifact generated in the swipe
 > UI is served straight from cache here (and vice versa). Regeneration calls OpenRouter
 > and can exceed 25s; the server streams whitespace keepalive bytes inside a single
 > `200` response, so don't set a client timeout below ~60s for these endpoints.
@@ -1157,7 +1160,7 @@ Returns a task's total cost in **API-equivalent USD** (LIN-1775), joining two so
   (e.g. `recommend`), from the llm-call-log.
 
 Pure read: no Linear fetch, no LLM call. Read scope is sufficient. `{identifier}` must be
-the issue **identifier** (e.g. `ENG-1770`), not a UUID — unlike `/recap` and `/brief`,
+the issue **identifier** (e.g. `ENG-1770`), not a UUID — unlike `/recap`,
 this endpoint never resolves through the provider, and dispatch/call-log rows are keyed
 by identifier. A UUID-shaped `{identifier}` is rejected with `400` rather than silently
 matching zero rows and returning an authoritative-looking `$0.00`.
@@ -2016,7 +2019,7 @@ Content-Type: application/json
 | `priority` | int | No | Issue priority on Linear's **native** scale (descending urgency): `0` = No priority, `1` = Urgent, `2` = High, `3` = Medium, `4` = Low. Prefer `priorityLevel` below for a provider-neutral scale — sending both is refused `400` |
 | `priorityLevel` | int | No | Issue priority on the **canonical** scale (ascending, shared across every provider — LIN-2239): `0` = unknown, `1` = lowest … `4` = highest (Linear: `4` = Urgent, `1` = Low). Maps to the provider's native scale at the write boundary; mutually exclusive with `priority` |
 
-**The description is filed as written (LIN-4502).** A non-empty `description` is stored as sent. The `## As asked` seal that used to wrap it is retired: the person's words are kept on the ticket's task (`asked`), which the brief quotes, and no step can change them through a description write.
+**The description is filed as written (LIN-4502).** A non-empty `description` is stored as sent. The `## As asked` seal that used to wrap it is retired: the person's words are kept on the ticket's task (`asked`), which the brief's `## As asked` part holds, and no step can change them through a description write.
 
 **Provider compatibility.** Not every optional field above is honoured by every provider. An unsupported one is **refused with `400`** rather than silently dropped on a false `201` (a behavior change — earlier versions of this endpoint accepted and silently discarded these fields):
 
@@ -2119,8 +2122,8 @@ Response. As with create, the echoed `issue` is the **same flat shape as `GET /i
 
 #### Description writes and the size record (LIN-4368, LIN-4502)
 
-A ticket filed before LIN-4502 may open with a legacy block, in the shape the brief
-still uses to quote the person's words:
+A ticket filed before LIN-4502 may open with a legacy block (the retired seal's shape; the
+brief no longer quotes it either, LIN-4536):
 
 ```
 ## As asked

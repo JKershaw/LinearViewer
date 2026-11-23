@@ -18,7 +18,7 @@ import { generatePrompt, PROMPT_TEMPLATES } from '../../lib/prompt-templates.js'
 import { STAGE_INTENT } from '../../lib/prompts/stage-intent.js';
 import { CUT, DECIDE } from '../../lib/prompts/stage-kinds.js';
 import { COMPLETION_SIGNALS } from '../../lib/completion-signals.js';
-import { ASKED_HEADING } from '../../lib/brief-quote.js';
+import { ASKED_HEADING } from '../../lib/records/words.js';
 import { CUTS_LABEL } from '../../lib/size-of-move.js';
 
 const decides = (kind) => Object.hasOwn(STAGE_INTENT, kind) && STAGE_INTENT[kind][0] === DECIDE;

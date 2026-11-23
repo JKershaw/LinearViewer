@@ -9,9 +9,9 @@ import { describe, test } from 'node:test';
 import assert from 'node:assert/strict';
 import { formatIssueContext, formatSelectorView } from '../../lib/openrouter.js';
 import { textWithoutPlan } from '../../lib/legacy-plan-text.js';
-import { ASKED_END } from '../../lib/brief-quote.js';
+import { SEALED_END } from '../helpers/sealed-description.js';
 
-const SEALED = `## As asked\n\nPlease fix X.\n\nMy idea: do Y.\n\n${ASKED_END}`;
+const SEALED = `## As asked\n\nPlease fix X.\n\nMy idea: do Y.\n\n${SEALED_END}`;
 const REPRO = `${SEALED}\n\n## Notes\n\nkept`;
 
 describe('textWithoutPlan: the temporary plan display cuts only a plan section (LIN-4527)', () => {
@@ -37,7 +37,7 @@ describe('textWithoutPlan: the temporary plan display cuts only a plan section (
   // LIN-4527 residual: a plan heading inside a block is cut like any other, end line included, because the block is no
   // longer recognised. No production block holds one (0 of 160 sealed tickets on LIN-4527).
   test('a plan heading inside a block is cut with the block\'s end line (LIN-4527 residual, no production block holds one)', () => {
-    const text = `## As asked\n\nPlease fix X.\n\n### Implementation Plan\n\nmy idea\n\n${ASKED_END}\n\n## Notes\n\nkept`;
+    const text = `## As asked\n\nPlease fix X.\n\n### Implementation Plan\n\nmy idea\n\n${SEALED_END}\n\n## Notes\n\nkept`;
     assert.equal(textWithoutPlan(text), `## As asked\n\nPlease fix X.\n\n## Notes\n\nkept`);
   });
 });
@@ -46,7 +46,7 @@ describe('the brief\'s kept ticket section (formatIssueContext) carries the bloc
   test('the repro: the person\'s words and the end line survive', () => {
     const out = formatIssueContext({ identifier: 'LIN-1', title: 'T', description: REPRO, state: { name: 'Todo', type: 'unstarted' } }, {});
     assert.ok(out.includes('My idea: do Y.'), 'the words inside the block');
-    assert.ok(out.includes(ASKED_END), 'the end line');
+    assert.ok(out.includes(SEALED_END), 'the end line');
     assert.ok(out.includes('## Notes\n\nkept'));
   });
 
@@ -63,7 +63,7 @@ describe('the selector\'s own view (formatSelectorView) carries the block', () =
     const text = `${SEALED}\n\n## Implementation Plan\n\nstep-written plan\n\n## Notes\n\nkept`;
     const out = formatSelectorView({ identifier: 'LIN-1', title: 'T', description: text, state: { name: 'Todo', type: 'unstarted' } }, {});
     assert.ok(out.includes('My idea: do Y.'), 'the words inside the block');
-    assert.ok(out.includes(ASKED_END), 'the end line');
+    assert.ok(out.includes(SEALED_END), 'the end line');
     assert.ok(!out.includes('step-written plan'), 'the plan below the block is cut');
   });
 });

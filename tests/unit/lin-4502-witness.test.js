@@ -10,8 +10,8 @@
  *   (c) LIN-4527: askedOf takes the description as filed, whole. A literal pre-P2 description (typed out here, its
  *       block and plan both kept) is returned unchanged, in every spelling a ticket reads back in.
  *
- * (a) and (b) are asserted on the stored task (RecordsStore.askedForTicket) and on the brief's quote
- * (lib/brief-quote.js composeBrief), never on the description alone.
+ * (a) and (b) are asserted on the stored task (RecordsStore.askedForTicket) and, since LIN-4536, on part 1 of the brief
+ * the proxy serves (`GET /api/proxy/brief/<id>`, the records brief, under `## As asked`), never on the description alone.
  */
 process.env.NODE_ENV = 'test';
 
@@ -24,7 +24,8 @@ import { localProvider } from '../../lib/providers/local/index.js';
 import { createLocalStore } from '../fixtures/local-harness.js';
 import { RecordsStore, RECORDS_COLLECTION, REFS_COLLECTION, QUERY_LOG_COLLECTION } from '../../lib/records-store.js';
 import { INDEX_SPECS } from '../../lib/db-indexes.js';
-import { quoteAsked, splitQuote, composeBrief } from '../../lib/brief-quote.js';
+import { sealedDescription } from '../helpers/sealed-description.js';
+import { ASKED_HEADING } from '../../lib/records/words.js';
 import { askedOf } from '../../lib/asked-of.js';
 import { adfToMarkdown, markdownToAdf } from '../../lib/providers/jira/adf.js';
 import { readFileSync } from 'node:fs';
@@ -36,7 +37,15 @@ const PLAIN_TICKET = 'LOCAL-2';
 
 const WORDS = 'Please write a full guide on how to properly configure it.\nCover **both** modes.';
 const PLAN = '## Implementation Plan\n\n1. step one';
-const MODEL_BRIEF = '## Situation\n\nmodel text';
+/** Part 1 of the brief the proxy serves for TICKET: from `## As asked` to part 2 (LIN-4536). */
+async function briefPartOne() {
+  const r = await call('GET', `/api/proxy/brief/${TICKET}`);
+  assert.equal(r.status, 200, JSON.stringify(r.body));
+  const { brief } = r.body;
+  const start = brief.indexOf(`${ASKED_HEADING}\n`);
+  assert.ok(start > -1, `the brief opens part 1 under ${ASKED_HEADING}:\n${brief}`);
+  return brief.slice(start, brief.indexOf('\n\n## 2 Its plan', start));
+}
 
 const harness = createMangoTmpdir('lin-4502-witness-');
 let db;
@@ -62,7 +71,7 @@ beforeEach(async () => {
     projects: [{ id: 'p1', name: 'Alpha', content: 'a', sortOrder: 1 }],
     issues: [
       // Sealed: the person's words are a `## As asked` block, then a plan below it (as every ticket filed before P2 is).
-      { id: 'i1', identifier: TICKET, title: 'Sealed', description: `${quoteAsked(WORDS)}\n\n${PLAN}`, projectId: 'p1', state: { name: 'Todo', type: 'unstarted' } },
+      { id: 'i1', identifier: TICKET, title: 'Sealed', description: `${sealedDescription(WORDS)}\n\n${PLAN}`, projectId: 'p1', state: { name: 'Todo', type: 'unstarted' } },
       // Unsealed: the person's words, then a plan heading (the shape a ticket filed after the seal was retired has).
       { id: 'i2', identifier: PLAIN_TICKET, title: 'Plain', description: `${WORDS}\n\n${PLAN}`, projectId: 'p1', state: { name: 'Todo', type: 'unstarted' } },
     ],
@@ -112,7 +121,7 @@ describe('LIN-4502 witness (a), as converted by LIN-4527: a task first named thr
   test('a sealed ticket: the first record that names it through the proxy makes its task, asked = the description as filed (block and plan)', async () => {
     const r = await call('POST', '/api/proxy/records', { kind: 'finding', to: 'review', says: 'first named', how: 'look', in: TICKET });
     assert.ok(r.status < 300, JSON.stringify(r.body));
-    assert.equal(await recordsStore.askedForTicket(LOCAL_URL_KEY, TICKET), `${quoteAsked(WORDS)}\n\n${PLAN}`);
+    assert.equal(await recordsStore.askedForTicket(LOCAL_URL_KEY, TICKET), `${sealedDescription(WORDS)}\n\n${PLAN}`);
   });
 
   test('an unsealed ticket with a plan heading: asked = the whole description, the plan included (LIN-4527: no cut)', async () => {
@@ -123,11 +132,11 @@ describe('LIN-4502 witness (a), as converted by LIN-4527: a task first named thr
 });
 
 describe('LIN-4502 witness (b): rewriting the description through the proxy leaves the task\'s asked and brief part 1 unchanged', () => {
-  test('whole body and a span inside the old block, then the brief quote: asked and part 1 are the words as first named', async () => {
+  test('whole body and a span inside the old block, then GET /brief: asked and part 1 are the words as first named', async () => {
     const first = await call('POST', '/api/proxy/records', { kind: 'finding', to: 'review', says: 'first named', how: 'look', in: TICKET });
     assert.ok(first.status < 300, JSON.stringify(first.body));
     const askedBefore = await recordsStore.askedForTicket(LOCAL_URL_KEY, TICKET);
-    const partOneBefore = composeBrief(askedBefore, MODEL_BRIEF).slice(0, composeBrief(askedBefore, MODEL_BRIEF).indexOf('## Situation'));
+    const partOneBefore = await briefPartOne();
 
     const original = await storedDescription('i1');
     // A span that used to sit inside the block: one phrase of the words is replaced. (LIN-4504: first, while the old
@@ -147,15 +156,15 @@ describe('LIN-4502 witness (b): rewriting the description through the proxy leav
     assert.ok(second.status < 300, JSON.stringify(second.body));
 
     const askedAfter = await recordsStore.askedForTicket(LOCAL_URL_KEY, TICKET);
-    const brief = composeBrief(askedAfter, MODEL_BRIEF);
-    const partOneAfter = brief.slice(0, brief.indexOf('## Situation'));
+    const partOneAfter = await briefPartOne();
 
     // Witness output recorded for the report: the proxy's answers and the description's state.
     console.log(JSON.stringify({ whole: { status: whole.status, code: whole.body?.code }, span: { status: span.status, code: span.body?.code }, descriptionNowStartsWith: (await storedDescription('i1')).slice(0, 40) }));
     assert.equal(askedAfter, askedBefore, 'the task\'s asked is unchanged');
-    assert.equal(askedAfter, `${quoteAsked(WORDS)}\n\n${PLAN}`, 'asked is the description as first named (LIN-4527)');
+    assert.equal(askedAfter, `${sealedDescription(WORDS)}\n\n${PLAN}`, 'asked is the description as first named (LIN-4527)');
     assert.equal(partOneAfter, partOneBefore, 'brief part 1 is unchanged');
-    assert.ok(brief.includes(askedAfter), 'the brief quotes the task\'s asked');
+    assert.ok(partOneAfter.includes(askedAfter), 'part 1 holds the task\'s asked');
+    assert.equal(partOneAfter.includes('short guide') || partOneAfter.includes('Entirely new body'), false, 'neither edit reaches part 1');
   });
 });
 

@@ -2,7 +2,7 @@ import { test, expect } from '../fixtures/test-base.js';
 import { localSeedId } from '../fixtures/local-harness.js';
 import { expectNoClippedOverflow } from '../helpers.js';
 import { defaultJiraSeed, JIRA_SITE } from '../fixtures/jira-harness.js';
-import { quoteAsked } from '../../lib/brief-quote.js';
+import { sealedDescription } from '../helpers/sealed-description.js';
 
 // LIN-3329: the task page, owner view
 // (GET /workspace/:urlKey/task/:identifier), at a 360px phone width.
@@ -47,7 +47,7 @@ async function seedTasks(page, { omit = [], reviewed = false } = {}) {
   const issue = (raw, identifier, title, state, extra = {}) => ({
     // Seeded in the legacy sealed shape a ticket filed before LIN-4502 carries (LIN-4352), so
     // the page renders the block whatever the dispatch store holds.
-    id: id(raw), identifier, title, description: quoteAsked(`Seeded ${title}`), projectId: id('tp-proj'), sortOrder: 1, state,
+    id: id(raw), identifier, title, description: sealedDescription(`Seeded ${title}`), projectId: id('tp-proj'), sortOrder: 1, state,
     url: `/workspace/${URL_KEY}/issue/${id(raw)}`, ...extra,
   });
   const resp = await page.request.post('/test/set-local-session', {
@@ -516,7 +516,7 @@ test.describe('Task page, owner view (LIN-3329)', () => {
           id: TASK_UUID, identifier: 'LOCAL-TP1', title: 'A task with a running build',
           // Seeded in the legacy sealed shape a ticket filed before LIN-4502 carries (LIN-4352),
           // so the page renders the block.
-          description: quoteAsked('The **task** description.'), projectId: id('tp-proj'), sortOrder: 1,
+          description: sealedDescription('The **task** description.'), projectId: id('tp-proj'), sortOrder: 1,
           state: { name: 'In Progress', type: 'started' }, url: `/workspace/${URL_KEY}/issue/${TASK_UUID}`,
           comments: [
             { id: 'c-pr', body: `Opened the pull request: ${PR_URL}`, createdAt: '2026-10-06T09:00:00Z', user: 'Runner' },

@@ -45,12 +45,25 @@ export const RETIRED = Object.freeze([
   // a question record (lib/prompts/handoff-words.js), so no Harbour text teaches the block.
   { word: 'DECISION: block taught', re: /`DECISION:`|^DECISION:|DECISION: \{/m },
   { word: 'WITHDRAW: block taught', re: /`WITHDRAW:`|^WITHDRAW:|WITHDRAW: \{/m },
+  // LIN-4536 (P6a): the quote of the person's words above the model-written brief, and the `?run=` door that put the
+  // records parts above it. GET /api/proxy/brief is the records brief for the credential's own run; part 1 is the task as
+  // filed under ASKED_HEADING (lib/records/words.js). (`splitQuote` is the LIN-4502 census's row; its last allowance went here.)
+  { word: 'the brief quote module', re: /brief-quote\.js/ },
+  { word: 'quoteAsked', re: /\bquoteAsked\b/ },
+  { word: 'composeBrief', re: /\bcomposeBrief\b/ },
+  { word: 'briefQuoteEnd', re: /\bbriefQuoteEnd\b/ },
+  { word: 'attachAsked', re: /\battachAsked\b/ },
+  { word: 'parentWordsOf', re: /\bparentWordsOf\b/ },
+  { word: 'the quote end line constants', re: /\bASKED_(?:END|END_SHORT|PARENT_HEADING|PARENT_END)\b/ },
+  { word: 'withRunRecords', re: /\bwithRunRecords\b/ },
+  { word: 'the brief ?run= door', re: /brief\/[^\s`'"()]*\?run=/ },
 ]);
 
 /** Files that keep a retired word, each with the words it may keep and the reason. */
 export const ALLOW = Object.freeze({
   // LIN-4533 (P3): the dated log of prompt-template changes. Its earlier entries name the block they changed; that is recorded history.
-  'scripts/prompt-template-change-log.md': { words: ['DECISION: block taught'], reason: 'the dated log of prompt-template changes: its earlier entries quote the DECISION: block they changed, which is recorded history (LIN-4533 adds its own entry)' },
+  // LIN-4536 (P6a): its LIN-4502 row names the brief quote module it changed; that is recorded history too.
+  'scripts/prompt-template-change-log.md': { words: ['DECISION: block taught', 'the brief quote module'], reason: 'the dated log of prompt-template changes: its earlier entries quote the DECISION: block and name the brief quote module they changed, which is recorded history (LIN-4533 and LIN-4536 add their own entries)' },
   // LIN-4533 (P3): a recorded liveness fixture of a past cycle (LIN-3238). Its messages are the transcript as it was, not taught text.
   'tests/fixtures/liveness/lin-3238-cycle.json': { words: ['DECISION: block taught'], reason: 'a recorded liveness fixture of the LIN-3238 cycle: its messages are the transcript as it was, kept as history' },
 });

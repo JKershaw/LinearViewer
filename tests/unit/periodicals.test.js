@@ -1611,9 +1611,9 @@ describe('resolvePeriodicalIdFromGateMarker (LIN-2575)', () => {
 // line, not the description's. The gate regex is unanchored on purpose and still finds it there.
 describe('the gate marker on a legacy sealed description (LIN-4353, LIN-4502)', () => {
   test('a legacy sealed description still resolves to its periodical', async () => {
-    const { quoteAsked } = await import('../../lib/brief-quote.js');
+    const { sealedDescription } = await import('../helpers/sealed-description.js');
     const p = PERIODICALS[0];
-    const sealed = quoteAsked(`${buildPeriodicalGateMarker(p.title)}\n\nRun the review.`);
+    const sealed = sealedDescription(`${buildPeriodicalGateMarker(p.title)}\n\nRun the review.`);
     assert.ok(!sealed.startsWith('<!--'), 'the marker is no longer the description\'s first line');
     assert.strictEqual(resolvePeriodicalIdFromGateMarker(sealed), p.id);
   });

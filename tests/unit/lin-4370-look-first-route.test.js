@@ -47,7 +47,7 @@ import { liveWaitOf, STAGE_IN_FLIGHT_CODE } from '../../lib/run-live-wait.js';
 import { getRecommendation, getRecommendationStream, setFetchImpl, setPromptTraceRecorder, buildSelectorArgs } from '../../lib/openrouter.js';
 import { generatePrompt, PROMPT_TEMPLATES, deriveDispatchKind } from '../../lib/prompt-templates.js';
 import { SURVEY_HEADINGS } from '../../lib/prompts/survey-words.js';
-import { quoteAsked } from '../../lib/brief-quote.js';
+import { sealedDescription } from '../helpers/sealed-description.js';
 import { stageRuns, recentRuns } from '../../lib/recent-runs.js';
 import { BLIND_READ_KIND } from '../../lib/prompts/blind-read-words.js';
 import { buildRouterPrompt } from '../../lib/stage-router.js';
@@ -64,7 +64,7 @@ import { planRound, loopFactsFor } from '../helpers/plan-review-loop.js';
 afterEach(() => { setFetchImpl(null); setPromptTraceRecorder(null); });
 
 const OPEN = { name: 'Todo', type: 'unstarted' };
-const ASKED = quoteAsked('Make the export button download a CSV.');
+const ASKED = sealedDescription('Make the export button download a CSV.');
 const RECORD = (decidedBy = 'the standing policy') => `\n\n## Size of the move\n\n**Size:** just the task\n**Why:** the export only needs the download, and nothing nearby binds on it.\n**Cuts:** none\n**Decided by:** ${decidedBy}`;
 const leaf = (over = {}) => ({ identifier: 'T-1', title: 'Export CSV', description: ASKED, state: OPEN, labels: [], ...over });
 
@@ -684,7 +684,7 @@ describe('LIN-4369 handoff: scoping\'s final message never reaches the stage aft
     // A stage prompt never copies the description (it says to read the ticket, and points at the brief); the
     // brief it starts from is built from the ticket and its comments, so it carries the record and no run's message.
     assert.match(items[0].prompt, /does not restate LF-1's description/);
-    assert.match(items[0].prompt, /Start from the distilled brief: GET [^\n]*\/api\/proxy\/brief\/LF-1/);
+    assert.match(items[0].prompt, /Start from your brief: GET [^\n]*\/api\/proxy\/brief\/LF-1/);
     const briefInput = buildBriefMessages(ISSUES['LF-1'].issue, { ...ISSUES['LF-1'], runs: stageRuns(rows), allRuns: stageRuns(rows) }).map(m => m.content).join('\n');
     assert.ok(briefInput.includes('**Size:** just the task'), 'the brief reads the size record');
     assert.ok(!briefInput.includes('NOTES FOR THE BUILDER'), 'the brief never reads a run\'s message');
@@ -709,7 +709,7 @@ describe('LIN-4369 handoff: scoping\'s final message never reaches the stage aft
 // ── LIN-4398: a Periodical's review ticket starts at scoping; every other ticket keeps both Surveys ──
 
 describe('LIN-4398: a gate-marked Periodical review skips the two Surveys and starts at scoping', () => {
-  const MARKED = quoteAsked(`${buildPeriodicalGateMarker('Documentation Review')}\n\nRun the documentation review.`);
+  const MARKED = sealedDescription(`${buildPeriodicalGateMarker('Documentation Review')}\n\nRun the documentation review.`);
   const marked = (over = {}) => leaf({ description: MARKED, ...over });
   const twin = (over = {}) => leaf(over);
   const mentions = leaf({ description: `${ASKED}\n\nThis ticket is not a Periodical review; it only mentions Periodicals in passing.` });

@@ -401,9 +401,9 @@ describe('buildAutopilotKickoff (scoped to an issue)', () => {
 
   test('first act reads the issue and triggers recommend-and-dispatch for it', () => {
     const text = buildAutopilotKickoff({ baseUrl: BASE_URL, issue });
-    // Lead with the distilled brief as starting context (LIN-260); the raw /issues
+    // Lead with the brief as starting context (LIN-260); the raw /issues
     // read stays available for full detail the brief doesn't carry.
-    assert.ok(text.includes('GET /brief/LIN-42'), 'scoped first act should start from the distilled brief');
+    assert.ok(text.includes('GET /brief/LIN-42'), 'scoped first act should start from the brief');
     assert.ok(text.includes('GET /issues/LIN-42'), 'raw issue detail stays available');
     // The fused verb (LIN-321) replaces the two-step GET /recommend -> POST /dispatch:
     // the scoped first act triggers recommend-and-dispatch with the issue identifier.
@@ -437,7 +437,7 @@ describe('buildAutopilotKickoff (providerUi capability gate, LIN-2804)', () => {
     const text = buildAutopilotKickoff({ baseUrl: BASE_URL, issue, providerUi: { issueDetail: false } });
     assert.ok(!text.includes('GET /issues/LIN-42'), 'no /issues/{id} read hint');
     assert.ok(
-      text.includes('this provider does not support raw issue-detail reads, so the brief is the fullest detail available'),
+      text.includes('this provider does not support raw reads of a ticket, so the brief holds its records, not its description'),
       'replacement wording present'
     );
     assert.ok(text.includes('GET /brief/LIN-42'), 'brief read hint unchanged');
@@ -448,7 +448,7 @@ describe('buildAutopilotKickoff (providerUi capability gate, LIN-2804)', () => {
     const generalText = buildAutopilotKickoff({ baseUrl: BASE_URL, providerUi: { issueDetail: false } });
     for (const text of [scopedText, generalText]) {
       assert.ok(!text.includes('verify `GET /issues/{id}`'), 'no unconditional /issues/{id} verify hint');
-      assert.ok(text.includes('verify via `GET /brief/{id}`, `GET /search`,'), 'replacement wording present');
+      assert.ok(text.includes('verify via `GET /brief/{id}` (records: verdicts, changes, findings), `GET /search`,'), 'replacement wording present');
       // The rest of the sentence — the artifact-URL clause — stays untouched.
       assert.ok(text.includes('plus the artifact URLs in `[evidence]`'));
     }
@@ -473,13 +473,13 @@ describe('buildAutopilotKickoff (providerUi capability gate, LIN-2804)', () => {
       const generalText = buildAutopilotKickoff({ baseUrl: BASE_URL, providerUi: { issueDetail: false, search: false } });
       for (const text of [scopedText, generalText]) {
         assert.ok(!text.includes('`GET /search`'), 'no /search mention — it 422s too on this provider');
-        assert.ok(text.includes('verify via `GET /brief/{id}`, plus the artifact URLs in `[evidence]`'), 'clause closes straight from the brief verb to the artifact-URL clause');
+        assert.ok(text.includes('verify via `GET /brief/{id}` (records: verdicts, changes, findings), plus the artifact URLs in `[evidence]`'), 'clause closes straight from the brief verb to the artifact-URL clause');
       }
     });
 
     test('search: true, issueDetail: false (e.g. GitHub) — GET /search mention still present', () => {
       const text = buildAutopilotKickoff({ baseUrl: BASE_URL, issue, providerUi: { issueDetail: false, search: true } });
-      assert.ok(text.includes('verify via `GET /brief/{id}`, `GET /search`,'), '/search retained when actually supported');
+      assert.ok(text.includes('verify via `GET /brief/{id}` (records: verdicts, changes, findings), `GET /search`,'), '/search retained when actually supported');
     });
 
     test('omitted/null search reproduces byte-identical output (defaults to full capability)', () => {

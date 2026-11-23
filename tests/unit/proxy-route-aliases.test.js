@@ -100,7 +100,10 @@ const PAIRS = [
     canonical: '/api/proxy/issues/:identifier/brief',
     alias: '/api/proxy/brief/:identifier',
     probe: { canonical: '/api/proxy/issues/LIN-999999/brief', alias: '/api/proxy/brief/LIN-999999' },
-    expectStatus: 404
+    // LIN-4536: the records brief reads no tracker, so a nonexistent issue is not a 404 any more. This app has no
+    // records store, so a validly-formatted id reaches the store check (503) while a renamed param would stop at
+    // format validation (400): the pair keeps its teeth.
+    expectStatus: 503
   },
   {
     name: 'prompt',

@@ -49,7 +49,6 @@ const PROXY_SITES = [
   { name: 'GET /recommend', method: 'get', path: '/api/proxy/recommend/TEST-1', expect: /AI recommendations not configured/ },
   { name: 'GET /recap', method: 'get', path: '/api/proxy/recap/TEST-1', expect: /AI recap is not configured/ },
   { name: 'POST /recap', method: 'post', path: '/api/proxy/recap/TEST-1', body: {}, expect: /AI recap is not configured/ },
-  { name: 'GET /brief', method: 'get', path: '/api/proxy/brief/TEST-1', expect: /AI brief is not configured/ },
   { name: 'POST /brief', method: 'post', path: '/api/proxy/brief/TEST-1', body: {}, expect: /AI brief is not configured/ },
   { name: 'POST /recommend-and-dispatch', method: 'post', path: '/api/proxy/recommend-and-dispatch', body: { issueIdentifier: 'TEST-1' }, expect: /AI recommendations not configured/ },
 ];
@@ -69,6 +68,13 @@ describe('proxy-family availability gate (no key anywhere)', () => {
       assert.notEqual(res.status, 503, JSON.stringify(res.body));
     });
   }
+
+  // LIN-4536: GET /brief is the records brief. It calls no model, so it is outside the gate (it is not one of PROXY_SITES).
+  test('GET /brief: the records brief makes no model call, so it stays outside the gate', async () => {
+    const app = buildApp({ ...REAL_TOKEN, provider: providerWithContext() });
+    const res = await call(app, 'get', '/api/proxy/brief/TEST-1');
+    assert.doesNotMatch(JSON.stringify(res.body), /AI brief is not configured/);
+  });
 
   test('GET /recommend: the ?kind= override makes no model call, so it stays outside the gate', async () => {
     const app = buildApp({ ...REAL_TOKEN, provider: providerWithContext() });

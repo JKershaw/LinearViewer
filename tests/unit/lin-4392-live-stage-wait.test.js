@@ -42,7 +42,7 @@ import { stageRuns, loadRecentRuns, WAITING_ON_A_PERSON } from '../../lib/recent
 import { createMangoTmpdir } from '../fixtures/mango-tmpdir.js';
 import { DispatchQueueStore } from '../../lib/dispatch-store.js';
 import { buildInstructions } from '../../lib/proxy-instructions.js';
-import { quoteAsked } from '../../lib/brief-quote.js';
+import { sealedDescription } from '../helpers/sealed-description.js';
 import { createProxyRoutes } from '../../routes/proxy.js';
 import { createWorkspaceApiRoutes } from '../../routes/workspace-api.js';
 import { registerProvider } from '../../lib/providers/registry.js';
@@ -55,7 +55,7 @@ afterEach(() => { setFetchImpl(null); setPromptTraceRecorder(null); });
 const OPEN = { name: 'Todo', type: 'unstarted' };
 const T = (hm) => `2026-11-08T${hm}:00.000Z`;
 const PLANNED = 'Make the export button download a CSV.\n\n## Implementation Plan\n\n1. Add the route.\n2. Wire the button.';
-const ASKED = quoteAsked('Make the export button download a CSV.');
+const ASKED = sealedDescription('Make the export button download a CSV.');
 
 // ── Fixtures: one provider, a dispatch store over rows, and the two apps ──────
 
