@@ -105,7 +105,7 @@ describe('LIN-4469: the mandates say only what the stage is told about its token
 
   test('the code, branch and PR prohibitions stay in words: the guard has no backstop for them', () => {
     for (const writes of ['none', 'one-comment', 'blind-comment', 'ticket-fields']) {
-      assert.match(renderedPrompts()[`preamble:${writes}`], /[Dd]o not change code, branches or pull requests/, writes);
+      assert.match(renderedPrompts()[`preamble:${writes}`], /[Dd]o not (comment on it, )?change code, branches or pull requests/, writes);
     }
   });
 });

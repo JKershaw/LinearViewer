@@ -64,15 +64,15 @@ describe('LIN-4468 — the allowance table (lib/stage-writes.js)', () => {
   });
 
   for (const writes of ['one-comment', 'blind-comment']) {
-    test(`${writes} allows one comment and recordWrite, and nothing else`, () => {
+    test(`${writes} allows recordWrite and nothing else: it posts no comment (LIN-4533)`, () => {
       for (const op of STAGE_WRITE_OPS) {
-        assert.equal(stageWriteAllows(writes, op), op === 'createComment' || op === 'recordWrite', `${writes} ${op}`);
+        assert.equal(stageWriteAllows(writes, op), op === 'recordWrite', `${writes} ${op}`);
       }
     });
   }
 
-  test('ticket-fields allows the triage operations, and no description, create or relation write', () => {
-    const allowed = ['updateIssue', 'createComment', 'addLabel', 'removeLabel', 'recordWrite'];
+  test('ticket-fields allows the triage operations, and no comment, description, create or relation write (LIN-4533)', () => {
+    const allowed = ['updateIssue', 'addLabel', 'removeLabel', 'recordWrite'];
     for (const op of STAGE_WRITE_OPS) {
       assert.equal(stageWriteAllows('ticket-fields', op), allowed.includes(op), `ticket-fields ${op}`);
     }
@@ -467,43 +467,27 @@ describe('LIN-4468 — over HTTP: a stage outside its ticket learns nothing from
     const app = stageAppOn(provider, { writes: 'blind-comment', writesTarget: 'LIN-9' });
     const res = await call(app, 'POST', '/api/proxy/issues/LIN-10/comments', { body: { body: BLIND } });
     assert.equal(res.status, 403, JSON.stringify(res.body));
-    assert.match(res.body.error, /may write only to LIN-9; LIN-10 is outside its allowance/);
+    assert.match(res.body.error, /does not permit createComment/);
     assert.equal(res.body.expected, undefined, 'no landing PRs of the other ticket in the answer');
     assert.deepEqual(trailReads, [], "the other ticket's comment trail is not read");
     assert.deepEqual(calls.createComment, []);
   });
 });
 
-describe('LIN-4468 — over HTTP: one-comment holds the comment to its own ticket', () => {
-  test('a comment on the stage\'s ticket is allowed', async () => {
+describe('LIN-4468 — over HTTP: one-comment posts no comment, on its ticket or any other (LIN-4533)', () => {
+  test('a comment on the stage\'s own ticket is refused by operation, and nothing is written', async () => {
     const { app, calls } = stageApp({ writes: 'one-comment', writesTarget: 'LIN-9' });
     const res = await call(app, 'POST', '/api/proxy/issues/LIN-9/comments', { body: { body: 'a finding' } });
-    assert.ok(res.status < 300, JSON.stringify(res.body));
-    assert.deepEqual(calls.createComment, ['LIN-9']);
-  });
-
-  test('the same ticket by its UUID or a lowercase key is the same ticket, and allowed', async () => {
-    const { app, calls } = stageApp({ writes: 'one-comment', writesTarget: 'LIN-9' });
-    const byUuid = await call(app, 'POST', '/api/proxy/issues/uuid-9/comments', { body: { body: 'a' } });
-    const byLower = await call(app, 'POST', '/api/proxy/issues/lin-9/comments', { body: { body: 'b' } });
-    assert.ok(byUuid.status < 300, JSON.stringify(byUuid.body));
-    assert.ok(byLower.status < 300, JSON.stringify(byLower.body));
-    assert.equal(calls.createComment.length, 2);
-  });
-
-  test('a comment on another ticket is refused, names the ticket it may write to, and writes nothing', async () => {
-    const { app, calls } = stageApp({ writes: 'one-comment', writesTarget: 'LIN-9' });
-    const res = await call(app, 'POST', '/api/proxy/issues/LIN-10/comments', { body: { body: 'wrong ticket' } });
     assert.equal(res.status, 403, JSON.stringify(res.body));
-    assert.match(res.body.error, /may write only to LIN-9; LIN-10 is outside its allowance/);
+    assert.match(res.body.error, /does not permit createComment/);
     assert.deepEqual(calls.createComment, [], 'nothing written');
   });
 
-  test('a comment with a ticket that does not resolve is refused, not allowed through', async () => {
+  test('a comment on another ticket is refused the same way', async () => {
     const { app, calls } = stageApp({ writes: 'one-comment', writesTarget: 'LIN-9' });
-    const res = await call(app, 'POST', '/api/proxy/issues/LIN-404/comments', { body: { body: 'x' } });
+    const res = await call(app, 'POST', '/api/proxy/issues/LIN-10/comments', { body: { body: 'wrong ticket' } });
     assert.equal(res.status, 403, JSON.stringify(res.body));
-    assert.deepEqual(calls.createComment, []);
+    assert.deepEqual(calls.createComment, [], 'nothing written');
   });
 
   test('a description edit, a label add and an issue update are refused by operation', async () => {
@@ -599,11 +583,11 @@ describe('LIN-4468 — over HTTP: a stamp that is absent, work, or unknown', () 
   });
 
   test('a restricted stamp with no ticket refuses every ticket write, and says it names none', async () => {
-    const { app, calls } = stageApp({ writes: 'one-comment', writesTarget: null });
-    const res = await call(app, 'POST', '/api/proxy/issues/LIN-9/comments', { body: { body: 'x' } });
+    const { app, calls } = stageApp({ writes: 'ticket-fields', writesTarget: null });
+    const res = await call(app, 'PATCH', '/api/proxy/issues/LIN-9', { body: { stateId: 's1' } });
     assert.equal(res.status, 403, JSON.stringify(res.body));
     assert.match(res.body.error, /names no ticket/);
-    assert.deepEqual(calls.createComment, []);
+    assert.deepEqual(calls.updateIssue, []);
   });
 });
 
@@ -645,7 +629,7 @@ describe('LIN-4468 — the edges: the PATCH field list and the instructions page
  * `aliases` maps every form to the canonical id. An unknown form resolves to nothing.
  */
 function formProvider(aliases) {
-  const calls = { createComment: [] };
+  const calls = { createComment: [], updateIssue: [] };
   const base = makeFakeProvider();
   return {
     calls,
@@ -658,7 +642,8 @@ function formProvider(aliases) {
       createComment: async (_token, issueId, body) => {
         calls.createComment.push(issueId);
         return { success: true, comment: { id: 'c1', body, createdAt: new Date().toISOString(), user: { name: 'Fake' } } };
-      }
+      },
+      updateIssue: async (_token, issueId) => { calls.updateIssue.push(issueId); return { issue: { id: 'i1' }, success: true }; }
     }
   };
 }
@@ -675,23 +660,23 @@ describe('LIN-4468 — over HTTP: a Jira-shaped ticket is held to its one ticket
 
   test('the stamped key, and the same issue by its numeric id, are allowed', async () => {
     const { provider, calls } = formProvider(JIRA);
-    const app = stageAppOn(provider, { writes: 'one-comment', writesTarget: 'PROJ-12' });
-    const byKey = await call(app, 'POST', '/api/proxy/issues/PROJ-12/comments', { body: { body: 'a' } });
-    const byId = await call(app, 'POST', '/api/proxy/issues/10012/comments', { body: { body: 'b' } });
+    const app = stageAppOn(provider, { writes: 'ticket-fields', writesTarget: 'PROJ-12' });
+    const byKey = await call(app, 'PATCH', '/api/proxy/issues/PROJ-12', { body: { stateId: '11111111-1111-4111-8111-111111111111' } });
+    const byId = await call(app, 'PATCH', '/api/proxy/issues/10012', { body: { stateId: '11111111-1111-4111-8111-111111111111' } });
     assert.ok(byKey.status < 300, JSON.stringify(byKey.body));
     assert.ok(byId.status < 300, JSON.stringify(byId.body));
-    assert.deepEqual(calls.createComment, ['PROJ-12', '10012']);
+    assert.deepEqual(calls.updateIssue, ['PROJ-12', '10012']);
   });
 
   test('another Jira ticket, by key or by numeric id, is refused and names the ticket it may write to', async () => {
     const { provider, calls } = formProvider(JIRA);
-    const app = stageAppOn(provider, { writes: 'one-comment', writesTarget: 'PROJ-12' });
+    const app = stageAppOn(provider, { writes: 'ticket-fields', writesTarget: 'PROJ-12' });
     for (const id of ['PROJ-13', '10013']) {
-      const res = await call(app, 'POST', `/api/proxy/issues/${id}/comments`, { body: { body: 'wrong' } });
+      const res = await call(app, 'PATCH', `/api/proxy/issues/${id}`, { body: { stateId: '11111111-1111-4111-8111-111111111111' } });
       assert.equal(res.status, 403, `${id}: ${JSON.stringify(res.body)}`);
       assert.match(res.body.error, /may write only to PROJ-12; /, id);
     }
-    assert.deepEqual(calls.createComment, [], 'nothing written');
+    assert.deepEqual(calls.updateIssue, [], 'nothing written');
   });
 });
 
@@ -699,35 +684,35 @@ describe('LIN-4468 — over HTTP: a GitHub-shaped ticket is held to its one tick
   // The stamped target is the stored identifier, `owner/repo#N`; the proxy path takes `#N` or `N` (ISSUE_ID_REGEX).
   const GITHUB = { 'owner/repo#12': '12', '#12': '12', '12': '12', '#13': '13', '13': '13' };
   // A `#` in a path segment is percent-encoded, as a client must send it.
-  const path = (id) => `/api/proxy/issues/${encodeURIComponent(id)}/comments`;
+  const path = (id) => `/api/proxy/issues/${encodeURIComponent(id)}`;
 
   test('the stamped owner/repo#N target is resolved, and the same issue as #N or N is allowed', async () => {
     const { provider, calls } = formProvider(GITHUB);
-    const app = stageAppOn(provider, { writes: 'one-comment', writesTarget: 'owner/repo#12' });
+    const app = stageAppOn(provider, { writes: 'ticket-fields', writesTarget: 'owner/repo#12' });
     for (const id of ['#12', '12']) {
-      const res = await call(app, 'POST', path(id), { body: { body: 'a' } });
+      const res = await call(app, 'PATCH', path(id), { body: { stateId: '11111111-1111-4111-8111-111111111111' } });
       assert.ok(res.status < 300, `${id}: ${JSON.stringify(res.body)}`);
     }
-    assert.deepEqual(calls.createComment, ['#12', '12']);
+    assert.deepEqual(calls.updateIssue, ['#12', '12']);
   });
 
   test('another GitHub issue, as #N or N, is refused and names the ticket it may write to', async () => {
     const { provider, calls } = formProvider(GITHUB);
-    const app = stageAppOn(provider, { writes: 'one-comment', writesTarget: 'owner/repo#12' });
+    const app = stageAppOn(provider, { writes: 'ticket-fields', writesTarget: 'owner/repo#12' });
     for (const id of ['#13', '13']) {
-      const res = await call(app, 'POST', path(id), { body: { body: 'wrong' } });
+      const res = await call(app, 'PATCH', path(id), { body: { stateId: '11111111-1111-4111-8111-111111111111' } });
       assert.equal(res.status, 403, `${id}: ${JSON.stringify(res.body)}`);
       assert.match(res.body.error, /may write only to owner\/repo#12; /, id);
     }
-    assert.deepEqual(calls.createComment, [], 'nothing written');
+    assert.deepEqual(calls.updateIssue, [], 'nothing written');
   });
 
   test('owner/repo#N is not a path form the proxy accepts: refused at the format check, before any gate or write', async () => {
     const { provider, calls } = formProvider(GITHUB);
-    const app = stageAppOn(provider, { writes: 'one-comment', writesTarget: 'owner/repo#12' });
-    const res = await call(app, 'POST', path('owner/repo#13'), { body: { body: 'x' } });
+    const app = stageAppOn(provider, { writes: 'ticket-fields', writesTarget: 'owner/repo#12' });
+    const res = await call(app, 'PATCH', path('owner/repo#13'), { body: { stateId: '11111111-1111-4111-8111-111111111111' } });
     assert.equal(res.status, 400, JSON.stringify(res.body));
     assert.equal(res.body.error, 'Invalid issue ID format');
-    assert.deepEqual(calls.createComment, []);
+    assert.deepEqual(calls.updateIssue, []);
   });
 });

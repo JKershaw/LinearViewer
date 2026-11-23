@@ -193,7 +193,7 @@ describe('judging signals read the As asked block (LIN-4353)', () => {
   });
 
   test('close-out: the summary says how the work meets what was asked', () => {
-    assert.ok(doneSignal('close-out', /^Summary comment posted, saying how the merged work meets what was asked/));
+    assert.ok(doneSignal('close-out', /^Final message is the report, saying how the merged work meets what was asked/));
     assert.match(COMPLETION_SIGNALS['close-out'].readinessCheck, /how the work meets what was asked/);
   });
 

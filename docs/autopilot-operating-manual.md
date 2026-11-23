@@ -464,17 +464,9 @@ range freely — mistakes are cheap. Near a merge, a Done, or anything downstrea
 that's where one verification before something lands is worth the pause. Keep the irreversible
 decisions yours, earned by evidence — never let the worker certify its own finish line.
 
-**When a park is genuine, make the ruling self-sufficient** — don't hand over a symptom and make the
-human reconstruct it. Cover, in the case itself: **what** is blocked and **why** — the specific
-obstacle, not a generic failure; **the decision**, stated as a decision, not a symptom; **the
-options**, each with your recommendation and your reasoning for it; **the cost of each option**, and
-**the cost of doing nothing** — what continues, what halts, what it costs to wait. When you emit the
-`DECISION:` block, per-option cost belongs in the option's wording (`options[].cost` takes numbers
-only, dropping prose); every `DECISION:` carries `if_unanswered: {"summary": "..."}` (what
-continues, what halts), which the person's card always shows. `on_answer: {"effect":
-"resume"|"dispatch"|"record"}` optionally declares what happens once it IS answered — though live
-evidence at press time (a resumable session, or a run already in progress on that task) can still
-override it.
+**When a park is genuine, make the question self-sufficient** — don't hand over a symptom and make the
+human reconstruct it. Ask with a `question` record (`POST /api/proxy/records`, `kind` `question`), and cover, in its `asks`: **what** is blocked and **why** — the specific
+obstacle, not a generic failure; **the decision**, stated as a decision, not a symptom; and **the cost of doing nothing** — what continues, what halts, what it costs to wait. Its `options` are the answers the person picks from, each worded with its cost and your recommendation and reasoning for it (the cost of an option belongs in its wording); `recommended` names one of them; `if-unanswered` says what continues and what halts. The answer comes back as a decision record that resumes the run that asked, with the option and the person's own words together.
 When the decision concerns a finding, bound the options by where it falls: a finding inside a
 bounded class may only be **do it here** or **drop it, with the reason** — offer **file** only for
 a finding outside every bounded class that the consequence test (`lib/prompts/leftover-words.js`, LIN-4401) sends to a ticket: it breaks something, blocks work, or touches safety. Any other outside find is a note entry in its area.
@@ -482,12 +474,9 @@ a finding outside every bounded class that the consequence test (`lib/prompts/le
 **Before offering file, check the ticket doesn't already exist.** Search the anchor's relations
 (`GET /api/proxy/issues/{id}/relations`) and `GET /api/proxy/search` for a ticket already naming the
 same file and finding. If one exists, link it (a `related` relation) and record it in the close-out
-summary instead of raising a ruling or filing a new one.
+summary instead of asking a question or filing a new one.
 
-**Before raising any `DECISION:`, check it isn't already covered.** Query
-`GET /api/proxy/rulings?issueIdentifier=<anchor>&includeResolved=true` and read the prior stage's
-comments. Don't re-raise a question an open, answered, dismissed, or withdrawn row already covers for the same
-anchor — task-bound rulings aren't covered by `includeResolved`. Ask for every fact the question needs in the one ruling.
+**Before asking a question, check it isn't already covered.** Query the task's open questions and its decisions: `GET /api/proxy/records?kind=question&in=<anchor>&state=open` and `GET /api/proxy/records?kind=decision&in=<anchor>`. Don't re-ask a question an open or answered record already covers. Ask for every fact the question needs in the one question record.
 
 **Merge sibling blockers before you bubble up.** If more than one child you're holding is blocked on
 the same root cause, don't escalate once per child — raise ONE hand-back naming the shared cause, with

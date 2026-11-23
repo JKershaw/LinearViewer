@@ -155,8 +155,8 @@ const PARENT = '5d1c6a7e-2b3f-4c8d-9e0f-1a2b3c4d5e6f';
 // The opening of each non-work value's closing sentence, as the block states it.
 const CLOSING_OPENER = {
   none: 'Just END with your findings',
-  'one-comment': 'Just END with the link to the one comment',
-  'blind-comment': 'Just END with the link to the one comment',
+  'one-comment': 'Just END with your findings',
+  'blind-comment': 'Just END with your verdict record',
   'ticket-fields': 'Just END with each field change',
 };
 

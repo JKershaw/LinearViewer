@@ -36,7 +36,6 @@ const at = (message, kind = 'status') => [{ message, kind, timestamp: '2026-09-2
 
 // The intended classification of each marker family, by leading prefix.
 const CLASSES = [
-  { prefix: 'DECISION:', terminal: null, wake: null, decision: true },
   { prefix: '[handoff]', terminal: null, wake: null },
   { prefix: '[done]', terminal: 'done', wake: 'done' },
   { prefix: '[failed]', terminal: 'failed', wake: 'failed' },
@@ -161,33 +160,31 @@ describe('S6: the enqueue 403 marker', () => {
   });
 });
 
-// LIN-3505: a kit worker's `DECISION:` line (before its `BLOCKED:`) becomes a
-// ruling. The runner posts the JSON as-is as a `decision` entry, then the
-// `[blocked]` marker; Harbour's own parseDecision reads it.
-describe('LIN-3505: a runner decision + [blocked] is a ruling', () => {
-  const line = lines.find((l) => l.startsWith('DECISION:'));
-  const json = line && line.slice('DECISION:'.length).trim();
+// LIN-4533 (LIN-4529 P3): the prompt no longer teaches the DECISION: block. A runner asks with a question record on the
+// task, then ends BLOCKED:; the answer comes back as a decision record that resumes it (lib/prompts/handoff-words.js).
+describe('LIN-4533: the prompt asks with a question record, not a decision block', () => {
+  test('the markers block carries no DECISION: example', () => {
+    assert.ok(!lines.some((l) => l.startsWith('DECISION:')), 'no DECISION: line in the markers block');
+  });
+
+  test('the closing contract asks a question record before the one outcome line, BLOCKED:', () => {
+    assert.match(prompt, /end your final message with exactly one outcome line/);
+    assert.match(prompt, /write a `question` record on the task/);
+    assert.match(prompt, /then end `BLOCKED:`/);
+  });
+
+  test('the prose sends no decision entry, and no step posts one before the [blocked] marker', () => {
+    assert.doesNotMatch(prompt, /runner feedback <id> decision/);
+    assert.doesNotMatch(prompt, /`DECISION:`|^DECISION:/m);
+  });
+});
+
+// The runner kit's decision entry is still read by the retiring path (LIN-3505); these pin the kit's own behaviour until
+// that path is removed in a later LIN-4529 piece. The prompt above no longer asks for it.
+describe('the runner kit still posts a decision entry the retiring path reads (LIN-3505)', () => {
+  const json = JSON.stringify({ decision_id: 'keep-schema', question: 'Which schema do we keep?', options: [{ id: 'a', label: 'Schema A' }, { id: 'b', label: 'Schema B' }], recommended: 'a' });
   const ledger = { items: { [K]: { rootItemId: K } } };
   const blocked = lines.find((l) => l.startsWith('[blocked] Waiting'));
-
-  test('the markers block carries a DECISION: example that parseDecision reads', () => {
-    assert.ok(line, 'a DECISION: line in the markers block');
-    const d = parseDecision(json);
-    assert.equal(d.decision_id, 'keep-schema');
-    assert.equal(d.options.length, 2);
-    assert.equal(d.recommended, 'a');
-  });
-
-  test('the closing contract allows DECISION: before the one outcome line', () => {
-    assert.match(prompt, /end your final message with exactly one outcome line/);
-    assert.match(prompt, /`DECISION:` line just before the `BLOCKED:` line/);
-  });
-
-  test('the prose tells the runner to post the decision before the [blocked] marker', () => {
-    assert.match(prompt, /runner feedback <id> decision '<the JSON>'/);
-    // the decision step sits in the same list item that precedes the marker step
-    assert.ok(prompt.indexOf("decision '<the JSON>'") < prompt.indexOf('"[blocked] <what it needs>"'));
-  });
 
   test('the kit posts a decision entry unchanged, and the server validator accepts it', () => {
     const body = feedbackBody(ledger, K, 'decision', json);

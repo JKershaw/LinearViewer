@@ -1586,7 +1586,7 @@ this read would hand it a cross-workspace view). Read scope is sufficient.
   `record`. So a read-only row never surfaces its declared effect **in** `effect` —
   `declaredEffect` is **not** guaranteed `null` on such a row; it still reports whatever the
   block declared, if anything.
-- **`declaredEffect`** is what the runner's own `DECISION:` block requested, via an optional
+- **`declaredEffect`** is what the runner's own ruling block requested, via an optional
   `on_answer: { "effect": "..." }` field — `null` when nothing was declared. This is
   disposition-independent: a read-only row can still carry a non-null `declaredEffect` if the
   runner declared one, even though that declaration never surfaces in `effect` (per the
@@ -1624,7 +1624,7 @@ Body:
   interaction is pressing "dismiss as proposed"; an unjustified proposal would turn that press
   into a rubber stamp.
 - **`decisionLoopId`** — optional but strongly preferred: a `decision_id` is not unique (one
-  session can emit the same `DECISION:` block from two loops), so omitting it applies the
+  session can emit the same ruling block from two loops), so omitting it applies the
   proposal to every loop sharing that `decision_id` (a deliberately back-compatible legacy
   shape). Send the target row's own `anchor.loopId ?? anchor.taskDecisionId` from the `GET`
   above to address exactly one row.

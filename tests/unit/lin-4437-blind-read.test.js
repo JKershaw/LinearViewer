@@ -205,7 +205,7 @@ describe('witness 2: the read is blind', () => {
   test('the ticket appears only as where the comment goes', () => {
     for (const line of prompt.split('\n').filter(l => l.includes('LIN-9'))) {
       // The verdict record (LIN-4518 step 2) names the ticket as its `in`, the place a record goes, not a text to read.
-      assert.match(line, /the comment below on LIN-9|one comment on LIN-9|LIN-9 is where it goes|linked on LIN-9|"in": "LIN-9"/, line);
+      assert.match(line, /no comment on LIN-9|LIN-9 is only the change|"in": "LIN-9"/, line);
     }
   });
   test('the skip is the blind read\'s alone: another stage still renders the attachments', () => {
@@ -226,13 +226,13 @@ describe('the prompt is the piloted text', () => {
     // (no class sections in the comment) and the class headings. Each is checked by its own rendered words below.
     // LIN-4520: the read-only line names the comment and the verdict record, the verdict paragraph names the record, and the
     // comment is its heading and Read line only (the verdict line is gone).
-    const CHANGED = ['**Where to stand.**', '**Areas.**', '**Sort each find', 'You only sort', 'Rules for the comment:', '### ', '**This is read-only.**', '**The verdict**', '## Blind read'];
+    const CHANGED = ['**Where to stand.**', '**Areas.**', '**Sort each find', 'You only sort', 'Rules for the comment:', '### ', '**This is read-only.**', '**The verdict**', '**The comment**', '**The Read line**', 'Rules for the Read line:', '## Blind read'];
     const fill = (t) => t.replace('{DESTINATION}', 'Your outputs are one comment on LIN-9, the comment below, and the finds you record as findings (the hand-off protocol says how). LIN-9 is where the comment goes, not something to read.').replaceAll('{PRS}', PR);
     for (const p of rest.filter(q => !CHANGED.some(c => q.startsWith(c)))) {
       assert.ok(body.includes(fill(p)), `unchanged pilot paragraph: ${p.slice(0, 60)}`);
     }
     assert.ok(body.includes(WHERE_EACH_FIND_GOES), 'the routing paragraph is the rendered one');
-    assert.ok(body.includes('Rules for the comment: its first line is exactly `## Blind read`'), 'the rules line keeps its opening');
+    assert.ok(body.includes('Rules for the Read line: full PR URLs appear only on it, for the change read;'), 'the rules line is the Read line\'s (LIN-4533)');
     assert.doesNotMatch(body, /### Inside the area|### Outside the area/, 'no class sections in the comment');
     assert.match(prompt, /## Goal/);
     assert.match(body.split('\n\n').find(q => q.startsWith('**Where to stand.**')), /git fetch origin pull\/<number>\/head/);

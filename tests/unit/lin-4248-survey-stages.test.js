@@ -86,10 +86,10 @@ describe('LIN-4248 Survey prompts: the hand-tuned wording, with only the fill-in
   const task = () => generatePrompt('survey-task', FIXTURE_ISSUE, FIXTURE_CONTEXT).prompt;
   const place = () => generatePrompt('survey-place', FIXTURE_ISSUE, FIXTURE_CONTEXT).prompt;
 
-  test('each renders its report at the base, as one comment on the surveyed ticket, and the ticket text as it reads now (LIN-4520: no heading format)', () => {
+  test('each renders its report at the base, in its final message and no comment, and the ticket text as it reads now (LIN-4520, LIN-4533)', () => {
     for (const p of [task(), place()]) {
       assert.ok(p.includes('A fixture ticket\n\nIts description, as it reads now.'), 'the ticket title and description');
-      assert.ok(p.includes(`Your only output is one comment on ${FIXTURE_ISSUE.identifier} holding your report, which names the base you read at as {BASE}.`), 'one report comment, naming the base');
+      assert.ok(p.includes(`Your only output is your final message, your report, which names the base you read at as {BASE}; you post no comment on ${FIXTURE_ISSUE.identifier}.`), 'one report, in the final message, naming the base');
       assert.doesNotMatch(p, /## Survey /, 'no Survey heading is asked for');
     }
   });

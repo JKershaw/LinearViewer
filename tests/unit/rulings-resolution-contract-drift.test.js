@@ -44,6 +44,7 @@ const proxyInstructionsSource = read('lib/proxy-instructions.js');
 const proxyRulingsSource = read('routes/proxy-rulings.js');
 const promptTemplateDefsSource = read('lib/prompt-template-defs.js');
 const autopilotManualSource = read('docs/autopilot-operating-manual.md');
+const handoffWordsSource = read('lib/prompts/handoff-words.js');
 const baselineSource = read('scripts/eval/meta-prompt.baseline.txt');
 
 /** Count non-overlapping occurrences of `needle` in `haystack`. */
@@ -113,45 +114,38 @@ describe('withdrawn resolution contract — doc-consistency drift guard (LIN-289
   });
 });
 
-describe('no-re-raise guidance literal list (LIN-2891/LIN-3038)', () => {
+describe('no-re-raise guidance (LIN-2891/LIN-3038, moved to the question record by LIN-4533)', () => {
+  // The three sites now point at the question check in lib/prompts/handoff-words.js (QUESTION_CHECK), and the manual states it.
   const liveSites = [
     { label: 'lib/prompt-template-defs.js', source: promptTemplateDefsSource, expected: 2 },
     { label: 'docs/autopilot-operating-manual.md', source: autopilotManualSource, expected: 1 },
   ];
 
-  test('the live prompt sources carry 0 "answered, or dismissed" and 3 "dismissed, or withdrawn"', () => {
-    let oldTotal = 0;
-    let newTotal = 0;
-    for (const { label, source, expected } of liveSites) {
-      const oldCount = countOccurrences(source, 'answered, or dismissed');
-      const newCount = countOccurrences(source, 'dismissed, or withdrawn');
-      assert.strictEqual(oldCount, 0, `${label} must carry no stale "answered, or dismissed" list`);
-      assert.strictEqual(newCount, expected,
-        `${label} must carry exactly ${expected} broadened "dismissed, or withdrawn" list(s)`);
-      oldTotal += oldCount;
-      newTotal += newCount;
+  test('the live prompt sources carry no "answered, or dismissed" list and no DECISION: re-raise guard (LIN-4533)', () => {
+    for (const { label, source } of liveSites) {
+      assert.strictEqual(countOccurrences(source, 'answered, or dismissed'), 0, `${label} must carry no stale list`);
+      assert.strictEqual(countOccurrences(source, 'Before raising any `DECISION:`'), 0, `${label} must not teach a DECISION: re-raise check`);
     }
-    assert.strictEqual(oldTotal, 0, 'no live prompt source still carries the old list');
-    assert.strictEqual(newTotal, 3, 'the 3 live no-re-raise guidance sites are broadened');
+  });
+
+  test('the prompt sites point at the question check, and the manual asks the same check (LIN-4533)', () => {
+    assert.strictEqual(countOccurrences(promptTemplateDefsSource, '+ QUESTION_CHECK +'), 2, 'both no-re-raise sites use the question check');
+    assert.strictEqual(countOccurrences(autopilotManualSource, 'Before asking a question, check it isn\'t already covered.'), 1);
+    assert.strictEqual(countOccurrences(handoffWordsSource, 'kind=question&in=<this ticket>&state=open'), 1, 'the check queries the open questions');
   });
 
   // LIN-3903: the trigger widened from "on a finding" to any DECISION:, and each
   // site asks for every fact in the one ruling. Case-insensitive: close-out's
   // Follow-up Triage bullet is lowercase ("before raising"), review's is bold-initial.
-  test('the 3 no-re-raise sites trigger on any DECISION: and ask for every fact in one ruling', () => {
-    const lower = src => src.toLowerCase();
-    assert.strictEqual(countOccurrences(lower(promptTemplateDefsSource), 'before raising any `decision:`'), 2);
-    assert.strictEqual(countOccurrences(lower(autopilotManualSource), 'before raising any `decision:`'), 1);
-    assert.strictEqual(countOccurrences(lower(promptTemplateDefsSource), 'every fact the question needs'), 2);
-    assert.strictEqual(countOccurrences(lower(autopilotManualSource), 'every fact the question needs'), 1);
-    assert.strictEqual(countOccurrences(lower(promptTemplateDefsSource), 'on a finding, check'), 0);
-    assert.strictEqual(countOccurrences(lower(autopilotManualSource), 'on a finding, check'), 0);
+  test('the 3 no-re-raise sites ask for every fact the question needs in the one question record (LIN-4533)', () => {
+    assert.strictEqual(countOccurrences(promptTemplateDefsSource, 'every fact the question needs in the one question record'), 2);
+    assert.strictEqual(countOccurrences(autopilotManualSource, 'every fact the question needs in the one question record'), 1);
+    assert.strictEqual(countOccurrences(promptTemplateDefsSource, 'on a finding, check'), 0);
+    assert.strictEqual(countOccurrences(autopilotManualSource, 'on a finding, check'), 0);
   });
 
-  test('the 2 lib/ sites keep their includeResolved scope note (never a task-bound one)', () => {
-    // The two prompt-template-defs.js sites each restate the scope note;
-    // broadening the literal list must not have dropped it.
-    assert.strictEqual(countOccurrences(promptTemplateDefsSource, 'never a task-bound one'), 2);
+  test('the rulings includeResolved scope note is gone from the prompt sites (LIN-4533: the question check queries records)', () => {
+    assert.strictEqual(countOccurrences(promptTemplateDefsSource, 'includeResolved'), 0);
   });
 
   test('the derived snapshot scripts/eval/meta-prompt.baseline.txt is accounted for and in sync', () => {
@@ -177,22 +171,13 @@ describe('no-re-raise guidance literal list (LIN-2891/LIN-3038)', () => {
 });
 
 describe('autopilot manual: the if_unanswered rule (LIN-3252 S2.3i)', () => {
-  test('the manual names if_unanswered, states the every-DECISION rule, and keeps the no-re-raise phrase', () => {
-    // The manual is the single source for `DECISION:` guidance — the rule lives
-    // here, not duplicated into a second prompt surface.
-    assert.ok(autopilotManualSource.includes('if_unanswered'), 'the manual names if_unanswered');
-    assert.match(
-      autopilotManualSource,
-      /every `DECISION:` carries `if_unanswered: \{"summary": "\.\.\."\}`/,
-      'the manual states that every DECISION carries if_unanswered.summary'
-    );
+  test('the manual names if-unanswered on the question record, and keeps the no-re-raise check (LIN-4533)', () => {
+    // The manual is the single source for the question guidance — the rule lives here, not duplicated into a second surface.
+    assert.ok(autopilotManualSource.includes('`if-unanswered`'), 'the manual names if-unanswered on the question');
+    assert.ok(!autopilotManualSource.includes('if_unanswered'), 'the retired DECISION: field name is gone');
     assert.ok(
-      autopilotManualSource.includes('which the person\'s card always shows'),
-      'the manual says the person\'s card always shows it'
-    );
-    assert.ok(
-      autopilotManualSource.includes('open, answered, dismissed, or withdrawn'),
-      'the no-re-raise phrase stays untouched'
+      autopilotManualSource.includes('Don\'t re-ask a question an open or answered record already covers'),
+      'the no-re-raise check stays'
     );
   });
 });

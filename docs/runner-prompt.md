@@ -166,17 +166,15 @@ subagent to add `--unix-socket <path>` to every curl. Its value wins over any
 
 > When you finish, end your final message with exactly one outcome line: `DONE: <one-line summary>`,
 > `FAILED: <why>`, or `BLOCKED: <what you need from a human>`. If the person's choice is what you
-> need, write a `DECISION:` line just before the `BLOCKED:` line: `DECISION:` then one strict-JSON
-> object with `decision_id` (a short unique string) and `options` (1 to 10 of
-> `{"id": "...", "label": "..."}`), optionally `question` and `recommended` (an option's `id`).
-> Under 2000 characters; no line inside it starts with `DONE:`, `FAILED:` or `BLOCKED:`.
+> need, ask it before you end: write a `question` record on the task (`POST /api/proxy/records`, with
+> `kind` `question`, `in` the task, `to` the person, `asks`, `options`, `recommended` and
+> `if-unanswered`), then end `BLOCKED:`. Their answer comes back as a decision record that resumes you.
+> Do not post a comment on the ticket: your final message is your report.
 
 **When a subagent finishes**, post, in this order:
 
 1. `runner feedback <id> recap "<two to four sentences on what it did>"`
-   For `BLOCKED:` with a `DECISION:` line, first post its JSON object as written, from the `{`,
-   as `runner feedback <id> decision '<the JSON>'`; Harbour reads it as a ruling (the same
-   `decision_id` again is safe: the last wins). Then the marker.
+   A `BLOCKED:` run's question is already a record, so post nothing more for it. Then the marker.
 2. `runner usage <agentId>`: posts the subagent's per-request usage records, from its own
    transcript. Each record carries the **realised** `harness` and `model` (what actually ran, never
    what the item asked for). With no readable transcript it posts nothing, so the item reads as having
@@ -187,7 +185,7 @@ subagent to add `--unix-socket <path>` to every curl. Its value wins over any
    With no outcome line, ask the subagent once; then post `"[failed] subagent ended without an outcome line"`.
 
 `runner feedback <id> <kind> <message>`: `kind` is one of {{FEEDBACK_ENTRY_KINDS}}; you need
-`status`, `recap`, `decision`. Every post carries the lineage's first item as `rootItemId`, so a
+`status` and `recap`. Every post carries the lineage's first item as `rootItemId`, so a
 subagent's usage records count once however many wakes it runs (the per-request key dedupes them).
 
 **Abort rows.** An item with `abort: true` names a session to cancel. `runner take` handles the
@@ -255,7 +253,6 @@ let running subagents finish or stop them, and report:
 ## Markers, exactly as Harbour reads them
 
 ```markers
-DECISION: {"decision_id":"keep-schema","question":"Which schema do we keep?","options":[{"id":"a","label":"Schema A"},{"id":"b","label":"Schema B"}],"recommended":"a"}
 [handoff] item 0f3a9c2e-1b4d-4e8f-9a7b-2c6d8e0f1a3b → subagent a1b2c3d4 (new)
 [handoff] item 7c1d2e3f-4a5b-4c6d-8e7f-9a0b1c2d3e4f → subagent a1b2c3d4 (continued from 0f3a9c2e-1b4d-4e8f-9a7b-2c6d8e0f1a3b)
 [done] Added the runner prompt route; tests green.

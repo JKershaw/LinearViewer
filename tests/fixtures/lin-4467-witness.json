@@ -2,33 +2,33 @@
   "renders": {
     "blocked:fresh": {
       "name": "blocked",
-      "bytes": 4898,
-      "sha256": "83847843019d8ae95e97f7a5200217dac5506bf3968daa7ebb100310aa60fb92"
+      "bytes": 5033,
+      "sha256": "1355f4480617e86f97c4f590695346300f259f4132b069d447d8e4e805997f25"
     },
     "blocked:fix": {
       "name": "blocked",
-      "bytes": 4898,
-      "sha256": "83847843019d8ae95e97f7a5200217dac5506bf3968daa7ebb100310aa60fb92"
+      "bytes": 5033,
+      "sha256": "1355f4480617e86f97c4f590695346300f259f4132b069d447d8e4e805997f25"
     },
     "bug:fresh": {
       "name": "bug",
-      "bytes": 6413,
-      "sha256": "d4d8ab440cd7114db5b999603d015f2166a9ee429d503866f6c32bc7e6302135"
+      "bytes": 6439,
+      "sha256": "34c44cf29de87f6372f73aff03f67237f1466e090f07fead73c172dc7b9ea6f4"
     },
     "bug:fix": {
       "name": "bug",
-      "bytes": 6413,
-      "sha256": "d4d8ab440cd7114db5b999603d015f2166a9ee429d503866f6c32bc7e6302135"
+      "bytes": 6439,
+      "sha256": "34c44cf29de87f6372f73aff03f67237f1466e090f07fead73c172dc7b9ea6f4"
     },
     "plan:fresh": {
       "name": "plan",
-      "bytes": 12687,
-      "sha256": "bfa8f4c7cf977fc95a2f173430fabda83a39677950caa179535a402204dfeaa7"
+      "bytes": 13117,
+      "sha256": "9c5b6ae6bc67eac981d6d2d5b4c8b24355d3d476eb5fb5cbe26d908deabe2ee3"
     },
     "plan:fix": {
       "name": "plan",
-      "bytes": 12687,
-      "sha256": "bfa8f4c7cf977fc95a2f173430fabda83a39677950caa179535a402204dfeaa7"
+      "bytes": 13117,
+      "sha256": "9c5b6ae6bc67eac981d6d2d5b4c8b24355d3d476eb5fb5cbe26d908deabe2ee3"
     },
     "look-into:fresh": {
       "name": "look into",
@@ -42,123 +42,123 @@
     },
     "triage:fresh": {
       "name": "triage",
-      "bytes": 3661,
-      "sha256": "09fa02ddb5066bdc2023d70638d04de0488163aa1d9e93477fa88a7efd9c1bd1"
+      "bytes": 3669,
+      "sha256": "0046976d7152cc7b8eef551f260a0d55d94ef4c99f25598d0fecdeb9b4a3f213"
     },
     "triage:fix": {
       "name": "triage",
-      "bytes": 3661,
-      "sha256": "09fa02ddb5066bdc2023d70638d04de0488163aa1d9e93477fa88a7efd9c1bd1"
+      "bytes": 3669,
+      "sha256": "0046976d7152cc7b8eef551f260a0d55d94ef4c99f25598d0fecdeb9b4a3f213"
     },
     "breakdown:fresh": {
       "name": "breakdown",
-      "bytes": 5778,
-      "sha256": "b4d2991d3fba21a287f2db7ca08aaecd736c4fa4a9a002a5782e1e7c36d3db72"
+      "bytes": 5919,
+      "sha256": "a90794dc4430c8f12315a9ce0c567c7f2142ad4f1abb726fd00fa8a18c470fe5"
     },
     "breakdown:fix": {
       "name": "breakdown",
-      "bytes": 5778,
-      "sha256": "b4d2991d3fba21a287f2db7ca08aaecd736c4fa4a9a002a5782e1e7c36d3db72"
+      "bytes": 5919,
+      "sha256": "a90794dc4430c8f12315a9ce0c567c7f2142ad4f1abb726fd00fa8a18c470fe5"
     },
     "research:fresh": {
       "name": "research",
-      "bytes": 13881,
-      "sha256": "d63591a49bc7a3e27d79865c6f68a0e02482edd6bb6d80fb4aa8efd6236cfb54"
+      "bytes": 14003,
+      "sha256": "13ccfb4af422698fc5a78e856b3306a8cbd14463b6cd2d983dba3cf685f1efdd"
     },
     "research:fix": {
       "name": "research",
-      "bytes": 13881,
-      "sha256": "d63591a49bc7a3e27d79865c6f68a0e02482edd6bb6d80fb4aa8efd6236cfb54"
+      "bytes": 14003,
+      "sha256": "13ccfb4af422698fc5a78e856b3306a8cbd14463b6cd2d983dba3cf685f1efdd"
     },
     "scoping:fresh": {
       "name": "scoping",
-      "bytes": 5938,
-      "sha256": "390d181d2530bb6a978a1ad548a5b97f284c61c43a1cd334a9e78929e72662c6"
+      "bytes": 6075,
+      "sha256": "3991fb95529e102980824011272275534fc1efe21890f92c942f7179473f4a84"
     },
     "scoping:fix": {
       "name": "scoping",
-      "bytes": 5938,
-      "sha256": "390d181d2530bb6a978a1ad548a5b97f284c61c43a1cd334a9e78929e72662c6"
+      "bytes": 6075,
+      "sha256": "3991fb95529e102980824011272275534fc1efe21890f92c942f7179473f4a84"
     },
     "design:fresh": {
       "name": "design",
-      "bytes": 4642,
-      "sha256": "3584f31007a747701f8f53fb678a41af44f3b7337aff2fcba7d0a87bdbb92d45"
+      "bytes": 4779,
+      "sha256": "75d059073ecd20f998af1f2cea8e1c423a8ebbff31aad480c590169f095c8c29"
     },
     "design:fix": {
       "name": "design",
-      "bytes": 4642,
-      "sha256": "3584f31007a747701f8f53fb678a41af44f3b7337aff2fcba7d0a87bdbb92d45"
+      "bytes": 4779,
+      "sha256": "75d059073ecd20f998af1f2cea8e1c423a8ebbff31aad480c590169f095c8c29"
     },
     "spike:fresh": {
       "name": "spike",
-      "bytes": 4422,
-      "sha256": "83253ce0000495f10ec1715975917e9282f9141f704572d37c473d76ae670166"
+      "bytes": 4541,
+      "sha256": "ccc008a3924c68d5906f4ed5e4134c8e82611adcdfab1e93599ff0cd62b6d452"
     },
     "spike:fix": {
       "name": "spike",
-      "bytes": 4422,
-      "sha256": "83253ce0000495f10ec1715975917e9282f9141f704572d37c473d76ae670166"
+      "bytes": 4541,
+      "sha256": "ccc008a3924c68d5906f4ed5e4134c8e82611adcdfab1e93599ff0cd62b6d452"
     },
     "context:fresh": {
       "name": "context",
-      "bytes": 3391,
-      "sha256": "b36cd5cabdc7d3c9a0fc32e95ccde9343b3e08e9526af305a3fa84b295016d62"
+      "bytes": 3385,
+      "sha256": "8fecdc96c72de6fff2c5e580307e18e9d1d375212f8fd5814855cb2191a85a1b"
     },
     "context:fix": {
       "name": "context",
-      "bytes": 3391,
-      "sha256": "b36cd5cabdc7d3c9a0fc32e95ccde9343b3e08e9526af305a3fa84b295016d62"
+      "bytes": 3385,
+      "sha256": "8fecdc96c72de6fff2c5e580307e18e9d1d375212f8fd5814855cb2191a85a1b"
     },
     "plan-review:fresh": {
       "name": "plan-review",
-      "bytes": 9517,
-      "sha256": "1b1a0a845a4d307e2b8131fce543efc4dbdc9b7efa704b6bc41544efd246f871"
+      "bytes": 9514,
+      "sha256": "b01175bad4df4982b0c15320e9d092e7b5939377956d5f16d298fe7c636d208c"
     },
     "plan-review:fix": {
       "name": "plan-review",
-      "bytes": 9517,
-      "sha256": "1b1a0a845a4d307e2b8131fce543efc4dbdc9b7efa704b6bc41544efd246f871"
+      "bytes": 9514,
+      "sha256": "b01175bad4df4982b0c15320e9d092e7b5939377956d5f16d298fe7c636d208c"
     },
     "implementation:fresh": {
       "name": "implement",
-      "bytes": 11391,
-      "sha256": "8dcd9b61099aa5ad36b1bdf5fabce4e9c70d39cfba04ee4785ac6eb8f3a8aab1"
+      "bytes": 11871,
+      "sha256": "22dcc396ee6b5e8e7637ad95e2dddcd333e341c3f42e223e1298c90f2d5b3c1d"
     },
     "implementation:fix": {
       "name": "implement",
-      "bytes": 11736,
-      "sha256": "97d47c5f69bc59127414cf95b877549758c2a94f5ccceda072ab3c11085de358"
+      "bytes": 12212,
+      "sha256": "f29d0b271564b7e1e077b709a4f31a1a70d9823bfcbef17405710a7a10c46a10"
     },
     "review:fresh": {
       "name": "review",
-      "bytes": 18700,
-      "sha256": "50234c9c9c1f66dabcb9dc27dc003aa0e91e3043d63fd1bb403417ea5d59180f"
+      "bytes": 18647,
+      "sha256": "cbcb7d141550b6ea2a38ae69234a4a7ed32f12177cbe71f0c04c4dab6ea4d1f2"
     },
     "review:fix": {
       "name": "review",
-      "bytes": 18700,
-      "sha256": "50234c9c9c1f66dabcb9dc27dc003aa0e91e3043d63fd1bb403417ea5d59180f"
+      "bytes": 18647,
+      "sha256": "cbcb7d141550b6ea2a38ae69234a4a7ed32f12177cbe71f0c04c4dab6ea4d1f2"
     },
     "close-out:fresh": {
       "name": "close-out",
-      "bytes": 11353,
-      "sha256": "031abcea82731f151a27137ed9b6855d5fe09a797986beaed49e2893cec13e61"
+      "bytes": 11310,
+      "sha256": "74899c59a3c5f104db551c79364cd92690262e96e279239f33e3b1ead616c22c"
     },
     "close-out:fix": {
       "name": "close-out",
-      "bytes": 11353,
-      "sha256": "031abcea82731f151a27137ed9b6855d5fe09a797986beaed49e2893cec13e61"
+      "bytes": 11310,
+      "sha256": "74899c59a3c5f104db551c79364cd92690262e96e279239f33e3b1ead616c22c"
     },
     "retrospective-audit:fresh": {
       "name": "retrospective-audit",
-      "bytes": 6419,
-      "sha256": "79b7806685713bb086c7e4e6677bdd3f89bccf394271dc170b67307c819892c0"
+      "bytes": 6408,
+      "sha256": "e10d70c40496d3ae128e19750edc5b4fba39f561bda9400c53a6dbe6b6cca108"
     },
     "retrospective-audit:fix": {
       "name": "retrospective-audit",
-      "bytes": 6419,
-      "sha256": "79b7806685713bb086c7e4e6677bdd3f89bccf394271dc170b67307c819892c0"
+      "bytes": 6408,
+      "sha256": "e10d70c40496d3ae128e19750edc5b4fba39f561bda9400c53a6dbe6b6cca108"
     },
     "retro:fresh": {
       "name": "retro",
@@ -172,46 +172,46 @@
     },
     "survey-task:fresh": {
       "name": "survey-task",
-      "bytes": 2633,
-      "sha256": "f6d0fd0783da2270e2a4ad89e5fcd2ef7d9da19546b7e3fec39f205178473979"
+      "bytes": 2654,
+      "sha256": "0e444af4f1107803bf7310cd6348e04acffb8ef6f7869571268b4af25211e607"
     },
     "survey-task:fix": {
       "name": "survey-task",
-      "bytes": 2633,
-      "sha256": "f6d0fd0783da2270e2a4ad89e5fcd2ef7d9da19546b7e3fec39f205178473979"
+      "bytes": 2654,
+      "sha256": "0e444af4f1107803bf7310cd6348e04acffb8ef6f7869571268b4af25211e607"
     },
     "survey-place:fresh": {
       "name": "survey-place",
-      "bytes": 3548,
-      "sha256": "72b5180bc5e9fc7c918361592fc8580d44c4d5d0342a789dfdccde76aadbd1dc"
+      "bytes": 3569,
+      "sha256": "31197c1a9b9e2b2dcb9552a25c132b76713d19af2876fa99a83b35dcfbba8708"
     },
     "survey-place:fix": {
       "name": "survey-place",
-      "bytes": 3548,
-      "sha256": "72b5180bc5e9fc7c918361592fc8580d44c4d5d0342a789dfdccde76aadbd1dc"
+      "bytes": 3569,
+      "sha256": "31197c1a9b9e2b2dcb9552a25c132b76713d19af2876fa99a83b35dcfbba8708"
     },
     "blind-read:fresh": {
       "name": "blind-read",
-      "bytes": 5018,
-      "sha256": "f524df41614b035b26d364a9806e1ecb00ef11053cd75dacace32f71852ed5df"
+      "bytes": 4985,
+      "sha256": "baad0ab185ca3f693008cf3406bcad65c92ef291d1459a91ac93daf1a438ec6e"
     },
     "blind-read:fix": {
       "name": "blind-read",
-      "bytes": 5018,
-      "sha256": "f524df41614b035b26d364a9806e1ecb00ef11053cd75dacace32f71852ed5df"
+      "bytes": 4985,
+      "sha256": "baad0ab185ca3f693008cf3406bcad65c92ef291d1459a91ac93daf1a438ec6e"
     }
   },
   "tables": {
     "COMPLETION_SIGNALS": [
       "{",
       "  \"blind-read\": {",
-      "    \"coreOutcome\": \"The current landing read cold at its head against its merge-base: whether the change left its area better, the same or worse, with its finds sorted three ways, posted as one `## Blind read` comment and its verdict recorded\",",
-      "    \"readinessCheck\": \"Is there one `## Blind read` comment naming exactly the landing's PRs, and one blind-read verdict record with a two-sided reason, read from the code alone?\",",
+      "    \"coreOutcome\": \"The current landing read cold at its head against its merge-base: whether the change left its area better, the same or worse, with its finds sorted three ways, recorded as its verdict and its finds, with no comment on the ticket\",",
+      "    \"readinessCheck\": \"Is there one blind-read verdict record, with a two-sided reason that names exactly the landing's PRs, read from the code alone, and no comment on the ticket?\",",
       "    \"signals\": [",
       "      \"Read only the diff, the code at the merge-base and at the head, and the area registry: no pull request text, commit messages, ticket, area notes or plans\",",
       "      \"One verdict record, `judgement` blind-read, with outcome better, same or worse, and a reason naming what the change made better and what it made worse, with their files\",",
       "      \"Each find sorted into exactly one class: inside the area and fix-sized, inside but larger, or outside the area\",",
-      "      \"One comment on the named ticket, its first line exactly `## Blind read`, naming every PR of the landing by full URL and no other; nothing else changed\",",
+      "      \"The verdict reason names every PR of the landing by full URL in its `Read:` line, and no other; no comment is posted on the ticket\",",
       "      \"With no PR on the landing, nothing read or posted, and the run ended `[skipped]`\"",
       "    ]",
       "  },",
@@ -232,7 +232,7 @@
       "      \"Each piece written as a plan record in this task, addressed to implementation\",",
       "      \"Each child task written with its piece and done-when, so Harbour makes its ticket; no plan text copied in\",",
       "      \"Blocked-by relations establish execution order\",",
-      "      \"Summary comment added to parent task\"",
+      "      \"Final message lists the child tasks, their tickets and pieces; no comment on the parent\"",
       "    ]",
       "  },",
       "  \"bug\": {",
@@ -254,7 +254,7 @@
       "      \"Every finding to close-out settled: inside work done with cited evidence, a monitor or rollback named by the name review wrote (an unnamed one settles nothing), or a finding accepted by a human naming the exact precondition exercised; an outside find recorded to project; once the deploy landed, a post-deploy check close-out cannot run is recorded as not run (what, why, follow-up) and does not hold the close\",",
       "      \"Green CI confirmed on the exact merged commit, or CI genuinely absent with the substitute re-run and recorded on it (green CI alone never settles a finding)\",",
       "      \"PR merged; once the deploy landed, the post-deploy steps done and the change verified on what landed in the same session, then the task set to Done — not held open for a separate verification pass\",",
-      "      \"Summary comment posted, saying how the merged work meets what was asked, related tickets this work settles closed or cancelled, outside finds written to their home, any gate ticket linked\"",
+      "      \"Final message is the report, saying how the merged work meets what was asked, related tickets this work settles closed or cancelled, outside finds written to their home, any gate ticket linked\"",
       "    ]",
       "  },",
       "  \"context\": {",
@@ -285,7 +285,7 @@
       "      \"Implementation follows plan (if present)\",",
       "      \"Code changes committed\",",
       "      \"Tests written and passing\",",
-      "      \"Summary comment added\"",
+      "      \"Report in the final message, with the PR recorded as a change\"",
       "    ]",
       "  },",
       "  \"look-into\": {",
@@ -349,10 +349,10 @@
       "    \"readinessCheck\": \"Were the deliverable's claims and its tests' integrity independently checked against the landed code (not the overall correctness CI already covers), with findings reported and no state changed?\",",
       "    \"signals\": [",
       "      \"Opens from the fact the change is already merged — the landed commit(s)/PR located before auditing anything\",",
-      "      \"Claims (in-code comments, PR/task description, summary comment) checked directly against the code at HEAD, not against the author's account of them\",",
+      "      \"Claims (in-code comments, PR/task description) checked directly against the code at HEAD, not against the author's account of them\",",
       "      \"Tests checked for integrity, not just presence — a test passing for a reason unrelated to the behavior it names, a vacuous assertion, or a negative/spy test that never asserts is surfaced\",",
       "      \"Ownership orphans checked — a hazard deferred between this ticket and a sibling it references, unowned by either at HEAD\",",
-      "      \"Findings reported as a comment, and each one recorded as a finding to project (`to: project`), none written into a note; no status/label/Done change, no merge\"",
+      "      \"Findings reported in the final message, and each one recorded as a finding to project (`to: project`), none written into a note; no status/label/Done change, no merge\"",
       "    ]",
       "  },",
       "  \"review\": {",
@@ -372,11 +372,11 @@
       "    \"coreOutcome\": \"The size of the move, and why, recorded in the description\",",
       "    \"readinessCheck\": \"Does the ticket say plainly what size of move this is and why, with nothing about how?\",",
       "    \"signals\": [",
-      "      \"The two Surveys' reports, filing comments and any person's size comment read\",",
+      "      \"The two Surveys' reports (their run records), filing findings and any person's size comment read\",",
       "      \"Sizes weighed from just the task to wrong work, one recommended\",",
       "      \"One `## Size of the move` section in the description, holding only the record's 4 lines\",",
       "      \"Cuts to the `## As asked` block listed in the record, or none\",",
-      "      \"Decided by a ruling or the standing policy; pending, with a `DECISION:`, only for a size the policy may not decide\"",
+      "      \"Decided by a ruling or the standing policy; pending, with a `question` record, only for a size the policy may not decide\"",
       "    ]",
       "  },",
       "  \"spike\": {",
@@ -390,7 +390,7 @@
       "    ]",
       "  },",
       "  \"survey-place\": {",
-      "    \"coreOutcome\": \"A read-only forecast of what this task will do to the codebase as a place, posted as one comment on the surveyed ticket at the named base\",",
+      "    \"coreOutcome\": \"A read-only forecast of what this task will do to the codebase as a place, reported in the final message at the named base\",",
       "    \"readinessCheck\": \"Is the report read-only, at the named base, and under its word limit?\",",
       "    \"signals\": [",
       "      \"Read at the base the report names, with nothing after it: no later commits, tickets, comments or reports, and no reviews or maps of the codebase's shape\",",
@@ -402,7 +402,7 @@
       "    ]",
       "  },",
       "  \"survey-task\": {",
-      "    \"coreOutcome\": \"A read-only forecast of why this task will be difficult, and what would be done first, posted as one comment on the surveyed ticket at the named base\",",
+      "    \"coreOutcome\": \"A read-only forecast of why this task will be difficult, and what would be done first, reported in the final message at the named base\",",
       "    \"readinessCheck\": \"Is the report read-only, at the named base, and under its word limit?\",",
       "    \"signals\": [",
       "      \"Read at the base the report names, with nothing after it: no later commits, tickets, comments or reports\",",
@@ -431,58 +431,58 @@
       "    \"This is a reading pass. Your verdict is your own, formed from the code you are pointed at; why the change was made is not yours to find out.\"",
       "  ],",
       "  \"blocked\": [",
-      "    \"When this task fixes something, its cause is part of the work, wherever it lives. Engineering choices, fixing at the cause and refactoring included, are yours; state each with its reason. Cutting the `## As asked` block is not yours: any sentence or clause not delivered in full, by scope, assumption, design, size limit or another ticket, is a cut. Quote each where you write and raise them as one ruling, a `DECISION:` before `BLOCKED:`; unanswered, a cut is not agreed. Only a change the team would need to hear about before it happens goes to the human, as one clear question with your recommendation.\"",
+      "    \"When this task fixes something, its cause is part of the work, wherever it lives. Engineering choices, fixing at the cause and refactoring included, are yours; state each with its reason. Cutting the `## As asked` block is not yours: any sentence or clause not delivered in full, by scope, assumption, design, size limit or another ticket, is a cut. Quote each where you write, and raise them as one `question` record: its `asks` quotes each cut, its `options` are the routes (the block in full, or the cut with its reason), and its `if-unanswered` says a cut is not agreed. Then end `BLOCKED:`. Only a change the team would need to hear about before it happens goes to the human, as one `question` record with your recommendation.\"",
       "  ],",
       "  \"breakdown\": [",
-      "    \"When this task fixes something, its cause is part of the work, wherever it lives. Engineering choices, fixing at the cause and refactoring included, are yours; state each with its reason. Cutting the `## As asked` block is not yours: any sentence or clause not delivered in full, by scope, assumption, design, size limit or another ticket, is a cut. Quote each where you write and raise them as one ruling, a `DECISION:` before `BLOCKED:`; unanswered, a cut is not agreed. Only a change the team would need to hear about before it happens goes to the human, as one clear question with your recommendation.\",",
+      "    \"When this task fixes something, its cause is part of the work, wherever it lives. Engineering choices, fixing at the cause and refactoring included, are yours; state each with its reason. Cutting the `## As asked` block is not yours: any sentence or clause not delivered in full, by scope, assumption, design, size limit or another ticket, is a cut. Quote each where you write, and raise them as one `question` record: its `asks` quotes each cut, its `options` are the routes (the block in full, or the cut with its reason), and its `if-unanswered` says a cut is not agreed. Then end `BLOCKED:`. Only a change the team would need to hear about before it happens goes to the human, as one `question` record with your recommendation.\",",
       "    \"A subtask may change course at the cause where the code shows the plan is wrong, saying so.\"",
       "  ],",
       "  \"bug\": [",
-      "    \"When this task fixes something, its cause is part of the work, wherever it lives. Judge the work, or propose the fix, against that cause rather than the ticket's wording. Only a change the team would need to hear about before it happens goes to the human, as one clear question with your recommendation.\",",
+      "    \"When this task fixes something, its cause is part of the work, wherever it lives. Judge the work, or propose the fix, against that cause rather than the ticket's wording. Only a change the team would need to hear about before it happens goes to the human, as one `question` record with your recommendation.\",",
       "    \"Propose the fix for every instance of its class; the next stage builds it.\"",
       "  ],",
       "  \"close-out\": [",
-      "    \"Engineering calls in finishing the work are yours; state each with its reason. Only a change the team would need to hear about before it happens goes to the human, as one clear question with your recommendation.\"",
+      "    \"Engineering calls in finishing the work are yours; state each with its reason. Only a change the team would need to hear about before it happens goes to the human, as one `question` record with your recommendation.\"",
       "  ],",
       "  \"context\": [",
       "    \"This is a reading pass. If the ticket is aimed at a symptom of something deeper, say so.\"",
       "  ],",
       "  \"design\": [",
-      "    \"When this task fixes something, its cause is part of the work, wherever it lives. Engineering choices, fixing at the cause and refactoring included, are yours; state each with its reason. Cutting the `## As asked` block is not yours: any sentence or clause not delivered in full, by scope, assumption, design, size limit or another ticket, is a cut. Quote each where you write and raise them as one ruling, a `DECISION:` before `BLOCKED:`; unanswered, a cut is not agreed. Only a change the team would need to hear about before it happens goes to the human, as one clear question with your recommendation.\"",
+      "    \"When this task fixes something, its cause is part of the work, wherever it lives. Engineering choices, fixing at the cause and refactoring included, are yours; state each with its reason. Cutting the `## As asked` block is not yours: any sentence or clause not delivered in full, by scope, assumption, design, size limit or another ticket, is a cut. Quote each where you write, and raise them as one `question` record: its `asks` quotes each cut, its `options` are the routes (the block in full, or the cut with its reason), and its `if-unanswered` says a cut is not agreed. Then end `BLOCKED:`. Only a change the team would need to hear about before it happens goes to the human, as one `question` record with your recommendation.\"",
       "  ],",
       "  \"implementation\": [",
-      "    \"When this task fixes something, its cause is part of the work, wherever it lives. Engineering choices, fixing at the cause and refactoring included, are yours; state each with its reason. Cutting the `## As asked` block is not yours: any sentence or clause not delivered in full, by scope, assumption, design, size limit or another ticket, is a cut. Quote each where you write and raise them as one ruling, a `DECISION:` before `BLOCKED:`; unanswered, a cut is not agreed. Only a change the team would need to hear about before it happens goes to the human, as one clear question with your recommendation.\"",
+      "    \"When this task fixes something, its cause is part of the work, wherever it lives. Engineering choices, fixing at the cause and refactoring included, are yours; state each with its reason. Cutting the `## As asked` block is not yours: any sentence or clause not delivered in full, by scope, assumption, design, size limit or another ticket, is a cut. Quote each where you write, and raise them as one `question` record: its `asks` quotes each cut, its `options` are the routes (the block in full, or the cut with its reason), and its `if-unanswered` says a cut is not agreed. Then end `BLOCKED:`. Only a change the team would need to hear about before it happens goes to the human, as one `question` record with your recommendation.\"",
       "  ],",
       "  \"look-into\": [",
       "    \"This is a reading pass. If the ticket is aimed at a symptom of something deeper, say so.\"",
       "  ],",
       "  \"plan\": [",
-      "    \"When this task fixes something, its cause is part of the work, wherever it lives. Engineering choices, fixing at the cause and refactoring included, are yours; state each with its reason. Cutting the `## As asked` block is not yours: any sentence or clause not delivered in full, by scope, assumption, design, size limit or another ticket, is a cut. Quote each where you write and raise them as one ruling, a `DECISION:` before `BLOCKED:`; unanswered, a cut is not agreed. Only a change the team would need to hear about before it happens goes to the human, as one clear question with your recommendation.\",",
+      "    \"When this task fixes something, its cause is part of the work, wherever it lives. Engineering choices, fixing at the cause and refactoring included, are yours; state each with its reason. Cutting the `## As asked` block is not yours: any sentence or clause not delivered in full, by scope, assumption, design, size limit or another ticket, is a cut. Quote each where you write, and raise them as one `question` record: its `asks` quotes each cut, its `options` are the routes (the block in full, or the cut with its reason), and its `if-unanswered` says a cut is not agreed. Then end `BLOCKED:`. Only a change the team would need to hear about before it happens goes to the human, as one `question` record with your recommendation.\",",
       "    \"Default to closing the gap at the cause: a ticket number records a trade-off, it does not pay for routing around it.\"",
       "  ],",
       "  \"plan-review\": [",
-      "    \"When this task fixes something, its cause is part of the work, wherever it lives. Judge the work, or propose the fix, against that cause rather than the ticket's wording. Only a change the team would need to hear about before it happens goes to the human, as one clear question with your recommendation.\",",
+      "    \"When this task fixes something, its cause is part of the work, wherever it lives. Judge the work, or propose the fix, against that cause rather than the ticket's wording. Only a change the team would need to hear about before it happens goes to the human, as one `question` record with your recommendation.\",",
       "    \"Judge, do not redesign: another reasonable approach is not a finding; a plan aimed at a symptom of a cause this task could fix is.\"",
       "  ],",
       "  \"research\": [",
-      "    \"When this task fixes something, its cause is part of the work, wherever it lives. Engineering choices, fixing at the cause and refactoring included, are yours; state each with its reason. Cutting the `## As asked` block is not yours: any sentence or clause not delivered in full, by scope, assumption, design, size limit or another ticket, is a cut. Quote each where you write and raise them as one ruling, a `DECISION:` before `BLOCKED:`; unanswered, a cut is not agreed. Only a change the team would need to hear about before it happens goes to the human, as one clear question with your recommendation.\",",
+      "    \"When this task fixes something, its cause is part of the work, wherever it lives. Engineering choices, fixing at the cause and refactoring included, are yours; state each with its reason. Cutting the `## As asked` block is not yours: any sentence or clause not delivered in full, by scope, assumption, design, size limit or another ticket, is a cut. Quote each where you write, and raise them as one `question` record: its `asks` quotes each cut, its `options` are the routes (the block in full, or the cut with its reason), and its `if-unanswered` says a cut is not agreed. Then end `BLOCKED:`. Only a change the team would need to hear about before it happens goes to the human, as one `question` record with your recommendation.\",",
       "    \"A refactor that removes the cause of what this task fixes, or that this task calls, counts as necessary.\"",
       "  ],",
       "  \"retro\": [",
       "    \"This is a reading pass. If the ticket is aimed at a symptom of something deeper, say so.\"",
       "  ],",
       "  \"retrospective-audit\": [",
-      "    \"When this task fixes something, its cause is part of the work, wherever it lives. Judge the work, or propose the fix, against that cause rather than the ticket's wording. Only a change the team would need to hear about before it happens goes to the human, as one clear question with your recommendation.\"",
+      "    \"When this task fixes something, its cause is part of the work, wherever it lives. Judge the work, or propose the fix, against that cause rather than the ticket's wording. Only a change the team would need to hear about before it happens goes to the human, as one `question` record with your recommendation.\"",
       "  ],",
       "  \"review\": [",
-      "    \"When this task fixes something, its cause is part of the work, wherever it lives. Judge the work, or propose the fix, against that cause rather than the ticket's wording. Only a change the team would need to hear about before it happens goes to the human, as one clear question with your recommendation.\",",
+      "    \"When this task fixes something, its cause is part of the work, wherever it lives. Judge the work, or propose the fix, against that cause rather than the ticket's wording. Only a change the team would need to hear about before it happens goes to the human, as one `question` record with your recommendation.\",",
       "    \"Green CI never settles a finding: CI is why it was recorded.\"",
       "  ],",
       "  \"scoping\": [",
-      "    \"When this task fixes something, its cause is part of the work, wherever it lives. Engineering choices, fixing at the cause and refactoring included, are yours; state each with its reason. Cutting the `## As asked` block is not yours: any sentence or clause not delivered in full, by scope, assumption, design, size limit or another ticket, is a cut. Quote each where you write and raise them as one ruling, a `DECISION:` before `BLOCKED:`; unanswered, a cut is not agreed. Only a change the team would need to hear about before it happens goes to the human, as one clear question with your recommendation.\"",
+      "    \"When this task fixes something, its cause is part of the work, wherever it lives. Engineering choices, fixing at the cause and refactoring included, are yours; state each with its reason. Cutting the `## As asked` block is not yours: any sentence or clause not delivered in full, by scope, assumption, design, size limit or another ticket, is a cut. Quote each where you write, and raise them as one `question` record: its `asks` quotes each cut, its `options` are the routes (the block in full, or the cut with its reason), and its `if-unanswered` says a cut is not agreed. Then end `BLOCKED:`. Only a change the team would need to hear about before it happens goes to the human, as one `question` record with your recommendation.\"",
       "  ],",
       "  \"spike\": [",
-      "    \"When this task fixes something, its cause is part of the work, wherever it lives. Engineering choices, fixing at the cause and refactoring included, are yours; state each with its reason. Cutting the `## As asked` block is not yours: any sentence or clause not delivered in full, by scope, assumption, design, size limit or another ticket, is a cut. Quote each where you write and raise them as one ruling, a `DECISION:` before `BLOCKED:`; unanswered, a cut is not agreed. Only a change the team would need to hear about before it happens goes to the human, as one clear question with your recommendation.\"",
+      "    \"When this task fixes something, its cause is part of the work, wherever it lives. Engineering choices, fixing at the cause and refactoring included, are yours; state each with its reason. Cutting the `## As asked` block is not yours: any sentence or clause not delivered in full, by scope, assumption, design, size limit or another ticket, is a cut. Quote each where you write, and raise them as one `question` record: its `asks` quotes each cut, its `options` are the routes (the block in full, or the cut with its reason), and its `if-unanswered` says a cut is not agreed. Then end `BLOCKED:`. Only a change the team would need to hear about before it happens goes to the human, as one `question` record with your recommendation.\"",
       "  ],",
       "  \"survey-place\": [",
       "    \"This is a reading pass. If the ticket is aimed at a symptom of something deeper, say so.\"",
@@ -642,7 +642,7 @@
       "{",
       "  \"blind-read\": {",
       "    \"category\": \"universal\",",
-      "    \"description\": \"Sent by code after an approving review, never by the selector. A blind read of the current landing's pull request(s) before merge: whether the change left its area better, the same or worse, and its finds sorted three ways. Reads only the diff, the code at its merge-base and head, and the area registry; posts one comment on the ticket and records its verdict, and changes nothing else.\",",
+      "    \"description\": \"Sent by code after an approving review, never by the selector. A blind read of the current landing's pull request(s) before merge: whether the change left its area better, the same or worse, and its finds sorted three ways. Reads only the diff, the code at its merge-base and head, and the area registry; records its verdict and its find records, and changes nothing else: it posts no comment on the ticket.\",",
       "    \"name\": \"blind-read\",",
       "    \"route\": null,",
       "    \"writes\": \"blind-comment\"",
@@ -680,7 +680,7 @@
       "  },",
       "  \"close-out\": {",
       "    \"category\": \"universal\",",
-      "    \"description\": \"Finish approved work: make the fixes review asked for, merge, do the post-deploy steps once the deploy lands, set Done, post the summary, and file the gate's tickets. Use when review has Approved and the PR is green (or, with no CI, the established-absence substitute was recorded).\",",
+      "    \"description\": \"Finish approved work: make the fixes review asked for, merge, do the post-deploy steps once the deploy lands, set Done, write the summary as the final message, and file the gate's tickets. Use when review has Approved and the PR is green (or, with no CI, the established-absence substitute was recorded).\",",
       "    \"name\": \"close-out\",",
       "    \"route\": {",
       "      \"requires\": \"An Approve from a code review; a plan-review Approve is not one.\",",
@@ -862,7 +862,7 @@
     ]
   },
   "stageLabels": "71b1066de2fe5206ed5acf5f18d47b5a62543f8c22697e24a7e982a3264e192a",
-  "contracts": "07b9aba2a8077256f6bd5ec8216351f2767b27c2e64fa74cccf379c14853d472",
+  "contracts": "0e8440ce8dc59022b08b5480f03ecb17b76b21946cc1e7615ef360ee84f34def",
   "stepWords": "0a06759d642d8c2268893789c6c196461af7b338e3b58dccf0ce7ab5353cbec5",
   "overrideLine": "d80270edc6735082ebb8f3364aaddf43194ba0189765beece5e546f2318570a9"
 }

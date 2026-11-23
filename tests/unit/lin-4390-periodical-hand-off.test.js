@@ -88,7 +88,7 @@ test('close-out merges, then sets the task Done and posts the final summary', ()
   const { prompt } = generatePrompt('close-out', ISSUE, {});
   assert.match(prompt, /Merge pinned to the commit CI passed on/);
   assert.match(prompt, /Then set the task to Done\./);
-  assert.match(prompt, /Post the summary comment: what merged/);
+  assert.match(prompt, /Write the summary as your final message: what merged/);
 });
 
 test('review approves but does not merge or mark Done', () => {

@@ -124,7 +124,7 @@ describe('a610ceb9: the fix round is one workflow, from records; the revision se
   test('the fix-round workflow says continue the same PR, answer the open findings, and points at the task, not a comment', () => {
     const wf = buildImplementationWorkflow(issue, true);
     assert.match(wf, /Continue the existing branch and the PR the task's change record names/);
-    assert.match(wf, /Push the fixes to the existing PR and answer each finding in your summary comment — do not open a new PR/);
+    assert.match(wf, /Push the fixes to the existing PR and answer each finding in your final message — do not open a new PR/);
     assert.match(wf, /including the open findings to implementation on this task/);
     assert.doesNotMatch(wf, /review comment with its findings/);
     assert.doesNotMatch(wf, /\*\*Open a PR\*\*/);

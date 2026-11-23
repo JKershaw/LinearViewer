@@ -508,7 +508,7 @@ describe('bug template', () => {
       // LIN-3299: code adds Scope and Authority after the lead, on every path.
       'Something behaves wrong. Find its cause for certain, with evidence, before anything is fixed; nothing ships without review.' + formatStageIntent('bug') + '\n',
       '## Process',
-      'Start by reading any prior investigation notes in comments. Confirm the reproduction steps and root-cause hypotheses still match what you can observe now. If the behavior has changed since investigation, note it and re-verify before proposing a fix.',
+      'Start by reading the prior investigation in the brief and on the task\'s records. Confirm the reproduction steps and root-cause hypotheses still match what you can observe now. If the behavior has changed since investigation, note it and re-verify before proposing a fix.',
       'Investigation process:',
       '1. Reproduce the issue (document exact steps)',
       '2. Validate the acceptance witness: confirm the signal you will call "fixed" (the failing test, log line, assertion, or observable behavior) actually tracks the real outcome. A witness that can read green while the outcome is still wrong (or red while it is already right) must be validated or replaced before you optimize against it. A witness that genuinely tracks the outcome is a valid answer — state it explicitly.',
@@ -1088,7 +1088,7 @@ describe('class-not-member enumeration rule — research template (LIN-1871)', (
 
   test('lists the class list among the research description output, where research records it', () => {
     const result = generatePrompt('research', researchIssue, ctx);
-    assert.ok(/\*\*Description\*\*: Key findings, the class list/i.test(result.prompt),
+    assert.ok(/\*\*Report\*\* \(your final message[^)]*\): Full research notes[^\n]*the class list/i.test(result.prompt),
       'the Output section must name the class list as a deliverable, not just imply it');
   });
 });
@@ -1443,7 +1443,7 @@ describe('triage template', () => {
     const result = generatePrompt('triage', mockIssue, mockContext);
     assert.ok(/preserves? scope/i.test(result.prompt),
       'handwritten triage should state that it preserves scope');
-    assert.ok(/Findings stay observations in a comment, never new work items/.test(result.prompt),
+    assert.ok(/Findings stay observations in the final message, never new work items/.test(result.prompt),
       'handwritten triage should keep findings as observations, never new work items');
     assert.doesNotMatch(result.prompt, /rewrite the task's description/i,
       'the description rewrite is guard-backed (LIN-4468), not restated in the template');
@@ -1586,7 +1586,7 @@ describe('context template', () => {
   test('includes read-only workflow instructions', () => {
     const result = generatePrompt('context', mockIssue, mockContext);
     assert.ok(result.prompt.includes('Fetch details'), 'should include fetch step');
-    assert.ok(result.prompt.includes('Add findings as a comment'), 'should include comment step');
+    assert.ok(result.prompt.includes('Your final message holds the findings'), 'should include the report step');
   });
 });
 
@@ -1632,7 +1632,7 @@ describe('review template', () => {
   test('includes read-only workflow instructions', () => {
     const result = generatePrompt('review', mockIssue, mockContext);
     assert.ok(result.prompt.includes('Fetch details'), 'should include fetch step');
-    assert.ok(result.prompt.includes('Add findings as a comment'), 'should include comment step');
+    assert.ok(result.prompt.includes('Your final message holds the findings'), 'should include the report step');
   });
 
   test('includes Test Quality Check sub-section', () => {
@@ -1929,8 +1929,8 @@ describe('Surface Assessment (handwritten path)', () => {
   test('research routes the Surface Assessment into the comment so plan can read it', () => {
     const result = generatePrompt('research', mockIssue, mockContext);
     assert.ok(
-      /\*\*Comment\*\*:[^\n]*Surface Assessment/.test(result.prompt),
-      'Surface Assessment must be part of the comment output, not only the description'
+      /\*\*Report\*\*[^\n]*Surface Assessment/.test(result.prompt),
+      'Surface Assessment must be part of the report, the final message on the run record'
     );
   });
 
@@ -2298,7 +2298,7 @@ describe('retrospective-audit template', () => {
 
   test('reports findings as a comment (read-only workflow), not a Linear write beyond the comment', () => {
     const result = generatePrompt('retrospective-audit', mockIssue, mockContext);
-    assert.ok(/Add findings as a comment/i.test(result.prompt), 'workflow ends in a findings comment');
+    assert.ok(/Your final message holds the findings/i.test(result.prompt), 'workflow ends in a findings report');
   });
 });
 
@@ -2692,7 +2692,7 @@ describe('close-out template + review→close-out ledger handoff (LIN-550)', () 
   test('(h1) sanity: the close-out body states merge→done→summary→follow-up in order', () => {
     const { prompt } = generatePrompt('close-out', issue, context);
     const land = prompt.slice(prompt.indexOf('### Land It and Close the Loop'), prompt.indexOf('### Outside Finds'));
-    const steps = [/Merge pinned/, /set the task to Done/, /Post the summary comment/, /Outside finds are not filed as tickets/];
+    const steps = [/Merge pinned/, /set the task to Done/, /Write the summary as your final message/, /Outside finds are not filed as tickets/];
     const positions = steps.map(re => land.search(re));
     assert.ok(positions.every(p => p > -1), 'every step is present in the Land It section');
     for (let i = 1; i < positions.length; i++) {

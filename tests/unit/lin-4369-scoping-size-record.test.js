@@ -120,10 +120,10 @@ describe('scoping writes the size record (LIN-4369)', () => {
     assert.ok(!p.includes('what done means. Read the code first'), 'the old lead is gone');
   });
 
-  test('it reads both Surveys\' report comments, the filing comments, and a subtask\'s parent record (LIN-4520: no Survey comment heading)', () => {
+  test('it reads both Surveys\' reports on their run records, the filed findings, and a subtask\'s parent record (LIN-4520, LIN-4533: no Survey comment)', () => {
     const p = processOf(render());
-    assert.match(p, /the two Surveys' report comments \(`survey-task`, `survey-place`\)/);
-    assert.match(p, /the comments filed with the ticket/);
+    assert.match(p, /the two Surveys' reports \(their run records: `survey-task`, `survey-place`\)/);
+    assert.match(p, /the findings filed with the ticket/);
     assert.match(p, /for a subtask its parent's size record/);
     assert.match(p, new RegExp(`A person's size comment on the trail is their ruling: record it as decided by ${DECIDED_BY.ruling}\\.`));
   });
@@ -175,7 +175,7 @@ describe('scoping\'s completion signals (LIN-4369)', () => {
     assert.match(coreOutcome, /size of the move/i);
     assert.ok(signals.some(s => s.includes(SIZE_OF_MOVE_HEADING) && s.includes(`only the record's ${RECORD_LINES.length} lines`)), 'one section, holding only its lines');
     assert.ok(signals.some(s => s.includes(SIZES[0]) && s.includes(WRONG_WORK)), 'sizes weighed from just the task to wrong work');
-    assert.ok(signals.some(s => /standing policy/.test(s) && /`DECISION:`, only for a size the policy may not decide/.test(s)), 'policy, and pending with a DECISION: only where the policy may not decide (a cut)');
+    assert.ok(signals.some(s => /standing policy/.test(s) && /`question` record, only for a size the policy may not decide/.test(s)), 'policy, and pending with a question record only where the policy may not decide (a cut)');
     assert.ok(signals.some(s => /The two Surveys' reports/.test(s)), 'Surveys read');
     for (const old of [/In scope items/, /Out of scope items/, /Assumptions stated/, /Success criteria defined/]) {
       assert.ok(!signals.some(s => old.test(s)), `no ${old}`);
