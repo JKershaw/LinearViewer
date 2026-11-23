@@ -165,6 +165,14 @@ describe('HarbourCommentsStore.wereRecordedByHarbour — batch/set-membership re
     assert.deepStrictEqual(await store.wereRecordedByHarbour('acme', undefined), new Set());
   });
 
+  test('a strict read (the comment ingest, LIN-4535) throws on a fault where the default read answers an empty Set', async () => {
+    const failing = new HarbourCommentsStore({ collection: { find() { throw new Error('read fault'); } } });
+    assert.deepStrictEqual(await failing.wereRecordedByHarbour('acme', ['recorded-1']), new Set(), 'the default read stays lenient');
+    await assert.rejects(() => failing.wereRecordedByHarbour('acme', ['recorded-1'], { strict: true }), /read fault/);
+    await assert.rejects(() => new HarbourCommentsStore({}).wereRecordedByHarbour('acme', ['recorded-1'], { strict: true }), /no collection/);
+    assert.deepStrictEqual(await store.wereRecordedByHarbour('acme', ['recorded-1'], { strict: true }), new Set(['recorded-1']), 'a healthy strict read answers as usual');
+  });
+
   test('an unconfigured store degrades to an empty Set, never throws', async () => {
     const unconfigured = new HarbourCommentsStore({});
     assert.deepStrictEqual(await unconfigured.wereRecordedByHarbour('acme', ['recorded-1']), new Set());

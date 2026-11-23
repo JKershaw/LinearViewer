@@ -253,7 +253,7 @@ describe('C. the page reply route files a non-owner member\'s reply under that m
     const { port } = server.address();
     try {
       const res = await fetch(`http://127.0.0.1:${port}/workspace/acme/api/comments/LIN-901`, {
-        method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ body: 'Take the narrow path.' }),
+        method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ body: text }),
       });
       return { status: res.status };
     } finally {
@@ -270,6 +270,14 @@ describe('C. the page reply route files a non-owner member\'s reply under that m
     assert.equal(findings[0].via, 'comment');
     assert.equal(findings[0].at, T('10:30'), 'dated by the reply\'s own time');
     assert.deepEqual(ledger.calls.map((c) => c.commentId), ['reply-1'], 'and ledgered as Harbour\'s, so the ingest never takes it again');
+  });
+
+  test('the reply\'s finding reads back as a ruling (the finding carries the page reply\'s ruling mark, as the posted comment does)', async () => {
+    await postReply(appFor('member-2'), 'Take the wide path.');
+    const [filed] = findings;
+    const read = personFindingsOf([{ id: filed.fixedId, by: filed.by, via: filed.via, at: filed.at, fields: { says: filed.says } }]);
+    assert.equal(read.length, 1);
+    assert.equal(read[0].ruling, true, 'remove the mark from the filed body and this is false: the selector\'s ruling fact could never be true');
   });
 });
 
@@ -426,6 +434,43 @@ describe('G. a person\'s finding is dated by the comment\'s own time', () => {
       await ingestPersonComments({ urlKey: URL_KEY, ticket: 'LIN-1', comments: [{ id: 'c-mo', body: 'Take it.', createdAt: T('10:00'), authorId: 'u-mo' }] });
       assert.equal(seen.length, 1);
       assert.equal(seen[0].at, T('10:00'), 'the comment\'s time, so a run dispatched after it is correctly later (remove the at and this is undefined)');
+    } finally {
+      configureCommentIngest(null);
+    }
+  });
+});
+
+// ---- I. a ledger that cannot be read ingests nothing (blind-read finding-d58e9e8f) --------------------------------------
+
+describe('I. a ledger read that fails skips the batch, never crediting Harbour\'s own post to the owner', () => {
+  test('the ledger read throws: nothing is written, and a later read with a working ledger takes the comment', async () => {
+    const written = [];
+    let ledgerUp = false;
+    configureCommentIngest({
+      writes: { async add(args) { written.push(args); return { record: {} }; }, async end() { return {}; } },
+      listPeople: async () => PEOPLE,
+      cutoffOf: async () => null,
+      ledger: {
+        async wereRecordedByHarbour(_urlKey, comments, options) {
+          if (!ledgerUp) {
+            // The real store throws a fault only for a strict read; the ingest must ask for one.
+            if (options?.strict) throw new Error('ledger read fault');
+            return new Set();
+          }
+          return new Set();
+        }
+      },
+      taskForTicket: async () => 'task-1',
+      taskOfTicket: async () => 'task-1'
+    });
+    const comments = [{ id: 'c-own', body: 'A Harbour post under the owner\'s key.', createdAt: T('10:00'), authorId: 'u-mo' }];
+    try {
+      const first = await ingestPersonComments({ urlKey: URL_KEY, ticket: 'LIN-1', comments });
+      assert.deepEqual(first, { ingested: 0, failed: 0 });
+      assert.equal(written.length, 0, 'a ledger that cannot be read writes no finding (remove the strict read and the comment is written as the owner\'s)');
+      ledgerUp = true;
+      const second = await ingestPersonComments({ urlKey: URL_KEY, ticket: 'LIN-1', comments });
+      assert.equal(second.ingested, 1, 'the next read, with the ledger up, takes it');
     } finally {
       configureCommentIngest(null);
     }

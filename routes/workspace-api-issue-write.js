@@ -435,7 +435,7 @@ export function registerIssueWriteRoutes(router, { workspaceFromUrl, dispatchQue
         try {
           const ticket = looksLikeTicket(issueId) ? issueId : (await writer.issueDetail(callScope, issueId))?.identifier;
           const filed = ticket
-            ? await recordPersonReplyFinding({ ctx: { provider: writer, token: callScope }, urlKey: workspace.urlKey, ticket, accountId: req.session.accountId, commentId, body, createdAt: answer.comment?.createdAt })
+            ? await recordPersonReplyFinding({ ctx: { provider: writer, token: callScope }, urlKey: workspace.urlKey, ticket, accountId: req.session.accountId, commentId, body: attributedBody, createdAt: answer.comment?.createdAt })
             : { ok: false, reason: `${issueId} could not be read to name its ticket` };
           if (!filed.ok) console.error(`[comment-ingest] the reply ${commentId} on ${issueId} (${workspace.urlKey}) has no finding: ${filed.reason}`);
         } catch (err) {
