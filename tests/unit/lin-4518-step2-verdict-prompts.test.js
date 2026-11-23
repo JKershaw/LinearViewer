@@ -77,7 +77,7 @@ describe('the blind read is handed the change records it judges, and writes its 
     assert.match(p, /"heads"` naming the \{HEAD\} you read for each, as `\{"<change id>": "<sha>"\}`/);
     assert.match(p, /`change-abc123` is the change record for https:\/\/github\.com\/acme\/widget\/pull\/7\./);
     // finding-53f10ec3 (4): a space after the comma that ends the clause.
-    assert.match(p, /`"in": "LIN-1"`, `"reasoning"` the reason in one line/);
+    assert.match(p, /`"in": "LIN-1"`, `"reasoning"` the Read line, then the reason in one line/);
   });
 
   // LIN-4518 step 3: the prompt reads the landing from its change records (finding 75b33054). With none handed in
@@ -89,8 +89,10 @@ describe('the blind read is handed the change records it judges, and writes its 
     assert.doesNotMatch(p, /change record is for/);
   });
 
-  test('the comment is still written (the tracker and the old readers keep it until P7)', () => {
-    assert.match(prompt([{ id: 'change-abc123', ref: 'https://github.com/acme/widget/pull/7', head: 'H1' }]), /## Blind read/);
+  test('no comment is written: the verdict record carries the Read line (LIN-4533)', () => {
+    const p = prompt([{ id: 'change-abc123', ref: 'https://github.com/acme/widget/pull/7', head: 'H1' }]);
+    assert.match(p, /You post no comment on LIN-1/);
+    assert.doesNotMatch(p, /## Blind read/);
   });
 });
 

@@ -115,7 +115,7 @@ describe('the selector prompt (LIN-3300)', () => {
     const p = prompt(leaf(), ctx({ comments }));
     assert.doesNotMatch(p, /Comment number 1\./);
     assert.match(p, /Comment number 5\./);
-    assert.match(p, /TRAIL FACTS \(computed in code from all 5 comments/);
+    assert.match(p, /TRAIL FACTS \(computed in code from the ticket's records/);
     assert.match(p, /- Plan records: not measured/, 'LIN-4504: with no records read, the plan facts say so');
   });
 

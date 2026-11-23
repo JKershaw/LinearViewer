@@ -63,7 +63,7 @@ describe('scoping reads the area notes by pointer (LIN-4346)', () => {
     const prompt = render('scoping');
     assert.ok(!prompt.includes("the area's notes"), 'the bare clause is gone');
     assert.ok(!prompt.includes('latest Periodical readings'), 'readings come through the notes');
-    assert.match(prompt, /the comments filed with the ticket, the area notes below, and for a subtask its parent's size record\./);
+    assert.match(prompt, /the findings filed with the ticket, the area notes below, and for a subtask its parent's size record\./);
   });
 
   test('the pointers share their opening, so the seven stages\' pointer is unchanged', () => {

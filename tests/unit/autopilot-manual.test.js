@@ -31,10 +31,10 @@ describe('extractPrincipleZeroSection', () => {
   test('carries the Principle 0 gate, the self-sufficient ruling format, and the sibling-merge rule, in order', () => {
     const section = extractPrincipleZeroSection();
     const gateAt = section.indexOf('Gate on Principle 0 first');
-    const rulingAt = section.indexOf('make the ruling self-sufficient');
+    const rulingAt = section.indexOf('make the question self-sufficient');
     const mergeAt = section.indexOf('Merge sibling blockers before you bubble up');
     assert.ok(gateAt > -1, 'the Principle 0 gate anchor is present');
-    assert.ok(rulingAt > gateAt, 'the self-sufficient ruling anchor follows the gate');
+    assert.ok(rulingAt > gateAt, 'the self-sufficient question anchor follows the gate');
     assert.ok(mergeAt > rulingAt, 'the sibling-merge anchor follows the ruling format');
   });
 
@@ -56,7 +56,7 @@ describe('extractPrincipleZeroSection', () => {
     const section = extractPrincipleZeroSection();
     const eligibilityAt = section.indexOf('offer **file** only for');
     const existingTicketAt = section.indexOf('Before offering file, check the ticket');
-    const noReRaiseAt = section.indexOf('Before raising any `DECISION:`, check it isn');
+    const noReRaiseAt = section.indexOf('Before asking a question, check it isn');
     const mergeAt = section.indexOf('Merge sibling blockers before you bubble up');
     assert.ok(eligibilityAt > -1, 'sanity: the LIN-3006 eligibility sentence is present');
     assert.ok(existingTicketAt > -1, 'the existing-ticket-check clause is present');
@@ -64,8 +64,8 @@ describe('extractPrincipleZeroSection', () => {
     assert.ok(eligibilityAt < existingTicketAt && existingTicketAt < noReRaiseAt && noReRaiseAt < mergeAt,
       'both new clauses sit after the eligibility sentence and before sibling-merge, in order');
     // LIN-3903: the check covers any DECISION:, and one ruling asks for every fact.
-    assert.ok(section.includes("Don't re-raise a question an open, answered, dismissed, or withdrawn row"), 'the check covers a question, not only a finding');
-    assert.ok(section.includes('Ask for every fact the question needs in the one ruling.'), 'one ruling asks for every fact');
+    assert.ok(section.includes("Don't re-ask a question an open or answered record already covers"), 'the check covers the open questions, not only a finding');
+    assert.ok(section.includes('Ask for every fact the question needs in the one question record.'), 'one question record asks for every fact');
   });
 
   test('the close-out hold is the 12 Oct standing ruling, not the asked/unasked split (LIN-3903)', () => {

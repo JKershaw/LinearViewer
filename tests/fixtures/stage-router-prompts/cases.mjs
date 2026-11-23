@@ -47,7 +47,8 @@ const COMPLETE_NODE = {
   context: {
     parent: null, siblings: [], project: null, focusedChild: null,
     // The approving review and the landed PR are records (the trail); the comments above stay for the authorship text rule.
-    trail: { ...NO_TRAIL, review: { verdict: 'approve', at: at(2), sha: null, heads: undefined, commentId: 'review-abc20aa', blindRead: null, staleUrls: [] } },
+    // LIN-4533: the landed PR is on the change record, so the selector's PR line reads the landing, not the comment above.
+    trail: { ...NO_TRAIL, landing: ['https://github.com/o/r/pull/7'], review: { verdict: 'approve', at: at(2), sha: null, heads: undefined, commentId: 'review-abc20aa', blindRead: null, staleUrls: [] } },
     planReviewRun: NO_PLAN_RUN,
     planFacts: planFactsOf({
       task: task('task-abc20'),

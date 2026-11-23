@@ -268,12 +268,12 @@ relationship between the tasks, not as a label.
 - `context` - context: Synthesize current state when joining mid-task
 - `plan-review` - plan-review: Verify a plan's grounding claims with fresh context before implementation starts
 - `review` - review: Verify implementation before merge
-- `close-out` - close-out: Settle the findings to close-out, then merge, set Done, post the summary (outside finds go to the project backlog)
+- `close-out` - close-out: Settle the findings to close-out, then merge, set Done, write the summary as its final message (outside finds go to the project backlog)
 - `retrospective-audit` - retrospective audit: Audit a merged change's claims and test integrity after the fact; record each finding to the project backlog
 - `retro` - retro: Retrospective look-back (or in-flight reorient) — reconstruct what happened, assess downstream effects/risks, surface lessons; presents findings without writing back
-- `survey-task` - survey-task: Sent by the look-first route (first on a fresh, unsized ticket) or by hand, never by the selector. Read-only forecast before work starts: why this task will be difficult and what would be done first; posts one comment on the surveyed ticket and changes nothing else
-- `survey-place` - survey-place: Sent by the look-first route (after survey-task) or by hand, never by the selector. Read-only forecast of the codebase as a place: where the task lands, what the obvious way would add, move or tangle, and what would leave the place better; posts one comment on the surveyed ticket and changes nothing else
-- `blind-read` - blind-read: Code sends it after an approving review, never the selector. Reads the ticket's current landing PR(s) cold, before merge (only the diff, the code at its merge-base and head, and the area registry): whether the change left its area better, the same or worse, with its finds sorted three ways; posts one `## Blind read` comment, whose PRs the proxy checks, and records its verdict
+- `survey-task` - survey-task: Sent by the look-first route (first on a fresh, unsized ticket) or by hand, never by the selector. Read-only forecast before work starts: why this task will be difficult and what would be done first; writes no comment on the ticket and changes nothing else; its report is its final message
+- `survey-place` - survey-place: Sent by the look-first route (after survey-task) or by hand, never by the selector. Read-only forecast of the codebase as a place: where the task lands, what the obvious way would add, move or tangle, and what would leave the place better; writes no comment on the ticket and changes nothing else; its report is its final message
+- `blind-read` - blind-read: Code sends it after an approving review, never the selector. Reads the ticket's current landing PR(s) cold, before merge (only the diff, the code at its merge-base and head, and the area registry): whether the change left its area better, the same or worse, with its finds sorted three ways; records its verdict, whose reason names the landing's PRs, and no comment on the ticket
 
 ### Public Templates Page
 

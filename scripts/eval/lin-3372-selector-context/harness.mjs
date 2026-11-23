@@ -125,7 +125,7 @@ export function selectorArgs(issue, context, k = {}) {
   const comments = context.comments || [];
   const runs = k.noRuns ? '' : formatRecentRuns(context.runs);
   const leaf = k.leafFacts ? true : children.length === 0;
-  const trail = facts.formatTrailFactsBlock(facts.assembleTrailFacts(comments, issue.description, { leaf }), comments.length, { runs: !!runs });
+  const trail = facts.formatTrailFactsBlock(facts.assembleTrailFacts(comments, issue.description, { leaf }), { runs: !!runs });
   const node = k.noNodeFacts ? '' : facts.formatNodeFactsBlock(facts.assembleNodeFacts(issue, children), children.length);
   const view = formatSelectorView(viewIssue, viewContext);
   return {

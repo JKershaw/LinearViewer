@@ -6,8 +6,8 @@
  *
  * It is built on the LIN-4495 and LIN-4502 censuses: the same file scan (tests/unit/helpers/retirement-census.js, with
  * its roots and reasoned exclusions: dated papers, plans and designs of record, reviews, the walk-8 stores, the runner
- * kit), the same per-word, per-file allowance, and the same planted-mutation proof. It starts with RETIRED empty on
- * purpose: P1 retires nothing yet. An empty list is not a pass for free, so the proof below shows the scan sees a planted
+ * kit), the same per-word, per-file allowance, and the same planted-mutation proof. It started with RETIRED empty (P1
+ * retired nothing); LIN-4535 and LIN-4533 added the first words. A list is not a pass for free, so the proof below shows the scan sees a planted
  * word in a synthetic file and in a real file's text, and that an allowance hides only its word in only its file.
  *
  * Designs and plans of record (docs/plans/, including the integration design this slice revises) are excluded by the
@@ -40,10 +40,20 @@ export const RETIRED = Object.freeze([
   { word: 'reportsLandedWork', re: /\breportsLandedWork\b/ },
   { word: 'opensAsAgentNote', re: /\bopensAsAgentNote\b/ },
   { word: 'holdingComment', re: /\bholdingComment\b/ },
+  // LIN-4533 (P3): the DECISION:/WITHDRAW: block taught to a stage or a person. The spellings a prompt, manual, doc or catalogue
+  // teaches: the backticked name, a line that opens with the marker, or the marker written with its JSON. A question is asked with
+  // a question record (lib/prompts/handoff-words.js), so no Harbour text teaches the block.
+  { word: 'DECISION: block taught', re: /`DECISION:`|^DECISION:|DECISION: \{/m },
+  { word: 'WITHDRAW: block taught', re: /`WITHDRAW:`|^WITHDRAW:|WITHDRAW: \{/m },
 ]);
 
-/** Files that keep a retired word, each with the words it may keep and the reason. Empty until RETIRED has rows. */
-export const ALLOW = Object.freeze({});
+/** Files that keep a retired word, each with the words it may keep and the reason. */
+export const ALLOW = Object.freeze({
+  // LIN-4533 (P3): the dated log of prompt-template changes. Its earlier entries name the block they changed; that is recorded history.
+  'scripts/prompt-template-change-log.md': { words: ['DECISION: block taught'], reason: 'the dated log of prompt-template changes: its earlier entries quote the DECISION: block they changed, which is recorded history (LIN-4533 adds its own entry)' },
+  // LIN-4533 (P3): a recorded liveness fixture of a past cycle (LIN-3238). Its messages are the transcript as it was, not taught text.
+  'tests/fixtures/liveness/lin-3238-cycle.json': { words: ['DECISION: block taught'], reason: 'a recorded liveness fixture of the LIN-3238 cycle: its messages are the transcript as it was, kept as history' },
+});
 
 /**
  * Every retired word in the given files, outside the per-word allowance: `[{file, word, line}]`. Pure over the file text,

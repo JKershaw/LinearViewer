@@ -79,7 +79,7 @@ export function makeReqRes({ session = {}, workspace = null, params = {}, query 
   return { req, res };
 }
 
-export function makeRouter(perWorkspace, { runSummaryCacheStore, sessionSummaryCacheStore, runParagraphStore, issues, observationSessionsStore, prState, freeTierStore } = {}) {
+export function makeRouter(perWorkspace, { runSummaryCacheStore, sessionSummaryCacheStore, runParagraphStore, issues, observationSessionsStore, prState, freeTierStore, recordsStore } = {}) {
   const { dispatchQueueStore, agentStatusStore } = makeStores(perWorkspace);
   return createDashboardRoutes({
     workspaceFromUrl: (req, res, next) => next(),
@@ -90,6 +90,7 @@ export function makeRouter(perWorkspace, { runSummaryCacheStore, sessionSummaryC
     sessionSummaryCacheStore: sessionSummaryCacheStore || new InMemorySessionSummaryCacheStore(),
     runParagraphStore: runParagraphStore || new InMemoryRunParagraphStore(),
     prState: prState || null,
+    recordsStore: recordsStore || null,
     freeTierStore: freeTierStore || { async tryUse() { return { allowed: true }; } },
     getWorkspaceAccessToken: async () => 'token',
     // Default touched-task state is NOT done, so the LIN-1258 bounded feed
@@ -102,6 +103,21 @@ export function makeRouter(perWorkspace, { runSummaryCacheStore, sessionSummaryC
     getOpenRouterSource: () => 'env',
     getDeployInfo: () => ({})
   });
+}
+
+// LIN-4533: a fake records store holding one task's change records, one per PR URL in the live `prUrls` array (so a test
+// can push a PR after a first read). It answers the reads lib/records/landing.js makes; `throws` makes every read fail.
+export function recordsStoreOfChanges(prUrls = [], { throws = false, ticket = null, taskId = 'task-1' } = {}) {
+  const versions = () => prUrls.map((url, i) => ({
+    id: `change-${i + 1}`, v: 1, op: 'add', kind: 'change', state: 'open', in: taskId,
+    at: `2026-11-20T10:${String(i).padStart(2, '0')}:00.000Z`, fields: { ref: url, head: 'abc1234' }, links: {}
+  }));
+  const guard = () => { if (throws) throw new Error('records read failed'); };
+  return {
+    taskForTicket: async (_urlKey, t) => { guard(); return ticket === null || t === ticket ? taskId : null; },
+    find: async (_urlKey, { kind, inRef }) => { guard(); return versions().filter((v) => v.kind === kind && v.in === inRef); },
+    versionsOf: async (_urlKey, ids) => { guard(); return versions().filter((v) => ids.includes(v.id)); }
+  };
 }
 
 // A taken history item carrying a `kind:'decision'` feedback entry (the

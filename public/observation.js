@@ -131,7 +131,7 @@ let supplementId = null;
 // the workspace segment.
 //
 // LIN-2756: `decision_id` is not unique within one workspace either — an
-// agent session that re-emits the same `DECISION:` block from two different
+// agent session that re-emits the same ruling block from two different
 // loops (a review pass and a close-out pass, say) produces two loops sharing
 // one `decision_id`. `rulingKey` therefore also threads the ANCHOR through
 // (never just a resolved loop-id string — the anchor is the one thing every

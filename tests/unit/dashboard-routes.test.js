@@ -15,7 +15,7 @@
 import { test, describe, before } from 'node:test';
 import assert from 'node:assert';
 import { buildTestSummary, buildTestSessionSummary, deriveSessionStatus, deriveSessionDecisions } from '../../routes/dashboard.js';
-import { NOW_ISO, createDashboardRoutes, makeStores, findRouteLayer, getHandler, makeReqRes, makeRouter, decisionItem } from '../fixtures/dashboard-router.js';
+import { NOW_ISO, createDashboardRoutes, makeStores, findRouteLayer, getHandler, makeReqRes, makeRouter, decisionItem, recordsStoreOfChanges } from '../fixtures/dashboard-router.js';
 import { createSessionsFeedCache } from '../../lib/sessions-feed-cache.js';
 import { InMemoryRunSummaryCacheStore } from '../../lib/run-summary-cache.js';
 import { InMemorySessionSummaryCacheStore } from '../../lib/session-summary-cache.js';
@@ -6283,8 +6283,8 @@ describe('GET /api/run/:runId/pr-state (LIN-3251, C1)', () => {
   const PATH = '/workspace/:urlKey/api/run/:runId/pr-state';
   const PR_URL = 'https://github.com/acme/widget/pull/12';
 
-  const prComment = (body, createdAt) => ({ body, createdAt, user: 'worker' });
-
+  // LIN-4533: a run's PR is its task's change record, not a tracker comment (a stage run posts none). `changes` is the live
+  // list of PR URLs the fake records store holds as change records for the run's ticket.
   function jsonResponse(status, body) {
     return { ok: status >= 200 && status < 300, status, async json() { return body; } };
   }
@@ -6303,19 +6303,22 @@ describe('GET /api/run/:runId/pr-state (LIN-3251, C1)', () => {
   }
 
   function makePrStateRouter({
+    changes = [],
     comments = [],
     github = {},
     now = () => Date.now(),
     bucket,
     cache,
     loadRun,
-    commentsThrow = false
+    recordsThrow = false
   } = {}) {
     const counts = { github: 0, comments: 0 };
+    // A comment is read by nothing here: the provider counts any read of it, so a test can show none was made.
     const provider = {
-      async fetchIssueComments() { counts.comments += 1; if (commentsThrow) throw new Error('tracker read failed'); return comments; }
+      async fetchIssueComments() { counts.comments += 1; return comments; }
     };
     const router = makeRouter({}, {
+      recordsStore: recordsStoreOfChanges(changes, { throws: recordsThrow, ticket: 'LIN-1' }),
       prState: {
         now,
         cache: cache || new Map(),
@@ -6337,7 +6340,7 @@ describe('GET /api/run/:runId/pr-state (LIN-3251, C1)', () => {
 
   test('two GETs within 15 min make one fetchPrStatus (4 upstream calls)', async () => {
     const { router, counts } = makePrStateRouter({
-      comments: [prComment(PR_URL, '2026-07-01T00:00:00.000Z')],
+      changes: [PR_URL],
       github: { state: 'open' }
     });
 
@@ -6355,14 +6358,14 @@ describe('GET /api/run/:runId/pr-state (LIN-3251, C1)', () => {
 
   test('LIN-3443: a GitHub-bound workspace reads its repo with its own token, cached under the workspace', async () => {
     const authHeaders = [];
-    const comments = [prComment(PR_URL, '2026-07-01T00:00:00.000Z')];
     const stub = githubStub({ counts: { github: 0 } });
     const router = makeRouter({}, {
+      recordsStore: recordsStoreOfChanges([PR_URL], { ticket: 'LIN-1' }),
       prState: {
         now: () => Date.now(),
         cache: new Map(),
         bucket: [],
-        resolveProvider: () => ({ provider: { async fetchIssueComments() { return comments; } }, callScope: { repo: 'acme/widget', token: 'ghs_tok' } }),
+        resolveProvider: () => ({ provider: { async fetchIssueComments() { return []; } }, callScope: { repo: 'acme/widget', token: 'ghs_tok' } }),
         loadRun: async () => ({ issueIdentifier: 'LIN-1', evidenceUrls: [] }),
         githubFetch: async (url, opts) => { authHeaders.push(opts?.headers?.Authorization); return stub(url, opts); }
       }
@@ -6377,7 +6380,7 @@ describe('GET /api/run/:runId/pr-state (LIN-3251, C1)', () => {
     let clock = 1_000_000;
     const bucket = [];
     const { router, counts } = makePrStateRouter({
-      comments: [prComment(PR_URL, '2026-07-01T00:00:00.000Z')],
+      changes: [PR_URL],
       github: { state: 'closed', merged: true },
       now: () => clock,
       bucket
@@ -6397,7 +6400,7 @@ describe('GET /api/run/:runId/pr-state (LIN-3251, C1)', () => {
     let clock = 2_000_000;
     const bucket = [];
     const { router, counts } = makePrStateRouter({
-      comments: [prComment(PR_URL, '2026-07-01T00:00:00.000Z')],
+      changes: [PR_URL],
       github: { state: 'open' },
       now: () => clock,
       bucket
@@ -6423,7 +6426,7 @@ describe('GET /api/run/:runId/pr-state (LIN-3251, C1)', () => {
       now: () => nowMs,
       bucket,
       cache: new Map(),
-      comments: [prComment(PR_URL, '2026-07-01T00:00:00.000Z')],
+      changes: [PR_URL],
       github: { state: 'open' }
     });
 
@@ -6442,7 +6445,7 @@ describe('GET /api/run/:runId/pr-state (LIN-3251, C1)', () => {
     // a fixed window that started at t=0 would have reset and wrongly allowed.
     const bucket = Array.from({ length: 36 }, (_, i) => base + i * 60 * 1000);
     const { router, counts } = makePrStateRouter({
-      comments: [prComment(PR_URL, '2026-07-01T00:00:00.000Z')],
+      changes: [PR_URL],
       github: { state: 'open' },
       now: () => clock,
       bucket
@@ -6464,7 +6467,7 @@ describe('GET /api/run/:runId/pr-state (LIN-3251, C1)', () => {
     const nowMs = 20_000_000;
     const bucket = Array(34).fill(nowMs);
     const { router, counts } = makePrStateRouter({
-      comments: [prComment(PR_URL, '2026-07-01T00:00:00.000Z')],
+      changes: [PR_URL],
       github: { state: 'open' },
       now: () => nowMs,
       bucket
@@ -6476,43 +6479,44 @@ describe('GET /api/run/:runId/pr-state (LIN-3251, C1)', () => {
     assert.equal(counts.github, 0, '34 + 4 > 36 → the read never starts');
   });
 
-  test('a tracker read that throws returns 200 unknown, never a 403 (N2)', async () => {
+  test('a records read that throws returns 200 unknown, never a 403 (N2)', async () => {
     const nowMs = 30_000_000;
     const { router, counts } = makePrStateRouter({
-      commentsThrow: true,
+      changes: [PR_URL],
+      recordsThrow: true,
       github: { state: 'open' },
       now: () => nowMs
     });
 
     const res = await callPrState(router);
-    assert.equal(res.statusCode, 200, 'a failed tracker read is not a 403');
+    assert.equal(res.statusCode, 200, 'a failed records read is not a 403');
     assert.equal(res.jsonBody.state, 'unknown');
     assert.equal(res.jsonBody.number, null);
     assert.equal(counts.github, 0, 'no PR resolved → no GitHub read');
   });
 
-  test('a PR URL newly posted on the run is picked up on the next poll (one fetchPrStatus)', async () => {
-    const comments = []; // the provider reads this live reference each GET
+  test('a change record newly written for the run is picked up on the next poll (one fetchPrStatus)', async () => {
+    const changes = []; // the records store reads this live reference each GET
     const { router, counts } = makePrStateRouter({
-      comments,
+      changes,
       github: { state: 'open' }
     });
 
     const first = await callPrState(router);
     assert.equal(first.jsonBody.state, 'none', 'no PR on record yet');
 
-    // the worker posts the PR URL after the first poll
-    comments.push(prComment(`opened ${PR_URL}`, '2026-07-01T00:00:00.000Z'));
+    // the implementation records its change after the first poll
+    changes.push(PR_URL);
 
     const second = await callPrState(router);
-    assert.equal(second.jsonBody.state, 'open', 'the newly posted PR is seen on the next poll');
+    assert.equal(second.jsonBody.state, 'open', 'the newly recorded PR is seen on the next poll');
     assert.equal(second.jsonBody.number, 12);
     assert.equal(counts.github, 4, 'exactly one fetchPrStatus call (4 upstream)');
   });
 
-  test('no PR URL on the run returns the none state with zero upstream fetches', async () => {
+  test('no change record on the run returns the none state with zero upstream fetches', async () => {
     const { router, counts } = makePrStateRouter({
-      comments: [prComment('opened a draft, no pull request link yet', '2026-07-01T00:00:00.000Z')],
+      changes: [],
       github: { state: 'open' }
     });
 
@@ -6523,9 +6527,36 @@ describe('GET /api/run/:runId/pr-state (LIN-3251, C1)', () => {
     assert.equal(counts.github, 0, 'no PR -> no GitHub read');
   });
 
+  // finding-84f02273: a PR URL in a tracker comment is no longer where a run's PR is found. Mutation: reading the
+  // comments again turns this red (the state would be 'open').
+  test('a PR URL only in a comment, with no change record, returns none and the comments are never read', async () => {
+    const { router, counts } = makePrStateRouter({
+      changes: [],
+      comments: [{ body: `opened ${PR_URL}`, createdAt: '2026-07-01T00:00:00.000Z', user: 'worker' }],
+      github: { state: 'open' }
+    });
+
+    const res = await callPrState(router);
+    assert.equal(res.statusCode, 200);
+    assert.equal(res.jsonBody.state, 'none');
+    assert.equal(counts.comments, 0, 'the tracker comments are not read');
+    assert.equal(counts.github, 0, 'no PR -> no GitHub read');
+  });
+
+  test('two change records name two PRs: withheld as unknown, never one picked silently', async () => {
+    const { router, counts } = makePrStateRouter({
+      changes: [PR_URL, 'https://github.com/acme/widget/pull/13'],
+      github: { state: 'open' }
+    });
+
+    const res = await callPrState(router);
+    assert.equal(res.jsonBody.state, 'unknown');
+    assert.equal(counts.github, 0);
+  });
+
   test('a PR in any repo is read now that the allowlist is gone (LIN-3333)', async () => {
     const { router, counts } = makePrStateRouter({
-      comments: [prComment(PR_URL, '2026-07-01T00:00:00.000Z')],
+      changes: [PR_URL],
       github: { state: 'open' }
     });
 

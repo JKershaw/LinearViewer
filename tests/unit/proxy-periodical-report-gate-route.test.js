@@ -6,7 +6,8 @@
  * `harbour-periodical-gate` marker (lib/periodical-report-gate.js,
  * lib/periodicals.js's buildPeriodicalScaffold). This proves the wiring
  * end-to-end through the route: a marked issue moving to a completed-type
- * state is refused without a real evidence comment, an ordinary issue is
+ * state is refused without a change record and a complete adversarial-read
+ * verdict record on it (LIN-4533: records, not comments), an ordinary issue is
  * completely unaffected, and a marked issue moving to a non-completed state
  * is unaffected too. Uses the same directly-injected fake-provider pattern as
  * tests/unit/proxy-create-write-contract.test.js.
@@ -30,7 +31,7 @@ function makeProvider({ description, comments = [] }) {
     name: 'fake',
     supports: () => true,
     async issueWriteGuard() {
-      return { id: 'iss-1', trashed: false, team: { id: TEAM_UUID }, description, comments: { nodes: comments } };
+      return { id: 'iss-1', identifier: 'ACME-1', trashed: false, team: { id: TEAM_UUID }, description, comments: { nodes: comments } };
     },
     async states() {
       return STATES;
@@ -43,7 +44,22 @@ function makeProvider({ description, comments = [] }) {
   return { provider, calls };
 }
 
-function buildApp(provider) {
+// LIN-4533: the gate reads the task's standing from records (lib/task-standing.js standingForTicket). A fake records
+// store holds the task's change and verdict records as versions, in the shape lib/records-store.js returns.
+const PR = 'https://github.com/JKershaw/LinearViewer/pull/1223';
+function recordsStoreOf(versions) {
+  return {
+    // A task's claim is keyed by the ticket identifier, as lib/records-store.js keys it: a UUID names no task.
+    taskForTicket: async (_urlKey, ticket) => (ticket === 'ACME-1' ? 'task-1' : null),
+    find: async (_urlKey, { kind, inRef }) => versions.filter((v) => v.kind === kind && v.in === inRef),
+    versionsOf: async (_urlKey, ids) => versions.filter((v) => ids.includes(v.id)),
+  };
+}
+const CHANGE = { id: 'change-1', v: 1, op: 'add', kind: 'change', state: 'open', in: 'task-1', at: '2026-11-20T10:00:00.000Z', fields: { ref: PR, head: 'abc1234' }, links: {} };
+const verdict = (fields) => ({ id: 'verdict-1', v: 1, op: 'add', kind: 'verdict', state: 'stands', in: 'task-1', at: '2026-11-21T10:00:00.000Z', fields, links: { on: ['change-1@1'] } });
+const ADVERSARIAL_COMPLETE = verdict({ judgement: 'adversarial-read', outcome: 'agree', differed: 'no', disposition: 'no change' });
+
+function buildApp(provider, versions = []) {
   const app = express();
   app.use(express.json());
   app.use(createProxyRoutes({
@@ -59,6 +75,7 @@ function buildApp(provider) {
     workspacePreferencesStore: {},
     freeTierStore: { tryUse: async () => ({ allowed: true }) },
     provider,
+    recordsStore: recordsStoreOf(versions),
   }));
   return app;
 }
@@ -81,30 +98,24 @@ async function patch(app, issueId, body) {
 
 const ISSUE_UUID = '33333333-3333-3333-3333-333333333333';
 const gatedDescription = `${buildPeriodicalGateMarker('Documentation Review')}\n\nRun the review.`;
-const REPORT_EVIDENCE_COMMENT = { body: 'Landed: https://github.com/JKershaw/LinearViewer/pull/1223' };
-const ADVERSARIAL_COMPLETE_COMMENT = {
-  body: 'Adversarial second-read verdict: AGREE. Differed from top finding: NO. Disposition: no change.',
-};
 
 describe('PATCH /api/proxy/issues/:issueId — periodical report-persistence gate (LIN-694)', () => {
-  test('refuses a marked issue moving to a completed state with no evidence comment', async () => {
+  test('refuses a marked issue moving to a completed state with no change record naming its PR', async () => {
     const { provider, calls } = makeProvider({
       description: gatedDescription,
-      comments: [{ body: 'Report: docs/reviews/documentation-review-2026-08-23.md' }],
+      comments: [{ body: `Landed: ${PR}` }],
     });
-    const { status, body } = await patch(buildApp(provider), ISSUE_UUID, { stateId: 'state-done' });
+    // A PR in a comment is not the change record: the records hold no change, so the gate refuses.
+    const { status, body } = await patch(buildApp(provider, []), ISSUE_UUID, { stateId: 'state-done' });
     assert.equal(status, 409);
     assert.equal(body.code, 'PERIODICAL_REPORT_NOT_PERSISTED');
     assert.match(body.error, /cannot be marked done/i);
     assert.equal(calls.updateIssue.length, 0, 'the write must never reach the provider');
   });
 
-  test('allows the same transition once a real evidence comment AND a complete adversarial-read record exist', async () => {
-    const { provider, calls } = makeProvider({
-      description: gatedDescription,
-      comments: [REPORT_EVIDENCE_COMMENT, ADVERSARIAL_COMPLETE_COMMENT],
-    });
-    const { status } = await patch(buildApp(provider), ISSUE_UUID, { stateId: 'state-done' });
+  test('allows the same transition once a change record names its PR AND a complete adversarial-read verdict is on it', async () => {
+    const { provider, calls } = makeProvider({ description: gatedDescription, comments: [] });
+    const { status } = await patch(buildApp(provider, [CHANGE, ADVERSARIAL_COMPLETE]), ISSUE_UUID, { stateId: 'state-done' });
     assert.equal(status, 200);
     assert.equal(calls.updateIssue.length, 1);
     assert.equal(calls.updateIssue[0].stateId, 'state-done');
@@ -112,38 +123,28 @@ describe('PATCH /api/proxy/issues/:issueId — periodical report-persistence gat
 
   // LIN-2323 — the new adversarial-read evidence predicate, end-to-end through
   // the route. Report-persistence evidence alone is no longer sufficient.
-  test('refuses a marked issue moving to completed when the adversarial-read comment is absent entirely', async () => {
-    const { provider, calls } = makeProvider({
-      description: gatedDescription,
-      comments: [REPORT_EVIDENCE_COMMENT],
-    });
-    const { status, body } = await patch(buildApp(provider), ISSUE_UUID, { stateId: 'state-done' });
+  test('refuses a marked issue moving to completed when no adversarial-read verdict is on the change', async () => {
+    const { provider, calls } = makeProvider({ description: gatedDescription, comments: [] });
+    const { status, body } = await patch(buildApp(provider, [CHANGE]), ISSUE_UUID, { stateId: 'state-done' });
     assert.equal(status, 409);
     assert.equal(body.code, 'PERIODICAL_ADVERSARIAL_READ_NOT_RECORDED');
     assert.match(body.error, /adversarial second-read/i);
     assert.equal(calls.updateIssue.length, 0, 'the write must never reach the provider');
   });
 
-  test('refuses a marked issue moving to completed when the adversarial-read comment carries only the verdict token', async () => {
-    const { provider, calls } = makeProvider({
-      description: gatedDescription,
-      comments: [REPORT_EVIDENCE_COMMENT, { body: 'Adversarial second-read verdict: AGREE' }],
-    });
-    const { status, body } = await patch(buildApp(provider), ISSUE_UUID, { stateId: 'state-done' });
+  test('refuses a marked issue moving to completed when the verdict record carries only the outcome', async () => {
+    const { provider, calls } = makeProvider({ description: gatedDescription, comments: [] });
+    const bare = verdict({ judgement: 'adversarial-read', outcome: 'agree' });
+    const { status, body } = await patch(buildApp(provider, [CHANGE, bare]), ISSUE_UUID, { stateId: 'state-done' });
     assert.equal(status, 409);
     assert.equal(body.code, 'PERIODICAL_ADVERSARIAL_READ_NOT_RECORDED');
     assert.equal(calls.updateIssue.length, 0, 'a bare-AGREE record must not satisfy the widened predicate');
   });
 
-  test('allows a complete DISAGREE record too — escalation does not block concluding', async () => {
-    const { provider, calls } = makeProvider({
-      description: gatedDescription,
-      comments: [
-        REPORT_EVIDENCE_COMMENT,
-        { body: 'Adversarial second-read verdict: DISAGREE. Differed from top finding: YES. Disposition: escalated.' },
-      ],
-    });
-    const { status } = await patch(buildApp(provider), ISSUE_UUID, { stateId: 'state-done' });
+  test('allows a complete DISAGREE verdict too — escalation does not block concluding', async () => {
+    const { provider, calls } = makeProvider({ description: gatedDescription, comments: [] });
+    const disagree = verdict({ judgement: 'adversarial-read', outcome: 'disagree', differed: 'yes', disposition: 'escalated' });
+    const { status } = await patch(buildApp(provider, [CHANGE, disagree]), ISSUE_UUID, { stateId: 'state-done' });
     assert.equal(status, 200);
     assert.equal(calls.updateIssue.length, 1);
   });

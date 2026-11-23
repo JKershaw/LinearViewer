@@ -19,10 +19,9 @@ Area notes for `llm-and-prompts` in the registry. Format and rules: README.md.
 - The `## As asked` quote's words have one owner, `lib/brief-quote.js`: import its spellings,
   never retype the heading or end line (LIN-4362, LIN-4502).
 - The blind read's kind, heading and verdict words have one owner, `lib/prompts/blind-read-words.js`;
-  the verdict prose ("better, the same or worse") is built there from the words. Import them. The scan
+  its verdict prose is built there. Import them. The scan
   in `tests/unit/stage-kind-tables.test.js` fails on a literal elsewhere, except as a row key of a table it
   lists; the stage kinds' tables are views of `STAGE_KINDS`, so that list names the record (LIN-4466, LIN-4470).
-  Prove a move byte-identical by rendering every kind, fresh and fix round (LIN-4466).
 - A stage kind's name is a literal once, as its key in `STAGE_KINDS` (`lib/prompts/stage-kinds.js`). A kind whose
   words code outside the record reads gets one leaf constant that the record imports: the blind read has one, and no
   other kind gets one, since a second constant per kind would be a second home (LIN-4470).
@@ -71,3 +70,4 @@ Area notes for `llm-and-prompts` in the registry. Format and rules: README.md.
 - The blind-read scan in `tests/unit/stage-kind-tables.test.js` reads `git ls-files`: a new file is not
   scanned until it is committed, so a local pass before the first commit proves nothing about it (LIN-4467).
 - `lib/prompts/area-registry-path.js` imports nothing (`tests/unit/area-map-placement.test.js`); leaves import it (LIN-4470).
+- A prompt that sends a stage to records names the read (the query): the brief shows only the last stage's run (LIN-4533).

@@ -113,9 +113,9 @@ describe('the parser reads the description outside the As-asked block, never com
       { body: `${SIZE_OF_MOVE_HEADING}\n\n**Size:** rebuild the area\n**Decided by:** a ruling`, createdAt: '2026-11-07T22:19:00.000Z' }];
     const facts = assembleTrailFacts(comments, SEALED);
     assert.equal(facts.size, 'not recorded');
-    assert.match(formatTrailFactsBlock(facts, comments.length), /^- Size of the move: not recorded$/m);
+    assert.match(formatTrailFactsBlock(facts), /^- Size of the move: not recorded$/m);
     const recorded = assembleTrailFacts(comments, withRecord(PLAIN));
-    assert.match(formatTrailFactsBlock(recorded, comments.length), /^- Size of the move: chosen just the task \(by the standing policy\)$/m);
+    assert.match(formatTrailFactsBlock(recorded), /^- Size of the move: chosen just the task \(by the standing policy\)$/m);
   });
 });
 

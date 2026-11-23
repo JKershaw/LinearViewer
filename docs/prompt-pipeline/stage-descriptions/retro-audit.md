@@ -135,7 +135,7 @@ Tests that pin today's prose and will need to follow the rewrite (`tests/unit/pr
 absence of `'reorient'`/`**retro**` in the meta-prompt hints (the meta-prompt is gone; the router lists stages from their own descriptions). Size ceiling
 `retro: 4265` bytes (`tests/unit/prompt-size-budget.test.js`, was 4114 when written).
 
-The **dispatch preamble** (heartbeats, `DECISION:` blocks parsed by `parseDecision` in
+The **dispatch preamble** (heartbeats, ruling blocks parsed by `parseDecision` (the parser retires in a later LIN-4529 piece; no prompt teaches the block any more) in
 `lib/session-telemetry.js:674`) is added by the dispatch layer to every dispatched prompt. It is
 not part of this template, but it is how "goes to John" actually reaches him in a headless run.
 

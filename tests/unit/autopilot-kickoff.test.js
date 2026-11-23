@@ -271,10 +271,10 @@ describe('buildAutopilotKickoff (inline handbook / disposition layer)', () => {
     assert.ok(sectionAt > -1, 'the handbook section heading is present, byte-identical');
 
     const gateAt = text.indexOf('Gate on Principle 0 first', sectionAt);
-    const rulingAt = text.indexOf('make the ruling self-sufficient', sectionAt);
+    const rulingAt = text.indexOf('make the question self-sufficient', sectionAt);
     const mergeAt = text.indexOf('Merge sibling blockers before you bubble up', sectionAt);
     assert.ok(gateAt > sectionAt, 'the Principle 0 gate anchor is present inside the section');
-    assert.ok(rulingAt > gateAt, 'the self-sufficient ruling anchor follows the gate');
+    assert.ok(rulingAt > gateAt, 'the self-sufficient question anchor follows the gate');
     assert.ok(mergeAt > rulingAt, 'the sibling-merge anchor follows the ruling format');
   });
 

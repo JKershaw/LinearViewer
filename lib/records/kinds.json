@@ -68,7 +68,9 @@
       "fields": {
         "judgement": "string",
         "outcome": "string",
-        "reasoning": "string"
+        "reasoning": "string",
+        "differed": "string",
+        "disposition": "string"
       },
       "start": "stands",
       "ends": [
@@ -134,6 +136,10 @@
       "better",
       "same",
       "worse"
+    ],
+    "adversarial-read": [
+      "agree",
+      "disagree"
     ]
   },
   "links": {

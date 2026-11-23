@@ -60,11 +60,11 @@ describe('the cut rule has one home (LIN-4345)', () => {
     }
   });
 
-  test('the ruling goes through the closing contract: a `DECISION:` before `BLOCKED:`', () => {
-    // Harbour records a ruling only from a DECISION: line; a run that ends DONE: with the ruling
-    // in its comment raises none (LIN-4345 replay r06, r13, r14). These are tokens code reads.
-    const decision = CUT.indexOf('`DECISION:`');
-    assert.ok(decision >= 0 && CUT.indexOf('`BLOCKED:`') > decision);
+  test('the cut goes to a question record, then the run ends `BLOCKED:` (LIN-4533)', () => {
+    // A cut is asked with a question record (the record is the ask; the DECISION: block that scraped it is retired), then the
+    // run ends BLOCKED:. A run that ends DONE: with the cut in its message raises none (LIN-4345 replay r06, r13, r14).
+    const question = CUT.indexOf('`question` record');
+    assert.ok(question >= 0 && CUT.indexOf('`BLOCKED:`') > question);
   });
 
   test('no other lib/ source spells out a copy of the rule', () => {
@@ -83,7 +83,7 @@ describe('the cut rule has one home (LIN-4345)', () => {
 describe('a template says only where its cuts go (LIN-4345, LIN-4367)', () => {
   // The words that belong to the rule: what quoting and ruling mean is CUT's to say.
   // A paraphrase restates the rule too (review M6 on LIN-4367), so its other words count.
-  const RULE_WORDS = /\bquot|\bruling|not yours|\bagreed\b|DECISION:/i;
+  const RULE_WORDS = /\bquot|\bruling|not yours|\bagreed\b|`question` record/i;
   const cutLines = (text) => text.split('\n').filter(l => /\bcuts?\b/i.test(l) && !l.includes(CUT));
 
   test('scoping and plan each name a place for their cuts', () => {

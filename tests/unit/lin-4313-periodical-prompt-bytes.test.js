@@ -72,6 +72,13 @@
  * (a finding to `project`, not a Waiting entry), its routes bullet (`areaNotesRoutes()`) and `routeObjectiveBreakage`
  * name the person and the project, the hand-off tail names the report pull request, and the second read follows the
  * report and its findings. Every other hash is unchanged, which is the witness that only those bullets moved.
+ * LIN-4533 re-pinned all 16: a Periodical's report is recorded as records, not comments. The hand-off bullet asks for the
+ * change as a change record (kind `change`) and ends with a final message, not a closing comment; the second read is a verdict
+ * record (judgement `adversarial-read`, with outcome, differed and disposition) on that change; the notes and routes bullets name the final
+ * message. The phrases those bullets used to carry are the only change.
+ * LIN-4533 (close-out, review fixes) re-pinned all 16 again: the second-read bullet's two leftover phrases, "not a substitute for the
+ * comment" and "visible in the comment and the appendix", name the verdict record, since no comment exists on this path
+ * (blind-read finding finding-501a9a7a). Those two phrases are the only change.
  * LIN-4502 re-pinned all 16: the As-asked seal is retired, so no proxy create seals the minted task's description and the
  * mint closing drops its parenthetical "(once Harbour seals it, the first line inside its `## As asked` block)". Swapping
  * that phrase back into each new prompt reproduces every old hash, plain and Mint + Autopilot, so it is the only change.
@@ -84,22 +91,22 @@ import { getPeriodicals, renderPeriodicalPrompt, withAutopilotTail } from '../..
 const sha256 = (text) => crypto.createHash('sha256').update(text).digest('hex');
 
 const PINNED = {
-  "documentation-review": { plain: "24de37bcb75e32072a592868bfa6d7848efb14fe591ed8aedb830dfd7f03aec2", autopilot: "c3eeed5c06749a540bb0d1c8b13f44222541945aa85133a2836c6341cff77b1a" },
-  "test-coverage-gap": { plain: "7d7fcdfe4267e596e3c8af75de4b8167bcbc145ac83365030ee8b03228a50088", autopilot: "3155851bf38cad02222b4a50e5b87d2d91304051b45bebbe24ddfdab68097e77" },
-  "security-review": { plain: "67199e354bfaec527cbed1033084275adb93e90fc5fc3b8de226aadc0d1cb2ef", autopilot: "fb1a4d5305795c028067c632c0b0b53414a43fd8164f0f58967191def281c767" },
-  "api-quality": { plain: "65113f1a7d0ef796918019adf41de1467047d9502f28bd25cc359365ff8fbed5", autopilot: "10be36d6cc79179bb733988ad5094a52b0f86a4d1de67ae475988108eeeb4e3a" },
-  "code-quality": { plain: "3179bfcf68c6543c2b14ce804a6e42d6b948e97cc8c8fe6e2ab4cd6125d8593f", autopilot: "83ea302e71e99e3e593b12bbbe328ae9778a6c33814e885124d10fad26dd957f" },
-  "drift-coherence": { plain: "abf2b1d4a9ad861bc9a28433307ab1fe578b1337da85ffbec5a4c42c07748a61", autopilot: "eefcea93a36fa9f5c9b11106be85d37a6890d9664f0d5b22966a0d3e17e8aa63" },
-  "comprehension-debt": { plain: "eb98e5ef7397a86b91eb70a6145cc9cbf44c08b37969a5dec57bc3b239373832", autopilot: "7c1129b5da48cab28a60f08cdf24a8d1044725f9c08eaa7b53a22f33e4929f7b" },
-  "stability-review": { plain: "d2575ead15242c8860c972d0f40ddd037477425876d721fc0da666c10c2e0fdc", autopilot: "733ec829ad2a5f2db0209bd39db734ab9617a0abefd76c77b0696c6b374d0a84" },
-  "dependency-supply-chain": { plain: "2b4da10c21f7ba3a40dc41368fda58926f783a921297e4c6d37f75af086fcf46", autopilot: "50669c19f2befe2bc310387de310e46cac9606abed944ceb8a77a274e1fdf7f4" },
-  "recent-headwinds": { plain: "e7eea3ca36bf09e85edf6bbd418fb9a460e9a10eb58a3bf531a8870175097aa2", autopilot: "ab65d8a17e517dfa4e639a6e9910d8df9863cedadbb4055254789dc36a1b9877" },
-  "design-review": { plain: "0c481068852cfa4e72d45732c539934f722558f38c098434a711932f9bc9a4ee", autopilot: "e91d15f1de9fd3051f5071a6c60e22534a51767bd7e02e505f24191b316d443f" },
-  "performance-scale": { plain: "3e89283075dce26067120574de8899daaf90b73c7ecec39d1a34b0de1a52622a", autopilot: "04f9fd2304d36aef5758b0300321d41f56c7f8c36a18602e3a6ffb7b6c316dfc" },
-  "data-fetch-architecture": { plain: "40fb767037d42e00d8781d49c3fddd080857c596a68e3184ea70fc202374ba37", autopilot: "c64ddfffe858eb80d619a634450aa01490d089212c36865bc04db4f96eb3896a" },
-  "integration-surface-maturity": { plain: "44f60dd848e41dd6f28f09641d0e8248d5c479d4707b702012f81541e45a6901", autopilot: "6d3b29fe7bb5a469ac338cd9d250995eb1b166011db92d5829033e47b64085f7" },
-  "onboarding-journey": { plain: "74863f2733953b125940c99f4aa7e0d5673c69a8e01a6216f52e56026915baa0", autopilot: "28fb5be733fae24a8a6a432c8825873b6cdc304f8e5a7b789a33fb7f160cd351" },
-  "seams-tangles": { plain: "25febdd6e3da85de1e84734c266c03feb66278a1af8744aa577dc2282e4231ab", autopilot: "65dbf14945bde06c2515a56385da55cfa2d1abbe224fa19ee23f8e42b00e91e1" },
+  "documentation-review": { plain: "cfdef2578704eebfe8b69549370dd7f2417755ef73de3a0dcd2b7b75fbedc11e", autopilot: "7a475d34ff053b51fb015db1f4ef46a12c9418fc4e188e1ddad70cc1ea72175c" },
+  "test-coverage-gap": { plain: "74282f9d37cf2a93167dfd56b6883a52a7d81bb41da5776b68ac3e8716153d76", autopilot: "f1944acb960593804d0bd55998dc738ac2192797db2cd4195fecf297487c034f" },
+  "security-review": { plain: "870d53633f9b39c04e6cf8d45921ba464b244f59f27aea4ea0877fa2beef91a0", autopilot: "eebbb56d734d0377a039a62dd877ee18ed4b5a8f04789f5eac605e07682e9836" },
+  "api-quality": { plain: "d4abff47afe3a00081287e2584cfe4bc7655de0d4aa67ecbfa9ff35850791cf6", autopilot: "918119f8086510f640b638aa03ae0882b975a3810574ea9f9fc141714f960146" },
+  "code-quality": { plain: "963a42fce1cdaa90c610824e27e07030683452e0a9e78ba1ff608eb240ca1240", autopilot: "abd0645e131c80ba798aef2ac5a2419f1674f3ec3743219ca7a15842258edee8" },
+  "drift-coherence": { plain: "146aab7575122749a41bcd3423bdc816d30fcee4fb8ed526fec1eb4be77012ef", autopilot: "a996b9faadd5a57158e97558cc6ea28c65b7cbc07051fd09c1769e67eb003dcc" },
+  "comprehension-debt": { plain: "f2204ed6d4f1c130bee8879004ecd0c90fe51f2da0c16331953cecbc048962f4", autopilot: "a2de2a845695bf47bfc481c9241c4f41b2533d9a6f22f69f46c21d812cced44e" },
+  "stability-review": { plain: "90ab182f5dafccc16eeaf26f17dde79027f706ae26b6360a7405ee5d479ba960", autopilot: "9b4cb9c8522a42d1f990ae5b7912e5478dc6283ada4fd835ce8f3e84efe15b25" },
+  "dependency-supply-chain": { plain: "5dea0e7ef7c73214e5e8a24d35de47a4f0ead7d24abcaf929c135ce92d18a795", autopilot: "330a04a73c53ca0e59b9ae73e3a60ba9c7915c6c5de31b7ba228133a03c40aef" },
+  "recent-headwinds": { plain: "bd1de3beaa68287d173ac5098b68120725426fd0e760f8ef98b8249b7a9015a7", autopilot: "43509a9c8dbed7464c9b74b8a2e88176f8e2fdc04e2e437a7936b6690db4d319" },
+  "design-review": { plain: "4b79c88900f209a4cc00ec5e55c59adaa275b84d04904bde39b4e2a305833ef6", autopilot: "bbb5239bbf47a6c191f374b0a5ebe2c759bd0d01fc58fe7ea8ca3a8ae1bab6a8" },
+  "performance-scale": { plain: "68a50e1ee529f627677560dc48401d2afb771402fba2f8c62fb3fe8ea29be2a6", autopilot: "8eba8d0950e6fe62b6f56d8d282c669c3f65a04e9abbe20864da0010a48baf6f" },
+  "data-fetch-architecture": { plain: "e7e3cc6748adfb0dd77b72add9aef592f0e8094918d8feac2ea964e6b727cf9b", autopilot: "86e148c3f139ccfee3cab57d520f2db48b7031d43367e4b64a7b7e0d34ce26e2" },
+  "integration-surface-maturity": { plain: "f1b65e93ae7538793732c6670c911c3560b4f846dd4a66dd442d0bc3a8aa8661", autopilot: "efb4efa85959bb4af13b47f97de89cdea8264868d1ac719b40a40037f140d9b9" },
+  "onboarding-journey": { plain: "eb70099507e15692b5f2e5756095d497ede27e941efef9ea6bdb816f16b12c4d", autopilot: "0ce1d8b84367243d348169c208c6dcd8b80be3a5c41ffb91f007123957115f96" },
+  "seams-tangles": { plain: "cb17cbd53e2a887e9fe53ccbc8d4492105b886fc7ca498db6a40ca96945931a9", autopilot: "d1467d76b3adc27b05eccb228c5f6e4d3d64ecca59669b2e94d0c8185e200c84" },
 };
 
 test('LIN-4313: every registry id has a pinned plain and Mint + Autopilot prompt, byte for byte', () => {
