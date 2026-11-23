@@ -22,7 +22,7 @@ import { dirname, join } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { createTaskPageLoader, deriveHeader, buildTaskPageModel } from '../../lib/task-page-loader.js';
 import { createTaskPageRoutes } from '../../routes/task-page.js';
-import { enrichLoop, deriveSessionWaiting, deriveSessionDecisions } from '../../routes/dashboard.js';
+import { enrichLoop, deriveSessionWaiting } from '../../routes/dashboard.js';
 import { registerProvider } from '../../lib/providers/registry.js';
 import '../../lib/providers/linear/index.js';
 import { stateBodyOf, stateIssue, failedStageLoop, STATE_NOW, STATE_URL_KEY } from '../fixtures/state-route.js';
@@ -103,7 +103,7 @@ async function privatePageOf({ issues, loops, task, writtenAt = STATE_NOW }) {
     fetchIssueComments: async () => [], fetchIssueFields: async () => null, fetchProjects: async () => ({ projects: [] }),
   });
   const loader = createTaskPageLoader({
-    dispatchStore: {}, agentStatusStore: {}, enrichLoop, deriveSessionWaiting, deriveSessionDecisions,
+    dispatchStore: {}, agentStatusStore: {}, enrichLoop, deriveSessionWaiting,
     getLoopsForIssue: async (_urlKey, id) => loops.filter((l) => l.issueIdentifier === id),
     getLoopsForIssues: async (_urlKey, ids) => loops.filter((l) => ids.includes(l.issueIdentifier)),
     now: () => STATE_NOW,

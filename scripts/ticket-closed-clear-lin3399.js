@@ -146,7 +146,7 @@ export async function runTicketClosedClear({
 
       if (execute) {
         for (const ticket of terminal) {
-          const r = await closeTicketRows({ urlKey, ticket, dispatchStore, recordsStore, sessionsFeedCache, agentStatusStore, candidates, now, by: actor, log, info: log });
+          const r = await closeTicketRows({ urlKey, ticket, dispatchStore, recordsStore, sessionsFeedCache, agentStatusStore, candidates, now, by: actor, log });
           for (const k of Object.keys(w.closed)) w.closed[k] += r[k] || 0;
         }
         // Idempotence: re-select; whatever is still selectable on a terminal ticket remains.

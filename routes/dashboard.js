@@ -74,10 +74,10 @@ import { createDashboardKpisRoutes } from './dashboard-kpis.js';
 import { createDashboardEffortRoutes } from './dashboard-effort.js';
 import { createDashboardSummariesRoutes, buildTestSummary, buildTestSessionSummary } from './dashboard-summaries.js';
 import { createDashboardDrilldownRoutes } from './dashboard-drilldown.js';
-import { deriveSessionWaiting, deriveSessionDecisions, settleWithConcurrency, isStandaloneSession, deriveSessionStatus } from './dashboard-session-state.js';
+import { deriveSessionWaiting, settleWithConcurrency, isStandaloneSession, deriveSessionStatus } from './dashboard-session-state.js';
 import { openQuestionsForRun } from '../lib/open-questions.js';
 import { personAccountIdOf } from './task-records.js';
-export { settleWithConcurrency, isStandaloneSession, deriveSessionStatus, deriveSessionWaiting, deriveSessionDecisions, buildTestSummary, buildTestSessionSummary };
+export { settleWithConcurrency, isStandaloneSession, deriveSessionStatus, deriveSessionWaiting, buildTestSummary, buildTestSessionSummary };
 
 
 // PR-state cache + upstream budget (LIN-3251) live in `lib/pr-state-store.js`

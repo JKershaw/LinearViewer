@@ -12,8 +12,6 @@
 import { computeSupersededLoopIds } from '../lib/loop-supersede.js';
 import { isTerminalLoop, loopIsWaiting } from '../lib/run-loop-state.js';
 import { liveOnAnchor } from '../lib/live-anchor.js';
-import { lineageOfLoop } from '../lib/ruling-standing.js';
-import { openQuestionFacts } from '../lib/records/question-facts.js';
 import { findAnchorLoop } from '../lib/session-summary.js';
 import { toEpochMs } from '../lib/utils/time.js';
 
@@ -192,21 +190,6 @@ export function deriveSessionWaiting(enrichedLoops) {
 export function waitingLoops(enrichedLoops) {
   const supersededLoopIds = computeSupersededLoopIds(enrichedLoops);
   return enrichedLoops.filter(l => l && !supersededLoopIds.has(l.loopId) && loopIsWaiting(l));
-}
-
-/**
- * The session's open question records, as the run page's pinned cards read them (LIN-3252 S2, LIN-4538 P7a): every OPEN
- * question whose asking run is one of the session's own lineages, whether or not the session is `waiting`. Read from the
- * question facts the caller passes (lib/records/question-facts.js questionFacts), so this is pure and reads no ruling store.
- * A question's answer, dismissal or closure ends it here, so it never reappears.
- *
- * @param {Array<Object>} enrichedLoops - the session's loops, already run through `enrichLoop`
- * @param {{questions?: Array<Object>}} [opts] - the workspace's question facts
- * @returns {Array<Object>} the open question facts asked from this session
- */
-export function deriveSessionDecisions(enrichedLoops, { questions = [] } = {}) {
-  const lineages = new Set((Array.isArray(enrichedLoops) ? enrichedLoops : []).map(lineageOfLoop));
-  return openQuestionFacts(questions).filter((q) => q.runId && lineages.has(q.runId));
 }
 
 /** LIN-4114: the predicate lives in lib/live-anchor.js; re-exported here so every importer keeps its path. */

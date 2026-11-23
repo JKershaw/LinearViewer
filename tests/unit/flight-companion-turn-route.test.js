@@ -1179,20 +1179,12 @@ describe('Flight Companion turn endpoint (LIN-2432 §A.12) — server.js store w
         assert.match(taskChatLine, new RegExp(`\\b${store}\\b`), `${store} is a pre-existing store — createTaskChatRoutes must already receive it too`);
       }
     }
-    // LIN-2617 adds two stores this route receives and Task Chat does not, so
-    // the mirror above is no longer total. The claim that still holds — and the
-    // one that actually matters — is that NEITHER is a new store: both are
-    // constructed at server level for the rulings feed and merely threaded here.
+    // LIN-4538: the chat tools read question records only, so neither ruling store is threaded into this route (or Task Chat)
+    // any more; both are still constructed at server level for the ruling machinery that reads them.
     for (const store of ['taskDecisionsStore', 'shelvedRulingsStore']) {
-      assert.match(flightLine, new RegExp(`\\b${store}\\b`), `${store} must be threaded (LIN-2617)`);
-      assert.match(
-        SERVER_SRC, new RegExp(`const ${store} = new `),
-        `${store} must already be constructed at server level — this route creates no store`
-      );
+      assert.doesNotMatch(flightLine, new RegExp(`\\b${store}\\b`), `${store} is no longer threaded here (LIN-4538)`);
+      assert.doesNotMatch(taskChatLine, new RegExp(`\\b${store}\\b`), `${store} is no longer threaded into Task Chat (LIN-4538)`);
     }
-    // The asymmetry is argued in server.js, not silent: Task Chat is outside the
-    // file carve of the change that added them.
-    assert.match(SERVER_SRC, /LIN-2617 adds taskDecisionsStore \+ shelvedRulingsStore/);
   });
 });
 

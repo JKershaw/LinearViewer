@@ -40,7 +40,7 @@ import { rowRecordOf } from '../../lib/task-board-view.js';
 import { renderTaskStatus } from '../../lib/render-task-page.js';
 import { createWorkspaceApiRoutes } from '../../routes/workspace-api.js';
 import { findRouteLayer } from './lib/route-layer.js';
-import { enrichLoop, deriveSessionWaiting, deriveSessionDecisions } from '../../routes/dashboard.js';
+import { enrichLoop, deriveSessionWaiting } from '../../routes/dashboard.js';
 import { heldTaskFacts, heldLoaderDeps } from '../fixtures/held-task-facts.js';
 import { stateBodyOf, stateIssue } from '../fixtures/state-route.js';
 import { registerProvider } from '../../lib/providers/registry.js';
@@ -81,7 +81,7 @@ const holding = (issues, writtenAt = NOW) => heldTaskFacts({ issues, now: writte
 /** The loader over a stored set of loops and a held set, wired the way server.js wires it. */
 function loaderOver({ loops, holder }) {
   return createTaskPageLoader({
-    dispatchStore: {}, agentStatusStore: {}, enrichLoop, deriveSessionWaiting, deriveSessionDecisions,
+    dispatchStore: {}, agentStatusStore: {}, enrichLoop, deriveSessionWaiting,
     getLoopsForIssue: async (_urlKey, identifier) => loops.filter((l) => l.issueIdentifier === identifier),
     getLoopsForIssues: async (_urlKey, ids) => loops.filter((l) => ids.includes(l.issueIdentifier)),
     now: () => NOW,

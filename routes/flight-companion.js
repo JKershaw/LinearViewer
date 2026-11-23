@@ -91,7 +91,7 @@ import { buildModelOptions, getModelCatalog as defaultGetModelCatalog } from '..
 import { shouldMockAi } from '../lib/should-mock-ai.js';
 import { createChatToolCatalog as defaultCreateChatToolCatalog, CHAT_TOOL_RESULT_BUDGETS } from '../lib/chat-tools.js';
 import { buildFlightCompanionMessages } from '../lib/prompts/flight-companion-brief.js';
-import { sessionIsTerminal, enrichLoop } from '../lib/run-loop-state.js';
+import { sessionIsTerminal } from '../lib/run-loop-state.js';
 import { resolveAiOperationModel } from '../lib/workspace-preferences.js';
 import { getProviderForWorkspace } from '../lib/providers/registry.js';
 import { getWorkspaceCallScope } from '../lib/workspace.js';
@@ -321,11 +321,6 @@ export function buildFlightCompanionStripData({ model, companionDoc, censusDoc, 
  *   `send_follow_up` write (LIN-1073). Wired in server.js §A.12.
  * @param {Object} [deps.agentStatusStore] - the other session read-model dep.
  *   Wired in server.js §A.12.
- * @param {Object} [deps.taskDecisionsStore] - LIN-2617: scan-produced decisions,
- *   one of `list_pending_decisions`' three inputs. Wired in server.js §A.12.
- * @param {Object} [deps.shelvedRulingsStore] - LIN-2617: shelved rulings
- *   (LIN-1727), the input whose absence would resurface a decision a human
- *   deliberately shelved. Wired in server.js §A.12.
  * @param {Object} [deps.proxyTokenStore] - LIN-1431 bootstrap-token provisioning
  *   for an `execute`-mode follow-up resuming a claude-code session. Optional,
  *   same as Task Chat's own wiring — absence degrades cleanly
@@ -386,11 +381,6 @@ export function createFlightCompanionRoutes({
   // LIN-3285: the owner's GitHub App installation token for `get_pr_status` on a
   // Linear/Jira workspace (server.js builds the one instance).
   installationTokenFor = null,
-  // LIN-2617: the two extra inputs `list_pending_decisions` needs to return the
-  // same rows the rulings feed returns. Optional, like every other store here —
-  // absent, that ONE tool reports "not configured" and the rest of the catalog
-  // is untouched.
-  taskDecisionsStore, shelvedRulingsStore,
   chatClient = { streamChat: defaultStreamChat, streamChatWithTools: defaultStreamChatWithTools },
   createToolCatalog = defaultCreateChatToolCatalog,
   // LIN-4532: the account store, for a person's canonical account id (the questions addressed to it). Absent: the session account.
@@ -622,8 +612,8 @@ export function createFlightCompanionRoutes({
         },
         deps: {
           observerStateStore, workspacePreferencesStore, recapCacheStore, briefCacheStore, recordsStore,
-          dispatchQueueStore, agentStatusStore, taskDecisionsStore, shelvedRulingsStore,
-          proxyTokenStore, sessionIsTerminal, enrichLoop,
+          dispatchQueueStore, agentStatusStore,
+          proxyTokenStore, sessionIsTerminal,
           chatClient, createToolCatalog,
           // LIN-4532 (finding-79815581): the person's canonical account, for the question read in list_pending_decisions.
           resolveCanonicalAccountId: accountStore ? (id) => accountStore.resolveCanonicalAccountId(id) : null,
@@ -783,8 +773,8 @@ export function createFlightCompanionRoutes({
         },
         deps: {
           observerStateStore, workspacePreferencesStore, recapCacheStore, briefCacheStore, recordsStore,
-          dispatchQueueStore, agentStatusStore, taskDecisionsStore, shelvedRulingsStore,
-          proxyTokenStore, sessionIsTerminal, enrichLoop,
+          dispatchQueueStore, agentStatusStore,
+          proxyTokenStore, sessionIsTerminal,
           chatClient, createToolCatalog,
           // LIN-4532 (finding-79815581): the person's canonical account, for the question read in list_pending_decisions.
           resolveCanonicalAccountId: accountStore ? (id) => accountStore.resolveCanonicalAccountId(id) : null,

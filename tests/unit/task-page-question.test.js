@@ -45,7 +45,7 @@ const stateOf = (loops, { ctx = null, ruling = standingOfLoops(loops, { urlKey: 
   return gatherTaskStates({ roots: [{ issue: { identifier: 'LIN-50', state: { type } }, children: [] }], loops, ruling, at: NOW, enrichLoop, deriveSessionWaiting }).states.get('LIN-50');
 };
 
-// The page-load path (LIN-4038): the loader gives the model the workspace's `rulingStandingOf`, so shelves count.
+// The page-load path (LIN-4038): the loader gives the model the workspace's question standing.
 // LIN-4538: the question section reads question records (questionRecords, routes/task-page.js); the standing reads the same questions.
 function model(loops, { ruling = standingOfLoops(loops, { urlKey: URL_KEY }), questionRecords = openQuestionRowsOf(loops), ...over } = {}) {
   const m = buildTaskPageModel({

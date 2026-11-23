@@ -21,8 +21,8 @@ import { isTerminalState } from '../../lib/providers/state-map.js';
 import { questionFacts } from '../../lib/records/question-facts.js';
 import { questionStandingOf } from '../../lib/records/question-standing.js';
 import {
-  reversalState, isSettledForCloser, closerCandidates, prepareCloserCandidates, selectTicketCloseWork,
-  closeTicketRows, ticketFromWrite, createOnTicketWrite, ticketClosedBasisHash, LEGACY_VERIFY_CAP
+  reversalState, closerCandidates, prepareCloserCandidates, selectTicketCloseWork,
+  closeTicketRows, ticketFromWrite, createOnTicketWrite, LEGACY_VERIFY_CAP
 } from '../../lib/ticket-close-closer.js';
 
 const URL_KEY = 'acme';
@@ -34,7 +34,7 @@ const ACCOUNT = 'acct-owner';
 const PEOPLE = [{ accountId: ACCOUNT, name: 'Owner' }];
 
 describe('ticket-close-closer (LIN-3366)', () => {
-  let dbDir, client, store, history, agentStatusStore, records, writes, counter = 0, logs, infos;
+  let dbDir, client, store, history, agentStatusStore, records, writes, counter = 0, logs;
   before(async () => {
     dbDir = mkdtempSync(join(tmpdir(), 'ticket-closer-'));
     client = new MangoClient(dbDir);
@@ -53,7 +53,7 @@ describe('ticket-close-closer (LIN-3366)', () => {
     await db.collection(RECORDS_COLLECTION).createIndex({ urlKey: 1, id: 1, v: 1 }, { unique: true });
     records = new RecordsStore({ records: db.collection(RECORDS_COLLECTION), refs: db.collection(REFS_COLLECTION), queryLog: db.collection(QUERY_LOG_COLLECTION) });
     writes = createRecordWrites({ recordsStore: records, isTerminalState, readTicket: null, askedText: () => '', stageKinds: ['implementation'], listPeople: async () => PEOPLE });
-    logs = []; infos = [];
+    logs = [];
   });
 
   /** An open question on a ticket's task, asked by no run (as a stage's question is filed). */
@@ -69,7 +69,6 @@ describe('ticket-close-closer (LIN-3366)', () => {
   }
 
   const log = (m) => logs.push(m);
-  const info = (m) => infos.push(m);
 
   // A blocked history row with a decision; quiet for `quietMin` minutes.
   const seedBlocked = (id, { identifier = 'LIN-1', issueId = 'iid-1', decisionId = `dec-${id}`, quietMin = 120, dispatchedAgoMin = quietMin + 20, extra = [], decision = true } = {}) => history.insertOne({
@@ -87,12 +86,12 @@ describe('ticket-close-closer (LIN-3366)', () => {
     return prepareCloserCandidates({ loops, questionStanding: o.questionStanding || new Map(), now: Date.now(), dispatchStore: store, log, ...o.extra });
   };
   const close = (o = {}) => closeTicketRows({
-    urlKey: URL_KEY, ticket: done, dispatchStore: store, recordsStore: records, agentStatusStore, log, info, ...o
+    urlKey: URL_KEY, ticket: done, dispatchStore: store, recordsStore: records, agentStatusStore, log, ...o
   });
   const row = (id) => history.findOne({ _id: id });
   const reverse = (id, decisionId) => store.markDecisionWithdrawalReversed(id, URL_KEY, decisionId);
 
-  describe('reversalState / isSettledForCloser (three states)', () => {
+  describe('reversalState (three states)', () => {
     const cells = [
       ['no digest => loop has no decision', { decision: null, withdrawalReversed: false }, 'clear'],
       ['key true', { decision: { decision_id: 'd' }, withdrawalReversed: true }, 'reversed'],
@@ -102,10 +101,6 @@ describe('ticket-close-closer (LIN-3366)', () => {
       ['key true + no decision', { decision: null, withdrawalReversed: true }, 'clear']
     ];
     for (const [name, loop, want] of cells) test(name, () => assert.equal(reversalState(loop), want));
-    test('a reversed loop is settled; a clear one is not', () => {
-      assert.equal(isSettledForCloser({ decision: { decision_id: 'd' }, withdrawalReversed: true }), true);
-      assert.equal(isSettledForCloser({ decision: { decision_id: 'd' }, withdrawalReversed: false }), false);
-    });
   });
 
   describe('the digest fact feeds the loop (lean read)', () => {
@@ -347,7 +342,7 @@ describe('ticket-close-closer (LIN-3366)', () => {
       await stripKey('legacy');
       const loops = await loopsOf();
       const r = await closeTicketRows({
-        urlKey: URL_KEY, ticket: done, dispatchStore: store, log, info,
+        urlKey: URL_KEY, ticket: done, dispatchStore: store, log,
         getLoops: async () => loops, redigest: async () => { throw new Error('mongo down'); }
       });
       assert.ok(logs.some(l => /\[ticket-closer\] verify failure/.test(l)));

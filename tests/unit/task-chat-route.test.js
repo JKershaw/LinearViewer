@@ -114,10 +114,10 @@ describe('task-chat route tool-calling wiring (LIN-990)', () => {
       'Task Chat has never exposed a remember/playbook write tool and must not inherit the core\'s default');
     assert.match(callSrc, /buildMessages:\s*buildTaskChatTurnMessages/,
       'the core must be handed Task Chat\'s OWN prompt, not fall through to the Flight Companion brief');
-    // LIN-2966 item 5 (subsumes LIN-2660): the two inputs list_pending_decisions
-    // needs, threaded all the way from server.js into this call.
-    assert.match(callSrc, /taskDecisionsStore\s*,/);
-    assert.match(callSrc, /shelvedRulingsStore\s*,/);
+    // LIN-4538: list_pending_decisions reads question records (recordsStore) only, so the old ruling stores are not
+    // threaded into this call.
+    assert.match(callSrc, /recordsStore\s*,/);
+    assert.doesNotMatch(callSrc, /taskDecisionsStore|shelvedRulingsStore/);
   });
 
   test('LIN-2966: the turn core is bound to the row\'s resolved binding, not the workspace-active one (LIN-2047, carried forward)', () => {

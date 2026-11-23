@@ -29,7 +29,7 @@ import { resolveRunnerOwnerRefusal } from '../lib/runner-owner-gate.js';
 import { readSessionById } from '../lib/dispatch-session-read.js';
 import { isTerminalState } from '../lib/providers/state-map.js';
 import { UUID_REGEX } from '../lib/dispatch-validation.js';
-import { sessionIsTerminal, enrichLoop } from './dashboard.js';
+import { sessionIsTerminal } from './dashboard.js';
 import { resolveIssueBinding, isValidIssueId, getWorkspaceCallScope } from '../lib/workspace.js';
 import { isHermeticTestToken, shouldMockAi } from '../lib/should-mock-ai.js';
 import { getProvider, getProviderForWorkspace } from '../lib/providers/registry.js';
@@ -224,13 +224,6 @@ export function buildMockAnswer(context, question, related) {
  *   broker-dependent (claude-code) session. Absent → provisioning degrades exactly as
  *   `provisionBootstrapToken` specifies (null for prose harnesses; fail-closed throw for
  *   claude-code, surfaced as a tool error rather than a silently credential-less resume)
- * @param {Object}   [deps.taskDecisionsStore] - LIN-2966 (subsumes LIN-2660): the
- *   scan-produced decisions input to the `list_pending_decisions` chat tool.
- *   Absent → that tool fails cleanly as "not configured"; every other tool is
- *   unaffected.
- * @param {Object}   [deps.shelvedRulingsStore] - LIN-2966: the shelved-rulings
- *   input to the same tool, so a deliberately shelved decision does not
- *   resurface in the chat.
  * @param {Object}   [deps.runProposalsStore] - LIN-3254: durable store for
  *   proposals a run-scoped chat turn makes (never executes). Required for a
  *   run-scoped turn; ordinary chats never touch it.
@@ -240,7 +233,7 @@ export function buildMockAnswer(context, question, related) {
  *   route's real (non-mockAi) run-scoped propose path is pinned end to end.
  * @returns {Router}
  */
-export function createTaskChatRoutes({ workspaceFromUrl, freeTierStore, workspacePreferencesStore, getOpenRouterSource, getDeployInfo, savedChatStore, recapCacheStore, briefCacheStore, dispatchQueueStore, agentStatusStore, proxyTokenStore, taskDecisionsStore, shelvedRulingsStore, runProposalsStore, chatClient, workspaceOwnerCheck = null, installationTokenFor = null, recordsStore = null, accountStore = null }) {
+export function createTaskChatRoutes({ workspaceFromUrl, freeTierStore, workspacePreferencesStore, getOpenRouterSource, getDeployInfo, savedChatStore, recapCacheStore, briefCacheStore, dispatchQueueStore, agentStatusStore, proxyTokenStore, runProposalsStore, chatClient, workspaceOwnerCheck = null, installationTokenFor = null, recordsStore = null, accountStore = null }) {
   const router = Router();
 
   // ─── HTML page ──────────────────────────────────────────────────────────────
@@ -693,11 +686,6 @@ export function createTaskChatRoutes({ workspaceFromUrl, freeTierStore, workspac
           dispatchQueueStore,
           agentStatusStore,
           sessionIsTerminal,
-          // LIN-2966 (subsumes LIN-2660): the two inputs `list_pending_decisions`
-          // needs to return the same rows the rulings feed returns.
-          taskDecisionsStore,
-          shelvedRulingsStore,
-          enrichLoop,
           // LIN-1139: thread the workspace prefs store so a tool-driven follow-up
           // resolves model/harness through the shared dispatch factory.
           workspacePreferencesStore,

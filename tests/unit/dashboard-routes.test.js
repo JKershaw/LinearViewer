@@ -14,7 +14,7 @@
  */
 import { test, describe, before, after, beforeEach } from 'node:test';
 import assert from 'node:assert';
-import { buildTestSummary, buildTestSessionSummary, deriveSessionStatus, deriveSessionDecisions } from '../../routes/dashboard.js';
+import { buildTestSummary, buildTestSessionSummary, deriveSessionStatus } from '../../routes/dashboard.js';
 import { NOW_ISO, createDashboardRoutes, makeStores, findRouteLayer, getHandler, makeReqRes, makeRouter, decisionItem, recordsStoreOfChanges } from '../fixtures/dashboard-router.js';
 import { createSessionsFeedCache } from '../../lib/sessions-feed-cache.js';
 import { InMemoryRunSummaryCacheStore } from '../../lib/run-summary-cache.js';
@@ -3984,35 +3984,6 @@ describe('GET /observation/session/:sessionId — waiting banner clears after a 
     assert.ok(html, 'the page rendered');
     assert.ok(!html.includes('session-waiting-banner'), 'no waiting banner once the reply cleared the block');
     assert.ok(html.includes('data-session-waiting="false"'), 'the waiting flag threaded to the client is false');
-  });
-});
-
-// ─── LIN-3252 S2 / LIN-4538 (P7a): the pinned question read ─────────────────────
-//
-// The run page's pinned cards are the session's OPEN question records (lib/open-questions.js openQuestionsForRun
-// through the route; deriveSessionDecisions is the pure read over the question facts). An answered or dismissed
-// question is never read here, and a question asked from another run is not this session's.
-describe('deriveSessionDecisions — the session\'s open question facts (LIN-4538)', () => {
-  const fact = (over = {}) => ({
-    questionId: 'q-1', state: 'open', to: 'person:acct-owner', ticket: 'LIN-1', runId: 'l-live', taskId: 'task-LIN-1', resolvedAt: null,
-    endedBy: null, reason: null, outcome: null, ...over,
-  });
-  const loopOf = (loopId, over = {}) => ({ loopId, lineageId: loopId, issueIdentifier: 'LIN-1', ...over });
-
-  test('an open question asked from this session\'s lineage is the card; an ended one is not', () => {
-    const rows = deriveSessionDecisions([loopOf('l-live')], {
-      questions: [fact(), fact({ questionId: 'q-2', state: 'answered', resolvedAt: '2026-10-30T11:00:00.000Z', endedBy: 'person:acct-owner' })],
-    });
-    assert.deepEqual(rows.map((r) => r.questionId), ['q-1']);
-  });
-
-  test('a question asked from another run is not this session\'s, even on the same ticket', () => {
-    const rows = deriveSessionDecisions([loopOf('l-live')], { questions: [fact({ runId: 'l-other' })] });
-    assert.deepEqual(rows, []);
-  });
-
-  test('no facts read: no card', () => {
-    assert.deepEqual(deriveSessionDecisions([loopOf('l-live')]), []);
   });
 });
 
