@@ -79,6 +79,7 @@ import { AgentStatusStore } from '../lib/agent-status-store.js';
 import { getLoopsForWorkspace } from '../lib/pipeline-loops.js';
 import { RecordsStore, RECORDS_COLLECTION, REFS_COLLECTION, QUERY_LOG_COLLECTION } from '../lib/records-store.js';
 import { questionFacts, openQuestionFacts, TICKET_CLOSED_QUESTION_REASON } from '../lib/records/question-facts.js';
+import { questionStandingOf } from '../lib/records/question-standing.js';
 import { prepareCloserCandidates, TICKET_CLOSED_REASON } from '../lib/ticket-close-closer.js';
 import { isDecisionLifecycleStampEntry } from '../lib/digest-feedback.js';
 import { TERMINAL_TYPES } from '../lib/providers/models.js';
@@ -176,7 +177,9 @@ export function createPacedMemoReader(read, { paceMs = TICKET_READ_PACE_MS, slee
  */
 async function ticketClauses({ urlKey, loops, now, readTicket, dispatchStore, recordsStore }) {
   const out = { clause3: [], clause3NoStamp: [], clause4: [], humanReopened: [], unverified: 0, unknown: new Set(), checked: new Set() };
-  const c = await prepareCloserCandidates({ loops, now, dispatchStore, persist: false });
+  // The closer's own reading of which loops' questions are settled (lib/ticket-close-closer.js closeTicketRows).
+  const questionStanding = recordsStore ? await questionStandingOf(recordsStore, urlKey) : new Map();
+  const c = await prepareCloserCandidates({ loops, questionStanding, now, dispatchStore, persist: false });
   out.unverified = c.unverified.length;
 
   // `readTicket` is memoised per run by `runFalseLiveRows`, shared with `falseCloses`.
@@ -193,7 +196,7 @@ async function ticketClauses({ urlKey, loops, now, readTicket, dispatchStore, re
     if (await terminal(r.issueIdentifier)) out.clause3.push({ loopId: r.loopId, issue: r.issueIdentifier });
   }
   // c3 with C's row stamp disabled: same selector over the loops as if no `ticket-closed` stamp existed.
-  const cNo = await prepareCloserCandidates({ loops: withoutTicketClosedStamp(loops), now, dispatchStore, persist: false });
+  const cNo = await prepareCloserCandidates({ loops: withoutTicketClosedStamp(loops), questionStanding, now, dispatchStore, persist: false });
   out.clause3NoStamp = [];
   for (const r of cNo.rows) {
     if (await terminal(r.issueIdentifier)) out.clause3NoStamp.push({ loopId: r.loopId, issue: r.issueIdentifier });

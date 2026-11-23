@@ -106,6 +106,28 @@ describe('false-live-rows (LIN-3365)', () => {
     assert.equal(w(r).clause3, 3);
   });
 
+  test('clause 3 mirrors the closer: a blocked row whose lineage asked a question that is now answered is settled, not false-live (LIN-4538)', async () => {
+    // The question records `run` = the asking run; with no run record its lineage is that run id, the loop's lineageId ?? loopId.
+    const askFrom = async (task, run) => {
+      const made = await records.ensureTask('acme', { identifier: task, title: task }, { by: 'implementation' });
+      assert.ok(made.id, `task refused: ${JSON.stringify(made)}`);
+      const snap = await writes.add({
+        urlKey: 'acme', kind: 'question', by: 'implementation', run, at: new Date(NOW - 3 * TICKET_CLOSED_GRACE_MS).toISOString(),
+        input: { asks: 'Which way?', options: ['left', 'right'], recommended: 'left', 'if-unanswered': 'pick left', to: 'project', in: made.id },
+      });
+      assert.ok(snap.record, `question refused: ${JSON.stringify(snap.problems)}`);
+      return snap.record.id;
+    };
+    const answered = await askFrom('LIN-ANS', 'l-answered');
+    await records.end('acme', answered, { state: 'answered', reason: 'answered by decision-z' }, { by: 'person:acct-owner' });
+    await askFrom('LIN-NONE', 'l-other'); // an unrelated lineage's question: the control, it does not settle l-none
+    const r = await run({
+      readLoops: async () => [blockedLoop('l-answered', 'LIN-ANS'), blockedLoop('l-none', 'LIN-NONE')],
+      readTicketState: async () => termTicket
+    });
+    assert.equal(w(r).clause3, 1, 'only the loop with no settled question is counted');
+  });
+
   test('clause 4 flags an open question on a terminal ticket, raised past the grace; a question on an open ticket is not counted', async () => {
     await askOpen('LIN-OLD', ago(0, -60));
     await askOpen('LIN-OPEN', ago(0, -60));

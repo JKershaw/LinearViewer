@@ -98,7 +98,7 @@ describe('how a failure is read (the fact that must survive the guess being remo
 
   test('taskFactsOf draws the failure from the task model, the same fact the row reads', () => {
     const model = modelOf('LIN-1', [failedLoop('implementation', { loopId: 'i1' })]);
-    const facts = taskFactsOf({ model, identifier: 'LIN-1', trackerType: 'started', now: NOW });
+    const facts = taskFactsOf({ model, trackerType: 'started', now: NOW });
     assert.deepEqual(facts.failed, { words: 'Build failed' });
   });
 
@@ -180,7 +180,7 @@ describe('what the states that stay read', () => {
   });
 
   test('rollUpRow: a failed child rolls up to a failed container when nothing needs the person', () => {
-    const own = taskFactsOf({ model: modelOf('LIN-100', []), identifier: 'LIN-100', trackerType: 'started', now: NOW });
+    const own = taskFactsOf({ model: modelOf('LIN-100', []), trackerType: 'started', now: NOW });
     const rolled = rollUpRow(own, [{ identifier: 'LIN-101', title: null, state: 'failed', words: 'Build failed' }]);
     assert.equal(rolled.state, 'failed');
     assert.equal(rolled.words, 'a subtask failed');

@@ -22,7 +22,7 @@ import { loadWorld } from './helpers/client-world.js';
 // LIN-4016: Home's pill reads the task's decided state. This helper reads the task's OWN facts; it equals the gather that
 // `/state` sends (lib/home-row-states.js) only for a leaf, which is every fixture that uses it. A container's state is
 // witnessed through the route (lin-4070-state-reads-gatherer.test.js), not here.
-const stateOf = (model) => taskStateOf(taskFactsOf({ model, identifier: model.identifier, now: NOW }));
+const stateOf = (model) => taskStateOf(taskFactsOf({ model, now: NOW }));
 import { renderPage } from '../../lib/render.js';
 import { enrichLoop, deriveSessionWaiting } from '../../routes/dashboard.js';
 import { escapeHtml } from '../../lib/utils/html.js';
