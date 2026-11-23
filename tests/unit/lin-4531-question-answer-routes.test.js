@@ -24,7 +24,7 @@ import { createDispatchItem } from '../../lib/dispatch-factory.js';
 import { createRecordWrites } from '../../lib/records/writes.js';
 import { isTerminalState } from '../../lib/providers/state-map.js';
 import { fixedIdOf } from '../../lib/records/refs.js';
-import { resumesQuestion } from '../../lib/prompts/question-resume.js';
+import { resumesQuestion, RESUME_ACTION } from '../../lib/prompts/question-resume.js';
 import { createQuestionAnswerRoutes } from '../../routes/question-answers.js';
 
 const URL_KEY = 'lin-4531-routes';
@@ -127,7 +127,7 @@ describe('the answer and dismiss routes', () => {
     const follow = await followUpsOf(run);
     assert.equal(follow.length, 1, 'one follow-up');
     assert.equal(follow[0].followUpTo, run);
-    assert.ok(resumesQuestion(follow[0].prompt, q));
+    assert.ok(resumesQuestion(follow[0].prompt, q, RESUME_ACTION.ANSWER));
     assert.ok(follow[0].prompt.includes('Option chosen:\nright'));
     assert.ok(follow[0].prompt.includes('Go right, keep the logs.'));
   });
@@ -193,7 +193,7 @@ describe('the kickoff witness: a fresh autopilot kickoff asks, is answered, and 
     const follow = await followUpsOf(kickoff._id);
     assert.equal(follow.length, 1, 'one follow-up, to the kickoff run');
     assert.equal(follow[0].followUpTo, kickoff._id);
-    assert.ok(resumesQuestion(follow[0].prompt, q), 'the resume carries the question');
+    assert.ok(resumesQuestion(follow[0].prompt, q, RESUME_ACTION.ANSWER), 'the resume carries the question');
     assert.ok(follow[0].prompt.includes('Split the epic now?'));
     assert.ok(follow[0].prompt.includes('Option chosen:\nkeep'));
     assert.ok(follow[0].prompt.includes('Keep it whole; the parts share one schema.'));

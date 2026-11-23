@@ -25,7 +25,7 @@ import { createRecordWrites } from '../../lib/records/writes.js';
 import { createQuestionAnswers } from '../../lib/question-answers.js';
 import { REAP_INACTIVITY_MS as LEAF_REAP, resolveDisposition as leafDisposition, runLoopFactsOf } from '../../lib/run-liveness.js';
 import { REAP_INACTIVITY_MS, resolveDisposition } from '../../lib/unanswered-decisions.js';
-import { questionAnsweredPrompt, questionDismissedPrompt, resumesQuestion } from '../../lib/prompts/question-resume.js';
+import { questionAnsweredPrompt, questionDismissedPrompt, resumesQuestion, RESUME_ACTION } from '../../lib/prompts/question-resume.js';
 import { isTerminalState } from '../../lib/providers/state-map.js';
 import { fixedIdOf } from '../../lib/records/refs.js';
 
@@ -58,10 +58,13 @@ beforeEach(async () => {
   service = makeService();
 });
 
-/** A follow-up row, as the factory writes one: `followUpTo` the run, the prompt verbatim. */
-async function writeFollowUp({ runId, prompt, id = `fu-${enqueueCalls.length}`, status = 'queued', feedback = [], dispatchedAt = NOW }) {
-  // As the factory writes one (lib/dispatch-factory.js inherits rootItemId from the parent): rooted at the run, following up on the tail.
-  await dispatch.collection.insertOne({ _id: id, urlKey: URL_KEY, followUpTo: runId, rootItemId: runId, prompt, feedback, status, dispatchedAt, target: 'cli', expiresAt: new Date('2099-01-01T00:00:00.000Z') });
+/**
+ * A follow-up row, as the factory writes one: rooted at the run, and `followUpTo` the row it follows up on (the run's tail, which
+ * for a first resume is the run's own row). `followUpTo` defaults to the run, as it does for a first follow-up.
+ */
+async function writeFollowUp({ runId, prompt, id = `fu-${enqueueCalls.length}`, followUpTo = runId, status = 'queued', feedback = [], dispatchedAt = NOW }) {
+  // As the factory writes one (lib/dispatch-factory.js inherits rootItemId from the parent).
+  await dispatch.collection.insertOne({ _id: id, urlKey: URL_KEY, followUpTo, rootItemId: runId, prompt, feedback, status, dispatchedAt, target: 'cli', expiresAt: new Date('2099-01-01T00:00:00.000Z') });
   return id;
 }
 
@@ -75,7 +78,8 @@ function makeService() {
     enqueueResume: async (args) => {
       enqueueCalls.push(args);
       if (enqueueResult) return enqueueResult(args);
-      const itemId = await writeFollowUp({ runId: args.runId, prompt: args.prompt });
+      // The row takes the id of this call (fu-0 for the first resume), and follows up on the tail the service chose, as the factory does.
+      const itemId = await writeFollowUp({ runId: args.runId, followUpTo: args.followUpTo, prompt: args.prompt, id: `fu-${enqueueCalls.length - 1}` });
       return { status: 200, body: { queued: true, itemId } };
     },
   });
@@ -315,6 +319,52 @@ describe('exactly one resume per answer', () => {
   });
 });
 
+describe('a settled question stays settled across the two actions (review finding af9e77b1)', () => {
+  test('a dismissal whose resume was made and whose end failed: an answer is 409, writes no decision, and makes no second resume', async () => {
+    const run = await askingRun('run-v1', { feedback: blocked() });
+    const q = await askQuestion({ run });
+    const realEnd = writes.end;
+    writes.end = async () => { throw new Error('store down'); };
+    await assert.rejects(service.dismiss({ urlKey: URL_KEY, questionId: q, by: PERSON, dispatchedBy: 'acct-owner' }), /store down/);
+    writes.end = realEnd;
+    assert.equal(enqueueCalls.length, 1, 'the dismissal resumed the run with its fallback');
+    assert.equal((await records.current(URL_KEY, q)).state, 'open', 'the question is still open: its end was not made');
+
+    const answer = await service.answer({ urlKey: URL_KEY, questionId: q, option: 'right', words: 'go right', by: PERSON, dispatchedBy: 'acct-owner' });
+    assert.equal(answer.status, 409, JSON.stringify(answer.body));
+    assert.equal(answer.body.code, 'ruling-settled');
+    assert.equal(await records.current(URL_KEY, fixedIdOf('decision', q, 'answer')), null, 'no decision was written');
+    assert.equal(enqueueCalls.length, 1, 'no second resume: the run was never told the answer');
+
+    const retry = await service.dismiss({ urlKey: URL_KEY, questionId: q, by: PERSON, dispatchedBy: 'acct-owner' });
+    assert.equal(retry.status, 200, JSON.stringify(retry.body));
+    assert.equal(retry.body.resumed, true);
+    assert.equal(enqueueCalls.length, 1, 'the dismissal retry completes the end and makes no second resume');
+    assert.equal((await records.current(URL_KEY, q)).state, 'withdrawn');
+  });
+
+  test('an answer whose decision stands but whose resume failed: a dismissal is 409, writes nothing, and the answer retry completes', async () => {
+    const run = await askingRun('run-v2', { feedback: blocked() });
+    const q = await askQuestion({ run });
+    enqueueResult = async () => { throw new Error('queue down'); };
+    await assert.rejects(service.answer({ urlKey: URL_KEY, questionId: q, option: 'left', by: PERSON, dispatchedBy: 'acct-owner' }), /queue down/);
+    enqueueResult = null;
+    assert.ok(await records.current(URL_KEY, fixedIdOf('decision', q, 'answer')), 'the decision stands');
+
+    const dismissed = await service.dismiss({ urlKey: URL_KEY, questionId: q, by: PERSON, dispatchedBy: 'acct-owner' });
+    assert.equal(dismissed.status, 409, JSON.stringify(dismissed.body));
+    assert.equal(dismissed.body.code, 'ruling-settled');
+    assert.equal(enqueueCalls.length, 1, 'the dismissal enqueued nothing');
+    assert.equal((await records.current(URL_KEY, q)).state, 'open', 'the question is not withdrawn against its own decision');
+
+    const retry = await service.answer({ urlKey: URL_KEY, questionId: q, option: 'left', by: PERSON, dispatchedBy: 'acct-owner' });
+    assert.equal(retry.status, 200, JSON.stringify(retry.body));
+    assert.equal(retry.body.resumed, true);
+    assert.equal(enqueueCalls.length, 2, 'the failed attempt and the one resume made by the retry');
+    assert.equal((await records.current(URL_KEY, q)).state, 'answered');
+  });
+});
+
 describe('the resume prompt', () => {
   test('holds the question, the option and the words verbatim, in that order, with markup and a long sentence', async () => {
     const run = await askingRun('run-q', { feedback: blocked() });
@@ -340,13 +390,21 @@ describe('the resume prompt', () => {
     assert.doesNotMatch(onlyOption, /own words/);
   });
 
-  test('the marker is a whole line: resumesQuestion finds it in either composer and not in a longer id', () => {
+  test('the marker is a whole line: resumesQuestion finds it in its own composer and not in a longer id', () => {
     const answered = questionAnsweredPrompt({ questionId: 'question-abc', asks: 'A?', option: 'x' });
     const dismissed = questionDismissedPrompt({ questionId: 'question-abc', asks: 'A?', ifUnanswered: 'go' });
-    assert.equal(resumesQuestion(answered, 'question-abc'), true);
-    assert.equal(resumesQuestion(dismissed, 'question-abc'), true);
-    assert.equal(resumesQuestion(answered, 'question-ab'), false);
-    assert.equal(resumesQuestion('some unrelated prompt', 'question-abc'), false);
+    assert.equal(resumesQuestion(answered, 'question-abc', RESUME_ACTION.ANSWER), true);
+    assert.equal(resumesQuestion(dismissed, 'question-abc', RESUME_ACTION.DISMISSAL), true);
+    assert.equal(resumesQuestion(answered, 'question-ab', RESUME_ACTION.ANSWER), false);
+    assert.equal(resumesQuestion('some unrelated prompt', 'question-abc', RESUME_ACTION.ANSWER), false);
+  });
+
+  test('the marker is per action (review finding af9e77b1): an answer marker is not a dismissal, and the reverse', () => {
+    const answered = questionAnsweredPrompt({ questionId: 'question-abc', asks: 'A?', option: 'x' });
+    const dismissed = questionDismissedPrompt({ questionId: 'question-abc', asks: 'A?', ifUnanswered: 'go' });
+    assert.equal(resumesQuestion(answered, 'question-abc', RESUME_ACTION.DISMISSAL), false);
+    assert.equal(resumesQuestion(dismissed, 'question-abc', RESUME_ACTION.ANSWER), false);
+    assert.throws(() => resumesQuestion(answered, 'question-abc', 'either'), /unknown action/, 'an unknown action never matches by default');
   });
 
   test('a dismissal with no if-unanswered text still tells the run what to do', () => {
@@ -403,7 +461,7 @@ describe('the lineage tail decides liveness and the follow-up target (review fin
     const run = await askingRun('run-t1', { feedback: blocked() });
     enqueueResult = async (args) => {
       // The first resume is taken by the runner: the tail is now running.
-      const itemId = await writeFollowUp({ runId: args.runId, prompt: args.prompt, status: 'taken', feedback: [] });
+      const itemId = await writeFollowUp({ runId: args.runId, followUpTo: args.followUpTo, prompt: args.prompt, status: 'taken', feedback: [] });
       return { status: 200, body: { queued: true, itemId } };
     };
     const q1 = await askQuestion({ run, asks: 'First?' });
@@ -450,7 +508,8 @@ describe('the lineage tail decides liveness and the follow-up target (review fin
     assert.equal(enqueueCalls.length, 1);
     // The resume was made, then the runner's follow-up took it on: the marker sits on a row that follows up on the first follow-up.
     const made = enqueueCalls[0].prompt;
-    await dispatch.collection.updateOne({ _id: 'fu-0' }, { $set: { status: 'done', feedback: [{ message: '[done] took the answer', timestamp: NOW.toISOString() }] } });
+    // fu-0 is the first resume, now done. Its own prompt is replaced, so the marker sits only on the nested row below.
+    await dispatch.collection.updateOne({ _id: 'fu-0' }, { $set: { prompt: 'the earlier note', status: 'done', feedback: [{ message: '[done] took the answer', timestamp: NOW.toISOString() }] } });
     await dispatch.collection.insertOne({ _id: 'fu-1', urlKey: URL_KEY, followUpTo: 'fu-0', rootItemId: run, prompt: made, feedback: [], status: 'taken', dispatchedAt: new Date(NOW.getTime() + 1000), target: 'cli', expiresAt: new Date('2099-01-01T00:00:00.000Z') });
     const retry = await service.answer({ urlKey: URL_KEY, questionId: q, option: 'left', by: PERSON, dispatchedBy: 'acct-owner' });
     assert.equal(retry.status, 200, JSON.stringify(retry.body));
