@@ -630,4 +630,19 @@ describe('LIN-4545: the answer sits on its question\'s task, whatever the run\'s
     assert.equal(versions.find((x) => x.v === 1).in, undefined, 'v1 stays as it was written');
     assert.equal((await records.current(URL_KEY, q)).state, 'answered');
   });
+
+  test('a retry over a decision the fixed route already put on the task adds no version: the has-task guard', async () => {
+    const run = await askingRun('run-t6', { status: 'done', feedback: doneAt(new Date(NOW.getTime() - 8 * DAY)) });
+    const { task, q } = await taskQuestion(run);
+    const decisionId = fixedIdOf('decision', q, 'answer');
+    // A partial failure of the fixed route: the decision was written `in` its task, the question not yet ended.
+    await writes.add({ urlKey: URL_KEY, kind: 'decision', input: { in: task, links: { answers: q }, answer: 'left' }, by: PERSON, run: null, fixedId: decisionId });
+    assert.equal((await records.current(URL_KEY, q)).state, 'open');
+    const out = await service.answer({ urlKey: URL_KEY, questionId: q, option: 'left', by: PERSON, dispatchedBy: 'acct-owner' });
+    assert.equal(out.status, 200, JSON.stringify(out.body));
+    const { snap } = await records.read(URL_KEY, decisionId);
+    assert.equal(snap.v, 1, 'no redundant v2 on a decision already on its task');
+    assert.equal(snap.in, task);
+    assert.equal((await records.current(URL_KEY, q)).state, 'answered');
+  });
 });
