@@ -112,9 +112,9 @@ describe('the scope in the URL (LIN-3983 PR 2)', () => {
 
   test('the scope and the view are written together, and the view keeps its own parameter', async () => {
     const world = await makeWorld();
-    world.page.switchView('rulings');
+    world.page.switchView('questions');
     await pressScope(world, 'all');
-    assert.equal(written(world).get('view'), 'rulings');
+    assert.equal(written(world).get('view'), 'questions');
     assert.equal(written(world).get('scope'), 'all');
   });
 });

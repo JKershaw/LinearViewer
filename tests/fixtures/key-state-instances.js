@@ -17,6 +17,7 @@ import { createRefreshOnResolveGate } from '../../lib/refresh-on-resolve-gate.js
 import { createInstallationTokenResolver } from '../../lib/connection-credential.js';
 import { createWorkspaceKpisCache } from '../../lib/workspace-kpis-cache.js';
 import { createTimelineFragmentReader } from '../../lib/task-timeline.js';
+import { createQuestionTaskTitles } from '../../lib/question-task-titles.js';
 import { fakeGitHub, connection, OWNER as LOOKUP_OWNER, NOW as LOOKUP_NOW } from './lin-3285-seam.js';
 import { createKeyState } from '../../lib/key-state.js';
 import { registerKeyStateHolders } from '../../lib/key-state-holders.js';
@@ -56,6 +57,8 @@ export function buildKeyStateInstances({ fetchAndPrepareProjects = async () => (
       readTaskTimeline: async ({ identifier }) => ({ identifier, lanes: [] }),
       now: () => new Date(now()),
     }),
+    // LIN-4553: the question card's task titles, over a stub one-issue read (the real one is the workspace provider's).
+    questionTaskTitles: createQuestionTaskTitles({ fetchTitle: async (_workspace, ticket) => `Title of ${ticket}`, now }),
   };
 }
 

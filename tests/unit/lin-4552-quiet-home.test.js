@@ -162,7 +162,7 @@ describe('one number: N questions plus M findings', () => {
     assert.equal(questionsWords(1), '1 question');
     assert.equal(questionsWords(4), '4 questions');
     const nav = renderNavBar({ workspaces: [], urlKey: URL_KEY, featureFlags: { runControls: true } });
-    assert.match(nav, /data-testid="nav-questions-badge"[^>]*href="\/workspace\/lin-4552-ws\/observation\?view=rulings"/);
+    assert.match(nav, /data-testid="nav-questions-badge"[^>]*href="\/workspace\/lin-4552-ws\/observation\?view=questions"/);
   });
 });
 

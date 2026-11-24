@@ -1580,7 +1580,7 @@ test.describe('LIN-3361: expandable grouped tool rows, folded decisions and read
     await expect(page.locator('#flight-companion-thread > li.chat-tool-row')).toHaveCount(1);
   });
 
-  test('open questions fold under "N decisions waiting"; opening it shows each question as the shared card, and answering one settles it', async ({ page }) => {
+  test('open questions fold under "N questions waiting"; opening it shows each question as the shared card, and answering one settles it', async ({ page }) => {
     // LIN-4538: `list_pending_decisions` returns the open questions the person was asked (lib/chat-tools.js projectPendingQuestion),
     // each drawn as the shared question card and answered through the one question route.
     const question = (n) => ({
@@ -1601,11 +1601,11 @@ test.describe('LIN-3361: expandable grouped tool rows, folded decisions and read
 
     const fold = page.locator('.fc-decisions-fold');
     await expect(fold).toHaveCount(1);
-    await expect(fold.locator('> summary')).toHaveText('2 decisions waiting');
+    await expect(fold.locator('> summary')).toHaveText('2 questions waiting');
     await expect(fold).not.toHaveAttribute('open', '');
     await expect(fold.locator('.fc-decision')).toHaveCount(2);
     await expect(fold.locator('.fc-decision').first()).toBeHidden();
-    await expect(page.getByTestId('fc-decisions-rulings-link')).toHaveAttribute('href', `/workspace/${URL_KEY}/observation?view=rulings`);
+    await expect(page.getByTestId('fc-decisions-rulings-link')).toHaveAttribute('href', `/workspace/${URL_KEY}/observation?view=questions`);
 
     await fold.locator('> summary').click();
     const row = fold.locator('.fc-decision').first();

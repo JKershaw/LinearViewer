@@ -182,6 +182,7 @@ import { createTaskFactsHolder, createTaskFactsRefresh } from './lib/task-facts-
 import { createWorkspaceIssuesMemo } from './lib/workspace-issues-memo.js'
 import { createKeyState } from './lib/key-state.js'
 import { registerKeyStateHolders } from './lib/key-state-holders.js'
+import { createQuestionTaskTitles } from './lib/question-task-titles.js'
 import { createTaskDoneCache } from './lib/task-done-cache.js'
 import { dispatchGuardTaskDoneCache } from './lib/dispatch-factory.js'
 import { gatherHomeInputs, gatherHomePage, homeRowDataFor } from './lib/home-pipeline.js'
@@ -3341,7 +3342,21 @@ app.use(createCollectiveRoutes({ workspaceFromUrl, dispatchQueueStore, proxyToke
 // LIN-4168: the dashboard’s touched-task done cache, built here (not by the router’s default) so the key-state registry
 // can reach the same instance the feed reads.
 const dashboardTaskDoneCache = createTaskDoneCache();
-app.use(createDashboardRoutes({ installationTokenFor, workspaceFromUrl, dispatchQueueStore, agentStatusStore, observationSessionsStore, observationMaterializer, sessionsFeedCache, taskDoneCache: dashboardTaskDoneCache, runSummaryCacheStore, sessionSummaryCacheStore, runParagraphStore, recordsStore, proxyEventStore, freeTierStore, getWorkspaceAccessToken, fetchIssueContext, fetchWorkspaceIssues, getOpenRouterSource, getDeployInfo, workspacePreferencesStore, runProposalsStore, proxyTokenStore, readRunEvidence, prStateStore, workspaceOwnerCheck, requestUsageLoader, accountStore, readTaskFacts: (urlKey) => taskFacts.read(urlKey) }))
+// LIN-4553: the question card's task title when the feed's and the run page's own sources miss it: one issue read from the
+// workspace's provider, bounded (lib/question-task-titles.js: capped per call, time-boxed, hits and misses cached). A provider
+// with a test transport under the hermetic token has no tracker to ask (the dispatch factory's own rule, refusesHermeticToken);
+// the local provider reads its own store. Per workspace key, so it is registered with the per-key reset below.
+const questionTaskTitles = createQuestionTaskTitles({
+  fetchTitle: async (workspace, ticket) => {
+    if (!workspace) return null;
+    const provider = getProviderForWorkspace(workspace);
+    if (typeof provider?.fetchIssueContext !== 'function') return null;
+    if (provider.testTransport && isHermeticTestToken(workspace.accessToken)) return null;
+    const { issue } = (await provider.fetchIssueContext(getWorkspaceCallScope(workspace), ticket)) || {};
+    return issue?.title ?? null;
+  },
+});
+app.use(createDashboardRoutes({ installationTokenFor, questionTaskTitles, workspaceFromUrl, dispatchQueueStore, agentStatusStore, observationSessionsStore, observationMaterializer, sessionsFeedCache, taskDoneCache: dashboardTaskDoneCache, runSummaryCacheStore, sessionSummaryCacheStore, runParagraphStore, recordsStore, proxyEventStore, freeTierStore, getWorkspaceAccessToken, fetchIssueContext, fetchWorkspaceIssues, getOpenRouterSource, getDeployInfo, workspacePreferencesStore, runProposalsStore, proxyTokenStore, readRunEvidence, prStateStore, workspaceOwnerCheck, requestUsageLoader, accountStore, readTaskFacts: (urlKey) => taskFacts.read(urlKey) }))
 
 // Mount task-chat routes (experimental "talk to a task" conversation).
 // Task Chat builds its catalog through the same createChatToolCatalog call the turn core makes for every surface.
@@ -3390,6 +3405,7 @@ registerKeyStateHolders(keyState, {
   installationTokenFor,
   workspaceKpisCache,
   timelineFragment,
+  questionTaskTitles,
 });
 const taskPageLoader = createTaskPageLoader({ dispatchStore: dispatchQueueStore, agentStatusStore, readRunEvidence, prStateStore, installationTokenFor, closeOutEventsStore, recordsStore, enrichLoop, deriveSessionWaiting, taskFacts: { read: taskFacts.read }, gatherTaskStates, readTaskTimeline })
 // LIN-3833 / LIN-4016: Home's row states, assembled once for all three Home routes (lib/home-row-states.js): one lean

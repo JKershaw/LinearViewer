@@ -9,7 +9,7 @@
  * runningRun).
  *
  * Surfaces: Home, the rulings page (Observation › rulings), Runs (Observation › runs), a task page with a question, the run page
- * of the asking run, and Flight Companion with its "decisions waiting" fold opened. Flight Companion's fold is drawn from a
+ * of the asking run, and Flight Companion with its "questions waiting" fold opened. Flight Companion's fold is drawn from a
  * model's `list_pending_decisions` tool result; the turn is mocked (as tests/e2e/flight-companion.spec.js does) with the
  * seeded questions as the real tool projects them, so no model is called.
  *
@@ -114,6 +114,9 @@ async function shootAll(page, name, path, prepare = async () => {}, { fresh = fa
       await page.waitForLoadState('networkidle');
       await prepare();
       if (width === 390) scroll390.push({ shot: `${name}-${theme}-${width}`, scrollWidth: await page.evaluate(() => document.documentElement.scrollWidth) });
+      // LIN-4553: a full-page shot taken while a poll repaints can catch the sticky header part-way down the page (seen on
+      // both sets, a different shot each run). Start each shot at the top, after two frames, so the header is where a person sees it.
+      await page.evaluate(() => new Promise((resolve) => { window.scrollTo(0, 0); requestAnimationFrame(() => requestAnimationFrame(resolve)); }));
       await page.screenshot({ path: `${DIR}/${name}-${theme}-${width}.png`, fullPage: true });
     }
   }

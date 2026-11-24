@@ -95,7 +95,8 @@
       "slug": "records",
       "match": [
         "^lib/records/|^lib/records-store\\.js$|^lib/records-tracker\\.js$|^lib/change-records\\.js$|^lib/task-standing\\.js$",
-        "^lib/open-questions\\.js$"
+        "^lib/open-questions\\.js$",
+        "^lib/question-task-titles\\.js$"
       ]
     },
     {

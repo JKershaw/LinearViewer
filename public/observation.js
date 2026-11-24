@@ -82,14 +82,14 @@ const hiddenWorkspaces = new Set();        // urlKeys toggled off
 let archiveOpen = false;
 
 // Active view (LIN-1194, LIN-1728, LIN-3983): 'runs' (the one feed of runs,
-// narrowed by `currentFilter`), 'rulings' (LIN-1728 Phase 4 — unanswered
-// decisions, a different payload shape entirely, polled from a different
-// endpoint). LIN-3983 folded the old
+// narrowed by `currentFilter`), 'questions' (LIN-1728 Phase 4 — the open questions
+// asked of the person, a different payload shape entirely, polled from a different
+// endpoint; LIN-4553 renamed it from 'rulings', which still loads). LIN-3983 folded the old
 // Autopilot and Sessions tabs into 'runs' and a filter; `?view=autopilot` and
-// `?view=sessions` still load (viewFromParams). The tab is a pure in-page
+// `?view=sessions` still load (viewFromParams), as `?view=rulings` does. The tab is a pure in-page
 // switch: it flips the poll endpoint, and resets the feed state so the views'
 // distinct data sets never bleed together.
-const VIEWS = ['runs', 'rulings'];
+const VIEWS = ['runs', 'questions'];
 // Which runs the feed shows (LIN-3983). 'autopilot' is the default and reads the
 // cheap materialized feed; 'standalone' and 'all' read the sessions source
 // (`?view=sessions`, live) and filter on each session's `standalone` flag.
@@ -97,13 +97,13 @@ const FILTERS = ['autopilot', 'standalone', 'all'];
 let currentView = 'runs';
 let currentFilter = 'autopilot';
 
-// The waiting block above the runs feed (LIN-3983). It paints the open ruling
-// rows (the same nodes the Rulings tab paints, capped) and one compact row for
-// each waiting run whose wait no ruling row covers.
-const WAITING_RULINGS_LIMIT = 3;
+// The waiting line above the runs feed (LIN-3983, one line since LIN-4553): how many
+// questions wait (a link to the Questions tab) and how many waiting runs no question
+// speaks for (a link to them). The cards themselves are on the Questions tab only, so
+// the runs stay on the first screen.
 // Loops whose question is open, from the rulings response (`openLoopIds`,
-// LIN-4003's reader). null until the first rulings response: no compact row is
-// painted before then, so one cannot appear and then duplicate a ruling row.
+// LIN-4003's reader). null until the first rulings response: no waiting run is
+// counted before then, so one cannot appear and then double-count a question.
 // A failed first response settles it to the empty set, so no wait is hidden.
 let openLoopIds = null;
 // The last rulings payload this page painted, so a view change repaints it at once.
@@ -1444,21 +1444,19 @@ function startPolling() {
   }
 }
 
-// Dispatch to the right poll for the active tab (LIN-1728: the rulings tab reads
+// Dispatch to the right poll for the active tab (LIN-1728: the Questions tab reads
 // a different endpoint entirely, not /sessions with a `?view=` discriminator —
-// a ruling row is not a session).
+// a question row is not a session).
 function pollCurrentView() {
-  if (currentView === 'rulings') return pollRulings();
-  // The runs view makes two reads per tick: the feed, and the rulings that feed
-  // the waiting block. The rulings read is not awaited, so the feed's own timing
+  if (currentView === 'questions') return pollRulings();
+  // The runs view makes two reads per tick: the feed, and the questions that feed
+  // the waiting line. The rulings read is not awaited, so the feed's own timing
   // is unchanged by it.
   pollRulings();
   return pollSessions();
 }
 
-// ─── Waiting block (LIN-3983) ───────────────────────────────────────────────
-
-const WAIT_FALLBACK_TEXT = 'Waiting on you, with no message.';
+// ─── Waiting line (LIN-3983, LIN-4553) ──────────────────────────────────────
 
 // The feedback markers the runner writes into a waiting message. They are a
 // machine signal, not copy: the message shows without them.
@@ -1466,35 +1464,30 @@ function stripFeedbackMarkers(text) {
   return String(text || '').replace(/\[(?:blocked|done|working)\]/g, '').replace(/\s+/g, ' ').trim();
 }
 
-// The runs that get a compact row in the waiting block. A session qualifies on
-// its status (`waiting`, so a day-dead run never does, LIN-608) and when one of
-// its waiting loops is not an open question, since the open ruling rows already
-// speak for the rest. Its text is the producer's message when the producer's own
-// question has no ruling row; otherwise the fixed fallback. Pure: the rulings
-// list is not an input.
+// The waiting runs the waiting line counts beside the questions. A session qualifies
+// on its status (`waiting`, so a day-dead run never does, LIN-608) and when one of
+// its waiting loops is not an open question, since the question count already
+// speaks for the rest. Pure: the rulings list is not an input.
 //
 // @param {Array<Object>} sessions - the feed's session payloads
 // @param {Set<string>} openIds - the rulings response's openLoopIds
-// @returns {Array<{sessionId, workspaceUrlKey, workspaceName, title, message}>}
+// @returns {Array<{sessionId, workspaceUrlKey, title}>}
 function compactWaitSessions(sessions, openIds) {
   const rows = [];
   for (const s of sessions) {
     if (!s || s.status !== 'waiting') continue;
     const waits = Array.isArray(s.waitingLoopIds) ? s.waitingLoopIds : [];
     if (!waits.some(id => !openIds.has(id))) continue;
-    const producerCovered = !s.producerLoopId || openIds.has(s.producerLoopId);
     rows.push({
       sessionId: s.sessionId,
       workspaceUrlKey: s.workspaceUrlKey,
-      workspaceName: s.workspaceName || s.workspaceUrlKey,
-      title: s.seedTitle || 'Untitled run',
-      message: producerCovered ? '' : stripFeedbackMarkers(s.waitingMessage)
+      title: s.seedTitle || 'Untitled run'
     });
   }
   return rows;
 }
 
-// Every session the block may judge: the loaded feed (under every filter), plus
+// Every session the line may judge: the loaded feed (under every filter), plus
 // the standalone waits read on the autopilot filter. The loaded feed wins on a
 // shared id, since it is the fresher read.
 function waitingSessions() {
@@ -1504,44 +1497,47 @@ function waitingSessions() {
   return [...byId.values()];
 }
 
-function compactWaitRowHtml(row, multiWorkspace) {
-  const href = sessionHref(row);
-  const ws = multiWorkspace ? ` <span class="obs-ruling-ws">${escapeHtml(row.workspaceName)}</span>` : '';
-  const link = href ? `<a class="obs-waiting-run-link" href="${escapeHtml(href)}">reply on its run page →</a>` : '';
-  return `<li class="obs-waiting-run" data-session-id="${escapeHtml(String(row.sessionId))}">`
-    + `<span class="obs-waiting-run-title">${escapeHtml(row.title)}</span>${ws}`
-    + `<p class="obs-waiting-run-text">${escapeHtml(row.message || WAIT_FALLBACK_TEXT)}</p>${link}</li>`;
+const plural = (n, one, many) => `${n} ${n === 1 ? one : many}`;
+
+// The line's words, from the counts: `questions` is the open questions, `runs` the
+// waiting runs no question speaks for. One run links to its run page; several link to
+// the All filter, which carries them (`runHref` null). Pure, so the words are tested.
+//
+// @returns {{questions: string, runs: string, runHref: string|null}}
+function waitingLineWords({ questions, runs }) {
+  return {
+    questions: questions > 0 ? `${plural(questions, 'question', 'questions')} waiting →` : '',
+    runs: runs.length > 0 ? `${plural(runs.length, 'run', 'runs')} waiting →` : '',
+    runHref: runs.length === 1 ? (sessionHref(runs[0]) || null) : null
+  };
 }
 
-// Paint the waiting block from the last rulings read and the feed. It is hidden
+// Paint the waiting line from the last rulings read and the feed. It is hidden
 // off the runs view and when nothing waits. It never fetches: the polls feed it.
 function renderWaitingBlock() {
   const section = document.getElementById('obs-waiting');
   if (!section) return;
-  const onRuns = currentView === 'runs';
-  const rulingsList = document.getElementById('obs-waiting-rulings');
-  const runsList = document.getElementById('obs-waiting-runs');
-  const count = document.getElementById('obs-waiting-count');
-  const more = document.getElementById('obs-waiting-more');
-  if (!onRuns) { section.hidden = true; return; }
+  if (currentView !== 'runs') { section.hidden = true; return; }
+  const questionsLink = document.getElementById('obs-waiting-questions');
+  const runsLink = document.getElementById('obs-waiting-runs');
+  const sep = document.getElementById('obs-waiting-sep');
 
-  const rulings = lastRulings || [];
-  if (rulingsList && lastRulings) {
-    renderRulings(rulings, { list: rulingsList, empty: null, limit: WAITING_RULINGS_LIMIT });
+  const questions = (lastRulings || []).filter(r => r?.kind === 'question').length;
+  const runs = openLoopIds === null ? [] : compactWaitSessions(waitingSessions(), openLoopIds);
+  const words = waitingLineWords({ questions, runs });
+  section.hidden = !words.questions && !words.runs;
+  if (questionsLink) {
+    questionsLink.textContent = words.questions;
+    questionsLink.hidden = !words.questions;
   }
-  const compact = openLoopIds === null ? [] : compactWaitSessions(waitingSessions(), openLoopIds);
-  const total = rulings.length + compact.length;
-  section.hidden = total === 0;
-  if (count) count.textContent = String(total);
-  if (runsList) {
-    const multi = (observationData?.workspaces || []).length > 1;
-    runsList.innerHTML = compact.map(row => compactWaitRowHtml(row, multi)).join('');
+  if (runsLink) {
+    runsLink.textContent = words.runs;
+    runsLink.hidden = !words.runs;
+    runsLink.setAttribute('href', words.runHref || '?filter=all');
+    if (words.runHref) runsLink.dataset.runPage = 'true';
+    else delete runsLink.dataset.runPage;
   }
-  if (more) {
-    const hidden = rulings.length - WAITING_RULINGS_LIMIT;
-    more.hidden = hidden <= 0;
-    more.textContent = `${hidden} more in Rulings →`;
-  }
+  if (sep) sep.hidden = !(words.questions && words.runs);
 }
 
 // Standalone waiting runs for the autopilot filter (decision 8). Under any other
@@ -1575,15 +1571,15 @@ function rulingsUrl(urlKey) {
   return `/workspace/${encodeURIComponent(urlKey)}/api/dashboard/rulings`;
 }
 
-// The rulings read serves two hosts (LIN-3983): the Rulings tab, which paints
-// every row and owns the poll status pill, and the waiting block above the runs
-// feed, which paints its first few and does not touch the pill. A failed read on
-// the block's behalf therefore never flips the feed's "live" pill.
+// The rulings read serves two readers (LIN-3983): the Questions tab, which paints
+// every card and owns the poll status pill, and the waiting line above the runs
+// feed, which counts them and does not touch the pill. A failed read on the
+// line's behalf therefore never flips the feed's "live" pill.
 async function pollRulings() {
   const urlKey = observationData?.urlKey;
   if (!urlKey) return;
   const pollView = currentView;
-  const onRulingsTab = pollView === 'rulings';
+  const onRulingsTab = pollView === 'questions';
   try {
     const res = await fetch(rulingsUrl(urlKey));
     if (res.status === 401) { window.location.href = '/logout'; return; }
@@ -1606,8 +1602,8 @@ async function pollRulings() {
 }
 
 // A failed rulings read keeps what was last painted. The first read to fail
-// settles `openLoopIds` to the empty set: every waiting run then gets its compact
-// row, so no wait is hidden for want of a ruling read.
+// settles `openLoopIds` to the empty set: every waiting run is then counted on
+// the waiting line, so no wait is hidden for want of a questions read.
 function rulingsReadFailed(onRulingsTab) {
   if (onRulingsTab) setPollStatus('● disconnected');
   settleOpenLoopIds(null);
@@ -1621,24 +1617,13 @@ function settleOpenLoopIds(next) {
   openLoopIds = next;
 }
 
-// The rulings list (LIN-1728 Phase 4, LIN-4532, LIN-4541): one row per open question record addressed to the person. A row
-// is keyed by its question id; a card holding an answer in progress (typed words, a chosen option, focus) or one already
-// settled is kept across the poll's repaint (questionRowNode), any other card is rebuilt from the payload.
-//
-// LIN-3983: `host` says where the rows paint. The Rulings tab (the default) and the waiting block above the Observation feed
-// both host these same nodes, so a row keeps its typed input when it moves between them. `host.limit` caps how many payload
-// rows are attached (the block shows the first few and links to the rest).
-function rulingsTabHost() {
-  return {
-    list: document.getElementById('obs-rulings'),
-    empty: document.getElementById('obs-rulings-empty'),
-    limit: Infinity
-  };
-}
-
-function renderRulings(rulings, host = rulingsTabHost()) {
-  const list = host.list;
-  const empty = host.empty;
+// The questions list (LIN-1728 Phase 4, LIN-4532, LIN-4541; the Questions tab since LIN-4553): one row per open question
+// record addressed to the person. A row is keyed by its question id; a card holding an answer in progress (typed words, a
+// chosen option, focus) or one already settled is kept across the poll's repaint (questionRowNode), any other card is rebuilt
+// from the payload. The tab is the one host: the waiting line above the runs feed only counts them (LIN-4553).
+function renderRulings(rulings) {
+  const list = document.getElementById('obs-rulings');
+  const empty = document.getElementById('obs-rulings-empty');
   if (!list) return;
 
   const nodes = [];
@@ -1646,8 +1631,7 @@ function renderRulings(rulings, host = rulingsTabHost()) {
   for (const row of rulings) {
     if (row?.kind !== 'question') continue;
     seenQuestions.add(row.questionId);
-    const qli = questionRowNode(row);
-    if (nodes.length < host.limit) nodes.push(qli);
+    nodes.push(questionRowNode(row));
   }
 
   // A question no longer in the payload (answered, dismissed, or ended elsewhere) is forgotten, so a later one is drawn fresh.
@@ -1695,10 +1679,6 @@ function questionRowNode(row) {
   const existing = renderedQuestionRows.get(row.questionId);
   if (existing && holdsCard(questionCardOf(existing))) return existing;
   const li = renderQuestionRulingRow(row);
-  // A rebuilt row replaces its old node wherever that node is attached. The old one may sit in the other host (LIN-3983):
-  // the block and the Rulings tab share `renderedQuestionRows`, so without this the stale <li> stays in the block's list
-  // after the tab repaints.
-  if (existing && existing.parentNode) existing.parentNode.removeChild(existing);
   renderedQuestionRows.set(row.questionId, li);
   return li;
 }
@@ -1720,7 +1700,7 @@ function rulingHeadOf(anchor) {
 
 // Switch the active Observation tab (LIN-1194, extended LIN-1728).
 // The views carry different data sets entirely (Autopilot excludes
-// standalone; Sessions includes standalone but is running-only; Rulings is
+// standalone; Sessions includes standalone but is running-only; Questions is
 // the person's open questions), so the feed state is
 // reset before re-polling to keep them from bleeding together, and the
 // collapsed cards are torn down so a fresh poll rebuilds them for the new view.
@@ -1747,7 +1727,7 @@ const VIEW_HINTS = {
   'runs:autopilot': 'Autopilot runs touched in the last 24 hours. Older runs are in the archive below.',
   'runs:standalone': 'Standalone runs, dispatched on their own rather than by autopilot, touched in the last 24 hours. Older ones are in the archive below.',
   'runs:all': 'Every run touched in the last 24 hours. Older runs are in the archive below.',
-  rulings: 'Every question waiting on you. Answer or dismiss each one here.'
+  questions: 'The questions asked of you, each with the task it is about. Answer or dismiss each one here.'
 };
 
 function syncViewChrome() {
@@ -1763,7 +1743,7 @@ function syncViewChrome() {
   const sessionViews = document.getElementById('obs-session-views');
   const rulingsSection = document.getElementById('obs-rulings-section');
   if (sessionViews) sessionViews.hidden = currentView !== 'runs';
-  if (rulingsSection) rulingsSection.hidden = currentView !== 'rulings';
+  if (rulingsSection) rulingsSection.hidden = currentView !== 'questions';
 
   for (const btn of document.querySelectorAll('#obs-filter [data-filter]')) {
     const on = btn.dataset.filter === currentFilter;
@@ -1793,17 +1773,18 @@ function writeViewToUrl() {
 
 // The view a page load opens on (LIN-3983). `view=autopilot` and `view=sessions`
 // are the old tab names: autopilot is the default filter, and sessions is the
-// all-runs filter unless a filter is given. Anything unknown opens on runs.
+// all-runs filter unless a filter is given. `view=rulings` is the Questions tab's
+// old name (LIN-4553), kept for old links and badges. Anything unknown opens on runs.
 function viewFromParams(params) {
   const view = params.get('view');
-  if (view === 'rulings') return { view, filter: 'autopilot' };
+  if (view === 'questions' || view === 'rulings') return { view: 'questions', filter: 'autopilot' };
   const explicit = params.get('filter');
   const fallback = view === 'sessions' ? 'all' : 'autopilot';
   return { view: 'runs', filter: FILTERS.includes(explicit) ? explicit : fallback };
 }
 
 // Tab switch (LIN-1194, LIN-1728, LIN-3983). The feed state is torn down, so the
-// new view starts from its own data and fills on its own poll. A rulings view does
+// new view starts from its own data and fills on its own poll. The Questions view does
 // not repaint from the last read here: a row painted now would be rebuilt by the
 // poll that answers the switch, which is the rebuild a person's place on the row
 // (a marker, a focused control) cannot survive.
@@ -1863,9 +1844,18 @@ function initControls() {
     });
   }
 
-  // The waiting block's "N more in Rulings →" opens the full list.
-  const waitingMore = document.getElementById('obs-waiting-more');
-  if (waitingMore) waitingMore.addEventListener('click', () => switchView('rulings'));
+  // The waiting line (LIN-4553): "N questions waiting →" opens the Questions tab in place; "N runs waiting →" opens the
+  // one run's page, or, for several, the All filter that carries them. The hrefs work without the script.
+  const waitingQuestions = document.getElementById('obs-waiting-questions');
+  if (waitingQuestions) waitingQuestions.addEventListener('click', (e) => { e.preventDefault(); switchView('questions'); });
+  const waitingRuns = document.getElementById('obs-waiting-runs');
+  if (waitingRuns) {
+    waitingRuns.addEventListener('click', (e) => {
+      if (waitingRuns.dataset.runPage === 'true') return;
+      e.preventDefault();
+      setFilter('all');
+    });
+  }
 
   const scope = document.getElementById('obs-scope');
   if (scope) {
@@ -1911,8 +1901,8 @@ function init() {
   if (!observationData) { console.warn('Observation: no initial data'); return; }
   initControls();
   // The URL opens the page where it was left (LIN-3983): the scope, the view and filter,
-  // including the rulings deep link from the navbar badge (`?view=rulings`,
-  // LIN-1728 review F6). Legacy values are rewritten to the current names.
+  // including the questions deep link from the navbar badge (`?view=questions`, once
+  // `?view=rulings`, LIN-1728 review F6). Legacy values are rewritten to the current names.
   const params = new URLSearchParams(window.location.search);
   applyWorkspaceScope(scopeFromParams(params));
   const opened = viewFromParams(params);
@@ -1968,9 +1958,9 @@ export {
     // LIN-2244: expose the parked-wait seam (same lean-feed reasoning) for
     // unit testing.
     sessionParkedWait,
-    // LIN-3983: the waiting block's pure rule, the view/filter URL contract, and
+    // LIN-3983, LIN-4553: the waiting line's pure rule and words, the view/filter URL contract, and
     // the poll/switch seams the view model is unit-tested through.
-    compactWaitSessions, stripFeedbackMarkers, viewFromParams, scopeFromParams, renderWaitingBlock,
+    compactWaitSessions, waitingLineWords, stripFeedbackMarkers, viewFromParams, scopeFromParams, renderWaitingBlock,
     pollCurrentView, pollRulings, pollWaitingSupplement, switchView, setFilter, sessionsUrl, feedKey, rulingsUrl,
     getOpenLoopIds, setOpenLoopIds,
     lastRulingsRef, standaloneWaitSupplement, sessionIndex,

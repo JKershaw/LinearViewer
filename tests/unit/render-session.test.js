@@ -552,12 +552,13 @@ describe('render-session: in-progress status (LIN-1163 item 4)', () => {
     assert.ok(!html.includes('completed —'), 'never renders the misleading "completed —"');
     assert.match(html, /data-testid="session-run-elapsed"[^>]*data-dispatched-at="2026-07-04T10:00:00\.000Z"[^>]*>in progress</);
     // The OTHER (terminal) run still renders its real completion time.
-    assert.match(html, /data-testid="session-run-completed"[^>]*>completed 2026-07-04T10:05:00\.000Z</);
+    // LIN-4553: the moment reads in words (the shared moment piece); the exact time is its `datetime`.
+    assert.match(html, /data-testid="session-run-completed"[^>]*>completed <time class="task-time" datetime="2026-07-04T10:05:00\.000Z"[^>]*>[^<]+ ago<\/time></);
   });
 
   test('a terminal run still renders its completed timestamp, not the in-progress element', () => {
     const html = renderSessionPage({ session: fixtureSession(), urlKey: 'ws-a' });
-    assert.match(html, /data-testid="session-run-completed"[^>]*>completed 2026-07-04T10:02:00\.000Z</);
+    assert.match(html, /data-testid="session-run-completed"[^>]*>completed <time class="task-time" datetime="2026-07-04T10:02:00\.000Z"[^>]*>[^<]+ ago<\/time></);
   });
 
   test('the session-level wall clock ticks from data-start while the session is open', () => {
@@ -661,7 +662,7 @@ describe('render-session: collapsed-run waiting flag (LIN-1163 item 5)', () => {
     session.loops[0].terminalStatus = null;
     session.loops[0].telemetry.parkedWait = { since: '2026-07-04T10:01:00.000Z', latest: '2026-07-04T10:03:00.000Z' };
     const html = renderSessionPage({ session, urlKey: 'ws-a' });
-    assert.match(html, /data-testid="session-run-parked-flag"[^>]*>◐ parked on a wait since 2026-07-04T10:01:00\.000Z</);
+    assert.match(html, /data-testid="session-run-parked-flag"[^>]*>◐ parked on a wait since <time class="task-time" datetime="2026-07-04T10:01:00\.000Z"[^>]*>[^<]+ ago<\/time></);
     assert.ok(!html.includes('data-testid="session-run-waiting-flag"'), 'not the blocked-on-a-human flag');
   });
 
@@ -1550,6 +1551,15 @@ describe('render-session: page order (LIN-3251, LIN-2948 §4)', () => {
     assert.ok(paragraph < evidence, 'paragraph before evidence');
     assert.ok(evidence < steps, 'evidence before steps');
     assert.ok(steps < closeOut, 'steps before close-out box');
+  });
+
+  // LIN-4553: the pinned cards sit in a section of their own, as the task page's do (lib/render-task-page.js renderTaskQuestion), so
+  // the page's section rhythm spaces them from what follows; drawn bare, the card's border touched the Steps heading.
+  test('the pinned question cards sit in their own section, spaced like every other section', () => {
+    const html = renderSessionPage({ session: fixtureSession(), urlKey: 'ws-a', questionRecords: [orderDecisionRow()], runEvidence: runEvidenceFixture() });
+    assert.match(html, /<section class="sess-section sess-question-records-section"[^>]*>\s*<div class="sess-qrecords" data-testid="session-question-records">/);
+    const none = renderSessionPage({ session: fixtureSession(), urlKey: 'ws-a', questionRecords: [], runEvidence: runEvidenceFixture() });
+    assert.doesNotMatch(none, /sess-question-records-section/, 'no questions, no empty section');
   });
 });
 

@@ -286,6 +286,20 @@ describe('render-session golden pin (LIN-3311, owner page byte-identity)', () =>
   test('rendering is deterministic (same input twice → same bytes)', () => {
     for (const name of Object.keys(CASES)) assert.equal(renderCase(name), renderCase(name), name);
   });
+
+  // LIN-4553 (LIN-4546 piece 5): nothing a person reads on the run page is raw. A moment (a step dispatched, completed or parked,
+  // a review's claim) reads in words through the shared moment piece (lib/components/time.js); the exact time stays in its
+  // `datetime` and its hover title, never in the text.
+  test('no ISO time in any case\'s visible text', () => {
+    for (const name of Object.keys(CASES)) {
+      const text = renderCase(name)
+        .replace(/<script[\s\S]*?<\/script>/g, '')
+        .replace(/<style[\s\S]*?<\/style>/g, '')
+        .replace(/<[^>]*>/g, ' ');
+      const iso = text.match(/\S{0,24}\s?\d{4}-\d{2}-\d{2}T\d{2}:\d{2}\S*/g) || [];
+      assert.deepEqual([...new Set(iso)], [], `${name}: an ISO time in the page's text`);
+    }
+  });
 });
 
 // The extracted `renderPrLine` must reproduce the PR line the pre-change page

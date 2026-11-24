@@ -127,6 +127,10 @@
     "disposition": "global-only",
     "exception": "comment-dedupe"
   },
+  "lib/question-task-titles.js::entries": {
+    "disposition": "registered",
+    "holder": "question-task-titles"
+  },
   "lib/refresh-on-resolve-gate.js::lastAttempt": {
     "disposition": "registered",
     "holder": "refresh-on-resolve:cooldown"
@@ -346,6 +350,10 @@
   "server.js::listWorkspacePeople": {
     "disposition": "not-state",
     "why": "Its factory keeps no empty Map, Set or WeakMap of its own (census scan, factory-level)."
+  },
+  "server.js::questionTaskTitles": {
+    "disposition": "delegated",
+    "to": "lib/question-task-titles.js::entries"
   },
   "server.js::readTaskTimeline": {
     "disposition": "not-state",

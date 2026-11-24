@@ -1168,15 +1168,15 @@ function renderDecisions(resultString, beforeLi) {
   fold.setAttribute('data-testid', 'fc-decisions-fold');
   var summary = document.createElement('summary');
   var count = parsed.questions.length;
-  summary.textContent = count + (count === 1 ? ' decision waiting' : ' decisions waiting');
+  summary.textContent = count + (count === 1 ? ' question waiting' : ' questions waiting'); // LIN-4553: named as the Questions tab and the Runs line name it
   fold.appendChild(summary);
-  var rulingsHref = urlKey ? '/workspace/' + encodeURIComponent(urlKey) + '/observation?view=rulings' : '';
+  var rulingsHref = urlKey ? '/workspace/' + encodeURIComponent(urlKey) + '/observation?view=questions' : '';
   if (rulingsHref) {
     var rulingsLink = document.createElement('a');
     rulingsLink.className = 'fc-decisions-rulings-link';
     rulingsLink.setAttribute('data-testid', 'fc-decisions-rulings-link');
     rulingsLink.setAttribute('href', rulingsHref);
-    rulingsLink.textContent = 'open the Rulings tab';
+    rulingsLink.textContent = 'open the Questions tab';
     fold.appendChild(rulingsLink);
   }
   var list = document.createElement('ul');

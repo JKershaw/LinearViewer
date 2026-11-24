@@ -29,15 +29,15 @@ async function clearRuns(page) {
 // question records, not a run).
 const seedRulingQuestion = (page, ticket) => seedQuestion(page, URL_KEY, { ticket, asks: `Proceed with ${ticket}?`, options: ['Approve', 'Reject'], recommended: 'Approve' });
 
-test.describe('Rulings tab (LIN-1728 Phase 4)', () => {
-  test('the Rulings tab renders alongside Runs (LIN-3983)', async ({ page }) => {
+test.describe('Questions tab (LIN-1728 Phase 4, named for questions by LIN-4553)', () => {
+  test('the Questions tab renders alongside Runs (LIN-3983)', async ({ page }) => {
     await page.goto(`/test/set-session?urlKey=${URL_KEY}`);
     await page.goto(OBSERVATION_URL);
     await page.waitForLoadState('networkidle');
     const tabs = page.locator('[data-testid^="obs-tab-"]');
     await expect(tabs).toHaveCount(2);
-    await expect(page.locator(SELECTORS.observation.tab('rulings'))).toBeVisible();
-    await expect(page.locator(SELECTORS.observation.tab('rulings'))).not.toHaveClass(/is-active/);
+    await expect(page.locator(SELECTORS.observation.tab('questions'))).toHaveText('Questions');
+    await expect(page.locator(SELECTORS.observation.tab('questions'))).not.toHaveClass(/is-active/);
   });
 });
 
@@ -108,7 +108,7 @@ test.describe('Ambient rulings nav badge (LIN-1728 Phase 3)', () => {
     expect(await page.evaluate(() => typeof window.updateRulingsBadge)).toBe('function');
   });
 
-  test('LIN-1728 review F6: the badge is a real link into the Rulings tab, not a button that does nothing', async ({ page }) => {
+  test('LIN-1728 review F6: the badge is a real link into the Questions tab, not a button that does nothing', async ({ page }) => {
     await page.goto(`/test/set-session?urlKey=${URL_KEY}&runnerKey=1`);
     await clearRuns(page);
     await seedRulingQuestion(page, 'LIN-1728-B6');
@@ -118,12 +118,12 @@ test.describe('Ambient rulings nav badge (LIN-1728 Phase 3)', () => {
 
     const badge = page.locator('[data-rulings-badge]');
     await expect(badge).toHaveJSProperty('tagName', 'A');
-    await expect(badge).toHaveAttribute('href', `/workspace/${URL_KEY}/observation?view=rulings`);
+    await expect(badge).toHaveAttribute('href', `/workspace/${URL_KEY}/observation?view=questions`);
 
     await badge.click();
-    await page.waitForURL(`**/workspace/${URL_KEY}/observation?view=rulings`);
+    await page.waitForURL(`**/workspace/${URL_KEY}/observation?view=questions`);
     await page.waitForLoadState('networkidle');
-    await expect(page.locator(SELECTORS.observation.tab('rulings'))).toHaveClass(/is-active/);
+    await expect(page.locator(SELECTORS.observation.tab('questions'))).toHaveClass(/is-active/);
     await expect(page.locator(SELECTORS.observation.rulingsSection)).toBeVisible();
     await expect(page.locator('[data-testid="ruling-question-row"]').filter({ hasText: 'LIN-1728-B6' })).toBeVisible();
   });

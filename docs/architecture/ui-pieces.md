@@ -481,7 +481,7 @@ Settings › Models polish. Each piece below has one authority; a new caller use
 
 - **Anatomy.** A `role="tablist"` row of real `<button>` tabs, one `is-active` tab with `aria-selected="true"`, the others at `tabindex="-1"`. Each tab has `data-tab` (its key) and `data-testid="<prefix>-<key>"`. Labels do not wrap: the strip scrolls sideways on a narrow screen rather than breaking a word. Tap targets are 44px tall. The anatomy is shown in `/styleguide`.
 - **Arrow keys** are the page's job, because the server renders no script. Observation moves focus and selection with Left and Right in `public/observation.js`.
-- **Consumers.** Observation (`runs | rulings | due`). The task-edit tabs (`.task-edit-tab`, `lib/render-task-edit.js`) are the next consumer to move; they keep their own rules until then, so this decision has two copies to consolidate, not one.
+- **Consumers.** Observation (`runs | questions`). The task-edit tabs (`.task-edit-tab`, `lib/render-task-edit.js`) are the next consumer to move; they keep their own rules until then, so this decision has two copies to consolidate, not one.
 - **What a tab says.** Each tab names what it holds. The line under the strip states the active tab's contents, including the 24-hour window for the runs feed.
 - **Not decided here:** the tab keys are part of each page's own URL contract (`?view=`), so a key is never renamed without keeping its old value working.
 
@@ -491,11 +491,11 @@ Settings › Models polish. Each piece below has one authority; a new caller use
 
 - **The pill words are the task page's own**, not a parallel set: `running`, `waiting`, `done`, `failed`, `idle` (`lib/render-task-page.js` `STATUS_PILL`). A card whose pill says `waiting` does not say "waiting on you" again. `done-with-warning` is `done` with the ⚠ marker.
 - **The summary line never repeats the pill's word.** A running card says the stage and how long it has run ("Implementation, 12 min in"). A waiting card's sentence is the question the run asked, with its runner marker (`[blocked]`, `[done]`, `[working]`) taken out at display time and the stored text untouched. A failed card says the stage and when it was last active. No card reads as a bracketed option list.
-- **A waiting card offers no answer choices.** A question is answered on its question record's card (the Rulings tab, the waiting block, the run and task pages), so an old run's decision block (history) still supplies the card's sentence but offers nothing to pick (LIN-4541).
+- **A waiting card offers no answer choices.** A question is answered on its question record's card (the Questions tab, the run and task pages; Runs shows only the one waiting line, LIN-4553), so an old run's decision block (history) still supplies the card's sentence but offers nothing to pick (LIN-4541).
 - **The progress count is in words** ("2 of 3 runs finished"), beside the bar. The feed carries no stages, so one cell is one run.
 - **One pill and one bar, each with a client replica pinned to its server helper.** `renderStatusPill` (`lib/components/status-pill.js`, with `warn`) and `renderSegmentBar` (`lib/components/segment-bar.js`, with `live`) are copied into `public/common.js`, because `public/` has no ES modules. `tests/unit/segment-bar-pill-parity.test.js` compares the two over a table of inputs, so a change made to one and not the other fails.
 - **Times are relative words with the exact local time and zone visible** (LIN-3975's time rule), for example `updated 3m ago · 14:02 BST`, as a `<time data-local-time="zoned">` the page formats. A `title` tooltip alone does not count.
-- **Workspace scope.** The feed opens on this workspace, as Live Console does. "All workspaces" widens it, and the chips filter inside it. The waiting block ignores the scope, so a question waiting in another workspace is still on it.
+- **Workspace scope.** The feed opens on this workspace, as Live Console does. "All workspaces" widens it, and the chips filter inside it. The waiting line ignores the scope, so a question waiting in another workspace is still counted on it.
 - **Not decided here:** the goal of an untitled run is not in the feed payload, so such a card reads "Untitled run" with its start time. Carrying the goal in the payload is a separate change.
 
 ## Question card (LIN-4551): one card, its face decided once
