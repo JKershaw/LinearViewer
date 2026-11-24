@@ -4,7 +4,7 @@
  *
  * The golden (tests/fixtures/lin-4559-existing-kinds-golden.json) was recorded by running `readSurfaces`
  * (tests/fixtures/lin-4559-existing-kinds-corpus.js) against the readers as they were on main before the change
- * (8a102628f): 210 feedback arrays (each existing kind x each marker, report line and park message, plus the
+ * (re-recorded at 69b5c1bbd, after LIN-4558 changed parseParkedWait): 210 feedback arrays (each existing kind x each marker, report line and park message, plus the
  * orderings the readers turn on: run words then `[done]`, a `[done]` inside assistant-text, blocked then resume,
  * done then blocked, a report line then `[done]` with a url, a decision case, a ticket walk). Here the same corpus is
  * read through the changed readers and must match it case by case. The two predicates whose argument changed from a

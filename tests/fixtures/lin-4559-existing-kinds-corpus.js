@@ -3,7 +3,7 @@
  * characterization.test.js). Feedback arrays of the kinds that existed before `agent-text` (and kind-less entries),
  * and every reader LIN-4559 touched, read over each. The golden (tests/fixtures/lin-4559-existing-kinds-golden.json)
  * was recorded by running `readSurfaces` against the readers as they were on main before the change (commit
- * 8a102628f), so the test proves each touched reader answers exactly as it did for every kind that already existed.
+ * 8a102628f; re-recorded at 69b5c1bbd after LIN-4558 changed parseParkedWait), so the test proves each touched reader answers exactly as it did for every kind that already existed.
  *
  * Pure and deterministic: fixed timestamps, no clock. `readSurfaces` takes the reader modules as an argument, so the
  * same code reads the old tree (recording) and the new one (checking). `messageArg` adapts the two predicates whose
