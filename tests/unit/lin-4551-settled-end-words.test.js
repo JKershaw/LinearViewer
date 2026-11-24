@@ -17,6 +17,8 @@ import { createRecordWrites } from '../../lib/records/writes.js';
 import { createQuestionAnswers } from '../../lib/question-answers.js';
 import { questionOutcomeText } from '../../lib/question-record-card.js';
 import { isTerminalState } from '../../lib/providers/state-map.js';
+import { TICKET_CLOSED_QUESTION_REASON } from '../../lib/records/question-facts.js';
+import { HARBOUR_WRITER } from '../../lib/records/writes.js';
 
 const URL_KEY = 'lin-4551-workspace';
 const NOW = new Date('2026-11-24T12:00:00.000Z');
@@ -75,6 +77,18 @@ describe('the settled refusal names how the question ended, and the card words i
     assert.equal(again.body.ended, 'withdrawn');
     const text = questionOutcomeText('answer', again.body);
     assert.match(text, /withdrawn/i);
+    assert.doesNotMatch(text, /dismiss/i);
+  });
+
+  test('withdrawn by the ticket closer (reason "ticket closed", by Harbour): the card does not say the run that asked took it back', async () => {
+    const q = await askQuestion();
+    await records.end(URL_KEY, q, { state: 'withdrawn', reason: TICKET_CLOSED_QUESTION_REASON }, { by: HARBOUR_WRITER });
+    const again = await service.answer({ urlKey: URL_KEY, questionId: q, option: 'left', words: null, by: PERSON, dispatchedBy: 'acct-owner' });
+    assert.equal(again.status, 409);
+    assert.equal(again.body.ended, 'withdrawn');
+    const text = questionOutcomeText('answer', again.body);
+    assert.match(text, /^Withdrawn\b/);
+    assert.doesNotMatch(text, /the run that asked/);
     assert.doesNotMatch(text, /dismiss/i);
   });
 

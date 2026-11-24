@@ -8,7 +8,8 @@
  *   2. Hostile input in the ask (<script>, <img onerror>, a markdown link to javascript:) renders as text in the fold: no element,
  *      no link, no dialog.
  *   3. The chosen option has a visible pressed style: aria-pressed and the computed style both change on a press, and both move
- *      when another option is pressed (late addition 1). On Home and on the rulings page (Observation loads only style.css).
+ *      when another option is pressed (late addition 1). On all four hosts: the task page and the run page load their own sheets
+ *      (task-page.css, session.css), and either could override the card's rules.
  *   4. A question a person dismissed in another tab: answering it on this card says "Dismissed" (late addition 2).
  *   5. A run still working: the card keeps its read-only words under the same lead and fold, with no control.
  *
@@ -206,31 +207,45 @@ async function expectPressedMoves(page, card) {
   expect(await lookOf(second), 'and leaves the old one').toEqual(restSecond);
 }
 
-test('the chosen option has a visible pressed style that moves with the choice, on Home and on the rulings page', async ({ page, seedLocal, localWorkerUrlKey: urlKey }) => {
+/** The four hosts one question on LOCAL-31, asked by `runId`, shows on: each loads its own sheets (style.css, task-page.css, session.css). */
+const ONE_QUESTION_HOSTS = ({ urlKey, runId, qid }) => [
+  { name: 'Home', path: `/workspace/${urlKey}/`, card: `${SELECTORS.waitingOnYou.question} ${Q.byId(qid)}` },
+  { name: 'the rulings page', path: `/workspace/${urlKey}/observation?view=rulings`, card: `[data-testid="ruling-question-row"] ${Q.byId(qid)}` },
+  { name: 'the task page', path: `/workspace/${urlKey}/task/LOCAL-31`, card: `[data-testid="task-page-question-records"] ${Q.byId(qid)}` },
+  { name: 'the run page', path: `/workspace/${urlKey}/observation/session/${runId}`, card: `[data-testid="session-question-records"] ${Q.byId(qid)}` },
+];
+
+test('the chosen option has a visible pressed style that moves with the choice, on Home, the rulings page, the task page and the run page', async ({ page, seedLocal, localWorkerUrlKey: urlKey }) => {
   await seedTasks(page, seedLocal, urlKey);
   const options = ['Move the rules into style.css', 'Add a card sheet on each page', 'Load session.css on the other pages'];
+  const runId = await askingRun(page, urlKey, 'LOCAL-31');
   const qid = await seedQuestion(page, urlKey, {
-    ticket: 'LOCAL-31', runId: await askingRun(page, urlKey, 'LOCAL-31'), asks: 'Where should the card\'s rules live?', options, recommended: options[0], ifUnanswered: 'style.css',
+    ticket: 'LOCAL-31', runId, asks: 'Where should the card\'s rules live?', options, recommended: options[0], ifUnanswered: 'style.css',
   });
-
-  await page.goto(`/workspace/${urlKey}/`);
-  await expectPressedMoves(page, page.locator(`${SELECTORS.waitingOnYou.question} ${Q.byId(qid)}`));
-
-  await page.goto(`/workspace/${urlKey}/observation?view=rulings`);
-  await expectPressedMoves(page, page.locator(`[data-testid="ruling-question-row"] ${Q.byId(qid)}`));
+  for (const host of ONE_QUESTION_HOSTS({ urlKey, runId, qid })) {
+    await test.step(host.name, async () => {
+      await page.goto(host.path);
+      await expectPressedMoves(page, page.locator(host.card));
+    });
+  }
 });
 
-test('Answer is the primary button and dismiss a quiet one', async ({ page, seedLocal, localWorkerUrlKey: urlKey }) => {
+test('Answer is the primary button and dismiss a quiet one, on Home, the rulings page, the task page and the run page', async ({ page, seedLocal, localWorkerUrlKey: urlKey }) => {
   await seedTasks(page, seedLocal, urlKey);
-  const qid = await seedQuestion(page, urlKey, { ticket: 'LOCAL-31', runId: await askingRun(page, urlKey, 'LOCAL-31') });
-  await page.goto(`/workspace/${urlKey}/observation?view=rulings`);
-  const card = page.locator(`[data-testid="ruling-question-row"] ${Q.byId(qid)}`);
-  await pointerAway(page);
-  const answer = await lookOf(card.locator(Q.answer));
-  const dismiss = await lookOf(card.locator(Q.dismiss));
-  await expect(card.locator(Q.answer)).toHaveClass(/\bbtn--primary\b/);
-  expect(answer.background, 'Answer is filled').not.toMatch(/rgba\(0, 0, 0, 0\)|transparent/);
-  expect(dismiss.background, 'dismiss is quiet: no fill').toMatch(/rgba\(0, 0, 0, 0\)|transparent/);
+  const runId = await askingRun(page, urlKey, 'LOCAL-31');
+  const qid = await seedQuestion(page, urlKey, { ticket: 'LOCAL-31', runId });
+  for (const host of ONE_QUESTION_HOSTS({ urlKey, runId, qid })) {
+    await test.step(host.name, async () => {
+      await page.goto(host.path);
+      const card = page.locator(host.card);
+      await pointerAway(page);
+      const answer = await lookOf(card.locator(Q.answer));
+      const dismiss = await lookOf(card.locator(Q.dismiss));
+      await expect(card.locator(Q.answer)).toHaveClass(/\bbtn--primary\b/);
+      expect(answer.background, 'Answer is filled').not.toMatch(/rgba\(0, 0, 0, 0\)|transparent/);
+      expect(dismiss.background, 'dismiss is quiet: no fill').toMatch(/rgba\(0, 0, 0, 0\)|transparent/);
+    });
+  }
 });
 
 test('a question dismissed in another tab: answering it on this card says "Dismissed"', async ({ page, seedLocal, localWorkerUrlKey: urlKey }) => {
