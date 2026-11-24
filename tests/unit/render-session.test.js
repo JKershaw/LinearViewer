@@ -662,8 +662,28 @@ describe('render-session: collapsed-run waiting flag (LIN-1163 item 5)', () => {
     session.loops[0].terminalStatus = null;
     session.loops[0].telemetry.parkedWait = { since: '2026-07-04T10:01:00.000Z', latest: '2026-07-04T10:03:00.000Z' };
     const html = renderSessionPage({ session, urlKey: 'ws-a' });
-    assert.match(html, /data-testid="session-run-parked-flag"[^>]*>◐ parked on a wait since <time class="task-time" datetime="2026-07-04T10:01:00\.000Z"[^>]*>[^<]+ ago<\/time></);
+    // LIN-4558: the words are "waiting · <age> · since <moment>" (were "parked on a wait since <moment>").
+    assert.match(html, /data-testid="session-run-parked-flag"[^>]*>◐ waiting · [^<·]+ · since <time class="task-time" datetime="2026-07-04T10:01:00\.000Z"[^>]*>[^<]+ ago<\/time></);
     assert.ok(!html.includes('data-testid="session-run-waiting-flag"'), 'not the blocked-on-a-human flag');
+  });
+
+  test('LIN-4558: a parked run says what it waits on and for how long, and links the child run on this page', () => {
+    const session = fixtureSession();
+    session.loops[0].terminalStatus = null;
+    session.loops[0].telemetry.parkedWait = { since: '2026-07-04T10:01:00.000Z', latest: '2026-07-04T10:45:00.000Z', what: 'child run LIN-9 "Build <it>"', runIds: ['loop-2'] };
+    const html = renderSessionPage({ session, urlKey: 'ws-a' }, { now: '2026-07-04T10:49:10.000Z' });
+    assert.match(html, /data-testid="session-run-parked-flag"[^>]*>◐ waiting on child run LIN-9 &quot;Build &lt;it&gt;&quot; · 48m · since <time /);
+    assert.match(html, /data-testid="session-run-child-link"><a href="#run-loop-2">/);
+    assert.match(html, /<li class="sess-run" id="run-loop-2" /, 'the child row carries the anchor the link names');
+  });
+
+  test('LIN-4558: a child run that is not on this page gets no link (the flag still names it)', () => {
+    const session = fixtureSession();
+    session.loops[0].terminalStatus = null;
+    session.loops[0].telemetry.parkedWait = { since: '2026-07-04T10:01:00.000Z', latest: '2026-07-04T10:45:00.000Z', what: 'child run LIN-77', runIds: ['elsewhere'] };
+    const html = renderSessionPage({ session, urlKey: 'ws-a' }, { now: '2026-07-04T11:31:00.000Z' });
+    assert.match(html, /◐ waiting on child run LIN-77 · 1h 30m · since /);
+    assert.ok(!html.includes('data-testid="session-run-child-link"'));
   });
 
   test('LIN-2244: blocked-on-a-human always wins if both signals were somehow present', () => {

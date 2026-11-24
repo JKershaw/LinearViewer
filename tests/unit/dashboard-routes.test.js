@@ -795,7 +795,7 @@ describe('GET /api/dashboard/sessions', () => {
     assert.ok(sess, 'session is present');
     const run = sess.runs.find(r => r.loopId === 'w-parked');
     assert.ok(run, 'parked worker run is present');
-    assert.deepEqual(run.parkedWait, { since: NOW_ISO, latest: NOW_ISO });
+    assert.deepEqual(run.parkedWait, { since: NOW_ISO, latest: NOW_ISO, what: 'a scheduled wakeup' });
   });
 
   test('a worker with no scheduled-wakeup wait projects parkedWait as null, not undefined', async () => {

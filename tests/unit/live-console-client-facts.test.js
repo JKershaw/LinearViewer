@@ -15,6 +15,7 @@
  */
 import { test, describe } from 'node:test';
 import assert from 'node:assert/strict';
+import { fmtAge } from '../../lib/time-words.js';
 import { CLIENT_SRC, loadLiveConsole, makeLaneNode, pinLaneMarkupToClient } from './helpers/live-console-world.js';
 
 describe('a lane says what it is doing, in words', () => {
@@ -95,7 +96,7 @@ describe('every run-related lane links to its run page', () => {
     assert.equal(li.querySelector('.lc-lane-run').hidden, false);
     assert.equal(li.querySelector('.lc-lane-task').getAttribute('href'), '/workspace/ws/task/LIN-5?source=linear');
     // "the separate 'task ↗' link is gone" is checked against the client source, not against the fixture: the fixture
-    // can never carry a link the client does not emit. pinLaneMarkupToClient's anchor count also pins it to two anchors.
+    // can never carry a link the client does not emit. pinLaneMarkupToClient's anchor count also pins it to three anchors (task, run, LIN-4558 child run).
     assert.equal(/lc-lane-task-page/.test(CLIENT_SRC), false, 'the separate "task ↗" link is gone');
   });
 
@@ -104,6 +105,58 @@ describe('every run-related lane links to its run page', () => {
     updateLaneNode(li, { ...base, sessionId: null });
     assert.equal(li.querySelector('.lc-lane-run').hidden, true);
     assert.equal(li.querySelector('.lc-lane-run').getAttribute('href'), null);
+  });
+});
+
+describe('LIN-4558: a parked lane says what it waits on, for how long, and links the child run', () => {
+  function laneHarness() {
+    pinLaneMarkupToClient();
+    const { api, world } = loadLiveConsole();
+    return { updateLaneNode: api.updateLaneNode, li: makeLaneNode(world) };
+  }
+  const base = { task: 'LIN-5', workspaceUrlKey: 'ws', workspaceName: 'WS', summary: '', heartbeat: null, waiting: false };
+  const minutesAgo = (m) => new Date(Date.now() - m * 60000).toISOString();
+
+  test('reads "waiting on <what> · <age>" and links the child run page', () => {
+    const { updateLaneNode, li } = laneHarness();
+    updateLaneNode(li, { ...base, parkedWait: { since: minutesAgo(48), latest: minutesAgo(1), what: 'child run LIN-9 "Build"', runIds: ['c1'], childSessionId: 'S9' } });
+    const action = li.querySelector('.lc-lane-action');
+    assert.equal(action.textContent, 'waiting on child run LIN-9 "Build" · 48m');
+    assert.equal(action.getAttribute('data-parked'), '1');
+    assert.match(action.getAttribute('title'), /^waiting since /);
+    const child = li.querySelector('.lc-lane-child');
+    assert.equal(child.hidden, false);
+    assert.equal(child.getAttribute('href'), '/workspace/ws/observation/session/S9');
+  });
+
+  test('a 90-minute wait reads in hours; a wait that does not say what reads "waiting"', () => {
+    const { updateLaneNode, li } = laneHarness();
+    updateLaneNode(li, { ...base, parkedWait: { since: minutesAgo(90), latest: minutesAgo(2) } });
+    assert.equal(li.querySelector('.lc-lane-action').textContent, 'waiting · 1h 30m');
+    assert.equal(li.querySelector('.lc-lane-child').hidden, true);
+  });
+
+  test('the child link goes when the lane is no longer parked (a reused node)', () => {
+    const { updateLaneNode, li } = laneHarness();
+    updateLaneNode(li, { ...base, parkedWait: { since: minutesAgo(5), latest: minutesAgo(1), what: 'X', childSessionId: 'S9' } });
+    updateLaneNode(li, { ...base, parkedWait: null });
+    assert.equal(li.querySelector('.lc-lane-action').textContent, 'working');
+    assert.equal(li.querySelector('.lc-lane-action').getAttribute('title'), null);
+    assert.equal(li.querySelector('.lc-lane-child').hidden, true);
+    assert.equal(li.querySelector('.lc-lane-child').getAttribute('href'), null);
+  });
+});
+
+describe('LIN-4558: the lane\'s wait age is the run page\'s wait age (waitAge is a classic-script copy of fmtAge)', () => {
+  test('waitAge agrees with lib/time-words.js fmtAge, including the rounding boundaries', () => {
+    const { api } = loadLiveConsole();
+    // 89.5s, 149.6s and 59m29.5s are where rounding to the second first would disagree with rounding to the minute;
+    // 59.5s is where the seconds branch rounds up to a whole minute.
+    for (const ms of [0, 1, 999, 30000, 59400, 59500, 59999, 60000, 89499, 89500, 149600, 3569500, 3570000, 3599999, 3600000, 5400000, 90 * 60000 + 29000, 90 * 60000 + 30000, 25 * 3600000]) {
+      assert.equal(api.waitAge(ms), fmtAge(ms), `${ms}ms`);
+    }
+    assert.equal(api.waitAge(-1), '');
+    assert.equal(api.waitAge(NaN), '');
   });
 });
 

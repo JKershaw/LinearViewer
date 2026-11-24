@@ -303,11 +303,16 @@ test.describe('sessionParkedWait / renderSummaryLine parked branch (LIN-2244)', 
     assert.equal(sessionParkedWait({ runs: [] }), null);
   });
 
+  test('LIN-4558: the parked line says what the run waits on, escaped', () => {
+    const s = { stale: false, waiting: false, terminal: false, runs: [{ parkedWait: { since: 't1', latest: 't2', what: 'child run LIN-9 "<b>"' } }] };
+    assert.match(renderSummaryLine(s), /Waiting on child run LIN-9 &quot;&lt;b&gt;&quot; · since stub-relative-time\(t1\)/);
+  });
+
   test('renderSummaryLine renders the parked line, distinct from "waiting on you" and "working"', () => {
     const s = { stale: false, waiting: false, terminal: false, runs: [{ parkedWait: { since: 't1', latest: 't2' } }] };
     const html = renderSummaryLine(s);
     assert.match(html, /obs-summary-parked/);
-    assert.match(html, /Parked on a wait since stub-relative-time\(t1\)/);
+    assert.match(html, /Waiting · since stub-relative-time\(t1\)/);
     assert.ok(!html.includes('obs-summary-waiting'));
     assert.ok(!html.includes('working…'));
   });
