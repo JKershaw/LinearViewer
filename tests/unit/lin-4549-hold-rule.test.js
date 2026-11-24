@@ -107,7 +107,7 @@ async function observationWorld() {
     timers: [],
   });
   worlds.push(world);
-  world.document.body.innerHTML = '<ul id="obs-rulings"></ul><p id="obs-rulings-empty"></p><ul id="obs-waiting-rulings"></ul>';
+  world.document.body.innerHTML = '<ul id="obs-rulings"></ul><p id="obs-rulings-empty"></p>';
   world.page = await world.importPage('observation.js');
   return world;
 }

@@ -1,10 +1,10 @@
 /**
- * LIN-3983 PR 1: the ruling rows have two hosts — the Rulings tab and the
- * "waiting on you" block above the Observation feed — and one set of row
- * nodes. These tests pin the host seam: a row keeps its state when it moves
- * between hosts, and the block caps what it attaches. LIN-4541: a row is an open
- * question record (`kind: 'question'`); the old decision rows retired with the
- * ruling predicate, so a row of any other shape is not drawn.
+ * LIN-3983 PR 1 gave the question rows two hosts, the Rulings tab and the waiting block above the Observation feed.
+ * LIN-4553 made the Questions tab the one host: the waiting line above the runs only counts the questions
+ * (tests/unit/observation-waiting-block.test.js), so a card is drawn in one place. These tests pin that: a row keeps
+ * the person's typed answer across the poll's repaint, and the line never holds a card. LIN-4541: a row is an open
+ * question record (`kind: 'question'`); the old decision rows retired with the ruling predicate, so a row of any
+ * other shape is not drawn.
  *
  * `public/observation.js` is a native ES module (LIN-4463 piece 4), loaded fresh per test through `importWorld`
  * (tests/unit/helpers/import-world.js) over the shared fake DOM (tests/unit/helpers/fake-dom.js). The Rulings tab and
@@ -22,11 +22,11 @@ afterEach(() => {
   while (worlds.length) worlds.pop().restore();
 });
 
-// The Rulings tab's list and empty state, and the waiting block's list, as the page draws them.
+// The Questions tab's list and empty state, and the waiting line, as the page draws them.
 const RULINGS_MARKUP = `
   <ul id="obs-rulings"></ul>
   <p id="obs-rulings-empty"></p>
-  <ul id="obs-waiting-rulings"></ul>`;
+  <p id="obs-waiting" hidden><a id="obs-waiting-questions" hidden></a></p>`;
 
 async function makeWorld({ api } = {}) {
   const world = importWorld({
@@ -68,47 +68,38 @@ const flush = async (times = 8) => {
   for (let i = 0; i < times; i++) await new Promise(r => setImmediate(r));
 };
 
-describe('renderRulings host seam (LIN-3983)', () => {
-  test('a row holding a typed answer, built in the waiting block, moves to the Rulings tab as the same node', async () => {
-    // A row holding input is reused, not rebuilt, so moving it between hosts keeps the typed words: the tab must attach the
-    // very node the block held.
+describe('the Questions tab is the one host (LIN-3983, LIN-4553)', () => {
+  test('a row holding a typed answer is kept across the repaint, as the same node', async () => {
     const world = await makeWorld();
     const tabList = byId(world, 'obs-rulings');
-    const blockList = byId(world, 'obs-waiting-rulings');
-    const { renderRulings, switchView } = world.page;
+    const { renderRulings } = world.page;
     const row = questionRow(1);
-    renderRulings([row], { list: blockList, empty: null, limit: 3 });
-    const built = blockList.children[0];
-    assert.ok(built, 'the block attaches the row');
+    renderRulings([row]);
+    const built = tabList.children[0];
+    assert.ok(built, 'the tab attaches the row');
     built.querySelector('[data-testid="question-record-card-input"]').value = 'half typed';
 
-    switchView('rulings');
-    renderRulings([row]);
+    renderRulings([row, questionRow(2)]);
     await flush();
 
-    assert.equal(tabList.children.length, 1, 'the row is attached to the Rulings tab');
+    assert.equal(tabList.children.length, 2);
     assert.equal(tabList.children[0], built, 'the same node, not a rebuilt one');
-    assert.equal(blockList.children.length, 0, 'and detached from the block');
   });
 
-  test('the block attaches at most `limit` rows; the Rulings tab still lists every row', async () => {
+  test('the tab lists every row, and the waiting line holds no card', async () => {
     const world = await makeWorld();
     const tabList = byId(world, 'obs-rulings');
     const tabEmpty = byId(world, 'obs-rulings-empty');
-    const blockList = byId(world, 'obs-waiting-rulings');
-    const { renderRulings, switchView } = world.page;
-    const rows = [1, 2, 3].map(questionRow);
-    renderRulings(rows, { list: blockList, empty: null, limit: 2 });
-    assert.equal(blockList.children.length, 2, 'the block shows the first two rows only');
-
-    switchView('rulings');
+    const { renderRulings, renderWaitingBlock } = world.page;
+    const rows = [1, 2, 3, 4, 5].map(questionRow);
     renderRulings(rows);
-    assert.equal(tabList.children.length, 3, 'the Rulings tab lists every row');
-    assert.equal(blockList.children.length, 0, 'rows move out of the block when the tab paints');
+    renderWaitingBlock();
+    assert.equal(tabList.children.length, 5, 'the Questions tab lists every row');
     assert.equal(tabEmpty.hidden, true, 'the tab empty state hides while rows are listed');
+    assert.equal(byId(world, 'obs-waiting').querySelectorAll('[data-testid="question-record-card"]').length, 0);
   });
 
-  test('the default host is the Rulings tab, so existing one-argument callers are unchanged', async () => {
+  test('renderRulings paints the Questions tab', async () => {
     const world = await makeWorld();
     const tabList = byId(world, 'obs-rulings');
     const { renderRulings } = world.page;

@@ -67,12 +67,22 @@ describe('render-observation: the view strip (LIN-3983, LIN-4540)', () => {
     { urlKey: 'ws-a' }
   );
 
-  test('the shared tab strip holds Runs and Rulings only', () => {
+  test('the shared tab strip holds Runs and Questions only (LIN-4553: the second tab is named for questions)', () => {
     const out = html();
     const tabCount = (out.match(/class="tabs__tab( is-active)?"/g) || []).length;
-    assert.strictEqual(tabCount, 2, 'Runs and Rulings');
+    assert.strictEqual(tabCount, 2, 'Runs and Questions');
     assert.match(out, /data-tab="runs"[^>]*aria-selected="true"/, 'the runs tab is selected on a bare load');
-    assert.match(out, /data-tab="rulings"/);
+    assert.match(out, /data-tab="questions"[^>]*>[\s\S]*?Questions/);
+    assert.doesNotMatch(out, />\s*Rulings\s*</, 'no label reads "Rulings"');
+  });
+
+  test('the waiting line is one line of two links and holds no card list (LIN-4553)', () => {
+    const out = html();
+    const line = out.match(/<p class="obs-waiting"[\s\S]*?<\/p>/);
+    assert.ok(line, 'the waiting line renders as one paragraph');
+    assert.match(line[0], /data-testid="obs-waiting-questions" href="\?view=questions"/);
+    assert.match(line[0], /data-testid="obs-waiting-runs"/);
+    assert.doesNotMatch(out, /obs-waiting-rulings|obs-waiting-more|obs-waiting-count/, 'the old block\'s card list, count and "more" link are gone');
   });
 });
 

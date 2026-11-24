@@ -83,11 +83,14 @@ export async function createSession(page, overrides = {}) {
  * selectors for the migrated surfaces.
  */
 export const SELECTORS = {
-  /** Observation (LIN-3983 PR 2): the view tabs, the workspace scope, the waiting block, the Rulings actions and the in-page bulk question. */
+  /** Observation (LIN-3983 PR 2, LIN-4553): the view tabs (Runs, Questions), the workspace scope, the waiting line and the Questions tab's rows. */
   observation: {
     tab: (key) => `[data-testid="obs-tab-${key}"]`,
     scope: (key) => `[data-testid="obs-scope-${key}"]`,
     waiting: '[data-testid="obs-waiting"]',
+    // LIN-4553: the waiting line's two links, "N questions waiting →" (to the Questions tab) and "N runs waiting →".
+    waitingQuestions: '[data-testid="obs-waiting-questions"]',
+    waitingRuns: '[data-testid="obs-waiting-runs"]',
     sessionViews: '[data-testid="obs-session-views"]',
     rulingsSection: '[data-testid="obs-rulings-section"]',
     // LIN-4541: a ruling row is an open question record (the old decision row, its controls and the bulk bar retired).

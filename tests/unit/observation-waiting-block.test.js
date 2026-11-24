@@ -1,12 +1,13 @@
 /**
  * LIN-3983 PR 1: the Observation waiting block and the view/filter model.
  *
- *   - compactWaitSessions: which waiting runs get a compact row, and its text.
- *     The rule is the one the block ships, so the cases here are the ones the
- *     plan named (day-dead, open questions, message-less waits,
- *     a producer covered while another loop waits).
- *   - viewFromParams: the URL contract, including the old `?view=` values.
- *   - the block's paint, the three openLoopIds states, and the URL written
+ *   - compactWaitSessions: which waiting runs the waiting line counts beside the
+ *     questions. The cases here are the ones the plan named (day-dead, open
+ *     questions, message-less waits, a producer covered while another loop waits).
+ *   - viewFromParams: the URL contract, including the old `?view=` values
+ *     (`?view=rulings` opens the Questions tab, LIN-4553).
+ *   - the line's paint (one line since LIN-4553: "N questions waiting →" and
+ *     "N runs waiting →"), the three openLoopIds states, and the URL written
  *     when the view or filter moves.
  *
  * `public/observation.js` is a native ES module (LIN-4463 piece 4), loaded fresh per test through `importWorld`
@@ -34,11 +35,11 @@ afterEach(() => {
 // the client with getElementById and read back by the test. The scope buttons and the active list are the feed's own
 // controls: a scope press repaints the feed, which is how a card gets painted without a read.
 const REGIONS_MARKUP = `
-  <div id="obs-waiting" hidden></div>
-  <div id="obs-waiting-rulings"></div>
-  <div id="obs-waiting-runs"></div>
-  <div id="obs-waiting-count"></div>
-  <div id="obs-waiting-more" hidden></div>
+  <p id="obs-waiting" hidden>
+    <a id="obs-waiting-questions" href="?view=questions" hidden></a>
+    <span id="obs-waiting-sep" hidden></span>
+    <a id="obs-waiting-runs" href="?filter=all" hidden></a>
+  </p>
   <div id="obs-rulings"></div>
   <div id="obs-rulings-empty"></div>
   <div id="obs-session-views"></div>
@@ -132,18 +133,15 @@ describe('stripFeedbackMarkers', () => {
   });
 });
 
-describe('compactWaitSessions — which waiting runs get a compact row (LIN-3983)', () => {
-  test('a waiting run whose only wait is not an open question gets a row with its producer message', async () => {
+describe('compactWaitSessions — which waiting runs the line counts (LIN-3983, LIN-4553)', () => {
+  test('a waiting run whose only wait is not an open question is counted, with its run and title', async () => {
     const world = await makeWorld();
     const { compactWaitSessions } = world.page;
     const rows = compactWaitSessions([waitingSession()], new Set());
-    assert.equal(rows.length, 1);
-    assert.equal(rows[0].sessionId, 's-1');
-    assert.equal(rows[0].message, 'need a ruling before removing the route');
-    assert.equal(rows[0].title, 'Remove the old route');
+    assert.deepEqual(plain(rows), [{ sessionId: 's-1', workspaceUrlKey: 'acme', title: 'Remove the old route' }]);
   });
 
-  test('a wait whose loop is an open question gets no row: the ruling row speaks for it', async () => {
+  test('a wait whose loop is an open question is not counted: the question count speaks for it', async () => {
     const world = await makeWorld();
     const { compactWaitSessions } = world.page;
     assert.deepEqual(plain(compactWaitSessions([waitingSession()], new Set(['loop-p']))), []);
@@ -162,21 +160,19 @@ describe('compactWaitSessions — which waiting runs get a compact row (LIN-3983
     assert.deepEqual(plain(compactWaitSessions([waitingSession({ status: 'done', waiting: false, waitingLoopIds: [] })], new Set())), []);
   });
 
-  test('a message-less wait gets the fixed fallback text (no message)', async () => {
+  test('a message-less wait is still counted', async () => {
     const world = await makeWorld();
     const { compactWaitSessions } = world.page;
     const rows = compactWaitSessions([waitingSession({ waitingMessage: null, producerLoopId: null })], new Set());
     assert.equal(rows.length, 1);
-    assert.equal(rows[0].message, '');
   });
 
-  test('when the producer is covered by a ruling but another loop of the run waits, the row shows the fallback', async () => {
+  test('when the producer is covered by a question but another loop of the run waits, the run is counted', async () => {
     const world = await makeWorld();
     const { compactWaitSessions } = world.page;
     const session = waitingSession({ waitingLoopIds: ['loop-p', 'loop-b'] });
     const rows = compactWaitSessions([session], new Set(['loop-p']));
-    assert.equal(rows.length, 1, 'loop-b is not covered, so the run gets a row');
-    assert.equal(rows[0].message, '', 'the producer’s own question is on the ruling row, so the row does not repeat it');
+    assert.equal(rows.length, 1, 'loop-b is not covered, so the run is counted');
   });
 
   test('a session from an older payload without waitingLoopIds gets no row rather than a wrong one', async () => {
@@ -197,8 +193,9 @@ describe('viewFromParams — the URL contract, with the old tab names (LIN-3983)
     assert.deepEqual(plain(parse('')), { view: 'runs', filter: 'autopilot' });
   });
 
-  test('the rulings view keeps its name', async () => {
-    assert.deepEqual(plain(parse('view=rulings')), { view: 'rulings', filter: 'autopilot' });
+  test('?view=questions opens the Questions tab, and the old ?view=rulings still does (LIN-4553)', async () => {
+    assert.deepEqual(plain(parse('view=questions')), { view: 'questions', filter: 'autopilot' });
+    assert.deepEqual(plain(parse('view=rulings')), { view: 'questions', filter: 'autopilot' });
   });
 
   test('a link to a retired tab opens on runs (LIN-4540)', async () => {
@@ -224,8 +221,27 @@ describe('viewFromParams — the URL contract, with the old tab names (LIN-3983)
   });
 });
 
-describe('the waiting block paint (LIN-3983)', () => {
-  test('the block is absent when nothing waits', async () => {
+// LIN-4553: a question row as the rulings feed sends it.
+const questionRow = (n) => ({
+  kind: 'question', questionId: `q-${n}`, short: `Q${n}?`, asks: `Q${n}?`, question: `Q${n}?`, options: [], state: 'resumable', interactive: true,
+  ticket: `LIN-${n}`, title: `Task ${n}`,
+  anchor: { workspaceUrlKey: 'acme', taskId: `task-${n}`, runId: `run-${n}`, loopId: null, issueId: null, issueIdentifier: `LIN-${n}`, target: null }
+});
+
+describe('the waiting line paint (LIN-3983, one line since LIN-4553)', () => {
+  test('waitingLineWords: counts in words, singular and plural, and where the runs link goes', async () => {
+    const world = await makeWorld();
+    const { waitingLineWords } = world.page;
+    assert.deepEqual(plain(waitingLineWords({ questions: 0, runs: [] })), { questions: '', runs: '', runHref: null });
+    assert.deepEqual(plain(waitingLineWords({ questions: 1, runs: [] })), { questions: '1 question waiting →', runs: '', runHref: null });
+    const one = [{ sessionId: 's-1', workspaceUrlKey: 'acme', title: 'x' }];
+    assert.deepEqual(plain(waitingLineWords({ questions: 5, runs: one })),
+      { questions: '5 questions waiting →', runs: '1 run waiting →', runHref: '/workspace/acme/observation/session/s-1' });
+    const two = [...one, { sessionId: 's-2', workspaceUrlKey: 'acme', title: 'y' }];
+    assert.equal(waitingLineWords({ questions: 0, runs: two }).runHref, null, 'several runs link to the All filter, not to one run');
+  });
+
+  test('the line is absent when nothing waits', async () => {
     const world = await makeWorld();
     const { renderWaitingBlock, setOpenLoopIds } = world.page;
     setOpenLoopIds(new Set());
@@ -233,40 +249,42 @@ describe('the waiting block paint (LIN-3983)', () => {
     assert.equal(byId(world, 'obs-waiting').hidden, true);
   });
 
-  test('a waiting run with no ruling row shows as a compact row, under the runs view', async () => {
+  test('a waiting run no question speaks for is counted on the line, linking to its run page', async () => {
     const world = await makeWorld();
     const { renderWaitingBlock, setOpenLoopIds, sessionIndex } = world.page;
     sessionIndex.set('s-1', waitingSession());
     setOpenLoopIds(new Set());
     renderWaitingBlock();
-    const block = byId(world, 'obs-waiting');
-    assert.equal(block.hidden, false);
-    assert.equal(byId(world, 'obs-waiting-count').textContent, '1');
-    assert.match(byId(world, 'obs-waiting-runs').innerHTML, /data-session-id="s-1"/);
-    assert.match(byId(world, 'obs-waiting-runs').innerHTML, /reply on its run page/);
+    assert.equal(byId(world, 'obs-waiting').hidden, false);
+    const runs = byId(world, 'obs-waiting-runs');
+    assert.equal(runs.hidden, false);
+    assert.equal(runs.textContent, '1 run waiting →');
+    assert.equal(runs.getAttribute('href'), '/workspace/acme/observation/session/s-1');
+    assert.equal(byId(world, 'obs-waiting-questions').hidden, true, 'no question waits, so no question count');
+    assert.equal(byId(world, 'obs-waiting-sep').hidden, true);
   });
 
-  test('no compact rows paint while openLoopIds is still loading (null), so none duplicates a ruling row', async () => {
+  test('no waiting run is counted while openLoopIds is still loading (null), so none double-counts a question', async () => {
     const world = await makeWorld();
     const { renderWaitingBlock, sessionIndex } = world.page;
     sessionIndex.set('s-1', waitingSession());
     renderWaitingBlock();
     assert.equal(byId(world, 'obs-waiting').hidden, true);
-    assert.equal(byId(world, 'obs-waiting-runs').innerHTML, '', 'no compact row is painted');
+    assert.equal(byId(world, 'obs-waiting-runs').hidden, true);
   });
 
-  test('off the runs view the block is hidden, whatever it holds', async () => {
+  test('off the runs view the line is hidden, whatever it holds', async () => {
     const world = await makeWorld();
     const { renderWaitingBlock, setOpenLoopIds, sessionIndex, switchView } = world.page;
     sessionIndex.set('s-1', waitingSession());
     setOpenLoopIds(new Set());
     renderWaitingBlock();
     assert.equal(byId(world, 'obs-waiting').hidden, false);
-    switchView('rulings');
+    switchView('questions');
     assert.equal(byId(world, 'obs-waiting').hidden, true);
   });
 
-  test('a failed first rulings read settles openLoopIds to empty, so waiting runs still get rows', async () => {
+  test('a failed first rulings read settles openLoopIds to empty, so waiting runs are still counted', async () => {
     const world = await makeWorld({ fetchImpl: async () => jsonResponse({}, { ok: false, status: 500 }) });
     const { pollRulings, sessionIndex, getOpenLoopIds } = world.page;
     sessionIndex.set('s-1', waitingSession());
@@ -274,8 +292,8 @@ describe('the waiting block paint (LIN-3983)', () => {
     await pollRulings();
     await flush();
     assert.equal(getOpenLoopIds().size, 0, 'settled to the empty set');
-    assert.equal(byId(world, 'obs-waiting').hidden, false, 'the run is still shown');
-    assert.equal(byId(world, 'obs-poll-status').textContent, '', 'a block read never touches the live pill');
+    assert.equal(byId(world, 'obs-waiting').hidden, false, 'the run is still counted');
+    assert.equal(byId(world, 'obs-poll-status').textContent, '', 'a line read never touches the live pill');
   });
 
   test('a later rulings failure keeps the last open set', async () => {
@@ -294,23 +312,45 @@ describe('the waiting block paint (LIN-3983)', () => {
     assert.deepEqual([...getOpenLoopIds()], ['loop-p']);
   });
 
-  test('the block shows at most three ruling rows and says how many more are on the Rulings tab', async () => {
-    // LIN-4541: a ruling row is an open question record.
-    const rows = [1, 2, 3, 4, 5].map(n => ({
-      kind: 'question', questionId: `q-${n}`, asks: `Q${n}?`, question: `Q${n}?`, options: [], state: 'resumable', interactive: true,
-      anchor: { workspaceUrlKey: 'acme', taskId: `task-${n}`, runId: `run-${n}`, loopId: null, issueId: null, issueIdentifier: `LIN-${n}`, target: null }
-    }));
+  test('five open questions are one line, "5 questions waiting →", and no card is drawn on Runs', async () => {
+    const rows = [1, 2, 3, 4, 5].map(questionRow);
     const world = await makeWorld({ fetchImpl: async () => jsonResponse({ rulings: rows, openLoopIds: [] }) });
-    const { renderWaitingBlock, setOpenLoopIds, pollRulings } = world.page;
-    // The page's own rulings read fills the rows the block shows, as it does on a load.
+    const { pollRulings } = world.page;
+    // The page's own rulings read fills the count, as it does on a load.
     await pollRulings();
     await flush();
-    setOpenLoopIds(new Set());
-    renderWaitingBlock();
-    assert.equal(byId(world, 'obs-waiting-rulings').children.length, 3);
-    const more = byId(world, 'obs-waiting-more');
-    assert.equal(more.hidden, false);
-    assert.equal(more.textContent, '2 more in Rulings →');
+    const line = byId(world, 'obs-waiting');
+    assert.equal(line.hidden, false);
+    const questions = byId(world, 'obs-waiting-questions');
+    assert.equal(questions.hidden, false);
+    assert.equal(questions.textContent, '5 questions waiting →');
+    assert.equal(line.querySelectorAll('[data-testid="question-record-card"]').length, 0, 'the cards are on the Questions tab only');
+    assert.equal(byId(world, 'obs-rulings').children.length, 0, 'the Questions tab is not painted from the Runs view');
+  });
+
+  test('"N questions waiting →" opens the Questions tab in place, which then draws every card', async () => {
+    const rows = [1, 2].map(questionRow);
+    const world = await makeWorld({ fetchImpl: async () => jsonResponse({ rulings: rows, openLoopIds: [] }) });
+    const { pollRulings } = world.page;
+    await pollRulings();
+    await flush();
+    // The page's own boot bound the line's links (initControls); the click is handled in place.
+    await clickOn(byId(world, 'obs-waiting-questions'));
+    await flush();
+    assert.match(world.replaced.at(-1), /[?&]view=questions/);
+    assert.equal(byId(world, 'obs-waiting').hidden, true);
+    assert.equal(byId(world, 'obs-rulings').children.length, 2);
+  });
+
+  test('questions and an uncovered waiting run share the one line, with a separator', async () => {
+    const world = await makeWorld({ fetchImpl: async () => jsonResponse({ rulings: [questionRow(1)], openLoopIds: [] }) });
+    const { pollRulings, sessionIndex } = world.page;
+    sessionIndex.set('s-1', waitingSession());
+    await pollRulings();
+    await flush();
+    assert.equal(byId(world, 'obs-waiting-questions').textContent, '1 question waiting →');
+    assert.equal(byId(world, 'obs-waiting-runs').textContent, '1 run waiting →');
+    assert.equal(byId(world, 'obs-waiting-sep').hidden, false);
   });
 });
 
@@ -338,8 +378,8 @@ describe('the runs filter and the URL (LIN-3983)', () => {
   test('a view change writes the view into the URL, and a bare runs/autopilot view writes none', async () => {
     const world = await makeWorld();
     const { switchView, setFilter } = world.page;
-    switchView('rulings');
-    assert.match(world.replaced.at(-1), /[?&]view=rulings/);
+    switchView('questions');
+    assert.match(world.replaced.at(-1), /[?&]view=questions/);
     switchView('runs');
     assert.doesNotMatch(world.replaced.at(-1), /view=|filter=/);
     setFilter('standalone');
@@ -349,9 +389,9 @@ describe('the runs filter and the URL (LIN-3983)', () => {
   test('the URL keeps the other parameters the page was opened with', async () => {
     const world = await makeWorld({ href: 'https://harbour.test/workspace/acme/observation?source=x' });
     const { switchView } = world.page;
-    switchView('rulings');
+    switchView('questions');
     assert.match(world.replaced.at(-1), /source=x/);
-    assert.match(world.replaced.at(-1), /view=rulings/);
+    assert.match(world.replaced.at(-1), /view=questions/);
   });
 
   test('a filter change that keeps the source re-polls that source', async () => {
@@ -376,7 +416,7 @@ describe('the standalone waiting read (decision 8, LIN-3983)', () => {
     const world = await makeWorld({ fetchImpl: async () => { calls++; return jsonResponse({ active: [] }); } });
     const { pollWaitingSupplement, setFilter, switchView } = world.page;
     setFilter('standalone');
-    switchView('rulings');
+    switchView('questions');
     await flush();
     calls = 0; // count only the supplement's own reads below
     await pollWaitingSupplement();
@@ -385,11 +425,11 @@ describe('the standalone waiting read (decision 8, LIN-3983)', () => {
     switchView('runs');
     setFilter('autopilot');
     await flush();
-    switchView('rulings');
+    switchView('questions');
     await flush();
-    calls = 0; // the rulings tab's own poll is not the supplement's
+    calls = 0; // the Questions tab's own poll is not the supplement's
     await pollWaitingSupplement();
-    assert.equal(calls, 0, 'on the rulings view the supplement never fetches');
+    assert.equal(calls, 0, 'on the Questions view the supplement never fetches');
   });
 
   test('on the autopilot filter it adds the standalone waits, and keeps the block as it was when it fails', async () => {
@@ -411,7 +451,7 @@ describe('the standalone waiting read (decision 8, LIN-3983)', () => {
     assert.deepEqual([...standaloneWaitSupplement.keys()], ['sa-1'], 'a failed read keeps what it had');
   });
 
-  test('on the standalone filter an autopilot run waiting on a plain [blocked] stays in the block (decision 8(i))', async () => {
+  test('on the standalone filter an autopilot run waiting on a plain [blocked] stays on the line (decision 8(i))', async () => {
     const autopilotWait = waitingSession({ sessionId: 'ap-1', standalone: false, waitingLoopIds: ['loop-ap'], producerLoopId: 'loop-ap' });
     const world = await makeWorld({
       fetchImpl: async () => jsonResponse({ active: [autopilotWait], recent: [], rulings: [] })
@@ -421,8 +461,8 @@ describe('the standalone waiting read (decision 8, LIN-3983)', () => {
     setFilter('standalone'); // the filter change polls the feed, which fills the block's session list
     await flush();
     const block = byId(world, 'obs-waiting');
-    assert.equal(block.hidden, false, 'the block is shown on the standalone filter');
-    assert.match(byId(world, 'obs-waiting-runs').innerHTML, /data-session-id="ap-1"/);
+    assert.equal(block.hidden, false, 'the line is shown on the standalone filter');
+    assert.equal(byId(world, 'obs-waiting-runs').getAttribute('href'), '/workspace/acme/observation/session/ap-1');
   });
 });
 
@@ -437,7 +477,7 @@ describe('the waiting accent is the strongest on the page (LIN-3983, outcome 1)'
     assert.ok(appliedDecls(OBSERVATION, '.obs-session[data-status="in-progress"]'), 'the in-progress card has a rule');
   });
 
-  test('the waiting block is not amber either, so the card that needs a person is not the quietest', async () => {
+  test('the waiting line is not amber either, so what needs a person is not the quietest', async () => {
     const body = appliedDecls(OBSERVATION, '.obs-waiting');
     assert.doesNotMatch([...body.values()].join(' '), /--amber/);
     assert.equal(body.get('border-left'), '4px solid var(--brand)');

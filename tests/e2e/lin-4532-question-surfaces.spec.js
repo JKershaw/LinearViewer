@@ -159,17 +159,18 @@ test.describe('Home: Waiting on you draws the open question records', () => {
     await expect(page.locator(BADGE)).toHaveText('1 question');
 
     await page.goto(`/workspace/${URL_KEY}/observation`);
-    await page.locator('[data-testid="obs-tab-rulings"]').click();
+    await page.locator('[data-testid="obs-tab-questions"]').click();
     await expect(page.locator('[data-testid="ruling-question-row"]')).toHaveCount(1);
     await expect(page.locator('[data-testid="ruling-question-row"] [data-testid="question-record-card-question"]')).toHaveText('Which way?');
   });
 });
 
-test.describe('the Rulings page shows the question row with its task', () => {
+test.describe('the Questions tab shows the question row with its task', () => {
   test('a question row heads with its task identifier, and answers with option and words', async ({ page }) => {
     await seedTree(page);
     const qid = await seedQuestion(page, URL_KEY, { ticket: 'LOCAL-S', runId: await askingRun(page, URL_KEY, 'LOCAL-S') });
-    await page.goto(`/workspace/${URL_KEY}/observation`);
+    // LIN-4553: the cards are on the Questions tab; Runs shows one "N questions waiting" line.
+    await page.goto(`/workspace/${URL_KEY}/observation?view=questions`);
     const row = page.locator('[data-testid="ruling-question-row"]');
     await expect(row).toHaveCount(1);
     await expect(row.locator('[data-testid="question-record-card-task-id"]')).toHaveText('LOCAL-S');

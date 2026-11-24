@@ -631,12 +631,12 @@ test.describe('Sessions tab — in-flight standalone sessions (LIN-1194)', () =>
     await page.goto(`/test/set-session?urlKey=${URL_KEY}`);
     await page.goto(OBSERVATION_URL);
     await page.waitForLoadState('networkidle');
-    // Rulings (LIN-1728 Phase 4) keeps its own coverage; this file's invariant
+    // Questions (LIN-1728 Phase 4) keeps its own coverage; this file's invariant
     // is the strip's shape and the default selection. The old Autopilot and
     // Sessions tabs are now the runs filter.
     await expect(page.locator('[data-testid^="obs-tab-"]')).toHaveCount(2);
     await expect(page.getByTestId('obs-tab-runs')).toHaveClass(/is-active/);
-    await expect(page.getByTestId('obs-tab-rulings')).not.toHaveClass(/is-active/);
+    await expect(page.getByTestId('obs-tab-questions')).not.toHaveClass(/is-active/);
     await expect(page.getByTestId('obs-filter-autopilot')).toHaveAttribute('aria-pressed', 'true');
   });
 

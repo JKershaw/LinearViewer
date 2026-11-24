@@ -219,7 +219,7 @@
 .obs-feed-empty { color: var(--muted); font-size: 0.85rem; padding: 0.4rem 0; }
 .obs-feed-empty.hidden { display: none; }
 
-/* Discovery link from the Rulings tab to the escalation KPI audit page
+/* Discovery link from the Questions tab to the escalation KPI audit page
    (LIN-1736) — a normal-case link, not an eyebrow-styled label, floated to
    the opposite end of the same heading row. */
 .obs-rulings-kpis-link {
@@ -231,17 +231,12 @@
 }
 .obs-rulings-kpis-link:hover { color: var(--brand-dim); }
 
-/* Rulings tab (LIN-1728 Phase 4). One card per unanswered decision — an
-   amber left accent (the escalation/waiting hue, matching `.chat-msg--blocked`
-   in chat.css) rather than the status-hue accents .obs-session uses, since a
-   ruling has no lifecycle status of its own. */
+/* Questions tab (LIN-1728 Phase 4, LIN-4553). One row per open question: the
+   row is only a list item, since the shared question card (lib/question-record-card.js)
+   carries its own frame, accent and task line; a frame here drew a card in a card. */
 .obs-ruling {
-  border: 1px solid var(--line);
-  border-left: 3px solid var(--amber);
-  border-radius: var(--radius-lg);
+  list-style: none;
   margin-bottom: var(--space-2);
-  padding: 0.6rem 0.8rem;
-  background: var(--raised);
 }
 .obs-ruling-head {
   font-family: var(--font-structural);
@@ -250,11 +245,6 @@
   margin-bottom: 0.3rem;
 }
 .obs-ruling-ws { color: var(--muted); }
-.obs-ruling-question {
-  font-family: var(--font-content);
-  font-weight: 500;
-  margin: 0 0 0.3rem;
-}
 
 .obs-session {
   border: 1px solid var(--line);
@@ -949,43 +939,32 @@ a.obs-task-ident:hover { text-decoration: underline; }
   100% { background: var(--raised); }
 }
 
-/* ─── Waiting block (LIN-3983) ────────────────────────────────────────────────
-   What waits on you, above the runs feed. The strongest accent on the page: a
-   waiting run is the one card that needs a person, so it is not the quietest.
-   The ruling rows inside it are the Rulings tab's own rows (open question
-   records, LIN-4541). */
-.obs-waiting[hidden] { display: none; }
+/* ─── Waiting line (LIN-3983, one line since LIN-4553) ───────────────────────
+   What waits on you, above the runs feed, in one line: the count of open
+   questions (a link to the Questions tab) and of waiting runs no question speaks
+   for. The cards are on the Questions tab, so the runs stay on the first screen. */
+.obs-waiting[hidden],
+.obs-waiting-link[hidden],
+.obs-waiting-sep[hidden] { display: none; }
 .obs-waiting {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 0 var(--space-2);
   border-left: 4px solid var(--brand);
   padding-left: var(--space-2h);
-  margin-bottom: 1.1rem;
+  margin: 0 0 var(--space-2);
 }
-.obs-waiting-run {
-  padding: var(--space-2) 0;
-  border-bottom: 1px solid var(--line);
-  list-style: none;
-}
-.obs-waiting-run-title { font-weight: 600; color: var(--text); }
-.obs-waiting-run-text { margin: 0.2rem 0 0.25rem; color: var(--muted); font-size: 0.9rem; }
-.obs-waiting-run-link {
+.obs-waiting-link {
   display: inline-flex;
   align-items: center;
   min-height: 44px;
   color: var(--brand);
-  font-size: 0.9rem;
-}
-.obs-waiting-more {
-  appearance: none;
-  background: none;
-  border: none;
-  padding: 0.4rem 0;
-  min-height: 44px;
-  color: var(--brand);
   font-family: var(--font-content);
-  font-size: 0.9rem;
-  cursor: pointer;
+  font-weight: 600;
 }
-.obs-waiting-more[hidden] { display: none; }
+.obs-waiting-link:hover { color: var(--brand-dim); }
+.obs-waiting-sep { color: var(--muted); }
 
 /* ─── Runs filter and view hint (LIN-3983) ─────────────────────────────────── */
 .obs-view-hint {

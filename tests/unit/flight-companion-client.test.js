@@ -4109,7 +4109,7 @@ describe('flight-companion.js — scannable thread (LIN-3361)', () => {
     assert.strictEqual((qli.innerHTML.match(/data-testid="question-record-card-option"/g) || []).length, 2, 'one button per option');
   });
 
-  test('questions: one closed fold "N decisions waiting" with a Rulings link, rows all in the DOM', async () => {
+  test('questions: one closed fold "N decisions waiting" with a Questions tab link, rows all in the DOM', async () => {
     const { exports: m, thread } = await loadClient({
       fetchImpl: () => sseResponse([
         sseFrame('tool', { phase: 'result', id: 't', name: 'list_pending_decisions', result: decisionResult([dec(), dec({ questionId: 'q-2', issueIdentifier: 'LIN-101' })]) }),
@@ -4121,7 +4121,7 @@ describe('flight-companion.js — scannable thread (LIN-3361)', () => {
     const fold = findByClass(thread, 'fc-decisions-fold');
     assert.ok(fold, 'the fold renders');
     assert.strictEqual(fold.children[0].textContent, '2 decisions waiting');
-    assert.strictEqual(findByClass(fold, 'fc-decisions-rulings-link').getAttribute('href'), '/workspace/acme/observation?view=rulings');
+    assert.strictEqual(findByClass(fold, 'fc-decisions-rulings-link').getAttribute('href'), '/workspace/acme/observation?view=questions');
     assert.strictEqual(findAllByClass(fold, 'fc-question').length, 2);
   });
 

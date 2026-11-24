@@ -1170,13 +1170,13 @@ function renderDecisions(resultString, beforeLi) {
   var count = parsed.questions.length;
   summary.textContent = count + (count === 1 ? ' decision waiting' : ' decisions waiting');
   fold.appendChild(summary);
-  var rulingsHref = urlKey ? '/workspace/' + encodeURIComponent(urlKey) + '/observation?view=rulings' : '';
+  var rulingsHref = urlKey ? '/workspace/' + encodeURIComponent(urlKey) + '/observation?view=questions' : '';
   if (rulingsHref) {
     var rulingsLink = document.createElement('a');
     rulingsLink.className = 'fc-decisions-rulings-link';
     rulingsLink.setAttribute('data-testid', 'fc-decisions-rulings-link');
     rulingsLink.setAttribute('href', rulingsHref);
-    rulingsLink.textContent = 'open the Rulings tab';
+    rulingsLink.textContent = 'open the Questions tab';
     fold.appendChild(rulingsLink);
   }
   var list = document.createElement('ul');

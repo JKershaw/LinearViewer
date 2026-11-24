@@ -1605,7 +1605,7 @@ test.describe('LIN-3361: expandable grouped tool rows, folded decisions and read
     await expect(fold).not.toHaveAttribute('open', '');
     await expect(fold.locator('.fc-decision')).toHaveCount(2);
     await expect(fold.locator('.fc-decision').first()).toBeHidden();
-    await expect(page.getByTestId('fc-decisions-rulings-link')).toHaveAttribute('href', `/workspace/${URL_KEY}/observation?view=rulings`);
+    await expect(page.getByTestId('fc-decisions-rulings-link')).toHaveAttribute('href', `/workspace/${URL_KEY}/observation?view=questions`);
 
     await fold.locator('> summary').click();
     const row = fold.locator('.fc-decision').first();
