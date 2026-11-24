@@ -481,7 +481,7 @@ Settings › Models polish. Each piece below has one authority; a new caller use
 
 - **Anatomy.** A `role="tablist"` row of real `<button>` tabs, one `is-active` tab with `aria-selected="true"`, the others at `tabindex="-1"`. Each tab has `data-tab` (its key) and `data-testid="<prefix>-<key>"`. Labels do not wrap: the strip scrolls sideways on a narrow screen rather than breaking a word. Tap targets are 44px tall. The anatomy is shown in `/styleguide`.
 - **Arrow keys** are the page's job, because the server renders no script. Observation moves focus and selection with Left and Right in `public/observation.js`.
-- **Consumers.** Observation (`runs | rulings | due`). The task-edit tabs (`.task-edit-tab`, `lib/render-task-edit.js`) are the next consumer to move; they keep their own rules until then, so this decision has two copies to consolidate, not one.
+- **Consumers.** Observation (`runs | questions`). The task-edit tabs (`.task-edit-tab`, `lib/render-task-edit.js`) are the next consumer to move; they keep their own rules until then, so this decision has two copies to consolidate, not one.
 - **What a tab says.** Each tab names what it holds. The line under the strip states the active tab's contents, including the 24-hour window for the runs feed.
 - **Not decided here:** the tab keys are part of each page's own URL contract (`?view=`), so a key is never renamed without keeping its old value working.
 
