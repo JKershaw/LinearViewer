@@ -188,6 +188,27 @@ describe('(a) an open question shows once on the task page', () => {
     assert.doesNotMatch(JSON.stringify(poll), /task-records|data-record-id/, 'and never repaints Records');
   });
 
+  test('the card on the task page reads ids quoted in the asker\'s words as the Records do (page and poll alike); its options stay as written', async () => {
+    const taskId = await makeTicketTask();
+    const q = await add('question', 'open', {
+      asks: `Should ${taskId} keep the old links? person:${OWNER} asked at ${HOURS_AGO(2)}.\n\n- see finding-0a1b2c3d`,
+      options: ['Keep them', 'Drop them'], 'if-unanswered': `I keep them and tell person:${MEMBER}.`,
+    }, { inTask: taskId, to: `person:${OWNER}`, by: 'review' });
+    await serve('owner');
+    const html = await getPage();
+    const at = html.indexOf(`data-question-id="${q.id}"`);
+    const card = html.slice(html.lastIndexOf('<', at), html.lastIndexOf('<', html.indexOf('data-testid="task-records"')));
+    const text = pageText(card);
+    assert.doesNotMatch(text, RAW_ID, `no raw record id in the card's text: ${(text.match(RAW_ID) || [])[0]}`);
+    assert.doesNotMatch(text, PERSON_ID, 'no raw person id in the card\'s text');
+    assert.doesNotMatch(text, ISO, 'no ISO time in the card\'s text');
+    assert.match(text, new RegExp(`Should ${TICKET} keep the old links\\? John asked 2 hours ago\\.`), 'the task id is its ticket, the person their name, the stamp words');
+    assert.match(text, /tell Mia\./);
+    assert.match(card, /data-option-id="Keep them"/, 'the options are the answer values, unchanged');
+    const poll = await (await fetch(`${base}/workspace/${URL_KEY}/api/task/${TICKET}/state`)).json();
+    assert.doesNotMatch(pageText(poll.questionHtml || ''), /person:|task-[0-9a-f]{8}|\d{4}-\d{2}-\d{2}T/, 'the poll repaints the same readable card');
+  });
+
   test('a member gets no card, so Records still lists it: once either way', async () => {
     const taskId = await makeTicketTask();
     const q = await add('question', 'open', { asks: 'Should the footer keep the old links?', options: ['Keep them', 'Drop them'] }, { inTask: taskId, to: `person:${OWNER}`, by: 'review' });
