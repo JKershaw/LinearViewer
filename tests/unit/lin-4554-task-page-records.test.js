@@ -27,7 +27,7 @@ import { INDEX_SPECS } from '../../lib/db-indexes.js';
 import { createTaskPageRoutes } from '../../routes/task-page.js';
 import { createTaskRecordsRoutes } from '../../routes/task-records.js';
 import { createFakeTracker } from '../helpers/fake-records-tracker.js';
-import { renderTaskRecordsSection } from '../../lib/render-task-records.js';
+import { renderTaskRecordsSection, pageEndsOf, pageEndRefusal, whoWordOf, readableWords, peopleNames } from '../../lib/render-task-records.js';
 import { renderTaskPage } from '../../lib/render-task-page.js';
 import { KINDS } from '../../lib/records/check.js';
 import { stageLabel } from '../../lib/run-view.js';
@@ -88,16 +88,16 @@ const loader = {
 };
 
 /** The task page and the record routes, as server.js wires them, for `viewer` ('owner' or 'member'). */
-async function serve(viewer = 'owner') {
+async function serve(viewer = 'owner', { people = listPeople } = {}) {
   const app = express();
   app.use(express.urlencoded({ extended: false }));
   app.use(express.json());
   const accountStore = { resolveCanonicalAccountId: async (id) => id };
   app.use(createTaskPageRoutes({
     workspaceFromUrl: session, getOpenRouterSource: () => null, getDeployInfo: () => ({}), loader,
-    workspaceOwnerCheck: async () => ({ status: viewer }), recordsStore: store, dispatchStore, accountStore, listPeople, now: () => NOW,
+    workspaceOwnerCheck: async () => ({ status: viewer }), recordsStore: store, dispatchStore, accountStore, listPeople: people, now: () => NOW,
   }));
-  app.use(createTaskRecordsRoutes({ workspaceFromUrl: session, recordsStore: store, accountStore, listPeople, readTicket, tracker: outward.tracker }));
+  app.use(createTaskRecordsRoutes({ workspaceFromUrl: session, recordsStore: store, accountStore, listPeople: people, readTicket, tracker: outward.tracker }));
   server = await new Promise((resolve) => { const s = app.listen(0, '127.0.0.1', () => resolve(s)); });
   base = `http://127.0.0.1:${server.address().port}`;
 }
@@ -207,6 +207,33 @@ describe('(a) an open question shows once on the task page', () => {
     assert.match(card, /data-option-id="Keep them"/, 'the options are the answer values, unchanged');
     const poll = await (await fetch(`${base}/workspace/${URL_KEY}/api/task/${TICKET}/state`)).json();
     assert.doesNotMatch(pageText(poll.questionHtml || ''), /person:|task-[0-9a-f]{8}|\d{4}-\d{2}-\d{2}T/, 'the poll repaints the same readable card');
+  });
+
+  test('one page load, and one poll, read the workspace\'s people once however many parts of the page name one', async () => {
+    const taskId = await makeTicketTask();
+    await add('question', 'open', { asks: `Should person:${MEMBER} keep the old links?`, options: ['Keep them', 'Drop them'] }, { inTask: taskId, to: `person:${OWNER}`, by: 'review' });
+    await add('decision', 'stands', { answer: 'One footer.' }, { inTask: taskId, by: `person:${OWNER}` });
+    let reads = 0;
+    await serve('owner', { people: async () => { reads += 1; return listPeople(); } });
+    const html = await getPage();
+    assert.match(pageText(html), /Should Mia keep the old links\?/, 'the card names the person the words quote');
+    assert.match(recordsSection(html), /John/, 'and Records names the person who wrote the decision');
+    assert.equal(reads, 1, 'both read the one list of people the page load fetched');
+    reads = 0;
+    await (await fetch(`${base}/workspace/${URL_KEY}/api/task/${TICKET}/state`)).json();
+    assert.ok(reads <= 1, `the poll reads the people at most once (read ${reads})`);
+  });
+
+  test('a failed read of the people is no names, once: each person reads "someone"', async () => {
+    const taskId = await makeTicketTask();
+    await add('question', 'open', { asks: `Should person:${MEMBER} keep the old links?`, options: ['Keep them', 'Drop them'] }, { inTask: taskId, to: `person:${OWNER}`, by: 'review' });
+    await add('decision', 'stands', { answer: 'One footer.' }, { inTask: taskId, by: `person:${OWNER}` });
+    let reads = 0;
+    await serve('owner', { people: async () => { reads += 1; throw new Error('the people read failed'); } });
+    const text = pageText(await getPage());
+    assert.match(text, /Should someone keep the old links\?/);
+    assert.doesNotMatch(text, PERSON_ID);
+    assert.equal(reads, 1, 'the failure is remembered for the request, not retried by each reader');
   });
 
   test('a member gets no card, so Records still lists it: once either way', async () => {
@@ -433,6 +460,18 @@ describe('(e) an end form offers only its own kind\'s ends a person may write he
     assert.deepEqual(projectOffered, ['answered', 'handed-on'], 'a question to the project has no card, so a person may still settle it here; never withdrawn');
   });
 
+  test('every end the form leaves out has a refusal that names where it is written; none reads as a bare "cannot end"', () => {
+    for (const [kind, { ends }] of Object.entries(KINDS.kinds)) {
+      for (const to of ['project', `person:${OWNER}`]) {
+        const offered = pageEndsOf({ kind, to });
+        for (const end of ends.filter((e) => !offered.includes(e))) {
+          const why = pageEndRefusal(end);
+          assert.ok(why && !/cannot end/.test(why), `${kind} to ${to} ending ${end}: refusal names the other surface (got ${why})`);
+        }
+      }
+    }
+  });
+
   for (const [state, to] of [['withdrawn', 'project'], ['withdrawn', `person:${OWNER}`], ['answered', `person:${OWNER}`]]) {
     test(`the end route refuses a person ending a question to ${to} ${state} from the task page, and the question stays open`, async () => {
       const taskId = await makeTicketTask();
@@ -457,5 +496,23 @@ describe('(f) LIN-4159: the task page says "needs you" for a waiting stage', () 
     const track = html.slice(html.indexOf('data-testid="task-page-track-mount"'));
     assert.match(track, /data-testid="task-page-stage-state">needs you</, 'the stage reads "needs you", Home\'s word');
     assert.doesNotMatch(pageText(html), /waiting on you/i, 'the task page never says "waiting on you"');
+  });
+});
+
+describe('one record-id shape: <kind>-<8 hex>, in an actor word and in the writer\'s words alike', () => {
+  const tickets = new Map([['task-0a1b2c3d', 'LIN-9']]);
+  test('an id of the shape reads the same way whole and quoted', () => {
+    assert.equal(whoWordOf('finding-0a1b2c3d', { tickets }), 'another finding');
+    assert.equal(readableWords('see finding-0a1b2c3d', { tickets }), 'see a finding');
+    assert.equal(whoWordOf('task-0a1b2c3d', { tickets }), 'LIN-9');
+    assert.equal(readableWords('on task-0a1b2c3d', { tickets }), 'on LIN-9');
+  });
+  test('a word that only looks like one is left alone by both readers (a hex-letter suffix: "one-decade")', () => {
+    assert.equal(readableWords('one-decade ago and task-abcdef1', { tickets }), 'one-decade ago and task-abcdef1');
+    assert.notEqual(whoWordOf('one-decade', { tickets }), 'another one', 'the actor reader does not take it for a record either');
+  });
+  test('peopleNames keeps only people with an account and a name', () => {
+    assert.deepEqual([...peopleNames([{ accountId: 'a', name: 'Ann' }, { accountId: 'b' }, { name: 'x' }, null])], [['a', 'Ann']]);
+    assert.equal(peopleNames(undefined).size, 0);
   });
 });

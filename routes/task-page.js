@@ -38,7 +38,7 @@ import { isHiddenState } from '../lib/providers/state-map.js';
 import { renderTaskQuestion } from '../lib/render-task-page.js';
 import { openQuestionsForTask, titlesFromIssues } from '../lib/open-questions.js';
 import { personAccountIdOf } from './task-records.js';
-import { readableWords } from '../lib/render-task-records.js';
+import { readableWords, peopleNames } from '../lib/render-task-records.js';
 import { requestFeatureFlags } from '../lib/run-controls.js';
 import { resolveIssueBinding, isValidIssueId } from '../lib/workspace.js';
 import { jsonError } from '../lib/errors.js';
@@ -88,6 +88,16 @@ export function createTaskPageRoutes({ workspaceFromUrl, getOpenRouterSource, ge
   if (!loader) throw new Error('task-page routes: loader is required');
   const router = Router();
 
+  // LIN-4554: the workspace's people, read once per request however many parts of the page name one (the question cards' words and
+  // the Records section). A failed read is no names, each person then reading "someone"; the memo holds that too.
+  const peopleReads = new WeakMap();
+  function peopleOf(req, urlKey) {
+    if (!peopleReads.has(req)) {
+      peopleReads.set(req, Promise.resolve().then(() => listPeople(urlKey)).catch(() => []).then((people) => (Array.isArray(people) ? people : [])));
+    }
+    return peopleReads.get(req);
+  }
+
   /**
    * LIN-4532 (P2b): the open question records on this task that the signed-in owner is asked, for the question section. Read for
    * the owner's canonical account; a failed read costs only these cards. [] when the stores are not wired.
@@ -100,7 +110,7 @@ export function createTaskPageRoutes({ workspaceFromUrl, getOpenRouterSource, ge
     const titlesOf = titlesFromIssues([{ identifier, title }]);
     const rows = await openQuestionsForTask({ recordsStore, dispatchStore, urlKey: workspace.urlKey, accountId, ticket: identifier, titlesOf })
       .catch(() => []);
-    return readableRows(workspace.urlKey, rows);
+    return readableRows(req, workspace.urlKey, rows);
   }
 
   /**
@@ -108,12 +118,11 @@ export function createTaskPageRoutes({ workspaceFromUrl, getOpenRouterSource, ge
    * name, the ticket or words, so the page's text carries none. The first load and the poll both read their rows here, so they
    * agree. The options are left as written: each is the answer the card sends. The people are read only when the words quote one.
    */
-  async function readableRows(urlKey, rows) {
+  async function readableRows(req, urlKey, rows) {
     if (!rows.length) return rows;
     const said = (row) => [row.short, row.asks, row.ifUnanswered].filter((x) => typeof x === 'string');
     const quotesPerson = rows.some((row) => said(row).some((x) => x.includes('person:')));
-    const people = quotesPerson ? await Promise.resolve().then(() => listPeople(urlKey)).catch(() => []) : [];
-    const names = new Map((Array.isArray(people) ? people : []).filter((p) => p && p.accountId && p.name).map((p) => [p.accountId, p.name]));
+    const names = peopleNames(quotesPerson ? await peopleOf(req, urlKey) : []);
     const tickets = new Map(rows.filter((row) => row.taskId && row.ticket).map((row) => [row.taskId, row.ticket]));
     const read = (x) => (typeof x === 'string' ? readableWords(x, { people: names, tickets, now: now() }) : x);
     return rows.map((row) => ({ ...row, short: read(row.short), asks: read(row.asks), ifUnanswered: read(row.ifUnanswered) }));
@@ -167,8 +176,8 @@ export function createTaskPageRoutes({ workspaceFromUrl, getOpenRouterSource, ge
       const views = taskId ? await recordsStore.viewsOf(urlKey, await recordsStore.find(urlKey, { inRef: taskId })) : [];
       // LIN-4554: the workspace's people (lib/workspace-people.js, injected: the Records area takes outside reads injected), so a
       // record line names a person. A failed read costs the names only: each person then reads "someone", never a raw id.
-      const people = views.length ? await Promise.resolve().then(() => listPeople(urlKey)).catch(() => []) : [];
-      return { views, people: Array.isArray(people) ? people : [], canAct: true, refused: queryValue(req.query.records_refused) || null };
+      const people = views.length ? await peopleOf(req, urlKey) : [];
+      return { views, people, canAct: true, refused: queryValue(req.query.records_refused) || null };
     } catch (err) {
       console.error('Task page records error:', err?.message || err);
       return null;

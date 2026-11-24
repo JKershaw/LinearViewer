@@ -176,7 +176,7 @@ export function createTaskRecordsRoutes({ workspaceFromUrl, recordsStore, accoun
       const prev = await recordsStore.current(urlKey, req.params.id);
       const kindEnds = KINDS.kinds[prev?.kind]?.ends || [];
       if (prev && kindEnds.includes(input.state) && !pageEndsOf(prev).includes(input.state)) {
-        return res.redirect(303, refusedTo(urlKey, identifier, [{ message: pageEndRefusal(prev, input.state) }]));
+        return res.redirect(303, refusedTo(urlKey, identifier, [{ message: pageEndRefusal(input.state) }]));
       }
       const result = await writes.end({ urlKey, id: req.params.id, input, by: writer.by, run: writer.run });
       if (result.problems) return res.redirect(303, refusedTo(urlKey, identifier, result.problems));
