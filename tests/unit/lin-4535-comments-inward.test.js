@@ -1,6 +1,7 @@
 /**
- * LIN-4535 (P5, plan D4, D5 and the ender): a comment's author is decided in one place, and a person's comment reaches its
- * task once, as a finding under its real author.
+ * LIN-4535 (P5, plan D4, D5 and the ender), LIN-4548: a comment's author is decided once, in one of two places (the seam,
+ * from the credential, for a comment Harbour posts; the ingest, from the tracker's author id, for one typed in the tracker),
+ * and a person's comment reaches its task once, as a finding under its real author.
  *
  * The witnesses (plan §7 for P5):
  *   - a ledger write that fails after a post is retried, then counted as a gap, and the post still answers (lib/harbour-comment-post.js);

@@ -11,7 +11,11 @@
  *   2. routes/proxy-writes.js :771  POST /api/proxy/issues/:issueId/attachments (comment target)
  *   3. routes/workspace-api.js :1565 POST /workspace/:urlKey/api/comments/:issueId
  *
- * Run with: node --test tests/unit/harbour-comments-seam.test.js
+ * LIN-4548 adds the author rule at seams 1 and 2: a person's own proxy token
+ * makes the comment their finding, once; any other token makes none (the
+ * last describe block).
+ *
+ * Run with: node scripts/run-unit-tests.mjs tests/unit/harbour-comments-seam.test.js
  */
 
 process.env.NODE_ENV = 'test';

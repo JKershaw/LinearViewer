@@ -195,7 +195,7 @@ describe('B. GitHub and Jira carry the author id the ingest matches (finding-c23
   });
 });
 
-// ---- C. the page reply route credits a non-owner member (the route's call; finding-a9a85539 (b)) ----------------------
+// ---- C. the page reply route credits a non-owner member (the route's `by`, filed by the seam since LIN-4548; finding-a9a85539 (b))
 
 describe('C. the page reply route files a non-owner member\'s reply under that member (the seam files it from the route\'s `by`)', () => {
   const PROVIDER_NAME = 'lin-4535-reply-fake';

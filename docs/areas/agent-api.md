@@ -60,3 +60,5 @@ Area notes for `agent-api` in the registry. Format and rules: README.md.
   kickoff's follow-up reads as a run of its own.
 - Records reads log who asked via `proxyAskerOf` (`lib/stage-writes.js`). The brief logs carried ids under a run only
   on its own task: a run's end ends them (LIN-4536).
+- Who a credential speaks for is `personOfCredential` (`lib/run-lineage.js`): a new route asks it, never its own origin
+  test, and a comment post passes it as `by` to `lib/harbour-comment-post.js`. `proxyAskerOf` is a known copy (LIN-4548).
