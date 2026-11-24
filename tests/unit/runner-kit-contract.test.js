@@ -39,6 +39,10 @@ import {
   SESSION_TARGETS
 } from '../../lib/runner-kit/runner.mjs';
 import { prUrlOfFeedback } from '../../lib/dispatch-wake.js';
+import { validateFeedbackBody, FEEDBACK_AGENT_ERROR } from '../../lib/dispatch-feedback-validation.js';
+import { terminalStatusOf, wakeMarkerOf, isLineageClosingTerminal } from '../../lib/dispatch-terminal.js';
+import { DispatchQueueStore } from '../../lib/dispatch-store.js';
+import { createMockCollection } from '../fixtures/mock-collection.js';
 import { LIN4197_CASES } from '../fixtures/cost-replay/corpus.js';
 import http from 'node:http';
 import { credentialStore, exchangeBootstrap, startBroker, BROKER_HOST } from '../../lib/runner-kit/broker.mjs';
@@ -52,7 +56,7 @@ const TABLE = JSON.parse(fs.readFileSync(CONTRACT_PATH, 'utf8'));
 // LIN-4384: the sha256 of contract.json's own bytes. simple-dispatcher pins the same value
 // (FIXTURE_SHA256 beside LV_COMMIT in test/runner-contract.test.js), so an edit here that is not
 // re-copied there would go unnoticed on this side without this tripwire.
-const CONTRACT_SHA256 = '8e60d7f472a29d54ef6a15bed95667b039cdcb9f803abd864fee366abf532d68';
+const CONTRACT_SHA256 = '92b83f16e0a92fcdc2f1e1e35492d40560bf1b652ca94cf6aa51e23aef9f5dcf';
 
 const OWNER = 'acct-owner-1111';
 const NOW = Date.parse('2026-10-18T12:00:00.000Z');
@@ -252,10 +256,23 @@ async function kitForwardOutcome(row) {
 
 // Which PR did the run open, as Harbour reads it: the message as one feedback entry, read by the
 // wake's PR pick (`prUrlOfFeedback`, whose report lines are `reportLinesOf`'s).
-function harbourFor(row) {
+// LIN-4559 `agent-text`: the post body through Harbour's validator and store (the entry it keeps), then whether any
+// marker reader takes that entry as the run's terminal, wake or lineage close.
+async function harbourFor(row) {
   switch (row.area) {
     case 'report':
       return prUrlOfFeedback([{ message: row.item.message }]);
+    case 'agent-text': {
+      const checked = validateFeedbackBody(row.item);
+      if (checked.error) return checked.error === FEEDBACK_AGENT_ERROR ? 'refused 400 (agent is required)' : `refused ${checked.status ?? 400}`;
+      const store = new DispatchQueueStore({ collection: createMockCollection(), historyCollection: createMockCollection() });
+      const queued = await store.addItem('acme', { prompt: 'p', kind: 'implementation', issueIdentifier: 'LIN-1' });
+      await store.takeItem(queued._id, 'acme', 'tok');
+      await store.addFeedback(queued._id, 'acme', checked.value, 'tok');
+      const [entry] = store.historyCollection._docs.find((d) => d._id === queued._id).feedback;
+      const runs = terminalStatusOf(entry) || wakeMarkerOf(entry) || isLineageClosingTerminal(entry);
+      return `stored as ${entry.kind} from ${entry.agent}, ${entry.rootItemId ? 'tagged' : 'untagged'}; ${runs ? 'read as the run\'s marker' : 'ends, wakes and closes nothing'}`;
+    }
     default:
       throw new Error(`unknown harbour area ${row.area}`);
   }
@@ -347,6 +364,8 @@ const AREA_SHAPES = {
   // LIN-4557: the keyed retry of a run's words (SD's assistant-text-outbox.js against Harbour's keyed append).
   'keyed-feedback': RUNNER_AREA,
   report: { inputs: [], columns: ['harbour'] },
+  // LIN-4559: a child agent's words on its parent's row, read by Harbour only (the kit posts none).
+  'agent-text': { inputs: [], columns: ['harbour'] },
   sentinel: { inputs: [], columns: ['kit'] },
   // LIN-4378: the brokers' 429 policy. The rows are its one owner: the kit's broker.mjs and
   // simple-dispatcher's harbour-token-mcp-server.js each keep their own constants (the kit loads
@@ -506,8 +525,8 @@ describe('the kit follows the contract table', () => {
 
 describe('Harbour follows the contract table (LIN-4384)', () => {
   for (const row of TABLE.rows.filter((r) => 'harbour' in r)) {
-    test(`${row.area}: ${row.case}`, () => {
-      assert.equal(harbourFor(row), row.harbour);
+    test(`${row.area}: ${row.case}`, async () => {
+      assert.equal(await harbourFor(row), row.harbour);
     });
   }
 });

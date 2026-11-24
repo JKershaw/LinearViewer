@@ -53,8 +53,8 @@ describe('addFeedback lineage closers (real MangoDB tmpdir, LIN-3365)', () => {
 
   describe('isLineageClosingTerminal', () => {
     test('done|complete|failed|aborted only', () => {
-      for (const m of ['[done] x', '[complete] x', '[failed] x', '[aborted] x', '  [DONE] x']) assert.equal(isLineageClosingTerminal(m), true, m);
-      for (const m of ['[skipped] human-continued', '[blocked] x', '[pending] x', 'done', '[working] x', '', null]) assert.equal(isLineageClosingTerminal(m), false, String(m));
+      for (const m of ['[done] x', '[complete] x', '[failed] x', '[aborted] x', '  [DONE] x']) assert.equal(isLineageClosingTerminal({ message: m }), true, m);
+      for (const m of ['[skipped] human-continued', '[blocked] x', '[pending] x', 'done', '[working] x', '', null]) assert.equal(isLineageClosingTerminal({ message: m }), false, String(m));
     });
   });
 

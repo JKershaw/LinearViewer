@@ -25,6 +25,12 @@ process.env.NODE_ENV = 'test';
 
 import { test, describe, before, after, beforeEach } from 'node:test';
 import assert from 'node:assert/strict';
+import { readFileSync } from 'node:fs';
+import { execFileSync } from 'node:child_process';
+import { fileURLToPath } from 'node:url';
+import { dirname, join } from 'node:path';
+import * as acorn from 'acorn';
+import * as walk from 'acorn-walk';
 
 import { FEEDBACK_KINDS, FEEDBACK_KIND_ROLES, FEEDBACK_ENTRY_KINDS } from '../../lib/dispatch-feedback-kinds.js';
 import { validateFeedbackBody } from '../../lib/dispatch-feedback-validation.js';
@@ -43,13 +49,17 @@ import { isLoopActive, deriveLoopLanes, buildTimeline } from '../../lib/live-con
 import { runSessionsOf } from '../../lib/task-page-loader.js';
 import { deriveSessionWaiting } from '../../routes/dashboard.js';
 import { DispatchQueueStore } from '../../lib/dispatch-store.js';
+import { loadDispatchHistory } from '../../lib/kpi-stats.js';
 import { createRunRecords } from '../../lib/run-records.js';
 import { RecordsStore, RECORDS_COLLECTION, REFS_COLLECTION, QUERY_LOG_COLLECTION } from '../../lib/records-store.js';
 import { createMockCollection } from '../fixtures/mock-collection.js';
+import { FIXTURE_SECRETS as SECRETS } from '../fixtures/secret-scan-fixtures.js';
+import { MASK } from '../../lib/mask-secrets.js';
 import { createMangoTmpdir } from '../fixtures/mango-tmpdir.js';
 import { buildApp, call, ACME } from './lib/proxy-fake-deps.js';
 
 const { _buildLoops } = pipelineInternal;
+const REPO = join(dirname(fileURLToPath(import.meta.url)), '../..');
 
 const AGENT = 'agent-a1b2c3';
 const CHILD_DONE = '[done] found 3 call sites in lib/dispatch-terminal.js';
@@ -336,5 +346,146 @@ describe('LIN-4559: a child [done] on a subscribed row wakes no parent', () => {
 
     await store.addFeedback(worker._id, 'acme', { message: '[done] Task completed' }, 'tok');
     assert.equal(wakesTo(orchestrator._id).length, 1, 'control: the run\'s own [done] wakes it once');
+  });
+});
+
+// ── Census: no reader matches a marker on a bare message ─────────────────────
+
+describe('LIN-4559 census: the marker regexes are read only through the role-aware primitives', () => {
+  const REGEXES = new Set(['TERMINAL_FEEDBACK_REGEX', 'WAKE_FEEDBACK_REGEX', 'RESUME_MARKER_REGEX']);
+  // In lib/dispatch-terminal.js, the functions that may touch a regex: the three entry primitives (each asks the
+  // table's role first), the status-bearing predicate (its one caller asks the role, lib/dispatch-lineage-status.js),
+  // and the store filter (which carries the role as `kind: {$nin: RUN_SILENT_KINDS}`).
+  const TERMINAL_ALLOWED = new Set(['terminalStatusOf', 'wakeMarkerOf', 'isResumeEntry', 'isStatusBearingMessage', 'noOwnTerminalMarkerFilter']);
+
+  /** Uses of a marker regex in `source` that bypass the role, as `file:line (where)`. */
+  function bypassesIn(file, source) {
+    const ast = acorn.parse(source, { ecmaVersion: 'latest', sourceType: 'module', locations: true });
+    const hits = [];
+    walk.fullAncestor(ast, (node, _state, ancestors) => {
+      // A bare name, or a member read (`terminalInternal.TERMINAL_FEEDBACK_REGEX`), whose property the walker never visits.
+      const name = node.type === 'Identifier' ? node.name
+        : (node.type === 'MemberExpression' && !node.computed ? node.property.name : null);
+      if (!name || !REGEXES.has(name)) return;
+      const parent = ancestors.at(-2);
+      if (parent?.type === 'ImportSpecifier' || parent?.type === 'VariableDeclarator' && parent.id === node) return;
+      if (parent?.type === 'Property' && parent.key === node && !parent.computed && parent.shorthand === false) return;
+      const fn = [...ancestors].reverse().find((a) => a.type === 'FunctionDeclaration');
+      if (file === 'lib/dispatch-terminal.js') {
+        if (!fn || TERMINAL_ALLOWED.has(fn.id?.name)) return; // module scope: the declarations and `__internal`
+        hits.push(`${file}:${node.loc.start.line} (${fn.id?.name})`);
+        return;
+      }
+      // Elsewhere: stripping a marker off a message already chosen as the run's (`.replace(REGEX, '')`) reads no
+      // marker; the KPI aggregation's match sits inside `runOwnEntries`, which filters on the role first.
+      const call = parent?.type === 'CallExpression' ? parent : null;
+      if (call?.callee?.property?.name === 'replace') return;
+      const viaRunOwn = ancestors.some((a) => a.type === 'CallExpression' && a.callee.type === 'Identifier' && a.callee.name === 'runOwnEntries');
+      if (viaRunOwn) return;
+      hits.push(`${file}:${node.loc.start.line}`);
+    });
+    return hits;
+  }
+
+  test('lib/, routes/ and server.js read no marker regex outside the primitives', () => {
+    const files = execFileSync('git', ['ls-files', 'lib', 'routes', 'server.js'], { cwd: REPO, encoding: 'utf8' })
+      .split('\n').filter((f) => /\.m?js$/.test(f) && !f.startsWith('lib/runner-kit/'));
+    const hits = files.flatMap((f) => {
+      const src = readFileSync(join(REPO, f), 'utf8');
+      return [...REGEXES].some((r) => src.includes(r)) ? bypassesIn(f, src) : [];
+    });
+    assert.deepEqual(hits, [], `a reader matches a marker regex without asking the kinds table's speaksForRun role; read it through terminalStatusOf / wakeMarkerOf (lib/dispatch-terminal.js):\n${hits.join('\n')}`);
+  });
+
+  test('the census sees a bypass (self-check)', () => {
+    const src = [
+      "import { WAKE_FEEDBACK_REGEX, __internal as t } from './dispatch-terminal.js';",
+      'export function f(e) { return WAKE_FEEDBACK_REGEX.exec(e.message); }',
+      "export const g = (m) => String(m).replace(WAKE_FEEDBACK_REGEX, '');",
+      'export const h = (e) => t.TERMINAL_FEEDBACK_REGEX.test(e.message);',
+      'export const k = runOwnEntries([], t.TERMINAL_FEEDBACK_REGEX);'
+    ].join('\n');
+    assert.deepEqual(bypassesIn('lib/sample.js', src), ['lib/sample.js:2', 'lib/sample.js:4']);
+  });
+});
+
+describe('LIN-4559: the KPI aggregation (the database path of the terminal twin) skips a child\'s words (real MangoDB)', () => {
+  const harness = createMangoTmpdir('lin-4559-kpi-');
+  before(() => harness.connect());
+  after(() => harness.close());
+
+  test('a child [done] is no terminal entry and a child [ticket] line no ticket marker; the run\'s own still are', async () => {
+    const col = harness.freshDb().collection('dispatch-history');
+    const d = new Date('2026-11-01T00:00:00Z');
+    await col.insertMany([
+      { _id: 'run-and-child', urlKey: 'k', dispatchedAt: d, feedback: [
+        { message: '[done] the run finished', timestamp: d },
+        { kind: 'agent-text', agent: AGENT, message: '[done] child finished later', timestamp: d },
+        { kind: 'agent-text', agent: AGENT, message: '[ticket] LIN-1 started', timestamp: d }
+      ] },
+      { _id: 'child-only', urlKey: 'k', dispatchedAt: d, feedback: [{ kind: 'agent-text', agent: AGENT, message: CHILD_DONE, timestamp: d }] },
+      { _id: 'run-only', urlKey: 'k', dispatchedAt: d, feedback: [
+        { kind: 'status', message: '[ticket] LIN-2 started', timestamp: d },
+        { kind: 'assistant-text', message: '[failed] said in the run\'s own words', timestamp: d }
+      ] }
+    ]);
+    const byId = Object.fromEntries((await loadDispatchHistory(col)).map((r) => [r._id, r]));
+    assert.equal(byId['run-and-child'].terminalEntry?.message, '[done] the run finished');
+    assert.deepEqual(byId['run-and-child'].ticketMarkerEntries, []);
+    assert.equal(byId['child-only'].terminalEntry ?? null, null);
+    assert.equal(byId['run-only'].terminalEntry?.message, '[failed] said in the run\'s own words');
+    assert.deepEqual(byId['run-only'].ticketMarkerEntries.map((e) => e.message), ['[ticket] LIN-2 started']);
+    assert.deepEqual(Object.keys(byId['run-only'].terminalEntry).sort(), ['message', 'timestamp'], 'the projected entry keeps its narrow shape');
+  });
+});
+
+// ── LIN-4556's key and masking apply to a child's words ─────────────────────
+
+describe('LIN-4559: a child\'s words are masked on arrival and keyed like the run\'s (LIN-4556)', () => {
+  const makeTaken = async () => {
+    const store = new DispatchQueueStore({ collection: createMockCollection(), historyCollection: createMockCollection() });
+    const item = await store.addItem('acme', { prompt: 'p', kind: 'implementation', issueIdentifier: 'LIN-1' });
+    await store.takeItem(item._id, 'acme', 'tok');
+    return { store, id: item._id, stored: () => store.historyCollection._docs.find((d) => d._id === item._id).feedback };
+  };
+  const post = (store, id, message, agent = AGENT, extra = {}) => store.addFeedback(id, 'acme', { message, kind: 'agent-text', agent, ...extra }, 'tok');
+  const chunk = (i, n, body) => `${AGENT}\n(agent-text ${i}/${n})\n${body}`;
+  // One line longer than a chunk, cut with the token across the cut (the LIN-4556 seam case).
+  const cutLine = () => {
+    const cut = 1900;
+    const line = `${'w'.repeat(cut - 13)} ${SECRETS.githubPat} then more words on the same line`;
+    return [line.slice(0, cut), line.slice(cut)];
+  };
+
+  test('a secret in a child\'s words is masked before it is stored', async () => {
+    const { store, id, stored } = await makeTaken();
+    await post(store, id, `The agent found ${SECRETS.githubPat} in .env`);
+    assert.ok(!stored()[0].message.includes(SECRETS.githubPat));
+    assert.ok(stored()[0].message.includes(MASK));
+  });
+
+  test('a token split across a child\'s two chunks is masked in chunk 2', async () => {
+    const { store, id, stored } = await makeTaken();
+    const [one, two] = cutLine();
+    await post(store, id, chunk(1, 2, one));
+    await post(store, id, chunk(2, 2, two));
+    assert.equal(stored()[1].message, chunk(2, 2, `${MASK} then more words on the same line`));
+  });
+
+  test('a child\'s chunk 2 is never joined to another child\'s chunk 1 (masked on its own)', async () => {
+    const { store, id, stored } = await makeTaken();
+    const [one, two] = cutLine();
+    await post(store, id, chunk(1, 2, one), 'agent-other');
+    await post(store, id, chunk(2, 2, two));
+    assert.equal(stored()[1].message, chunk(2, 2, two), 'nothing in chunk 2 alone matches, so it stores as posted');
+  });
+
+  test('a keyed child post retried with the same key is stored once', async () => {
+    const { store, id, stored } = await makeTaken();
+    const first = await post(store, id, 'Searching lib/.', AGENT, { key: 'run-1:agent-a1b2c3:0' });
+    const again = await post(store, id, 'Searching lib/.', AGENT, { key: 'run-1:agent-a1b2c3:0' });
+    assert.equal(first.success, true);
+    assert.equal(again.duplicate, true);
+    assert.equal(stored().length, 1);
   });
 });

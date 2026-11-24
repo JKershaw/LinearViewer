@@ -159,7 +159,7 @@ describe('LIN-4556: what masking touches', () => {
     const row = storedRow(store, item._id);
     assert.equal(row.feedback[0].message, `[done] PR opened; pushed with ${MASK}`);
     assert.equal(deriveTerminalStatus(row.feedback), 'done');
-    assert.equal(isLineageClosingTerminal(row.feedback[0].message), true);
+    assert.equal(isLineageClosingTerminal({ message: row.feedback[0].message }), true);
     assert.equal(findWakeEvent(row.feedback).marker, 'done');
   });
 

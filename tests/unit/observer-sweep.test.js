@@ -1423,7 +1423,7 @@ describe('observer-sweep: negative capability — no automated-intervention path
     assert.strictEqual(entry.lane, 'blocked');
     assert.strictEqual(entry.wouldBeMarker, 'blocked');
     assert.ok(
-      isWakeEvent(entry.wouldBeFeedback.message),
+      isWakeEvent({ message: entry.wouldBeFeedback.message }),
       'the logged would-be feedback message must be recognized by the SAME parser real dispatch feedback uses (lib/dispatch-terminal.js isWakeEvent), not merely similarly shaped'
     );
     assert.ok(entry.wouldBeComment?.body?.includes('[blocked]'), 'the logged would-be Linear comment carries the same marker vocabulary');

@@ -1649,7 +1649,8 @@ export function createDispatchRoutes({ dispatchQueueStore, dispatchTokenStore, w
       urlLabel,
       kind: sanitizedKind,
       rootItemId: sanitizedRootItemId,
-      key
+      key,
+      agent
     } = validation.value;
 
     try {
@@ -1657,7 +1658,8 @@ export function createDispatchRoutes({ dispatchQueueStore, dispatchTokenStore, w
         itemId,
         req.dispatchUrlKey,
         // LIN-4556: the idempotency key rides along only when the post carried one (sparse).
-        { message, url: url || null, urlLabel: urlLabel || null, kind: sanitizedKind, rootItemId: sanitizedRootItemId, ...(key ? { key } : {}) },
+        // LIN-4559: and the agent an agent-text post names (sparse; the validator sets it only on that kind).
+        { message, url: url || null, urlLabel: urlLabel || null, kind: sanitizedKind, rootItemId: sanitizedRootItemId, ...(key ? { key } : {}), ...(agent ? { agent } : {}) },
         req.dispatchTokenLabel,
         provisionWakeCredential,
         // LIN-4373: the leftover step, the same one the runner feedback route uses. This

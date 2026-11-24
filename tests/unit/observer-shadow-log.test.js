@@ -152,7 +152,7 @@ describe('observer-shadow-log: computeWouldBeActions (whole-tick payload)', () =
 describe('observer-shadow-log: vocabulary parity with the real dispatch-feedback parsers', () => {
   test('the logged would-be feedback message is recognized by isWakeEvent/findWakeEvent as a genuine "blocked" wake marker', () => {
     const action = computeWouldBeAction(attentionRow());
-    assert.ok(isWakeEvent(action.wouldBeFeedback.message));
+    assert.ok(isWakeEvent({ message: action.wouldBeFeedback.message }));
     const found = findWakeEvent([action.wouldBeFeedback]);
     assert.strictEqual(found.marker, 'blocked');
   });
