@@ -68,6 +68,7 @@ describe('the implementation brief states the local-testing rule once (LIN-4441)
     assert.equal(prompt.split(COMMAND).length - 1, 1);
     assert.match(prompt, /Where CI is absent, run the full suite once before pushing\./);
     assert.doesNotMatch(prompt, /Establish CI/, 'no pointer to a section this prompt does not have');
+    assert.match(prompt, /### Test Before Pushing[^#]*### Finish\n\nPush, and let CI settle\./, 'the closing final-message paragraph has its own heading, not the rule\'s');
   });
 
   test('review does not render the rule, and keeps its re-run CI gate', () => {
