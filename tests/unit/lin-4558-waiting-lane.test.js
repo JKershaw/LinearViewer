@@ -17,6 +17,7 @@ import assert from 'node:assert/strict';
 
 import * as telemetry from '../../lib/session-telemetry.js';
 import { buildConsoleFeed } from '../../lib/live-console.js';
+import { sessionIdByLoop as buildSessionIdByLoop } from '../../lib/pipeline-loops.js';
 
 const { buildRunTelemetry, parseParkedWait } = telemetry;
 
@@ -137,5 +138,27 @@ describe('LIN-4558 the waiting check recognises each runner wait line', () => {
       { kind: 'heartbeat', message: '[waiting] waiting on the CI run · 5m · next heartbeat in ≤5m', timestamp: 't2' },
     ];
     assert.deepEqual(parseParkedWait(fb), { since: 't1', latest: 't2', what: 'the CI run' });
+  });
+});
+
+// The run page links a parked run's child only when the child is a row on the same run page (lib/render-run-steps.js
+// parkedChildLink); Live Console links it through the session index. These two cases pin which children share a page.
+describe('LIN-4558 which child runs share the parent\'s run page', () => {
+  const row = (loopId, over = {}) => ({
+    loopId, workspaceUrlKey: 'acme', kind: 'worker', target: 'cli', issueIdentifier: `LIN-${loopId.length}`,
+    dispatchedAt: at(0), sessionId: null, followUpTo: null, ...over,
+  });
+
+  test('under an autopilot window a parent and its child are one run page: the run page can link the child in page', () => {
+    const ap = { loopId: 'ap-1', workspaceUrlKey: 'acme', kind: 'autopilot', issueIdentifier: 'LIN-1', dispatchedAt: at(-1), sessionId: null, followUpTo: null };
+    const ids = buildSessionIdByLoop([ap, row('parent-1', { sessionId: 'ap-1' }), row('child-1', { sessionId: 'ap-1', parentSessionId: 'parent-1' })]);
+    assert.equal(ids.get('acme::child-1'), ids.get('acme::parent-1'));
+  });
+
+  test('a worker with no autopilot and the child it dispatched are two runs: only Live Console can link the child', () => {
+    const ids = buildSessionIdByLoop([row('parent-1'), row('child-1', { parentSessionId: 'parent-1', rootItemId: 'parent-1' })]);
+    assert.notEqual(ids.get('acme::child-1'), ids.get('acme::parent-1'));
+    const lane = buildConsoleFeed({ loops: [runLoop([PARK, ...waitingBeats(15, 15)])] }, { now: T0 + 20 * 60000, sessionIdByLoop: ids }).lanes[0];
+    assert.equal(lane.parkedWait.childSessionId, ids.get('acme::child-1'));
   });
 });

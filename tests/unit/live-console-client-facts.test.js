@@ -15,6 +15,7 @@
  */
 import { test, describe } from 'node:test';
 import assert from 'node:assert/strict';
+import { fmtAge } from '../../lib/time-words.js';
 import { CLIENT_SRC, loadLiveConsole, makeLaneNode, pinLaneMarkupToClient } from './helpers/live-console-world.js';
 
 describe('a lane says what it is doing, in words', () => {
@@ -143,6 +144,19 @@ describe('LIN-4558: a parked lane says what it waits on, for how long, and links
     assert.equal(li.querySelector('.lc-lane-action').getAttribute('title'), null);
     assert.equal(li.querySelector('.lc-lane-child').hidden, true);
     assert.equal(li.querySelector('.lc-lane-child').getAttribute('href'), null);
+  });
+});
+
+describe('LIN-4558: the lane\'s wait age is the run page\'s wait age (waitAge is a classic-script copy of fmtAge)', () => {
+  test('waitAge agrees with lib/time-words.js fmtAge, including the rounding boundaries', () => {
+    const { api } = loadLiveConsole();
+    // 89.5s, 149.6s and 59m29.5s are where rounding to the second first would disagree with rounding to the minute;
+    // 59.5s is where the seconds branch rounds up to a whole minute.
+    for (const ms of [0, 1, 999, 30000, 59400, 59500, 59999, 60000, 89499, 89500, 149600, 3569500, 3570000, 3599999, 3600000, 5400000, 90 * 60000 + 29000, 90 * 60000 + 30000, 25 * 3600000]) {
+      assert.equal(api.waitAge(ms), fmtAge(ms), `${ms}ms`);
+    }
+    assert.equal(api.waitAge(-1), '');
+    assert.equal(api.waitAge(NaN), '');
   });
 });
 

@@ -176,9 +176,9 @@
   // cannot import the leaf until it becomes a module); keep the two in step.
   function waitAge(ms) {
     if (!Number.isFinite(ms) || ms < 0) return '';
-    const secs = Math.round(ms / 1000);
-    if (secs < 60) return `${secs}s`;
-    const mins = Math.round(secs / 60);
+    // Rounded once, as fmtAge does: to the second under a minute, else to the minute.
+    if (ms < 60000) { const secs = Math.round(ms / 1000); return secs < 60 ? `${secs}s` : '1m'; }
+    const mins = Math.round(ms / 60000);
     if (mins < 60) return `${mins}m`;
     const h = Math.floor(mins / 60), rm = mins % 60;
     return rm ? `${h}h ${rm}m` : `${h}h`;
@@ -1394,7 +1394,7 @@
   // LIN-3331 task-page link's show/hide-on-repaint path — without a full page.
   // LIN-4035 adds the stream row's markup and the activity section's state.
   if (typeof module !== 'undefined' && module.exports) {
-    module.exports = { updateLaneNode, eventRowHtml, showBarDetail, readActivityOpen, setActivityOpen, countActivityArrivals };
+    module.exports = { updateLaneNode, waitAge, eventRowHtml, showBarDetail, readActivityOpen, setActivityOpen, countActivityArrivals };
   }
   // LIN-4310: the lane's own builder, as a window global, so a suite gets the real lane markup from the client instead of
   // a copy of it (tests/unit/helpers/live-console-world.js). laneNode is the one builder paintLanes uses; nothing else
