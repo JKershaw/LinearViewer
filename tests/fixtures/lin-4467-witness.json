@@ -142,13 +142,13 @@
     },
     "close-out:fresh": {
       "name": "close-out",
-      "bytes": 11310,
-      "sha256": "74899c59a3c5f104db551c79364cd92690262e96e279239f33e3b1ead616c22c"
+      "bytes": 11648,
+      "sha256": "17eedf259e94f92bf1c8dfac2309024978a13d65751ce7eac4a1e7a48f63cb80"
     },
     "close-out:fix": {
       "name": "close-out",
-      "bytes": 11310,
-      "sha256": "74899c59a3c5f104db551c79364cd92690262e96e279239f33e3b1ead616c22c"
+      "bytes": 11648,
+      "sha256": "17eedf259e94f92bf1c8dfac2309024978a13d65751ce7eac4a1e7a48f63cb80"
     },
     "retrospective-audit:fresh": {
       "name": "retrospective-audit",

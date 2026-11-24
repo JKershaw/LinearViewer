@@ -60,8 +60,8 @@ Area notes for `llm-and-prompts` in the registry. Format and rules: README.md.
   (`node scripts/gen-llms-catalogue.mjs`). A kind in `SPINE` (`lib/run-view.js`) also moves the run page's "n of N", the
   session and task-page goldens (`UPDATE_RENDER_SESSION_GOLDEN=1`, `UPDATE_RENDER_TASK_PAGE_GOLDEN=1`) and the
   E2E count pins; read the golden diff before accepting it (LIN-4437).
-- `formatCiGateCheck` (`lib/prompt-formatters.js`) renders in implementation, review and close-out:
-  a rule for one stage gets its own formatter beside it. Prove the others unchanged by rendering every
+- `formatCiGateCheck` (`lib/prompt-formatters.js`) renders in implementation, review and close-out;
+  `formatLocalTestRule` in each prompt that pushes code, not review. A stage rule gets its own formatter. Prove the others unchanged by rendering every
   kind, fresh and fix round, at HEAD and on the branch, not by the budget test, whose ceilings are caps (LIN-4441).
 - `tests/fixtures/lin-4467-witness.json` stays as a ratchet: a sha256 for all 40 real-context renders, fresh and fix
   round. A rendered-text change regenerates it (`node tests/fixtures/lin-4467-witness.js --write`) beside the byte
