@@ -2370,6 +2370,8 @@ When `kind` is present the verb:
 - accepts only real prompt-template keys — `plan`, `implementation`, `review`, `research`, `design`, `breakdown`, `look-into`, `triage`, `scoping`, `spike`, `context`, `retro`, `blocked`. Meta-kinds (`defer`, `custom`, `autopilot`, `periodical`) and any unknown key are rejected with `400`, because they have no template body and would dispatch an empty prompt;
 - returns the same headers-only response plus `"override": true`.
 
+**A judging run starts fresh (LIN-4416).** A `review`, `plan-review` or `blind-read` row (an override `kind`, or the kind a descent lands on) that carries `followUpTo` is refused `400` with `code: JUDGING_RUN_NOT_FRESH`, and nothing is enqueued. That run writes as its stage (the verdict the merge gate reads), so it must not execute inside a resumed session whose earlier turns someone else wrote. Send it again without `followUpTo`. The rule sits in the dispatch factory (`lib/dispatch-factory.js` `guardJudgingRunFresh`), so every enqueue lane meets it, the session lane included.
+
 Use it **sparingly and only on a demonstrable engine miss** — each override is recorded so the recommendation heuristic can be improved. It is not the everyday path; the LLM-driven verb (no `kind`) remains the default. The caller still never supplies prompt text — only the verb key.
 
 **`noDescend` — dispatch the parent's own work.** By default this verb descends a

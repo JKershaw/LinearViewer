@@ -331,21 +331,21 @@ describe('witness 5: the E2E seed route writes each verdict as its judge, and it
 });
 
 describe('witness 7: one judging-kind question, and no list of judging kinds', () => {
-  test('judgesAs is the keys of KINDS.outcomes, defined once and asked by the write rule and the dispatch step only', () => {
+  test('judgesAs is the keys of KINDS.outcomes, defined once and asked by the write rule, the dispatch step and the factory\'s freshness guard only', () => {
     for (const j of Object.keys(KINDS.outcomes)) assert.equal(judgesAs(j), true, j);
     for (const k of ['implementation', 'close-out', 'custom', '', null, undefined, 'toString', '__proto__']) assert.equal(judgesAs(k), false, String(k));
     const defs = execFileSync('git', ['grep', '-n', 'export function judgesAs', '--', 'lib', 'routes'], { encoding: 'utf8' }).trim().split('\n');
     assert.equal(defs.length, 1, defs.join('\n'));
     const callers = execFileSync('git', ['grep', '-n', 'judgesAs(', '--', 'lib', 'routes', 'server.js'], { encoding: 'utf8' }).trim().split('\n')
       .filter((l) => !/export function judgesAs/.test(l)).map((l) => l.split(':')[0]);
-    assert.deepEqual([...new Set(callers)].sort(), ['lib/dispatch-entrance.js', 'lib/records/check.js']);
+    assert.deepEqual([...new Set(callers)].sort(), ['lib/dispatch-entrance.js', 'lib/dispatch-factory.js', 'lib/records/check.js']);
   });
 
   test('kinds.json gained no map: its top-level keys and outcome sets are as before', () => {
     const raw = JSON.parse(readFileSync(new URL('../../lib/records/kinds.json', import.meta.url), 'utf8'));
     assert.deepEqual(Object.keys(raw).sort(), Object.keys(KINDS).sort());
     assert.deepEqual(Object.keys(raw.outcomes).sort(), ['adversarial-read', 'blind-read', 'plan-review', 'review']);
-    for (const file of ['lib/records/check.js', 'lib/dispatch-entrance.js']) {
+    for (const file of ['lib/records/check.js', 'lib/dispatch-entrance.js', 'lib/dispatch-factory.js']) {
       const src = readFileSync(new URL(`../../${file}`, import.meta.url), 'utf8');
       assert.doesNotMatch(src, /\[\s*'review',\s*'plan-review'|new Set\(\[\s*'review'|JUDG\w*_KINDS\s*=/, `${file} names a list of judging kinds`);
     }

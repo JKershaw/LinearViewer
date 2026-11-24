@@ -26,9 +26,9 @@ Area notes for `runs-and-dispatch` in the registry. Format and rules: README.md.
   ticket's runs, read it batched: `listHistory`'s `withLineage`, never a walk per row (`runFact`,
   `lib/recent-runs.js`, LIN-4459: the walks go up, a parked stage's ending is below it).
 - Row-only kinds stay out of `DISPATCH_KINDS` (`lib/prompt-templates.js`) and sit in `ROW_ONLY_KINDS`
-  (`lib/dispatch-fields.js`); kind-keyed maps are tested against both. A kind check asks
-  `effectiveDispatchKind` (`lib/dispatch-kind.js`), the stored kind (LIN-4416). A new bucket can pull a kind
+  (`lib/dispatch-fields.js`); kind-keyed maps are tested against both. A new bucket can pull a kind
   into the round-trip walk, which `OFF_SPINE_KINDS` stops (LIN-4376).
+- A rule on what a row starts goes in `lib/dispatch-factory.js` on the stored kind: lane checks leak (LIN-4416).
 - The store knows no leftovers (LIN-4383). It holds a parent wake by `heldWakeFor` (LIN-4373),
   released by the holder's terminal or `_archiveItem` under the build's guard key, so it wakes once.
   Leftover wording lives in `lib/dispatch-leftover-hook.js`, bound into the store late
@@ -51,8 +51,7 @@ Area notes for `runs-and-dispatch` in the registry. Format and rules: README.md.
   the check sets Done only on a findings read of zero (LIN-4527); a Done ticket with no close-out stands only the
   read aside. Harbour never sets Done.
 - Verdicts, changes and the landing are records (LIN-4520): read them from the records (`landingOfTicket`,
-  `lib/records/landing.js`), never a comment. To retire an
-  export, grep every tree for its name: a `docs/papers` script and a hand-built prompt context still reached the
+  `lib/records/landing.js`), never a comment. To retire an export, grep every tree for its name: a `docs/papers` script and a hand-built prompt context still reached the
   retired readers; only CI caught them. Key PR statuses by PR URL, never by index: the
   cited list and the landing order PRs differently (LIN-4458).
 - A reader that classifies by kind routes `custom` before `bucketOf`: `BUCKET_OF_KIND` maps

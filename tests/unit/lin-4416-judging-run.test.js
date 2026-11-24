@@ -11,6 +11,12 @@
  *
  * Still enqueued: a non-judging kind, a kind-less follow-up (it joins the run it resumes, as ruled), a promptName that
  * derives `custom`, an abort, and the override arm with a judging kind (its prompt is built from the template).
+ *
+ * A judging run starts in a fresh session (finding-a1ed48c1, decision-0a0d4cc6): a template-built prompt is no guarantee
+ * once the session it lands in was primed by someone else. Before the factory guard (lib/dispatch-factory.js
+ * guardJudgingRunFresh), recommend-and-dispatch {kind:'review', followUpTo} enqueued a review row inside the caller's
+ * session (201, probed at e94465efd). Every lane meets the guard: the override arm, the descent arm, the session lane
+ * and the factory itself are each witnessed below.
  */
 process.env.NODE_ENV = 'test';
 
@@ -24,6 +30,11 @@ import { createProxyRoutes } from '../../routes/proxy.js';
 import { getPromptDisplayName } from '../../lib/prompt-templates.js';
 import { startsRunRow } from '../../lib/run-identity.js';
 import { effectiveDispatchKind } from '../../lib/dispatch-kind.js';
+import { createDispatchItem, JUDGING_RUN_NOT_FRESH_CODE } from '../../lib/dispatch-factory.js';
+import { mapDispatchRefusal } from '../../lib/dispatch-refusal.js';
+import { requireGrant } from '../../lib/require-grant.js';
+import { createDispatchRoutes as createProxyDispatchRoutes } from '../../routes/proxy-dispatch.js';
+import { createDispatchRoutes as createSessionDispatchRoutes } from '../../routes/dispatch.js';
 
 const MINTED = 'bootstrap-xyz';
 const PARENT = '5d1c6a7e-2b3f-4c8d-9e0f-1a2b3c4d5e6f';
@@ -147,6 +158,173 @@ describe('LIN-4416 rule 3: what still enqueues', () => {
       assert.equal(res.items[0].kind, kind);
     });
   }
+});
+
+const RECOMMEND = '/api/proxy/recommend-and-dispatch';
+
+function refusedNotFresh(res, kind, shape) {
+  assert.equal(res.status, 400, `${shape}: ${JSON.stringify(res.body)}`);
+  assert.equal(res.body.code, JUDGING_RUN_NOT_FRESH_CODE, shape);
+  assert.equal(res.body.kind, kind, shape);
+  assert.match(res.body.error, new RegExp(`^A ${kind} run judges work, so it must start in a fresh session`), shape);
+  assert.equal(res.items.length, 0, `${shape}: nothing is enqueued`);
+}
+
+/**
+ * The real proxy recommend-and-dispatch route over a scripted descent: `computeRecommendation` answers `action` for the
+ * named issue, as a routed recommendation would, so the descent arm can land on a judging kind (the hermetic test-mode
+ * mock never recommends one). Everything after the recommendation is the production path.
+ */
+async function callDescent(body, action) {
+  const captured = { items: [] };
+  const app = express();
+  app.use(express.json());
+  const logEvent = () => {};
+  app.use(createProxyDispatchRoutes({
+    authenticateProxyToken: (req, res, next) => {
+      Object.assign(req, { proxyUrlKey: 'acme', proxyTokenScope: 'readWrite', proxyTokenGrants: ['dispatch'], proxyCreatedBy: 'u1', proxyWorkspaceId: 'ws-acme', proxyTokenId: 't1' });
+      next();
+    },
+    chargeFreeTierOrReject: async () => null,
+    computeRecommendation: async ({ identifier }) => ({ identifier, reasoning: 'r', prompt: `the ${action} template for ${identifier}`, truncated: false, recommendedAction: action, deferTo: null, periodicalId: null, title: 'T' }),
+    denyIfUnsupported: () => false,
+    dispatchQueueStore: {
+      addItem: async (urlKey, item) => {
+        captured.items.push(item);
+        return { _id: `disp-${captured.items.length}`, dispatchedAt: '2026-11-24T00:00:00.000Z', ...item };
+      },
+      getItemStatus: async () => null,
+      getGrantDeclaration: async () => ({ state: 'none' })
+    },
+    getWorkspaceOpenRouterKey: async () => null,
+    graphqlErrorStatus: () => 500,
+    logEvent,
+    logOpenRouterCredentialSource: () => {},
+    proxyLimiter: (req, res, next) => next(),
+    PROXY_ATTACH_FAILED_MESSAGE: 'attach failed',
+    proxyTokenStore: {
+      mintGrantBootstrap: async () => ({ token: MINTED, kind: 'bootstrap', scope: 'readWrite' }),
+      createToken: async () => ({ token: MINTED, kind: 'bootstrap', scope: 'readWrite' })
+    },
+    recommendErrorResponse: (err) => ({ status: 500, body: { error: err.message } }),
+    RECOMMEND_DESCENT_BUDGET_MS: 5000,
+    // The production relay (routes/proxy.js) over the one refusal table.
+    relayDispatchRefusal: (err, req, res, endpoint, keepalive) => {
+      const reply = mapDispatchRefusal(err);
+      if (!reply) return false;
+      if (keepalive) keepalive.send(reply.status, { error: reply.message, ...reply.body });
+      else res.status(reply.status).json({ error: reply.message, ...reply.body });
+      return true;
+    },
+    requireGrant,
+    requireWriteScope: () => (req, res, next) => next(),
+    resolvePromptIssueContext: async () => null,
+    resolveProviderAccess: async () => ({ token: 'test-token', reason: 'ok', provider: { name: 'fake', ui: null, supports: () => true } }),
+    workspacePreferencesStore: { getWorkspacePreferences: async () => ({}) },
+    workspaceUnavailable: (req, res) => res.status(503).json({ error: 'unavailable' })
+  }));
+  const server = app.listen(0, '127.0.0.1');
+  await new Promise(resolve => server.once('listening', resolve));
+  try {
+    const res = await fetch(`http://127.0.0.1:${server.address().port}${RECOMMEND}`, {
+      method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(body)
+    });
+    const text = await res.text();
+    let parsed; try { parsed = JSON.parse(text); } catch { parsed = text; }
+    // An armed keepalive answers 200 with the real status in the body once it flushed; this never waits that long.
+    return { status: res.status, body: parsed, items: captured.items };
+  } finally {
+    await new Promise(resolve => server.close(resolve));
+  }
+}
+
+/** The signed-in owner's session lane (routes/dispatch.js), which John's ruling also binds: "on every lane that enqueues". */
+async function callSession(body) {
+  const captured = { items: [] };
+  const app = express();
+  app.use(express.json());
+  app.use(createSessionDispatchRoutes({
+    workspaceOwnerCheck: async () => ({ status: 'owner' }),
+    dispatchQueueStore: {
+      addItem: async (urlKey, item) => {
+        captured.items.push(item);
+        return { _id: `disp-${captured.items.length}`, dispatchedAt: '2026-11-24T00:00:00.000Z', ...item };
+      },
+      getItemStatus: async () => null
+    },
+    dispatchTokenStore: {},
+    workspaceFromUrl: (req, res, next) => {
+      req.workspace = { urlKey: req.params.urlKey };
+      req.session = { accountId: 'u1', linearUserId: 'u1' };
+      next();
+    },
+    userPreferencesStore: {},
+    harbourFeedbackTokenStore: null,
+    workspacePreferencesStore: undefined,
+    dispatchPresetsStore: undefined
+  }));
+  const server = app.listen(0, '127.0.0.1');
+  await new Promise(resolve => server.once('listening', resolve));
+  try {
+    const res = await fetch(`http://127.0.0.1:${server.address().port}/workspace/acme/api/dispatch`, {
+      method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(body)
+    });
+    const text = await res.text();
+    let parsed; try { parsed = JSON.parse(text); } catch { parsed = text; }
+    return { status: res.status, body: parsed, items: captured.items };
+  } finally {
+    await new Promise(resolve => server.close(resolve));
+  }
+}
+
+describe('LIN-4416 rule 3: a judging run starts in a fresh session, on every lane (finding-a1ed48c1)', () => {
+  for (const kind of JUDGING) {
+    test(`${kind}: recommend-and-dispatch's kind override with followUpTo is refused, nothing enqueued`, async () => {
+      refusedNotFresh(await call(RECOMMEND, { issueIdentifier: 'TEST-1', kind, followUpTo: PARENT, target: 'cli' }), kind, '{kind, followUpTo}');
+    });
+
+    test(`${kind}: a descent that lands on ${kind} with followUpTo is refused; the same descent fresh enqueues`, async () => {
+      refusedNotFresh(await callDescent({ issueIdentifier: 'TEST-1', followUpTo: PARENT, target: 'cli' }, kind), kind, 'descent + followUpTo');
+      const fresh = await callDescent({ issueIdentifier: 'TEST-1', target: 'cli' }, kind);
+      assert.equal(fresh.status, 201, JSON.stringify(fresh.body));
+      assert.equal(fresh.items[0].kind, kind);
+      assert.equal(fresh.items[0].followUpTo ?? null, null);
+    });
+
+    test(`${kind}: the session lane refuses it as a follow-up and still enqueues it fresh`, async () => {
+      refusedNotFresh(await callSession({ prompt: 'review it', promptName: kind, kind, target: 'cli', followUpTo: PARENT }), kind, 'session + followUpTo');
+      const fresh = await callSession({ prompt: 'review it', promptName: kind, kind, target: 'cli', issueIdentifier: 'TEST-1' });
+      assert.equal(fresh.status, 201, JSON.stringify(fresh.body));
+      assert.equal(fresh.items[0].kind, kind);
+    });
+
+    test(`${kind}: the factory refuses the follow-up row by its stored kind, given or derived, before any store call`, async () => {
+      const store = { addItem: async () => { throw new Error('reached the store'); }, getItemStatus: async () => { throw new Error('read the store'); } };
+      for (const [shape, args] of [
+        ['kind', { kind, fields: { followUpTo: PARENT } }],
+        ['promptName', { fields: { followUpTo: PARENT, promptName: getPromptDisplayName(kind) } }],
+        ['force', { kind, fields: { followUpTo: PARENT, force: true } }]
+      ]) {
+        await assert.rejects(createDispatchItem({ store, urlKey: 'acme', prompt: 'p', ...args }), (err) => {
+          assert.deepEqual(err.judgingRunNotFresh, { code: JUDGING_RUN_NOT_FRESH_CODE, kind, followUpTo: PARENT }, shape);
+          assert.equal(err.status, 400, shape);
+          return true;
+        }, shape);
+      }
+    });
+  }
+
+  // A kind-less (custom) follow-up into a live review run is witnessed on POST /dispatch above.
+  test('still enqueued: a non-judging override or descent with followUpTo, and an abort naming review', async () => {
+    const impl = await call(RECOMMEND, { issueIdentifier: 'TEST-1', kind: 'implementation', followUpTo: PARENT, target: 'cli' });
+    assert.equal(impl.status, 201, JSON.stringify(impl.body));
+    assert.equal(impl.items[0].kind, 'implementation');
+    const descentImpl = await callDescent({ issueIdentifier: 'TEST-1', followUpTo: PARENT, target: 'cli' }, 'implementation');
+    assert.equal(descentImpl.status, 201, JSON.stringify(descentImpl.body));
+    const store = { addItem: async (urlKey, item) => ({ _id: 'a1', ...item }), getItemStatus: async () => null };
+    const abort = await createDispatchItem({ store, urlKey: 'acme', kind: 'review', fields: { abort: true, abortTo: PARENT, followUpTo: PARENT } });
+    assert.equal(abort.kind, 'review');
+  });
 });
 
 describe('LIN-4416: one expression of the stored kind', () => {
