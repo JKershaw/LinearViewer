@@ -108,7 +108,7 @@ async function mint({ provider }) {
   app.use(createProxyRoutes({
     proxyTokenStore: new ProxyTokenStore({ collection: inMemoryCollection() }),
     proxyEventStore: { recordEvent: async () => {} },
-    agentStatusStore: {}, recapCacheStore: {}, briefCacheStore: {}, dispatchQueueStore: {},
+    agentStatusStore: {}, dispatchQueueStore: {},
     workspaceFromUrl: (req, res, next) => {
       req.workspace = { urlKey: 'acme', ...(provider === undefined ? {} : { provider }) };
       req.session = { accountId: 'account-A', features: { proxy: true } };

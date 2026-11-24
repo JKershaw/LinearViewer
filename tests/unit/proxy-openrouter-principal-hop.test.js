@@ -1,6 +1,7 @@
 /**
  * Unit tests for LIN-1926: pins the route→resolver principal hop for
- * `getWorkspaceOpenRouterKey` across the live AI-route call sites (five since LIN-4536: GET /brief calls no model), plus
+ * `getWorkspaceOpenRouterKey` across the live AI-route call sites (two since LIN-4537: recommend and
+ * recommend-and-dispatch; GET /brief, the records brief, calls no model since LIN-4536), plus
  * the ownerless (fail-closed) case.
  *
  * Before this fix had a regression test, nothing verified that every AI route
@@ -104,18 +105,6 @@ function makeRecordingResolver(userPreferencesStore) {
   return { calls, resolver };
 }
 
-// Minimal cache store fakes for recapCacheStore/briefCacheStore — load-bearing
-// per the ticket: routes/proxy.js 503s outright without them (recap :4123,
-// brief mirrors it), which would mask the hop under test behind an unrelated
-// failure rather than exercising it.
-function makeCacheStore() {
-  const docs = new Map();
-  return {
-    async get(urlKey, id) { return docs.get(`${urlKey}:${id}`) || null; },
-    async put(urlKey, id, doc) { docs.set(`${urlKey}:${id}`, { ...doc, generatedAt: new Date() }); }
-  };
-}
-
 // Minimal dispatchQueueStore fake for recommend-and-dispatch — mirrors the
 // canonical shape lib/dispatch-store.js's addItem returns (the fields the
 // route reads back: _id, kind, promptName, issueIdentifier, target,
@@ -145,7 +134,7 @@ function makeDispatchQueueStore() {
 }
 
 // workspacePreferencesStore must be no-op-safe, NOT {} — resolveAiOperationModel
-// (recap/brief :4206/4327/4488/4608) and createDispatchItem's dispatchDefaults
+// (recommend) and createDispatchItem's dispatchDefaults
 // lookup both call getWorkspacePreferences AFTER the resolver hop under test; a
 // bare {} would throw there and a status-only assertion would pass for the
 // wrong reason (per the ticket's fixture requirements).
@@ -171,8 +160,6 @@ function buildApp({ getWorkspaceOpenRouterKey: resolverFn, proxyEventStore, disp
     proxyTokenStore,
     proxyEventStore: proxyEventStore || { recordEvent: async () => {} },
     agentStatusStore: {},
-    recapCacheStore: makeCacheStore(),
-    briefCacheStore: makeCacheStore(),
     dispatchQueueStore: dispatchQueueStore || makeDispatchQueueStore(),
     workspaceFromUrl: (req, res, next) => next(),
     getWorkspaceAccessToken: async () => accessToken,
@@ -235,26 +222,6 @@ describe('req.proxyCreatedBy -> getWorkspaceOpenRouterKey principal hop (LIN-192
     assertPrincipalThreaded(spy);
   });
 
-  test('2: GET /api/proxy/issues/:identifier/recap', async () => {
-    const { spy, app, proxyTokenStore } = await setup();
-    const { token } = await proxyTokenStore.createToken(WORKSPACE_URL_KEY, { scope: 'read', createdBy: ACCOUNT_A });
-
-    const { status, body } = await requestJson(app, `/api/proxy/issues/${ISSUE_IDENTIFIER}/recap`, { token });
-
-    assert.equal(status, 200, JSON.stringify(body));
-    assertPrincipalThreaded(spy);
-  });
-
-  test('3: POST /api/proxy/recap/:identifier', async () => {
-    const { spy, app, proxyTokenStore } = await setup();
-    const { token } = await proxyTokenStore.createToken(WORKSPACE_URL_KEY, { scope: 'read', createdBy: ACCOUNT_A });
-
-    const { status, body } = await requestJson(app, `/api/proxy/recap/${ISSUE_IDENTIFIER}`, { method: 'POST', token });
-
-    assert.equal(status, 200, JSON.stringify(body));
-    assertPrincipalThreaded(spy);
-  });
-
   // LIN-4536: GET /brief is the records brief. It calls no model, so it resolves no OpenRouter key at all: no principal
   // to thread. (This setup has no records store, so it answers 503 before reading anything.)
   test('4: GET /api/proxy/issues/:identifier/brief resolves no OpenRouter key (the records brief calls no model)', async () => {
@@ -267,19 +234,9 @@ describe('req.proxyCreatedBy -> getWorkspaceOpenRouterKey principal hop (LIN-192
     assert.deepEqual(spy.calls, [], 'no model key is resolved for the records brief');
   });
 
-  test('5: POST /api/proxy/brief/:identifier', async () => {
-    const { spy, app, proxyTokenStore } = await setup();
-    const { token } = await proxyTokenStore.createToken(WORKSPACE_URL_KEY, { scope: 'read', createdBy: ACCOUNT_A });
-
-    const { status, body } = await requestJson(app, `/api/proxy/brief/${ISSUE_IDENTIFIER}`, { method: 'POST', token });
-
-    assert.equal(status, 200, JSON.stringify(body));
-    assertPrincipalThreaded(spy);
-  });
-
   test('6: POST /api/proxy/recommend-and-dispatch', async () => {
     const { spy, app, proxyTokenStore } = await setup();
-    // requireWriteScope gates this route — readWrite, unlike the other five.
+    // requireWriteScope gates this route — readWrite, unlike the others.
     // fixture:LIN-3136: the writer below holds the dispatch grant (the enqueue mounts require it)
     armDispatchWriterOnce(proxyTokenStore, { ownerAccountId: ACCOUNT_A });
     // /fixture:LIN-3136
@@ -303,7 +260,7 @@ describe('req.proxyCreatedBy -> getWorkspaceOpenRouterKey principal hop (LIN-192
   // ownerless bootstrap mint when DISPATCH_OWNERLESS_BROKER_COMPAT is off, and
   // this case must not depend on that env default either way (precedent:
   // linear-token-isolation.test.js R4). Exchange-hop coverage is retained by
-  // the six positive cases above.
+  // the positive cases above.
   test('negative: ownerless proxy token reaches the resolver with null and resolves null (fail-closed)', async () => {
     const { spy, app, proxyTokenStore } = await setup();
     const { token } = await proxyTokenStore.createToken(WORKSPACE_URL_KEY, { scope: 'read' }); // no createdBy
@@ -320,11 +277,12 @@ describe('req.proxyCreatedBy -> getWorkspaceOpenRouterKey principal hop (LIN-192
   // direct principal assertion above (isFreeTier discriminates a correct
   // principal from a null one in only 1 of 4 env configurations, so it is
   // explicitly rejected as the acceptance witness). Exercises the LIVE
-  // (non-isTestMode) path so logOpenRouterCredentialSource actually runs: POST
-  // /recap witnesses BEFORE its context fetch (routes/proxy.js:4296-4298),
-  // same ordering tests/unit/proxy-openrouter-fallback-note.test.js relies on.
-  // The downstream Linear call subsequently fails (no real workspace) — only
-  // the recorded audit events are asserted, never the response status/body.
+  // (non-isTestMode) path so logOpenRouterCredentialSource actually runs: GET
+  // /recommend witnesses BEFORE its context fetch (LIN-4537: it was POST /recap,
+  // now retired), same ordering tests/unit/proxy-openrouter-fallback-note.test.js
+  // relies on. The downstream Linear call subsequently fails (no real workspace)
+  // — only the recorded audit events are asserted, plus a not-404 status so a
+  // missing route cannot pass the negative check vacuously.
   test('secondary: creator key resolves -> no openrouter_key_fallback_* audit note (corroboration only)', async (t) => {
     const savedApiKey = process.env.OPENROUTER_API_KEY;
     const savedFreeTierKey = process.env.OPENROUTER_FREE_TIER_KEY;
@@ -346,7 +304,9 @@ describe('req.proxyCreatedBy -> getWorkspaceOpenRouterKey principal hop (LIN-192
     });
     const { token } = await proxyTokenStore.createToken(WORKSPACE_URL_KEY, { scope: 'read', createdBy: ACCOUNT_A });
 
-    await requestJson(app, `/api/proxy/recap/${ISSUE_IDENTIFIER}`, { method: 'POST', token });
+    const { status } = await requestJson(app, `/api/proxy/issues/${ISSUE_IDENTIFIER}/recommend`, { token });
+
+    assert.notEqual(status, 404, 'the request reached the route');
 
     assert.ok(
       !events.some(e => e.note === PAID_NOTE || e.note === FREE_NOTE),

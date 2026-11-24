@@ -233,8 +233,6 @@ async function laterFollowUp(world, followUpTo) {
     getWorkspaceAccessToken: async () => 'test-token',
     getWorkspaceOpenRouterKey: async () => null,
     agentStatusStore: {},
-    recapCacheStore: { get: async () => null, set: async () => {} },
-    briefCacheStore: { get: async () => null, set: async () => {} },
     dispatchQueueStore: world.store,
     workspaceFromUrl: (req, res, next) => next(),
     workspacePreferencesStore: { getWorkspacePreferences: async () => ({}) },

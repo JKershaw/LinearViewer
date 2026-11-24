@@ -340,7 +340,7 @@ function renderCard(direction) {
 
   // Accordion sections, grouped for scannability (LIN-1224). Three intent groups
   // replace the flat seven-row stack: Details (the task's own content), Insights
-  // (AI-derived recap/brief/context), and Work (dispatch history + prompt actions).
+  // (the relationship context), and Work (dispatch history + prompt actions).
   // Each accordion keeps its data-accordion hooks and its header->body adjacency,
   // so the delegated toggle + lazy-load handlers are untouched. Group labels only
   // appear when more than one group is present (the landing view, description-only,
@@ -368,32 +368,6 @@ function renderCard(direction) {
         </div>
         <div class="swipe-accordion-body" data-accordion-body="comments">
           <div class="swipe-comments-loading">Loading comments...</div>
-        </div>
-      </div>`);
-  }
-
-  // Recap accordion (lazy loaded) - only available when authenticated
-  if (urlKey) {
-    groups.insights.push(`
-      <div class="swipe-card-accordion">
-        <div class="swipe-accordion-header" data-accordion="recap">
-          <span class="swipe-accordion-toggle">▶</span> Recap
-        </div>
-        <div class="swipe-accordion-body" data-accordion-body="recap">
-          <div class="recap-section" data-recap-placeholder="1"></div>
-        </div>
-      </div>`);
-  }
-
-  // Brief accordion (lazy loaded) - only available when authenticated
-  if (urlKey) {
-    groups.insights.push(`
-      <div class="swipe-card-accordion">
-        <div class="swipe-accordion-header" data-accordion="brief">
-          <span class="swipe-accordion-toggle">▶</span> Brief
-        </div>
-        <div class="swipe-accordion-body" data-accordion-body="brief">
-          <div class="brief-section" data-brief-placeholder="1"></div>
         </div>
       </div>`);
   }
@@ -743,36 +717,6 @@ function handleAccordionClick(e) {
 
   if (type === 'comments' && !isOpen && body.querySelector('.swipe-comments-loading')) {
     loadComments(body);
-  }
-
-  if (type === 'recap' && !isOpen) {
-    const placeholder = body.querySelector('[data-recap-placeholder="1"]');
-    if (placeholder && window.RecapSection) {
-      placeholder.removeAttribute('data-recap-placeholder');
-      const issue = filteredIssues[currentIndex];
-      if (issue && urlKey) {
-        window.RecapSection.init(placeholder, {
-          urlKey,
-          identifier: issue.identifier || issue.id,
-          source: issue.source
-        });
-      }
-    }
-  }
-
-  if (type === 'brief' && !isOpen) {
-    const placeholder = body.querySelector('[data-brief-placeholder="1"]');
-    if (placeholder && window.BriefSection) {
-      placeholder.removeAttribute('data-brief-placeholder');
-      const issue = filteredIssues[currentIndex];
-      if (issue && urlKey) {
-        window.BriefSection.init(placeholder, {
-          urlKey,
-          identifier: issue.identifier || issue.id,
-          source: issue.source
-        });
-      }
-    }
   }
 
   if (type === 'context' && !isOpen) {

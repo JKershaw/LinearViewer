@@ -53,8 +53,6 @@ async function buildLocalApp() {
     resolveWorkspaceAccess: async () => ({ token: null, reason: 'not_connected' }),
     getWorkspaceAccessToken: async () => null,
     agentStatusStore: {},
-    recapCacheStore: {},
-    briefCacheStore: {},
     dispatchQueueStore: {},
     workspaceFromUrl: (req, res, next) => next(),
     getWorkspaceOpenRouterKey: async () => null,

@@ -4,7 +4,7 @@
  * Pins what the page reads and what it must never do:
  *   - the whole history, oldest-first, repeats unfolded — a 45-day-old row seeded
  *     through the REAL dispatch store still shows (LIN-3328's `horizon:'all'`);
- *   - brief/recap are cache `get` only (no `put`, no generate);
+ *   - no brief or recap: LIN-4537 retired the model-written summaries and their caches;
  *   - exactly one task-scoped tracker read, `fetchRecommendationContext(...,
  *     {noDescend:true})`; evidence reuses its comments (no `fetchIssueComments`).
  *   - sessions are read under the tracker's canonical identifier (a UUID open);
@@ -16,7 +16,7 @@
  */
 import { test, describe, before, after } from 'node:test';
 import assert from 'node:assert/strict';
-import { createTaskPageLoader, buildTaskPageModel, sessionMessage, buildTaskStages, briefCurrentSection, briefWithoutCurrent, deriveHeader, deriveReadyHeader, fmtWhen } from '../../lib/task-page-loader.js';
+import { createTaskPageLoader, buildTaskPageModel, sessionMessage, buildTaskStages, deriveHeader, deriveReadyHeader, fmtWhen } from '../../lib/task-page-loader.js';
 import { DISPATCH_KINDS } from '../../lib/prompt-templates.js';
 import { ROW_ONLY_KINDS } from '../../lib/dispatch-fields.js';
 import { ORCHESTRATION_KINDS } from '../../lib/effort-readout.js';
@@ -84,18 +84,6 @@ function spyProvider({ ctx = null, throwOnRead = null } = {}) {
   return { provider, calls };
 }
 
-/** Brief/recap cache spies: `get` answers, `put` must never run. */
-function cacheSpy(doc) {
-  const calls = { get: 0, put: 0 };
-  return {
-    calls,
-    store: {
-      async get() { calls.get += 1; return doc; },
-      async put() { calls.put += 1; },
-    },
-  };
-}
-
 /** A loop in `_buildLoops` shape (only the fields the loader reads). */
 function loop(over = {}) {
   return {
@@ -126,15 +114,11 @@ function done(over = {}) {
   return loop({ terminalStatus: 'done', terminalCompletedAt: '2026-10-06T11:00:00.000Z', feedback: [{ message: '[done] landed it', timestamp: '2026-10-06T11:00:00.000Z' }], ...over });
 }
 
-function loaderWith({ loops = [], brief = null, recap = null, getLoops = null, evidence = undefined, prStateStore = null, dispatchStore = {}, recordsStore = EMPTY } = {}) {
-  const briefSpy = cacheSpy(brief);
-  const recapSpy = cacheSpy(recap);
+function loaderWith({ loops = [], getLoops = null, evidence = undefined, prStateStore = null, dispatchStore = {}, recordsStore = EMPTY } = {}) {
   const loader = createTaskPageLoader({
     recordsStore,
     dispatchStore,
     agentStatusStore: {},
-    briefCacheStore: briefSpy.store,
-    recapCacheStore: recapSpy.store,
     readRunEvidence: evidence === undefined ? readRunEvidence : evidence,
     prStateStore,
     enrichLoop,
@@ -142,7 +126,7 @@ function loaderWith({ loops = [], brief = null, recap = null, getLoops = null, e
     getLoopsForIssue: getLoops || (async () => loops),
     now: () => NOW,
   });
-  return { loader, briefSpy, recapSpy };
+  return { loader };
 }
 
 describe('task page loader: what it reads', () => {
@@ -165,28 +149,13 @@ describe('task page loader: what it reads', () => {
     assert.equal(model.details.headSha, 'abc1234');
   });
 
-  test('brief and recap are read from the cache only — get, never put', async () => {
-    const { provider } = spyProvider({ ctx: ctxFor('LIN-50') });
-    const { loader, briefSpy, recapSpy } = loaderWith({
-      loops: [done()],
-      brief: { brief: 'The brief', model: 'm', generatedAt: '2026-10-06T09:00:00.000Z' },
-      recap: { recap: { done: [{ item: 'x' }] }, model: 'm', generatedAt: '2026-10-06T09:00:00.000Z' },
-    });
-    const { model } = await loader.loadTaskPage({ urlKey: 'ws', identifier: 'LIN-50', access: { provider, callScope: 'tok' } });
-    assert.equal(briefSpy.calls.get, 1);
-    assert.equal(recapSpy.calls.get, 1);
-    assert.equal(briefSpy.calls.put, 0, 'the page never writes the brief cache');
-    assert.equal(recapSpy.calls.put, 0, 'the page never writes the recap cache');
-    assert.equal(model.brief.body, 'The brief');
-    assert.deepEqual(model.recap.body, { done: [{ item: 'x' }] });
-  });
-
-  test('a cache miss is a null panel, not an error', async () => {
+  test('LIN-4537: the model carries no brief, recap or summary, and the loader takes no cache store', async () => {
     const { provider } = spyProvider({ ctx: ctxFor('LIN-50') });
     const { loader } = loaderWith({ loops: [done()] });
     const { model } = await loader.loadTaskPage({ urlKey: 'ws', identifier: 'LIN-50', access: { provider, callScope: 'tok' } });
-    assert.equal(model.brief, null);
-    assert.equal(model.recap, null);
+    for (const key of ['brief', 'recap', 'summary', 'contextMiss']) {
+      assert.equal(Object.hasOwn(model, key), false, `the page model has no ${key}`);
+    }
   });
 
   test('every session shows, oldest-first, repeats NOT folded', async () => {
@@ -243,10 +212,9 @@ describe('task page loader: no stored-only fallback', () => {
   const access = (read) => ({ provider: spyProvider(read).provider, callScope: 'tok' });
 
   test('stored sessions and a tracker error → unavailable, not a stored-only page', async () => {
-    const { loader, briefSpy } = loaderWith({ loops: stored, brief: { brief: 'cached brief' } });
+    const { loader } = loaderWith({ loops: stored });
     const result = await loader.loadTaskPage({ urlKey: 'ws', identifier: 'LIN-50', access: access({ throwOnRead: new Error('Linear API 500') }) });
     assert.deepEqual(result, { unavailable: true });
-    assert.equal(briefSpy.calls.get, 0, 'nothing else is read once the tracker failed');
   });
 
   test('no sessions and a tracker error → unavailable', async () => {
@@ -681,38 +649,9 @@ describe('buildTaskStages (LIN-3356)', () => {
     assert.equal(buildTaskStages([], { trackerType: 'started' }).length, 0, 'nothing ran, so nothing is drawn');
   });
 
-  test('the model carries stages and the brief\'s summary (no ahead stages: nothing ran, nothing is drawn, LIN-4103)', () => {
-    const model = buildTaskPageModel({
-      identifier: 'LIN-50', loops: [], ctx: ctxFor('LIN-50'), enrichLoop, deriveSessionWaiting, now: NOW,
-      brief: { brief: '## Current\nIt is going well.\n\n## Constraints\n- none', model: 'm', generatedAt: null },
-    });
-    assert.equal(model.summary, 'It is going well.');
+  test('the model carries stages (no ahead stages: nothing ran, nothing is drawn, LIN-4103)', () => {
+    const model = buildTaskPageModel({ identifier: 'LIN-50', loops: [], ctx: ctxFor('LIN-50'), enrichLoop, deriveSessionWaiting, now: NOW });
     assert.equal(model.stages.length, 0);
-    const bare = buildTaskPageModel({ identifier: 'LIN-50', loops: [], ctx: ctxFor('LIN-50'), enrichLoop, deriveSessionWaiting, now: NOW });
-    assert.equal(bare.summary, null, 'no brief, no paragraph, nothing generated');
-  });
-});
-
-describe('briefCurrentSection (LIN-3356)', () => {
-  test('returns the Current paragraph only', () => {
-    assert.equal(briefCurrentSection('## Current\nOne paragraph.\n\n## Constraints\n- a'), 'One paragraph.');
-  });
-  test('missing, empty or non-string input is null', () => {
-    for (const v of [null, undefined, '', 42, {}]) assert.equal(briefCurrentSection(v), null);
-  });
-  test('no Current heading is null', () => {
-    assert.equal(briefCurrentSection('## Constraints\n- a\n\n## Changelog\n- b'), null);
-  });
-  test('an empty or _None._ Current is null', () => {
-    assert.equal(briefCurrentSection('## Current\n\n## Constraints\n- a'), null);
-    assert.equal(briefCurrentSection('## Current\n- _None._\n\n## Constraints'), null);
-    assert.equal(briefCurrentSection('## Current\n_None._'), null);
-  });
-  test('### text inside Current stays; only a level-2 heading ends it', () => {
-    assert.equal(briefCurrentSection('## Current\nIntro.\n### Detail\nMore.\n## Constraints\n- a'), 'Intro.\n### Detail\nMore.');
-  });
-  test('the last section ends at the end of the body, and a preamble is skipped', () => {
-    assert.equal(briefCurrentSection('Here is the brief:\n\n## Current\nOnly this.'), 'Only this.');
   });
 });
 
@@ -730,25 +669,3 @@ describe('deriveReadyHeader: the one owner of the ready-to-merge answer (LIN-344
   }
 });
 
-// LIN-4536: the summary has nothing quoted above it any more, but a summary cached before then opens with the person's
-// words, which can hold a `## Current` of their own. The model's `## Current` is the last one, so the header and the panel
-// read the model's, never the person's (the cache retires in LIN-4537).
-describe('the summary\'s `## Current` is the model\'s, the last one (LIN-4536)', () => {
-  const CACHED_WITH_WORDS = '## As asked\n\nPlease fix it.\n\n## Current\nThe person\'s own heading.\n\n*End of what was asked. Steps write below this line; nothing above it changes.*\n\n## Current\nThe model\'s present state.\n\n## Constraints\n- _None._';
-  const NOW = '## Current\nThe model\'s present state.\n\n## Constraints\n- _None._';
-
-  test('a summary cached with the words above it: the header reads the model\'s Current', () => {
-    assert.equal(briefCurrentSection(CACHED_WITH_WORDS), 'The model\'s present state.');
-  });
-
-  test('the panel drops the model\'s Current and keeps the person\'s words as they were', () => {
-    const panel = briefWithoutCurrent(CACHED_WITH_WORDS);
-    assert.ok(panel.includes('The person\'s own heading.'));
-    assert.equal(panel.includes('The model\'s present state.'), false);
-  });
-
-  test('a summary with nothing above it reads as before', () => {
-    assert.equal(briefCurrentSection(NOW), 'The model\'s present state.');
-    assert.equal(briefWithoutCurrent(NOW), '## Constraints\n- _None._');
-  });
-});

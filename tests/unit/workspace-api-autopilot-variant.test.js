@@ -40,8 +40,6 @@ function buildApp() {
     userPreferencesStore: {},
     workspacePreferencesStore: {},
     customPromptsStore: {},
-    recapCacheStore: {},
-    briefCacheStore: {},
     reportHistoryStore: {},
     dispatchQueueStore: {},
     agentStatusStore: {},

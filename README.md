@@ -48,7 +48,7 @@ Platform Projects
 
 - **Dispatch Queue** - Queue prompts for external consumers (AI agents, automation) with bearer-token auth
 - **Workspace API Proxy** - Token-scoped REST-like access to your workspace (read / readWrite); the wire contract is source-neutral — one shape across providers, not a passthrough to any single backend — with audit logging and rate limiting
-- **Task Automation** - Endpoints for agent-driven workflows (stack, prompt, recommend, recap, brief, status)
+- **Task Automation** - Endpoints for agent-driven workflows (stack, prompt, recommend, brief, status)
 
 ## Authentication
 

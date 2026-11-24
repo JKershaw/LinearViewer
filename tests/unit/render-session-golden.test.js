@@ -171,29 +171,20 @@ function waitingSession() {
   return session;
 }
 
-const RECAP_OBJECT = {
-  done: [{ item: 'Wired the auth callback', evidence: 'commit abc123' }],
-  pending: [{ item: 'Add rate limiting', predicted: 'guard the token route' }],
-  deviations: [{ item: 'Token TTL shortened', type: 'scope-change', evidence: 'per review comment' }]
-};
-
 // ── Cases ─────────────────────────────────────────────────────────────────────
 
-const base = { urlKey: 'ws-a', issueContext: [] };
+const base = { urlKey: 'ws-a' };
 
 const CASES = {
   'not-found': () => ({ session: null, sessionId: 'nope', urlKey: 'ws-a' }),
   'plain-terminal': () => ({ ...base, session: fixtureSession(), sessionTerminal: true }),
   'can-reply-terminal': () => ({ ...base, session: fixtureSession(), canReply: true, sessionTerminal: true }),
-  'anchor-title-and-context': () => ({
+  // LIN-4537: was 'anchor-title-and-context'; the brief/recap context it also pinned is retired.
+  'anchor-title': () => ({
     ...base,
     session: fixtureSession(),
     anchorIssueTitle: 'A distinct <title> & more',
     sessionTerminal: true,
-    issueContext: [
-      { issueIdentifier: 'LIN-900', issueId: 'uuid-900', brief: '# Brief\n\nSome **markdown**.', briefModel: 'm', briefGeneratedAt: '2026-07-04T09:00:00.000Z', recap: RECAP_OBJECT, recapModel: 'm', recapGeneratedAt: '2026-07-04T09:30:00.000Z' },
-      { issueIdentifier: 'LIN-901', issueId: 'uuid-901', brief: null, recap: null }
-    ]
   }),
   'credential-dead-token': () => {
     const session = fixtureSession();

@@ -68,8 +68,6 @@ describe('CHAT_TOOL_SCOPE_TIERS (LIN-2971)', () => {
       get_comments: 'row',
       get_children_status: 'row',
       get_history: 'row',
-      get_brief: 'row',
-      get_recap: 'row',
       get_stack: 'workspace',
       list_task_sessions: 'fleet',
       get_session: 'fleet',

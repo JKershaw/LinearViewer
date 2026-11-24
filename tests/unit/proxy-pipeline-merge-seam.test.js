@@ -32,7 +32,7 @@ function app(recordPipelineMerge) {
     proxyEventStore: { recordEvent: async () => {} },
     resolveWorkspaceAccess: async () => ({ token: 'ws-token', reason: 'ok' }),
     getWorkspaceAccessToken: async () => 'ws-token',
-    agentStatusStore: {}, recapCacheStore: {}, briefCacheStore: {}, dispatchQueueStore: {},
+    agentStatusStore: {}, dispatchQueueStore: {},
     workspaceFromUrl: (req, res, next) => next(),
     getWorkspaceOpenRouterKey: async () => null, workspacePreferencesStore: {},
     freeTierStore: { tryUse: async () => ({ allowed: true }) },

@@ -52,8 +52,6 @@ function proxyApp({ recordsStore = null } = {}) {
     resolveWorkspaceAccess: async () => ({ token: null, reason: 'not_connected' }),
     getWorkspaceAccessToken: async () => null,
     agentStatusStore: {},
-    recapCacheStore: {},
-    briefCacheStore: {},
     dispatchQueueStore: {},
     workspaceFromUrl: (req, res, next) => next(),
     getWorkspaceOpenRouterKey: async () => null,
@@ -74,7 +72,7 @@ function sessionApp() {
       next();
     },
     freeTierStore: {}, getOpenRouterSource: () => null, userPreferencesStore: {}, workspacePreferencesStore: {},
-    customPromptsStore: {}, recapCacheStore: {}, briefCacheStore: {}, reportHistoryStore: {}, dispatchQueueStore: {},
+    customPromptsStore: {}, reportHistoryStore: {}, dispatchQueueStore: {},
     agentStatusStore: {}, promptTraceStore: {}, proxyTokenStore: {},
   }));
   return app;

@@ -138,7 +138,7 @@ describe('GET /workspace/:urlKey/task/:identifier', () => {
     assert.match(res.body, /data-testid="task-page"/);
     assert.match(res.body, /data-testid="task-page-title">Build the task page</);
     assert.match(res.body, /data-state-url="\/workspace\/acme\/api\/task\/LIN-50\/state\?issueId=11111111-2222-3333-4444-555555555555"/);
-    assert.match(res.body, /data-testid="task-page-owner-widgets"/, 'the owner controls render');
+    assert.match(res.body, /data-testid="task-page-owner-marker"/, 'the owner controls render');
     assert.match(res.body, /data-testid="task-page-run-control"/, 'LIN-3975: the owner with an unfinished task gets the run control');
     assert.deepEqual(calls.filter(c => c !== 'fetchProjects'), ['fetchRecommendationContext']);
   });
@@ -148,7 +148,7 @@ describe('GET /workspace/:urlKey/task/:identifier', () => {
     const res = await call(makeRouter(makeLoader(), undefined, MEMBER_CHECK), PAGE, { provider: name, params: { identifier: 'LIN-50' } });
     assert.equal(res.statusCode, 200);
     assert.match(res.body, /data-testid="task-page"/);
-    assert.doesNotMatch(res.body, /task-page-owner-widgets|task-page-run-control|task-page-share-slot|task-page-question/);
+    assert.doesNotMatch(res.body, /task-page-owner-marker|task-page-run-control|task-page-share-slot|task-page-question/);
     assert.doesNotMatch(res.body, /data-testid="run-evidence-closeout"/, 'no merge button for a member');
     assert.match(res.body, /data-testid="task-page-next"/, 'a member reads what comes next instead of the run control');
   });
@@ -157,10 +157,10 @@ describe('GET /workspace/:urlKey/task/:identifier', () => {
     const { name } = spyProvider();
     const throws = async () => { throw new Error('store down'); };
     const noAccount = await call(makeRouter(makeLoader()), PAGE, { provider: name, params: { identifier: 'LIN-50' }, accountId: null });
-    assert.doesNotMatch(noAccount.body, /task-page-owner-widgets/, 'no account reads as member');
+    assert.doesNotMatch(noAccount.body, /task-page-owner-marker/, 'no account reads as member');
     const unreadable = await call(makeRouter(makeLoader(), undefined, throws), PAGE, { provider: name, params: { identifier: 'LIN-50' } });
     assert.equal(unreadable.statusCode, 200);
-    assert.doesNotMatch(unreadable.body, /task-page-owner-widgets/, 'an unreadable owner answer reads as member');
+    assert.doesNotMatch(unreadable.body, /task-page-owner-marker/, 'an unreadable owner answer reads as member');
   });
 
   test('a malformed id is a 404 body, never a 400 detail, and reads nothing', async () => {
@@ -230,7 +230,7 @@ describe('GET /workspace/:urlKey/api/task/:identifier/state', () => {
     assert.equal(res.jsonBody.live, true);
     assert.match(res.jsonBody.headerHtml, /data-testid="task-page-status"/);
     assert.match(res.jsonBody.trackHtml, /data-loop-id="l1"/);
-    assert.doesNotMatch(res.jsonBody.headerHtml, /task-page-ask|task-page-owner-widgets/, 'viewer-blind: no owner control is re-sent');
+    assert.doesNotMatch(res.jsonBody.headerHtml, /task-page-ask|task-page-owner-marker/, 'viewer-blind: no owner control is re-sent');
     assert.equal(res.headers['Cache-Control'], 'no-store');
     assert.equal('contextHtml' in res.jsonBody, false, 'LIN-3975: a poll never carries a brief or recap');
     assert.equal('contextSig' in res.jsonBody, false);

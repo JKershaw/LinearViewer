@@ -237,8 +237,6 @@ function proxyApp(world) {
     getWorkspaceAccessToken: async () => 'test-token',
     getWorkspaceOpenRouterKey: async () => null,
     agentStatusStore: {},
-    recapCacheStore: { get: async () => null, set: async () => {} },
-    briefCacheStore: { get: async () => null, set: async () => {} },
     dispatchQueueStore: world.dispatchStore,
     workspaceFromUrl: (req, res, next) => next(),
     workspacePreferencesStore: { getWorkspacePreferences: async () => ({}) },
@@ -275,7 +273,7 @@ function fcApp(world) {
     workspaceOwnerCheck: async () => ({ status: 'owner' }),
     workspaceFromUrl: (req, res, next) => { req.workspace = { urlKey: URL_KEY }; req.session = { accountId: POSTER, features: { flightCompanion: true } }; next(); },
     getOpenRouterSource: () => null, getDeployInfo: () => ({}), observerStateStore: null, freeTierStore: null,
-    workspacePreferencesStore: null, recapCacheStore: null, briefCacheStore: null,
+    workspacePreferencesStore: null,
     dispatchQueueStore: world.dispatchStore,
     agentStatusStore: { listStatus: async () => ({ items: [], total: 0 }) },
     proxyTokenStore: world.routeTokenStore

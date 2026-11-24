@@ -659,8 +659,6 @@ function buildApp({ resolveWorkspaceAccess, provider }) {
     proxyTokenStore,
     proxyEventStore: { recordEvent: async () => {} },
     agentStatusStore: {},
-    recapCacheStore: {},
-    briefCacheStore: {},
     dispatchQueueStore: {},
     workspaceFromUrl: (req, res, next) => next(),
     resolveWorkspaceAccess,

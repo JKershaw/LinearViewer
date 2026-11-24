@@ -4,8 +4,9 @@
  * (getWorkspaceOpenRouterKey) came back empty.
  *
  * routes/proxy.js's logOpenRouterCredentialSource helper is called once per
- * request at the six top-level OpenRouter call sites (GET/POST recommend,
- * recap, brief, plus recommend-and-dispatch), after the existing 503
+ * request at the top-level OpenRouter call sites (GET recommend plus
+ * recommend-and-dispatch; LIN-4537 retired the recap and brief call sites
+ * and their cases here), after the existing 503
  * "not configured" gate. It writes an additive audit-note row
  * (openrouter_key_fallback_paid_env / openrouter_key_fallback_free_tier) via
  * the existing logEvent channel — no resolver contract change, no new store.
@@ -112,17 +113,6 @@ function inMemoryCollection() {
   };
 }
 
-// Minimal cache store fakes for recapCacheStore/briefCacheStore — the routes
-// 503 outright without them, which would mask the witness under an unrelated
-// failure. The store's own methods are `get`/`put`, not `set`.
-function makeCacheStore() {
-  const docs = new Map();
-  return {
-    async get(urlKey, id) { return docs.get(`${urlKey}:${id}`) || null; },
-    async put(urlKey, id, doc) { docs.set(`${urlKey}:${id}`, { ...doc, generatedAt: new Date() }); }
-  };
-}
-
 // Minimal dispatchQueueStore fake for recommend-and-dispatch, mirroring the
 // canonical shape lib/dispatch-store.js's addItem returns.
 function makeDispatchQueueStore() {
@@ -148,7 +138,7 @@ function makeDispatchQueueStore() {
 }
 
 // workspacePreferencesStore must be no-op-safe, NOT {} — resolveAiOperationModel
-// (recap/brief) calls getWorkspacePreferences AFTER the witness under test; a
+// (recommend) calls getWorkspacePreferences AFTER the witness under test; a
 // bare {} would throw there rather than exercise the live-Linear failure path.
 function noopWorkspacePreferencesStore() {
   return { getWorkspacePreferences: async () => ({}) };
@@ -172,8 +162,6 @@ function buildApp({ getWorkspaceOpenRouterKey, events, accessToken = 'not-a-real
     proxyTokenStore,
     proxyEventStore: { recordEvent: async (e) => { events.push(e); return e; } },
     agentStatusStore: {},
-    recapCacheStore: makeCacheStore(),
-    briefCacheStore: makeCacheStore(),
     dispatchQueueStore: dispatchQueueStore || makeDispatchQueueStore(),
     workspaceFromUrl: (req, res, next) => next(),
     getWorkspaceAccessToken: () => null,
@@ -330,60 +318,6 @@ describe('LIN-1458 — OpenRouter fallback-credential-source audit note', () => 
     assert.notEqual(status, 404, `expected the request to reach the route, got a missing-route 404`);
     const paidNotes = events.filter(e => e.note === PAID_NOTE);
     assert.equal(paidNotes.length, 1, `expected exactly one witness row for the whole request: ${JSON.stringify(events)}`);
-  });
-
-  test('POST /recap (force-regenerate): fallback note witnessed before the (failing) regeneration', async (t) => {
-    withEnv(t, 'OPENROUTER_API_KEY', 'sk-or-fake-paid-env-key');
-    withEnv(t, 'OPENROUTER_FREE_TIER_KEY', undefined);
-    const events = [];
-
-    const { status } = await mintAndRequest(
-      { getWorkspaceOpenRouterKey: async () => null, events },
-      `/api/proxy/recap/${ISSUE_IDENTIFIER}`,
-      { method: 'POST' }
-    );
-
-    assert.notEqual(status, 404, `expected the request to reach the route, got a missing-route 404`);
-    const paidNotes = events.filter(e => e.note === PAID_NOTE);
-    assert.equal(paidNotes.length, 1, `expected exactly one paid-env note: ${JSON.stringify(events)}`);
-  });
-
-  test('POST /brief (force-regenerate): fallback note witnessed before the (failing) regeneration', async (t) => {
-    withEnv(t, 'OPENROUTER_API_KEY', 'sk-or-fake-paid-env-key');
-    withEnv(t, 'OPENROUTER_FREE_TIER_KEY', undefined);
-    const events = [];
-
-    const { status } = await mintAndRequest(
-      { getWorkspaceOpenRouterKey: async () => null, events },
-      `/api/proxy/brief/${ISSUE_IDENTIFIER}`,
-      { method: 'POST' }
-    );
-
-    assert.notEqual(status, 404, `expected the request to reach the route, got a missing-route 404`);
-    const paidNotes = events.filter(e => e.note === PAID_NOTE);
-    assert.equal(paidNotes.length, 1, `expected exactly one paid-env note: ${JSON.stringify(events)}`);
-  });
-
-  test('POST /recap and POST /brief: isTestMode → no fallback note, fully deterministic', async () => {
-    const recapEvents = [];
-    const recapResult = await mintAndRequest(
-      { getWorkspaceOpenRouterKey: async () => null, events: recapEvents, accessToken: 'test-token' },
-      `/api/proxy/recap/${ISSUE_IDENTIFIER}`,
-      { method: 'POST' }
-    );
-    assert.equal(recapResult.status, 200, `isTestMode must serve the mock recap directly, got ${recapResult.status}`);
-    assert.ok(!recapEvents.some(e => e.note === PAID_NOTE || e.note === FREE_NOTE),
-      `isTestMode must suppress the witness on POST /recap: ${JSON.stringify(recapEvents)}`);
-
-    const briefEvents = [];
-    const briefResult = await mintAndRequest(
-      { getWorkspaceOpenRouterKey: async () => null, events: briefEvents, accessToken: 'test-token' },
-      `/api/proxy/brief/${ISSUE_IDENTIFIER}`,
-      { method: 'POST' }
-    );
-    assert.equal(briefResult.status, 200, `isTestMode must serve the mock brief directly, got ${briefResult.status}`);
-    assert.ok(!briefEvents.some(e => e.note === PAID_NOTE || e.note === FREE_NOTE),
-      `isTestMode must suppress the witness on POST /brief: ${JSON.stringify(briefEvents)}`);
   });
 
   // LIN-3658: the proxy's free-tier 429 body, byte for byte — `reason` sits

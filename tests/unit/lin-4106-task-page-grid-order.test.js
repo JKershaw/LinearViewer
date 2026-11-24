@@ -1,9 +1,10 @@
 /**
  * LIN-4106 (review item 5) — on desktop the ruling card is drawn before the run block in EVERY task-page grid.
  *
- * `public/task-page.css` has two desktop `grid-template-areas`: the one for a page with a brief or recap beside the
- * stages, and the `--quiet-context` one. The E2E "ruling card comes before" test only reaches the quiet one (its fixture
- * has no brief), so a swap back in the first template stayed green (mutation M8). This pins both, from the CSS itself.
+ * `public/task-page.css` had two desktop `grid-template-areas` (one with a brief or recap beside the stages, and a
+ * `--quiet-context` one), and the E2E only reached the quiet one, so a swap in the first stayed green (mutation M8).
+ * LIN-4537 retired the brief and recap, so one single-column template remains; this pins it from the CSS itself, and
+ * pins that no second template comes back.
  *
  * Run with: node --test tests/unit/lin-4106-task-page-grid-order.test.js
  */
@@ -26,18 +27,22 @@ function templates() {
   return out;
 }
 
-test('the task page has two desktop grid templates, the default and the quiet-context one', () => {
-  const task = templates().filter((t) => t.rows.includes('answer answer'));
-  assert.equal(task.length, 2, 'both templates found: ' + JSON.stringify(task.map((t) => t.selector)));
-  assert.ok(task.some((t) => /task-page--quiet-context/.test(t.selector)), 'one is the quiet-context template');
-  assert.ok(task.some((t) => !/task-page--quiet-context/.test(t.selector)), 'one is the default (brief/recap beside the stages)');
+/** The task page's templates: those that name the answer row. */
+const taskTemplates = () => templates().filter((t) => t.rows.includes('answer'));
+
+test('the task page has one desktop grid template, one column wide (LIN-4537: no brief/recap column, no quiet one)', () => {
+  const task = taskTemplates();
+  assert.equal(task.length, 1, 'one template: ' + JSON.stringify(task.map((t) => t.selector)));
+  assert.ok(!/task-page--quiet-context/.test(task[0].selector), 'the quiet-context template is gone');
+  assert.ok(task[0].rows.every((row) => !/\s/.test(row)), 'every row is one area wide: ' + JSON.stringify(task[0].rows));
+  assert.ok(!task[0].rows.includes('context') && !task[0].rows.includes('quiet'), 'no brief/recap or quiet area');
 });
 
-test('each task-page grid template lists the ruling card ("question") before the run block ("run")', () => {
-  for (const t of templates().filter((x) => x.rows.includes('answer answer'))) {
-    const question = t.rows.indexOf('question question');
-    const run = t.rows.indexOf('run run');
+test('the task-page grid template lists the ruling card ("question") before the run block ("run")', () => {
+  for (const t of taskTemplates()) {
+    const question = t.rows.indexOf('question');
+    const run = t.rows.indexOf('run');
     assert.ok(question >= 0 && run >= 0, `${t.selector}: both rows are present`);
-    assert.ok(question < run, `${t.selector}: "question question" (row ${question}) comes before "run run" (row ${run})`);
+    assert.ok(question < run, `${t.selector}: "question" (row ${question}) comes before "run" (row ${run})`);
   }
 });

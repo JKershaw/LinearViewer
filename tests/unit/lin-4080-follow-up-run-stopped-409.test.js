@@ -123,8 +123,6 @@ describe('LIN-4080 — run-proposal Apply into a stopped run', () => {
       observationSessionsStore: null,
       runSummaryCacheStore: new InMemoryRunSummaryCacheStore(),
       sessionSummaryCacheStore: new InMemorySessionSummaryCacheStore(),
-      briefCacheStore: { async get() { return null; } },
-      recapCacheStore: { async get() { return null; } },
       freeTierStore: { async tryUse() { return { allowed: true }; } },
       getWorkspaceAccessToken: async () => 'token',
       fetchIssueContext: async () => ({}),

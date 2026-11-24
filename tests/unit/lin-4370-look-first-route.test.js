@@ -51,7 +51,6 @@ import { sealedDescription } from '../helpers/sealed-description.js';
 import { stageRuns, recentRuns } from '../../lib/recent-runs.js';
 import { BLIND_READ_KIND } from '../../lib/prompts/blind-read-words.js';
 import { buildRouterPrompt } from '../../lib/stage-router.js';
-import { buildBriefMessages } from '../../lib/brief.js';
 import { createProxyRoutes } from '../../routes/proxy.js';
 import { createWorkspaceApiRoutes } from '../../routes/workspace-api.js';
 import { registerProvider } from '../../lib/providers/registry.js';
@@ -414,8 +413,6 @@ function proxyApp({ rows = [], items = [], live = [] } = {}) {
     getWorkspaceAccessToken: async () => 'live-access-token',
     getWorkspaceOpenRouterKey: async () => 'sk-test-key',
     agentStatusStore: {},
-    recapCacheStore: { get: async () => null, set: async () => {} },
-    briefCacheStore: { get: async () => null, set: async () => {} },
     dispatchQueueStore: {
       addItem: async (urlKey, item) => { const row = { _id: `disp-${items.length + 1}`, id: `disp-${items.length + 1}`, dispatchedAt: T('13:00'), ...item }; items.push(row); return row; },
       lineageIdentityRows: stubLineageIdentity(() => rows),
@@ -437,7 +434,7 @@ function uiApp({ rows = [], live = [] } = {}) {
     freeTierStore: { tryUse: async () => ({ allowed: true }) },
     workspacePreferencesStore: { getWorkspacePreferences: async () => ({}) },
     getOpenRouterSource: () => null,
-    userPreferencesStore: {}, customPromptsStore: {}, recapCacheStore: {}, briefCacheStore: {}, reportHistoryStore: {}, agentStatusStore: {}, promptTraceStore: {},
+    userPreferencesStore: {}, customPromptsStore: {}, reportHistoryStore: {}, agentStatusStore: {}, promptTraceStore: {},
     dispatchQueueStore: runStore(rows, live),
     recordsStore: askedRecords()
   }));
@@ -681,13 +678,9 @@ describe('LIN-4369 handoff: scoping\'s final message never reaches the stage aft
     assert.ok(seen[0].includes('**Size:** just the task'), 'the routing prompt carries the size record');
     assert.match(seen[0], /- Size of the move: chosen just the task \(by the standing policy\)\n/);
     assert.match(seen[0], /- scoping: done, 2026-11-08 11:30/, 'the selector sees that scoping ran, as a fact, not what it said');
-    // A stage prompt never copies the description (it says to read the ticket, and points at the brief); the
-    // brief it starts from is built from the ticket and its comments, so it carries the record and no run's message.
-    assert.match(items[0].prompt, /does not restate LF-1's description/);
+    // A stage prompt never copies the description; it points at the records brief, which no model writes and which
+    // carries no run's message (LIN-4537 retired the model-written brief that read the ticket and its comments).
     assert.match(items[0].prompt, /Start from your brief: GET [^\n]*\/api\/proxy\/brief\/LF-1/);
-    const briefInput = buildBriefMessages(ISSUES['LF-1'].issue, { ...ISSUES['LF-1'], runs: stageRuns(rows), allRuns: stageRuns(rows) }).map(m => m.content).join('\n');
-    assert.ok(briefInput.includes('**Size:** just the task'), 'the brief reads the size record');
-    assert.ok(!briefInput.includes('NOTES FOR THE BUILDER'), 'the brief never reads a run\'s message');
   });
 
   test('a scoping run that wrote no record falls through to the selector once, and its notes stay out too', async () => {

@@ -44,7 +44,7 @@ function buildApp(recordPipelineMerge) {
     },
     freeTierStore: {}, getOpenRouterSource: () => null, userPreferencesStore: {},
     workspacePreferencesStore: { getWorkspacePreferences: async () => ({}) },
-    customPromptsStore: {}, recapCacheStore: {}, briefCacheStore: {},
+    customPromptsStore: {},
     reportHistoryStore: {}, dispatchQueueStore: {}, agentStatusStore: {}, promptTraceStore: {},
     ...(recordPipelineMerge ? { recordPipelineMerge } : {}),
   }));

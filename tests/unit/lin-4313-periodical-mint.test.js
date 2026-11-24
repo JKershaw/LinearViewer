@@ -63,8 +63,6 @@ function world({ freeTierCheck = null } = {}) {
     getWorkspaceAccessToken: async () => 'test-token',
     getWorkspaceOpenRouterKey: async () => null,
     agentStatusStore: {},
-    recapCacheStore: { get: async () => null, set: async () => {} },
-    briefCacheStore: { get: async () => null, set: async () => {} },
     dispatchQueueStore: {
       // LIN-4492: the real store takes its `_id` from the factory's trusted id (lib/dispatch-store.js
       // trustedIdOf), so a run-starting row's runRecordId is its own `_id`.

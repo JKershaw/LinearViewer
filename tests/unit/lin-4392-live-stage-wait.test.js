@@ -112,8 +112,6 @@ function proxyApp({ rows = [], items = [], live = [], failRead = false } = {}) {
     getWorkspaceAccessToken: async () => 'live-access-token',
     getWorkspaceOpenRouterKey: async () => 'sk-test-key',
     agentStatusStore: {},
-    recapCacheStore: { get: async () => null, set: async () => {} },
-    briefCacheStore: { get: async () => null, set: async () => {} },
     dispatchQueueStore: {
       addItem: async (urlKey, item) => { const row = { _id: `disp-${items.length + 1}`, id: `disp-${items.length + 1}`, dispatchedAt: T('13:00'), ...item }; items.push(row); return row; },
       lineageIdentityRows: stubLineageIdentity(() => rows),
@@ -137,7 +135,7 @@ function uiApp({ rows = [], live = [] } = {}) {
     freeTierStore: { tryUse: async () => ({ allowed: true }) },
     workspacePreferencesStore: { getWorkspacePreferences: async () => ({}) },
     getOpenRouterSource: () => null,
-    userPreferencesStore: {}, customPromptsStore: {}, recapCacheStore: {}, briefCacheStore: {}, reportHistoryStore: {}, agentStatusStore: {}, promptTraceStore: {},
+    userPreferencesStore: {}, customPromptsStore: {}, reportHistoryStore: {}, agentStatusStore: {}, promptTraceStore: {},
     dispatchQueueStore: runStore(rows, live),
     recordsStore: askedRecords()
   }));

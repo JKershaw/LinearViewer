@@ -142,7 +142,7 @@ const LOOKUP_ALLOW = {
   'session.js:[data-testid="session-pr-state"]': 'captured: initPrState, before renderRunTranscripts',
   'task-page.js:[data-testid="task-page-share-slot"][data-shares-url]': 'owner share slot, outside every markdown body (server-rendered; initShare runs before enhanceMarkdown)',
   'task-page.js:[data-testid="task-page"][data-state-url]': 'page root, an ancestor of all ticket text',
-  'task-page.js:[data-testid="task-page-owner-widgets"]': 'captured: mountWidgets, before enhanceContextMarkdown',
+  'task-page.js:[data-testid="task-page-owner-marker"]': 'captured: mountWidgets, before enhanceContextMarkdown',
   'task-page.js:[data-testid="task-page-question"]': 'captured: init (LIN-3499), before markdown; the poll only removes it',
   'task-page.js:[data-testid="task-page"] > [data-testid="task-page-chat-fold"]': 'captured: init (LIN-3975), before markdown; a direct child of the page, so a copy in ticket text is never the fold',
   'task-page.js:[data-testid="task-page-description"] > [data-testid="task-page-description-more"]': 'captured: init (LIN-3975), before markdown; the section\'s own child, outside the description body, so a copy inside the ticket text is never this control',
@@ -212,20 +212,20 @@ describe('Rule C: Harbour controls are captured before the first markdown render
     const at = (s) => boot.indexOf(s);
     const render = at('renderRunTranscripts();');
     assert.ok(render > 0);
-    for (const init of ['initQuestionCards();', 'initInlineReplies();', 'initProposals();', 'initContextWidgets();', 'initPrState();', 'initCloseOut();']) {
+    for (const init of ['initQuestionCards();', 'initInlineReplies();', 'initProposals();', 'initPrState();', 'initCloseOut();']) {
       assert.ok(at(init) > 0 && at(init) < render, `${init} must run before renderRunTranscripts()`);
     }
     assert.ok(at('initRunToggles();') > render, 'initRunToggles needs the rendered transcripts');
   });
 
-  test('task-page.js: CloseOut.init and mountWidgets run before enhanceContextMarkdown (the first markdown call in init)', () => {
+  test('task-page.js: CloseOut.init and the run control run before enhanceMarkdown (the first markdown call in init)', () => {
     const src = stripComments(read('public/task-page.js'));
     const init = src.slice(src.indexOf('function init(doc)'));
-    const firstMd = init.indexOf('enhanceContextMarkdown(contextMount)');
+    // LIN-4537: the brief/recap widgets and their context markdown pass are gone; the page's one markdown pass is first.
+    const firstMd = init.indexOf('enhanceMarkdown(doc)');
     assert.ok(firstMd > 0);
     assert.ok(init.indexOf('CloseOut.init(doc)') > 0 && init.indexOf('CloseOut.init(doc)') < firstMd);
-    assert.ok(init.indexOf('mountWidgets(doc, main)') > 0 && init.indexOf('mountWidgets(doc, main)') < firstMd);
-    assert.ok(init.indexOf('enhanceMarkdown(doc)') > firstMd);
+    assert.ok(init.indexOf('PromptSection.init(runRoot, runOpts)') > 0 && init.indexOf('PromptSection.init(runRoot, runOpts)') < firstMd);
   });
 
   test('flight-companion.js: no markdown render at script top level; the copy control is captured above it', () => {

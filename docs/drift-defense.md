@@ -28,15 +28,14 @@ human adjudicates. We heal the blindness, not the architecture.
 ### 1. Drift sensor — LIN-290
 
 The trace the loop never left. Generalizes LIN-240's per-file churn into a cross-issue signal,
-computed from sources that already exist (git log, recent issue history, existing relations, and
-the `recap.deviations` field that `/api/proxy/recap` already returns but nothing reads back).
+computed from sources that already exist (git log, recent issue history and existing relations).
+The model-written recap's `deviations` field it once named retired with the recap (LIN-4537).
 
 ```
 driftSignal(candidateIssue) → {
   clusterSize,                 // count of recent issues/commits on a shared key
   members: ["LIN-…"],          // the cluster
   sharedKey,                   // file | label | component | related-issue
-  recentDeviations: [...]      // surfaced recap.deviations
 }
 ```
 
@@ -46,7 +45,7 @@ verdict** — consumers decide.
 ### 2. Supervisor reading — LIN-291 (carved from LIN-285)
 
 The altitude no per-PR review can occupy. A pass (manual trigger first, scheduled later) over
-recent loop state — the sensor, foreman status history, recent recaps — that produces a
+recent loop state — the sensor and foreman status history — that produces a
 human-facing flag: *"LIN-a/b/c/d all patch `<sharedKey>`; the routed-around contract gap looks
 like `<X>`; step back before the next patch."* It flags; it does not act. This is the execution-
 layer sibling of LIN-273's direction reading (which does the same against the north star at the

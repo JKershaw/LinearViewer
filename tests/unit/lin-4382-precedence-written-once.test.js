@@ -207,8 +207,6 @@ describe('a scoped run stops once its task is complete (LIN-4415)', () => {
         getWorkspaceAccessToken: async () => TOKEN,
         getWorkspaceOpenRouterKey: async () => null,
         agentStatusStore: {},
-        recapCacheStore: { get: async () => null, set: async () => {} },
-        briefCacheStore: { get: async () => null, set: async () => {} },
         dispatchQueueStore: store,
         workspaceFromUrl: (req, res, next) => next(),
         workspacePreferencesStore: { getWorkspacePreferences: async () => ({}) },

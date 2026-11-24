@@ -34,7 +34,7 @@ after(() => harness.close());
 const PUBLIC_NAMES = [
   'sessions', 'userPreferences', 'workspacePreferences', 'customPrompts', 'localIssues',
   'dispatchQueue', 'dispatchHistory', 'dispatchTokens', 'proxyTokens', 'proxyEvents',
-  'agentStatus', 'freeTier', 'recapCache', 'briefCache', 'reportHistory', 'kpiDailyRollup'
+  'agentStatus', 'freeTier', 'reportHistory', 'kpiDailyRollup'
 ];
 
 let db;

@@ -129,8 +129,6 @@ describe('Surface 2: the dispatch receipts', () => {
       getWorkspaceAccessToken: async () => 'test-token',
       getWorkspaceOpenRouterKey: async () => null,
       agentStatusStore: {},
-      recapCacheStore: { get: async () => null, set: async () => {} },
-      briefCacheStore: { get: async () => null, set: async () => {} },
       dispatchQueueStore: { addItem: async (urlKey, item) => { captured.item = item; return { _id: 'disp-1', dispatchedAt: '2026-06-28T00:00:00.000Z', ...item }; } },
       workspaceFromUrl: (req, res, next) => next(),
       workspacePreferencesStore: { getWorkspacePreferences: async () => ({}) },

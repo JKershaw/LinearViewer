@@ -275,8 +275,7 @@ export function createTaskShareRoutes({
       if (incomplete) {
         return res.json({ incomplete, trackHtml: maskFragment(record, 'state', renderTaskTrack(model, { now: now() })) });
       }
-      // No brief or recap rides here (LIN-3975): the state read has no tracker, so the page-load panels are the only
-      // ones shown, and a poll never repaints them.
+      // No context fragment rides here (LIN-3975; LIN-4537 retired the brief and recap it once carried).
       const body = {
         // LIN-4071: the gathered state's status, as the private state reply carries it (no subtask line rides here: a guest
         // sees no identifier outside the shared task).

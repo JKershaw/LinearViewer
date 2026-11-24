@@ -454,8 +454,6 @@ describe('readers: a Linear workspace reads with the minted token', () => {
       return createTaskPageLoader({
       recordsStore: LANDING,
         dispatchStore: {}, agentStatusStore: {},
-        briefCacheStore: { async get() { return null; } },
-        recapCacheStore: { async get() { return null; } },
         readRunEvidence, prStateStore, installationTokenFor, enrichLoop, deriveSessionWaiting,
         getLoopsForIssue: async () => [],
         now: () => new Date('2026-10-19T12:00:00.000Z'),

@@ -69,8 +69,6 @@ beforeEach(async () => {
     getWorkspaceAccessToken: async () => 'unused',
     getWorkspaceOpenRouterKey: async () => null,
     agentStatusStore: {},
-    recapCacheStore: { get: async () => null, put: async () => {} },
-    briefCacheStore: { get: async () => null, put: async () => {} },
     dispatchQueueStore: {},
     workspaceFromUrl: (req, res, next) => next(),
     workspacePreferencesStore: null,

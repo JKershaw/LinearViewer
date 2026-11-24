@@ -2,14 +2,15 @@
  * Keepalive-body characterization for group F compute (LIN-679 Stage 4 /
  * LIN-2538).
  *
- * All 5 `armKeepalive(res)` sites in routes/proxy-compute.js (recommend, recap
- * GET+POST, brief GET+POST) use the default 25s delayMs with no injection
- * seam, so an HTTP-level request always takes the un-flushed
+ * The one `armKeepalive(res)` site left in routes/proxy-compute.js (GET
+ * recommend; LIN-4537 retired the recap and brief compute routes that carried
+ * the others) uses the default 25s delayMs with no injection seam, so an
+ * HTTP-level request always takes the un-flushed
  * `res.status(status).json(body)` branch in a unit test — the wrong branch to
  * characterize this hazard. This constructs the F sub-router directly via
- * `createComputeRoutes({...})` and pulls a keepalive-guarded handler off its
- * own `router.stack` (POST /api/proxy/recap/:identifier, a string-path
- * registration), per the confirmed in-repo template
+ * `createComputeRoutes({...})` and pulls the keepalive-guarded handler off its
+ * own `router.stack` (GET /api/proxy/recommend/:identifier, on its
+ * deterministic ?kind= override path), per the confirmed in-repo template
  * tests/unit/ship-biscuit-route.test.js:76-140 (mocked timers, a
  * stall-then-release gate, a fake res recording the flushed write/end path).
  *
@@ -23,6 +24,8 @@ process.env.NODE_ENV = 'test';
 import { test, describe } from 'node:test';
 import assert from 'node:assert/strict';
 import { createComputeRoutes } from '../../routes/proxy-compute.js';
+import { generatePrompt, deriveDispatchKind } from '../../lib/prompt-templates.js';
+import { promptContextOf } from '../../lib/prompts/prompt-context.js';
 
 // A res that records both the flushed-heartbeat path (status/setHeader/
 // flushHeaders/write/end) and the fast json() path — same shape as the
@@ -48,29 +51,25 @@ function makeFlushRes() {
 }
 
 // Grab the actual route handler (last in the route stack, after the
-// proxyLimiter/authenticateProxyToken middleware). POST /recap and POST
-// /brief are the two string-path (non-array) F registrations.
+// proxyLimiter/authenticateProxyToken middleware). GET /recommend is an array
+// registration (canonical nested form + flat alias), so match either shape.
 function getRouteHandler(router, method, path) {
-  const layer = router.stack.find(l => l.route?.path === path && l.route.methods[method]);
+  const layer = router.stack.find(l => {
+    const p = l.route?.path;
+    return (Array.isArray(p) ? p.includes(path) : p === path) && l.route.methods[method];
+  });
   assert.ok(layer, `${method.toUpperCase()} ${path} route is registered`);
   return layer.route.stack[layer.route.stack.length - 1].handle;
 }
 
-// Minimal deps for createComputeRoutes, scoped to what POST /recap's
-// isTestMode path actually touches. `getTestMockData` is the injected,
-// gatable seam this test stalls on (mirrors the LIN-615/LIN-1203 templates'
-// stalled store read) — real getTestMockData lazy-loads a fixture module,
-// but that indirection is irrelevant to the keepalive branch under test, so a
-// direct fake in-memory dataset is used instead.
-function buildRouter({ issues }) {
+// Minimal deps for createComputeRoutes, scoped to what GET /recommend's
+// ?kind= override path actually touches. `resolvePromptIssueContext` is the
+// injected, gatable seam this test stalls on (mirrors the LIN-615/LIN-1203
+// templates' stalled store read): the override path reads the issue through it
+// inside the keepalive block and makes no model call.
+function buildRouter({ resolvePromptIssueContext }) {
   const noop = (req, res, next) => next();
-  const recapDoc = { current: null };
   return createComputeRoutes({
-    recapCacheStore: {
-      async put(urlKey, canonicalId, doc) { recapDoc.current = { ...doc, generatedAt: new Date('2026-09-05T00:00:00Z') }; },
-      async get() { return recapDoc.current; }
-    },
-    briefCacheStore: null,
     dispatchQueueStore: null,
     llmCallLogStore: null,
     getWorkspaceOpenRouterKey: async () => null,
@@ -90,46 +89,40 @@ function buildRouter({ issues }) {
     chargeFreeTierOrReject: async () => null,
     computeRecommendation: async () => { throw new Error('not exercised by this test'); },
     recommendErrorResponse: () => ({ status: 500, body: { error: 'not exercised by this test' } }),
-    resolvePromptIssueContext: async () => { throw new Error('not exercised by this test'); },
+    resolvePromptIssueContext,
     withTimeout: async (p) => p,
     LINEAGE_QUERY_LIMIT: 2000,
     RECOMMEND_DESCENT_BUDGET_MS: 180_000,
     LLM_TIMEOUT_MS: 180_000,
-    getTestMockData: issues.getTestMockData,
+    getTestMockData: async () => { throw new Error('not exercised by this test'); },
     fetchWithTimeout: async (workFn) => workFn(new AbortController().signal),
     CONTEXT_FETCH_TIMEOUT_MS: 45_000,
   });
 }
 
+const KIND = 'review';
+const ROUTE = '/api/proxy/recommend/:identifier';
+
 describe('routes/proxy-compute.js keepalive-body characterization (LIN-2538)', () => {
-  test('POST /recap: a >25s test-mode fetch flushes 200 + a heartbeat, then delivers the recap via the flushed res.end body', async (t) => {
+  test('GET /recommend?kind=: a >25s context read flushes 200 + a heartbeat, then delivers the prompt via the flushed res.end body', async (t) => {
     t.mock.timers.enable({ apis: ['setTimeout', 'setInterval'] });
 
     let release;
     const gate = new Promise((resolve) => { release = resolve; });
-    const getTestMockData = async () => {
-      await gate;
-      return {
-        // A completed AND an open child (LIN-2538 H3): exercises isTerminalState
-        // inside buildMockRecapFromContext's remainingChildren filter — an
-        // empty children array would never actually call it, silently
-        // masking a dropped `../lib/tree.js` import (ReferenceError, per H3).
-        issues: [{
-          id: 'iss-1', identifier: 'LIN-1', title: 'Task one', description: 'desc',
-          state: { name: 'Todo', type: 'unstarted' }, labels: { nodes: [] }, comments: { nodes: [] },
-          children: { nodes: [
-            { id: 'iss-2', identifier: 'LIN-2', title: 'Done child', state: { type: 'completed' } },
-            { id: 'iss-3', identifier: 'LIN-3', title: 'Open child', state: { type: 'started' } }
-          ] }
-        }],
-        projects: []
-      };
+    const ctx = {
+      issue: {
+        id: 'iss-1', identifier: 'LIN-1', title: 'Task one', description: 'desc',
+        state: { name: 'In Review', type: 'started' }, labels: [], comments: [],
+        children: []
+      },
+      comments: []
     };
+    const resolvePromptIssueContext = async () => { await gate; return ctx; };
 
-    const router = buildRouter({ issues: { getTestMockData } });
-    const handler = getRouteHandler(router, 'post', '/api/proxy/recap/:identifier');
+    const router = buildRouter({ resolvePromptIssueContext });
+    const handler = getRouteHandler(router, 'get', ROUTE);
 
-    const req = { proxyUrlKey: 'ws-a', proxyCreatedBy: 'acct-1', params: { identifier: 'LIN-1' }, body: {} };
+    const req = { proxyUrlKey: 'ws-a', proxyCreatedBy: 'acct-1', params: { identifier: 'LIN-1' }, query: { kind: KIND }, body: {} };
     const res = makeFlushRes();
 
     const done = handler(req, res);
@@ -142,50 +135,48 @@ describe('routes/proxy-compute.js keepalive-body characterization (LIN-2538)', (
 
     // Past the 25s flush threshold: HTTP 200 + JSON committed, no body yet.
     t.mock.timers.tick(25_000);
-    assert.equal(res.flushedHeaders, true, 'keepalive flushed headers before the stalled fixture load finished');
+    assert.equal(res.flushedHeaders, true, 'keepalive flushed headers before the stalled context read finished');
     assert.equal(res.statusCode, 200);
     assert.match(res.headers['Content-Type'], /application\/json/);
-    assert.equal(res.endedWith, undefined, 'no body committed yet — still stalled on getTestMockData');
+    assert.equal(res.endedWith, undefined, 'no body committed yet — still stalled on resolvePromptIssueContext');
 
     // One heartbeat interval later: a single JSON-safe whitespace byte.
     t.mock.timers.tick(15_000);
     assert.ok(res.writes.includes(' '), 'a keepalive heartbeat space was written past the H12 cap');
 
-    // Release the stalled fixture load; the recap now rides the *flushed* send path.
+    // Release the stalled context read; the prompt now rides the *flushed* send path.
     release();
     await done;
 
-    assert.ok(res.endedWith, 'recap delivered via res.end on the committed-200 path');
+    assert.ok(res.endedWith, 'prompt delivered via res.end on the committed-200 path');
     const body = JSON.parse(res.endedWith);
-    assert.equal(body.status, 'fresh');
-    assert.equal(body.identifier, 'LIN-1');
-    assert.deepEqual(body.recap, {
-      done: [{ item: 'Description documented', evidence: 'Description is present on the issue' }],
-      // The completed child is filtered out by isTerminalState; only the open
-      // one surfaces as pending — proof isTerminalState actually resolved
-      // (an omitted `../lib/tree.js` import would ReferenceError here, H3).
-      pending: [{ item: 'Complete subtask LIN-3', predicted: 'Open child' }],
-      deviations: []
-    }, 'recap body carries the deterministic mock recap shape (one open child pending, no comments, a description)');
+    const expected = generatePrompt(KIND, ctx.issue, promptContextOf(ctx), {}, null);
+    assert.ok(expected?.prompt, 'the fixture generates a prompt for the pinned kind');
+    assert.deepEqual(body, {
+      identifier: 'LIN-1',
+      reasoning: null,
+      prompt: expected.prompt,
+      truncated: false,
+      recommendedAction: KIND,
+      kind: deriveDispatchKind(KIND),
+      override: true
+    }, 'body carries the deterministic kind-override recommendation (no statusCode on a 200)');
     // The fast json() path must NOT have been used — the whole point is the flushed branch.
-    assert.equal(res.jsonBody, null, 'recap rode the flushed res.end path, not the fast res.json path');
+    assert.equal(res.jsonBody, null, 'prompt rode the flushed res.end path, not the fast res.json path');
   });
 
-  test('POST /recap: an issue-not-found error past the flush threshold carries its real status in the BODY, not res.statusCode (which is stuck at 200)', async (t) => {
+  test('GET /recommend?kind=: an issue-not-found error past the flush threshold carries its real status in the BODY, not res.statusCode (which is stuck at 200)', async (t) => {
     t.mock.timers.enable({ apis: ['setTimeout', 'setInterval'] });
 
     let release;
     const gate = new Promise((resolve) => { release = resolve; });
-    // No matching issue → buildMockRecapContextFromFixtures resolves to null.
-    const getTestMockData = async () => {
-      await gate;
-      return { issues: [], projects: [] };
-    };
+    // No matching issue → the context read resolves to null.
+    const resolvePromptIssueContext = async () => { await gate; return null; };
 
-    const router = buildRouter({ issues: { getTestMockData } });
-    const handler = getRouteHandler(router, 'post', '/api/proxy/recap/:identifier');
+    const router = buildRouter({ resolvePromptIssueContext });
+    const handler = getRouteHandler(router, 'get', ROUTE);
 
-    const req = { proxyUrlKey: 'ws-a', proxyCreatedBy: 'acct-1', params: { identifier: 'LIN-999999' }, body: {} };
+    const req = { proxyUrlKey: 'ws-a', proxyCreatedBy: 'acct-1', params: { identifier: 'LIN-999999' }, query: { kind: KIND }, body: {} };
     const res = makeFlushRes();
 
     const done = handler(req, res);
@@ -196,7 +187,7 @@ describe('routes/proxy-compute.js keepalive-body characterization (LIN-2538)', (
     await new Promise((resolve) => setImmediate(resolve));
 
     t.mock.timers.tick(25_000);
-    assert.equal(res.flushedHeaders, true, 'keepalive flushed headers before the stalled fixture load finished');
+    assert.equal(res.flushedHeaders, true, 'keepalive flushed headers before the stalled context read finished');
     t.mock.timers.tick(15_000);
     assert.ok(res.writes.includes(' '), 'a keepalive heartbeat space was written past the H12 cap');
 

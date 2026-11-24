@@ -236,8 +236,6 @@ function buildApp(reason, proxyEventStore = { recordEvent: async () => {} }) {
     getWorkspaceAccessToken: async () => null,
     // Unused on the failure path, but required by the factory signature.
     agentStatusStore: {},
-    recapCacheStore: {},
-    briefCacheStore: {},
     dispatchQueueStore: {},
     // Pins the same workspace the token resolves to, so the user-facing events
     // read surface (GET /workspace/:urlKey/api/proxy/events) is reachable here.

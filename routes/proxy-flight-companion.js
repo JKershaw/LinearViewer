@@ -131,8 +131,6 @@ function mergeToolEvents(events) {
  * @param {Function} deps.chargeFreeTierOrReject - Free-tier metering choke point (closure-local, shared with compute/dispatch groups)
  * @param {Object} deps.observerStateStore - Census/companion reservation store (turn-core dep)
  * @param {Object} deps.workspacePreferencesStore - Model + preference resolution (turn-core dep)
- * @param {Object} deps.recapCacheStore - `get_comments`-adjacent tool dep (turn-core dep, via createToolCatalog)
- * @param {Object} deps.briefCacheStore - Tool dep (turn-core dep, via createToolCatalog)
  * @param {Object} deps.dispatchQueueStore - Tool dep: session/follow-up reads (turn-core dep)
  * @param {Object} deps.agentStatusStore - Tool dep: session reads (turn-core dep)
  * @param {Object} deps.proxyTokenStore - Tool dep: `send_follow_up`'s bootstrap-provisioning seam (turn-core dep; inert under propose mode, kept for parity with the session route)
@@ -156,8 +154,6 @@ export function createProxyFlightCompanionRoutes({
   chargeFreeTierOrReject,
   observerStateStore,
   workspacePreferencesStore,
-  recapCacheStore,
-  briefCacheStore,
   recordsStore = null,
   dispatchQueueStore,
   agentStatusStore,
@@ -269,8 +265,6 @@ export function createProxyFlightCompanionRoutes({
           deps: {
             observerStateStore,
             workspacePreferencesStore,
-            recapCacheStore,
-            briefCacheStore,
             recordsStore,
             dispatchQueueStore,
             agentStatusStore,

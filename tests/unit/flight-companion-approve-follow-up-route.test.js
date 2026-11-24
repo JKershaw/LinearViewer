@@ -161,8 +161,6 @@ function buildApp({
     observerStateStore: null,
     freeTierStore: null,
     workspacePreferencesStore: null,
-    recapCacheStore: null,
-    briefCacheStore: null,
     dispatchQueueStore,
     agentStatusStore,
     proxyTokenStore,

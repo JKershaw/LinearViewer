@@ -61,10 +61,10 @@ describe('what a row says', () => {
 
   test('a Harbour job is on the Harbour surface, with no harness or effort field', () => {
     const html = body(emptyTable());
-    const row = html.slice(html.indexOf('data-testid="models-job-brief"'), html.indexOf('data-testid="models-job-brief"') + 4000);
+    const row = html.slice(html.indexOf('data-testid="models-job-run-summary"'), html.indexOf('data-testid="models-job-run-summary"') + 4000);
     assert.doesNotMatch(row.slice(0, row.indexOf('</details>')), /name="c__job__agent-session/);
-    assert.match(row, /name="c__job__harbour-call__brief__model"/);
-    assert.doesNotMatch(row, /__brief__harness/);
+    assert.match(row, /name="c__job__harbour-call__run-summary__model"/);
+    assert.doesNotMatch(row, /__run-summary__harness/);
   });
 
   test('the job label is the id in words', () => {

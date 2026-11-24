@@ -80,9 +80,6 @@ import { prepareRecommendationInput } from '../lib/recommendation-input.js';
 import { resolveRecommendation, describeDescent, armHopSignal } from '../lib/recommend-recurse.js';
 import { resolveWorkspaceModel, resolveAiOperationModel } from '../lib/workspace-preferences.js';
 import { getNorthStarDocVersion } from '../lib/north-star-resolver.js';
-import { generateRecap } from '../lib/recap.js';
-import { generateBrief } from '../lib/brief.js';
-import { hashContext } from '../lib/recap-cache.js';
 import { isBlocked, isTerminalState } from '../lib/providers/state-map.js';
 import { buildTaskStack } from '../lib/task-stack.js';
 import { generatePrompt, hasPrompt, isValidDispatchKind, deriveDispatchKind, getPromptDisplayName, PROMPT_TEMPLATES, DISPATCH_KINDS } from '../lib/prompt-templates.js';
@@ -337,7 +334,7 @@ export { LINEAGE_QUERY_LIMIT };
 const GRAPHQL_TIMEOUT_MS = 25_000;
 
 // Budget for the OpenRouter LLM generation leg on recommendation-style endpoints
-// (recommend/recap/brief). Generation routinely runs tens of seconds and varies
+// (recommend). Generation routinely runs tens of seconds and varies
 // with provider routing and output size; the previous 50s cap surfaced as
 // intermittent 504s whose root cause was this leg, not Linear (the error text
 // misattributed it). The armed keepalive (http-keepalive.js) writes a heartbeat
@@ -349,7 +346,7 @@ const GRAPHQL_TIMEOUT_MS = 25_000;
 const LLM_TIMEOUT_MS = 180_000;
 
 // Backstop for the Linear context fetch on recommendation-style endpoints
-// (recommend/recap/brief/status). These fetches run behind an armed keepalive
+// (recommend/status). These fetches run behind an armed keepalive
 // (http-keepalive.js flushes a 200 + heartbeat by 25s and then holds the
 // connection open), so a 25s cap on the fetch would fire at the same instant
 // the keepalive starts covering for slowness — surfacing a 504 on healthy large
@@ -443,8 +440,6 @@ async function fetchWithTimeout(workFn, ms) {
  * @param {Object} options.proxyTokenStore - Proxy token storage instance
  * @param {Object} options.proxyEventStore - Proxy event storage instance
  * @param {Object} options.agentStatusStore - Agent status storage instance
- * @param {Object} options.recapCacheStore - Recap cache storage instance
- * @param {Object} options.briefCacheStore - Brief cache storage instance
  * @param {Function} options.workspaceFromUrl - Middleware to validate workspace
  * @param {Function} options.resolveWorkspaceAccess - Function returning { token, reason } for actionable error envelopes (LIN-417)
  * @param {Function} options.getWorkspaceOpenRouterKey - Function to get OpenRouter API key from workspace sessions
@@ -479,7 +474,7 @@ async function fetchWithTimeout(workFn, ms) {
  *   workspace selects it, and via this injection.
  * @returns {Router} Express router with proxy routes
  */
-export function createProxyRoutes({ proxyTokenStore, proxyEventStore, agentStatusStore, recapCacheStore, briefCacheStore, dispatchQueueStore, dispatchTokenStore = null, closeOutEventsStore = null, llmCallLogStore, taskDecisionsStore = null, dismissalSuggestionsStore = null, harbourCommentsStore = null, changePrReaderFor = null, sessionsFeedCache = null, workspaceFromUrl, resolveWorkspaceAccess, getWorkspaceOpenRouterKey, getWorkspaceNorthStar, getNorthStarDocVersionForWorkspace = null, reportHistoryStore, workspacePreferencesStore, dispatchPresetsStore, freeTierStore, accountStore = null, provider: injectedProvider = null, rejectedCredentialRegistry = null, observerStateStore, flightCompanionChatClient = undefined, flightCompanionCreateToolCatalog = undefined, savedChatStore = null, workspaceHaltStore = null, workspaceOwnerCheck = null, modelRoutingStore = null, livenessAlarmStore = null, onTicketWrite = null, recordPipelineMerge = null, consumerHeartbeatStore = null, requestUsageStore = null, requestUsageLoader = null, leftoverStep = null, recordsStore = null, listRecordPeople = undefined }) {
+export function createProxyRoutes({ proxyTokenStore, proxyEventStore, agentStatusStore, dispatchQueueStore, dispatchTokenStore = null, closeOutEventsStore = null, llmCallLogStore, taskDecisionsStore = null, dismissalSuggestionsStore = null, harbourCommentsStore = null, changePrReaderFor = null, sessionsFeedCache = null, workspaceFromUrl, resolveWorkspaceAccess, getWorkspaceOpenRouterKey, getWorkspaceNorthStar, getNorthStarDocVersionForWorkspace = null, reportHistoryStore, workspacePreferencesStore, dispatchPresetsStore, freeTierStore, accountStore = null, provider: injectedProvider = null, rejectedCredentialRegistry = null, observerStateStore, flightCompanionChatClient = undefined, flightCompanionCreateToolCatalog = undefined, savedChatStore = null, workspaceHaltStore = null, workspaceOwnerCheck = null, modelRoutingStore = null, livenessAlarmStore = null, onTicketWrite = null, recordPipelineMerge = null, consumerHeartbeatStore = null, requestUsageStore = null, requestUsageLoader = null, leftoverStep = null, recordsStore = null, listRecordPeople = undefined }) {
   const router = Router();
 
   // =========================================================================
@@ -1574,7 +1569,7 @@ export function createProxyRoutes({ proxyTokenStore, proxyEventStore, agentStatu
 
   // Group F compute (LIN-679 Stage 4 / LIN-2538): extracted to
   // routes/proxy-compute.js, mounted at its original position.
-  router.use(createComputeRoutes({ recordsStore, recapCacheStore, briefCacheStore, dispatchQueueStore, closeOutEventsStore, requestUsageLoader, llmCallLogStore, getWorkspaceOpenRouterKey, getWorkspaceNorthStar, getNorthStarDocVersionForWorkspace, reportHistoryStore, workspacePreferencesStore, proxyLimiter, authenticateProxyToken, resolveProviderAccess, denyIfUnsupported, logEvent, logOpenRouterCredentialSource, workspaceUnavailable, graphqlErrorStatus, chargeFreeTierOrReject, computeRecommendation, recommendErrorResponse, resolvePromptIssueContext, withTimeout, LINEAGE_QUERY_LIMIT, RECOMMEND_DESCENT_BUDGET_MS, LLM_TIMEOUT_MS, getTestMockData, fetchWithTimeout, CONTEXT_FETCH_TIMEOUT_MS }));
+  router.use(createComputeRoutes({ recordsStore, dispatchQueueStore, closeOutEventsStore, requestUsageLoader, llmCallLogStore, getWorkspaceOpenRouterKey, getWorkspaceNorthStar, getNorthStarDocVersionForWorkspace, reportHistoryStore, workspacePreferencesStore, proxyLimiter, authenticateProxyToken, resolveProviderAccess, denyIfUnsupported, logEvent, logOpenRouterCredentialSource, workspaceUnavailable, graphqlErrorStatus, chargeFreeTierOrReject, computeRecommendation, recommendErrorResponse, resolvePromptIssueContext, withTimeout, LINEAGE_QUERY_LIMIT, RECOMMEND_DESCENT_BUDGET_MS, getTestMockData }));
 
 
   // Group G agent-status (LIN-679 Stage 1 / LIN-2533): extracted to
@@ -1648,7 +1643,7 @@ export function createProxyRoutes({ proxyTokenStore, proxyEventStore, agentStatu
   // router's own real defaults still apply. Named distinctly from a bare
   // `chatClient`/`createToolCatalog` at this composer's own top level so a
   // future second sub-router needing the same seam cannot collide with it.
-  router.use(createProxyFlightCompanionRoutes({ proxyLimiter, authenticateProxyToken, resolveProviderAccess, workspaceUnavailable, logEvent, logOpenRouterCredentialSource, getWorkspaceOpenRouterKey, chargeFreeTierOrReject, observerStateStore, workspacePreferencesStore, recapCacheStore, briefCacheStore, recordsStore, dispatchQueueStore, agentStatusStore, proxyTokenStore, savedChatStore, chatClient: flightCompanionChatClient, createToolCatalog: flightCompanionCreateToolCatalog }));
+  router.use(createProxyFlightCompanionRoutes({ proxyLimiter, authenticateProxyToken, resolveProviderAccess, workspaceUnavailable, logEvent, logOpenRouterCredentialSource, getWorkspaceOpenRouterKey, chargeFreeTierOrReject, observerStateStore, workspacePreferencesStore, recordsStore, dispatchQueueStore, agentStatusStore, proxyTokenStore, savedChatStore, chatClient: flightCompanionChatClient, createToolCatalog: flightCompanionCreateToolCatalog }));
 
   return router;
 }

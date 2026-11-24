@@ -14,7 +14,8 @@
  * (task-chat-route.test.js), Ship's Biscuit (ship-biscuit-route.test.js) and the
  * Flight Companion (flight-companion-*-route.test.js). The rest are here:
  * roadmap generate and chat, and workspace-api's `refuseFreeTier`
- * (recap) and `keepaliveError` mock-path (recommend) sites.
+ * (recommend, on a real free-tier key; it was recap until LIN-4537 retired it)
+ * and `keepaliveError` mock-path (recommend) sites.
  *
  * The recommend routes' AI-mock charge (LIN-405) is the one place the session
  * free-tier flag is a named parameter (`sessionFreeTierFlag`): the last two rows
@@ -130,14 +131,15 @@ describe('LIN-3658: workspace-api 429s a free-tier denial with the exact body', 
       getOpenRouterSource: () => 'free',
       userPreferencesStore: null,
       workspacePreferencesStore: null,
-      recapCacheStore: { async get() { return null; }, async put() {} },
     });
   }
 
-  test('refuseFreeTier: POST /api/recap/:issueId', async () => {
+  // LIN-4537: this row drove POST /api/recap/:issueId, now retired. GET /api/recommend/:issueId is the surviving
+  // route that reaches refuseFreeTier on a real (env) free-tier key rather than the AI-mock session flag.
+  test('refuseFreeTier: GET /api/recommend/:issueId on a free-tier key', async () => {
     await withEnv(FREE_TIER_ENV, async () => {
       const store = deniedStore();
-      const handler = getHandler(workspaceApiRouter(store), 'post', '/workspace/:urlKey/api/recap/:issueId');
+      const handler = getHandler(workspaceApiRouter(store), 'get', '/workspace/:urlKey/api/recommend/:issueId');
       const req = { workspace: { urlKey: 'ws-a', provider: PROVIDER_NAME, accessToken: 'tok' }, session: { features: {} }, params: { urlKey: 'ws-a', issueId: 'LIN-500' }, query: {}, body: {} };
       await assertRefused(handler, req, store, 'ws-a');
     });

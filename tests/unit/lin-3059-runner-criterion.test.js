@@ -73,8 +73,6 @@ function buildApp(store, captured) {
     getWorkspaceAccessToken: async () => 'test-token',
     getWorkspaceOpenRouterKey: async () => null,
     agentStatusStore: {},
-    recapCacheStore: { get: async () => null, set: async () => {} },
-    briefCacheStore: { get: async () => null, set: async () => {} },
     // addItem-ONLY: the referent guard fails open on a store without the read
     // capability (LIN-1656), which is exactly this file's documented setup.
     dispatchQueueStore: {

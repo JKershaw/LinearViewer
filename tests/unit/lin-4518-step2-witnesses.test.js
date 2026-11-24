@@ -101,8 +101,6 @@ function proxyApp() {
     getWorkspaceAccessToken: async () => NON_TEST_TOKEN,
     getWorkspaceOpenRouterKey: async () => null,
     agentStatusStore: {},
-    recapCacheStore: { get: async () => null, set: async () => {} },
-    briefCacheStore: { get: async () => null, set: async () => {} },
     recordsStore: store,
     provider: new CommentedProvider(),
     dispatchQueueStore: {

@@ -70,19 +70,44 @@ export const RETIRED = Object.freeze([
   { word: 'the Scan-due tab', re: /obs-tab-due|obs-due-|\bscanDue\b|\b(?:startBulkScan|stopBulkScan|startDueBulkScan)\b|BULK_SCAN_|\bscanEstimateOf\b|\bscanCostEstimate\b/ },
   { word: 'the shelving store', re: /shelved-rulings-store|\b[Ss]helvedRulingsStore\b/ },
   { word: 'shelving on a ruling', re: /\bshelvedLapseCount\b|\bshelvedTaskIdentifiers\b|rulings\/shelve\b|clear-shelved-rulings|obs-ruling-shelve|\b(?:shelveRulingRow|makeShelveButton|toggleShelvePanel)\b|\bSHELVE_DURATIONS\b/ },
+  // LIN-4537 (P6b): the model-written brief and recap, their two caches, their routes (POST /api/proxy/brief, GET and
+  // POST /api/proxy/recap, GET and POST /api/brief and /api/recap), the task-page, session, swipe and tree panels and their
+  // widgets, the chat tools, the model operations, the replay script, and the stage prompts' "read the current description
+  // and comment thread" line. An agent reads the records brief (lib/records/run-brief.js). The two cache collections stay
+  // named only by the one-off drop module (lib/drop-brief-recap-caches.js) and the erasure inventories, until it has run.
+  { word: 'the brief and recap modules', re: /\blib\/(?:brief|recap|brief-cache|recap-cache)\.js\b/ },
+  { word: 'the brief and recap calls', re: /\b(?:generateBrief|generateRecap|buildBriefMessages|buildRecapMessages|cleanBriefResponse|parseRecapResponse|DEFAULT_BRIEF_MODEL|DEFAULT_RECAP_MODEL|buildMockBrief|buildMockRecap|buildMockRecapContext|buildMockRecapFromContext|buildMockRecapContextFromFixtures)\b/ },
+  { word: 'the brief and recap caches', re: /\b(?:BriefCacheStore|RecapCacheStore|InMemoryBriefCacheStore|InMemoryRecapCacheStore|briefCacheStore|recapCacheStore|hashContext)\b|clear-(?:brief|recap)-cache/ },
+  { word: 'the brief and recap routes', re: /\/api\/(?:brief|recap)\/|\/api\/proxy\/recap\b|\/api\/proxy\/issues\/[^\s`'"]*\/recap\b|\/recap\/(?:\{id\}|:id|\$\{)/ },
+  { word: 'the brief and recap widgets', re: /\b(?:BriefSection|RecapSection)\b|public\/(?:brief|recap)\.js|['"]\/(?:brief|recap)\.js['"]|data-(?:brief|recap)-placeholder|data-toggle="(?:brief|recap)"/ },
+  { word: 'the brief and recap panels', re: /\b(?:renderContextPanel|renderRecapBody|renderTaskContext|contextSignature|briefCurrentSection|briefWithoutCurrent|joinSessionIssueContext|readCachedContext|mountWidgets|enhanceContextMarkdown)\b|task-page-(?:summary|context|write-brief|write-recap)\b/ },
+  { word: 'the brief and recap chat tools', re: /\bget_brief\b|\bget_recap\b/ },
+  { word: 'formatDiscussionReference', re: /\bformatDiscussionReference\b/ },
+  { word: 'the brief and recap replay script', re: /lin-263-spike4\.mjs/ },
 ]);
 
 /** Files that keep a retired word, each with the words it may keep and the reason. */
 export const ALLOW = Object.freeze({
   // LIN-4533 (P3): the dated log of prompt-template changes. Its earlier entries name the block they changed; that is recorded history.
   // LIN-4536 (P6a): its LIN-4502 row names the brief quote module it changed; that is recorded history too.
-  'scripts/prompt-template-change-log.md': { words: ['DECISION: block taught', 'the brief quote module'], reason: 'the dated log of prompt-template changes: its earlier entries quote the DECISION: block and name the brief quote module they changed, which is recorded history (LIN-4533 and LIN-4536 add their own entries)' },
+  'scripts/prompt-template-change-log.md': { words: ['DECISION: block taught', 'the brief quote module', 'the brief and recap modules', 'the brief and recap chat tools', 'the brief and recap routes', 'formatDiscussionReference'], reason: 'the dated log of prompt-template changes: its earlier entries quote the DECISION: block and name the brief quote module, the brief module, its chat tool and the discussion-reference formatter they changed, which is recorded history (LIN-4533, LIN-4536 and LIN-4537 add their own entries)' },
   // LIN-4533 (P3): a recorded liveness fixture of a past cycle (LIN-3238). Its messages are the transcript as it was, not taught text.
   'tests/fixtures/liveness/lin-3238-cycle.json': { words: ['DECISION: block taught'], reason: 'a recorded liveness fixture of the LIN-3238 cycle: its messages are the transcript as it was, kept as history' },
   // LIN-4540 (P7b-1): the task-decisions store is the old ruling store the scan wrote; its schema docs and write methods
   // name the scan and its fingerprint. The predicate still reads the store until LIN-4541 (P7b-2) deletes it whole, with
   // its allowance.
   'lib/task-decisions-store.js': { words: ['the scan module', 'the scan fingerprint'], reason: 'the old ruling store the scan wrote: its schema docs name the scan and its fingerprint; deleted whole with the other ruling stores in LIN-4541 (P7b-2)' },
+  // LIN-4537 (P6b): dated research and eval records that name the brief and recap as they were. Rewriting them would
+  // falsify the record (standing answer: recorded history stays as it is).
+  'docs/lin-260-prompt-scaling-research.md': { words: ['the brief and recap modules', 'the brief and recap calls'], reason: 'dated research (LIN-260) that measured the brief and recap as they were; recorded history, kept as it is' },
+  'docs/lin-418-llm-tracking-research.md': { words: ['the brief and recap modules', 'the brief and recap calls'], reason: 'dated research (LIN-418) that traced the LLM calls of its day, the brief and recap among them; recorded history, kept as it is' },
+  'scripts/eval/lin-263-spike4-results.md': { words: ['the brief and recap calls', 'the brief and recap replay script'], reason: 'the recorded results of the LIN-263 spike, which ran the brief and recap through the retired replay script; recorded history, kept as it is' },
+  'docs/prompt-pipeline/stage-descriptions/breakdown-triage-blocked-context.md': { words: ['formatDiscussionReference'], reason: 'dated notes of 3 Oct 2026 (superseded in part, see that directory\'s README) describing the templates as they were; recorded history' },
+  'docs/prompt-pipeline/stage-descriptions/implementation-bug-lookinto.md': { words: ['formatDiscussionReference'], reason: 'dated notes of 3 Oct 2026 (superseded in part, see that directory\'s README) describing the templates as they were; recorded history' },
+  'docs/prompt-pipeline/stage-descriptions/research-scoping-spike.md': { words: ['formatDiscussionReference'], reason: 'dated notes of 3 Oct 2026 (superseded in part, see that directory\'s README) describing the templates as they were; recorded history' },
+  'docs/prompt-pipeline/stage-descriptions/retro-audit.md': { words: ['formatDiscussionReference'], reason: 'dated notes of 3 Oct 2026 (superseded in part, see that directory\'s README) describing the templates as they were; recorded history' },
+  'docs/prompt-pipeline/stage-descriptions/review-closeout.md': { words: ['formatDiscussionReference'], reason: 'dated notes of 3 Oct 2026 (superseded in part, see that directory\'s README) describing the templates as they were; recorded history' },
+  'docs/prompt-pipeline/stage-descriptions/plumbing.md': { words: ['the brief and recap calls'], reason: 'dated notes of 3 Oct 2026 (superseded in part): a proposed generateBrief writer, never built; recorded history' },
 });
 
 /**

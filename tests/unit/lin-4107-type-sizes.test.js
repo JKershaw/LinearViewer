@@ -202,7 +202,6 @@ export const MONO_ALLOWED = Object.freeze([
   '.sess-v code',
   '.task-ref-ident',
   '.sess-ticket-ident',
-  '.sess-ctx-ident',
   '.sess-run-id',
   '.sess-cred-token',
   '.task-share-url',
@@ -235,7 +234,6 @@ export const MONO_ALLOWED = Object.freeze([
   // to review (kept mono, names do not settle it): card meta, a chat fold, key/value rows, a segment bar
   '.card-meta',
   '.chat-fold',
-  '.sess-ctx-meta',
   '.sess-kv',
   '.swipe-blocking-issue',
   '.swipe-card-header',

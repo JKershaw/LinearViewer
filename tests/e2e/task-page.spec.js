@@ -209,31 +209,6 @@ test.describe('Task page, owner view (LIN-3329)', () => {
     await expect(page.locator('[data-testid="task-page-run"]')).not.toContainText('Run to PR');
   });
 
-  // LIN-3975 (review finding 2): the owner's quiet line is the only way to write a brief or recap from this page. A
-  // press generates it in place (one POST, no reload) and leaves the recap offer alone on the line.
-  test('the quiet line writes a brief in place, and the recap offer stays on the line', async ({ page }) => {
-    // LOCAL-TP4, not LOCAL-TP1: the server keeps a brief for the rest of the run, and the repaint test below expects
-    // LOCAL-TP1 to have none (no brief GET on mount).
-    await seedTasks(page);
-    const briefPosts = [];
-    page.on('request', (req) => {
-      const path = new URL(req.url()).pathname;
-      if (req.method() === 'POST' && /\/api\/brief\//.test(path)) briefPosts.push(path);
-    });
-
-    await page.goto(`/workspace/${URL_KEY}/task/LOCAL-TP4`);
-    await expect(page.locator('[data-testid="task-page-write-brief"]')).toBeVisible();
-    await page.evaluate(() => { window.__noReloadMarker = true; });
-    await page.locator('[data-testid="task-page-write-brief"]').click();
-
-    await expect(page.locator('[data-testid="session-brief"]')).toHaveAttribute('data-state', 'fresh', { timeout: 10000 });
-    expect(briefPosts, 'the press posted one brief for this task').toEqual([`/workspace/${URL_KEY}/api/brief/LOCAL-TP4`]);
-    expect(await page.evaluate(() => window.__noReloadMarker), 'the brief appeared without a reload').toBe(true);
-    await expect(page.locator('[data-testid="task-page-write-brief"]')).toHaveCount(0);
-    await expect(page.locator('[data-testid="task-page-write-recap"]')).toBeVisible();
-    await expect(page.locator('[data-testid="task-page-context-offers"] [data-write-kind]')).toHaveCount(1);
-  });
-
   test('it updates itself, and a repaint keeps the rows the reader opened and the evidence', async ({ page }) => {
     await seedTasks(page, { reviewed: true });
     // LIN-4070: the held task facts are written by Home's load, the way a user arrives here. Warm them first, so the
@@ -245,8 +220,8 @@ test.describe('Task page, owner view (LIN-3329)', () => {
 
     // The page's own requests (the shared navbar's rulings badge poll is not
     // the task page's): the stored-data state endpoint it polls, plus the
-    // owner-only share list it loads once (LIN-3330) — never a brief/recap read
-    // or generate.
+    // owner-only share list it loads once (LIN-3330). The retired brief/recap
+    // routes stay in the net (LIN-4537), so any request to them fails below.
     const stateRequests = [];
     page.on('request', (req) => {
       const path = new URL(req.url()).pathname;
@@ -275,45 +250,36 @@ test.describe('Task page, owner view (LIN-3329)', () => {
     await expect(evidence.locator('[data-testid="run-evidence-checked-review-verdict"]')).toContainText('Approve');
 
     // The page only ever polled its stored-data state endpoint, plus the
-    // one-time owner share list load. With neither brief nor recap, no widget
-    // mounts, so there is no status GET; a press on the quiet line starts one
-    // (LIN-3340 G2, LIN-3975 finding 1). Opening the page spends no AI.
+    // one-time owner share list load. LIN-4537 retired the brief and recap, so
+    // the page makes no brief/recap request at all. Opening the page spends no AI.
     expect(stateRequests.length).toBeGreaterThan(0);
     const stateUrl = `/workspace/${URL_KEY}/api/task/LOCAL-TP1/state`;
     const sharesUrl = `/workspace/${URL_KEY}/api/task/LOCAL-TP1/shares`;
-    const briefUrl = `/workspace/${URL_KEY}/api/brief/LOCAL-TP1`;
-    const recapUrl = `/workspace/${URL_KEY}/api/recap/LOCAL-TP1`;
     expect(stateRequests).toContain(stateUrl);
     for (const path of stateRequests) {
-      expect([stateUrl, sharesUrl, briefUrl, recapUrl], `unexpected task-page request: ${path}`).toContain(path);
+      expect([stateUrl, sharesUrl], `unexpected task-page request: ${path}`).toContain(path);
     }
-    expect(stateRequests.filter(p => p === briefUrl).length, 'no brief GET on mount when neither exists').toBe(0);
-    expect(stateRequests.filter(p => p === recapUrl).length, 'no recap GET on mount when neither exists').toBe(0);
+    expect(stateRequests.filter(p => /\/api\/(brief|recap)\//.test(p)), 'no brief or recap request (LIN-4537)').toEqual([]);
   });
 
   // LIN-3356: the layout John asked for, on a phone and on desktop.
-  test('layout: one calm column on a phone (answer, stages, PR); stages beside the brief on desktop; the PR reads in the content face', async ({ page }) => {
+  test('layout: one calm column on a phone (answer, stages, PR); one column on desktop too; the PR reads in the content face', async ({ page }) => {
     await seedTasks(page, { reviewed: true });
     const token = await runnerToken(page);
     await seedSession(page, token, { identifier: 'LOCAL-TP1', title: 'A task with a running build', kind: 'plan', feedback: ['[done] planned it'] });
     await seedSession(page, token, { identifier: 'LOCAL-TP1', title: 'A task with a running build', kind: 'implementation' });
-    // A testid that is not drawn in this state reads as null, not as a 30-second wait.
-    const box = async (testid) => {
-      const el = page.locator(`[data-testid="${testid}"]`).first();
-      return (await el.count()) ? el.boundingBox() : null;
-    };
+    const box = async (testid) => page.locator(`[data-testid="${testid}"]`).first().boundingBox();
 
     // Phone (360): a single column in reading order, no sideways scroll.
     await page.goto(`/workspace/${URL_KEY}/task/LOCAL-TP1`);
     const answer = await box('task-page-answer');
     const stages = await box('task-page-track-mount');
     const pr = await box('task-page-pr-mount');
-    // With neither brief nor recap, the quiet line is the context block (LIN-3975, finding 1).
-    const context = (await box('task-page-context-mount')) || (await box('task-page-context-quiet'));
     expect(answer.y).toBeLessThan(stages.y);
     expect(stages.y).toBeLessThan(pr.y);
-    expect(pr.y).toBeLessThan(context.y);
-    expect(Math.abs(stages.x - context.x), 'one column').toBeLessThan(2);
+    expect(Math.abs(stages.x - pr.x), 'one column').toBeLessThan(2);
+    // LIN-4537: the "Brief and recap" section, its quiet line and its write offers are gone.
+    await expect(page.locator('.task-context-section, [data-testid^="task-page-context"], [data-testid^="task-page-write-"], [data-testid="task-page-summary"]')).toHaveCount(0);
     await noHorizontalScroll(page);
 
     // The page body is the content face now (LIN-4009), and the PR justification is the same face.
@@ -325,34 +291,25 @@ test.describe('Task page, owner view (LIN-3329)', () => {
     expect(fonts.lead).toBe(fonts.detail);
     expect(fonts.lead).toMatch(/Inter|sans-serif/);
 
-    // Desktop (1280): with a brief or recap, the brief/recap sits beside the stages in a plain column (not sticky,
-    // no scroll area of its own). With neither, the one quiet line takes no column (LIN-3975).
+    // Desktop (1280): one column (LIN-4537 retired the brief/recap column beside the stages). The stages, the PR and the
+    // answer share one left edge and one width, and the PR sits under the stages, not beside them.
     await page.setViewportSize({ width: 1280, height: 900 });
     await page.reload();
-    const dStages = await box('task-page-track-mount');
-    if (await page.locator('[data-testid="task-page-context-quiet"]').count()) {
-      const quiet = await box('task-page-context-quiet');
-      expect(quiet.x, 'the quiet line takes no column beside the stages').toBeLessThanOrEqual(dStages.x + 2);
-      // Finding 1: the quiet line sits under the stages (not in an empty row above them), draws no placeholder box, and
-      // holds both offers on one line.
-      expect(quiet.y, 'the quiet line is under the stages').toBeGreaterThan(dStages.y + dStages.height - 2);
-      await expect(page.locator('.brief-placeholder, .recap-placeholder')).toHaveCount(0);
-      // Polled, not read once: straight after the reload the offers can sit about 10 px apart until layout settles
-      // (Test Coverage Gap Review, 11 Nov., R1), so a one-shot read failed the first attempt and passed on retry. A real
-      // wrap never settles, so it still fails here.
-      await expect.poll(async () => {
-        const offerBrief = await box('task-page-write-brief');
-        const offerRecap = await box('task-page-write-recap');
-        return Math.abs(offerBrief.y - offerRecap.y);
-      }, { message: 'both offers on one line' }).toBeLessThan(4);
-    } else {
-      const dContext = await box('task-page-context-mount');
-      expect(dContext.x).toBeGreaterThan(dStages.x + dStages.width - 2);
-      expect(Math.abs(dContext.y - dStages.y), 'aligned at the top of the same band').toBeLessThan(80);
-      const aside = await page.locator('.task-context-section').evaluate((el) => { const cs = getComputedStyle(el); return { position: cs.position, overflowY: cs.overflowY }; });
-      expect(aside.position).not.toBe('sticky');
-      expect(aside.overflowY).toBe('visible');
-    }
+    const main = page.locator('main.task-page');
+    await expect(main).not.toHaveClass(/task-page--quiet-context/);
+    const tracks = await main.evaluate((el) => getComputedStyle(el).gridTemplateColumns.trim().split(/\s+/).length);
+    expect(tracks, 'the desktop grid has one column').toBe(1);
+    // Section boxes (the grid items themselves), so padding inside a section cannot skew the comparison.
+    const section = async (sel) => main.locator(`:scope > ${sel}`).boundingBox();
+    const dAnswer = await section('.task-answer');
+    const dStages = await section('.task-stages');
+    const dPr = await section('.task-pr-section');
+    expect(Math.abs(dStages.x - dPr.x), 'stages and PR share a left edge').toBeLessThan(2);
+    expect(Math.abs(dStages.x - dAnswer.x), 'stages and answer share a left edge').toBeLessThan(2);
+    expect(Math.abs(dStages.width - dPr.width), 'stages and PR span the same width').toBeLessThan(2);
+    expect(Math.abs(dStages.width - dAnswer.width), 'stages span the full column, as wide as the answer').toBeLessThan(2);
+    expect(dPr.y, 'the PR is under the stages').toBeGreaterThanOrEqual(dStages.y + dStages.height - 2);
+    await expect(page.locator('.task-context-section, [data-testid^="task-page-context"]')).toHaveCount(0);
     await noHorizontalScroll(page);
     await page.screenshot({ path: test.info().outputPath('task-page-running-1280.png'), fullPage: true });
   });
@@ -400,8 +357,6 @@ test.describe('Task page, owner view (LIN-3329)', () => {
       '[data-kind="implementation"] [data-testid="task-page-stage-state"]',
       '[data-kind="implementation"] [data-testid="task-page-session-message"]',
       '[data-testid="task-page-description"] .section-header',
-      // With neither brief nor recap, the owner's one quiet line is the empty-state text (LIN-3975, finding 1).
-      '[data-testid="task-page-context-offers"]',
       '[data-testid="task-page-back"]',
       '.task-details .disclosure__label',
     ];
@@ -591,7 +546,7 @@ test.describe('Task page, owner view (LIN-3329)', () => {
     await expect(guest.locator('[data-testid="run-evidence-closeout"]')).toHaveCount(0);
     await expect(guest.locator('[data-testid="task-page-pr-lead"]')).toHaveText('PR #41 is approved and ready to merge.');
     await expect(guest.locator('[data-action="closeout-press"]')).toHaveCount(0);
-    await expect(guest.locator('[data-testid="task-page-owner-widgets"]')).toHaveCount(0);
+    await expect(guest.locator('[data-testid="task-page-owner-marker"]')).toHaveCount(0);
     // A legacy sealed description renders as the block: its words, then the end line (LIN-4352).
     await expect(guest.locator('[data-testid="task-page-description-body"] p')).toHaveCount(2);
     await expect(guest.locator('[data-testid="task-page-description-body"] p').first()).toHaveText('The task description.');

@@ -4,12 +4,11 @@
  * JS-enhanced session page: per-run expandable transcripts rendered as shared
  * chat bubbles (LIN-1309) with client-side markdown rendering, per-run inline
  * reply boxes scoped to each run's loopId (the ONE reply surface — the
- * page-level global box was removed in LIN-1163), and BriefSection/RecapSection
- * widget init on context panels.
+ * page-level global box was removed in LIN-1163). LIN-4537 retired the
+ * brief/recap widgets the context panels once mounted.
  *
- * Loaded AFTER common.js, chat.js, marked.min.js, purify.min.js, brief.js,
- * recap.js — window.ChatUI, window.renderMarkdown, window.BriefSection,
- * window.RecapSection ARE available. Inline replies use the same raw-fetch
+ * Loaded AFTER common.js, chat.js, marked.min.js, purify.min.js —
+ * window.ChatUI and window.renderMarkdown ARE available. Inline replies use the same raw-fetch
  * dispatch as the original global reply box.
  */
 (function () {
@@ -223,47 +222,6 @@
         });
       })(boxes[i]);
     }
-  }
-
-  // ── BriefSection / RecapSection widget init (LIN-1133) ────────────────────
-  function initContextWidgets() {
-    var briefs = document.querySelectorAll('.sess-ctx-panel.brief-section');
-    var recaps = document.querySelectorAll('.sess-ctx-panel.recap-section');
-    if (typeof window.BriefSection === 'object' && typeof window.BriefSection.init === 'function') {
-      for (var i = 0; i < briefs.length; i++) {
-        var el = briefs[i];
-        var opts = { urlKey: el.dataset.urlKey, identifier: el.dataset.identifier };
-        if (opts.urlKey && opts.identifier) {
-          window.BriefSection.init(el, opts);
-        }
-      }
-    }
-    if (typeof window.RecapSection === 'object' && typeof window.RecapSection.init === 'function') {
-      for (var i = 0; i < recaps.length; i++) {
-        var el2 = recaps[i];
-        var opts2 = { urlKey: el2.dataset.urlKey, identifier: el2.dataset.identifier };
-        if (opts2.urlKey && opts2.identifier) {
-          window.RecapSection.init(el2, opts2);
-        }
-      }
-    }
-  }
-
-  // ── Live clocks (LIN-1163 item 4; LIN-3250 live ticking) ───────────────────
-  // The server renders each clock's current value and the timestamps it needs;
-  // this re-derives them once a second so an open run's wall clock and waiting
-  // clock keep moving without a reload. Per-run in-progress rows keep the
-  // original one-line "in progress · Xs" shape.
-  function formatElapsed(ms) {
-    if (!(ms >= 0)) return null;
-    var totalSec = Math.round(ms / 1000);
-    if (totalSec < 60) return totalSec + 's';
-    var m = Math.floor(totalSec / 60);
-    var s = totalSec % 60;
-    if (m < 60) return s ? m + 'm ' + s + 's' : m + 'm';
-    var h = Math.floor(m / 60);
-    var rm = m % 60;
-    return rm ? h + 'h ' + rm + 'm' : h + 'h';
   }
 
   // Elapsed for one element: a fixed `data-end` is static; an open clock ticks
@@ -603,7 +561,6 @@
     initQuestionCards();
     initInlineReplies();
     initProposals();
-    initContextWidgets();
     initPrState();
     initCloseOut();
     // Per-run transcripts must render before toggle init so content is visible.

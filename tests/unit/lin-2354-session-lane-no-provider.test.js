@@ -173,8 +173,8 @@ describe('LIN-2354 F1 — feedback-triage/autopilot lane (routes/workspace-api-f
       // /fixture:LIN-3136
       freeTierStore: {}, getOpenRouterSource: () => null, userPreferencesStore: {},
       workspacePreferencesStore: { getWorkspacePreferences: async () => ({}) },
-      customPromptsStore: {}, recapCacheStore: {},
-      briefCacheStore: {}, reportHistoryStore: {}, agentStatusStore: {}, promptTraceStore: {}
+      customPromptsStore: {},
+      reportHistoryStore: {}, agentStatusStore: {}, promptTraceStore: {}
     });
     app.use(router);
     return { app, dispatch };

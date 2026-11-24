@@ -14,8 +14,8 @@
  *
  * Deliberately NOT a heavyweight diagram library (no Mermaid): a custom
  * box-drawing layout matches the CLI aesthetic, keeps the no-build-step rule,
- * and makes the "start here" lane ordering and clickable nodes trivial. Mirrors
- * brief.js/recap.js: a plain global (`ContextSection`) since the swipe page is a
+ * and makes the "start here" lane ordering and clickable nodes trivial. A
+ * plain global (`ContextSection`) since the swipe page is a
  * plain script with no module loader.
  */
 (function () {
@@ -283,7 +283,7 @@
   function renderLoading() {
     return `
       <div class="context-header"><span class="context-status-label">context · loading…</span></div>
-      <div class="context-placeholder context-loading"><span class="context-spinner"></span> Mapping task relationships.</div>`;
+      <div class="context-placeholder context-loading"><span class="spinner" aria-hidden="true"></span> Mapping task relationships.</div>`;
   }
 
   function renderError(message) {

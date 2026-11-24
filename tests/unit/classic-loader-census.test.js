@@ -22,8 +22,6 @@ const UNIT = dirname(fileURLToPath(import.meta.url));
 
 /** Suites (file names under tests/unit/) that load browser scripts as classic scripts today. Sorted. */
 export const CLASSIC_LOADER_SUITES = [
-  'brief-recap-ai-not-configured-contract.test.js',
-  'brief-recap-autogenerate.test.js',
   'chart-helpers.test.js',
   'chat-append-options.test.js',
   'chat-identifiers.test.js',
@@ -143,8 +141,8 @@ test('the classic-loader census matches its baseline: no new classic suite, and 
   assert.deepEqual(gone, [], `listed suites no longer load browser scripts as classic: lower the baseline in this change: ${gone.join(', ')}`);
 });
 
-test('the baseline is recorded at 86 suites (the count that must not rise; LIN-4540 deleted the two scan suites)', () => {
-  assert.equal(CLASSIC_LOADER_SUITES.length, 86);
+test('the baseline is recorded at 84 suites (the count that must not rise; LIN-4540 deleted the two scan suites, LIN-4537 the two brief/recap widget suites)', () => {
+  assert.equal(CLASSIC_LOADER_SUITES.length, 84);
 });
 
 test('runClassic is counted unless it runs a named sibling: observation.js counts, chart-helpers.js does not', () => {

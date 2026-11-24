@@ -4454,157 +4454,27 @@ body[data-proxy-active="true"] .prompt-proxy-toggle {
 }
 
 /* =========================================================================
-   Recap Section (LIN-261)
-   Shared by every `RecapSection` host (swipe accordion, session, task page, scan).
+   The one loading spinner (the prompt section and the Context section draw it) and the prompt section's error line.
+   LIN-4537 renamed them from the retired recap widget's `.recap-spinner`/`.recap-error`, and folded the Context
+   section's identical `.context-spinner` into the same rule.
    ========================================================================= */
-.recap-section {
-  font-family: var(--font-content);
-  color: var(--text);
-  font-size: var(--font-size-base);
-}
-
-.recap-header {
-  display: flex;
-  align-items: center;
-  gap: 0.75ch;
-  flex-wrap: wrap;
-  margin-bottom: var(--space-2);
-}
-
-.recap-status-label {
-  font-weight: 600;
-  color: var(--text);
-}
-
-.recap-meta {
-  color: var(--muted);
-  font-size: var(--font-size-sm);
-}
-
-.recap-refresh {
-  margin-left: auto;
-  font-family: inherit;
-  font-size: var(--font-size-sm);
-  padding: 0.15rem 0.6rem;
-  background: transparent;
-  border: 1px solid var(--muted);
-  border-radius: var(--radius-sm);
-  color: var(--text);
-  cursor: pointer;
-}
-
-.recap-refresh:hover {
-  border-color: var(--text);
-  background: var(--card-h);
-}
-
-.recap-refresh:disabled {
-  opacity: 0.5;
-  cursor: default;
-}
-
-.recap-placeholder {
-  color: var(--muted);
-  font-style: italic;
-  padding: 0.35rem 0;
-}
-
-.recap-empty {
-  color: var(--muted);
-  padding: 0.35rem 0;
-}
-
-.recap-error {
+.prompt-error {
   color: var(--red);
   font-style: normal;
 }
 
-.recap-generating {
-  display: inline-flex;
-  align-items: center;
-  gap: 0.5ch;
-  color: var(--muted);
-  font-style: normal;
-}
-
-.recap-spinner {
+.spinner {
   display: inline-block;
   width: 0.9em;
   height: 0.9em;
   border: 2px solid var(--muted);
   border-top-color: transparent;
   border-radius: 50%;
-  animation: recap-spin 0.9s linear infinite;
+  animation: spinner-spin 0.9s linear infinite;
 }
 
-@keyframes recap-spin {
+@keyframes spinner-spin {
   to { transform: rotate(360deg); }
-}
-
-.recap-list {
-  list-style: none;
-  padding: 0;
-  margin: 0 0 var(--space-2h) 0;
-}
-
-.recap-section-title {
-  color: var(--muted);
-  font-size: var(--font-size-sm);
-  text-transform: uppercase;
-  letter-spacing: 0.05em;
-  margin-bottom: var(--space-1);
-}
-
-.recap-item {
-  display: flex;
-  align-items: flex-start;
-  gap: 0.75ch;
-  padding: 0.2rem 0;
-}
-
-.recap-marker {
-  flex-shrink: 0;
-  width: 1.25ch;
-  text-align: center;
-  font-weight: 600;
-}
-
-.recap-marker-done { color: var(--green); }
-.recap-marker-pending { color: var(--muted); }
-.recap-marker-deviation { color: var(--yellow); }
-
-.recap-body {
-  flex: 1;
-  min-width: 0;
-  display: flex;
-  flex-direction: column;
-  gap: 0.1rem;
-}
-
-.recap-item-title {
-  color: var(--text);
-  word-wrap: break-word;
-  overflow-wrap: break-word;
-}
-
-.recap-item-evidence {
-  color: var(--muted);
-  font-size: var(--font-size-sm);
-  word-wrap: break-word;
-  overflow-wrap: break-word;
-}
-
-.recap-type {
-  display: inline-block;
-  font-size: var(--font-size-sm);
-  text-transform: uppercase;
-  letter-spacing: 0.05em;
-  padding: 0.05rem 0.4rem;
-  margin-left: 0.5ch;
-  border: 1px solid var(--yellow);
-  color: var(--yellow);
-  border-radius: 2px;
-  vertical-align: middle;
 }
 
 /* =========================================================================
@@ -4664,16 +4534,6 @@ body[data-proxy-active="true"] .prompt-proxy-toggle {
   align-items: center;
   gap: 0.5ch;
   font-style: normal;
-}
-
-.context-spinner {
-  display: inline-block;
-  width: 0.9em;
-  height: 0.9em;
-  border: 2px solid var(--muted);
-  border-top-color: transparent;
-  border-radius: 50%;
-  animation: recap-spin 0.9s linear infinite;
 }
 
 /* Flow row: blockers → root → blocked. Wraps to stacked lanes on narrow screens. */
@@ -4822,121 +4682,6 @@ a.context-node:hover { border-color: var(--text); background: var(--bg); }
   .context-flow { flex-direction: column; align-items: stretch; }
   .context-flow-arrow { transform: rotate(90deg); align-self: flex-start; }
   .context-node-title { max-width: 100%; white-space: normal; }
-}
-
-/* =========================================================================
-   Brief Section
-   Current-state task brief (Markdown). Shares the recap header/spinner look.
-   ========================================================================= */
-.brief-section {
-  font-family: var(--font-content);
-  color: var(--text);
-  font-size: var(--font-size-base);
-}
-
-.brief-header {
-  display: flex;
-  align-items: center;
-  gap: 0.75ch;
-  flex-wrap: wrap;
-  margin-bottom: var(--space-2);
-}
-
-.brief-status-label {
-  font-weight: 600;
-  color: var(--text);
-}
-
-.brief-meta {
-  color: var(--muted);
-  font-size: var(--font-size-sm);
-}
-
-.brief-refresh {
-  margin-left: auto;
-  font-family: inherit;
-  font-size: var(--font-size-sm);
-  padding: 0.15rem 0.6rem;
-  background: transparent;
-  border: 1px solid var(--muted);
-  border-radius: var(--radius-sm);
-  color: var(--text);
-  cursor: pointer;
-}
-
-.brief-refresh:hover {
-  border-color: var(--text);
-  background: var(--card-h);
-}
-
-.brief-refresh:disabled {
-  opacity: 0.5;
-  cursor: default;
-}
-
-.brief-placeholder {
-  color: var(--muted);
-  font-style: italic;
-  padding: 0.35rem 0;
-}
-
-.brief-empty {
-  color: var(--muted);
-  padding: 0.35rem 0;
-}
-
-.brief-error {
-  color: var(--red);
-  font-style: normal;
-}
-
-.brief-generating {
-  display: inline-flex;
-  align-items: center;
-  gap: 0.5ch;
-  color: var(--muted);
-  font-style: normal;
-}
-
-.brief-spinner {
-  display: inline-block;
-  width: 0.9em;
-  height: 0.9em;
-  border: 2px solid var(--muted);
-  border-top-color: transparent;
-  border-radius: 50%;
-  animation: recap-spin 0.9s linear infinite;
-}
-
-.brief-content {
-  color: var(--text);
-  word-wrap: break-word;
-  overflow-wrap: break-word;
-}
-
-.brief-content h2 {
-  font-size: var(--font-size-sm);
-  text-transform: uppercase;
-  letter-spacing: 0.05em;
-  color: var(--muted);
-  margin: var(--space-2h) 0 var(--space-1);
-}
-
-.brief-content h2:first-child {
-  margin-top: 0;
-}
-
-.brief-content ul {
-  margin: var(--space-1) 0 var(--space-2);
-  padding-left: 1.5ch;
-}
-
-.brief-content li {
-  margin: 0.15rem 0;
-}
-
-.brief-content p {
-  margin: var(--space-1) 0 var(--space-2);
 }
 
 /* ==========================================================================

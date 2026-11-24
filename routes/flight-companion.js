@@ -313,10 +313,6 @@ export function buildFlightCompanionStripData({ model, companionDoc, censusDoc, 
  *   is the one whose absence silently loses the LIN-1139 model/harness
  *   inheritance a §A.6 approval-time enqueue would otherwise get, so its
  *   presence here is load-bearing, not cosmetic. Wired in server.js §A.12.
- * @param {Object} [deps.recapCacheStore] - `get_recap` chat tool (cache-only).
- *   Wired in server.js §A.12.
- * @param {Object} [deps.briefCacheStore] - `get_brief` chat tool (cache-only).
- *   Wired in server.js §A.12.
  * @param {Object} [deps.dispatchQueueStore] - session read-model + the gated
  *   `send_follow_up` write (LIN-1073). Wired in server.js §A.12.
  * @param {Object} [deps.agentStatusStore] - the other session read-model dep.
@@ -371,7 +367,7 @@ export function buildFlightCompanionStripData({ model, companionDoc, censusDoc, 
  */
 export function createFlightCompanionRoutes({
   workspaceFromUrl, getOpenRouterSource, getDeployInfo, observerStateStore,
-  freeTierStore, workspacePreferencesStore, recapCacheStore, briefCacheStore,
+  freeTierStore, workspacePreferencesStore,
   dispatchQueueStore, agentStatusStore, proxyTokenStore,
   // LIN-4501: the get_stack headlines read each task `asked` (lib/chat-tools.js).
   recordsStore = null,
@@ -611,7 +607,7 @@ export function createFlightCompanionRoutes({
           return { reason: 'free-tier', freeTierCheck: gate };
         },
         deps: {
-          observerStateStore, workspacePreferencesStore, recapCacheStore, briefCacheStore, recordsStore,
+          observerStateStore, workspacePreferencesStore, recordsStore,
           dispatchQueueStore, agentStatusStore,
           proxyTokenStore, sessionIsTerminal,
           chatClient, createToolCatalog,
@@ -772,7 +768,7 @@ export function createFlightCompanionRoutes({
           return { reason: 'free-tier', freeTierCheck: gate };
         },
         deps: {
-          observerStateStore, workspacePreferencesStore, recapCacheStore, briefCacheStore, recordsStore,
+          observerStateStore, workspacePreferencesStore, recordsStore,
           dispatchQueueStore, agentStatusStore,
           proxyTokenStore, sessionIsTerminal,
           chatClient, createToolCatalog,

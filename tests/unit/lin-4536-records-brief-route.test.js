@@ -61,8 +61,6 @@ function briefHandler({ recordsStore }) {
   const noop = (req, res, next) => next();
   const router = createComputeRoutes({
     recordsStore,
-    recapCacheStore: null,
-    briefCacheStore: { get: unused('the summary cache'), put: unused('the summary cache') },
     dispatchQueueStore: null,
     llmCallLogStore: null,
     getWorkspaceOpenRouterKey: unused('a model key'),

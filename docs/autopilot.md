@@ -133,7 +133,7 @@ One line each; the build spec will expand them.
   real tasks* as their first step and feed findings back into the descriptive
   documentation. Feature-flagged; start with a few templates. The drift-supervisor review is
   itself a periodical — the producer is its natural scheduler.
-- **Consumer — the thin orchestrator.** Walks the stack: pick → recap/brief → recommend →
+- **Consumer — the thin orchestrator.** Walks the stack: pick → brief → recommend →
   **dispatch the whole prompt to a separate worker** → watch feedback → decide
   (continue / complete / help). Distinct from the shipped single-session foreman, which
   alternates orchestrator and worker roles inside one session.
@@ -264,7 +264,7 @@ Honest inventory, because the main risk is parallel-building:
 
 | Piece | Where it is today | State |
 |---|---|---|
-| The driving verbs (`stack`, `recommend`, `recap`, `brief`, `foreman/status`) | proxy API | **shipped** |
+| The driving verbs (`stack`, `recommend`, `brief`, `foreman/status`) | proxy API | **shipped** |
 | Single-session foreman + playbook | `lib/prompts/foreman-playbook.js`, LIN-209 | **shipped** |
 | Foreman scoped to one project / area | LIN-237 | stub |
 | Periodicals (the producer) | LIN-315 | thin stub |

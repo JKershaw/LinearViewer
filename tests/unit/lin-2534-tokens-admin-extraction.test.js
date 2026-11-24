@@ -178,8 +178,6 @@ function fakeDeps() {
     },
     proxyEventStore: { recordEvent: async () => {}, listEvents: async () => ({ events: [], total: 0 }), listCredentialHealth: async () => ({ tokens: [] }) },
     agentStatusStore: {},
-    recapCacheStore: { get: async () => null, set: async () => {} },
-    briefCacheStore: { get: async () => null, set: async () => {} },
     dispatchQueueStore: {},
     workspaceFromUrl: (req, res, next) => next(),
     workspacePreferencesStore: {},

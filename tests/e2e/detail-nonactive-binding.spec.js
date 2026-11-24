@@ -1,6 +1,7 @@
 import { test, expect } from '../fixtures/test-base.js';
 import { defaultJiraSeed, JIRA_SITE } from '../fixtures/jira-harness.js';
 import { defaultGitHubSeed, GITHUB_REPO } from '../fixtures/github-harness.js';
+import { defaultLocalSeedWithUpNext } from '../fixtures/local-harness.js';
 
 // LIN-1903 — the acceptance witness the ticket's research called for: a
 // multi-binding workspace where the issue under test belongs to the
@@ -247,21 +248,20 @@ test.describe('Edit-link → task-edit → PATCH provenance chain, foreign write
   });
 });
 
-// LIN-1910 — the acceptance witness for the four surfaces the ticket names:
-// recap / brief / recommend / task-chat on a Jira row in a MERGED
-// multi-binding workspace (local active, Jira secondary — same fixture shape
-// as LIN-1903/1904 above). A real browser click-through, not a raw
-// page.request call with a hand-built ?source= — that is what actually
-// exercises the frontend `data-source` threading (lib/render.js → app.js →
-// recap.js/brief.js/task-chat.js), not just the backend route. Every
-// assertion is POSITIVE on Jira-grounded content (never merely "not a 500"),
+// LIN-1910 — the acceptance witness for the surfaces the ticket names that
+// remain (LIN-4537 retired recap and brief): recommend / task-chat on a Jira
+// row in a MERGED multi-binding workspace (local active, Jira secondary —
+// same fixture shape as LIN-1903/1904 above). A real browser click-through,
+// not a raw page.request call with a hand-built ?source= — that is what
+// actually exercises the frontend `data-source` threading (lib/render.js →
+// app.js → task-chat.js), not just the backend route. Every assertion is POSITIVE on Jira-grounded content (never merely "not a 500"),
 // plus a negative control against the active local binding's own answer.
-test.describe('Recap / Brief / Recommend / Task Chat on a non-active (Jira) binding (LIN-1910)', () => {
+test.describe('Recommend / Task Chat on a non-active (Jira) binding (LIN-1910)', () => {
   // Shared seed: local active + Jira secondary (openRouterConnected so the AI
   // surfaces render; taskChat on so the Chat deep-link renders).
-  async function seedAndGoto(page, seedLocal, suffix = '') {
+  async function seedAndGoto(page, seedLocal, suffix = '', localSeed = null) {
     await page.request.post('/test/set-jira-session', { data: { seed: defaultJiraSeed } });
-    const { dashboard } = await seedLocal(null, {
+    const { dashboard } = await seedLocal(localSeed, {
       openRouterConnected: true,
       features: { taskChat: true },
       extraBindings: [
@@ -272,38 +272,6 @@ test.describe('Recap / Brief / Recommend / Task Chat on a non-active (Jira) bind
     await page.goto(`${dashboard}${suffix}`);
     await page.waitForLoadState('networkidle');
   }
-
-  // LIN-3833: Brief and Recap are Swipe's folds now (Home's opened task has neither). The card for the task is
-  // opened by identifier and its accordion expanded.
-  async function openSwipeAccordion(page, identifier, name) {
-    const urlKey = page.url().match(/\/workspace\/([^/]+)\//)[1];
-    await page.goto(`/workspace/${urlKey}/swipe/${identifier}`);
-    const card = page.locator('#swipe-card');
-    await expect(card).toBeVisible();
-    await card.locator(`.swipe-accordion-header[data-accordion="${name}"]`).click();
-    return card.locator(`.swipe-accordion-body[data-accordion-body="${name}"]`);
-  }
-
-  test('recap and brief render Jira-grounded content for a Jira row, not the active binding\'s', async ({ page, seedLocal }) => {
-    await seedAndGoto(page, seedLocal);
-
-    // ENG-2 ("Jira task in progress") carries a description, a comment, and
-    // one open subtask (ENG-4) — enough surface for both mock builders to
-    // embed Jira-specific content, not generic filler.
-    const body = await openSwipeAccordion(page, 'ENG-2', 'brief');
-    const brief = body.locator('.brief-section');
-    // LIN-2944 P2: a section no longer spends AI when it opens, so the Jira
-    // row's (missing) brief renders the ✦ generate placeholder. Click it to
-    // provoke the POST, then assert the Jira-grounded content.
-    await brief.locator('[data-brief-refresh]').first().click();
-    await expect(brief).toContainText('Jira task in progress', { timeout: 5000 });
-    await expect(brief).toContainText('ENG-4', { timeout: 5000 });
-
-    const recapBody = await openSwipeAccordion(page, 'ENG-2', 'recap');
-    const recap = recapBody.locator('.recap-section');
-    await recap.locator('[data-recap-refresh]').first().click();
-    await expect(recap).toContainText('ENG-4', { timeout: 5000 });
-  });
 
   test('AI suggest generates a Jira-grounded prompt for a Jira row, not the active binding\'s', async ({ page, seedLocal }) => {
     await seedAndGoto(page, seedLocal, 'backlog');
@@ -350,16 +318,24 @@ test.describe('Recap / Brief / Recommend / Task Chat on a non-active (Jira) bind
   });
 
   // Negative control: the ACTIVE (local) binding's own row still resolves its
-  // own brief content — proof the fix did not make every row resolve through
-  // Jira regardless of which binding it actually belongs to.
-  test('regression control: a local-active row\'s brief is unaffected', async ({ page, seedLocal }) => {
-    await seedAndGoto(page, seedLocal);
+  // own content — proof the fix did not make every row resolve through Jira
+  // regardless of which binding it actually belongs to. (LIN-4537 retired the
+  // brief this control used to read; the AI-suggest surface above stands in.)
+  test('regression control: a local-active row\'s AI-suggest prompt is unaffected', async ({ page, seedLocal, localWorkerUrlKey }) => {
+    // The default local seed plus LOCAL-5 ("Local up next task"), a Todo leaf on the active local binding that the
+    // backlog page lists the way it lists the Jira row above.
+    await seedAndGoto(page, seedLocal, 'backlog', defaultLocalSeedWithUpNext(localWorkerUrlKey));
 
-    // LIN-3833: Brief is Swipe's fold; the local parent (LOCAL-1) is opened on its card.
-    const body = await openSwipeAccordion(page, 'LOCAL-1', 'brief');
-    const brief = body.locator('.brief-section');
-    await brief.locator('[data-brief-refresh]').first().click();
-    await expect(brief).toContainText('Local parent task', { timeout: 5000 });
-    await expect(brief).not.toContainText('Jira task');
+    const localNode = page.locator('.node').filter({ has: page.locator('.line:has-text("Local up next task")') }).first();
+    const localRow = localNode.locator('.line').first();
+    await expect(localRow).toBeAttached();
+    await localRow.click();
+    const component = localNode.locator('.prompt-section').first();
+    await expect(component).toBeVisible();
+    await component.locator('[data-testid="opened-task-write"]').click();
+    const body = component.locator('[data-prompt-body]');
+    await expect(body).toContainText('LOCAL-5', { timeout: 5000 });
+    await expect(body).not.toContainText('ENG-');
+    await expect(body).not.toContainText('Jira task');
   });
 });

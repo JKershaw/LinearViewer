@@ -142,8 +142,6 @@ function buildApp(workspace) {
     getOpenRouterSource: () => null,
     userPreferencesStore: {},
     customPromptsStore: {},
-    recapCacheStore: {},
-    briefCacheStore: {},
     reportHistoryStore: {},
     dispatchQueueStore: {},
     agentStatusStore: {},

@@ -45,7 +45,7 @@ async function setup({ ownerCheck, accountId = 'account-B' }) {
   app.use(createProxyRoutes({
     proxyTokenStore,
     proxyEventStore: { recordEvent: async () => {} },
-    agentStatusStore: {}, recapCacheStore: {}, briefCacheStore: {}, dispatchQueueStore: {},
+    agentStatusStore: {}, dispatchQueueStore: {},
     workspaceFromUrl: (req, res, next) => {
       req.workspace = { urlKey: 'acme', id: 'ws-1' };
       req.session = { accountId, features: { proxy: true } };

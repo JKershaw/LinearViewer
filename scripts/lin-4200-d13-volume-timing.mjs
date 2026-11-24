@@ -280,8 +280,8 @@ async function productionCollectors(db) {
     sessions: c('sessions'), userPreferences: c('user-preferences'), workspacePreferences: c('workspace-preferences'),
     customPrompts: c('custom-prompts'), localIssues: c('local-issues'), dispatchQueue, dispatchHistory,
     dispatchTokens: c('dispatch-tokens'), proxyTokens: c('proxy-tokens'), proxyEvents: c('proxy-events'),
-    agentStatus: c('foreman-status'), freeTier: c('free-tier-usage'), recapCache: c('recap-cache'),
-    briefCache: c('brief-cache'), reportHistory: c('report-history'), kpiDailyRollup
+    agentStatus: c('foreman-status'), freeTier: c('free-tier-usage'),
+    reportHistory: c('report-history'), kpiDailyRollup
   };
   const milestoneFunnelDeps = {
     taskModeStore: new TaskModeStore({ collection: c('task-mode-events') }),

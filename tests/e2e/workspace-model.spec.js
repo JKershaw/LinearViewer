@@ -1,80 +1,56 @@
 /**
  * E2E tests for workspace-scoped AI model selection (LIN-283).
  *
- * Covers both the UI (dashboard) and proxy paths to confirm that the
- * workspace preference flows through to every LLM call.
+ * The workspace's seeded model must be the model an AI operation resolves.
+ * These tests rode the recap until LIN-4537 retired it (and with it every
+ * route that echoed the model a generation used, dashboard and proxy alike).
+ * The witness is now the recommend operation: GET
+ * /workspace/:urlKey/api/recommend/status reports the model from the same
+ * `resolveAiOperationModel({ opKind: 'recommend' })` call the recommend routes
+ * make before their model call, and it makes no model call itself. The
+ * recommend mock path (lib/workspace-api-mocks.js) does not echo a model, so
+ * the status read is the surviving no-spend witness.
  *
- * The two UI-path POST recap tests ride a GENUINE `provider: 'local'` session
- * (LIN-411) seeded from `workspaceApiLocalSeed`, exercising the real
- * workspace-model lookup at `LOCAL_WORKSPACE_URL_KEY`. The proxy-path test is
- * intentionally left on the `test-token` proxy contract (per-worker key,
- * LIN-628) — that surface migrates separately. beforeEach/afterEach therefore
- * reset model prefs and recap cache for BOTH urlKeys so the two workspaces stay
- * isolated.
+ * The proxy-path test is gone: no surviving proxy route reports the model it
+ * resolved (GET /api/proxy/recommend's live path resolves it but does not
+ * return it, and its test-token mock path never resolves one).
+ *
+ * The tests ride a GENUINE `provider: 'local'` session (LIN-411) seeded from
+ * `workspaceApiLocalSeed`, exercising the real workspace-model lookup at the
+ * per-worker local urlKey. beforeEach/afterEach reset that workspace's model.
  */
 import { test, expect } from '../fixtures/test-base.js';
 import { workspaceApiLocalSeed } from '../fixtures/local-harness.js';
 
 const NON_DEFAULT_MODEL = 'anthropic/claude-sonnet-4';
 const DEFAULT_MODEL = 'openai/gpt-5.4-mini';
-const ISSUE_ID = '66666666-6666-6666-6666-666666666666'; // TEST-6 in workspaceApiLocalSeed
 
 test.describe('Workspace AI model selection', () => {
-  test.beforeEach(async ({ request, workerUrlKey, localWorkerUrlKey }) => {
-    // Each test starts with a clean slate: no workspace prefs and no
-    // cached recap (the cache stores the model used at generation time).
-    // Both urlKeys are reset because this file mixes a local UI-path workspace
-    // with the proxy-path workspace; neither must leak into the other.
-    for (const key of [workerUrlKey, localWorkerUrlKey]) {
-      await request.get(`/test/set-workspace-model?urlKey=${key}`);
-      await request.get(`/test/clear-recap-cache?urlKey=${key}&issueId=${ISSUE_ID}`);
-    }
+  test.beforeEach(async ({ request, localWorkerUrlKey }) => {
+    // Each test starts with a clean slate: no workspace model.
+    await request.get(`/test/set-workspace-model?urlKey=${localWorkerUrlKey}`);
   });
 
-  test.afterEach(async ({ request, workerUrlKey, localWorkerUrlKey }) => {
-    for (const key of [workerUrlKey, localWorkerUrlKey]) {
-      await request.get(`/test/set-workspace-model?urlKey=${key}`);
-      await request.get(`/test/clear-recap-cache?urlKey=${key}&issueId=${ISSUE_ID}`);
-    }
+  test.afterEach(async ({ request, localWorkerUrlKey }) => {
+    await request.get(`/test/set-workspace-model?urlKey=${localWorkerUrlKey}`);
   });
 
-  test('UI path: dashboard recap uses the seeded workspace model', async ({ page, request, seedLocal, localWorkerUrlKey }) => {
-    await seedLocal(workspaceApiLocalSeed);
+  test('the recommend operation resolves the seeded workspace model', async ({ page, request, seedLocal, localWorkerUrlKey }) => {
+    // openRouterConnected: a paid key, so the free-tier clamp (which forces the default) does not apply.
+    await seedLocal(workspaceApiLocalSeed, { openRouterConnected: true });
     const seed = await request.get(`/test/set-workspace-model?urlKey=${localWorkerUrlKey}&modelId=${encodeURIComponent(NON_DEFAULT_MODEL)}`);
     expect(seed.ok()).toBe(true);
 
-    // POST forces a fresh LLM call, exercising the workspace-model lookup
-    // at the dashboard recap call site (E3) on a genuine local session.
-    const res = await page.request.post(`/workspace/${localWorkerUrlKey}/api/recap/${ISSUE_ID}`);
+    const res = await page.request.get(`/workspace/${localWorkerUrlKey}/api/recommend/status`);
     expect(res.status()).toBe(200);
     const body = await res.json();
-    expect(body.status).toBe('fresh');
+    expect(body.enabled).toBe(true);
     expect(body.model).toBe(NON_DEFAULT_MODEL);
   });
 
-  test('Proxy path: GET /api/proxy/recap reflects the seeded workspace model', async ({ page, request, workerUrlKey }) => {
-    const seed = await request.get(`/test/set-workspace-model?urlKey=${workerUrlKey}&modelId=${encodeURIComponent(NON_DEFAULT_MODEL)}`);
-    expect(seed.ok()).toBe(true);
-
-    await page.goto(`/test/set-session?urlKey=${workerUrlKey}`);
-    const tokenRes = await page.request.get(`/test/create-proxy-token?label=workspace-model-test&scope=readWrite&urlKey=${workerUrlKey}`);
-    expect(tokenRes.ok()).toBe(true);
-    const { token } = await tokenRes.json();
-
-    // With no cached entry, GET takes the auto-regen branch (E7) and resolves
-    // the workspace model just like a real proxy consumer would.
-    const recap = await page.request.get(`/api/proxy/recap/${ISSUE_ID}`, {
-      headers: { Authorization: `Bearer ${token}` }
-    });
-    expect(recap.status()).toBe(200);
-    const body = await recap.json();
-    expect(body.status).toBe('fresh');
-    expect(body.model).toBe(NON_DEFAULT_MODEL);
-  });
-
-  test('Without a seeded model, recap falls back to the default', async ({ page, seedLocal, localWorkerUrlKey }) => {
-    await seedLocal(workspaceApiLocalSeed);
-    const res = await page.request.post(`/workspace/${localWorkerUrlKey}/api/recap/${ISSUE_ID}`);
+  test('without a seeded model, the recommend operation falls back to the default', async ({ page, seedLocal, localWorkerUrlKey }) => {
+    await seedLocal(workspaceApiLocalSeed, { openRouterConnected: true });
+    const res = await page.request.get(`/workspace/${localWorkerUrlKey}/api/recommend/status`);
     expect(res.status()).toBe(200);
     const body = await res.json();
     expect(body.model).toBe(DEFAULT_MODEL);

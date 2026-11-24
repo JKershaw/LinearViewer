@@ -100,8 +100,8 @@ function buildApp({ provider, dispatchQueueStore, token = 'ws-token', features =
     freeTierStore: freeTierStore || {}, getOpenRouterSource: () => null, userPreferencesStore: {},
     accountStore,
     workspacePreferencesStore: wsPrefs ?? { getWorkspacePreferences: async () => ({}) },
-    customPromptsStore: {}, recapCacheStore: {},
-    briefCacheStore: {}, reportHistoryStore: {}, agentStatusStore: {}, promptTraceStore: {}
+    customPromptsStore: {},
+    reportHistoryStore: {}, agentStatusStore: {}, promptTraceStore: {}
   });
   app.use(router);
   return app;

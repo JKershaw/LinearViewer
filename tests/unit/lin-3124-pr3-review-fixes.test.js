@@ -227,7 +227,7 @@ describe('LIN-3124 PR3 review fixes (verdict 71b71694)', () => {
       app.use(createWorkspaceApiRoutes({
         workspaceFromUrl: (req, _res, next) => { req.workspace = workspace; req.session = { linearUserId: 'u' }; next(); },
         freeTierStore: {}, getOpenRouterSource: () => null, userPreferencesStore: {}, workspacePreferencesStore: {}, customPromptsStore: {},
-        recapCacheStore: {}, briefCacheStore: {}, reportHistoryStore: {}, dispatchQueueStore: {}, agentStatusStore: {}, promptTraceStore: {}, proxyTokenStore: {},
+        reportHistoryStore: {}, dispatchQueueStore: {}, agentStatusStore: {}, promptTraceStore: {}, proxyTokenStore: {},
       }));
       const realFetch = globalThis.fetch;
       const realEnv = process.env.NODE_ENV;

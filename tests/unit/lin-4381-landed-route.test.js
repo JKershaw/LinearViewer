@@ -104,8 +104,6 @@ describe('LIN-4381: GET /api/proxy/periodicals over real stores', () => {
       getWorkspaceAccessToken: async () => 'test-token',
       getWorkspaceOpenRouterKey: async () => null,
       agentStatusStore: {},
-      recapCacheStore: { get: async () => null, set: async () => {} },
-      briefCacheStore: { get: async () => null, set: async () => {} },
       dispatchQueueStore,
       closeOutEventsStore,
       workspaceFromUrl: (req, res, next) => next(),

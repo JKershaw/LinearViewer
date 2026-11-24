@@ -178,13 +178,12 @@ function initAttachmentImages(content) {
 }
 
 /**
- * Lazy-mount a shared on-card section (Brief / Recap / Dispatched
- * Sessions) on first expand of its nested toggle. LIN-522: mirrors
- * public/swipe.js, reusing the view-agnostic BriefSection / RecapSection /
- * SessionsSection modules. The issue
+ * Lazy-mount a shared on-card section (Context / Dispatched Sessions) on
+ * first expand of its nested toggle. LIN-522: mirrors public/swipe.js,
+ * reusing the view-agnostic ContextSection / SessionsSection modules. The issue
  * identifier and workspace url key are read from the toggle's data
  * attributes (set server-side in lib/render.js).
- * @param {'brief'|'recap'|'sessions'} type - Which section to mount
+ * @param {'context'|'sessions'} type - Which section to mount
  * @param {HTMLElement} toggle - The nested toggle carrying the data attributes
  * @param {HTMLElement} content - The content container holding the placeholder
  */
@@ -192,7 +191,7 @@ function loadLazySection(type, toggle, content) {
   const identifier = toggle.dataset.issueIdentifier
   const urlKey = toggle.dataset.urlKey
   // LIN-1910: forward the resolved provider (stamped server-side in
-  // lib/render.js) so Brief/Recap resolve THIS issue's own provider instead of
+  // lib/render.js) so each section resolves THIS issue's own provider instead of
   // the workspace's active provider.
   const source = toggle.dataset.source
   if (!identifier || !urlKey) return
@@ -201,19 +200,7 @@ function loadLazySection(type, toggle, content) {
   // is wasteful; the modules expose their own refresh button for that).
   content.dataset.loaded = 'true'
 
-  if (type === 'brief') {
-    const placeholder = content.querySelector('[data-brief-placeholder="1"]')
-    if (placeholder && window.BriefSection) {
-      placeholder.removeAttribute('data-brief-placeholder')
-      window.BriefSection.init(placeholder, { urlKey, identifier, source })
-    }
-  } else if (type === 'recap') {
-    const placeholder = content.querySelector('[data-recap-placeholder="1"]')
-    if (placeholder && window.RecapSection) {
-      placeholder.removeAttribute('data-recap-placeholder')
-      window.RecapSection.init(placeholder, { urlKey, identifier, source })
-    }
-  } else if (type === 'sessions') {
+  if (type === 'sessions') {
     const placeholder = content.querySelector('[data-sessions-placeholder="1"]')
     if (placeholder && window.SessionsSection) {
       placeholder.removeAttribute('data-sessions-placeholder')
@@ -1354,10 +1341,10 @@ function init() {
           initAttachmentImages(content)
         }
 
-        // LIN-522: Lazy-mount the shared Brief / Recap / Sessions sections on
+        // LIN-522: Lazy-mount the shared Context / Sessions sections on
         // first expand (mirrors the swipe accordion's placeholder pattern).
         if (
-          (toggleType === 'brief' || toggleType === 'recap' || toggleType === 'context' || toggleType === 'sessions') &&
+          (toggleType === 'context' || toggleType === 'sessions') &&
           !isHidden &&
           !content.dataset.loaded
         ) {

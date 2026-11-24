@@ -1148,7 +1148,7 @@ describe('Flight Companion turn endpoint (LIN-2432 §A.12) — server.js store w
     const line = flightCompanionCallLine();
     for (const store of [
       'observerStateStore', 'freeTierStore', 'workspacePreferencesStore',
-      'recapCacheStore', 'briefCacheStore', 'dispatchQueueStore', 'agentStatusStore', 'proxyTokenStore',
+      '', '', 'dispatchQueueStore', 'agentStatusStore', 'proxyTokenStore',
     ]) {
       assert.match(line, new RegExp(`\\b${store}\\b`), `${store} must be passed to createFlightCompanionRoutes`);
     }
@@ -1174,7 +1174,7 @@ describe('Flight Companion turn endpoint (LIN-2432 §A.12) — server.js store w
     const flightLine = flightCompanionCallLine();
     const taskChatLine = SERVER_SRC.split('\n').find(l => l.includes('createTaskChatRoutes({'));
     assert.ok(taskChatLine, 'expected the createTaskChatRoutes(...) call site to exist');
-    for (const store of ['freeTierStore', 'workspacePreferencesStore', 'recapCacheStore', 'briefCacheStore', 'dispatchQueueStore', 'agentStatusStore', 'proxyTokenStore']) {
+    for (const store of ['freeTierStore', 'workspacePreferencesStore', '', '', 'dispatchQueueStore', 'agentStatusStore', 'proxyTokenStore']) {
       if (new RegExp(`\\b${store}\\b`).test(flightLine)) {
         assert.match(taskChatLine, new RegExp(`\\b${store}\\b`), `${store} is a pre-existing store — createTaskChatRoutes must already receive it too`);
       }

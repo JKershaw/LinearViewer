@@ -91,8 +91,6 @@ describe('the pinned-kind entrances', () => {
       getWorkspaceAccessToken: async () => 'test-token',
       getWorkspaceOpenRouterKey: async () => null,
       agentStatusStore: {},
-      recapCacheStore: { get: async () => null, set: async () => {} },
-      briefCacheStore: { get: async () => null, set: async () => {} },
       dispatchQueueStore: {
         getGrantDeclaration: async () => ({ state: 'none' }),
         addItem: async (urlKey, item) => { captured.item = item; return { _id: 'disp-1', dispatchedAt: '2026-11-07T00:00:00.000Z', ...item }; }
@@ -167,7 +165,7 @@ describe('the in-app prompt route (the UI\'s "run a step now" and the prompt pan
       workspaceFromUrl: (req, _res, next) => { req.workspace = workspace; req.session = { features: {} }; next(); },
       freeTierStore: {}, getOpenRouterSource: () => null, userPreferencesStore: {},
       workspacePreferencesStore: prefsStore(prefs),
-      customPromptsStore: {}, recapCacheStore: {}, briefCacheStore: {}, reportHistoryStore: {},
+      customPromptsStore: {}, reportHistoryStore: {},
       dispatchQueueStore: {}, agentStatusStore: {}, promptTraceStore: {}, proxyTokenStore: {}
     }));
     const server = app.listen(0, '127.0.0.1');

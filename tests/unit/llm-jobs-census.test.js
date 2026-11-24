@@ -18,12 +18,12 @@
  *    come from a builder CALL_PATHS names (LIN-3870);
  *  - every `feature:` / `opKind:` string literal is a registered job id, and every
  *    Harbour-call job is used by at least one of them;
- *  - the wrappers that take their `callMeta` from the caller (brief, recap,
- *    feedback title, run summary, session summary, run paragraph) are only ever
- *    called with a `callMeta` that carries `urlKey`.
+ *  - the wrappers that take their `callMeta` from the caller (feedback title,
+ *    run summary, session summary, run paragraph) are only ever called with a
+ *    `callMeta` that carries `urlKey`.
  * It reads the LITERAL provenance. A caller can still override `feature` through the
- * `...(options.callMeta || {})` spread at run time (as brief and recap always
- * could); a static test cannot see values, so a `urlKey` that is present in code but
+ * `...(options.callMeta || {})` spread at run time (as the brief and recap, retired
+ * with LIN-4537, always could); a static test cannot see values, so a `urlKey` that is present in code but
  * falsy at run time (`urlKey || null` in the roadmap routes) is the residual. The caller's-callMeta
  * test (LIN-3929) matches the spread's argument by name too: `...(other.callMeta || {})` in a
  * passthrough wrapper passes, as does a later `urlKey: null` override.
@@ -58,11 +58,11 @@ const OPENROUTER_MODULE = /(^|\/)openrouter\.js$/;
 
 // Wrappers whose callMeta the CALLER supplies. A call to any of these must pass a
 // `callMeta` object literal with `urlKey`; the wrapper adds the `feature`.
-// `generate` is generateCachedDocument's injected brief/recap generator
-// (routes/workspace-api.js); `generateSummary` / `generateParagraph` are the
+// `generate` was generateCachedDocument's injected brief/recap generator
+// (routes/workspace-api.js), gone with the brief and recap (LIN-4537); the name stays
+// so a revived `generate()` seam is still checked. `generateSummary` / `generateParagraph` are the
 // precompute seams (lib/session-materializer-precompute.js, lib/run-paragraph-hook.js).
 const WRAPPERS = {
-  generateBrief: 'brief', generateRecap: 'recap',
   generateFeedbackTitle: 'feedback-title',
   generateRunSummary: 'run-summary', generateSessionSummary: 'session-summary',
   generateRunParagraph: 'run-paragraph',
@@ -79,10 +79,8 @@ const WRAPPERS = {
 const WORKSPACE_API_UNIT = 'workspace-API unit';
 const CALL_PATHS = {
   'lib/agent-turn.js': { sites: 2 },
-  'lib/brief.js': { sites: 1, passthrough: true },
   'lib/feedback-title.js': { sites: 1, passthrough: true },
   'lib/observer-pass.js': { sites: 1 },
-  'lib/recap.js': { sites: 1, passthrough: true },
   'lib/run-paragraph.js': { sites: 1, passthrough: true },
   'lib/run-summary.js': { sites: 1, passthrough: true },
   'lib/session-summary.js': { sites: 1, passthrough: true },
@@ -172,7 +170,7 @@ function analyse(path, src) {
   const cachedDocCalls = [];
   const aliases = new Map(); // local name -> LLM_FNS name, for `import { streamChat as sc2 }`
   const namespaces = new Set(); // local name, for `import * as o`
-  const wrapperAliases = new Map(); // local name -> WRAPPERS name, for `import { generateBrief as gb }` (any source)
+  const wrapperAliases = new Map(); // local name -> WRAPPERS name, for `import { generateRunSummary as gb }` (any source)
   const builderBindings = new Map(); // local name -> callee, for `const opts = recommendCallOptions(...)` (LIN-3870)
   const imports = []; // { name, source } for every named or default import binding (LIN-3870)
 
@@ -391,9 +389,10 @@ describe('LIN-3852: every LLM use is a registered job', () => {
   });
 
   // LIN-4248: + survey-task, survey-place (agent sessions, hand-triggered, read-only). LIN-4437: + blind-read.
-  test('the registry has the 23 agent-session and 16 Harbour-call jobs (20 of the design note, + the two Surveys, + the blind read)', () => {
+  // LIN-4540: - scan, scan-retire. LIN-4537: - brief, recap.
+  test('the registry has the 23 agent-session and 12 Harbour-call jobs (20 of the design note, + the two Surveys, + the blind read)', () => {
     assert.equal(JOBS.filter((j) => j.surface === SURFACES.AGENT_SESSION).length, 23);
-    assert.equal(JOBS.filter((j) => j.surface === SURFACES.HARBOUR_CALL).length, 14);
+    assert.equal(JOBS.filter((j) => j.surface === SURFACES.HARBOUR_CALL).length, 12);
   });
 
   // ─── Failure witnesses: the checker names what it finds ───────────────────
@@ -461,7 +460,7 @@ describe('LIN-3852: every LLM use is a registered job', () => {
   });
 
   test('an aliased import of a wrapper called without its urlKey fails, naming the alias (LIN-3867)', () => {
-    const fixture = "import { generateBrief as gb } from './brief.js';\nexport const f = () => gb({}, { callMeta: { feature: 'brief' } });\n";
+    const fixture = "import { generateRunSummary as gb } from './run-summary.js';\nexport const f = () => gb({}, { callMeta: { feature: 'run-summary' } });\n";
     const problems = checkCensus({ ...inputs, sources: { ...sources, 'lib/fixture-wrapper-alias.js': fixture } });
     assert.ok(problems.some((p) => /^lib\/fixture-wrapper-alias\.js:\d+ gb\(\) is called without callMeta\.urlKey/.test(p)), problems.join('\n'));
   });
@@ -490,10 +489,10 @@ describe('LIN-3852: every LLM use is a registered job', () => {
   });
 
   test('a job with no group or an empty description fails', () => {
-    const jobs = JOBS.map((j) => (j.id === 'plan' ? { ...j, group: 'nope' } : j.id === 'recap' ? { ...j, description: ' ' } : j));
+    const jobs = JOBS.map((j) => (j.id === 'plan' ? { ...j, group: 'nope' } : j.id === 'run-summary' ? { ...j, description: ' ' } : j));
     const problems = checkCensus({ ...inputs, jobs });
     assert.ok(problems.some((p) => p.includes('"plan"') && p.includes('group')), problems.join('\n'));
-    assert.ok(problems.some((p) => p.includes('"recap"') && p.includes('description')), problems.join('\n'));
+    assert.ok(problems.some((p) => p.includes('"run-summary"') && p.includes('description')), problems.join('\n'));
   });
 
   test('a registered Harbour-call job that nothing uses fails', () => {
@@ -572,19 +571,20 @@ describe('LIN-3852: every LLM use is a registered job', () => {
   });
 
   // LIN-3929: a passthrough wrapper's spread stands in for the caller's urlKey only when it is the
-  // caller's callMeta. Synthetic brief.js sites, so moving the real file does not move the witnesses.
-  const briefFixture = (callMeta) => `import { streamChat } from './openrouter.js';\nexport const generateBrief = (options) => streamChat([], { callMeta: ${callMeta} }, () => {});\n`;
-  const briefProblems = (callMeta) => checkCensus({ ...inputs, sources: { ...sources, 'lib/brief.js': briefFixture(callMeta) } })
-    .filter((p) => p.startsWith('lib/brief.js:'));
+  // caller's callMeta. Synthetic run-summary.js sites (brief.js until LIN-4537 retired it), so moving the
+  // real file does not move the witnesses.
+  const summaryFixture = (callMeta) => `import { streamChat } from './openrouter.js';\nexport const generateRunSummary = (options) => streamChat([], { callMeta: ${callMeta} }, () => {});\n`;
+  const summaryProblems = (callMeta) => checkCensus({ ...inputs, sources: { ...sources, 'lib/run-summary.js': summaryFixture(callMeta) } })
+    .filter((p) => p.startsWith('lib/run-summary.js:'));
 
   test('a passthrough wrapper spreading options.meta, not the caller callMeta, fails naming the spread (LIN-3929)', () => {
-    const problems = briefProblems("{ feature: 'brief', issueIdentifier: 'X', ...(options.meta || {}) }");
+    const problems = summaryProblems("{ feature: 'run-summary', issueIdentifier: 'X', ...(options.meta || {}) }");
     assert.equal(problems.length, 1, problems.join('\n'));
-    assert.match(problems[0], /^lib\/brief\.js:\d+ streamChat\(\) passthrough callMeta spreads \.\.\.\(options\.meta \|\| \{\}\), not the caller's callMeta, so the caller's urlKey is dropped/);
+    assert.match(problems[0], /^lib\/run-summary\.js:\d+ streamChat\(\) passthrough callMeta spreads \.\.\.\(options\.meta \|\| \{\}\), not the caller's callMeta, so the caller's urlKey is dropped/);
   });
 
   test('a passthrough wrapper spreading options.callMeta raises no problem (positive control, LIN-3929)', () => {
-    assert.deepEqual(briefProblems("{ feature: 'brief', issueIdentifier: 'X', ...(options.callMeta || {}) }"), []);
+    assert.deepEqual(summaryProblems("{ feature: 'run-summary', issueIdentifier: 'X', ...(options.callMeta || {}) }"), []);
   });
 
   test('a passthrough wrapper spreading a destructured callMeta raises no problem (positive control, LIN-3929)', () => {
@@ -595,8 +595,8 @@ describe('LIN-3852: every LLM use is a registered job', () => {
   });
 
   test('a passthrough callMeta that is the caller spread but names no feature or opKind fails (LIN-3929)', () => {
-    const problems = briefProblems("{ issueIdentifier: 'X', ...(options.callMeta || {}) }");
+    const problems = summaryProblems("{ issueIdentifier: 'X', ...(options.callMeta || {}) }");
     assert.equal(problems.length, 1, problems.join('\n'));
-    assert.match(problems[0], /^lib\/brief\.js:\d+ streamChat\(\) callMeta names no feature or opKind/);
+    assert.match(problems[0], /^lib\/run-summary\.js:\d+ streamChat\(\) callMeta names no feature or opKind/);
   });
 });

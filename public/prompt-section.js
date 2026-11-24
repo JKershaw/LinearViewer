@@ -850,7 +850,7 @@
     return `
       <div class="swipe-prompt-header">
         <span class="swipe-prompt-name">${esc(name)} \u00b7 generating\u2026</span>
-        <span class="recap-spinner" aria-hidden="true"></span>
+        <span class="spinner" aria-hidden="true"></span>
       </div>
       ${renderGo(opts, state)}
       ${renderSetupNotice(state)}
@@ -865,7 +865,7 @@
       </div>
       ${renderGo(opts, state)}
       ${renderSetupNotice(state)}
-      <div class="swipe-prompt-text recap-error">${esc(state.error || 'Failed to load prompt.')}</div>`;
+      <div class="swipe-prompt-text prompt-error">${esc(state.error || 'Failed to load prompt.')}</div>`;
   }
 
   function applyState(container, html, phase) {

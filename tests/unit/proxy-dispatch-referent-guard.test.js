@@ -59,8 +59,6 @@ function buildProxyApp(captured, { provider, token = 'test-token' } = {}) {
     getWorkspaceAccessToken: async () => token,
     getWorkspaceOpenRouterKey: async () => null,
     agentStatusStore: {},
-    recapCacheStore: { get: async () => null, set: async () => {} },
-    briefCacheStore: { get: async () => null, set: async () => {} },
     dispatchQueueStore: {
       addItem: async (urlKey, item) => {
         captured.calls = (captured.calls || 0) + 1;

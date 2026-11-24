@@ -2,8 +2,8 @@ import { test, expect } from '../fixtures/test-base.js';
 import { workspaceApiLocalSeed } from '../fixtures/local-harness.js';
 
 // LIN-427: the swipe surface is fully modeled by the local provider (the page
-// reads projects/issues through fetchAndPrepareProjects, and the recap/brief AI
-// mock re-gates onto local sessions per #399), so all four describe blocks ride a
+// reads projects/issues through fetchAndPrepareProjects, and the AI mocks
+// re-gate onto local sessions per #399), so the describe blocks ride a
 // GENUINE `provider: 'local'` session seeded from `workspaceApiLocalSeed` (the
 // shared pipeline/workspace-api fixture, derived from testMockData) instead of the
 // `test-token` + `testMockData` mock short-circuit. The seed preserves the exact
@@ -467,110 +467,6 @@ test.describe('Swipe Dispatched Sessions', () => {
   });
 });
 
-// ============================================================================
-// Recap accordion on the swipe card.
-// Originally relocated from recap.spec.js (LIN-403). Migrated onto the local
-// provider with the rest of the swipe surface in LIN-427: the recap AI mock
-// (buildMockRecap) re-gates onto local sessions (#399), so the refresh flow
-// resolves to fresh content without the test-token path.
-// ============================================================================
-
-test.describe('Recap UI — Swipe', () => {
-  test.beforeEach(async ({ page, seedLocal, localWorkerUrlKey }) => {
-    await seedLocal(workspaceApiLocalSeed);
-    await page.goto(`/workspace/${localWorkerUrlKey}/swipe`);
-    await page.waitForLoadState('networkidle');
-  });
-
-  test('swipe card renders recap accordion', async ({ page }) => {
-    const recapAccordion = page.locator('.swipe-accordion-header[data-accordion="recap"]').first();
-    await expect(recapAccordion).toBeVisible();
-    await expect(recapAccordion).toContainText(/Recap/i);
-  });
-
-  test('opening recap accordion initialises the section', async ({ page }) => {
-    const recapAccordion = page.locator('.swipe-accordion-header[data-accordion="recap"]').first();
-    await recapAccordion.click();
-
-    const body = page.locator('.swipe-accordion-body[data-accordion-body="recap"]').first();
-    await expect(body).toHaveClass(/open/);
-
-    // The shared renderer attaches data-state attribute
-    const section = body.locator('.recap-section').first();
-    await expect(section).toHaveAttribute('data-state', /missing|fresh|stale|generating|loading/);
-  });
-
-  test('refresh button triggers POST and shows fresh content', async ({ page }) => {
-    const recapAccordion = page.locator('.swipe-accordion-header[data-accordion="recap"]').first();
-    await recapAccordion.click();
-
-    const section = page.locator('.swipe-accordion-body[data-accordion-body="recap"] .recap-section').first();
-    // Wait for the initial GET to resolve
-    await expect(section).not.toHaveAttribute('data-state', 'loading', { timeout: 5000 });
-
-    const refreshBtn = section.locator('[data-recap-refresh]');
-    await expect(refreshBtn).toBeVisible();
-    await refreshBtn.click();
-
-    // Should land on fresh with recap content
-    await expect(section).toHaveAttribute('data-state', 'fresh', { timeout: 5000 });
-    // Fresh content renders at least one item or an empty placeholder
-    const hasList = await section.locator('.recap-list').count();
-    const hasEmpty = await section.locator('.recap-empty').count();
-    expect(hasList + hasEmpty).toBeGreaterThan(0);
-  });
-});
-
-// ============================================================================
-// Brief accordion on the swipe card.
-// Originally relocated from brief.spec.js (LIN-404). Migrated onto the local
-// provider with the rest of the swipe surface in LIN-427: the brief AI mock
-// (buildMockBrief) re-gates onto local sessions (#399), so the refresh flow
-// resolves to fresh Markdown content without the test-token path.
-// ============================================================================
-
-test.describe('Brief UI — Swipe', () => {
-  test.beforeEach(async ({ page, seedLocal, localWorkerUrlKey }) => {
-    await seedLocal(workspaceApiLocalSeed);
-    await page.goto(`/workspace/${localWorkerUrlKey}/swipe`);
-    await page.waitForLoadState('networkidle');
-  });
-
-  test('swipe card renders brief accordion', async ({ page }) => {
-    const briefAccordion = page.locator('.swipe-accordion-header[data-accordion="brief"]').first();
-    await expect(briefAccordion).toBeVisible();
-    await expect(briefAccordion).toContainText(/Brief/i);
-  });
-
-  test('opening brief accordion initialises the section', async ({ page }) => {
-    const briefAccordion = page.locator('.swipe-accordion-header[data-accordion="brief"]').first();
-    await briefAccordion.click();
-
-    const body = page.locator('.swipe-accordion-body[data-accordion-body="brief"]').first();
-    await expect(body).toHaveClass(/open/);
-
-    const section = body.locator('.brief-section').first();
-    await expect(section).toHaveAttribute('data-state', /missing|fresh|stale|generating|loading/);
-  });
-
-  test('refresh button triggers POST and shows fresh content', async ({ page }) => {
-    const briefAccordion = page.locator('.swipe-accordion-header[data-accordion="brief"]').first();
-    await briefAccordion.click();
-
-    const section = page.locator('.swipe-accordion-body[data-accordion-body="brief"] .brief-section').first();
-    // Wait for the initial GET to resolve
-    await expect(section).not.toHaveAttribute('data-state', 'loading', { timeout: 5000 });
-
-    const refreshBtn = section.locator('[data-brief-refresh]');
-    await expect(refreshBtn).toBeVisible();
-    await refreshBtn.click();
-
-    // Should land on fresh with rendered Markdown content
-    await expect(section).toHaveAttribute('data-state', 'fresh', { timeout: 5000 });
-    await expect(section.locator('.brief-content')).toBeVisible();
-  });
-});
-
 test.describe('Context UI — Swipe (LIN-572)', () => {
   test.beforeEach(async ({ page, seedLocal, localWorkerUrlKey }) => {
     await seedLocal(workspaceApiLocalSeed);
@@ -582,6 +478,13 @@ test.describe('Context UI — Swipe (LIN-572)', () => {
     const accordion = page.locator('.swipe-accordion-header[data-accordion="context"]').first();
     await expect(accordion).toBeVisible();
     await expect(accordion).toContainText(/Context/i);
+  });
+
+  // LIN-4537 retired the model-written brief and recap: Context is the card's only Insights accordion now.
+  test('the card carries no Recap or Brief accordion', async ({ page }) => {
+    await expect(page.locator('.swipe-accordion-header[data-accordion="context"]').first()).toBeVisible();
+    await expect(page.locator('.swipe-accordion-header[data-accordion="recap"], .swipe-accordion-header[data-accordion="brief"]')).toHaveCount(0);
+    await expect(page.locator('.recap-section, .brief-section')).toHaveCount(0);
   });
 
   test('opening the context accordion lazy-mounts the deterministic diagram', async ({ page }) => {

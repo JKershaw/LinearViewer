@@ -362,10 +362,10 @@ Issue-scoped endpoints are canonical under `/issues/{id}/...`, so the read and w
 
 - `GET  /issues/{id}/relations` (read) pairs with `POST` / `DELETE /issues/{id}/relations[/{relationId}]` (write).
 - `POST /issues/{id}/comments` (write) pairs with `PATCH` / `DELETE /issues/{id}/comments/{commentId}` (write); reads of comments come back inside `GET /issues/{id}`.
-- `GET  /issues/{id}/recommend`, `/issues/{id}/recap` (issue-derived AI reads), `/issues/{id}/brief` (the records brief, LIN-4536).
+- `GET  /issues/{id}/recommend` (an issue-derived AI read), `/issues/{id}/brief` (the records brief, LIN-4536).
 - Cycle detail is canonical as the plural by-id form `GET /cycles/{cycleId}`, mirroring the `GET /cycles` list.
 
-For backward compatibility the proxy also accepts **forgiving aliases** for the obvious alternate guesses — the older flat forms `GET /relations/{id}`, `GET /recap/{id}`, `GET /brief/{id}`, `GET /recommend/{id}`, `POST /comments/{id}`, and the singular `GET /cycle/{cycleId}` all still resolve to the same handlers. They are intentionally undocumented going forward; prefer the canonical paths above. The RPC-style verbs (`/stack`, `/dispatch*`, `/recommend-and-dispatch`, `/agent/status` (deprecated alias `/foreman/status`), `/autopilot/*`) are not issue-scoped and are unchanged.
+For backward compatibility the proxy also accepts **forgiving aliases** for the obvious alternate guesses — the older flat forms `GET /relations/{id}`, `GET /brief/{id}`, `GET /recommend/{id}`, `POST /comments/{id}`, and the singular `GET /cycle/{cycleId}` all still resolve to the same handlers. They are intentionally undocumented going forward; prefer the canonical paths above. The RPC-style verbs (`/stack`, `/dispatch*`, `/recommend-and-dispatch`, `/agent/status` (deprecated alias `/foreman/status`), `/autopilot/*`) are not issue-scoped and are unchanged.
 
 #### Structured error envelope
 
@@ -873,7 +873,7 @@ Key off `state.type` — `"canceled"` is terminal, so every consumer that alread
 The same asymmetry is handled on the other by-ID surfaces:
 
 - `GET /api/proxy/issues/{id}/relations` returns a top-level `"trashed": true` (it has no root state to override); the relations are still returned so you can see what a now-deleted issue was related to.
-- The task-automation context endpoints (`/recommend`, `/recap`, `/prompt`) **refuse** a trashed target with **`404`** rather than distilling or recommending work on a ghost.
+- The task-automation context endpoints (`/recommend`, `/prompt`) **refuse** a trashed target with **`404`** rather than distilling or recommending work on a ghost.
 - The write endpoints (`PATCH /issues/{id}`, comments, relation-create, labels, description `append`/`replace`) **refuse** a trashed target with **`409`** rather than silently mutating a deleted issue.
 
 Collection endpoints (`/issues`, `/search`, `/stack`) and nested `children`/`parent`/relation lists are unaffected — trash is already excluded from those.
@@ -1013,40 +1013,13 @@ Response:
 
 Both lists are read whole, up to 1,000 each (LIN-4322). A list cut at that cap is named in a top-level `truncated` object beside `trashed` (e.g. `"truncated": { "inverseRelations": true }`); the key is absent when both lists are complete.
 
-#### Get Task Recap
-
-```
-GET  /api/proxy/issues/{identifier}/recap
-POST /api/proxy/recap/{identifier}
-```
-
-An AI-generated progress summary (`done` / `pending` / `deviations`). `GET` returns
-the cached recap and auto-regenerates when it's missing or stale; pass `?noRefresh=1`
-to read without regenerating. `POST` force-regenerates (it keeps the flat form). Both
-accept a UUID or an identifier (e.g. `ENG-42`). Read scope is sufficient.
-
-Response:
-```json
-{
-  "status": "fresh",
-  "identifier": "ENG-42",
-  "recap": { "done": [], "pending": [], "deviations": [] },
-  "generatedAt": "2026-04-20T12:00:00Z",
-  "model": "anthropic/claude-haiku-4.5"
-}
-```
-
-With `?noRefresh=1` and no cache, `status` is `"missing"` (or `"stale"`) and the
-`recap` field is omitted.
-
 #### Get Task Brief
 
 ```
 GET  /api/proxy/issues/{identifier}/brief
-POST /api/proxy/brief/{identifier}
 ```
 
-**`GET` is your brief on a task, built from its records alone (LIN-4536).** Nothing in it is written
+**Your brief on a task, built from its records alone (LIN-4536).** Nothing in it is written
 by a model, and it reads no tracker. It is read for your own credential: a dispatched run reads its own
 brief (its stage is the reader, so the records addressed to that stage are in it) with no `?run=`; a run
 reading another ticket reads that ticket's task as its stage; a person's copy reads as that person; a
@@ -1077,14 +1050,9 @@ A ticket with no task on record yet (never filed through Harbour, never dispatch
 ticket's (e.g. `ENG-42`); a UUID is refused (`400`), since a task is found by its identifier. Read scope is
 sufficient.
 
-`POST /api/proxy/brief/{identifier}` force-regenerates the model-written summary the task page shows
-(`## Current`, `## Constraints`, `## Open questions`, `## Changelog`). It is not the brief `GET` answers,
-and it retires with its cache in LIN-4537.
-
-> The recap and the task page's summary share the in-app cache, so an artifact generated in the swipe
-> UI is served straight from cache here (and vice versa). Regeneration calls OpenRouter
-> and can exceed 25s; the server streams whitespace keepalive bytes inside a single
-> `200` response, so don't set a client timeout below ~60s for these endpoints.
+LIN-4537 retired the model-written summary that sat beside this (its `POST` regenerate route, the task
+page's brief and recap panels, the two recap routes and both caches): no route writes or
+regenerates a summary of a ticket.
 
 #### Flight Companion Turn
 
@@ -1096,7 +1064,7 @@ Drive one turn of the Flight Companion — the same companion the browser's chat
 runs — from an agent. This closes the loop between what an agent proposes and what a
 human actually sees: an agent can check in on how it's performing and improve it. Read
 scope is sufficient (a proposal is never a write); billed to the **token creator's own**
-OpenRouter key, the same credential rule as recommend/recap/brief — never the caller's
+OpenRouter key, the same credential rule as recommend — never the caller's
 own bearer token.
 
 Body:
@@ -1160,7 +1128,7 @@ Returns a task's total cost in **API-equivalent USD** (LIN-1775), joining two so
   (e.g. `recommend`), from the llm-call-log.
 
 Pure read: no Linear fetch, no LLM call. Read scope is sufficient. `{identifier}` must be
-the issue **identifier** (e.g. `ENG-1770`), not a UUID — unlike `/recap`,
+the issue **identifier** (e.g. `ENG-1770`), not a UUID — unlike `/recommend`,
 this endpoint never resolves through the provider, and dispatch/call-log rows are keyed
 by identifier. A UUID-shaped `{identifier}` is rejected with `400` rather than silently
 matching zero rows and returning an authoritative-looking `$0.00`.
@@ -1266,7 +1234,7 @@ Linear fetch, no LLM call. Read scope is sufficient.
 
 Identity is `req.proxyCreatedBy` (the token creator's account), never a session — a
 creator-less/ownerless token resolves **no** north star, ever (fails closed, same
-invariant as [Get Task Recap](#get-task-recap)'s OpenRouter key resolution). The north
+invariant as the recommend route's OpenRouter key resolution). The north
 star is read from the creator's **durable** preferences, which can trail an unsaved
 in-session edit on the Roadmap page — the session copy is authoritative in-app, this
 endpoint's copy is the best-effort cross-device mirror of it.
@@ -1686,7 +1654,7 @@ dismiss/answer press, via the session-authed discharge path.
 
 ### Task Automation Endpoints
 
-These endpoints back the task-automation workflow: pick the next task, generate a prompt for it, and record agent progress. The **recap** and **brief** endpoints above are part of this group too. All are read-scope except `POST /api/proxy/agent/status` (deprecated alias: `POST /api/proxy/foreman/status`), which requires `readWrite`.
+These endpoints back the task-automation workflow: pick the next task, generate a prompt for it, and record agent progress. The **brief** endpoint above is part of this group too. All are read-scope except `POST /api/proxy/agent/status` (deprecated alias: `POST /api/proxy/foreman/status`), which requires `readWrite`.
 
 #### Get Task Stack
 
@@ -1786,7 +1754,7 @@ Generates a deterministic, template-based prompt for an issue: the same bytes `r
 GET /api/proxy/issues/{identifier}/recommend
 ```
 
-Returns an AI-generated prompt recommendation. Requires an OpenRouter key (the token creator's OAuth connection, or the server's `OPENROUTER_API_KEY`); returns `503` when neither is configured. Like recap/brief, this calls an LLM and can exceed 25s — the server streams keepalive whitespace inside a single `200`, so don't set a client timeout below ~60s.
+Returns an AI-generated prompt recommendation. Requires an OpenRouter key (the token creator's OAuth connection, or the server's `OPENROUTER_API_KEY`); returns `503` when neither is configured. It calls an LLM and can exceed 25s — the server streams keepalive whitespace inside a single `200`, so don't set a client timeout below ~60s.
 
 ```json
 {

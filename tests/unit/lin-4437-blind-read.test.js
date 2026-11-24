@@ -330,8 +330,8 @@ function buildApp(provider, recordsStore = null) {
     resolveWorkspaceAccess: async () => ({ token: 'ws-token', reason: 'ok' }),
     getWorkspaceAccessToken: async () => 'ws-token',
     getWorkspaceOpenRouterKey: async () => null,
-    agentStatusStore: {}, recapCacheStore: { get: async () => null, set: async () => {} },
-    briefCacheStore: { get: async () => null, set: async () => {} }, dispatchQueueStore: {},
+    agentStatusStore: {},
+    dispatchQueueStore: {},
     workspaceFromUrl: (req, res, next) => next(), workspacePreferencesStore: {},
     freeTierStore: { tryUse: async () => ({ allowed: true }) }, provider,
   }));

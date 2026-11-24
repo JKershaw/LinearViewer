@@ -384,8 +384,6 @@ function buildRouteApp({ itemForWatch = null, itemsForList = null } = {}) {
     getWorkspaceAccessToken: async () => 'test-token',
     getWorkspaceOpenRouterKey: async () => null,
     agentStatusStore: {},
-    recapCacheStore: { get: async () => null, set: async () => {} },
-    briefCacheStore: { get: async () => null, set: async () => {} },
     dispatchQueueStore: {
       addItem: async (urlKey, item) => ({ _id: 'disp-1', dispatchedAt: '2026-06-28T00:00:00.000Z', ...item }),
       getItemStatus: async () => itemForWatch,
@@ -466,8 +464,6 @@ describe('S0 — POST /api/proxy/dispatch createToken arguments', () => {
       getWorkspaceAccessToken: async () => 'test-token',
       getWorkspaceOpenRouterKey: async () => null,
       agentStatusStore: {},
-      recapCacheStore: { get: async () => null, set: async () => {} },
-      briefCacheStore: { get: async () => null, set: async () => {} },
       dispatchQueueStore: {
         getGrantDeclaration: async () => ({ state: 'none' }),
         addItem: async (urlKey, item) => ({ _id: 'disp-1', dispatchedAt: '2026-06-28T00:00:00.000Z', ...item }),
@@ -598,8 +594,6 @@ describe('S0 — projection source bodies are spread-free and token-free', () =>
       getWorkspaceAccessToken: async () => 'test-token',
       getWorkspaceOpenRouterKey: async () => null,
       agentStatusStore: {},
-      recapCacheStore: { get: async () => null, set: async () => {} },
-      briefCacheStore: { get: async () => null, set: async () => {} },
       workspaceFromUrl: (req, res, next) => next(),
       workspacePreferencesStore: { getWorkspacePreferences: async () => ({}) },
       freeTierStore: { tryUse: async () => ({ allowed: true }) },
@@ -681,8 +675,6 @@ function proxyApp() {
     getWorkspaceAccessToken: async () => 'test-token',
     getWorkspaceOpenRouterKey: async () => null,
     agentStatusStore: {},
-    recapCacheStore: { get: async () => null, set: async () => {} },
-    briefCacheStore: { get: async () => null, set: async () => {} },
     dispatchQueueStore: {
       getGrantDeclaration: async () => ({ state: 'none' }),
       // LIN-4492: the real store takes its `_id` from the factory's trusted id (lib/dispatch-store.js trustedIdOf).
@@ -929,7 +921,7 @@ function fcApp({ anchorStatus = null } = {}) {
     workspaceOwnerCheck: async () => ({ status: 'owner' }),
     workspaceFromUrl: (req, res, next) => { req.workspace = { urlKey: 'acme' }; req.session = { accountId: 'u1', features: { flightCompanion: true } }; next(); },
     getOpenRouterSource: () => null, getDeployInfo: () => ({}), observerStateStore: null, freeTierStore: null,
-    workspacePreferencesStore: null, recapCacheStore: null, briefCacheStore: null,
+    workspacePreferencesStore: null,
     dispatchQueueStore: {
       getGrantDeclaration: async () => ({ state: 'none' }),
       listItems: async () => [],

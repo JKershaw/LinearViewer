@@ -63,7 +63,7 @@ describe('the LIN-4085 replay, deterministic part (LIN-4353)', () => {
   });
 
   // The review prompt points at the block; it does not quote it. Stage prompts never
-  // copy the description (formatDiscussionReference, PR #369), and a quote would be the
+  // copy the description (PR #369), and a quote would be the
   // extra copy LIN-4345 decided against. The words reach review through the brief's part 1; review must read them first.
   test('review\'s Process starts from the As asked block, before the plan and the implementation notes', () => {
     const { prompt } = generatePrompt('review', ISSUE, CONTEXT);

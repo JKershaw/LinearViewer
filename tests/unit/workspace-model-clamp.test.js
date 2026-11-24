@@ -82,8 +82,8 @@ test('missing urlKey or store still returns DEFAULT_MODEL (unchanged guard)', as
 // resolveAiOperationModel (LIN-1145)
 // =============================================================================
 
-test('AI_OPERATION_KINDS covers the scoped operations, including flight-companion, ship-biscuit and task-chat (LIN-2623, LIN-2966; LIN-3300 removed recommend-write with the brief writer; LIN-4540 removed scan with the scan)', () => {
-  assert.deepEqual(AI_OPERATION_KINDS, ['recommend', 'recap', 'brief', 'run-summary', 'session-summary', 'flight-companion', 'ship-biscuit', 'task-chat']);
+test('AI_OPERATION_KINDS covers the scoped operations, including flight-companion, ship-biscuit and task-chat (LIN-2623, LIN-2966; LIN-3300 removed recommend-write with the brief writer; LIN-4540 removed scan with the scan; LIN-4537 removed recap and brief)', () => {
+  assert.deepEqual(AI_OPERATION_KINDS, ['recommend', 'run-summary', 'session-summary', 'flight-companion', 'ship-biscuit', 'task-chat']);
 });
 
 // Every AI operation kind is a job in the registry, so the Models page can show it (LIN-3855 retired the
@@ -106,19 +106,19 @@ test('resolveAiOperationModel: per-operation override takes precedence over mode
 
 test('resolveAiOperationModel: other operation kind uses modelId when no override set', async () => {
   const store = makeStore({ modelId: 'openai/gpt-5.5', aiModelOverrides: { byKind: { recommend: { model: 'anthropic/claude-opus-4' } } } });
-  const model = await resolveAiOperationModel({ urlKey: 'acme', workspacePreferencesStore: store, opKind: 'recap' });
+  const model = await resolveAiOperationModel({ urlKey: 'acme', workspacePreferencesStore: store, opKind: 'run-summary' });
   assert.equal(model, 'openai/gpt-5.5');
 });
 
 test('resolveAiOperationModel: override=null for one kind does not affect another', async () => {
-  const store = makeStore({ modelId: 'openai/gpt-5.5', aiModelOverrides: { byKind: { recommend: { model: 'openai/gpt-5.5-pro' }, recap: { model: null } } } });
-  const recModel = await resolveAiOperationModel({ urlKey: 'acme', workspacePreferencesStore: store, opKind: 'recap' });
+  const store = makeStore({ modelId: 'openai/gpt-5.5', aiModelOverrides: { byKind: { recommend: { model: 'openai/gpt-5.5-pro' }, 'run-summary': { model: null } } } });
+  const recModel = await resolveAiOperationModel({ urlKey: 'acme', workspacePreferencesStore: store, opKind: 'run-summary' });
   assert.equal(recModel, 'openai/gpt-5.5');
 });
 
 test('resolveAiOperationModel: falls to DEFAULT_MODEL when nothing is stored', async () => {
   const store = makeStore({});
-  const model = await resolveAiOperationModel({ urlKey: 'acme', workspacePreferencesStore: store, opKind: 'brief' });
+  const model = await resolveAiOperationModel({ urlKey: 'acme', workspacePreferencesStore: store, opKind: 'session-summary' });
   assert.equal(model, DEFAULT_MODEL);
 });
 
@@ -145,14 +145,12 @@ test('resolveAiOperationModel: each operation kind resolves independently', asyn
     aiModelOverrides: {
       byKind: {
         recommend: { model: 'openai/gpt-5.5-pro' },
-        recap: { model: 'openai/gpt-5.5' }
+        'run-summary': { model: 'openai/gpt-5.5' }
       }
     }
   });
   assert.equal(await resolveAiOperationModel({ urlKey: 'acme', workspacePreferencesStore: store, opKind: 'recommend' }), 'openai/gpt-5.5-pro');
-  assert.equal(await resolveAiOperationModel({ urlKey: 'acme', workspacePreferencesStore: store, opKind: 'recap' }), 'openai/gpt-5.5');
-  assert.equal(await resolveAiOperationModel({ urlKey: 'acme', workspacePreferencesStore: store, opKind: 'brief' }), 'openai/gpt-5.4-mini');
-  assert.equal(await resolveAiOperationModel({ urlKey: 'acme', workspacePreferencesStore: store, opKind: 'run-summary' }), 'openai/gpt-5.4-mini');
+  assert.equal(await resolveAiOperationModel({ urlKey: 'acme', workspacePreferencesStore: store, opKind: 'run-summary' }), 'openai/gpt-5.5');
   assert.equal(await resolveAiOperationModel({ urlKey: 'acme', workspacePreferencesStore: store, opKind: 'session-summary' }), 'openai/gpt-5.4-mini');
   assert.equal(await resolveAiOperationModel({ urlKey: 'acme', workspacePreferencesStore: store, opKind: 'task-chat' }), 'openai/gpt-5.4-mini');
   assert.equal(await resolveAiOperationModel({ urlKey: 'acme', workspacePreferencesStore: store, opKind: 'flight-companion' }), 'openai/gpt-5.4-mini');
@@ -269,6 +267,6 @@ test('with the env var unset, the clamp is byte-identical to pre-LIN-1333 behavi
   await withFreeTierModel(undefined, async () => {
     const store = makeStoreWithModel('openai/gpt-5.5');
     assert.equal(await resolveWorkspaceModel({ urlKey: 'acme', workspacePreferencesStore: store, forceDefault: true }), DEFAULT_MODEL);
-    assert.equal(await resolveAiOperationModel({ urlKey: 'acme', workspacePreferencesStore: store, opKind: 'recap', forceDefault: true }), DEFAULT_MODEL);
+    assert.equal(await resolveAiOperationModel({ urlKey: 'acme', workspacePreferencesStore: store, opKind: 'run-summary', forceDefault: true }), DEFAULT_MODEL);
   });
 });

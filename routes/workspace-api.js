@@ -13,14 +13,14 @@
  * Shape (LIN-3596): every route is registered explicitly, in the order below, as a
  * thin handler over a small set of shared steps. The steps sit in two places:
  *   - module level, where they need no dependency (`recommendCallOptions`, `toHopRecord`, ...;
- *     `openIssue`, `refuseCapability`, `failureOf`, `refuseFreeTier`, `aiNotConfigured`, `keepaliveFailure` and `loadContext` live in workspace-api-steps.js, shared with workspace-api-prompts.js, workspace-api-issue-read.js, workspace-api-issue-write.js, workspace-api-audit.js and workspace-api-feedback.js);
+ *     `openIssue`, `refuseCapability`, `failureOf` and `refuseFreeTier` live in workspace-api-steps.js, shared with workspace-api-prompts.js, workspace-api-issue-read.js, workspace-api-issue-write.js, workspace-api-audit.js and workspace-api-feedback.js);
  *   - inside `createWorkspaceApiRoutes`, where they close over the injected stores.
  * The AI pre-flight calls (`resolveChatCredential`, `checkFreeTierGate`, the
  * `forceDefault` model clamp) are deliberately NOT shared: each route names its own,
  * because the source-text censuses scan the workspace-API unit (this file and
  * routes/workspace-api-*.js) for every one of them.
  *
- * Test-mode builders (mock recommendation, recap, brief, audit data, ...) live
+ * Test-mode builders (mock recommendation, audit data, ...) live
  * in lib/workspace-api-mocks.js.
  */
 import { Router } from 'express';
@@ -36,7 +36,7 @@ import { registerSessionsRoutes, registerRunEvidenceRoutes } from './workspace-a
 export { feedbackSubmitLimiter } from './workspace-api-feedback.js';
 export { decisionStampDedupe } from './workspace-api-issue-write.js';
 import { isHermeticTestToken } from '../lib/should-mock-ai.js';
-import { failureOf, openIssue, refuseFreeTier, aiNotConfigured, keepaliveFailure, loadContext } from './workspace-api-steps.js';
+import { failureOf, openIssue, refuseFreeTier } from './workspace-api-steps.js';
 import { isRecommendationEnabled, getRecommendation, getRecommendationStream, getModelDisplayName } from '../lib/openrouter.js';
 import { resolveChatCredential, isAiUnavailable, checkFreeTierGate, isFlagFreeTier, freeTierRefusalBlock } from '../lib/chat-request.js';
 import { getModelCatalog, isFreeModel } from '../lib/openrouter-catalog.js';
@@ -45,10 +45,7 @@ import { resolveRecommendation, armHopSignal } from '../lib/recommend-recurse.js
 import { deriveDispatchKind } from '../lib/prompt-templates.js';
 import { prepareRecommendationInput } from '../lib/recommendation-input.js';
 import { resolveAiOperationModel } from '../lib/workspace-preferences.js';
-import { generateRecap } from '../lib/recap.js';
-import { generateBrief } from '../lib/brief.js';
 import { buildContextGraph } from '../lib/context-graph.js';
-import { hashContext } from '../lib/recap-cache.js';
 import { getFeatureFlags } from '../lib/feature-defaults.js';
 import { armKeepalive, armSseKeepalive, clientGoneSignal } from '../lib/http-keepalive.js';
 import { testMockData } from '../lib/sample-data/mock-data.js';
@@ -60,8 +57,6 @@ import {
   generateMockRecommendation,
   buildMockRecommendationHop,
   planMockDescent,
-  buildMockRecap,
-  buildMockBrief,
 } from '../lib/workspace-api-mocks.js';
 
 // The two mock builders other modules import from this router (tests, the dashboard).
@@ -200,7 +195,7 @@ export function streamMockFixture(res, mockIssue) {
  * @param {Object} [options.closeOut] - LIN-3248 test seam for the check/press routes: optional `{ resolveProvider, readPrStatus, githubFetch, isStopAtRun, runnerReady, markDone }` overrides
  * @returns {Router} Express router
  */
-export function createWorkspaceApiRoutes({ workspaceFromUrl, freeTierStore, getOpenRouterSource, userPreferencesStore, workspacePreferencesStore, customPromptsStore, recapCacheStore, briefCacheStore, reportHistoryStore, dispatchQueueStore, agentStatusStore, promptTraceStore, proxyTokenStore, taskDecisionsStore, harbourCommentsStore = null, sessionsFeedCache = null, ownerCredentialStore = null, adoptConnectionCredential = null, accountStore = null, runEvidence = null, closeOutEventsStore = null, closeOut = null, workspaceOwnerCheck = null, onTicketWrite = null, recordPipelineMerge = null, installationTokenFor = null, loadTaskState = null, recordsStore = null }) {
+export function createWorkspaceApiRoutes({ workspaceFromUrl, freeTierStore, getOpenRouterSource, userPreferencesStore, workspacePreferencesStore, customPromptsStore, reportHistoryStore, dispatchQueueStore, agentStatusStore, promptTraceStore, proxyTokenStore, taskDecisionsStore, harbourCommentsStore = null, sessionsFeedCache = null, ownerCredentialStore = null, adoptConnectionCredential = null, accountStore = null, runEvidence = null, closeOutEventsStore = null, closeOut = null, workspaceOwnerCheck = null, onTicketWrite = null, recordPipelineMerge = null, installationTokenFor = null, loadTaskState = null, recordsStore = null }) {
   const router = Router();
 
   // The test-token DATA mock charges the free tier on its own (the AI-gate above it is
@@ -642,136 +637,6 @@ export function createWorkspaceApiRoutes({ workspaceFromUrl, freeTierStore, getO
   registerSessionsRoutes(router, { workspaceFromUrl, dispatchQueueStore, agentStatusStore, loadTaskState });
 
   // ===========================================================================
-  // Recap API (LIN-261) and Brief API (current-state task brief)
-  // ===========================================================================
-
-  // The GET half of both: the cache status for one issue, read against the issue's
-  // CURRENT content hash. `fresh` carries the stored body, `stale` (the content moved)
-  // and `missing` (never generated) do not.
-  //   @returns {Object} { status: 'fresh'|'stale'|'missing', <kind>?, generatedAt?, model? }
-  const cachedStatusHandler = (kind, store, storeName) => async (req, res) => {
-    const issue = openIssue(req, res, { store, storeName, capability: kind });
-    if (!issue) return;
-    const { workspace, issueId } = issue;
-
-    try {
-      const { context, missing } = await loadContext(workspace, issueId, issue);
-      if (missing) return notFound.json(res, 'Issue not found');
-
-      const canonicalId = context.issue?.id || issueId;
-      const inputHash = hashContext(context);
-      const cached = await store.get(workspace.urlKey, canonicalId);
-
-      if (!cached) {
-        return res.json({ status: 'missing' });
-      }
-      if (cached.inputHash !== inputHash) {
-        return res.json({
-          status: 'stale',
-          generatedAt: cached.generatedAt,
-          model: cached.model
-        });
-      }
-      return res.json({
-        status: 'fresh',
-        [kind]: cached[kind],
-        generatedAt: cached.generatedAt,
-        model: cached.model
-      });
-    } catch (error) {
-      console.error(`${kind === 'recap' ? 'Recap' : 'Brief'} GET error:`, error);
-      jsonError(res, ...failureOf(error, `Failed to fetch ${kind} status`));
-    }
-  };
-
-  // The POST half of both, after each route's own AI pre-flight: read the context, generate
-  // the body (the deterministic mock under `mockAi`, the model otherwise), persist it under
-  // the issue's content hash, read the stored row back for its timestamp, and reply fresh.
-  // Force-regenerate always calls OpenRouter; the keepalive is a Heroku H12 guard.
-  //   @param {'recap'|'brief'} kind
-  //   @param {Object} ai - the route's resolved credential: `{ mockAi, apiKey, isFreeTier }`
-  const generateCachedDocument = async (kind, store, res, issue, ai, { generate, buildMock }) => {
-    const { workspace, issueId } = issue;
-    const { isFreeTier } = ai;
-    const keepalive = armKeepalive(res);
-    try {
-      const { context, missing } = await loadContext(workspace, issueId, issue);
-      if (missing) {
-        return keepaliveError(keepalive, 404, 'Issue not found');
-      }
-
-      const canonicalId = context.issue?.id || issueId;
-      const inputHash = hashContext(context);
-      const model = await resolveAiOperationModel({ urlKey: workspace.urlKey, workspacePreferencesStore, opKind: kind, forceDefault: isFreeTier });
-
-      let body;
-      let modelUsed;
-      if (ai.mockAi) {
-        body = buildMock(context);
-        modelUsed = model;
-      } else {
-        const result = await generate(context.issue, context, { apiKey: ai.apiKey, model, callMeta: { urlKey: workspace?.urlKey } });
-        body = result[kind];
-        modelUsed = result.model;
-      }
-
-      await store.put(workspace.urlKey, canonicalId, { inputHash, [kind]: body, model: modelUsed });
-      const stored = await store.get(workspace.urlKey, canonicalId);
-
-      keepalive.send(200, {
-        status: 'fresh',
-        [kind]: stored?.[kind] ?? body,
-        generatedAt: stored?.generatedAt ?? new Date(),
-        model: modelUsed
-      });
-    } catch (error) {
-      keepaliveFailure(keepalive, `${kind === 'recap' ? 'Recap' : 'Brief'} POST error:`, error, `Failed to generate ${kind}`, { openRouter: true });
-    }
-  };
-
-  /**
-   * GET recap status + body (if fresh).
-   *
-   * @route GET /workspace/:urlKey/api/recap/:issueId
-   * @returns {Object} { status: 'fresh'|'stale'|'missing', recap?, generatedAt?, model? }
-   */
-  router.get('/workspace/:urlKey/api/recap/:issueId', workspaceFromUrl, cachedStatusHandler('recap', recapCacheStore, 'Recap cache'));
-
-  /**
-   * POST recap generate.
-   * Regenerates the recap via Haiku (or configured model) and caches it.
-   *
-   * @route POST /workspace/:urlKey/api/recap/:issueId
-   * @returns {Object} { status: 'fresh', recap, generatedAt, model }
-   */
-  router.post('/workspace/:urlKey/api/recap/:issueId', workspaceFromUrl, async (req, res) => {
-    const issue = openIssue(req, res, { store: recapCacheStore, storeName: 'Recap cache', capability: 'recap' });
-    if (!issue) return;
-    const { workspace, issueId } = issue;
-
-    // `isTestMode` (test-token) gates the DATA mock; `mockAi` additionally fires
-    // the AI mock for local-provider sessions, whose data comes from the
-    // provider (LIN-388). The AI-config + free-tier guards key off `mockAi` so a
-    // migrated local session isn't 503'd for lacking an OpenRouter key.
-    const mockAi = shouldMockAi(workspace);
-    const credential = resolveChatCredential({ sessionApiKey: req.session.openRouterApiKey });
-    const { apiKey: apiKeyToUse, isFreeTier } = credential;
-
-    if (isAiUnavailable({ credential, mockAi })) {
-      return aiNotConfigured(res, 'recap');
-    }
-
-    if (!mockAi && isFreeTier) {
-      const check = await checkFreeTierGate({ isFreeTier, urlKey: workspace.urlKey, freeTierStore });
-      if (check) {
-        return refuseFreeTier(res, check);
-      }
-    }
-
-    return generateCachedDocument('recap', recapCacheStore, res, issue, { mockAi, apiKey: apiKeyToUse, isFreeTier }, { generate: generateRecap, buildMock: buildMockRecap });
-  });
-
-  // ===========================================================================
   // Context API (LIN-572) — relationship neighborhood for the Context section.
   //
   // Deterministic, not AI: it resolves the issue's blocker chains, parent/child
@@ -820,46 +685,6 @@ export function createWorkspaceApiRoutes({ workspaceFromUrl, freeTierStore, getO
       console.error('Context GET error:', error);
       jsonError(res, ...failureOf(error, 'Failed to build context'));
     }
-  });
-
-  /**
-   * GET brief status + body (if fresh).
-   *
-   * @route GET /workspace/:urlKey/api/brief/:issueId
-   * @returns {Object} { status: 'fresh'|'stale'|'missing', brief?, generatedAt?, model? }
-   */
-  router.get('/workspace/:urlKey/api/brief/:issueId', workspaceFromUrl, cachedStatusHandler('brief', briefCacheStore, 'Brief cache'));
-
-  /**
-   * POST brief generate.
-   * Regenerates the brief via Haiku (or configured model) and caches it.
-   *
-   * @route POST /workspace/:urlKey/api/brief/:issueId
-   * @returns {Object} { status: 'fresh', brief, generatedAt, model }
-   */
-  router.post('/workspace/:urlKey/api/brief/:issueId', workspaceFromUrl, async (req, res) => {
-    const issue = openIssue(req, res, { store: briefCacheStore, storeName: 'Brief cache', capability: 'brief' });
-    if (!issue) return;
-    const { workspace, issueId } = issue;
-
-    // See the recap POST note: `isTestMode` gates the DATA mock, `mockAi` the AI
-    // mock (incl. local-provider sessions) and the AI-config/free-tier guards.
-    const mockAi = shouldMockAi(workspace);
-    const credential = resolveChatCredential({ sessionApiKey: req.session.openRouterApiKey });
-    const { apiKey: apiKeyToUse, isFreeTier } = credential;
-
-    if (isAiUnavailable({ credential, mockAi })) {
-      return aiNotConfigured(res, 'brief');
-    }
-
-    if (!mockAi && isFreeTier) {
-      const check = await checkFreeTierGate({ isFreeTier, urlKey: workspace.urlKey, freeTierStore });
-      if (check) {
-        return refuseFreeTier(res, check);
-      }
-    }
-
-    return generateCachedDocument('brief', briefCacheStore, res, issue, { mockAi, apiKey: apiKeyToUse, isFreeTier }, { generate: generateBrief, buildMock: buildMockBrief });
   });
 
   // The feedback intake route (LIN-3893): registered on this router, here, so the route table's order is unchanged.

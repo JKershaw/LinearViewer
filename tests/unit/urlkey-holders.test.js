@@ -161,6 +161,7 @@ const COLLECTION_CLASSES = {
   'custom-prompts': 'C', 'report-history': 'C', 'task-snapshots': 'C', 'task-decisions': 'C', 'run-paragraph': 'C',
   'workspaces': 'C', 'workspace-halt': 'C',
   // Key inside `_id` or a non-`urlKey` field: read by the no-holder count through URLKEY_SOURCES.
+  // LIN-4537: brief-cache and recap-cache are retired; they stay until scripts/drop-brief-recap-caches.mjs drops them.
   'brief-cache': 'C', 'recap-cache': 'C', 'workspace-preferences': 'C', 'harbour-comments': 'C',
   'observer-state': 'C', 'local-issues': 'C',
   'consumer-heartbeats': 'C', 'kpi-daily-rollup': 'C', 'dismissal-suggestions': 'C', 'dispatch-presets': 'C', 'run-proposals': 'C',

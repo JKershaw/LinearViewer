@@ -100,7 +100,7 @@ function buildApp({ provider, session } = {}) {
     // Factory signature — none used by the issue write routes.
     freeTierStore: {}, getOpenRouterSource: () => null, userPreferencesStore: {},
     workspacePreferencesStore: { getWorkspacePreferences: async () => ({}) },
-    customPromptsStore: {}, recapCacheStore: {}, briefCacheStore: {},
+    customPromptsStore: {},
     reportHistoryStore: {}, dispatchQueueStore: {}, agentStatusStore: {}, promptTraceStore: {},
   });
   app.use(router);

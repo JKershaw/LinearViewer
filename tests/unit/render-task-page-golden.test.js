@@ -10,7 +10,7 @@
  * and say why in the commit — never by widening an assertion.
  *
  * Also pinned here:
- *   - the page order (answer → stages → pull request → brief/recap → docs → details → share);
+ *   - the page order (answer → stages → pull request → docs → details → share; LIN-4537 retired brief/recap);
  *   - `renderOwnerControls` is the ONLY owner/guest difference: owner HTML with
  *     its two fragments removed is byte-identical to the guest HTML;
  *   - every in-Harbour href goes through `harbourHref` (carries the source kind),
@@ -165,9 +165,7 @@ const QUESTION_ROW = {
 function caseOf(name) {
   switch (name) {
     case 'running-blocked-repeat':
-      return { loops: RUNNING_LOOPS, ctx: ctx(), evidence: EVIDENCE,
-        brief: { brief: '## Current\nThe **review** is running on `PR #41`; the build landed.\n\n## Constraints\n- keep it small', model: 'm', generatedAt: '2026-10-06T09:00:00.000Z' },
-        recap: { recap: { done: [{ item: 'plan', evidence: 'comment' }], pending: [], deviations: [] }, model: 'm', generatedAt: '2026-10-06T09:00:00.000Z' } };
+      return { loops: RUNNING_LOOPS, ctx: ctx(), evidence: EVIDENCE };
     case 'waiting':
       return { loops: [done({ loopId: 'plan-1', kind: 'plan' }), loop({ loopId: 'impl-2', wakeMarker: 'blocked', waitingMessage: '[blocked] which API key?', feedback: [{ message: '[blocked] which API key?' }] })], ctx: ctx() };
     case 'open-ruling-recommended':
@@ -244,10 +242,10 @@ describe('task page owner golden (LIN-3329)', () => {
 });
 
 describe('task page structure', () => {
-  test('page order: answer → stages → pull request → brief/recap → docs → details → share', () => {
+  test('page order: answer → stages → pull request → docs → details → share', () => {
     const html = render('running-blocked-repeat');
     const at = (testid) => html.indexOf(`data-testid="${testid}"`);
-    const order = ['task-page-answer', 'task-page-track', 'task-page-pr-mount', 'task-page-context', 'task-page-docs', 'task-page-details', 'task-page-share-slot'].map(at);
+    const order = ['task-page-answer', 'task-page-track', 'task-page-pr-mount', 'task-page-docs', 'task-page-details', 'task-page-share-slot'].map(at);
     assert.ok(order.every(i => i > 0), JSON.stringify(order));
     assert.deepEqual([...order].sort((a, b) => a - b), order);
   });
@@ -294,11 +292,10 @@ describe('task page structure', () => {
     assert.match(none, /no sessions yet/);
   });
 
-  test('the answer carries the brief\'s ## Current paragraph, plain; absent without a brief; no second strip', () => {
+  test('the answer is the pill and its sentence: no summary paragraph (LIN-4537), no brief or recap, no second strip', () => {
     const html = render('running-blocked-repeat');
-    assert.match(html, /data-testid="task-page-summary">The review is running on PR #41; the build landed\.</);
-    const summary = html.slice(html.indexOf('data-testid="task-page-summary"'), html.indexOf('</p>', html.indexOf('data-testid="task-page-summary"')));
-    assert.doesNotMatch(summary, /keep it small|Constraints/, 'only the Current section');
+    assert.doesNotMatch(html, /task-page-summary|task-summary/, 'no summary paragraph');
+    assert.doesNotMatch(html, /task-page-context|Brief and recap|\/(?:brief|recap)\.js/, 'no brief or recap section or widget script');
     assert.doesNotMatch(renderTaskStatus(model('waiting'), { taskState: stateOf('waiting') }), /task-page-summary/);
     assert.doesNotMatch(html, /segment-bar|task-strip/, 'one progress picture: the stage bars');
   });
@@ -476,12 +473,12 @@ describe('data-ready-header (LIN-3448)', () => {
   });
   const opts = (viewer, name = 'running-blocked-repeat') => ({ viewer, urlKey: 'acme', binding: BINDING, now: NOW, pageOptions: PAGE_OPTIONS, taskState: stateOf(name) });
 
-  test('a ready close-out renders the flag and the ready header HTML, without a summary', () => {
+  test('a ready close-out renders the flag and the ready header HTML, with no summary', () => {
     const { flag, header } = attrs(renderTaskPage(model('running-blocked-repeat'), opts('owner')));
     assert.equal(flag, 'true');
     assert.match(header, /Approved\. PR #41 is ready to merge\./);
     assert.match(header, /data-status=&quot;waiting&quot;/);
-    assert.doesNotMatch(header, /task-summary/, 'the load-time summary is carried by the client, not duplicated here');
+    assert.doesNotMatch(header, /task-summary/, 'no summary paragraph (LIN-4537)');
   });
 
   test('not ready, no evidence, or a guest load (never ready): no flag, no header', () => {
@@ -511,16 +508,11 @@ describe('viewer isolation', () => {
       // LIN-3975: an attempt's run link (or its plain reason) is for a viewer with a run page to open. A guest has none,
       // so that markup is the one viewer difference outside the owner fragments; strip it before the parity check.
       let stripped = owner.replace(/ <(?:a|span) class="task-stage-run[^"]*"[^>]*>[^<]*<\/(?:a|span)>/g, '');
-      // LIN-3975 (finding 1): with neither brief nor recap, the owner's quiet line holds the offers and the marker is not
-      // drawn; the guest's quiet line is the plain state. That pair is the one context difference, stripped the same way.
-      const quiet = owner.includes('data-testid="task-page-context-offers"');
-      for (const f of [fragments.context, fragments.pullRequest, fragments.share, fragments.question]) {
+      for (const f of [fragments.marker, fragments.pullRequest, fragments.share, fragments.question]) {
         if (!f) continue;
         assert.ok(stripped.includes(f), 'the owner page carries the fragment verbatim');
         stripped = stripped.replace(f, '');
       }
-      if (quiet) stripped = stripped.replace(fragments.writeOffers, '');
-      if (quiet) stripped = stripped.replace('<section class="sess-section task-context-section task-context-section--quiet" data-testid="task-page-context-quiet"></section>', '<section class="sess-section task-context-section task-context-section--quiet" data-testid="task-page-context-quiet"><p class="task-context-none" data-testid="task-page-context-none">○ no brief or recap yet</p></section>');
       // LIN-3975: the run control holds the slot the next-step line holds for a viewer with none, so the line is
       // present exactly when the run control is absent.
       if (fragments.runControl) {
@@ -531,11 +523,11 @@ describe('viewer isolation', () => {
     });
   }
 
-  test('the owner widget marker and the close-out box are owner-only', () => {
+  test('the owner marker and the close-out box are owner-only', () => {
     const owner = render('running-blocked-repeat', 'owner');
     const guest = render('running-blocked-repeat', 'guest');
-    assert.match(owner, /data-testid="task-page-owner-widgets"/);
-    assert.doesNotMatch(guest, /task-page-owner-widgets/);
+    assert.match(owner, /data-testid="task-page-owner-marker"/);
+    assert.doesNotMatch(guest, /task-page-owner-marker/);
     assert.match(owner, /data-testid="run-evidence-closeout"/);
     assert.match(owner, /data-issue-id="11111111-2222-3333-4444-555555555555"/);
     assert.match(owner, /data-source="linear"/);

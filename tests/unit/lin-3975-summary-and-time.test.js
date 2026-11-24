@@ -4,8 +4,9 @@
  *   - the moment piece: the relative words, the ISO `datetime`, the UTC fallback in `title`, tap-to-exact (`tap`);
  *   - the client toggle (public/common.js): a tap or Enter flips a `tap` time between its words and its local
  *     exact time, with the zone named, and a re-run never re-binds it;
- *   - the brief panel never repeats the header's `## Current` paragraph;
- *   - the description shows without a fold, cut when long, and the empty brief-and-recap state is one quiet line.
+ *   - the description shows without a fold, cut when long.
+ * LIN-4537 retired the brief and recap, so the header's `## Current` paragraph, the panel that dropped it and the quiet
+ * brief-and-recap line went with them; one test below pins that none is drawn and the grid keeps no column for them.
  *
  * Run with: node --test tests/unit/lin-3975-summary-and-time.test.js
  */
@@ -16,7 +17,6 @@ import { fileURLToPath } from 'node:url';
 import { dirname, join } from 'node:path';
 import vm from 'node:vm';
 import { timeHtml } from '../../lib/components/time.js';
-import { briefWithoutCurrent, briefCurrentSection } from '../../lib/task-page-loader.js';
 import { relativeAgo } from '../../lib/time-words.js';
 import { renderTaskDocs, renderTaskPage } from '../../lib/render-task-page.js';
 import { buildPromptOpts } from '../../lib/render-prompt-opts.js';
@@ -162,54 +162,7 @@ describe('LIN-3975 — the client toggles a tap time between its words and its e
   });
 });
 
-// ─── the summary ─────────────────────────────────────────────────────────────
-
-describe('LIN-3975 — the brief never repeats the header\'s ## Current paragraph', () => {
-  const BRIEF = [
-    '## Current',
-    'Build is running on the shared run control.',
-    '',
-    '## Done',
-    '- the viewer split',
-    '',
-    '## Next',
-    '- the time piece',
-  ].join('\n');
-
-  test('the Current section is removed and the rest is kept', () => {
-    const kept = briefWithoutCurrent(BRIEF);
-    assert.doesNotMatch(kept, /Build is running/);
-    assert.doesNotMatch(kept, /## Current/);
-    assert.match(kept, /## Done\n- the viewer split/);
-    assert.match(kept, /## Next/);
-  });
-
-  test('the header\'s paragraph and the brief\'s rest are the whole brief, with nothing shown twice', () => {
-    assert.equal(briefCurrentSection(BRIEF), 'Build is running on the shared run control.');
-    const html = renderTaskDocs({ identifier: 'LIN-1', description: null, comments: [] });
-    assert.equal(html, '');
-  });
-
-  test('a brief that is only its Current section keeps a pointer, not an empty miss', () => {
-    assert.equal(briefWithoutCurrent('## Current\nOnly this.'), '_Its current state is at the top of the page._');
-  });
-
-  test('a brief without a Current section is unchanged', () => {
-    assert.equal(briefWithoutCurrent('## Done\n- x'), '## Done\n- x');
-  });
-
-  test('the page shows the header paragraph once, and the brief panel without it', () => {
-    const html = renderTaskPage(model({
-      summary: 'Build is running on the shared run control.',
-      brief: { body: BRIEF, model: null, generatedAt: null },
-    }), { viewer: 'owner', urlKey: 'acme', binding: { source: 'linear' }, now: NOW, pageOptions: {}, promptOpts: PROMPT_OPTS });
-    const count = html.split('Build is running on the shared run control.').length - 1;
-    assert.equal(count, 1, 'the paragraph is printed once');
-    assert.match(html, /task-summary/, 'the header carries it');
-  });
-});
-
-describe('LIN-3975 — the description shows without a fold, and the empty brief and recap is one quiet line', () => {
+describe('LIN-3975 — the description shows without a fold', () => {
   test('a short description is shown, not cut, and not in a disclosure', () => {
     const html = renderTaskDocs({ identifier: 'LIN-1', description: 'Short.', comments: [] }, NOW);
     assert.match(html, /<section class="task-description" data-testid="task-page-description">/);
@@ -229,31 +182,16 @@ describe('LIN-3975 — the description shows without a fold, and the empty brief
     assert.match(html, /task-md--cut/);
   });
 
-  test('neither brief nor recap: one quiet section with no heading and no placeholder boxes; the owner gets the two offers', () => {
-    const owner = renderTaskPage(model(), { viewer: 'owner', urlKey: 'acme', binding: { source: 'linear' }, now: NOW, pageOptions: {}, promptOpts: PROMPT_OPTS });
-    assert.match(owner, /data-testid="task-page-context-quiet"/);
-    assert.match(owner, /data-testid="task-page-write-brief"[^>]*>Write a brief</);
-    assert.match(owner, /data-testid="task-page-write-recap"[^>]*>Write a recap</);
-    assert.doesNotMatch(owner, /No brief yet|No recap yet/, 'the placeholder widgets are not drawn');
-    assert.doesNotMatch(owner, /data-testid="task-page-context-mount"/, 'no panel mount for the placeholders to fill');
-    assert.doesNotMatch(owner, /Brief and recap/, 'no heading');
-    assert.match(owner, /class="sess-page task-page task-page--quiet-context"/, 'the stages take the full width');
-    const guest = renderTaskPage(model(), { viewer: 'guest', urlKey: 'acme', binding: { source: 'linear' }, now: NOW, pageOptions: {} });
-    assert.match(guest, /data-testid="task-page-context-quiet"/);
-    assert.match(guest, /○ no brief or recap yet/);
-    assert.doesNotMatch(guest, /task-page-write-brief/, 'a guest is offered no write');
-  });
-
-  test('the quiet line is a named grid row after the PR, not an auto-placed cell that can land above the stages', () => {
-    // The wide grid is read as its row sequence, so a reflow or a merged selector list does not change the answer.
+  test('LIN-4537: no brief, recap, summary or write offer is drawn for any viewer, and the grid keeps no column for them', () => {
+    for (const viewer of ['owner', 'member', 'guest']) {
+      const html = renderTaskPage(model(), { viewer, urlKey: 'acme', binding: { source: 'linear' }, now: NOW, pageOptions: {}, promptOpts: viewer === 'owner' ? PROMPT_OPTS : null });
+      assert.doesNotMatch(html, /task-page-context|task-page-summary|task-page-write-(brief|recap)|Brief and recap|no brief or recap yet/, `${viewer}: none drawn`);
+      assert.doesNotMatch(html, /\/(brief|recap)\.js/, `${viewer}: no widget script loaded`);
+    }
     const wide = { media: '(min-width: 1024px)' };
-    const rowsOf = (areas) => [...areas.matchAll(/"([^"]*)"/g)].map(m => m[1].trim().replace(/\s+/g, ' '));
-    const inOrder = (rows, first, second) => rows.some((row, i) => row === first && rows[i + 1] === second);
-    assert.equal(declOf(TASK_PAGE, '.sess-page.task-page > .task-context-section--quiet', 'grid-area', wide), 'quiet');
-    const page = rowsOf(declOf(TASK_PAGE, '.sess-page.task-page', 'grid-template-areas', wide));
-    assert.ok(inOrder(page, 'pr context', 'quiet quiet') && inOrder(page, 'quiet quiet', 'docs docs'), 'the quiet row sits between the PR and the docs');
-    const quiet = rowsOf(declOf(TASK_PAGE, '.sess-page.task-page.task-page--quiet-context', 'grid-template-areas', wide));
-    assert.ok(quiet.indexOf('stages stages') >= 0 && quiet.indexOf('quiet quiet') > quiet.indexOf('stages stages'), 'the quiet-context layout puts the quiet row after the full-width stages');
+    const areas = declOf(TASK_PAGE, '.sess-page.task-page', 'grid-template-areas', wide);
+    assert.doesNotMatch(areas, /\bcontext\b|\bquiet\b/, 'no brief/recap column and no quiet row');
+    assert.doesNotMatch(read('public/task-page.css'), /task-context|quiet-context|task-summary/, 'no rule names the retired sections');
   });
 
   test('the Read-all control is wired in the task page client before its first Markdown render', () => {
@@ -356,10 +294,6 @@ function model(over = {}) {
     guesses: ['plan'],
     nextStep: { kind: 'plan', label: 'Plan', why: 'usual', failed: false },
     stages: [],
-    summary: null,
-    brief: null,
-    recap: null,
-    contextMiss: null,
     evidence: null,
     description: null,
     comments: [],

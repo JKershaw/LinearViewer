@@ -3,11 +3,11 @@
  *
  * The witness renders a guest page for a Done, merged task from LIN-3351's
  * comment shapes (conditional-approve review → `## Close-out` comment → merged PR
- * → a press/close-out event → a brief written before the close-out) and asserts
- * on the page text that the page no longer contradicts itself. The units pin
- * each edge the plan named: the freshness gate, the merger rule, the close-out
- * summary pick, the sessions line, the not-finished banner staying put, and the
- * client keeping the load-time summary across a poll.
+ * → a press/close-out event) and asserts on the page text that the page no longer
+ * contradicts itself. The units pin each edge the plan named: the merger rule, the
+ * close-out summary pick, the sessions line and the not-finished banner staying put.
+ * LIN-4537 retired the model-written brief, so the freshness gate that withheld a
+ * stale one, and the client keeping its summary across a poll, went with it.
  *
  * Run with: node --test tests/unit/task-page-finished-story.test.js
  */
@@ -21,7 +21,6 @@ import { renderTaskPage, renderTaskPullRequest, sessionsLine } from '../../lib/r
 import { renderEvidence } from '../../lib/render-run-evidence.js';
 import { readRunEvidence, closeOutSummaryFor } from '../../lib/run-evidence.js';
 import { deriveCloseOutState } from '../../lib/run-closeout-state.js';
-import { hashContext } from '../../lib/brief-cache.js';
 import { enrichLoop, deriveSessionWaiting } from '../../routes/dashboard.js';
 
 const NOW = new Date('2026-10-08T21:00:00.000Z');
@@ -101,13 +100,11 @@ function loop(over = {}) {
 
 const MERGED_PR = { readable: true, state: 'closed', merged: true, head: { sha: 'abc1234' }, checks: [{ conclusion: 'success' }] };
 
-function makeLoader({ ctx, brief = null, recap = null, events = [], loops = [loop()], stopAt = 'pr', recordsOverride = null } = {}) {
+function makeLoader({ ctx, events = [], loops = [loop()], stopAt = 'pr', recordsOverride = null } = {}) {
   const loader = createTaskPageLoader({
     recordsStore: recordsOverride ?? RECORDS,
     dispatchStore: {},
     agentStatusStore: {},
-    briefCacheStore: { async get() { return brief; } },
-    recapCacheStore: { async get() { return recap; } },
     closeOutEventsStore: { async listForIssue() { return events; } },
     readRunEvidence: (args) => readRunEvidence({ openFindings: FINDINGS_NONE, ...args, readPrStatus: async () => MERGED_PR }),
     prStateStore: null,
@@ -121,13 +118,6 @@ function makeLoader({ ctx, brief = null, recap = null, events = [], loops = [loo
   return { loader, access };
 }
 
-const STALE_BRIEF = {
-  brief: '## Current\n\nWork remaining is the final correctness pass on F1–F4.\n\n## Next\n- F1 pending',
-  inputHash: 'written-before-the-close-out',
-  model: 'm',
-  generatedAt: '2026-10-08T12:00:00.000Z',
-};
-
 const pageText = (html) => html.replace(/<script[\s\S]*?<\/script>/g, '').replace(/<style[\s\S]*?<\/style>/g, '').replace(/<[^>]+>/g, ' ').replace(/&#0?39;|&apos;/g, "'").replace(/\s+/g, ' ');
 const body = (html) => html.slice(html.indexOf('<main'), html.indexOf('</main>'));
 
@@ -136,8 +126,6 @@ describe('the witness: a guest reads a finished, merged task', () => {
     const ctx = over.ctx || ctxFor();
     const { loader, access } = makeLoader({
       ctx,
-      brief: STALE_BRIEF,
-      recap: { recap: { done: [{ item: 'x' }] }, inputHash: 'old', model: 'm', generatedAt: '2026-10-08T12:00:00.000Z' },
       events: [{ by: 'press', prUrl: PR_URL, merged: true, at: '2026-10-08T18:05:00.000Z' }],
       // 19 sessions' worth of states: the real producer vocabulary incl. closed/expired.
       loops: [
@@ -158,12 +146,9 @@ describe('the witness: a guest reads a finished, merged task', () => {
     const { model, html } = await guestPage();
     const text = pageText(body(html));
 
-    // 1. nothing stale at the top: the unhashed brief is withheld, not shown as current
-    assert.equal(model.summary, null);
-    assert.doesNotMatch(text, /Work remaining is the final correctness pass/);
-    assert.doesNotMatch(text, /F1 pending/);
-    assert.match(text, /brief out of date: written before the latest changes/);
-    assert.match(text, /recap out of date/);
+    // 1. nothing model-written at the top or below it: LIN-4537 retired the brief and recap, so nothing stale can show
+    assert.equal(Object.hasOwn(model, 'summary'), false);
+    assert.doesNotMatch(text, /\bbrief\b|\brecap\b/i);
 
     // 2. no count or stamp re-adjudicates the ledger on a finished task
     assert.doesNotMatch(text, /\d+ of \d+ checked/);
@@ -206,7 +191,7 @@ describe('the witness: a guest reads a finished, merged task', () => {
     const raw = main.slice(main.indexOf('task-page-pr-raw'));
     assert.match(raw, /Close-out summary, <time class="task-time"[^>]*datetime="2026-10-08T18:11:00\.000Z"[^>]*data-local-time="tap"[^>]*>[^<]+ ago<\/time> — its own words, not re-reviewed/);
     assert.match(raw, /All five items are discharged; merged at abc1234/);
-    const pr = main.slice(main.indexOf('task-pr-section'), main.indexOf('task-context-section'));
+    const pr = main.slice(main.indexOf('task-pr-section'), main.indexOf('task-docs'));
     assert.equal((pr.match(/All five items are discharged/g) || []).length, 1, 'once in the PR section (the tracker comments list is separate)');
     assert.match(main, /<details[^>]*task-pr-raw/);
     assert.doesNotMatch(main.match(/<details[^>]*task-pr-raw[^>]*>/)[0], /\bopen\b/, 'the disclosure is closed');
@@ -227,62 +212,11 @@ describe('the witness: a guest reads a finished, merged task', () => {
   });
 });
 
-describe('B1 freshness gate', () => {
-  const fresh = (ctx) => ({ brief: '## Current\n\nAll shipped.', inputHash: hashContext(ctx), model: 'm', generatedAt: '2026-10-08T19:00:00.000Z' });
-  const load = async (ctx, brief) => {
-    const { loader, access } = makeLoader({ ctx, brief });
-    return (await loader.loadTaskPage({ urlKey: 'ws', identifier: 'LIN-51', access })).model;
-  };
-
-  test('a matching hash is shown; a mismatch is a stale miss with no summary', async () => {
-    const ctx = ctxFor();
-    const ok = await load(ctx, fresh(ctx));
-    assert.equal(ok.summary, 'All shipped.');
-    assert.equal(ok.brief.body, '## Current\n\nAll shipped.');
-    const stale = await load(ctx, STALE_BRIEF);
-    assert.equal(stale.summary, null);
-    assert.equal(stale.brief, null);
-    assert.equal(stale.contextMiss.brief, 'stale');
-  });
-
-  test('all children terminal (incl. canceled) is exact and gated', async () => {
-    const kids = [{ id: 'k1', identifier: 'LIN-52', title: 'k', state: { name: 'Canceled', type: 'canceled' } }];
-    const ctx = ctxFor({ children: kids });
-    assert.equal((await load(ctx, STALE_BRIEF)).contextMiss.brief, 'stale');
-    assert.equal((await load(ctx, fresh(ctx))).summary, 'All shipped.');
-  });
-
-  test('an open child on a task still in progress keeps today\'s behaviour (named residual)', async () => {
-    const kids = [{ id: 'k1', identifier: 'LIN-52', title: 'k', state: { name: 'Todo', type: 'unstarted' } }];
-    const model = await load(ctxFor({ stateType: 'started', children: kids }), STALE_BRIEF);
-    assert.equal(model.summary, 'Work remaining is the final correctness pass on F1–F4.');
-    assert.equal(model.contextMiss.brief, null);
-  });
-
-  test('a Done parent with an open child is unverifiable: no summary, and it says so', async () => {
-    const kids = [{ id: 'k1', identifier: 'LIN-52', title: 'k', state: { name: 'Todo', type: 'unstarted' } }];
-    const ctx = ctxFor({ children: kids });
-    const model = await load(ctx, fresh(ctx));
-    assert.equal(model.summary, null);
-    assert.equal(model.contextMiss.brief, 'unverifiable');
-    const html = renderTaskPage(model, { viewer: 'guest', urlKey: 'ws', now: NOW });
-    assert.match(pageText(body(html)), /brief can't be checked against the latest changes/);
-  });
-
-  test('a duplicate parent with an open child is unverifiable, as Done is (LIN-3656)', async () => {
-    const kids = [{ id: 'k1', identifier: 'LIN-52', title: 'k', state: { name: 'Todo', type: 'unstarted' } }];
-    const ctx = ctxFor({ stateType: 'duplicate', children: kids });
-    const model = await load(ctx, fresh(ctx));
-    assert.equal(model.summary, null);
-    assert.equal(model.contextMiss.brief, 'unverifiable');
-  });
-
-  test('the state read builds its model with no brief, recap or summary', async () => {
-    const { loader } = makeLoader({ ctx: ctxFor(), brief: fresh(ctxFor()) });
+describe('the state read', () => {
+  test('builds its model with no brief, recap or summary (LIN-4537: none exists), and never claims finished', async () => {
+    const { loader } = makeLoader({ ctx: ctxFor() });
     const { model } = await loader.loadTaskState({ urlKey: 'ws', identifier: 'LIN-51', issueId: UUID });
-    assert.equal(model.brief, null);
-    assert.equal(model.recap, null);
-    assert.equal(model.summary, null);
+    for (const key of ['brief', 'recap', 'summary', 'contextMiss']) assert.equal(Object.hasOwn(model, key), false, `no ${key}`);
     assert.equal(model.finished, false, 'no tracker read: never claims finished');
   });
 });
@@ -351,7 +285,7 @@ describe('B4 owner load: a press merge reads as a close-out merge (review F1)', 
   test('partial merge with a press event: the owner box does not claim it either', async () => {
     const partial = { status: 'partial', pr: { number: 41, url: PR_URL }, message: 'PR #41 merged · 1 more PR open' };
     const loader = createTaskPageLoader({
-      dispatchStore: {}, agentStatusStore: {}, briefCacheStore: { async get() { return null; } }, recapCacheStore: { async get() { return null; } },
+      dispatchStore: {}, agentStatusStore: {},
       closeOutEventsStore: { async listForIssue() { return PRESS; } },
       readRunEvidence: async () => ({ closeOut: partial, ledger: null, state: { pr: partial.pr } }),
       prStateStore: null, readTaskRunFacts: async () => ({ stopAt: 'pr', variant: 'standard' }),

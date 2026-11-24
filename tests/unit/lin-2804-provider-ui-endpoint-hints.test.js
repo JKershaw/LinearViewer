@@ -82,8 +82,6 @@ function buildKickoffApp({ provider, dispatchQueueStore }) {
     getWorkspaceOpenRouterKey: async () => null,
     provider,
     agentStatusStore: {},
-    recapCacheStore: { get: async () => null, set: async () => {} },
-    briefCacheStore: { get: async () => null, set: async () => {} },
     dispatchQueueStore,
     workspaceFromUrl: (req, res, next) => next(),
     workspacePreferencesStore: { getWorkspacePreferences: async () => ({}) },
@@ -185,8 +183,8 @@ function buildFeedbackApp({ provider, dispatchQueueStore }) {
     proxyTokenStore: fakeProxyTokenStore(),
     freeTierStore: {}, getOpenRouterSource: () => null, userPreferencesStore: {},
     workspacePreferencesStore: { getWorkspacePreferences: async () => ({}) },
-    customPromptsStore: {}, recapCacheStore: {},
-    briefCacheStore: {}, reportHistoryStore: {}, agentStatusStore: {}, promptTraceStore: {}
+    customPromptsStore: {},
+    reportHistoryStore: {}, agentStatusStore: {}, promptTraceStore: {}
   });
   app.use(router);
   return app;

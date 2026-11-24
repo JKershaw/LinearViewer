@@ -2,7 +2,7 @@
  * LIN-2044 — the compute-endpoint capability backstop and provider routing.
  *
  * Steps 1-6 re-pointed routes/proxy.js's compute fetchers (stack/prompt/
- * recommend/recap/brief) off a static Linear import onto the request's own
+ * recommend/recap/brief; LIN-4537 later retired recap and the model brief) off a static Linear import onto the request's own
  * ACTIVE provider (`resolveProviderAccess` -> `provider.fetch*`), and Step 4
  * added a `denyIfUnsupported` capability gate at all 11 physically reachable
  * entry points so a provider that doesn't implement a compute fetcher declines
@@ -97,8 +97,6 @@ function buildApp({ provider, resolveWorkspaceAccess } = {}) {
     getWorkspaceAccessToken: async () => NON_TEST_TOKEN,
     getWorkspaceOpenRouterKey: async () => null,
     agentStatusStore: {},
-    recapCacheStore: { get: async () => null, put: async () => {} },
-    briefCacheStore: { get: async () => null, put: async () => {} },
     dispatchQueueStore: {},
     workspaceFromUrl: (req, res, next) => next(),
     workspacePreferencesStore: {},
@@ -175,9 +173,14 @@ describe('Proxy compute routes decline cleanly when the resolved provider lacks 
     assert.deepEqual(provider.calls, []);
   });
 
-  test('GET .../recap: a provider without fetchRecommendationContext declines with 422 CAPABILITY_NOT_SUPPORTED', async () => {
-    const provider = new FakeComputeProvider();
-    const { status, body } = await call(buildApp({ provider }), 'GET', '/api/proxy/issues/ENG-9/recap');
+  // LIN-4537: this case drove GET .../recap, now retired. GET /recommend is the surviving route gated on
+  // fetchRecommendationContext; a provider with fetchIssueContext but not fetchRecommendationContext passes
+  // the first gate and must decline on the second, naming it.
+  test('GET .../recommend: a provider with fetchIssueContext but without fetchRecommendationContext declines with 422 CAPABILITY_NOT_SUPPORTED naming fetchRecommendationContext', async () => {
+    const provider = new FakeComputeProvider({
+      fetchIssueContext: async () => fakeContext({ id: 'jira-uuid-1', identifier: 'ENG-9', title: 'irrelevant' }),
+    });
+    const { status, body } = await call(buildApp({ provider }), 'GET', '/api/proxy/issues/ENG-9/recommend');
     assert.equal(status, 422, JSON.stringify(body));
     assert.equal(body.code, 'CAPABILITY_NOT_SUPPORTED');
     assert.equal(body.capability, 'fetchRecommendationContext');
@@ -234,18 +237,7 @@ describe('Proxy compute routes call the RESOLVED provider\'s own method — neve
     assert.equal(provider.calls[0].args[1], 'ENG-9');
     assert.match(body.prompt, new RegExp(distinctiveTitle), 'the rendered prompt must embed the resolved provider\'s own issue title — a fallback to Linear (or to nothing) could not produce this string');
   });
-
-  test('GET .../recap calls provider.fetchRecommendationContext, and the response reflects THAT provider\'s own identifier — never a 401 (the Jira-token-sent-to-Linear symptom)', async () => {
-    const provider = new FakeComputeProvider({
-      fetchRecommendationContext: async () => fakeContext({ id: 'jira-uuid-1', identifier: 'ENG-9', title: 'irrelevant' }),
-    });
-    const { status, body } = await call(buildApp({ provider }), 'GET', '/api/proxy/issues/ENG-9/recap?noRefresh=1');
-    assert.equal(status, 200, JSON.stringify(body));
-    assert.equal(provider.calls.length, 1);
-    assert.equal(provider.calls[0].fn, 'fetchRecommendationContext');
-    assert.equal(provider.calls[0].args[0], NON_TEST_TOKEN);
-    assert.equal(provider.calls[0].args[1], 'ENG-9');
-    assert.equal(body.status, 'missing', 'a never-cached issue with noRefresh=1 short-circuits before any LLM call');
-    assert.equal(body.identifier, 'ENG-9');
-  });
+  // LIN-4537: the GET .../recap case that proved fetchRecommendationContext reaches the resolved provider
+  // went with the route. On GET /recommend (its live path ends in a model call) that is pinned with an
+  // OpenRouter fetch stub by tests/unit/lin-2353-recommend-llm-provider-ui.test.js.
 });

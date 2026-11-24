@@ -35,7 +35,7 @@ afterEach(() => {
 const REAL_TOKEN = { resolveWorkspaceAccess: async () => ({ token: 'real-token', reason: 'ok' }) };
 const MOCK_TOKEN = { resolveWorkspaceAccess: async () => ({ token: 'test-token', reason: 'ok' }) };
 
-// A provider that can serve the recap/brief context fetch for a non-test token.
+// A provider that can serve the records-brief and recommend context fetches for a non-test token.
 function providerWithContext() {
   const base = BASE_DEPS().provider;
   return {
@@ -47,9 +47,6 @@ function providerWithContext() {
 
 const PROXY_SITES = [
   { name: 'GET /recommend', method: 'get', path: '/api/proxy/recommend/TEST-1', expect: /AI recommendations not configured/ },
-  { name: 'GET /recap', method: 'get', path: '/api/proxy/recap/TEST-1', expect: /AI recap is not configured/ },
-  { name: 'POST /recap', method: 'post', path: '/api/proxy/recap/TEST-1', body: {}, expect: /AI recap is not configured/ },
-  { name: 'POST /brief', method: 'post', path: '/api/proxy/brief/TEST-1', body: {}, expect: /AI brief is not configured/ },
   { name: 'POST /recommend-and-dispatch', method: 'post', path: '/api/proxy/recommend-and-dispatch', body: { issueIdentifier: 'TEST-1' }, expect: /AI recommendations not configured/ },
 ];
 
@@ -73,7 +70,7 @@ describe('proxy-family availability gate (no key anywhere)', () => {
   test('GET /brief: the records brief makes no model call, so it stays outside the gate', async () => {
     const app = buildApp({ ...REAL_TOKEN, provider: providerWithContext() });
     const res = await call(app, 'get', '/api/proxy/brief/TEST-1');
-    assert.doesNotMatch(JSON.stringify(res.body), /AI brief is not configured/);
+    assert.doesNotMatch(JSON.stringify(res.body), /AI[^"]*not configured/);
   });
 
   test('GET /recommend: the ?kind= override makes no model call, so it stays outside the gate', async () => {
