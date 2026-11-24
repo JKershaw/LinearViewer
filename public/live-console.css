@@ -568,7 +568,7 @@
   font-size: 0.72rem;
   color: var(--amber-dim);
 }
-/* LIN-2244: "parked on a wait" overrides the amber "working" tone above with a
+/* LIN-2244: the parked "waiting on …" words (LIN-4558) override the amber "working" tone above with a
    muted one — nothing here needs a human's attention the way the amber
    working/waiting vocabulary implies elsewhere on this rail. */
 .lc-lane-action[data-parked="1"] { color: var(--slate-dim); }

@@ -171,8 +171,9 @@
     const m = Math.floor(s / 60), r = s % 60;
     return r ? `${m}m ${r}s` : `${m}m`;
   }
-  // LIN-4558: a wait's age in whole minutes once past one, as lib/time-words.js
-  // fmtDuration words a minute-rounded span ("48m", "1h 30m"): an age, not a stopwatch.
+  // LIN-4558: a wait's age in whole minutes once past one ("48m", "1h 30m"): an age,
+  // not a stopwatch. A classic-script copy of lib/time-words.js `fmtAge` (this file
+  // cannot import the leaf until it becomes a module); keep the two in step.
   function waitAge(ms) {
     if (!Number.isFinite(ms) || ms < 0) return '';
     const secs = Math.round(ms / 1000);
