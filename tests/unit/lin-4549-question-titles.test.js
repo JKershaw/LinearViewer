@@ -4,7 +4,8 @@
  * docs/areas/records.md). The reader, then each caller with its own source:
  *   - Home (lib/home-row-states.js): the page's issues; the live fragment's held issue set is the same `titlesFromIssues`;
  *   - Flight Companion's chat tool (lib/chat-tools.js list_pending_decisions): the workspace's issue read, best effort;
- *   - the rulings feed (routes/dashboard-rulings.js): the runs it already read (a run carries its task's title);
+ *   - the rulings feed (routes/dashboard-rulings.js): the held issue set when it is warm (no provider call), then the runs it
+ *     already read (a run carries its task's title);
  *   - the task page (routes/task-page.js) is witnessed in tests/unit/task-page-route.test.js, the run page (routes/dashboard.js)
  *     end to end in tests/e2e/lin-4549-card-task-line.spec.js.
  * A task with no known title reads as its identifier alone: `title` is null, never '' or 'undefined'.
@@ -131,19 +132,19 @@ describe('LIN-4549 — Flight Companion\'s chat tool (lib/chat-tools.js): each p
   });
 });
 
-describe('LIN-4549 — the rulings feed (routes/dashboard-rulings.js): each row carries its task\'s title from the runs it read', () => {
+describe('LIN-4549 — the rulings feed (routes/dashboard-rulings.js): each row carries its task\'s title from the held issue set, then the runs it read', () => {
   let server;
   let feedLoops = [];
   afterEach(async () => { if (server) await new Promise((r) => server.close(r)); server = null; feedLoops = []; });
 
-  async function feed() {
+  async function feed(taskFacts = undefined) {
     const session = { accountId: OWNER, workspaces: [{ urlKey: URL_KEY, name: 'Titles' }] };
     const app = express();
     app.use(createDashboardRulingsRoutes({
       workspaceFromUrl: (req, res, next) => { req.workspace = { urlKey: URL_KEY, id: 'ws' }; req.session = session; next(); },
       sessionsFeedCache: { keyFor: (_ws, ns) => ns, get: async (_k, fn) => fn(), clear() {} },
       mergeLoops: async () => feedLoops,
-      recordsStore: records, dispatchQueueStore: dispatch, accountStore: { resolveCanonicalAccountId: async (id) => id },
+      recordsStore: records, dispatchQueueStore: dispatch, accountStore: { resolveCanonicalAccountId: async (id) => id }, taskFacts,
     }));
     server = await new Promise((resolve) => { const s = app.listen(0, '127.0.0.1', () => resolve(s)); });
     const res = await fetch(`http://127.0.0.1:${server.address().port}/workspace/${URL_KEY}/api/dashboard/rulings`);
@@ -157,5 +158,19 @@ describe('LIN-4549 — the rulings feed (routes/dashboard-rulings.js): each row 
     const body = await feed();
     const byTicket = Object.fromEntries(body.rulings.map((r) => [r.ticket, r.title]));
     assert.deepEqual(byTicket, { 'LIN-1': 'Ship the thing', 'LIN-3': null });
+  });
+  test('a warm held issue set names a task that has no run (finding-3788e61b); a cold set leaves it alone; the feed makes no provider call', async () => {
+    await ask('LIN-1');
+    await ask('LIN-3');
+    feedLoops = [{ workspaceUrlKey: URL_KEY, issueIdentifier: 'LIN-1', issueTitle: 'Ship the thing' }];
+    const issues = [{ identifier: 'LIN-1', title: 'Held title one' }, { identifier: 'LIN-3', title: 'Held title three' }];
+    let reads = 0;
+    const warm = await feed({ read: (urlKey) => { reads += 1; assert.equal(urlKey, URL_KEY); return { complete: true, issues }; } });
+    assert.deepEqual(Object.fromEntries(warm.rulings.map((r) => [r.ticket, r.title])), { 'LIN-1': 'Held title one', 'LIN-3': 'Held title three' });
+    assert.equal(reads, 1, 'one held-set read per workspace, nothing that reaches a provider');
+    await new Promise((r) => server.close(r));
+    server = null;
+    const cold = await feed({ read: () => ({ complete: false, issues }) });
+    assert.deepEqual(Object.fromEntries(cold.rulings.map((r) => [r.ticket, r.title])), { 'LIN-1': 'Ship the thing', 'LIN-3': null });
   });
 });

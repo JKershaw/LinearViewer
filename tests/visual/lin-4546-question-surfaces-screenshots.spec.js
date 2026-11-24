@@ -64,7 +64,7 @@ async function seed(page, urlKey) {
   expect(resp.ok(), `seed failed: ${await resp.text()}`).toBeTruthy();
 
   // The asking run on LOCAL-12 (parked on `[blocked]`), so the run page pins its question.
-  const runId = await askingRun(page, urlKey, 'LOCAL-12');
+  const runId = await askingRun(page, urlKey, 'LOCAL-12', { title: titleOf('LOCAL-12') });
   const asked = [
     { ticket: 'LOCAL-11', variant: 0, runId: null },
     { ticket: 'LOCAL-12', variant: 1, runId },
@@ -81,10 +81,13 @@ async function seed(page, urlKey) {
 function pendingResult(questions) {
   return JSON.stringify({
     count: questions.length, truncated: false,
-    questions: questions.map((q, i) => ({
-      questionId: q.id, question: q.fields.asks, options: q.fields.options, recommended: q.fields.recommended ?? null,
-      issueIdentifier: ['LOCAL-11', 'LOCAL-12', 'LOCAL-13'][i] ?? null, state: 'resumable', interactive: true,
-    })),
+    questions: questions.map((q, i) => {
+      const issueIdentifier = ['LOCAL-11', 'LOCAL-12', 'LOCAL-13'][i] ?? null;
+      return {
+        questionId: q.id, question: q.fields.asks, options: q.fields.options, recommended: q.fields.recommended ?? null,
+        issueIdentifier, issueTitle: issueIdentifier ? titleOf(issueIdentifier) : null, state: 'resumable', interactive: true,
+      };
+    }),
   });
 }
 

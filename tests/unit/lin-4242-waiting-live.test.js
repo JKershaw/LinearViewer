@@ -12,7 +12,7 @@
  * - The cards take their task titles from the held issue set when it is warm (lib/open-questions.js `titlesFromIssues`, LIN-4549),
  *   else the card shows its task's identifier alone.
  *
- * The keyed merge itself (public/question-cards.js mergeWaitingCards) runs in a fake DOM in
+ * The keyed merge itself (public/waiting-merge.js, which imports holdsCard itself) runs in a fake DOM in
  * tests/unit/lin-4242-waiting-merge.test.js; the live section runs in a real browser in tests/e2e/lin-4242-waiting-live.spec.js.
  */
 import { test, describe } from 'node:test';

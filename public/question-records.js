@@ -24,8 +24,8 @@ function setBusy(card, busy) {
 }
 
 // ── Keeping a card across a repaint (LIN-4549, finding-7a603e81) ──────────────
-// The one rule every host that repaints a question card asks: Home's live Waiting refresh (public/question-cards.js
-// mergeWaitingCards, given it by public/app.js), Observation's rulings poll (public/observation.js) and Home's opened task
+// The one rule every host that repaints a question card asks: Home's live Waiting refresh (public/waiting-merge.js,
+// which imports holdsCard itself), Observation's rulings poll (public/observation.js) and Home's opened task
 // (public/prompt-section.js keepTypedQuestion). It reads either card: a question record's, or the older reply card a run
 // parked on a bare `[blocked]` draws (lib/question-card.js). Each host decides first which card is "the same" (by its key);
 // this says whether that card holds the reader's place.

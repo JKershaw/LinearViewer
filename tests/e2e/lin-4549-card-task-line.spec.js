@@ -69,9 +69,9 @@ test('Home, the rulings page, the task page and the run page: the card names its
     await expect(card.locator(`${Q.task} [data-testid="issue-row-state"]`)).toHaveText('needs you');
   }
 
-  // The rulings page: titles from the runs the feed read. LOCAL-12's run carries its title; LOCAL-11 has no run: identifier alone.
+  // The rulings page: titles from the held issue set Home's load just warmed, so LOCAL-11 (no run) is titled too (finding-3788e61b).
   await page.goto(`/workspace/${urlKey}/observation?view=rulings`);
-  for (const [qid, ticket, title] of [[q12, 'LOCAL-12', TASKS['LOCAL-12']], [q11, 'LOCAL-11', null]]) {
+  for (const [qid, ticket, title] of [[q12, 'LOCAL-12', TASKS['LOCAL-12']], [q11, 'LOCAL-11', TASKS['LOCAL-11']]]) {
     const row = page.locator('[data-testid="ruling-question-row"]', { has: page.locator(Q.byId(qid)) });
     await expectTaskLine(row, row.locator(Q.card), ticket, title);
   }
