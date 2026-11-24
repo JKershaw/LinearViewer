@@ -35,13 +35,13 @@ export function makeLaneNode(world, lane = {}) {
 }
 
 // The lane's parts and anchors, pinned to the client source. laneNode builds every part that updateLaneNode queries, and
-// it has exactly two anchors, the task link and the run link. A class updateLaneNode queries that laneNode does not build
+// it has exactly three anchors: the task link, the run link and (LIN-4558) the child-run link of a parked lane. A class updateLaneNode queries that laneNode does not build
 // fails here. (LIN-4310: this used to check a copied fixture against laneNode; with the copy gone, it checks laneNode.)
 export function pinLaneMarkupToClient() {
   const start = CLIENT_SRC.indexOf('function laneNode(lane)');
   const template = CLIENT_SRC.slice(start, CLIENT_SRC.indexOf('updateLaneNode(li, lane);', start));
   assert.ok(template.includes('<li class="lc-lane'), 'laneNode still builds the lane');
-  assert.equal((template.match(/<a class=/g) || []).length, 2, 'laneNode emits one task link and one run link, nothing else');
+  assert.equal((template.match(/<a class=/g) || []).length, 3, 'laneNode emits one task link, one run link and one child-run link, nothing else');
   const queried = [...CLIENT_SRC.matchAll(/li\.querySelector\('\.([a-z-]+)'\)/g)].map(m => m[1]);
   assert.ok(queried.length > 0, 'updateLaneNode queries its lane parts');
   for (const cls of queried) assert.ok(template.includes(`class="${cls}"`), `laneNode builds .${cls}`);

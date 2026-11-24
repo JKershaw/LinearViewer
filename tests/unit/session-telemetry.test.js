@@ -231,7 +231,7 @@ describe('parseParkedWait (LIN-2244)', () => {
       { message: '[working] 6 tools/32s · alive', timestamp: 't1' },
       { message: '[working · verifying] Not done yet — a scheduled wakeup still pending.', timestamp: 't2' },
     ];
-    assert.deepEqual(parseParkedWait(feedback), { since: 't2', latest: 't2' });
+    assert.deepEqual(parseParkedWait(feedback), { since: 't2', latest: 't2', what: 'a scheduled wakeup' });
   });
 
   test('"since" is the start of the CONTIGUOUS run of parked entries, not the first-ever mention', () => {
@@ -241,7 +241,7 @@ describe('parseParkedWait (LIN-2244)', () => {
       { message: '[working · verifying] a scheduled wakeup still pending.', timestamp: 't3' },
       { message: '[working · verifying] a scheduled wakeup still pending.', timestamp: 't4' },
     ];
-    assert.deepEqual(parseParkedWait(feedback), { since: 't3', latest: 't4' });
+    assert.deepEqual(parseParkedWait(feedback), { since: 't3', latest: 't4', what: 'a scheduled wakeup' });
   });
 
   test('not parked when the LATEST entry is something else — even if parked earlier', () => {
@@ -273,7 +273,7 @@ describe('parseParkedWait (LIN-2244)', () => {
       { message: '[working · verifying] a scheduled wakeup still pending.', timestamp: 't2' },
       { kind: 'decision-withdrawn', message: JSON.stringify({ decision_id: 'd-1', reason: 'unrelated' }), timestamp: 't3' },
     ];
-    assert.deepEqual(parseParkedWait(feedback), { since: 't2', latest: 't2' });
+    assert.deepEqual(parseParkedWait(feedback), { since: 't2', latest: 't2', what: 'a scheduled wakeup' });
   });
 
   test('a decision-withdrawal-reversed stamp as the LAST entry does not mask a parked wait — the latest non-stamp entry decides', () => {
@@ -281,7 +281,7 @@ describe('parseParkedWait (LIN-2244)', () => {
       { message: '[working · verifying] a scheduled wakeup still pending.', timestamp: 't1' },
       { kind: 'decision-withdrawal-reversed', message: JSON.stringify({ decision_id: 'd-1' }), timestamp: 't2' },
     ];
-    assert.deepEqual(parseParkedWait(feedback), { since: 't1', latest: 't1' });
+    assert.deepEqual(parseParkedWait(feedback), { since: 't1', latest: 't1', what: 'a scheduled wakeup' });
   });
 
   test('a decision-answer stamp as the LAST entry does not mask a parked wait — the latest non-stamp entry decides', () => {
@@ -291,7 +291,7 @@ describe('parseParkedWait (LIN-2244)', () => {
       { message: '[working · verifying] a scheduled wakeup still pending.', timestamp: 't1' },
       { kind: 'decision-answer', message: JSON.stringify({ decision_id: 'd-1', answer: 'proceed' }), timestamp: 't2' },
     ];
-    assert.deepEqual(parseParkedWait(feedback), { since: 't1', latest: 't1' });
+    assert.deepEqual(parseParkedWait(feedback), { since: 't1', latest: 't1', what: 'a scheduled wakeup' });
   });
 
   test('a decision-withdrawn stamp in the MIDDLE of a parked run is passed over without breaking the run', () => {
@@ -300,7 +300,7 @@ describe('parseParkedWait (LIN-2244)', () => {
       { kind: 'decision-withdrawn', message: JSON.stringify({ decision_id: 'd-1', reason: 'unrelated, re-scope needed' }), timestamp: 't2' },
       { message: '[working · verifying] a scheduled wakeup still pending.', timestamp: 't3' },
     ];
-    assert.deepEqual(parseParkedWait(feedback), { since: 't1', latest: 't3' });
+    assert.deepEqual(parseParkedWait(feedback), { since: 't1', latest: 't3', what: 'a scheduled wakeup' });
   });
 
   test('a stamp in the middle still respects a genuine non-stamp break in the parked run', () => {
@@ -309,7 +309,7 @@ describe('parseParkedWait (LIN-2244)', () => {
       { kind: 'decision-withdrawn', message: JSON.stringify({ decision_id: 'd-1', reason: 'unrelated' }), timestamp: 't2' },
       { message: '[working · verifying] a scheduled wakeup still pending.', timestamp: 't3' },
     ];
-    assert.deepEqual(parseParkedWait(feedback), { since: 't3', latest: 't3' });
+    assert.deepEqual(parseParkedWait(feedback), { since: 't3', latest: 't3', what: 'a scheduled wakeup' });
   });
 
   test('a run of ONLY stamps before the parked entry yields since === latest (no earlier non-stamp parked entry)', () => {
@@ -318,7 +318,7 @@ describe('parseParkedWait (LIN-2244)', () => {
       { kind: 'decision-withdrawal-reversed', message: JSON.stringify({ decision_id: 'd-1' }), timestamp: 't2' },
       { message: '[working · verifying] a scheduled wakeup still pending.', timestamp: 't3' },
     ];
-    assert.deepEqual(parseParkedWait(feedback), { since: 't3', latest: 't3' });
+    assert.deepEqual(parseParkedWait(feedback), { since: 't3', latest: 't3', what: 'a scheduled wakeup' });
   });
 
   test('all-stamp feedback (no non-stamp entry at all) returns null', () => {
@@ -342,7 +342,7 @@ describe('parseParkedWait skips non-state entries (LIN-4240)', () => {
       { message: PARK, timestamp: 't1' },
       { kind: 'tool', message: 'Read lib/session-telemetry.js', timestamp: 't2' },
     ];
-    assert.deepEqual(parseParkedWait(feedback), { since: 't1', latest: 't1' });
+    assert.deepEqual(parseParkedWait(feedback), { since: 't1', latest: 't1', what: 'a scheduled wakeup' });
   });
 
   // Witness 2
@@ -351,7 +351,7 @@ describe('parseParkedWait skips non-state entries (LIN-4240)', () => {
       { message: PARK, timestamp: 't1' },
       { kind: 'usage', message: '{"model":"x","inputTokens":10}', timestamp: 't2' },
     ];
-    assert.deepEqual(parseParkedWait(feedback), { since: 't1', latest: 't1' });
+    assert.deepEqual(parseParkedWait(feedback), { since: 't1', latest: 't1', what: 'a scheduled wakeup' });
   });
 
   test('park, then a legacy UNTAGGED [usage] line → still parked', () => {
@@ -359,7 +359,7 @@ describe('parseParkedWait skips non-state entries (LIN-4240)', () => {
       { message: PARK, timestamp: 't1' },
       { message: '[usage] claude-opus 1200 in / 300 out', timestamp: 't2' },
     ];
-    assert.deepEqual(parseParkedWait(feedback), { since: 't1', latest: 't1' });
+    assert.deepEqual(parseParkedWait(feedback), { since: 't1', latest: 't1', what: 'a scheduled wakeup' });
   });
 
   test('park, then kind:resources → still parked', () => {
@@ -367,7 +367,7 @@ describe('parseParkedWait skips non-state entries (LIN-4240)', () => {
       { message: PARK, timestamp: 't1' },
       { kind: 'resources', message: '[resources] {"cpu":0.4}', timestamp: 't2' },
     ];
-    assert.deepEqual(parseParkedWait(feedback), { since: 't1', latest: 't1' });
+    assert.deepEqual(parseParkedWait(feedback), { since: 't1', latest: 't1', what: 'a scheduled wakeup' });
   });
 
   // Witness 3
@@ -377,7 +377,7 @@ describe('parseParkedWait skips non-state entries (LIN-4240)', () => {
       { kind: 'tool', message: 'Bash npm test', timestamp: 't2' },
       { kind: 'decision-withdrawn', message: STAMP, timestamp: 't3' },
     ];
-    assert.deepEqual(parseParkedWait(feedback), { since: 't1', latest: 't1' });
+    assert.deepEqual(parseParkedWait(feedback), { since: 't1', latest: 't1', what: 'a scheduled wakeup' });
   });
 
   // Witness 4: the reaper's exact [ticket] shape (kind:'status', message-matched)
@@ -386,7 +386,7 @@ describe('parseParkedWait skips non-state entries (LIN-4240)', () => {
       { message: PARK, timestamp: 't1' },
       { kind: 'status', message: '[ticket] LIN-1 done', timestamp: 't2' },
     ];
-    assert.deepEqual(parseParkedWait(feedback), { since: 't1', latest: 't1' });
+    assert.deepEqual(parseParkedWait(feedback), { since: 't1', latest: 't1', what: 'a scheduled wakeup' });
   });
 
   // Witness 5
@@ -396,7 +396,7 @@ describe('parseParkedWait skips non-state entries (LIN-4240)', () => {
       { kind: 'tool', message: 'Read a.js', timestamp: 't2' },
       { message: PARK, timestamp: 't3' },
     ];
-    assert.deepEqual(parseParkedWait(feedback), { since: 't1', latest: 't3' });
+    assert.deepEqual(parseParkedWait(feedback), { since: 't1', latest: 't3', what: 'a scheduled wakeup' });
   });
 
   test('park, a ticket marker, another park → one run, since at the FIRST park', () => {
@@ -405,7 +405,7 @@ describe('parseParkedWait skips non-state entries (LIN-4240)', () => {
       { kind: 'status', message: '[ticket] LIN-1 started', timestamp: 't2' },
       { message: PARK, timestamp: 't3' },
     ];
-    assert.deepEqual(parseParkedWait(feedback), { since: 't1', latest: 't3' });
+    assert.deepEqual(parseParkedWait(feedback), { since: 't1', latest: 't3', what: 'a scheduled wakeup' });
   });
 
   // Witness 6 guards: these must hold before AND after the change.
@@ -415,7 +415,7 @@ describe('parseParkedWait skips non-state entries (LIN-4240)', () => {
       { kind: 'assistant-text', message: 'Waiting on CI, will check again.', timestamp: 't2' },
       { message: PARK, timestamp: 't3' },
     ];
-    assert.deepEqual(parseParkedWait(feedback), { since: 't3', latest: 't3' });
+    assert.deepEqual(parseParkedWait(feedback), { since: 't3', latest: 't3', what: 'a scheduled wakeup' });
   });
 
   test('guard: park, then [done] → not parked', () => {
@@ -464,7 +464,7 @@ describe('parseParkedWait skips non-state entries (LIN-4240)', () => {
       { message: PARK, timestamp: 't1' },
       { kind: 'heartbeat', message: '[working · verifying] verifying in background (scheduled wakeup) · idle 2m · next heartbeat in ≤1m', timestamp: 't2' },
     ];
-    assert.deepEqual(parseParkedWait(feedback), { since: 't1', latest: 't2' });
+    assert.deepEqual(parseParkedWait(feedback), { since: 't1', latest: 't2', what: 'a scheduled wakeup' });
   });
 });
 
@@ -1463,7 +1463,7 @@ describe('buildRunTelemetry', () => {
       dispatchedAt: '2026-06-22T10:00:00.000Z',
       feedback: [{ message: '[working · verifying] a scheduled wakeup still pending.', timestamp: '2026-06-22T10:05:00.000Z' }],
     });
-    assert.deepEqual(parked.parkedWait, { since: '2026-06-22T10:05:00.000Z', latest: '2026-06-22T10:05:00.000Z' });
+    assert.deepEqual(parked.parkedWait, { since: '2026-06-22T10:05:00.000Z', latest: '2026-06-22T10:05:00.000Z', what: 'a scheduled wakeup' });
 
     const notParked = buildRunTelemetry({
       dispatchedAt: '2026-06-22T10:00:00.000Z',
