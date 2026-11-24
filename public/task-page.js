@@ -18,7 +18,7 @@
  * changes or every 60 s while a lane runs, never more than once per 60 s
  * window, and never once the poll stops (hidden tab, 401, revoked link). Done is
  * the one exception: it reads once more, past the window, then stops (`finish`).
- * Owner-only behaviour starts from owner-only DOM hooks: the `task-page-owner-widgets`
+ * Owner-only behaviour starts from owner-only DOM hooks: the `task-page-owner-marker`
  * marker is the owner signal, and the close-out box (public/close-out.js)
  * is its own owner fragment. A guest loads the same scripts and they no-op.
  * (LIN-4537 retired the brief/recap widgets the marker once mounted.)
@@ -614,7 +614,7 @@ function init(doc) {
   // repaints it.
   if (window.QuestionCards && typeof window.QuestionCards.initQuestionCards === 'function') window.QuestionCards.initQuestionCards();
   var questionCard = doc.querySelector('[data-testid="task-page-question"]');
-  var isOwnerPage = !!doc.querySelector('[data-testid="task-page-owner-widgets"]');
+  var isOwnerPage = !!doc.querySelector('[data-testid="task-page-owner-marker"]');
   var closeOutBox = window.CloseOut && typeof window.CloseOut.init === 'function' ? window.CloseOut.init(doc) : null;
   // LIN-3975: the owner's run control (the shared PromptSection, surface `task`) is wired here too, before the
   // first Markdown render below, so a look-alike control in ticket text cannot be the one found. A guest or a
@@ -679,7 +679,7 @@ function init(doc) {
   // card. A poll that says a question while the card is missing reloads the page
   // once, since the card is server-rendered for the owner and the poll does not
   // paint it. Both are captured at init, before any markdown renders (LIN-3385).
-  // The owner-widgets marker is the owner signal — no second owner check.
+  // The owner marker is the owner signal — no second owner check.
   function syncQuestion(state) {
     var asked = typeof state.questionHtml === 'string' && state.questionHtml !== '';
     if (questionCard && !asked) {

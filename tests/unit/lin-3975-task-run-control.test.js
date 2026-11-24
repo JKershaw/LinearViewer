@@ -265,13 +265,13 @@ describe('LIN-3975 — the run control is the owner\'s; everyone else reads the 
 
   test('a member reads the page with no run control, no owner control, and the next step in the slot', () => {
     const html = page(model(), 'member');
-    assert.doesNotMatch(html, /task-page-run-control|task-page-owner-widgets|task-page-share-slot/);
+    assert.doesNotMatch(html, /task-page-run-control|task-page-owner-marker|task-page-share-slot/);
     assert.match(html, /<p class="task-next" data-testid="task-page-next">Nothing has run on this task yet\.<\/p>/);
   });
 
   test('a guest reads the same as a member: no control, the next step', () => {
     const html = page(model(), 'guest');
-    assert.doesNotMatch(html, /task-page-run-control|task-page-owner-widgets/);
+    assert.doesNotMatch(html, /task-page-run-control|task-page-owner-marker/);
     assert.match(html, /data-testid="task-page-next"/);
   });
 

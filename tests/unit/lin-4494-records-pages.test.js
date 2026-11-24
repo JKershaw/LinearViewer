@@ -1,7 +1,7 @@
 /**
  * LIN-4494 (piece 3): the records pages and the session writes, in process, on the real store (a MangoDB engine).
  *
- * Witnesses (the piece's own list): the task page's Records section in both grid templates, with "no ticket yet" for a
+ * Witnesses (the piece's own list): the task page's Records section in the grid template, with "no ticket yet" for a
  * ticketless task; a signed-in person's add, child task, end and supersede through the session (no token), filed by
  * their account, and a refused write redirects with its reason; a guest page carries no records, and the renderer
  * refuses them for a guest; the project page numbers its backlog oldest first, makes a task (no ticket, once, retry

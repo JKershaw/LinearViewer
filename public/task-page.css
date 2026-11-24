@@ -159,10 +159,8 @@
       "docs"
       "details"
       "share";
-    column-gap: var(--space-4);
     align-items: start;
   }
-  .sess-page.task-page > * { grid-column: 1 / -1; }
   .sess-page.task-page > .sess-back { grid-area: back; }
   .sess-page.task-page > .task-header { grid-area: header; }
   .sess-page.task-page > .task-answer { grid-area: answer; }
@@ -170,9 +168,9 @@
   .sess-page.task-page > .task-next { grid-area: run; }
   .sess-page.task-page > .task-question { grid-area: question; }
   .sess-page.task-page > .task-stages { grid-area: stages; }
-  /* LIN-4494: the Records section sits under the run line, in both templates. */
+  /* LIN-4494: the Records section sits under the run line. */
   .sess-page.task-page > .task-records { grid-area: records; }
-  /* LIN-4405: "Sessions on one clock" sits beneath the Stages, in both templates. */
+  /* LIN-4405: "Sessions on one clock" sits beneath the Stages. */
   .sess-page.task-page > .task-timeline { grid-area: timeline; }
   .sess-page.task-page > .task-pr-section { grid-area: pr; }
   .sess-page.task-page > .task-docs { grid-area: docs; }

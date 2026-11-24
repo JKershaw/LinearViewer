@@ -546,7 +546,7 @@ test.describe('Task page, owner view (LIN-3329)', () => {
     await expect(guest.locator('[data-testid="run-evidence-closeout"]')).toHaveCount(0);
     await expect(guest.locator('[data-testid="task-page-pr-lead"]')).toHaveText('PR #41 is approved and ready to merge.');
     await expect(guest.locator('[data-action="closeout-press"]')).toHaveCount(0);
-    await expect(guest.locator('[data-testid="task-page-owner-widgets"]')).toHaveCount(0);
+    await expect(guest.locator('[data-testid="task-page-owner-marker"]')).toHaveCount(0);
     // A legacy sealed description renders as the block: its words, then the end line (LIN-4352).
     await expect(guest.locator('[data-testid="task-page-description-body"] p')).toHaveCount(2);
     await expect(guest.locator('[data-testid="task-page-description-body"] p').first()).toHaveText('The task description.');

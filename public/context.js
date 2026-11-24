@@ -283,7 +283,7 @@
   function renderLoading() {
     return `
       <div class="context-header"><span class="context-status-label">context · loading…</span></div>
-      <div class="context-placeholder context-loading"><span class="context-spinner"></span> Mapping task relationships.</div>`;
+      <div class="context-placeholder context-loading"><span class="spinner" aria-hidden="true"></span> Mapping task relationships.</div>`;
   }
 
   function renderError(message) {

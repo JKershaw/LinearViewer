@@ -209,7 +209,7 @@ describe('LIN-3341 — Go is one press', () => {
     const err = await mount({}, {}, { templateApi: async () => { throw new Error('boom'); } });
     await err.container.click({ prompt: 'implementation' });
     await err.flush();
-    assert.match(err.container.innerHTML, /recap-error/, 'error phase rendered');
+    assert.match(err.container.innerHTML, /prompt-error/, 'error phase rendered');
     assert.match(err.container.innerHTML, /data-testid="opened-task-go"/, 'Go shows in error');
   });
 

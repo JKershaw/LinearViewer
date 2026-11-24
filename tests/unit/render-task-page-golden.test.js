@@ -526,8 +526,8 @@ describe('viewer isolation', () => {
   test('the owner marker and the close-out box are owner-only', () => {
     const owner = render('running-blocked-repeat', 'owner');
     const guest = render('running-blocked-repeat', 'guest');
-    assert.match(owner, /data-testid="task-page-owner-widgets"/);
-    assert.doesNotMatch(guest, /task-page-owner-widgets/);
+    assert.match(owner, /data-testid="task-page-owner-marker"/);
+    assert.doesNotMatch(guest, /task-page-owner-marker/);
     assert.match(owner, /data-testid="run-evidence-closeout"/);
     assert.match(owner, /data-issue-id="11111111-2222-3333-4444-555555555555"/);
     assert.match(owner, /data-source="linear"/);

@@ -4454,25 +4454,26 @@ body[data-proxy-active="true"] .prompt-proxy-toggle {
 }
 
 /* =========================================================================
-   The spinner and error line the prompt section draws (public/prompt-section.js).
-   They kept the recap widget's names; LIN-4537 retired the widget and the rest of its rules.
+   The one loading spinner (the prompt section and the Context section draw it) and the prompt section's error line.
+   LIN-4537 renamed them from the retired recap widget's `.recap-spinner`/`.recap-error`, and folded the Context
+   section's identical `.context-spinner` into the same rule.
    ========================================================================= */
-.recap-error {
+.prompt-error {
   color: var(--red);
   font-style: normal;
 }
 
-.recap-spinner {
+.spinner {
   display: inline-block;
   width: 0.9em;
   height: 0.9em;
   border: 2px solid var(--muted);
   border-top-color: transparent;
   border-radius: 50%;
-  animation: recap-spin 0.9s linear infinite;
+  animation: spinner-spin 0.9s linear infinite;
 }
 
-@keyframes recap-spin {
+@keyframes spinner-spin {
   to { transform: rotate(360deg); }
 }
 
@@ -4533,16 +4534,6 @@ body[data-proxy-active="true"] .prompt-proxy-toggle {
   align-items: center;
   gap: 0.5ch;
   font-style: normal;
-}
-
-.context-spinner {
-  display: inline-block;
-  width: 0.9em;
-  height: 0.9em;
-  border: 2px solid var(--muted);
-  border-top-color: transparent;
-  border-radius: 50%;
-  animation: recap-spin 0.9s linear infinite;
 }
 
 /* Flow row: blockers → root → blocked. Wraps to stacked lanes on narrow screens. */
