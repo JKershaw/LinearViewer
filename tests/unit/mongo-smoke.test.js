@@ -1830,8 +1830,6 @@ describe(
         proxyEvents: freshCollection('l1-proxy-events'),
         agentStatus: freshCollection('l1-agent-status'),
         freeTier: freshCollection('l1-free-tier'),
-        recapCache: freshCollection('l1-recap-cache'),
-        briefCache: freshCollection('l1-brief-cache'),
         reportHistory: freshCollection('l1-report-history'),
         kpiDailyRollup: freshCollection('l1-kpi-daily-rollup')
       };

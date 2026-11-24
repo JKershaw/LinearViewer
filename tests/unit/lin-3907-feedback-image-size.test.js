@@ -62,7 +62,7 @@ function buildApp(calls) {
     workspacePreferencesStore: { getWorkspacePreferences: async () => ({}) },
     dispatchQueueStore: { addItem: async () => ({ _id: 'd1' }) },
     freeTierStore: {}, getOpenRouterSource: () => null, userPreferencesStore: {},
-    customPromptsStore: {}, recapCacheStore: {}, briefCacheStore: {},
+    customPromptsStore: {},
     reportHistoryStore: {}, agentStatusStore: {}, promptTraceStore: {},
   }));
   // Mirrors the real server.js catch-all: a client error the parser already carries

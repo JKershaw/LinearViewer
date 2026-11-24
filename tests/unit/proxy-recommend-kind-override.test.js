@@ -49,8 +49,6 @@ function buildApp({ aiConfigured = false, freeTierCalls } = {}) {
     getWorkspaceAccessToken: async () => 'test-token',
     getWorkspaceOpenRouterKey: async () => (aiConfigured ? 'sk-test-key' : null),
     agentStatusStore: {},
-    recapCacheStore: { get: async () => null, set: async () => {} },
-    briefCacheStore: { get: async () => null, set: async () => {} },
     dispatchQueueStore: { addItem: async () => ({ _id: 'disp-1' }) },
     workspaceFromUrl: (req, res, next) => next(),
     workspacePreferencesStore: {},

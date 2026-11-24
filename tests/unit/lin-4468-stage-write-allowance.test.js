@@ -314,8 +314,7 @@ const CENSUS = [
   { m: 'POST', p: '/api/proxy/runner/feedback/:id', kind: 'gated', op: 'runnerFeedback' },
   { m: 'POST', p: '/api/proxy/runner/usage/:id', kind: 'gated', op: 'runnerUsage' },
   // Not tracker writes
-  { m: 'POST', p: '/api/proxy/recap/:identifier', kind: 'not-ticket', reason: 'regenerates a recap cache for a read surface; writes no tracker state' },
-  { m: 'POST', p: '/api/proxy/brief/:identifier', kind: 'not-ticket', reason: 'regenerates a brief cache for a read surface; writes no tracker state' },
+  // (LIN-4537 retired POST /api/proxy/recap/:identifier and POST /api/proxy/brief/:identifier, and their rows.)
   { m: 'POST', p: '/api/proxy/flight-companion/turn', kind: 'not-ticket', reason: 'a chat turn that returns a proposal; a proposal is not a write (routes/proxy-flight-companion.js)' },
   // Exempt and session-authenticated
   { m: 'POST', p: '/api/proxy/token', kind: 'exempt', reason: 'exchanges a bootstrap for a working token; authenticates by the bootstrap, not a proxy bearer' },
@@ -387,10 +386,11 @@ describe('LIN-4468 — route census: every proxy write route is classified and c
   });
 
   test('mutation: a not-ticket write that carries a stage gate fails the census', () => {
-    const routes = proxyRoutes().map(r => (r.path === '/api/proxy/brief/:identifier'
+    // LIN-4537: planted on flight-companion/turn, the not-ticket row left once POST /brief was retired.
+    const routes = proxyRoutes().map(r => (r.method === 'POST' && r.path === '/api/proxy/flight-companion/turn'
       ? { ...r, chain: [...r.chain, 'requireWriteScope:createComment'] }
       : r));
-    assert.ok(censusViolations(routes).includes('not-ticket route carries a stage gate: POST /api/proxy/brief/:identifier'));
+    assert.ok(censusViolations(routes).includes('not-ticket route carries a stage gate: POST /api/proxy/flight-companion/turn'));
   });
 });
 

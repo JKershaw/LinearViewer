@@ -102,8 +102,6 @@ function makeLoader({ ctx, brief = null, recap = null, events = [], loops = [loo
     recordsStore: RECORDS,
     dispatchStore: {},
     agentStatusStore: {},
-    briefCacheStore: { async get() { return brief; } },
-    recapCacheStore: { async get() { return recap; } },
     closeOutEventsStore: { async listForIssue() { return events; } },
     readRunEvidence: (args) => readRunEvidence({ openFindings: FINDINGS_NONE, ...args, readPrStatus: async () => MERGED_PR }),
     prStateStore: null,

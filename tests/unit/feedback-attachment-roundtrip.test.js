@@ -68,8 +68,8 @@ function buildApp(provider) {
     },
     dispatchQueueStore: { addItem: async () => ({ _id: 'd1' }) },
     freeTierStore: {}, getOpenRouterSource: () => null, userPreferencesStore: {},
-    workspacePreferencesStore: {}, customPromptsStore: {}, recapCacheStore: {},
-    briefCacheStore: {}, reportHistoryStore: {}, agentStatusStore: {}, promptTraceStore: {},
+    workspacePreferencesStore: {}, customPromptsStore: {},
+    reportHistoryStore: {}, agentStatusStore: {}, promptTraceStore: {},
   });
   app.use(router);
   return app;

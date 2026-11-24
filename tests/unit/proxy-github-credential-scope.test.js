@@ -75,8 +75,6 @@ function buildApp({ provider, resolveWorkspaceAccess }) {
     resolveWorkspaceAccess,
     getWorkspaceAccessToken: async () => INSTALL_TOKEN,
     agentStatusStore: {},
-    recapCacheStore: {},
-    briefCacheStore: {},
     dispatchQueueStore: {},
     workspaceFromUrl: (req, res, next) => next(),
     getWorkspaceOpenRouterKey: async () => null,

@@ -39,7 +39,7 @@ function buildApp({ workspace, session, adoptConnectionCredential }) {
       next();
     },
     freeTierStore: {}, getOpenRouterSource: () => null, userPreferencesStore: {},
-    workspacePreferencesStore: {}, customPromptsStore: {}, recapCacheStore: {}, briefCacheStore: {},
+    workspacePreferencesStore: {}, customPromptsStore: {},
     reportHistoryStore: {}, dispatchQueueStore: {}, agentStatusStore: {}, promptTraceStore: {},
     proxyTokenStore: {}, taskDecisionsStore: {},
     ownerCredentialStore: { get: async () => null },

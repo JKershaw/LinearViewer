@@ -271,8 +271,6 @@ describe('hop 4: routes/task-page.js and routes/task-share.js', () => {
     return createTaskPageLoader({
       recordsStore,
       dispatchStore: {}, agentStatusStore: {},
-      briefCacheStore: { async get() { return null; } },
-      recapCacheStore: { async get() { return null; } },
       readRunEvidence,
       prStateStore: createPrStateStore({ cache: new Map(), bucket: [], githubFetch: github }),
       installationTokenFor, enrichLoop, deriveSessionWaiting,

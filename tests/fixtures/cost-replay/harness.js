@@ -170,8 +170,6 @@ export function buildCostApp(store, callCollection, requestUsageLoader) {
     getWorkspaceAccessToken: async () => 'replay-token',
     getWorkspaceOpenRouterKey: async () => null,
     agentStatusStore: {},
-    recapCacheStore: { get: async () => null, set: async () => {} },
-    briefCacheStore: { get: async () => null, set: async () => {} },
     dispatchQueueStore: store,
     requestUsageLoader,
     llmCallLogStore: new LlmCallLogStore({ collection: callCollection }),

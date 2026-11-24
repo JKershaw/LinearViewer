@@ -21,3 +21,8 @@ Area notes for `front-end-pages` in the registry. Format and rules: README.md.
   mergeWaitingCards) removes every `.waiting-card` the fragment does not list, so a card the fragment does not draw must not
   wear that class (LIN-4532). The live merge keys a question wrapper by its question id (`question:<id>`), and holds one that is
   settled or has an answer in flight, so a refresh never takes out a card the person is answering.
+- Retiring a page widget, grep `public/` and `lib/` for every class and test id it drew before deleting a rule: another
+  surface may borrow it. The prompt section still draws `.recap-spinner` and `.recap-error` (`public/prompt-section.js`),
+  so LIN-4537 kept those two rules in `public/style.css` when the recap widget went; and the task page's hidden
+  `task-page-owner-widgets` marker outlived the widgets it was named for, because `public/task-page.js` reads it as the
+  owner signal.

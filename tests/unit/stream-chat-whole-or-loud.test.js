@@ -13,7 +13,8 @@
  *   reasoning bound when hidden reasoning ate the cap);
  * - the budget is sized from the catalog: reasoning headroom for a model that can
  *   reason, within its output limits, and no `reasoning` field on the first attempt;
- * - the brief route answers 502 OUTPUT_TRUNCATED and caches nothing;
+ * - a caching route answers 502 OUTPUT_TRUNCATED and caches nothing (the dashboard run summary;
+ *   it was the brief route until LIN-4537 retired it);
  * - `allowPartial` keeps the old live behaviour for callers that handle a cut-off.
  *
  * The catalog is the real /models response of 7 Nov 2026, trimmed
@@ -27,20 +28,19 @@ process.env.NODE_ENV = 'test';
 import { test, describe, beforeEach, afterEach, mock } from 'node:test';
 import assert from 'node:assert/strict';
 import fs from 'node:fs';
-import express from 'express';
 import {
-  streamChat, streamChatWithTools, setFetchImpl, setLlmCallRecorder,
+  streamChat, streamChatWithTools, setFetchImpl, setLlmCallRecorder, DEFAULT_MODEL,
   TruncatedOutputError, isCompleteFinish, truncationFailureOf
 } from '../../lib/openrouter.js';
 import {
   _setCatalogCacheForTests, _resetCatalogCacheForTests, _normalizeModelForTests, getCachedCatalogModel
 } from '../../lib/openrouter-catalog.js';
 import { planCallBudget, planRetryBudget } from '../../lib/call-budget.js';
-import { generateBrief } from '../../lib/brief.js';
-import { InMemoryBriefCacheStore } from '../../lib/brief-cache.js';
 import { LlmCallLogStore } from '../../lib/llm-call-log.js';
-import { createProxyRoutes } from '../../routes/proxy.js';
-import { ProviderInterface } from '../../lib/providers/interface.js';
+import { createDashboardRoutes } from '../../routes/dashboard.js';
+import { InMemoryRunSummaryCacheStore } from '../../lib/run-summary-cache.js';
+import { withFreshDigests } from '../fixtures/with-fresh-digests.js';
+import { appAround, request } from './lib/entrance-route-sweep.js';
 
 const FIXTURE = JSON.parse(fs.readFileSync(new URL('../fixtures/openrouter-models-2026-11-07.json', import.meta.url), 'utf8'));
 const HAIKU = 'anthropic/claude-haiku-5.5';
@@ -350,12 +350,12 @@ describe('the call log keeps the retry marker', () => {
       sse({ text: 'cut', finishReason: 'length', usage: PROSE_CAP }),
       sse({ text: 'whole', finishReason: 'stop', usage: WHOLE }),
     );
-    await streamChat(MSGS, { apiKey: 'k', model: 'unlisted/model', maxTokens: 1500, callMeta: { urlKey: 'acme', feature: 'brief' } }, () => {});
+    await streamChat(MSGS, { apiKey: 'k', model: 'unlisted/model', maxTokens: 1500, callMeta: { urlKey: 'acme', feature: 'run-summary' } }, () => {});
     await new Promise(r => setImmediate(r));
     assert.equal(persisted.length, 2);
     assert.equal(persisted[0].retry, null);
     assert.equal(persisted[1].retry, 'length');
-    assert.equal(persisted[1].feature, 'brief');
+    assert.equal(persisted[1].feature, 'run-summary');
   });
 });
 
@@ -403,82 +403,67 @@ describe('streamChat: a stalled response body has its own deadline', () => {
   });
 });
 
-// --- the brief, end to end --------------------------------------------------------
+// --- a caching route, end to end ----------------------------------------------------
+// LIN-4537 retired the brief, and with it generateBrief and the proxy brief route this section drove.
+// streamChat's own recovery is pinned above; the route-level half (a cut-off answer is a 502 that
+// names the model and reason, and nothing is cached) is held here on the dashboard run summary, a
+// surviving cached Harbour call, driven on its real (non-mock) path.
 
-class FakeContextProvider extends ProviderInterface {
-  constructor(name, description) { super(); this.name = name; this.description = description; }
-  async fetchRecommendationContext() {
-    const issue = { id: 'uuid-4358', identifier: 'ENG-4358', title: 'Long ticket', description: this.description, state: { type: 'started' }, labels: [] };
-    return { issue, comments: [], children: [], parent: null, focusedChild: null };
-  }
-}
+const NOW_ISO = new Date().toISOString();
+const SUMMARY_ENV = ['NODE_ENV', 'HARBOUR_DISABLE_AI_MOCK', 'OPENROUTER_API_KEY', 'OPENROUTER_FREE_TIER_KEY'];
 
-function proxyApp({ provider, briefCacheStore }) {
-  const app = express();
-  app.use(express.json());
-  app.use(createProxyRoutes({
-    proxyTokenStore: { validateToken: async () => ({ tokenId: 't1', urlKey: 'acme', label: 'test', scope: 'read', createdBy: 'u1' }) },
-    proxyEventStore: { recordEvent: async () => {} },
-    resolveWorkspaceAccess: async () => ({ token: 'real-token', reason: 'ok' }),
-    getWorkspaceAccessToken: async () => 'real-token',
-    getWorkspaceOpenRouterKey: async () => 'sk-test',
-    agentStatusStore: {},
-    recapCacheStore: { get: async () => null, put: async () => {} },
-    briefCacheStore,
-    dispatchQueueStore: {},
-    workspaceFromUrl: (req, res, next) => next(),
-    workspacePreferencesStore: null,
-    freeTierStore: { tryUse: async () => ({ allowed: true }) },
-    provider,
+function runSummaryApp(runSummaryCacheStore) {
+  const history = [
+    { id: 'run-1', issueIdentifier: 'ENG-4358', issueTitle: 'Long ticket', promptName: 'implementation', prompt: 'p', dispatchedAt: NOW_ISO, resolvedAt: NOW_ISO, status: 'taken', feedback: [{ message: 'pr opened' }] }
+  ];
+  return appAround(createDashboardRoutes({
+    workspaceFromUrl: (req, _res, next) => {
+      req.session = { openRouterApiKey: 'sk-test' };
+      req.workspace = { urlKey: 'acme', id: 'acme-id', provider: 'linear' };
+      next();
+    },
+    dispatchQueueStore: {
+      async listItems() { return []; },
+      async listHistory() { return { items: withFreshDigests(history) }; }
+    },
+    agentStatusStore: { async listStatus() { return { items: [{ id: 'as-run-1', dispatchId: 'run-1', taskIdentifier: 'ENG-4358', action: 'implementation', status: 'completed', summary: 'all done', timestamp: NOW_ISO }] }; } },
+    runSummaryCacheStore,
+    sessionSummaryCacheStore: null,
+    freeTierStore: null,
+    getWorkspaceAccessToken: async () => 'workspace-token',
+    fetchIssueContext: async () => ({}),
+    fetchWorkspaceIssues: async () => [],
+    getOpenRouterSource: () => 'session',
+    getDeployInfo: () => ({})
   }));
-  return app;
 }
 
-async function call(app, method, path) {
-  const realSetTimeout = global.setTimeout;
-  global.setTimeout = (...args) => realSetTimeout(...args).unref?.();
-  const server = app.listen(0, '127.0.0.1');
-  await new Promise(resolve => server.once('listening', resolve));
-  const { port } = server.address();
-  try {
-    const res = await fetch(`http://127.0.0.1:${port}${path}`, { method, headers: { Authorization: 'Bearer anything' } });
-    let json = {};
-    try { json = await res.json(); } catch { /* empty */ }
-    return { status: res.status, body: json };
-  } finally {
-    global.setTimeout = realSetTimeout;
-    await new Promise(resolve => server.close(resolve));
-  }
-}
-
-const MODEL_BRIEF = '## Current\nWhole.\n\n## Constraints\n- _None._\n\n## Open questions\n- _None._\n\n## Changelog\n- _None._';
-
-describe('the brief: whole, or a clear refusal with nothing cached', () => {
-  test('generateBrief on Haiku 5.5: the 7 Nov failure (reasoning ate the cap) now recovers to a whole brief', async () => {
-    seedLiveCatalog();
-    replies(
-      sse({ text: '## Current\nPiece B is merged and deployed. The seal at first dispatch has not been seen live yet, and the', finishReason: 'length', usage: { prompt_tokens: 8300, completion_tokens: 6000, total_tokens: 14300, completion_tokens_details: { reasoning_tokens: 5600 } } }),
-      sse({ text: MODEL_BRIEF, finishReason: 'stop', usage: WHOLE }),
-    );
-    const issue = { identifier: 'LIN-4352', title: 't', description: 'd', state: { type: 'started' }, labels: [] };
-    const { brief } = await generateBrief(issue, { issue, comments: [], children: [], parent: null }, { apiKey: 'k', model: HAIKU });
-    assert.equal(brief, MODEL_BRIEF);
-    assert.equal(bodies[0].max_tokens, 6000, 'the brief asks for 3000 visible tokens plus headroom');
-  });
-
-  test('the proxy brief route answers 502 OUTPUT_TRUNCATED, names the model and reason, and caches nothing', async () => {
-    replies(
-      sse({ text: '## Current\nPiece B is merged and the', finishReason: 'length', usage: REASONING_CAP }),
-      sse({ text: '## Current\nStill cut', finishReason: 'length', usage: REASONING_CAP }),
-    );
-    const store = new InMemoryBriefCacheStore();
-    const app = proxyApp({ provider: new FakeContextProvider('lin-4358-cut', 'A long ticket.'), briefCacheStore: store });
-    const { status, body } = await call(app, 'POST', '/api/proxy/brief/ENG-4358');
-    assert.equal(status, 502, JSON.stringify(body));
-    assert.equal(body.code, 'OUTPUT_TRUNCATED');
-    assert.equal(body.finishReason, 'length');
-    assert.match(body.detail, /cut off/);
-    assert.equal(await store.get('acme', 'uuid-4358'), null, 'no partial was cached');
+describe('a caching route: whole, or a clear refusal with nothing cached', () => {
+  test('POST run-summary answers 502 OUTPUT_TRUNCATED, names the model and reason, and caches nothing', async () => {
+    const prev = Object.fromEntries(SUMMARY_ENV.map(k => [k, process.env[k]]));
+    process.env.NODE_ENV = 'test';
+    process.env.HARBOUR_DISABLE_AI_MOCK = '1';
+    delete process.env.OPENROUTER_API_KEY;
+    delete process.env.OPENROUTER_FREE_TIER_KEY;
+    try {
+      replies(
+        sse({ text: '{"outcome": "Piece B is merged and the', finishReason: 'length', usage: PROSE_CAP }),
+        sse({ text: '{"outcome": "Still cut', finishReason: 'length', usage: PROSE_CAP }),
+      );
+      const store = new InMemoryRunSummaryCacheStore();
+      const { status, body } = await request(runSummaryApp(store), 'POST', '/workspace/acme/api/dashboard/run-summary/run-1');
+      assert.equal(status, 502, JSON.stringify(body));
+      assert.equal(body.code, 'OUTPUT_TRUNCATED');
+      assert.equal(body.model, DEFAULT_MODEL);
+      assert.equal(body.finishReason, 'length');
+      assert.match(body.message, /cut off/);
+      assert.equal(bodies.length, 2, 'one call and exactly one retry');
+      assert.equal(await store.get('acme', 'run-1'), null, 'no partial was cached');
+    } finally {
+      for (const k of SUMMARY_ENV) {
+        if (prev[k] === undefined) delete process.env[k]; else process.env[k] = prev[k];
+      }
+    }
   });
 
   test('truncationFailureOf maps only a TruncatedOutputError', () => {

@@ -108,8 +108,6 @@ function mountRoute(stores, { ownerCheck } = {}) {
     observerStateStore: null,
     freeTierStore: null,
     workspacePreferencesStore: null,
-    recapCacheStore: null,
-    briefCacheStore: null,
     dispatchQueueStore: stores.dispatchQueueStore,
     agentStatusStore: stores.agentStatusStore,
     proxyTokenStore: stores.proxyTokenStore,

@@ -65,7 +65,7 @@ function buildApp({ resolveWorkspaceAccess, validateToken, issueDetail, rejected
       credentialFingerprint: fingerprintCredential('linear-tok'),
     })),
     getWorkspaceAccessToken: async () => 'linear-tok',
-    agentStatusStore: {}, recapCacheStore: {}, briefCacheStore: {}, dispatchQueueStore: {},
+    agentStatusStore: {}, dispatchQueueStore: {},
     workspaceFromUrl: (req, res, next) => next(),
     getWorkspaceOpenRouterKey: async () => null,
     workspacePreferencesStore: {},

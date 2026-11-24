@@ -331,16 +331,24 @@ describe('generatePrompt', () => {
     };
 
     const result = generatePrompt('blocked', mockIssue, contextWithComments);
-    // Pass-by-reference: the prompt points at the task's discussion rather than
-    // baking the comment thread in verbatim (keeps prompts short for long-lived
-    // tasks; the agent reads live content). So the comment bodies/authors must
-    // NOT appear, and the reference directive must.
+    // The prompt never bakes the comment thread in verbatim (keeps prompts short for long-lived tasks). LIN-4537: nor
+    // does it send the agent to the description and comment thread; a person's comment reaches the stage as a finding
+    // in its records brief.
     assert.ok(!result.prompt.includes('First comment with research findings'),
       'comment bodies must not be embedded verbatim');
     assert.ok(!result.prompt.includes('Alice'),
       'comment authors must not be embedded verbatim');
-    assert.ok(result.prompt.includes('read the current description and comment thread'),
-      'prompt must reference the task discussion instead of embedding it');
+  });
+
+  test('LIN-4537: no stage prompt carries the "read the current description and comment thread" line', () => {
+    const contextWithComments = { ...mockContext, comments: [{ body: 'A comment', user: 'Alice', createdAt: '2024-01-15T10:00:00Z' }] };
+    const kinds = Object.keys(PROMPT_TEMPLATES);
+    assert.ok(kinds.length >= 17, `every template is rendered (${kinds.length})`);
+    for (const kind of kinds) {
+      const { prompt } = generatePrompt(kind, mockIssue, contextWithComments);
+      assert.ok(!prompt.includes('**Read before acting:**'), `${kind}: no discussion-reference line`);
+      assert.ok(!prompt.includes('read the current description and comment thread'), `${kind}: no pointer to the description and comment thread`);
+    }
   });
 });
 
@@ -2755,7 +2763,7 @@ describe('close-out template + review→close-out ledger handoff (LIN-550)', () 
 // `### What a plan ready to build looks like` section.
 // =============================================================================
 
-import { formatReadOnlyWorkflow, formatDiscussionReference } from '../../lib/prompt-formatters.js';
+import { formatReadOnlyWorkflow } from '../../lib/prompt-formatters.js';
 
 describe('plan-review template + the four qualities (LIN-1602 / LIN-1859 / LIN-4021)', () => {
   const issue = {
@@ -2833,7 +2841,7 @@ describe('plan-review template + the four qualities (LIN-1602 / LIN-1859 / LIN-4
     // mentions from the shared formatters. Subtract exactly what they emit and
     // assert the template's own prose adds none.
     let own = prompt;
-    for (const shared of [formatReadOnlyWorkflow(issue, { useLinear: true }), formatDiscussionReference(issue, { useLinear: true })]) {
+    for (const shared of [formatReadOnlyWorkflow(issue, { useLinear: true })]) {
       assert.ok(shared && own.includes(shared), 'the shared formatter output is present to subtract');
       own = own.replace(shared, '');
     }

@@ -1,12 +1,14 @@
 /**
- * E2E coverage for the Brief / Recap / Dispatched Sessions sections mounted on
- * the main projects (tree) view — LIN-522.
+ * E2E coverage for the lazy sections mounted on the main projects (tree) view —
+ * LIN-522.
  *
- * These three sections reuse the view-agnostic client modules (public/brief.js,
- * recap.js, sessions.js) already proven on the swipe surface. Here we verify the
- * tree-view integration: each is a nested toggle inside the per-issue Details
+ * The Dispatched Sessions section reuses the view-agnostic client module
+ * (public/sessions.js) already proven on the swipe surface. Here we verify the
+ * tree-view integration: it is a nested toggle inside the per-issue Details
  * block, lazy-mounted on first expand (mirroring the Comments lazy-load), and
- * the existing Details/Comments content is unaffected.
+ * the existing Details/Comments content is unaffected. Brief and Recap were
+ * sections here too until LIN-4537 retired them (public/brief.js and recap.js
+ * are deleted); Context left Home in LIN-3833.
  *
  * Rides a seeded local-provider workspace (no `test-token` mock); the detail
  * block itself is fetched lazily from /api/detail on first expand.
@@ -15,7 +17,7 @@ import { test, expect } from '../fixtures/test-base.js';
 import { defaultLocalSeedWithUpNext } from '../fixtures/local-harness.js';
 
 /**
- * Expand an issue line, then open its Details block (the nested Brief/Recap/Sessions toggles live inside the Details
+ * Expand an issue line, then open its Details block (the nested Sessions toggle lives inside the Details
  * content). Returns the `.details` locator for the issue. LIN-4024: the default is the Up next project row (LOCAL-5);
  * a started parent (LOCAL-1) is In Progress, so a spec that needs it names it.
  */
@@ -44,8 +46,8 @@ test.describe('Tree view: Brief / Recap / Context leave Home (LIN-522, LIN-3833)
     await page.evaluate(() => localStorage.clear());
   });
 
-  // LIN-3833 (Q4): the state-first opened task on Home has no Brief, Recap, Scan or Context folds. They stay on
-  // Swipe, where the card keeps them.
+  // LIN-3833 (Q4): the state-first opened task on Home has no Brief, Recap, Scan or Context folds. Context stays on
+  // Swipe, where the card keeps it; LIN-4537 retired Brief and Recap everywhere (the tree's lazy toggles included).
   for (const section of ['brief', 'recap', 'context']) {
     test(`${section} is not a fold of the opened task on the backlog page`, async ({ page, localWorkerUrlKey }) => {
       // LIN-4119: the opened task is a project row, which the backlog page holds.
@@ -60,7 +62,7 @@ test.describe('Tree view: Brief / Recap / Context leave Home (LIN-522, LIN-3833)
     await page.goto(`/workspace/${localWorkerUrlKey}/backlog`);
     const details = await openIssueDetails(page);
 
-    // Comments still toggles and loads alongside the new sections.
+    // Comments still toggles and loads alongside the lazy sections.
     const commentsToggle = details.locator('.detail-toggle[data-toggle="comments"]');
     const commentsContent = details.locator('.detail-content[data-content="comments"]');
     await expect(commentsToggle).toBeVisible();

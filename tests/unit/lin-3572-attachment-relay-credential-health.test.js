@@ -70,8 +70,6 @@ function buildApp({ providerName = 'linear', rejectedCredentialRegistry, eventRo
     getWorkspaceAccessToken: async () => WS_TOKEN,
     getWorkspaceOpenRouterKey: async () => null,
     agentStatusStore: {},
-    recapCacheStore: { get: async () => null, set: async () => {} },
-    briefCacheStore: { get: async () => null, set: async () => {} },
     dispatchQueueStore: {},
     workspaceFromUrl: (req, res, next) => next(),
     workspacePreferencesStore: {},

@@ -23,7 +23,7 @@ import { createFakeDom } from './helpers/fake-dom.js';
 import * as taskPage from '../../public/task-page.js';
 import { bodyOf } from './helpers/task-page-body.js';
 import { loop, NOW, PAGE_OPTIONS } from './helpers/task-page-loop.js';
-import { renderTaskPage, renderTaskStatus, renderTaskContext, renderTaskTrack } from '../../lib/render-task-page.js';
+import { renderTaskPage, renderTaskStatus, renderTaskTrack } from '../../lib/render-task-page.js';
 import { buildTaskPageModel } from '../../lib/task-page-loader.js';
 import { gatherTaskStates } from '../../lib/home-row-states.js';
 import { enrichLoop, deriveSessionWaiting } from '../../routes/dashboard.js';
@@ -228,8 +228,7 @@ describe('createPoller', () => {
   });
 });
 
-// LIN-3340: the poll must not leave a stale header on a merge-ready page, and a guest's
-// client-side markdown must survive an unchanged brief.
+// LIN-3340: the poll must not leave a stale header on a merge-ready page.
 describe('poll safety (LIN-3340)', () => {
   const { paintsReadyHeader, runOptsOf } = taskPage;
 
@@ -254,20 +253,6 @@ describe('poll safety (LIN-3340)', () => {
     assert.equal(runOptsOf(null), null);
   });
 
-  test('a guest brief `<pre>` is upgraded to markdown and the upgrade is idempotent', (t) => {
-    const world = importWorld({ window: { renderMarkdown: (text) => `<p>${text}</p>` } });
-    t.after(() => world.restore());
-    const { enhanceContextMarkdown } = taskPage;
-    const mount = world.document.createElement('div');
-    mount.innerHTML = renderTaskContext(taskModel([loop()], { brief: { brief: 'A **brief**' } }), { urlKey: 'acme', now: NOW });
-    assert.equal(mount.querySelectorAll('pre.sess-ctx-body').length, 1, 'the server draws the brief as a plain <pre>');
-    enhanceContextMarkdown(mount);
-    assert.equal(mount.querySelectorAll('pre.sess-ctx-body').length, 0, 'the <pre> was replaced');
-    assert.match(mount.innerHTML, /<p>A \*\*brief\*\*<\/p>/, 'markdown rendered');
-    const once = mount.innerHTML;
-    enhanceContextMarkdown(mount); // no pre left — a no-op
-    assert.equal(mount.innerHTML, once);
-  });
 });
 describe('isGuestStateUrl (the onGone gate)', () => {
   const { isGuestStateUrl } = taskPage;
@@ -321,7 +306,7 @@ const settle = () => new Promise((resolve) => setImmediate(resolve));
 const STATES = new WeakMap();
 const stateOf = (loops) => gatherTaskStates({ roots: [{ issue: { identifier: 'LIN-50', state: { type: 'started' } }, children: [] }], loops, ruling: null, at: NOW, enrichLoop, deriveSessionWaiting }).states.get('LIN-50');
 
-/** A task model from the loader, as the page load builds it. `over` is the loader's own input (brief, recap, evidence). */
+/** A task model from the loader, as the page load builds it. `over` is the loader's own input (evidence and the rest). */
 const taskModel = (loops, over = {}) => {
   const m = buildTaskPageModel({ identifier: 'LIN-50', loops, ctx: null, enrichLoop, deriveSessionWaiting, now: NOW, ...over });
   STATES.set(m, stateOf(loops));
@@ -534,46 +519,6 @@ describe('apply(): the header after a session ends on a merge-ready page (LIN-34
   });
 });
 
-// LIN-3340 G1/F2 (review `388f4246`): the owner's brief/recap widgets must be
-// mounted WITH the task's provider kind, or their GET/POST resolve the wrong
-// provider. A mutation dropping `source: source` left the suite green, because
-// the e2e compares pathnames only.
-describe('owner widget mount threads source (LIN-3340)', () => {
-  /** The owner's page (or a guest's) with a brief and a recap, over the fake DOM; the widgets' inits are recorded. */
-  function makeDoc(t, { source, marker = true } = {}) {
-    const calls = [];
-    const init = (lib) => (el, opts) => calls.push({ lib, el, opts });
-    const world = importWorld({ window: { BriefSection: { init: init('brief') }, RecapSection: { init: init('recap') } } });
-    t.after(() => world.restore());
-    const m = taskModel([loop()], { brief: { brief: 'A brief' }, recap: null });
-    const binding = source === undefined ? {} : { source };
-    world.document.body.innerHTML = pageBody(m, { viewer: marker ? 'owner' : 'guest', binding, urlKey: 'fbk' });
-    const doc = world.document;
-    const main = doc.querySelector('[data-testid="task-page"]');
-    return { doc, main, calls, mountWidgets: taskPage.mountWidgets };
-  }
-
-  test('the task source reaches both widget inits (and both refresh POSTs)', (t) => {
-    const { doc, main, calls, mountWidgets } = makeDoc(t, { source: 'linear' });
-    assert.equal(mountWidgets(doc, main), true);
-    assert.equal(calls.length, 2);
-    assert.deepEqual(calls.map(c => c.lib).sort(), ['brief', 'recap']);
-    for (const c of calls) assert.equal(c.opts.source, 'linear', `${c.lib} got the task source`);
-  });
-
-  test('a task with no data-source mounts the widgets with no source', (t) => {
-    const { doc, main, calls, mountWidgets } = makeDoc(t, { source: undefined });
-    mountWidgets(doc, main);
-    for (const c of calls) assert.equal(c.opts.source, undefined, 'no source stays off the request');
-  });
-
-  test('a guest (no owner marker) mounts nothing', (t) => {
-    const { doc, main, calls, mountWidgets } = makeDoc(t, { source: 'linear', marker: false });
-    assert.equal(mountWidgets(doc, main), false);
-    assert.equal(calls.length, 0);
-  });
-});
-
 /** The stage rows the server draws for `loops`, in a fresh world: `rows` are the `.task-step` items, `doc` the document. */
 function trackOf(loops, now = NOW) {
   const { document } = createFakeDom();
@@ -665,36 +610,16 @@ describe('stage rows: head, clocks and check-ins across a repaint (LIN-3356)', (
   });
 });
 
-describe('repaintHeader keeps the load-time summary (LIN-3373)', () => {
+describe('repaintHeader (LIN-3373)', () => {
   const { repaintHeader } = taskPage;
 
-  /** A load-time answer: the page's own header, with its summary when the brief has one. */
-  function answerOf(summaryBrief) {
+  test('LIN-4537: the repaint replaces the header whole; no summary paragraph is drawn or carried', () => {
     const { document } = createFakeDom();
-    const m = taskModel([loop()], summaryBrief ? { brief: { brief: summaryBrief } } : {});
-    document.body.innerHTML = `<section data-testid="task-page-answer">${headerOf(m)}</section>`;
-    return document.querySelector('[data-testid="task-page-answer"]');
-  }
-
-  test('a header with no summary does not delete the load-time one', () => {
-    const answer = answerOf('## Current\nWorking on it.');
-    assert.ok(answer.querySelector('[data-testid="task-page-summary"]'), 'the load-time summary is on the page');
+    document.body.innerHTML = `<section data-testid="task-page-answer">${headerOf(taskModel([loop()]))}</section>`;
+    const answer = document.querySelector('[data-testid="task-page-answer"]');
     repaintHeader(answer, headerOf(taskModel([loop({ agentState: 'idle', terminalStatus: 'completed' })])));
-    assert.ok(answer.querySelector('[data-testid="task-page-summary"]'), 'the summary survives the repaint');
-    assert.ok(answer.querySelector('[data-testid="task-page-status"] [data-testid="task-page-summary"]'), 'carried into the repainted status block');
+    assert.equal(answer.querySelectorAll('[data-testid="task-page-status"]').length, 1, 'one status block');
     assert.notEqual(answer.querySelector('[data-testid="task-page-status"]').getAttribute('data-status'), 'running', 'the header was repainted');
-  });
-
-  test('a header that carries its own summary replaces it; nothing is re-added', () => {
-    const answer = answerOf('## Current\nWorking on it.');
-    repaintHeader(answer, headerOf(taskModel([loop()], { brief: { brief: '## Current\nNow something else.' } })));
-    assert.equal(answer.querySelectorAll('[data-testid="task-page-summary"]').length, 1);
-    assert.match(answer.querySelector('[data-testid="task-page-summary"]').textContent, /Now something else/, 'the new summary, not the old one');
-  });
-
-  test('no load-time summary: nothing is carried', () => {
-    const answer = answerOf(null);
-    repaintHeader(answer, '<div data-testid="task-page-status">x</div>');
-    assert.equal(answer.querySelector('[data-testid="task-page-summary"]'), null);
+    assert.equal(answer.querySelector('.task-summary'), null, 'no summary paragraph');
   });
 });

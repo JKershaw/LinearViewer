@@ -55,8 +55,8 @@ function sanitizeHistory(history) {
 }
 
 /**
- * Build a small deterministic task context from the data fixtures for test mode
- * (mirrors buildMockRecapContext in lib/workspace-api-mocks.js). Returns null when
+ * Build a small deterministic task context for test mode
+ * from the data fixtures. Returns null when
  * the identifier doesn't resolve, so the caller can 404.
  */
 function buildMockTaskContext(issueId) {
@@ -233,7 +233,7 @@ export function buildMockAnswer(context, question, related) {
  *   route's real (non-mockAi) run-scoped propose path is pinned end to end.
  * @returns {Router}
  */
-export function createTaskChatRoutes({ workspaceFromUrl, freeTierStore, workspacePreferencesStore, getOpenRouterSource, getDeployInfo, savedChatStore, recapCacheStore, briefCacheStore, dispatchQueueStore, agentStatusStore, proxyTokenStore, runProposalsStore, chatClient, workspaceOwnerCheck = null, installationTokenFor = null, recordsStore = null, accountStore = null }) {
+export function createTaskChatRoutes({ workspaceFromUrl, freeTierStore, workspacePreferencesStore, getOpenRouterSource, getDeployInfo, savedChatStore, dispatchQueueStore, agentStatusStore, proxyTokenStore, runProposalsStore, chatClient, workspaceOwnerCheck = null, installationTokenFor = null, recordsStore = null, accountStore = null }) {
   const router = Router();
 
   // ─── HTML page ──────────────────────────────────────────────────────────────
@@ -678,8 +678,6 @@ export function createTaskChatRoutes({ workspaceFromUrl, freeTierStore, workspac
               scope: getWorkspaceCallScope(workspace),
             },
           },
-          recapCacheStore,
-          briefCacheStore,
           recordsStore,
           urlKey: workspace.urlKey,
           // LIN-1073: session read-model + the gated follow-up write.

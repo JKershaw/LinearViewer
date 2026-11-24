@@ -72,8 +72,6 @@ function buildApp({
     }),
     reportHistoryStore,
     agentStatusStore: {},
-    recapCacheStore: { get: async () => null, set: async () => {} },
-    briefCacheStore: { get: async () => null, set: async () => {} },
     workspaceFromUrl: (req, res, next) => next(),
     freeTierStore: { tryUse: async () => ({ allowed: true }) }
   }));
@@ -253,8 +251,6 @@ describe('GET /api/proxy/north-star', () => {
       getWorkspaceNorthStar: (urlKey, accountId) => getWorkspaceNorthStar(userPreferencesStore, urlKey, accountId),
       reportHistoryStore: { getLatest: async () => report() },
       agentStatusStore: {},
-      recapCacheStore: { get: async () => null, set: async () => {} },
-      briefCacheStore: { get: async () => null, set: async () => {} },
       workspaceFromUrl: (req, res, next) => next(),
       freeTierStore: { tryUse: async () => ({ allowed: true }) }
     }));

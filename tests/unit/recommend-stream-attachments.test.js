@@ -119,8 +119,6 @@ function buildApp(context) {
     getOpenRouterSource: () => null,
     userPreferencesStore: {},
     customPromptsStore: {},
-    recapCacheStore: {},
-    briefCacheStore: {},
     reportHistoryStore: {},
     agentStatusStore: {},
     promptTraceStore: {}

@@ -156,8 +156,8 @@ describe('LIN-3854: proxy model routing', () => {
       ['/jobs/review', { reason: 'r', model: 5 }, 400],
       ['/jobs/review', { reason: 'r', model: 'bad\u0001id' }, 400],
       ['/jobs/review', { reason: 'r', model: '' }, 400],
-      ['/jobs/recap', { reason: 'r', model: 'claude opus' }, 400],
-      ['/jobs/recap', { reason: 'r', harness: 'claude-code' }, 400],
+      ['/jobs/recommend', { reason: 'r', model: 'claude opus' }, 400],
+      ['/jobs/recommend', { reason: 'r', harness: 'claude-code' }, 400],
       ['/jobs/nope', { reason: 'r', model: 'x' }, 404],
       ['/groups/judge', { reason: 'r', model: 'x' }, 400],
       ['/groups/nope', { reason: 'r', surface: 'agent-session', model: 'x' }, 404],
@@ -173,11 +173,11 @@ describe('LIN-3854: proxy model routing', () => {
 
   test('a Harbour-call model passes the provider/model pattern; null clears', async () => {
     await enable();
-    assert.equal((await post('/jobs/recap', { reason: 'r', model: 'anthropic/claude-sonnet-4' })).status, 200);
-    const got = (await fx.routingStore.getEffectiveTable(ACME, { defaultModel: DEFAULT_MODEL })).jobs.find((j) => j.id === 'recap');
+    assert.equal((await post('/jobs/recommend', { reason: 'r', model: 'anthropic/claude-sonnet-4' })).status, 200);
+    const got = (await fx.routingStore.getEffectiveTable(ACME, { defaultModel: DEFAULT_MODEL })).jobs.find((j) => j.id === 'recommend');
     assert.equal(got.model, 'anthropic/claude-sonnet-4');
-    assert.equal((await post('/jobs/recap', { reason: 'back', model: null })).status, 200);
-    const cleared = (await fx.routingStore.getEffectiveTable(ACME, { defaultModel: DEFAULT_MODEL })).jobs.find((j) => j.id === 'recap');
+    assert.equal((await post('/jobs/recommend', { reason: 'back', model: null })).status, 200);
+    const cleared = (await fx.routingStore.getEffectiveTable(ACME, { defaultModel: DEFAULT_MODEL })).jobs.find((j) => j.id === 'recommend');
     assert.equal(cleared.source.model, 'none');
   });
 

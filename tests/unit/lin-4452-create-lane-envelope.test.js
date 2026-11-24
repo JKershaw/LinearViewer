@@ -77,8 +77,6 @@ function buildProxyApp() {
     resolveWorkspaceAccess: async () => ({ token: SCOPE, reason: 'ok', provider: 'jira' }),
     getWorkspaceAccessToken: async () => SCOPE,
     agentStatusStore: {},
-    recapCacheStore: {},
-    briefCacheStore: {},
     dispatchQueueStore: {},
     workspaceFromUrl: (req, res, next) => next(),
     getWorkspaceOpenRouterKey: async () => null,
@@ -105,8 +103,6 @@ function buildSessionApp() {
     userPreferencesStore: {},
     workspacePreferencesStore: {},
     customPromptsStore: {},
-    recapCacheStore: {},
-    briefCacheStore: {},
     reportHistoryStore: {},
     dispatchQueueStore: {},
     agentStatusStore: {},
@@ -209,8 +205,8 @@ describe('feedback lane: a landed ticket reports PARTIAL_WRITE (POST /workspace/
       },
       dispatchQueueStore: { addItem: async () => ({ _id: 'd1' }) },
       freeTierStore: {}, getOpenRouterSource: () => null, userPreferencesStore: {},
-      workspacePreferencesStore: {}, customPromptsStore: {}, recapCacheStore: {},
-      briefCacheStore: {}, reportHistoryStore: {}, agentStatusStore: {}, promptTraceStore: {},
+      workspacePreferencesStore: {}, customPromptsStore: {},
+      reportHistoryStore: {}, agentStatusStore: {}, promptTraceStore: {},
     }));
     return app;
   }

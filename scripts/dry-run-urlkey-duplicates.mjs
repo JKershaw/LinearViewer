@@ -110,7 +110,8 @@ export const URLKEY_SOURCES = Object.freeze([
       return m ? m[1] : null
     }
   },
-  // `_id` is `${workspaceId}:${issueId}`; an issue id carries no colon.
+  // `_id` is `${workspaceId}:${issueId}`; an issue id carries no colon. LIN-4537: both caches are retired and no code
+  // opens them; they stay here until scripts/drop-brief-recap-caches.mjs has dropped them, then these rows go.
   { collection: 'brief-cache', shape: 'id', parse: id => id.slice(0, Math.max(id.lastIndexOf(':'), 0)) },
   { collection: 'recap-cache', shape: 'id', parse: id => id.slice(0, Math.max(id.lastIndexOf(':'), 0)) }
 ])

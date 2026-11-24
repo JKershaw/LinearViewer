@@ -89,8 +89,8 @@ function buildApp({ provider, dispatchQueueStore, features = {} }) {
     proxyTokenStore: fakeProxyTokenStore(),
     freeTierStore: {}, getOpenRouterSource: () => null, userPreferencesStore: {},
     workspacePreferencesStore: { getWorkspacePreferences: async () => ({}) },
-    customPromptsStore: {}, recapCacheStore: {},
-    briefCacheStore: {}, reportHistoryStore: {}, agentStatusStore: {}, promptTraceStore: {}
+    customPromptsStore: {},
+    reportHistoryStore: {}, agentStatusStore: {}, promptTraceStore: {}
   });
   app.use(router);
   return app;

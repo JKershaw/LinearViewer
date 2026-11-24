@@ -231,8 +231,6 @@ describe('GET /api/proxy/dispatch/:id/prompt — masked by proxy creator', () =>
       getWorkspaceAccessToken: async () => 'test-token',
       getWorkspaceOpenRouterKey: async () => null,
       agentStatusStore: {},
-      recapCacheStore: { get: async () => null, set: async () => {} },
-      briefCacheStore: { get: async () => null, set: async () => {} },
       dispatchQueueStore: {
         getItemPrompt: async (urlKey, id) => ({
           id, prompt: PROSE, promptName: 'implementation', kind: 'implementation', target: 'cli',

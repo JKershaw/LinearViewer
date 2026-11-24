@@ -4,7 +4,7 @@
  *
  * Task-automation / compute endpoints: task stack, prompt generation,
  * AI recommendation, cost, north-star, periodicals,
- * recap (GET+POST), brief (GET+POST).
+ * and the records brief (GET; LIN-4537 retired the model-written recap and brief routes).
  */
 import { Router } from 'express';
 import { graphqlErrorExtra, graphqlErrorDetail } from '../lib/proxy-graphql-errors.js';
@@ -12,17 +12,9 @@ import { appCallsOf } from '../lib/cost-read-calls.js';
 import { readTaskCost } from '../lib/task-cost-read.js';
 import { resolveChatCredential, isAiUnavailable } from '../lib/chat-request.js';
 import { resolveRecommendation } from '../lib/recommend-recurse.js';
-import { resolveAiOperationModel } from '../lib/workspace-preferences.js';
 import { resolveNorthStarSignal, resolveRoadmapNarrative, classifyReportFreshness, ROADMAP_REPORT_MAX_AGE_DAYS, getNorthStarDocVersion } from '../lib/north-star-resolver.js';
-import { generateRecap } from '../lib/recap.js';
-import { generateBrief } from '../lib/brief.js';
-import { truncationFailureOf } from '../lib/openrouter.js';
 import { extractPrUrls } from '../lib/run-evidence.js';
-import { buildMockBrief } from '../lib/workspace-api-mocks.js';
 import { attachLandingChanges } from '../lib/change-records.js';
-import { fixtureParent } from '../lib/sample-data/fixture-parent.js';
-import { hashContext } from '../lib/recap-cache.js';
-import { isTerminalState } from '../lib/providers/state-map.js';
 import { buildTaskStack, askedForStack } from '../lib/task-stack.js';
 import { generatePrompt, hasPrompt, deriveDispatchKind } from '../lib/prompt-templates.js';
 import { promptContextOf } from '../lib/prompts/prompt-context.js';
@@ -42,8 +34,6 @@ import { TOKEN_ORIGIN, WRITES, proxyAskerOf } from '../lib/stage-writes.js';
 
 /**
  * @param {Object} deps
- * @param {Object} deps.recapCacheStore - Recap cache storage instance
- * @param {Object} deps.briefCacheStore - Brief cache storage instance
  * @param {Object} deps.dispatchQueueStore - Dispatch queue storage instance
  * @param {Object|null} [deps.closeOutEventsStore] - Merged close-out events (lib/close-out-events-store.js),
  *   read by GET /api/proxy/periodicals for landings (LIN-4381). server.js passes it; without it the route
@@ -73,15 +63,10 @@ import { TOKEN_ORIGIN, WRITES, proxyAskerOf } from '../lib/stage-writes.js';
  * @param {Function} deps.withTimeout - Races a promise against a timeout (module-scope, shared with group I)
  * @param {number} deps.LINEAGE_QUERY_LIMIT - Cap on the task cost read's lineage-sibling rows (`/cost`, lib/task-cost-read.js; tests inject a smaller one)
  * @param {number} deps.RECOMMEND_DESCENT_BUDGET_MS - Shared cross-hop budget for the recommend recursion (module-scope)
- * @param {number} deps.LLM_TIMEOUT_MS - Budget for the OpenRouter LLM generation leg (module-scope)
  * @param {Function} deps.getTestMockData - Lazy-loads test fixtures in test mode (module-scope, shared with groups H/I)
- * @param {Function} deps.fetchWithTimeout - Like withTimeout, but cancels the underlying work via AbortSignal on trip (module-scope; definition stays in routes/proxy.js, shared with group I)
- * @param {number} deps.CONTEXT_FETCH_TIMEOUT_MS - Backstop for the Linear context fetch on recommendation-style endpoints (module-scope; definition stays in routes/proxy.js, shared with group I)
  */
 export function createComputeRoutes({
   recordsStore = null,
-  recapCacheStore,
-  briefCacheStore,
   dispatchQueueStore,
   closeOutEventsStore = null,
   requestUsageLoader,
@@ -106,28 +91,9 @@ export function createComputeRoutes({
   withTimeout,
   LINEAGE_QUERY_LIMIT,
   RECOMMEND_DESCENT_BUDGET_MS,
-  LLM_TIMEOUT_MS,
   getTestMockData,
-  fetchWithTimeout,
-  CONTEXT_FETCH_TIMEOUT_MS,
 }) {
   const router = Router();
-
-  // The reply a streamed compute route (recap and brief, read and generate) sends when it fails, in one
-  // place: issue not found, a cut-off model answer (LIN-4358: nothing was cached), the AI service down,
-  // else the tracker error (graphqlErrorStatus is this router's injected mapper). Each route names itself and its fallback.
-  function streamedFailureReply(err, req, { route, failure }) {
-    if (err.message?.includes('not found')) return { status: 404, body: { error: 'Issue not found' } };
-    const truncated = truncationFailureOf(err);
-    if (truncated) {
-      const [status, message, extra] = truncated;
-      return { status, body: { error: message, detail: err.message, ...extra } };
-    }
-    if (err.message?.includes('OpenRouter')) return { status: 503, body: { error: 'AI service temporarily unavailable', detail: err.message } };
-    const status = graphqlErrorStatus(err, req);
-    console.error(`Proxy ${route} error:`, err.message);
-    return { status, body: { error: failure, detail: graphqlErrorDetail(err, req), ...graphqlErrorExtra(err, status) } };
-  }
 
   // LIN-4381: a route running without the events store reads no landings, so no
   // Periodical lane can read `landed` and nothing else says so. Say it once per
@@ -160,90 +126,7 @@ export function createComputeRoutes({
 
   // Longer timeout for Linear endpoints that make multiple sequential GraphQL
   // calls (e.g. the projects + issues fetch behind /stack-style pagination).
-  // The OpenRouter generation leg is NOT capped by this — it has its own, much
-  // larger budget (LLM_TIMEOUT_MS) so a slow-but-healthy generation isn't killed.
   const MULTI_REQUEST_TIMEOUT_MS = 50_000;
-
-  /**
-   * Build a mock recommendation context from test fixtures (mirrors lib/workspace-api-mocks.js).
-   */
-  async function buildMockRecapContextFromFixtures(issueId) {
-    const mockData = await getTestMockData();
-    const mockIssue = mockData.issues.find(i => i.id === issueId || i.identifier === issueId || i.url?.endsWith(`/${issueId}`));
-    if (!mockIssue) return null;
-    const project = mockData.projects.find(p => p.id === mockIssue.project?.id) || null;
-    const labels = (mockIssue.labels?.nodes || []).map(l => l.name);
-    const comments = (mockIssue.comments?.nodes || []).map(c => ({
-      id: c.id,
-      body: c.body,
-      createdAt: c.createdAt,
-      user: { name: c.user?.name || 'Unknown' }
-    }));
-    const children = (mockIssue.children?.nodes || []).map(c => ({
-      id: c.id,
-      identifier: c.identifier || c.id,
-      title: c.title,
-      state: c.state || { type: 'unstarted', name: 'Todo' },
-      labels: (c.labels?.nodes || []).map(l => l.name)
-    }));
-    return {
-      issue: {
-        id: mockIssue.id,
-        identifier: mockIssue.identifier || mockIssue.id,
-        title: mockIssue.title,
-        description: mockIssue.description || '',
-        state: mockIssue.state,
-        labels,
-        url: mockIssue.url
-      },
-      // The parent as the live providers return it (identifier, title and description), so
-      // test mode reaches the brief's parent quote the way production does (LIN-4345).
-      parent: fixtureParent(mockData.issues, mockIssue),
-      siblings: [],
-      project: project ? { id: project.id, name: project.name } : null,
-      children,
-      comments,
-      focusedChild: null
-    };
-  }
-
-  /**
-   * Build a small deterministic recap for test mode.
-   */
-  function buildMockRecapFromContext(context) {
-    const done = [];
-    const pending = [];
-    const deviations = [];
-
-    if ((context.comments || []).length > 0) {
-      done.push({
-        item: 'Discussion captured in comments',
-        evidence: `${context.comments.length} comment(s) recorded`
-      });
-    }
-    if (context.issue?.description) {
-      done.push({
-        item: 'Description documented',
-        evidence: 'Description is present on the issue'
-      });
-    }
-    const remainingChildren = (context.children || []).filter(
-      c => !isTerminalState(c.state?.type)
-    );
-    for (const c of remainingChildren.slice(0, 3)) {
-      pending.push({
-        item: `Complete subtask ${c.identifier}`,
-        predicted: c.title || ''
-      });
-    }
-    if (pending.length === 0) {
-      pending.push({
-        item: 'Continue implementation',
-        predicted: 'Pick up from current state'
-      });
-    }
-    return { done, pending, deviations };
-  }
 
   // =========================================================================
   // Consumer API - Task Automation Endpoints
@@ -1006,265 +889,6 @@ export function createComputeRoutes({
   });
 
   /**
-   * GET /api/proxy/issues/:identifier/recap  (canonical — nested issue-scoped)
-   * GET /api/proxy/recap/:identifier           (forgiving alias, flat form)
-   * Returns the AI-generated recap (done/pending/deviations) for an issue.
-   * Auto-regenerates when missing or stale unless `?noRefresh=1` is passed.
-   * Shared :identifier param across both forms (LIN-528). POST /recap/:identifier
-   * (force-regenerate) is intentionally left flat-only — out of scope for LIN-528.
-   */
-  router.get(['/api/proxy/issues/:identifier/recap', '/api/proxy/recap/:identifier'], proxyLimiter, authenticateProxyToken, async (req, res) => {
-    try {
-      const { token: accessToken, reason, provider } = await resolveProviderAccess(req.proxyUrlKey, req.proxyCreatedBy, req, { source: req.query?.source });
-      // LIN-1980: stamp before any other logic (incl. the !accessToken early
-      // return below) so the fingerprint is present even when this request
-      // later 401s from a shared credential another site marked suspect.
-      if (!accessToken) {
-        return workspaceUnavailable(req, res, '/api/proxy/recap', reason);
-      }
-      if (denyIfUnsupported(provider, 'fetchRecommendationContext', req, res, '/api/proxy/recap')) return;
-      if (!recapCacheStore) {
-        logEvent(req, '/api/proxy/recap', 503);
-        return jsonError(res, 503, 'Recap cache not configured');
-      }
-
-      const { identifier } = req.params;
-      if (!isValidIssueId(identifier)) {
-        logEvent(req, '/api/proxy/recap', 400);
-        return badRequest.json(res, 'Invalid identifier format');
-      }
-
-      const noRefresh = req.query.noRefresh === '1' || req.query.noRefresh === 'true';
-      const isTestMode = isHermeticTestToken(accessToken);
-      const sessionApiKey = await getWorkspaceOpenRouterKey(req.proxyUrlKey, req.proxyCreatedBy);
-
-      // Regenerate path calls OpenRouter; arm a Heroku H12 guard.
-      const keepalive = armKeepalive(res);
-      try {
-        let context;
-        if (isTestMode) {
-          context = await buildMockRecapContextFromFixtures(identifier);
-          if (!context) {
-            logEvent(req, '/api/proxy/recap', 404);
-            return keepaliveError(keepalive, 404, 'Issue not found');
-          }
-        } else {
-          context = await fetchWithTimeout((signal) => provider.fetchRecommendationContext(accessToken, identifier, { signal }), CONTEXT_FETCH_TIMEOUT_MS);
-        }
-
-        const canonicalId = context.issue?.id || identifier;
-        const inputHash = hashContext(context);
-        const cached = await recapCacheStore.get(req.proxyUrlKey, canonicalId);
-
-        if (cached && cached.inputHash === inputHash) {
-          logEvent(req, '/api/proxy/recap', 200);
-          return keepalive.send(200, {
-            status: 'fresh',
-            identifier: context.issue?.identifier || identifier,
-            recap: cached.recap,
-            generatedAt: cached.generatedAt,
-            model: cached.model
-          });
-        }
-
-        if (noRefresh) {
-          logEvent(req, '/api/proxy/recap', 200);
-          return keepalive.send(200, {
-            status: cached ? 'stale' : 'missing',
-            identifier: context.issue?.identifier || identifier,
-            generatedAt: cached?.generatedAt,
-            model: cached?.model
-          });
-        }
-
-        // A free-tier-only deployment is accepted via isFreeTier. The gate sits
-        // AFTER the cache-hit / noRefresh returns above, so a fresh-cache read
-        // never reaches it — and the charge below never bills a cache hit.
-        const credential = resolveChatCredential({ sessionApiKey });
-        const { apiKey: resolvedApiKey, isFreeTier } = credential;
-        if (isAiUnavailable({ credential, mockAi: isTestMode })) {
-          logEvent(req, '/api/proxy/recap', 503);
-          return keepaliveError(keepalive, 503, 'AI recap is not configured. Connect OpenRouter via OAuth or set OPENROUTER_API_KEY on the server.');
-        }
-
-        // LIN-1458: witness which credential source served this request.
-        if (!isTestMode) {
-          logOpenRouterCredentialSource(req, '/api/proxy/recap', { sessionApiKey, isFreeTier });
-        }
-
-        // Charge one free-tier unit only now that generation is guaranteed.
-        if (isFreeTier && !isTestMode) {
-          const rejection = await chargeFreeTierOrReject(req, '/api/proxy/recap');
-          if (rejection) {
-            logEvent(req, '/api/proxy/recap', 429);
-            return keepalive.send(rejection.status, rejection.body);
-          }
-        }
-
-        const selectedModel = await resolveAiOperationModel({ urlKey: req.proxyUrlKey, workspacePreferencesStore, opKind: 'recap', forceDefault: isFreeTier });
-        let recap;
-        let modelUsed;
-        if (isTestMode) {
-          recap = buildMockRecapFromContext(context);
-          modelUsed = selectedModel;
-        } else {
-          const result = await withTimeout(
-            generateRecap(context.issue, context, { apiKey: resolvedApiKey, model: selectedModel, callMeta: { urlKey: req.proxyUrlKey } }),
-            LLM_TIMEOUT_MS
-          );
-          recap = result.recap;
-          modelUsed = result.model;
-        }
-
-        await recapCacheStore.put(req.proxyUrlKey, canonicalId, {
-          inputHash,
-          recap,
-          model: modelUsed
-        });
-        const stored = await recapCacheStore.get(req.proxyUrlKey, canonicalId);
-
-        logEvent(req, '/api/proxy/recap', 200);
-        keepalive.send(200, {
-          status: 'fresh',
-          identifier: context.issue?.identifier || identifier,
-          recap: stored?.recap ?? recap,
-          generatedAt: stored?.generatedAt ?? new Date(),
-          model: modelUsed
-        });
-      } catch (err) {
-        keepalive.stop();
-        const { status, body } = streamedFailureReply(err, req, { route: '/recap', failure: 'Failed to fetch recap' });
-        logEvent(req, '/api/proxy/recap', status);
-        keepalive.send(status, body);
-      }
-    } catch (err) {
-      logEvent(req, '/api/proxy/recap', 500);
-      console.error('Proxy /recap outer error:', err.message);
-      jsonError(res, 500, 'Failed to fetch recap', { detail: err.message });
-    }
-  });
-
-  /**
-   * POST /api/proxy/recap/:identifier
-   * Force-regenerate the recap and return it.
-   */
-  router.post('/api/proxy/recap/:identifier', proxyLimiter, authenticateProxyToken, async (req, res) => {
-    try {
-      const { token: accessToken, reason, provider } = await resolveProviderAccess(req.proxyUrlKey, req.proxyCreatedBy, req, { source: req.query?.source });
-      // LIN-1980: stamp before any other logic (incl. the !accessToken early
-      // return below) so the fingerprint is present even when this request
-      // later 401s from a shared credential another site marked suspect.
-      if (!accessToken) {
-        return workspaceUnavailable(req, res, '/api/proxy/recap', reason);
-      }
-      if (denyIfUnsupported(provider, 'fetchRecommendationContext', req, res, '/api/proxy/recap')) return;
-      if (!recapCacheStore) {
-        logEvent(req, '/api/proxy/recap', 503);
-        return jsonError(res, 503, 'Recap cache not configured');
-      }
-
-      const { identifier } = req.params;
-      if (!isValidIssueId(identifier)) {
-        logEvent(req, '/api/proxy/recap', 400);
-        return badRequest.json(res, 'Invalid identifier format');
-      }
-
-      const isTestMode = isHermeticTestToken(accessToken);
-      const sessionApiKey = await getWorkspaceOpenRouterKey(req.proxyUrlKey, req.proxyCreatedBy);
-
-      // A free-tier-only deployment is accepted via isFreeTier. POST always
-      // regenerates (no cache short-circuit), so charging right after the gate
-      // bills exactly one unit per generation.
-      const credential = resolveChatCredential({ sessionApiKey });
-      const { apiKey: resolvedApiKey, isFreeTier } = credential;
-      if (isAiUnavailable({ credential, mockAi: isTestMode })) {
-        logEvent(req, '/api/proxy/recap', 503);
-        return jsonError(res, 503, 'AI recap is not configured. Connect OpenRouter via OAuth or set OPENROUTER_API_KEY on the server.');
-      }
-
-      // LIN-1458: witness which credential source served this request.
-      if (!isTestMode) {
-        logOpenRouterCredentialSource(req, '/api/proxy/recap', { sessionApiKey, isFreeTier });
-      }
-
-      if (isFreeTier && !isTestMode) {
-        const rejection = await chargeFreeTierOrReject(req, '/api/proxy/recap');
-        if (rejection) {
-          logEvent(req, '/api/proxy/recap', 429);
-          return res.status(rejection.status).json(rejection.body);
-        }
-      }
-
-      // Force-regenerate always calls OpenRouter; arm a Heroku H12 guard.
-      const keepalive = armKeepalive(res);
-      try {
-        let context;
-        if (isTestMode) {
-          context = await buildMockRecapContextFromFixtures(identifier);
-          if (!context) {
-            logEvent(req, '/api/proxy/recap', 404);
-            return keepaliveError(keepalive, 404, 'Issue not found');
-          }
-        } else {
-          context = await fetchWithTimeout((signal) => provider.fetchRecommendationContext(accessToken, identifier, { signal }), CONTEXT_FETCH_TIMEOUT_MS);
-        }
-
-        const canonicalId = context.issue?.id || identifier;
-        const inputHash = hashContext(context);
-
-        const selectedModel = await resolveAiOperationModel({ urlKey: req.proxyUrlKey, workspacePreferencesStore, opKind: 'recap', forceDefault: isFreeTier });
-        let recap;
-        let modelUsed;
-        if (isTestMode) {
-          recap = buildMockRecapFromContext(context);
-          modelUsed = selectedModel;
-        } else {
-          const result = await withTimeout(
-            generateRecap(context.issue, context, { apiKey: resolvedApiKey, model: selectedModel, callMeta: { urlKey: req.proxyUrlKey } }),
-            LLM_TIMEOUT_MS
-          );
-          recap = result.recap;
-          modelUsed = result.model;
-        }
-
-        await recapCacheStore.put(req.proxyUrlKey, canonicalId, {
-          inputHash,
-          recap,
-          model: modelUsed
-        });
-        const stored = await recapCacheStore.get(req.proxyUrlKey, canonicalId);
-
-        logEvent(req, '/api/proxy/recap', 200);
-        keepalive.send(200, {
-          status: 'fresh',
-          identifier: context.issue?.identifier || identifier,
-          recap: stored?.recap ?? recap,
-          generatedAt: stored?.generatedAt ?? new Date(),
-          model: modelUsed
-        });
-      } catch (err) {
-        keepalive.stop();
-        const { status, body } = streamedFailureReply(err, req, { route: '/recap', failure: 'Failed to fetch recap' });
-        logEvent(req, '/api/proxy/recap', status);
-        keepalive.send(status, body);
-      }
-    } catch (err) {
-      if (err.message?.includes('not found')) {
-        logEvent(req, '/api/proxy/recap', 404);
-        return notFound.json(res, 'Issue not found');
-      }
-      if (err.message?.includes('OpenRouter')) {
-        logEvent(req, '/api/proxy/recap', 503);
-        return jsonError(res, 503, 'AI service temporarily unavailable', { detail: err.message });
-      }
-      const status = graphqlErrorStatus(err, req);
-      logEvent(req, '/api/proxy/recap', status);
-      console.error('Proxy /recap POST error:', err.message);
-      jsonError(res, status, 'Failed to generate recap', { detail: graphqlErrorDetail(err, req), ...graphqlErrorExtra(err, status) });
-    }
-  });
-
-  /**
    * GET /api/proxy/issues/:identifier/brief  (canonical — nested issue-scoped)
    * GET /api/proxy/brief/:identifier           (forgiving alias, flat form)
    *
@@ -1356,126 +980,6 @@ export function createComputeRoutes({
       logEvent(req, endpoint, 500);
       console.error('Proxy /brief error:', err.message);
       jsonError(res, 500, 'Failed to fetch brief', { detail: err.message });
-    }
-  });
-
-  /**
-   * POST /api/proxy/brief/:identifier
-   * Force-regenerate the model-written summary the task page shows, and return it. LIN-4536: this is not the brief GET
-   * answers (the records brief); the summary, its cache and this route retire in LIN-4537.
-   */
-  router.post('/api/proxy/brief/:identifier', proxyLimiter, authenticateProxyToken, async (req, res) => {
-    try {
-      const { token: accessToken, reason, provider } = await resolveProviderAccess(req.proxyUrlKey, req.proxyCreatedBy, req, { source: req.query?.source });
-      // LIN-1980: stamp before any other logic (incl. the !accessToken early
-      // return below) so the fingerprint is present even when this request
-      // later 401s from a shared credential another site marked suspect.
-      if (!accessToken) {
-        return workspaceUnavailable(req, res, '/api/proxy/brief', reason);
-      }
-      if (denyIfUnsupported(provider, 'fetchRecommendationContext', req, res, '/api/proxy/brief')) return;
-      if (!briefCacheStore) {
-        logEvent(req, '/api/proxy/brief', 503);
-        return jsonError(res, 503, 'Brief cache not configured');
-      }
-
-      const { identifier } = req.params;
-      if (!isValidIssueId(identifier)) {
-        logEvent(req, '/api/proxy/brief', 400);
-        return badRequest.json(res, 'Invalid identifier format');
-      }
-
-      const isTestMode = isHermeticTestToken(accessToken);
-      const sessionApiKey = await getWorkspaceOpenRouterKey(req.proxyUrlKey, req.proxyCreatedBy);
-
-      // Free-tier-only deployments accepted via isFreeTier. POST always regenerates,
-      // so charging right after the gate bills exactly one unit per generation.
-      const credential = resolveChatCredential({ sessionApiKey });
-      const { apiKey: resolvedApiKey, isFreeTier } = credential;
-      if (isAiUnavailable({ credential, mockAi: isTestMode })) {
-        logEvent(req, '/api/proxy/brief', 503);
-        return jsonError(res, 503, 'AI brief is not configured. Connect OpenRouter via OAuth or set OPENROUTER_API_KEY on the server.');
-      }
-
-      // LIN-1458: witness which credential source served this request.
-      if (!isTestMode) {
-        logOpenRouterCredentialSource(req, '/api/proxy/brief', { sessionApiKey, isFreeTier });
-      }
-
-      if (isFreeTier && !isTestMode) {
-        const rejection = await chargeFreeTierOrReject(req, '/api/proxy/brief');
-        if (rejection) {
-          logEvent(req, '/api/proxy/brief', 429);
-          return res.status(rejection.status).json(rejection.body);
-        }
-      }
-
-      // Force-regenerate always calls OpenRouter; arm a Heroku H12 guard.
-      const keepalive = armKeepalive(res);
-      try {
-        let context;
-        if (isTestMode) {
-          context = await buildMockRecapContextFromFixtures(identifier);
-          if (!context) {
-            logEvent(req, '/api/proxy/brief', 404);
-            return keepaliveError(keepalive, 404, 'Issue not found');
-          }
-        } else {
-          context = await fetchWithTimeout((signal) => provider.fetchRecommendationContext(accessToken, identifier, { signal }), CONTEXT_FETCH_TIMEOUT_MS);
-        }
-
-        const canonicalId = context.issue?.id || identifier;
-        const inputHash = hashContext(context);
-
-        const selectedModel = await resolveAiOperationModel({ urlKey: req.proxyUrlKey, workspacePreferencesStore, opKind: 'brief', forceDefault: isFreeTier });
-        let brief;
-        let modelUsed;
-        if (isTestMode) {
-          brief = buildMockBrief(context);
-          modelUsed = selectedModel;
-        } else {
-          const result = await withTimeout(
-            generateBrief(context.issue, context, { apiKey: resolvedApiKey, model: selectedModel, callMeta: { urlKey: req.proxyUrlKey } }),
-            LLM_TIMEOUT_MS
-          );
-          brief = result.brief;
-          modelUsed = result.model;
-        }
-
-        await briefCacheStore.put(req.proxyUrlKey, canonicalId, {
-          inputHash,
-          brief,
-          model: modelUsed
-        });
-        const stored = await briefCacheStore.get(req.proxyUrlKey, canonicalId);
-
-        logEvent(req, '/api/proxy/brief', 200);
-        keepalive.send(200, {
-          status: 'fresh',
-          identifier: context.issue?.identifier || identifier,
-          brief: stored?.brief ?? brief,
-          generatedAt: stored?.generatedAt ?? new Date(),
-          model: modelUsed
-        });
-      } catch (err) {
-        keepalive.stop();
-        const { status, body } = streamedFailureReply(err, req, { route: '/brief', failure: 'Failed to generate brief' });
-        logEvent(req, '/api/proxy/brief', status);
-        keepalive.send(status, body);
-      }
-    } catch (err) {
-      if (err.message?.includes('not found')) {
-        logEvent(req, '/api/proxy/brief', 404);
-        return notFound.json(res, 'Issue not found');
-      }
-      if (err.message?.includes('OpenRouter')) {
-        logEvent(req, '/api/proxy/brief', 503);
-        return jsonError(res, 503, 'AI service temporarily unavailable', { detail: err.message });
-      }
-      const status = graphqlErrorStatus(err, req);
-      logEvent(req, '/api/proxy/brief', status);
-      console.error('Proxy /brief POST error:', err.message);
-      jsonError(res, status, 'Failed to generate brief', { detail: graphqlErrorDetail(err, req), ...graphqlErrorExtra(err, status) });
     }
   });
 

@@ -138,13 +138,6 @@ const DEP_DEFAULTS = {
   // empty, the same graceful degrade as the other unwired page caches.
   runParagraphStore: () => null,
   recordsStore: () => null,
-  // Brief/recap caches are per-issue (keyed by issue UUID); the per-session page
-  // (LIN-1003) joins them onto a session by distinct loop.issueId. They are NOT
-  // otherwise reachable in this router — the observation feed never reads issue
-  // context — so they are injected here explicitly (default null → the join is
-  // simply skipped, e.g. in tests that don't wire them).
-  briefCacheStore: () => null,
-  recapCacheStore: () => null,
   // LIN-1588: the proxy-event store, source of Beat 1's per-token credential
   // verdict. Read ONLY by the per-session page (a page load, never the feed
   // poll). Default null → the credential line degrades to `unknown`, which is
@@ -165,8 +158,8 @@ const DEP_DEFAULTS = {
   // Task decisions (LIN-2215), the rulings feed's second input
   // alongside `loops` — see the rulings GET (dashboard-rulings.js). Default
   // null → the taskDecisions branch is simply skipped (collectUnansweredDecisions
-  // defaults it to []), same degrade-gracefully convention as briefCacheStore/
-  // recapCacheStore/proxyEventStore above, so an unwired test sees no behaviour change.
+  // defaults it to []), same degrade-gracefully convention as
+  // proxyEventStore above, so an unwired test sees no behaviour change.
   taskDecisionsStore: () => null,
   // Proposed dismissals (LIN-2444), the rulings feed's THIRD input. An agent
   // may PROPOSE that a ruling be dismissed and never perform one, so the
@@ -276,8 +269,6 @@ export function createDashboardRoutes(deps) {
     runParagraphStore,
     recordsStore,
     accountStore,
-    briefCacheStore,
-    recapCacheStore,
     proxyEventStore,
     workspacePreferencesStore,
     workspaceOwnerCheck,
@@ -349,8 +340,7 @@ export function createDashboardRoutes(deps) {
   // instead learns the session's issue set from tiny `{urlKey,sessionId}`-indexed
   // projected reads and rebuilds NON-lean over ONLY those issues via
   // `getSessionsForIssues` (LIN-623), so the read scales with one session, not the
-  // whole workspace. Brief/recap are cache-ONLY reads on load (never an LLM spend on
-  // page load); a miss renders an explicit affordance.
+  // whole workspace.
   router.get('/workspace/:urlKey/observation/session/:sessionId', workspaceFromUrl, async (req, res, next) => {
     try {
       const workspace = req.workspace;
@@ -368,14 +358,14 @@ export function createDashboardRoutes(deps) {
         return res.status(404).send(renderSessionPage({ session: null, sessionId: '', urlKey: workspace.urlKey }, pageOptions));
       }
 
-      // The local half (LIN-3311): session, issue context, run view, stored
+      // The local half (LIN-3311): session, run view, stored
       // paragraph — Mongo only, no request input. Everything below that reads
       // `req` or is owner-only stays in this route.
       const local = await loadRunLocal(workspace.urlKey, sessionId);
       if (!local) {
         return res.status(404).send(renderSessionPage({ session: null, sessionId, urlKey: workspace.urlKey }, pageOptions));
       }
-      const { session, issueContext, anchorLoop, anchorIssueTitle, runView, runParagraph } = local;
+      const { session, anchorLoop, anchorIssueTitle, runView, runParagraph } = local;
 
       // Session-level "waiting on user" banner (LIN-1005): the SAME rollup the
       // observation feed uses, computed here over the non-lean session's enriched
@@ -457,7 +447,7 @@ export function createDashboardRoutes(deps) {
       // session's own rows. A follow-up or wake row reads the run it resumes (`readRunAccount`, via `runRecordIdFor`).
       const runAccount = recordsStore ? await readRunAccount(recordsStore, (urlKey, id) => dispatchQueueStore.rowForRunRecords(urlKey, id), workspace.urlKey, session) : null;
       const html = renderSessionPage(
-        { session, sessionId, issueContext, waiting, waitingMessage, producerLoopId, decision, decisionCase, questionRecords, producer, urlKey: workspace.urlKey, canReply, sessionTerminal, credentialByToken, anchorIssueTitle, runView, proposals, runEvidence, runParagraph, runAccount },
+        { session, sessionId, waiting, waitingMessage, producerLoopId, decision, decisionCase, questionRecords, producer, urlKey: workspace.urlKey, canReply, sessionTerminal, credentialByToken, anchorIssueTitle, runView, proposals, runEvidence, runParagraph, runAccount },
         pageOptions
       );
       res.send(html);
@@ -666,14 +656,14 @@ export function createDashboardRoutes(deps) {
   /**
    * The run page's LOCAL half (LIN-3311): everything the page
    * model needs that is Mongo-only and request-free — the NON-lean session
-   * (LIN-1021 point-read), the brief/recap cache-join, the anchor loop and its
+   * (LIN-1021 point-read), the anchor loop and its
    * title, the run view, and the stored run paragraph. No tracker or GitHub
    * read, no `req`, no owner-only input, so it also runs as a cheap local probe.
    *
    * @param {string} urlKey
    * @param {string} sessionId
    * @param {{ now?: Date|string|number }} [opts] - the run view's clock
-   * @returns {Promise<null|{ session: Object, issueContext: Array, anchorLoop: (Object|null), anchorIssueTitle: (string|null), runView: Object, paragraph: (Object|null), runParagraph: (string|null) }>}
+   * @returns {Promise<null|{ session: Object, anchorLoop: (Object|null), anchorIssueTitle: (string|null), runView: Object, paragraph: (Object|null), runParagraph: (string|null) }>}
    *   null when the session is gone; `paragraph` is the stored record
    *   (`{ paragraph, inputHash, final, … }`), `runParagraph` its text.
    */
@@ -682,12 +672,6 @@ export function createDashboardRoutes(deps) {
     // `feedback[]`, but scoped to this session's issues, not the whole workspace.
     const session = await loadSessionWithTranscript(urlKey, sessionId);
     if (!session) return null;
-
-    // Brief/recap cache-join over the session's distinct non-null issue UUIDs.
-    // `.get()` is a pure Mongo lookup (no LLM, null on miss); null `issueId`
-    // loops cannot be cache-joined and are skipped best-effort (mirrors the
-    // lazy-hydration discipline). Never call the generating path on load.
-    const issueContext = await joinSessionIssueContext(session, urlKey);
 
     const anchorLoop = findAnchorLoop(session) || (session.loops && session.loops[0]) || null;
     const anchorIssueTitle = (anchorLoop && anchorLoop.issueTitle) || null;
@@ -703,7 +687,7 @@ export function createDashboardRoutes(deps) {
       ? ((await runParagraphStore.get(urlKey, sessionId)) || null)
       : null;
 
-    return { session, issueContext, anchorLoop, anchorIssueTitle, runView, paragraph, runParagraph: paragraph?.paragraph || null };
+    return { session, anchorLoop, anchorIssueTitle, runView, paragraph, runParagraph: paragraph?.paragraph || null };
   }
 
   /**
@@ -828,46 +812,6 @@ export function createDashboardRoutes(deps) {
    */
   function pointReadSession(urlKey, sessionId) {
     return pointReadSessionFor(urlKey, sessionId, loopDeps);
-  }
-
-  /**
-   * Cache-only brief/recap join for the per-session page (LIN-1003). Reduces the
-   * session's loops to distinct non-null issue UUIDs and reads each issue's
-   * cached brief + recap. Pure reads; a store miss (or an unwired store) yields
-   * a null body → the renderer shows an explicit generate affordance.
-   *
-   * @param {Object} session - non-lean reconstructed session
-   * @param {string} urlKey
-   * @returns {Promise<Array<Object>>}
-   */
-  async function joinSessionIssueContext(session, urlKey) {
-    const seen = new Set();
-    const distinct = [];
-    for (const loop of session.loops || []) {
-      const issueId = loop.issueId || null;
-      if (!issueId || seen.has(issueId)) continue; // null → skippable best-effort
-      seen.add(issueId);
-      distinct.push({ issueIdentifier: loop.issueIdentifier || null, issueId });
-    }
-
-    const out = [];
-    for (const d of distinct) {
-      const [brief, recap] = await Promise.all([
-        briefCacheStore ? briefCacheStore.get(urlKey, d.issueId).catch(() => null) : Promise.resolve(null),
-        recapCacheStore ? recapCacheStore.get(urlKey, d.issueId).catch(() => null) : Promise.resolve(null)
-      ]);
-      out.push({
-        issueIdentifier: d.issueIdentifier,
-        issueId: d.issueId,
-        brief: brief?.brief || null,
-        briefModel: brief?.model || null,
-        briefGeneratedAt: brief?.generatedAt || null,
-        recap: recap?.recap || null,
-        recapModel: recap?.model || null,
-        recapGeneratedAt: recap?.generatedAt || null
-      });
-    }
-    return out;
   }
 
   router.use(createDashboardRulingsRoutes(ctx));

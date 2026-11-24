@@ -69,9 +69,8 @@ const COMPUTE_SITE_ENDPOINTS = [
   '/api/proxy/stack',
   '/api/proxy/prompt',
   '/api/proxy/recommend',
-  '/api/proxy/recap', // GET
-  '/api/proxy/recap', // POST (recap appears twice — see the dedicated test below)
-  '/api/proxy/brief', // POST only: LIN-4536 made GET /brief the records brief, which reads no tracker and resolves no credential
+  // LIN-4536 made GET /brief the records brief, which reads no tracker and resolves no credential;
+  // LIN-4537 retired GET/POST /recap and POST /brief, the other three sites.
 ];
 
 // The 1 direct call site that moved to routes/proxy-kickoff.js (group H).
@@ -146,11 +145,12 @@ describe('LIN-1980 — req.resolvedCredentialFingerprint stamping coverage', () 
     const dispatchMatches = PROXY_DISPATCH_SRC.match(pattern) || [];
     const entranceLibMatches = ENTRANCE_LIB_SRC.match(pattern) || [];
     const proxyMatches = PROXY_SRC.match(pattern) || [];
-    // LIN-4536: 6, not 7. GET /brief is the records brief: it reads no tracker, so it resolves no provider credential.
+    // LIN-4536: GET /brief is the records brief: it reads no tracker, so it resolves no provider credential.
+    // LIN-4537: 3 (stack, prompt, recommend). GET/POST /recap and POST /brief were retired.
     assert.equal(
       computeMatches.length,
-      6,
-      `expected 6 direct resolveProviderAccess(req.proxyUrlKey, req.proxyCreatedBy, req) call sites in routes/proxy-compute.js, found ${computeMatches.length}.`
+      3,
+      `expected 3 direct resolveProviderAccess(req.proxyUrlKey, req.proxyCreatedBy, req) call sites in routes/proxy-compute.js, found ${computeMatches.length}.`
     );
     // LIN-3601: was `kickoffMatches.length === 1`, `dispatchMatches.length === 1` and
     // the F=7 + H=1 + I=1 = 9 partition. The two entrance sites (autopilot/kickoff,
@@ -225,7 +225,7 @@ describe('LIN-1980 — req.resolvedCredentialFingerprint stamping coverage', () 
   // scratch copy fail it (PR evidence). The 7 sites in routes/proxy-compute.js and the
   // 0 in routes/proxy.js are not E and stay exactly as they were.
   test('each of the 9 direct sites checks !accessToken immediately after the resolveProviderAccess(...) call, with nothing but the LIN-1980 comment between them — no logic can act on a request whose provider resolution failed before the guard has a chance to reject it', () => {
-    assertOrderingGuard(PROXY_COMPUTE_SRC, 6, 'routes/proxy-compute.js'); // LIN-4536: GET /brief resolves no credential
+    assertOrderingGuard(PROXY_COMPUTE_SRC, 3, 'routes/proxy-compute.js'); // LIN-4536: GET /brief resolves no credential; LIN-4537: recap x2 + POST /brief retired
     assertOrderingGuard(PROXY_SRC, 0, 'routes/proxy.js');
   });
 

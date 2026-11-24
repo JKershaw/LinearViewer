@@ -73,7 +73,7 @@ function proxyApp(provider, onTicketWrite) {
     proxyEventStore: { recordEvent: async () => {} },
     resolveWorkspaceAccess: async () => ({ token: 'ws-token', reason: 'ok' }),
     getWorkspaceAccessToken: async () => 'ws-token',
-    agentStatusStore: {}, recapCacheStore: {}, briefCacheStore: {}, dispatchQueueStore: {},
+    agentStatusStore: {}, dispatchQueueStore: {},
     workspaceFromUrl: (req, res, next) => next(),
     getWorkspaceOpenRouterKey: async () => null, workspacePreferencesStore: {},
     freeTierStore: { tryUse: async () => ({ allowed: true }) },
@@ -166,7 +166,7 @@ describe('seam 2: PATCH /workspace/:urlKey/api/issues/:id', () => {
     app.use(createWorkspaceApiRoutes({
       workspaceFromUrl: (req, res, next) => { req.workspace = { urlKey: req.params.urlKey, provider: NAME, accessToken: 't' }; req.session = { accountId: 'a' }; next(); },
       freeTierStore: {}, getOpenRouterSource: () => null, userPreferencesStore: {}, workspacePreferencesStore: { getWorkspacePreferences: async () => ({}) },
-      customPromptsStore: {}, recapCacheStore: {}, briefCacheStore: {}, reportHistoryStore: {}, dispatchQueueStore: {}, agentStatusStore: {}, promptTraceStore: {},
+      customPromptsStore: {}, reportHistoryStore: {}, dispatchQueueStore: {}, agentStatusStore: {}, promptTraceStore: {},
       ...(onTicketWrite ? { onTicketWrite } : {})
     }));
     return app;

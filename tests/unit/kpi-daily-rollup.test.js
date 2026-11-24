@@ -323,7 +323,7 @@ describe('the daily job', () => {
 describe('agreement with the public page (collectKpiStats)', () => {
   const names = [
     'sessions', 'userPreferences', 'workspacePreferences', 'customPrompts', 'localIssues', 'dispatchQueue',
-    'dispatchTokens', 'proxyTokens', 'proxyEvents', 'agentStatus', 'freeTier', 'recapCache', 'briefCache', 'reportHistory', 'kpiDailyRollup'
+    'dispatchTokens', 'proxyTokens', 'proxyEvents', 'agentStatus', 'freeTier', 'reportHistory', 'kpiDailyRollup'
   ];
   const stub = (rows = []) => ({
     find: () => ({ toArray: async () => rows }),

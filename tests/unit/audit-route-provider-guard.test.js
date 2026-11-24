@@ -61,8 +61,8 @@ function buildApp(workspace) {
     },
     // Only the factory signature matters here; the audit route uses none of these.
     freeTierStore: {}, getOpenRouterSource: () => null, userPreferencesStore: {},
-    workspacePreferencesStore: {}, customPromptsStore: {}, recapCacheStore: {},
-    briefCacheStore: {}, reportHistoryStore: {}, dispatchQueueStore: {},
+    workspacePreferencesStore: {}, customPromptsStore: {},
+    reportHistoryStore: {}, dispatchQueueStore: {},
     agentStatusStore: {}, promptTraceStore: {}, proxyTokenStore: {}
   });
   app.use(router);

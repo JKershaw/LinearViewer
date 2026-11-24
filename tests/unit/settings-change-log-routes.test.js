@@ -336,20 +336,20 @@ describe('the Models page is fed spend by the route (LIN-3855: jobs are ordered 
 
   test('the dispatch history and the call log reach the page: spend orders the jobs, no priced job reads "no runs"', async () => {
     state.history = { items: [usageRow('r1', 'review', 1), usageRow('i1', 'implementation', 5)], total: 2 };
-    state.callDocs = [{ feature: 'recap', model: 'openai/gpt-5.4-mini', cost: 0.4 }];
+    state.callDocs = [{ feature: 'run-summary', model: 'openai/gpt-5.4-mini', cost: 0.4 }];
     const html = await models();
 
     const ids = jobIds(html);
     assert.ok(ids.indexOf('implementation') < ids.indexOf('review'), 'implementation ($5) lists before review ($1), against the registry order');
     assert.ok(ids.indexOf('review') < ids.indexOf('bug'), 'a job with spend lists before one with no runs');
-    assert.ok(ids.indexOf('recap') < ids.indexOf('recommend'), 'the priced Harbour call lists before the one the registry puts first');
+    assert.ok(ids.indexOf('run-summary') < ids.indexOf('recommend'), 'the priced Harbour call lists before the one the registry puts first');
     assert.deepEqual(state.historyReads.map((r) => r.urlKey), ['alpha'], 'one history read, for this workspace');
 
-    for (const id of ['implementation', 'review', 'recap']) assert.doesNotMatch(row(html, id), /no runs/, `${id} has runs`);
+    for (const id of ['implementation', 'review', 'run-summary']) assert.doesNotMatch(row(html, id), /no runs/, `${id} has runs`);
     assert.match(row(html, 'bug'), /no runs/, 'a job with no runs still says so');
     assert.match(row(html, 'implementation'), /\$5\.00/);
     assert.match(row(html, 'review'), /\$1\.00/);
-    assert.match(row(html, 'recap'), /\$0\.40/);
+    assert.match(row(html, 'run-summary'), /\$0\.40/);
   });
 
   test('the coverage line comes from the same read: it appears when the history read hit its cap, not otherwise', async () => {

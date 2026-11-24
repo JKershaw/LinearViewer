@@ -31,8 +31,6 @@ function buildApp({ promptTraceStore } = {}) {
     userPreferencesStore: {},
     workspacePreferencesStore: {},
     customPromptsStore: {},
-    recapCacheStore: {},
-    briefCacheStore: {},
     reportHistoryStore: {},
     dispatchQueueStore: {},
     agentStatusStore: {},

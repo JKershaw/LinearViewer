@@ -204,7 +204,7 @@ describe('the /kpis founder wiring (LIN-4178 review finding 2): the production l
     return {
       sessions: empty(), userPreferences: empty(), workspacePreferences: empty(), customPrompts: empty(),
       localIssues: empty(), dispatchTokens: empty(), proxyTokens: empty(), proxyEvents: empty(), agentStatus: empty(),
-      freeTier: empty(), recapCache: empty(), briefCache: empty(), reportHistory: empty(), kpiDailyRollup: empty(),
+      freeTier: empty(), reportHistory: empty(), kpiDailyRollup: empty(),
       dispatchHistory: collection(HISTORY), dispatchQueue: collection(QUEUE),
     };
   };

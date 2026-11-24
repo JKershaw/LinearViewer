@@ -18,8 +18,9 @@ import { seedWorkspaceOwnership } from '../fixtures/workspace-ownership.js';
 //
 // It is RED-FIRST: authored against `50588aef` (pre-P0), where none of the new
 // DOM exists. P0's commits make it green. Home-path assertions arrive in P1, the
-// Brief/Recap no-spend block in P2, and the proxy-default/R2-5 block in P3 —
-// each in its own `test.describe` block, per the plan.
+// Insights no-spend block in P2 (Brief/Recap until LIN-4537 retired them), and
+// the proxy-default/R2-5 block in P3 — each in its own `test.describe` block,
+// per the plan.
 //
 // DOM CONTRACT this spec pins (the P0 implementation must emit these hooks):
 //   .prompt-section                                  the shared opened-task component
@@ -664,52 +665,42 @@ test.describe('LIN-2944 P1 — Home first-screen witness (R1/R2)', () => {
 });
 
 // =============================================================================
-// LIN-2944 P2 — nothing spends AI when Brief or Recap opens.
+// LIN-2944 P2 — nothing spends AI when the card's Insights open.
 //
-// The opened task's Brief and Recap sections are lazy-mounted on expand. Before
-// P2 they auto-POSTed on that expand (LIN-998); P2 makes them render the manual
-// ✦ generate placeholder instead, so expanding a section spends nothing and only
-// an explicit generate does. This witness pins POST /api/brief/*, POST
-// /api/recap/* and the recommend spend channel to zero across an expand.
+// The opened card's Insights sections are lazy-mounted on expand, and opening
+// one must spend nothing. P2 pinned that on Brief and Recap; LIN-4537 retired
+// both (the card no longer carries them), so the witness now opens what remains
+// of Insights (Context) and pins the recommend spend channel AND every
+// brief/recap request (any method — the routes are gone) to zero across it.
 //
 // Its own `test.describe` block because P3 appends a disjoint block to this file.
 // =============================================================================
-test.describe('LIN-2944 P2 — no AI spend when Brief/Recap open', () => {
-  test('expanding Brief and Recap on the top task issues zero AI requests until generate', async ({ page, seedLocal, localWorkerUrlKey }) => {
+test.describe('LIN-2944 P2 — no AI spend when the card\'s Insights open', () => {
+  test('the card has no Brief or Recap, and expanding Context issues zero AI requests', async ({ page, seedLocal, localWorkerUrlKey }) => {
     const spend = [];
     page.on('request', (req) => {
       let pathname = '';
       try { pathname = new URL(req.url()).pathname; } catch { return; }
-      const briefRecapPost = (pathname.includes('/api/brief/') || pathname.includes('/api/recap/')) && req.method() === 'POST';
-      if (briefRecapPost || isRecommendSpend(req.url())) spend.push(`${req.method()} ${pathname}`);
+      const briefRecap = /\/api\/(brief|recap)\//.test(pathname) || /\/api\/proxy\/(issues\/[^/]+\/)?recap\b/.test(pathname);
+      if (briefRecap || isRecommendSpend(req.url())) spend.push(`${req.method()} ${pathname}`);
     });
 
-    // openRouterConnected so the surfaces are live and a pre-P2 open WOULD spend.
+    // openRouterConnected so the surfaces are live and a spending open WOULD spend.
     await seedLocal(workspaceApiLocalSeed, { openRouterConnected: true });
     await page.goto(`/workspace/${localWorkerUrlKey}/swipe`);
     await page.waitForLoadState('networkidle');
 
-    // The 3001 server's data dir persists across runs, so a prior run may have
-    // cached this task's brief/recap. Clear both so the open below is genuinely
-    // the `missing` state (the state P2 makes non-spending).
-    const topId = await page.evaluate(() => window.__SWIPE_DATA__.issues[0].id);
-    const topIdentifier = (await page.locator('.swipe-card-identifier').first().textContent()).trim();
-    for (const issueId of [topId, topIdentifier]) {
-      await page.request.get(`/test/clear-brief-cache?urlKey=${localWorkerUrlKey}&issueId=${encodeURIComponent(issueId)}`);
-      await page.request.get(`/test/clear-recap-cache?urlKey=${localWorkerUrlKey}&issueId=${encodeURIComponent(issueId)}`);
-    }
+    // LIN-4537: the Brief and Recap accordions are gone from the card.
+    await expect(page.locator('.swipe-accordion-header[data-accordion="context"]').first()).toBeVisible();
+    await expect(page.locator('.swipe-accordion-header[data-accordion="brief"], .swipe-accordion-header[data-accordion="recap"]')).toHaveCount(0);
 
-    await page.locator('.swipe-accordion-header[data-accordion="brief"]').first().click();
-    await page.locator('.swipe-accordion-header[data-accordion="recap"]').first().click();
+    await page.locator('.swipe-accordion-header[data-accordion="context"]').first().click();
+    const context = page.locator('.swipe-accordion-body[data-accordion-body="context"] .context-section').first();
+    // The section settles on its deterministic diagram, not generated content.
+    await expect(context).toHaveAttribute('data-state', 'loaded');
+    await page.waitForLoadState('networkidle');
 
-    const brief = page.locator('.swipe-accordion-body[data-accordion-body="brief"] .brief-section').first();
-    const recap = page.locator('.swipe-accordion-body[data-accordion-body="recap"] .recap-section').first();
-
-    // P2: each section settles on the manual placeholder, not generated content.
-    await expect(brief).toHaveAttribute('data-state', 'missing');
-    await expect(recap).toHaveAttribute('data-state', 'missing');
-
-    // The expands themselves spent nothing.
+    // The expand itself spent nothing.
     expect(spend).toEqual([]);
   });
 });

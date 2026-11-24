@@ -218,8 +218,8 @@ function buildApp(workspace) {
       next();
     },
     freeTierStore: {}, getOpenRouterSource: () => null, userPreferencesStore: {},
-    workspacePreferencesStore: {}, customPromptsStore: {}, recapCacheStore: {},
-    briefCacheStore: {}, reportHistoryStore: {}, dispatchQueueStore: {},
+    workspacePreferencesStore: {}, customPromptsStore: {},
+    reportHistoryStore: {}, dispatchQueueStore: {},
     agentStatusStore: {}, promptTraceStore: {}, proxyTokenStore: {},
   });
   app.use(router);

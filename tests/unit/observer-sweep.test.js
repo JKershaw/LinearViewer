@@ -58,7 +58,7 @@ import {
 } from '../../lib/observer-sweep.js';
 import { ObserverStateStore } from '../../lib/observer-state-store.js';
 import { computeWouldBeActions, ObserverShadowLogStore } from '../../lib/observer-shadow-log.js';
-import { stableStringify } from '../../lib/recap-cache.js';
+import { stableStringify } from '../../lib/utils/stable-stringify.js';
 import { DispatchQueueStore } from '../../lib/dispatch-store.js';
 import { AgentStatusStore } from '../../lib/agent-status-store.js';
 import { isWakeEvent } from '../../lib/dispatch-terminal.js';

@@ -110,10 +110,10 @@ describe('a row names a model by its display name (LIN-3952 item 3)', () => {
 
   test('a Harbour call set to an id shows its display name in the row value', () => {
     const table = applyChangesToTable(emptyTable(), [
-      { scope: 'job', surface: SURFACES.HARBOUR_CALL, key: 'recap', field: 'model', to: 'openai/gpt-5.4-mini' }
+      { scope: 'job', surface: SURFACES.HARBOUR_CALL, key: 'run-summary', field: 'model', to: 'openai/gpt-5.4-mini' }
     ]);
     const html = body(table);
-    const row = html.slice(html.indexOf('data-testid="models-job-recap"'));
+    const row = html.slice(html.indexOf('data-testid="models-job-run-summary"'));
     assert.match(row.match(/settings-row-value">([^<]*)</)[1], /GPT-5\.4 Mini · set here/);
   });
 });

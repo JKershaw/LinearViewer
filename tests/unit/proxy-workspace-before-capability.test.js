@@ -54,8 +54,6 @@ function buildApp(providerName, { token = 'ws-token', reason = 'ok' } = {}) {
     resolveWorkspaceAccess: async () => ({ token, reason, provider: providerName }),
     getWorkspaceAccessToken: async () => token,
     agentStatusStore: {},
-    recapCacheStore: {},
-    briefCacheStore: {},
     dispatchQueueStore: {},
     workspaceFromUrl: (req, res, next) => next(),
     getWorkspaceOpenRouterKey: async () => null,

@@ -4,15 +4,15 @@
  * Run with: node --test tests/unit/run-summary-cache.test.js
  *
  * Coverage:
- *   - stableStringify determinism
+ *   - stableStringify determinism (the one copy, lib/utils/stable-stringify.js, LIN-4537)
  *   - hashLoop stability + sensitivity to summarisable fields only
  *   - RunSummaryCacheStore key format, get/put/delete, TTL expiry
  *   - InMemory fallback
  */
 import { test, describe } from 'node:test';
 import assert from 'node:assert';
+import { stableStringify } from '../../lib/utils/stable-stringify.js';
 import {
-  stableStringify,
   hashLoop,
   RunSummaryCacheStore,
   InMemoryRunSummaryCacheStore

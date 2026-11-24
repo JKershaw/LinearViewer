@@ -785,7 +785,7 @@ window.readSSEStream = async function readSSEStream(response, onEvent) {
  * Unified client-side dispatch to POST /api/dispatch.
  *
  * Every dispatch surface (dashboard tree, dispatch page, session page,
- * close-out box, prompt sections, swipe/recap/brief) funnels through here so
+ * close-out box, prompt sections, swipe) funnels through here so
  * the payload contract is assembled in exactly one place — no surface can silently drop the issue link again.
  * The dispatch history these records become is joined back to tasks by
  * `issueIdentifier` (see lib/pipeline-loops.js), so it is required by default.

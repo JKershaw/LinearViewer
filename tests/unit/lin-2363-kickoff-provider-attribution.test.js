@@ -103,8 +103,6 @@ function buildApp({ providerName, displayName, live = true, throwOn = 'context',
       },
     },
     agentStatusStore: {},
-    recapCacheStore: { get: async () => null, set: async () => {} },
-    briefCacheStore: { get: async () => null, set: async () => {} },
     dispatchQueueStore: {
       addItem: async () => {
         if (throwOn === 'dispatch') throw upstreamError(upstreamStatus, shape);

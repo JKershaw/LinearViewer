@@ -240,7 +240,7 @@ describe('C. the page reply route files a non-owner member\'s reply under that m
       },
       freeTierStore: {}, getOpenRouterSource: () => null, userPreferencesStore: {},
       workspacePreferencesStore: { getWorkspacePreferences: async () => ({}) },
-      customPromptsStore: {}, recapCacheStore: {}, briefCacheStore: {},
+      customPromptsStore: {},
       reportHistoryStore: {}, dispatchQueueStore: {}, agentStatusStore: {}, promptTraceStore: {},
       harbourCommentsStore: ledger,
     }));

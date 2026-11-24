@@ -242,8 +242,6 @@ describe('task page loader', () => {
     return createTaskPageLoader({
       recordsStore: LANDING,
       dispatchStore: {}, agentStatusStore: {},
-      briefCacheStore: { async get() { return null; } },
-      recapCacheStore: { async get() { return null; } },
       readRunEvidence, prStateStore, enrichLoop, deriveSessionWaiting,
       getLoopsForIssue: async () => [],
       now: () => NOW,

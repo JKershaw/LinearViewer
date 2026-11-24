@@ -107,7 +107,7 @@ function buildApp({ provider, sessionApiKey = null, freeTierStore = {}, accessTo
     // Triage enqueue is best-effort; a no-op store keeps the focus on titles.
     dispatchQueueStore: { addItem: async () => ({ _id: 'd1' }) },
     freeTierStore, getOpenRouterSource: () => null, userPreferencesStore: {},
-    customPromptsStore: {}, recapCacheStore: {}, briefCacheStore: {},
+    customPromptsStore: {},
     reportHistoryStore: {}, agentStatusStore: {}, promptTraceStore: {},
   });
   app.use(router);

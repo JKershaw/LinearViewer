@@ -68,7 +68,7 @@ function buildApp({ tokensById, viewer }) {
       expiresAt: Date.now() + 3600_000, credentialFingerprint: fingerprintCredential('linear-tok'),
     }),
     getWorkspaceAccessToken: async () => 'linear-tok',
-    agentStatusStore: {}, recapCacheStore: {}, briefCacheStore: {}, dispatchQueueStore: {},
+    agentStatusStore: {}, dispatchQueueStore: {},
     workspaceFromUrl: (req, res, next) => next(),
     getWorkspaceOpenRouterKey: async () => null,
     workspacePreferencesStore: {},

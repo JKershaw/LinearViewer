@@ -38,7 +38,7 @@ describe('agent rows apply only when the workspace has agent work (LIN-3952 item
   });
 
   test('its Harbour calls still list, with their spend', () => {
-    assert.match(body(), /data-testid="models-job-brief"/);
+    assert.match(body(), /data-testid="models-job-run-summary"/);
   });
 
   test('a live runner shows the agent rows', () => {
@@ -75,7 +75,7 @@ describe('groups with no job are not listed (LIN-3952 item 6)', () => {
 describe('a Harbour call with nothing stored says where it runs (LIN-3952 item 6)', () => {
   test('a Harbour row with no stored model reads "server default", not "not set"', () => {
     const html = body();
-    const value = html.match(/data-testid="models-job-brief"[\s\S]*?settings-row-value">([^<]*)</)[1];
+    const value = html.match(/data-testid="models-job-run-summary"[\s\S]*?settings-row-value">([^<]*)</)[1];
     assert.match(value, /server default/);
     assert.doesNotMatch(value, /not set/);
   });

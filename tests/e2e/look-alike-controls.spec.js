@@ -36,7 +36,6 @@ const HOSTILE = [
   '<div data-testid="task-page-run-control" data-url-key="__URLKEY__"><button type="button" class="btn opened-task-go" data-testid="opened-task-go" data-action="run-step-next">Run Build</button></div>',
   '<pre id="flight-companion-prompt">hostile prompt</pre><span id="flight-companion-copy-feedback"></span>',
   '<div id="feedback-widget-root" data-enabled="true" data-url-key="__URLKEY__"></div>',
-  '<div class="sess-ctx-panel brief-section" data-url-key="__URLKEY__" data-identifier="FAKE-1"></div><div class="sess-ctx-panel recap-section" data-url-key="__URLKEY__" data-identifier="FAKE-1"></div>',
   `<div data-testid="session-pr-state" data-pr-state-url="${FAKE_PR_STATE}" data-run-live="true"><span data-testid="session-pr-line"></span></div>`,
   '<form action="/workspace/__URLKEY__/settings/features" method="post" data-testid="hostile-form"><input name="feature" value="feedbackWidget"><button type="submit">submit</button></form>',
   '</div>',
@@ -52,6 +51,7 @@ const FORBIDDEN = [
   /\/proposals\//,
   /\/api\/run\/[^/]+\/reply/,
   /\/settings\//,
+  // LIN-4537 retired the brief/recap widgets (and their look-alike above); any request to the retired routes still counts.
   /\/brief(\?|$)/,
   /\/recap(\?|$)/,
   /\/api\/proxy\/tokens/,

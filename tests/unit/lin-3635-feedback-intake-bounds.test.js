@@ -45,7 +45,7 @@ function buildApp(createCalls) {
     workspacePreferencesStore: { getWorkspacePreferences: async () => ({}) },
     dispatchQueueStore: { addItem: async () => ({ _id: 'd1' }) },
     freeTierStore: {}, getOpenRouterSource: () => null, userPreferencesStore: {},
-    customPromptsStore: {}, recapCacheStore: {}, briefCacheStore: {},
+    customPromptsStore: {},
     reportHistoryStore: {}, agentStatusStore: {}, promptTraceStore: {},
   }));
   return app;

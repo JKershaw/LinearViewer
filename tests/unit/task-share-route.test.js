@@ -432,8 +432,6 @@ describe('render-time secret masking (LIN-3389)', () => {
       ...guestModel(),
       description: `desc ${secret}`,
       comments: [{ author: 'a', body: `comment ${secret}`, createdAt: NOW.toISOString() }],
-      brief: { body: `brief ${secret}`, generatedAt: NOW.toISOString() },
-      recap: null,
     };
   }
 
@@ -444,7 +442,7 @@ describe('render-time secret masking (LIN-3389)', () => {
     try { await fn(lines); } finally { console.warn = orig; }
   }
 
-  test('secrets planted in description, comment and brief are masked; entity-encoded too', async () => {
+  test('secrets planted in description and comment are masked; entity-encoded too', async () => {
     for (const secret of [F.githubPat, ASSIGN, F.awsAccessKey]) {
       const { base, close } = await build({
         store: withRecord(),
@@ -456,7 +454,7 @@ describe('render-time secret masking (LIN-3389)', () => {
           assert.equal(res.status, 200);
           assert.ok(res.text.includes('[redacted]'));
           assert.ok(!res.text.includes(F.githubPat) && !res.text.includes(F.genericSecretValue) && !res.text.includes(F.awsAccessKey.slice(4)));
-          assert.equal((res.text.match(/\[redacted\]/g) || []).length >= 3, true, 'description, comment and brief');
+          assert.equal((res.text.match(/\[redacted\]/g) || []).length >= 2, true, 'description and comment');
         });
       } finally { await close(); }
     }
@@ -513,7 +511,7 @@ describe('render-time secret masking (LIN-3389)', () => {
     } finally { await close(); }
   });
 
-  test('a minted Harbour token planted bare in description, comment and brief is masked on the rendered page (LIN-3795)', async () => {
+  test('a minted Harbour token planted bare in description and comment is masked on the rendered page (LIN-3795)', async () => {
     for (const kind of ['proxy', 'dispatch', 'feedback']) {
       // The token keeps its prefix and 43-char base64url shape, so the redaction matches it as a real one. Its last 4
       // characters are fixed, not random: a random 4-char tail can occur in page text by chance, which made this check
@@ -529,7 +527,7 @@ describe('render-time secret masking (LIN-3389)', () => {
           assert.equal(res.status, 200);
           assert.ok(!res.text.includes(minted), `${kind} token reached the body`);
           assert.ok(!res.text.includes(minted.slice(-4)), `${kind} token tail reached the body`);
-          assert.ok((res.text.match(/\[redacted\]/g) || []).length >= 3, 'description, comment and brief');
+          assert.ok((res.text.match(/\[redacted\]/g) || []).length >= 2, 'description and comment');
         });
       } finally { await close(); }
     }
@@ -582,10 +580,11 @@ describe('render-time secret masking (LIN-3389)', () => {
     } finally { await close(); }
   });
 
-  test('LIN-3975: /state carries no brief or recap, so the masked brief reaches the page only; the page masks it', async () => {
+  test('LIN-3975: /state carries no context fragment, so a secret in the description reaches the page only; the page masks it', async () => {
+    // LIN-4537: the brief this once planted the secret in is retired; the description is the page-only text now.
     const model = {
       ...guestModel(),
-      brief: { body: `brief ${F.githubPat}`, generatedAt: NOW.toISOString() },
+      description: `desc ${F.githubPat}`,
       sessions: [],
     };
     const { base, close } = await build({
@@ -600,10 +599,10 @@ describe('render-time secret masking (LIN-3389)', () => {
         const stateRes = await get(base, `/t/${TOKEN}/state`);
         const state = JSON.parse(stateRes.text);
         assert.ok(!stateRes.text.includes(F.githubPat));
-        assert.equal('contextHtml' in state, false, 'a poll never repaints the brief');
+        assert.equal('contextHtml' in state, false, 'a poll never repaints a context fragment');
         assert.equal('contextSig' in state, false);
         const page = await get(base, `/t/${TOKEN}`);
-        assert.ok(!page.text.includes(F.githubPat), 'the guest page masks the brief it renders');
+        assert.ok(!page.text.includes(F.githubPat), 'the guest page masks the description it renders');
         assert.ok(page.text.includes('[redacted]'));
       });
     } finally { await close(); }

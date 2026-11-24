@@ -103,7 +103,7 @@ const uuidForUrlKey = (key) => {
  * @param {Object|null} [options.taskModeStore] - Task-mode event store (LIN-2942), for /test/clear-task-mode-events
  * @returns {Router} Express router
  */
-export function createTestRoutes({ dispatchQueueStore, dispatchTokenStore, freeTierStore, userPreferencesStore, workspacePreferencesStore, modelRoutingStore = null, customPromptsStore, collectiveCharactersStore, collectivePresetsStore, dispatchPresetsStore, proxyTokenStore, proxyEventStore, agentStatusStore, observationSessionsStore, sessionsFeedCache, recapCacheStore, briefCacheStore, runSummaryCacheStore, sessionSummaryCacheStore, reportHistoryStore, shipBiscuitHistoryStore, taskDecisionsStore, dismissalSuggestionsStore, savedChatStore, localStore, recordsStore = null, getWorkspaceAccessToken, accountStore, accountWorkspaceStore, ownerCredentialStore, connectionStore, clearWorkspaceIssuesMemo, resetKeyState = null, observerStateStore, dispatchHistoryCollection, proxyEventsCollection, resetKpiCache, workspaceHaltStore, emailTransport = null, commentDedupe = null, decisionStampDedupe = null, taskModeStore = null, taskShareCollection = null, kpiDailyRollupCollection = null, clearWorkspaceKpis = () => {} }) {
+export function createTestRoutes({ dispatchQueueStore, dispatchTokenStore, freeTierStore, userPreferencesStore, workspacePreferencesStore, modelRoutingStore = null, customPromptsStore, collectiveCharactersStore, collectivePresetsStore, dispatchPresetsStore, proxyTokenStore, proxyEventStore, agentStatusStore, observationSessionsStore, sessionsFeedCache, runSummaryCacheStore, sessionSummaryCacheStore, reportHistoryStore, shipBiscuitHistoryStore, taskDecisionsStore, dismissalSuggestionsStore, savedChatStore, localStore, recordsStore = null, getWorkspaceAccessToken, accountStore, accountWorkspaceStore, ownerCredentialStore, connectionStore, clearWorkspaceIssuesMemo, resetKeyState = null, observerStateStore, dispatchHistoryCollection, proxyEventsCollection, resetKpiCache, workspaceHaltStore, emailTransport = null, commentDedupe = null, decisionStampDedupe = null, taskModeStore = null, taskShareCollection = null, kpiDailyRollupCollection = null, clearWorkspaceKpis = () => {} }) {
   const router = Router();
 
   // ── Connection-backed fixture variants (LIN-3124 PR3 checkpoint F, T27) ────
@@ -1451,22 +1451,6 @@ export function createTestRoutes({ dispatchQueueStore, dispatchTokenStore, freeT
     }
   })
 
-  // Endpoint to clear a specific recap cache entry for tests.
-  // Query params: ?urlKey=...&issueId=...
-  router.get('/test/clear-recap-cache', async (req, res) => {
-    try {
-      const urlKey = req.query.urlKey || 'test-workspace';
-      const issueId = req.query.issueId;
-      if (!issueId) {
-        return res.status(400).json({ error: 'issueId required' });
-      }
-      await recapCacheStore.delete(urlKey, issueId);
-      res.send('ok');
-    } catch (err) {
-      res.status(500).json({ error: err.message });
-    }
-  });
-
   // Endpoint to clear a specific run-summary cache entry for tests (LIN-509).
   // Query params: ?urlKey=...&loopId=...
   router.get('/test/clear-run-summary-cache', async (req, res) => {
@@ -1493,22 +1477,6 @@ export function createTestRoutes({ dispatchQueueStore, dispatchTokenStore, freeT
         return res.status(400).json({ error: 'sessionId required' });
       }
       if (sessionSummaryCacheStore) await sessionSummaryCacheStore.delete(urlKey, sessionId);
-      res.send('ok');
-    } catch (err) {
-      res.status(500).json({ error: err.message });
-    }
-  });
-
-  // Endpoint to clear a specific brief cache entry for tests.
-  // Query params: ?urlKey=...&issueId=...
-  router.get('/test/clear-brief-cache', async (req, res) => {
-    try {
-      const urlKey = req.query.urlKey || 'test-workspace';
-      const issueId = req.query.issueId;
-      if (!issueId) {
-        return res.status(400).json({ error: 'issueId required' });
-      }
-      await briefCacheStore.delete(urlKey, issueId);
       res.send('ok');
     } catch (err) {
       res.status(500).json({ error: err.message });

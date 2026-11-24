@@ -13,7 +13,6 @@ import assert from 'node:assert';
 import { createChatToolCatalog, CHAT_TOOL_SCHEMAS, CHAT_TOOL_SCOPE_TIERS, CHAT_TOOL_RESULT_BUDGETS, FOLLOW_UP_TOOL_SCHEMA, REMEMBER_TOOL_SCHEMA, PLAYBOOK_MAX_CHARS, projectActiveSession } from '../../lib/chat-tools.js';
 import { deriveFollowUpDispatch } from '../../lib/follow-up-dispatch.js';
 import { TOOL_RESULT_MAX_CHARS } from '../../lib/openrouter.js';
-import { hashContext } from '../../lib/recap-cache.js';
 import { getSessionsForWorkspace } from '../../lib/pipeline-loops.js';
 import { classifyLoop } from '../../lib/observer-sweep.js';
 import { computeSupersededLoopIds } from '../../lib/loop-supersede.js';
@@ -65,39 +64,15 @@ function makeFakeProvider(overrides = {}) {
   return provider;
 }
 
-// An in-memory cache store matching the RecapCacheStore/BriefCacheStore get()
-// contract used by the cache-only brief/recap tools. Keyed by (urlKey, issueId).
-function makeFakeCacheStore() {
-  const map = new Map();
-  const k = (workspaceId, issueId) => `${workspaceId}:${issueId}`;
-  return {
-    map,
-    async get(workspaceId, issueId) {
-      return map.get(k(workspaceId, issueId)) || null;
-    },
-    put(workspaceId, issueId, value) {
-      map.set(k(workspaceId, issueId), value);
-    },
-  };
-}
-
 const SCOPE = 'workspace-token-abc';
 const URL_KEY = 'ws-key';
-
-// The canonical context the fake provider returns for any issueId (its issue.id
-// is a fixed 'uuid-1'), and the hash the cache-only tools compute over it. Used
-// to seed the cache stores so a seeded entry reads back as `fresh`.
-const CANONICAL_ID = 'uuid-1';
-function contextFor(issueId) {
-  return { issue: { id: CANONICAL_ID, identifier: issueId, title: 'A task' } };
-}
 
 describe('CHAT_TOOL_SCHEMAS', () => {
   test('exposes the pass-1 + pass-2 + pass-3 read tools', () => {
     const names = CHAT_TOOL_SCHEMAS.map(t => t.function.name).sort();
     assert.deepStrictEqual(names, [
-      'get_brief', 'get_children_status', 'get_comments', 'get_history', 'get_pr_status',
-      'get_recap', 'get_relations', 'get_session', 'get_stack', 'list_active_sessions',
+      'get_children_status', 'get_comments', 'get_history', 'get_pr_status',
+      'get_relations', 'get_session', 'get_stack', 'list_active_sessions',
       'list_pending_decisions', 'list_task_sessions', 'lookup_task',
       'search_tasks',
     ]);
@@ -117,9 +92,7 @@ describe('CHAT_TOOL_SCHEMAS', () => {
     assert.deepStrictEqual(byName.lookup_task.parameters.required, ['issueId']);
     assert.deepStrictEqual(byName.get_relations.parameters.required, ['issueId']);
     assert.deepStrictEqual(byName.search_tasks.parameters.required, ['query']);
-    // Pass-2: brief/recap take an issueId; stack's limit is optional.
-    assert.deepStrictEqual(byName.get_brief.parameters.required, ['issueId']);
-    assert.deepStrictEqual(byName.get_recap.parameters.required, ['issueId']);
+    // Pass-2: stack's limit is optional (LIN-4537 retired the brief and recap reads).
     assert.deepStrictEqual(byName.get_stack.parameters.required, []);
     // LIN-1065: get_comments takes one explicitly-named task.
     assert.deepStrictEqual(byName.get_comments.parameters.required, ['issueId']);
@@ -156,7 +129,7 @@ describe('CHAT_TOOL_RESULT_BUDGETS (LIN-1065, LIN-1073, LIN-2617, LIN-2624)', ()
   });
 
   test('does NOT override any other tool, so they keep the 4000 default', () => {
-    for (const name of ['lookup_task', 'search_tasks', 'get_relations', 'get_brief', 'get_recap', 'get_stack', 'get_history', 'list_task_sessions']) {
+    for (const name of ['lookup_task', 'search_tasks', 'get_relations', 'get_stack', 'get_history', 'list_task_sessions']) {
       assert.strictEqual(CHAT_TOOL_RESULT_BUDGETS[name], undefined, `${name} must not be overridden`);
     }
   });
@@ -447,23 +420,6 @@ describe('executors — direct provider calls, workspace-scoped', () => {
     );
   });
 
-  // The load-bearing shared-surface guard: the two new child fields ride on
-  // context.children but must NOT change the hashed slice, or recap/brief caches
-  // invalidate workspace-wide.
-  test('the new child fields (updatedAt, relations) do not leak into hashContext (LIN-1066; the task-snapshot slice it also guarded went with LIN-4502)', () => {
-    const withNewFields = childrenContextFor('LIN-200');
-    // The same context with the two new fields stripped from every child.
-    const withoutNewFields = {
-      ...withNewFields,
-      children: withNewFields.children.map(({ updatedAt, relations, ...rest }) => rest),
-    };
-
-    assert.strictEqual(
-      hashContext(withNewFields), hashContext(withoutNewFields),
-      'hashContext must ignore child updatedAt/relations',
-    );
-  });
-
   test('an executor never accepts a scope/token from the model (scoping is by construction)', async () => {
     const provider = makeFakeProvider();
     const { executeTool } = createChatToolCatalog({ provider, scope: SCOPE });
@@ -549,109 +505,6 @@ describe('executeTool — error handling', () => {
       () => executeTool({ name: 'lookup_task', arguments: { issueId: 'LIN-404' } }),
       /Task LIN-404 not found/,
     );
-  });
-});
-
-describe('pass-2 cache-only reads — get_brief / get_recap (LIN-1026)', () => {
-  // Each twin is exercised against both stores/fields via a small table so the
-  // shared readCachedContext helper is proven for both.
-  const twins = [
-    { name: 'get_brief', field: 'brief', storeName: 'Brief cache' },
-    { name: 'get_recap', field: 'recap', storeName: 'Recap cache' },
-  ];
-
-  function makeCatalog({ store, field } = {}) {
-    const provider = makeFakeProvider();
-    const briefCacheStore = field === 'brief' ? store : makeFakeCacheStore();
-    const recapCacheStore = field === 'recap' ? store : makeFakeCacheStore();
-    const { executeTool } = createChatToolCatalog({
-      provider, scope: SCOPE, briefCacheStore, recapCacheStore, urlKey: URL_KEY,
-    });
-    return { provider, executeTool };
-  }
-
-  for (const twin of twins) {
-    test(`${twin.name} returns 'fresh' with the cached payload when the hash matches`, async () => {
-      const store = makeFakeCacheStore();
-      const inputHash = hashContext(contextFor('LIN-1'));
-      store.put(URL_KEY, CANONICAL_ID, {
-        inputHash, [twin.field]: 'cached body', model: 'openai/x', generatedAt: 'ts',
-      });
-      const { executeTool } = makeCatalog({ store, field: twin.field });
-
-      const result = await executeTool({ name: twin.name, arguments: { issueId: 'LIN-1' } });
-      assert.strictEqual(result.status, 'fresh');
-      assert.strictEqual(result.identifier, 'LIN-1');
-      assert.strictEqual(result[twin.field], 'cached body');
-      assert.strictEqual(result.model, 'openai/x');
-      assert.strictEqual(result.generatedAt, 'ts');
-    });
-
-    test(`${twin.name} returns 'stale' (no body) when the cached hash is outdated`, async () => {
-      const store = makeFakeCacheStore();
-      store.put(URL_KEY, CANONICAL_ID, {
-        inputHash: 'a-different-hash', [twin.field]: 'old body', model: 'm', generatedAt: 'ts',
-      });
-      const { executeTool } = makeCatalog({ store, field: twin.field });
-
-      const result = await executeTool({ name: twin.name, arguments: { issueId: 'LIN-1' } });
-      assert.strictEqual(result.status, 'stale');
-      assert.strictEqual(result.identifier, 'LIN-1');
-      assert.strictEqual(result[twin.field], undefined, 'stale never leaks a body');
-      assert.strictEqual(result.generatedAt, 'ts');
-    });
-
-    test(`${twin.name} returns 'missing' when nothing is cached`, async () => {
-      const { executeTool } = makeCatalog({ store: makeFakeCacheStore(), field: twin.field });
-      const result = await executeTool({ name: twin.name, arguments: { issueId: 'LIN-1' } });
-      assert.strictEqual(result.status, 'missing');
-      assert.strictEqual(result.identifier, 'LIN-1');
-      assert.strictEqual(result[twin.field], undefined);
-    });
-
-    test(`${twin.name} NEVER generates — it only reads the store`, async () => {
-      const { provider, executeTool } = makeCatalog({ store: makeFakeCacheStore(), field: twin.field });
-      await executeTool({ name: twin.name, arguments: { issueId: 'LIN-1' } });
-      // The only provider call is the context fetch; no generate* is invoked.
-      assert.deepStrictEqual(
-        provider.calls.map(c => c.method),
-        ['fetchRecommendationContext'],
-      );
-    });
-
-    test(`${twin.name} validates the id before touching the provider`, async () => {
-      const { provider, executeTool } = makeCatalog({ store: makeFakeCacheStore(), field: twin.field });
-      await assert.rejects(
-        () => executeTool({ name: twin.name, arguments: { issueId: 'bad id!' } }),
-        /Invalid issue id/,
-      );
-      assert.strictEqual(provider.calls.length, 0);
-    });
-
-    test(`${twin.name} fails cleanly as 'not configured' when its cache store is absent`, async () => {
-      const provider = makeFakeProvider();
-      // Construct WITHOUT the stores/urlKey — mirrors a deployment that never wired them.
-      const { executeTool } = createChatToolCatalog({ provider, scope: SCOPE });
-      await assert.rejects(
-        () => executeTool({ name: twin.name, arguments: { issueId: 'LIN-1' } }),
-        new RegExp(`${twin.storeName} is not configured`),
-      );
-      assert.strictEqual(provider.calls.length, 0, 'no provider call on a not-configured store');
-    });
-  }
-
-  test('brief/recap reads are scoped to the bound urlKey, not a model-supplied one', async () => {
-    const store = makeFakeCacheStore();
-    const inputHash = hashContext(contextFor('LIN-1'));
-    store.put(URL_KEY, CANONICAL_ID, { inputHash, brief: 'body' });
-    const provider = makeFakeProvider();
-    const { executeTool } = createChatToolCatalog({
-      provider, scope: SCOPE, briefCacheStore: store, recapCacheStore: makeFakeCacheStore(), urlKey: URL_KEY,
-    });
-    // Model tries to smuggle a different urlKey — ignored; the bound key resolves the hit.
-    const result = await executeTool({ name: 'get_brief', arguments: { issueId: 'LIN-1', urlKey: 'other-ws' } });
-    assert.strictEqual(result.status, 'fresh');
-    assert.strictEqual(result.brief, 'body');
   });
 });
 

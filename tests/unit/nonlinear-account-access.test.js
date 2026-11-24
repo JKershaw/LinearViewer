@@ -193,8 +193,8 @@ describe('North-star durable write-through works for a GitHub/local session — 
     const userPreferencesStore = freshPrefsStore();
     const router = createWorkspaceApiRoutes({
       workspaceFromUrl: (req, res, next) => next(), freeTierStore: {}, getOpenRouterSource: () => null,
-      userPreferencesStore, workspacePreferencesStore: {}, customPromptsStore: {}, recapCacheStore: {},
-      briefCacheStore: {}, reportHistoryStore: {}, dispatchQueueStore: {}, agentStatusStore: {},
+      userPreferencesStore, workspacePreferencesStore: {}, customPromptsStore: {},
+      reportHistoryStore: {}, dispatchQueueStore: {}, agentStatusStore: {},
       promptTraceStore: {}, proxyTokenStore: {},
     });
     const handler = getHandler(router, 'put', '/workspace/:urlKey/api/roadmap/north-star');

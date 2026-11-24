@@ -85,8 +85,6 @@ function buildCollections(overrides = {}) {
     proxyEvents: empty(),
     agentStatus: empty(),
     freeTier: empty(),
-    recapCache: empty(),
-    briefCache: empty(),
     reportHistory: empty(),
     kpiDailyRollup: empty(),
     ...overrides
@@ -132,7 +130,6 @@ describe('collectKpiStats', () => {
     assert.strictEqual(stats.totals.agentActions, 0);
     assert.strictEqual(stats.totals.dispatches, 0);
     assert.strictEqual(stats.totals.autopilotRuns, 0);
-    assert.strictEqual(stats.totals.aiSummaries, 0);
     assert.strictEqual(stats.totals.activeTokens, 0);
     assert.strictEqual(stats.proxyCategories.days.length, ACTIVITY_WINDOW_DAYS);
     assert.strictEqual(stats.proxyCategoriesHourly.hours.length, HOURLY_WINDOW_HOURS);
@@ -490,10 +487,8 @@ describe('collectKpiStats', () => {
     assert.strictEqual(stats.totals.activeTokens, 3);
   });
 
-  test('sums cache, token, and local provider counts', async () => {
+  test('sums token and local provider counts (LIN-4537: no cached-summary count)', async () => {
     const collections = buildCollections({
-      recapCache: createMockCollection([{ _id: 'w:1' }, { _id: 'w:2' }]),
-      briefCache: createMockCollection([{ _id: 'w:1' }]),
       proxyTokens: createMockCollection([{ _id: 't1' }, { _id: 't2' }]),
       dispatchTokens: createMockCollection([{ _id: 't3' }]),
       localIssues: createMockCollection([
@@ -504,7 +499,7 @@ describe('collectKpiStats', () => {
     });
 
     const stats = await collectKpiStats(collections, { lineageIdentity: NO_FOUNDERS, now: NOW, milestoneFunnelDeps: NO_MILESTONE_FUNNEL_DEPS });
-    assert.strictEqual(stats.totals.aiSummaries, 3);
+    assert.equal(Object.hasOwn(stats.totals, 'aiSummaries'), false, 'the retired caches are not counted');
     assert.strictEqual(stats.totals.activeTokens, 3);
     assert.strictEqual(stats.totals.localIssues, 2);
     assert.strictEqual(stats.totals.localProjects, 1);
@@ -1261,8 +1256,8 @@ describe('collectKpiStats (aggregation path, real MangoDB)', () => {
     const names = [
       'sessions', 'userPreferences', 'workspacePreferences', 'customPrompts',
       'localIssues', 'dispatchQueue', 'dispatchHistory', 'dispatchTokens',
-      'proxyTokens', 'proxyEvents', 'agentStatus', 'freeTier', 'recapCache',
-      'briefCache', 'reportHistory', 'kpiDailyRollup'
+      'proxyTokens', 'proxyEvents', 'agentStatus', 'freeTier',
+      'reportHistory', 'kpiDailyRollup'
     ];
     const collections = {};
     for (const name of names) {

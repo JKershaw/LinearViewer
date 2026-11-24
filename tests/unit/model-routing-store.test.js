@@ -74,11 +74,11 @@ describe('the model-routing store', () => {
 
   test('null clears a field so the job follows its group again; invalid values and unknown targets are refused', async () => {
     await store().changeGroup('harbour-call', 'tell', { model: 'g' }, ctx());
-    await store().changeJob('brief', { model: 'own' }, ctx());
-    await store().changeJob('brief', { model: null }, ctx());
-    const brief = (await store().getEffectiveTable(URL_KEY, { defaultModel: DEFAULT_MODEL })).jobs.find((j) => j.id === 'brief');
-    assert.deepEqual([brief.model, brief.source.model], ['g', 'group']);
-    await assert.rejects(store().changeJob('brief', { harness: 'x' }, ctx()), /no "harness" field|has no/);
+    await store().changeJob('run-summary', { model: 'own' }, ctx());
+    await store().changeJob('run-summary', { model: null }, ctx());
+    const runSummary = (await store().getEffectiveTable(URL_KEY, { defaultModel: DEFAULT_MODEL })).jobs.find((j) => j.id === 'run-summary');
+    assert.deepEqual([runSummary.model, runSummary.source.model], ['g', 'group']);
+    await assert.rejects(store().changeJob('run-summary', { harness: 'x' }, ctx()), /no "harness" field|has no/);
     await assert.rejects(store().changeJob('nope', { model: 'x' }, ctx()), (e) => e.code === 'INVALID');
     await assert.rejects(store().changeJob('review', { model: 5 }, ctx()), (e) => e.code === 'INVALID');
     await assert.rejects(store().changeJob('review', { model: 'a\nb' }, ctx()), (e) => e.code === 'INVALID');

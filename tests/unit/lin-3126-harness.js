@@ -95,7 +95,7 @@ export function buildWorkspaceApiApp({ workspace, features = {}, taskDecisionsSt
   app.use(createWorkspaceApiRoutes({
     workspaceFromUrl: (req, _res, next) => { req.workspace = workspace; req.session = sessionFor(workspace, features); next(); },
     freeTierStore: {}, getOpenRouterSource: () => null, userPreferencesStore: {}, workspacePreferencesStore,
-    customPromptsStore: {}, recapCacheStore: {}, briefCacheStore: {}, reportHistoryStore: {},
+    customPromptsStore: {}, reportHistoryStore: {},
     dispatchQueueStore, agentStatusStore: {}, promptTraceStore: {}, proxyTokenStore,
     taskDecisionsStore,
   }));

@@ -44,8 +44,6 @@ function buildApp(captured) {
     getWorkspaceAccessToken: async () => 'test-token',
     getWorkspaceOpenRouterKey: async () => null,
     agentStatusStore: {},
-    recapCacheStore: { get: async () => null, set: async () => {} },
-    briefCacheStore: { get: async () => null, set: async () => {} },
     dispatchQueueStore: {
       getGrantDeclaration: async () => ({ state: 'none' }),
       addItem: async (urlKey, item) => {

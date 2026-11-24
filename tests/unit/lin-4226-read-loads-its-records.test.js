@@ -192,7 +192,7 @@ describe('W5: /kpis makes one batched, instance-wide load', () => {
     return {
       sessions: empty(), userPreferences: empty(), workspacePreferences: empty(), customPrompts: empty(),
       localIssues: empty(), dispatchTokens: empty(), proxyTokens: empty(), proxyEvents: empty(), agentStatus: empty(),
-      freeTier: empty(), recapCache: empty(), briefCache: empty(), reportHistory: empty(), kpiDailyRollup: empty(),
+      freeTier: empty(), reportHistory: empty(), kpiDailyRollup: empty(),
       dispatchHistory: collection(history), dispatchQueue: collection([]),
     };
   };

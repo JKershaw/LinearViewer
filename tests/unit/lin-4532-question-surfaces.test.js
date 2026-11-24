@@ -169,7 +169,7 @@ describe('the task page: a question record with no ruling (LIN-4532 P2b)', () =>
 describe('the chat tool: list_pending_decisions carries the open questions (LIN-4532 P2b)', () => {
   function catalogFor(dispatchedBy, resolveCanonicalAccountId = null) {
     const { executors } = createChatToolCatalog({
-      provider: { name: 'fake' }, scope: 'scope', recapCacheStore: null, briefCacheStore: null, urlKey: URL_KEY,
+      provider: { name: 'fake' }, scope: 'scope', urlKey: URL_KEY,
       recordsStore: records, dispatchQueueStore: dispatch, agentStatusStore: { async listStatus() { return { items: [], total: 0 }; } },
       sessionIsTerminal: () => false, dispatchedBy, resolveCanonicalAccountId,
     });

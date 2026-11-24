@@ -245,8 +245,8 @@ export function createTaskPageRoutes({ workspaceFromUrl, getOpenRouterSource, ge
     }
   });
 
-  // Stored data only: dispatch rows, agent status, brief/recap caches, and the held set's gathered state. Returns the
-  // header status, the track and the brief/recap panels, rendered by the same functions as the page. Viewer-blind: the
+  // Stored data only: dispatch rows, agent status and the held set's gathered state. Returns the header status and the
+  // track, rendered by the same functions as the page (LIN-4537 retired the brief/recap panels). Viewer-blind: the
   // owner controls stay in the page and are never re-sent. `status` is the gathered state's projection (`pageStatusOf`,
   // LIN-4071), so a poll stops only on a complete gathered `done`, never on a page-load word.
   router.get('/workspace/:urlKey/api/task/:identifier/state', workspaceFromUrl, async (req, res) => {

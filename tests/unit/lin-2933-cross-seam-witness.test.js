@@ -157,7 +157,7 @@ async function startApp({ provider, ownerCredentialStore, accessToken }) {
     },
     freeTierStore: {}, getOpenRouterSource: () => null, userPreferencesStore: {},
     workspacePreferencesStore: { getWorkspacePreferences: async () => ({}) },
-    customPromptsStore: {}, recapCacheStore: {}, briefCacheStore: {},
+    customPromptsStore: {},
     reportHistoryStore: {}, dispatchQueueStore: {}, agentStatusStore: {}, promptTraceStore: {},
     // LIN-2889: stampDecisionAnswers now calls the shared answer() op, not
     // markOutcome() directly — this witness's task stamp must actually land

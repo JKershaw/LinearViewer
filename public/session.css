@@ -1,8 +1,8 @@
 /* Dedicated per-session page (LIN-1003, Phase 1 of LIN-950; LIN-1133 per-run expansion).
  *
  * A server-rendered snapshot enhanced with client-side JS (common.js, marked.min.js,
- * purify.min.js, brief.js, recap.js, session.js) for per-run expandable transcripts,
- * inline reply boxes, brief/recap widgets, and markdown rendering.
+ * purify.min.js, session.js) for per-run expandable transcripts, inline reply boxes,
+ * and markdown rendering.
  * Machine facts (ids, timestamps, chips, transcript body) take the structural mono face;
  * human structure (headings, labels) takes the content sans face. */
 
@@ -451,101 +451,6 @@
   line-height: 1.5;
 }
 .sess-tx-link { font-size: var(--font-size-sm); }
-
-/* ── Task context (brief / recap) ─────────────────────────────────────────── */
-.sess-ctx-issue {
-  display: grid;
-  gap: var(--space-2h);
-  margin-bottom: var(--space-3);
-}
-@media (min-width: 720px) {
-  .sess-ctx-issue { grid-template-columns: 1fr 1fr; }
-}
-.sess-ctx-panel {
-  border: 1px solid var(--line);
-  border-radius: var(--radius-md);
-  padding: 0.6rem 0.75rem;
-}
-.sess-ctx-panel--miss { border-style: dashed; }
-.sess-ctx-head {
-  display: flex;
-  justify-content: space-between;
-  align-items: baseline;
-  margin-bottom: 0.4rem;
-}
-.sess-ctx-kind { font-family: var(--font-content); font-weight: 600; color: var(--text); }
-.sess-ctx-ident { font-family: var(--font-structural); font-size: var(--font-size-sm); color: var(--muted); overflow-wrap: anywhere; }
-.sess-ctx-body {
-  font-family: var(--font-content);
-  font-size: var(--font-size-sm);
-  line-height: 1.55;
-  white-space: pre-wrap;
-  word-break: break-word;
-  margin: 0;
-  color: var(--text);
-  /* Cap the verbatim brief body per-panel (not per-row) so a long brief scrolls
-     within its own panel and doesn't stretch the page or drag the sibling
-     recap column's height (LIN-1024). */
-  max-height: 360px;
-  overflow-y: auto;
-  scrollbar-gutter: stable;
-}
-.sess-ctx-meta {
-  margin-top: 0.4rem;
-  font-family: var(--font-structural);
-  font-size: var(--font-size-sm);
-  color: var(--muted);
-}
-.sess-ctx-miss {
-  margin: 0;
-  font-family: var(--font-content);
-  font-size: var(--font-size-sm);
-  color: var(--muted);
-}
-
-/* Structured recap (LIN-1023): the recap cache stores an object, not a string,
-   so it renders as grouped lists rather than a single <pre>. */
-/* Recap panel body scrolls independently of the brief (per-panel cap, LIN-1024). */
-.sess-ctx-recap {
-  display: grid;
-  gap: 0.6rem;
-  max-height: 360px;
-  overflow-y: auto;
-  scrollbar-gutter: stable;
-}
-.sess-recap-group-head {
-  font-family: var(--font-content);
-  font-weight: 600;
-  font-size: var(--font-size-sm);
-  color: var(--text);
-  margin-bottom: var(--space-1);
-}
-.sess-recap-icon { color: var(--muted); }
-.sess-recap-list { list-style: none; margin: 0; padding: 0; display: grid; gap: 0.3rem; }
-.sess-recap-item { display: grid; gap: 0.1rem; }
-.sess-recap-what {
-  font-family: var(--font-content);
-  font-size: var(--font-size-sm);
-  line-height: 1.4;
-  color: var(--text);
-  overflow-wrap: anywhere;
-}
-.sess-recap-tag {
-  font-family: var(--font-content);
-  font-size: var(--font-size-sm);
-  color: var(--muted);
-  border: 1px solid var(--line);
-  border-radius: var(--radius-sm);
-  padding: 0 0.3rem;
-  margin-left: var(--space-1);
-}
-.sess-recap-sub {
-  font-family: var(--font-content);
-  font-size: var(--font-size-sm);
-  line-height: 1.4;
-  color: var(--muted);
-  word-break: break-word;
-}
 
 .sess-notfound { font-family: var(--font-content); color: var(--muted); }
 

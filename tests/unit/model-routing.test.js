@@ -31,9 +31,9 @@ describe('migration: the switch changes nothing', () => {
     assert.deepEqual(t.defaults, { 'agent-session': { model: 'top', harness: 'claude-code' }, 'harbour-call': { model: 'a/b' } });
   });
 
-  test('an override becomes the job\'s own model; a stored scan override is read by no job (the scan retired, LIN-4540)', () => {
-    const t = tableFromPreferences({ aiModelOverrides: { byKind: { scan: { model: 's' }, recap: { model: 'r' }, 'feedback-title': { model: 'ignored' } } } });
-    assert.deepEqual([t.jobs.scan, t.jobs['scan-retire'], t.jobs.recap, t.jobs['feedback-title']], [undefined, undefined, { model: 'r' }, undefined]);
+  test('an override becomes the job\'s own model; a stored scan, recap or brief override is read by no job (retired, LIN-4540, LIN-4537)', () => {
+    const t = tableFromPreferences({ aiModelOverrides: { byKind: { scan: { model: 's' }, recap: { model: 'rc' }, brief: { model: 'b' }, 'run-summary': { model: 'r' }, 'feedback-title': { model: 'ignored' } } } });
+    assert.deepEqual([t.jobs.scan, t.jobs['scan-retire'], t.jobs.recap, t.jobs.brief, t.jobs['run-summary'], t.jobs['feedback-title']], [undefined, undefined, undefined, undefined, { model: 'r' }, undefined]);
   });
 
   test('a blank stays blank (no key), and stray byKind for custom/periodical is ignored', () => {
@@ -47,7 +47,7 @@ describe('the old forms are the migration run in reverse', () => {
   const FORM_PREFS = [
     {},
     { modelId: 'a/b' },
-    { modelId: 'a/b', dispatchDefaults: { model: 'm', harness: 'opencode', effort: 'high', byKind: { review: { model: 'r' }, autopilot: { harness: 'claude-code', effort: 'low' } } }, aiModelOverrides: { byKind: { recommend: { model: 'a/rec' }, recap: { model: 'a/recap' } } } }
+    { modelId: 'a/b', dispatchDefaults: { model: 'm', harness: 'opencode', effort: 'high', byKind: { review: { model: 'r' }, autopilot: { harness: 'claude-code', effort: 'low' } } }, aiModelOverrides: { byKind: { recommend: { model: 'a/rec' }, 'run-summary': { model: 'a/run-summary' } } } }
   ];
   for (const [i, prefs] of FORM_PREFS.entries()) {
     test(`projectLegacy(tableFromPreferences(p)) equals the form-shaped p (${i})`, () => {
@@ -59,20 +59,20 @@ describe('the old forms are the migration run in reverse', () => {
   }
 
   test('the Harbour model seed sets the Harbour default and every Harbour group, leaving job rows', () => {
-    const base = applyChangesToTable(tableFromPreferences({ aiModelOverrides: { byKind: { recap: { model: 'own' } } } }), []);
+    const base = applyChangesToTable(tableFromPreferences({ aiModelOverrides: { byKind: { 'run-summary': { model: 'own' } } } }), []);
     const t = applyChangesToTable(base, harbourModelChanges('a/new'));
     assert.equal(t.defaults['harbour-call'].model, 'a/new');
     assert.ok(Object.values(t.groups['harbour-call']).every((g) => g.model === 'a/new'));
-    assert.equal(t.jobs.recap.model, 'own');
+    assert.equal(t.jobs['run-summary'].model, 'own');
   });
 });
 
 describe('diff and apply', () => {
   test('diffTables reports from and to, and applying the diff reproduces the table', () => {
     const a = tableFromPreferences({ dispatchDefaults: { model: 'x' } });
-    const b = applyChangesToTable(applyChangesToTable(a, harbourModelChanges('a/b')), [{ scope: 'job', surface: 'harbour-call', key: 'recap', field: 'model', to: 'a/r' }]);
+    const b = applyChangesToTable(applyChangesToTable(a, harbourModelChanges('a/b')), [{ scope: 'job', surface: 'harbour-call', key: 'run-summary', field: 'model', to: 'a/r' }]);
     const changes = diffTables(a, b);
-    assert.ok(changes.some((c) => c.key === 'recap' && c.from === null && c.to === 'a/r'));
+    assert.ok(changes.some((c) => c.key === 'run-summary' && c.from === null && c.to === 'a/r'));
     assert.deepEqual(diffTables(applyChangesToTable(a, changes), b), []);
   });
 
@@ -86,7 +86,7 @@ describe('census (item 1\'s registry against the old forms\' scope)', () => {
     assert.deepEqual([...AGENT_JOB_IDS].sort(), [...new Set([...DISPATCH_DEFAULT_KINDS, 'periodical', 'custom'])].sort());
   });
 
-  test('the ten AI operations are all Harbour jobs, and the job counts are the registry\'s', () => {
+  test('the six AI operations are all Harbour jobs, and the job counts are the registry\'s', () => {
     for (const op of AI_OPERATION_KINDS) assert.ok(HARBOUR_JOB_IDS.includes(op), op);
     assert.equal(AGENT_JOB_IDS.length + HARBOUR_JOB_IDS.length, JOBS.length);
   });

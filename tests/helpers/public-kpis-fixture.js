@@ -83,7 +83,6 @@ export function buildStats({ fullSeries = false, workspaces = 40, funnel = build
       dispatches: 56,
       autopilotRuns: 8,
       feedbackNotes: 7,
-      aiSummaries: 89,
       roadmapReports: 10,
       roadmapReportsBasis: 'newest 20 reports per workspace',
       customPrompts: 2,

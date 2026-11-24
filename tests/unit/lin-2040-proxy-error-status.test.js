@@ -94,8 +94,6 @@ function buildApp(provider, { resolveWorkspaceAccess, rejectedCredentialRegistry
       || (async () => ({ token: 'ws-token', reason: 'ok', provider: provider.name, credentialFingerprint: FINGERPRINT })),
     getWorkspaceAccessToken: async () => 'ws-token',
     agentStatusStore: {},
-    recapCacheStore: {},
-    briefCacheStore: {},
     dispatchQueueStore: {},
     workspaceFromUrl: (req, res, next) => next(),
     getWorkspaceOpenRouterKey: async () => null,

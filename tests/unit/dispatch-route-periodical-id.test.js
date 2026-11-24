@@ -131,8 +131,6 @@ function buildProxyApp(captured) {
     getWorkspaceAccessToken: async () => 'test-token',
     getWorkspaceOpenRouterKey: async () => null,
     agentStatusStore: {},
-    recapCacheStore: { get: async () => null, set: async () => {} },
-    briefCacheStore: { get: async () => null, set: async () => {} },
     dispatchQueueStore: {
       addItem: async (urlKey, item) => {
         captured.item = item;
@@ -194,8 +192,6 @@ function buildProxyAppWithRealStore(store) {
     getWorkspaceAccessToken: async () => 'test-token',
     getWorkspaceOpenRouterKey: async () => null,
     agentStatusStore: {},
-    recapCacheStore: { get: async () => null, set: async () => {} },
-    briefCacheStore: { get: async () => null, set: async () => {} },
     dispatchQueueStore: store,
     workspaceFromUrl: (req, res, next) => next(),
     freeTierStore: { tryUse: async () => ({ allowed: true }) }
@@ -257,8 +253,6 @@ function buildRecommendApp(captured) {
     getWorkspaceAccessToken: async () => 'test-token',
     getWorkspaceOpenRouterKey: async () => null,
     agentStatusStore: {},
-    recapCacheStore: { get: async () => null, set: async () => {} },
-    briefCacheStore: { get: async () => null, set: async () => {} },
     dispatchQueueStore: {
       addItem: async (urlKey, item) => {
         captured.item = item;
@@ -525,8 +519,6 @@ function buildLiveRecommendApp({ description, captured }) {
     getWorkspaceNorthStar: async () => null,
     workspacePreferencesStore: { getWorkspacePreferences: async () => ({}) },
     agentStatusStore: {},
-    recapCacheStore: { get: async () => null, set: async () => {}, put: async () => {} },
-    briefCacheStore: { get: async () => null, set: async () => {}, put: async () => {} },
     dispatchQueueStore: {
       addItem: async (urlKey, item) => {
         captured.item = item;

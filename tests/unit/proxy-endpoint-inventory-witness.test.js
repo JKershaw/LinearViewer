@@ -360,23 +360,8 @@ const ROWS = [
     note: 'dispatchQueueStore reads, empty fold (:4389)',
     run: () => call(buildApp({ dispatchQueueStore: makeDispatchStore() }), 'GET', '/api/proxy/periodicals'),
   },
-  {
-    group: 'F', method: 'GET', url: '/api/proxy/issues/LIN-999999/recap', expect: 404,
-    note: 'canonical form, isTestMode "Issue not found" (:4492)',
-    expectBody: { error: 'Issue not found' },
-    run: () => call(buildApp(), 'GET', '/api/proxy/issues/LIN-999999/recap'),
-  },
-  {
-    group: 'F', method: 'GET', url: '/api/proxy/recap/LIN-999999', expect: 404,
-    note: 'flat alias form (:4492 array path)',
-    expectBody: { error: 'Issue not found' },
-    run: () => call(buildApp(), 'GET', '/api/proxy/recap/LIN-999999'),
-  },
-  {
-    group: 'F', method: 'POST', url: '/api/proxy/recap/bad%20id', expect: 400,
-    note: 'isValidIssueId, flat-only form (:4645)',
-    run: () => call(buildApp(), 'POST', '/api/proxy/recap/bad%20id', { body: {} }),
-  },
+  // LIN-4537: GET/POST /recap (both forms) and POST /brief were retired with the model-written
+  // recap and brief; their rows went with them. GET /brief (the records brief) stays.
   {
     group: 'F', method: 'GET', url: '/api/proxy/issues/LIN-999999/brief', expect: 503,
     note: 'canonical form; LIN-4536: the records brief reads no tracker, so this app (no records store) answers 503',
@@ -388,11 +373,6 @@ const ROWS = [
     note: 'flat alias form (array path); LIN-4536: the records brief, no records store here',
     expectBody: { error: 'Records store not configured' },
     run: () => call(buildApp(), 'GET', '/api/proxy/brief/LIN-999999'),
-  },
-  {
-    group: 'F', method: 'POST', url: '/api/proxy/brief/bad%20id', expect: 400,
-    note: 'isValidIssueId, flat-only form (:4935)',
-    run: () => call(buildApp(), 'POST', '/api/proxy/brief/bad%20id', { body: {} }),
   },
 
   // --- Group G: agent status ---

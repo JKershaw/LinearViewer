@@ -22,7 +22,7 @@
  *     BLIND to a mutation that renames only the alias's `:param`, because every
  *     probe below short-circuits on the SAME pre-network format validation
  *     regardless of which literal string the (now-unbound) param resolves to —
- *     for 6 of the 9 pairs a validly-formatted-but-nonexistent id still
+ *     for 5 of the 8 pairs a validly-formatted-but-nonexistent id still
  *     produces a distinguishing 400-vs-404 divergence, but for the 3 pairs
  *     whose validator treats an unbound param the same as a malformed one
  *     (`relations`, `comments`, `cycle detail`), that divergence never
@@ -36,7 +36,7 @@
  * echo probes) so every assertion is stable offline.
  *
  * The e2e suite already covers most of the *pairing*: tests/e2e/proxy.spec.js
- * drives 7 of these 9 pairs through both URLs with the same probe design. Only
+ * drives 6 of these 8 pairs through both URLs with the same probe design. Only
  * the two `agent/status` <-> `foreman/status` pairs are unique to this file.
  */
 
@@ -86,14 +86,7 @@ const PAIRS = [
     probe: { canonical: '/api/proxy/issues/LIN-999999/recommend', alias: '/api/proxy/recommend/LIN-999999' },
     expectStatus: 404
   },
-  {
-    name: 'recap',
-    method: 'get',
-    canonical: '/api/proxy/issues/:identifier/recap',
-    alias: '/api/proxy/recap/:identifier',
-    probe: { canonical: '/api/proxy/issues/LIN-999999/recap', alias: '/api/proxy/recap/LIN-999999' },
-    expectStatus: 404
-  },
+  // LIN-4537: the recap pair (GET /api/proxy/issues/:identifier/recap + /api/proxy/recap/:identifier) was retired.
   {
     name: 'brief',
     method: 'get',
@@ -154,8 +147,6 @@ function buildApp({ provider } = {}) {
     getWorkspaceAccessToken: async () => 'test-token',
     getWorkspaceOpenRouterKey: async () => null,
     agentStatusStore: {},
-    recapCacheStore: { get: async () => null, set: async () => {} },
-    briefCacheStore: { get: async () => null, set: async () => {} },
     dispatchQueueStore: {},
     workspaceFromUrl: (req, res, next) => next(),
     workspacePreferencesStore: {},
@@ -208,7 +199,7 @@ describe('proxy route aliases — identical payloads', () => {
 // 2. Param-echo probes (mutation-teeth): the identical-payloads probes above
 // short-circuit on format validation that never actually reads the shared
 // :param, so all of them are blind to a mutation that renames only the
-// alias's param. For 3 of the 9 pairs — relations (read), comments (write),
+// alias's param. For 3 of the 8 pairs — relations (read), comments (write),
 // cycle detail — the existing probe's validator (isValidIssueId / UUID_REGEX)
 // treats an unbound param exactly like a malformed one, so no status
 // divergence exists to catch that mutation (verified: a param rename makes
@@ -219,7 +210,7 @@ describe('proxy route aliases — identical payloads', () => {
 // mutation the alias falls back to its pre-network 400 while the canonical
 // still reaches the provider and echoes 200/201, so the two diverge.
 //
-// The other 6 pairs (recommend/recap/brief/prompt/agent-status×2) already
+// The other 5 pairs (recommend/brief/prompt/agent-status×2; LIN-4537 retired recap) already
 // probe with a validly-formatted-but-nonexistent identifier and see a real
 // 400-vs-404 divergence under the same mutation, so they already have teeth
 // without an echo probe — adding one there is optional strengthening, not

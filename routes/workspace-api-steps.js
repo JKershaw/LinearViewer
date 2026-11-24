@@ -4,15 +4,13 @@
  * (failureOf) and routes/workspace-api-issue-read.js (failureOf, openIssue) and
  * routes/workspace-api-issue-write.js (refuseCapability) and
  * routes/workspace-api-feedback.js (refuseCapability) import them; each is defined here once. `openIssue` and
- * `refuseCapability` moved here with LIN-3872; `refuseFreeTier`, `aiNotConfigured`,
- * `keepaliveFailure` and `loadContext` with LIN-3877 (the composer reads them too).
+ * `refuseCapability` moved here with LIN-3872; `refuseFreeTier` with LIN-3877. LIN-4537 retired
+ * `aiNotConfigured`, `keepaliveFailure` and `loadContext` with the recap and brief routes, their only readers.
  */
-import { badRequest, jsonError, keepaliveError } from '../lib/errors.js';
+import { badRequest, jsonError } from '../lib/errors.js';
 import { freeTierRefusalBlock } from '../lib/chat-request.js';
-import { buildMockRecapContext } from '../lib/workspace-api-mocks.js';
 import { truncationFailureOf } from '../lib/openrouter.js';
 import { isValidIssueId, resolveIssueBinding } from '../lib/workspace.js';
-import { isHermeticTestToken } from '../lib/should-mock-ai.js';
 
 /**
  * The error ladder shared by the upstream-calling routes, as `[status, message, extra]`
@@ -44,26 +42,20 @@ export function refuseCapability(res, providerName, capability, doing) {
 /**
  * The preamble every issue-addressed route opens with: resolve the issue's own binding
  * (LIN-1904: per the `source` provenance stamp, not always the workspace's active
- * provider), then refuse, in this order, a malformed id, an
- * unconfigured store, and a provider without recommendation context (LIN-1910). Replies
+ * provider), then refuse, in this order, a malformed id and a provider without
+ * recommendation context (LIN-1910). Replies
  * and returns null when it refuses.
  * @param {Object} [checks]
- * @param {*} [checks.store] - the store the route needs, checked with `storeName`
- * @param {string} [checks.storeName] - "<storeName> not configured" (503)
  * @param {string} [checks.capability] - require `fetchRecommendationContext`, worded "<capability> for this issue"
  * @param {boolean} [checks.bind=true] - false where the route resolves the binding only on a branch
  */
-export function openIssue(req, res, { store, storeName, capability, bind = true } = {}) {
+export function openIssue(req, res, { capability, bind = true } = {}) {
   const workspace = req.workspace;
   const { issueId } = req.params;
   const binding = bind ? resolveIssueBinding(workspace, req.query.source) : null;
 
   if (!isValidIssueId(issueId)) {
     badRequest.json(res, 'Invalid issue ID format');
-    return null;
-  }
-  if (storeName && !store) {
-    jsonError(res, 503, `${storeName} not configured`);
     return null;
   }
   if (capability && !binding.provider.supports('fetchRecommendationContext')) {
@@ -74,26 +66,3 @@ export function openIssue(req, res, { store, storeName, capability, bind = true 
 }
 
 export const refuseFreeTier = (res, check) => jsonError(res, 429, check.reason, freeTierRefusalBlock(check));
-
-export const aiNotConfigured = (res, noun) =>
-  jsonError(res, 503, `AI ${noun} is not configured. Connect OpenRouter or set OPENROUTER_API_KEY.`, { code: 'AI_NOT_CONFIGURED' });
-
-/** The catch tail of the keepalive routes: stop the keepalive, log, and reply through it with the ladder's answer. */
-export function keepaliveFailure(keepalive, label, error, fallbackMessage, arms) {
-  keepalive.stop();
-  console.error(label, error);
-  keepaliveError(keepalive, ...failureOf(error, fallbackMessage, arms));
-}
-
-/**
- * The context a recommend-family route works from: the fixtures under a test token,
- * otherwise the provider's. `missing` is true only when the fixture issue is absent;
- * a provider's answer is taken as given.
- */
-export async function loadContext(workspace, issueId, { provider, callScope }) {
-  if (isHermeticTestToken(workspace.accessToken)) {
-    const context = buildMockRecapContext(issueId);
-    return { context, missing: !context };
-  }
-  return { context: await provider.fetchRecommendationContext(callScope, issueId), missing: false };
-}

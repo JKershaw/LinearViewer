@@ -81,8 +81,6 @@ function buildApp({ providerName = 'github', token = REPO } = {}) {
     resolveWorkspaceAccess: async () => ({ token, reason: 'ok', provider: providerName }),
     getWorkspaceAccessToken: async () => token,
     agentStatusStore: {},
-    recapCacheStore: {},
-    briefCacheStore: {},
     dispatchQueueStore: {},
     workspaceFromUrl: (req, res, next) => next(),
     getWorkspaceOpenRouterKey: async () => null,

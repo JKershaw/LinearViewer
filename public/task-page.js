@@ -2,8 +2,8 @@
  * Task page client (LIN-3329, Subtask B of LIN-3324).
  *
  * Keeps an open task page current while the work runs: polls the stored-data
- * state endpoint (`data-state-url` on `<main>`) and repaints the header status,
- * the progress track and the brief/recap panels from the HTML it returns.
+ * state endpoint (`data-state-url` on `<main>`) and repaints the header status
+ * and the progress track from the HTML it returns.
  *
  * The poll loop is Live Console's (public/live-console.js): a chained
  * `setTimeout`, an in-flight guard, backoff on failure, paused while the tab is
@@ -18,14 +18,13 @@
  * changes or every 60 s while a lane runs, never more than once per 60 s
  * window, and never once the poll stops (hidden tab, 401, revoked link). Done is
  * the one exception: it reads once more, past the window, then stops (`finish`).
- * Owner-only behaviour starts from owner-only DOM hooks: the brief/recap widgets mount from the
- * `task-page-owner-widgets` marker, and the close-out box (public/close-out.js)
+ * Owner-only behaviour starts from owner-only DOM hooks: the `task-page-owner-widgets`
+ * marker is the owner signal, and the close-out box (public/close-out.js)
  * is its own owner fragment. A guest loads the same scripts and they no-op.
+ * (LIN-4537 retired the brief/recap widgets the marker once mounted.)
  *
  * Evidence and the description/comments block sit OUTSIDE every poll-repainted
- * mount, so a repaint can never lose or move them. The brief/recap panels are
- * never repainted by a poll (LIN-3975: the state read carries none); the owner's
- * widgets own their refresh, and a guest keeps the page-load panels.
+ * mount, so a repaint can never lose or move them.
  *
  * The owner's run control (LIN-3975) is the shared PromptSection, mounted here
  * from its `data-run-opts` before any Markdown renders. It owns its own refresh.
@@ -503,55 +502,6 @@ function enhanceMarkdown(root) {
 }
 
 /**
- * Upgrade the brief's server-rendered `<pre class="sess-ctx-body">` to
- * markdown (a guest, or an owner whose widget libs failed to load). Replaces
- * the `<pre>` with a div, so a second call is a no-op.
- */
-function enhanceContextMarkdown(mount) {
-  if (!mount || typeof window.renderMarkdown !== 'function') return;
-  var pres = mount.querySelectorAll('pre.sess-ctx-body');
-  for (var i = 0; i < pres.length; i++) {
-    var pre = pres[i];
-    if (!pre.parentNode) continue;
-    var div = document.createElement('div');
-    div.className = 'sess-ctx-body sess-ctx-md';
-    div.innerHTML = window.renderMarkdown(pre.textContent);
-    pre.parentNode.replaceChild(div, pre);
-  }
-}
-
-/**
- * Mount the owner's live brief/recap widgets from the owner marker, threading
- * the task's `source` (from `<main data-source>`) so their GET/POST resolve
- * THIS issue's provider (G1). Returns whether anything mounted — the caller
- * then never repaints the context mount.
- */
-function mountWidgets(doc, main) {
-  var marker = doc.querySelector('[data-testid="task-page-owner-widgets"]');
-  if (!marker) return false;
-  var source = main.getAttribute('data-source') || undefined;
-  var fallbackUrlKey = main.getAttribute('data-url-key') || '';
-  var fallbackIdentifier = main.getAttribute('data-identifier') || '';
-  var mounted = false;
-  function mount(selector, lib) {
-    if (!lib || typeof lib.init !== 'function') return;
-    var panels = doc.querySelectorAll(selector);
-    for (var i = 0; i < panels.length; i++) {
-      var el = panels[i];
-      lib.init(el, {
-        urlKey: (el.dataset && el.dataset.urlKey) || fallbackUrlKey,
-        identifier: (el.dataset && el.dataset.identifier) || fallbackIdentifier,
-        source: source,
-      });
-      mounted = true;
-    }
-  }
-  mount('.sess-ctx-panel.brief-section', window.BriefSection);
-  mount('.sess-ctx-panel.recap-section', window.RecapSection);
-  return mounted;
-}
-
-/**
  * Whether a state URL belongs to a guest share page (LIN-3330 review, ledger 2).
  * Only a guest page's state endpoint can 404 because the link was revoked or
  * never issued; an owner page's 404 (e.g. the workspace left the session in
@@ -609,18 +559,11 @@ function proposalsUrlOf(stateUrl) {
 }
 
 /**
- * Repaint the answer header from the state endpoint (LIN-3373). That read has
- * no tracker, so it can't verify a summary and its header carries none: the
- * load-time summary paragraph is carried across rather than deleted by the
- * repaint. A header that does carry one replaces it.
+ * Repaint the answer header from the state endpoint (LIN-3373). LIN-4537: the
+ * header carries no summary paragraph any more, so the repaint replaces it whole.
  */
 function repaintHeader(answer, html) {
-  var summaryNode = answer.querySelector('[data-testid="task-page-summary"]');
   answer.innerHTML = html;
-  if (summaryNode && !answer.querySelector('[data-testid="task-page-summary"]')) {
-    var status = answer.querySelector('[data-testid="task-page-status"]');
-    (status || answer).appendChild(summaryNode);
-  }
   // LIN-3991: the exact time beside a state sentence is local, so repainted HTML is localised again.
   if (typeof window.initLocalTimes === 'function') window.initLocalTimes(answer);
 }
@@ -641,29 +584,6 @@ function init(doc) {
       readAll.hidden = true;
     });
   }
-  // LIN-3975 (finding 1): with neither brief nor recap, the owner's quiet line offers to write each. A press mounts
-  // that one widget into the quiet section and starts its generate (the widget's own refresh, one press). The
-  // empty-state placeholder widgets are never mounted; the offer is removed once pressed.
-  // Both are captured here, before any Markdown renders, and the handler uses the captured references only.
-  var writeOffers = doc.querySelector('[data-testid="task-page-context-offers"]');
-  var quietContext = doc.querySelector('[data-testid="task-page-context-quiet"]');
-  if (writeOffers && quietContext) {
-    writeOffers.addEventListener('click', function (e) {
-      var button = e.target ? e.target.closest('[data-write-kind]') : null;
-      if (!button || !writeOffers.contains(button)) return;
-      var kind = button.getAttribute('data-write-kind');
-      var widget = kind === 'brief' ? window.BriefSection : window.RecapSection;
-      if (!widget || typeof widget.refresh !== 'function') return;
-      var offer = button.parentNode;
-      if (offer && offer.parentNode) offer.parentNode.removeChild(offer);
-      if (!writeOffers.querySelector('[data-write-kind]')) writeOffers.parentNode.removeChild(writeOffers);
-      var panel = doc.createElement('div');
-      panel.className = 'sess-ctx-panel ' + (kind === 'brief' ? 'brief-section' : 'recap-section');
-      panel.setAttribute('data-testid', 'session-' + kind);
-      quietContext.appendChild(panel);
-      widget.refresh(panel, main.getAttribute('data-url-key') || '', main.getAttribute('data-identifier') || '', main.getAttribute('data-source') || undefined);
-    });
-  }
   // LIN-3975: the owner's task-chat fold, mounted before the first Markdown render (LIN-3385). It is a direct child of
   // the page (so a copy in ticket text is never it), and the page's own options ride on it.
   var chatFold = doc.querySelector('[data-testid="task-page"] > [data-testid="task-page-chat-fold"]');
@@ -677,7 +597,6 @@ function init(doc) {
   // The status mount is what the poll repaints; the stage track beside it (`task-page-track-mount`) is the page-load read's (LIN-3975).
   var answer = doc.querySelector('[data-testid="task-page-answer-status"]');
   var trackMount = doc.querySelector('[data-testid="task-page-track-mount"]');
-  var contextMount = doc.querySelector('[data-testid="task-page-context-mount"]');
   var rows = function () { return trackMount ? trackMount.querySelectorAll('.task-step') : []; };
   var memory = createOpenMemory(rows());
   // LIN-4405: "Sessions on one clock", a direct child of the page (so a copy in ticket text is never it), captured here
@@ -686,7 +605,7 @@ function init(doc) {
   var timelineMount = timelineSection ? timelineSection.querySelector(':scope > [data-testid="task-timeline-mount"]') : null;
 
   // LIN-3385: wire every Harbour control BEFORE the first markdown render
-  // (`enhanceContextMarkdown` below is the first). Ticket-derived markdown
+  // (`enhanceMarkdown` below is the first). Ticket-derived markdown
   // keeps `data-*`/`id`/`class`, so a control looked up after it lands could
   // resolve to look-alike ticket text. The close-out box is captured here and
   // its press button is bound directly (close-out.js is idempotent per box).
@@ -719,10 +638,6 @@ function init(doc) {
       });
   }
 
-  // Owner's live widgets (if the libs loaded). Once mounted, the context
-  // mount is never repainted; the widgets own their refresh.
-  var widgetsMounted = mountWidgets(doc, main);
-  if (!widgetsMounted && contextMount) enhanceContextMarkdown(contextMount);
   enhanceMarkdown(doc);
 
   function toggle(row) {
@@ -922,8 +837,6 @@ export {
   runOptsOf,
   proposalsUrlOf,
   enhanceMarkdown,
-  enhanceContextMarkdown,
-  mountWidgets,
   FAST_MS,
   SLOW_MS,
   MAX_BACKOFF_MS

@@ -58,8 +58,6 @@ function buildApp({ createToken, recordEvent } = {}) {
     resolveWorkspaceAccess: async () => ({ token: null, reason: 'not_connected' }),
     getWorkspaceAccessToken: async () => null,
     agentStatusStore: {},
-    recapCacheStore: {},
-    briefCacheStore: {},
     dispatchQueueStore: {
       addItem: async (urlKey, doc) => {
         const item = {

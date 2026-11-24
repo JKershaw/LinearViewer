@@ -659,8 +659,6 @@ test.describe('Proxy API - Route Aliases (LIN-528)', () => {
       canonical: '/api/proxy/cycles/not-a-uuid', alias: '/api/proxy/cycle/not-a-uuid' },
     { name: 'recommend', method: 'get', token: () => readToken, status: 404,
       canonical: '/api/proxy/issues/LIN-999999/recommend', alias: '/api/proxy/recommend/LIN-999999' },
-    { name: 'recap', method: 'get', token: () => readToken, status: 404,
-      canonical: '/api/proxy/issues/LIN-999999/recap', alias: '/api/proxy/recap/LIN-999999' },
     // LIN-4536: the records brief reads no tracker; a ticket with no task answers 200 { status: 'missing' }.
     { name: 'brief', method: 'get', token: () => readToken, status: 200,
       canonical: '/api/proxy/issues/LIN-999999/brief', alias: '/api/proxy/brief/LIN-999999' },
@@ -682,24 +680,39 @@ test.describe('Proxy API - Route Aliases (LIN-528)', () => {
       expect(await alias.json()).toEqual(await canonical.json());
     });
   }
+
+  // LIN-4537 retired the model-written recap (both forms, GET and POST) and the brief's force-regenerate POST. Each
+  // now 404s at the ROUTING layer (Express's own "Cannot <METHOD>" page), not at a handler, even with a write token.
+  // GET /api/proxy/brief/:id (the records brief, LIN-4536) stays, with its alias, in the table above.
+  const RETIRED = [
+    { method: 'get', path: '/api/proxy/issues/LIN-999999/recap' },
+    { method: 'get', path: '/api/proxy/recap/LIN-999999' },
+    { method: 'post', path: '/api/proxy/recap/LIN-999999' },
+    { method: 'post', path: '/api/proxy/brief/LIN-999999' },
+  ];
+  for (const route of RETIRED) {
+    test(`retired: ${route.method.toUpperCase()} ${route.path} is not routed (LIN-4537)`, async ({ request }) => {
+      const resp = await request[route.method](route.path, { headers: { Authorization: `Bearer ${writeToken}` } });
+      expect(resp.status()).toBe(404);
+      expect(await resp.text()).toContain(`Cannot ${route.method.toUpperCase()} ${route.path}`);
+    });
+  }
 });
 
 // =============================================================================
-// LIN-2044 — proxy compute fetchers (stack/prompt/recommend/recap/brief) route
-// through the request's own ACTIVE provider instead of a static Linear import.
-// Prior to this fix, a Jira-active workspace's token-auth proxy requests to
-// these endpoints still hit Linear's GraphQL API and 401'd (a valid Linear
-// token was never involved) — the exact gap LIN-1910 closed on the session-auth
-// surfaces (routes/workspace-api.js) but explicitly left open here.
+// LIN-2044 — proxy compute fetchers (stack/prompt/recommend, and the brief)
+// route through the request's own ACTIVE provider instead of a static Linear
+// import. Prior to this fix, a Jira-active workspace's token-auth proxy
+// requests to these endpoints still hit Linear's GraphQL API and 401'd (a valid
+// Linear token was never involved) — the exact gap LIN-1910 closed on the
+// session-auth surfaces (routes/workspace-api.js) but explicitly left open here.
 //
-// Witness strategy (no LLM spend): GET .../recap runs its context fetch BEFORE
-// the cache-hit/noRefresh short-circuit, so `?noRefresh=1` on a never-cached
-// issue answers {status:'missing'} with no OpenRouter call, and a 200 there means
-// the Jira credential served the fetch (a fall-through to Linear 401s). The
-// title read-back that used to prove the fetch rode on LIN-598's task snapshots,
-// which LIN-4502 retired; that the active provider's own fetcher is the one
-// called, with its own data in the response, is pinned at the unit layer
-// (tests/unit/proxy-provider-routed-compute.test.js, the recap and brief seams).
+// Witness strategy (no LLM spend): a 200 on a network-free read means the Jira
+// credential served the request (a fall-through to Linear 401s). The recap
+// witness that used `?noRefresh=1` retired with the recap (LIN-4537); that the
+// active provider's own fetcher is the one called, with its own data in the
+// response, is pinned at the unit layer
+// (tests/unit/proxy-provider-routed-compute.test.js).
 // =============================================================================
 test.describe('Proxy API - Jira-active compute endpoints (LIN-2044)', () => {
   let jiraToken;
@@ -709,21 +722,6 @@ test.describe('Proxy API - Jira-active compute endpoints (LIN-2044)', () => {
     const tokenResp = await page.request.get(`/test/create-proxy-token?urlKey=${urlKey}&scope=read`);
     expect(tokenResp.ok()).toBeTruthy();
     jiraToken = (await tokenResp.json()).token;
-  });
-
-  test('positive witness: GET /api/proxy/recap/ENG-1?noRefresh=1 succeeds against Jira', async ({ request }) => {
-    const recapResp = await request.get('/api/proxy/recap/ENG-1?noRefresh=1', {
-      headers: { Authorization: `Bearer ${jiraToken}` }
-    });
-    // Negative control: pre-fix, a Jira-active workspace sent a Jira
-    // API token to Linear's GraphQL client and got a 401 (graphqlErrorStatus
-    // mapping Linear's own auth rejection) — never `Entity not found: Issue`,
-    // since the credential shape alone was wrong before any lookup happened.
-    // A 401 here would mean this request still fell through to Linear.
-    expect(recapResp.status(), await recapResp.text().catch(() => '')).toBe(200);
-    const recapBody = await recapResp.json();
-    expect(recapBody.status).toBe('missing');
-    expect(recapBody.identifier).toBe('ENG-1');
   });
 
   // LIN-4536: the brief is the records brief and reads no tracker at all; a Jira ticket with no task answers `missing`.

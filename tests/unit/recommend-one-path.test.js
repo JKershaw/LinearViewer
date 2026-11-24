@@ -195,8 +195,6 @@ function buildProxyApp({ features = {}, openRouterKey = 'sk-test-key', freeTier 
     getWorkspaceAccessToken: async () => 'live-access-token',
     getWorkspaceOpenRouterKey: async () => { if (keyHold) await keyHold(); return openRouterKey; },
     agentStatusStore: {},
-    recapCacheStore: { get: async () => null, set: async () => {} },
-    briefCacheStore: { get: async () => null, set: async () => {} },
     dispatchQueueStore: {
       addItem: addItem || (async (urlKey, item) => ({ _id: 'disp-1', dispatchedAt: '2026-06-28T00:00:00.000Z', ...item })),
       ...runStore(runRows)
@@ -231,8 +229,6 @@ function buildUiApp({ features = {}, sessionKey = 'sk-test', freeTier = { count:
     getOpenRouterSource: () => null,
     userPreferencesStore: {},
     customPromptsStore: {},
-    recapCacheStore: {},
-    briefCacheStore: {},
     reportHistoryStore: {},
     agentStatusStore: {},
     promptTraceStore: {},

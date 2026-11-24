@@ -70,8 +70,6 @@ function buildApp() {
     getWorkspaceAccessToken: async () => 'live-access-token',
     getWorkspaceOpenRouterKey: async () => 'sk-test-key',
     agentStatusStore: {},
-    recapCacheStore: { get: async () => null, set: async () => {} },
-    briefCacheStore: { get: async () => null, set: async () => {} },
     dispatchQueueStore: { addItem: async () => ({ _id: 'disp-1' }) },
     workspaceFromUrl: (req, res, next) => next(),
     workspacePreferencesStore: { getWorkspacePreferences: async () => ({}) },
