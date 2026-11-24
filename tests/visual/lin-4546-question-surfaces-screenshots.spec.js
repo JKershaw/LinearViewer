@@ -19,16 +19,33 @@
  * taken on main at d11effb18 with only the seeds added; piece 7 (LIN-4555) takes the "after" set with the same spec.
  * LIN-4551: each 390px load also records the page's scroll width beside its shot (scroll-390.json), so "no sideways scroll" is
  * a measure, not a look. The card-face sets are `lin4551-before` (main at 82ff17aff) and `lin4551-after`.
+ *
+ * LIN-4555 (piece 7, the walk): this is the walk's one command, the same for its before and after passes.
+ *   - The member walk covers all six surfaces, as the owner's does (piece 1 shot only the four it thought differ): Runs and
+ *     Flight Companion are open to a member too (Flight Companion is gated on its feature flag alone, routes/flight-companion.js),
+ *     and the questions the seed asks are addressed to the signed-in person, so a member's tool lists the same rows.
+ *   - The workspace is seeded through tests/fixtures/local-harness.js (the `seedLocal` fixture), and every element is read
+ *     through SELECTORS (tests/helpers.js), so the after pass reads what the specs read.
+ *   - `LIN4546_SHOTS_DIR` writes the set somewhere else (a scratch pass that is not evidence), and `--grep owner` or
+ *     `--grep member` walks one role.
+ * The "before" set is piece 1's (main d11effb18 plus the seeds, ca6b7c1f0), filled with this walk's member Runs and Flight
+ * Companion shots and scroll-390.json: this spec run at ca6b7c1f0 in a scratch worktree, adapted only for what that tree
+ * lacked (SELECTORS' questionCard, waitingOnYou, runPage and flightCompanion entries for test ids its DOM already drew; no
+ * `short` or title on the tool row, which arrived with LIN-4550 and LIN-4549). That pass reproduced all 44 of piece 1's shots
+ * at their dimensions. The 12 added PNGs are palette-quantized like piece 1's.
+ * The Questions page is opened as `?view=rulings`, the link piece 1's set used: it still opens the Questions tab
+ * (public/observation.js viewFromParams), so one URL walks the page before and after LIN-4553 renamed it.
  */
 import { mkdirSync, writeFileSync } from 'node:fs';
 import { test, expect } from '../fixtures/test-base.js';
 import { localSeedId } from '../fixtures/local-harness.js';
+import { SELECTORS } from '../helpers.js';
 import { askingRun, recordsOf, runningRun, seedOwnerFindings, seedLongQuestion } from '../fixtures/question-records.js';
 import { renderSSEFrames } from '../fixtures/flight-companion-sse-frames.js';
 import { questionShortOf } from '../../lib/records/question-short.js';
 
 const SET = process.env.LIN4546_SHOTS || 'before';
-const DIR = `docs/reviews/_evidence-2026-11-24-lin4546/${SET}`;
+const DIR = process.env.LIN4546_SHOTS_DIR || `docs/reviews/_evidence-2026-11-24-lin4546/${SET}`;
 const WIDTHS = { 1280: { width: 1280, height: 900 }, 390: { width: 390, height: 844 } };
 const OLD = '2020-01-01T00:00:00Z';
 
@@ -43,28 +60,27 @@ const TASKS = [
   { key: 'task', identifier: 'LOCAL-16', title: 'The task page: the question once, records that read as a person would', parent: 'charter', state: 'unstarted' },
 ];
 const titleOf = (identifier) => TASKS.find((t) => t.identifier === identifier).title;
+const Q = SELECTORS.questionCard;
+const OBS = SELECTORS.observation;
+const FC = SELECTORS.flightCompanion;
 
 test.describe.configure({ mode: 'serial' });
 test.setTimeout(300000);
 
 /** The realistic workspace. Answers the asking run's id (its question is pinned on the run page) and the questions' rows. */
-async function seed(page, urlKey) {
+async function seed(page, seedLocal, urlKey) {
   await page.request.get('/test/clear-comment-dedupe');
   await page.goto('/test/clear-local-store');
-  await page.request.get(`/test/clear-dispatch-queue?urlKey=${urlKey}`);
-  await page.request.get(`/test/clear-dispatch-history?urlKey=${urlKey}`);
-  await page.request.get(`/test/clear-sessions-feed-cache?urlKey=${urlKey}`);
-  await page.request.get(`/test/clear-ticket-records?urlKey=${urlKey}`);
+  for (const seam of ['clear-dispatch-queue', 'clear-dispatch-history', 'clear-sessions-feed-cache', 'clear-ticket-records']) {
+    await page.request.get(`/test/${seam}?urlKey=${urlKey}`);
+  }
   const id = (raw) => localSeedId(urlKey, raw);
   const issues = TASKS.map((t, i) => ({
     id: id(t.key), identifier: t.identifier, title: t.title, projectId: id('proj'), sortOrder: i, createdAt: OLD,
     ...(t.parent ? { parentId: id(t.parent) } : {}),
     state: t.state === 'started' ? { name: 'In Progress', type: 'started' } : { name: 'Todo', type: 'unstarted' },
   }));
-  const resp = await page.request.post('/test/set-local-session', {
-    data: { urlKey, runnerKey: true, features: { flightCompanion: true }, projects: [{ id: id('proj'), name: 'UI finish', content: 'Seeded for LIN-4546', sortOrder: 0 }], issues },
-  });
-  expect(resp.ok(), `seed failed: ${await resp.text()}`).toBeTruthy();
+  await seedLocal({ projects: [{ id: id('proj'), name: 'UI finish', content: 'Seeded for LIN-4546', sortOrder: 0 }], issues }, { runnerKey: true, features: { flightCompanion: true } });
 
   // The asking run on LOCAL-12 (parked on `[blocked]`), so the run page pins its question.
   const runId = await askingRun(page, urlKey, 'LOCAL-12', { title: titleOf('LOCAL-12') });
@@ -122,35 +138,12 @@ async function shootAll(page, name, path, prepare = async () => {}, { fresh = fa
   }
 }
 
-test.beforeAll(() => { mkdirSync(DIR, { recursive: true }); });
-test.afterAll(() => { writeFileSync(`${DIR}/scroll-390.json`, `${JSON.stringify(scroll390, null, 2)}\n`); });
-
-test('owner: Home, rulings, Runs, task page, run page and Flight Companion', async ({ page, localWorkerUrlKey: urlKey }) => {
-  const { runId, questions } = await seed(page, urlKey);
-  expect(questions).toHaveLength(3);
-  const base = `/workspace/${urlKey}`;
-
-  await shootAll(page, 'home-owner', `${base}/`, async () => {
-    await expect(page.locator('[data-testid="waiting-on-you"]')).toBeVisible();
-  });
-  await shootAll(page, 'rulings-owner', `${base}/observation?view=rulings`, async () => {
-    await expect(page.locator('[data-testid="ruling-question-row"]').first()).toBeVisible();
-  });
-  // Runs as it opens (the Autopilot filter), and with every run showing, so the running runs (the three seeded and the asking run) are in the shot.
-  await shootAll(page, 'runs-owner', `${base}/observation`, async () => {
-    await page.waitForTimeout(500);
-  });
-  await shootAll(page, 'runs-all-owner', `${base}/observation?filter=all`, async () => {
-    await expect(page.getByRole('heading', { name: /Active · [1-9][0-9]* running/ })).toBeVisible();
-  });
-  await shootAll(page, 'task-owner', `${base}/task/LOCAL-11`, async () => {
-    await expect(page.locator('[data-testid="question-record-card"]').first()).toBeVisible();
-  });
-  await shootAll(page, 'run-owner', `${base}/observation/session/${runId}`, async () => {
-    await expect(page.locator('[data-testid="question-record-card"]').first()).toBeVisible();
-  });
-
-  // Flight Companion: the turn is mocked with the seeded questions as the tool's result, and the fold is opened.
+/**
+ * Flight Companion with its "questions waiting" fold opened. The turn is mocked with the seeded questions as the tool's result
+ * (pendingResult; tests/e2e/flight-companion.spec.js mocks the same way), the page's auto-wake turn is brought on by the clock,
+ * and the fold is opened if it drew closed. No model is called.
+ */
+async function shootFlightCompanion(page, name, base, questions) {
   await page.route('**/api/flight-companion/turn', (route) => {
     if (route.request().method() !== 'POST') return route.continue();
     const frames = renderSSEFrames([
@@ -161,23 +154,60 @@ test('owner: Home, rulings, Runs, task page, run page and Flight Companion', asy
     return route.fulfill({ status: 200, contentType: 'text/event-stream', body: frames });
   });
   await page.clock.install();
-  await shootAll(page, 'flight-companion-owner', `${base}/flight-companion`, async () => {
+  await shootAll(page, name, `${base}/flight-companion`, async () => {
     await page.clock.fastForward(30000);
-    const fold = page.locator('.fc-decisions-fold');
+    const fold = page.locator(FC.decisionsFold);
     await expect(fold).toHaveCount(1);
-    if (!(await fold.evaluate((el) => el.open))) await fold.locator('> summary').click();
-    await expect(fold.locator('[data-testid="question-record-card"]').first()).toBeVisible();
+    if (!(await fold.evaluate((el) => el.open))) await page.locator(FC.decisionsSummary).click();
+    await expect(fold.locator(Q.card).first()).toBeVisible();
   }, { fresh: true });
+}
+
+/** Runs as it opens (the Autopilot filter), and with every run showing, so the running runs (the three seeded and the asking run) are in the shot. */
+async function shootRuns(page, role, base) {
+  await shootAll(page, `runs-${role}`, `${base}/observation`, async () => {
+    await page.waitForTimeout(500);
+  });
+  await shootAll(page, `runs-all-${role}`, `${base}/observation?filter=all`, async () => {
+    await expect(page.getByRole('heading', { name: /Active · [1-9][0-9]* running/ })).toBeVisible();
+  });
+}
+
+test.beforeAll(() => { mkdirSync(DIR, { recursive: true }); });
+test.afterAll(() => { writeFileSync(`${DIR}/scroll-390.json`, `${JSON.stringify(scroll390, null, 2)}\n`); });
+
+test('owner: Home, rulings, Runs, task page, run page and Flight Companion', async ({ page, seedLocal, localWorkerUrlKey: urlKey }) => {
+  const { runId, questions } = await seed(page, seedLocal, urlKey);
+  expect(questions).toHaveLength(3);
+  const base = `/workspace/${urlKey}`;
+
+  await shootAll(page, 'home-owner', `${base}/`, async () => {
+    await expect(page.locator(SELECTORS.waitingOnYou.section)).toBeVisible();
+  });
+  await shootAll(page, 'rulings-owner', `${base}/observation?view=rulings`, async () => {
+    await expect(page.locator(OBS.ruling.row).first()).toBeVisible();
+  });
+  await shootRuns(page, 'owner', base);
+  await shootAll(page, 'task-owner', `${base}/task/LOCAL-11`, async () => {
+    await expect(page.locator(Q.card).first()).toBeVisible();
+  });
+  await shootAll(page, 'run-owner', `${base}/observation/session/${runId}`, async () => {
+    await expect(page.locator(`${SELECTORS.runPage.questions} ${Q.card}`).first()).toBeVisible();
+  });
+
+  await shootFlightCompanion(page, 'flight-companion-owner', base, questions);
 });
 
-test('member: Home, rulings, task page and run page (the surfaces that differ for a member)', async ({ page, localWorkerUrlKey: urlKey }) => {
-  const { runId } = await seed(page, urlKey);
+test('member: Home, rulings, Runs, task page, run page and Flight Companion', async ({ page, seedLocal, localWorkerUrlKey: urlKey }) => {
+  const { runId, questions } = await seed(page, seedLocal, urlKey);
   // The workspace's owner is someone else: the session is a member.
   const own = await page.request.get(`/test/set-workspace-ownership?urlKey=${urlKey}&state=foreign`);
   expect(own.ok(), `ownership seam failed: ${await own.text()}`).toBeTruthy();
   const base = `/workspace/${urlKey}`;
   await shootAll(page, 'home-member', `${base}/`);
   await shootAll(page, 'rulings-member', `${base}/observation?view=rulings`, async () => { await page.waitForTimeout(500); });
+  await shootRuns(page, 'member', base);
   await shootAll(page, 'task-member', `${base}/task/LOCAL-11`);
   await shootAll(page, 'run-member', `${base}/observation/session/${runId}`);
+  await shootFlightCompanion(page, 'flight-companion-member', base, questions);
 });
