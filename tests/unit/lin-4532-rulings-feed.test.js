@@ -174,6 +174,13 @@ describe('LIN-4541: the feed reads question records only', () => {
     assert.equal(row.asks, 'Which way?');
   });
 
+  test('LIN-4550: a row carries the one-line question as `short`, derived for a question asked without one', async () => {
+    const run = await askingRun('run-short-1');
+    await askQuestion({ run, asks: 'The footer can show runs left or runs used. Which should it show?' });
+    const [row] = (await feed()).rulings;
+    assert.equal(row.short, 'Which should it show?');
+  });
+
   test('openLoopIds holds the loops in the lineage of a run that asked the person an open question, and no other', async () => {
     const run = await askingRun('run-open-1');
     await askQuestion({ run, asks: 'Open?' });

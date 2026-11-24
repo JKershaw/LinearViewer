@@ -77,6 +77,8 @@ describe('list_pending_decisions reads the person\'s open question records (LIN-
     assert.equal(result.truncated, false);
     assert.deepEqual(result.questions.map((q) => q.questionId), [first, second]);
     assert.equal(result.questions[0].question, 'Merge now?');
+    // LIN-4550: the one-line question rides beside the full ask (derived here: these questions were asked without one).
+    assert.equal(result.questions[0].short, 'Merge now?');
     assert.deepEqual(result.questions[0].options, ['yes', 'no']);
     assert.equal(result.questions[0].recommended, 'yes');
     assert.equal(result.questions[0].issueIdentifier, 'LIN-1');

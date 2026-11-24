@@ -38,6 +38,7 @@
     },
     "question": {
       "fields": {
+        "short": "string",
         "asks": "string",
         "options": "list",
         "recommended": "string",
@@ -115,10 +116,13 @@
     }
   },
   "limits": {
-    "_about": "LIN-4530 (LIN-4529 plan D1). The most characters a text field may hold, by kind and field. A longer value is refused with this limit named; it is never truncated.",
+    "_about": "LIN-4530 (LIN-4529 plan D1). The most characters a text field may hold, by kind and field. A longer value is refused with this limit named; it is never truncated. LIN-4550: a question's `short` is its one-line question, one sentence the cards lead with.",
     "decision": {
       "answer": 10000,
       "words": 10000
+    },
+    "question": {
+      "short": 200
     }
   },
   "outcomes": {
