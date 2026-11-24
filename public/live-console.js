@@ -171,6 +171,26 @@
     const m = Math.floor(s / 60), r = s % 60;
     return r ? `${m}m ${r}s` : `${m}m`;
   }
+  // LIN-4558: a wait's age in whole minutes once past one ("48m", "1h 30m"): an age,
+  // not a stopwatch. A classic-script copy of lib/time-words.js `fmtAge` (this file
+  // cannot import the leaf until it becomes a module); keep the two in step.
+  function waitAge(ms) {
+    if (!Number.isFinite(ms) || ms < 0) return '';
+    // Rounded once, as fmtAge does: to the second under a minute, else to the minute.
+    if (ms < 60000) { const secs = Math.round(ms / 1000); return secs < 60 ? `${secs}s` : '1m'; }
+    const mins = Math.round(ms / 60000);
+    if (mins < 60) return `${mins}m`;
+    const h = Math.floor(mins / 60), rm = mins % 60;
+    return rm ? `${h}h ${rm}m` : `${h}h`;
+  }
+  // LIN-4558: a parked lane's words: what it waits on (the runner's own words, read by
+  // lib/session-telemetry.js parseParkedWait) and for how long, on the server's clock.
+  function parkedWords(pw) {
+    const sinceMs = pw && pw.since ? Date.parse(pw.since) : NaN;
+    const age = Number.isFinite(sinceMs) ? waitAge((lastServerNow || Date.now()) - sinceMs) : '';
+    const head = pw && pw.what ? `waiting on ${pw.what}` : 'waiting';
+    return age ? `${head} · ${age}` : head;
+  }
   // Escaped HTML for the `.lc-lane-hb` tick — breakdown keys are tool names
   // sourced from the agent's own message text and are not fully trusted, so
   // every dynamic bit goes through `esc` before it becomes markup. When the
@@ -1251,6 +1271,7 @@
           <span class="lc-lane-stage" data-testid="live-console-lane-stage"></span>
           <span class="lc-lane-since" data-testid="live-console-lane-since"></span>
           <span class="lc-lane-action" data-testid="live-console-lane-action"></span>
+          <a class="lc-lane-child" data-testid="live-console-lane-child" href="#" hidden>child run ↗</a>
           <span class="lc-lane-tickets" data-testid="live-console-lane-tickets"></span>
         </span>
         <span class="lc-lane-mid">
@@ -1330,10 +1351,24 @@
       actionEl.setAttribute('data-waiting', '1');
       if (lane.waitingSince) actionEl.setAttribute('title', window.exactLocalTime(new Date(lane.waitingSince).toISOString()));
     } else if (lane.parkedWait) {
-      actionEl.textContent = `parked since ${rel(lane.parkedWait.since)}`;
+      // LIN-4558: what it waits on and for how long ("waiting on child run LIN-9 · 48m").
+      actionEl.textContent = parkedWords(lane.parkedWait);
       actionEl.setAttribute('data-parked', '1');
+      if (lane.parkedWait.since) actionEl.setAttribute('title', `waiting since ${window.exactLocalTime(lane.parkedWait.since)}`);
     } else {
       actionEl.textContent = 'working';
+    }
+    // LIN-4558: a wait on a dispatched child run links the child's own run page.
+    const childEl = li.querySelector('.lc-lane-child');
+    const childHref = !lane.waiting && lane.parkedWait && lane.parkedWait.childSessionId
+      ? window.runPageHref(lane.workspaceUrlKey, lane.parkedWait.childSessionId)
+      : '';
+    if (childHref) {
+      childEl.setAttribute('href', childHref);
+      childEl.hidden = false;
+    } else {
+      childEl.removeAttribute('href');
+      childEl.hidden = true;
     }
     // LIN-3977: a credential shows only when it is dead and needs re-issuing. An
     // `unknown` one is the ordinary case, not a fact about the lane.
@@ -1359,7 +1394,7 @@
   // LIN-3331 task-page link's show/hide-on-repaint path — without a full page.
   // LIN-4035 adds the stream row's markup and the activity section's state.
   if (typeof module !== 'undefined' && module.exports) {
-    module.exports = { updateLaneNode, eventRowHtml, showBarDetail, readActivityOpen, setActivityOpen, countActivityArrivals };
+    module.exports = { updateLaneNode, waitAge, eventRowHtml, showBarDetail, readActivityOpen, setActivityOpen, countActivityArrivals };
   }
   // LIN-4310: the lane's own builder, as a window global, so a suite gets the real lane markup from the client instead of
   // a copy of it (tests/unit/helpers/live-console-world.js). laneNode is the one builder paintLanes uses; nothing else

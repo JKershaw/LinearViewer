@@ -13,7 +13,7 @@ import assert from 'node:assert/strict';
 import { readdirSync, readFileSync } from 'node:fs';
 import { dirname, join, relative } from 'node:path';
 import { fileURLToPath } from 'node:url';
-import { fmtDuration, relativeAgo } from '../../lib/time-words.js';
+import { fmtDuration, fmtAge, relativeAgo } from '../../lib/time-words.js';
 import { shareTime, tickClocks } from '../../public/task-page.js';
 import { createFakeDom } from './helpers/fake-dom.js';
 
@@ -53,6 +53,14 @@ describe('LIN-4472 — one home for the duration and relative-time words', () =>
     assert.equal(fmtDuration(NaN), null);
     assert.equal(fmtDuration(undefined), null);
     assert.equal(fmtDuration(Infinity), null, 'a non-finite span has no words (the page\'s old clock printed "Infinityh")');
+  });
+
+  test('fmtAge (LIN-4558): an age rounded to the minute once past one', () => {
+    assert.equal(fmtAge(30_000), '30s');
+    assert.equal(fmtAge(48 * 60_000 + 12_000), '48m');
+    assert.equal(fmtAge(90 * 60_000 + 29_000), '1h 30m');
+    assert.equal(fmtAge(-1), null);
+    assert.equal(fmtAge(NaN), null);
   });
 
   test('relativeAgo: the words a moment takes, and null when there is no moment', () => {

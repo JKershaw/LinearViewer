@@ -427,11 +427,13 @@ function renderSummaryLine(s) {
   // "this session needs you" signal — but sits under stale to match the server's
   // deriveSessionStatus ordering (a day-dead session isn't shown as waiting).
   if (s.waiting) return renderWaitingSummary(s);
-  // LIN-2244: parked on a pending async wait (e.g. a ScheduleWakeup CI poll). Checked before the
+  // LIN-2244: parked on a wait (LIN-4558: a child run, a sub-agent, a background task or a scheduled wakeup), in the
+  // same words as the run page and Live Console: what it waits on, when the runner's lines say. Checked before the
   // status-line branches so a stale-looking line can't paper over a genuinely stalled wait.
   const parkedWait = sessionParkedWait(s);
   if (parkedWait) {
-    return `<span class="obs-summary-line obs-summary-parked">Parked on a wait since ${escapeHtml(relativeTime(parkedWait.since))}</span>`;
+    const head = parkedWait.what ? `Waiting on ${parkedWait.what}` : 'Waiting';
+    return `<span class="obs-summary-line obs-summary-parked">${escapeHtml(head)} · since ${escapeHtml(relativeTime(parkedWait.since))}</span>`;
   }
   if (!s.terminal) return runningSummary(s, st);
   // Terminal but no cached summary → offer to generate (explicit spend only). A failed run says where it stopped first.

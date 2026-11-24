@@ -28,3 +28,11 @@ Area notes for `front-end-pages` in the registry. Format and rules: README.md.
   `.recap-spinner` and `.recap-error`, and the task page's owner signal (`public/task-page.js`) was a marker named
   for the brief/recap widgets; LIN-4537 renamed them (`.spinner`, `.prompt-error`, `task-page-owner-marker`) and folded
   the Context section's identical `.context-spinner` into `.spinner`, so one rule draws every loading spinner.
+- A run waiting on something reads the same words everywhere: "waiting on <what>" from `parkedWait`, which one reader
+  builds (`parseParkedWait`, `lib/session-telemetry.js`) from the runner's own lines, matched by exact shape
+  (`PARKED_WAIT_SHAPES`). A surface draws `what` and the age (`fmtAge`, `lib/time-words.js`), never its own regex, and a
+  runner rewording moves that shape in the same ticket. Before LIN-4558 only "scheduled wakeup" matched, so a run waiting
+  on a child read as working, and its lane dropped off Live Console because a wait line mints no heartbeat metric.
+- The run page is pinned byte for byte (`tests/unit/render-session-golden.test.js`). An optional fragment in a run row goes
+  on an existing template line, and an `id` only on the rows that need one: LIN-4558's first pass put an empty
+  interpolation on its own line and an `id` on every row, and all 24 goldens moved.
