@@ -60,7 +60,6 @@ export const CLASSIC_LOADER_SUITES = [
   'lin-4024-look.test.js',
   'lin-4114-inflight-lock.test.js',
   'lin-4242-waiting-live.test.js',
-  'lin-4242-waiting-merge.test.js',
   'lin-4243-placement.test.js',
   'lin-4296-dispatch-reader.test.js',
   'lin-4296-scope-pick.test.js',
@@ -124,8 +123,8 @@ test('the classic-loader census matches its baseline: no new classic suite, and 
   assert.deepEqual(gone, [], `listed suites no longer load browser scripts as classic: lower the baseline in this change: ${gone.join(', ')}`);
 });
 
-test('the baseline is recorded at 58 suites (the count that must not rise; LIN-4540 deleted the two scan suites, LIN-4537 the two brief/recap widget suites, LIN-4541 the six ruling-card and ruling-row suites, LIN-4463 piece 5 the two app.js suites and the eighteen prompt-section suites)', () => {
-  assert.equal(CLASSIC_LOADER_SUITES.length, 58);
+test('the baseline is recorded at 57 suites (the count that must not rise; LIN-4540 deleted the two scan suites, LIN-4537 the two brief/recap widget suites, LIN-4541 the six ruling-card and ruling-row suites, LIN-4463 piece 5 the two app.js suites and the eighteen prompt-section suites, LIN-4549 the waiting-merge suite, now a module import)', () => {
+  assert.equal(CLASSIC_LOADER_SUITES.length, 57);
 });
 
 test('runClassic is counted unless it runs a named sibling: observation.js counts, chart-helpers.js does not', () => {

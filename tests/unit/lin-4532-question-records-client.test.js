@@ -97,6 +97,23 @@ describe('the question record card, in the browser', () => {
     assert.equal(card.dataset.settled, undefined);
   });
 
+  // LIN-4549: a refusal as settled elsewhere (`ruling-settled`) marks the card so the one keep-a-card rule lets it go on the next
+  // refresh; any other refusal does not, and neither leaves the answer flagged as in flight.
+  test('a refusal as settled elsewhere marks the card for the next refresh; another refusal does not', async () => {
+    const stale = drawCard(row());
+    nextResponse = refused(409, { error: 'This ruling was already answered or dismissed.', code: 'ruling-settled' });
+    await clickDelegated(option(stale, 'left'));
+    await clickDelegated(part(stale, 'question-record-card-answer'));
+    assert.equal(stale.dataset.settledElsewhere, 'true');
+    assert.equal(stale.dataset.answerInFlight, undefined);
+    assert.equal(stale.dataset.settled, undefined, 'not settled by this page');
+    const other = drawCard(row({ questionId: 'q-2' }));
+    nextResponse = refused(409, { error: 'This question already has a different answer', code: 'decision-exists' });
+    await clickDelegated(option(other, 'left'));
+    await clickDelegated(part(other, 'question-record-card-answer'));
+    assert.equal(other.dataset.settledElsewhere, undefined);
+  });
+
   test('a dismissal posts to the dismiss route; a stopped run is said to be not resumed', async () => {
     const card = drawCard(row({ questionId: 'q-9' }), 'ws-2');
     nextResponse = ok({ dismissed: true, resumed: false, notResumedBecause: 'stopped' });

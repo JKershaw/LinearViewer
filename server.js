@@ -176,7 +176,8 @@ import { noJobBody, noJobNoticeOf } from './lib/components/dispatch-no-job.js'
 import { renderSwipePage, orderIssuesForSwipe } from './lib/render-swipe.js'
 import { rowDataByNodeKey } from './lib/task-board-view.js'
 import { createHomeRowStates, createWaitingStanding, gatherTaskStates } from './lib/home-row-states.js'
-import { renderWaitingSection, waitingTitlesOf } from './lib/waiting-section.js'
+import { renderWaitingSection } from './lib/waiting-section.js'
+import { titlesFromIssues } from './lib/open-questions.js'
 import { createTaskFactsHolder, createTaskFactsRefresh } from './lib/task-facts-holder.js'
 import { createWorkspaceIssuesMemo } from './lib/workspace-issues-memo.js'
 import { createKeyState } from './lib/key-state.js'
@@ -3340,7 +3341,7 @@ app.use(createCollectiveRoutes({ workspaceFromUrl, dispatchQueueStore, proxyToke
 // LIN-4168: the dashboard’s touched-task done cache, built here (not by the router’s default) so the key-state registry
 // can reach the same instance the feed reads.
 const dashboardTaskDoneCache = createTaskDoneCache();
-app.use(createDashboardRoutes({ installationTokenFor, workspaceFromUrl, dispatchQueueStore, agentStatusStore, observationSessionsStore, observationMaterializer, sessionsFeedCache, taskDoneCache: dashboardTaskDoneCache, runSummaryCacheStore, sessionSummaryCacheStore, runParagraphStore, recordsStore, proxyEventStore, freeTierStore, getWorkspaceAccessToken, fetchIssueContext, fetchWorkspaceIssues, getOpenRouterSource, getDeployInfo, workspacePreferencesStore, runProposalsStore, proxyTokenStore, readRunEvidence, prStateStore, workspaceOwnerCheck, requestUsageLoader, accountStore }))
+app.use(createDashboardRoutes({ installationTokenFor, workspaceFromUrl, dispatchQueueStore, agentStatusStore, observationSessionsStore, observationMaterializer, sessionsFeedCache, taskDoneCache: dashboardTaskDoneCache, runSummaryCacheStore, sessionSummaryCacheStore, runParagraphStore, recordsStore, proxyEventStore, freeTierStore, getWorkspaceAccessToken, fetchIssueContext, fetchWorkspaceIssues, getOpenRouterSource, getDeployInfo, workspacePreferencesStore, runProposalsStore, proxyTokenStore, readRunEvidence, prStateStore, workspaceOwnerCheck, requestUsageLoader, accountStore, readTaskFacts: (urlKey) => taskFacts.read(urlKey) }))
 
 // Mount task-chat routes (experimental "talk to a task" conversation).
 // Task Chat builds its catalog through the same createChatToolCatalog call the turn core makes for every surface.
@@ -3861,15 +3862,15 @@ app.get('/workspace/:urlKey/api/home-waiting', workspaceFromUrl, async (req, res
     const featureFlags = await requestFeatureFlags(req);
     if (featureFlags.runControls !== true) return jsonError(res, 403, 'Waiting on you is for the workspace owner');
     // LIN-4532 (P2b): the open questions are counted with the rulings (the count and the badge).
-    const { ruling, questions = [] } = await waitingStanding({ urlKey: workspace.urlKey, accountId: req.session.accountId });
-    const rows = ruling ? ruling.rows : [];
-    // The task titles come from the held issue set when it is warm (a read, no provider call); a cold set leaves them to
-    // `anchor.issueTitle`, the same fallback the section always had.
+    // LIN-4549: each question's task title comes from the held issue set when it is warm (a read, no provider call); a cold set
+    // leaves the card its identifier alone.
     const held = taskFacts.read(workspace.urlKey);
+    const titlesOf = held.complete ? titlesFromIssues(held.issues) : null;
+    const { ruling, questions = [] } = await waitingStanding({ urlKey: workspace.urlKey, accountId: req.session.accountId, titlesOf });
+    const rows = ruling ? ruling.rows : [];
     // LIN-4532 (finding-dca7ac9d): the question cards come in the fragment too, so a question asked after the page load is merged
-    // in by the refresh (public/question-cards.js mergeWaitingCards), as a ruling is.
-    const titles = held.complete ? waitingTitlesOf(held.issues, [...rows.map(row => row?.anchor?.issueIdentifier), ...questions.map(q => q.ticket)].filter(Boolean)) : {};
-    const html = renderWaitingSection({ rows, titles, questions }, { urlKey: workspace.urlKey, owner: true });
+    // in by the refresh (public/waiting-merge.js), as a ruling is.
+    const html = renderWaitingSection({ rows, questions }, { urlKey: workspace.urlKey, owner: true });
     res.json({ html, count: rows.length + questions.length });
   } catch (error) {
     if (isAuthError(error)) return unauthorized.json(res, 'Not authenticated');

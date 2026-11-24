@@ -1,7 +1,8 @@
 /**
  * LIN-4246: the opened task's repaint, at the call site (`keepTypedQuestion`, public/prompt-section.js), on the shared fake DOM.
  *
- * Home's state poll repaints the question slot. A card keeps its place only while `QuestionCards.keepsReaderPlace` says so:
+ * Home's state poll repaints the question slot. A card keeps its place only while it is the same card (QuestionCards.rulingKeyOf)
+ * and the one keep-a-card rule holds it (public/question-records.js holdsCard, LIN-4549):
  * the same ruling, and the card holds the reader's typed text, focus, or an answer in flight. Each case mounts Home with a
  * running task and a card, then fires the captured 10s poll once with a second `/state` body, and asserts on node identity.
  * `question-cards.js` runs in the same realm as the imported module (without it `keepsPlace` is always false and these cannot go red for the
@@ -84,7 +85,7 @@ async function mountWithCard(t, first) {
       localStorage: { getItem: () => null, setItem() {} },
     },
   });
-  assert.equal(typeof world.window.QuestionCards?.keepsReaderPlace, 'function', 'question-cards.js is in the same realm: the gate exists');
+  assert.equal(typeof world.window.QuestionCards?.rulingKeyOf, 'function', 'question-cards.js is in the same realm: the key gate exists');
   const container = world.makeContainer();
   world.PromptSection.init(container, HOME);
   await flushN(3);

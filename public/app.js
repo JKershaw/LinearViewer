@@ -10,6 +10,8 @@
  * Exported names are its test seams. `window.refreshWaitingOnYou` is the e2e hook the bridge inventory lists.
  */
 import * as PromptSection from './prompt-section.js'
+import { holdsReaderInput } from './question-records.js'
+import { mergeWaitingCards, noteSettled, questionKeyOf } from './waiting-merge.js'
 import { buildPromptFilename } from '../lib/prompt-filename.js'
 import { sourceQuery } from '../lib/task-page-href.js'
 
@@ -544,7 +546,7 @@ const deskSectionOf = header => DESK_SECTIONS.find(section => header.matches(sec
 // outcome in a live region. Bound once at startup to elements Harbour renders, never to the document, so a look-alike card
 // in ticket text cannot fire it.
 // LIN-4242: the owner's section is always drawn (hidden when empty), and the same startup bindings serve the live refresh:
-// `window.refreshWaitingOnYou()` fetches the section from /api/home-waiting and merges it in (public/question-cards.js), and
+// `window.refreshWaitingOnYou()` fetches the section from /api/home-waiting and merges it in (public/waiting-merge.js), and
 // runs on every rulings tick (public/common.js). Nothing is re-queried per tick.
 function initWaitingOnYou() {
   const main = document.querySelector('main')
@@ -568,11 +570,10 @@ function initWaitingOnYou() {
   main.addEventListener('harbour:question-record-settled', (e) => {
     onQuestionRecordSettled({ main, countLine, live, detail: e.detail || {}, source: e.target })
   })
-  // The cards are server-rendered: bind their answer, option and dismiss controls now, scoped to the section.
+  // A reply card answered elsewhere on Home (the opened task's) bubbles its outcome to the desk root even once it has left the page.
+  // LIN-4549: Waiting itself holds only question record cards, which public/question-records.js answers through one delegated
+  // listener, so nothing in the section needs binding.
   if (window.QuestionCards && typeof window.QuestionCards.setDeskRoot === 'function') window.QuestionCards.setDeskRoot(main)
-  if (window.QuestionCards && typeof window.QuestionCards.initQuestionCards === 'function') {
-    window.QuestionCards.initQuestionCards(section)
-  }
   // LIN-4243: Running, Up next and the count line follow a change of the Waiting key set. Captured here, at startup.
   const placement = createDeskPlacement({
     main,
@@ -589,8 +590,9 @@ function initWaitingOnYou() {
     return fetch(`/workspace/${encodeURIComponent(urlKey)}/api/home-waiting`)
       .then(response => (response.ok ? response.json() : null))
       .then(data => {
-        if (!data || typeof data.html !== 'string' || !window.QuestionCards?.mergeWaitingCards) return
-        const { removed } = window.QuestionCards.mergeWaitingCards(body, data.html)
+        if (!data || typeof data.html !== 'string') return
+        // LIN-4549: the merge is a module (public/waiting-merge.js), which asks the one keep-a-card rule itself.
+        const { removed } = mergeWaitingCards(body, data.html)
         // LIN-4532 (P2b): the count is read off the page, the one count the question cards settle through (waitingCountIn), so
         // a merged question card and a settled one count the same way as a ruling card.
         const count = waitingCountIn(main)
@@ -621,11 +623,9 @@ function initWaitingOnYou() {
   if (typeof window.onRulingsTick === 'function') window.onRulingsTick(() => refreshWaitingOnYou())
 }
 
-/** The Waiting count's number: the ruling cards left in Waiting, plus the open question cards (not yet settled). */
+/** The Waiting count's number: the open question cards left in Waiting (not settled). LIN-4549: Waiting draws no reply card. */
 function waitingCountIn(main) {
-  const rulings = main.querySelectorAll('[data-testid="waiting-on-you"] [data-testid="session-question-card"]').length
-  const questions = main.querySelectorAll('[data-testid="waiting-on-you"] .waiting-question [data-testid="question-record-card"]:not([data-settled="true"])').length
-  return rulings + questions
+  return main.querySelectorAll('[data-testid="waiting-on-you"] .waiting-question [data-testid="question-record-card"]:not([data-settled="true"])').length
 }
 
 /** LIN-4532 (P2b): a question record card was answered or dismissed here. The card stays (settled, with its outcome); the count
@@ -633,6 +633,8 @@ function waitingCountIn(main) {
  *  opened task's card, a search result's) settles with it, showing the same outcome, so a copy answered in the opened task
  *  is not left open and counted in Waiting until the next refresh. */
 function onQuestionRecordSettled({ main, countLine, live, detail, source = null }) {
+  // LIN-4242: a question settled here stays settled: a refresh response requested before this never re-adds its card.
+  noteSettled(detail.questionId)
   if (detail.questionId) settleQuestionCopies(main, detail.questionId, source)
   setWaitingCount(countLine, waitingCountIn(main))
   if (detail.urlKey && typeof window.updateRulingsBadge === 'function') window.updateRulingsBadge(detail.urlKey)
@@ -651,48 +653,36 @@ function settleQuestionCopies(main, questionId, source) {
   })
 }
 
+// A reply card (a run parked on a bare `[blocked]`, lib/question-card.js) answered on Home: the opened task draws one. LIN-4549:
+// Waiting draws no reply card, so its old branches (a `.waiting-card` wrapper, the next waiting reply card's focus) are gone.
 function onRulingGone({ main, countLine, live, detail }) {
   const key = detail.key
   if (!key) return
   const rulingKey = window.QuestionCards?.rulingKeyOf
-  // LIN-4242: a settled ruling stays settled: a refresh response requested before this never re-adds its card.
-  window.QuestionCards?.noteSettled?.(key)
-  // Every copy of this ruling's card on the page: the Waiting card, a search result, the opened task.
+  // Every copy of this ruling's card on the page: a search result, the opened task.
   main.querySelectorAll('[data-testid="session-question-card"]').forEach(card => {
     if (!rulingKey || rulingKey(card) !== key) return
-    ;(card.closest('.waiting-card') || card).remove()
+    card.remove()
   })
-  // The count line's "N waiting on you" counts the cards left inside Waiting only, one per ruling.
   const section = main.querySelector('[data-testid="waiting-on-you"]')
-  const waitingCards = main.querySelectorAll('[data-testid="waiting-on-you"] [data-testid="session-question-card"]').length
   setWaitingCount(countLine, waitingCountIn(main))
   if (detail.urlKey && typeof window.updateRulingsBadge === 'function') window.updateRulingsBadge(detail.urlKey)
   // LIN-4242: an empty section is hidden, not removed, so the live refresh can merge a new card into it.
   syncWaitingSection(section)
-  // Focus: the next waiting card's first option, else the section heading, else the page.
-  const next = waitingCards > 0 && section
-    ? (section.querySelector('[data-testid="session-question-card-option"]') || section.querySelector('.waiting-header'))
-    : null
-  if (next) {
-    if (next.classList.contains('waiting-header')) next.setAttribute('tabindex', '-1')
-    next.focus()
-  } else {
-    main.setAttribute('tabindex', '-1')
-    main.focus()
-  }
+  main.setAttribute('tabindex', '-1')
+  main.focus()
   live.textContent = detail.message || 'Answered'
 }
 
 /**
- * LIN-4243: the keys of the Waiting cards under `body`, sorted (one per card, by the one `rulingKeyOf`). LIN-4538 (P7a): Home's
- * waiting rows are open question records now, so an open question card is keyed too (`question:<id>`); a card settled here is
- * not, the same cards `waitingCountIn` counts. Without them the key set never changed and Running and Up next never followed.
+ * LIN-4243: the keys of the Waiting cards under `body`, sorted: one per open question card (its question id, the merge's own key,
+ * public/waiting-merge.js); a card settled here is not keyed, the same cards `waitingCountIn` counts. Without them the key set
+ * never changed and Running and Up next never followed.
  */
 function waitingKeysIn(body) {
-  const keyOf = window.QuestionCards?.rulingKeyOf
-  if (!body || !keyOf) return []
-  const cards = body.querySelectorAll('[data-testid="session-question-card"], .waiting-question [data-testid="question-record-card"]:not([data-settled="true"])')
-  return [...cards].map(keyOf).filter(Boolean).sort()
+  if (!body) return []
+  const cards = body.querySelectorAll('.waiting-question [data-testid="question-record-card"]:not([data-settled="true"])')
+  return [...cards].map(questionKeyOf).filter(Boolean).sort()
 }
 
 /**
@@ -715,7 +705,8 @@ function createDeskPlacement({ main, countLine, live, searchResults, searchInput
 
   function facts() {
     const active = document.activeElement
-    const holds = window.QuestionCards?.cardHoldsInput || (() => false)
+    // LIN-4549: the reader-input half of the one keep-a-card rule (public/question-records.js), handed to the classic policy.
+    const holds = holdsReaderInput
     return {
       search: !!(searchInput && searchInput.value.trim()),
       dispatchesInFlight: typeof window.dispatchesInFlight === 'function' ? window.dispatchesInFlight() : 0,
@@ -831,7 +822,7 @@ function syncWaitingSection(section) {
   if (!section) return
   // LIN-4494: a person's record is a reason to show the section too (`.waiting-record`, drawn on the page load).
   // LIN-4532 (P2b): an open question record (`.waiting-question`) is one too.
-  const empty = !section.querySelector('.waiting-card, .waiting-record, .waiting-question')
+  const empty = !section.querySelector('.waiting-record, .waiting-question')
   section.classList.toggle('hidden', empty || section.dataset.searchHidden === 'true')
 }
 

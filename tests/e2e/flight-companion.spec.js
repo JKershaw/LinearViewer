@@ -1610,7 +1610,9 @@ test.describe('LIN-3361: expandable grouped tool rows, folded decisions and read
     await fold.locator('> summary').click();
     const row = fold.locator('.fc-decision').first();
     await expect(row).toBeVisible();
-    await expect(row.getByTestId('fc-decision-task-link')).toHaveAttribute('href', `/workspace/${URL_KEY}/task/LIN-42`);
+    // LIN-4549: the card draws its own task line; the identifier links to the task page, once.
+    await expect(row.getByTestId('question-record-card-task-id')).toHaveAttribute('href', `/workspace/${URL_KEY}/task/LIN-42`);
+    await expect(row.getByText('LIN-42', { exact: true })).toHaveCount(1);
     const card = row.locator('[data-testid="question-record-card"]');
     await expect(card.getByTestId('question-record-card-question')).toHaveText('Q42?');
     await card.locator('[data-option-id="Ship it"]').click();

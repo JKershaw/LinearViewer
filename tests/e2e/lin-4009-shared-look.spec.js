@@ -117,7 +117,7 @@ test.describe('one shared look (LIN-4009)', () => {
     });
     const style = async (identifier) => styleOf(rowState(page, identifier));
     // LIN-4114: a task with an open question is a Waiting on you card; its needs-you state reads on that card's task line.
-    const needsYou = await styleOf(page.locator('[data-testid="waiting-task-line"]', { hasText: TASKS.needsYou }).locator('[data-testid="issue-row-state"]'));
+    const needsYou = await styleOf(page.locator('[data-testid="question-record-card-task"]', { hasText: TASKS.needsYou }).locator('[data-testid="issue-row-state"]'));
     const failed = await style(TASKS.failed);
     const running = await style(TASKS.running);
     // LIN-4103: a never-run row has no state at all (the guessed "ready" tone is gone), so it has no state element.

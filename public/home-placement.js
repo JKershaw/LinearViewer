@@ -44,14 +44,15 @@
    * The facts `blockedBy` needs from one desk section element (its wrapper, header and body).
    * @param {Element} el - a `.running-section` or `.up-next-section`
    * @param {Element|null} activeElement - document.activeElement
-   * @param {(card: Element) => boolean} cardHoldsInput - QuestionCards.cardHoldsInput
+   * @param {(card: Element) => boolean} cardHoldsInput - the reader-input half of the one keep-a-card rule
+   *   (public/question-records.js holdsReaderInput), handed in by public/app.js (LIN-4549)
    */
   function sectionFacts(el, activeElement, cardHoldsInput) {
     return {
       openedTask: !!el.querySelector('.details:not(.hidden)'),
       openFold: !!el.querySelector('.home-fetched'),
       fieldFocused: !!activeElement && el.contains(activeElement) && activeElement.matches(FIELD),
-      // A ruling card or a question record card (LIN-4538); QuestionCards.cardHoldsInput reads either's typed answer.
+      // A ruling card or a question record card (LIN-4538); the rule reads either's typed answer.
       cardHoldsInput: [...el.querySelectorAll('[data-testid="session-question-card"], [data-testid="question-record-card"]')].some(card => cardHoldsInput(card)),
     };
   }

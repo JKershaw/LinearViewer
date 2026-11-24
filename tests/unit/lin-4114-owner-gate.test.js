@@ -34,7 +34,8 @@ describe('LIN-4114 witness 16: Waiting on you is owner only', () => {
   test('the owner (run controls on) gets the section, with the card and its task line', () => {
     const html = homeHtml({ runControls: true });
     assert.match(html, /data-testid="waiting-on-you"/);
-    assert.match(html, /data-testid="waiting-task-line"/);
+    // LIN-4549: the card draws its own task line (Home's waitingTaskLine is gone).
+    assert.match(html, /data-testid="question-record-card-task"/);
     assert.match(html, /data-testid="question-record-card"/);
     assert.match(html, /Which for LIN-1/);
   });

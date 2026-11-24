@@ -6,7 +6,7 @@
  *
  * Selectors this spec expects (new; to be added to SELECTORS.homeDesk in tests/helpers.js when the section is built):
  *   [data-testid="waiting-on-you"]        the section (role="region"), first desk section on Home
- *   [data-testid="waiting-task-line"]     the task line Home draws above each card (identifier, linked)
+ *   [data-testid="question-record-card-task"]  the card's own task line (identifier linked, title; LIN-4549)
  *   [data-testid="waiting-header"]        the section header (the DESK_SECTIONS toggle)
  * The card, its options, Answer and the count line use the selectors the shared card already has.
  *
@@ -111,8 +111,8 @@ test('W7: a question three levels down and a solo question each get one card, an
   const section = page.locator(SECTION);
   await expect(section).toBeVisible();
   await expect(section.locator('[data-testid="question-record-card"]')).toHaveCount(2);
-  await expect(section.locator('[data-testid="waiting-task-line"]', { hasText: 'LOCAL-D' })).toHaveCount(1);
-  await expect(section.locator('[data-testid="waiting-task-line"]', { hasText: 'LOCAL-S' })).toHaveCount(1);
+  await expect(section.locator('[data-testid="question-record-card-task"]', { hasText: 'LOCAL-D' })).toHaveCount(1);
+  await expect(section.locator('[data-testid="question-record-card-task"]', { hasText: 'LOCAL-S' })).toHaveCount(1);
   await expect(page.locator(COUNT)).toContainText('2 waiting on you');
   await syncBadge(page);
   await expect(page.locator(BADGE)).toHaveText('2', { timeout: 15000 });
@@ -189,7 +189,7 @@ test('W12: answering with the recommended button settles the card in place; the 
   await syncBadge(page);
   await expect(page.locator(BADGE)).toHaveText('2', { timeout: 15000 });
 
-  const deep = page.locator(WAIT_CARD, { has: page.locator('[data-testid="waiting-task-line"]', { hasText: 'LOCAL-D' }) }).locator('[data-testid="question-record-card"]');
+  const deep = page.locator(WAIT_CARD, { has: page.locator('[data-testid="question-record-card-task"]', { hasText: 'LOCAL-D' }) }).locator('[data-testid="question-record-card"]');
   await expect(deep.locator('.btn--primary'), 'the recommended option is the main button').toHaveCount(1, { timeout: 5000 });
   await deep.locator('.btn--primary').click();
   await deep.locator(ANSWER).click();
@@ -236,7 +236,7 @@ test('W13: an answer the server could not record leaves the card open and counte
     if (fail && route.request().method() === 'POST') return route.fulfill({ status: 500, body: '{"error":"boom"}', contentType: 'application/json' });
     return route.continue();
   });
-  const card = page.locator(WAIT_CARD, { has: page.locator('[data-testid="waiting-task-line"]', { hasText: 'LOCAL-S' }) }).locator('[data-testid="question-record-card"]');
+  const card = page.locator(WAIT_CARD, { has: page.locator('[data-testid="question-record-card-task"]', { hasText: 'LOCAL-S' }) }).locator('[data-testid="question-record-card"]');
   await answerWith(card, 'Yes');
   await expect(card.locator(FEEDBACK)).toHaveText('boom', { timeout: 15000 });
   await expect(card).not.toHaveAttribute('data-settled', 'true');
@@ -304,7 +304,7 @@ test('W9b: a started waiting task with a running child is the named context row:
   await page.goto(`/workspace/${URL_KEY}/`);
   await expect(page.locator(COUNT)).toContainText('waiting on you');
   // One question, one card: the card for LOCAL-M is in Waiting.
-  await expect(page.locator(WAIT_CARD, { has: page.locator('[data-testid="waiting-task-line"]', { hasText: 'LOCAL-M' }) })).toHaveCount(1);
+  await expect(page.locator(WAIT_CARD, { has: page.locator('[data-testid="question-record-card-task"]', { hasText: 'LOCAL-M' }) })).toHaveCount(1);
   await expect(page.locator(WAIT_CARD)).toHaveCount(1);
   // The context row in Running is the only place the task is drawn outside Waiting, and it has no state words.
   const drawn = await page.locator('main [data-identifier="LOCAL-M"]').count();
@@ -338,7 +338,7 @@ test('W16: a viewer without run controls (a keyless owner) gets no Waiting secti
   await page.goto(`/workspace/${URL_KEY}/`);
   await expect(page.locator(SECTION)).toHaveCount(0);
   await expect(page.locator('[data-testid="session-question-card"]')).toHaveCount(0);
-  await expect(page.locator('[data-testid="waiting-task-line"]')).toHaveCount(0);
+  await expect(page.locator('[data-testid="question-record-card-task"]')).toHaveCount(0);
   const html = await page.content();
   expect(html, 'no Waiting section in the page').not.toContain('data-testid="waiting-on-you"');
   // LIN-4242: the live fragment is owner-only by the same predicate: a 403, and no card text.

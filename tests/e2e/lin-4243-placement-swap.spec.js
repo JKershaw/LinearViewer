@@ -80,7 +80,7 @@ const homeDocReads = (page, urlKey) => {
 };
 const row = (page, region, identifier) => page.locator(`${region} .line[data-identifier="${identifier}"]`);
 const waitingCard = (page, identifier) => page.locator(WAIT_CARD, {
-  has: page.locator('[data-testid="waiting-task-line"]', { hasText: identifier }),
+  has: page.locator('[data-testid="question-record-card-task"]', { hasText: identifier }),
 });
 
 async function answerElsewhere(context, identifier) {

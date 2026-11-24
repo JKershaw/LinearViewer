@@ -36,7 +36,7 @@ import { rowRecordOf } from '../lib/task-board-view.js';
 import { pageStatusOf } from '../lib/task-state.js';
 import { isHiddenState } from '../lib/providers/state-map.js';
 import { renderTaskQuestion } from '../lib/render-task-page.js';
-import { openQuestionsForTask } from '../lib/open-questions.js';
+import { openQuestionsForTask, titlesFromIssues } from '../lib/open-questions.js';
 import { personAccountIdOf } from './task-records.js';
 import { requestFeatureFlags } from '../lib/run-controls.js';
 import { resolveIssueBinding, isValidIssueId } from '../lib/workspace.js';
@@ -91,11 +91,13 @@ export function createTaskPageRoutes({ workspaceFromUrl, getOpenRouterSource, ge
    * LIN-4532 (P2b): the open question records on this task that the signed-in owner is asked, for the question section. Read for
    * the owner's canonical account; a failed read costs only these cards. [] when the stores are not wired.
    */
-  async function questionRecordsOf(req, workspace, identifier) {
+  async function questionRecordsOf(req, workspace, identifier, title = null) {
     if (!recordsStore || !dispatchStore || !identifier) return [];
     const accountId = await personAccountIdOf(req, accountStore);
     if (!accountId) return [];
-    return openQuestionsForTask({ recordsStore, dispatchStore, urlKey: workspace.urlKey, accountId, ticket: identifier })
+    // LIN-4549: the page's own task is the one these questions are on, so its title names them (lib/open-questions.js titlesOf).
+    const titlesOf = titlesFromIssues([{ identifier, title }]);
+    return openQuestionsForTask({ recordsStore, dispatchStore, urlKey: workspace.urlKey, accountId, ticket: identifier, titlesOf })
       .catch(() => []);
   }
 
@@ -199,7 +201,7 @@ export function createTaskPageRoutes({ workspaceFromUrl, getOpenRouterSource, ge
         ));
       }
       const model = owner
-        ? { ...result.model, proposals: await pendingProposalsOf(workspace.urlKey, result.model), questionRecords: await questionRecordsOf(req, workspace, result.model.identifier) }
+        ? { ...result.model, proposals: await pendingProposalsOf(workspace.urlKey, result.model), questionRecords: await questionRecordsOf(req, workspace, result.model.identifier, result.model.title) }
         : result.model;
       const stateQuery = model.issueId ? [`issueId=${encodeURIComponent(model.issueId)}`] : [];
       const stateUrl = `/workspace/${encodeURIComponent(workspace.urlKey)}/api/task/${encodeURIComponent(model.identifier)}/state${stateQuery.length ? `?${stateQuery.join('&')}` : ''}`;
@@ -281,7 +283,7 @@ export function createTaskPageRoutes({ workspaceFromUrl, getOpenRouterSource, ge
       // one the page-load card uses, so this read and the page cannot disagree. The poll keys on this string.
       // LIN-4532 (P2b): the open question records of this task ride in the same section (`questionRecords`).
       const questionHtml = (await viewerOf(req)) === 'owner'
-        ? renderTaskQuestion({ ...model, questionRecords: await questionRecordsOf(req, workspace, model.identifier) }, { urlKey: workspace.urlKey })
+        ? renderTaskQuestion({ ...model, questionRecords: await questionRecordsOf(req, workspace, model.identifier, model.title) }, { urlKey: workspace.urlKey })
         : '';
       const body = {
         // LIN-4071: the page's status is the gathered state's (the poll stops on a Done task only when the gather says done).

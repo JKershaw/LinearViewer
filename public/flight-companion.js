@@ -547,6 +547,9 @@ function parsePendingResult(resultString) {
       return {
         questionId: q.questionId,
         issueIdentifier: typeof q.issueIdentifier === 'string' ? q.issueIdentifier : null,
+        // LIN-4549: the card's task line reads the row's own names (lib/question-record-card.js questionTaskLine).
+        ticket: typeof q.issueIdentifier === 'string' ? q.issueIdentifier : null,
+        title: typeof q.issueTitle === 'string' ? q.issueTitle : null,
         asks: typeof q.question === 'string' ? q.question : '',
         options: q.options,
         recommended: typeof q.recommended === 'string' ? q.recommended : null,
@@ -1184,20 +1187,9 @@ function renderDecisions(resultString, beforeLi) {
     var qli = document.createElement('li');
     qli.className = 'fc-decision fc-question';
     qli.setAttribute('data-testid', 'fc-question');
-    qli.innerHTML = renderQuestionRecordCard(question, { urlKey: urlKey || '' });
-    // LIN-3361: the question's task, linked above its card (the task page), as the decision rows had it.
-    var taskHref = question.issueIdentifier ? taskPageHref({ urlKey: urlKey, identifier: question.issueIdentifier }) : '';
-    if (taskHref) {
-      var ref = document.createElement('p');
-      ref.className = 'fc-decision-ref';
-      var refLink = document.createElement('a');
-      refLink.className = 'chat-task-link';
-      refLink.setAttribute('data-testid', 'fc-decision-task-link');
-      refLink.setAttribute('href', taskHref);
-      refLink.textContent = question.issueIdentifier;
-      ref.appendChild(refLink);
-      qli.insertBefore(ref, qli.firstChild);
-    }
+    // LIN-4549: the card draws its own task line (the identifier, linked to the task page, and the title); the separate task link
+    // above it (LIN-3361's fc-decision-ref) is gone, so the identifier shows once.
+    qli.innerHTML = renderQuestionRecordCard(question, { urlKey: urlKey || '', taskHref: function (identifier) { return taskPageHref({ urlKey: urlKey, identifier: identifier }); } });
     list.appendChild(qli);
   });
   thread.hidden = false;

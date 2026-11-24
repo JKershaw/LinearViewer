@@ -120,15 +120,17 @@ describe('Home: Waiting on you draws the open question cards and counts them (LI
   });
 
   test('the section draws each question as a card under its task line, and is shown with only a question open', () => {
-    const html = renderWaitingSection({ rows: [], titles: { 'LIN-9': 'Ship the thing' }, questions: [ROW()] }, { urlKey: URL_KEY, owner: true });
+    // LIN-4549: the row carries its task's title (lib/open-questions.js titlesOf), and the card draws the task line itself.
+    const html = renderWaitingSection({ rows: [], questions: [{ ...ROW(), title: 'Ship the thing' }] }, { urlKey: URL_KEY, owner: true });
     assert.match(html, /data-testid="waiting-question"/);
     assert.match(html, /data-testid="question-record-card"[^>]*data-question-id="q-1"/);
-    assert.match(html, /<a class="waiting-task-link" href="[^"]*LIN-9[^"]*">LIN-9<\/a>/);
-    assert.match(html, /Ship the thing/);
+    assert.match(html, /<a class="sess-qcard-task-id" href="[^"]*LIN-9[^"]*" data-testid="question-record-card-task-id">LIN-9<\/a>/);
+    assert.match(html, /data-testid="question-record-card-task-title">Ship the thing</);
     assert.doesNotMatch(html, / hidden"/, 'an open question is a reason to show the section');
     assert.equal(renderWaitingSection({ rows: [], questions: [ROW()] }, { urlKey: URL_KEY, owner: false }), '', 'a non-owner gets no section');
-    // The card's own `.waiting-card` wrapper is not used: the live merge would otherwise remove it on a refresh.
-    assert.doesNotMatch(html, /class="waiting-card"[^>]*><div class="waiting-task-line"[^>]*><span class="waiting-task-title">Which/);
+    // LIN-4549: Home's own task line is gone: the identifier shows once per card, on the card's task line.
+    assert.equal((html.match(/>LIN-9</g) || []).length, 1, 'the identifier shows once');
+    assert.doesNotMatch(html, /waiting-task-line/);
   });
 
   test('an empty section stays hidden', () => {

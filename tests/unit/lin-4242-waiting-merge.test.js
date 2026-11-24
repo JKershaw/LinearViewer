@@ -1,24 +1,21 @@
 /**
  * LIN-4242 — the live Waiting on you merge, witnessed in a fake DOM (no browser, no timers).
  *
- * public/question-cards.js `mergeWaitingCards` and `keepsReaderPlace` run in a vm sandbox over a small element tree. The
+ * public/waiting-merge.js `mergeWaitingCards` (LIN-4549: a module, moved out of the classic public/question-cards.js; it asks the
+ * one keep-a-card rule, public/question-records.js holdsCard, itself) runs over the shared fake DOM, a fresh module instance per
+ * world. The
  * fresh markup is the real `renderWaitingSection` output, parsed by a minimal HTML parser below, so the merge sees the
- * same `.waiting-card` wrappers and `question-record-card` markup the server sends. Each test is a mutation witness: the
+ * same `.waiting-question` wrappers and `question-record-card` markup the server sends. Each test is a mutation witness: the
  * comment on it names the change that makes it fail.
  *
  * LIN-4532 (finding-dca7ac9d): the same merge also draws and keys the open question cards (`.waiting-question`), at the end of the file.
  */
 import { test, describe } from 'node:test';
 import assert from 'node:assert/strict';
-import vm from 'node:vm';
-import { readFileSync } from 'node:fs';
-import { fileURLToPath } from 'node:url';
-import { dirname, join } from 'node:path';
 import { renderWaitingSection } from '../../lib/waiting-section.js';
 import { createFakeDom } from './helpers/fake-dom.js';
+import { holdsCard } from '../../public/question-records.js';
 
-const REPO = join(dirname(fileURLToPath(import.meta.url)), '../..');
-const QUESTION_CARDS_JS_SRC = readFileSync(join(REPO, 'public/question-cards.js'), 'utf8');
 
 // ── The page and the sandbox ────────────────────────────────────────────────
 
@@ -29,39 +26,31 @@ const row = (identifier) => ({
   reason: null, interactive: true,
 });
 
-/** The server's section for `identifiers`, parsed into a document root. Returns the live body and the sandbox. */
-function world(identifiers) {
+// A fresh instance of the merge module per world, so the questions one test settles (`noteSettled`) never reach another.
+let instance = 0;
+async function mergeModule() {
+  const m = await import(`../../public/waiting-merge.js?world=${instance += 1}`);
+  return { mergeWaitingCards: m.mergeWaitingCards, questionKeyOf: m.questionKeyOf, noteSettled: m.noteSettled };
+}
+
+/** The server's section for `identifiers`, parsed into a document root. Returns the live body and the merge module (`QC`). */
+async function world(identifiers) {
   const dom = createFakeDom();
   const { document } = dom;
   const sectionHtml = renderWaitingSection({ rows: [], questions: identifiers.map(row) }, { urlKey: 'ws', owner: true });
   dom.parse(sectionHtml, document.body);
   const body = document.querySelector('.waiting-body');
-  const sandbox = {
-    console,
-    document,
-    window: { addEventListener() {}, matchMedia: () => ({ matches: false }) },
-    CustomEvent: class { constructor(type, init) { this.type = type; this.detail = init && init.detail; } },
-    localStorage: { getItem: () => null, setItem() {} },
-    setTimeout,
-    clearTimeout,
-  };
-  sandbox.window.document = document;
-  vm.createContext(sandbox);
-  vm.runInContext(QUESTION_CARDS_JS_SRC, sandbox, { filename: 'question-cards.js' });
-  const QC = sandbox.window.QuestionCards;
-  return { body, document, QC, sandbox };
+  return { body, document, QC: await mergeModule() };
 }
 
-/** The key the merge uses for a wrapper: rulingKeyOf on its inner session card. */
-const keyOfWrapper = (QC, wrapper) => QC.rulingKeyOf(wrapper.querySelector('[data-testid="question-record-card"]'));
+/** The key the merge uses for a wrapper: its card's question id (public/waiting-merge.js questionKeyOf). */
+const keyOfWrapper = (QC, wrapper) => QC.questionKeyOf(wrapper.querySelector('[data-testid="question-record-card"]'));
 const wrappersOf = (body) => body.children.filter((c) => c.classList.contains('waiting-question'));
-const idsOf = (body) => wrappersOf(body).map((w) => w.querySelector('[data-testid="waiting-task-line"]').textContent.match(/LIN-\d+/)[0]);
-const wrapperFor = (body, identifier) => wrappersOf(body).find((w) => w.querySelector('[data-testid="waiting-task-line"]').textContent.includes(identifier));
+const idsOf = (body) => wrappersOf(body).map((w) => w.querySelector('[data-testid="question-record-card-task"]').textContent.match(/LIN-\d+/)[0]);
+const wrapperFor = (body, identifier) => wrappersOf(body).find((w) => w.querySelector('[data-testid="question-record-card-task"]').textContent.includes(identifier));
 /** The fresh server markup for `identifiers`, as the route sends it. */
 const freshFor = (identifiers) => renderWaitingSection({ rows: [], questions: identifiers.map(row) }, { urlKey: 'ws', owner: true });
-/**
- * The merge's result, copied into this realm: the sandbox's own arrays would fail strict deep equality on prototype.
- */
+/** The merge's result, as a plain copy. */
 const merge = (QC, body, html) => {
   const r = QC.mergeWaitingCards(body, html);
   return { count: r.count, removed: [...r.removed] };
@@ -70,20 +59,20 @@ const merge = (QC, body, html) => {
 const EMPTY = renderWaitingSection({ rows: [], questions: [] }, { urlKey: 'ws', owner: true });
 
 describe('LIN-4242: the fake DOM reads the server markup the way the merge needs', () => {
-  test('the parsed section has one keyed wrapper per ruling, and the keys are distinct', () => {
-    const { body, QC } = world(['LIN-1', 'LIN-2']);
+  test('the parsed section has one keyed wrapper per ruling, and the keys are distinct', async () => {
+    const { body, QC } = await world(['LIN-1', 'LIN-2']);
     assert.deepEqual(idsOf(body), ['LIN-1', 'LIN-2']);
     const keys = wrappersOf(body).map((w) => keyOfWrapper(QC, w));
     assert.equal(new Set(keys).size, 2, 'two rulings, two keys');
-    assert.ok(keys.every((k) => k && k !== 'loop:|'), 'every key is set');
+    assert.deepEqual(keys, ['q-LIN-1', 'q-LIN-2'], 'every key is its question id');
   });
 });
 
 describe('LIN-4242: the keyed merge (fake DOM)', () => {
-  test('a key only in the fresh set is inserted at its server-order position and bound; the others are untouched', () => {
+  test('a key only in the fresh set is inserted at its server-order position and bound; the others are untouched', async () => {
     // Witness: drop the `insertBefore` position (append instead) → LIN-2 lands last and the order assertion fails.
     // Witness: drop `initQuestionCards(item.el)` → LIN-2's card is not bound.
-    const { body, QC } = world(['LIN-1', 'LIN-3']);
+    const { body, QC } = await world(['LIN-1', 'LIN-3']);
     const kept = wrapperFor(body, 'LIN-1');
     const result = merge(QC, body, freshFor(['LIN-1', 'LIN-2', 'LIN-3']));
     assert.equal(result.count, 3);
@@ -94,9 +83,9 @@ describe('LIN-4242: the keyed merge (fake DOM)', () => {
     assert.equal(added.dataset.questionId, 'q-LIN-2', 'the added card is the question it names');
   });
 
-  test('a kept card is the same node, with its typed text and focus intact, and is never re-rendered', () => {
+  test('a kept card is the same node, with its typed text and focus intact, and is never re-rendered', async () => {
     // Witness: a merge that replaces kept wrappers (`wrapper.replaceWith(fresh)`) → the node identity and the focus assertions fail.
-    const { body, QC, document } = world(['LIN-1', 'LIN-2']);
+    const { body, QC, document } = await world(['LIN-1', 'LIN-2']);
     const wrapper = wrapperFor(body, 'LIN-1');
     const card = wrapper.querySelector('[data-testid="question-record-card"]');
     const textarea = card.querySelector('[data-testid="question-record-card-input"]');
@@ -109,12 +98,12 @@ describe('LIN-4242: the keyed merge (fake DOM)', () => {
     assert.equal(document.activeElement, textarea, 'focus survives');
   });
 
-  test('a key only on the page is removed and reported, unless its answer is still in flight', () => {
+  test('a key only on the page is removed and reported, unless its answer is still in flight', async () => {
     // Witness: drop the `answerInFlight` guard → the in-flight card is removed and the first assertion fails.
-    const { body, QC } = world(['LIN-1', 'LIN-2']);
-    // A question record's card is in flight while its controls are disabled (the answer is being written): questionCardHeld.
+    const { body, QC } = await world(['LIN-1', 'LIN-2']);
+    // A question record's card is in flight while its controls are disabled (the answer is being written): holdsCard.
     const inFlight = wrapperFor(body, 'LIN-2').querySelector('[data-testid="question-record-card"]');
-    const key2 = QC.rulingKeyOf(inFlight);
+    const key2 = QC.questionKeyOf(inFlight);
     const answer = inFlight.querySelector('[data-testid="question-record-card-answer"]');
     answer.disabled = true;
     const first = merge(QC, body, freshFor(['LIN-1']));
@@ -127,11 +116,11 @@ describe('LIN-4242: the keyed merge (fake DOM)', () => {
     assert.equal(second.count, 1);
   });
 
-  test('a just-answered key is not re-added by a response requested before it settled', () => {
+  test('a just-answered key is not re-added by a response requested before it settled', async () => {
     // Witness: drop the `settledKeys.has(key)` skip → LIN-2 is re-added and the count and id assertions fail.
     // The key settles through noteSettled, which app.js calls from RULING_GONE_EVENT (this page answered or dismissed it).
-    const { body, QC } = world(['LIN-1', 'LIN-2']);
-    const answeredKey = QC.rulingKeyOf(wrapperFor(body, 'LIN-2').querySelector('[data-testid="question-record-card"]'));
+    const { body, QC } = await world(['LIN-1', 'LIN-2']);
+    const answeredKey = QC.questionKeyOf(wrapperFor(body, 'LIN-2').querySelector('[data-testid="question-record-card"]'));
     QC.noteSettled(answeredKey);
     wrapperFor(body, 'LIN-2').remove(); // the page has already removed the answered card (onRulingGone)
     // The response was requested before the answer, so it still lists LIN-2.
@@ -140,10 +129,10 @@ describe('LIN-4242: the keyed merge (fake DOM)', () => {
     assert.deepEqual(idsOf(body), ['LIN-1']);
   });
 
-  test('a card that leaves one response and returns in a later one comes back: a server-side drop is not a settlement', () => {
+  test('a card that leaves one response and returns in a later one comes back: a server-side drop is not a settlement', async () => {
     // Witness: restore `noteSettled(key)` in the removal path → the card cannot return and the second merge fails.
     // This is the one→zero→one path for the merge: a ruling that the live guard drops for a moment and restores.
-    const { body, QC } = world(['LIN-1']);
+    const { body, QC } = await world(['LIN-1']);
     assert.equal(merge(QC, body, EMPTY).count, 0, 'zero: the card goes');
     assert.deepEqual(idsOf(body), []);
     const back = merge(QC, body, freshFor(['LIN-1']));
@@ -152,61 +141,56 @@ describe('LIN-4242: the keyed merge (fake DOM)', () => {
     assert.deepEqual(back.removed, []);
   });
 
-  test('a fresh set that repeats a key contributes it once', () => {
-    const { body, QC } = world([]);
+  test('a fresh set that repeats a key contributes it once', async () => {
+    const { body, QC } = await world([]);
     const result = merge(QC, body, freshFor(['LIN-1', 'LIN-1']));
     assert.equal(result.count, 1);
     assert.deepEqual(idsOf(body), ['LIN-1']);
   });
 
-  test('a null or empty body is a no-op, not an error', () => {
-    const { QC } = world([]);
+  test('a null or empty body is a no-op, not an error', async () => {
+    const { QC } = await world([]);
     assert.deepEqual(merge(QC, null, freshFor(['LIN-1'])), { count: 0, removed: [] });
   });
 });
 
-describe('LIN-4242: keepsReaderPlace, the gate the opened task’s repaint uses (keepTypedQuestion)', () => {
+// LIN-4549: keepsReaderPlace (question-cards.js) is gone. Its two halves are pinned where they now live: the key gate (another
+// question's card is never kept) at the opened task's call site (tests/unit/lin-4549-hold-rule.test.js, "another question's card"),
+// and the hold half here, on the one rule (public/question-records.js holdsCard) over the same server markup.
+describe('LIN-4242: the hold half of the opened task\'s repaint gate, now the one rule (holdsCard)', () => {
   const cardFor = (QC, body, identifier) => wrapperFor(body, identifier).querySelector('[data-testid="question-record-card"]');
 
-  test('the same ruling with typed text is kept', () => {
-    // Witness: drop the rulingKeyOf equality → the cross-ruling case below is kept and the other assertion still passes; the
-    // cross-ruling test is the one that fails.
-    const { body, QC } = world(['LIN-1']);
+  test('a card with typed text is held', async () => {
+    const { body, QC } = await world(['LIN-1']);
     const old = cardFor(QC, body, 'LIN-1');
     old.querySelector('[data-testid="question-record-card-input"]').value = 'my words';
-    const fresh = cardFor(QC, world(['LIN-1']).body, 'LIN-1');
-    assert.equal(QC.keepsReaderPlace(old, fresh), true);
+    assert.equal(holdsCard(old), true);
   });
 
-  test('a different ruling with typed text is never kept', () => {
-    // Witness: the rulingKeyOf equality removed → this assertion fails.
-    const { body, QC } = world(['LIN-1']);
-    const old = cardFor(QC, body, 'LIN-1');
-    old.querySelector('[data-testid="question-record-card-input"]').value = 'my words for LIN-1';
-    const other = cardFor(QC, world(['LIN-9']).body, 'LIN-9');
-    assert.equal(QC.keepsReaderPlace(old, other), false);
+  test('a card with no input, no focus and no answer in flight is not held', async () => {
+    // Witness: holdsCard replaced by `true` → this assertion fails.
+    const { body, QC } = await world(['LIN-1']);
+    assert.equal(holdsCard(cardFor(QC, body, 'LIN-1')), false);
   });
 
-  test('the same ruling with no input, no focus and no answer in flight is not kept', () => {
-    // Witness: `cardHoldsInput` replaced by `true` → this assertion fails.
-    const { body, QC } = world(['LIN-1']);
-    const old = cardFor(QC, body, 'LIN-1');
-    const fresh = cardFor(QC, world(['LIN-1']).body, 'LIN-1');
-    assert.equal(QC.keepsReaderPlace(old, fresh), false);
-  });
-
-  test('the same ruling with an answer in flight is kept, even with no typed text', () => {
-    const { body, QC } = world(['LIN-1']);
+  test('a card with an answer in flight is held, even with no typed text', async () => {
+    const { body, QC } = await world(['LIN-1']);
     const old = cardFor(QC, body, 'LIN-1');
     old.dataset.answerInFlight = 'true';
-    const fresh = cardFor(QC, world(['LIN-1']).body, 'LIN-1');
-    assert.equal(QC.keepsReaderPlace(old, fresh), true);
+    assert.equal(holdsCard(old), true);
   });
 
-  test('a missing card on either side is never kept', () => {
-    const { QC, document } = world([]);
-    assert.equal(QC.keepsReaderPlace(null, null), false);
-    assert.equal(QC.keepsReaderPlace(document.createElement('div'), null), false);
+  test('a missing card is never held', async () => {
+    assert.equal(holdsCard(null), false);
+  });
+
+  test('the merge asks the rule itself: a card with typed words the server no longer lists stays (no hand-off from app.js)', async () => {
+    // Witness: drop the holdsCard call from the merge's removal → the typed card is taken out.
+    const { body, QC } = await world(['LIN-1']);
+    cardFor(QC, body, 'LIN-1').querySelector('[data-testid="question-record-card-input"]').value = 'my words';
+    const result = merge(QC, body, EMPTY);
+    assert.deepEqual(result.removed, []);
+    assert.deepEqual(idsOf(body), ['LIN-1']);
   });
 });
 
@@ -233,25 +217,13 @@ const sectionFor = ({ questions = [] }) => renderWaitingSection(
   { urlKey: 'ws', owner: true },
 );
 
-/** The live document with `html` as its section, and the merge's sandbox over it. */
-function questionWorld(html) {
+/** The live document with `html` as its section, and a fresh merge module over it. */
+async function questionWorld(html) {
   const dom = createFakeDom();
   const { document } = dom;
   dom.parse(html, document.body);
   const body = document.querySelector('.waiting-body');
-  const sandbox = {
-    console,
-    document,
-    window: { addEventListener() {}, matchMedia: () => ({ matches: false }) },
-    CustomEvent: class { constructor(type, init) { this.type = type; this.detail = init && init.detail; } },
-    localStorage: { getItem: () => null, setItem() {} },
-    setTimeout,
-    clearTimeout,
-  };
-  sandbox.window.document = document;
-  vm.createContext(sandbox);
-  vm.runInContext(QUESTION_CARDS_JS_SRC, sandbox, { filename: 'question-cards.js' });
-  return { body, document, QC: sandbox.window.QuestionCards };
+  return { body, document, QC: await mergeModule() };
 }
 
 const questionWrappers = (body) => body.children.filter((c) => c.classList.contains('waiting-question'));
@@ -259,8 +231,8 @@ const questionIdsOn = (body) => questionWrappers(body).map((w) => w.querySelecto
 const rulingWrappers = (body) => body.children.filter((c) => c.classList.contains('waiting-question'));
 
 describe('LIN-4532: the live Waiting refresh draws question cards (finding-dca7ac9d)', () => {
-  test('a question asked after the page load is drawn by the refresh, under its task line, and the earlier question stays', () => {
-    const { body, QC } = questionWorld(sectionFor({ questions: [question('q-old', 'LIN-8')] }));
+  test('a question asked after the page load is drawn by the refresh, under its task line, and the earlier question stays', async () => {
+    const { body, QC } = await questionWorld(sectionFor({ questions: [question('q-old', 'LIN-8')] }));
     assert.equal(questionWrappers(body).length, 1, 'the page load drew the earlier question');
     const fresh = sectionFor({ questions: [question('q-old', 'LIN-8'), question('q-new')] });
     const result = merge(QC, body, fresh);
@@ -268,27 +240,27 @@ describe('LIN-4532: the live Waiting refresh draws question cards (finding-dca7a
     assert.deepEqual(result.removed, [], 'nothing was taken out');
     assert.equal(result.count, 2, 'the merge counts both questions');
     const wrapper = questionWrappers(body)[1];
-    assert.equal(wrapper.classList.contains('waiting-card'), false, 'a question is never a waiting-card wrapper (the lesson in front-end-pages)');
-    assert.match(wrapper.querySelector('[data-testid="waiting-task-line"]').textContent, /LIN-9/, 'under its task line');
+    assert.ok(wrapper.classList.contains('waiting-question'), 'a question is a .waiting-question wrapper, the merge unit');
+    assert.match(wrapper.querySelector('[data-testid="question-record-card-task"]').textContent, /LIN-9/, 'with its task line (the card draws it, LIN-4549)');
   });
 
-  test('a question already on the page is not drawn again by a later refresh', () => {
-    const { body, QC } = questionWorld(sectionFor({ questions: [question('q-a')] }));
+  test('a question already on the page is not drawn again by a later refresh', async () => {
+    const { body, QC } = await questionWorld(sectionFor({ questions: [question('q-a')] }));
     const fresh = sectionFor({ questions: [question('q-a')] });
     merge(QC, body, fresh);
     merge(QC, body, fresh);
     assert.deepEqual(questionIdsOn(body), ['q-a'], 'one card for the question, however many refreshes');
   });
 
-  test('a question the server no longer lists is taken out, and reported as removed', () => {
-    const { body, QC } = questionWorld(sectionFor({ questions: [question('q-gone')] }));
+  test('a question the server no longer lists is taken out, and reported as removed', async () => {
+    const { body, QC } = await questionWorld(sectionFor({ questions: [question('q-gone')] }));
     const result = merge(QC, body, sectionFor({ rulings: ['LIN-1'] }));
     assert.deepEqual(questionIdsOn(body), [], 'an open question that is no longer open leaves the page');
-    assert.deepEqual(result.removed, ['question:q-gone']);
+    assert.deepEqual(result.removed, ['q-gone']);
   });
 
-  test('a question answered here stays on the page, settled, though the refresh no longer lists it', () => {
-    const { body, document, QC } = questionWorld(sectionFor({ questions: [question('q-done')] }));
+  test('a question answered here stays on the page, settled, though the refresh no longer lists it', async () => {
+    const { body, document, QC } = await questionWorld(sectionFor({ questions: [question('q-done')] }));
     const card = document.querySelector('[data-testid="question-record-card"]');
     card.dataset.settled = 'true';
     const result = merge(QC, body, sectionFor({}));
@@ -296,8 +268,8 @@ describe('LIN-4532: the live Waiting refresh draws question cards (finding-dca7a
     assert.deepEqual(result.removed, [], 'a settled card is not reported as answered elsewhere');
   });
 
-  test('a question whose answer is in flight (its controls disabled) is kept until the answer lands', () => {
-    const { body, document, QC } = questionWorld(sectionFor({ questions: [question('q-flight')] }));
+  test('a question whose answer is in flight (its controls disabled) is kept until the answer lands', async () => {
+    const { body, document, QC } = await questionWorld(sectionFor({ questions: [question('q-flight')] }));
     document.querySelectorAll('[data-testid="question-record-card"] button').forEach((b) => { b.disabled = true; });
     merge(QC, body, sectionFor({}));
     assert.deepEqual(questionIdsOn(body), ['q-flight'], 'the in-flight card is not taken out from under its answer');

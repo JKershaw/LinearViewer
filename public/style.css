@@ -4910,13 +4910,11 @@ a.context-node:hover { border-color: var(--text); background: var(--bg); }
   border-radius: 3px;
 }
 
-/* LIN-4114: Home's "Waiting on you" desk section. Its header and body open and close like the other desk sections; the
-   card is the shared question card (lib/question-card.js); the task line sits above each card and links to the task page. */
+/* LIN-4114: Home's "Waiting on you" desk section. Its header and body open and close like the other desk sections; each
+   card is the shared question record card (lib/question-record-card.js), which draws its own task line (LIN-4549). */
 .waiting-section { margin: 0 0 1rem; }
 .waiting-header:focus { outline: 2px solid var(--brand); outline-offset: 2px; }
-.waiting-card, .waiting-question { margin: 0.5rem 0; }
-.waiting-task-line { font-family: var(--font-content); font-size: var(--font-size-sm); color: var(--muted); margin-bottom: 0.25rem; }
-.waiting-task-link { color: var(--text); }
+.waiting-question { margin: 0.5rem 0; }
 /* A screen-reader-only live region (LIN-4114): the desk says the outcome of an answer without a visible line. */
 .sr-only {
   position: absolute;
@@ -4932,3 +4930,129 @@ a.context-node:hover { border-color: var(--text); background: var(--bg); }
 
 @media (max-width: 640px) { .nav-bar { font-size: 14px; } .nav-label { font-size: 0.8em; } .wordmark-nav { font-size: 0.85em; } .toggle { font-size: 1rem; } }
 @media (max-width: 400px) { .nav-bar { font-size: 13px; } }
+
+/* ── The question card (LIN-3252 S2; moved here from session.css, LIN-4549) ────
+   Every page that draws the card loads this sheet (Home, the rulings tab, the task page, the run page,
+   Flight Companion: tests/unit/lin-4549-question-card-sheets.test.js). It sits after the .btn and
+   .action-btn rules, so a tie at equal specificity goes to the card, as it did from the later sheet.
+   First the run page's ONE answer surface, replacing the LIN-1005 waiting banner and
+   the decision half of the per-run reply box. Amber running-family accent (no
+   new status colour); pinned above the steps, whether or not the session is
+   waiting. The dismiss control sits in `.sess-qcard-actions` (`.sess-qcard-dismiss`). */
+.sess-qcards {
+  margin: 0 0 1.25rem;
+  display: grid;
+  gap: var(--space-2h);
+}
+.sess-qcard {
+  padding: 0.85rem 1rem;
+  border: 1px solid var(--amber);
+  border-left-width: 4px;
+  border-radius: 4px;
+  background: color-mix(in srgb, var(--amber) 10%, var(--card));
+  display: grid;
+  gap: 0.6rem;
+}
+/* LIN-4549 (LIN-4162): the card's own task line: the identifier in mono (a machine fact), the title in the page face. */
+.sess-qcard-task {
+  margin: 0;
+  font-family: var(--font-content);
+  font-size: var(--font-size-sm);
+  color: var(--muted);
+  overflow-wrap: anywhere;
+}
+.sess-qcard-task-id { font-family: var(--font-structural); color: var(--text); }
+.sess-qcard-task-title { color: var(--text); }
+.sess-qcard-question {
+  margin: 0;
+  font-family: var(--font-content);
+  font-weight: 600;
+  font-size: var(--font-size-base);
+  color: var(--text);
+  /* LIN-4538: a question record carries its whole ask here (no case prose below it), so an unbroken token (a URL) must
+     wrap inside the card, as the case chunks do (LIN-2184). */
+  overflow-wrap: anywhere;
+}
+.sess-qcard-why-summary {
+  cursor: pointer;
+  font-family: var(--font-content);
+  font-size: var(--font-size-sm);
+  color: var(--muted);
+}
+.sess-qcard-case {
+  margin-top: 0.4rem;
+  display: grid;
+  gap: 0.4rem;
+}
+.sess-qcard-case-chunk {
+  margin: 0;
+  font-family: var(--font-content);
+  font-size: var(--font-size-base);
+  line-height: 1.5;
+  color: var(--text);
+  white-space: pre-wrap;
+  overflow-wrap: anywhere;
+}
+.sess-qcard-options {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.4rem;
+}
+/* LIN-4114: the options are the shared .btn buttons (lib/question-card.js); the radio rules are gone. */
+.sess-qcard-option { min-height: 32px; }
+.sess-qcard-input {
+  width: 100%;
+  box-sizing: border-box;
+  font-family: var(--font-content);
+  font-size: var(--font-size-base);
+  padding: 0.4rem 0.5rem;
+  color: var(--text);
+  background: var(--card);
+  border: 1px solid var(--line-soft);
+  border-radius: var(--radius-sm);
+  resize: vertical;
+}
+.sess-qcard-actions {
+  display: flex;
+  align-items: center;
+  gap: var(--space-2);
+}
+/* A quiet text button — the card's deliberate "no" is secondary to Answer. */
+.sess-qcard-dismiss {
+  background: none;
+  border: none;
+  padding: 0.15rem 0.25rem;
+  font-family: var(--font-content);
+  font-size: var(--font-size-sm);
+  color: var(--muted);
+  text-decoration: underline;
+  text-underline-offset: 2px;
+  cursor: pointer;
+}
+.sess-qcard-dismiss:hover:not(:disabled) { color: var(--text); }
+.sess-qcard-dismiss:disabled { opacity: 0.5; cursor: default; }
+.sess-qcard-readonly {
+  margin: 0;
+  font-family: var(--font-content);
+  font-size: var(--font-size-base);
+  color: var(--muted);
+}
+.sess-qcard-if-unanswered {
+  margin: 0;
+  font-family: var(--font-content);
+  font-size: var(--font-size-sm);
+  color: var(--muted);
+}
+/* LIN-2948 R1: the card verb's dark-theme legibility (its proposal twin stays in session.css). */
+.sess-qcard-answer {
+  color: var(--green-dim);
+  background: var(--card);
+}
+/* LIN-1024: the card on a small screen. */
+@media (max-width: 480px) {
+  .sess-qcard { padding: 0.75rem 0.85rem; }
+  .sess-qcard-case-chunk { line-height: 1.5; }
+}

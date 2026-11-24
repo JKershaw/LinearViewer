@@ -7,6 +7,7 @@
  * through the checked records pipeline. Nothing here calls a model.
  */
 import { expect } from '@playwright/test';
+import { RUNNING_PROGRESS } from '../../lib/sample-data/question-workload.js';
 
 /** The runner token for a workspace, from the test seam (the same one lin-4242-waiting-live.spec.js uses). */
 export async function runnerTokenFor(page, urlKey) {
@@ -15,10 +16,11 @@ export async function runnerTokenFor(page, urlKey) {
 }
 
 /** A run parked on `[blocked] which way?`: enqueued by the owner, taken by a runner, then blocked. Returns its item id (the run id). */
-export async function askingRun(page, urlKey, identifier, { token = null } = {}) {
+export async function askingRun(page, urlKey, identifier, { token = null, title = identifier } = {}) {
   const bearer = token || await runnerTokenFor(page, urlKey);
+  // LIN-4549: `title` is the task's title the run carries, as a stage run's does (the identifier, as before, when not given).
   const res = await page.request.post(`/workspace/${urlKey}/api/dispatch`, {
-    data: { prompt: 'implementation prompt', promptName: 'implementation', kind: 'implementation', issueIdentifier: identifier, issueTitle: identifier, target: 'cli' },
+    data: { prompt: 'implementation prompt', promptName: 'implementation', kind: 'implementation', issueIdentifier: identifier, issueTitle: title, target: 'cli' },
   });
   expect(res.status(), `dispatch seed failed: ${await res.text()}`).toBe(201);
   const itemId = (await res.json()).item.id;
@@ -30,6 +32,47 @@ export async function askingRun(page, urlKey, identifier, { token = null } = {})
   });
   expect(feedback.status()).toBe(200);
   return itemId;
+}
+
+/**
+ * LIN-4549: a running task's run, as a runner leaves it mid-work: enqueued by the owner, taken by a runner, and carrying a progress
+ * line (lib/sample-data/question-workload.js RUNNING_PROGRESS, picked by `n`). Returns its item id (the run id).
+ */
+export async function runningRun(page, urlKey, identifier, { title = identifier, n = 0, token = null } = {}) {
+  const bearer = token || await runnerTokenFor(page, urlKey);
+  const res = await page.request.post(`/workspace/${urlKey}/api/dispatch`, {
+    data: { prompt: 'implementation prompt', promptName: 'implementation', kind: 'implementation', issueIdentifier: identifier, issueTitle: title, target: 'cli' },
+  });
+  expect(res.status(), `dispatch seed failed: ${await res.text()}`).toBe(201);
+  const itemId = (await res.json()).item.id;
+  const taken = await page.request.post(`/api/dispatch/take/${itemId}`, { headers: { Authorization: `Bearer ${bearer}` } });
+  expect(taken.status(), `take failed: ${await taken.text()}`).toBe(200);
+  const feedback = await page.request.post(`/api/dispatch/feedback/${itemId}`, {
+    headers: { Authorization: `Bearer ${bearer}`, 'Content-Type': 'application/json' },
+    data: { message: RUNNING_PROGRESS[n % RUNNING_PROGRESS.length] },
+  });
+  expect(feedback.status()).toBe(200);
+  return itemId;
+}
+
+/**
+ * LIN-4549: `findings` open findings addressed to the signed-in person, spread over `tasks` ([{ticket, title}]), through the
+ * test-only seed (routes/test.js POST /test/seed-owner-findings). Returns their ids.
+ */
+export async function seedOwnerFindings(page, urlKey, { tasks, findings = 36 }) {
+  const res = await page.request.post('/test/seed-owner-findings', { data: { urlKey, tasks, findings } });
+  expect(res.status(), `findings seed failed: ${await res.text()}`).toBe(200);
+  return (await res.json()).findings;
+}
+
+/**
+ * LIN-4549: one open question of real length (several hundred words with lists, three or four long options, the recommended one
+ * not first), through POST /test/seed-question-record with `long: true`; `variant` picks which. Returns the question record id.
+ */
+export async function seedLongQuestion(page, urlKey, { ticket, title = null, runId = null, variant = 0 }) {
+  const res = await page.request.post('/test/seed-question-record', { data: { urlKey, ticket, title, runId, long: true, variant } });
+  expect(res.status(), `question seed failed: ${await res.text()}`).toBe(200);
+  return (await res.json()).id;
 }
 
 /** One open question the signed-in person was asked by `runId`, filed under `ticket`. Returns the question record id. */

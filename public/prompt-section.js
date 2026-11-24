@@ -16,6 +16,7 @@
 import { formatUsd } from '../lib/cost-format.js';
 import { buildPromptFilename } from '../lib/prompt-filename.js';
 import { taskPageHref } from '../lib/task-page-href.js';
+import { holdsCard, focusInCard } from './question-records.js';
 
 const promptCache = new Map(); // `${issueId}:${label}` -> {label, name, raw, html, reasoning}
 const lastPromptLabel = new Map(); // issueId -> label
@@ -878,7 +879,7 @@ function applyState(container, html, phase) {
 const MARKDOWN_SINK = '[data-prompt-body], .swipe-reasoning';
 // LIN-4538 (P7a): the opened task's question card (keepTypedQuestion, readerFocusIn). The task's open question is a question
 // record card now (lib/question-record-card.js); a ruling card is still read where one is drawn. Both are keyed by the one
-// QuestionCards.rulingKeyOf (a question card by its question id).
+// QuestionCards.rulingKeyOf (a question card by its question id) and kept by the one rule (public/question-records.js holdsCard).
 const QUESTION_CARD = '[data-testid="session-question-card"], [data-testid="question-record-card"]';
 
 /**
@@ -1007,13 +1008,12 @@ function init(container, opts) {
     keepTypedQuestion(oldQuestion, focus);
   }
 
-  // The question card sits in the state block, so a repaint writes it again. A card stays only while it holds the reader's
-  // place (typed text, focus, or an answer in flight): the check the live Waiting section uses (QuestionCards.keepsReaderPlace,
-  // which cardHoldsInput decides). It is gated on the ruling key first, so this task can never keep another ruling's card.
-  // Focus is the one part that cannot be read after the write: the write detaches the old card, which blurs it, so the
-  // caller captures it first (readerFocusIn) and it is put back here after the card is moved back (LIN-4246). `focus` is that
-  // capture: its `el` is the element that had focus before the write, and null when focus was not inside the card. LIN-4293:
-  // the keep rule takes that pre-write element, so "focus inside the card" is decided by QuestionCards.focusInCard alone.
+  // The question card sits in the state block, so a repaint writes it again. The same card (one QuestionCards.rulingKeyOf
+  // key; this task can never keep another question's card) stays while the one keep-a-card rule holds it (public/question-records.js
+  // holdsCard, LIN-4549: typed words, a chosen option, focus, a control off, an answer in flight, or settled). Focus is the one part
+  // that cannot be read after the write: the write detaches the old card, which blurs it, so the caller captures it first
+  // (readerFocusIn) and it is put back here after the card is moved back (LIN-4246). `focus` is that capture: its `el` is the
+  // element that had focus before the write, and null when focus was not inside the card (LIN-4293: the rule takes that element).
   // An idle card is replaced, and bound again, on every repaint: a bound card never matches fresh server markup, so there is
   // no unchanged-markup keep here (LIN-4024's clause was dead, and LIN-4246 removed it). The LIN-4246 call-site tests pin this.
   function keepTypedQuestion(oldQuestion, focus) {
@@ -1022,19 +1022,19 @@ function init(container, opts) {
     const QC = window.QuestionCards;
     const oldCard = oldQuestion ? oldQuestion.querySelector(QUESTION_CARD) : null;
     const freshCard = fresh.querySelector(QUESTION_CARD);
-    const keepsPlace = !!(QC && typeof QC.keepsReaderPlace === 'function' && QC.keepsReaderPlace(oldCard, freshCard, focus ? focus.el : null));
+    const keyOf = QC && typeof QC.rulingKeyOf === 'function' ? QC.rulingKeyOf : null;
+    const sameCard = !!(oldCard && freshCard && keyOf && keyOf(oldCard) === keyOf(freshCard));
+    const keepsPlace = sameCard && holdsCard(oldCard, focus ? focus.el : null);
     if (oldQuestion && keepsPlace) { fresh.replaceWith(oldQuestion); restoreReaderFocus(focus); return; }
     if (QC && typeof QC.initQuestionCards === 'function') QC.initQuestionCards(container);
   }
 
   // The reader's focus inside the question card, read before a repaint detaches it: the element, and its caret or selection
   // where it has one. Null when focus is elsewhere (or on the card's own box), so only a focused card is kept for focus.
-  // LIN-4293: "inside the card" is QuestionCards.focusInCard's rule, the same one the keep gate reads. With no QuestionCards
-  // there is no keep at all (keepTypedQuestion), so there is nothing to capture for.
+  // LIN-4293: "inside the card" is focusInCard's rule (public/question-records.js), the same one the keep rule reads.
   function readerFocusIn(oldQuestion) {
-    const QC = window.QuestionCards;
     const card = oldQuestion ? oldQuestion.querySelector(QUESTION_CARD) : null;
-    if (!QC || typeof QC.focusInCard !== 'function' || !QC.focusInCard(card)) return null;
+    if (!focusInCard(card)) return null;
     const active = document.activeElement;
     return { el: active, start: active.selectionStart, end: active.selectionEnd };
   }
