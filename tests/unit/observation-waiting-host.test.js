@@ -33,7 +33,6 @@ async function makeWorld({ api } = {}) {
     window: {
       addEventListener() {},
       matchMedia: () => ({ matches: false }),
-      sourceQuery: (source) => (source ? `?source=${encodeURIComponent(source)}` : ''),
       api: api || (async () => { throw new Error('window.api not stubbed'); })
     },
     globals: {

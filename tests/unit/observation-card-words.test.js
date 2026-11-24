@@ -40,7 +40,6 @@ async function loadPage({ workspaces, search = '', chipUrlKeys = [] }) {
       renderStatusPill: common.renderStatusPill,
       renderSegmentBar: common.renderSegmentBar,
       ChatUI: { appendOptions() {}, resolveCaption: () => '' },
-      sourceQuery: () => '',
       __OBSERVATION_DATA__: { urlKey: 'acme', workspaces },
       location: { search: search ? `?${search}` : '' },
       api: () => new Promise(() => {}),

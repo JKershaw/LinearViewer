@@ -11,6 +11,7 @@
  */
 import * as PromptSection from './prompt-section.js'
 import { buildPromptFilename } from '../lib/prompt-filename.js'
+import { sourceQuery } from '../lib/task-page-href.js'
 
 const STORAGE_KEY = 'linear-projects-state'
 // TEAM_STORAGE_KEY and the team-selection helpers now live in common.js
@@ -51,9 +52,8 @@ function stripCodeBlockFences(text) {
 // converges onto the superset (whole-string fence strip + marked-absent fallback);
 // relativeTime is the same "Behavior B" format this page's local copy seeded.
 
-// The shared `?source=<kind>` builder lives in common.js as
-// `window.sourceQuery` (the one every page script uses). This page is always
-// loaded after common.js, so the call sites below resolve to it.
+// The shared `?source=<kind>` builder is `sourceQuery`, imported from the served lib leaf
+// (lib/task-page-href.js), the server's own. It has no leading `?`, so the caller adds one.
 
 /**
  * Load and render comments for an issue
@@ -83,7 +83,8 @@ async function loadComments(toggle, content) {
   errorEl?.classList.add('hidden')
 
   try {
-    const selectQuery = sourceQuery(source)
+    const query = sourceQuery(source)
+    const selectQuery = query ? `?${query}` : ''
     const data = await window.api(`/workspace/${encodeURIComponent(urlKey)}/api/comments/${encodeURIComponent(issueId)}${selectQuery}`)
     const comments = (data && data.comments) || []
 

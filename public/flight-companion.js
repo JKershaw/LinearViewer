@@ -46,6 +46,7 @@
  */
 import { formatUsd } from '../lib/cost-format.js';
 import { renderQuestionRecordCard } from '../lib/question-record-card.js';
+import { taskPageHref } from '../lib/task-page-href.js';
 
 
 var CADENCE_BASE_MS = 30000;
@@ -1185,7 +1186,7 @@ function renderDecisions(resultString, beforeLi) {
     qli.setAttribute('data-testid', 'fc-question');
     qli.innerHTML = renderQuestionRecordCard(question, { urlKey: urlKey || '' });
     // LIN-3361: the question's task, linked above its card (the task page), as the decision rows had it.
-    var taskHref = question.issueIdentifier && window.taskPageHref ? window.taskPageHref({ urlKey: urlKey, identifier: question.issueIdentifier }) : '';
+    var taskHref = question.issueIdentifier ? taskPageHref({ urlKey: urlKey, identifier: question.issueIdentifier }) : '';
     if (taskHref) {
       var ref = document.createElement('p');
       ref.className = 'fc-decision-ref';
@@ -1232,7 +1233,7 @@ function readoutHeadings() {
 function foldReadout(el) {
   window.ChatUI.foldAfterAnchor(el, { summary: 'full readout', headings: readoutHeadings() });
   window.ChatUI.linkifyIdentifiers(el, seenIdentifiers, function (id) {
-    return window.taskPageHref ? window.taskPageHref({ urlKey: urlKey, identifier: id }) : '';
+    return taskPageHref({ urlKey: urlKey, identifier: id });
   });
 }
 

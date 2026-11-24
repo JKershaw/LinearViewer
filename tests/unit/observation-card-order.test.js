@@ -33,7 +33,6 @@ async function loadObservation() {
       addEventListener() {},
       matchMedia: () => ({ matches: false }),
       ChatUI: { appendOptions() {} },
-      sourceQuery: () => '',
       // The card head paints its status pill with common.js's helpers, which the page loads first.
       renderStatusPill: loadCommonWindow().renderStatusPill,
       renderSegmentBar: loadCommonWindow().renderSegmentBar,

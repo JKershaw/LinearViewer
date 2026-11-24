@@ -71,7 +71,6 @@ async function makeWorld({ fetchImpl, href = 'https://harbour.test/workspace/acm
       location: { href },
       history: { state: null, replaceState(state, title, url) { replaced.push(url); } },
       ChatUI: { appendOptions() {}, resolveCaption: () => '' },
-      sourceQuery: () => '',
       renderStatusPill: common.renderStatusPill,
       renderSegmentBar: common.renderSegmentBar,
       api: async () => { throw new Error('window.api not stubbed'); }

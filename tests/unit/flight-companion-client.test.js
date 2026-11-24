@@ -86,18 +86,6 @@ function sliceIsPinnedToBottomSource() {
 }
 const IS_PINNED_TO_BOTTOM_SRC = sliceIsPinnedToBottomSource();
 
-// LIN-3361: the REAL window.sourceQuery + window.taskPageHref (common.js), so
-// the thread's task links are built by the shipped helper, never a stub.
-function sliceWindowFnSource(name) {
-  const startMarker = `window.${name} = function ${name}(`;
-  const startIdx = COMMON_JS_SRC.indexOf(startMarker);
-  assert.ok(startIdx !== -1, `${name} marker not found in public/common.js — has it moved/been renamed?`);
-  const endIdx = COMMON_JS_SRC.indexOf('\n};', startIdx);
-  assert.ok(endIdx !== -1, `closing \`};\` for ${name} not found`);
-  return COMMON_JS_SRC.slice(startIdx, endIdx + 3);
-}
-const TASK_PAGE_HREF_SRC = sliceWindowFnSource('sourceQuery') + '\n' + sliceWindowFnSource('taskPageHref');
-
 // ─── Minimal DOM shim ───────────────────────────────────────────────────────
 
 class FakeClassList {
@@ -612,7 +600,6 @@ async function loadClient({ hiddenInitial = false, fetchImpl, apiImpl, postComme
     },
   });
   vm.runInThisContext(READ_SSE_STREAM_SRC, { filename: 'common.js (readSSEStream slice)' });
-  vm.runInThisContext(TASK_PAGE_HREF_SRC, { filename: 'common.js (taskPageHref slice)' });
   const m = await world.importPage('flight-companion.js');
   // A deferred module runs before DOMContentLoaded, and the page starts on that event. A test that holds the document
   // loading (readyState 'loading') fires DOMContentLoaded itself.
@@ -4056,7 +4043,6 @@ describe('flight-companion.js — scannable thread (LIN-3361)', () => {
       calls.push({ fn: 'linkify', el, known: Array.from(known), href: hrefFor('LIN-5') });
       return realLinkify(el, known, hrefFor);
     };
-    windowShim.taskPageHref = ({ urlKey, identifier }) => '/workspace/' + urlKey + '/task/' + identifier;
 
     doc.dispatch('DOMContentLoaded');
 
