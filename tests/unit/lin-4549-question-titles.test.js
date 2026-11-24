@@ -137,14 +137,14 @@ describe('LIN-4549 — the rulings feed (routes/dashboard-rulings.js): each row 
   let feedLoops = [];
   afterEach(async () => { if (server) await new Promise((r) => server.close(r)); server = null; feedLoops = []; });
 
-  async function feed(taskFacts = undefined) {
+  async function feed(readTaskFacts = undefined) {
     const session = { accountId: OWNER, workspaces: [{ urlKey: URL_KEY, name: 'Titles' }] };
     const app = express();
     app.use(createDashboardRulingsRoutes({
       workspaceFromUrl: (req, res, next) => { req.workspace = { urlKey: URL_KEY, id: 'ws' }; req.session = session; next(); },
       sessionsFeedCache: { keyFor: (_ws, ns) => ns, get: async (_k, fn) => fn(), clear() {} },
       mergeLoops: async () => feedLoops,
-      recordsStore: records, dispatchQueueStore: dispatch, accountStore: { resolveCanonicalAccountId: async (id) => id }, taskFacts,
+      recordsStore: records, dispatchQueueStore: dispatch, accountStore: { resolveCanonicalAccountId: async (id) => id }, readTaskFacts,
     }));
     server = await new Promise((resolve) => { const s = app.listen(0, '127.0.0.1', () => resolve(s)); });
     const res = await fetch(`http://127.0.0.1:${server.address().port}/workspace/${URL_KEY}/api/dashboard/rulings`);
@@ -165,12 +165,12 @@ describe('LIN-4549 — the rulings feed (routes/dashboard-rulings.js): each row 
     feedLoops = [{ workspaceUrlKey: URL_KEY, issueIdentifier: 'LIN-1', issueTitle: 'Ship the thing' }];
     const issues = [{ identifier: 'LIN-1', title: 'Held title one' }, { identifier: 'LIN-3', title: 'Held title three' }];
     let reads = 0;
-    const warm = await feed({ read: (urlKey) => { reads += 1; assert.equal(urlKey, URL_KEY); return { complete: true, issues }; } });
+    const warm = await feed((urlKey) => { reads += 1; assert.equal(urlKey, URL_KEY); return { complete: true, issues }; });
     assert.deepEqual(Object.fromEntries(warm.rulings.map((r) => [r.ticket, r.title])), { 'LIN-1': 'Held title one', 'LIN-3': 'Held title three' });
     assert.equal(reads, 1, 'one held-set read per workspace, nothing that reaches a provider');
     await new Promise((r) => server.close(r));
     server = null;
-    const cold = await feed({ read: () => ({ complete: false, issues }) });
+    const cold = await feed(() => ({ complete: false, issues }));
     assert.deepEqual(Object.fromEntries(cold.rulings.map((r) => [r.ticket, r.title])), { 'LIN-1': 'Ship the thing', 'LIN-3': null });
   });
 });

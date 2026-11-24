@@ -25,14 +25,14 @@ import { personAccountIdOf } from './task-records.js';
  * (`kind: 'question'`), so the page, the count and the badge read one list. The person is the canonical account
  * (personAccountIdOf), the id the answer route files its decision under. Null when there is no person to read for.
  */
-async function openQuestionRowsFor({ accountId, workspaces, recordsStore, dispatchQueueStore, merged = [], taskFacts = null }) {
+async function openQuestionRowsFor({ accountId, workspaces, recordsStore, dispatchQueueStore, merged = [], readTaskFacts = null }) {
   if (!recordsStore || !dispatchQueueStore || !accountId) return [];
   const rows = [];
   for (const w of workspaces) {
     // LIN-4549: each question's task title first from the held issue set when it is warm (a read of what Home already holds, no
     // provider call, so the 5s badge poll adds none), then from the runs this feed already read (a run carries its task's title,
     // resolved at the read seam, LIN-962). A cold set and no run leaves the card its identifier alone.
-    const held = taskFacts?.read ? taskFacts.read(w.urlKey) : null;
+    const held = typeof readTaskFacts === 'function' ? readTaskFacts(w.urlKey) : null;
     const fromHeld = held?.complete ? titlesFromIssues(held.issues) : null;
     const fromRuns = titlesFromIssues(merged.filter((l) => l?.workspaceUrlKey === w.urlKey).map((l) => ({ identifier: l.issueIdentifier, title: l.issueTitle })));
     const titlesOf = (tickets) => ({ ...fromRuns(tickets), ...(fromHeld ? fromHeld(tickets) : {}) });
@@ -83,7 +83,7 @@ async function openLoopIdsFor({ accountId, workspaces, merged, recordsStore }) {
 // One cached loop read backs the waiting block's open-loop set — the same `sessionsFeedCache` instance as `/sessions`,
 // under a separate `rulings` view namespace so the two payload shapes never collide on one cache entry. The ambient
 // count stays scoped to `req.session.workspaces` like every other Observation read here, never fleet-wide.
-function rulingsFeed({ sessionsFeedCache, mergeLoops, recordsStore, dispatchQueueStore, accountStore, taskFacts }) {
+function rulingsFeed({ sessionsFeedCache, mergeLoops, recordsStore, dispatchQueueStore, accountStore, readTaskFacts }) {
   return async (req, res) => {
     const workspaces = connectedWorkspaces(req.session);
 
@@ -96,7 +96,7 @@ function rulingsFeed({ sessionsFeedCache, mergeLoops, recordsStore, dispatchQueu
       // A failed records or dispatch-store read costs only the questions, never the feed the 5s badge poll reads
       // (finding-ab3270e4).
       const accountId = req.session?.accountId ? await personAccountIdOf({ session: req.session }, accountStore).catch(() => null) : null;
-      const rulings = await openQuestionRowsFor({ accountId, workspaces, recordsStore, dispatchQueueStore, merged, taskFacts }).catch(() => []);
+      const rulings = await openQuestionRowsFor({ accountId, workspaces, recordsStore, dispatchQueueStore, merged, readTaskFacts }).catch(() => []);
       const openLoopIds = await openLoopIdsFor({ accountId, workspaces, merged, recordsStore }).catch(() => []);
 
       // LIN-4103 beat 3: the badge on a workspace page counts that workspace's rulings (the URL's workspace, by each row's
