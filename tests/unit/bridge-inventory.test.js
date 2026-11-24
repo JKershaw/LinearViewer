@@ -32,12 +32,36 @@ function realInputs() {
     }
   }
   const pages = {};
-  const emitted = {};
-  for (const f of readdirSync(join(ROOT, 'public')).filter((n) => n.endsWith('.js'))) {
-    pages[f] = read(`public/${f}`);
-    if (emittedNames.has(`/${f}`)) emitted[f] = pages[f];
-  }
+  for (const f of readdirSync(join(ROOT, 'public')).filter((n) => n.endsWith('.js'))) pages[f] = read(`public/${f}`);
+  const roots = Object.keys(pages).filter((f) => emittedNames.has(`/${f}`));
+  const emitted = importClosure(roots, pages, (rel) => read(rel));
   return { renderers, emitted, pages };
+}
+
+/**
+ * The modules a browser runs: the renderer-listed ones plus everything they import statically, by `./x.js` within public/
+ * and `../lib/x.js` (a served shared leaf, keyed 'lib/x.js'). An import-only module (public/prompt-section.js) is run
+ * with its importer, so a global it writes is a bridge as much as a listed module's. Pure over the sources it is given.
+ */
+export function importClosure(roots, pages, readLib) {
+  const emitted = {};
+  const queue = [...roots.map((f) => [f, pages[f]])];
+  while (queue.length) {
+    const [key, src] = queue.shift();
+    if (key in emitted) continue;
+    emitted[key] = src;
+    for (const m of src.matchAll(/(?:^|\n)\s*(?:import|export)\s[^;]*?from\s+'(\.{1,2}\/[^']+\.js)'/g)) {
+      const spec = m[1];
+      if (spec.startsWith('../lib/')) {
+        const lib = spec.slice(3);
+        if (!(lib in emitted)) queue.push([lib, readLib(lib)]);
+      } else {
+        const f = spec.slice(2);
+        if (!(f in emitted) && pages[f] !== undefined) queue.push([f, pages[f]]);
+      }
+    }
+  }
+  return emitted;
 }
 
 const realRun = (overrides = {}) => {
@@ -74,9 +98,11 @@ describe('the bridge over the real repo', () => {
     }
   });
 
-  test('the emitted modules are the converted pages (workspace-kpis.js, task-page.js, flight-companion.js, observation.js, question-records.js LIN-4532, swipe.js and app.js LIN-4463 piece 5)', () => {
-    // prompt-section.js is a module too, but no renderer lists it: app.js, swipe.js and task-page.js import it.
-    assert.deepEqual(Object.keys(inputs.emitted).sort(), ['app.js', 'flight-companion.js', 'observation.js', 'question-records.js', 'swipe.js', 'task-page.js', 'workspace-kpis.js']);
+  test('the emitted modules are the converted pages (workspace-kpis.js, task-page.js, flight-companion.js, observation.js, question-records.js LIN-4532, swipe.js and app.js LIN-4463 piece 5), what they import, and the lib leaves', () => {
+    // prompt-section.js is a module no renderer lists: app.js, swipe.js and task-page.js import it, so it is checked with them.
+    const publicFiles = Object.keys(inputs.emitted).filter((k) => !k.startsWith('lib/')).sort();
+    assert.deepEqual(publicFiles, ['app.js', 'flight-companion.js', 'observation.js', 'prompt-section.js', 'question-records.js', 'swipe.js', 'task-page.js', 'workspace-kpis.js']);
+    for (const lib of ['lib/cost-format.js', 'lib/prompt-filename.js', 'lib/task-page-href.js']) assert.ok(inputs.emitted[lib], lib);
   });
 
   test('the renderer lists the check reads include the const SCRIPTS shape (the task page), so a list the reader cannot match fails here', () => {
@@ -96,6 +122,21 @@ describe('the checks fail on each synthetic breach (witnesses for the inventory)
   test('growth: a module writes a global, nested in a function, and the check names it', () => {
     const emitted = { ...realInputs().emitted, 'swipe.js': 'function f() { window.CostFormat = 1; }\n' };
     assert.ok(realRun({ emitted }).problems.some((p) => /swipe\.js writes window\.CostFormat: a bridge/.test(p)));
+  });
+
+  test('growth in an import-only module: a write in public/prompt-section.js, which no renderer lists, fails and names it', () => {
+    const inputs = realInputs();
+    const src = `${inputs.pages['prompt-section.js']}\nwindow.PromptSection = { init };\n`;
+    const pages = { ...inputs.pages, 'prompt-section.js': src };
+    const roots = Object.keys(inputs.emitted).filter((k) => !k.startsWith('lib/') && k !== 'prompt-section.js');
+    const emitted = importClosure(roots, pages, read);
+    assert.ok(realRun({ emitted, pages }).problems.some((p) => /prompt-section\.js writes window\.PromptSection: a bridge/.test(p)));
+  });
+
+  test('the import closure follows ./ and ../lib/ specifiers, multi-line imports included, and stops at an unknown file', () => {
+    const pages = { 'a.js': "import { x } from './b.js';\nimport {\n  y,\n} from '../lib/y.js';\n", 'b.js': "export * from './missing.js';\n" };
+    const got = importClosure(['a.js'], pages, (rel) => `// ${rel}`);
+    assert.deepEqual(Object.keys(got).sort(), ['a.js', 'b.js', 'lib/y.js']);
   });
 
   test('a window. write in another spelling is still a write; a property of another object is not', () => {

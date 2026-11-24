@@ -10,7 +10,7 @@
  * the served lib leaf (the server's own, `lib/task-page-href.js`) instead of reading common.js's twin, and the shared
  * PromptSection from ./prompt-section.js.
  */
-import { taskPageHref } from '../lib/task-page-href.js';
+import { sourceQuery, taskPageHref } from '../lib/task-page-href.js';
 import * as PromptSection from './prompt-section.js';
 
 // isTerminalState comes from public/common.js (a classic script, so it has run), the one browser home for the terminal set.
@@ -411,9 +411,7 @@ function renderCard(direction) {
   // Prompts accordion (lazy loaded) - the primary triage action, emphasised as
   // the anchor of the Work group. Only available when authenticated.
   if (urlKey) {
-    const cached = PromptSection.getCached
-      ? PromptSection.getCached(issue.id, urlKey)
-      : null;
+    const cached = PromptSection.getCached(issue.id, urlKey);
     const hint = cached ? ` <span class="swipe-prompts-cache-hint">· ${_esc(cached.name || cached.label)} cached</span>` : '';
     groups.work.push(`
       <div class="swipe-card-accordion swipe-card-accordion--primary">
@@ -803,8 +801,9 @@ function handleAccordionClick(e) {
 // builder — the comment route resolves strictly. Sparse: an unsourced issue
 // yields the byte-identical pre-residual URL.
 function swipeCommentsUrl(apiPrefix, issue) {
-  return `${apiPrefix}/api/comments/${encodeURIComponent(issue.id)}`
-    + window.sourceQuery(issue.source);
+  // The lib's sourceQuery has no leading delimiter (the twin it replaces had a `?`), so the `?` is added here.
+  const query = sourceQuery(issue.source);
+  return `${apiPrefix}/api/comments/${encodeURIComponent(issue.id)}${query ? `?${query}` : ''}`;
 }
 
 async function loadComments(container) {

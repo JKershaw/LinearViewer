@@ -326,7 +326,6 @@ async function loadClient(t, { stateBody = null, previewBody = null, presetsBody
       if (url.includes('/api/prompt/')) return { prompt: 'PROMPT', promptName: 'Plan' };
       return { success: true, item: { id: 'd-1' } };
     },
-    taskPageHref: ({ identifier }) => `/workspace/acme/task/${identifier}`,
     dispatchPrompt: async (args) => { calls.dispatch.push(args); return { success: true, item: { id: 'd-1' } }; },
     ProxyToggle: { isActive: () => true, setActive() {}, maybeAppend: async (raw) => raw },
     renderDispatchDisclosure: () => '',
@@ -535,7 +534,7 @@ describe('LIN-4010 — the client: one run box, the state once, a new user\'s li
     const c = makeContainer();
     PromptSection.init(c, { ...HOME, row: serverRow({ container: true }) });
     await flush(); await flush();
-    assert.match(c.innerHTML, /href="\/workspace\/acme\/task\/LIN-42"[^>]*data-testid="opened-task-watch"/);
+    assert.match(c.innerHTML, /href="\/workspace\/acme\/task\/LIN-42\?source=linear"[^>]*data-testid="opened-task-watch"/);
   });
 
   // LIN-4010 review (finding 4, a missing witness): Stop on a container is the subtask's Stop, not the parent's.

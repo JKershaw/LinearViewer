@@ -34,7 +34,6 @@ async function loadClient(t, { stateBody, container = false }) {
     renderDispatchDisclosure: () => '',
     readDispatchExecControls: () => ({ model: null, harness: null }),
     isPinnedToBottom: () => false,
-    taskPageHref: () => '/workspace/acme/task/LIN-42',
     toast: () => {},
   };
   const world = await promptSectionWorld(t, {

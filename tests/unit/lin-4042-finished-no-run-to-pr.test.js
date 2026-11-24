@@ -42,7 +42,6 @@ async function loadClient(t, { stateBody, timers = null, quota = null }) {
     renderDispatchDisclosure: () => '',
     readDispatchExecControls: () => ({ model: null, harness: null }),
     isPinnedToBottom: () => false,
-    taskPageHref: () => '/workspace/acme/task/LIN-42',
     toast: () => {},
     dispatchPrompt: async () => ({ success: true, item: { id: 'd-1' } }),
     fetchAutopilotKickoff: async () => ({ prompt: 'PLAN PROMPT', promptName: 'Plan', kind: 'plan' }),

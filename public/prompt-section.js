@@ -15,6 +15,7 @@
  */
 import { formatUsd } from '../lib/cost-format.js';
 import { buildPromptFilename } from '../lib/prompt-filename.js';
+import { taskPageHref } from '../lib/task-page-href.js';
 
 const promptCache = new Map(); // `${issueId}:${label}` -> {label, name, raw, html, reasoning}
 const lastPromptLabel = new Map(); // issueId -> label
@@ -290,7 +291,7 @@ function renderGo(opts, state) {
     // read lands, it says "Started" — true on a 201, not a status claim.
     // LIN-4010: once the running box shows, it holds the Watch link, so the Go slot does not repeat it.
     const boxed = caps.runBox && !!(state.opened && state.opened.sessions && state.opened.sessions.running && !state.opened.sessions.queued);
-    const href = caps.watchLink && !boxed && window.taskPageHref({
+    const href = caps.watchLink && !boxed && taskPageHref({
       urlKey: opts.urlKey,
       identifier: opts.issue && opts.issue.identifier,
       source: opts.issue && opts.issue.source
@@ -1116,9 +1117,7 @@ function init(container, opts) {
     // LIN-4016: the words are the server's (`attention`): lead and detail come from it, so a failed subtask reads as
     // failed and the browser picks no text of its own.
     const linkOf = (s) => {
-      const href = window.taskPageHref
-        ? window.taskPageHref({ urlKey: opts.urlKey, identifier: s.identifier, source: opts.issue && opts.issue.source })
-        : '#';
+      const href = taskPageHref({ urlKey: opts.urlKey, identifier: s.identifier, source: opts.issue && opts.issue.source });
       return `<a class="btn btn--quiet opened-task-needs-you-open" data-testid="opened-task-needs-you-open" href="${esc(href)}">Open</a>`;
     };
     const nameOf = (s) => `${esc(s.identifier)}${s.title ? ` ${esc(s.title)}` : ''}`;
@@ -1360,8 +1359,8 @@ function init(container, opts) {
       const polled = !!summary.canStop;
       const since = running.since ? formatGeneratedAge(Date.parse(running.since)) : null;
       // LIN-4010 review: Watch opens the task the box runs on, as Stop does (the opened task; LIN-4024).
-      const watchHref = caps.watchLink && window.taskPageHref
-        ? window.taskPageHref({ urlKey: opts.urlKey, identifier: issue.identifier, source: issue.source })
+      const watchHref = caps.watchLink
+        ? taskPageHref({ urlKey: opts.urlKey, identifier: issue.identifier, source: issue.source })
         : null;
       const watch = watchHref ? `<a class="btn--quiet opened-task-watch" href="${esc(watchHref)}" data-testid="opened-task-watch">Watch \u203A</a>` : '';
       let actions = watch;

@@ -94,7 +94,6 @@ async function load(t, { opened = null, previewFor = () => null, panelFor = serv
       return { success: true, item: { id: 'd-1' } };
     },
     fetchAutopilotKickoff: async (args) => { calls.kickoff.push(args); return kickoff; },
-    taskPageHref: ({ identifier, source }) => `/workspace/acme/task/${identifier || 'LIN-42'}${source ? `?source=${source}` : ''}`,
     dispatchPrompt: async (args) => { calls.dispatch.push(args); return { success: true, item: { id: 'd-1' } }; },
     ProxyToggle: { isActive: () => true, setActive() {}, maybeAppend: async (raw) => raw },
     renderDispatchDisclosure: () => '',

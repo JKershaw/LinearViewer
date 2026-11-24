@@ -25,7 +25,6 @@ export async function swipeWorld(t, { data = {}, window = {}, classic = [] } = {
       renderMarkdown: (s) => escapeHtml(s),
       stripCodeBlockWrapper: (s) => s,
       relativeTime: () => '',
-      sourceQuery: (source) => (source ? `?source=${encodeURIComponent(source)}` : ''),
       api: async () => ({}),
       ...window,
     },

@@ -141,7 +141,6 @@ async function load(t, { stateBody = null, events = [] } = {}) {
     renderDispatchDisclosure: () => '',
     readDispatchExecControls: () => ({}),
     dispatchPrompt: async () => ({ success: true, item: { id: 'd-1' } }),
-    taskPageHref: () => '/workspace/acme/task/LIN-42',
     isPinnedToBottom: () => false,
     toast: () => {},
   };

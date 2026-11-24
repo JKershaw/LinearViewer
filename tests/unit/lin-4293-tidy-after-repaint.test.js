@@ -77,7 +77,6 @@ async function mountWithCard(t, { freeTier = false, holdQuota = false, body = st
       renderDispatchDisclosure: () => '',
       readDispatchExecControls: () => ({ model: null, harness: null }),
       isPinnedToBottom: () => false,
-      taskPageHref: () => '/workspace/acme/task/LIN-42',
       toast: () => {},
     },
     classic: ['question-cards.js'],

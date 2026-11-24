@@ -68,6 +68,26 @@ describe('Swipe card task-page link (LIN-3331)', () => {
     assert.ok(!html.includes('bindingScope'), 'the pair-era scope is ignored');
   });
 
+  test('the comments read carries the source as ?source=, from the lib leaf whose query has no leading delimiter (LIN-4463)', async (t) => {
+    const urls = [];
+    const issue = { id: 'issue-1', identifier: 'LIN-1', title: 'T', stateType: 'unstarted' };
+    for (const [source, tail] of [['linear', '?source=linear'], [undefined, '']]) {
+      const world = await swipeWorld(t, {
+        data: { issues: [{ ...issue, source }], filters: [{ key: 'all', label: 'All' }], urlKey: 'ws' },
+        window: { api: async (url) => { urls.push(url); return { comments: [] }; } },
+      });
+      const card = world.document.getElementById('swipe-card');
+      const header = card.querySelector('[data-accordion="comments"]');
+      const body = card.querySelector('[data-accordion-body="comments"]');
+      // The fake DOM neither dispatches events nor models nextElementSibling: call the card's recorded click listeners
+      // with the header's own parts as the target.
+      const target = { closest: (sel) => (sel === '.swipe-accordion-header' ? target : null), dataset: header.dataset, classList: header.classList, nextElementSibling: body };
+      for (const fn of card.listenersOf('click')) fn({ target, preventDefault() {}, stopPropagation() {} });
+      await new Promise((r) => setImmediate(r));
+      assert.equal(urls.pop(), `/workspace/ws/api/comments/issue-1${tail}`);
+    }
+  });
+
   test('no link on the landing card (no workspace)', async (t) => {
     const html = await renderCard(t, { id: 'issue-1', identifier: 'LIN-1', title: 'T', stateType: 'unstarted' }, null);
     assert.ok(!html.includes('swipe-task-page-link'), 'landing card omits the link');

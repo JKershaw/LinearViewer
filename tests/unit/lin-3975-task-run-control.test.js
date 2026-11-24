@@ -96,7 +96,6 @@ async function load(t, { opened = null, lastCopy = null, prompt = null, fetch = 
     readSSEStream: reply || (async () => {}),
     fetchAutopilotKickoff: async () => ({ prompt: 'A', promptName: 'Autopilot', kind: 'autopilot' }),
     dispatchPrompt: async () => ({ success: true, item: { id: 'd-1' } }),
-    taskPageHref: () => '/workspace/acme/task/LIN-42',
     ProxyToggle: {
       isActive: () => false, setActive() {}, maybeAppend: async (raw) => raw,
       takeRateLimitNotice: () => rateLimit,

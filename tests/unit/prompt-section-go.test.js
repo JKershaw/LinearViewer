@@ -37,7 +37,6 @@ async function loadPromptSection(t, overrides = {}) {
     escapeHtml: (s) => (s == null ? '' : String(s)),
     stripCodeBlockWrapper: (s) => s,
     renderMarkdown: (s) => String(s == null ? '' : s),
-    taskPageHref: ({ urlKey, identifier } = {}) => (urlKey && identifier ? `/workspace/${urlKey}/task/${identifier}` : ''),
     readDispatchExecControls: overrides.readDispatchExecControls || (() => ({ model: null, harness: null })),
     renderDispatchDisclosure: () => '<div class="swipe-prompt-options"></div>',
     ProxyToggle: { maybeAppend: async (raw) => raw },
@@ -147,7 +146,7 @@ describe('LIN-3341 — Go is one press', () => {
     // LIN-3833 (Q1): no harness is forced on the client; the server settles a blank one for an opened-task run.
     assert.equal(d.harness, null, 'an untouched panel sends no harness (was claude-code, LIN-3211)');
     assert.match(m.container.innerHTML, /data-testid="opened-task-started"/, 'the started line is shown');
-    assert.match(m.container.innerHTML, /href="\/workspace\/ws\/task\/LIN-42"[^>]*data-testid="opened-task-started-link"/, 'with a task-page link');
+    assert.match(m.container.innerHTML, /href="\/workspace\/ws\/task\/LIN-42\?source=linear"[^>]*data-testid="opened-task-started-link"/, 'with a task-page link');
   });
 
   test('a double press makes one dispatch', async (t) => {
@@ -360,7 +359,7 @@ describe('LIN-3341 — Go is one press', () => {
     assert.doesNotMatch(dup.container.innerHTML, /data-testid="opened-task-go"/, 'no pressable Go after a duplicate refusal');
     assert.doesNotMatch(dup.container.innerHTML, /data-action="go"/, 'no Go action after a duplicate refusal');
     assert.match(dup.container.innerHTML, /data-go-status="running"/, 'the slot is in the running state');
-    assert.match(dup.container.innerHTML, /href="\/workspace\/ws\/task\/LIN-42"[^>]*data-testid="opened-task-started-link"/, 'with the watch link');
+    assert.match(dup.container.innerHTML, /href="\/workspace\/ws\/task\/LIN-42\?source=linear"[^>]*data-testid="opened-task-started-link"/, 'with the watch link');
     assert.equal(dup.timers.filter((t) => !t.cancelled).length, 1, 'the poll is running');
     // (d) a second press after the refusal cannot send a second dispatch: no drawn Go is left to press.
     assert.equal(dup.container.querySelector('[data-testid="opened-task-go"][data-action="go"]'), null, 'no pressable Go to press again');
