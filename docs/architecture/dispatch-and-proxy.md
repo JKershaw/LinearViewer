@@ -49,7 +49,7 @@ path is best-effort under degradation; the degraded-mode path is the proxy verb 
 - `GET /api/dispatch/poll` - Poll for available items (may carry an additive `halt` request
   key, omitted when unset; the runner honours it)
 - `POST /api/dispatch/take/:itemId` - Atomically claim an item
-- `POST /api/dispatch/feedback/:itemId` - Post feedback on a taken item (a retired `kind` `decision` or `decision-withdrawn` is refused 422 `DECISION_FEEDBACK_RETIRED`, naming `POST /api/proxy/records`: a question is a question record, LIN-4541)
+- `POST /api/dispatch/feedback/:itemId` - Post feedback on a taken item (a retired `kind` `decision` or `decision-withdrawn` is refused 422 `DECISION_FEEDBACK_RETIRED`, naming `POST /api/proxy/records`: a question is a question record, LIN-4541). LIN-4556, both feedback routes: `addFeedback` (`lib/dispatch-store.js`) masks secrets in `message`/`url`/`urlLabel` before storing (`lib/dispatch-feedback-masking.js`, over `lib/mask-secrets.js`; a continuation `(assistant-text i/n)` chunk is scanned joined to chunk i-1). An optional `key` (1-128 chars of `A-Z a-z 0-9 . _ : / -`, malformed is 400) makes the post idempotent: the append carries `$nor: [{'feedback.key': key}]` in its one atomic update, and a key the row holds answers 200 `duplicate: true` before any wake, run-record or closer step; a gone or not-yours row stays 404
 - `POST /api/dispatch/usage/:itemId` - Post per-request usage records for a taken item (LIN-4198;
   body `{records: [...]}`, at most 100 per call; the runner-token twin is `POST /api/proxy/runner/usage/:id`).
   **Auth deviation from feedback, on purpose:** this route accepts the consumer dispatch token only and

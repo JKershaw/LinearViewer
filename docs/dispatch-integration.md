@@ -206,6 +206,12 @@ Content-Type: application/json
 | `message` | string | Yes | Feedback message (max 2000 chars) |
 | `url` | string | No | Link URL (e.g., PR, deployment) |
 | `urlLabel` | string | No | Display text for the link |
+| `key` | string | No | Idempotency key (LIN-4556): 1-128 characters of `A-Z a-z 0-9 . _ : / -`, starting with a letter or digit. A post whose key the item already holds stores nothing and answers `duplicate: true`, so a retry after a lost reply is safe. A malformed key is a 400 (never dropped) |
+
+Secrets in `message`, `url` and `urlLabel` are masked to `[redacted]` before the entry is stored
+(LIN-4556, `lib/dispatch-feedback-masking.js` over the `lib/secret-scan.js` rules), on this route and on
+`POST /api/proxy/runner/feedback/:id`. A continuation chunk `(assistant-text i/n)`, i > 1, is also scanned
+joined to chunk i-1, so a secret cut at the chunk seam is masked.
 
 **Constraints:**
 - Only the token that took the item can post feedback (strict ownership)
@@ -219,6 +225,10 @@ Content-Type: application/json
   "feedbackCount": 1
 }
 ```
+
+A keyed post the item already holds (LIN-4556) also answers 200, with `"duplicate": true` and the
+current `feedbackCount`. Only a key the item holds reads as a duplicate: a keyed post to an item that is
+gone or not yours is the 404 below, as without a key.
 
 **Error Response (404):**
 ```json
