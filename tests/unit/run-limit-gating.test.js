@@ -23,7 +23,7 @@ import { fileURLToPath } from 'node:url';
 import express from 'express';
 import { createDispatchRoutes } from '../../routes/dispatch.js';
 import { FreeTierStore } from '../../lib/free-tier-store.js';
-import { loadWorld } from './helpers/client-world.js';
+import { promptSectionWorld } from './helpers/prompt-section-world.js';
 import { isWorkspaceApiUnitFile } from './lib/workspace-api-unit.js';
 
 const FUTURE = '2026-10-03T00:00:00.000Z';
@@ -80,13 +80,12 @@ const FRESH = { prompt: 'run me', kind: 'implementation' };
 /**
  * The THIRD surface (LIN-3239): render the shared opened-task ladder against
  * the exact `GET .../dispatch/quota` body, so the client's displayed run count
- * is proven to agree with the route's read. A client world (loadWorld, LIN-4310)
- * with prompt-section.js and the ladder's window stubs; the container is a real
+ * is proven to agree with the route's read. public/prompt-section.js is a native module (LIN-4463 piece 5),
+ * imported over the fake DOM, with the ladder's window stubs; the container is a real
  * element, and the ladder render only needs the `window.api` quota read to resolve.
  */
-async function renderLadderQuota(quotaBody) {
-  const world = loadWorld({
-    scripts: ['prompt-section.js'],
+async function renderLadderQuota(t, quotaBody) {
+  const world = await promptSectionWorld(t, {
     window: {
       escapeHtml: (s) => (s == null ? '' : String(s)),
       stripCodeBlockWrapper: (s) => s,
@@ -102,7 +101,7 @@ async function renderLadderQuota(quotaBody) {
     },
   });
   const container = world.makeContainer();
-  world.window.PromptSection.init(container, {
+  world.PromptSection.init(container, {
     urlKey: 'acme',
     issue: { id: 'i-1', identifier: 'A-1', title: 'A task' },
     surface: 'swipe',
@@ -329,7 +328,7 @@ describe('LIN-3238 — three-surface agreement (factory gate + quota read + ladd
     assert.equal(quota.body.resetsAt, post.body.freeTier.resetsAt);
   });
 
-  test('the ladder (third surface) displays the quota read\'s own numbers (LIN-3239)', async () => {
+  test('the ladder (third surface) displays the quota read\'s own numbers (LIN-3239)', async (t) => {
     // A different count so the assertion cannot pass on a coincidental default.
     const dispatchStore = { countFreshRunsSince: async () => 7 };
     const freeTierStore = new FreeTierStore({ collection: {}, dispatchStore, runLimit: 10 });
@@ -337,7 +336,7 @@ describe('LIN-3238 — three-surface agreement (factory gate + quota read + ladd
     const quota = await call(buildApp({ freeTierStore }), 'get', `${PATH}/quota`);
     assert.equal(quota.status, 200, JSON.stringify(quota.body));
 
-    const html = await renderLadderQuota(quota.body);
+    const html = await renderLadderQuota(t, quota.body);
     assert.match(html, new RegExp(`data-runs-remaining="${quota.body.remaining}"`), 'the ladder shows the quota read\'s remaining');
     assert.match(html, new RegExp(`data-runs-limit="${quota.body.limit}"`), 'the ladder shows the quota read\'s limit');
     assert.match(html, new RegExp(`${quota.body.remaining} of ${quota.body.limit} runs left today`), 'the human-readable ladder count agrees');

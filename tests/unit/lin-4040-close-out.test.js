@@ -1,19 +1,19 @@
 // LIN-4040 close-out — the review ledger's fixes A (the Swipe ladder's "run this step" rung follows the one run offer, and a
 // press re-reads it), B (the running line names the first worker's own issue or none) and C (pinned in
-// task-page-question.test.js: the task page's pill says "needs you"). Runs in the shared client world
-// (helpers/client-world.js).
+// task-page-question.test.js: the task page's pill says "needs you"). public/prompt-section.js is a native module (LIN-4463
+// piece 5), imported over the fake DOM (helpers/prompt-section-world.js).
 import { test, describe } from 'node:test';
 import assert from 'node:assert/strict';
 import { firstWorkerIdentifier } from '../../lib/task-page-loader.js';
 import { runWordsOf } from '../../lib/task-run-facts.js';
-import { loadWorld } from './helpers/client-world.js';
+import { promptSectionWorld } from './helpers/prompt-section-world.js';
 
 
 const flush = () => new Promise((r) => setImmediate(r));
 
 const RUN_LIMIT_TITLE = 'daily run limit reached \u00b7 resets at midnight UTC';
 
-function loadPromptSection({ quota, dispatch, stateReply } = {}) {
+async function loadPromptSection(t, { quota, dispatch, stateReply } = {}) {
   const calls = { api: [], dispatch: [], order: [] };
   const timers = [];
   const window = {
@@ -46,14 +46,14 @@ function loadPromptSection({ quota, dispatch, stateReply } = {}) {
     toast: () => {},
     fetchAutopilotKickoff: async () => ({ prompt: 'AUTOPILOT PROMPT', promptName: 'Autopilot', kind: 'autopilot' }),
   };
-  const world = loadWorld({
-    window, scripts: ['prompt-section.js'], timers,
+  const world = await promptSectionWorld(t, {
+    window, timers,
     globals: { fetch: async () => ({ ok: false, status: 500, json: async () => ({}) }) },
   });
   // Fire every pending timer once (the 2s button-restore), then let reads settle.
   async function runTimers() {
     const due = timers.splice(0);
-    for (const t of due) t.fn();
+    for (const timer of due) timer.fn();
     await flush();
     await flush();
   }
@@ -89,8 +89,8 @@ function baseOpts(extra = {}) {
   return { runSetup: !o.dispatchEnabled, ...o };
 }
 
-async function mountIdle(extra, loadOpts) {
-  const loaded = loadPromptSection(loadOpts);
+async function mountIdle(t, extra, loadOpts) {
+  const loaded = await loadPromptSection(t, loadOpts);
   const container = loaded.makeContainer();
   loaded.PromptSection.init(container, baseOpts(extra));
   await flush();
@@ -98,8 +98,8 @@ async function mountIdle(extra, loadOpts) {
   return { ...loaded, container };
 }
 
-async function mountFresh(extra, loadOpts) {
-  const m = await mountIdle(extra, loadOpts);
+async function mountFresh(t, extra, loadOpts) {
+  const m = await mountIdle(t, extra, loadOpts);
   await m.container.click({ prompt: 'implementation' });
   await flush();
   await flush();
@@ -116,15 +116,15 @@ const QUOTA_FULL = { limited: true, runsUsed: 3, limit: 10, remaining: 7, resets
 const runStepTag = (html) => tagFor(html, 'run-step');
 
 describe('LIN-4040 close-out A — the ladder\'s "run this step" rung follows the one offer', () => {
-  test('an offer draws the rung enabled', async () => {
-    const m = await mountFresh({ row: { action: OFFER } }, { quota: QUOTA_FULL });
+  test('an offer draws the rung enabled', async (t) => {
+    const m = await mountFresh(t, { row: { action: OFFER } }, { quota: QUOTA_FULL });
     assert.match(runStepTag(m.container.innerHTML) || '', /data-action="run-step"/);
     assert.doesNotMatch(runStepTag(m.container.innerHTML) || '', /disabled/);
   });
 
   for (const [name, action, why] of [['busy', BUSY, BUSY.why], ['answer-first', ANSWER_FIRST, ANSWER_FIRST.why], ['none (finished)', NONE, NONE.why]]) {
-    test(`${name}: the rung is drawn disabled with the offer's reason, and carries no run action`, async () => {
-      const m = await mountFresh({ row: { action } }, { quota: QUOTA_FULL });
+    test(`${name}: the rung is drawn disabled with the offer's reason, and carries no run action`, async (t) => {
+      const m = await mountFresh(t, { row: { action } }, { quota: QUOTA_FULL });
       const tag = runStepTag(m.container.innerHTML) || '';
       assert.match(tag, /disabled/);
       assert.doesNotMatch(tag, /data-action="run-step"/);
@@ -132,24 +132,24 @@ describe('LIN-4040 close-out A — the ladder\'s "run this step" rung follows th
     });
   }
 
-  test('no offer known (neither the state nor the row carries one): no run is offered', async () => {
-    const m = await mountFresh({ row: null }, { quota: QUOTA_FULL });
+  test('no offer known (neither the state nor the row carries one): no run is offered', async (t) => {
+    const m = await mountFresh(t, { row: null }, { quota: QUOTA_FULL });
     const tag = runStepTag(m.container.innerHTML) || '';
     assert.match(tag, /disabled/);
     assert.doesNotMatch(tag, /data-action="run-step"/);
   });
 
-  test('the state read wins over the row: a busy state read redraws an offered card\'s rung disabled', async () => {
-    const m = await mountFresh({ row: { action: OFFER } }, { quota: QUOTA_FULL, stateReply: { sessions: { action: BUSY, busy: true, count: 1 } } });
+  test('the state read wins over the row: a busy state read redraws an offered card\'s rung disabled', async (t) => {
+    const m = await mountFresh(t, { row: { action: OFFER } }, { quota: QUOTA_FULL, stateReply: { sessions: { action: BUSY, busy: true, count: 1 } } });
     await flush();
     const tag = runStepTag(m.container.innerHTML) || '';
     assert.match(tag, /disabled/);
     assert.doesNotMatch(tag, /data-action="run-step"/);
   });
 
-  test('stale press: drawn as an offer, but a run started since — the press re-reads, refuses, and dispatches nothing', async () => {
+  test('stale press: drawn as an offer, but a run started since — the press re-reads, refuses, and dispatches nothing', async (t) => {
     let reply = { sessions: { action: OFFER, busy: false, count: 0 } };
-    const m = await mountFresh({ row: { action: OFFER } }, { quota: QUOTA_FULL, stateReply: () => reply });
+    const m = await mountFresh(t, { row: { action: OFFER } }, { quota: QUOTA_FULL, stateReply: () => reply });
     assert.match(runStepTag(m.container.innerHTML) || '', /data-action="run-step"/, 'enabled on the first read');
     // A run starts after the card was drawn; the next state read says so.
     reply = { sessions: { action: BUSY, busy: true, count: 1 } };
@@ -159,8 +159,8 @@ describe('LIN-4040 close-out A — the ladder\'s "run this step" rung follows th
     assert.match(m.container.innerHTML, /A run started on this task while you were choosing, so nothing was started\./);
   });
 
-  test('a press that is still an offer on the re-read dispatches once, as a run-step', async () => {
-    const m = await mountFresh({ row: { action: OFFER } }, { quota: QUOTA_FULL, stateReply: { sessions: { action: OFFER, busy: false, count: 0 } } });
+  test('a press that is still an offer on the re-read dispatches once, as a run-step', async (t) => {
+    const m = await mountFresh(t, { row: { action: OFFER } }, { quota: QUOTA_FULL, stateReply: { sessions: { action: OFFER, busy: false, count: 0 } } });
     await m.container.click({ action: 'run-step', target: 'cli' });
     await flush();
     assert.equal(m.calls.dispatch.length, 1);

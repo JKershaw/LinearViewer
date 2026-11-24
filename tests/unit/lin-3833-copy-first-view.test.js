@@ -13,12 +13,12 @@ import assert from 'node:assert/strict';
 import { TaskModeStore, copyKindOf } from '../../lib/task-mode-store.js';
 import { renderPage } from '../../lib/render.js';
 import { serverSessions, serverRow } from '../fixtures/task-decision.js';
-import { loadWorld } from './helpers/client-world.js';
+import { promptSectionWorld } from './helpers/prompt-section-world.js';
 
 const flush = () => new Promise((r) => setTimeout(r, 0));
 
-/** A PromptSection sandbox. `stateBody` is what the state endpoint answers (null for no read). */
-function load({ stateBody = null } = {}) {
+/** A PromptSection world (the imported module). `stateBody` is what the state endpoint answers (null for no read). */
+async function load(t, { stateBody = null } = {}) {
   // LIN-4016: the state body is the server's: its `sessions` carry the decision the browser reads.
   if (stateBody && stateBody.sessions) stateBody = { ...stateBody, sessions: serverSessions(stateBody.sessions) };
   const calls = { api: [] };
@@ -39,7 +39,7 @@ function load({ stateBody = null } = {}) {
     isPinnedToBottom: () => false,
     toast: () => {},
   };
-  const world = loadWorld({ window, scripts: ['prompt-section.js'] });
+  const world = await promptSectionWorld(t, { window });
   return { PromptSection: world.PromptSection, calls, makeContainer: world.makeContainer };
 }
 
@@ -61,8 +61,8 @@ describe('LIN-3833 — the copy-first step comes from the task\'s status alone',
     ['backlog', 'scoping', 'Write the prompt for this task. The prompt says which step it is for.'],
     ['started', '__ai__', 'Generate the next prompt for this task'],
   ]) {
-    test(`${stateType} → "Write the prompt" for ${label}`, async () => {
-      const { PromptSection, makeContainer } = load();
+    test(`${stateType} → "Write the prompt" for ${label}`, async (t) => {
+      const { PromptSection, makeContainer } = await load(t);
       const c = makeContainer();
       PromptSection.init(c, homeOpts({ issue: { id: 'uuid-42', identifier: 'LIN-42', title: 'T', url: '', stateType } }));
       await flush();
@@ -71,8 +71,8 @@ describe('LIN-3833 — the copy-first step comes from the task\'s status alone',
     });
   }
 
-  test('no run, model, cost, stage or session element is rendered to a copy-first viewer', async () => {
-    const { PromptSection, makeContainer } = load({ stateBody: { live: false, status: 'idle', headerHtml: '<p class="task-sentence">No sessions yet.</p>', trackHtml: '<div class="task-track">stages</div>', sessions: { count: 0, last: null, running: null } } });
+  test('no run, model, cost, stage or session element is rendered to a copy-first viewer', async (t) => {
+    const { PromptSection, makeContainer } = await load(t, { stateBody: { live: false, status: 'idle', headerHtml: '<p class="task-sentence">No sessions yet.</p>', trackHtml: '<div class="task-track">stages</div>', sessions: { count: 0, last: null, running: null } } });
     const c = makeContainer();
     PromptSection.init(c, homeOpts());
     await flush();
@@ -83,8 +83,8 @@ describe('LIN-3833 — the copy-first step comes from the task\'s status alone',
 });
 
 describe('LIN-3833 — once written, the prompt is copied, bounded and keyed', () => {
-  test('a written prompt shows Copy, the bounded box with Rewrite and Download, and the progress-key checkbox', async () => {
-    const { PromptSection, makeContainer } = load();
+  test('a written prompt shows Copy, the bounded box with Rewrite and Download, and the progress-key checkbox', async (t) => {
+    const { PromptSection, makeContainer } = await load(t);
     const c = makeContainer();
     PromptSection.init(c, homeOpts());
     await flush();
@@ -100,8 +100,8 @@ describe('LIN-3833 — once written, the prompt is copied, bounded and keyed', (
     assert.match(c.innerHTML, /Copy it, then paste it into Claude Code, Codex or any coding agent\./);
   });
 
-  test('Rewrite and Download sit outside the markdown sink, so a look-alike in the prompt body is never bound', async () => {
-    const { PromptSection, makeContainer } = load();
+  test('Rewrite and Download sit outside the markdown sink, so a look-alike in the prompt body is never bound', async (t) => {
+    const { PromptSection, makeContainer } = await load(t);
     const c = makeContainer();
     PromptSection.init(c, homeOpts());
     await flush();
@@ -115,8 +115,8 @@ describe('LIN-3833 — once written, the prompt is copied, bounded and keyed', (
 });
 
 describe('LIN-3833 — the state block: the task\'s own sentence, and what was last copied', () => {
-  test('a copy-first state block says the tracker word and what was copied, with no session words (LIN-4010)', async () => {
-    const { PromptSection, makeContainer } = load({ stateBody: { live: false, status: 'idle', headerHtml: '<p class="task-sentence">No sessions yet.</p>', trackHtml: '<div class="task-track">stages</div>', sessions: { count: 0, last: null, running: null } } });
+  test('a copy-first state block says the tracker word and what was copied, with no session words (LIN-4010)', async (t) => {
+    const { PromptSection, makeContainer } = await load(t, { stateBody: { live: false, status: 'idle', headerHtml: '<p class="task-sentence">No sessions yet.</p>', trackHtml: '<div class="task-track">stages</div>', sessions: { count: 0, last: null, running: null } } });
     const c = makeContainer();
     PromptSection.init(c, homeOpts());
     await flush();
@@ -125,8 +125,8 @@ describe('LIN-3833 — the state block: the task\'s own sentence, and what was l
     assert.equal(/idle|No sessions yet/.test(c.innerHTML), false, 'a new user never sees "idle" or "No sessions yet"');
   });
 
-  test('Swipe keeps its own card: no state block, no copy-first view', async () => {
-    const { PromptSection, calls, makeContainer } = load({ stateBody: { live: false, status: 'idle', headerHtml: '<p class="task-sentence">Nothing yet.</p>', sessions: { count: 0, last: null, running: null } } });
+  test('Swipe keeps its own card: no state block, no copy-first view', async (t) => {
+    const { PromptSection, calls, makeContainer } = await load(t, { stateBody: { live: false, status: 'idle', headerHtml: '<p class="task-sentence">Nothing yet.</p>', sessions: { count: 0, last: null, running: null } } });
     const c = makeContainer();
     PromptSection.init(c, homeOpts({ surface: 'swipe' }));
     await flush();
@@ -144,7 +144,7 @@ describe('LIN-3833 — the copy record names its prompt', () => {
     assert.equal(copyKindOf(undefined), null);
   });
 
-  test('the store writes kind on a copy and never on a dispatch', async () => {
+  test('the store writes kind on a copy and never on a dispatch', async (t) => {
     const stored = [];
     const store = new TaskModeStore({ collection: { insertOne: async (doc) => { stored.push(doc); } } });
     const base = { accountId: 'acct-1', urlKey: 'ws', issueId: null, issueIdentifier: 'LIN-42', rung: 'copy', ready: true, needs: null, surface: 'home' };

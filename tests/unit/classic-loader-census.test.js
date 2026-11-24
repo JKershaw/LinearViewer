@@ -2,8 +2,8 @@
  * LIN-4471: the classic-loader census, a ratchet on the suites that run browser scripts as classic scripts. A suite counts
  * when it calls `loadWorld` (tests/unit/helpers/client-world.js, a vm over the fake DOM), runs a `public/` source
  * through a vm itself, or runs a classic script through the import helper's `runClassic`
- * (tests/unit/helpers/import-world.js) with any file other than the two named IIFE siblings, RUN_CLASSIC_SIBLINGS below.
- * Those two (`chart-helpers.js`, `close-out.js`) are what a converted page reads beside its imports, so a module suite
+ * (tests/unit/helpers/import-world.js), or a world helper's `classic:` list, with any file other than the named IIFE siblings,
+ * RUN_CLASSIC_SIBLINGS below. Those (`chart-helpers.js`, `close-out.js`, `question-cards.js`) are what a converted page reads beside its imports, so a module suite
  * that runs one of them is not a classic suite. Any other file loaded through `runClassic`, `observation.js` say, or a
  * `runClassic` call whose argument is not a literal sibling name, counts: the helper must not be a way round the ratchet.
  * A converted page is tested by a plain import instead (tests/unit/helpers/import-world.js), and it does not count. The list below is the baseline, written out by name as fake-dom-census.test.js does, so that "the
@@ -53,39 +53,21 @@ export const CLASSIC_LOADER_SUITES = [
   'lin-3254-session-run-toggles.test.js',
   'lin-3618-dispatch-token-expiry-display.test.js',
   'lin-3833-client-harness.test.js',
-  'lin-3833-copy-first-view.test.js',
-  'lin-3833-run-control.test.js',
-  'lin-3968-home-polish.test.js',
   'lin-3975-proposal-refresh.test.js',
   'lin-3975-summary-and-time.test.js',
-  'lin-3975-task-run-control.test.js',
   'lin-3975-task-run-links.test.js',
-  'lin-4010-home-opened-task.test.js',
-  'lin-4016-browser-follows-server.test.js',
   'lin-4016-sessions-fold-parked.test.js',
   'lin-4024-look.test.js',
-  'lin-4040-close-out.test.js',
-  'lin-4042-finished-no-run-to-pr.test.js',
   'lin-4114-inflight-lock.test.js',
   'lin-4242-waiting-live.test.js',
   'lin-4242-waiting-merge.test.js',
   'lin-4243-placement.test.js',
-  'lin-4246-opened-task-repaint-keep.test.js',
-  'lin-4293-tidy-after-repaint.test.js',
   'lin-4296-dispatch-reader.test.js',
   'lin-4296-scope-pick.test.js',
-  'prompt-section-go.test.js',
-  'prompt-section-look-alike.test.js',
-  'prompt-section-p0.test.js',
-  'prompt-section-preserve.test.js',
-  'prompt-section-recommend-url.test.js',
   'prompt-section-run-quota.test.js',
   'prompt-section-runner-link.test.js',
-  'prompt-section-task-mode.test.js',
   'reply-delivery-contract.test.js',
   'rulings-badge-client.test.js',
-  'run-limit-gating.test.js',
-  'runner-link-surfaces.test.js',
   'segment-bar-pill-parity.test.js',
   'session-pr-state-poll.test.js',
   'session-run-transcript-entries.test.js',
@@ -102,18 +84,27 @@ export const CLASSIC_LOADER_SUITES = [
 
 /**
  * The classic scripts `importWorld().runClassic` may run without the suite counting: the IIFE siblings the plan blesses
- * (they declare nothing that could collide), which a converted page reads beside its imports.
+ * (they declare nothing that could collide), which a converted page reads beside its imports. question-cards.js joined in
+ * LIN-4463 piece 5: the PromptSection module reads its window.QuestionCards when it draws, as the task page reads
+ * close-out.js's window.CloseOut.
  */
-export const RUN_CLASSIC_SIBLINGS = ['chart-helpers.js', 'close-out.js'];
+export const RUN_CLASSIC_SIBLINGS = ['chart-helpers.js', 'close-out.js', 'question-cards.js'];
 
 /** True when the source of a suite runs a browser script as a classic script, by the census rule. */
 export function loadsClassic(src) {
   if (/\bloadWorld\(/.test(src)) return true;
   if (/public\//.test(src) && /node:vm|vm\.(runIn|Script|createContext)/.test(src)) return true;
   const calls = [...src.matchAll(/\brunClassic\(\s*([^)]*?)\s*\)/g)];
-  return calls.some(([, arg]) => {
+  if (calls.some(([, arg]) => {
     const literal = /^(['"])([^'"]+)\1$/.exec(arg);
     return !(literal && RUN_CLASSIC_SIBLINGS.includes(literal[2]));
+  })) return true;
+  // A world helper's `classic: [...]` option runs each name through runClassic inside the helper (task-page-world.js,
+  // prompt-section-world.js, swipe-world.js), so a non-sibling named there counts too. The option is read to the end of
+  // its line: every quoted name in it must be a sibling, and an option with no literal list at all counts.
+  return [...src.matchAll(/\bclassic\s*:\s*([^\n]*)/g)].some(([, rest]) => {
+    if (!rest.trim().startsWith('[') && !/\?\s*\[/.test(rest)) return true;
+    return [...rest.matchAll(/(['"])([^'"]+)\1/g)].some(([, , name]) => !RUN_CLASSIC_SIBLINGS.includes(name));
   });
 }
 
@@ -133,8 +124,8 @@ test('the classic-loader census matches its baseline: no new classic suite, and 
   assert.deepEqual(gone, [], `listed suites no longer load browser scripts as classic: lower the baseline in this change: ${gone.join(', ')}`);
 });
 
-test('the baseline is recorded at 76 suites (the count that must not rise; LIN-4540 deleted the two scan suites, LIN-4537 the two brief/recap widget suites, LIN-4541 the six ruling-card and ruling-row suites, LIN-4463 piece 5 the two app.js suites)', () => {
-  assert.equal(CLASSIC_LOADER_SUITES.length, 76);
+test('the baseline is recorded at 58 suites (the count that must not rise; LIN-4540 deleted the two scan suites, LIN-4537 the two brief/recap widget suites, LIN-4541 the six ruling-card and ruling-row suites, LIN-4463 piece 5 the two app.js suites and the eighteen prompt-section suites)', () => {
+  assert.equal(CLASSIC_LOADER_SUITES.length, 58);
 });
 
 test('runClassic is counted unless it runs a named sibling: observation.js counts, chart-helpers.js does not', () => {
@@ -146,10 +137,15 @@ test('runClassic is counted unless it runs a named sibling: observation.js count
   assert.equal(loadsClassic('world.runClassic(name);'), true, 'a non-literal argument cannot be shown to be a sibling');
   assert.equal(loadsClassic("world.runClassic('./chart-helpers.js');"), true, 'only the bare sibling name is exempt');
   assert.equal(loadsClassic("await world.importPage('workspace-kpis.js');"), false, 'importing a module is not a classic load');
+  assert.equal(loadsClassic("await promptSectionWorld(t, { classic: ['question-cards.js'] });"), false, 'a world helper naming a sibling');
+  assert.equal(loadsClassic("await pageWorld(t, { classic: ['common.js'] });"), true, 'a world helper naming a non-sibling counts');
+  assert.equal(loadsClassic("await pageWorld(t, { classic: names });"), true, 'a non-literal classic list counts');
+  assert.equal(loadsClassic("await pageWorld(t, { classic: real ? ['close-out.js'] : [] });"), false, 'a choice between sibling lists');
+  assert.equal(loadsClassic("await pageWorld(t, { classic: ['close-out.js', 'common.js'] });"), true, 'one non-sibling in a list is enough');
 });
 
-test('the real suites that run a sibling through runClassic are not counted, and the siblings list is the two IIFEs', () => {
-  assert.deepEqual(RUN_CLASSIC_SIBLINGS, ['chart-helpers.js', 'close-out.js']);
+test('the real suites that run a sibling through runClassic are not counted, and the siblings list is the three IIFEs', () => {
+  assert.deepEqual(RUN_CLASSIC_SIBLINGS, ['chart-helpers.js', 'close-out.js', 'question-cards.js']);
   const found = classicLoaderSuites(['workspace-kpis-module.test.js', 'import-world.test.js']);
   assert.deepEqual(found, []);
 });

@@ -62,6 +62,30 @@ export async function fireDOMContentLoaded(document) {
 }
 
 /**
+ * The container factory both worlds share (LIN-4463 piece 5: promptSectionWorld uses it too, so there is one): a real
+ * element appended to `document.body`, with `click(dataset)` (the drawn button with those data attributes, given to the
+ * container's click listeners) and `key(k)` (the key, sent to the focused element's container listeners).
+ */
+export function containerMaker(document) {
+  return () => {
+    const container = document.createElement('div');
+    document.body.appendChild(container);
+    container.click = async (dataset) => {
+      const attrs = Object.entries(dataset).map(([k, v]) => `[data-${k.replace(/[A-Z]/g, (c) => `-${c.toLowerCase()}`)}="${v}"]`).join('');
+      const btn = container.querySelector(`button${attrs}`);
+      if (!btn) throw new Error(`no button ${JSON.stringify(dataset)} is drawn in the container`);
+      for (const fn of container.listenersOf('click')) await fn({ target: btn });
+      return btn;
+    };
+    container.key = async (k) => {
+      const event = { key: k, target: document.activeElement, preventDefault() {} };
+      for (const fn of container.listenersOf('keydown')) await fn(event);
+    };
+    return container;
+  };
+}
+
+/**
  * @param {{window?: object, scripts?: string[], timers?: Array|null, globals?: object}} options
  *   `window` are the stubs the client calls on `window`; `scripts` are file names under `public/`; `globals` are extra sandbox
  *   globals (for example `CustomEvent`, `localStorage`) that a suite needs and the default set does not have.
@@ -109,22 +133,7 @@ export function loadWorld({ window: windowStubs = {}, scripts = ['prompt-section
   vm.createContext(sandbox);
   for (const name of scripts) vm.runInContext(readFileSync(join(PUBLIC_DIR, name), 'utf8'), sandbox, { filename: name });
 
-  const makeContainer = () => {
-    const container = document.createElement('div');
-    document.body.appendChild(container);
-    container.click = async (dataset) => {
-      const attrs = Object.entries(dataset).map(([k, v]) => `[data-${k.replace(/[A-Z]/g, (c) => `-${c.toLowerCase()}`)}="${v}"]`).join('');
-      const btn = container.querySelector(`button${attrs}`);
-      if (!btn) throw new Error(`no button ${JSON.stringify(dataset)} is drawn in the container`);
-      for (const fn of container.listenersOf('click')) await fn({ target: btn });
-      return btn;
-    };
-    container.key = async (k) => {
-      const event = { key: k, target: document.activeElement, preventDefault() {} };
-      for (const fn of container.listenersOf('keydown')) await fn(event);
-    };
-    return container;
-  };
+  const makeContainer = containerMaker(document);
   // Evaluates a snippet in the world's script scope (LIN-4280). Top-level `let` and `const` bindings of the loaded
   // scripts live there, not on the context object, so `sandbox` cannot reach them: `world.run('currentView = "rulings"')`
   // sets one, and `world.run('currentView')` reads it. Bindings persist across calls in the same world.

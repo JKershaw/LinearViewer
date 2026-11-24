@@ -10,6 +10,7 @@
  */
 import { test, describe } from 'node:test';
 import assert from 'node:assert';
+import { readFileSync } from 'node:fs';
 import { renderDisplayLabels, renderPage, renderDetailsContent } from '../../lib/render.js';
 import { PERIODICALS_PROJECT_ID, NO_PROJECT_ID, buildInProgressForest } from '../../lib/tree.js';
 import { testMockPeriodicalsTree } from '../fixtures/periodicals-tree.js';
@@ -1240,10 +1241,11 @@ describe('task-page link (LIN-3331)', () => {
 // Home must load the shared opened-task component script. Dropping
 // /prompt-section.js from the list left all unit tests green (surviving M10).
 describe('Home script list (LIN-2944 P1)', () => {
-  test('signed-in pages load /prompt-section.js before /app.js', () => {
+  test('signed-in pages load app.js as a module, which imports the shared component (LIN-4463 piece 5)', () => {
     const trees = [{ project: { id: 'p1', name: 'P' }, incomplete: [], completed: [], completedCount: 0 }];
     const authed = renderPage(trees, [], [], 'Org', { urlKey: 'ws', workspaces: [{ urlKey: 'ws', provider: 'linear' }] });
-    assert.ok(authed.includes('/prompt-section.js'), 'signed-in page loads the shared component');
-    assert.ok(authed.indexOf('/prompt-section.js') < authed.indexOf('/app.js'), 'loaded before app.js mounts it');
+    assert.match(authed, /<script type="module" src="\/app\.js"><\/script>/, 'app.js is a module');
+    assert.ok(!authed.includes('src="/prompt-section.js"'), 'the component is not a tag of its own: app.js imports it');
+    assert.match(readFileSync(new URL('../../public/app.js', import.meta.url), 'utf8'), /^import \* as PromptSection from '\.\/prompt-section\.js'/m);
   });
 });

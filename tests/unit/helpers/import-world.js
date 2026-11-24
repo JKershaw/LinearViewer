@@ -22,10 +22,14 @@
  *    cache-bust a second import returns the first instance's timers and listeners. Pure lib leaves that the page imports
  *    keep their cache, and they are pure, so that is safe.
  *  - `runClassic` runs a `public/` classic script in the main realm with `vm.runInThisContext`. It is the one supported
- *    way to put a classic sibling into the same realm as a module. Use it for `chart-helpers.js` and `close-out.js`,
- *    which are IIFEs and so declare nothing that could collide. Any other file loaded this way counts as a classic suite
- *    in tests/unit/classic-loader-census.test.js (RUN_CLASSIC_SIBLINGS names the two exempt ones), so this helper is not
- *    a way round that ratchet.
+ *    way to put a classic sibling into the same realm as a module. Use it for the IIFE siblings (`chart-helpers.js`,
+ *    `close-out.js`, `question-cards.js`), which declare nothing that could collide. Any other file loaded this way
+ *    counts as a classic suite in tests/unit/classic-loader-census.test.js (RUN_CLASSIC_SIBLINGS names the exempt ones),
+ *    so this helper is not a way round that ratchet. The source runs inside a block (LIN-4463 piece 5), so a file with
+ *    top-level `const`/`let` (common.js) can run once per world: unwrapped, a second world in the same process threw
+ *    "already declared". In the block those bindings are the file's own (a later classic script cannot read them bare;
+ *    a module reads `window.X` anyway), and its top-level functions still become globals (sloppy-mode block functions).
+ *    Those function globals are non-configurable, so `restore()` cannot delete them; the next run overwrites them.
  *  - `restore()` puts back every global it changed, by descriptor: a replaced property gets its old descriptor back, a
  *    new property is deleted. It works from a snapshot taken when the world was made, so a global a test adds by hand
  *    is removed too. Accessor globals are never assigned, because Node 25 exposes some of them getter-only.
@@ -96,9 +100,12 @@ export function importWorld({ window: windowStubs = {}, globals = {}, timers = n
   return {
     document,
     window: globalThis,
-    /** Runs a classic `public/` script in this realm (vm.runInThisContext). Its globals are restored by `restore()`. */
+    /**
+     * Runs a classic `public/` script in this realm (vm.runInThisContext), inside a block (see the header). Its
+     * `window.X =` globals are restored by `restore()`.
+     */
     runClassic(name) {
-      vm.runInThisContext(readFileSync(fileOf(name), 'utf8'), { filename: name });
+      vm.runInThisContext(`{\n${readFileSync(fileOf(name), 'utf8')}\n}`, { filename: name, lineOffset: -1 });
     },
     /** Imports a `public/` module (or an absolute path) fresh: a new instance of its module state. */
     importPage(name) {

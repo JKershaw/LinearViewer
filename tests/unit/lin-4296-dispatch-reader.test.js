@@ -6,23 +6,25 @@
  * harness and no model, and a harness and model chosen on the real controls are the ones dispatched. The swipe disclosure
  * passes `harnessDefault: ''` (public/prompt-section.js), so nothing is pre-selected.
  *
- * Runs in the shared client world (tests/unit/helpers/client-world.js), with the real dispatch disclosure.
+ * public/prompt-section.js is a native module (LIN-4463 piece 5), imported over the fake DOM, with the real dispatch
+ * disclosure.
  */
 import { test, describe } from 'node:test';
 import assert from 'node:assert/strict';
-import { loadWorld } from './helpers/client-world.js';
+import { promptSectionWorld } from './helpers/prompt-section-world.js';
 import { DISCLOSURE_SCRIPTS, disclosureWindowStubs } from './helpers/real-dispatch-disclosure.js';
 
-const flush = () => new Promise((r) => setTimeout(r, 0));
+// setImmediate, not setTimeout: the world collects setTimeout into `timers`, and it is the page's global and the test's.
+const flush = () => new Promise((r) => setImmediate(r));
 
 // The model select's sentinel "other…" option is labelled with the ellipsis; a real model is any other non-blank option.
 const isRealModelOption = (o) => o.value !== '' && o.text !== 'other…';
 
-async function mount() {
+async function mount(t) {
   const calls = { dispatch: [] };
-  const world = loadWorld({
+  const world = await promptSectionWorld(t, {
     window: disclosureWindowStubs(),
-    scripts: DISCLOSURE_SCRIPTS,
+    classic: DISCLOSURE_SCRIPTS,
     timers: [],
     globals: { fetch: async () => ({ ok: false, json: async () => ({}) }) },
   });
@@ -54,8 +56,8 @@ async function mount() {
 }
 
 describe('LIN-4296 — the dispatch reader reads the disclosure\'s own selects', () => {
-  test('an untouched disclosure pre-selects no harness, and dispatches with no harness and no model', async () => {
-    const { container, calls } = await mount();
+  test('an untouched disclosure pre-selects no harness, and dispatches with no harness and no model', async (t) => {
+    const { container, calls } = await mount(t);
     const panel = container.querySelector('.swipe-prompt-options');
     assert.ok(panel, 'precondition: the disclosure is drawn');
     assert.equal(panel.querySelector('.dispatch-exec-harness-select').value, '', 'the blank option is what the harness reads');
@@ -64,8 +66,8 @@ describe('LIN-4296 — the dispatch reader reads the disclosure\'s own selects',
     assert.deepEqual([calls.dispatch[0].harness, calls.dispatch[0].model], [null, null]);
   });
 
-  test('a harness and a model chosen on the disclosure\'s selects are the ones dispatched', async () => {
-    const { container, calls } = await mount();
+  test('a harness and a model chosen on the disclosure\'s selects are the ones dispatched', async (t) => {
+    const { container, calls } = await mount(t);
     const panel = container.querySelector('.swipe-prompt-options');
     const harness = panel.querySelector('.dispatch-exec-harness-select');
     const model = panel.querySelector('.dispatch-exec-model');
@@ -80,15 +82,15 @@ describe('LIN-4296 — the dispatch reader reads the disclosure\'s own selects',
 
   // The end-to-end witness that the modelled `options` / `value` / `selectedIndex` / `dataset` surface is enough for production's
   // rebuild path (public/common.js rebuildDispatchModelOptions + updateDispatchModelHint), which no catalog fetch reaches here.
-  test('rebuilding the model options keeps a prior model, keeps the blank and other… ends, and reads the hint without throwing', async () => {
-    const { container, world } = await mount();
+  test('rebuilding the model options keeps a prior model, keeps the blank and other… ends, and reads the hint without throwing', async (t) => {
+    const { container, world } = await mount(t);
     const panel = container.querySelector('.swipe-prompt-options');
     const model = panel.querySelector('.dispatch-exec-model');
     const pick = [...model.options].find(isRealModelOption);
     assert.ok(pick, 'precondition: the model select offers a real model to choose');
     model.value = pick.value;
     assert.equal(model.value, pick.value, 'precondition: the pick took');
-    world.run('rebuildDispatchModelOptions')(model, 'opencode');
+    world.window.rebuildDispatchModelOptions(model, 'opencode');
     const opts = [...model.options];
     assert.equal(model.value, pick.value, 'the prior model survives the rebuild');
     assert.equal(opts[0].value, '', 'the blank option stays first');

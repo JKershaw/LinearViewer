@@ -3,11 +3,15 @@
  *
  * A native ES module (LIN-4463 piece 5). A module runs after every classic script on the page, wherever it is listed,
  * once the document is parsed and before DOMContentLoaded. So it reads the classic globals (common.js's api, escapeHtml,
- * renderMarkdown, the page's PromptSection) safely, and its DOMContentLoaded init registers after the classic page
+ * renderMarkdown) safely, and imports the shared PromptSection and the download filename rule (the server's own, a
+ * served lib leaf) instead of keeping copies. Its DOMContentLoaded init registers after the classic page
  * script listed after it (dispatch.js, settings.js); none of those reads what this init sets up. Its top-level names
  * are module-scoped: nothing classic reads them (the queue badge's updater, the one that was read, is common.js's).
  * Exported names are its test seams. `window.refreshWaitingOnYou` is the e2e hook the bridge inventory lists.
  */
+import * as PromptSection from './prompt-section.js'
+import { buildPromptFilename } from '../lib/prompt-filename.js'
+
 const STORAGE_KEY = 'linear-projects-state'
 // TEAM_STORAGE_KEY and the team-selection helpers now live in common.js
 // (alongside initNavBar) so the workspace switcher works on every page — LIN-288.
@@ -36,52 +40,6 @@ const QUEUE_POLL_INTERVAL_MS = 1000
 function stripCodeBlockFences(text) {
   if (!text) return text
   return text.replace(/^```[^\n]*\n?/, '').replace(/\n?```\s*$/, '').trim()
-}
-
-/**
- * Slugify a value into a filesystem-safe token for a download filename.
- * Mirrors slugifyForFilename in lib/prompt-formatters.js.
- * @param {string} value
- * @returns {string} Lower-cased, dash-separated slug
- */
-function slugifyForFilename(value) {
-  return String(value || '')
-    .trim()
-    .toLowerCase()
-    .replace(/[^a-z0-9.-]+/g, '-')
-    .replace(/-+/g, '-')
-    .replace(/^[-.]+|[-.]+$/g, '')
-}
-
-/**
- * Build a `<identifier>-<promptName>.md` filename for a downloaded prompt.
- * @param {string} identifier - Issue identifier (e.g. LIN-316), may be empty
- * @param {string} promptName - Prompt name (e.g. "Retro")
- * @returns {string} Safe filename ending in `.md`
- */
-function buildPromptFilename(identifier, promptName) {
-  const id = slugifyForFilename(identifier)
-  const name = slugifyForFilename(promptName) || 'prompt'
-  const base = id ? `${id}-${name}` : name
-  return `${base}.md`
-}
-
-/**
- * Trigger a client-side markdown download of the given text.
- * @param {string} text - File contents
- * @param {string} filename - Download filename
- */
-function downloadMarkdown(text, filename) {
-  const blob = new Blob([text], { type: 'text/markdown' })
-  const url = URL.createObjectURL(blob)
-  const a = document.createElement('a')
-  a.href = url
-  a.download = filename
-  document.body.appendChild(a)
-  a.click()
-  document.body.removeChild(a)
-  // Release the object URL on the next tick so the download can start first.
-  setTimeout(() => URL.revokeObjectURL(url), 0)
 }
 
 // ==========================================================================
@@ -308,12 +266,12 @@ async function loadDetails(details) {
  */
 function mountHomePromptSections(root) {
   const page = window.__HOME_PROMPT_OPTS__
-  if (!page || !window.PromptSection) return
+  if (!page) return
   ;(root || document).querySelectorAll('[data-prompt-mount]').forEach((el) => {
     if (el.dataset.mounted) return
     if (!el.dataset.issueId) return
     el.dataset.mounted = 'true'
-    el._promptSectionHandle = window.PromptSection.init(el, homePromptOpts(el, page))
+    el._promptSectionHandle = PromptSection.init(el, homePromptOpts(el, page))
   })
 }
 
@@ -1561,7 +1519,7 @@ async function handleDownloadClick(e) {
     // Mint+Autopilot) so the downloaded .md always carries the forced block.
     const forceProxy = promptContainer.dataset.proxyForce === 'true'
     textToDownload = await maybeAppendProxyBlock(textToDownload, urlKey, { force: forceProxy })
-    downloadMarkdown(textToDownload, buildPromptFilename(identifier, promptName))
+    PromptSection.downloadMarkdown(textToDownload, buildPromptFilename(identifier, promptName))
     const originalText = downloadBtn.textContent
     downloadBtn.textContent = 'saved!'
     setTimeout(() => {

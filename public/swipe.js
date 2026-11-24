@@ -7,9 +7,11 @@
  *
  * A native ES module (LIN-4463 piece 5): it runs after every classic script on the page, once the document is parsed and
  * before DOMContentLoaded, as the classic script at the end of the body did. It imports the task-page link builder from
- * the served lib leaf (the server's own, `lib/task-page-href.js`) instead of reading common.js's twin.
+ * the served lib leaf (the server's own, `lib/task-page-href.js`) instead of reading common.js's twin, and the shared
+ * PromptSection from ./prompt-section.js.
  */
 import { taskPageHref } from '../lib/task-page-href.js';
+import * as PromptSection from './prompt-section.js';
 
 // isTerminalState comes from public/common.js (a classic script, so it has run), the one browser home for the terminal set.
 
@@ -409,8 +411,8 @@ function renderCard(direction) {
   // Prompts accordion (lazy loaded) - the primary triage action, emphasised as
   // the anchor of the Work group. Only available when authenticated.
   if (urlKey) {
-    const cached = window.PromptSection && window.PromptSection.getCached
-      ? window.PromptSection.getCached(issue.id, urlKey)
+    const cached = PromptSection.getCached
+      ? PromptSection.getCached(issue.id, urlKey)
       : null;
     const hint = cached ? ` <span class="swipe-prompts-cache-hint">· ${_esc(cached.name || cached.label)} cached</span>` : '';
     groups.work.push(`
@@ -445,8 +447,8 @@ function renderCard(direction) {
   // LIN-3098 S4b: "run on my machine ›" right under the title, outside every
   // accordion and whatever the flags say, so it is on the first screen of a
   // phone. Signed-in only (the landing card has no workspace).
-  const runnerLinkHtml = urlKey && window.PromptSection
-    ? `<div class="swipe-card-runner">${window.PromptSection.runnerLinkHtml(urlKey)}</div>`
+  const runnerLinkHtml = urlKey
+    ? `<div class="swipe-card-runner">${PromptSection.runnerLinkHtml(urlKey)}</div>`
     : '';
 
   // LIN-3331: the card's link through to the task page. `urlKey` gates the
@@ -765,12 +767,12 @@ function handleAccordionClick(e) {
 
   if (type === 'prompts' && !isOpen) {
     const placeholder = body.querySelector('[data-prompt-placeholder="1"]');
-    if (placeholder && window.PromptSection) {
+    if (placeholder) {
       placeholder.removeAttribute('data-prompt-placeholder');
       const issue = filteredIssues[currentIndex];
       if (issue) {
         tearDownActivePrompt();
-        activePromptHandle = window.PromptSection.init(placeholder, {
+        activePromptHandle = PromptSection.init(placeholder, {
           urlKey,
           issue,
           // LIN-2942: where the ladder press happened, carried on its mode record.

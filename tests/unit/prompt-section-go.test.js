@@ -6,14 +6,13 @@
 // stored task-state endpoint once on mount, so a run already in progress shows
 // the running/waiting line instead of a pressable Go (`live || waiting`).
 //
-// The client runs in the shared client world (tests/unit/helpers/client-world.js): the one fake DOM
-// and one vm sandbox. A press is `container.click(dataset)`, which needs the button to be drawn, as a
+// public/prompt-section.js is a native module (LIN-4463 piece 5), imported over the fake DOM. A press is `container.click(dataset)`, which needs the button to be drawn, as a
 // browser needs it. Assertions read the drawn markup (`innerHTML`, `querySelector`) and node identity:
 // a node held before a press is kept (the same node, still attached) or rebuilt (detached).
 
 import { test, describe } from 'node:test';
 import assert from 'node:assert/strict';
-import { loadWorld } from './helpers/client-world.js';
+import { promptSectionWorld } from './helpers/prompt-section-world.js';
 
 // Every element in the container outside `slotSelector`. A repaint that touches only that slot keeps all of them: the
 // same node, still attached. A full render detaches them all.
@@ -30,7 +29,7 @@ function nodesOutside(container, slotSelector) {
   return out;
 }
 
-function loadPromptSection(overrides = {}) {
+async function loadPromptSection(t, overrides = {}) {
   const calls = { api: [], dispatch: [], kickoff: [], records: [], fetch: [] };
   const timers = [];
 
@@ -71,9 +70,8 @@ function loadPromptSection(overrides = {}) {
     return { item: { id: 'disp-1' } };
   };
 
-  const world = loadWorld({
+  const world = await promptSectionWorld(t, {
     window,
-    scripts: ['prompt-section.js'],
     timers,
     globals: {
       fetch: async (url, opts) => {
@@ -118,8 +116,8 @@ function baseOpts(extra = {}) {
   return { runSetup: !o.dispatchEnabled, ...o };
 }
 
-async function mount(overrides = {}, extra = {}, loadOverrides = {}) {
-  const h = loadPromptSection({ ...overrides, ...loadOverrides });
+async function mount(t, overrides = {}, extra = {}, loadOverrides = {}) {
+  const h = await loadPromptSection(t, { ...overrides, ...loadOverrides });
   const container = h.makeContainer();
   h.PromptSection.init(container, baseOpts(extra));
   await h.flush();
@@ -128,8 +126,8 @@ async function mount(overrides = {}, extra = {}, loadOverrides = {}) {
 }
 
 describe('LIN-3341 — Go is one press', () => {
-  test('one press: one kickoff (stopAt=pr) and one dispatch with the full payload', async () => {
-    const m = await mount();
+  test('one press: one kickoff (stopAt=pr) and one dispatch with the full payload', async (t) => {
+    const m = await mount(t);
     assert.match(m.container.innerHTML, /data-rung="run-task"[^>]*data-action="go"/, 'Go is ready');
     await m.container.click({ action: 'go', rung: 'run-task' });
     await m.flush();
@@ -152,11 +150,11 @@ describe('LIN-3341 — Go is one press', () => {
     assert.match(m.container.innerHTML, /href="\/workspace\/ws\/task\/LIN-42"[^>]*data-testid="opened-task-started-link"/, 'with a task-page link');
   });
 
-  test('a double press makes one dispatch', async () => {
+  test('a double press makes one dispatch', async (t) => {
     // The first press is held in `starting` until its kickoff answers: that is the window a second press could land in.
     let releaseKickoff;
     const kickoffHeld = new Promise((r) => { releaseKickoff = r; });
-    const m = await mount({ kickoff: () => kickoffHeld });
+    const m = await mount(t, { kickoff: () => kickoffHeld });
     await m.container.click({ action: 'go', rung: 'run-task' });
     await m.flush();
     // A starting Go is drawn disabled and is not pressable, so a second press has no control to land on.
@@ -170,10 +168,10 @@ describe('LIN-3341 — Go is one press', () => {
     assert.equal(m.calls.dispatch.length, 1, 'the second press is ignored');
   });
 
-  test('a non-blank panel harness is sent, never null', async () => {
+  test('a non-blank panel harness is sent, never null', async (t) => {
     // The press reads the disclosure drawn on the card (startRun looks up `.swipe-prompt-options`), so the reader gets that node.
     const panels = [];
-    const m = await mount({}, {}, { readDispatchExecControls: (panel) => { panels.push(panel); return { model: 'openai/gpt-5.4-mini', harness: 'opencode' }; } });
+    const m = await mount(t, {}, {}, { readDispatchExecControls: (panel) => { panels.push(panel); return { model: 'openai/gpt-5.4-mini', harness: 'opencode' }; } });
     await m.container.click({ prompt: 'implementation' });
     await m.flush();
     const card = m.container.querySelector('.swipe-prompt-options');
@@ -185,36 +183,36 @@ describe('LIN-3341 — Go is one press', () => {
     assert.equal(m.calls.dispatch[0].model, 'openai/gpt-5.4-mini');
   });
 
-  test('Go is present in idle, generating, fresh and error', async () => {
+  test('Go is present in idle, generating, fresh and error', async (t) => {
     // idle
-    const idle = await mount();
+    const idle = await mount(t);
     assert.match(idle.container.innerHTML, /data-testid="opened-task-go"/);
 
     // generating: click ✦ next step with a stream that never settles. The click
     // handler reaches fetchPrompt's first await synchronously, so the phase is
     // already `generating` when it returns.
-    const genH = loadPromptSection({ readSSEStream: () => new Promise(() => {}) });
+    const genH = await loadPromptSection(t, { readSSEStream: () => new Promise(() => {}) });
     const genC = genH.makeContainer();
     genH.PromptSection.init(genC, baseOpts());
     await genC.click({ prompt: '__ai__' });
     assert.match(genC.innerHTML, /data-testid="opened-task-go"/, 'Go shows while generating');
 
     // fresh: a template result
-    const fresh = await mount();
+    const fresh = await mount(t);
     await fresh.container.click({ prompt: 'implementation' });
     await fresh.flush();
     assert.match(fresh.container.innerHTML, /data-testid="opened-task-go"/, 'Go shows in fresh');
 
     // error: the template fetch throws
-    const err = await mount({}, {}, { templateApi: async () => { throw new Error('boom'); } });
+    const err = await mount(t, {}, {}, { templateApi: async () => { throw new Error('boom'); } });
     await err.container.click({ prompt: 'implementation' });
     await err.flush();
     assert.match(err.container.innerHTML, /prompt-error/, 'error phase rendered');
     assert.match(err.container.innerHTML, /data-testid="opened-task-go"/, 'Go shows in error');
   });
 
-  test('a Go press during the ✦ stream does not rebuild the prompt body (N4)', async () => {
-    const m = await mount({}, {}, { readSSEStream: () => new Promise(() => {}) });
+  test('a Go press during the ✦ stream does not rebuild the prompt body (N4)', async (t) => {
+    const m = await mount(t, {}, {}, { readSSEStream: () => new Promise(() => {}) });
     await m.container.click({ prompt: '__ai__' });
     await m.flush();
     // The streamed body is held before the press. Everything outside the Go slot is held too.
@@ -229,7 +227,7 @@ describe('LIN-3341 — Go is one press', () => {
     for (const el of kept) assert.ok(el.isConnected, `only the Go slot was repainted: <${el.localName}> outside it was rebuilt`);
   });
 
-  test('LIN-4247: a complete idle reply ends the run: Go returns, the started line goes, polling stops', async () => {
+  test('LIN-4247: a complete idle reply ends the run: Go returns, the started line goes, polling stops', async (t) => {
     // The ended reply is complete and carries `sessions` with nothing busy, as the server sends it.
     const idleReply = { live: false, status: 'idle', headerHtml: '<div class="task-status"><p class="task-sentence">No session running.</p></div>', sessions: { busy: false, action: { kind: 'offer' } } };
     const queue = [
@@ -238,7 +236,7 @@ describe('LIN-3341 — Go is one press', () => {
       { live: true, status: 'running', headerHtml: '<div class="task-status"><p class="task-sentence">Autopilot running since 12:00.</p></div>', sessions: { busy: true, action: { kind: 'busy' } } }, // first poll
       idleReply // second poll: the run has ended
     ];
-    const m = await mount({}, {}, { stateApi: async () => queue.shift() || idleReply });
+    const m = await mount(t, {}, {}, { stateApi: async () => queue.shift() || idleReply });
     await m.container.click({ action: 'go', rung: 'run-task' });
     await m.flush();
     await m.runTimers(); // first poll
@@ -260,10 +258,10 @@ describe('LIN-3341 — Go is one press', () => {
   const NOT_YET = { live: false, status: 'idle', headerHtml: '<div class="task-status"><p class="task-sentence">No sessions yet.</p></div>' };
   const LIVE = { live: true, status: 'running', headerHtml: '<div class="task-status"><p class="task-sentence">Autopilot running.</p></div>', sessions: { busy: true, action: { kind: 'busy' } } };
 
-  test('LIN-4247: an incomplete reply is not an end: Go stays out and the poll goes on', async () => {
+  test('LIN-4247: an incomplete reply is not an end: Go stays out and the poll goes on', async (t) => {
     // `incomplete` carries no live or status (routes/task-page.js), and sessions.busy is set, as the server sends it.
     const incomplete = { incomplete: 'cold', sessions: { busy: true, action: null } };
-    const m = await mount({}, {}, { stateApi: repliesOf(NOT_YET, NOT_YET, incomplete) });
+    const m = await mount(t, {}, {}, { stateApi: repliesOf(NOT_YET, NOT_YET, incomplete) });
     await m.container.click({ action: 'go', rung: 'run-task' });
     await m.flush();
     await m.runTimers(); // the incomplete poll
@@ -272,10 +270,10 @@ describe('LIN-3341 — Go is one press', () => {
     assert.equal(m.timers.filter((t) => !t.cancelled).length, 1, 'a poll is scheduled');
   });
 
-  test('LIN-4247: a merely incomplete reply, with no sessions at all, is never an end on its own', async () => {
+  test('LIN-4247: a merely incomplete reply, with no sessions at all, is never an end on its own', async (t) => {
     // The rule must not lean on `sessions.busy`: an incomplete reply alone keeps the run started and the poll going.
     const bare = { incomplete: 'cold' };
-    const m = await mount({}, {}, { stateApi: repliesOf(NOT_YET, NOT_YET, bare) });
+    const m = await mount(t, {}, {}, { stateApi: repliesOf(NOT_YET, NOT_YET, bare) });
     await m.container.click({ action: 'go', rung: 'run-task' });
     await m.flush();
     await m.runTimers();
@@ -284,10 +282,10 @@ describe('LIN-3341 — Go is one press', () => {
     assert.equal(m.timers.filter((t) => !t.cancelled).length, 1, 'a poll is scheduled');
   });
 
-  test('LIN-4247: a complete reply that is still busy (a subtask runs) is not an end', async () => {
+  test('LIN-4247: a complete reply that is still busy (a subtask runs) is not an end', async (t) => {
     // live is false, but a subtask runs: the offer is `busy`. Go must not return, or a second press could start a second run.
     const busy = { live: false, status: 'idle', headerHtml: '<div class="task-status"><p class="task-sentence">A subtask runs.</p></div>', sessions: { busy: true, action: { kind: 'busy', identifier: 'LIN-43' } } };
-    const m = await mount({}, {}, { stateApi: repliesOf(NOT_YET, NOT_YET, busy) });
+    const m = await mount(t, {}, {}, { stateApi: repliesOf(NOT_YET, NOT_YET, busy) });
     await m.container.click({ action: 'go', rung: 'run-task' });
     await m.flush();
     await m.runTimers();
@@ -296,10 +294,10 @@ describe('LIN-3341 — Go is one press', () => {
     assert.equal(m.timers.filter((t) => !t.cancelled).length, 1, 'a poll is scheduled');
   });
 
-  test('LIN-4247: a finished task draws neither Go nor the started line when its run ends', async () => {
+  test('LIN-4247: a finished task draws neither Go nor the started line when its run ends', async (t) => {
     // The server's `none` offer is the only decider: the ended reply carries it, and Go stays out.
     const finished = { live: false, status: 'done', headerHtml: '<div class="task-status"><p class="task-sentence">Done.</p></div>', sessions: { busy: false, action: { kind: 'none' } } };
-    const m = await mount({}, {}, { stateApi: repliesOf(NOT_YET, NOT_YET, LIVE, finished) });
+    const m = await mount(t, {}, {}, { stateApi: repliesOf(NOT_YET, NOT_YET, LIVE, finished) });
     await m.container.click({ action: 'go', rung: 'run-task' });
     await m.flush();
     await m.runTimers(); // live
@@ -310,7 +308,7 @@ describe('LIN-3341 — Go is one press', () => {
     assert.equal(m.timers.filter((t) => !t.cancelled).length, 0, 'polling stops');
   });
 
-  test('LIN-4247: a poll read that lands after a Stop restarted the run does not end the newer run', async () => {
+  test('LIN-4247: a poll read that lands after a Stop restarted the run does not end the newer run', async (t) => {
     // The poll read is held open; a Stop in the meantime restarts the poll with a new Go state. The held read is complete and
     // says the run ended, but it is stale: it was taken before that Stop, so it must not reset Go.
     const RUNNING_WITH_SESSION = { ...LIVE, sessions: { busy: true, action: { kind: 'busy' }, running: { loopId: 'loop-1', target: 'cli' }, canStop: true } };
@@ -327,7 +325,7 @@ describe('LIN-3341 — Go is one press', () => {
     };
     // The task page surface: Stop is its run control (handleRunAction returns early on Swipe). This file's workspace fills
     // Run to PR, so the task page's primary control is the Go this test presses (without it that page's primary is Next step).
-    const m = await mount({}, { surface: 'task', filledRung: 'pr' }, { stateApi });
+    const m = await mount(t, {}, { surface: 'task', filledRung: 'pr' }, { stateApi });
     await m.container.click({ action: 'go', rung: 'run-task' });
     await m.flush();
     await m.runTimers(); // first poll: live, the session is known
@@ -345,16 +343,16 @@ describe('LIN-3341 — Go is one press', () => {
     assert.doesNotMatch(m.container.innerHTML, /data-testid="opened-task-go"/, 'no Go from the stale read');
   });
 
-  test('a 201 no-runner warning adds our plain-words line with the runner link', async () => {
-    const m = await mount({ dispatch: async () => ({ item: { id: 'd' }, warning: 'no consumer' }) });
+  test('a 201 no-runner warning adds our plain-words line with the runner link', async (t) => {
+    const m = await mount(t, { dispatch: async () => ({ item: { id: 'd' }, warning: 'no consumer' }) });
     await m.container.click({ action: 'go', rung: 'run-task' });
     await m.flush();
     assert.match(m.container.innerHTML, /Nothing is listening for this run yet\./);
     assert.match(m.container.innerHTML, /href="\/workspace\/ws\/runner"/);
   });
 
-  test('refusals branch on err.body.code', async () => {
-    const dup = await mount({ dispatch: async () => { const e = new Error('dup'); e.status = 409; e.body = { code: 'DUPLICATE_DISPATCH' }; throw e; } });
+  test('refusals branch on err.body.code', async (t) => {
+    const dup = await mount(t, { dispatch: async () => { const e = new Error('dup'); e.status = 409; e.body = { code: 'DUPLICATE_DISPATCH' }; throw e; } });
     await dup.container.click({ action: 'go', rung: 'run-task' });
     await dup.flush();
     // LIN-3446: a duplicate refusal means a run IS live — no pressable Go, the
@@ -370,7 +368,7 @@ describe('LIN-3341 — Go is one press', () => {
 
     // LIN-3494: every other refusal shows the server's own reason, then the link.
     const refuse = async (status, body, message) => {
-      const m = await mount({ dispatch: async () => { const e = new Error(message || String(status)); e.status = status; e.body = body; throw e; } });
+      const m = await mount(t, { dispatch: async () => { const e = new Error(message || String(status)); e.status = status; e.body = body; throw e; } });
       await m.container.click({ action: 'go', rung: 'run-task' });
       await m.flush();
       return m.container.innerHTML;
@@ -413,8 +411,8 @@ describe('LIN-3341 — Go is one press', () => {
     assert.doesNotMatch(empty, /Couldn\u2019t start the run/);
   });
 
-  test('a not-set-up Go press records intent and dispatches nothing', async () => {
-    const m = await mount({}, { dispatchEnabled: false });
+  test('a not-set-up Go press records intent and dispatches nothing', async (t) => {
+    const m = await mount(t, {}, { dispatchEnabled: false });
     assert.match(m.container.innerHTML, /data-rung="run-task"[^>]*data-action="setup"/, 'Go shows ○ set up');
     await m.container.click({ action: 'setup', setupNeeds: 'dispatch', rung: 'run-task' });
     await m.flush();
@@ -432,8 +430,8 @@ describe('LIN-3341 — Go is one press', () => {
     const seq = (...qs) => { let i = 0; return () => qs[Math.min(i++, qs.length - 1)]; };
     const goTag = (m) => m.container.innerHTML.match(/<button[^>]*data-testid="opened-task-go"[^>]*>/)[0];
 
-    test('a successful Go press shows the re-read allowance and disables Go at zero', async () => {
-      const m = await mount({}, { freeTier: true }, { quota: seq(Q(1), Q(0)) });
+    test('a successful Go press shows the re-read allowance and disables Go at zero', async (t) => {
+      const m = await mount(t, {}, { freeTier: true }, { quota: seq(Q(1), Q(0)) });
       assert.match(m.container.innerHTML, /1 of 10 runs left today/);
       await m.container.click({ action: 'go', rung: 'run-task' });
       await m.flush();
@@ -442,8 +440,8 @@ describe('LIN-3341 — Go is one press', () => {
       assert.match(m.container.innerHTML, /0 of 10 runs left today/);
     });
 
-    test('a Go press repaints only the Go and ladder slots, never the whole container', async () => {
-      const m = await mount({}, { freeTier: true }, { quota: seq(Q(1), Q(0)) });
+    test('a Go press repaints only the Go and ladder slots, never the whole container', async (t) => {
+      const m = await mount(t, {}, { freeTier: true }, { quota: seq(Q(1), Q(0)) });
       // The ✦ next-step button sits outside the Go and ladder slots. A full render would rebuild it, so holding it proves the
       // press did not run one. Every other element outside those two slots is held the same way.
       const next = m.container.querySelector('[data-testid="opened-task-next-step"]');
@@ -458,9 +456,9 @@ describe('LIN-3341 — Go is one press', () => {
       assert.ok(m.container.querySelector('[data-ladder-slot]'), 'the ladder slot is still there');
     });
 
-    test('a RUN_LIMIT_REACHED 429 leaves Go exhausted via the quota read', async () => {
+    test('a RUN_LIMIT_REACHED 429 leaves Go exhausted via the quota read', async (t) => {
       const dispatch = async () => { const e = new Error('429'); e.status = 429; e.body = { code: 'RUN_LIMIT_REACHED' }; throw e; };
-      const m = await mount({ dispatch }, { freeTier: true }, { quota: seq(Q(1), Q(0)) });
+      const m = await mount(t, { dispatch }, { freeTier: true }, { quota: seq(Q(1), Q(0)) });
       await m.container.click({ action: 'go', rung: 'run-task' });
       await m.flush();
       await m.flush();
@@ -470,8 +468,8 @@ describe('LIN-3341 — Go is one press', () => {
     });
   });
 
-  test('a run-limited Go is disabled while ✦ next step stays enabled', async () => {
-    const m = await mount({}, { freeTier: true }, { quota: { limited: true, runsUsed: 10, limit: 10, remaining: 0 } });
+  test('a run-limited Go is disabled while ✦ next step stays enabled', async (t) => {
+    const m = await mount(t, {}, { freeTier: true }, { quota: { limited: true, runsUsed: 10, limit: 10, remaining: 0 } });
     await m.flush();
     const go = m.container.innerHTML.match(/<button[^>]*data-testid="opened-task-go"[^>]*>/);
     assert.ok(go);
@@ -483,50 +481,50 @@ describe('LIN-3341 — Go is one press', () => {
   });
 
   describe('mount-time live check', () => {
-    test('live:true shows the running line and no Go, with zero dispatch POSTs', async () => {
-      const m = await mount({}, {}, { stateApi: async () => ({ live: true, status: 'running', headerHtml: '<div class="task-status"><p class="task-sentence">Autopilot queued, waiting for a worker.</p></div>' }) });
+    test('live:true shows the running line and no Go, with zero dispatch POSTs', async (t) => {
+      const m = await mount(t, {}, {}, { stateApi: async () => ({ live: true, status: 'running', headerHtml: '<div class="task-status"><p class="task-sentence">Autopilot queued, waiting for a worker.</p></div>' }) });
       assert.match(m.container.innerHTML, /data-testid="opened-task-started"/);
       assert.match(m.container.innerHTML, /Autopilot queued, waiting for a worker\./);
       assert.doesNotMatch(m.container.innerHTML, /data-testid="opened-task-go"/);
       assert.equal(m.calls.dispatch.length, 0);
     });
 
-    test('live:false leaves Go ready', async () => {
-      const m = await mount({}, {}, { stateApi: async () => ({ live: false, status: 'idle', headerHtml: '<div class="task-status"><p class="task-sentence">No sessions yet.</p></div>' }) });
+    test('live:false leaves Go ready', async (t) => {
+      const m = await mount(t, {}, {}, { stateApi: async () => ({ live: false, status: 'idle', headerHtml: '<div class="task-status"><p class="task-sentence">No sessions yet.</p></div>' }) });
       assert.match(m.container.innerHTML, /data-rung="run-task"[^>]*data-action="go"/);
       assert.doesNotMatch(m.container.innerHTML, /data-testid="opened-task-started"/);
     });
 
-    test('a failed read leaves Go ready', async () => {
-      const m = await mount({}, {}, { stateApi: async () => { throw new Error('offline'); } });
+    test('a failed read leaves Go ready', async (t) => {
+      const m = await mount(t, {}, {}, { stateApi: async () => { throw new Error('offline'); } });
       assert.match(m.container.innerHTML, /data-rung="run-task"[^>]*data-action="go"/);
     });
 
-    test('waiting (live:false, status:waiting) counts as in progress — no Go, zero POSTs (round-3 1A)', async () => {
-      const m = await mount({}, {}, { stateApi: async () => ({ live: false, status: 'waiting', headerHtml: '<div class="task-status"><p class="task-sentence">Waiting for your answer.</p></div>' }) });
+    test('waiting (live:false, status:waiting) counts as in progress — no Go, zero POSTs (round-3 1A)', async (t) => {
+      const m = await mount(t, {}, {}, { stateApi: async () => ({ live: false, status: 'waiting', headerHtml: '<div class="task-status"><p class="task-sentence">Waiting for your answer.</p></div>' }) });
       assert.doesNotMatch(m.container.innerHTML, /data-testid="opened-task-go"/, 'Go is suppressed while waiting');
       assert.match(m.container.innerHTML, /Waiting for your answer\./);
       assert.equal(m.calls.dispatch.length, 0);
     });
 
-    test('no Go read when Go is not set up, and no read at all when urlKey/identifier is missing or window.api is absent', async () => {
+    test('no Go read when Go is not set up, and no read at all when urlKey/identifier is missing or window.api is absent', async (t) => {
       // LIN-3833: the one mount read also paints the state block for every viewer, so a viewer with no
       // dispatch still reads once. What is gated is Go: no Go button and no press-time dispatch.
-      const notReady = await mount({}, { dispatchEnabled: false });
+      const notReady = await mount(t, {}, { dispatchEnabled: false });
       assert.equal(notReady.calls.dispatch.length, 0);
       assert.equal(notReady.calls.api.filter((u) => String(u).includes('/api/task/')).length, 1, 'one display read, and no Go read');
 
-      const noKey = loadPromptSection();
+      const noKey = await loadPromptSection(t);
       noKey.PromptSection.init(noKey.makeContainer(), baseOpts({ urlKey: '' }));
       await noKey.flush();
       assert.equal(noKey.calls.api.some((u) => String(u).includes('/api/task/')), false, 'no urlKey → no read');
 
-      const noIdent = loadPromptSection();
+      const noIdent = await loadPromptSection(t);
       noIdent.PromptSection.init(noIdent.makeContainer(), baseOpts({ issue: { id: 'uuid-42' } }));
       await noIdent.flush();
       assert.equal(noIdent.calls.api.some((u) => String(u).includes('/api/task/')), false, 'no identifier → no read');
 
-      const noApi = loadPromptSection();
+      const noApi = await loadPromptSection(t);
       delete noApi.window.api;
       const c = noApi.makeContainer();
       noApi.PromptSection.init(c, baseOpts());
@@ -534,10 +532,10 @@ describe('LIN-3341 — Go is one press', () => {
       assert.match(c.innerHTML, /data-rung="run-task"[^>]*data-action="go"/, 'Go still renders without window.api');
     });
 
-    test('a result landing after destroy is a no-op', async () => {
+    test('a result landing after destroy is a no-op', async (t) => {
       let resolveState;
       const deferred = new Promise((r) => { resolveState = r; });
-      const h = loadPromptSection({ stateApi: () => deferred });
+      const h = await loadPromptSection(t, { stateApi: () => deferred });
       const c = h.makeContainer();
       const ret = h.PromptSection.init(c, baseOpts());
       ret.destroy();
@@ -553,9 +551,9 @@ describe('LIN-3341 — Go is one press', () => {
     const IDLE = { live: false, status: 'idle', headerHtml: '<div class="task-status"><p class="task-sentence">No sessions yet.</p></div>' };
     const stateReads = (m) => m.calls.api.filter((u) => String(u).includes('/api/task/')).length;
 
-    test('mount says idle, press-time read says live: no dispatch, running line, poll started', async () => {
+    test('mount says idle, press-time read says live: no dispatch, running line, poll started', async (t) => {
       const queue = [IDLE, { live: true, status: 'running', headerHtml: '<div class="task-status"><p class="task-sentence">Autopilot running since 09:00.</p></div>' }];
-      const m = await mount({}, {}, { stateApi: async () => queue.shift() || IDLE });
+      const m = await mount(t, {}, {}, { stateApi: async () => queue.shift() || IDLE });
       assert.match(m.container.innerHTML, /data-action="go"/, 'Go rendered from the idle mount read');
       await m.container.click({ action: 'go', rung: 'run-task' });
       await m.flush();
@@ -567,9 +565,9 @@ describe('LIN-3341 — Go is one press', () => {
       assert.equal(m.timers.filter((t) => !t.cancelled).length, 1, 'the poll is running');
     });
 
-    test('mount says idle, press-time read says waiting: no dispatch, running line', async () => {
+    test('mount says idle, press-time read says waiting: no dispatch, running line', async (t) => {
       const queue = [IDLE, { live: false, status: 'waiting', headerHtml: '<div class="task-status"><p class="task-sentence">Waiting for your answer.</p></div>' }];
-      const m = await mount({}, {}, { stateApi: async () => queue.shift() || IDLE });
+      const m = await mount(t, {}, {}, { stateApi: async () => queue.shift() || IDLE });
       await m.container.click({ action: 'go', rung: 'run-task' });
       await m.flush();
       await m.flush();
@@ -579,8 +577,8 @@ describe('LIN-3341 — Go is one press', () => {
       assert.equal(m.timers.filter((t) => !t.cancelled).length, 1, 'the poll is running');
     });
 
-    test('a press reads the state again even when the mount read already resolved', async () => {
-      const m = await mount({}, {}, { stateApi: async () => IDLE });
+    test('a press reads the state again even when the mount read already resolved', async (t) => {
+      const m = await mount(t, {}, {}, { stateApi: async () => IDLE });
       const before = stateReads(m);
       await m.container.click({ action: 'go', rung: 'run-task' });
       await m.flush();
@@ -589,9 +587,9 @@ describe('LIN-3341 — Go is one press', () => {
       assert.equal(m.calls.dispatch.length, 1, 'idle at press time still dispatches once');
     });
 
-    test('a failed press-time read proceeds: the read is best-effort, the server duplicate guard stays the backstop', async () => {
+    test('a failed press-time read proceeds: the read is best-effort, the server duplicate guard stays the backstop', async (t) => {
       let n = 0;
-      const m = await mount({}, {}, { stateApi: async () => { n += 1; if (n > 1) throw new Error('offline'); return IDLE; } });
+      const m = await mount(t, {}, {}, { stateApi: async () => { n += 1; if (n > 1) throw new Error('offline'); return IDLE; } });
       await m.container.click({ action: 'go', rung: 'run-task' });
       await m.flush();
       await m.flush();
@@ -599,10 +597,10 @@ describe('LIN-3341 — Go is one press', () => {
       assert.match(m.container.innerHTML, /data-testid="opened-task-started"/);
     });
 
-    test('a press while the read is in flight waits, then dispatches when the read is not live', async () => {
+    test('a press while the read is in flight waits, then dispatches when the read is not live', async (t) => {
       let resolveState;
       const deferred = new Promise((r) => { resolveState = r; });
-      const m = await mount({}, {}, { stateApi: () => deferred });
+      const m = await mount(t, {}, {}, { stateApi: () => deferred });
       await m.container.click({ action: 'go', rung: 'run-task' });
       assert.equal(m.calls.dispatch.length, 0, 'dispatch waits for the read');
       resolveState({ live: false, status: 'idle', headerHtml: '<div>x</div>' });
@@ -612,10 +610,10 @@ describe('LIN-3341 — Go is one press', () => {
       assert.equal(m.calls.dispatch.length, 1, 'the press proceeds once the read says not-live');
     });
 
-    test('a press while the read is in flight paints the running line and starts the poll when live (round-3 1B)', async () => {
+    test('a press while the read is in flight paints the running line and starts the poll when live (round-3 1B)', async (t) => {
       let resolveState;
       const deferred = new Promise((r) => { resolveState = r; });
-      const m = await mount({}, {}, { stateApi: () => deferred });
+      const m = await mount(t, {}, {}, { stateApi: () => deferred });
       await m.container.click({ action: 'go', rung: 'run-task' });
       resolveState({ live: true, status: 'running', headerHtml: '<div class="task-status"><p class="task-sentence">Autopilot running since 09:00.</p></div>' });
       await m.flush();

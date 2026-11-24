@@ -24,7 +24,7 @@ import { renderSwimPage } from '../../lib/render-swim.js';
 import { renderRunnerLink, runnerSetupHref } from '../../lib/components/runner-link.js';
 // Side-effect import: registers the Linear provider so the render fallbacks resolve.
 import '../../lib/providers/linear/index.js';
-import { loadWorld } from './helpers/client-world.js';
+import { promptSectionWorld } from './helpers/prompt-section-world.js';
 import { swipeWorld } from './helpers/swipe-world.js';
 
 const __dirname = dirname(fileURLToPath(import.meta.url));
@@ -82,9 +82,9 @@ describe('the shared markup', () => {
     assert.ok(renderRunnerLink('a"b c').includes('href="/workspace/a%22b%20c/runner"'));
   });
 
-  test('client twin (PromptSection.runnerLinkHtml) emits the same markup', () => {
-    const world = loadWorld({ scripts: ['prompt-section.js'], window: { escapeHtml: escapeLikeCommon } });
-    assert.equal(world.window.PromptSection.runnerLinkHtml('ws'), renderRunnerLink('ws'));
+  test('client twin (PromptSection.runnerLinkHtml) emits the same markup', async (t) => {
+    const world = await promptSectionWorld(t, { window: { escapeHtml: escapeLikeCommon } });
+    assert.equal(world.PromptSection.runnerLinkHtml('ws'), renderRunnerLink('ws'));
   });
 });
 
@@ -139,7 +139,7 @@ describe('Swim popover (renderSwimPage)', () => {
 
 // ---------------------------------------------------------------------------
 // Swipe: import public/swipe.js (a native module, LIN-4463 piece 5) over the server's swipe markup and read the card
-// it draws at load (helpers/swipe-world.js). PromptSection is the real prompt-section.js, which draws the link.
+// it draws at load (helpers/swipe-world.js). PromptSection is the real prompt-section.js swipe.js imports, which draws the link.
 // ---------------------------------------------------------------------------
 
 function escapeLikeCommon(s) {
@@ -153,7 +153,7 @@ function escapeLikeCommon(s) {
 }
 
 async function renderSwipeCard(t, data) {
-  const world = await swipeWorld(t, { data, classic: ['prompt-section.js'] });
+  const world = await swipeWorld(t, { data });
   return world.document.getElementById('swipe-card').innerHTML;
 }
 

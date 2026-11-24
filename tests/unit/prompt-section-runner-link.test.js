@@ -12,14 +12,14 @@
  *     dispatch then forces proxy access. The disclosure's dispatch buttons,
  *     the +proxy toggle and every other caller are unchanged.
  *
- * Runs in the shared client world (tests/unit/helpers/client-world.js), with the real dispatch disclosure.
+ * public/prompt-section.js is a native module (LIN-4463 piece 5), imported over the fake DOM, with the real dispatch disclosure.
  */
 import { test, describe } from 'node:test';
 import assert from 'node:assert/strict';
-import { loadWorld } from './helpers/client-world.js';
+import { promptSectionWorld } from './helpers/prompt-section-world.js';
 import { DISCLOSURE_SCRIPTS, disclosureWindowStubs } from './helpers/real-dispatch-disclosure.js';
 
-// The client world (tests/unit/helpers/client-world.js): the real dispatch disclosure and the component. `makeContainer()`
+// The world (tests/unit/helpers/prompt-section-world.js): the real dispatch disclosure and the component. `makeContainer()`
 // makes a container in the world of the most recent `loadPromptSection()`; each test makes its containers straight after
 // its own load, so it always reaches its own world.
 let currentWorld = null;
@@ -37,13 +37,13 @@ function makeLocalStorage() {
   };
 }
 
-function loadPromptSection({ localStorage } = {}) {
+async function loadPromptSection(t, { localStorage } = {}) {
   const calls = { dispatch: [], readers: [] };
   const timers = [];
   const storage = localStorage ? { localStorage } : {};
-  const world = loadWorld({
+  const world = await promptSectionWorld(t, {
     window: { ...disclosureWindowStubs(), ...storage },
-    scripts: DISCLOSURE_SCRIPTS,
+    classic: DISCLOSURE_SCRIPTS,
     timers,
     globals: {
       ...storage,
@@ -66,7 +66,7 @@ function loadPromptSection({ localStorage } = {}) {
     return realReader(scopeEl);
   };
   currentWorld = world;
-  return { PromptSection: window.PromptSection, window, calls, timers };
+  return { PromptSection: world.PromptSection, window, calls, timers };
 }
 
 function baseOpts(issue, extra = {}) {
@@ -88,7 +88,8 @@ function baseOpts(issue, extra = {}) {
   return { runSetup: !o.dispatchEnabled, ...o };
 }
 
-const flush = () => new Promise((r) => setTimeout(r, 0));
+// setImmediate, not setTimeout: the world collects setTimeout into `timers`, and it is the page's global and the test's.
+const flush = () => new Promise((r) => setImmediate(r));
 
 const LADDER = 'data-testid="opened-task-ladder"';
 const LINK = 'data-testid="opened-task-runner-link"';
@@ -105,8 +106,8 @@ function rungDataset(html, rung) {
   return ds;
 }
 
-async function fresh({ localStorage, dispatchEnabled = true } = {}) {
-  const loaded = loadPromptSection({ localStorage });
+async function fresh(t, { localStorage, dispatchEnabled = true } = {}) {
+  const loaded = await loadPromptSection(t, { localStorage });
   const container = makeContainer();
   loaded.PromptSection.init(container, baseOpts({ id: 'issue-1', identifier: 'LIN-1' }, { dispatchEnabled }));
   await container.click({ prompt: 'implementation' });
@@ -120,29 +121,29 @@ async function fresh({ localStorage, dispatchEnabled = true } = {}) {
 // per card, never a duplicate when Prompts is opened. The surface tests are in
 // runner-link-surfaces.test.js.
 describe('"run on my machine ›": the shared markup, and no longer beside the ladder', () => {
-  test('runnerLinkHtml links to /runner with the shared class and testid', () => {
-    const { PromptSection } = loadPromptSection();
+  test('runnerLinkHtml links to /runner with the shared class and testid', async (t) => {
+    const { PromptSection } = await loadPromptSection(t);
     assert.equal(
       PromptSection.runnerLinkHtml('ws'),
       'Harbour can also run steps for you, on your own machine. <a class="opened-task-runner-link" href="/workspace/ws/runner" data-testid="opened-task-runner-link">Set up a runner \u203A</a>',
     );
   });
 
-  test('the urlKey is encoded into the href', () => {
-    const { PromptSection } = loadPromptSection();
+  test('the urlKey is encoded into the href', async (t) => {
+    const { PromptSection } = await loadPromptSection(t);
     const html = PromptSection.runnerLinkHtml('a"b c');
     assert.ok(html.includes('href="/workspace/a%22b%20c/runner"'));
   });
 
   for (const dispatchEnabled of [true, false]) {
     {
-      test(`the component itself renders no runner link (dispatch ${dispatchEnabled ? 'on' : 'off'}), idle or fresh`, async () => {
-        const { PromptSection } = loadPromptSection();
+      test(`the component itself renders no runner link (dispatch ${dispatchEnabled ? 'on' : 'off'}), idle or fresh`, async (t) => {
+        const { PromptSection } = await loadPromptSection(t);
         const container = makeContainer();
         PromptSection.init(container, baseOpts({ id: 'issue-1', identifier: 'LIN-1' }, { dispatchEnabled }));
         assert.ok(container.innerHTML.includes(LADDER));
         assert.ok(!container.innerHTML.includes(LINK));
-        const { container: freshContainer } = await fresh({ dispatchEnabled });
+        const { container: freshContainer } = await fresh(t, { dispatchEnabled });
         assert.ok(!freshContainer.innerHTML.includes(LINK));
       });
     }
@@ -150,8 +151,8 @@ describe('"run on my machine ›": the shared markup, and no longer beside the l
 });
 
 describe('the ○ set up › notices', () => {
-  test('dispatch: the old text, plus the link to /runner', async () => {
-    const { PromptSection } = loadPromptSection();
+  test('dispatch: the old text, plus the link to /runner', async (t) => {
+    const { PromptSection } = await loadPromptSection(t);
     const container = makeContainer();
     PromptSection.init(container, baseOpts({ id: 'issue-1', identifier: 'LIN-1' }, { dispatchEnabled: false }));
     // Named by its rung: a press on the bare action would land on Go's set-up control first, which says something else.
@@ -159,8 +160,8 @@ describe('the ○ set up › notices', () => {
     assert.match(container.innerHTML, /<div class="opened-task-setup-notice">running this step needs the dispatch runner set up <a [^>]*href="\/workspace\/ws\/runner"[^>]*data-testid="opened-task-setup-runner-link"/);
   });
 
-  test('"generate a prompt first" stays byte-identical, with no link', async () => {
-    const { PromptSection } = loadPromptSection();
+  test('"generate a prompt first" stays byte-identical, with no link', async (t) => {
+    const { PromptSection } = await loadPromptSection(t);
     const container = makeContainer();
     PromptSection.init(container, baseOpts({ id: 'issue-1', identifier: 'LIN-1' }, { dispatchEnabled: true, proxyEnabled: true }));
     await container.click({ rung: 'copy', action: 'setup', setupNeeds: 'prompt' });
@@ -171,46 +172,46 @@ describe('the ○ set up › notices', () => {
 describe('N3: proxyForce only on the run-step rung, only where a runner was set up', () => {
   const marked = () => { const ls = makeLocalStorage(); ls.setItem('harbour-runner:ws', '1'); return ls; };
 
-  test('marker + proxy on: the enabled run-step rung carries data-proxy-force="runner"', async () => {
-    const { container } = await fresh({ localStorage: marked() });
+  test('marker + proxy on: the enabled run-step rung carries data-proxy-force="runner"', async (t) => {
+    const { container } = await fresh(t, { localStorage: marked() });
     assert.equal(rungDataset(container.innerHTML, 'run-step').proxyForce, 'runner');
   });
 
-  test('no marker: no stamp', async () => {
-    const { container } = await fresh({ localStorage: makeLocalStorage() });
+  test('no marker: no stamp', async (t) => {
+    const { container } = await fresh(t, { localStorage: makeLocalStorage() });
     assert.equal(rungDataset(container.innerHTML, 'run-step').proxyForce, undefined);
   });
 
-  test('a marker for another workspace does not count', async () => {
+  test('a marker for another workspace does not count', async (t) => {
     const ls = makeLocalStorage();
     ls.setItem('harbour-runner:other', '1');
-    const { container } = await fresh({ localStorage: ls });
+    const { container } = await fresh(t, { localStorage: ls });
     assert.equal(rungDataset(container.innerHTML, 'run-step').proxyForce, undefined);
   });
 
-  test('a throwing localStorage is treated as no marker', async () => {
+  test('a throwing localStorage is treated as no marker', async (t) => {
     const throwing = { getItem() { throw new Error('denied'); }, setItem() { throw new Error('denied'); }, removeItem() {} };
-    const { container } = await fresh({ localStorage: throwing });
+    const { container } = await fresh(t, { localStorage: throwing });
     assert.equal(rungDataset(container.innerHTML, 'run-step').proxyForce, undefined);
   });
 
-  test('the stamped rung\'s dispatch carries proxyForce: true', async () => {
-    const { container, calls } = await fresh({ localStorage: marked() });
+  test('the stamped rung\'s dispatch carries proxyForce: true', async (t) => {
+    const { container, calls } = await fresh(t, { localStorage: marked() });
     await container.click(rungDataset(container.innerHTML, 'run-step'));
     await flush(); // the press re-reads the offer before it dispatches (LIN-4040 close-out, review A)
     assert.equal(calls.dispatch.length, 1);
     assert.equal(calls.dispatch[0].proxyForce, true);
   });
 
-  test('an unstamped rung\'s dispatch is unchanged: proxyForce false for a template prompt', async () => {
-    const { container, calls } = await fresh({ localStorage: makeLocalStorage() });
+  test('an unstamped rung\'s dispatch is unchanged: proxyForce false for a template prompt', async (t) => {
+    const { container, calls } = await fresh(t, { localStorage: makeLocalStorage() });
     await container.click(rungDataset(container.innerHTML, 'run-step'));
     await flush(); // the press re-reads the offer before it dispatches (LIN-4040 close-out, review A)
     assert.equal(calls.dispatch[0].proxyForce, false);
   });
 
-  test('the disclosure\'s dispatch button is unchanged, even where a runner was set up', async () => {
-    const { container, calls } = await fresh({ localStorage: marked() });
+  test('the disclosure\'s dispatch button is unchanged, even where a runner was set up', async (t) => {
+    const { container, calls } = await fresh(t, { localStorage: marked() });
     const panel = container.querySelector('.swipe-prompt-options');
     assert.ok(panel, 'precondition: the disclosure is drawn');
     await container.click({ action: 'dispatch', target: 'cli' });

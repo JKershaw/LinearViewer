@@ -2,7 +2,7 @@
  * LIN-3975 (PR 1): the task page's run control and its viewers.
  *
  *   - the surface capability table: one row per SURFACES entry, and the rows for home and swipe unchanged;
- *   - the `task` surface (client, vm): the run control with no state block, no repeated running sentence, no
+ *   - the `task` surface (client; public/prompt-section.js is a native module (LIN-4463 piece 5), imported over the fake DOM): the run control with no state block, no repeated running sentence, no
  *     "watch on the task page" link, and the copy-first view with its own "You copied …" line;
  *   - the page (server render): the run control is the owner's only; a member and a guest read the next-step line
  *     in its slot; a finished task has no control unless a run is held (LIN-4048); the tracker's state sits outside the
@@ -25,7 +25,7 @@ import { buildPromptOpts } from '../../lib/render-prompt-opts.js';
 import { escapeHtml } from '../../lib/utils/html.js';
 import { serverSessions, serverRow } from '../fixtures/task-decision.js';
 import { readSheets } from '../helpers/css-rules.js';
-import { loadWorld } from './helpers/client-world.js';
+import { promptSectionWorld } from './helpers/prompt-section-world.js';
 
 const __dirname = dirname(fileURLToPath(import.meta.url));
 const read = (rel) => readFileSync(join(__dirname, '../..', rel), 'utf8');
@@ -37,13 +37,14 @@ const UUID = '11111111-2222-3333-4444-555555555555';
 
 describe('LIN-3975 — the capability table has a row for every surface', () => {
   test('SURFACE_CAPABILITIES keys are exactly the SURFACES vocabulary (a new surface needs a row)', () => {
-    const block = /const SURFACE_CAPABILITIES = Object\.freeze\(\{([\s\S]*?)\n {2}\}\);/.exec(SRC)[1];
-    const keys = [...block.matchAll(/^ {4}(\w+): /gm)].map((m) => m[1]);
+    // A module's top level is at column 0 (LIN-4463 piece 5), so the table closes at `});` and its rows are 2 spaces in.
+    const block = /const SURFACE_CAPABILITIES = Object\.freeze\(\{([\s\S]*?)\n\}\);/.exec(SRC)[1];
+    const keys = [...block.matchAll(/^ {2}(\w+): /gm)].map((m) => m[1]);
     assert.deepStrictEqual([...keys].sort(), [...SURFACES].sort());
   });
 
-  test('the task row shows the run control and copy-first, with no state block and no watch link', () => {
-    const { capabilitiesOf } = load().PromptSection;
+  test('the task row shows the run control and copy-first, with no state block and no watch link', async (t) => {
+    const { capabilitiesOf } = (await load(t)).PromptSection;
     const task = { ...capabilitiesOf('task') };
     assert.equal(task.stateBlock, false);
     assert.equal(task.runControl, true);
@@ -52,8 +53,8 @@ describe('LIN-3975 — the capability table has a row for every surface', () => 
     assert.equal(task.runningBody, 'blank', 'the top answer says the running sentence once');
   });
 
-  test('the home row is unchanged: state block, watch link, shared buttons; swipe has none of the run control', () => {
-    const { capabilitiesOf } = load().PromptSection;
+  test('the home row is unchanged: state block, watch link, shared buttons; swipe has none of the run control', async (t) => {
+    const { capabilitiesOf } = (await load(t)).PromptSection;
     const home = { ...capabilitiesOf('home') };
     assert.equal(home.stateBlock, true);
     assert.equal(home.watchLink, true);
@@ -66,7 +67,7 @@ describe('LIN-3975 — the capability table has a row for every surface', () => 
   });
 });
 
-// ─── the client, in a vm ─────────────────────────────────────────────────────
+// ─── the client, imported ───────────────────────────────────────────────────
 
 const esc = (s) => escapeHtml(s);
 
@@ -74,7 +75,7 @@ const esc = (s) => escapeHtml(s);
  * The page's stubs. `prompt` answers `/api/prompt/…` (a hang, a failure, or a prompt); `reply` and `rateLimit`
  * drive the streamed reply and the proxy's token-limit notice, so every phase of the component is reachable.
  */
-function load({ opened = null, lastCopy = null, prompt = null, fetch = null, reply = null, rateLimit = false, calls = [], preview = null } = {}) {
+async function load(t, { opened = null, lastCopy = null, prompt = null, fetch = null, reply = null, rateLimit = false, calls = [], preview = null } = {}) {
   // LIN-4016: the opened task's sessions are the server's (the decision the browser reads).
   if (opened && opened.sessions) opened = { ...opened, sessions: serverSessions(opened.sessions) };
   const window = {
@@ -106,9 +107,9 @@ function load({ opened = null, lastCopy = null, prompt = null, fetch = null, rep
     isPinnedToBottom: () => false,
     toast() {},
   };
-  // The shared client world: one fake document, one vm sandbox, prompt-section.js run in it.
-  return loadWorld({
-    window, scripts: ['prompt-section.js'],
+  // The shared client world: one fake document, prompt-section.js imported over it.
+  return promptSectionWorld(t, {
+    window,
     globals: { fetch: fetch || (async () => ({ ok: true, json: async () => ({}) })) },
   });
 }
@@ -142,8 +143,8 @@ const RUNNING = {
   running: { loopId: 'l1', kind: 'plan', label: 'Plan', state: 'running', since: null, target: 'cli' },
 };
 
-async function mount(surface, over = {}, loadOver = {}) {
-  const world = load(loadOver);
+async function mount(t, surface, over = {}, loadOver = {}) {
+  const world = await load(t, loadOver);
   const c = world.makeContainer();
   world.PromptSection.init(c, { ...BASE, surface, ...over });
   await flush();
@@ -152,37 +153,37 @@ async function mount(surface, over = {}, loadOver = {}) {
 }
 
 describe('LIN-3975 — the task surface shows the run control, not the state block', () => {
-  test('with a next step: the main action is Run <step>, and there is no state block', async () => {
-    const c = await mount('task', {}, { opened: { status: 'idle', live: false, headerHtml: '<p class="task-status">HEADER</p>', sessions: PLAN_NEXT } });
+  test('with a next step: the main action is Run <step>, and there is no state block', async (t) => {
+    const c = await mount(t, 'task', {}, { opened: { status: 'idle', live: false, headerHtml: '<p class="task-status">HEADER</p>', sessions: PLAN_NEXT } });
     assert.match(c.innerHTML, /data-testid="opened-task-go"[^>]*data-action="run-step-next"[^>]*>Run Plan</);
     assert.equal(c.innerHTML.includes('data-state-slot'), false, 'no state block on the task surface');
     assert.equal(c.innerHTML.includes('HEADER'), false, 'the top answer already carries the task sentence');
   });
 
-  test('while a stage runs: the running line has no watch link and no repeated sentence', async () => {
-    const c = await mount('task', {}, { opened: { status: 'running', live: true, headerHtml: '<p class="task-status">RUNNING SENTENCE</p>', sessions: RUNNING } });
+  test('while a stage runs: the running line has no watch link and no repeated sentence', async (t) => {
+    const c = await mount(t, 'task', {}, { opened: { status: 'running', live: true, headerHtml: '<p class="task-status">RUNNING SENTENCE</p>', sessions: RUNNING } });
     assert.match(c.innerHTML, /data-testid="opened-task-started"/);
     assert.equal(c.innerHTML.includes('opened-task-started-link'), false, 'no watch link on the task page itself');
     assert.equal(c.innerHTML.includes('RUNNING SENTENCE'), false, 'the running sentence is the top answer\'s, not repeated');
   });
 
-  test('the same running state on Home keeps its watch link, in the running box (LIN-4010)', async () => {
-    const c = await mount('home', {}, { opened: { status: 'running', live: true, headerHtml: '<p>RUN</p>', sessions: RUNNING } });
+  test('the same running state on Home keeps its watch link, in the running box (LIN-4010)', async (t) => {
+    const c = await mount(t, 'home', {}, { opened: { status: 'running', live: true, headerHtml: '<p>RUN</p>', sessions: RUNNING } });
     assert.match(c.innerHTML, /data-testid="opened-task-watch"/);
     assert.equal(c.innerHTML.includes('data-testid="opened-task-started-link"'), false, 'the Go slot does not repeat it');
   });
 
-  test('copy-first (no runner): the copy view carries the last-copy line in its own slot', async () => {
+  test('copy-first (no runner): the copy view carries the last-copy line in its own slot', async (t) => {
     const lastCopy = { label: 'Plan', kind: 'plan', at: new Date().toISOString() };
-    const c = await mount('task', { dispatchEnabled: false }, { opened: { status: 'idle', live: false, headerHtml: '', sessions: PLAN_NEXT }, lastCopy });
+    const c = await mount(t, 'task', { dispatchEnabled: false }, { opened: { status: 'idle', live: false, headerHtml: '', sessions: PLAN_NEXT }, lastCopy });
     assert.match(c.innerHTML, /data-testid="opened-task-write"/, 'the copy-first view writes the prompt');
     assert.match(c.innerHTML, /data-last-copy-slot/);
     assert.match(c.innerHTML, /You copied the Plan prompt/, 'the last copy is read back in the view itself');
     assert.equal(c.innerHTML.includes('data-state-slot'), false);
   });
 
-  test('swipe keeps its own card: no run control, no task-surface markup', async () => {
-    const c = await mount('swipe', {}, { opened: { status: 'idle', live: false, headerHtml: '', sessions: PLAN_NEXT } });
+  test('swipe keeps its own card: no run control, no task-surface markup', async (t) => {
+    const c = await mount(t, 'swipe', {}, { opened: { status: 'idle', live: false, headerHtml: '', sessions: PLAN_NEXT } });
     assert.equal(c.innerHTML.includes('opened-task-go--main'), false);
     assert.equal(c.innerHTML.includes('data-state-slot'), false);
   });
@@ -418,7 +419,7 @@ function classTokensOfMarkup(html, own = new Set()) {
  * Each phase, reached the way a reader reaches it: a render, a press, or a stubbed reply. `marker` is what the
  * phase must show, so a driver that did not reach its state fails here instead of passing vacuously.
  */
-async function everyPhase() {
+async function everyPhase(t) {
   const hangs = () => new Promise(() => {});
   const fails = async () => { throw new Error('boom'); };
   const prompt = async () => ({ prompt: 'PROMPT', promptName: 'Plan' });
@@ -428,7 +429,7 @@ async function everyPhase() {
   const streamPrompt = async (_resp, onEvent) => { onEvent('delta', { section: 'prompt', content: 'PROMPT' }); onEvent('done', { identifier: 'LIN-42', title: 'T', deferredVia: [] }); };
   const phases = [];
   const run = async (name, marker, surface, over, loadOver, presses = []) => {
-    const world = load(loadOver);
+    const world = await load(t, loadOver);
     const c = world.makeContainer();
     world.PromptSection.init(c, { ...BASE, surface, ...over });
     await flush();
@@ -479,9 +480,9 @@ describe('LIN-3975 — the run control\'s classes are styled by the sheets the t
     for (const t of Object.keys(HOOK)) assert.equal(everywhere.has(t), false, `${t} is defined by no sheet, as its entry says`);
   });
 
-  test('dynamic: every phase is reached, and every class a phase emits is styled by a linked sheet or is a hook', async () => {
+  test('dynamic: every phase is reached, and every class a phase emits is styled by a linked sheet or is a hook', async (t) => {
     const linked = new Set(TASK_SHEETS.flatMap((f) => [...classesIn(f)]));
-    const phases = await everyPhase();
+    const phases = await everyPhase(t);
     for (const ph of phases) assert.match(ph.html, ph.marker, `the "${ph.name}" phase is reached`);
     const emittedBy = new Map();
     for (const ph of phases.filter((p) => p.name !== 'swipe card')) {
@@ -494,8 +495,8 @@ describe('LIN-3975 — the run control\'s classes are styled by the sheets the t
     assert.deepStrictEqual(unstyled.map((t) => `${t} (${emittedBy.get(t)[0]})`), [], 'a class emitted on the task surface is styled by a linked sheet, or is a hook');
   });
 
-  test('dynamic: no task-surface phase emits a swipe-only class (the claim is checked, not a comment)', async () => {
-    const phases = await everyPhase();
+  test('dynamic: no task-surface phase emits a swipe-only class (the claim is checked, not a comment)', async (t) => {
+    const phases = await everyPhase(t);
     const leaked = [];
     for (const ph of phases.filter((p) => p.name !== 'swipe card')) {
       for (const t of classTokensOfMarkup(ph.html, ph.own)) if (t in SWIPE_ONLY) leaked.push(`${t} (${ph.name})`);
@@ -521,8 +522,8 @@ describe('LIN-3975 — the run control\'s classes are styled by the sheets the t
 describe('LIN-3975 — a staged chat proposal is applied or declined from the run control', () => {
   const PROPOSAL = { id: 'prop-1', runId: 'run-9', reason: 'Please post a status update.' };
 
-  async function mountWithProposal(calls) {
-    const world = load({ opened: { status: 'idle', live: false, headerHtml: '', sessions: PLAN_NEXT }, calls });
+  async function mountWithProposal(t, calls) {
+    const world = await load(t, { opened: { status: 'idle', live: false, headerHtml: '', sessions: PLAN_NEXT }, calls });
     const c = world.makeContainer();
     world.PromptSection.init(c, { ...BASE, surface: 'task', proposals: [PROPOSAL] });
     await flush();
@@ -530,8 +531,8 @@ describe('LIN-3975 — a staged chat proposal is applied or declined from the ru
     return c;
   }
 
-  test('the proposal is listed with its reason, and Apply and Decline sit beside it', async () => {
-    const c = await mountWithProposal([]);
+  test('the proposal is listed with its reason, and Apply and Decline sit beside it', async (t) => {
+    const c = await mountWithProposal(t, []);
     assert.match(c.innerHTML, /data-testid="opened-task-proposals"/);
     assert.match(c.innerHTML, /Proposed in chat: Please post a status update\./);
     assert.match(c.innerHTML, /data-action="apply-proposal" data-proposal-id="prop-1" data-run-id="run-9"[^>]*>Apply</);
@@ -539,9 +540,9 @@ describe('LIN-3975 — a staged chat proposal is applied or declined from the ru
     assert.match(c.innerHTML, /Change does not apply to it/, 'the run control says what Apply does');
   });
 
-  test('Apply posts to the run page\'s apply endpoint, then settles the row to one quiet word', async () => {
+  test('Apply posts to the run page\'s apply endpoint, then settles the row to one quiet word', async (t) => {
     const calls = [];
-    const c = await mountWithProposal(calls);
+    const c = await mountWithProposal(t, calls);
     await c.click({ action: 'apply-proposal', proposalId: 'prop-1', runId: 'run-9' });
     await flush();
     await flush();
@@ -553,9 +554,9 @@ describe('LIN-3975 — a staged chat proposal is applied or declined from the ru
     assert.doesNotMatch(c.innerHTML, /data-action="apply-proposal"/, 'no Apply once applied');
   });
 
-  test('Decline posts to the decline endpoint and never to apply', async () => {
+  test('Decline posts to the decline endpoint and never to apply', async (t) => {
     const calls = [];
-    const c = await mountWithProposal(calls);
+    const c = await mountWithProposal(t, calls);
     await c.click({ action: 'decline-proposal', proposalId: 'prop-1', runId: 'run-9' });
     await flush();
     await flush();
@@ -566,8 +567,8 @@ describe('LIN-3975 — a staged chat proposal is applied or declined from the ru
 
   // LIN-3975 (finding 1): a fold turn proposes after the page loaded. The run control is handed the list again and
   // lists it in place, with no reload; the same handle clears it when the list empties.
-  test('a proposal staged after mount is listed in place by setProposals, and cleared the same way', async () => {
-    const world = load({ opened: { status: 'idle', live: false, headerHtml: '', sessions: PLAN_NEXT }, calls: [] });
+  test('a proposal staged after mount is listed in place by setProposals, and cleared the same way', async (t) => {
+    const world = await load(t, { opened: { status: 'idle', live: false, headerHtml: '', sessions: PLAN_NEXT }, calls: [] });
     const c = world.makeContainer();
     const handle = world.PromptSection.init(c, { ...BASE, surface: 'task', proposals: [] });
     await flush();
@@ -589,15 +590,18 @@ describe('LIN-3975 — the run control is wired before the first Markdown render
     const end = src.indexOf('function toggle(row) {');
     assert.ok(start > 0 && end > start, 'init is found');
     const init = src.slice(start, end);
-    const mount = init.indexOf('window.PromptSection.init(runRoot, runOpts)');
+    // PromptSection is imported (LIN-4463 piece 5), not a global.
+    const mount = init.indexOf('PromptSection.init(runRoot, runOpts)');
     const markdown = init.search(/enhanceContextMarkdown\(|enhanceMarkdown\(/);
     assert.ok(mount > 0, 'the run control is mounted in init');
     assert.ok(markdown > mount, 'the first Markdown render comes after the run control is wired');
   });
 
-  test('the page scripts load prompt-section.js and decision-panel.js for both viewers (the head stays byte-identical)', () => {
+  test('the page loads decision-panel.js and its task-page.js module, which imports prompt-section.js, for both viewers (the head stays byte-identical)', () => {
     const html = page(model(), 'guest');
-    assert.match(html, /<script src="\/prompt-section\.js"/);
+    // LIN-4463 piece 5: prompt-section.js is a module task-page.js imports, so it has no tag of its own.
+    assert.match(html, /<script type="module" src="\/task-page\.js"/);
+    assert.match(read('public/task-page.js'), /^import \* as PromptSection from '\.\/prompt-section\.js';/m);
     assert.match(html, /<script src="\/decision-panel\.js"/);
     assert.match(html, /<link rel="stylesheet" href="\/run-control\.css">/);
   });

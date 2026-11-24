@@ -4,7 +4,7 @@
  * (LIN-4471). A page module imports one by a relative specifier. This suite is the witness for the serving boundary:
  * the served bytes and type, the boot failure on a missing file, the purity rule, the page emission, the retirement of
  * the restated copy, and the 404s for every path the allow-list does not serve, sent raw (LIN-4471). The bridge's
- * inventory and the renderer coverage of the bridge are in tests/unit/bridge-inventory.test.js.
+ * inventory (at zero since LIN-4463 piece 5) is in tests/unit/bridge-inventory.test.js.
  *
  * Run with: node --test tests/unit/shared-modules.test.js
  */
@@ -94,7 +94,7 @@ export function purityProblems(src, name = 'module') {
 
 describe('the allow-lists', () => {
   test('SHARED_MODULES is separate from VENDOR_ASSETS, and VENDOR_ASSETS is unchanged', () => {
-    assert.deepEqual(Object.keys(SHARED_MODULES), ['/lib/cost-format.js', '/lib/time-words.js', '/lib/question-record-card.js', '/lib/task-page-href.js']);
+    assert.deepEqual(Object.keys(SHARED_MODULES), ['/lib/cost-format.js', '/lib/time-words.js', '/lib/question-record-card.js', '/lib/task-page-href.js', '/lib/prompt-filename.js']);
     assert.deepEqual(Object.keys(VENDOR_ASSETS).sort(), ['/chart.umd.min.js', '/marked.min.js', '/purify.min.js']);
   });
 
@@ -228,7 +228,7 @@ describe('retirement: the restated browser copy and its parity check are gone', 
 
   test('the retired namespace is gone from the allow-list and the page modules', () => {
     assert.equal(Object.keys(SHARED_MODULES).some((url) => url.startsWith(RETIRED_PREFIX)), false);
-    assert.doesNotMatch(read('public/cost-format-global.js'), new RegExp(RETIRED_PREFIX));
+    assert.doesNotMatch(read('public/prompt-section.js'), new RegExp(RETIRED_PREFIX));
     assert.doesNotMatch(read('public/workspace-kpis.js'), new RegExp(RETIRED_PREFIX));
   });
 });

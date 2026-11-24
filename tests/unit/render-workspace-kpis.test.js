@@ -149,15 +149,15 @@ test('a noscript line says charts need JavaScript', () => {
   assert.match(html, /<noscript><p[^>]*data-testid="workspace-kpis-noscript">Charts need JavaScript/);
 });
 
-test('scripts load Chart.js and the shared helper before common and app; the page script is a module (LIN-4471)', () => {
+test('scripts load Chart.js and the shared helper before common; the page script and app.js are modules (LIN-4471, LIN-4463)', () => {
   const html = render(stats());
-  // The classic scripts keep their order. The page script is a module, so its place in the list does not matter: a module
-  // runs after every classic script, wherever it is listed. Its own tag is pinned by source, not by index.
-  const classic = ['/chart.umd.min.js', '/chart-helpers.js', '/common.js', '/app.js'].map(src => html.indexOf(`src="${src}"`));
-  assert.ok(classic.every(i => i > -1), 'all four classic scripts present');
+  // The classic scripts keep their order. The page script and app.js are modules, so their place in the list does not
+  // matter: a module runs after every classic script, wherever it is listed. Their tags are pinned by source, not by index.
+  const classic = ['/chart.umd.min.js', '/chart-helpers.js', '/common.js'].map(src => html.indexOf(`<script src="${src}"`));
+  assert.ok(classic.every(i => i > -1), 'all three classic scripts present');
   assert.deepEqual([...classic].sort((a, b) => a - b), classic);
   assert.match(html, /<script type="module" src="\/workspace-kpis\.js"><\/script>/);
-  assert.equal(html.includes('/cost-format-global.js'), false, 'the page takes no bridge');
+  assert.match(html, /<script type="module" src="\/app\.js"><\/script>/);
   assert.equal(html.includes('/kpis.css'), false, 'the public stylesheet is not loaded');
   assert.match(html, /<script type="application\/json" data-global="__WORKSPACE_KPI_DATA__">/);
 });

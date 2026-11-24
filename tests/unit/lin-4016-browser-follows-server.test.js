@@ -11,11 +11,11 @@ import { escapeHtml } from '../../lib/utils/html.js';
 import { rowRecordOf, rowDataByNodeKey } from '../../lib/task-board-view.js';
 import { nodeKey } from '../../lib/tree.js';
 import { stateBodyOf, stateIssue, failedStageLoop } from '../fixtures/state-route.js';
-import { loadWorld } from './helpers/client-world.js';
+import { promptSectionWorld } from './helpers/prompt-section-world.js';
 const flush = () => new Promise((r) => setTimeout(r, 0));
 
 // The state body, the way /state sends it (routes/task-page.js): the sessions block is the server's, the row record too.
-function loadClient({ stateBody, container = false }) {
+async function loadClient(t, { stateBody, container = false }) {
   const calls = { api: [] };
   const window = {
     escapeHtml: (x) => (x == null ? '' : escapeHtml(String(x))),
@@ -37,8 +37,8 @@ function loadClient({ stateBody, container = false }) {
     taskPageHref: () => '/workspace/acme/task/LIN-42',
     toast: () => {},
   };
-  const world = loadWorld({
-    window, scripts: ['prompt-section.js'],
+  const world = await promptSectionWorld(t, {
+    window,
     globals: { fetch: async () => ({ ok: true, json: async () => ({}) }) },
   });
   return { PromptSection: world.PromptSection, calls, container, makeContainer: world.makeContainer };
@@ -61,8 +61,8 @@ const stateWith = (sessions) => ({
   sessions: { count: 1, next: null, last: null, offered: null, excluded: [], queued: null, busy: false, action: null, canStop: false, running: null, ...sessions },
 });
 
-async function paint(stateBody, opts = {}) {
-  const { PromptSection, makeContainer } = loadClient({ stateBody, container: !!opts.row?.container });
+async function paint(t, stateBody, opts = {}) {
+  const { PromptSection, makeContainer } = await loadClient(t, { stateBody, container: !!opts.row?.container });
   const c = makeContainer();
   PromptSection.init(c, { ...HOME, ...opts });
   await flush(); await flush(); await flush();
@@ -72,38 +72,38 @@ async function paint(stateBody, opts = {}) {
 const PLAN_OFFER = { kind: 'plan', label: 'Plan', why: 'usual', failed: false, reason: 'usually next after Research' };
 
 describe('LIN-4016 W4 — the run control paints the server\'s decision', () => {
-  test('an offered step with action null (busy on the server): no step button and no Run to PR, whatever the offer says', async () => {
-    const html = await paint(stateWith({ offered: PLAN_OFFER, action: null, busy: true }));
+  test('an offered step with action null (busy on the server): no step button and no Run to PR, whatever the offer says', async (t) => {
+    const html = await paint(t, stateWith({ offered: PLAN_OFFER, action: null, busy: true }));
     assert.doesNotMatch(html, /data-action="run-step-next"/, 'busy offers no step button');
     assert.doesNotMatch(html, /Run to PR/, 'busy offers no Run to PR');
   });
 
-  test('the server\'s step action is the main button, even with no offer field', async () => {
-    const html = await paint(stateWith({ offered: PLAN_OFFER, action: { kind: 'offer', step: PLAN_OFFER, why: PLAN_OFFER.reason } }));
+  test('the server\'s step action is the main button, even with no offer field', async (t) => {
+    const html = await paint(t, stateWith({ offered: PLAN_OFFER, action: { kind: 'offer', step: PLAN_OFFER, why: PLAN_OFFER.reason } }));
     assert.match(html, /data-action="run-step-next"[^>]*>Run Plan</);
   });
 
-  test('a container: the server\'s run-to-pr action is Run to PR and no stage step, even when an offer is set', async () => {
-    const html = await paint(stateWith({ offered: PLAN_OFFER, action: { kind: 'offer', why: 'a container runs to PR' } }), { row: rowRecordOf({ stateType: 'started', container: true }), filledRung: 'pr' });
+  test('a container: the server\'s run-to-pr action is Run to PR and no stage step, even when an offer is set', async (t) => {
+    const html = await paint(t, stateWith({ offered: PLAN_OFFER, action: { kind: 'offer', why: 'a container runs to PR' } }), { row: rowRecordOf({ stateType: 'started', container: true }), filledRung: 'pr' });
     assert.match(html, /data-action="go"[^>]*>Run to PR</);
     assert.doesNotMatch(html, /run-step-next/);
   });
 
-  test('a running session whose canStop is false has no Stop, whatever its target', async () => {
+  test('a running session whose canStop is false has no Stop, whatever its target', async (t) => {
     const running = { loopId: 'loop-1', kind: 'implementation', label: 'Build', state: 'running', since: '2026-10-30T10:00:00.000Z', target: 'cli' };
-    const html = await paint(stateWith({ running, busy: true, action: null, canStop: false }));
+    const html = await paint(t, stateWith({ running, busy: true, action: null, canStop: false }));
     assert.doesNotMatch(html, /data-testid="run-stop"/, 'the server says this run cannot be stopped from here');
   });
 
-  test('a running session whose canStop is true has Stop', async () => {
+  test('a running session whose canStop is true has Stop', async (t) => {
     const running = { loopId: 'loop-1', kind: 'implementation', label: 'Build', state: 'running', since: '2026-10-30T10:00:00.000Z', target: 'local' };
-    const html = await paint(stateWith({ running, busy: true, action: null, canStop: true }));
+    const html = await paint(t, stateWith({ running, busy: true, action: null, canStop: true }));
     assert.match(html, /data-testid="run-stop"/);
   });
 
-  test('a queued run (the server\'s queued) reads queued with Undo, and never as running', async () => {
+  test('a queued run (the server\'s queued) reads queued with Undo, and never as running', async (t) => {
     const queued = { loopId: 'q-1', kind: 'implementation', label: 'Build', state: 'queued', target: 'cli' };
-    const html = await paint(stateWith({ running: queued, queued, busy: true, action: null, canStop: true }));
+    const html = await paint(t, stateWith({ running: queued, queued, busy: true, action: null, canStop: true }));
     assert.match(html, /data-testid="opened-task-queued"/);
     assert.doesNotMatch(html, /data-testid="opened-task-running"/);
   });
@@ -125,29 +125,29 @@ describe('LIN-4016 — the opened task agrees with its row (finished, and a fail
 
   // REWRITTEN (LIN-4070): the body was fabricated with a failed pill, which the server no longer sends for a Done task (the
   // gather words it done, D2). The body is now the one `/state` returns for a Done task whose last stage failed.
-  test('a finished row whose last stage failed: the server words it done, the box paints done, and offers no stage', async () => {
+  test('a finished row whose last stage failed: the server words it done, the box paints done, and offers no stage', async (t) => {
     const { body } = await stateBodyOf({ issues: [stateIssue('LIN-42', 'completed')], loops: [failedStageLoop('LIN-42')], identifier: 'LIN-42' });
     assert.match(body.homeStatusHtml, /status-pill--done/, 'the server words a finished task done (LIN-4070 D2)');
     assert.doesNotMatch(body.homeStatusHtml, /status-pill--error/);
     assert.equal(body.sessions.action.kind, 'none', 'a finished task offers no action (LIN-4042): the no-run decision');
     const row = rowRecordOf({ stateType: 'completed', decided: { action: body.sessions.action } });
-    const html = await paint(body, { row });
+    const html = await paint(t, body, { row });
     assert.match(html, /status-pill--done task-status-pill" data-testid="home-task-status-pill"><span class="status-pill__dot" aria-hidden="true"><\/span>done</);
     assert.doesNotMatch(html, /status-pill--error/, 'no failed pill beside a done row');
     assert.doesNotMatch(html, /data-action="run-step-next"/, 'a finished task offers no stage step');
   });
 
-  test('a finished row with no decided word keeps /state\'s own line (the record carries no state word: /state says it, LIN-4071)', async () => {
+  test('a finished row with no decided word keeps /state\'s own line (the record carries no state word: /state says it, LIN-4071)', async (t) => {
     const row = rowRecordOf({ stateType: 'completed' });
     assert.equal('stateWord' in row, false, 'the record carries no state word');
-    const html = await paint({ ...stateWith({}), homeStatusHtml: FAILED_PILL }, { row });
+    const html = await paint(t, { ...stateWith({}), homeStatusHtml: FAILED_PILL }, { row });
     assert.match(html, /status-pill--error/);
   });
 
-  test('a parent whose subtask failed names it as failed, and does not say it needs a person', async () => {
+  test('a parent whose subtask failed names it as failed, and does not say it needs a person', async (t) => {
     // LIN-4071: the subtask line is `/state`'s `attention` (the gather's words); the browser builds the link from the task's source.
     const attention = { identifier: 'C-9', title: null, state: 'failed', lead: 'A subtask failed', detail: ' · Build failed', words: 'A subtask failed: C-9 · Build failed' };
-    const html = await paint({ ...stateWith({}), attention }, { row: rowRecordOf({ stateType: 'started' }) });
+    const html = await paint(t, { ...stateWith({}), attention }, { row: rowRecordOf({ stateType: 'started' }) });
     assert.match(html, /A subtask failed: <span class="opened-task-needs-you-name">C-9<\/span> · Build failed/);
     assert.doesNotMatch(html, /needs you/);
   });
@@ -160,39 +160,39 @@ describe('LIN-4069 — before the first /state reply the run control takes the r
   // `/state` never answers: the box is painted from the row record alone.
   const PENDING = new Promise(() => {});
 
-  test('the row\'s run-to-pr action shows Run to PR with no sessions yet', async () => {
+  test('the row\'s run-to-pr action shows Run to PR with no sessions yet', async (t) => {
     const row = rowRecordOf({ stateType: 'started', decided: { state: 'next', action: { kind: 'offer', why: 'a container runs to PR' } } });
     assert.deepEqual(row.action, { kind: 'offer', why: 'a container runs to PR' });
-    const html = await paint(PENDING, { row, filledRung: 'pr' });
+    const html = await paint(t, PENDING, { row, filledRung: 'pr' });
     assert.match(html, /data-action="go"[^>]*>Run to PR</);
   });
 
-  test('a row whose action is null (busy subtree, or finished) shows no run before /state replies', async () => {
+  test('a row whose action is null (busy subtree, or finished) shows no run before /state replies', async (t) => {
     const row = rowRecordOf({ stateType: 'started', decided: { state: 'running', action: null } });
     assert.equal(row.action, null);
-    const html = await paint(PENDING, { row });
+    const html = await paint(t, PENDING, { row });
     assert.doesNotMatch(html, /Run to PR/);
     assert.doesNotMatch(html, /run-step-next/);
     assert.doesNotMatch(html, /data-action="go"/);
   });
 
-  test('once /state replies, its sessions.action wins over the row\'s (the row only fills the gap before the reply)', async () => {
+  test('once /state replies, its sessions.action wins over the row\'s (the row only fills the gap before the reply)', async (t) => {
     const row = rowRecordOf({ stateType: 'started', decided: { state: 'next', action: { kind: 'offer', why: 'row' } } });
-    const html = await paint(stateWith({ offered: PLAN_OFFER, action: null, busy: true }), { row });
+    const html = await paint(t, stateWith({ offered: PLAN_OFFER, action: null, busy: true }), { row });
     assert.doesNotMatch(html, /Run to PR/, 'the server\'s busy decision removes the row\'s offer');
   });
 });
 
 describe('LIN-4104 D1 — the browser draws the offer kind and names no run for answer-first or busy', () => {
-  test('answer-first (a question needs you): no Go, no Run to PR and no step button, whatever the offer says', async () => {
-    const html = await paint(stateWith({ offered: PLAN_OFFER, busy: true, action: { kind: 'answer-first', identifiers: ['LIN-42'], why: 'a question needs you before a run is offered' } }));
+  test('answer-first (a question needs you): no Go, no Run to PR and no step button, whatever the offer says', async (t) => {
+    const html = await paint(t, stateWith({ offered: PLAN_OFFER, busy: true, action: { kind: 'answer-first', identifiers: ['LIN-42'], why: 'a question needs you before a run is offered' } }));
     assert.doesNotMatch(html, /data-action="go"/, 'no Go while a question is open');
     assert.doesNotMatch(html, /data-action="run-step-next"/, 'no step button while a question is open');
     assert.doesNotMatch(html, /Run to PR/);
   });
 
-  test('busy with the run named (kind busy): no Go and no step button, the run line is the box\'s', async () => {
-    const html = await paint(stateWith({ offered: PLAN_OFFER, busy: true, action: { kind: 'busy', identifier: 'LIN-42', words: 'Build running', why: 'x' } }));
+  test('busy with the run named (kind busy): no Go and no step button, the run line is the box\'s', async (t) => {
+    const html = await paint(t, stateWith({ offered: PLAN_OFFER, busy: true, action: { kind: 'busy', identifier: 'LIN-42', words: 'Build running', why: 'x' } }));
     assert.doesNotMatch(html, /data-action="go"/);
     assert.doesNotMatch(html, /data-action="run-step-next"/);
   });
@@ -204,25 +204,25 @@ describe('LIN-4104 D1 — the browser draws the offer kind and names no run for 
 describe('LIN-4104 D2 — the filled run button follows the last dispatch on this workspace', () => {
   const OFFER = { kind: 'offer', container: false, step: null, why: 'the run control offers the three rungs' };
 
-  test('filled pr (the last dispatch was a Run to PR): the primary button is Run to PR', async () => {
-    const html = await paint(stateWith({ action: OFFER }), { filledRung: 'pr' });
+  test('filled pr (the last dispatch was a Run to PR): the primary button is Run to PR', async (t) => {
+    const html = await paint(t, stateWith({ action: OFFER }), { filledRung: 'pr' });
     assert.match(html, /data-testid="opened-task-go"[^>]*data-action="go"[^>]*>Run to PR</, 'Run to PR is the primary');
     assert.match(html, /data-filled-rung="pr"/, 'the button says which rung it fills');
   });
 
-  test('a new workspace with no prior dispatch (filledRung next-step): the primary button is Next step', async () => {
-    const html = await paint(stateWith({ action: OFFER }), { filledRung: 'next-step' });
+  test('a new workspace with no prior dispatch (filledRung next-step): the primary button is Next step', async (t) => {
+    const html = await paint(t, stateWith({ action: OFFER }), { filledRung: 'next-step' });
     assert.match(html, /data-testid="opened-task-go"[^>]*data-filled-rung="next-step"[^>]*>Next step</, 'Next step is the primary');
     assert.doesNotMatch(html, /data-testid="opened-task-go"[^>]*>Run to PR</, 'Run to PR is not the primary');
   });
 
-  test('an unset filledRung is a workspace with no prior dispatch: Next step, the same as next-step', async () => {
-    const html = await paint(stateWith({ action: OFFER }));
+  test('an unset filledRung is a workspace with no prior dispatch: Next step, the same as next-step', async (t) => {
+    const html = await paint(t, stateWith({ action: OFFER }));
     assert.match(html, /data-testid="opened-task-go"[^>]*data-filled-rung="next-step"[^>]*>Next step</);
   });
 
-  test('filled done (the last dispatch was a Run to Done): Run to Done is the primary and starts the no-stop kickoff (D4), and Run to PR stays available', async () => {
-    const html = await paint(stateWith({ action: OFFER }), { filledRung: 'done' });
+  test('filled done (the last dispatch was a Run to Done): Run to Done is the primary and starts the no-stop kickoff (D4), and Run to PR stays available', async (t) => {
+    const html = await paint(t, stateWith({ action: OFFER }), { filledRung: 'done' });
     assert.match(html, /data-testid="opened-task-go"[^>]*data-action="go-done"[^>]*data-filled-rung="done"[^>]*>Run to Done</, 'Run to Done is the primary');
     assert.doesNotMatch(html, /data-filled-rung="done"[^>]*disabled/, 'and it is enabled');
     assert.match(html, /data-testid="opened-task-run-to-pr"[^>]*data-action="go"[^>]*>Run to PR</, 'Run to PR is still offered beside it');
@@ -230,8 +230,8 @@ describe('LIN-4104 D2 — the filled run button follows the last dispatch on thi
 
   // LIN-4104 review finding 1: every offer draws all three rungs in trust order, and only the filled one is primary.
   for (const filledRung of ['next-step', 'pr', 'done']) {
-    test(`filled ${filledRung}: all three rungs are drawn in trust order, and only the filled one is primary`, async () => {
-      const html = await paint(stateWith({ action: OFFER }), { filledRung });
+    test(`filled ${filledRung}: all three rungs are drawn in trust order, and only the filled one is primary`, async (t) => {
+      const html = await paint(t, stateWith({ action: OFFER }), { filledRung });
       // Whole button elements (opening tag and label), so the label is seen with its tag.
       const tags = [...html.matchAll(/<button\b[^>]*>[^<]*<\/button>/g)].map((m) => m[0]);
       const rungTag = (name) => tags.find((tag) => tag.endsWith(`>${name}</button>`));
@@ -251,41 +251,41 @@ describe('LIN-4104 D2 — the filled run button follows the last dispatch on thi
 
   // LIN-4104 review ledger (D4): before a run to PR or to Done, the step line says Harbour picks where to start.
   for (const filledRung of ['pr', 'done']) {
-    test(`filled ${filledRung} with no offered step: the step line reads "Harbour picks where to start"`, async () => {
-      const html = await paint(stateWith({ action: OFFER }), { filledRung });
+    test(`filled ${filledRung} with no offered step: the step line reads "Harbour picks where to start"`, async (t) => {
+      const html = await paint(t, stateWith({ action: OFFER }), { filledRung });
       assert.match(html, /data-testid="opened-task-step-why"[^>]*>Harbour picks where to start\b/);
     });
   }
 
-  test('a failed stage keeps its step as the primary and still draws all three rungs beside it (LIN-3968, finding 1)', async () => {
-    const html = await paint(stateWith({ offered: PLAN_OFFER, action: { ...OFFER, step: PLAN_OFFER } }), { filledRung: 'done' });
+  test('a failed stage keeps its step as the primary and still draws all three rungs beside it (LIN-3968, finding 1)', async (t) => {
+    const html = await paint(t, stateWith({ offered: PLAN_OFFER, action: { ...OFFER, step: PLAN_OFFER } }), { filledRung: 'done' });
     assert.match(html, /data-testid="opened-task-go"[^>]*data-action="run-step-next"[^>]*>Run Plan</);
     assert.match(html, />Next step</);
     assert.match(html, /data-testid="opened-task-run-to-pr"[^>]*>Run to PR</);
     assert.match(html, /data-testid="opened-task-run-to-done"[^>]*>Run to Done</);
   });
 
-  test('a failed stage still names its step as the primary, whatever the filled rung (LIN-3968)', async () => {
-    const html = await paint(stateWith({ offered: PLAN_OFFER, action: { ...OFFER, step: PLAN_OFFER } }), { filledRung: 'next-step' });
+  test('a failed stage still names its step as the primary, whatever the filled rung (LIN-3968)', async (t) => {
+    const html = await paint(t, stateWith({ offered: PLAN_OFFER, action: { ...OFFER, step: PLAN_OFFER } }), { filledRung: 'next-step' });
     assert.match(html, /data-testid="opened-task-go"[^>]*data-action="run-step-next"[^>]*>Run Plan</);
   });
 
-  test('Another step is a run-step, so the dispatch it records fills Next step: the rung fills next-step on the next load', async () => {
+  test('Another step is a run-step, so the dispatch it records fills Next step: the rung fills next-step on the next load', async (t) => {
     // The server records a run-step as next-step (lin-4104-reach.test.js); the page then paints the Next step primary.
-    const html = await paint(stateWith({ action: OFFER }), { filledRung: 'next-step' });
+    const html = await paint(t, stateWith({ action: OFFER }), { filledRung: 'next-step' });
     assert.match(html, /data-filled-rung="next-step"/);
   });
 });
 
 // LIN-4104 review finding 2: a step run from Another step re-reads the offer before it fetches or dispatches the step.
 describe('LIN-4104 review finding 2 — a step picked from Another step is refused when its offer is stale', () => {
-  test('a stale press of the picked step fetches no prompt, dispatches nothing, and says a run started', async () => {
+  test('a stale press of the picked step fetches no prompt, dispatches nothing, and says a run started', async (t) => {
     const OFFER_LEAF = { kind: 'offer', container: false, step: null, why: 'the run control offers the three rungs' };
     const BUSY = { busy: true, action: { kind: 'busy', identifier: 'LIN-43', words: 'Build running', why: 'x' } };
     // The page renders the offer; the server answers busy on every read after the pick (a run started since the render).
     let serverBusy = false;
     const body = () => stateWith({ action: serverBusy ? BUSY.action : OFFER_LEAF, ...(serverBusy ? { busy: true } : {}) });
-    const { PromptSection, calls, makeContainer } = loadClient({ stateBody: body });
+    const { PromptSection, calls, makeContainer } = await loadClient(t, { stateBody: body });
     const c = makeContainer();
     PromptSection.init(c, { ...HOME, filledRung: 'pr' });
     await flush(); await flush(); await flush();
@@ -306,9 +306,9 @@ describe('LIN-4104 review finding 2 — a step picked from Another step is refus
 // LIN-4104 D4 (the corrective from beat 3): Another step re-reads the offer at its press. A run that started between the
 // render and the press makes the offer no longer an offer, so the list does not open, and the press says so in plain words.
 describe('LIN-4104 D4 — Another step re-reads the offer at its press', () => {
-  test('a run starts between render and Another step: the list does not open, and a plain refusal says nothing was started', async () => {
+  test('a run starts between render and Another step: the list does not open, and a plain refusal says nothing was started', async (t) => {
     const body = stateWith({ action: { kind: 'offer', container: false, step: null, why: 'the run control offers the three rungs' } });
-    const { PromptSection, makeContainer } = loadClient({ stateBody: body });
+    const { PromptSection, makeContainer } = await loadClient(t, { stateBody: body });
     const c = makeContainer();
     PromptSection.init(c, { ...HOME, filledRung: 'pr' });
     await flush(); await flush(); await flush();
