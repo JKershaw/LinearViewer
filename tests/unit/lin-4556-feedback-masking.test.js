@@ -217,6 +217,33 @@ describe('LIN-4556: a secret split across two assistant-text chunks is masked', 
     assert.equal(stored[1], chunk(2, 2, `${MASK} then more words on the same line`));
   });
 
+  test('the rollback (recap i/n) format: a token split across two recap chunks is masked like the assistant-text pair', async () => {
+    // simple-dispatcher hook.js postTurnText (SD_ASSISTANT_TEXT_RELAY=0) posts `[<label> ](recap i/n)\n<chunk>`,
+    // the label on the SAME line, chunked by the same chunkLines.
+    const token = 'ghp_A1b2C3d4E5f6G7h8I9j0K1l2M3n4O5p6Q7r8';
+    const recap = (i, n, text, label = null) => `${label ? `${label} ` : ''}(recap ${i}/${n})\n${text}`;
+    for (const label of [null, '[turn 3]']) {
+      const store = makeStore();
+      const item = await takenByDispatchToken(store);
+      const stored = await postChunks(store, item, [
+        recap(1, 2, `token is ${token.slice(0, 16)}`, label),
+        recap(2, 2, `${token.slice(16)} tail`, label)
+      ]);
+      assert.equal(stored[1], recap(2, 2, `${MASK} tail`, label), `label ${label}`);
+    }
+  });
+
+  test('a recap chunk is not continued by an assistant-text chunk (head families do not mix)', async () => {
+    const store = makeStore();
+    const item = await takenByDispatchToken(store);
+    const token = 'ghp_A1b2C3d4E5f6G7h8I9j0K1l2M3n4O5p6Q7r8';
+    const stored = await postChunks(store, item, [
+      `(recap 1/2)\ntoken is ${token.slice(0, 16)}`,
+      chunk(2, 2, `${token.slice(16)} tail`)
+    ]);
+    assert.ok(stored[1].includes(token.slice(16)), 'no cross-family join: masked on its own only');
+  });
+
   test('a long line hard-split inside a long key chunk 1 already masked: the key\'s remainder in chunk 2 is masked', async () => {
     const store = makeStore();
     const item = await takenByDispatchToken(store);
@@ -291,8 +318,10 @@ describe('LIN-4556: a secret split across two assistant-text chunks is masked', 
 
 describe('LIN-4556: chunk-head helpers', () => {
   test('parseChunkHead reads the head with and without the label line', () => {
-    assert.deepEqual(parseChunkHead('(assistant-text 2/5)\nbody'), { label: null, i: 2, n: 5, bodyStart: 21 });
-    assert.deepEqual(parseChunkHead('[turn 3]\n(assistant-text 1/2)\nbody'), { label: '[turn 3]', i: 1, n: 2, bodyStart: 30 });
+    assert.deepEqual(parseChunkHead('(assistant-text 2/5)\nbody'), { label: null, i: 2, n: 5, bodyStart: 21, family: 'assistant-text' });
+    assert.deepEqual(parseChunkHead('[turn 3]\n(assistant-text 1/2)\nbody'), { label: '[turn 3]', i: 1, n: 2, bodyStart: 30, family: 'assistant-text' });
+    assert.deepEqual(parseChunkHead('(recap 2/3)\nbody'), { label: null, i: 2, n: 3, bodyStart: 12, family: 'recap' });
+    assert.deepEqual(parseChunkHead('[turn 3] (recap 1/2)\nbody'), { label: '[turn 3]', i: 1, n: 2, bodyStart: 21, family: 'recap' });
     assert.equal(parseChunkHead('plain words'), null);
     assert.equal(parseChunkHead('(assistant-text 3/2)\nbody'), null, 'i past n is not a chunk');
     assert.equal(parseChunkHead('(assistant-text 2/5) no newline'), null);
