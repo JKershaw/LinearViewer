@@ -531,7 +531,7 @@ function parseProposalResult(resultString) {
 }
 
 // LIN-2621 beat 4, LIN-4538: `list_pending_decisions`' tool result (lib/chat-tools.js's `projectPendingQuestion` rows:
-// `{count, truncated, questions: [{questionId, question, options: [label], recommended, issueIdentifier, interactive}]}`),
+// `{count, truncated, questions: [{questionId, question, short, options: [label], recommended, issueIdentifier, interactive}]}`),
 // parsed with the SAME defensive posture as parseProposalResult below — a truncated or malformed payload fails JSON.parse or
 // the shape check honestly, never throws uncaught. A row missing `questionId` or a non-array `options` is dropped rather than
 // rendered half-built; the question card drops any malformed option the same way.
@@ -551,6 +551,9 @@ function parsePendingResult(resultString) {
         ticket: typeof q.issueIdentifier === 'string' ? q.issueIdentifier : null,
         title: typeof q.issueTitle === 'string' ? q.issueTitle : null,
         asks: typeof q.question === 'string' ? q.question : '',
+        // LIN-4551: the one-line question the tool row carries (lib/chat-tools.js `short`), so the card leads with it, as on every
+        // other host; without it the card leads with the ask's first line.
+        short: typeof q.short === 'string' ? q.short : null,
         options: q.options,
         recommended: typeof q.recommended === 'string' ? q.recommended : null,
         ifUnanswered: null,

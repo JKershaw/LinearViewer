@@ -17,12 +17,15 @@
  *   LIN4546_SHOTS=before npx playwright test --config=playwright.visual.config.js tests/visual/lin-4546-question-surfaces-screenshots.spec.js
  * Output: docs/reviews/_evidence-2026-11-24-lin4546/<LIN4546_SHOTS>/<surface>-<role>-<theme>-<width>.png. The "before" set was
  * taken on main at d11effb18 with only the seeds added; piece 7 (LIN-4555) takes the "after" set with the same spec.
+ * LIN-4551: each 390px load also records the page's scroll width beside its shot (scroll-390.json), so "no sideways scroll" is
+ * a measure, not a look. The card-face sets are `lin4551-before` (main at 82ff17aff) and `lin4551-after`.
  */
-import { mkdirSync } from 'node:fs';
+import { mkdirSync, writeFileSync } from 'node:fs';
 import { test, expect } from '../fixtures/test-base.js';
 import { localSeedId } from '../fixtures/local-harness.js';
 import { askingRun, recordsOf, runningRun, seedOwnerFindings, seedLongQuestion } from '../fixtures/question-records.js';
 import { renderSSEFrames } from '../fixtures/flight-companion-sse-frames.js';
+import { questionShortOf } from '../../lib/records/question-short.js';
 
 const SET = process.env.LIN4546_SHOTS || 'before';
 const DIR = `docs/reviews/_evidence-2026-11-24-lin4546/${SET}`;
@@ -84,7 +87,8 @@ function pendingResult(questions) {
     questions: questions.map((q, i) => {
       const issueIdentifier = ['LOCAL-11', 'LOCAL-12', 'LOCAL-13'][i] ?? null;
       return {
-        questionId: q.id, question: q.fields.asks, options: q.fields.options, recommended: q.fields.recommended ?? null,
+        // LIN-4551: `short` as the reader gives it (written, else derived), which the tool row carries since LIN-4550.
+        questionId: q.id, question: q.fields.asks, short: questionShortOf(q.fields), options: q.fields.options, recommended: q.fields.recommended ?? null,
         issueIdentifier, issueTitle: issueIdentifier ? titleOf(issueIdentifier) : null, state: 'resumable', interactive: true,
       };
     }),
@@ -99,6 +103,7 @@ async function setTheme(page, theme) {
  * One full-page shot of `path` per theme and width. `prepare` runs after each load (open a fold, wait for a poll). `fresh`
  * clears the page's storage before each load, so a page that restores its thread (Flight Companion) starts empty each time.
  */
+const scroll390 = [];
 async function shootAll(page, name, path, prepare = async () => {}, { fresh = false } = {}) {
   for (const theme of ['light', 'dark']) {
     await setTheme(page, theme);
@@ -108,12 +113,14 @@ async function shootAll(page, name, path, prepare = async () => {}, { fresh = fa
       await page.goto(path);
       await page.waitForLoadState('networkidle');
       await prepare();
+      if (width === 390) scroll390.push({ shot: `${name}-${theme}-${width}`, scrollWidth: await page.evaluate(() => document.documentElement.scrollWidth) });
       await page.screenshot({ path: `${DIR}/${name}-${theme}-${width}.png`, fullPage: true });
     }
   }
 }
 
 test.beforeAll(() => { mkdirSync(DIR, { recursive: true }); });
+test.afterAll(() => { writeFileSync(`${DIR}/scroll-390.json`, `${JSON.stringify(scroll390, null, 2)}\n`); });
 
 test('owner: Home, rulings, Runs, task page, run page and Flight Companion', async ({ page, localWorkerUrlKey: urlKey }) => {
   const { runId, questions } = await seed(page, urlKey);
