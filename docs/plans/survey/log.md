@@ -5323,3 +5323,5 @@ The full stop holds: the fleet is paused, and the drive is only reporting. The o
 Since LIN-4548, a log comment I post on LIN-4008 becomes my open finding on its task (finding-17883768, task-203b0f9f). I end each one as done ("a log line; nothing to act on"). For the notes review: log comments versus findings.
 
 **24 Nov, 17:29Z hourly.** LIN-4550 (piece 2) merged 14:50, about an hour with no review loop. LIN-4551 (piece 3), beat 4 of 4 (docs, walk, PR, CI): the session stalled about 55 minutes on resume (16:21–17:14, no tool activity, possibly a long Bash). The dispatcher's own stall re-fire redelivered the task at 17:21, and it has been working since. No help from me.
+
+**24 Nov, ~18:40Z: LIN-4508 folded in (John: "Feels useful and we can dispatch it now").** This is "watch agents work as it happens": each run's words reach Harbour while it works, with secrets masked on intake. Kicked off as a second lane, ticket as filed 20 Nov. It spans the runner (simple-dispatcher) and Harbour. It shares the run page with LIN-4553 (LIN-4546 piece 5); watch for merge friction.
