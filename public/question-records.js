@@ -23,6 +23,60 @@ function setBusy(card, busy) {
   card.querySelectorAll('button, textarea').forEach((el) => { el.disabled = busy; });
 }
 
+// ── Keeping a card across a repaint (LIN-4549, finding-7a603e81) ──────────────
+// The one rule every host that repaints a question card asks: Home's live Waiting refresh (public/question-cards.js
+// mergeWaitingCards, given it by public/app.js), Observation's rulings poll (public/observation.js) and Home's opened task
+// (public/prompt-section.js keepTypedQuestion). It reads either card: a question record's, or the older reply card a run
+// parked on a bare `[blocked]` draws (lib/question-card.js). Each host decides first which card is "the same" (by its key);
+// this says whether that card holds the reader's place.
+const TYPED = `${INPUT}, [data-testid="session-question-card-input"]`;
+const PRESSED = `${OPTION}[aria-pressed="true"]`;
+
+/**
+ * Focus inside the card. `active` is the element that had focus BEFORE a write that may detach the card (a repaint detaches it,
+ * which blurs it, so after the write only the caller can know); omitted, it is the card's document's focus now; null says
+ * nothing was focused. The card's own box is not focus inside it (LIN-4293).
+ * @param {Element|null} card
+ * @param {Element|null} [active]
+ */
+export function focusInCard(card, active) {
+  if (!card) return false;
+  const el = active === undefined ? card.ownerDocument?.activeElement ?? null : active;
+  return !!el && el !== card && card.contains(el);
+}
+
+/**
+ * The reader is mid-answer on this card: typed words, a chosen option, focus inside it, or an answer in flight. Home's placement
+ * reads this half alone (public/home-placement.js): a settled card holds a place on the page, not the reader's input, so it never
+ * holds Running and Up next back.
+ * @param {Element|null} card
+ * @param {Element|null} [active] - as in focusInCard
+ */
+export function holdsReaderInput(card, active) {
+  if (!card) return false;
+  if (card.dataset?.answerInFlight === 'true') return true;
+  const typed = card.querySelector(TYPED);
+  if (typed && typeof typed.value === 'string' && typed.value.length > 0) return true;
+  // A chosen option is an answer being made only on an open card: a card answered with an option keeps it pressed once settled,
+  // and that must not hold Home's placement back (LIN-4243: an answered task returns to Running).
+  if (card.dataset?.settled !== 'true' && card.querySelector(PRESSED)) return true;
+  return focusInCard(card, active);
+}
+
+/**
+ * Whether a repaint keeps this card where it is rather than drawing it fresh: the reader is mid-answer on it (holdsReaderInput),
+ * a request from it is out (a control is off), or it is settled (answered or dismissed here, showing its outcome). The union of
+ * what the three hosts each kept before LIN-4549.
+ * @param {Element|null} card
+ * @param {Element|null} [active] - as in focusInCard
+ */
+export function holdsCard(card, active) {
+  if (!card) return false;
+  if (card.dataset?.settled === 'true') return true;
+  if ([...card.querySelectorAll('button, textarea')].some((el) => el.disabled)) return true;
+  return holdsReaderInput(card, active);
+}
+
 function say(card, text) {
   const feedback = card.querySelector(FEEDBACK);
   if (feedback) feedback.textContent = text;
@@ -43,6 +97,9 @@ function settle(card, text) {
 
 async function send(card, action, payload) {
   setBusy(card, true);
+  // The answer is out until the route answers (holdsReaderInput reads it): the same flag the older reply card sets
+  // (public/question-cards.js sendReply). Cleared on every outcome, so a settled card is settled, not in flight.
+  card.dataset.answerInFlight = 'true';
   let text;
   try {
     const res = await fetch(questionActionPath(card.dataset.urlKey, card.dataset.questionId, action), {
@@ -52,11 +109,13 @@ async function send(card, action, payload) {
       body: JSON.stringify(payload),
     });
     const body = await res.json().catch(() => ({}));
+    delete card.dataset.answerInFlight;
     if (res.ok) return settle(card, questionOutcomeText(action, body));
     text = questionOutcomeText(action, { error: body?.error || 'Could not record it; try again' });
   } catch {
     text = 'Could not reach Harbour; try again';
   }
+  delete card.dataset.answerInFlight;
   setBusy(card, false);
   say(card, text);
   return null;

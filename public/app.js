@@ -10,6 +10,7 @@
  * Exported names are its test seams. `window.refreshWaitingOnYou` is the e2e hook the bridge inventory lists.
  */
 import * as PromptSection from './prompt-section.js'
+import { holdsCard, holdsReaderInput } from './question-records.js'
 import { buildPromptFilename } from '../lib/prompt-filename.js'
 import { sourceQuery } from '../lib/task-page-href.js'
 
@@ -590,7 +591,8 @@ function initWaitingOnYou() {
       .then(response => (response.ok ? response.json() : null))
       .then(data => {
         if (!data || typeof data.html !== 'string' || !window.QuestionCards?.mergeWaitingCards) return
-        const { removed } = window.QuestionCards.mergeWaitingCards(body, data.html)
+        // LIN-4549: the one keep-a-card rule, handed to the classic merge (no global carries it).
+        const { removed } = window.QuestionCards.mergeWaitingCards(body, data.html, { holds: holdsCard })
         // LIN-4532 (P2b): the count is read off the page, the one count the question cards settle through (waitingCountIn), so
         // a merged question card and a settled one count the same way as a ruling card.
         const count = waitingCountIn(main)
@@ -715,7 +717,8 @@ function createDeskPlacement({ main, countLine, live, searchResults, searchInput
 
   function facts() {
     const active = document.activeElement
-    const holds = window.QuestionCards?.cardHoldsInput || (() => false)
+    // LIN-4549: the reader-input half of the one keep-a-card rule (public/question-records.js), handed to the classic policy.
+    const holds = holdsReaderInput
     return {
       search: !!(searchInput && searchInput.value.trim()),
       dispatchesInFlight: typeof window.dispatchesInFlight === 'function' ? window.dispatchesInFlight() : 0,

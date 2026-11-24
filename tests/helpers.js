@@ -191,6 +191,19 @@ export const SELECTORS = {
     /** One row of the recent block, by identifier. */
     recentRow: (identifier) => `[data-testid="running-recent"] [data-testid="issue-line"][data-identifier="${identifier}"]`,
   },
+  /** LIN-4549: the shared question record card (lib/question-record-card.js), on every surface that draws it. */
+  questionCard: {
+    card: '[data-testid="question-record-card"]',
+    byId: (questionId) => `[data-testid="question-record-card"][data-question-id="${questionId}"]`,
+    input: '[data-testid="question-record-card-input"]',
+    option: '[data-testid="question-record-card-option"]',
+    pressedOption: '[data-testid="question-record-card-option"][aria-pressed="true"]',
+  },
+  /** LIN-4549: Home's Waiting on you section and its question wrappers (`.waiting-question`, one per open question). */
+  waitingOnYou: {
+    section: '[data-testid="waiting-on-you"]',
+    question: '[data-testid="waiting-question"]',
+  },
   /** An issue row by id (pairs the testid with the existing data-id hook). */
   issue: (id) => `[data-testid="issue-line"][data-id="${id}"]`,
   /** Workspace KPIs page (LIN-3689): section, card and empty-state test ids. */

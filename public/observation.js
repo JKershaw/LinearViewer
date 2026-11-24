@@ -36,6 +36,7 @@
 
 import { fmtDuration } from '../lib/time-words.js';
 import { renderQuestionRecordCard } from '../lib/question-record-card.js';
+import { holdsCard } from './question-records.js';
 import { taskPageHref } from '../lib/task-page-href.js';
 
 let observationData = null;
@@ -1680,25 +1681,16 @@ function renderQuestionRulingRow(row) {
   return li;
 }
 
-// questionId -> the <li> on the page. A card holding an answer in progress (typed words, a chosen option, focus) or one already
-// settled is kept across the poll's repaint; any other card is rebuilt from the payload.
+// questionId -> the <li> on the page. A card the one keep-a-card rule holds (public/question-records.js holdsCard: typed words, a
+// chosen option, focus, a control off, an answer in flight, or settled; LIN-4549) is kept across the poll's repaint; any other
+// card is rebuilt from the payload.
 const renderedQuestionRows = new Map();
 function questionCardOf(li) {
   return li ? li.querySelector('[data-testid="question-record-card"]') : null;
 }
-function questionCardHoldsAnswer(li) {
-  const card = questionCardOf(li);
-  if (!card) return false;
-  if (card.dataset.settled === 'true') return true;
-  const input = card.querySelector('[data-testid="question-record-card-input"]');
-  if (input && input.value) return true;
-  if (card.querySelector('[data-testid="question-record-card-option"][aria-pressed="true"]')) return true;
-  const active = document.activeElement;
-  return !!(active && card.contains(active));
-}
 function questionRowNode(row) {
   const existing = renderedQuestionRows.get(row.questionId);
-  if (existing && questionCardHoldsAnswer(existing)) return existing;
+  if (existing && holdsCard(questionCardOf(existing))) return existing;
   const li = renderQuestionRulingRow(row);
   // A rebuilt row replaces its old node wherever that node is attached. The old one may sit in the other host (LIN-3983):
   // the block and the Rulings tab share `renderedQuestionRows`, so without this the stale <li> stays in the block's list

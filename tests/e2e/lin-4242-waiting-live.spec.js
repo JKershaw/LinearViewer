@@ -206,7 +206,7 @@ test('a refresh requested before a question was answered here does not replace i
 });
 
 test('a card whose answer is in flight survives a refresh that no longer lists it, as the same node', async ({ page }) => {
-  // Witness: drop the in-flight exception in mergeWaitingCards' removal (questionCardHeld) → the card is removed while its answer is out.
+  // Witness: drop the hold exception in mergeWaitingCards' removal (`holds`, public/question-records.js holdsCard) → the card is removed while its answer is out.
   await seedTree(page);
   await seedWaiting(page, 'LOCAL-S', THREE_OPTIONS);
   await page.goto(`/workspace/${URL_KEY}/`);
@@ -327,7 +327,7 @@ test.describe('the opened task keeps its typed question across a state repaint (
     // Witness: drop `|| keepsPlace` from keepTypedQuestion → the repaint writes the new card and the typed text is gone.
     await openRunningThenRaise(page);
     await page.locator(OPENED_INPUT).fill('half a sentence in the opened task');
-    // fill() leaves the textarea focused, and focus alone keeps a card (cardHoldsInput). Blur first, so this test
+    // fill() leaves the textarea focused, and focus alone keeps a card (holdsCard). Blur first, so this test
     // witnesses the typed text and not the focus: the card must hold no focus when the poll paints.
     await page.locator(OPENED_INPUT).blur();
     expect(await page.evaluate(() => !document.querySelector('[data-question-slot] [data-testid="question-record-card"]').contains(document.activeElement))).toBe(true);
@@ -358,7 +358,7 @@ test.describe('the opened task keeps its typed question across a state repaint (
   });
 
   test('a different question\'s card replaces the typed one: the question key gates the keep', async ({ page }) => {
-    // Witness: drop the key comparison in keepsReaderPlace → the typed card of the old question is kept over the new one.
+    // Witness: drop the key comparison in keepTypedQuestion (prompt-section.js) → the typed card of the old question is kept over the new one.
     await openRunningThenRaise(page);
     await page.locator(OPENED_INPUT).fill('an answer to the first question');
     await page.locator(OPENED_CARD).evaluate(el => { el.dataset.keepMark = 'yes'; });

@@ -277,44 +277,6 @@
     if (isQuestionWrapper(wrapper)) { var qcard = questionCardOf(wrapper); return qcard && qcard.dataset.questionId ? 'question:' + qcard.dataset.questionId : ''; }
     var inner = innerCardOf(wrapper); return inner ? rulingKeyOf(inner) : '';
   }
-  // A question card answered here (settled) or with a request in flight (its controls disabled) stays where it is: the refresh
-  // does not take it out, the same as a reply card held for its answer.
-  function questionCardHeld(wrapper) {
-    var qcard = questionCardOf(wrapper);
-    if (!qcard) return false;
-    if (qcard.dataset.settled === 'true') return true;
-    var controls = qcard.querySelectorAll('button, textarea');
-    for (var c = 0; c < controls.length; c++) { if (controls[c].disabled) return true; }
-    return false;
-  }
-  // LIN-4293: "focus inside the card", the one rule. `active` is the element that had focus BEFORE a write that may detach the
-  // card: a repaint detaches it, which blurs it, so after the write only the caller can know. Omitted (undefined) it is
-  // document.activeElement, the live Waiting section's and Home placement's reading; null says nothing was focused. The card's
-  // own box is not focus inside it.
-  function focusInCard(card, active) {
-    if (!card) return false;
-    var el = active === undefined ? document.activeElement : active;
-    return !!el && el !== card && card.contains(el);
-  }
-  // Whether a card holds the reader's place: typed text, focus inside it, or an answer in flight. Home's opened task uses
-  // the same check (public/prompt-section.js keepTypedQuestion), gated on the card key first. `active` as in focusInCard.
-  function cardHoldsInput(card, active) {
-    if (!card) return false;
-    if (card.dataset && card.dataset.answerInFlight === 'true') return true;
-    // The typed answer: a reply card's input, or a question record card's (LIN-4538).
-    var textarea = card.querySelector('[data-testid="session-question-card-input"]') || card.querySelector('[data-testid="question-record-card-input"]');
-    if (textarea && textarea.value && textarea.value.length > 0) return true;
-    return focusInCard(card, active);
-  }
-  // LIN-4242: whether a repaint keeps the card already on the page in place of its fresh markup (the opened task's
-  // keepTypedQuestion, public/prompt-section.js). The card key is the gate: a different card is never kept, and
-  // the same card is kept only while it holds the reader's place. LIN-4293: `active` is the focused element before
-  // the repaint (LIN-4246: the write detaches the card first, so only the caller can know it); omitted, the answer is the
-  // Waiting merge's, unchanged.
-  function keepsReaderPlace(oldCard, freshCard, active) {
-    if (!oldCard || !freshCard) return false;
-    return rulingKeyOf(oldCard) === rulingKeyOf(freshCard) && cardHoldsInput(oldCard, active);
-  }
   function waitingWrappersIn(body) {
     var out = [];
     var kids = body.children || [];
@@ -326,12 +288,17 @@
   /**
    * Merge a fresh server section into the live `.waiting-body` (LIN-4242). Keeps cards the page and the server agree on,
    * adds new ones in server order and binds them, removes cards the server no longer lists (announced by the caller),
-   * except a card whose answer is still in flight. Returns the cards now in the body and the keys removed.
+   * except a card `holds` keeps. Returns the cards now in the body and the keys removed.
+   * LIN-4549: `holds` is the one keep-a-card rule (public/question-records.js holdsCard), handed in by its caller (public/app.js):
+   * this classic file cannot import the module, and no global carries it.
    * @param {Element} body - the live `.waiting-body`
    * @param {string} freshHtml - the server's section markup (`{ html }` from /api/home-waiting)
+   * @param {{holds: (card: Element) => boolean}} opts
    * @returns {{count: number, removed: string[]}}
    */
-  function mergeWaitingCards(body, freshHtml) {
+  function mergeWaitingCards(body, freshHtml, opts) {
+    var holds = opts && opts.holds;
+    if (typeof holds !== 'function') throw new TypeError('mergeWaitingCards needs the keep rule: { holds } (public/question-records.js holdsCard)');
     var removed = [];
     if (!body) return { count: 0, removed: removed };
     var template = document.createElement('template');
@@ -345,15 +312,11 @@
       freshKeys.add(key);
       fresh.push({ key: key, el: found[f] });
     }
-    // Remove what the server no longer lists, unless its answer is still in flight.
+    // Remove what the server no longer lists, unless the reader's place is on it (the one rule, `holds`).
     waitingWrappersIn(body).forEach(function (wrapper) {
       var key = cardKeyOf(wrapper);
       if (freshKeys.has(key)) return;
-      if (isQuestionWrapper(wrapper)) { if (questionCardHeld(wrapper)) return; }
-      else {
-        var inner = innerCardOf(wrapper);
-        if (inner && inner.dataset && inner.dataset.answerInFlight === 'true') return;
-      }
+      if (holds(isQuestionWrapper(wrapper) ? questionCardOf(wrapper) : innerCardOf(wrapper))) return;
       // Not settled here: a card that leaves one response may return in a later one (a live run on its task comes and goes).
       // Only an answer or dismiss on this page settles a key, through RULING_GONE_EVENT (app.js onRulingGone -> noteSettled).
       removed.push(key);
@@ -373,7 +336,7 @@
     return { count: waitingWrappersIn(body).length, removed: removed };
   }
 
-  var api = { appendYouBubble: appendYouBubble, sendReply: sendReply, initQuestionCards: initQuestionCards, rulingKeyOf: rulingKeyOf, RULING_GONE_EVENT: RULING_GONE_EVENT, setDeskRoot: function (el) { deskRoot = el; }, cardHoldsInput: cardHoldsInput, focusInCard: focusInCard, keepsReaderPlace: keepsReaderPlace, mergeWaitingCards: mergeWaitingCards, noteSettled: noteSettled };
+  var api = { appendYouBubble: appendYouBubble, sendReply: sendReply, initQuestionCards: initQuestionCards, rulingKeyOf: rulingKeyOf, RULING_GONE_EVENT: RULING_GONE_EVENT, setDeskRoot: function (el) { deskRoot = el; }, mergeWaitingCards: mergeWaitingCards, noteSettled: noteSettled };
   if (typeof window !== 'undefined') window.QuestionCards = api;
   if (typeof module !== 'undefined' && module.exports) module.exports = api;
 })();

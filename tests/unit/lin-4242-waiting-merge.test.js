@@ -1,7 +1,8 @@
 /**
  * LIN-4242 — the live Waiting on you merge, witnessed in a fake DOM (no browser, no timers).
  *
- * public/question-cards.js `mergeWaitingCards` and `keepsReaderPlace` run in a vm sandbox over a small element tree. The
+ * public/question-cards.js `mergeWaitingCards` runs in a vm sandbox over a small element tree, given the one keep-a-card rule
+ * (public/question-records.js holdsCard) as public/app.js gives it (LIN-4549). The
  * fresh markup is the real `renderWaitingSection` output, parsed by a minimal HTML parser below, so the merge sees the
  * same `.waiting-card` wrappers and `question-record-card` markup the server sends. Each test is a mutation witness: the
  * comment on it names the change that makes it fail.
@@ -16,6 +17,7 @@ import { fileURLToPath } from 'node:url';
 import { dirname, join } from 'node:path';
 import { renderWaitingSection } from '../../lib/waiting-section.js';
 import { createFakeDom } from './helpers/fake-dom.js';
+import { holdsCard } from '../../public/question-records.js';
 
 const REPO = join(dirname(fileURLToPath(import.meta.url)), '../..');
 const QUESTION_CARDS_JS_SRC = readFileSync(join(REPO, 'public/question-cards.js'), 'utf8');
@@ -60,10 +62,11 @@ const wrapperFor = (body, identifier) => wrappersOf(body).find((w) => w.querySel
 /** The fresh server markup for `identifiers`, as the route sends it. */
 const freshFor = (identifiers) => renderWaitingSection({ rows: [], questions: identifiers.map(row) }, { urlKey: 'ws', owner: true });
 /**
- * The merge's result, copied into this realm: the sandbox's own arrays would fail strict deep equality on prototype.
+ * The merge's result, copied into this realm: the sandbox's own arrays would fail strict deep equality on prototype. The merge is
+ * given the one keep-a-card rule, as public/app.js gives it (LIN-4549).
  */
 const merge = (QC, body, html) => {
-  const r = QC.mergeWaitingCards(body, html);
+  const r = QC.mergeWaitingCards(body, html, { holds: holdsCard });
   return { count: r.count, removed: [...r.removed] };
 };
 /** The fresh server markup for an empty owner section (zero rulings). */
@@ -112,7 +115,7 @@ describe('LIN-4242: the keyed merge (fake DOM)', () => {
   test('a key only on the page is removed and reported, unless its answer is still in flight', () => {
     // Witness: drop the `answerInFlight` guard → the in-flight card is removed and the first assertion fails.
     const { body, QC } = world(['LIN-1', 'LIN-2']);
-    // A question record's card is in flight while its controls are disabled (the answer is being written): questionCardHeld.
+    // A question record's card is in flight while its controls are disabled (the answer is being written): holdsCard.
     const inFlight = wrapperFor(body, 'LIN-2').querySelector('[data-testid="question-record-card"]');
     const key2 = QC.rulingKeyOf(inFlight);
     const answer = inFlight.querySelector('[data-testid="question-record-card-answer"]');
@@ -165,48 +168,39 @@ describe('LIN-4242: the keyed merge (fake DOM)', () => {
   });
 });
 
-describe('LIN-4242: keepsReaderPlace, the gate the opened task’s repaint uses (keepTypedQuestion)', () => {
+// LIN-4549: keepsReaderPlace (question-cards.js) is gone. Its two halves are pinned where they now live: the key gate (another
+// question's card is never kept) at the opened task's call site (tests/unit/lin-4549-hold-rule.test.js, "another question's card"),
+// and the hold half here, on the one rule (public/question-records.js holdsCard) over the same server markup.
+describe('LIN-4242: the hold half of the opened task\'s repaint gate, now the one rule (holdsCard)', () => {
   const cardFor = (QC, body, identifier) => wrapperFor(body, identifier).querySelector('[data-testid="question-record-card"]');
 
-  test('the same ruling with typed text is kept', () => {
-    // Witness: drop the rulingKeyOf equality → the cross-ruling case below is kept and the other assertion still passes; the
-    // cross-ruling test is the one that fails.
+  test('a card with typed text is held', () => {
     const { body, QC } = world(['LIN-1']);
     const old = cardFor(QC, body, 'LIN-1');
     old.querySelector('[data-testid="question-record-card-input"]').value = 'my words';
-    const fresh = cardFor(QC, world(['LIN-1']).body, 'LIN-1');
-    assert.equal(QC.keepsReaderPlace(old, fresh), true);
+    assert.equal(holdsCard(old), true);
   });
 
-  test('a different ruling with typed text is never kept', () => {
-    // Witness: the rulingKeyOf equality removed → this assertion fails.
+  test('a card with no input, no focus and no answer in flight is not held', () => {
+    // Witness: holdsCard replaced by `true` → this assertion fails.
     const { body, QC } = world(['LIN-1']);
-    const old = cardFor(QC, body, 'LIN-1');
-    old.querySelector('[data-testid="question-record-card-input"]').value = 'my words for LIN-1';
-    const other = cardFor(QC, world(['LIN-9']).body, 'LIN-9');
-    assert.equal(QC.keepsReaderPlace(old, other), false);
+    assert.equal(holdsCard(cardFor(QC, body, 'LIN-1')), false);
   });
 
-  test('the same ruling with no input, no focus and no answer in flight is not kept', () => {
-    // Witness: `cardHoldsInput` replaced by `true` → this assertion fails.
-    const { body, QC } = world(['LIN-1']);
-    const old = cardFor(QC, body, 'LIN-1');
-    const fresh = cardFor(QC, world(['LIN-1']).body, 'LIN-1');
-    assert.equal(QC.keepsReaderPlace(old, fresh), false);
-  });
-
-  test('the same ruling with an answer in flight is kept, even with no typed text', () => {
+  test('a card with an answer in flight is held, even with no typed text', () => {
     const { body, QC } = world(['LIN-1']);
     const old = cardFor(QC, body, 'LIN-1');
     old.dataset.answerInFlight = 'true';
-    const fresh = cardFor(QC, world(['LIN-1']).body, 'LIN-1');
-    assert.equal(QC.keepsReaderPlace(old, fresh), true);
+    assert.equal(holdsCard(old), true);
   });
 
-  test('a missing card on either side is never kept', () => {
-    const { QC, document } = world([]);
-    assert.equal(QC.keepsReaderPlace(null, null), false);
-    assert.equal(QC.keepsReaderPlace(document.createElement('div'), null), false);
+  test('a missing card is never held', () => {
+    assert.equal(holdsCard(null), false);
+  });
+
+  test('the merge refuses to run without the rule, rather than keep nothing', () => {
+    const { body, QC } = world(['LIN-1']);
+    assert.throws(() => QC.mergeWaitingCards(body, freshFor(['LIN-1'])), /needs the keep rule/);
   });
 });
 

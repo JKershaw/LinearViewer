@@ -16,6 +16,7 @@ import assert from 'node:assert/strict';
 import { escapeHtml } from '../../lib/utils/html.js';
 import { serverSessions, serverRow } from '../fixtures/task-decision.js';
 import { promptSectionWorld } from './helpers/prompt-section-world.js';
+import { focusInCard } from '../../public/question-records.js';
 
 const RUNNING = { loopId: 'loop-1', kind: 'implementation', label: 'Build', state: 'running', since: '2026-11-05T10:00:00.000Z', target: 'cli' };
 const HOME = {
@@ -182,17 +183,17 @@ describe('LIN-4293: the "in progress" views keep today\'s inputs', () => {
 
 describe('LIN-4293: focusInCard, the one "focus inside the question card" rule', () => {
   // Pins the clause the render-path and LIN-4246 witnesses do not: the card's own box is not focus inside it. Witness: drop
-  // `el !== card` from QuestionCards.focusInCard and the first assertion goes red (card.contains(card) is true).
+  // `el !== card` from focusInCard and the first assertion goes red (card.contains(card) is true). LIN-4549: the rule moved
+  // from question-cards.js to the one keep-a-card rule's module (public/question-records.js); the assertions are unchanged.
   test('the card itself is not focus inside it; an element in it is; nothing focused is not', async (t) => {
     const h = await mountWithCard(t);
-    const QC = h.world.window.QuestionCards;
     const card = h.card();
     assert.ok(card, 'the mount put the question card on the page');
     const input = card.querySelector('[data-testid="session-question-card-input"]');
     assert.ok(input, 'the card has a textarea');
 
-    assert.equal(QC.focusInCard(card, card), false, 'the card\'s own box is not focus inside it');
-    assert.equal(QC.focusInCard(card, input), true, 'the textarea inside the card is focus inside it');
-    assert.equal(QC.focusInCard(card, null), false, 'null says nothing was focused');
+    assert.equal(focusInCard(card, card), false, 'the card\'s own box is not focus inside it');
+    assert.equal(focusInCard(card, input), true, 'the textarea inside the card is focus inside it');
+    assert.equal(focusInCard(card, null), false, 'null says nothing was focused');
   });
 });
