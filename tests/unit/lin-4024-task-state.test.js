@@ -32,7 +32,7 @@ const ruling = (over = {}) => loop({
   wakeMarker: 'blocked', waitingMessage: '[blocked] re-dispatch?',
   feedback: [{ message: '[blocked] re-dispatch?', timestamp: '2026-10-29T10:05:00.000Z' }],
   decision: { decision_id: 'd-1', question: 'Re-dispatch the cancelled research?' }, decisionCase: [],
-  answeredDecisions: [], withdrawal: null, ...over,
+  withdrawal: null, ...over,
 });
 // An auto-enqueued check-in behind the ruling: queued, not running (the LIN-4011 case).
 const queuedWake = (over = {}) => loop({

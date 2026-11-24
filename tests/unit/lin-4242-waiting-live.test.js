@@ -48,7 +48,7 @@ const rulingLoop = (identifier, over = {}) => loop({
   loopId: `r-${identifier}`, lineageId: `r-${identifier}`, issueIdentifier: identifier, agentState: 'complete',
   wakeMarker: 'blocked', waitingMessage: '[blocked] which way?',
   feedback: [{ message: '[blocked] which way?', timestamp: '2026-10-30T10:05:00.000Z' }],
-  decision: { decision_id: `d-${identifier}`, question: `Which for ${identifier}?` }, decisionCase: [], answeredDecisions: [], withdrawal: null, ...over,
+  decision: { decision_id: `d-${identifier}`, question: `Which for ${identifier}?` }, decisionCase: [], withdrawal: null, ...over,
 });
 
 // LIN-4538: the standing and the person's question cards are read from question records (questionsFromLoops, one per loop

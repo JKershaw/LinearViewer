@@ -11,7 +11,6 @@
  */
 import { computeSupersededLoopIds } from '../lib/loop-supersede.js';
 import { isTerminalLoop, loopIsWaiting } from '../lib/run-loop-state.js';
-import { liveOnAnchor } from '../lib/live-anchor.js';
 import { findAnchorLoop } from '../lib/session-summary.js';
 import { toEpochMs } from '../lib/utils/time.js';
 
@@ -191,9 +190,6 @@ export function waitingLoops(enrichedLoops) {
   const supersededLoopIds = computeSupersededLoopIds(enrichedLoops);
   return enrichedLoops.filter(l => l && !supersededLoopIds.has(l.loopId) && loopIsWaiting(l));
 }
-
-/** LIN-4114: the predicate lives in lib/live-anchor.js; re-exported here so every importer keeps its path. */
-export { liveOnAnchor };
 
 /**
  * Most-relevant activity timestamp for a run, used to sort the merged feed.

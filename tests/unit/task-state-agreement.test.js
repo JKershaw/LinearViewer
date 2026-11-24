@@ -40,7 +40,7 @@ const queuedLoop = (over = {}) => loop({ agentState: 'queued', historyStatus: 'd
 const rulingLoop = (over = {}) => loop({
   wakeMarker: 'blocked', waitingMessage: '[blocked] which way?',
   feedback: [{ message: '[blocked] which way?', timestamp: '2026-10-30T10:05:00.000Z' }],
-  decision: { decision_id: 'd-1', question: 'Which way?' }, decisionCase: [], answeredDecisions: [], withdrawal: null, ...over,
+  decision: { decision_id: 'd-1', question: 'Which way?' }, decisionCase: [], withdrawal: null, ...over,
 });
 // A waiting session with no structured question: a park, not a ruling.
 const parkLoop = (over = {}) => loop({

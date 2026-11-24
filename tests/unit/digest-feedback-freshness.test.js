@@ -62,7 +62,6 @@ describe('applyHarvestedAbortToDigest(digest, abortEntry, dispatchedAt) — V4 +
     wake: { marker: 'blocked', waitingMessage: 'waiting on a human' },
     decision: { decision_id: 'd-1' },
     decisionCase: ['case text'],
-    answeredDecisionId: 'd-0',
     parkedWait: { reason: 'ci-poll' },
     telemetry: {
       runtime: { ms: null, dispatchedAt: '2026-04-10T09:00:00.000Z', completedAt: null, crossCheck: null },
@@ -110,7 +109,6 @@ describe('applyHarvestedAbortToDigest(digest, abortEntry, dispatchedAt) — V4 +
     const out = applyHarvestedAbortToDigest(digest, abortEntry, '2026-04-10T09:00:00.000Z');
     assert.deepEqual(out.decision, digest.decision);
     assert.deepEqual(out.decisionCase, digest.decisionCase);
-    assert.equal(out.answeredDecisionId, digest.answeredDecisionId);
   });
 
   test('F1 millisecond-exact guard: a genuine terminal 700ms LATER than the abort is kept, never rewound', () => {

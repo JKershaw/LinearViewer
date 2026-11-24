@@ -187,7 +187,7 @@
     return 'loop:' + (d.loopId || '');
   }
   // In the unit suite `CustomEvent` stays absent because announceRulingGone exits without it: the typeof guard below
-  // returns before any dispatchEvent, so the question-card-task-bound suite never needs a bubbling event (LIN-4309).
+  // returns before any dispatchEvent, so the unit suite never needs a bubbling event (LIN-4309).
   function announceRulingGone(card, message) {
     if (!card || typeof CustomEvent !== 'function') return;
     // A card still on the page bubbles to <main>. A card that left it (a search cleared while its answer was in flight)

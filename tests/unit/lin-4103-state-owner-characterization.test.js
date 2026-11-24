@@ -131,7 +131,7 @@ describe('how a failure is read (the fact that must survive the guess being remo
     const parent = node('LIN-70', 'started', [child]);
     const s = states([parent], {
       'LIN-70': [failedLoop('implementation', { issueIdentifier: 'LIN-70', loopId: 'pf' })],
-      'LIN-71': [loop({ issueIdentifier: 'LIN-71', wakeMarker: 'blocked', waitingMessage: '[blocked] which way?', feedback: [{ message: '[blocked] which way?', timestamp: '2026-11-01T10:05:00.000Z' }], decision: { decision_id: 'd-1', question: 'Which way?' }, decisionCase: [], answeredDecisions: [], withdrawal: null })],
+      'LIN-71': [loop({ issueIdentifier: 'LIN-71', wakeMarker: 'blocked', waitingMessage: '[blocked] which way?', feedback: [{ message: '[blocked] which way?', timestamp: '2026-11-01T10:05:00.000Z' }], decision: { decision_id: 'd-1', question: 'Which way?' }, decisionCase: [], withdrawal: null })],
     });
     assert.equal(s.get('LIN-70').state, 'needs-you');
     assert.equal(s.get('LIN-70').attention.words, 'A subtask needs you: LIN-71');

@@ -38,7 +38,7 @@ const rulingLoop = (identifier, over = {}) => loop({
   loopId: `r-${identifier}`, lineageId: `r-${identifier}`, issueIdentifier: identifier, agentState: 'complete',
   wakeMarker: 'blocked', waitingMessage: '[blocked] which way?',
   feedback: [{ message: '[blocked] which way?', timestamp: '2026-10-30T10:05:00.000Z' }],
-  decision: { decision_id: `d-${identifier}`, question: 'Which way?' }, decisionCase: [], answeredDecisions: [], withdrawal: null, ...over,
+  decision: { decision_id: `d-${identifier}`, question: 'Which way?' }, decisionCase: [], withdrawal: null, ...over,
 });
 /**
  * A ruling whose run ended long ago ("gone"): not resumable, so its default effect is a fresh run ("dispatch"), and a
@@ -47,7 +47,7 @@ const rulingLoop = (identifier, over = {}) => loop({
 const goneRulingLoop = (identifier) => loop({
   loopId: `g-${identifier}`, lineageId: `g-${identifier}`, issueIdentifier: identifier, agentState: 'complete',
   wakeMarker: null, terminalStatus: 'complete', terminalCompletedAt: '2020-01-01T00:00:00.000Z',
-  feedback: [], decision: { decision_id: `d-${identifier}`, question: 'Which way?' }, decisionCase: [], answeredDecisions: [], withdrawal: null,
+  feedback: [], decision: { decision_id: `d-${identifier}`, question: 'Which way?' }, decisionCase: [], withdrawal: null,
 });
 /** A live run on the same task as a ruling: non-terminal, so it is the "live run already exists on this anchor" case. */
 const liveLoop = (identifier) => loop({ loopId: `live-${identifier}`, lineageId: `live-${identifier}`, issueIdentifier: identifier });

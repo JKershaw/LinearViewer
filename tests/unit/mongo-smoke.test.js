@@ -2010,8 +2010,8 @@ describe(
     });
 
     // Extracts only the loop-facing facts the digest is responsible for
-    // (terminal/wake/decision/decisionCase/answeredDecisionId/
-    // answeredDecisions/withdrawal (LIN-2891/LIN-3034)/telemetry's
+    // (terminal/wake/decision/decisionCase/
+    // withdrawal (LIN-2891/LIN-3034)/telemetry's
     // parkedWait+runtime+model+resources+ticketWalk) — never raw
     // `feedback`/`promptText`, which legitimately differ between the lean and
     // non-lean shapes for reasons unrelated to this equivalence (LIN-622).
@@ -2038,8 +2038,6 @@ describe(
         waitingMessage: loop.waitingMessage,
         decision: loop.decision,
         decisionCase: loop.decisionCase,
-        answeredDecisionId: loop.answeredDecisionId,
-        answeredDecisions: loop.answeredDecisions,
         withdrawal: loop.withdrawal,
         telemetry: telemetryRest
       };

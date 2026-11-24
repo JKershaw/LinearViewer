@@ -18,7 +18,6 @@ import {
   getSessionsForWorkspace,
   getSessionsForIssues,
   isDecisionAnswerEntry,
-  resolvedDecisionEvents,
   firstRaisedAt,
   __internal
 } from '../../lib/pipeline-loops.js';
@@ -38,7 +37,6 @@ const {
   _buildLoops,
   LOOKBACK_MS,
   _findLastDecision,
-  _findDecisionAnswer,
   correlateDecisionCase
 } = __internal;
 
@@ -1114,7 +1112,7 @@ describe('lean read projection (LIN-623)', () => {
       dispatchedAt: new Date('2026-04-10T09:55:00.000Z')
     };
     const digest = digestFeedback(doc, { now: Date.now() });
-    for (const key of ['terminal', 'wake', 'decision', 'decisionEntryIndex', 'decisionCase', 'answeredDecisionId', 'parkedWait', 'telemetry']) {
+    for (const key of ['terminal', 'wake', 'decision', 'decisionEntryIndex', 'decisionCase', 'parkedWait', 'telemetry']) {
       assert.ok(key in digest, `digest is missing loop-facing fact "${key}" — not a complete substitute for feedback`);
     }
 
@@ -1298,7 +1296,7 @@ describe('self-heal (LIN-3011): missing/stale feedbackDigest re-reads by _id, gu
     const stores = makeLeanDigestStores({
       items: [leanDigestItem({
         feedbackVersion: 3,
-        feedbackDigest: { version: 2, terminal: null, wake: null, decision: null, decisionCase: [], answeredDecisionId: null, parkedWait: null, telemetry: { runtime: {}, metrics: [], toolPeak: null } }
+        feedbackDigest: { version: 2, terminal: null, wake: null, decision: null, decisionCase: [], parkedWait: null, telemetry: { runtime: {}, metrics: [], toolPeak: null } }
       })],
       collectionDocs: [rawCollectionDoc({
         feedbackVersion: 3,
@@ -1319,7 +1317,7 @@ describe('self-heal (LIN-3011): missing/stale feedbackDigest re-reads by _id, gu
         feedbackDigest: {
           version: 2,
           terminal: { status: 'done', entry: { message: '[done] finished', timestamp: digestIso(HOUR + 5 * MIN) } },
-          wake: null, decision: null, decisionCase: [], answeredDecisionId: null,
+          wake: null, decision: null, decisionCase: [],
           parkedWait: null,
           telemetry: { runtime: {}, metrics: [], toolPeak: null }
         }
@@ -1458,7 +1456,6 @@ describe('lean loop build reads terminal/wake/decision/telemetry from feedbackDi
     decision: { decision_id: 'd-1', question: 'ship or hold?' },
     decisionEntryIndex: 2,
     decisionCase: ['here is the case'],
-    answeredDecisionId: 'd-0',
     parkedWait: { reason: 'ci-poll' },
     telemetry: {
       model: 'opus', evidence: [{ url: 'https://x' }], usage: { costUsd: 1.2 }, resources: null,
@@ -1467,7 +1464,7 @@ describe('lean loop build reads terminal/wake/decision/telemetry from feedbackDi
     }
   };
 
-  test('terminal/wake/decision/decisionCase/answeredDecisionId/parkedWait are sourced from the digest, not re-derived from (absent) feedback', async () => {
+  test('terminal/wake/decision/decisionCase/parkedWait are sourced from the digest, not re-derived from (absent) feedback', async () => {
     const stores = makeLeanDigestStores({
       items: [leanDigestItem({ feedbackVersion: 5, feedbackDigest: FRESH_DIGEST })],
       collectionDocs: [rawCollectionDoc({ feedbackVersion: 5 })]
@@ -1481,7 +1478,6 @@ describe('lean loop build reads terminal/wake/decision/telemetry from feedbackDi
     assert.strictEqual(loop.waitingMessage, 'need a ruling');
     assert.deepStrictEqual(loop.decision, FRESH_DIGEST.decision);
     assert.deepStrictEqual(loop.decisionCase, ['here is the case']);
-    assert.strictEqual(loop.answeredDecisionId, 'd-0');
     assert.deepStrictEqual(loop.telemetry.parkedWait, { reason: 'ci-poll' });
     assert.strictEqual(loop.telemetry.runtime.ms, 600000);
   });
@@ -1562,71 +1558,26 @@ describe('lean loop build reads terminal/wake/decision/telemetry from feedbackDi
   });
 });
 
-describe('answeredDecisions legacy-digest fallback (LIN-3022/LIN-2991 Surface 2, F1)', () => {
-  test('a fresh legacy digest (no answeredDecisions key, scalar answeredDecisionId set) maps to the synthesized one-entry set', async () => {
-    const legacyDigest = {
-      version: 5,
-      terminal: null, wake: null, decision: { decision_id: 'x', question: 'ship?' }, decisionEntryIndex: 0, decisionCase: [],
-      answeredDecisionId: 'x',
-      // No `answeredDecisions` key at all — this is the pre-this-change shape.
-      parkedWait: null,
-      telemetry: { runtime: {}, metrics: [], toolPeak: null }
-    };
-    const stores = makeLeanDigestStores({
-      items: [leanDigestItem({ feedbackVersion: 5, feedbackDigest: legacyDigest })],
-      collectionDocs: [rawCollectionDoc({ feedbackVersion: 5 })]
-    });
-    const loops = await getLoopsForWorkspace('ws', { ...stores, lean: true });
-    assert.strictEqual(loops.length, 1);
-    assert.deepStrictEqual(loops[0].answeredDecisions, [
-      { decisionId: 'x', raisedAt: null, resolvedAt: null, outcome: null }
-    ], 'a legacy digest with no answeredDecisions key must synthesize a one-entry set from the scalar answeredDecisionId');
-  });
-
-  test('a post-change digest with a genuine empty answeredDecisions set stays empty, side by side with the legacy case above', async () => {
-    const postChangeDigest = {
-      version: 5,
-      terminal: null, wake: null, decision: null, decisionEntryIndex: -1, decisionCase: [],
-      answeredDecisionId: null,
-      answeredDecisions: [],
-      parkedWait: null,
-      telemetry: { runtime: {}, metrics: [], toolPeak: null }
-    };
-    const stores = makeLeanDigestStores({
-      items: [leanDigestItem({ feedbackVersion: 5, feedbackDigest: postChangeDigest })],
-      collectionDocs: [rawCollectionDoc({ feedbackVersion: 5 })]
-    });
-    const loops = await getLoopsForWorkspace('ws', { ...stores, lean: true });
-    assert.deepStrictEqual(loops[0].answeredDecisions, [],
-      'a post-change digest with a genuine empty set must stay empty, never fall back to the scalar (there is none here)');
-  });
-
-  // LIN-3022 beat 2: the mapping alone (pinned above, beat 1) is not enough —
-  // §2's admit/discharge predicates must ALSO treat a legacy-fallback-derived
-  // loop as answered, both standalone (isDecisionAnsweredInLineage with no
-  // map) and through the census (classifyLoop).
-  test('a legacy digest loop: its answer stamp alone does not discharge the row; a settled question on its lineage does (LIN-4538)', async () => {
-    const legacyDigest = {
+describe('a digest-backed blocked loop (LIN-4538)', () => {
+  test('a settled question on its lineage discharges the row; the digest alone does not', async () => {
+    const digest = {
       version: 5,
       terminal: null,
       wake: { marker: 'blocked', waitingMessage: 'need a ruling' },
       decision: { decision_id: 'x', question: 'ship?' }, decisionEntryIndex: 0, decisionCase: [],
-      answeredDecisionId: 'x',
-      // No `answeredDecisions` key at all — the pre-this-change shape.
       parkedWait: null,
       telemetry: { runtime: {}, metrics: [], toolPeak: null }
     };
     const stores = makeLeanDigestStores({
-      items: [leanDigestItem({ feedbackVersion: 5, feedbackDigest: legacyDigest })],
+      items: [leanDigestItem({ feedbackVersion: 5, feedbackDigest: digest })],
       collectionDocs: [rawCollectionDoc({ feedbackVersion: 5 })]
     });
     const loops = await getLoopsForWorkspace('ws', { ...stores, lean: true });
     const loop = loops[0];
     assert.strictEqual(loop.wakeMarker, 'blocked', 'sanity: the blocked marker derives from the digest');
 
-    // LIN-4538: the answer stamp on the digest no longer discharges a row; a settled question on its lineage does.
     const opts = { superseded: new Set(), now: Date.now(), staleMs: DEFAULT_LANE_STALE_MS };
-    assert.strictEqual(classifyLoop(loop, opts), 'blocked', 'a legacy answered decision on the digest does not discharge the row');
+    assert.strictEqual(classifyLoop(loop, opts), 'blocked', 'the digest alone does not discharge the row');
     assert.strictEqual(
       classifyLoop(loop, { ...opts, questionStanding: new Map([[loop.lineageId ?? loop.loopId, 'settled']]) }), 'resolved',
       'a settled question on its lineage discharges the row'
@@ -1635,7 +1586,7 @@ describe('answeredDecisions legacy-digest fallback (LIN-3022/LIN-2991 Surface 2,
 });
 
 // LIN-2891 (LIN-3034) Surface 2: `withdrawal` has NO legacy scalar predecessor
-// (unlike `answeredDecisions` above) — a pre-ship digest with no `withdrawal`
+// — a pre-ship digest with no `withdrawal`
 // key at all must read as `null`, not be synthesized from anything else.
 describe('withdrawal (LIN-2891/LIN-3034 Surface 2): lean path via _loopFactsFromDigest', () => {
   test('no-digest default: a queued live item (no feedbackDigest at all) reports withdrawal: null', async () => {
@@ -1653,8 +1604,6 @@ describe('withdrawal (LIN-2891/LIN-3034 Surface 2): lean path via _loopFactsFrom
     const digest = {
       version: 5,
       terminal: null, wake: null, decision: { decision_id: 'd-1', question: 'ship?' }, decisionEntryIndex: 0, decisionCase: [],
-      answeredDecisionId: null,
-      answeredDecisions: [],
       withdrawal: { decisionId: 'd-1', reason: 'no longer needed', timestamp: digestIso(HOUR) },
       parkedWait: null,
       telemetry: { runtime: {}, metrics: [], toolPeak: null }
@@ -1668,12 +1617,10 @@ describe('withdrawal (LIN-2891/LIN-3034 Surface 2): lean path via _loopFactsFrom
     assert.deepStrictEqual(loops[0].withdrawal, { decisionId: 'd-1', reason: 'no longer needed', timestamp: digestIso(HOUR) });
   });
 
-  test('a pre-ship digest with no withdrawal key at all reads as null — no synthesis (unlike answeredDecisions)', async () => {
+  test('a pre-ship digest with no withdrawal key at all reads as null — no synthesis', async () => {
     const preShipDigest = {
       version: 5,
       terminal: null, wake: null, decision: null, decisionEntryIndex: -1, decisionCase: [],
-      answeredDecisionId: null,
-      answeredDecisions: [],
       // No `withdrawal` key at all — this is the pre-this-change shape.
       parkedWait: null,
       telemetry: { runtime: {}, metrics: [], toolPeak: null }
@@ -1697,7 +1644,7 @@ describe("abort harvest sourced from the abort row's own feedbackDigest.terminal
       feedbackDigest: {
         version: 1,
         terminal: { status: 'aborted', entry: { message: '[aborted] cancelled', timestamp: digestIso(HOUR + 900) } },
-        wake: null, decision: null, decisionCase: [], answeredDecisionId: null, parkedWait: null,
+        wake: null, decision: null, decisionCase: [], parkedWait: null,
         telemetry: { runtime: {}, metrics: [], toolPeak: null }
       },
       dispatchedAt: digestIso(59 * MIN),
@@ -1713,7 +1660,6 @@ describe("abort harvest sourced from the abort row's own feedbackDigest.terminal
       feedbackDigest: {
         version: 1,
         terminal: null, wake: { marker: 'blocked', waitingMessage: 'waiting' }, decision: null, decisionCase: [],
-        answeredDecisionId: null,
         parkedWait: { reason: 'ci-poll' },
         telemetry: { runtime: { ms: null, dispatchedAt: digestIso(0), completedAt: null, crossCheck: null }, metrics: [], toolPeak: null },
         ...digestOverrides
@@ -1810,7 +1756,7 @@ describe("abort harvest sourced from the abort row's own feedbackDigest.terminal
           feedbackDigest: {
             version: 1,
             terminal: { status: 'aborted', entry: abortEntry },
-            wake: null, decision: null, decisionCase: [], answeredDecisionId: null, parkedWait: null,
+            wake: null, decision: null, decisionCase: [], parkedWait: null,
             telemetry: { runtime: {}, metrics: [], toolPeak: null }
           }
         }),
@@ -1843,7 +1789,7 @@ describe("abort harvest sourced from the abort row's own feedbackDigest.terminal
           feedbackDigest: {
             version: 1,
             terminal: { status: 'aborted', entry: { message: '[aborted] cancelled', timestamp: equalMs } },
-            wake: null, decision: null, decisionCase: [], answeredDecisionId: null, parkedWait: null,
+            wake: null, decision: null, decisionCase: [], parkedWait: null,
             telemetry: { runtime: {}, metrics: [], toolPeak: null }
           }
         }),
@@ -1860,14 +1806,13 @@ describe("abort harvest sourced from the abort row's own feedbackDigest.terminal
   test('decision fields are unaffected by the harvested abort', async () => {
     const decision = { decision_id: 'd-9', question: 'proceed?' };
     const stores = makeLeanDigestStores({
-      items: [abortRow(), targetRow({ decision, decisionCase: ['case text'], answeredDecisionId: 'd-8' })],
+      items: [abortRow(), targetRow({ decision, decisionCase: ['case text'] })],
       collectionDocs: abortCollectionDocs()
     });
     const loops = await getLoopsForWorkspace('ws', { ...stores, lean: true });
     const target = loops.find(l => l.loopId === 'target-1');
     assert.deepStrictEqual(target.decision, decision);
     assert.deepStrictEqual(target.decisionCase, ['case text']);
-    assert.strictEqual(target.answeredDecisionId, 'd-8');
   });
 
   // Review ledger L3 (PR #1560): LIN-1261's exclusion — a `[skipped]` row
@@ -1883,7 +1828,7 @@ describe("abort harvest sourced from the abort row's own feedbackDigest.terminal
           feedbackDigest: {
             version: 1,
             terminal: { status: 'skipped', entry: { message: '[skipped] human-continued session', timestamp: digestIso(HOUR + 900) } },
-            wake: null, decision: null, decisionCase: [], answeredDecisionId: null, parkedWait: null,
+            wake: null, decision: null, decisionCase: [], parkedWait: null,
             telemetry: { runtime: {}, metrics: [], toolPeak: null }
           }
         }),
@@ -1906,11 +1851,11 @@ describe('lineage metrics union + retention-safe toolPeak on the lean digest-bac
     const items = [
       leanDigestItem({
         id: 'r-1', dispatchedAt: digestIso(0), feedbackVersion: 1,
-        feedbackDigest: { version: 1, terminal: null, wake: null, decision: null, decisionCase: [], answeredDecisionId: null, parkedWait: null, telemetry: { runtime: {}, metrics: [m2], toolPeak: 4 } }
+        feedbackDigest: { version: 1, terminal: null, wake: null, decision: null, decisionCase: [], parkedWait: null, telemetry: { runtime: {}, metrics: [m2], toolPeak: 4 } }
       }),
       leanDigestItem({
         id: 'r-2', dispatchedAt: digestIso(1000), feedbackVersion: 1, rootItemId: 'r-1',
-        feedbackDigest: { version: 1, terminal: null, wake: null, decision: null, decisionCase: [], answeredDecisionId: null, parkedWait: null, telemetry: { runtime: {}, metrics: [m1], toolPeak: 2 } }
+        feedbackDigest: { version: 1, terminal: null, wake: null, decision: null, decisionCase: [], parkedWait: null, telemetry: { runtime: {}, metrics: [m1], toolPeak: 2 } }
       })
     ];
     const stores = makeLeanDigestStores({ items, collectionDocs: [rawCollectionDoc({ _id: 'r-1' }), rawCollectionDoc({ _id: 'r-2' })] });
@@ -1929,7 +1874,7 @@ describe('lineage metrics union + retention-safe toolPeak on the lean digest-bac
       items: [leanDigestItem({
         feedbackVersion: 1,
         feedbackDigest: {
-          version: 1, terminal: null, wake: null, decision: null, decisionCase: [], answeredDecisionId: null, parkedWait: null,
+          version: 1, terminal: null, wake: null, decision: null, decisionCase: [], parkedWait: null,
           telemetry: {
             runtime: {},
             metrics: [{ timestamp: digestIso(7 * HOUR), total: 2 }], // recent tail only, NOT the peak
@@ -2397,11 +2342,7 @@ describe('_buildLoops: decision prose does not float the activity clock (LIN-218
   });
 });
 
-// ── LIN-1728: answeredDecisionId derivation ────────────────────────────────
-function answerEntry(decisionId, timestamp) {
-  return { kind: 'decision-answer', message: JSON.stringify({ decision_id: decisionId }), timestamp };
-}
-
+// ── LIN-1728: decision-answer stamps ───────────────────────────────────────
 describe('isDecisionAnswerEntry (LIN-1728)', () => {
   test('true only for kind: "decision-answer"', () => {
     assert.strictEqual(isDecisionAnswerEntry({ kind: 'decision-answer' }), true);
@@ -2412,116 +2353,7 @@ describe('isDecisionAnswerEntry (LIN-1728)', () => {
   });
 });
 
-describe('_findDecisionAnswer (LIN-1728, backward scan)', () => {
-  test('returns the decision_id of the last decision-answer entry', () => {
-    const feedback = [answerEntry('d-1', 't1'), answerEntry('d-2', 't2')];
-    assert.strictEqual(_findDecisionAnswer(feedback), 'd-2');
-  });
-
-  test('a malformed answer entry is skipped, scanning backwards to an earlier valid one', () => {
-    const feedback = [answerEntry('d-1', 't1'), { kind: 'decision-answer', message: 'not-json', timestamp: 't2' }];
-    assert.strictEqual(_findDecisionAnswer(feedback), 'd-1');
-  });
-
-  test('no decision-answer entries at all yields null', () => {
-    assert.strictEqual(_findDecisionAnswer([textEntry('A'), { kind: 'status', message: '[done]' }]), null);
-  });
-
-  test('non-array feedback is tolerated, never throws', () => {
-    assert.strictEqual(_findDecisionAnswer(undefined), null);
-  });
-
-  // LIN-2225: a dismiss stamp is the SAME 'decision-answer' kind with an
-  // additive `outcome: 'dismissed'` field (lib/dispatch-store.js). This
-  // module's job — "was this decision_id resolved at all" — must not care
-  // which outcome resolved it, so a dismissed decision clears the unanswered
-  // queue exactly like an answered one.
-  test('a dismiss-tagged entry ({decision_id, outcome:"dismissed"}) still resolves the decision_id', () => {
-    const feedback = [{ kind: 'decision-answer', message: JSON.stringify({ decision_id: 'd-1', outcome: 'dismissed' }), timestamp: 't1' }];
-    assert.strictEqual(_findDecisionAnswer(feedback), 'd-1');
-  });
-});
-
-// LIN-1736: the loop-backed half of the escalation KPIs' time-to-response and
-// false-escalation inputs — every RESOLVED decision in a loop's feedback,
-// paired with when it was raised and how it was resolved.
-describe('resolvedDecisionEvents (LIN-1736)', () => {
-  test('null/non-array feedback yields []', () => {
-    assert.deepStrictEqual(resolvedDecisionEvents(undefined), []);
-    assert.deepStrictEqual(resolvedDecisionEvents(null), []);
-  });
-
-  test('a decision with no matching stamp is excluded (still-unanswered is not this function\'s question)', () => {
-    const feedback = [decisionEntry({ decision_id: 'd-1', question: 'q?' }, 't1')];
-    assert.deepStrictEqual(resolvedDecisionEvents(feedback), []);
-  });
-
-  test('a resolved decision pairs raisedAt (the decision entry) with resolvedAt (the stamp), outcome "answered" when the stamp carries no outcome field', () => {
-    const feedback = [
-      decisionEntry({ decision_id: 'd-1', question: 'q?' }, 't1'),
-      answerEntry('d-1', 't2'),
-    ];
-    assert.deepStrictEqual(resolvedDecisionEvents(feedback), [
-      { decisionId: 'd-1', raisedAt: 't1', resolvedAt: 't2', outcome: 'answered' },
-    ]);
-  });
-
-  test('outcome "dismissed" is read off the stamp\'s own outcome field (LIN-2225)', () => {
-    const feedback = [
-      decisionEntry({ decision_id: 'd-1', question: 'q?' }, 't1'),
-      { kind: 'decision-answer', message: JSON.stringify({ decision_id: 'd-1', outcome: 'dismissed' }), timestamp: 't2' },
-    ];
-    assert.deepStrictEqual(resolvedDecisionEvents(feedback), [
-      { decisionId: 'd-1', raisedAt: 't1', resolvedAt: 't2', outcome: 'dismissed' },
-    ]);
-  });
-
-  test('multiple distinct decisions in one loop each resolve independently', () => {
-    const feedback = [
-      decisionEntry({ decision_id: 'd-1', question: 'first?' }, 't1'),
-      answerEntry('d-1', 't2'),
-      decisionEntry({ decision_id: 'd-2', question: 'second?' }, 't3'),
-      answerEntry('d-2', 't4'),
-    ];
-    assert.deepStrictEqual(resolvedDecisionEvents(feedback), [
-      { decisionId: 'd-1', raisedAt: 't1', resolvedAt: 't2', outcome: 'answered' },
-      { decisionId: 'd-2', raisedAt: 't3', resolvedAt: 't4', outcome: 'answered' },
-    ]);
-  });
-
-  test('FIRST occurrence wins on both sides — a dedup-retry double-stamp (LIN-2208) does not shift the resolution instant, and a re-raised decision_id keeps its ORIGINAL raisedAt', () => {
-    const feedback = [
-      decisionEntry({ decision_id: 'd-1', question: 'q?' }, 't1'),
-      decisionEntry({ decision_id: 'd-1', question: 'q? (re-asked)' }, 't1b'),
-      answerEntry('d-1', 't2'),
-      answerEntry('d-1', 't2b'), // a redundant re-stamp of the same decision_id
-    ];
-    assert.deepStrictEqual(resolvedDecisionEvents(feedback), [
-      { decisionId: 'd-1', raisedAt: 't1', resolvedAt: 't2', outcome: 'answered' },
-    ]);
-  });
-
-  test('a malformed stamp is skipped, not thrown', () => {
-    const feedback = [
-      decisionEntry({ decision_id: 'd-1', question: 'q?' }, 't1'),
-      { kind: 'decision-answer', message: 'not-json', timestamp: 't2' },
-    ];
-    assert.deepStrictEqual(resolvedDecisionEvents(feedback), []);
-  });
-
-  test('a decision entry with no decision_id (unparseable) is tolerated — the answer, if any, still resolves with raisedAt: null', () => {
-    const feedback = [
-      { kind: 'decision', message: '[decision] not-json', timestamp: 't1' },
-      answerEntry('d-1', 't2'),
-    ];
-    assert.deepStrictEqual(resolvedDecisionEvents(feedback), [
-      { decisionId: 'd-1', raisedAt: null, resolvedAt: 't2', outcome: 'answered' },
-    ]);
-  });
-});
-
-// LIN-1736: the unanswered-age half — companion to resolvedDecisionEvents,
-// for a decision that has NOT been resolved.
+// LIN-1736: the unanswered-age half, for a decision that has NOT been resolved.
 describe('firstRaisedAt (LIN-1736)', () => {
   test('null/non-array feedback, or no decisionId, yields null', () => {
     assert.strictEqual(firstRaisedAt(undefined, 'd-1'), null);
@@ -2547,43 +2379,7 @@ describe('firstRaisedAt (LIN-1736)', () => {
   });
 });
 
-describe('_buildLoops: answeredDecisionId derivation end-to-end (LIN-1728)', () => {
-  test('a loop with no decision-answer stamp derives answeredDecisionId: null', () => {
-    const feedback = [decisionEntry(FULL_DECISION_PAYLOAD, 't1')];
-    const loop = _buildLoops({ historyItems: [historyItem({ feedback })], now: NOW })[0];
-    assert.strictEqual(loop.answeredDecisionId, null);
-    assert.ok('answeredDecisionId' in loop, 'key must be present, never omitted');
-  });
-
-  test('a stamped answer matching the current decision derives answeredDecisionId equal to it', () => {
-    const feedback = [decisionEntry(FULL_DECISION_PAYLOAD, 't1'), answerEntry('d-1', 't2')];
-    const loop = _buildLoops({ historyItems: [historyItem({ feedback })], now: NOW })[0];
-    assert.strictEqual(loop.answeredDecisionId, 'd-1');
-  });
-
-  test('a newer decision after an old answer: answeredDecisionId still names the OLD answered id, distinct from the new decision', () => {
-    const feedback = [
-      decisionEntry({ decision_id: 'd-1' }, 't1'),
-      answerEntry('d-1', 't2'),
-      decisionEntry({ decision_id: 'd-2' }, 't3')
-    ];
-    const loop = _buildLoops({ historyItems: [historyItem({ feedback })], now: NOW })[0];
-    assert.strictEqual(loop.decision.decision_id, 'd-2', 'the current decision is the newer, unanswered one');
-    assert.strictEqual(loop.answeredDecisionId, 'd-1', 'the answer stamp still names the old id — this loop is unanswered for d-2');
-  });
-
-  test('lean/non-lean parity: answeredDecisionId is identical and present on the lean loop even though feedback is []', () => {
-    const feedback = [decisionEntry(FULL_DECISION_PAYLOAD, 't1'), answerEntry('d-1', 't2')];
-    const hist = historyItem({ feedback });
-    const full = _buildLoops({ historyItems: [hist], now: NOW })[0];
-    const lean = _buildLoops({ historyItems: [hist], now: NOW, lean: true })[0];
-    assert.strictEqual(lean.answeredDecisionId, full.answeredDecisionId);
-    assert.strictEqual(lean.answeredDecisionId, 'd-1');
-  });
-});
-
-// LIN-2891/LIN-3034: withdrawal derivation, mirroring the answeredDecisionId
-// end-to-end idiom directly above — the lean/non-lean equivalence rule
+// LIN-2891/LIN-3034: withdrawal derivation end-to-end — the lean/non-lean equivalence rule
 // (LIN-3008/LIN-3011/LIN-3022) applies to `withdrawal` the same as any other
 // field, and the characterization golden / mongo-smoke W1 fixtures only ever
 // exercise the null case, so this is the sole coverage of a LIVE withdrawal

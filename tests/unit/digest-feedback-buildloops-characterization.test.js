@@ -35,9 +35,8 @@
  *      fixture is updated so the test proves the CURRENT version of that
  *      same invariant: lean and non-lean stay identical, now via the digest.
  *
- * LIN-3022 (LIN-2991 Surface 2, §1) update: the golden loop now also carries
- * `answeredDecisions` (the set-derived sibling of `answeredDecisionId`), so
- * both this and the lean-derived variant below gained that field.
+ * LIN-4541 update: the golden loop no longer carries `answeredDecisionId` or
+ * `answeredDecisions` (the old answer-stamp facts, retired with the ruling predicate).
  *
  * LIN-2891 (LIN-3034) update: the golden loop now also carries `withdrawal`
  * (item-scoped decision-withdrawal, derived by `_findDecisionWithdrawal` in
@@ -142,10 +141,6 @@ const EXPECTED_GOLDEN_LOOP = {
     recommended: 'yes'
   },
   decisionCase: ['Investigated the approach.', 'Found two viable options.'],
-  answeredDecisionId: 'd-1',
-  answeredDecisions: [
-    { decisionId: 'd-1', raisedAt: at(32), resolvedAt: at(40), outcome: 'answered' }
-  ],
   withdrawal: null,
   withdrawalReversed: false,
   source: 'history',

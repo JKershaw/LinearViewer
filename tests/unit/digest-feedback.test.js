@@ -160,7 +160,6 @@ describe('digestFeedback(doc, { now }): doc contract', () => {
     assert.equal(digest.decision, null);
     assert.equal(digest.decisionEntryIndex, null);
     assert.deepStrictEqual(digest.decisionCase, []);
-    assert.equal(digest.answeredDecisionId, null);
     assert.equal(digest.parkedWait, null);
   });
 
@@ -458,7 +457,6 @@ describe('digestFeedback: loop-facing fields match _buildLoops per-row derivatio
         : null, 'wake must match _buildLoops (marker/waitingMessage/at)');
       assert.deepStrictEqual(digest.decision, expected.decision, 'decision must match _buildLoops');
       assert.deepStrictEqual(digest.decisionCase, expected.decisionCase, 'decisionCase must match _buildLoops');
-      assert.deepStrictEqual(digest.answeredDecisionId, expected.answeredDecisionId, 'answeredDecisionId must match _buildLoops');
       assert.deepStrictEqual(digest.telemetry.runtime, expected.telemetry.runtime, 'telemetry.runtime must match _buildLoops');
       assert.deepStrictEqual(digest.telemetry.model ?? null, expected.telemetry.model ?? null);
       assert.deepStrictEqual(digest.telemetry.evidence, expected.telemetry.producedArtifacts);
@@ -758,7 +756,7 @@ describe('digestFeedback: re-review ledger N1–N3', () => {
 });
 
 // ─────────────────────────────────────────────────────────────────────────
-// LIN-2891 (LIN-3034): _findDecisionWithdrawal — sibling of _findDecisionAnswer
+// LIN-2891 (LIN-3034): _findDecisionWithdrawal — the decision-withdrawal read
 // ─────────────────────────────────────────────────────────────────────────
 
 function requireFindDecisionWithdrawal() {

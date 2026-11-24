@@ -34,7 +34,7 @@ function loop(over = {}) {
 const blocked = (over = {}) => loop({
   wakeMarker: 'blocked', waitingMessage: '[blocked] which way?',
   feedback: [{ message: '[blocked] which way?', timestamp: '2026-10-25T10:05:00.000Z' }],
-  decision: { decision_id: 'd-1', question: 'Which way?' }, decisionCase: [], answeredDecisions: [], withdrawal: null, ...over
+  decision: { decision_id: 'd-1', question: 'Which way?' }, decisionCase: [], withdrawal: null, ...over
 });
 // A waiting session with no structured question: a park (LIN-4010), not a ruling.
 const parkedLoop = (over = {}) => loop({

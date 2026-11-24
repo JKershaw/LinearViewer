@@ -183,7 +183,7 @@ describe('LIN-4541: the feed reads question records only', () => {
   });
 
   test('a loop carrying an old DECISION: block (history) is no row and opens no loop', async () => {
-    feedLoops = [loop({ loopId: 'old-1', wakeMarker: 'blocked', decision: { decision_id: 'd-1', question: 'Old?', options: [] }, decisionCase: [], answeredDecisions: [] })];
+    feedLoops = [loop({ loopId: 'old-1', wakeMarker: 'blocked', decision: { decision_id: 'd-1', question: 'Old?', options: [] }, decisionCase: [] })];
     const body = await feed();
     assert.equal(body.count, 0);
     assert.deepEqual(body.rulings, []);
