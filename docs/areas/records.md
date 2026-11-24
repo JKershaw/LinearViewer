@@ -54,8 +54,8 @@ routes/task-records.js, routes/project-page.js, routes/dispatch.js, server.js).
 - A write that makes one record and then ends another is two writes. Name the first with `fixedIdOf` (lib/records/refs.js,
   the one derived-id rule) from the second, as make-a-task and supersede do, so a retry after a failed end finds the
   record it made. Imports use the same rule, which holds after an imported record ends. Never hash an id by hand.
-- Open questions are rows of the rulings feed (LIN-4532): `openQuestionsFor` (lib/open-questions.js) adds `kind: 'question'`
-  rows, so the page, `count` and the badge read one list. Other records stay out: Home draws them
+- Open questions have one reader, `openQuestionsFor` (lib/open-questions.js, LIN-4532): the rulings feed, its count and
+  badge, and the cards call it. Other records stay out: Home draws them
   (`createWaitingStanding` `records`) on page load only, uncounted.
 - A page GET never makes a task. The task page reads its task record by the ticket's claim (`taskForTicket`) and offers
   its add and child-task forms before one exists; the first write through the checked pipeline makes the task

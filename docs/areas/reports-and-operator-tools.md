@@ -31,7 +31,7 @@ Area notes for `reports-and-operator-tools` in the registry. Format and rules: R
   marker, so a lineage that blocked and then finished reads unblocked. Read every member
   `/cost` lists, not roots: on LIN-4393 each member's own resume lines were missing from
   its root's merged read. `dispatchedBy` is never origin (one account for autopilot and
-  person), and `/rulings` returns loop rulings only (LIN-4422).
+  person), and its questions are question records only (LIN-4538).
 - Measure 1 has one source, the pre-merge blind-read verdict record (LIN-4519; the `## Blind read` comment before P6): a
   landing counts as read only when a blind-read verdict first written before its merge names its PR through the change
   record's ref, and anything else is unread under a named reason. A landing merged before `VERDICT_RECORDS_SINCE`

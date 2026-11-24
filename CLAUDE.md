@@ -20,9 +20,9 @@ AI agents, and verifies the work on real evidence.
 - `npx playwright install` - Install Playwright browsers (first-time setup)
 - `npm start` - Start the server (runs on PORT from .env, default 3000)
 - `npm test` - Run all tests (unit via `npm run test:unit`, then Playwright E2E)
-- `npm run test:unit` - Run unit tests only (`node --test` over `tests/unit/*.test.js` + the `scripts/` tests (`scripts/eval/eval-dense.test.mjs`, `scripts/code-shape/*.test.mjs`); locally at half the CPUs, `UNIT_TEST_CONCURRENCY=N` overrides; CI unchanged). Use this, not a bare `node --test` glob
+- `npm run test:unit` - Run unit tests only (`node --test` over `tests/unit/*.test.js` + the `scripts/` tests; locally at half the CPUs, `UNIT_TEST_CONCURRENCY=N` overrides; CI unchanged). Use this, not a bare `node --test` glob
 - `npm run test:hermetic` - Run the SAME unit suite under a socket-level watcher and additionally fail if any test opens a non-loopback socket (LIN-1880). CI runs its keyed form in `unit`, the proxy form in `unit-proxy`. See `tests/fixtures/network-guard.js`
-- `npm run test:hermetic:proxy` - The same check with `HTTPS_PROXY`/`HTTP_PROXY` set. A connect to the configured proxy endpoint itself now counts as an escape (LIN-2992); both arms are part of LIN-1880's acceptance. `npm run test:hermetic:keyed` is the same check with dummy `OPENROUTER_API_KEY`/`OPENROUTER_FREE_TIER_KEY` set (LIN-2369, the CI keyed arm); the runner blanks both keys for every unit run, so the result must not change
+- `npm run test:hermetic:proxy` - The same check with `HTTPS_PROXY`/`HTTP_PROXY` set. A connect to the configured proxy endpoint itself counts as an escape (LIN-2992), part of LIN-1880's acceptance. `npm run test:hermetic:keyed` is the same check with dummy `OPENROUTER_API_KEY`/`OPENROUTER_FREE_TIER_KEY` set (LIN-2369, the CI keyed arm); the runner blanks both keys for every unit run, so the result must not change
 - `npm run test:ui` - Run Playwright tests with the Playwright UI
 - `npm run secret-scan` - Run secret scan over repository source in CI (LIN-2573)
 - `npm run scan:public-pages` - Run public pages secret scan on schedule (landing, /kpis, /archive/:n; LIN-2573)
@@ -51,7 +51,7 @@ E2E specs live in `tests/e2e/` (Playwright) with unit tests in `tests/unit/` (`n
 
 **Prefer `data-testid` over brittle selectors.** Render files emit `data-testid="<surface>-<element>"` (footer links/ai-status, settings sections/toggles/logout, `render.js` project + issue rows, swipe, swim). In specs, select through `SELECTORS`/page objects (`settings(page).section('account')`, `footer(page).getLink('swipe')`) instead of `:has-text()`, CSS classes, or exact `href` values. `tests/e2e/settings.spec.js` is the proof-of-pattern refactor.
 
-**Parallel-aware caller discipline.** A spec's workspace `urlKey` is one value with three consumers — the session endpoint, the `/workspace/${urlKey}/…` navigation URLs, and the teardown/seed query params — so always drive navigation off the `urlKey` a session helper returns, never a hard-coded literal. `createSession`/`seedLocalWorkspace` return the key for this reason. Parallel execution itself (`workers > 1`) is **not** enabled yet: it needs per-worker `urlKey` isolation threaded server-side and is owned by **LIN-625**. Do not raise `workers` in `playwright.config.js` without that isolation — the historical flakiness came from shared server-side store partition keys, not Playwright context sharing.
+**Parallel-aware caller discipline.** A spec's workspace `urlKey` has three consumers (the session endpoint, the `/workspace/${urlKey}/…` URLs, the teardown/seed query params), so drive navigation off the `urlKey` that `createSession`/`seedLocalWorkspace` return, never a literal. Parallel execution (`workers > 1`) is **not** enabled: it needs per-worker server-side `urlKey` isolation (**LIN-625**). Don't raise `workers` in `playwright.config.js` before then; the old flakiness was shared server-side store partition keys, not Playwright contexts.
 
 ## Unit Testing Pattern (LIN-2023)
 
@@ -59,10 +59,9 @@ Test servers in `tests/unit` bind `127.0.0.1` explicitly (`app.listen(0, '127.0.
 
 ## Linear API
 
-- Uses `graphql-request` to query Linear's GraphQL API
-- OAuth tokens passed via `Authorization: Bearer {token}` header
-- Fetches projects with state "started" and all issues
-- Single query fetches both projects and issues
+- `graphql-request` against Linear's GraphQL API
+- OAuth token as `Authorization: Bearer {token}`
+- One query fetches started projects and all issues
 
 ## Key Behaviors
 
@@ -75,7 +74,7 @@ Test servers in `tests/unit` bind `127.0.0.1` explicitly (`app.listen(0, '127.0.
 - Collapse state persisted in localStorage
 - 401 errors clear session and redirect to landing page
 - Free tier users are bounded by runs per account per UTC day (`FREE_TIER_RUN_LIMIT`, default 10); prompts are unlimited (a global hourly safety net only). Go shows remaining runs and disables itself and the run-step rung at the limit; run gating 429s carry `freeTier.used: true` + `runsUsed`.
-- `/kpis` is a public, intentionally unlinked page of instance-wide aggregate stats (Chart.js charts, 60s server cache). `lib/kpi-stats.js` is the privacy boundary: only counts and app-defined labels, never workspace keys or content
+- `/kpis` is a public, intentionally unlinked page of instance-wide aggregate stats (Chart.js, 60s server cache). `lib/kpi-stats.js` is the privacy boundary: only counts and app-defined labels, never workspace keys or content
 
 ## AI Agent Support
 
@@ -99,7 +98,7 @@ The `/llms.txt` file provides guidance for AI agents navigating the site, includ
 
 ## Invariants
 
-- One path for every recommendation: the stage selector (`lib/openrouter.js` → `lib/stage-router.js`) picks the stage from the stages' own descriptions, rules written once and facts computed in code, and `generatePrompt()` (`lib/prompt-templates.js`) assembles its prompt; no model writes a prompt, and code settles only the routes `CODE_ROUTES` lists (lib/code-routes.js; the look-first route is Surveys, then scoping); none reads a model's verdict, and a person's comment posted after work started outranks the sequence until a later dispatched run. Prompt-behavior changes land in the stage templates, routing changes in the selector; full detail in `docs/architecture/prompt-system.md`.
+- One path for every recommendation: the stage selector (`lib/openrouter.js` → `lib/stage-router.js`) picks the stage from the stages' own descriptions, rules written once and facts computed in code, and `generatePrompt()` (`lib/prompt-templates.js`) assembles its prompt; no model writes a prompt, and code settles only the routes `CODE_ROUTES` lists (lib/code-routes.js; the look-first route is Surveys, then scoping); none reads a model's verdict, and a person's comment (read as its finding, `lib/comment-ingest.js`) posted after work started outranks the sequence until a later dispatched run. Prompt-behavior changes land in the stage templates, routing changes in the selector; full detail in `docs/architecture/prompt-system.md`.
 - This file must stay ≤110 lines / ≤12,000 bytes (bytes binding); the `docs/architecture/` citations above must resolve to real content, not just to an existing file.
 - `ci-success` must be green on a PR before merging (it aggregates the unit, unit-proxy and e2e jobs).
 - A PAT-mode session still supports OAuth if OAuth vars are configured; see `docs/architecture/auth.md`.
@@ -107,4 +106,5 @@ The `/llms.txt` file provides guidance for AI agents navigating the site, includ
 - Runner copies (`{ "runner": true }`) are owner-only, carry server-resolved `take`+`dispatch` grants, live 1h/24h and revoke by lineage. Enqueue (`/dispatch`, `/recommend-and-dispatch`, `/autopilot/kickoff`) requires `dispatch` (LIN-3136); see `docs/proxy-integration.md`.
 - The scheduler's registered-job roster and the prompt-template count are hand-written in `docs/architecture/source-map.md`, but checked against source at test time, never trusted as written.
 - Email is an **identity type, never a provider** (no `lib/providers/email`): `lib/email-auth.js` + `routes/email-auth.js`. `lib/email-availability.js` is the one availability predicate (never enabled by `NODE_ENV` alone); see `docs/architecture/auth.md`.
+- Hand-offs are records (`docs/areas/records.md`): agents ask by `question` record; the answer is a `decision` (option and the person's words) resuming the asker with all three unless stopped (`lib/question-answers.js`); `GET /brief` is the records brief for the caller's run. No ruling is scraped; no model summarises a ticket.
 - Prompt size is frozen (`tests/unit/prompt-size-budget.test.js`): a new lesson lands as code or a test first, and prompt text (templates, the stage-router prompt, runner prompt) grows only with its reason recorded beside the ceiling it raises.

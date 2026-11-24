@@ -106,6 +106,23 @@ export const RETIRED = Object.freeze([
   { word: 'the size guard codes', re: /\bSIZE_RECORD_(?:HOW|POLICY_CUT|SHAPE|DROPPED|CODES)\b|\brefusedBySizeRecord\b|\bSIZE_(?:HOW|SHAPE)_WORDS\b/ },
   { word: 'the size readers', re: /\b(?:readSizeRecord|checkSizeRecord|sizeFact|recordShape|STANDING_POLICY_LINE|SIZE_OF_MOVE_HEADING|RECORD_LINES|RECORD_PARTS|DECIDED_BY_LABEL|DECIDED_BY_MAX_OTHER_WORDS|CUT_MAX_OTHER_WORDS|WHY_MAX_WORDS)\b/ },
   { word: 'the size record\'s decided-by line', re: /\*\*Decided by:\*\*|pending a ruling/ },
+  // LIN-4543 (P9): the census made final. The plan §5 searches, re-run at the close, and every export the slice's pieces
+  // deleted, checked against the rows above: these were gone from the tree but no row kept them gone. Each is a piece's
+  // retirement, named here so it cannot come back.
+  // Ask item 7, the text rules for who wrote a comment: LIN-4535 retired `isRuling` as an authorship test.
+  { word: 'isRuling', re: /\bisRuling\b/ },
+  // Ask item 7, the predicate that stitches the stores: its effect choice and the closer's reads (LIN-4538, LIN-4541).
+  { word: 'the predicate\'s effect and closer reads', re: /\b(?:resolveEffect|isSettledForCloser|ticketClosedBasisHash|liveOnAnchor)\b|live-anchor\.js/ },
+  // Ask item 7, answers as comments: the digest's answer-stamp readers (LIN-4541 close-out).
+  { word: 'the answer-stamp digest reads', re: /\b(?:_findDecisionAnswer|resolvedDecisionEvents)\b/ },
+  // Ask item 7, the scan: its model default, payload parser and decision checks (LIN-4540).
+  { word: 'the scan\'s model and parsers', re: /\b(?:DEFAULT_SCAN_MODEL|extractScanPayload|isClaimedDecisionValid|isExplicitRetirementSignal)\b/ },
+  // Ask item 7, the formal size section: its line labels (LIN-4542).
+  { word: 'the size section\'s labels', re: /\b(?:CUTS_LABEL|SIZE_LABEL|WHY_LABEL|NO_CUTS|WRONG_WORK)\b/ },
+  // Ask item 5, stage runs write no comments: the Periodical gate's comment-evidence checks (LIN-4533).
+  { word: 'the comment-evidence checks', re: /\b(?:hasReportEvidenceComment|hasAdversarialReadEvidenceComment)\b/ },
+  // Ask item 7, the model-written brief: the mock brief's fixture parent (LIN-4537).
+  { word: 'the brief mock\'s fixture parent', re: /fixture-parent\.js|\bfixtureParent\b/ },
 ]);
 
 /** Files that keep a retired word, each with the words it may keep and the reason. */
