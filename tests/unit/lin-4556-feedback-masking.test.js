@@ -220,7 +220,7 @@ describe('LIN-4556: a secret split across two assistant-text chunks is masked', 
   test('the rollback (recap i/n) format: a token split across two recap chunks is masked like the assistant-text pair', async () => {
     // simple-dispatcher hook.js postTurnText (SD_ASSISTANT_TEXT_RELAY=0) posts `[<label> ](recap i/n)\n<chunk>`,
     // the label on the SAME line, chunked by the same chunkLines.
-    const token = 'ghp_A1b2C3d4E5f6G7h8I9j0K1l2M3n4O5p6Q7r8';
+    const token = SECRETS.github;
     const recap = (i, n, text, label = null) => `${label ? `${label} ` : ''}(recap ${i}/${n})\n${text}`;
     for (const label of [null, '[turn 3]']) {
       const store = makeStore();
@@ -236,7 +236,7 @@ describe('LIN-4556: a secret split across two assistant-text chunks is masked', 
   test('a recap chunk is not continued by an assistant-text chunk (head families do not mix)', async () => {
     const store = makeStore();
     const item = await takenByDispatchToken(store);
-    const token = 'ghp_A1b2C3d4E5f6G7h8I9j0K1l2M3n4O5p6Q7r8';
+    const token = SECRETS.github;
     const stored = await postChunks(store, item, [
       `(recap 1/2)\ntoken is ${token.slice(0, 16)}`,
       chunk(2, 2, `${token.slice(16)} tail`)
