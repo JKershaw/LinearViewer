@@ -1,7 +1,7 @@
 // =============================================================================
 // LIN-4535 review witnesses (PR #2501, verdict-d11e83be): each load-bearing wiring is pinned by a test that goes red when
-// the call is removed. The three the review named: the ender in endRunOf (run-records.js), the page-reply finding in the
-// route (routes/workspace-api-issue-write.js) and the ingest in prepareRecommendationInput (recommendation-input.js), plus
+// the call is removed. The three the review named: the ender in endRunOf (run-records.js), the page-reply finding (filed by
+// the comment seam, lib/harbour-comment-post.js, since LIN-4548; the route states the member as `by`) and the ingest in prepareRecommendationInput (recommendation-input.js), plus
 // the dispatch seat's ingest (dispatch-factory.js). The other findings: the client-chosen comment id (record before post),
 // the per-provider author ids, the cutover at workspace creation, and the finding's time.
 // =============================================================================
@@ -29,6 +29,7 @@ import { LinearProvider } from '../../lib/providers/linear/index.js';
 import { setLinearFetchImpl, getLinearFetchImpl } from '../../lib/linear-fetch.js';
 import {
   postHarbourComment,
+  HARBOUR,
   configureHarbourCommentLedger,
   harbourCommentLedgerGaps,
   resetHarbourCommentLedgerGaps,
@@ -77,6 +78,7 @@ describe('A. the ledger seam records a Linear comment id before the post (findin
     let postedWith = null;
     const answer = await postHarbourComment({
       urlKey: URL_KEY,
+      by: HARBOUR,
       store,
       clientIds: true,
       post: async (commentId) => { order.push('post'); postedWith = commentId; return { success: true, comment: { id: commentId, body: 'x' } }; }
@@ -90,6 +92,7 @@ describe('A. the ledger seam records a Linear comment id before the post (findin
     let posted = 0;
     const answer = await postHarbourComment({
       urlKey: URL_KEY,
+      by: HARBOUR,
       store: ledgerSpy({ failing: true }),
       clientIds: true,
       post: async () => { posted += 1; return { success: true, comment: { id: 'never' } }; }
@@ -105,6 +108,7 @@ describe('A. the ledger seam records a Linear comment id before the post (findin
     const store = ledgerSpy({ failing: true });
     const answer = await postHarbourComment({
       urlKey: URL_KEY,
+      by: HARBOUR,
       store,
       post: async () => { posted += 1; return { id: 'gh-7', body: 'x' }; }
     });
@@ -191,9 +195,9 @@ describe('B. GitHub and Jira carry the author id the ingest matches (finding-c23
   });
 });
 
-// ---- C. the page reply route credits a non-owner member (the route's call; finding-a9a85539 (b)) ----------------------
+// ---- C. the page reply route credits a non-owner member (the route's `by`, filed by the seam since LIN-4548; finding-a9a85539 (b))
 
-describe('C. the page reply route files a non-owner member\'s reply under that member (the route call is pinned)', () => {
+describe('C. the page reply route files a non-owner member\'s reply under that member (the seam files it from the route\'s `by`)', () => {
   const PROVIDER_NAME = 'lin-4535-reply-fake';
   let findings;
   let ledger;
@@ -264,12 +268,23 @@ describe('C. the page reply route files a non-owner member\'s reply under that m
   test('a non-owner member\'s page reply is a finding by person:<the member\'s account>, under the comment\'s fixed id', async () => {
     const { status } = await postReply(appFor('member-2'), 'Take the narrow path.');
     assert.equal(status, 201);
-    assert.equal(findings.length, 1, 'the route wrote the reply\'s finding (remove the route call and this is 0)');
+    assert.equal(findings.length, 1, 'the seam wrote the reply\'s finding (the route says `by: person:<member>`; say HARBOUR and this is 0)');
     assert.equal(findings[0].by, 'person:member-2', 'credited to the member, not to the owner whose credential posted it');
     assert.equal(findings[0].fixedId, fixedIdOf('finding', 'comment', 'reply-1'));
     assert.equal(findings[0].via, 'comment');
     assert.equal(findings[0].at, T('10:30'), 'dated by the reply\'s own time');
     assert.deepEqual(ledger.calls.map((c) => c.commentId), ['reply-1'], 'and ledgered as Harbour\'s, so the ingest never takes it again');
+  });
+
+  test('LIN-4548: a finding write that throws leaves the reply a 201 (the comment is written)', async () => {
+    configureCommentIngest({
+      writes: { async add() { throw new Error('records down'); }, async end() { return { record: null }; } },
+      listPeople: async () => [], cutoffOf: async () => null, ledger,
+      taskForTicket: async () => 'task-901', taskOfTicket: async () => 'task-901'
+    });
+    const { status } = await postReply(appFor('member-2'), 'Records are down, the reply still lands.');
+    assert.equal(status, 201);
+    assert.equal(ledger.calls.length, 1);
   });
 
   // LIN-4541: a reply is a comment, never a ruling. The page reply appends no ruling mark, so its finding holds the person's

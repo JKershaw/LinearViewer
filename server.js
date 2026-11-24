@@ -695,8 +695,9 @@ const harbourCommentsCollection = db.collection('harbour-comments')
 const harbourCommentsStore = new HarbourCommentsStore({
   collection: harbourCommentsCollection
 })
-// LIN-4535 (P5): Harbour's own comment posts are recorded in the ledger (lib/harbour-comment-post.js), and a person's comment
-// reaches its task as a finding (lib/comment-ingest.js), the only reader that decides who wrote a comment. The cutover
+// LIN-4535 (P5), LIN-4548: every comment Harbour posts is recorded in the ledger, its author settled at the post from the
+// credential that sent it (lib/harbour-comment-post.js: a person's own files their finding there). A comment typed in the
+// tracker reaches its task as a finding through lib/comment-ingest.js, which skips the ledgered ones. The cutover
 // (set at boot below for the workspaces that exist; at creation for a new one) keeps older comments out of the ingest.
 configureHarbourCommentLedger(harbourCommentsStore)
 configureCommentIngest({

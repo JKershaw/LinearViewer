@@ -1,6 +1,7 @@
 /**
- * LIN-4535 (P5, plan D4, D5 and the ender): a comment's author is decided in one place, and a person's comment reaches its
- * task once, as a finding under its real author.
+ * LIN-4535 (P5, plan D4, D5 and the ender), LIN-4548: a comment's author is decided once, in one of two places (the seam,
+ * from the credential, for a comment Harbour posts; the ingest, from the tracker's author id, for one typed in the tracker),
+ * and a person's comment reaches its task once, as a finding under its real author.
  *
  * The witnesses (plan §7 for P5):
  *   - a ledger write that fails after a post is retried, then counted as a gap, and the post still answers (lib/harbour-comment-post.js);
@@ -19,6 +20,8 @@ import { fileURLToPath } from 'node:url';
 
 import {
   postHarbourComment,
+  repairHarbourCommentRecord,
+  HARBOUR,
   configureHarbourCommentLedger,
   harbourCommentLedgerGaps,
   resetHarbourCommentLedgerGaps,
@@ -32,7 +35,7 @@ import {
   personFindingsOf,
   personFindingOfComment,
   endCarriedPersonFindings,
-  recordPersonReplyFinding
+  recordPersonCommentFinding
 } from '../../lib/comment-ingest.js';
 import { fixedIdOf } from '../../lib/records/refs.js';
 
@@ -70,22 +73,22 @@ describe('the one seam for Harbour\'s own comment posts (lib/harbour-comment-pos
   test('a post is recorded in the ledger under its workspace, after it lands, and the answer is returned as the provider gave it', async () => {
     const store = fakeLedger();
     const answer = { success: true, comment: { id: 'c-1', body: 'hi' } };
-    const out = await postHarbourComment({ urlKey: URL_KEY, store, post: async () => answer });
+    const out = await postHarbourComment({ urlKey: URL_KEY, by: HARBOUR, store, post: async () => answer });
     assert.equal(out, answer);
     assert.deepEqual(store.calls, [{ urlKey: URL_KEY, commentId: 'c-1' }]);
   });
 
   test('a refused post (success: false) and an answer with no id record nothing', async () => {
     const store = fakeLedger();
-    await postHarbourComment({ urlKey: URL_KEY, store, post: async () => ({ success: false }) });
-    await postHarbourComment({ urlKey: URL_KEY, store, post: async () => ({ success: true, comment: {} }) });
+    await postHarbourComment({ urlKey: URL_KEY, by: HARBOUR, store, post: async () => ({ success: false }) });
+    await postHarbourComment({ urlKey: URL_KEY, by: HARBOUR, store, post: async () => ({ success: true, comment: {} }) });
     assert.equal(store.calls.length, 0);
   });
 
   test('a failed record is retried LEDGER_ATTEMPTS times in all, then counted as a gap; the post still answers (it never throws on the ledger)', async () => {
     const store = fakeLedger({ failures: Infinity });
     const answer = { success: true, comment: { id: 'c-2' } };
-    const out = await postHarbourComment({ urlKey: URL_KEY, store, post: async () => answer });
+    const out = await postHarbourComment({ urlKey: URL_KEY, by: HARBOUR, store, post: async () => answer });
     assert.equal(out, answer, 'the write answers as it did before the ledger');
     assert.equal(store.calls.length, LEDGER_ATTEMPTS);
     assert.equal(harbourCommentLedgerGaps(), 1, 'the gap is counted');
@@ -93,7 +96,7 @@ describe('the one seam for Harbour\'s own comment posts (lib/harbour-comment-pos
 
   test('a record that succeeds on a retry is no gap', async () => {
     const store = fakeLedger({ failures: LEDGER_ATTEMPTS - 1 });
-    await postHarbourComment({ urlKey: URL_KEY, store, post: async () => ({ success: true, comment: { id: 'c-3' } }) });
+    await postHarbourComment({ urlKey: URL_KEY, by: HARBOUR, store, post: async () => ({ success: true, comment: { id: 'c-3' } }) });
     assert.equal(store.calls.length, LEDGER_ATTEMPTS);
     assert.equal(harbourCommentLedgerGaps(), 0);
     assert.ok(store.recorded.has('c-3'));
@@ -101,17 +104,17 @@ describe('the one seam for Harbour\'s own comment posts (lib/harbour-comment-pos
 
   test('a post that throws propagates to its caller, and nothing is recorded', async () => {
     const store = fakeLedger();
-    await assert.rejects(() => postHarbourComment({ urlKey: URL_KEY, store, post: async () => { throw new Error('tracker down'); } }), /tracker down/);
+    await assert.rejects(() => postHarbourComment({ urlKey: URL_KEY, by: HARBOUR, store, post: async () => { throw new Error('tracker down'); } }), /tracker down/);
     assert.equal(store.calls.length, 0);
   });
 
   test('the registered ledger is the default when a caller names none; with no ledger at all the post is not recorded and not a gap', async () => {
     const store = fakeLedger();
     configureHarbourCommentLedger(store);
-    await postHarbourComment({ urlKey: URL_KEY, post: async () => ({ success: true, comment: { id: 'c-4' } }) });
+    await postHarbourComment({ urlKey: URL_KEY, by: HARBOUR, post: async () => ({ success: true, comment: { id: 'c-4' } }) });
     assert.equal(store.calls.length, 1);
     configureHarbourCommentLedger(null);
-    await postHarbourComment({ urlKey: URL_KEY, post: async () => ({ success: true, comment: { id: 'c-5' } }) });
+    await postHarbourComment({ urlKey: URL_KEY, by: HARBOUR, post: async () => ({ success: true, comment: { id: 'c-5' } }) });
     assert.equal(harbourCommentLedgerGaps(), 0);
   });
 
@@ -235,11 +238,61 @@ describe('a person\'s comment reaches its task once, as a finding (ingestPersonC
     assert.deepEqual(await ingestPersonComments({ urlKey: URL_KEY, ticket: 'LIN-1', comments: comments() }), { ingested: 0, failed: 0 });
   });
 
-  test('a page reply the route posted is filed under the same fixed id, under the member\'s own account', async () => {
-    const out = await recordPersonReplyFinding({ ctx: null, urlKey: URL_KEY, ticket: 'LIN-1', accountId: 'mo', commentId: 'c-reply', body: 'Use the cache.' });
+  test('a person\'s comment Harbour posted is filed under the same fixed id, under the person\'s own account', async () => {
+    const out = await recordPersonCommentFinding({ ctx: null, urlKey: URL_KEY, ticket: 'LIN-1', accountId: 'mo', commentId: 'c-reply', body: 'Use the cache.' });
     assert.equal(out.ok, true);
     const f = findings.get(fixedIdOf('finding', 'comment', 'c-reply'));
-    assert.equal(f.by, 'person:mo', 'credited to the member, never to the workspace\'s credential');
+    assert.equal(f.by, 'person:mo', 'credited to the person, never to the workspace\'s credential');
+  });
+
+  // LIN-4548: who wrote a comment Harbour posts is settled at the seam, from `by`.
+  const tracker = { provider: { async issueDetail(_t, ref) { return ref === 'iss-uuid-1' ? { identifier: 'LIN-1' } : null; } }, token: 'tok' };
+  const personPost = (extra = {}) => postHarbourComment({
+    urlKey: URL_KEY, by: 'person:mo', store: ledger, finding: { ctx: tracker, issueRef: 'LIN-1', body: 'Ship the narrow path.' },
+    post: async () => ({ success: true, comment: { id: 'c-own-token', body: 'Ship the narrow path.', createdAt: T('10:02') } }), ...extra
+  });
+
+  test('LIN-4548: a person\'s post through the seam is ledgered and filed once as their finding; the ingest then takes it no second time', async () => {
+    await personPost();
+    assert.ok(ledger.recorded.has('c-own-token'), 'ledgered, so the ingest never re-decides its author from the tracker');
+    const f = findings.get(fixedIdOf('finding', 'comment', 'c-own-token'));
+    assert.ok(f, 'the seam filed the finding');
+    assert.deepEqual([f.by, f.via, f.in, f.fields.says], ['person:mo', 'comment', 'task-1', 'Ship the narrow path.']);
+    // The tracker names the owner's credential (u-mo here) as its author: the ingest still files nothing new.
+    await ingestPersonComments({ urlKey: URL_KEY, ticket: 'LIN-1', comments: [{ commentId: 'c-own-token', authorId: 'u-mo', createdAt: T('10:02'), body: 'x' }] });
+    assert.equal([...findings.keys()].filter((k) => k !== fixedIdOf('finding', 'comment', 'c-harbour')).length, 1, 'one finding');
+  });
+
+  test('LIN-4548: an issue ref that is not a ticket is named through the provider\'s issueDetail', async () => {
+    await personPost({ finding: { ctx: tracker, issueRef: 'iss-uuid-1', body: 'By uuid.' } });
+    assert.equal(findings.get(fixedIdOf('finding', 'comment', 'c-own-token'))?.in, 'task-1');
+  });
+
+  test('LIN-4548: a Harbour post files no finding, a refused post files none, and a post that does not say who wrote it throws before posting', async () => {
+    await postHarbourComment({ urlKey: URL_KEY, by: HARBOUR, store: ledger, finding: { ctx: tracker, issueRef: 'LIN-1', body: 'x' }, post: async () => ({ success: true, comment: { id: 'c-run' } }) });
+    await personPost({ post: async () => ({ success: false }) });
+    assert.equal(findings.size, 0);
+    let posted = 0;
+    for (const by of [undefined, null, 'person:', 'stage:implementation', 'mo']) {
+      await assert.rejects(() => postHarbourComment({ urlKey: URL_KEY, by, store: ledger, post: async () => { posted += 1; return { id: 'c-x' }; } }), TypeError);
+    }
+    assert.equal(posted, 0);
+  });
+
+  test('LIN-4548: a finding write that fails never fails the post (the comment is written), and the repair files it again once', async () => {
+    const add = writes.add;
+    writes.add = async () => { throw new Error('records down'); };
+    const answer = await personPost();
+    assert.equal(answer.success, true, 'the post answers as the provider gave it');
+    assert.equal(findings.size, 0);
+    writes.add = add;
+    const comment = { id: 'c-own-token', createdAt: T('10:02') };
+    const finding = { ctx: tracker, issueRef: 'LIN-1', body: 'Ship the narrow path.' };
+    await repairHarbourCommentRecord({ urlKey: URL_KEY, comment, by: 'person:mo', finding, store: ledger });
+    await repairHarbourCommentRecord({ urlKey: URL_KEY, comment, by: 'person:mo', finding, store: ledger });
+    assert.equal(findings.size, 1, 'filed once, under its fixed id, however many repairs');
+    await repairHarbourCommentRecord({ urlKey: URL_KEY, comment: { id: 'c-run-2' }, by: HARBOUR, finding, store: ledger });
+    assert.equal(findings.size, 1, 'a Harbour repair files nothing');
   });
 
   test('the selector reads these findings by their comment: personFindingOfComment matches the fixed id, never the words', async () => {

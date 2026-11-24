@@ -25,12 +25,14 @@
   `lib/partial-write-error.js` `partialWriteEnvelope`: `retryable:false`, answered 500. A lane
   that does not map it answers a bare 500 that hides the landed issue. (LIN-4451, LIN-4452.)
 - A comment's author is the provider's tracker user id, mapped onto the comment as `authorId` on list and create (Linear
-  `user.id`, GitHub `user.id`, Jira `author.accountId`); lib/comment-ingest.js matches it to a person's `trackerUserId`
-  and nothing else decides authorship. A provider with no author id leaves it null, and its comments are never a
+  `user.id`, GitHub `user.id`, Jira `author.accountId`); for a comment typed in the tracker, lib/comment-ingest.js
+  matches it to a person's `trackerUserId`. A comment Harbour posts is settled at the post, from the credential that
+  sent it, never from this id (LIN-4548). A provider with no author id leaves it null, and its comments are never a
   person's. (LIN-4535.)
 - A provider whose comment create takes a client-chosen id declares `clientCommentIds` (Linear, checked by introspecting
-  `CommentCreateInput`). Harbour then records the id in the ledger before it posts, so a lost record can never make its
-  own post read as a person's (lib/harbour-comment-post.js). Check the tracker's schema before declaring it. (LIN-4535.)
+  `CommentCreateInput`). Harbour then records the id in the ledger before it posts, so a lost record can never let the
+  ingest re-decide its author from the tracker (lib/harbour-comment-post.js, which settles it at the post from the
+  sending credential, LIN-4548). Check the tracker's schema before declaring it. (LIN-4535.)
 - The dispatch seat reads the ticket's comments through the provider (lib/dispatch-factory.js). A test that dispatches
   with a Linear token other than the hermetic one must install the transport (`setLinearFetchImpl`, lib/linear-fetch.js),
   or the read reaches api.linear.app and the hermetic watcher fails CI. (LIN-4535.)

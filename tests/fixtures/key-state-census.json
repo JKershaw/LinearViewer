@@ -59,6 +59,10 @@
     "disposition": "global-only",
     "exception": "pr-status-seeded"
   },
+  "lib/harbour-comment-post.js::posters": {
+    "disposition": "global-only",
+    "exception": "process-lifetime-memos"
+  },
   "lib/key-state.js::exceptions": {
     "disposition": "not-state",
     "why": "The registry’s own table of exception names."

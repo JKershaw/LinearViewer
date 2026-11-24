@@ -48,7 +48,7 @@ Area notes for `agent-api` in the registry. Format and rules: README.md.
   page and the test seams; a bare `origin: 'person'` is ignored. Find every mint by its call (`tests/unit/lin-4492-mint-census.test.js`):
   a helper-name search misses a bare `createToken`, which is how LIN-4468 found its gap. A new mint fails the census until it is listed.
   An owner-issued runner or agent grant copy is a `person` credential: it acts as the owner, so a record written with it is filed as
-  `person:<owner>` by design. `lib/run-lineage.js` `writerOf` is the pure refusal check; the records routes (`routes/proxy-records.js`,
+  `person:<owner>` by design, and a comment posted with it is the owner's finding (one person test, `personOfCredential`, LIN-4548). `lib/run-lineage.js` `writerOf` is the pure refusal check; the records routes (`routes/proxy-records.js`,
   LIN-4493) call it, reading the runs from the records store, and a refusal names its reason (403).
 - The dispatch factory allocates a row's id before its prompt is finalized (LIN-4492, `lib/dispatch-factory.js`). The prompt and every
   credential minted for the row name it; `addItem` takes that id only as its trusted third argument, never from a body field.
@@ -60,3 +60,5 @@ Area notes for `agent-api` in the registry. Format and rules: README.md.
   kickoff's follow-up reads as a run of its own.
 - Records reads log who asked via `proxyAskerOf` (`lib/stage-writes.js`). The brief logs carried ids under a run only
   on its own task: a run's end ends them (LIN-4536).
+- Who a credential speaks for is `personOfCredential` (`lib/run-lineage.js`): a new route asks it, never its own origin
+  test, and a comment post passes it as `by` to `lib/harbour-comment-post.js`. `proxyAskerOf` is a known copy (LIN-4548).

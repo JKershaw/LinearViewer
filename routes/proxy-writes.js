@@ -57,7 +57,8 @@ import { flattenIssue, MAX_ATTACHMENT_BYTES } from '../lib/proxy-wire.js';
 import { UUID_REGEX, isValidIssueId } from '../lib/workspace.js';
 import { appendBlock, replace as replaceInDescription, DescriptionEditError } from '../lib/description-edit.js';
 import { addedPlanHeadings, PLAN_HEADING_WORDS, PLAN_IN_DESCRIPTION } from '../lib/legacy-plan-text.js';
-import { postHarbourComment, repairHarbourCommentRecord } from '../lib/harbour-comment-post.js';
+import { postHarbourComment, repairHarbourCommentRecord, rememberCommentPoster, commentPosterOf, HARBOUR } from '../lib/harbour-comment-post.js';
+import { personOfCredential } from '../lib/run-lineage.js';
 import { isRestrictedStamp, sameTicketKey, ISSUE_PATCH_FIELDS } from '../lib/stage-writes.js';
 import { jsonError } from '../lib/errors.js';
 import { parseFeedbackImage } from '../lib/attachment-upload.js';
@@ -295,14 +296,25 @@ export function createProxyWriteRoutes({
       .catch(e => console.error(`[ticket-closer] seam ${seam} failure:`, e?.message || e));
   }
 
+  /**
+   * LIN-4548: who wrote a comment sent through the proxy, by the records API's own person test (lib/run-lineage.js
+   * personOfCredential, writerOf's branch (i)): a person's own token is that person's; any other token is Harbour's.
+   */
+  const commentAuthorOf = (req) => personOfCredential({ origin: req.proxyOrigin ?? null, createdBy: req.proxyCreatedBy ?? null }) ?? HARBOUR;
+
+  /** What a person's finding needs from this request (lib/harbour-comment-post.js): the writer's access, the issue, the words. */
+  const commentFindingOf = ({ req, token, provider }, text) => ({ ctx: { provider, token }, issueRef: req.params.issueId, body: text });
+
   /** Create a comment and answer 201; `remember` sees the payload once the write is accepted. */
-  async function postComment({ req, res, endpoint, token, provider }, text, remember) {
-    // LIN-4535 (D4): the post and its ledger record are one seam (lib/harbour-comment-post.js); a failed record never fails the post.
-    const posted = await postHarbourComment({ urlKey: req.proxyUrlKey, store: harbourCommentsStore, clientIds: provider.clientCommentIds === true, post: (commentId) => provider.createComment(token, req.params.issueId, text, commentId) });
+  async function postComment(ctx, text, remember) {
+    const { req, res, endpoint, token, provider } = ctx;
+    // LIN-4535 (D4), LIN-4548: the post, its ledger record and a person's finding are one seam (lib/harbour-comment-post.js);
+    // a failed record or finding never fails the post.
+    const posted = await postHarbourComment({ urlKey: req.proxyUrlKey, by: commentAuthorOf(req), finding: commentFindingOf(ctx, text), store: harbourCommentsStore, clientIds: provider.clientCommentIds === true, post: (commentId) => provider.createComment(token, req.params.issueId, text, commentId) });
     const created = normalizeWritePayload(posted, 'comment');
     // A clear failure instead of a misleading 201 when the provider reports the write did not land.
     if (writeRejected(req, res, endpoint, created, 'Comment was not created')) return;
-    remember?.(created);
+    remember?.(rememberCommentPoster(created, commentAuthorOf(req)));
     logEvent(req, endpoint, 201);
     res.status(201).json(created);
   }
@@ -662,9 +674,9 @@ export function createProxyWriteRoutes({
       // from the provider, so it is not evidence the provider accepted anything
       // on THIS request.
       logEvent(req, endpoint, 200, null, { skipWitness: true });
-      // Dedupe-hit ledger repair (LIN-2649 S1, F2): the original post's own record may have failed. The seam repairs it
-      // (lib/harbour-comment-post.js, LIN-4535), so the ledger is written one way; it never gates this response.
-      if (harbourCommentsStore) await repairHarbourCommentRecord({ urlKey: req.proxyUrlKey, commentId: prior.comment?.id ?? null, store: harbourCommentsStore });
+      // Dedupe-hit repair (LIN-2649 S1, F2; LIN-4548): the original post's own record, or a person's finding, may have
+      // failed. The seam repairs both (lib/harbour-comment-post.js), so each is written one way; it never gates this response.
+      await repairHarbourCommentRecord({ urlKey: req.proxyUrlKey, comment: prior.comment ?? null, by: commentPosterOf(prior), finding: commentFindingOf(ctx, body), store: harbourCommentsStore });
       return res.status(200).json({ ...prior, deduped: true });
     }
     await postComment(ctx, body, (created) => commentDedupe.set(key, created));
