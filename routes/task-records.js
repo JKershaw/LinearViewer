@@ -25,6 +25,7 @@ import { jsonError } from '../lib/errors.js';
 import { createRecordWrites } from '../lib/records/writes.js';
 import { askedOf } from '../lib/asked-of.js';
 import { fixedIdOf } from '../lib/records/refs.js';
+import { DISMISSED_END } from '../lib/records/check.js';
 import { ADDABLE, SUPERSEDABLE } from '../lib/render-task-records.js';
 import { RecordsNotFound, RecordsVersionConflict } from '../lib/records-store.js';
 import { isTerminalState } from '../lib/providers/state-map.js';
@@ -168,6 +169,11 @@ export function createTaskRecordsRoutes({ workspaceFromUrl, recordsStore, accoun
     if (!writer) return undefined;
     try {
       const input = { state: trimmed(req.body?.state), reason: trimmed(req.body?.reason), ...(trimmed(req.body?.into) ? { into: trimmed(req.body.into) } : {}) };
+      // LIN-4550: a question is dismissed through its card's Dismiss, which tells the run that asked (lib/question-answers.js); this generic end would skip that.
+      if (input.state === DISMISSED_END) {
+        const prev = await recordsStore.current(urlKey, req.params.id);
+        if (prev?.kind === 'question') return res.redirect(303, refusedTo(urlKey, identifier, [{ message: "Dismiss a question with its card's Dismiss, which tells the run that asked" }]));
+      }
       const result = await writes.end({ urlKey, id: req.params.id, input, by: writer.by, run: writer.run });
       if (result.problems) return res.redirect(303, refusedTo(urlKey, identifier, result.problems));
       return res.redirect(303, backTo(urlKey, identifier));

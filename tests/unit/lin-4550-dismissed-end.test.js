@@ -15,7 +15,15 @@
 import { describe, test, before, after, beforeEach, afterEach } from 'node:test';
 import assert from 'node:assert/strict';
 import { createMangoTmpdir } from '../fixtures/mango-tmpdir.js';
+import express from 'express';
 import { createRecordsRouteHarness } from '../helpers/records-route-harness.js';
+import { RecordsStore, RECORDS_COLLECTION, REFS_COLLECTION, QUERY_LOG_COLLECTION } from '../../lib/records-store.js';
+import { INDEX_SPECS } from '../../lib/db-indexes.js';
+import { createTaskRecordsRoutes } from '../../routes/task-records.js';
+import { renderTaskRecordsSection } from '../../lib/render-task-records.js';
+import { createFakeTracker } from '../helpers/fake-records-tracker.js';
+import { DISMISSED_END as CHECK_DISMISSED_END } from '../../lib/records/check.js';
+import { DISMISSED_END as FACTS_DISMISSED_END } from '../../lib/records/question-facts.js';
 import { createRecordWrites, HARBOUR_WRITER } from '../../lib/records/writes.js';
 import { isTerminalState } from '../../lib/providers/state-map.js';
 import { KINDS } from '../../lib/records/check.js';
@@ -144,5 +152,84 @@ describe('scripts/pipeline-churn.mjs books old and new dismissals as dismissed',
       'question-new': 'dismissed',
       'question-agent': 'withdrawn',
     });
+  });
+});
+
+describe('the task page\'s generic end form does not dismiss a question (it would skip the dismiss spine\'s resume)', () => {
+  const TASK_URL_KEY = 'lin-4550-task-page';
+  const TICKET = 'LIN-4451';
+  let store;
+  let server;
+  let base;
+
+  beforeEach(async () => {
+    const db = harness.freshDb();
+    for (const collection of [RECORDS_COLLECTION, REFS_COLLECTION]) {
+      for (const spec of INDEX_SPECS.filter((x) => x.collection === collection && x.options?.unique)) {
+        await db.collection(collection).createIndex(spec.keySpec, spec.options);
+      }
+    }
+    store = new RecordsStore({ records: db.collection(RECORDS_COLLECTION), refs: db.collection(REFS_COLLECTION), queryLog: db.collection(QUERY_LOG_COLLECTION) });
+    const app = express();
+    app.use(express.urlencoded({ extended: false }));
+    app.use((req, _res, next) => { req.workspace = { urlKey: TASK_URL_KEY, id: 'ws-1' }; req.session = { accountId: 'acc-john', workspaces: [] }; next(); });
+    app.use(createTaskRecordsRoutes({
+      workspaceFromUrl: (_req, _res, next) => next(),
+      recordsStore: store,
+      accountStore: { resolveCanonicalAccountId: async (id) => id },
+      listPeople: async () => PEOPLE,
+      readTicket: async (_ctx, ref) => ({ identifier: ref, description: 'The person asked for this.', state: { type: 'started', name: 'In Progress' }, parent: null }),
+      tracker: createFakeTracker().tracker,
+    }));
+    server = await new Promise((resolve) => { const s = app.listen(0, '127.0.0.1', () => resolve(s)); });
+    base = `http://127.0.0.1:${server.address().port}`;
+  });
+  afterEach(async () => {
+    server.closeAllConnections();
+    await new Promise((resolve) => server.close(resolve));
+  });
+
+  async function openQuestion() {
+    const task = await store.ensureTask(TASK_URL_KEY, { identifier: TICKET, asked: 'The person asked for this.', closed: false, closedReason: null }, { by: JOHN });
+    return store.add(TASK_URL_KEY, { kind: 'question', state: 'open', fields: { asks: 'Runs left or runs used?', options: ['runs left', 'runs used'], recommended: 'runs left' }, links: {}, in: task.id, to: 'person:acc-john' }, { by: 'implementation' });
+  }
+  const postEnd = (id, state, reason) => fetch(`${base}/workspace/${TASK_URL_KEY}/records/${id}/end`, {
+    method: 'POST', redirect: 'manual', headers: { 'content-type': 'application/x-www-form-urlencoded' },
+    body: new URLSearchParams({ identifier: TICKET, state, reason }),
+  });
+
+  test('a signed-in person posting state=dismissed to the task-page end route gets the refusal and the question stays open', async () => {
+    const q = await openQuestion();
+    const r = await postEnd(q.id, 'dismissed', 'not needed');
+    assert.equal(r.status, 303);
+    assert.match(decodeURIComponent(r.headers.get('location')), /records_refused=Dismiss a question with its card's Dismiss, which tells the run that asked/);
+    assert.equal((await store.current(TASK_URL_KEY, q.id)).state, 'open');
+  });
+
+  test('the same route still ends a question another way (answered stays a person\'s generic end)', async () => {
+    const q = await openQuestion();
+    const r = await postEnd(q.id, 'withdrawn', 'asked in error');
+    assert.equal(r.status, 303);
+    assert.doesNotMatch(r.headers.get('location'), /records_refused/);
+    assert.equal((await store.current(TASK_URL_KEY, q.id)).state, 'withdrawn');
+  });
+
+  test('the rendered end form for an open question has no `dismissed` option, and one for a finding is unchanged', async () => {
+    const q = await openQuestion();
+    const finding = await store.add(TASK_URL_KEY, { kind: 'finding', state: 'open', fields: { says: 'a thing', how: 'a test' }, links: {}, to: 'project' }, { by: 'implementation' });
+    const views = await store.viewsOf(TASK_URL_KEY, [await store.current(TASK_URL_KEY, q.id), await store.current(TASK_URL_KEY, finding.id)]);
+    const html = renderTaskRecordsSection({ views, identifier: TICKET, urlKey: TASK_URL_KEY, canAct: true });
+    const questionLine = html.split('<li').find((l) => l.includes(`records/${q.id}/end`));
+    assert.ok(questionLine, 'the question line carries its end form');
+    assert.doesNotMatch(questionLine, /<option value="dismissed">/);
+    assert.match(questionLine, /<option value="answered">/);
+    assert.match(questionLine, /<option value="withdrawn">/);
+  });
+});
+
+describe('the end word has one owner', () => {
+  test('lib/records/question-facts.js re-exports the word lib/records/check.js defines', () => {
+    assert.equal(FACTS_DISMISSED_END, 'dismissed');
+    assert.equal(CHECK_DISMISSED_END, FACTS_DISMISSED_END);
   });
 });
