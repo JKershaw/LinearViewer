@@ -5321,3 +5321,5 @@ The full stop holds: the fleet is paused, and the drive is only reporting. The o
 **24 Nov, ~14:05Z: LIN-4017 held too (John).** The lane is LIN-4546 then LIN-4342, then a pause. LIN-4343, LIN-3976 and LIN-4017 wait for after the notes review, where John decides whether to add more tasks. Change of plan posted on LIN-4008.
 
 Since LIN-4548, a log comment I post on LIN-4008 becomes my open finding on its task (finding-17883768, task-203b0f9f). I end each one as done ("a log line; nothing to act on"). For the notes review: log comments versus findings.
+
+**24 Nov, 17:29Z hourly.** LIN-4550 (piece 2) merged 14:50, about an hour with no review loop. LIN-4551 (piece 3), beat 4 of 4 (docs, walk, PR, CI): the session stalled about 55 minutes on resume (16:21–17:14, no tool activity, possibly a long Bash). The dispatcher's own stall re-fire redelivered the task at 17:21, and it has been working since. No help from me.
