@@ -580,10 +580,12 @@
 }
 
 /* LIN-3361: a result's decisions sit in one closed fold; quiet summary, the
-   rows inside keep their normal look. */
+   rows inside keep their normal look. LIN-4555: the summary is words ("3
+   questions waiting", as the Runs line says it), so it is in the page face, not
+   mono; the link is the site's link colour, not the browser's default blue. */
 .fc-decisions-fold > summary {
   cursor: pointer;
-  font-family: var(--font-structural);
+  font-family: var(--font-content);
   font-size: var(--font-size-sm);
   color: var(--muted);
 }
@@ -591,5 +593,7 @@
   display: inline-block;
   margin: var(--space-1) 0 var(--space-1) var(--space-2);
   font-size: var(--font-size-sm);
+  color: var(--brand-dim);
 }
+.fc-decisions-rulings-link:hover { color: var(--brand); }
 .fc-decisions-list { list-style: none; margin: 0; padding: 0; }

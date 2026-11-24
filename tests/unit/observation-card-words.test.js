@@ -95,6 +95,9 @@ const CARDS = {
   failed: () => ({ sessionId: 'S', loops: [anchor({ agentState: 'error', resolvedAt: RECENT }), loop({ loopId: 'w', agentState: 'error', resolvedAt: RECENT })] }),
   idle: () => ({ sessionId: 'S', loops: [anchor({ dispatchedAt: LONG_AGO }), loop({ loopId: 'w', dispatchedAt: LONG_AGO })] }),
   untitled: () => ({ sessionId: 'S', loops: [anchor(), loop({ loopId: 'w', issueIdentifier: null, issueTitle: null, kind: 'implementation' })] }),
+  // LIN-4555: a run dispatched on its own (no autopilot anchor): the feed's session has no seedIssue, only the one task it touched.
+  // As lib/pipeline-loops.js assembles it: no anchor, so seedIssue null, and tasksTouched the one task.
+  standalone: () => ({ sessionId: 'w', seedIssue: null, tasksTouched: ['LIN-900'], loops: [loop({ loopId: 'w', sessionId: null })] }),
 };
 
 // Paints a payload's card head with the real fillSessionHead, and returns the painted HTML.
@@ -176,6 +179,19 @@ describe('names and places (LIN-3983 PR 2)', () => {
     assert.match(text, /Untitled run/);
     assert.ok(!text.includes(`run ${payload.sessionId.slice(0, 8)}`), 'no id-based name');
     assert.ok(!/\brun S\b/.test(text), 'the session id is not used as a name');
+  });
+
+  // LIN-4555 (the walk): a standalone run's session has no anchor, so the feed sends no seedIssue. The card put the task's TITLE in
+  // the identifier cell (mono, the machine-fact face) and showed no identifier at all. A card is named by its task: the one task the
+  // run touched is its identifier, in that cell, and the title reads in the name line, in the page face.
+  test('a standalone run is named by its task: the identifier in the identifier cell, the title in the name line', async (t) => {
+    const { world, page } = await loadPage({ workspaces: [WS] });
+    t.after(() => world.restore());
+    const payload = buildSessionPayload(CARDS.standalone(), WS, false);
+    assert.equal(payload.seedIssue, null, 'the feed sends no seedIssue for a run with no anchor (the case under test)');
+    const html = paint(page, payload);
+    assert.equal(/<span class="obs-session-ident">([^<]*)<\/span>/.exec(html)?.[1], 'LIN-900', 'the identifier cell holds the identifier');
+    assert.equal(/<span class="obs-session-name">([^<]*)<\/span>/.exec(html)?.[1], 'Remove the old route', 'the title reads in the name line');
   });
 
   test('the workspace name shows only when more than one workspace is showing', async (t) => {

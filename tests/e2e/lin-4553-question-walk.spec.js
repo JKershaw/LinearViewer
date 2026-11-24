@@ -165,5 +165,12 @@ test('Flight Companion\'s fold: one frame, a highlight that moves with the choic
     await expect(options.nth(1)).toHaveAttribute('aria-pressed', 'false');
     expect(await look(2), `Flight Companion at ${at}: the highlight moves to the new choice`).toBe(pressed);
     expect(await look(1), `Flight Companion at ${at}: the old choice is back at rest`).toBe(resting);
+
+    // LIN-4555 (the walk): the fold's link is styled as the site's links are, not the browser's default blue, and its summary
+    // ("1 question waiting", words, not a machine fact) is in the page face, as the Runs line says it.
+    const linkColor = await page.locator(FC.decisionsLink).evaluate((el) => getComputedStyle(el).color);
+    expect(linkColor, `Flight Companion at ${at}: the fold's link is not the browser's default blue`).not.toBe('rgb(0, 0, 238)');
+    const summaryFont = await page.locator(FC.decisionsSummary).evaluate((el) => getComputedStyle(el).fontFamily);
+    expect(summaryFont, `Flight Companion at ${at}: the fold's summary is not mono`).not.toMatch(/JetBrains|mono/i);
   }
 });

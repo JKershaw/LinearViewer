@@ -515,9 +515,14 @@ function fillSessionHead(li, s) {
   const pill = SESSION_PILL[status] || { variant: 'queued', label: status || '' };
   // A card is named by its task, else by its goal's stand-in: never by its id (LIN-3983 PR 2). The
   // payload carries no goal, so an untitled run reads "Untitled run" and says when it started.
-  const ident = s.seedIssue || s.seedTitle || 'Untitled run';
-  const name = s.seedIssue && s.seedTitle && s.seedTitle !== s.seedIssue ? s.seedTitle : '';
-  const started = !s.seedIssue && !s.seedTitle && s.dispatchedAt
+  // LIN-4555: a run dispatched on its own has no anchor, so the feed sends no seedIssue (lib/pipeline-loops.js _assembleSession);
+  // the one task it touched is still its task. Without this the card put the TITLE in the identifier cell (mono, the face for
+  // machine facts) and showed no identifier at all.
+  const touched = Array.isArray(s.tasksTouched) ? s.tasksTouched : [];
+  const task = s.seedIssue || (touched.length === 1 ? touched[0] : null);
+  const ident = task || s.seedTitle || 'Untitled run';
+  const name = task && s.seedTitle && s.seedTitle !== task ? s.seedTitle : '';
+  const started = !task && !s.seedTitle && s.dispatchedAt
     ? `Started ${exactTimeHtml(s.dispatchedAt) || escapeHtml(relativeTime(s.dispatchedAt))}` : '';
   const runtime = formatRuntime(s.runtime);
 

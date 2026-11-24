@@ -107,6 +107,8 @@ export const SELECTORS = {
   flightCompanion: {
     decisionsFold: '[data-testid="fc-decisions-fold"]',
     decisionsSummary: '[data-testid="fc-decisions-fold"] > summary',
+    /** LIN-4555: the fold's "open the Questions tab" link. */
+    decisionsLink: '[data-testid="fc-decisions-rulings-link"]',
     question: '[data-testid="fc-question"]',
   },
   footer: {
