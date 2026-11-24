@@ -337,6 +337,26 @@ export const SELECTORS = {
     another: '[data-testid="run-another"]',
     harbourLabel: '[data-testid="task-page-harbour-label"]',
   },
+  /**
+   * LIN-4554: the task page's Records section. A line reads in plain words (state, who, a <time>); the write tools sit in closed
+   * folds: one "Add a record" fold after the list, one "End" fold on each open record, for the owner and an acting member only.
+   */
+  taskRecords: {
+    section: '[data-testid="task-records"]',
+    line: '[data-testid="task-record"]',
+    byId: (recordId) => `[data-testid="task-record"][data-record-id="${recordId}"]`,
+    state: '[data-testid="task-record-state"]',
+    by: '[data-testid="task-record-by"]',
+    to: '[data-testid="task-record-to"]',
+    time: '[data-testid="task-record-time"]',
+    addTools: '[data-testid="task-records-tools"]',
+    recordTools: '[data-testid="task-record-tools"]',
+    endState: '[data-testid="task-record-end-state"]',
+    endReason: '[data-testid="task-record-end-reason"]',
+    endInto: '[data-testid="task-record-end-into"]',
+    endSubmit: '[data-testid="task-record-end-submit"]',
+    refused: '[data-testid="task-records-refused"]',
+  },
   /** LIN-4106: Home's opened task has the same state line: one pill and one sentence, and the All-runs button. */
   homeTaskStatus: {
     line: '[data-testid="home-task-status"]',

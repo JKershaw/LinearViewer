@@ -1,5 +1,5 @@
 /**
- * LIN-4016 — the Sessions fold says "parked" for a waiting session on a parked task, and "waiting on you" for one on a
+ * LIN-4016 — the Sessions fold says "parked" for a waiting session on a parked task, and "needs you" for one on a
  * ruling. The route reads the task's decided state (the same reader its row and opened task use) and sends `taskParked`;
  * the fold reads that flag and does not re-derive the park rule.
  *
@@ -59,7 +59,7 @@ describe('LIN-4016 — the sessions route says whether a waiting session sits on
     assert.deepEqual(reads, [{ urlKey: 'ws', identifier: 'LIN-7' }]);
   });
 
-  test('a waiting session on a ruling: taskParked is false (the fold keeps "waiting on you")', async () => {
+  test('a waiting session on a ruling: taskParked is false (the fold keeps "needs you")', async () => {
     const loadTaskState = async () => ({ taskState: { state: 'needs-you' } });
     const res = await callRoute(loadTaskState, blockedSession());
     assert.equal(res.jsonBody.taskParked, false);
@@ -108,8 +108,8 @@ describe('LIN-4016 — the sessions route decides the word the fold paints', () 
     assert.equal(await parked(async () => ({ taskState: { state: 'parked' } })), 'parked');
   });
 
-  test('a waiting session on a ruling still reads "waiting on you"', async () => {
-    assert.equal(await parked(async () => ({ taskState: { state: 'needs-you' } })), 'waiting on you');
+  test('a waiting session on a ruling still reads "needs you"', async () => {
+    assert.equal(await parked(async () => ({ taskState: { state: 'needs-you' } })), 'needs you');
   });
 
   test('a running session reads "running" whatever the park flag says', async () => {

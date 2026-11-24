@@ -3,7 +3,7 @@
  *
  *   POST /workspace/:urlKey/task/:identifier/records        add a finding or question on this task (kind, text, to)
  *   POST /workspace/:urlKey/task/:identifier/records/child  add a child task under this task (done-when)
- *   POST /workspace/:urlKey/records/:id/end                 end an open record (state, reason, into)
+ *   POST /workspace/:urlKey/records/:id/end                 end an open record (state, reason, into), as the page offers (pageEndsOf)
  *   POST /workspace/:urlKey/records/:id/supersede           supersede an open lesson or decision with new words
  *
  * Every write goes through the one checked pipeline (lib/records/writes.js) with `by` = `person:<canonical account>`,
@@ -26,8 +26,8 @@ import { jsonError } from '../lib/errors.js';
 import { createRecordWrites } from '../lib/records/writes.js';
 import { askedOf } from '../lib/asked-of.js';
 import { fixedIdOf } from '../lib/records/refs.js';
-import { DISMISSED_END } from '../lib/records/check.js';
-import { ADDABLE, SUPERSEDABLE } from '../lib/render-task-records.js';
+import { KINDS } from '../lib/records/check.js';
+import { ADDABLE, SUPERSEDABLE, pageEndsOf, pageEndRefusal } from '../lib/render-task-records.js';
 import { RecordsNotFound, RecordsVersionConflict } from '../lib/records-store.js';
 import { isTerminalState } from '../lib/providers/state-map.js';
 import { STAGE_KINDS } from '../lib/prompts/stage-kinds.js';
@@ -177,10 +177,14 @@ export function createTaskRecordsRoutes({ workspaceFromUrl, recordsStore, accoun
       : res.redirect(303, refusedTo(urlKey, identifier, problems)));
     try {
       const input = { state: trimmed(req.body?.state), reason: trimmed(req.body?.reason), ...(trimmed(req.body?.into) ? { into: trimmed(req.body.into) } : {}) };
-      // LIN-4550: a question is dismissed through its card's Dismiss, which tells the run that asked (lib/question-answers.js); this generic end would skip that.
-      if (input.state === DISMISSED_END) {
-        const prev = await recordsStore.current(urlKey, req.params.id);
-        if (prev?.kind === 'question') return refuse(422, [{ message: "Dismiss a question with its card's Dismiss, which tells the run that asked" }]);
+      // LIN-4550, LIN-4554: the page ends a record only as its form offers (pageEndsOf, lib/render-task-records.js, the one rule).
+      // An end of the kind it does not offer belongs to another surface (a question's card answers or dismisses it; only the run
+      // that asked withdraws it), and is refused here naming that surface. An end the kind does not have at all is left to the
+      // checked pipeline, which names it.
+      const prev = await recordsStore.current(urlKey, req.params.id);
+      const kindEnds = KINDS.kinds[prev?.kind]?.ends || [];
+      if (prev && kindEnds.includes(input.state) && !pageEndsOf(prev).includes(input.state)) {
+        return refuse(422, [{ message: pageEndRefusal(input.state) }]);
       }
       const result = await writes.end({ urlKey, id: req.params.id, input, by: writer.by, run: writer.run });
       if (result.problems) return refuse(422, result.problems);

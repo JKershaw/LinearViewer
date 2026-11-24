@@ -270,11 +270,60 @@ h1 .task-ident { font-size: inherit; }
 .task-record-state { color: var(--text); }
 .task-record-preview { color: var(--text); margin: var(--space-1) 0; }
 .task-record-flag { color: var(--amber); }
+.task-record-flag--note { color: var(--muted); }
+.task-record-ticket { color: var(--brand-dim); text-underline-offset: 2px; }
 .task-record-noticket { color: var(--muted); font-style: italic; }
-.task-record-form { display: flex; flex-wrap: wrap; gap: var(--space-2); align-items: flex-end; margin-top: var(--space-1); }
-.task-record-form label { display: grid; gap: 2px; font-size: var(--font-size-sm); color: var(--muted); }
+/* LIN-4554: the record-writing tools sit in closed folds, the owner's (and an acting member's) tools rather than the first thing
+   under the question: one "Add a record" fold after the list, one "End" fold on each open record. Phone-first: each control
+   is full width with a 44px tap target; from 600px the forms sit in a row at the page's control size. */
+.task-records-tools { border-top: 1px solid var(--line); padding-top: var(--space-1); }
+.task-record-tools { margin-top: var(--space-1); }
+.task-records-tools > summary,
+.task-record-tools > summary {
+  display: flex;
+  align-items: center;
+  gap: var(--space-1);
+  min-height: 44px;
+  cursor: pointer;
+  list-style: none;
+  font-size: var(--font-size-sm);
+  color: var(--brand-dim);
+}
+.task-records-tools > summary::-webkit-details-marker,
+.task-record-tools > summary::-webkit-details-marker { display: none; }
+.task-records-tools > summary::before,
+.task-record-tools > summary::before { content: "▸"; color: var(--muted); }
+.task-records-tools[open] > summary::before,
+.task-record-tools[open] > summary::before { content: "▾"; }
+.task-records-tools > summary:focus-visible,
+.task-record-tools > summary:focus-visible { outline: 2px solid var(--brand); outline-offset: 2px; }
+.task-record-form { display: grid; gap: var(--space-2); margin: var(--space-1) 0 var(--space-2); }
+.task-record-form label { display: grid; gap: 2px; font-size: var(--font-size-sm); color: var(--muted); min-width: 0; }
 /* Form controls take the type scale, not the browser's default control size (LIN-4107: the token sizes only). */
 .task-record-form input, .task-record-form select, .task-record-form button { font: inherit; }
+.task-record-form input,
+.task-record-form select {
+  box-sizing: border-box;
+  width: 100%;
+  min-width: 0;
+  min-height: 44px;
+  padding: var(--space-1) var(--space-2);
+  color: var(--text);
+  background: var(--bg);
+  border: 1px solid var(--line);
+  border-radius: var(--radius-md);
+}
+.task-record-form .btn { min-height: 44px; justify-self: start; }
+@media (min-width: 600px) {
+  .task-records-tools > summary,
+  .task-record-tools > summary { min-height: 32px; }
+  .task-record-form { display: flex; flex-wrap: wrap; align-items: flex-end; }
+  .task-record-form input,
+  .task-record-form select { width: auto; min-height: 32px; }
+  /* A take-over choice names a record by its words, which can be long: the select stays a control, not a row. */
+  .task-record-form select { max-width: 20rem; }
+  .task-record-form .btn { min-height: 32px; }
+}
 .task-records-refused { color: var(--amber); }
 .task-records-none { color: var(--muted); }
 

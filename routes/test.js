@@ -104,7 +104,7 @@ const uuidForUrlKey = (key) => {
  * @param {Object|null} [options.taskModeStore] - Task-mode event store (LIN-2942), for /test/clear-task-mode-events
  * @returns {Router} Express router
  */
-export function createTestRoutes({ dispatchQueueStore, dispatchTokenStore, freeTierStore, userPreferencesStore, workspacePreferencesStore, modelRoutingStore = null, customPromptsStore, collectiveCharactersStore, collectivePresetsStore, dispatchPresetsStore, proxyTokenStore, proxyEventStore, agentStatusStore, observationSessionsStore, sessionsFeedCache, runSummaryCacheStore, sessionSummaryCacheStore, reportHistoryStore, shipBiscuitHistoryStore, savedChatStore, localStore, recordsStore = null, getWorkspaceAccessToken, accountStore, accountWorkspaceStore, ownerCredentialStore, connectionStore, clearWorkspaceIssuesMemo, resetKeyState = null, observerStateStore, dispatchHistoryCollection, proxyEventsCollection, resetKpiCache, workspaceHaltStore, emailTransport = null, commentDedupe = null, taskModeStore = null, taskShareCollection = null, kpiDailyRollupCollection = null, clearWorkspaceKpis = () => {} }) {
+export function createTestRoutes({ dispatchQueueStore, dispatchTokenStore, freeTierStore, userPreferencesStore, workspacePreferencesStore, modelRoutingStore = null, customPromptsStore, collectiveCharactersStore, collectivePresetsStore, dispatchPresetsStore, proxyTokenStore, proxyEventStore, agentStatusStore, observationSessionsStore, sessionsFeedCache, runSummaryCacheStore, sessionSummaryCacheStore, reportHistoryStore, shipBiscuitHistoryStore, savedChatStore, localStore, recordsStore = null, getWorkspaceAccessToken, accountStore, accountWorkspaceStore, ownerCredentialStore, connectionStore, clearWorkspaceIssuesMemo, resetKeyState = null, observerStateStore, dispatchHistoryCollection, proxyEventsCollection, resetKpiCache, workspaceHaltStore, emailTransport = null, commentDedupe = null, taskModeStore = null, taskShareCollection = null, kpiDailyRollupCollection = null, clearWorkspaceKpis = () => {}, workspaceStore = null }) {
   const router = Router();
 
   // ── Connection-backed fixture variants (LIN-3124 PR3 checkpoint F, T27) ────
@@ -714,6 +714,95 @@ export function createTestRoutes({ dispatchQueueStore, dispatchTokenStore, freeT
       ids.push(out.record.id);
     }
     res.json({ findings: ids });
+  });
+
+  // LIN-4554: a task's Records trail shaped like a real one, for walking the task page: findings, questions ended every way (a
+  // person's dismissal in the LIN-4550 form and, as rows from before it were stored, `withdrawn` "dismissed" by a person; an agent's
+  // own withdrawal; one handed on; one answered with its decision), lessons, a stale decision, a plan, child tasks, and writers
+  // of every sort (stages, Harbour, the signed-in person, a named member, an id the workspace cannot name). Written through the
+  // checked pipeline, as a stage or a person writes them (the old dismissal form is a person's `withdrawn` "dismissed", which the
+  // pipeline still takes; the task page's form no longer offers it). The signed-in account is given a name on the workspace's tracker identity, and a named
+  // member is added, as a real tracker's people carry names (lib/workspace-people.js). Answers the record ids by role.
+  router.post('/test/seed-task-page-records', express.json(), async (req, res) => {
+    if (!recordsStore) return res.status(503).send('no records store wired into test routes');
+    const { urlKey, ticket, ownerName = 'Sam Owner', memberName = 'Mia Member' } = req.body || {};
+    const accountId = req.session?.accountId;
+    if (typeof urlKey !== 'string' || typeof ticket !== 'string') return res.status(400).send('urlKey and ticket are required');
+    if (!accountId) return res.status(400).send('no signed-in account');
+    const ws = getWorkspaceByUrlKey(req.session, urlKey);
+    if (!ws) return res.status(400).send('workspace not in session');
+    const provider = ws.provider || 'local';
+    // The workspace registry entry the people reader looks the workspace up by (lib/workspace-people.js): a local session
+    // workspace lives in the session only, so without it nobody here could be named.
+    if (workspaceStore) await workspaceStore.registerWorkspace({ id: ws.id, urlKey, provider });
+    // The signed-in person's name, on their identity for this workspace's tracker.
+    const account = await accountStore.getAccount(accountId);
+    const identities = (account?.identities || []).map((i) => (i.provider === provider ? { ...i, name: ownerName } : i));
+    if (!identities.some((i) => i.provider === provider)) identities.push({ provider, scope: `seed-${accountId}`, name: ownerName });
+    await accountStore.collection.updateOne({ _id: accountId }, { $set: { identities } });
+    // A named member of the workspace.
+    const memberId = `seed-member-${ws.id}`;
+    const now = new Date();
+    if (!(await accountStore.getAccount(memberId))) {
+      await accountStore.collection.insertOne({ _id: memberId, identities: [{ provider, scope: `seed-${memberId}`, name: memberName }], createdAt: now, updatedAt: now });
+    }
+    if (!(await accountWorkspaceStore.collection.findOne({ accountId: memberId, workspaceId: ws.id }))) {
+      await accountWorkspaceStore.collection.insertOne({ _id: crypto.randomUUID(), accountId: memberId, workspaceId: ws.id, createdAt: now, role: null });
+    }
+    const me = `person:${accountId}`;
+    const member = `person:${memberId}`;
+    const ghost = 'person:acc-departed-0001';
+    const ago = (h) => new Date(now.getTime() - h * 3600_000).toISOString();
+    // Every write goes through the checked pipeline (lib/records/writes.js), as a stage or a person writes it. Adds carry their
+    // own `at`; ends are written now.
+    const listPeople = async () => [{ accountId, name: ownerName }, { accountId: memberId, name: memberName }];
+    const writes = createRecordWrites({ recordsStore, isTerminalState, listPeople, stageKinds: Object.keys(STAGE_KINDS) });
+    const { id: taskId } = await recordsStore.ensureTask(urlKey, { identifier: ticket, title: ticket, closed: false }, { by: 'harbour', at: ago(72) });
+    const failed = (out, what) => { if (out.problems) throw Object.assign(new Error(`${what}: ${out.problems.map((x) => x.message).join('; ')}`), { status: 422 }); return out; };
+    const add = async (kind, input, { by = 'review', at = ago(48) } = {}) => failed(await writes.add({ urlKey, kind, input: { in: taskId, ...input }, by, run: null, at }), `add ${kind}`).record;
+    const end = async (id, state, reason, by, into = null) => failed(await writes.end({ urlKey, id, input: { state, reason, ...(into ? { into } : {}) }, by, run: null }), `end ${id} ${state}`);
+    const ids = {};
+    try {
+      // Findings: open ones by stages and Harbour, one by the member, one by someone the workspace cannot name; some ended.
+      for (const [n, says] of findingNotes(14).entries()) {
+        const r = await add('finding', { says, to: n % 4 === 0 ? me : 'project' }, { by: ['review', 'implementation', 'harbour', BLIND_READ_KIND][n % 4], at: ago(40 - n * 2) });
+        if (n === 0) ids.finding = r.id;
+        if (n === 5) await end(r.id, 'done', 'fixed in the follow-up', 'implementation');
+        if (n === 6) await end(r.id, 'declined', 'not this task', me);
+      }
+      ids.memberFinding = (await add('finding', { says: 'The footer copy needs a second look before launch.', to: me }, { by: member, at: ago(6) })).id;
+      ids.ghostFinding = (await add('finding', { says: 'Left by someone who has since left the workspace.', to: 'project' }, { by: ghost, at: ago(30) })).id;
+      // Questions ended every way: a person's dismissal (the LIN-4550 end, and the `withdrawn` "dismissed" form rows from before
+      // it carry), an agent's own withdrawal, an answer with its decision, one handed on; one to the project left open.
+      const qNew = await add('question', { asks: 'Should the old footer links stay for a release?', options: ['Keep them', 'Drop them'], to: me }, { by: 'review', at: ago(20) });
+      await end(qNew.id, 'dismissed', 'dismissed', me);
+      ids.dismissed = qNew.id;
+      const qOld = await add('question', { asks: 'Is the footer one component or one per page?', options: ['One', 'Per page'], to: me }, { by: 'plan', at: ago(60) });
+      await end(qOld.id, 'withdrawn', 'dismissed', me);
+      ids.dismissedOld = qOld.id;
+      const qAgent = await add('question', { asks: 'Which branch carries the footer work?', options: ['main', 'a feature branch'], to: me }, { by: 'implementation', at: ago(15) });
+      await end(qAgent.id, 'withdrawn', 'found it in the plan', 'implementation');
+      ids.withdrawn = qAgent.id;
+      const qAnswered = await add('question', { asks: 'Ship the footer behind a flag?', options: ['Yes', 'No'], to: me }, { by: 'review', at: ago(26) });
+      await add('decision', { answer: 'Yes', words: 'Behind a flag for one release.', answers: qAnswered.id }, { by: me, at: ago(25) });
+      await end(qAnswered.id, 'answered', 'answered on the card', me);
+      ids.projectQuestion = (await add('question', { asks: 'Who owns the footer after launch?', to: 'project' }, { by: 'implementation', at: ago(8) })).id;
+      const qHanded = await add('question', { asks: 'Does design sign off the footer?', to: member }, { by: 'review', at: ago(12) });
+      await end(qHanded.id, 'handed-on', 'moved to the design task', me, ids.finding);
+      // Lessons and a decision resting on one later disproved; a plan; child tasks, one ended with a finding addressed to it.
+      await add('lesson', { says: 'Footers are shared across pages, so change them in one place.' }, { by: 'retro', at: ago(50) });
+      const l2 = await add('lesson', { says: 'The footer renders before the fonts load.' }, { by: 'review', at: ago(45) });
+      await add('decision', { answer: 'One footer component for every page.', why: 'one place to change', on: [`${l2.id}@1`] }, { by: me, at: ago(44) });
+      await end(l2.id, 'disproved', 'it renders after', 'review');
+      await add('plan', { says: '# Plan\nOne footer component, then move each page onto it.', to: 'implementation' }, { by: 'plan', at: ago(70) });
+      await add('task', { 'done-when': 'every page uses the one footer' }, { by: me, at: ago(40) });
+      const childB = await add('task', { 'done-when': 'the old footer CSS is gone' }, { by: me, at: ago(39) });
+      await end(childB.id, 'done', 'done', me);
+      await add('finding', { says: 'Check nothing still loads the old footer CSS.', to: childB.id }, { by: 'review', at: ago(2) });
+    } catch (err) {
+      return res.status(err.status || 500).send(err.message);
+    }
+    res.json({ ids, memberId });
   });
 
   // LIN-4541: append feedback rows to a taken item's history document exactly as they were stored, for a spec that renders an

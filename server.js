@@ -1297,7 +1297,7 @@ if (process.env.NODE_ENV === 'test') {
   // additive, test-only seam so a spec can inject a rejecting aggregate() on
   // the exact two collections /kpis' loaders read, without touching /kpis'
   // own route logic. See routes/test.js's kpis-fail-next-aggregate handler.
-  app.use(createTestRoutes({ dispatchQueueStore, dispatchTokenStore, freeTierStore, userPreferencesStore, workspacePreferencesStore, modelRoutingStore, customPromptsStore, collectiveCharactersStore, collectivePresetsStore, dispatchPresetsStore, proxyTokenStore, proxyEventStore, agentStatusStore, observationSessionsStore, sessionsFeedCache, runSummaryCacheStore, sessionSummaryCacheStore, reportHistoryStore, shipBiscuitHistoryStore, savedChatStore, localStore, recordsStore, getWorkspaceAccessToken, accountStore, accountWorkspaceStore, ownerCredentialStore, connectionStore, clearWorkspaceIssuesMemo, resetKeyState: (ctx) => keyState.resetKey(ctx), observerStateStore, dispatchHistoryCollection, proxyEventsCollection, resetKpiCache: (mode) => kpiPage.reset(mode), workspaceHaltStore, emailTransport: emailTransport?.kind === 'capture' ? emailTransport : null, commentDedupe, taskModeStore, taskShareCollection: db.collection('task_share_links'), kpiDailyRollupCollection, clearWorkspaceKpis: (urlKey) => workspaceKpisCache.clear({ urlKey }) }))
+  app.use(createTestRoutes({ dispatchQueueStore, dispatchTokenStore, freeTierStore, userPreferencesStore, workspacePreferencesStore, modelRoutingStore, customPromptsStore, collectiveCharactersStore, collectivePresetsStore, dispatchPresetsStore, proxyTokenStore, proxyEventStore, agentStatusStore, observationSessionsStore, sessionsFeedCache, runSummaryCacheStore, sessionSummaryCacheStore, reportHistoryStore, shipBiscuitHistoryStore, savedChatStore, localStore, recordsStore, getWorkspaceAccessToken, accountStore, accountWorkspaceStore, ownerCredentialStore, connectionStore, clearWorkspaceIssuesMemo, resetKeyState: (ctx) => keyState.resetKey(ctx), observerStateStore, dispatchHistoryCollection, proxyEventsCollection, resetKpiCache: (mode) => kpiPage.reset(mode), workspaceHaltStore, emailTransport: emailTransport?.kind === 'capture' ? emailTransport : null, commentDedupe, taskModeStore, taskShareCollection: db.collection('task_share_links'), kpiDailyRollupCollection, clearWorkspaceKpis: (urlKey) => workspaceKpisCache.clear({ urlKey }), workspaceStore }))
 }
 
 // =============================================================================
@@ -3431,6 +3431,8 @@ app.use(createTaskPageRoutes({
   recordsStore,
   // LIN-4532 (P2b): the open question records the owner is asked on this task (the question section), read with the dispatch rows.
   dispatchStore: dispatchQueueStore,
+  // LIN-4554: the workspace's people, so a Records line names a person rather than printing their id.
+  listPeople: (urlKey) => listWorkspacePeople(urlKey),
 }))
 
 // LIN-4494 (piece 3): a signed-in person's record writes from the task page, and the project page (its backlog and

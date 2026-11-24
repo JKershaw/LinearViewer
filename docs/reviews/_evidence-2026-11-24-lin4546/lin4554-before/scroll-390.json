@@ -1,0 +1,52 @@
+[
+  {
+    "shot": "task-owner-closed-light-390",
+    "scrollWidth": 390,
+    "clientWidth": 390
+  },
+  {
+    "shot": "task-owner-closed-dark-390",
+    "scrollWidth": 390,
+    "clientWidth": 390
+  },
+  {
+    "shot": "task-owner-open-light-390",
+    "scrollWidth": 390,
+    "clientWidth": 390
+  },
+  {
+    "shot": "task-owner-open-dark-390",
+    "scrollWidth": 390,
+    "clientWidth": 390
+  },
+  {
+    "shot": "task-reader-closed-light-390",
+    "scrollWidth": 390,
+    "clientWidth": 390
+  },
+  {
+    "shot": "task-reader-closed-dark-390",
+    "scrollWidth": 390,
+    "clientWidth": 390
+  },
+  {
+    "shot": "task-member-closed-light-390",
+    "scrollWidth": 390,
+    "clientWidth": 390
+  },
+  {
+    "shot": "task-member-closed-dark-390",
+    "scrollWidth": 390,
+    "clientWidth": 390
+  },
+  {
+    "shot": "task-member-open-light-390",
+    "scrollWidth": 390,
+    "clientWidth": 390
+  },
+  {
+    "shot": "task-member-open-dark-390",
+    "scrollWidth": 390,
+    "clientWidth": 390
+  }
+]
