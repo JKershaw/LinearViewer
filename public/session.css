@@ -52,109 +52,6 @@
   border-bottom: 1px solid var(--line);
 }
 
-/* ── Pinned question card (LIN-3252 S2) ─────────────────────────────────────
-   The run page's ONE answer surface, replacing the LIN-1005 waiting banner and
-   the decision half of the per-run reply box. Amber running-family accent (no
-   new status colour); pinned above the steps, whether or not the session is
-   waiting. The dismiss control sits in `.sess-qcard-actions` (`.sess-qcard-dismiss`). */
-.sess-qcards {
-  margin: 0 0 1.25rem;
-  display: grid;
-  gap: var(--space-2h);
-}
-.sess-qcard {
-  padding: 0.85rem 1rem;
-  border: 1px solid var(--amber);
-  border-left-width: 4px;
-  border-radius: 4px;
-  background: color-mix(in srgb, var(--amber) 10%, var(--card));
-  display: grid;
-  gap: 0.6rem;
-}
-.sess-qcard-question {
-  margin: 0;
-  font-family: var(--font-content);
-  font-weight: 600;
-  font-size: var(--font-size-base);
-  color: var(--text);
-  /* LIN-4538: a question record carries its whole ask here (no case prose below it), so an unbroken token (a URL) must
-     wrap inside the card, as the case chunks do (LIN-2184). */
-  overflow-wrap: anywhere;
-}
-.sess-qcard-why-summary {
-  cursor: pointer;
-  font-family: var(--font-content);
-  font-size: var(--font-size-sm);
-  color: var(--muted);
-}
-.sess-qcard-case {
-  margin-top: 0.4rem;
-  display: grid;
-  gap: 0.4rem;
-}
-.sess-qcard-case-chunk {
-  margin: 0;
-  font-family: var(--font-content);
-  font-size: var(--font-size-base);
-  line-height: 1.5;
-  color: var(--text);
-  white-space: pre-wrap;
-  overflow-wrap: anywhere;
-}
-.sess-qcard-options {
-  list-style: none;
-  margin: 0;
-  padding: 0;
-  display: flex;
-  flex-wrap: wrap;
-  gap: 0.4rem;
-}
-/* LIN-4114: the options are the shared .btn buttons (lib/question-card.js); the radio rules are gone. */
-.sess-qcard-option { min-height: 32px; }
-.sess-qcard-input {
-  width: 100%;
-  box-sizing: border-box;
-  font-family: var(--font-content);
-  font-size: var(--font-size-base);
-  padding: 0.4rem 0.5rem;
-  color: var(--text);
-  background: var(--card);
-  border: 1px solid var(--line-soft);
-  border-radius: var(--radius-sm);
-  resize: vertical;
-}
-.sess-qcard-actions {
-  display: flex;
-  align-items: center;
-  gap: var(--space-2);
-}
-/* A quiet text button — the card's deliberate "no" is secondary to Answer. */
-.sess-qcard-dismiss {
-  background: none;
-  border: none;
-  padding: 0.15rem 0.25rem;
-  font-family: var(--font-content);
-  font-size: var(--font-size-sm);
-  color: var(--muted);
-  text-decoration: underline;
-  text-underline-offset: 2px;
-  cursor: pointer;
-}
-.sess-qcard-dismiss:hover:not(:disabled) { color: var(--text); }
-.sess-qcard-dismiss:disabled { opacity: 0.5; cursor: default; }
-.sess-qcard-readonly {
-  margin: 0;
-  font-family: var(--font-content);
-  font-size: var(--font-size-base);
-  color: var(--muted);
-}
-.sess-qcard-if-unanswered {
-  margin: 0;
-  font-family: var(--font-content);
-  font-size: var(--font-size-sm);
-  color: var(--muted);
-}
-
 /* ── Overview ─────────────────────────────────────────────────────────────── */
 /* A quiet "spec sheet" panel (LIN-1225): the flat key/value list gains a subtle
    inset container with hairline-separated rows so the run summary reads as a
@@ -577,8 +474,6 @@
 @media (max-width: 480px) {
   .sess-page { padding: 0 0.75rem 2.5rem; }
   .sess-kv { grid-template-columns: 6.5rem 1fr; gap: var(--space-2); }
-  .sess-qcard { padding: 0.75rem 0.85rem; }
-  .sess-qcard-case-chunk { line-height: 1.5; }
   .sess-inline-reply-input { min-height: 4rem; }
   .sess-run-tx { --chat-thread-max-height: 280px; }
 }
@@ -625,8 +520,8 @@
    themed colour from the AA-safe `-dim` text companions (the raw hues are for
    fills/dots only; see style.css), painted on the opaque `--card` surface so
    the ratio holds against the amber-tinted card fill too. Light is not
-   regressed: the same `-dim` text clears AA there as well. */
-.sess-qcard-answer,
+   regressed: the same `-dim` text clears AA there as well. The card verb's half
+   (`.sess-qcard-answer`) moved to style.css with the card (LIN-4549). */
 .sess-proposal-apply {
   color: var(--green-dim);
   background: var(--card);
