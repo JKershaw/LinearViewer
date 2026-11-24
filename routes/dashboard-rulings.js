@@ -1,7 +1,7 @@
 /**
  * The rulings feed (LIN-3742 split of routes/dashboard.js):
  *
- *   GET  /workspace/:urlKey/api/dashboard/rulings — the signed-in person's open questions (ambient count + Rulings tab)
+ *   GET  /workspace/:urlKey/api/dashboard/rulings — the signed-in person's open questions (ambient count, the Questions tab, the Runs tab's waiting line)
  *
  * LIN-4541 (LIN-4529 P7b-2): a ruling is a question record and its answer a decision record. The feed lists the open
  * question records addressed to the signed-in person (LIN-4532), answered and dismissed through the questions route
@@ -47,7 +47,7 @@ async function openQuestionRowsFor({ accountId, workspaces, recordsStore, dispat
         kind: 'question',
         questionId: q.questionId,
         // The card reads `asks` (lib/question-record-card.js, the openQuestionsFor row's own name); `question` stays for the
-        // feed's other readers. Without `asks` the Rulings page drew the card with no question (LIN-4541).
+        // feed's other readers. Without `asks` the Questions page drew the card with no question (LIN-4541).
         asks: q.asks,
         question: q.asks,
         // LIN-4550: the one-line question the card leads with (the reader's own: written, or derived for an older ask).
@@ -107,7 +107,7 @@ function rulingsFeed({ sessionsFeedCache, mergeLoops, recordsStore, dispatchQueu
       const openLoopIds = await openLoopIdsFor({ accountId, workspaces, merged, recordsStore }).catch(() => []);
 
       // LIN-4103 beat 3: the badge on a workspace page counts that workspace's rulings (the URL's workspace, by each row's
-      // anchor). `count` stays the all-workspaces count the Rulings tab reads; the badge reads `workspaceCount`.
+      // anchor). `count` stays the all-workspaces count the Questions tab and the waiting line read; the badge reads `workspaceCount`.
       const pageUrlKey = req.params?.urlKey || null;
       const workspaceCount = rulings.filter((r) => r.anchor?.workspaceUrlKey === pageUrlKey).length;
       keepalive.send(200, {
