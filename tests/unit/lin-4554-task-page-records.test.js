@@ -82,7 +82,10 @@ function session(req, _res, next) {
 }
 
 const MODEL = { identifier: TICKET, title: 'Footer', issueId: null, tracker: null, status: 'open', sentence: 'x', live: false, sessions: [], stages: [], evidence: null, details: null };
-const loader = { async loadTaskPage() { return { model: { ...MODEL }, taskState: null }; } };
+const loader = {
+  async loadTaskPage() { return { model: { ...MODEL }, taskState: null }; },
+  async loadTaskState() { return { model: { ...MODEL }, taskState: { state: 'needs-you', unsettled: false }, incomplete: null, runWords: null }; },
+};
 
 /** The task page and the record routes, as server.js wires them, for `viewer` ('owner' or 'member'). */
 async function serve(viewer = 'owner') {
@@ -169,6 +172,20 @@ describe('(a) an open question shows once on the task page', () => {
     assert.equal(cards.length, 1, 'the question is drawn once, as its card');
     assert.equal(recordLine(recordsSection(html), q.id), null, 'Records leaves out the open question the page already draws as a card');
     assert.equal((pageText(html).match(/Should the footer keep the old links\?/g) || []).length, 1, 'its words appear once on the page');
+
+    // The card carries the task line, quiet: the identifier and the title, not a link (the page is the task).
+    const card = html.slice(html.indexOf(`data-question-id="${q.id}"`));
+    const taskLine = card.match(/<p class="sess-qcard-task" data-testid="question-record-card-task">([\s\S]*?)<\/p>/);
+    assert.ok(taskLine, 'the card on the task page carries its task line');
+    assert.match(taskLine[1], new RegExp(`data-testid="question-record-card-task-id">${TICKET}<`), 'with the task\'s identifier');
+    assert.match(taskLine[1], /data-testid="question-record-card-task-title">Footer</, 'and its title');
+    assert.doesNotMatch(taskLine[1], /<a\b/, 'quiet: not a link on the page that is the task');
+
+    // The state poll repaints the question section from the same rows, so it draws the same card, and it carries no Records
+    // markup that could bring the question back into the list.
+    const poll = await (await fetch(`${base}/workspace/${URL_KEY}/api/task/${TICKET}/state`)).json();
+    assert.match(poll.questionHtml || '', new RegExp(`data-question-id="${q.id}"`), 'the poll draws the same card the page drew');
+    assert.doesNotMatch(JSON.stringify(poll), /task-records|data-record-id/, 'and never repaints Records');
   });
 
   test('a member gets no card, so Records still lists it: once either way', async () => {

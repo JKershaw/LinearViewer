@@ -1,6 +1,6 @@
 /**
  * LIN-3499 — the task page shows the question and its answer box wherever it
- * says "waiting on you" (LIN-4103 beat 3: the product's word, as Home and Observation).
+ * says "needs you" (LIN-4103 beat 3; LIN-4159: the word Home uses).
  *
  * Pinned here:
  *   - the card is present exactly when the owner is being asked: the pill says
