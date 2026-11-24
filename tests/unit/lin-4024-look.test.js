@@ -104,6 +104,7 @@ describe('the Sessions fold on Home reads as sessions (public/sessions.js)', () 
       window: {
         escapeHtml: (x) => String(x == null ? '' : x).replace(/[&<>"']/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' })[c]),
         relativeTime: () => '3m ago',
+        taskPageHref: () => '/workspace/acme/task/LIN-42',
         runPageHref: (urlKey, sessionId) => (urlKey && sessionId ? `/workspace/${urlKey}/observation/session/${sessionId}` : ''),
         api: async () => ({ sessions }),
       },

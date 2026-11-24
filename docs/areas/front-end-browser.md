@@ -29,8 +29,8 @@ Area notes for `front-end-browser` in the registry. Format and rules: README.md.
   subdirectory.
 - The bridge is at zero (LIN-4463 piece 5): no module writes a global for classic scripts. A module may write one only
   as a declared e2e hook (`window.refreshWaitingOnYou`), which no classic script reads; `tests/unit/bridge-inventory.test.js`
-  fails on any other write, in a renderer-listed module or in one it imports (the check follows the static imports). When a classic script still reads a function a converting file declares, move the function to
-  `public/common.js` (as `updateQueueBadge` moved) or convert the reader first; never bridge it back.
+  fails on any other write, imported modules included. When a classic script still reads a function a converting file
+  declares, move the function to `public/common.js` (as `updateQueueBadge` moved) or convert the reader first; never bridge it back.
 - A module's place in a renderer's script list means nothing: it runs after every classic script, so on a page where a
   classic page script follows it, that script now runs first and its DOMContentLoaded listener registers first. Check each
   such page reads nothing the module sets up, and witness it in a browser (`tests/e2e/lin-4463-app-module-pages.spec.js`).
