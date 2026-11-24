@@ -16,13 +16,14 @@
  *   - every off-switch, and a resolved blocker that is not one; a run that ended `done` with an
  *     open `DECISION:` does not hold the route (verdict note 1: the engineering choice);
  *   - opposite Survey verdicts give the same route (advice, not a gate);
- *   - a pending record plus an answered ruling: the facts line and scoping's `when`;
+ *   - an answered question with no size decision yet: the facts line and scoping's `when` (LIN-4542);
+ *   - a "## Size of the move" section in a description is ordinary text: nothing reads it (LIN-4542);
  *   - the LIN-4348 shape gets scoping once nothing holds it;
  *   - parity across both seams, recommend-and-dispatch dispatching the code-routed step with no
  *     model call, the Survey reading by kind in GET /issues/{id}/cost, and the trace naming the
  *     route;
  *   - the LIN-4369 handoff: a scoping run's final message with builder notes never reaches the
- *     prompt of the stage after it, while the size record does;
+ *     prompt of the stage after it, while its size decision does (LIN-4542: a decision record);
  *   - waiting on a live run (close-out ledger item 2, since LIN-4392 the general live-stage
  *     wait in lib/run-live-wait.js): while a look-first step is queued or running,
  *     nothing else is sent, scoping included, and the ticket is not handed to the selector;
@@ -64,7 +65,10 @@ afterEach(() => { setFetchImpl(null); setPromptTraceRecorder(null); });
 
 const OPEN = { name: 'Todo', type: 'unstarted' };
 const ASKED = sealedDescription('Make the export button download a CSV.');
+// LIN-4542: the retired size section, now ordinary text that nothing reads, and the size as it is recorded now: a standing
+// decision by scoping on the task (prepareRecommendationInput's sizeDecisions).
 const RECORD = (decidedBy = 'the standing policy') => `\n\n## Size of the move\n\n**Size:** just the task\n**Why:** the export only needs the download, and nothing nearby binds on it.\n**Cuts:** none\n**Decided by:** ${decidedBy}`;
+const SIZED = [{ id: 'decision-s1', answer: 'just the task', why: 'the export only needs the download, and nothing nearby binds on it.', at: '2026-11-08T11:30:00.000Z' }];
 const leaf = (over = {}) => ({ identifier: 'T-1', title: 'Export CSV', description: ASKED, state: OPEN, labels: [], ...over });
 
 const T = (hm) => `2026-11-08T${hm}:00.000Z`;
@@ -85,7 +89,7 @@ const NO_PLAN = planFactsOf({ task: { id: 'task-t1', kind: 'task', state: 'open'
 const A_PLAN = planFactsOf({ task: { id: 'task-t1', kind: 'task', state: 'open' }, inside: [{ id: 'plan-t1', v: 1, kind: 'plan', state: 'kept', in: 'task-t1', to: 'implementation', at: T('09:00') }] });
 const A_PIECE = planFactsOf({ task: { id: 'task-t1', kind: 'task', state: 'open', links: { piece: 'plan-t0' } }, piece: { id: 'plan-t0', v: 1, kind: 'plan', state: 'kept', in: 'task-t0', to: 'implementation', at: T('09:00') } });
 // The loop's facts are records (LIN-4518 finding-527b8237): no plan-review verdict on record here, so the run is empty.
-const ctx = (comments = [], allRuns = [], over = {}) => ({ parent: null, siblings: [], project: null, children: [], comments, personFindings: findingsOf(comments), planReviewLoop: loopFactsFor([], findingsOf(comments)), focusedChild: null, attachments: [], runs: [], allRuns, asked: WORDS, planFacts: NO_PLAN, ...over });
+const ctx = (comments = [], allRuns = [], over = {}) => ({ parent: null, siblings: [], project: null, children: [], comments, personFindings: findingsOf(comments), planReviewLoop: loopFactsFor([], findingsOf(comments)), focusedChild: null, attachments: [], runs: [], allRuns, asked: WORDS, planFacts: NO_PLAN, sizeDecisions: [], ...over });
 const stepOf = (issue, context) => lookFirstStep(issue, context)?.step ?? null;
 
 describe('step choice: survey-task, then survey-place, then scoping, each once', () => {
@@ -225,15 +229,17 @@ describe('when the route is off', () => {
     assert.equal(lookFirstOff(issue, context), reason);
   };
 
-  test('a plan, a PR, a size record, children, no asked words on its task, completed or canceled, an open blocker, a waiting run, unknown runs', () => {
+  test('a plan, a PR, a size decision, children, no asked words on its task, completed or canceled, an open blocker, a waiting run, unknown runs', () => {
     asOff(leaf(), ctx([], [], { planFacts: A_PLAN }), 'has a plan');
     asOff(leaf(), ctx([], [], { planFacts: A_PIECE }), 'has a plan');
     asOff(leaf(), ctx([], [], { planFacts: planFactsNotMeasured('no records store') }), 'plan facts not measured');
     asOff(leaf(), ctx([], [], { planFacts: undefined }), 'plan facts not measured');
     // LIN-4497: the gate reads the implementation run's own PR, not a comment's URL (see the LIN-4497 block).
     asOff(leaf(), ctx([], stageRuns([{ id: 'im0', kind: 'implementation', status: 'taken', dispatchedAt: T('10:00'), feedback: [{ message: '[done] Built.', url: 'https://github.com/o/r/pull/7', timestamp: T('10:20') }] }])), 'has its own PR');
-    asOff(leaf({ description: ASKED + RECORD() }), ctx(), 'size recorded');
-    asOff(leaf({ description: ASKED + RECORD('pending a ruling') }), ctx(), 'size recorded');
+    // LIN-4542: the size is a standing decision by scoping on the task; decisions not read turn the route off, as plan facts do.
+    asOff(leaf(), ctx([], [], { sizeDecisions: SIZED }), 'size decided');
+    asOff(leaf(), ctx([], [], { sizeDecisions: null }), 'size decisions not measured');
+    asOff(leaf(), ctx([], [], { sizeDecisions: undefined }), 'size decisions not measured');
     asOff(leaf(), ctx([], [], { children: [{ identifier: 'T-2', state: OPEN }] }), 'not a leaf');
     // LIN-4501: a task with no `asked` is off, whatever the description holds (a sealed block included).
     asOff(leaf(), ctx([], [], { asked: null }), 'no asked words on its task');
@@ -271,15 +277,32 @@ describe('when the route is off', () => {
   });
 });
 
-describe('a pending record plus an answered ruling, and the in-flight shapes', () => {
-  test('the facts line reads "pending a ruling" and scoping\'s `when` covers the answered ruling', () => {
-    const issue = leaf({ description: ASKED + RECORD('pending a ruling') });
-    const comments = [surveyTask('10:00'), surveyPlace('10:30'), person('12:00', 'Err larger on this one.\n\n— Ruling recorded via Harbour')];
-    const prompt = buildRouterPrompt(buildSelectorArgs(issue, ctx(comments)));
-    assert.match(prompt, /- Size of the move: pending a ruling\n/);
-    assert.match(PROMPT_TEMPLATES.scoping.route.when, /has answered the size ruling and the size of the move still reads pending a ruling/);
-    assert.match(prompt, /- `scoping`: [^\n]*\n  When: [^\n]*has answered the size ruling and the size of the move still reads pending a ruling/);
-    assert.equal(lookFirstStep(issue, ctx(comments)), null, 'the route stands aside: a record exists, so rule 1 and scoping\'s `when` carry it');
+describe('an answered question with no size decision yet, and the in-flight shapes', () => {
+  // LIN-4542 (was: a "pending a ruling" size section plus an answered ruling). Scoping asked about a cut and wrote no
+  // decision; the person answered. The facts line reads "not decided", and scoping's `when` covers it (the answer resumes
+  // the scoping run that asked; when that run was stopped, the selector can still send scoping).
+  test('the facts line reads "not decided" and scoping\'s `when` covers the answered question', () => {
+    const comments = [surveyTask('10:00'), surveyPlace('10:30')];
+    const runs = [run('survey-task', '09:40', 'done', '10:00'), run('survey-place', '10:20', 'done', '10:30'), run('scoping', '11:00', 'done', '11:20')];
+    const answered = { answeredQuestions: [{ questionId: 'question-q1', at: T('12:00') }] };
+    const prompt = buildRouterPrompt(buildSelectorArgs(leaf(), ctx(comments, runs, answered)));
+    assert.match(prompt, /- Size of the move: not decided\n/);
+    assert.match(PROMPT_TEMPLATES.scoping.route.when, /a person has answered scoping's question on the size and the size of the move still reads not decided/);
+    assert.match(prompt, /- `scoping`: [^\n]*\n  When: [^\n]*has answered scoping's question on the size and the size of the move still reads not decided/);
+    assert.equal(lookFirstStep(leaf(), ctx(comments, runs, answered)), null, 'scoping was attempted, so the route stands aside and scoping\'s `when` carries it');
+  });
+
+  test('a decision the records could not read is "not measured", never "not decided"', () => {
+    const prompt = buildRouterPrompt(buildSelectorArgs(leaf(), ctx([], [], { sizeDecisions: null })));
+    assert.match(prompt, /- Size of the move: not measured \(the records could not be read\)\n/);
+  });
+
+  // LIN-4542: the guard and the reader are gone, so a size section in a description is no longer special.
+  test('a "## Size of the move" section in a description is ordinary text: it neither turns the route off nor sizes the ticket', () => {
+    const issue = leaf({ description: ASKED + RECORD() });
+    assert.equal(lookFirstOff(issue, ctx()), null);
+    assert.equal(stepOf(issue, ctx()), 'survey-task');
+    assert.match(buildRouterPrompt(buildSelectorArgs(issue, ctx())), /- Size of the move: not decided\n/);
   });
 
   test('the LIN-4348 shape (Survey comments, a headed size comment, no record) is unsized and gets scoping once nothing holds it', () => {
@@ -362,7 +385,7 @@ describe('both seams take the same code route, with no model call', () => {
       calls.push(1);
       return { ok: true, json: async () => ({ choices: [{ message: { content: '## Reasoning\n→ **plan**' }, finish_reason: 'stop' }], usage: { completion_tokens: 3 } }) };
     });
-    const rec = await getRecommendation(leaf({ description: ASKED + RECORD() }), ctx(), { apiKey: 'stub', model: 'x' });
+    const rec = await getRecommendation(leaf(), ctx([], [], { sizeDecisions: SIZED }), { apiKey: 'stub', model: 'x' });
     assert.equal(calls.length, 1);
     assert.equal(rec.codeRoute, undefined);
     assert.equal(rec.recommendedAction, 'plan');
@@ -393,17 +416,18 @@ const runStore = (rows, live = []) => ({
 
 // LIN-4501: the ticket's task holds the person's words, read by prepareRecommendationInput (askedForTicket). Only the
 // words: every other records read fails inside its own guard, so the open findings stay "not read", as before records.
-const askedRecords = (words = WORDS) => ({
+const askedRecords = (words = WORDS, { decisions = [] } = {}) => ({
   askedForTicket: async () => words,
   // LIN-4535: the ticket's task and its person findings (none here: the harness's comments are not ingested).
   taskForTicket: async (_urlKey, ticket) => `task-${ticket}`,
-  find: async () => [],
+  // LIN-4542: the task's standing decisions (the size of the move, when scoping wrote one); no other record here.
+  find: async (_urlKey, { kind, state, inRef } = {}) => (kind === 'decision' && state === 'stands' ? decisions.filter((d) => d.in === inRef) : []),
   askedForTickets: async (_urlKey, tickets) => new Map(tickets.filter(Boolean).map((t) => [t, words])),
   // LIN-4504: the ticket's plan facts, read by the same entrance; no plan record here.
   planFactsForTickets: async (_urlKey, tickets) => new Map(tickets.filter(Boolean).map((t) => [t, NO_PLAN]))
 });
 
-function proxyApp({ rows = [], items = [], live = [] } = {}) {
+function proxyApp({ rows = [], items = [], live = [], decisions = [] } = {}) {
   const app = express();
   app.use(express.json());
   app.use(withDefaults(createProxyRoutes, 0, { requestUsageLoader: NO_REQUEST_RECORDS })({
@@ -421,7 +445,7 @@ function proxyApp({ rows = [], items = [], live = [] } = {}) {
     workspaceFromUrl: (req, res, next) => next(),
     workspacePreferencesStore: { getWorkspacePreferences: async () => ({}) },
     freeTierStore: { tryUse: async () => ({ allowed: true }), checkRun: async () => ({ allowed: true, runsUsed: 0, limit: 10, remaining: 10, resetsAt: null }) },
-    recordsStore: askedRecords()
+    recordsStore: askedRecords(WORDS, { decisions })
   }));
   return app;
 }
@@ -649,12 +673,15 @@ describe('wired: the read surfaces carry the wait too (review fix 1: the proxy G
   });
 });
 
-describe('LIN-4369 handoff: scoping\'s final message never reaches the stage after it; the size record does', () => {
+describe('LIN-4369 handoff: scoping\'s final message never reaches the stage after it; its size decision does (LIN-4542)', () => {
   const NOTES = 'NOTES FOR THE BUILDER: sweep these names in lib/export.js line 42, rename exportCsv to downloadCsv, and pin this test rule';
 
-  test('the routing prompt and the dispatched prompt after scoping carry the record, not the final report', async () => {
-    const description = ASKED + RECORD();
-    setIssue(leaf({ identifier: 'LF-1', description }), [surveyTask('10:20'), surveyPlace('10:50')]);
+  test('the routing prompt and the dispatched prompt after scoping carry the decision, not the final report', async () => {
+    setIssue(leaf({ identifier: 'LF-1' }), [surveyTask('10:20'), surveyPlace('10:50')]);
+    // The scoping run's decision on the task: `by` is the run's stage, filled from the run the write names.
+    const decisions = [{ id: 'decision-s1', v: 1, kind: 'decision', by: 'scoping', state: 'stands', in: 'task-LF-1', at: T('11:25'), fields: { answer: 'just the task', why: 'the export only needs the download, and nothing nearby binds on it.', scope: 'task-LF-1' } },
+      // A person's decision on the same task (an answer to some question) is not the size.
+      { id: 'decision-p1', v: 1, kind: 'decision', by: 'person:john', state: 'stands', in: 'task-LF-1', at: T('11:40'), fields: { answer: 'Yes', words: 'Go ahead.' } }];
     const rows = [
       doneRow('survey-task', '10:00', '10:20'),
       doneRow('survey-place', '10:30', '10:50'),
@@ -666,7 +693,7 @@ describe('LIN-4369 handoff: scoping\'s final message never reaches the stage aft
       return { ok: true, json: async () => ({ choices: [{ message: { content: '## Reasoning\n→ **plan**\n**Why now:** sized.' }, finish_reason: 'stop' }], usage: { completion_tokens: 3 } }) };
     });
     const items = [];
-    const res = await request(proxyApp({ rows, items }), '/api/proxy/recommend-and-dispatch', { method: 'POST', body: { issueIdentifier: 'LF-1' } });
+    const res = await request(proxyApp({ rows, items, decisions }), '/api/proxy/recommend-and-dispatch', { method: 'POST', body: { issueIdentifier: 'LF-1' } });
     assert.equal(res.status, 201, JSON.stringify(res.body));
     assert.equal(seen.length, 1, 'sized: the route stands aside and the selector decides');
     assert.equal(items[0].kind, 'plan');
@@ -674,16 +701,15 @@ describe('LIN-4369 handoff: scoping\'s final message never reaches the stage aft
       assert.ok(!text.includes('NOTES FOR THE BUILDER'), `${where} excludes scoping's final message`);
       assert.ok(!text.includes('exportCsv'), `${where} excludes its code names`);
     }
-    // The next recommendation reads the record: in the ticket it sees and as a fact.
-    assert.ok(seen[0].includes('**Size:** just the task'), 'the routing prompt carries the size record');
-    assert.match(seen[0], /- Size of the move: chosen just the task \(by the standing policy\)\n/);
+    // The next recommendation reads the decision, as a fact computed in code.
+    assert.match(seen[0], /- Size of the move: decided by scoping \(2026-11-08 11:25\): just the task\n/);
     assert.match(seen[0], /- scoping: done, 2026-11-08 11:30/, 'the selector sees that scoping ran, as a fact, not what it said');
     // A stage prompt never copies the description; it points at the records brief, which no model writes and which
     // carries no run's message (LIN-4537 retired the model-written brief that read the ticket and its comments).
     assert.match(items[0].prompt, /Start from your brief: GET [^\n]*\/api\/proxy\/brief\/LF-1/);
   });
 
-  test('a scoping run that wrote no record falls through to the selector once, and its notes stay out too', async () => {
+  test('a scoping run that wrote no decision falls through to the selector once, and its notes stay out too', async () => {
     setIssue(leaf({ identifier: 'LF-1' }), [surveyTask('10:20'), surveyPlace('10:50')]);
     const rows = [doneRow('survey-task', '10:00', '10:20'), doneRow('survey-place', '10:30', '10:50'), doneRow('scoping', '11:00', '11:30', `[done] Every write refused. ${NOTES}`)];
     const seen = [];
@@ -736,7 +762,7 @@ describe('LIN-4398: a gate-marked Periodical review skips the two Surveys and st
   test('its unmarked twin keeps both Surveys: survey-task first, scoping only after both comments', () => {
     assert.equal(stepOf(twin(), ctx()), 'survey-task');
     assert.equal(stepOf(twin(), ctx([surveyTask('10:00'), surveyPlace('10:30')], [run('survey-task', '09:50', 'done', '10:00'), run('survey-place', '10:20', 'done', '10:30')])), 'scoping');
-    assert.equal(lookFirstStep(twin(), ctx()).why, 'the look-first sequence: no size of the move is recorded, so survey-task is next; code sends each step once, whatever an earlier step said.', 'the ordinary reason text is unchanged');
+    assert.equal(lookFirstStep(twin(), ctx()).why, 'the look-first sequence: no size of the move is decided, so survey-task is next; code sends each step once, whatever an earlier step said.', 'the ordinary reason text is unchanged');
   });
 
   test('a hand-sent Survey or an earlier Survey run on the marked review does not stop, repeat, or re-route scoping', () => {
@@ -747,8 +773,8 @@ describe('LIN-4398: a gate-marked Periodical review skips the two Surveys and st
     assert.equal(stepOf(marked(), ctx([], [run('scoping', '11:00', 'queued', '11:00')])), null);
   });
 
-  test('the other off-switches still hold on a marked review (a size record, a person\'s hold, a plan)', () => {
-    assert.equal(lookFirstOff(marked({ description: MARKED + RECORD() }), ctx()), 'size recorded');
+  test('the other off-switches still hold on a marked review (a size decision, a person\'s hold, a plan)', () => {
+    assert.equal(lookFirstOff(marked(), ctx([], [], { sizeDecisions: SIZED })), 'size decided');
     assert.equal(lookFirstOff(marked(), ctx([surveyTask('10:00'), person('10:30')], [run('survey-task', '09:40', 'done', '10:00')])), "a person's comment holds it");
     assert.equal(lookFirstOff(marked(), ctx([], [], { planFacts: A_PLAN })), 'has a plan');
   });

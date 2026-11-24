@@ -33,9 +33,9 @@ Area notes for `llm-and-prompts` in the registry. Format and rules: README.md.
 - `lib/prompt-template-defs.js` cannot import what imports `lib/prompt-templates.js` (a
   cycle): shared words live in a leaf that imports only leaves, as `lib/prompts/leftover-words.js`
   (LIN-4376) and `lib/prompts/autopilot-precedence.js` (never restate a rank; LIN-4382).
-- Prompt words banning a kind of how do not hold it (LIN-4369's replay: closing one channel
-  moved it to the next). Hold the shape in code or a test (`SIZE_RECORD_SHAPE`,
-  `lib/size-of-move.js`, arm 3) or hold the reader's side (arm 4).
+- Prompt words banning a kind of how do not hold it, nor does a text guard (LIN-4369's replay:
+  closing one channel moved it to the next). Hold the reader's side: a fact the next stage reads is
+  a record, as the size of the move is (LIN-4542).
 - A stage lead's first sentence is the selector's purpose line: changing it means new router
   snapshots, `scripts/eval/meta-prompt.baseline.txt` and routing ceiling (LIN-4369).
 - `lib/prompts/autopilot-precedence.js`: check real rows reach a server guard before prompt

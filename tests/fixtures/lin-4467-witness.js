@@ -28,7 +28,7 @@ const ISSUE = {
   id: 'LIN-900',
   identifier: 'LIN-900',
   title: 'Witness ticket for the stage-kind record',
-  description: `## As asked\n\nWitness ask: every stage renders the same text it did.\n\n## Size of the move\n\n**Size:** just the task\n**Why:** one piece.\n**Cuts:** none\n**Decided by:** the standing policy\n\n## ${PLAN_HEADING_WORDS}\n\nWitness plan.\n\nSession fit: one session.\n\nNo plan review owed.\n`,
+  description: `## As asked\n\nWitness ask: every stage renders the same text it did.\n\n## ${PLAN_HEADING_WORDS}\n\nWitness plan.\n\nSession fit: one session.\n\nNo plan review owed.\n`,
   url: 'https://linear.app/witness/issue/LIN-900',
   state: { name: 'In Progress', type: 'started' },
   labels: ['Bug', 'Area: prompts'],

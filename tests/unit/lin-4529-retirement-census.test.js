@@ -97,13 +97,22 @@ export const RETIRED = Object.freeze([
   { word: 'the decision writers', re: /\b(?:markDecisionAnswered|markDecisionWithdrawn|markDecisionWithdrawalReversed|isDecisionSettled|isDecisionSettledIn)\b/ },
   { word: 'answers as comments', re: /\b(?:RULING_MARK|stampDecisionAnswers|decisionStampDedupe|deliverRulingRecord|deliverRulingDispatch|deliverRulingAnswer|deliverRulingReply|composeDispatchPrompt|deliveredEffect)\b|Ruling recorded via Harbour/ },
   { word: 'the old ruling test seams', re: /clear-task-decisions|clear-dismissal-suggestions|\/test\/task-decisions\b/ },
+  // LIN-4542 (P8): the formal size section. The size of the move is a standing decision by scoping on the task, read by
+  // the selector and look-first from records (lib/recommendation-input.js sizeDecisionsOfTicket); a `## Size of the move`
+  // section in a description is ordinary text. The module, its guard's four 422s and wording tables, its readers and the
+  // record's fixed lines and decided-by values go; the standing policy's line moved, word for word, to
+  // lib/prompt-template-defs.js (STANDING_SIZE_POLICY).
+  { word: 'the size module', re: /size-of-move/ },
+  { word: 'the size guard codes', re: /\bSIZE_RECORD_(?:HOW|POLICY_CUT|SHAPE|DROPPED|CODES)\b|\brefusedBySizeRecord\b|\bSIZE_(?:HOW|SHAPE)_WORDS\b/ },
+  { word: 'the size readers', re: /\b(?:readSizeRecord|checkSizeRecord|sizeFact|recordShape|STANDING_POLICY_LINE|SIZE_OF_MOVE_HEADING|RECORD_LINES|RECORD_PARTS|DECIDED_BY_LABEL|DECIDED_BY_MAX_OTHER_WORDS|CUT_MAX_OTHER_WORDS|WHY_MAX_WORDS)\b/ },
+  { word: 'the size record\'s decided-by line', re: /\*\*Decided by:\*\*|pending a ruling/ },
 ]);
 
 /** Files that keep a retired word, each with the words it may keep and the reason. */
 export const ALLOW = Object.freeze({
   // LIN-4533 (P3): the dated log of prompt-template changes. Its earlier entries name the block they changed; that is recorded history.
   // LIN-4536 (P6a): its LIN-4502 row names the brief quote module it changed; that is recorded history too.
-  'scripts/prompt-template-change-log.md': { words: ['DECISION: block taught', 'the brief quote module', 'the brief and recap modules', 'the brief and recap chat tools', 'the brief and recap routes', 'formatDiscussionReference'], reason: 'the dated log of prompt-template changes: its earlier entries quote the DECISION: block and name the brief quote module, the brief module, its chat tool and the discussion-reference formatter they changed, which is recorded history (LIN-4533, LIN-4536 and LIN-4537 add their own entries)' },
+  'scripts/prompt-template-change-log.md': { words: ['DECISION: block taught', 'the brief quote module', 'the brief and recap modules', 'the brief and recap chat tools', 'the brief and recap routes', 'formatDiscussionReference', 'the size module', 'the size guard codes', 'the size readers', 'the size record\'s decided-by line'], reason: 'the dated log of prompt-template changes: its earlier entries quote the DECISION: block and name the brief quote module, the brief module, its chat tool, the discussion-reference formatter and the size section\'s module, guard and lines they changed, which is recorded history (LIN-4533, LIN-4536, LIN-4537 and LIN-4542 add their own entries)' },
   // LIN-4533 (P3): a recorded liveness fixture of a past cycle (LIN-3238). Its messages are the transcript as it was, not taught text.
   'tests/fixtures/liveness/lin-3238-cycle.json': { words: ['DECISION: block taught'], reason: 'a recorded liveness fixture of the LIN-3238 cycle: its messages are the transcript as it was, kept as history' },
   // LIN-4537 (P6b): dated research and eval records that name the brief and recap as they were. Rewriting them would

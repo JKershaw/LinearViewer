@@ -10,7 +10,7 @@
  *   - a create whose body holds the heading or end line is filed as written, with no block sealed around it;
  *   - append and replace still splice;
  *   - the write-below route the close-out prune used is gone (LIN-4502 retired the prune): it answers 404;
- *   - a PATCH with a description still makes exactly one issueDescription read (the size record guard's);
+ *   - a PATCH with a description still makes exactly one issueDescription read (the plan-heading guard's, LIN-4504; LIN-4542 retired the size record guard that shared it);
  *   - Jira: descriptions are read with the one adfToMarkdown reader and written with markdownToAdf. A block in the
  *     ADF reads back as its rendering, and an orphaned `harbour.asAsked` property is never read and never removed.
  * Every LocalStore case runs on a plain body and on a Linear-style backslash-escaped one.
@@ -168,7 +168,7 @@ describe('description writes on LocalStore — the one description read', () => 
   });
   afterEach(() => { localProvider.issueDescription = savedRead; });
 
-  test('a PATCH without description makes no issueDescription read; one with description makes exactly one (the size record guard\'s)', async () => {
+  test('a PATCH without description makes no issueDescription read; one with description makes exactly one (the plan-heading guard\'s)', async () => {
     let reads = 0;
     localProvider.issueDescription = async function (...args) { reads += 1; return savedRead.apply(this, args); };
     const titleOnly = await call(proxyApp(), 'PATCH', '/api/proxy/issues/i1', { title: 'Renamed' });

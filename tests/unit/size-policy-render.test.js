@@ -33,7 +33,8 @@ import { registerProvider } from '../../lib/providers/registry.js';
 
 const ROOT = join(dirname(fileURLToPath(import.meta.url)), '..', '..');
 const ERR_LARGER_LINE = /\*\*Standing size policy:\*\* err larger: take the larger move when the look shows it pays, and when in doubt; it does not mean inflating every ticket, and a small, clear ticket stays just the task\.\n/;
-const CUT_GUARD = 'A size smaller than the ask, or wrong work, is a cut; the standing policy never decides one.';
+// LIN-4542: the cut sentence as scoping's decision-record prompt words it (a cut is raised, never decided by the policy).
+const CUT_GUARD = 'A size smaller than the ask, or judging the ticket the wrong work, is a cut, and the standing policy never decides one: write no decision and raise it as the Scope and Authority section says.';
 // What the scoping prompt said when no policy was stored: every task stopped for a size ruling.
 const ASKS = [/no standing policy/, /Without one, the size is/, /\(set \d{4}-\d{2}-\d{2}\)/];
 // Absent preferences, and the value the retired setting could still have stored.
@@ -41,7 +42,7 @@ const PREFS = { 'no stored value': {}, "a stored sizePolicy of 'ask'": { sizePol
 
 function assertHandsOff(prompt, label) {
   assert.match(prompt, ERR_LARGER_LINE, label);
-  assert.ok(prompt.includes(CUT_GUARD), `${label}: the cut sentence is unchanged`);
+  assert.ok(prompt.includes(CUT_GUARD), `${label}: the cut sentence is rendered`);
   for (const re of ASKS) assert.doesNotMatch(prompt, re, label);
 }
 
