@@ -19,6 +19,8 @@
 //     independent, sharing only the cache instance and generation tracker.
 
 import { LEDGER_ATTEMPTS } from '../../lib/harbour-comment-post.js';
+import { configureCommentIngest } from '../../lib/comment-ingest.js';
+import { fixedIdOf } from '../../lib/records/refs.js';
 import { test, describe } from 'node:test';
 import assert from 'node:assert/strict';
 import { readFileSync } from 'node:fs';
@@ -474,6 +476,41 @@ describe('POST /workspace/:urlKey/api/comments/:issueId — session-lane auth re
     assert.strictEqual(second.body.comment.id, retryCommentId);
     assert.strictEqual(calls.createComment.length, 2, 'the identical resubmission must not mint a third comment');
     assert.strictEqual(storeCalls.length, 1, 'the dedupe hit must not attempt a second durable-credential read');
+  });
+
+  // LIN-4548: the member's finding is filed by the comment seam, so a recovered retry files it once, under the retry's
+  // comment id, and an identical re-press (a dedupe hit) files no second one.
+  test('(a3) LIN-4548: a recovered retry files the member\'s finding once, under the retry\'s comment id', async () => {
+    const findings = new Map();
+    configureCommentIngest({
+      writes: {
+        async add({ input, by, via, fixedId }) {
+          if (!findings.has(fixedId)) findings.set(fixedId, { by, via, in: input.in });
+          return { record: { id: fixedId } };
+        },
+        async end() { return {}; }
+      },
+      listPeople: async () => [], cutoffOf: async () => null, ledger: { async wereRecordedByHarbour() { return new Set(); } },
+      taskForTicket: async (_u, ticket) => (ticket === ISSUE_ID ? 'task-901' : null), taskOfTicket: async () => null
+    });
+    try {
+      const { provider } = makeCredentialKeyedProvider({ rejectedTokens: [REJECTED_TOKEN] });
+      const { store: ownerCredentialStore } = makeFakeOwnerCredentialStore({ token: FRESH_TOKEN, tokenExpiresAt: Date.now() + 3600_000, provider: 'linear' });
+      const app = buildApp({
+        provider, session: makeRecoverySession({ accountId: 'member-9' }), ownerCredentialStore,
+        harbourCommentsStore: makeSpyHarbourCommentsStore(),
+        workspaceOverrides: { provider: 'linear', accessToken: REJECTED_TOKEN },
+      });
+      const payload = { body: 'LIN-4548 recovered reply finding' };
+      const first = await postComment(app, ISSUE_ID, payload);
+      assert.strictEqual(first.status, 201);
+      assert.deepStrictEqual([...findings.entries()], [[fixedIdOf('finding', 'comment', first.body.comment.id), { by: 'person:member-9', via: 'comment', in: 'task-901' }]]);
+      const second = await postComment(app, ISSUE_ID, payload);
+      assert.strictEqual(second.status, 200);
+      assert.strictEqual(findings.size, 1);
+    } finally {
+      configureCommentIngest(null);
+    }
   });
 
   test('(b) the durable store holds the SAME dead credential → no recovery, classified 500, retryable:false', async () => {

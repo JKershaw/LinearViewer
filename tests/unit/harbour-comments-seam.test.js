@@ -16,7 +16,7 @@
 
 process.env.NODE_ENV = 'test';
 
-import { test, describe } from 'node:test';
+import { test, describe, beforeEach, afterEach } from 'node:test';
 import assert from 'node:assert/strict';
 import express from 'express';
 import { createProxyRoutes } from '../../routes/proxy.js';
@@ -25,6 +25,8 @@ import { registerProvider } from '../../lib/providers/registry.js';
 import { ProviderInterface } from '../../lib/providers/interface.js';
 import { HarbourCommentsStore } from '../../lib/harbour-comments-store.js';
 import { LEDGER_ATTEMPTS } from '../../lib/harbour-comment-post.js';
+import { configureCommentIngest } from '../../lib/comment-ingest.js';
+import { fixedIdOf } from '../../lib/records/refs.js';
 
 const ISSUE_ID = '11111111-1111-1111-1111-111111111111';
 // Minimal but valid PNG magic bytes (≥12 bytes), matching the fixtures in
@@ -50,6 +52,8 @@ class FakeWriteProvider extends ProviderInterface {
       return 'https://uploads.linear.app/fake-asset.png';
     };
     this.issueWriteGuard = async () => ({ id: ISSUE_ID, trashed: false, team: { id: 'team-1' } });
+    // LIN-4548: names the ticket a person's finding is filed under, when the comment names the issue by its UUID.
+    this.issueDetail = async (_token, ref) => (ref === ISSUE_ID ? { id: ISSUE_ID, identifier: 'LIN-7' } : null);
   }
 }
 
@@ -112,11 +116,11 @@ function createMockCollection() {
   };
 }
 
-function buildProxyApp({ provider, harbourCommentsStore }) {
+function buildProxyApp({ provider, harbourCommentsStore, credential = {} }) {
   const app = express();
   app.use(express.json());
   app.use(createProxyRoutes({
-    proxyTokenStore: { validateToken: async () => ({ tokenId: 't1', urlKey: 'acme', label: 'test', scope: 'readWrite', createdBy: 'u1' }) },
+    proxyTokenStore: { validateToken: async () => ({ tokenId: 't1', urlKey: 'acme', label: 'test', scope: 'readWrite', createdBy: 'u1', ...credential }) },
     proxyEventStore: { recordEvent: async () => {} },
     resolveWorkspaceAccess: async () => ({ token: 'ws-token', reason: 'ok' }),
     getWorkspaceAccessToken: async () => 'ws-token',
@@ -332,5 +336,96 @@ describe('end-to-end — an agent comment written through the proxy is recorded,
     const foreignId = 'a-human-typed-this-directly-in-linear';
     const notForeign = await harbourCommentsStore.wereRecordedByHarbour('acme', [foreignId]);
     assert.ok(!notForeign.has(foreignId), 'an unrecorded (human-authored) id must not read as Harbour-authored');
+  });
+});
+
+// LIN-4548: one rule for who wrote a comment. A comment sent with a person's own proxy token is that person's finding,
+// once; one sent by a run (or any non-person credential) is Harbour's, and gives none.
+describe('LIN-4548 — a comment sent with a person\'s own proxy token is their finding; a run\'s is not', () => {
+  let findings;
+  beforeEach(() => {
+    findings = new Map();
+    configureCommentIngest({
+      writes: {
+        async add({ kind, input, by, via, fixedId }) {
+          if (!findings.has(fixedId)) findings.set(fixedId, { kind, by, via, in: input.in, says: input.says });
+          return { record: { id: fixedId } };
+        },
+        async end() { return { record: null }; }
+      },
+      listPeople: async () => [],
+      cutoffOf: async () => null,
+      ledger: { async wereRecordedByHarbour() { return new Set(); } },
+      taskForTicket: async (_urlKey, ticket) => (ticket === 'LIN-7' ? 'task-7' : null),
+      taskOfTicket: async () => null
+    });
+  });
+  afterEach(() => configureCommentIngest(null));
+
+  const PERSON = { origin: 'person', createdBy: 'acct-john' };
+
+  test('a person\'s token: one finding by person:<account>, via comment, on the ticket\'s task; a repeat post (dedupe hit) leaves it one', async () => {
+    const provider = new FakeWriteProvider({ name: 'lin4548-person' });
+    const ledger = makeFakeLedger();
+    const app = buildProxyApp({ provider, harbourCommentsStore: ledger, credential: PERSON });
+
+    const first = await postProxyComment(app, ISSUE_ID, { body: 'lin4548 a note for the builder' });
+    assert.strictEqual(first.status, 201);
+    const id = fixedIdOf('finding', 'comment', first.body.comment.id);
+    assert.deepEqual(findings.get(id), { kind: 'finding', by: 'person:acct-john', via: 'comment', in: 'task-7', says: 'lin4548 a note for the builder' });
+    assert.strictEqual(ledger.calls.length, 1, 'still ledgered, so the ingest never re-decides its author from the tracker');
+
+    const again = await postProxyComment(app, ISSUE_ID, { body: 'lin4548 a note for the builder' });
+    assert.strictEqual(again.status, 200);
+    assert.strictEqual(again.body.deduped, true);
+    assert.strictEqual(findings.size, 1, 'one finding, however many times it is sent');
+  });
+
+  test('a person\'s token on the attachment route\'s comment target: the same one finding', async () => {
+    const provider = new FakeWriteProvider({ name: 'lin4548-attach' });
+    const app = buildProxyApp({ provider, harbourCommentsStore: makeFakeLedger(), credential: PERSON });
+    const { status, body } = await postAttachment(app, ISSUE_ID, { image: PNG_DATA_URL });
+    assert.strictEqual(status, 201);
+    assert.strictEqual(findings.get(fixedIdOf('finding', 'comment', body.comment.id))?.by, 'person:acct-john');
+  });
+
+  test('a finding write that throws leaves the person\'s comment a 201', async () => {
+    configureCommentIngest({
+      writes: { async add() { throw new Error('records down'); }, async end() { return {}; } },
+      listPeople: async () => [], cutoffOf: async () => null, ledger: { async wereRecordedByHarbour() { return new Set(); } },
+      taskForTicket: async () => 'task-7', taskOfTicket: async () => null
+    });
+    const provider = new FakeWriteProvider({ name: 'lin4548-throws' });
+    const app = buildProxyApp({ provider, harbourCommentsStore: makeFakeLedger(), credential: PERSON });
+    const { status, body } = await postProxyComment(app, ISSUE_ID, { body: 'lin4548 finding write throws' });
+    assert.strictEqual(status, 201);
+    assert.strictEqual(body.success, true);
+  });
+
+  const NOT_A_PERSON = [
+    ['a dispatch token with no run', { origin: 'dispatch', runRecordId: null }],
+    ['a dispatch token with a run (unstamped)', { origin: 'dispatch', runRecordId: 'run-1' }],
+    ['a person token with no owner', { origin: 'person', createdBy: null }],
+    ['an old token with no origin', {}]
+  ];
+  for (const [name, credential] of NOT_A_PERSON) {
+    test(`${name}: the comment is posted and ledgered as Harbour's, and gives no finding`, async () => {
+      const provider = new FakeWriteProvider({ name: `lin4548-${name}` });
+      const ledger = makeFakeLedger();
+      const app = buildProxyApp({ provider, harbourCommentsStore: ledger, credential });
+      const { status } = await postProxyComment(app, ISSUE_ID, { body: `lin4548 not a person: ${name}` });
+      assert.strictEqual(status, 201);
+      assert.strictEqual(ledger.calls.length, 1);
+      assert.strictEqual(findings.size, 0);
+    });
+  }
+
+  test('a stage run\'s token is refused the comment (403), so it can never make a finding', async () => {
+    const provider = new FakeWriteProvider({ name: 'lin4548-stage' });
+    const app = buildProxyApp({ provider, harbourCommentsStore: makeFakeLedger(), credential: { origin: 'dispatch', runRecordId: 'run-2', writes: 'work' } });
+    const { status } = await postProxyComment(app, ISSUE_ID, { body: 'lin4548 a stage run tries to comment' });
+    assert.strictEqual(status, 403);
+    assert.strictEqual(provider.calls.createComment.length, 0);
+    assert.strictEqual(findings.size, 0);
   });
 });

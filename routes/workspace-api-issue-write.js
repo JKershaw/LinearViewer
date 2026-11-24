@@ -35,9 +35,7 @@ import { dedupeKey, createDedupeCache } from '../lib/proxy-dedupe.js';
 import { commentDedupe, commentDedupeGenerations } from './proxy.js';
 import { isHermeticTestToken } from '../lib/should-mock-ai.js';
 import { refuseCapability } from './workspace-api-steps.js';
-import { postHarbourComment, repairHarbourCommentRecord } from '../lib/harbour-comment-post.js';
-import { recordPersonReplyFinding } from '../lib/comment-ingest.js';
-import { looksLikeTicket } from '../lib/records/refs.js';
+import { postHarbourComment, repairHarbourCommentRecord, HARBOUR } from '../lib/harbour-comment-post.js';
 
 
 // Normalize a provider write result to `{ success, issue }`. Linear returns that
@@ -223,33 +221,25 @@ export function registerIssueWriteRoutes(router, { workspaceFromUrl, harbourComm
     // Deliberately identifier-agnostic in test mode — it echoes whichever
     // :issueId the caller sent, so every spec's own seeded issueIdentifier
     // is accepted, not one hardcoded fixture.
-    // LIN-4535 (D4, plan note 2): the reply goes out under the workspace's binding (resolveIssueBinding), which may be the
-    // owner's credential, so the tracker would credit the owner. The post is ledgered as Harbour's (the seam), and the
-    // reply's finding is written here, under the member's own account, so the ingest never has to guess its author.
-    const writeComment = async ({ provider: writer, callScope }) => {
+    // LIN-4535 (D4, plan note 2), LIN-4548: the reply goes out under the workspace's binding (resolveIssueBinding), which
+    // may be the owner's credential, so the tracker would credit the owner. It is the member's own comment, so the seam
+    // (lib/harbour-comment-post.js) ledgers it and files its finding under the member's account, the same rule as a comment
+    // sent with a person's own proxy token; the ingest never has to guess its author.
+    const replyAuthor = req.session?.accountId ? `person:${req.session.accountId}` : HARBOUR;
+    const replyFinding = ({ provider: writer, callScope }) => ({ ctx: { provider: writer, token: callScope }, issueRef: issueId, body });
+    const writeComment = async (binding) => {
       if (isTestMode) {
         return { success: true, comment: { id: `test-comment-${key}`, body, createdAt: new Date().toISOString(), user: { name: 'Harbour' } } };
       }
-      const answer = normalizeCommentWrite(await postHarbourComment({
+      const { provider: writer, callScope } = binding;
+      return normalizeCommentWrite(await postHarbourComment({
         urlKey: workspace.urlKey,
+        by: replyAuthor,
+        finding: replyFinding(binding),
         store: harbourCommentsStore,
         clientIds: writer.clientCommentIds === true,
         post: (commentId) => writer.createComment(callScope, issueId, body, commentId)
       }));
-      const commentId = answer.comment?.id;
-      if (answer.success !== false && commentId) {
-        // The finding is best effort after a landed post: a failure is logged, never a failed reply (the comment is written).
-        try {
-          const ticket = looksLikeTicket(issueId) ? issueId : (await writer.issueDetail(callScope, issueId))?.identifier;
-          const filed = ticket
-            ? await recordPersonReplyFinding({ ctx: { provider: writer, token: callScope }, urlKey: workspace.urlKey, ticket, accountId: req.session.accountId, commentId, body, createdAt: answer.comment?.createdAt })
-            : { ok: false, reason: `${issueId} could not be read to name its ticket` };
-          if (!filed.ok) console.error(`[comment-ingest] the reply ${commentId} on ${issueId} (${workspace.urlKey}) has no finding: ${filed.reason}`);
-        } catch (err) {
-          console.error(`[comment-ingest] the reply ${commentId} on ${issueId} (${workspace.urlKey}) has no finding: ${err?.message || err}`);
-        }
-      }
-      return answer;
     };
 
     const refuseTrashed = () => jsonError(res, 409, 'Issue is trashed; refusing to comment on a deleted issue');
@@ -364,12 +354,12 @@ export function registerIssueWriteRoutes(router, { workspaceFromUrl, harbourComm
       // person's text: an identical resubmission hits the same cache entry.
       const prior = commentDedupe.get(key);
       if (prior) {
-        // Dedupe-hit ledger repair (LIN-2649 S1, F2): a dedupe hit means the
-        // ORIGINAL create's own ledger-record attempt may have failed
-        // silently, leaving a Harbour-written comment unrecorded. The seam
-        // repairs it (lib/harbour-comment-post.js, LIN-4535): idempotent upsert,
-        // the post's bounded retries, never gates the response.
-        if (harbourCommentsStore) await repairHarbourCommentRecord({ urlKey: workspace.urlKey, commentId: prior.comment?.id ?? null, store: harbourCommentsStore });
+        // Dedupe-hit repair (LIN-2649 S1, F2; LIN-4548): a dedupe hit means the
+        // ORIGINAL create's own ledger record, or the member's finding, may
+        // have failed silently. The seam repairs both (lib/harbour-comment-post.js):
+        // idempotent writes, the post's bounded retries, never gates the response.
+        // Test mode's stand-in filed no finding, so its repair files none either.
+        await repairHarbourCommentRecord({ urlKey: workspace.urlKey, comment: prior.comment ?? null, by: isTestMode ? HARBOUR : replyAuthor, finding: replyFinding(issueBinding), store: harbourCommentsStore });
 
         return res.status(200).json({ ...prior, deduped: true });
       }

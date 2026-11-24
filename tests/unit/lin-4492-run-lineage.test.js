@@ -4,7 +4,7 @@
  */
 import { test, describe } from 'node:test';
 import assert from 'node:assert/strict';
-import { writerOf, WRITER_REFUSAL, lineageOfRun } from '../../lib/run-lineage.js';
+import { writerOf, WRITER_REFUSAL, lineageOfRun, personOfCredential } from '../../lib/run-lineage.js';
 
 // A build's stage row is its own root; its leftover inherits the build's root (lib/dispatch-factory.js anchor).
 const BUILD = { id: 'build-1', kind: 'implementation', open: true, rootItemId: 'build-1' };
@@ -150,4 +150,25 @@ describe('LIN-4492: exactly the three outcomes, over every combination', () => {
     }
     assert.equal(seen, credentials.length * tokenRuns.length * named.length);
   });
+});
+
+// LIN-4548: the comment seam asks "is this a person" by personOfCredential, so it must be writerOf's person branch exactly.
+describe('LIN-4548: personOfCredential is writerOf\'s person test, and nothing else', () => {
+  const SHAPES = [
+    ['a person with an owner', { origin: 'person', createdBy: 'acct-john', runRecordId: null }, 'person:acct-john'],
+    ['a person with no owner', { origin: 'person', createdBy: null, runRecordId: null }, null],
+    ['a dispatch credential with a run', { origin: 'dispatch', createdBy: 'acct-owner', runRecordId: 'build-1' }, null],
+    ['a dispatch credential with no run', { origin: 'dispatch', createdBy: 'acct-owner', runRecordId: null }, null],
+    ['no origin (predates run identity)', { origin: null, createdBy: 'acct-owner', runRecordId: null }, null],
+    ['an unknown origin', { origin: 'custom', createdBy: 'acct-owner', runRecordId: null }, null],
+    ['no credential', null, null]
+  ];
+  for (const [name, credential, expected] of SHAPES) {
+    test(`${name}: ${expected ?? 'not a person'}, as writerOf files it`, () => {
+      assert.equal(personOfCredential(credential), expected);
+      // writerOf's own answer for the same credential (a dispatch one given its run, so only the person branch can differ).
+      const w = writerOf({ credential, tokenRun: BUILD, namedRun: BUILD, namedRunGiven: true });
+      assert.equal(w.ok && w.as === 'person' ? w.by : null, expected);
+    });
+  }
 });
