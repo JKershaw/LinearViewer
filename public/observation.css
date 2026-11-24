@@ -249,7 +249,6 @@
   color: var(--muted);
   margin-bottom: 0.3rem;
 }
-.obs-ruling-issue { font-weight: 600; color: var(--text); }
 .obs-ruling-ws { color: var(--muted); }
 .obs-ruling-question {
   font-family: var(--font-content);
@@ -1021,10 +1020,6 @@ a.obs-task-ident:hover { text-decoration: underline; }
    the ticket), and for the new Rulings pieces. Additive: nothing above is
    touched. Plain words are set in the content face; ids and counts keep the
    structural face. */
-
-/* The task's title beside its id on a Rulings row, and the note that says what
-   each action does (both plain words, so the content face). */
-.obs-ruling-title { color: var(--text); font-family: var(--font-content); }
 
 /* The run's own meta chips for a task budget and its ticket walk (the same
    muted, machine-fact face as the other meta). */

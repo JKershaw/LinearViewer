@@ -85,7 +85,7 @@ test.describe('Home: Waiting on you draws the open question records', () => {
     await page.goto(`/workspace/${URL_KEY}/`);
 
     await expect(page.locator(WAITING_QCARD)).toHaveCount(1);
-    await expect(page.locator(`${WAITING_Q} [data-testid="waiting-task-line"]`)).toContainText('LOCAL-S');
+    await expect(page.locator(`${WAITING_Q} [data-testid="question-record-card-task"]`)).toContainText('LOCAL-S');
     await expect(page.locator(COUNT)).toContainText('1 waiting on you');
     await syncBadge(page);
     await expect(page.locator(BADGE)).toHaveText('1');
@@ -120,7 +120,7 @@ test.describe('Home: Waiting on you draws the open question records', () => {
     const qid = await seedQuestion(page, URL_KEY, { ticket: 'LOCAL-S', runId: await askingRun(page, URL_KEY, 'LOCAL-S') });
     await refresh(page);
     await expect(cardFor(page, qid, WAITING_Q)).toHaveCount(1);
-    await expect(page.locator(`${WAITING_Q} [data-testid="waiting-task-line"]`)).toContainText('LOCAL-S');
+    await expect(page.locator(`${WAITING_Q} [data-testid="question-record-card-task"]`)).toContainText('LOCAL-S');
     await expect(page.locator(COUNT)).toContainText('1 waiting on you');
     await expect(page.locator(SECTION)).toBeVisible();
   });
@@ -172,7 +172,7 @@ test.describe('the Rulings page shows the question row with its task', () => {
     await page.goto(`/workspace/${URL_KEY}/observation`);
     const row = page.locator('[data-testid="ruling-question-row"]');
     await expect(row).toHaveCount(1);
-    await expect(row.locator('.obs-ruling-issue')).toHaveText('LOCAL-S');
+    await expect(row.locator('[data-testid="question-record-card-task-id"]')).toHaveText('LOCAL-S');
     await answerCard(cardFor(page, qid, '[data-testid="ruling-question-row"]'), 'left', 'left it is');
     await expect(row.locator('[data-testid="question-record-card-feedback"]')).toHaveText(RESUMED);
     expect((await decisionFor(page, URL_KEY, qid))?.fields.words).toBe('left it is');

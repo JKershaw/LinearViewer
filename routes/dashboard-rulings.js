@@ -16,7 +16,7 @@ import { Router } from 'express';
 import { keepaliveError } from '../lib/errors.js';
 import { armKeepalive } from '../lib/http-keepalive.js';
 import { connectedWorkspaces } from './dashboard-session-state.js';
-import { openQuestionsFor } from '../lib/open-questions.js';
+import { openQuestionsFor, titlesFromIssues } from '../lib/open-questions.js';
 import { readRulingStanding } from '../lib/ruling-standing.js';
 import { personAccountIdOf } from './task-records.js';
 
@@ -25,11 +25,14 @@ import { personAccountIdOf } from './task-records.js';
  * (`kind: 'question'`), so the page, the count and the badge read one list. The person is the canonical account
  * (personAccountIdOf), the id the answer route files its decision under. Null when there is no person to read for.
  */
-async function openQuestionRowsFor({ accountId, workspaces, recordsStore, dispatchQueueStore }) {
+async function openQuestionRowsFor({ accountId, workspaces, recordsStore, dispatchQueueStore, merged = [] }) {
   if (!recordsStore || !dispatchQueueStore || !accountId) return [];
   const rows = [];
   for (const w of workspaces) {
-    const questions = await openQuestionsFor({ recordsStore, dispatchStore: dispatchQueueStore, urlKey: w.urlKey, accountId });
+    // LIN-4549: each question's task title from the runs this feed already read (a run carries its task's title, resolved at the
+    // read seam, LIN-962), so no tracker call is added to the 5s badge poll. A task with no run here shows its identifier alone.
+    const titlesOf = titlesFromIssues(merged.filter((l) => l?.workspaceUrlKey === w.urlKey).map((l) => ({ identifier: l.issueIdentifier, title: l.issueTitle })));
+    const questions = await openQuestionsFor({ recordsStore, dispatchStore: dispatchQueueStore, urlKey: w.urlKey, accountId, titlesOf });
     for (const q of questions) {
       rows.push({
         kind: 'question',
@@ -40,13 +43,16 @@ async function openQuestionRowsFor({ accountId, workspaces, recordsStore, dispat
         question: q.asks,
         options: q.options,
         recommended: q.recommended,
+        // LIN-4549: the card draws its own task line from the row's `ticket` and `title`.
+        ticket: q.ticket ?? null,
+        title: q.title ?? null,
         ifUnanswered: q.ifUnanswered,
         interactive: q.interactive,
         state: q.state,
         reason: q.reason,
         askedAt: q.askedAt,
         // The task by its identifier (`ticket`, what a task page is keyed by), so the row heads like a run row (finding-9221fb7a).
-        anchor: { workspaceUrlKey: w.urlKey, taskId: q.taskId, runId: q.runId, loopId: null, issueId: null, issueIdentifier: q.ticket ?? null, target: null },
+        anchor: { workspaceUrlKey: w.urlKey, taskId: q.taskId, runId: q.runId, loopId: null, issueId: null, issueIdentifier: q.ticket ?? null, issueTitle: q.title ?? null, target: null },
       });
     }
   }
@@ -86,7 +92,7 @@ function rulingsFeed({ sessionsFeedCache, mergeLoops, recordsStore, dispatchQueu
       // A failed records or dispatch-store read costs only the questions, never the feed the 5s badge poll reads
       // (finding-ab3270e4).
       const accountId = req.session?.accountId ? await personAccountIdOf({ session: req.session }, accountStore).catch(() => null) : null;
-      const rulings = await openQuestionRowsFor({ accountId, workspaces, recordsStore, dispatchQueueStore }).catch(() => []);
+      const rulings = await openQuestionRowsFor({ accountId, workspaces, recordsStore, dispatchQueueStore, merged }).catch(() => []);
       const openLoopIds = await openLoopIdsFor({ accountId, workspaces, merged, recordsStore }).catch(() => []);
 
       // LIN-4103 beat 3: the badge on a workspace page counts that workspace's rulings (the URL's workspace, by each row's

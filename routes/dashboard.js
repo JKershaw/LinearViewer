@@ -70,7 +70,7 @@ import { createDashboardEffortRoutes } from './dashboard-effort.js';
 import { createDashboardSummariesRoutes, buildTestSummary, buildTestSessionSummary } from './dashboard-summaries.js';
 import { createDashboardDrilldownRoutes } from './dashboard-drilldown.js';
 import { deriveSessionWaiting, settleWithConcurrency, isStandaloneSession, deriveSessionStatus } from './dashboard-session-state.js';
-import { openQuestionsForRun } from '../lib/open-questions.js';
+import { openQuestionsForRun, titlesFromIssues } from '../lib/open-questions.js';
 import { personAccountIdOf } from './task-records.js';
 export { settleWithConcurrency, isStandaloneSession, deriveSessionStatus, deriveSessionWaiting, buildTestSummary, buildTestSessionSummary };
 
@@ -365,7 +365,9 @@ export function createDashboardRoutes(deps) {
       const questionRecords = await (async () => {
         const accountId = recordsStore ? await personAccountIdOf(req, accountStore) : null;
         if (!accountId) return [];
-        return openQuestionsForRun({ recordsStore, dispatchStore: dispatchQueueStore, urlKey: workspace.urlKey, accountId, runId: session.sessionId });
+        // LIN-4549: the run's own rows name the tasks it worked on, with their titles (lib/open-questions.js titlesOf).
+        const titlesOf = titlesFromIssues(enrichedLoops.map((l) => ({ identifier: l.issueIdentifier, title: l.issueTitle })));
+        return openQuestionsForRun({ recordsStore, dispatchStore: dispatchQueueStore, urlKey: workspace.urlKey, accountId, runId: session.sessionId, titlesOf });
       })().catch(() => []);
 
       // Per-run inline reply (LIN-1004/LIN-1133; LIN-1163 removed the page-level

@@ -343,6 +343,14 @@ describe('LIN-4024 — GET …/api/task/:identifier/state sends the question car
     assert.equal(member.jsonBody.questionHtml, '', 'a member has no answer box');
   });
 
+  // LIN-4549: the card names its task (the page's own: lib/open-questions.js titlesOf from the page's model), identifier then title.
+  test('the owner\'s card carries the task line: the identifier, then the page\'s own title', async () => {
+    const owner = await call(makeRouter(makeLoader({ loops: [WAITING_LOOP] }), undefined, OWNER_CHECK, ASKED()), STATE, { params: { identifier: 'LIN-50' }, query: { issueId: UUID } });
+    assert.match(owner.jsonBody.questionHtml, /data-testid="question-record-card-task-id">LIN-50</);
+    // The state read's model is titled from its stored loop (STORED_LOOP's issueTitle), the title this page shows.
+    assert.match(owner.jsonBody.questionHtml, /data-testid="question-record-card-task-title">Stored title</);
+  });
+
   // LIN-4538: an answered question is no longer asked, so the owner's card goes; the pill reads from the standing, not the card.
   test('an answered question sends no question card, even to the owner', async () => {
     const answered = questionRecordsOf([{ id: 'q-impl-2', ticket: 'LIN-50', run: 'impl-2', to: 'person:acct-1', ended: { state: 'answered', by: 'person:acct-1', reason: 'answered by d' } }]);

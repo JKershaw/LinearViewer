@@ -4910,13 +4910,11 @@ a.context-node:hover { border-color: var(--text); background: var(--bg); }
   border-radius: 3px;
 }
 
-/* LIN-4114: Home's "Waiting on you" desk section. Its header and body open and close like the other desk sections; the
-   card is the shared question card (lib/question-card.js); the task line sits above each card and links to the task page. */
+/* LIN-4114: Home's "Waiting on you" desk section. Its header and body open and close like the other desk sections; each
+   card is the shared question record card (lib/question-record-card.js), which draws its own task line (LIN-4549). */
 .waiting-section { margin: 0 0 1rem; }
 .waiting-header:focus { outline: 2px solid var(--brand); outline-offset: 2px; }
-.waiting-card, .waiting-question { margin: 0.5rem 0; }
-.waiting-task-line { font-family: var(--font-content); font-size: var(--font-size-sm); color: var(--muted); margin-bottom: 0.25rem; }
-.waiting-task-link { color: var(--text); }
+.waiting-question { margin: 0.5rem 0; }
 /* A screen-reader-only live region (LIN-4114): the desk says the outcome of an answer without a visible line. */
 .sr-only {
   position: absolute;
@@ -4955,6 +4953,16 @@ a.context-node:hover { border-color: var(--text); background: var(--bg); }
   display: grid;
   gap: 0.6rem;
 }
+/* LIN-4549 (LIN-4162): the card's own task line: the identifier in mono (a machine fact), the title in the page face. */
+.sess-qcard-task {
+  margin: 0;
+  font-family: var(--font-content);
+  font-size: var(--font-size-sm);
+  color: var(--muted);
+  overflow-wrap: anywhere;
+}
+.sess-qcard-task-id { font-family: var(--font-structural); color: var(--text); }
+.sess-qcard-task-title { color: var(--text); }
 .sess-qcard-question {
   margin: 0;
   font-family: var(--font-content);

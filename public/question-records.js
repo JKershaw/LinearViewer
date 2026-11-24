@@ -53,7 +53,7 @@ export function focusInCard(card, active) {
  * @param {Element|null} [active] - as in focusInCard
  */
 export function holdsReaderInput(card, active) {
-  if (!card) return false;
+  if (!card || card.dataset?.settledElsewhere === 'true') return false;
   if (card.dataset?.answerInFlight === 'true') return true;
   const typed = card.querySelector(TYPED);
   if (typed && typeof typed.value === 'string' && typed.value.length > 0) return true;
@@ -66,12 +66,13 @@ export function holdsReaderInput(card, active) {
 /**
  * Whether a repaint keeps this card where it is rather than drawing it fresh: the reader is mid-answer on it (holdsReaderInput),
  * a request from it is out (a control is off), or it is settled (answered or dismissed here, showing its outcome). The union of
- * what the three hosts each kept before LIN-4549.
+ * what the three hosts each kept before LIN-4549. A card refused as settled elsewhere (`data-settled-elsewhere`) is never held.
  * @param {Element|null} card
  * @param {Element|null} [active] - as in focusInCard
  */
 export function holdsCard(card, active) {
-  if (!card) return false;
+  // A card whose answer the route refused as settled elsewhere holds nothing: there is no answer left for it to give.
+  if (!card || card.dataset?.settledElsewhere === 'true') return false;
   if (card.dataset?.settled === 'true') return true;
   if ([...card.querySelectorAll('button, textarea')].some((el) => el.disabled)) return true;
   return holdsReaderInput(card, active);
@@ -111,6 +112,9 @@ async function send(card, action, payload) {
     const body = await res.json().catch(() => ({}));
     delete card.dataset.answerInFlight;
     if (res.ok) return settle(card, questionOutcomeText(action, body));
+    // Answered or dismissed elsewhere (the route's `ruling-settled`, keyed on its code): this card is no longer the reader's to
+    // answer, so the keep rule lets it go and the next refresh takes it out ("Answered elsewhere"). It is not settled here.
+    if (body?.code === 'ruling-settled') card.dataset.settledElsewhere = 'true';
     text = questionOutcomeText(action, { error: body?.error || 'Could not record it; try again' });
   } catch {
     text = 'Could not reach Harbour; try again';

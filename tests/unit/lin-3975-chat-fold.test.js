@@ -186,7 +186,7 @@ describe('LIN-3975 — a chat proposal for the task\'s runs is staged in the run
     assert.match(src, /runProposalsStore\.list\(urlKey, runId\)/);
     assert.match(src, /filter\(p => p && p\.status === 'proposed'\)/);
     // LIN-4532 (P2b): the owner's model also carries the open question records of the task (the question section).
-    assert.match(src, /const model = owner\s*\?\s*\{ \.\.\.result\.model, proposals: await pendingProposalsOf\(workspace\.urlKey, result\.model\), questionRecords: await questionRecordsOf\(req, workspace, result\.model\.identifier\) \}\s*:\s*result\.model;/);
+    assert.match(src, /const model = owner\s*\?\s*\{ \.\.\.result\.model, proposals: await pendingProposalsOf\(workspace\.urlKey, result\.model\), questionRecords: await questionRecordsOf\(req, workspace, result\.model\.identifier, result\.model\.title\) \}\s*:\s*result\.model;/);
   });
 
   test('the run control names what Apply does, and Apply and Decline post to the run page\'s own endpoints', () => {

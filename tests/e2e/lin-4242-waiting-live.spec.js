@@ -81,7 +81,7 @@ async function syncBadge(page) {
 }
 
 const waitingCard = (page, identifier) => page.locator(WAIT_CARD, {
-  has: page.locator('[data-testid="waiting-task-line"]', { hasText: identifier }),
+  has: page.locator('[data-testid="question-record-card-task"]', { hasText: identifier }),
 });
 const cardOf = (page, identifier) => waitingCard(page, identifier).locator('[data-testid="question-record-card"]');
 
@@ -105,7 +105,7 @@ test('a question asked after load gets its card on refresh; the count line and b
   await refresh(page);
   // The fragment's task line takes its title from the held task facts (the route's `waitingTitlesOf`), not the dispatch's issueTitle.
   // Witness: force the route's titles off → the line reads the seeded issueTitle `LOCAL-S`.
-  await expect(waitingCard(page, 'LOCAL-S').locator('.waiting-task-title')).toHaveText('Solo task, Todo');
+  await expect(waitingCard(page, 'LOCAL-S').locator('[data-testid="question-record-card-task-title"]')).toHaveText('Solo task, Todo');
   await expect(waitingCard(page, 'LOCAL-S')).toHaveCount(1);
   await expect(page.locator(SECTION)).toBeVisible();
   await expect(page.locator(COUNT)).toContainText('1 waiting on you');

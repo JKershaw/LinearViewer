@@ -149,7 +149,7 @@ test('Home on this shape with twenty open rulings: the Waiting section is owner-
   await page.setViewportSize({ width: 1280, height: 900 });
   await page.goto(`/workspace/${URL_KEY}/`);
   await expect(page.locator('[data-testid="waiting-on-you"]')).toBeVisible();
-  await expect(page.locator('[data-testid="waiting-on-you"] .waiting-card')).toHaveCount(todo.length);
+  await expect(page.locator('[data-testid="waiting-on-you"] .waiting-question')).toHaveCount(todo.length);
   await expect(page.locator('[data-testid="in-progress-count"]')).toContainText(`${todo.length} waiting on you`);
   await expect(page.locator('.rulings-badge .rulings-count')).toHaveText(String(todo.length), { timeout: 15000 });
 

@@ -1,7 +1,8 @@
 /**
  * LIN-4549 (LIN-4546 piece 1, finding-7a603e81): one keep-a-card-across-a-repaint rule for the question card, on every host.
  *
- * Three hosts repaint a question card: Home's live Waiting refresh (the merge, public/question-cards.js mergeWaitingCards),
+ * Three hosts repaint a question card: Home's live Waiting refresh (the merge, public/waiting-merge.js; in beat 3 it was in
+ * public/question-cards.js),
  * Observation's rulings poll (public/observation.js renderRulings), and Home's opened task (public/prompt-section.js, its state
  * poll). Each had its own rule for which card survives the repaint, and they disagreed. The one rule (public/question-records.js
  * holdsCard) keeps today's union: a card the reader has typed in, chosen an option on, holds focus in, whose controls are off
@@ -43,6 +44,16 @@ const STATES = {
   'focus inside': { kept: true, apply(card, document) { document.activeElement = card.querySelector('[data-testid="question-record-card-input"]'); } },
   'a disabled control': { kept: true, apply(card) { card.querySelectorAll('button, textarea').forEach((el) => { el.disabled = true; }); } },
   'an answer in flight': { kept: true, apply(card) { card.dataset.answerInFlight = 'true'; } },
+  // The route refused this card's answer as settled elsewhere (`ruling-settled`): nothing is left for the reader to give, so even
+  // its chosen option and focus on its Answer button do not hold it (tests/e2e/lin-4242-waiting-live.spec.js "a stale card").
+  'refused as settled elsewhere (with a chosen option and focus)': {
+    kept: false,
+    apply(card, document) {
+      STATES['a chosen option'].apply(card);
+      document.activeElement = card.querySelector('[data-testid="question-record-card-answer"]');
+      card.dataset.settledElsewhere = 'true';
+    },
+  },
   settled: {
     kept: true,
     apply(card) { card.dataset.settled = 'true'; card.querySelectorAll('button, textarea').forEach((el) => { el.disabled = true; }); },
@@ -56,30 +67,23 @@ afterEach(() => { while (worlds.length) worlds.pop().restore(); });
 // ── Home: the live Waiting refresh ─────────────────────────────────────────
 // The merge never re-renders a card the server still lists; the rule decides whether a card the server no longer lists (answered
 // elsewhere, withdrawn) is taken out from under the reader. A Home card stays a `.waiting-question` wrapper.
-// question-cards.js runs through importWorld's runClassic (an IIFE sibling a module page reads), over the fake DOM.
-function homeWorld() {
-  const world = importWorld({
-    window: { addEventListener() {}, matchMedia: () => ({ matches: false }) },
-    globals: {
-      CustomEvent: class { constructor(type, init) { this.type = type; this.detail = init && init.detail; } },
-      localStorage: { getItem: () => null, setItem() {} },
-    },
-  });
-  worlds.push(world);
-  world.document.body.innerHTML = renderWaitingSection({ rows: [], questions: [row()] }, { urlKey: 'ws', owner: true });
-  world.runClassic('question-cards.js');
-  return { document: world.document, body: world.document.querySelector('.waiting-body'), QC: world.window.QuestionCards };
+// The merge is a module (public/waiting-merge.js, LIN-4549 beat 4) that asks the rule itself; a fresh instance per world.
+let mergeInstance = 0;
+async function homeWorld() {
+  const dom = createFakeDom();
+  dom.parse(renderWaitingSection({ rows: [], questions: [row()] }, { urlKey: 'ws', owner: true }), dom.document.body);
+  const merge = await import(`../../public/waiting-merge.js?world=${mergeInstance += 1}`);
+  return { document: dom.document, body: dom.document.querySelector('.waiting-body'), merge };
 }
 
 describe('LIN-4549 — Home: the live Waiting refresh keeps a card by the one rule', () => {
   for (const [name, state] of Object.entries(STATES)) {
-    test(`${name}: ${state.kept ? 'kept' : 'taken out'} when the refresh no longer lists it`, () => {
-      const { document, body, QC } = homeWorld();
-      assert.equal(typeof QC?.mergeWaitingCards, 'function', 'question-cards.js ran in the world');
+    test(`${name}: ${state.kept ? 'kept' : 'taken out'} when the refresh no longer lists it`, async () => {
+      const { document, body, merge } = await homeWorld();
       const wrapper = body.querySelector('.waiting-question');
       const card = wrapper.querySelector('[data-testid="question-record-card"]');
       state.apply(card, document);
-      QC.mergeWaitingCards(body, renderWaitingSection({ rows: [], questions: [] }, { urlKey: 'ws', owner: true }), { holds: QR.holdsCard });
+      merge.mergeWaitingCards(body, renderWaitingSection({ rows: [], questions: [] }, { urlKey: 'ws', owner: true }));
       assert.equal(wrapper.isConnected, state.kept, `${name}: the card is ${state.kept ? 'still' : 'no longer'} on Home`);
       if (state.kept) assert.ok(wrapper.classList.contains('waiting-question'), 'a kept Home card stays a .waiting-question');
     });

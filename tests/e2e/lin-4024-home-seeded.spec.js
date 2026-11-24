@@ -90,7 +90,7 @@ test('a task waiting on a question reads the same on the count line, the card, a
   await expect(count).not.toContainText('running');
 
   // LIN-4114: the question is a card in Waiting on you (not a row in Running), labelled with its task.
-  const card = page.locator('[data-testid="waiting-on-you"] .waiting-question', { has: page.locator('[data-testid="waiting-task-line"]', { hasText: 'LOCAL-T1' }) });
+  const card = page.locator('[data-testid="waiting-on-you"] .waiting-question', { has: page.locator('[data-testid="question-record-card-task"]', { hasText: 'LOCAL-T1' }) });
   await expect(card).toHaveCount(1);
   await expect(card.locator('[data-testid="question-record-card-question"]')).toContainText('Which API key?');
   await expect(page.locator('.running-section .line[data-identifier="LOCAL-T1"]')).toHaveCount(0);

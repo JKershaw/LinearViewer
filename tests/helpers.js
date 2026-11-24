@@ -198,6 +198,10 @@ export const SELECTORS = {
     input: '[data-testid="question-record-card-input"]',
     option: '[data-testid="question-record-card-option"]',
     pressedOption: '[data-testid="question-record-card-option"][aria-pressed="true"]',
+    /** The card's own task line (LIN-4549): the identifier (mono, linked where the host gives a link), then the title. */
+    task: '[data-testid="question-record-card-task"]',
+    taskId: '[data-testid="question-record-card-task-id"]',
+    taskTitle: '[data-testid="question-record-card-task-title"]',
   },
   /** LIN-4549: Home's Waiting on you section and its question wrappers (`.waiting-question`, one per open question). */
   waitingOnYou: {

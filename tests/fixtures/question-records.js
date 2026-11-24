@@ -16,10 +16,11 @@ export async function runnerTokenFor(page, urlKey) {
 }
 
 /** A run parked on `[blocked] which way?`: enqueued by the owner, taken by a runner, then blocked. Returns its item id (the run id). */
-export async function askingRun(page, urlKey, identifier, { token = null } = {}) {
+export async function askingRun(page, urlKey, identifier, { token = null, title = identifier } = {}) {
   const bearer = token || await runnerTokenFor(page, urlKey);
+  // LIN-4549: `title` is the task's title the run carries, as a stage run's does (the identifier, as before, when not given).
   const res = await page.request.post(`/workspace/${urlKey}/api/dispatch`, {
-    data: { prompt: 'implementation prompt', promptName: 'implementation', kind: 'implementation', issueIdentifier: identifier, issueTitle: identifier, target: 'cli' },
+    data: { prompt: 'implementation prompt', promptName: 'implementation', kind: 'implementation', issueIdentifier: identifier, issueTitle: title, target: 'cli' },
   });
   expect(res.status(), `dispatch seed failed: ${await res.text()}`).toBe(201);
   const itemId = (await res.json()).item.id;

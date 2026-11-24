@@ -9,7 +9,8 @@
  *
  * - The page and the fragment are one markup over one reduction: for the same seeded state (zero, one, many, a ruling outside
  *   the window, a ruling the live-run guard drops), the page's section is the fragment's markup byte for byte, owner only.
- * - The task lines take their titles from the held issue set when it is warm (`waitingTitlesOf`), else `anchor.issueTitle`.
+ * - The cards take their task titles from the held issue set when it is warm (lib/open-questions.js `titlesFromIssues`, LIN-4549),
+ *   else the card shows its task's identifier alone.
  *
  * The keyed merge itself (public/question-cards.js mergeWaitingCards) runs in a fake DOM in
  * tests/unit/lin-4242-waiting-merge.test.js; the live section runs in a real browser in tests/e2e/lin-4242-waiting-live.spec.js.
@@ -23,7 +24,8 @@ import { withHarnessModels } from '../fixtures/harness-models.js';
 import { loadWorld } from './helpers/client-world.js';
 import { renderNavBar } from '../../lib/components/navbar.js';
 import { createHomeRowStates, createWaitingStanding } from '../../lib/home-row-states.js';
-import { renderWaitingSection, waitingTitlesOf } from '../../lib/waiting-section.js';
+import { renderWaitingSection } from '../../lib/waiting-section.js';
+import { titlesFromIssues } from '../../lib/open-questions.js';
 import '../../lib/providers/linear/index.js';
 import { renderPage } from '../../lib/render.js';
 import { questionRecordsOf, questionsFromLoops } from './helpers/question-records.js';
@@ -244,7 +246,7 @@ describe('LIN-4242 witness 3: the page section and the live fragment are one mar
       assert.equal(page.questions.length, expected, 'the page carries the expected questions');
       assert.equal(page.rulingCount, expected, 'the count is the open questions');
       // The route's answer: renderWaitingSection over the same reads, with the held titles (none here, so the fallback).
-      const fragment = renderWaitingSection({ rows: ruling.rows, titles: {}, questions: page.questions }, { urlKey: 'ws', owner: true });
+      const fragment = renderWaitingSection({ rows: ruling.rows, questions: page.questions }, { urlKey: 'ws', owner: true });
       const html = pageHtmlFor(page, true);
       assert.ok(html.includes(fragment), 'the page section is the fragment markup, byte for byte');
       assert.equal((html.match(/data-testid="waiting-question"/g) || []).length, expected);
@@ -266,22 +268,25 @@ describe('LIN-4242 witness 3: the page section and the live fragment are one mar
   });
 });
 
+// LIN-4549: waitingTitlesOf moved into the one reader's lookup (lib/open-questions.js titlesFromIssues): the same rules, now the
+// `titlesOf` every caller of openQuestionsFor passes. The card draws the title itself (lib/question-record-card.js).
 describe('LIN-4242: the task lines take their titles from the held issue set when it is warm', () => {
-  test('waitingTitlesOf names only the wanted identifiers, first match wins, and a missing title is empty', () => {
+  test('titlesFromIssues names only the wanted identifiers, first match wins, and a missing title is left out', () => {
     const issues = [
       { identifier: 'LIN-1', title: 'First title' },
       { identifier: 'LIN-1', title: 'Second title' },
       { identifier: 'LIN-2', title: undefined },
       { identifier: 'LIN-9', title: 'Not waiting' },
     ];
-    assert.deepEqual({ ...waitingTitlesOf(issues, ['LIN-1', 'LIN-2']) }, { 'LIN-1': 'First title', 'LIN-2': '' });
-    assert.deepEqual({ ...waitingTitlesOf(null, ['LIN-1']) }, {});
+    assert.deepEqual({ ...titlesFromIssues(issues)(['LIN-1', 'LIN-2']) }, { 'LIN-1': 'First title' });
+    assert.deepEqual({ ...titlesFromIssues(null)(['LIN-1']) }, {});
   });
 
-  test('a waiting card reads its held title, and falls back to anchor.issueTitle with no titles', () => {
-    const held = renderWaitingSection({ questions: [waitingRow('LIN-1')], titles: waitingTitlesOf([{ identifier: 'LIN-1', title: 'Held title' }], ['LIN-1']) }, { urlKey: 'ws', owner: true });
-    assert.match(held, /class="waiting-task-title">Held title</);
-    const cold = renderWaitingSection({ questions: [waitingRow('LIN-1')], titles: {} }, { urlKey: 'ws', owner: true });
-    assert.match(cold, /class="waiting-task-title">LIN-1</, 'a question carries no task title of its own: the line names the ticket');
+  test('a waiting card reads its held title, and with none shows its identifier alone (no blank gap, no repeat)', () => {
+    const held = renderWaitingSection({ questions: [{ ...waitingRow('LIN-1'), title: 'Held title' }] }, { urlKey: 'ws', owner: true });
+    assert.match(held, /data-testid="question-record-card-task-title">Held title</);
+    const cold = renderWaitingSection({ questions: [{ ...waitingRow('LIN-1'), title: null }] }, { urlKey: 'ws', owner: true });
+    assert.match(cold, /data-testid="question-record-card-task-id">LIN-1</, 'the line names the ticket');
+    assert.doesNotMatch(cold, /question-record-card-task-title/, 'and no title span when the title is unknown');
   });
 });

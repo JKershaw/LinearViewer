@@ -17,10 +17,11 @@ Area notes for `front-end-pages` in the registry. Format and rules: README.md.
   as a module, never a second card or handler (LIN-4532). A question's `in` is its task RECORD id, not the ticket: a page
   keyed by identifier matches on the row's `ticket` (`ticketOfTask` in `lib/records-store.js`). LIN-4532's first pass
   filtered the task page on `taskId` against `LIN-n` and matched nothing.
-- On Home a question card is a `.waiting-question`, not a `.waiting-card`: the live merge (`public/question-cards.js`
-  mergeWaitingCards) removes every `.waiting-card` the fragment does not list, so a card the fragment does not draw must not
-  wear that class (LIN-4532). The live merge keys a question wrapper by its question id (`question:<id>`), and holds one that is
-  settled or has an answer in flight, so a refresh never takes out a card the person is answering.
+- On Home a question card is a `.waiting-question` wrapper, the live merge's unit (`public/waiting-merge.js`, LIN-4549; the
+  `.waiting-card` branches are gone). The merge keys a wrapper by its card's question id and takes out one the fragment no
+  longer lists unless the one keep-a-card rule holds it (`public/question-records.js` holdsCard), so a refresh never takes out a
+  card the person is answering. The card draws its own task line (`lib/question-record-card.js` questionTaskLine): a host passes
+  its `taskHref` and any state words (Home's "needs you", `lib/waiting-section.js`), never a second line of its own.
 - Retiring a page widget, grep `public/` and `lib/` for every class and test id it drew before deleting a rule: another
   surface may borrow it, and a borrowed name then says the wrong thing. The prompt section drew the recap widget's
   `.recap-spinner` and `.recap-error`, and the task page's owner signal (`public/task-page.js`) was a marker named

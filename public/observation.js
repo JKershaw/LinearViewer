@@ -1670,14 +1670,17 @@ function renderRulings(rulings, host = rulingsTabHost()) {
 }
 
 // LIN-4532 (P2b): an open question record, as a ruling row. Its card is the shared one (lib/question-record-card.js); the answer
-// and the dismissal go through the one route each (public/question-records.js).
+// and the dismissal go through the one route each (public/question-records.js). LIN-4549: the card draws its own task line (the
+// identifier, linked to the task page, and the title), so the row adds only the workspace's name, and only when several show.
 function renderQuestionRulingRow(row) {
   const li = document.createElement('li');
   li.className = 'obs-ruling obs-ruling-question';
   li.dataset.testid = 'ruling-question-row';
-  // The same task head a ruling row carries (its identifier and title, the workspace name when several show): finding-9221fb7a.
-  li.appendChild(rulingHeadOf(row?.anchor || {}));
-  li.insertAdjacentHTML('beforeend', renderQuestionRecordCard(row, { urlKey: row?.anchor?.workspaceUrlKey || '' }));
+  const head = rulingHeadOf(row?.anchor || {});
+  if (head) li.appendChild(head);
+  const urlKey = row?.anchor?.workspaceUrlKey || '';
+  const card = { ...row, ticket: row?.ticket ?? row?.anchor?.issueIdentifier ?? null, title: row?.title ?? row?.anchor?.issueTitle ?? null };
+  li.insertAdjacentHTML('beforeend', renderQuestionRecordCard(card, { urlKey, taskHref: (identifier) => taskPageHref({ urlKey, identifier }) }));
   return li;
 }
 
@@ -1700,17 +1703,16 @@ function questionRowNode(row) {
   return li;
 }
 
-// The task head of a question row: the task by its id and its title (LIN-3983 PR 2). The workspace key is never
-// shown; the workspace's name is, and only when more than one workspace is showing.
+// The head of a question row: the workspace's name, and only when more than one workspace is showing (LIN-3983 PR 2); the task
+// itself is the card's own task line (LIN-4549). Null when there is nothing to say. The workspace key is never shown.
 function rulingHeadOf(anchor) {
+  const workspaces = observationData?.workspaces || [];
+  if (workspaces.length <= 1) return null;
+  const wsName = workspaces.find(w => w.urlKey === anchor?.workspaceUrlKey)?.name || anchor?.workspaceUrlKey;
+  if (!wsName) return null;
   const head = document.createElement('div');
   head.className = 'obs-ruling-head';
-  const idLabel = anchor?.issueIdentifier || 'Question';
-  const workspaces = observationData?.workspaces || [];
-  const wsName = workspaces.find(w => w.urlKey === anchor?.workspaceUrlKey)?.name || anchor?.workspaceUrlKey;
-  head.innerHTML = `<span class="obs-ruling-issue">${escapeHtml(String(idLabel))}</span>`
-    + (anchor?.issueTitle ? ` <span class="obs-ruling-title">${escapeHtml(String(anchor.issueTitle))}</span>` : '')
-    + (workspaces.length > 1 && wsName ? ` <span class="obs-ruling-ws" data-testid="obs-ruling-ws">${escapeHtml(String(wsName))}</span>` : '');
+  head.innerHTML = `<span class="obs-ruling-ws" data-testid="obs-ruling-ws">${escapeHtml(String(wsName))}</span>`;
   return head;
 }
 

@@ -203,6 +203,7 @@ export const MONO_ALLOWED = Object.freeze([
   '.task-ref-ident',
   '.sess-ticket-ident',
   '.sess-run-id',
+  '.sess-qcard-task-id', // LIN-4549 (LIN-4162): the task identifier on the shared question card
   '.sess-cred-token',
   '.task-share-url',
   '.context-node-id',
