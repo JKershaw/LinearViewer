@@ -33,6 +33,15 @@ describe('code-shape area map placement (LIN-3729)', () => {
     assert.strictEqual(areaOf('lib/run-records.js'), 'Runs & dispatch');
   });
 
+  // LIN-4556: the plain-text masker sits beside the rules it runs (secret-scan); the HTML masker that calls it stays a
+  // page module, and feedback intake's masking sits with dispatch by its dispatch- name.
+  test('the plain-text masker lands in Platform & plumbing beside secret-scan', () => {
+    assert.strictEqual(areaOf('lib/mask-secrets.js'), 'Platform & plumbing');
+    assert.strictEqual(areaOf('lib/secret-scan.js'), 'Platform & plumbing');
+    assert.strictEqual(areaOf('lib/mask-secrets-in-html.js'), 'Front end: server-rendered pages');
+    assert.strictEqual(areaOf('lib/dispatch-feedback-masking.js'), 'Runs & dispatch');
+  });
+
   test('the three relabelled files land in their owning areas', () => {
     assert.strictEqual(areaOf('lib/proxy-fetch.js'), 'Platform & plumbing');
     assert.strictEqual(areaOf('lib/openrouter-key-resolver.js'), 'Auth, accounts & workspaces');

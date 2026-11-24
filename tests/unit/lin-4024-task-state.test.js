@@ -119,7 +119,7 @@ describe('LIN-4024 — LIN-4011/4012 read the same on the row, the count and the
     assert.equal(states.get('LIN-4008').running, false);
 
     const parts = buildInProgressCountParts([{ projectName: 'P', roots: [parent] }], states, { rulingCount: ruling0.rows.length });
-    assert.deepEqual(parts.map((p) => p.text), ['2 waiting on you'], 'the summary says two rulings and nothing is running');
+    assert.deepEqual(parts.map((p) => p.text), ['2 questions'], 'the summary says two questions and nothing is running');
   });
 
   test('the opened task: a queued check-in behind a ruling is not running, and the task is waiting on the ruling', () => {

@@ -86,9 +86,9 @@ test.describe('Home: Waiting on you draws the open question records', () => {
 
     await expect(page.locator(WAITING_QCARD)).toHaveCount(1);
     await expect(page.locator(`${WAITING_Q} [data-testid="question-record-card-task"]`)).toContainText('LOCAL-S');
-    await expect(page.locator(COUNT)).toContainText('1 waiting on you');
+    await expect(page.locator(COUNT)).toContainText('1 question');
     await syncBadge(page);
-    await expect(page.locator(BADGE)).toHaveText('1');
+    await expect(page.locator(BADGE)).toHaveText('1 question');
 
     const card = cardFor(page, qid, WAITING_Q);
     await answerCard(card, 'right', 'take the right one, it touches less');
@@ -121,7 +121,7 @@ test.describe('Home: Waiting on you draws the open question records', () => {
     await refresh(page);
     await expect(cardFor(page, qid, WAITING_Q)).toHaveCount(1);
     await expect(page.locator(`${WAITING_Q} [data-testid="question-record-card-task"]`)).toContainText('LOCAL-S');
-    await expect(page.locator(COUNT)).toContainText('1 waiting on you');
+    await expect(page.locator(COUNT)).toContainText('1 question');
     await expect(page.locator(SECTION)).toBeVisible();
   });
 
@@ -153,10 +153,10 @@ test.describe('Home: Waiting on you draws the open question records', () => {
 
     await seedQuestion(page, URL_KEY, { ticket: 'LOCAL-D', runId: await askingRun(page, URL_KEY, 'LOCAL-D') });
     await page.goto(`/workspace/${URL_KEY}/`);
-    await expect(page.locator(COUNT)).toContainText('1 waiting on you');
+    await expect(page.locator(COUNT)).toContainText('1 question');
     await expect(page.locator(WAITING_QCARD)).toHaveCount(1);
     await syncBadge(page);
-    await expect(page.locator(BADGE)).toHaveText('1');
+    await expect(page.locator(BADGE)).toHaveText('1 question');
 
     await page.goto(`/workspace/${URL_KEY}/observation`);
     await page.locator('[data-testid="obs-tab-rulings"]').click();

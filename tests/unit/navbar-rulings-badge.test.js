@@ -16,7 +16,9 @@ describe('renderNavBar — rulings badge (LIN-1728 Phase 3)', () => {
     assert.match(html, /data-rulings-badge/);
     assert.match(html, /class="rulings-badge hidden"/);
     assert.match(html, /data-url-key="test-ws"/);
-    assert.match(html, /<span class="rulings-count">0<\/span> waiting on you/);
+    // LIN-4552: the badge says "N questions" (the whole phrase is the count's, written by public/common.js questionsWords).
+    assert.match(html, /<span class="rulings-count">0 questions<\/span>/);
+    assert.doesNotMatch(html, /waiting on you/i, 'Home says "Waiting on you" once, in its section header');
   });
 
   test('is absent when the runControls bit is off — same gate as the queue badge', () => {

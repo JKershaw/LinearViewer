@@ -9,6 +9,7 @@
  * Every write goes through the one checked pipeline (lib/records/writes.js) with `by` = `person:<canonical account>`,
  * read from the session, never from the body. Forms post plainly (no script needed): a written or refused write
  * answers 303 back to the task page's Records section, and a refusal carries its first problem in `records_refused`.
+ * LIN-4552: the end route also answers a JSON post in JSON (Home's note "clear"), with no page to go back to.
  * A guest has no session account and gets no route (the guest route is /t/:token, which never reaches here).
  *
  * The first write on a ticket with no task record makes that task here, through the pipeline's `ensureTickets` (a page
@@ -163,10 +164,17 @@ export function createTaskRecordsRoutes({ workspaceFromUrl, recordsStore, accoun
 
   router.post('/workspace/:urlKey/records/:id/end', workspaceFromUrl, async (req, res) => {
     const { urlKey } = req.workspace;
+    // LIN-4552: a script's end (Home's "clear" on a note, public/waiting-notes.js) posts JSON and is answered in JSON: 200 with the
+    // record's id and end, or the refusal's status with its first problem as `error`. It needs no `identifier`, which only names
+    // the page a form post goes back to. A form post is answered as before: a 303 back to the task page's Records section.
+    const json = req.is('application/json') === 'application/json';
     const identifier = trimmed(req.body?.identifier);
-    if (!isValidIssueId(identifier)) return jsonError(res, 404, 'Task not found');
+    if (!json && !isValidIssueId(identifier)) return jsonError(res, 404, 'Task not found');
     const writer = await writerOrRefuse(req, res);
     if (!writer) return undefined;
+    const refuse = (status, problems) => (json
+      ? res.status(status).json({ error: problems[0]?.message || 'refused', problems })
+      : res.redirect(303, refusedTo(urlKey, identifier, problems)));
     try {
       const input = { state: trimmed(req.body?.state), reason: trimmed(req.body?.reason), ...(trimmed(req.body?.into) ? { into: trimmed(req.body.into) } : {}) };
       // LIN-4550, LIN-4554: the page ends a record only as its form offers (pageEndsOf, lib/render-task-records.js, the one rule).
@@ -176,16 +184,17 @@ export function createTaskRecordsRoutes({ workspaceFromUrl, recordsStore, accoun
       const prev = await recordsStore.current(urlKey, req.params.id);
       const kindEnds = KINDS.kinds[prev?.kind]?.ends || [];
       if (prev && kindEnds.includes(input.state) && !pageEndsOf(prev).includes(input.state)) {
-        return res.redirect(303, refusedTo(urlKey, identifier, [{ message: pageEndRefusal(input.state) }]));
+        return refuse(422, [{ message: pageEndRefusal(input.state) }]);
       }
       const result = await writes.end({ urlKey, id: req.params.id, input, by: writer.by, run: writer.run });
-      if (result.problems) return res.redirect(303, refusedTo(urlKey, identifier, result.problems));
+      if (result.problems) return refuse(422, result.problems);
+      if (json) return res.json({ ok: true, id: req.params.id, state: input.state });
       return res.redirect(303, backTo(urlKey, identifier));
     } catch (err) {
-      if (err instanceof RecordsNotFound) return res.redirect(303, refusedTo(urlKey, identifier, [{ message: 'That record is not in this workspace' }]));
-      if (err instanceof RecordsVersionConflict) return res.redirect(303, refusedTo(urlKey, identifier, [{ message: 'That record changed while you were writing; reload and try again' }]));
+      if (err instanceof RecordsNotFound) return refuse(404, [{ message: 'That record is not in this workspace' }]);
+      if (err instanceof RecordsVersionConflict) return refuse(409, [{ message: 'That record changed while you were writing; reload and try again' }]);
       console.error('Task records end error:', err?.message || err);
-      return res.redirect(303, refusedTo(urlKey, identifier, [{ message: 'The records store is unavailable; try again' }]));
+      return refuse(503, [{ message: 'The records store is unavailable; try again' }]);
     }
   });
 

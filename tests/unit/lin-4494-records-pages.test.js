@@ -18,7 +18,7 @@ import { createTaskRecordsRoutes } from '../../routes/task-records.js';
 import { createFakeTracker } from '../helpers/fake-records-tracker.js';
 import { HARBOUR_WRITER } from '../../lib/records/writes.js';
 import { createProjectPageRoutes } from '../../routes/project-page.js';
-import { renderTaskRecordsSection, renderWaitingRecordLine } from '../../lib/render-task-records.js';
+import { renderTaskRecordsSection } from '../../lib/render-task-records.js';
 import { renderTaskPage } from '../../lib/render-task-page.js';
 import { renderWaitingSection } from '../../lib/waiting-section.js';
 import { createWaitingStanding } from '../../lib/home-row-states.js';
@@ -464,18 +464,20 @@ describe("Home's Waiting on you: the person's open records, owner only", () => {
       recordsStore: store,
     });
     const mine = await standing({ urlKey: URL_KEY, accountId: ACCOUNT });
-    assert.deepEqual(mine.records.map((r) => r.fields.says), ['for john']);
+    // LIN-4552: the records are Home's notes, openFindingsFor rows (lib/open-questions.js).
+    assert.deepEqual(mine.records.map((r) => r.says), ['for john']);
     const none = await standing({ urlKey: URL_KEY });
     assert.deepEqual(none.records, []);
   });
 
   test('the section draws the records beside the rulings, for the owner only', () => {
-    const records = [{ id: 'finding-abc', kind: 'finding', state: 'open', fields: { says: 'the footer is wrong' }, in: 'task-1', to: 'person:acc-john' }];
+    // LIN-4552: a record is a note line under "Notes for you" (lib/waiting-section.js renderNoteLine).
+    const records = [{ recordId: 'finding-abc', says: 'the footer is wrong', lead: 'the footer is wrong', ticket: null, title: null }];
     const owner = renderWaitingSection({ rows: [], records }, { urlKey: URL_KEY, owner: true });
-    assert.match(owner, /data-testid="waiting-record"/);
+    assert.match(owner, /data-testid="waiting-note"/);
+    assert.match(owner, /the footer is wrong/);
     assert.doesNotMatch(owner, /class="waiting-section hidden"/, 'a record alone shows the section');
     assert.equal(renderWaitingSection({ rows: [], records }, { urlKey: URL_KEY, owner: false }), '');
-    assert.match(renderWaitingRecordLine(records[0], { urlKey: URL_KEY }), /the footer is wrong/);
   });
 
   test('a section with no rulings and no records stays hidden', () => {

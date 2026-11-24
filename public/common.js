@@ -2781,7 +2781,18 @@ function runRulingsTick(urlKey) {
 }
 
 /**
- * Update the ambient "waiting on you" rulings badge count for a workspace.
+ * LIN-4552: the words for a number of open questions, "1 question" / "N questions": the nav badge here and Home's live count line
+ * (public/app.js reads this global). The server's count line says the same (lib/task-board-view.js questionsWords; a parity test,
+ * tests/unit/lin-4552-quiet-home.test.js, holds the two to one rule: this classic file cannot import the server's).
+ * @global
+ */
+window.questionsWords = function questionsWords(n) {
+  return `${n} ${n === 1 ? 'question' : 'questions'}`;
+};
+
+/**
+ * Update the ambient open-questions badge for a workspace (LIN-4552: "N questions", the number Home's count line says; a note,
+ * an open finding, is never in it).
  * Mirrors updateQueueBadge's raw-fetch, silently-swallow-failures shape (a
  * background poller must never redirect to /logout or toast on a transient
  * error) — reads GET .../api/dashboard/rulings, which is `req.session.workspaces`
@@ -2801,7 +2812,7 @@ window.updateRulingsBadge = async function updateRulingsBadge(urlKey) {
     const badge = document.querySelector(`[data-rulings-badge][data-url-key="${urlKey}"]`);
     if (badge) {
       const countEl = badge.querySelector('.rulings-count');
-      if (countEl) countEl.textContent = count;
+      if (countEl) countEl.textContent = window.questionsWords(count);
       badge.classList.toggle('hidden', count === 0);
     }
   } catch (e) {

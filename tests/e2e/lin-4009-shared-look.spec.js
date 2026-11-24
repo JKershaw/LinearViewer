@@ -116,8 +116,20 @@ test.describe('one shared look (LIN-4009)', () => {
       return { tone: el.dataset.tone, color: cs.color, weight: cs.fontWeight, background: cs.backgroundColor };
     });
     const style = async (identifier) => styleOf(rowState(page, identifier));
-    // LIN-4114: a task with an open question is a Waiting on you card; its needs-you state reads on that card's task line.
-    const needsYou = await styleOf(page.locator('[data-testid="question-record-card-task"]', { hasText: TASKS.needsYou }).locator('[data-testid="issue-row-state"]'));
+    // LIN-4114: a task with an open question is a Waiting on you card, not a row. LIN-4552: the card's line carries no state words
+    // under the header that says "Waiting on you", so the needs-you tone is read off a row-state drawn as a row draws it.
+    await expect(page.locator('[data-testid="question-record-card-task"]', { hasText: TASKS.needsYou })).toHaveCount(1);
+    const needsYou = await page.evaluate(() => {
+      const probe = document.createElement('span');
+      probe.className = 'row-state';
+      probe.dataset.tone = 'needs-you';
+      probe.textContent = 'needs you';
+      document.querySelector('.running-section .line, main').appendChild(probe);
+      const cs = getComputedStyle(probe);
+      const out = { tone: probe.dataset.tone, color: cs.color, weight: cs.fontWeight, background: cs.backgroundColor };
+      probe.remove();
+      return out;
+    });
     const failed = await style(TASKS.failed);
     const running = await style(TASKS.running);
     // LIN-4103: a never-run row has no state at all (the guessed "ready" tone is gone), so it has no state element.
@@ -143,9 +155,9 @@ test.describe('one shared look (LIN-4009)', () => {
     await page.waitForLoadState('networkidle');
 
     const count = page.locator('[data-testid="in-progress-count"]');
-    // LIN-4024: the count line counts open questions as waiting on you, failed tasks as failed, running tasks as running.
-    // One question is open here (the blocked task), so the failed task is not waiting on you.
-    await expect(count).toContainText('1 waiting on you');
+    // LIN-4024: the count line counts open questions (LIN-4552: "N questions"), failed tasks as failed, running tasks as running.
+    // One question is open here (the blocked task), so the failed task is not counted as a question.
+    await expect(count).toContainText('1 question');
     await expect(count).toContainText('1 failed');
     await expect(count).toContainText('1 running');
     await expect(count.locator('[data-tone="needs-you"]')).toHaveCount(1);

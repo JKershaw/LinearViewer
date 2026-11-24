@@ -460,16 +460,45 @@ describe('(e) an end form offers only its own kind\'s ends a person may write he
     assert.deepEqual(projectOffered, ['answered', 'handed-on'], 'a question to the project has no card, so a person may still settle it here; never withdrawn');
   });
 
-  test('every end the form leaves out has a refusal that names where it is written; none reads as a bare "cannot end"', () => {
+  test('every end the form leaves out has a refusal that names the surface that writes it', () => {
+    // Each end's own wording: dismissed goes through the card, a question's withdrawn is the asking run's, a person's answered is the card's.
+    const surface = {
+      dismissed: [/Dismiss/],
+      withdrawn: [/run that asked/],
+      answered: [/card/, /answer/i],
+    };
+    let checked = 0;
     for (const [kind, { ends }] of Object.entries(KINDS.kinds)) {
       for (const to of ['project', `person:${OWNER}`]) {
         const offered = pageEndsOf({ kind, to });
         for (const end of ends.filter((e) => !offered.includes(e))) {
           const why = pageEndRefusal(end);
-          assert.ok(why && !/cannot end/.test(why), `${kind} to ${to} ending ${end}: refusal names the other surface (got ${why})`);
+          assert.ok(surface[end], `${kind} to ${to} ending ${end}: the refusal has a surface to name (add it here if a new end is left out)`);
+          for (const pattern of surface[end]) assert.match(why, pattern, `${kind} to ${to} ending ${end}: refusal names its own surface (got ${why})`);
+          assert.doesNotMatch(why, /cannot end/);
+          checked += 1;
         }
       }
     }
+    assert.ok(checked >= 3, `the loop reached the left-out ends (checked ${checked})`);
+    for (const end of Object.keys(surface)) {
+      assert.ok(Object.values(KINDS.kinds).some(({ ends }) => ends.includes(end)), `${end} is an end some kind has`);
+    }
+  });
+
+  test('a JSON post ending a question withdrawn answers 422 JSON naming the run that asked, and the question stays open (LIN-4552 with LIN-4554)', async () => {
+    const taskId = await makeTicketTask();
+    const q = await add('question', 'open', { asks: 'Which footer?' }, { inTask: taskId, to: `person:${OWNER}`, by: 'review' });
+    await serve('owner');
+    const res = await fetch(`${base}/workspace/${URL_KEY}/records/${q.id}/end`, {
+      method: 'POST', headers: { 'content-type': 'application/json', accept: 'application/json' },
+      body: JSON.stringify({ state: 'withdrawn', reason: 'not needed' }),
+    });
+    assert.equal(res.status, 422, 'a JSON post is refused with the status, not redirected');
+    const body = await res.json();
+    assert.match(body.error, /run that asked/, 'the error names who may take the question back');
+    assert.match(body.problems[0].message, /run that asked/);
+    assert.equal((await store.current(URL_KEY, q.id)).state, 'open', 'the question stays open');
   });
 
   for (const [state, to] of [['withdrawn', 'project'], ['withdrawn', `person:${OWNER}`], ['answered', `person:${OWNER}`]]) {

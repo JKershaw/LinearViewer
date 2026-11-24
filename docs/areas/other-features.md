@@ -15,3 +15,6 @@ Area notes for `other-features` in the registry. Format and rules: README.md.
 - When a producer retires, its readers keep their inputs and read them as false forever, and no test fails.
   `lib/task-state.js` kept a `taskScan` fact after the scan was the last thing that could set it (LIN-4540).
   Before deleting a writer, grep for the facts and fields that only it fed, and delete them with it.
+- Markup a browser module repaints carries every label it can show, drawn by the server; the module sets numbers and toggles
+  which label shows, never writing words (`renderNotesMore` in `lib/waiting-section.js`, read by `public/waiting-notes.js`).
+  LIN-4552's first pass wrote "show N more" in both files: one rule spelled two ways.

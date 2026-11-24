@@ -176,7 +176,7 @@ import { noJobBody, noJobNoticeOf } from './lib/components/dispatch-no-job.js'
 import { renderSwipePage, orderIssuesForSwipe } from './lib/render-swipe.js'
 import { rowDataByNodeKey } from './lib/task-board-view.js'
 import { createHomeRowStates, createWaitingStanding, gatherTaskStates } from './lib/home-row-states.js'
-import { renderWaitingSection } from './lib/waiting-section.js'
+import { waitingFragmentOf } from './lib/waiting-section.js'
 import { titlesFromIssues } from './lib/open-questions.js'
 import { createTaskFactsHolder, createTaskFactsRefresh } from './lib/task-facts-holder.js'
 import { createWorkspaceIssuesMemo } from './lib/workspace-issues-memo.js'
@@ -3856,24 +3856,22 @@ app.get('/workspace/:urlKey/api/home-rows', workspaceFromUrl, async (req, res) =
 
 // LIN-4242: the live Waiting on you fragment. Owner only, by the page's own predicate (`featureFlags.runControls === true`):
 // anyone else gets a 403 and no card text. It draws the section the page draws, over the same reduction (`waitingStanding`),
-// and answers `{ html, count }` only. The client derives each card's key from the markup (`rulingKeyOf`), so no keys here.
+// and answers `{ html, count }` only. The client reads each key from the markup (a card's question id, a note's `data-key`), so no keys here.
 // Titles come from the held task facts when warm, so a card a refresh adds reads as the page reads it.
 app.get('/workspace/:urlKey/api/home-waiting', workspaceFromUrl, async (req, res) => {
   const workspace = req.workspace;
   try {
     const featureFlags = await requestFeatureFlags(req);
     if (featureFlags.runControls !== true) return jsonError(res, 403, 'Waiting on you is for the workspace owner');
-    // LIN-4532 (P2b): the open questions are counted with the rulings (the count and the badge).
     // LIN-4549: each question's task title comes from the held issue set when it is warm (a read, no provider call); a cold set
     // leaves the card its identifier alone.
     const held = taskFacts.read(workspace.urlKey);
     const titlesOf = held.complete ? titlesFromIssues(held.issues) : null;
-    const { ruling, questions = [] } = await waitingStanding({ urlKey: workspace.urlKey, accountId: req.session.accountId, titlesOf });
-    const rows = ruling ? ruling.rows : [];
+    const { questions = [], records = [] } = await waitingStanding({ urlKey: workspace.urlKey, accountId: req.session.accountId, titlesOf });
     // LIN-4532 (finding-dca7ac9d): the question cards come in the fragment too, so a question asked after the page load is merged
-    // in by the refresh (public/waiting-merge.js), as a ruling is.
-    const html = renderWaitingSection({ rows, questions }, { urlKey: workspace.urlKey, owner: true });
-    res.json({ html, count: rows.length + questions.length });
+    // in by the refresh (public/waiting-merge.js). LIN-4552 (finding-d4767b81): the notes for the owner (open findings) come too,
+    // merged by their own keys (`record:<id>`, public/waiting-notes.js); `count` is the questions alone (waitingFragmentOf).
+    res.json(waitingFragmentOf({ questions, records }, { urlKey: workspace.urlKey }));
   } catch (error) {
     if (isAuthError(error)) return unauthorized.json(res, 'Not authenticated');
     console.error('Home waiting error:', error);
