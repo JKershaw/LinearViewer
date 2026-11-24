@@ -10,10 +10,8 @@
  * description-target attachment) carry the plan-heading guard (LIN-4504, `refusedByPlanHeading`)
  * at their two call sites: a plan is records, never a description section. (LIN-4542 retired the
  * size record guard: the size of the move is a decision record, and a `## Size of the move`
- * section in a description is ordinary text.) Every write that creates or edits a comment
- * body (create, edit, and the comment-target attachment caption) carries the blind-read guard (LIN-4437, `refusedByBlindRead`): a comment opening
- * with `## Blind read` names exactly the landing's PRs (lib/run-ledger.js checkBlindReadPrs; LIN-4520 retired its
- * verdict-line shape, a verdict being a record); it is the one comment guard that reads the trail first.
+ * section in a description is ordinary text.) A comment body is ordinary text: the blind-read guard
+ * (LIN-4437) retired with the blind read's comment (LIN-4533), whose landing rule holds on its verdict record.
  *
  * Shape. Every route is one literal registration whose handler runs through
  * `guarded(spec, handler)`, which owns the part they all share, in this order:
@@ -59,10 +57,7 @@ import { flattenIssue, MAX_ATTACHMENT_BYTES } from '../lib/proxy-wire.js';
 import { UUID_REGEX, isValidIssueId } from '../lib/workspace.js';
 import { appendBlock, replace as replaceInDescription, DescriptionEditError } from '../lib/description-edit.js';
 import { addedPlanHeadings, PLAN_HEADING_WORDS, PLAN_IN_DESCRIPTION } from '../lib/legacy-plan-text.js';
-import { blindReadRefusal, checkBlindReadPrs } from '../lib/run-ledger.js';
-import { opensAsBlindRead } from '../lib/run-trail.js';
 import { postHarbourComment, repairHarbourCommentRecord } from '../lib/harbour-comment-post.js';
-import { landingOfTicket } from '../lib/records/landing.js';
 import { isRestrictedStamp, sameTicketKey, ISSUE_PATCH_FIELDS } from '../lib/stage-writes.js';
 import { jsonError } from '../lib/errors.js';
 import { parseFeedbackImage } from '../lib/attachment-upload.js';
@@ -151,7 +146,7 @@ export const SPEC_OPERATIONS = Object.freeze(Object.keys(SPEC));
  * @param {Function} deps.resolveLabelInput - Symbolic-or-UUID label ref resolver (closure-local)
  * @param {Function} deps.refResolutionFailed - Maps a RefResolutionError to its own 422 (closure-local)
  * @param {Function} deps.partialWriteFailed - Maps a PartialWriteError (write landed, its confirmation re-read failed) to its own envelope (closure-local)
- * @param {Object} [deps.recordsStore] - the records store the Periodical gate's standing and the blind-read guard's landing are read from
+ * @param {Object} [deps.recordsStore] - the records store the Periodical gate's standing is read from
  * @param {Function} deps.logEvent - Audit/witness event logger (closure-local)
  * @param {Object} [deps.harbourCommentsStore] - Durable (urlKey, commentId) ledger (LIN-2648); best-effort record at each createComment seam, never gates the response
  * @param {Function} [deps.onTicketWrite] - Optional ticket-closed closer seam (LIN-3366), fire-and-forget; never changes a response
@@ -636,39 +631,6 @@ export function createProxyWriteRoutes({
 
   // ---------------------------------------------------------------------------
   // Comments
-  /**
-   * The blind-read guard (LIN-4437, its PR-set half kept by LIN-4520), at every write that creates or edits a comment
-   * body, after the guard. It acts only on a comment whose first non-blank line is the `## Blind read` heading
-   * (exactly, or with a `:` tail), so a review verdict that mentions the heading further down, and a
-   * `## Blind read pilot` tally, pass untouched. The body must name at least one full PR URL (no read needed). The PR set
-   * then needs the ticket's records landing (lib/records/landing.js), the one every gate reads: exactly the landing's PRs.
-   * When the landing cannot be read, the set check is skipped and logged, and the URL check still holds: fail open, as the
-   * close-out gate does on a failed read. 422 with the code. Resolves true once it has refused.
-   * LIN-4520: the verdict's shape (one verdict line, a word, a reason) is no longer checked here; a blind read's verdict is
-   * a record.
-   */
-  async function refusedByBlindRead(ctx, body) {
-    if (!opensAsBlindRead(body)) return false;
-    // LIN-4518 step 3: the landing is the task's records landing (lib/records/landing.js), the one every gate reads.
-    let landing = null;
-    try {
-      if (!recordsStore) throw new Error('no records store');
-      landing = await landingOfTicket({ recordsStore, urlKey: ctx.req.proxyUrlKey, ticket: ctx.req.params.issueId });
-    } catch (err) {
-      console.warn(`[blind-read] ${ctx.req.params.issueId}: PR-set check skipped, the landing could not be read (${err?.message || err}); the URL check held`);
-    }
-    const check = checkBlindReadPrs(body, { landing });
-    return check.ok ? false : refuseBlindRead(ctx, check);
-  }
-
-  function refuseBlindRead(ctx, check) {
-    return refuse(ctx, 422, blindReadRefusal(check), {
-      code: check.code,
-      ...(check.line ? { line: check.line } : {}),
-      ...(check.expected ? { expected: check.expected, got: check.got } : {})
-    });
-  }
-
   // ---------------------------------------------------------------------------
 
   // POST /api/proxy/issues/:issueId/comments (canonical, nested issue-scoped form)
@@ -681,10 +643,8 @@ export function createProxyWriteRoutes({
     // cosmetic exception for a doubly-invalid body, which reports the
     // dangerous-chars message instead of the length one.
     if (refuseBadCommentBody(ctx, body)) return;
-    // LIN-4468: the stage-target check comes before the blind read, which reads the target's comment trail
-    // and can answer with its landing PRs: a stage outside its ticket is refused before any answer about it.
+    // LIN-4468: the stage-target check comes first: a stage outside its ticket is refused before any answer about it.
     if (!await guardTarget(ctx, 'issueWriteGuard', { onNull: 'proceed' })) return;
-    if (await refusedByBlindRead(ctx, body)) return;
 
     // Deterministic dedupe (LIN-399): an identical comment just created for this
     // issue is returned instead of minting a duplicate. The generation tag
@@ -735,7 +695,6 @@ export function createProxyWriteRoutes({
     if (refuseBadUuid(ctx, commentId, 'comment')) return;
     const { body } = req.body;
     if (refuseBadCommentBody(ctx, body)) return;
-    if (await refusedByBlindRead(ctx, body)) return;
     const updated = normalizeWritePayload(await provider.updateComment(token, commentId, body), 'comment');
     if (writeRejected(req, res, endpoint, updated, 'Comment was not updated')) return;
     commentDedupeGenerations.bump(req.proxyUrlKey);
@@ -774,7 +733,6 @@ export function createProxyWriteRoutes({
     // type-check then dangerous-chars, comes before the length/budget math.
     const bodyValidation = validateCommentBody(body, { required: false });
     if (!bodyValidation.valid) return refuse(ctx, 400, bodyValidation.error);
-    if (!toDescription && body && await refusedByBlindRead(ctx, body)) return;
 
     if (!image) return refuse(ctx, 400, 'image is required');
     const parsed = parseFeedbackImage(image);

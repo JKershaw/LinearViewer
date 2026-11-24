@@ -2066,14 +2066,7 @@ That invalidation has the same scope as the dedupe window it invalidates: **in-p
 
 **The leftover answer is retired (LIN-4495).** A builder's leftovers are findings now, written with `POST /api/proxy/records` (see Writing records); no comment opening with `### Leftovers` is checked, and the `422` codes that checked its retirement line are gone.
 
-**The blind read (LIN-4437; its PR-set rule kept by LIN-4520).** A comment whose first non-blank line is `## Blind read` (exactly, or followed by `:`) is a blind read. Its full PR URLs must be exactly the ticket's current landing, the PRs of the task's records landing (`lib/records/landing.js`), with at least one. The check runs on create, edit and a comment-target attachment caption, and a refused body posts nothing. If the records landing cannot be read, the PR-set check is skipped and logged, and the URL check still holds. Any other comment is not checked: one that mentions the heading further down, or one that opens with a longer heading such as `## Blind read pilot`.
-
-The verdict is a record, not a comment line: a blind read's verdict (`better`, `same` or `worse`, with its reason) is written through the records route (see Records, LIN-4493), and no `Verdict:` line is read or refused here.
-
-| Status | `code` | Meaning |
-|--------|--------|---------|
-| `422` | `BLIND_READ_PRS_MISSING` | no full PR URL. |
-| `422` | `BLIND_READ_PRS_MISMATCH` | the full PR URLs differ from the landing (`expected`, `got`). Cite any other PR as `#N`. |
+**The blind read's comment guard is retired (LIN-4543).** A comment is ordinary text: none is checked for a heading, and no `422` code refuses one (`BLIND_READ_PRS_*` are gone). The blind read writes no comment (LIN-4533); its verdict (`better`, `same` or `worse`, with its reason) is a record written through the records route (see Records, LIN-4493), and the rule that it names exactly the task's landing is held there: a blind-read verdict whose `on` is not the landing is refused (`lib/records/landing.js`, `blindReadSetProblems` in `routes/proxy-records.js`).
 
 #### Delete Comment
 

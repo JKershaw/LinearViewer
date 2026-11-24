@@ -37,7 +37,7 @@ import { refreshTaskChanges } from '../../lib/change-records.js';
 import { SUMMARY_LEAD, summaryBodyOf } from '../../lib/records/summary.js';
 import { computeIssueRoundTrips } from '../../lib/plan-review-round-trips.js';
 import { readOpenFindings, findingsHold } from '../../lib/close-out-findings.js';
-import { withoutHarbourSummaries, isHarbourSummary, opensAsBlindRead } from '../../lib/run-trail.js';
+import { withoutHarbourSummaries, isHarbourSummary } from '../../lib/run-trail.js';
 import { personCommentsOf } from '../../lib/comment-ingest.js';
 
 const URL_KEY = 'lin-4516-workspace';
@@ -291,7 +291,6 @@ describe('witness 5: a verdict summary of every kind changes nothing for any com
       assert.ok(isHarbourSummary(comment), `not read as a harbour summary: ${body.split('\n')[0]}`);
       assert.deepEqual(personCommentsOf([{ id: 'summary', createdAt: comment.createdAt, body, authorId: 'u1' }],
         { recorded: new Set(['summary']), people: [{ accountId: 'john', trackerUserId: 'u1' }] }), [], `read as a person's comment: ${body.split('\n')[0]}`);
-      assert.equal(opensAsBlindRead(comment), false, `opened as a blind read: ${body.split('\n')[0]}`);
       assert.deepEqual(withoutHarbourSummaries([...human, comment]), human, 'the summary is filtered out of the discussed comments');
     }
   });
@@ -519,10 +518,6 @@ describe('close-out witness C: no comment reader picks a verdict summary up (fin
       const got = rounds([{ id: 'c1', body, createdAt: at(30) }]);
       assert.deepEqual(got, baseline, `a summary changed the round-trip reading: ${body.split('\n')[0]}`);
     }
-  });
-
-  test('a blind-read summary is not a blind read to the opening predicate (the comment reader that parsed it is retired, LIN-4520)', () => {
-    assert.equal(opensAsBlindRead({ id: 'c1', body: summary('blind-read', 'same', 'Reads as it did.'), createdAt: at(30) }), false);
   });
 });
 

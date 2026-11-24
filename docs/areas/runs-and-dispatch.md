@@ -52,7 +52,7 @@ Area notes for `runs-and-dispatch` in the registry. Format and rules: README.md.
   the check sets Done only on a findings read of zero (LIN-4527); a Done ticket with no close-out stands only the
   read aside. Harbour never sets Done.
 - Verdicts, changes and the landing are records (LIN-4520): read them from the records (`landingOfTicket`,
-  `lib/records/landing.js`), never a comment; `lib/run-trail.js` keeps only the authorship text rule. To retire an
+  `lib/records/landing.js`), never a comment. To retire an
   export, grep every tree for its name: a `docs/papers` script and a hand-built prompt context still reached the
   retired readers; only CI caught them. Key PR statuses by PR URL, never by index: the
   cited list and the landing order PRs differently (LIN-4458).
