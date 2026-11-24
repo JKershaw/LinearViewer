@@ -116,10 +116,18 @@ function sheetListsOf(text) {
   return lists;
 }
 
-/** The classes the card draws, over its interactive and its read-only face. */
+/**
+ * The classes the card draws, over its interactive and its read-only face. LIN-4553: the sample draws every part of the card,
+ * so its task line (identifier, linked, then title) and its full ask behind the fold are checked on every page too; the first
+ * sample had neither a task nor a longer ask, so those rules were never asked for.
+ */
 function cardClasses() {
-  const row = { questionId: 'q-1', asks: 'Which?', options: ['a', 'b'], recommended: 'b', ifUnanswered: null, state: 'resumable', interactive: true };
-  const html = renderQuestionRecordCard(row, { urlKey: 'w' }) + renderQuestionRecordCard({ ...row, interactive: false }, { urlKey: 'w' });
+  const row = {
+    questionId: 'q-1', short: 'Which?', asks: 'Which?\n\nThe background:\n- one\n- two', options: ['a', 'b'], recommended: 'b',
+    ifUnanswered: null, state: 'resumable', interactive: true, ticket: 'LIN-1', title: 'The task',
+  };
+  const ctx = { urlKey: 'w', taskHref: (identifier) => `/workspace/w/task/${identifier}` };
+  const html = renderQuestionRecordCard(row, ctx) + renderQuestionRecordCard({ ...row, interactive: false }, ctx);
   const classes = new Set();
   for (const m of html.matchAll(/class="([^"]*)"/g)) for (const c of m[1].split(/\s+/)) if (c) classes.add(c);
   return classes;

@@ -238,6 +238,8 @@ export async function readRunAccount(recordsStore, readRow, urlKey, session) {
  * @param {Function} deps.getDeployInfo            - () → deploy metadata
  * @param {number}   [deps.recentLimit=120]        - cap on terminal runs returned by /loops
  * @param {Object}   [deps.sessionsFeedCache]      - short-TTL SWR cache for the /sessions feed (LIN-617)
+ * @param {Object}   [deps.questionTaskTitles]     - LIN-4553: the bounded title lookup a question card's task needs when the
+ *   run page's and the feed's own sources miss it (lib/question-task-titles.js `createQuestionTaskTitles`)
  * @returns {Router}
  */
 export function createDashboardRoutes(deps) {
@@ -262,7 +264,9 @@ export function createDashboardRoutes(deps) {
     installationTokenFor,
     prState,
     prStateStore: sharedPrStateStore,
-    requestUsageLoader
+    requestUsageLoader,
+    // LIN-4553: the bounded tracker lookup for a question's task title (lib/question-task-titles.js); absent, none is read.
+    questionTaskTitles = null
   } = resolved;
   const router = Router();
   const loopDeps = { dispatchStore: dispatchQueueStore, agentStatusStore };
@@ -367,7 +371,9 @@ export function createDashboardRoutes(deps) {
         if (!accountId) return [];
         // LIN-4549: the run's own rows name the tasks it worked on, with their titles (lib/open-questions.js titlesOf).
         const titlesOf = titlesFromIssues(enrichedLoops.map((l) => ({ identifier: l.issueIdentifier, title: l.issueTitle })));
-        return openQuestionsForRun({ recordsStore, dispatchStore: dispatchQueueStore, urlKey: workspace.urlKey, accountId, runId: session.sessionId, titlesOf });
+        // LIN-4553: a run dispatched without its task's title is titled by one bounded tracker read (lib/question-task-titles.js).
+        const lookupTitles = questionTaskTitles ? (tickets) => questionTaskTitles.titlesFor(workspace, tickets) : null;
+        return openQuestionsForRun({ recordsStore, dispatchStore: dispatchQueueStore, urlKey: workspace.urlKey, accountId, runId: session.sessionId, titlesOf, lookupTitles });
       })().catch(() => []);
 
       // Per-run inline reply (LIN-1004/LIN-1133; LIN-1163 removed the page-level
