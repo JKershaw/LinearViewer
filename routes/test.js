@@ -7,6 +7,7 @@
 import express, { Router } from 'express';
 import { personMint } from '../lib/stage-writes.js';
 import { BLIND_READ_KIND } from '../lib/prompts/blind-read-words.js';
+import { STAGE_KINDS } from '../lib/prompts/stage-kinds.js';
 import { REVIEW_JUDGEMENT, CLOSE_OUT_STAGE } from '../lib/records/words.js';
 import { createRecordWrites } from '../lib/records/writes.js';
 import { isTerminalState } from '../lib/providers/state-map.js';
@@ -726,8 +727,9 @@ export function createTestRoutes({ dispatchQueueStore, dispatchTokenStore, freeT
     if (typeof urlKey !== 'string' || typeof ticket !== 'string' || !Array.isArray(events)) {
       return res.status(400).send('urlKey, ticket and events are required');
     }
-    // The checked pipeline and the proxy's own pin answer every write, so the seed is what a stage would write.
-    const writes = createRecordWrites({ recordsStore, isTerminalState });
+    // The checked pipeline and the proxy's own pin answer every write, so the seed is what a stage would write. It knows the
+    // stage kinds, so a verdict is held to its judge (LIN-4416) and each is written as its judging stage, not as Harbour.
+    const writes = createRecordWrites({ recordsStore, isTerminalState, stageKinds: Object.keys(STAGE_KINDS) });
     const by = 'Harbour';
     const first = events[0]?.at ?? new Date().toISOString();
     const { id: taskId } = await recordsStore.ensureTask(urlKey, { identifier: ticket, title: ticket, closed: false }, { by, at: first });
@@ -750,7 +752,7 @@ export function createTestRoutes({ dispatchQueueStore, dispatchTokenStore, freeT
         if (pin.problems) return res.status(422).json(pin.problems);
         const judgement = ev.kind === 'review' ? REVIEW_JUDGEMENT : BLIND_READ_KIND;
         const outcome = ev.outcome ?? (ev.kind === 'review' ? 'approve' : 'same');
-        const out = await writes.add({ urlKey, kind: 'verdict', input: { in: taskId, judgement, outcome, reasoning: 'seeded by an E2E spec', on: pin.on }, by, run: null });
+        const out = await writes.add({ urlKey, kind: 'verdict', input: { in: taskId, judgement, outcome, reasoning: 'seeded by an E2E spec', on: pin.on }, by: judgement, run: null });
         if (out.problems) return res.status(422).json(out.problems);
       } else if (ev.kind === 'closeOut') {
         const runId = `close-out-seed-${n}-${crypto.randomUUID().slice(0, 8)}`;

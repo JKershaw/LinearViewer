@@ -2262,7 +2262,7 @@ Content-Type: application/json
 |-------|------|----------|-------------|
 | `prompt` | string | Yes | The prompt to run (max ~10MB) |
 | `promptName` | string | No | Short label for the dispatch (max 100 chars) |
-| `kind` | string | No | Stable task classification — one of the `DISPATCH_KINDS` (the prompt-template keys, plus `custom`; see `lib/prompt-templates.js`). When omitted it is derived from `promptName`, falling back to `custom`. Read it instead of inferring the task type from `promptName` or the prompt body |
+| `kind` | string | No | Stable task classification — one of the `DISPATCH_KINDS` (the prompt-template keys, plus `custom`; see `lib/prompt-templates.js`). When omitted it is derived from `promptName`, falling back to `custom`. Read it instead of inferring the task type from `promptName` or the prompt body. A kind, given or derived, that starts a `review`, `plan-review` or `blind-read` run is refused 400 (its run would write the verdict the merge gate reads, from your prompt): start those with `POST /recommend-and-dispatch` and `kind`, which builds the prompt from the template (LIN-4416) |
 | `issueId` / `issueIdentifier` / `issueTitle` / `issueUrl` | string | No | Optional linkage to an issue |
 | `target` | string | No | `cli` \| `web` \| `dash` (default `cli`). `local`/Harbour OS is **not** available to proxy consumers |
 | `repo` | string | No | Repository override — the runner's folder override, stored verbatim. Harbour does not validate it against any workspace repo list; the project `repo=` feature and its guard were retired (LIN-3333). The consumer's own admission check resolves it against its folder namespaces |
@@ -2371,6 +2371,8 @@ When `kind` is present the verb:
 - generates the body for the **named issue with no descent** (the wobble is the verb, not the target);
 - accepts only real prompt-template keys — `plan`, `implementation`, `review`, `research`, `design`, `breakdown`, `look-into`, `triage`, `scoping`, `spike`, `context`, `retro`, `blocked`. Meta-kinds (`defer`, `custom`, `autopilot`, `periodical`) and any unknown key are rejected with `400`, because they have no template body and would dispatch an empty prompt;
 - returns the same headers-only response plus `"override": true`.
+
+**A judging run starts fresh (LIN-4416).** A `review`, `plan-review` or `blind-read` row (an override `kind`, or the kind a descent lands on) that carries `followUpTo` is refused `400` with `code: JUDGING_RUN_NOT_FRESH`, and nothing is enqueued. That run writes as its stage (the verdict the merge gate reads), so it must not execute inside a resumed session whose earlier turns someone else wrote. Send it again without `followUpTo`. The rule sits in the dispatch factory (`lib/dispatch-factory.js` `guardJudgingRunFresh`), so every enqueue lane meets it, the session lane included.
 
 Use it **sparingly and only on a demonstrable engine miss** — each override is recorded so the recommendation heuristic can be improved. It is not the everyday path; the LLM-driven verb (no `kind`) remains the default. The caller still never supplies prompt text — only the verb key.
 

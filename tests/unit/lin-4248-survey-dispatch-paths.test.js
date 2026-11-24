@@ -13,6 +13,9 @@
  *   (c) POST /api/proxy/recommend-and-dispatch with `kind` (the override arm)
  * Control: kind 'implementation' still carries the PR wording.
  *
+ * LIN-4416: a judging kind (blind-read) cannot start a run on POST /dispatch, which carries a caller's prompt, so paths
+ * (a), (b) and the follow-up arm witness its refusal and (c) its preamble (tests/unit/lin-4416-judging-run.test.js).
+ *
  * Set NODE_ENV before importing routes so the test-mode short-circuit applies.
  */
 process.env.NODE_ENV = 'test';
@@ -25,6 +28,7 @@ import express from 'express';
 import { createProxyRoutes } from '../../routes/proxy.js';
 import { PROMPT_TEMPLATES } from '../../lib/prompt-templates.js';
 import { WRITES } from '../../lib/stage-writes.js';
+import { judgesAs } from '../../lib/records/check.js';
 
 const MARKER = '## Workspace API access (auto-appended)';
 const MINTED = 'bootstrap-xyz';
@@ -100,6 +104,13 @@ const PR_WORDING = /open PRs|PR link|commit SHA/;
 // context, look-into, retro, triage), found from the templates, not a literal list.
 const NON_WORK_KINDS = Object.keys(PROMPT_TEMPLATES).filter(kind => PROMPT_TEMPLATES[kind].writes !== WRITES.WORK);
 
+/** LIN-4416: a judging kind on POST /dispatch is refused before any item, naming recommend-and-dispatch. */
+function assertJudgingRefused(res, captured, kind) {
+  assert.equal(res.status, 400, JSON.stringify(res.body));
+  assert.match(res.body.error, new RegExp(`a ${kind} run judges work.*recommend-and-dispatch`));
+  assert.equal(captured.item, undefined, `${kind}: no item enqueued`);
+}
+
 function assertNoPrWording(item, where) {
   assert.ok(item, `${where}: an item was dispatched`);
   assert.ok(item.prompt.includes(MARKER), `${where}: still gets the access block`);
@@ -113,6 +124,7 @@ describe('LIN-4248 / LIN-4251 — every non-work stage gets its own preamble on 
       const res = await call(buildApp(captured), 'post', '/api/proxy/dispatch', {
         prompt: 'survey it', issueIdentifier: 'TEST-1', kind
       });
+      if (judgesAs(kind)) return assertJudgingRefused(res, captured, kind);
       assert.equal(res.status, 201, JSON.stringify(res.body));
       assertNoPrWording(captured.item,`${kind} (a)`);
     });
@@ -122,6 +134,7 @@ describe('LIN-4248 / LIN-4251 — every non-work stage gets its own preamble on 
       const res = await call(buildApp(captured), 'post', '/api/proxy/dispatch', {
         prompt: 'survey it', issueIdentifier: 'TEST-1', promptName: kind
       });
+      if (judgesAs(kind)) return assertJudgingRefused(res, captured, kind);
       assert.equal(res.status, 201, JSON.stringify(res.body));
       assertNoPrWording(captured.item,`${kind} (b)`);
     });
@@ -167,6 +180,8 @@ describe('LIN-4251 — a follow-up gets the block of the stage it names, through
       const res = await call(buildApp(captured), 'post', '/api/proxy/dispatch', {
         prompt: 'carry on', issueIdentifier: 'TEST-1', kind, followUpTo: PARENT, appendProxyContext: true
       });
+      // LIN-4416: a stage-kind follow-up starts its own run, so a judging one is refused like a fresh row.
+      if (judgesAs(kind)) return assertJudgingRefused(res, captured, kind);
       assert.equal(res.status, 201, JSON.stringify(res.body));
       assertNoPrWording(captured.item, `${kind} follow-up`);
       assert.ok(captured.item.prompt.includes(CLOSING_OPENER[writes]), `${kind} follow-up carries its closing`);

@@ -136,10 +136,12 @@ describe('LIN-1751 — end-to-end budget enforcement at the dispatch seam', () =
     });
     assert.equal(t2.status, 201, JSON.stringify(t2.body));
 
-    // A dispatch continuing task 1 (its review) — admitted, budget is full but
-    // this is not a NEW distinct task.
+    // A dispatch continuing task 1 (its close-out) — admitted, budget is full but
+    // this is not a NEW distinct task. (LIN-4416: a review cannot start on
+    // POST /dispatch, which carries the caller's prompt, so the next stage here
+    // is a non-judging one.)
     const t1Review = await call(app, 'post', DISPATCH, {
-      prompt: 'review it', promptName: 'review', issueIdentifier: 'LIN-1', target: 'cli', sessionId
+      prompt: 'close it out', promptName: 'close-out', issueIdentifier: 'LIN-1', target: 'cli', sessionId
     });
     assert.equal(t1Review.status, 201, JSON.stringify(t1Review.body),
       'a dispatch continuing an already-counted task must never be refused');

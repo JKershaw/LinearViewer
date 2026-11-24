@@ -28,7 +28,8 @@ import fs from 'fs';
 import path from 'path';
 import os from 'os';
 import { spawnClaudeSession } from '../lib/harbour-spawn.js';
-import { DISPATCH_DEFAULT_KINDS, deriveDispatchKind, getPromptDescriptionsForAI } from '../lib/prompt-templates.js';
+import { DISPATCH_DEFAULT_KINDS, getPromptDescriptionsForAI } from '../lib/prompt-templates.js';
+import { effectiveDispatchKind } from '../lib/dispatch-kind.js';
 import { stampFromRow, stampForItem } from '../lib/item-stage-stamp.js';
 import { dispatchMintOptions } from '../lib/stage-writes.js';
 import { resolveRoutingWithSources } from '../lib/dispatch-factory.js';
@@ -607,7 +608,7 @@ export function createDispatchRoutes({ dispatchQueueStore, dispatchTokenStore, w
    * GET /workspace/:urlKey/api/dispatch/preview
    * LIN-3833: the setting a run with these fields would stamp, read-only, from the resolution the
    * dispatch itself uses (`resolveRoutingWithSources`, the same inputs `createDispatchItem` gives it).
-   * `kind` is derived the entrance's way (an explicit `kind`, else `deriveDispatchKind(promptName)`).
+   * `kind` is the one the dispatch will store: `effectiveDispatchKind` (lib/dispatch-kind.js), the same call the entrance and the factory make.
    * `surface` takes the same opened-task default the session lane takes. Owner-only: the run control
    * that calls it is the owner's, and it names the workspace's routing. `sources` says, per field,
    * which tier answered, so the browser shows what the server resolved and never resolves it itself.
@@ -629,7 +630,7 @@ export function createDispatchRoutes({ dispatchQueueStore, dispatchTokenStore, w
       const preset = (presetId && dispatchPresetsStore)
         ? await Promise.resolve(dispatchPresetsStore.get(req.workspace.urlKey, presetId)).catch(() => null)
         : null;
-      const kind = queryText(req.query.kind) || deriveDispatchKind(queryText(req.query.promptName) || undefined);
+      const kind = effectiveDispatchKind({ kind: queryText(req.query.kind), promptName: queryText(req.query.promptName) || undefined });
       const routing = await resolveRoutingWithSources({
         urlKey: req.workspace.urlKey,
         kind,
@@ -685,7 +686,7 @@ export function createDispatchRoutes({ dispatchQueueStore, dispatchTokenStore, w
       if (surface !== null && !SURFACES.includes(surface)) {
         return res.status(400).json({ error: `surface must be one of: ${SURFACES.join(', ')}` });
       }
-      const kind = queryText(req.query.kind) || deriveDispatchKind(queryText(req.query.promptName) || undefined);
+      const kind = effectiveDispatchKind({ kind: queryText(req.query.kind), promptName: queryText(req.query.promptName) || undefined });
       const choice = { harness: queryText(req.query.harness), model: queryText(req.query.model), effort: queryText(req.query.effort) };
       const settle = { applyDefaultHarness: surface !== null, settleHarness: surface !== null };
       const workspace = req.workspace;

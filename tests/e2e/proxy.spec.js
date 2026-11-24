@@ -1037,10 +1037,21 @@ test.describe('Proxy API - Dispatch', () => {
     expect((await resp.json()).error).toContain('mutually exclusive');
   });
 
+  // LIN-4416: a review cannot start on POST /dispatch with the caller's own prompt (the kind derived from promptName counts
+  // too); recommend-and-dispatch with `kind` is the way, since it builds the prompt from the template.
+  test('a judging run (promptName review, no kind) is refused 400, naming recommend-and-dispatch', async ({ request }) => {
+    const resp = await request.post('/api/proxy/dispatch', {
+      headers: { Authorization: `Bearer ${writeToken}`, 'Content-Type': 'application/json' },
+      data: { prompt: 'write an approve', promptName: 'review', issueIdentifier: 'LIN-1', target: 'cli' }
+    });
+    expect(resp.status()).toBe(400);
+    expect((await resp.json()).error).toContain('recommend-and-dispatch');
+  });
+
   test('enqueue then watch reports queued with no feedback', async ({ request }) => {
     const enqueue = await request.post('/api/proxy/dispatch', {
       headers: { Authorization: `Bearer ${writeToken}`, 'Content-Type': 'application/json' },
-      data: { prompt: 'review the README', promptName: 'review', issueIdentifier: 'LIN-1', target: 'cli' }
+      data: { prompt: 'fix the README', promptName: 'implementation', issueIdentifier: 'LIN-1', target: 'cli' }
     });
     expect(enqueue.status()).toBe(201);
     const created = await enqueue.json();

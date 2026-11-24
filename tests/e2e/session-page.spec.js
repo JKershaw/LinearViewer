@@ -136,8 +136,11 @@ async function seedWarmSession(page) {
 // LIN-3250 ledger item 5: a real-shaped stepped single-lineage run — the ticket's
 // own "one warm session, in-session follow-ups" shape. An autopilot anchor plus
 // one implementation lineage built from follow-ups (implementation, rework,
-// review, rework) whose close-out is still running. Progress must read
-// "3 of 5" (LIN-4437: the blind read in SPINE) with "Next: close-out".
+// rework, rework) whose close-out is still running, and the review between them.
+// LIN-4416: a review run starts in a fresh session (a judging kind is refused as a
+// follow-up, lib/dispatch-factory.js guardJudgingRunFresh), so the review is its own
+// fresh row in the same autopilot session, not a link in the lineage. Progress must
+// read "3 of 5" (LIN-4437: the blind read in SPINE) with "Next: close-out".
 async function seedSteppedLineageSession(page) {
   const anchor = await page.request.post(`/workspace/${URL_KEY}/api/dispatch`, {
     data: { prompt: 'orchestrate', promptName: 'autopilot', kind: 'autopilot', issueIdentifier: 'LIN-3250', issueTitle: 'Stepped run', target: 'cli' }
@@ -167,9 +170,11 @@ async function seedSteppedLineageSession(page) {
   await finish(impl1);
   const impl2 = await dispatch({ prompt: 'rework', promptName: 'implementation', kind: 'implementation', followUpTo: impl1 });
   await finish(impl2);
-  const review = await dispatch({ prompt: 'review', promptName: 'review', kind: 'review', followUpTo: impl2 });
+  const impl3 = await dispatch({ prompt: 'rework', promptName: 'implementation', kind: 'implementation', followUpTo: impl2 });
+  await finish(impl3);
+  const review = await dispatch({ prompt: 'review', promptName: 'review', kind: 'review' });
   await finish(review);
-  const rework = await dispatch({ prompt: 'rework after review', promptName: 'implementation', kind: 'implementation', followUpTo: review });
+  const rework = await dispatch({ prompt: 'rework after review', promptName: 'implementation', kind: 'implementation', followUpTo: impl3 });
   await finish(rework);
   const closeOut = await dispatch({ prompt: 'close out', promptName: 'close-out', kind: 'close-out', followUpTo: rework });
   // close-out: taken but deliberately left running (no terminal marker).
