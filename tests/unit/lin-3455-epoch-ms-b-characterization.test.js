@@ -10,9 +10,8 @@
  * epoch 0 on the old raw-NaN copies and missing afterwards (LIN-3453's
  * "null is missing, not epoch 0" rule, tested in the swap commit instead).
  *
- * Every assertion here must hold before AND after the swap. The one deliberate
- * input change that is not pinned here is an Invalid Date *instance* in
- * unanswered-decisions (NaN -> 0), which the parent plan names as a change.
+ * Every assertion here must hold before AND after the swap. (The task-decisions
+ * store and ruling predicate cases left with those modules, LIN-4541.)
  */
 import { test, describe, beforeEach } from 'node:test';
 import assert from 'node:assert/strict';
@@ -21,8 +20,6 @@ import { RunProposalsStore } from '../../lib/run-proposals-store.js';
 import { SavedChatStore } from '../../lib/saved-chat-store.js';
 import { ReportHistoryStore } from '../../lib/report-history-store.js';
 import { ShipBiscuitHistoryStore } from '../../lib/ship-biscuit-history-store.js';
-import { TaskDecisionsStore } from '../../lib/task-decisions-store.js';
-import { collectUnansweredDecisions } from '../../lib/unanswered-decisions.js';
 import { extractPrUrls, closeOutSummaryFor } from '../../lib/run-evidence.js';
 import { recentRuns } from '../../lib/recent-runs.js';
 
@@ -145,188 +142,6 @@ describe('LIN-3455 characterization: plain-sort history stores', () => {
       assert.deepEqual(docs.map(d => d._id).sort(), ['h-junk', 'h-new', 'h-old']);
     });
   }
-});
-
-// ---------------------------------------------------------------------------
-// task-decisions-store
-// ---------------------------------------------------------------------------
-describe('LIN-3455 characterization: task-decisions-store', () => {
-  const ISSUE = '11111111-1111-4111-8111-111111111111';
-  let collection, store;
-  const row = (id, issueId, extra = {}) => ({ _id: id, urlKey: 'acme', issueId, outcome: null, decision: { decision_id: id }, ...extra });
-  beforeEach(() => {
-    collection = createMockCollection();
-    store = new TaskDecisionsStore({ collection });
-  });
-
-  describe('listNewestScanPerTask (:595 `>` newest-then-filter reduction)', () => {
-    const pick = async () => (await store.listNewestScanPerTask(['acme']))['acme::t1'].scannedAt;
-
-    test('two junk rows: the first one stays (junk > junk is false)', async () => {
-      collection._docs.push(row('a', 't1', { scannedAt: 'not-a-date' }), row('b', 't1'));
-      assert.equal(await pick(), 'not-a-date');
-    });
-    test('junk first, then valid: the junk row sticks (valid > junk is false)', async () => {
-      collection._docs.push(row('a', 't1', { scannedAt: 'not-a-date' }), row('b', 't1', { scannedAt: T2.toISOString() }));
-      assert.equal(await pick(), 'not-a-date');
-    });
-    test('valid first, then junk: the valid row stays (junk > valid is false)', async () => {
-      collection._docs.push(row('a', 't1', { scannedAt: T2.toISOString() }), row('b', 't1', { scannedAt: 'not-a-date' }));
-      assert.equal(await pick(), T2.toISOString());
-    });
-    test('control: two valid rows, the newer wins', async () => {
-      collection._docs.push(row('a', 't1', { scannedAt: T1.toISOString() }), row('b', 't1', { scannedAt: T2.toISOString() }));
-      assert.equal(await pick(), T2.toISOString());
-    });
-  });
-
-  describe('listResolvedForWorkspaces (:634 `>= cutoff`)', () => {
-    const resolved = (id, outcomeAt) => row(id, 't1', { outcome: 'answered', outcomeAt, scannedAt: T1 });
-    test('a junk outcomeAt is excluded under a finite cutoff', async () => {
-      collection._docs.push(resolved('ok', T2), resolved('bad-s', 'not-a-date'), resolved('bad-u', undefined));
-      const out = await store.listResolvedForWorkspaces(['acme'], T1.getTime());
-      assert.deepEqual(out.map(r => r.id), ['ok']);
-    });
-    test('a junk outcomeAt is excluded even with no cutoff at all', async () => {
-      collection._docs.push(resolved('ok', T2), resolved('bad-s', 'not-a-date'), resolved('bad-u', undefined));
-      const out = await store.listResolvedForWorkspaces(['acme'], undefined);
-      assert.deepEqual(out.map(r => r.id), ['ok']);
-    });
-  });
-
-  describe('listCandidatesForWorkspace (:685-700 `>` and `===` tie-breaks, :693 sort)', () => {
-    test('two junk rows for one issue: the first one stays (neither > nor === holds)', async () => {
-      collection._docs.push(
-        row('first', 'issue-x', { scannedAt: 'not-a-date', seq: 1 }),
-        row('second', 'issue-x', { seq: 2 })
-      );
-      const { items } = await store.listCandidatesForWorkspace('acme');
-      assert.deepEqual(items.map(r => r.id), ['first']);
-    });
-    test('junk first then valid for one issue: the junk row sticks', async () => {
-      collection._docs.push(
-        row('junk', 'issue-x', { scannedAt: 'not-a-date', seq: 1 }),
-        row('valid', 'issue-x', { scannedAt: T2, seq: 2 })
-      );
-      const { items } = await store.listCandidatesForWorkspace('acme');
-      assert.deepEqual(items.map(r => r.id), ['junk']);
-    });
-    test('valid first then junk for one issue: the valid row stays', async () => {
-      collection._docs.push(
-        row('valid', 'issue-x', { scannedAt: T2, seq: 1 }),
-        row('junk', 'issue-x', { scannedAt: 'not-a-date', seq: 2 })
-      );
-      const { items } = await store.listCandidatesForWorkspace('acme');
-      assert.deepEqual(items.map(r => r.id), ['valid']);
-    });
-
-    test('a junk-scannedAt candidate falls through to the issueId tiebreak, not to epoch 0 (stays between its neighbours)', async () => {
-      collection._docs.push(
-        row('c', 'issue-c', { scannedAt: T2 }),
-        row('b', 'issue-b'),
-        row('a', 'issue-a', { scannedAt: T1 })
-      );
-      const { items, totalCandidateCount } = await store.listCandidatesForWorkspace('acme');
-      assert.equal(totalCandidateCount, 3);
-      assert.deepEqual(items.map(r => r.issueId), ['issue-a', 'issue-b', 'issue-c']);
-    });
-
-    test('cursor paging: the junk row is dropped from later pages, valid rows page through in order', async () => {
-      collection._docs.push(
-        row('c', 'issue-c', { scannedAt: T2 }),
-        row('b', 'issue-b', { scannedAt: 'not-a-date' }),
-        row('a', 'issue-a', { scannedAt: T1 })
-      );
-      const page1 = await store.listCandidatesForWorkspace('acme', { limit: 1 });
-      assert.deepEqual(page1.items.map(r => r.issueId), ['issue-a']);
-      assert.ok(page1.nextCursor);
-      const page2 = await store.listCandidatesForWorkspace('acme', { limit: 5, cursor: page1.nextCursor });
-      assert.deepEqual(page2.items.map(r => r.issueId), ['issue-c']);
-      assert.equal(page2.nextCursor, null);
-    });
-
-    test('cursor paging: a junk cursor scannedAt returns an empty page (NaN compared false), not every candidate', async () => {
-      collection._docs.push(
-        row('c', 'issue-c', { scannedAt: T2 }),
-        row('a', 'issue-a', { scannedAt: T1 })
-      );
-      const page = await store.listCandidatesForWorkspace('acme', { cursor: { scannedAt: 'not-a-date', issueId: 'issue-0' } });
-      assert.deepEqual(page.items, []);
-      assert.equal(page.nextCursor, null);
-    });
-  });
-
-  describe('_docsFor / getStatus newest-first (:721 sort `|| seq`)', () => {
-    test('a junk-scannedAt row with the highest seq stays first; valid rows keep scannedAt order', async () => {
-      collection._docs.push(
-        row('t1', ISSUE, { scannedAt: T1, seq: 1 }),
-        row('t2', ISSUE, { scannedAt: T2, seq: 2 }),
-        row('junk', ISSUE, { scannedAt: 'not-a-date', seq: 3 })
-      );
-      assert.deepEqual((await store._docsFor('acme', ISSUE)).map(d => d._id), ['junk', 't2', 't1']);
-      assert.equal((await store.getStatus('acme', ISSUE)).id, 'junk');
-    });
-    test('an absent scannedAt (undefined) with the highest seq behaves the same', async () => {
-      collection._docs.push(
-        row('t1', ISSUE, { scannedAt: T1, seq: 1 }),
-        row('t2', ISSUE, { scannedAt: T2, seq: 2 }),
-        row('junk', ISSUE, { seq: 3 })
-      );
-      assert.deepEqual((await store._docsFor('acme', ISSUE)).map(d => d._id), ['junk', 't2', 't1']);
-    });
-  });
-});
-
-// ---------------------------------------------------------------------------
-// unanswered-decisions: taskDecisionScannedAtMs / _dispatchedAtMs read junk as 0
-// ---------------------------------------------------------------------------
-describe('LIN-3455 characterization: unanswered-decisions', () => {
-  const NOW = new Date('2026-10-10T12:00:00.000Z');
-  const dec = (id) => ({ decision_id: id, question: 'Proceed?' });
-  const taskDecision = (id, extra = {}) => ({
-    id: `scan-${id}`, urlKey: 'acme', issueId: 'task-1', issueIdentifier: 'LIN-9',
-    inputHash: 'h', decision: dec(id), outcome: null, outcomeAt: null, ...extra
-  });
-  const surfaced = (taskDecisions, newestScanByTask) =>
-    collectUnansweredDecisions({ taskDecisions, newestScanByTask }, { now: NOW }).map(r => r.decision.decision_id);
-
-  test('junk then valid scannedAt: the valid row is newer than junk (0) and wins', () => {
-    assert.deepEqual(surfaced([taskDecision('junk', { scannedAt: 'not-a-date' }), taskDecision('valid', { scannedAt: T1.toISOString() })]), ['valid']);
-  });
-  test('valid then junk scannedAt: the valid row stays', () => {
-    assert.deepEqual(surfaced([taskDecision('valid', { scannedAt: T1.toISOString() }), taskDecision('junk')]), ['valid']);
-  });
-  test('two junk scannedAt rows: the first stays (0 > 0 is false)', () => {
-    assert.deepEqual(surfaced([taskDecision('first', { scannedAt: 'not-a-date' }), taskDecision('second')]), ['first']);
-  });
-  test('a newer outcome-bearing scan drops the candidate; a junk-scannedAt one does not', () => {
-    const cand = taskDecision('open', { scannedAt: T1.toISOString() });
-    const newest = (scannedAt) => ({ 'acme::task-1': { urlKey: 'acme', issueId: 'task-1', outcome: 'answered', scannedAt } });
-    assert.deepEqual(surfaced([cand], newest(T2.toISOString())), [], 'control: a strictly newer answered scan discharges it');
-    assert.deepEqual(surfaced([cand], newest('not-a-date')), ['open'], 'junk newest scan reads as 0, not newer');
-  });
-
-  const loop = (loopId, extra = {}) => ({
-    loopId, issueId: 'uuid-1', issueIdentifier: 'LIN-900', workspaceUrlKey: 'acme', target: 'cli',
-    followUpTo: null, terminalStatus: null, terminalCompletedAt: null, wakeMarker: null, agentState: null,
-    decision: null, decisionCase: [], answeredDecisions: [], ...extra
-  });
-  const stampLoop = (wakes) => {
-    const root = loop('root', { dispatchedAt: '2026-10-01T00:00:00.000Z' });
-    const members = wakes.map(([id, extra]) => loop(id, { lineageId: 'root', wakeMarker: 'blocked', decision: dec('dup'), ...extra }));
-    const rows = collectUnansweredDecisions({ loops: [root, ...members] }, { now: NOW });
-    assert.equal(rows.length, 1);
-    return rows[0].stampLoopId;
-  };
-
-  test('content loop: a junk dispatchedAt is the oldest member (0), so a valid one is chosen', () => {
-    assert.equal(stampLoop([['wake-z', {}], ['wake-a', { dispatchedAt: T1.toISOString() }]]), 'wake-a');
-    assert.equal(stampLoop([['wake-a', { dispatchedAt: T1.toISOString() }], ['wake-z', { dispatchedAt: 'not-a-date' }]]), 'wake-a');
-  });
-  test('content loop: two junk dispatchedAt tie at 0 and the greater loopId wins', () => {
-    assert.equal(stampLoop([['wake-1', {}], ['wake-2', { dispatchedAt: 'not-a-date' }]]), 'wake-2');
-    assert.equal(stampLoop([['wake-2', {}], ['wake-1', { dispatchedAt: 'not-a-date' }]]), 'wake-2');
-  });
 });
 
 // ---------------------------------------------------------------------------

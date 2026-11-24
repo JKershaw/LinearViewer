@@ -9,6 +9,7 @@
  * its own copy of these helpers for now (its seeding has grown past these two).
  */
 import { expect } from './test-base.js';
+import { seedQuestion } from './question-records.js';
 
 // Drop every run the Observation feed reads, so each test starts from nothing.
 export async function clearRuns(page, urlKey) {
@@ -26,10 +27,11 @@ export async function clearRuns(page, urlKey) {
  *     feed does not carry (LIN-1194). Its `[blocked]` message is a plain wait.
  *   - otherwise: an autopilot anchor with one worker under it.
  *
- * With `decisionId`, the worker also carries a structured decision, so the
- * block has a ruling row for it. Without one, the wait is plain.
+ * With `question: true`, the worker also asked the signed-in person a question record (the test seam,
+ * tests/fixtures/question-records.js), so the block has a ruling row for it (LIN-4541: a ruling is a question record, never
+ * a decision entry, which the feedback route refuses). Without one, the wait is plain.
  */
-export async function seedBlockedRun(page, { urlKey, issueIdentifier, issueTitle, decisionId, standalone = false, message = '[blocked] need a ruling before continuing' }) {
+export async function seedBlockedRun(page, { urlKey, issueIdentifier, issueTitle, question = false, standalone = false, message = '[blocked] need a ruling before continuing' }) {
   let sessionId;
   if (!standalone) {
     const anchor = await page.request.post(`/workspace/${urlKey}/api/dispatch`, {
@@ -64,20 +66,8 @@ export async function seedBlockedRun(page, { urlKey, issueIdentifier, issueTitle
   });
   expect(blocked.status(), `blocked feedback failed: ${await blocked.text()}`).toBe(200);
 
-  if (decisionId) {
-    const decision = await page.request.post(`/api/dispatch/feedback/${workerId}`, {
-      headers: auth,
-      data: {
-        kind: 'decision',
-        message: JSON.stringify({
-          decision_id: decisionId,
-          question: 'Proceed with option A?',
-          options: [{ id: 'a', label: 'Approve' }, { id: 'b', label: 'Reject' }],
-          recommended: 'a'
-        })
-      }
-    });
-    expect(decision.status(), `decision feedback failed: ${await decision.text()}`).toBe(200);
+  if (question) {
+    await seedQuestion(page, urlKey, { ticket: issueIdentifier, runId: workerId, asks: 'Proceed with option A?', options: ['Approve', 'Reject'], recommended: 'Approve' });
   }
   return { workerId, sessionId };
 }

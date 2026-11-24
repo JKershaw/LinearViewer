@@ -148,16 +148,16 @@ describe('the pill words are the task page\'s own (LIN-3983 PR 2)', () => {
 });
 
 describe('the answer choices and the question (LIN-3983 PR 2)', () => {
-  test('the choices show while the producer question is open, and are dropped once it is not', async (t) => {
+  // LIN-4541: an old run's DECISION: block (history) offers no choices on the card, open or not: a question is answered on
+  // its question record's card. The question itself still reads.
+  test('an old decision\'s options are never offered as choices; the question still reads', async (t) => {
     const { world, page } = await loadPage({ workspaces: [WS] });
     t.after(() => world.restore());
     const payload = buildSessionPayload(CARDS.waitingWithChoices(), WS, false);
     page.setOpenLoopIds(new Set(['w']));
-    assert.match(paint(page, payload), /Answer with Email link · Linear OAuth/);
-    page.setOpenLoopIds(new Set());
-    const closed = paint(page, payload);
-    assert.ok(!closed.includes('Email link'), 'a question that is no longer open is not offered as a choice');
-    assert.match(visibleText(closed), /Which sign-in method should I build\?/, 'the question itself still reads');
+    const html = paint(page, payload);
+    assert.ok(!html.includes('Email link'), 'no old option is offered as a choice');
+    assert.match(visibleText(html), /Which sign-in method should I build\?/, 'the question itself still reads');
   });
 
   test('the sentence is the question with its marker taken out, not the marker', async (t) => {

@@ -53,7 +53,6 @@ function makeRunnerApp({
   dispatchTokens = [],
   proxyTokens = [],
   halt = null,
-  sessionsFeedCache = null,
   composerOverrides = {},
 } = {}) {
   const calls = { pollAvailable: [], takeItem: [], addFeedback: [], validateToken: [] };
@@ -82,7 +81,6 @@ function makeRunnerApp({
     dispatchQueueStore,
     dispatchTokenStore,
     workspaceHaltStore,
-    sessionsFeedCache,
     ...composerOverrides,
   });
   return { app, calls };
@@ -296,20 +294,21 @@ describe('LIN-3130 S2a — POST /api/proxy/runner/feedback/:id', () => {
     assert.equal(typeof calls.addFeedback[0].provision, 'function', 'the wake provisioner is passed through');
   });
 
-  test('decision-withdrawn clears sessionsFeedCache; an ordinary write does not', async () => {
-    const cleared = [];
-    const sessionsFeedCache = { clear: (k) => cleared.push(k) };
+  // LIN-4541: the runner feedback route refuses a retired decision kind 422 naming the records route, and stores nothing;
+  // an ordinary write still lands.
+  test('decision and decision-withdrawn are refused 422 DECISION_FEEDBACK_RETIRED and reach no store; an ordinary write lands', async () => {
+    for (const [kind, message] of [['decision', JSON.stringify({ decision_id: 'd-1', question: 'q' })], ['decision-withdrawn', JSON.stringify({ decision_id: 'd-1', reason: 'superseded' })]]) {
+      const a = makeRunnerApp({ token: runnerToken({ grants: ['take'] }) });
+      const res = await call(a.app, 'POST', RUNNER_FEEDBACK, { body: { message, kind } });
+      assert.equal(res.status, 422, JSON.stringify(res.body));
+      assert.equal(res.body.code, 'DECISION_FEEDBACK_RETIRED');
+      assert.match(res.body.error, /POST \/api\/proxy\/records/);
+      assert.equal(a.calls.addFeedback.length, 0, `${kind}: nothing is stored`);
+    }
 
-    const withdrawal = JSON.stringify({ decision_id: 'd-1', reason: 'superseded' });
-    const a = makeRunnerApp({ token: runnerToken({ grants: ['take'] }), sessionsFeedCache });
-    const resA = await call(a.app, 'POST', RUNNER_FEEDBACK, { body: { message: withdrawal, kind: 'decision-withdrawn' } });
-    assert.equal(resA.status, 200, JSON.stringify(resA.body));
-    assert.deepEqual(cleared, [ACME]);
-
-    const b = makeRunnerApp({ token: runnerToken({ grants: ['take'] }), sessionsFeedCache });
+    const b = makeRunnerApp({ token: runnerToken({ grants: ['take'] }) });
     const resB = await call(b.app, 'POST', RUNNER_FEEDBACK, { body: { message: 'heartbeat', kind: 'heartbeat' } });
     assert.equal(resB.status, 200, JSON.stringify(resB.body));
-    assert.deepEqual(cleared, [ACME], 'an ordinary write must not clear the cache');
   });
 });
 

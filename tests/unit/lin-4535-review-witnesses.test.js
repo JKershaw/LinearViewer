@@ -272,12 +272,15 @@ describe('C. the page reply route files a non-owner member\'s reply under that m
     assert.deepEqual(ledger.calls.map((c) => c.commentId), ['reply-1'], 'and ledgered as Harbour\'s, so the ingest never takes it again');
   });
 
-  test('the reply\'s finding reads back as a ruling (the finding carries the page reply\'s ruling mark, as the posted comment does)', async () => {
+  // LIN-4541: a reply is a comment, never a ruling. The page reply appends no ruling mark, so its finding holds the person's
+  // words exactly, and it reads back as a person's comment with no ruling flag (a ruling is a decision record).
+  test('the reply\'s finding holds the person\'s words exactly and reads back with no ruling flag', async () => {
     await postReply(appFor('member-2'), 'Take the wide path.');
     const [filed] = findings;
+    assert.equal(filed.says, 'Take the wide path.', 'no mark is appended to the person\'s words');
     const read = personFindingsOf([{ id: filed.fixedId, by: filed.by, via: filed.via, at: filed.at, fields: { says: filed.says } }]);
     assert.equal(read.length, 1);
-    assert.equal(read[0].ruling, true, 'remove the mark from the filed body and this is false: the selector\'s ruling fact could never be true');
+    assert.equal('ruling' in read[0], false);
   });
 });
 

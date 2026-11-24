@@ -26,7 +26,7 @@ import { DispatchQueueStore } from '../../lib/dispatch-store.js';
 import { createRecordWrites } from '../../lib/records/writes.js';
 import { createQuestionAnswers } from '../../lib/question-answers.js';
 import { REAP_INACTIVITY_MS as LEAF_REAP, resolveDisposition as leafDisposition, runLoopFactsOf } from '../../lib/run-liveness.js';
-import { REAP_INACTIVITY_MS, resolveDisposition } from '../../lib/unanswered-decisions.js';
+import { REAP_INACTIVITY_MS, resolveDisposition } from '../../lib/run-liveness.js';
 import { questionAnsweredPrompt, questionDismissedPrompt, resumesQuestion, RESUME_ACTION } from '../../lib/prompts/question-resume.js';
 import { isTerminalState } from '../../lib/providers/state-map.js';
 import { fixedIdOf } from '../../lib/records/refs.js';

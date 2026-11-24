@@ -34,7 +34,6 @@ import { registerAuditRoutes } from './workspace-api-audit.js';
 import { registerFeedbackRoutes } from './workspace-api-feedback.js';
 import { registerSessionsRoutes, registerRunEvidenceRoutes } from './workspace-api-run-evidence.js';
 export { feedbackSubmitLimiter } from './workspace-api-feedback.js';
-export { decisionStampDedupe } from './workspace-api-issue-write.js';
 import { isHermeticTestToken } from '../lib/should-mock-ai.js';
 import { failureOf, openIssue, refuseFreeTier } from './workspace-api-steps.js';
 import { isRecommendationEnabled, getRecommendation, getRecommendationStream, getModelDisplayName } from '../lib/openrouter.js';
@@ -186,8 +185,6 @@ export function streamMockFixture(res, mockIssue) {
  * @param {Function} options.workspaceFromUrl - Middleware to extract workspace from URL
  * @param {Object} options.freeTierStore - Free tier usage store
  * @param {Function} options.getOpenRouterSource - Helper to determine OpenRouter source
- * @param {Object} [options.taskDecisionsStore] - Task-keyed decision store (LIN-2197): the old answer path's stamp, retired with the store (LIN-4541)
- * @param {Object} [options.sessionsFeedCache] - Shared SWR cache for the rulings/sessions feed (LIN-2755); null → uncached deployment, invalidation is a no-op
  * @param {Object} [options.ownerCredentialStore] - Durable owner-credential store (LIN-2933); null → the comment route's one-shot auth-recovery is disabled, not a hard dependency
  * @param {Function} [options.adoptConnectionCredential] - LIN-3124 PR3 (D7): connection-keyed adopt read (injected; protected module imports no connection seam)
  * @param {Object} [options.runEvidence] - LIN-3247 test seam for the run-evidence route: optional `{ resolveProvider, viewerIsOwner, readPrStatus, githubFetch }` overrides
@@ -195,7 +192,7 @@ export function streamMockFixture(res, mockIssue) {
  * @param {Object} [options.closeOut] - LIN-3248 test seam for the check/press routes: optional `{ resolveProvider, readPrStatus, githubFetch, isStopAtRun, runnerReady, markDone }` overrides
  * @returns {Router} Express router
  */
-export function createWorkspaceApiRoutes({ workspaceFromUrl, freeTierStore, getOpenRouterSource, userPreferencesStore, workspacePreferencesStore, customPromptsStore, reportHistoryStore, dispatchQueueStore, agentStatusStore, promptTraceStore, proxyTokenStore, taskDecisionsStore, harbourCommentsStore = null, sessionsFeedCache = null, ownerCredentialStore = null, adoptConnectionCredential = null, accountStore = null, runEvidence = null, closeOutEventsStore = null, closeOut = null, workspaceOwnerCheck = null, onTicketWrite = null, recordPipelineMerge = null, installationTokenFor = null, loadTaskState = null, recordsStore = null }) {
+export function createWorkspaceApiRoutes({ workspaceFromUrl, freeTierStore, getOpenRouterSource, userPreferencesStore, workspacePreferencesStore, customPromptsStore, reportHistoryStore, dispatchQueueStore, agentStatusStore, promptTraceStore, proxyTokenStore, harbourCommentsStore = null, ownerCredentialStore = null, adoptConnectionCredential = null, accountStore = null, runEvidence = null, closeOutEventsStore = null, closeOut = null, workspaceOwnerCheck = null, onTicketWrite = null, recordPipelineMerge = null, installationTokenFor = null, loadTaskState = null, recordsStore = null }) {
   const router = Router();
 
   // The test-token DATA mock charges the free tier on its own (the AI-gate above it is
@@ -631,7 +628,7 @@ export function createWorkspaceApiRoutes({ workspaceFromUrl, freeTierStore, getO
 
   // The issue-write routes (POST comments, POST issues, PATCH issues) moved to workspace-api-issue-write.js
   // (LIN-3876); they register on this router directly after the reads, so the three paths keep one router (and one OPTIONS `Allow`).
-  registerIssueWriteRoutes(router, { workspaceFromUrl, dispatchQueueStore, taskDecisionsStore, harbourCommentsStore, sessionsFeedCache, ownerCredentialStore, adoptConnectionCredential, onTicketWrite, recordPipelineMerge });
+  registerIssueWriteRoutes(router, { workspaceFromUrl, harbourCommentsStore, ownerCredentialStore, adoptConnectionCredential, onTicketWrite, recordPipelineMerge });
 
   // The sessions route (LIN-3894): registered on this router, here, so the route table's order is unchanged.
   registerSessionsRoutes(router, { workspaceFromUrl, dispatchQueueStore, agentStatusStore, loadTaskState });

@@ -49,7 +49,7 @@ path is best-effort under degradation; the degraded-mode path is the proxy verb 
 - `GET /api/dispatch/poll` - Poll for available items (may carry an additive `halt` request
   key, omitted when unset; the runner honours it)
 - `POST /api/dispatch/take/:itemId` - Atomically claim an item
-- `POST /api/dispatch/feedback/:itemId` - Post feedback on a taken item
+- `POST /api/dispatch/feedback/:itemId` - Post feedback on a taken item (a retired `kind` `decision` or `decision-withdrawn` is refused 422 `DECISION_FEEDBACK_RETIRED`, naming `POST /api/proxy/records`: a question is a question record, LIN-4541)
 - `POST /api/dispatch/usage/:itemId` - Post per-request usage records for a taken item (LIN-4198;
   body `{records: [...]}`, at most 100 per call; the runner-token twin is `POST /api/proxy/runner/usage/:id`).
   **Auth deviation from feedback, on purpose:** this route accepts the consumer dispatch token only and

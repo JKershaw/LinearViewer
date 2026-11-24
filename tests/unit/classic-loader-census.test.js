@@ -23,7 +23,6 @@ const UNIT = dirname(fileURLToPath(import.meta.url));
 /** Suites (file names under tests/unit/) that load browser scripts as classic scripts today. Sorted. */
 export const CLASSIC_LOADER_SUITES = [
   'chart-helpers.test.js',
-  'chat-append-options.test.js',
   'chat-identifiers.test.js',
   'chat-render-markdown-text.test.js',
   'chat-tool-rows.test.js',
@@ -69,9 +68,7 @@ export const CLASSIC_LOADER_SUITES = [
   'lin-4024-look.test.js',
   'lin-4040-close-out.test.js',
   'lin-4042-finished-no-run-to-pr.test.js',
-  'lin-4114-dismiss-order.test.js',
   'lin-4114-inflight-lock.test.js',
-  'lin-4241-settled-ruling-client.test.js',
   'lin-4242-waiting-live.test.js',
   'lin-4242-waiting-merge.test.js',
   'lin-4243-placement.test.js',
@@ -79,7 +76,6 @@ export const CLASSIC_LOADER_SUITES = [
   'lin-4293-tidy-after-repaint.test.js',
   'lin-4296-dispatch-reader.test.js',
   'lin-4296-scope-pick.test.js',
-  'observation-ruling-delivery.test.js',
   'prompt-section-go.test.js',
   'prompt-section-look-alike.test.js',
   'prompt-section-p0.test.js',
@@ -88,14 +84,12 @@ export const CLASSIC_LOADER_SUITES = [
   'prompt-section-run-quota.test.js',
   'prompt-section-runner-link.test.js',
   'prompt-section-task-mode.test.js',
-  'question-card-task-bound.test.js',
   'reply-delivery-contract.test.js',
   'rulings-badge-client.test.js',
   'run-limit-gating.test.js',
   'runner-link-surfaces.test.js',
   'segment-bar-pill-parity.test.js',
   'session-pr-state-poll.test.js',
-  'session-question-card-effect.test.js',
   'session-run-transcript-entries.test.js',
   'ship-biscuit-parity.test.js',
   'ship-journey-geometry.test.js',
@@ -141,8 +135,8 @@ test('the classic-loader census matches its baseline: no new classic suite, and 
   assert.deepEqual(gone, [], `listed suites no longer load browser scripts as classic: lower the baseline in this change: ${gone.join(', ')}`);
 });
 
-test('the baseline is recorded at 84 suites (the count that must not rise; LIN-4540 deleted the two scan suites, LIN-4537 the two brief/recap widget suites)', () => {
-  assert.equal(CLASSIC_LOADER_SUITES.length, 84);
+test('the baseline is recorded at 78 suites (the count that must not rise; LIN-4540 deleted the two scan suites, LIN-4537 the two brief/recap widget suites, LIN-4541 the six ruling-card and ruling-row suites)', () => {
+  assert.equal(CLASSIC_LOADER_SUITES.length, 78);
 });
 
 test('runClassic is counted unless it runs a named sibling: observation.js counts, chart-helpers.js does not', () => {

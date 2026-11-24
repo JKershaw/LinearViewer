@@ -110,8 +110,10 @@ describe('addFeedback persists kind/rootItemId (LIN-1297)', () => {
     assert.ok(FEEDBACK_ENTRY_KINDS.includes('refusal'));
   });
 
-  test('LIN-2180: "decision" is a recognized FEEDBACK_ENTRY_KINDS member', () => {
-    assert.ok(FEEDBACK_ENTRY_KINDS.includes('decision'));
+  // LIN-4541: "decision" is history: no runner may post it (the route refuses it 422). The store is not the validation
+  // boundary, so a row that carries the kind (an old one) still persists and reads as given.
+  test('LIN-4541: "decision" is no longer a runner-postable FEEDBACK_ENTRY_KINDS member', () => {
+    assert.equal(FEEDBACK_ENTRY_KINDS.includes('decision'), false);
   });
 
   test('LIN-2180: a kind:"decision" feedback entry persists as given', async () => {

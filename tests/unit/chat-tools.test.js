@@ -19,7 +19,6 @@ import { computeSupersededLoopIds } from '../../lib/loop-supersede.js';
 import { DEFAULT_LANE_STALE_MS } from '../../lib/live-console.js';
 import { withFreshDigests } from '../fixtures/with-fresh-digests.js';
 import { questionStandingOf } from '../../lib/records/question-standing.js';
-import { TaskDecisionsStore } from '../../lib/task-decisions-store.js';
 import { sessionIsTerminal } from '../../routes/dashboard.js';
 import { createMockCollection } from '../fixtures/mock-collection.js';
 
@@ -2343,21 +2342,13 @@ function decisionEntry(id, question, timestamp, optionCount = 0) {
   };
 }
 
-// LIN-2671: the `decision-answer` stamp `markDecisionAnswered` writes, in the
+// LIN-2671: the `decision-answer` stamp the retired answer path wrote (history since LIN-4541), in the
 // shape `_findDecisionAnswer` parses — so `answeredDecisionId` derives for real.
 function answerEntry(decisionId, timestamp) {
   return { kind: 'decision-answer', message: JSON.stringify({ decision_id: decisionId }), timestamp };
 }
 
 
-
-// LIN-2704: the pending-set exit is the acceptance criterion, not "a tap
-// posts" (§4 of the plan). Unlike the rest of this describe block, these
-// tests wire a REAL TaskDecisionsStore (tests/fixtures/mock-collection.js)
-// rather than the listUnansweredForWorkspaces-only stub above, because the
-// thing being proven is the real `markOutcome` path the projected ids feed —
-// a stub that only ever returns the seeded array can't demonstrate a row
-// actually leaving the pending set.
 
 describe('pass-4 fleet reads — partial lists say so (LIN-2617)', () => {
   test('a capped list reports the full matching count AND flags itself truncated', async () => {

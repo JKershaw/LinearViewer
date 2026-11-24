@@ -4,14 +4,14 @@
  * (lib/task-decisions-store.js, lib/shelved-rulings-store.js, lib/dismissal-suggestions-store.js) finds only the machinery
  * itself and the old answer path.
  *
- * The allowance is the list below, each with its reason. P7b (after the cutover gate) deletes these modules and their
- * importers together, so an entry is removed with the file it names. A new importer fails this test until it is either a
- * reader moved onto question and decision records (lib/records/question-facts.js, lib/open-questions.js) or named here with
- * a reason.
+ * The allowance is the list below, each with its reason. P7b (after the cutover gate) deleted these modules and their
+ * importers together (LIN-4540 the shelving store, LIN-4541 the predicate and the other two stores), so the allowance is
+ * empty: a new importer of a deleted module fails here (and fails to load). A reader of rulings reads question and decision
+ * records (lib/records/question-facts.js, lib/open-questions.js).
  */
 import { describe, test } from 'node:test';
 import assert from 'node:assert/strict';
-import { readdirSync, readFileSync, statSync } from 'node:fs';
+import { existsSync, readdirSync, readFileSync, statSync } from 'node:fs';
 import { join, relative } from 'node:path';
 import { fileURLToPath } from 'node:url';
 
@@ -28,14 +28,8 @@ const OLD_MODULES = Object.freeze([
 /** Live code the witness searches. Experiments, docs and recorded fixtures are history, not code that runs. */
 const SEARCHED = ['lib', 'routes', 'scripts', 'public'];
 
-/** Importers that stay until P7b, each with the reason it stays. */
-export const ALLOWED_IMPORTERS = Object.freeze({
-  'lib/dismissal-suggestions-store.js': 'machinery: the suggestion store reads the predicate; retired with the ruling stores in P7b',
-  'routes/proxy-rulings.js': 'machinery: the agents\' rulings route and its suggest routes; retired in P7b (LIN-4541)',
-  'routes/dashboard-rulings.js': 'old answer path: the Rulings page feed and its answer, dismiss and keep routes; retired with the page in P7b (shelve went in LIN-4540)',
-  'routes/workspace-api-issue-write.js': 'old answer path: answers posted as comments and the task-decision outcome; retired in P7b',
-  'server.js': 'wiring: constructs the ruling stores for the routes above; the constructors go with them in P7b',
-});
+/** Importers that stay, each with the reason it stays. Empty since LIN-4541 deleted the last of the old modules. */
+export const ALLOWED_IMPORTERS = Object.freeze({});
 
 /** Every .js and .mjs file under the searched roots, plus server.js. */
 function liveFiles() {
@@ -84,6 +78,10 @@ describe('LIN-4538: the old ruling modules are imported only by the machinery an
     const importers = new Set(oldImportersIn(files).map((r) => r.file));
     const stale = Object.keys(ALLOWED_IMPORTERS).filter((f) => !importers.has(f));
     assert.deepEqual(stale, [], `these allowed importers no longer import an old module; remove them from ALLOWED_IMPORTERS: ${stale.join(', ')}`);
+  });
+
+  test('the old modules are not on disk (LIN-4540, LIN-4541)', () => {
+    assert.deepEqual(OLD_MODULES.filter((m) => existsSync(join(ROOT, 'lib', `${m}.js`))), []);
   });
 
   test('the matcher sees each import form, and only the four old modules', () => {

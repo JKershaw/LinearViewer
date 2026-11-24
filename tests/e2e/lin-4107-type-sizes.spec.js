@@ -49,7 +49,7 @@ async function seedTaskWithSession(page, urlKey) {
 const typeKey = (base) => `${base}-type`;
 test.afterEach(async ({ page, localWorkerUrlKey }) => {
   const key = typeKey(localWorkerUrlKey);
-  for (const reset of ['clear-dispatch-queue', 'clear-dispatch-history', 'clear-dispatch-tokens', 'clear-task-mode-events', 'clear-observation-sessions', 'clear-sessions-feed-cache', 'clear-agent-status', 'clear-task-decisions']) {
+  for (const reset of ['clear-dispatch-queue', 'clear-dispatch-history', 'clear-dispatch-tokens', 'clear-task-mode-events', 'clear-observation-sessions', 'clear-sessions-feed-cache', 'clear-agent-status']) {
     await page.request.get(`/test/${reset}?urlKey=${key}`);
   }
 });

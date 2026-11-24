@@ -42,7 +42,7 @@ const rulingLoop = (identifier, over = {}) => loop({
 });
 /**
  * A ruling whose run ended long ago ("gone"): not resumable, so its default effect is a fresh run ("dispatch"), and a
- * live run on the same task turns that into "record" (lib/unanswered-decisions.js, resolveEffect branch 3).
+ * live run on the same task turns that into "record" (the retired ruling predicate's resolveEffect, branch 3; history since LIN-4541).
  */
 const goneRulingLoop = (identifier) => loop({
   loopId: `g-${identifier}`, lineageId: `g-${identifier}`, issueIdentifier: identifier, agentState: 'complete',

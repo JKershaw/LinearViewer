@@ -11,8 +11,8 @@ let OBSERVATION_URL;
 test.beforeEach(async ({ page, workerUrlKey, localWorkerUrlKey }) => {
   URL_KEY = workerUrlKey;
   OBSERVATION_URL = `/workspace/${URL_KEY}/observation`;
-  await page.request.get(`/test/clear-task-decisions?urlKey=${localWorkerUrlKey}`);
   await page.request.get('/test/clear-comment-dedupe');
+  await page.request.get(`/test/clear-ticket-records?urlKey=${URL_KEY}`);
   await page.goto(`/test/set-session?urlKey=${URL_KEY}`);
   await clearRuns(page, URL_KEY);
 });
@@ -20,7 +20,7 @@ test.beforeEach(async ({ page, workerUrlKey, localWorkerUrlKey }) => {
 test.describe('waiting on you (LIN-3983)', () => {
   test('a run waiting on a question shows that question above the feed, answerable in the first viewport', async ({ page }) => {
     await seedBlockedRun(page, {
-      urlKey: URL_KEY, issueIdentifier: 'LIN-3983-W1', issueTitle: 'Waiting question', decisionId: 'd-waiting-block'
+      urlKey: URL_KEY, issueIdentifier: 'LIN-3983-W1', issueTitle: 'Waiting question', question: true
     });
     await page.setViewportSize({ width: 1280, height: 900 });
     await page.goto(OBSERVATION_URL);
@@ -28,24 +28,24 @@ test.describe('waiting on you (LIN-3983)', () => {
 
     const block = page.getByTestId('obs-waiting');
     await expect(block).toBeVisible();
-    const row = block.locator('.obs-ruling').filter({ hasText: 'LIN-3983-W1' });
+    const row = block.locator('[data-testid="ruling-question-row"]').filter({ hasText: 'LIN-3983-W1' });
     await expect(row).toBeVisible();
-    const box = await row.locator('.chat-option-btn').first().boundingBox();
+    const box = await row.locator('[data-testid="question-record-card-option"]').first().boundingBox();
     expect(box, 'the answer control has a box').not.toBeNull();
     expect(box.y + box.height).toBeLessThanOrEqual(900);
   });
 
   test('at 390×844 the waiting question is answerable in the first viewport, with no sideways scroll', async ({ page }) => {
     await seedBlockedRun(page, {
-      urlKey: URL_KEY, issueIdentifier: 'LIN-3983-W2', issueTitle: 'Phone question', decisionId: 'd-waiting-phone'
+      urlKey: URL_KEY, issueIdentifier: 'LIN-3983-W2', issueTitle: 'Phone question', question: true
     });
     await page.setViewportSize({ width: 390, height: 844 });
     await page.goto(OBSERVATION_URL);
     await page.waitForLoadState('networkidle');
 
-    const row = page.getByTestId('obs-waiting').locator('.obs-ruling').filter({ hasText: 'LIN-3983-W2' });
+    const row = page.getByTestId('obs-waiting').locator('[data-testid="ruling-question-row"]').filter({ hasText: 'LIN-3983-W2' });
     await expect(row).toBeVisible();
-    const box = await row.locator('.chat-option-btn').first().boundingBox();
+    const box = await row.locator('[data-testid="question-record-card-option"]').first().boundingBox();
     expect(box, 'the answer control has a box').not.toBeNull();
     expect(box.y + box.height).toBeLessThanOrEqual(844);
     const pageScrolls = await page.evaluate(() => document.documentElement.scrollWidth > window.innerWidth);

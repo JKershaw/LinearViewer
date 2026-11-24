@@ -15,6 +15,7 @@
  */
 import { test, expect } from '../fixtures/test-base.js';
 import { localSeedId } from '../fixtures/local-harness.js';
+import { seedQuestion } from '../fixtures/question-records.js';
 import { writeFileSync, mkdirSync } from 'node:fs';
 
 const DIR = 'docs/reviews/_evidence-2026-11-03-lin4107';
@@ -67,13 +68,8 @@ async function seedRuling(page, urlKey) {
   expect((await page.request.post(`/api/dispatch/take/${itemId}`, { headers: auth })).status()).toBe(200);
   const feedback = (data) => page.request.post(`/api/dispatch/feedback/${itemId}`, { headers: auth, data });
   expect((await feedback({ message: '[blocked] the research session was cancelled; re-dispatch it?' })).status()).toBe(200);
-  expect((await feedback({
-    kind: 'decision',
-    message: JSON.stringify({
-      decision_id: 'lin4107-evidence', question: 'The research session was cancelled. Re-dispatch it?',
-      options: [{ id: 'redispatch', label: 'Re-dispatch the research' }, { id: 'skip', label: 'Skip research and plan' }],
-    }),
-  })).status()).toBe(200);
+  // LIN-4541: a ruling is a question record the run asked (the feedback route refuses a decision entry now).
+  await seedQuestion(page, urlKey, { ticket: 'LOCAL-3', runId: itemId, asks: 'The research session was cancelled. Re-dispatch it?', options: ['Re-dispatch the research', 'Skip research and plan'] });
 }
 
 // Elements whose type the change touches. Each is read where it exists; "absent" means the page has no such element.

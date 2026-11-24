@@ -12,6 +12,7 @@
 import { mkdirSync } from 'node:fs';
 import { test, expect } from '../fixtures/test-base.js';
 import { localSeedId } from '../fixtures/local-harness.js';
+import { seedQuestion } from '../fixtures/question-records.js';
 
 const DIR = 'docs/reviews/_evidence-2026-11-02-lin4114';
 const WIDTHS = { 1280: { width: 1280, height: 900 }, 390: { width: 390, height: 844 } };
@@ -37,7 +38,9 @@ async function seedDispatch(page, urlKey, token, identifier, { decision, blocked
     headers: { Authorization: `Bearer ${token}`, 'Content-Type': 'application/json' }, data,
   });
   if (blocked) await feedback({ message: '[blocked] which way?' });
-  await feedback({ kind: 'decision', message: JSON.stringify({ decision_id: `d-${identifier}`, question: `Which for ${identifier}?`, ...decision }) });
+  // LIN-4541: a ruling is a question record the run asked (the feedback route refuses a decision entry now).
+  const labelOf = (id) => decision.options.find((o) => o.id === id)?.label ?? null;
+  await seedQuestion(page, urlKey, { ticket: identifier, runId: itemId, asks: `Which for ${identifier}?`, options: decision.options.map((o) => o.label), recommended: labelOf(decision.recommended) });
 }
 
 /** The workspace: a deep Todo task with a recommended ruling, a solo Todo task with a plain ruling, a running task with a
@@ -48,7 +51,7 @@ async function seed(page, urlKey, { runner }) {
   await page.request.get(`/test/clear-dispatch-queue?urlKey=${urlKey}`);
   await page.request.get(`/test/clear-dispatch-history?urlKey=${urlKey}`);
   await page.request.get(`/test/clear-sessions-feed-cache?urlKey=${urlKey}`);
-  await page.request.get(`/test/clear-task-decisions?urlKey=${urlKey}`);
+  await page.request.get(`/test/clear-ticket-records?urlKey=${urlKey}`);
   const id = (raw) => localSeedId(urlKey, raw);
   const issues = [
     { id: id('charter'), identifier: 'LOCAL-0', title: 'Charter: the Waiting on you section', projectId: id('proj'), sortOrder: 0, createdAt: OLD, state: { name: 'In Progress', type: 'started' } },

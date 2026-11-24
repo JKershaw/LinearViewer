@@ -1,11 +1,10 @@
 /**
- * The dashboard route fixture (LIN-4308): the helpers that drive `createDashboardRoutes` through its handlers. Shared by
- * `tests/unit/dashboard-routes.test.js` and the client suite that paints the rulings badge from this route's JSON
- * (`tests/unit/rulings-badge-client.test.js`). Only helpers used by more than one suite live here; a helper one suite
- * uses stays in that suite.
+ * The dashboard route fixture (LIN-4308): the helpers that drive `createDashboardRoutes` through its handlers. Only
+ * helpers used by more than one suite live here; a helper one suite uses stays in that suite. (The rulings badge suite
+ * reads question records now, LIN-4541, and the old decision-row helper went with the ruling predicate.)
  *
  * No `test()` and no `describe()` here: importing this module runs nothing. `NOW_ISO` is computed once, when the module
- * first loads, so every importer sees the same value (`decisionItem` reads it).
+ * first loads, so every importer sees the same value.
  */
 import assert from 'node:assert';
 import { createDashboardRoutes as createDashboardRoutes__unplumbed } from '../../routes/dashboard.js';
@@ -117,21 +116,5 @@ export function recordsStoreOfChanges(prUrls = [], { throws = false, ticket = nu
     taskForTicket: async (_urlKey, t) => { guard(); return ticket === null || t === ticket ? taskId : null; },
     find: async (_urlKey, { kind, inRef }) => { guard(); return versions().filter((v) => v.kind === kind && v.in === inRef); },
     versionsOf: async (_urlKey, ids) => { guard(); return versions().filter((v) => ids.includes(v.id)); }
-  };
-}
-
-// A taken history item carrying a `kind:'decision'` feedback entry (the
-// same shape `hook.js`'s complete-path emission and a `[blocked]`-parked
-// wait both produce) — the input the rulings predicate reads.
-export function decisionItem(id, identifier, decisionId, extraFeedback = []) {
-  return {
-    id, issueIdentifier: identifier, issueTitle: `Title ${identifier}`,
-    promptName: 'implementation', prompt: 'p', dispatchedAt: NOW_ISO, resolvedAt: NOW_ISO,
-    status: 'taken',
-    feedback: [
-      { message: '[blocked] need a decision', timestamp: NOW_ISO },
-      { kind: 'decision', message: JSON.stringify({ decision_id: decisionId, question: 'Proceed?' }), timestamp: NOW_ISO },
-      ...extraFeedback
-    ]
   };
 }

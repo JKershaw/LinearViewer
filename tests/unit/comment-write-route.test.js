@@ -31,7 +31,6 @@ import { createProxyRoutes } from '../../routes/proxy.js';
 import { registerProvider } from '../../lib/providers/registry.js';
 import { createSessionsFeedCache } from '../../lib/sessions-feed-cache.js';
 import { InMemoryRunSummaryCacheStore } from '../../lib/run-summary-cache.js';
-import { TaskDecisionsStore } from '../../lib/task-decisions-store.js';
 import { withFreshDigests } from '../fixtures/with-fresh-digests.js';
 import { randomUUID } from 'node:crypto';
 import { fingerprintCredential } from '../../lib/credential-diagnostics.js';
@@ -64,62 +63,11 @@ function makeFakeProvider(overrides = {}) {
   return { provider, calls };
 }
 
-function makeFakeDispatchQueueStore(overrides = {}) {
-  const calls = { markDecisionAnswered: [] };
-  const store = {
-    async markDecisionAnswered(itemId, urlKey, decisionId) {
-      calls.markDecisionAnswered.push({ itemId, urlKey, decisionId });
-      if (overrides.markDecisionAnswered) return overrides.markDecisionAnswered(itemId, urlKey, decisionId);
-      return { success: true, feedbackCount: 1 };
-    },
-    // LIN-4241: the settled-ruling pre-check. Default: not settled, so each
-    // scenario keeps exercising the path it was written for.
-    async isDecisionSettled() { return overrides.isDecisionSettled ? overrides.isDecisionSettled() : false; },
-  };
-  return { store, calls };
-}
-
-// A minimal in-memory collection backing a REAL TaskDecisionsStore (same shape
-// as the real-store `/rulings/answer` tests in dashboard-routes.test.js):
-// equality-match filters, `matchedCount` reporting and upsert — enough for the
-// store's conditional writes to behave as they do against MongoDB. Reads
-// return a copy, matching a real driver's independent documents.
-function makeMockTaskDecisionsCollection() {
-  const docs = [];
-  const matches = (doc, query) => Object.entries(query).every(([k, v]) => doc[k] === v);
-  return {
-    _docs: docs,
-    async findOne(query) { const doc = docs.find(d => matches(d, query)); return doc ? { ...doc } : null; },
-    async updateOne(query, update, opts = {}) {
-      const idx = docs.findIndex(d => matches(d, query));
-      if (idx >= 0) { Object.assign(docs[idx], update.$set || {}); return { matchedCount: 1 }; }
-      if (opts.upsert) { docs.push({ ...(update.$set || {}) }); return { matchedCount: 0, upsertedId: true }; }
-      return { matchedCount: 0 };
-    },
-    find(query = {}) { return { async toArray() { return docs.filter(d => matches(d, query)).map(d => ({ ...d })); } }; },
-  };
-}
-
-function makeFakeTaskDecisionsStore(overrides = {}) {
-  const calls = { markOutcome: [], answer: [] };
-  const store = {
-    async markOutcome({ urlKey, issueId, id, outcome }) {
-      calls.markOutcome.push({ urlKey, issueId, id, outcome });
-      if (overrides.markOutcome) return overrides.markOutcome({ urlKey, issueId, id, outcome });
-      return { id, urlKey, issueId, outcome, outcomeAt: new Date().toISOString() };
-    },
-    // LIN-2889: default delegates to this same store's markOutcome (so
-    // calls.markOutcome is still recorded and every override above keeps
-    // working unchanged) rather than adding a second, independent call shape.
-    async answer({ urlKey, issueId, id, optionId }) {
-      calls.answer.push({ urlKey, issueId, id, optionId });
-      if (overrides.answer) return overrides.answer({ urlKey, issueId, id, optionId });
-      const record = await store.markOutcome({ urlKey, issueId, id, outcome: 'answered' });
-      return { record, firstStampWins: !!record && record.firstStampWins !== false, unretried: false };
-    },
-    // LIN-4241: the scan-row pre-check. Default: no row outcome yet (unstamped).
-    async readOutcome() { return overrides.readOutcome ? overrides.readOutcome() : { outcome: null }; },
-  };
+// LIN-4541: a dispatch store the comment route must never touch. The route stamps nothing now (answers as comments
+// retired), so any call on it is a failure the test reports.
+function makeUntouchableDispatchQueueStore() {
+  const calls = [];
+  const store = new Proxy({}, { get: (_t, name) => (...args) => { calls.push({ name, args }); throw new Error(`the comment route called dispatchQueueStore.${String(name)}`); } });
   return { store, calls };
 }
 
@@ -214,7 +162,7 @@ function makeSpyHarbourCommentsStore() {
   };
 }
 
-function buildApp({ provider, session, dispatchQueueStore, taskDecisionsStore, harbourCommentsStore, sessionsFeedCache, ownerCredentialStore, workspaceOverrides, adoptConnectionCredential, onWorkspace } = {}) {
+function buildApp({ provider, session, dispatchQueueStore, harbourCommentsStore, ownerCredentialStore, workspaceOverrides, adoptConnectionCredential, onWorkspace } = {}) {
   registerProvider(provider);
   const app = express();
   app.use(express.json());
@@ -232,13 +180,7 @@ function buildApp({ provider, session, dispatchQueueStore, taskDecisionsStore, h
     workspacePreferencesStore: { getWorkspacePreferences: async () => ({}) },
     customPromptsStore: {},
     reportHistoryStore: {}, dispatchQueueStore: dispatchQueueStore || {}, agentStatusStore: {}, promptTraceStore: {},
-    taskDecisionsStore,
     harbourCommentsStore,
-    // LIN-2755 beat 2: NOT YET a real parameter of createWorkspaceApiRoutes
-    // (beat 1's sweep found this) — passed here so the RED tests below are
-    // ready for beat 3 to wire it in; today it is silently ignored by the
-    // destructure, which is exactly why those tests are red.
-    sessionsFeedCache,
     // LIN-2933: the session-lane one-shot auth-recovery store. null by
     // default (every existing test above is unaffected — recovery is simply
     // never eligible without one), injected explicitly by the recovery
@@ -311,7 +253,7 @@ async function callWithAuth(app, method, path, payload) {
 }
 
 describe('POST /workspace/:urlKey/api/comments/:issueId (LIN-2154)', () => {
-  test('201 happy path → { success, comment }; body carries the attribution line', async () => {
+  test('201 happy path → { success, comment }; the body is the person\'s words, with no ruling mark (LIN-4541)', async () => {
     const { provider, calls } = makeFakeProvider();
     const app = buildApp({ provider });
 
@@ -319,10 +261,27 @@ describe('POST /workspace/:urlKey/api/comments/:issueId (LIN-2154)', () => {
 
     assert.strictEqual(status, 201);
     assert.strictEqual(body.success, true);
-    assert.match(body.comment.body, /^ship it\n\n/);
-    assert.match(body.comment.body, /Ruling recorded via Harbour/);
+    assert.strictEqual(body.comment.body, 'ship it');
     assert.strictEqual(calls.createComment.length, 1);
     assert.strictEqual(calls.createComment[0].issueId, ISSUE_ID);
+  });
+
+  // LIN-4541 (LIN-4529 P7b-2): a comment is never an answer. Ruling ids in a body are ignored like any other unknown key:
+  // no stamp, no settled-ruling refusal, no 400 for a malformed copy list; the comment is written as the person's words.
+  test('LIN-4541: ruling ids in the body are ignored — the comment is written, nothing is stamped or refused', async () => {
+    const { provider, calls } = makeFakeProvider();
+    const { store: dispatchQueueStore, calls: storeCalls } = makeUntouchableDispatchQueueStore();
+    const app = buildApp({ provider, dispatchQueueStore });
+
+    const { status, body } = await postComment(app, ISSUE_ID, {
+      body: 'pick b', decisionLoopId: 'loop-1', decisionId: 'd-1', decisionLoopIds: 'not-a-list', optionId: 'b',
+      taskDecisionId: 't-1', taskDecisionIssueId: ISSUE_ID, answerAttemptId: 'a-1'
+    });
+
+    assert.strictEqual(status, 201, JSON.stringify(body));
+    assert.strictEqual(body.comment.body, 'pick b');
+    assert.strictEqual(calls.createComment.length, 1);
+    assert.deepStrictEqual(storeCalls, [], 'the route never touches the dispatch store');
   });
 
   test('400 when body is missing', async () => {
@@ -421,771 +380,6 @@ describe('POST /workspace/:urlKey/api/comments/:issueId (LIN-2154)', () => {
 });
 
 // =============================================================================
-// LIN-4241: the settled-ruling guard on the comment route. A ruling already
-// answered or dismissed is refused 409 `ruling-settled`: no comment is written
-// for a settled ruling, and an answer that loses a race gets no run (the client
-// dispatches only on a 2xx). Only the PRIMARY loop decides; a stamped copy never
-// blocks.
-// =============================================================================
-describe('POST /workspace/:urlKey/api/comments/:issueId — settled-ruling guard (LIN-4241)', () => {
-  // A stateful stand-in for the loop store: an item is settled once any decision
-  // on it is answered or dismissed. Mirrors the real store's contract: the
-  // pre-check reads, the stamp is a check-and-set that reports `alreadySettled`.
-  function makeSettlingStore({ settledItems = [] } = {}) {
-    const settled = new Set(settledItems);
-    const calls = { markDecisionAnswered: [] };
-    return {
-      settled,
-      calls,
-      store: {
-        async isDecisionSettled(itemId) { return settled.has(itemId); },
-        async markDecisionAnswered(itemId, urlKey, decisionId) {
-          calls.markDecisionAnswered.push({ itemId, urlKey, decisionId });
-          if (settled.has(itemId)) return { success: false, alreadySettled: true };
-          settled.add(itemId);
-          return { success: true, feedbackCount: 1 };
-        },
-      },
-    };
-  }
-
-  const RULING_SETTLED_ERROR = 'This ruling was already answered or dismissed.';
-
-  test('a second answer to a settled ruling is refused 409 ruling-settled: no comment written, no stamp added', async () => {
-    const { provider, calls: providerCalls } = makeFakeProvider();
-    const { store, settled, calls: stampCalls } = makeSettlingStore({ settledItems: ['loop-1'] });
-    const app = buildApp({ provider, dispatchQueueStore: store });
-
-    const { status, body } = await postComment(app, ISSUE_ID, { body: 'a late answer', decisionLoopId: 'loop-1', decisionId: 'd-1' });
-
-    assert.strictEqual(status, 409);
-    assert.strictEqual(body.code, 'ruling-settled');
-    assert.strictEqual(body.error, RULING_SETTLED_ERROR);
-    assert.strictEqual(providerCalls.createComment.length, 0, 'the refused answer writes no comment');
-    assert.strictEqual(stampCalls.markDecisionAnswered.length, 0, 'and adds no stamp');
-    assert.ok(settled.has('loop-1'));
-  });
-
-  test('a first answer lands 201; a second, different answer to the same ruling is refused and writes no second comment', async () => {
-    const { provider, calls: providerCalls } = makeFakeProvider();
-    const { store, calls: stampCalls } = makeSettlingStore();
-    const app = buildApp({ provider, dispatchQueueStore: store });
-
-    const first = await postComment(app, ISSUE_ID, { body: 'first answer', decisionLoopId: 'loop-1', decisionId: 'd-1' });
-    const second = await postComment(app, ISSUE_ID, { body: 'second answer', decisionLoopId: 'loop-1', decisionId: 'd-1' });
-
-    assert.strictEqual(first.status, 201);
-    assert.strictEqual(second.status, 409);
-    assert.strictEqual(second.body.code, 'ruling-settled');
-    assert.strictEqual(providerCalls.createComment.length, 1, 'only the first answer wrote a comment');
-    assert.strictEqual(stampCalls.markDecisionAnswered.length, 1, 'only the first answer stamped');
-  });
-
-  test('concurrent answers to one ruling: both pass the pre-check, the stamp CAS lets exactly one win; one 201 (the one run), one 409', async () => {
-    const { provider, calls: providerCalls } = makeFakeProvider();
-    // Hold both pre-checks until both requests have read "not settled", so both
-    // reach the stamp and the stamp's check-and-set decides the winner. Without
-    // the barrier the requests can serialize and the race is never exercised.
-    const settled = new Set();
-    const stamps = [];
-    let checked = 0;
-    let release;
-    const bothChecked = new Promise((resolve) => { release = resolve; });
-    const store = {
-      async isDecisionSettled(itemId) {
-        const isSettled = settled.has(itemId);
-        checked++;
-        if (checked === 2) release();
-        if (!isSettled) await bothChecked;
-        return settled.has(itemId);
-      },
-      async markDecisionAnswered(itemId) {
-        stamps.push(itemId);
-        if (settled.has(itemId)) return { success: false, alreadySettled: true };
-        settled.add(itemId);
-        return { success: true, feedbackCount: 1 };
-      },
-    };
-    const app = buildApp({ provider, dispatchQueueStore: store });
-
-    let timer;
-    const results = await Promise.race([
-      Promise.all([
-        postComment(app, ISSUE_ID, { body: 'answer A', decisionLoopId: 'loop-1', decisionId: 'd-1' }),
-        postComment(app, ISSUE_ID, { body: 'answer B', decisionLoopId: 'loop-1', decisionId: 'd-1' }),
-      ]),
-      new Promise((_, reject) => { timer = setTimeout(() => reject(new Error('both pre-checks never reached the barrier')), 5000); }),
-    ]).finally(() => clearTimeout(timer));
-
-    assert.strictEqual(checked, 2, 'both requests reached the pre-check');
-    assert.strictEqual(stamps.length, 2, 'both requests reached the stamp');
-    assert.deepStrictEqual(results.map(r => r.status).sort(), [201, 409], 'exactly one answer is accepted; the other is refused');
-    assert.strictEqual(results.filter(r => r.status === 201).length, 1, 'one 201 means one run is dispatched by the client');
-    assert.strictEqual(settled.size, 1, 'the ruling is stamped exactly once');
-    // The race loser's comment already existed when its stamp lost (the
-    // documented trade-off: the comment is durable, the run is suppressed).
-    assert.strictEqual(providerCalls.createComment.length, 2);
-
-    // The loser retries with identical text (a double press). The comment
-    // dedupe cache holds its comment, so this is a dedupe hit. It must still
-    // refuse: a 200 here would dispatch a run for a settled ruling.
-    const loserIndex = results.findIndex(r => r.status === 409);
-    const loserBody = ['answer A', 'answer B'][loserIndex];
-    const retry = await postComment(app, ISSUE_ID, { body: loserBody, decisionLoopId: 'loop-1', decisionId: 'd-1' });
-    assert.strictEqual(retry.status, 409, 'an identical retry of the race loser is refused, not deduped into a 200');
-    assert.strictEqual(retry.body.code, 'ruling-settled');
-    assert.strictEqual(providerCalls.createComment.length, 2, 'the retry writes no further comment');
-  });
-
-  test('primary vs copy: a stamped copy does not block a primary answer, and the copy\'s already-stamped result counts as landed', async () => {
-    const { provider } = makeFakeProvider();
-    const { store, settled, calls: stampCalls } = makeSettlingStore({ settledItems: ['copy-1'] });
-    const app = buildApp({ provider, dispatchQueueStore: store });
-
-    const { status, body } = await postComment(app, ISSUE_ID, {
-      body: 'answer to a joined ruling', decisionLoopId: 'loop-1', decisionLoopIds: ['copy-1'], decisionId: 'd-1'
-    });
-
-    assert.strictEqual(status, 201, 'the primary is not settled, so a stamped copy must not refuse the request');
-    assert.deepStrictEqual(stampCalls.markDecisionAnswered.map(c => c.itemId), ['loop-1', 'copy-1'], 'every copy is still stamped');
-    assert.ok(settled.has('loop-1'));
-  });
-
-  // LIN-4241 review finding (blocking): the primary stamp lands on the first attempt,
-  // the copy stamp fails, so the response is 201 and the dedupe key stays unset. The
-  // identical-text retry must stamp the copy and be accepted (200 deduped). It must
-  // NOT be refused as "already settled elsewhere": the primary is settled only by this
-  // request's own earlier stamp. Stateful store: the copy fails exactly once.
-  test('LIN-4241 retry witness: primary landed + copy failed on attempt 1 → identical-text retry is 200 deduped (not 409), stamps the copy, writes no further comment', async () => {
-    const { provider, calls: providerCalls } = makeFakeProvider();
-    const settled = new Set();
-    const stamps = [];
-    let copyFailuresLeft = 1;
-    const store = {
-      async isDecisionSettled(itemId) { return settled.has(itemId); },
-      async markDecisionAnswered(itemId) {
-        stamps.push(itemId);
-        if (itemId === 'copy-1' && copyFailuresLeft > 0) {
-          copyFailuresLeft -= 1;
-          return null; // the copy stamp fails: no matching item
-        }
-        if (settled.has(itemId)) return { success: false, alreadySettled: true };
-        settled.add(itemId);
-        return { success: true, feedbackCount: 1 };
-      },
-    };
-    const app = buildApp({ provider, dispatchQueueStore: store });
-    const payload = { body: 'answer to a joined ruling — copy stamp fails once', decisionLoopId: 'loop-1', decisionLoopIds: ['copy-1'], decisionId: 'd-1' };
-
-    const first = await postComment(app, ISSUE_ID, payload);
-    assert.strictEqual(first.status, 201, 'first attempt: comment written, primary stamped, copy failed');
-    assert.deepStrictEqual(stamps, ['loop-1', 'copy-1'], 'first attempt stamped the primary, then the failing copy');
-    assert.ok(settled.has('loop-1'));
-    assert.ok(!settled.has('copy-1'));
-
-    const retry = await postComment(app, ISSUE_ID, payload);
-    assert.strictEqual(retry.status, 200, 'the retry is accepted: the primary was settled by this request\'s own stamp, not elsewhere');
-    assert.strictEqual(retry.body.code, undefined);
-    assert.strictEqual(retry.body.deduped, true, 'the comment write is still deduped');
-    assert.ok(settled.has('copy-1'), 'the retry stamps the copy');
-    assert.deepStrictEqual(stamps, ['loop-1', 'copy-1', 'loop-1', 'copy-1'], 'the retry re-attempts the primary (already stamped, lands) and the copy');
-    assert.strictEqual(providerCalls.createComment.length, 1, 'the retry writes no second comment');
-
-    const third = await postComment(app, ISSUE_ID, payload);
-    assert.strictEqual(third.status, 200);
-    assert.strictEqual(third.body.deduped, true);
-    assert.strictEqual(stamps.length, 4, 'once every stamp has landed, a further identical retry does not stamp again');
-  });
-
-  // LIN-4241 review finding 1: the dedupe key is text-only, so a second tab that answers the same ruling with the
-  // same choice text lands on the dedupe hit. The client's per-card `answerAttemptId` separates it from a retry.
-  test('LIN-4241 second tab (same text, copy failed on the first): a different submission is refused 409 before any stamp; the first submission\'s own retry still lands 200', async () => {
-    const { provider, calls: providerCalls } = makeFakeProvider();
-    const settled = new Set();
-    const stamps = [];
-    let copyFailuresLeft = 1;
-    const store = {
-      async isDecisionSettled(itemId) { return settled.has(itemId); },
-      async markDecisionAnswered(itemId) {
-        stamps.push(itemId);
-        if (itemId === 'copy-1' && copyFailuresLeft > 0) { copyFailuresLeft -= 1; return null; }
-        if (settled.has(itemId)) return { success: false, alreadySettled: true };
-        settled.add(itemId);
-        return { success: true, feedbackCount: 1 };
-      },
-    };
-    const app = buildApp({ provider, dispatchQueueStore: store });
-    const answer = (answerAttemptId) => ({ body: 'Option A (copy-failed witness)', decisionLoopId: 'loop-1', decisionLoopIds: ['copy-1'], decisionId: 'd-1', answerAttemptId });
-
-    const tab1 = await postComment(app, ISSUE_ID, answer('tab-1'));
-    assert.strictEqual(tab1.status, 201, 'tab 1 answers: primary stamped, copy failed');
-
-    const tab2 = await postComment(app, ISSUE_ID, answer('tab-2'));
-    assert.strictEqual(tab2.status, 409, 'tab 2 picks the same option: a second answer to a settled ruling');
-    assert.strictEqual(tab2.body.code, 'ruling-settled');
-    assert.deepStrictEqual(stamps, ['loop-1', 'copy-1'], 'the refused second answer adds no stamp, not even to the copy');
-    assert.strictEqual(providerCalls.createComment.length, 1, 'and writes no second comment');
-
-    const tab1Retry = await postComment(app, ISSUE_ID, answer('tab-1'));
-    assert.strictEqual(tab1Retry.status, 200, 'tab 1\'s own identical retry is a genuine retry, not a second answer');
-    assert.strictEqual(tab1Retry.body.deduped, true);
-    assert.deepStrictEqual(stamps, ['loop-1', 'copy-1', 'loop-1', 'copy-1'], 'the retry stamps the copy it is owed');
-    assert.ok(settled.has('copy-1'));
-    assert.strictEqual(providerCalls.createComment.length, 1);
-  });
-
-  test('LIN-4241 second tab after a full landing: a different submission to the settled ruling is 409; a resend of the same submission is 200 deduped with no stamp', async () => {
-    const { provider, calls: providerCalls } = makeFakeProvider();
-    const { store, calls: stampCalls } = makeSettlingStore();
-    const app = buildApp({ provider, dispatchQueueStore: store });
-    const answer = (answerAttemptId) => ({ body: 'Option A (full-landing witness)', decisionLoopId: 'loop-1', decisionId: 'd-1', answerAttemptId });
-
-    assert.strictEqual((await postComment(app, ISSUE_ID, answer('tab-1'))).status, 201);
-
-    const tab2 = await postComment(app, ISSUE_ID, answer('tab-2'));
-    assert.strictEqual(tab2.status, 409);
-    assert.strictEqual(tab2.body.code, 'ruling-settled');
-
-    const resend = await postComment(app, ISSUE_ID, answer('tab-1'));
-    assert.strictEqual(resend.status, 200, 'a resend of the landed submission (its 201 was lost) completes as a retry');
-    assert.strictEqual(resend.body.deduped, true);
-    assert.strictEqual(providerCalls.createComment.length, 1, 'one comment for the ruling');
-    assert.strictEqual(stampCalls.markDecisionAnswered.length, 1, 'one stamp for the ruling; the refused and the resent requests add none');
-  });
-
-  // Finding 2: the same-submission race. Two identical requests in flight (one card, a double press) both miss the
-  // dedupe cache and reach the stamp. Only one may win; the loser must not read the winner's marker as its own.
-  test('LIN-4241 race: two identical-text answers in flight → exactly one 201 and one 409, for two different submissions and for one resubmitted card', async () => {
-    for (const [a, b] of [['tab-1', 'tab-2'], ['tab-1', 'tab-1']]) {
-      let creates = 0;
-      const { provider, calls: providerCalls } = makeFakeProvider({
-        // The second comment write lands only after the first request has stamped, so the loser's stamp runs
-        // after the winner's marker is set. That is the window the isRetry gate has to hold shut.
-        createComment: async (issueId, body) => {
-          creates += 1;
-          if (creates === 2) await new Promise((resolve) => setTimeout(resolve, 25));
-          return { success: true, comment: { id: `race-${creates}`, body, createdAt: new Date().toISOString(), user: { name: 'Fake' } } };
-        },
-      });
-      const settled = new Set();
-      let checked = 0;
-      let release;
-      const bothChecked = new Promise((resolve) => { release = resolve; });
-      const store = {
-        async isDecisionSettled(itemId) {
-          const isSettled = settled.has(itemId);
-          checked++;
-          if (checked === 2) release();
-          if (!isSettled) await bothChecked;
-          return settled.has(itemId);
-        },
-        async markDecisionAnswered(itemId) {
-          if (settled.has(itemId)) return { success: false, alreadySettled: true };
-          settled.add(itemId);
-          return { success: true, feedbackCount: 1 };
-        },
-      };
-      const app = buildApp({ provider, dispatchQueueStore: store });
-      const answer = (answerAttemptId) => ({ body: `Option ${a}-${b} (race witness)`, decisionLoopId: 'loop-1', decisionId: 'd-1', answerAttemptId });
-
-      const results = await Promise.all([postComment(app, ISSUE_ID, answer(a)), postComment(app, ISSUE_ID, answer(b))]);
-
-      assert.deepStrictEqual(results.map(r => r.status).sort(), [201, 409], `attempts ${a}/${b}: one answer is accepted, the other refused`);
-      assert.strictEqual(settled.size, 1, `attempts ${a}/${b}: the ruling is stamped once`);
-      assert.strictEqual(providerCalls.createComment.length, 2, 'both comments were in flight before either finished (the documented race trade-off)');
-    }
-  });
-
-  test('LIN-4241 second tab on a scan (task-bound) row: a different submission with the same text is 409 with no second stamp; the first submission\'s resend is 200 deduped', async () => {
-    const { provider, calls: providerCalls } = makeFakeProvider();
-    const rows = new Map();
-    const { store: taskDecisionsStore, calls: taskCalls } = makeFakeTaskDecisionsStore({
-      // The real store's first-stamp-wins answer(): the first call stamps the row, later calls report it already answered.
-      async answer({ id }) {
-        const existing = rows.get(id);
-        if (existing) return { record: existing, firstStampWins: false, unretried: false };
-        const record = { id, outcome: 'answered' };
-        rows.set(id, record);
-        return { record, firstStampWins: true, unretried: false };
-      },
-    });
-    const app = buildApp({ provider, taskDecisionsStore });
-    const answer = (answerAttemptId) => ({
-      body: 'Scan reply (second-tab witness)', taskDecisionId: 'scan-1', taskDecisionIssueId: '66666666-6666-6666-6666-666666666666', answerAttemptId
-    });
-
-    assert.strictEqual((await postComment(app, ISSUE_ID, answer('tab-1'))).status, 201);
-
-    const tab2 = await postComment(app, ISSUE_ID, answer('tab-2'));
-    assert.strictEqual(tab2.status, 409, 'a second tab answering the scan row is refused, not deduped into a run');
-    assert.strictEqual(tab2.body.code, 'ruling-settled');
-    assert.strictEqual(taskCalls.answer.length, 1, 'the refused second answer does not stamp the row');
-    assert.strictEqual(providerCalls.createComment.length, 1);
-
-    const resend = await postComment(app, ISSUE_ID, answer('tab-1'));
-    assert.strictEqual(resend.status, 200);
-    assert.strictEqual(resend.body.deduped, true);
-    assert.strictEqual(taskCalls.answer.length, 1, 'the resend re-stamps nothing: the row is already answered by this submission');
-  });
-
-  // LIN-4241: the settle marker belongs to ONE ruling. Ruling 1 landed with its copy failed, and ruling 2 (a different
-  // loop) carries the same reply text and is already settled by another write. Ruling 2 must be refused, not read as
-  // ruling 1's own retry and answered 200.
-  test('LIN-4241 marker is per ruling: a same-text answer to a different, already-settled ruling is 409, not a retry of another ruling\'s landed stamp', async () => {
-    const { provider, calls: providerCalls } = makeFakeProvider();
-    const settled = new Set(['loop-2']);
-    let copyFailuresLeft = 1;
-    const store = {
-      async isDecisionSettled(itemId) { return settled.has(itemId); },
-      async markDecisionAnswered(itemId) {
-        if (itemId === 'copy-1' && copyFailuresLeft > 0) { copyFailuresLeft -= 1; return null; }
-        if (settled.has(itemId)) return { success: false, alreadySettled: true };
-        settled.add(itemId);
-        return { success: true, feedbackCount: 1 };
-      },
-    };
-    const app = buildApp({ provider, dispatchQueueStore: store });
-    const text = 'Option B (per-ruling marker witness)';
-
-    assert.strictEqual((await postComment(app, ISSUE_ID, { body: text, decisionLoopId: 'loop-1', decisionLoopIds: ['copy-1'], decisionId: 'd-1' })).status, 201);
-    const other = await postComment(app, ISSUE_ID, { body: text, decisionLoopId: 'loop-2', decisionId: 'd-2' });
-    assert.strictEqual(other.status, 409, 'loop-2 is settled elsewhere: the answer is refused');
-    assert.strictEqual(other.body.code, 'ruling-settled');
-    assert.strictEqual(providerCalls.createComment.length, 1, 'and writes no comment for it');
-  });
-
-  // LIN-4241: the `target` check in secondSubmission. A different submission id on a DIFFERENT, unsettled ruling is
-  // not a second tab on the first ruling: it is a fresh answer (200 deduped by the ruling-blind key, loop-2 stamped).
-  test('LIN-4241 second-submission refusal is per ruling: a different attempt id on a different, unsettled ruling is not refused', async () => {
-    const { provider, calls: providerCalls } = makeFakeProvider();
-    const settled = new Set();
-    const stamps = [];
-    let copyFailuresLeft = 1;
-    const store = {
-      async isDecisionSettled(itemId) { return settled.has(itemId); },
-      async markDecisionAnswered(itemId) {
-        if (itemId === 'copy-1' && copyFailuresLeft > 0) { copyFailuresLeft -= 1; return null; }
-        if (settled.has(itemId)) return { success: false, alreadySettled: true };
-        settled.add(itemId);
-        stamps.push(itemId);
-        return { success: true, feedbackCount: 1 };
-      },
-    };
-    const app = buildApp({ provider, dispatchQueueStore: store });
-    const text = 'Option C (second-submission target witness)';
-
-    const first = await postComment(app, ISSUE_ID, { body: text, decisionLoopId: 'loop-1', decisionLoopIds: ['copy-1'], decisionId: 'd-1', answerAttemptId: 'X' });
-    assert.strictEqual(first.status, 201, 'attempt X: primary stamped, copy failed');
-    const other = await postComment(app, ISSUE_ID, { body: text, decisionLoopId: 'loop-2', decisionId: 'd-2', answerAttemptId: 'Y' });
-    assert.strictEqual(other.status, 200, 'loop-2 is a different, unsettled ruling: not a second tab on loop-1');
-    assert.strictEqual(other.body.deduped, true);
-    assert.ok(settled.has('loop-2'), 'loop-2 is stamped');
-    assert.strictEqual(providerCalls.createComment.length, 1, 'one comment in total');
-  });
-
-  // LIN-4241: the scan row's own copy-failed retry. The primary loop and the scan row land on attempt 1, a copy fails,
-  // so the identical retry finds the row already answered by its own earlier attempt. That is this request's landed
-  // stamp, not "answered elsewhere": the retry is 200 deduped, and the copy is stamped.
-  test('LIN-4241 retry witness (scan row + copy failed): the identical retry is 200 deduped, not 409, and stamps the copy', async () => {
-    const { provider, calls: providerCalls } = makeFakeProvider();
-    const settled = new Set();
-    let copyFailuresLeft = 1;
-    const dispatchQueueStore = {
-      async isDecisionSettled(itemId) { return settled.has(itemId); },
-      async markDecisionAnswered(itemId) {
-        if (itemId === 'copy-1' && copyFailuresLeft > 0) { copyFailuresLeft -= 1; return null; }
-        if (settled.has(itemId)) return { success: false, alreadySettled: true };
-        settled.add(itemId);
-        return { success: true, feedbackCount: 1 };
-      },
-    };
-    const rows = new Map();
-    const { store: taskDecisionsStore, calls: taskCalls } = makeFakeTaskDecisionsStore({
-      async answer({ id }) {
-        const existing = rows.get(id);
-        if (existing) return { record: existing, firstStampWins: false, unretried: false };
-        const record = { id, outcome: 'answered' };
-        rows.set(id, record);
-        return { record, firstStampWins: true, unretried: false };
-      },
-    });
-    const app = buildApp({ provider, dispatchQueueStore, taskDecisionsStore });
-    const payload = {
-      body: 'Scan reply (copy-failed witness)', decisionLoopId: 'loop-1', decisionLoopIds: ['copy-1'], decisionId: 'd-1',
-      taskDecisionId: 'scan-2', taskDecisionIssueId: '66666666-6666-6666-6666-666666666666'
-    };
-
-    assert.strictEqual((await postComment(app, ISSUE_ID, payload)).status, 201, 'attempt 1: primary and scan row stamped, copy failed');
-    const retry = await postComment(app, ISSUE_ID, payload);
-    assert.strictEqual(retry.status, 200, 'the retry is this submission\'s own landed stamp, not a second answer');
-    assert.strictEqual(retry.body.deduped, true);
-    assert.ok(settled.has('copy-1'), 'the retry stamps the copy');
-    assert.strictEqual(providerCalls.createComment.length, 1, 'no second comment');
-    assert.strictEqual(taskCalls.answer.length, 2, 'the scan row is re-attempted on the retry, as the copy-failed loop primary is');
-  });
-
-  test('a scan (task-bound) row already answered or dismissed is refused 409 ruling-settled before the comment', async () => {
-    for (const outcome of ['answered', 'dismissed']) {
-      const { provider, calls: providerCalls } = makeFakeProvider();
-      const { store: taskDecisionsStore } = makeFakeTaskDecisionsStore({ readOutcome: () => ({ outcome }) });
-      const app = buildApp({ provider, taskDecisionsStore });
-
-      const { status, body } = await postComment(app, ISSUE_ID, {
-        body: `late scan answer (${outcome})`, taskDecisionId: 'scan-1', taskDecisionIssueId: '66666666-6666-6666-6666-666666666666'
-      });
-
-      assert.strictEqual(status, 409, `a row already ${outcome} is settled`);
-      assert.strictEqual(body.code, 'ruling-settled');
-      assert.strictEqual(providerCalls.createComment.length, 0, 'no comment for a settled scan row');
-    }
-  });
-});
-
-// =============================================================================
-// LIN-1728 Phase 2: optional decision-answer stamp params on the same route.
-// =============================================================================
-describe('POST /workspace/:urlKey/api/comments/:issueId — decision-answer stamp (LIN-1728)', () => {
-  test('both params present → markDecisionAnswered is called with the right args, and the comment still 201s', async () => {
-    const { provider } = makeFakeProvider();
-    const { store, calls } = makeFakeDispatchQueueStore();
-    const app = buildApp({ provider, dispatchQueueStore: store });
-
-    const { status, body } = await postComment(app, ISSUE_ID, { body: 'ship it — decision stamp both-present', decisionLoopId: 'loop-1', decisionId: 'd-1' });
-
-    assert.strictEqual(status, 201);
-    assert.strictEqual(body.success, true);
-    assert.strictEqual(calls.markDecisionAnswered.length, 1);
-    assert.deepStrictEqual(calls.markDecisionAnswered[0], { itemId: 'loop-1', urlKey: 'acme', decisionId: 'd-1' });
-  });
-
-  test('params absent → markDecisionAnswered is never called; unchanged 201 behavior', async () => {
-    const { provider } = makeFakeProvider();
-    const { store, calls } = makeFakeDispatchQueueStore();
-    const app = buildApp({ provider, dispatchQueueStore: store });
-
-    const { status } = await postComment(app, ISSUE_ID, { body: 'ship it — decision stamp absent' });
-
-    assert.strictEqual(status, 201);
-    assert.strictEqual(calls.markDecisionAnswered.length, 0);
-  });
-
-  test('only one of the pair present → markDecisionAnswered is never called (not a half-stamp)', async () => {
-    const { provider } = makeFakeProvider();
-    const { store, calls } = makeFakeDispatchQueueStore();
-    const app = buildApp({ provider, dispatchQueueStore: store });
-
-    const { status } = await postComment(app, ISSUE_ID, { body: 'ship it — decision stamp half-present', decisionLoopId: 'loop-1' });
-
-    assert.strictEqual(status, 201);
-    assert.strictEqual(calls.markDecisionAnswered.length, 0);
-  });
-
-  test('stamp failure (store throws) does not fail the comment response', async () => {
-    const { provider } = makeFakeProvider();
-    const { store } = makeFakeDispatchQueueStore({
-      markDecisionAnswered: () => { throw new Error('store down'); },
-    });
-    const app = buildApp({ provider, dispatchQueueStore: store });
-
-    const { status, body } = await postComment(app, ISSUE_ID, { body: 'ship it — decision stamp throws', decisionLoopId: 'loop-1', decisionId: 'd-1' });
-
-    assert.strictEqual(status, 201);
-    assert.strictEqual(body.success, true);
-  });
-
-  test('stamp returning null (no matching item) does not fail the comment response', async () => {
-    const { provider } = makeFakeProvider();
-    const { store } = makeFakeDispatchQueueStore({ markDecisionAnswered: () => null });
-    const app = buildApp({ provider, dispatchQueueStore: store });
-
-    const { status, body } = await postComment(app, ISSUE_ID, { body: 'ship it — decision stamp returns null', decisionLoopId: 'loop-1', decisionId: 'd-1' });
-
-    assert.strictEqual(status, 201);
-    assert.strictEqual(body.success, true);
-  });
-
-  test('a deduped resubmission does not re-stamp', async () => {
-    const { provider } = makeFakeProvider();
-    const { store, calls } = makeFakeDispatchQueueStore();
-    const app = buildApp({ provider, dispatchQueueStore: store });
-
-    const first = await postComment(app, ISSUE_ID, { body: 'the same text — decision stamp dedupe', decisionLoopId: 'loop-1', decisionId: 'd-1' });
-    assert.strictEqual(first.status, 201);
-    assert.strictEqual(calls.markDecisionAnswered.length, 1);
-
-    const second = await postComment(app, ISSUE_ID, { body: 'the same text — decision stamp dedupe', decisionLoopId: 'loop-1', decisionId: 'd-1' });
-    assert.strictEqual(second.status, 200);
-    assert.strictEqual(second.body.deduped, true);
-    assert.strictEqual(calls.markDecisionAnswered.length, 1, 'no second stamp on a deduped resubmission');
-  });
-
-  // LIN-2208: reproduces the failure-then-immediate-identical-retry sequence
-  // from close-out on PR #1170 — a failed stamp followed by the one natural
-  // retry (Save again, IDENTICAL text) must actually re-stamp, not be
-  // swallowed by the comment-dedupe short-circuit. This is the failure path;
-  // the test above it is the success path and must stay proof of THAT case
-  // only (per the ticket's own constraint), not be repurposed here.
-  test('LIN-2208: a failed stamp is retried on an identical-text dedupe resubmission, and a further identical retry does not double-stamp once it succeeds', async () => {
-    const { provider } = makeFakeProvider();
-    let attempt = 0;
-    const { store, calls } = makeFakeDispatchQueueStore({
-      markDecisionAnswered: () => {
-        attempt += 1;
-        return attempt === 1 ? null : { success: true, feedbackCount: 1 };
-      },
-    });
-    const app = buildApp({ provider, dispatchQueueStore: store });
-
-    const payload = { body: 'the same text — decision stamp retry', decisionLoopId: 'loop-1', decisionId: 'd-1' };
-    const first = await postComment(app, ISSUE_ID, payload);
-    assert.strictEqual(first.status, 201);
-    assert.strictEqual(calls.markDecisionAnswered.length, 1, 'first attempt fails (no matching item yet)');
-
-    // Pre-LIN-2208: the dedupe short-circuit returned {deduped:true} before
-    // ever reaching the stamp block, so a failed stamp could never self-heal
-    // within the 5-minute TTL via the one obvious retry. The comment write
-    // itself must STILL be deduped (no second comment) — only the stamp
-    // attempt bypasses the short-circuit.
-    const second = await postComment(app, ISSUE_ID, payload);
-    assert.strictEqual(second.status, 200);
-    assert.strictEqual(second.body.deduped, true, 'the comment write is still deduped — no second comment');
-    assert.strictEqual(calls.markDecisionAnswered.length, 2, 'the retry reached the stamp block and re-attempted');
-
-    // A third identical retry must NOT stamp a third time now that one has
-    // already succeeded — the pre-existing success-path guarantee, unaffected
-    // by this fix.
-    const third = await postComment(app, ISSUE_ID, payload);
-    assert.strictEqual(third.status, 200);
-    assert.strictEqual(calls.markDecisionAnswered.length, 2, 'no further stamp once one has already succeeded');
-  });
-});
-
-describe('POST /workspace/:urlKey/api/comments/:issueId — task-decision answer stamp (LIN-2197 Phase 5, L4)', () => {
-  test('both params present → markOutcome is called with outcome: "answered", and the comment still 201s', async () => {
-    const { provider } = makeFakeProvider();
-    const { store, calls } = makeFakeTaskDecisionsStore();
-    const app = buildApp({ provider, taskDecisionsStore: store });
-
-    const { status, body } = await postComment(app, ISSUE_ID, {
-      body: 'ship it — task-decision stamp both-present',
-      taskDecisionId: 'scan_11111111_aaaaaaaaaaaa',
-      taskDecisionIssueId: '11111111-2222-3333-4444-555555555555',
-    });
-
-    assert.strictEqual(status, 201);
-    assert.strictEqual(body.success, true);
-    assert.strictEqual(calls.markOutcome.length, 1);
-    assert.deepStrictEqual(calls.markOutcome[0], {
-      urlKey: 'acme', issueId: '11111111-2222-3333-4444-555555555555', id: 'scan_11111111_aaaaaaaaaaaa', outcome: 'answered',
-    });
-  });
-
-  test('params absent → markOutcome is never called; unchanged 201 behavior', async () => {
-    const { provider } = makeFakeProvider();
-    const { store, calls } = makeFakeTaskDecisionsStore();
-    const app = buildApp({ provider, taskDecisionsStore: store });
-
-    const { status } = await postComment(app, ISSUE_ID, { body: 'ship it — task-decision stamp absent' });
-
-    assert.strictEqual(status, 201);
-    assert.strictEqual(calls.markOutcome.length, 0);
-  });
-
-  test('only one of the pair present → markOutcome is never called (not a half-stamp)', async () => {
-    const { provider } = makeFakeProvider();
-    const { store, calls } = makeFakeTaskDecisionsStore();
-    const app = buildApp({ provider, taskDecisionsStore: store });
-
-    const { status } = await postComment(app, ISSUE_ID, {
-      body: 'ship it — task-decision stamp half-present', taskDecisionId: 'scan_11111111_aaaaaaaaaaaa',
-    });
-
-    assert.strictEqual(status, 201);
-    assert.strictEqual(calls.markOutcome.length, 0);
-  });
-
-  test('no taskDecisionsStore configured → route still 201s (optional dependency, never a hard failure)', async () => {
-    const { provider } = makeFakeProvider();
-    const app = buildApp({ provider }); // taskDecisionsStore omitted entirely
-
-    const { status, body } = await postComment(app, ISSUE_ID, {
-      body: 'ship it — no store configured',
-      taskDecisionId: 'scan_11111111_aaaaaaaaaaaa',
-      taskDecisionIssueId: '11111111-2222-3333-4444-555555555555',
-    });
-
-    assert.strictEqual(status, 201);
-    assert.strictEqual(body.success, true);
-  });
-
-  test('stamp failure (store throws) does not fail the comment response', async () => {
-    const { provider } = makeFakeProvider();
-    const { store } = makeFakeTaskDecisionsStore({
-      markOutcome: () => { throw new Error('store down'); },
-    });
-    const app = buildApp({ provider, taskDecisionsStore: store });
-
-    const { status, body } = await postComment(app, ISSUE_ID, {
-      body: 'ship it — task-decision stamp throws',
-      taskDecisionId: 'scan_11111111_aaaaaaaaaaaa',
-      taskDecisionIssueId: '11111111-2222-3333-4444-555555555555',
-    });
-
-    assert.strictEqual(status, 201);
-    assert.strictEqual(body.success, true);
-  });
-
-  test('stamp returning null (no matching row) does not fail the comment response', async () => {
-    const { provider } = makeFakeProvider();
-    const { store } = makeFakeTaskDecisionsStore({ markOutcome: () => null });
-    const app = buildApp({ provider, taskDecisionsStore: store });
-
-    const { status, body } = await postComment(app, ISSUE_ID, {
-      body: 'ship it — task-decision stamp returns null',
-      taskDecisionId: 'scan_11111111_aaaaaaaaaaaa',
-      taskDecisionIssueId: '11111111-2222-3333-4444-555555555555',
-    });
-
-    assert.strictEqual(status, 201);
-    assert.strictEqual(body.success, true);
-  });
-
-  test('a deduped resubmission does not re-stamp', async () => {
-    const { provider } = makeFakeProvider();
-    const { store, calls } = makeFakeTaskDecisionsStore();
-    const app = buildApp({ provider, taskDecisionsStore: store });
-
-    const payload = {
-      body: 'the same text — task-decision stamp dedupe',
-      taskDecisionId: 'scan_11111111_aaaaaaaaaaaa',
-      taskDecisionIssueId: '11111111-2222-3333-4444-555555555555',
-    };
-    const first = await postComment(app, ISSUE_ID, payload);
-    assert.strictEqual(first.status, 201);
-    assert.strictEqual(calls.markOutcome.length, 1);
-
-    const second = await postComment(app, ISSUE_ID, payload);
-    assert.strictEqual(second.status, 200);
-    assert.strictEqual(second.body.deduped, true);
-    assert.strictEqual(calls.markOutcome.length, 1, 'no second stamp on a deduped resubmission');
-  });
-
-  // LIN-2208, task-decision sibling of the loop-decision case above.
-  test('LIN-2208: a failed stamp is retried on an identical-text dedupe resubmission, and a further identical retry does not double-stamp once it succeeds', async () => {
-    const { provider } = makeFakeProvider();
-    let attempt = 0;
-    const { store, calls } = makeFakeTaskDecisionsStore({
-      markOutcome: ({ id, urlKey, issueId, outcome }) => {
-        attempt += 1;
-        return attempt === 1 ? null : { id, urlKey, issueId, outcome, outcomeAt: new Date().toISOString() };
-      },
-    });
-    const app = buildApp({ provider, taskDecisionsStore: store });
-
-    const payload = {
-      body: 'the same text — task-decision stamp retry',
-      taskDecisionId: 'scan_11111111_aaaaaaaaaaaa',
-      taskDecisionIssueId: '11111111-2222-3333-4444-555555555555',
-    };
-    const first = await postComment(app, ISSUE_ID, payload);
-    assert.strictEqual(first.status, 201);
-    assert.strictEqual(calls.markOutcome.length, 1, 'first attempt fails (no matching row yet)');
-
-    const second = await postComment(app, ISSUE_ID, payload);
-    assert.strictEqual(second.status, 200);
-    assert.strictEqual(second.body.deduped, true, 'the comment write is still deduped — no second comment');
-    assert.strictEqual(calls.markOutcome.length, 2, 'the retry reached the stamp block and re-attempted');
-
-    const third = await postComment(app, ISSUE_ID, payload);
-    assert.strictEqual(third.status, 200);
-    assert.strictEqual(calls.markOutcome.length, 2, 'no further stamp once one has already succeeded');
-  });
-
-  // LIN-2889 close-out ledger L1 (RW1): the LIN-2724 repro through THIS route
-  // — the bug's own surface — against the REAL TaskDecisionsStore, not the
-  // permissive fake above. A self-resolved row answered via a comment must
-  // persist `answered` with the self-resolve reason/hash cleared, and an
-  // identical re-POST must not stamp again.
-  test('LIN-2889 L1 (RW1): a self-resolved row answered via a comment persists `answered` with reason/hash cleared (real store, LIN-2724); an identical re-POST does not re-stamp', async () => {
-    const taskDecisionsStore = new TaskDecisionsStore({ collection: makeMockTaskDecisionsCollection() });
-    const issueId = '11111111-2222-3333-4444-555555555555';
-    const scanned = await taskDecisionsStore.recordScan({
-      urlKey: 'acme', issueId, issueIdentifier: 'LIN-30', inputHash: 'a'.repeat(64),
-      decision: { decision_id: 'd-1', question: 'Proceed?', options: [{ id: 'opt-a', label: 'Yes' }] }
-    });
-    await taskDecisionsStore.markOutcome({
-      urlKey: 'acme', issueId, id: scanned.id, outcome: 'self-resolved',
-      outcomeReason: 'Retired automatically: a rescan found no pending decision.', outcomeBasisHash: 'basis-xyz'
-    });
-    const seeded = await taskDecisionsStore.getStatus('acme', issueId);
-    assert.equal(seeded.outcome, 'self-resolved', 'sanity: the LIN-2724 precondition is seeded');
-    assert.equal(seeded.outcomeBasisHash, 'basis-xyz');
-
-    // Count answer() calls on the real store without changing its behavior.
-    let answerCalls = 0;
-    const realAnswer = taskDecisionsStore.answer.bind(taskDecisionsStore);
-    taskDecisionsStore.answer = async (args) => { answerCalls += 1; return realAnswer(args); };
-
-    const { provider } = makeFakeProvider();
-    const app = buildApp({ provider, taskDecisionsStore });
-    const payload = { body: 'ship it — LIN-2724 real-store repro', taskDecisionId: scanned.id, taskDecisionIssueId: issueId };
-
-    const first = await postComment(app, ISSUE_ID, payload);
-    assert.strictEqual(first.status, 201);
-    assert.strictEqual(answerCalls, 1);
-
-    const status = await taskDecisionsStore.getStatus('acme', issueId);
-    assert.equal(status.outcome, 'answered', 'a human answer outranks the earlier self-resolve guess');
-    assert.equal(status.outcomeReason, null, 'the self-resolved outcomeReason does not survive the un-retire');
-    assert.equal(status.outcomeBasisHash, null, 'the self-resolved outcomeBasisHash does not survive the un-retire');
-
-    const second = await postComment(app, ISSUE_ID, payload);
-    assert.strictEqual(second.status, 200);
-    assert.strictEqual(second.body.deduped, true);
-    assert.strictEqual(answerCalls, 1, 'the stamp succeeded, so an identical re-POST must not re-stamp');
-    assert.equal((await taskDecisionsStore.getStatus('acme', issueId)).outcome, 'answered');
-  });
-
-  // LIN-2889 close-out ledger L1 (RW2): pins the task half's POSITIVE success
-  // rule. answer() returning a leftover `self-resolved` record (the rare
-  // stacked-retire race) is a record, but NOT a landed answer — it must count
-  // as a failed stamp so the LIN-2208 identical-text retry re-attempts it.
-  // Reverting the rule to the pre-fix `!!record` (mutation M6) makes the first
-  // attempt look successful and the retry never happens.
-  test('LIN-2889 L1 (RW2): answer() returning a leftover self-resolved record is a failed stamp — an identical re-POST re-attempts it', async () => {
-    const { provider } = makeFakeProvider();
-    let attempt = 0;
-    const { store, calls } = makeFakeTaskDecisionsStore({
-      answer: ({ id, urlKey, issueId }) => {
-        attempt += 1;
-        return attempt === 1
-          ? { record: { id, urlKey, issueId, outcome: 'self-resolved' }, firstStampWins: false, unretried: false }
-          : { record: { id, urlKey, issueId, outcome: 'answered' }, firstStampWins: true, unretried: true };
-      },
-    });
-    const app = buildApp({ provider, taskDecisionsStore: store });
-
-    const payload = {
-      body: 'the same text — leftover self-resolved retry',
-      taskDecisionId: 'scan_11111111_aaaaaaaaaaaa',
-      taskDecisionIssueId: '11111111-2222-3333-4444-555555555555',
-    };
-    const first = await postComment(app, ISSUE_ID, payload);
-    assert.strictEqual(first.status, 201);
-    assert.strictEqual(calls.answer.length, 1);
-
-    const second = await postComment(app, ISSUE_ID, payload);
-    assert.strictEqual(second.status, 200);
-    assert.strictEqual(second.body.deduped, true);
-    assert.strictEqual(calls.answer.length, 2, 'a leftover self-resolved record is not a landed answer — the retry must re-attempt');
-
-    const third = await postComment(app, ISSUE_ID, payload);
-    assert.strictEqual(third.status, 200);
-    assert.strictEqual(calls.answer.length, 2, 'no further stamp once one has genuinely landed');
-  });
-});
-
-// =============================================================================
 // LIN-2664 F2: dedupe-hit harbour-comments ledger repair on this seam
 // (routes/workspace-api.js POST /workspace/:urlKey/api/comments/:issueId).
 // =============================================================================
@@ -1211,244 +405,6 @@ describe('POST /workspace/:urlKey/api/comments/:issueId — harbour-comments led
       'the repair attempt targets the SAME comment id the original create minted'
     );
   });
-});
-
-// =============================================================================
-// LIN-2755 beat 2: ruling-write cache invalidation (RED until beat 3).
-// =============================================================================
-//
-// This route's stamp block (`stampDecisionAnswers`, routes/workspace-api-issue-write.js)
-// is TWO of the ticket's 11 write sites in one request:
-//   - the loop half (`markDecisionAnswered`, workspace-api.js:262) — writes
-//     into data the sessions-feed cache actually holds (mergeLoops
-//     reconstructs from dispatchQueueStore), so it gets BOTH the
-//     invalidation+bound witness AND the stronger stale-row witness (2),
-//     same as dashboard.js's dismiss route.
-//   - the task-decision half (`markOutcome`, workspace-api.js:275) — writes
-//     to taskDecisionsStore, read LIVE on every rulings poll (per beat 1's
-//     sweep), so invalidation+bound only.
-//
-// Beat 1's sweep also found that `createWorkspaceApiRoutes` does not yet
-// accept `sessionsFeedCache` at all — mounting THIS route's app and
-// `createDashboardRoutes`'s rulings GET side by side, sharing one real cache
-// instance and one real dispatchQueueStore, is what makes that gap
-// observable: today the shared cache is warmed by the GET side and never
-// invalidated by a write through this route, because nothing here even
-// receives it yet.
-describe('POST /workspace/:urlKey/api/comments/:issueId — ruling-write cache invalidation (LIN-2755)', () => {
-  const CACHE_URL_KEY = 'acme';
-  const CACHE_DECISION_ID = 'd-cache-1';
-
-  // A single loop, `listHistory`-backed, that starts decision-bearing and
-  // flips to answered once `markDecisionAnswered` is called — same technique
-  // as the equivalent WITNESS 2 test in tests/unit/dashboard-routes.test.js.
-  function makeSharedLoopStore() {
-    let discharged = false;
-    let historyReads = 0;
-    return {
-      historyReads: () => historyReads,
-      dispatchQueueStore: {
-        async listItems() { return []; },
-        async listHistory() {
-          historyReads++;
-          const nowIso = new Date().toISOString();
-          const feedback = [
-            { message: '[blocked] need a decision', timestamp: nowIso },
-            { kind: 'decision', message: JSON.stringify({ decision_id: CACHE_DECISION_ID, question: 'Proceed?' }), timestamp: nowIso },
-          ];
-          if (discharged) feedback.push({ kind: 'decision-answer', message: JSON.stringify({ decision_id: CACHE_DECISION_ID }), timestamp: nowIso });
-          return {
-            items: withFreshDigests([{
-              id: 'loop-1', issueIdentifier: 'LIN-99', issueTitle: 'Title LIN-99', promptName: 'implementation',
-              prompt: 'p', dispatchedAt: nowIso, resolvedAt: nowIso, status: 'taken', feedback,
-            }]),
-          };
-        },
-        async markDecisionAnswered() { discharged = true; return { success: true, feedbackCount: 3 }; },
-        async isDecisionSettled() { return discharged; },
-      },
-    };
-  }
-
-  function makeSharedTaskDecisionsStore() {
-    const calls = [];
-    const store = {
-      calls,
-      async listUnansweredForWorkspaces() { return []; }, // this half's write is exercised in isolation below
-      async listNewestScanPerTask() { return {}; },
-      async markOutcome(args) { calls.push(args); return { ...args, outcomeAt: new Date().toISOString() }; },
-      async readOutcome() { return null; }, // LIN-4241 pre-check: row not yet read as settled
-      // LIN-2889: stampDecisionAnswers now calls answer(), not markOutcome()
-      // directly — delegate so `calls` still records the underlying stamp
-      // attempt, keeping this witness's "the write actually reached the
-      // store" assertion meaningful.
-      async answer({ urlKey, issueId, id, optionId }) {
-        const record = await store.markOutcome({ urlKey, issueId, id, outcome: 'answered', optionId });
-        return { record, firstStampWins: true, unretried: false };
-      },
-    };
-    return store;
-  }
-
-  // Mounts the SAME workspace-api app `buildApp` builds, plus a
-  // dashboard.js router sharing the same dispatchQueueStore/taskDecisionsStore
-  // and ONE real sessionsFeedCache instance — mirroring how server.js wires a
-  // single process-wide cache into both route factories.
-  function buildCrossRouterApp({ dispatchQueueStore, taskDecisionsStore, sessionsFeedCache }) {
-    const { provider } = makeFakeProvider();
-    const app = buildApp({ provider, dispatchQueueStore, taskDecisionsStore, sessionsFeedCache });
-
-    const dashboardRouter = createDashboardRoutes({
-      workspaceFromUrl: (req, res, next) => next(),
-      dispatchQueueStore: dispatchQueueStore || {},
-      agentStatusStore: { async listStatus() { return { items: [] }; } },
-      runSummaryCacheStore: new InMemoryRunSummaryCacheStore(),
-      freeTierStore: { async tryUse() { return { allowed: true }; } },
-      getWorkspaceAccessToken: async () => 'token',
-      fetchIssueContext: async () => ({}),
-      getOpenRouterSource: () => 'env',
-      getDeployInfo: () => ({}),
-      sessionsFeedCache,
-      taskDecisionsStore,
-    });
-    // A tiny dedicated mount that seeds req.session.workspaces the way real
-    // session auth would — dashboard.js's rulings route reads it directly.
-    app.use((req, res, next) => {
-      req.session = req.session || {};
-      req.session.workspaces = [{ urlKey: CACHE_URL_KEY, name: 'Acme' }];
-      next();
-    }, dashboardRouter);
-
-    return app;
-  }
-
-  async function getRulings(app) {
-    const server = app.listen(0, '127.0.0.1');
-    await new Promise(r => server.once('listening', r));
-    const { port } = server.address();
-    try {
-      const res = await fetch(`http://127.0.0.1:${port}/workspace/${CACHE_URL_KEY}/api/dashboard/rulings`);
-      return await res.json();
-    } finally {
-      await new Promise(r => server.close(r));
-    }
-  }
-
-  test('the loop half (markDecisionAnswered, workspace-api.js:262) invalidates the rulings cache — witness 1+3', async () => {
-    const { dispatchQueueStore, historyReads } = makeSharedLoopStore();
-    const app = buildCrossRouterApp({ dispatchQueueStore, sessionsFeedCache: createSessionsFeedCache() });
-
-    const warm = await getRulings(app);
-    assert.equal(warm.count, 1, 'sanity: the ruling is visible before any write');
-    assert.equal(historyReads(), 1, 'sanity: the first poll always reconstructs');
-
-    const stillWarm = await getRulings(app);
-    assert.equal(stillWarm.count, 1);
-    assert.equal(historyReads(), 1, 'sanity: a second poll within the 5s TTL is still served from cache');
-
-    const write = await postComment(app, ISSUE_ID, {
-      body: 'ship it — cache invalidation loop half', decisionLoopId: 'loop-1', decisionId: CACHE_DECISION_ID,
-    }, CACHE_URL_KEY);
-    assert.strictEqual(write.status, 201);
-
-    const afterWrite = await getRulings(app);
-    assert.equal(historyReads(), 2,
-      'THE RED: the next poll after a successful stamp must reconstruct — only true if the write invalidated the cache');
-
-    const afterWriteAgain = await getRulings(app);
-    assert.equal(historyReads(), 2, 'bound (LIN-2227): one write costs at most one reconstruction, not two');
-  });
-
-  test('WITNESS 2 (stale-row, loop-backed): the loop half actually excludes the discharged row on the next poll', async () => {
-    const { dispatchQueueStore, historyReads } = makeSharedLoopStore();
-    const app = buildCrossRouterApp({ dispatchQueueStore, sessionsFeedCache: createSessionsFeedCache() });
-
-    const before = await getRulings(app);
-    assert.equal(before.count, 1, 'the ruling is present before the stamp');
-
-    const write = await postComment(app, ISSUE_ID, {
-      body: 'ship it — cache invalidation stale row', decisionLoopId: 'loop-1', decisionId: CACHE_DECISION_ID,
-    }, CACHE_URL_KEY);
-    assert.strictEqual(write.status, 201);
-
-    const after = await getRulings(app);
-    assert.equal(after.count, 0,
-      'THE RED: the discharged row must actually be gone on the next poll, without waiting out the 5s TTL');
-    assert.equal(historyReads(), 2, 'the row only disappeared because the cache was invalidated and re-read');
-  });
-
-  test('the task-decision half (markOutcome, workspace-api.js:275) invalidates the rulings cache — witness 1+3', async () => {
-    // No loop-backed rows at all — isolates this half from the loop half above.
-    let historyReads = 0;
-    const dispatchQueueStore = {
-      async listItems() { return []; },
-      async listHistory() { historyReads++; return { items: [] }; },
-    };
-    const taskDecisionsStore = makeSharedTaskDecisionsStore();
-    const app = buildCrossRouterApp({ dispatchQueueStore, taskDecisionsStore, sessionsFeedCache: createSessionsFeedCache() });
-
-    const warm = await getRulings(app);
-    assert.equal(warm.count, 0);
-    assert.equal(historyReads, 1, 'sanity: the first poll always reconstructs');
-
-    const stillWarm = await getRulings(app);
-    assert.equal(historyReads, 1, 'sanity: a second poll within the 5s TTL is still served from cache');
-
-    const write = await postComment(app, ISSUE_ID, {
-      body: 'ship it — cache invalidation task-decision half',
-      taskDecisionId: 'scan_11111111_aaaaaaaaaaaa',
-      taskDecisionIssueId: '11111111-2222-3333-4444-555555555555',
-    }, CACHE_URL_KEY);
-    assert.strictEqual(write.status, 201);
-    assert.strictEqual(taskDecisionsStore.calls.length, 1, 'sanity: the write actually reached markOutcome');
-
-    const afterWrite = await getRulings(app);
-    assert.equal(historyReads, 2,
-      'THE RED: the next poll after a successful stamp must reconstruct — only true if the write invalidated the cache');
-
-    const afterWriteAgain = await getRulings(app);
-    assert.equal(historyReads, 2, 'bound (LIN-2227): one write costs at most one reconstruction, not two');
-  });
-
-  // LIN-2889 close-out ledger L2: the negative half of "clear only on genuine
-  // success". A task-half stamp that did NOT land — no matching row, or a
-  // leftover self-resolved record — changed nothing this call can claim, so
-  // it must leave the cache warm. Mutation M7 (clear on a failed stamp) fails
-  // this test.
-  for (const [label, answerResult] of [
-    ['no matching row', { record: null, firstStampWins: false, unretried: false }],
-    ['leftover self-resolved record', { record: { outcome: 'self-resolved' }, firstStampWins: false, unretried: false }],
-  ]) {
-    test(`LIN-2889 L2: a failed task-half stamp (${label}) does NOT invalidate the rulings cache`, async () => {
-      let historyReads = 0;
-      const dispatchQueueStore = {
-        async listItems() { return []; },
-        async listHistory() { historyReads++; return { items: [] }; },
-      };
-      let answerCalls = 0;
-      const taskDecisionsStore = {
-        async listUnansweredForWorkspaces() { return []; },
-        async listNewestScanPerTask() { return {}; },
-        async answer() { answerCalls++; return answerResult; },
-        async readOutcome() { return null; }, // LIN-4241 pre-check: row not yet read as settled
-      };
-      const app = buildCrossRouterApp({ dispatchQueueStore, taskDecisionsStore, sessionsFeedCache: createSessionsFeedCache() });
-
-      await getRulings(app);
-      assert.equal(historyReads, 1, 'sanity: the first poll always reconstructs');
-
-      const write = await postComment(app, ISSUE_ID, {
-        body: `ship it — failed task-half stamp (${label})`,
-        taskDecisionId: 'scan_11111111_aaaaaaaaaaaa',
-        taskDecisionIssueId: '11111111-2222-3333-4444-555555555555',
-      }, CACHE_URL_KEY);
-      assert.strictEqual(write.status, 201, 'a failed stamp never fails the comment itself');
-      assert.strictEqual(answerCalls, 1, 'sanity: the stamp was attempted');
-
-      await getRulings(app);
-      assert.equal(historyReads, 1, 'a failed stamp must not invalidate the cache — the next poll is still served from it');
-    });
-  }
 });
 
 // =============================================================================
@@ -1486,19 +442,18 @@ describe('POST /workspace/:urlKey/api/comments/:issueId — session-lane auth re
   // stamp — exactly once, keyed on the retry's own comment id. Mutation M10
   // (the retry returning 201 directly, bypassing the tail) survives every
   // other case in this file without this one.
-  test('(a2) L2: a recovered retry runs the shared success tail exactly once — ledger record (retry\'s comment id), one stamp, and dedupe on an identical re-press with no third createComment', async () => {
+  test('(a2) L2: a recovered retry runs the shared success tail exactly once — ledger record (retry\'s comment id) and dedupe on an identical re-press with no third createComment', async () => {
     const { provider, calls } = makeCredentialKeyedProvider({ rejectedTokens: [REJECTED_TOKEN] });
     const { store: ownerCredentialStore, calls: storeCalls } = makeFakeOwnerCredentialStore({
       token: FRESH_TOKEN, tokenExpiresAt: Date.now() + 3600_000, provider: 'linear',
     });
-    const { store: dispatchQueueStore, calls: stampCalls } = makeFakeDispatchQueueStore();
     const harbourCommentsStore = makeSpyHarbourCommentsStore();
     const app = buildApp({
       provider, session: makeRecoverySession(), ownerCredentialStore,
-      dispatchQueueStore, harbourCommentsStore,
+      harbourCommentsStore,
       workspaceOverrides: { provider: 'linear', accessToken: REJECTED_TOKEN },
     });
-    const payload = { body: 'LIN-2933 L2 recovered success tail', decisionLoopId: 'loop-l2', decisionId: 'd-l2' };
+    const payload = { body: 'LIN-2933 L2 recovered success tail' };
 
     const first = await postComment(app, ISSUE_ID, payload);
 
@@ -1510,9 +465,6 @@ describe('POST /workspace/:urlKey/api/comments/:issueId — session-lane auth re
     assert.strictEqual(harbourCommentsStore.calls.length, 1, 'exactly one ledger record for the recovered write');
     assert.strictEqual(harbourCommentsStore.calls[0].commentId, retryCommentId, 'the ledger record must carry the RETRY\'s comment id, never a stale/absent original-attempt id');
 
-    assert.strictEqual(stampCalls.markDecisionAnswered.length, 1, 'exactly one decision stamp for the recovered write');
-    assert.deepStrictEqual(stampCalls.markDecisionAnswered[0], { itemId: 'loop-l2', urlKey: 'acme', decisionId: 'd-l2' });
-
     // An identical resubmission must hit the dedupe cache the recovered
     // retry just populated — 200/deduped:true, no third provider write, and
     // no second recovery attempt (no second durable point-read either).
@@ -1522,7 +474,6 @@ describe('POST /workspace/:urlKey/api/comments/:issueId — session-lane auth re
     assert.strictEqual(second.body.comment.id, retryCommentId);
     assert.strictEqual(calls.createComment.length, 2, 'the identical resubmission must not mint a third comment');
     assert.strictEqual(storeCalls.length, 1, 'the dedupe hit must not attempt a second durable-credential read');
-    assert.strictEqual(stampCalls.markDecisionAnswered.length, 1, 'a deduped resubmission must not re-stamp — the recovered write already stamped it');
   });
 
   test('(b) the durable store holds the SAME dead credential → no recovery, classified 500, retryable:false', async () => {
@@ -1778,33 +729,5 @@ describe('server.js production wiring pin (LIN-2933, plan-review R2)', () => {
       /app\.use\(createWorkspaceApiRoutes\(\{[^}]*\bownerCredentialStore\b[^}]*\}\)\)/,
       'server.js must wire ownerCredentialStore into createWorkspaceApiRoutes'
     );
-  });
-});
-
-// LIN-3959: a comment answer on a joined ruling stamps every copy, and a malformed
-// list is refused before the comment is written (never a posted comment with only
-// some copies stamped).
-describe('POST /workspace/:urlKey/api/comments/:issueId — joined-copy stamps (LIN-3959)', () => {
-  test('decisionLoopIds stamps each copy through the same write, and the comment still 201s', async () => {
-    const { provider } = makeFakeProvider();
-    const { store, calls } = makeFakeDispatchQueueStore();
-    const app = buildApp({ provider, dispatchQueueStore: store });
-
-    const { status } = await postComment(app, ISSUE_ID, { body: 'ship it — joined copies', decisionLoopId: 'wk-1', decisionLoopIds: ['wk-1', 'ap-1'], decisionId: 'd-1' });
-
-    assert.strictEqual(status, 201);
-    assert.deepStrictEqual(calls.markDecisionAnswered.map(c => c.itemId), ['wk-1', 'ap-1']);
-  });
-
-  test('a malformed decisionLoopIds is refused 400 with no comment written and no stamp', async () => {
-    const { provider, calls: providerCalls } = makeFakeProvider();
-    const { store, calls } = makeFakeDispatchQueueStore();
-    const app = buildApp({ provider, dispatchQueueStore: store });
-
-    const { status } = await postComment(app, ISSUE_ID, { body: 'ship it — bad list', decisionLoopId: 'wk-1', decisionLoopIds: 'ap-1', decisionId: 'd-1' });
-
-    assert.strictEqual(status, 400);
-    assert.strictEqual(providerCalls.createComment.length, 0, 'the comment is not written');
-    assert.strictEqual(calls.markDecisionAnswered.length, 0);
   });
 });

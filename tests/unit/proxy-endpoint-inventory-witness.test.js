@@ -9,8 +9,8 @@
  * asserts that all 55 registrations still resolve"). This file is that
  * replacement, landed as PR-0 (no handler moves) before any group is moved.
  *
- * 76 covered (method, URL) forms (3 `routes/proxy-rulings.js` forms
- * known-uncovered; see the Group K comment below) — 66 route registrations,
+ * The covered (method, URL) forms (the 3 `routes/proxy-rulings.js` forms that
+ * were a known-uncovered gap retired with that file, LIN-4541) — 66 route registrations,
  * 10 of them array-path aliases (2 URL forms each) — are driven through
  * `createProxyRoutes` over REAL HTTP (an express app + `fetch`, the pattern
  * already established by tests/unit/proxy-route-aliases.test.js), each
@@ -474,13 +474,8 @@ const ROWS = [
   },
 
   // --- Group K: operator halt (LIN-2994 Surface 3 / LIN-3025, routes/proxy-halt.js) ---
-  // NOTE (LIN-3025): this table is still deliberately missing the 3
-  // pre-existing routes/proxy-rulings.js forms (GET /api/proxy/rulings,
-  // POST .../suggest-dismissal, POST .../suggest-answer) — a bounded,
-  // documented gap from LIN-2444, which updated the DI census
-  // (tests/unit/proxy-di-witness.test.js) but not this file. Fixing that
-  // gap is out of scope here; this comment exists so 76 below is read as
-  // "75 covered forms, 3 known-uncovered", never as "the whole surface".
+  // (The 3 routes/proxy-rulings.js forms this table never covered retired with that file, LIN-4541: the table now covers
+  // the whole proxy surface.)
   {
     group: 'K', method: 'GET', url: '/api/proxy/dispatch/halt', expect: 200,
     note: 'no halt set yet — BASE_DEPS() default workspaceHaltStore.getWorkspaceHalt resolves null',
@@ -676,9 +671,9 @@ describe('LIN-679 PR-0: proxy.js registration count', () => {
   // OWN registration count is still 1; total 74 -> 75.
   // LIN-3218 (LIN-3201 A1): the numeric corpus total ("exactly 1 registration
   // here / 75 URL forms") is gone. The table's coverage is instead derived from
-  // source: every proxy route file's `router.<verb>(` registrations, minus the
-  // documented LIN-2444 `routes/proxy-rulings.js` gap, plus one extra URL form
-  // per array-path alias, must equal the number of rows below. A new
+  // source: every proxy route file's `router.<verb>(` registrations, plus one
+  // extra URL form per array-path alias, must equal the number of rows below
+  // (LIN-4541 retired routes/proxy-rulings.js, the one documented gap). A new
   // registration in any proxy file (or a dropped/added alias) changes the
   // derived figure and fails here until the table is re-derived — the same
   // mechanical guard `router.stack` used to give, without a literal every
@@ -700,17 +695,13 @@ describe('LIN-679 PR-0: proxy.js registration count', () => {
       totalRegistrations += countRegistrations(src);
       aliasRegistrations += countAliasRegistrations(src);
     }
-    // The 3 forms in routes/proxy-rulings.js are the documented, bounded gap
-    // (LIN-2444) deliberately excluded from this table; the count is read from
-    // that file, not pinned.
-    const rulingsRegistrations = countRegistrations(read('routes/proxy-rulings.js'));
-    const expectedForms = totalRegistrations - rulingsRegistrations + aliasRegistrations;
+    const expectedForms = totalRegistrations + aliasRegistrations;
 
     assert.ok(expectedForms > 0, 'the derivation must find at least one registration, never pass on a zero surface');
     assert.equal(
       ROWS.length, expectedForms,
       `the ROWS table must cover exactly ${expectedForms} URL forms derived from source ` +
-      `(${totalRegistrations} registrations - ${rulingsRegistrations} documented rulings forms + ${aliasRegistrations} array-path aliases); found ${ROWS.length}`
+      `(${totalRegistrations} registrations + ${aliasRegistrations} array-path aliases); found ${ROWS.length}`
     );
 
     // The composer's OWN registrations (the ones not moved to a sub-router)
@@ -731,7 +722,7 @@ describe('LIN-679 PR-0: proxy.js registration count', () => {
 // The witness itself.
 // ---------------------------------------------------------------------------
 
-describe('LIN-679 PR-0: endpoint inventory witness (76 covered URL forms resolve; 3 routes/proxy-rulings.js forms known-uncovered)', () => {
+describe('LIN-679 PR-0: endpoint inventory witness (every covered URL form resolves)', () => {
   for (const row of ROWS) {
     test(`[${row.group}] ${row.method} ${row.url} -> ${row.expect} (${row.note})`, async () => {
       const { status, body, contentType } = await row.run();

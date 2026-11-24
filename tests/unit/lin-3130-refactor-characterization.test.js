@@ -100,26 +100,22 @@ describe('LIN-3130 — validateFeedbackBody: sanitized payload', () => {
   });
 });
 
-describe('LIN-3130 — validateFeedbackBody: decision-withdrawn shape', () => {
-  test('well-formed JSON with non-empty decision_id + reason passes', () => {
-    const message = JSON.stringify({ decision_id: 'd-1', reason: 'superseded' });
-    const { value } = validateFeedbackBody({ message, kind: 'decision-withdrawn' });
-    assert.equal(value.kind, 'decision-withdrawn');
-    assert.equal(value.message, message);
-  });
-
-  test('malformed JSON -> exact error string', () => {
-    assert.deepEqual(
-      validateFeedbackBody({ message: 'not json', kind: 'decision-withdrawn' }),
-      { error: 'message must be valid JSON for kind:"decision-withdrawn"' }
-    );
-  });
-
-  test('missing/empty decision_id or reason -> exact error string', () => {
-    const expected = { error: 'kind:"decision-withdrawn" requires a non-empty decision_id and reason' };
-    assert.deepEqual(validateFeedbackBody({ message: JSON.stringify({ decision_id: 'd-1' }), kind: 'decision-withdrawn' }), expected);
-    assert.deepEqual(validateFeedbackBody({ message: JSON.stringify({ decision_id: '', reason: 'r' }), kind: 'decision-withdrawn' }), expected);
-    assert.deepEqual(validateFeedbackBody({ message: JSON.stringify({ decision_id: 'd-1', reason: '   ' }), kind: 'decision-withdrawn' }), expected);
+// LIN-4541: the decision-withdrawn shape gate went with the kind. A runner post of either retired decision kind is refused
+// 422 before any other rule, whatever its shape (tests/unit/dispatch-feedback-kind-sanitize.test.js drives the route).
+describe('LIN-3130 — validateFeedbackBody: the retired decision kinds (LIN-4541)', () => {
+  test('decision and decision-withdrawn are refused 422 with the records route, well-formed or not', () => {
+    for (const body of [
+      { message: JSON.stringify({ decision_id: 'd-1', reason: 'superseded' }), kind: 'decision-withdrawn' },
+      { message: 'not json', kind: 'decision-withdrawn' },
+      { message: JSON.stringify({ decision_id: 'd-1', question: 'q' }), kind: 'decision' },
+      { message: '', kind: 'decision' },
+    ]) {
+      const out = validateFeedbackBody(body);
+      assert.equal(out.status, 422, JSON.stringify(body));
+      assert.equal(out.code, 'DECISION_FEEDBACK_RETIRED');
+      assert.match(out.error, /POST \/api\/proxy\/records/);
+      assert.equal(out.value, undefined);
+    }
   });
 });
 

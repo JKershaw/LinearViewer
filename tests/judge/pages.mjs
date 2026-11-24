@@ -55,12 +55,12 @@ const TASK_CLOCK = [
 // answer choices are what this PR changes, so a mask on the row would hide the very difference the judge must class.
 const OBS_TIMES = [
   { selector: '.obs-session-time', reason: 'the card\'s "updated … ago" stamp is relative to the real clock the seed runs on' },
-  { selector: '.obs-ruling-suggestion-meta', reason: 'the proposal\'s "by …, ago" stamp is relative to the real clock the seed runs on' },
+  { selector: '.obs-ruling-suggestion-meta', optional: true, reason: 'the proposal\'s "by …, ago" stamp is relative to the real clock the seed runs on (the banner retired with proposed dismissals, LIN-4541, so only a base shot can hold it)' },
   { selector: '.obs-session-started', optional: true, reason: 'an untitled run\'s "Started …" is a relative time (base has no such line: LIN-3983 PR 2 adds it)' },
   { selector: '.obs-summary-elapsed', optional: true, reason: 'a running stage\'s "… in" is the clock at the shot (base has no such span: PR 2 wraps it)' },
   { selector: '.obs-meta-runtime', optional: true, reason: 'a run\'s runtime is the clock at the shot (base has no such class: PR 2 adds it)' },
 ];
-// The Rulings tab shows no session cards, so only the proposal's stamp is on screen there.
+// The Rulings tab shows no session cards, so only the proposal's stamp could be on screen there (a base shot's, LIN-4541).
 const OBS_RULING_TIMES = OBS_TIMES.filter((m) => m.selector === '.obs-ruling-suggestion-meta');
 
 // `state` names a set-up the spec performs identically on both sides (see replay.spec.js):

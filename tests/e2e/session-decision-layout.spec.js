@@ -1,5 +1,6 @@
 import { test, expect } from '../fixtures/test-base.js';
 import { askingRun, seedQuestion } from '../fixtures/question-records.js';
+import { seedHistoryFeedback } from '../fixtures/history-feedback.js';
 
 // LIN-2193: real-Chromium, real-stylesheet coverage for a decision-bearing
 // waiting session. LIN-2184 shipped three CSS regressions in a row on this
@@ -34,8 +35,10 @@ import { askingRun, seedQuestion } from '../fixtures/question-records.js';
 // session's anchor above is never taken, so its run reads as still working
 // and its card would be read-only). A question record has no case prose: the unbroken-token
 // overflow fixture moves into the question's own text. The feed-card test
-// still reads the old `decision` feedback, which the Observation feed (the
-// ruling machinery, retired in P7b) shows.
+// still reads an old `decision` row, which the Observation feed card shows as
+// history: its sentence and case excerpt, with no answer choices (LIN-4541,
+// which also writes that row through the history seam, since no route
+// writes the kind now).
 
 let URL_KEY;
 let SESSION_ID;
@@ -111,11 +114,8 @@ async function seedDecisionSession(page) {
   });
   expect(note2.status(), `second assistant-text failed: ${await note2.text()}`).toBe(200);
 
-  const decision = await page.request.post(`/api/dispatch/feedback/${workerId}`, {
-    headers: auth,
-    data: { kind: 'decision', message: `[decision] ${JSON.stringify(DECISION_PAYLOAD)}` }
-  });
-  expect(decision.status(), `decision feedback failed: ${await decision.text()}`).toBe(200);
+  // LIN-4541: the feedback route refuses a decision entry now, so the old row is written as it was stored (history seam).
+  await seedHistoryFeedback(page, URL_KEY, workerId, [{ kind: 'decision', message: `[decision] ${JSON.stringify(DECISION_PAYLOAD)}` }]);
 
   const blocked = await page.request.post(`/api/dispatch/feedback/${workerId}`, {
     headers: auth,
@@ -258,7 +258,7 @@ test.describe('Decision-bearing waiting-session layout (LIN-2193)', () => {
     }
   });
 
-  test('feed card: excerpt line-count and option-run stay contained at the measured content widths', async ({ page }) => {
+  test('feed card: the excerpt line-count stays contained at the measured content widths, and an old decision offers no choices (LIN-4541)', async ({ page }) => {
     const OBSERVATION_URL = `/workspace/${URL_KEY}/observation`;
 
     // .obs-page's content width is 460.8px at a 600px viewport and 588.0px at
@@ -270,7 +270,7 @@ test.describe('Decision-bearing waiting-session layout (LIN-2193)', () => {
       await page.goto(OBSERVATION_URL);
       // The feed card is client-rendered from a poll — wait for it before
       // measuring; expect()'s 5s default is tighter than first poll+paint.
-      await page.waitForSelector('#obs-active .obs-session .obs-summary-decision-options');
+      await page.waitForSelector('#obs-active .obs-session .obs-summary-decision-excerpt');
 
       const excerpt = page.locator('#obs-active .obs-session .obs-summary-decision-excerpt').first();
       await expect(excerpt).toBeVisible();
@@ -282,81 +282,8 @@ test.describe('Decision-bearing waiting-session layout (LIN-2193)', () => {
       }));
       expect(rectsLength).toBeLessThanOrEqual(2);
       expect(textLength).toBeLessThanOrEqual(66);
+      // LIN-4541: a question is answered on its question record's card; an old decision on the feed card offers nothing to pick.
+      await expect(page.locator('#obs-active .obs-session .obs-summary-decision-options')).toHaveCount(0);
     }
-
-    // Option-run clip check (the card clips its own overflow via
-    // `.obs-session { overflow: hidden }`) at 360px: the options span's own
-    // painted box must stay inside the card, and the point at its own last
-    // client rect must resolve back to itself, not the clipping ancestor.
-    await page.setViewportSize({ width: 360, height: 800 });
-    await page.goto(OBSERVATION_URL);
-    await page.waitForSelector('#obs-active .obs-session .obs-summary-decision-options');
-
-    const card = page.locator('#obs-active .obs-session').first();
-    const optionsRun = card.locator('.obs-summary-decision-options');
-    await expect(optionsRun).toBeVisible();
-    await expect(optionsRun).not.toHaveText('');
-    await optionsRun.scrollIntoViewIfNeeded();
-
-    // LIN-2195: the ticket's ACTUAL acceptance criterion — "the glance surface
-    // should stay glanceable at 360px" — measured rather than asserted in
-    // prose. The clip check below proves the run is CONTAINED; containment was
-    // already true before this ticket and stayed true while the card grew to 7
-    // line boxes, so it cannot witness the growth. This does.
-    //
-    // Measured RELATIVE to the same run rendered unbounded, in the same element
-    // and the same computed style, rather than against a fixed line count. An
-    // absolute count is a font-metrics assertion in disguise: it held at <= 2
-    // locally and produced 3 in the Linux CI container, where the self-hosted
-    // face resolves differently. The relative form asks the question the ticket
-    // actually asks — did bounding the run make the glance surface smaller —
-    // and is invariant to whatever font the runner ends up with.
-    const { boundedLines, unboundedLines } = await optionsRun.evaluate((el, labels) => {
-      // BOTH strings are measured in the SAME probe, from the SAME origin.
-      // Measuring the live element against a clone appended at the end of the
-      // inline flow compares a run starting at x=37 with one starting at
-      // x=237 — a ~1.5 line-box head start that is an artifact of position,
-      // not of the bound, and it let both assertions pass with the bound
-      // disabled. The probe stays INLINE inside a block wrapper: getClientRects
-      // on a block returns one border-box rect, not per-line fragments.
-      const wrap = document.createElement('div');
-      const probe = el.cloneNode(false);
-      wrap.appendChild(probe);
-      el.parentNode.parentNode.appendChild(wrap);
-      probe.textContent = el.textContent;
-      const bounded = probe.getClientRects().length;
-      probe.textContent = `[${labels.join(' / ')}]`;
-      const unbounded = probe.getClientRects().length;
-      wrap.remove();
-      return { boundedLines: bounded, unboundedLines: unbounded };
-    }, DECISION_PAYLOAD.options.map(o => o.label));
-
-    expect(unboundedLines).toBeGreaterThan(1); // the fixture must actually overflow, or this proves nothing
-    expect(boundedLines).toBeLessThan(unboundedLines);
-    // A generous absolute ceiling on top, so an unbounded run that happened to
-    // fit in 2 lines on some future runner still could not pass silently.
-    expect(boundedLines).toBeLessThanOrEqual(3);
-
-    // ...and the run must actually be doing its job — bounded, but not empty,
-    // and reporting the remainder rather than silently dropping it. The
-    // fixture's 5 options exceed the budget, so a "+N more" marker is expected.
-    await expect(optionsRun).toContainText('more');
-
-    const cardBox = await card.boundingBox();
-    const result = await optionsRun.evaluate(el => {
-      const rects = el.getClientRects();
-      const last = rects[rects.length - 1];
-      // The horizontal centre of the last line-box, not its edge — a wrapped
-      // inline element's fragment boundary is imprecise right at its own
-      // edge (kerning/sub-pixel rounding can hand that exact pixel to a
-      // sibling or the parent even when healthy), so the centre is the
-      // honest point to hit-test.
-      const cx = (last.left + last.right) / 2;
-      const cy = last.top + last.height / 2;
-      const hit = document.elementFromPoint(cx, cy);
-      return { right: last.right, painted: hit === el || el.contains(hit) };
-    });
-    expect(result.painted).toBe(true);
-    expect(result.right).toBeLessThanOrEqual(cardBox.x + cardBox.width);
   });
 });

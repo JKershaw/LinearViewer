@@ -23,7 +23,6 @@ import { createAgentStatusRoutes } from './proxy-agent-status.js';
 import { createProxyHaltRoutes } from './proxy-halt.js';
 import { createProxyModelRoutingRoutes } from './proxy-model-routing.js';
 import { createProxyAlarmRoutes } from './proxy-alarms.js';
-import { createRulingsRoutes } from './proxy-rulings.js';
 import { createTokensAdminRoutes, isDefaultCopyMint } from './proxy-tokens-admin.js';
 import { createTokenExchangeRoutes } from './proxy-token-exchange.js';
 import { createReadRoutes } from './proxy-reads.js';
@@ -474,7 +473,7 @@ async function fetchWithTimeout(workFn, ms) {
  *   workspace selects it, and via this injection.
  * @returns {Router} Express router with proxy routes
  */
-export function createProxyRoutes({ proxyTokenStore, proxyEventStore, agentStatusStore, dispatchQueueStore, dispatchTokenStore = null, closeOutEventsStore = null, llmCallLogStore, taskDecisionsStore = null, dismissalSuggestionsStore = null, harbourCommentsStore = null, changePrReaderFor = null, sessionsFeedCache = null, workspaceFromUrl, resolveWorkspaceAccess, getWorkspaceOpenRouterKey, getWorkspaceNorthStar, getNorthStarDocVersionForWorkspace = null, reportHistoryStore, workspacePreferencesStore, dispatchPresetsStore, freeTierStore, accountStore = null, provider: injectedProvider = null, rejectedCredentialRegistry = null, observerStateStore, flightCompanionChatClient = undefined, flightCompanionCreateToolCatalog = undefined, savedChatStore = null, workspaceHaltStore = null, workspaceOwnerCheck = null, modelRoutingStore = null, livenessAlarmStore = null, onTicketWrite = null, recordPipelineMerge = null, consumerHeartbeatStore = null, requestUsageStore = null, requestUsageLoader = null, leftoverStep = null, recordsStore = null, listRecordPeople = undefined }) {
+export function createProxyRoutes({ proxyTokenStore, proxyEventStore, agentStatusStore, dispatchQueueStore, dispatchTokenStore = null, closeOutEventsStore = null, llmCallLogStore, harbourCommentsStore = null, changePrReaderFor = null, workspaceFromUrl, resolveWorkspaceAccess, getWorkspaceOpenRouterKey, getWorkspaceNorthStar, getNorthStarDocVersionForWorkspace = null, reportHistoryStore, workspacePreferencesStore, dispatchPresetsStore, freeTierStore, accountStore = null, provider: injectedProvider = null, rejectedCredentialRegistry = null, observerStateStore, flightCompanionChatClient = undefined, flightCompanionCreateToolCatalog = undefined, savedChatStore = null, workspaceHaltStore = null, workspaceOwnerCheck = null, modelRoutingStore = null, livenessAlarmStore = null, onTicketWrite = null, recordPipelineMerge = null, consumerHeartbeatStore = null, requestUsageStore = null, requestUsageLoader = null, leftoverStep = null, recordsStore = null, listRecordPeople = undefined }) {
   const router = Router();
 
   // =========================================================================
@@ -1596,14 +1595,6 @@ export function createProxyRoutes({ proxyTokenStore, proxyEventStore, agentStatu
   // (before the routes that own `/dispatch/...`) so nothing shadows it.
   router.use(createProxyAlarmRoutes({ livenessAlarmStore, proxyLimiter, authenticateProxyToken, logEvent }));
 
-  // LIN-2444: the consumer-API rulings surface — a workspace-scoped READ of
-  // unanswered decisions, plus a PROPOSE-a-dismissal write. Deliberately no
-  // proxy dismiss: per John's ruling an agent may recommend a dismissal and
-  // never perform one, so `decision-answer` stays absent from
-  // FEEDBACK_ENTRY_KINDS (LIN-1728) and this router never reaches
-  // markDecisionAnswered. See routes/proxy-rulings.js.
-  router.use(createRulingsRoutes({ proxyLimiter, authenticateProxyToken, requireWriteScope, logEvent, dispatchQueueStore, agentStatusStore, taskDecisionsStore, dismissalSuggestionsStore, sessionsFeedCache }));
-
   // Group H kickoff (LIN-679 Stage 5 / LIN-2539): extracted to
   // routes/proxy-kickoff.js, mounted at its original position.
   // LIN-4503: each dispatch of a ticket through this router retries its child tasks' tickets (lib/dispatch-factory.js).
@@ -1630,7 +1621,7 @@ export function createProxyRoutes({ proxyTokenStore, proxyEventStore, agentStatu
   // sub-router's path-scoped gate never runs a second pass over it (R8).
   router.use(createProxyRunnerPromptRoutes({ proxyLimiter, authenticateProxyToken, requireGrant, logEvent }));
 
-  router.use(createProxyRunnerRoutes({ proxyLimiter, authenticateProxyToken, requireGrant, logEvent, dispatchQueueStore, dispatchTokenStore, proxyTokenStore, workspaceHaltStore, sessionsFeedCache, consumerHeartbeatStore, requestUsageStore, leftoverStep }));
+  router.use(createProxyRunnerRoutes({ proxyLimiter, authenticateProxyToken, requireGrant, logEvent, dispatchQueueStore, dispatchTokenStore, proxyTokenStore, workspaceHaltStore, consumerHeartbeatStore, requestUsageStore, leftoverStep }));
 
   // LIN-2620: the Flight Companion turn, over the proxy — a LIN-679 sub-router
   // (routes/proxy-flight-companion.js) built on the extracted turn core

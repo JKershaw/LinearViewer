@@ -76,85 +76,11 @@ describe('render-observation: the view strip (LIN-3983, LIN-4540)', () => {
   });
 });
 
-describe('render-observation: bulk select-all checkbox accessible name (LIN-2444 review, Minor — ≤400px a11y nit)', () => {
-  // At max-width:400px, public/observation.css hides `.obs-ruling-bulk-select-all-text`
-  // via `display:none`, which drops it from the accessible-name computation —
-  // the wrapping <label>'s only text was that span, so the checkbox lost its
-  // only name at that viewport. An explicit aria-label on the input itself
-  // always wins over the implicit wrapping-label association, so the name
-  // survives regardless of the span's visibility.
-  test('the select-all checkbox carries its own aria-label, independent of the visible label text', () => {
-    const html = renderObservationPage(
-      { workspaces: [{ urlKey: 'ws-a', name: 'Alpha' }] },
-      { urlKey: 'ws-a' }
-    );
-    assert.match(
-      html,
-      /<input type="checkbox" id="obs-ruling-select-all" aria-label="select all proposed" data-testid="obs-ruling-select-all">/,
-      'the select-all checkbox must carry an aria-label so it has a name even when the sibling text span is display:none at ≤400px'
-    );
-  });
-});
-
-// LIN-2757: half the bulk bar's markup carried no pinned assertion at all —
-// only the aria-label above. These pin the visible select-all span text and
-// the SSR button label, and require the button label to match the client
-// runtime's template exactly (public/observation.js's syncRulingsBulkBar),
-// since the two had zero shared witness before this.
-describe('render-observation: bulk bar markup — visible select-all text + SSR button label (LIN-2757)', () => {
-  test('the visible select-all span reads the same kind-neutral text as its aria-label', () => {
-    const html = renderObservationPage(
-      { workspaces: [{ urlKey: 'ws-a', name: 'Alpha' }] },
-      { urlKey: 'ws-a' }
-    );
-    assert.match(
-      html,
-      /<span class="obs-ruling-bulk-select-all-text">select all proposed<\/span>/,
-      'the visible span must carry the same text as the aria-label'
-    );
-  });
-
-  test('the SSR "0 selected" button label matches the client-rendered template exactly', () => {
-    const html = renderObservationPage(
-      { workspaces: [{ urlKey: 'ws-a', name: 'Alpha' }] },
-      { urlKey: 'ws-a' }
-    );
-    assert.match(
-      html,
-      /id="obs-ruling-agree-selected" disabled>Apply 0 as proposed<\/button>/,
-      'SSR markup and public/observation.js\'s syncRulingsBulkBar must never drift apart on this label'
-    );
-  });
-});
-
-// Review finding B (PR #1453, commit 91286e16): this markup had zero pinned
-// render coverage — an M9 mutation stripping aria-live="polite" from the
-// progress node left every unit test (and both new e2e tests) green. These
-// two assertions pin the accessibility half of LIN-2758's bulk-agree feature
-// directly against the rendered markup, so a future regression here fails a
-// unit test rather than only a live screen reader.
-describe('render-observation: bulk-agree progress node + Stop button markup (LIN-2758)', () => {
-  test('the progress node carries aria-live="polite" — a screen reader must hear per-row progress and the completion summary', () => {
-    const html = renderObservationPage(
-      { workspaces: [{ urlKey: 'ws-a', name: 'Alpha' }] },
-      { urlKey: 'ws-a' }
-    );
-    assert.match(
-      html,
-      /<p class="obs-ruling-bulk-progress" id="obs-ruling-bulk-progress" data-testid="obs-ruling-bulk-progress" aria-live="polite"><\/p>/,
-      'stripping aria-live="polite" here would silence the batch progress/summary announcement entirely, with no visible symptom'
-    );
-  });
-
-  test('the Stop button is hidden until a batch is running', () => {
-    const html = renderObservationPage(
-      { workspaces: [{ urlKey: 'ws-a', name: 'Alpha' }] },
-      { urlKey: 'ws-a' }
-    );
-    assert.match(
-      html,
-      /<button type="button" class="obs-ruling-bulk-stop" id="obs-ruling-bulk-stop" data-testid="obs-ruling-bulk-stop" hidden>Stop<\/button>/,
-      'Stop must render hidden on first paint — syncRulingsBulkBar toggles it visible only while rulingsBulkRunning'
-    );
+describe('render-observation: the bulk-agree bar is gone with proposed answers (LIN-4541)', () => {
+  test('no bulk bar, select-all, progress line or Stop renders, and the page loads no chat.js', () => {
+    const out = renderObservationPage({ workspaces: [{ urlKey: 'ws-a', name: 'Alpha' }] }, { urlKey: 'ws-a' });
+    assert.doesNotMatch(out, /obs-ruling-bulk|obs-ruling-select-all|obs-ruling-agree-selected/);
+    assert.doesNotMatch(out, /\/chat\.js/);
+    assert.match(out, /id="obs-rulings"/, 'the rulings list stays');
   });
 });

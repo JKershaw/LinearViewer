@@ -23,6 +23,7 @@
  */
 import { test, expect } from '../fixtures/test-base.js';
 import { localSeedId } from '../fixtures/local-harness.js';
+import { seedQuestion } from '../fixtures/question-records.js';
 import { seedWorkspaceOwnership } from '../fixtures/workspace-ownership.js';
 
 const DIR = 'docs/reviews/_evidence-2026-11-03-lin4106';
@@ -36,7 +37,7 @@ const NEVER = 'LOCAL-S4E';
 test.beforeEach(async ({ page, localWorkerUrlKey }) => {
   await page.request.get('/test/clear-comment-dedupe');
   await page.goto('/test/clear-local-store');
-  for (const reset of ['clear-dispatch-queue', 'clear-dispatch-history', 'clear-agent-status', 'clear-task-decisions']) {
+  for (const reset of ['clear-dispatch-queue', 'clear-dispatch-history', 'clear-agent-status']) {
     await page.goto(`/test/${reset}?urlKey=${localWorkerUrlKey}`);
   }
 });
@@ -82,17 +83,8 @@ async function run(page, urlKey, headers, identifier, kind, feedback = []) {
 async function ruling(page, urlKey, headers, identifier) {
   const itemId = await run(page, urlKey, headers, identifier, 'implementation');
   expect((await page.request.post(`/api/dispatch/feedback/${itemId}`, { headers, data: { message: '[blocked] which way?' } })).status()).toBe(200);
-  const decision = await page.request.post(`/api/dispatch/feedback/${itemId}`, {
-    headers,
-    data: {
-      kind: 'decision',
-      message: JSON.stringify({
-        decision_id: `d-${identifier}`, question: `Which for ${identifier}?`,
-        options: [{ id: 'ship', label: 'Ship it now' }, { id: 'wait', label: 'Wait for review' }], recommended: 'wait',
-      }),
-    },
-  });
-  expect(decision.status()).toBe(200);
+  // LIN-4541: a ruling is a question record the run asked (the feedback route refuses a decision entry now).
+  await seedQuestion(page, urlKey, { ticket: identifier, runId: itemId, asks: `Which for ${identifier}?`, options: ['Ship it now', 'Wait for review'], recommended: 'Wait for review' });
 }
 
 /** Set the theme the way the site reads it (a persisted cookie), and the viewport. */

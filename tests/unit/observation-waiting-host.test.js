@@ -2,7 +2,9 @@
  * LIN-3983 PR 1: the ruling rows have two hosts — the Rulings tab and the
  * "waiting on you" block above the Observation feed — and one set of row
  * nodes. These tests pin the host seam: a row keeps its state when it moves
- * between hosts, and the block caps what it attaches.
+ * between hosts, and the block caps what it attaches. LIN-4541: a row is an open
+ * question record (`kind: 'question'`); the old decision rows retired with the
+ * ruling predicate, so a row of any other shape is not drawn.
  *
  * `public/observation.js` is a native ES module (LIN-4463 piece 4), loaded fresh per test through `importWorld`
  * (tests/unit/helpers/import-world.js) over the shared fake DOM (tests/unit/helpers/fake-dom.js). The Rulings tab and
@@ -31,7 +33,6 @@ async function makeWorld({ api } = {}) {
     window: {
       addEventListener() {},
       matchMedia: () => ({ matches: false }),
-      ChatUI: { appendOptions() {}, resolveCaption: () => '' },
       sourceQuery: (source) => (source ? `?source=${encodeURIComponent(source)}` : ''),
       api: api || (async () => { throw new Error('window.api not stubbed'); })
     },
@@ -51,22 +52,16 @@ async function makeWorld({ api } = {}) {
 
 const byId = (world, id) => world.document.getElementById(id);
 
-function taskBoundRow(n) {
+function questionRow(n) {
   return {
-    decision: { decision_id: `d-${n}`, question: `Question ${n}?`, options: [] },
-    decisionCase: [],
-    anchor: {
-      loopId: null,
-      taskDecisionId: `td-${n}`,
-      issueId: `issue-${n}`,
-      issueIdentifier: `LIN-${n}`,
-      workspaceUrlKey: 'ws',
-      source: null
-    },
-    disposition: 'task-bound',
-    canReply: false,
-    alternate: null,
-    suggestedDismissal: null
+    kind: 'question',
+    questionId: `q-${n}`,
+    asks: `Question ${n}?`,
+    question: `Question ${n}?`,
+    options: ['left', 'right'],
+    state: 'resumable',
+    interactive: true,
+    anchor: { workspaceUrlKey: 'ws', taskId: `task-${n}`, runId: `run-${n}`, loopId: null, issueId: null, issueIdentifier: `LIN-${n}`, target: null }
   };
 }
 
@@ -75,24 +70,22 @@ const flush = async (times = 8) => {
 };
 
 describe('renderRulings host seam (LIN-3983)', () => {
-  test('a pending row built in the waiting block moves to the Rulings tab as the same node', async () => {
-    // A row with a reply in flight is reused, not rebuilt, so moving it between
-    // hosts keeps its state: the tab must attach the very node the block held.
+  test('a row holding a typed answer, built in the waiting block, moves to the Rulings tab as the same node', async () => {
+    // A row holding input is reused, not rebuilt, so moving it between hosts keeps the typed words: the tab must attach the
+    // very node the block held.
     const world = await makeWorld();
     const tabList = byId(world, 'obs-rulings');
     const blockList = byId(world, 'obs-waiting-rulings');
-    const { renderRulings, rulingKey, rulingsPending, switchView } = world.page;
-    const row = taskBoundRow(1);
-    const key = rulingKey(row.anchor.workspaceUrlKey, row.anchor, row.decision.decision_id);
+    const { renderRulings, switchView } = world.page;
+    const row = questionRow(1);
     renderRulings([row], { list: blockList, empty: null, limit: 3 });
     const built = blockList.children[0];
     assert.ok(built, 'the block attaches the row');
+    built.querySelector('[data-testid="question-record-card-input"]').value = 'half typed';
 
-    rulingsPending.add(key);
     switchView('rulings');
     renderRulings([row]);
     await flush();
-    rulingsPending.delete(key);
 
     assert.equal(tabList.children.length, 1, 'the row is attached to the Rulings tab');
     assert.equal(tabList.children[0], built, 'the same node, not a rebuilt one');
@@ -104,11 +97,10 @@ describe('renderRulings host seam (LIN-3983)', () => {
     const tabList = byId(world, 'obs-rulings');
     const tabEmpty = byId(world, 'obs-rulings-empty');
     const blockList = byId(world, 'obs-waiting-rulings');
-    const { renderRulings, renderedRulingRows, switchView } = world.page;
-    const rows = [1, 2, 3].map(taskBoundRow);
+    const { renderRulings, switchView } = world.page;
+    const rows = [1, 2, 3].map(questionRow);
     renderRulings(rows, { list: blockList, empty: null, limit: 2 });
     assert.equal(blockList.children.length, 2, 'the block shows the first two rows only');
-    assert.equal(renderedRulingRows.size, 3, 'the rest stay tracked, so the tab reuses them');
 
     switchView('rulings');
     renderRulings(rows);
@@ -121,7 +113,20 @@ describe('renderRulings host seam (LIN-3983)', () => {
     const world = await makeWorld();
     const tabList = byId(world, 'obs-rulings');
     const { renderRulings } = world.page;
-    renderRulings([taskBoundRow(1), taskBoundRow(2)]);
+    renderRulings([questionRow(1), questionRow(2)]);
     assert.equal(tabList.children.length, 2);
+  });
+
+  test('LIN-4541: a row draws its question\'s words, and a row that is not a question record is not drawn', async () => {
+    const world = await makeWorld();
+    const tabList = byId(world, 'obs-rulings');
+    const tabEmpty = byId(world, 'obs-rulings-empty');
+    const { renderRulings } = world.page;
+    const oldDecisionRow = { decision: { decision_id: 'd-1', question: 'Old?' }, anchor: { loopId: 'L1', workspaceUrlKey: 'ws' }, disposition: 'resumable' };
+    renderRulings([oldDecisionRow]);
+    assert.equal(tabList.children.length, 0, 'an old decision row is not a row any more');
+    assert.equal(tabEmpty.hidden, false, 'so the empty state shows');
+    renderRulings([questionRow(7)]);
+    assert.equal(tabList.children[0].querySelector('[data-testid="question-record-card-question"]').textContent, 'Question 7?');
   });
 });

@@ -449,155 +449,6 @@
     }
   }
 
-  // Disposition → caption text (LIN-1728 Phase 4, decision 4/F8). The SAME
-  // button-press means two different things depending on the anchor's
-  // press-time liveness (`lib/run-liveness.js`'s `resolveDisposition`,
-  // resolved server-side and passed straight through, never re-derived here):
-  // resumable/gone both admit a reply (a follow-up vs. a fresh run — a
-  // different action under the hood, so the caption says so honestly);
-  // mid-turn/indeterminate are read-only — no options render, no dispatch is
-  // ever attempted for either.
-  var DISPOSITION_CAPTIONS = {
-    resumable: 'Reply & continue',
-    gone: 'Reply & start a run',
-    'mid-turn': 'still running — reply disabled',
-    indeterminate: 'no action available yet',
-    // LIN-2215 F2: a scan-produced decision (LIN-2197 Phase 3) — no dispatch
-    // item behind it, so the reply is comment-only (no run started/resumed).
-    'task-bound': 'A task raised a decision — reply to resolve it'
-  };
-
-  // Effect → caption text (LIN-2775 Area 5). A SEPARATE namespace from
-  // DISPOSITION_CAPTIONS above, not three entries merged into it — `effect`
-  // (lib/unanswered-decisions.js's `resolveEffect`) answers "what happens
-  // once a reply is delivered", a different question from `disposition`'s
-  // "whether/how a reply can be delivered" (LIN-2215 F2 rewrote the
-  // neighbouring readOnly check to keep exactly these two namespaces apart;
-  // collapsing them back into one table here would reintroduce that shape).
-  // Provisional labels — final vocabulary lands via LIN-2757.
-  var EFFECT_CAPTIONS = {
-    resume: 'Answer & resume',
-    dispatch: 'Answer & start a run',
-    record: 'Record answer'
-  };
-
-  // The allow-list `canReplyFor` (lib/unanswered-decisions.js) mirrors:
-  // resumable/gone/task-bound are interactive, everything else — including a
-  // disposition not yet in this list — is read-only. Shared by the caption
-  // lookup and the options-render gate below so the two can never drift
-  // apart from each other.
-  function isReadOnlyDisposition(disposition) {
-    return !(disposition === 'resumable' || disposition === 'gone' || disposition === 'task-bound');
-  }
-
-  // Effect-first, disposition as fallback — but ONLY on a row that can
-  // actually act. `resolveEffect` still resolves a non-null `effect` on a
-  // read-only mid-turn/indeterminate row (a live run on the row's own,
-  // necessarily non-terminal, loop self-matches the anchor and forces
-  // `record` before that function's read-only-null branch ever fires — see
-  // the S1 handover on LIN-2775), so an ungated `EFFECT_CAPTIONS[effect] ||
-  // ...` lookup would print "Record answer" on a row with no buttons at all,
-  // regressing the honesty property LIN-2215 F2 established. Gating on
-  // `isReadOnlyDisposition` here — the SAME predicate the options-render gate
-  // uses — keeps that property: a row that cannot act never claims an
-  // effect. Exposed on window.ChatUI (below) so a caller updating a caption
-  // in place after the fact (e.g. observation.js's override flip control)
-  // reuses this exact logic rather than re-deriving it.
-  function resolveCaption(disposition, effect) {
-    return (!isReadOnlyDisposition(disposition) && EFFECT_CAPTIONS[effect])
-      || DISPOSITION_CAPTIONS[disposition]
-      || DISPOSITION_CAPTIONS.indeterminate;
-  }
-
-  /**
-   * Append an option-button row — the LIN-1728 chat primitive for answering a
-   * decision. Every option LABEL is agent-authored text (it comes straight off
-   * a `kind: 'decision'` feedback payload another session wrote) and is
-   * rendered via DOM text (`textContent`), never through `appendMessage`'s
-   * `html` sink — that sink is caller-trusted HTML and is unsafe for this
-   * source.
-   *
-   * @param {Element} container - any element to append into (not necessarily a `.chat-thread`).
-   * @param {Object} opts
-   * @param {Array<{id: string, label: string, cost?: number}>} [opts.options] - decision options.
-   * @param {string} [opts.recommended] - the recommended option's `id`, if any.
-   * @param {string} [opts.recommendedLabel] - opt-in marker text (e.g. "agent recommends") rendered
-   *   next to the recommended option's button, as a DOM text node (never innerHTML), matching the
-   *   `opt.label` discipline below. Omitted by default so existing callers (Flight Companion's
-   *   `.fc-decision` cards) render byte-identically to today — this is additive, never a rename of
-   *   the existing `.chat-option--recommended` CSS star.
-   * @param {'resumable'|'gone'|'mid-turn'|'indeterminate'|'task-bound'} opts.disposition - press-time disposition (see `lib/unanswered-decisions.js`).
-   * @param {'resume'|'dispatch'|'record'|null} [opts.effect] - press-time resolved effect (`lib/unanswered-decisions.js`'s `resolveEffect`), used effect-first for the caption on a row that can act; ignored (never claimed) on a read-only disposition (LIN-2775 Area 5).
-   * @param {function(string, string): void} [opts.onSelect] - called with `(optionId, optionLabel)` on a button press. Never called for a read-only disposition — an ALLOW-list of `resumable`/`gone`/`task-bound` is interactive; every other value, including one not yet in this list, is read-only (LIN-2215 F2) — or when `options` is empty.
-   * @returns {Element} the appended `<div class="chat-options">` wrapper.
-   */
-  function appendOptions(container, opts) {
-    opts = opts || {};
-    var options = Array.isArray(opts.options) ? opts.options : [];
-    var disposition = opts.disposition;
-    var onSelect = typeof opts.onSelect === 'function' ? opts.onSelect : function () {};
-
-    var wrap = document.createElement('div');
-    wrap.className = 'chat-options';
-    wrap.setAttribute('data-disposition', disposition || '');
-
-    var caption = document.createElement('div');
-    caption.className = 'chat-options-caption';
-    caption.textContent = resolveCaption(disposition, opts.effect);
-    wrap.appendChild(caption);
-
-    // Read-only dispositions render the caption alone — no buttons, no dispatch
-    // ever attempted. LIN-2215 F2: inverted to an ALLOW-list mirroring
-    // `canReplyFor`'s own three-way OR (lib/unanswered-decisions.js) — the prior
-    // hand-maintained deny-list (`disposition === 'mid-turn' || ... === 'indeterminate'`)
-    // agreed with the server predicate only by coincidence and had already
-    // drifted once (task-bound rendered as "no action available yet" instead of
-    // reply-eligible). An allow-list fails SAFE: an unrecognized future
-    // disposition now defaults to read-only, not interactive.
-    var readOnly = isReadOnlyDisposition(disposition);
-    if (readOnly || !options.length) {
-      wrap.classList.add('chat-options--readonly');
-      container.appendChild(wrap);
-      return wrap;
-    }
-
-    var row = document.createElement('div');
-    row.className = 'chat-options-row';
-    options.forEach(function (opt) {
-      if (!opt || typeof opt.id !== 'string' || typeof opt.label !== 'string') return;
-      var btn = document.createElement('button');
-      btn.type = 'button';
-      btn.className = 'chat-option chat-option-btn';
-      if (opts.recommended && opt.id === opts.recommended) {
-        btn.classList.add('chat-option--recommended');
-      }
-      // DOM text, never innerHTML — opt.label is agent-authored and must never
-      // reach a markup sink (this is the constraint's targeted regression case:
-      // a label containing markup must render as literal text, not execute).
-      // Set BEFORE the recommended-marker span below: `textContent =` clears
-      // any existing children, so appending the marker first would be wiped.
-      btn.textContent = opt.label;
-      if (opts.recommended && opt.id === opts.recommended && opts.recommendedLabel) {
-        // DOM text node, never innerHTML — same discipline as opt.label
-        // above. Opt-in only: omitting opts.recommendedLabel (the default)
-        // adds no DOM here, which is the whole guarantee that Flight
-        // Companion's `.fc-decision` cards (public/flight-companion.js's
-        // question cards, which never set this option) stay byte-
-        // identical to today.
-        var marker = document.createElement('span');
-        marker.className = 'chat-option-recommended-label';
-        marker.textContent = opts.recommendedLabel;
-        btn.appendChild(marker);
-      }
-      btn.addEventListener('click', function () { onSelect(opt.id, opt.label); });
-      row.appendChild(btn);
-    });
-    wrap.appendChild(row);
-
-    container.appendChild(wrap);
-    return wrap;
-  }
-
   /**
    * Swap a chat text element's raw streamed Markdown for rendered, sanitized
    * HTML (LIN-2670) — called once, on the `done` frame, never per token. The
@@ -716,7 +567,6 @@
   window.ChatUI = {
     appendMessage: appendMessage,
     appendNote: appendNote,
-    appendOptions: appendOptions,
     appendToolRow: appendToolRow,
     foldAfterAnchor: foldAfterAnchor,
     chooseFoldAnchor: chooseFoldAnchor,
@@ -725,7 +575,6 @@
     collectIdentifiers: collectIdentifiers,
     collectIdentifiersFromText: collectIdentifiersFromText,
     isPinnedToBottom: window.isPinnedToBottom,
-    resolveCaption: resolveCaption,
     renderMarkdownText: renderMarkdownText,
     toolBreadcrumbLabel: toolBreadcrumbLabel
   };

@@ -191,7 +191,7 @@ reader re-reads `.bookkeeping`. A stamped row now also:
 Deliberately unchanged: `lib/observer-efficacy-signal.js` (closing a row is not a human
 answering a `[blocked]` wake) and the display-only readers that only mention the markers
 (`lib/render-session.js`, `lib/run-paragraph.js`, `lib/sessions-view.js`,
-`lib/unanswered-decisions.js`, `lib/chat-tools.js` `latestLoopMarker`).
+`lib/chat-tools.js` `latestLoopMarker`; the ruling predicate that was here retired, LIN-4541).
 
 The stamp is written by `stampBookkeeping` (one row, no notify), and in bulk by
 `closeLineageRows` / `closeIssueRows` (`lib/dispatch-store.js`): select the ids, then a

@@ -179,25 +179,24 @@ describe('LIN-4533: the prompt asks with a question record, not a decision block
   });
 });
 
-// The runner kit's decision entry is still read by the retiring path (LIN-3505); these pin the kit's own behaviour until
-// that path is removed in a later LIN-4529 piece. The prompt above no longer asks for it.
-describe('the runner kit still posts a decision entry the retiring path reads (LIN-3505)', () => {
+// LIN-4541 (LIN-4529 P7b-2): the decision entry is retired. The kit forms whatever body it is told to, but the server refuses a
+// decision entry 422, naming the records route; an old decision row (history) still reads as the question it was.
+describe('a decision entry is refused at the server; an old one still reads (LIN-3505, LIN-4541)', () => {
   const json = JSON.stringify({ decision_id: 'keep-schema', question: 'Which schema do we keep?', options: [{ id: 'a', label: 'Schema A' }, { id: 'b', label: 'Schema B' }], recommended: 'a' });
   const ledger = { items: { [K]: { rootItemId: K } } };
   const blocked = lines.find((l) => l.startsWith('[blocked] Waiting'));
 
-  test('the kit posts a decision entry unchanged, and the server validator accepts it', () => {
+  test('a decision entry the kit forms is refused by the server validator, 422 naming POST /api/proxy/records', () => {
     const body = feedbackBody(ledger, K, 'decision', json);
     assert.equal(body.kind, 'decision');
-    assert.equal(body.message, json);
-    assert.equal(body.rootItemId, K);
     const v = validateFeedbackBody(body);
-    assert.equal(v.error, undefined);
-    assert.equal(v.value.kind, 'decision');
-    assert.equal(v.value.message, json);
+    assert.equal(v.status, 422);
+    assert.equal(v.code, 'DECISION_FEEDBACK_RETIRED');
+    assert.match(v.error, /POST \/api\/proxy\/records/);
+    assert.equal(v.value, undefined);
   });
 
-  test('decision then [blocked] reads as one ruling and a blocked wake, not terminal', () => {
+  test('an old decision row then [blocked] still reads as one ruling and a blocked wake, not terminal (history)', () => {
     const feedback = [
       { ...feedbackBody(ledger, K, 'decision', json), timestamp: '2026-09-29T12:00:00.000Z' },
       { ...feedbackBody(ledger, K, 'status', blocked), timestamp: '2026-09-29T12:00:01.000Z' }

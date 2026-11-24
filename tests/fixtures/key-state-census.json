@@ -311,10 +311,6 @@
     "disposition": "global-only",
     "exception": "yap-buffers"
   },
-  "routes/workspace-api-issue-write.js::decisionStampDedupe": {
-    "disposition": "global-only",
-    "exception": "decision-stamp-dedupe"
-  },
   "server.js::_workspaceTitleResolver": {
     "disposition": "not-state",
     "why": "Its factory keeps no empty Map, Set or WeakMap of its own (census scan, factory-level)."

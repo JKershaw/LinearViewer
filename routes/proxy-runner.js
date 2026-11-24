@@ -21,8 +21,7 @@
  *     routes' own auth/limiter chains intact.
  *
  * `haltReadTimeoutMs` is a defaulted param and is NOT passed from the composer
- * (it is not bound there), so the factory default applies. `sessionsFeedCache`
- * is defaulted too.
+ * (it is not bound there), so the factory default applies.
  *
  * The path-scoped `requireGrant('take')` gate refuses any token without the
  * grant. Only a runner copy carries it: `routes/proxy-tokens-admin.js` mints
@@ -66,7 +65,6 @@ const USAGE_ROUTE = '/api/proxy/runner/usage/:id';
  * @param {Object} deps.dispatchTokenStore - Dispatch token store, for other-consumer recency
  * @param {Object} deps.proxyTokenStore - Proxy token store, used to provision wake credentials
  * @param {Object} deps.workspaceHaltStore - Durable per-workspace operator halt store
- * @param {Object} [deps.sessionsFeedCache] - Sessions-feed cache; cleared on decision-withdrawn
  * @param {Object} [deps.consumerHeartbeatStore] - Consumer heartbeat store (LIN-1952)
  * @param {number} [deps.haltReadTimeoutMs] - Bounded halt-read timeout (default POLL_HALT_READ_TIMEOUT_MS)
  * @param {{forRequest: Function}} [deps.leftoverStep] - LIN-4373: the leftover step, built once in
@@ -81,7 +79,6 @@ export function createProxyRunnerRoutes({
   dispatchTokenStore,
   proxyTokenStore,
   workspaceHaltStore,
-  sessionsFeedCache = null,
   consumerHeartbeatStore = null,
   leftoverStep = null,
   requestUsageStore = null,
@@ -189,8 +186,7 @@ export function createProxyRunnerRoutes({
    * POST /api/proxy/runner/feedback/:id
    * Post feedback on a taken item. Ownership is enforced inside the store's
    * single atomic update; a bearer that did not take the item gets a 404.
-   * Mirrors /api/dispatch/feedback, including clearing `sessionsFeedCache` only
-   * on kind:'decision-withdrawn'.
+   * Mirrors /api/dispatch/feedback, including the 422 for a retired decision kind (LIN-4541).
    */
   router.post(FEEDBACK_ROUTE, requireStageWrite('runnerFeedback'), async (req, res) => {
     const { id } = req.params;
@@ -219,6 +215,11 @@ export function createProxyRunnerRoutes({
 
     const validation = validateFeedbackBody(req.body);
     if (validation.error) {
+      // LIN-4541: a retired decision kind is a 422 naming the records route; every other refusal is the 400 it always was.
+      if (validation.status === 422) {
+        logEvent(req, FEEDBACK_ROUTE, 422);
+        return jsonError(res, 422, validation.error, { code: validation.code });
+      }
       logEvent(req, FEEDBACK_ROUTE, 400);
       return badRequest.json(res, validation.error);
     }
@@ -237,12 +238,6 @@ export function createProxyRunnerRoutes({
       if (!result) {
         logEvent(req, FEEDBACK_ROUTE, 404);
         return notFound.json(res, 'Item not found or feedback not allowed');
-      }
-
-      // Only decision-withdrawn needs a hard invalidation; ordinary feedback
-      // relies on the cache's 5s TTL (review R1 / Surface 3).
-      if (feedback.kind === 'decision-withdrawn') {
-        sessionsFeedCache?.clear(req.proxyUrlKey);
       }
 
       logEvent(req, FEEDBACK_ROUTE, 200);

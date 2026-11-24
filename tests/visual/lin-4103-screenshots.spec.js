@@ -18,6 +18,7 @@
  */
 import { test, expect } from '../fixtures/test-base.js';
 import { localSeedId } from '../fixtures/local-harness.js';
+import { seedQuestion } from '../fixtures/question-records.js';
 
 const DIR = 'docs/reviews/_evidence-2026-11-01-lin4103';
 const OLD = '2020-01-01T00:00:00Z';
@@ -88,13 +89,8 @@ async function seedRuling(page, urlKey, auth, identifier, decisionId) {
   expect((await page.request.post(`/api/dispatch/take/${itemId}`, { headers: auth })).status()).toBe(200);
   const feedback = (data) => page.request.post(`/api/dispatch/feedback/${itemId}`, { headers: auth, data });
   expect((await feedback({ message: '[blocked] which way should the numbers read?' })).status()).toBe(200);
-  expect((await feedback({
-    kind: 'decision',
-    message: JSON.stringify({
-      decision_id: decisionId, question: 'Which way should the numbers read?',
-      options: [{ id: 'rows', label: 'In the rows' }, { id: 'page', label: 'On the page' }],
-    }),
-  })).status()).toBe(200);
+  // LIN-4541: a ruling is a question record the run asked (the feedback route refuses a decision entry now).
+  await seedQuestion(page, urlKey, { ticket: identifier, runId: itemId, asks: 'Which way should the numbers read?', options: ['In the rows', 'On the page'] });
 }
 
 async function seedScene(page, urlKey) {
