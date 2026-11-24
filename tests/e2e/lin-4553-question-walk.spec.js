@@ -127,6 +127,8 @@ test('Flight Companion\'s fold: one frame, a highlight that moves with the choic
     await page.goto(`/workspace/${urlKey}/flight-companion`);
     await page.clock.fastForward(30000);
     await page.locator(FC.decisionsSummary).click();
+    // The fold names the thing a question, as the Questions tab and the Runs line do (LIN-4553).
+    await expect(page.locator(FC.decisionsSummary)).toHaveText('1 question waiting');
     const row = page.locator(FC.question);
     const card = row.locator(Q.card);
     await expect(card.locator(Q.taskTitle)).toHaveText(TASKS['LOCAL-33']);

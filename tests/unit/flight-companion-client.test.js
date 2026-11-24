@@ -2192,7 +2192,7 @@ describe('flight-companion.js — LIN-4538: the open questions the companion sho
     await flush();
     const fold = findByClass(thread, 'fc-decisions-fold');
     assert.ok(fold, 'the fold renders for a question');
-    assert.strictEqual(fold.children[0].textContent, '1 decision waiting');
+    assert.strictEqual(fold.children[0].textContent, '1 question waiting');
     const qli = findAllByClass(fold, 'fc-question')[0];
     assert.ok(qli, 'the question is a row of the fold');
     assert.match(qli.innerHTML, /data-testid="question-record-card" data-question-id="q-1"/);
@@ -4100,7 +4100,7 @@ describe('flight-companion.js — scannable thread (LIN-3361)', () => {
     await flush();
     const fold = findByClass(thread, 'fc-decisions-fold');
     assert.ok(fold, 'the fold renders for a question alone');
-    assert.strictEqual(fold.children[0].textContent, '1 decision waiting');
+    assert.strictEqual(fold.children[0].textContent, '1 question waiting');
     const qli = findAllByClass(fold, 'fc-question')[0];
     assert.ok(qli, 'the question is a row of the fold');
     // The row's markup is the shared card's (the fake DOM keeps an innerHTML string, so the card is read from that markup).
@@ -4109,7 +4109,7 @@ describe('flight-companion.js — scannable thread (LIN-3361)', () => {
     assert.strictEqual((qli.innerHTML.match(/data-testid="question-record-card-option"/g) || []).length, 2, 'one button per option');
   });
 
-  test('questions: one closed fold "N decisions waiting" with a Questions tab link, rows all in the DOM', async () => {
+  test('questions: one closed fold "N questions waiting" with a Questions tab link, rows all in the DOM', async () => {
     const { exports: m, thread } = await loadClient({
       fetchImpl: () => sseResponse([
         sseFrame('tool', { phase: 'result', id: 't', name: 'list_pending_decisions', result: decisionResult([dec(), dec({ questionId: 'q-2', issueIdentifier: 'LIN-101' })]) }),
@@ -4120,12 +4120,12 @@ describe('flight-companion.js — scannable thread (LIN-3361)', () => {
     await flush();
     const fold = findByClass(thread, 'fc-decisions-fold');
     assert.ok(fold, 'the fold renders');
-    assert.strictEqual(fold.children[0].textContent, '2 decisions waiting');
+    assert.strictEqual(fold.children[0].textContent, '2 questions waiting');
     assert.strictEqual(findByClass(fold, 'fc-decisions-rulings-link').getAttribute('href'), '/workspace/acme/observation?view=questions');
     assert.strictEqual(findAllByClass(fold, 'fc-question').length, 2);
   });
 
-  test('a single open question reads "1 decision waiting"; zero questions render nothing', async () => {
+  test('a single open question reads "1 question waiting"; zero questions render nothing', async () => {
     const one = await loadClient({
       fetchImpl: () => sseResponse([
         sseFrame('tool', { phase: 'result', id: 't', name: 'list_pending_decisions', result: decisionResult([dec()]) }),
@@ -4134,7 +4134,7 @@ describe('flight-companion.js — scannable thread (LIN-3361)', () => {
     });
     one.exports.autoWakeTick();
     await flush();
-    assert.strictEqual(findByClass(one.thread, 'fc-decisions-fold').children[0].textContent, '1 decision waiting');
+    assert.strictEqual(findByClass(one.thread, 'fc-decisions-fold').children[0].textContent, '1 question waiting');
 
     const none = await loadClient({
       fetchImpl: () => sseResponse([

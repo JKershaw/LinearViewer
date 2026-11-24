@@ -615,7 +615,7 @@ main.flight-companion-page[data-url-key]  - page container
                                               tool run
       .fc-decisions-fold                       - (LIN-3361) ONE closed <details> per
                                               `list_pending_decisions` result,
-                                              summary "N decisions waiting", holding a
+                                              summary "N questions waiting", holding a
                                               Rulings link
                                               `[data-testid="fc-decisions-rulings-link"]`
                                               (/workspace/{urlKey}/observation?view=
