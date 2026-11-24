@@ -270,6 +270,8 @@ h1 .task-ident { font-size: inherit; }
 .task-record-state { color: var(--text); }
 .task-record-preview { color: var(--text); margin: var(--space-1) 0; }
 .task-record-flag { color: var(--amber); }
+.task-record-flag--note { color: var(--muted); }
+.task-record-ticket { color: var(--brand-dim); text-underline-offset: 2px; }
 .task-record-noticket { color: var(--muted); font-style: italic; }
 /* LIN-4554: the record-writing tools sit in closed folds, the owner's (and an acting member's) tools rather than the first thing
    under the question: one "Add a record" fold after the list, one "End" fold on each open record. Phone-first: each control
@@ -318,6 +320,8 @@ h1 .task-ident { font-size: inherit; }
   .task-record-form { display: flex; flex-wrap: wrap; align-items: flex-end; }
   .task-record-form input,
   .task-record-form select { width: auto; min-height: 32px; }
+  /* A take-over choice names a record by its words, which can be long: the select stays a control, not a row. */
+  .task-record-form select { max-width: 20rem; }
   .task-record-form .btn { min-height: 32px; }
 }
 .task-records-refused { color: var(--amber); }
