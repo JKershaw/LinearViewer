@@ -4,7 +4,8 @@
  *
  *   - the Questions tab: no sideways scroll, and the card's lead and its first (recommended) option on the first screen;
  *   - the Runs tab: one waiting line, "3 questions waiting →";
- *   - the run page: no sideways scroll, the card names its task, and its steps' moments read in words;
+ *   - the run page: no sideways scroll, the card names its task, and its steps' moments read in words; LIN-4555: the card leads the
+ *     page, its lead and first option on the first screen;
  *   - Flight Companion's fold (its tool result mocked with the tool's own row shape, as tests/e2e/lin-4549-card-task-line.spec.js
  *     does; nothing calls a model): no sideways scroll, one frame (the card's), and the chosen option's highlight moves with
  *     the choice (late addition 1 of LIN-4546; tests/e2e/lin-4551-card-face.spec.js covers the other four hosts);
@@ -103,6 +104,13 @@ test('the Questions tab, the Runs line and the run page, with long questions, at
     const runCard = page.locator(SELECTORS.runPage.questions).locator(Q.byId(questions['LOCAL-32']));
     await expect(runCard.locator(Q.taskTitle)).toHaveText(TASKS['LOCAL-32']);
     await expectNoSidewaysScroll(page, `run page at ${at}`);
+    // LIN-4555 (finding-9eafd4d6): the question leads the run page, so its lead and first (recommended) option are on the first
+    // screen at 390px too; under the header strip the first option ended at about 1080px of an 844px screen.
+    for (const [name, part] of [['lead', runCard.locator(Q.lead)], ['first option', runCard.locator(Q.option).first()]]) {
+      const box = await part.boundingBox();
+      expect(box, `run page at ${at}: the ${name} has a box`).not.toBeNull();
+      expect(box.y + box.height, `run page at ${at}: the ${name} ends on the first screen`).toBeLessThanOrEqual(viewport.height);
+    }
     await expectNothingRaw(runCard, `run page card at ${at}`);
     // The whole run page, not just the card: its steps print their moments in words (LIN-4553; they printed ISO times).
     await expectNothingRaw(page.locator(SELECTORS.runPage.page), `run page at ${at}`);
