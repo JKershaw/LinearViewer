@@ -8,7 +8,7 @@
  *    "Prompt" record, `autopilot`/`wake`/`periodical` are orchestration rows);
  *  - R-B `runSessionsOf` returns the box's sessions for runs only (no queue record reaches the list or the count);
  *  - R-C the Sessions route lists runs only, and each row carries the box's stage label and state word;
- *  - R-D a waiting run reads "waiting on you" in the list and in the strip (one vocabulary, the product's);
+ *  - R-D a waiting run reads "needs you" in the list and in the strip (one vocabulary, the product's);
  *  - R-E `sessionSummaryOf().count` counts runs only (the box's "N sessions" agrees with the list);
  *  - R-F the 30-day boundary of the list: a run dispatched 30 days minus a minute is in the window; 30 days plus a minute is
  *    history (guard: the boundary is already in `inReadWindow`; this pins it on the list).
@@ -125,14 +125,14 @@ describe('R-C the Sessions route lists runs only, with the box\'s label and stat
   });
 });
 
-describe('R-D a waiting run reads "waiting on you" in the list, as in the strip', () => {
-  test('a run blocked on a question reads waiting on you, the product\'s word (not a separate machine word)', async () => {
+describe('R-D a waiting run reads "needs you" in the list, as in the strip', () => {
+  test('a run blocked on a question reads needs you, the product\'s word (not a separate machine word)', async () => {
     const res = await callRoute(
       [item('run-w', 5)],
       { statuses: [{ dispatchId: 'run-w', taskIdentifier: 'LIN-7', status: 'blocked', issueIdentifier: 'LIN-7', timestamp: minutesAgo(4) }] },
     );
     assert.equal(res.jsonBody.sessions[0].state, 'waiting');
-    assert.equal(res.jsonBody.sessions[0].word, 'waiting on you', 'the word the list paints is the server\'s, the strip\'s word');
+    assert.equal(res.jsonBody.sessions[0].word, 'needs you', 'the word the list paints is the server\'s, the strip\'s word');
   });
 });
 
@@ -167,7 +167,7 @@ describe('R-E the box\'s session count counts runs only, so it agrees with the l
 });
 
 describe('R-D the strip names a waiting run in the same words as the list', () => {
-  test('a run blocked on a question reads waiting on you in the strip', () => {
+  test('a run blocked on a question reads needs you in the strip', () => {
     const blocked = loop({
       loopId: 'run-q', lineageId: 'run-q', wakeMarker: 'blocked', waitingMessage: '[blocked] which way?',
       feedback: [{ message: '[blocked] which way?', timestamp: '2026-11-01T10:05:00.000Z' }],
@@ -180,7 +180,7 @@ describe('R-D the strip names a waiting run in the same words as the list', () =
     });
     assert.equal(model.stages[0].state, 'waiting', 'the fixture is a waiting run');
     const html = renderStageStrip(model, { now: NOW });
-    assert.match(html, /waiting on you/);
+    assert.match(html, /needs you/);
     assert.doesNotMatch(html, /waiting for an answer/);
   });
 });

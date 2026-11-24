@@ -1,0 +1,75 @@
+[
+  {
+    "shot": "task-owner-closed-light-390",
+    "order": [
+      "task-page-back",
+      "page-header sess-header task-header",
+      "task-page-answer",
+      "task-page-question",
+      "task-page-run",
+      "section sess-section task-records",
+      "section sess-section task-stages",
+      "task-timeline",
+      "task-page-docs",
+      "task-page-details",
+      "task-page-share-slot"
+    ]
+  },
+  {
+    "shot": "task-owner-open-light-390",
+    "order": [
+      "task-page-back",
+      "page-header sess-header task-header",
+      "task-page-answer",
+      "task-page-question",
+      "task-page-run",
+      "section sess-section task-records",
+      "section sess-section task-stages",
+      "task-timeline",
+      "task-page-docs",
+      "task-page-details",
+      "task-page-share-slot"
+    ]
+  },
+  {
+    "shot": "task-reader-closed-light-390",
+    "order": [
+      "task-page-back",
+      "page-header sess-header task-header",
+      "task-page-answer",
+      "task-page-next",
+      "section sess-section task-stages",
+      "task-timeline",
+      "task-page-docs",
+      "task-page-details"
+    ]
+  },
+  {
+    "shot": "task-member-closed-light-390",
+    "order": [
+      "task-page-back",
+      "page-header sess-header task-header",
+      "task-page-answer",
+      "task-page-next",
+      "section sess-section task-records",
+      "section sess-section task-stages",
+      "task-timeline",
+      "task-page-docs",
+      "task-page-details"
+    ]
+  },
+  {
+    "shot": "task-member-open-light-390",
+    "order": [
+      "task-page-back",
+      "page-header sess-header task-header",
+      "task-page-answer",
+      "task-page-next",
+      "section sess-section task-records",
+      "section sess-section task-stages",
+      "task-timeline",
+      "task-page-docs",
+      "task-page-details"
+    ]
+  }
+]

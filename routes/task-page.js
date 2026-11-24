@@ -38,6 +38,7 @@ import { isHiddenState } from '../lib/providers/state-map.js';
 import { renderTaskQuestion } from '../lib/render-task-page.js';
 import { openQuestionsForTask, titlesFromIssues } from '../lib/open-questions.js';
 import { personAccountIdOf } from './task-records.js';
+import { readableWords, peopleNames } from '../lib/render-task-records.js';
 import { requestFeatureFlags } from '../lib/run-controls.js';
 import { resolveIssueBinding, isValidIssueId } from '../lib/workspace.js';
 import { jsonError } from '../lib/errors.js';
@@ -83,9 +84,18 @@ function sessionsOfState(model, taskState, runWords = null) {
  * @param {Function} [deps.now] - () → Date
  * @returns {Router}
  */
-export function createTaskPageRoutes({ workspaceFromUrl, getOpenRouterSource, getDeployInfo, loader, workspaceOwnerCheck = null, runProposalsStore = null, taskFacts = null, refreshTaskFacts = null, taskModeStore = null, accountStore = null, timelineFragment = null, recordsStore = null, dispatchStore = null, now = () => new Date() }) {
+export function createTaskPageRoutes({ workspaceFromUrl, getOpenRouterSource, getDeployInfo, loader, workspaceOwnerCheck = null, runProposalsStore = null, taskFacts = null, refreshTaskFacts = null, taskModeStore = null, accountStore = null, timelineFragment = null, recordsStore = null, dispatchStore = null, listPeople = async () => [], now = () => new Date() }) {
   if (!loader) throw new Error('task-page routes: loader is required');
   const router = Router();
+
+  // LIN-4554: the workspace's people, read once per request however many parts of the page name one (the question cards' words and
+  // the Records section). The read's promise rides on the request's own `res.locals`, so it lives and dies with the request and no
+  // container outlives it. A failed read is no names, each person then reading "someone"; the memo holds that too.
+  function peopleOf(req, urlKey) {
+    const locals = req.res.locals;
+    locals.taskPagePeople ??= Promise.resolve().then(() => listPeople(urlKey)).catch(() => []).then((people) => (Array.isArray(people) ? people : []));
+    return locals.taskPagePeople;
+  }
 
   /**
    * LIN-4532 (P2b): the open question records on this task that the signed-in owner is asked, for the question section. Read for
@@ -97,8 +107,24 @@ export function createTaskPageRoutes({ workspaceFromUrl, getOpenRouterSource, ge
     if (!accountId) return [];
     // LIN-4549: the page's own task is the one these questions are on, so its title names them (lib/open-questions.js titlesOf).
     const titlesOf = titlesFromIssues([{ identifier, title }]);
-    return openQuestionsForTask({ recordsStore, dispatchStore, urlKey: workspace.urlKey, accountId, ticket: identifier, titlesOf })
+    const rows = await openQuestionsForTask({ recordsStore, dispatchStore, urlKey: workspace.urlKey, accountId, ticket: identifier, titlesOf })
       .catch(() => []);
+    return readableRows(req, workspace.urlKey, rows);
+  }
+
+  /**
+   * LIN-4554: the card's words as the page reads a record's (readableWords): an id or stamp quoted in the asker's words reads as a
+   * name, the ticket or words, so the page's text carries none. The first load and the poll both read their rows here, so they
+   * agree. The options are left as written: each is the answer the card sends. The people are read only when the words quote one.
+   */
+  async function readableRows(req, urlKey, rows) {
+    if (!rows.length) return rows;
+    const said = (row) => [row.short, row.asks, row.ifUnanswered].filter((x) => typeof x === 'string');
+    const quotesPerson = rows.some((row) => said(row).some((x) => x.includes('person:')));
+    const names = peopleNames(quotesPerson ? await peopleOf(req, urlKey) : []);
+    const tickets = new Map(rows.filter((row) => row.taskId && row.ticket).map((row) => [row.taskId, row.ticket]));
+    const read = (x) => (typeof x === 'string' ? readableWords(x, { people: names, tickets, now: now() }) : x);
+    return rows.map((row) => ({ ...row, short: read(row.short), asks: read(row.asks), ifUnanswered: read(row.ifUnanswered) }));
   }
 
   // LIN-4070: the private handlers' only route to the holder. An incomplete read starts the background refresh (the
@@ -147,7 +173,10 @@ export function createTaskPageRoutes({ workspaceFromUrl, getOpenRouterSource, ge
     try {
       const taskId = await recordsStore.taskForTicket(urlKey, identifier);
       const views = taskId ? await recordsStore.viewsOf(urlKey, await recordsStore.find(urlKey, { inRef: taskId })) : [];
-      return { views, canAct: true, refused: queryValue(req.query.records_refused) || null };
+      // LIN-4554: the workspace's people (lib/workspace-people.js, injected: the Records area takes outside reads injected), so a
+      // record line names a person. A failed read costs the names only: each person then reads "someone", never a raw id.
+      const people = views.length ? await peopleOf(req, urlKey) : [];
+      return { views, people, canAct: true, refused: queryValue(req.query.records_refused) || null };
     } catch (err) {
       console.error('Task page records error:', err?.message || err);
       return null;

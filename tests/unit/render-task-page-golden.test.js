@@ -517,7 +517,9 @@ describe('viewer isolation', () => {
       // present exactly when the run control is absent.
       if (fragments.runControl) {
         assert.ok(stripped.includes(fragments.runControl), 'the owner page carries the run control verbatim');
-        stripped = stripped.replace(fragments.runControl, renderNextLine(model(name), { taskState: stateOf(name) }));
+        // LIN-4554: the owner page with its owner fragments taken out draws no question above, so the line in the slot is the one
+        // for a page with no question card (as the guest's is).
+        stripped = stripped.replace(fragments.runControl, renderNextLine(model(name), { taskState: stateOf(name), questionShown: false }));
       }
       assert.equal(stripped, guest);
     });
