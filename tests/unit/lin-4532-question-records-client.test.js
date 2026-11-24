@@ -97,6 +97,16 @@ describe('the question record card, in the browser', () => {
     assert.equal(card.dataset.settled, undefined);
   });
 
+  // LIN-4551: the browser passes the refusal whole, so the card words how the question ended (`ended`), not the route's sentence.
+  test('a refusal as settled elsewhere that names its end is worded by it: a person\'s dismissal says "Dismissed"', async () => {
+    const stale = drawCard(row());
+    nextResponse = refused(409, { error: 'This ruling was already answered or dismissed.', code: 'ruling-settled', ended: 'dismissed' });
+    await clickDelegated(option(stale, 'left'));
+    await clickDelegated(part(stale, 'question-record-card-answer'));
+    assert.match(part(stale, 'question-record-card-feedback').textContent, /^Dismissed\b/);
+    assert.equal(stale.dataset.settledElsewhere, 'true');
+  });
+
   // LIN-4549: a refusal as settled elsewhere (`ruling-settled`) marks the card so the one keep-a-card rule lets it go on the next
   // refresh; any other refusal does not, and neither leaves the answer flagged as in flight.
   test('a refusal as settled elsewhere marks the card for the next refresh; another refusal does not', async () => {

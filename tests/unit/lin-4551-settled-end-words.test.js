@@ -78,6 +78,15 @@ describe('the settled refusal names how the question ended, and the card words i
     assert.doesNotMatch(text, /dismiss/i);
   });
 
+  test('a person\'s dismissal from before LIN-4550 (stored `withdrawn`, reason "dismissed", by the person) still reads "Dismissed"', async () => {
+    const q = await askQuestion();
+    await records.end(URL_KEY, q, { state: 'withdrawn', reason: 'dismissed' }, { by: PERSON });
+    const again = await service.answer({ urlKey: URL_KEY, questionId: q, option: 'left', words: null, by: PERSON, dispatchedBy: 'acct-owner' });
+    assert.equal(again.status, 409);
+    assert.equal(again.body.ended, 'dismissed');
+    assert.match(questionOutcomeText('answer', again.body), /^Dismissed\b/);
+  });
+
   test('answered: a dismissal after it gets `ended: answered`, and the card says "Answered"', async () => {
     const q = await askQuestion();
     const answered = await service.answer({ urlKey: URL_KEY, questionId: q, option: 'right', words: null, by: PERSON, dispatchedBy: 'acct-owner' });

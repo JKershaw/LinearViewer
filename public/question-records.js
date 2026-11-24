@@ -120,7 +120,8 @@ async function send(card, action, payload) {
     // Answered or dismissed elsewhere (the route's `ruling-settled`, keyed on its code): this card is no longer the reader's to
     // answer, so the keep rule lets it go and the next refresh takes it out ("Answered elsewhere"). It is not settled here.
     if (body?.code === 'ruling-settled') card.dataset.settledElsewhere = 'true';
-    text = questionOutcomeText(action, { error: body?.error || 'Could not record it; try again' });
+    // The refusal is passed whole: a `ruling-settled` one names how the question ended (`ended`), which the card words (LIN-4551).
+    text = questionOutcomeText(action, { ...body, error: body?.error || 'Could not record it; try again' });
   } catch {
     text = 'Could not reach Harbour; try again';
   }
