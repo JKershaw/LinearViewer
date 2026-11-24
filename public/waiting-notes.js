@@ -32,13 +32,13 @@ const moreWords = (hidden) => `show ${hidden} more`;
 
 /** The notes group directly in `body` (the section's `.waiting-body`), or null. */
 function groupIn(body) {
-  return [...(body?.children || [])].find((el) => el.classList && el.classList.contains(GROUP)) || null;
+  return [...(body?.children || [])].find((el) => el.classList.contains(GROUP)) || null;
 }
 
 /** The note lines in a group's list, in page order. */
 function notesIn(group) {
   const list = group?.querySelector(LIST);
-  return list ? [...list.children].filter((el) => el.matches && el.matches(NOTE)) : [];
+  return list ? [...list.children].filter((el) => el.matches(NOTE)) : [];
 }
 
 /**
