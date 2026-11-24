@@ -27,24 +27,24 @@ routes/task-records.js, routes/project-page.js, routes/dispatch.js, server.js).
   `addFeedback`, `_closeRows`, `stampBookkeeping`), witnessed in tests/unit/lin-4493-run-lifecycle.test.js.
 - A person is addressed by the name the tracker shows, stored at sign-in as `identity.name` (lib/account-session.js
   `establishAccount`) and read by lib/workspace-people.js (canonical accounts with a named identity). An account that
-  signed in before the name was stored cannot be addressed until its next sign-in; the refusal names who can be. A note
-  writing "John" is refused if the tracker spells it otherwise: address by `person:<accountId>` (LIN-4505).
+  signed in before the name was stored cannot be addressed until its next sign-in; the refusal names who can be. A name
+  the tracker spells otherwise is refused: address by `person:<accountId>` (LIN-4505).
 - Reads are by the indexed fields. A write reads only the records it names (`versionsOf`, `lookup`), and a find
   picks candidates by `{urlKey, kind, state, to}` or `{urlKey, in}` and reduces each to its current version
   (`find`). A write's body is checked as a dry run before any ticket is made, so a refused body makes no task.
-- The query log has no TTL index (lib/db-indexes.js bans them): rows carry `expiresAt`, and the hourly cleanup removes
-  them after 90 days (lib/hourly-cleanup.js).
+- The query log has no TTL index (lib/db-indexes.js bans them): rows carry `expiresAt`; the hourly cleanup removes them.
 - A record id can have a ticket's shape (`finding-12345678`, `row-12345`). `looksLikeTicket` reads only an upper-case
   team key and a number, and a record id that exists is never read as a ticket (`checkWrite`). A new reference path
   resolves against the records first and sends only the rest to the tracker, or a valid record is refused as unreadable.
 - A new collection is inventoried three times: `INVENTORY` in `lib/account-erasure.js`, `COLLECTION_CLASSES` in
   `tests/unit/urlkey-holders.test.js`, and the dry-run's `URLKEY_SOURCES` (`scripts/dry-run-urlkey-duplicates.mjs`).
   The second is the one a local run of the area's tests misses; CI's full suite caught it.
-
-- Every writer goes through one checked pipeline, `lib/records/writes.js` (`createRecordWrites`): the proxy routes and the
-  task-page and project-page routes. It checks the body, dry-runs the tickets it names, makes their
-  tasks only when that is clean, then checks again. `by` is the writer's own (a stage kind, `person:<account>`,
-  `import`, `harbour`), never read from a body; a new writer calls the pipeline, never the store's add, revise, end or link.
+- Every writer goes through one checked pipeline, `lib/records/writes.js` (`createRecordWrites`): the proxy, task-page
+  and project-page routes. It checks the body, dry-runs the tickets it names, makes their tasks only when that is
+  clean, then checks again. `by` is the writer's own (a stage kind, `person:<account>`, `harbour`), never read from a
+  body; a new writer calls the pipeline, never the store's add, revise, end or link. Only a stage writes a verdict of its
+  judgement; a writer with no `stageKinds` writes none. Readers count verdicts via `verdictCounts` (`lib/records/words.js`):
+  a withdrawn one is none (LIN-4416).
 - Outward steps run after a record persists, through one injected `tracker(ctx)` port (lib/records-tracker.js),
   never on a dry run or an import. A child ticket is made only when the parent's children read whole (`capped === false`;
   unknown fails closed) and no child carries the task's mark (lib/records/ticket-stub.js); a mark another task holds is
@@ -53,7 +53,7 @@ routes/task-records.js, routes/project-page.js, routes/dispatch.js, server.js).
   reaches the network and the hermetic run fails. Censuses read `git ls-files`: stage a new file before running them.
 - A write that makes one record and then ends another is two writes. Name the first with `fixedIdOf` (lib/records/refs.js,
   the one derived-id rule) from the second, as make-a-task and supersede do, so a retry after a failed end finds the
-  record it made. Imports use the same rule, which holds after an imported record ends. Never hash an id by hand.
+  record it made (imported ids too). Never hash an id by hand.
 - Open questions have one reader, `openQuestionsFor` (lib/open-questions.js, LIN-4532): the rulings feed, its count and
   badge, and the cards call it. Other records stay out: Home draws them
   (`createWaitingStanding` `records`) on page load only, uncounted.
@@ -62,8 +62,7 @@ routes/task-records.js, routes/project-page.js, routes/dispatch.js, server.js).
   (routes/task-records.js sends `in: <ticket>`). The project page's actions and the proxy make tasks the same way.
 - Imported records (LIN-4505) keep `via: import` and their fixed ids: never re-import or re-id them; the importer is gone.
 - A records reading has one caller per surface, and an injected alias hides a caller from a search by name: the
-  session page reads evidence through `readRunEvidenceFn` (`routes/dashboard.js`), missed the store at LIN-4495, and
-  every session page read "not measured". Search the aliases too, and keep a missing store reading "not measured",
+  session page's `readRunEvidenceFn` (`routes/dashboard.js`) missed the store at LIN-4495, so every one read "not measured". Search the aliases too, and keep a missing store reading "not measured",
   never zero, so a missed caller shows instead of passing.
 - A verdict rests on the head its judge read: `heads` pins it before the refresh (`pinVerdictToHeads`). A merge
   revises the head (`recordChangeMerged`), so a PR merged after an unseen push is in `staleUrls` but not

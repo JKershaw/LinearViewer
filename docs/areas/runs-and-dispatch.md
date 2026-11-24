@@ -6,10 +6,9 @@ Area notes for `runs-and-dispatch` in the registry. Format and rules: README.md.
 
 - A run-row field that is always present with a default is one entry in `RUN_FIELDS`
   (`lib/dispatch-fields.js`). A sparse field stays a conditional spread in `addItem`, `_archiveItem` and both
-  projections (`_formatItem`, `_formatHistoryItem`, as `runRecordId` is, LIN-4492), so other rows keep their key sets byte-identical. Six fields were once
-  dropped on one hop of four.
-- Every exit from the queue except a take archives through `_archiveItem` (`lib/dispatch-store.js`);
-  a new exit must archive through it too.
+  projections (`_formatItem`, `_formatHistoryItem`, as `runRecordId` is, LIN-4492), so other rows keep their key sets byte-identical
+  (six fields were once dropped on one hop of four).
+- Every exit from the queue but a take archives through `_archiveItem` (`lib/dispatch-store.js`), a new one too.
 - The wake path is `_planWake` (decide) then `_deliverWake` (deliver) in `lib/dispatch-store.js`,
   shared by `addFeedback` and the held-wake release (LIN-4373). Its guards (LIN-1059, 1165, 1357,
   2297, 4080, 4166) run in an order that matters: change the pair whole, keep the wake suites
@@ -18,8 +17,7 @@ Area notes for `runs-and-dispatch` in the registry. Format and rules: README.md.
 - "This run's PR": `prUrlOfFeedback` takes a report line's PR before the `[done]` `url` (LIN-4375). Only a done
   implementation row owns it, via `terminalPrUrlOfFeedback` (LIN-4497): other rows name siblings; detail reads merge follow-ups.
 - Two `[done]` posts can reach a decide-then-enqueue at once, so "no row yet" is no guard: claim
-  first, compare-and-set on the row (`claimHeldWake`). LIN-4373 relied on the read and queued two
-  leftover rows (LIN-4375).
+  first, compare-and-set on the row (`claimHeldWake`); a read queued two leftover rows (LIN-4375).
 - A claim whose holder skips is released on every path out (`releaseHeldWakeClaim`). A stamp left
   by a skip held the re-report forever (LIN-4375 review).
 - Any session can park `[pending]` on CI and finish on a ci-wake `custom` row (`lib/ci-wake-sweep.js`).
@@ -28,7 +26,8 @@ Area notes for `runs-and-dispatch` in the registry. Format and rules: README.md.
   ticket's runs, read it batched: `listHistory`'s `withLineage`, never a walk per row (`runFact`,
   `lib/recent-runs.js`, LIN-4459: the walks go up, a parked stage's ending is below it).
 - Row-only kinds stay out of `DISPATCH_KINDS` (`lib/prompt-templates.js`) and sit in `ROW_ONLY_KINDS`
-  (`lib/dispatch-fields.js`); kind-keyed maps are tested against both. A new bucket can pull a kind
+  (`lib/dispatch-fields.js`); kind-keyed maps are tested against both. A kind check asks
+  `effectiveDispatchKind` (`lib/dispatch-kind.js`), the stored kind (LIN-4416). A new bucket can pull a kind
   into the round-trip walk, which `OFF_SPINE_KINDS` stops (LIN-4376).
 - The store knows no leftovers (LIN-4383). It holds a parent wake by `heldWakeFor` (LIN-4373),
   released by the holder's terminal or `_archiveItem` under the build's guard key, so it wakes once.
