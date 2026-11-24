@@ -19,7 +19,6 @@ import { STAGE_INTENT } from '../../lib/prompts/stage-intent.js';
 import { CUT, DECIDE } from '../../lib/prompts/stage-kinds.js';
 import { COMPLETION_SIGNALS } from '../../lib/completion-signals.js';
 import { ASKED_HEADING } from '../../lib/records/words.js';
-import { CUTS_LABEL } from '../../lib/size-of-move.js';
 
 const decides = (kind) => Object.hasOwn(STAGE_INTENT, kind) && STAGE_INTENT[kind][0] === DECIDE;
 const DECIDING = Object.keys(STAGE_INTENT).filter(decides);
@@ -88,8 +87,8 @@ describe('a template says only where its cuts go (LIN-4345, LIN-4367)', () => {
 
   test('scoping and plan each name a place for their cuts', () => {
     const scoping = generatePrompt('scoping', ISSUE, CONTEXT).prompt;
-    // LIN-4369: scoping's cuts live in the size record's Cuts line, not an Out of Scope bullet.
-    assert.ok(cutLines(scoping).some(l => l.startsWith(`**${CUTS_LABEL}:**`)), 'scoping writes its cuts in the size record');
+    // LIN-4542: a cut is never in scoping's size decision: it writes no decision and raises the cut (CUT's question).
+    assert.ok(cutLines(scoping).some(l => l.includes('is a cut') && l.includes('write no decision and raise it as the Scope and Authority section says')), 'scoping raises its cuts instead of deciding');
     assert.ok(cutLines(generatePrompt('plan', ISSUE, CONTEXT).prompt).length > 0, 'plan lists its cuts');
   });
 

@@ -72,13 +72,13 @@
     },
     "scoping:fresh": {
       "name": "scoping",
-      "bytes": 5863,
-      "sha256": "4b11b5e5f569f17ee299480b9875e96ab65b145664d91649b621137bad4a54d4"
+      "bytes": 5858,
+      "sha256": "6dc5176c2301a40ab8e01ccfbbef54b159859d8c6a07ff64d983a33df63148c0"
     },
     "scoping:fix": {
       "name": "scoping",
-      "bytes": 5863,
-      "sha256": "4b11b5e5f569f17ee299480b9875e96ab65b145664d91649b621137bad4a54d4"
+      "bytes": 5858,
+      "sha256": "6dc5176c2301a40ab8e01ccfbbef54b159859d8c6a07ff64d983a33df63148c0"
     },
     "design:fresh": {
       "name": "design",
@@ -172,23 +172,23 @@
     },
     "survey-task:fresh": {
       "name": "survey-task",
-      "bytes": 2654,
-      "sha256": "0e444af4f1107803bf7310cd6348e04acffb8ef6f7869571268b4af25211e607"
+      "bytes": 2537,
+      "sha256": "a505e16f0ae8ffe7ff7251a3c4b8f9ef0599888f8ed78a690d27490bd3933a62"
     },
     "survey-task:fix": {
       "name": "survey-task",
-      "bytes": 2654,
-      "sha256": "0e444af4f1107803bf7310cd6348e04acffb8ef6f7869571268b4af25211e607"
+      "bytes": 2537,
+      "sha256": "a505e16f0ae8ffe7ff7251a3c4b8f9ef0599888f8ed78a690d27490bd3933a62"
     },
     "survey-place:fresh": {
       "name": "survey-place",
-      "bytes": 3569,
-      "sha256": "31197c1a9b9e2b2dcb9552a25c132b76713d19af2876fa99a83b35dcfbba8708"
+      "bytes": 3452,
+      "sha256": "e09dfd49415abe6d92a9a4bcff7454ad2f2d3398a3e74f8b6833e46b2399808b"
     },
     "survey-place:fix": {
       "name": "survey-place",
-      "bytes": 3569,
-      "sha256": "31197c1a9b9e2b2dcb9552a25c132b76713d19af2876fa99a83b35dcfbba8708"
+      "bytes": 3452,
+      "sha256": "e09dfd49415abe6d92a9a4bcff7454ad2f2d3398a3e74f8b6833e46b2399808b"
     },
     "blind-read:fresh": {
       "name": "blind-read",
@@ -369,14 +369,14 @@
       "    ]",
       "  },",
       "  \"scoping\": {",
-      "    \"coreOutcome\": \"The size of the move, and why, recorded in the description\",",
-      "    \"readinessCheck\": \"Does the ticket say plainly what size of move this is and why, with nothing about how?\",",
+      "    \"coreOutcome\": \"The size of the move, and why, recorded as a decision on the task\",",
+      "    \"readinessCheck\": \"Does the decision say plainly what size of move this is and why, with nothing about how?\",",
       "    \"signals\": [",
-      "      \"The two Surveys' reports (their run records), filing findings and any person's size comment read\",",
-      "      \"Sizes weighed from just the task to wrong work, one recommended\",",
-      "      \"One `## Size of the move` section in the description, holding only the record's 4 lines\",",
-      "      \"Cuts to the `## As asked` block listed in the record, or none\",",
-      "      \"Decided by a ruling or the standing policy; pending, with a `question` record, only for a size the policy may not decide\"",
+      "      \"The two Surveys' reports (their run records), filing findings and any person's word on the size read\",",
+      "      \"Sizes weighed from just the task up to rebuilding the area it touches, one recommended\",",
+      "      \"One `decision` record on the task: the size as its answer, one sentence of why\",",
+      "      \"A cut to the `## As asked` block, or wrong work, raised instead of a decision, the run ending `BLOCKED:`\",",
+      "      \"Settled by a person's ruling or the standing policy\"",
       "    ]",
       "  },",
       "  \"spike\": {",
@@ -795,7 +795,7 @@
       "    \"description\": \"Settle the size of the move, and why. Use when requirements are ambiguous or scope creep is a risk.\",",
       "    \"name\": \"scoping\",",
       "    \"route\": {",
-      "      \"when\": \"The goal or its boundaries are in dispute: what to build is a product or intent question that reading the code would not settle; or a person has answered the size ruling and the size of the move still reads pending a ruling.\",",
+      "      \"when\": \"The goal or its boundaries are in dispute: what to build is a product or intent question that reading the code would not settle; or a person has answered scoping's question on the size and the size of the move still reads not decided.\",",
       "      \"whenNot\": \"The gap is knowledge to gather, such as how the code behaves, a platform or dependency, or history, even when the ticket is terse (`research`); only the solution shape is open (`design`); unexpected behaviour (`bug`).\"",
       "    },",
       "    \"writes\": \"work\"",

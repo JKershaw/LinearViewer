@@ -21,7 +21,7 @@ describe('prepareRecommendationInput (LIN-3469)', () => {
   test('forwards exactly the prompt-read fields plus the task\'s runs', async () => {
     const input = await prepareRecommendationInput(ctx, { dispatchQueueStore: store, urlKey: 'acme', identifier: 'LIN-1' });
     assert.deepEqual(Object.keys(input).sort(),
-      ['allRuns', 'answeredQuestions', 'asked', 'attachments', 'children', 'comments', 'focusedChild', 'landingChanges', 'openFindings', 'parent', 'personFindings', 'planFacts', 'planReviewLoop', 'planReviewRun', 'project', 'reviewRound', 'runTimes', 'runs', 'siblings', 'trail']);
+      ['allRuns', 'answeredQuestions', 'asked', 'attachments', 'children', 'comments', 'focusedChild', 'landingChanges', 'openFindings', 'parent', 'personFindings', 'planFacts', 'planReviewLoop', 'planReviewRun', 'project', 'reviewRound', 'runTimes', 'runs', 'siblings', 'sizeDecisions', 'trail']);
     assert.equal(input.asked, null, 'no records store: no words on record');
     assert.equal(input.trail, null, 'LIN-4518 step 3: no records store: the trail is not read, so no gate reads a comment for it');
     assert.equal(input.landingChanges, null, 'LIN-4518 step 2: no records store: the landing is not read, so a blind read names no id');
@@ -45,6 +45,34 @@ describe('prepareRecommendationInput (LIN-3469)', () => {
     const faulty = { askedForTicket: async () => { throw new Error('records down'); } };
     const failed = await prepareRecommendationInput(ctx, { dispatchQueueStore: store, urlKey: 'acme', identifier: 'LIN-1', recordsStore: faulty });
     assert.equal(failed.asked, null, 'a records fault reads as no words, never the description');
+  });
+
+  // LIN-4542 (P8): the size of the move is a standing decision by scoping on the task, read from records.
+  test('sizeDecisions are the task\'s standing decisions by scoping, oldest first; null when not read, [] with no task', async () => {
+    const recs = [
+      { id: 'decision-b', kind: 'decision', by: 'scoping', state: 'stands', in: 'task-1', at: '2026-11-20T12:00:00.000Z', fields: { answer: 'a small tidy first', why: 'the tidy lets the change land on one home.', scope: 'task-1' } },
+      { id: 'decision-a', kind: 'decision', by: 'scoping', state: 'stands', in: 'task-1', at: '2026-11-20T10:00:00.000Z', fields: { answer: 'just the task', why: 'nothing binds.', scope: 'task-1' } },
+      { id: 'decision-p', kind: 'decision', by: 'person:john', state: 'stands', in: 'task-1', at: '2026-11-20T11:00:00.000Z', fields: { answer: 'Yes', words: 'Go ahead.' } },
+      { id: 'decision-o', kind: 'decision', by: 'scoping', state: 'stands', in: 'task-2', at: '2026-11-20T09:00:00.000Z', fields: { answer: 'another task', why: 'not this one.' } },
+    ];
+    const queries = [];
+    const records = {
+      taskForTicket: async (urlKey, ticket) => (ticket === 'LIN-1' ? 'task-1' : null),
+      find: async (urlKey, q) => { queries.push(q); return recs.filter((r) => (!q.kind || r.kind === q.kind) && (!q.state || r.state === q.state) && (q.inRef === undefined || r.in === q.inRef)); },
+    };
+    const input = await prepareRecommendationInput(ctx, { dispatchQueueStore: store, urlKey: 'acme', identifier: 'LIN-1', recordsStore: records });
+    assert.deepEqual(input.sizeDecisions, [
+      { id: 'decision-a', answer: 'just the task', why: 'nothing binds.', at: '2026-11-20T10:00:00.000Z' },
+      { id: 'decision-b', answer: 'a small tidy first', why: 'the tidy lets the change land on one home.', at: '2026-11-20T12:00:00.000Z' },
+    ], 'scoping\'s own, on this task, oldest first; a person\'s decision and another task\'s are not the size');
+    assert.ok(queries.some((q) => q.kind === 'decision' && q.state === 'stands' && q.inRef === 'task-1'), 'a superseded or withdrawn decision is not read: only standing ones');
+    const noTask = await prepareRecommendationInput(ctx, { dispatchQueueStore: store, urlKey: 'acme', identifier: 'LIN-2', recordsStore: records });
+    assert.deepEqual(noTask.sizeDecisions, [], 'no task on record: nothing decided');
+    const none = await prepareRecommendationInput(ctx, { dispatchQueueStore: store, urlKey: 'acme', identifier: 'LIN-1' });
+    assert.equal(none.sizeDecisions, null, 'no records store: not read');
+    const faulty = { taskForTicket: async () => { throw new Error('records down'); }, find: async () => [] };
+    const failed = await prepareRecommendationInput(ctx, { dispatchQueueStore: store, urlKey: 'acme', identifier: 'LIN-1', recordsStore: faulty });
+    assert.equal(failed.sizeDecisions, null, 'a records fault reads as not read, never "not decided"');
   });
 
   test('does not leak other context fields (issue, siblingsTotal)', async () => {

@@ -7,10 +7,10 @@
  * upload, relations create/delete, labels add/remove.
  *
  * The description writes (PATCH `description`, append, replace and the
- * description-target attachment) carry the size record guard (LIN-4368,
- * `refusedBySizeRecord`) at their two call sites: a `## Size of the move` section
- * says what and why, never how, a policy never decides "wrong work", and a write may not drop
- * the section (lib/size-of-move.js checkSizeRecord). Every write that creates or edits a comment
+ * description-target attachment) carry the plan-heading guard (LIN-4504, `refusedByPlanHeading`)
+ * at their two call sites: a plan is records, never a description section. (LIN-4542 retired the
+ * size record guard: the size of the move is a decision record, and a `## Size of the move`
+ * section in a description is ordinary text.) Every write that creates or edits a comment
  * body (create, edit, and the comment-target attachment caption) carries the blind-read guard (LIN-4437, `refusedByBlindRead`): a comment opening
  * with `## Blind read` names exactly the landing's PRs (lib/run-ledger.js checkBlindReadPrs; LIN-4520 retired its
  * verdict-line shape, a verdict being a record); it is the one comment guard that reads the trail first.
@@ -58,7 +58,6 @@ import { extractPeriodicalGateId } from '../lib/periodicals.js';
 import { flattenIssue, MAX_ATTACHMENT_BYTES } from '../lib/proxy-wire.js';
 import { UUID_REGEX, isValidIssueId } from '../lib/workspace.js';
 import { appendBlock, replace as replaceInDescription, DescriptionEditError } from '../lib/description-edit.js';
-import { checkSizeRecord, recordShape, SIZE_OF_MOVE_HEADING, SIZE_RECORD_CODES, DECIDED_BY, WRONG_WORK } from '../lib/size-of-move.js';
 import { addedPlanHeadings, PLAN_HEADING_WORDS, PLAN_IN_DESCRIPTION } from '../lib/legacy-plan-text.js';
 import { blindReadRefusal, checkBlindReadPrs } from '../lib/run-ledger.js';
 import { opensAsBlindRead } from '../lib/run-trail.js';
@@ -72,15 +71,6 @@ const TRASHED_MESSAGE = 'Issue is trashed; refusing to modify a deleted issue';
 const BAD_ISSUE_ID = 'Invalid issue ID format';
 const COMMENT_TOO_LONG = `body exceeds maximum length of ${MAX_COMMENT_LENGTH}`;
 const RELATION_TYPES = ['blocks', 'blocked-by', 'duplicate', 'related'];
-// LIN-4368: the size record guard's refusal wording.
-const SIZE_HOW_WORDS = { 'code-span': 'a code span', path: 'a file path', call: 'call syntax', 'numbered-steps': 'a numbered step' };
-// LIN-4369 arm 3: what a SIZE_RECORD_SHAPE refusal's kind means, for its message.
-const SIZE_SHAPE_WORDS = {
-  'extra-line': 'is not one of the record\'s lines', 'repeated-line': 'repeats a line', 'missing-line': 'comes before a line the record is missing',
-  size: 'names no size from the list', 'why-empty': 'gives no why', 'why-too-long': 'makes the why too long', 'why-sentences': 'makes the why more than one sentence',
-  'cuts-empty': 'opens the cuts with nothing under it', 'cut-unquoted': 'names a cut without quoting the task\'s asked word for word', 'cut-too-long': 'says too much beside its quotation',
-  'decided-by': 'names no one who decided from the list', 'decided-by-too-long': 'says too much after who decided',
-};
 
 // Body-size exception, scoped to the attachments route only (mirrors the feedback
 // route's own parser, routes/workspace-api-feedback.js): the global
@@ -161,7 +151,7 @@ export const SPEC_OPERATIONS = Object.freeze(Object.keys(SPEC));
  * @param {Function} deps.resolveLabelInput - Symbolic-or-UUID label ref resolver (closure-local)
  * @param {Function} deps.refResolutionFailed - Maps a RefResolutionError to its own 422 (closure-local)
  * @param {Function} deps.partialWriteFailed - Maps a PartialWriteError (write landed, its confirmation re-read failed) to its own envelope (closure-local)
- * @param {Object} [deps.recordsStore] - LIN-4501: the size guard reads the ticket's task `asked` (lib/records-store.js askedForTicket); absent, no ask is on record
+ * @param {Object} [deps.recordsStore] - the records store the Periodical gate's standing and the blind-read guard's landing are read from
  * @param {Function} deps.logEvent - Audit/witness event logger (closure-local)
  * @param {Object} [deps.harbourCommentsStore] - Durable (urlKey, commentId) ledger (LIN-2648); best-effort record at each createComment seam, never gates the response
  * @param {Function} [deps.onTicketWrite] - Optional ticket-closed closer seam (LIN-3366), fire-and-forget; never changes a response
@@ -338,44 +328,6 @@ export function createProxyWriteRoutes({
   const refuseNonUuidRef = (ctx, name, value) => Boolean(value) && !UUID_REGEX.test(value) && refuse(ctx, 400, `${name} must be a UUID`);
 
   /**
-   * LIN-4501: the ticket's task `asked`, the only words a size record's cut may quote; null with no task, no store,
-   * or a records fault (logged). The ticket is the route's own id, as the write names it.
-   */
-  async function askedOfTicket(ctx, issue = null) {
-    if (!recordsStore || typeof recordsStore.askedForTicket !== 'function') return null;
-    // A task's claim is keyed by the ticket identifier. A write addressed by UUID names no identifier, so the
-    // live read the guard already made supplies it (the Linear description read carries it).
-    const ticket = issue?.identifier || ctx.req.params.issueId;
-    try {
-      return await recordsStore.askedForTicket(ctx.req.proxyUrlKey, ticket);
-    } catch (err) {
-      console.error(`[size-of-move] the task's asked could not be read (${ctx.req.proxyUrlKey} ${ticket}): ${err?.message || err}`);
-      return null;
-    }
-  }
-
-  /**
-   * The size record guard (LIN-4368), at both description call sites, given the live
-   * description and the one the write would store: lib/size-of-move.js checkSizeRecord acts only when
-   * the write adds, changes or drops the `## Size of the move` section, so an older section
-   * never blocks an unrelated write. Answers 422 with the code, and the line for a "how"
-   * or "shape" refusal, and returns true once it has refused. Only this proxy lane is guarded:
-   * the session lane and direct provider edits are people's lanes.
-   */
-  async function refusedBySizeRecord(ctx, live, next, liveIssue = null) {
-    const check = checkSizeRecord(live, next, { asked: await askedOfTicket(ctx, liveIssue) });
-    if (check.ok) return false;
-    const lead = `The "${SIZE_OF_MOVE_HEADING}" section`;
-    const message = {
-      [SIZE_RECORD_CODES.how]: `${lead} says what is being done and why, never how: its line ${check.line?.number} carries ${SIZE_HOW_WORDS[check.kind]} (${JSON.stringify(check.token)}). Say it in plain words; a quotation may carry such text only when it matches the task's asked word for word.`,
-      [SIZE_RECORD_CODES.shape]: `${lead} holds four lines and nothing else: its line ${check.line?.number} ${SIZE_SHAPE_WORDS[check.kind]}${check.missing ? ` (${check.missing})` : ''}. The lines: ${recordShape().join(' | ')}.`,
-      [SIZE_RECORD_CODES.policyCut]: `${lead} cannot be decided by ${DECIDED_BY.policy} when the size is "${WRONG_WORK}": that cuts the ask, and a cut needs a person's ruling. Record it as ${DECIDED_BY.pending} and raise the ruling.`,
-      [SIZE_RECORD_CODES.dropped]: `${lead} is kept once written: the new description drops it. Keep it, or replace it in place.`,
-    }[check.code];
-    return refuse(ctx, 422, message, { code: check.code, ...(check.kind ? { kind: check.kind } : {}), ...(check.line ? { line: check.line } : {}) });
-  }
-
-  /**
    * LIN-4504: a plan is records (`POST /api/proxy/records`, a plan addressed to implementation or breakdown), never a
    * description section. Every proxy description write (create, PATCH, append, replace, and the description-target
    * attachment) is refused 422 when it ADDS a plan heading line (lib/legacy-plan-text.js addedPlanHeadings, the one
@@ -542,8 +494,8 @@ export function createProxyWriteRoutes({
     const teamId = guard?.team?.id || null;
 
     // LIN-4352: a PATCH that writes `description` makes one dedicated
-    // issueDescription read (the read editDescription makes), so the size record
-    // guard compares the live section with the one being written. issueWriteGuard is not
+    // issueDescription read (the read editDescription makes), so the plan-heading
+    // guard compares the live body with the one being written. issueWriteGuard is not
     // grown for this (lib/providers/linear/index.js says why), and a PATCH without
     // `description` makes no extra read. A missing issue compares as an empty body
     // and proceeds, so the provider's own not-found still maps as before.
@@ -551,7 +503,6 @@ export function createProxyWriteRoutes({
       const live = await guardTarget(ctx, 'issueDescription', { onNull: 'proceed' });
       if (!live) return;
       if (refusedByPlanHeading(ctx, live.issue?.description || '', description)) return;
-      if (await refusedBySizeRecord(ctx, live.issue?.description || '', description, live.issue)) return;
     }
 
     const input = {};
@@ -623,11 +574,9 @@ export function createProxyWriteRoutes({
     const { req, res, endpoint, token, provider } = ctx;
     let current;
     let next;
-    let liveIssue = null;
     try {
       const target = await guardTarget(ctx, 'issueDescription', { onNull: 'notFound' });
       if (!target) return;
-      liveIssue = target.issue;
       current = target.issue.description || '';
       next = merge(current);
     } catch (err) {
@@ -641,7 +590,6 @@ export function createProxyWriteRoutes({
     if (DANGEROUS_CHARS_REGEX.test(next)) return refuse(ctx, 400, 'resulting description contains invalid characters');
     // Append, replace and the description-target attachment all pass here.
     if (refusedByPlanHeading(ctx, current, next)) return;
-    if (await refusedBySizeRecord(ctx, current, next, liveIssue)) return;
 
     try {
       const updated = normalizeWritePayload(await provider.updateIssue(token, req.params.issueId, { description: next }), 'issue');

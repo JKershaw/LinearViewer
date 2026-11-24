@@ -112,12 +112,6 @@ describe('code-shape area map placement (LIN-3729)', () => {
     assert.strictEqual(areaOf('lib/legacy-plan-text.js'), 'LLM & prompts');
   });
 
-  // LIN-4369: the size record's owner supplies the scoping prompt's words (sizes, decided-by values, record parts)
-  // and the selector's facts line, beside the As-asked owner. It fell through to the catch-all when LIN-4368 added it.
-  test('the size record owner lands in LLM & prompts', () => {
-    assert.strictEqual(areaOf('lib/size-of-move.js'), 'LLM & prompts');
-  });
-
   // LIN-4383: the registry's path is the product's, spelled once in a zero-import leaf under lib/prompts/, so the
   // existing `^lib/prompts/` pattern files it with the prompt that names it (`AREA_NOTES_WHERE`, LIN-4346) and the
   // registry needs no new pattern. The scripts and the tests' helper import it from there, never the other way.

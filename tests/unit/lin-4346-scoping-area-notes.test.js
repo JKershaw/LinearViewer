@@ -4,9 +4,9 @@
  * As asked: "The area's notes and the latest Periodical readings should feed it too ... read them
  * where they exist". The notes live in docs/areas/ (LIN-4371) and corrective Periodicals feed them
  * (LIN-4379, LIN-4380), so Periodical readings reach scoping through the notes. The shared pointer
- * ends "name it ... where you record your decisions", but scoping's record takes no fifth line
- * (SIZE_RECORD_SHAPE) and it posts no comment (LIN-4369 arm 4): its pointer sends citations to its
- * final message. The Surveys get no pointer (survey-place reads no reports on the codebase's shape).
+ * ends "name it ... where you record your decisions", but scoping writes only its size decision
+ * (LIN-4542: one sentence of why) and it posts no comment (LIN-4369 arm 4): its pointer sends citations
+ * to its final message. The Surveys get no pointer (survey-place reads no reports on the codebase's shape).
  */
 import { test, describe } from 'node:test';
 import assert from 'node:assert/strict';
@@ -14,9 +14,6 @@ import { generatePrompt } from '../../lib/prompt-templates.js';
 import { formatAreaNotesPointer, formatScopingAreaNotesPointer } from '../../lib/prompt-formatters.js';
 import { REGISTRY_PATH } from '../../lib/prompts/area-registry-path.js';
 import { ASKED_HEADING } from '../../lib/records/words.js';
-import {
-  SIZE_OF_MOVE_HEADING, SIZES, SIZE_LABEL, WHY_LABEL, CUTS_LABEL, DECIDED_BY_LABEL, DECIDED_BY, NO_CUTS, checkSizeRecord
-} from '../../lib/size-of-move.js';
 
 const END = '*End of what was asked. Steps write below this line; nothing above it changes.*';
 const ISSUE = {
@@ -40,18 +37,12 @@ describe('scoping reads the area notes by pointer (LIN-4346)', () => {
     assert.match(pointer, /Periodical readings reach the project backlog as findings/);
   });
 
-  test('the pointer never asks for a record line: citations go in the final message, never the size record', () => {
+  test('the pointer never asks for a record line: citations go in the final message, never the size decision', () => {
     const prompt = render('scoping');
-    assert.match(pointer, /Name each one you weighed in your final message, never in the size record\./);
+    assert.match(pointer, /Name each one you weighed in your final message, never in the size decision\./);
     assert.ok(!prompt.includes('where you record your decisions'), 'not the shared pointer\'s "record your decisions"');
     assert.ok(!prompt.includes(formatAreaNotesPointer()), 'not the shared pointer');
     assert.ok(!/\*\*[^*]+:\*\*/.test(pointer), 'the pointer names no record label');
-    // Why: a citation written as a fifth line is refused by the proxy guard.
-    const four = [`**${SIZE_LABEL}:** ${SIZES[0]}`, `**${WHY_LABEL}:** Doing it as asked delivers what was asked.`, `**${CUTS_LABEL}:** ${NO_CUTS}`, `**${DECIDED_BY_LABEL}:** ${DECIDED_BY.policy}`];
-    const record = `${ISSUE.description}\n\n${SIZE_OF_MOVE_HEADING}\n\n${four.join('\n')}`;
-    assert.deepEqual(checkSizeRecord(ISSUE.description, record), { ok: true });
-    assert.equal(checkSizeRecord(ISSUE.description, `${record}\nNotes weighed: the prompts area's lessons (LIN-4371)`).code, 'SIZE_RECORD_SHAPE');
-    assert.notEqual(checkSizeRecord(ISSUE.description, `${record}\nNotes weighed: docs/areas/llm-and-prompts.md (LIN-4371)`).ok, true, 'a cited path is refused too');
   });
 
   test('a note entry is weighed by the bind rule scoping applies to a Survey finding', () => {
@@ -63,7 +54,7 @@ describe('scoping reads the area notes by pointer (LIN-4346)', () => {
     const prompt = render('scoping');
     assert.ok(!prompt.includes("the area's notes"), 'the bare clause is gone');
     assert.ok(!prompt.includes('latest Periodical readings'), 'readings come through the notes');
-    assert.match(prompt, /the findings filed with the ticket, the area notes below, and for a subtask its parent's size record\./);
+    assert.match(prompt, /the findings filed with the ticket, the area notes below, and for a subtask its parent's size decision \(/);
   });
 
   test('the pointers share their opening, so the seven stages\' pointer is unchanged', () => {
