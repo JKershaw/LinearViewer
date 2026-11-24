@@ -8,6 +8,9 @@
  * words, a chosen option, focus, a control off, an answer in flight, or settled). Questions settled on this page are remembered
  * (noteSettled), so a response requested before the answer never re-adds one.
  *
+ * LIN-4552: the keyed merge itself is `mergeKeyed`, which Home's notes merge (public/waiting-notes.js) runs too, over its own lines
+ * and keys (`record:<id>`); a new question card goes in above the notes group.
+ *
  * Question record cards need no binding: public/question-records.js answers them through one delegated listener.
  */
 import { holdsCard } from './question-records.js';

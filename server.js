@@ -3854,7 +3854,7 @@ app.get('/workspace/:urlKey/api/home-rows', workspaceFromUrl, async (req, res) =
 
 // LIN-4242: the live Waiting on you fragment. Owner only, by the page's own predicate (`featureFlags.runControls === true`):
 // anyone else gets a 403 and no card text. It draws the section the page draws, over the same reduction (`waitingStanding`),
-// and answers `{ html, count }` only. The client derives each card's key from the markup (`rulingKeyOf`), so no keys here.
+// and answers `{ html, count }` only. The client reads each key from the markup (a card's question id, a note's `data-key`), so no keys here.
 // Titles come from the held task facts when warm, so a card a refresh adds reads as the page reads it.
 app.get('/workspace/:urlKey/api/home-waiting', workspaceFromUrl, async (req, res) => {
   const workspace = req.workspace;

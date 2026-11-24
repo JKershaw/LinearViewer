@@ -24,11 +24,8 @@ const FEEDBACK = '[data-testid="waiting-note-feedback"]';
 // The notes cleared on this page, by key. Module state: one page, one set.
 const clearedKeys = new Set();
 
-/** A note line's key: its `data-key` (`record:<id>`). */
+/** A note line's key: its `data-key` (`record:<id>`, written by lib/waiting-section.js noteKeyFor). */
 export const noteKeyOf = (el) => (el && el.dataset && el.dataset.key) || '';
-
-/** The "show N more" words, as the server writes them (lib/waiting-section.js notesMoreWords). */
-const moreWords = (hidden) => `show ${hidden} more`;
 
 /** The notes group directly in `body` (the section's `.waiting-body`), or null. */
 function groupIn(body) {
@@ -64,7 +61,11 @@ export function syncNotesGroup(group) {
     const hidden = Math.max(0, count - limit);
     const expanded = list?.dataset.expanded === 'true';
     more.classList.toggle('hidden', hidden === 0);
-    more.textContent = expanded ? 'show fewer' : moreWords(hidden);
+    // The words are the server's (lib/waiting-section.js renderNotesMore): only the number and which label shows change here.
+    const number = more.querySelector('[data-testid="waiting-notes-hidden-count"]');
+    if (number) number.textContent = String(hidden);
+    more.querySelector('[data-testid="waiting-notes-more-closed"]')?.classList.toggle('hidden', expanded);
+    more.querySelector('[data-testid="waiting-notes-more-open"]')?.classList.toggle('hidden', !expanded);
     more.setAttribute('aria-expanded', expanded ? 'true' : 'false');
   }
   return count;

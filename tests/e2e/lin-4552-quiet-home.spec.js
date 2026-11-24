@@ -64,7 +64,7 @@ test('said once, one number, and the notes below the questions with a fold after
   const notes = page.locator(`${W.notes} ${W.note}`);
   await expect(notes).toHaveCount(8);
   await expect(notes.filter({ visible: true })).toHaveCount(5);
-  await expect(page.locator(W.notesMore)).toHaveText('show 3 more');
+  await expect(page.locator(W.notesMore)).toHaveText('show 3 more', { useInnerText: true });
   const first = notes.first();
   await expect(first.locator(W.noteTask)).toHaveAttribute('href', new RegExp(`/workspace/${urlKey}/task/LOCAL-2[12]`));
   await expect(first.locator(W.noteTask)).toContainText(/LOCAL-2[12] (A quiet Home|Notes for you below)/);
@@ -73,6 +73,7 @@ test('said once, one number, and the notes below the questions with a fold after
   await page.locator(W.notesMore).click();
   await expect(notes.filter({ visible: true })).toHaveCount(8);
   await expect(page.locator(W.notesMore)).toHaveAttribute('aria-expanded', 'true');
+  await expect(page.locator(W.notesMore)).toHaveText('show fewer', { useInnerText: true });
 
   // At a phone's width the notes wrap: no sideways scroll.
   await page.setViewportSize({ width: 390, height: 844 });

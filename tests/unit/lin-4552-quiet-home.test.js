@@ -225,7 +225,7 @@ describe('Notes for you: short lines naming their task', () => {
     assert.equal(NOTES_SHOWN, 5);
     assert.equal((html.match(/data-testid="waiting-note"[^>]*data-folded="true"/g) || []).length, 3);
     assert.match(html, /data-shown="5" data-expanded="false"/);
-    assert.match(html, /data-testid="waiting-notes-more" aria-expanded="false">show 3 more</);
+    assert.match(html, /data-testid="waiting-notes-more" aria-expanded="false"><span data-testid="waiting-notes-more-closed">show <span data-testid="waiting-notes-hidden-count">3<\/span> more<\/span><span class="hidden" data-testid="waiting-notes-more-open">show fewer<\/span>/);
   });
 
   test('the notes are read in a fixed number of store reads: 50 findings cost what 1 does', async () => {
@@ -346,12 +346,14 @@ describe('the notes stay current: the live merge (finding-d4767b81)', () => {
     const { mergeNotes, toggleNotesFold } = await notesModule();
     const w = notesWorld([note(1)]);
     const more = () => w.body.querySelector('[data-testid="waiting-notes-more"]');
+    // The label that shows: the words are the server's, the browser sets the number and picks the label.
+    const label = () => [...more().children].find((el) => !el.classList.contains('hidden'))?.textContent;
     mergeNotes(w.body, sectionFor([1, 2, 3, 4, 5, 6, 7].map((i) => note(i))));
     assert.equal(w.lines().filter((l) => l.dataset.folded === 'true').length, 2);
-    assert.equal(more().textContent, 'show 2 more');
+    assert.equal(label(), 'show 2 more');
     assert.equal(more().classList.contains('hidden'), false);
     toggleNotesFold(w.body.querySelector('[data-testid="waiting-notes"]'));
-    assert.equal(more().textContent, 'show fewer');
+    assert.equal(label(), 'show fewer');
     assert.equal(more().getAttribute('aria-expanded'), 'true');
     mergeNotes(w.body, sectionFor([]));
     assert.equal(w.body.querySelector('[data-testid="waiting-notes"]').classList.contains('hidden'), true, 'an empty group hides');
