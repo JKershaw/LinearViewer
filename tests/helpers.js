@@ -202,6 +202,17 @@ export const SELECTORS = {
     task: '[data-testid="question-record-card-task"]',
     taskId: '[data-testid="question-record-card-task-id"]',
     taskTitle: '[data-testid="question-record-card-task-title"]',
+    /** LIN-4551: the card's face: the one-line lead, the full ask in a closed fold, the recommended label and the controls. */
+    lead: '[data-testid="question-record-card-question"]',
+    ask: '[data-testid="question-record-card-ask"]',
+    askSummary: '[data-testid="question-record-card-ask"] > summary',
+    askBody: '[data-testid="question-record-card-ask-body"]',
+    options: '[data-testid="question-record-card-options"]',
+    recommended: '[data-testid="question-record-card-recommended"]',
+    answer: '[data-testid="question-record-card-answer"]',
+    dismiss: '[data-testid="question-record-card-dismiss"]',
+    feedback: '[data-testid="question-record-card-feedback"]',
+    readonly: '[data-testid="question-record-card-readonly"]',
   },
   /** LIN-4549: Home's Waiting on you section and its question wrappers (`.waiting-question`, one per open question). */
   waitingOnYou: {
