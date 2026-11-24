@@ -334,7 +334,7 @@ describe('LIN-4416: one expression of the stored kind', () => {
     };
     assert.equal(grep('export function effectiveDispatchKind').length, 1);
     const callers = grep('effectiveDispatchKind\\(').filter((l) => !/export function/.test(l));
-    assert.deepEqual(callers.map((l) => l.split(':')[0]).sort(), ['lib/dispatch-entrance.js', 'lib/dispatch-entrance.js', 'lib/dispatch-factory.js']);
-    assert.deepEqual(grep('kind \\|\\| deriveDispatchKind\\(').filter((l) => !l.startsWith('lib/dispatch-kind.js')), [], 'a second copy of the expression');
+    assert.deepEqual(callers.map((l) => l.split(':')[0]).sort(), ['lib/dispatch-entrance.js', 'lib/dispatch-entrance.js', 'lib/dispatch-factory.js', 'routes/dispatch.js', 'routes/dispatch.js']);
+    assert.deepEqual(grep('\\|\\| deriveDispatchKind\\(').filter((l) => !l.startsWith('lib/dispatch-kind.js')), [], 'a second copy of the expression');
   });
 });
