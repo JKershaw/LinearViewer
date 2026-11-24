@@ -203,6 +203,17 @@ describe('LIN-4549 — the opened task: the state poll keeps a card by the one r
     });
   }
 
+  // The successor of keepsReaderPlace(card, null) (lin-4242-waiting-merge before LIN-4549): a repaint whose state draws no card
+  // never puts the old one back, however much it holds.
+  test('a repaint that draws no card does not keep the old one, however much it holds', async (t) => {
+    const h = await openedTask(t);
+    const old = h.card();
+    STATES['typed words'].apply(old);
+    await h.poll(stateWith(''));
+    assert.equal(h.card(), null, 'no card in the slot');
+    assert.equal(old.isConnected, false, 'the old card is not put back');
+  });
+
   test('another question\'s card is never kept, however much the old one holds', async (t) => {
     const h = await openedTask(t);
     const old = h.card();
