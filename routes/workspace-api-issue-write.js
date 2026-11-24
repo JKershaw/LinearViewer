@@ -35,7 +35,7 @@ import { dedupeKey, createDedupeCache } from '../lib/proxy-dedupe.js';
 import { commentDedupe, commentDedupeGenerations } from './proxy.js';
 import { isHermeticTestToken } from '../lib/should-mock-ai.js';
 import { refuseCapability } from './workspace-api-steps.js';
-import { postHarbourComment, repairHarbourCommentRecord, HARBOUR } from '../lib/harbour-comment-post.js';
+import { postHarbourComment, repairHarbourCommentRecord, rememberCommentPoster, commentPosterOf, HARBOUR } from '../lib/harbour-comment-post.js';
 
 
 // Normalize a provider write result to `{ success, issue }`. Linear returns that
@@ -248,7 +248,7 @@ export function registerIssueWriteRoutes(router, { workspaceFromUrl, harbourComm
     // original attempt and a LIN-2933 recovered retry, so a successful write
     // reaches this exactly once per request, on whichever attempt produced it.
     const finishCommentSuccess = async (commentCreate) => {
-      commentDedupe.set(key, commentCreate);
+      commentDedupe.set(key, rememberCommentPoster(commentCreate, isTestMode ? HARBOUR : replyAuthor));
       return res.status(201).json(commentCreate);
     };
 
@@ -359,7 +359,7 @@ export function registerIssueWriteRoutes(router, { workspaceFromUrl, harbourComm
         // have failed silently. The seam repairs both (lib/harbour-comment-post.js):
         // idempotent writes, the post's bounded retries, never gates the response.
         // Test mode's stand-in filed no finding, so its repair files none either.
-        await repairHarbourCommentRecord({ urlKey: workspace.urlKey, comment: prior.comment ?? null, by: isTestMode ? HARBOUR : replyAuthor, finding: replyFinding(issueBinding), store: harbourCommentsStore });
+        await repairHarbourCommentRecord({ urlKey: workspace.urlKey, comment: prior.comment ?? null, by: commentPosterOf(prior), finding: replyFinding(issueBinding), store: harbourCommentsStore });
 
         return res.status(200).json({ ...prior, deduped: true });
       }

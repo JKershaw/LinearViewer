@@ -407,6 +407,61 @@ describe('POST /workspace/:urlKey/api/comments/:issueId — harbour-comments led
       'the repair attempt targets the SAME comment id the original create minted'
     );
   });
+
+  // LIN-4548: a finding writer that fails its first `failFirst` writes, then files.
+  function configureFlakyFindings({ failFirst }) {
+    const findings = new Map();
+    let attempts = 0;
+    configureCommentIngest({
+      writes: {
+        async add({ input, by, via, fixedId }) {
+          attempts += 1;
+          if (attempts <= failFirst) throw new Error('records down');
+          if (!findings.has(fixedId)) findings.set(fixedId, { by, via, in: input.in });
+          return { record: { id: fixedId } };
+        },
+        async end() { return {}; }
+      },
+      listPeople: async () => [], cutoffOf: async () => null, ledger: { async wereRecordedByHarbour() { return new Set(); } },
+      taskForTicket: async (_u, ticket) => (ticket === ISSUE_ID ? 'task-901' : null), taskOfTicket: async () => null
+    });
+    return findings;
+  }
+
+  test('LIN-4548: the first finding write fails; the member\'s identical repeat (a dedupe hit) files exactly one finding, by that member', async () => {
+    const findings = configureFlakyFindings({ failFirst: 1 });
+    try {
+      const { provider } = makeFakeProvider();
+      const app = buildApp({ provider, session: { accountId: 'member-4548a' }, harbourCommentsStore: makeSpyHarbourCommentsStore() });
+      const payload = { body: 'LIN-4548 reply whose first finding write fails' };
+      const first = await postComment(app, ISSUE_ID, payload);
+      assert.strictEqual(first.status, 201, 'the comment is written whatever the finding does');
+      assert.strictEqual(findings.size, 0, 'the first finding write failed');
+      const again = await postComment(app, ISSUE_ID, payload);
+      assert.strictEqual(again.status, 200);
+      assert.strictEqual(again.body.deduped, true);
+      assert.deepStrictEqual([...findings.entries()], [[fixedIdOf('finding', 'comment', first.body.comment.id), { by: 'person:member-4548a', via: 'comment', in: 'task-901' }]]);
+    } finally {
+      configureCommentIngest(null);
+    }
+  });
+
+  test('LIN-4548: another member\'s identical reply (a dedupe hit) repairs under the ORIGINAL member, never the one repeating', async () => {
+    const findings = configureFlakyFindings({ failFirst: 1 });
+    try {
+      const { provider } = makeFakeProvider();
+      const payload = { body: 'LIN-4548 two members send the same words' };
+      const first = await postComment(buildApp({ provider, session: { accountId: 'member-4548a' }, harbourCommentsStore: makeSpyHarbourCommentsStore() }), ISSUE_ID, payload);
+      assert.strictEqual(first.status, 201);
+      assert.strictEqual(findings.size, 0, 'member A\'s finding write failed');
+      const other = await postComment(buildApp({ provider, session: { accountId: 'member-4548b' }, harbourCommentsStore: makeSpyHarbourCommentsStore() }), ISSUE_ID, payload);
+      assert.strictEqual(other.status, 200);
+      assert.strictEqual(other.body.deduped, true);
+      assert.deepStrictEqual([...findings.values()].map(f => f.by), ['person:member-4548a']);
+    } finally {
+      configureCommentIngest(null);
+    }
+  });
 });
 
 // =============================================================================

@@ -385,6 +385,41 @@ describe('LIN-4548 — a comment sent with a person\'s own proxy token is their 
     assert.strictEqual(findings.size, 1, 'one finding, however many times it is sent');
   });
 
+  test('the first finding write fails; the person\'s identical repeat (a dedupe hit, 200 deduped) files exactly one finding, by them', async () => {
+    let attempts = 0;
+    configureCommentIngest({
+      writes: {
+        async add({ kind, input, by, via, fixedId }) {
+          attempts += 1;
+          if (attempts === 1) throw new Error('records down');
+          if (!findings.has(fixedId)) findings.set(fixedId, { kind, by, via, in: input.in, says: input.says });
+          return { record: { id: fixedId } };
+        },
+        async end() { return { record: null }; }
+      },
+      listPeople: async () => [], cutoffOf: async () => null, ledger: { async wereRecordedByHarbour() { return new Set(); } },
+      taskForTicket: async (_urlKey, ticket) => (ticket === 'LIN-7' ? 'task-7' : null), taskOfTicket: async () => null
+    });
+    const app = buildProxyApp({ provider: new FakeWriteProvider({ name: 'lin4548-heal' }), harbourCommentsStore: makeFakeLedger(), credential: PERSON });
+    const first = await postProxyComment(app, ISSUE_ID, { body: 'lin4548 heal a failed finding write' });
+    assert.strictEqual(first.status, 201);
+    assert.strictEqual(findings.size, 0, 'the first finding write failed');
+    const again = await postProxyComment(app, ISSUE_ID, { body: 'lin4548 heal a failed finding write' });
+    assert.strictEqual(again.status, 200);
+    assert.strictEqual(again.body.deduped, true);
+    assert.deepEqual([...findings.entries()], [[fixedIdOf('finding', 'comment', first.body.comment.id), { kind: 'finding', by: 'person:acct-john', via: 'comment', in: 'task-7', says: 'lin4548 heal a failed finding write' }]]);
+  });
+
+  test('a dispatch token posts X, then a person\'s token posts the identical X (a dedupe hit): Harbour\'s comment never becomes the person\'s finding', async () => {
+    const body = 'lin4548 the same words from a run and a person';
+    const run = await postProxyComment(buildProxyApp({ provider: new FakeWriteProvider({ name: 'lin4548-x-run' }), harbourCommentsStore: makeFakeLedger(), credential: { origin: 'dispatch', runRecordId: null } }), ISSUE_ID, { body });
+    assert.strictEqual(run.status, 201);
+    const person = await postProxyComment(buildProxyApp({ provider: new FakeWriteProvider({ name: 'lin4548-x-person' }), harbourCommentsStore: makeFakeLedger(), credential: PERSON }), ISSUE_ID, { body });
+    assert.strictEqual(person.status, 200);
+    assert.strictEqual(person.body.deduped, true);
+    assert.strictEqual(findings.size, 0);
+  });
+
   test('a person\'s token on the attachment route\'s comment target: the same one finding', async () => {
     const provider = new FakeWriteProvider({ name: 'lin4548-attach' });
     const app = buildProxyApp({ provider, harbourCommentsStore: makeFakeLedger(), credential: PERSON });

@@ -57,7 +57,7 @@ import { flattenIssue, MAX_ATTACHMENT_BYTES } from '../lib/proxy-wire.js';
 import { UUID_REGEX, isValidIssueId } from '../lib/workspace.js';
 import { appendBlock, replace as replaceInDescription, DescriptionEditError } from '../lib/description-edit.js';
 import { addedPlanHeadings, PLAN_HEADING_WORDS, PLAN_IN_DESCRIPTION } from '../lib/legacy-plan-text.js';
-import { postHarbourComment, repairHarbourCommentRecord, HARBOUR } from '../lib/harbour-comment-post.js';
+import { postHarbourComment, repairHarbourCommentRecord, rememberCommentPoster, commentPosterOf, HARBOUR } from '../lib/harbour-comment-post.js';
 import { personOfCredential } from '../lib/run-lineage.js';
 import { isRestrictedStamp, sameTicketKey, ISSUE_PATCH_FIELDS } from '../lib/stage-writes.js';
 import { jsonError } from '../lib/errors.js';
@@ -314,7 +314,7 @@ export function createProxyWriteRoutes({
     const created = normalizeWritePayload(posted, 'comment');
     // A clear failure instead of a misleading 201 when the provider reports the write did not land.
     if (writeRejected(req, res, endpoint, created, 'Comment was not created')) return;
-    remember?.(created);
+    remember?.(rememberCommentPoster(created, commentAuthorOf(req)));
     logEvent(req, endpoint, 201);
     res.status(201).json(created);
   }
@@ -676,7 +676,7 @@ export function createProxyWriteRoutes({
       logEvent(req, endpoint, 200, null, { skipWitness: true });
       // Dedupe-hit repair (LIN-2649 S1, F2; LIN-4548): the original post's own record, or a person's finding, may have
       // failed. The seam repairs both (lib/harbour-comment-post.js), so each is written one way; it never gates this response.
-      await repairHarbourCommentRecord({ urlKey: req.proxyUrlKey, comment: prior.comment ?? null, by: commentAuthorOf(req), finding: commentFindingOf(ctx, body), store: harbourCommentsStore });
+      await repairHarbourCommentRecord({ urlKey: req.proxyUrlKey, comment: prior.comment ?? null, by: commentPosterOf(prior), finding: commentFindingOf(ctx, body), store: harbourCommentsStore });
       return res.status(200).json({ ...prior, deduped: true });
     }
     await postComment(ctx, body, (created) => commentDedupe.set(key, created));
