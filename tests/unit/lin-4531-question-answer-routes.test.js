@@ -165,7 +165,8 @@ describe('the answer and dismiss routes', () => {
     const follow = await followUpsOf(run);
     assert.equal(follow.length, 1);
     assert.match(follow[0].prompt, /^Dismissal of question /m);
-    assert.equal((await records.current(URL_KEY, q)).state, 'withdrawn');
+    // LIN-4550: a person's dismissal ends the question `dismissed` (it ended `withdrawn`, the word for an agent's withdrawal, before).
+    assert.equal((await records.current(URL_KEY, q)).state, 'dismissed');
   });
 });
 

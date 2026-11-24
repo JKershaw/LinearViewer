@@ -318,6 +318,22 @@ describe('GET /api/escalation-kpis (LIN-1736; question records, LIN-4538)', () =
     assert.equal(body.escalationRate.raisedInWindow, 3, 'all three were raised within the window');
   });
 
+  test('LIN-4550: a dismissal ended `dismissed` and an old one ended `withdrawn` "dismissed" are both false escalations; an agent withdrawal is neither', async () => {
+    const newer = await askQuestion('ws-a', 'LIN-11');
+    const older = await askQuestion('ws-a', 'LIN-12');
+    const byAgent = await askQuestion('ws-a', 'LIN-13');
+    await records.end('ws-a', newer, { state: 'dismissed', reason: 'dismissed' }, { by: PERSON });
+    await records.end('ws-a', older, { state: 'withdrawn', reason: 'dismissed' }, { by: PERSON });
+    await records.end('ws-a', byAgent, { state: 'withdrawn', reason: 'answered it myself' }, { by: 'implementation' });
+    const handler = getHandler(makeKpiRouter(records), 'get', '/workspace/:urlKey/api/escalation-kpis');
+    const { req, res } = kpiReq();
+    await handler(req, res);
+    assert.equal(res.jsonBody.falseEscalation.dismissed, 2);
+    assert.equal(res.jsonBody.falseEscalation.answered, 0);
+    assert.equal(res.jsonBody.falseEscalation.total, 2);
+    assert.equal(res.jsonBody.escalationRate.raisedInWindow, 3);
+  });
+
   test('a closed ticket\'s open question is "ticket closed": self-resolved, never a false escalation', async () => {
     await askQuestion('ws-a', 'LIN-9');
     const ended = await endOpenQuestionsOfTicket({ recordsStore: records, writes, urlKey: 'ws-a', ticket: 'LIN-9' });

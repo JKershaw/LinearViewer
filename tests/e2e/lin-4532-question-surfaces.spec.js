@@ -102,14 +102,14 @@ test.describe('Home: Waiting on you draws the open question records', () => {
     expect(await questionState(page, URL_KEY, qid)).toBe('answered');
   });
 
-  test('dismissing a question ends it withdrawn, and the card says the run takes its fallback', async ({ page }) => {
+  test('dismissing a question ends it dismissed (LIN-4550), and the card says the run takes its fallback', async ({ page }) => {
     await seedTree(page);
     const qid = await seedQuestion(page, URL_KEY, { ticket: 'LOCAL-D', runId: await askingRun(page, URL_KEY, 'LOCAL-D') });
     await page.goto(`/workspace/${URL_KEY}/`);
     const card = cardFor(page, qid, WAITING_Q);
     await card.locator('[data-testid="question-record-card-dismiss"]').click();
     await expect(card.locator('[data-testid="question-record-card-feedback"]')).toHaveText(DISMISSED);
-    expect(await questionState(page, URL_KEY, qid)).toBe('withdrawn');
+    expect(await questionState(page, URL_KEY, qid)).toBe('dismissed');
   });
 
   test('a question asked after the page loaded gets its card on the live refresh, without a reload (finding-dca7ac9d)', async ({ page }) => {

@@ -44,6 +44,7 @@
 import { mkdirSync, readFileSync, writeFileSync, existsSync } from 'node:fs';
 import { join } from 'node:path';
 import { tmpdir } from 'node:os';
+import { pathToFileURL } from 'node:url';
 import { classifyTicket, summarizeChurn, taskHead } from '../lib/pipeline-churn.js';
 import { ticketTaskIdOf } from '../lib/records/refs.js';
 import { questionOutcomeOf } from '../lib/records/question-facts.js';
@@ -110,7 +111,7 @@ async function readTicket(get, identifier) {
  * The ticket's question records (LIN-4538), in the shape lib/pipeline-churn.js reads: the current version gives the state, the
  * end and the outcome; the first version gives what was asked, the asking run and when. The first version never changes, so it is cached.
  */
-async function readQuestions(get, identifier) {
+export async function readQuestions(get, identifier) {
   const list = await get(`/records?kind=question&in=${encodeURIComponent(ticketTaskIdOf(identifier))}`);
   const questions = [];
   for (const r of list.records || []) {
@@ -193,4 +194,7 @@ async function main() {
   else console.log(render(tickets, summary, args.rows));
 }
 
-main().catch((e) => { console.error(e.message || e); process.exit(1); });
+// Run only when executed, so a test can import readQuestions (LIN-4550) without starting the CLI.
+if (import.meta.url === pathToFileURL(process.argv[1] || '').href) {
+  main().catch((e) => { console.error(e.message || e); process.exit(1); });
+}

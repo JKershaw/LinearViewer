@@ -140,14 +140,14 @@ describe('the behaviour table: resumable', () => {
     assert.equal(enqueueCalls.length, 1);
   });
 
-  test('dismiss: the question ends withdrawn with reason "dismissed", and the follow-up says so and quotes if-unanswered', async () => {
+  test('dismiss: the question ends dismissed with reason "dismissed" (LIN-4550; it ended withdrawn before), and the follow-up says so and quotes if-unanswered', async () => {
     const run = await askingRun('run-c', { feedback: blocked() });
     const q = await askQuestion({ run, ifUnanswered: 'keep the old flag' });
     const out = await service.dismiss({ urlKey: URL_KEY, questionId: q, by: PERSON, dispatchedBy: 'acct-owner' });
     assert.equal(out.status, 200, JSON.stringify(out.body));
     assert.equal(out.body.resumed, true);
     const ended = await records.current(URL_KEY, q);
-    assert.equal(ended.state, 'withdrawn');
+    assert.equal(ended.state, 'dismissed');
     assert.equal(ended.ended.reason, 'dismissed');
     assert.equal(enqueueCalls.length, 1);
     assert.match(enqueueCalls[0].prompt, /^Dismissal of question /m);
@@ -180,7 +180,7 @@ describe('the behaviour table: stopped', () => {
     assert.equal((await records.current(URL_KEY, q)).state, 'answered');
   });
 
-  test('dismiss: the question is withdrawn and no follow-up is made', async () => {
+  test('dismiss: the question ends dismissed (LIN-4550) and no follow-up is made', async () => {
     const run = await askingRun('run-f', { feedback: blocked() });
     await dispatch.collection.insertOne({ _id: 'abort-f', urlKey: URL_KEY, abort: true, abortTo: run, feedback: [{ message: '[aborted] stopped', timestamp: NOW.toISOString() }], status: 'done', feedbackAt: NOW, expiresAt: new Date('2099-01-01T00:00:00.000Z') });
     const q = await askQuestion({ run });
@@ -188,7 +188,7 @@ describe('the behaviour table: stopped', () => {
     assert.equal(out.status, 200);
     assert.equal(out.body.notResumedBecause, 'stopped');
     assert.equal(enqueueCalls.length, 0);
-    assert.equal((await records.current(URL_KEY, q)).state, 'withdrawn');
+    assert.equal((await records.current(URL_KEY, q)).state, 'dismissed');
   });
 
   test('a follow-up the factory refuses as stopped (a race after the read) is not resumed, and the decision still stands', async () => {
@@ -223,13 +223,13 @@ describe('the behaviour table: gone', () => {
     assert.equal(enqueueCalls.length, 0);
   });
 
-  test('dismiss of a gone run withdraws the question and makes no follow-up', async () => {
+  test('dismiss of a gone run ends the question dismissed (LIN-4550) and makes no follow-up', async () => {
     const run = await askingRun('run-i', { status: 'done', feedback: doneAt(new Date(NOW.getTime() - 8 * DAY)) });
     const q = await askQuestion({ run });
     const out = await service.dismiss({ urlKey: URL_KEY, questionId: q, by: PERSON, dispatchedBy: 'acct-owner' });
     assert.equal(out.status, 200);
     assert.equal(enqueueCalls.length, 0);
-    assert.equal((await records.current(URL_KEY, q)).state, 'withdrawn');
+    assert.equal((await records.current(URL_KEY, q)).state, 'dismissed');
   });
 });
 
@@ -344,7 +344,7 @@ describe('a settled question stays settled across the two actions (review findin
     assert.equal(retry.status, 200, JSON.stringify(retry.body));
     assert.equal(retry.body.resumed, true);
     assert.equal(enqueueCalls.length, 1, 'the dismissal retry completes the end and makes no second resume');
-    assert.equal((await records.current(URL_KEY, q)).state, 'withdrawn');
+    assert.equal((await records.current(URL_KEY, q)).state, 'dismissed');
   });
 
   test('an answer whose decision stands but whose resume failed: a dismissal is 409, writes nothing, and the answer retry completes', async () => {
