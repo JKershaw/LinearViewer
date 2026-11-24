@@ -5317,3 +5317,5 @@ The full stop holds: the fleet is paused, and the drive is only reporting. The o
 **24 Nov, 13:50Z: standing permission (John).** "If this loop happens again, you can let the autopilot know how to handle it, until we've resolved it properly." So if review keeps adding a condition each round, I can send the autopilot a note without asking first: pin review once, a re-review checks only the conditions it set, and anything new and small goes to project (decision-5dbdf161). This holds until the clean-up ticket fixes the cause. LIN-4549 merged at 13:47; piece 2 (LIN-4550) started 13:48.
 
 **24 Nov, ~14:00Z: UI lane trimmed (John, for token use).** LIN-4343 (walk every page) and LIN-3976 (run page) come out of the run; they go after the notes review. The lane is now LIN-4546 → LIN-4342 (side rail) → LIN-4017 (stylesheet). John: "The existing scheduled work should give us plenty of data on the new process."
+
+**24 Nov, ~14:05Z: LIN-4017 held too (John).** The lane is LIN-4546 then LIN-4342, then a pause. LIN-4343, LIN-3976 and LIN-4017 wait for after the notes review, where John decides whether to add more tasks. Change of plan posted on LIN-4008.
