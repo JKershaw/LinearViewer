@@ -282,6 +282,8 @@ describe('(b+) a page-text scan over a richly seeded task: no raw id and no ISO 
     await endAs(noTicket.id, 'done', 'done', `person:${OWNER}`);
     await add('finding', 'open', { says: 'Check the tidy CSS.', how: 'look' }, { ...t, to: noTicket.id, by: 'review' });
     await add('finding', 'open', { says: 'Hand the footer piece on.', how: 'see' }, { ...t, to: withTicket.id, by: 'review' });
+    // A writer's own words that quote ids and a stamp, as real notes do: the preview reads them as the line does.
+    await add('finding', 'open', { says: `${withTicket.id}: person:${OWNER} asked why ${f1.id} repeats; person:acc-ghost saw it at ${HOURS_AGO(2)}.`, how: 'read' }, { ...t, to: 'project', by: 'review' });
 
     await serve('owner');
     const html = await getPage();
@@ -292,6 +294,7 @@ describe('(b+) a page-text scan over a richly seeded task: no raw id and no ISO 
     assert.doesNotMatch(text, /person:|acc-[a-z]/, `no raw person or account id in the text: ${(text.match(/person:\S*|acc-\S*/) || [])[0]}`);
     assert.doesNotMatch(text, ISO, `no ISO time in the text: ${(text.match(ISO) || [])[0]}`);
     // And it reads as people: names, stage words, Harbour, the project, a child task by its ticket.
+    assert.ok(text.includes('LIN-4999: John asked why a finding repeats; someone saw it 2 hours ago.'), 'ids and stamps inside a writer\'s words read as the line reads them');
     for (const word of ['John', 'Mia', 'someone', 'Harbour', 'the project', stageLabel('implementation'), 'LIN-4999', 'dismissed', 'handed on']) {
       assert.ok(text.includes(word), `the page says "${word}"`);
     }
