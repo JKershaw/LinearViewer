@@ -579,7 +579,7 @@ function fillSessionHead(li, s) {
 function renderDisclosure(s) {
   const n = s.runs.length;
   const show = n ? `Show run detail · ${n} run${n === 1 ? '' : 's'}` : 'Show run detail';
-  return `<button type="button" class="obs-disc" aria-expanded="false">`
+  return `<button type="button" class="obs-disc" data-testid="obs-session-disclosure" aria-expanded="false">`
     + `<span class="obs-disc-show">${escapeHtml(show)}</span>`
     + `<span class="obs-disc-hide">Hide run detail</span></button>`;
 }

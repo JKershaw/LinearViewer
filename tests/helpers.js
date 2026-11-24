@@ -91,6 +91,8 @@ export const SELECTORS = {
     // LIN-4553: the waiting line's two links, "N questions waiting →" (to the Questions tab) and "N runs waiting →".
     waitingQuestions: '[data-testid="obs-waiting-questions"]',
     waitingRuns: '[data-testid="obs-waiting-runs"]',
+    /** LIN-4555: a Runs card's "Show run detail" control (public/observation.js renderDisclosure). */
+    runDetail: '[data-testid="obs-session-disclosure"]',
     sessionViews: '[data-testid="obs-session-views"]',
     rulingsSection: '[data-testid="obs-rulings-section"]',
     // LIN-4541: a ruling row is an open question record (the old decision row, its controls and the bulk bar retired).
@@ -103,6 +105,8 @@ export const SELECTORS = {
   runPage: {
     page: '[data-testid="session-page"]',
     questions: '[data-testid="session-question-records"]',
+    /** LIN-4555: a step's head, which opens its transcript (lib/render-run-steps.js). */
+    runToggle: '[data-testid="session-run-toggle"]',
   },
   flightCompanion: {
     decisionsFold: '[data-testid="fc-decisions-fold"]',
@@ -241,6 +245,8 @@ export const SELECTORS = {
     noteTask: '[data-testid="waiting-note-task"]',
     noteSays: '[data-testid="waiting-note-says"]',
     noteClear: '[data-testid="waiting-note-clear"]',
+    /** LIN-4555: a note's "more" fold, holding the whole note. */
+    noteFoldSummary: '[data-testid="waiting-note-fold"] > summary',
     notesMore: '[data-testid="waiting-notes-more"]',
   },
   /** LIN-4552: Home's count line, its questions part ("N questions", the needs-you tone), and the nav's open-questions badge. */
