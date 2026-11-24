@@ -89,13 +89,12 @@ export function createTaskPageRoutes({ workspaceFromUrl, getOpenRouterSource, ge
   const router = Router();
 
   // LIN-4554: the workspace's people, read once per request however many parts of the page name one (the question cards' words and
-  // the Records section). A failed read is no names, each person then reading "someone"; the memo holds that too.
-  const peopleReads = new WeakMap();
+  // the Records section). The read's promise rides on the request's own `res.locals`, so it lives and dies with the request and no
+  // container outlives it. A failed read is no names, each person then reading "someone"; the memo holds that too.
   function peopleOf(req, urlKey) {
-    if (!peopleReads.has(req)) {
-      peopleReads.set(req, Promise.resolve().then(() => listPeople(urlKey)).catch(() => []).then((people) => (Array.isArray(people) ? people : [])));
-    }
-    return peopleReads.get(req);
+    const locals = req.res.locals;
+    locals.taskPagePeople ??= Promise.resolve().then(() => listPeople(urlKey)).catch(() => []).then((people) => (Array.isArray(people) ? people : []));
+    return locals.taskPagePeople;
   }
 
   /**
