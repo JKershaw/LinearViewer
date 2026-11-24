@@ -66,8 +66,8 @@ describe('the bridge over the real repo', () => {
     assert.deepEqual(Object.keys(inputs.emitted).filter((f) => bridgeWrites(inputs.emitted[f]).size), ['cost-format-global.js']);
   });
 
-  test('the emitted modules are the shim and the five page modules that import the formatter or read no bridge (workspace-kpis.js, task-page.js, flight-companion.js, observation.js, and question-records.js, LIN-4532)', () => {
-    assert.deepEqual(Object.keys(inputs.emitted).sort(), ['cost-format-global.js', 'flight-companion.js', 'observation.js', 'question-records.js', 'task-page.js', 'workspace-kpis.js']);
+  test('the emitted modules are the shim and the page modules that import the formatter or read no bridge (workspace-kpis.js, task-page.js, flight-companion.js, observation.js, question-records.js LIN-4532, swipe.js LIN-4463 piece 5)', () => {
+    assert.deepEqual(Object.keys(inputs.emitted).sort(), ['cost-format-global.js', 'flight-companion.js', 'observation.js', 'question-records.js', 'swipe.js', 'task-page.js', 'workspace-kpis.js']);
   });
 
   test('the renderer lists the check read are the three that name a consumer, so a list the reader cannot match fails here', () => {
@@ -88,7 +88,7 @@ describe('the bridge over the real repo', () => {
   test('the bridge keeps exactly one classic reader (prompt-section.js), and the pages converted to modules are not among them', () => {
     assert.deepEqual([...result.readers.keys()].sort(), Object.keys(CONSUMERS).sort());
     assert.deepEqual(Object.keys(CONSUMERS), ['/prompt-section.js']);
-    for (const converted of ['/workspace-kpis.js', '/task-page.js', '/flight-companion.js', '/observation.js']) assert.equal(result.readers.has(converted), false, converted);
+    for (const converted of ['/workspace-kpis.js', '/task-page.js', '/flight-companion.js', '/observation.js', '/swipe.js']) assert.equal(result.readers.has(converted), false, converted);
   });
 });
 

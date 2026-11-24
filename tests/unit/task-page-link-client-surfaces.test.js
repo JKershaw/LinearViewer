@@ -9,7 +9,8 @@
  * surfaces are covered in render.test.js / render-session.test.js.
  *
  * Every surface runs in a client world (tests/unit/helpers/client-world.js over the one fake DOM, LIN-4310): the
- * swipe card is the server's own markup (helpers/swipe-page.js), and the Live Console lane is the client's own builder.
+ * swipe card is the swipe.js module imported over the server's own markup (helpers/swipe-world.js), and the Live Console
+ * lane is the client's own builder.
  */
 import { test, describe, before, after } from 'node:test';
 import assert from 'node:assert/strict';
@@ -22,7 +23,7 @@ import { importWorld } from './helpers/import-world.js';
 import { taskPageHref, sourceQuery } from '../../lib/task-page-href.js';
 import { escapeHtml } from '../../lib/utils/html.js';
 import { loadLiveConsole, makeLaneNode } from './helpers/live-console-world.js';
-import { swipePageBody } from './helpers/swipe-page.js';
+import { swipeWorld } from './helpers/swipe-world.js';
 
 const ROOT = join(dirname(fileURLToPath(import.meta.url)), '../..');
 const read = (p) => readFileSync(join(ROOT, p), 'utf8');
@@ -48,34 +49,27 @@ function worldWithCommon(windowStubs = {}) {
   return world;
 }
 
+// swipe.js is a native module (LIN-4463 piece 5) that imports the builder from the served lib leaf, so the href is the
+// server's own taskPageHref, not common.js's twin.
 describe('Swipe card task-page link (LIN-3331)', () => {
-  function renderCard(issue, urlKey = 'ws') {
-    const world = loadWorld({
-      scripts: [],
-      window: { __SWIPE_DATA__: { issues: [issue], filters: [{ key: 'all', label: 'All' }], urlKey } },
-      globals: { location: { search: '', href: '' }, history: { replaceState() {} } },
-    });
-    world.document.body.innerHTML = swipePageBody({ urlKey });
-    world.run(withHarnessModels(COMMON_SRC));
-    world.window.renderMarkdown = (s) => world.window.escapeHtml(s);
-    world.window.stripCodeBlockWrapper = (s) => s;
-    world.run(read('public/swipe.js'));
+  async function renderCard(t, issue, urlKey = 'ws') {
+    const world = await swipeWorld(t, { data: { issues: [issue], filters: [{ key: 'all', label: 'All' }], urlKey } });
     return world.document.getElementById('swipe-card').innerHTML;
   }
 
-  test('renders a task-page link for a plain issue', () => {
-    const html = renderCard({ id: 'issue-1', identifier: 'LIN-1', title: 'Say hello', stateType: 'unstarted' });
+  test('renders a task-page link for a plain issue', async (t) => {
+    const html = await renderCard(t, { id: 'issue-1', identifier: 'LIN-1', title: 'Say hello', stateType: 'unstarted' });
     assert.match(html, /data-testid="swipe-task-page-link"[^>]*href="\/workspace\/ws\/task\/LIN-1"/);
   });
 
-  test('carries the issue source', () => {
-    const html = renderCard({ id: 'issue-1', identifier: 'LIN-1', title: 'T', stateType: 'unstarted', source: 'linear', bindingScope: 'team-a' });
+  test('carries the issue source', async (t) => {
+    const html = await renderCard(t, { id: 'issue-1', identifier: 'LIN-1', title: 'T', stateType: 'unstarted', source: 'linear', bindingScope: 'team-a' });
     assert.match(html, /data-testid="swipe-task-page-link"[^>]*href="\/workspace\/ws\/task\/LIN-1\?source=linear"/);
     assert.ok(!html.includes('bindingScope'), 'the pair-era scope is ignored');
   });
 
-  test('no link on the landing card (no workspace)', () => {
-    const html = renderCard({ id: 'issue-1', identifier: 'LIN-1', title: 'T', stateType: 'unstarted' }, null);
+  test('no link on the landing card (no workspace)', async (t) => {
+    const html = await renderCard(t, { id: 'issue-1', identifier: 'LIN-1', title: 'T', stateType: 'unstarted' }, null);
     assert.ok(!html.includes('swipe-task-page-link'), 'landing card omits the link');
   });
 });

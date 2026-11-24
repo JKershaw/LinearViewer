@@ -4,9 +4,14 @@
  * Mobile-first task card swiping. Prompt generation is handled by
  * the shared PromptSection module (public/prompt-section.js),
  * embedded as the fourth card accordion.
+ *
+ * A native ES module (LIN-4463 piece 5): it runs after every classic script on the page, once the document is parsed and
+ * before DOMContentLoaded, as the classic script at the end of the body did. It imports the task-page link builder from
+ * the served lib leaf (the server's own, `lib/task-page-href.js`) instead of reading common.js's twin.
  */
+import { taskPageHref } from '../lib/task-page-href.js';
 
-// isTerminalState comes from public/common.js (loaded first), the one browser home for the terminal set.
+// isTerminalState comes from public/common.js (a classic script, so it has run), the one browser home for the terminal set.
 
 // ==========================================================================
 // State
@@ -448,13 +453,11 @@ function renderCard(direction) {
   // landing card out; the shared helper drops it when there's no identifier.
   // An <a> is already excluded from the swipe/drag gesture (handleSwipeStart),
   // so it cannot start a card transition.
-  const taskHref = window.taskPageHref
-    ? window.taskPageHref({
-        urlKey,
-        identifier: issue.identifier || issue.id,
-        source: issue.source
-      })
-    : '';
+  const taskHref = taskPageHref({
+    urlKey,
+    identifier: issue.identifier || issue.id,
+    source: issue.source
+  });
   const taskPageLinkHtml = taskHref
     ? `<a class="swipe-card-task-page task-page-link" data-testid="swipe-task-page-link" href="${_esc(taskHref)}">task page ↗</a>`
     : '';
