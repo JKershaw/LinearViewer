@@ -234,10 +234,12 @@ describe('LIN-4556 characterization: validateFeedbackBody for an un-keyed post',
     assert.deepEqual(value, { message: 'm', url: null, urlLabel: null, kind: undefined, rootItemId: undefined });
   });
 
-  test('an unknown body field (including `key`, today) is dropped silently, never refused', () => {
-    const { value, error } = validateFeedbackBody({ message: 'm', key: 'run-1:chunk-3', extra: 1 });
+  // Beat 3 (LIN-4556) made `key` a known field (validated, passed through); this pinned "a key is dropped today"
+  // until then. The un-keyed half is unchanged: an unknown field is still dropped, never refused.
+  test('an unknown body field is dropped silently, never refused', () => {
+    const { value, error } = validateFeedbackBody({ message: 'm', extra: 1 });
     assert.equal(error, undefined);
-    assert.ok(!('key' in value) && !('extra' in value));
+    assert.ok(!('extra' in value));
   });
 
   test('an unknown kind and a malformed rootItemId are dropped (LIN-1297), not refused', () => {
@@ -287,7 +289,7 @@ describe('LIN-4556 characterization: POST /api/dispatch/feedback/:itemId (dispat
     const { store, app, headers } = await setup();
     const item = await takenItem(store);
     await serve(app, async (base) => {
-      const res = await fetch(`${base}/api/dispatch/feedback/${item._id}`, { method: 'POST', headers, body: JSON.stringify({ message: 'hello', key: 'ignored-today' }) });
+      const res = await fetch(`${base}/api/dispatch/feedback/${item._id}`, { method: 'POST', headers, body: JSON.stringify({ message: 'hello' }) }); // beat 3: was `key: 'ignored-today'`; a key is now honoured
       assert.equal(res.status, 200);
       assert.deepEqual(await res.json(), { success: true, feedbackCount: 1 });
     });
@@ -331,9 +333,10 @@ describe('LIN-4556 characterization: POST /api/proxy/runner/feedback/:id (runner
     return { app, calls };
   }
 
-  test('hands addFeedback the validator payload as is (key dropped) with ownership {takenByTokenId}', async () => {
+  // Beat 3: the body carried `key: 'k1'` and pinned it dropped; a key now passes through (tests/unit/lin-4556-keyed-feedback.test.js).
+  test('hands addFeedback the validator payload as is with ownership {takenByTokenId}', async () => {
     const { app, calls } = makeApp({ success: true, feedbackCount: 3 });
-    const res = await call(app, 'POST', `/api/proxy/runner/feedback/${ID}`, { body: { message: 'm', kind: 'assistant-text', key: 'k1' } });
+    const res = await call(app, 'POST', `/api/proxy/runner/feedback/${ID}`, { body: { message: 'm', kind: 'assistant-text' } });
     assert.equal(res.status, 200);
     assert.deepEqual(res.body, { success: true, feedbackCount: 3 });
     assert.equal(calls.length, 1);
@@ -426,11 +429,13 @@ describe('LIN-4556 probe: how @jkershaw/mangodb evaluates a "no entry with this 
 // The mock collection (tests/fixtures/mock-collection.js) backs most store tests; record what it does too,
 // since a keyed-append test on the mock would otherwise be a false witness.
 describe('LIN-4556 probe: the mock collection and the same guards', () => {
-  for (const [label, guard] of [
-    ['$nor', (k) => ({ $nor: [{ 'feedback.key': k }] })],
-    ['$not/$elemMatch', (k) => ({ feedback: { $not: { $elemMatch: { key: k } } } })]
+  // Beat 3 taught the mock `$nor` (proven against MangoDB in tests/unit/lin-4556-keyed-feedback.test.js), so its row
+  // now pins the guard working; `$not/$elemMatch`, which the store does not use, stays unmodelled and never matches.
+  for (const [label, guard, expected] of [
+    ['$nor', (k) => ({ $nor: [{ 'feedback.key': k }] }), { first: true, second: false, stored: 1 }],
+    ['$not/$elemMatch', (k) => ({ feedback: { $not: { $elemMatch: { key: k } } } }), { first: false, second: false, stored: 0 }]
   ]) {
-    test(`mock: ${label} is unsupported today: no append ever matches`, async () => {
+    test(`mock: ${label} -> ${JSON.stringify(expected)}`, async () => {
       const coll = createMockCollection();
       await coll.insertOne({ _id: 'a', feedback: [] });
       let outcome;
@@ -441,10 +446,8 @@ describe('LIN-4556 probe: the mock collection and the same guards', () => {
       } catch (err) {
         outcome = { error: err.message };
       }
-      // Observed at 4368dec9d: the mock matches neither guard, so even the FIRST append is refused.
-      // A keyed-append test on the mock would fail closed (never store), so beat 3 pins it on MangoDB
-      // or teaches the mock both operators with its own fidelity tests (the LIN-1343 precedent).
-      assert.deepEqual(outcome, { first: false, second: false, stored: 0 });
+      // Observed at 4368dec9d: the mock matched neither guard, so even the FIRST append was refused.
+      assert.deepEqual(outcome, expected);
     });
   }
 });
