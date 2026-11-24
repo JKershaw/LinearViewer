@@ -101,6 +101,7 @@ export const SELECTORS = {
   },
   /** The run page's pinned question cards (LIN-4532) and Flight Companion's fold of them (LIN-3361, LIN-4553). */
   runPage: {
+    page: '[data-testid="session-page"]',
     questions: '[data-testid="session-question-records"]',
   },
   flightCompanion: {

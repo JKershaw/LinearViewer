@@ -4,7 +4,7 @@
  *
  *   - the Questions tab: no sideways scroll, and the card's lead and its first (recommended) option on the first screen;
  *   - the Runs tab: one waiting line, "3 questions waiting →";
- *   - the run page: no sideways scroll, the card names its task;
+ *   - the run page: no sideways scroll, the card names its task, and its steps' moments read in words;
  *   - Flight Companion's fold (its tool result mocked with the tool's own row shape, as tests/e2e/lin-4549-card-task-line.spec.js
  *     does; nothing calls a model): no sideways scroll, one frame (the card's), and the chosen option's highlight moves with
  *     the choice (late addition 1 of LIN-4546; tests/e2e/lin-4551-card-face.spec.js covers the other four hosts);
@@ -104,6 +104,8 @@ test('the Questions tab, the Runs line and the run page, with long questions, at
     await expect(runCard.locator(Q.taskTitle)).toHaveText(TASKS['LOCAL-32']);
     await expectNoSidewaysScroll(page, `run page at ${at}`);
     await expectNothingRaw(runCard, `run page card at ${at}`);
+    // The whole run page, not just the card: its steps print their moments in words (LIN-4553; they printed ISO times).
+    await expectNothingRaw(page.locator(SELECTORS.runPage.page), `run page at ${at}`);
   }
 });
 
