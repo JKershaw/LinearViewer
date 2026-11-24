@@ -197,6 +197,15 @@ describe('(a) an open question shows once on the task page', () => {
     assert.doesNotMatch(html, /data-testid="question-record-card"/, 'a member is drawn no question card');
     assert.ok(recordLine(recordsSection(html), q.id), 'so Records lists the question, the one place it shows');
   });
+
+  test('a page that draws no question above never points at one above (the member and the reader of a waiting task)', () => {
+    const waiting = { ...MODEL, waitingFor: 'ruling', nextStep: null };
+    const member = renderTaskPage(waiting, { viewer: 'owner', urlKey: URL_KEY, now: NOW, taskState: { state: 'needs-you' } });
+    // An owner page with no question card drawn (no open question record, no ruling card) says it plainly too.
+    assert.doesNotMatch(pageText(member), /question above/, 'no card above, so no "question above"');
+    const guest = renderTaskPage(waiting, { viewer: 'guest', urlKey: URL_KEY, now: NOW, taskState: { state: 'needs-you' } });
+    assert.match(pageText(guest), /Nothing comes next until its question is answered\./, 'the reader is told what it waits on, without an "above"');
+  });
 });
 
 describe('(b) record lines read as a person would', () => {
