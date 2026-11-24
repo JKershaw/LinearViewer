@@ -126,7 +126,7 @@ describe('Home: Waiting on you draws the open question cards and counts them (LI
     assert.match(html, /data-testid="question-record-card"[^>]*data-question-id="q-1"/);
     assert.match(html, /<a class="sess-qcard-task-id" href="[^"]*LIN-9[^"]*" data-testid="question-record-card-task-id">LIN-9<\/a>/);
     assert.match(html, /data-testid="question-record-card-task-title">Ship the thing</);
-    assert.doesNotMatch(html, / hidden"/, 'an open question is a reason to show the section');
+    assert.match(html, /class="waiting-section" /, 'an open question is a reason to show the section');
     assert.equal(renderWaitingSection({ rows: [], questions: [ROW()] }, { urlKey: URL_KEY, owner: false }), '', 'a non-owner gets no section');
     // LIN-4549: Home's own task line is gone: the identifier shows once per card, on the card's task line.
     assert.equal((html.match(/>LIN-9</g) || []).length, 1, 'the identifier shows once');

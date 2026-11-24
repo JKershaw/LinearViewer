@@ -151,7 +151,7 @@ describe('LIN-4010 — a waiting task is a ruling or a park', () => {
       s,
       { rulingCount: 1 },
     ).map((p) => p.text);
-    assert.deepEqual(parts, ['1 waiting on you']);
+    assert.deepEqual(parts, ['1 question']);
   });
 
   test('a failed stage still needs a person, whatever the waiting word', () => {

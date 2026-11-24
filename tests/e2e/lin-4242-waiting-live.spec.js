@@ -108,24 +108,24 @@ test('a question asked after load gets its card on refresh; the count line and b
   await expect(waitingCard(page, 'LOCAL-S').locator('[data-testid="question-record-card-task-title"]')).toHaveText('Solo task, Todo');
   await expect(waitingCard(page, 'LOCAL-S')).toHaveCount(1);
   await expect(page.locator(SECTION)).toBeVisible();
-  await expect(page.locator(COUNT)).toContainText('1 waiting on you');
+  await expect(page.locator(COUNT)).toContainText('1 question');
   await syncBadge(page);
-  await expect(page.locator(BADGE)).toHaveText('1');
+  await expect(page.locator(BADGE)).toHaveText('1 question');
 
   // Answered here: the card stays, settled with its outcome, and leaves the count line and the badge.
   await answerWith(cardOf(page, 'LOCAL-S'), 'Wait for review');
   await expect(cardOf(page, 'LOCAL-S')).toHaveAttribute('data-settled', 'true');
   await expect(page.locator(OPEN_CARD)).toHaveCount(0);
-  await expect(page.locator(COUNT).filter({ hasText: 'waiting on you' })).toHaveCount(0);
+  await expect(page.locator(`${COUNT} [data-tone="needs-you"]`)).toHaveCount(0);
   await syncBadge(page);
-  await expect(page.locator(BADGE)).toHaveText('0');
+  await expect(page.locator(BADGE)).toHaveText('0 questions');
 
   // One to zero to one: a new question lands in the section and the count line.
   await seedWaiting(page, 'LOCAL-D', THREE_OPTIONS);
   await refresh(page);
   await expect(waitingCard(page, 'LOCAL-D')).toHaveCount(1);
   await expect(page.locator(SECTION)).toBeVisible();
-  await expect(page.locator(COUNT)).toContainText('1 waiting on you');
+  await expect(page.locator(COUNT)).toContainText('1 question');
 });
 
 test('a card answered elsewhere leaves on refresh and says so; a half-typed answer on a card still open survives as the same node', async ({ page, context }) => {
@@ -133,7 +133,7 @@ test('a card answered elsewhere leaves on refresh and says so; a half-typed answ
   await seedWaiting(page, 'LOCAL-S', THREE_OPTIONS);
   await seedWaiting(page, 'LOCAL-D', THREE_OPTIONS);
   await page.goto(`/workspace/${URL_KEY}/`);
-  await expect(page.locator(COUNT)).toContainText('2 waiting on you');
+  await expect(page.locator(COUNT)).toContainText('2 questions');
 
   const typed = cardOf(page, 'LOCAL-S').locator('[data-testid="question-record-card-input"]');
   await typed.fill('half a sentence about the solo task');
@@ -147,7 +147,7 @@ test('a card answered elsewhere leaves on refresh and says so; a half-typed answ
   await refresh(page);
   await expect(waitingCard(page, 'LOCAL-D')).toHaveCount(0);
   await expect(page.locator(LIVE)).toHaveText('Answered elsewhere');
-  await expect(page.locator(COUNT)).toContainText('1 waiting on you');
+  await expect(page.locator(COUNT)).toContainText('1 question');
   await expect(typed).toHaveValue('half a sentence about the solo task');
   await expect(typed).toBeFocused();
   await expect(page.locator(`${SECTION} [data-keep-mark="yes"]`)).toHaveCount(1);
@@ -201,7 +201,7 @@ test('a refresh requested before a question was answered here does not replace i
   const after = await page.evaluate(() => ({
     cards: document.querySelectorAll('[data-testid="waiting-on-you"] .waiting-question').length,
     open: document.querySelectorAll('[data-testid="waiting-on-you"] .waiting-question [data-testid="question-record-card"]:not([data-settled="true"])').length,
-    waitingPart: /waiting on you/.test(document.querySelector('[data-testid="in-progress-count"]')?.textContent || ''),
+    waitingPart: !!document.querySelector('[data-testid="in-progress-count"] [data-tone="needs-you"]'),
   }));
   expect(after).toEqual({ cards: 1, open: 0, waitingPart: false });
   await page.unroute('**/api/home-waiting');

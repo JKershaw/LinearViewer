@@ -883,11 +883,14 @@ describe('capability-aware rendering (LIN-177 S3)', () => {
     const degraded = renderBacklogPage([], [], [], 'Test', { ...opts, degradedSources: [{ provider: 'github', scope: 'JKershaw/LinearViewer' }] });
     assert.ok(degraded.includes('data-testid="dashboard-source-notice"'), 'notice present');
     assert.ok(degraded.includes('data-source="github"'));
-    assert.ok(degraded.includes('reconnect GitHub Issues in Settings'), 'display name in both places');
-    assert.ok(!degraded.includes('reconnect github in Settings'), 'raw key not used as the label');
-    assert.ok(degraded.includes('GitHub Issues (JKershaw/LinearViewer) did not load, so its tasks are missing.'), 'says what failed');
-    assert.ok(degraded.includes('The rest of this board is up to date.'), 'says what still works');
-    assert.ok(degraded.includes('Reload to try again'), 'says what the reader can do');
+    assert.match(degraded, />reconnect GitHub Issues<\/a> in Settings/, 'display name in both places');
+    assert.ok(!degraded.includes('reconnect github'), 'raw key not used as the label');
+    assert.ok(degraded.includes("GitHub Issues (JKershaw/LinearViewer) didn't load, so its tasks are missing"), 'says what failed');
+    assert.ok(degraded.includes('the rest is up to date'), 'says what still works');
+    assert.ok(degraded.includes('Reload, or'), 'says what the reader can do');
+    // LIN-4552: one small line, not the truncation box.
+    assert.match(degraded, /<p class="source-notice" data-testid="dashboard-source-notice"/, 'one line');
+    assert.ok(!degraded.includes('truncation-notice'), 'not the truncation box');
     assert.ok(!degraded.includes('issues could not be loaded'), 'the truncation copy is not reused');
 
     const escaped = renderBacklogPage([], [], [], 'Test', { ...opts, degradedSources: [{ provider: 'github', scope: '<img src=x onerror=alert(1)>' }] });

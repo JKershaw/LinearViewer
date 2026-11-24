@@ -108,7 +108,7 @@ test('a question on a Running task moves it to Waiting only, with one Home read;
   await expect(waitingCard(page, 'LOCAL-A')).toHaveCount(1);
   await expect(row(page, RUNNING, 'LOCAL-A')).toHaveCount(0);
   await expect(row(page, RUNNING, 'LOCAL-B')).toHaveCount(1);
-  await expect(page.locator(COUNT)).toContainText('1 waiting on you');
+  await expect(page.locator(COUNT)).toContainText('1 question');
   expect(await page.locator(COUNT).textContent()).not.toBe(countBefore);
   expect(docReads.length).toBe(1);
 
@@ -121,7 +121,7 @@ test('a question on a Running task moves it to Waiting only, with one Home read;
   await refresh(page);
   await expect(waitingCard(page, 'LOCAL-A')).toHaveCount(0);
   await expect(page.locator(`${RUNNING} .line[data-identifier="LOCAL-A"], ${UP_NEXT} .line[data-identifier="LOCAL-A"]`)).toHaveCount(1);
-  await expect(page.locator(COUNT).filter({ hasText: 'waiting on you' })).toHaveCount(0);
+  await expect(page.locator(`${COUNT} [data-tone="needs-you"]`)).toHaveCount(0);
   expect(docReads.length).toBe(2);
 });
 

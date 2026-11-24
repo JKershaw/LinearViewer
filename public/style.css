@@ -2910,6 +2910,15 @@ a.wordmark:hover {
   color: var(--amber-dim);
 }
 
+/* LIN-4552: a source that did not load (lib/render.js degradedHtml) is one small line, not a box. */
+.source-notice {
+  margin: var(--space-2) auto;
+  max-width: 60ch;
+  font-size: var(--font-size-sm);
+  color: var(--amber-dim);
+}
+.source-notice a { color: inherit; }
+
 /* =============================================================================
    Login Page (Landing Page CTA)
    =============================================================================
@@ -4915,6 +4924,26 @@ a.context-node:hover { border-color: var(--text); background: var(--bg); }
 .waiting-section { margin: 0 0 1rem; }
 .waiting-header:focus { outline: 2px solid var(--brand); outline-offset: 2px; }
 .waiting-question { margin: 0.5rem 0; }
+/* LIN-4552: "Notes for you", the quieter group under the questions (lib/waiting-section.js renderNotesGroup): a small muted title, one
+   short line per note (the task's identifier in mono and its title, linking to the task; what the note says, in muted text; a quiet
+   clear), and a fold. Lines past the first few carry data-folded and show only when the list is expanded (public/waiting-notes.js). */
+.waiting-notes { margin: var(--space-3) 0 0; }
+.waiting-notes-title { margin: 0 0 var(--space-1); font-size: var(--font-size-sm); font-weight: 600; color: var(--muted); }
+.waiting-notes-list { list-style: none; margin: 0; padding: 0; }
+.waiting-notes-list[data-expanded="false"] > .waiting-note[data-folded="true"] { display: none; }
+.waiting-note { padding: var(--space-1) 0; border-top: 1px solid var(--line); font-size: var(--font-size-sm); }
+.waiting-note-line { display: flex; flex-wrap: wrap; align-items: baseline; gap: 0 var(--space-2); }
+.waiting-note-task { color: var(--text); text-decoration: none; overflow-wrap: anywhere; }
+.waiting-note-task:hover .waiting-note-title { text-decoration: underline; }
+.waiting-note-id { font-family: var(--font-structural); }
+.waiting-note-says { flex: 1 1 16rem; min-width: 0; color: var(--muted); overflow-wrap: anywhere; }
+.waiting-note-clear { margin-left: auto; }
+.waiting-note-fold-summary { cursor: pointer; color: var(--muted); }
+.waiting-note-full { color: var(--muted); overflow-wrap: anywhere; }
+.waiting-note-full p, .waiting-note-full ul, .waiting-note-full ol { margin: var(--space-1) 0; }
+.waiting-note-feedback:empty { display: none; }
+.waiting-note-feedback { display: block; color: var(--amber-dim); }
+.waiting-notes-more { margin-top: var(--space-1); }
 /* A screen-reader-only live region (LIN-4114): the desk says the outcome of an answer without a visible line. */
 .sr-only {
   position: absolute;

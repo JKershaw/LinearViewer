@@ -164,11 +164,11 @@ describe('LIN-4016 W1 — the states the tracker does not decide read the same o
         assert.deepEqual(pill, { word: 'failed', tone: 'error' });
       }
 
-      // The count line counts a failed task as failed and never as waiting on you, and a running one as running.
+      // The count line counts a failed task as failed and never as a question, and a running one as running.
       const texts = s.count.map((p) => p.text);
       assert.equal(texts.includes('1 failed'), s.row.state === 'failed');
       assert.equal(texts.includes('1 running'), running);
-      assert.equal(texts.some((t) => t.includes('waiting on you')), s.row.state === 'needs-you' && s.model.waitingFor === 'ruling');
+      assert.equal(texts.some((t) => t.endsWith(' question') || t.endsWith(' questions')), s.row.state === 'needs-you' && s.model.waitingFor === 'ruling');
     });
   }
 
@@ -330,7 +330,7 @@ const TREE_SCENARIOS = [
       treeNode('LIN-92', 'started', [ownRuling('LIN-92')]),
       treeNode('LIN-93'),
     ]),
-    expect: { state: 'needs-you', count: ['2 waiting on you'], attention: ['LIN-91', 'LIN-92'] },
+    expect: { state: 'needs-you', count: ['2 questions'], attention: ['LIN-91', 'LIN-92'] },
   },
   {
     name: 'a parent with one failed open subtask',
@@ -388,7 +388,7 @@ describe('LIN-4103 — a parent\'s row, /state, the opened box and the count lin
       // The count line counts the root's own decided state, and the waiting number is the rulings the surfaces share.
       assert.equal(s.count.includes('1 running'), s.row.state === 'running');
       assert.equal(s.count.includes('1 failed'), s.row.state === 'failed');
-      const waiting = s.count.find((t) => t.includes('waiting on you'));
+      const waiting = s.count.find((t) => t.endsWith(' question') || t.endsWith(' questions'));
       assert.equal(waiting ? Number.parseInt(waiting, 10) : 0, s.rulingCount, 'the count line is the ruling count');
     });
   }
