@@ -10,6 +10,7 @@ import { BLIND_READ_KIND } from '../lib/prompts/blind-read-words.js';
 import { REVIEW_JUDGEMENT, CLOSE_OUT_STAGE } from '../lib/records/words.js';
 import { createRecordWrites } from '../lib/records/writes.js';
 import { isTerminalState } from '../lib/providers/state-map.js';
+import { longQuestion, findingNotes } from '../lib/sample-data/question-workload.js';
 import { pinVerdictToHeads } from '../lib/change-records.js';
 import crypto from 'crypto';
 import { getWorkspaceByUrlKey } from '../lib/workspace.js';
@@ -649,17 +650,26 @@ export function createTestRoutes({ dispatchQueueStore, dispatchTokenStore, freeT
 
   // LIN-4532 (P2b, finding-89c7a7a5): one open question record, asked by the dispatch run `runId` (a run parked on `[blocked]`) to the
   // signed-in person, filed under `ticket`. Written by the checked pipeline, as a stage writes it (lib/records/writes.js).
+  // LIN-4549: `long: true` fills what the body leaves out with a question shaped like a real one (several hundred words with
+  // lists, three or four long options, the recommended one not first; `variant` picks which, lib/sample-data/question-workload.js),
+  // and `title` names the task as the tracker does (else the ticket).
   router.post('/test/seed-question-record', express.json(), async (req, res) => {
     if (!recordsStore) return res.status(503).send('no records store wired into test routes');
-    const { urlKey, ticket, runId = null, asks, options = [], recommended = null, ifUnanswered = null, to = null } = req.body || {};
+    const body = req.body || {};
+    const sample = body.long ? longQuestion(body.variant) : null;
+    const { urlKey, ticket, runId = null, to = null, title = null } = body;
+    const asks = body.asks ?? sample?.asks;
+    const options = body.options ?? sample?.options ?? [];
+    const recommended = body.recommended ?? sample?.recommended ?? null;
+    const ifUnanswered = body.ifUnanswered ?? sample?.ifUnanswered ?? null;
     const accountId = req.session?.accountId;
     if (typeof urlKey !== 'string' || typeof ticket !== 'string' || typeof asks !== 'string') {
-      return res.status(400).send('urlKey, ticket and asks are required');
+      return res.status(400).send('urlKey, ticket and asks are required (or long: true)');
     }
     if (!to && !accountId) return res.status(400).send('no signed-in account to ask');
     const at = new Date().toISOString();
     // `in` names the task RECORD (the id ensureTask returns): this seam has no tracker to resolve a ticket through.
-    const { id: taskId } = await recordsStore.ensureTask(urlKey, { identifier: ticket, title: ticket, closed: false }, { by: 'Harbour', at });
+    const { id: taskId } = await recordsStore.ensureTask(urlKey, { identifier: ticket, title: typeof title === 'string' && title ? title : ticket, closed: false }, { by: 'Harbour', at });
     // The addressee is the signed-in account, the only person this local workspace has in the seed.
     const listPeople = async () => (accountId ? [{ accountId, name: 'Owner' }] : []);
     const writes = createRecordWrites({ recordsStore, isTerminalState, listPeople });
@@ -669,6 +679,40 @@ export function createTestRoutes({ dispatchQueueStore, dispatchTokenStore, freeT
     });
     if (out.problems) return res.status(422).json(out.problems);
     res.json({ id: out.record.id });
+  });
+
+  // LIN-4549: the notes a real owner has, for walking the question and notes surfaces: `findings` open findings (default 36)
+  // addressed to the signed-in person, spread round-robin over `tasks` ([{ticket, title}]), with notes of real length (some a
+  // line, some a paragraph, many naming internal ids: lib/sample-data/question-workload.js). Written through the checked records
+  // pipeline, as a stage writes them. Running tasks are made through the dispatch API as a runner makes them
+  // (tests/fixtures/question-records.js runningRun), not here: the queue's writers are a closed, censused set. Answers the ids.
+  router.post('/test/seed-owner-findings', express.json(), async (req, res) => {
+    if (!recordsStore) return res.status(503).send('no records store wired into test routes');
+    const { urlKey, tasks = [], findings = 36 } = req.body || {};
+    const accountId = req.session?.accountId;
+    if (typeof urlKey !== 'string' || !Array.isArray(tasks) || tasks.length === 0) {
+      return res.status(400).send('urlKey and tasks ([{ticket, title}]) are required');
+    }
+    if (!accountId) return res.status(400).send('no signed-in account to address');
+    const count = Math.max(0, Math.min(200, Number(findings) || 0));
+    const listPeople = async () => [{ accountId, name: 'Owner' }];
+    const writes = createRecordWrites({ recordsStore, isTerminalState, listPeople });
+    const taskIds = [];
+    for (const t of tasks) {
+      if (typeof t?.ticket !== 'string') return res.status(400).send('each task needs a ticket');
+      const made = await recordsStore.ensureTask(urlKey, { identifier: t.ticket, title: typeof t.title === 'string' && t.title ? t.title : t.ticket, closed: false }, { by: 'Harbour', at: new Date().toISOString() });
+      taskIds.push(made.id);
+    }
+    const ids = [];
+    for (const [n, says] of findingNotes(count).entries()) {
+      const out = await writes.add({
+        urlKey, kind: 'finding', by: n % 3 === 0 ? 'review' : 'implementation', run: null,
+        input: { says, to: `person:${accountId}`, in: taskIds[n % taskIds.length] },
+      });
+      if (out.problems) return res.status(422).json(out.problems);
+      ids.push(out.record.id);
+    }
+    res.json({ findings: ids });
   });
 
   // LIN-4541: append feedback rows to a taken item's history document exactly as they were stored, for a spec that renders an
