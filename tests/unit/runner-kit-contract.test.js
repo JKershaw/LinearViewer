@@ -52,7 +52,7 @@ const TABLE = JSON.parse(fs.readFileSync(CONTRACT_PATH, 'utf8'));
 // LIN-4384: the sha256 of contract.json's own bytes. simple-dispatcher pins the same value
 // (FIXTURE_SHA256 beside LV_COMMIT in test/runner-contract.test.js), so an edit here that is not
 // re-copied there would go unnoticed on this side without this tripwire.
-const CONTRACT_SHA256 = 'bee92a1e8e1dbe6d95a52853fc0dfb54b9b8c1d90ace2b1eb4af16f304108444';
+const CONTRACT_SHA256 = '8e60d7f472a29d54ef6a15bed95667b039cdcb9f803abd864fee366abf532d68';
 
 const OWNER = 'acct-owner-1111';
 const NOW = Date.parse('2026-10-18T12:00:00.000Z');
@@ -292,6 +292,9 @@ function kitFor(row) {
       return kitStoreOutcome(row);
     case 'heartbeat':
       return 'not sent (the runner-kit producer, POST /api/proxy/runner/heartbeat, is a follow-up)';
+    // LIN-4557: SD's keyed retry of a run's words. The kit posts assistant-text without a key until LIN-4561.
+    case 'keyed-feedback':
+      return 'not sent (the kit posts assistant-text without a key; its keyed, in-order sending is LIN-4561)';
     case 'sentinel':
       return kitSentinelOutcome(row);
     case 'exchange':
@@ -341,6 +344,8 @@ const AREA_SHAPES = {
   auth: RUNNER_AREA,
   store: RUNNER_AREA,
   heartbeat: RUNNER_AREA,
+  // LIN-4557: the keyed retry of a run's words (SD's assistant-text-outbox.js against Harbour's keyed append).
+  'keyed-feedback': RUNNER_AREA,
   report: { inputs: [], columns: ['harbour'] },
   sentinel: { inputs: [], columns: ['kit'] },
   // LIN-4378: the brokers' 429 policy. The rows are its one owner: the kit's broker.mjs and
