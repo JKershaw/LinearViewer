@@ -24,8 +24,9 @@ import { importWorld } from './helpers/import-world.js';
 import { promptSectionWorld } from './helpers/prompt-section-world.js';
 import { serverSessions, serverRow } from '../fixtures/task-decision.js';
 
+// LIN-4551: each ask carries a second paragraph, so the card has its full-ask fold (a one-sentence ask has none).
 const row = (asks = 'Which way?') => ({
-  questionId: 'q-1', asks, options: ['left', 'right'], recommended: 'left', ifUnanswered: 'pick left',
+  questionId: 'q-1', asks: `${asks}\n\nLeft is shorter; right touches less.`, options: ['left', 'right'], recommended: 'left', ifUnanswered: 'pick left',
   taskId: 'task-1', ticket: 'LIN-1', runId: 'run-1', askedAt: '2026-11-24T09:00:00.000Z', state: 'resumable', reason: null, interactive: true,
 });
 
@@ -44,6 +45,8 @@ const STATES = {
   'focus inside': { kept: true, apply(card, document) { document.activeElement = card.querySelector('[data-testid="question-record-card-input"]'); } },
   'a disabled control': { kept: true, apply(card) { card.querySelectorAll('button, textarea').forEach((el) => { el.disabled = true; }); } },
   'an answer in flight': { kept: true, apply(card) { card.dataset.answerInFlight = 'true'; } },
+  // LIN-4551: the reader opened the full ask; a rebuilt card's fold would start closed under them.
+  'an open fold': { kept: true, apply(card) { card.querySelector('[data-testid="question-record-card-ask"]').setAttribute('open', ''); } },
   // The route refused this card's answer as settled elsewhere (`ruling-settled`): nothing is left for the reader to give, so even
   // its chosen option and focus on its Answer button do not hold it (tests/e2e/lin-4242-waiting-live.spec.js "a stale card").
   'refused as settled elsewhere (with a chosen option and focus)': {

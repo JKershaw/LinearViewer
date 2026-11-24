@@ -2,7 +2,8 @@
  * LIN-4532 (LIN-4529 P2b): the question record card (lib/question-record-card.js), the markup both pages and the browser handler read.
  *
  * What is pinned, and what it fails without the change:
- *   - the card carries the question id and workspace, and offers an option button per option, the recommended one first and primary;
+ *   - the card carries the question id and workspace, and offers an option button per option, the recommended one first and marked
+ *     (LIN-4551: marked by its "recommended" label, not the main button style, which no option keeps);
  *   - a run still working is read-only: no option, no words box, no Answer or dismiss control (the route would refuse them);
  *   - the question's own words are escaped, never written as markup;
  *   - "if you don't answer" is the question's words, else worded by whether the run is still waiting;
@@ -18,14 +19,17 @@ const row = (over = {}) => ({
 });
 
 describe('renderQuestionRecordCard', () => {
-  test('carries the question id and workspace, and offers each option, the recommended one first and primary', () => {
+  test('carries the question id and workspace, and offers each option, the recommended one first and marked', () => {
     const html = renderQuestionRecordCard(row(), { urlKey: 'ws-1' });
     assert.match(html, /data-question-id="q-1"/);
     assert.match(html, /data-url-key="ws-1"/);
     const optionTags = html.match(/<button[^>]*question-record-card-option[^>]*>[^<]*</g) || [];
     assert.equal(optionTags.length, 2);
     assert.match(optionTags[0], />right</, 'the recommended option comes first');
-    assert.match(optionTags[0], /btn--primary/);
+    // LIN-4551: the recommended option is marked by its label; it no longer keeps the main button style (the highlight then never
+    // moved to another choice), so neither option carries btn--primary.
+    assert.match(html, /data-option-id="right"[^>]*>right<span[^>]*data-testid="question-record-card-recommended"[^>]*>recommended</);
+    assert.doesNotMatch(optionTags[0], /btn--primary/);
     assert.match(optionTags[0], /data-recommended="true"/);
     assert.match(optionTags[1], />left</);
     assert.doesNotMatch(optionTags[1], /btn--primary/);
@@ -36,8 +40,12 @@ describe('renderQuestionRecordCard', () => {
 
   test('a recommendation that names no offered option is no recommendation', () => {
     const html = renderQuestionRecordCard(row({ recommended: 'nope' }), { urlKey: 'ws-1' });
-    assert.doesNotMatch(html, /btn--primary/);
+    // LIN-4551: Answer is now the card's primary button, so "no option is primary" is read on the options, not the whole card.
+    const optionTags = html.match(/<button[^>]*question-record-card-option[^>]*>/g) || [];
+    assert.equal(optionTags.length, 2);
+    for (const tag of optionTags) assert.doesNotMatch(tag, /btn--primary/);
     assert.doesNotMatch(html, /data-recommended/);
+    assert.doesNotMatch(html, /question-record-card-recommended/);
   });
 
   test('a run still working is read-only: no option, words box, Answer or dismiss', () => {

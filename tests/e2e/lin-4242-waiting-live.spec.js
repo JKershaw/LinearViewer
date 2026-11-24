@@ -164,7 +164,9 @@ test('a stale card that answers a settled question is refused, says so, and leav
   // This page still shows the card (no refresh yet). Its answer is refused as settled (the route's 409): the card says so and
   // is not settled by this page, so it claims no answer of its own.
   await answerWith(cardOf(page, 'LOCAL-S'), 'Wait for review');
-  await expect(cardOf(page, 'LOCAL-S').locator('[data-testid="question-record-card-feedback"]')).toHaveText('This ruling was already answered or dismissed.');
+  // LIN-4551: the refusal names how the question ended (`ended: answered`), so the card says it was answered elsewhere rather than
+  // the old "answered or dismissed".
+  await expect(cardOf(page, 'LOCAL-S').locator('[data-testid="question-record-card-feedback"]')).toHaveText('Answered elsewhere; there is nothing left to send.');
   await expect(cardOf(page, 'LOCAL-S')).not.toHaveAttribute('data-settled', 'true');
   await refresh(page);
   await expect(waitingCard(page, 'LOCAL-S')).toHaveCount(0);

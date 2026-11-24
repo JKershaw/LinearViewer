@@ -4969,10 +4969,36 @@ a.context-node:hover { border-color: var(--text); background: var(--bg); }
   font-weight: 600;
   font-size: var(--font-size-base);
   color: var(--text);
-  /* LIN-4538: a question record carries its whole ask here (no case prose below it), so an unbroken token (a URL) must
-     wrap inside the card, as the case chunks do (LIN-2184). */
+  /* LIN-4551: the one-line question (`short`) leads; the whole ask sits in the fold below. An unbroken token (a URL) still
+     wraps inside the card, as the case chunks do (LIN-2184). */
   overflow-wrap: anywhere;
 }
+/* LIN-4551: the full ask behind a closed fold, kept as the agent wrote it (paragraphs, breaks, lists: lib/question-record-card.js
+   formatQuestionAsk). Quiet until opened; opened, it reads as prose and wraps inside the card at 390px. */
+.sess-qcard-ask { min-width: 0; }
+.sess-qcard-ask-summary {
+  cursor: pointer;
+  width: fit-content;
+  font-family: var(--font-content);
+  font-size: var(--font-size-sm);
+  color: var(--muted);
+}
+.sess-qcard-ask-summary:hover { color: var(--text); }
+.sess-qcard-ask-body {
+  margin-top: var(--space-2);
+  font-family: var(--font-content);
+  font-size: var(--font-size-base);
+  line-height: 1.5;
+  color: var(--text);
+  overflow-wrap: anywhere;
+}
+.sess-qcard-ask-body p,
+.sess-qcard-ask-body ul,
+.sess-qcard-ask-body ol { margin: 0 0 0.6em; }
+.sess-qcard-ask-body > :last-child { margin-bottom: 0; }
+.sess-qcard-ask-body ul,
+.sess-qcard-ask-body ol { padding-left: 1.25rem; }
+.sess-qcard-ask-body li + li { margin-top: 0.25em; }
 .sess-qcard-why-summary {
   cursor: pointer;
   font-family: var(--font-content);
@@ -5003,6 +5029,40 @@ a.context-node:hover { border-color: var(--text); background: var(--bg); }
 }
 /* LIN-4114: the options are the shared .btn buttons (lib/question-card.js); the radio rules are gone. */
 .sess-qcard-option { min-height: 32px; }
+/* LIN-4551: a question record's options are readable rows: one per line, full width, left-aligned, all one style. The
+   recommended one comes first with its label above its words; the chosen one carries the pressed look, which moves with the
+   choice (aria-pressed, public/question-records.js pickOption). The reply card (lib/question-card.js) keeps its chip row. */
+.sess-qrecord .sess-qcard-options {
+  flex-direction: column;
+  flex-wrap: nowrap;
+  gap: var(--space-2);
+}
+.sess-qrecord .sess-qcard-option {
+  flex-direction: column;
+  align-items: flex-start;
+  justify-content: flex-start;
+  gap: var(--space-1);
+  width: 100%;
+  min-height: 40px;
+  padding: var(--space-2) var(--space-3);
+  font-size: var(--font-size-base);
+  line-height: 1.4;
+  text-align: left;
+  white-space: normal;
+  overflow-wrap: anywhere;
+}
+.sess-qrecord .sess-qcard-option[aria-pressed="true"],
+.sess-qrecord .sess-qcard-option[aria-pressed="true"]:hover {
+  border-color: var(--brand);
+  background: color-mix(in srgb, var(--brand) 14%, var(--card));
+  box-shadow: inset 4px 0 0 var(--brand);
+}
+.sess-qcard-option-tag {
+  order: -1;
+  font-size: var(--font-size-sm);
+  font-weight: 600;
+  color: var(--brand);
+}
 .sess-qcard-input {
   width: 100%;
   box-sizing: border-box;
@@ -5046,8 +5106,9 @@ a.context-node:hover { border-color: var(--text); background: var(--bg); }
   font-size: var(--font-size-sm);
   color: var(--muted);
 }
-/* LIN-2948 R1: the card verb's dark-theme legibility (its proposal twin stays in session.css). */
-.sess-qcard-answer {
+/* LIN-2948 R1: the reply card verb's dark-theme legibility (its proposal twin stays in session.css). A question record's Answer
+   is the primary .btn (LIN-4551), so this reads only the reply card's .action-btn. */
+.action-btn.sess-qcard-answer {
   color: var(--green-dim);
   background: var(--card);
 }

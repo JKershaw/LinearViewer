@@ -2169,7 +2169,7 @@ describe('flight-companion.js — LIN-4538: the open questions the companion sho
     const parsed = m.parsePendingResult(questionsResult([question()]));
     assert.strictEqual(parsed.ok, true);
     assert.deepStrictEqual(parsed.questions, [{
-      questionId: 'q-1', issueIdentifier: 'LIN-100', ticket: 'LIN-100', title: null, asks: 'Should we ship it?', options: ['Ship it', 'Hold'], recommended: 'Ship it',
+      questionId: 'q-1', issueIdentifier: 'LIN-100', ticket: 'LIN-100', title: null, asks: 'Should we ship it?', short: null, options: ['Ship it', 'Hold'], recommended: 'Ship it',
       ifUnanswered: null, state: 'resumable', interactive: true,
     }]);
     // LIN-4549: the chat row's issueTitle becomes the card's title (its task line).
@@ -2198,6 +2198,20 @@ describe('flight-companion.js — LIN-4538: the open questions the companion sho
     assert.match(qli.innerHTML, /data-testid="question-record-card" data-question-id="q-1"/);
     assert.match(qli.innerHTML, /data-testid="question-record-card-question"[^>]*>Should we ship it\?</, 'the card shows the question text');
     assert.strictEqual((qli.innerHTML.match(/data-testid="question-record-card-option"/g) || []).length, 2, 'one button per option');
+  });
+
+  // LIN-4551: the tool row's `short` (lib/chat-tools.js, LIN-4550) reaches the card, so Flight Companion leads with the one-line
+  // question like every other host, and the whole ask sits behind the card's fold.
+  test('a question row\'s `short` is the card\'s lead, and the whole ask is behind its fold', async () => {
+    const asks = 'Should we ship it today? The tests pass.\n\n- the docs are done\n- the review approved';
+    const { exports: m, thread } = await loadClient({ fetchImpl: () => sseResponse([questionToolFrame([{ ...question(), question: asks, short: 'Should we ship it today?' }]), sseFrame('done', { surface: true })]) });
+    assert.strictEqual(m.parsePendingResult(questionsResult([{ ...question(), short: 'One line?' }])).questions[0].short, 'One line?');
+    m.autoWakeTick();
+    await flush();
+    const qli = findAllByClass(findByClass(thread, 'fc-decisions-fold'), 'fc-question')[0];
+    assert.match(qli.innerHTML, /data-testid="question-record-card-question"[^>]*>Should we ship it today\?</);
+    assert.match(qli.innerHTML, /data-testid="question-record-card-ask"/);
+    assert.match(qli.innerHTML, /<ul><li>the docs are done<\/li><li>the review approved<\/li><\/ul>/);
   });
 
   test('no decision rows are rendered from the tool: the fold holds only questions', async () => {

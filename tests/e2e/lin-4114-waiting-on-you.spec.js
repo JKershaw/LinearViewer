@@ -120,7 +120,7 @@ test('W7: a question three levels down and a solo question each get one card, an
 
 // ---- witness 1 (press semantics), 3 (double press, in-flight lock): browser behaviour -----------------------------
 
-test('W1: the recommended answer is the main button; a press chooses an option, and Answer sends it with the typed words in one request', async ({ page }) => {
+test('W1: the recommended answer comes first and is labelled; a press chooses an option, and Answer sends it with the typed words in one request', async ({ page }) => {
   await seedTree(page, { runnerKey: true });
   await seedWaiting(page, 'LOCAL-S', THREE_OPTIONS);
   await page.goto(`/workspace/${URL_KEY}/`);
@@ -128,10 +128,15 @@ test('W1: the recommended answer is the main button; a press chooses an option, 
   const card = page.locator(CARD).first();
   await expect(card).toBeVisible();
   await expect(card.locator('input[type="radio"]')).toHaveCount(0);
-  const primary = card.locator('.btn--primary');
-  await expect(primary, 'the recommended option is the main button').toHaveCount(1, { timeout: 5000 });
+  // LIN-4551: the recommended option is marked by its "recommended" label and its place first, not the main button style (which
+  // Answer now carries, and no option keeps).
+  const primary = card.locator('[data-testid="question-record-card-option"][data-recommended="true"]');
+  await expect(primary, 'one option is the recommended one').toHaveCount(1, { timeout: 5000 });
   await expect(primary).toHaveAttribute('data-option-id', 'Wait for review');
   await expect(primary).toHaveAttribute('data-recommended', 'true');
+  await expect(card.locator('[data-testid="question-record-card-option"]').first()).toHaveAttribute('data-option-id', 'Wait for review');
+  await expect(primary.locator('[data-testid="question-record-card-recommended"]')).toHaveText('recommended');
+  await expect(card.locator('[data-testid="question-record-card-option"].btn--primary'), 'no option keeps the main button style').toHaveCount(0);
 
   // A press on an option only chooses it: nothing is sent until Answer.
   let answers = 0;
@@ -190,8 +195,10 @@ test('W12: answering with the recommended button settles the card in place; the 
   await expect(page.locator(BADGE)).toHaveText('2', { timeout: 15000 });
 
   const deep = page.locator(WAIT_CARD, { has: page.locator('[data-testid="question-record-card-task"]', { hasText: 'LOCAL-D' }) }).locator('[data-testid="question-record-card"]');
-  await expect(deep.locator('.btn--primary'), 'the recommended option is the main button').toHaveCount(1, { timeout: 5000 });
-  await deep.locator('.btn--primary').click();
+  // LIN-4551: the recommended option is the labelled one (Answer is the card's .btn--primary now).
+  const recommended = deep.locator('[data-testid="question-record-card-option"][data-recommended="true"]');
+  await expect(recommended, 'the recommended option is marked').toHaveCount(1, { timeout: 5000 });
+  await recommended.click();
   await deep.locator(ANSWER).click();
   await expect(deep).toHaveAttribute('data-settled', 'true');
   await expect(deep.locator(FEEDBACK)).toHaveText('Answered. The run resumes with your answer.');

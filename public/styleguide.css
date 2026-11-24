@@ -321,3 +321,17 @@
 .sg-pending-sample .models-save {
   position: static;
 }
+
+/* LIN-4551: the question card's samples, drawn by its own renderer (lib/question-record-card.js); the card's look is style.css's. */
+.sg-qcard-samples {
+  display: grid;
+  gap: var(--space-2);
+  margin-top: var(--space-3);
+  max-width: 48rem;
+}
+.sg-qcard-sample-tag {
+  margin: var(--space-2) 0 0;
+  font-family: var(--font-content);
+  font-size: var(--font-size-sm);
+  color: var(--muted);
+}

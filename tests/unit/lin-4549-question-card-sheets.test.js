@@ -41,6 +41,8 @@ const DRAWERS = {
   'lib/render-task-page.js': { pages: ['lib/render-task-page.js'] },
   'public/observation.js': { pages: ['lib/render-observation.js'] },
   'public/flight-companion.js': { pages: ['lib/render-flight-companion.js'] },
+  // LIN-4551: the styleguide draws the card's states with its own renderer (inert samples).
+  'lib/render-styleguide.js': { pages: ['lib/render-styleguide.js'] },
 };
 
 /** The source files a drawer can live in: lib/ (recursive), routes/, public/*.js and server.js, repo-relative. */
