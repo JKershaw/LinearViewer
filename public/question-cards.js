@@ -173,7 +173,7 @@
 
   // ── Answered, dismissed: one bubbling event (LIN-4114) ───────────────────────
   // Fired from inside the card when its answer is delivered (an option press, Answer, a successful Retry delivery) or its
-  // dismiss succeeds. It bubbles to Home's <main>, where one listener clears every copy of the ruling's card (public/app.js).
+  // dismiss succeeds. It bubbles to Home's <main>, where one listener clears every copy of that card (public/app.js).
   // A dismiss fires BEFORE the card leaves the DOM: a detached node does not bubble.
   var RULING_GONE_EVENT = 'harbour:question-answered';
   // Home registers its <main> here at startup (setDeskRoot), so an answer whose card has already left the page still reaches it.
@@ -259,17 +259,18 @@
   }
 
   // ── Live Waiting on you (LIN-4242) ───────────────────────────────────────────
-  // The merge unit is the `.waiting-card` wrapper (task line + card), keyed by rulingKeyOf on its inner session card. A
-  // kept wrapper is never re-rendered or moved: moving a focused textarea blurs it. Rulings this page has settled (answered
+  // The merge unit is the `.waiting-card` wrapper (task line + card), keyed by rulingKeyOf on its inner card. A
+  // kept wrapper is never re-rendered or moved: moving a focused textarea blurs it. Cards this page has settled (answered
   // or dismissed here, or refused as settled) are remembered, so a response requested before that never re-adds one.
   var settledKeys = new Set();
   function noteSettled(key) { if (key) settledKeys.add(key); }
-  // A question record's wrapper holds the record card (LIN-4538: lib/question-record-card.js), a ruling wrapper the session card.
+  // A question record's wrapper holds the record card (LIN-4538: lib/question-record-card.js); a waiting run's wrapper holds the
+  // reply card (lib/question-card.js).
   function innerCardOf(wrapper) {
     return wrapper.querySelector('[data-testid="session-question-card"]') || wrapper.querySelector('[data-testid="question-record-card"]');
   }
   // LIN-4532 (finding-dca7ac9d): a question record's wrapper (`.waiting-question`) is keyed by its question id, and its card is the
-  // shared question-record card (lib/question-record-card.js), not a ruling card.
+  // shared question-record card (lib/question-record-card.js), not the reply card.
   function questionCardOf(wrapper) { return wrapper.querySelector('[data-testid="question-record-card"]'); }
   function isQuestionWrapper(wrapper) { return !!(wrapper.classList && wrapper.classList.contains('waiting-question')); }
   function cardKeyOf(wrapper) {
@@ -277,7 +278,7 @@
     var inner = innerCardOf(wrapper); return inner ? rulingKeyOf(inner) : '';
   }
   // A question card answered here (settled) or with a request in flight (its controls disabled) stays where it is: the refresh
-  // does not take it out, the same as a ruling card held for its answer.
+  // does not take it out, the same as a reply card held for its answer.
   function questionCardHeld(wrapper) {
     var qcard = questionCardOf(wrapper);
     if (!qcard) return false;
@@ -296,18 +297,18 @@
     return !!el && el !== card && card.contains(el);
   }
   // Whether a card holds the reader's place: typed text, focus inside it, or an answer in flight. Home's opened task uses
-  // the same check (public/prompt-section.js keepTypedQuestion), gated on the ruling key first. `active` as in focusInCard.
+  // the same check (public/prompt-section.js keepTypedQuestion), gated on the card key first. `active` as in focusInCard.
   function cardHoldsInput(card, active) {
     if (!card) return false;
     if (card.dataset && card.dataset.answerInFlight === 'true') return true;
-    // The typed answer: a ruling card's input, or a question record card's (LIN-4538).
+    // The typed answer: a reply card's input, or a question record card's (LIN-4538).
     var textarea = card.querySelector('[data-testid="session-question-card-input"]') || card.querySelector('[data-testid="question-record-card-input"]');
     if (textarea && textarea.value && textarea.value.length > 0) return true;
     return focusInCard(card, active);
   }
   // LIN-4242: whether a repaint keeps the card already on the page in place of its fresh markup (the opened task's
-  // keepTypedQuestion, public/prompt-section.js). The ruling key is the gate: a different ruling's card is never kept, and
-  // the same ruling's card is kept only while it holds the reader's place. LIN-4293: `active` is the focused element before
+  // keepTypedQuestion, public/prompt-section.js). The card key is the gate: a different card is never kept, and
+  // the same card is kept only while it holds the reader's place. LIN-4293: `active` is the focused element before
   // the repaint (LIN-4246: the write detaches the card first, so only the caller can know it); omitted, the answer is the
   // Waiting merge's, unchanged.
   function keepsReaderPlace(oldCard, freshCard, active) {
