@@ -1,18 +1,18 @@
 /**
  * LIN-4437 (piece 2 of LIN-4396): the `blind-read` stage, sent by hand. Nothing gates on it yet.
  *
- *   - LIN-4520: a read's verdict is a records verdict (`trail.review.blindRead`, lib/task-standing.js), and its PR set is
- *     lib/run-ledger.js checkBlindReadPrs against the records landing. The comment-shape readers (the verdict line, the
- *     verdict word, the reason, the repeated verdict) and the comment landing and kind readers are retired, and their
- *     cases are gone; the records-side cases below replace them;
+ *   - LIN-4520: a read's verdict is a records verdict (`trail.review.blindRead`, lib/task-standing.js). The comment-shape
+ *     readers (the verdict line, the verdict word, the reason, the repeated verdict) and the comment landing and kind
+ *     readers are retired, and their cases are gone; the records-side cases below replace them;
+ *   - LIN-4543: its PR set is held on its verdict record (routes/proxy-records.js blindReadSetProblems, tested in
+ *     tests/unit/lin-4516-verdict-records.test.js witness 3), not on a comment: the proxy's comment guard and the
+ *     opening reader are retired, and a comment that opens with the old heading is ordinary text;
  *   - witness 1: a read is never landing work and never an answer to a person (no loop, no silenced
  *     person), down to the selector's rendered facts with runs known;
  *   - witness 2: the read is blind: the prompt and its preamble carry no ticket text, no attachment
  *     title and no brief or issue-read hint;
  *   - the prompt is the piloted text (tests/fixtures/blind-read-piloted.txt, frozen from #2407) but for
  *     its fill-ins and the Where-to-stand sentence;
- *   - the proxy holds the PR set of a read, and with a failed records read keeps the no-PR check and skips
- *     only the PR-set check, with a log;
  *   - the run-evidence box shows the records blind read;
  *   - a live blind read holds the live-stage wait; the churn and round-trip readers place it.
  */
@@ -26,8 +26,6 @@ import assert from 'node:assert/strict';
 import { readFileSync } from 'node:fs';
 import { fileURLToPath } from 'node:url';
 import express from 'express';
-import { BLIND_READ_CODES } from '../../lib/run-ledger.js';
-import { opensAsBlindRead } from '../../lib/run-trail.js';
 import { withPersonFindings } from './helpers/person-findings.js';
 import { BLIND_READ_HEADING } from '../../lib/prompts/blind-read-words.js';
 import { SURVEY_HEADINGS } from '../../lib/prompts/survey-words.js';
@@ -73,17 +71,6 @@ async function trailOf(events) {
   return trailForTicket({ recordsStore, urlKey: 'acme', ticket: 'LIN-1' });
 }
 
-describe('a read is recognised by its opening (opensAsBlindRead; its comment is Harbour\'s, so never ingested as a person\'s)', () => {
-  test('a well-formed read opens as a blind read and is not a person\'s comment', () => {
-    assert.equal(opensAsBlindRead(read1(1)), true);
-  });
-  test('the heading is matched exactly: a longer heading, or a mention further down, is not a read', () => {
-    assert.equal(opensAsBlindRead(c(1, `${BLIND_READ_HEADING} pilot\nVerdict: mixed`)), false);
-    assert.equal(opensAsBlindRead(c(1, review(1).body + `\n\nThe ${BLIND_READ_HEADING} comment said same.\nVerdict: mixed`)), false);
-    assert.equal(opensAsBlindRead(c(1, `\n\n${BLIND_READ_HEADING}: LIN-1\nVerdict: same. a b c ${PR}`)), true, 'a `:` tail, after blank lines');
-  });
-});
-
 describe('the landing is the records landing, which decides the PR set of a read (LIN-4520; was the comment landing)', () => {
   test('no review: every change on the task is the landing', async () => {
     assert.deepEqual([...(await trailOf([ev.pr(1, OLD, 'h'), ev.pr(2, PR, 'h')])).landing].sort(), [OLD, PR].sort());
@@ -119,17 +106,14 @@ describe('the blind read on record is the latest one (LIN-4520, LIN-4544; was la
   });
 });
 
-describe('no local copies: recommendation-facts imports the moved readers', () => {
-  // LIN-4458 moved the openings to lib/run-trail.js; tests/unit/lin-4458-comment-kind-census.test.js
-  // holds every file to it. This keeps the original pin on the two files it named.
-  test('the close-out opening, firstHeading and firstLineOf are defined only in lib/run-trail.js', () => {
-    for (const file of ['lib/recommendation-facts.js', 'lib/run-ledger.js']) {
-      for (const name of ['isCloseOut', 'firstHeading', 'firstLineOf']) {
-        assert.doesNotMatch(read(file), new RegExp(`(?:function|const)\\s+${name}\\b`), `${file}: ${name} has no local definition`);
+describe('no local copies: the comment-opening readers are gone (LIN-4543)', () => {
+  // LIN-4458 moved the openings to lib/run-trail.js; LIN-4543 retired them with the blind-read guard, their last caller.
+  test('the close-out opening, firstHeading and firstLineOf are defined nowhere in the readers\' files', () => {
+    for (const file of ['lib/recommendation-facts.js', 'lib/run-ledger.js', 'lib/run-trail.js']) {
+      for (const name of ['isCloseOut', 'firstHeading', 'firstLineOf', 'opensAsBlindRead']) {
+        assert.doesNotMatch(read(file), new RegExp(`(?:function|const)\\s+${name}\\b`), `${file}: ${name} has no definition`);
       }
     }
-    assert.match(read('lib/run-trail.js'), /const firstLineOf\b/);
-    assert.match(read('lib/run-trail.js'), /function firstHeading\b/);
   });
 });
 
@@ -303,24 +287,21 @@ describe('the run readers place a blind read', () => {
   });
 });
 
-// ── The proxy holds a read's PR set (routes/proxy-writes.js refusedByBlindRead, checkBlindReadPrs) ──────────────
+// ── The proxy holds no rule on a comment's heading (LIN-4543: the blind-read guard retired) ──────────────
 const URL_KEY = 'acme-4437';
 const ISSUE_ID = '44374437-4437-4437-4437-443744374437';
 class FakeProvider extends ProviderInterface {
   constructor() {
     super();
     this.name = 'fake';
-    this.calls = { createComment: 0, fetchIssueComments: 0 };
+    this.calls = { createComment: 0, updateComment: 0, fetchIssueComments: 0 };
     this.createComment = async (token, issueId, body) => { this.calls.createComment++; return { id: `n-${this.calls.createComment}`, body, createdAt: at(9), user: { name: 'Agent' } }; };
-    this.updateComment = async (token, id, body) => ({ id, body });
+    this.updateComment = async (token, id, body) => { this.calls.updateComment++; return { id, body }; };
     this.issueWriteGuard = async () => ({ id: ISSUE_ID, team: { id: 't' } });
-    this.fetchIssueComments = async () => {
-      this.calls.fetchIssueComments++;
-      return [summary(1), review(2)];
-    };
+    this.fetchIssueComments = async () => { this.calls.fetchIssueComments++; return [summary(1), review(2)]; };
   }
 }
-function buildApp(provider, recordsStore = null) {
+function buildApp(provider, recordsStore) {
   const app = express();
   app.use(express.json());
   app.use(createProxyRoutes({
@@ -337,10 +318,10 @@ function buildApp(provider, recordsStore = null) {
   }));
   return app;
 }
-// The ticket's records (LIN-4518 step 3): the landing is PR 77, a review on it. `records` overrides the store.
+// The ticket's records: the landing is PR 77, a review on it. The store is handed to the route and must go unread.
 const LANDING = [ev.pr(1, PR, 'abc1234'), ev.review(2, PR)];
-async function post(provider, body, method = 'POST', path = `${ISSUE_ID}/comments`, records = null) {
-  const recordsStore = records ?? await seededRecordsStore(harness, LANDING, { urlKey: URL_KEY, tickets: [ISSUE_ID] });
+async function post(provider, body, method = 'POST', path = `${ISSUE_ID}/comments`) {
+  const recordsStore = await seededRecordsStore(harness, LANDING, { urlKey: URL_KEY, tickets: [ISSUE_ID] });
   const server = buildApp(provider, recordsStore).listen(0, '127.0.0.1');
   await new Promise((r) => server.once('listening', r));
   try {
@@ -353,59 +334,29 @@ async function post(provider, body, method = 'POST', path = `${ISSUE_ID}/comment
   }
 }
 let uniq = 0;
-const readBody = (verdict = 'better', prs = [PR]) => `${read1(1, prs, verdict).body}\n\n(${++uniq})`;
-const NO_PR_READ = (n) => `${BLIND_READ_HEADING}\n\nI read the change and it is fine. No link given (${n}).`;
 
-describe('the proxy holds a read\'s PR set', () => {
-  test('refuses a read that names no PR by full URL with 422, before any trail read, and posts nothing', async () => {
-    const p = new FakeProvider();
-    const res = await post(p, NO_PR_READ(++uniq));
-    assert.equal(res.status, 422);
-    assert.equal(res.body.code, BLIND_READ_CODES.prsMissing);
-    assert.deepEqual(p.calls, { createComment: 0, fetchIssueComments: 0 });
-  });
-  test('refuses a read whose PR URLs differ from the records landing, naming both sets', async () => {
-    const p = new FakeProvider();
-    const res = await post(p, readBody('same', [PR, OLD]));
-    assert.equal(res.status, 422);
-    assert.equal(res.body.code, BLIND_READ_CODES.prsMismatch);
-    assert.deepEqual(res.body.expected, [PR]);
-    assert.equal(p.calls.createComment, 0);
-  });
-  test('posts a read naming exactly the landing, and reads no comment for the set check', async () => {
-    const p = new FakeProvider();
-    const res = await post(p, readBody('worse'));
-    assert.equal(res.status, 201, JSON.stringify(res.body));
-    // The landing is read from the records (LIN-4518 step 3): no comment read for the set check.
-    assert.equal(p.calls.fetchIssueComments, 0);
-  });
-  test('passes a review verdict that mentions the heading mid-comment, and never reads the trail for it', async () => {
-    const p = new FakeProvider();
-    const res = await post(p, `${review(5).body}\n\n${BLIND_READ_HEADING}\nVerdict: mixed (${++uniq})`);
-    assert.equal(res.status, 201, JSON.stringify(res.body));
-    assert.equal(p.calls.fetchIssueComments, 0);
-  });
-  test('never validates a `## Blind read pilot` tally as a read', async () => {
-    const res = await post(new FakeProvider(), `${BLIND_READ_HEADING} pilot\n\n- #2404 · same. Verdict: mixed (${++uniq})`);
-    assert.equal(res.status, 201, JSON.stringify(res.body));
-  });
-  test('with a failed records read, skips only the PR-set check, with a log; the no-PR check still holds', async () => {
-    const warned = [];
-    const original = console.warn;
-    console.warn = (...args) => warned.push(args.join(' '));
-    try {
-      const failingStore = { async taskForTicket() { throw new Error('the store is down'); } };
-      const passed = await post(new FakeProvider(), readBody('same', [PR, OLD]), 'POST', `${ISSUE_ID}/comments`, failingStore);
-      assert.equal(passed.status, 201, 'the set check is skipped');
-      assert.ok(warned.some(w => /\[blind-read\].*PR-set check skipped/.test(w)), 'and logged');
-      const refused = await post(new FakeProvider(), NO_PR_READ(++uniq), 'POST', `${ISSUE_ID}/comments`, failingStore);
-      assert.equal(refused.body.code, BLIND_READ_CODES.prsMissing, 'the no-PR check holds without the records');
-    } finally {
-      console.warn = original;
+describe('a comment that opens with the old blind-read heading is ordinary text', () => {
+  test('one naming no PR, or a PR other than the landing, posts (these were 422 before LIN-4543), reading no trail', async () => {
+    for (const text of [
+      `${BLIND_READ_HEADING}\n\nI read the change and it is fine. No link given (${++uniq}).`,
+      `${read1(1, [PR, OLD]).body}\n\n(${++uniq})`,
+      `${read1(1, [PR]).body}\n\n(${++uniq})`
+    ]) {
+      const p = new FakeProvider();
+      const res = await post(p, text);
+      assert.equal(res.status, 201, JSON.stringify(res.body));
+      assert.equal(p.calls.createComment, 1);
+      assert.equal(p.calls.fetchIssueComments, 0, 'no comment read');
     }
   });
-  test('PATCH is held to the same PR-set check', async () => {
-    const res = await post(new FakeProvider(), NO_PR_READ(++uniq), 'PATCH', `${ISSUE_ID}/comments/0c0c0c0c-0c0c-0c0c-0c0c-0c0c0c0c0c0c`);
-    assert.equal(res.body.code, BLIND_READ_CODES.prsMissing);
+  test('an edit to one is ordinary too', async () => {
+    const p = new FakeProvider();
+    const res = await post(p, `${BLIND_READ_HEADING}\n\nNo link given (${++uniq}).`, 'PATCH', `${ISSUE_ID}/comments/0c0c0c0c-0c0c-0c0c-0c0c-0c0c0c0c0c0c`);
+    assert.equal(res.status, 200, JSON.stringify(res.body));
+    assert.equal(p.calls.updateComment, 1);
+  });
+  test('the proxy catalogue no longer documents a blind-read refusal, and no source keeps its codes', () => {
+    assert.doesNotMatch(read('lib/proxy-instructions.js'), /BLIND_READ_(?:PRS|\*)|blind read's shape|is a blind read \(LIN-4437\)/);
+    assert.doesNotMatch(read('lib/run-ledger.js'), /BLIND_READ_CODES|checkBlindReadPrs/);
   });
 });

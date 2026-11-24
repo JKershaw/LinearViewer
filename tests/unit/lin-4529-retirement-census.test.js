@@ -123,6 +123,10 @@ export const RETIRED = Object.freeze([
   { word: 'the comment-evidence checks', re: /\b(?:hasReportEvidenceComment|hasAdversarialReadEvidenceComment)\b/ },
   // Ask item 7, the model-written brief: the mock brief's fixture parent (LIN-4537).
   { word: 'the brief mock\'s fixture parent', re: /fixture-parent\.js|\bfixtureParent\b/ },
+  // Ask item 5, stage runs write no comments, and the blind read posts none (LIN-4533): the proxy's blind-read comment guard,
+  // its opening reader, its PR-set check and its refusal codes. The blind read's landing rule holds on its verdict record
+  // (routes/proxy-records.js blindReadSetProblems). Found by P9's re-run of the plan's searches (LIN-4543).
+  { word: 'the blind-read comment guard', re: /\b(?:refusedByBlindRead|refuseBlindRead|opensAsBlindRead|checkBlindReadPrs|blindReadRefusal|BLIND_READ_CODES)\b|BLIND_READ_PRS_(?:MISSING|MISMATCH)/ },
 ]);
 
 /** Files that keep a retired word, each with the words it may keep and the reason. */
