@@ -32,7 +32,7 @@ export const EXCLUDED = Object.freeze({
   'scripts/eval/fixtures/': 'recorded eval history, kept as it is (standing answer)',
 });
 
-/** The words this slice retires, each with the spelling the census matches. Empty until a piece retires something. */
+/** The words this slice retires, each with the spelling the census matches: each piece's own, and LIN-4543's final sweep. */
 export const RETIRED = Object.freeze([
   // LIN-4535 (P5): the text authorship readers. A person's comment is its finding (lib/comment-ingest.js), never a comment's words.
   { word: 'isPersonComment', re: /\bisPersonComment\b/ },

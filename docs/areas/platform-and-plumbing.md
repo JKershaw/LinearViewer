@@ -20,3 +20,7 @@ Area notes for `platform-and-plumbing` in the registry. Format and rules: README
   invisible to them until it is added. Run them after `git add`, not only on the working tree: a plan-heading leaf
   module LIN-4502 added passed a comment-kind census while untracked and failed once committed (that census is
   retired, LIN-4520).
+- A retirement census holds only the words each piece remembered to add. At a slice's close, diff the exports its
+  pieces deleted (`git diff <base>..HEAD`, lines opening `-export`) against `RETIRED`: LIN-4543 found seven words gone
+  from the tree with no row keeping them gone (`tests/unit/lin-4529-retirement-census.test.js`). A row for a generic
+  name catches future honest uses too, so keep those out and say why.
