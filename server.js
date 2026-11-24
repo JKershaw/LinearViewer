@@ -3431,6 +3431,8 @@ app.use(createTaskPageRoutes({
   recordsStore,
   // LIN-4532 (P2b): the open question records the owner is asked on this task (the question section), read with the dispatch rows.
   dispatchStore: dispatchQueueStore,
+  // LIN-4554: the workspace's people, so a Records line names a person rather than printing their id.
+  listPeople: (urlKey) => listWorkspacePeople(urlKey),
 }))
 
 // LIN-4494 (piece 3): a signed-in person's record writes from the task page, and the project page (its backlog and

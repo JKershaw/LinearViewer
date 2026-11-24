@@ -83,7 +83,7 @@ function sessionsOfState(model, taskState, runWords = null) {
  * @param {Function} [deps.now] - () → Date
  * @returns {Router}
  */
-export function createTaskPageRoutes({ workspaceFromUrl, getOpenRouterSource, getDeployInfo, loader, workspaceOwnerCheck = null, runProposalsStore = null, taskFacts = null, refreshTaskFacts = null, taskModeStore = null, accountStore = null, timelineFragment = null, recordsStore = null, dispatchStore = null, now = () => new Date() }) {
+export function createTaskPageRoutes({ workspaceFromUrl, getOpenRouterSource, getDeployInfo, loader, workspaceOwnerCheck = null, runProposalsStore = null, taskFacts = null, refreshTaskFacts = null, taskModeStore = null, accountStore = null, timelineFragment = null, recordsStore = null, dispatchStore = null, listPeople = async () => [], now = () => new Date() }) {
   if (!loader) throw new Error('task-page routes: loader is required');
   const router = Router();
 
@@ -147,7 +147,10 @@ export function createTaskPageRoutes({ workspaceFromUrl, getOpenRouterSource, ge
     try {
       const taskId = await recordsStore.taskForTicket(urlKey, identifier);
       const views = taskId ? await recordsStore.viewsOf(urlKey, await recordsStore.find(urlKey, { inRef: taskId })) : [];
-      return { views, canAct: true, refused: queryValue(req.query.records_refused) || null };
+      // LIN-4554: the workspace's people (lib/workspace-people.js, injected: the Records area takes outside reads injected), so a
+      // record line names a person. A failed read costs the names only: each person then reads "someone", never a raw id.
+      const people = views.length ? await Promise.resolve().then(() => listPeople(urlKey)).catch(() => []) : [];
+      return { views, people: Array.isArray(people) ? people : [], canAct: true, refused: queryValue(req.query.records_refused) || null };
     } catch (err) {
       console.error('Task page records error:', err?.message || err);
       return null;

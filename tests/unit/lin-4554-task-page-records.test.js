@@ -248,6 +248,58 @@ describe('(b) record lines read as a person would', () => {
   });
 });
 
+describe('(b+) a page-text scan over a richly seeded task: no raw id and no ISO time anywhere a person reads', () => {
+  test('every kind, start and end states, stage, Harbour, person and unknown writers, links between records, an open card', async () => {
+    const taskId = await makeTicketTask();
+    const t = { inTask: taskId };
+    // An open question to the owner: drawn as its card, whose text is read too.
+    await add('question', 'open', { asks: 'Keep the footer?\n\n- yes\n- no', options: ['Keep it', 'Drop it'], recommended: 'Keep it', 'if-unanswered': 'it stays' }, { ...t, to: `person:${OWNER}`, by: 'review' });
+    // Questions: to the project, to a stage, ended every way.
+    await add('question', 'open', { asks: 'Who owns the footer?' }, { ...t, to: 'project', by: 'implementation' });
+    await add('question', 'open', { asks: 'Should Build split it?' }, { ...t, to: 'implementation', by: `person:${OWNER}` });
+    const qd = await add('question', 'open', { asks: 'Rename it?' }, { ...t, to: `person:${OWNER}`, by: 'review' });
+    await endAs(qd.id, 'dismissed', 'dismissed', `person:${OWNER}`);
+    const qh = await add('question', 'open', { asks: 'Move it?' }, { ...t, to: `person:${MEMBER}`, by: 'review' });
+    // Findings: open, done, declined, handed on into another record; by Harbour and by someone the workspace cannot name.
+    const f1 = await add('finding', 'open', { says: 'The footer is duplicated.', how: 'grep' }, { ...t, to: 'project', by: 'harbour' });
+    await endAs(qh.id, 'handed-on', 'moved', `person:${OWNER}`, { into: f1.id });
+    const f2 = await add('finding', 'open', { says: 'A ghost note.', how: 'look' }, { ...t, to: 'person:acc-ghost', by: 'person:acc-ghost' });
+    await endAs(f2.id, 'declined', 'not ours', 'person:acc-ghost');
+    const f3 = await add('finding', 'open', { says: 'Fix the footer links.', how: 'click' }, { ...t, to: 'close-out', by: 'review' });
+    await endAs(f3.id, 'done', 'fixed', 'implementation');
+    // Decisions and lessons, linked: a stale decision on a disproved lesson, a superseded lesson into another.
+    const l1 = await add('lesson', 'holds', { says: 'Footers are shared.' }, { ...t, by: 'review' });
+    const l2 = await add('lesson', 'holds', { says: 'Footers are per page.' }, { ...t, by: 'review' });
+    await add('decision', 'stands', { answer: 'One footer.', why: 'simpler' }, { ...t, by: `person:${OWNER}`, links: { on: [`${l2.id}@1`] } });
+    await endAs(l2.id, 'disproved', 'they are not', 'review');
+    await endAs(l1.id, 'superseded', 'superseded from the task page', `person:${OWNER}`, { into: l2.id });
+    // A verdict, a plan, a change; child tasks with and without a ticket, one ended with a finding addressed to it.
+    await add('plan', 'kept', { says: '# Plan\nstep one' }, { ...t, by: 'plan', to: 'implementation' });
+    await add('verdict', 'stands', { judgement: 'review', outcome: 'approve', reasoning: 'Looks right.' }, { ...t, by: 'review' });
+    await add('change', 'open', { ref: 'https://github.com/o/r/pull/9' }, { ...t, by: 'implementation' });
+    const withTicket = await add('task', 'open', { 'done-when': 'the footer is one piece', ref: 'LIN-4999' }, { ...t, by: `person:${OWNER}` });
+    const noTicket = await add('task', 'open', { 'done-when': 'the footer CSS is tidy' }, { ...t, by: `person:${OWNER}` });
+    await endAs(noTicket.id, 'done', 'done', `person:${OWNER}`);
+    await add('finding', 'open', { says: 'Check the tidy CSS.', how: 'look' }, { ...t, to: noTicket.id, by: 'review' });
+    await add('finding', 'open', { says: 'Hand the footer piece on.', how: 'see' }, { ...t, to: withTicket.id, by: 'review' });
+
+    await serve('owner');
+    const html = await getPage();
+    assert.match(html, /data-testid="question-record-card"/, 'the owner\'s open question is on the page as its card');
+    const text = pageText(html);
+    const RAW = /\b(?:task|finding|question|decision|verdict|plan|change|lesson|run)-[0-9a-f]{6,}\b/;
+    assert.doesNotMatch(text, RAW, `no raw record id in the text: ${(text.match(RAW) || [])[0]}`);
+    assert.doesNotMatch(text, /person:|acc-[a-z]/, `no raw person or account id in the text: ${(text.match(/person:\S*|acc-\S*/) || [])[0]}`);
+    assert.doesNotMatch(text, ISO, `no ISO time in the text: ${(text.match(ISO) || [])[0]}`);
+    // And it reads as people: names, stage words, Harbour, the project, a child task by its ticket.
+    for (const word of ['John', 'Mia', 'someone', 'Harbour', 'the project', stageLabel('implementation'), 'LIN-4999', 'dismissed', 'handed on']) {
+      assert.ok(text.includes(word), `the page says "${word}"`);
+    }
+    const section = recordsSection(html);
+    assert.ok((section.match(/<time\b[^>]*datetime="[^"]+"/g) || []).length >= 10, 'each record line keeps its exact time in a <time datetime>');
+  });
+});
+
 describe('(c) a dismissal reads once, as dismissed; an agent\'s own withdrawal stays withdrawn', () => {
   test('the LIN-4550 end, an old withdrawn-by-a-person "dismissed" row, and an agent\'s withdrawal', async () => {
     const taskId = await makeTicketTask();
