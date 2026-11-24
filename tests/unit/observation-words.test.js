@@ -23,7 +23,7 @@ function loop(over = {}) {
   return {
     loopId: 'w', lineageId: null, kind: 'implementation', followUpTo: null, sessionId: 'S',
     issueIdentifier: 'LIN-900', workspaceUrlKey: 'acme', dispatchedAt: RECENT, resolvedAt: null,
-    decision: null, decisionCase: [], answeredDecisions: [], withdrawal: null,
+    decision: null, decisionCase: [], withdrawal: null,
     wakeMarker: null, waitingMessage: null,
     ...over
   };

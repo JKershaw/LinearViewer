@@ -84,6 +84,19 @@ export const RETIRED = Object.freeze([
   { word: 'the brief and recap chat tools', re: /\bget_brief\b|\bget_recap\b/ },
   { word: 'formatDiscussionReference', re: /\bformatDiscussionReference\b/ },
   { word: 'the brief and recap replay script', re: /lin-263-spike4\.mjs/ },
+  // LIN-4541 (P7b-2): the ruling predicate, the old ruling stores, the agents' rulings route and its suggestions, the page's
+  // old ruling writes, the store's decision writers, answers as comments, and the test seams that served them. A question is
+  // a question record and its answer a decision record (lib/question-answers.js). The old collections stay as history,
+  // named only by the erasure inventories (tests/unit/lin-4541-ruling-stores-retired.test.js); the four decision feedback
+  // kinds stay as read-only history rows (lib/dispatch-feedback-kinds.js), so old rows still display.
+  { word: 'the ruling predicate module', re: /unanswered-decisions\.js/ },
+  { word: 'the ruling predicate', re: /\b(?:collectUnansweredDecisions|openDecisionLoopIds|rulingStandingOf|buildRulingRef|answeredDecisionIdsByLineage|isDecisionAnsweredInLineage|isDecisionAnswered|isDecisionWithdrawn|parseStampLoopIds|STAMP_LOOP_IDS_MESSAGE|MAX_STAMP_LOOP_IDS)\b/ },
+  { word: 'the old ruling stores', re: /task-decisions-store|dismissal-suggestions-store|\b(?:TaskDecisionsStore|DismissalSuggestionsStore|taskDecisionsStore|dismissalSuggestionsStore|attachStandingSuggestions)\b/ },
+  { word: 'the agents\' rulings route', re: /proxy-rulings\.js|\bcreateRulingsRoutes\b|\/api\/proxy\/rulings\b|\bsuggest-(?:dismissal|answer)\b|\brulingSuggest(?:Dismissal|Answer)\b/ },
+  { word: 'the page\'s old ruling writes', re: /rulings\/(?:dismiss|answer|keep|reverse-withdrawal)\b|\b(?:dismissRuling|deliverRulingStampOnly|agreeRulingRow|keepRulingRow|bulkAgreeSelected|renderRulingRow)\b|obs-ruling-(?:bulk|agree|keep|select-all)/ },
+  { word: 'the decision writers', re: /\b(?:markDecisionAnswered|markDecisionWithdrawn|markDecisionWithdrawalReversed|isDecisionSettled|isDecisionSettledIn)\b/ },
+  { word: 'answers as comments', re: /\b(?:RULING_MARK|stampDecisionAnswers|decisionStampDedupe|deliverRulingRecord|deliverRulingDispatch|deliverRulingAnswer|deliverRulingReply|composeDispatchPrompt|deliveredEffect)\b|Ruling recorded via Harbour/ },
+  { word: 'the old ruling test seams', re: /clear-task-decisions|clear-dismissal-suggestions|\/test\/task-decisions\b/ },
 ]);
 
 /** Files that keep a retired word, each with the words it may keep and the reason. */
@@ -93,10 +106,6 @@ export const ALLOW = Object.freeze({
   'scripts/prompt-template-change-log.md': { words: ['DECISION: block taught', 'the brief quote module', 'the brief and recap modules', 'the brief and recap chat tools', 'the brief and recap routes', 'formatDiscussionReference'], reason: 'the dated log of prompt-template changes: its earlier entries quote the DECISION: block and name the brief quote module, the brief module, its chat tool and the discussion-reference formatter they changed, which is recorded history (LIN-4533, LIN-4536 and LIN-4537 add their own entries)' },
   // LIN-4533 (P3): a recorded liveness fixture of a past cycle (LIN-3238). Its messages are the transcript as it was, not taught text.
   'tests/fixtures/liveness/lin-3238-cycle.json': { words: ['DECISION: block taught'], reason: 'a recorded liveness fixture of the LIN-3238 cycle: its messages are the transcript as it was, kept as history' },
-  // LIN-4540 (P7b-1): the task-decisions store is the old ruling store the scan wrote; its schema docs and write methods
-  // name the scan and its fingerprint. The predicate still reads the store until LIN-4541 (P7b-2) deletes it whole, with
-  // its allowance.
-  'lib/task-decisions-store.js': { words: ['the scan module', 'the scan fingerprint'], reason: 'the old ruling store the scan wrote: its schema docs name the scan and its fingerprint; deleted whole with the other ruling stores in LIN-4541 (P7b-2)' },
   // LIN-4537 (P6b): dated research and eval records that name the brief and recap as they were. Rewriting them would
   // falsify the record (standing answer: recorded history stays as it is).
   'docs/lin-260-prompt-scaling-research.md': { words: ['the brief and recap modules', 'the brief and recap calls'], reason: 'dated research (LIN-260) that measured the brief and recap as they were; recorded history, kept as it is' },
@@ -105,8 +114,9 @@ export const ALLOW = Object.freeze({
   'docs/prompt-pipeline/stage-descriptions/breakdown-triage-blocked-context.md': { words: ['formatDiscussionReference'], reason: 'dated notes of 3 Oct 2026 (superseded in part, see that directory\'s README) describing the templates as they were; recorded history' },
   'docs/prompt-pipeline/stage-descriptions/implementation-bug-lookinto.md': { words: ['formatDiscussionReference'], reason: 'dated notes of 3 Oct 2026 (superseded in part, see that directory\'s README) describing the templates as they were; recorded history' },
   'docs/prompt-pipeline/stage-descriptions/research-scoping-spike.md': { words: ['formatDiscussionReference'], reason: 'dated notes of 3 Oct 2026 (superseded in part, see that directory\'s README) describing the templates as they were; recorded history' },
-  'docs/prompt-pipeline/stage-descriptions/retro-audit.md': { words: ['formatDiscussionReference'], reason: 'dated notes of 3 Oct 2026 (superseded in part, see that directory\'s README) describing the templates as they were; recorded history' },
-  'docs/prompt-pipeline/stage-descriptions/review-closeout.md': { words: ['formatDiscussionReference'], reason: 'dated notes of 3 Oct 2026 (superseded in part, see that directory\'s README) describing the templates as they were; recorded history' },
+  // LIN-4541 (P7b-2): the same dated notes name the agents' rulings route and the old stores as the templates read them then.
+  'docs/prompt-pipeline/stage-descriptions/retro-audit.md': { words: ['formatDiscussionReference', 'the agents\' rulings route'], reason: 'dated notes of 3 Oct 2026 (superseded in part, see that directory\'s README) describing the templates as they were; recorded history' },
+  'docs/prompt-pipeline/stage-descriptions/review-closeout.md': { words: ['formatDiscussionReference', 'the old ruling stores', 'the agents\' rulings route'], reason: 'dated notes of 3 Oct 2026 (superseded in part, see that directory\'s README) describing the templates as they were; recorded history' },
   'docs/prompt-pipeline/stage-descriptions/plumbing.md': { words: ['the brief and recap calls'], reason: 'dated notes of 3 Oct 2026 (superseded in part): a proposed generateBrief writer, never built; recorded history' },
 });
 

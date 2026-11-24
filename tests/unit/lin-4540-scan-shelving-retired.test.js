@@ -4,8 +4,9 @@
  * (lib/account-erasure.js INVENTORY), the dry run's URLKEY_SOURCES and the urlkey-holders COLLECTION_CLASSES, each with
  * its reason, so an erasure still reaches a workspace's old shelves. Nothing else opens or names it.
  *
- * The scan had no collection of its own: it wrote task decisions (lib/task-decisions-store.js, still read by the ruling
- * predicate until LIN-4541 retires it) and read the Harbour-comments ledger, which stays for the comment ingest.
+ * The scan had no collection of its own: it wrote task decisions (the old ruling store LIN-4541 retired, whose collection is
+ * history now: tests/unit/lin-4541-ruling-stores-retired.test.js) and read the Harbour-comments ledger, which stays for the
+ * comment ingest.
  *
  * The retired words themselves (module names, routes, jobs, page selectors) are pinned by the slice's census,
  * tests/unit/lin-4529-retirement-census.test.js. This file pins what a word list cannot: the collection is opened by

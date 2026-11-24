@@ -28,7 +28,7 @@ import * as walk from 'acorn-walk';
 
 import {
   FEEDBACK_KINDS, FEEDBACK_KIND_ROLES, FEEDBACK_ENTRY_KINDS, PARKED_WAIT_SKIPPED_KINDS,
-  DECISION_LIFECYCLE_STAMP_KINDS, feedbackKindMayCarryWake
+  DECISION_LIFECYCLE_STAMP_KINDS, RETIRED_DECISION_KINDS, feedbackKindMayCarryWake
 } from '../../lib/dispatch-feedback-kinds.js';
 import * as dispatchStore from '../../lib/dispatch-store.js';
 import { findWakeEvent } from '../../lib/dispatch-terminal.js';
@@ -38,8 +38,9 @@ const LEAF = 'lib/dispatch-feedback-kinds.js';
 const kindsWith = (role) => FEEDBACK_KINDS.filter((row) => row[role]).map((row) => row.kind);
 
 describe('every row declares every role', () => {
-  test('the role columns are the four the readers use', () => {
-    assert.deepEqual([...FEEDBACK_KIND_ROLES], ['runnerPostable', 'relay', 'decisionStamp', 'mayCarryWake']);
+  test('the role columns are the five the readers use', () => {
+    // LIN-4541: `refuse` names the retired kinds a runner post is refused 422 for (lib/dispatch-feedback-validation.js).
+    assert.deepEqual([...FEEDBACK_KIND_ROLES], ['runnerPostable', 'relay', 'decisionStamp', 'mayCarryWake', 'refuse']);
   });
 
   for (const row of FEEDBACK_KINDS) {
@@ -89,6 +90,13 @@ describe('every kind set is the table filtered by a role', () => {
 
   test('DECISION_LIFECYCLE_STAMP_KINDS is the decisionStamp rows', () => {
     assert.deepEqual([...DECISION_LIFECYCLE_STAMP_KINDS].sort(), kindsWith('decisionStamp').sort());
+  });
+
+  test('LIN-4541: RETIRED_DECISION_KINDS is the refuse rows, and no refused kind is runner-postable', () => {
+    assert.deepEqual([...RETIRED_DECISION_KINDS].sort(), kindsWith('refuse').sort());
+    assert.deepEqual([...RETIRED_DECISION_KINDS].sort(), ['decision', 'decision-withdrawn']);
+    for (const row of FEEDBACK_KINDS) if (row.refuse) assert.equal(row.runnerPostable, false, row.kind);
+    assert.deepEqual(FEEDBACK_KINDS.filter((r) => r.kind.startsWith('decision')).map((r) => r.runnerPostable), [false, false, false, false], 'every decision kind is history: no runner posts one');
   });
 
   test('the table has rows for kinds a runner may not post', () => {

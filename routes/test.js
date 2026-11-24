@@ -99,11 +99,10 @@ const uuidForUrlKey = (key) => {
  *   (lib/workspace-kpis-cache.js, LIN-4201), so a seam that rewrites the rollup is seen on the next load
  * @param {Object|null} [options.emailTransport] - The capture email transport (LIN-1892), or null when email sign-in isn't in capture mode
  * @param {Object|null} [options.commentDedupe] - In-process comment dedupe cache (LIN-3198 reset seam), or null when not wired
- * @param {Object|null} [options.decisionStampDedupe] - In-process decision-stamp dedupe cache (LIN-3198), or null
  * @param {Object|null} [options.taskModeStore] - Task-mode event store (LIN-2942), for /test/clear-task-mode-events
  * @returns {Router} Express router
  */
-export function createTestRoutes({ dispatchQueueStore, dispatchTokenStore, freeTierStore, userPreferencesStore, workspacePreferencesStore, modelRoutingStore = null, customPromptsStore, collectiveCharactersStore, collectivePresetsStore, dispatchPresetsStore, proxyTokenStore, proxyEventStore, agentStatusStore, observationSessionsStore, sessionsFeedCache, runSummaryCacheStore, sessionSummaryCacheStore, reportHistoryStore, shipBiscuitHistoryStore, taskDecisionsStore, dismissalSuggestionsStore, savedChatStore, localStore, recordsStore = null, getWorkspaceAccessToken, accountStore, accountWorkspaceStore, ownerCredentialStore, connectionStore, clearWorkspaceIssuesMemo, resetKeyState = null, observerStateStore, dispatchHistoryCollection, proxyEventsCollection, resetKpiCache, workspaceHaltStore, emailTransport = null, commentDedupe = null, decisionStampDedupe = null, taskModeStore = null, taskShareCollection = null, kpiDailyRollupCollection = null, clearWorkspaceKpis = () => {} }) {
+export function createTestRoutes({ dispatchQueueStore, dispatchTokenStore, freeTierStore, userPreferencesStore, workspacePreferencesStore, modelRoutingStore = null, customPromptsStore, collectiveCharactersStore, collectivePresetsStore, dispatchPresetsStore, proxyTokenStore, proxyEventStore, agentStatusStore, observationSessionsStore, sessionsFeedCache, runSummaryCacheStore, sessionSummaryCacheStore, reportHistoryStore, shipBiscuitHistoryStore, savedChatStore, localStore, recordsStore = null, getWorkspaceAccessToken, accountStore, accountWorkspaceStore, ownerCredentialStore, connectionStore, clearWorkspaceIssuesMemo, resetKeyState = null, observerStateStore, dispatchHistoryCollection, proxyEventsCollection, resetKpiCache, workspaceHaltStore, emailTransport = null, commentDedupe = null, taskModeStore = null, taskShareCollection = null, kpiDailyRollupCollection = null, clearWorkspaceKpis = () => {} }) {
   const router = Router();
 
   // ── Connection-backed fixture variants (LIN-3124 PR3 checkpoint F, T27) ────
@@ -672,6 +671,31 @@ export function createTestRoutes({ dispatchQueueStore, dispatchTokenStore, freeT
     res.json({ id: out.record.id });
   });
 
+  // LIN-4541: append feedback rows to a taken item's history document exactly as they were stored, for a spec that renders an
+  // old row (a DECISION: block, a decision-answer stamp) now that no route writes those kinds. Test-only history: nothing in
+  // the app writes them. Each row goes through the store's own after-write step and write notice, as the retired writers did,
+  // so the digest and the read-model follow the raw rows.
+  router.post('/test/seed-history-feedback', express.json(), async (req, res) => {
+    const { urlKey, itemId, entries } = req.body || {};
+    if (typeof urlKey !== 'string' || typeof itemId !== 'string' || !Array.isArray(entries)) {
+      return res.status(400).send('urlKey, itemId and entries are required');
+    }
+    const history = dispatchQueueStore?.historyCollection;
+    if (!history) return res.status(503).send('no dispatch history collection wired into test routes');
+    for (const { kind, message } of entries) {
+      const entry = { kind, message, timestamp: new Date() };
+      const doc = await history.findOneAndUpdate(
+        { _id: itemId, urlKey },
+        { $push: { feedback: entry }, $inc: { feedbackVersion: 1 } },
+        { returnDocument: 'after' }
+      );
+      if (!doc) return res.status(404).send('no such history item in that workspace');
+      await dispatchQueueStore._afterFeedbackWrite(doc, entry);
+      dispatchQueueStore._notifyWriteForDoc(doc, urlKey);
+    }
+    res.json({ ok: true, appended: entries.length });
+  });
+
   // LIN-4532 (finding-89c7a7a5): the records of one kind in a workspace, as the store reads them (state, addressee, fields, links),
   // so a spec can read what an answer or a dismissal wrote.
   router.get('/test/records-of', async (req, res) => {
@@ -1008,12 +1032,8 @@ export function createTestRoutes({ dispatchQueueStore, dispatchTokenStore, freeT
   })
 
   // Read-back sibling for a single dispatch item's raw feedback[] (LIN-2209):
-  // proves a write (e.g. a `decision-answer` stamp) actually landed in
-  // storage, independent of whatever a render layer chooses to do with it —
-  // a rendered-count assertion alone cannot distinguish "the stamp was
-  // written and correctly hidden from the transcript" from "the stamp was
-  // never written at all". Mirrors /test/task-decisions's read-back
-  // precedent (LIN-2217) for the dispatch-store side of the same discipline.
+  // proves a write actually landed in storage, independent of whatever a
+  // render layer chooses to do with it.
   router.get('/test/dispatch-item', async (req, res) => {
     try {
       const urlKey = req.query.urlKey || 'test-workspace'
@@ -1060,23 +1080,16 @@ export function createTestRoutes({ dispatchQueueStore, dispatchTokenStore, freeT
     }
   })
 
-  // Endpoint to drop the in-process comment-dedupe caches (LIN-3198). Two
-  // process-global caches collapse an identical (workspace, issue, body)
-  // comment re-post to a 200 instead of a fresh 201: `commentDedupe` (the
-  // written-comment reply cache) and `decisionStampDedupe` (LIN-2208's
-  // "already stamped" marker, keyed identically). No existing /test/clear-*
-  // route reset either, so a spec that re-posts the same ruling body against
-  // one server could never pass twice — and a CI retry deterministically hit
-  // the dedupe instead of recovering. Cleared TOGETHER (never one alone: the
-  // pair must return to "never seen" or a retry either mints a fresh comment
-  // and skips stamping, or re-stamps a deduped one). The clear is global, not
-  // urlKey-scoped: `dedupeKey` hashes its parts, so entries cannot be filtered
-  // by workspace; no e2e test asserts a deduped comment 200, so a clear from
-  // one worker cannot change another worker's assertion. No-op if not wired.
+  // Endpoint to drop the in-process comment-dedupe cache (LIN-3198). The
+  // process-global `commentDedupe` collapses an identical (workspace, issue,
+  // body) comment re-post to a 200 instead of a fresh 201, so a spec that
+  // re-posts the same body against one server could never pass twice. The
+  // clear is global, not urlKey-scoped: `dedupeKey` hashes its parts, so
+  // entries cannot be filtered by workspace. No-op if not wired. (Its LIN-2208
+  // decision-stamp twin went with answers as comments, LIN-4541.)
   router.get('/test/clear-comment-dedupe', (req, res) => {
     try {
       if (commentDedupe) commentDedupe.clear()
-      if (decisionStampDedupe) decisionStampDedupe.clear()
       res.send('ok')
     } catch (err) {
       res.status(500).json({ error: err.message })
@@ -1368,59 +1381,6 @@ export function createTestRoutes({ dispatchQueueStore, dispatchTokenStore, freeT
       }
       await reportHistoryStore._pruneToCapacity(urlKey)
       res.status(201).json({ inserted })
-    } catch (err) {
-      res.status(500).json({ error: err.message })
-    }
-  })
-
-  // LIN-2444: clears the proposed-dismissal rows for testing. Without it an e2e
-  // workspace reset clears the other ruling stores but leaks proposed-dismissal rows into
-  // the next test, which the rulings-tab specs will depend on.
-  router.get('/test/clear-dismissal-suggestions', async (req, res) => {
-    try {
-      const urlKey = req.query.urlKey || 'test-workspace'
-      if (dismissalSuggestionsStore) await dismissalSuggestionsStore.clear(urlKey)
-      res.send('ok')
-    } catch (err) {
-      res.status(500).json({ error: err.message })
-    }
-  })
-
-  // Endpoint to clear the task-decisions store for testing (LIN-2212)
-  router.get('/test/clear-task-decisions', async (req, res) => {
-    try {
-      const urlKey = req.query.urlKey || 'test-workspace'
-      if (taskDecisionsStore) await taskDecisionsStore.clear(urlKey)
-      res.send('ok')
-    } catch (err) {
-      res.status(500).json({ error: err.message })
-    }
-  })
-
-
-  // Read sibling to /test/clear-task-decisions (LIN-2217): proves the
-  // 'answered' stamp crosses the durable taskDecisions store boundary.
-  // First read-back store endpoint in this file — see class docstring.
-  router.get('/test/task-decisions', async (req, res) => {
-    try {
-      const urlKey = req.query.urlKey || 'test-workspace'
-      const record = taskDecisionsStore ? await taskDecisionsStore.getStatus(urlKey, req.query.issueId) : null
-      res.json({ ok: true, record })
-    } catch (err) {
-      res.status(500).json({ error: err.message })
-    }
-  })
-
-  // Verification sibling to /test/clear-task-decisions (LIN-2270): a
-  // workspace-wide count (any issueId, any outcome), so a caller can assert
-  // a clear actually left the store empty for that key instead of assuming
-  // it did — LIN-2228's original clear silently targeted a urlKey the
-  // fixtures never wrote to, and a green suite gave no signal either way.
-  router.get('/test/task-decisions-count', async (req, res) => {
-    try {
-      const urlKey = req.query.urlKey || 'test-workspace'
-      const count = taskDecisionsStore ? await taskDecisionsStore.count(urlKey) : 0
-      res.json({ ok: true, count })
     } catch (err) {
       res.status(500).json({ error: err.message })
     }

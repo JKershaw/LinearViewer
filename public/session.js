@@ -41,7 +41,7 @@
     feedback.textContent = '';
     feedback.className = 'sess-reply-feedback';
 
-    window.ReplyDelivery.postComment(opts.urlKey, opts.issueId, prompt, { decisionLoopId: opts.decisionLoopId, decisionId: opts.decisionId, source: opts.source })
+    window.ReplyDelivery.postComment(opts.urlKey, opts.issueId, prompt, { source: opts.source })
       .then(function (result) {
         if (!result.ok) throw window.ReplyDelivery.errorFromResult(result);
         appendYouBubble(thread, prompt);
@@ -173,13 +173,6 @@
         var issueIdentifier = box.dataset.issueIdentifier || '';
         var issueless = !issueIdentifier;
         var issueId = box.dataset.issueId || issueIdentifier;
-        // LIN-1728 Phase 2: present only when the run carries an unanswered
-        // decision (lib/render-session.js's renderInlineReplyBox omits the
-        // attribute otherwise). The decision-bearing loop IS this reply box's
-        // own loop, so decisionLoopId reuses data-loop-id rather than a
-        // separate attribute.
-        var decisionId = box.dataset.decisionId || null;
-
         var opts = {
           urlKey: box.dataset.urlKey,
           followUpTo: box.dataset.loopId,
@@ -191,8 +184,6 @@
           sessionWaiting: box.dataset.sessionWaiting === 'true',
           issueId: issueId,
           issueless: issueless,
-          decisionLoopId: decisionId ? box.dataset.loopId : null,
-          decisionId: decisionId,
           // LIN-3126 residual: the run page's own source stamp, forwarded so the
           // reply's comment write / resume resolves the issue's provider.
           // Sparse — absent on an unsourced run.

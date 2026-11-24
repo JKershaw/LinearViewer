@@ -246,10 +246,9 @@ Layout only. For the pages Settings shares pieces with:
 
 1. **Confirming a change: confirmation in place.** John, asked on 24 October whether LIN-511's native `confirm()` or Settings' ask in place should win: "On the page is best, I think." Authority: `askInPlace` with its confirm and Cancel, as built today. It **supersedes LIN-511's native `confirm()` rule** (`docs/ui-divergences.md`). That doc needs updating to match; Consolidate makes the edit and this PR does not touch it. `tests/unit/settings-components.test.js` (renamed by LIN-3890 from `render-settings-shell.test.js`) asserts the new Settings code has no `confirm(`; that stays true.
 
-   **Native `confirm()` sites still in the code (follow-up; outside what LIN-3886 migrates unless a site is on a page these tickets already touch).** `docs/ui-divergences.md` lists four sites; the code had the seven below, verified at base (the scan's two, retire and unretire, went with the scan in LIN-4540):
+   **Native `confirm()` sites still in the code (follow-up; outside what LIN-3886 migrates unless a site is on a page these tickets already touch).** `docs/ui-divergences.md` lists four sites; the code had the seven below, verified at base (the scan's two, retire and unretire, went with the scan in LIN-4540, and the bulk agree with the ruling machinery in LIN-4541):
    - `public/common.js:2737`, the `form[data-confirm]` submit guard (comment at 2734), used by `lib/components/navbar.js:466` to remove a workspace;
    - `public/custom-prompts.js:195`;
-   - `public/observation.js:3041` (bulk agree);
    - `public/session.js:36` (`window.confirm`);
 
 2. **Dispatch's halt controls: keep both** (inventory in decision 16).
@@ -492,10 +491,9 @@ Settings › Models polish. Each piece below has one authority; a new caller use
 
 - **The pill words are the task page's own**, not a parallel set: `running`, `waiting`, `done`, `failed`, `idle` (`lib/render-task-page.js` `STATUS_PILL`). A card whose pill says `waiting` does not say "waiting on you" again. `done-with-warning` is `done` with the ⚠ marker.
 - **The summary line never repeats the pill's word.** A running card says the stage and how long it has run ("Implementation, 12 min in"). A waiting card's sentence is the question the run asked, with its runner marker (`[blocked]`, `[done]`, `[working]`) taken out at display time and the stored text untouched. A failed card says the stage and when it was last active. No card reads as a bracketed option list.
-- **Answer choices show only while the question is open.** The choices come from the rulings response's `openLoopIds`, so a question that was dismissed, answered or withdrawn is never offered as something to pick.
+- **A waiting card offers no answer choices.** A question is answered on its question record's card (the Rulings tab, the waiting block, the run and task pages), so an old run's decision block (history) still supplies the card's sentence but offers nothing to pick (LIN-4541).
 - **The progress count is in words** ("2 of 3 runs finished"), beside the bar. The feed carries no stages, so one cell is one run.
 - **One pill and one bar, each with a client replica pinned to its server helper.** `renderStatusPill` (`lib/components/status-pill.js`, with `warn`) and `renderSegmentBar` (`lib/components/segment-bar.js`, with `live`) are copied into `public/common.js`, because `public/` has no ES modules. `tests/unit/segment-bar-pill-parity.test.js` compares the two over a table of inputs, so a change made to one and not the other fails.
 - **Times are relative words with the exact local time and zone visible** (LIN-3975's time rule), for example `updated 3m ago · 14:02 BST`, as a `<time data-local-time="zoned">` the page formats. A `title` tooltip alone does not count.
-- **Bulk apply asks in the page**, never through `confirm()`: a question with the count and what each answer does, and Apply and Cancel beside it (`#obs-ruling-bulk-confirm`). This is the confirm decision above, applied to Observation.
 - **Workspace scope.** The feed opens on this workspace, as Live Console does. "All workspaces" widens it, and the chips filter inside it. The waiting block ignores the scope, so a question waiting in another workspace is still on it.
 - **Not decided here:** the goal of an untitled run is not in the feed payload, so such a card reads "Untitled run" with its start time. Carrying the goal in the payload is a separate change.

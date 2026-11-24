@@ -34,7 +34,6 @@ test.beforeEach(async ({ page, localWorkerUrlKey }) => {
   await page.request.get(`/test/clear-dispatch-queue?urlKey=${URL_KEY}`);
   await page.request.get(`/test/clear-dispatch-history?urlKey=${URL_KEY}`);
   await page.request.get(`/test/clear-sessions-feed-cache?urlKey=${URL_KEY}`);
-  await page.request.get(`/test/clear-task-decisions?urlKey=${URL_KEY}`);
   await page.request.get(`/test/clear-ticket-records?urlKey=${URL_KEY}`);
 });
 

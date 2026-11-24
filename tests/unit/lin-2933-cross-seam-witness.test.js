@@ -5,46 +5,31 @@
  * The ticket's research found that NO existing test crosses the real
  * client → route seam for a ruling reply: tests/unit/reply-delivery-
  * contract.test.js exercises the real public/common.js but against a
- * stubbed fetch, and tests/unit/observation-ruling-delivery.test.js
- * exercises the real public/observation.js but with window.ReplyDelivery
- * itself stubbed out. Both individually-real halves can hide a defect at
+ * stubbed fetch, and the Observation row's own suite (retired with the row,
+ * LIN-4541) exercised the page with window.ReplyDelivery itself stubbed out.
+ * Both individually-real halves can hide a defect at
  * the seam between them — which is exactly what the ticket's own
  * originally-proposed COUNT-keyed witness did (it passed a client-only
  * retry that would have failed 5/5 on the real 2026-09-23 incident; see the
  * research comment for the decisive experiment).
  *
- * This file combines, for real, all three: the real `deliverRulingReply`
- * (public/observation.js), the real `window.ReplyDelivery` IIFE
- * (public/common.js, unstubbed), and a real HTTP round-trip to the real
- * Express comment route (routes/workspace-api-issue-write.js, registered by
- * createWorkspaceApiRoutes) — against a CREDENTIAL-KEYED fake Linear
+ * This file combines, for real, the client and the route: the real `window.ReplyDelivery.postComment` (public/common.js,
+ * unstubbed, the write every reply surface goes through) and a real HTTP round-trip to the real Express comment route
+ * (routes/workspace-api-issue-write.js, registered by createWorkspaceApiRoutes) — against a CREDENTIAL-KEYED fake Linear
  * provider, not a count-keyed one, per the research's own correction.
  *
- * Uses the `task-bound` disposition (LIN-2215), not `resumable`: it is
- * comment-only (no dispatch item, so no need to also stand up the
- * /api/dispatch route here), and it is one of the four C1 sites this
- * ticket changed the failure message for — so it still exercises the exact
- * channel under test: window.ReplyDelivery.postComment → the comment
- * route's credential recovery → the route's classified error response →
- * observation.js's rulingReplyFailureMessage. The route-level recovery
- * cases (a)-(f) live in tests/unit/comment-write-route.test.js; this file's
- * job is the one cross-seam proof step 7 calls for, not a second copy of
- * that coverage.
+ * LIN-4541: the witness used to start from the Observation ruling row's press handler (`deliverRulingReply`) and read its
+ * feedback line. That row and its handler retired with the ruling machinery (a question is answered on its question
+ * record's card, through its own route), so the witness now starts one step in, at the shared client write, and reads the
+ * `{ok, status, data}` it hands every caller and the Error `errorFromResult` builds from it. The route-level recovery cases
+ * (a)-(f) live in tests/unit/comment-write-route.test.js; this file's job is the one cross-seam proof step 7 calls for.
  *
  * Two cases, mirroring the research's own decisive experiment (§2):
- *  - credential-keyed recovery → the press lands ("recorded ✓"), buttons
- *    re-enable.
- *  - persistent dead credential → the named LINEAR_AUTH message, the row
- *    is restored (buttons re-enabled), and the comment is never recorded.
+ *  - credential-keyed recovery → the write lands (201).
+ *  - persistent dead credential → the named LINEAR_AUTH cause reaches the client's Error, and the comment is never recorded.
  *
- * observation.js is a native ES module (LIN-4463 piece 4), imported fresh per
- * test through `importWorld` (tests/unit/helpers/import-world.js) over the shared
- * fake DOM (LIN-4283): the ruling row is parsed into the world's document, and
- * the buttons and feedback are read back from it. common.js is still a classic
- * script that must run in the same realm (it is what puts window.ReplyDelivery
- * on the global), so it is run once per file with `runClassic`, not once per
- * test: its top-level const and let bindings cannot be declared twice in one
- * realm.
+ * common.js is a classic script that must run in the realm (it is what puts window.ReplyDelivery on the global), so it is
+ * run once per file with `runClassic`: its top-level const and let bindings cannot be declared twice in one realm.
  */
 import { test, describe, after } from 'node:test';
 import assert from 'node:assert/strict';
@@ -72,7 +57,6 @@ const world = await importWorld({
     addEventListener() {},
     matchMedia: () => ({ matches: false }),
     location: { get origin() { return origin; } },
-    ChatUI: { appendOptions() {}, resolveCaption: () => 'no action available yet' },
   },
   globals: {
     confirm: () => true,
@@ -90,30 +74,6 @@ const world = await importWorld({
 });
 world.runClassic('common.js');
 after(() => world.restore());
-
-/**
- * observation.js imported fresh for one test, against the test server at `serverOrigin`. Its module state (the ruling
- * rows, the dedupe the page keeps) is its own, as a fresh page's is.
- */
-async function loadPageAt(serverOrigin) {
-  origin = serverOrigin;
-  return world.importPage('observation.js');
-}
-
-/**
- * A ruling row drawn into the world's document: the option button ChatUI draws (`chat-option chat-option-btn`, chat.js) and
- * the feedback line `renderRulingRow` ends every row with. `rulingRowControls` reads these nodes, so the re-enable check
- * below reads real `disabled` state off real buttons.
- */
-function drawRow() {
-  const container = world.document.createElement('div');
-  world.document.body.appendChild(container);
-  container.innerHTML = '<li class="obs-ruling" data-testid="obs-ruling-row">'
-    + '<button type="button" class="chat-option chat-option-btn">Approve</button>'
-    + '<p class="obs-ruling-feedback" data-testid="obs-ruling-feedback"></p>'
-    + '</li>';
-  return container.querySelector('li.obs-ruling');
-}
 
 // ─── Credential-keyed fake Linear provider + owner-credential store ───────
 
@@ -159,16 +119,7 @@ async function startApp({ provider, ownerCredentialStore, accessToken }) {
     workspacePreferencesStore: { getWorkspacePreferences: async () => ({}) },
     customPromptsStore: {},
     reportHistoryStore: {}, dispatchQueueStore: {}, agentStatusStore: {}, promptTraceStore: {},
-    // LIN-2889: stampDecisionAnswers now calls the shared answer() op, not
-    // markOutcome() directly — this witness's task stamp must actually land
-    // (rather than throwing a logged TypeError) for the recovery-tail
-    // fidelity it exists to check.
-    taskDecisionsStore: {
-      answer: async () => ({ record: { outcome: 'answered' }, firstStampWins: true, unretried: false }),
-      readOutcome: async () => ({ outcome: null }), // LIN-4241 pre-check: row not yet settled
-    },
     harbourCommentsStore: null,
-    sessionsFeedCache: null,
     ownerCredentialStore,
   }));
   const server = app.listen(0, '127.0.0.1');
@@ -180,72 +131,38 @@ const URL_KEY = 'the-witness-workspace';
 const REJECTED_TOKEN = 'session-token-dead';
 const FRESH_TOKEN = 'durable-token-fresh';
 
-function makeRow() {
-  return {
-    decision: { decision_id: 'd-witness-1' },
-    anchor: {
-      loopId: null,
-      issueId: '11111111-2222-3333-4444-555555555555',
-      issueIdentifier: 'LIN-2933-W',
-      workspaceUrlKey: URL_KEY,
-      target: null,
-      followUpTo: null,
-      taskDecisionId: 'scan_11111111_aaaaaaaaaaaa',
-    },
-    disposition: 'task-bound',
-  };
-}
+const ISSUE_ID = '11111111-2222-3333-4444-555555555555';
 
-describe('LIN-2933 cross-seam witness: real deliverRulingReply → real window.ReplyDelivery → real comment route', () => {
-  test('credential-keyed recovery: the press lands — "recorded ✓", buttons re-enable, provider called original+retry', async () => {
+describe('LIN-2933 cross-seam witness: real window.ReplyDelivery.postComment → real comment route', () => {
+  test('credential-keyed recovery: the write lands, provider called original+retry', async () => {
     const { provider, calls } = makeCredentialKeyedProvider([REJECTED_TOKEN]);
     const { store: ownerCredentialStore } = makeOwnerCredentialStore({ token: FRESH_TOKEN, tokenExpiresAt: Date.now() + 3600_000, provider: 'linear' });
     const server = await startApp({ provider, ownerCredentialStore, accessToken: REJECTED_TOKEN });
     try {
-      const { port } = server.address();
-      const page = await loadPageAt(`http://127.0.0.1:${port}`);
-      const { deliverRulingReply } = page;
-      const li = drawRow();
-
-      // Distinct prompt text from the other case below — the route's dedupe
-      // cache is keyed on (urlKey, issueId, body, generation) and is a
-      // MODULE-LEVEL cache shared across every test in this process; an
-      // identical body would make the second case a cache hit instead of a
-      // real write.
-      await deliverRulingReply(makeRow(), 'Approve — recovery case', li);
-
-      const feedback = li.querySelector('.obs-ruling-feedback');
-      assert.match(feedback.textContent, /recorded ✓/, 'the press lands once the server has adopted a different credential');
-      const buttons = li.querySelectorAll('.chat-option-btn');
-      // Non-vacuity: the row must carry its buttons, or the re-enable check below asserts nothing.
-      assert.ok(buttons.length > 0, 'the row has its option buttons drawn');
-      buttons.forEach((b) => assert.equal(b.disabled, false, 'buttons re-enable once the ruling settles'));
+      origin = `http://127.0.0.1:${server.address().port}`;
+      // Distinct text from the other case below — the route's dedupe cache is keyed on (urlKey, issueId, body, generation)
+      // and is a MODULE-LEVEL cache shared across every test in this process; an identical body would make the second
+      // case a cache hit instead of a real write.
+      const result = await world.window.ReplyDelivery.postComment(URL_KEY, ISSUE_ID, 'Approve — recovery case');
+      assert.equal(result.ok, true, `the write lands once the server has adopted a different credential: ${JSON.stringify(result.data)}`);
+      assert.equal(result.status, 201);
       assert.deepStrictEqual(calls.createComment, [REJECTED_TOKEN, FRESH_TOKEN], 'the original attempt used the dead session token; the recovered retry used the adopted one');
     } finally {
       await new Promise((r) => server.close(r));
     }
   });
 
-  test('persistent dead credential: named LINEAR_AUTH message, row restored, no comment ever recorded', async () => {
+  test('persistent dead credential: the named LINEAR_AUTH cause reaches the client, and no comment is ever recorded', async () => {
     const { provider, calls } = makeCredentialKeyedProvider([REJECTED_TOKEN]);
     const { store: ownerCredentialStore } = makeOwnerCredentialStore({ token: REJECTED_TOKEN, tokenExpiresAt: Date.now() + 3600_000, provider: 'linear' });
     const server = await startApp({ provider, ownerCredentialStore, accessToken: REJECTED_TOKEN });
     try {
-      const { port } = server.address();
-      const page = await loadPageAt(`http://127.0.0.1:${port}`);
-      const { deliverRulingReply } = page;
-      const li = drawRow();
-
-      await deliverRulingReply(makeRow(), 'Approve — persistent-failure case', li);
-
-      const feedback = li.querySelector('.obs-ruling-feedback');
-      assert.match(feedback.textContent, /Linear rejected the request as unauthenticated/, 'the named cause reaches the UI, not a bare "Failed to create comment"');
-      assert.match(feedback.textContent, /Sign in again and press once more/);
-      assert.equal(feedback.classList.contains('obs-ruling-feedback--error'), true);
-      const buttons = li.querySelectorAll('.chat-option-btn');
-      assert.ok(buttons.length > 0, 'the row has its option buttons drawn');
-      buttons.forEach((b) => assert.equal(b.disabled, false, 'the row is restored — never left stuck disabled'));
-      assert.strictEqual(calls.createComment.length, 1, 'no comment is ever recorded for a press that never succeeded');
+      origin = `http://127.0.0.1:${server.address().port}`;
+      const result = await world.window.ReplyDelivery.postComment(URL_KEY, ISSUE_ID, 'Approve — persistent-failure case');
+      assert.equal(result.ok, false);
+      const err = world.window.ReplyDelivery.errorFromResult(result);
+      assert.equal(err.code, 'LINEAR_AUTH', 'the classified cause reaches the client, not a bare "Failed to create comment"');
+      assert.strictEqual(calls.createComment.length, 1, 'no comment is ever recorded for a write that never succeeded');
     } finally {
       await new Promise((r) => server.close(r));
     }

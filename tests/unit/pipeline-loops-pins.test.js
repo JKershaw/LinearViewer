@@ -66,7 +66,6 @@ function facts(loop) {
     waitingMessage: loop.waitingMessage,
     decision: loop.decision,
     decisionCase: loop.decisionCase,
-    answeredDecisions: loop.answeredDecisions,
     withdrawal: loop.withdrawal,
     withdrawalReversed: loop.withdrawalReversed,
     telemetry: loop.telemetry

@@ -11,11 +11,7 @@
  *   GET      /workspace/:urlKey/dashboard                          — 302 → /observation (retired flag)
  *   GET      /workspace/:urlKey/api/dashboard/sessions             — sessionId-grouped feed (observation poll source; LIN-595)
  *   GET      /workspace/:urlKey/api/dashboard/loops                — merged cross-workspace runs (flat poll source)
- *   GET      /workspace/:urlKey/api/dashboard/rulings              — unanswered-decision feed (ambient count + rulings tab; LIN-1728)
- *   POST     /workspace/:urlKey/api/dashboard/rulings/dismiss      — dismiss a loop-backed ruling with no comment (LIN-2225)
- *   POST     /workspace/:urlKey/api/dashboard/rulings/reverse-withdrawal — reverse a `decision-withdrawn` stamp, terminal (LIN-2891/LIN-3035; session-auth-only, no UI button yet)
- *   POST     /workspace/:urlKey/api/dashboard/rulings/answer       — stamp a TASK-BOUND ruling answered with no comment, durable optionId (LIN-2754 Track B; the answer already lives on the ticket, this is bookkeeping only)
- *   POST     /workspace/:urlKey/api/dashboard/rulings/keep         — withdraw a proposed dismissal (LIN-2444; view-only — never touches answer state, arms no keepalive)
+ *   GET      /workspace/:urlKey/api/dashboard/rulings              — the person's open questions (ambient count + rulings tab; LIN-1728, LIN-4532, LIN-4541)
  *   GET      /workspace/:urlKey/escalation-kpis                    — operator-facing escalation KPI audit page (LIN-1736; rate, time-to-response, false-escalation, unanswered age); ?windowDays= (default 30), ?targetPerDay= (optional)
  *   GET      /workspace/:urlKey/api/escalation-kpis                — the same KPIs as JSON
  *   GET      /workspace/:urlKey/effort-readout                     — operator-facing per-kind effort x cost x duration x survived-the-next-gate read-out (LIN-2641); URL-only, unflagged and unlinked
@@ -155,20 +151,6 @@ const DEP_DEFAULTS = {
   // test can supply an injectable-clock cache and drive the cross-TTL boundary
   // directly (LIN-1259, item 2 hardening).
   taskDoneCache: createTaskDoneCache,
-  // Task decisions (LIN-2215), the rulings feed's second input
-  // alongside `loops` — see the rulings GET (dashboard-rulings.js). Default
-  // null → the taskDecisions branch is simply skipped (collectUnansweredDecisions
-  // defaults it to []), same degrade-gracefully convention as
-  // proxyEventStore above, so an unwired test sees no behaviour change.
-  taskDecisionsStore: () => null,
-  // Proposed dismissals (LIN-2444), the rulings feed's THIRD input. An agent
-  // may PROPOSE that a ruling be dismissed and never perform one, so the
-  // proposal has to reach the surface where a human can agree to it — the
-  // rulings feed. Without it the whole feature is write-only. Default null → the
-  // suggestion join is skipped and every row reports
-  // `suggestedDismissal: null`, same degrade-gracefully convention as the
-  // stores above.
-  dismissalSuggestionsStore: () => null,
   // Run proposals (LIN-3254): the "Proposed in chat" rows on the run page and
   // the Apply / Decline actions. Default null → no rows render and Apply /
   // Decline 503, same degrade-gracefully convention as the stores above.
@@ -256,7 +238,6 @@ export async function readRunAccount(recordsStore, readRow, urlKey, session) {
  * @param {Function} deps.getDeployInfo            - () → deploy metadata
  * @param {number}   [deps.recentLimit=120]        - cap on terminal runs returned by /loops
  * @param {Object}   [deps.sessionsFeedCache]      - short-TTL SWR cache for the /sessions feed (LIN-617)
- * @param {Object}   [deps.taskDecisionsStore]     - task decisions store (LIN-2215), threaded into /api/dashboard/rulings; retired with the old stores (LIN-4541)
  * @returns {Router}
  */
 export function createDashboardRoutes(deps) {

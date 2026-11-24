@@ -44,12 +44,14 @@ import { createMockCollection } from '../fixtures/mock-collection.js';
 /** Today's runner allowlist, in its rendered order. Written out, never read from source. */
 const RUNNER_KINDS_LITERAL = [
   'status', 'recap', 'heartbeat', 'evidence', 'assistant-text', 'tool', 'usage', 'resources',
-  'refusal', 'decision', 'decision-withdrawn'
+  'refusal'
 ];
-/** Kinds the store writes itself that a runner may not post (human-only stamps). */
+/** LIN-4541: the two kinds runners used to post, now history: a runner post of either is refused 422. */
+const REFUSED_KINDS = ['decision', 'decision-withdrawn'];
+/** Kinds the store wrote itself that a runner may not post (human-only stamps), history since LIN-4541. */
 const STORE_ONLY_KINDS = ['decision-answer', 'decision-withdrawal-reversed'];
-/** Every feedback-entry kind written anywhere, plus an unknown kind and no kind at all. */
-const UNIVERSE = [...RUNNER_KINDS_LITERAL, ...STORE_ONLY_KINDS, 'some-future-kind', undefined];
+/** Every feedback-entry kind on a stored row, plus an unknown kind and no kind at all. */
+const UNIVERSE = [...RUNNER_KINDS_LITERAL, ...REFUSED_KINDS, ...STORE_ONLY_KINDS, 'some-future-kind', undefined];
 
 const STAMP_KINDS = ['decision-answer', 'decision-withdrawn', 'decision-withdrawal-reversed'];
 const PARKED_RELAY_KINDS = ['tool', 'usage', 'resources'];
@@ -67,14 +69,18 @@ describe('FEEDBACK_ENTRY_KINDS: contents and order, as the runner prompt renders
   test('the runner prompt renders the literal list byte for byte', () => {
     const prompt = buildRunnerKickoff({ baseUrl: 'https://harbour.example' });
     const rendered = '`status`, `recap`, `heartbeat`, `evidence`, `assistant-text`, `tool`, `usage`, '
-      + '`resources`, `refusal`, `decision`, `decision-withdrawn`';
+      + '`resources`, `refusal`';
     assert.ok(prompt.includes(rendered), 'the runner prompt lists the feedback kinds in today\'s order');
   });
 
-  test('the runner-facing validator accepts each allowlisted kind and drops the store-only stamps', () => {
+  test('the runner-facing validator accepts each allowlisted kind, refuses the retired decision kinds, and drops the store-only stamps', () => {
     for (const kind of RUNNER_KINDS_LITERAL) {
-      const message = kind === 'decision-withdrawn' ? JSON.stringify({ decision_id: 'd1', reason: 'r' }) : 'm';
-      assert.equal(validateFeedbackBody({ message, kind }).value?.kind, kind, kind);
+      assert.equal(validateFeedbackBody({ message: 'm', kind }).value?.kind, kind, kind);
+    }
+    for (const kind of REFUSED_KINDS) {
+      const out = validateFeedbackBody({ message: 'm', kind });
+      assert.equal(out.status, 422, kind);
+      assert.equal(out.code, 'DECISION_FEEDBACK_RETIRED', kind);
     }
     for (const kind of [...STORE_ONLY_KINDS, 'some-future-kind']) {
       assert.equal(validateFeedbackBody({ message: 'm', kind }).value.kind, undefined, kind);

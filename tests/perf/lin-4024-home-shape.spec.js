@@ -1,5 +1,6 @@
 import { test, expect } from '../fixtures/test-base.js';
 import { localSeedId } from '../fixtures/local-harness.js';
+import { seedQuestion } from '../fixtures/question-records.js';
 
 // LIN-4024 (witness D, the shape measure): Home on a workspace of this workspace's shape, seeded locally: ~3,700 tasks in
 // 11 projects, ~60% with a parent, ~63% done, and a started charter root over one project's tree. The page must hold the
@@ -79,7 +80,7 @@ async function seedWorkspace(page, { runnerKey = false } = {}) {
 
 /**
  * LIN-4114 (settle before merge): a worker waiting on a ruling, written through the dispatch API the way a runner writes it
- * (enqueue, take, `[blocked]` and `[decision]`). The same route the Waiting on you E2E seeds with.
+ * (enqueue, take, `[blocked]`), and the question record it asked (LIN-4541). The same seeding the Waiting on you E2E uses.
  */
 async function seedRuling(page, identifier, token) {
   const res = await page.request.post(`/workspace/${URL_KEY}/api/dispatch`, {
@@ -93,9 +94,8 @@ async function seedRuling(page, identifier, token) {
     headers: { Authorization: `Bearer ${token}`, 'Content-Type': 'application/json' }, data,
   });
   expect((await feedback({ message: '[blocked] which way?' })).status()).toBe(200);
-  const decision = { options: [{ id: 'ship', label: 'Ship it now' }, { id: 'wait', label: 'Wait for review' }], recommended: 'wait' };
-  const res2 = await feedback({ kind: 'decision', message: JSON.stringify({ decision_id: `d-${identifier}`, question: `Which for ${identifier}?`, ...decision }) });
-  expect(res2.status(), `decision failed: ${await res2.text()}`).toBe(200);
+  // LIN-4541: a ruling is a question record the run asked (the feedback route refuses a decision entry now).
+  await seedQuestion(page, URL_KEY, { ticket: identifier, runId: itemId, asks: `Which for ${identifier}?`, options: ['Ship it now', 'Wait for review'], recommended: 'Wait for review' });
 }
 
 test('Home on a few thousand tasks: the page is small, draws no project section, and the backlog page holds the rest', async ({ page }) => {

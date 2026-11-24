@@ -1,5 +1,6 @@
 import { test, expect } from '../fixtures/test-base.js';
 import { askingRun, seedQuestion, questionState, decisionFor } from '../fixtures/question-records.js';
+import { seedHistoryFeedback } from '../fixtures/history-feedback.js';
 
 // LIN-1003 (Phase 1 of LIN-950): the dedicated per-session page
 // (GET /workspace/:urlKey/observation/session/:sessionId) — the Observation
@@ -240,11 +241,11 @@ async function seedStandaloneWarm(page, { issueIdentifier, issueTitle }) {
   return { item, token };
 }
 
-// Seed an autopilot session with one worker carrying an unanswered `decision`
-// feedback entry (LIN-1728 Phase 2) plus a [blocked] marker — the real
-// "waiting for a ruling" shape the runner emits via
-// `POST /api/dispatch/feedback/:itemId` with `kind: 'decision'` (accepted
-// since LIN-2180, FEEDBACK_ENTRY_KINDS). Returns the seeded decisionId so
+// Seed an autopilot session with one worker carrying an old `decision`
+// feedback entry (LIN-1728 Phase 2) plus a [blocked] marker — the shape the
+// runner used to emit. LIN-4541: the feedback route refuses that kind now, so
+// the decision is written as it was stored, through the history seam
+// (tests/fixtures/history-feedback.js). Returns the seeded decisionId so
 // callers can assert the threaded value.
 async function seedSessionWithDecision(page) {
   const decisionId = 'd-e2e-1';
@@ -269,10 +270,9 @@ async function seedSessionWithDecision(page) {
     headers: auth, data: { message: '[blocked] need a ruling before continuing' }
   });
   expect(blocked.status(), `blocked feedback failed: ${await blocked.text()}`).toBe(200);
-  const decision = await page.request.post(`/api/dispatch/feedback/${workerId}`, {
-    headers: auth, data: { kind: 'decision', message: JSON.stringify({ decision_id: decisionId, question: 'Proceed with option A?', options: [{ id: 'a', label: 'Approve' }] }) }
-  });
-  expect(decision.status(), `decision feedback failed: ${await decision.text()}`).toBe(200);
+  await seedHistoryFeedback(page, URL_KEY, workerId, [
+    { kind: 'decision', message: JSON.stringify({ decision_id: decisionId, question: 'Proceed with option A?', options: [{ id: 'a', label: 'Approve' }] }) },
+  ]);
   return { workerId, decisionId };
 }
 
@@ -865,17 +865,13 @@ test.describe('Dedicated per-session page (LIN-1003)', () => {
     expect(kpi.falseEscalation.total).toBe(1);
   });
 
-  test('a decision-answer stamp in a run\'s transcript never renders as a chat bubble (LIN-1728 Phase 2, F6)', async ({ page }) => {
+  test('an old decision-answer stamp in a run\'s transcript never renders as a chat bubble (LIN-1728 Phase 2, F6; history since LIN-4541)', async ({ page }) => {
     await page.goto(`/test/set-session?urlKey=${URL_KEY}`);
     await clearRuns(page);
     const { workerId, decisionId } = await seedSessionWithDecision(page);
-    // Stamp the answer directly through the durable comment route's own write
-    // path shape — a `decision-answer` feedback entry — without going through
-    // the UI, isolating this test to the transcript-render exclusion (F6).
-    const commentResp = await page.request.post(`/workspace/${URL_KEY}/api/comments/LIN-1728`, {
-      data: { body: 'recorded', decisionLoopId: workerId, decisionId }
-    });
-    expect(commentResp.status()).toBe(201);
+    // The stamp as the retired answer path stored it: a `decision-answer` feedback entry. No route writes one now, so it is
+    // written through the history seam, isolating this test to the transcript-render exclusion (F6): old rows still display.
+    await seedHistoryFeedback(page, URL_KEY, workerId, [{ kind: 'decision-answer', message: JSON.stringify({ decision_id: decisionId }) }]);
 
     // LIN-2209 (F1/L1): a rendered-count assertion alone is not a witness for
     // the write — storage holding 2 entries (a no-op stamp) and storage

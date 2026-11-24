@@ -97,8 +97,7 @@ describe('LIN-3601 proxy-grant sweep — the composer', () => {
 
   test('enumerates every URL form the proxy route sources register', () => {
     // Each `router.<verb>(` is one URL form, plus one more per array-path alias
-    // (proxy-endpoint-inventory-witness derives the same figure and subtracts
-    // the three documented routes/proxy-rulings.js forms; this sweep calls them).
+    // (proxy-endpoint-inventory-witness derives the same figure).
     assert.equal(routes.length, derivedUrlForms(), 'the enumerated route count must equal the count derived from the proxy sources');
     assert.ok(writes.length > 20, `a sweep that finds ${writes.length} write routes is not sweeping the composer`);
     for (const m of ENQUEUE_MOUNTS) {

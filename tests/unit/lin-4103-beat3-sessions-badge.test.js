@@ -171,7 +171,7 @@ describe('R-D the strip names a waiting run in the same words as the list', () =
     const blocked = loop({
       loopId: 'run-q', lineageId: 'run-q', wakeMarker: 'blocked', waitingMessage: '[blocked] which way?',
       feedback: [{ message: '[blocked] which way?', timestamp: '2026-11-01T10:05:00.000Z' }],
-      decision: { decision_id: 'd-1', question: 'Which way?' }, decisionCase: [], answeredDecisions: [], withdrawal: null,
+      decision: { decision_id: 'd-1', question: 'Which way?' }, decisionCase: [], withdrawal: null,
     });
     const model = buildTaskPageModel({
       identifier: 'LIN-7', loops: [blocked],

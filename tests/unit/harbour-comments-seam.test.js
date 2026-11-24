@@ -303,7 +303,7 @@ describe('seam 3 — POST /workspace/:urlKey/api/comments/:issueId (routes/works
 
     assert.strictEqual(status, 201);
     assert.strictEqual(body.success, true);
-    assert.match(body.comment.body, /Ruling recorded via Harbour/);
+    assert.strictEqual(body.comment.body, 'seam3-throw ship it', 'the person\'s words, with no ruling mark (LIN-4541)');
     assert.strictEqual(ledger.calls.length, LEDGER_ATTEMPTS);
   });
 

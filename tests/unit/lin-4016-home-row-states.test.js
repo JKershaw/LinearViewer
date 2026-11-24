@@ -29,7 +29,7 @@ const rulingLoop = (identifier, over = {}) => loop({
   loopId: `r-${identifier}`, lineageId: `r-${identifier}`, issueIdentifier: identifier,
   wakeMarker: 'blocked', waitingMessage: '[blocked] which way?',
   feedback: [{ message: '[blocked] which way?', timestamp: '2026-10-30T10:05:00.000Z' }],
-  decision: { decision_id: `d-${identifier}`, question: 'Which way?' }, decisionCase: [], answeredDecisions: [], withdrawal: null, ...over,
+  decision: { decision_id: `d-${identifier}`, question: 'Which way?' }, decisionCase: [], withdrawal: null, ...over,
 });
 
 const node = (identifier) => ({

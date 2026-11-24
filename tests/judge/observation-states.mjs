@@ -1,5 +1,5 @@
 // Observation judge states (LIN-3983 PR 2). `obs-two-runs` seeds the set the ticket names: one run
-// waiting on a structured question (so the waiting block shows its answer), and one run still working.
+// waiting on a question record (so the waiting block shows its card), and one run still working.
 // Both the Runs view and the Rulings tab are shot from that one seed (the same urlKey, seeded once per
 // server). The seed runs through the dispatch API, the same routes the e2e seed uses (both sides have them),
 // on the real clock: the rows are relative to now, and their times are masked in pages.mjs.
@@ -44,24 +44,12 @@ export async function seedObservation(request, baseURL, urlKey, state) {
   const anchor = (await anchorRes.json()).item.id;
   const waiting = await enqueueAndTake(request, urlKey, { task: 'LOCAL-1', title: 'Local parent task', kind: 'implementation', sessionId: anchor }, token);
   await feedback(request, waiting, token, { message: '[blocked] Which sign-in method should I build?' });
-  await feedback(request, waiting, token, {
-    kind: 'decision',
-    message: JSON.stringify({
-      decision_id: 'judge-decision-sign-in',
-      question: 'Which sign-in method should I build?',
-      options: [{ id: 'a', label: 'Email link' }, { id: 'b', label: 'Linear OAuth' }],
-      recommended: 'a',
-    }),
+  // LIN-4541: the question is a question record the run asked (the feedback route refuses a decision entry now, and the
+  // proposed-dismissal banner and bulk bar retired with the ruling machinery).
+  const question = await request.post('/test/seed-question-record', {
+    data: { urlKey, ticket: 'LOCAL-1', runId: waiting, asks: 'Which sign-in method should I build?', options: ['Email link', 'Linear OAuth'], recommended: 'Email link' },
   });
-
-  // A standing proposal on that question, so the Rulings tab shows its banner and the bulk bar (the replay shoots both).
-  const proxy = await request.get(`/test/create-proxy-token?scope=readWrite&label=judge-suggest&urlKey=${urlKey}`);
-  if (!proxy.ok()) throw new Error(`observation seed proxy token failed: ${proxy.status()}`);
-  const suggest = await request.post('/api/proxy/rulings/judge-decision-sign-in/suggest-dismissal', {
-    headers: { Authorization: `Bearer ${(await proxy.json()).token}`, 'Content-Type': 'application/json' },
-    data: { reason: 'shipped separately' },
-  });
-  if (!suggest.ok()) throw new Error(`observation seed suggest-dismissal failed: ${suggest.status()} ${await suggest.text()}`);
+  if (!question.ok()) throw new Error(`observation seed question failed: ${question.status()} ${await question.text()}`);
 
   // A working run: its own standalone dispatch, with a heartbeat.
   const working = await enqueueAndTake(request, urlKey, { task: 'LOCAL-2', title: 'Local child task', kind: 'plan-review' }, token);

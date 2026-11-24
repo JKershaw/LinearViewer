@@ -13,7 +13,7 @@ import { join } from 'node:path';
 import { MangoClient } from '@jkershaw/mangodb';
 import { DispatchQueueStore } from '../../lib/dispatch-store.js';
 import { AgentStatusStore } from '../../lib/agent-status-store.js';
-import { getLoopsForWorkspace } from '../../lib/pipeline-loops.js';
+import { getLoopsForWorkspace, redigestHistoryRows } from '../../lib/pipeline-loops.js';
 import { TICKET_CLOSED_GRACE_MS } from '../../lib/lineage-closure.js';
 import { RecordsStore, RECORDS_COLLECTION, REFS_COLLECTION, QUERY_LOG_COLLECTION } from '../../lib/records-store.js';
 import { createRecordWrites } from '../../lib/records/writes.js';
@@ -89,7 +89,16 @@ describe('ticket-close-closer (LIN-3366)', () => {
     urlKey: URL_KEY, ticket: done, dispatchStore: store, recordsStore: records, agentStatusStore, log, ...o
   });
   const row = (id) => history.findOne({ _id: id });
-  const reverse = (id, decisionId) => store.markDecisionWithdrawalReversed(id, URL_KEY, decisionId);
+  // LIN-4541: the store's withdrawal and reversal writers are gone (no code writes those kinds now). The closer still reads
+  // the history rows they wrote, so the fixtures write those rows as they were stored: the entry, the version bump, and the
+  // digest written back from raw feedback (what the old writers' after-write step left).
+  const pushHistory = async (id, kind, body) => {
+    await history.updateOne({ _id: id }, { $push: { feedback: { kind, message: JSON.stringify(body), timestamp: new Date() } } });
+    await history.updateOne({ _id: id }, { $inc: { feedbackVersion: 1 } });
+    await redigestHistoryRows([id], store, { persist: true });
+  };
+  const withdraw = (id, decisionId, reason) => pushHistory(id, 'decision-withdrawn', { decision_id: decisionId, reason });
+  const reverse = (id, decisionId) => pushHistory(id, 'decision-withdrawal-reversed', { decision_id: decisionId });
 
   describe('reversalState (three states)', () => {
     const cells = [
@@ -268,7 +277,7 @@ describe('ticket-close-closer (LIN-3366)', () => {
     test('a reversed withdrawal is not selected, its carrier row stays open, and two runs log zero failures', async () => {
       await seedBlocked('a', { decisionId: 'dec-a' });
       await seedBlocked('b');
-      await store.markDecisionWithdrawn('a', URL_KEY, 'dec-a', 'ticket-closed: LIN-1 reached completed');
+      await withdraw('a', 'dec-a', 'ticket-closed: LIN-1 reached completed');
       await close(); // closes both rows
       await reverse('a', 'dec-a');
       // Human re-opens the ruling: un-retire the carrier row too (as the dashboard does by deleting bookkeeping).
@@ -286,7 +295,7 @@ describe('ticket-close-closer (LIN-3366)', () => {
     });
     test('a newer decision (new id) on the row makes it eligible again', async () => {
       await seedBlocked('a', { decisionId: 'dec-a' });
-      await store.markDecisionWithdrawn('a', URL_KEY, 'dec-a', 'ticket-closed: x');
+      await withdraw('a', 'dec-a', 'ticket-closed: x');
       await reverse('a', 'dec-a');
       await history.updateOne({ _id: 'a' }, { $push: { feedback: { kind: 'decision', message: JSON.stringify({ decision_id: 'dec-a2', question: 'q2', options: [] }), timestamp: mins(100) } } });
       await history.updateOne({ _id: 'a' }, { $inc: { feedbackVersion: 1 } });
@@ -303,7 +312,7 @@ describe('ticket-close-closer (LIN-3366)', () => {
     };
     const reversedRow = async (id) => {
       await seedBlocked(id, { decisionId: `dec-${id}` });
-      await store.markDecisionWithdrawn(id, URL_KEY, `dec-${id}`, 'ticket-closed: LIN-1 reached completed');
+      await withdraw(id, `dec-${id}`, 'ticket-closed: LIN-1 reached completed');
       await reverse(id, `dec-${id}`);
       await history.updateOne({ _id: id }, { $set: { bookkeeping: null } });
       await stripKey(id);
@@ -315,9 +324,8 @@ describe('ticket-close-closer (LIN-3366)', () => {
       const calls = [];
       const spy = Object.create(store);
       spy.closeIssueRows = async (...a) => { calls.push(['close', ...a]); return store.closeIssueRows(...a); };
-      spy.markDecisionWithdrawn = async (...a) => { calls.push(['withdraw', ...a]); return store.markDecisionWithdrawn(...a); };
       const first = await close({ dispatchStore: spy });
-      assert.deepEqual(calls, [], 'closeIssueRows and markDecisionWithdrawn are not called');
+      assert.deepEqual(calls, [], 'closeIssueRows is not called');
       assert.equal(first.closedRows, 0);
       assert.equal((await row('a')).bookkeeping, null);
       assert.equal((await row('a')).feedbackDigest.withdrawalReversed, true, 're-digest persisted the fact');

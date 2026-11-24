@@ -65,25 +65,3 @@ export async function questionState(page, urlKey, questionId) {
 export async function decisionFor(page, urlKey, questionId) {
   return (await recordsOf(page, urlKey, 'decision')).find((r) => r.links?.answers === questionId) ?? null;
 }
-
-/**
- * A worker waiting on an old-style ruling, written the way lin-4242-waiting-live.spec.js writes it (a `[decision]` on the parked
- * run). Used where a ruling and a question are open together.
- */
-export async function seedRuling(page, urlKey, identifier, decision, { token = null } = {}) {
-  const bearer = token || await runnerTokenFor(page, urlKey);
-  const res = await page.request.post(`/workspace/${urlKey}/api/dispatch`, {
-    data: { prompt: 'implementation prompt', promptName: 'implementation', kind: 'implementation', issueIdentifier: identifier, issueTitle: identifier, target: 'cli' },
-  });
-  expect(res.status(), `dispatch seed failed: ${await res.text()}`).toBe(201);
-  const itemId = (await res.json()).item.id;
-  const taken = await page.request.post(`/api/dispatch/take/${itemId}`, { headers: { Authorization: `Bearer ${bearer}` } });
-  expect(taken.status(), `take failed: ${await taken.text()}`).toBe(200);
-  const feedback = (data) => page.request.post(`/api/dispatch/feedback/${itemId}`, {
-    headers: { Authorization: `Bearer ${bearer}`, 'Content-Type': 'application/json' }, data,
-  });
-  expect((await feedback({ message: '[blocked] which way?' })).status()).toBe(200);
-  const res2 = await feedback({ kind: 'decision', message: JSON.stringify({ decision_id: `d-${identifier}`, question: `Which for ${identifier}?`, ...decision }) });
-  expect(res2.status(), `decision failed: ${await res2.text()}`).toBe(200);
-  return itemId;
-}

@@ -19,7 +19,7 @@ The owner's direction, from LIN-3613's description: "perhaps a round of known im
 As recorded on the ticket and in the operator's notes:
 
 * **In-frame calls are yours.** The items, their order, the lanes and the launching. Do not ask the owner for these.
-* **Rulings are yours to decide, and the owner's to press.** The proxy cannot answer a ruling, by design. Pre-fill it with `POST /api/proxy/rulings/{id}/suggest-answer` (`optionId`, and a `reason` of 500 characters or fewer). Then tell the owner to press.
+* **Rulings are yours to recommend, and the owner's to answer.** A ruling is a `question` record addressed to the owner; no agent answers one, by design. Name your pick in it (`recommended`, with the reason in `asks`), then tell the owner. (The proposed-answer route this runbook used to name retired with the ruling machinery, LIN-4541.)
 * **A non-obvious ruling gets a sub-agent investigation first.** Decide on its report.
 * **A ruling with no obvious right answer goes to the owner.** Say so plainly and keep working on other lanes.
 * **A live or human check is recorded as not run.** Write what, why and the follow-up. Do not hold work for it.
@@ -88,7 +88,7 @@ Every sub-agent prompt says: no `rm`, no `git clean`, no worktree removal, temp 
 
 ## Where the live state lives
 
-On LIN-3613, as comments, newest last. Each one records the lane order, what is running with its run ids, what is queued, the calls taken and what is waiting on the owner. Post one after every launch batch and every merge. A fresh agent reads the ticket, its children, the open rulings (`GET /api/proxy/rulings`) and `GET /api/proxy/heartbeats`, and has the state.
+On LIN-3613, as comments, newest last. Each one records the lane order, what is running with its run ids, what is queued, the calls taken and what is waiting on the owner. Post one after every launch batch and every merge. A fresh agent reads the ticket, its children, the open rulings (`GET /api/proxy/records?kind=question&state=open`) and `GET /api/proxy/heartbeats`, and has the state.
 
 Do not keep state only in a scratchpad. Cycle 1 did, and this runbook exists to end that.
 

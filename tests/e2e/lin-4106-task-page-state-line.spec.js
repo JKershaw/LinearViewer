@@ -29,12 +29,11 @@ test.beforeEach(async ({ page, localWorkerUrlKey }) => {
   await page.goto(`/test/clear-agent-status?urlKey=${URL_KEY}`);
   await page.goto(`/test/clear-observation-sessions?urlKey=${URL_KEY}`);
   await page.goto(`/test/clear-sessions-feed-cache?urlKey=${URL_KEY}`);
-  await page.goto(`/test/clear-task-decisions?urlKey=${URL_KEY}`);
   await page.request.get(`/test/clear-ticket-records?urlKey=${URL_KEY}`);
 });
 
 test.afterEach(async ({ page, localWorkerUrlKey }) => {
-  for (const reset of ['clear-dispatch-queue', 'clear-dispatch-history', 'clear-agent-status', 'clear-task-decisions', 'clear-ticket-records']) {
+  for (const reset of ['clear-dispatch-queue', 'clear-dispatch-history', 'clear-agent-status', 'clear-ticket-records']) {
     await page.request.get(`/test/${reset}?urlKey=${localWorkerUrlKey}`);
   }
 });

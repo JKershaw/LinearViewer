@@ -17,7 +17,7 @@
 import { test, expect } from '../fixtures/test-base.js';
 import { localSeedId } from '../fixtures/local-harness.js';
 import {
-  askingRun, seedQuestion, stopRun, questionState, decisionFor, seedRuling,
+  askingRun, seedQuestion, stopRun, questionState, decisionFor, runnerTokenFor,
 } from '../fixtures/question-records.js';
 
 const OLD = '2020-01-01T00:00:00Z';
@@ -29,10 +29,6 @@ const BADGE = '.rulings-badge .rulings-count';
 const RESUMED = 'Answered. The run resumes with your answer.';
 const NOT_RESUMED = 'Answered. The run was stopped, so it was not resumed.';
 const DISMISSED = 'Dismissed. The run is told and takes its fallback.';
-const THREE_OPTIONS = {
-  options: [{ id: 'ship', label: 'Ship it now' }, { id: 'wait', label: 'Wait for review' }, { id: 'split', label: 'Split the change' }],
-  recommended: 'wait',
-};
 
 let URL_KEY;
 
@@ -45,7 +41,6 @@ test.beforeEach(async ({ page, localWorkerUrlKey }) => {
   await page.request.get(`/test/clear-dispatch-queue?urlKey=${URL_KEY}`);
   await page.request.get(`/test/clear-dispatch-history?urlKey=${URL_KEY}`);
   await page.request.get(`/test/clear-sessions-feed-cache?urlKey=${URL_KEY}`);
-  await page.request.get(`/test/clear-task-decisions?urlKey=${URL_KEY}`);
   await page.request.get(`/test/clear-ticket-records?urlKey=${URL_KEY}`);
 });
 
@@ -142,22 +137,31 @@ test.describe('Home: Waiting on you draws the open question records', () => {
     expect((await decisionFor(page, URL_KEY, qid))?.fields.answer).toBe('left');
   });
 
-  test('with an old ruling and a question open, Home counts and draws the question; the badge and the Rulings page also list the old ruling', async ({ page }) => {
-    // LIN-4538 (P7a): Home reads question records only. An old ruling still open is the ruling machinery's until P7b retires it
-    // (after the cutover answers every open one): the Rulings page lists and answers it, and the badge, which counts that page's
-    // rows, includes it. So during the cutover Home's count is its own cards, and the badge leads to the page that serves the rest.
+  test('LIN-4541: a stale DECISION: post is refused 422 naming the records route; Home, the badge and the Rulings page agree on the one question', async ({ page }) => {
+    // The old ruling path is gone: a runner posting a decision entry is refused out loud, and stores nothing, so the only
+    // ruling there is to count is the question record. Home's count, the badge and the Rulings page read the same one.
     await seedTree(page);
-    await seedRuling(page, URL_KEY, 'LOCAL-S', THREE_OPTIONS);
+    const staleRun = await askingRun(page, URL_KEY, 'LOCAL-S');
+    const token = await runnerTokenFor(page, URL_KEY);
+    const stale = await page.request.post(`/api/dispatch/feedback/${staleRun}`, {
+      headers: { Authorization: `Bearer ${token}`, 'Content-Type': 'application/json' },
+      data: { kind: 'decision', message: JSON.stringify({ decision_id: 'd-stale', question: 'Which way?', options: [{ id: 'a', label: 'A' }] }) },
+    });
+    expect(stale.status()).toBe(422);
+    expect((await stale.json()).code).toBe('DECISION_FEEDBACK_RETIRED');
+    expect((await stale.json()).error).toContain('POST /api/proxy/records');
+
     await seedQuestion(page, URL_KEY, { ticket: 'LOCAL-D', runId: await askingRun(page, URL_KEY, 'LOCAL-D') });
     await page.goto(`/workspace/${URL_KEY}/`);
     await expect(page.locator(COUNT)).toContainText('1 waiting on you');
     await expect(page.locator(WAITING_QCARD)).toHaveCount(1);
-    await expect(page.locator(`${SECTION} [data-testid="waiting-task-line"]`, { hasText: 'LOCAL-S' })).toHaveCount(0);
     await syncBadge(page);
-    await expect(page.locator(BADGE)).toHaveText('2');
+    await expect(page.locator(BADGE)).toHaveText('1');
 
     await page.goto(`/workspace/${URL_KEY}/observation`);
-    await expect(page.locator('[data-testid="obs-ruling-row"], [data-testid="ruling-question-row"]')).toHaveCount(2);
+    await page.locator('[data-testid="obs-tab-rulings"]').click();
+    await expect(page.locator('[data-testid="ruling-question-row"]')).toHaveCount(1);
+    await expect(page.locator('[data-testid="ruling-question-row"] [data-testid="question-record-card-question"]')).toHaveText('Which way?');
   });
 });
 

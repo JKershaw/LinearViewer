@@ -38,8 +38,8 @@ Area notes for `runs-and-dispatch` in the registry. Format and rules: README.md.
 - A feedback-entry kind is one row in `FEEDBACK_KINDS` (`lib/dispatch-feedback-kinds.js`) that declares
   every role; readers filter the table, and its row order is the runner prompt's bytes. A shared
   constant is imported from its owner (`HALT_MODES`, `followUpTarget`, `NEVER_RAN` in
-  `lib/dispatch-terminal.js`). The decision-stamp set had four copies in `lib/`; the LIN-4455
-  censuses (`lin-4455-feedback-kinds-table`, `lin-4455-constants-owners`) fail on a new one.
+  `lib/dispatch-terminal.js`); the LIN-4455 censuses fail on a copy. A retired kind keeps its row
+  with `refuse`, unpostable: old rows show; a stale post is a 422 naming its successor (LIN-4541).
 - A task timeline lane is running from the page's open session ids (`isOpenState`), never the
   cost row; a lineage's own `incomplete`, not the shared `lineagesTruncated`, decides "not
   complete" (LIN-4405, `lib/task-timeline.js`).

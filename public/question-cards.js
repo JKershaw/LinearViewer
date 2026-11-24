@@ -2,7 +2,7 @@
  * Question-card client (LIN-3252 S2; shared by the session page and the task
  * page, LIN-3499).
  *
- * The pinned question card's behaviour: Answer, option choice, dismiss, and the
+ * The pinned reply card's behaviour (Answer), and the
  * Send-and-continue reply plumbing (`sendReply`) the session page's per-run
  * reply boxes also use. Paired with lib/question-card.js (the markup).
  *
@@ -65,34 +65,12 @@
       return recorded ? base + ' Recorded on the task.' : base;
     }
 
-    function onDispatchOk(note) {
+    function onDispatchOk() {
       outcome = 'success';
       appendYouBubble(thread, prompt);
       textarea.value = '';
-      // The success copy matches what actually happened (LIN-3252 F1): a
-      // resume queues a follow-up, a `record` effect only records, and a
-      // `dispatch` effect starts a fresh run. A dispatch whose press-time
-      // anchor check downgraded it to record (G1) arrives with a note — say so
-      // rather than claiming a run started.
-      //
-      // H1: read the DELIVERED effect, not the declared one. `deliverRulingAnswer`
-      // rewrites a declared `resume` on a reaped loop (G3) to a fresh run, so a
-      // card that branched on `opts.effect` would claim "queued" while a run
-      // actually started.
-      var effect = window.ReplyDelivery.deliveredEffect(opts);
-      if (effect === 'record') {
-        feedback.textContent = 'recorded on the task';
-        btn.textContent = 'answered ✓';
-      } else if (effect === 'dispatch' && !note) {
-        feedback.textContent = 'started a new run';
-        btn.textContent = 'started ✓';
-      } else if (effect === 'dispatch') {
-        feedback.textContent = 'recorded on the task — ' + note;
-        btn.textContent = 'answered ✓';
-      } else {
-        feedback.textContent = queuedCopy(!opts.issueless);
-        btn.textContent = 'queued ✓';
-      }
+      feedback.textContent = queuedCopy(!opts.issueless);
+      btn.textContent = 'queued ✓';
       feedback.className = 'sess-reply-feedback';
       if (cardCtx) announceRulingGone(cardCtx.card, feedback.textContent);
     }
@@ -103,15 +81,6 @@
     // both wire to this same handler here: today's identical "reply failed:
     // ..." copy, zero user-visible change from before the extraction.
     function onDispatchFailed(e) {
-      // LIN-4241: a ruling settled elsewhere is gone, not failed. The card leaves and says so; no retry is offered.
-      if (e && e.code === RULING_SETTLED_CODE) {
-        outcome = 'settled';
-        feedback.textContent = ANSWERED_ELSEWHERE_COPY;
-        feedback.className = 'sess-reply-feedback';
-        btn.textContent = 'answered elsewhere';
-        if (cardCtx) removeAnsweredElsewhere(cardCtx.card);
-        return;
-      }
       outcome = 'failed';
       feedback.textContent = 'reply failed: ' + e.message;
       feedback.className = 'sess-reply-feedback error';
@@ -148,10 +117,7 @@
     // caller-side reimplementation of postDispatch.
     function onPartialFailure(dispatchErr, retryDispatch) {
       outcome = 'partial';
-      var delivered = window.ReplyDelivery.deliveredEffect(opts);
-      // LIN-4140: a task-bound answer is always a record, so its failure names
-      // the task, not a session it was never going to reach.
-      var deliveryVerb = delivered === 'dispatch' ? 'start a run' : (opts.taskDecisionId ? 'record on the task' : 'deliver to the session');
+      var deliveryVerb = 'deliver to the session';
       appendYouBubble(thread, prompt);
       textarea.value = '';
       feedback.textContent = 'Recorded on the task. Could not ' + deliveryVerb + ': ' + dispatchErr.message + '. ';
@@ -165,7 +131,7 @@
         feedback.textContent = 'retrying delivery…';
         feedback.className = 'sess-reply-feedback';
         retryDispatch().then(function () {
-          feedback.textContent = delivered === 'dispatch' ? 'started a new run' : queuedCopy(true);
+          feedback.textContent = queuedCopy(true);
           feedback.className = 'sess-reply-feedback';
           // LIN-4114: a retry that lands delivers the answer, so the card goes like any other delivered answer.
           if (cardCtx) announceRulingGone(cardCtx.card, feedback.textContent);
@@ -195,26 +161,11 @@
     // window.updateQueueBadge, a UI side effect this reply flow must not own.
     // Full reasoning: the banner note on window.ReplyDelivery (common.js).
     //
-    // LIN-3252 F1: the answer is delivered by its resolved `effect` through
-    // the ONE shared helper both this card and the Rulings tab use — resume
-    // (comment + follow-up), record (comment only, honoring record_on), or
-    // dispatch (comment then a fresh run). Never a card-local parallel path.
-    opts.prompt = prompt;
-    window.ReplyDelivery.deliverRulingAnswer(opts, {
+    // LIN-4541: a reply is a comment and a resume, never an answer to a ruling. A question is answered through its own
+    // route (public/question-records.js), so the old record and fresh-run effects went with the ruling machinery.
+    window.ReplyDelivery.deliverReply(opts, prompt, {
       onCommentFailed: onDispatchFailed,
       onDispatchFailed: onDispatchFailed,
-      onNoTarget: function () {
-        outcome = 'failed';
-        feedback.textContent = 'cannot record a reply: no linked issue';
-        feedback.className = 'sess-reply-feedback error';
-        btn.textContent = 'failed';
-      },
-      onNoLinkedIssue: function () {
-        outcome = 'failed';
-        feedback.textContent = 'cannot start a fresh run: no linked issue';
-        feedback.className = 'sess-reply-feedback error';
-        btn.textContent = 'failed';
-      },
       onPartialFailure: onPartialFailure,
       onDispatchOk: onDispatchOk
     }).then(restoreButton);
@@ -222,21 +173,21 @@
 
   // ── Answered, dismissed: one bubbling event (LIN-4114) ───────────────────────
   // Fired from inside the card when its answer is delivered (an option press, Answer, a successful Retry delivery) or its
-  // dismiss succeeds. It bubbles to Home's <main>, where one listener clears every copy of the ruling's card (public/app.js).
+  // dismiss succeeds. It bubbles to Home's <main>, where one listener clears every copy of that card (public/app.js).
   // A dismiss fires BEFORE the card leaves the DOM: a detached node does not bubble.
   var RULING_GONE_EVENT = 'harbour:question-answered';
   // Home registers its <main> here at startup (setDeskRoot), so an answer whose card has already left the page still reaches it.
   var deskRoot = null;
-  // The key every copy of one question's card shares (LIN-4538): a question record's card by its question id; a ruling card by
-  // the scan decision id for a task-bound card, else the loop + decision. Question cards must not share the ruling key: they
-  // would all read 'loop:|', so a typed answer could be kept on a different question's card.
+  // The key every copy of one question's card shares (LIN-4538): a question record's card by its question id; a waiting run's
+  // reply card by its loop. Question cards must not share the loop key: they would all read 'loop:', so a typed answer could be
+  // kept on a different question's card.
   function rulingKeyOf(card) {
     var d = card.dataset || {};
     if (d.questionId) return 'question:' + d.questionId;
-    return d.taskDecisionId ? 'task:' + d.taskDecisionId : 'loop:' + (d.stampLoopId || '') + '|' + (d.decisionId || '');
+    return 'loop:' + (d.loopId || '');
   }
   // In the unit suite `CustomEvent` stays absent because announceRulingGone exits without it: the typeof guard below
-  // returns before any dispatchEvent, so the question-card-task-bound suite never needs a bubbling event (LIN-4309).
+  // returns before any dispatchEvent, so the unit suite never needs a bubbling event (LIN-4309).
   function announceRulingGone(card, message) {
     if (!card || typeof CustomEvent !== 'function') return;
     // A card still on the page bubbles to <main>. A card that left it (a search cleared while its answer was in flight)
@@ -248,90 +199,11 @@
       detail: { key: rulingKeyOf(card), urlKey: (card.dataset && card.dataset.urlKey) || '', message: message || '' }
     }));
   }
-  // LIN-4241: the settled-ruling refusal is a 409 whose `code` is 'ruling-settled' (lib/ruling-settled.js). It is not a
-  // failure: the card leaves and the page says the ruling was answered elsewhere. Keyed on the code, never the wording.
-  var RULING_SETTLED_CODE = 'ruling-settled';
-  var ANSWERED_ELSEWHERE_COPY = 'Answered elsewhere';
-  // LIN-4241: a fresh id for one card's answer (the server's `answerAttemptId`). randomUUID where the browser has it;
-  // the fallback only needs to be unique per card within one page.
-  function newAnswerAttemptId() {
-    if (typeof crypto !== 'undefined' && crypto && typeof crypto.randomUUID === 'function') return crypto.randomUUID();
-    return 'a-' + Date.now().toString(36) + '-' + Math.random().toString(36).slice(2);
-  }
-  function removeAnsweredElsewhere(card) {
-    if (!card) return;
-    announceRulingGone(card, ANSWERED_ELSEWHERE_COPY);
-    if (card.parentNode) card.parentNode.removeChild(card);
-  }
-
-  // ── Pinned question cards (LIN-3252 S2) ────────────────────────────────────
-  // One card per unanswered decision (plus a bare-BLOCKED card). Answer goes
-  // through the SAME Send-and-continue plumbing as the per-run box — comment
-  // write then the existing dispatch follow-up — with the decision ids and the
-  // chosen option forwarded through window.ReplyDelivery. A read-only card
-  // renders no answer button/textarea, so it is skipped here.
-  // The follow-up text a dismiss sends to a still-waiting run (S2.5). It carries
-  // NO decision ids — the comment route would otherwise stamp it `answered`.
-  var DISMISS_PROMPT = 'not worth asking: proceed on your best judgment';
-  // window.ReplyDelivery.deliverReply requires all four handlers; a dismiss
-  // removes its own card, so the follow-up's outcome is UI-silent.
-  var DISMISS_NOOP_HANDLERS = {
-    onCommentFailed: function () {},
-    onDispatchFailed: function () {},
-    onPartialFailure: function () {},
-    onDispatchOk: function () {}
-  };
-
-  // Dismiss a decision card: stamp via the existing dashboard route, then apply
-  // condition C2 (the follow-up is sent only for a `resumable` decision, from
-  // window.ReplyDelivery). Remove the card on success; it never comes back.
-  // LIN-3959: the joined row's copies, written onto the card as JSON by
-  // lib/question-card.js. Undefined when absent or unreadable, so the request
-  // falls back to the single primary stamp exactly as before.
-  function readStampLoopIds(card) {
-    try {
-      var ids = JSON.parse(card.dataset.stampLoopIds || 'null');
-      return Array.isArray(ids) ? ids : undefined;
-    } catch (e) {
-      return undefined;
-    }
-  }
-
-  function dismissQuestionCard(card, dismissBtn, answerBtn, feedback) {
-    var urlKey = card.dataset.urlKey;
-    card.dataset.answerInFlight = 'true'; // LIN-4242: in flight until it settles (the live section keeps it)
-    if (dismissBtn) dismissBtn.disabled = true;
-    if (answerBtn) answerBtn.disabled = true;
-    if (feedback) { feedback.textContent = 'dismissing…'; feedback.className = 'sess-qcard-feedback sess-reply-feedback'; }
-
-    var dismissOpts = {
-      urlKey: urlKey,
-      stampLoopId: card.dataset.stampLoopId,
-      stampLoopIds: readStampLoopIds(card),
-      decisionId: card.dataset.decisionId,
-      followUpTo: card.dataset.loopId,
-      target: card.dataset.target === 'web' ? 'web' : 'cli',
-      issueId: card.dataset.issueId || card.dataset.issueIdentifier || '',
-      disposition: card.dataset.disposition,
-      source: card.dataset.source || undefined,
-      prompt: DISMISS_PROMPT
-    };
-    window.ReplyDelivery.dismissRuling(dismissOpts, DISMISS_NOOP_HANDLERS).then(function () {
-      delete card.dataset.answerInFlight;
-      announceRulingGone(card, 'Dismissed');
-      if (card.parentNode) card.parentNode.removeChild(card);
-    }).catch(function (e) {
-      // LIN-4241: answered elsewhere before this dismiss landed: the card is gone, not a failed dismiss.
-      if (e && e.code === RULING_SETTLED_CODE) { removeAnsweredElsewhere(card); return; }
-      delete card.dataset.answerInFlight;
-      if (dismissBtn) dismissBtn.disabled = false;
-      if (answerBtn) answerBtn.disabled = false;
-      if (feedback) {
-        feedback.textContent = 'dismiss failed: ' + e.message;
-        feedback.className = 'sess-qcard-feedback sess-reply-feedback error';
-      }
-    });
-  }
+  // ── Pinned reply cards (LIN-3252 S2) ────────────────────────────────────
+  // One card for a run parked on a bare `[blocked]` with no question record (lib/question-card.js renderBareBlockedCard). Answer
+  // goes through the SAME Send-and-continue plumbing as the per-run box: comment write, then the follow-up. A read-only card
+  // renders no answer button/textarea, so it is skipped here. (The decision card with its options and dismiss went with the
+  // ruling machinery, LIN-4541: a question is a question record's card, public/question-records.js.)
 
   // `root` scopes the binding (Home binds the card it paints into its state block); a card bound once is skipped, so a
   // repeat call never answers twice.
@@ -344,85 +216,26 @@
         var btn = card.querySelector('[data-testid="session-question-card-answer"]');
         var textarea = card.querySelector('[data-testid="session-question-card-input"]');
         var feedback = card.querySelector('.sess-qcard-feedback');
-        var dismissBtn = card.querySelector('[data-testid="session-question-card-dismiss"]');
         if (!btn || !textarea || !feedback) return; // read-only card
-        if (dismissBtn) {
-          dismissBtn.addEventListener('click', function (e) {
-            e.preventDefault();
-            dismissQuestionCard(card, dismissBtn, btn, feedback);
-          });
-        }
         var thread = card.querySelector('[data-testid="session-question-card-thread"]');
-        // LIN-4114: every option is a button; one press answers with its own label. The card's controls are one set, so an
-        // in-flight answer disables all of them (sendReply restores them on a failure only).
-        var optionBtns = Array.prototype.slice.call(card.querySelectorAll('[data-testid="session-question-card-option"]'));
-        var controls = [btn].concat(optionBtns, dismissBtn ? [dismissBtn] : []);
-        var cardCtx = { card: card, controls: controls };
+        // LIN-4114: an in-flight answer disables the card's controls (sendReply restores them on a failure only).
+        var cardCtx = { card: card, controls: [btn] };
         var issueIdentifier = card.dataset.issueIdentifier || '';
-        var decisionId = card.dataset.decisionId || null;
-        // LIN-3252 F1: the row's resolved effect, emitted server-side
-        // (lib/render-session.js) exactly as the Rulings tab's row carries it.
-        // LIN-4143 fail-closed: an absent or empty effect is `record`, never `resume`. A card whose markup carries no decided
-        // effect must not start a run (the shared helper turns `resume` on a non-resumable disposition into a fresh run).
-        var effect = card.dataset.effect || 'record';
-
-        // LIN-4241: one submission id per card. Every retry of this card's answer reuses it, so the server
-        // reads a resend as the same answer; another tab's answer to the same ruling carries its own id and is refused.
-        var answerAttemptId = newAnswerAttemptId();
         var opts = {
           urlKey: card.dataset.urlKey,
-          answerAttemptId: answerAttemptId,
           followUpTo: card.dataset.loopId,
           target: card.dataset.target === 'web' ? 'web' : 'cli',
-          // Force for a resumable decision (blocked-live or freshly terminal) or
-          // a paused session — same force semantics as the per-run box (LIN-1252).
-          force: card.dataset.disposition === 'resumable' || card.dataset.sessionWaiting === 'true',
-          effect: effect,
-          disposition: card.dataset.disposition || '',
-          recordOn: card.dataset.recordOn || null,
-          sessionWaiting: card.dataset.sessionWaiting === 'true',
+          // A paused session forces the resume — same force semantics as the per-run box (LIN-1252).
+          force: card.dataset.sessionWaiting === 'true',
           issueId: card.dataset.issueId || issueIdentifier,
           issueIdentifier: issueIdentifier,
           issueless: !issueIdentifier,
-          decisionLoopId: decisionId ? card.dataset.stampLoopId : null,
-          decisionLoopIds: decisionId ? readStampLoopIds(card) : undefined,
-          decisionId: decisionId,
-          // LIN-3126 residual: the ruling anchor's source (rendered onto the
-          // card by lib/render-session.js), forwarded to the shared answer
-          // helper so its comment write / dispatch resolves the issue's provider.
+          // LIN-3126 residual: the run's source (rendered onto the card by lib/question-card.js), forwarded so the comment
+          // write resolves the issue's provider.
           source: card.dataset.source || undefined
         };
-        // LIN-4140: a scan-raised (task-bound) ruling answers with the scan
-        // decision id and the issue's UUID. Its record-only delivery is decided
-        // in window.ReplyDelivery (deliveredEffect), so `effect` needs no change
-        // here. Absent the attribute, opts gains no keys.
-        var taskDecisionId = card.dataset.taskDecisionId || '';
-        if (taskDecisionId) {
-          opts.taskDecisionId = taskDecisionId;
-          opts.taskDecisionIssueId = card.dataset.issueId || '';
-        }
 
-        // The agent brief a `dispatch` answer needs is composed from what the
-        // card already renders (question + "why" chunks) through the SAME
-        // shared composer the Rulings tab uses — never a card-local copy. Built
-        // for every answer; the shared path ignores it on a resume/record.
-        function composeDispatch(prompt) {
-          var questionEl = card.querySelector('[data-testid="session-question-card-question"]');
-          var chunkEls = card.querySelectorAll('[data-testid="session-question-card-why-chunk"]');
-          var chunks = [];
-          for (var k = 0; k < chunkEls.length; k++) chunks.push(chunkEls[k].textContent || '');
-          var row = { decision: { question: questionEl ? (questionEl.textContent || '') : '' }, decisionCase: chunks };
-          return window.ReplyDelivery.composeDispatchPrompt(row, prompt);
-        }
-
-        // Answer sends the typed text only. An empty box says so; a button names its answer, so a press never reads the box.
-        function send(pressed, prompt, optionId) {
-          // LIN-4140: a task-bound answer sends no option id, so its body matches the Rulings tab's (no option id for a scan row).
-          opts.optionId = opts.taskDecisionId ? null : optionId;
-          opts.prompt = prompt;
-          opts.dispatchPrompt = composeDispatch(prompt);
-          sendReply(opts, pressed, textarea, feedback, thread, cardCtx);
-        }
+        // Answer sends the typed text only. An empty box says so.
         function submit() {
           var typed = (textarea.value || '').trim();
           if (!typed) {
@@ -430,14 +243,9 @@
             feedback.className = 'sess-qcard-feedback sess-reply-feedback error';
             return;
           }
-          send(btn, typed, null);
+          opts.prompt = typed;
+          sendReply(opts, btn, textarea, feedback, thread, cardCtx);
         }
-        optionBtns.forEach(function (optBtn) {
-          optBtn.addEventListener('click', function (e) {
-            e.preventDefault();
-            send(optBtn, (optBtn.textContent || '').trim(), optBtn.dataset.optionId || null);
-          });
-        });
 
         btn.addEventListener('click', function (e) { e.preventDefault(); submit(); });
         textarea.addEventListener('keydown', function (e) {
@@ -451,17 +259,18 @@
   }
 
   // ── Live Waiting on you (LIN-4242) ───────────────────────────────────────────
-  // The merge unit is the `.waiting-card` wrapper (task line + card), keyed by rulingKeyOf on its inner session card. A
-  // kept wrapper is never re-rendered or moved: moving a focused textarea blurs it. Rulings this page has settled (answered
+  // The merge unit is the `.waiting-card` wrapper (task line + card), keyed by rulingKeyOf on its inner card. A
+  // kept wrapper is never re-rendered or moved: moving a focused textarea blurs it. Cards this page has settled (answered
   // or dismissed here, or refused as settled) are remembered, so a response requested before that never re-adds one.
   var settledKeys = new Set();
   function noteSettled(key) { if (key) settledKeys.add(key); }
-  // A question record's wrapper holds the record card (LIN-4538: lib/question-record-card.js), a ruling wrapper the session card.
+  // A question record's wrapper holds the record card (LIN-4538: lib/question-record-card.js); a waiting run's wrapper holds the
+  // reply card (lib/question-card.js).
   function innerCardOf(wrapper) {
     return wrapper.querySelector('[data-testid="session-question-card"]') || wrapper.querySelector('[data-testid="question-record-card"]');
   }
   // LIN-4532 (finding-dca7ac9d): a question record's wrapper (`.waiting-question`) is keyed by its question id, and its card is the
-  // shared question-record card (lib/question-record-card.js), not a ruling card.
+  // shared question-record card (lib/question-record-card.js), not the reply card.
   function questionCardOf(wrapper) { return wrapper.querySelector('[data-testid="question-record-card"]'); }
   function isQuestionWrapper(wrapper) { return !!(wrapper.classList && wrapper.classList.contains('waiting-question')); }
   function cardKeyOf(wrapper) {
@@ -469,7 +278,7 @@
     var inner = innerCardOf(wrapper); return inner ? rulingKeyOf(inner) : '';
   }
   // A question card answered here (settled) or with a request in flight (its controls disabled) stays where it is: the refresh
-  // does not take it out, the same as a ruling card held for its answer.
+  // does not take it out, the same as a reply card held for its answer.
   function questionCardHeld(wrapper) {
     var qcard = questionCardOf(wrapper);
     if (!qcard) return false;
@@ -488,18 +297,18 @@
     return !!el && el !== card && card.contains(el);
   }
   // Whether a card holds the reader's place: typed text, focus inside it, or an answer in flight. Home's opened task uses
-  // the same check (public/prompt-section.js keepTypedQuestion), gated on the ruling key first. `active` as in focusInCard.
+  // the same check (public/prompt-section.js keepTypedQuestion), gated on the card key first. `active` as in focusInCard.
   function cardHoldsInput(card, active) {
     if (!card) return false;
     if (card.dataset && card.dataset.answerInFlight === 'true') return true;
-    // The typed answer: a ruling card's input, or a question record card's (LIN-4538).
+    // The typed answer: a reply card's input, or a question record card's (LIN-4538).
     var textarea = card.querySelector('[data-testid="session-question-card-input"]') || card.querySelector('[data-testid="question-record-card-input"]');
     if (textarea && textarea.value && textarea.value.length > 0) return true;
     return focusInCard(card, active);
   }
   // LIN-4242: whether a repaint keeps the card already on the page in place of its fresh markup (the opened task's
-  // keepTypedQuestion, public/prompt-section.js). The ruling key is the gate: a different ruling's card is never kept, and
-  // the same ruling's card is kept only while it holds the reader's place. LIN-4293: `active` is the focused element before
+  // keepTypedQuestion, public/prompt-section.js). The card key is the gate: a different card is never kept, and
+  // the same card is kept only while it holds the reader's place. LIN-4293: `active` is the focused element before
   // the repaint (LIN-4246: the write detaches the card first, so only the caller can know it); omitted, the answer is the
   // Waiting merge's, unchanged.
   function keepsReaderPlace(oldCard, freshCard, active) {
@@ -564,7 +373,7 @@
     return { count: waitingWrappersIn(body).length, removed: removed };
   }
 
-  var api = { appendYouBubble: appendYouBubble, sendReply: sendReply, dismissQuestionCard: dismissQuestionCard, initQuestionCards: initQuestionCards, rulingKeyOf: rulingKeyOf, RULING_GONE_EVENT: RULING_GONE_EVENT, setDeskRoot: function (el) { deskRoot = el; }, cardHoldsInput: cardHoldsInput, focusInCard: focusInCard, keepsReaderPlace: keepsReaderPlace, mergeWaitingCards: mergeWaitingCards, noteSettled: noteSettled };
+  var api = { appendYouBubble: appendYouBubble, sendReply: sendReply, initQuestionCards: initQuestionCards, rulingKeyOf: rulingKeyOf, RULING_GONE_EVENT: RULING_GONE_EVENT, setDeskRoot: function (el) { deskRoot = el; }, cardHoldsInput: cardHoldsInput, focusInCard: focusInCard, keepsReaderPlace: keepsReaderPlace, mergeWaitingCards: mergeWaitingCards, noteSettled: noteSettled };
   if (typeof window !== 'undefined') window.QuestionCards = api;
   if (typeof module !== 'undefined' && module.exports) module.exports = api;
 })();

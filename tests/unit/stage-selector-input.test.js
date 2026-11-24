@@ -18,7 +18,6 @@ import assert from 'node:assert/strict';
 import { assembleTrailFacts, formatTrailFactsBlock } from '../../lib/recommendation-facts.js';
 import { planFactsOf } from '../../lib/records/plan-facts.js';
 import { planReviewRunOf } from '../../lib/records/plan-review-run.js';
-import { RULING_MARK } from '../../lib/run-trail.js';
 import { personFindingsOf } from '../../lib/comment-ingest.js';
 import { fixedIdOf } from '../../lib/records/refs.js';
 import { formatSelectorView, formatIssueContext, buildSelectorArgs } from '../../lib/openrouter.js';
@@ -68,31 +67,24 @@ describe('trail facts (LIN-3300)', () => {
     assert.equal(closed.closeOutAfterReview, true);
   });
 
-  test('PR links are the trail landing, oldest first, never a comment\'s text; the latest person and ruling are the latest person findings', () => {
+  test('PR links are the trail landing, oldest first, never a comment\'s text; the latest person is the latest person finding, the latest ruling the latest answered question', () => {
     const facts = assembleTrailFacts([
-      { createdAt: at(3), body: `Go to implementation.\n\n${RULING_MARK}` },
+      { createdAt: at(3), body: 'Go to implementation.' },
       { createdAt: at(1), body: `Opened https://github.com/a/b/pull/1` },
-      { createdAt: at(2), body: `Hold.\n\n${RULING_MARK}` },
+      { createdAt: at(2), body: 'Hold.' },
       { createdAt: at(4), body: `Now ${PR}` }
-    ], '', { trail: trailOf({ landing: ['https://github.com/a/b/pull/1', PR] }), personFindings: [personFinding(2, `Hold.\n\n${RULING_MARK}`), personFinding(3, `Go to implementation.\n\n${RULING_MARK}`)], answeredQuestions: [{ questionId: 'q-1', at: at(3) }] });
+    ], '', { trail: trailOf({ landing: ['https://github.com/a/b/pull/1', PR] }), personFindings: [personFinding(2, 'Hold.'), personFinding(3, 'Go to implementation.')], answeredQuestions: [{ questionId: 'q-1', at: at(3) }] });
     assert.deepEqual(facts.prUrls, ['https://github.com/a/b/pull/1', PR]);
     assert.deepEqual(assembleTrailFacts([{ createdAt: at(1), body: `Opened ${PR}` }], '').prUrls, [], 'no trail read: no PR, and a comment does not supply one');
     assert.equal(facts.latestPerson.at, at(3));
-    assert.equal(facts.latestPerson.ruling, true);
-    // LIN-4538 (P7a): the latest RULING is the latest question a person answered on the task (question records), not a comment mark.
+    assert.equal('ruling' in facts.latestPerson, false, 'LIN-4541: a person\'s comment carries no ruling flag; a ruling is a decision record');
+    // LIN-4538 (P7a): the latest RULING is the latest question a person answered on the task (question records).
     assert.equal(facts.latestRuling.at, at(3));
-    assert.equal(assembleTrailFacts([], '', { personFindings: [personFinding(3, `Go.\n\n${RULING_MARK}`)] }).latestRuling, null, 'a comment mark is not a ruling: no answered question, no ruling');
+    assert.equal(assembleTrailFacts([], '', { personFindings: [personFinding(3, 'Go.')] }).latestRuling, null, 'a comment is not a ruling: no answered question, no ruling');
   });
 
-  test('a ruling is a finding whose words end with the mark; a quote of the mark mid-text is a person\'s words, not a ruling', () => {
-    assert.equal(personFinding(1, `Go.\n\n${RULING_MARK}\n`).ruling, true, 'trailing whitespace is fine');
-    assert.equal(personFinding(1, `Quotes "${RULING_MARK}" mid-text.`).ruling, false);
-    const facts = assembleTrailFacts([{ createdAt: at(1), body: 'x' }, { createdAt: at(2), body: 'y' }], '', {
-      personFindings: [personFinding(1, `Quotes "${RULING_MARK}" mid-text.`), personFinding(2, 'Plain words.')]
-    });
-    assert.equal(facts.latestPerson.at, at(2));
-    assert.equal(facts.latestPerson.ruling, false);
-    assert.equal(facts.latestRuling, null, 'no ruling: the quote does not make one');
+  test('LIN-4541: a finding carries no ruling flag, whatever its words say', () => {
+    assert.deepEqual(Object.keys(personFinding(1, 'Go.\n\n— Ruling recorded via Harbour')).sort(), ['accountId', 'at', 'id', 'says']);
   });
 
   test('no person finding means no latest person, even when a comment reads like a person\'s words', () => {
@@ -105,7 +97,6 @@ describe('trail facts (LIN-3300)', () => {
       { createdAt: at(1), body: '**Last round before re-review (FC, an engineering call):**\n- land F1.' }
     ], '', { personFindings: [personFinding(1, '**Last round before re-review (FC, an engineering call):**\n- land F1.')] });
     assert.equal(facts.latestPerson.at, at(1));
-    assert.equal(facts.latestPerson.ruling, false);
   });
 
   test('actedAfter: a dispatched run after the person\'s finding; a run before it does not count', () => {
@@ -129,9 +120,9 @@ describe('trail facts (LIN-3300)', () => {
     assert.equal(landed.latestPerson.actedAfter, true, 'a change record version written after it is landed work');
   });
 
-  test('TRAIL FACTS names the latest person\'s finding, whether it is a ruling, and whether a run was dispatched after it', () => {
-    const withRuling = formatTrailFactsBlock(assembleTrailFacts([], '', { personFindings: [personFinding(3, `Go.\n\n${RULING_MARK}`)] }));
-    assert.match(withRuling, /- Latest person's comment[^:]*: 2026-10-03 10:00, a ruling recorded via Harbour \(shown with the comments\); a run was dispatched after it, or landed work followed: no/);
+  test('TRAIL FACTS names the latest person\'s finding and whether a run was dispatched after it', () => {
+    const latest = formatTrailFactsBlock(assembleTrailFacts([], '', { personFindings: [personFinding(3, 'Go.')] }));
+    assert.match(latest, /- Latest person's comment[^:]*: 2026-10-03 10:00 \(shown with the comments\); a run was dispatched after it, or landed work followed: no/);
     assert.match(formatTrailFactsBlock(assembleTrailFacts([], '', { personFindings: [] })), /- Latest person's comment[^:]*: none/);
     assert.match(formatTrailFactsBlock(assembleTrailFacts([], '')), /- Latest person's comment[^:]*: not measured/, 'no findings read: not measured, never none');
     assert.equal(assembleTrailFacts([], '').personRead, false);
@@ -235,7 +226,7 @@ describe('the selector view (LIN-3300)', () => {
     blockedBy: [{ identifier: 'LIN-2', title: 'b', state: { name: 'Todo', type: 'unstarted' } }, { identifier: 'LIN-3', title: 'c', state: { name: 'Done', type: 'completed' } }]
   };
   const comments = [
-    { user: 'John', commentId: 'c1', createdAt: at(1), body: `Ruling: plan first.\n\n${RULING_MARK}` },
+    { user: 'John', commentId: 'c1', createdAt: at(1), body: 'Ruling: plan first.' },
     { user: 'Agent', createdAt: at(2), body: 'Older note one.' },
     { user: 'Agent', createdAt: at(3), body: 'Newer note two.' },
     { user: 'Agent', createdAt: at(4), body: 'y'.repeat(2500) },
@@ -247,17 +238,18 @@ describe('the selector view (LIN-3300)', () => {
     cousins: [{ identifier: 'LIN-5', title: 'cousin', state: { name: 'Todo' } }], cousinsTotal: 40,
     project: { name: 'Harbour' }, children: [], comments,
     // LIN-4535: the person's findings, keyed by the comment's fixed id (the ingest's rule); the selector reads these, not the words.
-    personFindings: findingFor('c1', 1, `Ruling: plan first.\n\n${RULING_MARK}`)
+    personFindings: findingFor('c1', 1, 'Ruling: plan first.')
   };
 
-  test('only the latest 3 comment bodies, capped, plus the latest ruling wherever it sits', () => {
+  test('only the latest 3 comment bodies, capped, plus the latest person\'s comment wherever it sits', () => {
     const view = formatSelectorView(issue, context);
     assert.match(view, /Latest 3 of 5 comments/);
     assert.doesNotMatch(view, /Older note one\./);
     assert.match(view, /Newer note two\./);
     assert.match(view, /Newest note\./);
     assert.doesNotMatch(view, /y{2001}/, 'a comment is capped');
-    assert.match(view, /Latest ruling recorded via Harbour[^\n]*\n+Ruling: plan first\./);
+    assert.match(view, /Latest person's comment[^\n]*\n+Ruling: plan first\./);
+    assert.doesNotMatch(view, /ruling recorded via Harbour/, 'LIN-4541: no comment is marked a ruling');
   });
 
   test('the ticket, its labels and relations stay; the worker-only nudge and cousins go', () => {
@@ -277,17 +269,11 @@ describe('the selector view (LIN-3300)', () => {
     assert.match(full, /fetch the parent epic's full child list/);
   });
 
-  test('a comment that only quotes the mark is never shown as the latest ruling', () => {
-    const quoting = { user: 'John', commentId: 'c6', createdAt: at(6), body: `### Plan Review Verdict\n\nThe suffix "${RULING_MARK}" is quoted here.\n\n**Verdict:** Request Changes.` };
-    const view = formatSelectorView(issue, { ...context, personFindings: [...context.personFindings, ...findingFor('c6', 6, quoting.body)], comments: [...comments, ...[7, 8, 9].map(d => ({ user: 'A', createdAt: `2026-10-0${d}T10:00:00.000Z`, body: `n${d}` })), quoting].sort((a, b) => a.createdAt.localeCompare(b.createdAt)) });
-    assert.match(view, /Latest ruling recorded via Harbour[^\n]*\n+Ruling: plan first\./, 'the real ruling, not the quoting verdict');
-  });
-
-  test('a ruling among the latest 3 is not shown twice', () => {
+  test('the latest person\'s comment among the latest 3 is not shown twice', () => {
     const view = formatSelectorView(issue, { ...context, comments: comments.slice(0, 2) });
     assert.match(view, /Latest 2 of 2 comments/);
-    assert.doesNotMatch(view, /Latest ruling recorded via Harbour/, 'not repeated above the comments');
-    assert.match(view, /\*\*John, the latest person's comment \(a ruling recorded via Harbour\)\*\*/, 'the latest person\'s finding is marked where its comment sits; an unfiled comment is not a person\'s');
+    assert.doesNotMatch(view, /Latest person's comment\*\*/, 'not repeated above the comments');
+    assert.match(view, /\*\*John, the latest person's comment\*\*/, 'the latest person\'s finding is marked where its comment sits; an unfiled comment is not a person\'s');
     assert.equal(view.split('Ruling: plan first.').length, 2, 'shown once');
   });
 });

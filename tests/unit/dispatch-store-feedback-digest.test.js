@@ -55,7 +55,6 @@ function digestFixture(overrides = {}) {
     decision: null,
     decisionEntryIndex: null,
     decisionCase: null,
-    answeredDecisionId: null,
     parkedWait: null,
     telemetry: {
       model: 'claude', evidence: [], usage: null, resources: null,

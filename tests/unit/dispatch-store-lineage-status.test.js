@@ -449,12 +449,6 @@ describe('lineage list fields persisted at write time (real MangoDB tmpdir, LIN-
       assert.equal((await persisted(root)).lineageFeedbackCount, 1);
     });
 
-    test('decision markers count on their own row atomically with the push', async () => {
-      const root = await run();
-      await store.markDecisionAnswered(root, URL_KEY, 'dec-1', 'answered');
-      assert.equal((await persisted(root)).lineageFeedbackCount, 1);
-      await assertPersistedMatchesOracle('decision');
-    });
   });
 
   describe('legacy rows: self-heal on read and the once-per-process backfill', () => {

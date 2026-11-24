@@ -301,8 +301,8 @@ describe('loop-supersede characterization (LIN-1478 beat 1, pre-extraction)', ()
     );
   });
 
-  // LIN-1728 (Revision 3, F6): the `decision-answer` stamp `markDecisionAnswered`
-  // writes is answer metadata, not a new status — a run genuinely still parked
+  // LIN-1728 (Revision 3, F6): the `decision-answer` stamp the retired answer path
+  // wrote (history since LIN-4541) is answer metadata, not a new status — a run genuinely still parked
   // `[blocked]` must not read as un-waiting just because a Save/Save-and-continue
   // stamped an answer onto it (the actual resume, if it happens, is a separate
   // feedback event that would itself move the tail).

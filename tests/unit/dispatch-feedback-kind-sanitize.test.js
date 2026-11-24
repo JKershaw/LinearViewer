@@ -33,7 +33,7 @@ function makeStore() {
   return { store, collection, historyCollection };
 }
 
-function buildApp({ dispatchQueueStore, dispatchTokenStore, sessionsFeedCache }) {
+function buildApp({ dispatchQueueStore, dispatchTokenStore }) {
   const app = express();
   app.use(express.json());
   app.use(createDispatchRoutes({
@@ -42,8 +42,7 @@ function buildApp({ dispatchQueueStore, dispatchTokenStore, sessionsFeedCache })
     workspaceFromUrl: (req, res, next) => { req.workspace = { urlKey: req.params.urlKey }; next(); },
     userPreferencesStore: {},
     harbourFeedbackTokenStore: null,
-    proxyTokenStore: null,
-    sessionsFeedCache
+    proxyTokenStore: null
   }));
   return app;
 }
@@ -85,17 +84,17 @@ function storedFeedbackEntry(collection, historyCollection, itemId) {
 }
 
 describe('LIN-2180 — routes/dispatch.js feedback kind sanitize (accept path)', () => {
-  test('kind:"decision" survives the sanitize step and persists on the stored feedback entry', async () => {
+  test('a runner kind (status) survives the sanitize step and persists on the stored feedback entry', async () => {
     const { store: dispatchQueueStore, collection, historyCollection } = makeStore();
     const dispatchTokenStore = new DispatchTokenStore({ collection: createMockCollection() });
     const { token, itemId } = await takenItemViaToken({ dispatchQueueStore, dispatchTokenStore });
 
     const app = buildApp({ dispatchQueueStore, dispatchTokenStore });
-    const res = await call(app, 'post', `/api/dispatch/feedback/${itemId}`, { message: '[decision] ruling: proceed', kind: 'decision' }, token);
+    const res = await call(app, 'post', `/api/dispatch/feedback/${itemId}`, { message: 'working on it', kind: 'status' }, token);
 
     assert.equal(res.status, 200, JSON.stringify(res.body));
     const entry = storedFeedbackEntry(collection, historyCollection, itemId);
-    assert.equal(entry.kind, 'decision', 'the sanitize step must accept "decision", not drop it to undefined');
+    assert.equal(entry.kind, 'status', 'the sanitize step must accept "status", not drop it to undefined');
   });
 
   test('an unrecognized kind is still silently dropped (existing behavior preserved)', async () => {
@@ -112,134 +111,39 @@ describe('LIN-2180 — routes/dispatch.js feedback kind sanitize (accept path)',
   });
 });
 
-// LIN-2891/LIN-3035: kind:"decision-withdrawn" is a NEW FEEDBACK_ENTRY_KINDS
-// member with its own required-shape gate (routes/dispatch.js, immediately
-// before the sole addFeedback call) — malformed input must 400, never fall
-// into the ":100" silent-drop behavior above. That existing test remains the
-// regression witness for the merge-order hazard for every OTHER
-// unrecognized/rejected kind; these cases cover the one kind with its own
-// extra validation.
-describe('LIN-2891/LIN-3035 — routes/dispatch.js kind:"decision-withdrawn" validation gate', () => {
-  test('a well-formed decision-withdrawn message succeeds end to end and persists', async () => {
+// LIN-4541 (LIN-4529 P7b-2): the scraped DECISION: block and the WITHDRAW: block are retired. A stale client still posting
+// either kind is refused 422 naming the records route, before any other check and before anything is stored, so its
+// question is never silently dropped kind-less (the unknown-kind behaviour above). No translator.
+describe('LIN-4541 — a retired decision kind is refused 422 naming POST /api/proxy/records', () => {
+  for (const [kind, message] of [
+    ['decision', JSON.stringify({ decision_id: 'd-1', question: 'Which way?', options: [{ id: 'a', label: 'A' }] })],
+    ['decision-withdrawn', JSON.stringify({ decision_id: 'd-1', reason: 'superseded by LIN-99' })],
+    ['decision-withdrawn', 'not json at all'],
+  ]) {
+    test(`kind:"${kind}" (${message.slice(0, 20)}…) is refused 422 DECISION_FEEDBACK_RETIRED and nothing is stored`, async () => {
+      const { store: dispatchQueueStore, collection, historyCollection } = makeStore();
+      const dispatchTokenStore = new DispatchTokenStore({ collection: createMockCollection() });
+      const { token, itemId } = await takenItemViaToken({ dispatchQueueStore, dispatchTokenStore });
+
+      const app = buildApp({ dispatchQueueStore, dispatchTokenStore });
+      const res = await call(app, 'post', `/api/dispatch/feedback/${itemId}`, { message, kind }, token);
+
+      assert.equal(res.status, 422, JSON.stringify(res.body));
+      assert.equal(res.body.code, 'DECISION_FEEDBACK_RETIRED');
+      assert.match(res.body.error, /POST \/api\/proxy\/records/, 'the refusal names the route that replaced it');
+      assert.equal(storedFeedbackEntry(collection, historyCollection, itemId), undefined, 'a refused post stores nothing');
+    });
+  }
+
+  test('the two stamps that were never runner-postable are still dropped kind-less, as any unknown kind (no new refusal)', async () => {
     const { store: dispatchQueueStore, collection, historyCollection } = makeStore();
     const dispatchTokenStore = new DispatchTokenStore({ collection: createMockCollection() });
     const { token, itemId } = await takenItemViaToken({ dispatchQueueStore, dispatchTokenStore });
 
     const app = buildApp({ dispatchQueueStore, dispatchTokenStore });
-    const res = await call(app, 'post', `/api/dispatch/feedback/${itemId}`,
-      { message: JSON.stringify({ decision_id: 'd-1', reason: 'superseded by LIN-99' }), kind: 'decision-withdrawn' },
-      token);
+    const res = await call(app, 'post', `/api/dispatch/feedback/${itemId}`, { message: '{"decision_id":"d-1"}', kind: 'decision-answer' }, token);
 
     assert.equal(res.status, 200, JSON.stringify(res.body));
-    const entry = storedFeedbackEntry(collection, historyCollection, itemId);
-    assert.equal(entry.kind, 'decision-withdrawn');
-    assert.deepEqual(JSON.parse(entry.message), { decision_id: 'd-1', reason: 'superseded by LIN-99' });
-  });
-
-  test('a missing reason returns 400, not a silent drop', async () => {
-    const { store: dispatchQueueStore, collection, historyCollection } = makeStore();
-    const dispatchTokenStore = new DispatchTokenStore({ collection: createMockCollection() });
-    const { token, itemId } = await takenItemViaToken({ dispatchQueueStore, dispatchTokenStore });
-
-    const app = buildApp({ dispatchQueueStore, dispatchTokenStore });
-    const res = await call(app, 'post', `/api/dispatch/feedback/${itemId}`,
-      { message: JSON.stringify({ decision_id: 'd-1' }), kind: 'decision-withdrawn' },
-      token);
-
-    assert.equal(res.status, 400, JSON.stringify(res.body));
-    assert.equal(storedFeedbackEntry(collection, historyCollection, itemId), undefined, 'nothing must be persisted on a 400');
-  });
-
-  test('an empty (whitespace-only) reason returns 400', async () => {
-    const { store: dispatchQueueStore } = makeStore();
-    const dispatchTokenStore = new DispatchTokenStore({ collection: createMockCollection() });
-    const { token, itemId } = await takenItemViaToken({ dispatchQueueStore, dispatchTokenStore });
-
-    const app = buildApp({ dispatchQueueStore, dispatchTokenStore });
-    const res = await call(app, 'post', `/api/dispatch/feedback/${itemId}`,
-      { message: JSON.stringify({ decision_id: 'd-1', reason: '   ' }), kind: 'decision-withdrawn' },
-      token);
-
-    assert.equal(res.status, 400, JSON.stringify(res.body));
-  });
-
-  test('an empty decision_id returns 400', async () => {
-    const { store: dispatchQueueStore } = makeStore();
-    const dispatchTokenStore = new DispatchTokenStore({ collection: createMockCollection() });
-    const { token, itemId } = await takenItemViaToken({ dispatchQueueStore, dispatchTokenStore });
-
-    const app = buildApp({ dispatchQueueStore, dispatchTokenStore });
-    const res = await call(app, 'post', `/api/dispatch/feedback/${itemId}`,
-      { message: JSON.stringify({ decision_id: '', reason: 'valid reason' }), kind: 'decision-withdrawn' },
-      token);
-
-    assert.equal(res.status, 400, JSON.stringify(res.body));
-  });
-
-  test('a malformed (non-JSON) message returns 400', async () => {
-    const { store: dispatchQueueStore } = makeStore();
-    const dispatchTokenStore = new DispatchTokenStore({ collection: createMockCollection() });
-    const { token, itemId } = await takenItemViaToken({ dispatchQueueStore, dispatchTokenStore });
-
-    const app = buildApp({ dispatchQueueStore, dispatchTokenStore });
-    const res = await call(app, 'post', `/api/dispatch/feedback/${itemId}`,
-      { message: 'not json', kind: 'decision-withdrawn' },
-      token);
-
-    assert.equal(res.status, 400, JSON.stringify(res.body));
-  });
-
-  test('a successful decision-withdrawn add clears sessionsFeedCache for this urlKey', async () => {
-    const { store: dispatchQueueStore } = makeStore();
-    const dispatchTokenStore = new DispatchTokenStore({ collection: createMockCollection() });
-    const { token, itemId } = await takenItemViaToken({ dispatchQueueStore, dispatchTokenStore });
-
-    const cleared = [];
-    const sessionsFeedCache = { clear: (urlKey) => cleared.push(urlKey) };
-    const app = buildApp({ dispatchQueueStore, dispatchTokenStore, sessionsFeedCache });
-    const res = await call(app, 'post', `/api/dispatch/feedback/${itemId}`,
-      { message: JSON.stringify({ decision_id: 'd-1', reason: 'superseded' }), kind: 'decision-withdrawn' },
-      token);
-
-    assert.equal(res.status, 200, JSON.stringify(res.body));
-    assert.deepEqual(cleared, [URL_KEY], 'a successful add must clear the cache for this urlKey exactly once');
-  });
-
-  test('a 400 (missing reason) does NOT clear sessionsFeedCache', async () => {
-    const { store: dispatchQueueStore } = makeStore();
-    const dispatchTokenStore = new DispatchTokenStore({ collection: createMockCollection() });
-    const { token, itemId } = await takenItemViaToken({ dispatchQueueStore, dispatchTokenStore });
-
-    const cleared = [];
-    const sessionsFeedCache = { clear: (urlKey) => cleared.push(urlKey) };
-    const app = buildApp({ dispatchQueueStore, dispatchTokenStore, sessionsFeedCache });
-    const res = await call(app, 'post', `/api/dispatch/feedback/${itemId}`,
-      { message: JSON.stringify({ decision_id: 'd-1' }), kind: 'decision-withdrawn' },
-      token);
-
-    assert.equal(res.status, 400, JSON.stringify(res.body));
-    assert.deepEqual(cleared, [], 'a rejected write must never invalidate the cache');
-  });
-
-  // Review R1: sessionsFeedCache?.clear() had been called after every successful
-  // addFeedback, not just kind:'decision-withdrawn' — a regression against Rev 8
-  // Surface 3, which defeats the LIN-617 stale-while-revalidate cache for any
-  // workspace with active runner traffic. The two tests above only ever exercise
-  // decision-withdrawn, so they cannot catch a clear that is unconditional; this
-  // is the negative witness for a successful write of a DIFFERENT kind.
-  test('a successful non-withdrawal feedback write does NOT clear sessionsFeedCache', async () => {
-    const { store: dispatchQueueStore } = makeStore();
-    const dispatchTokenStore = new DispatchTokenStore({ collection: createMockCollection() });
-    const { token, itemId } = await takenItemViaToken({ dispatchQueueStore, dispatchTokenStore });
-
-    const cleared = [];
-    const sessionsFeedCache = { clear: (urlKey) => cleared.push(urlKey) };
-    const app = buildApp({ dispatchQueueStore, dispatchTokenStore, sessionsFeedCache });
-    const res = await call(app, 'post', `/api/dispatch/feedback/${itemId}`,
-      { message: 'heartbeat', kind: 'heartbeat' },
-      token);
-
-    assert.equal(res.status, 200, JSON.stringify(res.body));
-    assert.deepEqual(cleared, [], 'a successful write of a kind other than decision-withdrawn must not invalidate the cache');
+    assert.ok(!('kind' in storedFeedbackEntry(collection, historyCollection, itemId)), 'a store-only kind is never persisted from a runner post');
   });
 });

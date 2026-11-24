@@ -5,9 +5,11 @@
  * What is pinned, and what it fails without the change:
  *   - an open question addressed to the signed-in person is a `kind: 'question'` row, with its question, options, recommendation,
  *     "if you don't answer", its workspace anchor and whether it can be answered now;
- *   - `count` and `workspaceCount` include the question: they equal the page's row count with a mix of questions and loop rulings;
+ *   - `count` and `workspaceCount` include the question: they equal the page's row count;
  *   - a question addressed to someone else is not in this person's feed;
- *   - a question that has ended leaves the feed.
+ *   - a question that has ended leaves the feed;
+ *   - LIN-4541: the feed is question records only (an old DECISION: loop is no row), each row carries `asks` for the card, and
+ *     `openLoopIds` comes from the same records.
  */
 import { describe, test, before, after, beforeEach, afterEach } from 'node:test';
 import assert from 'node:assert/strict';
@@ -30,11 +32,14 @@ let dispatch;
 let writes;
 let server;
 let base;
+// The loop set the feed's cached read returns (LIN-4541 tests set it; empty otherwise).
+let feedLoops = [];
 
 before(() => harness.connect());
 after(() => harness.close());
 
 afterEach(async () => {
+  feedLoops = [];
   if (server) await new Promise((resolve) => server.close(resolve));
   server = null;
 });
@@ -53,7 +58,7 @@ async function listen() {
   const ctx = {
     workspaceFromUrl: (req, res, next) => { req.workspace = { urlKey: URL_KEY, id: 'ws-feed' }; req.session = session; next(); },
     sessionsFeedCache: { keyFor: (_ws, ns) => ns, get: async (_k, fn) => fn(), clear() {} },
-    mergeLoops: async () => [],
+    mergeLoops: async () => feedLoops,
     recordsStore: records,
     dispatchQueueStore: dispatch,
     accountStore: { resolveCanonicalAccountId: async (id) => id },
@@ -154,5 +159,41 @@ describe('the rulings feed carries open questions', () => {
     } finally {
       records.find = realFind;
     }
+  });
+});
+
+// LIN-4541 (LIN-4529 P7b-2): the feed is the person's open question records and nothing else. The open-loop set the
+// Observation waiting block reads comes from the same records (lib/ruling-standing.js), never from a DECISION: block.
+describe('LIN-4541: the feed reads question records only', () => {
+  const loop = (over) => ({ loopId: 'x', lineageId: null, workspaceUrlKey: URL_KEY, issueIdentifier: 'LIN-9', feedback: [], ...over });
+
+  test('a row carries the question as `asks`, the name the card reads', async () => {
+    const run = await askingRun('run-asks-1');
+    await askQuestion({ run, asks: 'Which way?' });
+    const [row] = (await feed()).rulings;
+    assert.equal(row.asks, 'Which way?');
+  });
+
+  test('openLoopIds holds the loops in the lineage of a run that asked the person an open question, and no other', async () => {
+    const run = await askingRun('run-open-1');
+    await askQuestion({ run, asks: 'Open?' });
+    feedLoops = [loop({ loopId: run }), loop({ loopId: 'child-1', lineageId: run }), loop({ loopId: 'other-1' })];
+    const body = await feed();
+    assert.deepEqual([...body.openLoopIds].sort(), ['child-1', run].sort());
+  });
+
+  test('a loop carrying an old DECISION: block (history) is no row and opens no loop', async () => {
+    feedLoops = [loop({ loopId: 'old-1', wakeMarker: 'blocked', decision: { decision_id: 'd-1', question: 'Old?', options: [] }, decisionCase: [] })];
+    const body = await feed();
+    assert.equal(body.count, 0);
+    assert.deepEqual(body.rulings, []);
+    assert.deepEqual(body.openLoopIds, []);
+  });
+
+  test('a question to someone else opens no loop for this person', async () => {
+    const run = await askingRun('run-open-2');
+    await askQuestion({ run, to: `person:${OTHER}`, asks: 'Not yours' });
+    feedLoops = [loop({ loopId: run })];
+    assert.deepEqual((await feed()).openLoopIds, []);
   });
 });

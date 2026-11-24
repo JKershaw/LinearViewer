@@ -52,7 +52,7 @@ const TABLE = JSON.parse(fs.readFileSync(CONTRACT_PATH, 'utf8'));
 // LIN-4384: the sha256 of contract.json's own bytes. simple-dispatcher pins the same value
 // (FIXTURE_SHA256 beside LV_COMMIT in test/runner-contract.test.js), so an edit here that is not
 // re-copied there would go unnoticed on this side without this tripwire.
-const CONTRACT_SHA256 = '871ca615f627a02611957489f3abc83498f1dca64af07259800a174148ba23a2';
+const CONTRACT_SHA256 = 'bee92a1e8e1dbe6d95a52853fc0dfb54b9b8c1d90ace2b1eb4af16f304108444';
 
 const OWNER = 'acct-owner-1111';
 const NOW = Date.parse('2026-10-18T12:00:00.000Z');
@@ -280,7 +280,7 @@ function kitFor(row) {
     case 'cap': {
       const message = 'x'.repeat(row.item.length);
       try {
-        const capped = capFeedbackMessage(message, row.item.kind);
+        const capped = capFeedbackMessage(message);
         return capped.length === 2000 && capped.endsWith('...') ? 'truncated' : 'unexpected';
       } catch {
         return 'error';
@@ -399,9 +399,8 @@ describe('contract table shape', () => {
     const diffs = TABLE.rows.filter((r) => 'kit' in r && r.kit !== r.sd).map((r) => r.case);
     assert.ok(diffs.some((c) => /abort row under an unknown halt mode/.test(c)));
     assert.ok(diffs.some((c) => /line posted/.test(c)));
-    assert.ok(diffs.some((c) => /decision message/.test(c)));
-    // LIN-4384: SD's hook reads a DONE: inside a DECISION block as the turn's end; the kit does not.
-    assert.ok(TABLE.rows.some((r) => r.area === 'sentinel' && /only inside a DECISION block/.test(r.case) && r.kit !== r.sd));
+    // LIN-4541: the decision-cap row and the DECISION-block report and sentinel rows went with the DECISION: block.
+    assert.ok(!TABLE.rows.some((r) => /decision message|DECISION block/.test(r.case)));
     // LIN-4378: a final exchange 429 reaches whoever asked for the exchange: the runner at the kit's
     // `start`, the agent's first request in SD.
     assert.ok(TABLE.rows.some((r) => r.area === 'forward' && /refused 429/.test(r.case) && r.kit !== r.sd));
@@ -416,19 +415,18 @@ describe('contract table shape', () => {
   // LIN-4475 replaces the exact count with a check by name: the seven stay, each with harbour === sd
   // and a sentinel twin on the same message. New report rows may differ from sd only with a difference
   // (checkRowShape), so the count is no longer the census.
-  test('report keeps the seven LIN-4384 cases by name: each has harbour === sd and a sentinel twin', () => {
-    const SEVEN = [
+  // LIN-4541: the two DECISION-block cases went with the DECISION: block (no session writes one), so five remain.
+  test('report keeps the five LIN-4384 cases by name: each has harbour === sd and a sentinel twin', () => {
+    const FIVE = [
       'one DONE: line naming one PR',
       'two PRs on one DONE: line: the first PR named on it',
       'an indented DONE: line still counts',
       'two DONE: lines: the PR on the newest line',
-      'a DONE: inside a DECISION block, then a real DONE: line: the real (newest) line\'s PR',
-      'a DONE: only inside a DECISION block: its PR, not one mentioned before it',
       'the session\'s own PR on its DONE: line beats a PR it mentioned more often (LIN-4375)'
     ];
     const report = TABLE.rows.filter((r) => r.area === 'report');
     const sentinel = TABLE.rows.filter((r) => r.area === 'sentinel');
-    for (const name of SEVEN) {
+    for (const name of FIVE) {
       const row = report.find((r) => r.case === name);
       assert.ok(row, `no report row named "${name}"`);
       assert.equal(row.harbour, row.sd, `${name}: the PR readers agree`);
@@ -686,14 +684,14 @@ describe('resolveRepo', () => {
 describe('capFeedbackMessage', () => {
   test('a message at the cap is unchanged', () => {
     const m = 'y'.repeat(2000);
-    assert.equal(capFeedbackMessage(m, 'status'), m);
+    assert.equal(capFeedbackMessage(m), m);
   });
   test('over the cap: first 1997 characters plus "..." (Simple Dispatcher\'s feedback.js)', () => {
     const m = 'a'.repeat(1997) + 'bcdef';
-    assert.equal(capFeedbackMessage(m, 'status'), 'a'.repeat(1997) + '...');
+    assert.equal(capFeedbackMessage(m), 'a'.repeat(1997) + '...');
   });
   test('a [done] prefix survives truncation', () => {
-    assert.match(capFeedbackMessage('[done] ' + 'z'.repeat(3000), 'status'), /^\[done\] z+\.\.\.$/);
+    assert.match(capFeedbackMessage('[done] ' + 'z'.repeat(3000)), /^\[done\] z+\.\.\.$/);
   });
 });
 
@@ -717,11 +715,6 @@ describe('feedback is capped where it is posted (runCommand feedback)', () => {
     assert.ok(posts[0].endsWith('...'));
   });
 
-  test('a decision message over the cap still errors and posts nothing (a cut ruling is malformed JSON)', async () => {
-    const { posts, error } = await feedback('decision', 'x'.repeat(2500));
-    assert.match(error.message, /decision exceeds 2000/);
-    assert.deepEqual(posts, []);
-  });
 });
 
 // LIN-3857 (D3): a subagent model/effort the kit drops or inherits is posted to the ITEM (a status

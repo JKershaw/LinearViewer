@@ -8,6 +8,8 @@ Area notes for `front-end-browser` in the registry. Format and rules: README.md.
   when the poll stops (hidden tab, 401, revoked link). `createTimelineRefresher` (`public/task-page.js`, LIN-4405)
   is the pattern; a running chip changes the poll's track about once a minute, so "fetch when it changes" alone repeats.
   Done reads once more first (`finish`): the poll that says done carries the last change, and stopping drops it.
+- Rows painted in two hosts (the waiting block, the Rulings tab) share one keyed node map: a rebuilt row detaches its old
+  node from whichever host holds it, or the stale one stays painted there (`public/observation.js`, LIN-4541).
 - Task-page CSS is phone-first at `min-width: 600px` (only the listed breakpoints pass `tests/unit/ui-authorities.test.js`),
   with `--font-size-*` tokens and no new mono selector (`tests/unit/lin-4107-type-sizes.test.js`).
 

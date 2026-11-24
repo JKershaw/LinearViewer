@@ -65,7 +65,7 @@ function runningLoop(sessionId) {
   return {
     loopId: `${sessionId}-l`, lineageId: `${sessionId}-l`, kind: 'implementation', followUpTo: null, sessionId,
     issueIdentifier: `LIN-${sessionId}`, issueTitle: `Task ${sessionId}`, workspaceUrlKey: 'acme', dispatchedAt: RECENT,
-    resolvedAt: null, decision: null, decisionCase: [], answeredDecisions: [], withdrawal: null, wakeMarker: null, waitingMessage: null
+    resolvedAt: null, decision: null, decisionCase: [], withdrawal: null, wakeMarker: null, waitingMessage: null
   };
 }
 

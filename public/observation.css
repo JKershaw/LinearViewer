@@ -256,239 +256,6 @@
   font-weight: 500;
   margin: 0 0 0.3rem;
 }
-.obs-ruling-case {
-  color: var(--muted);
-  font-size: 0.88rem;
-  margin: 0 0 0.3rem;
-}
-.obs-ruling-cost {
-  color: var(--muted);
-  font-size: 0.82rem;
-  font-style: italic;
-  margin: 0 0 0.3rem;
-}
-.obs-ruling-feedback {
-  font-family: var(--font-structural);
-  font-size: 0.78rem;
-  color: var(--muted);
-  margin: 0.4rem 0 0;
-}
-.obs-ruling-feedback:empty { display: none; }
-.obs-ruling-feedback--error { color: var(--red); }
-
-/* Proposed-dismissal banner (LIN-2444 Phase 2) — a suggestion someone else
-   made, distinct from the ruling's own content, so it gets its own callout
-   rather than reusing .obs-ruling-cost's plain italic line. Base rules here
-   ARE the phone-width form (mobile-first, per this file's own convention —
-   the one width query below is a desktop enhancement, not a rewrite); the
-   reason wraps rather than clips, since it is the full argument being agreed
-   to, never a truncated excerpt like .obs-ruling-case above. */
-.obs-ruling-suggestion {
-  margin: 0.4rem 0;
-  padding: 0.5rem 0.6rem;
-  border: 1px solid var(--line);
-  border-left: 3px solid var(--brand);
-  border-radius: var(--radius-sm);
-  background: color-mix(in srgb, var(--brand) 6%, var(--card));
-}
-.obs-ruling-suggestion-label {
-  font-family: var(--font-structural);
-  font-size: 0.72rem;
-  text-transform: uppercase;
-  letter-spacing: 0.04em;
-  color: var(--muted);
-  margin: 0 0 0.2rem;
-}
-.obs-ruling-suggestion-reason {
-  font-family: var(--font-content);
-  font-size: 0.85rem;
-  color: var(--text);
-  margin: 0 0 var(--space-1);
-  overflow-wrap: break-word;
-}
-.obs-ruling-suggestion-meta {
-  font-family: var(--font-structural);
-  font-size: 0.76rem;
-  color: var(--muted);
-  margin: 0;
-}
-/* Selection checkbox + label row (LIN-2444 Phase 5) — the checkbox itself
-   needs no rule of its own; only the row it sits in does. */
-.obs-ruling-suggestion-head {
-  display: flex;
-  align-items: center;
-  gap: 0.4rem;
-  margin: 0 0 0.2rem;
-}
-.obs-ruling-suggestion-head .obs-ruling-suggestion-label { margin: 0; }
-
-/* Free-text answer + dismiss (LIN-2225). Mirrors .sess-inline-reply-input /
-   .sess-inline-reply-actions (session.css) — same textarea + action-row shape,
-   scoped to a ruling row instead of a run card. */
-.obs-ruling-answer { margin-top: 0.4rem; }
-.obs-ruling-answer-input {
-  width: 100%;
-  box-sizing: border-box;
-  min-height: 2.6rem;
-  resize: vertical;
-  padding: 0.35rem 0.5rem;
-  font-family: var(--font-structural);
-  font-size: 0.8rem;
-  line-height: 1.5;
-  color: var(--text);
-  background: var(--card);
-  border: 1px solid var(--line);
-  border-radius: var(--radius-sm);
-}
-.obs-ruling-answer-input:focus {
-  outline: none;
-  border-color: var(--brand);
-}
-.obs-ruling-answer-input:disabled { opacity: 0.6; }
-.obs-ruling-answer-actions {
-  display: flex;
-  align-items: center;
-  flex-wrap: wrap;
-  gap: 0.4rem 0.6rem;
-}
-.obs-ruling-answer-send {
-  color: var(--green);
-  background: color-mix(in srgb, var(--green) 12%, transparent);
-}
-.obs-ruling-answer-send:hover { background: color-mix(in srgb, var(--green) 22%, transparent); }
-.obs-ruling-answer-send:disabled { opacity: 0.5; cursor: default; }
-.obs-ruling-dismiss {
-  color: var(--muted);
-  background: color-mix(in srgb, var(--muted) 10%, transparent);
-}
-.obs-ruling-dismiss:hover { background: color-mix(in srgb, var(--muted) 20%, transparent); }
-.obs-ruling-dismiss:disabled { opacity: 0.5; cursor: default; }
-
-/* Agree/Keep (LIN-2444 Phase 3/4) — same base/hover/disabled triplet as
-   dismiss above. Agree is green-toned like .obs-ruling-answer-send
-   (it IS a dismiss, just of the accepted-suggestion kind); Keep is neutral,
-   matching .obs-ruling-dismiss's weight (Keep discards a proposal, it does
-   not raise or defer anything). Both append
-   into the existing .obs-ruling-answer-actions flex row, so no new layout
-   is needed at any width. */
-.obs-ruling-agree {
-  color: var(--green);
-  background: color-mix(in srgb, var(--green) 12%, transparent);
-}
-.obs-ruling-agree:hover { background: color-mix(in srgb, var(--green) 22%, transparent); }
-.obs-ruling-agree:disabled { opacity: 0.5; cursor: default; }
-
-/* Effect override flip (LIN-2775 Area 5) — neutral like .obs-ruling-dismiss:
-   it changes what the row WILL do, not a clearance/acceptance action, so it
-   borrows no green/amber weight from either. `--active` marks a standing
-   override with the same brand accent .tabs__tab.is-active uses. */
-.obs-ruling-effect-flip {
-  margin-top: 0.35rem;
-  color: var(--muted);
-  background: color-mix(in srgb, var(--muted) 10%, transparent);
-}
-.obs-ruling-effect-flip:hover { background: color-mix(in srgb, var(--muted) 20%, transparent); }
-.obs-ruling-effect-flip:disabled { opacity: 0.5; cursor: default; }
-.obs-ruling-effect-flip--active {
-  color: var(--brand);
-  background: color-mix(in srgb, var(--brand) 14%, transparent);
-}
-
-.obs-ruling-keep {
-  color: var(--muted);
-  background: color-mix(in srgb, var(--muted) 10%, transparent);
-}
-.obs-ruling-keep:hover { background: color-mix(in srgb, var(--muted) 20%, transparent); }
-.obs-ruling-keep:disabled { opacity: 0.5; cursor: default; }
-
-/* Same 44px-ladder tap-target bump `.detail-toggle` gets at this breakpoint
-   (public/style.css:1315-1319) — scoped to just these two new buttons; the
-   pre-existing dismiss button is untouched, out of this phase. */
-@media (max-width: 640px) {
-  .obs-ruling-agree,
-  .obs-ruling-keep {
-    padding: 0.5rem 0.7rem;
-  }
-}
-
-/* Bulk-agree bar (LIN-2444 Phase 5) — select-all-suggested + exact count +
-   Agree selected, inline above the feed. Own .obs-ruling-bulk-* names with
-   real rules. Base rules ARE the phone form, per this file's own
-   mobile-first convention — the file's one width query is a desktop
-   enhancement, never a rewrite. */
-.obs-ruling-bulk-bar {
-  display: flex;
-  align-items: center;
-  gap: var(--space-2);
-  flex-wrap: wrap;
-  margin: 0 0 0.6rem;
-}
-.obs-ruling-bulk-bar[hidden] { display: none; }
-.obs-ruling-bulk-select-all {
-  display: flex;
-  align-items: center;
-  gap: 0.35rem;
-  font-family: var(--font-structural);
-  font-size: 0.8rem;
-  color: var(--text);
-}
-.obs-ruling-bulk-count {
-  font-family: var(--font-structural);
-  font-size: 0.78rem;
-  color: var(--muted);
-}
-.obs-ruling-bulk-agree {
-  color: var(--green);
-  background: color-mix(in srgb, var(--green) 12%, transparent);
-}
-.obs-ruling-bulk-agree:hover { background: color-mix(in srgb, var(--green) 22%, transparent); }
-.obs-ruling-bulk-agree:disabled { opacity: 0.5; cursor: default; }
-
-/* LIN-2758: batch progress, above the bar (machine-fact typographic
-   convention: a per-row count is a machine fact, not prose). Plain text node, no animation, so no
-   prefers-reduced-motion carve-out is needed. */
-.obs-ruling-bulk-progress {
-  font-family: var(--font-structural);
-  font-size: 0.78rem;
-  color: var(--muted);
-  margin: 0 0 var(--space-2);
-}
-/* Stop takes the amber caution treatment -- it halts an
-   otherwise-destructive-reaching action mid-flight, distinct from the green
-   "commit" affordance .obs-ruling-bulk-agree carries. */
-.obs-ruling-bulk-stop {
-  color: var(--amber);
-  background: color-mix(in srgb, var(--amber) 12%, transparent);
-  border: none;
-  border-radius: var(--radius-sm);
-  padding: 0.3rem 0.6rem;
-  font: inherit;
-  font-size: 0.78rem;
-  cursor: pointer;
-}
-.obs-ruling-bulk-stop:hover { background: color-mix(in srgb, var(--amber) 22%, transparent); }
-.obs-ruling-bulk-stop[hidden] { display: none; }
-
-/* Same 44px-ladder tap-target bump Agree/Keep get above (`.detail-toggle`'s
-   convention, public/style.css) — it is a real tappable action button, same
-   as they are. The select-all affordance needs no bump of its own: it is a
-   <label> wrapping the checkbox, so the whole label — not just the small
-   native checkbox — is already the tap target. */
-@media (max-width: 640px) {
-  .obs-ruling-bulk-agree {
-    padding: 0.5rem 0.7rem;
-  }
-  .obs-ruling-bulk-stop {
-    padding: 0.5rem 0.7rem;
-  }
-}
-
-/* At the narrowest phone widths the select-all LABEL collapses to just its
-   checkbox — the exact count beside it already carries the same meaning
-   more compactly. */
-@media (max-width: 400px) {
-  .obs-ruling-bulk-select-all-text { display: none; }
-}
 
 .obs-session {
   border: 1px solid var(--line);
@@ -1186,15 +953,14 @@ a.obs-task-ident:hover { text-decoration: underline; }
 /* ─── Waiting block (LIN-3983) ────────────────────────────────────────────────
    What waits on you, above the runs feed. The strongest accent on the page: a
    waiting run is the one card that needs a person, so it is not the quietest.
-   The ruling rows inside it are the Rulings tab's own rows; their bulk
-   checkbox belongs to the tab, not the block. */
+   The ruling rows inside it are the Rulings tab's own rows (open question
+   records, LIN-4541). */
 .obs-waiting[hidden] { display: none; }
 .obs-waiting {
   border-left: 4px solid var(--brand);
   padding-left: var(--space-2h);
   margin-bottom: 1.1rem;
 }
-.obs-waiting-rulings .obs-ruling-select { display: none; }
 .obs-waiting-run {
   padding: var(--space-2) 0;
   border-bottom: 1px solid var(--line);
@@ -1259,55 +1025,6 @@ a.obs-task-ident:hover { text-decoration: underline; }
 /* The task's title beside its id on a Rulings row, and the note that says what
    each action does (both plain words, so the content face). */
 .obs-ruling-title { color: var(--text); font-family: var(--font-content); }
-.obs-ruling-actions-note {
-  margin: var(--space-1) 0 0;
-  font-family: var(--font-content);
-  font-size: 0.78rem;
-  color: var(--muted);
-  max-width: 62ch;
-}
-
-/* The bulk apply's own question, asked in the page (LIN-3983 PR 2). Shown only
-   while a bulk apply is waiting on the person; the page never uses confirm(). */
-.obs-ruling-bulk-confirm {
-  margin: 0 0 var(--space-2);
-  padding: var(--space-2);
-  border: 1px solid var(--border-strong);
-  border-radius: var(--radius-sm);
-  background: var(--inset);
-  font-family: var(--font-content);
-}
-.obs-ruling-bulk-confirm[hidden] { display: none; }
-.obs-ruling-bulk-confirm-text { margin: 0 0 var(--space-2); font-size: 0.85rem; color: var(--text); }
-.obs-ruling-bulk-confirm-actions { display: flex; flex-wrap: wrap; gap: var(--space-2); align-items: center; }
-.obs-ruling-bulk-confirm-yes {
-  color: var(--green);
-  font-weight: 600;
-}
-.obs-ruling-bulk-confirm-yes:hover { background: color-mix(in srgb, var(--green) 22%, transparent); }
-.obs-ruling-bulk-confirm-no {
-  border: 0;
-  background: transparent;
-  color: var(--muted);
-  font-size: 0.85rem;
-  padding: var(--space-1) var(--space-2);
-  cursor: pointer;
-  text-decoration: underline;
-}
-.obs-ruling-bulk-confirm-no:hover { color: var(--text); }
-
-/* Retry delivery on a partial failure (the Rulings row's own control). */
-.obs-ruling-retry-delivery {
-  border: 1px solid var(--border-strong);
-  background: transparent;
-  color: var(--amber);
-  border-radius: var(--radius-sm);
-  font-size: 0.8rem;
-  padding: var(--space-1) var(--space-2);
-  cursor: pointer;
-}
-.obs-ruling-retry-delivery:hover { background: color-mix(in srgb, var(--amber) 18%, transparent); }
-.obs-ruling-retry-delivery:disabled { opacity: 0.5; cursor: default; }
 
 /* The run's own meta chips for a task budget and its ticket walk (the same
    muted, machine-fact face as the other meta). */
@@ -1337,13 +1054,3 @@ a.obs-task-ident:hover { text-decoration: underline; }
 .obs-session-started { color: var(--muted); font-size: 0.82rem; }
 .obs-session-time time { color: inherit; }
 
-/* Phone (LIN-3983 PR 2): the answer and dismiss controls are at least 44px
-   tall, so each is a real tap target. */
-@media (max-width: 640px) {
-  .obs-ruling-answer-send,
-  .obs-ruling-dismiss,
-  .obs-ruling-agree,
-  .obs-ruling-keep,
-  .obs-ruling-bulk-confirm-yes,
-  .obs-ruling-bulk-confirm-no { min-height: 44px; }
-}

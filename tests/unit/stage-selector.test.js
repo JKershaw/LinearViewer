@@ -18,7 +18,6 @@ import assert from 'node:assert/strict';
 import { buildRouterPrompt, routeStage, parseWhyNow } from '../../lib/stage-router.js';
 import { formatStageOptions, getSelectableStages, STAGE_LEADS } from '../../lib/prompt-templates.js';
 import { getRecommendation, setFetchImpl, buildSelectorArgs } from '../../lib/openrouter.js';
-import { RULING_MARK } from '../../lib/run-trail.js';
 import { planReviewRunOf } from '../../lib/records/plan-review-run.js';
 
 const open = { name: 'In Progress', type: 'started' };
@@ -176,14 +175,6 @@ describe('the selector prompt (LIN-3300)', () => {
     const breakdown = getSelectableStages().find(s => s.key === 'breakdown');
     assert.match(breakdown.whenNot, /one PR in ordered commits/);
     assert.ok(prompt().includes(breakdown.whenNot), 'the routing prompt carries the not-when verbatim');
-  });
-
-  test('a ruling older than the latest comments still reaches the selector', () => {
-    const comments = [
-      { user: 'John', person: true, createdAt: '2026-10-01T00:00:00Z', body: `Dispatch implement for N4.\n\n${RULING_MARK}` },
-      ...[2, 3, 4].map(n => ({ user: 'A', createdAt: `2026-10-0${n}T00:00:00Z`, body: `Note ${n}.` }))
-    ];
-    assert.match(prompt(leaf(), ctx({ comments })), /Latest ruling recorded via Harbour[^\n]*\n+Dispatch implement for N4\./);
   });
 });
 

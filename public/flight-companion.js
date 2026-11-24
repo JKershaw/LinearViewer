@@ -1152,8 +1152,8 @@ function renderDecisions(resultString, beforeLi) {
   // Nothing pending: the model's own prose says so — no dead UI to add.
   if (!parsed.questions.length) return;
   // LIN-3361: one closed fold per result. Every row is built and appended
-  // up front (nothing lazy, nothing removed), so the option buttons' click
-  // handlers and `fc-decision--resolved` work the same once it is opened.
+  // up front (nothing lazy, nothing removed), so each question card's
+  // handlers work the same once it is opened.
   var foldLi = document.createElement('li');
   foldLi.className = 'chat-msg fc-decisions-fold-msg';
   var fold = document.createElement('details');

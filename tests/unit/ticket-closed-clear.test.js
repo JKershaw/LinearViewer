@@ -90,7 +90,7 @@ describe('ticket-closed-clear (LIN-3399)', () => {
     const legacyLoop = {
       loopId: 'legacy', issueIdentifier: 'LIN-1', terminalStatus: null, wakeMarker: 'blocked', agentState: null,
       historyStatus: 'taken', source: 'history', bookkeeping: null, dispatchedAt: mins(300).toISOString(),
-      decision: { decision_id: 'dec-legacy', question: 'q', options: [] }, decisionCase: [], answeredDecisions: [],
+      decision: { decision_id: 'dec-legacy', question: 'q', options: [] }, decisionCase: [],
       withdrawal: null, withdrawalReversed: undefined, workspaceUrlKey: 'acme'
     };
     const whole = async () => JSON.stringify(await history.find({}).toArray()); // includes feedbackDigest

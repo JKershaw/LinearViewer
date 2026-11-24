@@ -329,7 +329,7 @@ describe('LIN-4024 — GET …/api/task/:identifier/state sends the question car
     ...STORED_LOOP,
     loopId: 'impl-2', lineageId: 'impl-2', wakeMarker: 'blocked', waitingMessage: '[blocked] which API key?',
     feedback: [{ message: '[blocked] which API key?' }],
-    decision: { decision_id: 'lin-50-rc', question: 'Which API key?' }, decisionCase: [], answeredDecisions: [], withdrawal: null,
+    decision: { decision_id: 'lin-50-rc', question: 'Which API key?' }, decisionCase: [], withdrawal: null,
   };
 
   const ASKED = () => questionRecordsOf([{ id: 'q-impl-2', ticket: 'LIN-50', run: 'impl-2', to: 'person:acct-1' }]);

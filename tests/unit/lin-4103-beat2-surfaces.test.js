@@ -45,7 +45,7 @@ const failedLoop = (kind, over = {}) => loop({
 const ruling = (over = {}) => loop({
   wakeMarker: 'blocked', waitingMessage: '[blocked] which way?',
   feedback: [{ message: '[blocked] which way?', timestamp: '2026-11-01T10:05:00.000Z' }],
-  decision: { decision_id: 'd-1', question: 'Which way?' }, decisionCase: [], answeredDecisions: [], withdrawal: null, ...over,
+  decision: { decision_id: 'd-1', question: 'Which way?' }, decisionCase: [], withdrawal: null, ...over,
 });
 
 const node = (identifier, type = 'started', children = []) => ({

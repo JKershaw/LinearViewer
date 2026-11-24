@@ -144,9 +144,9 @@ function agentStatusEntry(overrides = {}) {
   };
 }
 
-// LIN-2671: the two feedback entries a loop's decision/answer facts derive
+// LIN-2671: the two feedback entries a loop's decision facts and answer history derive
 // from, built in the REAL wire shapes `_buildLoops` parses (`kind: 'decision'`
-// via `parseDecision`; `kind: 'decision-answer'` via `_findDecisionAnswer`) —
+// via `parseDecision`; `kind: 'decision-answer'`, the retired answer stamp) —
 // never hand-baked onto a Loop record, so the fixtures exercise the same
 // derivation production reads.
 function decisionFeedbackEntry(decisionId, timestamp = '2026-04-11T11:06:00.000Z') {

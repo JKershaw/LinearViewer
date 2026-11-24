@@ -312,19 +312,6 @@
       "kit": "truncated"
     },
     {
-      "area": "cap",
-      "case": "decision message over 2000 characters",
-      "halt": null,
-      "item": {
-        "route": "feedback",
-        "kind": "decision",
-        "length": 2500
-      },
-      "sd": "dropped",
-      "kit": "error",
-      "difference": "Truncated JSON is a silent malformed ruling, so the kit errors instead; SD's hook drops an over-gate decision (hook.js). Deliberate (LIN-3451)."
-    },
-    {
       "area": "heartbeat",
       "case": "consumer-level heartbeat field set",
       "halt": null,
@@ -513,24 +500,6 @@
     },
     {
       "area": "report",
-      "case": "a DONE: inside a DECISION block, then a real DONE: line: the real (newest) line's PR",
-      "item": {
-        "message": "DECISION:\n{\"question\": \"Which way?\",\nDONE: https://github.com/JKershaw/LinearViewer/pull/109\n\"options\": [\"a\", \"b\"]}\n\nDONE: opened https://github.com/JKershaw/LinearViewer/pull/103"
-      },
-      "sd": "https://github.com/JKershaw/LinearViewer/pull/103",
-      "harbour": "https://github.com/JKershaw/LinearViewer/pull/103"
-    },
-    {
-      "area": "report",
-      "case": "a DONE: only inside a DECISION block: its PR, not one mentioned before it",
-      "item": {
-        "message": "Need a ruling first; the pattern is in https://github.com/JKershaw/LinearViewer/pull/2357.\n\nDECISION:\n{\"question\": \"Which way?\",\nDONE: https://github.com/JKershaw/LinearViewer/pull/109\n\"options\": [\"a\", \"b\"]}"
-      },
-      "sd": "https://github.com/JKershaw/LinearViewer/pull/109",
-      "harbour": "https://github.com/JKershaw/LinearViewer/pull/109"
-    },
-    {
-      "area": "report",
       "case": "the session's own PR on its DONE: line beats a PR it mentioned more often (LIN-4375)",
       "item": {
         "message": "Read https://github.com/JKershaw/LinearViewer/pull/2357 for context.\nAgain https://github.com/JKershaw/LinearViewer/pull/2357, and https://github.com/JKershaw/LinearViewer/pull/2357 once more.\nThe sibling https://github.com/JKershaw/LinearViewer/pull/2357 sets the pattern.\n\nDONE: opened https://github.com/JKershaw/LinearViewer/pull/2359"
@@ -592,25 +561,6 @@
       },
       "sd": "finished",
       "kit": "finished"
-    },
-    {
-      "area": "sentinel",
-      "case": "a DONE: inside a DECISION block, then a real DONE: line last",
-      "item": {
-        "message": "DECISION:\n{\"question\": \"Which way?\",\nDONE: https://github.com/JKershaw/LinearViewer/pull/109\n\"options\": [\"a\", \"b\"]}\n\nDONE: opened https://github.com/JKershaw/LinearViewer/pull/103"
-      },
-      "sd": "finished",
-      "kit": "finished"
-    },
-    {
-      "area": "sentinel",
-      "case": "a DONE: only inside a DECISION block, the block's closing brace last",
-      "item": {
-        "message": "Need a ruling first; the pattern is in https://github.com/JKershaw/LinearViewer/pull/2357.\n\nDECISION:\n{\"question\": \"Which way?\",\nDONE: https://github.com/JKershaw/LinearViewer/pull/109\n\"options\": [\"a\", \"b\"]}"
-      },
-      "sd": "finished",
-      "kit": "not finished",
-      "difference": "LIN-4377: SD's parseCompletionSentinel (hook.js) takes the first trimmed line anywhere in the turn that starts with DONE:, so a DONE: inside the DECISION JSON ends the turn. The kit's transcriptFinished reads only the last non-empty line (here the block's closing brace), so the turn is not over. Pinned as found; neither reader changes. SD's DECISION_EMIT_INSTRUCTION tells a session never to start a line in the block with DONE:."
     },
     {
       "area": "sentinel",

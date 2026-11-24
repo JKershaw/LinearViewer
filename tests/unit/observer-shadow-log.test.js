@@ -11,8 +11,8 @@
  *      isWakeEvent), not merely similarly-shaped, so LIN-2133/LIN-2139 can
  *      consume them without translation.
  *   C. ObserverShadowLogStore — recordActions / listByWorkspace / cleanup,
- *      against an in-memory mock collection (precedent:
- *      tests/unit/task-decisions-store.test.js).
+ *      against an in-memory mock collection (the retired task-decisions store's
+ *      suite was the precedent, LIN-4541).
  *   D. Growth/retention cap — per-workspace count cap, matching P1-2's
  *      (lib/observer-state-store.js) retention pattern per this ticket's own
  *      acceptance criteria.
@@ -45,7 +45,7 @@ import {
 import { isWakeEvent, findWakeEvent } from '../../lib/dispatch-terminal.js';
 
 // Minimal in-memory mock of the collection surface the store uses —
-// precedent: tests/unit/task-decisions-store.test.js's createMockCollection.
+// precedent: the retired task-decisions store suite's createMockCollection (LIN-4541).
 function createMockCollection() {
   const docs = [];
   function matches(doc, query) {

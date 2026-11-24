@@ -125,12 +125,11 @@ describe('WorkspaceHaltStore', () => {
     assert.ok(proxyLine && /\bworkspaceHaltStore\b/.test(proxyLine), 'workspaceHaltStore must be passed to createProxyRoutes');
   });
 
-  // LIN-2891/LIN-3035: same census pattern as G2 above, for the DI parameter
-  // that lets routes/dispatch.js's feedback route invalidate the rulings
-  // cache after a successful write.
-  test('LIN-3035: sessionsFeedCache is wired into createDispatchRoutes in server.js', () => {
+  // LIN-4541: the feedback route's cache invalidation (LIN-3035) went with the decision-withdrawn kind it served, so
+  // createDispatchRoutes no longer takes the sessions-feed cache.
+  test('LIN-4541: sessionsFeedCache is no longer passed to createDispatchRoutes in server.js', () => {
     const dispatchLine = SERVER_SRC.split('\n').find(l => l.includes('createDispatchRoutes({'));
-    assert.ok(dispatchLine && /\bsessionsFeedCache\b/.test(dispatchLine), 'sessionsFeedCache must be passed to createDispatchRoutes');
+    assert.ok(dispatchLine && !/\bsessionsFeedCache\b/.test(dispatchLine), 'createDispatchRoutes no longer reads sessionsFeedCache');
   });
 
   test("G1: server.js's workspace-halt collection is actually bound into new WorkspaceHaltStore(", () => {

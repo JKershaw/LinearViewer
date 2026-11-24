@@ -288,7 +288,7 @@ const CENSUS = [
   { m: 'DELETE', p: '/api/proxy/issues/:issueId/relations/:relationId', kind: 'scoped', op: 'deleteRelation' },
   { m: 'POST', p: '/api/proxy/issues/:issueId/labels', kind: 'scoped', op: 'addLabel' },
   { m: 'DELETE', p: '/api/proxy/issues/:issueId/labels/:labelId', kind: 'scoped', op: 'removeLabel' },
-  // Agent status, halt, model routing, rulings, kickoff, dispatch
+  // Agent status, halt, model routing, kickoff, dispatch
   { m: 'POST', p: '/api/proxy/agent/status', kind: 'scoped', op: 'agentStatus' },
   { m: 'POST', p: '/api/proxy/foreman/status', kind: 'scoped', op: 'agentStatus' },
   { m: 'POST', p: '/api/proxy/dispatch/halt', kind: 'scoped', op: 'haltSet' },
@@ -297,8 +297,6 @@ const CENSUS = [
   { m: 'POST', p: '/api/proxy/model-routing/groups/:group', kind: 'scoped', op: 'modelRouting' },
   { m: 'POST', p: '/api/proxy/model-routing/presets/:presetId/apply', kind: 'scoped', op: 'modelRouting' },
   { m: 'POST', p: '/api/proxy/model-routing/log/:entryId/undo', kind: 'scoped', op: 'modelRouting' },
-  { m: 'POST', p: '/api/proxy/rulings/:decisionId/suggest-dismissal', kind: 'scoped', op: 'rulingSuggestDismissal' },
-  { m: 'POST', p: '/api/proxy/rulings/:decisionId/suggest-answer', kind: 'scoped', op: 'rulingSuggestAnswer' },
   { m: 'POST', p: '/api/proxy/autopilot/kickoff', kind: 'scoped', op: 'kickoff' },
   { m: 'POST', p: '/api/proxy/dispatch', kind: 'scoped', op: 'dispatch' },
   { m: 'POST', p: '/api/proxy/recommend-and-dispatch', kind: 'scoped', op: 'dispatch' },

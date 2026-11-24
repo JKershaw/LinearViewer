@@ -19,7 +19,6 @@ import { computeSupersededLoopIds } from '../../lib/loop-supersede.js';
 import { DEFAULT_LANE_STALE_MS } from '../../lib/live-console.js';
 import { withFreshDigests } from '../fixtures/with-fresh-digests.js';
 import { questionStandingOf } from '../../lib/records/question-standing.js';
-import { TaskDecisionsStore } from '../../lib/task-decisions-store.js';
 import { sessionIsTerminal } from '../../routes/dashboard.js';
 import { createMockCollection } from '../fixtures/mock-collection.js';
 
@@ -1921,7 +1920,7 @@ function supersededBlockedHistory() {
 }
 
 // LIN-2671: a [blocked] run whose decision was answered OUT OF BAND — the
-// `answeredDecisionId` signal, with NO follow-up loop naming it. The
+// decision-answer stamp on its feedback, with NO follow-up loop naming it. The
 // superseded fixture above cannot exercise this: there the answer evidence is
 // the follow-up's `followUpTo`, here it is the decision-answer stamp alone.
 function answeredDecisionHistory() {
@@ -2264,13 +2263,11 @@ describe('pass-4 fleet read — list_active_sessions (LIN-2617)', () => {
     const answeringSibling = {
       loopId: 'g-root', kind: 'implementation', dispatchedAt: T_FLEET_OLD, lineageId: 'g-lineage',
       terminalStatus: 'done', wakeMarker: null, agentState: null, decision: null,
-      answeredDecisions: [{ decisionId: 'dec-g', raisedAt: null, resolvedAt: null, outcome: 'answered' }],
       feedback: [{ message: '[done] answered on this loop', timestamp: T_FLEET_OLD }],
     };
     const tailWithDecision = {
       loopId: 'g-tail', kind: 'implementation', dispatchedAt: T_FLEET_FRESH, lineageId: 'g-lineage',
       terminalStatus: null, wakeMarker: 'blocked', agentState: null, decision: { decision_id: 'dec-g' },
-      answeredDecisions: [],
       feedback: [{ message: '[blocked] which option?', timestamp: T_FLEET_FRESH }],
     };
     const session = { sessionId: 'g-root', seedIssue: 'LIN-741', tasksTouched: [], dispatchedAt: T_FLEET_OLD, loops: [answeringSibling, tailWithDecision] };
@@ -2315,7 +2312,6 @@ describe('pass-4 fleet read — list_active_sessions (LIN-2617)', () => {
     const solo = {
       loopId: 'solo-1', kind: 'autopilot', dispatchedAt: T_FLEET_OLD,
       terminalStatus: null, wakeMarker: 'blocked', agentState: null, decision: { decision_id: 'dec-solo' },
-      answeredDecisions: [{ decisionId: 'dec-solo', raisedAt: null, resolvedAt: null, outcome: 'answered' }],
       feedback: [{ message: '[blocked] which option?', timestamp: T_FLEET_OLD }],
     };
     const session = { sessionId: 'solo-1', seedIssue: 'LIN-742', tasksTouched: [], dispatchedAt: T_FLEET_OLD, loops: [solo] };
@@ -2343,21 +2339,13 @@ function decisionEntry(id, question, timestamp, optionCount = 0) {
   };
 }
 
-// LIN-2671: the `decision-answer` stamp `markDecisionAnswered` writes, in the
-// shape `_findDecisionAnswer` parses — so `answeredDecisionId` derives for real.
+// LIN-2671: the `decision-answer` stamp the retired answer path wrote (history since LIN-4541), in the
+// shape it had.
 function answerEntry(decisionId, timestamp) {
   return { kind: 'decision-answer', message: JSON.stringify({ decision_id: decisionId }), timestamp };
 }
 
 
-
-// LIN-2704: the pending-set exit is the acceptance criterion, not "a tap
-// posts" (§4 of the plan). Unlike the rest of this describe block, these
-// tests wire a REAL TaskDecisionsStore (tests/fixtures/mock-collection.js)
-// rather than the listUnansweredForWorkspaces-only stub above, because the
-// thing being proven is the real `markOutcome` path the projected ids feed —
-// a stub that only ever returns the seeded array can't demonstrate a row
-// actually leaving the pending set.
 
 describe('pass-4 fleet reads — partial lists say so (LIN-2617)', () => {
   test('a capped list reports the full matching count AND flags itself truncated', async () => {

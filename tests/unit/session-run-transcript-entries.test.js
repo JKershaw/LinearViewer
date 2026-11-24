@@ -22,8 +22,8 @@
  * `decision-answer` (see lib/dispatch-feedback-kinds.js, lib/observer-efficacy-
  * signal.js:125) and does not (yet) include the two withdrawal kinds either
  * — an out-of-whitelist `kind` is silently dropped, not stored. The existing
- * e2e test instead uses the durable comment route's `markDecisionAnswered`
- * write path (`POST /workspace/:urlKey/api/comments/LIN-1728`), which is
+ * e2e test seeds that stamp through the history seam (POST
+ * /test/seed-history-feedback, LIN-4541: no route writes it now), which is
  * `decision-answer`-specific; the withdrawal write path is LIN-3035/LIN-3036,
  * not yet landed on this branch (LIN-3037's research comment `494e713b`
  * confirms `origin/lin-2891-linearviewer` is LIN-3034 only at this beat).

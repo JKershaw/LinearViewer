@@ -283,7 +283,7 @@ const queryText = (value) => (typeof value === 'string' && value.trim() ? value 
  *   closed with OWNER_CHECK_UNAVAILABLE. Never consulted on the verify path.
  * @returns {Router} Express router with dispatch routes
  */
-export function createDispatchRoutes({ dispatchQueueStore, dispatchTokenStore, workspaceFromUrl, userPreferencesStore, harbourFeedbackTokenStore, workspacePreferencesStore, dispatchPresetsStore, proxyTokenStore, provider: injectedProvider = null, getWorkspaceAccessToken = null, fetchIssueContext = null, workspaceHaltStore = null, haltReadTimeoutMs = POLL_HALT_READ_TIMEOUT_MS, sessionsFeedCache = null, workspaceOwnerCheck = null, taskModeStore = null, freeTierStore = null, accountStore = null, consumerHeartbeatStore = null, closeOut = null, installationTokenFor = null, requestUsageStore = null, requestUsageLoader = null, leftoverStep = null, recordsStore = null }) {
+export function createDispatchRoutes({ dispatchQueueStore, dispatchTokenStore, workspaceFromUrl, userPreferencesStore, harbourFeedbackTokenStore, workspacePreferencesStore, dispatchPresetsStore, proxyTokenStore, provider: injectedProvider = null, getWorkspaceAccessToken = null, fetchIssueContext = null, workspaceHaltStore = null, haltReadTimeoutMs = POLL_HALT_READ_TIMEOUT_MS, workspaceOwnerCheck = null, taskModeStore = null, freeTierStore = null, accountStore = null, consumerHeartbeatStore = null, closeOut = null, installationTokenFor = null, requestUsageStore = null, requestUsageLoader = null, leftoverStep = null, recordsStore = null }) {
   const router = Router();
   // LIN-4503: each session dispatch of a ticket retries its child tasks' tickets (lib/dispatch-factory.js).
   const childTickets = recordsStore ? childTicketRetryOf({ recordsStore }) : null;
@@ -1638,6 +1638,8 @@ export function createDispatchRoutes({ dispatchQueueStore, dispatchTokenStore, w
     // (LIN-3035/LIN-3130). Validation order and error contracts are unchanged.
     const validation = validateFeedbackBody(req.body);
     if (validation.error) {
+      // LIN-4541: a retired decision kind (a stale DECISION:/WITHDRAW: client) is a 422 naming POST /api/proxy/records.
+      if (validation.status === 422) return jsonError(res, 422, validation.error, { code: validation.code });
       return badRequest.json(res, validation.error);
     }
     const {
@@ -1662,14 +1664,6 @@ export function createDispatchRoutes({ dispatchQueueStore, dispatchTokenStore, w
 
       if (!result) {
         return notFound.json(res, 'Item not found or feedback not allowed');
-      }
-
-      // Only the decision-withdrawn write needs a hard invalidation (Surface 3);
-      // ordinary feedback writes rely on the cache's 5s TTL, so clearing here on
-      // every kind would defeat the stale-while-revalidate path for any workspace
-      // with active runner traffic (review R1).
-      if (sanitizedKind === 'decision-withdrawn') {
-        sessionsFeedCache?.clear(req.dispatchUrlKey);
       }
 
       res.json(result);

@@ -11,8 +11,10 @@ import { test, before, after } from 'node:test';
 import assert from 'node:assert/strict';
 import http from 'node:http';
 import express from 'express';
-import { createWorkspaceApiRoutes, decisionStampDedupe } from '../../routes/workspace-api.js';
-import { decisionStampDedupe as movedDedupe } from '../../routes/workspace-api-issue-write.js';
+import * as composer from '../../routes/workspace-api.js';
+import * as issueWrite from '../../routes/workspace-api-issue-write.js';
+
+const { createWorkspaceApiRoutes } = composer;
 
 let server, base;
 
@@ -38,6 +40,8 @@ test('OPTIONS reports the create and patch verbs on the issue paths', async () =
   assert.equal(await allowFor('/workspace/w/api/issues/abc'), 'PATCH');
 });
 
-test('the composer re-exports the one shared decisionStampDedupe instance', () => {
-  assert.equal(decisionStampDedupe, movedDedupe);
+// LIN-4541: the decision-stamp dedupe went with answers as comments: neither module exports it now.
+test('the decision-stamp dedupe is gone from both modules', () => {
+  assert.equal('decisionStampDedupe' in composer, false);
+  assert.equal('decisionStampDedupe' in issueWrite, false);
 });
