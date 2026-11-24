@@ -72,7 +72,7 @@ test.describe('Ambient rulings nav badge (LIN-1728 Phase 3)', () => {
     // queue-badge e2e coverage makes.
     await page.evaluate((urlKey) => window.updateRulingsBadge(urlKey), URL_KEY);
     await expect(badge).not.toHaveClass(/hidden/);
-    await expect(badge.locator('.rulings-count')).toHaveText('1');
+    await expect(badge.locator('.rulings-count')).toHaveText('1 question');
 
     // Server-side scoping check: the count comes from `req.session.workspaces`,
     // never fleet-wide.
@@ -104,7 +104,7 @@ test.describe('Ambient rulings nav badge (LIN-1728 Phase 3)', () => {
     const badge = page.locator('[data-rulings-badge]');
     await expect(badge).toBeAttached();
     await expect(badge).not.toHaveClass(/hidden/);
-    await expect(badge.locator('.rulings-count')).toHaveText('1');
+    await expect(badge.locator('.rulings-count')).toHaveText('1 question');
     expect(await page.evaluate(() => typeof window.updateRulingsBadge)).toBe('function');
   });
 

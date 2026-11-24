@@ -33,8 +33,9 @@ after(() => harness.close());
 
 /** The shipped `updateRulingsBadge`, from its assignment to its closing brace in public/common.js. */
 function updateRulingsBadgeSource() {
-  const start = COMMON_JS_SRC.indexOf('window.updateRulingsBadge = async function updateRulingsBadge(');
-  const end = COMMON_JS_SRC.indexOf('\n};', start);
+  // LIN-4552: from the badge's words (questionsWords, defined just above it) through updateRulingsBadge.
+  const start = COMMON_JS_SRC.indexOf('window.questionsWords = function questionsWords(');
+  const end = COMMON_JS_SRC.indexOf('\n};', COMMON_JS_SRC.indexOf('window.updateRulingsBadge = async function updateRulingsBadge('));
   assert.ok(start !== -1 && end !== -1, 'updateRulingsBadge not found in public/common.js');
   return COMMON_JS_SRC.slice(start, end + 3);
 }
@@ -56,7 +57,7 @@ function rulingsHandler({ recordsStore, dispatchQueueStore }) {
 
 describe('LIN-4103 beat 3 — the rulings feed counts the page\'s own workspace for the badge', () => {
   // LIN-4103 review item 2: the number painted in the header badge is the page's own workspace, the number its Home count
-  // line shows ("N waiting on you" reads that workspace's rulings only). Distinguishing precondition: a SECOND workspace on
+  // line shows ("N questions" reads that workspace's questions only). Distinguishing precondition: a SECOND workspace on
   // the same session holds a ruling; with one workspace both numbers agree by accident. The client function is the real
   // shipped one, sliced out of public/common.js and run against the real route's JSON, so a badge that reads the
   // all-workspaces `count` paints 3 here and fails.
@@ -106,8 +107,8 @@ describe('LIN-4103 beat 3 — the rulings feed counts the page\'s own workspace 
 
     const a = await paint('ws-a');
     assert.equal(a.feedCount, 3, 'the all-workspaces count is 3 (this is the number a wrong badge would paint)');
-    assert.equal(String(a.text), '1', 'workspace A\'s badge equals A\'s count line: one ruling');
+    assert.equal(String(a.text), '1 question', 'workspace A\'s badge equals A\'s count line: one question (LIN-4552: "N questions")');
     const b = await paint('ws-b');
-    assert.equal(String(b.text), '2', 'workspace B\'s badge equals B\'s count line: two rulings');
+    assert.equal(String(b.text), '2 questions', 'workspace B\'s badge equals B\'s count line: two questions');
   });
 });

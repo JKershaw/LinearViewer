@@ -12,6 +12,7 @@
 import * as PromptSection from './prompt-section.js'
 import { holdsReaderInput } from './question-records.js'
 import { mergeWaitingCards, noteSettled, questionKeyOf } from './waiting-merge.js'
+import { bindNotes, mergeNotes } from './waiting-notes.js'
 import { buildPromptFilename } from '../lib/prompt-filename.js'
 import { sourceQuery } from '../lib/task-page-href.js'
 
@@ -574,6 +575,15 @@ function initWaitingOnYou() {
   // LIN-4549: Waiting itself holds only question record cards, which public/question-records.js answers through one delegated
   // listener, so nothing in the section needs binding.
   if (window.QuestionCards && typeof window.QuestionCards.setDeskRoot === 'function') window.QuestionCards.setDeskRoot(main)
+  // LIN-4552: "Notes for you": clear and the fold, delegated on this section (public/waiting-notes.js). A cleared note is not a question,
+  // so the count line and the badge do not move; the section hides when nothing is left in it.
+  bindNotes(section, {
+    urlKey,
+    onCleared: () => {
+      live.textContent = 'Note cleared'
+      syncWaitingSection(section)
+    },
+  })
   // LIN-4243: Running, Up next and the count line follow a change of the Waiting key set. Captured here, at startup.
   const placement = createDeskPlacement({
     main,
@@ -593,6 +603,8 @@ function initWaitingOnYou() {
         if (!data || typeof data.html !== 'string') return
         // LIN-4549: the merge is a module (public/waiting-merge.js), which asks the one keep-a-card rule itself.
         const { removed } = mergeWaitingCards(body, data.html)
+        // LIN-4552 (finding-d4767b81): the notes for the owner merge too, by their own keys, so a note added after load shows now.
+        mergeNotes(body, data.html)
         // LIN-4532 (P2b): the count is read off the page, the one count the question cards settle through (waitingCountIn), so
         // a merged question card and a settled one count the same way as a ruling card.
         const count = waitingCountIn(main)
@@ -820,27 +832,29 @@ function createDeskPlacement({ main, countLine, live, searchResults, searchInput
 // hidden while either holds, so one never overwrites the other (clearing a search does not un-hide an empty section).
 function syncWaitingSection(section) {
   if (!section) return
-  // LIN-4494: a person's record is a reason to show the section too (`.waiting-record`, drawn on the page load).
-  // LIN-4532 (P2b): an open question record (`.waiting-question`) is one too.
-  const empty = !section.querySelector('.waiting-record, .waiting-question')
+  // LIN-4532 (P2b): an open question record (`.waiting-question`) is a reason to show the section. LIN-4552: a note for the
+  // person (`.waiting-note`, merged live by public/waiting-notes.js) is one too.
+  const empty = !section.querySelector('.waiting-question, .waiting-note')
   section.classList.toggle('hidden', empty || section.dataset.searchHidden === 'true')
 }
 
 /**
- * The count line's waiting part: "N waiting on you", first in the line as the server builds it. At 0 the part goes with its
- * separator. LIN-4242: the line is hidden, not removed, when no part is left, so a ruling raised after load can write back in.
+ * The count line's questions part: "N questions" (LIN-4552: "Waiting on you" is the section header's alone), first in the line as the
+ * server builds it (lib/task-board-view.js), found by its tone, the one part in the needs-you tone. Its words are common.js's
+ * questionsWords, the badge's. At 0 the part goes with its separator. LIN-4242: the line is hidden, not removed, when no part is
+ * left, so a question raised after load can write back in.
  */
 function setWaitingCount(countLine, n) {
   if (!countLine) return
-  let part = [...countLine.querySelectorAll('.in-progress-count__part')].find(el => /waiting on you/.test(el.textContent))
+  let part = countLine.querySelector('.in-progress-count__part[data-tone="needs-you"]')
   if (n > 0) {
     if (part) {
-      part.textContent = `${n} waiting on you`
+      part.textContent = window.questionsWords(n)
     } else {
       part = document.createElement('span')
       part.className = 'in-progress-count__part'
       part.dataset.tone = 'needs-you'
-      part.textContent = `${n} waiting on you`
+      part.textContent = window.questionsWords(n)
       const first = countLine.querySelector('.in-progress-count__part')
       if (first) {
         countLine.insertBefore(part, first)

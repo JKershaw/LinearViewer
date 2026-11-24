@@ -1,6 +1,7 @@
 import { test, expect } from '../fixtures/test-base.js';
 import { localSeedId } from '../fixtures/local-harness.js';
 import { askingRun, seedQuestion } from '../fixtures/question-records.js';
+import { SELECTORS } from '../helpers.js';
 
 // LIN-4024 (witness D and E, the small seed): the opened charter, search under ancestors, and the lazy rows route's
 // authz and done-task witnesses. The full ~3,700-task shape is measured on its own (tests/perf/lin-4024-home-shape.spec.js),
@@ -86,7 +87,7 @@ test('a task waiting on a question reads the same on the count line, the card, a
   await page.goto(`/workspace/${URL_KEY}/`);
 
   const count = page.locator('[data-testid="in-progress-count"]');
-  await expect(count).toContainText('1 waiting on you');
+  await expect(count).toContainText('1 question');
   await expect(count).not.toContainText('running');
 
   // LIN-4114: the question is a card in Waiting on you (not a row in Running), labelled with its task.
@@ -96,8 +97,9 @@ test('a task waiting on a question reads the same on the count line, the card, a
   await expect(page.locator('.running-section .line[data-identifier="LOCAL-T1"]')).toHaveCount(0);
 
   // The badge fills from a 5s client poll, so wait for it to settle before comparing it with the summary's number.
-  const waiting = (await count.textContent()).match(/(\d+) waiting on you/)[1];
-  await expect(page.locator('.rulings-badge .rulings-count')).toHaveText(waiting, { timeout: 15000 });
+  // LIN-4552: the badge says the count line's own words, "N questions".
+  const waiting = (await count.textContent()).match(/\d+ questions?\b/)[0];
+  await expect(page.locator(SELECTORS.questionsBadge)).toHaveText(waiting, { timeout: 15000 });
 
   // The question is answered where it is shown, and no raw record JSON reaches the page.
   await expect(card.locator('text=questionId')).toHaveCount(0);

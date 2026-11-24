@@ -194,7 +194,7 @@ describe('LIN-4009 — each row state has its own tone', () => {
     const rowStates = states({ roots: trees[0].roots, loops: { 'LIN-99': [blocked({ issueIdentifier: 'LIN-99' })] } });
     const html = renderPage([], trees, [], 'Test', { urlKey: 'acme', workspace: { urlKey: 'acme', provider: 'linear' }, rowStates, rulingCount: 1 });
     assert.match(html, /<span class="row-state" data-tone="needs-you" data-testid="issue-row-state">needs you</);
-    assert.match(html, /<span class="in-progress-count__part" data-tone="needs-you">1 waiting on you</);
+    assert.match(html, /<span class="in-progress-count__part" data-tone="needs-you">1 question</);
     assert.doesNotMatch(html, /in progress<\/span>/);
   });
 });
@@ -233,7 +233,7 @@ describe('LIN-3833 — In Progress order and its count line', () => {
       },
     });
     // LIN-4024: waiting on you counts rulings (passed in), running counts tasks; an idle task adds no part.
-    assert.deepEqual(countTexts(trees, rowStates, { rulingCount: 1 }), ['1 waiting on you', '1 running']);
+    assert.deepEqual(countTexts(trees, rowStates, { rulingCount: 1 }), ['1 question', '1 running']);
     assert.deepEqual(countTexts(trees, rowStates), ['1 running']);
     assert.deepEqual(countTexts([tree('Alpha', node('A-idle'))], states({ roots: [node('A-idle')] })), []);
     assert.deepEqual(countTexts([], new Map()), [], 'no tasks, no line');

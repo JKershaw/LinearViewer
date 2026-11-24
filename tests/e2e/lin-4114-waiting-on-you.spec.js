@@ -93,10 +93,10 @@ async function answerWith(card, option) {
 const THREE_OPTIONS = { options: ['Ship it now', 'Wait for review', 'Split the change'], recommended: 'Wait for review' };
 const ONE_OPTION = { options: ['Yes'] };
 
-/** The count line's "N waiting on you", or '' when the line says no such thing. */
+/** The count line's "N questions" (LIN-4552), or 0 when the line says no such thing. */
 async function waitingCount(page) {
   const text = (await page.locator(COUNT).textContent()) || '';
-  const m = text.match(/(\d+) waiting on you/);
+  const m = text.match(/(\d+) questions?\b/);
   return m ? Number(m[1]) : 0;
 }
 
@@ -113,9 +113,9 @@ test('W7: a question three levels down and a solo question each get one card, an
   await expect(section.locator('[data-testid="question-record-card"]')).toHaveCount(2);
   await expect(section.locator('[data-testid="question-record-card-task"]', { hasText: 'LOCAL-D' })).toHaveCount(1);
   await expect(section.locator('[data-testid="question-record-card-task"]', { hasText: 'LOCAL-S' })).toHaveCount(1);
-  await expect(page.locator(COUNT)).toContainText('2 waiting on you');
+  await expect(page.locator(COUNT)).toContainText('2 questions');
   await syncBadge(page);
-  await expect(page.locator(BADGE)).toHaveText('2', { timeout: 15000 });
+  await expect(page.locator(BADGE)).toHaveText('2 questions', { timeout: 15000 });
 });
 
 // ---- witness 1 (press semantics), 3 (double press, in-flight lock): browser behaviour -----------------------------
@@ -190,9 +190,9 @@ test('W12: answering with the recommended button settles the card in place; the 
   await seedWaiting(page, 'LOCAL-D', THREE_OPTIONS);
   await seedWaiting(page, 'LOCAL-S', ONE_OPTION);
   await page.goto(`/workspace/${URL_KEY}/`);
-  await expect(page.locator(COUNT)).toContainText('2 waiting on you');
+  await expect(page.locator(COUNT)).toContainText('2 questions');
   await syncBadge(page);
-  await expect(page.locator(BADGE)).toHaveText('2', { timeout: 15000 });
+  await expect(page.locator(BADGE)).toHaveText('2 questions', { timeout: 15000 });
 
   const deep = page.locator(WAIT_CARD, { has: page.locator('[data-testid="question-record-card-task"]', { hasText: 'LOCAL-D' }) }).locator('[data-testid="question-record-card"]');
   // LIN-4551: the recommended option is the labelled one (Answer is the card's .btn--primary now).
@@ -203,13 +203,13 @@ test('W12: answering with the recommended button settles the card in place; the 
   await expect(deep).toHaveAttribute('data-settled', 'true');
   await expect(deep.locator(FEEDBACK)).toHaveText('Answered. The run resumes with your answer.');
   await expect(page.locator(OPEN_CARD)).toHaveCount(1);
-  await expect(page.locator(COUNT)).toContainText('1 waiting on you');
+  await expect(page.locator(COUNT)).toContainText('1 question');
   await syncBadge(page);
-  await expect(page.locator(BADGE)).toHaveText('1', { timeout: 15000 });
+  await expect(page.locator(BADGE)).toHaveText('1 question', { timeout: 15000 });
 
   await page.reload();
   await expect(page.locator(CARD)).toHaveCount(1);
-  await expect(page.locator(COUNT)).toContainText('1 waiting on you');
+  await expect(page.locator(COUNT)).toContainText('1 question');
 });
 
 test('W12b: answering a non-recommended option the same way; with the last card answered the count line part goes, and a reload hides the section', async ({ page }) => {
@@ -220,9 +220,9 @@ test('W12b: answering a non-recommended option the same way; with the last card 
   await answerWith(card, 'Ship it now');
   await expect(card).toHaveAttribute('data-settled', 'true');
   await expect(page.locator(OPEN_CARD)).toHaveCount(0);
-  await expect(page.locator(COUNT).filter({ hasText: 'waiting on you' })).toHaveCount(0);
+  await expect(page.locator(`${COUNT} [data-tone="needs-you"]`)).toHaveCount(0);
   await syncBadge(page);
-  await expect(page.locator(BADGE)).toHaveText('0', { timeout: 15000 });
+  await expect(page.locator(BADGE)).toHaveText('0 questions', { timeout: 15000 });
   // LIN-4242: the owner's section and count line are hidden, not removed, so a question asked later can land in them.
   await page.reload();
   await expect(page.locator(SECTION)).toBeHidden();
@@ -236,7 +236,7 @@ test('W13: an answer the server could not record leaves the card open and counte
   await seedWaiting(page, 'LOCAL-S', ONE_OPTION);
   await seedWaiting(page, 'LOCAL-D', ONE_OPTION);
   await page.goto(`/workspace/${URL_KEY}/`);
-  await expect(page.locator(COUNT)).toContainText('2 waiting on you');
+  await expect(page.locator(COUNT)).toContainText('2 questions');
 
   let fail = true;
   await page.route(/\/questions\/[^/]+\/answer$/, route => {
@@ -248,12 +248,12 @@ test('W13: an answer the server could not record leaves the card open and counte
   await expect(card.locator(FEEDBACK)).toHaveText('boom', { timeout: 15000 });
   await expect(card).not.toHaveAttribute('data-settled', 'true');
   await expect(card.locator(ANSWER)).toBeEnabled();
-  await expect(page.locator(COUNT)).toContainText('2 waiting on you');
+  await expect(page.locator(COUNT)).toContainText('2 questions');
 
   fail = false;
   await card.locator(ANSWER).click();
   await expect(card).toHaveAttribute('data-settled', 'true', { timeout: 15000 });
-  await expect(page.locator(COUNT)).toContainText('1 waiting on you');
+  await expect(page.locator(COUNT)).toContainText('1 question');
   await page.unroute(/\/questions\/[^/]+\/answer$/);
 });
 
@@ -280,9 +280,9 @@ test('W14: answering a waiting task\'s card inside search settles the Waiting ca
   await expect(page.locator(CARD)).toHaveCount(1);
   await expect(page.locator(OPEN_CARD)).toHaveCount(0);
   await expect(page.locator(CARD).locator(FEEDBACK)).toHaveText('Answered. The run resumes with your answer.');
-  await expect(page.locator(COUNT).filter({ hasText: 'waiting on you' })).toHaveCount(0);
+  await expect(page.locator(`${COUNT} [data-tone="needs-you"]`)).toHaveCount(0);
   await syncBadge(page);
-  await expect(page.locator(BADGE)).toHaveText('0', { timeout: 15000 });
+  await expect(page.locator(BADGE)).toHaveText('0 questions', { timeout: 15000 });
 });
 
 // ---- witnesses 9 (rendered Home: each task once), and the named context exception -----------------------------------
@@ -309,7 +309,7 @@ test('W9b: a started waiting task with a running child is the named context row:
   await seedTree(page, { runnerKey: true });
   await seedWaiting(page, 'LOCAL-M', THREE_OPTIONS);
   await page.goto(`/workspace/${URL_KEY}/`);
-  await expect(page.locator(COUNT)).toContainText('waiting on you');
+  await expect(page.locator(COUNT)).toContainText('1 question');
   // One question, one card: the card for LOCAL-M is in Waiting.
   await expect(page.locator(WAIT_CARD, { has: page.locator('[data-testid="question-record-card-task"]', { hasText: 'LOCAL-M' }) })).toHaveCount(1);
   await expect(page.locator(WAIT_CARD)).toHaveCount(1);
@@ -319,8 +319,8 @@ test('W9b: a started waiting task with a running child is the named context row:
   await expect(page.locator('main [data-identifier="LOCAL-M"] [data-testid="issue-row-state"]'), 'the context row has no state words').toHaveCount(0);
   // Count line, badge and cards agree.
   await syncBadge(page);
-  await expect(page.locator(BADGE)).toHaveText('1', { timeout: 15000 });
-  await expect(page.locator(COUNT)).toContainText('1 waiting on you');
+  await expect(page.locator(BADGE)).toHaveText('1 question', { timeout: 15000 });
+  await expect(page.locator(COUNT)).toContainText('1 question');
 });
 
 // ---- witness 16 (browser): a viewer without run controls gets no Waiting section, no card and no ruling text -------------

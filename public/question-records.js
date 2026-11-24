@@ -25,14 +25,16 @@ function setBusy(card, busy) {
 
 // ── Keeping a card across a repaint (LIN-4549, finding-7a603e81) ──────────────
 // The one rule every host that repaints a question card asks: Home's live Waiting refresh (public/waiting-merge.js,
-// which imports holdsCard itself), Observation's rulings poll (public/observation.js) and Home's opened task
+// which imports holdsCard itself, and LIN-4552's notes merge, public/waiting-notes.js, for a note line), Observation's rulings poll (public/observation.js) and Home's opened task
 // (public/prompt-section.js keepTypedQuestion). It reads either card: a question record's, or the older reply card a run
 // parked on a bare `[blocked]` draws (lib/question-card.js). Each host decides first which card is "the same" (by its key);
 // this says whether that card holds the reader's place.
 const TYPED = `${INPUT}, [data-testid="session-question-card-input"]`;
 const PRESSED = `${OPTION}[aria-pressed="true"]`;
-// LIN-4551: the full ask's fold, opened. The reader is reading it, so a repaint must not close it under them.
-const OPEN_FOLD = '[data-testid="question-record-card-ask"][open]';
+// LIN-4551: the full ask's fold, opened. The reader is reading it, so a repaint must not close it under them. LIN-4552: a note line's
+// fold on Home (lib/waiting-section.js) is read the same way: Home's notes merge asks this rule of each line (public/waiting-notes.js),
+// where a clear in flight is a control off and focus on its clear is focus inside.
+const OPEN_FOLD = '[data-testid="question-record-card-ask"][open], [data-testid="waiting-note-fold"][open]';
 
 /**
  * Focus inside the card. `active` is the element that had focus BEFORE a write that may detach the card (a repaint detaches it,

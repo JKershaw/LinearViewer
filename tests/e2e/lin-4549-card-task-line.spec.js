@@ -59,14 +59,15 @@ async function expectTaskLine(scope, card, identifier, title) {
 test('Home, the rulings page, the task page and the run page: the card names its task, once', async ({ page, seedLocal, localWorkerUrlKey: urlKey }) => {
   const { runId, q11, q12 } = await seed(page, seedLocal, urlKey);
 
-  // Home: both titles from the page's issues; the identifier links to the task page; Home's "needs you" sits on the card's line.
+  // Home: both titles from the page's issues; the identifier links to the task page. LIN-4552: the card's line carries no "needs you"
+  // on Home: the section header says "Waiting on you" once.
   await page.goto(`/workspace/${urlKey}/`);
   for (const [qid, ticket] of [[q11, 'LOCAL-11'], [q12, 'LOCAL-12']]) {
     const wrapper = page.locator(SELECTORS.waitingOnYou.question, { has: page.locator(Q.byId(qid)) });
     const card = wrapper.locator(Q.card);
     await expectTaskLine(wrapper, card, ticket, TASKS[ticket]);
     await expect(card.locator(Q.taskId)).toHaveAttribute('href', new RegExp(`/workspace/${urlKey}/task/${ticket}`));
-    await expect(card.locator(`${Q.task} [data-testid="issue-row-state"]`)).toHaveText('needs you');
+    await expect(card.locator(`${Q.task} [data-testid="issue-row-state"]`)).toHaveCount(0);
   }
 
   // The rulings page: titles from the held issue set Home's load just warmed, so LOCAL-11 (no run) is titled too (finding-3788e61b).

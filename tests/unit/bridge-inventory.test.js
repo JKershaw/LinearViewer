@@ -101,8 +101,9 @@ describe('the bridge over the real repo', () => {
   test('the emitted modules are the converted pages (workspace-kpis.js, task-page.js, flight-companion.js, observation.js, question-records.js LIN-4532, swipe.js and app.js LIN-4463 piece 5), what they import, and the lib leaves', () => {
     // prompt-section.js is a module no renderer lists: app.js, swipe.js and task-page.js import it, so it is checked with them.
     // waiting-merge.js (LIN-4549) is one too: app.js imports it (Home's live Waiting merge, out of the classic question-cards.js).
+    // waiting-notes.js (LIN-4552) as well: app.js imports it (Home's "Notes for you": the notes merge, clear and the fold).
     const publicFiles = Object.keys(inputs.emitted).filter((k) => !k.startsWith('lib/')).sort();
-    assert.deepEqual(publicFiles, ['app.js', 'flight-companion.js', 'observation.js', 'prompt-section.js', 'question-records.js', 'swipe.js', 'task-page.js', 'waiting-merge.js', 'workspace-kpis.js']);
+    assert.deepEqual(publicFiles, ['app.js', 'flight-companion.js', 'observation.js', 'prompt-section.js', 'question-records.js', 'swipe.js', 'task-page.js', 'waiting-merge.js', 'waiting-notes.js', 'workspace-kpis.js']);
     for (const lib of ['lib/cost-format.js', 'lib/prompt-filename.js', 'lib/task-page-href.js']) assert.ok(inputs.emitted[lib], lib);
   });
 

@@ -217,8 +217,23 @@ export const SELECTORS = {
   /** LIN-4549: Home's Waiting on you section and its question wrappers (`.waiting-question`, one per open question). */
   waitingOnYou: {
     section: '[data-testid="waiting-on-you"]',
+    header: '[data-testid="waiting-header"]',
     question: '[data-testid="waiting-question"]',
+    /** LIN-4552: "Notes for you", the open findings to the owner under the questions, and each note line's parts. */
+    notes: '[data-testid="waiting-notes"]',
+    note: '[data-testid="waiting-note"]',
+    noteByRecord: (recordId) => `[data-testid="waiting-note"][data-record-id="${recordId}"]`,
+    noteTask: '[data-testid="waiting-note-task"]',
+    noteSays: '[data-testid="waiting-note-says"]',
+    noteClear: '[data-testid="waiting-note-clear"]',
+    notesMore: '[data-testid="waiting-notes-more"]',
   },
+  /** LIN-4552: Home's count line, its questions part ("N questions", the needs-you tone), and the nav's open-questions badge. */
+  homeCount: {
+    line: '[data-testid="in-progress-count"]',
+    questions: '[data-testid="in-progress-count"] [data-tone="needs-you"]',
+  },
+  questionsBadge: '[data-testid="nav-questions-badge"] .rulings-count',
   /** An issue row by id (pairs the testid with the existing data-id hook). */
   issue: (id) => `[data-testid="issue-line"][data-id="${id}"]`,
   /** Workspace KPIs page (LIN-3689): section, card and empty-state test ids. */

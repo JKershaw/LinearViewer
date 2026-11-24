@@ -21,7 +21,8 @@ Area notes for `front-end-pages` in the registry. Format and rules: README.md.
   `.waiting-card` branches are gone). The merge keys a wrapper by its card's question id and takes out one the fragment no
   longer lists unless the one keep-a-card rule holds it (`public/question-records.js` holdsCard), so a refresh never takes out a
   card the person is answering. The card draws its own task line (`lib/question-record-card.js` questionTaskLine): a host passes
-  its `taskHref` and any state words (Home's "needs you", `lib/waiting-section.js`), never a second line of its own.
+  its `taskHref` and any state words, never a second line of its own. Home passes none: its header says "Waiting on you"
+  once (LIN-4552). A state word anywhere else comes from `STATE_WORDS` (`lib/task-state.js`), never spelled per page.
 - Retiring a page widget, grep `public/` and `lib/` for every class and test id it drew before deleting a rule: another
   surface may borrow it, and a borrowed name then says the wrong thing. The prompt section drew the recap widget's
   `.recap-spinner` and `.recap-error`, and the task page's owner signal (`public/task-page.js`) was a marker named
