@@ -3356,7 +3356,7 @@ const questionTaskTitles = createQuestionTaskTitles({
     return issue?.title ?? null;
   },
 });
-app.use(createDashboardRoutes({ installationTokenFor, questionTaskTitles, workspaceFromUrl, dispatchQueueStore, agentStatusStore, observationSessionsStore, observationMaterializer, sessionsFeedCache, taskDoneCache: dashboardTaskDoneCache, runSummaryCacheStore, sessionSummaryCacheStore, runParagraphStore, recordsStore, proxyEventStore, freeTierStore, getWorkspaceAccessToken, fetchIssueContext, fetchWorkspaceIssues, getOpenRouterSource, getDeployInfo, workspacePreferencesStore, runProposalsStore, proxyTokenStore, readRunEvidence, prStateStore, workspaceOwnerCheck, requestUsageLoader, accountStore, readTaskFacts: (urlKey) => taskFacts.read(urlKey) }))
+app.use(createDashboardRoutes({ installationTokenFor, questionTaskTitles, listPeople: (urlKey) => listWorkspacePeople(urlKey), workspaceFromUrl, dispatchQueueStore, agentStatusStore, observationSessionsStore, observationMaterializer, sessionsFeedCache, taskDoneCache: dashboardTaskDoneCache, runSummaryCacheStore, sessionSummaryCacheStore, runParagraphStore, recordsStore, proxyEventStore, freeTierStore, getWorkspaceAccessToken, fetchIssueContext, fetchWorkspaceIssues, getOpenRouterSource, getDeployInfo, workspacePreferencesStore, runProposalsStore, proxyTokenStore, readRunEvidence, prStateStore, workspaceOwnerCheck, requestUsageLoader, accountStore, readTaskFacts: (urlKey) => taskFacts.read(urlKey) }))
 
 // Mount task-chat routes (experimental "talk to a task" conversation).
 // Task Chat builds its catalog through the same createChatToolCatalog call the turn core makes for every surface.
@@ -3418,6 +3418,8 @@ const waitingStanding = createWaitingStanding({
   getLoopsForWorkspace, dispatchStore: dispatchQueueStore, agentStatusStore, enrichLoop,
   // LIN-4494: the person's open records ride on the same section (lib/home-row-states.js), canonical account first.
   recordsStore, canonicalAccountId: canonicalAccountIdOf,
+  // LIN-4555: the people a quoted person id reads as, and the bounded title lookup the other card surfaces ask (finding-6d2b47e0).
+  listPeople: (urlKey) => listWorkspacePeople(urlKey), questionTaskTitles,
 })
 const homeRowStates = createHomeRowStates({
   getLoopsForWorkspace, dispatchStore: dispatchQueueStore, agentStatusStore, enrichLoop, deriveSessionWaiting,
@@ -3449,6 +3451,8 @@ app.use(createTaskPageRoutes({
   dispatchStore: dispatchQueueStore,
   // LIN-4554: the workspace's people, so a Records line names a person rather than printing their id.
   listPeople: (urlKey) => listWorkspacePeople(urlKey),
+  // LIN-4555 (finding-6d2b47e0): the bounded title lookup every other card surface asks, for a question whose task the page cannot title.
+  questionTaskTitles,
 }))
 
 // LIN-4494 (piece 3): a signed-in person's record writes from the task page, and the project page (its backlog and
@@ -3478,7 +3482,7 @@ app.use(createTaskShareRoutes({
 // LIN-2432 §A.12: mirrors createTaskChatRoutes' set above, minus savedChatStore
 // (§A.11/LIN-2437's own concern — see routes/flight-companion.js's JSDoc for why
 // it is deliberately not threaded here yet).
-app.use(createFlightCompanionRoutes({ installationTokenFor, workspaceFromUrl, getOpenRouterSource, getDeployInfo, observerStateStore, freeTierStore, workspacePreferencesStore, recordsStore, dispatchQueueStore, agentStatusStore, proxyTokenStore, workspaceOwnerCheck, accountStore }))
+app.use(createFlightCompanionRoutes({ installationTokenFor, workspaceFromUrl, getOpenRouterSource, getDeployInfo, observerStateStore, freeTierStore, workspacePreferencesStore, recordsStore, dispatchQueueStore, agentStatusStore, proxyTokenStore, workspaceOwnerCheck, accountStore, listPeople: (urlKey) => listWorkspacePeople(urlKey) }))
 
 // Mount passage-planner routes (experimental one-click kickoff prompt, Flight Companion parity — LIN-1849).
 app.use(createPassagePlannerRoutes({ workspaceFromUrl, getOpenRouterSource, getDeployInfo }))
@@ -3883,7 +3887,7 @@ app.get('/workspace/:urlKey/api/home-waiting', workspaceFromUrl, async (req, res
     // leaves the card its identifier alone.
     const held = taskFacts.read(workspace.urlKey);
     const titlesOf = held.complete ? titlesFromIssues(held.issues) : null;
-    const { questions = [], records = [] } = await waitingStanding({ urlKey: workspace.urlKey, accountId: req.session.accountId, titlesOf });
+    const { questions = [], records = [] } = await waitingStanding({ urlKey: workspace.urlKey, accountId: req.session.accountId, titlesOf, workspace });
     // LIN-4532 (finding-dca7ac9d): the question cards come in the fragment too, so a question asked after the page load is merged
     // in by the refresh (public/waiting-merge.js). LIN-4552 (finding-d4767b81): the notes for the owner (open findings) come too,
     // merged by their own keys (`record:<id>`, public/waiting-notes.js); `count` is the questions alone (waitingFragmentOf).

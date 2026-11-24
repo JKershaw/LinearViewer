@@ -240,6 +240,8 @@ export async function readRunAccount(recordsStore, readRow, urlKey, session) {
  * @param {Object}   [deps.sessionsFeedCache]      - short-TTL SWR cache for the /sessions feed (LIN-617)
  * @param {Object}   [deps.questionTaskTitles]     - LIN-4553: the bounded title lookup a question card's task needs when the
  *   run page's and the feed's own sources miss it (lib/question-task-titles.js `createQuestionTaskTitles`)
+ * @param {Function} [deps.listPeople]             - LIN-4555: async (urlKey) → the workspace's people (lib/workspace-people.js), so a
+ *   person id an asker quoted reads by name on the Questions feed and the run page; absent, it reads "someone"
  * @returns {Router}
  */
 export function createDashboardRoutes(deps) {
@@ -266,7 +268,9 @@ export function createDashboardRoutes(deps) {
     prStateStore: sharedPrStateStore,
     requestUsageLoader,
     // LIN-4553: the bounded tracker lookup for a question's task title (lib/question-task-titles.js); absent, none is read.
-    questionTaskTitles = null
+    questionTaskTitles = null,
+    // LIN-4555: the workspace's people, for the asker's words (lib/open-questions.js reads them).
+    listPeople = null
   } = resolved;
   const router = Router();
   const loopDeps = { dispatchStore: dispatchQueueStore, agentStatusStore };
@@ -373,7 +377,7 @@ export function createDashboardRoutes(deps) {
         const titlesOf = titlesFromIssues(enrichedLoops.map((l) => ({ identifier: l.issueIdentifier, title: l.issueTitle })));
         // LIN-4553: a run dispatched without its task's title is titled by one bounded tracker read (lib/question-task-titles.js).
         const lookupTitles = questionTaskTitles ? (tickets) => questionTaskTitles.titlesFor(workspace, tickets) : null;
-        return openQuestionsForRun({ recordsStore, dispatchStore: dispatchQueueStore, urlKey: workspace.urlKey, accountId, runId: session.sessionId, titlesOf, lookupTitles });
+        return openQuestionsForRun({ recordsStore, dispatchStore: dispatchQueueStore, urlKey: workspace.urlKey, accountId, runId: session.sessionId, titlesOf, lookupTitles, listPeople });
       })().catch(() => []);
 
       // Per-run inline reply (LIN-1004/LIN-1133; LIN-1163 removed the page-level
