@@ -243,8 +243,12 @@ test.describe('Decision-bearing waiting-session layout (LIN-2193)', () => {
     await page.waitForLoadState('networkidle');
 
     const card = page.locator('[data-testid="question-record-card"]');
-    const question = card.locator('[data-testid="question-record-card-question"]');
     await expect(card).toBeVisible();
+    // LIN-4551: the card leads with the one-line question ("Which deployment strategy should we use for the rollout?"), and the
+    // whole ask, token and all, sits in the fold below it. Opened, the token's paragraph is what must stay inside the card.
+    await expect(card.locator('[data-testid="question-record-card-question"]')).not.toContainText(UNBROKEN_TOKEN);
+    await card.locator('[data-testid="question-record-card-ask"] > summary').click();
+    const question = card.locator('[data-testid="question-record-card-ask-body"] p', { hasText: UNBROKEN_TOKEN });
     await expect(question).toContainText(UNBROKEN_TOKEN);
 
     const cardBox = await card.boundingBox();

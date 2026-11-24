@@ -3,7 +3,8 @@
  *
  *   1. Home, the rulings page, the task page and the run page: a question asked with no `short` (as every question before LIN-4550
  *      was) leads with the derived one-line question; the full ask sits in a closed fold that, opened, keeps its paragraphs and
- *      lists; the options are full-width, left-aligned rows, the recommended one first and labelled "recommended".
+ *      lists. On the same hosts, the options are full-width, left-aligned rows, the recommended one first and labelled
+ *      "recommended".
  *   2. Hostile input in the ask (<script>, <img onerror>, a markdown link to javascript:) renders as text in the fold: no element,
  *      no link, no dialog.
  *   3. The chosen option has a visible pressed style: aria-pressed and the computed style both change on a press, and both move
@@ -59,8 +60,8 @@ const lookOf = (locator) => locator.evaluate((el) => {
   return { background: s.backgroundColor, border: s.borderColor, ink: s.color, outline: s.boxShadow };
 });
 
-/** The face every host must draw for the seeded long question `variant`, asked with no `short`. */
-async function expectFace(card, variant) {
+/** The lead and the fold every host must draw for the seeded long question `variant`, asked with no `short`. */
+async function expectLeadAndFold(card, variant) {
   const sample = longQuestion(variant);
   await expect(card.locator(Q.lead)).toHaveText(deriveQuestionShort(sample.asks));
   const fold = card.locator(Q.ask);
@@ -73,7 +74,11 @@ async function expectFace(card, variant) {
   expect(await card.locator(`${Q.askBody} > p`).count(), 'paragraphs are kept').toBeGreaterThanOrEqual(3);
   expect(await card.locator(`${Q.askBody} ul > li`).count(), 'the bulleted list is kept').toBeGreaterThanOrEqual(3);
   expect(await card.locator(`${Q.askBody} ol > li`).count(), 'the numbered list is kept').toBeGreaterThanOrEqual(2);
+}
 
+/** The option rows every host must draw for the seeded long question `variant`: full-width, left-aligned, recommended first. */
+async function expectOptionRows(card, variant) {
+  const sample = longQuestion(variant);
   const options = card.locator(Q.option);
   await expect(options).toHaveCount(sample.options.length);
   await expect(options.first()).toHaveAttribute('data-option-id', sample.recommended);
@@ -88,23 +93,60 @@ async function expectFace(card, variant) {
   }
 }
 
-test('on Home, the rulings page, the task page and the run page: the lead, the closed fold, and the option rows', async ({ page, seedLocal, localWorkerUrlKey: urlKey }) => {
+/** Seeds LOCAL-31's question (no run) and LOCAL-32's (asked by a run), both long and with no `short`. */
+async function seedLongPair(page, seedLocal, urlKey) {
   await seedTasks(page, seedLocal, urlKey);
   const runId = await askingRun(page, urlKey, 'LOCAL-32', { title: TASKS['LOCAL-32'] });
   const q31 = await seedLongQuestion(page, urlKey, { ticket: 'LOCAL-31', title: TASKS['LOCAL-31'], variant: 0 });
   const q32 = await seedLongQuestion(page, urlKey, { ticket: 'LOCAL-32', title: TASKS['LOCAL-32'], runId, variant: 1 });
+  return { runId, q31, q32 };
+}
 
-  await page.goto(`/workspace/${urlKey}/`);
-  await expectFace(page.locator(`${SELECTORS.waitingOnYou.question} ${Q.byId(q31)}`), 0);
+/** Each host's card for the pair, with the variant it was seeded from: Home, the rulings page, the task page, the run page. */
+const HOSTS = ({ urlKey, runId, q31, q32 }) => [
+  { name: 'Home', path: `/workspace/${urlKey}/`, card: `${SELECTORS.waitingOnYou.question} ${Q.byId(q31)}`, variant: 0 },
+  { name: 'the rulings page', path: `/workspace/${urlKey}/observation?view=rulings`, card: `[data-testid="ruling-question-row"] ${Q.byId(q32)}`, variant: 1 },
+  { name: 'the task page', path: `/workspace/${urlKey}/task/LOCAL-31`, card: `[data-testid="task-page-question-records"] ${Q.byId(q31)}`, variant: 0 },
+  { name: 'the run page', path: `/workspace/${urlKey}/observation/session/${runId}`, card: `[data-testid="session-question-records"] ${Q.byId(q32)}`, variant: 1 },
+];
 
-  await page.goto(`/workspace/${urlKey}/observation?view=rulings`);
-  await expectFace(page.locator(`[data-testid="ruling-question-row"] ${Q.byId(q32)}`), 1);
+test('on Home, the rulings page, the task page and the run page: the derived lead and the closed fold that keeps the ask\'s shape', async ({ page, seedLocal, localWorkerUrlKey: urlKey }) => {
+  const seeded = await seedLongPair(page, seedLocal, urlKey);
+  for (const host of HOSTS({ urlKey, ...seeded })) {
+    await test.step(host.name, async () => {
+      await page.goto(host.path);
+      await expectLeadAndFold(page.locator(host.card), host.variant);
+    });
+  }
+});
 
-  await page.goto(`/workspace/${urlKey}/task/LOCAL-31`);
-  await expectFace(page.locator(`[data-testid="task-page-question-records"] ${Q.byId(q31)}`), 0);
+test('at 390px an opened long ask wraps inside its card, on every host, with no sideways scroll', async ({ page, seedLocal, localWorkerUrlKey: urlKey }) => {
+  await page.setViewportSize({ width: 390, height: 844 });
+  const seeded = await seedLongPair(page, seedLocal, urlKey);
+  for (const host of HOSTS({ urlKey, ...seeded })) {
+    await test.step(host.name, async () => {
+      await page.goto(host.path);
+      const card = page.locator(host.card);
+      await expect(card.locator(Q.ask)).toHaveCount(1);
+      await card.locator(Q.askSummary).click();
+      await expect(card.locator(Q.askBody)).toBeVisible();
+      const body = await card.locator(Q.askBody).evaluate((el) => ({ scroll: el.scrollWidth, client: el.clientWidth }));
+      expect(body.scroll, 'the ask wraps inside the fold').toBeLessThanOrEqual(body.client);
+      const box = await card.boundingBox();
+      expect(box.x + box.width, 'the card fits the screen').toBeLessThanOrEqual(390);
+      expect(await page.evaluate(() => document.documentElement.scrollWidth), 'no sideways scroll').toBeLessThanOrEqual(390);
+    });
+  }
+});
 
-  await page.goto(`/workspace/${urlKey}/observation/session/${runId}`);
-  await expectFace(page.locator(`[data-testid="session-question-records"] ${Q.byId(q32)}`), 1);
+test('on Home, the rulings page, the task page and the run page: the options are full-width rows, the recommended one first and labelled', async ({ page, seedLocal, localWorkerUrlKey: urlKey }) => {
+  const seeded = await seedLongPair(page, seedLocal, urlKey);
+  for (const host of HOSTS({ urlKey, ...seeded })) {
+    await test.step(host.name, async () => {
+      await page.goto(host.path);
+      await expectOptionRows(page.locator(host.card), host.variant);
+    });
+  }
 });
 
 test('hostile input in the ask renders as text in the fold: no script, image or link, and no dialog', async ({ page, seedLocal, localWorkerUrlKey: urlKey }) => {

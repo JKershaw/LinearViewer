@@ -4969,10 +4969,36 @@ a.context-node:hover { border-color: var(--text); background: var(--bg); }
   font-weight: 600;
   font-size: var(--font-size-base);
   color: var(--text);
-  /* LIN-4538: a question record carries its whole ask here (no case prose below it), so an unbroken token (a URL) must
-     wrap inside the card, as the case chunks do (LIN-2184). */
+  /* LIN-4551: the one-line question (`short`) leads; the whole ask sits in the fold below. An unbroken token (a URL) still
+     wraps inside the card, as the case chunks do (LIN-2184). */
   overflow-wrap: anywhere;
 }
+/* LIN-4551: the full ask behind a closed fold, kept as the agent wrote it (paragraphs, breaks, lists: lib/question-record-card.js
+   formatQuestionAsk). Quiet until opened; opened, it reads as prose and wraps inside the card at 390px. */
+.sess-qcard-ask { min-width: 0; }
+.sess-qcard-ask-summary {
+  cursor: pointer;
+  width: fit-content;
+  font-family: var(--font-content);
+  font-size: var(--font-size-sm);
+  color: var(--muted);
+}
+.sess-qcard-ask-summary:hover { color: var(--text); }
+.sess-qcard-ask-body {
+  margin-top: var(--space-2);
+  font-family: var(--font-content);
+  font-size: var(--font-size-base);
+  line-height: 1.5;
+  color: var(--text);
+  overflow-wrap: anywhere;
+}
+.sess-qcard-ask-body p,
+.sess-qcard-ask-body ul,
+.sess-qcard-ask-body ol { margin: 0 0 0.6em; }
+.sess-qcard-ask-body > :last-child { margin-bottom: 0; }
+.sess-qcard-ask-body ul,
+.sess-qcard-ask-body ol { padding-left: 1.25rem; }
+.sess-qcard-ask-body li + li { margin-top: 0.25em; }
 .sess-qcard-why-summary {
   cursor: pointer;
   font-family: var(--font-content);

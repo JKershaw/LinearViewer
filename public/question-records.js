@@ -31,6 +31,8 @@ function setBusy(card, busy) {
 // this says whether that card holds the reader's place.
 const TYPED = `${INPUT}, [data-testid="session-question-card-input"]`;
 const PRESSED = `${OPTION}[aria-pressed="true"]`;
+// LIN-4551: the full ask's fold, opened. The reader is reading it, so a repaint must not close it under them.
+const OPEN_FOLD = '[data-testid="question-record-card-ask"][open]';
 
 /**
  * Focus inside the card. `active` is the element that had focus BEFORE a write that may detach the card (a repaint detaches it,
@@ -65,8 +67,10 @@ export function holdsReaderInput(card, active) {
 
 /**
  * Whether a repaint keeps this card where it is rather than drawing it fresh: the reader is mid-answer on it (holdsReaderInput),
- * a request from it is out (a control is off), or it is settled (answered or dismissed here, showing its outcome). The union of
- * what the three hosts each kept before LIN-4549. A card refused as settled elsewhere (`data-settled-elsewhere`) is never held.
+ * a request from it is out (a control is off), it is settled (answered or dismissed here, showing its outcome), or the reader has
+ * its full ask open (LIN-4551: a rebuilt card's fold starts closed). The union of what the three hosts each kept before LIN-4549,
+ * and the open fold. An open fold holds the card, not Home's placement (holdsReaderInput leaves it out). A card refused as settled
+ * elsewhere (`data-settled-elsewhere`) is never held.
  * @param {Element|null} card
  * @param {Element|null} [active] - as in focusInCard
  */
@@ -75,6 +79,7 @@ export function holdsCard(card, active) {
   if (!card || card.dataset?.settledElsewhere === 'true') return false;
   if (card.dataset?.settled === 'true') return true;
   if ([...card.querySelectorAll('button, textarea')].some((el) => el.disabled)) return true;
+  if (card.querySelector(OPEN_FOLD)) return true;
   return holdsReaderInput(card, active);
 }
 
