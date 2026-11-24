@@ -1,7 +1,7 @@
 /**
- * LIN-4179 / LIN-4446: the one USD formatter, lib/cost-format.js. The browser runs these same bytes through the
- * module shim (public/cost-format-global.js, which imports /lib/cost-format.js, LIN-4471), so this file pins the rules the
- * browser inherits.
+ * LIN-4179 / LIN-4446: the one USD formatter, lib/cost-format.js. The browser runs these same bytes: the page modules
+ * import /lib/cost-format.js (LIN-4471; the module shim that once bridged it to classic scripts went in LIN-4463 piece 5),
+ * so this file pins the rules the browser inherits.
  *
  * Run with: node --test tests/unit/cost-format.test.js
  */

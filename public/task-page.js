@@ -36,6 +36,7 @@
  * row toggle is this file's own, delegated from the track mount.
  */
 import { fmtDuration, relativeAgo } from '../lib/time-words.js';
+import * as PromptSection from './prompt-section.js';
 
 var FAST_MS = 10000;
 var SLOW_MS = 45000;
@@ -622,9 +623,7 @@ function init(doc) {
   var runRoot = doc.querySelector('[data-testid="task-page-run-control"]');
   var runOpts = runOptsOf(runRoot);
   var runControl = null;
-  if (runRoot && runOpts && window.PromptSection && typeof window.PromptSection.init === 'function') {
-    runControl = window.PromptSection.init(runRoot, runOpts);
-  }
+  if (runRoot && runOpts) runControl = PromptSection.init(runRoot, runOpts);
 
   // LIN-3975 (finding 1): a fold turn that proposes a follow-up stages it in the run control at once. The owner's
   // staged list is re-read (owner-only) and handed to the run control's own repaint; nothing is re-rendered here.

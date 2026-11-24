@@ -27,16 +27,15 @@ Area notes for `front-end-browser` in the registry. Format and rules: README.md.
   resolves to the same file in the browser and in Node only because `public/` is served at the URL root and stays flat,
   with no nested .js files (`tests/unit/front-end-import-layout.test.js`). Do not move `public/` under a prefix or add a
   subdirectory.
-- One bridge, no new names: `public/cost-format-global.js` is the only module that writes a global for classic scripts.
-  Its names, its one emitter and its classic readers are inventoried (`tests/unit/bridge-inventory.test.js`). A new name
-  fails the check, and so does a registered reader that no longer reads, so the bridge only shrinks. A page that is a
-  module imports the formatter directly and reads no bridge.
-- A bridge reader reads the global only from a handler or callback that runs after DOMContentLoaded, never while its
-  script executes: Chart.js calls scale tick callbacks synchronously. Its witness loads the reader first and installs the
-  global after it (`loadCostFormat`, `tests/fixtures/browser-cost-format.js`), which is the order a page has. The inventory
-  reads each witness's calls and fails a witness whose first `loadCostFormat(` comes before it loads the reader.
-- A `{ module }` entry's place in a renderer's script list means nothing: a module runs after every classic script,
-  wherever it is listed. A bridge reader is safe because of when it reads the global, not where the shim sits.
+- The bridge is at zero (LIN-4463 piece 5): no module writes a global for classic scripts. A module may write one only
+  as a declared e2e hook (`window.refreshWaitingOnYou`), which no classic script reads; `tests/unit/bridge-inventory.test.js`
+  fails on any other write, imported modules included. When a classic script still reads a function a converting file
+  declares, move the function to `public/common.js` (as `updateQueueBadge` moved) or convert the reader first; never bridge it back.
+- A module's place in a renderer's script list means nothing: it runs after every classic script, so on a page where a
+  classic page script follows it, that script now runs first and its DOMContentLoaded listener registers first. Check each
+  such page reads nothing the module sets up, and witness it in a browser (`tests/e2e/lin-4463-app-module-pages.spec.js`).
+- A module that page modules import (`public/prompt-section.js`) touches no global at load: it reads common.js helpers when
+  called, so a suite can import a page for its pure exports in Node.
 - A converted page is tested by plain `import` over the fake DOM (`tests/unit/helpers/import-world.js`), not by `loadWorld`.
   Each import is a fresh module instance, and the world puts every global back when it is restored. The classic-loader
   census (`tests/unit/classic-loader-census.test.js`) is a ratchet on the suites that still load classic scripts: it may
@@ -44,8 +43,9 @@ Area notes for `front-end-browser` in the registry. Format and rules: README.md.
   clipboard, and real timers unless `timers` is passed, so a page's init would reach the network or leave a poll
   running. Test pure exports by a static import; drive an init through one shared world with inert defaults
   (`tests/unit/helpers/task-page-world.js`, LIN-4472), made before the import so the page's DOMContentLoaded listener
-  lands on the fake document. A suite that runs a classic file through `runClassic` counts, except `public/chart-helpers.js` and `public/close-out.js`,
-  the two IIFE siblings a module page may read.
+  lands on the fake document. A suite that runs a classic file through `runClassic` counts, except the IIFE siblings a
+  module page may read (`public/chart-helpers.js`, `public/close-out.js`, `public/question-cards.js`). The world is the
+  real `globalThis`, page and test alike: a suite that collects `timers` flushes with `setImmediate`.
 
 - A page module runs while `document.readyState` is already `'interactive'`, before DOMContentLoaded, so a module page
   that starts on DOMContentLoaded registers that listener unconditionally: its old `readyState === 'loading'` branch is

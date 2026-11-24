@@ -1,3 +1,18 @@
+/**
+ * Home, and the shared page behaviour of the other ten pages that load it (lib/render*.js, `{ module: '/app.js' }`).
+ *
+ * A native ES module (LIN-4463 piece 5). A module runs after every classic script on the page, wherever it is listed,
+ * once the document is parsed and before DOMContentLoaded. So it reads the classic globals (common.js's api, escapeHtml,
+ * renderMarkdown) safely, and imports the shared PromptSection and the download filename rule (the server's own, a
+ * served lib leaf) instead of keeping copies. Its DOMContentLoaded init registers after the classic page
+ * script listed after it (dispatch.js, settings.js); none of those reads what this init sets up. Its top-level names
+ * are module-scoped: nothing classic reads them (the queue badge's updater, the one that was read, is common.js's).
+ * Exported names are its test seams. `window.refreshWaitingOnYou` is the e2e hook the bridge inventory lists.
+ */
+import * as PromptSection from './prompt-section.js'
+import { buildPromptFilename } from '../lib/prompt-filename.js'
+import { sourceQuery } from '../lib/task-page-href.js'
+
 const STORAGE_KEY = 'linear-projects-state'
 // TEAM_STORAGE_KEY and the team-selection helpers now live in common.js
 // (alongside initNavBar) so the workspace switcher works on every page — LIN-288.
@@ -28,52 +43,6 @@ function stripCodeBlockFences(text) {
   return text.replace(/^```[^\n]*\n?/, '').replace(/\n?```\s*$/, '').trim()
 }
 
-/**
- * Slugify a value into a filesystem-safe token for a download filename.
- * Mirrors slugifyForFilename in lib/prompt-formatters.js.
- * @param {string} value
- * @returns {string} Lower-cased, dash-separated slug
- */
-function slugifyForFilename(value) {
-  return String(value || '')
-    .trim()
-    .toLowerCase()
-    .replace(/[^a-z0-9.-]+/g, '-')
-    .replace(/-+/g, '-')
-    .replace(/^[-.]+|[-.]+$/g, '')
-}
-
-/**
- * Build a `<identifier>-<promptName>.md` filename for a downloaded prompt.
- * @param {string} identifier - Issue identifier (e.g. LIN-316), may be empty
- * @param {string} promptName - Prompt name (e.g. "Retro")
- * @returns {string} Safe filename ending in `.md`
- */
-function buildPromptFilename(identifier, promptName) {
-  const id = slugifyForFilename(identifier)
-  const name = slugifyForFilename(promptName) || 'prompt'
-  const base = id ? `${id}-${name}` : name
-  return `${base}.md`
-}
-
-/**
- * Trigger a client-side markdown download of the given text.
- * @param {string} text - File contents
- * @param {string} filename - Download filename
- */
-function downloadMarkdown(text, filename) {
-  const blob = new Blob([text], { type: 'text/markdown' })
-  const url = URL.createObjectURL(blob)
-  const a = document.createElement('a')
-  a.href = url
-  a.download = filename
-  document.body.appendChild(a)
-  a.click()
-  document.body.removeChild(a)
-  // Release the object URL on the next tick so the download can start first.
-  setTimeout(() => URL.revokeObjectURL(url), 0)
-}
-
 // ==========================================================================
 // Markdown Rendering (using marked.js library)
 // ==========================================================================
@@ -83,9 +52,8 @@ function downloadMarkdown(text, filename) {
 // converges onto the superset (whole-string fence strip + marked-absent fallback);
 // relativeTime is the same "Behavior B" format this page's local copy seeded.
 
-// The shared `?source=<kind>` builder lives in common.js as
-// `window.sourceQuery` (the one every page script uses). This page is always
-// loaded after common.js, so the call sites below resolve to it.
+// The shared `?source=<kind>` builder is `sourceQuery`, imported from the served lib leaf
+// (lib/task-page-href.js), the server's own. It has no leading `?`, so the caller adds one.
 
 /**
  * Load and render comments for an issue
@@ -115,7 +83,8 @@ async function loadComments(toggle, content) {
   errorEl?.classList.add('hidden')
 
   try {
-    const selectQuery = sourceQuery(source)
+    const query = sourceQuery(source)
+    const selectQuery = query ? `?${query}` : ''
     const data = await window.api(`/workspace/${encodeURIComponent(urlKey)}/api/comments/${encodeURIComponent(issueId)}${selectQuery}`)
     const comments = (data && data.comments) || []
 
@@ -298,54 +267,64 @@ async function loadDetails(details) {
  */
 function mountHomePromptSections(root) {
   const page = window.__HOME_PROMPT_OPTS__
-  if (!page || !window.PromptSection) return
+  if (!page) return
   ;(root || document).querySelectorAll('[data-prompt-mount]').forEach((el) => {
     if (el.dataset.mounted) return
-    const id = el.dataset.issueId
-    if (!id) return
-    const issue = {
-      id,
-      identifier: el.dataset.identifier || '',
-      title: el.dataset.title || '',
-      url: el.dataset.url || '',
-      // LIN-1904/LIN-1910: thread the resolved provider so the template and
-      // Autopilot fetches resolve THIS issue's own provider, exactly as before.
-      source: el.dataset.source || undefined,
-      // LIN-3833: the task's tracker state type (unstarted, backlog, started, ...) names the copy-first step.
-      stateType: el.dataset.stateType || ''
-    }
+    if (!el.dataset.issueId) return
     el.dataset.mounted = 'true'
-    el._promptSectionHandle = window.PromptSection.init(el, {
-      urlKey: el.dataset.urlKey || page.urlKey || undefined,
-      issue,
-      // LIN-2942: where the ladder press happened, carried on its mode record.
-      surface: 'home',
-      // LIN-2944 F3: only the ordering pipeline's front card advertises a
-      // ranking reason; every other opened task renders no why line. N2: match on
-      // the binding-aware node key, not the raw id.
-      why: el.dataset.nodeKey === page.topTaskId ? (page.topTaskWhy || []) : [],
-      // LIN-4016: this row's decision record from the server (rowData, keyed by node key): whether it is a container,
-      // whether it is finished, the subtask line it names, and its copy-first step. The browser looks it up and decides nothing.
-      row: (page.rowData || {})[el.dataset.nodeKey] || null,
-      hasAI: page.hasAI,
-      aiState: page.aiState,
-      freeTier: page.freeTier,
-      dispatchEnabled: page.dispatchEnabled,
-      runSetup: page.runSetup,
-      isLocalhost: page.isLocalhost,
-      customPrompts: page.customPrompts,
-      defaultPromptKeys: page.defaultPromptKeys,
-      morePromptKeys: page.morePromptKeys,
-      promptMeta: page.promptMeta,
-      // LIN-4010: the stage words name each step ("Build"), not the template's "implement".
-      stageWords: page.stageWords,
-      // LIN-4104 D2: the filled run button, from the viewer's last dispatch on this workspace (read once per page load).
-      filledRung: page.filledRung,
-      // LIN-732: a caller-supplied dispatch-disclosure id prefix so the same
-      // issue in In Progress AND its project tree gets disjoint panel ids.
-      idPrefix: el.dataset.instanceKey || `home-${id}`
-    })
+    el._promptSectionHandle = PromptSection.init(el, homePromptOpts(el, page))
   })
+}
+
+/**
+ * The opts one opened task mounts with: its identity from the server's placeholder (`el`'s data attributes) and the page's
+ * options (`page`, `window.__HOME_PROMPT_OPTS__`). Reads nothing else, so a suite checks a row's opts without a mount.
+ * @param {HTMLElement} el - a `[data-prompt-mount]` placeholder with a `data-issue-id`
+ * @param {object} page - the page's prompt options
+ */
+function homePromptOpts(el, page) {
+  const id = el.dataset.issueId
+  const issue = {
+    id,
+    identifier: el.dataset.identifier || '',
+    title: el.dataset.title || '',
+    url: el.dataset.url || '',
+    // LIN-1904/LIN-1910: thread the resolved provider so the template and
+    // Autopilot fetches resolve THIS issue's own provider, exactly as before.
+    source: el.dataset.source || undefined,
+    // LIN-3833: the task's tracker state type (unstarted, backlog, started, ...) names the copy-first step.
+    stateType: el.dataset.stateType || ''
+  }
+  return {
+    urlKey: el.dataset.urlKey || page.urlKey || undefined,
+    issue,
+    // LIN-2942: where the ladder press happened, carried on its mode record.
+    surface: 'home',
+    // LIN-2944 F3: only the ordering pipeline's front card advertises a
+    // ranking reason; every other opened task renders no why line. N2: match on
+    // the binding-aware node key, not the raw id.
+    why: el.dataset.nodeKey === page.topTaskId ? (page.topTaskWhy || []) : [],
+    // LIN-4016: this row's decision record from the server (rowData, keyed by node key): whether it is a container,
+    // whether it is finished, the subtask line it names, and its copy-first step. The browser looks it up and decides nothing.
+    row: (page.rowData || {})[el.dataset.nodeKey] || null,
+    hasAI: page.hasAI,
+    aiState: page.aiState,
+    freeTier: page.freeTier,
+    dispatchEnabled: page.dispatchEnabled,
+    runSetup: page.runSetup,
+    isLocalhost: page.isLocalhost,
+    customPrompts: page.customPrompts,
+    defaultPromptKeys: page.defaultPromptKeys,
+    morePromptKeys: page.morePromptKeys,
+    promptMeta: page.promptMeta,
+    // LIN-4010: the stage words name each step ("Build"), not the template's "implement".
+    stageWords: page.stageWords,
+    // LIN-4104 D2: the filled run button, from the viewer's last dispatch on this workspace (read once per page load).
+    filledRung: page.filledRung,
+    // LIN-732: a caller-supplied dispatch-disclosure id prefix so the same
+    // issue in In Progress AND its project tree gets disjoint panel ids.
+    idPrefix: el.dataset.instanceKey || `home-${id}`
+  }
 }
 
 /** Tear down any mounted opened-task component under `root` (before re-fetch). */
@@ -1541,7 +1520,7 @@ async function handleDownloadClick(e) {
     // Mint+Autopilot) so the downloaded .md always carries the forced block.
     const forceProxy = promptContainer.dataset.proxyForce === 'true'
     textToDownload = await maybeAppendProxyBlock(textToDownload, urlKey, { force: forceProxy })
-    downloadMarkdown(textToDownload, buildPromptFilename(identifier, promptName))
+    PromptSection.downloadMarkdown(textToDownload, buildPromptFilename(identifier, promptName))
     const originalText = downloadBtn.textContent
     downloadBtn.textContent = 'saved!'
     setTimeout(() => {
@@ -1711,29 +1690,6 @@ function initDispatchDisclosures(root) {
 // =============================================================================
 // Queue Badge Management
 // =============================================================================
-
-/**
- * Update the queue badge count for a workspace
- */
-async function updateQueueBadge(urlKey) {
-  try {
-    // Deliberately raw fetch (NOT window.api): this is a 1s background poller that
-    // must silently swallow failures — it must never redirect to /logout or toast
-    // on a transient error. (api() carve-out: pollers stay on raw fetch.)
-    const response = await fetch(`/workspace/${encodeURIComponent(urlKey)}/api/dispatch/count`)
-    if (!response.ok) return
-
-    const { count } = await response.json()
-    const badge = document.querySelector(`[data-queue-badge][data-url-key="${urlKey}"]`)
-    if (badge) {
-      const countEl = badge.querySelector('.queue-count')
-      if (countEl) countEl.textContent = count
-      badge.classList.toggle('hidden', count === 0)
-    }
-  } catch (e) {
-    console.error('Failed to update queue badge:', e)
-  }
-}
 
 /**
  * Start polling for queue badge updates
@@ -2355,3 +2311,6 @@ document.addEventListener('DOMContentLoaded', () => {
   initFreeTierStatus()
   // +proxy toggle is wired by window.ProxyToggle.init() in common.js (LIN-525)
 })
+
+// Test seams (LIN-4463 piece 5): the functions the suites drive. Nothing in the page reads these.
+export { homePromptOpts, mountHomePromptSections, mergeHomeRowOpts }

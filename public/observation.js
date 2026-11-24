@@ -36,6 +36,7 @@
 
 import { fmtDuration } from '../lib/time-words.js';
 import { renderQuestionRecordCard } from '../lib/question-record-card.js';
+import { taskPageHref } from '../lib/task-page-href.js';
 
 let observationData = null;
 let pollId = null;
@@ -877,13 +878,11 @@ function renderTaskBlock(s, ident, node, runs) {
   // (routes/dashboard.js projects it, sparse); without it the link is plain —
   // it resolves to the workspace's active provider, exactly as the Edit link does.
   const sourceRun = runs.find(r => r && r.issueSource) || runs[0] || {};
-  const taskHref = window.taskPageHref
-    ? window.taskPageHref({
-        urlKey: s.workspaceUrlKey,
-        identifier: ident,
-        source: sourceRun.issueSource
-      })
-    : '';
+  const taskHref = taskPageHref({
+    urlKey: s.workspaceUrlKey,
+    identifier: ident,
+    source: sourceRun.issueSource
+  });
   const taskPageLinkHtml = taskHref
     ? ` <a class="obs-task-page task-page-link" data-testid="obs-task-page-link" href="${escapeHtml(taskHref)}">task page ↗</a>`
     : '';

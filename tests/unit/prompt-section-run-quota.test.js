@@ -3,12 +3,12 @@
 // prompts are unlimited, so the run state never leaks into the prompt controls.
 //
 // The allowance is read from S1's GET /api/dispatch/quota at load, only when
-// the caller marks the workspace free-tier. It runs in the shared client world
-// (tests/unit/helpers/client-world.js), with the real dispatch disclosure from public/common.js.
+// the caller marks the workspace free-tier. public/prompt-section.js is a native module (LIN-4463 piece 5),
+// imported over the fake DOM, with the real dispatch disclosure from public/common.js.
 
 import { test, describe } from 'node:test';
 import assert from 'node:assert/strict';
-import { loadWorld } from './helpers/client-world.js';
+import { promptSectionWorld } from './helpers/prompt-section-world.js';
 import { DISCLOSURE_SCRIPTS, disclosureWindowStubs } from './helpers/real-dispatch-disclosure.js';
 
 const flush = () => new Promise((r) => setImmediate(r));
@@ -32,12 +32,12 @@ function nodesOutside(container, slotSelector) {
 
 // The client world: the real public/common.js (the dispatch disclosure and its exec controls come from it) and
 // public/prompt-section.js. The stubs this suite names are set after load, so they replace common.js's own definitions.
-function loadPromptSection({ quota, dispatch } = {}) {
+async function loadPromptSection(t, { quota, dispatch } = {}) {
   const calls = { api: [], dispatch: [], order: [], readers: [] };
   const timers = [];
-  const world = loadWorld({
+  const world = await promptSectionWorld(t, {
     window: disclosureWindowStubs(),
-    scripts: DISCLOSURE_SCRIPTS,
+    classic: DISCLOSURE_SCRIPTS,
     timers,
     globals: {
       // This suite's own default: an unstubbed read answers `ok: false`. The shared default (`ok: true`) would hide that branch.
@@ -80,7 +80,7 @@ function loadPromptSection({ quota, dispatch } = {}) {
     await flush();
     await flush();
   }
-  return { PromptSection: window.PromptSection, window, calls, timers, runTimers, makeContainer: world.makeContainer };
+  return { PromptSection: world.PromptSection, window, calls, timers, runTimers, makeContainer: world.makeContainer };
 }
 
 const ISSUE = { id: 'uuid-42', identifier: 'LIN-42', title: 'A task' };
@@ -107,8 +107,8 @@ function baseOpts(extra = {}) {
   return { runSetup: !o.dispatchEnabled, ...o };
 }
 
-async function mountIdle(extra, loadOpts) {
-  const loaded = loadPromptSection(loadOpts);
+async function mountIdle(t, extra, loadOpts) {
+  const loaded = await loadPromptSection(t, loadOpts);
   const container = loaded.makeContainer();
   loaded.PromptSection.init(container, baseOpts(extra));
   await flush();
@@ -116,8 +116,8 @@ async function mountIdle(extra, loadOpts) {
   return { ...loaded, container };
 }
 
-async function mountFresh(extra, loadOpts) {
-  const m = await mountIdle(extra, loadOpts);
+async function mountFresh(t, extra, loadOpts) {
+  const m = await mountIdle(t, extra, loadOpts);
   await m.container.click({ prompt: 'implementation' });
   await flush();
   await flush();
@@ -133,8 +133,8 @@ const QUOTA_FULL = { limited: true, runsUsed: 3, limit: 10, remaining: 7, resets
 const QUOTA_ZERO = { limited: true, runsUsed: 10, limit: 10, remaining: 0, resetsAt: '2026-10-03T00:00:00.000Z' };
 
 describe('LIN-3239 — ladder run allowance', () => {
-  test('N>0: Go shows "N of <limit> runs left today" and Go + run this step are ready', async () => {
-    const m = await mountFresh({}, { quota: QUOTA_FULL });
+  test('N>0: Go shows "N of <limit> runs left today" and Go + run this step are ready', async (t) => {
+    const m = await mountFresh(t, {}, { quota: QUOTA_FULL });
     const html = m.container.innerHTML;
 
     assert.match(html, /data-testid="opened-task-run-quota"/, 'the allowance is shown');
@@ -147,8 +147,8 @@ describe('LIN-3239 — ladder run allowance', () => {
     assert.match(html, /data-rung="run-task"[^>]*data-action="go"/, 'Go is the ready run-task entry');
   });
 
-  test('N=0: only Go and run this step are disabled, with the run-limit reason', async () => {
-    const m = await mountFresh({}, { quota: QUOTA_ZERO });
+  test('N=0: only Go and run this step are disabled, with the run-limit reason', async (t) => {
+    const m = await mountFresh(t, {}, { quota: QUOTA_ZERO });
     const html = m.container.innerHTML;
 
     assert.match(html, /0 of 10 runs left today/);
@@ -165,31 +165,31 @@ describe('LIN-3239 — ladder run allowance', () => {
     assert.doesNotMatch(go[0], /data-action="go"/, 'no ready handler at zero');
   });
 
-  test('N=0: ✦ next step stays enabled (prompts are unlimited)', async () => {
-    const m = await mountIdle({}, { quota: QUOTA_ZERO });
+  test('N=0: ✦ next step stays enabled (prompts are unlimited)', async (t) => {
+    const m = await mountIdle(t, {}, { quota: QUOTA_ZERO });
     const goTag = m.container.innerHTML.match(/<button[^>]*data-testid="opened-task-next-step"[^>]*>/);
     assert.ok(goTag, 'the ✦ next step is rendered');
     assert.doesNotMatch(goTag[0], / disabled/, 'the ✦ next step is NOT disabled by the run limit');
   });
 
-  test('N=0: the idle copy rung still asks for a prompt, never the run limit', async () => {
-    const m = await mountIdle({}, { quota: QUOTA_ZERO });
+  test('N=0: the idle copy rung still asks for a prompt, never the run limit', async (t) => {
+    const m = await mountIdle(t, {}, { quota: QUOTA_ZERO });
     const copy = tagFor(m.container.innerHTML, 'copy');
     assert.ok(copy, 'the idle copy rung is rendered');
     assert.match(copy, /data-setup-needs="prompt"/, 'copy is gated on a prompt, not the run limit');
     assert.doesNotMatch(copy, /daily run limit reached/, 'the run limit never leaks into copy');
   });
 
-  test('unreadable counts (runsUsed null) show no allowance and gate nothing', async () => {
-    const m = await mountFresh({}, { quota: { limited: true, runsUsed: null, limit: 10, remaining: 0, resetsAt: null } });
+  test('unreadable counts (runsUsed null) show no allowance and gate nothing', async (t) => {
+    const m = await mountFresh(t, {}, { quota: { limited: true, runsUsed: null, limit: 10, remaining: 0, resetsAt: null } });
     const html = m.container.innerHTML;
     assert.doesNotMatch(html, /data-testid="opened-task-run-quota"/, 'no fabricated allowance');
     assert.match(tagFor(html, 'run-step') || '', /data-action="run-step"/, 'run this step stays ready');
     assert.match(html, /data-rung="run-task"[^>]*data-action="go"/, 'Go stays ready');
   });
 
-  test('not free tier: no quota read is made and the ladder is unchanged', async () => {
-    const m = await mountFresh({ freeTier: false }, { quota: QUOTA_ZERO });
+  test('not free tier: no quota read is made and the ladder is unchanged', async (t) => {
+    const m = await mountFresh(t, { freeTier: false }, { quota: QUOTA_ZERO });
     assert.equal(m.calls.api.some((u) => String(u).endsWith('/api/dispatch/quota')), false, 'no quota read when not free tier');
     assert.doesNotMatch(m.container.innerHTML, /data-testid="opened-task-run-quota"/);
     assert.match(tagFor(m.container.innerHTML, 'run-step') || '', /data-action="run-step"/);
@@ -205,8 +205,8 @@ describe('LIN-3267 — re-read the run quota after a ladder press', () => {
   // settled press includes firing that timer.
   const press = async (m) => { await m.container.click({ action: 'run-step', target: 'cli' }); await flush(); await flush(); await m.runTimers(); };
 
-  test('after a successful run-step press the count and rungs show the re-read quota', async () => {
-    const m = await mountFresh({}, { quota: seq(Q(1), Q(0)) });
+  test('after a successful run-step press the count and rungs show the re-read quota', async (t) => {
+    const m = await mountFresh(t, {}, { quota: seq(Q(1), Q(0)) });
     assert.match(m.container.innerHTML, /1 of 10 runs left today/);
     assert.match(tagFor(m.container.innerHTML, 'run-step'), /data-action="run-step"/);
     await press(m);
@@ -216,30 +216,30 @@ describe('LIN-3267 — re-read the run quota after a ladder press', () => {
     assert.match(tagFor(m.container.innerHTML, 'run-task'), /disabled/, 'Go is disabled at zero');
   });
 
-  test('a RUN_LIMIT_REACHED 429 on a run-step press leaves the ladder exhausted', async () => {
+  test('a RUN_LIMIT_REACHED 429 on a run-step press leaves the ladder exhausted', async (t) => {
     const dispatch = async () => { const e = new Error('limit'); e.status = 429; e.body = { code: 'RUN_LIMIT_REACHED' }; throw e; };
-    const m = await mountFresh({}, { quota: seq(Q(1), Q(0)), dispatch });
+    const m = await mountFresh(t, {}, { quota: seq(Q(1), Q(0)), dispatch });
     await press(m);
     assert.match(m.container.innerHTML, /0 of 10 runs left today/);
     assert.match(tagFor(m.container.innerHTML, 'run-step'), new RegExp(`disabled[^>]*${RUN_LIMIT_TITLE}`));
   });
 
-  test('the quota is re-read after the press settles, never before or during it', async () => {
-    const m = await mountFresh({}, { quota: seq(Q(5), Q(4)) });
+  test('the quota is re-read after the press settles, never before or during it', async (t) => {
+    const m = await mountFresh(t, {}, { quota: seq(Q(5), Q(4)) });
     assert.deepEqual(m.calls.order, ['quota'], 'only the load read before the press');
     await press(m);
     assert.deepEqual(m.calls.order, ['quota', 'dispatch', 'quota']);
   });
 
-  test('a failed re-read keeps the last known allowance', async () => {
+  test('a failed re-read keeps the last known allowance', async (t) => {
     let n = 0;
-    const m = await mountFresh({}, { quota: () => { if (n++ === 0) return Q(5); throw new Error('down'); } });
+    const m = await mountFresh(t, {}, { quota: () => { if (n++ === 0) return Q(5); throw new Error('down'); } });
     await press(m);
     assert.match(m.container.innerHTML, /5 of 10 runs left today/);
   });
 
-  test('not free tier: a press makes no quota read', async () => {
-    const m = await mountFresh({ freeTier: false }, { quota: Q(5) });
+  test('not free tier: a press makes no quota read', async (t) => {
+    const m = await mountFresh(t, { freeTier: false }, { quota: Q(5) });
     await press(m);
     assert.equal(m.calls.order.filter((x) => x === 'quota').length, 0);
   });
@@ -253,8 +253,8 @@ describe('LIN-3267 — re-read the run quota after a ladder press', () => {
     ['a run-step press', { action: 'run-step', target: 'cli' }, 'button[data-action="run-step"][data-target="cli"]', 'button[data-rung="run-step"]', true],
     ['a Dispatch-panel dispatch press', { action: 'dispatch', target: 'cli' }, 'button[data-action="dispatch"][data-target="cli"]', 'button[data-action="dispatch"][data-target="cli"]', false],
   ]) {
-    test(`${name} makes no whole-container write and the button keeps ✓ + disabled until the restore`, async () => {
-      const m = await mountFresh({}, { quota: seq(Q(1), Q(0)) });
+    test(`${name} makes no whole-container write and the button keeps ✓ + disabled until the restore`, async (t) => {
+      const m = await mountFresh(t, {}, { quota: seq(Q(1), Q(0)) });
       const btn = m.container.querySelector(selector);
       assert.ok(btn, 'precondition: the control is drawn');
       const label = btn.textContent;
@@ -284,9 +284,9 @@ describe('LIN-3267 — re-read the run quota after a ladder press', () => {
     });
   }
 
-  test('a 429 run-step press keeps err + disabled until the restore, then exhausts the ladder without a full write', async () => {
+  test('a 429 run-step press keeps err + disabled until the restore, then exhausts the ladder without a full write', async (t) => {
     const dispatch = async () => { const e = new Error('limit'); e.status = 429; e.body = { code: 'RUN_LIMIT_REACHED' }; throw e; };
-    const m = await mountFresh({}, { quota: seq(Q(1), Q(0)), dispatch });
+    const m = await mountFresh(t, {}, { quota: seq(Q(1), Q(0)), dispatch });
     const kept = nodesOutside(m.container, '[data-go-slot], [data-ladder-slot]');
     const btn = await m.container.click({ action: 'run-step', target: 'cli' });
     await flush();

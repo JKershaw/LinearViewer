@@ -17,14 +17,14 @@
 // pinned by the pre-existing tests/unit/prompt-section-recommend-url.test.js and
 // is "confirmed" here rather than duplicated.
 //
-// The client runs in the shared client world (tests/unit/helpers/client-world.js). A press is `container.click`,
+// public/prompt-section.js is a native module (LIN-4463 piece 5), imported over the fake DOM. A press is `container.click`,
 // which needs the control drawn. The Autopilot result is shown by `__autopilot_stepper__`: the `__autopilot__`
 // label has no drawn control in production (the Go button starts a run instead of showing a result), and both
 // labels take the same autopilot branch (`isAutopilotLabel`). Node identity is checked where the body is replaced.
 
 import { test, describe } from 'node:test';
 import assert from 'node:assert/strict';
-import { loadWorld } from './helpers/client-world.js';
+import { promptSectionWorld } from './helpers/prompt-section-world.js';
 
 // A Response-like object whose body yields one chunk carrying `body` then ends.
 function streamResponse(bodyStr) {
@@ -64,7 +64,7 @@ function spyOnBodyWrites(anyNode, onWrite) {
 }
 
 // `memory` is the record `loadPromptMemory` reads back on mount (a `harbour:prompt-memory:` entry).
-function loadPromptSection({ apiResult, proxyAppend, isPinnedToBottom, memory } = {}) {
+async function loadPromptSection(t, { apiResult, proxyAppend, isPinnedToBottom, memory } = {}) {
   const calls = { fetch: [], autopilot: [], api: [], proxyAppend: [], readSSE: [] };
   let fetchImpl = async () => ({ ok: false, json: async () => ({}) });
   const store = new Map();
@@ -118,9 +118,8 @@ function loadPromptSection({ apiResult, proxyAppend, isPinnedToBottom, memory } 
     setItem: (k, v) => store.set(k, String(v)),
     removeItem: (k) => store.delete(k),
   };
-  const world = loadWorld({
+  const world = await promptSectionWorld(t, {
     window,
-    scripts: ['prompt-section.js'],
     globals: {
       setTimeout: (fn) => { fn(); return 1; },
       clearTimeout: () => {},
@@ -158,15 +157,16 @@ function baseOpts(issue, extra = {}) {
 }
 
 // Let the fire-and-forget fetchPrompt microtasks flush.
-const flush = () => new Promise((r) => setTimeout(r, 0));
+// setImmediate, not setTimeout: the world's setTimeout (run at once, below) is the page's global and the test's.
+const flush = () => new Promise((r) => setImmediate(r));
 
 // ---------------------------------------------------------------------------
 // LIN-3079 — proxyForce-keyed suppression + forced attach
 // ---------------------------------------------------------------------------
 
 describe('LIN-3079 characterization: Autopilot result forces proxy, ordinary does not', () => {
-  test('Autopilot result suppresses the +proxy toggle even when proxyEnabled is true', async () => {
-    const { PromptSection, makeContainer } = loadPromptSection();
+  test('Autopilot result suppresses the +proxy toggle even when proxyEnabled is true', async (t) => {
+    const { PromptSection, makeContainer } = await loadPromptSection(t);
     const container = makeContainer();
     const issue = { id: 'issue-1', identifier: 'LIN-1' };
 
@@ -178,8 +178,8 @@ describe('LIN-3079 characterization: Autopilot result forces proxy, ordinary doe
     assert.equal(container.querySelector('.prompt-proxy-toggle'), null, 'no +proxy toggle is drawn');
   });
 
-  test('ordinary (template) result keeps the +proxy toggle', async () => {
-    const { PromptSection, makeContainer } = loadPromptSection();
+  test('ordinary (template) result keeps the +proxy toggle', async (t) => {
+    const { PromptSection, makeContainer } = await loadPromptSection(t);
     const container = makeContainer();
     const issue = { id: 'issue-2', identifier: 'LIN-2' };
 
@@ -191,8 +191,8 @@ describe('LIN-3079 characterization: Autopilot result forces proxy, ordinary doe
     assert.ok(container.querySelector('.prompt-proxy-toggle'), 'the +proxy toggle is drawn');
   });
 
-  test('copy forces the append for an Autopilot result and not for an ordinary one', async () => {
-    const { PromptSection, makeContainer, calls } = loadPromptSection();
+  test('copy forces the append for an Autopilot result and not for an ordinary one', async (t) => {
+    const { PromptSection, makeContainer, calls } = await loadPromptSection(t);
     const issue = { id: 'issue-3', identifier: 'LIN-3' };
 
     // Autopilot → force:true
@@ -206,7 +206,7 @@ describe('LIN-3079 characterization: Autopilot result forces proxy, ordinary doe
     assert.equal(calls.proxyAppend[0].opts.force, true);
 
     // Ordinary → force:false
-    const { PromptSection: PS2, makeContainer: makeContainer2, calls: calls2 } = loadPromptSection();
+    const { PromptSection: PS2, makeContainer: makeContainer2, calls: calls2 } = await loadPromptSection(t);
     const c2 = makeContainer2();
     PS2.init(c2, baseOpts({ id: 'issue-4', identifier: 'LIN-4' }));
     await c2.click({ prompt: 'implementation' });
@@ -217,7 +217,7 @@ describe('LIN-3079 characterization: Autopilot result forces proxy, ordinary doe
     assert.equal(calls2.proxyAppend[0].opts.force, false);
   });
 
-  test('the suppression is keyed on proxyForce, not on kind/label (LIN-3079 review N1)', async () => {
+  test('the suppression is keyed on proxyForce, not on kind/label (LIN-3079 review N1)', async (t) => {
     // An entry whose label is not autopilot but carries proxyForce must still be
     // suppressed; the lazy integration of the two flags is the fault LIN-3079
     // closed. The entry here is a restored prompt memory: its label is an ordinary
@@ -229,14 +229,14 @@ describe('LIN-3079 characterization: Autopilot result forces proxy, ordinary doe
       record: { v: 1, label: 'implementation', name: 'Implementation', raw: 'MEMORY PROMPT', kind: 'implementation', proxyForce, generatedAt: Date.now() },
     });
 
-    const forced = loadPromptSection({ memory: memoryFor(true) });
+    const forced = await loadPromptSection(t, { memory: memoryFor(true) });
     const cForced = forced.makeContainer();
     forced.PromptSection.init(cForced, baseOpts(issue));
     await flush();
     assert.match(cForced.querySelector('[data-prompt-body]').textContent, /MEMORY PROMPT/);
     assert.equal(cForced.querySelector('.prompt-proxy-toggle'), null, 'proxyForce alone suppresses the toggle');
 
-    const plain = loadPromptSection({ memory: memoryFor(false) });
+    const plain = await loadPromptSection(t, { memory: memoryFor(false) });
     const cPlain = plain.makeContainer();
     plain.PromptSection.init(cPlain, baseOpts(issue));
     await flush();
@@ -244,7 +244,7 @@ describe('LIN-3079 characterization: Autopilot result forces proxy, ordinary doe
     assert.ok(cPlain.querySelector('.prompt-proxy-toggle'), 'the same entry without proxyForce keeps the toggle');
 
     // And an autopilot result suppresses it, then switching back to an ordinary prompt restores it.
-    const { PromptSection, makeContainer } = loadPromptSection();
+    const { PromptSection, makeContainer } = await loadPromptSection(t);
     const container = makeContainer();
     PromptSection.init(container, baseOpts({ id: 'issue-6', identifier: 'LIN-6' }));
     await container.click({ prompt: '__autopilot_stepper__' });
@@ -265,9 +265,9 @@ describe('LIN-3079 characterization: Autopilot result forces proxy, ordinary doe
 // ---------------------------------------------------------------------------
 
 describe('LIN-2987 characterization: pinned-bottom is sampled before body mutation', () => {
-  test('in a streaming render pass, isPinnedToBottom runs before body.innerHTML is assigned', async () => {
+  test('in a streaming render pass, isPinnedToBottom runs before body.innerHTML is assigned', async (t) => {
     const order = [];
-    const { PromptSection, setFetchImpl, streamResponse, makeContainer } = loadPromptSection({
+    const { PromptSection, setFetchImpl, streamResponse, makeContainer } = await loadPromptSection(t, {
       isPinnedToBottom: () => { order.push('pin'); return true; },
     });
     const issue = { id: 'issue-9', identifier: 'LIN-9' };

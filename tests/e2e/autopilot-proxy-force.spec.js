@@ -269,6 +269,9 @@ test.describe('LIN-3079 periodical Mint + Autopilot — copy/download forced', (
       variant.locator('.prompt-download').click(),
     ]);
     await assertDownloadedFileHasProxyBlock(download);
+    // LIN-4463: Home's server-rendered .prompt-download goes through app.js's handleDownloadClick, which builds the name
+    // with the imported buildPromptFilename: '<identifier>-<promptName>.md', here the row's line identifier and its prompt name.
+    expect(download.suggestedFilename()).toBe('documentation-review-autopilot.md');
   });
 });
 

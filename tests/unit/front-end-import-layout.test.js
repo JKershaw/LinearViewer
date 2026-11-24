@@ -46,9 +46,12 @@ describe('every import in public/ is a flat sibling or an allow-listed lib leaf'
     });
   }
 
-  test('the bridge and the page that uses the leaf both reach it by the same relative specifier', () => {
-    const src = readFileSync(join(PUBLIC, 'cost-format-global.js'), 'utf8');
-    assert.deepEqual(importSpecifiers(src).map((i) => i.specifier), ['../lib/cost-format.js']);
+  test('the pages that use the cost leaf all reach it by the same relative specifier (the bridge is gone, LIN-4463 piece 5)', () => {
+    for (const page of ['prompt-section.js', 'workspace-kpis.js', 'flight-companion.js']) {
+      const specifiers = importSpecifiers(readFileSync(join(PUBLIC, page), 'utf8')).map((i) => i.specifier);
+      assert.ok(specifiers.includes('../lib/cost-format.js'), `${page}: ${specifiers.join(', ')}`);
+    }
+    assert.equal(publicTop.includes('cost-format-global.js'), false, 'the module shim is deleted');
   });
 });
 

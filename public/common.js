@@ -782,6 +782,34 @@ window.readSSEStream = async function readSSEStream(response, onEvent) {
 // =============================================================================
 
 /**
+ * Update the nav queue badge's count for a workspace. A page with no badge for `urlKey` sends no request: the count
+ * would have nowhere to go. Here, not in app.js (LIN-4463 piece 5): dispatchPrompt below and the classic dispatch.js
+ * call it after a dispatch, and app.js is a module whose names classic scripts cannot read; app.js's 1s poll reads it
+ * from here. Before, a page without app.js (the task, session and swipe pages) skipped it by a typeof guard; it has no
+ * badge, so it still sends nothing.
+ *
+ * Deliberately raw fetch (NOT window.api): this is a 1s background poller that must silently swallow failures; it must
+ * never redirect to /logout or toast on a transient error. (api() carve-out: pollers stay on raw fetch.)
+ * @global
+ * @param {string} urlKey
+ */
+window.updateQueueBadge = async function updateQueueBadge(urlKey) {
+  const badge = document.querySelector(`[data-queue-badge][data-url-key="${urlKey}"]`);
+  if (!badge) return;
+  try {
+    const response = await fetch(`/workspace/${encodeURIComponent(urlKey)}/api/dispatch/count`);
+    if (!response.ok) return;
+
+    const { count } = await response.json();
+    const countEl = badge.querySelector('.queue-count');
+    if (countEl) countEl.textContent = count;
+    badge.classList.toggle('hidden', count === 0);
+  } catch (e) {
+    console.error('Failed to update queue badge:', e);
+  }
+};
+
+/**
  * Unified client-side dispatch to POST /api/dispatch.
  *
  * Every dispatch surface (dashboard tree, dispatch page, session page,
@@ -915,7 +943,7 @@ window.dispatchPrompt = async function dispatchPrompt(opts = {}) {
     on401: false
   });
 
-  // Refresh the nav queue badge where that machinery exists (dashboard etc.).
+  // Refresh the nav queue badge (a no-op on a page without one). Guarded because a suite may run this function alone.
   if (typeof window.updateQueueBadge === 'function') {
     window.updateQueueBadge(urlKey);
   }

@@ -9,7 +9,7 @@
 //    passes entryRung and the client records nothing; a refused act records no
 //    act; ✦ "next step" is not a mode event; a failed record never alters the press.
 //
-// Same vm-sandbox house pattern as prompt-section-p0.test.js.
+// public/prompt-section.js is a native module (LIN-4463 piece 5), imported over the fake DOM.
 
 import { test, describe } from 'node:test';
 import assert from 'node:assert/strict';
@@ -17,12 +17,12 @@ import { readFileSync } from 'node:fs';
 import { fileURLToPath } from 'node:url';
 import { dirname, join } from 'node:path';
 import { RUNGS, NEEDS, SURFACES, validateTaskModeEvent } from '../../lib/task-mode-store.js';
-import { loadWorld } from './helpers/client-world.js';
+import { promptSectionWorld } from './helpers/prompt-section-world.js';
 
 const __dirname = dirname(fileURLToPath(import.meta.url));
 
 /**
- * The container is a real element in the client world (loadWorld). The suite's press is its own: a synthetic button with the
+ * The container is a real element in the world (promptSectionWorld). The suite's press is its own: a synthetic button with the
  * dataset given, handed to the container's click listeners. The fake's own `click` needs a drawn button, and these presses
  * name rungs and actions the suite does not draw (LIN-4296: moved onto the shared fake, the press shim stays here).
  */
@@ -39,9 +39,9 @@ function makeContainer(world) {
   return container;
 }
 
-function loadPromptSection({ copyFails = false, recordFails = false, recordThrowsSync = false } = {}) {
+async function loadPromptSection(t, { copyFails = false, recordFails = false, recordThrowsSync = false } = {}) {
   const calls = { records: [], dispatch: [], fetch: [], autopilotFetch: [], anchorClicks: [] };
-  const world = loadWorld({
+  const world = await promptSectionWorld(t, {
     window: {
       escapeHtml: (s) => (s == null ? '' : String(s)),
       stripCodeBlockWrapper: (s) => s,
@@ -61,7 +61,6 @@ function loadPromptSection({ copyFails = false, recordFails = false, recordThrow
       isPinnedToBottom: () => false,
       toast: () => {},
     },
-    scripts: ['prompt-section.js'],
     timers: [], // collected and never run, as the suite's old no-op setTimeout did
     globals: {
       URL: { createObjectURL: () => 'blob:x', revokeObjectURL: () => {} },
@@ -88,7 +87,7 @@ function loadPromptSection({ copyFails = false, recordFails = false, recordThrow
     if (String(name).toLowerCase() === 'a') el.click = () => calls.anchorClicks.push({ download: el.download });
     return el;
   };
-  return { PromptSection: world.window.PromptSection, window: world.window, calls, world };
+  return { PromptSection: world.PromptSection, window: world.window, calls, world };
 }
 
 const ISSUE = { id: 'uuid-42', identifier: 'LIN-42', title: 'A task' };
@@ -113,22 +112,22 @@ function baseOpts(extra = {}) {
 
 const flush = () => new Promise((r) => setImmediate(r));
 
-async function mount(extra, loadOpts) {
-  const loaded = loadPromptSection(loadOpts);
+async function mount(t, extra, loadOpts) {
+  const loaded = await loadPromptSection(t, loadOpts);
   const container = makeContainer(loaded.world);
   loaded.PromptSection.init(container, baseOpts(extra));
   return { ...loaded, container };
 }
 
-async function withResult(label, extra, loadOpts) {
-  const m = await mount(extra, loadOpts);
+async function withResult(t, label, extra, loadOpts) {
+  const m = await mount(t, extra, loadOpts);
   await m.container.click({ prompt: label });
   await flush();
   return m;
 }
 
 describe('LIN-2942 vocabulary drift pin', () => {
-  test('RUNGS and NEEDS are exactly the data-rung / data-setup-needs values renderLadder emits', async () => {
+  test('RUNGS and NEEDS are exactly the data-rung / data-setup-needs values renderLadder emits', async (t) => {
     const rungs = new Set();
     const needs = new Set();
     const collect = (html) => {
@@ -140,9 +139,9 @@ describe('LIN-2942 vocabulary drift pin', () => {
     // LIN-3849: the states are run controls on, set-up rung (owner, no way to
     // run), and neither (member).
     for (const state of [{ dispatchEnabled: true, runSetup: false }, { dispatchEnabled: false, runSetup: true }, { dispatchEnabled: false, runSetup: false }]) {
-      const idle = await mount(state);
+      const idle = await mount(t, state);
       collect(idle.container.innerHTML);
-      const fresh = await withResult('implementation', state);
+      const fresh = await withResult(t, 'implementation', state);
       collect(fresh.container.innerHTML);
     }
     assert.deepEqual([...rungs].sort(), [...RUNGS].sort());
@@ -168,8 +167,8 @@ describe('LIN-2944 P1: SURFACES drift pin', () => {
 
 describe('LIN-2944 P1: handleDispatch threads the mount surface', () => {
   for (const surface of ['swipe', 'home']) {
-    test(`a dispatch from a ${surface} mount passes surface: ${surface}`, async () => {
-      const m = await withResult('implementation', { surface });
+    test(`a dispatch from a ${surface} mount passes surface: ${surface}`, async (t) => {
+      const m = await withResult(t, 'implementation', { surface });
       await m.container.click({ action: 'run-step', rung: 'run-step', target: 'cli' });
       await flush();
       assert.equal(m.calls.dispatch.length, 1);
@@ -180,8 +179,8 @@ describe('LIN-2944 P1: handleDispatch threads the mount surface', () => {
 });
 
 describe('LIN-2942 client hooks in PromptSection', () => {
-  test('a copy of a template result records copy/copy for the task and surface', async () => {
-    const m = await withResult('implementation');
+  test('a copy of a template result records copy/copy for the task and surface', async (t) => {
+    const m = await withResult(t, 'implementation');
     await m.container.click({ action: 'copy' });
     await flush();
     assert.equal(m.calls.records.length, 1);
@@ -197,8 +196,8 @@ describe('LIN-2942 client hooks in PromptSection', () => {
     assert.equal(validateTaskModeEvent({ ...body, accountId: 'a', urlKey: 'ws' }), null);
   });
 
-  test('a download of a template result records copy/copy', async () => {
-    const m = await withResult('implementation');
+  test('a download of a template result records copy/copy', async (t) => {
+    const m = await withResult(t, 'implementation');
     await m.container.click({ action: 'download' });
     await flush();
     assert.equal(m.calls.anchorClicks.length, 1, 'the download clicks its anchor once');
@@ -206,8 +205,8 @@ describe('LIN-2942 client hooks in PromptSection', () => {
   });
 
   for (const label of ['__autopilot__', '__autopilot_stepper__']) {
-    test(`the ${label} press records run-task/press, and its copy records run-task/copy`, async () => {
-      const m = await withResult(label);
+    test(`the ${label} press records run-task/press, and its copy records run-task/copy`, async (t) => {
+      const m = await withResult(t, label);
       await m.container.click({ action: 'copy' });
       await flush();
       assert.deepEqual(m.calls.records.map(r => [r.body.rung, r.body.ready, r.body.act]), [
@@ -218,8 +217,8 @@ describe('LIN-2942 client hooks in PromptSection', () => {
   }
 
   for (const [rung, needs] of [['copy', 'prompt'], ['run-step', 'dispatch'], ['run-step', 'prompt'], ['run-task', 'dispatch']]) {
-    test(`a set-up press on ${rung} records ready:false, needs:${needs} and dispatches nothing`, async () => {
-      const m = await mount();
+    test(`a set-up press on ${rung} records ready:false, needs:${needs} and dispatches nothing`, async (t) => {
+      const m = await mount(t);
       await m.container.click({ action: 'setup', rung, setupNeeds: needs });
       await flush();
       assert.deepEqual(m.calls.records.map(r => r.body), [{
@@ -229,8 +228,8 @@ describe('LIN-2942 client hooks in PromptSection', () => {
     });
   }
 
-  test('a run-step dispatch passes entryRung run-step and the client records nothing', async () => {
-    const m = await withResult('implementation');
+  test('a run-step dispatch passes entryRung run-step and the client records nothing', async (t) => {
+    const m = await withResult(t, 'implementation');
     await m.container.click({ action: 'run-step', rung: 'run-step', target: 'cli' });
     await flush();
     assert.equal(m.calls.dispatch.length, 1);
@@ -238,46 +237,46 @@ describe('LIN-2942 client hooks in PromptSection', () => {
     assert.equal(m.calls.records.length, 0);
   });
 
-  test('a dispatch from the disclosure carries the result\'s rung: run-task for an autopilot result', async () => {
-    const m = await withResult('__autopilot__');
+  test('a dispatch from the disclosure carries the result\'s rung: run-task for an autopilot result', async (t) => {
+    const m = await withResult(t, '__autopilot__');
     await m.container.click({ action: 'dispatch', target: 'cli' });
     await flush();
     assert.equal(m.calls.dispatch[0].entryRung, 'run-task');
     assert.deepEqual(m.calls.records.map(r => r.body.act), ['press']);
   });
 
-  test('a refused copy records only the press, never the copy', async () => {
-    const m = await withResult('__autopilot__', {}, { copyFails: true });
+  test('a refused copy records only the press, never the copy', async (t) => {
+    const m = await withResult(t, '__autopilot__', {}, { copyFails: true });
     await m.container.click({ action: 'copy' });
     await m.container.click({ action: 'download' });
     await flush();
     assert.deepEqual(m.calls.records.map(r => `${r.body.rung}/${r.body.act}`), ['run-task/press']);
   });
 
-  test('✦ next step and a template pick are not mode events', async () => {
-    const m = await withResult('implementation');
+  test('✦ next step and a template pick are not mode events', async (t) => {
+    const m = await withResult(t, 'implementation');
     await m.container.click({ prompt: '__ai__' });
     await flush();
     assert.equal(m.calls.records.length, 0);
   });
 
-  test('a failed record never alters the press', async () => {
-    const m = await withResult('implementation', {}, { recordFails: true });
+  test('a failed record never alters the press', async (t) => {
+    const m = await withResult(t, 'implementation', {}, { recordFails: true });
     const btn = await m.container.click({ action: 'copy' });
     await flush();
     assert.equal(m.calls.records.length, 1);
     assert.equal(btn.textContent, 'copied!');
   });
 
-  test('a fetch that throws synchronously never alters the press', async () => {
-    const m = await withResult('implementation', {}, { recordThrowsSync: true });
+  test('a fetch that throws synchronously never alters the press', async (t) => {
+    const m = await withResult(t, 'implementation', {}, { recordThrowsSync: true });
     const btn = await m.container.click({ action: 'copy' });
     await flush();
     assert.equal(btn.textContent, 'copied!');
   });
 
-  test('without a surface option the event carries surface null', async () => {
-    const m = await mount({ surface: undefined });
+  test('without a surface option the event carries surface null', async (t) => {
+    const m = await mount(t, { surface: undefined });
     await m.container.click({ action: 'setup', rung: 'run-task', setupNeeds: 'dispatch' });
     await flush();
     assert.equal(m.calls.records[0].body.surface, null);
@@ -289,8 +288,8 @@ describe('LIN-2942 client hooks in PromptSection', () => {
 // and the dispatch. Every other ladder path (run-this-step, copy) sends nothing.
 describe('LIN-3246 stopAt — the ladder declares the PR boundary', () => {
   for (const label of ['__autopilot__', '__autopilot_stepper__']) {
-    test(`${label}: the kickoff fetch and the dispatch both pass stopAt:'pr'`, async () => {
-      const m = await withResult(label);
+    test(`${label}: the kickoff fetch and the dispatch both pass stopAt:'pr'`, async (t) => {
+      const m = await withResult(t, label);
       assert.equal(m.calls.autopilotFetch.length, 1);
       assert.equal(m.calls.autopilotFetch[0].stopAt, 'pr');
       await m.container.click({ action: 'dispatch', target: 'cli' });
@@ -301,8 +300,8 @@ describe('LIN-3246 stopAt — the ladder declares the PR boundary', () => {
     });
   }
 
-  test('run this step (a template result): no stopAt on the fetch or the dispatch', async () => {
-    const m = await withResult('implementation');
+  test('run this step (a template result): no stopAt on the fetch or the dispatch', async (t) => {
+    const m = await withResult(t, 'implementation');
     assert.equal(m.calls.autopilotFetch.length, 0, 'a template result never hits the autopilot kickoff');
     await m.container.click({ action: 'run-step', rung: 'run-step', target: 'cli' });
     await flush();
@@ -311,9 +310,9 @@ describe('LIN-3246 stopAt — the ladder declares the PR boundary', () => {
     assert.equal(m.calls.dispatch[0].stopAt, undefined);
   });
 
-  test('copy/download never dispatch, so stopAt never reaches the dispatch seam', async () => {
+  test('copy/download never dispatch, so stopAt never reaches the dispatch seam', async (t) => {
     for (const label of ['implementation', '__autopilot__']) {
-      const m = await withResult(label);
+      const m = await withResult(t, label);
       await m.container.click({ action: 'copy' });
       await m.container.click({ action: 'download' });
       await flush();

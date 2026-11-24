@@ -14,11 +14,11 @@
 //   Addendum 4 — adopt `window.readSSEStream`; ignore non-object payloads
 //                (`[DONE]`), throw on `payload.error`.
 //
-// Runs in the shared client world (tests/unit/helpers/client-world.js): one fake DOM, one vm sandbox.
+// public/prompt-section.js is a native module (LIN-4463 piece 5), imported over the fake DOM.
 
 import { test, describe } from 'node:test';
 import assert from 'node:assert/strict';
-import { loadWorld } from './helpers/client-world.js';
+import { promptSectionWorld } from './helpers/prompt-section-world.js';
 
 // ---------------------------------------------------------------------------
 // fakes
@@ -34,7 +34,7 @@ function makeLocalStorage() {
   };
 }
 
-// The client runs in the shared client world (tests/unit/helpers/client-world.js): one fake DOM and one vm sandbox.
+// public/prompt-section.js is a native module (LIN-4463 piece 5), imported over the fake DOM.
 // A press is `container.click(dataset)`, which needs the control to be drawn, as a browser needs it. Assertions read the
 // drawn markup (`innerHTML`, `querySelector`), node identity, and the drawn control's own properties.
 //
@@ -60,7 +60,7 @@ function nodesOutside(container, slotSelector) {
   return out;
 }
 
-function loadPromptSection({ localStorage, readSSEStream, fetchImpl } = {}) {
+async function loadPromptSection(t, { localStorage, readSSEStream, fetchImpl } = {}) {
   const calls = {
     fetch: [], autopilot: [], api: [], disclosure: [], readSSE: [], dispatch: [], clipboard: [],
   };
@@ -94,9 +94,8 @@ function loadPromptSection({ localStorage, readSSEStream, fetchImpl } = {}) {
   };
   if (localStorage) windowStubs.localStorage = localStorage;
 
-  const world = loadWorld({
+  const world = await promptSectionWorld(t, {
     window: windowStubs,
-    scripts: ['prompt-section.js'],
     timers,
     globals: {
       ...(localStorage ? { localStorage } : {}),
@@ -142,7 +141,8 @@ function baseOpts(issue, extra = {}) {
   return { runSetup: !o.dispatchEnabled, ...o };
 }
 
-const flush = () => new Promise((r) => setTimeout(r, 0));
+// setImmediate, not setTimeout: the world collects setTimeout into `timers`, and it is the page's global and the test's.
+const flush = () => new Promise((r) => setImmediate(r));
 
 // A Response-like object with an empty (but valid) SSE body, so the baseline's
 // own reader still completes rather than throwing on a missing body — keeping
@@ -194,8 +194,8 @@ function promptBody(container) {
 // ---------------------------------------------------------------------------
 
 describe('P0 addendum 1: source is threaded on the template and Autopilot fetches', () => {
-  test('template prompt URL carries ?source=jira when issue.source is set', async () => {
-    const { PromptSection, calls } = loadPromptSection();
+  test('template prompt URL carries ?source=jira when issue.source is set', async (t) => {
+    const { PromptSection, calls } = await loadPromptSection(t);
     const container = makeContainer();
     PromptSection.init(container, baseOpts({ id: 'issue-1', identifier: 'JIRA-1', source: 'jira' }));
     await container.click({ prompt: 'implementation' });
@@ -207,8 +207,8 @@ describe('P0 addendum 1: source is threaded on the template and Autopilot fetche
     assert.match(promptCalls[0].url, /\?source=jira$/);
   });
 
-  test('template prompt URL has no query when issue.source is absent', async () => {
-    const { PromptSection, calls } = loadPromptSection();
+  test('template prompt URL has no query when issue.source is absent', async (t) => {
+    const { PromptSection, calls } = await loadPromptSection(t);
     const container = makeContainer();
     PromptSection.init(container, baseOpts({ id: 'issue-2', identifier: 'LIN-2' }));
     await container.click({ prompt: 'implementation' });
@@ -219,8 +219,8 @@ describe('P0 addendum 1: source is threaded on the template and Autopilot fetche
     assert.equal(promptCalls[0].url, '/workspace/ws/api/prompt/issue-2/implementation');
   });
 
-  test('Autopilot kickoff is passed source=jira when issue.source is set', async () => {
-    const { PromptSection, calls } = loadPromptSection();
+  test('Autopilot kickoff is passed source=jira when issue.source is set', async (t) => {
+    const { PromptSection, calls } = await loadPromptSection(t);
     const container = makeContainer();
     PromptSection.init(container, baseOpts({ id: 'issue-3', identifier: 'JIRA-3', source: 'jira' }));
     // The standard `__autopilot__` entry is drawn in no state: production draws only the stepper as an Autopilot entry.
@@ -242,12 +242,12 @@ describe('P0 addendum 1: source is threaded on the template and Autopilot fetche
 // ---------------------------------------------------------------------------
 
 describe('P0 addendum 2 REVERSED by LIN-3341: autopilot prompt memory is not restored', () => {
-  test('a persisted Autopilot entry is NOT restored (idle mount) and its stale key is dropped', async () => {
+  test('a persisted Autopilot entry is NOT restored (idle mount) and its stale key is dropped', async (t) => {
     const ls = makeLocalStorage();
     const issue = { id: 'issue-7', identifier: 'LIN-7' };
 
     // Session 1: generate an Autopilot prompt. LIN-3341 no longer persists it.
-    const first = loadPromptSection({ localStorage: ls });
+    const first = await loadPromptSection(t, { localStorage: ls });
     const c1 = makeContainer();
     first.PromptSection.init(c1, baseOpts(issue, { proxyEnabled: true }));
     await c1.click({ prompt: '__autopilot_stepper__' });
@@ -261,7 +261,7 @@ describe('P0 addendum 2 REVERSED by LIN-3341: autopilot prompt memory is not res
     }));
 
     // Session 2: a fresh module instance sharing the same storage (a reload).
-    const second = loadPromptSection({ localStorage: ls });
+    const second = await loadPromptSection(t, { localStorage: ls });
     const c2 = makeContainer();
     second.PromptSection.init(c2, baseOpts(issue, { proxyEnabled: true, dispatchEnabled: true }));
 
@@ -270,7 +270,7 @@ describe('P0 addendum 2 REVERSED by LIN-3341: autopilot prompt memory is not res
     assert.equal(ls.getItem('harbour:prompt-memory:ws:issue-7'), null, 'the stale autopilot record is removed on load');
   });
 
-  test('a stored stepper autopilot record is dropped on mount and never cached (the stepper arm)', () => {
+  test('a stored stepper autopilot record is dropped on mount and never cached (the stepper arm)', async (t) => {
     const ls = makeLocalStorage();
     const issue = { id: 'issue-stepper', identifier: 'LIN-ST' };
 
@@ -279,7 +279,7 @@ describe('P0 addendum 2 REVERSED by LIN-3341: autopilot prompt memory is not res
       v: 1, label: '__autopilot_stepper__', name: 'Autopilot · stepped', raw: 'STEPPER PROMPT', kind: 'autopilot',
     }));
 
-    const { PromptSection } = loadPromptSection({ localStorage: ls });
+    const { PromptSection } = await loadPromptSection(t, { localStorage: ls });
     const container = makeContainer();
     PromptSection.init(container, baseOpts(issue, { proxyEnabled: true, dispatchEnabled: true }));
 
@@ -289,14 +289,14 @@ describe('P0 addendum 2 REVERSED by LIN-3341: autopilot prompt memory is not res
     assert.equal(PromptSection.getCached('issue-stepper', 'ws'), null, 'getCached does not surface a dropped autopilot record');
   });
 
-  test('a stored __ai__ record still hydrates fresh (the filter is autopilot-only)', () => {
+  test('a stored __ai__ record still hydrates fresh (the filter is autopilot-only)', async (t) => {
     const ls = makeLocalStorage();
     const issue = { id: 'issue-ai', identifier: 'LIN-AI' };
     ls.setItem('harbour:prompt-memory:ws:issue-ai', JSON.stringify({
       v: 1, label: '__ai__', name: 'AI Recommendation', raw: 'AI PROMPT', generatedAt: Date.now(),
     }));
 
-    const { PromptSection } = loadPromptSection({ localStorage: ls });
+    const { PromptSection } = await loadPromptSection(t, { localStorage: ls });
     const container = makeContainer();
     PromptSection.init(container, baseOpts(issue, { aiState: 'off' }));
 
@@ -307,10 +307,10 @@ describe('P0 addendum 2 REVERSED by LIN-3341: autopilot prompt memory is not res
     assert.equal(cached && cached.name, 'AI Recommendation');
   });
 
-  test('the appended proxy block is never persisted', async () => {
+  test('the appended proxy block is never persisted', async (t) => {
     const ls = makeLocalStorage();
     const issue = { id: 'issue-8', identifier: 'LIN-8' };
-    const { PromptSection, calls } = loadPromptSection({ localStorage: ls });
+    const { PromptSection, calls } = await loadPromptSection(t, { localStorage: ls });
     const container = makeContainer();
     PromptSection.init(container, baseOpts(issue, { proxyEnabled: true }));
     await container.click({ prompt: '__autopilot_stepper__' });
@@ -325,8 +325,8 @@ describe('P0 addendum 2 REVERSED by LIN-3341: autopilot prompt memory is not res
     assert.equal(persisted.includes('## Workspace API access'), false);
   });
 
-  test('a fresh result shows "generated <age> · regenerate"', async () => {
-    const { PromptSection } = loadPromptSection();
+  test('a fresh result shows "generated <age> · regenerate"', async (t) => {
+    const { PromptSection } = await loadPromptSection(t);
     const container = makeContainer();
     PromptSection.init(container, baseOpts({ id: 'issue-11', identifier: 'LIN-11' }));
     await container.click({ prompt: 'implementation' });
@@ -342,8 +342,8 @@ describe('P0 addendum 2 REVERSED by LIN-3341: autopilot prompt memory is not res
 // ---------------------------------------------------------------------------
 
 describe('P0 addendum 3: the dispatch disclosure idPrefix is caller-overridable', () => {
-  test('two inits for the same issue with different prefixes yield disjoint ids', async () => {
-    const { PromptSection, calls } = loadPromptSection();
+  test('two inits for the same issue with different prefixes yield disjoint ids', async (t) => {
+    const { PromptSection, calls } = await loadPromptSection(t);
     const issue = { id: 'issue-1', identifier: 'LIN-1' };
 
     const a = makeContainer();
@@ -359,8 +359,8 @@ describe('P0 addendum 3: the dispatch disclosure idPrefix is caller-overridable'
     assert.deepEqual(calls.disclosure, ['alpha', 'beta']);
   });
 
-  test('the default idPrefix stays swipe-<issue.id> (Swipe output byte-identical)', async () => {
-    const { PromptSection, calls } = loadPromptSection();
+  test('the default idPrefix stays swipe-<issue.id> (Swipe output byte-identical)', async (t) => {
+    const { PromptSection, calls } = await loadPromptSection(t);
     const issue = { id: 'issue-9', identifier: 'LIN-9' };
     const container = makeContainer();
     PromptSection.init(container, baseOpts(issue, { dispatchEnabled: true }));
@@ -380,8 +380,8 @@ function aiOpts(issue) {
 }
 
 describe('P0 addendum 4: PromptSection adopts window.readSSEStream', () => {
-  test('the AI stream is read through window.readSSEStream', async () => {
-    const { PromptSection, calls } = loadPromptSection({
+  test('the AI stream is read through window.readSSEStream', async (t) => {
+    const { PromptSection, calls } = await loadPromptSection(t, {
       readSSEStream: async () => {},
       fetchImpl: async () => emptyStreamResponse(),
     });
@@ -393,8 +393,8 @@ describe('P0 addendum 4: PromptSection adopts window.readSSEStream', () => {
     assert.equal(calls.readSSE.length, 1);
   });
 
-  test('an error frame ends in the error state (LIN-2980 propagation)', async () => {
-    const { PromptSection } = loadPromptSection({
+  test('an error frame ends in the error state (LIN-2980 propagation)', async (t) => {
+    const { PromptSection } = await loadPromptSection(t, {
       readSSEStream: async (response, onEvent) => {
         onEvent('message', { error: 'upstream boom' });
       },
@@ -409,8 +409,8 @@ describe('P0 addendum 4: PromptSection adopts window.readSSEStream', () => {
     assert.match(container.innerHTML, /upstream boom/);
   });
 
-  test('a non-object [DONE] payload is ignored, and the stream settles fresh', async () => {
-    const { PromptSection } = loadPromptSection({
+  test('a non-object [DONE] payload is ignored, and the stream settles fresh', async (t) => {
+    const { PromptSection } = await loadPromptSection(t, {
       readSSEStream: async (response, onEvent) => {
         onEvent('message', '[DONE]');
         onEvent('message', { section: 'prompt', content: 'OK PROMPT' });
@@ -435,8 +435,8 @@ describe('P0 addendum 4: PromptSection adopts window.readSSEStream', () => {
 // ---------------------------------------------------------------------------
 
 describe('P0 fix-up F1: the ladder rungs act, and the Edit slot is not dead', () => {
-  test('the enabled run-step rung dispatches the current prompt to cli', async () => {
-    const { PromptSection, calls } = loadPromptSection();
+  test('the enabled run-step rung dispatches the current prompt to cli', async (t) => {
+    const { PromptSection, calls } = await loadPromptSection(t);
     const container = makeContainer();
     PromptSection.init(container, baseOpts(
       { id: 'issue-20', identifier: 'LIN-20', url: 'https://x/20' },
@@ -454,8 +454,8 @@ describe('P0 fix-up F1: the ladder rungs act, and the Edit slot is not dead', ()
     assert.equal(calls.dispatch[0].issue.identifier, 'LIN-20');
   });
 
-  test('an idle run-step rung says it needs a prompt and dispatches nothing', async () => {
-    const { PromptSection, calls } = loadPromptSection();
+  test('an idle run-step rung says it needs a prompt and dispatches nothing', async (t) => {
+    const { PromptSection, calls } = await loadPromptSection(t);
     const container = makeContainer();
     PromptSection.init(container, baseOpts({ id: 'issue-21', identifier: 'LIN-21' }, { dispatchEnabled: true }));
 
@@ -466,8 +466,8 @@ describe('P0 fix-up F1: the ladder rungs act, and the Edit slot is not dead', ()
     assert.match(container.innerHTML, /generate a prompt first/);
   });
 
-  test('the idle copy rung is shown disabled with a reason (no silent no-op)', () => {
-    const { PromptSection } = loadPromptSection();
+  test('the idle copy rung is shown disabled with a reason (no silent no-op)', async (t) => {
+    const { PromptSection } = await loadPromptSection(t);
     const container = makeContainer();
     PromptSection.init(container, baseOpts({ id: 'issue-22', identifier: 'LIN-22' }));
 
@@ -475,8 +475,8 @@ describe('P0 fix-up F1: the ladder rungs act, and the Edit slot is not dead', ()
     assert.match(container.innerHTML, /data-setup-needs="prompt"/);
   });
 
-  test('the fresh ladder does not duplicate the action cluster copy', async () => {
-    const { PromptSection } = loadPromptSection();
+  test('the fresh ladder does not duplicate the action cluster copy', async (t) => {
+    const { PromptSection } = await loadPromptSection(t);
     const container = makeContainer();
     PromptSection.init(container, baseOpts({ id: 'issue-23', identifier: 'LIN-23' }));
     await container.click({ prompt: 'implementation' });
@@ -488,8 +488,8 @@ describe('P0 fix-up F1: the ladder rungs act, and the Edit slot is not dead', ()
     assert.match(container.innerHTML, /class="swipe-prompt-copy"/);
   });
 
-  test('the Swipe Edit slot is hidden unless a caller supplies editUrl', () => {
-    const { PromptSection } = loadPromptSection();
+  test('the Swipe Edit slot is hidden unless a caller supplies editUrl', async (t) => {
+    const { PromptSection } = await loadPromptSection(t);
     const plain = makeContainer();
     PromptSection.init(plain, baseOpts({ id: 'issue-24', identifier: 'LIN-24' }));
     assert.equal(plain.innerHTML.includes('swipe-prompt-edit'), false);
@@ -513,9 +513,9 @@ describe('P0 fix-up F2: regenerate obeys the same gate as the primary', () => {
   for (const [name, opts] of [
     ['unconfigured', { aiState: 'unconfigured' }],
   ]) {
-    test(`a remembered AI prompt disables regenerate when ${name}`, () => {
+    test(`a remembered AI prompt disables regenerate when ${name}`, async (t) => {
       const ls = seededAiMemory('issue-30');
-      const { PromptSection } = loadPromptSection({ localStorage: ls });
+      const { PromptSection } = await loadPromptSection(t, { localStorage: ls });
       const container = makeContainer();
       PromptSection.init(container, baseOpts({ id: 'issue-30', identifier: 'LIN-30' }, opts));
 
@@ -524,12 +524,12 @@ describe('P0 fix-up F2: regenerate obeys the same gate as the primary', () => {
     });
   }
 
-  test('a non-AI remembered prompt keeps regenerate enabled', () => {
+  test('a non-AI remembered prompt keeps regenerate enabled', async (t) => {
     const ls = makeLocalStorage();
     ls.setItem('harbour:prompt-memory:ws:issue-31', JSON.stringify({
       v: 1, label: 'implementation', name: 'Implementation', raw: 'TEMPLATE', generatedAt: Date.now()
     }));
-    const { PromptSection } = loadPromptSection({ localStorage: ls });
+    const { PromptSection } = await loadPromptSection(t, { localStorage: ls });
     const container = makeContainer();
     PromptSection.init(container, baseOpts({ id: 'issue-31', identifier: 'LIN-31' }, { aiState: 'off' }));
 
@@ -539,13 +539,13 @@ describe('P0 fix-up F2: regenerate obeys the same gate as the primary', () => {
 });
 
 describe('P0 fix-up ledger 7: a throwing localStorage is recovered from gracefully', () => {
-  test('init, generate and persist survive getItem/setItem throwing', async () => {
+  test('init, generate and persist survive getItem/setItem throwing', async (t) => {
     const throwing = {
       getItem() { throw new Error('storage denied'); },
       setItem() { throw new Error('quota exceeded'); },
       removeItem() { throw new Error('storage denied'); },
     };
-    const { PromptSection } = loadPromptSection({ localStorage: throwing });
+    const { PromptSection } = await loadPromptSection(t, { localStorage: throwing });
     const container = makeContainer();
 
     PromptSection.init(container, baseOpts({ id: 'issue-40', identifier: 'LIN-40' }));
@@ -566,8 +566,8 @@ describe('P0 fix-up ledger 7: a throwing localStorage is recovered from graceful
 // ---------------------------------------------------------------------------
 
 describe('P0 re-review N1: the set-up notice renders in the fresh state too', () => {
-  test('pressing a set-up rung after a prompt lands shows the notice in fresh', async () => {
-    const { PromptSection } = loadPromptSection();
+  test('pressing a set-up rung after a prompt lands shows the notice in fresh', async (t) => {
+    const { PromptSection } = await loadPromptSection(t);
     const container = makeContainer();
     PromptSection.init(container, baseOpts(
       { id: 'issue-27', identifier: 'LIN-27' },
@@ -587,12 +587,12 @@ describe('P0 re-review N1: the set-up notice renders in the fresh state too', ()
     assert.match(container.innerHTML, /dispatch runner set up/);
   });
 
-  test('a remembered prompt restored into fresh says what a set-up rung needs', async () => {
+  test('a remembered prompt restored into fresh says what a set-up rung needs', async (t) => {
     const ls = makeLocalStorage();
     ls.setItem('harbour:prompt-memory:ws:issue-28', JSON.stringify({
       v: 1, label: 'implementation', name: 'Implementation', raw: 'REMEMBERED', generatedAt: Date.now()
     }));
-    const { PromptSection } = loadPromptSection({ localStorage: ls });
+    const { PromptSection } = await loadPromptSection(t, { localStorage: ls });
     const container = makeContainer();
     PromptSection.init(container, baseOpts({ id: 'issue-28', identifier: 'LIN-28' }, { dispatchEnabled: false }));
 
@@ -605,8 +605,8 @@ describe('P0 re-review N1: the set-up notice renders in the fresh state too', ()
 });
 
 describe('P0 re-review N2: the rendered idle run-step stays a set-up rung (R7)', () => {
-  test('with dispatch enabled, the rendered idle run-step carries data-action="setup"', () => {
-    const { PromptSection } = loadPromptSection();
+  test('with dispatch enabled, the rendered idle run-step carries data-action="setup"', async (t) => {
+    const { PromptSection } = await loadPromptSection(t);
     const container = makeContainer();
     PromptSection.init(container, baseOpts({ id: 'issue-29', identifier: 'LIN-29' }, { dispatchEnabled: true }));
 
@@ -658,8 +658,8 @@ describe('P0 re-review N3: the setup notice is tied to phase transitions (class 
   for (const combo of COMBOS) {
     const label = `dispatch=${combo.dispatch} proxy=${combo.proxy}`;
 
-    test(`[${label}] idle starts clean; each rendered setup rung raises a notice`, async () => {
-      const { PromptSection } = loadPromptSection();
+    test(`[${label}] idle starts clean; each rendered setup rung raises a notice`, async (t) => {
+      const { PromptSection } = await loadPromptSection(t);
       const container = makeContainer();
       PromptSection.init(container, optsFor(combo));
 
@@ -672,8 +672,8 @@ describe('P0 re-review N3: the setup notice is tied to phase transitions (class 
       }
     });
 
-    test(`[${label}] a notice raised in idle does not survive the template transition into fresh`, async () => {
-      const { PromptSection } = loadPromptSection();
+    test(`[${label}] a notice raised in idle does not survive the template transition into fresh`, async (t) => {
+      const { PromptSection } = await loadPromptSection(t);
       const container = makeContainer();
       PromptSection.init(container, optsFor(combo));
 
@@ -688,8 +688,8 @@ describe('P0 re-review N3: the setup notice is tied to phase transitions (class 
       assert.equal(hasEnabledRunStep(container.innerHTML), combo.dispatch, 'no notice beside an enabled run-step');
     });
 
-    test(`[${label}] a fresh setup-rung press shows its notice, and the next request clears it`, async () => {
-      const { PromptSection } = loadPromptSection();
+    test(`[${label}] a fresh setup-rung press shows its notice, and the next request clears it`, async (t) => {
+      const { PromptSection } = await loadPromptSection(t);
       const container = makeContainer();
       PromptSection.init(container, optsFor(combo));
       await container.click({ prompt: 'implementation' });
@@ -712,9 +712,9 @@ describe('P0 re-review N3: the setup notice is tied to phase transitions (class 
     // that remains (dispatch/proxy) raises its notice without touching the
     // streamed body; and the stream-settle transition clears that notice (the
     // S-settle mutant leaves it standing beside the now-landed prompt).
-    test(`[${label}] streaming: no prompt-needing set-up rung, a press keeps the streamed body, settle clears the notice`, async () => {
+    test(`[${label}] streaming: no prompt-needing set-up rung, a press keeps the streamed body, settle clears the notice`, async (t) => {
       const stream = gatedStream();
-      const { PromptSection } = loadPromptSection({
+      const { PromptSection } = await loadPromptSection(t, {
         readSSEStream: stream.readSSEStream,
         fetchImpl: async () => emptyStreamResponse(),
       });
@@ -746,8 +746,8 @@ describe('P0 re-review N3: the setup notice is tied to phase transitions (class 
     });
   }
 
-  test('a notice raised in idle does not survive the AI-stream transition to fresh', async () => {
-    const { PromptSection } = loadPromptSection({
+  test('a notice raised in idle does not survive the AI-stream transition to fresh', async (t) => {
+    const { PromptSection } = await loadPromptSection(t, {
       readSSEStream: async (response, onEvent) => {
         onEvent('message', { section: 'prompt', content: 'STREAMED' });
       },
@@ -766,8 +766,8 @@ describe('P0 re-review N3: the setup notice is tied to phase transitions (class 
     assert.equal(noticeCount(container.innerHTML), 0, 'AI stream transition clears the notice');
   });
 
-  test('a notice raised in idle does not survive the error transition', async () => {
-    const { PromptSection } = loadPromptSection();
+  test('a notice raised in idle does not survive the error transition', async (t) => {
+    const { PromptSection } = await loadPromptSection(t);
     const container = makeContainer();
     PromptSection.init(container, baseOpts({ id: 'issue-err', identifier: 'LIN-62' }, { dispatchEnabled: true }));
 
@@ -779,12 +779,12 @@ describe('P0 re-review N3: the setup notice is tied to phase transitions (class 
     assert.equal(noticeCount(container.innerHTML), 0, 'error phase renders no notice');
   });
 
-  test('a remembered prompt restoring into fresh starts with no notice', () => {
+  test('a remembered prompt restoring into fresh starts with no notice', async (t) => {
     const ls = makeLocalStorage();
     ls.setItem('harbour:prompt-memory:ws:issue-mem', JSON.stringify({
       v: 1, label: '__ai__', name: 'AI Recommendation', raw: 'REMEMBERED', generatedAt: Date.now()
     }));
-    const { PromptSection } = loadPromptSection({ localStorage: ls });
+    const { PromptSection } = await loadPromptSection(t, { localStorage: ls });
     const container = makeContainer();
     PromptSection.init(container, baseOpts({ id: 'issue-mem', identifier: 'LIN-63' }, { aiState: 'off' }));
 
@@ -800,8 +800,8 @@ describe('P0 re-review N3: the setup notice is tied to phase transitions (class 
 // ---------------------------------------------------------------------------
 
 describe('P0 re-review N4: a set-up press updates only the notice slot', () => {
-  test('in idle, a set-up press shows its notice without a full render', async () => {
-    const { PromptSection } = loadPromptSection();
+  test('in idle, a set-up press shows its notice without a full render', async (t) => {
+    const { PromptSection } = await loadPromptSection(t);
     const container = makeContainer();
     PromptSection.init(container, baseOpts({ id: 'issue-70', identifier: 'LIN-70' }, { dispatchEnabled: true }));
     const kept = nodesOutside(container, '[data-setup-notice-slot]');
@@ -813,8 +813,8 @@ describe('P0 re-review N4: a set-up press updates only the notice slot', () => {
     assert.ok(kept.every((node) => node.isConnected), 'no full render on a set-up press: every node outside the notice slot is kept');
   });
 
-  test('in fresh, a set-up press keeps the prompt body and does not re-render', async () => {
-    const { PromptSection } = loadPromptSection();
+  test('in fresh, a set-up press keeps the prompt body and does not re-render', async (t) => {
+    const { PromptSection } = await loadPromptSection(t);
     const container = makeContainer();
     PromptSection.init(container, baseOpts({ id: 'issue-71', identifier: 'LIN-71' }));
     await container.click({ prompt: 'implementation' });
@@ -830,9 +830,9 @@ describe('P0 re-review N4: a set-up press updates only the notice slot', () => {
     assert.ok(kept.every((node) => node.isConnected), 'no full render on a set-up press');
   });
 
-  test('mid-stream, a set-up press keeps the streamed reasoning and does not re-render', async () => {
+  test('mid-stream, a set-up press keeps the streamed reasoning and does not re-render', async (t) => {
     const stream = gatedStream();
-    const { PromptSection } = loadPromptSection({
+    const { PromptSection } = await loadPromptSection(t, {
       readSSEStream: stream.readSSEStream,
       fetchImpl: async () => emptyStreamResponse(),
     });
@@ -854,9 +854,9 @@ describe('P0 re-review N4: a set-up press updates only the notice slot', () => {
     await flush();
   });
 
-  test('mid-stream, the prompt-needing rungs are inert and say a prompt is generating', async () => {
+  test('mid-stream, the prompt-needing rungs are inert and say a prompt is generating', async (t) => {
     const stream = gatedStream();
-    const { PromptSection } = loadPromptSection({
+    const { PromptSection } = await loadPromptSection(t, {
       readSSEStream: stream.readSSEStream,
       fetchImpl: async () => emptyStreamResponse(),
     });
@@ -889,8 +889,8 @@ describe('P0 re-review N4: a set-up press updates only the notice slot', () => {
 describe('LIN-3211 / LIN-3833: the run-step rung sends only a chosen harness; a blank one goes to the server', () => {
   // `panelHarness`: what the card's panel selector holds ('' = the blank "—"
   // option). `panel: false`: no panel rendered in the card at all.
-  async function pressRung({ panelHarness = 'claude-code', panel = true } = {}) {
-    const { PromptSection, window, calls } = loadPromptSection();
+  async function pressRung(t, { panelHarness = 'claude-code', panel = true } = {}) {
+    const { PromptSection, window, calls } = await loadPromptSection(t);
     if (!panel) window.renderDispatchDisclosure = () => '';
     // The card's panel, as the reader is given it: the drawn `.swipe-prompt-options`, and nothing else. A real
     // readDispatchExecControls reads the harness select inside the element it is given, and returns null for anything
@@ -917,20 +917,20 @@ describe('LIN-3211 / LIN-3833: the run-step rung sends only a chosen harness; a 
   // harness, and the server settles it for an opened-task run (`surface`, asserted in
   // lin-3833-run-sources.test.js and, through enterSessionDispatch, in lin-3833-session-harness-wiring.test.js,
   // which also carries the structured-token half of LIN-3211).
-  test('a chosen claude-code is sent as chosen', async () => {
-    assert.equal((await pressRung({ panelHarness: 'claude-code' })).harness, 'claude-code');
+  test('a chosen claude-code is sent as chosen', async (t) => {
+    assert.equal((await pressRung(t, { panelHarness: 'claude-code' })).harness, 'claude-code');
   });
 
-  test('panel set to opencode → opencode (LIN-1094: the panel choice is honoured)', async () => {
-    assert.equal((await pressRung({ panelHarness: 'opencode' })).harness, 'opencode');
+  test('panel set to opencode → opencode (LIN-1094: the panel choice is honoured)', async (t) => {
+    assert.equal((await pressRung(t, { panelHarness: 'opencode' })).harness, 'opencode');
   });
 
-  test('panel blank ("—") → no harness sent (LIN-3833, was claude-code)', async () => {
-    assert.equal((await pressRung({ panelHarness: '' })).harness, null);
+  test('panel blank ("—") → no harness sent (LIN-3833, was claude-code)', async (t) => {
+    assert.equal((await pressRung(t, { panelHarness: '' })).harness, null);
   });
 
-  test('no panel in the card → no harness sent (LIN-3833, was claude-code)', async () => {
-    assert.equal((await pressRung({ panel: false })).harness, null);
+  test('no panel in the card → no harness sent (LIN-3833, was claude-code)', async (t) => {
+    assert.equal((await pressRung(t, { panel: false })).harness, null);
   });
 });
 
@@ -940,8 +940,8 @@ describe('LIN-3211 / LIN-3833: the run-step rung sends only a chosen harness; a 
 // conditions now live in the shared component.
 // =============================================================================
 describe('LIN-2944 P1 F9: the picker and the primary under the flag states', () => {
-  test('templates, "more" keys and custom prompts render under "other prompts"', async () => {
-    const { PromptSection } = loadPromptSection();
+  test('templates, "more" keys and custom prompts render under "other prompts"', async (t) => {
+    const { PromptSection } = await loadPromptSection(t);
     const container = makeContainer();
     PromptSection.init(container, baseOpts({ id: 'issue-pick', identifier: 'LIN-PICK' }, {
       defaultPromptKeys: ['implementation', 'plan'],
@@ -962,23 +962,23 @@ describe('LIN-2944 P1 F9: the picker and the primary under the flag states', () 
 
   // LIN-3848: the promptButtons switch is gone — the other prompts always show,
   // and a stale `promptButtons: false` option is ignored.
-  test('the other prompts are always shown, even with a stale promptButtons=false (LIN-3848)', () => {
-    const { PromptSection } = loadPromptSection();
+  test('the other prompts are always shown, even with a stale promptButtons=false (LIN-3848)', async (t) => {
+    const { PromptSection } = await loadPromptSection(t);
     const container = makeContainer();
     PromptSection.init(container, baseOpts({ id: 'issue-pb', identifier: 'LIN-PB' }, { promptButtons: false }));
     assert.ok(container.innerHTML.includes('data-testid="other-prompts"'), 'templates shown');
     assert.ok(container.innerHTML.includes('data-testid="opened-task-go"'), '✦ primary shown');
   });
 
-  test('a stale aiState=off is not a state any more: no "AI suggestions are off" reason (LIN-3848)', () => {
-    const { PromptSection } = loadPromptSection();
+  test('a stale aiState=off is not a state any more: no "AI suggestions are off" reason (LIN-3848)', async (t) => {
+    const { PromptSection } = await loadPromptSection(t);
     const container = makeContainer();
     PromptSection.init(container, baseOpts({ id: 'issue-off', identifier: 'LIN-OFF' }, { aiState: 'off' }));
     assert.ok(!container.innerHTML.includes('AI suggestions are off'));
   });
 
-  test('unconfigured disables the ✦ next-step with a reason and a click spends nothing (F9)', async () => {
-    const { PromptSection, calls } = loadPromptSection();
+  test('unconfigured disables the ✦ next-step with a reason and a click spends nothing (F9)', async (t) => {
+    const { PromptSection, calls } = await loadPromptSection(t);
     const container = makeContainer();
     PromptSection.init(container, baseOpts({ id: 'issue-ai', identifier: 'LIN-AI' }, { aiState: 'unconfigured', hasAI: false }));
 
@@ -1003,28 +1003,28 @@ describe('LIN-2944 P1 F9: the picker and the primary under the flag states', () 
 // =============================================================================
 describe('LIN-836 / LIN-2944 P1: the Autopilot proxy gate', () => {
   const issue = { id: 'issue-ap', identifier: 'LIN-AP', title: 'A task', state: { type: 'started' }, labels: { nodes: [] } };
-  const mount = (extra) => {
-    const { PromptSection } = loadPromptSection();
+  const mount = async (t, extra) => {
+    const { PromptSection } = await loadPromptSection(t);
     const container = makeContainer();
     PromptSection.init(container, baseOpts(issue, extra));
     return container;
   };
 
-  test('run controls ⇒ Go is the enabled run-task entry, plus the stepper sibling', () => {
-    const container = mount({ dispatchEnabled: true });
+  test('run controls ⇒ Go is the enabled run-task entry, plus the stepper sibling', async (t) => {
+    const container = await mount(t, { dispatchEnabled: true });
     assert.match(container.innerHTML, /data-rung="run-task"[^>]*data-action="go"/, 'Go is the enabled run-task entry');
     assert.match(container.innerHTML, /data-prompt="__autopilot_stepper__"/, 'stepper sibling renders under other prompts');
   });
 
-  test('owner with no way to run ⇒ Go is a set-up entry; the stepper (a key tool) still renders', () => {
-    const container = mount({ dispatchEnabled: false, runSetup: true });
+  test('owner with no way to run ⇒ Go is a set-up entry; the stepper (a key tool) still renders', async (t) => {
+    const container = await mount(t, { dispatchEnabled: false, runSetup: true });
     assert.match(container.innerHTML, /data-rung="run-task"[^>]*data-action="setup"/, 'Go shows ○ set up');
     assert.equal(container.innerHTML.includes('data-prompt="__autopilot__"'), false, 'no enabled Autopilot entry');
     assert.match(container.innerHTML, /data-prompt="__autopilot_stepper__"/, 'LIN-3849: key tools have no switch');
   });
 
-  test('member (neither bit) ⇒ no Go control and no set-up rung at all', () => {
-    const container = mount({ dispatchEnabled: false, runSetup: false });
+  test('member (neither bit) ⇒ no Go control and no set-up rung at all', async (t) => {
+    const container = await mount(t, { dispatchEnabled: false, runSetup: false });
     assert.equal(/data-rung="run-task"/.test(container.innerHTML), false, 'no Go');
     assert.equal(/data-setup-needs="dispatch"/.test(container.innerHTML), false, 'no set-up rung for running');
     assert.equal(/data-rung="run-step"/.test(container.innerHTML), false, 'no run-step rung');

@@ -5,33 +5,20 @@
  * Witnesses: `rowDataByNodeKey` decides a container from the gather's row states, and the rows that have subtasks are the
  * containers and no others (LIN-4071: the container fact is the gather's, and it reaches the browser as the row's decided
  * action, `container: true`, never as a flag); the Home mount hands each row its record and the "Another step" stage words,
- * from the page options and the rows a fold fetches (the real `mountHomePromptSections` and `mergeHomeRowOpts` from public/app.js).
+ * from the page options and the rows a fold fetches (the real `homePromptOpts` and `mergeHomeRowOpts` from public/app.js).
  *
- * The placeholders are the server's own (`renderDetailsContent`, layout home), drawn on the shared fake DOM through loadWorld
- * (LIN-4307); the mount and merge run from public/app.js source, and the Sessions fold runs from public/sessions.js.
+ * The placeholders are the server's own (`renderDetailsContent`, layout home), drawn on the shared fake DOM; app.js is
+ * imported as the module it is (LIN-4463 piece 5), and the Sessions fold runs from public/sessions.js through loadWorld.
  */
 import { test, describe } from 'node:test';
 import assert from 'node:assert/strict';
-import { readFileSync } from 'node:fs';
-import { fileURLToPath } from 'node:url';
-import { dirname, join } from 'node:path';
 import { rowDataByNodeKey } from '../../lib/task-board-view.js';
 import { buildRowStates } from '../../lib/task-page-loader.js';
 import { nodeKey } from '../../lib/tree.js';
 import { enrichLoop, deriveSessionWaiting } from '../../routes/dashboard.js';
 import { renderDetailsContent } from '../../lib/render.js';
 import { loadWorld } from './helpers/client-world.js';
-
-const __dirname = dirname(fileURLToPath(import.meta.url));
-const APP = readFileSync(join(__dirname, '../../public/app.js'), 'utf8');
-
-// The function's source, cut from its declaration to its closing brace at column 0.
-function functionSource(src, name) {
-  const start = src.indexOf(`function ${name}(`);
-  assert.ok(start >= 0, `${name} is declared in public/app.js`);
-  const end = src.indexOf('\n}\n', start);
-  return src.slice(start, end + 2);
-}
+import { importWorld } from './helpers/import-world.js';
 
 const node = (identifier, children = []) => ({
   issue: { id: `id-${identifier}`, identifier, title: identifier, source: 'linear', state: { name: 'Todo', type: 'unstarted' } },
@@ -66,49 +53,44 @@ describe('the Home mount — each opened row gets its decision record and the st
   // An opened task as Home draws it: the server's own placeholder (renderDetailsContent, layout home).
   const openedTask = (id) => ({ id, identifier: `LIN-${id}`, title: `Task ${id}`, url: '', source: 'linear', description: '', state: { name: 'Started', type: 'started' } });
 
-  function mountWith(pageOpts) {
-    const inits = [];
-    const world = loadWorld({
-      scripts: [],
-      window: {
-        __HOME_PROMPT_OPTS__: { topTaskId: 'linear:top', defaultPromptKeys: [], morePromptKeys: [], ...pageOpts },
-        PromptSection: { init: (el, opts) => { inits.push({ el, opts }); return {}; } },
-      },
+  // app.js is a module (LIN-4463 piece 5): the page's options are window.__HOME_PROMPT_OPTS__, and each drawn placeholder's
+  // opts are what the real homePromptOpts builds, the same call mountHomePromptSections makes for each row.
+  async function homeWith(t, pageOpts) {
+    const world = importWorld({
+      window: { addEventListener() {}, __HOME_PROMPT_OPTS__: { topTaskId: 'linear:top', defaultPromptKeys: [], morePromptKeys: [], ...pageOpts } },
     });
-    world.run(functionSource(APP, 'mountHomePromptSections'));
-    world.run(functionSource(APP, 'mergeHomeRowOpts'));
-    // The page is drawn from the server's placeholders, then mounted by the real function.
-    const mount = (issues) => {
+    t.after(() => world.restore());
+    const app = await world.importPage('app.js');
+    const optsOf = (issues) => {
       world.document.body.innerHTML = issues.map((issue) => renderDetailsContent(issue, { urlKey: 'ws', featureFlags: {}, layout: 'home' })).join('');
-      world.run('mountHomePromptSections()');
+      const byKey = new Map();
+      for (const el of world.document.querySelectorAll('[data-prompt-mount]')) byKey.set(el.dataset.nodeKey, app.homePromptOpts(el, world.window.__HOME_PROMPT_OPTS__));
+      return (issue) => byKey.get(nodeKey(issue));
     };
-    return { inits, world, mount };
+    return { app, world, optsOf };
   }
 
-  test('a container row carries its decided action (Run to PR, container) in its record; a leaf row has no record, and the stage words reach both', () => {
+  test('a container row carries its decided action (Run to PR, container) in its record; a leaf row has no record, and the stage words reach both', async (t) => {
     const parent = openedTask('1');
     const leaf = openedTask('2');
-    const { inits, mount } = mountWith({
+    const { optsOf } = await homeWith(t, {
       rowData: { [nodeKey(parent)]: { action: { kind: 'offer', why: 'a container runs to PR', container: true }, copyStep: { label: 'plan', name: 'Plan', why: '' }, trackerWord: 'In progress' } },
       stageWords: { research: 'Research', implementation: 'Build' },
     });
-    mount([parent, leaf]);
-    const byNode = (issue) => inits.find((i) => i.el.dataset.nodeKey === nodeKey(issue)).opts;
+    const byNode = optsOf([parent, leaf]);
     assert.equal(byNode(parent).row.action.container, true);
     assert.equal(byNode(leaf).row, null);
     assert.equal(JSON.stringify(byNode(leaf).stageWords), JSON.stringify({ research: 'Research', implementation: 'Build' }), 'the stage words name each step');
   });
 
-  test('a fetched row\'s container flag is merged into the page map before it mounts (mergeHomeRowOpts)', () => {
-    const { inits, world, mount } = mountWith({ rowData: {} });
+  test('a fetched row\'s container flag is merged into the page map before it mounts (mergeHomeRowOpts)', async (t) => {
+    const { app, world } = await homeWith(t, { rowData: {} });
     const fetched = { 'linear:fetched-parent': { action: { kind: 'offer', why: 'a container runs to PR', container: true }, copyStep: { label: 'plan', name: 'Plan', why: '' }, trackerWord: 'In progress' } };
-    world.run(`mergeHomeRowOpts(${JSON.stringify({ rowData: fetched })})`);
-    world.run(`mergeHomeRowOpts(${JSON.stringify({ rowData: fetched })})`);
+    app.mergeHomeRowOpts({ rowData: fetched });
+    app.mergeHomeRowOpts({ rowData: fetched });
     const rowData = world.window.__HOME_PROMPT_OPTS__.rowData;
     assert.equal(Object.keys(rowData).length, 1, 'merged once, not duplicated');
     assert.equal(rowData['linear:fetched-parent'].action.container, true);
-    assert.equal(inits.length, 0, 'the merge alone mounts nothing');
-    mount([]);
   });
 });
 

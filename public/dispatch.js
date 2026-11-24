@@ -7,7 +7,7 @@
  * - Token management (create, list, revoke)
  * - Dispatch history (paginated resolved items)
  *
- * Loaded only on the /dispatch page. Requires common.js and app.js to be loaded first
+ * Loaded only on the /dispatch page. Requires common.js to be loaded first
  * (provides escapeHtml() and updateQueueBadge()).
  */
 

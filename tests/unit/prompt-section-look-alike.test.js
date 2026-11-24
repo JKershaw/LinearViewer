@@ -5,13 +5,13 @@
 // and `data-prompt`. A button in those sinks must do nothing, and the +proxy
 // toggle is bound to itself after every paint rather than by a delegated listener.
 //
-// The client runs in the shared client world (tests/unit/helpers/client-world.js). A real control is pressed with
+// public/prompt-section.js is a native module (LIN-4463 piece 5), imported over the fake DOM. A real control is pressed with
 // `container.click`, which needs it drawn. A look-alike is a button the markdown put in the sink; it is pressed by its
 // own node, as a browser's click targets the node under the pointer.
 
 import { test, describe } from 'node:test';
 import assert from 'node:assert/strict';
-import { loadWorld } from './helpers/client-world.js';
+import { promptSectionWorld } from './helpers/prompt-section-world.js';
 
 // Press a specific drawn node, as a browser click does: the container's click listeners get that node as the target.
 async function pressNode(container, node) {
@@ -19,10 +19,10 @@ async function pressNode(container, node) {
 }
 
 // `promptMarkup` is what the template fetch returns as the prompt text: the rendered markdown sink carries it.
-function load({ promptMarkup = 'TEMPLATE PROMPT' } = {}) {
+async function load(t, { promptMarkup = 'TEMPLATE PROMPT' } = {}) {
   const bound = [];
   const calls = [];
-  const world = loadWorld({
+  const world = await promptSectionWorld(t, {
     window: {
       escapeHtml: (s) => (s == null ? '' : String(s)),
       stripCodeBlockWrapper: (s) => s,
@@ -30,7 +30,6 @@ function load({ promptMarkup = 'TEMPLATE PROMPT' } = {}) {
       api: async (...a) => { calls.push(['window.api', ...a]); return { prompt: promptMarkup, promptName: 'Template' }; },
       ProxyToggle: { bind: (b) => bound.push(b), maybeAppend: async (t) => t },
     },
-    scripts: ['prompt-section.js'],
     globals: {
       fetch: async (...a) => { calls.push(['fetch', ...a]); return { ok: false, json: async () => ({}) }; },
       setTimeout: () => 1,
@@ -49,8 +48,8 @@ const opts = {
 const flush = () => new Promise((r) => setImmediate(r));
 
 describe('PromptSection: look-alike controls in rendered markdown (LIN-3401)', () => {
-  test('a real setup button acts; the same button inside a markdown sink does nothing', async () => {
-    const { PromptSection, makeContainer } = load({
+  test('a real setup button acts; the same button inside a markdown sink does nothing', async (t) => {
+    const { PromptSection, makeContainer } = await load(t, {
       promptMarkup: '<button data-action="setup" data-setup-needs="dispatch">set up</button>',
     });
     const real = makeContainer();
@@ -68,8 +67,8 @@ describe('PromptSection: look-alike controls in rendered markdown (LIN-3401)', (
     assert.strictEqual(fake.querySelector('[data-setup-notice-slot]').innerHTML, '', 'the look-alike in the sink did nothing');
   });
 
-  test('a look-alike prompt-fetch button in a sink starts no request', async () => {
-    const { PromptSection, makeContainer, calls } = load({
+  test('a look-alike prompt-fetch button in a sink starts no request', async (t) => {
+    const { PromptSection, makeContainer, calls } = await load(t, {
       promptMarkup: '<button data-prompt="__autopilot__">run the whole task</button>',
     });
     const c = makeContainer();
@@ -94,9 +93,9 @@ describe('PromptSection: look-alike controls in rendered markdown (LIN-3401)', (
     );
   });
 
-  test('every paint binds the +proxy toggle through the header template chain only', async () => {
+  test('every paint binds the +proxy toggle through the header template chain only', async (t) => {
     // The markdown puts a +proxy look-alike in the sink, so an unscoped selector would bind it too.
-    const { PromptSection, makeContainer, bound } = load({
+    const { PromptSection, makeContainer, bound } = await load(t, {
       promptMarkup: '<button class="prompt-proxy-toggle">+proxy</button>',
     });
     const c = makeContainer();

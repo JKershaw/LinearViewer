@@ -6,7 +6,7 @@
  * opened task run on the one subtask the selector defers to (`focus`), narrowed to where the selector would descend;
  * the state line and the offered step's reason come from the server.
  *
- * Client witnesses (the component, run in a sandbox like the other prompt-section tests): one run box holds the step,
+ * Client witnesses (public/prompt-section.js is a native module (LIN-4463 piece 5), imported over the fake DOM): one run box holds the step,
  * why it is next, Run, then what it runs on; a running task names its state once, with Stop beside Watch; a new user's
  * Home says no "idle" or "No sessions yet"; a container's Run dispatches the subtask, and its opened task names it.
  */
@@ -17,7 +17,7 @@ import { standingOfLoops } from './helpers/question-records.js';
 import { buildRowStates, buildTaskPageModel, nextStepOf, waitingForOf, sessionSummaryOf } from '../../lib/task-page-loader.js';
 import { buildInProgressCountParts } from '../../lib/task-board-view.js';
 import { renderHomeStatus } from '../../lib/render-task-page.js';
-import { loadWorld } from './helpers/client-world.js';
+import { promptSectionWorld } from './helpers/prompt-section-world.js';
 
 // LIN-4016: Home's pill reads the task's decided state. This helper reads the task's OWN facts; it equals the gather that
 // `/state` sends (lib/home-row-states.js) only for a leaf, which is every fixture that uses it. A container's state is
@@ -307,7 +307,7 @@ describe('LIN-4010 — a new user\'s Home shows no "idle" or "No sessions yet"',
 
 // ─── the client: the run box, the running box, the container ─────────────────
 
-function loadClient({ stateBody = null, previewBody = null, presetsBody = [], panelHtml = '', container = false } = {}) {
+async function loadClient(t, { stateBody = null, previewBody = null, presetsBody = [], panelHtml = '', container = false } = {}) {
   // LIN-4016: the state body is the server's (its `sessions` carry the decision: queued, busy, action and canStop).
   if (stateBody && stateBody.sessions) stateBody = { ...stateBody, sessions: serverSessions(stateBody.sessions, { container }) };
   const calls = { api: [], dispatch: [], post: [] };
@@ -326,7 +326,6 @@ function loadClient({ stateBody = null, previewBody = null, presetsBody = [], pa
       if (url.includes('/api/prompt/')) return { prompt: 'PROMPT', promptName: 'Plan' };
       return { success: true, item: { id: 'd-1' } };
     },
-    taskPageHref: ({ identifier }) => `/workspace/acme/task/${identifier}`,
     dispatchPrompt: async (args) => { calls.dispatch.push(args); return { success: true, item: { id: 'd-1' } }; },
     ProxyToggle: { isActive: () => true, setActive() {}, maybeAppend: async (raw) => raw },
     renderDispatchDisclosure: () => '',
@@ -334,9 +333,9 @@ function loadClient({ stateBody = null, previewBody = null, presetsBody = [], pa
     isPinnedToBottom: () => false,
     toast: () => {},
   };
-  // The shared client world (tests/unit/helpers/client-world.js): the fake DOM, the vm, and the container's click and
+  // The PromptSection world (tests/unit/helpers/prompt-section-world.js): the fake DOM, the imported module, and the container's click and
   // key shims. This suite's own layer is the `window` stubs above.
-  const world = loadWorld({ window, scripts: ['prompt-section.js'] });
+  const world = await promptSectionWorld(t, { window });
   return { PromptSection: world.PromptSection, calls, makeContainer: world.makeContainer };
 }
 
@@ -361,8 +360,8 @@ const PLAN_NEXT = {
 };
 
 describe('LIN-4010 — the client: one run box, the state once, a new user\'s line, a container\'s run', () => {
-  test('the run box holds the step, why it is next, Run, then what it runs on, in that order', async () => {
-    const { PromptSection, makeContainer } = loadClient({
+  test('the run box holds the step, why it is next, Run, then what it runs on, in that order', async (t) => {
+    const { PromptSection, makeContainer } = await loadClient(t, {
       stateBody: { status: 'idle', live: false, homeStatusHtml: '<p>idle</p>', sessions: PLAN_NEXT },
       previewBody: { kind: 'plan-review', harness: 'claude-code', words: {}, sources: {}, group: null, description: 'Review the plan before anything is built on it.' },
     });
@@ -379,8 +378,8 @@ describe('LIN-4010 — the client: one run box, the state once, a new user\'s li
     assert.match(box, /opened-task-step-what[^>]*>Review the plan before anything is built on it\./, 'the step says what it does');
   });
 
-  test('a stage word is used for Another step, not the template name', async () => {
-    const { PromptSection, makeContainer } = loadClient({ stateBody: { status: 'idle', live: false, sessions: PLAN_NEXT } });
+  test('a stage word is used for Another step, not the template name', async (t) => {
+    const { PromptSection, makeContainer } = await loadClient(t, { stateBody: { status: 'idle', live: false, sessions: PLAN_NEXT } });
     const c = makeContainer();
     PromptSection.init(c, { ...HOME });
     await flush();
@@ -391,9 +390,9 @@ describe('LIN-4010 — the client: one run box, the state once, a new user\'s li
     assert.doesNotMatch(c.innerHTML, />implement</);
   });
 
-  test('a running task names its state once: the running box, Stop beside Watch, and no "Last" line', async () => {
+  test('a running task names its state once: the running box, Stop beside Watch, and no "Last" line', async (t) => {
     const running = { loopId: 'l1', kind: 'implementation', label: 'Build', state: 'running', since: '2026-10-29T10:00:00.000Z', target: 'cli' };
-    const { PromptSection, makeContainer } = loadClient({
+    const { PromptSection, makeContainer } = await loadClient(t, {
       stateBody: { status: 'running', live: true, homeStatusHtml: '<p>STATE-LINE</p>', sessions: { count: 2, next: { kind: 'review', label: 'Review' }, last: { label: 'Build', state: 'running', at: null }, running, offered: null, busy: true, excluded: [] } },
     });
     const c = makeContainer();
@@ -406,8 +405,8 @@ describe('LIN-4010 — the client: one run box, the state once, a new user\'s li
     assert.equal(c.innerHTML.includes('Build running'), false, 'the state sentence is not restated');
   });
 
-  test('a new user\'s opened task says the tracker word and no session words', async () => {
-    const { PromptSection, makeContainer } = loadClient({ stateBody: { status: 'idle', live: false, homeStatusHtml: '<p>No sessions yet.</p>', sessions: { count: 0 } } });
+  test('a new user\'s opened task says the tracker word and no session words', async (t) => {
+    const { PromptSection, makeContainer } = await loadClient(t, { stateBody: { status: 'idle', live: false, homeStatusHtml: '<p>No sessions yet.</p>', sessions: { count: 0 } } });
     const c = makeContainer();
     PromptSection.init(c, { ...HOME, dispatchEnabled: false });
     await flush(); await flush();
@@ -417,8 +416,8 @@ describe('LIN-4010 — the client: one run box, the state once, a new user\'s li
 
   // LIN-4024 (John, 29 Oct): a container's opened task runs on the container. Its one action is Run to PR, which starts
   // the autopilot on it; no subtask's stage is offered, read, or named from Home.
-  test('a container: no stage step is offered, the state read is the container\'s own, and its one action is Run to PR', async () => {
-    const { PromptSection, calls, makeContainer } = loadClient({
+  test('a container: no stage step is offered, the state read is the container\'s own, and its one action is Run to PR', async (t) => {
+    const { PromptSection, calls, makeContainer } = await loadClient(t, {
       container: true,
       stateBody: { status: 'idle', live: false, homeStatusHtml: '<p>idle</p>', sessions: { ...PLAN_NEXT, offered: { kind: 'research', label: 'Research', why: 'usual', failed: false, reason: 'the next step for this task' }, next: { kind: 'research', label: 'Research' } } },
       previewBody: { kind: 'research', harness: 'claude-code', words: {}, sources: {}, group: null },
@@ -437,8 +436,8 @@ describe('LIN-4010 — the client: one run box, the state once, a new user\'s li
   // "A subtask needs you" it said the task two ways while the row said needs you.
   // LIN-4071: the subtask line is `/state`'s `attention`; the parent's own idle line is the server's to leave out (it sends
   // no `homeStatusHtml` for an otherwise idle parent whose subtask needs attention), so the browser paints what it is sent.
-  test('a container whose subtask needs you states that from /state\'s attention, and paints no own line the server withheld', async () => {
-    const { PromptSection, makeContainer } = loadClient({
+  test('a container whose subtask needs you states that from /state\'s attention, and paints no own line the server withheld', async (t) => {
+    const { PromptSection, makeContainer } = await loadClient(t, {
       stateBody: {
         status: 'idle', live: false, homeStatusHtml: '', sessions: PLAN_NEXT,
         attention: { identifier: 'LIN-99', title: 'Models rows', state: 'needs-you', lead: 'A subtask needs you', detail: '', words: 'A subtask needs you: LIN-99' },
@@ -451,8 +450,8 @@ describe('LIN-4010 — the client: one run box, the state once, a new user\'s li
     assert.equal(c.innerHTML.includes('OWN-IDLE-LINE'), false, 'the parent\'s own idle line is not shown beside it');
   });
 
-  test('a container with no subtask waiting keeps its own line', async () => {
-    const { PromptSection, makeContainer } = loadClient({
+  test('a container with no subtask waiting keeps its own line', async (t) => {
+    const { PromptSection, makeContainer } = await loadClient(t, {
       stateBody: { status: 'idle', live: false, homeStatusHtml: '<p>OWN-IDLE-LINE</p>', sessions: PLAN_NEXT },
     });
     const c = makeContainer();
@@ -464,8 +463,8 @@ describe('LIN-4010 — the client: one run box, the state once, a new user\'s li
 
   // LIN-4024 (look): a new user's one action is a solid "Write the prompt", and the step line has no stray leading dot.
   // LIN-4103 (Item 5): before the prompt is written, no stage is named on screen; the step line gives the reason only.
-  test('copy-first: the Write the prompt button is the primary, and no stage is named before the prompt is written', async () => {
-    const { PromptSection, makeContainer } = loadClient({ stateBody: { status: 'idle', live: false, homeStatusHtml: '<p>No sessions yet.</p>', sessions: { count: 0 } } });
+  test('copy-first: the Write the prompt button is the primary, and no stage is named before the prompt is written', async (t) => {
+    const { PromptSection, makeContainer } = await loadClient(t, { stateBody: { status: 'idle', live: false, homeStatusHtml: '<p>No sessions yet.</p>', sessions: { count: 0 } } });
     const c = makeContainer();
     PromptSection.init(c, { ...HOME, dispatchEnabled: false, issue: { ...HOME.issue, stateType: 'backlog' }, row: serverRow({ stateType: 'backlog' }) });
     await flush(); await flush();
@@ -475,24 +474,24 @@ describe('LIN-4010 — the client: one run box, the state once, a new user\'s li
   });
 
   // LIN-4024: a task waiting on a question shows the owner's card in the state block; no card when the server sends none.
-  test('a waiting task shows its question card in the state block, and no slot when the server sends no card', async () => {
+  test('a waiting task shows its question card in the state block, and no slot when the server sends no card', async (t) => {
     const card = '<div class="sess-qcard" data-testid="session-question-card" data-url-key="acme"><p data-testid="session-question-card-question">Which key?</p></div>';
-    const waiting = loadClient({ stateBody: { status: 'waiting', live: false, homeStatusHtml: '<p>needs you</p>', questionHtml: card, sessions: PLAN_NEXT } });
+    const waiting = await loadClient(t, { stateBody: { status: 'waiting', live: false, homeStatusHtml: '<p>needs you</p>', questionHtml: card, sessions: PLAN_NEXT } });
     const c = waiting.makeContainer();
     waiting.PromptSection.init(c, HOME);
     await flush(); await flush();
     assert.match(c.innerHTML, /data-question-slot(?:="")?>\s*<div class="sess-qcard" data-testid="session-question-card"/, 'the card is in its slot');
     assert.match(c.innerHTML, /data-testid="opened-task-state"/, 'the card sits in the state block');
 
-    const quiet = loadClient({ stateBody: { status: 'idle', live: false, homeStatusHtml: '<p>idle</p>', questionHtml: '', sessions: PLAN_NEXT } });
+    const quiet = await loadClient(t, { stateBody: { status: 'idle', live: false, homeStatusHtml: '<p>idle</p>', questionHtml: '', sessions: PLAN_NEXT } });
     const d = quiet.makeContainer();
     quiet.PromptSection.init(d, HOME);
     await flush(); await flush();
     assert.equal(d.innerHTML.includes('data-question-slot'), false, 'no card, no slot');
   });
 
-  test('Escape closes the Change drawer and returns focus to its Change button (witnessed by the close action)', async () => {
-    const { PromptSection, makeContainer } = loadClient({
+  test('Escape closes the Change drawer and returns focus to its Change button (witnessed by the close action)', async (t) => {
+    const { PromptSection, makeContainer } = await loadClient(t, {
       stateBody: { status: 'idle', live: false, sessions: PLAN_NEXT },
       // The Change button is drawn in the Runs on line, which waits for a preview; without one the line reads "Working out".
       previewBody: { kind: 'plan-review', harness: 'claude-code', words: { model: 'Sonnet' }, sources: { model: 'job' }, group: null, stepLabel: 'Plan review' },
@@ -508,9 +507,9 @@ describe('LIN-4010 — the client: one run box, the state once, a new user\'s li
 
   // LIN-4010 review (finding 1): a running task's state is said once. Home's line is empty while it runs (the server
   // sends none), and the client must not fall back to the task page's sentence; the strip chip shows elapsed time only.
-  test('a running task says its state once: no Home line, and the strip chip shows the elapsed time, not the word', async () => {
+  test('a running task says its state once: no Home line, and the strip chip shows the elapsed time, not the word', async (t) => {
     const running = { loopId: 'l1', kind: 'implementation', label: 'Build', state: 'running', since: '2026-10-29T10:00:00.000Z', target: 'cli' };
-    const { PromptSection, makeContainer } = loadClient({
+    const { PromptSection, makeContainer } = await loadClient(t, {
       stateBody: {
         status: 'running', live: true, homeStatusHtml: '', headerHtml: '<p>Build running for 1s.</p>',
         stripHtml: '<li class="task-strip-chip"><span class="task-strip-name">Build</span> <span class="task-strip-state">1s<span class="task-strip-srword"> running</span></span></li>',
@@ -527,21 +526,21 @@ describe('LIN-4010 — the client: one run box, the state once, a new user\'s li
   });
 
   // LIN-4010 review (finding 5): Watch opens the task the running box runs on, not the container it sits under.
-  test('a container\'s running box: Watch links to the container it runs on', async () => {
+  test('a container\'s running box: Watch links to the container it runs on', async (t) => {
     const running = { loopId: 'l9', kind: 'research', label: 'Research', state: 'running', since: '2026-10-29T10:00:00.000Z', target: 'cli' };
-    const { PromptSection, makeContainer } = loadClient({
+    const { PromptSection, makeContainer } = await loadClient(t, {
       stateBody: { status: 'running', live: true, homeStatusHtml: '', headerHtml: '', sessions: { count: 1, running, next: null, last: null, offered: null, busy: true, excluded: [] } },
     });
     const c = makeContainer();
     PromptSection.init(c, { ...HOME, row: serverRow({ container: true }) });
     await flush(); await flush();
-    assert.match(c.innerHTML, /href="\/workspace\/acme\/task\/LIN-42"[^>]*data-testid="opened-task-watch"/);
+    assert.match(c.innerHTML, /href="\/workspace\/acme\/task\/LIN-42\?source=linear"[^>]*data-testid="opened-task-watch"/);
   });
 
   // LIN-4010 review (finding 4, a missing witness): Stop on a container is the subtask's Stop, not the parent's.
-  test('Stop on a container posts the container it runs on', async () => {
+  test('Stop on a container posts the container it runs on', async (t) => {
     const running = { loopId: 'l9', kind: 'research', label: 'Research', state: 'running', since: '2026-10-29T10:00:00.000Z', target: 'cli' };
-    const { PromptSection, calls, makeContainer } = loadClient({
+    const { PromptSection, calls, makeContainer } = await loadClient(t, {
       stateBody: { status: 'running', live: true, homeStatusHtml: '', headerHtml: '', sessions: { count: 1, running, next: null, last: null, offered: null, busy: true, excluded: [] } },
     });
     const c = makeContainer();
@@ -558,8 +557,8 @@ describe('LIN-4010 — the client: one run box, the state once, a new user\'s li
 
   // LIN-4010 review (finding 3): Change is a choice. A default card and the saved presets are the choices; "Choose for
   // this run" reveals the existing decision panel, which stays in the drawer, hidden until it is asked for.
-  test('Change is a choice: a default card, preset cards, and "Choose for this run" reveals the decision panel', async () => {
-    const { PromptSection, makeContainer } = loadClient({
+  test('Change is a choice: a default card, preset cards, and "Choose for this run" reveals the decision panel', async (t) => {
+    const { PromptSection, makeContainer } = await loadClient(t, {
       stateBody: { status: 'idle', live: false, sessions: PLAN_NEXT },
       previewBody: { kind: 'plan-review', harness: 'claude-code', words: { model: 'Sonnet' }, sources: { model: 'job' }, group: null, stepLabel: 'Plan review' },
       presetsBody: [{ id: 'p1', name: 'Quick' }],
@@ -578,8 +577,8 @@ describe('LIN-4010 — the client: one run box, the state once, a new user\'s li
 
   // LIN-4010 review (finding 3): a copy-first viewer's runner line is the view's own foot (inside the Home box), not a
   // line the server appends after the folds.
-  test('the copy-first view carries the runner line as its foot', async () => {
-    const { PromptSection, makeContainer } = loadClient({ stateBody: { status: 'idle', live: false, sessions: { count: 0 } } });
+  test('the copy-first view carries the runner line as its foot', async (t) => {
+    const { PromptSection, makeContainer } = await loadClient(t, { stateBody: { status: 'idle', live: false, sessions: { count: 0 } } });
     const c = makeContainer();
     PromptSection.init(c, { ...HOME, dispatchEnabled: false });
     await flush(); await flush();
@@ -587,8 +586,8 @@ describe('LIN-4010 — the client: one run box, the state once, a new user\'s li
   });
   // LIN-4010 close-out (review: the opened-task surfaces class). Only Home changes layout: the task page's Change panel
   // keeps the Preset row and the decision panel open, with no cards and no "Choose for this run".
-  test('the task surface\'s Change panel is unchanged: a Preset row, the decision panel visible, no cards, no choose toggle', async () => {
-    const { PromptSection, makeContainer } = loadClient({
+  test('the task surface\'s Change panel is unchanged: a Preset row, the decision panel visible, no cards, no choose toggle', async (t) => {
+    const { PromptSection, makeContainer } = await loadClient(t, {
       stateBody: { status: 'idle', live: false, sessions: PLAN_NEXT },
       previewBody: { kind: 'plan-review', harness: 'claude-code', words: { model: 'Sonnet' }, sources: { model: 'job' }, group: null, stepLabel: 'Plan review' },
       presetsBody: [{ id: 'p1', name: 'Quick' }],

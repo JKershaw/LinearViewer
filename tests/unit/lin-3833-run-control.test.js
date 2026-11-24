@@ -13,16 +13,14 @@ import assert from 'node:assert/strict';
 import { readFileSync } from 'node:fs';
 import { fileURLToPath } from 'node:url';
 import { dirname, join } from 'node:path';
-import { loadWorld } from './helpers/client-world.js';
+import { promptSectionWorld } from './helpers/prompt-section-world.js';
 import { decisionPanel, routingWords, agentLists, optionWordsOf } from '../../lib/components/decision-panel.js';
 import { offeredTargetsFor } from '../../lib/dispatch-targets.js';
 import { HARNESSES_WITHOUT_EFFORT } from '../../lib/model-routing.js';
 import { escapeHtml } from '../../lib/utils/html.js';
 import { serverSessions, serverRow } from '../fixtures/task-decision.js';
-import { loadCostFormat } from '../fixtures/browser-cost-format.js';
 
 const __dirname = dirname(fileURLToPath(import.meta.url));
-const SRC = readFileSync(join(__dirname, '../../public/prompt-section.js'), 'utf8');
 const flush = () => new Promise((r) => setTimeout(r, 0));
 
 // The suite's container is a real element in the client world (LIN-4296: the fake models `<select>` and `<input>`), with the
@@ -79,7 +77,7 @@ const withWords = (preview) => (preview && !preview.words
   ? { ...preview, words: routingWords({ harness: preview.harness, model: preview.model, effort: preview.effort }) }
   : preview);
 
-function load({ opened = null, previewFor = () => null, panelFor = serverPanel, presets = [], kickoff = { prompt: 'AUTOPILOT PROMPT', promptName: 'Autopilot', kind: 'autopilot' } } = {}) {
+async function load(t, { opened = null, previewFor = () => null, panelFor = serverPanel, presets = [], kickoff = { prompt: 'AUTOPILOT PROMPT', promptName: 'Autopilot', kind: 'autopilot' } } = {}) {
   const calls = { api: [], dispatch: [], kickoff: [] };
   const window = {
     escapeHtml, // the page's own escape (lib/utils/html.js), so an attribute is escaped as a browser would see it
@@ -96,7 +94,6 @@ function load({ opened = null, previewFor = () => null, panelFor = serverPanel, 
       return { success: true, item: { id: 'd-1' } };
     },
     fetchAutopilotKickoff: async (args) => { calls.kickoff.push(args); return kickoff; },
-    taskPageHref: ({ identifier, source }) => `/workspace/acme/task/${identifier || 'LIN-42'}${source ? `?source=${source}` : ''}`,
     dispatchPrompt: async (args) => { calls.dispatch.push(args); return { success: true, item: { id: 'd-1' } }; },
     ProxyToggle: { isActive: () => true, setActive() {}, maybeAppend: async (raw) => raw },
     renderDispatchDisclosure: () => '',
@@ -104,19 +101,14 @@ function load({ opened = null, previewFor = () => null, panelFor = serverPanel, 
     isPinnedToBottom: () => false,
     toast: () => {},
   };
-  // No scripts at load: the page script runs first, then the cost formatter is installed in the same sandbox, as the
-  // page's module shim does (it runs after the classic scripts).
-  // The Go poll's own timers are the client world's (collected by no one, unref'd), as before.
-  const world = loadWorld({
+  // public/prompt-section.js is a native module (LIN-4463 piece 5), imported over the fake DOM. It imports the cost
+  // formatter from its served leaf, so no bridge global is installed. The Go poll's own timers are real, as before; any
+  // still pending are cleared when the world is restored.
+  const world = await promptSectionWorld(t, {
     window,
-    scripts: [],
     globals: { fetch: async () => ({ ok: true, json: async () => ({}) }) },
   });
-  world.run(SRC);
-  // LIN-4446: the page's shim is a module, so the formatter is installed after the classic page script has run, as in
-  // the browser. The script must not read it while it loads.
-  loadCostFormat(world.sandbox);
-  return { PromptSection: world.window.PromptSection, calls, world };
+  return { PromptSection: world.PromptSection, calls, world };
 }
 
 const HOME = {
@@ -132,7 +124,7 @@ const HOME = {
 // `offered` is the step the server offers (LIN-3968); `next` is the "comes next" wording. Nothing runs, so they agree.
 const PLAN_NEXT = { count: 1, next: { kind: 'plan', label: 'Plan' }, offered: { kind: 'plan', label: 'Plan', why: 'usual', failed: false, reason: 'usually next after Research' }, last: { label: 'Research', state: 'done', at: null }, running: null };
 
-async function mount(over = {}, loadOver = {}) {
+async function mount(t, over = {}, loadOver = {}) {
   // LIN-4016: the server's decision for the row and its sessions (the browser reads these, it decides nothing).
   const row = over.row || serverRow({ stateType: (over.issue || HOME.issue).stateType });
   const { subtaskNeedsYou, ...rest } = over;
@@ -143,7 +135,7 @@ async function mount(over = {}, loadOver = {}) {
     sessions: serverSessions(loadOver.opened.sessions, { container: row.action?.container === true, noRun: row.action?.kind === 'none' }),
     attention: subtaskNeedsYou ?? loadOver.opened.attention ?? null,
   };
-  const env = load({ ...loadOver, opened: opened || loadOver.opened });
+  const env = await load(t, { ...loadOver, opened: opened || loadOver.opened });
   over = { ...rest, row };
   const c = makeContainer(env.world);
   env.PromptSection.init(c, { ...HOME, ...over });
@@ -152,19 +144,19 @@ async function mount(over = {}, loadOver = {}) {
 }
 
 describe('LIN-3833 — the main action names the step the sessions name', () => {
-  test('the sessions name a next step: the main button is Run <step>, and the step line says why', async () => {
-    const { c } = await mount({}, { opened: { status: 'idle', live: false, headerHtml: '', trackHtml: '', sessions: PLAN_NEXT } });
+  test('the sessions name a next step: the main button is Run <step>, and the step line says why', async (t) => {
+    const { c } = await mount(t, {}, { opened: { status: 'idle', live: false, headerHtml: '', trackHtml: '', sessions: PLAN_NEXT } });
     assert.match(c.innerHTML, /data-testid="opened-task-go"[^>]*data-action="run-step-next"[^>]*>Run Plan</);
     assert.match(c.innerHTML, /usually next after Research/);
   });
 
-  test('no step named: the main button is Run to PR', async () => {
-    const { c } = await mount({}, { opened: { status: 'idle', live: false, headerHtml: '', trackHtml: '', sessions: { count: 0, next: null, last: null, running: null } } });
+  test('no step named: the main button is Run to PR', async (t) => {
+    const { c } = await mount(t, {}, { opened: { status: 'idle', live: false, headerHtml: '', trackHtml: '', sessions: { count: 0, next: null, last: null, running: null } } });
     assert.match(c.innerHTML, /data-testid="opened-task-go"[^>]*data-action="go"[^>]*>Run to PR</);
   });
 
-  test('there is one main action: no ladder, no Dispatch disclosure, no other-prompts list on Home', async () => {
-    const { c } = await mount({}, { opened: { status: 'idle', live: false, headerHtml: '', trackHtml: '', sessions: PLAN_NEXT } });
+  test('there is one main action: no ladder, no Dispatch disclosure, no other-prompts list on Home', async (t) => {
+    const { c } = await mount(t, {}, { opened: { status: 'idle', live: false, headerHtml: '', trackHtml: '', sessions: PLAN_NEXT } });
     assert.equal(c.innerHTML.includes('opened-task-ladder'), false);
     assert.equal(c.innerHTML.includes('Dispatch ▾'), false);
     assert.equal(c.innerHTML.includes('swipe-prompt-dispatch'), false);
@@ -172,17 +164,17 @@ describe('LIN-3833 — the main action names the step the sessions name', () => 
 });
 
 describe('LIN-3833 — Runs on says where each value comes from, from the server\'s own preview', () => {
-  test('a job row says "set for <step> in Models"; a group row names its group', async () => {
+  test('a job row says "set for <step> in Models"; a group row names its group', async (t) => {
     const preview = (sources, extra = {}) => () => ({ kind: 'plan', stepLabel: 'Plan', group: 'plan', model: 'm-job', harness: 'claude-code', effort: null, sources: { model: 'job', harness: 'group', effort: 'none', ...sources }, ...extra });
-    const { c } = await mount({}, { opened: { status: 'idle', live: false, headerHtml: '', sessions: PLAN_NEXT }, previewFor: preview() });
+    const { c } = await mount(t, {}, { opened: { status: 'idle', live: false, headerHtml: '', sessions: PLAN_NEXT }, previewFor: preview() });
     await flush();
     assert.match(c.innerHTML, /data-testid="run-on-what">m-job/);
     assert.match(c.innerHTML, /set for Plan in Models/);
     assert.match(c.innerHTML, /from the Plan group in Models/);
   });
 
-  test('a Change panel starts with nothing chosen: the harness follows Settings › Models, and no option is selected', async () => {
-    const { c, calls } = await mount({}, { opened: { status: 'idle', live: false, headerHtml: '', sessions: PLAN_NEXT } });
+  test('a Change panel starts with nothing chosen: the harness follows Settings › Models, and no option is selected', async (t) => {
+    const { c, calls } = await mount(t, {}, { opened: { status: 'idle', live: false, headerHtml: '', sessions: PLAN_NEXT } });
     await c.click({ action: 'change-run' });
     await flush();
     assert.match(c.innerHTML, /data-testid="run-change-panel"/);
@@ -196,16 +188,16 @@ describe('LIN-3833 — Runs on says where each value comes from, from the server
     assert.ok(calls.api.some((a) => a.url.includes('/api/dispatch/decision-panel')), 'the shared panel is read from the server when Change opens');
   });
 
-  test('the panel\'s fields are the server\'s, so Use stays off until the panel has loaded, and says so when it cannot load', async () => {
-    const { c } = await mount({}, { opened: { status: 'idle', live: false, headerHtml: '', sessions: PLAN_NEXT }, panelFor: () => { throw new Error('down'); } });
+  test('the panel\'s fields are the server\'s, so Use stays off until the panel has loaded, and says so when it cannot load', async (t) => {
+    const { c } = await mount(t, {}, { opened: { status: 'idle', live: false, headerHtml: '', sessions: PLAN_NEXT }, panelFor: () => { throw new Error('down'); } });
     await c.click({ action: 'change-run' });
     await flush();
     assert.match(c.innerHTML, /data-testid="run-panel-failed"/);
     assert.match(c.innerHTML, /data-testid="run-use"[^>]*disabled/);
   });
 
-  test('a repaint of the cached panel keeps the draft: a model typed and a harness picked both survive it (LIN-3962)', async () => {
-    const { c } = await mount({}, { opened: { status: 'idle', live: false, headerHtml: '', sessions: PLAN_NEXT } });
+  test('a repaint of the cached panel keeps the draft: a model typed and a harness picked both survive it (LIN-3962)', async (t) => {
+    const { c } = await mount(t, {}, { opened: { status: 'idle', live: false, headerHtml: '', sessions: PLAN_NEXT } });
     await c.click({ action: 'change-run' });
     await flush();
     await c.fire('input', { dataset: { testid: 'run-model' }, value: 'x/y' });
@@ -217,8 +209,8 @@ describe('LIN-3833 — Runs on says where each value comes from, from the server
     assert.equal(root.querySelector('[data-testid="run-model"]').value, 'x/y', 'the typed model is shown');
   });
 
-  test('the summary says no effort once the draft harness is opencode, which takes none (LIN-3962)', async () => {
-    const { c } = await mount({}, { opened: { status: 'idle', live: false, headerHtml: '', sessions: PLAN_NEXT } });
+  test('the summary says no effort once the draft harness is opencode, which takes none (LIN-3962)', async (t) => {
+    const { c } = await mount(t, {}, { opened: { status: 'idle', live: false, headerHtml: '', sessions: PLAN_NEXT } });
     await c.click({ action: 'change-run' });
     await flush();
     await c.fire('change', { dataset: { testid: 'run-effort' }, value: 'high' });
@@ -231,10 +223,10 @@ describe('LIN-3833 — Runs on says where each value comes from, from the server
 });
 
 describe('LIN-3833 — the choice for this run goes through the preview, and the run dispatches with it', () => {
-  test('"Use for this run" re-asks the preview with the chosen harness, and the Runs-on line says it was chosen', async () => {
+  test('"Use for this run" re-asks the preview with the chosen harness, and the Runs-on line says it was chosen', async (t) => {
     const seen = [];
     const previewFor = (q) => { seen.push(Object.fromEntries(q)); return { kind: 'plan', stepLabel: 'Plan', group: 'plan', model: 'x', harness: q.get('harness') || 'claude-code', effort: null, sources: { model: 'default', harness: q.get('harness') ? 'explicit' : 'default', effort: 'none' } }; };
-    const { c, calls } = await mount({}, { opened: { status: 'idle', live: false, headerHtml: '', sessions: PLAN_NEXT }, previewFor });
+    const { c, calls } = await mount(t, {}, { opened: { status: 'idle', live: false, headerHtml: '', sessions: PLAN_NEXT }, previewFor });
     await c.click({ action: 'change-run' });
     await flush();
     await c.fire('change', { dataset: { testid: 'run-harness' }, value: 'opencode' });
@@ -245,8 +237,8 @@ describe('LIN-3833 — the choice for this run goes through the preview, and the
     assert.ok(calls.api.some((a) => a.url.includes('/api/dispatch/preview')));
   });
 
-  test('Run to PR dispatches the autopilot kickoff with the run choice, not a harness forced on the client', async () => {
-    const { c, calls } = await mount({}, { opened: { status: 'idle', live: false, headerHtml: '', sessions: { count: 0, next: null, last: null, running: null } } });
+  test('Run to PR dispatches the autopilot kickoff with the run choice, not a harness forced on the client', async (t) => {
+    const { c, calls } = await mount(t, {}, { opened: { status: 'idle', live: false, headerHtml: '', sessions: { count: 0, next: null, last: null, running: null } } });
     await c.click({ action: 'change-run' });
     await flush();
     await c.fire('change', { dataset: { testid: 'run-model' }, value: 'deepseek-v4-pro' });
@@ -264,8 +256,8 @@ describe('LIN-3833 — the choice for this run goes through the preview, and the
     assert.equal(d.surface, 'home');
   });
 
-  test('Run <step> fetches that step\'s prompt and dispatches it as a run-step of its own kind', async () => {
-    const { c, calls } = await mount({}, { opened: { status: 'idle', live: false, headerHtml: '', sessions: PLAN_NEXT } });
+  test('Run <step> fetches that step\'s prompt and dispatches it as a run-step of its own kind', async (t) => {
+    const { c, calls } = await mount(t, {}, { opened: { status: 'idle', live: false, headerHtml: '', sessions: PLAN_NEXT } });
     await c.click({ action: 'run-step-next' });
     await flush();
     await flush();
@@ -290,9 +282,9 @@ describe('LIN-3969 — the Runs-on line shows the answer to the latest preview r
     return { pending, previewFor };
   };
 
-  test('Reset, then a chosen model: the reset read answering last does not undo the chosen model', async () => {
+  test('Reset, then a chosen model: the reset read answering last does not undo the chosen model', async (t) => {
     const { pending, previewFor } = held();
-    const { c } = await mount({}, { opened: { status: 'idle', live: false, headerHtml: '', sessions: PLAN_NEXT }, previewFor });
+    const { c } = await mount(t, {}, { opened: { status: 'idle', live: false, headerHtml: '', sessions: PLAN_NEXT }, previewFor });
     pending.shift()();
     await flush();
     await c.click({ action: 'change-run' });
@@ -308,9 +300,9 @@ describe('LIN-3969 — the Runs-on line shows the answer to the latest preview r
     assert.match(c.innerHTML, /data-testid="run-on-what">chosen-model-x</, 'the stale reset answer is dropped');
   });
 
-  test('the mount read answering after a chosen model does not undo it', async () => {
+  test('the mount read answering after a chosen model does not undo it', async (t) => {
     const { pending, previewFor } = held();
-    const { c } = await mount({}, { opened: { status: 'idle', live: false, headerHtml: '', sessions: PLAN_NEXT }, previewFor });
+    const { c } = await mount(t, {}, { opened: { status: 'idle', live: false, headerHtml: '', sessions: PLAN_NEXT }, previewFor });
     await c.click({ action: 'change-run' });
     await c.fire('input', { dataset: { testid: 'run-model' }, value: 'chosen-model-x' });
     await c.click({ action: 'use-run' });
@@ -329,10 +321,10 @@ describe('LIN-3969 — the Runs-on line shows the answer to the latest preview r
 // focused control: the same control in the new block is focused, with the typed value and the caret.
 describe('LIN-3969 — a run-block repaint keeps the control being typed in', () => {
   // The repaint replaces the run slot in the drawn markup, so the Model input it holds is a new node, as in a browser.
-  test('a preview landing mid-typing leaves the Model input focused, with its value and caret', async () => {
+  test('a preview landing mid-typing leaves the Model input focused, with its value and caret', async (t) => {
     const pending = [];
     const previewFor = () => new Promise((resolve) => { pending.push(() => resolve({ kind: 'plan', stepLabel: 'Plan', model: null, harness: 'claude-code', effort: null, sources: { model: 'none', harness: 'fallback', effort: 'none' } })); });
-    const { c, world } = await mount({}, { opened: { status: 'idle', live: false, headerHtml: '', sessions: PLAN_NEXT }, previewFor });
+    const { c, world } = await mount(t, {}, { opened: { status: 'idle', live: false, headerHtml: '', sessions: PLAN_NEXT }, previewFor });
     pending.shift()();
     await flush();
     await c.click({ action: 'change-run' });
@@ -356,8 +348,8 @@ describe('LIN-3969 — a run-block repaint keeps the control being typed in', ()
 });
 
 describe('LIN-3833 — Undo and Stop after a run', () => {
-  test('a queued run offers Undo, which deletes that queued item', async () => {
-    const { c, calls } = await mount({}, { opened: { status: 'idle', live: false, headerHtml: '', sessions: PLAN_NEXT } });
+  test('a queued run offers Undo, which deletes that queued item', async (t) => {
+    const { c, calls } = await mount(t, {}, { opened: { status: 'idle', live: false, headerHtml: '', sessions: PLAN_NEXT } });
     await c.click({ action: 'run-step-next' });
     await flush();
     await flush();
@@ -369,16 +361,16 @@ describe('LIN-3833 — Undo and Stop after a run', () => {
     assert.equal(del.url, '/workspace/acme/api/dispatch/d-1');
   });
 
-  test('Stop is offered only for a target a runner polls: a local session shows no Stop', async () => {
+  test('Stop is offered only for a target a runner polls: a local session shows no Stop', async (t) => {
     const running = { loopId: 'loop-1', kind: 'implementation', label: 'Build', state: 'running', since: '2026-10-25T10:00:00.000Z', target: 'local' };
-    const { c } = await mount({}, { opened: { status: 'running', live: true, headerHtml: '', sessions: { count: 1, next: { kind: 'review', label: 'Review' }, last: null, running } } });
+    const { c } = await mount(t, {}, { opened: { status: 'running', live: true, headerHtml: '', sessions: { count: 1, next: { kind: 'review', label: 'Review' }, last: null, running } } });
     assert.match(c.innerHTML, /data-testid="opened-task-running"/);
     assert.equal(c.innerHTML.includes('data-testid="run-stop"'), false);
   });
 
-  test('a cli session shows Stop, which asks in place and then aborts that session on its own target', async () => {
+  test('a cli session shows Stop, which asks in place and then aborts that session on its own target', async (t) => {
     const running = { loopId: 'loop-1', kind: 'implementation', label: 'Build', state: 'running', since: '2026-10-25T10:00:00.000Z', target: 'cli' };
-    const { c, calls } = await mount({}, { opened: { status: 'running', live: true, headerHtml: '', sessions: { count: 1, next: null, last: null, running } } });
+    const { c, calls } = await mount(t, {}, { opened: { status: 'running', live: true, headerHtml: '', sessions: { count: 1, next: null, last: null, running } } });
     assert.match(c.innerHTML, /data-testid="run-stop"/);
     await c.click({ action: 'stop-run' });
     assert.match(c.innerHTML, /Stop this run\? The session is cancelled/);
@@ -397,14 +389,14 @@ describe('LIN-3833 — a subtask that needs you is named on any opened Home task
   const WAITING = { identifier: 'LIN-22', title: 'Waiting child', href: '/workspace/acme/task/LIN-22?source=linear' };
   const OPENED = { status: 'idle', live: false, headerHtml: '', trackHtml: '', sessions: PLAN_NEXT };
 
-  test('the line names the subtask and its Open button links to its task page', async () => {
-    const { c } = await mount({ subtaskNeedsYou: WAITING, issue: { ...HOME.issue, source: 'linear' } }, { opened: OPENED });
+  test('the line names the subtask and its Open button links to its task page', async (t) => {
+    const { c } = await mount(t, { subtaskNeedsYou: WAITING, issue: { ...HOME.issue, source: 'linear' } }, { opened: OPENED });
     assert.match(c.innerHTML, /data-testid="opened-task-needs-you"[^>]*>A subtask needs you: <span[^>]*>LIN-22 Waiting child<\/span>/);
     assert.match(c.innerHTML, /data-testid="opened-task-needs-you-open"[^>]*href="\/workspace\/acme\/task\/LIN-22\?source=linear"/);
   });
 
-  test('no subtask needing you: no line', async () => {
-    const { c } = await mount({ subtaskNeedsYou: null }, { opened: OPENED });
+  test('no subtask needing you: no line', async (t) => {
+    const { c } = await mount(t, { subtaskNeedsYou: null }, { opened: OPENED });
     assert.equal(c.innerHTML.includes('opened-task-needs-you'), false);
   });
 });
@@ -425,8 +417,8 @@ describe('LIN-3833 — "Another step" leaves out only what the task cannot take 
     await c.click({ action: 'run-more' });
   };
 
-  test('after a Review session, Build and Review stay on the list; only retro is left out and counted', async () => {
-    const { c } = await mount(LIST, { opened: { status: 'idle', live: false, headerHtml: '', trackHtml: '', sessions: REVIEWED } });
+  test('after a Review session, Build and Review stay on the list; only retro is left out and counted', async (t) => {
+    const { c } = await mount(t, LIST, { opened: { status: 'idle', live: false, headerHtml: '', trackHtml: '', sessions: REVIEWED } });
     await open(c);
     assert.match(c.innerHTML, /data-kind="implementation"/);
     assert.match(c.innerHTML, /data-kind="review"/);
@@ -435,9 +427,9 @@ describe('LIN-3833 — "Another step" leaves out only what the task cannot take 
     assert.match(c.innerHTML, /data-testid="run-another-left-out"[^>]*>1 step left out: it does not fit this task's state\./);
   });
 
-  test('a finished task lists no step; every step is left out and counted', async () => {
+  test('a finished task lists no step; every step is left out and counted', async (t) => {
     const issue = { ...HOME.issue, stateType: 'completed' };
-    const { c } = await mount({ ...LIST, issue }, { opened: { status: 'idle', live: false, headerHtml: '', trackHtml: '', sessions: REVIEWED } });
+    const { c } = await mount(t, { ...LIST, issue }, { opened: { status: 'idle', live: false, headerHtml: '', trackHtml: '', sessions: REVIEWED } });
     await open(c);
     assert.equal(c.innerHTML.includes('data-testid="run-another-item"'), false);
     assert.match(c.innerHTML, /7 steps left out: they do not fit this task's state\./);
@@ -448,14 +440,14 @@ describe('LIN-3991 — a running task says its state once in the opened task', (
   const running = { loopId: 'loop-1', kind: 'implementation', label: 'Build', state: 'running', since: '2026-10-25T10:00:00.000Z', target: 'cli' };
   const SENTENCE = '<p class="task-sentence" data-testid="task-page-sentence">Build running for 1h.</p>';
 
-  test('the state block says it, and neither the run control nor its Go slot repeats it', async () => {
-    const { c } = await mount({}, { opened: { status: 'running', live: true, homeStatusHtml: SENTENCE, sessions: { count: 1, next: { kind: 'review', label: 'Review' }, last: null, running } } });
+  test('the state block says it, and neither the run control nor its Go slot repeats it', async (t) => {
+    const { c } = await mount(t, {}, { opened: { status: 'running', live: true, homeStatusHtml: SENTENCE, sessions: { count: 1, next: { kind: 'review', label: 'Review' }, last: null, running } } });
     assert.equal(c.innerHTML.split('Build running for 1h.').length - 1, 1, 'the sentence appears once');
   });
 
   // LIN-4103 beat 2: the box names no guessed next step. Its "Next: Review, once Build finishes" line is gone.
-  test('the running box says the state once: Running now, the step and Stop; it names no guessed next step (LIN-4103)', async () => {
-    const { c } = await mount({}, { opened: { status: 'running', live: true, homeStatusHtml: SENTENCE, sessions: { count: 1, last: null, running } } });
+  test('the running box says the state once: Running now, the step and Stop; it names no guessed next step (LIN-4103)', async (t) => {
+    const { c } = await mount(t, {}, { opened: { status: 'running', live: true, homeStatusHtml: SENTENCE, sessions: { count: 1, last: null, running } } });
     // The box's own markup nests, so read from its opening tag to the end of its Next line.
     const start = c.innerHTML.indexOf('data-testid="opened-task-running"');
     // LIN-4103: the box's head ends after its actions (Watch, Stop), the first closing div past that span.
@@ -478,8 +470,8 @@ describe('LIN-3987 — Home\'s run controls are shared buttons, marked when chos
   const runButtons = (html) => [...html.matchAll(/<button\b[^>]*>/g)].map((m) => m[0])
     .filter((tag) => /data-testid="(run-[a-z-]+|opened-task-go)"/.test(tag) || RUN_ACTIONS.some((a) => tag.includes(`data-action="${a}"`)));
 
-  test('every button in the run block, with the Change panel open, carries a shared button class', async () => {
-    const { c } = await mount({}, { opened: { status: 'idle', live: false, headerHtml: '', sessions: PLAN_NEXT }, previewFor: () => ({ kind: 'plan', stepLabel: 'Plan', group: 'plan', model: null, harness: 'claude-code', effort: null, sources: {} }) });
+  test('every button in the run block, with the Change panel open, carries a shared button class', async (t) => {
+    const { c } = await mount(t, {}, { opened: { status: 'idle', live: false, headerHtml: '', sessions: PLAN_NEXT }, previewFor: () => ({ kind: 'plan', stepLabel: 'Plan', group: 'plan', model: null, harness: 'claude-code', effort: null, sources: {} }) });
     await c.click({ action: 'change-run' });
     await flush();
     await c.click({ action: 'run-another' });
@@ -489,8 +481,8 @@ describe('LIN-3987 — Home\'s run controls are shared buttons, marked when chos
     for (const tag of tags) assert.match(tag, SHARED, `shared class on ${tag}`);
   });
 
-  test('a quiet button is used on its own, not with .btn: .btn:hover would paint a fill over its label (decision 6)', async () => {
-    const { c } = await mount({}, { opened: { status: 'idle', live: false, headerHtml: '', sessions: PLAN_NEXT }, previewFor: () => ({ kind: 'plan', stepLabel: 'Plan', group: 'plan', model: null, harness: 'claude-code', effort: null, sources: {} }) });
+  test('a quiet button is used on its own, not with .btn: .btn:hover would paint a fill over its label (decision 6)', async (t) => {
+    const { c } = await mount(t, {}, { opened: { status: 'idle', live: false, headerHtml: '', sessions: PLAN_NEXT }, previewFor: () => ({ kind: 'plan', stepLabel: 'Plan', group: 'plan', model: null, harness: 'claude-code', effort: null, sources: {} }) });
     await c.click({ action: 'change-run' });
     await flush();
     await c.click({ action: 'run-another' });
@@ -502,8 +494,8 @@ describe('LIN-3987 — Home\'s run controls are shared buttons, marked when chos
     for (const tag of quiet) assert.equal(classesOf(tag).includes('btn'), false, `quiet alone: ${tag}`);
   });
 
-  test('a chosen Runs-on target is marked aria-pressed, and is not marked by bold or underline', async () => {
-    const { c } = await mount({}, { opened: { status: 'idle', live: false, headerHtml: '', sessions: PLAN_NEXT }, previewFor: () => ({ kind: 'plan', stepLabel: 'Plan', group: 'plan', model: null, harness: 'claude-code', effort: null, sources: {} }) });
+  test('a chosen Runs-on target is marked aria-pressed, and is not marked by bold or underline', async (t) => {
+    const { c } = await mount(t, {}, { opened: { status: 'idle', live: false, headerHtml: '', sessions: PLAN_NEXT }, previewFor: () => ({ kind: 'plan', stepLabel: 'Plan', group: 'plan', model: null, harness: 'claude-code', effort: null, sources: {} }) });
     await c.click({ action: 'change-run' });
     await flush();
     await c.click({ action: 'run-target', target: 'web' });
@@ -512,8 +504,8 @@ describe('LIN-3987 — Home\'s run controls are shared buttons, marked when chos
     assert.equal(tagOf(c.innerHTML, 'run-target-cli').includes('aria-pressed="false"'), true);
   });
 
-  test('with opencode chosen, Claude Code on the web is not offered and says why; a web draft falls back to the runner', async () => {
-    const { c, calls } = await mount({}, { opened: { status: 'idle', live: false, headerHtml: '', sessions: { count: 0, next: null, last: null, running: null } }, previewFor: () => ({ kind: 'plan', stepLabel: 'Plan', group: 'plan', model: null, harness: 'claude-code', effort: null, sources: {} }) });
+  test('with opencode chosen, Claude Code on the web is not offered and says why; a web draft falls back to the runner', async (t) => {
+    const { c, calls } = await mount(t, {}, { opened: { status: 'idle', live: false, headerHtml: '', sessions: { count: 0, next: null, last: null, running: null } }, previewFor: () => ({ kind: 'plan', stepLabel: 'Plan', group: 'plan', model: null, harness: 'claude-code', effort: null, sources: {} }) });
     await c.click({ action: 'change-run' });
     await flush();
     await c.click({ action: 'run-target', target: 'web' });
@@ -530,9 +522,9 @@ describe('LIN-3987 — Home\'s run controls are shared buttons, marked when chos
     assert.equal(calls.dispatch[0].target, 'cli', 'the run goes to the runner, never to a web target the harness cannot run');
   });
 
-  test('the Runs-on line, the heading and the summary name models and harnesses in words, never a raw id or alias', async () => {
+  test('the Runs-on line, the heading and the summary name models and harnesses in words, never a raw id or alias', async (t) => {
     const previewFor = (q) => ({ kind: 'plan', stepLabel: 'Plan', group: 'plan', model: q.get('model') || null, harness: q.get('harness') || 'claude-code', effort: null, sources: {}, words: routingWords({ harness: q.get('harness') || 'claude-code', model: q.get('model') || null, effort: null }) });
-    const { c } = await mount({}, { opened: { status: 'idle', live: false, headerHtml: '', sessions: PLAN_NEXT }, previewFor });
+    const { c } = await mount(t, {}, { opened: { status: 'idle', live: false, headerHtml: '', sessions: PLAN_NEXT }, previewFor });
     await c.click({ action: 'change-run' });
     await flush();
     // The model field repaints nothing as it is typed (LIN-3969, so the caret stays); a target choice repaints the block.
@@ -552,8 +544,8 @@ describe('LIN-3987 — Home\'s run controls are shared buttons, marked when chos
 // LIN-3987 review, finding 1: a harness picked on the draft re-reads the server's panel, so the words for a blank model
 // and effort follow the harness the draft names, and go back to Settings' words when the harness is blank again.
 describe('LIN-3987 review — a harness picked on the draft re-reads the panel, so its words follow it', () => {
-  test('picking opencode names its default model in the summary; a blank harness names Claude Code\'s own again', async () => {
-    const { c, calls } = await mount({}, { opened: { status: 'idle', live: false, headerHtml: '', sessions: PLAN_NEXT }, previewFor: () => ({ kind: 'plan', stepLabel: 'Plan', group: 'plan', model: null, harness: 'claude-code', effort: null, sources: {} }) });
+  test('picking opencode names its default model in the summary; a blank harness names Claude Code\'s own again', async (t) => {
+    const { c, calls } = await mount(t, {}, { opened: { status: 'idle', live: false, headerHtml: '', sessions: PLAN_NEXT }, previewFor: () => ({ kind: 'plan', stepLabel: 'Plan', group: 'plan', model: null, harness: 'claude-code', effort: null, sources: {} }) });
     await c.click({ action: 'change-run' });
     await flush();
     const summary = () => /data-testid="run-will-use">([^<]*)</.exec(c.innerHTML)[1];
@@ -571,13 +563,13 @@ describe('LIN-3987 review — a harness picked on the draft re-reads the panel, 
   });
 
   // Reads overlap and can answer in either order: only the latest paints (runPanelSeq in fetchRunPanel).
-  test('an older read that answers last does not paint over the latest answer\'s words', async () => {
+  test('an older read that answers last does not paint over the latest answer\'s words', async (t) => {
     const held = [];
     let gate = false;
     const panelFor = (q) => (gate
       ? new Promise((resolve) => { held.push(() => resolve(serverPanel(q))); })
       : serverPanel(q));
-    const { c } = await mount({}, { panelFor, opened: { status: 'idle', live: false, headerHtml: '', sessions: PLAN_NEXT }, previewFor: () => ({ kind: 'plan', stepLabel: 'Plan', group: 'plan', model: null, harness: 'claude-code', effort: null, sources: {} }) });
+    const { c } = await mount(t, {}, { panelFor, opened: { status: 'idle', live: false, headerHtml: '', sessions: PLAN_NEXT }, previewFor: () => ({ kind: 'plan', stepLabel: 'Plan', group: 'plan', model: null, harness: 'claude-code', effort: null, sources: {} }) });
     await c.click({ action: 'change-run' });
     await flush();
     const summary = () => /data-testid="run-will-use">([^<]*)</.exec(c.innerHTML)[1];
@@ -605,8 +597,8 @@ describe('LIN-3992 — the summary names the model the draft holds, without a re
   const runsOn = (c) => /data-testid="opened-task-runs-on">([\s\S]*?)<\/div>/.exec(c.innerHTML)[1].replace(/<button[\s\S]*?<\/button>/, '').replace(/<[^>]+>/g, '').trim();
   const panelOpen = { status: 'idle', live: false, headerHtml: '', sessions: PLAN_NEXT };
 
-  test('a suggestion picked names its display name in the summary at once', async () => {
-    const { c } = await mount({}, { opened: panelOpen });
+  test('a suggestion picked names its display name in the summary at once', async (t) => {
+    const { c } = await mount(t, {}, { opened: panelOpen });
     await c.click({ action: 'change-run' });
     await flush();
     assert.match(summary(c), /^This run will use Claude Code(?:&#039;|')s own model/, summary(c));
@@ -616,8 +608,8 @@ describe('LIN-3992 — the summary names the model the draft holds, without a re
     assert.match(summary(c), /^This run will use Claude Opus 5\.5 · Claude Code · /, summary(c));
   });
 
-  test('a typed model no option names is shown as typed, and a cleared model goes back to the default words', async () => {
-    const { c } = await mount({}, { opened: panelOpen });
+  test('a typed model no option names is shown as typed, and a cleared model goes back to the default words', async (t) => {
+    const { c } = await mount(t, {}, { opened: panelOpen });
     await c.click({ action: 'change-run' });
     await flush();
     await c.fire('input', { dataset: { testid: 'run-model' }, value: 'x/y' });
@@ -628,8 +620,8 @@ describe('LIN-3992 — the summary names the model the draft holds, without a re
 
   // Witness that "Use for this run" sends the picked id. It passes once the pick path sets the model, so it is checked
   // by breaking that line (draft.model = null) and watching it fail; see the PR.
-  test('"Use for this run" sends the picked model: the preview is asked for it, and Run to PR dispatches it', async () => {
-    const { c, calls } = await mount({}, { opened: { status: 'idle', live: false, headerHtml: '', sessions: { count: 0, next: null, last: null, running: null } } });
+  test('"Use for this run" sends the picked model: the preview is asked for it, and Run to PR dispatches it', async (t) => {
+    const { c, calls } = await mount(t, {}, { opened: { status: 'idle', live: false, headerHtml: '', sessions: { count: 0, next: null, last: null, running: null } } });
     await c.click({ action: 'change-run' });
     await flush();
     await c.fire('input', { dataset: { testid: 'run-model' }, value: 'opus' });
@@ -645,15 +637,15 @@ describe('LIN-3992 — the summary names the model the draft holds, without a re
 
   const fallback = (sources = { model: 'fallback', harness: 'fallback', effort: 'none' }, model = null) => () => ({ kind: 'plan', stepLabel: 'Plan', group: 'plan', model, harness: 'claude-code', effort: null, sources, words: routingWords({ harness: 'claude-code', model, effort: null }) });
 
-  test('Runs on names Claude Code once when the model is Claude Code\'s own, and says the runner', async () => {
-    const { c } = await mount({}, { opened: panelOpen, previewFor: fallback() });
+  test('Runs on names Claude Code once when the model is Claude Code\'s own, and says the runner', async (t) => {
+    const { c } = await mount(t, {}, { opened: panelOpen, previewFor: fallback() });
     await flush();
     assert.equal(runsOn(c).match(/Claude Code/g)?.length, 1, runsOn(c));
     assert.match(runsOn(c), /^Runs on Claude Code(?:&#039;|')s own model · your runner/, runsOn(c));
   });
 
-  test('Runs on names Claude Code once when the target is Claude Code on the web and the model is its own', async () => {
-    const { c } = await mount({}, { opened: panelOpen, previewFor: fallback() });
+  test('Runs on names Claude Code once when the target is Claude Code on the web and the model is its own', async (t) => {
+    const { c } = await mount(t, {}, { opened: panelOpen, previewFor: fallback() });
     await c.click({ action: 'change-run' });
     await flush();
     await c.click({ action: 'run-target', target: 'web' });
@@ -663,16 +655,16 @@ describe('LIN-3992 — the summary names the model the draft holds, without a re
     assert.match(runsOn(c), /on the web/, runsOn(c));
   });
 
-  test('Runs on keeps where the harness came from when the model is named', async () => {
-    const { c } = await mount({}, { opened: panelOpen, previewFor: fallback({ model: 'explicit', harness: 'fallback', effort: 'none' }, 'sonnet') });
+  test('Runs on keeps where the harness came from when the model is named', async (t) => {
+    const { c } = await mount(t, {}, { opened: panelOpen, previewFor: fallback({ model: 'explicit', harness: 'fallback', effort: 'none' }, 'sonnet') });
     await flush();
     assert.match(runsOn(c), /^Runs on Claude Sonnet 5\.5 · your runner — chosen for this run, Claude Code, the default$/, runsOn(c));
   });
 });
 
 // LIN-4104 D4: Run to Done is the autopilot kickoff with no stop, in the kickoff's query and in the dispatch body.
-test('LIN-4104 D4: Run to Done dispatches the autopilot kickoff with no stopAt, in the query and the body', async () => {
-  const { c, calls } = await mount({ filledRung: 'done' }, { opened: { status: 'idle', live: false, headerHtml: '', sessions: { count: 0, next: null, last: null, running: null } } });
+test('LIN-4104 D4: Run to Done dispatches the autopilot kickoff with no stopAt, in the query and the body', async (t) => {
+  const { c, calls } = await mount(t, { filledRung: 'done' }, { opened: { status: 'idle', live: false, headerHtml: '', sessions: { count: 0, next: null, last: null, running: null } } });
   await c.click({ action: 'go-done', rung: 'run-task' });
   await flush();
   await flush();
@@ -690,8 +682,8 @@ describe('LIN-4106 — the Change drawer: a heading, the default with its number
   const NUMBERS = { runs: 12, priced: 12, unpriced: 0, noTelemetry: 0, spendUsd: 6.48, typicalUsd: 0.54 };
   const withNumbers = (q) => ({ ...serverPanel(q), numbers: NUMBERS });
   const opened = { status: 'idle', live: false, headerHtml: '', sessions: PLAN_NEXT };
-  const openDrawer = async (loadOver = {}) => {
-    const { c } = await mount({}, { opened, previewFor: () => null, ...loadOver });
+  const openDrawer = async (t, loadOver = {}) => {
+    const { c } = await mount(t, {}, { opened, previewFor: () => null, ...loadOver });
     await c.click({ action: 'change-run' });
     await flush();
     return c;
@@ -699,41 +691,41 @@ describe('LIN-4106 — the Change drawer: a heading, the default with its number
   const panelOf = (c) => c.innerHTML.slice(c.innerHTML.indexOf('data-testid="run-change-panel"'));
   const defaultCardOf = (c) => /data-testid="run-default"[^>]*>([\s\S]*?)<\/button>/.exec(c.innerHTML)[1];
 
-  test('the drawer opens with a heading that says what it is for, before the head line', async () => {
-    const panel = panelOf(await openDrawer());
+  test('the drawer opens with a heading that says what it is for, before the head line', async (t) => {
+    const panel = panelOf(await openDrawer(t));
     assert.match(panel, /<h3 class="opened-task-change-title" data-testid="run-change-heading">Change this run<\/h3>/);
     assert.ok(panel.indexOf('run-change-heading') < panel.indexOf('This run only'), 'the heading comes first');
   });
 
-  test('the default choice reads as a choice: "Default for <step>", with the numbers of the last 30 days and the typical cost', async () => {
-    const card = defaultCardOf(await openDrawer({ panelFor: withNumbers }));
+  test('the default choice reads as a choice: "Default for <step>", with the numbers of the last 30 days and the typical cost', async (t) => {
+    const card = defaultCardOf(await openDrawer(t, { panelFor: withNumbers }));
     assert.match(card, /Default for /);
     assert.match(card, /12 runs in the last 30 days, about \$0\.54 each/);
   });
 
   // LIN-4106 (beat 4): pins for the default choice's figures, as the card draws them. The card stays one line on a phone
   // (Use for this run must stay on the first screen, LIN-3987); its spend and unpriced count are in the decision panel.
-  test('with nothing priced, the card gives the runs and no typical run: never $0', async () => {
+  test('with nothing priced, the card gives the runs and no typical run: never $0', async (t) => {
     const panelFor = (q) => ({ ...serverPanel(q), numbers: { runs: 3, priced: 0, unpriced: 3, noTelemetry: 0, spendUsd: 0, typicalUsd: null } });
-    const card = defaultCardOf(await openDrawer({ panelFor }));
+    const card = defaultCardOf(await openDrawer(t, { panelFor }));
     assert.match(card, /3 runs in the last 30 days/);
     assert.doesNotMatch(card, /\$0|about/, card);
   });
 
-  test('the default choice is named in plain words from the preview\'s words, never by its model id', async () => {
+  test('the default choice is named in plain words from the preview\'s words, never by its model id', async (t) => {
     const previewFor = () => ({ kind: 'plan', stepLabel: 'Plan', group: 'plan', model: 'claude-opus-5-5', harness: 'claude-code', effort: null, sources: { model: 'default', harness: 'default', effort: 'none' } });
-    const card = defaultCardOf(await openDrawer({ previewFor, panelFor: withNumbers }));
+    const card = defaultCardOf(await openDrawer(t, { previewFor, panelFor: withNumbers }));
     assert.match(card, /Claude Opus 5\.5/);
     assert.doesNotMatch(card, /claude-opus-5-5/);
   });
 
-  test('the default choice names no machine key: plain words only', async () => {
-    const text = defaultCardOf(await openDrawer({ panelFor: withNumbers })).replace(/<[^>]+>/g, ' ');
+  test('the default choice names no machine key: plain words only', async (t) => {
+    const text = defaultCardOf(await openDrawer(t, { panelFor: withNumbers })).replace(/<[^>]+>/g, ' ');
     assert.doesNotMatch(text, /\bclaude-code\b|\bnone\b|\bnull\b|\bundefined\b/, text);
   });
 
-  test('the drawer links to the house pages it depends on: Settings › Models for the default, Dispatch for the runs', async () => {
-    const panel = panelOf(await openDrawer({ panelFor: withNumbers }));
+  test('the drawer links to the house pages it depends on: Settings › Models for the default, Dispatch for the runs', async (t) => {
+    const panel = panelOf(await openDrawer(t, { panelFor: withNumbers }));
     assert.match(panel, /href="\/workspace\/acme\/settings\/models"[^>]*>Settings › Models</);
     assert.match(panel, /data-testid="run-dispatch-link"[^>]*href="\/workspace\/acme\/dispatch"|href="\/workspace\/acme\/dispatch"[^>]*data-testid="run-dispatch-link"/);
   });
@@ -748,19 +740,19 @@ describe('LIN-4106 — the Change drawer: a heading, the default with its number
 });
 
 describe('LIN-4106 — Home\'s opened box says its last run once, in the state line', () => {
-  test('no raw "Last:" clause under the run box; the count button stays', async () => {
-    const { c } = await mount({}, { opened: { status: 'idle', live: false, headerHtml: '', sessions: PLAN_NEXT } });
+  test('no raw "Last:" clause under the run box; the count button stays', async (t) => {
+    const { c } = await mount(t, {}, { opened: { status: 'idle', live: false, headerHtml: '', sessions: PLAN_NEXT } });
     assert.equal(/Last: /.test(c.innerHTML), false, 'the raw state words are not repeated under the box');
     assert.match(c.innerHTML, /data-testid="opened-task-all"/);
   });
 
   // Review item 2: with "Last: … ·" gone, a bare "All 13" read as a fragment. The button says what it opens, in words.
-  test('the way to the runs is plain words: "The only run" for one, "All N runs" for several', async () => {
+  test('the way to the runs is plain words: "The only run" for one, "All N runs" for several', async (t) => {
     const label = (html) => /data-testid="opened-task-all">([^<]*)</.exec(html)[1];
-    const one = await mount({}, { opened: { status: 'idle', live: false, headerHtml: '', sessions: PLAN_NEXT } });
+    const one = await mount(t, {}, { opened: { status: 'idle', live: false, headerHtml: '', sessions: PLAN_NEXT } });
     assert.equal(label(one.c.innerHTML), 'The only run');
     assert.match(one.c.innerHTML, /data-action="all-sessions" data-testid="opened-task-all"/, 'the hooks stay');
-    const many = await mount({}, { opened: { status: 'idle', live: false, headerHtml: '', sessions: { ...PLAN_NEXT, count: 13 } } });
+    const many = await mount(t, {}, { opened: { status: 'idle', live: false, headerHtml: '', sessions: { ...PLAN_NEXT, count: 13 } } });
     assert.equal(label(many.c.innerHTML), 'All 13 runs');
   });
 });

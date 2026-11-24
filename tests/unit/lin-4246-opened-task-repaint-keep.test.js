@@ -4,7 +4,7 @@
  * Home's state poll repaints the question slot. A card keeps its place only while `QuestionCards.keepsReaderPlace` says so:
  * the same ruling, and the card holds the reader's typed text, focus, or an answer in flight. Each case mounts Home with a
  * running task and a card, then fires the captured 10s poll once with a second `/state` body, and asserts on node identity.
- * `question-cards.js` is loaded into the same vm (without it `keepsPlace` is always false and these cannot go red for the
+ * `question-cards.js` runs in the same realm as the imported module (without it `keepsPlace` is always false and these cannot go red for the
  * right reason; `mountWithCard` fails loudly if it is missing).
  *
  * The typed-input survival claim is witnessed once, by the E2E in tests/e2e/lin-4242-waiting-live.spec.js. The cases here are
@@ -16,7 +16,7 @@ import { test, describe } from 'node:test';
 import assert from 'node:assert/strict';
 import { escapeHtml } from '../../lib/utils/html.js';
 import { serverSessions, serverRow } from '../fixtures/task-decision.js';
-import { loadWorld } from './helpers/client-world.js';
+import { promptSectionWorld } from './helpers/prompt-section-world.js';
 
 const RUNNING = { loopId: 'loop-1', kind: 'implementation', label: 'Build', state: 'running', since: '2026-11-05T10:00:00.000Z', target: 'cli' };
 const HOME = {
@@ -31,7 +31,8 @@ const HOME = {
   row: serverRow({ stateType: 'started' }),
 };
 
-const flush = () => new Promise((r) => setTimeout(r, 0));
+// setImmediate, not setTimeout: the world collects setTimeout into `timers`, and it is the page's global and the test's.
+const flush = () => new Promise((r) => setImmediate(r));
 const flushN = async (n) => { for (let i = 0; i < n; i++) await flush(); };
 
 /** A running task's `/state` body, with the question card `questionHtml` (the server's own card markup, as the poll sends it). */
@@ -52,10 +53,10 @@ function cardHtml(decisionId, question) {
 }
 
 /** Home mounted on a running task with `first` as its state, and the poll captured. `next(body)` sets the poll's body. */
-async function mountWithCard(first) {
+async function mountWithCard(t, first) {
   const timers = [];
   let current = first;
-  const world = loadWorld({
+  const world = await promptSectionWorld(t, {
     window: {
       escapeHtml: (x) => (x == null ? '' : escapeHtml(String(x))),
       stripCodeBlockWrapper: (x) => x,
@@ -76,14 +77,14 @@ async function mountWithCard(first) {
       taskPageHref: () => '/workspace/acme/task/LIN-42',
       toast: () => {},
     },
-    scripts: ['question-cards.js', 'prompt-section.js'],
+    classic: ['question-cards.js'],
     timers,
     globals: {
       CustomEvent: class { constructor(type, init) { this.type = type; this.detail = init && init.detail; } },
       localStorage: { getItem: () => null, setItem() {} },
     },
   });
-  assert.equal(typeof world.window.QuestionCards?.keepsReaderPlace, 'function', 'question-cards.js is in the same vm: the gate exists');
+  assert.equal(typeof world.window.QuestionCards?.keepsReaderPlace, 'function', 'question-cards.js is in the same realm: the gate exists');
   const container = world.makeContainer();
   world.PromptSection.init(container, HOME);
   await flushN(3);
@@ -104,8 +105,8 @@ async function mountWithCard(first) {
 }
 
 describe('LIN-4246 — the opened task\'s repaint keeps a card only while it holds the reader\'s place', () => {
-  test('same ruling, markup changed, nothing typed, nothing focused: the old card is replaced by a fresh, bound one', async () => {
-    const h = await mountWithCard(stateWithCard(cardHtml('d-LOCAL-S', 'Which way?')));
+  test('same ruling, markup changed, nothing typed, nothing focused: the old card is replaced by a fresh, bound one', async (t) => {
+    const h = await mountWithCard(t, stateWithCard(cardHtml('d-LOCAL-S', 'Which way?')));
     const old = h.card();
     assert.ok(old, 'the card is on the page');
     assert.equal(old.dataset.qcardBound, 'true', 'the mount binds the card');
@@ -120,8 +121,8 @@ describe('LIN-4246 — the opened task\'s repaint keeps a card only while it hol
     assert.equal(fresh.dataset.qcardBound, 'true', 'the fresh card is bound');
   });
 
-  test('same ruling, markup changed, typed text: the same node and its text are kept (the contrast for the case above)', async () => {
-    const h = await mountWithCard(stateWithCard(cardHtml('d-LOCAL-S', 'Which way?')));
+  test('same ruling, markup changed, typed text: the same node and its text are kept (the contrast for the case above)', async (t) => {
+    const h = await mountWithCard(t, stateWithCard(cardHtml('d-LOCAL-S', 'Which way?')));
     const old = h.card();
     const input = old.querySelector('[data-testid="session-question-card-input"]');
     input.value = 'half a sentence';
@@ -134,11 +135,11 @@ describe('LIN-4246 — the opened task\'s repaint keeps a card only while it hol
     assert.equal(old.querySelector('[data-testid="session-question-card-input"]').value, 'half a sentence', 'the typed text is intact');
   });
 
-  test('same ruling, markup changed, focused but nothing typed: the same node is kept and focus returns to its textarea', async () => {
+  test('same ruling, markup changed, focused but nothing typed: the same node is kept and focus returns to its textarea', async (t) => {
     // Review finding on 926fdba9: the repaint detaches the old slot before keepTypedQuestion reads document.activeElement, so
     // focus never keeps a card here and the reader loses the caret every poll. The focus must be captured before the write
     // and restored after the old node is put back. Witness: drop the focus capture → the old node is replaced and this fails.
-    const h = await mountWithCard(stateWithCard(cardHtml('d-LOCAL-S', 'Which way?')));
+    const h = await mountWithCard(t, stateWithCard(cardHtml('d-LOCAL-S', 'Which way?')));
     const old = h.card();
     const input = old.querySelector('[data-testid="session-question-card-input"]');
     input.focus();
@@ -152,12 +153,12 @@ describe('LIN-4246 — the opened task\'s repaint keeps a card only while it hol
     assert.equal(h.document.activeElement, input, 'focus is back in the textarea after the repaint');
   });
 
-  test('current behaviour, not a promise: an idle card is replaced on every poll, even with byte-identical markup', async () => {
+  test('current behaviour, not a promise: an idle card is replaced on every poll, even with byte-identical markup', async (t) => {
     // `initQuestionCards` stamps data-qcard-bound on the mounted card, and fresh server markup never carries the stamp, so the
     // `innerHTML ===` clause in keepTypedQuestion cannot hold for a bound card. Pinned here so removing that clause is visibly
     // neutral; if a later change keeps idle cards, that is a decision and this test should change with it.
     const same = cardHtml('d-LOCAL-S', 'Which way?');
-    const h = await mountWithCard(stateWithCard(same));
+    const h = await mountWithCard(t, stateWithCard(same));
     const old = h.card();
     await h.poll(stateWithCard(same));
     assert.notEqual(h.card(), old, 'the idle card is a fresh node');

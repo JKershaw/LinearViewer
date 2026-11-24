@@ -50,7 +50,6 @@ async function makeWorld() {
       addEventListener() {},
       matchMedia: () => ({ matches: false }),
       ChatUI: { appendOptions() {}, resolveCaption: () => '' },
-      sourceQuery: () => '',
       location,
       history
     },

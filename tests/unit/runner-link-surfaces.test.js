@@ -24,14 +24,10 @@ import { renderSwimPage } from '../../lib/render-swim.js';
 import { renderRunnerLink, runnerSetupHref } from '../../lib/components/runner-link.js';
 // Side-effect import: registers the Linear provider so the render fallbacks resolve.
 import '../../lib/providers/linear/index.js';
-import { withHarnessModels } from '../fixtures/harness-models.js';
-import { loadWorld } from './helpers/client-world.js';
-import { swipePageBody } from './helpers/swipe-page.js';
+import { promptSectionWorld } from './helpers/prompt-section-world.js';
+import { swipeWorld } from './helpers/swipe-world.js';
 
 const __dirname = dirname(fileURLToPath(import.meta.url));
-const PROMPT_SECTION_SRC = readFileSync(join(__dirname, '../../public/prompt-section.js'), 'utf8');
-const COMMON_SRC = readFileSync(join(__dirname, '../../public/common.js'), 'utf8');
-const SWIPE_SRC = readFileSync(join(__dirname, '../../public/swipe.js'), 'utf8');
 
 const LINK = 'Harbour can also run steps for you, on your own machine. <a class="opened-task-runner-link" href="/workspace/ws/runner" data-testid="opened-task-runner-link">Set up a runner ›</a>';
 const TESTID = 'data-testid="opened-task-runner-link"';
@@ -86,9 +82,9 @@ describe('the shared markup', () => {
     assert.ok(renderRunnerLink('a"b c').includes('href="/workspace/a%22b%20c/runner"'));
   });
 
-  test('client twin (PromptSection.runnerLinkHtml) emits the same markup', () => {
-    const world = loadWorld({ scripts: ['prompt-section.js'], window: { escapeHtml: escapeLikeCommon } });
-    assert.equal(world.window.PromptSection.runnerLinkHtml('ws'), renderRunnerLink('ws'));
+  test('client twin (PromptSection.runnerLinkHtml) emits the same markup', async (t) => {
+    const world = await promptSectionWorld(t, { window: { escapeHtml: escapeLikeCommon } });
+    assert.equal(world.PromptSection.runnerLinkHtml('ws'), renderRunnerLink('ws'));
   });
 });
 
@@ -142,8 +138,8 @@ describe('Swim popover (renderSwimPage)', () => {
 });
 
 // ---------------------------------------------------------------------------
-// Swipe: run public/swipe.js (with the real prompt-section.js) against a
-// minimal DOM and read the card it renders.
+// Swipe: import public/swipe.js (a native module, LIN-4463 piece 5) over the server's swipe markup and read the card
+// it draws at load (helpers/swipe-world.js). PromptSection is the real prompt-section.js swipe.js imports, which draws the link.
 // ---------------------------------------------------------------------------
 
 function escapeLikeCommon(s) {
@@ -156,25 +152,8 @@ function escapeLikeCommon(s) {
     .replace(/'/g, '&#039;');
 }
 
-function renderSwipeCard(swipeData) {
-  // swipe.js reads `.swipe-filter-select` and friends at load, so the markup is in the document before any script
-  // runs (loadWorld has no markup option). `window` is the global object, as in a browser: swipe.js calls some
-  // window.* helpers as bare globals (renderMarkdown), and the card's history and location are read on load.
-  const world = loadWorld({
-    scripts: [],
-    window: {
-      __SWIPE_DATA__: swipeData,
-      escapeHtml: escapeLikeCommon,
-      renderMarkdown: (s) => escapeLikeCommon(s),
-      stripCodeBlockWrapper: (s) => s,
-    },
-    globals: { location: { search: '', href: '' }, history: { replaceState() {} } },
-  });
-  world.document.body.innerHTML = swipePageBody({ urlKey: swipeData.urlKey });
-  // The real common.js, as the page loads it first: it owns the terminal-state set swipe.js reads.
-  world.run(withHarnessModels(COMMON_SRC));
-  world.run(PROMPT_SECTION_SRC);
-  world.run(SWIPE_SRC);
+async function renderSwipeCard(t, data) {
+  const world = await swipeWorld(t, { data });
   return world.document.getElementById('swipe-card').innerHTML;
 }
 
@@ -189,8 +168,8 @@ function swipeData(extra = {}) {
 
 describe('Swipe card (public/swipe.js)', () => {
   for (const flags of FLAG_STATES) {
-    test(`under the title, outside every accordion (${flagName(flags)})`, () => {
-      const html = renderSwipeCard(swipeData({ proxyEnabled: flags.proxy, dispatchEnabled: flags.dispatch }));
+    test(`under the title, outside every accordion (${flagName(flags)})`, async (t) => {
+      const html = await renderSwipeCard(t, swipeData({ proxyEnabled: flags.proxy, dispatchEnabled: flags.dispatch }));
       assert.equal(count(html, TESTID), 1, 'exactly one link');
       assert.ok(html.includes(`<div class="swipe-card-runner">${LINK}</div>`));
       const linkAt = html.indexOf(LINK);
@@ -199,8 +178,8 @@ describe('Swipe card (public/swipe.js)', () => {
     });
   }
 
-  test('not on the landing card (no workspace)', () => {
-    const html = renderSwipeCard(swipeData({ urlKey: '' }));
+  test('not on the landing card (no workspace)', async (t) => {
+    const html = await renderSwipeCard(t, swipeData({ urlKey: '' }));
     assert.ok(html.includes('swipe-card-title'), 'the card rendered');
     assert.ok(!html.includes(TESTID));
   });
@@ -214,10 +193,10 @@ describe('Swipe status pill glyph (LIN-3674)', () => {
     ['triage', '○', 'todo'],
   ];
   for (const [stateType, char, cls] of PILLS) {
-    test(`${stateType} draws ${char} in the ${cls} pill`, () => {
+    test(`${stateType} draws ${char} in the ${cls} pill`, async (t) => {
       const data = swipeData();
       data.issues[0].stateType = stateType;
-      const html = renderSwipeCard(data);
+      const html = await renderSwipeCard(t, data);
       assert.ok(html.includes(`<span class="status-pill status-pill--${cls}"><span class="status-pill__char">${char}</span>`), stateType);
     });
   }
