@@ -99,6 +99,15 @@ export const SELECTORS = {
       ws: '[data-testid="obs-ruling-ws"]',
     },
   },
+  /** The run page's pinned question cards (LIN-4532) and Flight Companion's fold of them (LIN-3361, LIN-4553). */
+  runPage: {
+    questions: '[data-testid="session-question-records"]',
+  },
+  flightCompanion: {
+    decisionsFold: '[data-testid="fc-decisions-fold"]',
+    decisionsSummary: '[data-testid="fc-decisions-fold"] > summary',
+    question: '[data-testid="fc-question"]',
+  },
   footer: {
     /** Footer nav link by its visible text, e.g. 'swipe', 'settings'. */
     link: (name) => `[data-testid="footer-link-${name}"]`,
