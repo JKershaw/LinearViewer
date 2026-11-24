@@ -3865,11 +3865,11 @@ app.get('/workspace/:urlKey/api/home-waiting', workspaceFromUrl, async (req, res
     // leaves the card its identifier alone.
     const held = taskFacts.read(workspace.urlKey);
     const titlesOf = held.complete ? titlesFromIssues(held.issues) : null;
-    const { ruling, questions = [], records = [] } = await waitingStanding({ urlKey: workspace.urlKey, accountId: req.session.accountId, titlesOf });
+    const { questions = [], records = [] } = await waitingStanding({ urlKey: workspace.urlKey, accountId: req.session.accountId, titlesOf });
     // LIN-4532 (finding-dca7ac9d): the question cards come in the fragment too, so a question asked after the page load is merged
     // in by the refresh (public/waiting-merge.js). LIN-4552 (finding-d4767b81): the notes for the owner (open findings) come too,
     // merged by their own keys (`record:<id>`, public/waiting-notes.js); `count` is the questions alone (waitingFragmentOf).
-    res.json(waitingFragmentOf({ rows: ruling ? ruling.rows : [], questions, records }, { urlKey: workspace.urlKey }));
+    res.json(waitingFragmentOf({ questions, records }, { urlKey: workspace.urlKey }));
   } catch (error) {
     if (isAuthError(error)) return unauthorized.json(res, 'Not authenticated');
     console.error('Home waiting error:', error);
