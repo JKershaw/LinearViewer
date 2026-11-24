@@ -208,9 +208,17 @@ test('after a swap rows are bound once, the opened task mounts once, and fold st
   await row(page, UP_NEXT, 'LOCAL-T').click();
   await expect(row(page, UP_NEXT, 'LOCAL-T')).toHaveAttribute('aria-expanded', 'false');
 
-  // Persisted expanded rows open on the new rows as a reload opens them: LOCAL-T is marked expanded in the reader's state
-  // (as another tab would leave it), and the next swap opens it, as a reload would.
-  await page.evaluate((id) => { state.expanded.push({ id, section: 'home-up-next' }); }, idOf('t'));
+  // Persisted expanded rows open on the new rows as a reload opens them: LOCAL-T is opened by a click, so the reader's
+  // state marks it expanded, then its details are hidden without a click (an open row holds the swap), so the state
+  // still says expanded and the next swap opens it, as a reload would. app.js is a module (LIN-4463 piece 5), so the
+  // state is reached through the page, not as a global.
+  await row(page, UP_NEXT, 'LOCAL-T').click();
+  await expect(row(page, UP_NEXT, 'LOCAL-T')).toHaveAttribute('aria-expanded', 'true');
+  await page.evaluate(() => {
+    const details = document.querySelector('[data-testid="home-up-next-section"] .details:not(.hidden)');
+    details.classList.add('hidden');
+  });
+  await expect(page.locator(`${UP_NEXT} .details:not(.hidden)`)).toHaveCount(0);
   await answerElsewhere(context, 'LOCAL-A');
   await refresh(page);
   await expect(page.locator(`${RUNNING} .line[data-identifier="LOCAL-A"], ${UP_NEXT} .line[data-identifier="LOCAL-A"]`)).toHaveCount(1);

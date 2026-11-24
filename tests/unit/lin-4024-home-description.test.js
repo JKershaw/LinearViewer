@@ -6,20 +6,15 @@
  * the fold); the client renders it through the one shared renderer the "show more" block also uses; and the Home
  * description fold renders its markdown when it opens (public/app.js, real source).
  *
- * The page is the server's own markup (renderDetailsContent) drawn on the shared fake DOM, and app.js runs its init over it
- * (LIN-4307): its document listeners are bound as they are in a browser, and a click is delivered to them with
- * `clickDelegated`. There is no stand-in for document or window.
+ * The page is the server's own markup (renderDetailsContent) drawn on the shared fake DOM, and app.js is imported over it
+ * as the module it is (LIN-4463 piece 5) and runs its init (LIN-4307): its document listeners are bound as they are in a
+ * browser, and a click is delivered to them with `clickDelegated`. There is no stand-in for document or window.
  */
 import { test, describe } from 'node:test';
 import assert from 'node:assert/strict';
-import { readFileSync } from 'node:fs';
-import { fileURLToPath } from 'node:url';
-import { dirname, join } from 'node:path';
 import { renderDetailsContent } from '../../lib/render.js';
-import { loadWorld, clickDelegated, fireDOMContentLoaded } from './helpers/client-world.js';
-
-const __dirname = dirname(fileURLToPath(import.meta.url));
-const APP = readFileSync(join(__dirname, '../../public/app.js'), 'utf8');
+import { clickDelegated, fireDOMContentLoaded } from './helpers/client-world.js';
+import { importWorld } from './helpers/import-world.js';
 
 const DESCRIPTION = '## Why\n\nSome **bold** text.\n\n- one\n- two';
 
@@ -69,35 +64,34 @@ describe('Home description — rendered markdown on open, no raw preview', () =>
   });
 });
 
-// Home's page for `issue`: the server's markup drawn on the fake DOM, then public/app.js run over it and its
-// DOMContentLoaded init fired, so its document listeners are bound as in a browser. `renders` records each markdown
-// render: renderMarkdown is common.js's, and a stub stands in for it here.
-async function loadPage(issue, options) {
+// Home's page for `issue`: the server's markup drawn on the fake DOM, then public/app.js imported over it (a module,
+// LIN-4463 piece 5) and its DOMContentLoaded init fired, so its document listeners are bound as in a browser. `renders`
+// records each markdown render: renderMarkdown is common.js's, and a stub stands in for it here.
+async function loadPage(t, issue, options) {
   const renders = [];
-  const world = loadWorld({
-    scripts: [],
+  const world = importWorld({
     window: { addEventListener() {} },
     globals: {
       renderMarkdown: (text) => { renders.push(text); return `<p>${text}</p>`; },
-      atob: (s) => Buffer.from(s, 'base64').toString('binary'),
       localStorage: { getItem: () => null, setItem() {}, removeItem() {} },
       setInterval: () => 0, clearInterval() {},
       fetch: () => new Promise(() => {}),
       console: { log() {}, error() {}, warn() {} },
     },
   });
+  t.after(() => world.restore());
   // The details the server renders are injected into the row's `.details` wrapper, as the client does on expand
   // (public/app.js fills the lazy `.details`); the fold's handler looks its content up from that wrapper.
   const details = renderDetailsContent(issue, { urlKey: 'ws', featureFlags: {}, provider: EDITABLE, ...options });
   world.document.body.innerHTML = `<div class="details" data-details-for="${issue.id}" data-section="">${details}</div>`;
-  world.run(APP);
+  await world.importPage('app.js');
   await fireDOMContentLoaded(world.document);
   return { world, renders };
 }
 
 describe('Home description — the client renders the markdown on first open (public/app.js, run)', () => {
-  test('Home\'s description fold renders its markdown the first time it opens, and not again', async () => {
-    const { world, renders } = await loadPage(issue, { layout: 'home' });
+  test('Home\'s description fold renders its markdown the first time it opens, and not again', async (t) => {
+    const { world, renders } = await loadPage(t, issue, { layout: 'home' });
     const toggle = world.document.querySelector('[data-testid="issue-description-toggle"]');
     const home = world.document.querySelector('.home-description');
 
@@ -112,8 +106,8 @@ describe('Home description — the client renders the markdown on first open (pu
     assert.equal(renders.length, 1, 'a second open does not render it again');
   });
 
-  test('the show-more block renders on its first expansion, and not again', async () => {
-    const { world, renders } = await loadPage(issue, {});
+  test('the show-more block renders on its first expansion, and not again', async (t) => {
+    const { world, renders } = await loadPage(t, issue, {});
     const showMore = world.document.querySelector('.issue-desc-toggle');
     assert.ok(showMore, 'the long description has a show-more toggle');
 

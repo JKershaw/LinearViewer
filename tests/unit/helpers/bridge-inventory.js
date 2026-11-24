@@ -100,19 +100,33 @@ export function witnessProblem(consumer, witness, text) {
  * The problems with the inventory. `emitted`: `{ file: src }` for every file a renderer emits as a module. `pages`:
  * `{ file: src }` for every other public script (classic or module) that may read a bridged name. `renderers`: the
  * script lists, `[{ rel, entries: [{ src, module }] }]`. `consumers`: `{ '/file.js': 'tests/…/witness.test.js' }`, the
- * registered readers and their witnesses. `fileExists(path)` and `readText(path)` read the witness files.
+ * registered readers and their witnesses. `hooks`: `{ name: 'tests/e2e/…spec.js' }`, the e2e hooks a module may write
+ * (never read by a classic script). `fileExists(path)` and `readText(path)` read the witness and spec files.
  */
-export function bridgeProblems({ bridged, shim, emitted, pages, renderers, consumers, fileExists, readText }) {
+export function bridgeProblems({ bridged, shim, emitted, pages, renderers, consumers, hooks = {}, fileExists, readText }) {
   const problems = [];
   const written = new Set();
+  const hooksWritten = new Set();
   for (const [file, src] of Object.entries(emitted)) {
     for (const name of bridgeWrites(src)) {
+      if (hooks[name]) { hooksWritten.add(name); continue; }
       written.add(name);
       if (!bridged.includes(name)) problems.push(`${file} writes window.${name}: a new bridge name. The bridge is one shim with a declared name list; a new name is growth, so it needs its own change and a shrink plan, not a second shim.`);
     }
   }
   for (const name of bridged) {
     if (!written.has(name)) problems.push(`window.${name} is declared but no emitted module writes it: delete it from the declared list.`);
+  }
+  // An e2e hook (LIN-4463 piece 5) is a name a module writes only so a browser test can call it. It is not a bridge: no
+  // classic script may read it, and the spec that calls it must exist and name it.
+  for (const [name, spec] of Object.entries(hooks)) {
+    if (!hooksWritten.has(name)) problems.push(`window.${name} is a declared e2e hook but no emitted module writes it: delete it from the hook list.`);
+    if (!fileExists(spec)) problems.push(`window.${name}: its e2e spec ${spec} does not exist.`);
+    else if (!readText(spec).includes(`window.${name}`)) problems.push(`window.${name}: its e2e spec ${spec} never calls it, so the hook has no user: delete it.`);
+    for (const [file, src] of Object.entries(pages)) {
+      if (emitted[file]) continue;
+      if (bridgeReads(src, [name], { sourceType: 'module' }).size) problems.push(`${file} reads window.${name}, an e2e hook a module writes. A classic reader turns the hook into a bridge, which is growth: read it from a module by import instead.`);
+    }
   }
 
   const readers = new Map();

@@ -54,7 +54,6 @@ export const CLASSIC_LOADER_SUITES = [
   'lin-3618-dispatch-token-expiry-display.test.js',
   'lin-3833-client-harness.test.js',
   'lin-3833-copy-first-view.test.js',
-  'lin-3833-home-mount-needs-you.test.js',
   'lin-3833-run-control.test.js',
   'lin-3968-home-polish.test.js',
   'lin-3975-proposal-refresh.test.js',
@@ -64,7 +63,6 @@ export const CLASSIC_LOADER_SUITES = [
   'lin-4010-home-opened-task.test.js',
   'lin-4016-browser-follows-server.test.js',
   'lin-4016-sessions-fold-parked.test.js',
-  'lin-4024-home-description.test.js',
   'lin-4024-look.test.js',
   'lin-4040-close-out.test.js',
   'lin-4042-finished-no-run-to-pr.test.js',
@@ -135,8 +133,8 @@ test('the classic-loader census matches its baseline: no new classic suite, and 
   assert.deepEqual(gone, [], `listed suites no longer load browser scripts as classic: lower the baseline in this change: ${gone.join(', ')}`);
 });
 
-test('the baseline is recorded at 78 suites (the count that must not rise; LIN-4540 deleted the two scan suites, LIN-4537 the two brief/recap widget suites, LIN-4541 the six ruling-card and ruling-row suites)', () => {
-  assert.equal(CLASSIC_LOADER_SUITES.length, 78);
+test('the baseline is recorded at 76 suites (the count that must not rise; LIN-4540 deleted the two scan suites, LIN-4537 the two brief/recap widget suites, LIN-4541 the six ruling-card and ruling-row suites, LIN-4463 piece 5 the two app.js suites)', () => {
+  assert.equal(CLASSIC_LOADER_SUITES.length, 76);
 });
 
 test('runClassic is counted unless it runs a named sibling: observation.js counts, chart-helpers.js does not', () => {

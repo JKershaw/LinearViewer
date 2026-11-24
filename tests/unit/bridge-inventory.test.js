@@ -24,6 +24,10 @@ const BRIDGED = ['CostFormat'];
 const CONSUMERS = {
   '/prompt-section.js': 'tests/unit/lin-3833-run-control.test.js',
 };
+/** E2e hooks: names a module writes only so a browser spec can call them, never read by a classic script (LIN-4463 piece 5). */
+const HOOKS = {
+  refreshWaitingOnYou: 'tests/e2e/lin-4242-waiting-live.spec.js',
+};
 
 function realInputs() {
   const rendererFiles = readdirSync(join(ROOT, 'lib')).filter((f) => f.endsWith('.js'));
@@ -53,6 +57,7 @@ describe('the bridge over the real repo', () => {
     pages: inputs.pages,
     renderers: inputs.renderers,
     consumers: CONSUMERS,
+    hooks: HOOKS,
     fileExists: (p) => existsSync(join(ROOT, p)),
     readText: (p) => read(p),
   });
@@ -63,11 +68,15 @@ describe('the bridge over the real repo', () => {
 
   test('the one emitter of the bridge is the shim, and it is the only module that writes a bridged name', () => {
     assert.deepEqual([...result.written], BRIDGED);
-    assert.deepEqual(Object.keys(inputs.emitted).filter((f) => bridgeWrites(inputs.emitted[f]).size), ['cost-format-global.js']);
+    const writesBridged = (f) => [...bridgeWrites(inputs.emitted[f])].some((n) => BRIDGED.includes(n));
+    assert.deepEqual(Object.keys(inputs.emitted).filter(writesBridged), ['cost-format-global.js']);
+    // The only other module write is the declared e2e hook, from app.js.
+    const others = Object.keys(inputs.emitted).flatMap((f) => [...bridgeWrites(inputs.emitted[f])].filter((n) => !BRIDGED.includes(n)).map((n) => `${f}:${n}`));
+    assert.deepEqual(others, ['app.js:refreshWaitingOnYou']);
   });
 
-  test('the emitted modules are the shim and the page modules that import the formatter or read no bridge (workspace-kpis.js, task-page.js, flight-companion.js, observation.js, question-records.js LIN-4532, swipe.js LIN-4463 piece 5)', () => {
-    assert.deepEqual(Object.keys(inputs.emitted).sort(), ['cost-format-global.js', 'flight-companion.js', 'observation.js', 'question-records.js', 'swipe.js', 'task-page.js', 'workspace-kpis.js']);
+  test('the emitted modules are the shim and the page modules that import the formatter or read no bridge (workspace-kpis.js, task-page.js, flight-companion.js, observation.js, question-records.js LIN-4532, swipe.js and app.js LIN-4463 piece 5)', () => {
+    assert.deepEqual(Object.keys(inputs.emitted).sort(), ['app.js', 'cost-format-global.js', 'flight-companion.js', 'observation.js', 'question-records.js', 'swipe.js', 'task-page.js', 'workspace-kpis.js']);
   });
 
   test('the renderer lists the check read are the three that name a consumer, so a list the reader cannot match fails here', () => {
@@ -88,7 +97,7 @@ describe('the bridge over the real repo', () => {
   test('the bridge keeps exactly one classic reader (prompt-section.js), and the pages converted to modules are not among them', () => {
     assert.deepEqual([...result.readers.keys()].sort(), Object.keys(CONSUMERS).sort());
     assert.deepEqual(Object.keys(CONSUMERS), ['/prompt-section.js']);
-    for (const converted of ['/workspace-kpis.js', '/task-page.js', '/flight-companion.js', '/observation.js', '/swipe.js']) assert.equal(result.readers.has(converted), false, converted);
+    for (const converted of ['/workspace-kpis.js', '/task-page.js', '/flight-companion.js', '/observation.js', '/swipe.js', '/app.js']) assert.equal(result.readers.has(converted), false, converted);
   });
 });
 
@@ -102,8 +111,11 @@ describe('the checks fail on each synthetic breach (witnesses for the inventory)
       pages: { ...inputs.pages },
       renderers: inputs.renderers,
       consumers: { ...CONSUMERS },
+      hooks: { ...HOOKS },
       fileExists: () => true,
-      readText: (witness) => rightOrderByRun(Object.keys(CONSUMERS).find((c) => CONSUMERS[c] === witness)),
+      readText: (path) => (Object.values(HOOKS).includes(path)
+        ? read(path)
+        : rightOrderByRun(Object.keys(CONSUMERS).find((c) => CONSUMERS[c] === path))),
     };
   };
   const run = (overrides) => bridgeProblems({ ...base(), ...overrides }).problems;
@@ -166,5 +178,16 @@ describe('the checks fail on each synthetic breach (witnesses for the inventory)
 
   test('timing: a witness that never loads its consumer is named, so the order cannot pass by omission', () => {
     assert.match(witnessProblem('/prompt-section.js', 'w.test.js', 'loadCostFormat(world.sandbox);'), /never loads the consumer/);
+  });
+
+  test('an e2e hook read by a classic script is a bridge and fails; an undeclared hook is a new bridge name', () => {
+    const pages = { ...realInputs().pages, 'dispatch.js': "document.addEventListener('click', () => window.refreshWaitingOnYou());\n" };
+    assert.ok(run({ pages }).some((p) => /dispatch\.js reads window\.refreshWaitingOnYou, an e2e hook/.test(p)));
+    assert.ok(run({ hooks: {} }).some((p) => /app\.js writes window\.refreshWaitingOnYou: a new bridge name/.test(p)));
+  });
+
+  test('a declared hook no module writes, or whose spec never calls it, fails', () => {
+    assert.ok(run({ hooks: { ...HOOKS, gone: 'tests/e2e/lin-4242-waiting-live.spec.js' } }).some((p) => /window\.gone is a declared e2e hook but no emitted module writes it/.test(p)));
+    assert.ok(run({ readText: () => '// no hook here' }).some((p) => /window\.refreshWaitingOnYou: its e2e spec .* never calls it/.test(p)));
   });
 });
