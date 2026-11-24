@@ -35,9 +35,11 @@ after(() => harness.close());
 async function refresh() {
   idx = buildIndex(await store.snapshots(URL_KEY));
 }
-function ctx(now = idx) {
+function ctx(now = idx, by = undefined) {
   return {
     addressees: { stages: STAGES, people: PEOPLE },
+    // LIN-4416: the writer, as createRecordWrites hands it in (a verdict is held to its judge).
+    by,
     resolve(ref) {
       const s = now.at(ref);
       return s ? { kind: s.kind, id: ref } : null;
@@ -49,7 +51,7 @@ function ctx(now = idx) {
 
 /** A write as the proxy makes it: check, then store. Returns the stored version or the 422 problems. */
 async function write(kind, body, by = 'implementation') {
-  const { problems, record } = checkAdd(kind, body, ctx());
+  const { problems, record } = checkAdd(kind, body, ctx(idx, by));
   if (problems.length) return { problems };
   const snap = await store.add(URL_KEY, record, { by, at: at(++minute) });
   await refresh();
@@ -62,7 +64,7 @@ const add = async (kind, body, by) => {
 };
 async function revise(id, body, by = 'implementation') {
   const prev = idx.at(id);
-  const { problems, changes } = checkRevise(prev, body, ctx());
+  const { problems, changes } = checkRevise(prev, body, ctx(idx, by));
   if (problems.length) return { problems };
   const snap = await store.revise(URL_KEY, id, changes, { by, at: at(++minute), reason: body.reason });
   await refresh();
@@ -168,20 +170,20 @@ describe('shape: what a write may hold (check.js)', () => {
 
   test('a verdict needs an on, and its outcome must be in its judgement\'s set', async () => {
     const c = await add('change', { ref: 'https://github.com/acme/widget/pull/9', head: 'abc' });
-    refused(checkAdd('verdict', { judgement: 'review', outcome: 'approve' }, ctx()).problems, 'on');
-    refused(checkAdd('verdict', { judgement: 'review', outcome: 'better', on: [c] }, ctx()).problems, 'outcome');
-    refused(checkAdd('verdict', { judgement: 'vibes', outcome: 'approve', on: [c] }, ctx()).problems, 'judgement');
-    assert.deepEqual(checkAdd('verdict', { judgement: 'blind-read', outcome: 'better', on: [c] }, ctx()).problems, []);
+    refused(checkAdd('verdict', { judgement: 'review', outcome: 'approve' }, ctx(idx, 'review')).problems, 'on');
+    refused(checkAdd('verdict', { judgement: 'review', outcome: 'better', on: [c] }, ctx(idx, 'review')).problems, 'outcome');
+    refused(checkAdd('verdict', { judgement: 'vibes', outcome: 'approve', on: [c] }, ctx(idx, 'review')).problems, 'judgement');
+    assert.deepEqual(checkAdd('verdict', { judgement: 'blind-read', outcome: 'better', on: [c] }, ctx(idx, 'blind-read')).problems, []);
   });
 
   test('a bare on id is pinned to the change\'s current version; an unknown version is refused', async () => {
     const c = await add('change', { ref: 'https://github.com/acme/widget/pull/9', head: 'abc' });
-    const pinned = checkAdd('verdict', { judgement: 'review', outcome: 'approve', on: c }, ctx());
+    const pinned = checkAdd('verdict', { judgement: 'review', outcome: 'approve', on: c }, ctx(idx, 'review'));
     assert.deepEqual(pinned.record.links.on, [`${c}@1`]);
     await revise(c, { head: 'def', reason: 'new head' }, 'implementation');
-    const again = checkAdd('verdict', { judgement: 'review', outcome: 'approve', on: c }, ctx());
+    const again = checkAdd('verdict', { judgement: 'review', outcome: 'approve', on: c }, ctx(idx, 'review'));
     assert.deepEqual(again.record.links.on, [`${c}@2`]);
-    refused(checkAdd('verdict', { judgement: 'review', outcome: 'approve', on: `${c}@9` }, ctx()).problems, 'on');
+    refused(checkAdd('verdict', { judgement: 'review', outcome: 'approve', on: `${c}@9` }, ctx(idx, 'review')).problems, 'on');
   });
 
   test('a plan link must point to a plan; a piece joins a task to a plan', async () => {

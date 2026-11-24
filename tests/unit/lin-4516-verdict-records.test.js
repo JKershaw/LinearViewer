@@ -33,6 +33,7 @@ import { createRecordsRouteHarness } from '../helpers/records-route-harness.js';
 import { createFakeTracker } from '../helpers/fake-records-tracker.js';
 import { createRecordWrites } from '../../lib/records/writes.js';
 import { isTerminalState } from '../../lib/providers/state-map.js';
+import { STAGE_KINDS } from '../../lib/prompts/stage-kinds.js';
 import { refreshTaskChanges } from '../../lib/change-records.js';
 import { SUMMARY_LEAD, summaryBodyOf } from '../../lib/records/summary.js';
 import { computeIssueRoundTrips } from '../../lib/plan-review-round-trips.js';
@@ -92,7 +93,7 @@ beforeEach(async () => {
     blind: await rh.mintRunToken('row-blind'),
   };
   taskId = (await store.ensureTask(URL_KEY, { identifier: TICKET, asked: 'Slice 3 P3.', closed: false, closedReason: null }, { by: 'Harbour', at: T0 })).id;
-  writes = createRecordWrites({ recordsStore: store, isTerminalState });
+  writes = createRecordWrites({ recordsStore: store, isTerminalState, stageKinds: Object.keys(STAGE_KINDS) });
 });
 
 afterEach(async () => {
@@ -393,7 +394,8 @@ describe('witness 4 : the conditions contract', () => {
 describe('witness 5 : the summary path', () => {
   test('an import posts no summary, and a failed summary is named in the answer and never retried', async () => {
     const changeId = await addChange(41, 'H1');
-    const plain = createRecordWrites({ recordsStore: store, isTerminalState, tracker: () => tracker.port });
+    // LIN-4416: a writer that writes verdicts knows the stage kinds, so it can hold each to its judge.
+    const plain = createRecordWrites({ recordsStore: store, isTerminalState, stageKinds: Object.keys(STAGE_KINDS), tracker: () => tracker.port });
     const imported = await plain.add({ urlKey: URL_KEY, kind: 'verdict', input: { judgement: 'review', outcome: 'approve', reasoning: 'imported', on: [`${changeId}@1`], in: taskId }, by: 'review', via: 'import' });
     assert.ok(!imported.problems, JSON.stringify(imported.problems));
     assert.equal(tracker.comments.length, 0, 'an import posts no summary');

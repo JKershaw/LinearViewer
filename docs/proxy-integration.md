@@ -2260,7 +2260,7 @@ Content-Type: application/json
 |-------|------|----------|-------------|
 | `prompt` | string | Yes | The prompt to run (max ~10MB) |
 | `promptName` | string | No | Short label for the dispatch (max 100 chars) |
-| `kind` | string | No | Stable task classification — one of the `DISPATCH_KINDS` (the prompt-template keys, plus `custom`; see `lib/prompt-templates.js`). When omitted it is derived from `promptName`, falling back to `custom`. Read it instead of inferring the task type from `promptName` or the prompt body |
+| `kind` | string | No | Stable task classification — one of the `DISPATCH_KINDS` (the prompt-template keys, plus `custom`; see `lib/prompt-templates.js`). When omitted it is derived from `promptName`, falling back to `custom`. Read it instead of inferring the task type from `promptName` or the prompt body. A kind, given or derived, that starts a `review`, `plan-review` or `blind-read` run is refused 400 (its run would write the verdict the merge gate reads, from your prompt): start those with `POST /recommend-and-dispatch` and `kind`, which builds the prompt from the template (LIN-4416) |
 | `issueId` / `issueIdentifier` / `issueTitle` / `issueUrl` | string | No | Optional linkage to an issue |
 | `target` | string | No | `cli` \| `web` \| `dash` (default `cli`). `local`/Harbour OS is **not** available to proxy consumers |
 | `repo` | string | No | Repository override — the runner's folder override, stored verbatim. Harbour does not validate it against any workspace repo list; the project `repo=` feature and its guard were retired (LIN-3333). The consumer's own admission check resolves it against its folder namespaces |
