@@ -177,7 +177,14 @@
   font-family: var(--font-content);
   font-size: var(--font-size-sm);
   color: var(--slate-dim);
-  white-space: nowrap;
+  /* LIN-4558: the flag names what the run waits on (a child's title can be long), so it wraps inside the
+     card at 390px rather than widening it. */
+  overflow-wrap: anywhere;
+}
+/* LIN-4558: the in-page link to the child run a parked run waits on. */
+.sess-run-child {
+  font-family: var(--font-content);
+  font-size: var(--font-size-sm);
 }
 /* The per-run status is now a shared `.status-pill` (dot + AA-safe label); this
    only positions it at the end of the head row. */
