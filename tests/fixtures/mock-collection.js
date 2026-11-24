@@ -16,6 +16,10 @@
  * projection). This mirrors the real driver closely enough for the bounded
  * history read (LIN-1030) to be exercised in unit tests.
  *
+ * Also supports top-level `$nor` and dot-path query keys (LIN-4556; through an
+ * array only plain equality, anything else throws), proven against MangoDB in
+ * tests/unit/lin-4556-keyed-feedback.test.js.
+ *
  * Also supports `{ $in: [...] }` (used by the Observation materializer's
  * followUpTo BFS batch lookups, LIN-1307).
  * And `{ $exists: true|false }` (LIN-4383: the stopped-run cleanup's
@@ -139,8 +143,41 @@ export function createMockCollection() {
     return next;
   };
 
+  // Dot-path query keys (LIN-4556). Through plain objects a path resolves to one value and
+  // every condition above applies as on a top-level field. Through an ARRAY (e.g.
+  // `'feedback.key'`) Mongo matches if any element's leaf matches; the mock models plain
+  // equality only and throws on any other condition there, so no test can lean on an
+  // unmodelled negation (`$ne`/`$nin` through an array differ between MangoDB and MongoDB,
+  // finding-9cb8380b) and pass vacuously.
+  const leavesAt = (value, parts) => {
+    if (parts.length === 0) return { values: [value], viaArray: false };
+    if (Array.isArray(value)) {
+      const values = [];
+      for (const el of value) values.push(...leavesAt(el, parts).values);
+      return { values, viaArray: true };
+    }
+    if (value === null || typeof value !== 'object') return { values: [undefined], viaArray: false };
+    const inner = leavesAt(value[parts[0]], parts.slice(1));
+    return inner;
+  };
+  const pathMatches = (doc, key, condition) => {
+    if (!key.includes('.')) return fieldMatches(doc[key], condition);
+    const [head, ...rest] = key.split('.');
+    const { values, viaArray } = leavesAt(doc[head], rest);
+    if (!viaArray) return fieldMatches(values[0], condition);
+    if (condition !== null && typeof condition === 'object') {
+      throw new Error(`mock-collection: only plain equality is modelled on a dot path through an array (${key})`);
+    }
+    return values.some((v) => fieldMatches(v, condition));
+  };
+
+  // `$nor: [q1, q2, ...]` (LIN-4556's keyed feedback append): matches when NO sub-query
+  // matches, as in Mongo/MangoDB.
   const matches = (doc, query) =>
-    Object.keys(query).every(key => fieldMatches(doc[key], query[key]));
+    Object.keys(query).every((key) => {
+      if (key === '$nor') return Array.isArray(query.$nor) && !query.$nor.some((sub) => matches(doc, sub));
+      return pathMatches(doc, key, query[key]);
+    });
 
   return {
     _docs: docs,

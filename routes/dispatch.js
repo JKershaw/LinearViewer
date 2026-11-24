@@ -1648,14 +1648,16 @@ export function createDispatchRoutes({ dispatchQueueStore, dispatchTokenStore, w
       url,
       urlLabel,
       kind: sanitizedKind,
-      rootItemId: sanitizedRootItemId
+      rootItemId: sanitizedRootItemId,
+      key
     } = validation.value;
 
     try {
       const result = await dispatchQueueStore.addFeedback(
         itemId,
         req.dispatchUrlKey,
-        { message, url: url || null, urlLabel: urlLabel || null, kind: sanitizedKind, rootItemId: sanitizedRootItemId },
+        // LIN-4556: the idempotency key rides along only when the post carried one (sparse).
+        { message, url: url || null, urlLabel: urlLabel || null, kind: sanitizedKind, rootItemId: sanitizedRootItemId, ...(key ? { key } : {}) },
         req.dispatchTokenLabel,
         provisionWakeCredential,
         // LIN-4373: the leftover step, the same one the runner feedback route uses. This
