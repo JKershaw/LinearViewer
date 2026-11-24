@@ -42,7 +42,6 @@ import { localSeedId } from '../fixtures/local-harness.js';
 import { SELECTORS } from '../helpers.js';
 import { askingRun, recordsOf, runningRun, seedOwnerFindings, seedLongQuestion } from '../fixtures/question-records.js';
 import { renderSSEFrames } from '../fixtures/flight-companion-sse-frames.js';
-import { questionShortOf } from '../../lib/records/question-short.js';
 
 const SET = process.env.LIN4546_SHOTS || 'before';
 const DIR = process.env.LIN4546_SHOTS_DIR || `docs/reviews/_evidence-2026-11-24-lin4546/${SET}`;
@@ -93,21 +92,25 @@ async function seed(page, seedLocal, urlKey) {
   await seedOwnerFindings(page, urlKey, { findings: 36, tasks: TASKS.filter((t) => t.key !== 'charter').map((t) => ({ ticket: t.identifier, title: t.title })) });
   for (const [n, ticket] of ['LOCAL-11', 'LOCAL-14', 'LOCAL-15'].entries()) await runningRun(page, urlKey, ticket, { title: titleOf(ticket), n });
   const questions = (await recordsOf(page, urlKey, 'question')).filter((r) => r.state === 'open');
-  return { runId, questions };
+  // LIN-4555: the reader's own rows for these questions (lib/open-questions.js, through the Questions feed): each carries its own
+  // ticket and title, its words as the reader reads them, and `optionWords`, the fields list_pending_decisions projects.
+  const feed = await page.request.get(`/workspace/${urlKey}/api/dashboard/rulings`);
+  expect(feed.ok(), `rulings feed failed: ${await feed.text()}`).toBeTruthy();
+  const rows = (await feed.json()).rulings || [];
+  return { runId, questions, rows };
 }
 
-/** Flight Companion's `list_pending_decisions` result for the seeded questions, as lib/chat-tools.js projects them. */
-function pendingResult(questions) {
+/**
+ * Flight Companion's `list_pending_decisions` result, as lib/chat-tools.js projectPendingQuestion shapes the reader's rows. LIN-4555:
+ * built from the reader's rows (each names its own ticket), not from the records in list order with tickets assigned by position.
+ */
+function pendingResult(rows) {
   return JSON.stringify({
-    count: questions.length, truncated: false,
-    questions: questions.map((q, i) => {
-      const issueIdentifier = ['LOCAL-11', 'LOCAL-12', 'LOCAL-13'][i] ?? null;
-      return {
-        // LIN-4551: `short` as the reader gives it (written, else derived), which the tool row carries since LIN-4550.
-        questionId: q.id, question: q.fields.asks, short: questionShortOf(q.fields), options: q.fields.options, recommended: q.fields.recommended ?? null,
-        issueIdentifier, issueTitle: issueIdentifier ? titleOf(issueIdentifier) : null, state: 'resumable', interactive: true,
-      };
-    }),
+    count: rows.length, truncated: false,
+    questions: rows.map((r) => ({
+      questionId: r.questionId, question: r.asks, short: r.short, options: r.options, optionWords: r.optionWords ?? r.options,
+      recommended: r.recommended ?? null, issueIdentifier: r.ticket ?? null, issueTitle: r.title ?? null, state: r.state ?? 'resumable', interactive: true,
+    })),
   });
 }
 
@@ -143,11 +146,11 @@ async function shootAll(page, name, path, prepare = async () => {}, { fresh = fa
  * (pendingResult; tests/e2e/flight-companion.spec.js mocks the same way), the page's auto-wake turn is brought on by the clock,
  * and the fold is opened if it drew closed. No model is called.
  */
-async function shootFlightCompanion(page, name, base, questions) {
+async function shootFlightCompanion(page, name, base, rows) {
   await page.route('**/api/flight-companion/turn', (route) => {
     if (route.request().method() !== 'POST') return route.continue();
     const frames = renderSSEFrames([
-      ['tool', { phase: 'result', id: 't1', name: 'list_pending_decisions', result: pendingResult(questions) }],
+      ['tool', { phase: 'result', id: 't1', name: 'list_pending_decisions', result: pendingResult(rows) }],
       ['token', { token: 'Three questions are waiting on you, and three runs are going.' }],
       ['done', {}],
     ]);
@@ -177,8 +180,9 @@ test.beforeAll(() => { mkdirSync(DIR, { recursive: true }); });
 test.afterAll(() => { writeFileSync(`${DIR}/scroll-390.json`, `${JSON.stringify(scroll390, null, 2)}\n`); });
 
 test('owner: Home, rulings, Runs, task page, run page and Flight Companion', async ({ page, seedLocal, localWorkerUrlKey: urlKey }) => {
-  const { runId, questions } = await seed(page, seedLocal, urlKey);
+  const { runId, questions, rows } = await seed(page, seedLocal, urlKey);
   expect(questions).toHaveLength(3);
+  expect(rows).toHaveLength(3);
   const base = `/workspace/${urlKey}`;
 
   await shootAll(page, 'home-owner', `${base}/`, async () => {
@@ -195,11 +199,11 @@ test('owner: Home, rulings, Runs, task page, run page and Flight Companion', asy
     await expect(page.locator(`${SELECTORS.runPage.questions} ${Q.card}`).first()).toBeVisible();
   });
 
-  await shootFlightCompanion(page, 'flight-companion-owner', base, questions);
+  await shootFlightCompanion(page, 'flight-companion-owner', base, rows);
 });
 
 test('member: Home, rulings, Runs, task page, run page and Flight Companion', async ({ page, seedLocal, localWorkerUrlKey: urlKey }) => {
-  const { runId, questions } = await seed(page, seedLocal, urlKey);
+  const { runId, rows } = await seed(page, seedLocal, urlKey);
   // The workspace's owner is someone else: the session is a member.
   const own = await page.request.get(`/test/set-workspace-ownership?urlKey=${urlKey}&state=foreign`);
   expect(own.ok(), `ownership seam failed: ${await own.text()}`).toBeTruthy();
@@ -209,5 +213,5 @@ test('member: Home, rulings, Runs, task page, run page and Flight Companion', as
   await shootRuns(page, 'member', base);
   await shootAll(page, 'task-member', `${base}/task/LOCAL-11`);
   await shootAll(page, 'run-member', `${base}/observation/session/${runId}`);
-  await shootFlightCompanion(page, 'flight-companion-member', base, questions);
+  await shootFlightCompanion(page, 'flight-companion-member', base, rows);
 });

@@ -140,13 +140,24 @@
           who: 'agent',
           whoState: 'in-progress',
           html: '<span class="sess-tx-msg markdown-content">' + messageHtml + '</span>' + link,
-          time: entry.timestamp ? String(entry.timestamp) : undefined,
+          time: transcriptTimeOf(entry.timestamp),
           liClass: liClass,
           testId: 'session-transcript-entry',
           reveal: false
         });
       }
     }
+  }
+
+  // LIN-4555 (the walk): a bubble's time as the product says times: relative words, then the exact local time with its zone
+  // (common.js relativeTime and formatLocalTime), as the Runs card reads "updated just now · 10:49 PM GMT". It printed the raw ISO
+  // stamp. With neither helper loaded the bubble shows no time, never the stamp.
+  function transcriptTimeOf(timestamp) {
+    if (!timestamp) return undefined;
+    var rel = typeof window.relativeTime === 'function' ? window.relativeTime(timestamp) : '';
+    var exact = typeof window.formatLocalTime === 'function' ? window.formatLocalTime(timestamp, { zone: true }) : '';
+    var words = [rel, exact].filter(function (part) { return part; }).join(' \u00b7 ');
+    return words || undefined;
   }
 
   // ── Per-run inline reply boxes (LIN-1133; LIN-1298 echo thread) ───────────

@@ -143,3 +143,21 @@ test('renderRunTranscripts is unchanged for feedback with no decision-lifecycle 
   assert.match(sandbox.__appended[0].html, /opened the pull request/);
   assert.match(sandbox.__appended[0].html, /PR #1/);
 });
+
+// LIN-4555 (the walk): a transcript bubble printed its entry's raw ISO stamp (`2026-11-24T22:55:27.978Z`) beside the message once a
+// step was opened on the run page, one of the six surfaces where nothing a person reads is an ISO time. It reads as the rest of the
+// product's times do: relative words, then the exact local time (the Runs card's "updated just now · 10:49 PM GMT").
+test('a bubble\'s time reads in words, never as the raw ISO stamp (LIN-4555)', () => {
+  const sandbox = makeSandbox([thread([{ message: 'opened the pull request', timestamp: '2026-08-01T00:00:00.000Z' }])]);
+  sandbox.window.relativeTime = (iso) => (iso === '2026-08-01T00:00:00.000Z' ? '5m ago' : '');
+  sandbox.window.formatLocalTime = (iso, opts) => (iso === '2026-08-01T00:00:00.000Z' && opts?.zone ? '10:49 PM GMT' : null);
+  sandbox.renderRunTranscripts();
+  assert.equal(sandbox.__appended.length, 1);
+  assert.equal(sandbox.__appended[0].time, '5m ago · 10:49 PM GMT');
+});
+
+test('with neither time helper loaded a bubble shows no time rather than the raw stamp (LIN-4555)', () => {
+  const sandbox = makeSandbox([thread([{ message: 'opened the pull request', timestamp: '2026-08-01T00:00:00.000Z' }])]);
+  sandbox.renderRunTranscripts();
+  assert.equal(sandbox.__appended[0].time, undefined);
+});
