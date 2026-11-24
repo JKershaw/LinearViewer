@@ -206,12 +206,25 @@ describe('the task page\'s generic end form does not dismiss a question (it woul
     assert.equal((await store.current(TASK_URL_KEY, q.id)).state, 'open');
   });
 
-  test('the same route still ends a question another way (answered stays a person\'s generic end)', async () => {
+  // LIN-4554 changed what this pinned: a person no longer ends a question `withdrawn` here (the asking agent's word for taking its own
+  // question back), nor `answered` when it was asked of a person (their card answers it and resumes the run). The route still ends
+  // a question another way: handed on into a record, and `answered` for a question to the project, which has no card.
+  test('the same route still ends a question another way (handed on; answered stays a person\'s generic end where no card answers it)', async () => {
     const q = await openQuestion();
-    const r = await postEnd(q.id, 'withdrawn', 'asked in error');
+    const taken = await store.add(TASK_URL_KEY, { kind: 'finding', state: 'open', fields: { says: 'carried on here', how: 'a test' }, links: {}, in: q.in, to: 'project' }, { by: 'implementation' });
+    const r = await fetch(`${base}/workspace/${TASK_URL_KEY}/records/${q.id}/end`, {
+      method: 'POST', redirect: 'manual', headers: { 'content-type': 'application/x-www-form-urlencoded' },
+      body: new URLSearchParams({ identifier: TICKET, state: 'handed-on', reason: 'carried on in a finding', into: taken.id }),
+    });
     assert.equal(r.status, 303);
     assert.doesNotMatch(r.headers.get('location'), /records_refused/);
-    assert.equal((await store.current(TASK_URL_KEY, q.id)).state, 'withdrawn');
+    assert.equal((await store.current(TASK_URL_KEY, q.id)).state, 'handed-on');
+
+    const toProject = await store.add(TASK_URL_KEY, { kind: 'question', state: 'open', fields: { asks: 'Who owns it?' }, links: {}, in: q.in, to: 'project' }, { by: 'implementation' });
+    const a = await postEnd(toProject.id, 'answered', 'the owner said so');
+    assert.equal(a.status, 303);
+    assert.doesNotMatch(a.headers.get('location'), /records_refused/);
+    assert.equal((await store.current(TASK_URL_KEY, toProject.id)).state, 'answered');
   });
 
   test('the rendered end form for an open question has no `dismissed` option, and one for a finding is unchanged', async () => {
@@ -221,9 +234,11 @@ describe('the task page\'s generic end form does not dismiss a question (it woul
     const html = renderTaskRecordsSection({ views, identifier: TICKET, urlKey: TASK_URL_KEY, canAct: true });
     const questionLine = html.split('<li').find((l) => l.includes(`records/${q.id}/end`));
     assert.ok(questionLine, 'the question line carries its end form');
-    assert.doesNotMatch(questionLine, /<option value="dismissed">/);
-    assert.match(questionLine, /<option value="answered">/);
-    assert.match(questionLine, /<option value="withdrawn">/);
+    assert.doesNotMatch(questionLine, /<option value="dismissed"/);
+    // LIN-4554: asked of a person, so their card answers it and only the asking agent withdraws it: the form offers handed on alone.
+    assert.match(questionLine, /<option value="handed-on"/);
+    assert.doesNotMatch(questionLine, /<option value="answered"/);
+    assert.doesNotMatch(questionLine, /<option value="withdrawn"/);
   });
 });
 
