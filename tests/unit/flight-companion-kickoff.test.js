@@ -46,7 +46,8 @@ describe('buildFlightCompanionKickoff', () => {
     const text = buildFlightCompanionKickoff({ baseUrl: BASE_URL });
     assert.ok(text.includes(`${PROXY}/stack?view=digest`));
     assert.ok(text.includes(`${PROXY}/brief/{id}`));
-    assert.ok(text.includes(`${PROXY}/recap/{id}`));
+    // LIN-4537 (P6b): the recap route is retired, so the catalog must not teach it.
+    assert.ok(!text.includes('/recap/'));
     assert.ok(text.includes(`${PROXY}/issues/{id}`));
     assert.ok(text.includes(`${PROXY}/search`));
   });

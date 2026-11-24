@@ -54,8 +54,7 @@ Keep only this in steady state; everything else is drill-down on demand:
 - **The proxy**: base `https://projects.jkershaw.com/api/proxy`, a Bearer token, and the
   verb catalog at `GET /instructions`. The verbs you drive:
   - Orient/choose: `GET /stack?view=digest` (compact one-line headlines plus each line's ranking features — `downstreamUnblocks`, `criticalPathLen`, optional `heldBy`, compact `why` — no full task bodies — drill
-    into a task with `GET /brief/{id}` only once you've picked it), `GET /recap/{id}`,
-    `GET /brief/{id}`, `GET /recommend/{id}`.
+    into a task with `GET /brief/{id}` only once you've picked it), `GET /recommend/{id}`.
   - Dispatch: `POST /recommend-and-dispatch` (the fused trigger: recommend + enqueue, prompt stays server-side) → `GET /dispatch/{id}` (watch) / `GET /dispatch?…` (list). Plain `POST /dispatch` is for a human-supplied prompt only.
   - Verify: `GET /issues/{id}`, `GET /search`, plus the artifact URLs in `[evidence]`.
 

@@ -134,8 +134,6 @@ function buildApp({ dispatchStore, runProposalsStore, proxyTokenStore, ownerChec
     observationSessionsStore: null,
     runSummaryCacheStore: new InMemoryRunSummaryCacheStore(),
     sessionSummaryCacheStore: new InMemorySessionSummaryCacheStore(),
-    briefCacheStore: { async get() { return null; } },
-    recapCacheStore: { async get() { return null; } },
     freeTierStore: { async tryUse() { return { allowed: true }; } },
     getWorkspaceAccessToken: async () => 'token',
     fetchIssueContext: async () => ({}),

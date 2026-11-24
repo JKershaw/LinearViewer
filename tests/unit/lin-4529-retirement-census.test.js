@@ -78,7 +78,7 @@ export const RETIRED = Object.freeze([
   { word: 'the brief and recap modules', re: /\blib\/(?:brief|recap|brief-cache|recap-cache)\.js\b/ },
   { word: 'the brief and recap calls', re: /\b(?:generateBrief|generateRecap|buildBriefMessages|buildRecapMessages|cleanBriefResponse|parseRecapResponse|DEFAULT_BRIEF_MODEL|DEFAULT_RECAP_MODEL|buildMockBrief|buildMockRecap|buildMockRecapContext|buildMockRecapFromContext|buildMockRecapContextFromFixtures)\b/ },
   { word: 'the brief and recap caches', re: /\b(?:BriefCacheStore|RecapCacheStore|InMemoryBriefCacheStore|InMemoryRecapCacheStore|briefCacheStore|recapCacheStore|hashContext)\b|clear-(?:brief|recap)-cache/ },
-  { word: 'the brief and recap routes', re: /\/api\/(?:brief|recap)\/|\/api\/proxy\/recap\b|\/api\/proxy\/issues\/[^\s`'"]*\/recap\b/ },
+  { word: 'the brief and recap routes', re: /\/api\/(?:brief|recap)\/|\/api\/proxy\/recap\b|\/api\/proxy\/issues\/[^\s`'"]*\/recap\b|\/recap\/(?:\{id\}|:id|\$\{)/ },
   { word: 'the brief and recap widgets', re: /\b(?:BriefSection|RecapSection)\b|public\/(?:brief|recap)\.js|['"]\/(?:brief|recap)\.js['"]|data-(?:brief|recap)-placeholder|data-toggle="(?:brief|recap)"/ },
   { word: 'the brief and recap panels', re: /\b(?:renderContextPanel|renderRecapBody|renderTaskContext|contextSignature|briefCurrentSection|briefWithoutCurrent|joinSessionIssueContext|readCachedContext|mountWidgets|enhanceContextMarkdown)\b|task-page-(?:summary|context|write-brief|write-recap)\b/ },
   { word: 'the brief and recap chat tools', re: /\bget_brief\b|\bget_recap\b/ },
@@ -90,7 +90,7 @@ export const RETIRED = Object.freeze([
 export const ALLOW = Object.freeze({
   // LIN-4533 (P3): the dated log of prompt-template changes. Its earlier entries name the block they changed; that is recorded history.
   // LIN-4536 (P6a): its LIN-4502 row names the brief quote module it changed; that is recorded history too.
-  'scripts/prompt-template-change-log.md': { words: ['DECISION: block taught', 'the brief quote module', 'the brief and recap modules', 'the brief and recap chat tools', 'formatDiscussionReference'], reason: 'the dated log of prompt-template changes: its earlier entries quote the DECISION: block and name the brief quote module, the brief module, its chat tool and the discussion-reference formatter they changed, which is recorded history (LIN-4533, LIN-4536 and LIN-4537 add their own entries)' },
+  'scripts/prompt-template-change-log.md': { words: ['DECISION: block taught', 'the brief quote module', 'the brief and recap modules', 'the brief and recap chat tools', 'the brief and recap routes', 'formatDiscussionReference'], reason: 'the dated log of prompt-template changes: its earlier entries quote the DECISION: block and name the brief quote module, the brief module, its chat tool and the discussion-reference formatter they changed, which is recorded history (LIN-4533, LIN-4536 and LIN-4537 add their own entries)' },
   // LIN-4533 (P3): a recorded liveness fixture of a past cycle (LIN-3238). Its messages are the transcript as it was, not taught text.
   'tests/fixtures/liveness/lin-3238-cycle.json': { words: ['DECISION: block taught'], reason: 'a recorded liveness fixture of the LIN-3238 cycle: its messages are the transcript as it was, kept as history' },
   // LIN-4540 (P7b-1): the task-decisions store is the old ruling store the scan wrote; its schema docs and write methods
