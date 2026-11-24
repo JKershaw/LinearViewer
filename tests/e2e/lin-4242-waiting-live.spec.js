@@ -103,7 +103,7 @@ test('a question asked after load gets its card on refresh; the count line and b
 
   await seedWaiting(page, 'LOCAL-S', THREE_OPTIONS);
   await refresh(page);
-  // The fragment's task line takes its title from the held task facts (the route's `waitingTitlesOf`), not the dispatch's issueTitle.
+  // The fragment's task line takes its title from the held task facts (lib/open-questions.js `titlesFromIssues` over `taskFacts.read`), not the dispatch's issueTitle.
   // Witness: force the route's titles off → the line reads the seeded issueTitle `LOCAL-S`.
   await expect(waitingCard(page, 'LOCAL-S').locator('[data-testid="question-record-card-task-title"]')).toHaveText('Solo task, Todo');
   await expect(waitingCard(page, 'LOCAL-S')).toHaveCount(1);

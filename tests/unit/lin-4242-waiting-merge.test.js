@@ -30,7 +30,7 @@ const row = (identifier) => ({
 let instance = 0;
 async function mergeModule() {
   const m = await import(`../../public/waiting-merge.js?world=${instance += 1}`);
-  return { mergeWaitingCards: m.mergeWaitingCards, rulingKeyOf: m.questionKeyOf, noteSettled: m.noteSettled };
+  return { mergeWaitingCards: m.mergeWaitingCards, questionKeyOf: m.questionKeyOf, noteSettled: m.noteSettled };
 }
 
 /** The server's section for `identifiers`, parsed into a document root. Returns the live body and the merge module (`QC`). */
@@ -44,7 +44,7 @@ async function world(identifiers) {
 }
 
 /** The key the merge uses for a wrapper: its card's question id (public/waiting-merge.js questionKeyOf). */
-const keyOfWrapper = (QC, wrapper) => QC.rulingKeyOf(wrapper.querySelector('[data-testid="question-record-card"]'));
+const keyOfWrapper = (QC, wrapper) => QC.questionKeyOf(wrapper.querySelector('[data-testid="question-record-card"]'));
 const wrappersOf = (body) => body.children.filter((c) => c.classList.contains('waiting-question'));
 const idsOf = (body) => wrappersOf(body).map((w) => w.querySelector('[data-testid="question-record-card-task"]').textContent.match(/LIN-\d+/)[0]);
 const wrapperFor = (body, identifier) => wrappersOf(body).find((w) => w.querySelector('[data-testid="question-record-card-task"]').textContent.includes(identifier));
@@ -103,7 +103,7 @@ describe('LIN-4242: the keyed merge (fake DOM)', () => {
     const { body, QC } = await world(['LIN-1', 'LIN-2']);
     // A question record's card is in flight while its controls are disabled (the answer is being written): holdsCard.
     const inFlight = wrapperFor(body, 'LIN-2').querySelector('[data-testid="question-record-card"]');
-    const key2 = QC.rulingKeyOf(inFlight);
+    const key2 = QC.questionKeyOf(inFlight);
     const answer = inFlight.querySelector('[data-testid="question-record-card-answer"]');
     answer.disabled = true;
     const first = merge(QC, body, freshFor(['LIN-1']));
@@ -120,7 +120,7 @@ describe('LIN-4242: the keyed merge (fake DOM)', () => {
     // Witness: drop the `settledKeys.has(key)` skip → LIN-2 is re-added and the count and id assertions fail.
     // The key settles through noteSettled, which app.js calls from RULING_GONE_EVENT (this page answered or dismissed it).
     const { body, QC } = await world(['LIN-1', 'LIN-2']);
-    const answeredKey = QC.rulingKeyOf(wrapperFor(body, 'LIN-2').querySelector('[data-testid="question-record-card"]'));
+    const answeredKey = QC.questionKeyOf(wrapperFor(body, 'LIN-2').querySelector('[data-testid="question-record-card"]'));
     QC.noteSettled(answeredKey);
     wrapperFor(body, 'LIN-2').remove(); // the page has already removed the answered card (onRulingGone)
     // The response was requested before the answer, so it still lists LIN-2.
