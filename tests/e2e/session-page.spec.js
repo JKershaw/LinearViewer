@@ -856,7 +856,8 @@ test.describe('Dedicated per-session page (LIN-1003)', () => {
     ]);
     expect((await dismissReq.response()).status()).toBe(200);
     await expect(card).toHaveAttribute('data-settled', 'true');
-    expect(await questionState(page, URL_KEY, questionId)).toBe('withdrawn');
+    // LIN-4550: a person's dismissal ends the question `dismissed`.
+    expect(await questionState(page, URL_KEY, questionId)).toBe('dismissed');
 
     // A reload does not bring it back as an open question.
     await page.reload();

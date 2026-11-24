@@ -22,13 +22,13 @@
     },
     "plan:fresh": {
       "name": "plan",
-      "bytes": 12825,
-      "sha256": "a35748b1e747595c4771bd05af350f925b790ee2972a72d9ef929a603f9a18a2"
+      "bytes": 12812,
+      "sha256": "d6abf2f7ce44e9b8f3882b88a11f5714892a821bad82b4826c5d3e75d9153f0a"
     },
     "plan:fix": {
       "name": "plan",
-      "bytes": 12825,
-      "sha256": "a35748b1e747595c4771bd05af350f925b790ee2972a72d9ef929a603f9a18a2"
+      "bytes": 12812,
+      "sha256": "d6abf2f7ce44e9b8f3882b88a11f5714892a821bad82b4826c5d3e75d9153f0a"
     },
     "look-into:fresh": {
       "name": "look into",
@@ -122,13 +122,13 @@
     },
     "implementation:fresh": {
       "name": "implement",
-      "bytes": 11579,
-      "sha256": "a37fb47939ccc6e5d4d35747ac0d8493b2ccba4cef4be33b24b5d2e76e450198"
+      "bytes": 11566,
+      "sha256": "ab488ef62e3ff7b6d960a5894df8468a082ef34b38d86cacba4295a9b66607e2"
     },
     "implementation:fix": {
       "name": "implement",
-      "bytes": 11920,
-      "sha256": "fdf55ceac7fe5eedca32d125c802ee3831687b4a2f4835fa8c1ef4f3d5fda744"
+      "bytes": 11907,
+      "sha256": "23d967659aff3469ee7a8ab7fd5cf0f6a05bab71da1a66364a49ef60fc635128"
     },
     "review:fresh": {
       "name": "review",

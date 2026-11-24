@@ -1,5 +1,5 @@
 {
-  "_about": "LIN-4493 (layer slice 1). The record shape, written once: every kind's fields, starting state and ends (layer design §3.2), the outcome sets (§3.2), the link types (§3.1), and the ends that name a record that takes over (§3.3), plus the text limits (LIN-4530). Pure data: check.js, views.js and brief.js read it, and nothing else spells a kind out. Field types: string, number, list (of strings), scope (a task id or 'project').",
+  "_about": "LIN-4493 (layer slice 1). The record shape, written once: every kind's fields, starting state and ends (layer design §3.2), the outcome sets (§3.2), the link types (§3.1), and the ends that name a record that takes over (§3.3), plus the text limits (LIN-4530). Pure data: check.js, views.js and brief.js read it, and nothing else spells a kind out. LIN-4550: a question's `dismissed` end is a person's alone (check.js dismissedWriterProblems); an agent takes its own question back as `withdrawn`. Field types: string, number, list (of strings), scope (a task id or 'project').",
   "kinds": {
     "task": {
       "fields": {
@@ -38,6 +38,7 @@
     },
     "question": {
       "fields": {
+        "short": "string",
         "asks": "string",
         "options": "list",
         "recommended": "string",
@@ -47,6 +48,7 @@
       "ends": [
         "answered",
         "withdrawn",
+        "dismissed",
         "handed-on"
       ],
       "needsTo": true
@@ -115,10 +117,13 @@
     }
   },
   "limits": {
-    "_about": "LIN-4530 (LIN-4529 plan D1). The most characters a text field may hold, by kind and field. A longer value is refused with this limit named; it is never truncated.",
+    "_about": "LIN-4530 (LIN-4529 plan D1). The most characters a text field may hold, by kind and field. A longer value is refused with this limit named; it is never truncated. LIN-4550: a question's `short` is its one-line question, one sentence the cards lead with.",
     "decision": {
       "answer": 10000,
       "words": 10000
+    },
+    "question": {
+      "short": 200
     }
   },
   "outcomes": {
@@ -166,6 +171,7 @@
   "staleEnds": [
     "superseded",
     "withdrawn",
+    "dismissed",
     "abandoned",
     "disproved"
   ],

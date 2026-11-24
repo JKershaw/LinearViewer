@@ -338,4 +338,18 @@ describe('computeEscalationKpis — question records (LIN-4538)', () => {
     assert.strictEqual(kpis.unansweredAge.count, 1, 'the open question is the one unanswered row');
     assert.strictEqual(kpis.escalationRate.raisedInWindow, 2, 'both were raised');
   });
+
+  test('LIN-4550: a person\'s dismissal ended `dismissed` and an old one ended `withdrawn` "dismissed" both book as dismissals; an agent\'s withdrawal books as neither', async () => {
+    const newer = await askQuestion('LIN-105');
+    const older = await askQuestion('LIN-106');
+    const byAgent = await askQuestion('LIN-107');
+    await records.end(URL_KEY, newer, { state: 'dismissed', reason: DISMISSED_REASON }, { by: PERSON });
+    await records.end(URL_KEY, older, { state: 'withdrawn', reason: DISMISSED_REASON }, { by: PERSON });
+    await records.end(URL_KEY, byAgent, { state: 'withdrawn', reason: 'answered it myself' }, { by: 'implementation' });
+    const kpis = await kpisNow();
+    assert.strictEqual(kpis.falseEscalation.dismissed, 2);
+    assert.strictEqual(kpis.falseEscalation.answered, 0);
+    assert.strictEqual(kpis.falseEscalation.total, 2, 'the agent withdrawal settles no outcome');
+    assert.strictEqual(kpis.escalationRate.raisedInWindow, 3);
+  });
 });

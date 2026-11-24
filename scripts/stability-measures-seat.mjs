@@ -8,7 +8,8 @@
 //                  the records read holds the questions asked since the records path (LIN-4531); rulings from before it are
 //                  not counted. "Raised" counts question records: one ask is one record. Outcome buckets as
 //                  lib/escalation-kpis.js (questionOutcomeOf, lib/records/question-facts.js): answered share =
-//                  answered / (answered + dismissed); a question ended "ticket closed" is self-resolved and a question
+//                  answered / (answered + dismissed); a dismissal is a question a person ended `dismissed` or, before
+//                  LIN-4550, ended `withdrawn` "dismissed"; a question ended "ticket closed" is self-resolved and a question
 //                  withdrawn by an agent is withdrawn: neither is judged (LIN-2650). A question on a finished task's parent
 //                  or on any other unfinished ticket is not counted against the task; whether a parent's questions belong
 //                  to its pieces is LIN-4399's call, so the row names the gap and counts the parent-anchored ones.

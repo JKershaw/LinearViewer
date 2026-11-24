@@ -99,7 +99,7 @@ export async function recordsOf(page, urlKey, kind) {
   return res.json();
 }
 
-/** The current state of one question record ('open', 'answered', 'withdrawn'). */
+/** The current state of one question record ('open', 'answered', 'dismissed' by a person, 'withdrawn' by an agent or a closed ticket). */
 export async function questionState(page, urlKey, questionId) {
   return (await recordsOf(page, urlKey, 'question')).find((r) => r.id === questionId)?.state ?? null;
 }

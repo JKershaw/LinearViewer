@@ -45,6 +45,8 @@ async function openQuestionRowsFor({ accountId, workspaces, recordsStore, dispat
         // feed's other readers. Without `asks` the Rulings page drew the card with no question (LIN-4541).
         asks: q.asks,
         question: q.asks,
+        // LIN-4550: the one-line question the card leads with (the reader's own: written, or derived for an older ask).
+        short: q.short,
         options: q.options,
         recommended: q.recommended,
         // LIN-4549: the card draws its own task line from the row's `ticket` and `title`.

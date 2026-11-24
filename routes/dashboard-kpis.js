@@ -26,8 +26,10 @@ import { requestFeatureFlags } from '../lib/run-controls.js';
 // polled.
 //
 // LIN-4538 (P7a): the KPIs read question records (lib/records/question-facts.js).
-// A dismissal is a question ended `withdrawn` by a person; a question whose ticket
-// closed ends `withdrawn` "ticket closed" and is self-resolved, never a dismissal.
+// A dismissal is a question a person ended `dismissed` (LIN-4550), or, before
+// that, ended `withdrawn` "dismissed" by a person: questionOutcomeOf reads both.
+// A question whose ticket closed ends `withdrawn` "ticket closed" and is
+// self-resolved, never a dismissal; an agent's own withdrawal is neither.
 //
 // "Escalation rate per human" reduces here to "per workspace" — see
 // lib/escalation-kpis.js's own docstring for why. `targetPerDay` is

@@ -1,0 +1,82 @@
+{
+  "_about": "LIN-4550: the asks of the real question records this workspace held on 24 Nov 2026 (GET /api/proxy/records?kind=question), stored verbatim; nothing in them is a secret, so nothing is scrubbed. `researchSet` marks the nine asked before LIN-4546's research ran (2026-11-24T09:36Z), the set it validated the lead rule on; the two asked since are kept as more witnesses. `short` is the one-line question lib/records/question-short.js must derive for each, written by hand from the rule (the first sentence ending in '?', else the first sentence, trimmed, within the cap). question-a9961da7's question sentence is 240 characters, over the cap, so its parenthetical aside is dropped.",
+  "asks": [
+    {
+      "id": "question-aaf40304",
+      "askedAt": "2026-11-19T22:30:45.196Z",
+      "researchSet": true,
+      "asks": "Done-when 3 now rests on a deciding paired blind read of the changed code (the files pieces 1–5 touched, before/after labels hidden, beside an untouched control area read at the same two times). What pass figure D (changed-code after-minus-before, minus the control's) counts as 'reads better'? The read has not run, and nothing will run it until you set this figure.",
+      "short": "What pass figure D (changed-code after-minus-before, minus the control's) counts as 'reads better'?"
+    },
+    {
+      "id": "question-fbdb0930",
+      "askedAt": "2026-11-20T19:08:18.508Z",
+      "researchSet": true,
+      "asks": "LIN-4504's live cutover cannot start: the fleet pause is refused. The pause is the first step of the cutover, and nothing may be captured or applied until it is set. Refusal quoted from POST /api/proxy/dispatch/halt with {\"mode\":\"pause\"}: 409 PROXY_TOKEN_UNBOUND, \"This token is not bound to a workspace, so it cannot halt the runner. Mint a new token on the Proxy page, or use the Dispatch page.\" GET /api/proxy/dispatch/halt reads {\"halt\":null}, so nothing is paused. Which way do you want the pause set?",
+      "short": "Which way do you want the pause set?"
+    },
+    {
+      "id": "question-dec1b780",
+      "askedAt": "2026-11-21T00:56:02.189Z",
+      "researchSet": true,
+      "asks": "Ruling 1 (slice 3, piece P8 / LIN-4521): when close-out pushes its own fix commit after the approval, the approval becomes stale. Should merging then wait for a quick re-review of the new head? Records can show the approval as stale but can't stop the merge: close-out merges inside its own session (--match-head-commit), and Harbour's recorders run afterwards. So a yes is enforced by a close-out prompt rule: after its own push, close-out writes a finding to review naming the new head and parks instead of merging, and P5's live-wait fix lets the re-review run beside it. It costs about one run per task.",
+      "short": "Should merging then wait for a quick re-review of the new head?"
+    },
+    {
+      "id": "question-a9961da7",
+      "askedAt": "2026-11-21T00:56:02.234Z",
+      "researchSet": true,
+      "asks": "Ruling 2 (slice 3, piece P4 / LIN-4517): open tasks that were reviewed by comment have no verdict record at cutover. Should those verdicts be imported once (a one-off script, never committed, that pins each to the head findSha guesses, runs before the flip, and is discarded before findSha is retired), or should each such task be re-reviewed as it comes up? This also decides how far back the measures can read: with no import, they start at the cutover instant, and P1's committed readings cover the history before it.",
+      "short": "Should those verdicts be imported once, or should each such task be re-reviewed as it comes up?"
+    },
+    {
+      "id": "question-6a487149",
+      "askedAt": "2026-11-23T00:37:41.871Z",
+      "researchSet": true,
+      "asks": "LIN-4531's done-when says 'the kinds that ask can write questions'. Plan item 6 made that rest on a census of DECISION feedback in production dispatch history, grouped by kind (kickoff, kind-less custom/work, collective, chat). The PR gives a run to the fresh autopilot kickoff only. Stage kinds, the leftover and Periodicals already had runs. The census was not run: it needs production rows this workspace cannot read (the proxy list caps at 100 rows and carries no feedback). The implementation stage handed it to LIN-4529 as finding-acd3bd04, but no comment or ruling of yours agrees to that hand-on, so review cannot count it as settled. Nothing breaks meanwhile: kinds without a run keep the scraped DECISION: path until P7b retires it. May LIN-4531 close with the census moved to LIN-4529, to be settled before P7b-2 removes the DECISION: feedback path? Or must LIN-4531 stay open until you run the census and each asking kind gets a run or a design §11 line?",
+      "short": "May LIN-4531 close with the census moved to LIN-4529, to be settled before P7b-2 removes the DECISION: feedback path?"
+    },
+    {
+      "id": "question-c2af1113",
+      "askedAt": "2026-11-23T11:45:42.253Z",
+      "researchSet": true,
+      "asks": "LIN-4532 has no chat answer path. list_pending_decisions lists open questions, but no chat tool answers or dismisses one. The ticket's Done-when says chat tools answer with option and words, and the brief's constraints keep the chat catalog read-only (a new chat write tool would break that invariant). Which path do you want?",
+      "short": "Which path do you want?"
+    },
+    {
+      "id": "question-829a69b1",
+      "askedAt": "2026-11-24T07:00:54.663Z",
+      "researchSet": true,
+      "asks": "Restart the LIN-4463 lane, and if so, how big should the last piece be? What is blocked: on 13 Nov you paused the lane after piece 4 \"to save budget for the rest of the week\", until you restart it. That was 11 days ago, and nothing has restarted it. Everything else that held the ticket has cleared. Done-when 3 is settled by your 23 Nov answer. Done-when 2's entries are back in records, and each says why it waits (finding-07d212a8). The bridge is the only one left, with one reader under a red-on-new-reader check (review verdict-2574090d). Only the paused piece remains. The cost of doing nothing: LIN-4463 stays open, and LIN-4342 (side rail) and LIN-4343 (UI sweep 4) stay blocked behind it. Nothing breaks meanwhile. Code finding: the bridge's last reader is one line, prompt-section.js:1512 (window.CostFormat.formatUsd(nums.typicalUsd)). The server already words that figure (lib/components/decision-panel.js typicalWords). So the bridge can go without converting the 6,200-line prompt-section/app/swipe chain: the server sends the words, that line reads them, and cost-format-global.js and its fixture are deleted. I recommend that small piece. It meets Done-when 1 as 'gone' for the least spend and unblocks the side rail sooner. Converting the chain is still the right move for those pages, but no Done-when needs it. app.js is loaded by 11 renderers, so it is the riskiest conversion, and it can be a later piece by the same recipe. Yes means the lane restarts on the option you pick. No means it stays paused.",
+      "short": "Restart the LIN-4463 lane, and if so, how big should the last piece be?"
+    },
+    {
+      "id": "question-d7c086e8",
+      "askedAt": "2026-11-24T07:10:11.324Z",
+      "researchSet": true,
+      "asks": "LIN-4416 shortlist, as you asked: approve before anything is built? The re-plan (plan-33a70884 v2) picks two themes, about five issues, each one rule in one place, both in LinearViewer only:\n\n1. Verdict authority (LIN-3386 verdict half, LIN-3402 item 2, plus finding-a75343af and finding-071b3def). Any run can write a review Approve today and the merge/Done gate accepts it, which makes every other limit advisory. Fix: only the judging stage may write a verdict, a withdrawn verdict stops counting, and a dispatch holder can't start a review run with its own prompt.\n2. One report gate on every lane (LIN-2576). The periodical report gate runs on only one of the routes that can set Done, and it has topped a Periodical's findings five times. Fix: one shared gate called by all of them.\n\nLeft in the backlog: who may end a close-out finding (finding-5dcf7993, the next candidate, which needs its own production count first); the merge credential (LIN-3417, which needs a separate worker identity, your call); member-minted tokens (LIN-4215, your call); tokens in prompt text and untrusted tracker text (LIN-3387); and the rest of the 134 as they are.\n\nYes = build these two as written (breakdown into two child tasks, then plan review, build, review, close-out). No = name what to add or swap, and the plan is redone to that before anything is built.",
+      "short": "LIN-4416 shortlist, as you asked: approve before anything is built?"
+    },
+    {
+      "id": "question-6c882b7c",
+      "askedAt": "2026-11-24T07:43:27.705Z",
+      "researchSet": true,
+      "asks": "LIN-4416: the plan for your three verdict rules has been sent back three times, and Harbour stopped the plan/review cycle for you to decide whether it goes on. One more plan round, or stop here?\n\nWhat happened: rules 1 (only the judging stage writes a verdict) and 2 (withdrawn verdicts stop counting) have passed review every time. Rule 3 (a caller can't start a judging run with its own prompt) has not: each review found another way round it, first by adding a followUpTo, then by leaving `kind` out and sending promptName 'Review', which the server turns into a review run (finding-6cf58138, checked in code). The pattern is that rule 3 checked the shape of the request instead of the kind the run will actually get.\n\nThe fix is that root, not another special case: rule 3 tests the kind the dispatch will really get, through one shared helper the dispatch code already uses, so no request shape gets round it. The blocked step checked this and found nothing outside the task in the way.\n\nYes = one more plan round (v5) with that fix, then plan review, build, review and close-out. Stop = nothing is built; the plan stays at v4 and the hole stays open.",
+      "short": "One more plan round, or stop here?"
+    },
+    {
+      "id": "question-4ac79968",
+      "askedAt": "2026-11-24T09:52:19.127Z",
+      "researchSet": false,
+      "asks": "LIN-4416, PR #2514 is built with CI green, and review found one more way round rule 3. Ship what's done, or one more build round?\n\nWhere it stands (review verdict-e4c62314, request-changes): rule 1 (only the judging stage writes a verdict) and rule 2 (a withdrawn verdict stops counting) are met. CI is green on e94465efd, and the full suite passes merged onto current main (25,150 tests, 0 failures). Rule 3 is met on POST /dispatch, but not on recommend-and-dispatch: send a custom dispatch with your own instructions, then recommend-and-dispatch {kind:'review', followUpTo:<that row>}, and a review run (writing as review) starts inside the session you filled (finding-a1ed48c1, probed). Nothing legitimate uses that route today.\n\nThe pattern: this is the fifth way round rule 3 (plan rounds found followUpTo and promptName, now this). Each time the check sat on one route's request rather than on the row that actually starts a run. The fix the reviewer gives is small (a judging run must start in a fresh session: refuse a judging kind with followUpTo on the recommend lane), but it is again one route.\n\nCost of waiting: nothing is merged, so until this lands any run can still write an Approve the merge/Done gate accepts (the hole rules 1 and 2 close).",
+      "short": "Ship what's done, or one more build round?"
+    },
+    {
+      "id": "question-0bbfc433",
+      "askedAt": "2026-11-24T12:55:49.115Z",
+      "researchSet": false,
+      "asks": "LIN-4549 (piece 1/7 of LIN-4546), PR #2516: CI is green on head 14ea474 and review has approved twice, but the merge keeps slipping by one review round. Do we pin review a third time, or change the rule that causes the loop?\n\nWhere it stands: review approved 84944f5d, then 5b5e444, then af37497, each time with one small condition. Discharging a condition needs a new commit, which makes the approval stale under the gate's rule that a push after approval goes back to review. Close-out then parks waiting on review, and the engine refuses to send review while close-out is open (STAGE_IN_FLIGHT), so I have had to pin review by hand twice (project finding-34ab47ef). The latest delta is one five-line comment in lib/chat-tools.js that review itself wrote out word for word. Nothing is merged; pieces 2 to 7 of LIN-4546 are held behind this one.\n\nCost of waiting: nothing lands and LIN-4546 stays open; no harm is done meanwhile.",
+      "short": "Do we pin review a third time, or change the rule that causes the loop?"
+    }
+  ]
+}

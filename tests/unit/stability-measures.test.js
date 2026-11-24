@@ -835,6 +835,15 @@ describe('seat: question records per finished task and the answered share', () =
     assert.deepStrictEqual([origin.status, origin.reason], [STATUS.NOT_MEASURED, ORIGIN_UNREADABLE]);
   });
 
+  test('LIN-4550: a question ended `dismissed` and an old one ended `withdrawn` "dismissed" both book as dismissed; an agent withdrawal books as withdrawn', () => {
+    const dismissedNow = { id: 'question-LIN-1-dismissed-now', kind: 'question', in: ticketTaskIdOf('LIN-1'), state: 'dismissed', ended: { reason: 'dismissed' }, by: 'person:acct' };
+    const questions = { questions: [dismissedNow, question('LIN-2', 'dismissed'), question('LIN-2', 'withdrawn'), question('LIN-3', 'answered')] };
+    const r = rulingsRow({ finished, questions });
+    assert.deepStrictEqual(r.value.outcomes, { answered: 1, dismissed: 2, withdrawn: 1, 'self-resolved': 0, 'handed-on': 0, open: 0 });
+    assert.strictEqual(r.unreadable, 0, 'no outcome is strange');
+    assert.strictEqual(r.value.answeredShare, 33.3);
+  });
+
   test('outcome buckets as escalation-kpis: answered / (answered + dismissed); withdrawn, handed-on and self-resolved are neither; an open question is open', () => {
     const questions = { questions: [
       question('LIN-1', 'answered'), question('LIN-1', 'answered'), question('LIN-2', 'dismissed'), question('LIN-2', 'withdrawn'),
