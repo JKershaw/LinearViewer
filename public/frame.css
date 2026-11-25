@@ -73,17 +73,6 @@ body.frame-body {
   margin-bottom: var(--space-4);
 }
 
-.frame-back {
-  display: inline-block;
-  margin-bottom: var(--space-2);
-  color: var(--brand-dim);
-  text-decoration: none;
-}
-
-.frame-back:hover {
-  text-decoration: underline;
-}
-
 .frame-filters {
   display: flex;
   flex-wrap: wrap;
@@ -204,11 +193,6 @@ body.frame-body {
   white-space: nowrap;
 }
 
-.frame-count--needs-you {
-  color: var(--red-dim);
-  font-weight: 600;
-}
-
 .frame-count--needs-you:hover {
   text-decoration: underline;
 }
@@ -308,16 +292,12 @@ body.frame-body {
 
 /* ---- Search ---------------------------------------------------------------- */
 
+/* The fields' body is the one text control (style.css, `.token-label-input`); here only their width. */
 .frame-search__input,
 .search-page__input {
   width: 100%;
+  min-width: 0;
   box-sizing: border-box;
-  padding: var(--space-1) var(--space-2);
-  border: 1px solid var(--line);
-  border-radius: var(--radius-sm);
-  background: var(--raised);
-  color: var(--text);
-  font: inherit;
 }
 
 .search-page__form {

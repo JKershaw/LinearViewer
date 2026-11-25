@@ -2855,8 +2855,9 @@ function stopRulingsPolling() {
 /**
  * Initialize the rulings badge: seed its count on load and start polling.
  * Runs from this file's own DOMContentLoaded handler below, so every page
- * that renders the badge markup (any page with the `dispatch` feature flag
- * on, `lib/components/navbar.js`) gets the live-updating count — including
+ * that renders the badge markup (the owner with run controls: the old bar,
+ * `lib/components/navbar.js`, or the frame's rail and band, `lib/components/frame.js`,
+ * LIN-4562) gets the live-updating count — including
  * Observation, which renders the badge but does not load app.js.
  */
 function initRulingsBadge() {

@@ -95,7 +95,9 @@
      `--nav-sticky-min` is the floor per breakpoint and the no-JS fallback. The
      live header height (`--nav-bar-h`, written by `setupNavStickyHeight` in
      common.js) wins whenever it is larger, because the header wraps by content
-     and flags, which no static value can track (LIN-4037). */
+     and flags, which no static value can track (LIN-4037). On a page in the
+     frame (LIN-4562) public/frame.css sets both instead: the phone band's
+     height below 760px, 0 on desktop, where nothing sticky crosses the page. */
   --nav-sticky-min: 6rem;
   --nav-sticky-h: max(var(--nav-sticky-min), var(--nav-bar-h, 0px));
 
@@ -1177,7 +1179,9 @@ a.wordmark:hover {
 .row-state[data-tone='quiet'] { color: var(--muted); }
 /* LIN-4010: a park (waiting with no open ruling) is quiet, not a call on you; it reads apart from needs-you. */
 .row-state[data-tone='parked'] { color: var(--muted); font-style: italic; }
-.in-progress-count__part[data-tone='needs-you'] { color: var(--red-dim); font-weight: 600; }
+/* LIN-4562: the frame's questions count (rail and band) reads in the same tone as Home's count line. */
+.in-progress-count__part[data-tone='needs-you'],
+.frame-count--needs-you { color: var(--red-dim); font-weight: 600; }
 .in-progress-count__part[data-tone='running'], .in-progress-count__part[data-tone='queued'] { color: var(--amber-dim); }
 .in-progress-count__part[data-tone='quiet'] { color: var(--muted); }
 
@@ -3875,10 +3879,12 @@ body[data-proxy-active="true"] .prompt-proxy-toggle {
 /* LIN-3889: the breadcrumb back-link, one body for the three drill-down pages. Session's was
    promoted above the title (LIN-1225) so the page opens with an orientation cue; Task edit and
    create match its rhythm so drill-down pages open the same way. Task page's back link reuses
-   `.sess-back`. `.settings-back` (settings.css) is a named variant of this decision. */
+   `.sess-back`. `.settings-back` (settings.css) is a named variant of this decision. LIN-4562: the frame's
+   "← <parent>" (`.frame-back`, lib/components/frame.js) is the same link, and replaces the others as pages move. */
 .sess-back,
 .task-create-back,
-.task-edit-back {
+.task-edit-back,
+.frame-back {
   display: inline-block;
   margin: var(--space-1) 0 var(--space-2);
   font-family: var(--font-content);
@@ -3888,9 +3894,13 @@ body[data-proxy-active="true"] .prompt-proxy-toggle {
 }
 .sess-back:hover,
 .task-create-back:hover,
-.task-edit-back:hover { color: var(--brand); }
+.task-edit-back:hover,
+.frame-back:hover { color: var(--brand); }
 
-.token-label-input {
+/* LIN-4562: the frame's search fields are text controls too (public/frame.css only sets their width). */
+.token-label-input,
+.frame-search__input,
+.search-page__input {
   font-family: var(--font-content);
   font-size: var(--font-size-base);
   padding: var(--space-1) var(--space-2);
@@ -3904,11 +3914,15 @@ body[data-proxy-active="true"] .prompt-proxy-toggle {
 /* The border turns blue on focus, and the default ring is kept for keyboard focus (LIN-786: never
    kill focus outright). The old `.model-select:focus` rule that removed the outline for every focus,
    mouse or keyboard, is gone (LIN-3889). */
-.token-label-input:focus {
+.token-label-input:focus,
+.frame-search__input:focus,
+.search-page__input:focus {
   border-color: var(--blue);
 }
 
-.token-label-input:focus:not(:focus-visible) {
+.token-label-input:focus:not(:focus-visible),
+.frame-search__input:focus:not(:focus-visible),
+.search-page__input:focus:not(:focus-visible) {
   outline: none;
 }
 
