@@ -469,9 +469,9 @@
   color: var(--muted);
 }
 
-/* LIN-4564: in the frame (lib/components/frame.js), the run page's body takes the frame's one left edge (public/frame.css
-   .frame-main), not a centred column with a gutter of its own; it keeps its reading width. The way back and the h1 are
-   the frame's. */
+/* LIN-4564: in the frame (lib/components/frame.js), a `.sess-page` body (the run page, and the task page, which loads this
+   sheet first) takes the frame's one left edge (public/frame.css .frame-main), not a centred column with a gutter of its
+   own; the run page keeps its reading width (task-page.css widens the task page). The way back and the h1 are the frame's. */
 .frame-main > .sess-page {
   margin: 0;
   padding-left: 0;

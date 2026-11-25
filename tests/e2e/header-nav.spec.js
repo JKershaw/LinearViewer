@@ -412,12 +412,10 @@ test.describe('Mobile nav-strip density sweep (LIN-2179)', () => {
     liveConsole: true, shipJourney: true
   };
   const MOBILE_SWEEP_WIDTHS = [360, 390, 412, 430];
-  // A first-class view (never hoisted — already primary, so it exercises the
-  // baseline five-inline-plus-toggle case), the shortest flag-gated label (`ship`,
-  // 4 chars — the one view that did NOT wrap pre-fix) and the longest flag-gated
-  // label (`passage-planner` — the worst-case hoisted-label width).
-  // LIN-4564: Swim and the flagged views left the old bar for the frame, so the strip is swept on the pages still on it: a
-  // first-class view (Settings), and the power-user views KPIs and Dispatch (the owner's), each active in turn.
+  // The strip is swept on the pages still on the old bar, each active in turn: a first-class view (Settings, never
+  // hoisted, the baseline inline-plus-toggle case) and two power-user views (KPIs, and Dispatch, the owner's), which the
+  // strip hoists inline when active. Before LIN-4564 these were Swim and the flagged views `ship` (the shortest hoisted
+  // label) and `passage-planner` (the longest); those pages left the bar for the frame, which has no strip.
   const MOBILE_SWEEP_VIEWS = [
     { pagePath: 'settings', activeKey: 'settings' },
     { pagePath: 'kpis', activeKey: 'kpis' },
@@ -594,9 +592,8 @@ test.describe('Landing preview nav auth tap target (LIN-2210)', () => {
   });
 });
 
-// LIN-2523: `.nav-filters` goes from 1 item (workspace) to 2 (+ team; the wordmark
-// leads the row, outside the strip, since LIN-4009); on the four newly-selectored pages (swipe/swim/ship/roadmap) now
-// that they thread real teams/selectedTeamId into renderNavBar. PINNED on the
+// LIN-2523: the four newly-selectored pages (swipe/swim/ship/roadmap) thread real teams/selectedTeamId into their team
+// selector, so it carries the team item. PINNED on the
 // Linear test-token session (mirrors tests/e2e/error-handling.spec.js's own
 // "Team Filtering" block) — the local provider declares zero teams
 // (`fetchTeams` returns `[]`), so `swimLocalSeed`'s session would never
@@ -677,7 +674,7 @@ test.describe('.nav-filters team-item mobile sweep (LIN-2523)', () => {
 // carries real assignee names (Alice/Bob/Charlie), so the dashboard-only
 // data-present branch this sweep checks is actually exercised. Swept across
 // the same mobile widths as the density sweeps above, plus a same-width
-// regression guard that /swim (team-reached, NOT assignee-reached) stays at 3
+// regression guard that /swim (team-reached, NOT assignee-reached) carries the team alone in its filter line (LIN-4564)
 // — proving the dashboard-only boundary holds under the same viewport.
 test.describe('.nav-filters assignee-item mobile sweep (LIN-2529)', () => {
   const MOBILE_SWEEP_WIDTHS = [360, 390, 412, 430];
