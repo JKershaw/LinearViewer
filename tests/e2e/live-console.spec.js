@@ -288,7 +288,7 @@ test.describe('Live Console (experimental)', () => {
     // reservation narrow the mobile strip well below a naive viewport-minus-padding
     // guess, so 319 (not 358) is the real pinned width at 390px.
     // LIN-4564: the page sits in the frame, which owns the gutter; .lc-page has no side padding of its own, so the strip
-    // is the column's full 900px at 1280 and the frame main's width at 390 (re-captured against the frame's markup).
+    // is the column's full 900px at 1280 and fills the frame main's content box at 390.
     test('route A: .lc-pulse geometry and .lc-page max-width stay pinned (LIN-1741)', async ({ page }) => {
       const pulse = page.locator('.lc-pulse');
 
@@ -303,12 +303,18 @@ test.describe('Live Console (experimental)', () => {
       expect(maxWidth).toBe('900px');
 
       await page.setViewportSize({ width: 390, height: 844 });
+      // At 390 the strip fills the frame's column: the main's content box, which is the viewport less the root's scrollbar
+      // gutter (15px on CI's Chromium, 0 with overlay scrollbars) and the frame's phone gutter. Read, not a literal, so the
+      // pin holds on both (CI measured 351, a Mac 366).
       const mobile = await pulse.evaluate(el => {
         const r = el.getBoundingClientRect();
         const cs = getComputedStyle(el);
-        return { width: r.width, height: r.height, display: cs.display, position: cs.position };
+        const main = document.getElementById('main');
+        const ms = getComputedStyle(main);
+        const column = main.clientWidth - parseFloat(ms.paddingLeft) - parseFloat(ms.paddingRight);
+        return { fillsColumn: Math.abs(r.width - column) <= 1, height: r.height, display: cs.display, position: cs.position };
       });
-      expect(mobile).toEqual({ width: 366, height: 46, display: 'block', position: 'static' });
+      expect(mobile).toEqual({ fillsColumn: true, height: 46, display: 'block', position: 'static' });
     });
   });
 
