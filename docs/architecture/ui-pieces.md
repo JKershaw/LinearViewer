@@ -190,7 +190,7 @@ The class is "a rule written in 2 or more places that Settings shares". Two repr
 - **Counting rule:** a site is a page frame (grid plus pane plus back) written for a page.
 - **Sites at base:** the shell above; `settings.css:853` is its only breakpoint.
 - **Consolidate deletes:** nothing.
-- **Differences:** the pane's `max-width: 600px` (`settings.css:583`) and `.settings-main { max-width: 1000px }` (:848) are two page widths. Class: **unclear** (`.settings-main` is emitted once, at `render-settings.js:996`, by the legacy Models page; LIN-3855 owns it).
+- **Differences:** the pane's `max-width: 600px` (`settings.css:583`) was once set against a second page width, `.settings-main` (retired by LIN-4566: the rule and the class are gone). Class: **retired**.
 
 ### 13. Link
 
@@ -287,7 +287,7 @@ Measured at `55149a37` (the last commit that changed CSS). Each decision's autho
 | 10 Group title | `.settings-group-title` (Settings), `.section .section-header` (elsewhere) | `audit.css` `.settings-header` (no emitter on Audit) | done | 5 → 4 |
 | 11 Key row | `keyRow` | the seven dead token-list rules in common-actions.css; `.token-list` and `.token-meta` in dispatch.css; `.proxy-token-list` in proxy.css | done | 7 dead → 0 |
 | 13 Link | `.settings-link` (style.css) | `audit.css` copy and the `settings.css` copy | done | 2 → 1 |
-| 14 Back link | `.sess-back, .task-create-back, .task-edit-back` (style.css); `.settings-back` is a named variant | the three page copies (session, task create, task edit) | done | 4 → 2 |
+| 14 Back link | `.sess-back, .frame-back` (style.css); `.settings-back` is a named variant | the three page copies (session, task create, task edit) | done | 4 → 2 |
 | 15 Text control | `.model-select`, `.token-label-input` (style.css) | `audit.css` `.model-select`, the `settings.css` body, the `common-actions.css` body | done. `.model-select:focus` no longer removes the ring for keyboard focus (`:focus-visible`) | 3 → 2 |
 | 16 Halt controls | `lib/components/halt-controls.js` | the second Dispatch and Running markup | done; `routes/` is byte-unchanged | 2 render sites → 1 |
 
@@ -352,7 +352,7 @@ The first Plain move. The helper is `lib/components/plain-page.js`; decision 17 
 | Workspace shape | the frame's h1 with its lede (`renderPublicFrame`) | one shape since LIN-4567 |
 | `html` section | `renderSection` | done: Legal |
 | `fields` section | `renderField` | shipped; sampled on `/styleguide` only |
-| `rows` section | `renderSection` over `rowsList` (`settings-group.js`), the rows Settings uses | shipped; Account home (LIN-3956), which links `settings.css` through the document entry, and `/styleguide`, which links it by hand. Settings `group()` shares the rows list |
+| `rows` section | `renderSection` over `rowsList` (`settings-group.js`), the rows Settings uses | shipped; Account home (LIN-3956), which lists `settings.css` in its own `renderPublicFrame` stylesheets (LIN-4567 removed the document entry), and `/styleguide`, which links it by hand. Settings `group()` shares the rows list |
 | `form` section | `plainFormHtml`: `renderField` with a text input (`token-label-input`, `aria-label`, placeholder, maxlength), and a primary `renderButton` | shipped; Account home (LIN-3956) and the workspace-not-found CTA (`LOCAL_WORKSPACE_FORM`), and `/styleguide` |
 | `empty` section | `renderEmptyState` | shipped; sampled on `/styleguide` only |
 | Document entry | removed in LIN-4567: a page calls `renderPublicFrame` and lists its own stylesheets and footer | retired: Legal and Account home use `renderPublicFrame` |
