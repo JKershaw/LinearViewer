@@ -31,17 +31,12 @@ test.describe('PAT Authentication Mode', () => {
     await expect(page.locator('[data-testid="rail-workspace-add-local"]')).toContainText('+ Local workspace')
   })
 
-  test('PAT workspace hides remove button in workspace dropdown', async ({ page }) => {
-    await page.goto(WORKSPACE_URL)
+  test('PAT workspace offers no remove control in Settings › Sources', async ({ page }) => {
+    // LIN-4566: removing a workspace lives in Settings › Sources; a PAT session cannot remove its workspace
+    await page.goto(SETTINGS_URL.replace(/account$/, 'sources'))
     await page.waitForLoadState('networkidle')
 
-    // Open workspace dropdown (LIN-4563: Home's is the rail's workspace menu, which never offers remove)
-    await page.locator(SELECTORS.nav.workspaceToggle).click()
-    await expect(page.locator(SELECTORS.nav.workspaceMenu)).toBeVisible()
-
-    // The remove button should not be present
-    await expect(page.locator('.nav-option-danger')).toHaveCount(0)
-    await expect(page.locator(`${SELECTORS.nav.workspaceMenu} [action$="/remove"]`)).toHaveCount(0)
+    await expect(page.locator('[data-testid="settings-workspace-remove"]')).toHaveCount(0)
   })
 
   test('settings page shows "refresh session" instead of "logout"', async ({ page }) => {

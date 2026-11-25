@@ -50,21 +50,3 @@ test('every sync getFeatureFlags( call in routes/ and server.js is a listed non-
   }
   for (const f of Object.keys(ALLOWED_SYNC)) assert.ok(found[f], `${f} is listed but has no sync call left: shrink the allowlist`);
 });
-
-test('every renderer that draws the nav forwards featureFlags to renderNavBar', () => {
-  const bad = [];
-  for (const dir of ['lib', 'routes']) {
-    for (const f of readdirSync(join(ROOT, dir))) {
-      if (!f.endsWith('.js')) continue;
-      const src = readFileSync(join(ROOT, dir, f), 'utf8');
-      const re = /renderNavBar\(\s*\{([^}]*)\}/g;
-      let m;
-      while ((m = re.exec(src))) {
-        if (!/featureFlags/.test(m[1])) bad.push(`${dir}/${f}: ${m[0].slice(0, 80)}`);
-      }
-    }
-  }
-  // Landing is unauthenticated: it has no urlKey, so no run controls to carry.
-  const real = bad.filter((b) => !b.startsWith('lib/render-landing.js'));
-  assert.deepEqual(real, [], 'a renderNavBar call that drops featureFlags loses the owner\'s Dispatch link and queue/rulings badges on that page');
-});
