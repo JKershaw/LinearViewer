@@ -22,8 +22,9 @@ let world = null;
 afterEach(() => { if (world) world.restore(); world = null; });
 
 // The page module over the fake DOM. The stubs are the common.js globals it reads: the escape, the relative time its
-// `formatDispatchTime` words, and `taskPageHref`, the window helper. Its own formatPromptHtml and renderFeedbackEntries
-// are real; the items here carry no prompt or feedback, so neither draws anything.
+// `formatDispatchTime` words, and `taskPageHref`, the window helper. Its own formatPromptHtml and the shared transcript
+// module (LIN-4560, which retired renderFeedbackEntries) are real; the items here carry no prompt or feedback, so
+// neither draws anything.
 async function loadPage() {
   world = importWorld({
     window: {

@@ -69,6 +69,7 @@ import { publicOrigin } from '../lib/public-origin.js';
 import { postUsage } from '../lib/request-usage-intake.js';
 import { childTicketRetryOf } from '../lib/records-tracker.js';
 import { historyTranscriptFeedback, transcriptEntries } from '../lib/dispatch-transcript.js';
+import { TRANSCRIPT_WATCH_MAX_IDS } from '../lib/transcript.js'; // LIN-4560: the most runs one transcripts read follows, named once
 import { clampWaitSeconds, holdForChange } from '../lib/dispatch-watch.js';
 import { armKeepalive } from '../lib/http-keepalive.js';
 
@@ -157,8 +158,6 @@ const DANGEROUS_CHARS_REGEX = /[\x00-\x08\x0B\x0C\x0E-\x1F\x7F]/;
 
 // Maximum recent / favourite custom prompts handling (the favourites cap is the store's).
 const DISPATCH_HISTORY_DEFAULT_LIMIT = 20;  // LIN-3812: server default page for the history list
-// LIN-4560: the most runs one transcripts read follows (a history page is 20; a run page's live runs are fewer).
-const TRANSCRIPT_WATCH_MAX_IDS = 25;
 const MAX_RECENT_PROMPTS = 10;
 const MAX_CUSTOM_PROMPT_LENGTH = 10000;
 

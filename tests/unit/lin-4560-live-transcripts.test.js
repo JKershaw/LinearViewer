@@ -23,6 +23,7 @@ import { DispatchQueueStore } from '../../lib/dispatch-store.js';
 import { createMockCollection } from '../fixtures/mock-collection.js';
 import { FIXTURE_SECRETS } from '../fixtures/secret-scan-fixtures.js';
 import { MASK } from '../../lib/mask-secrets.js';
+import { TRANSCRIPT_WATCH_MAX_IDS } from '../../lib/transcript.js';
 import { renderStatusPill } from '../../lib/components/status-pill.js';
 import { renderSurface } from '../../lib/components/surface.js';
 import { importWorld } from './helpers/import-world.js';
@@ -312,6 +313,26 @@ describe('createTranscriptFollower: one read in flight, paused while hidden, one
     shown = true;
     t.f.poke();
     assert.equal(t.calls.length, 1);
+  });
+
+  test('a followed run the answer leaves out is followed no more: one read, no tight loop (finding-8a88d629)', async () => {
+    const t = await follower({ ids: ['gone'], answers: [{ rows: [], reason: 'terminal' }] });
+    t.f.start(); await t.fire(); await t.settle();
+    assert.equal(t.calls.length, 1);
+    assert.deepEqual(t.f.state().following, []);
+    assert.deepEqual(t.timers, [], 'nothing scheduled');
+  });
+
+  test('more live runs than one read carries each get a turn: 30 live ids are all read within two answers (finding-61478544)', async () => {
+    const ids = Array.from({ length: 30 }, (_, i) => `r${i + 1}`);
+    const asked = (url) => decodeURIComponent(url.match(/ids=([^&]*)/)[1]).split(',');
+    assert.equal(ids.length > 25, true);
+    const w = await follower({ ids, answers: [{ rows: ids.slice(0, 25).map((id) => row(id, 1)) }, { rows: [] }] });
+    w.f.start(); await w.fire(); await w.settle();
+    await w.fire();
+    assert.equal(asked(w.calls[0]).length, TRANSCRIPT_WATCH_MAX_IDS, 'a read carries no more than the cap');
+    const all = new Set([...asked(w.calls[0]), ...asked(w.calls[1])]);
+    assert.equal(all.size, 30, 'every one of the 30 ids appeared within two reads');
   });
 
   test('a 401 stops for good; another failure retries after a pause', async () => {

@@ -22,7 +22,7 @@
  * A module page modules import: it touches no global at load (common.js's helpers are read when a function is called),
  * so a suite can import it, or a page that imports it, in Node.
  */
-import { renderTranscript } from '../lib/transcript.js';
+import { renderTranscript, TRANSCRIPT_WATCH_MAX_IDS } from '../lib/transcript.js';
 import { relativeAgo } from '../lib/time-words.js';
 
 /** How long one read holds open, in seconds (below Heroku's 30s H12; the server's keepalive covers a longer hold). */
@@ -87,7 +87,18 @@ export function createTranscriptFollower(o) {
   let stopped = false;
   let timer = null;
 
-  const following = () => [...new Set([...finishing, ...o.liveIds().filter((id) => !done.has(id))])].slice(0, 25);
+  let offset = 0; // where the next read starts in the live ids, so more live runs than one read carries each get their turn
+
+  // The ids the next read carries, at most TRANSCRIPT_WATCH_MAX_IDS (the route refuses more): runs owing a last read
+  // first, then the live ids from `offset` on, wrapping, so no live run past the cap is starved.
+  const following = () => {
+    const owing = [...finishing].slice(0, TRANSCRIPT_WATCH_MAX_IDS);
+    const live = [...new Set(o.liveIds())].filter((id) => !done.has(id) && !finishing.has(id));
+    const room = TRANSCRIPT_WATCH_MAX_IDS - owing.length;
+    if (live.length <= room) return [...owing, ...live];
+    const start = offset % live.length;
+    return [...owing, ...live.slice(start), ...live.slice(0, start)].slice(0, TRANSCRIPT_WATCH_MAX_IDS);
+  };
 
   function schedule(ms) {
     clearTimer(timer);
@@ -117,6 +128,8 @@ export function createTranscriptFollower(o) {
     const ids = following();
     if (!ids.length) return Promise.resolve();
     inFlight = true;
+    // The next read starts after the live ids this one carried (finishing ids do not count against the rotation).
+    offset += ids.filter((id) => !finishing.has(id)).length;
     // A run owing its last read is read at once, never held.
     const wait = ids.some((id) => finishing.has(id)) ? 0 : waitSeconds;
     const url = `/workspace/${encodeURIComponent(o.urlKey)}/api/dispatch/transcripts?ids=${ids.map(encodeURIComponent).join(',')}`
@@ -128,6 +141,10 @@ export function createTranscriptFollower(o) {
       .then((body) => {
         if (stopped || !body || !Array.isArray(body.rows)) return;
         for (const row of body.rows) applyRow(row);
+        // A run the answer leaves out is gone (past its TTL, deleted, or one the twin cannot read): follow it no more,
+        // or the follower would ask for it again at once, forever.
+        const answered = new Set(body.rows.map((row) => row.id));
+        for (const id of ids) if (!answered.has(id)) { done.add(id); finishing.delete(id); }
       }, (err) => {
         failed = true;
         if (err && (err.status === 401 || err.status === 403 || err.status === 404)) stopped = true;
