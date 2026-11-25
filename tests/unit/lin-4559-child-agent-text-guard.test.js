@@ -370,9 +370,9 @@ describe('LIN-4559: a child [done] on a subscribed row wakes no parent', () => {
 describe('LIN-4559 census: the marker regexes are read only through the role-aware primitives', () => {
   const REGEXES = new Set(['TERMINAL_FEEDBACK_REGEX', 'WAKE_FEEDBACK_REGEX', 'RESUME_MARKER_REGEX']);
   // In lib/dispatch-terminal.js, the functions that may touch a regex: the three entry primitives (each asks the
-  // table's role first), the status-bearing predicate (its one caller asks the role, lib/dispatch-lineage-status.js),
+  // table's role first), the status-bearing predicate (it takes the entry and asks the role itself),
   // and the store filter (which carries the role as `kind: {$nin: RUN_SILENT_KINDS}`).
-  const TERMINAL_ALLOWED = new Set(['terminalStatusOf', 'wakeMarkerOf', 'isResumeEntry', 'isStatusBearingMessage', 'noOwnTerminalMarkerFilter']);
+  const TERMINAL_ALLOWED = new Set(['terminalStatusOf', 'wakeMarkerOf', 'isResumeEntry', 'isStatusBearingEntry', 'noOwnTerminalMarkerFilter']);
 
   /** Uses of a marker regex in `source` that bypass the role, as `file:line (where)`. */
   function bypassesIn(file, source) {
@@ -504,4 +504,20 @@ describe('LIN-4559: a child\'s words are masked on arrival and keyed like the ru
     assert.equal(again.duplicate, true);
     assert.equal(stored().length, 1);
   });
+});
+
+// ── The agent id is the key's id: one rule, so the two cannot drift apart ────
+
+describe('LIN-4559: the `agent` id rule is the `key` rule', () => {
+  const accepts = (field, value) => {
+    const body = field === 'agent' ? { message: 'm', kind: 'agent-text', agent: value } : { message: 'm', key: value };
+    return !validateFeedbackBody(body).error;
+  };
+  const CASES = ['a', 'A1', '0abc', 'a.b_c:d/e-f', 'a'.repeat(128), 'a'.repeat(129), '', ' a', 'a b', '-a', '.a', '_a', 'a\n', 'é', 'a$'];
+
+  for (const value of CASES) {
+    test(`${JSON.stringify(value.length > 20 ? `${value.length} chars` : value)}: agent and key agree`, () => {
+      assert.equal(accepts('agent', value), accepts('key', value));
+    });
+  }
 });
