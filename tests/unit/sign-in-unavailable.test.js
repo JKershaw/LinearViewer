@@ -43,13 +43,14 @@ test('the helper says the sign-in is not set up and gives a way back, with no va
   assert.match(log.warnings[0], /LINEAR_CLIENT_ID, LINEAR_CLIENT_SECRET/, 'the names reach the server log');
 });
 
-// LIN-3995 outcome 2: the door carries the landing's look. The Harbour wordmark
-// is the page heading and links home, and the title drops the "Projects" suffix.
+// LIN-3995 outcome 2: the door carries the landing's look, and the title drops the "Projects" suffix. LIN-4567: in the
+// public frame, the wordmark links home from the band and the door's sentence is the page's one h1.
 for (const name of ['Linear', 'Jira', 'GitHub', 'GitHub Projects']) {
-  test(`the ${name} sign-in page heads with the Harbour wordmark linking to / and its title has no "Projects"`, () => {
+  test(`the ${name} sign-in page carries the Harbour wordmark linking to / and its title has no "Projects"`, () => {
     const html = renderSignInUnavailablePage(name, [], captureWarn());
-    assert.match(html, /<h1><a href="\/" class="header-link">Harbour<\/a><\/h1>/);
-    assert.match(html, new RegExp(`<title>${name} sign-in is not set up - Harbour</title>`));
+    assert.match(html, /<a href="\/" class="wordmark wordmark-rail"/);
+    assert.match(html, new RegExp(`<h1>${name} sign-in is not set up</h1>`));
+    assert.match(html, new RegExp(`<title>${name} sign-in is not set up · Harbour</title>`));
     assert.doesNotMatch(html, /<title>[^<]*Projects<\/title>/);
   });
 }

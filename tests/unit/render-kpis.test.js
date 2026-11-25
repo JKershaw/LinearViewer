@@ -32,7 +32,7 @@ describe('renderKpisPage: frame', () => {
 
   test('is noindex, titled, and loads Chart.js and the page script', () => {
     assert.match(html, /<meta name="robots" content="noindex">/);
-    assert.match(html, /<title>KPIs - Harbour<\/title>/);
+    assert.match(html, /<title>Harbour in numbers · Harbour<\/title>/);
     assert.match(html, /chart\.umd\.min\.js/);
     assert.match(html, /\/kpis\.js/);
   });
@@ -44,8 +44,8 @@ describe('renderKpisPage: frame', () => {
     assert.ok(!/<script[^>]*type="module"/.test(html));
   });
 
-  test('carries the hidden-leaf wording on <main>, once, from the server constant', () => {
-    const attr = /<main[^>]*data-hidden-text="([^"]*)"/.exec(html)?.[1];
+  test('carries the hidden-leaf wording on the page body, once, from the server constant', () => {
+    const attr = /<div class="kpis-content"[^>]*data-hidden-text="([^"]*)"/.exec(html)?.[1];
     assert.ok(attr);
     const text = JSON.parse(attr.replaceAll('&quot;', '"'));
     assert.deepStrictEqual(text, { 'below-floor': `fewer than ${F}`, withheld: 'not shown' });

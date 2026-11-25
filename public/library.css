@@ -8,10 +8,10 @@
  * into the authenticated app.
  */
 
+/* LIN-4567: the Library sits in the public frame, which owns the left edge, the h1 (the page's name, a document's
+   title), its subtitle (the intro, a document's byline), the way back and the footer. */
 .library {
   max-width: 68ch;
-  margin: 0 auto;
-  padding: var(--space-4) var(--space-3) 0;
   color: var(--text);
   font-family: var(--font-content);
   line-height: 1.65;
@@ -20,11 +20,6 @@
 /* A document page gets a wider frame; the text column stays 68ch below. */
 .library--doc {
   max-width: 64rem;
-}
-
-.library-intro {
-  color: var(--muted);
-  margin: 0 0 var(--space-4);
 }
 
 /* Search ------------------------------------------------------------------ */
@@ -154,23 +149,6 @@
   border-radius: var(--radius-md);
 }
 
-.library-doc__back {
-  max-width: 68ch;
-  margin: 0 0 var(--space-3);
-  font-family: var(--font-structural);
-  font-size: 0.85em;
-}
-
-.library-doc__back a {
-  color: var(--muted);
-  text-decoration: none;
-}
-
-.library-doc__back a:hover {
-  color: var(--brand-dim);
-  text-decoration: underline;
-}
-
 /* Further reading, floated right at desktop width; below 960px it falls back
    under the text (see the media query at the end of the file). */
 .library-doc__aside {
@@ -200,28 +178,8 @@
 /* The reading column stays 68ch inside the wider panel. The cap is on the
    body's children, not the body itself, so a figure (below) can span the full
    panel width. */
-.library-doc__header,
 .library-doc__body > * {
   max-width: 68ch;
-}
-
-.library-doc__header {
-  text-align: left;
-  margin: 0 0 var(--space-5);
-}
-
-.library-doc__header h1 {
-  font-family: var(--font-content);
-  font-size: 2em;
-  line-height: 1.25;
-  margin: 0 0 var(--space-2);
-}
-
-.library-doc__byline {
-  color: var(--muted);
-  font-family: var(--font-structural);
-  font-size: 0.85em;
-  margin: 0;
 }
 
 /* LIN-3761: long unbroken runs (links, inline code, bold hashes) wrap instead
@@ -365,15 +323,5 @@
     width: auto;
     order: 3;
     margin: var(--space-4) 0 0;
-  }
-}
-
-@media (max-width: 640px) {
-  .library {
-    padding: var(--space-3) var(--space-2) 0;
-  }
-
-  .library-doc__header h1 {
-    font-size: 1.6em;
   }
 }

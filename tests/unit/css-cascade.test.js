@@ -83,11 +83,13 @@ describe('css-cascade: interference (flippedPairs)', () => {
 });
 
 describe('css-cascade: every page stylesheet list starts with /style.css', () => {
-  test('every list in lib/ does, apart from the Plain page fragment', () => {
+  // LIN-4567: the Plain document entry and its appended '/settings.css' fragment are gone (a Plain page sits in the public
+  // frame and names its own sheets), so every list starts with /style.css.
+  test('every list in lib/ does', () => {
     const lists = stylesheetLists(ROOT);
     assert.ok(lists.length > 30, `expected the renderers' lists, found ${lists.length}`);
     const offenders = lists.filter((names) => names[0] !== '/style.css').map((names) => names.join(' '));
-    assert.deepEqual(offenders, ['/settings.css'], 'only the fragment lib/components/plain-page.js appends after a page list');
+    assert.deepEqual(offenders, []);
     assert.doesNotThrow(() => pageLists(ROOT));
   });
 

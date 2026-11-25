@@ -207,9 +207,9 @@ test.describe('OpenRouter Auth Callback', () => {
     // Try callback without authorization code
     await page.goto('/auth/openrouter/callback');
 
-    // Should show error page
-    await expect(page.locator('.error-title')).toBeVisible();
-    await expect(page.locator('.error-title')).toHaveText('Authorization Failed');
+    // Should show error page (LIN-4567: in the public frame, its subject the page's one h1)
+    await expect(page.locator(SELECTORS.nav.heading)).toBeVisible();
+    await expect(page.locator(SELECTORS.nav.heading)).toHaveText('Authorization Failed');
   });
 
   test('callback without session verifier returns error', async ({ page }) => {
@@ -221,8 +221,8 @@ test.describe('OpenRouter Auth Callback', () => {
     await page.goto('/auth/openrouter/callback?code=test-code');
 
     // Should show session expired error
-    await expect(page.locator('.error-title')).toBeVisible();
-    await expect(page.locator('.error-title')).toHaveText('Session Expired');
+    await expect(page.locator(SELECTORS.nav.heading)).toBeVisible();
+    await expect(page.locator(SELECTORS.nav.heading)).toHaveText('Session Expired');
   });
 });
 

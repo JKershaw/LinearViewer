@@ -162,19 +162,21 @@ describe('renderErrorPage diagnostic block stays byte-identical without the new 
   test('four-row block has no testids and no Source/Reference rows', () => {
     const out = renderErrorPage('T', 'M', { diagnostic: { detail: 'd', category: 'upstream', retryable: true, code: 'C', time: 'T0' } });
     assert.doesNotMatch(out, /data-testid="error-detail/);
-    assert.doesNotMatch(out, />Source<|>Reference</);
+    // The block's rows only: the public frame's footer has a Source link of its own (LIN-4567).
+    assert.doesNotMatch(out, /error-detail-key">(?:Source|Reference)</);
     assert.match(out, /Reason<\/span> <span class="error-detail-value">d/);
   });
 
   // Captured from renderErrorPage at base c93f8792 (LIN-3775 close-out). The
   // container is compared, not the whole document, so unrelated shell changes
   // (head, footer) don't trip it; every byte of the diagnostic block is inside.
-  const BASE_CONTAINER = '<div class="error-container">\n    <h2 class="error-title">T</h2>\n    <p class="error-message">M</p>\n    <div class="error-details" role="note">\n      <div class="error-detail-row"><span class="error-detail-key">Reason</span> <span class="error-detail-value">d</span></div>\n      <div class="error-detail-row"><span class="error-detail-key">Type</span> <span class="error-detail-value">upstream · retryable</span></div>\n      <div class="error-detail-row"><span class="error-detail-key">Code</span> <span class="error-detail-value">C</span></div>\n      <div class="error-detail-row"><span class="error-detail-key">Time</span> <span class="error-detail-value">T0</span></div>\n    </div>\n    <a href="/" class="login-button">Go back</a>\n    \n  </div>';
+  // LIN-4567: the title left the container for the public frame's h1, and the frame closes <main> after it.
+  const BASE_CONTAINER = '<div class="error-container">\n    <p class="error-message">M</p>\n    <div class="error-details" role="note">\n      <div class="error-detail-row"><span class="error-detail-key">Reason</span> <span class="error-detail-value">d</span></div>\n      <div class="error-detail-row"><span class="error-detail-key">Type</span> <span class="error-detail-value">upstream · retryable</span></div>\n      <div class="error-detail-row"><span class="error-detail-key">Code</span> <span class="error-detail-value">C</span></div>\n      <div class="error-detail-row"><span class="error-detail-key">Time</span> <span class="error-detail-value">T0</span></div>\n    </div>\n    <a href="/" class="login-button">Go back</a>\n    \n  </div>';
 
   test('four-key output is byte-identical to the base render (exact assertion)', () => {
     const out = renderErrorPage('T', 'M', { diagnostic: { detail: 'd', category: 'upstream', retryable: true, code: 'C', time: 'T0' } });
     const start = out.indexOf('<div class="error-container">');
-    const end = out.indexOf('\n</body>');
+    const end = out.indexOf('\n    </main>');
     assert.ok(start >= 0 && end > start);
     assert.equal(out.slice(start, end), BASE_CONTAINER);
   });

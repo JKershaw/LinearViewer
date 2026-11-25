@@ -111,15 +111,19 @@ test('the Plain and Settings phone roots are both rem, so the styleguide sample 
   assert.match(renderStyleguide(), /<div class="settings-shell sg-settings-sample" inert>/, 'the Settings samples keep their wrapper');
 });
 
-test('the /styleguide title carries the Plain title class', () => {
-  assert.match(renderStyleguide(), /<h2 class="plain-title">Style Guide<\/h2>/);
+// LIN-4567: the page sits in the public frame, so its name is the frame's one h1 (the Plain title h2 under a "Harbour"
+// h1 went with the brand header).
+test('the /styleguide title is the public frame\'s one h1', () => {
+  const html = renderStyleguide();
+  assert.match(html, /<h1>Style Guide<\/h1>/);
+  assert.equal((html.match(/<h1\b/g) || []).length, 1);
 });
 
 // LIN-3950: /styleguide is itself a Plain page, and shows the Plain layout with one sample of every
 // section kind, in the Plain section and in each theme panel (light and dark).
 test('/styleguide is a Plain page, with every section kind sampled in the page and both theme panels', () => {
   const html = renderStyleguide();
-  assert.match(html, /<main class="plain-page styleguide-content">/);
+  assert.match(html, /<div class="plain-page styleguide-content">/);
   const plain = '<div class="plain-page sg-settings-sample sg-plain-sample" inert>';
   assert.equal(html.split(plain).length - 1, 3, 'one Plain sample in the section and one per theme panel');
   const sample = html.split(plain)[1];

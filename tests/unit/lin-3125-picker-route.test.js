@@ -221,7 +221,8 @@ describe('LIN-3125 Phase 3 — held picker route', () => {
     assert.match(res.body, /No repositories available from your connected GitHub Issues accounts/);
     assert.match(res.body, /Connect a different GitHub Issues account/);
     assert.ok(res.body.includes('/auth/github?mode=add-source&amp;workspace=acme'), 'connect-different link is the bare beginUrl');
-    assert.ok(!res.body.includes('Linear'));
+    // The page's own words (the public frame's footer links the LinearViewer repository, LIN-4567).
+    assert.ok(!/<main[\s\S]*<\/main>/.exec(res.body)[0].includes('Linear'));
   });
 
   test('GET suspended/uninstalled listing failure => all-failed state, connection omitted', async () => {

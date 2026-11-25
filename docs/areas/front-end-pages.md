@@ -11,7 +11,7 @@ Area notes for `front-end-pages` in the registry. Format and rules: README.md.
   (`tests/unit/task-timeline-page.test.js`) is the gate.
 - The task page's desktop grid (`public/task-page.css`, ≥1024px) places every child by `grid-area`. A new section needs
   its own area in the template, or it renders at the top of the page (LIN-4405).
-- A landing band (`lib/render-landing.js`) is named in more places than its renderer: its `data-testid`, its `.lx-*` classes in `public/landing.css`, the unit and e2e specs, the test-id list in `public/llms.txt`, `docs/architecture/source-map.md`, `docs/architecture/ui-pieces.md` and the `landing` baselines in `tests/screenshots/pages/`. When a band changes, grep its old name in comments too. LIN-4487's first pass left two comments naming the removed band (`tests/e2e/landing.spec.js`, `public/landing.css`).
+- A landing band (`lib/render-landing.js`) is named beyond its renderer: its `data-testid`, `.lx-*` classes in `public/landing.css`, specs, `public/llms.txt`, the architecture docs and `tests/screenshots/pages/`. Grep its old name in comments too (LIN-4487 left two).
 - An open question record reaches a page through one reader, `openQuestionsFor` (`lib/open-questions.js`), and one card,
   `renderQuestionRecordCard` (`lib/question-record-card.js`); a new surface uses both and loads `public/question-records.js`
   as a module, never a second card or handler (LIN-4532). A question's `in` is its task RECORD id, not the ticket: a page
@@ -42,7 +42,8 @@ Area notes for `front-end-pages` in the registry. Format and rules: README.md.
   way back, the footer and the tab title, so drop the page's own `renderPageHeader`, back link and footer, and style
   nothing the shared rules already draw: its search fields are the text control (`.token-label-input` in
   `public/style.css`), its way back is the drill-down back link (`.sess-back`), its questions count is Home's needs-you
-  tone. LIN-4562's first cut drew all three again in `public/frame.css`.
+  tone. LIN-4562's first cut drew all three again in `public/frame.css`. A public page passes no viewer: the request's
+  comes through `frameViewerContext`; a body with its own H1 is named by it (`takeFirstH1`, LIN-4567).
 - A count drawn twice (rail and band) is updated by one function writing every copy (`updateRulingsBadge`,
   `updateQueueBadge`, `public/common.js`), and each page runs one poll: the old bar's badge keeps `public/app.js`'s, the
   frame's count polls from `public/common.js`. LIN-4562's first push moved the whole poll and started requests on old

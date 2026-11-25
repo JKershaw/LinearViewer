@@ -228,20 +228,24 @@ describe('library routes', () => {
     }
   });
 
+  // LIN-4567: the page sits in the public frame, whose one h1 is the document's name (its body H1's words when it has
+  // one, which the body then loses) and whose subtitle is the byline. The tab title starts with the same name.
   test('every document page renders exactly one H1 with the byline right after it', async () => {
     for (const doc of catalog.docs) {
       const res = await get(`/library/${doc.slug}`);
       const html = await res.text();
-      const main = /<main class="library[^"]*">([\s\S]*?)<\/main>/.exec(html);
+      const main = /<main id="main"[^>]*>([\s\S]*?)<\/main>/.exec(html);
       assert.ok(main, `${doc.slug}: has a <main>`);
-      const h1Count = (main[1].match(/<h1\b/g) || []).length;
-      assert.equal(h1Count, 1, `${doc.slug}: exactly one H1 in main (no duplicated title)`);
+      const h1s = main[1].match(/<h1\b[^>]*>([\s\S]*?)<\/h1>/g) || [];
+      assert.equal(h1s.length, 1, `${doc.slug}: exactly one H1 in main (no duplicated title)`);
       assert.match(
         main[1],
-        /<h1\b[\s\S]*?<\/h1>\s*<p class="library-doc__byline">/,
+        /<h1\b[\s\S]*?<\/h1>\s*<p class="page-header__subtitle">[^<]*min read/,
         `${doc.slug}: byline directly follows the H1`,
       );
-      assert.equal((main[1].match(/library-doc__byline/g) || []).length, 1, `${doc.slug}: one byline`);
+      const name = /<h1>([^<]*)<\/h1>/.exec(h1s[0])?.[1];
+      assert.ok(name, `${doc.slug}: the h1 is the page's name`);
+      assert.ok(html.includes(`<title>${name} · Harbour</title>`), `${doc.slug}: the tab title names it`);
     }
   });
 
@@ -281,7 +285,7 @@ describe('library routes', () => {
 
   test('the document page has a back link, an aside and a folder GitHub link', async () => {
     const html = await (await get('/library/cost-mix')).text();
-    assert.match(html, /<a href="\/library" data-testid="library-back-link">← Library<\/a>/, 'back link to the Library');
+    assert.match(html, /<a class="frame-back frame-public__back" href="\/library" data-testid="frame-back">← Library<\/a>/, 'back link to the Library (the public frame\'s way back)');
     assert.match(html, /<aside class="library-doc__aside">/, 'further-reading aside');
     assert.match(
       html,

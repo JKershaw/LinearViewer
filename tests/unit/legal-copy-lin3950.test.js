@@ -13,9 +13,11 @@ const snapshot = JSON.parse(readFileSync(FIXTURE, 'utf8'));
 
 const text = (s) => s.replace(/<[^>]+>/g, '').replace(/&rsquo;/g, '’').replace(/\s+/g, ' ').trim();
 
+// LIN-4567: the pages sit in the public frame, so the heading is the frame's one h1 and the sections are h2 under it
+// (they were a Plain-title h2 and h3 sections under a "Harbour" h1). The words are still the snapshot's.
 function pageCopy(html) {
-  const heading = text(html.match(/<main[^>]*>\s*<h2[^>]*>([\s\S]*?)<\/h2>/)[1]);
-  const sections = [...html.matchAll(/<section class="section[^"]*"[^>]*>\s*<h3[^>]*>([\s\S]*?)<\/h3>([\s\S]*?)<\/section>/g)]
+  const heading = text(html.match(/<main[^>]*>[\s\S]*?<h1[^>]*>([\s\S]*?)<\/h1>/)[1]);
+  const sections = [...html.matchAll(/<section class="section[^"]*"[^>]*>\s*<h2[^>]*>([\s\S]*?)<\/h2>([\s\S]*?)<\/section>/g)]
     .map((m) => ({ title: text(m[1]), body: text(m[2]) }));
   return { heading, sections };
 }

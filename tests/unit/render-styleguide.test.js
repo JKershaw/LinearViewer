@@ -11,12 +11,12 @@ const rootTokenNames = () => [...appliedDecls(STYLE, ':root').keys()].filter((pr
 test('renders a complete, public, static HTML document', () => {
   const html = renderStyleguide();
   assert.match(html, /^<!DOCTYPE html>/);
-  assert.match(html, /<title>Style Guide - Harbour<\/title>/);
+  assert.match(html, /<title>Style Guide · Harbour<\/title>/);
   assert.match(html, /<link rel="stylesheet" href="\/style.css">/);
   assert.match(html, /<link rel="stylesheet" href="\/styleguide.css">/);
-  // Public page chrome (mirrors legal pages): landing body class, header home link.
-  assert.match(html, /<body class="is-landing">/);
-  assert.match(html, /class="header-link"/);
+  // Public page chrome (mirrors legal pages): landing body class, the public frame (LIN-4567) with its wordmark home link.
+  assert.match(html, /<body class="frame-body frame-body--public is-landing">/);
+  assert.match(html, /data-testid="frame-public-band"/);
   // Unlisted: keep it out of search indexes.
   assert.match(html, /<meta name="robots" content="noindex">/);
 });
@@ -143,9 +143,9 @@ test('the .theme-dark hook exists in the stylesheet and only overrides tokens', 
   }
 });
 
-test('footer marks no current page action and hides authed nav', () => {
+test('the footer is the one every page shares, with no deploy stamp (the page stays byte-stable)', () => {
   const html = renderStyleguide();
-  assert.match(html, /class="page-footer"/);
-  // isLanding => no authenticated action links.
-  assert.doesNotMatch(html, /class="footer-actions"/);
+  assert.match(html, /data-testid="frame-footer"/);
+  assert.doesNotMatch(html, /data-testid="frame-footer-stamp"/);
+  assert.doesNotMatch(html, /class="page-footer"/);
 });

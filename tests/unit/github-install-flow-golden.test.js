@@ -39,7 +39,7 @@
 import { test, describe, before, after } from 'node:test';
 import assert from 'node:assert';
 import crypto from 'node:crypto';
-import { readFileSync } from 'node:fs';
+import { readFileSync, writeFileSync } from 'node:fs';
 import { fileURLToPath } from 'node:url';
 import { dirname, join } from 'node:path';
 import { mkdtempSync, rmSync } from 'node:fs';
@@ -53,7 +53,13 @@ import { withResolver } from './lin-3382-resolver-harness.js';
 import { buildBranches, runBranch } from '../fixtures/github-install-flow-branches.js';
 
 const __dirname = dirname(fileURLToPath(import.meta.url));
-const GOLDEN = JSON.parse(readFileSync(join(__dirname, '../fixtures/github-install-flow-golden.json'), 'utf8'));
+const GOLDEN_PATH = join(__dirname, '../fixtures/github-install-flow-golden.json');
+const GOLDEN = JSON.parse(readFileSync(GOLDEN_PATH, 'utf8'));
+// LIN-4567: a deliberate change to the pages these routers render (the public frame, LIN-4342 piece 6) regenerates the
+// fixture with `UPDATE_GITHUB_INSTALL_FLOW_GOLDEN=1 node scripts/run-unit-tests.mjs tests/unit/github-install-flow-golden.test.js`,
+// as the render-session golden does. The branch keys and count stay fixed; only bodies are rewritten. Review the diff.
+const UPDATE = process.env.UPDATE_GITHUB_INSTALL_FLOW_GOLDEN === '1';
+const updated = {};
 
 const { privateKey: RSA_PRIVATE_KEY } = crypto.generateKeyPairSync('rsa', { modulusLength: 2048 });
 const RSA_PEM = RSA_PRIVATE_KEY.export({ type: 'pkcs1', format: 'pem' });
@@ -154,6 +160,7 @@ describe('GitHub install-flow golden harness (byte-parity, LIN-2397 stage A)', (
     }
     if (dbClient?.close) await dbClient.close();
     if (dbDir) rmSync(dbDir, { recursive: true, force: true });
+    if (UPDATE) writeFileSync(GOLDEN_PATH, `${JSON.stringify({ ...GOLDEN, ...updated }, null, 2)}\n`);
   });
 
   function freshAccountStores() {
@@ -188,6 +195,10 @@ describe('GitHub install-flow golden harness (byte-parity, LIN-2397 stage A)', (
               ...(branch.userPreferencesStore ? { userPreferencesStore: branch.userPreferencesStore } : {}),
             });
             const actual = await runBranch(router, branch);
+            if (UPDATE) {
+              (updated[d.routerKey] ||= { ...GOLDEN[d.routerKey] })[branch.key] = actual;
+              return;
+            }
             assert.deepStrictEqual(actual, expected);
           } finally {
             if (branch.notConfigured) process.env.GITHUB_APP_ID = savedAppId;

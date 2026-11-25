@@ -6,7 +6,7 @@
  * with JS on, because `securitypolicyviolation` needs a listener.
  */
 import { test, expect } from '@playwright/test';
-import { expectNoClippedOverflow } from '../helpers.js';
+import { expectNoClippedOverflow, SELECTORS } from '../helpers.js';
 
 test.describe('Library — server-rendered, no JavaScript', () => {
   test.use({ javaScriptEnabled: false });
@@ -33,8 +33,10 @@ test.describe('Library — server-rendered, no JavaScript', () => {
   test('a result links to a readable document page', async ({ page }) => {
     await page.goto('/library?q=review+loops');
     await page.locator('[data-testid="library-result-link"]').first().click();
-    await expect(page.locator('[data-testid="library-doc-title"]')).toBeVisible();
-    await expect(page).toHaveTitle(/Harbour Library/);
+    // LIN-4567: the document's name is the public frame's one h1, and the tab title starts with it.
+    const name = await page.locator(SELECTORS.nav.heading).textContent();
+    expect(name.trim().length).toBeGreaterThan(0);
+    await expect(page).toHaveTitle(`${name.trim()} · Harbour`);
     await expect(page.locator('meta[name="description"]')).toHaveAttribute('content', /.+/);
   });
 
@@ -49,7 +51,8 @@ test.describe('Library — server-rendered, no JavaScript', () => {
 
   test('a document page has a link back to the Library', async ({ page }) => {
     await page.goto('/library/review-loops');
-    await page.locator('[data-testid="library-back-link"]').click();
+    await expect(page.locator(SELECTORS.nav.back)).toHaveText('\u2190 Library');
+    await page.locator(SELECTORS.nav.back).click();
     await expect(page).toHaveURL(/\/library$/);
     await expect(page.locator('h2', { hasText: 'Papers' })).toBeVisible();
   });
