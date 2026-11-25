@@ -6,8 +6,9 @@
  * 8a102628f; re-recorded at 69b5c1bbd after LIN-4558 changed parseParkedWait), so the test proves each touched reader answers exactly as it did for every kind that already existed.
  *
  * Pure and deterministic: fixed timestamps, no clock. `readSurfaces` takes the reader modules as an argument, so the
- * same code reads the old tree (recording) and the new one (checking). `messageArg` adapts the two predicates whose
- * signature changed from a message to an entry (`isLineageClosingTerminal`, `isWakeEvent`).
+ * same code reads the old tree (recording) and the new one (checking). `messageArg` adapts the three predicates whose
+ * signature changed from a message to an entry (`isLineageClosingTerminal`, `isWakeEvent`, and the status-bearing
+ * predicate, whose golden key keeps its recorded name `isStatusBearingMessage`).
  */
 
 const T0 = Date.UTC(2026, 10, 1, 9, 0, 0);
@@ -99,7 +100,7 @@ export function readSurfaces(feedback, m, messageArg) {
     findWakeEvent: wake ? { index: idx(feedback, wake.entry), marker: wake.marker } : null,
     isLineageClosingTerminal: feedback.map((e) => t.isLineageClosingTerminal(messageArg(e))),
     isWakeEvent: feedback.map((e) => t.isWakeEvent(messageArg(e))),
-    isStatusBearingMessage: feedback.map((e) => t.isStatusBearingMessage(e.message)),
+    isStatusBearingMessage: feedback.map((e) => t.isStatusBearingEntry(messageArg(e))),
     parseParkedWait: m.telemetry.parseParkedWait(feedback),
     buildRunTelemetry: m.telemetry.buildRunTelemetry({ dispatchedAt: at(0), feedback }),
     correlateDecisionCase: m.digest.correlateDecisionCase(feedback, feedback.length),
