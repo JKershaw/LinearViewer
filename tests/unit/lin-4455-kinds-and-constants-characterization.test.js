@@ -42,9 +42,11 @@ import { createMockCollection } from '../fixtures/mock-collection.js';
 // ─── The kind universe ───────────────────────────────────────────────────────
 
 /** Today's runner allowlist, in its rendered order. Written out, never read from source. */
+// LIN-4559: `agent-text` (a child agent's words) joins at the end of the postable block, so the prompt's list grows
+// by one name after `refusal` and every older byte stays where it was.
 const RUNNER_KINDS_LITERAL = [
   'status', 'recap', 'heartbeat', 'evidence', 'assistant-text', 'tool', 'usage', 'resources',
-  'refusal'
+  'refusal', 'agent-text'
 ];
 /** LIN-4541: the two kinds runners used to post, now history: a runner post of either is refused 422. */
 const REFUSED_KINDS = ['decision', 'decision-withdrawn'];
@@ -69,13 +71,15 @@ describe('FEEDBACK_ENTRY_KINDS: contents and order, as the runner prompt renders
   test('the runner prompt renders the literal list byte for byte', () => {
     const prompt = buildRunnerKickoff({ baseUrl: 'https://harbour.example' });
     const rendered = '`status`, `recap`, `heartbeat`, `evidence`, `assistant-text`, `tool`, `usage`, '
-      + '`resources`, `refusal`';
-    assert.ok(prompt.includes(rendered), 'the runner prompt lists the feedback kinds in today\'s order');
+      + '`resources`, `refusal`, `agent-text`';
+    assert.ok(prompt.includes(`\`kind\` is one of ${rendered}; `), 'the runner prompt lists the feedback kinds in today\'s order');
   });
 
   test('the runner-facing validator accepts each allowlisted kind, refuses the retired decision kinds, and drops the store-only stamps', () => {
     for (const kind of RUNNER_KINDS_LITERAL) {
-      assert.equal(validateFeedbackBody({ message: 'm', kind }).value?.kind, kind, kind);
+      // LIN-4559: an agent-text post names its agent (refused without one, in lin-4559-child-agent-text-guard).
+      const agent = kind === 'agent-text' ? { agent: 'a1b2c3d4' } : {};
+      assert.equal(validateFeedbackBody({ message: 'm', kind, ...agent }).value?.kind, kind, kind);
     }
     for (const kind of REFUSED_KINDS) {
       const out = validateFeedbackBody({ message: 'm', kind });
@@ -91,12 +95,13 @@ describe('FEEDBACK_ENTRY_KINDS: contents and order, as the runner prompt renders
 // ─── 2. The skip sets ────────────────────────────────────────────────────────
 
 describe('the hand-written kind sets, read through their readers', () => {
-  test('parseParkedWait walks past exactly the relay kinds and the stamp kinds', () => {
+  // LIN-4559: and `agent-text`, a child agent's words, which say nothing about the run's own state.
+  test('parseParkedWait walks past exactly the relay kinds, the stamp kinds and agent-text', () => {
     const skipped = UNIVERSE.filter((kind) => parseParkedWait([
       { kind: 'status', message: 'Scheduled wakeup in 270s', timestamp: '2026-11-13T10:00:00Z' },
       entry(kind, 'a later line', '2026-11-13T10:01:00Z')
     ]) !== null);
-    assert.deepEqual(skipped.map(label).sort(), [...PARKED_RELAY_KINDS, ...STAMP_KINDS].sort());
+    assert.deepEqual(skipped.map(label).sort(), [...PARKED_RELAY_KINDS, ...STAMP_KINDS, 'agent-text'].sort());
   });
 
   test('parseHeartbeats drops exactly the stamp kinds and `decision`', () => {
@@ -111,9 +116,10 @@ describe('the hand-written kind sets, read through their readers', () => {
     assert.deepEqual(ignored.map(label).sort(), [...STAMP_KINDS].sort());
   });
 
-  test('the run view\'s waiting clock looks past exactly the stamp kinds to an earlier [blocked]', () => {
+  test('the run view\'s waiting clock looks past exactly the stamp kinds and agent-text to an earlier [blocked]', () => {
     // run-view's stamp set is private: a later [done] carried by a stamp kind is skipped, so
     // the session is still waiting on the earlier [blocked]; any other kind's [done] ends it.
+    // LIN-4559: a child agent's [done] (agent-text) is the child's, so the run still waits.
     const skipped = UNIVERSE.filter((kind) => buildRunViewOverRecords({
       loops: [{
         loopId: 'l1', lineageId: 'l1', kind: 'implementation', terminalStatus: null,
@@ -123,7 +129,7 @@ describe('the hand-written kind sets, read through their readers', () => {
         ]
       }]
     }, { now: '2026-11-13T11:00:00Z', records: [] }).waiting.active);
-    assert.deepEqual(skipped.map(label).sort(), [...STAMP_KINDS].sort());
+    assert.deepEqual(skipped.map(label).sort(), [...STAMP_KINDS, 'agent-text'].sort());
   });
 
   test('isDecisionLifecycleStampEntry is true for exactly the stamp kinds', () => {
@@ -132,18 +138,19 @@ describe('the hand-written kind sets, read through their readers', () => {
   });
 });
 
-// ─── 3. findWakeEvent has no kind rule ───────────────────────────────────────
+// ─── 3. findWakeEvent: one kind rule, the run's own words (LIN-4559) ─────────
 
-describe('findWakeEvent returns the last wake marker regardless of entry kind', () => {
+describe('findWakeEvent returns the last wake marker of every kind but a child agent\'s words', () => {
   for (const kind of UNIVERSE) {
-    test(`a [done] carried by ${label(kind)} is the wake`, () => {
+    // LIN-4559: until agent-text, every kind (and an unknown one) carried a wake. A child agent's [done] is the
+    // child's, so the earlier [blocked] stays the run's wake; every other kind reads exactly as before.
+    const childWords = kind === 'agent-text';
+    test(`a [done] carried by ${label(kind)} ${childWords ? 'is not' : 'is'} the wake`, () => {
+      const blocked = { kind: 'status', message: '[blocked] waiting on a person', timestamp: '2026-11-13T10:00:00Z' };
       const last = entry(kind, '[done] finished', '2026-11-13T10:02:00Z');
-      const found = findWakeEvent([
-        { kind: 'status', message: '[blocked] waiting on a person', timestamp: '2026-11-13T10:00:00Z' },
-        last
-      ]);
-      assert.equal(found?.entry, last);
-      assert.equal(found?.marker, 'done');
+      const found = findWakeEvent([blocked, last]);
+      assert.equal(found?.entry, childWords ? blocked : last);
+      assert.equal(found?.marker, childWords ? 'blocked' : 'done');
     });
 
     test(`a later non-marker ${label(kind)} entry does not hide an earlier marker`, () => {

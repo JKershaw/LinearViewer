@@ -906,27 +906,23 @@ describe('loadDispatchHistory — FRESH_DIGEST $cond structural witness (LIN-301
   // Today's exact per-field expressions (kpi-stats.js:308-409) — the required
   // ELSE branch once each field is wrapped in $cond. Reuses the SAME shared
   // regex sources the production pipeline does, never a retyped copy.
-  const todaysTerminalEntry = {
-    $last: {
-      $filter: {
-        input: {
-          $map: {
-            input: { $ifNull: ['$feedback', []] },
-            as: 'f',
-            in: { message: '$$f.message', timestamp: '$$f.timestamp' }
-          }
-        },
-        as: 'entry',
-        cond: {
-          $regexMatch: {
-            input: { $ifNull: ['$$entry.message', ''] },
-            regex: TERMINAL_INTERNAL.TERMINAL_FEEDBACK_REGEX.source,
-            options: 'i'
-          }
+  // LIN-4559: the run's own entries only (a child agent's words, kind agent-text, are no terminal or ticket marker of
+  // the run), filtered on the raw entry and narrowed after, so the projected {message, timestamp} shape is unchanged.
+  const speaksForRun = { $not: [{ $in: [{ $ifNull: ['$$entry.kind', null] }, ['agent-text']] }] };
+  const runOwnEntries = (regex) => ({
+    $map: {
+      input: {
+        $filter: {
+          input: { $ifNull: ['$feedback', []] },
+          as: 'entry',
+          cond: { $and: [speaksForRun, { $regexMatch: { input: { $ifNull: ['$$entry.message', ''] }, regex: regex.source, options: 'i' } }] }
         }
-      }
+      },
+      as: 'f',
+      in: { message: '$$f.message', timestamp: '$$f.timestamp' }
     }
-  };
+  });
+  const todaysTerminalEntry = { $last: runOwnEntries(TERMINAL_INTERNAL.TERMINAL_FEEDBACK_REGEX) };
   const todaysUsageEntry = {
     $last: {
       $filter: {
@@ -957,25 +953,7 @@ describe('loadDispatchHistory — FRESH_DIGEST $cond structural witness (LIN-301
       }
     }
   };
-  const todaysTicketMarkerEntries = {
-    $filter: {
-      input: {
-        $map: {
-          input: { $ifNull: ['$feedback', []] },
-          as: 'f',
-          in: { message: '$$f.message', timestamp: '$$f.timestamp' }
-        }
-      },
-      as: 'entry',
-      cond: {
-        $regexMatch: {
-          input: { $ifNull: ['$$entry.message', ''] },
-          regex: SESSION_TELEMETRY_INTERNAL.TICKET_PREFIX.source,
-          options: 'i'
-        }
-      }
-    }
-  };
+  const todaysTicketMarkerEntries = runOwnEntries(SESSION_TELEMETRY_INTERNAL.TICKET_PREFIX);
   const todaysFeedbackCount = { $size: { $ifNull: ['$feedback', []] } };
 
   function capturePipelineStub() {

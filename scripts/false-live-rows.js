@@ -239,7 +239,7 @@ async function falseCloses({ dispatchStore, recordsStore, urlKey, now, readTicke
       const hasSuccessor = peers.some(p => toMs(p.dispatchedAt) > toMs(r.dispatchedAt) && (p.feedback || []).some(f => f.rootItemId));
       if (!hasSuccessor) found['handed-on'].push(r._id);
     } else if (reason === 'lineage-terminal') {
-      const hasTerminal = peers.some(p => (p.feedback || []).some(f => isLineageClosingTerminal(f.message) && toMs(f.timestamp) <= atMs));
+      const hasTerminal = peers.some(p => (p.feedback || []).some(f => isLineageClosingTerminal(f) && toMs(f.timestamp) <= atMs));
       if (!hasTerminal) found['lineage-terminal'].push(r._id);
     } else if (reason === 'ticket-closed') {
       const st = await ticketOutcome(r.issueIdentifier);
@@ -265,7 +265,7 @@ function informational(rows, now) {
   for (const r of rows) if (r.rootItemId) { if (!byRoot.has(r.rootItemId)) byRoot.set(r.rootItemId, []); byRoot.get(r.rootItemId).push(r); }
   let n = 0;
   for (const group of byRoot.values()) {
-    if (group.some(r => (r.feedback || []).some(f => isLineageClosingTerminal(f.message)))) continue;
+    if (group.some(r => (r.feedback || []).some(f => isLineageClosingTerminal(f)))) continue;
     for (const r of group) {
       if (r.kind === 'wake' || r.status !== 'taken' || r.bookkeeping || toMs(r.dispatchedAt) < horizonMs) continue;
       if (group.some(p => p._id !== r._id && toMs(p.dispatchedAt) > toMs(r.dispatchedAt))) n += 1;
@@ -351,7 +351,7 @@ export function postsAfterEnd(rows) {
   let entries = 0;
   for (const r of rows) {
     const fb = r.feedback || [];
-    const ends = fb.filter(f => isLineageClosingTerminal(f.message)).map(f => toMs(f.timestamp));
+    const ends = fb.filter(f => isLineageClosingTerminal(f)).map(f => toMs(f.timestamp));
     if (r.bookkeeping?.at) ends.push(toMs(r.bookkeeping.at));
     // The LATEST end, not the first: a held session that is followed up posts [done] again, and
     // that is a session ending twice, not a zombie. Production (30 d, linearviewer): the earliest-end

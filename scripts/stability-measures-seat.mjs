@@ -18,11 +18,11 @@
 //   operator-free  the share of finished tasks with no question record, no [blocked] marker in any lineage member's feedback
 //                  and no dispatch row closed with closedReason 'operator': an UPPER BOUND over the three readable
 //                  conditions, with the fourth (no person-started dispatch) named as missing. Blocking is read from the
-//                  feedback markers (WAKE_FEEDBACK_REGEX, any entry, not the last one), never from `status`, which reports
+//                  feedback markers (wakeMarkerOf, any entry, not the last one), never from `status`, which reports
 //                  blocked only while no terminal exists in the lineage. Every member of every lineage /cost lists is
 //                  read, not only roots.
 
-import { WAKE_FEEDBACK_REGEX, isWaitingWakeMarker } from '../lib/dispatch-terminal.js';
+import { isWaitingWakeMarker, wakeMarkerOf } from '../lib/dispatch-terminal.js';
 import { questionOutcomeOf } from '../lib/records/question-facts.js';
 import { ticketTaskIdOf } from '../lib/records/refs.js';
 import { notMeasured, percent, round, row } from './stability-measures-core.mjs';
@@ -36,16 +36,15 @@ export const SEAT_KEYS = Object.freeze(['rulings', 'origin', 'operator-free']);
 const OUTCOMES = ['answered', 'dismissed', 'withdrawn', 'self-resolved', 'handed-on'];
 
 /**
- * Whether any feedback entry is a `[blocked]` wake marker: the waiting marker of lib/dispatch-terminal.js, matched on
- * every entry. A lineage that blocked and then finished still blocked (deriveBlockedStatus reads only the last marker,
- * so it would say no). `[pending]` is an agent-to-agent handoff, not a wait on a person.
+ * Whether any feedback entry is a `[blocked]` wake marker: the waiting marker of lib/dispatch-terminal.js, read on
+ * every entry that speaks for the run. A lineage that blocked and then finished still blocked (deriveBlockedStatus
+ * reads only the last marker, so it would say no). `[pending]` is an agent-to-agent handoff, not a wait on a person.
  */
 export function hasBlockedMarker(feedback) {
   if (!Array.isArray(feedback)) return false;
-  return feedback.some((f) => {
-    const m = WAKE_FEEDBACK_REGEX.exec(f?.message || '');
-    return !!m && isWaitingWakeMarker(m[1].toLowerCase());
-  });
+  // LIN-4559: wakeMarkerOf asks the kinds table whether the entry speaks for the run, so a child agent's `[blocked]`
+  // (kind agent-text) is not the lineage having blocked.
+  return feedback.some((f) => isWaitingWakeMarker(wakeMarkerOf(f)));
 }
 
 /**

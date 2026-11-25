@@ -28,19 +28,21 @@ import * as walk from 'acorn-walk';
 
 import {
   FEEDBACK_KINDS, FEEDBACK_KIND_ROLES, FEEDBACK_ENTRY_KINDS, PARKED_WAIT_SKIPPED_KINDS,
-  DECISION_LIFECYCLE_STAMP_KINDS, RETIRED_DECISION_KINDS, feedbackKindMayCarryWake
+  DECISION_LIFECYCLE_STAMP_KINDS, RETIRED_DECISION_KINDS, feedbackKindMayCarryWake,
+  RUN_SILENT_KINDS, feedbackKindSpeaksForRun, entrySpeaksForRun
 } from '../../lib/dispatch-feedback-kinds.js';
 import * as dispatchStore from '../../lib/dispatch-store.js';
-import { findWakeEvent } from '../../lib/dispatch-terminal.js';
+import { findWakeEvent, terminalStatusOf, wakeMarkerOf, isLineageClosingTerminal, findTerminalFeedback } from '../../lib/dispatch-terminal.js';
 
 const REPO = join(dirname(fileURLToPath(import.meta.url)), '../..');
 const LEAF = 'lib/dispatch-feedback-kinds.js';
 const kindsWith = (role) => FEEDBACK_KINDS.filter((row) => row[role]).map((row) => row.kind);
 
 describe('every row declares every role', () => {
-  test('the role columns are the five the readers use', () => {
+  test('the role columns are the six the readers use', () => {
     // LIN-4541: `refuse` names the retired kinds a runner post is refused 422 for (lib/dispatch-feedback-validation.js).
-    assert.deepEqual([...FEEDBACK_KIND_ROLES], ['runnerPostable', 'relay', 'decisionStamp', 'mayCarryWake', 'refuse']);
+    // LIN-4559: `speaksForRun` says whether an entry is the run's own statement (false: a child agent's words).
+    assert.deepEqual([...FEEDBACK_KIND_ROLES], ['runnerPostable', 'relay', 'decisionStamp', 'mayCarryWake', 'refuse', 'speaksForRun']);
   });
 
   for (const row of FEEDBACK_KINDS) {
@@ -113,6 +115,47 @@ describe('every kind set is the table filtered by a role', () => {
     for (const row of FEEDBACK_KINDS) {
       const entry = { kind: row.kind, message: '[done] finished' };
       assert.equal(findWakeEvent([entry])?.entry === entry, row.mayCarryWake, row.kind);
+    }
+  });
+
+  test('LIN-4559: RUN_SILENT_KINDS is the rows that do not speak for the run, and is exactly agent-text', () => {
+    assert.deepEqual([...RUN_SILENT_KINDS].sort(), FEEDBACK_KINDS.filter((r) => !r.speaksForRun).map((r) => r.kind).sort());
+    assert.deepEqual([...RUN_SILENT_KINDS], ['agent-text']);
+    assert.ok(Object.isFrozen(RUN_SILENT_KINDS));
+  });
+
+  test('LIN-4559: a row that does not speak for the run carries no wake, and is no relay, stamp or refused kind', () => {
+    for (const row of FEEDBACK_KINDS) {
+      if (row.speaksForRun) continue;
+      assert.equal(row.mayCarryWake, false, row.kind);
+      assert.equal(row.relay, false, row.kind);
+      assert.equal(row.decisionStamp, false, row.kind);
+      assert.equal(row.refuse, false, row.kind);
+    }
+  });
+
+  test('LIN-4559: agent-text is the last runner-postable row (the prompt renders it after every older kind)', () => {
+    assert.equal(FEEDBACK_ENTRY_KINDS.at(-1), 'agent-text');
+  });
+
+  test('LIN-4559: feedbackKindSpeaksForRun and entrySpeaksForRun read the speaksForRun column; unknown and missing kinds speak', () => {
+    for (const row of FEEDBACK_KINDS) {
+      assert.equal(feedbackKindSpeaksForRun(row.kind), row.speaksForRun, row.kind);
+      assert.equal(entrySpeaksForRun({ kind: row.kind }), row.speaksForRun, row.kind);
+    }
+    assert.equal(feedbackKindSpeaksForRun('some-future-kind'), true);
+    assert.equal(feedbackKindSpeaksForRun(undefined), true);
+    assert.equal(entrySpeaksForRun({ message: '[done] x' }), true);
+    assert.equal(entrySpeaksForRun(null), true);
+  });
+
+  test('LIN-4559: every marker primitive reads the role: a [done] is the run\'s exactly when its kind speaks for the run', () => {
+    for (const row of FEEDBACK_KINDS) {
+      const entry = { kind: row.kind, message: '[done] finished' };
+      assert.equal(terminalStatusOf(entry), row.speaksForRun ? 'done' : null, row.kind);
+      assert.equal(findTerminalFeedback([entry])?.entry === entry, row.speaksForRun, row.kind);
+      assert.equal(isLineageClosingTerminal(entry), row.speaksForRun, row.kind);
+      assert.equal(wakeMarkerOf(entry), row.speaksForRun && row.mayCarryWake ? 'done' : null, row.kind);
     }
   });
 });
