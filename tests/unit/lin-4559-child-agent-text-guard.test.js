@@ -39,6 +39,8 @@ import {
   deriveWireStatus, deriveWireTerminal, findWakeEvent, deriveBlockedStatus, derivePendingPark, noOwnTerminalMarkerFilter
 } from '../../lib/dispatch-terminal.js';
 import { selectLineageCloses } from '../../lib/lineage-closure.js';
+import { prUrlOfFeedback } from '../../lib/dispatch-wake.js';
+import { hasBlockedMarker } from '../../scripts/stability-measures-seat.mjs';
 import { parseParkedWait, buildSessionTelemetry } from '../../lib/session-telemetry.js';
 import { deriveLoopFacingFacts, digestFeedback } from '../../lib/digest-feedback.js';
 import { runLoopFactsOf } from '../../lib/run-liveness.js';
@@ -195,6 +197,20 @@ describe('LIN-4559: a child [done] on the parent\'s row is not the run\'s termin
     assert.equal(facts.agentState, 'running');
     const [run] = recentRuns([row]);
     assert.notEqual(run?.outcome, 'done');
+  });
+
+  test('the run\'s reported PR: prUrlOfFeedback takes the run\'s own entries only, never a child\'s', () => {
+    const own = { kind: 'assistant-text', message: 'DONE: https://github.com/o/r/pull/1' };
+    const child = { kind: 'agent-text', agent: 'a1', message: 'DONE: https://github.com/o/r/pull/2' };
+    assert.equal(prUrlOfFeedback([own, child]), 'https://github.com/o/r/pull/1');
+    assert.equal(prUrlOfFeedback([child, own]), 'https://github.com/o/r/pull/1');
+    assert.equal(prUrlOfFeedback([{ kind: 'agent-text', agent: 'a1', message: 'see https://github.com/o/r/pull/2' }]), null);
+  });
+
+  test('the stability-measures seat: a child [blocked] is not the lineage having blocked (the run\'s own still is)', () => {
+    const child = { kind: 'agent-text', agent: 'a1', message: '[blocked] DECISION: which way?' };
+    assert.equal(hasBlockedMarker([{ kind: 'assistant-text', message: '[working] start' }, child]), false);
+    assert.equal(hasBlockedMarker([child, { message: '[blocked] DECISION: which way?' }]), true);
   });
 
   test('lineage closure (backfill): selectLineageCloses closes nothing on a child [done]', () => {
@@ -387,8 +403,8 @@ describe('LIN-4559 census: the marker regexes are read only through the role-awa
     return hits;
   }
 
-  test('lib/, routes/ and server.js read no marker regex outside the primitives', () => {
-    const files = execFileSync('git', ['ls-files', 'lib', 'routes', 'server.js'], { cwd: REPO, encoding: 'utf8' })
+  test('lib/, routes/, scripts/ and server.js read no marker regex outside the primitives', () => {
+    const files = execFileSync('git', ['ls-files', 'lib', 'routes', 'scripts', 'server.js'], { cwd: REPO, encoding: 'utf8' })
       .split('\n').filter((f) => /\.m?js$/.test(f) && !f.startsWith('lib/runner-kit/'));
     const hits = files.flatMap((f) => {
       const src = readFileSync(join(REPO, f), 'utf8');
