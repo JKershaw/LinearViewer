@@ -7,6 +7,11 @@
  * The snapshot below was captured on origin/main BEFORE `summarizeActivity` was
  * extracted and the optional `urlKey` filter was added, so it passes before and
  * after: the public /kpis page keeps reading exactly what it read.
+ *
+ * LIN-4559 moved two expressions on purpose: `terminalEntry` and `ticketMarkerEntries` now filter the raw entries on
+ * the kinds table's `speaksForRun` role (a child agent's words, `agent-text`, are no terminal or ticket marker of the
+ * run) before narrowing them to {message, timestamp}. Every other read is byte-identical; the result for every kind
+ * that existed before is pinned in tests/unit/lin-4559-existing-kinds-characterization.test.js.
  */
 import { test } from 'node:test';
 import assert from 'node:assert';
@@ -236,34 +241,55 @@ const AGGREGATE_SNAPSHOT = [
                 '$feedbackDigest.kpiTerminalEntry',
                 {
                   $last: {
-                    $filter: {
+                    $map: {
                       input: {
-                        $map: {
+                        $filter: {
                           input: {
                             $ifNull: [
                               '$feedback',
                               []
                             ]
                           },
-                          as: 'f',
-                          in: {
-                            message: '$$f.message',
-                            timestamp: '$$f.timestamp'
+                          as: 'entry',
+                          cond: {
+                            $and: [
+                              {
+                                $not: [
+                                  {
+                                    $in: [
+                                      {
+                                        $ifNull: [
+                                          '$$entry.kind',
+                                          null
+                                        ]
+                                      },
+                                      [
+                                        'agent-text'
+                                      ]
+                                    ]
+                                  }
+                                ]
+                              },
+                              {
+                                $regexMatch: {
+                                  input: {
+                                    $ifNull: [
+                                      '$$entry.message',
+                                      ''
+                                    ]
+                                  },
+                                  regex: '^\\s*\\[(done|complete|failed|aborted|skipped)\\]',
+                                  options: 'i'
+                                }
+                              }
+                            ]
                           }
                         }
                       },
-                      as: 'entry',
-                      cond: {
-                        $regexMatch: {
-                          input: {
-                            $ifNull: [
-                              '$$entry.message',
-                              ''
-                            ]
-                          },
-                          regex: '^\\s*\\[(done|complete|failed|aborted|skipped)\\]',
-                          options: 'i'
-                        }
+                      as: 'f',
+                      in: {
+                        message: '$$f.message',
+                        timestamp: '$$f.timestamp'
                       }
                     }
                   }
@@ -426,34 +452,55 @@ const AGGREGATE_SNAPSHOT = [
                 },
                 '$feedbackDigest.kpiTicketMarkerEntries',
                 {
-                  $filter: {
+                  $map: {
                     input: {
-                      $map: {
+                      $filter: {
                         input: {
                           $ifNull: [
                             '$feedback',
                             []
                           ]
                         },
-                        as: 'f',
-                        in: {
-                          message: '$$f.message',
-                          timestamp: '$$f.timestamp'
+                        as: 'entry',
+                        cond: {
+                          $and: [
+                            {
+                              $not: [
+                                {
+                                  $in: [
+                                    {
+                                      $ifNull: [
+                                        '$$entry.kind',
+                                        null
+                                      ]
+                                    },
+                                    [
+                                      'agent-text'
+                                    ]
+                                  ]
+                                }
+                              ]
+                            },
+                            {
+                              $regexMatch: {
+                                input: {
+                                  $ifNull: [
+                                    '$$entry.message',
+                                    ''
+                                  ]
+                                },
+                                regex: '^\\s*\\[ticket\\]\\s*(LIN-\\d+)\\s+(started|done|blocked|refused|dissolved|trimmed)\\b\\s*(?:[—-]\\s*(.*))?$',
+                                options: 'i'
+                              }
+                            }
+                          ]
                         }
                       }
                     },
-                    as: 'entry',
-                    cond: {
-                      $regexMatch: {
-                        input: {
-                          $ifNull: [
-                            '$$entry.message',
-                            ''
-                          ]
-                        },
-                        regex: '^\\s*\\[ticket\\]\\s*(LIN-\\d+)\\s+(started|done|blocked|refused|dissolved|trimmed)\\b\\s*(?:[—-]\\s*(.*))?$',
-                        options: 'i'
-                      }
+                    as: 'f',
+                    in: {
+                      message: '$$f.message',
+                      timestamp: '$$f.timestamp'
                     }
                   }
                 }

@@ -153,35 +153,35 @@ describe('feedbackWithHarvestedAbort (F1 guard)', () => {
  */
 describe('isWakeEvent', () => {
   test('[done]/[complete]/[failed]/[aborted]/[blocked]/[pending] are all wake events', () => {
-    assert.equal(isWakeEvent('[done] finished in 40s'), true);
-    assert.equal(isWakeEvent('[complete] all green'), true);
-    assert.equal(isWakeEvent('[failed] tests red'), true);
-    assert.equal(isWakeEvent('[aborted] gave up'), true);
-    assert.equal(isWakeEvent('[blocked] waiting on a human'), true);
-    assert.equal(isWakeEvent('[pending] beat 1 done, beats 2-4 remain'), true);
+    assert.equal(isWakeEvent({ message: '[done] finished in 40s' }), true);
+    assert.equal(isWakeEvent({ message: '[complete] all green' }), true);
+    assert.equal(isWakeEvent({ message: '[failed] tests red' }), true);
+    assert.equal(isWakeEvent({ message: '[aborted] gave up' }), true);
+    assert.equal(isWakeEvent({ message: '[blocked] waiting on a human' }), true);
+    assert.equal(isWakeEvent({ message: '[pending] beat 1 done, beats 2-4 remain' }), true);
   });
 
   test('non-terminal markers and empty input are not wake events', () => {
-    assert.equal(isWakeEvent('[working] still going'), false);
-    assert.equal(isWakeEvent('[stalled?] no output for a while'), false);
-    assert.equal(isWakeEvent(''), false);
-    assert.equal(isWakeEvent(undefined), false);
-    assert.equal(isWakeEvent(null), false);
+    assert.equal(isWakeEvent({ message: '[working] still going' }), false);
+    assert.equal(isWakeEvent({ message: '[stalled?] no output for a while' }), false);
+    assert.equal(isWakeEvent({ message: '' }), false);
+    assert.equal(isWakeEvent({ message: undefined }), false);
+    assert.equal(isWakeEvent({ message: null }), false);
   });
 
   test('case-insensitive and tolerant of leading whitespace', () => {
-    assert.equal(isWakeEvent('  [BLOCKED] ok'), true);
+    assert.equal(isWakeEvent({ message: '  [BLOCKED] ok' }), true);
   });
 
   test('a non-prefix mention does not count', () => {
-    assert.equal(isWakeEvent('note: a worker reports [blocked] when stuck'), false);
+    assert.equal(isWakeEvent({ message: 'note: a worker reports [blocked] when stuck' }), false);
   });
 
   // SPLIT-PROOF: [blocked] wakes a parent, but it is NOT terminal — the new
   // predicate must not leak into terminal/telemetry/KPI semantics.
   test('[blocked] is a wake event WHILE findTerminalFeedback stays blind to it', () => {
     const feedback = [{ message: '[blocked] cannot proceed without creds' }];
-    assert.equal(isWakeEvent(feedback[0].message), true);
+    assert.equal(isWakeEvent({ message: feedback[0].message }), true);
     assert.equal(findTerminalFeedback(feedback), null);
     assert.equal(deriveTerminalStatus(feedback), null);
   });
@@ -191,7 +191,7 @@ describe('isWakeEvent', () => {
   // KPI/close-out never see a pause as a finish.
   test('[pending] is a wake event WHILE findTerminalFeedback / deriveCompletedAt stay blind to it', () => {
     const feedback = [{ message: '[pending] my part is done, the task is not', timestamp: 't' }];
-    assert.equal(isWakeEvent(feedback[0].message), true);
+    assert.equal(isWakeEvent({ message: feedback[0].message }), true);
     assert.equal(findTerminalFeedback(feedback), null);
     assert.equal(deriveTerminalStatus(feedback), null);
     assert.equal(deriveCompletedAt(feedback), null, 'a pause must not stamp a completion time');
@@ -208,14 +208,14 @@ describe('LIN-2423: [ticket] marker lines never match the terminal/wake vocabula
     const feedback = [{ message: '[ticket] LIN-900 done', timestamp: 't' }];
     assert.equal(deriveTerminalStatus(feedback), null, 'must not be read as the dispatch\'s own terminal status');
     assert.equal(findTerminalFeedback(feedback), null);
-    assert.equal(isWakeEvent(feedback[0].message), false, 'must not wake a parent as if it were a dispatch-level event');
+    assert.equal(isWakeEvent({ message: feedback[0].message }), false, 'must not wake a parent as if it were a dispatch-level event');
   });
 
   test('every documented marker state ([ticket] LIN-XXXX started/done/blocked/refused/dissolved/trimmed) is inert to both regexes', () => {
     for (const state of ['started', 'done', 'blocked', 'refused', 'dissolved', 'trimmed']) {
       const message = `[ticket] LIN-2423 ${state}`;
       assert.equal(deriveTerminalStatus([{ message }]), null, `"${message}" must not derive a terminal status`);
-      assert.equal(isWakeEvent(message), false, `"${message}" must not be a wake event`);
+      assert.equal(isWakeEvent({ message: message }), false, `"${message}" must not be a wake event`);
     }
   });
 });

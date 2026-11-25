@@ -56,7 +56,7 @@ test('[skipped] is a terminal marker with its own distinct benign status', () =>
 
 // ── (c) Not a wake event: no up-chain wake is bubbled for a skip ──────────────
 test('[skipped] is NOT a wake event — it never wakes an up-chain parent', () => {
-  assert.equal(isWakeEvent(SKIPPED_MSG), false);
+  assert.equal(isWakeEvent({ message: SKIPPED_MSG }), false);
   assert.equal(findWakeEvent(skippedFeedback), null);
 });
 
@@ -64,7 +64,7 @@ test('regression guard: [aborted] stays a wake-triggering terminal, distinct fro
   const abortedMsg = '[aborted] cancelled by operator';
   const abortedFeedback = [{ message: abortedMsg, timestamp: '2026-07-03T12:00:00.000Z' }];
   assert.equal(deriveTerminalStatus(abortedFeedback), 'aborted');
-  assert.equal(isWakeEvent(abortedMsg), true, 'aborted still wakes; only skipped is suppressed');
+  assert.equal(isWakeEvent({ message: abortedMsg }), true, 'aborted still wakes; only skipped is suppressed');
   // The two are genuinely different outcomes.
   assert.notEqual(deriveTerminalStatus(abortedFeedback), deriveTerminalStatus(skippedFeedback));
 });

@@ -84,7 +84,8 @@
         var head = run.querySelector('[data-testid="session-run-toggle"]');
         if (!head) return;
         run.addEventListener('click', function (e) {
-          if (e.target.closest('button, a[href], textarea, .chat-composer, .sess-inline-reply, .sess-proposals')) return;
+          // LIN-4559: a child agent's thread (its <summary> opens it) is not a click on the card.
+          if (e.target.closest('button, a[href], textarea, .chat-composer, .sess-inline-reply, .sess-proposals, .sess-agent-thread')) return;
           toggleRun(run, head);
         });
         head.addEventListener('keydown', function (e) {
@@ -105,6 +106,17 @@
   // link both stay INSIDE the bubble body, fed from the escaped `data-feedback`
   // JSON — that embed is still the one XSS boundary; nothing here moves to
   // server-rendered message HTML.
+  //
+  // LIN-4559: a child agent's words (`entry.agent`, kind `agent-text`) are not
+  // the run's. Each child is its own collapsible thread (`agentThreadFor`): a
+  // native <details> placed in the run's thread where that child's first entry
+  // falls, holding the child's bubbles in order, collapsed by default (the
+  // run's own conversation stays the line a reader follows; the summary names
+  // the child and counts its messages, one click opens it). A child bubble is
+  // built the same way as the run's (same markdown/escape path), with no
+  // in-progress pill: it never needs to settle. Ported as is when the
+  // transcript look moves to its shared module (LIN-4560).
+
   function renderRunTranscripts() {
     var threads = document.querySelectorAll('[data-testid="session-run-transcript"]');
     for (var i = 0; i < threads.length; i++) {
@@ -114,6 +126,7 @@
       var entries;
       try { entries = JSON.parse(data); } catch (e) { continue; }
       if (!entries || !entries.length || typeof window.ChatUI === 'undefined') continue;
+      var agentThreads = {};
 
       for (var j = 0; j < entries.length; j++) {
         var entry = entries[j];
@@ -125,12 +138,20 @@
         // rides the encoded JSON per LIN-2184 (lib/render-session.js's
         // encodeFeedbackJSON).
         if (entry.kind === 'decision-answer' || entry.kind === 'decision-withdrawn' || entry.kind === 'decision-withdrawal-reversed') continue;
-        var messageHtml = typeof window.renderMarkdown === 'function'
-          ? window.renderMarkdown(entry.message || '', { breaks: true })
-          : window.escapeHtml(entry.message || '');
-        var link = entry.url
-          ? ' <a class="sess-tx-link" data-testid="session-transcript-link" href="' + window.escapeHtml(entry.url) + '" target="_blank" rel="noopener noreferrer">' + window.escapeHtml(entry.urlLabel || entry.url) + '</a>'
-          : '';
+        if (entry.agent) {
+          var child = agentThreadFor(agentThreads, thread, String(entry.agent));
+          window.ChatUI.appendMessage(child.list, {
+            who: 'agent',
+            html: transcriptBubbleHtml(entry),
+            time: entry.timestamp ? String(entry.timestamp) : undefined,
+            liClass: 'sess-run-tx-entry sess-agent-tx-entry',
+            testId: 'session-agent-transcript-entry',
+            reveal: false
+          });
+          child.n += 1;
+          child.count.textContent = '· ' + child.n + (child.n === 1 ? ' message' : ' messages');
+          continue;
+        }
         // LIN-1163 item 6: a [blocked]/[pending] entry (flagged server-side,
         // lib/render-session.js's encodeFeedbackJSON) gets the opt-in
         // .chat-msg--blocked highlight — additive, no other chat.css consumer
@@ -139,7 +160,7 @@
         window.ChatUI.appendMessage(thread, {
           who: 'agent',
           whoState: 'in-progress',
-          html: '<span class="sess-tx-msg markdown-content">' + messageHtml + '</span>' + link,
+          html: transcriptBubbleHtml(entry),
           time: entry.timestamp ? String(entry.timestamp) : undefined,
           liClass: liClass,
           testId: 'session-transcript-entry',
@@ -147,6 +168,39 @@
         });
       }
     }
+  }
+
+  // The body of one bubble: the message through the shared markdown render (or
+  // its escaped fallback) and the evidence link, both escaped.
+  function transcriptBubbleHtml(entry) {
+    var messageHtml = typeof window.renderMarkdown === 'function'
+      ? window.renderMarkdown(entry.message || '', { breaks: true })
+      : window.escapeHtml(entry.message || '');
+    var link = entry.url
+      ? ' <a class="sess-tx-link" data-testid="session-transcript-link" href="' + window.escapeHtml(entry.url) + '" target="_blank" rel="noopener noreferrer">' + window.escapeHtml(entry.urlLabel || entry.url) + '</a>'
+      : '';
+    return '<span class="sess-tx-msg markdown-content">' + messageHtml + '</span>' + link;
+  }
+
+  // The thread of one child agent inside a run's transcript, made on its first
+  // entry and appended at that point, so threads sit in time order among the
+  // run's own bubbles.
+  function agentThreadFor(threads, thread, agent) {
+    if (threads[agent]) return threads[agent];
+    var li = document.createElement('li');
+    li.className = 'sess-agent-thread';
+    li.setAttribute('data-testid', 'session-agent-thread');
+    li.setAttribute('data-agent', agent);
+    li.innerHTML = '<details class="sess-agent-thread__details">'
+      + '<summary class="sess-agent-thread__summary" data-testid="session-agent-thread-summary">'
+      + '<span class="sess-agent-thread__who">child agent</span> '
+      + '<span class="sess-agent-thread__name">' + window.escapeHtml(agent) + '</span>'
+      + ' <span class="sess-agent-thread__count"></span></summary>'
+      + '<ul class="sess-agent-thread__tx chat-thread" data-testid="session-agent-thread-transcript"></ul>'
+      + '</details>';
+    thread.appendChild(li);
+    threads[agent] = { list: li.querySelector('.sess-agent-thread__tx'), count: li.querySelector('.sess-agent-thread__count'), n: 0 };
+    return threads[agent];
   }
 
   // ── Per-run inline reply boxes (LIN-1133; LIN-1298 echo thread) ───────────

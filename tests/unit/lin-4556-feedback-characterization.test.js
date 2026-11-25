@@ -155,7 +155,7 @@ describe('LIN-4556 characterization: [done] / [blocked] markers', () => {
     const row = storedRow(store, item._id);
     assert.equal(row.feedback[0].message, done);
     assert.equal(deriveTerminalStatus(row.feedback), 'done');
-    assert.equal(isLineageClosingTerminal(row.feedback[0].message), true);
+    assert.equal(isLineageClosingTerminal({ message: row.feedback[0].message }), true);
     assert.equal(findWakeEvent(row.feedback).marker, 'done');
     assert.equal(row.status, 'taken', 'a terminal marker does not change the row status');
   });
