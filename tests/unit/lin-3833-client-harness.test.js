@@ -25,7 +25,7 @@ function loadCommon() {
       location: { origin: 'http://test.local', pathname: '/' },
       ProxyToggle: { shouldAppend: () => false },
     },
-    document: { addEventListener() {}, querySelector: () => null },
+    document: { addEventListener() {}, querySelector: () => null, querySelectorAll: () => [] },
     localStorage: { getItem: () => null, setItem() {} },
     console,
     fetch() { throw new Error('fetch should not be called'); },

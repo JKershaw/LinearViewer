@@ -1723,8 +1723,9 @@ function stopQueuePolling() {
  * Initialize queue panel functionality
  */
 function initQueuePanel() {
-  // Initialize badge count on page load and start polling
-  const badge = document.querySelector('[data-queue-badge]')
+  // Initialize badge count on page load and start polling. LIN-4562: only the old bar's badge (a button); the frame's
+  // count on the Dispatch item is polled by common.js (initQueueBadge), so a page never runs both polls.
+  const badge = document.querySelector('button[data-queue-badge]')
   if (badge) {
     const urlKey = badge.dataset.urlKey
     updateQueueBadge(urlKey)
@@ -1738,9 +1739,10 @@ function initQueuePanel() {
     })
   }
 
-  // Handle badge click to show queue panel
+  // Handle badge click to show queue panel. Only the old bar's badge, a button, opens it: the frame's count sits inside
+  // the Dispatch link, which goes to the queue's own page.
   document.addEventListener('click', async (e) => {
-    const badgeBtn = e.target.closest('[data-queue-badge]')
+    const badgeBtn = e.target.closest('button[data-queue-badge]')
     if (!badgeBtn) return
 
     e.preventDefault()
@@ -2242,7 +2244,7 @@ function initSearch() {
 }
 
 // Cleanup polling on page unload. Rulings-badge cleanup registers itself
-// from common.js now, alongside its own init (LIN-1728 review F7).
+// from common.js now, alongside its own init (LIN-1728 review F7); so does the frame's queue count (LIN-4562).
 window.addEventListener('beforeunload', stopQueuePolling)
 
 /**

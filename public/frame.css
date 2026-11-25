@@ -1,0 +1,453 @@
+/* =============================================================================
+   The page frame (LIN-4342, piece 1: LIN-4562)
+   =============================================================================
+   The rail, the phone band, <main> with one left edge, the footer, and the public band, drawn by
+   lib/components/frame.js. Loaded last on every framed page, after the page's own sheets.
+
+   - Desktop: the rail is a sticky column at the left; the page sits beside it.
+   - Below 760px (the width Settings' area list already switches at; the written list in
+     docs/architecture/ui-pieces.md allows no new width): the rail is a drawer behind ☰ and the top of the page
+     is one band. Nothing is set smaller than on desktop: no phone rule here sets a font-size.
+   - Sizes are the --font-size-* tokens only. Mono only for machine facts (a task's identifier on search).
+   - --nav-sticky-h stays defined for page-level fixed controls and tests/fixed-overlay-sweep.js: on a framed
+     page it is the band's height on a phone and 0 on desktop (there is no sticky header to clear there).
+   ========================================================================== */
+
+:root:has(> body.frame-body) {
+  --frame-rail-w: 15rem;
+  --frame-band-h: 3.25rem;
+  --nav-sticky-min: 0px;
+  --nav-bar-h: 0px;
+}
+
+body.frame-body {
+  padding: 0;
+  margin: 0;
+  max-width: none;
+}
+
+/* The skip link: the first Tab stop on every page, shown when focused, landing in <main>. */
+.frame-skip {
+  position: absolute;
+  left: var(--space-2);
+  top: var(--space-2);
+  z-index: var(--z-overlay);
+  padding: var(--space-2) var(--space-3);
+  background: var(--raised);
+  color: var(--brand-dim);
+  border: 1px solid var(--line);
+  border-radius: var(--radius-sm);
+  transform: translateY(-300%);
+}
+
+.frame-skip:focus {
+  transform: none;
+}
+
+.frame {
+  display: grid;
+  grid-template-columns: var(--frame-rail-w) minmax(0, 1fr);
+  min-height: 100vh;
+}
+
+.frame-page {
+  min-width: 0;
+  display: flex;
+  flex-direction: column;
+}
+
+/* One left edge, one width, one space above the heading, on every page. */
+.frame-main {
+  flex: 1;
+  box-sizing: border-box;
+  width: 100%;
+  max-width: 120ch;
+  padding: var(--space-5);
+}
+
+.frame-main:focus {
+  outline: none;
+}
+
+.frame-head {
+  margin-bottom: var(--space-4);
+}
+
+.frame-filters {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--space-2) var(--space-4);
+  margin-bottom: var(--space-4);
+  position: relative;
+}
+
+/* ---- The rail ------------------------------------------------------------ */
+
+.frame-rail {
+  position: sticky;
+  top: 0;
+  height: 100vh;
+  box-sizing: border-box;
+  overflow-y: auto;
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-4);
+  padding: var(--space-3);
+  background: var(--card);
+  border-right: 1px solid var(--line);
+}
+
+.frame-rail__top {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-2);
+}
+
+.wordmark-rail {
+  font-size: var(--font-size-lg);
+  padding: var(--space-1) var(--space-2);
+}
+
+.frame-rail__group-title {
+  display: block;
+  padding: 0 var(--space-2);
+  margin-bottom: var(--space-1);
+  color: var(--muted);
+  font-size: var(--font-size-sm);
+}
+
+.frame-rail__list {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+}
+
+.frame-rail__row {
+  display: flex;
+  align-items: center;
+  gap: var(--space-1);
+}
+
+.frame-rail__item {
+  flex: 1;
+  min-width: 0;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--space-2);
+  min-height: 2.25rem;
+  padding: var(--space-1) var(--space-2);
+  border-radius: var(--radius-sm);
+  color: var(--text);
+  text-decoration: none;
+}
+
+.frame-rail__item:hover {
+  background: var(--card-h);
+}
+
+/* Where you are, marked once: the page itself, or the place it was reached from. */
+.frame-rail__item[aria-current] {
+  background: var(--teal-soft);
+  color: var(--brand-dim);
+  font-weight: 600;
+  box-shadow: inset 3px 0 0 var(--brand);
+}
+
+.frame-rail__foot {
+  margin-top: auto;
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-2);
+}
+
+.frame-rail__status {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: var(--space-2);
+  padding: 0 var(--space-2);
+  color: var(--muted);
+  font-size: var(--font-size-sm);
+}
+
+.frame-rail__feedback {
+  background: none;
+  border: 0;
+  padding: 0;
+  color: var(--muted);
+  font: inherit;
+  cursor: pointer;
+}
+
+.frame-rail__feedback:hover:not(:disabled) {
+  color: var(--brand-dim);
+}
+
+/* A count: what is waiting on you beside Home (and in the band), what is queued on Dispatch. */
+.frame-count {
+  flex: none;
+  font-size: var(--font-size-sm);
+  color: var(--muted);
+  text-decoration: none;
+  white-space: nowrap;
+}
+
+.frame-count--needs-you:hover {
+  text-decoration: underline;
+}
+
+/* ---- The workspace menu: switch and add ----------------------------------- */
+
+.frame-workspace {
+  position: relative;
+}
+
+.frame-workspace__toggle {
+  width: 100%;
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  padding: var(--space-1) var(--space-2);
+  background: none;
+  border: 1px solid var(--line);
+  border-radius: var(--radius-sm);
+  color: var(--text);
+  font: inherit;
+  text-align: left;
+  cursor: pointer;
+}
+
+.frame-workspace__label {
+  color: var(--muted);
+  font-size: var(--font-size-sm);
+}
+
+.frame-workspace__name {
+  font-weight: 600;
+  overflow-wrap: anywhere;
+}
+
+.frame-menu {
+  position: absolute;
+  left: 0;
+  right: 0;
+  top: calc(100% + var(--space-1));
+  z-index: var(--z-overlay);
+  padding: var(--space-1);
+  background: var(--raised);
+  border: 1px solid var(--line);
+  border-radius: var(--radius-md);
+  box-shadow: var(--shadow-md);
+}
+
+.frame-menu[hidden] {
+  display: none;
+}
+
+.frame-menu__list {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+}
+
+.frame-menu__list + .frame-menu__list {
+  margin-top: var(--space-1);
+  padding-top: var(--space-1);
+  border-top: 1px solid var(--line);
+}
+
+.frame-menu__form {
+  margin: 0;
+}
+
+.frame-menu__row {
+  display: flex;
+  align-items: center;
+  gap: var(--space-2);
+  width: 100%;
+  box-sizing: border-box;
+  padding: var(--space-1) var(--space-2);
+  background: none;
+  border: 0;
+  border-radius: var(--radius-sm);
+  color: var(--text);
+  font: inherit;
+  text-align: left;
+  text-decoration: none;
+  cursor: pointer;
+}
+
+.frame-menu__row:hover {
+  background: var(--card-h);
+}
+
+.frame-menu__add {
+  color: var(--brand-dim);
+}
+
+.frame-menu__mark {
+  color: var(--muted);
+}
+
+/* ---- Search ---------------------------------------------------------------- */
+
+/* The field's body is the one text control (style.css, `.token-label-input`); here only its width. The search page's own
+   field is sized in public/search.css. */
+.frame-search__input {
+  width: 100%;
+  min-width: 0;
+  box-sizing: border-box;
+}
+
+/* ---- The footer: the same on every page ------------------------------------- */
+
+.frame-footer {
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: space-between;
+  gap: var(--space-2) var(--space-4);
+  padding: var(--space-3) var(--space-5);
+  border-top: 1px solid var(--line);
+  color: var(--muted);
+  font-size: var(--font-size-sm);
+}
+
+.frame-footer__link,
+.frame-footer__stamp a {
+  color: var(--muted);
+}
+
+.frame-footer__link:hover {
+  color: var(--brand-dim);
+}
+
+/* ---- The phone band (shown below 760px) and the public band ----------------- */
+
+.frame-band {
+  display: none;
+}
+
+.frame--public {
+  grid-template-columns: minmax(0, 1fr);
+}
+
+.frame-public {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: var(--space-2) var(--space-4);
+  padding: var(--space-3) var(--space-5);
+  border-bottom: 1px solid var(--line);
+}
+
+.frame-public__back {
+  margin-bottom: 0;
+}
+
+.frame-public__actions {
+  margin-left: auto;
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--space-2);
+}
+
+.frame-public__action {
+  color: var(--brand-dim);
+  font-weight: 600;
+}
+
+.frame-scrim[hidden] {
+  display: none;
+}
+
+@media (max-width: 760px) {
+  :root:has(> body.frame-body:not(.frame-body--public)) {
+    --nav-bar-h: var(--frame-band-h);
+  }
+
+  .frame {
+    grid-template-columns: minmax(0, 1fr);
+  }
+
+  .frame-band {
+    position: sticky;
+    top: 0;
+    z-index: var(--z-sticky);
+    display: flex;
+    align-items: center;
+    gap: var(--space-2);
+    box-sizing: border-box;
+    height: var(--frame-band-h);
+    padding: 0 var(--space-3);
+    background: var(--raised);
+    border-bottom: 1px solid var(--line);
+  }
+
+  .frame-band__menu {
+    flex: none;
+    min-width: 2.75rem;
+    min-height: 2.75rem;
+    background: none;
+    border: 0;
+    color: var(--text);
+    font: inherit;
+    font-size: var(--font-size-lg);
+    cursor: pointer;
+  }
+
+  .frame-band__name {
+    flex: 1;
+    min-width: 0;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+    font-weight: 600;
+  }
+
+  .frame-band__search {
+    flex: none;
+    color: var(--brand-dim);
+  }
+
+  /* The drawer: off screen and out of the Tab order until ☰ opens it. */
+  .frame-rail {
+    position: fixed;
+    top: 0;
+    left: 0;
+    bottom: 0;
+    z-index: var(--z-overlay);
+    width: min(85vw, 20rem);
+    height: auto;
+    transform: translateX(-100%);
+    visibility: hidden;
+    /* Closing: slide out, then leave the Tab order. Opening (below): visible at once, so focus can move in. */
+    transition: transform 0.2s ease, visibility 0s linear 0.2s;
+  }
+
+  .frame-body.frame-drawer-open .frame-rail {
+    transform: none;
+    visibility: visible;
+    transition: transform 0.2s ease, visibility 0s linear 0s;
+  }
+
+  .frame-scrim {
+    position: fixed;
+    inset: 0;
+    z-index: var(--z-sticky);
+    background: rgba(0, 0, 0, 0.35);
+  }
+
+  .frame-rail__item {
+    min-height: 2.75rem;
+  }
+
+  .frame-main {
+    padding: var(--space-3);
+  }
+
+  .frame-footer,
+  .frame-public {
+    padding: var(--space-3);
+  }
+}

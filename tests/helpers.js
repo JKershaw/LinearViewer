@@ -126,6 +126,36 @@ export const SELECTORS = {
      * (LIN-978). The cross-view links moved here from the footer.
      */
     view: (name) => `.nav-views [data-testid="nav-view-${name}"]`,
+    // LIN-4562: the frame (lib/components/frame.js). The old bar's keys above stay until piece 7 (LIN-4568), because
+    // pages not yet moved still carry the bar.
+    skip: '[data-testid="frame-skip"]',
+    rail: '[data-testid="frame-rail"]',
+    /** A rail item by its place key (lib/places.js): 'home', 'connect', 'settings' … */
+    place: (key) => `[data-testid="frame-rail"] [data-testid="rail-place-${key}"]`,
+    railItems: '[data-testid="frame-rail"] .frame-rail__item',
+    railMarked: '[data-testid="frame-rail"] .frame-rail__item[aria-current]',
+    railSearch: '[data-testid="rail-search-input"]',
+    railQuestions: '[data-testid="rail-questions"]',
+    railQueued: '[data-testid="rail-queued"]',
+    workspaceToggle: '[data-testid="rail-workspace-toggle"]',
+    workspaceMenu: '[data-testid="rail-workspace-menu"]',
+    band: '[data-testid="frame-band"]',
+    bandMenu: '[data-testid="frame-band-menu"]',
+    bandName: '[data-testid="frame-band-name"]',
+    bandQuestions: '[data-testid="band-questions"]',
+    bandSearch: '[data-testid="frame-band-search"]',
+    scrim: '[data-testid="frame-scrim"]',
+    main: '[data-testid="frame-main"]',
+    back: '[data-testid="frame-back"]',
+    footer: '[data-testid="frame-footer"]',
+    filters: '[data-testid="frame-filters"]',
+  },
+  /** LIN-4562: the search page (lib/render-search.js). */
+  search: {
+    form: '[data-testid="search-page-form"]',
+    input: '[data-testid="search-page-input"]',
+    result: '[data-testid="search-result"]',
+    resultFor: (identifier) => `[data-testid="search-result"][data-identifier="${identifier}"]`,
   },
   settings: {
     /** Settings group by slug (LIN-3846 kept the survivors; LIN-3855 retired ai-model and dispatch-defaults): account | providers | dispatch-presets | ai-usage | workspace-features | experimental | workflow. */

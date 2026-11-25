@@ -46,7 +46,7 @@ const PUBLIC_JS = readdirSync(join(ROOT, 'public'))
 const DELEGATED_ALLOW = {
   // UI-only or off the three pages: no request, no setting write.
   'app.js:.desc-toggle': 'UI-only: expands a description',
-  'app.js:[data-queue-badge]': 'UI-only: opens the queue panel (dashboard)',
+  'app.js:button[data-queue-badge]': 'UI-only: opens the queue panel from the old bar badge (LIN-4562: the frame count sits inside the Dispatch link)',
   'app.js:.queue-panel-close': 'UI-only: closes the queue panel (dashboard)',
   'common.js:.dispatch-exec-harness-select, .harness-select': 'UI-only: syncs a model list on change',
   'common.js:.disclosure-toggle': 'UI-only: opens a disclosure',
