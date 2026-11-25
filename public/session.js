@@ -150,11 +150,14 @@ function renderRunTranscripts() {
 // entry is the row and its transcript list (made on a live row's first entry).
 var liveRuns = null;
 var liveUrlKey = '';
+var stepSummaries = [];
+var stepRefresh = null;
 
 function captureLiveRuns() {
   liveRuns = new Map();
   var page = document.querySelector('[data-testid="session-page"]');
   liveUrlKey = page ? page.getAttribute('data-url-key') || '' : '';
+  stepSummaries = stepsOf(document);
   var runs = document.querySelectorAll('.sess-run[data-loop-id]');
   for (var i = 0; i < runs.length; i++) {
     var run = runs[i];
@@ -165,7 +168,10 @@ function captureLiveRuns() {
       run: run,
       live: run.getAttribute('data-status') === 'running',
       list: list,
-      drawn: drawn
+      drawn: drawn,
+      // The face's status pill and clock, settled in place when the run finishes while the page is open.
+      status: run.querySelector('[data-testid="session-run-status"]'),
+      clock: run.querySelector('[data-testid="session-run-elapsed"]')
     });
   }
 }
@@ -197,10 +203,66 @@ function transcriptListFor(entry) {
   return list;
 }
 
+// A run that finished while the page was open settles whole (LIN-2546): its face's pill and clock become the ones the
+// server draws for a finished run (`row.face`, lib/render-run-steps.js), and the row stops reading as running, so no
+// in-progress marker is left anywhere on it. The clock's 1 s tick then finds nothing to tick.
+function replaceWith(el, html) {
+  var holder = document.createElement('span');
+  holder.innerHTML = html;
+  var next = holder.firstChild;
+  if (el && el.parentNode && next) el.parentNode.replaceChild(next, el);
+  return next || el;
+}
+
+function settleRun(entry, face) {
+  entry.live = false;
+  if (face.state) entry.run.setAttribute('data-status', face.state);
+  if (face.status) entry.status = replaceWith(entry.status, face.status);
+  if (face.times) entry.clock = replaceWith(entry.clock, face.times);
+  refreshStepSummaries();
+}
+
+// A step's one-line summary ("Build · in progress · …") is the session view's (lib/run-view.js, the step's lineage, tier
+// and cost), which a run's own read cannot rebuild. So when a run settles, the page reads itself once more (the same
+// page, in the background, never a reload) and takes each step summary's words from the server's own render, matched by
+// the runs the step holds (a step the run's end woke, a new follow-up, is not on this page and is left for a reload).
+// The server's page carries no rendered transcript (transcripts are drawn here from the embed), so nothing an agent
+// wrote can stand in for a summary. A failed read leaves the summaries as they were.
+function stepsOf(root) {
+  var steps = root.querySelectorAll('[data-testid="session-step"]');
+  var out = [];
+  for (var i = 0; i < steps.length; i++) {
+    var summary = steps[i].querySelector('[data-testid="session-step-summary"]');
+    var runs = steps[i].querySelectorAll('.sess-run[data-loop-id]');
+    var ids = [];
+    for (var j = 0; j < runs.length; j++) ids.push(runs[j].getAttribute('data-loop-id'));
+    if (summary) out.push({ summary: summary, ids: ids });
+  }
+  return out;
+}
+
+function refreshStepSummaries() {
+  if (stepRefresh || !stepSummaries.length || typeof fetch !== 'function' || typeof DOMParser === 'undefined') return;
+  stepRefresh = fetch(window.location.href, { headers: { Accept: 'text/html' }, credentials: 'same-origin' })
+    .then(function (resp) { return resp && resp.ok ? resp.text() : null; })
+    .then(function (html) {
+      if (!html) return;
+      var fresh = stepsOf(new DOMParser().parseFromString(html, 'text/html'));
+      stepSummaries.forEach(function (step) {
+        var match = fresh.find(function (f) { return f.ids.some(function (id) { return step.ids.indexOf(id) !== -1; }); });
+        if (match) step.summary.textContent = match.summary.textContent;
+      });
+    })
+    .catch(function () { /* leave the summaries as they were */ })
+    .then(function () { stepRefresh = null; });
+}
+
 function applyLiveRun(row) {
   var entry = liveRuns && liveRuns.get(row.id);
+  if (!entry) return;
+  if (!row.live && row.face && entry.live) settleRun(entry, row.face);
   // A row with no words yet gets no list: an empty transcript is not drawn.
-  if (!entry || (!entry.list && !(row.entries && row.entries.length))) return;
+  if (!entry.list && !(row.entries && row.entries.length)) return;
   redrawTranscript(transcriptListFor(entry), row.entries, row.live);
 }
 

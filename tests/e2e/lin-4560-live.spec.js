@@ -6,8 +6,9 @@ import { FIXTURE_SECRETS } from '../fixtures/secret-scan-fixtures.js';
  * LIN-4560 beat 4: a live run's transcript updates without a reload, on the run page and in Dispatch history, through the
  * one shared follower (public/transcript-live.js) and the signed-in hold-open read (GET …/api/dispatch/transcripts).
  *  (a) the run page: a new entry posted while the page is open appears without a reload; an opened child-agent thread
- *      stays open; the in-progress marker is on the newest bubble only; at done the transcript has no marker at all;
- *  (b) the same in Dispatch history, for a row with no words when the page loaded;
+ *      stays open; the in-progress marker is on the newest bubble only; when the run finishes while the page is open, no
+ *      in-progress marker is left anywhere on it (the transcript, the face's pill and clock, its step's line);
+ *  (b) the same in Dispatch history, for a row with no words when the page loaded, its outcome pill settling at done;
  *  (e) a secret in a row stored before intake masking (written raw through the history seam) renders masked on both.
  */
 
@@ -80,6 +81,16 @@ test.describe('LIN-4560: live transcripts without a reload', () => {
     await post({ message: '[done] landed the change', kind: 'status' });
     await expect(tx.locator('[data-testid="transcript-entry"]').filter({ hasText: 'landed the change' })).toBeVisible({ timeout: 15000 });
     await expect(tx.locator('.status-pill--in-progress'), 'a finished run has no in-progress marker').toHaveCount(0);
+    // LIN-2546 in full: the run finished while the page was open, so it shows no in-progress marker anywhere: its face's
+    // pill reads done, its clock is the completion time, and its step's line no longer says in progress.
+    await expect(run).toHaveAttribute('data-status', 'done', { timeout: 15000 });
+    await expect(run.locator('[data-testid="session-run-status"]')).toHaveText('done');
+    await expect(run.locator('[data-testid="session-run-elapsed"]')).toHaveCount(0);
+    await expect(run.locator('[data-testid="session-run-completed"]')).toContainText('completed');
+    await expect(run.locator('.status-pill--running, .status-pill--in-progress')).toHaveCount(0);
+    const step = page.locator('[data-testid="session-step"]').filter({ has: run });
+    await expect(step.locator('[data-testid="session-step-summary"]')).not.toContainText('in progress', { timeout: 15000 });
+    await expect(step).not.toContainText('in progress');
     expect(loads.n).toBe(0);
   });
 
@@ -103,6 +114,10 @@ test.describe('LIN-4560: live transcripts without a reload', () => {
     await post({ message: '[done] landed', kind: 'status' });
     await expect(tx.locator('[data-testid="transcript-entry"]')).toHaveCount(3, { timeout: 15000 });
     await expect(tx.locator('.status-pill--in-progress'), 'a finished run has no in-progress marker').toHaveCount(0);
+    // LIN-2546 in full: the row's outcome pill settles too (it read `taken`, the in-progress amber).
+    await expect(row).toHaveAttribute('data-live', 'false');
+    await expect(row.locator('.history-status')).toHaveText(/done/);
+    await expect(row.locator('.status-pill--in-progress')).toHaveCount(0);
     expect(loads.n).toBe(0);
   });
 

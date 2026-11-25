@@ -1095,9 +1095,31 @@ function liveHistoryIds() {
   return historyRows().filter((el) => el.getAttribute('data-live') === 'true').map((el) => el.getAttribute('data-row-id'))
 }
 
+/** The outcome pill's markup for `outcome` (the one place the history list draws it, LIN-2122). */
+function historyStatusPillHtml(outcome) {
+  const pill = historyOutcomePill(outcome)
+  const stateClass = pill.state ? ` status-pill--${pill.state}` : ''
+  const charHtml = pill.char ? `<span class="status-pill__char">${pill.char}</span>` : ''
+  return `<span class="history-status status-pill${stateClass} status-${escapeHtml(outcome)}">`
+    + `${charHtml}<span class="status-pill__label">${escapeHtml(outcome)}</span></span>`
+}
+
+// A row that finished while the page was open settles whole (LIN-2546): its outcome pill becomes the finished run's
+// word (`row.status`, the wire status) and it stops reading as live, so no in-progress marker is left on it.
+function settleHistoryRow(item, status) {
+  item.setAttribute('data-live', 'false')
+  item.setAttribute('data-status', status)
+  const pill = [...item.children].find((el) => el.classList.contains('history-status'))
+  if (!pill) return
+  const holder = document.createElement('span')
+  holder.innerHTML = historyStatusPillHtml(status)
+  if (holder.firstChild) item.replaceChild(holder.firstChild, pill)
+}
+
 function applyLiveHistoryRow(row) {
   const item = historyRows().find((el) => el.getAttribute('data-row-id') === row.id)
   if (!item) return
+  if (!row.live && row.status && item.getAttribute('data-live') === 'true') settleHistoryRow(item, row.status)
   const info = [...item.children].find((el) => el.classList.contains('history-info')) || item
   let list = [...info.children].find((el) => el.getAttribute('data-testid') === 'history-transcript')
   // A row with no words yet gets no list: an empty transcript is not drawn.
@@ -1167,15 +1189,11 @@ function renderDispatchHistoryList(container, items, total, offset, urlKey) {
     // LIN-2122: the page shows the outcome word, not the stored `status` (always `taken`
     // for an archived row). A server that predates `outcome` answers only `status`.
     const outcome = item.outcome || item.status
-    const pill = historyOutcomePill(outcome)
-    const stateClass = pill.state ? ` status-pill--${pill.state}` : ''
-    const charHtml = pill.char ? `<span class="status-pill__char">${pill.char}</span>` : ''
     // Canonical `.status-pill` markup, hand-mirrored from the server helper
     // lib/components/status-pill.js \u2014 the shared contract is the global CSS
     // class API, which cards can't reach client-side. `history-status` and
     // `status-<outcome>` ride alongside as the existing E2E + semantic hooks.
-    const statusPillHtml = `<span class="history-status status-pill${stateClass} status-${escapeHtml(outcome)}">`
-      + `${charHtml}<span class="status-pill__label">${escapeHtml(outcome)}</span></span>`
+    const statusPillHtml = historyStatusPillHtml(outcome)
     const issueHtml = item.issueIdentifier
       ? (item.issueUrl
         ? ` <a class="history-issue" href="${escapeHtml(item.issueUrl)}" target="_blank">${escapeHtml(item.issueIdentifier)}</a>`

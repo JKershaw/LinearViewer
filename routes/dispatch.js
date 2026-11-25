@@ -49,7 +49,8 @@ import { readHaltForPoll, projectHaltForPoll, POLL_HALT_READ_TIMEOUT_MS } from '
 import { ownerlessCompatEnabled } from '../lib/ownerless-token-policy.js';
 import { buildQueuedPollWarning, getConsumerLastSeenAt } from '../lib/consumer-poll-warning.js';
 import { HALT_MODES, HALT_MODE_ERROR } from '../lib/workspace-halt.js';
-import { deriveTerminalStatus, deriveWireTerminal, NEVER_RAN } from '../lib/dispatch-terminal.js';
+import { deriveCompletedAt, deriveTerminalStatus, deriveWireTerminal, NEVER_RAN } from '../lib/dispatch-terminal.js';
+import { renderRunStatusPill, renderRunTimesBody, runStatusMeta } from '../lib/render-run-steps.js';
 import { resolveOwnerMintRefusal } from '../lib/owner-mint-refusals.js';
 import { resolveRunnerOwnerRefusal, sendRunnerRefusal } from '../lib/runner-owner-gate.js';
 import { readPlanFacts } from '../lib/chat-request.js';
@@ -808,7 +809,14 @@ export function createDispatchRoutes({ dispatchQueueStore, dispatchTokenStore, w
     const readToken = async () => JSON.stringify(await Promise.all(ids.map((id) => dispatchQueueStore.getItemWatchToken(urlKey, id))));
     const readSnapshot = async () => (await Promise.all(ids.map((id) => dispatchQueueStore.getItemFeedback(urlKey, id)))).filter(Boolean);
     const isLive = (item) => deriveWireTerminal(item) === null;
-    const rowsOf = (items) => items.map((item) => ({ id: item.id, live: isLive(item), entries: transcriptEntries(item.feedback) }));
+    // A finished run also carries how it settled, so the page settles it whole without a reload (LIN-2546: no
+    // in-progress marker anywhere on a finished run): its wire status (Dispatch history's outcome pill) and its run-page
+    // face, drawn by the run page's own renderers (lib/render-run-steps.js) from the same derivations its loop uses.
+    const settledOf = (item) => {
+      const loop = { terminalStatus: deriveTerminalStatus(item.feedback), terminalCompletedAt: deriveCompletedAt(item.feedback), bookkeeping: item.bookkeeping || null, dispatchedAt: item.dispatchedAt };
+      return { status: deriveWireTerminal(item), face: { state: runStatusMeta(loop).state, status: renderRunStatusPill(loop), times: renderRunTimesBody(loop) } };
+    };
+    const rowsOf = (items) => items.map((item) => ({ id: item.id, live: isLive(item), entries: transcriptEntries(item.feedback), ...(isLive(item) ? {} : settledOf(item)) }));
     let keepalive = null;
     try {
       // The token is read before the body, so a change landing between the two reads is re-checked (LIN-3812).

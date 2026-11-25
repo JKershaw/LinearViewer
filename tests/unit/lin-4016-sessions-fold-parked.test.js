@@ -209,3 +209,34 @@ describe('LIN-4560 — the Sessions fold groups a child agent\'s words under its
     assert.equal(group.getAttribute('data-agent'), 'a"><b>x</b>');
   });
 });
+
+// LIN-4560: Home's fold masks at read as the run page, Dispatch history and the proxy read do, with piece A's masker, so a
+// row stored before intake masking (LIN-4556) shows masked in the fold too. A clean line is unchanged.
+describe('LIN-4560 — the Sessions fold masks a row stored before intake masking', () => {
+  test('the route sends the secret masked, the clean line as it was, and the fold draws it masked', async () => {
+    const { FIXTURE_SECRETS } = await import('../fixtures/secret-scan-fixtures.js');
+    const { MASK } = await import('../../lib/mask-secrets.js');
+    const stores = {
+      dispatchQueueStore: {
+        async listItems() { return []; },
+        async listHistory() {
+          return { items: [{ ...item('d-6', 10), feedback: [
+            { message: 'a clean line', timestamp: minutesAgo(9), kind: 'assistant-text' },
+            { message: `the token was ${FIXTURE_SECRETS.githubPat} in .env`, timestamp: minutesAgo(8), kind: 'assistant-text' },
+          ] }] };
+        },
+      },
+      agentStatusStore: { async listStatus() { return { items: [] }; } },
+    };
+    const res = await callRoute(async () => ({ taskState: { state: 'needs-you' } }), stores);
+    const feedback = res.jsonBody.sessions[0].feedback;
+    assert.equal(feedback[0].message, 'a clean line');
+    assert.ok(!JSON.stringify(res.jsonBody).includes(FIXTURE_SECRETS.githubPat), 'the secret never leaves the route');
+    assert.ok(feedback[1].message.includes(MASK));
+    const world = loadWorld({ window: { escapeHtml, relativeTime: () => '', runPageHref: () => null, api: async () => res.jsonBody }, scripts: ['sessions.js'] });
+    const container = world.makeContainer();
+    world.window.SessionsSection.init(container, { urlKey: 'acme', identifier: 'LIN-7', home: true, stageWords: {} });
+    await flush(); await flush();
+    assert.ok(container.innerHTML.includes(MASK) && !container.innerHTML.includes(FIXTURE_SECRETS.githubPat));
+  });
+});

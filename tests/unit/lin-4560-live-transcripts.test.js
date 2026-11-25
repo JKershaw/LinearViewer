@@ -134,6 +134,7 @@ describe('GET /workspace/:urlKey/api/dispatch/transcripts: the signed-in twin', 
       const [row] = body.rows;
       assert.equal(row.id, run._id);
       assert.equal(row.live, true);
+      assert.equal(row.face, undefined, "a live run carries no settled face");
       assert.deepEqual(row.entries.map((e) => e.message.slice(0, 12)), ['Looked at it', '{"inputToken', 'Searching.', 'old [redacte']);
       assert.equal(row.entries[1].quiet, true);
       assert.equal(row.entries[2].agent, 'a1');
@@ -153,6 +154,11 @@ describe('GET /workspace/:urlKey/api/dispatch/transcripts: the signed-in twin', 
       assert.ok(Date.now() - t0 < 1000);
       assert.equal(body.reason, 'terminal');
       assert.equal(body.rows[0].live, false);
+      // A finished run carries how it settled: its wire status and its run-page face, drawn by the page's renderers.
+      assert.equal(body.rows[0].status, 'done');
+      assert.equal(body.rows[0].face.state, 'done');
+      assert.match(body.rows[0].face.status, /data-testid="session-run-status"[^>]*>.*done<\/span>$/);
+      assert.match(body.rows[0].face.times, /data-testid="session-run-completed">completed /);
     } finally { await srv.close(); }
   });
 
