@@ -816,7 +816,7 @@ main.lc-page[data-url-key]                    - page container
 2. **Drill into project**: Click project header to expand, click task to see details
 3. **Expand subtasks**: Click parent task or ▶ arrow to show child tasks (works in both sections)
 4. **Filter by team**: Use the team selector in the filter line at the top of Home or Backlog
-5. **Search for issues**: Type in the side rail's search field (`[data-testid="rail-search-input"]`) and press Enter; the search page lists matching tasks across the workspace, open and done
+5. **Search for issues**: Type in the side rail's search field (`[data-testid="rail-search-input"]`) and press Enter; the search page lists matching tasks in the workspace's active projects, open and done
 6. **Open in provider**: Expand task, click the "View in {provider} →" link (text is dynamic, e.g. "View in Linear")
 7. **View task details**: Expand task, click "Details ▶" to show description and metadata
 8. **Generate prompt for task**: Expand task, click "Prompts ▶" to reveal the shared opened-task component, click a template under "other prompts", copy the generated prompt
