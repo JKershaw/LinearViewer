@@ -24,7 +24,7 @@ import crypto from 'node:crypto';
 
 import { renderLandingHero } from '../../lib/components/landing-hero.js';
 import { renderLandingPage } from '../../lib/render-landing.js';
-import { renderNavBar } from '../../lib/components/navbar.js';
+import { renderNavBar, renderPreviewSignIn } from '../../lib/components/navbar.js';
 import { renderLoginPage } from '../../lib/render-pages.js';
 import { renderAllAreas as renderSettingsPage } from '../helpers/render-settings-areas.js';
 import { isGitHubConfigured } from '../../lib/providers/github/app-auth.js';
@@ -111,17 +111,19 @@ describe('LIN-1890 E3 — threaded through the landing page', () => {
   });
 });
 
-describe('LIN-1890 E4 — the landing nav bar', () => {
+// LIN-4564: the previews' sign-in path moved from the old bar's landing branch to the public frame's band
+// (renderPreviewSignIn); the gates are the same calls.
+describe('LIN-1890 E4 — the preview sign-in path', () => {
   test('offers the Jira CTA when configured, reading the provider predicate directly', () => {
     configureJira();
-    const html = renderNavBar({ isLanding: true });
+    const html = renderPreviewSignIn();
     assert.ok(html.includes(`href="${JIRA_ENTRY_HREF}"`));
     assert.ok(html.includes('data-testid="nav-login-jira"'));
   });
 
   test('omits it when unconfigured — the honest-degradation half of the gate', () => {
     unconfigureJira();
-    const html = renderNavBar({ isLanding: true });
+    const html = renderPreviewSignIn();
     assert.ok(!html.includes('/auth/jira'));
     assert.ok(!html.includes('nav-login-jira'));
   });
@@ -132,39 +134,32 @@ describe('LIN-1890 E4 — the landing nav bar', () => {
     // `isJiraOAuthConfigured()` rather than testing one env var inline.
     unconfigureJira();
     process.env.JIRA_CLIENT_ID = 'client-id-1';
-    assert.ok(!renderNavBar({ isLanding: true }).includes('/auth/jira'),
+    assert.ok(!renderPreviewSignIn().includes('/auth/jira'),
       'a half-configured server must not promise a Jira sign-in');
   });
 
   test('the Linear CTA is nameable on its own (N4 — `nav a.login` is now ambiguous)', () => {
     configureJira();
-    const html = renderNavBar({ isLanding: true });
+    const html = renderPreviewSignIn();
     assert.ok(html.includes('data-testid="nav-login-linear"'));
     // The shared class is retained for styling — the testid is what makes the
     // three CTAs individually selectable.
-    const loginCtas = html.match(/class="nav-action login"/g) || [];
+    const loginCtas = html.match(/class="frame-public__action login"/g) || [];
     assert.ok(loginCtas.length >= 2, 'more than one CTA carries the shared class, which is why it cannot be a selector');
   });
 
-  test('CHARACTERIZATION: the homepage still suppresses the whole bar', () => {
-    // LIN-1508: `minimalNav` drops the landing bar entirely because the hero
-    // carries the CTAs there. A new CTA must not resurrect it.
-    configureJira();
-    assert.equal(renderNavBar({ isLanding: true, minimalNav: true }), '');
-  });
-
-  test('CHARACTERIZATION: the isLanding-only login CTAs never leak onto authenticated pages', () => {
-    // The `nav-login-*` CTAs are specific to the unauthenticated `isLanding`
-    // bar. LIN-2802 deliberately adds a SEPARATE, authenticated surface (the
+  test('CHARACTERIZATION: the signed-out login CTAs never leak onto authenticated pages', () => {
+    // The `nav-login-*` CTAs are specific to the unauthenticated previews' band
+    // (renderPreviewSignIn, LIN-4564). LIN-2802 deliberately adds a SEPARATE, authenticated surface (the
     // workspace switcher's registry-driven add rows, `nav-workspace-add-*`)
     // that DOES render an `entryCta.href` — see
     // tests/unit/lin-2802-workspace-add-rows.test.js for that surface's own
     // coverage. This test narrows to what it can still honestly claim: the
-    // isLanding CTAs themselves stay isLanding-only.
+    // signed-out CTAs themselves stay signed-out-only.
     configureJira();
-    const html = renderNavBar({ isLanding: false, urlKey: 'acme', workspaces: [{ urlKey: 'acme', name: 'Acme' }] });
-    assert.ok(!html.includes('nav-login-jira'), 'the isLanding Jira CTA testid belongs to the unauthenticated bar only');
-    assert.ok(!html.includes('nav-login-linear'), 'the isLanding Linear CTA testid belongs to the unauthenticated bar only');
+    const html = renderNavBar({ urlKey: 'acme', workspaces: [{ urlKey: 'acme', name: 'Acme' }] });
+    assert.ok(!html.includes('nav-login-jira'), 'the signed-out Jira CTA testid belongs to the unauthenticated preview band only');
+    assert.ok(!html.includes('nav-login-linear'), 'the signed-out Linear CTA testid belongs to the unauthenticated preview band only');
   });
 });
 
@@ -230,17 +225,17 @@ describe('LIN-2010 step 9 — the landing hero (mirrors Jira E3)', () => {
   });
 });
 
-describe('LIN-2010 step 9 — the landing nav bar (mirrors Jira E4)', () => {
+describe('LIN-2010 step 9 — the preview sign-in path (mirrors Jira E4)', () => {
   test('offers the GitHub CTA when configured, reading the provider predicate directly', () => {
     configureGithub();
-    const html = renderNavBar({ isLanding: true });
+    const html = renderPreviewSignIn();
     assert.ok(html.includes(`href="${GITHUB_ENTRY_HREF}"`));
     assert.ok(html.includes('data-testid="nav-login-github"'));
   });
 
   test('omits it when unconfigured — the honest-degradation half of the gate', () => {
     unconfigureGithub();
-    const html = renderNavBar({ isLanding: true });
+    const html = renderPreviewSignIn();
     assert.ok(!html.includes('/auth/github'));
     assert.ok(!html.includes('nav-login-github'));
   });
@@ -248,7 +243,7 @@ describe('LIN-2010 step 9 — the landing nav bar (mirrors Jira E4)', () => {
   test('a partial config (one var only) must not render the CTA', () => {
     unconfigureGithub();
     process.env.GITHUB_CLIENT_ID = 'gh-client-id-1';
-    assert.ok(!renderNavBar({ isLanding: true }).includes('/auth/github'),
+    assert.ok(!renderPreviewSignIn().includes('/auth/github'),
       'a half-configured server must not promise a GitHub sign-in');
   });
 });
@@ -281,7 +276,7 @@ describe('LIN-2010 step 9 (F2) — present-but-malformed GITHUB_APP_PRIVATE_KEY'
     assert.ok(!heroHtml.includes('/auth/github'), 'hero: no GitHub link of any shape');
     assert.ok(!heroHtml.includes('landing-cta-github'));
 
-    const navHtml = renderNavBar({ isLanding: true });
+    const navHtml = renderPreviewSignIn();
     assert.ok(!navHtml.includes('/auth/github'), 'navbar: no GitHub link of any shape');
     assert.ok(!navHtml.includes('nav-login-github'));
 

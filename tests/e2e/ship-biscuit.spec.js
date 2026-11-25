@@ -37,7 +37,7 @@ test.describe("The Ship's Biscuit (experimental)", () => {
       await page.goto(`/test/set-session?${featuresParam({ shipBiscuit: true })}&urlKey=${URL_KEY}`);
       await page.goto(PAGE_URL);
       await page.waitForLoadState('networkidle');
-      await expect(page.locator('.page-header h1')).toHaveText("The Ship's Biscuit");
+      await expect(page.locator('.page-header h1')).toHaveText("Ship's biscuit"); // LIN-4564: the frame's h1 is the registry's name; the masthead leads the line under it
     });
 
     test('toggle lives in the Experimental section and defaults off', async ({ page }) => {

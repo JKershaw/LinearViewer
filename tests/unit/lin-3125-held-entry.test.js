@@ -23,7 +23,6 @@ import { createHeldConnectionRoutes } from '../../routes/held-connection.js';
 import { reproofUrlForAccount, EMAIL_REPROOF_URL } from '../../lib/account-conflict.js';
 import { renderGitHubRepoSelectPage, renderGitHubProjectSelectPage, renderLoginPage } from '../../lib/render-pages.js';
 import { renderAccountHomePage, accountHomeSourceCtas } from '../../lib/render-account-home.js';
-import { renderNavBar } from '../../lib/components/navbar.js';
 import { getProvider } from '../../lib/providers/registry.js';
 import { loadStrippedSources } from '../fixtures/connection-access-guards.js';
 import { withResolver } from './lin-3382-resolver-harness.js';
@@ -398,7 +397,6 @@ describe('LIN-3125 Phase 3 — held-connection entry', () => {
 
     test('signed-out sign-in surfaces are unmarked', () => {
       assert.ok(!renderLoginPage({ githubEnabled: true }).includes('heldConnection'));
-      assert.ok(!renderNavBar({ isLanding: true }).includes('heldConnection'));
     });
 
     test('conflict "Sign in again" reproof URL is the bare basePath (reaches authorize)', async () => {

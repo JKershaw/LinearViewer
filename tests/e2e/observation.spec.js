@@ -58,9 +58,12 @@ test.describe('Autopilot Observation page (first-class)', () => {
       await page.goto(`/test/set-session?urlKey=${URL_KEY}`);
       await page.goto(OBSERVATION_URL);
       await page.waitForLoadState('networkidle');
-      // Title routes through the shared renderPageHeader primitive (LIN-975);
-      // the h1 also carries the fused "● live" indicator, so match by substring.
-      await expect(page.locator('.page-header.obs-header h1')).toContainText('Observation');
+      // LIN-4564: the page sits in the frame as the place Runs: its h1 is the page's name, the rail marks Runs, and the
+      // "● live" indicator is the line under the h1.
+      await expect(page.locator(SELECTORS.nav.heading)).toHaveText('Runs');
+      await expect(page.locator(SELECTORS.nav.railMarked)).toHaveAttribute('data-place', 'runs');
+      await expect(page.locator(`${SELECTORS.nav.main} #obs-banner`)).toBeVisible();
+      await expect(page).toHaveTitle(/^Runs · /);
     });
 
     test('/dashboard 302-redirects to /observation', async ({ page }) => {
@@ -688,7 +691,7 @@ test.describe('Sessions tab — in-flight standalone sessions (LIN-1194)', () =>
     // LIN-3250: the page heading is now the task title + "Run <id>", so anchor
     // on the run-page surfaces rather than the old "Session" heading text.
     await expect(page.locator('[data-testid="session-page"]')).toBeVisible();
-    await expect(page.locator('[data-testid="session-title"]')).toContainText('Standalone drill-in');
+    await expect(page.locator(SELECTORS.nav.heading)).toContainText('Standalone drill-in');
     await expect(page.locator('[data-testid="session-run-id"]')).toContainText('Run ');
   });
 });
@@ -822,6 +825,8 @@ test.describe('LIN-2298: no fixed overlay covers the Observation feed', () => {
     await page.goto(OBSERVATION_URL);
     await page.waitForLoadState('networkidle');
 
+    // LIN-4564: on a phone the trigger sits at the foot of the frame's rail, a drawer behind ☰.
+    await page.locator(SELECTORS.nav.bandMenu).click();
     const trigger = page.getByTestId('nav-feedback-trigger');
     await expect(trigger).toBeVisible();
     await expect(trigger).toHaveAttribute('aria-expanded', 'false');

@@ -460,15 +460,22 @@
 }
 
 /* ── Run page header + steps (LIN-3250) ────────────────────────────────────────
-   The heading's human title (sans) with a small mono run id; an empty paragraph
-   slot reserved for S3; and one-line per-step summaries above the existing run
-   rows. Dark-theme tokens only. */
-.sess-heading-title { font-family: var(--font-content); }
+   The run's short mono id (the line under the frame's h1 since LIN-4564: the h1 is the run's title alone); an empty
+   paragraph slot reserved for S3; and one-line per-step summaries above the existing run rows. Dark-theme tokens only.
+   The id reads at the subtitle line's own size, not the sm token nested inside it (the em would compound). */
 .sess-run-id {
   font-family: var(--font-structural);
-  font-size: var(--font-size-sm);
   font-weight: 400;
   color: var(--muted);
+}
+
+/* LIN-4564: in the frame (lib/components/frame.js), the run page's body takes the frame's one left edge (public/frame.css
+   .frame-main), not a centred column with a gutter of its own; it keeps its reading width. The way back and the h1 are
+   the frame's. */
+.frame-main > .sess-page {
+  margin: 0;
+  padding-left: 0;
+  padding-right: 0;
 }
 .sess-paragraph-slot:empty { display: none; }
 /* LIN-3253 (S3): the stored paragraph S1 reserved the slot for. */

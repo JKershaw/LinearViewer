@@ -970,7 +970,7 @@
     var halfSize = Math.ceil(maxR + CARD_SIZE.width / 2 + SECTOR_LABEL_OFFSET + 16);
 
     // Measure the REAL viewport the canvas scrolls in. `.ship-page` height is
-    // driven off the measured nav height (--ship-nav-h; see measureNavHeight),
+    // driven off the measured canvas top (--ship-top; see measureCanvasOffset),
     // so clientHeight is the true available height here — the single fact F1's
     // fit and F2's page-fit share (LIN-1221).
     var pageEl = document.querySelector('.ship-page');
@@ -1785,30 +1785,32 @@
   }
 
   // =============================================================================
-  // Nav-height fact (LIN-1221 F2)
+  // Canvas-offset fact (LIN-1221 F2; LIN-4564)
   //
-  // The shared header is forced into normal flow on ship (`.nav-bar{position:
-  // static}`, the LIN-984 pointer-interception guard — must NOT be re-pinned).
-  // The ONE fact three consumers need is the vertical space consumed ABOVE the
-  // canvas — the nav's BOTTOM edge in the viewport (its height PLUS any page
-  // padding above it; the nav does not sit flush at y=0). That drives `.ship-
-  // page`'s height (`100vh - navBottom`), the fixed mode/zoom control offsets,
-  // and — via `.ship-page` clientHeight — F1's fit `availH`. It used to be
-  // triplicated as stale `56px` / `68px` / `6rem` constants; against the
-  // finished S2 two-row nav the `top:68px` toggle landed over the nav's view
-  // strip (the live LIN-984 collision). Measure it once, expose it as
-  // `--ship-nav-h`; the CSS drives everything off that variable.
+  // The ONE fact three consumers need is where the canvas starts in the
+  // viewport: its TOP (everything consumed above it: on the frame, the main's
+  // padding and the page's h1, plus the phone band below 760px) and its LEFT
+  // (the frame's rail at 1280, the page gutter on a phone). That drives
+  // `.ship-page`'s height (`100vh - top`), the fixed mode/backlog/zoom control
+  // offsets (they must clear the h1 above and the rail beside), and — via
+  // `.ship-page` clientHeight — F1's fit `availH`. It used to be triplicated as
+  // stale `56px` / `68px` / `6rem` constants (the live LIN-984 collision), then
+  // measured off the old bar's bottom edge; LIN-4564 measures the canvas itself,
+  // so no chrome's shape is assumed. Exposed as `--ship-top` / `--ship-left` /
+  // `--ship-right` (the canvas's right edge, for the backlog control);
+  // the CSS drives everything off those variables.
   // =============================================================================
-  function measureNavHeight() {
-    var nav = document.querySelector('.nav-bar');
-    if (!nav) return;
-    // Bottom edge relative to the viewport top = everything consumed above the
-    // canvas. `.ship-page` follows the nav in normal flow, so this is exactly
-    // where the canvas begins and where fixed controls must clear.
-    var bottom = Math.round(nav.getBoundingClientRect().bottom);
-    if (bottom > 0) {
-      document.documentElement.style.setProperty('--ship-nav-h', bottom + 'px');
-    }
+  function measureCanvasOffset() {
+    var pageEl = document.querySelector('.ship-page');
+    if (!pageEl) return;
+    // Measured at the top of the document, so a page scrolled to its footer does not shrink the canvas.
+    var rect = pageEl.getBoundingClientRect();
+    var top = Math.round(rect.top + window.scrollY);
+    var left = Math.round(rect.left + window.scrollX);
+    var right = Math.round(document.documentElement.clientWidth - rect.right);
+    if (top > 0) document.documentElement.style.setProperty('--ship-top', top + 'px');
+    if (left >= 0) document.documentElement.style.setProperty('--ship-left', left + 'px');
+    if (right >= 0) document.documentElement.style.setProperty('--ship-right', right + 'px');
   }
 
   // =============================================================================
@@ -1822,9 +1824,9 @@
   }
 
   function init() {
-    // Measure the nav BEFORE the first render so `.ship-page` clientHeight (F1's
-    // fit availH) already reflects the corrected `100vh - navH` height.
-    measureNavHeight();
+    // Measure the canvas offset BEFORE the first render so `.ship-page` clientHeight
+    // (F1's fit availH) already reflects the corrected `100vh - top` height.
+    measureCanvasOffset();
     render();
     wirePopover();
     wireHeadingControl();
@@ -1833,14 +1835,15 @@
     wireZoomControl();
     wirePan();
 
-    // Keep the nav-height fact current on viewport changes (a resize/orientation
-    // flip can reflow the two-row nav). Re-measuring updates `.ship-page` height
+    // Keep the canvas-offset fact current on viewport changes (a resize or
+    // orientation flip can cross the frame's drawer width or rewrap the h1).
+    // Re-measuring updates `.ship-page` height
     // and the control offsets; the live zoom is intentionally left untouched so a
     // resize doesn't yank the user's current zoom out from under them.
     var resizeTimer = null;
     window.addEventListener('resize', function () {
       if (resizeTimer) window.clearTimeout(resizeTimer);
-      resizeTimer = window.setTimeout(measureNavHeight, 150);
+      resizeTimer = window.setTimeout(measureCanvasOffset, 150);
     });
   }
 

@@ -11,7 +11,7 @@
  */
 import { test, describe } from 'node:test';
 import assert from 'node:assert';
-import { renderFlightCompanionPage } from '../../lib/render-flight-companion.js';
+import { renderFlightCompanionPage, renderObserverReportPanel } from '../../lib/render-flight-companion.js';
 import { COMPANION_READOUT_HEADINGS } from '../../lib/prompts/flight-companion-brief.js';
 import { taskPageHref } from '../../lib/task-page-href.js';
 
@@ -462,17 +462,17 @@ describe('renderFlightCompanionPage — LIN-2771 beat 3: data-fc-ai-configured a
 
   test('emits data-fc-ai-configured="true" when aiConfigured is true', () => {
     const html = renderFlightCompanionPage({}, { urlKey: 'ws', aiConfigured: true });
-    assert.match(html, /<main class="flight-companion-page"[^>]*data-fc-ai-configured="true"/);
+    assert.match(html, /<div class="flight-companion-page"[^>]*data-fc-ai-configured="true"/);
   });
 
   test('emits data-fc-ai-configured="false" when aiConfigured is false', () => {
     const html = renderFlightCompanionPage({}, { urlKey: 'ws', aiConfigured: false });
-    assert.match(html, /<main class="flight-companion-page"[^>]*data-fc-ai-configured="false"/);
+    assert.match(html, /<div class="flight-companion-page"[^>]*data-fc-ai-configured="false"/);
   });
 
   test('omitted aiConfigured defaults to "false" — the client treats absent/anything-but-false as re-arm', () => {
     const html = renderFlightCompanionPage({}, { urlKey: 'ws' });
-    assert.match(html, /<main class="flight-companion-page"[^>]*data-fc-ai-configured="false"/);
+    assert.match(html, /<div class="flight-companion-page"[^>]*data-fc-ai-configured="false"/);
   });
 });
 
@@ -578,16 +578,17 @@ describe('renderFlightCompanionPage — scannable thread (LIN-3361)', () => {
     assert.ok(!html.includes('href="/workspace/w"s'));
   });
 
+  // LIN-4564: the page always has its workspace now (the frame requires one), so the no-urlKey guard is pinned on the panel.
   test('no urlKey: the issue is plain text, never a hand-built or empty href', () => {
-    const html = renderFlightCompanionPage({ prompt: 'k', observerReportDoc: docWith([{ lane: 'a', issue: 'LIN-5', stage: 's', since: 'x' }]) }, {});
+    const html = renderObserverReportPanel(docWith([{ lane: 'a', issue: 'LIN-5', stage: 's', since: 'x' }]), {});
     assert.ok(!html.includes('fc-obs-attention-issue-link'));
     assert.ok(html.includes('<span class="fc-obs-attention-issue">LIN-5</span>'));
   });
 
   test('data-fc-readout-headings on the page element equals the exported constant', () => {
     const html = renderFlightCompanionPage({ prompt: 'k' }, { urlKey: 'ws' });
-    const m = html.match(/<main class="flight-companion-page"[^>]*data-fc-readout-headings="([^"]*)"/);
-    assert.ok(m, 'attribute present on main.flight-companion-page');
+    const m = html.match(/<div class="flight-companion-page"[^>]*data-fc-readout-headings="([^"]*)"/);
+    assert.ok(m, 'attribute present on the flight-companion-page element');
     const decoded = m[1].replace(/&quot;/g, '"').replace(/&#39;/g, "'").replace(/&amp;/g, '&');
     assert.deepStrictEqual(JSON.parse(decoded), COMPANION_READOUT_HEADINGS);
   });

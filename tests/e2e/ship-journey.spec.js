@@ -1048,8 +1048,13 @@ test.describe('Ship Journey (LIN-1675 P3)', () => {
       await expect(dots.nth(3)).toBeFocused();
 
       await page.locator('[data-testid="ship-journey-coverage"]').click();
-      const bodyFocused = await page.evaluate(() => document.activeElement === document.body);
-      expect(bodyFocused).toBe(true);
+      // LIN-4564: the page sits in the frame, whose <main id="main" tabindex="-1"> (the skip link's target) takes focus on a
+      // click inside it; that is still focus resting outside the map, which is what this leg needs.
+      const restsOutsideMap = await page.evaluate(() => {
+        const el = document.activeElement;
+        return el === document.body || el === document.getElementById('main');
+      });
+      expect(restsOutsideMap).toBe(true);
 
       await page.locator('[data-testid="ship-journey-step-back"]').click();
       const focusedTestId = await page.evaluate(() => document.activeElement && document.activeElement.getAttribute('data-testid'));

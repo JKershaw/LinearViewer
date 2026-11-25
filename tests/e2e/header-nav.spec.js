@@ -5,10 +5,13 @@ import { nav, featuresParam, SELECTORS } from '../helpers.js';
 // LIN-4563 (LIN-4342 piece 2): Home and Backlog moved onto the page frame (lib/components/frame.js), so they draw no old
 // bar: no `.nav-bar`, no `.nav-views`, no sticky header, and their team and assignee selectors sit in the frame's filter
 // line (`SELECTORS.nav.filters`). The old bar's own mechanics are still tested here, on a page still on it: `BAR_PAGE`
-// (Swim, which carries the team selector) unless a test names another. The in-page search toggle is retired everywhere.
+// unless a test names another. The in-page search toggle is retired everywhere.
 // The assignee selector reaches no old-bar page any more (ASSIGNEE_PAGES are Home and Backlog), so its sweeps read Home's
 // filter line, and the bar-height clearance part of them goes: Home has no sticky header to clear.
-const BAR_PAGE = 'swim';
+// LIN-4564 (piece 3): Swipe, Swim, Ship, Roadmap and every flagged view moved onto the frame too, so every page the team
+// selector reaches (FILTERABLE_PAGES) draws it in the filter line, and no old-bar page carries a team any more. The old
+// bar is read on Settings (always reachable, still on the bar until piece 5), and the team sweeps read the filter line.
+const BAR_PAGE = 'settings';
 
 // LIN-978 (UI audit D, keystone): the shared header-level view switcher. The
 // cross-view links were hoisted from the footer into `renderNavBar`, so
@@ -266,7 +269,7 @@ test.describe('Desktop nav overflow (LIN-1286)', () => {
 test.describe('nav-actions placement (LIN-1149)', () => {
   test('queue badge precedes rulings badge precedes feedback trigger in DOM order on an old-bar page', async ({ page, seedLocal, localWorkerUrlKey }) => {
     await seedLocal(swimLocalSeed, { features: { ...FLAGS, feedbackWidget: true }, runnerKey: true });
-    await page.goto(`/workspace/${localWorkerUrlKey}/observation`);
+    await page.goto(`/workspace/${localWorkerUrlKey}/${BAR_PAGE}`);
     await page.waitForLoadState('networkidle');
 
     const actions = page.locator('.nav-actions');
@@ -290,7 +293,7 @@ test.describe('nav-actions placement (LIN-1149)', () => {
 
   test('both badges are absent on an old-bar page when run controls are off', async ({ page, seedLocal, localWorkerUrlKey }) => {
     await seedLocal(swimLocalSeed, { features: {}, runnerKey: false }); // no way to run: run controls OFF
-    await page.goto(`/workspace/${localWorkerUrlKey}/observation`);
+    await page.goto(`/workspace/${localWorkerUrlKey}/${BAR_PAGE}`);
     await page.waitForLoadState('networkidle');
 
     const actions = page.locator('.nav-actions');
@@ -413,10 +416,12 @@ test.describe('Mobile nav-strip density sweep (LIN-2179)', () => {
   // baseline five-inline-plus-toggle case), the shortest flag-gated label (`ship`,
   // 4 chars — the one view that did NOT wrap pre-fix) and the longest flag-gated
   // label (`passage-planner` — the worst-case hoisted-label width).
+  // LIN-4564: Swim and the flagged views left the old bar for the frame, so the strip is swept on the pages still on it: a
+  // first-class view (Settings), and the power-user views KPIs and Dispatch (the owner's), each active in turn.
   const MOBILE_SWEEP_VIEWS = [
-    { pagePath: 'swim', activeKey: 'swim' },
-    { pagePath: 'ship', activeKey: 'ship' },
-    { pagePath: 'passage-planner', activeKey: 'passage-planner' }
+    { pagePath: 'settings', activeKey: 'settings' },
+    { pagePath: 'kpis', activeKey: 'kpis' },
+    { pagePath: 'dispatch', activeKey: 'dispatch' }
   ];
 
   test.beforeEach(async ({ seedLocal }) => {
@@ -426,7 +431,7 @@ test.describe('Mobile nav-strip density sweep (LIN-2179)', () => {
   for (const width of MOBILE_SWEEP_WIDTHS) {
     test(`mobile --nav-sticky-h clearance is at least the measured header height at ${width}px (branch-a guard)`, async ({ page, localWorkerUrlKey }) => {
       await page.setViewportSize({ width, height: 700 });
-      await page.goto(`/workspace/${localWorkerUrlKey}/passage-planner`);
+      await page.goto(`/workspace/${localWorkerUrlKey}/${BAR_PAGE}`);
       await page.waitForLoadState('networkidle');
 
       const { clearancePx, headerPx } = await page.evaluate(() => {
@@ -528,7 +533,7 @@ test.describe('Mobile nav-strip density sweep (LIN-2179)', () => {
 
     test(`every nav view target is a comfortable 44px tap target, and the toggle keeps a real width, at ${width}px (LIN-2189 F1)`, async ({ page, localWorkerUrlKey }) => {
       await page.setViewportSize({ width, height: 800 });
-      await page.goto(`/workspace/${localWorkerUrlKey}/passage-planner`);
+      await page.goto(`/workspace/${localWorkerUrlKey}/${BAR_PAGE}`);
       await page.waitForLoadState('networkidle');
 
       // Height is the tap-target contract for every inline link and the toggle —
@@ -550,7 +555,7 @@ test.describe('Mobile nav-strip density sweep (LIN-2179)', () => {
 
   test('toggle accessible name still contains "more" while the label is visually hidden (LIN-2179)', async ({ page, localWorkerUrlKey }) => {
     await page.setViewportSize({ width: 390, height: 800 });
-    await page.goto(`/workspace/${localWorkerUrlKey}/passage-planner`);
+    await page.goto(`/workspace/${localWorkerUrlKey}/${BAR_PAGE}`);
     await page.waitForLoadState('networkidle');
 
     const toggle = page.locator('[data-testid="nav-more-toggle"]');
@@ -574,13 +579,14 @@ test.describe('Mobile nav-strip density sweep (LIN-2179)', () => {
 // never carries. This targets the unauthenticated `/swipe` preview directly (no
 // seedLocal/session needed — it is the landing bar, not a workspace nav), the
 // same surface the review measured 18.7px → 44.0px on.
+// LIN-4564: the preview sits in the public frame, so its sign-in path is the band's (renderPreviewSignIn).
 test.describe('Landing preview nav auth tap target (LIN-2210)', () => {
-  test('.nav-action.login clears 44px on /swipe at 390px', async ({ page }) => {
+  test('the preview\'s sign-in actions clear 44px on /swipe at 390px', async ({ page }) => {
     await page.setViewportSize({ width: 390, height: 800 });
     await page.goto('/swipe');
     await page.waitForLoadState('networkidle');
 
-    const heights = await page.locator('.nav-actions .nav-action.login').evaluateAll(els =>
+    const heights = await page.locator('[data-testid="frame-public-band"] .frame-public__action').evaluateAll(els =>
       els.map(el => el.getBoundingClientRect().height)
     );
     expect(heights.length).toBeGreaterThan(0);
@@ -598,6 +604,8 @@ test.describe('Landing preview nav auth tap target (LIN-2210)', () => {
 // same mobile widths tests/e2e/header-nav.spec.js's other density sweep uses
 // (360/390/412/430) so this rides the same "does the strip actually still
 // fit" concern, not just a desktop-only assertion.
+// LIN-4564: the four selectored pages sit in the frame, so the team item is the filter line's (`SELECTORS.nav.filters`),
+// the frame's `filters` slot, at the top of <main>; the workspace is the rail's.
 test.describe('.nav-filters team-item mobile sweep (LIN-2523)', () => {
   const MOBILE_SWEEP_WIDTHS = [360, 390, 412, 430];
   const NEWLY_SELECTORED_PAGES = ['swipe', 'swim', 'ship', 'roadmap'];
@@ -615,17 +623,19 @@ test.describe('.nav-filters team-item mobile sweep (LIN-2523)', () => {
 
   for (const width of MOBILE_SWEEP_WIDTHS) {
     for (const pagePath of NEWLY_SELECTORED_PAGES) {
-      test(`${pagePath} at ${width}px: .nav-filters carries the team item (2 children, team selector attached)`, async ({ page, workerUrlKey }) => {
+      test(`${pagePath} at ${width}px: the filter line carries the team item, nothing scrolls sideways`, async ({ page, workerUrlKey }) => {
         await page.setViewportSize({ width, height: 800 });
         await page.goto(`/workspace/${workerUrlKey}/${pagePath}`);
         await page.waitForLoadState('networkidle');
 
-        await expect(page.locator('.nav-filters')).toBeVisible();
-        const childCount = await page.locator('.nav-filters').evaluate(el => el.children.length);
-        expect(childCount, `${pagePath} at ${width}px must carry workspace + team (2), not just workspace (1)`).toBe(2);
-
-        await expect(page.locator('#team-toggle')).toBeAttached();
-        await expect(page.locator('#team-toggle')).toHaveText('all');
+        const line = page.locator(SELECTORS.nav.filters);
+        await expect(line).toBeVisible();
+        const items = await line.evaluate(el => [...el.children].filter(c => c.classList.contains('nav-item')).length);
+        expect(items, `${pagePath} at ${width}px carries the team item alone (no assignee off Home and Backlog)`).toBe(1);
+        await expect(page.locator('.nav-bar')).toHaveCount(0);
+        await expect(line.locator('#team-toggle')).toHaveText('all');
+        const scrolls = await page.evaluate(() => document.documentElement.scrollWidth > window.innerWidth);
+        expect(scrolls, `no sideways scroll at ${width}px`).toBe(false);
       });
     }
 
@@ -640,16 +650,22 @@ test.describe('.nav-filters team-item mobile sweep (LIN-2523)', () => {
     });
   }
 
-  test('picking a team marks the selection and keeps the count at 2, on each newly-selectored page', async ({ page, workerUrlKey }) => {
+  test('picking a team marks the selection in the filter line, on each newly-selectored page', async ({ page, workerUrlKey }) => {
     await page.setViewportSize({ width: 390, height: 800 });
     for (const pagePath of NEWLY_SELECTORED_PAGES) {
       await page.goto(`/workspace/${workerUrlKey}/${pagePath}?team=eeeeeeee-eeee-eeee-eeee-eeeeeeeeeeee`);
       await page.waitForLoadState('networkidle');
 
-      const childCount = await page.locator('.nav-filters').evaluate(el => el.children.length);
-      expect(childCount, pagePath).toBe(2);
-      await expect(page.locator('#team-toggle'), pagePath).toHaveText('Engineering');
+      await expect(page.locator(`${SELECTORS.nav.filters} #team-toggle`), pagePath).toHaveText('Engineering');
     }
+  });
+
+  test.afterAll(async ({ browser, workerUrlKey }) => {
+    const context = await browser.newContext();
+    const page = await context.newPage();
+    await page.goto(`/test/set-session?urlKey=${workerUrlKey}`);
+    await page.goto(`/workspace/${workerUrlKey}/?team=all`);
+    await context.close();
   });
 });
 
@@ -698,13 +714,15 @@ test.describe('.nav-filters assignee-item mobile sweep (LIN-2529)', () => {
       await expect(line.locator('#assignee-toggle')).toHaveText('all');
     });
 
-    test(`/swim at ${width}px stays at 2 — assignee must not leak onto a team-reached, non-dashboard page`, async ({ page, workerUrlKey }) => {
+    // LIN-4564: Swim sits in the frame; its filter line carries the team alone.
+    test(`/swim at ${width}px carries the team alone — assignee must not leak onto a team-reached, non-dashboard page`, async ({ page, workerUrlKey }) => {
       await page.setViewportSize({ width, height: 800 });
       await page.goto(`/workspace/${workerUrlKey}/swim`);
       await page.waitForLoadState('networkidle');
 
-      const childCount = await page.locator('.nav-filters').evaluate(el => el.children.length);
-      expect(childCount).toBe(2);
+      const line = page.locator(SELECTORS.nav.filters);
+      const items = await line.evaluate(el => [...el.children].filter(c => c.classList.contains('nav-item')).length);
+      expect(items).toBe(1);
       await expect(page.locator('#assignee-toggle')).toHaveCount(0);
     });
   }
@@ -830,7 +848,8 @@ function readStripShape() {
 // header (`--nav-bar-h`), so these widths are swept with the worst content: a team, an assignee, and the
 // feedback trigger. The token probe and the scroll outcome are both asserted, because the token alone
 // read green over both bands before. LIN-4563: Home left the old bar, and no old-bar page draws the assignee, so the
-// worst content an old-bar page can carry is read on Swim: a team selected and the feedback trigger.
+// worst content an old-bar page can carry was read on Swim: a team selected and the feedback trigger. LIN-4564: Swim left
+// the bar too, and no old-bar page draws a team, so the worst content left is the feedback trigger, read on BAR_PAGE.
 test.describe('Pinned header clearance at the measured breach (LIN-4037)', () => {
   const BREACH_WIDTHS = [481, 500, 520, 560, 600, 640, 660, 700, 760, 836];
   const FEEDBACK_ON = { feedbackWidget: true };
@@ -851,7 +870,7 @@ test.describe('Pinned header clearance at the measured breach (LIN-4037)', () =>
   async function openDashboard(page, urlKey, { width, height = 800, features = {}, tall = false }) {
     await page.goto(`/test/set-session?urlKey=${urlKey}${featuresParam(features)}`);
     await page.setViewportSize({ width, height });
-    await page.goto(`/workspace/${urlKey}/${BAR_PAGE}?team=${encodeURIComponent(TEST_TEAM_ENGINEERING_ID)}`);
+    await page.goto(`/workspace/${urlKey}/${BAR_PAGE}`);
     await page.waitForLoadState('networkidle');
     if (tall) {
       await page.evaluate(() => {
@@ -882,7 +901,7 @@ test.describe('Pinned header clearance at the measured breach (LIN-4037)', () =>
   }
 
   for (const width of BREACH_WIDTHS) {
-    test(`token clears the measured header at ${width}px with a team and feedback on`, async ({ page, workerUrlKey }) => {
+    test(`token clears the measured header at ${width}px with feedback on`, async ({ page, workerUrlKey }) => {
       await openDashboard(page, workerUrlKey, { width, features: FEEDBACK_ON });
 
       const headerPx = await page.evaluate(() => document.querySelector('.nav-bar').offsetHeight);
@@ -981,7 +1000,9 @@ test.describe('Pinned header clearance at the measured breach (LIN-4037)', () =>
 // full line of its own with the team below it, is swept on the old bar's page with the states it can carry (no team, a
 // team). Home has no sticky header, so the clearance half of this block reads the old bar's page alone.
 test.describe('.nav-filters mobile density budget (LIN-2551, reshaped by LIN-4024)', () => {
-  const BAR_STATES = DENSITY_FILTER_STATES.filter(state => state.assignee === 'all');
+  // LIN-4564: no old-bar page draws a team any more (every FILTERABLE_PAGES page is on the frame), so the bar carries one
+  // state, no filters; the team states are the filter line's (the LIN-2523 sweep above and the Home cases here).
+  const BAR_STATES = DENSITY_FILTER_STATES.filter(state => state.team === 'all' && state.assignee === 'all');
 
   test.beforeEach(async ({ page, workerUrlKey }) => {
     await page.goto(`/test/set-session?urlKey=${workerUrlKey}`);
@@ -1014,7 +1035,7 @@ test.describe('.nav-filters mobile density budget (LIN-2551, reshaped by LIN-402
     }
 
     for (const state of BAR_STATES) {
-      test(`${BAR_PAGE} at ${width}px, ${state.label}: the workspace name has its own full line, and the team sits on one row below it`, async ({ page, workerUrlKey }) => {
+      test(`${BAR_PAGE} at ${width}px, ${state.label}: the workspace name has its own full line`, async ({ page, workerUrlKey }) => {
         await page.setViewportSize({ width, height: 800 });
         await page.goto(densityUrl(workerUrlKey, state, BAR_PAGE));
         await page.waitForLoadState('networkidle');
@@ -1022,23 +1043,21 @@ test.describe('.nav-filters mobile density budget (LIN-2551, reshaped by LIN-402
         await expect(page.locator('.nav-filters')).toBeVisible();
         const shape = await page.evaluate(readStripShape);
 
-        // Workspace + team: 2 DOM children (LIN-4009: the brand leads the row, outside the strip; LIN-4024 moves the
-        // workspace name by CSS only).
-        expect(shape.children).toBe(2);
+        // The workspace alone: 1 DOM child (LIN-4009: the brand leads the row, outside the strip; LIN-4024 moves the
+        // workspace name by CSS only; LIN-4564: no team on an old-bar page).
+        expect(shape.children).toBe(1);
 
         // The workspace name, in full, on a line of its own (item 23 of LIN-4024).
         expect(shape.workspaceText).toBe(TEST_WORKSPACE_NAME);
         expect(shape.workspaceTruncated, `the workspace name must not be cut at ${width}px`).toBe(false);
         expect(shape.workspaceWidth, 'the workspace item takes the strip\'s full width').toBeGreaterThanOrEqual(shape.filtersWidth - 1);
-        expect(shape.otherTop, 'the team sits below the workspace line, not beside it').toBeGreaterThanOrEqual(shape.workspaceBottom - 1);
-        expect(shape.otherRows).toBe(1);
-        expect(shape.otherHeight).toBeLessThanOrEqual(SINGLE_ROW_MAX_HEIGHT);
+        expect(shape.otherRows).toBe(0);
       });
     }
 
-    test(`${BAR_PAGE} at ${width}px: --nav-sticky-h clears the tallest old-bar header, the workspace line plus a team`, async ({ page, workerUrlKey }) => {
+    test(`${BAR_PAGE} at ${width}px: --nav-sticky-h clears the tallest old-bar header, the workspace line`, async ({ page, workerUrlKey }) => {
       await page.setViewportSize({ width, height: 800 });
-      await page.goto(densityUrl(workerUrlKey, BAR_STATES[1], BAR_PAGE));
+      await page.goto(densityUrl(workerUrlKey, BAR_STATES[0], BAR_PAGE));
       await page.waitForLoadState('networkidle');
 
       const { clearancePx, headerPx } = await page.evaluate(() => {
@@ -1059,7 +1078,7 @@ test.describe('.nav-filters mobile density budget (LIN-2551, reshaped by LIN-402
       // `overflow-x: clip` makes it unreachable with no horizontal scrollbar to reveal it. A `nowrap` revision of the
       // LIN-2551 fix did exactly that, so it stays pinned. (Home's filter line is checked in its own sweep above.)
       await page.setViewportSize({ width, height: 800 });
-      await page.goto(densityUrl(workerUrlKey, BAR_STATES[1], BAR_PAGE));
+      await page.goto(densityUrl(workerUrlKey, BAR_STATES[0], BAR_PAGE));
       await page.waitForLoadState('networkidle');
 
       const offscreen = await page.evaluate(() => {
@@ -1110,7 +1129,7 @@ test.describe('.nav-filters mobile density budget (LIN-2551, reshaped by LIN-402
     expect(line.rows, 'at 320px team and assignee may take a second row, but never a third').toBeLessThanOrEqual(2);
     expect(line.offscreen, 'wrapping is the degradation; clipping a control is not').toEqual([]);
 
-    await page.goto(densityUrl(workerUrlKey, BAR_STATES[1], BAR_PAGE));
+    await page.goto(densityUrl(workerUrlKey, BAR_STATES[0], BAR_PAGE));
     await page.waitForLoadState('networkidle');
     const offscreen = await page.evaluate(() => {
       const viewport = document.documentElement.clientWidth;

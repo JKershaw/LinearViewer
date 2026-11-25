@@ -531,7 +531,7 @@ async function dropFileOnZone(page, { name, type, bytes, size }) {
 // `toBeEnabled()` is the real readiness signal (LIN-2298): the trigger ships
 // `disabled` and public/feedback-widget.js clears that only after the panel is
 // built and the click handler bound.
-const WIDGET_PAGE = 'swim'
+const WIDGET_PAGE = 'settings'
 
 async function enableWidget(page, urlKey) {
   // LIN-3848: Settings is the single place the widget is switched. The toggle
@@ -542,7 +542,8 @@ async function enableWidget(page, urlKey) {
   await page.locator(SELECTORS.settings.switch('feedbackWidget')).click()
   await expect(page.locator(SELECTORS.settings.switch('feedbackWidget'))).toHaveText('● on')
   // LIN-4563: Home moved onto the frame (its trigger is in the rail's foot, its footer the frame's). These specs pin the
-  // old footer and the bar's trigger, which still render on pages not yet moved, so they land on one (/swim).
+  // old footer and the bar's trigger, which still render on pages not yet moved, so they land on one (/settings; LIN-4564
+  // moved /swim onto the frame).
   await page.goto(`/workspace/${urlKey}/${WIDGET_PAGE}`)
   await page.waitForLoadState('networkidle')
   await expect(page.getByTestId('nav-feedback-trigger')).toBeEnabled()

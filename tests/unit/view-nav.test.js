@@ -204,12 +204,6 @@ test('renderNavBar carries the view switcher on authenticated workspace pages', 
   assert.match(html, /nav-view-current" data-testid="nav-view-settings"/);
 });
 
-test('renderNavBar does NOT carry the view switcher on the landing nav', () => {
-  const html = renderNavBar({ isLanding: true });
-  assert.doesNotMatch(html, /class="nav-views"/);
-  assert.doesNotMatch(html, /nav-view-observation/);
-});
-
 // --- footer no longer carries the hoisted links -----------------------------
 
 test('renderPageFooter no longer renders the cross-view links (hoisted to header)', () => {

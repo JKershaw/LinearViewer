@@ -112,12 +112,15 @@ function _esc(str) {
 // ==========================================================================
 
 const swipeBase = urlKey ? `/workspace/${encodeURIComponent(urlKey)}/swipe` : '/swipe';
+// The frame's tab title (`Swipe · <Workspace>`, or `Swipe · Harbour` on the preview; LIN-4564): the card on show is added
+// after it, so the tab still starts with the page's name and keeps the workspace.
+const pageTitle = document.title;
 
 function updateUrl() {
   const issue = filteredIssues[currentIndex];
   const path = issue && issue.identifier ? `${swipeBase}/${encodeURIComponent(issue.identifier)}` : swipeBase;
   history.replaceState(null, '', path + window.location.search);
-  document.title = issue && issue.identifier ? `Swipe - ${issue.identifier} ${issue.title}` : 'Swipe - Tasks';
+  document.title = issue && issue.identifier ? `${pageTitle} — ${issue.identifier} ${issue.title}` : pageTitle;
 }
 
 function navigateToIdentifier(identifier) {

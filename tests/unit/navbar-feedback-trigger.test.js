@@ -16,7 +16,7 @@
  *   - trigger without mount → a control that does nothing when clicked.
  *
  * Neither throws and neither is visible in CI. So the contract is pinned as a
- * contract: for the same `(urlKey, isLanding, featureFlags)` the two renderers
+ * contract: for the same `(urlKey, featureFlags)` the two renderers
  * must agree.
  *
  * WHAT THIS DOES NOT COVER, stated because an earlier version of this comment
@@ -28,7 +28,7 @@
  * GATES agree given equal inputs — real and worth having, and not the same
  * claim. Call-site threading was checked by hand across all 25 `renderNavBar`
  * sites for LIN-2298 (every one pairs with a `renderPageFooter` receiving the
- * same `urlKey`/`isLanding`/`featureFlags`); a test that pins THAT would have
+ * same `urlKey`/`featureFlags`); a test that pins THAT would have
  * to walk the render modules, which is a different tool than this one.
  *
  * Run with: node --test tests/unit/navbar-feedback-trigger.test.js
@@ -51,7 +51,7 @@ function hasTrigger(opts) {
 /**
  * Whether the widget is actually USABLE on a page rendered with these inputs:
  * the footer must mount it AND the mount must be enabled. `renderFeedbackMount`
- * emits the root on every `!isLanding && urlKey` page regardless of the flag,
+ * emits the root on every non-landing `urlKey` page regardless of the flag,
  * carrying `data-enabled` — and `public/feedback-widget.js` returns early
  * without building the panel when that is not `"true"`. So a disabled mount is
  * not a usable widget, and the trigger must not render against one.
@@ -109,10 +109,6 @@ describe('renderNavBar — feedback trigger (LIN-2298)', () => {
     assert.equal(hasTrigger({ urlKey: null, featureFlags: { feedbackWidget: true } }), false);
   });
 
-  test('is absent entirely on the unauthenticated landing nav', () => {
-    assert.equal(hasTrigger({ isLanding: true, urlKey: 'test-ws', featureFlags: { feedbackWidget: true } }), false);
-  });
-
   test('trails the queue and rulings badges in nav-actions source order', () => {
     const html = renderNavBar({
       workspaces: WORKSPACES, urlKey: 'test-ws',
@@ -142,15 +138,13 @@ describe('LIN-2298 gate contract: the trigger and the widget mount agree', () =>
   // nobody thought to spot-check.
   const CASES = [];
   for (const urlKey of ['test-ws', null]) {
-    for (const isLanding of [false, true]) {
-      for (const featureFlags of [{ feedbackWidget: true }, { feedbackWidget: false }, {}]) {
-        CASES.push({ urlKey, isLanding, featureFlags });
-      }
+    for (const featureFlags of [{ feedbackWidget: true }, { feedbackWidget: false }, {}]) {
+      CASES.push({ urlKey, featureFlags });
     }
   }
 
   for (const opts of CASES) {
-    const label = `urlKey=${opts.urlKey} isLanding=${opts.isLanding} flag=${JSON.stringify(opts.featureFlags.feedbackWidget)}`;
+    const label = `urlKey=${opts.urlKey} flag=${JSON.stringify(opts.featureFlags.feedbackWidget)}`;
     test(`trigger presence matches widget usability (${label})`, () => {
       assert.equal(
         hasTrigger(opts),

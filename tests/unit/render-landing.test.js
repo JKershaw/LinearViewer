@@ -38,9 +38,9 @@ test('leads with the Harbour brand hero (the settled top area)', () => {
 test('drops the shared top bar on the homepage — the hero is the sole sign-in path', () => {
   // LIN-1508: the homepage no longer renders the shared landing top bar
   // (projects / local workspace / sign in / GitHub). It was pure duplication of
-  // the hero's CTAs. `minimalNav` scopes the removal to the homepage — the same
-  // bar is preserved for the swipe/swim/ship previews (their e2e specs pin it as
-  // their only sign-in route), so this asserts absence on the homepage only.
+  // the hero's CTAs. The landing bar renders nothing at all now. LIN-4564: the
+  // swipe/swim/ship previews carry their sign-in path in the public frame's band
+  // (renderPreviewSignIn), not in a bar.
   const html = renderLandingPage({ githubEnabled: true });
   assert.ok(!html.includes('class="nav-bar"'), 'no landing top bar on the homepage');
   assert.ok(!html.includes('nav-action login'), 'no top-bar sign-in action on the homepage');

@@ -50,4 +50,5 @@ Area notes for `front-end-pages` in the registry. Format and rules: README.md.
 - Moving a page onto the frame or retiring its widget leaves edges. The frame owns the page's name, so client code that
   hid the body misses the h1 and tab: the revoked-link notice (`goneHandlerFor`, `public/task-page.js`) left the title
   showing (LIN-4563). What existed only for a retired feature goes too, server side included (the `search` home-rows
-  kind, rows' `data-search-text`, a constant named for it). Grep the client's `innerHTML =`, `kind=` and `data-*`.
+  kind, rows' `data-search-text`, a constant named for it). Grep the client's `innerHTML =`, `kind=`, `data-*`,
+  `document.title` and `.nav-bar`: Swipe's script retitled the tab, Ship measured the bar (LIN-4564).

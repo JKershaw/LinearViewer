@@ -10,7 +10,8 @@ import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import { renderRoadmapPage } from '../../lib/render-roadmap.js';
 
-const render = (model) => renderRoadmapPage({ roadmapModel: model, organizationName: 'Acme' }, {});
+// LIN-4564: a workspace page in the frame needs its workspace.
+const render = (model) => renderRoadmapPage({ roadmapModel: model, organizationName: 'Acme' }, { urlKey: 'acme' });
 
 const milestone = (extra = {}) => ({
   name: 'P',

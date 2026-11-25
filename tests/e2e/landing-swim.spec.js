@@ -1,4 +1,5 @@
 import { test, expect } from '../fixtures/test-base.js';
+import { SELECTORS } from '../helpers.js';
 
 test.describe('Landing Swim Page (/swim)', () => {
   test.beforeEach(async ({ page }) => {
@@ -29,7 +30,8 @@ test.describe('Landing Swim Page (/swim)', () => {
     // Playwright server's EMAIL_TRANSPORT=capture turns on.
     await expect(page.locator('[data-testid="nav-login-email"]')).toBeVisible();
     await expect(page.locator('[data-testid="nav-login-email"]')).toHaveAttribute('href', '/auth/email');
-    await expect(page.locator('nav a[href="/"]')).toBeVisible();
+    // LIN-4564: the preview sits in the public frame; its band's way back leads to Harbour's front page.
+    await expect(page.locator(SELECTORS.nav.back)).toHaveAttribute('href', '/');
   });
 
   test('does not show workspace selector in nav', async ({ page }) => {
@@ -64,19 +66,19 @@ test.describe('Landing Swim Page (/swim)', () => {
   });
 
   test('says under its title that it shows sample tasks (LIN-3995)', async ({ page }) => {
-    await expect(page.locator('header.page-header .page-header__subtitle')).toHaveText('Sample tasks, not a workspace. Sign in to see yours.');
-    await expect(page.locator('nav a[href="/"]')).toHaveText('← Harbour');
+    await expect(page.locator(`${SELECTORS.nav.main} .page-header__subtitle`)).toHaveText('Sample tasks, not a workspace. Sign in to see yours.');
+    // LIN-4564: the preview sits in the public frame; its band's way back leads to Harbour's front page.
+    await expect(page.locator(SELECTORS.nav.back)).toHaveText('← Harbour');
+    await expect(page.locator(SELECTORS.nav.back)).toHaveAttribute('href', '/');
   });
 
-  test('footer shows cross-view navigation links', async ({ page }) => {
-    await expect(page.locator('.page-footer')).toBeVisible();
-    await expect(page.locator('.footer-actions')).toBeVisible();
-    // swim is current page — shown in bold, not a link
-    await expect(page.locator('.footer-actions strong.footer-current')).toHaveText('swim');
-    // LIN-3995: the row names the previews, and its home link reads as the back link does
-    await expect(page.locator('.footer-actions')).toContainText('previews:');
-    await expect(page.locator('.footer-actions a[href="/"]')).toHaveText('Harbour');
-    await expect(page.locator('.footer-actions a[href="/swipe"]')).toBeVisible();
+  // LIN-4564: the preview sits in the public frame, whose footer is the same on every page (the previews row is gone;
+  // the landing page still links both previews).
+  test('the footer is the frame\'s, the same on every page', async ({ page }) => {
+    await expect(page.locator(SELECTORS.nav.footer)).toBeVisible();
+    await expect(page.locator('[data-testid="frame-footer-library"]')).toBeVisible();
+    await expect(page.locator('.footer-actions')).toHaveCount(0);
+    await expect(page).toHaveTitle('Swim · Harbour');
   });
 
   test('popover appears when clicking a swim box', async ({ page }) => {

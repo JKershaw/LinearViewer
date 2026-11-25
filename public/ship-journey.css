@@ -7,8 +7,8 @@
 
 .sj-page {
   max-width: 900px; /* the house column width — kpis/live-console/session/roadmap */
-  margin: 0 auto;
-  padding: 0 1rem 3rem;
+  /* LIN-4564: in the frame, which owns the left edge, the gutter and the h1; the column starts at that edge. */
+  padding: 0 0 3rem;
 }
 
 .sj-experimental {

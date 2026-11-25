@@ -1,4 +1,5 @@
 import { test, expect } from '../fixtures/test-base.js';
+import { SELECTORS } from '../helpers.js';
 
 // LIN-1892 (G2): the unauthenticated /ship preview renders the same isLanding
 // navbar as /swipe and /swim, and that bar is its only sign-in path. No other
@@ -17,7 +18,8 @@ test.describe('Landing Ship Page (/ship)', () => {
     // Email: the webServer sets EMAIL_TRANSPORT=capture (NODE_ENV=test).
     await expect(page.locator('[data-testid="nav-login-email"]')).toBeVisible();
     await expect(page.locator('[data-testid="nav-login-email"]')).toHaveAttribute('href', '/auth/email');
-    await expect(page.locator('nav a[href="/"]')).toBeVisible();
+    // LIN-4564: the preview sits in the public frame; its band's way back leads to Harbour's front page.
+    await expect(page.locator(SELECTORS.nav.back)).toHaveAttribute('href', '/');
   });
 
   test('signed-out /ship is the preview, not a redirect', async ({ page }) => {

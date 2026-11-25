@@ -363,10 +363,10 @@ test.describe('Flight Companion Page (experimental)', () => {
     // for release purposes was that whole container — it stayed pinned
     // across nearly the entire page scroll, overlaying How-to/Kickoff/
     // Observer below and intercepting clicks meant for them. No `position`
-    // is needed at all: the page's own shared `.nav-bar` (public/style.css)
-    // is already `position: sticky; top: 0`, and scrolling the section into
+    // is needed at all: the frame's phone band (`.frame-band`, public/frame.css;
+    // LIN-4564) is already `position: sticky; top: 0`, and scrolling the section into
     // view naturally lands the composer flush with the viewport bottom, with
-    // the nav's own sticky band overlapping only the section's own top edge
+    // the band's own sticky strip overlapping only the section's own top edge
     // — never anything below it. Was Shape A by accident before this beat:
     // `.chat-thread` sat at chat.css's 40vh default (337.6px at this
     // viewport) inside an ordinary scrolling page.

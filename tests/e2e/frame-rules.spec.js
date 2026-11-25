@@ -2,7 +2,7 @@ import { test, expect } from '../fixtures/test-base.js';
 import { seedShapedWorkspace } from '../fixtures/local-harness.js';
 import { SELECTORS } from '../helpers.js';
 import { placeFor, litPlaceFor, railFor } from '../../lib/places.js';
-import { FEATURE_DEFAULTS } from '../../lib/feature-defaults.js';
+import { FEATURE_DEFAULTS, FEATURES, EXPERIMENTAL_VIEWS } from '../../lib/feature-defaults.js';
 
 /**
  * LIN-4562 (LIN-4342 piece 1): the walk. The rules every page in the frame keeps (docs/reviews/navigation-2026-11-07/
@@ -25,6 +25,9 @@ import { FEATURE_DEFAULTS } from '../../lib/feature-defaults.js';
  * The pages on the frame, by place key. `path` replaces the registry path (a drilled-in page's route has a parameter);
  * `query` is appended; `name` is the page's name when it is not the registry label (a task page's name is its title).
  * LIN-4563 (piece 2) adds Home, Backlog and the task family: a task, its edit page, a new task, and a task not found.
+ * LIN-4564 (piece 3) adds Watch and Views: Runs, a run page (`seeded: 'run'`, the anchor the walk dispatches) and a run
+ * not found, Live, Swipe, Swim, Roadmap and every flagged view. A page behind a flag (`flag`) is walked only for a viewer
+ * who has it on: with it off its route leads to Settings and the rail does not list it (the items check says so).
  */
 const FRAMED = [
   { key: 'connect' },
@@ -35,17 +38,46 @@ const FRAMED = [
   { key: 'task-edit', path: '/task/SHAPE-261/edit', name: 'Edit SHAPE-261' },
   { key: 'task-new' },
   { key: 'task', path: '/task/NOPE-404', name: 'Task not found', notFound: true },
+  { key: 'runs' },
+  { key: 'run', seeded: 'run', name: 'Walk run' },
+  { key: 'run', path: '/observation/session/nope-404', name: 'Run not found', notFound: true },
+  { key: 'live', flag: FEATURES.LIVE_CONSOLE },
+  { key: 'swipe' },
+  { key: 'swim' },
+  { key: 'roadmap', flag: FEATURES.ROADMAP },
+  ...EXPERIMENTAL_VIEWS.map(({ flag, path }) => ({ key: path, flag })),
 ];
+
+/** Every flag a place in the rail waits on, on. */
+const EVERY_VIEW_FLAG = Object.fromEntries([FEATURES.ROADMAP, ...EXPERIMENTAL_VIEWS.map(v => v.flag)].map(flag => [flag, true]));
 
 const VIEWERS = [
   // The seeded session account is the workspace owner; a runner key gives it run controls (lib/run-controls.js).
   { name: 'owner', runnerKey: true, flags: { ...FEATURE_DEFAULTS, runControls: true, liveConsole: true } },
   { name: 'new user', runnerKey: false, flags: { ...FEATURE_DEFAULTS, runControls: false, runSetup: true } },
+  // LIN-4564: flags on. Each flagged view adds its place in its own slot (lib/places.js), and its page keeps the rules.
+  { name: 'owner, every view flag on', runnerKey: true, features: EVERY_VIEW_FLAG, flags: { ...FEATURE_DEFAULTS, ...EVERY_VIEW_FLAG, runControls: true, liveConsole: true } },
 ];
 
 const WIDTHS = [1280, 390];
 
-const urlOf = (urlKey, { key, path, query = '' }) => `/workspace/${urlKey}${path || placeFor(key).path}${query}`;
+const urlOf = (urlKey, { key, path, query = '' }, seeded = {}) => `/workspace/${urlKey}${path || seeded[key] || placeFor(key).path}${query}`;
+
+/** The pages this viewer walks: a page behind a flag only when the viewer has it on. */
+const framedFor = (viewer) => FRAMED.filter(entry => !entry.flag || viewer.flags[entry.flag] === true);
+
+/** A run to walk: an autopilot anchor dispatched in this workspace (its page is /observation/session/<id>). */
+async function seedWalkRun(page, urlKey) {
+  const resp = await page.request.post(`/workspace/${urlKey}/api/dispatch`, {
+    data: { prompt: 'orchestrate', promptName: 'autopilot', kind: 'autopilot', issueIdentifier: 'SHAPE-261', issueTitle: 'Walk run', target: 'cli' },
+  });
+  const body = await resp.json().catch(() => ({}));
+  // The dispatch route refuses a second autopilot for the same task within minutes (DUPLICATE_DISPATCH) and names the
+  // first; each test re-seeds, so the walk runs the anchor it already has.
+  const id = resp.status() === 201 ? body.item?.id : (resp.status() === 409 && body.code === 'DUPLICATE_DISPATCH' ? body.id : null);
+  if (!id) throw new Error(`seedWalkRun: ${resp.status()} ${JSON.stringify(body)}`);
+  return `/observation/session/${encodeURIComponent(id)}`;
+}
 
 /** Reads what the rules need off the page in one pass. */
 async function readFrame(page) {
@@ -97,10 +129,12 @@ async function tabThroughRail(page, expected) {
 for (const viewer of VIEWERS) {
   test.describe(`the frame rules, ${viewer.name}`, () => {
     let urlKey;
+    let seeded;
     const expectedItems = railFor(viewer.flags).flatMap(g => g.places.map(p => p.key));
 
     test.beforeEach(async ({ page, localWorkerUrlKey }) => {
-      ({ urlKey } = await seedShapedWorkspace(page, { urlKey: localWorkerUrlKey, tasks: 300, projects: 30, questions: 3, runnerKey: viewer.runnerKey }));
+      ({ urlKey } = await seedShapedWorkspace(page, { urlKey: localWorkerUrlKey, tasks: 300, projects: 30, questions: 3, runnerKey: viewer.runnerKey, features: viewer.features }));
+      seeded = { run: await seedWalkRun(page, urlKey) };
     });
 
     for (const width of WIDTHS) {
@@ -109,8 +143,8 @@ for (const viewer of VIEWERS) {
         const footers = new Set();
         const edges = new Set();
         const sizes = new Set();
-        for (const entry of FRAMED) {
-          const response = await page.goto(urlOf(urlKey, entry));
+        for (const entry of framedFor(viewer)) {
+          const response = await page.goto(urlOf(urlKey, entry, seeded));
           expect(response.status(), `${entry.key}: the page renders`).toBe(entry.notFound ? 404 : 200);
           await page.waitForLoadState('networkidle');
           const f = await readFrame(page);
@@ -126,16 +160,18 @@ for (const viewer of VIEWERS) {
           edges.add(f.h1Left);
           sizes.add(f.h1Size);
 
-          // A page whose job is typing (task edit, new task: LIN-1565's autofocus) opens with the keyboard already in a
-          // field in <main>, past the rail, which is what the skip link is for; the walk checks that instead.
+          // A page whose job is typing (task edit, new task: LIN-1565's autofocus; Task chat, whose script focuses its field on
+          // load) opens with the keyboard already in a field in <main>, past the rail, which is what the skip link is for;
+          // the walk checks that instead.
           const autofocused = await page.evaluate(() => {
             const el = document.activeElement;
-            return !!el && el.hasAttribute('autofocus') && el !== document.getElementById('main') && !!document.getElementById('main')?.contains(el);
+            const field = !!el && (el.hasAttribute('autofocus') || ['INPUT', 'TEXTAREA', 'SELECT'].includes(el.tagName));
+            return field && el !== document.getElementById('main') && !!document.getElementById('main')?.contains(el);
           });
           if (autofocused) continue;
           // The first Tab stop is the skip link, and it lands in <main>.
           await page.keyboard.press('Tab');
-          expect((await focused(page)).testid).toBe('frame-skip');
+          expect((await focused(page)).testid, `${entry.key}: the first Tab stop is the skip link`).toBe('frame-skip');
           await expect(page.locator(SELECTORS.nav.skip)).toBeVisible();
           await page.keyboard.press('Enter');
           await expect.poll(async () => (await focused(page)).id).toBe('main');
