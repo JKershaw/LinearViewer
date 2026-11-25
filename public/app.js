@@ -5,9 +5,9 @@
  * once the document is parsed and before DOMContentLoaded. So it reads the classic globals (common.js's api, escapeHtml,
  * renderMarkdown) safely, and imports the shared PromptSection and the download filename rule (the server's own, a
  * served lib leaf) instead of keeping copies. Its DOMContentLoaded init registers after the classic page
- * script listed after it (dispatch.js, settings.js); none of those reads what this init sets up. Its top-level names
- * are module-scoped: nothing classic reads them (the queue badge's updater, the one that was read, is common.js's).
- * Exported names are its test seams. `window.refreshWaitingOnYou` is the e2e hook the bridge inventory lists.
+ * script listed after it (settings.js), and before dispatch.js's, a module listed after it since LIN-4560; none of those
+ * reads what this init sets up, and this init reads nothing they set up. Its top-level names are module-scoped:
+ * nothing classic reads them (the queue badge's updater, the one that was read, is common.js's). Exported names are its test seams. `window.refreshWaitingOnYou` is the e2e hook the bridge inventory lists.
  */
 import * as PromptSection from './prompt-section.js'
 import { holdsReaderInput } from './question-records.js'

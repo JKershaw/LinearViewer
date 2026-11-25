@@ -98,13 +98,14 @@ describe('the bridge over the real repo', () => {
     }
   });
 
-  test('the emitted modules are the converted pages (workspace-kpis.js, task-page.js, flight-companion.js, observation.js, question-records.js LIN-4532, swipe.js and app.js LIN-4463 piece 5), what they import, and the lib leaves', () => {
+  test('the emitted modules are the converted pages (workspace-kpis.js, task-page.js, flight-companion.js, observation.js, question-records.js LIN-4532, swipe.js and app.js LIN-4463 piece 5, session.js and dispatch.js LIN-4560), what they import, and the lib leaves', () => {
     // prompt-section.js is a module no renderer lists: app.js, swipe.js and task-page.js import it, so it is checked with them.
     // waiting-merge.js (LIN-4549) is one too: app.js imports it (Home's live Waiting merge, out of the classic question-cards.js).
     // waiting-notes.js (LIN-4552) as well: app.js imports it (Home's "Notes for you": the notes merge, clear and the fold).
     const publicFiles = Object.keys(inputs.emitted).filter((k) => !k.startsWith('lib/')).sort();
-    assert.deepEqual(publicFiles, ['app.js', 'flight-companion.js', 'observation.js', 'prompt-section.js', 'question-records.js', 'swipe.js', 'task-page.js', 'waiting-merge.js', 'waiting-notes.js', 'workspace-kpis.js']);
-    for (const lib of ['lib/cost-format.js', 'lib/prompt-filename.js', 'lib/task-page-href.js']) assert.ok(inputs.emitted[lib], lib);
+    // transcript-live.js (LIN-4560) as well: session.js and dispatch.js import it (the transcript drawn and kept live).
+    assert.deepEqual(publicFiles, ['app.js', 'dispatch.js', 'flight-companion.js', 'observation.js', 'prompt-section.js', 'question-records.js', 'session.js', 'swipe.js', 'task-page.js', 'transcript-live.js', 'waiting-merge.js', 'waiting-notes.js', 'workspace-kpis.js']);
+    for (const lib of ['lib/cost-format.js', 'lib/prompt-filename.js', 'lib/task-page-href.js', 'lib/time-words.js']) assert.ok(inputs.emitted[lib], lib);
   });
 
   test('the renderer lists the check reads include the const SCRIPTS shape (the task page), so a list the reader cannot match fails here', () => {
@@ -148,8 +149,9 @@ describe('the checks fail on each synthetic breach (witnesses for the inventory)
   });
 
   test('an e2e hook read by a classic script is a bridge and fails; an undeclared hook is a bridge write', () => {
-    const pages = { ...realInputs().pages, 'dispatch.js': "document.addEventListener('click', () => window.refreshWaitingOnYou());\n" };
-    assert.ok(realRun({ pages }).problems.some((p) => /dispatch\.js reads window\.refreshWaitingOnYou, an e2e hook/.test(p)));
+    // settings.js stands in for a classic script (dispatch.js was the stand-in until it became a module, LIN-4560).
+    const pages = { ...realInputs().pages, 'settings.js': "document.addEventListener('click', () => window.refreshWaitingOnYou());\n" };
+    assert.ok(realRun({ pages }).problems.some((p) => /settings\.js reads window\.refreshWaitingOnYou, an e2e hook/.test(p)));
     assert.ok(realRun({ hooks: {} }).problems.some((p) => /app\.js writes window\.refreshWaitingOnYou: a bridge/.test(p)));
   });
 

@@ -1,23 +1,18 @@
 /**
  * LIN-3251 (LIN-2948 S1b) beat 3 — the session page's PR-state client poll.
  *
- * public/session.js is a plain browser script, so — following the house pattern
- * in session-question-card-effect.test.js — the real shipped source is
- * vm-sandboxed with a minimal `session-pr-state` element, fake timers and a
- * scripted fetch. Nothing is re-implemented here.
+ * public/session.js is a native ES module (LIN-4560): the real shipped module is
+ * imported (tests/unit/helpers/import-world.js) over a minimal `session-pr-state`
+ * element, fake timers and a scripted fetch, with the real question-cards.js (the
+ * classic sibling it reads at load) run first in the same realm. Nothing is
+ * re-implemented here. It was a vm over the classic script until then.
  *
  * Run with: node --test tests/unit/session-pr-state-poll.test.js
  */
-import { test, describe } from 'node:test';
+import { test, describe, afterEach } from 'node:test';
 import assert from 'node:assert/strict';
-import vm from 'node:vm';
-import { readFileSync } from 'node:fs';
-import { fileURLToPath } from 'node:url';
-import { dirname, join } from 'node:path';
+import { importWorld } from './helpers/import-world.js';
 
-const __dirname = dirname(fileURLToPath(import.meta.url));
-const QUESTION_CARDS_JS_SRC = readFileSync(join(__dirname, '../../public/question-cards.js'), 'utf8');
-const SESSION_JS_SRC = readFileSync(join(__dirname, '../../public/session.js'), 'utf8');
 
 const NEUTRAL = 'Checking for a pull request…';
 const OPEN_COPY = 'Nothing has been merged. PR #12 is open: checks passing.';
@@ -78,7 +73,10 @@ function makeFetch() {
   };
 }
 
-function makeSandbox({ el, line, timers, fetchImpl, visibility = 'visible' }) {
+let world = null;
+afterEach(() => { if (world) world.restore(); world = null; });
+
+async function makeSandbox({ el, line, timers, fetchImpl, visibility = 'visible' }) {
   const listeners = {};
   const document = {
     visibilityState: visibility,
@@ -87,30 +85,28 @@ function makeSandbox({ el, line, timers, fetchImpl, visibility = 'visible' }) {
     querySelectorAll() { return []; },
     createElement() { return makeEl(); }
   };
-  const sandbox = {
-    module: { exports: {} },
-    window: {},
-    document,
-    setTimeout: timers.setTimeout.bind(timers),
-    clearTimeout: timers.clearTimeout.bind(timers),
-    setInterval: timers.setInterval.bind(timers),
-    fetch: fetchImpl,
-    console
-  };
-  vm.createContext(sandbox);
-  vm.runInContext(QUESTION_CARDS_JS_SRC, sandbox, { filename: 'question-cards.js' });
-  vm.runInContext(SESSION_JS_SRC, sandbox, { filename: 'session.js' });
+  world = importWorld({
+    globals: {
+      document,
+      setTimeout: timers.setTimeout.bind(timers),
+      clearTimeout: timers.clearTimeout.bind(timers),
+      setInterval: timers.setInterval.bind(timers),
+      fetch: fetchImpl
+    }
+  });
+  world.runClassic('question-cards.js');
+  const api = await world.importPage('session.js');
   return {
-    api: sandbox.module.exports,
+    api,
     document,
     dispatch(type) { (listeners[type] || []).forEach(fn => fn()); }
   };
 }
 
 describe('session PR-state poll (LIN-3251 beat 3)', () => {
-  test('pollAction: schedule while live+visible, pause when hidden, stop when terminal or finished', () => {
+  test('pollAction: schedule while live+visible, pause when hidden, stop when terminal or finished', async () => {
     const { el, line } = makePrStateEl();
-    const { api } = makeSandbox({ el, line, timers: makeTimers(), fetchImpl: makeFetch().fetchImpl });
+    const { api } = await makeSandbox({ el, line, timers: makeTimers(), fetchImpl: makeFetch().fetchImpl });
     assert.equal(api.pollAction(true, null, true), 'schedule');
     assert.equal(api.pollAction(true, 'open', true), 'schedule');
     assert.equal(api.pollAction(true, 'unknown', true), 'schedule');
@@ -126,7 +122,7 @@ describe('session PR-state poll (LIN-3251 beat 3)', () => {
     const { el, line } = makePrStateEl({ live: false });
     const f = makeFetch();
     f.setResponses([{ state: 'open', number: 12, message: OPEN_COPY }]);
-    const { api } = makeSandbox({ el, line, timers, fetchImpl: f.fetchImpl });
+    const { api } = await makeSandbox({ el, line, timers, fetchImpl: f.fetchImpl });
 
     api.initPrState();
     await flush();
@@ -141,7 +137,7 @@ describe('session PR-state poll (LIN-3251 beat 3)', () => {
     const { el, line } = makePrStateEl({ live: true });
     const f = makeFetch();
     f.setResponses([{ state: 'merged', number: 12, message: 'PR #12 was merged.' }]);
-    const sandbox = makeSandbox({ el, line, timers, fetchImpl: f.fetchImpl });
+    const sandbox = await makeSandbox({ el, line, timers, fetchImpl: f.fetchImpl });
 
     sandbox.api.initPrState();
     await flush();
@@ -161,7 +157,7 @@ describe('session PR-state poll (LIN-3251 beat 3)', () => {
     const timers = makeTimers();
     const { el, line } = makePrStateEl({ live: true });
     const f = makeFetch();
-    const sandbox = makeSandbox({ el, line, timers, fetchImpl: f.fetchImpl, visibility: 'hidden' });
+    const sandbox = await makeSandbox({ el, line, timers, fetchImpl: f.fetchImpl, visibility: 'hidden' });
 
     sandbox.api.initPrState();
     await flush();
@@ -188,7 +184,7 @@ describe('session PR-state poll (LIN-3251 beat 3)', () => {
     const { el, line } = makePrStateEl({ live: true });
     const f = makeFetch();
     f.setResponses([{ state: 'open', number: 12, message: OPEN_COPY }]);
-    const { api } = makeSandbox({ el, line, timers, fetchImpl: f.fetchImpl });
+    const { api } = await makeSandbox({ el, line, timers, fetchImpl: f.fetchImpl });
 
     assert.equal(line.textContent, NEUTRAL, 'neutral before the fetch');
     api.initPrState();
@@ -201,7 +197,7 @@ describe('session PR-state poll (LIN-3251 beat 3)', () => {
     const { el, line } = makePrStateEl({ live: true });
     const f = makeFetch();
     f.setResponses([{ throw: true }, { state: 'open', number: 12, message: OPEN_COPY }]);
-    const { api } = makeSandbox({ el, line, timers, fetchImpl: f.fetchImpl });
+    const { api } = await makeSandbox({ el, line, timers, fetchImpl: f.fetchImpl });
 
     api.initPrState();
     await flush();

@@ -4759,6 +4759,20 @@ a.context-node:hover { border-color: var(--text); background: var(--bg); }
   opacity: 0.7;
 }
 
+/* LIN-4560: a child agent's lines in the Sessions fold, one collapsed group per child (public/sessions.js). Tokens only;
+   a long unbroken agent name or line wraps rather than widening the fold. */
+.session-feedback-agent {
+  min-width: 0;
+  overflow-wrap: anywhere;
+  border-left: 2px solid var(--line);
+  padding-left: var(--space-2);
+  margin: 0.1rem 0;
+}
+.session-feedback-agent-summary {
+  cursor: pointer;
+  color: var(--muted);
+}
+
 /* LIN-3098 S4/S4b: "run on my machine ›" wherever a task opens (tree detail,
    Swipe card, Swim popover), and the same link inside the Swipe dispatch/proxy
    set-up notices. Shared here so every page that opens a task has it. */

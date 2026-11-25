@@ -18,6 +18,7 @@ import { readFileSync } from 'node:fs';
 import { dirname, join } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { withHarnessModels } from '../fixtures/harness-models.js';
+import { harnessModelsBlock } from '../../lib/model-routing-harnesses.js';
 import { loadWorld } from './helpers/client-world.js';
 import { importWorld } from './helpers/import-world.js';
 import { taskPageHref, sourceQuery } from '../../lib/task-page-href.js';
@@ -148,13 +149,25 @@ describe('Observation task-block task-page link (LIN-3331)', () => {
   });
 });
 
+// dispatch.js is a native module (LIN-4560): imported over the fake DOM, with the real common.js run first in the same
+// realm, as the page loads it, so the href is common.js's window.taskPageHref.
 describe('Dispatch history task-page link (LIN-3331)', () => {
-  const world = worldWithCommon();
-  world.run(read('public/dispatch.js'));
+  let world = null;
+  let page = null;
+  before(async () => {
+    world = importWorld({
+      window: { __HARNESS_MODELS__: harnessModelsBlock(), matchMedia: () => ({ matches: false }), addEventListener() {}, removeEventListener() {} },
+      globals: { localStorage: { getItem: () => null, setItem() {} }, setInterval: () => 0, clearInterval() {}, cancelAnimationFrame() {} },
+    });
+    world.runClassic('common.js');
+    page = await world.importPage('dispatch.js');
+  });
+  after(() => world.restore());
 
   function renderHistory(items) {
-    const container = world.makeContainer();
-    world.sandbox.renderDispatchHistoryList(container, items, items.length, 0, 'ws');
+    const container = world.document.createElement('div');
+    world.document.body.appendChild(container);
+    page.renderDispatchHistoryList(container, items, items.length, 0, 'ws');
     return container.innerHTML;
   }
 

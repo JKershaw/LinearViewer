@@ -11,10 +11,11 @@
  * this file now checks the stronger property: they spell no `'decision-...'` literal and
  * import the set from the table. `lib/run-view.js`'s waiting scan is held to the same.
  *
- * Two copies remain because a browser script cannot import `lib/`:
- *   - `public/dispatch.js` (`renderFeedbackEntries`);
- *   - `public/session.js` (`renderRunTranscripts`).
- * Each must carry exactly the table's 3 kinds; this file is that alarm.
+ * The two browser copies (`public/dispatch.js` `renderFeedbackEntries`, `public/session.js` `renderRunTranscripts`) are
+ * retired too (LIN-4560): both pages draw the server's transcript entries (lib/dispatch-transcript.js), which mark a stamp
+ * `quiet` through session-telemetry's `isNonStateEntry` (the table's set), through the one transcript look
+ * (lib/transcript.js), which skips a `quiet` entry. So for them, and the leaf, this file checks the stronger property: no
+ * `'decision-...'` literal, and the server's entry marks every one of the table's stamp kinds quiet (called live).
  *
  * Follows tests/unit/passage-runner-contract-drift.test.js's convention:
  * every source read into its own variable and asserted per-source (never
@@ -34,6 +35,7 @@ import { fileURLToPath } from 'node:url';
 import { dirname, join } from 'node:path';
 import { isDecisionLifecycleStampEntry } from '../../lib/digest-feedback.js';
 import { DECISION_LIFECYCLE_STAMP_KINDS } from '../../lib/dispatch-feedback-kinds.js';
+import { transcriptEntry } from '../../lib/dispatch-transcript.js';
 
 const __dirname = dirname(fileURLToPath(import.meta.url));
 const read = (relPath) => readFileSync(join(__dirname, '../..', relPath), 'utf8');
@@ -112,19 +114,27 @@ describe('the stamp kinds: one 3-kind declaration (LIN-3037, LIN-4455)', () => {
   });
 });
 
-describe('the browser copies stay in sync with the table (LIN-3037)', () => {
+describe('the browser copies are retired: the transcript draws the server\'s entries (LIN-3037, LIN-4560)', () => {
   const sites = [
-    { label: 'public/dispatch.js (renderFeedbackEntries)', source: dispatchJsSource },
-    { label: 'public/session.js (renderRunTranscripts)', source: sessionJsSource },
+    { label: 'public/dispatch.js', source: dispatchJsSource },
+    { label: 'public/session.js', source: sessionJsSource },
+    { label: 'lib/transcript.js (the one transcript look, a browser leaf)', source: read('lib/transcript.js') },
   ];
 
   for (const { label, source } of sites) {
-    test(`${label} carries exactly the table's 3 kinds, no more, no fewer`, () => {
-      const siteKinds = [...extractKindSet(source)].sort();
-      assert.deepStrictEqual(siteKinds, sortedHelperKinds,
-        `${label}'s inline 3-kind literal set has drifted from the table's stamp kinds`);
+    test(`${label} spells no decision-* kind of its own`, () => {
+      assert.deepStrictEqual(extractKindOccurrences(source), [], `${label} carries its own decision-* literal`);
     });
   }
+
+  test('the server\'s transcript entry marks every stamp kind of the table quiet, and a decoy not', () => {
+    for (const kind of sortedHelperKinds) {
+      assert.equal(transcriptEntry({ kind, message: '{"decision_id":"d-1"}', timestamp: '2026-08-01T00:00:00.000Z' }).quiet, true, kind);
+    }
+    for (const kind of ['decision', 'assistant-text', 'status']) {
+      assert.equal(transcriptEntry({ kind, message: 'a real line', timestamp: '2026-08-01T00:00:00.000Z' }).quiet, undefined, kind);
+    }
+  });
 });
 
 describe('the lib/ readers take the stamp kinds from the table (LIN-4455)', () => {

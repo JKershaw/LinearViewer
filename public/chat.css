@@ -316,3 +316,83 @@
 .chat-fold { padding-left: 0; font-family: inherit; font-size: inherit; color: inherit; }
 .chat-fold > summary { color: var(--muted); font-size: var(--font-size-sm); margin: var(--space-1) 0; }
 .chat-task-link { text-decoration: underline; }
+
+/* ── A run's transcript (LIN-1133, LIN-1309, LIN-4559; one look, LIN-4560) ──
+   The one transcript look (lib/transcript.js) draws a run's words on the run
+   page (public/session.js) and in Dispatch history (public/dispatch.js), and
+   both style it from here, moved out of session.css. The bubbles are the shared
+   ones above; this retunes the thread into a boxed, scrollable inset and adds
+   the transcript's own parts: the message body (`.chat-md`, so marked's output
+   wraps and a code block scrolls inside its own box), the evidence link, a
+   child agent's collapsible thread and the waiting note.
+
+   Phone first: the base rules are the 390px layout, and the desktop layer is
+   `min-width: 600px`. Every box may shrink and wraps a long unbroken token, so
+   nothing widens the page. Theme tokens only, so dark mode is the token
+   override it is everywhere else. */
+.sess-run-tx {
+  --chat-thread-max-height: 280px;
+  --chat-thread-gap: var(--space-2);
+  --chat-thread-margin: 0;
+  min-width: 0;
+  overflow-x: hidden;
+  scrollbar-gutter: stable;
+  margin-top: var(--space-2);
+  padding: var(--space-2);
+  border: 1px solid var(--line-soft);
+  border-radius: var(--radius-sm);
+  background: var(--inset);
+}
+.sess-run-tx-entry { min-width: 0; word-break: break-word; }
+.sess-run-tx .chat-msg__body.surface { min-width: 0; }
+.sess-tx-msg {
+  display: block;
+  font-family: var(--font-content);
+  font-size: var(--font-size-sm);
+  line-height: 1.5;
+  color: var(--text);
+}
+.sess-tx-link {
+  color: var(--brand);
+  font-size: var(--font-size-sm);
+  overflow-wrap: anywhere;
+}
+/* A child agent's thread (LIN-4559): a native <details>, collapsed by default,
+   placed where the child's first message falls. The summary names the child
+   and counts its messages. */
+.sess-agent-thread {
+  list-style: none;
+  min-width: 0;
+  overflow-wrap: anywhere;
+  border-left: 2px solid var(--line);
+  padding-left: var(--space-2);
+}
+.sess-agent-thread__summary {
+  min-width: 0;
+  overflow-wrap: anywhere;
+  cursor: pointer;
+  font-family: var(--font-content);
+  font-size: var(--font-size-sm);
+  color: var(--muted);
+}
+/* The child's name keeps the summary's face (LIN-4107: mono only on the allowlisted selectors); colour sets it apart. */
+.sess-agent-thread__name { color: var(--text); }
+/* Two classes: the shared `.chat-thread` would otherwise give the inner thread its own scroll box, clipping its last
+   line; the run's transcript scrolls, the child's thread does not. */
+.sess-agent-thread__tx.chat-thread {
+  --chat-thread-max-height: none;
+  --chat-thread-margin: 0;
+  min-width: 0;
+  overflow-y: visible;
+  margin-top: var(--space-2);
+}
+/* A wait line (LIN-4558) reads as waiting, not as a bubble: a quiet note with the running family's amber edge. */
+.sess-tx-waiting {
+  min-width: 0;
+  overflow-wrap: anywhere;
+  border-left: 2px solid var(--amber);
+  font-style: italic;
+}
+@media (min-width: 600px) {
+  .sess-run-tx { --chat-thread-max-height: 360px; }
+}

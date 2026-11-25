@@ -7,9 +7,22 @@
  * - Token management (create, list, revoke)
  * - Dispatch history (paginated resolved items)
  *
- * Loaded only on the /dispatch page. Requires common.js to be loaded first
- * (provides escapeHtml() and updateQueueBadge()).
+ * Loaded only on the /dispatch page, as a native ES module (LIN-4560). A module
+ * runs after every classic script on the page, wherever it is listed, once the
+ * document is parsed and before DOMContentLoaded, so common.js (escapeHtml(),
+ * api(), updateQueueBadge(), dispatchPrompt(), showModal(), toast()) and
+ * decision-panel.js have run. It now runs after app.js (the other module, listed
+ * before it), so app.js's DOMContentLoaded init registers first: app.js's
+ * inits read nothing this file sets up (no `.prompt-container` or disclosure
+ * placeholder on this page) and this file's inits read nothing app.js sets up.
+ * Its top-level names are module-scoped: nothing classic reads them (the queue
+ * badge's updater is common.js's). Exported names are its test seams. History
+ * rows draw and follow their transcripts through public/transcript-live.js (the
+ * one transcript look, lib/transcript.js, kept live; LIN-4560), as the run page
+ * does.
  */
+
+import { createTranscriptFollower, redrawTranscript, transcriptItemsHtml } from './transcript-live.js'
 
 const UUID_DISPATCH_REGEX = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i
 
@@ -1042,6 +1055,8 @@ async function loadDispatchHistory(urlKey, offset) {
     // state below rather than redirecting.
     const { items, total } = await api(`/workspace/${encodeURIComponent(urlKey)}/api/dispatch/history?offset=${offset}`, { on401: false })
     renderDispatchHistoryList(historyEl, items, total, offset, urlKey)
+    // LIN-4560: follow the rows still running (one shared follower; a later load only nudges it).
+    if (liveHistoryIds().length) followLiveHistory(urlKey)
   } catch (e) {
     console.error('Failed to load history:', e)
     historyEl.innerHTML = '<div class="history-list-empty">Failed to load history</div>'
@@ -1049,32 +1064,92 @@ async function loadDispatchHistory(urlKey, offset) {
 }
 
 /**
- * Render feedback entries for a history item
+ * A history row's transcript (LIN-4560): the row's feedback, which the history read sends as the server's transcript
+ * entries (lib/dispatch-transcript.js: masked, with blocked/waiting/quiet decided there), drawn by the one transcript
+ * look (lib/transcript.js), the same the run page draws. It retired `renderFeedbackEntries`, this page's own tree of
+ * escaped lines. Kept from it: the stored order, a decision-lifecycle stamp never drawn (the server marks it quiet,
+ * LIN-2205/LIN-3037), a link only for an http(s) URL with its label or "link", nothing drawn when nothing is said. A
+ * child agent's words are now its own thread, never the run's lines (finding-6ea68b77). `live` is the row still running
+ * (outcome `taken`), so only then does its newest own bubble carry the in-progress pill. '' when nothing is drawn.
  */
-function renderFeedbackEntries(feedback) {
-  // LIN-2205 (LIN-1728 F6 follow-up) / LIN-3037: a decision-lifecycle stamp
-  // (decision-answer, decision-withdrawn, decision-withdrawal-reversed) is
-  // answer/withdrawal metadata, not a feedback line — `_formatFeedbackEntries`
-  // (lib/dispatch-store.js) carries `kind` through, so filter here rather
-  // than render a bare `{"decision_id":...}` entry (or a withdrawal's raw
-  // `reason` text).
-  const visible = (feedback || []).filter(f =>
-    f.kind !== 'decision-answer' && f.kind !== 'decision-withdrawn' && f.kind !== 'decision-withdrawal-reversed')
-  if (visible.length === 0) return ''
+function historyTranscriptHtml(feedback, live) {
+  const items = transcriptItemsHtml(feedback, live)
+  return items ? `<ul class="sess-run-tx chat-thread" data-testid="history-transcript">${items}</ul>` : ''
+}
 
-  const entries = visible.map((f, i) => {
-    const isLast = i === visible.length - 1
-    const prefix = isLast ? '\u2514\u2500' : '\u251c\u2500'
-    const time = formatDispatchTime(f.timestamp)
-    const isSafeUrl = f.url && /^https?:\/\//i.test(f.url)
-    const urlHtml = isSafeUrl
-      ? ` <a class="feedback-link" href="${escapeHtml(f.url)}" target="_blank">${escapeHtml(f.urlLabel || 'link')}</a>`
-      : ''
+// Live history transcripts (LIN-4560): a row still running (outcome `taken`, `data-live`) is followed through the same
+// shared follower the run page uses (public/transcript-live.js), keyed on its dispatch row id (`data-row-id`), so its new
+// words appear without the refresh button and without losing the reader's scroll or opened threads. A row with no words
+// yet gets its list on its first entry. The follower reads the rows from the page each round, so a page loaded by "show
+// more" or the refresh button is followed too.
+let historyFollower = null
 
-    return `<div class="feedback-entry"><span class="feedback-prefix">${prefix}</span> ${escapeHtml(f.message)}${urlHtml} <span class="feedback-time">\u00b7 ${time}</span></div>`
-  }).join('')
+// The history rows are the list's own children, never a look-alike inside a transcript message (a message may carry
+// class and data attributes through the sanitizer; LIN-3385's rule).
+function historyRows() {
+  const list = document.querySelector('.history-list')
+  return list ? [...list.children].filter((el) => el.classList.contains('history-item') && el.hasAttribute('data-row-id')) : []
+}
 
-  return `<div class="feedback-list">${entries}</div>`
+function liveHistoryIds() {
+  return historyRows().filter((el) => el.getAttribute('data-live') === 'true').map((el) => el.getAttribute('data-row-id'))
+}
+
+/** The outcome pill's markup for `outcome` (the one place the history list draws it, LIN-2122). */
+function historyStatusPillHtml(outcome) {
+  const pill = historyOutcomePill(outcome)
+  const stateClass = pill.state ? ` status-pill--${pill.state}` : ''
+  const charHtml = pill.char ? `<span class="status-pill__char">${pill.char}</span>` : ''
+  return `<span class="history-status status-pill${stateClass} status-${escapeHtml(outcome)}">`
+    + `${charHtml}<span class="status-pill__label">${escapeHtml(outcome)}</span></span>`
+}
+
+// A row that finished while the page was open settles whole (LIN-2546): its outcome pill becomes the finished run's
+// word (`row.status`, the wire status) and it stops reading as live, so no in-progress marker is left on it.
+function settleHistoryRow(item, status) {
+  item.setAttribute('data-live', 'false')
+  item.setAttribute('data-status', status)
+  const pill = [...item.children].find((el) => el.classList.contains('history-status'))
+  if (!pill) return
+  const holder = document.createElement('span')
+  holder.innerHTML = historyStatusPillHtml(status)
+  if (holder.firstChild) item.replaceChild(holder.firstChild, pill)
+}
+
+function applyLiveHistoryRow(row) {
+  const item = historyRows().find((el) => el.getAttribute('data-row-id') === row.id)
+  if (!item) return
+  if (!row.live && row.status && item.getAttribute('data-live') === 'true') settleHistoryRow(item, row.status)
+  const info = [...item.children].find((el) => el.classList.contains('history-info')) || item
+  let list = [...info.children].find((el) => el.getAttribute('data-testid') === 'history-transcript')
+  // A row with no words yet gets no list: an empty transcript is not drawn.
+  if (!list && !(row.entries && row.entries.length)) return
+  if (!list) {
+    list = document.createElement('ul')
+    list.className = 'sess-run-tx chat-thread'
+    list.setAttribute('data-testid', 'history-transcript')
+    list.hidden = true
+    info.appendChild(list)
+  }
+  redrawTranscript(list, row.entries, row.live)
+}
+
+function followLiveHistory(urlKey) {
+  if (!historyFollower) {
+    historyFollower = createTranscriptFollower({
+      urlKey,
+      liveIds: liveHistoryIds,
+      drawnCount: (id) => {
+        const item = historyRows().find((el) => el.getAttribute('data-row-id') === id)
+        return item ? Number(item.getAttribute('data-drawn')) : -1
+      },
+      apply: applyLiveHistoryRow,
+      fetchJson: (url) => api(url, { on401: false })
+    })
+    historyFollower.start()
+  } else {
+    historyFollower.poke()
+  }
 }
 
 /**
@@ -1114,15 +1189,11 @@ function renderDispatchHistoryList(container, items, total, offset, urlKey) {
     // LIN-2122: the page shows the outcome word, not the stored `status` (always `taken`
     // for an archived row). A server that predates `outcome` answers only `status`.
     const outcome = item.outcome || item.status
-    const pill = historyOutcomePill(outcome)
-    const stateClass = pill.state ? ` status-pill--${pill.state}` : ''
-    const charHtml = pill.char ? `<span class="status-pill__char">${pill.char}</span>` : ''
     // Canonical `.status-pill` markup, hand-mirrored from the server helper
     // lib/components/status-pill.js \u2014 the shared contract is the global CSS
     // class API, which cards can't reach client-side. `history-status` and
     // `status-<outcome>` ride alongside as the existing E2E + semantic hooks.
-    const statusPillHtml = `<span class="history-status status-pill${stateClass} status-${escapeHtml(outcome)}">`
-      + `${charHtml}<span class="status-pill__label">${escapeHtml(outcome)}</span></span>`
+    const statusPillHtml = historyStatusPillHtml(outcome)
     const issueHtml = item.issueIdentifier
       ? (item.issueUrl
         ? ` <a class="history-issue" href="${escapeHtml(item.issueUrl)}" target="_blank">${escapeHtml(item.issueIdentifier)}</a>`
@@ -1152,10 +1223,10 @@ function renderDispatchHistoryList(container, items, total, offset, urlKey) {
     const promptHtml = hasPrompt
       ? `<div class="history-prompt">${formatPromptHtml(item.prompt)}</div>`
       : ''
-    const feedbackHtml = hasFeedback ? renderFeedbackEntries(item.feedback) : ''
+    const feedbackHtml = hasFeedback ? historyTranscriptHtml(item.feedback, outcome === 'taken') : ''
 
     return `
-      <div class="history-item${expandableClass}" data-status="${escapeHtml(outcome)}">
+      <div class="history-item${expandableClass}" data-status="${escapeHtml(outcome)}" data-row-id="${escapeHtml(item.id || '')}" data-live="${outcome === 'taken'}" data-drawn="${(item.feedback || []).length}">
         ${statusPillHtml}
         <div class="history-info">
           <span class="history-name">${escapeHtml(item.promptName || 'Prompt')}</span>${issueHtml}${taskPageHtml}
@@ -1209,8 +1280,8 @@ function initDispatchHistory() {
 
   // Delegated click handler for expanding history items
   historyEl.addEventListener('click', (e) => {
-    // Don't toggle when clicking links
-    if (e.target.closest('a')) return
+    // Don't toggle when clicking links, or a child agent's thread (its <summary> opens it; LIN-4560)
+    if (e.target.closest('a, .sess-agent-thread')) return
 
     const item = e.target.closest('.history-item.expandable')
     if (item) {
@@ -1246,3 +1317,9 @@ document.addEventListener('DOMContentLoaded', () => {
   initDispatchTokenManagement()
   initDispatchHistory()
 })
+
+// Test seams (LIN-4560): the functions the suites drive. Nothing in the page reads these.
+export {
+  HALT_MODE_LABELS, formatHaltStatusHtml, formatDispatchTokenExpiry, dispatchTokenModalBody,
+  historyTranscriptHtml, historyOutcomePill, renderDispatchHistoryList, applyLiveHistoryRow, liveHistoryIds
+}

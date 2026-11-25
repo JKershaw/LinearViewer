@@ -398,7 +398,7 @@ describe('render-session: reply surface (LIN-1004; LIN-1163 removed the page-lev
     // The per-run inline reply IS present (unaffected by the removal).
     assert.match(html, /data-testid="session-inline-reply"/);
     // Scripts always load (transcripts, widgets, expand/collapse, reply).
-    assert.match(html, /<script src="\/session\.js"><\/script>/);
+    assert.match(html, /<script type="module" src="\/session\.js"><\/script>/);
   });
 
   test('NO reply box of any kind when canReply is false (scripts still loaded for transcripts + widgets)', () => {
@@ -410,7 +410,7 @@ describe('render-session: reply surface (LIN-1004; LIN-1163 removed the page-lev
     assert.ok(!html.includes('data-testid="session-inline-reply"'), 'no inline reply boxes when canReply is false');
     // Scripts are always loaded — they handle transcripts, context widgets, and expand/collapse.
     assert.match(html, /script src="\/common\.js/);
-    assert.match(html, /script src="\/session\.js/);
+    assert.match(html, /script type="module" src="\/session\.js/);
   });
 
   test('chat.css is linked even on the not-found body (LIN-1298)', () => {
@@ -506,7 +506,7 @@ describe('render-session: per-run expand/collapse + inline reply (LIN-1133)', ()
     assert.match(html, /script src="\/common\.js"/);
     assert.match(html, /script src="\/purify\.min\.js"/);
     assert.match(html, /script src="\/marked\.min\.js"/);
-    assert.match(html, /script src="\/session\.js"/);
+    assert.match(html, /script type="module" src="\/session\.js"/);
   });
 
   test('LIN-1163: no global reply box is rendered even when canReply — the per-run inline reply is the only surface', () => {

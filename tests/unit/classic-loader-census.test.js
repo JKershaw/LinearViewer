@@ -34,7 +34,6 @@ export const CLASSIC_LOADER_SUITES = [
   'common-render-markdown.test.js',
   'common-team-filter-nav.test.js',
   'decision-panel-client-hints.test.js',
-  'dispatch-feedback-entries.test.js',
   'dispatch-prompt-stop-at.test.js',
   'dispatch-surface-forward.test.js',
   'fake-dom-census.test.js',
@@ -43,15 +42,12 @@ export const CLASSIC_LOADER_SUITES = [
   'flight-companion-client.test.js',
   'form-behaviours.test.js',
   'http-keepalive.test.js',
-  'lin-2122-history-outcome-pill.test.js',
   'lin-2370-browser-copy-prompt-provider-identity.test.js',
   'lin-2933-cross-seam-witness.test.js',
   'lin-2944-p3-proxy-toggle-post.test.js',
   'lin-3131-runner-bootstrap-client.test.js',
   'lin-3136-driver-copy-client.test.js',
   'lin-3136-settings-take-predicate.test.js',
-  'lin-3254-session-run-toggles.test.js',
-  'lin-3618-dispatch-token-expiry-display.test.js',
   'lin-3833-client-harness.test.js',
   'lin-3975-proposal-refresh.test.js',
   'lin-3975-summary-and-time.test.js',
@@ -68,7 +64,6 @@ export const CLASSIC_LOADER_SUITES = [
   'reply-delivery-contract.test.js',
   'rulings-badge-client.test.js',
   'segment-bar-pill-parity.test.js',
-  'session-pr-state-poll.test.js',
   'session-run-transcript-entries.test.js',
   'ship-biscuit-parity.test.js',
   'ship-journey-geometry.test.js',
@@ -123,8 +118,8 @@ test('the classic-loader census matches its baseline: no new classic suite, and 
   assert.deepEqual(gone, [], `listed suites no longer load browser scripts as classic: lower the baseline in this change: ${gone.join(', ')}`);
 });
 
-test('the baseline is recorded at 57 suites (the count that must not rise; LIN-4540 deleted the two scan suites, LIN-4537 the two brief/recap widget suites, LIN-4541 the six ruling-card and ruling-row suites, LIN-4463 piece 5 the two app.js suites and the eighteen prompt-section suites, LIN-4549 the waiting-merge suite, now a module import)', () => {
-  assert.equal(CLASSIC_LOADER_SUITES.length, 57);
+test('the baseline is recorded at 52 suites (the count that must not rise; LIN-4540 deleted the two scan suites, LIN-4537 the two brief/recap widget suites, LIN-4541 the six ruling-card and ruling-row suites, LIN-4463 piece 5 the two app.js suites and the eighteen prompt-section suites, LIN-4549 the waiting-merge suite, now a module import, LIN-4560 the three dispatch.js and two session.js suites, now module imports)', () => {
+  assert.equal(CLASSIC_LOADER_SUITES.length, 52);
 });
 
 test('runClassic is counted unless it runs a named sibling: observation.js counts, chart-helpers.js does not', () => {

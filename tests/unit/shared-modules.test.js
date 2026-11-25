@@ -94,7 +94,7 @@ export function purityProblems(src, name = 'module') {
 
 describe('the allow-lists', () => {
   test('SHARED_MODULES is separate from VENDOR_ASSETS, and VENDOR_ASSETS is unchanged', () => {
-    assert.deepEqual(Object.keys(SHARED_MODULES), ['/lib/cost-format.js', '/lib/time-words.js', '/lib/question-record-card.js', '/lib/task-page-href.js', '/lib/prompt-filename.js']);
+    assert.deepEqual(Object.keys(SHARED_MODULES), ['/lib/cost-format.js', '/lib/time-words.js', '/lib/question-record-card.js', '/lib/task-page-href.js', '/lib/prompt-filename.js', '/lib/transcript.js']);
     assert.deepEqual(Object.keys(VENDOR_ASSETS).sort(), ['/chart.umd.min.js', '/marked.min.js', '/purify.min.js']);
   });
 

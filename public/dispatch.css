@@ -367,38 +367,6 @@
   margin-top: 0.15rem;
 }
 
-/* Feedback entries within history items */
-.feedback-list {
-  margin-top: 0.35rem;
-  padding-left: var(--space-1);
-}
-
-.feedback-entry {
-  font-size: var(--font-size-sm);
-  color: var(--text);
-  padding: 0.1rem 0;
-  word-break: break-word;
-}
-
-.feedback-prefix {
-  font-family: var(--font-structural);
-  color: var(--muted);
-}
-
-.feedback-link {
-  color: var(--blue);
-  text-decoration: none;
-}
-
-.feedback-link:hover {
-  text-decoration: underline;
-}
-
-.feedback-time {
-  color: var(--muted);
-  font-size: 0.9em;
-}
-
 /* History refresh button */
 .history-refresh {
   color: var(--muted);
