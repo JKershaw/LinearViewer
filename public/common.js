@@ -2882,16 +2882,17 @@ function initRulingsBadge() {
 }
 
 // =============================================================================
-// Queue count (moved from app.js, LIN-4562)
+// The frame's queue count (LIN-4562)
 // =============================================================================
-// The count of queued dispatches: the old bar's badge, or the count on the frame's Dispatch item. It lived in app.js's
-// queue panel init, which the frame's pages do not all load (the search page loads none), so it moves here beside the
-// questions count, as updateQueueBadge did. Same 1s cadence, raw fetch, visible tab only.
+// The count of queued dispatches on the frame's Dispatch item. The frame's pages do not all load app.js (the search page
+// loads none), so the frame's count is polled here, beside the questions count. The old bar's badge (a button) keeps
+// app.js's poll, so a page runs one poll or the other, and a page on the old bar polls exactly as before. Same 1s cadence,
+// raw fetch, visible tab only.
 const QUEUE_POLL_INTERVAL_MS = 1000;
 let queuePollIntervalId = null;
 
 function initQueueBadge() {
-  const badge = document.querySelector('[data-queue-badge]');
+  const badge = document.querySelector('.frame-count[data-queue-badge]');
   if (!badge) return;
   const urlKey = badge.dataset.urlKey;
   window.updateQueueBadge(urlKey);

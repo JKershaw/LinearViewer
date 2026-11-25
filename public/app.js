@@ -22,6 +22,8 @@ const STORAGE_KEY = 'linear-projects-state'
 const UUID_REGEX = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i
 
 // Queue badge polling state
+let queuePollIntervalId = null
+const QUEUE_POLL_INTERVAL_MS = 1000
 
 // Rulings badge polling (LIN-1728 Phase 3) now lives in common.js — see
 // initRulingsBadge there for why (LIN-1728 review F7: it must be reachable
@@ -1695,11 +1697,47 @@ function initDispatchDisclosures(root) {
 // =============================================================================
 
 /**
+ * Start polling for queue badge updates
+ */
+function startQueuePolling(urlKey) {
+  if (queuePollIntervalId) return
+
+  queuePollIntervalId = setInterval(() => {
+    if (!document.hidden) {
+      updateQueueBadge(urlKey)
+    }
+  }, QUEUE_POLL_INTERVAL_MS)
+}
+
+/**
+ * Stop polling for queue badge updates
+ */
+function stopQueuePolling() {
+  if (queuePollIntervalId) {
+    clearInterval(queuePollIntervalId)
+    queuePollIntervalId = null
+  }
+}
+
+/**
  * Initialize queue panel functionality
  */
 function initQueuePanel() {
-  // LIN-4562: the count's seed and poll moved to common.js (initQueueBadge), which every page with the bar or the frame
-  // loads, so the frame's Dispatch count is live on pages that do not load this module.
+  // Initialize badge count on page load and start polling. LIN-4562: only the old bar's badge (a button); the frame's
+  // count on the Dispatch item is polled by common.js (initQueueBadge), so a page never runs both polls.
+  const badge = document.querySelector('button[data-queue-badge]')
+  if (badge) {
+    const urlKey = badge.dataset.urlKey
+    updateQueueBadge(urlKey)
+    startQueuePolling(urlKey)
+
+    // Fetch immediately when tab becomes visible (data may be stale)
+    document.addEventListener('visibilitychange', () => {
+      if (!document.hidden) {
+        updateQueueBadge(urlKey)
+      }
+    })
+  }
 
   // Handle badge click to show queue panel. Only the old bar's badge, a button, opens it: the frame's count sits inside
   // the Dispatch link, which goes to the queue's own page.
@@ -2205,7 +2243,9 @@ function initSearch() {
   })
 }
 
-// The queue and questions polls clean up after themselves in common.js, beside their inits (LIN-1728 review F7, LIN-4562).
+// Cleanup polling on page unload. Rulings-badge cleanup registers itself
+// from common.js now, alongside its own init (LIN-1728 review F7); so does the frame's queue count (LIN-4562).
+window.addEventListener('beforeunload', stopQueuePolling)
 
 /**
  * Get the workspace urlKey from the footer settings link.
