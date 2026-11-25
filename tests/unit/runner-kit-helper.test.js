@@ -1877,9 +1877,13 @@ describe('commands (against a fake Harbour)', () => {
     assert.equal(first.reason, 'stall');
     assert.equal(first.stalls.find((x) => x.itemId === row.itemId).finished, true);
     await run(['wait'], { waitPollMs: 10, waitHeartbeatMs: 10, waitCapMs: 300 });
-    const posts = harbour.state.feedback.slice(before).filter((f) => f.itemId === row.itemId);
+    // LIN-4561: `wait` now also sends the subagent's own words (its transcript's text, here `DONE: shipped`) as keyed
+    // assistant-text on the row, once. The watchdog's posts are every other post on the row, and there is still one.
+    const onRow = harbour.state.feedback.slice(before).filter((f) => f.itemId === row.itemId);
+    const posts = onRow.filter((f) => f.body.kind !== 'assistant-text');
     assert.equal(posts.length, 1);
     assert.equal(posts[0].body.message, `[blocked] stalled: subagent ${row.agentId} finished but its outcome was never posted`);
+    assert.deepEqual(onRow.filter((f) => f.body.kind === 'assistant-text').map((f) => f.body.message), ['DONE: shipped'], 'the run\'s words, sent once');
     assert.equal(ledgerNow().items[row.itemId].state, 'running');
   });
 

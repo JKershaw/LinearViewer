@@ -1,6 +1,6 @@
 {
   "version": 1,
-  "note": "LIN-3451: Simple Dispatcher is the reference; each row pins sd plus kit and/or harbour (LIN-4384), and a column that differs from sd carries a difference. Test fixture only: the kit never loads this file. Byte-copied to simple-dispatcher test/fixtures/runner-contract.json. LIN-4475: `session` is running | finished | stopped | none; the retired `live` is gone. `[done]` is the runner's own post, read by Harbour only, so it has no report row: SD's pinReport asserts both of its readings against one sd value, and they differ on a [done] line. Harbour's reading is pinned in tests/unit/lin-4375-session-pr-wins.test.js. The kit's ledger also has a `lost` state that no session value names: resolveFollowUp refuses it as it refuses none, so the vocabulary leaves it out. LIN-4475 `fold` (W8): per request, the kit transcript fold (runner.mjs transcriptRequestRecords) against Simple Dispatcher's walkRequestRecords. It compares requestId, model, at and the five token fields, in first-seen order, rendered as one JSON array per side: an absent value renders null, a \"\" stays \"\", an absent token field is 0. It excludes harness, agent, effort, the skipped counts, and SD's attribution of one request across several transcripts. Its corpus rows name the eight files in tests/fixtures/runner-kit/transcript-corpus by id and sha256; its inline rows carry their own lines. LIN-4557 `keyed-feedback`: one assistant-text post through each side's sender, Harbour answering from item.replies in order (the last repeats), then one later attempt. The clause is \"<outcome>; posts <n>; keys <distinct>\": acknowledged (nothing left queued), dropped (a 404 is final), rejected (any other 4xx: set aside loudly, not retried) or queued; a retry carries the same key, which Harbour stores once (LIN-4556). LIN-4559 `agent-text`: a child agent's words (a subagent of the run, simple-dispatcher's subagents/agent-<id>.jsonl) posted on the run's own row as kind agent-text with `agent` naming the child. Read by Harbour only (the kit posts none: its subagents are the runs). The clause is \"stored as agent-text from <agent>, tagged|untagged; ends, wakes and closes nothing\" or \"refused 400 (agent is required)\": the entry Harbour stores and whether any reader takes it as the run's terminal, wake or lineage close. Harbour drops a child entry's rootItemId, so it is always untagged.",
+  "note": "LIN-3451: Simple Dispatcher is the reference; each row pins sd plus kit and/or harbour (LIN-4384), and a column that differs from sd carries a difference. Test fixture only: the kit never loads this file. Byte-copied to simple-dispatcher test/fixtures/runner-contract.json. LIN-4475: `session` is running | finished | stopped | none; the retired `live` is gone. `[done]` is the runner's own post, read by Harbour only, so it has no report row: SD's pinReport asserts both of its readings against one sd value, and they differ on a [done] line. Harbour's reading is pinned in tests/unit/lin-4375-session-pr-wins.test.js. The kit's ledger also has a `lost` state that no session value names: resolveFollowUp refuses it as it refuses none, so the vocabulary leaves it out. LIN-4475 `fold` (W8): per request, the kit transcript fold (runner.mjs transcriptRequestRecords) against Simple Dispatcher's walkRequestRecords. It compares requestId, model, at and the five token fields, in first-seen order, rendered as one JSON array per side: an absent value renders null, a \"\" stays \"\", an absent token field is 0. It excludes harness, agent, effort, the skipped counts, and SD's attribution of one request across several transcripts. Its corpus rows name the eight files in tests/fixtures/runner-kit/transcript-corpus by id and sha256; its inline rows carry their own lines. LIN-4557 `keyed-feedback`: one assistant-text post through each side's sender, Harbour answering from item.replies in order (the last repeats), then one later attempt. The clause is \"<outcome>; posts <n>; keys <distinct>\": acknowledged (nothing left queued), dropped (a 404 is final), rejected (any other 4xx: set aside loudly, not retried) or queued; a retry carries the same key, which Harbour stores once (LIN-4556). LIN-4561: the kit's column is its own keyed sender (runner.mjs relayWords, a run's words from its subagent's transcript), driven the same way: one `wait` pass, then one later one. LIN-4559 `agent-text`: a child agent's words (a subagent of the run, simple-dispatcher's subagents/agent-<id>.jsonl) posted on the run's own row as kind agent-text with `agent` naming the child. Read by Harbour only (the kit posts none: its subagents are the runs). The clause is \"stored as agent-text from <agent>, tagged|untagged; ends, wakes and closes nothing\" or \"refused 400 (agent is required)\": the entry Harbour stores and whether any reader takes it as the run's terminal, wake or lineage close. Harbour drops a child entry's rootItemId, so it is always untagged.",
   "rows": [
     {
       "area": "halt",
@@ -1209,8 +1209,7 @@
         ]
       },
       "sd": "acknowledged; posts 2; keys 1",
-      "kit": "not sent (the kit posts assistant-text without a key; its keyed, in-order sending is LIN-4561)",
-      "difference": "LIN-4557: Simple Dispatcher queues each assistant-text post with a key (assistant-text-outbox.js) and resends it until Harbour acknowledges it; Harbour stores a key once (LIN-4556). The kit sends no key yet; its keyed sending is LIN-4561."
+      "kit": "acknowledged; posts 2; keys 1"
     },
     {
       "area": "keyed-feedback",
@@ -1226,8 +1225,7 @@
         ]
       },
       "sd": "acknowledged; posts 1; keys 1",
-      "kit": "not sent (the kit posts assistant-text without a key; its keyed, in-order sending is LIN-4561)",
-      "difference": "LIN-4557: Simple Dispatcher queues each assistant-text post with a key (assistant-text-outbox.js) and resends it until Harbour acknowledges it; Harbour stores a key once (LIN-4556). The kit sends no key yet; its keyed sending is LIN-4561."
+      "kit": "acknowledged; posts 1; keys 1"
     },
     {
       "area": "keyed-feedback",
@@ -1245,8 +1243,7 @@
         ]
       },
       "sd": "dropped; posts 1; keys 1",
-      "kit": "not sent (the kit posts assistant-text without a key; its keyed, in-order sending is LIN-4561)",
-      "difference": "LIN-4557: Simple Dispatcher queues each assistant-text post with a key (assistant-text-outbox.js) and resends it until Harbour acknowledges it; Harbour stores a key once (LIN-4556). The kit sends no key yet; its keyed sending is LIN-4561."
+      "kit": "dropped; posts 1; keys 1"
     },
     {
       "area": "keyed-feedback",
@@ -1264,8 +1261,7 @@
         ]
       },
       "sd": "rejected; posts 1; keys 1",
-      "kit": "not sent (the kit posts assistant-text without a key; its keyed, in-order sending is LIN-4561)",
-      "difference": "LIN-4557: Simple Dispatcher queues each assistant-text post with a key (assistant-text-outbox.js) and resends it until Harbour acknowledges it; Harbour stores a key once (LIN-4556). The kit sends no key yet; its keyed sending is LIN-4561."
+      "kit": "rejected; posts 1; keys 1"
     },
     {
       "area": "agent-text",
