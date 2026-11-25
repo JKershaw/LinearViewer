@@ -259,10 +259,31 @@ test('W13: an answer the server could not record leaves the card open and counte
   await page.unroute(/\/questions\/[^/]+\/answer$/);
 });
 
-// ---- witness 14 retired (LIN-4563) ------------------------------------------------------------------------------------
-// W14 answered a waiting task's card inside Home's in-page search and checked the Waiting copy settled with it. The search
-// is retired, and nothing else on Home draws a second copy of a waiting task's card (the named context row's opened task
-// draws none: W9b), so the case it guarded cannot arise on Home any more.
+// ---- witness 14 (LIN-4563): a second copy of a waiting task's card, in the opened task of its context row ---------------
+// Home's in-page search used to be where W14 opened a waiting task. The search is retired, but a started waiting task's row
+// (LOCAL-M, under the charter) still opens in place and its state poll draws the task's open question as a second card, so
+// two copies of one question can sit on Home. Answering the opened task's copy settles the Waiting copy and the count with it.
+test('W14: answering the opened context row\'s card settles the Waiting copy too, and the count line and badge drop', async ({ page }) => {
+  await seedTree(page, { runnerKey: true });
+  await seedWaiting(page, 'LOCAL-M', THREE_OPTIONS);
+  await page.goto(`/workspace/${URL_KEY}/`);
+  await expect(page.locator(CARD)).toHaveCount(1);
+
+  await page.locator(SELECTORS.openedTask.parentLine('LOCAL-0')).click();
+  await page.locator(SELECTORS.openedTask.parentLine('LOCAL-M')).click();
+  const opened = page.locator('[data-question-slot] [data-testid="question-record-card"]');
+  await expect(opened, 'the opened task draws the question as a second card').toHaveCount(1);
+  await answerWith(opened, 'Wait for review');
+  await expect(opened).toHaveAttribute('data-settled', 'true', { timeout: 15000 });
+
+  // The Waiting copy of the same question settled with it: nothing is left open or counted.
+  await expect(page.locator(CARD)).toHaveCount(1);
+  await expect(page.locator(OPEN_CARD)).toHaveCount(0);
+  await expect(page.locator(CARD).locator(FEEDBACK)).toHaveText('Answered. The run resumes with your answer.');
+  await expect(page.locator(`${COUNT} [data-tone="needs-you"]`)).toHaveCount(0);
+  await syncBadge(page);
+  await expect(page.locator(BADGE)).toHaveText('0 questions', { timeout: 15000 });
+});
 
 // ---- witnesses 9 (rendered Home: each task once), and the named context exception -----------------------------------
 

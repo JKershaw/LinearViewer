@@ -171,6 +171,19 @@ describe('renderTaskEditPage — the four v1 fields', () => {
     assert.ok(html.includes('<a class="frame-back" href="/workspace/acme/" data-testid="frame-back">← Home</a>'));
     assert.ok(html.includes('href="/workspace/acme/" data-testid="task-edit-cancel"'));
   });
+
+  // LIN-4563: the page's way back has one owner. Cancel takes the frame's parent href, so it follows where the person came from.
+  test('Cancel lands where the frame\'s way back does: Backlog from Backlog, Home from Home or from nowhere', () => {
+    for (const [from, href, back] of [
+      ['backlog', '/workspace/acme/backlog', '← Backlog'],
+      ['home', '/workspace/acme/', '← Home'],
+      [undefined, '/workspace/acme/', '← Home'],
+    ]) {
+      const html = render({}, { from });
+      assert.ok(html.includes(`<a class="frame-back" href="${href}" data-testid="frame-back">${back}</a>`), `way back from ${from}`);
+      assert.ok(html.includes(`href="${href}" data-testid="task-edit-cancel"`), `Cancel from ${from}`);
+    }
+  });
 });
 
 describe('renderTaskEditPage — the state control', () => {

@@ -197,22 +197,31 @@ for (const viewer of VIEWERS) {
       await expect(page.locator(SELECTORS.nav.rail)).toBeHidden();
     });
 
-    // LIN-4563: a task page lights the place the person came from, and its one way back goes there (default Home).
-    test('a task opened from Backlog lights Backlog and leads back there; opened from Home it lights Home', async ({ page }) => {
+    // LIN-4563: a task page lights the place the person came from, and its one way back goes there (default Home). From Backlog
+    // the test follows a link Backlog itself renders (a project's "+ Add task"); a task link has no home on Home's rows until a row
+    // opens, so Home's case follows the task page href.
+    test('a page opened from Backlog lights Backlog and leads back there; opened from Home it lights Home', async ({ page }) => {
       await page.setViewportSize({ width: 1280, height: 900 });
       for (const from of ['backlog', 'home']) {
         await page.goto(urlOf(urlKey, { key: from }));
-        // Any task link on the page (a Backlog row's task page link sits in its opened details, so follow the href).
-        await page.evaluate((href) => {
-          const a = document.createElement('a');
-          a.href = href;
-          a.dataset.testid = 'walk-task-link';
-          document.querySelector('#main').append(a);
-        }, `/workspace/${urlKey}/task/SHAPE-261`);
-        await page.locator('[data-testid="walk-task-link"]').evaluate(a => a.click());
-        await expect(page).toHaveURL(new RegExp(`/workspace/${urlKey}/task/SHAPE-261$`));
+        let landed;
+        if (from === 'backlog') {
+          // A real link the Backlog page draws: the first project's Add task link, to the new-task page.
+          await page.locator('a[href*="/task/new?projectId="]').first().click();
+          landed = new RegExp(`/workspace/${urlKey}/task/new\\?projectId=`);
+        } else {
+          await page.evaluate((href) => {
+            const a = document.createElement('a');
+            a.href = href;
+            a.dataset.testid = 'walk-task-link';
+            document.querySelector('#main').append(a);
+          }, `/workspace/${urlKey}/task/SHAPE-261`);
+          await page.locator('[data-testid="walk-task-link"]').evaluate(a => a.click());
+          landed = new RegExp(`/workspace/${urlKey}/task/SHAPE-261$`);
+        }
+        await expect(page).toHaveURL(landed);
         await expect(page.locator(SELECTORS.nav.railMarked)).toHaveAttribute('data-place', from);
-        await expect(page.locator(SELECTORS.nav.back)).toHaveText(from === 'backlog' ? '← Backlog' : '← Home');
+        await expect(page.locator(SELECTORS.nav.back)).toHaveText(from === 'backlog' ? '\u2190 Backlog' : '\u2190 Home');
         await page.locator(SELECTORS.nav.back).click();
         await expect(page).toHaveURL(new RegExp(`/workspace/${urlKey}${placeFor(from).path}$`));
       }
