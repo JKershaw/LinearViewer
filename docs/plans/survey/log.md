@@ -5358,3 +5358,5 @@ Since LIN-4548, a log comment I post on LIN-4008 becomes my open finding on its 
 - A session with an unanswered earlier re-fire goes to FAILED instead.
 
 The clock runs from the last transcript entry (before 12:48), so expect: LIN-4561's 2d38189e (RESUMING, last entry 12:20:53) from about 13:21; any EXECUTING session from about 13:13; the autopilots only after their children move. Docs: docs/linux-substrate-findings.md:94-109 ("A host reboot needs no new reaper"). If nothing re-fires well past 60 minutes, check `[stall-failsafe]` lines in the dispatcher log. A gap: a failed re-fire launch ends FAILED, not retried. Test dispatch at 12:55 opened fine (John saw the window).
+
+**25 Nov, 13:28Z: the failsafe brought things back on time.** LIN-4561's session (RESUMING, last entry 12:20) was re-fired at about 13:21 to 13:23, as predicted. It's on beat 4: branches pushed, watching CI on both PRs. The LIN-4508 autopilot is heartbeating again. The LIN-4342 autopilot was in a background wait (auditing PR #2536) at the crash, so it's on the 60-minute clock with a live async wait: due about 13:48. This confirms the restart-gap explanation.
