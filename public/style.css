@@ -3150,11 +3150,9 @@ body[data-proxy-active="true"] .prompt-proxy-toggle {
 
 /* LIN-3889: the breadcrumb back-link, one body for the three drill-down pages. Session's was
    promoted above the title (LIN-1225) so the page opens with an orientation cue; Task edit and
-   create match its rhythm so drill-down pages open the same way. Task page's back link reuses
-   `.sess-back`. `.settings-back` (settings.css) is a named variant of this decision. LIN-4562: the frame's
+   create match its rhythm so drill-down pages open the same way. `.settings-back` (settings.css) is a named variant of this decision. LIN-4562: the frame's
    "← <parent>" (`.frame-back`, lib/components/frame.js) is the same link, and replaces the others as pages move
    (LIN-4563: the task family's three went with it). */
-.sess-back,
 .frame-back {
   display: inline-block;
   margin: var(--space-1) 0 var(--space-2);
@@ -3163,7 +3161,6 @@ body[data-proxy-active="true"] .prompt-proxy-toggle {
   color: var(--muted);
   text-decoration: none;
 }
-.sess-back:hover,
 .frame-back:hover { color: var(--brand); }
 
 /* LIN-4562: the frame's search fields share the text control's body (public/frame.css only sets their width). Their
