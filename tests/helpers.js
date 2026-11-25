@@ -200,6 +200,8 @@ export const SELECTORS = {
     openLink: (key) => `[data-testid="settings-open-${key}"]`,
     /** The active source's marker on a binding row (LIN-3888). */
     providerActive: '[data-testid="settings-provider-active"]',
+    /** LIN-4566: the "Remove this workspace" ask on Settings › Sources (its Confirm `-confirm`, Cancel `-cancel`). */
+    removeWorkspace: '[data-testid="settings-workspace-remove"]',
     /** A key row in Settings › Agent access (LIN-3888): its test id is `settings-key-{source}`. Absent from the Proxy and Dispatch pages. */
     keyRows: '[data-testid^="settings-key-"]',
     /** The new Proxy key's name input (LIN-3888). */

@@ -173,7 +173,7 @@ describe('the route', () => {
     const a = express();
     a.use(createRunnerSetupRoutes({
       workspaceFromUrl: (req, res, next) => {
-        req.workspace = { id: 'ws-1', urlKey: req.params.urlKey };
+        req.workspace = { id: 'ws-1', urlKey: req.params.urlKey, name: 'Acme Works' };
         req.session = { features, accountId, workspaces: [] };
         next();
       },
@@ -213,6 +213,13 @@ describe('the route', () => {
       assert.match(r.body, new RegExp(`data-state="${want}"`));
     });
   }
+
+  // LIN-4566: the page sits in the frame, whose tab title names the workspace; the route hands it the workspace's name.
+  test('the tab names the page and the workspace (the frame\'s `<Page> · <Workspace>`)', async () => {
+    const { app: a } = app({ ownerCheck: () => ({ status: 'owner' }) });
+    const r = await get(a);
+    assert.match(r.body, /<title>Run on my machine · Acme Works<\/title>/);
+  });
 
   test('LIN-3648: an unrecognised answer is "unavailable", with one fixed-tail warn and no raw answer in it', async () => {
     const fn = Object.assign(() => {}, { status: 'owner' });

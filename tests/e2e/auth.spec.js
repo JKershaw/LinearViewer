@@ -82,8 +82,8 @@ test.describe('Logout Flow', () => {
   test('logout link destroys session and shows landing page', async ({ page, workerUrlKey }) => {
     await page.goto(`/workspace/${workerUrlKey}/settings/account`);
 
-    // Verify we're authenticated
-    await expect(page.locator('.nav-bar')).toBeVisible();
+    // Verify we're authenticated (LIN-4566: Settings sits in the frame, whose rail is drawn only for a signed-in person)
+    await expect(page.locator(SELECTORS.nav.rail)).toBeVisible();
 
     // Click logout on settings page and wait for navigation
     await Promise.all([

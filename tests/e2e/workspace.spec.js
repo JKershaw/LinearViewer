@@ -1,11 +1,13 @@
 import { test, expect } from '../fixtures/test-base.js';
 import { SELECTORS } from '../helpers.js';
 
-// LIN-4563 (LIN-4342 piece 2): Home moved onto the frame, whose rail carries the workspace menu (switch and add only;
-// removing a workspace moves to Settings in piece 5). The old bar's menu (switch, add, remove) still renders on pages not
-// yet moved, so its cases below run on a page still on the bar (OLD_BAR_PAGE). Switching from Home goes through the
-// rail's menu. LIN-4564 (piece 3) moved Swim onto the frame, so the bar's menu is read on Settings.
-const OLD_BAR_PAGE = 'settings';
+// LIN-4563 (LIN-4342 piece 2): Home moved onto the frame, whose rail carries the workspace menu (switch and add only).
+// LIN-4566 (piece 5) moved Settings, the last signed-in page whose old bar a person could open, onto the frame: the one
+// workspace page still drawing the old bar, the Project backlog (routes/project-page.js), loads no script, so its menu
+// cannot open. The selector cases read the rail's menu (on Settings, MENU_PAGE) instead, and the old bar's markup is
+// checked for what it must no longer offer. Removing a workspace lives in Settings › Sources: neither menu offers it.
+const MENU_PAGE = 'settings';
+const OLD_BAR_PAGE = 'project';
 
 // Mixed-harness boundary split (LIN-428, parent S3/LIN-389).
 //   - The two single-workspace selector cases ('single workspace shows in
@@ -23,76 +25,66 @@ const OLD_BAR_PAGE = 'settings';
 let WORKSPACE_URL;
 
 test.beforeEach(({ workerUrlKey }) => {
-  WORKSPACE_URL = `/workspace/${workerUrlKey}/${OLD_BAR_PAGE}`;
+  WORKSPACE_URL = `/workspace/${workerUrlKey}/${MENU_PAGE}`;
 });
+
+const railRows = (page) => page.locator(`${SELECTORS.nav.workspaceMenu} li`);
 
 test.describe('Workspace Selector', () => {
   test('single workspace shows in selector', async ({ page, seedLocal }) => {
     const { urlKey } = await seedLocal();
-    await page.goto(`/workspace/${urlKey}/${OLD_BAR_PAGE}`);
+    await page.goto(`/workspace/${urlKey}/${MENU_PAGE}`);
 
-    const workspaceToggle = page.locator('#workspace-toggle');
+    const workspaceToggle = page.locator(SELECTORS.nav.workspaceToggle);
     await expect(workspaceToggle).toBeVisible();
-    await expect(workspaceToggle).toHaveText('Local Workspace');
+    await expect(page.locator(SELECTORS.nav.workspaceName)).toHaveText('Local Workspace');
 
     // Click to open options
     await workspaceToggle.click();
-
-    const workspaceOptions = page.locator('#workspace-options');
-    await expect(workspaceOptions).toBeVisible();
+    await expect(page.locator(SELECTORS.nav.workspaceMenu)).toBeVisible();
 
     // Should show workspace rows (1 workspace + Linear +add + Jira +add + local
     // +add row). Jira renders here because the shared Playwright webServer sets
     // JIRA_CLIENT_ID/SECRET/REDIRECT_URI for the whole run (LIN-2802).
     // The local-create row is always present (LIN-377), independent of OAuth/PAT.
-    await expect(workspaceOptions.locator('.nav-options-row')).toHaveCount(4);
-    await expect(workspaceOptions.locator('[data-testid="nav-workspace-add-linear"]')).toContainText('+ Linear');
-    await expect(workspaceOptions.locator('[data-testid="nav-workspace-add-jira"]')).toContainText('+ Jira');
-    await expect(workspaceOptions.locator('.nav-option-add-local')).toContainText('+local workspace');
+    await expect(railRows(page)).toHaveCount(4);
 
     // Row order (LIN-2802 acceptance bullet 3): the workspace row, then the
     // registry-driven provider add rows in registry order (linear before
     // jira; github would sort between them if configured here), with Local
     // always the true last row.
-    const rows = workspaceOptions.locator('.nav-options-row');
+    const rows = railRows(page);
     await expect(rows.nth(0)).toContainText('Local Workspace');
-    await expect(rows.nth(1)).toContainText('+ Linear');
-    await expect(rows.nth(2)).toContainText('+ Jira');
-    await expect(rows.nth(3)).toContainText('+local workspace');
-    await expect(rows.last().locator('.option-prefix')).toHaveText('└─');
+    await expect(rows.nth(1).locator('[data-testid="rail-workspace-add-linear"]')).toContainText('+ Linear');
+    await expect(rows.nth(2).locator('[data-testid="rail-workspace-add-jira"]')).toContainText('+ Jira');
+    await expect(rows.nth(3).locator('[data-testid="rail-workspace-add-local"]')).toContainText('+ Local workspace');
   });
 
   test('multiple workspaces show in selector', async ({ page, workerUrlKey }) => {
     await page.goto(`/test/set-session?multiWorkspace=true&urlKey=${workerUrlKey}`);
     await page.goto(WORKSPACE_URL);
 
-    const workspaceToggle = page.locator('#workspace-toggle');
-    await workspaceToggle.click();
-
-    const workspaceOptions = page.locator('#workspace-options');
-    await expect(workspaceOptions).toBeVisible();
+    await page.locator(SELECTORS.nav.workspaceToggle).click();
+    await expect(page.locator(SELECTORS.nav.workspaceMenu)).toBeVisible();
 
     // Should show 2 workspaces + Linear +add + Jira +add + local +add option
-    const options = workspaceOptions.locator('.nav-options-row');
-    await expect(options).toHaveCount(5); // 2 workspaces + Linear +add + Jira +add + local +add
+    await expect(railRows(page)).toHaveCount(5);
 
-    // First workspace should be selected (has ● marker)
-    await expect(workspaceOptions.locator('.nav-option.selected')).toContainText('Test Workspace');
+    // First workspace should be the current one (has ● marker)
+    await expect(page.locator(`${SELECTORS.nav.workspaceMenu} [aria-current="true"]`)).toContainText('Test Workspace');
   });
 
   test('clicking outside closes workspace selector', async ({ page, seedLocal }) => {
     const { urlKey } = await seedLocal();
-    await page.goto(`/workspace/${urlKey}/${OLD_BAR_PAGE}`);
+    await page.goto(`/workspace/${urlKey}/${MENU_PAGE}`);
 
-    const workspaceToggle = page.locator('#workspace-toggle');
-    await workspaceToggle.click();
+    await page.locator(SELECTORS.nav.workspaceToggle).click();
+    await expect(page.locator(SELECTORS.nav.workspaceMenu)).toBeVisible();
 
-    await expect(page.locator('#workspace-options')).toBeVisible();
+    // Click outside (a bare corner of the page's <main>)
+    await page.locator(SELECTORS.nav.main).click({ position: { x: 2, y: 2 } });
 
-    // Click outside (a bare corner of the page's <main>; Settings, the old-bar page since LIN-4564, draws no heading yet)
-    await page.locator('main').first().click({ position: { x: 2, y: 2 } });
-
-    await expect(page.locator('#workspace-options')).toHaveClass(/hidden/);
+    await expect(page.locator(SELECTORS.nav.workspaceMenu)).toBeHidden();
   });
 });
 
@@ -123,77 +115,84 @@ test.describe('Workspace Switching', () => {
     await expect(page.locator(SELECTORS.nav.workspaceName)).toHaveText('Second Workspace');
   });
 
-  test('switching workspace from settings stays on settings', async ({ page, workerUrlKey, secondWorkerUrlKey }) => {
+  test('switching workspace from settings stays on settings, through the rail\'s menu', async ({ page, workerUrlKey, secondWorkerUrlKey }) => {
     // Set up multiWorkspace session
     await page.goto(`/test/set-session?multiWorkspace=true&urlKey=${workerUrlKey}`);
     await page.goto(`/workspace/${workerUrlKey}/settings`);
 
-    // Verify we're on settings page
+    // Verify we're on settings page (LIN-4566: in the frame)
     await expect(page.getByTestId('settings-nav')).toBeVisible();
 
-    // Open workspace selector
-    await page.locator('#workspace-toggle').click();
-    await expect(page.locator('#workspace-options')).toBeVisible();
+    // Open the rail's workspace menu
+    await page.locator(SELECTORS.nav.workspaceToggle).click();
+    await expect(page.locator(SELECTORS.nav.workspaceMenu)).toBeVisible();
 
     // Click the second workspace and wait for navigation to settings in new workspace
     await Promise.all([
       page.waitForURL(`/workspace/${secondWorkerUrlKey}/settings`),
-      page.getByRole('option', { name: /Second Workspace/ }).click()
+      page.locator(`[data-testid="rail-workspace-${secondWorkerUrlKey}"]`).click()
     ]);
 
     // Should still be on settings page
     await expect(page.getByTestId('settings-nav')).toBeVisible();
-    await expect(page.locator('#workspace-toggle')).toHaveText('Second Workspace');
+    await expect(page.locator(SELECTORS.nav.workspaceName)).toHaveText('Second Workspace');
   });
 });
 
+// LIN-4566 (LIN-4342 piece 5): removing a workspace lives in Settings › Sources, as an ask in place that posts to the
+// existing POST /workspace/:urlKey/remove (routes/workspace.js). The old bar's red "remove" is gone with it.
 test.describe('Workspace Removal', () => {
-  test('remove button appears on active workspace', async ({ page, workerUrlKey }) => {
+  test('the old bar\'s workspace menu offers no remove', async ({ page, workerUrlKey }) => {
     await page.goto(`/test/set-session?multiWorkspace=true&urlKey=${workerUrlKey}`);
-    await page.goto(WORKSPACE_URL);
+    await page.goto(`/workspace/${workerUrlKey}/${OLD_BAR_PAGE}`);
 
-    await page.locator('#workspace-toggle').click();
-
-    // Remove button should be visible next to active workspace
-    const removeButton = page.locator('#workspace-options .nav-option-danger');
-    await expect(removeButton).toBeVisible();
-    await expect(removeButton).toHaveText('remove');
+    // The bar's menu is drawn (closed: the page loads no script to open it); it switches and adds, never removes.
+    await expect(page.locator('#workspace-options')).toHaveCount(1);
+    await expect(page.locator('#workspace-options [role="option"]')).toHaveCount(2);
+    await expect(page.locator('#workspace-options [action$="/remove"]')).toHaveCount(0);
+    await expect(page.locator('#workspace-options .nav-option-danger')).toHaveCount(0);
   });
 
-  test('removing last workspace logs out', async ({ page, workerUrlKey }) => {
-    // Single workspace
+  test('Settings › Sources removes this workspace through its confirm, and lands on the one left', async ({ page, workerUrlKey, secondWorkerUrlKey }) => {
+    await page.goto(`/test/set-session?multiWorkspace=true&urlKey=${workerUrlKey}`);
+    await page.goto(`/workspace/${workerUrlKey}/settings/sources`);
+
+    const ask = page.locator(SELECTORS.settings.removeWorkspace);
+    await expect(ask).toBeVisible();
+    // Closed, nothing is sent: the confirm is in place, and Cancel leaves the workspace where it was.
+    await ask.locator('summary').click();
+    await expect(ask).toContainText('your other workspaces are not affected');
+    await ask.getByTestId('settings-workspace-remove-cancel').click();
+    await expect(page).toHaveURL(new RegExp(`/workspace/${workerUrlKey}/settings/sources$`));
+    await page.locator(SELECTORS.nav.workspaceToggle).click();
+    await expect(page.locator(`[data-testid="rail-workspace-${workerUrlKey}"]`)).toBeVisible();
+
+    // Confirmed, the workspace goes and the person lands on the other one's Home.
+    await page.goto(`/workspace/${workerUrlKey}/settings/sources`);
+    await ask.locator('summary').click();
+    await Promise.all([
+      page.waitForURL(`/workspace/${secondWorkerUrlKey}/`),
+      ask.getByTestId('settings-workspace-remove-confirm').click()
+    ]);
+    await page.locator(SELECTORS.nav.workspaceToggle).click();
+    await expect(page.locator(`[data-testid="rail-workspace-${secondWorkerUrlKey}"]`)).toBeVisible();
+    await expect(page.locator(`[data-testid="rail-workspace-${workerUrlKey}"]`)).toHaveCount(0);
+  });
+
+  test('removing the last workspace from Settings signs out', async ({ page, workerUrlKey }) => {
     await page.goto(`/test/set-session?urlKey=${workerUrlKey}`);
-    await page.goto(WORKSPACE_URL);
+    await page.goto(`/workspace/${workerUrlKey}/settings/sources`);
 
-    await page.locator('#workspace-toggle').click();
-
-    // Set up dialog handler for confirmation
-    page.on('dialog', dialog => dialog.accept());
-
-    // Click remove and wait for redirect to landing page
+    const ask = page.locator(SELECTORS.settings.removeWorkspace);
+    await ask.locator('summary').click();
+    await expect(ask).toContainText('you are signed out too');
     await Promise.all([
       page.waitForURL('/'),
-      page.locator('#workspace-options .nav-option-danger').click()
+      ask.getByTestId('settings-workspace-remove-confirm').click()
     ]);
 
     // Should redirect to landing page (logged out)
     await expect(page.locator('body')).toHaveClass(/is-landing/);
-  });
-
-  // Note: Testing the full removal flow with multiple workspaces is flaky due to
-  // form submission timing. We test single workspace removal (logs out) and
-  // verify remove button exists for multi-workspace setups.
-  test('remove button exists for multi-workspace setup', async ({ page, workerUrlKey }) => {
-    await page.goto(`/test/set-session?multiWorkspace=true&urlKey=${workerUrlKey}`);
-    await page.goto(WORKSPACE_URL);
-
-    await page.locator('#workspace-toggle').click();
-    await expect(page.locator('#workspace-options')).toBeVisible();
-
-    // Remove button should be present
-    const removeButton = page.locator('#workspace-options .nav-option-danger');
-    await expect(removeButton).toBeVisible();
-    await expect(removeButton).toHaveText('remove');
   });
 });
 
@@ -201,15 +200,12 @@ test.describe('Workspace Limit', () => {
   test('at max workspaces, all are displayed', async ({ page, workerUrlKey, workerSuffix }) => {
     await page.goto(`/test/set-session?maxWorkspaces=true&urlKey=${workerUrlKey}`);
     // Use workspace-0's URL key for max workspaces test (per-worker suffixed)
-    await page.goto(`/workspace/workspace-0${workerSuffix}/${OLD_BAR_PAGE}`);
+    await page.goto(`/workspace/workspace-0${workerSuffix}/${MENU_PAGE}`);
 
-    await page.locator('#workspace-toggle').click();
-
-    const workspaceOptions = page.locator('#workspace-options');
-    await expect(workspaceOptions).toBeVisible();
+    await page.locator(SELECTORS.nav.workspaceToggle).click();
+    await expect(page.locator(SELECTORS.nav.workspaceMenu)).toBeVisible();
 
     // Should show 10 workspaces + Linear +add + Jira +add + local +add = 13 rows
-    const options = workspaceOptions.locator('.nav-options-row');
-    await expect(options).toHaveCount(13);
+    await expect(railRows(page)).toHaveCount(13);
   });
 });

@@ -1,6 +1,6 @@
 import { test, expect } from '../fixtures/test-base.js'
 import { seedWorkspaceOwnership } from '../fixtures/workspace-ownership.js'
-import { SELECTORS, nav, settings, revokeKeyInPlace } from '../helpers.js'
+import { SELECTORS, settings, revokeKeyInPlace } from '../helpers.js'
 
 // Proof-of-pattern spec for LIN-215: brittle `:has-text()` / class / href
 // selectors here are migrated to the stable `data-testid` selectors and page
@@ -21,9 +21,11 @@ test.describe('Settings Page', () => {
 
   test('renders the list of areas with a state for each, in two groups (LIN-3846)', async ({ page }) => {
     await page.goto(`/workspace/${urlKey}/settings`)
-    // The centred Settings heading is gone (LIN-3952): the nav is how the page starts.
+    // LIN-4566: Settings sits in the frame. Its one h1 is "Settings", and its list of areas sits beside the area in <main>.
+    await expect(page.locator(SELECTORS.nav.heading)).toHaveText('Settings')
     const nav = page.getByTestId('settings-nav')
     await expect(nav).toBeVisible()
+    await expect(page.locator(SELECTORS.nav.main).getByTestId('settings-nav')).toBeVisible()
     await expect(nav).toContainText('Workspace')
     await expect(nav).toContainText('You')
     for (const area of ['sources', 'models', 'running', 'agent-access', 'health', 'change-log', 'features', 'account']) {
@@ -32,13 +34,13 @@ test.describe('Settings Page', () => {
     }
   })
 
-  test('has header view-switcher links', async ({ page }) => {
+  test('the rail reaches the other places, and marks Settings as where you are (LIN-4566)', async ({ page }) => {
     await openArea(page, 'account')
-    // Cross-view links moved from the footer into the shared header switcher
-    // (LIN-978); settings is the current page so it renders as the bold current.
-    await expect(nav(page).getView('swipe')).toBeVisible()
-    await expect(nav(page).getView('swim')).toBeVisible()
-    await expect(nav(page).getView('settings')).toBeVisible()
+    // The cross-view links are the rail's places (LIN-4562; the old bar's switcher went with Settings' move onto the frame).
+    await expect(page.locator(SELECTORS.nav.place('swipe'))).toBeVisible()
+    await expect(page.locator(SELECTORS.nav.place('swim'))).toBeVisible()
+    await expect(page.locator(SELECTORS.nav.railMarked)).toHaveCount(1)
+    await expect(page.locator(SELECTORS.nav.railMarked)).toHaveAttribute('data-place', 'settings')
   })
 
   test('has Account section with logout', async ({ page }) => {
@@ -59,11 +61,10 @@ test.describe('Settings Page', () => {
     await expect(add).toHaveAttribute('href', /\/auth\/email\/register\?next=/)
   })
 
-  test('shows workspace dropdown in nav', async ({ page }) => {
+  test('shows the workspace button in the rail', async ({ page }) => {
     await openArea(page, 'account')
-    const workspaceToggle = page.locator('#workspace-toggle')
-    await expect(workspaceToggle).toBeVisible()
-    await expect(workspaceToggle).toContainText('Local Workspace')
+    await expect(page.locator(SELECTORS.nav.workspaceToggle)).toBeVisible()
+    await expect(page.locator(SELECTORS.nav.workspaceName)).toHaveText('Local Workspace')
   })
 
   test('shows the AI usage KPI section (LIN-418)', async ({ page }) => {

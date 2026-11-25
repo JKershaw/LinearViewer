@@ -89,12 +89,16 @@ test.describe('Settings geometry (LIN-3890)', () => {
     expect(selectedBg).toMatch(/rgba\(0, 0, 0, 0\)|transparent/);
 
     await settings(page).gotoArea(urlKey, 'sources');
-    // The centred Settings heading is gone (LIN-3952), so "‹ Settings" is the first thing on the page.
-    await expect(page.locator('[data-testid="settings-page-head"]')).toHaveCount(0);
+    // LIN-4566: Settings sits in the frame, so the band names it and the page's one h1 ("Settings") leads <main>; under
+    // it, the area opens with "‹ Settings" (back to the list), then its title. The list itself is not shown.
+    await expect(page.locator(SELECTORS.nav.bandName)).toHaveText('Settings');
     const top = async (selector) => (await page.locator(selector).first().boundingBox()).y;
+    const heading = await top(SELECTORS.nav.heading);
     const back = await top('[data-testid="settings-back"]');
     const title = await top('.settings-area-title');
+    expect(heading).toBeLessThan(back);
     expect(back).toBeLessThan(title);
+    await expect(page.getByTestId('settings-nav')).toBeHidden();
     await expect(page.locator('[data-testid="settings-nav-sources"]')).toHaveAttribute('aria-current', 'page');
   });
 

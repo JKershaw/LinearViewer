@@ -13,7 +13,13 @@ import { nav, featuresParam, SELECTORS } from '../helpers.js';
 // bar is read on Settings (always reachable, still on the bar until piece 5), and the team sweeps read the filter line.
 // LIN-4565 (piece 4): Dispatch, KPIs and Prompts moved onto the frame; the two tests that read the bar on Dispatch read it
 // on BAR_PAGE, or are retired where only Dispatch could show the case (the active-hoist invariant, below).
-const BAR_PAGE = 'settings';
+// LIN-4566 (piece 5): Settings moved onto the frame, so the bar is read on the Project backlog (routes/project-page.js),
+// the one workspace page still drawing it until piece 7 (LIN-4568). That page loads no script, so the bar's markup, CSS
+// and pin are read there, and the five tests of what public/common.js does to the bar (the ⋯ more collapse at 390px and
+// at a narrow desktop, the strip scrolling its active tab into reach, and the clearance a scrolled-to control settles
+// under, at each width and on resize) are retired: no page that draws the bar runs that code any more, and it goes with
+// the bar in piece 7.
+const BAR_PAGE = 'project';
 
 // LIN-978 (UI audit D, keystone): the shared header-level view switcher. The
 // cross-view links were hoisted from the footer into `renderNavBar`, so
@@ -118,37 +124,6 @@ test.describe('Header view switcher (LIN-978)', () => {
     expect(suggest404.status()).toBe(404);
   });
 
-  test('collapses flag-gated views behind ⋯ more at 390px, first-class six stay inline (LIN-1058, LIN-3689)', async ({ page, localWorkerUrlKey }) => {
-    await page.setViewportSize({ width: 390, height: 800 });
-    await page.goto(`/workspace/${localWorkerUrlKey}/${BAR_PAGE}`);
-    await page.waitForLoadState('networkidle');
-
-    // The first-class six (LIN-1088 added projects, LIN-3689 kpis) stay inline on the strip
-    // and share one vertical band.
-    for (const view of ['observation', 'swipe', 'swim', 'projects', 'settings', 'kpis']) {
-      await expect(nav(page).getView(view)).toBeVisible();
-    }
-    const primaryTops = await page.locator('.nav-views > [data-testid^="nav-view-"]').evaluateAll(els =>
-      els.map(el => el.getBoundingClientRect().top)
-    );
-    expect(primaryTops.length).toBe(6); // exactly the first-class six inline (Swim hoists no extra tab; swim IS its current tab)
-    expect(Math.max(...primaryTops) - Math.min(...primaryTops)).toBeLessThan(4);
-
-    // The flag-gated views are collapsed (not visible) until `⋯ more` opens them.
-    for (const view of ['roadmap', 'dispatch', 'proxy']) {
-      await expect(nav(page).getView(view)).not.toBeVisible();
-    }
-    const more = page.locator('[data-testid="nav-more-toggle"]');
-    await expect(more).toBeVisible();
-    await expect(more).toHaveAttribute('aria-expanded', 'false');
-
-    // Opening `⋯ more` reveals the flag-gated views in the in-flow expander.
-    await more.click();
-    await expect(more).toHaveAttribute('aria-expanded', 'true');
-    for (const view of ['roadmap', 'dispatch', 'proxy']) {
-      await expect(nav(page).getView(view)).toBeVisible();
-    }
-  });
 
   test('every nav view target is a comfortable 44px tap target at 390px', async ({ page, localWorkerUrlKey }) => {
     await page.setViewportSize({ width: 390, height: 800 });
@@ -183,53 +158,11 @@ test.describe('Header view switcher (LIN-978)', () => {
 // something is hidden), so desktop no longer horizontal-scrolls yet a strip that fits
 // never over-collapses — and the active-hoist invariant still holds.
 test.describe('Desktop nav overflow (LIN-1286)', () => {
-  // The widest possible switcher: 5 first-class + 3 power-user + 6 experimental.
-  const WIDE_FLAGS = {
-    roadmap: true,
-    collective: true, taskChat: true, ship: true,
-    flightCompanion: true, shipBiscuit: true
-  };
-  const FLAG_GATED = ['roadmap', 'dispatch', 'proxy', 'collective', 'task-chat', 'ship', 'flight-companion', 'ship-biscuit'];
-
+  // LIN-4566 (piece 5): the collapse itself (the width-measuring routine in public/common.js) is no longer read: Settings,
+  // the last page on the bar that loads common.js, moved onto the frame, and the Project backlog, where the bar is now
+  // read, loads no script. What stays is the markup's resting state: nothing collapsed, the toggle hidden.
   const stripScrolls = (page) =>
     page.locator('.nav-views').evaluate(el => el.scrollWidth > el.clientWidth + 1);
-
-  const countVisible = async (page, views) => {
-    let n = 0;
-    for (const v of views) if (await nav(page).getView(v).isVisible()) n++;
-    return n;
-  };
-
-  test('collapses the excess behind ⋯ more at a narrow desktop width, no horizontal scroll', async ({ page, seedLocal, localWorkerUrlKey }) => {
-    await seedLocal(swimLocalSeed, { features: WIDE_FLAGS, runnerKey: true });
-    // A narrow DESKTOP width (above the 640px mobile breakpoint) that cannot fit all
-    // 14 tabs — so the measuring routine must collapse the excess.
-    await page.setViewportSize({ width: 800, height: 800 });
-    await page.goto(`/workspace/${localWorkerUrlKey}/${BAR_PAGE}`);
-    await page.waitForLoadState('networkidle');
-
-    // The first-class six stay inline.
-    for (const view of ['observation', 'swipe', 'swim', 'projects', 'settings', 'kpis']) {
-      await expect(nav(page).getView(view)).toBeVisible();
-    }
-
-    // The toggle is revealed because something is genuinely hidden…
-    const more = page.locator('[data-testid="nav-more-toggle"]');
-    await expect(more).toBeVisible();
-    await expect(more).toHaveAttribute('aria-expanded', 'false');
-    // …and at least one flag-gated view is collapsed out of the inline strip.
-    expect(await countVisible(page, FLAG_GATED)).toBeLessThan(FLAG_GATED.length);
-
-    // The core defect is gone: the strip does not horizontally scroll.
-    expect(await stripScrolls(page)).toBe(false);
-
-    // Opening `⋯ more` reveals every collapsed view in the in-flow card.
-    await more.click();
-    await expect(more).toHaveAttribute('aria-expanded', 'true');
-    for (const view of FLAG_GATED) {
-      await expect(nav(page).getView(view)).toBeVisible();
-    }
-  });
 
   test('does NOT collapse when the row already fits at a wide desktop width', async ({ page, seedLocal, localWorkerUrlKey }) => {
     // Only the 3 power-user flags on → 8 tabs, comfortably fitting a wide desktop.
@@ -303,11 +236,11 @@ test.describe('nav-actions placement (LIN-1149)', () => {
 // point: no prior test locked "the header pins", which is how the regression
 // shipped. Height measured at runtime; no pixel value is hardcoded.
 test.describe('Sticky header pin + clearance (LIN-1068)', () => {
-  // LIN-4563: Home has no sticky header now (it sits in the frame), so the pin is read on an old-bar page (Settings, whose
-  // page lets the document scroll; Swim's board does not pin the bar), made tall enough to scroll by a spacer appended to
+  // LIN-4563: Home has no sticky header now (it sits in the frame), so the pin is read on an old-bar page (LIN-4566: the
+  // Project backlog, now Settings is on the frame; Swim's board does not pin the bar), made tall enough to scroll by a spacer appended to
   // its <main> after load (a control, then the spacer, so the control is not clamped at the page end). The pins read only
   // the header, so the spacer changes nothing they measure.
-  const PIN_PAGE = 'settings';
+  const PIN_PAGE = 'project';
   test.beforeEach(async ({ seedLocal }) => {
     await seedLocal(swimLocalSeed, { features: FLAGS, runnerKey: true });
   });
@@ -410,8 +343,9 @@ test.describe('Mobile nav-strip density sweep (LIN-2179)', () => {
   // LIN-4564: Swim and the flagged views left the old bar for the frame, so the strip is swept on the pages still on it: a
   // first-class view (Settings), and the power-user views KPIs and Dispatch (the owner's), each active in turn.
   // LIN-4565: KPIs and Dispatch moved onto the frame too, so Settings is the one page left with an active view on the bar.
+  // LIN-4566: Settings moved too; the strip is swept on the Project backlog, whose bar marks Tasks (`projects`) active.
   const MOBILE_SWEEP_VIEWS = [
-    { pagePath: 'settings', activeKey: 'settings' }
+    { pagePath: 'project', activeKey: 'projects' }
   ];
 
   test.beforeEach(async ({ seedLocal }) => {
@@ -444,44 +378,6 @@ test.describe('Mobile nav-strip density sweep (LIN-2179)', () => {
     });
 
     for (const { pagePath, activeKey } of MOBILE_SWEEP_VIEWS) {
-      test(`view strip is a single non-wrapping row with the active tab reachable at ${width}px (${activeKey})`, async ({ page, localWorkerUrlKey }) => {
-        await page.setViewportSize({ width, height: 800 });
-        await page.goto(`/workspace/${localWorkerUrlKey}/${pagePath}`);
-        await page.waitForLoadState('networkidle');
-
-        // One row: every primary child of `.nav-views` shares a single top offset —
-        // INCLUDING the `⋯ more` toggle itself (LIN-2189 F3): the toggle's own wrap
-        // was the reported defect, and a guard that only checks the links passes
-        // vacuously on the exact two-row layout the user reported (the links alone
-        // always shared row 1; only the toggle dropped to row 2). The closed strip
-        // inherits the base non-wrapping row (LIN-2179) so it can no longer wrap
-        // onto a second row at any width, for any hoisted label.
-        const primaryTops = await page.locator('.nav-views > [data-testid^="nav-view-"], .nav-views > [data-testid="nav-more-toggle"]').evaluateAll(els =>
-          els.map(el => el.getBoundingClientRect().top)
-        );
-        expect(primaryTops.length).toBeGreaterThan(0);
-        expect(Math.max(...primaryTops) - Math.min(...primaryTops)).toBeLessThan(4);
-
-        // Active tab reachable: fully inside the strip's visible box and clear of
-        // the pinned toggle's own footprint (the scroll-into-view guard, LIN-2179
-        // delta 4 — the scrolling row must never hide the active tab).
-        const result = await page.evaluate(() => {
-          const strip = document.querySelector('.nav-views');
-          const active = document.querySelector('.nav-view-current');
-          const toggle = document.querySelector('.nav-more-toggle');
-          if (!strip || !active) return null;
-          const stripRect = strip.getBoundingClientRect();
-          const activeRect = active.getBoundingClientRect();
-          const toggleVisible = toggle && getComputedStyle(toggle).display !== 'none';
-          const toggleRect = toggleVisible ? toggle.getBoundingClientRect() : null;
-          const insideStrip = activeRect.left >= stripRect.left - 1 && activeRect.right <= stripRect.right + 1;
-          const clearOfToggle = !toggleRect || activeRect.right <= toggleRect.left + 1 || activeRect.left >= toggleRect.right - 1;
-          return { insideStrip, clearOfToggle };
-        });
-        expect(result, 'expected an active tab to be present').not.toBeNull();
-        expect(result.insideStrip, 'active tab must be fully inside the visible strip').toBe(true);
-        expect(result.clearOfToggle, 'active tab must not sit under the pinned toggle').toBe(true);
-      });
 
       test(`keyboard focus traversal keeps every focused mobile nav tab visible within the strip at ${width}px (${activeKey}) (LIN-2189 F2)`, async ({ page, localWorkerUrlKey }) => {
         await page.setViewportSize({ width, height: 800 });
@@ -900,76 +796,8 @@ test.describe('Pinned header clearance at the measured breach (LIN-4037)', () =>
       expect(clearance, `the sticky clearance (${clearance}px) must cover the ${headerPx}px header at ${width}px`).toBeGreaterThanOrEqual(headerPx);
     });
 
-    test(`a control scrolled into view at ${width}px settles below the header, not under it`, async ({ page, workerUrlKey }) => {
-      // A short viewport, so the page is taller than the screen and has room to scroll.
-      await openDashboard(page, workerUrlKey, { width, height: 400, features: FEEDBACK_ON, tall: true });
-
-      // A control whose scroll is clamped neither at the page top (it sits more than 200px down the page) nor at the
-      // page end (it sits above the last scroll position), so the header clearance alone decides where it lands. The header is read
-      // after the scroll, once it is pinned: before that it sits in flow, a few px lower.
-      const settle = await page.evaluate(() => {
-        const nav = document.querySelector('.nav-bar');
-        const maxScroll = document.documentElement.scrollHeight - window.innerHeight;
-        const docTop = (el) => el.getBoundingClientRect().top + window.scrollY;
-        // The scroll needed is docTop - token, and the token is at least the header's offsetHeight, so a control with
-        // docTop - offsetHeight <= maxScroll never needs more scroll than the page has.
-        // Only the window may scroll for the target: a clipping ancestor (overflow other than visible) would take the
-        // scroll itself, and the control would settle where that container puts it, not where the header clearance does.
-        const windowOnly = (el) => {
-          for (let a = el.parentElement; a && a !== document.body; a = a.parentElement) {
-            if (getComputedStyle(a).overflowY !== 'visible') return false;
-          }
-          return true;
-        };
-        const target = [...document.querySelectorAll('a[href], button, summary, [tabindex]')]
-          .filter(e => !nav.contains(e) && e.offsetParent !== null && windowOnly(e))
-          .filter(e => docTop(e) > 200 && docTop(e) - nav.offsetHeight <= maxScroll)
-          .sort((a, b) => docTop(b) - docTop(a))[0];
-        if (!target) return null;
-        target.scrollIntoView({ block: 'start' });
-        const rect = target.getBoundingClientRect();
-        const hit = document.elementFromPoint(
-          Math.round(rect.left + rect.width / 2),
-          Math.round(rect.top + rect.height / 2)
-        );
-        return {
-          top: rect.top,
-          navBottom: nav.getBoundingClientRect().bottom,
-          scrolled: window.scrollY,
-          maxScroll,
-          clickable: target === hit || target.contains(hit),
-        };
-      });
-      expect(settle, 'expected a focusable control with room to scroll').not.toBeNull();
-      expect(settle.scrolled, 'the page must have scrolled for the assertion to mean anything').toBeGreaterThan(0);
-      expect(settle.scrolled, 'the scroll must not be clamped at the page end').toBeLessThan(settle.maxScroll);
-      expect(settle.top, `control top (${settle.top}px) must not sit under the header bottom (${settle.navBottom}px) at ${width}px`).toBeGreaterThanOrEqual(settle.navBottom - 1);
-      expect(settle.clickable, 'the header must not click-intercept the control').toBe(true);
-    });
   }
 
-  test('the clearance follows the header on resize, with no reload', async ({ page, workerUrlKey }) => {
-    await openDashboard(page, workerUrlKey, { width: 1024, features: FEEDBACK_ON });
-    expect(await readClearancePx(page)).toBe(96); // desktop: the floor clears the ~93px header
-
-    await page.setViewportSize({ width: 560, height: 800 });
-    // LIN-4563: no old-bar page's own content wraps its header past the 124px floor any more (that took Home's assignee
-    // item), so the header is grown in place, as a wrapped row would grow it, to put it in the breach band.
-    await page.evaluate(() => {
-      const grow = document.createElement('div');
-      grow.setAttribute('data-test-header-grow', '');
-      grow.style.height = '60px';
-      document.querySelector('.nav-bar').append(grow);
-    });
-    const headerPx = await page.evaluate(() => document.querySelector('.nav-bar').offsetHeight);
-    expect(headerPx, 'the header must be in the breach band for this to mean anything').toBeGreaterThan(124);
-    // Poll until the observer catches up: the floor (124px) is already below the header, so a plain "> 96" would pass early.
-    await expect.poll(() => readClearancePx(page)).toBeGreaterThanOrEqual(headerPx);
-
-    await page.evaluate(() => document.querySelector('[data-test-header-grow]').remove());
-    await page.setViewportSize({ width: 1024, height: 800 });
-    await expect.poll(() => readClearancePx(page)).toBe(96);
-  });
 
   for (const { width, expected } of [{ width: 400, expected: 208 }, { width: 480, expected: 208 }, { width: 1024, expected: 96 }]) {
     test(`the clearance stays at the static floor at ${width}px where the header already clears it`, async ({ page, workerUrlKey }) => {

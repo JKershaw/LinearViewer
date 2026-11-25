@@ -80,6 +80,7 @@ export function createRunnerSetupRoutes({
           deployInfo: getDeployInfo(),
           openRouterSource: getOpenRouterSource(req),
           workspaces: req.session.workspaces,
+          workspaceName: workspace.name,
           featureFlags
         }
       );

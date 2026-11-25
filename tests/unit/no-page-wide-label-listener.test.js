@@ -50,7 +50,6 @@ const DELEGATED_ALLOW = {
   'app.js:.queue-panel-close': 'UI-only: closes the queue panel (dashboard)',
   'common.js:.dispatch-exec-harness-select, .harness-select': 'UI-only: syncs a model list on change',
   'common.js:.disclosure-toggle': 'UI-only: opens a disclosure',
-  'common.js:form[data-confirm]': 'asks confirm() before a native submit; can only cancel one',
   'observation.js:.obs-run-gen': 'UI-only: expands rows (observation page)',
   'ship.js:.swim-box': 'UI-only: opens a popover (ship page)',
   'swim.js:.swim-box': 'UI-only: closes a popover (swim page)',

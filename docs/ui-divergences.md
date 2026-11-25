@@ -27,12 +27,13 @@ is changed for another reason.
 
 **Still native (follow-up, not migrated by LIN-3889):**
 
-- `public/common.js` (`form[data-confirm]` submit guard, comment at 2734), used by `lib/components/navbar.js` to remove a workspace;
 - `public/custom-prompts.js` (delete a custom prompt);
 - `public/observation.js` (bulk agree);
 - `public/session.js` (`window.confirm`);
 
-An entry here is removed when its site moves in place. The four sites the LIN-511 rule named
+An entry here is removed when its site moves in place. Removing a workspace moved in place with LIN-4566: it is
+Settings › Sources' "Remove this workspace" ask, and the `form[data-confirm]` guard in `public/common.js` went with
+the old bar's "remove", its only user. The four sites the LIN-511 rule named
 (`public/proxy.js` and `public/dispatch.js` token revokes) no longer exist: token revoke is on
 Settings › Agent access, in place.
 

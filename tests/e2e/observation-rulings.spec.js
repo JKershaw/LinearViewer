@@ -116,8 +116,10 @@ test.describe('Ambient rulings nav badge (LIN-1728 Phase 3)', () => {
   });
 
   // LIN-4563: on the bar (a page not yet moved; Home's rail count leads to Home's questions instead, frame-rules.spec.js).
-  // LIN-4564: Swim moved onto the frame, so the old bar is read on Settings.
-  test('LIN-1728 review F6: the badge is a real link into the Questions tab, not a button that does nothing', async ({ page }) => {
+  // LIN-4564: Swim moved onto the frame, so the old bar was read on Settings. LIN-4566: Settings moved onto the frame
+  // too, the last page whose bar ran a script, so F6 is read on the rail's count: still a real link, now to the questions
+  // on Home (the plan's "waiting" rule), not the Runs page's Questions tab.
+  test('LIN-1728 review F6: the badge is a real link to the questions, not a button that does nothing', async ({ page }) => {
     await page.goto(`/test/set-session?urlKey=${URL_KEY}&runnerKey=1`);
     await clearRuns(page);
     await seedRulingQuestion(page, 'LIN-1728-B6');
@@ -125,16 +127,15 @@ test.describe('Ambient rulings nav badge (LIN-1728 Phase 3)', () => {
     await page.goto(`/workspace/${URL_KEY}/settings`);
     await page.waitForLoadState('networkidle');
 
-    const badge = page.locator('[data-rulings-badge]');
+    const badge = page.locator(SELECTORS.nav.railQuestions);
     await expect(badge).toHaveJSProperty('tagName', 'A');
-    await expect(badge).toHaveAttribute('href', `/workspace/${URL_KEY}/observation?view=questions`);
+    await expect(badge).toHaveAttribute('href', `/workspace/${URL_KEY}/#waiting-on-you`);
+    await expect(badge).not.toHaveClass(/hidden/);
 
     await badge.click();
-    await page.waitForURL(`**/workspace/${URL_KEY}/observation?view=questions`);
+    await page.waitForURL(`**/workspace/${URL_KEY}/#waiting-on-you`);
     await page.waitForLoadState('networkidle');
-    await expect(page.locator(SELECTORS.observation.tab('questions'))).toHaveClass(/is-active/);
-    await expect(page.locator(SELECTORS.observation.rulingsSection)).toBeVisible();
-    await expect(page.locator('[data-testid="ruling-question-row"]').filter({ hasText: 'LIN-1728-B6' })).toBeVisible();
+    await expect(page.locator('#waiting-on-you')).toBeVisible();
   });
 });
 
@@ -242,8 +243,9 @@ test.describe('Phone header: the wordmark shares the first line with the actions
     await clearRuns(page);
     for (const width of [320, 360, 390, 412, 430, 480]) {
       await page.setViewportSize({ width, height: 800 });
-      // LIN-4563: the bar's phone header, on a page still on the bar (Home sits in the frame; LIN-4564: Swim too, so Settings).
-      await page.goto(`/workspace/${URL_KEY}/settings`);
+      // LIN-4563: the bar's phone header, on a page still on the bar (Home sits in the frame; LIN-4564: Swim too; LIN-4566:
+      // Settings too, so the Project backlog, whose bar is drawn by the server and laid out by CSS alone).
+      await page.goto(`/workspace/${URL_KEY}/project`);
       await page.waitForLoadState('networkidle');
       await page.evaluate(() => {
         document.querySelectorAll('[data-queue-badge], [data-rulings-badge]').forEach(b => b.classList.remove('hidden'));

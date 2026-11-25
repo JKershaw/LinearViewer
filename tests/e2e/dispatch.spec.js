@@ -1,5 +1,6 @@
 import { test, expect } from '../fixtures/test-base.js';
 import { seedWorkspaceOwnership } from '../fixtures/workspace-ownership.js';
+import { SELECTORS } from '../helpers.js';
 
 // Per-worker workspace URL key (LIN-628): bound from the worker-scoped fixture
 // so session, nav, the dispatch token, and the teardown query params all address
@@ -7,17 +8,18 @@ import { seedWorkspaceOwnership } from '../fixtures/workspace-ownership.js';
 // module-scoped lets are per-worker state.
 let URL_KEY;
 let WORKSPACE_URL;
-// LIN-4563: the queue popover opens from the old bar's "N queued" button (public/app.js initQueuePanel). Home moved onto the
-// frame, whose count is on the Dispatch item and links to the queue's own page, so the popover is read on a page still on
-// the bar that loads app.js (Settings, until piece 5 moves it).
-let QUEUE_PANEL_URL;
-const QUEUE_PANEL_BADGE = 'button[data-queue-badge]';
+// LIN-4563: the queue popover opened from the old bar's "N queued" button (public/app.js initQueuePanel). Home moved onto
+// the frame, whose count is on the Dispatch item and links to the queue's own page. LIN-4566 (piece 5) moved Settings, the
+// last page on the bar that loaded app.js, onto the frame, so no page opens the popover any more: the queue is read where
+// the rail's count leads, the Dispatch page's own list (the same `.queue-item` rows, window.renderQueueRow). The popover's
+// own close button is not read; its code goes with the bar in piece 7 (LIN-4568).
+let QUEUE_URL;
 let API_PREFIX;
 
 test.beforeEach(({ workerUrlKey }) => {
   URL_KEY = workerUrlKey;
   WORKSPACE_URL = `/workspace/${URL_KEY}/`;
-  QUEUE_PANEL_URL = `/workspace/${URL_KEY}/settings`;
+  QUEUE_URL = `/workspace/${URL_KEY}/dispatch`;
   API_PREFIX = `/workspace/${URL_KEY}`;
 });
 
@@ -236,7 +238,7 @@ test.describe('Dispatch Queue', () => {
     await expect(badge.locator('.queue-count')).toHaveText('1');
   });
 
-  test('clicking queue badge shows queue panel', async ({ page }) => {
+  test('the rail\'s queued count leads to the queue, which lists the dispatched item', async ({ page }) => {
     // First dispatch something to have items in queue
 
     // Expand Prompts section to reveal prompt buttons
@@ -258,27 +260,22 @@ test.describe('Dispatch Queue', () => {
     await dispatchBtn.click();
     await expect(dispatchBtn).toHaveText('✓');
 
-    // LIN-3833: the badge is on the bar; the Swipe dispatch above is read back there (LIN-4563: on a page still on the bar).
-    await page.goto(QUEUE_PANEL_URL);
+    // The rail's count shows on any framed page (here Settings), on the Dispatch item, and leads to the queue's page.
+    await page.goto(`${API_PREFIX}/settings`);
     await page.waitForLoadState('networkidle');
-    // Click the queue badge (wait for async badge update)
-    const badge = page.locator(QUEUE_PANEL_BADGE);
-    await expect(badge).not.toHaveClass(/hidden/, { timeout: 10000 });
-    await badge.click();
-
-    // Queue panel should appear
-    const panel = page.locator('.queue-panel');
-    await expect(panel).toBeVisible();
+    const count = page.locator(SELECTORS.nav.railQueued);
+    await expect(count).not.toHaveClass(/hidden/, { timeout: 10000 });
+    await expect(count.locator('.queue-count')).toHaveText('1');
+    await page.locator(SELECTORS.nav.place('dispatch')).click();
+    await expect(page).toHaveURL(new RegExp(`${QUEUE_URL}$`));
 
     // Should show the dispatched item
-    const queueItem = panel.locator('.queue-item');
-    await expect(queueItem).toBeVisible();
+    await expect(page.locator('.queue-list .queue-item')).toBeVisible();
   });
 
-  // LIN-1244: the nav-badge popover rows (the screenshot surface) show richer
-  // default content via the shared window.renderQueueRow helper — the same
-  // contract as the /dispatch Queue list.
-  test('queue panel rows show enriched default fields (issue link, snippet, model)', async ({ page }) => {
+  // LIN-1244: the queue rows show richer default content via the shared window.renderQueueRow helper (the popover's twin
+  // until LIN-4566; the Dispatch page's list now).
+  test('queue rows show enriched default fields (issue link, snippet, model)', async ({ page }) => {
     // Seed a queue item carrying the fields the enriched row surfaces. The
     // session (with dispatch enabled) is already established in beforeEach.
     await page.request.post(`${API_PREFIX}/api/dispatch`, {
@@ -294,14 +291,10 @@ test.describe('Dispatch Queue', () => {
       },
     });
 
-    await page.goto(QUEUE_PANEL_URL);
+    await page.goto(QUEUE_URL);
     await page.waitForLoadState('networkidle');
 
-    const badge = page.locator(QUEUE_PANEL_BADGE);
-    await expect(badge).not.toHaveClass(/hidden/, { timeout: 10000 });
-    await badge.click();
-
-    const item = page.locator('.queue-panel .queue-item');
+    const item = page.locator('.queue-list .queue-item');
     await expect(item).toBeVisible();
 
     // Issue rendered as a link.
@@ -320,7 +313,7 @@ test.describe('Dispatch Queue', () => {
     await expect(chips).toContainText('investigate');
   });
 
-  test('can remove item from queue panel', async ({ page }) => {
+  test('can remove an item from the queue', async ({ page }) => {
     // First dispatch something
 
     // Expand Prompts section to reveal prompt buttons
@@ -342,70 +335,26 @@ test.describe('Dispatch Queue', () => {
     await dispatchBtn.click();
     await expect(dispatchBtn).toHaveText('✓');
 
-    // LIN-3833: the badge is on the bar; the Swipe dispatch above is read back there (LIN-4563: on a page still on the bar).
-    await page.goto(QUEUE_PANEL_URL);
+    // Read back on the queue's page, where the rail's count leads.
+    await page.goto(QUEUE_URL);
     await page.waitForLoadState('networkidle');
-    // LIN-3833: the badge is on the bar; the Swipe dispatch above is read back there (LIN-4563: on a page still on the bar).
-    await page.goto(QUEUE_PANEL_URL);
-    await page.waitForLoadState('networkidle');
-    // Open queue panel (wait for async badge update)
-    const badge = page.locator(QUEUE_PANEL_BADGE);
-    await expect(badge).not.toHaveClass(/hidden/, { timeout: 10000 });
-    await badge.click();
+    const count = page.locator(SELECTORS.nav.railQueued);
+    await expect(count).not.toHaveClass(/hidden/, { timeout: 10000 });
 
-    const panel = page.locator('.queue-panel');
-    await expect(panel).toBeVisible();
+    const list = page.locator('.queue-list');
+    await expect(list.locator('.queue-item')).toBeVisible();
 
     // Click remove button
-    const removeBtn = panel.locator('.queue-item-remove');
-    await removeBtn.click();
+    await list.locator('.queue-item-remove').click();
 
     // Item should be removed
-    await expect(panel.locator('.queue-item')).toHaveCount(0);
+    await expect(list.locator('.queue-item')).toHaveCount(0);
 
-    // Panel should show empty message
-    await expect(panel.locator('.queue-panel-empty')).toContainText('Queue is empty');
+    // The list shows its empty message
+    await expect(list.locator('.queue-list-empty')).toContainText('Queue is empty');
 
-    // Badge should be hidden (queue is empty)
-    await expect(badge).toHaveClass(/hidden/);
-  });
-
-  test('can close queue panel with close button', async ({ page }) => {
-    // Dispatch something first
-
-    // Expand Prompts section to reveal prompt buttons
-    await expandPromptsSection(page);
-
-    // Reveal hidden prompts (blocked is behind "more")
-    await clickMoreToggle(page, '#swipe-card', BLOCKED_ISSUE_ID);
-
-    const labelLink = page.locator(`#swipe-card .prompt-section [data-testid="other-prompts"] .swipe-prompt-btn[data-prompt="blocked"]`);
-    await labelLink.click();
-
-    const promptContainer = page.locator(`#swipe-card .prompt-section`);
-    await expect(promptContainer.locator('[data-prompt-body]')).not.toContainText('Loading', { timeout: 10000 });
-
-    // Dispatch targets are now collapsed behind a "Dispatch ▾" disclosure.
-    await openDispatchOptions(promptContainer);
-
-    await promptContainer.locator('.swipe-prompt-dispatch[data-target="cli"]').click();
-
-    // LIN-3833: the badge is on the bar; the Swipe dispatch above is read back there (LIN-4563: on a page still on the bar).
-    await page.goto(QUEUE_PANEL_URL);
-    await page.waitForLoadState('networkidle');
-    // Open panel (wait for async badge update)
-    const badge = page.locator(QUEUE_PANEL_BADGE);
-    await expect(badge).not.toHaveClass(/hidden/, { timeout: 10000 });
-    await badge.click();
-
-    const panel = page.locator('.queue-panel');
-    await expect(panel).toBeVisible();
-
-    // Click close button
-    await panel.locator('.queue-panel-close').click();
-
-    // Panel should be hidden
-    await expect(panel).not.toBeVisible();
+    // The rail's count goes (queue is empty)
+    await expect(count).toHaveClass(/hidden/);
   });
 
   test('badge updates via polling when consumer claims item', async ({ page, request }) => {

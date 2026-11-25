@@ -33,8 +33,6 @@ export const OLD_CHROME_ALLOWANCE = [
   'lib/render-library.js',
   'lib/render-pages.js',
   'lib/render-project-page.js',
-  'lib/render-runner-setup.js',
-  'lib/render-settings.js',
   'lib/render-styleguide.js',
   'lib/render-templates.js',
   'routes/getting-started.js',
@@ -80,6 +78,17 @@ test('the list only falls: a listed file that moved onto the frame comes off it 
   const found = new Set(oldChromeFiles());
   const stale = OLD_CHROME_ALLOWANCE.filter(rel => !found.has(rel));
   assert.deepEqual(stale, [], `no longer imports the shell's renderPage; delete from OLD_CHROME_ALLOWANCE: ${stale.join(', ')}`);
+});
+
+// LIN-4566 (piece 5): Settings and the rest of Set up. Settings is one place (every area renders through the one
+// renderer, the areas list beside the area in <main>); Run on my machine is drilled in under Settings.
+test('the pages piece 5 moved are on the frame (LIN-4566: Settings and Run on my machine)', () => {
+  for (const [rel, place] of [['lib/render-settings.js', 'settings'], ['lib/render-runner-setup.js', 'runner']]) {
+    assert.ok(!OLD_CHROME_ALLOWANCE.includes(rel), `${rel} is listed as old chrome`);
+    const source = readFileSync(join(ROOT, rel), 'utf8');
+    assert.match(source, new RegExp(`renderFrame\\(\\{\\s*place: '${place}'`), `${rel} renders through the frame at ${place}`);
+    assert.doesNotMatch(source, /renderNavBar\(|renderPageFooter\(|renderPageHeader\(/, `${rel} draws no old bar, old footer or second header`);
+  }
 });
 
 // LIN-4565 (piece 4): Tools. Dispatch, KPIs and Prompts at their places; Escalation and Effort drilled in under KPIs
