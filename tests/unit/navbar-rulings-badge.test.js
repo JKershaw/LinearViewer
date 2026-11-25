@@ -39,9 +39,4 @@ describe('renderNavBar — rulings badge (LIN-1728 Phase 3)', () => {
     assert.ok(queueIdx !== -1 && rulingsIdx !== -1, 'both badges present');
     assert.ok(queueIdx < rulingsIdx, 'queue badge must render before the rulings badge');
   });
-
-  test('is absent entirely on the unauthenticated landing nav', () => {
-    const html = renderNavBar({ isLanding: true, featureFlags: { runControls: true } });
-    assert.doesNotMatch(html, /data-rulings-badge/);
-  });
 });

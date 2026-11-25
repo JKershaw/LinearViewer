@@ -93,11 +93,6 @@ describe('the preview sign-in path (calls isEmailSignInAvailable)', () => {
     assert.ok(html.indexOf('nav-login-linear') < html.indexOf('nav-login-email'));
   });
 
-  test('the landing bar (the homepage) still renders nothing', () => {
-    Object.assign(process.env, { NODE_ENV: 'development', EMAIL_TRANSPORT: 'console' });
-    assert.equal(renderNavBar({ isLanding: true }), '');
-  });
-
   test('the authenticated (non-landing) bar never carries the email CTA', () => {
     Object.assign(process.env, { NODE_ENV: 'development', EMAIL_TRANSPORT: 'console' });
     const html = renderNavBar({ workspaces: [{ id: 'w', name: 'Acme', urlKey: 'acme' }], urlKey: 'acme' });

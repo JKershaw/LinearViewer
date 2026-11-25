@@ -54,12 +54,6 @@ test('authenticated nav bar carries the wordmark linking to the workspace home',
   assert.match(html, /class="wordmark wordmark-nav"/);
 });
 
-test('landing nav bar does NOT carry the wordmark (landing visuals untouched)', () => {
-  const html = renderNavBar({ isLanding: true });
-  assert.doesNotMatch(html, /data-testid="nav-brand"/);
-  assert.doesNotMatch(html, /wordmark/);
-});
-
 // --- footer wiring ----------------------------------------------------------
 
 test('authenticated footer carries the wordmark as a plain brand label', () => {

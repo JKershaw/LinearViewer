@@ -148,26 +148,18 @@ describe('LIN-1890 E4 — the preview sign-in path', () => {
     assert.ok(loginCtas.length >= 2, 'more than one CTA carries the shared class, which is why it cannot be a selector');
   });
 
-  test('CHARACTERIZATION: the homepage still suppresses the whole bar', () => {
-    // LIN-1508: the landing bar renders nothing because the hero carries the
-    // CTAs there (LIN-4564: the homepage is its only caller left). A new CTA
-    // must not resurrect it.
-    configureJira();
-    assert.equal(renderNavBar({ isLanding: true }), '');
-  });
-
-  test('CHARACTERIZATION: the isLanding-only login CTAs never leak onto authenticated pages', () => {
-    // The `nav-login-*` CTAs are specific to the unauthenticated `isLanding`
-    // bar. LIN-2802 deliberately adds a SEPARATE, authenticated surface (the
+  test('CHARACTERIZATION: the signed-out login CTAs never leak onto authenticated pages', () => {
+    // The `nav-login-*` CTAs are specific to the unauthenticated previews' band
+    // (renderPreviewSignIn, LIN-4564). LIN-2802 deliberately adds a SEPARATE, authenticated surface (the
     // workspace switcher's registry-driven add rows, `nav-workspace-add-*`)
     // that DOES render an `entryCta.href` — see
     // tests/unit/lin-2802-workspace-add-rows.test.js for that surface's own
     // coverage. This test narrows to what it can still honestly claim: the
-    // isLanding CTAs themselves stay isLanding-only.
+    // signed-out CTAs themselves stay signed-out-only.
     configureJira();
-    const html = renderNavBar({ isLanding: false, urlKey: 'acme', workspaces: [{ urlKey: 'acme', name: 'Acme' }] });
-    assert.ok(!html.includes('nav-login-jira'), 'the isLanding Jira CTA testid belongs to the unauthenticated bar only');
-    assert.ok(!html.includes('nav-login-linear'), 'the isLanding Linear CTA testid belongs to the unauthenticated bar only');
+    const html = renderNavBar({ urlKey: 'acme', workspaces: [{ urlKey: 'acme', name: 'Acme' }] });
+    assert.ok(!html.includes('nav-login-jira'), 'the signed-out Jira CTA testid belongs to the unauthenticated preview band only');
+    assert.ok(!html.includes('nav-login-linear'), 'the signed-out Linear CTA testid belongs to the unauthenticated preview band only');
   });
 });
 

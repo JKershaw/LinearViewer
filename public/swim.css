@@ -619,8 +619,9 @@
   /* Re-derive the viewport-minus-chrome cap from real chrome instead of the
      stale pre-S2 `140px` literal (LIN-1226). --nav-sticky-h is the sticky chrome
      above the page: in the frame, the band's height on a phone and 0 at 1280
-     (public/frame.css), so the cap tracks it. */
-  max-height: calc(100vh - var(--nav-sticky-h) - 0.75rem - var(--space-5));
+     (public/frame.css), so the cap tracks it. --space-5 is the breathing room
+     under the container. */
+  max-height: calc(100vh - var(--nav-sticky-h) - var(--space-5));
 }
 
 /* .swim-lanes padding-top is for horizontal mode (first row's group label

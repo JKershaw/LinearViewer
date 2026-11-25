@@ -980,8 +980,7 @@ a.wordmark:hover {
   flex-shrink: 0;
 }
 
-.nav-option-form,
-.nav-action-form {
+.nav-option-form {
   display: contents;
 }
 
@@ -2519,16 +2518,6 @@ a.wordmark:hover {
     align-items: center;
     /* Label-to-value spacing, tightened from the base 0.5ch (LIN-2551). */
     gap: 0.25ch;
-  }
-
-  /* Landing/preview auth links (Sign in / GitHub / Jira, .nav-action.login):
-     unlike .nav-item, .nav-action has no padding of its own, so the 44px
-     min-height above never reached these. Give them a real tap target. */
-  .nav-action.login {
-    display: inline-flex;
-    align-items: center;
-    min-height: 44px;
-    padding: var(--space-2) 0;
   }
 
   .nav-value {
