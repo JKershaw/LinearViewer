@@ -84,11 +84,12 @@
   margin-top: 0.4rem;
   /* LIN-4565: one grid for the head and every row (each is a subgrid of it, below), so the columns line up whatever
      width they settle at. The two wide tracks (harness, model) give way to a smaller floor when the card is narrower than
-     their full width: in the frame the rail takes 15rem on desktop, and at 1024px the card is ~690px against the ~826px
-     the old fixed tracks needed. At the floor a long model name wraps inside its cell (overflow-wrap below), never
+     their full width: in the frame the rail takes 15rem on desktop, and at 1024px the card is ~670-690px (CI's Chromium
+     reserves a 15px scrollbar gutter, a Mac none) against the ~826px the old fixed tracks needed; the floors sum to
+     ~630px, so both fit. At the floor a long model name wraps inside its cell (overflow-wrap below), never
      clips; at 1440px every track still reaches its full width, as before. */
   display: grid;
-  grid-template-columns: minmax(6rem, 8.5rem) minmax(9rem, 16rem) 5rem 6rem 6rem 5rem auto;
+  grid-template-columns: minmax(5rem, 8.5rem) minmax(7rem, 16rem) 5rem 6rem 6rem 5rem auto;
   gap: 0.15rem var(--space-2);
   /* The narrow-viewport fallback for the 52rem `.effort-grid` card floor
      above: when the card cannot hold even the tracks' floors (phones; the
