@@ -187,7 +187,7 @@ import { createTaskDoneCache } from './lib/task-done-cache.js'
 import { dispatchGuardTaskDoneCache } from './lib/dispatch-factory.js'
 import { gatherHomeInputs, gatherHomePage, homeRowDataFor } from './lib/home-pipeline.js'
 import { renderDashboardAfterRefresh as renderRefreshedDashboard } from './lib/dashboard-refresh.js'
-import { homeRowsFor, HOME_ROW_KINDS, HOME_SEARCH_MAX_LENGTH } from './lib/home-rows.js'
+import { homeRowsFor, searchTasks, HOME_ROW_KINDS, HOME_SEARCH_MAX_LENGTH } from './lib/home-rows.js'
 import { renderSwimPage } from './lib/render-swim.js'
 import { renderShipPage } from './lib/render-ship.js'
 import { createCollectiveRoutes } from './routes/collective.js'
@@ -220,6 +220,7 @@ import { buildSessionCounts } from './lib/sessions-view.js'
 import { renderRoadmapPage } from './lib/render-roadmap.js'
 import { buildRoadmapModel } from './lib/roadmap.js'
 import { renderProxyPage } from './lib/render-proxy.js'
+import { renderSearchPage } from './lib/render-search.js'
 import { suggestedModels, SUGGESTED_MODEL_IDS, FREE_TIER_MODEL_IDS, setLlmCallRecorder, setPromptTraceRecorder, getPaidEnvKey, getFreeTierModelConfigWarning, streamChatWithTools } from './lib/openrouter.js'
 import { resolveOpenRouterSource, isFreeTierOffered } from './lib/chat-request.js'
 import { resolveWorkspaceModel, resolveAiOperationModel, jobModelResolver, getWorkspaceFeatures, isWorkspaceFeatureEnabled, setWorkspaceFeature, resolveDispatchDefaults } from './lib/workspace-preferences.js'
@@ -4320,6 +4321,38 @@ app.get('/workspace/:urlKey/proxy', workspaceFromUrl, async (req, res) => {
     baseUrl: publicOrigin(req)
   });
   res.send(html);
+});
+
+/**
+ * LIN-4562: the search page. The rail's search field and the phone band's Search link come here from every page. It finds
+ * tasks across the whole workspace, open first and then done (`searchTasks`, lib/home-rows.js), from the same prepared
+ * trees Home reads, unfiltered by team or assignee: a filter belongs to the page it narrows, and search is the workspace.
+ * An empty `q` renders the page with its field and no results, without reading the tracker.
+ */
+app.get('/workspace/:urlKey/search', workspaceFromUrl, async (req, res) => {
+  const workspace = req.workspace;
+  const q = typeof req.query.q === 'string' ? req.query.q.slice(0, HOME_SEARCH_MAX_LENGTH).trim() : '';
+  const featureFlags = await requestFeatureFlags(req);
+  const page = {
+    q,
+    urlKey: workspace.urlKey,
+    workspaceName: workspace.name || 'Workspace',
+    workspaces: req.session.workspaces,
+    featureFlags,
+    openRouterSource: getOpenRouterSource(req),
+    deployInfo: getDeployInfo(),
+  };
+  if (!q) return res.send(renderSearchPage(page));
+  try {
+    // Every project, unfiltered and untrimmed (no `slim`: search matches descriptions too); urlKey null like the other
+    // non-dashboard reads, so no Periodicals group is drawn in (searchTasks skips it either way).
+    const { trees } = await fetchAndPrepareProjects(workspace, null, null, null, { accountId: req.session.accountId });
+    res.send(renderSearchPage({ ...page, result: searchTasks({ q, trees }) }));
+  } catch (error) {
+    if (isAuthError(error)) return res.redirect(`/workspace/${encodeURIComponent(workspace.urlKey)}/`);
+    console.error('Search error:', error);
+    res.status(500).send(renderSearchPage({ ...page, notice: 'Search could not read this workspace just now. Try again.' }));
+  }
 });
 
 // The Models page's writes (POST …/settings/models/changes, …/presets and …/presets/:id/apply) live in

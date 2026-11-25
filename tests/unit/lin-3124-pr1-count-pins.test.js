@@ -149,13 +149,15 @@ const PINS = [
     minus: (s) => countWorkspaceEdgeWriters(withoutFirstMatch(s, /(^|[^a-zA-Z])bindAccountToWorkspace\(/, /^(?!lib\/account-workspace-store\.js).*/)),
   },
   {
-    // LIN-3125 Phase 3 (F1): the EXPLICIT held-entry marker emitters. Exactly 4 —
+    // LIN-3125 Phase 3 (F1): the EXPLICIT held-entry marker emitters. Exactly 5 —
     // navbar switcher add row, render-settings "as a new workspace", and the two
     // server.js add-source redirects. Deliberate new pin (the plan's
     // `held-marker-emitters`); the reason is stated here and in §D-F1.
+    // LIN-4562: the fifth is the frame's workspace menu (lib/components/frame.js), the same explicit add rows as the
+    // old bar's, over the same provider list; it falls back to 4 when piece 7 (LIN-4568) deletes the bar's menu.
     id: 'held-marker-emitters',
     label: 'explicit held-entry marker emitters (LIN-3125 F1)',
-    expected: 4,
+    expected: 5,
     sources: REAL,
     count: countHeldMarkerEmitters,
     plus: (s) => countHeldMarkerEmitters(withLine(s, 'lib/workspace.js', "const u = withHeldMarker('/auth/github', p);")),

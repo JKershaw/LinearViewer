@@ -482,5 +482,9 @@
   "server.js::ticketWriter": {
     "disposition": "not-state",
     "why": "The checked records writer (lib/records/writes.js createRecordWrites), built once over the records store: it keeps no per-key state of its own, its tracker reads and store writes happen per call."
+  },
+  "lib/places.js::byKey": {
+    "disposition": "not-state",
+    "why": "The place registry's lookup by key and alias (LIN-4562), built once at load from the frozen PLACES and DRILLED lists: the same for every workspace and never written after."
   }
 }

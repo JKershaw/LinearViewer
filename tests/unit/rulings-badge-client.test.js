@@ -16,6 +16,7 @@ import { test, describe, before, after } from 'node:test';
 import assert from 'node:assert/strict';
 import { readFileSync } from 'node:fs';
 import { renderNavBar } from '../../lib/components/navbar.js';
+import { renderRail } from '../../lib/components/frame.js';
 import { createMangoTmpdir } from '../fixtures/mango-tmpdir.js';
 import { RecordsStore, RECORDS_COLLECTION, REFS_COLLECTION, QUERY_LOG_COLLECTION } from '../../lib/records-store.js';
 import { DispatchQueueStore } from '../../lib/dispatch-store.js';
@@ -110,5 +111,27 @@ describe('LIN-4103 beat 3 — the rulings feed counts the page\'s own workspace 
     assert.equal(String(a.text), '1 question', 'workspace A\'s badge equals A\'s count line: one question (LIN-4552: "N questions")');
     const b = await paint('ws-b');
     assert.equal(String(b.text), '2 questions', 'workspace B\'s badge equals B\'s count line: two questions');
+  });
+});
+
+describe('LIN-4562: the frame draws the count twice (Home\'s rail item and the phone band); the updater writes every copy', () => {
+  test('both copies read the number and show; at zero both hide', async () => {
+    let body = { workspaceCount: 2, count: 5 };
+    const world = loadWorld({ scripts: [], globals: { fetch: async () => ({ ok: true, json: async () => body }) } });
+    // The band's copy is the same markup with its own test id (lib/components/frame.js questionsCount).
+    const rail = renderRail({ urlKey: 'ws-a', workspaces: [{ urlKey: 'ws-a', name: 'Alpha' }], featureFlags: { runControls: true } });
+    const bandCopy = rail.match(/<a class="frame-count[^>]*data-testid="rail-questions"[\s\S]*?<\/a>/)[0].replace('rail-questions', 'band-questions');
+    world.document.body.innerHTML = `${rail}${bandCopy}`;
+    world.run(updateRulingsBadgeSource());
+    await world.window.updateRulingsBadge('ws-a');
+    const copies = [...world.document.querySelectorAll('[data-rulings-badge][data-url-key="ws-a"]')];
+    assert.equal(copies.length, 2);
+    for (const copy of copies) {
+      assert.equal(String(copy.querySelector('.rulings-count').textContent), '2 questions');
+      assert.equal(copy.classList.contains('hidden'), false);
+    }
+    body = { workspaceCount: 0, count: 0 };
+    await world.window.updateRulingsBadge('ws-a');
+    for (const copy of copies) assert.equal(copy.classList.contains('hidden'), true, 'hidden at zero');
   });
 });

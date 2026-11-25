@@ -82,7 +82,7 @@ function makeElement(overrides = {}) {
  * @param {string[]} [opts.teamIds] - team ids the rendered #team-options panel carries
  *   (drives the savedTeamExists check)
  */
-function runInitNavBar({ pathname = '/workspace/acme/', search = '', savedTeam = null, selectedOptionTeam = null, teamIds = ['eng', 'design'] } = {}) {
+function runInitNavBar({ pathname = '/workspace/acme/', search = '', savedTeam = null, selectedOptionTeam = null, teamIds = ['eng', 'design'], host = 'bar' } = {}) {
   const optionEls = teamIds.map(id => makeElement({ dataset: { team: id } }));
   const selectedOptionEl = selectedOptionTeam !== null
     ? makeElement({ dataset: { team: selectedOptionTeam } })
@@ -96,7 +96,9 @@ function runInitNavBar({ pathname = '/workspace/acme/', search = '', savedTeam =
     },
   });
   const teamToggleEl = makeElement();
-  const navBarEl = makeElement();
+  // LIN-4562: the selectors sit in the old bar, or in the frame's filter line (lib/components/navbar.js renderFilterLine).
+  const navBarEl = host === 'bar' ? makeElement() : null;
+  const filterLineEl = host === 'filters' ? makeElement() : null;
 
   const byId = {
     'workspace-toggle': null,
@@ -122,6 +124,7 @@ function runInitNavBar({ pathname = '/workspace/acme/', search = '', savedTeam =
     document: {
       querySelector(sel) {
         if (sel === '.nav-bar') return navBarEl;
+        if (sel === '[data-frame-filters]') return filterLineEl;
         if (sel === '.nav-dropdown-overlay') return null;
         if (sel === '#team-options .nav-option.selected') return selectedOptionEl;
         return null;
@@ -211,6 +214,19 @@ describe('LIN-2520 — team option click handler (real navigation, path-preservi
     teamOptionsEl.fire('click', { stopPropagation() {}, target: { closest: () => optionEl } });
 
     assert.equal(sandbox.window.location.href, '/workspace/acme/swim?team=eng-id');
+  });
+
+  test('LIN-4562: the same handler drives the frame\'s filter line (no old bar on the page)', () => {
+    const { teamOptionsEl, sandbox } = runInitNavBar({ pathname: '/workspace/acme/backlog', search: '', host: 'filters' });
+    const optionEl = makeElement({ dataset: { team: 'eng-id' } });
+    teamOptionsEl.fire('click', { stopPropagation() {}, target: { closest: () => optionEl } });
+    assert.equal(sandbox.window.location.href, '/workspace/acme/backlog?team=eng-id');
+  });
+
+  test('LIN-4562: with neither host on the page, nothing is wired', () => {
+    const { teamOptionsEl, sandbox } = runInitNavBar({ pathname: '/workspace/acme/proxy', host: 'none' });
+    teamOptionsEl.fire('click', { stopPropagation() {}, target: { closest: () => makeElement({ dataset: { team: 'eng-id' } }) } });
+    assert.equal(sandbox.window.location.href, undefined);
   });
 
   test('a click outside any .nav-option[data-team] is ignored', () => {

@@ -237,13 +237,14 @@ describe('LIN-3790 fetchAndPrepareProjects — legacy (not connection-backed) se
 });
 
 describe('LIN-3774 every fetchAndPrepareProjects call site passes accountId', () => {
-  test('every call site carries accountId; the three non-dashboard sites keep urlKey null', () => {
+  test('every call site carries accountId; the four non-dashboard sites keep urlKey null', () => {
     // LIN-4118: the Home route, /api/home-rows and the sign-in refresh now fetch through ONE gather, in
     // lib/home-pipeline.js. That gather is the one dashboard call site, so the sites are scanned in all three files.
     const pipeline = readFileSync(join(__dirname, '../../lib/home-pipeline.js'), 'utf8');
     const sources = SERVER_SRC + readFileSync(join(__dirname, '../../lib/dashboard-refresh.js'), 'utf8') + pipeline;
     const calls = [...sources.matchAll(/(?<!function )fetchAndPrepareProjects\((workspace,[^\n]*)/g)].map(m => m[1]);
-    assert.equal(calls.length, 4, `expected 4 call sites (the shared gather + three non-dashboard reads), found ${calls.length}`);
+    // LIN-4562: the search page is the fourth non-dashboard read.
+    assert.equal(calls.length, 5, `expected 5 call sites (the shared gather + four non-dashboard reads), found ${calls.length}`);
     // The gather builds its fetch options once; its accountId rides in that object, so a call that passes `fetchOpts`
     // is checked against the object literal that the gather builds.
     const fetchOpts = pipeline.match(/const fetchOpts = \{[^}]*\}/)?.[0] ?? '';
@@ -254,7 +255,7 @@ describe('LIN-3774 every fetchAndPrepareProjects call site passes accountId', ()
     const dashboard = calls.filter(c => c.includes('workspace.urlKey'));
     assert.equal(dashboard.length, 1, 'the dashboard fetch is the one shared gather');
     const nonDashboard = calls.filter(c => !c.includes('workspace.urlKey'));
-    assert.equal(nonDashboard.length, 3);
+    assert.equal(nonDashboard.length, 4);
     for (const c of nonDashboard) assert.match(c, /, null, \{ accountId: req\.session\.accountId \}\)/, `urlKey must stay null: ${c}`);
     // Each caller hands its session's account to the gather: the Home route, /api/home-rows and the LIN-4119 backlog page, and the refresh.
     const server = SERVER_SRC;

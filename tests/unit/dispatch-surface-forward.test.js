@@ -28,7 +28,7 @@ function loadCommon() {
       // dispatchPrompt consults the toggle to decide attachProxy; off here so the
       // body stays minimal and focused on the surface field.
     },
-    document: { addEventListener() {}, querySelector: () => null },
+    document: { addEventListener() {}, querySelector: () => null, querySelectorAll: () => [] },
     localStorage: { getItem: () => null, setItem() {} },
     console,
     fetch() { throw new Error('fetch should not be called'); },

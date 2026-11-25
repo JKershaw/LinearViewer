@@ -482,3 +482,78 @@ export async function seedLocalWorkspace(page, seed = null, { features, openRout
   const body = await resp.json();
   return { urlKey: body.urlKey, dashboard: localDashboardUrl(body.urlKey) };
 }
+
+// ---------------------------------------------------------------------------
+// LIN-4562: a workspace shaped like the real one — thousands of tasks, a few questions open.
+// ---------------------------------------------------------------------------
+
+const SHAPED_OLD = '2020-01-01T00:00:00Z';
+
+/**
+ * A synthetic workspace of the real one's shape (LIN-4342's "How to check"; question-d2640e4b defaults to this rather
+ * than committing the 29 Oct backlog copy): `tasks` tasks over `projects` projects, about 60% with a parent (two levels
+ * deep), about 60% done, a few started. Task i belongs to project i % projects; within a project the k-th task
+ * (k = floor(i / projects)) is a root when k % 5 is 0 or 1, else a child of the slot-0 root `slot` places back. Titles carry
+ * their number and state, so search can name one: "Finished item 42", "Backlog task 43", "Open task 44". Shape, not
+ * words: nothing here is real workspace content.
+ *
+ * @param {string} [urlKey]
+ * @param {{tasks?: number, projects?: number}} [opts]
+ * @returns {{projects: Array, issues: Array}}
+ */
+export function shapedLocalSeed(urlKey = LOCAL_WORKSPACE_URL_KEY, { tasks = 3000, projects = 30 } = {}) {
+  const id = (rawId) => localSeedId(urlKey, rawId);
+  const projectRows = Array.from({ length: projects }, (_, p) => ({ id: id(`shape-proj-${p}`), name: `Project ${p}`, content: `Seeded project ${p}`, sortOrder: p }));
+  const issues = [];
+  for (let i = 0; i < tasks; i += 1) {
+    const project = i % projects;
+    const k = Math.floor(i / projects);
+    const slot = k % 5;
+    const parentIdx = slot >= 2 ? i - projects * slot : null;
+    const r = i % 100;
+    let state;
+    if (r < 60) state = { name: 'Done', type: 'completed' };
+    else if (r < 63) state = { name: 'In Progress', type: 'started' };
+    else if (r < 80) state = { name: 'Todo', type: 'unstarted' };
+    else state = { name: 'Backlog', type: 'backlog' };
+    const title = state.type === 'completed' ? `Finished item ${i}` : (state.type === 'backlog' ? `Backlog task ${i}` : `Open task ${i}`);
+    const issue = {
+      id: id(`shape-t${i}`),
+      identifier: `SHAPE-${i}`,
+      title,
+      projectId: id(`shape-proj-${project}`),
+      sortOrder: i,
+      createdAt: SHAPED_OLD,
+      state,
+      url: `/workspace/${urlKey}/issue/${id(`shape-t${i}`)}`,
+    };
+    if (state.type === 'completed') issue.completedAt = SHAPED_OLD;
+    if (parentIdx !== null) issue.parentId = id(`shape-t${parentIdx}`);
+    issues.push(issue);
+  }
+  return { projects: projectRows, issues };
+}
+
+/**
+ * Seed the shaped workspace and exactly `questions` open questions addressed to the signed-in owner (the workspace's
+ * records are cleared first; then the test-only POST /test/seed-question-record, the records pipeline's own write). `runnerKey` defaults to true: the owner with a
+ * runner is who sees the questions count. Pass `runnerKey: false` for a new user without a runner.
+ *
+ * @param {import('@playwright/test').Page} page
+ * @param {{urlKey?: string, tasks?: number, projects?: number, questions?: number, runnerKey?: boolean}} [opts]
+ * @returns {Promise<{urlKey: string, dashboard: string}>}
+ */
+export async function seedShapedWorkspace(page, { urlKey = LOCAL_WORKSPACE_URL_KEY, tasks = 3000, projects = 30, questions = 3, runnerKey = true } = {}) {
+  const seeded = await seedLocalWorkspace(page, shapedLocalSeed(urlKey, { tasks, projects }), { urlKey, runnerKey });
+  // Records outlast a seed (they live in their own store), so the questions start from none: exactly `questions` open.
+  const cleared = await page.request.get(`/test/clear-ticket-records?urlKey=${encodeURIComponent(seeded.urlKey)}`);
+  if (!cleared.ok()) throw new Error(`seedShapedWorkspace: clearing records failed: ${cleared.status()}`);
+  for (let q = 0; q < questions; q += 1) {
+    const ticket = `SHAPE-${projects * 5 * q + 61}`;
+    const resp = await page.request.post('/test/seed-question-record', {
+      data: { urlKey: seeded.urlKey, ticket, asks: `Which way for ${ticket}?`, options: ['Ship it now', 'Wait for review'], recommended: 'Wait for review' },
+    });
+    if (!resp.ok()) throw new Error(`seedShapedWorkspace: question seed failed: ${resp.status()} ${await resp.text()}`);
+  }
+  return seeded;
+}

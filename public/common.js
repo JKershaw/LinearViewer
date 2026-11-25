@@ -794,16 +794,19 @@ window.readSSEStream = async function readSSEStream(response, onEvent) {
  * @param {string} urlKey
  */
 window.updateQueueBadge = async function updateQueueBadge(urlKey) {
-  const badge = document.querySelector(`[data-queue-badge][data-url-key="${urlKey}"]`);
-  if (!badge) return;
+  // LIN-4562: every copy — the old bar's badge, or the count on the frame's Dispatch item.
+  const badges = document.querySelectorAll(`[data-queue-badge][data-url-key="${urlKey}"]`);
+  if (badges.length === 0) return;
   try {
     const response = await fetch(`/workspace/${encodeURIComponent(urlKey)}/api/dispatch/count`);
     if (!response.ok) return;
 
     const { count } = await response.json();
-    const countEl = badge.querySelector('.queue-count');
-    if (countEl) countEl.textContent = count;
-    badge.classList.toggle('hidden', count === 0);
+    badges.forEach((badge) => {
+      const countEl = badge.querySelector('.queue-count');
+      if (countEl) countEl.textContent = count;
+      badge.classList.toggle('hidden', count === 0);
+    });
   } catch (e) {
     console.error('Failed to update queue badge:', e);
   }
@@ -2301,8 +2304,11 @@ window.buildFilterUrl = function buildFilterUrl(paramName, value) {
 
 // Navigation bar interactions (workspace/team selectors)
 function initNavBar() {
+  // LIN-4562: the team and assignee selectors render in the old bar, or in the frame's filter line
+  // (lib/components/navbar.js renderFilterLine) with the same ids, so this one client drives either host.
   const navBar = document.querySelector('.nav-bar')
-  if (!navBar) return
+  const filterLine = document.querySelector('[data-frame-filters]')
+  if (!navBar && !filterLine) return
 
   const workspaceToggle = document.getElementById('workspace-toggle')
   const teamToggle = document.getElementById('team-toggle')
@@ -2376,8 +2382,10 @@ function initNavBar() {
   // the tab strip in NORMAL FLOW — no floating panel, no backdrop, no click-catcher
   // (LIN-984 safe by construction). Deliberately NOT wired through the selector
   // dropdown machinery above (no `.nav-dropdown-overlay`, no closeAllSelectors).
-  setupNavViewsOverflow(navBar)
-  setupNavStickyHeight(navBar)
+  if (navBar) {
+    setupNavViewsOverflow(navBar)
+    setupNavStickyHeight(navBar)
+  }
 
   // Team option selection (workspace uses form submission)
   if (teamOptions) {
@@ -2809,12 +2817,12 @@ window.updateRulingsBadge = async function updateRulingsBadge(urlKey) {
     // without it (an older server) falls back to the all-workspaces `count`.
     const body = await response.json();
     const count = typeof body.workspaceCount === 'number' ? body.workspaceCount : body.count;
-    const badge = document.querySelector(`[data-rulings-badge][data-url-key="${urlKey}"]`);
-    if (badge) {
+    // LIN-4562: every copy — the frame draws it on Home's rail item and in the phone band.
+    document.querySelectorAll(`[data-rulings-badge][data-url-key="${urlKey}"]`).forEach((badge) => {
       const countEl = badge.querySelector('.rulings-count');
       if (countEl) countEl.textContent = window.questionsWords(count);
       badge.classList.toggle('hidden', count === 0);
-    }
+    });
   } catch (e) {
     console.error('Failed to update rulings badge:', e);
   }
@@ -2871,6 +2879,33 @@ function initRulingsBadge() {
   // no `addEventListener` (tests/unit/reply-delivery-contract.test.js's
   // sandbox contract).
   window.addEventListener('beforeunload', stopRulingsPolling);
+}
+
+// =============================================================================
+// Queue count (moved from app.js, LIN-4562)
+// =============================================================================
+// The count of queued dispatches: the old bar's badge, or the count on the frame's Dispatch item. It lived in app.js's
+// queue panel init, which the frame's pages do not all load (the search page loads none), so it moves here beside the
+// questions count, as updateQueueBadge did. Same 1s cadence, raw fetch, visible tab only.
+const QUEUE_POLL_INTERVAL_MS = 1000;
+let queuePollIntervalId = null;
+
+function initQueueBadge() {
+  const badge = document.querySelector('[data-queue-badge]');
+  if (!badge) return;
+  const urlKey = badge.dataset.urlKey;
+  window.updateQueueBadge(urlKey);
+  queuePollIntervalId = setInterval(() => {
+    if (!document.hidden) window.updateQueueBadge(urlKey);
+  }, QUEUE_POLL_INTERVAL_MS);
+  // Fetch immediately when the tab becomes visible (the count may be stale).
+  document.addEventListener('visibilitychange', () => {
+    if (!document.hidden) window.updateQueueBadge(urlKey);
+  });
+  window.addEventListener('beforeunload', () => {
+    if (queuePollIntervalId) clearInterval(queuePollIntervalId);
+    queuePollIntervalId = null;
+  });
 }
 
 // =============================================================================
@@ -2967,5 +3002,6 @@ document.addEventListener('DOMContentLoaded', () => {
   initDisclosure();
   initNavBar();
   initRulingsBadge();
+  initQueueBadge();
   window.ProxyToggle.init();
 });

@@ -4921,7 +4921,8 @@ a.context-node:hover { border-color: var(--text); background: var(--bg); }
 
 /* LIN-4114: Home's "Waiting on you" desk section. Its header and body open and close like the other desk sections; each
    card is the shared question record card (lib/question-record-card.js), which draws its own task line (LIN-4549). */
-.waiting-section { margin: 0 0 1rem; }
+/* LIN-4562: the questions count links here (#waiting-on-you), so it lands below the sticky header, not under it. */
+.waiting-section { margin: 0 0 1rem; scroll-margin-top: var(--nav-sticky-h); }
 .waiting-header:focus { outline: 2px solid var(--brand); outline-offset: 2px; }
 .waiting-question { margin: 0.5rem 0; }
 /* LIN-4552: "Notes for you", the quieter group under the questions (lib/waiting-section.js renderNotesGroup): a small muted title, one

@@ -31,7 +31,9 @@ test.describe('Proxy Page', () => {
     await page.waitForLoadState('networkidle');
 
     // Page title
-    await expect(page.locator('h1')).toHaveText('Proxy');
+    // LIN-4562: the page is on the frame, named for what a person does there (the URL is unchanged).
+    await expect(page.locator('h1')).toHaveText('Connect an agent');
+    await expect(page).toHaveTitle(/^Connect an agent · /);
 
     // All sections present
     await expect(page.locator('text=Agent Prompt')).toBeVisible();

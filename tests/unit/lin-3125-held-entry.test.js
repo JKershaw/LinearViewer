@@ -423,7 +423,7 @@ describe('LIN-3125 Phase 3 — held-connection entry', () => {
   // Source scan: exactly four helper call sites, literal only in the helper
   // -------------------------------------------------------------------------
   describe('source scan', () => {
-    test('withHeldMarker( call sites are exactly the four approved emitters', () => {
+    test('withHeldMarker( call sites are exactly the approved emitters (four, and the rail menu: LIN-4562)', () => {
       const sources = loadStrippedSources();
       const sites = [];
       for (const [rel, src] of sources) {
@@ -432,9 +432,11 @@ describe('LIN-3125 Phase 3 — held-connection entry', () => {
           if (/(^|[^.\w])withHeldMarker\(/.test(line)) sites.push(`${rel}:${i + 1}`);
         });
       }
-      assert.equal(sites.length, 4, `expected 4 emitters, got:\n${sites.join('\n')}`);
+      // LIN-4562: the frame's workspace menu (lib/components/frame.js) draws the same explicit add rows as the old bar's,
+      // through the same provider list (navbar.js workspaceAddProviders), so it is the fifth emitter until piece 7 deletes the bar's.
+      assert.equal(sites.length, 5, `expected 5 emitters, got:\n${sites.join('\n')}`);
       const files = sites.map(s => s.split(':')[0]).sort();
-      assert.deepEqual(files, ['lib/components/navbar.js', 'lib/render-settings.js', 'server.js', 'server.js']);
+      assert.deepEqual(files, ['lib/components/frame.js', 'lib/components/navbar.js', 'lib/render-settings.js', 'server.js', 'server.js']);
     });
 
     test('no production file hardcodes the marker literal outside the helper', () => {
