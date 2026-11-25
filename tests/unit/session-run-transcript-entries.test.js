@@ -346,3 +346,32 @@ describe('LIN-4559 run page: each child agent is its own collapsible thread unde
     assert.equal(run.classList.contains('sess-run--expanded'), before);
   });
 });
+
+// ── LIN-4560: characterization of the run page's transcript, before the shared transcript module replaces it ──────────
+// What the shared module must keep from this renderer (beat 1 of LIN-4560, written against the classic script before the
+// page became a module): the run's own entries in stored order, the evidence link escaped with its label (or the URL),
+// and a run with no feedback drawing no transcript at all.
+describe('LIN-4560 characterization: the run page transcript as the classic renderer drew it', () => {
+  test('the run\'s own entries keep their stored order', () => {
+    const { tx } = drawn(loopWith([own('one', 1), own('two', 2), own('three', 3, 'status'), own('four', 4)]));
+    assert.deepEqual(ownBubbles(tx).map(textOf), ['one', 'two', 'three', 'four']);
+  });
+
+  test('an evidence link is escaped and carries its label, or the URL when it has none', () => {
+    const { tx } = drawn(loopWith([
+      { ...own('opened the PR', 1), url: 'https://example.com/pr/1?a=1&b="2"', urlLabel: 'PR <1>' },
+      { ...own('pushed', 2), url: 'https://example.com/commit/abc' }
+    ]));
+    const [labelled, bare] = ownBubbles(tx).map((li) => li.querySelector('[data-testid="session-transcript-link"]'));
+    assert.equal(labelled.getAttribute('href'), 'https://example.com/pr/1?a=1&b="2"');
+    assert.equal(labelled.textContent, 'PR <1>');
+    assert.equal(labelled.getAttribute('target'), '_blank');
+    assert.equal(labelled.getAttribute('rel'), 'noopener noreferrer');
+    assert.equal(bare.textContent, 'https://example.com/commit/abc');
+  });
+
+  test('a run with no feedback draws no transcript', () => {
+    const html = pageHtml(loopWith([]));
+    assert.equal(html.includes('data-testid="session-run-transcript"'), false);
+  });
+});

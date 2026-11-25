@@ -5,31 +5,21 @@
  * textareas); a proposal row (`.sess-proposals`) was missed, so clicking a
  * proposal's text collapsed the run out from under the reader.
  *
- * The REAL `toggleRun`/`initRunToggles` source is sliced out of public/session.js
- * (LIN-4307: on the shared fake DOM through loadWorld, with no private vm), and run
- * over the run page the server renders (renderSessionPage: one run with a pending proposal
+ * public/session.js is a native ES module (LIN-4560): the REAL `initRunToggles` is
+ * imported over the fake DOM (tests/unit/helpers/import-world.js) and run over the
+ * run page the server renders (renderSessionPage: one run with a pending proposal
  * and its reply box), so the shipped selector decides over the shipped markup.
  *
  * Run with: node --test tests/unit/lin-3254-session-run-toggles.test.js
  */
-import { test } from 'node:test';
+import { test, afterEach } from 'node:test';
 import assert from 'node:assert/strict';
-import { readFileSync } from 'node:fs';
-import { fileURLToPath } from 'node:url';
-import { dirname, join } from 'node:path';
-import { loadWorld, clickOn } from './helpers/client-world.js';
+import { clickOn } from './helpers/client-world.js';
+import { importWorld } from './helpers/import-world.js';
 import { renderSessionPageOf } from '../fixtures/cost-read-cores.js';
 
-const __dirname = dirname(fileURLToPath(import.meta.url));
-const SESSION_JS_SRC = readFileSync(join(__dirname, '../../public/session.js'), 'utf8');
-
-function extractToggleSrc() {
-  const start = SESSION_JS_SRC.indexOf('function toggleRun(');
-  assert.notEqual(start, -1, 'toggleRun found in public/session.js');
-  const end = SESSION_JS_SRC.indexOf('function renderRunTranscripts(', start);
-  assert.notEqual(end, -1, 'the next top-level function marks the end of the slice');
-  return SESSION_JS_SRC.slice(start, end);
-}
+let world = null;
+afterEach(() => { if (world) world.restore(); world = null; });
 
 // The run page as the server renders it: one run the owner can reply to, with one pending proposal (renderSessionPage,
 // through the fixture that builds its run view). Body only: the fake parser takes no doctype.
@@ -50,14 +40,15 @@ function runPageBody() {
   return html.match(/<body[^>]*>([\s\S]*)<\/body>/i)[1];
 }
 
-// The world the slice runs in: the server's run page drawn, then initRunToggles run over it. The click targets are
+// The world the module runs in: the server's run page drawn, then its initRunToggles run over it. The click targets are
 // plain text inside each excluded region (the proposal's prompt, the reply box's thread), never a button or textarea,
 // which the selector excludes on their own.
-function makeWorld() {
-  const world = loadWorld({ scripts: [] });
+async function makeWorld() {
+  // session.js reads window.QuestionCards' three functions at load; this suite drives none of them.
+  world = importWorld({ window: { QuestionCards: {} } });
   world.document.body.innerHTML = runPageBody();
-  world.run(extractToggleSrc());
-  world.run('initRunToggles()');
+  const page = await world.importPage('session.js');
+  page.initRunToggles();
   const runs = world.document.querySelectorAll('.sess-run');
   assert.equal(runs.length, 1, 'the page has the one run');
   const run = runs[0];
@@ -72,7 +63,7 @@ function makeWorld() {
 }
 
 test('initRunToggles ignores a click inside .sess-proposals (LIN-3254 nit)', async () => {
-  const { run, head, proposal } = makeWorld();
+  const { run, head, proposal } = await makeWorld();
   assert.equal(run.listenersOf('click').length, 1, 'the run registered one click handler');
 
   await clickOn(run, proposal);
@@ -82,7 +73,7 @@ test('initRunToggles ignores a click inside .sess-proposals (LIN-3254 nit)', asy
 });
 
 test('initRunToggles still toggles on a plain card click, and still ignores the reply box', async () => {
-  const { run, head, reply } = makeWorld();
+  const { run, head, reply } = await makeWorld();
 
   await clickOn(run, reply);
   assert.equal(run.classList.contains('sess-run--expanded'), false, 'the reply box stays excluded');

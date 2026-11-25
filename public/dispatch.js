@@ -7,8 +7,16 @@
  * - Token management (create, list, revoke)
  * - Dispatch history (paginated resolved items)
  *
- * Loaded only on the /dispatch page. Requires common.js to be loaded first
- * (provides escapeHtml() and updateQueueBadge()).
+ * Loaded only on the /dispatch page, as a native ES module (LIN-4560). A module
+ * runs after every classic script on the page, wherever it is listed, once the
+ * document is parsed and before DOMContentLoaded, so common.js (escapeHtml(),
+ * api(), updateQueueBadge(), dispatchPrompt(), showModal(), toast()) and
+ * decision-panel.js have run. It now runs after app.js (the other module, listed
+ * before it), so app.js's DOMContentLoaded init registers first: app.js's
+ * inits read nothing this file sets up (no `.prompt-container` or disclosure
+ * placeholder on this page) and this file's inits read nothing app.js sets up.
+ * Its top-level names are module-scoped: nothing classic reads them (the queue
+ * badge's updater is common.js's). Exported names are its test seams.
  */
 
 const UUID_DISPATCH_REGEX = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i
@@ -1246,3 +1254,9 @@ document.addEventListener('DOMContentLoaded', () => {
   initDispatchTokenManagement()
   initDispatchHistory()
 })
+
+// Test seams (LIN-4560): the functions the suites drive. Nothing in the page reads these.
+export {
+  HALT_MODE_LABELS, formatHaltStatusHtml, formatDispatchTokenExpiry, dispatchTokenModalBody,
+  renderFeedbackEntries, historyOutcomePill, renderDispatchHistoryList
+}
