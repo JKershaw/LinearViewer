@@ -526,14 +526,13 @@ function goneHandlerFor(stateUrl, main) {
     main.innerHTML = '<p class="task-share-gone" data-testid="task-share-gone">This link is no longer available.</p>';
     // LIN-4563: the page sits in the public frame, whose h1, the line under it and the tab name the task. A revoked link
     // stops naming it there too: the page is "Link not available".
-    const head = main.closest ? main.closest('[data-testid="frame-main"]')?.querySelector('.frame-head') : null;
+    const head = main.closest('[data-testid="frame-main"]')?.querySelector('.frame-head');
     if (head) {
       const h1 = head.querySelector('h1');
       if (h1) h1.textContent = GONE_PAGE_NAME;
       head.querySelector('.page-header__subtitle')?.remove();
     }
-    const doc = main.ownerDocument;
-    if (doc) doc.title = `${GONE_PAGE_NAME} · Harbour`;
+    main.ownerDocument.title = `${GONE_PAGE_NAME} · Harbour`;
   };
 }
 

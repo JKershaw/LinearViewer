@@ -285,7 +285,9 @@ describe('goneHandlerFor (the one decision)', () => {
   });
 
   test('a guest state URL gets a handler that replaces <main> with the gone notice', () => {
-    const main = { innerHTML: '<p>the shared task</p>' };
+    const { document } = createFakeDom();
+    document.body.innerHTML = '<div data-testid="task-page"><p>the shared task</p></div>';
+    const main = document.querySelector('[data-testid="task-page"]');
     const onGone = goneHandlerFor(GUEST, main);
     assert.equal(typeof onGone, 'function');
     assert.equal(main.innerHTML, '<p>the shared task</p>', 'building the handler changes nothing');
