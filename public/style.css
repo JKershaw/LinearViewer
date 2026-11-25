@@ -3897,7 +3897,8 @@ body[data-proxy-active="true"] .prompt-proxy-toggle {
 .task-edit-back:hover,
 .frame-back:hover { color: var(--brand); }
 
-/* LIN-4562: the frame's search fields are text controls too (public/frame.css only sets their width). */
+/* LIN-4562: the frame's search fields share the text control's body (public/frame.css only sets their width). Their
+   focus is the house ring, not the blue border below, which lin-4009-blue-sweep keeps to its named members. */
 .token-label-input,
 .frame-search__input,
 .search-page__input {
@@ -3914,15 +3915,11 @@ body[data-proxy-active="true"] .prompt-proxy-toggle {
 /* The border turns blue on focus, and the default ring is kept for keyboard focus (LIN-786: never
    kill focus outright). The old `.model-select:focus` rule that removed the outline for every focus,
    mouse or keyboard, is gone (LIN-3889). */
-.token-label-input:focus,
-.frame-search__input:focus,
-.search-page__input:focus {
+.token-label-input:focus {
   border-color: var(--blue);
 }
 
-.token-label-input:focus:not(:focus-visible),
-.frame-search__input:focus:not(:focus-visible),
-.search-page__input:focus:not(:focus-visible) {
+.token-label-input:focus:not(:focus-visible) {
   outline: none;
 }
 
