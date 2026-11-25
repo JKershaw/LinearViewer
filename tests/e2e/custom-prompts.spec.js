@@ -223,7 +223,6 @@ test.describe('Custom Prompts Page', () => {
 
     await expect(page.locator(SELECTORS.nav.rail)).toBeVisible();
     await expect(page.locator(SELECTORS.nav.workspaceName)).toHaveText('Local Workspace');
-    await expect(page.locator('.nav-bar')).toHaveCount(0);
     await expect(page.locator(SELECTORS.nav.back)).toHaveCount(1);
   });
 

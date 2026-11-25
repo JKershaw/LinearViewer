@@ -443,7 +443,7 @@ a.wordmark:hover {
   font-weight: 600;
 }
 
-/* Rulings badge in nav bar (LIN-1728 Phase 3) — the ambient "waiting on you"
+/* Questions count beside Home in the rail and in the phone band (LIN-1728 Phase 3, LIN-4562) — the ambient "waiting on you"
    count, visually distinct from .queue-badge (amber, the escalation-surface
    accent used elsewhere for a blocked/waiting state) so the two convey
    different meanings at a glance.

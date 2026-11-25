@@ -60,7 +60,7 @@ test.afterEach(async ({ page, localWorkerUrlKey }) => {
  * it), the way back and the footer. tests/e2e/frame-rules.spec.js checks the frame's sizes: one heading size across pages, and nothing in the rail
  * or band smaller on a phone than on desktop.
  */
-const EXEMPT_CHROME = '.nav-bar, [class*="nav-option"], .frame-rail, .frame-band, .frame-head, .frame-back, .frame-footer, .frame-skip';
+const EXEMPT_CHROME = '[class*="nav-option"], .frame-rail, .frame-band, .frame-head, .frame-back, .frame-footer, .frame-skip';
 
 async function distinctSizes(page) {
   return page.evaluate((EXEMPT_CHROME) => {

@@ -136,7 +136,9 @@ test.describe('Archive Pages', () => {
 
   test('archive #1 is a standalone snapshot — no shared app chrome', async ({ page }) => {
     await page.goto('/archive/1');
-    await expect(page.locator('.page-footer')).toHaveCount(0);
+    // LIN-4568: no frame chrome (the old .page-footer it once checked for is gone from the app).
+    await expect(page.locator('[data-testid="frame-footer"]')).toHaveCount(0);
+    await expect(page.locator('[data-testid="frame-rail"], [data-testid="frame-public-band"]')).toHaveCount(0);
   });
 
   test('404s an archive number that does not exist', async ({ page }) => {

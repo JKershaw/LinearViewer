@@ -130,7 +130,6 @@ test.describe('Prompts Page', () => {
       await page.goto(`/workspace/${localWorkerUrlKey}/prompts`);
 
       await expect(page.locator(SELECTORS.nav.footer)).toBeVisible();
-      await expect(page.locator('.page-footer')).toHaveCount(0);
 
       await expect(page.locator(`${SELECTORS.nav.place('settings')}[href="/workspace/${localWorkerUrlKey}/settings"]`)).toBeVisible();
       await expect(page.locator(`${SELECTORS.nav.place('swim')}[href="/workspace/${localWorkerUrlKey}/swim"]`)).toBeVisible();

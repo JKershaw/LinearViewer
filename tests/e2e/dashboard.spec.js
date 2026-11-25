@@ -82,7 +82,6 @@ test.describe('Authenticated Dashboard', () => {
 
   test('shows the frame footer with the deploy stamp, the rail with view links, and reset on the Backlog page', async ({ page, localWorkerUrlKey }) => {
     await expect(page.locator(SELECTORS.nav.footer)).toBeVisible();
-    await expect(page.locator('.page-footer')).toHaveCount(0);
 
     // The places are the rail's.
     await expect(page.locator(`${SELECTORS.nav.place('settings')}[href="/workspace/${localWorkerUrlKey}/settings"]`)).toBeVisible();

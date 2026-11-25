@@ -52,3 +52,6 @@ Area notes for `front-end-pages` in the registry. Format and rules: README.md.
   kind, rows' `data-search-text`, a constant named for it). Grep the client's `innerHTML =`, `kind=`, `data-*`,
   `document.title` and old chrome classes: Swipe's script retitled the tab, Ship measured the bar (LIN-4564). A 15rem rail
   breaks fixed widths at 1024 (LIN-4565).
+- Deleting chrome leaves `toHaveCount(0)` checks on its classes that can never fail again, and labels naming it
+  (`lib/feature-defaults.js`, `lib/render-settings-you.js`): grep `tests/e2e/` and the labels for its class and its
+  words (LIN-4568).

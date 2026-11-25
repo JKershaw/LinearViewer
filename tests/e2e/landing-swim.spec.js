@@ -73,11 +73,10 @@ test.describe('Landing Swim Page (/swim)', () => {
   });
 
   // LIN-4564: the preview sits in the public frame, whose footer is the same on every page (the previews row is gone;
-  // the landing page still links both previews).
+  // the landing page links both previews from its swim section, LIN-4568).
   test('the footer is the frame\'s, the same on every page', async ({ page }) => {
     await expect(page.locator(SELECTORS.nav.footer)).toBeVisible();
     await expect(page.locator('[data-testid="frame-footer-library"]')).toBeVisible();
-    await expect(page.locator('.footer-actions')).toHaveCount(0);
     await expect(page).toHaveTitle('Swim · Harbour');
   });
 
