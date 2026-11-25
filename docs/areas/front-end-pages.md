@@ -47,13 +47,7 @@ Area notes for `front-end-pages` in the registry. Format and rules: README.md.
   `updateQueueBadge`, `public/common.js`), and each page runs one poll: the old bar's badge keeps `public/app.js`'s, the
   frame's count polls from `public/common.js`. LIN-4562's first push moved the whole poll and started requests on old
   pages that load no `public/app.js` (`tests/e2e/look-alike-controls.spec.js` caught it).
-- When a page moves onto the frame, its name leaves its body: the h1, the line under it and the tab are the frame's. Client
-  code that blanked or replaced the page's body to hide what it showed now misses them. The guest task page's revoked-link
-  notice (`goneHandlerFor`, `public/task-page.js`) replaced the body and left the task's title in the h1 and the tab until
-  LIN-4563 made it rename the frame's header too (`tests/e2e/task-share.spec.js` caught it). Grep the page's client for
-  `innerHTML =` on its root before moving it.
-- Retiring a client feature retires everything that existed only for it, server side included: LIN-4563's in-page search
-  took with it the `search` home-rows kind (`searchRows`), every row's `data-search-text` (a full description per row), a
-  placement reason, a hide reason and a constant named for it (`HOME_SEARCH_MAX_LENGTH`, renamed `SEARCH_MAX_LENGTH` for
-  the search page that still reads it). Grep the client for the request parameters and attributes it read (`kind=`,
-  `data-*`), and the names that still say the feature, before calling the removal done.
+- Moving a page onto the frame or retiring its widget leaves edges. The frame owns the page's name, so client code that
+  hid the body misses the h1 and tab: the revoked-link notice (`goneHandlerFor`, `public/task-page.js`) left the title
+  showing (LIN-4563). What existed only for a retired feature goes too, server side included (the `search` home-rows
+  kind, rows' `data-search-text`, a constant named for it). Grep the client's `innerHTML =`, `kind=` and `data-*`.
