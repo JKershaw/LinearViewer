@@ -9,8 +9,8 @@
 
 .lc-page {
   max-width: 900px;
-  margin: 0 auto;
-  padding: 0 1rem 3rem;
+  /* LIN-4564: in the frame, which owns the left edge, the gutter and the h1; the column starts at that edge. */
+  padding: 0 0 3rem;
 }
 
 /* LIN-3977: the scope control and the visible labels of the two range controls. */

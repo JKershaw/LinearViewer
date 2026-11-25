@@ -8,10 +8,10 @@
 /* =============================================================================
    Page Container
    ============================================================================= */
+/* LIN-4564: the page sits in the frame, which owns its left edge, gutter and h1; the column starts at that edge. */
 .roadmap-page {
   max-width: 900px;
-  margin: 0 auto;
-  padding: var(--space-3) 0;
+  padding: 0 0 var(--space-3);
 }
 
 .roadmap-section {
@@ -100,22 +100,6 @@ details.roadmap-layer[data-state="not-available"] > summary::before { content: '
   margin: 0 0 var(--space-4) 0;
   padding-bottom: var(--space-3);
   border-bottom: 1px solid var(--line);
-}
-
-/* The title routes through renderPageHeader (LIN-975). Override the global
-   centered `header` + its bottom margin so the primitive sits left-aligned and
-   tight against the meta line, preserving the roadmap's bespoke header block. */
-.roadmap-page-header {
-  text-align: left;
-  margin-bottom: 0;
-}
-
-.roadmap-page-header h1 {
-  font-family: var(--font-content);
-  font-size: 1.4em;
-  font-weight: 700;
-  margin: 0 0 var(--space-1) 0;
-  color: var(--text);
 }
 
 /* Header meta (LIN-1222): a flex-wrap row of atomic facts. The `·` separators
@@ -903,7 +887,7 @@ details.roadmap-layer[data-state="not-available"] > summary::before { content: '
    ============================================================================= */
 @media (max-width: 600px) {
   .roadmap-page {
-    padding: var(--space-2) 0;
+    padding: 0 0 var(--space-2);
   }
 
   /* The shipped feed's two-line flex row (LIN-1222) is width-agnostic — it wraps

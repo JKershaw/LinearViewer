@@ -2,27 +2,15 @@
    Ship Page — Radial view
    ========================================================================== */
 
-body:has(.ship-page) {
+/* LIN-4564: the page sits in the frame (lib/components/frame.js): the rail beside it at 1280, the band above it on a
+   phone, the h1 and the footer around it. The canvas owns its own scroll and fills the viewport below where it starts
+   (--ship-top, measured at runtime by ship.js measureCanvasOffset; LIN-1221 F2 measured the old bar's bottom edge, which
+   is gone). The page itself scrolls only by the footer's height, so the footer, the same on every page, stays
+   reachable. The fixed controls clear the chrome by the same measurement (--ship-top above, --ship-left beside). The
+   canvas takes the page's full width: only the frame's reading-width cap is lifted, its left edge stays. The `56px`
+   / `0px` fallbacks only apply before ship.js runs. */
+.frame-main:has(> .ship-page) {
   max-width: none;
-  overflow: hidden; /* the .ship-page itself owns scrolling */
-}
-
-/* The shared header is pinned/translucent globally (LIN-984), but the ship page
-   is a fixed-viewport canvas: `body` has `overflow: hidden` and `.ship-page`
-   owns its own scroll, so NOTHING scrolls under the header here. Pinning it buys
-   nothing and only reintroduces the original hazard — the sticky header's
-   stacking context swallows pointer events on the page's `position: fixed`
-   near-top controls (the ship mode toggle), which `scroll-margin` can't rescue
-   because they never scroll. So the header keeps the normal-flow fallback on
-   ship: static, opaque, no blur → no stacking context, exactly as it behaved
-   before LIN-984. The fixed controls (mode toggle offset below the measured
-   --ship-nav-h; LIN-1221 F2) stay clickable and clear of the empty-space
-   drag/pan zone. */
-body:has(.ship-page) .nav-bar {
-  position: static;
-  background: var(--bg);
-  -webkit-backdrop-filter: none;
-  backdrop-filter: none;
 }
 
 .ship-page {
@@ -30,12 +18,7 @@ body:has(.ship-page) .nav-bar {
   overflow: auto;
   -webkit-overflow-scrolling: touch;
   cursor: grab;
-  /* Fill the viewport beneath the (normal-flow) nav. Driven off the REAL nav
-     height measured at runtime (--ship-nav-h; LIN-1221 F2) so this stays exact
-     against the finished S2 two-row header — the stale `56px` under-reserved and
-     left the canvas overflowing the viewport. The `56px` fallback only applies
-     before ship.js runs. */
-  height: calc(100vh - var(--ship-nav-h, 56px));
+  height: calc(100vh - var(--ship-top, 56px));
   background: var(--bg);
 }
 
@@ -346,11 +329,12 @@ body:has(.ship-page) .nav-bar {
 
 .ship-mode-control {
   position: fixed;
-  /* Sit just below the normal-flow nav, measured at runtime (LIN-1221 F2). The
-     stale `top:68px` landed the toggle over the finished S2 nav's second (view-
-     switcher) row — the live LIN-984 collision. `56px` fallback pre-JS. */
-  top: calc(var(--ship-nav-h, 56px) + 12px);
-  left: 16px;
+  /* Sit just inside the canvas's top-left corner, measured at runtime (LIN-1221
+     F2; LIN-4564: --ship-top/--ship-left clear the frame's h1 and rail). The
+     stale `top:68px` once landed the toggle over the old bar — the live LIN-984
+     collision. Fallbacks pre-JS. */
+  top: calc(var(--ship-top, 56px) + 12px);
+  left: calc(var(--ship-left, 0px) + 16px);
   z-index: 8; /* above heading control (7) */
   display: flex;
   align-items: center;
@@ -417,8 +401,8 @@ body:has(.ship-page) .nav-bar {
 
 .ship-backlog-control {
   position: fixed;
-  top: calc(var(--ship-nav-h, 56px) + 12px);
-  right: 16px;
+  top: calc(var(--ship-top, 56px) + 12px);
+  right: calc(var(--ship-right, 0px) + 16px);
   z-index: 8; /* same band as the mode control */
   display: flex;
   align-items: center;
@@ -487,7 +471,7 @@ body:has(.ship-page) .nav-bar {
 .ship-zoom-control {
   position: fixed;
   bottom: 24px;
-  left: 16px;
+  left: calc(var(--ship-left, 0px) + 16px);
   z-index: 8; /* same band as the mode control */
   display: flex;
   align-items: stretch;
@@ -581,12 +565,12 @@ body:has(.ship-page) .nav-bar {
    control instead, sharing the left anchor. The offset is the control's OWN
    height via translateY(100%) — both controls carry identical font, padding and
    border, so the row below lands flush with no measured constant to go stale
-   (the `--ship-nav-h` lesson from LIN-1221 F2). 400px, not 381px, so the rule
+   (the measured-offset lesson from LIN-1221 F2). 400px, not 381px, so the rule
    engages with margin above the measured collision threshold. Proper mobile
    design for this view is still LIN-270. */
 @media (max-width: 400px) {
   .ship-backlog-control {
-    left: 16px;
+    left: calc(var(--ship-left, 0px) + 16px);
     right: auto;
     transform: translateY(calc(100% + 6px));
   }

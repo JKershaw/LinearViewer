@@ -201,7 +201,7 @@ test.describe('Live Console (experimental)', () => {
         await page.request.post(`/test/create-runner-key?urlKey=${URL_KEY}`);
         await page.goto(PAGE_URL);
         await page.waitForLoadState('networkidle');
-        await expect(page.locator('.page-header h1')).toHaveText('Live Console');
+        await expect(page.locator(SELECTORS.nav.heading)).toHaveText('Live');
         const res = await page.request.get(EVENTS_API);
         expect(res.status()).toBe(200);
       });
@@ -211,7 +211,7 @@ test.describe('Live Console (experimental)', () => {
       await page.goto(`/test/set-session?${featuresParam({ liveConsole: true })}&urlKey=${URL_KEY}`);
       await page.goto(PAGE_URL);
       await page.waitForLoadState('networkidle');
-      await expect(page.locator('.page-header h1')).toHaveText('Live Console');
+      await expect(page.locator(SELECTORS.nav.heading)).toHaveText('Live');
     });
 
     test('toggle lives in the Views section and defaults off without a runner', async ({ page }) => {
@@ -287,6 +287,8 @@ test.describe('Live Console (experimental)', () => {
     // .lc-page's 1rem side padding plus the root's `scrollbar-gutter: stable`
     // reservation narrow the mobile strip well below a naive viewport-minus-padding
     // guess, so 319 (not 358) is the real pinned width at 390px.
+    // LIN-4564: the page sits in the frame, which owns the gutter; .lc-page has no side padding of its own, so the strip
+    // is the column's full 900px at 1280 and the frame main's width at 390 (re-captured against the frame's markup).
     test('route A: .lc-pulse geometry and .lc-page max-width stay pinned (LIN-1741)', async ({ page }) => {
       const pulse = page.locator('.lc-pulse');
 
@@ -295,7 +297,7 @@ test.describe('Live Console (experimental)', () => {
         const cs = getComputedStyle(el);
         return { width: r.width, height: r.height, display: cs.display, position: cs.position };
       });
-      expect(desktop).toEqual({ width: 868, height: 46, display: 'block', position: 'static' });
+      expect(desktop).toEqual({ width: 900, height: 46, display: 'block', position: 'static' });
 
       const maxWidth = await page.locator('.lc-page').evaluate(el => getComputedStyle(el).maxWidth);
       expect(maxWidth).toBe('900px');
@@ -306,7 +308,7 @@ test.describe('Live Console (experimental)', () => {
         const cs = getComputedStyle(el);
         return { width: r.width, height: r.height, display: cs.display, position: cs.position };
       });
-      expect(mobile).toEqual({ width: 319, height: 46, display: 'block', position: 'static' });
+      expect(mobile).toEqual({ width: 366, height: 46, display: 'block', position: 'static' });
     });
   });
 

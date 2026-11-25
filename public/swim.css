@@ -2,14 +2,15 @@
    Swim Page - Horizontal Lane View
    ========================================================================== */
 
-/* Override body max-width so swim lanes can use full viewport */
-body:has(.swim-page) {
+/* LIN-4564: the page sits in the frame (lib/components/frame.js). The lanes use the page's full width (the frame's
+   <main> keeps its left edge; only its reading-width cap is lifted here), and the lanes scroll sideways inside
+   .swim-container, never the page. The frame owns the gutter and the h1. */
+.frame-main:has(> .swim-page) {
   max-width: none;
-  overflow-x: auto;
 }
 
 .swim-page {
-  padding: var(--space-2h) var(--space-3) var(--space-5);
+  padding: 0 0 var(--space-5);
 }
 
 /* ==========================================================================
@@ -595,7 +596,7 @@ body:has(.swim-page) {
 
 @media (min-width: 641px) {
   .swim-page {
-    padding: var(--space-3) var(--space-5) 3rem;
+    padding-bottom: 3rem;
   }
 
   .swim-lane-label {
@@ -616,10 +617,9 @@ body:has(.swim-page) {
   overflow-x: auto;
   overflow-y: auto;
   /* Re-derive the viewport-minus-chrome cap from real chrome instead of the
-     stale pre-S2 `140px` literal (LIN-1226). The old constant was exactly
-     nav 6rem + page top padding 0.75rem + page bottom --space-5 (96+12+32=140);
-     routing the nav portion through --nav-sticky-h keeps desktop identical while
-     tracking the S2 two-row nav's ≤640px bump (7.75rem) the frozen literal missed. */
+     stale pre-S2 `140px` literal (LIN-1226). --nav-sticky-h is the sticky chrome
+     above the page: in the frame, the band's height on a phone and 0 at 1280
+     (public/frame.css), so the cap tracks it. */
   max-height: calc(100vh - var(--nav-sticky-h) - 0.75rem - var(--space-5));
 }
 

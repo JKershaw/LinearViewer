@@ -196,33 +196,37 @@ test.describe('Ship Page', () => {
     expect(clip.offX).toBe(0);
   });
 
-  // LIN-1221 F2 / LIN-984 non-regression: on desktop the fixed mode toggle must
-  // sit clear of the (normal-flow) shared nav and stay clickable — the nav must
-  // not overlay and intercept it.
-  test('desktop mode toggle clears the nav and stays clickable (F2 / LIN-984)', async ({ page }) => {
+  // LIN-1221 F2 / LIN-984 non-regression, in the frame since LIN-4564: on desktop the fixed mode toggle sits inside the
+  // canvas's top-left corner, clear of the frame's h1 above and its rail beside, and stays clickable: nothing of the
+  // frame overlays and intercepts it.
+  test('desktop mode toggle clears the frame and stays clickable (F2 / LIN-984)', async ({ page }) => {
     await page.setViewportSize({ width: 1280, height: 720 });
     await page.reload();
     await page.waitForLoadState('networkidle');
 
     const geom = await page.evaluate(() => {
-      const nav = document.querySelector('.nav-bar').getBoundingClientRect();
+      const canvas = document.querySelector('.ship-page').getBoundingClientRect();
+      const rail = document.querySelector('[data-testid="frame-rail"]').getBoundingClientRect();
       const ctl = document.querySelector('.ship-mode-control').getBoundingClientRect();
-      // What actually receives a click at the toggle's centre?
       const cx = ctl.left + ctl.width / 2;
       const cy = ctl.top + ctl.height / 2;
       const hit = document.elementFromPoint(cx, cy);
       const ctlEl = document.querySelector('.ship-mode-control');
       return {
-        navBottom: nav.bottom,
+        canvasTop: canvas.top,
+        canvasLeft: canvas.left,
+        railRight: rail.right,
         ctlTop: ctl.top,
-        interceptedByNav: !!(hit && hit.closest('.nav-bar')),
+        ctlLeft: ctl.left,
+        interceptedByFrame: !!(hit && hit.closest('[data-testid="frame-rail"], .frame-head, [data-testid="frame-band"]')),
         toggleOwnsHit: !!(hit && ctlEl.contains(hit))
       };
     });
-    // The toggle sits entirely below the nav (no vertical overlap).
-    expect(geom.ctlTop).toBeGreaterThanOrEqual(geom.navBottom);
-    // And nothing from the nav overlays the toggle's hit point.
-    expect(geom.interceptedByNav).toBe(false);
+    // Inside the canvas: below the h1, right of the rail.
+    expect(geom.ctlTop).toBeGreaterThanOrEqual(geom.canvasTop);
+    expect(geom.ctlLeft).toBeGreaterThanOrEqual(geom.canvasLeft);
+    expect(geom.ctlLeft).toBeGreaterThanOrEqual(geom.railRight);
+    expect(geom.interceptedByFrame).toBe(false);
     expect(geom.toggleOwnsHit).toBe(true);
 
     // It genuinely responds to a click (project mode stays active, unintercepted).
@@ -242,7 +246,7 @@ test.describe('Ship Page', () => {
     // F2). Scan a few control-free candidate points for bare canvas.
     const origin = await page.evaluate(() => {
       const r = document.querySelector('.ship-page').getBoundingClientRect();
-      const IGNORE = '.swim-box, .ship-heading-control, .ship-mode-control, .ship-zoom-control, .swim-popover';
+      const IGNORE = '.swim-box, .ship-heading-control, .ship-mode-control, .ship-backlog-control, .ship-zoom-control, .swim-popover';
       const candidates = [
         [r.right - 24, r.top + 24],
         [r.right - 24, r.bottom - 24],

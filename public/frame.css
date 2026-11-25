@@ -357,6 +357,21 @@ body.frame-body {
   font-weight: 600;
 }
 
+/* A preview's "+ Local workspace" (LIN-4564, navbar.js renderPreviewSignIn): a form's button that reads as the band's
+   other actions. */
+.frame-public__form {
+  margin: 0;
+}
+
+.frame-public__button {
+  padding: 0;
+  background: none;
+  border: 0;
+  font-family: inherit;
+  font-size: inherit;
+  cursor: pointer;
+}
+
 .frame-scrim[hidden] {
   display: none;
 }
@@ -452,5 +467,12 @@ body.frame-body {
 
   .frame-public {
     padding: var(--space-3);
+  }
+  /* A public band's actions (Sign in, a preview's sign-in path) are tap targets: 44px tall on a phone (LIN-2210, carried
+     over from the old bar's landing CTAs by LIN-4564). */
+  .frame-public__action {
+    display: inline-flex;
+    align-items: center;
+    min-height: 2.75rem;
   }
 }

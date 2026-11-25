@@ -312,9 +312,7 @@ body {
   margin-right: auto;
   /* `clip`, not `hidden`, for the same reason as the `html` reset above: `hidden`
      would make `body` a scroll container and defeat the sticky header (LIN-1068).
-     Swim pages deliberately re-establish a horizontal scroll container via
-     `body:has(.swim-page) { overflow-x: auto }` (swim.css) — that override is
-     intentional and orthogonal to this base clip. */
+     Swim's lanes scroll sideways inside their own container (.swim-container, swim.css), never the page. */
   overflow-x: clip;
 }
 

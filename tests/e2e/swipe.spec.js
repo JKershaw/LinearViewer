@@ -143,9 +143,9 @@ test.describe('Swipe Page', () => {
     }
   });
 
-  test('swipe shows as current in the header switcher', async ({ page }) => {
-    // The current page shows "swipe" as bold in the header nav (LIN-978).
-    await expect(page.locator('.nav-views [data-testid="nav-view-swipe"].nav-view-current')).toBeVisible();
+  test('the rail marks Swipe as the page (LIN-978; the frame since LIN-4564)', async ({ page }) => {
+    await expect(page.locator(SELECTORS.nav.place('swipe'))).toHaveAttribute('aria-current', 'page');
+    await expect(page.locator(SELECTORS.nav.heading)).toHaveText('Swipe');
   });
 
   test('swipe link appears in the rail on the dashboard', async ({ page, localWorkerUrlKey }) => {

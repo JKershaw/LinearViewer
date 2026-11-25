@@ -39,8 +39,9 @@ const CASES = [
       ),
   },
   {
+    // LIN-4564: Observation is the place Runs in the frame (its URL stays /observation).
     name: 'observation',
-    title: 'Observation',
+    title: 'Runs',
     html: () =>
       renderObservationPage(
         { workspaces: [{ urlKey: 'ws', name: 'WS' }] },
@@ -63,7 +64,7 @@ const CASES = [
   },
   {
     name: 'task-chat',
-    title: 'Task Chat',
+    title: 'Task chat',
     html: () => renderTaskChatPage({}, { urlKey: 'ws' }),
   },
   {
@@ -73,7 +74,7 @@ const CASES = [
   },
   {
     name: 'passage-planner',
-    title: 'Passage Planner',
+    title: 'Passage planner',
     html: () => renderPassagePlannerPage({}, { urlKey: 'ws' }),
   },
 ];
@@ -87,8 +88,9 @@ describe('LIN-975: page titles route through renderPageHeader', () => {
         rendered != null,
         `${name} should emit a <header class="page-header"><h1> block`
       );
-      // startsWith (not equals) so observation's fused "● live" indicator, which
-      // rides inside the h1 via titleHtml, still passes.
+      // startsWith (not equals), kept from when observation's "● live" indicator rode inside the h1 (it is the line
+      // under it since LIN-4564). The frame (lib/components/frame.js) draws each page's h1 through the primitive, as the
+      // registry's label (lib/places.js).
       assert.ok(
         rendered.startsWith(title),
         `${name} page-header title should be "${title}" (got: ${JSON.stringify(rendered)})`

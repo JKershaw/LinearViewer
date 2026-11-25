@@ -10,6 +10,12 @@
  * `UPDATE_RENDER_SESSION_GOLDEN=1 node --test tests/unit/render-session-golden.test.js`
  * and say why in the commit — never by widening an assertion.
  *
+ * LIN-4564 (LIN-4342 piece 3): the run page moved onto the frame (lib/components/frame.js). The golden was regenerated
+ * and changed only in its chrome: the rail, the "← Runs" way back (the old "← back to feed" link), the h1 (the run's
+ * title alone; "Run <id>" is the line under it), the footer and the tab title. Its body, everything inside the page's
+ * container from the question cards to the close-out box, was compared byte for byte with the golden before the move and
+ * is identical in all 25 cases.
+ *
  * Determinism: every case pins `options.now` (the only clock the renderer
  * reads, via `buildRunView`) and passes a fixed `deployInfo`.
  */

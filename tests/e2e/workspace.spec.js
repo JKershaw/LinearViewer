@@ -3,8 +3,9 @@ import { SELECTORS } from '../helpers.js';
 
 // LIN-4563 (LIN-4342 piece 2): Home moved onto the frame, whose rail carries the workspace menu (switch and add only;
 // removing a workspace moves to Settings in piece 5). The old bar's menu (switch, add, remove) still renders on pages not
-// yet moved, so its cases below run on /swim (OLD_BAR_PAGE). Switching from Home goes through the rail's menu.
-const OLD_BAR_PAGE = 'swim';
+// yet moved, so its cases below run on a page still on the bar (OLD_BAR_PAGE). Switching from Home goes through the
+// rail's menu. LIN-4564 (piece 3) moved Swim onto the frame, so the bar's menu is read on Settings.
+const OLD_BAR_PAGE = 'settings';
 
 // Mixed-harness boundary split (LIN-428, parent S3/LIN-389).
 //   - The two single-workspace selector cases ('single workspace shows in
@@ -88,8 +89,8 @@ test.describe('Workspace Selector', () => {
 
     await expect(page.locator('#workspace-options')).toBeVisible();
 
-    // Click outside (on the page's heading)
-    await page.locator('h1').first().click();
+    // Click outside (a bare corner of the page's <main>; Settings, the old-bar page since LIN-4564, draws no heading yet)
+    await page.locator('main').first().click({ position: { x: 2, y: 2 } });
 
     await expect(page.locator('#workspace-options')).toHaveClass(/hidden/);
   });

@@ -27,34 +27,21 @@ export const OLD_CHROME_ALLOWANCE = [
   'lib/components/plain-page.js',
   'lib/render-account-home.js',
   'lib/render-audit.js',
-  'lib/render-collective.js',
   'lib/render-custom-prompts.js',
   'lib/render-dispatch.js',
   'lib/render-effort-readout.js',
   'lib/render-email-auth.js',
   'lib/render-escalation-kpis.js',
-  'lib/render-flight-companion.js',
   'lib/render-kpis.js',
   'lib/render-landing.js',
   'lib/render-legal.js',
   'lib/render-library.js',
-  'lib/render-live-console.js',
-  'lib/render-observation.js',
   'lib/render-pages.js',
-  'lib/render-passage-planner.js',
   'lib/render-project-page.js',
   'lib/render-prompts.js',
-  'lib/render-roadmap.js',
   'lib/render-runner-setup.js',
-  'lib/render-session.js',
   'lib/render-settings.js',
-  'lib/render-ship-biscuit.js',
-  'lib/render-ship-journey.js',
-  'lib/render-ship.js',
   'lib/render-styleguide.js',
-  'lib/render-swim.js',
-  'lib/render-swipe.js',
-  'lib/render-task-chat.js',
   'lib/render-templates.js',
   'lib/render-workspace-kpis.js',
   'routes/getting-started.js',
@@ -100,6 +87,23 @@ test('the list only falls: a listed file that moved onto the frame comes off it 
   const found = new Set(oldChromeFiles());
   const stale = OLD_CHROME_ALLOWANCE.filter(rel => !found.has(rel));
   assert.deepEqual(stale, [], `no longer imports the shell's renderPage; delete from OLD_CHROME_ALLOWANCE: ${stale.join(', ')}`);
+});
+
+// LIN-4564 (piece 3): Watch and Views. Runs, the run page and Live; Swipe, Swim and Roadmap; and every flagged view
+// (EXPERIMENTAL_VIEWS), each at its own place. Swipe, Swim and Ship draw their signed-out previews in the public frame.
+const PIECE_3 = ['observation', 'session', 'live-console', 'swipe', 'swim', 'roadmap', 'collective', 'task-chat', 'ship', 'flight-companion', 'passage-planner', 'ship-biscuit', 'ship-journey'];
+
+test('the pages piece 3 moved are on the frame (LIN-4564: Watch and Views)', () => {
+  for (const name of PIECE_3) {
+    const rel = `lib/render-${name}.js`;
+    assert.ok(!OLD_CHROME_ALLOWANCE.includes(rel), `${rel} is listed as old chrome`);
+    const source = readFileSync(join(ROOT, rel), 'utf8');
+    assert.match(source, /renderFrame\(/, `${rel} renders through the frame`);
+    assert.doesNotMatch(source, /renderNavBar\(|renderPageFooter\(/, `${rel} draws no old bar or old footer`);
+  }
+  for (const name of ['swipe', 'swim', 'ship']) {
+    assert.match(readFileSync(join(ROOT, `lib/render-${name}.js`), 'utf8'), /renderPublicFrame\(/, `${name}'s signed-out preview sits in the public frame`);
+  }
 });
 
 test('the pages piece 2 moved are on the frame (LIN-4563: Home and Backlog, the task page, edit, new and not found)', () => {

@@ -13,6 +13,7 @@ import { renderSwipePage } from '../../../lib/render-swipe.js';
  *   when `urlKey` is empty). The page's own `__SWIPE_DATA__` is not used; the suite supplies its card data.
  */
 export function swipePageBody(options = {}) {
-  const html = renderSwipePage({ projectTrees: [], inProgressTrees: [], recentActivityTrees: [] }, options).replace(/<!doctype[^>]*>/i, '');
+  // No workspace is the signed-out preview (LIN-4564: it sits in the public frame; a workspace page needs its urlKey).
+  const html = renderSwipePage({ projectTrees: [], inProgressTrees: [], recentActivityTrees: [] }, { isLanding: !options.urlKey, ...options }).replace(/<!doctype[^>]*>/i, '');
   return html.match(/<body[^>]*>([\s\S]*)<\/body>/i)[1];
 }

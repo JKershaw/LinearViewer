@@ -2,10 +2,11 @@
    Swipe Page - Mobile-First Task Cards
    ========================================================================== */
 
+/* LIN-4564: the page sits in the frame (lib/components/frame.js), which owns the one left edge, the gutter and the h1;
+   the column starts at that edge rather than centring itself. */
 .swipe-page {
   max-width: 520px;
-  margin: 0 auto;
-  padding: var(--space-2h) var(--space-3) var(--space-5);
+  padding: 0 0 var(--space-5);
 }
 
 /* Filter Bar */
@@ -875,7 +876,7 @@ body[data-proxy-active="true"] .prompt-section .prompt-proxy-toggle {
 
 @media (min-width: 641px) {
   .swipe-page {
-    padding: var(--space-3) var(--space-5) 3rem;
+    padding-bottom: 3rem;
   }
 
   .swipe-card-inner {
@@ -890,28 +891,27 @@ body[data-proxy-active="true"] .prompt-section .prompt-proxy-toggle {
 /* Wide desktop — intentional two-pane composition (LIN-1224).
    The mobile form is a single ~520px column; on a 1280px canvas that left the
    card floating in a void with vast dead margins. At >=900px the page becomes a
-   framed grid: a left control rail (title + filter + prev/next) beside the card
-   stage, centred in a bounded panel. Nothing here touches the mobile layout —
-   below 900px the page stays the original single centred column. */
+   framed grid: a left control column (filter + prev/next) beside the card
+   stage, in a bounded panel. Nothing here touches the mobile layout —
+   below 900px the page stays the original single column. LIN-4564: the title
+   left the panel for the frame's h1 above it, so the column starts at the filter. */
 @media (min-width: 900px) {
   .swipe-page {
     display: grid;
     grid-template-columns: minmax(220px, 300px) minmax(0, 560px);
-    grid-template-rows: auto auto auto 1fr;
+    grid-template-rows: auto auto 1fr;
     grid-template-areas:
-      "rail-header stage"
       "rail-filter stage"
       "rail-nav    stage"
       "rail-fill   stage";
     column-gap: var(--space-5);
     align-items: start;
-    justify-content: center;
+    justify-content: start;
     max-width: 960px;
     padding: var(--space-4) var(--space-5) 3rem;
     background: var(--card);
     border: 1px solid var(--line);
     border-radius: var(--radius-lg);
-    margin-top: var(--space-4);
   }
 
   /* Card stage sits on the framed panel; the raised card + its shadow now read
@@ -920,20 +920,9 @@ body[data-proxy-active="true"] .prompt-section .prompt-proxy-toggle {
     background: var(--bg);
   }
 
-  .swipe-header { grid-area: rail-header; }
   .swipe-filter-bar { grid-area: rail-filter; }
   .swipe-nav-row { grid-area: rail-nav; }
   .swipe-card-area { grid-area: stage; }
-
-  /* Rail header: left-aligned in the rail rather than page-centred. */
-  .swipe-header {
-    text-align: left;
-    margin-bottom: var(--space-3);
-  }
-
-  .swipe-header h1 {
-    font-size: var(--font-size-lg);
-  }
 
   .swipe-filter-bar {
     margin-bottom: 0;
@@ -956,7 +945,7 @@ body[data-proxy-active="true"] .prompt-section .prompt-proxy-toggle {
 
 @media (max-width: 400px) {
   .swipe-page {
-    padding: var(--space-2) var(--space-2h) var(--space-4);
+    padding-bottom: var(--space-4);
   }
 
   .swipe-card-inner {

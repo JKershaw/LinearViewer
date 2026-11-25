@@ -537,14 +537,14 @@ export function shapedLocalSeed(urlKey = LOCAL_WORKSPACE_URL_KEY, { tasks = 3000
 /**
  * Seed the shaped workspace and exactly `questions` open questions addressed to the signed-in owner (the workspace's
  * records are cleared first; then the test-only POST /test/seed-question-record, the records pipeline's own write). `runnerKey` defaults to true: the owner with a
- * runner is who sees the questions count. Pass `runnerKey: false` for a new user without a runner.
+ * runner is who sees the questions count. Pass `runnerKey: false` for a new user without a runner, and `features` to turn flags on (LIN-4564: the walk with every view flag on).
  *
  * @param {import('@playwright/test').Page} page
- * @param {{urlKey?: string, tasks?: number, projects?: number, questions?: number, runnerKey?: boolean}} [opts]
+ * @param {{urlKey?: string, tasks?: number, projects?: number, questions?: number, runnerKey?: boolean, features?: Object}} [opts]
  * @returns {Promise<{urlKey: string, dashboard: string}>}
  */
-export async function seedShapedWorkspace(page, { urlKey = LOCAL_WORKSPACE_URL_KEY, tasks = 3000, projects = 30, questions = 3, runnerKey = true } = {}) {
-  const seeded = await seedLocalWorkspace(page, shapedLocalSeed(urlKey, { tasks, projects }), { urlKey, runnerKey });
+export async function seedShapedWorkspace(page, { urlKey = LOCAL_WORKSPACE_URL_KEY, tasks = 3000, projects = 30, questions = 3, runnerKey = true, features } = {}) {
+  const seeded = await seedLocalWorkspace(page, shapedLocalSeed(urlKey, { tasks, projects }), { urlKey, runnerKey, features });
   // Records outlast a seed (they live in their own store), so the questions start from none: exactly `questions` open.
   const cleared = await page.request.get(`/test/clear-ticket-records?urlKey=${encodeURIComponent(seeded.urlKey)}`);
   if (!cleared.ok()) throw new Error(`seedShapedWorkspace: clearing records failed: ${cleared.status()}`);

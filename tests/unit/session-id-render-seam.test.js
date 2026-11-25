@@ -18,6 +18,9 @@
  * never a fresh literal — so it cannot pass while the ingress silently coerces,
  * truncates or rejects what the renderer is then asked to escape.
  *
+ * LIN-4564: the run page moved onto the frame, whose tab is `<run title> · <Workspace>`; the sessionId's sink is now
+ * the run id line under the h1, and the tests below follow it there (the <title> checks stay, so it cannot return).
+ *
  * Assertion scope. Assertions target the `<title>` ELEMENT, not the whole `<head>`.
  * The shared page shell puts its own inline `<script>` in the head, so a
  * head-wide "contains no <script>" check would be a false positive that fails
@@ -250,6 +253,12 @@ describe('LIN-1118 seam: a relaxed sessionId survives dispatch storage and stays
     assert.equal((head.match(/<title>/g) || []).length, 1, 'exactly one <title> open tag');
     assert.equal((head.match(/<\/title>/g) || []).length, 1,
       'exactly one </title> close tag — the payload must not forge a second');
+
+    // 6. LIN-4564: the run page's tab is the frame's `<run title> · <Workspace>`, so the sessionId no longer reaches the
+    //    <title> at all; its sink is the run id line under the h1, where it is escaped.
+    assert.ok(!title.includes('title&gt;'), 'the sessionId is not in the tab title');
+    assert.ok(!page.sentBody.includes(HOSTILE_SESSION_ID), 'the raw payload reaches no part of the page');
+    assert.match(page.sentBody, /data-testid="session-run-id">Run &lt;\/title&gt;</, 'the run id line carries it escaped');
   });
 
   test('the ordinary composite sessionId LIN-1118 exists to enable renders unescaped-but-intact', async () => {
@@ -275,10 +284,11 @@ describe('LIN-1118 seam: a relaxed sessionId survives dispatch storage and stays
     assert.equal(page.statusCode, 200, 'the session page rendered');
     // LIN-1801: this session has no seedIssue, so the anchor-loop fallback
     // (session.loops[0], per routes/dashboard.js) is the worker carrying
-    // issueTitle 'Title LIN-1118' — distinct from the composite id, so it now
-    // renders as a title suffix. The escape-fidelity claim this test exists for
-    // still holds: the composite id itself reaches the title unescaped-but-intact.
-    assert.equal(titleOf(page.sentBody), `Session · ${COMPOSITE} — Title LIN-1118`,
-      'a benign composite id reaches the title unchanged — the escape must not over-escape');
+    // issueTitle 'Title LIN-1118'. LIN-4564: a run page's name is its title, so the tab is
+    // `Title LIN-1118 · <Workspace>` and the composite id reaches the run id line under the h1 instead, in its short
+    // form, unescaped-but-intact: the escape must not over-escape.
+    assert.match(titleOf(page.sentBody), /^Title LIN-1118 · /, 'the run\'s title names the tab');
+    assert.match(page.sentBody, /data-testid="session-run-id">Run LIN-1117</,
+      'a benign composite id reaches the run id line unchanged — the escape must not over-escape');
   });
 });

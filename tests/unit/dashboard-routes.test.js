@@ -2681,7 +2681,7 @@ describe('GET /observation/session/:sessionId — the page through the route (LI
     // (autopilotHistoryItem('sess-ctx', 'LIN-900') here), carrying issueTitle
     // 'Title LIN-900' — distinct from the session's bare seedIssue 'LIN-900'.
     assert.match(html, /data-testid="session-seed-title"[^>]*>Title LIN-900</);
-    assert.match(html, /data-testid="session-title"[^>]*>Title LIN-900</);
+    assert.match(html, /<h1>Title LIN-900<\/h1>/, 'the frame\'s h1 is the run\'s title (LIN-4564)');
     assert.match(html, /data-testid="session-run-id"[^>]*>Run sess-ctx</);
   });
 });

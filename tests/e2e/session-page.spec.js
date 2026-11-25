@@ -1,4 +1,5 @@
 import { test, expect } from '../fixtures/test-base.js';
+import { SELECTORS } from '../helpers.js';
 import { askingRun, seedQuestion, questionState, decisionFor } from '../fixtures/question-records.js';
 import { seedHistoryFeedback } from '../fixtures/history-feedback.js';
 
@@ -372,8 +373,10 @@ test.describe('Dedicated per-session page (LIN-1003)', () => {
 
     // The page shell rendered.
     await expect(page.locator('[data-testid="session-page"]')).toBeVisible();
-    // LIN-3250: the heading is the task title + a short "Run <id>".
-    await expect(page.locator('[data-testid="session-title"]')).toContainText('Session-page seed');
+    // LIN-3250: the heading is the task title + a short "Run <id>". LIN-4564: the frame's h1 is the run's title (a run
+    // page's name is its title), and "Run <id>" is the line under it.
+    await expect(page.locator(SELECTORS.nav.heading)).toHaveText('Session-page seed');
+    await expect(page).toHaveTitle(/^Session-page seed · /);
     await expect(page.locator('[data-testid="session-run-id"]')).toContainText('Run ');
 
     // Tasks-touched surface carries the seeded task.
@@ -410,9 +413,8 @@ test.describe('Dedicated per-session page (LIN-1003)', () => {
     await expect(entries.first().locator('.sess-tx-link')).toHaveAttribute('href', 'https://example.com/pr/42');
     await expect(entries.last().locator('.surface.chat-msg__body')).toContainText('landed the change');
 
-    // Back-to-feed link points at the observation feed.
-    await expect(page.locator('[data-testid="session-back"]'))
-      .toHaveAttribute('href', `/workspace/${URL_KEY}/observation`);
+    // The way back (the frame's, LIN-4564) points at the observation feed.
+    await expect(page.locator(SELECTORS.nav.back)).toHaveAttribute('href', `/workspace/${URL_KEY}/observation`);
   });
 
   // LIN-1801 review fix: the Overview seed-title span is a THIRD child of the
@@ -927,7 +929,9 @@ test.describe('Dedicated per-session page (LIN-1003)', () => {
     expect(await resp.text()).toContain('data-testid="session-not-found"');
   });
 
-  test('Observation nav tab is active and links to the feed, not the session page (LIN-1149)', async ({ page }) => {
+  // LIN-1149, in the frame since LIN-4564: the run page is drilled in under Runs, so the rail marks Runs (`aria-current="true"`,
+  // the parent, not the page), Runs links to the feed, and the page's one way back leads there too.
+  test('the rail marks Runs on the run page, Runs links to the feed, and the way back leads there (LIN-1149, LIN-4564)', async ({ page }) => {
     await page.goto(`/test/set-session?urlKey=${URL_KEY}`);
     await clearRuns(page);
     await seedSessionWithTranscript(page);
@@ -936,23 +940,14 @@ test.describe('Dedicated per-session page (LIN-1003)', () => {
     await page.goto(`/workspace/${URL_KEY}/observation/session/${encodeURIComponent(sessionId)}`);
     await page.waitForLoadState('networkidle');
 
-    // The page rendered.
     await expect(page.locator('[data-testid="session-page"]')).toBeVisible();
-    // The page-local back link points to the Observation feed.
-    await expect(page.locator('[data-testid="session-back"]'))
-      .toHaveAttribute('href', `/workspace/${URL_KEY}/observation`);
-
-    // The shared Observation nav tab is active (aria-current) on the session page.
-    const observationTab = page.locator('[data-testid="nav-view-observation"]');
-    await expect(observationTab).toBeVisible();
-    await expect(observationTab).toHaveAttribute('aria-current', 'page');
-    // The Observation tab is a direct link to the feed, not the session page —
-    // verified by navigating from a different surface.
-    await page.goto(`/workspace/${URL_KEY}/swipe`);
-    await page.waitForLoadState('networkidle');
-    // On the swipe page the Observation tab is a clickable anchor (not active).
-    const tabHref = await page.locator('[data-testid="nav-view-observation"]').getAttribute('href');
-    expect(tabHref).toBe(`/workspace/${URL_KEY}/observation`);
+    await expect(page.locator(SELECTORS.nav.back)).toHaveText('← Runs');
+    await expect(page.locator(SELECTORS.nav.back)).toHaveAttribute('href', `/workspace/${URL_KEY}/observation`);
+    await expect(page.locator('[data-testid="session-back"]')).toHaveCount(0);
+    const runs = page.locator(SELECTORS.nav.place('runs'));
+    await expect(page.locator(SELECTORS.nav.railMarked)).toHaveCount(1);
+    await expect(runs).toHaveAttribute('aria-current', 'true');
+    await expect(runs).toHaveAttribute('href', `/workspace/${URL_KEY}/observation`);
   });
 
   // ── LIN-3250: the rewritten run page (header strip, steps, live clocks) ────

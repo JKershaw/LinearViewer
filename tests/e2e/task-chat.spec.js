@@ -37,7 +37,7 @@ test.describe('Task Chat Page (experimental)', () => {
       await page.goto(PAGE_URL);
       await page.waitForLoadState('networkidle');
       // Title routes through the shared renderPageHeader primitive (LIN-975).
-      await expect(page.locator('.page-header h1')).toHaveText('Task Chat');
+      await expect(page.locator('.page-header h1')).toHaveText('Task chat'); // LIN-4564: the frame's h1 is the registry's name (lib/places.js)
     });
 
     test('toggle lives in the Experimental section and defaults off', async ({ page }) => {

@@ -1,4 +1,5 @@
 import { test, expect } from '../fixtures/test-base.js';
+import { SELECTORS } from '../helpers.js';
 
 test.describe('Landing Swipe Page (/swipe)', () => {
   test.beforeEach(async ({ page }) => {
@@ -35,7 +36,9 @@ test.describe('Landing Swipe Page (/swipe)', () => {
     await expect(page.locator('[data-testid="nav-login-email"]')).toHaveAttribute('href', '/auth/email');
 
     // LIN-3995: the back link names the way home, not "projects" (no project tree when signed out)
-    await expect(page.locator('nav a[href="/"]')).toHaveText('← Harbour');
+    // LIN-4564: the preview sits in the public frame; its band's way back leads to Harbour's front page.
+    await expect(page.locator(SELECTORS.nav.back)).toHaveText('← Harbour');
+    await expect(page.locator(SELECTORS.nav.back)).toHaveAttribute('href', '/');
   });
 
   test('does not show workspace selector in nav', async ({ page }) => {
@@ -89,18 +92,16 @@ test.describe('Landing Swipe Page (/swipe)', () => {
   });
 
   test('says under its title that it shows sample tasks (LIN-3995)', async ({ page }) => {
-    await expect(page.locator('header.swipe-header .page-header__subtitle')).toHaveText('Sample tasks, not a workspace. Sign in to see yours.');
+    await expect(page.locator(`${SELECTORS.nav.main} .page-header__subtitle`)).toHaveText('Sample tasks, not a workspace. Sign in to see yours.');
   });
 
-  test('footer shows cross-view navigation links', async ({ page }) => {
-    await expect(page.locator('.page-footer')).toBeVisible();
-    await expect(page.locator('.footer-actions')).toBeVisible();
-    // swipe is current page — shown in bold, not a link
-    await expect(page.locator('.footer-actions strong.footer-current')).toHaveText('swipe');
-    // LIN-3995: the row names the previews, and its home link reads as the back link does
-    await expect(page.locator('.footer-actions')).toContainText('previews:');
-    await expect(page.locator('.footer-actions a[href="/"]')).toHaveText('Harbour');
-    await expect(page.locator('.footer-actions a[href="/swim"]')).toBeVisible();
+  // LIN-4564: the preview sits in the public frame, whose footer is the same on every page (the previews row is gone;
+  // the landing page still links both previews).
+  test('the footer is the frame\'s, the same on every page', async ({ page }) => {
+    await expect(page.locator(SELECTORS.nav.footer)).toBeVisible();
+    await expect(page.locator('[data-testid="frame-footer-library"]')).toBeVisible();
+    await expect(page.locator('.footer-actions')).toHaveCount(0);
+    await expect(page).toHaveTitle(/^Swipe · Harbour( — |$)/); // the card on show follows the page's name (public/swipe.js)
   });
 
   test('description accordion works when issue has description', async ({ page }) => {

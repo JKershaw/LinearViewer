@@ -107,7 +107,8 @@ test.describe('Ambient rulings nav badge (LIN-1728 Phase 3)', () => {
     // Before the fix this was permanently dead on Observation: no seeded
     // count on load (initRulingsBadge lived in app.js, which Observation
     // never loads).
-    const badge = page.locator('[data-rulings-badge]');
+    // LIN-4564: Observation (Runs) sits in the frame; its count is the rail's, beside Home.
+    const badge = page.locator(SELECTORS.nav.railQuestions);
     await expect(badge).toBeAttached();
     await expect(badge).not.toHaveClass(/hidden/);
     await expect(badge.locator('.rulings-count')).toHaveText('1 question');
@@ -115,12 +116,13 @@ test.describe('Ambient rulings nav badge (LIN-1728 Phase 3)', () => {
   });
 
   // LIN-4563: on the bar (a page not yet moved; Home's rail count leads to Home's questions instead, frame-rules.spec.js).
+  // LIN-4564: Swim moved onto the frame, so the old bar is read on Settings.
   test('LIN-1728 review F6: the badge is a real link into the Questions tab, not a button that does nothing', async ({ page }) => {
     await page.goto(`/test/set-session?urlKey=${URL_KEY}&runnerKey=1`);
     await clearRuns(page);
     await seedRulingQuestion(page, 'LIN-1728-B6');
 
-    await page.goto(`/workspace/${URL_KEY}/swim`);
+    await page.goto(`/workspace/${URL_KEY}/settings`);
     await page.waitForLoadState('networkidle');
 
     const badge = page.locator('[data-rulings-badge]');
@@ -240,8 +242,8 @@ test.describe('Phone header: the wordmark shares the first line with the actions
     await clearRuns(page);
     for (const width of [320, 360, 390, 412, 430, 480]) {
       await page.setViewportSize({ width, height: 800 });
-      // LIN-4563: the bar's phone header, on a page still on the bar (Home sits in the frame).
-      await page.goto(`/workspace/${URL_KEY}/swim`);
+      // LIN-4563: the bar's phone header, on a page still on the bar (Home sits in the frame; LIN-4564: Swim too, so Settings).
+      await page.goto(`/workspace/${URL_KEY}/settings`);
       await page.waitForLoadState('networkidle');
       await page.evaluate(() => {
         document.querySelectorAll('[data-queue-badge], [data-rulings-badge]').forEach(b => b.classList.remove('hidden'));

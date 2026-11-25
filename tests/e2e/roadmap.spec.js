@@ -1,4 +1,5 @@
 import { test, expect } from '../fixtures/test-base.js';
+import { SELECTORS } from '../helpers.js';
 import { workspaceApiLocalSeed } from '../fixtures/local-harness.js';
 
 // LIN-409: the happy-path roadmap surface (page render, generate stream, pipeline
@@ -50,9 +51,9 @@ test.describe('Roadmap Page', () => {
     await page.waitForLoadState('networkidle');
 
     await expect(page.locator('.roadmap-header')).toBeVisible();
-    // Title routes through the shared renderPageHeader primitive (LIN-975),
-    // preserved inside the bespoke roadmap header block.
-    await expect(page.locator('.roadmap-header .page-header h1')).toContainText('Roadmap');
+    // LIN-4564: the page sits in the frame; its h1 is the frame's, the meta line stays in the roadmap's header block.
+    await expect(page.locator(SELECTORS.nav.heading)).toHaveText('Roadmap');
+    await expect(page).toHaveTitle(/^Roadmap · /);
     // Time window anchor
     await expect(page.locator('.roadmap-header-meta')).toContainText('last 90 days');
     // Velocity panel (projection-flavored) was removed
@@ -159,13 +160,13 @@ test.describe('Roadmap Page', () => {
     await expect(page).toHaveTitle(/Roadmap/);
   });
 
-  test('back to projects link is present', async ({ page }) => {
+  // LIN-4564: the rail reaches Home from every page, and marks Roadmap here.
+  test('the rail reaches Home and marks Roadmap', async ({ page }) => {
     await page.goto(ROADMAP_URL);
     await page.waitForLoadState('networkidle');
 
-    // Should have a link back to projects
-    const projectsLink = page.locator('[data-testid="nav-view-projects"]');
-    await expect(projectsLink).toBeVisible();
+    await expect(page.locator(SELECTORS.nav.place('home'))).toBeVisible();
+    await expect(page.locator(SELECTORS.nav.railMarked)).toHaveAttribute('data-place', 'roadmap');
   });
 
   test('embeds __ROADMAP_DATA__ in page', async ({ page }) => {

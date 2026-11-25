@@ -436,7 +436,7 @@
  * 0` to land the composer flush with the viewport's bottom edge without a
  * magic `calc()` tied to the page header's height. That backfired (LIN-2632
  * review finding F2): this section is the first of four siblings
- * inside one shared container (`<main class="flight-companion-page">`), and
+ * inside one shared container (`<div class="flight-companion-page">`), and
  * `position: sticky`'s containing block for release purposes is that WHOLE
  * container, not the section's own box — so it stayed pinned across nearly
  * the entire page scroll, painting itself over How-to/Kickoff/Observer and
@@ -444,13 +444,14 @@
  * over the copy-prompt button resolved to the chat thread, and a real
  * Playwright `click({trial: true})` on it timed out).
  *
- * No `position` is needed at all, because the page's own shared header
- * (`.nav-bar`, public/style.css) is ALREADY `position: sticky; top: 0` and
+ * No `position` is needed at all, because the page's own phone band (the
+ * frame's `.frame-band`, public/frame.css, below 760px; LIN-4564 — it took the
+ * old shared header's place) is ALREADY `position: sticky; top: 0` and
  * stays visually pinned across the whole page regardless of this section —
  * that is what closes the header-height gap for free: scrolling the section
  * into view (e.g. `scrollIntoViewIfNeeded`, or a user's own swipe) naturally
  * lands its bottom — the composer, its last child — flush with the
- * viewport's bottom edge, with the nav's own sticky band overlapping only
+ * viewport's bottom edge, with the band's own sticky strip overlapping only
  * the section's OWN top edge (its "Chat" heading), never anything below it.
  * Scrolling further moves the section (now just an ordinary block) out of
  * view like any other content, letting the next section slide up in normal

@@ -164,9 +164,13 @@ describe('render-session: tasks + overview', () => {
     assert.match(html, /data-testid="session-task-link"[^>]*href="\/workspace\/ws-a\/task\/LIN-901"/);
   });
 
-  test('back-to-feed link targets the workspace observation feed', () => {
-    const html = renderSessionPage({ session: fixtureSession(), urlKey: 'ws-a' });
-    assert.match(html, /data-testid="session-back"[^>]*href="\/workspace\/ws-a\/observation"/);
+  // LIN-4564: the way back is the frame's (the run page is drilled in under Runs), and Runs is the one lit rail item.
+  test('the way back targets the workspace observation feed, and Runs is lit', () => {
+    const html = renderSessionPage({ session: fixtureSession(), urlKey: 'ws-a' }, { featureFlags: { runControls: true } });
+    assert.match(html, /class="frame-back" href="\/workspace\/ws-a\/observation" data-testid="frame-back">← Runs</);
+    assert.doesNotMatch(html, /data-testid="session-back"/, 'one way back, not two');
+    assert.deepEqual([...html.matchAll(/data-place="([^"]+)" aria-current="([^"]+)"/g)].map(m => [m[1], m[2]]), [['runs', 'true']]);
+    assert.equal((html.match(/<h1[\s>]/g) || []).length, 1, 'one h1');
   });
 });
 
@@ -178,18 +182,18 @@ describe('render-session: anchor issue title (LIN-1801)', () => {
     );
     assert.match(html, /data-testid="session-seed"[^>]*>LIN-900</, 'session-seed keeps its identifier-only content');
     assert.match(html, /data-testid="session-seed-title"[^>]*>Seed task</);
-    // LIN-3250: the body h1 is the task title + a short "Run <id>"; the document
-    // <title> keeps the identifier-first form.
-    assert.match(html, /data-testid="session-title"[^>]*>Seed task</);
+    // LIN-3250: the h1 is the task title, with a short "Run <id>" beside it. LIN-4564 (the frame): a run page's name is
+    // its title, so the h1 is the title alone, the run id is the line under it, and the tab is `<title> · <Workspace>`.
+    assert.match(html, /<h1>Seed task<\/h1>/);
     assert.match(html, /data-testid="session-run-id"[^>]*>Run sess-abc</);
-    assert.match(html, /<title>Session · LIN-900 — Seed task<\/title>/);
+    assert.match(html, /<title>Seed task · Workspace<\/title>/);
   });
 
   test('an absent anchorIssueTitle still shows the run\'s own task title; no seed-title span, no title suffix', () => {
     const html = renderSessionPage({ session: fixtureSession(), urlKey: 'ws-a' }, {});
     assert.ok(!html.includes('data-testid="session-seed-title"'));
-    assert.match(html, /data-testid="session-title"[^>]*>Seed task</, 'the heading takes the loop\'s own issueTitle');
-    assert.match(html, /<title>Session · LIN-900<\/title>/);
+    assert.match(html, /<h1>Seed task<\/h1>/, 'the heading takes the loop\'s own issueTitle');
+    assert.match(html, /<title>Seed task · Workspace<\/title>/);
   });
 
   test('anchorIssueTitle equal to session.seedIssue is treated as no title (LIN-783-style regression guard)', () => {
@@ -198,7 +202,7 @@ describe('render-session: anchor issue title (LIN-1801)', () => {
       {}
     );
     assert.ok(!html.includes('data-testid="session-seed-title"'));
-    assert.match(html, /<title>Session · LIN-900<\/title>/);
+    assert.match(html, /<title>Seed task · Workspace<\/title>/, 'the run\'s own title names the page, not the bare identifier');
   });
 
   test('a hostile anchorIssueTitle is escaped, single-escaped, and cannot break out of the header or <title>', () => {
@@ -214,7 +218,7 @@ describe('render-session: anchor issue title (LIN-1801)', () => {
     );
     assert.match(
       html,
-      /<title>Session · LIN-900 — &quot;&gt;&lt;script&gt;alert\(1\)&lt;\/script&gt; &amp; co<\/title>/
+      /<title>&quot;&gt;&lt;script&gt;alert\(1\)&lt;\/script&gt; &amp; co · Workspace<\/title>/
     );
   });
 });
@@ -421,11 +425,11 @@ describe('render-session: reply surface (LIN-1004; LIN-1163 removed the page-lev
 
 describe('render-session: not-found body', () => {
   test('a null session renders a 404 body, not a crash', () => {
-    const html = renderSessionPage({ session: null, sessionId: 'nope', urlKey: 'ws-a' });
+    const html = renderSessionPage({ session: null, sessionId: 'nope', urlKey: 'ws-a' }, { featureFlags: { runControls: true } });
     assert.match(html, /data-testid="session-not-found"/);
-    assert.match(html, /Session not found/);
-    // Still has the back link so the user can return to the feed.
-    assert.match(html, /data-testid="session-back"/);
+    assert.match(html, /<h1>Run not found<\/h1>/);
+    // Still has the way back so the user can return to the feed (LIN-4564: the frame's "← Runs").
+    assert.match(html, /class="frame-back" href="\/workspace\/ws-a\/observation" data-testid="frame-back">← Runs</);
   });
 });
 
@@ -1009,73 +1013,53 @@ describe('render-session: document <title> escaping (LIN-1567)', () => {
   }
 
   // LIN-1118 relaxed sessionId from a UUID to an opaque string, so `"`, `<`, `>`
-  // and `/` can all reach the title.
+  // and `/` can all reach the page. LIN-4564: the tab is the frame's `<run title> · <Workspace>` (a run page's name is
+  // its title), so the run's title is what reaches <title>; the sessionId only reaches the line under the h1.
   const HOSTILE = '"><script>alert(1)</script>';
+  const titled = (title, extra = {}) => fixtureSession({ loops: [{ ...fixtureSession().loops[0], issueTitle: title }], ...extra });
 
-  test('a hostile sessionId cannot break out of <title> into live markup', () => {
-    const html = renderSessionPage(
-      { session: fixtureSession({ sessionId: HOSTILE, seedIssue: null }), urlKey: 'ws-a' },
-      {}
-    );
+  test('a hostile run title cannot break out of <title> into live markup', () => {
+    const html = renderSessionPage({ session: titled(HOSTILE), urlKey: 'ws-a' }, {});
     const head = headOf(html);
     assert.ok(!head.includes('<script>alert(1)</script>'), 'raw script must not reach the document head');
     const title = titleOf(html);
     assert.ok(title != null, 'head should contain a <title>');
     assert.ok(!/[<>]/.test(title), `<title> must hold no markup characters (got: ${JSON.stringify(title)})`);
-    assert.equal(title, 'Session · &quot;&gt;&lt;script&gt;alert(1)&lt;/script&gt;');
+    assert.equal(title, '&quot;&gt;&lt;script&gt;alert(1)&lt;/script&gt; · Workspace');
   });
 
-  test('a hostile seedIssue is escaped too — it is the first branch of the ||', () => {
-    const html = renderSessionPage(
-      { session: fixtureSession({ seedIssue: HOSTILE, sessionId: 'sess-abc' }), urlKey: 'ws-a' },
-      {}
-    );
-    const head = headOf(html);
-    assert.ok(!head.includes('<script>alert(1)</script>'), 'raw script must not reach the document head');
-    assert.equal(titleOf(html), 'Session · &quot;&gt;&lt;script&gt;alert(1)&lt;/script&gt;');
+  test('a hostile sessionId is escaped on the run id line and never reaches the head', () => {
+    const html = renderSessionPage({ session: fixtureSession({ sessionId: HOSTILE, seedIssue: null }), urlKey: 'ws-a' }, {});
+    assert.ok(!html.includes('<script>alert(1)</script>'), 'raw script must not reach the document');
+    assert.ok(!headOf(html).includes('script&gt;'), 'the sessionId is not in the tab title');
   });
 
   test('the head carries exactly one <title> element', () => {
-    const html = renderSessionPage(
-      { session: fixtureSession({ sessionId: '</title><script>alert(1)</script>', seedIssue: null }), urlKey: 'ws-a' },
-      {}
-    );
+    const html = renderSessionPage({ session: titled('</title><script>alert(1)</script>'), urlKey: 'ws-a' }, {});
     const opens = (headOf(html).match(/<title>/g) || []).length;
     const closes = (headOf(html).match(/<\/title>/g) || []).length;
     assert.equal(opens, 1, 'one <title> open tag');
     assert.equal(closes, 1, 'one </title> close tag — a payload must not forge a second');
   });
 
-  test('the ordinary seedIssue title is unchanged (no over-escaping)', () => {
-    const html = renderSessionPage(
-      { session: fixtureSession({ seedIssue: 'LIN-1567' }), urlKey: 'ws-a' },
-      {}
-    );
-    assert.equal(titleOf(html), 'Session · LIN-1567');
+  test('the ordinary run title is unchanged (no over-escaping)', () => {
+    const html = renderSessionPage({ session: titled('Seed task'), urlKey: 'ws-a' }, {});
+    assert.equal(titleOf(html), 'Seed task · Workspace');
   });
 
-  test('the ordinary sessionId title is unchanged when there is no seedIssue', () => {
-    const html = renderSessionPage(
-      { session: fixtureSession({ seedIssue: null, sessionId: 'sess-abc' }), urlKey: 'ws-a' },
-      {}
-    );
-    assert.equal(titleOf(html), 'Session · sess-abc');
+  test('the workspace names the tab when the session knows it', () => {
+    const html = renderSessionPage({ session: titled('Seed task'), urlKey: 'ws-a' }, { workspaces: [{ urlKey: 'ws-a', name: 'Acme' }] });
+    assert.equal(titleOf(html), 'Seed task · Acme');
   });
 
   test('an ampersand is escaped once, not twice (double-encoding guard)', () => {
-    const html = renderSessionPage(
-      { session: fixtureSession({ seedIssue: 'Tom & Jerry' }), urlKey: 'ws-a' },
-      {}
-    );
-    assert.equal(titleOf(html), 'Session · Tom &amp; Jerry');
+    const html = renderSessionPage({ session: titled('Tom & Jerry'), urlKey: 'ws-a' }, {});
+    assert.equal(titleOf(html), 'Tom &amp; Jerry · Workspace');
   });
 
-  test('a missing session identity degrades to the bare prefix, not "undefined"', () => {
-    const html = renderSessionPage(
-      { session: fixtureSession({ seedIssue: null, sessionId: null }), urlKey: 'ws-a' },
-      {}
-    );
-    assert.equal(titleOf(html), 'Session · ');
+  test('a missing session identity degrades to the page\'s own name, not "undefined"', () => {
+    const html = renderSessionPage({ session: fixtureSession({ seedIssue: null, sessionId: null, loops: [] }), urlKey: 'ws-a' }, {});
+    assert.equal(titleOf(html), 'Run · Workspace');
   });
 });
 
@@ -1559,7 +1543,7 @@ describe('render-session: page order (LIN-3251, LIN-2948 §4)', () => {
       assert.ok(i > -1, `marker present: ${needle}`);
       return i;
     };
-    const heading = idx('data-testid="session-title"');
+    const heading = idx('<h1>');
     const header = idx('sess-run-header');
     const pinned = idx('session-question-records');
     const paragraph = idx('data-testid="session-paragraph"');
@@ -1580,7 +1564,7 @@ describe('render-session: page order (LIN-3251, LIN-2948 §4)', () => {
   // LIN-4555: with no question, nothing moves: the header strip follows the heading, as LIN-3251 composed it.
   test('with no open question the header strip directly follows the heading', () => {
     const html = renderSessionPage({ session: fixtureSession(), urlKey: 'ws-a', questionRecords: [], runEvidence: runEvidenceFixture() });
-    const heading = html.indexOf('data-testid="session-title"');
+    const heading = html.indexOf('<h1>');
     assert.ok(heading > -1, 'the heading renders');
     const firstSection = /<section class="([^"]*)"/.exec(html.slice(heading));
     assert.match(firstSection?.[1] ?? '', /\bsess-run-header\b/, 'the first section after the heading is the header strip');

@@ -9,7 +9,7 @@
 
 .ship-biscuit-page {
   max-width: 820px;
-  margin: 0 auto;
+  /* LIN-4564: in the frame, which owns the left edge and the h1; the column starts at that edge. */
 }
 
 .ship-biscuit-experimental {
