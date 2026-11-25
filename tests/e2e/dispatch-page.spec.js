@@ -1165,10 +1165,11 @@ test.describe('Dispatch Page', () => {
       const historyItem = page.locator('.history-item[data-status="taken"]');
       await expect(historyItem).toBeVisible();
 
-      const feedbackList = historyItem.locator('.feedback-list');
+      // LIN-4560: the row's feedback is drawn by the one transcript look (lib/transcript.js), as the run page's is.
+      const feedbackList = historyItem.locator('[data-testid="history-transcript"]');
       await expect(feedbackList).toBeVisible();
 
-      const feedbackEntries = historyItem.locator('.feedback-entry');
+      const feedbackEntries = historyItem.locator('[data-testid="transcript-entry"]');
       await expect(feedbackEntries).toHaveCount(2);
 
       // First entry: message only
@@ -1176,7 +1177,7 @@ test.describe('Dispatch Page', () => {
 
       // Second entry: message with link
       await expect(feedbackEntries.nth(1)).toContainText('Created PR');
-      const link = feedbackEntries.nth(1).locator('.feedback-link');
+      const link = feedbackEntries.nth(1).locator('[data-testid="transcript-link"]');
       await expect(link).toBeVisible();
       await expect(link).toHaveText('PR #1');
       await expect(link).toHaveAttribute('href', 'https://example.com/pr/1');
@@ -1197,7 +1198,7 @@ test.describe('Dispatch Page', () => {
       const historyItem = page.locator('.history-item');
       await expect(historyItem).toBeVisible();
 
-      const feedbackList = historyItem.locator('.feedback-list');
+      const feedbackList = historyItem.locator('[data-testid="history-transcript"]');
       await expect(feedbackList).toHaveCount(0);
     });
 
@@ -1222,7 +1223,7 @@ test.describe('Dispatch Page', () => {
       // Verify history shows item without feedback
       const historyItem = page.locator('.history-item[data-status="taken"]');
       await expect(historyItem).toBeVisible();
-      await expect(historyItem.locator('.feedback-list')).toHaveCount(0);
+      await expect(historyItem.locator('[data-testid="history-transcript"]')).toHaveCount(0);
 
       // Add feedback via API while page is open
       await request.post(`/api/dispatch/feedback/${item.id}`, {
@@ -1236,9 +1237,9 @@ test.describe('Dispatch Page', () => {
       await refreshBtn.click();
 
       // Wait for feedback to appear
-      const feedbackList = page.locator('.history-item .feedback-list');
+      const feedbackList = page.locator('.history-item [data-testid="history-transcript"]');
       await expect(feedbackList).toBeVisible({ timeout: 5000 });
-      await expect(page.locator('.feedback-entry')).toContainText('Added after page load');
+      await expect(page.locator('[data-testid="transcript-entry"]')).toContainText('Added after page load');
     });
   });
 

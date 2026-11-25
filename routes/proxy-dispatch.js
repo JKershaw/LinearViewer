@@ -10,6 +10,8 @@
  */
 import { Router } from 'express';
 import { armKeepalive } from '../lib/http-keepalive.js';
+import { clampWaitSeconds, holdForChange } from '../lib/dispatch-watch.js';
+import { maskFeedbackFields } from '../lib/dispatch-feedback-masking.js';
 import { jsonError, keepaliveError, notFound, replyStoreFault } from '../lib/errors.js';
 import { MAX_NAME_LENGTH, DANGEROUS_CHARS_REGEX } from '../lib/issue-write-validation.js';
 import { deriveCompletedAt, deriveWireStatus, deriveWireTerminal, closedProjection, NEVER_RAN } from '../lib/dispatch-terminal.js';
@@ -24,15 +26,8 @@ import { enterProxyDispatch, enterRecommendDispatch, enterPeriodicalMint, refuse
 // proxy handlers that cap an identifier directly.
 const MAX_IDENTIFIER_LENGTH = 100;     // Issue identifiers
 
-// Long-poll tuning for GET /api/proxy/dispatch/:id?wait=Ns (LIN-392).
-// DISPATCH_WAIT_MAX_S caps the hold below the ~60s ceiling that armKeepalive
-// (flush at 25s) buys us past Heroku's 30s H12; the re-check interval bounds
-// worst-case detection latency. Module-level so tests can drive the loop at
-// short `wait` values instead of real-time waits.
-const DISPATCH_WAIT_MAX_S = 50;
-const DISPATCH_WAIT_POLL_MS = 1500;
-
-const sleep = (ms) => new Promise((resolve) => setTimeout(resolve, ms));
+// Long-poll tuning and the wait loop for GET /api/proxy/dispatch/:id?wait=Ns (LIN-392) live in lib/dispatch-watch.js
+// (LIN-4560), shared with the signed-in twin the run page and Dispatch history follow (routes/dispatch.js).
 
 // A dispatch id as the watch and prompt reads take it from the path: present, short and
 // free of control characters. The store lookup is workspace-scoped on top of this.
@@ -110,10 +105,14 @@ function formatDispatchWatch(item, meta = null, wakeShadow = null, liveConsumerL
     consumerLastSeenAt: item.consumerLastSeenAt || null,
     consumerPollWarning: buildQueuedPollWarning(terminalStatus || item.status, liveConsumerLastSeenAt),
     feedback: (item.feedback || []).map(f => {
+      // LIN-4560: masked at read with piece A's masker (lib/dispatch-feedback-masking.js), the same fields intake masks,
+      // so a row stored before intake masking (LIN-4556) reaches a driving session masked too. A clean field is the
+      // same string, so a secret-free read is byte-identical.
+      const masked = maskFeedbackFields({ message: f.message, url: f.url || null, urlLabel: f.urlLabel || null });
       const entry = {
-        message: f.message,
-        url: f.url || null,
-        urlLabel: f.urlLabel || null,
+        message: masked.message,
+        url: masked.url || null,
+        urlLabel: masked.urlLabel || null,
         timestamp: f.timestamp || null
       };
       // Additive-only (LIN-1297 idiom, matching _formatFeedbackEntries):
@@ -469,10 +468,7 @@ export function createDispatchRoutes({
     if (isBadDispatchId(id)) return reject400(req, res, '/api/proxy/dispatch/:id', 'Invalid dispatch id');
 
     // Parse + clamp ?wait. Garbage / non-positive → 0 → unchanged short-poll.
-    const waitSeconds = Math.min(
-      Math.max(0, Math.floor(Number(req.query.wait)) || 0),
-      DISPATCH_WAIT_MAX_S
-    );
+    const waitSeconds = clampWaitSeconds(req.query.wait);
 
     // LIN-3805 / LIN-3465: hoisted so the catch below replies through the keepalive once
     // it is armed; after its first flush the headers are committed and `res.status()`
@@ -527,29 +523,25 @@ export function createDispatchRoutes({
           status: deriveWireTerminal(current) || current.status,
           feedbackLength: (current.feedback || []).length
         };
-        const waitStart = Date.now();
-        const deadline = waitStart + waitSeconds * 1000;
-        let reason = 'timeout'; // default: held the full window, nothing new
-        while (Date.now() < deadline) {
-          await sleep(DISPATCH_WAIT_POLL_MS);
-          if (res.writableEnded || res.destroyed) {
-            keepalive.stop();
-            return; // client gave up
-          }
-          // LIN-3805: a fault here is NOT swallowed into "unchanged snapshot" (a hidden
-          // sibling `[done]` would read as still running); it propagates to the catch.
-          // LIN-3812: scalars only per tick; the whole document plus lineage feedback is re-read
-          // only when the token moved. The re-read body (not the token) decides 'change'.
-          const nextToken = await dispatchQueueStore.getItemWatchToken(req.proxyUrlKey, id);
-          if (nextToken === watchToken) continue;
-          watchToken = nextToken;
-          const next = await dispatchQueueStore.getItemFeedback(req.proxyUrlKey, id, { includeGroupFeedback: true });
-          if (!next) break; // item genuinely expired mid-wait; return last known snapshot
-          current = next;
-          if (dispatchWatchChanged(baseline, current)) { reason = 'change'; break; }
+        // LIN-3805: a fault in the loop is NOT swallowed into "unchanged snapshot" (a hidden sibling `[done]` would
+        // read as still running); it propagates to the catch. LIN-3812: scalars only per tick; the whole document plus
+        // lineage feedback is re-read only when the token moved, and the re-read body decides 'change'.
+        const held = await holdForChange({
+          initial: current,
+          token: watchToken,
+          waitSeconds,
+          readToken: () => dispatchQueueStore.getItemWatchToken(req.proxyUrlKey, id),
+          readSnapshot: () => dispatchQueueStore.getItemFeedback(req.proxyUrlKey, id, { includeGroupFeedback: true }),
+          changed: (next) => dispatchWatchChanged(baseline, next),
+          isGone: () => res.writableEnded || res.destroyed
+        });
+        if (held.aborted) {
+          keepalive.stop();
+          return; // client gave up
         }
+        current = held.current;
         logEvent(req, '/api/proxy/dispatch/:id', 200);
-        return keepalive.send(200, formatDispatchWatch(current, { reason, waitedMs: Date.now() - waitStart }, wakeShadow, await liveSeen(current)));
+        return keepalive.send(200, formatDispatchWatch(current, { reason: held.reason, waitedMs: held.waitedMs }, wakeShadow, await liveSeen(current)));
       }
 
       logEvent(req, '/api/proxy/dispatch/:id', 200);
