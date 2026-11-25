@@ -122,6 +122,9 @@ function formatDispatchWatch(item, meta = null, wakeShadow = null, liveConsumerL
       // Additive-only (LIN-1297 idiom, matching _formatFeedbackEntries):
       // assign only when present, never emit `kind: null` (LIN-1475).
       if (f.kind) entry.kind = f.kind;
+      // LIN-4559: the child agent an `agent-text` entry names, sparse like kind (the same rule as
+      // lib/dispatch-feedback-format.js), so a driving session can tell whose words they are.
+      if (f.agent) entry.agent = f.agent;
       return entry;
     }),
     // LIN-3257: read-only shadow verdict. Present (null) on every row so the
