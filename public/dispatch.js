@@ -17,12 +17,12 @@
  * placeholder on this page) and this file's inits read nothing app.js sets up.
  * Its top-level names are module-scoped: nothing classic reads them (the queue
  * badge's updater is common.js's). Exported names are its test seams. History
- * rows draw their transcripts through the one transcript look (the served leaf
- * lib/transcript.js, LIN-4560), the same the run page draws.
+ * rows draw and follow their transcripts through public/transcript-live.js (the
+ * one transcript look, lib/transcript.js, kept live; LIN-4560), as the run page
+ * does.
  */
 
-import { relativeAgo } from '../lib/time-words.js'
-import { renderTranscript } from '../lib/transcript.js'
+import { createTranscriptFollower, redrawTranscript, transcriptItemsHtml } from './transcript-live.js'
 
 const UUID_DISPATCH_REGEX = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i
 
@@ -1055,6 +1055,8 @@ async function loadDispatchHistory(urlKey, offset) {
     // state below rather than redirecting.
     const { items, total } = await api(`/workspace/${encodeURIComponent(urlKey)}/api/dispatch/history?offset=${offset}`, { on401: false })
     renderDispatchHistoryList(historyEl, items, total, offset, urlKey)
+    // LIN-4560: follow the rows still running (one shared follower; a later load only nudges it).
+    if (liveHistoryIds().length) followLiveHistory(urlKey)
   } catch (e) {
     console.error('Failed to load history:', e)
     historyEl.innerHTML = '<div class="history-list-empty">Failed to load history</div>'
@@ -1071,8 +1073,61 @@ async function loadDispatchHistory(urlKey, offset) {
  * (outcome `taken`), so only then does its newest own bubble carry the in-progress pill. '' when nothing is drawn.
  */
 function historyTranscriptHtml(feedback, live) {
-  const items = renderTranscript(feedback || [], { live, host: window, relative: relativeAgo })
+  const items = transcriptItemsHtml(feedback, live)
   return items ? `<ul class="sess-run-tx chat-thread" data-testid="history-transcript">${items}</ul>` : ''
+}
+
+// Live history transcripts (LIN-4560): a row still running (outcome `taken`, `data-live`) is followed through the same
+// shared follower the run page uses (public/transcript-live.js), keyed on its dispatch row id (`data-row-id`), so its new
+// words appear without the refresh button and without losing the reader's scroll or opened threads. A row with no words
+// yet gets its list on its first entry. The follower reads the rows from the page each round, so a page loaded by "show
+// more" or the refresh button is followed too.
+let historyFollower = null
+
+// The history rows are the list's own children, never a look-alike inside a transcript message (a message may carry
+// class and data attributes through the sanitizer; LIN-3385's rule).
+function historyRows() {
+  const list = document.querySelector('.history-list')
+  return list ? [...list.children].filter((el) => el.classList.contains('history-item') && el.hasAttribute('data-row-id')) : []
+}
+
+function liveHistoryIds() {
+  return historyRows().filter((el) => el.getAttribute('data-live') === 'true').map((el) => el.getAttribute('data-row-id'))
+}
+
+function applyLiveHistoryRow(row) {
+  const item = historyRows().find((el) => el.getAttribute('data-row-id') === row.id)
+  if (!item) return
+  const info = [...item.children].find((el) => el.classList.contains('history-info')) || item
+  let list = [...info.children].find((el) => el.getAttribute('data-testid') === 'history-transcript')
+  // A row with no words yet gets no list: an empty transcript is not drawn.
+  if (!list && !(row.entries && row.entries.length)) return
+  if (!list) {
+    list = document.createElement('ul')
+    list.className = 'sess-run-tx chat-thread'
+    list.setAttribute('data-testid', 'history-transcript')
+    list.hidden = true
+    info.appendChild(list)
+  }
+  redrawTranscript(list, row.entries, row.live)
+}
+
+function followLiveHistory(urlKey) {
+  if (!historyFollower) {
+    historyFollower = createTranscriptFollower({
+      urlKey,
+      liveIds: liveHistoryIds,
+      drawnCount: (id) => {
+        const item = historyRows().find((el) => el.getAttribute('data-row-id') === id)
+        return item ? Number(item.getAttribute('data-drawn')) : -1
+      },
+      apply: applyLiveHistoryRow,
+      fetchJson: (url) => api(url, { on401: false })
+    })
+    historyFollower.start()
+  } else {
+    historyFollower.poke()
+  }
 }
 
 /**
@@ -1153,7 +1208,7 @@ function renderDispatchHistoryList(container, items, total, offset, urlKey) {
     const feedbackHtml = hasFeedback ? historyTranscriptHtml(item.feedback, outcome === 'taken') : ''
 
     return `
-      <div class="history-item${expandableClass}" data-status="${escapeHtml(outcome)}">
+      <div class="history-item${expandableClass}" data-status="${escapeHtml(outcome)}" data-row-id="${escapeHtml(item.id || '')}" data-live="${outcome === 'taken'}" data-drawn="${(item.feedback || []).length}">
         ${statusPillHtml}
         <div class="history-info">
           <span class="history-name">${escapeHtml(item.promptName || 'Prompt')}</span>${issueHtml}${taskPageHtml}
@@ -1248,5 +1303,5 @@ document.addEventListener('DOMContentLoaded', () => {
 // Test seams (LIN-4560): the functions the suites drive. Nothing in the page reads these.
 export {
   HALT_MODE_LABELS, formatHaltStatusHtml, formatDispatchTokenExpiry, dispatchTokenModalBody,
-  historyTranscriptHtml, historyOutcomePill, renderDispatchHistoryList
+  historyTranscriptHtml, historyOutcomePill, renderDispatchHistoryList, applyLiveHistoryRow, liveHistoryIds
 }

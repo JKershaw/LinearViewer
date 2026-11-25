@@ -151,6 +151,9 @@ const TABLE = {
   'routes/proxy-dispatch.js :: /api/proxy/dispatch': [PRJ, 3],
   'routes/proxy-dispatch.js :: /api/proxy/dispatch/:id': [PRJ, 1],
   'routes/proxy-dispatch.js :: liveSeen': [PRJ, 1], // the :id watch long-poll re-read, keyed lexically after LIN-3367's const liveSeen arrow
+  // LIN-4560: the live transcripts read's point reads of each followed row; the reply is an explicit projection (each
+  // row's id, liveness and masked transcript entries), never the row, its prompt or a token.
+  'routes/dispatch.js :: readSnapshot': [PRJ, 1],
   // LIN-4404: these three reads were the /cost route's, keyed under the snapshots/diff route registered above it (the
   // scanner reads no array registration). They moved with the fetch into the task's own read; each still projects the
   // prompt out (`projection: { prompt: 0 }`), and its result is the cost read's input, never a response row.

@@ -11,14 +11,14 @@
  * the document is parsed and before DOMContentLoaded, so common.js, chat.js, marked.min.js, purify.min.js and
  * question-cards.js have all run: common.js's renderMarkdown, renderStatusPill, renderSurface and formatLocalTime (the
  * transcript's host) and window.QuestionCards ARE available. It imports the duration and relative-time words from the
- * served lib leaf (lib/time-words.js) instead of keeping a copy, and draws each run's transcript through the one
- * transcript look (the served leaf lib/transcript.js). On the run page it now runs after question-records.js (the
+ * served lib leaf (lib/time-words.js) instead of keeping a copy, and draws and follows each run's transcript through
+ * public/transcript-live.js (the one transcript look, lib/transcript.js, kept live). On the run page it now runs after question-records.js (the
  * other module, listed before it), so that module's document click listener registers first; the two touch different
  * elements and neither reads what the other sets up. Its top-level names are module-scoped: nothing classic reads them.
  * Exported names are its test seams. Inline replies use the same raw-fetch dispatch as the original global reply box.
  */
-import { fmtDuration, relativeAgo } from '../lib/time-words.js';
-import { renderTranscript } from '../lib/transcript.js';
+import { fmtDuration } from '../lib/time-words.js';
+import { createTranscriptFollower, redrawTranscript, transcriptItemsHtml } from './transcript-live.js';
 
 // The reply plumbing and the pinned question cards live in
 // public/question-cards.js (LIN-3499), shared with the task page.
@@ -129,8 +129,93 @@ function renderRunTranscripts() {
     if (!entries || !entries.length) continue;
     var run = thread.closest('.sess-run');
     var live = !!run && run.getAttribute('data-status') === 'running';
-    thread.innerHTML = renderTranscript(entries, { live: live, host: window, relative: relativeAgo });
+    thread.innerHTML = transcriptItemsHtml(entries, live);
   }
+}
+
+// ── Live transcripts (LIN-4560) ───────────────────────────────────────────────
+// While a run is live its new words appear without a reload: the page follows
+// its running rows (a `.sess-run` whose `data-status` is running, keyed on its
+// `data-loop-id`, the dispatch row id) through the shared follower
+// (public/transcript-live.js), one held read at a time, paused while the tab is
+// hidden. Each answer replaces that run's entries whole and redraws its list in
+// place, keeping the reader's scroll and opened threads; the in-progress marker
+// moves to the newest bubble, and a run that reports done gets one last read and
+// is drawn settled. A running row with no words yet gets its list on its first
+// entry, at the top of its body. The rows are captured before any transcript
+// markdown renders (captureLiveRuns), so nothing in an agent's words is matched. This is the page's one transcript read; the PR
+// line keeps its own cached 60 s read (initPrState), a different route and pace.
+// The run rows, captured once before any transcript markdown renders (LIN-3385): a transcript message may carry
+// class and data attributes through the sanitizer, so a look-alike row in an agent's words is never matched. Each
+// entry is the row and its transcript list (made on a live row's first entry).
+var liveRuns = null;
+var liveUrlKey = '';
+
+function captureLiveRuns() {
+  liveRuns = new Map();
+  var page = document.querySelector('[data-testid="session-page"]');
+  liveUrlKey = page ? page.getAttribute('data-url-key') || '' : '';
+  var runs = document.querySelectorAll('.sess-run[data-loop-id]');
+  for (var i = 0; i < runs.length; i++) {
+    var run = runs[i];
+    var list = run.querySelector('[data-testid="session-run-transcript"]');
+    var drawn = 0;
+    try { drawn = list && list.dataset.feedback ? JSON.parse(list.dataset.feedback).length : 0; } catch (e) { drawn = -1; }
+    liveRuns.set(run.getAttribute('data-loop-id'), {
+      run: run,
+      live: run.getAttribute('data-status') === 'running',
+      list: list,
+      drawn: drawn
+    });
+  }
+}
+
+function liveRunIds() {
+  var ids = [];
+  if (liveRuns) liveRuns.forEach(function (entry, id) { if (entry.live) ids.push(id); });
+  return ids;
+}
+
+function transcriptListFor(entry) {
+  if (entry.list) return entry.list;
+  var list = document.createElement('ul');
+  list.className = 'sess-run-tx chat-thread';
+  list.setAttribute('data-testid', 'session-run-transcript');
+  list.hidden = true;
+  var body = null;
+  for (var i = 0; i < entry.run.children.length; i++) {
+    if (entry.run.children[i].getAttribute('data-testid') === 'session-run-body') body = entry.run.children[i];
+  }
+  if (!body) {
+    body = document.createElement('div');
+    body.className = 'sess-run-body';
+    body.setAttribute('data-testid', 'session-run-body');
+    entry.run.appendChild(body);
+  }
+  body.insertBefore(list, body.firstChild);
+  entry.list = list;
+  return list;
+}
+
+function applyLiveRun(row) {
+  var entry = liveRuns && liveRuns.get(row.id);
+  // A row with no words yet gets no list: an empty transcript is not drawn.
+  if (!entry || (!entry.list && !(row.entries && row.entries.length))) return;
+  redrawTranscript(transcriptListFor(entry), row.entries, row.live);
+}
+
+function initLiveTranscripts() {
+  if (!liveRuns) captureLiveRuns();
+  if (!liveUrlKey || !liveRunIds().length) return null;
+  var follower = createTranscriptFollower({
+    urlKey: liveUrlKey,
+    liveIds: liveRunIds,
+    drawnCount: function (id) { var entry = liveRuns.get(id); return entry ? entry.drawn : -1; },
+    apply: applyLiveRun,
+    fetchJson: function (url) { return window.api(url, { on401: false }); }
+  });
+  follower.start();
+  return follower;
 }
 
 // ── Per-run inline reply boxes (LIN-1133; LIN-1298 echo thread) ───────────
@@ -541,12 +626,14 @@ document.addEventListener('DOMContentLoaded', function () {
   initProposals();
   initPrState();
   initCloseOut();
+  captureLiveRuns();
   // Per-run transcripts must render before toggle init so content is visible.
   renderRunTranscripts();
   initRunToggles();
+  initLiveTranscripts();
   tickClocks();
   setInterval(tickClocks, 1000);
 });
 
 // Test seams (LIN-4560): the functions the suites drive. Nothing in the page reads these.
-export { initQuestionCards, initInlineReplies, initPrState, pollAction, pressCloseOut, closeOutContext, initRunToggles, renderRunTranscripts };
+export { initQuestionCards, initInlineReplies, initPrState, pollAction, pressCloseOut, closeOutContext, initRunToggles, renderRunTranscripts, captureLiveRuns, initLiveTranscripts };

@@ -22,7 +22,7 @@
 
 import { Router } from 'express';
 import { createHeartbeatIngest, tokenValidationOptions } from '../lib/consumer-heartbeat-ingest.js';
-import { badRequest, jsonError, notFound, unauthorized, serviceUnavailable, replyStoreFault } from '../lib/errors.js';
+import { badRequest, jsonError, keepaliveError, notFound, unauthorized, serviceUnavailable, replyStoreFault } from '../lib/errors.js';
 import rateLimit from 'express-rate-limit';
 import fs from 'fs';
 import path from 'path';
@@ -49,7 +49,7 @@ import { readHaltForPoll, projectHaltForPoll, POLL_HALT_READ_TIMEOUT_MS } from '
 import { ownerlessCompatEnabled } from '../lib/ownerless-token-policy.js';
 import { buildQueuedPollWarning, getConsumerLastSeenAt } from '../lib/consumer-poll-warning.js';
 import { HALT_MODES, HALT_MODE_ERROR } from '../lib/workspace-halt.js';
-import { deriveTerminalStatus, NEVER_RAN } from '../lib/dispatch-terminal.js';
+import { deriveTerminalStatus, deriveWireTerminal, NEVER_RAN } from '../lib/dispatch-terminal.js';
 import { resolveOwnerMintRefusal } from '../lib/owner-mint-refusals.js';
 import { resolveRunnerOwnerRefusal, sendRunnerRefusal } from '../lib/runner-owner-gate.js';
 import { readPlanFacts } from '../lib/chat-request.js';
@@ -67,7 +67,9 @@ import { redactSessionItem, redactSessionItems } from '../lib/dispatch-session-r
 import { publicOrigin } from '../lib/public-origin.js';
 import { postUsage } from '../lib/request-usage-intake.js';
 import { childTicketRetryOf } from '../lib/records-tracker.js';
-import { historyTranscriptFeedback } from '../lib/dispatch-transcript.js';
+import { historyTranscriptFeedback, transcriptEntries } from '../lib/dispatch-transcript.js';
+import { clampWaitSeconds, holdForChange } from '../lib/dispatch-watch.js';
+import { armKeepalive } from '../lib/http-keepalive.js';
 
 // Directory for Harbour OS dispatch prompt staging files. The OS tmp dir is
 // shared between the Node server and the Harbour OS terminal that reads the
@@ -154,6 +156,8 @@ const DANGEROUS_CHARS_REGEX = /[\x00-\x08\x0B\x0C\x0E-\x1F\x7F]/;
 
 // Maximum recent / favourite custom prompts handling (the favourites cap is the store's).
 const DISPATCH_HISTORY_DEFAULT_LIMIT = 20;  // LIN-3812: server default page for the history list
+// LIN-4560: the most runs one transcripts read follows (a history page is 20; a run page's live runs are fewer).
+const TRANSCRIPT_WATCH_MAX_IDS = 25;
 const MAX_RECENT_PROMPTS = 10;
 const MAX_CUSTOM_PROMPT_LENGTH = 10000;
 
@@ -771,6 +775,67 @@ export function createDispatchRoutes({ dispatchQueueStore, dispatchTokenStore, w
       res.json({ ...result, items });
     } catch (err) {
       return reportFailure(res, 'List dispatch history error:', err, 'Failed to list dispatch history');
+    }
+  });
+
+  /**
+   * GET /workspace/:urlKey/api/dispatch/transcripts?ids=<id,id…>&wait=Ns (LIN-4560)
+   * The signed-in twin of the hold-open read (`GET /api/proxy/dispatch/:id?wait=`, routes/proxy-dispatch.js): the run
+   * page and Dispatch history follow their live runs' transcripts through it, without a reload. One request watches
+   * every run a page follows, so a page never has two reads in flight. With `wait`, it holds (the shared loop,
+   * lib/dispatch-watch.js `holdForChange`) until one of them changes: new feedback, or a run reaching its end. It
+   * returns each run's own feedback as the transcript entries the page first drew (lib/dispatch-transcript.js: masked,
+   * with blocked/waiting/quiet decided), keyed on the dispatch row id, so the page replaces a run's entries whole and an
+   * entry is never drawn twice or lost. `live` is false once the run's own feedback carries its terminal marker (or the
+   * row is closed at the source). Ids the workspace does not hold are left out. With every run already finished it
+   * answers at once (`reason: 'terminal'`); with `have` (the entry count the page drew for each id) it answers at once
+   * when the page is behind (`reason: 'change'`), so nothing posted before or between reads waits for the next change.
+   */
+  router.get('/workspace/:urlKey/api/dispatch/transcripts', workspaceFromUrl, async (req, res) => {
+    const { workspace } = req;
+    const ids = [...new Set(String(req.query.ids || '').split(',').map((id) => id.trim()).filter(Boolean))];
+    if (!ids.length || ids.length > TRANSCRIPT_WATCH_MAX_IDS || ids.some((id) => id.length > 100 || DANGEROUS_CHARS_REGEX.test(id))) {
+      return badRequest.json(res, 'Invalid dispatch ids');
+    }
+    // `have`: how many entries the page already drew for each id, in the same order (optional). A snapshot that differs
+    // from it answers at once, so an entry posted before this read (or between two reads) is never held back until the
+    // next change: the hold is from what the page has, not only from this read's own first look.
+    const haveRaw = req.query.have === undefined ? [] : String(req.query.have).split(',');
+    if (haveRaw.length && haveRaw.length !== ids.length) return badRequest.json(res, 'Invalid have counts');
+    const have = new Map(haveRaw.map((n, i) => [ids[i], Number.isInteger(Number(n)) ? Number(n) : -1]));
+    const waitSeconds = clampWaitSeconds(req.query.wait);
+    const urlKey = workspace.urlKey;
+    const readToken = async () => JSON.stringify(await Promise.all(ids.map((id) => dispatchQueueStore.getItemWatchToken(urlKey, id))));
+    const readSnapshot = async () => (await Promise.all(ids.map((id) => dispatchQueueStore.getItemFeedback(urlKey, id)))).filter(Boolean);
+    const isLive = (item) => deriveWireTerminal(item) === null;
+    const rowsOf = (items) => items.map((item) => ({ id: item.id, live: isLive(item), entries: transcriptEntries(item.feedback) }));
+    let keepalive = null;
+    try {
+      // The token is read before the body, so a change landing between the two reads is re-checked (LIN-3812).
+      const token = waitSeconds > 0 ? await readToken() : null;
+      const initial = await readSnapshot();
+      if (waitSeconds === 0) return res.json({ rows: rowsOf(initial) });
+      if (!initial.some(isLive)) return res.json({ rows: rowsOf(initial), reason: 'terminal', waitedMs: 0 });
+      const behind = have.size > 0 && initial.some((item) => have.get(item.id) !== (item.feedback || []).length);
+      if (behind) return res.json({ rows: rowsOf(initial), reason: 'change', waitedMs: 0 });
+      keepalive = armKeepalive(res);
+      const baseline = new Map(initial.map((item) => [item.id, { live: isLive(item), length: (item.feedback || []).length }]));
+      const changed = (items) => items.length !== baseline.size || items.some((item) => {
+        const was = baseline.get(item.id);
+        return !was || was.live !== isLive(item) || was.length !== (item.feedback || []).length;
+      });
+      const held = await holdForChange({ initial, token, waitSeconds, readToken, readSnapshot, changed, isGone: () => res.writableEnded || res.destroyed });
+      if (held.aborted) {
+        keepalive.stop();
+        return;
+      }
+      return keepalive.send(200, { rows: rowsOf(held.current), reason: held.reason, waitedMs: held.waitedMs });
+    } catch (err) {
+      // LIN-3805 / LIN-3465: once the keepalive is armed, every reply goes through it (the headers may be committed).
+      if (!keepalive) return reportFailure(res, 'Dispatch transcripts read error:', err, 'Failed to read transcripts');
+      if (replyStoreFault(res, err, { keepalive })) return;
+      console.error('Dispatch transcripts read error:', err.message);
+      return keepaliveError(keepalive, 500, 'Failed to read transcripts');
     }
   });
 

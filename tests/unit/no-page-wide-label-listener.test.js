@@ -140,6 +140,9 @@ const LOOKUP_ALLOW = {
   'session.js:[data-testid="session-waiting-clock"]': 'ui-only: textContent clock',
   'session.js:[data-testid="session-proposals"]': 'captured: initProposals, before renderRunTranscripts',
   'session.js:[data-testid="session-pr-state"]': 'captured: initPrState, before renderRunTranscripts',
+  // LIN-4560: the live transcripts' rows and page key, captured once in captureLiveRuns, before renderRunTranscripts.
+  'session.js:[data-testid="session-page"]': 'captured: captureLiveRuns, before renderRunTranscripts; Harbour\'s own page root (its workspace key)',
+  'session.js:.sess-run[data-loop-id]': 'captured: captureLiveRuns, before renderRunTranscripts; the run rows the live transcripts follow',
   'task-page.js:[data-testid="task-page-share-slot"][data-shares-url]': 'owner share slot, outside every markdown body (server-rendered; initShare runs before enhanceMarkdown)',
   'task-page.js:[data-testid="task-page"][data-state-url]': 'page root, an ancestor of all ticket text',
   'task-page.js:[data-testid="task-page-owner-marker"]': 'captured: mountWidgets, before enhanceContextMarkdown',

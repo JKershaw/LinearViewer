@@ -103,7 +103,8 @@ describe('the bridge over the real repo', () => {
     // waiting-merge.js (LIN-4549) is one too: app.js imports it (Home's live Waiting merge, out of the classic question-cards.js).
     // waiting-notes.js (LIN-4552) as well: app.js imports it (Home's "Notes for you": the notes merge, clear and the fold).
     const publicFiles = Object.keys(inputs.emitted).filter((k) => !k.startsWith('lib/')).sort();
-    assert.deepEqual(publicFiles, ['app.js', 'dispatch.js', 'flight-companion.js', 'observation.js', 'prompt-section.js', 'question-records.js', 'session.js', 'swipe.js', 'task-page.js', 'waiting-merge.js', 'waiting-notes.js', 'workspace-kpis.js']);
+    // transcript-live.js (LIN-4560) as well: session.js and dispatch.js import it (the transcript drawn and kept live).
+    assert.deepEqual(publicFiles, ['app.js', 'dispatch.js', 'flight-companion.js', 'observation.js', 'prompt-section.js', 'question-records.js', 'session.js', 'swipe.js', 'task-page.js', 'transcript-live.js', 'waiting-merge.js', 'waiting-notes.js', 'workspace-kpis.js']);
     for (const lib of ['lib/cost-format.js', 'lib/prompt-filename.js', 'lib/task-page-href.js', 'lib/time-words.js']) assert.ok(inputs.emitted[lib], lib);
   });
 

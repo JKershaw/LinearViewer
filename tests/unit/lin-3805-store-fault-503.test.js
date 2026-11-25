@@ -414,6 +414,8 @@ describe('dispatch router (token lane and session lane)', () => {
           ['list', 'GET', `/workspace/${URL_KEY}/api/dispatch`, {}, undefined, queue, 'find'],
           ['count', 'GET', `/workspace/${URL_KEY}/api/dispatch/count`, {}, undefined, queue, 'countDocuments'],
           ['history', 'GET', `/workspace/${URL_KEY}/api/dispatch/history`, {}, undefined, history, 'find'],
+          // LIN-4560: the live transcripts read's first store touch (a point read of each followed row).
+          ['transcripts', 'GET', `/workspace/${URL_KEY}/api/dispatch/transcripts?ids=${ID}`, {}, undefined, queue, 'findOne'],
           ['delete', 'DELETE', `/workspace/${URL_KEY}/api/dispatch/${ID}`, {}, undefined, queue, 'findOne'],
           ['trim', 'PATCH', `/workspace/${URL_KEY}/api/dispatch/${ID}/trim`, {}, { maxTasks: 1 }, queue, 'findOne']
         ];
@@ -449,6 +451,64 @@ describe('dispatch router (token lane and session lane)', () => {
 
 // Rows the unhandled-status guard requires for a keepalive-armed route (see below).
 const POST_FLUSH_ROWS = new Set();
+
+// LIN-4560: the live transcripts read holds open like the proxy watch (the shared loop, lib/dispatch-watch.js), so it has
+// the same two fault rows: a held re-check fault before the keepalive flushed is a real 503; after the flush it rides in a
+// committed 200 as `statusCode`.
+describe('the live transcripts read (session lane, keepalive-armed)', () => {
+  async function setup() {
+    const { createDispatchRoutes } = await import('../../routes/dispatch.js');
+    const { default: express } = await import('express');
+    const parts = makeStore();
+    const app = express();
+    app.use((req, res, next) => { req.session = { accountId: 'acct-1' }; next(); });
+    app.use(createDispatchRoutes({
+      dispatchQueueStore: parts.store, dispatchTokenStore: {}, userPreferencesStore: {}, proxyTokenStore: {},
+      workspaceFromUrl: (req, res, next) => { req.workspace = WORKSPACE; next(); },
+      workspaceOwnerCheck: async () => ({ status: 'owner' })
+    }));
+    const item = await parts.store.addItem(URL_KEY, { prompt: 'p' });
+    await parts.store.takeItem(item._id, URL_KEY, TOKEN);
+    const real = parts.store.getItemWatchToken.bind(parts.store);
+    return { ...parts, app, item, real };
+  }
+  const secondTokenReadThrows = (store, real, error) => {
+    let reads = 0;
+    store.getItemWatchToken = async (...args) => { if (++reads >= 2) throw error; return real(...args); };
+  };
+
+  test('a fault on the held re-check before the flush is a real 503', async () => {
+    const { store, app, item, real } = await setup();
+    secondTokenReadThrows(store, real, new DispatchStoreFault('getItemWatchToken', BOOM));
+    const q = quiet();
+    try {
+      await serve(app, async (base) => {
+        const res = await sendJson(base, 'GET', `/workspace/${URL_KEY}/api/dispatch/transcripts?ids=${item._id}&wait=5`);
+        assert.equal(res.status, 503);
+        await assertEnvelope(res, 'transcripts pre-flush');
+      });
+    } finally { q.mock.restore(); }
+  });
+
+  test('after the flush: a store fault is 200 with statusCode:503; a plain Error is statusCode:500', async () => {
+    for (const [error, statusCode] of [[new DispatchStoreFault('getItemWatchToken', BOOM), 503], [new Error('boom'), 500]]) {
+      const { store, app, item, real } = await setup();
+      secondTokenReadThrows(store, real, error);
+      const q = quiet();
+      try {
+        await serve(app, async (base) => {
+          const res = await sendJson(base, 'GET', `/workspace/${URL_KEY}/api/dispatch/transcripts?ids=${item._id}&wait=5`, { 'X-Request-Start': String(Date.now() - 25_000) });
+          assert.equal(res.status, 200, 'the headers were committed at the flush');
+          const body = JSON.parse(await res.text());
+          assert.equal(body.statusCode, statusCode);
+          if (statusCode === 503) assert.equal(body.code, 'DISPATCH_STORE_UNAVAILABLE');
+          else assert.equal(body.error, 'Failed to read transcripts');
+        });
+      } finally { q.mock.restore(); }
+    }
+    POST_FLUSH_ROWS.add('GET /workspace/:urlKey/api/dispatch/transcripts');
+  });
+});
 
 describe('enqueue lanes: an addItem fault is the 503 envelope', () => {
   async function dispatchSetup() {
@@ -771,6 +831,7 @@ describe('the contract is stated where callers read it', () => {
       'POST /workspace/:urlKey/api/dispatch',
       'GET /workspace/:urlKey/api/dispatch', 'GET /workspace/:urlKey/api/dispatch/count',
       'GET /workspace/:urlKey/api/dispatch/history', 'DELETE /workspace/:urlKey/api/dispatch/:itemId',
+      'GET /workspace/:urlKey/api/dispatch/transcripts',
       'PATCH /workspace/:urlKey/api/dispatch/:sessionId/trim',
       // proxy runner and dispatch
       'GET /api/proxy/runner/poll', 'POST /api/proxy/runner/take/:id', 'POST /api/proxy/runner/feedback/:id',
@@ -788,7 +849,7 @@ describe('the contract is stated where callers read it', () => {
       [/\/api\/proxy\/runner\/prompt$/, 'static runner prompt text, no store read']
     ];
     // Routes whose keepalive can flush before the reply: each needs a post-flush row.
-    const keepaliveArmed = ['GET /api/proxy/dispatch/:id'];
+    const keepaliveArmed = ['GET /api/proxy/dispatch/:id', 'GET /workspace/:urlKey/api/dispatch/transcripts'];
 
     const dispatchRoutes = stackOf(createDispatchRoutes({
       dispatchQueueStore: {}, dispatchTokenStore: {}, workspaceFromUrl: (q, r, n) => n(), userPreferencesStore: {}, proxyTokenStore: {}

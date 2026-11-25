@@ -32,7 +32,7 @@ import assert from 'node:assert/strict';
 import { createDispatchRoutes } from '../../routes/dispatch.js';
 import { enumerateRoutes, sampleUrl, appAround, request, makeSpy, SAMPLE_UUID } from './lib/entrance-route-sweep.js';
 
-const ROUTE_COUNT = 30; // LIN-3962 adds the decision panel beside the preview; LIN-4198 adds POST /api/dispatch/usage/:itemId
+const ROUTE_COUNT = 31; // LIN-3962 adds the decision panel beside the preview; LIN-4198 adds POST /api/dispatch/usage/:itemId; LIN-4560 the live transcripts read
 const COPY = "Only this workspace's owner can act on its runner.";
 const OWNER = 'acct-owner';
 const MEMBER = 'acct-member';
@@ -132,6 +132,7 @@ const TABLE = {
   [`GET ${BASE}/decision-panel`]: { verdict: 'read-only', reason: 'LIN-3962: the Home run panel\'s body, owner-only (PREVIEW_OWNER_ONLY); reads the history for its numbers, writes nothing', probes: [{}] },
   [`GET ${BASE}/quota`]: { verdict: 'read-only', reason: 'LIN-3238 Q6: the caller\'s own free-tier usage; reads only', probes: [{}] },
   [`GET ${BASE}/history`]: { verdict: 'read-only', reason: 'history list (LIN-3384 redacts the row); reads only', probes: [{}] },
+  [`GET ${BASE}/transcripts`]: { verdict: 'read-only', reason: 'LIN-4560: the live transcripts read (the signed-in twin of the hold-open watch); masked entries only, no prompt; reads only', probes: [{}] },
   [`GET ${BASE}/recent-prompts`]: { verdict: 'read-only', reason: 'the caller\'s own recent prompts', probes: [{}] },
   [`POST ${BASE}/recent-prompts`]: { verdict: 'read-only', reason: 'writes the caller\'s own preferences, not runner state', probes: [{ body: { prompt: 'p' } }] },
   [`GET ${BASE}/favorite-prompts`]: { verdict: 'read-only', reason: 'the caller\'s own favourites (LIN-1011)', probes: [{}] },
