@@ -4,7 +4,7 @@
  */
 import { Router } from 'express'
 import { randomUUID } from 'node:crypto'
-import { removeWorkspace, upsertWorkspace, saveSession, getActiveWorkspace, getWorkspaceByUrlKey, validateWorkspaceUrlKey, linkProvider } from '../lib/workspace.js'
+import { removeWorkspace, removingEndsSession, upsertWorkspace, saveSession, getActiveWorkspace, getWorkspaceByUrlKey, validateWorkspaceUrlKey, linkProvider } from '../lib/workspace.js'
 import { establishAccount, clearUnresolvableAccountSession } from '../lib/account-session.js'
 import { recordWorkspace } from '../lib/workspace-registry.js'
 import { evictWorkspaceTokenPair } from '../lib/workspace-token-cache.js'
@@ -115,7 +115,7 @@ export function createWorkspaceRoutes({ localStore, accountStore, accountWorkspa
     }
 
     // If only one workspace, just logout entirely
-    if (req.session.workspaces?.length <= 1) {
+    if (removingEndsSession(req.session.workspaces)) {
       // LIN-1507: same treatment as /logout — capture accountId + workspaces
       // BEFORE destroy() destroys the session data.
       const accountId = req.session.accountId

@@ -246,7 +246,7 @@ Layout only. For the pages Settings shares pieces with:
 
 1. **Confirming a change: confirmation in place.** John, asked on 24 October whether LIN-511's native `confirm()` or Settings' ask in place should win: "On the page is best, I think." Authority: `askInPlace` with its confirm and Cancel, as built today. It **supersedes LIN-511's native `confirm()` rule** (`docs/ui-divergences.md`). That doc needs updating to match; Consolidate makes the edit and this PR does not touch it. `tests/unit/settings-components.test.js` (renamed by LIN-3890 from `render-settings-shell.test.js`) asserts the new Settings code has no `confirm(`; that stays true.
 
-   **Native `confirm()` sites still in the code (follow-up; outside what LIN-3886 migrates unless a site is on a page these tickets already touch).** `docs/ui-divergences.md` lists four sites; the code had the seven below, verified at base (the scan's two, retire and unretire, went with the scan in LIN-4540, and the bulk agree with the ruling machinery in LIN-4541):
+   **Native `confirm()` sites still in the code (follow-up; outside what LIN-3886 migrates unless a site is on a page these tickets already touch).** `docs/ui-divergences.md` lists three sites (four until LIN-4566 moved the workspace remove in place); the code had the seven below, verified at base (the scan's two, retire and unretire, went with the scan in LIN-4540, and the bulk agree with the ruling machinery in LIN-4541):
    - ~~`public/common.js`, the `form[data-confirm]` submit guard, used by `lib/components/navbar.js` to remove a workspace~~: moved in place by LIN-4566 (Settings › Sources, "Remove this workspace");
    - `public/custom-prompts.js:195`;
    - `public/session.js:36` (`window.confirm`);
