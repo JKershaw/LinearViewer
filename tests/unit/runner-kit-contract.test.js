@@ -56,7 +56,7 @@ const TABLE = JSON.parse(fs.readFileSync(CONTRACT_PATH, 'utf8'));
 // LIN-4384: the sha256 of contract.json's own bytes. simple-dispatcher pins the same value
 // (FIXTURE_SHA256 beside LV_COMMIT in test/runner-contract.test.js), so an edit here that is not
 // re-copied there would go unnoticed on this side without this tripwire.
-const CONTRACT_SHA256 = '92b83f16e0a92fcdc2f1e1e35492d40560bf1b652ca94cf6aa51e23aef9f5dcf';
+const CONTRACT_SHA256 = '92df7f9b7557f34eaccbc1eb66fdb886b41ed148d12fd06cf307eb8c436de2c1';
 
 const OWNER = 'acct-owner-1111';
 const NOW = Date.parse('2026-10-18T12:00:00.000Z');
@@ -134,6 +134,52 @@ async function kitAuthOutcome(row) {
       home, now: () => Date.now(), fetchImpl, waitPollMs: 10, waitHeartbeatMs: 10, waitCapMs: 60
     });
     return out.reason;
+  } finally { fs.rmSync(home, { recursive: true, force: true }); }
+}
+
+// LIN-4561: the kit's keyed sending of a run's words, in the `keyed-feedback` clause. As SD's pin does: one
+// assistant-text post through the sender (a `wait` pass over a running subagent whose transcript has one text block),
+// Harbour answering from item.replies in order (the last repeats), then one later attempt (a second `wait` pass).
+// The outcome reads the saved queue: dropped (a 404 was answered), rejected (set aside), queued, else acknowledged.
+async function kitKeyedFeedbackOutcome(row) {
+  const home = fs.mkdtempSync(path.join(fs.existsSync('/tmp') ? '/tmp' : os.tmpdir(), 'rkc-words-'));
+  try {
+    const dir = path.join(home, 'acme');
+    fs.mkdirSync(dir, { recursive: true, mode: 0o700 });
+    credentialStore({ file: path.join(dir, 'runner.token') }).set('runner-working-token');
+    fs.writeFileSync(path.join(dir, 'runner.json'), JSON.stringify({
+      baseUrl: 'http://127.0.0.1:1', urlKey: 'acme', ownerAccountId: OWNER,
+      expiresAt: new Date(Date.now() + 20 * 3600_000).toISOString()
+    }));
+    fs.writeFileSync(path.join(dir, 'ledger.json'), JSON.stringify(ledger));
+    const transcripts = path.join(home, 'transcripts', 'proj', 'sess', 'subagents');
+    fs.mkdirSync(transcripts, { recursive: true });
+    fs.writeFileSync(path.join(transcripts, 'agent-agent-live.jsonl'),
+      `${JSON.stringify({ type: 'assistant', uuid: 'line-1', message: { content: [{ type: 'text', text: 'the words' }] } })}\n`);
+    const replies = row.item.replies;
+    const bodies = [];
+    const fetchImpl = async (url, init) => {
+      if (url.includes('/runner/feedback/')) {
+        const body = JSON.parse(init.body);
+        // Only the run's words are this row's posts. `wait` may post others on the same row (its stall watchdog, when
+        // the clock reads the transcript as old: the CI arm shifts the clock 400 days); they take no reply from the row.
+        if (body.kind !== 'assistant-text') return new Response(JSON.stringify({ success: true }), { status: 200 });
+        bodies.push(body);
+        const r = replies[Math.min(bodies.length, replies.length) - 1];
+        return new Response(JSON.stringify({ success: true, ...(r.duplicate ? { duplicate: true } : {}) }), { status: r.status });
+      }
+      return new Response(JSON.stringify({ items: [] }), { status: 200 });
+    };
+    // One poll per `wait`: the cap ends it before the second poll.
+    const pass = () => runCommand(['wait', '--url-key', 'acme'], {
+      home, now: () => Date.now(), fetchImpl, transcriptRoot: path.join(home, 'transcripts'), waitPollMs: 60_000, waitHeartbeatMs: 10, waitCapMs: 5
+    });
+    await pass();
+    await pass();
+    const words = JSON.parse(fs.readFileSync(path.join(dir, 'words', 'agent-live.json'), 'utf8'));
+    const outcome = bodies.length && replies.slice(0, bodies.length).some((r) => r.status === 404) ? 'dropped'
+      : (words.rejected?.length ? 'rejected' : (words.queue?.length ? 'queued' : 'acknowledged'));
+    return `${outcome}; posts ${bodies.length}; keys ${new Set(bodies.map((b) => b.key)).size}`;
   } finally { fs.rmSync(home, { recursive: true, force: true }); }
 }
 
@@ -309,9 +355,9 @@ function kitFor(row) {
       return kitStoreOutcome(row);
     case 'heartbeat':
       return 'not sent (the runner-kit producer, POST /api/proxy/runner/heartbeat, is a follow-up)';
-    // LIN-4557: SD's keyed retry of a run's words. The kit posts assistant-text without a key until LIN-4561.
+    // LIN-4557: SD's keyed retry of a run's words. LIN-4561: the kit's own keyed sender, driven the same way.
     case 'keyed-feedback':
-      return 'not sent (the kit posts assistant-text without a key; its keyed, in-order sending is LIN-4561)';
+      return kitKeyedFeedbackOutcome(row);
     case 'sentinel':
       return kitSentinelOutcome(row);
     case 'exchange':
