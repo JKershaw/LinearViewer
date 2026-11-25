@@ -36,21 +36,19 @@ Area notes for `front-end-pages` in the registry. Format and rules: README.md.
 - The run page is pinned byte for byte (`tests/unit/render-session-golden.test.js`). An optional fragment in a run row goes
   on an existing template line, and an `id` only on the rows that need one: LIN-4558's first pass put an empty
   interpolation on its own line and an `id` on every row, and all 24 goldens moved.
-- A page moves onto the frame by its place key: register it in `lib/places.js` (a place, or a drilled-in page with its
-  `parent`), render through `renderFrame` (`lib/components/frame.js`), delete its file from the allowance in
-  `tests/unit/frame-census.test.js`, and widen `FRAMED` in `tests/e2e/frame-rules.spec.js`. The frame owns the h1, the
+- A page sits in the frame by its place key: register it in `lib/places.js` (a place, or a drilled-in page with its
+  `parent`), render through `renderFrame` (`lib/components/frame.js`; `tests/unit/frame-census.test.js` fails any page
+  drawing its own chrome), and widen `FRAMED` in `tests/e2e/frame-rules.spec.js`. The frame owns the h1, the
   way back, the footer and the tab title, so drop the page's own `renderPageHeader`, back link and footer, and style
   nothing the shared rules already draw: its search fields are the text control (`.token-label-input` in
   `public/style.css`), its way back is the drill-down back link (`.sess-back`), its questions count is Home's needs-you
   tone. LIN-4562's first cut drew all three again in `public/frame.css`. A public page passes no viewer: the request's
   comes through `frameViewerContext`; a body with its own H1 is named by it (`takeFirstH1`, LIN-4567).
 - A count drawn twice (rail and band) is updated by one function writing every copy (`updateRulingsBadge`,
-  `updateQueueBadge`, `public/common.js`), and each page runs one poll: the old bar's badge keeps `public/app.js`'s, the
-  frame's count polls from `public/common.js`. LIN-4562's first push moved the whole poll and started requests on old
-  pages that load no `public/app.js` (`tests/e2e/look-alike-controls.spec.js` caught it).
+  `updateQueueBadge`, `public/common.js`), and polled once, from `public/common.js` (LIN-4568 retired `public/app.js`'s).
 - Moving a page onto the frame or retiring its widget leaves edges. The frame owns the page's name: client code that
   hid the body misses the h1 and tab: the revoked-link notice (`goneHandlerFor`, `public/task-page.js`) left the title
   showing (LIN-4563). What existed only for a retired feature goes too, server side included (the `search` home-rows
   kind, rows' `data-search-text`, a constant named for it). Grep the client's `innerHTML =`, `kind=`, `data-*`,
-  `document.title` and `.nav-bar`: Swipe's script retitled the tab, Ship measured the bar (LIN-4564). A 15rem rail
+  `document.title` and old chrome classes: Swipe's script retitled the tab, Ship measured the bar (LIN-4564). A 15rem rail
   breaks fixed widths at 1024 (LIN-4565).

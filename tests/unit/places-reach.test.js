@@ -96,7 +96,7 @@ describe('the lit place', () => {
   test('a place lights itself; a drilled-in page lights its parent', () => {
     const owner = { runControls: true };
     assert.equal(litPlaceFor('connect', { flags: owner }).key, 'connect');
-    assert.equal(litPlaceFor('proxy', { flags: owner }).key, 'connect', 'the old bar key is an alias');
+    assert.equal(litPlaceFor('proxy'), null, "the old bar's currentPage keys went with it (LIN-4568): a page names its place by key");
     assert.equal(litPlaceFor('run', { flags: owner }).key, 'runs');
     assert.equal(litPlaceFor('escalation', { flags: owner }).key, 'kpis');
     assert.equal(litPlaceFor('search', { flags: owner }).key, 'home');

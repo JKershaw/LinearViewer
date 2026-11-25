@@ -2,7 +2,11 @@ import { test, describe, beforeEach, afterEach } from 'node:test';
 import assert from 'node:assert/strict';
 
 import { getDeployInfo } from '../../lib/deploy-info.js';
-import { renderPageFooter } from '../../lib/components/footer.js';
+import { renderFrameFooter } from '../../lib/components/frame.js';
+
+// LIN-4568: the old footer went with the old bar; the deploy stamp is the frame footer's (renderFrameFooter).
+const renderPageFooter = ({ deployInfo }) => renderFrameFooter(deployInfo);
+const stampOf = (html) => html.match(/frame-footer__stamp[^>]*>([\s\S]*)<\/span>\s*<\/footer>/)[1];
 
 const DEPLOY_ENV_KEYS = [
   'DEPLOY_VERSION', 'DEPLOY_CREATED_AT', 'DEPLOY_COMMIT',
@@ -62,13 +66,13 @@ describe('footer deploy-info gate', () => {
 
   test('does not push an empty version part when version is absent', () => {
     const html = renderPageFooter({ deployInfo: { version: null, createdAt: null, commit: 'abc1234def5678' } });
-    const deployBlock = html.match(/<div class="footer-deploy">([\s\S]*?)<\/div>/)[1];
+    const deployBlock = stampOf(html);
     assert.ok(!deployBlock.startsWith(' · '), `deploy block should not lead with an empty version separator: ${deployBlock}`);
   });
 
   test('renders both version and commit when both are present', () => {
     const html = renderPageFooter({ deployInfo: { version: 'v1.2.3', createdAt: null, commit: 'abc1234def5678' } });
-    const deployBlock = html.match(/<div class="footer-deploy">([\s\S]*?)<\/div>/)[1];
+    const deployBlock = stampOf(html);
     assert.match(deployBlock, /v1\.2\.3 · <a[^>]*class="footer-link"[^>]*>abc1234</);
   });
 
@@ -78,9 +82,10 @@ describe('footer deploy-info gate', () => {
     assert.doesNotMatch(html, /class="deploy-time"/);
   });
 
-  test('empty deployInfo still falls back to the repo link (deployless branch unchanged)', () => {
+  test('empty deployInfo still links the repo (the footer\'s Source link) and draws no stamp', () => {
     const html = renderPageFooter({ deployInfo: {} });
     assert.doesNotMatch(html, /class="deploy-time"/);
+    assert.doesNotMatch(html, /frame-footer__stamp/);
     assert.match(html, /github\.com\/JKershaw\/LinearViewer/);
   });
 });

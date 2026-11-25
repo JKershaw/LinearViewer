@@ -23,7 +23,10 @@ import {
   EXPERIMENTAL_VIEWS,
   getFeatureFlags,
 } from '../../lib/feature-defaults.js';
-import { getViewNavLinks } from '../../lib/components/view-nav.js';
+import { railFor } from '../../lib/places.js';
+
+// LIN-4568: the old bar's link list (getViewNavLinks) went with the bar; the rail (lib/places.js railFor) is the nav.
+const railKeys = (flags) => railFor(flags).flatMap(g => g.places.map(p => p.key));
 import { renderLiveConsolePage } from '../../lib/render-live-console.js';
 
 // ─── feature wiring ───────────────────────────────────────────────────────────
@@ -44,12 +47,11 @@ test('getFeatureFlags keeps liveConsole off by default and honours an explicit t
   assert.equal(getFeatureFlags({ features: { liveConsole: true } }).liveConsole, true);
 });
 
-test('nav surfaces live-console ONLY when the flag is on (gated inclusion)', () => {
-  assert.ok(!getViewNavLinks('acme', {}).map(l => l.text).includes('live-console'));
-  const on = getViewNavLinks('acme', { liveConsole: true }).map(l => l.text);
-  assert.ok(on.includes('live-console'));
+test('the rail surfaces live-console ONLY when the flag is on (gated inclusion)', () => {
+  assert.ok(!railKeys({}).includes('live'));
+  assert.ok(railKeys({ liveConsole: true }).includes('live'));
   // strict === true gate
-  assert.ok(!getViewNavLinks('acme', { liveConsole: 1 }).map(l => l.text).includes('live-console'));
+  assert.ok(!railKeys({ liveConsole: 1 }).includes('live'));
 });
 
 // ─── renderer ─────────────────────────────────────────────────────────────────

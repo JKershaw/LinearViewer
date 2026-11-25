@@ -1,7 +1,7 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
 
-import { renderNavBar } from '../../lib/components/navbar.js';
+import { renderFilterLine as renderNavBar } from '../../lib/components/navbar.js';
 
 // LIN-2527: the assignee selector is dashboard-only — gated on
 // `currentPage === 'projects'` DIRECTLY, never FILTERABLE_PAGES (the team
@@ -9,6 +9,9 @@ import { renderNavBar } from '../../lib/components/navbar.js';
 // Reusing FILTERABLE_PAGES here would be actively wrong: /swipe, /swim,
 // /ship, /roadmap keep the team selector but must stay assignee-free
 // (LIN-2518 tracks that as a deliberate scope shrink, not an oversight).
+// LIN-4119 widened it to Backlog. LIN-4568: the old bar went; the gate is the
+// page filter line's (renderFilterLine), which draws the same selectors in the
+// frame's `filters` slot, so these cases now read it.
 
 const ASSIGNEES = ['Alice', 'Bob'];
 
@@ -24,10 +27,12 @@ function renderFor(currentPage, opts = {}) {
   });
 }
 
-test('assignee selector renders on the dashboard (projects) page only', () => {
-  const html = renderFor('projects');
-  assert.match(html, /id="assignee-toggle"/);
-  assert.match(html, /id="assignee-options"/);
+test('assignee selector renders on the project sections only: Home (projects) and Backlog', () => {
+  for (const page of ['projects', 'backlog']) {
+    const html = renderFor(page);
+    assert.match(html, /id="assignee-toggle"/, page);
+    assert.match(html, /id="assignee-options"/, page);
+  }
 });
 
 test('assignee selector is absent on every non-dashboard page — even the four team-filterable ones, EVEN with a populated assignees array (proves the gate, not just the data-absence guard)', () => {
@@ -95,11 +100,4 @@ test('team selector is unaffected — still renders on the dashboard alongside t
   });
   assert.match(html, /id="team-toggle"/);
   assert.match(html, /id="assignee-toggle"/);
-});
-
-test('workspace switcher stays unconditional, unaffected by the assignee gate', () => {
-  for (const page of ['projects', 'swipe', 'settings']) {
-    const html = renderFor(page);
-    assert.match(html, /id="workspace-toggle"/, `expected workspace switcher present on ${page}`);
-  }
 });

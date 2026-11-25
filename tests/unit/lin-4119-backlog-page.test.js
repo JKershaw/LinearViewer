@@ -19,7 +19,10 @@ import { readFileSync } from 'node:fs';
 import { fileURLToPath } from 'node:url';
 import { dirname, join } from 'node:path';
 import { renderPage } from '../../lib/render.js';
-import { renderNavBar } from '../../lib/components/navbar.js';
+import { renderFilterLine as renderNavBar } from '../../lib/components/navbar.js';
+import { renderRail } from '../../lib/components/frame.js';
+import { placeFor } from '../../lib/places.js';
+// LIN-4568: the old bar went. Its filters are the page filter line's (renderFilterLine), its workspace menu the rail's.
 import { buildInProgressForest } from '../../lib/tree.js';
 import '../../lib/providers/linear/index.js';
 
@@ -151,9 +154,10 @@ describe('LIN-4119 — navbar page name "backlog"', () => {
   });
 
   test('a backlog workspace switch keeps the page: the switcher links to /backlog', () => {
-    const nav = renderNavBar({
-      ...navOptions,
-      currentPage: 'backlog',
+    const nav = renderRail({
+      urlKey: 'acme',
+      lit: placeFor('backlog'),
+      current: true,
       workspaces: [{ urlKey: 'acme', name: 'Acme', provider: 'local' }],
     });
     assert.ok(nav.includes('/workspace/acme/backlog'), 'switching workspace on /backlog stays on /backlog');

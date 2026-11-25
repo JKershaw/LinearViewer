@@ -3,9 +3,10 @@
 // =============================================================================
 //
 // Covers the two server-rendered seams the widget rides on: the per-user
-// `feedbackWidget` feature flag (shared persistence) and the footer-resident
-// toggle + widget mount/assets that renderPageFooter emits on authenticated,
-// workspace-scoped pages.
+// `feedbackWidget` feature flag (shared persistence) and the widget mount/assets
+// on authenticated, workspace-scoped pages. LIN-4568: the old footer that drew
+// the mount went with the old bar; the frame (renderFrame) draws it on every
+// signed-in page, and the public frame and the landing draw none.
 
 import { test, describe } from 'node:test';
 import assert from 'node:assert/strict';
@@ -17,7 +18,12 @@ import {
   FEATURE_LABELS,
   isValidFeatureKey
 } from '../../lib/feature-defaults.js';
-import { renderPageFooter } from '../../lib/components/footer.js';
+import { renderFrame, renderPublicFrame, renderFrameFooter } from '../../lib/components/frame.js';
+import { renderLandingPage } from '../../lib/render-landing.js';
+
+/** A signed-in page in the frame, as the old footer's options described it. */
+const renderPageFooter = ({ urlKey, featureFlags = {}, dispatchDefaults = {} }) =>
+  renderFrame({ place: 'home', urlKey, featureFlags, dispatchDefaults });
 
 describe('feedbackWidget feature flag (LIN-635)', () => {
   test('is registered as a valid per-user flag', () => {
@@ -43,7 +49,7 @@ describe('feedbackTriage feature flag (LIN-733, removed in LIN-3848)', () => {
   });
 });
 
-describe('footer feedback surface (LIN-635)', () => {
+describe('the feedback widget mount on framed pages (LIN-635, LIN-4568)', () => {
   test('renders the widget mount on an authenticated workspace page, with no footer toggle (LIN-3848)', () => {
     const html = renderPageFooter({ urlKey: 'acme', featureFlags: {} });
     assert.match(html, /data-testid="feedback-widget-root"/);
@@ -51,7 +57,7 @@ describe('footer feedback surface (LIN-635)', () => {
     assert.match(html, /\/feedback-widget\.css/);
     assert.match(html, /data-url-key="acme"/);
     assert.doesNotMatch(html, /footer-feedback-toggle/);
-    assert.doesNotMatch(html, />feedback</);
+    assert.doesNotMatch(html, />feedback</, 'flag off: no trigger');
   });
 
   test('the mount reflects the flag state', () => {
@@ -63,12 +69,11 @@ describe('footer feedback surface (LIN-635)', () => {
 
   test('Settings is the single place to switch the widget (LIN-3848)', () => {
     assert.ok(FEATURE_LABELS.feedbackWidget);
-    const html = renderPageFooter({ urlKey: 'acme', featureFlags: { feedbackWidget: true } });
-    const deployRow = html.match(/<div class="footer-deploy">([\s\S]*?)<\/div>/);
-    assert.ok(deployRow, 'footer-deploy row present');
-    assert.match(deployRow[1], /privacy/);
-    assert.match(deployRow[1], /terms/);
-    assert.doesNotMatch(deployRow[1], /feedback/);
+    // The footer is the same on every page: no feedback control in it, whatever the flag.
+    const footer = renderFrameFooter({});
+    assert.match(footer, /Privacy/);
+    assert.match(footer, /Terms/);
+    assert.doesNotMatch(footer, /feedback/i);
   });
 
   // LIN-1132: the widget's model/harness exec-controls read the workspace
@@ -100,14 +105,14 @@ describe('footer feedback surface (LIN-635)', () => {
     assert.match(html, /&lt;script&gt;/);
   });
 
-  test('is omitted on the unauthenticated landing footer', () => {
-    const html = renderPageFooter({ isLanding: true, currentPage: '/' });
+  test('is omitted on the unauthenticated landing', () => {
+    const html = renderLandingPage({});
     assert.doesNotMatch(html, /feedback-widget-root/);
     assert.doesNotMatch(html, /footer-feedback-toggle/);
   });
 
-  test('is omitted when there is no workspace urlKey', () => {
-    const html = renderPageFooter({ urlKey: null, featureFlags: { feedbackWidget: true } });
+  test('is omitted where there is no workspace: the public frame', () => {
+    const html = renderPublicFrame({ title: 'Library', viewer: { signedIn: false, homeHref: null } });
     assert.doesNotMatch(html, /feedback-widget-root/);
   });
 });

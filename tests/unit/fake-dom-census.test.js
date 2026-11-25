@@ -50,8 +50,8 @@ const EXCLUDED = new Set(['tests/unit/helpers/fake-dom.js', SELF]);
  * classification, beat 2); an entry with no comment is not yet classified as stopped.
  */
 const HAND_WRITTEN_FAKE_DOM_FILES = [
-  'tests/unit/common-assignee-filter-nav.test.js', // stop: getBoundingClientRect in initNavBar, public/common.js:2905 (LIN-4271 stop rule)
-  'tests/unit/common-team-filter-nav.test.js', // stop: getBoundingClientRect in initNavBar, public/common.js:2905 (LIN-4271 stop rule)
+  'tests/unit/common-assignee-filter-nav.test.js', // stop lifted: LIN-4568 took the bar's height measure out of the filter client (initFilterLine); can move to fake-dom.js
+  'tests/unit/common-team-filter-nav.test.js', // stop lifted: LIN-4568 took the bar's height measure out of the filter client (initFilterLine); can move to fake-dom.js
   'tests/unit/flight-companion-client.test.js', // stop: style write and layout read-back, public/flight-companion.js:653-665 (LIN-4271)
   'tests/unit/lin-4114-inflight-lock.test.js', // stop: real bubbling dispatchEvent, public/question-cards.js:241-243; the fake dispatchEvent is inert
 ];

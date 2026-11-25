@@ -22,7 +22,7 @@ import { openFindingsFor } from '../../lib/open-questions.js';
 import { renderWaitingSection, waitingFragmentOf, NOTES_SHOWN } from '../../lib/waiting-section.js';
 import { buildInProgressCountParts, questionsWords } from '../../lib/task-board-view.js';
 import { renderPage } from '../../lib/render.js';
-import { renderNavBar } from '../../lib/components/navbar.js';
+import { renderRail } from '../../lib/components/frame.js';
 import { renderHomeStatus, renderTaskStatus } from '../../lib/render-task-page.js';
 import { STATE_WORDS } from '../../lib/task-state.js';
 import { createDashboardRulingsRoutes } from '../../routes/dashboard-rulings.js';
@@ -161,8 +161,10 @@ describe('one number: N questions plus M findings', () => {
     for (const n of [0, 1, 2, 11]) assert.equal(sandbox.questionsWords(n), questionsWords(n), String(n));
     assert.equal(questionsWords(1), '1 question');
     assert.equal(questionsWords(4), '4 questions');
-    const nav = renderNavBar({ workspaces: [], urlKey: URL_KEY, featureFlags: { runControls: true } });
-    assert.match(nav, /data-testid="nav-questions-badge"[^>]*href="\/workspace\/lin-4552-ws\/observation\?view=questions"/);
+    // LIN-4568: the badge is the rail's (the old bar's went); it leads to the questions on Home (LIN-4342's plan).
+    const nav = renderRail({ workspaces: [], urlKey: URL_KEY, featureFlags: { runControls: true } });
+    assert.match(nav, /data-testid="rail-questions" href="\/workspace\/lin-4552-ws\/#waiting-on-you"/);
+    assert.match(nav, /<span class="rulings-count">0 questions<\/span>/);
   });
 });
 

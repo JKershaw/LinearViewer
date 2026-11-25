@@ -74,13 +74,14 @@ export const NON_HOME_TASK = Object.freeze([
   '.repo-picker-truncated-note',
   '.section .section-header--ruled',
 ]);
-// Shell chrome at a phone width (the header that the LIN-2191 and LIN-4009 tests lay out at 320px). The nav and its badges
-// keep their original sizes, because the header's layout pins depend on them; the nav sets its own phone size (14px at
-// 640px, 13px at 400px), so the body text beside it can stay at 16px. Exempt by name (ruling dispatch 4eeb6ac5, rule 2).
+// Shell chrome at a phone width (the header that the LIN-2191 and LIN-4009 tests lay out at 320px). The filter line's
+// selectors and the questions count keep their original sizes, because their layout pins depend on them. Exempt by name
+// (ruling dispatch 4eeb6ac5, rule 2). LIN-4568: the old bar's own selectors (.nav-bar, .nav-view, .nav-action …) went
+// with their rules.
 export const CHROME_EXEMPT = Object.freeze([
-  '.nav-action', '.nav-label', '.nav-more-toggle', '.nav-option', '.nav-value', '.nav-view',
-  '.queue-badge', '.rulings-badge', '.wordmark-nav',
-  '.nav-bar', '.toggle',
+  '.nav-label', '.nav-option', '.nav-value',
+  '.rulings-badge',
+  '.toggle',
 ]);
 const EXEMPT = new Set([...LIN4024_EXEMPT, ...HOME_PIN_EXEMPT, ...CHROME_EXEMPT]);
 const OUT_OF_SCOPE = new Set(NON_HOME_TASK);
@@ -208,7 +209,6 @@ export const MONO_ALLOWED = Object.freeze([
   '.sess-cred-token',
   '.task-share-url',
   '.context-node-id',
-  '.footer-deploy',
   '.chat-tool-row',
   '.chat-tool-group',
   // figures
@@ -228,8 +228,6 @@ export const MONO_ALLOWED = Object.freeze([
   '.task-chat-warning code',
   '.task-edit-preview code',
   // glyphs (structural characters)
-  '.nav-view-current::before',
-  '.nav-more-toggle',
   '.sess-run-toggle-icon',
   '.task-ref-glyph',
   // to review (kept mono, names do not settle it): card meta, a chat fold, key/value rows, a segment bar

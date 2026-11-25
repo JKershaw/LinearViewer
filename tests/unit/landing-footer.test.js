@@ -1,23 +1,30 @@
 /**
- * LIN-3980 outcome 6: the footer suits a visitor. On `/` nothing is marked
- * current (the visitor is in no view), and the cross-view row names the
- * previews. LIN-4564: the previews sit in the public frame and draw its footer,
- * so the row is only ever drawn on `/`.
+ * LIN-3980 outcome 6, as LIN-4568 (LIN-4342 piece 7) left it: the landing draws the footer every page shares
+ * (renderFrameFooter, lib/components/frame.js), so a visitor on `/` meets the same Library, Templates, Privacy, Terms and
+ * Source as everywhere else. The previews the old landing footer named ("previews: swipe · swim") are links beside the
+ * swim glimpse they preview, so `/` still leads to both.
  */
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
-import { renderPageFooter } from '../../lib/components/footer.js';
+import { renderLandingPage } from '../../lib/render-landing.js';
+import { renderFrameFooter } from '../../lib/components/frame.js';
 
-test('on / nothing in the cross-view row is marked current, and the row names the previews', () => {
-  const html = renderPageFooter({ isLanding: true, currentPage: '/' });
-  assert.doesNotMatch(html, /footer-current/);
-  assert.doesNotMatch(html, /footer-link-projects/);
-  assert.match(html, /previews:/);
-  assert.match(html, /<a href="\/swipe" class="footer-action" data-testid="footer-link-swipe">swipe<\/a>/);
-  assert.match(html, /<a href="\/swim" class="footer-action" data-testid="footer-link-swim">swim<\/a>/);
+const DEPLOY = { version: 'v9', commit: 'abcdef1234567' };
+
+test('the landing footer is the frame footer, byte for byte', () => {
+  const html = renderLandingPage({ deployInfo: DEPLOY });
+  assert.ok(html.includes(renderFrameFooter(DEPLOY)), 'the shared footer, unchanged');
+  assert.equal(html.match(/<footer\b/g).length, 1, 'one footer');
+  assert.doesNotMatch(html, /page-footer|footer-actions|previews:/, 'the old footer and its preview row are gone');
 });
 
-test('the legal links still mark the current legal page on /privacy', () => {
-  const html = renderPageFooter({ isLanding: true, currentPage: '/privacy' });
-  assert.match(html, /<strong class="footer-current">privacy<\/strong>/);
+test('the previews are linked from the swim section, beside the board they preview', () => {
+  const html = renderLandingPage({});
+  const swim = html.slice(html.indexOf('data-testid="landing-swim"'), html.indexOf('data-testid="landing-prompt"'));
+  assert.match(swim, /<a[^>]*href="\/swim"[^>]*data-testid="landing-preview-swim"/);
+  assert.match(swim, /<a[^>]*href="\/swipe"[^>]*data-testid="landing-preview-swipe"/);
+});
+
+test('the landing loads the frame sheet that styles the footer', () => {
+  assert.match(renderLandingPage({}), /href="\/frame\.css"/);
 });

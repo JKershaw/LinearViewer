@@ -24,7 +24,10 @@ import {
   EXPERIMENTAL_VIEWS,
   getFeatureFlags,
 } from '../../lib/feature-defaults.js';
-import { getViewNavLinks } from '../../lib/components/view-nav.js';
+import { railFor } from '../../lib/places.js';
+
+// LIN-4568: the old bar's link list (getViewNavLinks) went with the bar; the rail (lib/places.js railFor) is the nav.
+const railKeys = (flags) => railFor(flags).flatMap(g => g.places.map(p => p.key));
 import { renderShipJourneyPage } from '../../lib/render-ship-journey.js';
 import { deriveJourney } from '../../lib/ship-journey.js';
 
@@ -48,12 +51,11 @@ test('getFeatureFlags keeps shipJourney off by default and honours an explicit t
   assert.equal(getFeatureFlags({ features: { shipJourney: true } }).shipJourney, true);
 });
 
-test('nav surfaces ship-journey ONLY when the flag is on (gated inclusion)', () => {
-  assert.ok(!getViewNavLinks('acme', {}).map(l => l.text).includes('ship-journey'));
-  const on = getViewNavLinks('acme', { shipJourney: true }).map(l => l.text);
-  assert.ok(on.includes('ship-journey'));
+test('the rail surfaces ship-journey ONLY when the flag is on (gated inclusion)', () => {
+  assert.ok(!railKeys({}).includes('ship-journey'));
+  assert.ok(railKeys({ shipJourney: true }).includes('ship-journey'));
   // strict === true gate
-  assert.ok(!getViewNavLinks('acme', { shipJourney: 1 }).map(l => l.text).includes('ship-journey'));
+  assert.ok(!railKeys({ shipJourney: 1 }).includes('ship-journey'));
 });
 
 // ─── renderer: thin-data empty state ─────────────────────────────────────────

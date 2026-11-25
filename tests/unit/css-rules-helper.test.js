@@ -69,7 +69,7 @@ describe('css-rules: the real sheets', () => {
   test('readSheets parses a shipped sheet in order and finds a known rule', () => {
     const [style] = readSheets(['/style.css']);
     assert.equal(style.name, '/style.css');
-    assert.ok(style.rules.length > 650, 'style.css has over six hundred and fifty style rules (LIN-4537 removed the brief/recap widget rules)');
+    assert.ok(style.rules.length > 600, 'style.css has over six hundred style rules (LIN-4537 removed the brief/recap widget rules, LIN-4568 the old bar and footer)');
     assert.ok(declOf([style], '.opened-task-change-summary', 'font-size', { media: '(max-width: 640px)' }));
   });
 });

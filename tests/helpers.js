@@ -13,9 +13,9 @@
  *     test-token path) and returns the active workspace urlKey.
  *   - `SELECTORS` — a factory of stable `data-testid` selectors. Prefer these
  *     over `:has-text()`, CSS classes, and exact `href` values (LIN-215). The
- *     matching attributes are emitted by the render files (footer, settings,
- *     render.js project/issue rows, swipe, swim).
- *   - Thin page objects (`footer`, `settings`, `dashboard`) — proof-of-pattern
+ *     matching attributes are emitted by the render files (the frame's rail,
+ *     band and footer, settings, render.js project/issue rows, swipe, swim).
+ *   - Thin page objects (`settings`, `dashboard`) — proof-of-pattern
  *     wrappers over the selectors for the highest-traffic interactions.
  *
  * Parallel-aware by design (the soft coupling to LIN-625): `createSession`
@@ -115,19 +115,9 @@ export const SELECTORS = {
     decisionsLink: '[data-testid="fc-decisions-rulings-link"]',
     question: '[data-testid="fc-question"]',
   },
-  footer: {
-    /** Footer nav link by its visible text, e.g. 'swipe', 'settings'. */
-    link: (name) => `[data-testid="footer-link-${name}"]`,
-    aiStatus: '[data-testid="footer-ai-status"]',
-  },
+  // LIN-4562: the frame (lib/components/frame.js). LIN-4568 deleted the old bar's keys (`nav.view`, the `footer` group and
+  // their page objects) with the bar and the old footer.
   nav: {
-    /**
-     * Header view-switcher link by its visible text, e.g. 'swipe', 'settings'
-     * (LIN-978). The cross-view links moved here from the footer.
-     */
-    view: (name) => `.nav-views [data-testid="nav-view-${name}"]`,
-    // LIN-4562: the frame (lib/components/frame.js). The old bar's keys above stay until piece 7 (LIN-4568), because
-    // pages not yet moved still carry the bar.
     skip: '[data-testid="frame-skip"]',
     rail: '[data-testid="frame-rail"]',
     /** A rail item by its place key (lib/places.js): 'home', 'connect', 'settings' … */
@@ -137,6 +127,8 @@ export const SELECTORS = {
     railSearch: '[data-testid="rail-search-input"]',
     railQuestions: '[data-testid="rail-questions"]',
     railQueued: '[data-testid="rail-queued"]',
+    /** The quiet AI status at the rail's foot (it left the old footer, LIN-4562); its test id kept its old name. */
+    aiStatus: '[data-testid="frame-rail"] [data-testid="footer-ai-status"]',
     workspaceToggle: '[data-testid="rail-workspace-toggle"]',
     /** LIN-4563: the workspace's name on the rail's workspace button (the button also reads "Workspace"). */
     workspaceName: '[data-testid="rail-workspace-toggle"] .frame-workspace__name',
@@ -294,13 +286,13 @@ export const SELECTORS = {
     noteFoldSummary: '[data-testid="waiting-note-fold"] > summary',
     notesMore: '[data-testid="waiting-notes-more"]',
   },
-  /** LIN-4552: Home's count line, its questions part ("N questions", the needs-you tone), and the nav's open-questions badge. */
+  /** LIN-4552: Home's count line and its questions part ("N questions", the needs-you tone). */
   homeCount: {
     line: '[data-testid="in-progress-count"]',
     questions: '[data-testid="in-progress-count"] [data-tone="needs-you"]',
   },
   // LIN-4563: on a page in the frame the count is drawn twice, on Home's rail item and in the phone band; this is the one
-  // a desktop reader sees (the rail's there, the bar's on a page not yet moved). The band's copy is SELECTORS.nav.bandQuestions.
+  // a desktop reader sees (the rail's). The band's copy is SELECTORS.nav.bandQuestions.
   questionsBadge: '.rulings-badge:not([data-testid="band-questions"]) .rulings-count',
   /** An issue row by id (pairs the testid with the existing data-id hook). */
   issue: (id) => `[data-testid="issue-line"][data-id="${id}"]`,
@@ -507,28 +499,6 @@ export function workspaceKpis(page) {
     numbers: (name) => page.locator(SELECTORS.workspaceKpis.numbers(name)),
     table: (name) => page.locator(SELECTORS.workspaceKpis.table(name)),
     spark: (card) => page.locator(SELECTORS.workspaceKpis.spark(card)),
-  }
-}
-
-/**
- * Footer page object — thin wrapper over the footer selectors.
- * @param {import('@playwright/test').Page} page
- */
-export function footer(page) {
-  return {
-    getLink: (name) => page.locator(SELECTORS.footer.link(name)),
-    aiStatus: () => page.locator(SELECTORS.footer.aiStatus),
-  }
-}
-
-/**
- * Header nav page object — the shared view switcher (LIN-978).
- * @param {import('@playwright/test').Page} page
- */
-export function nav(page) {
-  return {
-    /** Header view-switcher link by visible text, e.g. 'swim', 'settings'. */
-    getView: (name) => page.locator(SELECTORS.nav.view(name)),
   }
 }
 

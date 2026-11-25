@@ -24,7 +24,8 @@ import crypto from 'node:crypto';
 
 import { renderLandingHero } from '../../lib/components/landing-hero.js';
 import { renderLandingPage } from '../../lib/render-landing.js';
-import { renderNavBar, renderPreviewSignIn } from '../../lib/components/navbar.js';
+import { renderPreviewSignIn } from '../../lib/components/navbar.js';
+import { renderFrame } from '../../lib/components/frame.js';
 import { renderLoginPage } from '../../lib/render-pages.js';
 import { renderAllAreas as renderSettingsPage } from '../helpers/render-settings-areas.js';
 import { isGitHubConfigured } from '../../lib/providers/github/app-auth.js';
@@ -151,13 +152,14 @@ describe('LIN-1890 E4 — the preview sign-in path', () => {
   test('CHARACTERIZATION: the signed-out login CTAs never leak onto authenticated pages', () => {
     // The `nav-login-*` CTAs are specific to the unauthenticated previews' band
     // (renderPreviewSignIn, LIN-4564). LIN-2802 deliberately adds a SEPARATE, authenticated surface (the
-    // workspace switcher's registry-driven add rows, `nav-workspace-add-*`)
+    // workspace switcher's registry-driven add rows, now the rail menu's `rail-workspace-add-*`)
     // that DOES render an `entryCta.href` — see
     // tests/unit/lin-2802-workspace-add-rows.test.js for that surface's own
     // coverage. This test narrows to what it can still honestly claim: the
     // signed-out CTAs themselves stay signed-out-only.
     configureJira();
-    const html = renderNavBar({ urlKey: 'acme', workspaces: [{ urlKey: 'acme', name: 'Acme' }] });
+    // LIN-4568: a signed-in page is the frame (the old bar went).
+    const html = renderFrame({ place: 'home', urlKey: 'acme', workspaces: [{ urlKey: 'acme', name: 'Acme' }] });
     assert.ok(!html.includes('nav-login-jira'), 'the signed-out Jira CTA testid belongs to the unauthenticated preview band only');
     assert.ok(!html.includes('nav-login-linear'), 'the signed-out Linear CTA testid belongs to the unauthenticated preview band only');
   });

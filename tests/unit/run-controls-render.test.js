@@ -13,7 +13,8 @@
 import { test, describe } from 'node:test';
 import assert from 'node:assert/strict';
 import { createRunControlsResolver } from '../../lib/run-controls.js';
-import { renderNavBar } from '../../lib/components/navbar.js';
+import { renderRail } from '../../lib/components/frame.js';
+// LIN-4568: the old bar went; the rail (renderRail) draws Dispatch, its queue count and the questions count.
 import { buildPromptOpts } from '../../lib/render-prompt-opts.js';
 import { renderDispatchPage } from '../../lib/render-dispatch.js';
 import { renderProxyPage } from '../../lib/render-proxy.js';
@@ -52,8 +53,8 @@ describe('run controls render for the owner with a live way to run, and nobody e
       const featureFlags = await flagsFor(setup);
       assert.equal(featureFlags.runControls, expected);
 
-      const nav = renderNavBar({ workspaces: [{ urlKey: 'acme', name: 'Acme' }], urlKey: 'acme', currentPage: 'settings', featureFlags });
-      assert.equal(nav.includes('data-testid="nav-view-dispatch"'), expected, 'Dispatch nav link');
+      const nav = renderRail({ workspaces: [{ urlKey: 'acme', name: 'Acme' }], urlKey: 'acme', featureFlags });
+      assert.equal(nav.includes('data-testid="rail-place-dispatch"'), expected, 'Dispatch in the rail');
       assert.equal(nav.includes('data-queue-badge'), expected, 'queue badge');
       assert.equal(nav.includes('data-rulings-badge'), expected, 'rulings badge');
 
@@ -82,9 +83,12 @@ describe('run controls render for the owner with a live way to run, and nobody e
 });
 
 describe('key tools render with no flag set', () => {
-  test('the Proxy page and its nav link are always there', () => {
-    const nav = renderNavBar({ workspaces: [{ urlKey: 'acme', name: 'Acme' }], urlKey: 'acme', currentPage: 'settings', featureFlags: {} });
-    assert.ok(nav.includes('data-testid="nav-view-proxy"'));
+  test('the Proxy page is always there; its rail item is the owner\'s (LIN-4342\'s stated reach change)', () => {
+    // The old bar listed the Proxy page for everyone (LIN-3849). The rail's Tools need run controls, so a member reaches
+    // Connect an agent by its URL or from Settings › Agent access, not from the rail.
+    const nav = renderRail({ workspaces: [{ urlKey: 'acme', name: 'Acme' }], urlKey: 'acme', featureFlags: {} });
+    assert.ok(!nav.includes('data-testid="rail-place-connect"'));
+    assert.ok(renderRail({ urlKey: 'acme', featureFlags: { runControls: true } }).includes('data-testid="rail-place-connect"'));
     const html = renderProxyPage('Acme', { urlKey: 'acme', featureFlags: {}, baseUrl: 'https://h.example' });
     assert.ok(html.startsWith('<!DOCTYPE html>'));
   });

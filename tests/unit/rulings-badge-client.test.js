@@ -5,7 +5,8 @@
  * before, and the test is the client half of the badge contract:
  *   - the JSON comes from the real rulings handler (routes/dashboard-rulings.js) over a real records store;
  *   - the function is the real shipped one, sliced out of public/common.js and run in a loadWorld over the fake DOM;
- *   - the badge is the real markup the navbar draws (renderNavBar with `featureFlags.runControls: true`, lib/components/navbar.js).
+ *   - the badge is the real markup the rail draws (renderRail with `featureFlags.runControls: true`, lib/components/frame.js;
+ *     the old bar's copy went with the bar, LIN-4568).
  *
  * LIN-4541: a ruling is an open question record addressed to the person (the old decision rows retired with the ruling
  * predicate), so the workspaces' rulings are question records here.
@@ -15,7 +16,6 @@
 import { test, describe, before, after } from 'node:test';
 import assert from 'node:assert/strict';
 import { readFileSync } from 'node:fs';
-import { renderNavBar } from '../../lib/components/navbar.js';
 import { renderRail } from '../../lib/components/frame.js';
 import { createMangoTmpdir } from '../fixtures/mango-tmpdir.js';
 import { RecordsStore, RECORDS_COLLECTION, REFS_COLLECTION, QUERY_LOG_COLLECTION } from '../../lib/records-store.js';
@@ -98,11 +98,11 @@ describe('LIN-4103 beat 3 — the rulings feed counts the page\'s own workspace 
         scripts: [],
         globals: { fetch: async () => ({ ok: true, json: async () => body }) },
       });
-      world.document.body.innerHTML = renderNavBar({ workspaces, urlKey, featureFlags: { runControls: true } });
+      world.document.body.innerHTML = renderRail({ workspaces, urlKey, featureFlags: { runControls: true } });
       world.run(updateRulingsBadgeSource());
       await world.window.updateRulingsBadge(urlKey);
       const badge = world.document.querySelector(`[data-rulings-badge][data-url-key="${urlKey}"]`);
-      assert.ok(badge, `the navbar draws the rulings badge for ${urlKey}`);
+      assert.ok(badge, `the rail draws the rulings badge for ${urlKey}`);
       return { text: badge.querySelector('.rulings-count').textContent, feedCount: body.count };
     };
 

@@ -36,10 +36,11 @@ test.describe('Landing Page (bespoke showcase)', () => {
     await page.goto('/');
     // The redundant landing top bar (projects / local workspace / sign in /
     // GitHub) is removed on the homepage: the hero below already carries the
-    // primary sign-in CTAs, so the bar was pure duplication. It is preserved for
-    // the swipe/swim previews (see landing-swipe/landing-swim specs), which have
-    // no hero and rely on it as their only sign-in route.
-    await expect(page.locator('nav.nav-bar')).toHaveCount(0);
+    // primary sign-in CTAs, so the bar was pure duplication. The swipe/swim
+    // previews carry their sign-in path in the public frame's band (LIN-4564);
+    // the landing, the frame's named exception, draws no band and no rail.
+    await expect(page.locator(SELECTORS.nav.publicBand)).toHaveCount(0);
+    await expect(page.locator(SELECTORS.nav.rail)).toHaveCount(0);
     await expect(page.locator('nav a.login')).toHaveCount(0);
     // The hero carries the directly-reachable Linear sign-in CTA instead.
     const linearCta = page.locator('[data-testid="landing-cta-linear"]');
@@ -153,18 +154,17 @@ test.describe('Landing Page (bespoke showcase)', () => {
     await expect(page.locator('a[href="https://os.harbour.cat"]')).toHaveCount(0);
   });
 
-  test('footer shows cross-view navigation and the GitHub link', async ({ page }) => {
+  // LIN-4568: the landing draws the footer every page shares; the previews it used to name sit beside the swim glimpse.
+  test('the footer is the one every page shares, and the previews are linked from the swim section', async ({ page }) => {
     await page.goto('/');
-    await expect(page.locator('.page-footer')).toBeVisible();
-    // LIN-3980: a visitor on / is in no view, so nothing in the row is current;
-    // the row names the signed-out previews.
-    await expect(page.locator('.footer-actions strong.footer-current')).toHaveCount(0);
-    await expect(page.locator('.footer-actions')).toContainText('previews:');
-    await expect(page.locator('.footer-actions a[href="/swipe"]')).toBeVisible();
-    await expect(page.locator('.footer-actions a[href="/swim"]')).toBeVisible();
-    const footerLink = page.locator('.footer-link');
-    await expect(footerLink.first()).toBeVisible();
-    await expect(footerLink.first()).toHaveAttribute('href', 'https://github.com/JKershaw/LinearViewer');
+    await expect(page.locator(SELECTORS.nav.footer)).toBeVisible();
+    await expect(page.locator(SELECTORS.nav.footerLink('source'))).toHaveAttribute('href', 'https://github.com/JKershaw/LinearViewer');
+    await expect(page.locator(SELECTORS.nav.footer)).not.toContainText('previews');
+    const swim = page.locator('[data-testid="landing-swim"]');
+    await expect(swim.locator('[data-testid="landing-preview-swim"]')).toHaveAttribute('href', '/swim');
+    await expect(swim.locator('[data-testid="landing-preview-swipe"]')).toHaveAttribute('href', '/swipe');
+    await swim.locator('[data-testid="landing-preview-swipe"]').click();
+    await expect(page).toHaveURL(/\/swipe$/);
   });
 
   test('the email-enabled server renders "Continue with email" in the hero (LIN-1892)', async ({ page }) => {
@@ -225,9 +225,9 @@ test.describe('Landing Page (bespoke showcase)', () => {
 
 // LIN-3345: the footer's Library link reaches the Library from every
 // footer-bearing page. LIN-4567: /templates sits in the public frame, whose footer (the one every page shares) names it
-// "Library"; the landing, the named exception, keeps its own footer until the old one goes (LIN-4568).
+// "Library"; LIN-4568 gave the landing the same footer.
 test.describe('Footer Library link (LIN-3345)', () => {
-  for (const [path, selector, text] of [['/', 'a.footer-legal[href="/library"]', 'library'], ['/templates', SELECTORS.nav.footerLink('library'), 'Library']]) {
+  for (const [path, selector, text] of [['/', SELECTORS.nav.footerLink('library'), 'Library'], ['/templates', SELECTORS.nav.footerLink('library'), 'Library']]) {
     test(`from ${path} the footer library link opens /library`, async ({ page }) => {
       await page.goto(path);
       const link = page.locator(selector);

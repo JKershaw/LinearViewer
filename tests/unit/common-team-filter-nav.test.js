@@ -1,8 +1,8 @@
 /**
  * Unit tests for public/common.js's team-filter client wiring (LIN-2520):
  *   - window.buildFilterUrl — the shared path-preserving filter-URL helper.
- *   - initNavBar's team option click handler (real navigation, path-preserving).
- *   - initNavBar's saved-team auto-restore, divergence-aware (R4): reads the
+ *   - initFilterLine's team option click handler (real navigation, path-preserving).
+ *   - initFilterLine's saved-team auto-restore, divergence-aware (R4): reads the
  *     server-applied team off the DOM's `.selected` marker and only
  *     replaceState's when it agrees with the saved (localStorage) team;
  *     otherwise falls back to a real navigation.
@@ -12,8 +12,8 @@
  * uses to reach the real `window.ProxyToggle.buildBlock`. A top-level
  * `function` declaration in vm-executed code attaches directly to the
  * contextified sandbox object (verified: Node's vm treats the sandbox as the
- * script's global object), so `initNavBar`/`buildFilterUrl` are reachable as
- * `sandbox.initNavBar`/`sandbox.window.buildFilterUrl` without any source
+ * script's global object), so `initFilterLine`/`buildFilterUrl` are reachable as
+ * `sandbox.initFilterLine`/`sandbox.window.buildFilterUrl` without any source
  * change beyond mirroring `buildFilterUrl` onto `window` (matching the
  * existing `window.computeFitZoom`-style shared-helper convention).
  *
@@ -30,7 +30,7 @@ import { withHarnessModels } from '../fixtures/harness-models.js';
 const __dirname = dirname(fileURLToPath(import.meta.url));
 const COMMON_SRC = readFileSync(join(__dirname, '../../public/common.js'), 'utf8');
 
-// ─── Minimal DOM shim, scoped to exactly what initNavBar touches ──────────
+// ─── Minimal DOM shim, scoped to exactly what initFilterLine touches ──────────
 
 function makeClassList() {
   const set = new Set();
@@ -52,7 +52,7 @@ function makeElement(overrides = {}) {
   return {
     dataset: {},
     classList: makeClassList(),
-    // Real elements support MULTIPLE listeners per event type (initNavBar
+    // Real elements support MULTIPLE listeners per event type (initFilterLine
     // registers two separate 'click' listeners on #team-options: the option
     // handler and a later stopPropagation-only one) — a single-slot shim would
     // silently clobber the first with the second.
@@ -64,13 +64,12 @@ function makeElement(overrides = {}) {
     querySelector: () => null,
     querySelectorAll: () => [],
     closest: () => null,
-    getBoundingClientRect: () => ({ height: 0 }),
     ...overrides,
   };
 }
 
 /**
- * Build a fresh vm sandbox + call initNavBar() once, mirroring a specific
+ * Build a fresh vm sandbox + call initFilterLine() once, mirroring a specific
  * DOM/localStorage/URL state. Returns the sandbox for assertions.
  *
  * @param {Object} opts
@@ -82,7 +81,7 @@ function makeElement(overrides = {}) {
  * @param {string[]} [opts.teamIds] - team ids the rendered #team-options panel carries
  *   (drives the savedTeamExists check)
  */
-function runInitNavBar({ pathname = '/workspace/acme/', search = '', savedTeam = null, selectedOptionTeam = null, teamIds = ['eng', 'design'], host = 'bar' } = {}) {
+function runInitFilterLine({ pathname = '/workspace/acme/', search = '', savedTeam = null, selectedOptionTeam = null, teamIds = ['eng', 'design'], host = 'filters' } = {}) {
   const optionEls = teamIds.map(id => makeElement({ dataset: { team: id } }));
   const selectedOptionEl = selectedOptionTeam !== null
     ? makeElement({ dataset: { team: selectedOptionTeam } })
@@ -96,13 +95,11 @@ function runInitNavBar({ pathname = '/workspace/acme/', search = '', savedTeam =
     },
   });
   const teamToggleEl = makeElement();
-  // LIN-4562: the selectors sit in the old bar, or in the frame's filter line (lib/components/navbar.js renderFilterLine).
-  const navBarEl = host === 'bar' ? makeElement() : null;
+  // LIN-4562: the selectors sit in the frame's filter line (lib/components/navbar.js renderFilterLine); LIN-4568 deleted
+  // the old bar that also hosted them.
   const filterLineEl = host === 'filters' ? makeElement() : null;
 
   const byId = {
-    'workspace-toggle': null,
-    'workspace-options': null,
     'team-toggle': teamToggleEl,
     'team-options': teamOptionsEl,
   };
@@ -117,13 +114,12 @@ function runInitNavBar({ pathname = '/workspace/acme/', search = '', savedTeam =
   // called bare as `computeFitZoom(...)` in public/ship.js). A distinct fake
   // `window` object (as other vm-sandbox tests in this repo use, where the
   // tested code never relies on that bare/global duality) would make every
-  // bare `buildFilterUrl(...)` call inside initNavBar throw ReferenceError.
+  // bare `buildFilterUrl(...)` call inside initFilterLine throw ReferenceError.
   const sandbox = {
     location: { pathname, search, href: undefined },
     history: { replaceState: (...args) => historyCalls.push(args) },
     document: {
       querySelector(sel) {
-        if (sel === '.nav-bar') return navBarEl;
         if (sel === '[data-frame-filters]') return filterLineEl;
         if (sel === '.nav-dropdown-overlay') return null;
         if (sel === '#team-options .nav-option.selected') return selectedOptionEl;
@@ -136,7 +132,6 @@ function runInitNavBar({ pathname = '/workspace/acme/', search = '', savedTeam =
       getElementById: (id) => byId[id] || null,
       createElement: () => makeElement(),
       body: { appendChild() {} },
-      documentElement: { style: { setProperty() {} } },
       addEventListener() {},
     },
     localStorage: {
@@ -153,7 +148,7 @@ function runInitNavBar({ pathname = '/workspace/acme/', search = '', savedTeam =
   vm.createContext(sandbox);
   vm.runInContext(withHarnessModels(COMMON_SRC), sandbox, { filename: 'common.js' });
 
-  sandbox.initNavBar();
+  sandbox.initFilterLine();
 
   return { sandbox, teamOptionsEl, teamToggleEl, historyCalls };
 }
@@ -209,28 +204,28 @@ describe('LIN-2520 — window.buildFilterUrl (shared path-preserving filter URL 
 
 describe('LIN-2520 — team option click handler (real navigation, path-preserving)', () => {
   test('navigates to the current path with ?team=<id>, staying on non-dashboard pages', () => {
-    const { teamOptionsEl, sandbox } = runInitNavBar({ pathname: '/workspace/acme/swim', search: '' });
+    const { teamOptionsEl, sandbox } = runInitFilterLine({ pathname: '/workspace/acme/swim', search: '' });
     const optionEl = makeElement({ dataset: { team: 'eng-id' } });
     teamOptionsEl.fire('click', { stopPropagation() {}, target: { closest: () => optionEl } });
 
     assert.equal(sandbox.window.location.href, '/workspace/acme/swim?team=eng-id');
   });
 
-  test('LIN-4562: the same handler drives the frame\'s filter line (no old bar on the page)', () => {
-    const { teamOptionsEl, sandbox } = runInitNavBar({ pathname: '/workspace/acme/backlog', search: '', host: 'filters' });
+  test('LIN-4562: the handler drives the frame\'s filter line on Backlog too', () => {
+    const { teamOptionsEl, sandbox } = runInitFilterLine({ pathname: '/workspace/acme/backlog', search: '' });
     const optionEl = makeElement({ dataset: { team: 'eng-id' } });
     teamOptionsEl.fire('click', { stopPropagation() {}, target: { closest: () => optionEl } });
     assert.equal(sandbox.window.location.href, '/workspace/acme/backlog?team=eng-id');
   });
 
-  test('LIN-4562: with neither host on the page, nothing is wired', () => {
-    const { teamOptionsEl, sandbox } = runInitNavBar({ pathname: '/workspace/acme/proxy', host: 'none' });
+  test('LIN-4562: with no filter line on the page, nothing is wired', () => {
+    const { teamOptionsEl, sandbox } = runInitFilterLine({ pathname: '/workspace/acme/proxy', host: 'none' });
     teamOptionsEl.fire('click', { stopPropagation() {}, target: { closest: () => makeElement({ dataset: { team: 'eng-id' } }) } });
     assert.equal(sandbox.window.location.href, undefined);
   });
 
   test('a click outside any .nav-option[data-team] is ignored', () => {
-    const { teamOptionsEl, sandbox } = runInitNavBar({ pathname: '/workspace/acme/swim' });
+    const { teamOptionsEl, sandbox } = runInitFilterLine({ pathname: '/workspace/acme/swim' });
     teamOptionsEl.fire('click', { stopPropagation() {}, target: { closest: () => null } });
     assert.equal(sandbox.window.location.href, undefined);
   });
@@ -240,7 +235,7 @@ describe('LIN-2520 — team option click handler (real navigation, path-preservi
 
 describe("LIN-2520 R4 — auto-restore branches on server-applied vs saved team", () => {
   test('server-applied team matches saved team -> URL-only replaceState, no navigation', () => {
-    const { sandbox, historyCalls } = runInitNavBar({
+    const { sandbox, historyCalls } = runInitFilterLine({
       pathname: '/workspace/acme/swim',
       search: '', // no ?team= in the URL
       savedTeam: 'eng-id',
@@ -254,7 +249,7 @@ describe("LIN-2520 R4 — auto-restore branches on server-applied vs saved team"
   });
 
   test('server-applied team diverges from saved team -> real navigation, no replaceState', () => {
-    const { sandbox, historyCalls } = runInitNavBar({
+    const { sandbox, historyCalls } = runInitFilterLine({
       pathname: '/workspace/acme/swim',
       search: '',
       savedTeam: 'eng-id',
@@ -267,7 +262,7 @@ describe("LIN-2520 R4 — auto-restore branches on server-applied vs saved team"
   });
 
   test('no marked .selected option (panel/marker absent) defaults the server-applied read to "all" -> diverges from a real saved team -> real navigation', () => {
-    const { sandbox, historyCalls } = runInitNavBar({
+    const { sandbox, historyCalls } = runInitFilterLine({
       pathname: '/workspace/acme/swim',
       search: '',
       savedTeam: 'eng-id',
@@ -280,7 +275,7 @@ describe("LIN-2520 R4 — auto-restore branches on server-applied vs saved team"
   });
 
   test('no saved team at all -> neither replaceState nor a real navigation fires', () => {
-    const { sandbox, historyCalls } = runInitNavBar({
+    const { sandbox, historyCalls } = runInitFilterLine({
       pathname: '/workspace/acme/swim',
       search: '',
       savedTeam: null,
@@ -292,7 +287,7 @@ describe("LIN-2520 R4 — auto-restore branches on server-applied vs saved team"
   });
 
   test('URL already carries ?team= -> auto-restore does not fire at all (no double-handling)', () => {
-    const { sandbox, historyCalls } = runInitNavBar({
+    const { sandbox, historyCalls } = runInitFilterLine({
       pathname: '/workspace/acme/swim',
       search: '?team=design-id',
       savedTeam: 'eng-id',
@@ -305,7 +300,7 @@ describe("LIN-2520 R4 — auto-restore branches on server-applied vs saved team"
   });
 
   test("saved team of 'all' never triggers the restore branch (already the default)", () => {
-    const { sandbox, historyCalls } = runInitNavBar({
+    const { sandbox, historyCalls } = runInitFilterLine({
       pathname: '/workspace/acme/swim',
       search: '',
       savedTeam: 'all',
