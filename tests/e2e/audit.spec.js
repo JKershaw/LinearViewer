@@ -1,5 +1,6 @@
 import { test, expect } from '../fixtures/test-base.js';
 import { workspaceApiLocalSeed } from '../fixtures/local-harness.js';
+import { SELECTORS } from '../helpers.js';
 
 // Migrated onto the local-provider harness (LIN-412). Audit is NOT
 // provider-routed (runAudit goes straight to GraphQL), so the surface stays on
@@ -9,7 +10,7 @@ import { workspaceApiLocalSeed } from '../fixtures/local-harness.js';
 // (computeAuditFromData over testMockTeams/testMockData) is unchanged, so every
 // deterministic assertion below holds byte-for-byte.
 
-test.describe('Operator Dashboard', () => {
+test.describe('Operator audit', () => {
   test.describe('Unauthenticated', () => {
     test('redirects to home when not authenticated', async ({ page }) => {
       // Clear any existing session
@@ -29,42 +30,40 @@ test.describe('Operator Dashboard', () => {
       await seedLocal(workspaceApiLocalSeed);
     });
 
-    test('renders dashboard page', async ({ page, localWorkerUrlKey }) => {
+    // LIN-4565 (LIN-4342 piece 4): the page sits in the frame as Operator audit, drilled in under Settings.
+    test('renders the Operator audit page', async ({ page, localWorkerUrlKey }) => {
       await page.goto(`/workspace/${localWorkerUrlKey}/audit`);
 
-      // Should show dashboard header
-      await expect(page.locator('h1')).toContainText('Operator Dashboard');
-
-      // Should show subtitle
-      await expect(page.locator('.dashboard-subtitle')).toContainText('audit');
+      await expect(page.locator('h1')).toHaveText('Operator audit');
+      await expect(page).toHaveTitle(/^Operator audit · /);
+      await expect(page.locator(SELECTORS.nav.subtitle)).toContainText('audit');
 
       // Should show Run Audit button
       await expect(page.locator('#run-audit')).toBeVisible();
       await expect(page.locator('#run-audit')).toContainText('Run Audit');
     });
 
-    test('shows workspace dropdown in navigation', async ({ page, localWorkerUrlKey }) => {
+    test('shows the workspace on the rail', async ({ page, localWorkerUrlKey }) => {
       await page.goto(`/workspace/${localWorkerUrlKey}/audit`);
 
-      // Should show workspace dropdown with workspace name
-      const workspaceToggle = page.locator('#workspace-toggle');
-      await expect(workspaceToggle).toBeVisible();
-      await expect(workspaceToggle).toContainText('Local Workspace');
+      await expect(page.locator(SELECTORS.nav.workspaceToggle)).toBeVisible();
+      await expect(page.locator(SELECTORS.nav.workspaceName)).toHaveText('Local Workspace');
     });
 
-    test('has back link to projects', async ({ page, localWorkerUrlKey }) => {
+    test('lights Settings, its parent, and leads back there', async ({ page, localWorkerUrlKey }) => {
       await page.goto(`/workspace/${localWorkerUrlKey}/audit`);
 
-      // Should have link back to workspace projects page
-      const projectsLink = page.locator('[data-testid="nav-view-projects"]');
-      await expect(projectsLink).toBeVisible();
+      await expect(page.locator(SELECTORS.nav.railMarked)).toHaveCount(1);
+      await expect(page.locator(SELECTORS.nav.railMarked)).toHaveAttribute('data-place', 'settings');
+      await expect(page.locator(SELECTORS.nav.back)).toHaveText('\u2190 Settings');
+      await expect(page.locator(SELECTORS.nav.place('home'))).toBeVisible();
     });
 
-    test('does not have logout link in navbar', async ({ page, localWorkerUrlKey }) => {
+    test('has no logout link in the rail', async ({ page, localWorkerUrlKey }) => {
       await page.goto(`/workspace/${localWorkerUrlKey}/audit`);
 
-      // Logout moved to settings page
-      await expect(page.locator('.nav-action[href="/logout"]')).not.toBeVisible();
+      // Logout lives in Settings
+      await expect(page.locator(`${SELECTORS.nav.rail} a[href="/logout"]`)).toHaveCount(0);
     });
 
     test('runs audit and displays report', async ({ page, localWorkerUrlKey }) => {

@@ -2,6 +2,7 @@ import { test, expect } from '../fixtures/test-base.js';
 import {
   workspaceApiLocalSeed,
 } from '../fixtures/local-harness.js';
+import { SELECTORS } from '../helpers.js';
 
 // TEST-6 "Task needing preparation" — present in workspaceApiLocalSeed (shares
 // the pipeline fixture identity), so prompt-generation assertions resolve
@@ -211,15 +212,19 @@ test.describe('Custom Prompts Page', () => {
     await page.goto(`/workspace/${localWorkerUrlKey}/prompts/custom`);
     await page.waitForLoadState('networkidle');
 
-    await expect(page.locator('h1')).toContainText('Custom Prompts');
+    await expect(page.locator('h1')).toHaveText('Custom prompts');
     await expect(page.locator('.custom-prompts-empty')).toBeVisible();
   });
 
-  test('page shows nav bar with workspace', async ({ page, localWorkerUrlKey }) => {
+  // LIN-4565 (LIN-4342 piece 4): the page sits in the frame, drilled in under Prompts.
+  test('page sits in the frame under Prompts: the rail and the workspace, and one way back', async ({ page, localWorkerUrlKey }) => {
     await page.goto(`/workspace/${localWorkerUrlKey}/prompts/custom`);
     await page.waitForLoadState('networkidle');
 
-    await expect(page.locator('.nav-bar')).toBeVisible();
+    await expect(page.locator(SELECTORS.nav.rail)).toBeVisible();
+    await expect(page.locator(SELECTORS.nav.workspaceName)).toHaveText('Local Workspace');
+    await expect(page.locator('.nav-bar')).toHaveCount(0);
+    await expect(page.locator(SELECTORS.nav.back)).toHaveCount(1);
   });
 
   // =========================================================================

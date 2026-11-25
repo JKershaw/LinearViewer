@@ -68,7 +68,7 @@ test.describe('Dispatch Page', () => {
       await page.waitForLoadState('networkidle');
 
       await expect(page.locator('h1')).toHaveText('Dispatch');
-      await expect(page.locator('.dispatch-subtitle')).toContainText('Queue prompts');
+      await expect(page.locator(SELECTORS.nav.subtitle)).toContainText('Queue prompts');
     });
 
     test('without run controls the page stays reachable by URL, read-only: no send menu (LIN-3849)', async ({ page }) => {
@@ -1243,53 +1243,51 @@ test.describe('Dispatch Page', () => {
     });
   });
 
+  // LIN-4565 (LIN-4342 piece 4): Dispatch sits in the page frame, so its place is the rail's Dispatch item (lib/places.js).
   test.describe('Navigation', () => {
-    test('header switcher shows dispatch as current when feature enabled', async ({ page }) => {
+    test('the rail marks Dispatch as the page, and the tab names it', async ({ page }) => {
       await seedLocalWorkspace(page, REPO_SEED, { runnerKey: true, proxyDefault: false, urlKey: WS });
       await seedWorkspaceOwnership(page, WS, 'owner'); // LIN-3383: runner enqueue is owner-only
       await page.goto(DISPATCH_URL);
       await page.waitForLoadState('networkidle');
 
-      // Header switcher (LIN-978) shows dispatch as the current page (bold).
-      const dispatchCurrent = page.locator('.nav-views [data-testid="nav-view-dispatch"].nav-view-current');
-      await expect(dispatchCurrent).toBeVisible();
+      await expect(page.locator(SELECTORS.nav.railMarked)).toHaveCount(1);
+      await expect(page.locator(SELECTORS.nav.railMarked)).toHaveAttribute('data-place', 'dispatch');
+      await expect(page.locator(SELECTORS.nav.railMarked)).toHaveAttribute('aria-current', 'page');
+      await expect(page).toHaveTitle(/^Dispatch · /);
+      await expect(page.locator(SELECTORS.nav.back)).toHaveCount(0);
     });
 
-    test('header dispatch link works from other pages', async ({ page }) => {
+    test('the rail\'s Dispatch item leads there from another page', async ({ page }) => {
       await seedLocalWorkspace(page, REPO_SEED, { runnerKey: true, proxyDefault: false, urlKey: WS });
       await seedWorkspaceOwnership(page, WS, 'owner'); // LIN-3383: runner enqueue is owner-only
-      await page.goto(SETTINGS_URL);
+      await page.goto(`/workspace/${WS}/`);
       await page.waitForLoadState('networkidle');
 
-      // Header switcher carries the flagged dispatch link (LIN-978).
-      const dispatchLink = page.locator('.nav-views a[data-testid="nav-view-dispatch"]');
-      await expect(dispatchLink).toBeVisible();
-
-      await dispatchLink.click();
+      await page.locator(SELECTORS.nav.place('dispatch')).click();
       await page.waitForLoadState('networkidle');
-
-      // Should be on dispatch page
-      await expect(page.locator('h1')).toHaveText('Dispatch');
+      await expect(page).toHaveURL(new RegExp(`${DISPATCH_URL}$`));
+      await expect(page.locator(SELECTORS.nav.heading)).toHaveText('Dispatch');
     });
 
-    test('header does not show dispatch link when feature disabled', async ({ page }) => {
+    test('without run controls the rail has no Dispatch item, and the page reached by URL lights Settings', async ({ page }) => {
       await seedLocalWorkspace(page, REPO_SEED, { urlKey: WS });
       await seedWorkspaceOwnership(page, WS, 'owner'); // LIN-3383: runner enqueue is owner-only
-      await page.goto(SETTINGS_URL);
+      await page.goto(DISPATCH_URL);
       await page.waitForLoadState('networkidle');
 
-      const dispatchLink = page.locator('.nav-views [data-testid="nav-view-dispatch"]');
-      await expect(dispatchLink).toHaveCount(0);
+      await expect(page.locator(SELECTORS.nav.place('dispatch'))).toHaveCount(0);
+      await expect(page.locator(SELECTORS.nav.railMarked)).toHaveAttribute('data-place', 'settings');
+      await expect(page.locator(SELECTORS.nav.back)).toHaveText('\u2190 Settings');
     });
 
-    test('navbar shows projects link on dispatch page', async ({ page }) => {
+    test('the rail leads home from the dispatch page', async ({ page }) => {
       await seedLocalWorkspace(page, REPO_SEED, { runnerKey: true, proxyDefault: false, urlKey: WS });
       await seedWorkspaceOwnership(page, WS, 'owner'); // LIN-3383: runner enqueue is owner-only
       await page.goto(DISPATCH_URL);
       await page.waitForLoadState('networkidle');
 
-      const projectsLink = page.locator('[data-testid="nav-view-projects"]');
-      await expect(projectsLink).toBeVisible();
+      await expect(page.locator(SELECTORS.nav.place('home'))).toHaveAttribute('href', `/workspace/${WS}/`);
     });
   });
 

@@ -57,9 +57,9 @@ async function get(app, path) {
   }
 }
 
-const build = (workspaceFromUrl, collections) => {
+const build = (workspaceFromUrl, collections, extra = {}) => {
   const app = express();
-  app.use(createWorkspaceKpisRoutes({ workspaceFromUrl, collections, now: () => NOW }));
+  app.use(createWorkspaceKpisRoutes({ workspaceFromUrl, collections, now: () => NOW, ...extra }));
   return app;
 };
 
@@ -84,7 +84,17 @@ describe('GET /workspace/:urlKey/kpis', () => {
     assert.equal(res.status, 200);
     assert.match(res.text, /data-testid="workspace-kpis-section-activity"/);
     assert.match(res.text, /data-testid="workspace-kpis-value-dispatches-30d">1</);
-    assert.match(res.text, /<title>Alpha - KPIs<\/title>/);
+    // LIN-4565: in the frame the tab is `<Page> · <Workspace>`.
+    assert.match(res.text, /<title>KPIs · Alpha<\/title>/);
+  });
+
+  test('LIN-4565: the frame\'s footer stamp and rail AI status come from the route\'s deps, as on every other page', async () => {
+    const collections = freshCollections();
+    const app = build(settingTo('ws-a', 'Alpha'), collections, { getDeployInfo: () => ({ version: 'v1.2.3', commit: 'abcdef1234567' }), getOpenRouterSource: () => 'env' });
+    const res = await get(app, '/workspace/ws-a/kpis');
+    assert.equal(res.status, 200);
+    assert.match(res.text, /data-testid="frame-footer-stamp"/);
+    assert.doesNotMatch(res.text, /title="OpenRouter: off"/);
   });
 
   test('LIN-3713: the page shows the merge-time card from this workspace\'s seeded events', async () => {

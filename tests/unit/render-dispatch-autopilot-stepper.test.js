@@ -13,7 +13,7 @@ import assert from 'node:assert/strict';
 import { renderDispatchPage } from '../../lib/render-dispatch.js';
 
 test('a stepper load button sits beside the classic one', () => {
-  const html = renderDispatchPage('WS', { featureFlags: {} });
+  const html = renderDispatchPage('WS', { urlKey: 'ws', featureFlags: {} });
   // Classic control still present and still variant-less.
   assert.ok(html.includes('class="btn--quiet dispatch-load-autopilot" title='),
     'classic "load Autopilot" button unchanged');
@@ -27,7 +27,7 @@ test('a stepper load button sits beside the classic one', () => {
 });
 
 test('the cluster renders whatever the stale stored switches say (LIN-3849)', () => {
-  const html = renderDispatchPage('WS', { featureFlags: { proxy: false, dispatch: false } });
+  const html = renderDispatchPage('WS', { urlKey: 'ws', featureFlags: { proxy: false, dispatch: false } });
   assert.equal((html.match(/class="btn--quiet dispatch-load-autopilot"/g) || []).length, 2);
   assert.ok(html.includes('dispatch-continue-until-stopped'));
   assert.ok(html.includes('prompt-proxy-toggle'));

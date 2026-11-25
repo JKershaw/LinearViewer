@@ -20,21 +20,26 @@ function baseKpis(overrides = {}) {
 describe('renderEscalationKpisPage', () => {
   test('renders a complete HTML document with all four stat cards', () => {
     const html = renderEscalationKpisPage('Acme', {
-      urlKey: 'acme', workspaces: [{ urlKey: 'acme', name: 'Acme' }],
+      urlKey: 'acme', workspaces: [{ urlKey: 'acme', name: 'Acme' }], featureFlags: { runControls: true },
       kpis: baseKpis(), windowDays: 30, generatedAt: '2026-08-23T00:00:00.000Z',
     });
     assert.ok(html.startsWith('<!DOCTYPE') || html.includes('<html'), 'a full document');
-    assert.ok(html.includes('Escalation KPIs'));
+    // LIN-4565: in the frame the page is named by its place (lib/places.js): Escalation, drilled in under KPIs.
+    assert.match(html, /<h1>Escalation<\/h1>/);
+    assert.match(html, /<title>Escalation · Acme<\/title>/);
+    assert.match(html, /data-testid="frame-back">← KPIs</, 'the way back is KPIs');
+    assert.match(html, /data-place="kpis" aria-current="true"/, 'KPIs, its parent, is the marked rail item');
     for (const testId of ['kpi-escalation-rate', 'kpi-time-to-response', 'kpi-false-escalation', 'kpi-unanswered-age']) {
       assert.ok(html.includes(`data-testid="${testId}"`), `missing ${testId}`);
     }
   });
 
   test('shows "no target set" when targetPerDay is null, and the target value when supplied', () => {
-    const noTarget = renderEscalationKpisPage('Acme', { kpis: baseKpis(), windowDays: 30 });
+    const noTarget = renderEscalationKpisPage('Acme', { urlKey: 'acme', kpis: baseKpis(), windowDays: 30 });
     assert.ok(noTarget.includes('no target set'));
 
     const withTarget = renderEscalationKpisPage('Acme', {
+      urlKey: 'acme',
       kpis: baseKpis({ escalationRate: { raisedInWindow: 5, perDay: 0.17, targetPerDay: 2, overTarget: false } }),
       windowDays: 30,
     });
@@ -43,12 +48,13 @@ describe('renderEscalationKpisPage', () => {
   });
 
   test('a stale unanswered count renders the warn accent class', () => {
-    const html = renderEscalationKpisPage('Acme', { kpis: baseKpis({ unansweredAge: { count: 1, staleCount: 1, maxAgeMs: 90000000, staleThresholdMs: 86400000 } }), windowDays: 30 });
+    const html = renderEscalationKpisPage('Acme', { urlKey: 'acme', kpis: baseKpis({ unansweredAge: { count: 1, staleCount: 1, maxAgeMs: 90000000, staleThresholdMs: 86400000 } }), windowDays: 30 });
     assert.ok(/kpi-card--warn"[^>]*data-testid="kpi-unanswered-age"/.test(html) || html.includes('kpi-card--warn'));
   });
 
   test('zero resolved rulings in the window renders an honest empty state, not a fabricated 0%', () => {
     const html = renderEscalationKpisPage('Acme', {
+      urlKey: 'acme',
       kpis: baseKpis({ timeToResponse: { count: 0, medianMs: null, maxMs: null }, falseEscalation: { dismissed: 0, answered: 0, total: 0, rate: null } }),
       windowDays: 30,
     });
@@ -56,12 +62,12 @@ describe('renderEscalationKpisPage', () => {
   });
 
   test('escapes the workspace name in the title', () => {
-    const html = renderEscalationKpisPage('<script>alert(1)</script>', { kpis: baseKpis(), windowDays: 30 });
+    const html = renderEscalationKpisPage('<script>alert(1)</script>', { urlKey: 'acme', kpis: baseKpis(), windowDays: 30 });
     assert.ok(!html.includes('<script>alert(1)</script>'));
   });
 
   test('the window selector preselects the requested windowDays', () => {
-    const html = renderEscalationKpisPage('Acme', { kpis: baseKpis(), windowDays: 90 });
+    const html = renderEscalationKpisPage('Acme', { urlKey: 'acme', kpis: baseKpis(), windowDays: 90 });
     assert.ok(html.includes('<option value="90" selected>90 days</option>'));
   });
 });

@@ -28,6 +28,9 @@ import { FEATURE_DEFAULTS, FEATURES, EXPERIMENTAL_VIEWS } from '../../lib/featur
  * LIN-4564 (piece 3) adds Watch and Views: Runs, a run page (`seeded: 'run'`, the anchor the walk dispatches) and a run
  * not found, Live, Swipe, Swim, Roadmap and every flagged view. A page behind a flag (`flag`) is walked only for a viewer
  * who has it on: with it off its route leads to Settings and the rail does not list it (the items check says so).
+ * LIN-4565 (piece 4) adds Tools: Dispatch, KPIs, Escalation and Effort (drilled in under KPIs), Prompts, Custom prompts
+ * (under Prompts) and Operator audit (under Settings). Every viewer walks them: their pages answer by URL for anyone in
+ * the workspace, and for a new user, whose rail draws no Tools group, each lights Settings (lib/places.js reachedFrom).
  */
 const FRAMED = [
   { key: 'connect' },
@@ -46,6 +49,13 @@ const FRAMED = [
   { key: 'swim' },
   { key: 'roadmap', flag: FEATURES.ROADMAP },
   ...EXPERIMENTAL_VIEWS.map(({ flag, path }) => ({ key: path, flag })),
+  { key: 'dispatch' },
+  { key: 'kpis' },
+  { key: 'escalation' },
+  { key: 'effort' },
+  { key: 'prompts' },
+  { key: 'custom-prompts' },
+  { key: 'audit' },
 ];
 
 /** Every flag a place in the rail waits on, on. */

@@ -2669,7 +2669,7 @@ app.use(createMilestoneFunnelRoutes({ taskModeStore, accountStore, accountWorksp
 // stale-while-revalidate cache (60 s, as /kpis), registered as per-key state below.
 const workspaceKpisCollections = { dispatchQueue: dispatchQueueCollection, dispatchHistory: dispatchHistoryCollection, proxyEvents: proxyEventsCollection, agentStatus: agentStatusCollection, reportHistory: reportHistoryCollection, customPrompts: customPromptsCollection, closeOutEvents: db.collection('close-out-events'), kpiDailyRollup: kpiDailyRollupCollection }
 const workspaceKpisCache = workspaceKpisCacheFor({ collections: workspaceKpisCollections, requestUsageLoader })
-app.use(createWorkspaceKpisRoutes({ workspaceFromUrl, requestUsageLoader, workspaceKpisCache, collections: workspaceKpisCollections }))
+app.use(createWorkspaceKpisRoutes({ workspaceFromUrl, requestUsageLoader, workspaceKpisCache, collections: workspaceKpisCollections, getOpenRouterSource, getDeployInfo }))
 
 // The ONE PR-state store (LIN-3311): the LIN-3251 cache,
 // sliding 36/h GitHub budget and PR-state cache. The dashboard router

@@ -1,6 +1,6 @@
 import { test, expect } from '../fixtures/test-base.js';
 import { seedLocalWorkspace } from '../fixtures/local-harness.js';
-import { nav, workspaceKpis, expectNoClippedOverflow } from '../helpers.js';
+import { SELECTORS, workspaceKpis, expectNoClippedOverflow } from '../helpers.js';
 
 /**
  * LIN-3689 — the in-Harbour workspace KPIs page, GET /workspace/:urlKey/kpis.
@@ -65,15 +65,27 @@ test.describe('LIN-3689 — workspace KPIs page (e2e)', () => {
     await expect(workspaceKpis(page).value('autopilot-runs', '30d')).toHaveText('3');
   });
 
-  test('kpis sits in the header next to settings, links there, and is current on its own page', async ({ page }) => {
-    await page.goto(`/workspace/${keyA}/settings`);
-    await expect(nav(page).getView('kpis')).toBeVisible();
-    await nav(page).getView('kpis').click();
+  // LIN-4565 (LIN-4342 piece 4): KPIs is a place in the rail's Tools group; Escalation and Effort are drilled in under it.
+  test('KPIs is the rail\'s place, marked on its own page; it leads to Escalation and Effort, which light KPIs and lead back', async ({ page }) => {
+    await page.goto(`/workspace/${keyA}/`);
+    await page.locator(SELECTORS.nav.place('kpis')).click();
     await expect(page).toHaveURL(new RegExp(`/workspace/${keyA}/kpis$`));
-    const current = nav(page).getView('kpis');
-    await expect(current).toBeVisible();
-    await expect(current).toHaveClass(/nav-view-current/);
-    expect(await current.evaluate(el => el.tagName)).not.toBe('A');
+    await expect(page.locator(SELECTORS.nav.railMarked)).toHaveAttribute('data-place', 'kpis');
+    await expect(page.locator(SELECTORS.nav.railMarked)).toHaveAttribute('aria-current', 'page');
+    await expect(page.locator(SELECTORS.nav.heading)).toHaveText('KPIs');
+
+    for (const [link, path, name] of [['escalation', 'escalation-kpis', 'Escalation'], ['effort', 'effort-readout', 'Effort']]) {
+      await page.locator(`[data-testid="workspace-kpis-link-${link}"]`).click();
+      await expect(page).toHaveURL(new RegExp(`/workspace/${keyA}/${path}$`));
+      await expect(page.locator(SELECTORS.nav.heading)).toHaveText(name);
+      await expect(page).toHaveTitle(new RegExp(`^${name} · `));
+      await expect(page.locator(SELECTORS.nav.railMarked)).toHaveCount(1);
+      await expect(page.locator(SELECTORS.nav.railMarked)).toHaveAttribute('data-place', 'kpis');
+      await expect(page.locator(SELECTORS.nav.railMarked)).toHaveAttribute('aria-current', 'true');
+      await expect(page.locator(SELECTORS.nav.back)).toHaveText('\u2190 KPIs');
+      await page.locator(SELECTORS.nav.back).click();
+      await expect(page).toHaveURL(new RegExp(`/workspace/${keyA}/kpis$`));
+    }
   });
 
   test('a workspace the session lacks gets the 404 page; no session redirects to /', async ({ page, playwright, baseURL }) => {

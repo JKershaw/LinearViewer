@@ -3735,9 +3735,7 @@ body[data-proxy-active="true"] .prompt-proxy-toggle {
    renderPageHeader() (lib/components/page-header.js). The layout (left-aligned,
    margin, the 24px title) is `.page-header` above (LIN-4009); this block owns
    the subtitle, absorbing the former per-page `*-subtitle` rules.
-   Load-bearing test-hook classes (.dashboard-subtitle, .dispatch-subtitle,
-   .prompts-subtitle) ride alongside `.page-header__subtitle` as no-style hooks
-   (passed via subtitleClass). `0.9em` has no exact Phase-0 token, so it stays a
+   `0.9em` has no exact Phase-0 token, so it stays a
    literal — preserving the prior look byte-for-byte (LIN-461 convention).
    ============================================================================= */
 .page-header__subtitle {

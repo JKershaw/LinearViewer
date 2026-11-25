@@ -10,9 +10,6 @@
    dispatch.js reaches the send panel via [data-send-panel] (LIN-3889). Key/value
    tree rows are `.field` (style.css), so this file no longer restates that row. */
 
-/* `.dispatch-subtitle` is now a no-style E2E hook (dispatch-page.spec.js);
-   canonical styling lives in `.page-header__subtitle` (style.css, LIN-462). */
-
 /* =============================================================================
    Dispatch Nodes (tree items)
    ============================================================================= */
