@@ -47,3 +47,7 @@ Area notes for `front-end-pages` in the registry. Format and rules: README.md.
   `updateQueueBadge`, `public/common.js`), and each page runs one poll: the old bar's badge keeps `public/app.js`'s, the
   frame's count polls from `public/common.js`. LIN-4562's first push moved the whole poll and started requests on old
   pages that load no `public/app.js` (`tests/e2e/look-alike-controls.spec.js` caught it).
+- Moving a page onto the frame or retiring its widget leaves edges. The frame owns the page's name, so client code that
+  hid the body misses the h1 and tab: the revoked-link notice (`goneHandlerFor`, `public/task-page.js`) left the title
+  showing (LIN-4563). What existed only for a retired feature goes too, server side included (the `search` home-rows
+  kind, rows' `data-search-text`, a constant named for it). Grep the client's `innerHTML =`, `kind=` and `data-*`.

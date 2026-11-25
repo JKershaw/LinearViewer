@@ -201,8 +201,9 @@ test.describe('Empty-project default collapse (LIN-2514)', () => {
   // bypassing the default-collapse union init() applies — so closing search
   // reverted a default-collapsed empty project's header to ▼ while its
   // (nonexistent) children stayed hidden, an expanded-looking project with
-  // nothing under it.
-  test('closing search restores the empty project\'s collapsed state', async ({ page, seedLocal, localWorkerUrlKey }) => {
+  // nothing under it. LIN-4563 retired the in-page search; the path that
+  // re-applies state now is Backlog's "reset folds", held to the same rule.
+  test('reset restores the empty project\'s collapsed state', async ({ page, seedLocal, localWorkerUrlKey }) => {
     await seedLocal(emptyProjectSeed(localWorkerUrlKey));
     await page.goto(`/workspace/${localWorkerUrlKey}/backlog`);
     await page.waitForLoadState('networkidle');
@@ -211,14 +212,10 @@ test.describe('Empty-project default collapse (LIN-2514)', () => {
     const emptyProject = page.locator(`.project[data-id="${emptyId}"]`);
     await expect(emptyProject.locator('.project-header')).toHaveText(/^▶/);
 
-    const searchToggle = page.locator('.search-toggle');
-    const searchInput = page.locator('#search-input');
-    await searchToggle.click();
-    await searchInput.fill('active');
-    await expect(searchInput).toHaveValue('active');
-
-    // Escape closes search and restores the underlying view.
-    await searchInput.press('Escape');
+    // Expand it by hand, then reset: the default (collapsed) comes back.
+    await emptyProject.locator('.project-header').click();
+    await expect(emptyProject.locator('.project-header')).toHaveText(/^▼/);
+    await page.locator('[data-testid="backlog-reset"]').click();
 
     await expect(emptyProject.locator('.project-header')).toHaveText(/^▶/);
     await expect(emptyProject.locator('[data-testid="project-header"] .add-task-link')).toBeVisible();
@@ -233,8 +230,9 @@ test.describe('Empty-project default collapse (LIN-2514)', () => {
   // *back in* and re-hid an already-hidden project: one dead click. This is
   // the exact reviewed step 2->4 sequence: manually expand a
   // default-collapsed empty project, open+close search, then the very next
-  // header click must respond (not be swallowed).
-  test('a header click responds immediately after a search round trip following manual expand (F-A)', async ({ page, seedLocal, localWorkerUrlKey }) => {
+  // header click must respond (not be swallowed). LIN-4563: the round trip is
+  // now Backlog's "reset folds", which re-applies state the same way.
+  test('a header click responds immediately after a reset following manual expand (F-A)', async ({ page, seedLocal, localWorkerUrlKey }) => {
     await seedLocal(emptyProjectSeed(localWorkerUrlKey));
     await page.goto(`/workspace/${localWorkerUrlKey}/backlog`);
     await page.waitForLoadState('networkidle');
@@ -253,13 +251,8 @@ test.describe('Empty-project default collapse (LIN-2514)', () => {
     await expect(header).toHaveText(/^▼/);
     await expect(addTaskLink).toBeVisible();
 
-    // 3. Open search, then close it (Escape) — F5 fixed this half: it must
-    // revert to collapsed (the default), not stay expanded.
-    const searchToggle = page.locator('.search-toggle');
-    const searchInput = page.locator('#search-input');
-    await searchToggle.click();
-    await searchInput.fill('active');
-    await searchInput.press('Escape');
+    // 3. Reset — it must revert to collapsed (the default), not stay expanded.
+    await page.locator('[data-testid="backlog-reset"]').click();
     await expect(header).toHaveText(/^▶/);
     await expect(addTaskLink).toBeVisible();
 

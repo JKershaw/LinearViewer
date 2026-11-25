@@ -152,9 +152,11 @@ describe('LIN-4115 — Home halt banner: placement beside the onboarding hint an
     assert.ok(banner < card, 'banner comes before the card');
   });
 
-  test('the banner is above the Home content (before <main>)', () => {
+  test('the banner is above the Home content (LIN-4563: under the frame\'s heading, before the desk)', () => {
     const html = render({ halt: haltOf('pause') });
-    assert.ok(html.indexOf('data-testid="home-halt-banner"') < html.indexOf('<main>'), 'banner is above <main>');
+    const banner = html.indexOf('data-testid="home-halt-banner"');
+    assert.ok(html.indexOf('<h1>') < banner, 'banner is under the page heading');
+    assert.ok(banner < html.indexOf('data-testid="home-backlog"'), 'banner is above the desk');
   });
 });
 

@@ -21,6 +21,7 @@
  * seed through the retired comment scan).
  */
 import { test, expect } from '../fixtures/test-base.js';
+import { SELECTORS } from '../helpers.js';
 import { localSeedId } from '../fixtures/local-harness.js';
 import { askingRun, seedQuestion } from '../fixtures/question-records.js';
 
@@ -33,7 +34,8 @@ const WAIT_CARD = `${SECTION} .waiting-question`;
 const ANSWER = '[data-testid="question-record-card-answer"]';
 const FEEDBACK = '[data-testid="question-record-card-feedback"]';
 const COUNT = '[data-testid="in-progress-count"]';
-const BADGE = '.rulings-badge .rulings-count';
+// LIN-4563: the rail's count on Home (the band draws a second copy for a phone), the bar's on a page not yet moved.
+const BADGE = SELECTORS.questionsBadge;
 
 /**
  * LIN-4242: the badge reads the rulings feed through the 5s cache and moves only on the interval. Clear the cache and read
@@ -257,25 +259,23 @@ test('W13: an answer the server could not record leaves the card open and counte
   await page.unroute(/\/questions\/[^/]+\/answer$/);
 });
 
-// ---- witness 14: the same question twice on a page; search and the opened task are the other copies ----------------
-
-test('W14: answering a waiting task\'s card inside search settles the Waiting card too, and the count line and badge drop', async ({ page }) => {
+// ---- witness 14 (LIN-4563): a second copy of a waiting task's card, in the opened task of its context row ---------------
+// Home's in-page search used to be where W14 opened a waiting task. The search is retired, but a started waiting task's row
+// (LOCAL-M, under the charter) still opens in place and its state poll draws the task's open question as a second card, so
+// two copies of one question can sit on Home. Answering the opened task's copy settles the Waiting copy and the count with it.
+test('W14: answering the opened context row\'s card settles the Waiting copy too, and the count line and badge drop', async ({ page }) => {
   await seedTree(page, { runnerKey: true });
-  await seedWaiting(page, 'LOCAL-S', THREE_OPTIONS);
+  await seedWaiting(page, 'LOCAL-M', THREE_OPTIONS);
   await page.goto(`/workspace/${URL_KEY}/`);
   await expect(page.locator(CARD)).toHaveCount(1);
 
-  await page.locator('.search-toggle').click();
-  await page.locator('#search-input').fill('Solo task');
-  const results = page.locator('[data-testid="home-search-results"]');
-  await expect(results.locator('[data-identifier="LOCAL-S"]').first()).toBeVisible();
-  await expect(page.locator(SECTION)).toBeHidden({ timeout: 5000 });
-  await results.locator('[data-identifier="LOCAL-S"]').first().click();
-  const opened = page.locator('[data-testid="opened-task"]').first().locator('[data-testid="question-record-card"]');
+  await page.locator(SELECTORS.openedTask.parentLine('LOCAL-0')).click();
+  await page.locator(SELECTORS.openedTask.parentLine('LOCAL-M')).click();
+  const opened = page.locator('[data-question-slot] [data-testid="question-record-card"]');
+  await expect(opened, 'the opened task draws the question as a second card').toHaveCount(1);
   await answerWith(opened, 'Wait for review');
   await expect(opened).toHaveAttribute('data-settled', 'true', { timeout: 15000 });
 
-  await page.locator('#search-input').fill('');
   // The Waiting copy of the same question settled with it: nothing is left open or counted.
   await expect(page.locator(CARD)).toHaveCount(1);
   await expect(page.locator(OPEN_CARD)).toHaveCount(0);
@@ -296,7 +296,6 @@ test('W9: no task is drawn twice on Home across its sections, a waiting task inc
   const repeats = await page.evaluate(() => {
     const seen = new Map();
     for (const el of document.querySelectorAll('main [data-identifier]')) {
-      if (el.closest('.home-search-results')) continue;
       const id = el.getAttribute('data-identifier');
       seen.set(id, (seen.get(id) || 0) + 1);
     }
@@ -354,24 +353,23 @@ test('W16: a viewer without run controls (a keyless owner) gets no Waiting secti
   expect(await fragment.text()).not.toContain(asks);
 });
 
-// ---- witness 17: search hides the section; collapse persists across a reload; reset opens it ------------------------
+// ---- witness 17: collapse persists across a reload; reset opens it ----------------------------------------------------
+// LIN-4563: the in-page search that hid the section is retired, and "reset" moved to the Backlog page's control line. The
+// folds it resets are the one stored state Home reads too, so a reset on Backlog opens Home's Waiting section.
 
-test('W17: search hides the section and clearing it restores it; collapsing persists across reload and "reset" opens it', async ({ page }) => {
+test('W17: collapsing Waiting persists across reload, and Backlog\'s "reset folds" opens it', async ({ page }) => {
   await seedTree(page, { runnerKey: true });
   await seedWaiting(page, 'LOCAL-S', THREE_OPTIONS);
   await page.goto(`/workspace/${URL_KEY}/`);
-  await expect(page.locator(SECTION)).toBeVisible();
-
-  await page.locator('.search-toggle').click();
-  await page.locator('#search-input').fill('Solo');
-  await expect(page.locator(SECTION)).toBeHidden();
-  await page.locator('#search-input').fill('');
   await expect(page.locator(SECTION)).toBeVisible();
 
   await page.locator(`${SECTION} [data-testid="waiting-header"]`).click();
   await expect(page.locator(`${SECTION} [data-testid="waiting-body"]`)).toBeHidden();
   await page.reload();
   await expect(page.locator(`${SECTION} [data-testid="waiting-body"]`)).toBeHidden();
-  await page.locator('.reset-view').click();
+  await expect(page.locator('.reset-view'), 'Home draws no reset').toHaveCount(0);
+  await page.goto(`/workspace/${URL_KEY}/backlog`);
+  await page.locator('[data-testid="backlog-reset"]').click();
+  await page.goto(`/workspace/${URL_KEY}/`);
   await expect(page.locator(`${SECTION} [data-testid="waiting-body"]`)).toBeVisible();
 });

@@ -1,4 +1,5 @@
 import { test, expect } from '../fixtures/test-base.js';
+import { SELECTORS } from '../helpers.js';
 
 test.describe('Authentication Flow', () => {
   test.beforeEach(async ({ page }) => {
@@ -57,19 +58,18 @@ test.describe('Authentication Flow', () => {
     // Should see dashboard (no is-landing class)
     await expect(page.locator('body')).not.toHaveClass(/is-landing/);
 
-    // Should see navigation bar with actions
-    await expect(page.locator('.nav-bar')).toBeVisible();
-    await expect(page.locator('.reset-view')).toBeVisible();
+    // Should see the rail, Home marked (LIN-4563: Home sits in the frame)
+    await expect(page.locator(SELECTORS.nav.rail)).toBeVisible();
+    await expect(page.locator(SELECTORS.nav.railMarked)).toHaveAttribute('data-place', 'home');
   });
 
   test('authenticated users see workspace selector', async ({ page, workerUrlKey }) => {
     await page.goto(`/test/set-session?urlKey=${workerUrlKey}`);
     await page.goto(`/workspace/${workerUrlKey}/`);
 
-    // Should see workspace selector
-    const workspaceToggle = page.locator('#workspace-toggle');
-    await expect(workspaceToggle).toBeVisible();
-    await expect(workspaceToggle).toHaveText('Test Workspace');
+    // Should see workspace selector (LIN-4563: the rail's workspace button)
+    await expect(page.locator(SELECTORS.nav.workspaceToggle)).toBeVisible();
+    await expect(page.locator(SELECTORS.nav.workspaceName)).toHaveText('Test Workspace');
   });
 });
 

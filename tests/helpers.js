@@ -138,6 +138,8 @@ export const SELECTORS = {
     railQuestions: '[data-testid="rail-questions"]',
     railQueued: '[data-testid="rail-queued"]',
     workspaceToggle: '[data-testid="rail-workspace-toggle"]',
+    /** LIN-4563: the workspace's name on the rail's workspace button (the button also reads "Workspace"). */
+    workspaceName: '[data-testid="rail-workspace-toggle"] .frame-workspace__name',
     workspaceMenu: '[data-testid="rail-workspace-menu"]',
     band: '[data-testid="frame-band"]',
     bandMenu: '[data-testid="frame-band-menu"]',
@@ -146,6 +148,8 @@ export const SELECTORS = {
     bandSearch: '[data-testid="frame-band-search"]',
     scrim: '[data-testid="frame-scrim"]',
     main: '[data-testid="frame-main"]',
+    /** LIN-4563: the page's one h1, its name (a task page's is the task's title). */
+    heading: '[data-testid="frame-main"] h1',
     back: '[data-testid="frame-back"]',
     footer: '[data-testid="frame-footer"]',
     filters: '[data-testid="frame-filters"]',
@@ -284,7 +288,9 @@ export const SELECTORS = {
     line: '[data-testid="in-progress-count"]',
     questions: '[data-testid="in-progress-count"] [data-tone="needs-you"]',
   },
-  questionsBadge: '[data-testid="nav-questions-badge"] .rulings-count',
+  // LIN-4563: on a page in the frame the count is drawn twice, on Home's rail item and in the phone band; this is the one
+  // a desktop reader sees (the rail's there, the bar's on a page not yet moved). The band's copy is SELECTORS.nav.bandQuestions.
+  questionsBadge: '.rulings-badge:not([data-testid="band-questions"]) .rulings-count',
   /** An issue row by id (pairs the testid with the existing data-id hook). */
   issue: (id) => `[data-testid="issue-line"][data-id="${id}"]`,
   /** Workspace KPIs page (LIN-3689): section, card and empty-state test ids. */

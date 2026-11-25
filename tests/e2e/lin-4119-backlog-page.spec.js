@@ -212,29 +212,31 @@ test.describe('LIN-4119 W4 — the /backlog page, its access and its guards', ()
     }
   });
 
-  test('the assignee selector and the search toggle render on /backlog, and choosing an assignee stays on /backlog', async ({ page, seedLocal, localWorkerUrlKey }) => {
+  test('the assignee selector renders in /backlog\'s filter line, and choosing an assignee stays on /backlog', async ({ page, seedLocal, localWorkerUrlKey }) => {
     await seedLocal(assigneeFilterLocalSeed(localWorkerUrlKey));
     await page.goto(`/workspace/${localWorkerUrlKey}/backlog`);
-    await expect(page.locator('#assignee-toggle')).toBeVisible();
-    await expect(page.locator('.search-toggle')).toBeVisible();
+    // LIN-4563: page filters sit in the frame's filter line, not the bar.
+    await expect(page.locator(`${SELECTORS.nav.filters} #assignee-toggle`)).toBeVisible();
     await page.locator('#assignee-toggle').click();
     await page.locator('#assignee-options .nav-option[data-assignee="me"]').click();
     await expect(page).toHaveURL(new RegExp(`/workspace/${localWorkerUrlKey}/backlog\\?assignee=me$`));
     await expect(page.locator('#assignee-toggle')).toHaveText('me');
   });
 
-  test('the search toggle opens the search panel on /backlog', async ({ page, seedLocal, localWorkerUrlKey }) => {
+  // LIN-4563: the in-page search toggle is retired; /backlog's search is the rail's field, which leads to the search page.
+  test('the rail\'s search field on /backlog leads to the search page', async ({ page, seedLocal, localWorkerUrlKey }) => {
     await seedLocal(inProgressSeed(localWorkerUrlKey));
     await page.goto(`/workspace/${localWorkerUrlKey}/backlog`);
-    await page.locator('.search-toggle').click();
-    await expect(page.locator('#search-panel')).not.toHaveClass(/hidden/);
-    await expect(page.locator('#search-input')).toBeFocused();
+    await expect(page.locator('.search-toggle')).toHaveCount(0);
+    await page.locator(SELECTORS.nav.railSearch).fill('task');
+    await page.locator(SELECTORS.nav.railSearch).press('Enter');
+    await expect(page).toHaveURL(new RegExp(`/workspace/${localWorkerUrlKey}/search\\?q=task$`));
   });
 
   test('the team filter renders on /backlog, and choosing a team stays on /backlog', async ({ page, workerUrlKey }) => {
     await page.goto(`/test/set-session?urlKey=${workerUrlKey}`);
     await page.goto(`/workspace/${workerUrlKey}/backlog`);
-    await expect(page.locator('#team-toggle')).toBeVisible();
+    await expect(page.locator(`${SELECTORS.nav.filters} #team-toggle`)).toBeVisible();
     await page.locator('#team-toggle').click();
     await page.locator(`#team-options .nav-option[data-team="${DESIGN}"]`).click();
     await expect(page).toHaveURL(new RegExp(`/workspace/${workerUrlKey}/backlog\\?team=${DESIGN}$`));

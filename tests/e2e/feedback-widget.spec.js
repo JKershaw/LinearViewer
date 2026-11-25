@@ -420,24 +420,21 @@ test.describe('Feedback widget', () => {
       })
     }
 
-    // `.footer-actions` holds the `reset` link — an interactive control, so an
-    // overlay covering it is the same defect as the covered toggle, not a
-    // cosmetic one. It reached the FAB's band at 23 offsets at 430px before
-    // LIN-2299's reserve.
-    test('the reset-link row is clear of every fixed overlay too', async ({ page, seedLocal }) => {
+    // The `reset` control: an overlay covering it is the same defect as the covered toggle, not a cosmetic one. It reached
+    // the FAB's band at 23 offsets at 430px before LIN-2299's reserve. LIN-4563: it left the footer for the Backlog page's
+    // control line, so it is swept there.
+    test('the reset control is clear of every fixed overlay too', async ({ page, seedLocal }) => {
       const { urlKey } = await seedLocal()
       await page.setViewportSize({ width: 430, height: 844 })
       await enableWidget(page, urlKey)
-      // Only the main dashboard renders `reset`; assert its presence rather
-      // than sweeping vacuously against a control that is not there.
-      await expect(page.locator('.footer-action.reset-view')).toHaveCount(1)
+      await page.goto(`/workspace/${urlKey}/backlog`)
+      await page.waitForLoadState('load')
+      // Only the Backlog page renders `reset`; assert its presence rather than sweeping vacuously against a control that
+      // is not there.
+      await expect(page.locator('[data-testid="backlog-reset"]')).toHaveCount(1)
 
-      // The LINK, not the row. `.footer-actions` is a block: its rect spans the
-      // full column and INCLUDES its padding, so it would report the same result
-      // with or without a reserve and prove nothing — the trap that made an
-      // earlier version of the `.footer-deploy` assertion vacuous.
-      const result = await sweepFixedOverlaps(page, '.footer-action.reset-view')
-      expectSweepNotVacuous(expect, result, 'reset link @430px')
+      const result = await sweepFixedOverlaps(page, '[data-testid="backlog-reset"]')
+      expectSweepNotVacuous(expect, result, 'reset control @430px')
       expect(result.hits, describeHits(result)).toEqual([])
     })
 
@@ -534,6 +531,8 @@ async function dropFileOnZone(page, { name, type, bytes, size }) {
 // `toBeEnabled()` is the real readiness signal (LIN-2298): the trigger ships
 // `disabled` and public/feedback-widget.js clears that only after the panel is
 // built and the click handler bound.
+const WIDGET_PAGE = 'swim'
+
 async function enableWidget(page, urlKey) {
   // LIN-3848: Settings is the single place the widget is switched. The toggle
   // saves in place (AJAX, no reload) and the new state is read back from the
@@ -542,7 +541,9 @@ async function enableWidget(page, urlKey) {
   await page.waitForLoadState('networkidle')
   await page.locator(SELECTORS.settings.switch('feedbackWidget')).click()
   await expect(page.locator(SELECTORS.settings.switch('feedbackWidget'))).toHaveText('● on')
-  await page.goto(`/workspace/${urlKey}/`)
+  // LIN-4563: Home moved onto the frame (its trigger is in the rail's foot, its footer the frame's). These specs pin the
+  // old footer and the bar's trigger, which still render on pages not yet moved, so they land on one (/swim).
+  await page.goto(`/workspace/${urlKey}/${WIDGET_PAGE}`)
   await page.waitForLoadState('networkidle')
   await expect(page.getByTestId('nav-feedback-trigger')).toBeEnabled()
   // `toBeEnabled()` can resolve at readyState 'interactive': /feedback-widget.js

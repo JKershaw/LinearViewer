@@ -30,6 +30,7 @@ import { renderTaskCreatePage } from '../lib/render-task-create.js';
 import { renderErrorPage } from '../lib/render.js';
 import { requestFeatureFlags } from '../lib/run-controls.js';
 import { resolveIssueBinding } from '../lib/workspace.js';
+import { taskFromReferer } from '../lib/places.js';
 
 /**
  * Best-effort option list for a capability-gated read. Two independent guards,
@@ -80,7 +81,10 @@ export function createTaskCreateRoutes({ workspaceFromUrl, getOpenRouterSource, 
       urlKey: workspace.urlKey,
       openRouterSource: getOpenRouterSource(req),
       workspaces: req.session.workspaces,
-      featureFlags: await requestFeatureFlags(req)
+      featureFlags: await requestFeatureFlags(req),
+      // LIN-4563: the frame's tab names the workspace, and the rail lights Home or Backlog by where the person came from.
+      workspaceName: workspace.name || 'Workspace',
+      from: taskFromReferer(req.get('referer'), workspace.urlKey)
     };
 
     // LIN-3240 (LIN-3126 §2) / LIN-3335: creation targets the workspace's

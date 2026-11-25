@@ -1,4 +1,5 @@
 import { test, expect } from '../fixtures/test-base.js';
+import { SELECTORS } from '../helpers.js';
 import { workspaceApiLocalSeed } from '../fixtures/local-harness.js';
 
 // LIN-427: the swipe surface is fully modeled by the local provider (the page
@@ -147,13 +148,13 @@ test.describe('Swipe Page', () => {
     await expect(page.locator('.nav-views [data-testid="nav-view-swipe"].nav-view-current')).toBeVisible();
   });
 
-  test('swipe link appears in the header switcher on the dashboard', async ({ page, localWorkerUrlKey }) => {
+  test('swipe link appears in the rail on the dashboard', async ({ page, localWorkerUrlKey }) => {
     // Navigate to main dashboard
     await page.goto(`/workspace/${localWorkerUrlKey}/`);
     await page.waitForLoadState('networkidle');
 
-    // Header switcher (LIN-978) carries the swipe link.
-    await expect(page.locator('.nav-views a[data-testid="nav-view-swipe"]')).toBeVisible();
+    // LIN-4563: Home sits in the frame; its rail carries Swipe under Views.
+    await expect(page.locator(SELECTORS.nav.place('swipe'))).toBeVisible();
   });
 
   test('shows blocking relationship rows on cards', async ({ page }) => {

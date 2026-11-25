@@ -21,10 +21,20 @@ import { FEATURE_DEFAULTS } from '../../lib/feature-defaults.js';
  * The 3,000-task search budget is tests/perf/lin-4562-search-shape.spec.js.
  */
 
-/** The pages on the frame, by place key. `query` is appended to the registry path. */
+/**
+ * The pages on the frame, by place key. `path` replaces the registry path (a drilled-in page's route has a parameter);
+ * `query` is appended; `name` is the page's name when it is not the registry label (a task page's name is its title).
+ * LIN-4563 (piece 2) adds Home, Backlog and the task family: a task, its edit page, a new task, and a task not found.
+ */
 const FRAMED = [
   { key: 'connect' },
   { key: 'search', query: '?q=Finished+item+42' },
+  { key: 'home' },
+  { key: 'backlog' },
+  { key: 'task', path: '/task/SHAPE-261', name: 'Open task 261' },
+  { key: 'task-edit', path: '/task/SHAPE-261/edit', name: 'Edit SHAPE-261' },
+  { key: 'task-new' },
+  { key: 'task', path: '/task/NOPE-404', name: 'Task not found', notFound: true },
 ];
 
 const VIEWERS = [
@@ -35,7 +45,7 @@ const VIEWERS = [
 
 const WIDTHS = [1280, 390];
 
-const urlOf = (urlKey, { key, query = '' }) => `/workspace/${urlKey}${placeFor(key).path}${query}`;
+const urlOf = (urlKey, { key, path, query = '' }) => `/workspace/${urlKey}${path || placeFor(key).path}${query}`;
 
 /** Reads what the rules need off the page in one pass. */
 async function readFrame(page) {
@@ -100,10 +110,11 @@ for (const viewer of VIEWERS) {
         const edges = new Set();
         const sizes = new Set();
         for (const entry of FRAMED) {
-          await page.goto(urlOf(urlKey, entry));
+          const response = await page.goto(urlOf(urlKey, entry));
+          expect(response.status(), `${entry.key}: the page renders`).toBe(entry.notFound ? 404 : 200);
           await page.waitForLoadState('networkidle');
           const f = await readFrame(page);
-          const name = placeFor(entry.key).label;
+          const name = entry.name || placeFor(entry.key).label;
 
           expect(f.h1Count, `${entry.key}: one h1`).toBe(1);
           expect(f.h1Text).toBe(name);
@@ -115,6 +126,13 @@ for (const viewer of VIEWERS) {
           edges.add(f.h1Left);
           sizes.add(f.h1Size);
 
+          // A page whose job is typing (task edit, new task: LIN-1565's autofocus) opens with the keyboard already in a
+          // field in <main>, past the rail, which is what the skip link is for; the walk checks that instead.
+          const autofocused = await page.evaluate(() => {
+            const el = document.activeElement;
+            return !!el && el.hasAttribute('autofocus') && el !== document.getElementById('main') && !!document.getElementById('main')?.contains(el);
+          });
+          if (autofocused) continue;
           // The first Tab stop is the skip link, and it lands in <main>.
           await page.keyboard.press('Tab');
           expect((await focused(page)).testid).toBe('frame-skip');
@@ -177,6 +195,36 @@ for (const viewer of VIEWERS) {
       await expect(page.locator(SELECTORS.nav.rail)).toBeVisible();
       await page.locator(SELECTORS.nav.scrim).click({ position: { x: 370, y: 400 } });
       await expect(page.locator(SELECTORS.nav.rail)).toBeHidden();
+    });
+
+    // LIN-4563: a task page lights the place the person came from, and its one way back goes there (default Home). From Backlog
+    // the test follows a link Backlog itself renders (a project's "+ Add task"); a task link has no home on Home's rows until a row
+    // opens, so Home's case follows the task page href.
+    test('a page opened from Backlog lights Backlog and leads back there; opened from Home it lights Home', async ({ page }) => {
+      await page.setViewportSize({ width: 1280, height: 900 });
+      for (const from of ['backlog', 'home']) {
+        await page.goto(urlOf(urlKey, { key: from }));
+        let landed;
+        if (from === 'backlog') {
+          // A real link the Backlog page draws: the first project's Add task link, to the new-task page.
+          await page.locator('a[href*="/task/new?projectId="]').first().click();
+          landed = new RegExp(`/workspace/${urlKey}/task/new\\?projectId=`);
+        } else {
+          await page.evaluate((href) => {
+            const a = document.createElement('a');
+            a.href = href;
+            a.dataset.testid = 'walk-task-link';
+            document.querySelector('#main').append(a);
+          }, `/workspace/${urlKey}/task/SHAPE-261`);
+          await page.locator('[data-testid="walk-task-link"]').evaluate(a => a.click());
+          landed = new RegExp(`/workspace/${urlKey}/task/SHAPE-261$`);
+        }
+        await expect(page).toHaveURL(landed);
+        await expect(page.locator(SELECTORS.nav.railMarked)).toHaveAttribute('data-place', from);
+        await expect(page.locator(SELECTORS.nav.back)).toHaveText(from === 'backlog' ? '\u2190 Backlog' : '\u2190 Home');
+        await page.locator(SELECTORS.nav.back).click();
+        await expect(page).toHaveURL(new RegExp(`/workspace/${urlKey}${placeFor(from).path}$`));
+      }
     });
 
     test('search finds a done task and a task in another project, and each links to its task page', async ({ page }) => {

@@ -7,11 +7,17 @@ import { seedWorkspaceOwnership } from '../fixtures/workspace-ownership.js';
 // module-scoped lets are per-worker state.
 let URL_KEY;
 let WORKSPACE_URL;
+// LIN-4563: the queue popover opens from the old bar's "N queued" button (public/app.js initQueuePanel). Home moved onto the
+// frame, whose count is on the Dispatch item and links to the queue's own page, so the popover is read on a page still on
+// the bar that loads app.js (Settings, until piece 5 moves it).
+let QUEUE_PANEL_URL;
+const QUEUE_PANEL_BADGE = 'button[data-queue-badge]';
 let API_PREFIX;
 
 test.beforeEach(({ workerUrlKey }) => {
   URL_KEY = workerUrlKey;
   WORKSPACE_URL = `/workspace/${URL_KEY}/`;
+  QUEUE_PANEL_URL = `/workspace/${URL_KEY}/settings`;
   API_PREFIX = `/workspace/${URL_KEY}`;
 });
 
@@ -252,11 +258,11 @@ test.describe('Dispatch Queue', () => {
     await dispatchBtn.click();
     await expect(dispatchBtn).toHaveText('✓');
 
-    // LIN-3833: the badge is on Home's nav; the Swipe dispatch above is read back there.
-    await page.goto(WORKSPACE_URL);
+    // LIN-3833: the badge is on the bar; the Swipe dispatch above is read back there (LIN-4563: on a page still on the bar).
+    await page.goto(QUEUE_PANEL_URL);
     await page.waitForLoadState('networkidle');
     // Click the queue badge (wait for async badge update)
-    const badge = page.locator('[data-queue-badge]');
+    const badge = page.locator(QUEUE_PANEL_BADGE);
     await expect(badge).not.toHaveClass(/hidden/, { timeout: 10000 });
     await badge.click();
 
@@ -288,10 +294,10 @@ test.describe('Dispatch Queue', () => {
       },
     });
 
-    await page.goto(WORKSPACE_URL);
+    await page.goto(QUEUE_PANEL_URL);
     await page.waitForLoadState('networkidle');
 
-    const badge = page.locator('[data-queue-badge]');
+    const badge = page.locator(QUEUE_PANEL_BADGE);
     await expect(badge).not.toHaveClass(/hidden/, { timeout: 10000 });
     await badge.click();
 
@@ -336,14 +342,14 @@ test.describe('Dispatch Queue', () => {
     await dispatchBtn.click();
     await expect(dispatchBtn).toHaveText('✓');
 
-    // LIN-3833: the badge is on Home's nav; the Swipe dispatch above is read back there.
-    await page.goto(WORKSPACE_URL);
+    // LIN-3833: the badge is on the bar; the Swipe dispatch above is read back there (LIN-4563: on a page still on the bar).
+    await page.goto(QUEUE_PANEL_URL);
     await page.waitForLoadState('networkidle');
-    // LIN-3833: the badge is on Home's nav; the Swipe dispatch above is read back there.
-    await page.goto(WORKSPACE_URL);
+    // LIN-3833: the badge is on the bar; the Swipe dispatch above is read back there (LIN-4563: on a page still on the bar).
+    await page.goto(QUEUE_PANEL_URL);
     await page.waitForLoadState('networkidle');
     // Open queue panel (wait for async badge update)
-    const badge = page.locator('[data-queue-badge]');
+    const badge = page.locator(QUEUE_PANEL_BADGE);
     await expect(badge).not.toHaveClass(/hidden/, { timeout: 10000 });
     await badge.click();
 
@@ -384,11 +390,11 @@ test.describe('Dispatch Queue', () => {
 
     await promptContainer.locator('.swipe-prompt-dispatch[data-target="cli"]').click();
 
-    // LIN-3833: the badge is on Home's nav; the Swipe dispatch above is read back there.
-    await page.goto(WORKSPACE_URL);
+    // LIN-3833: the badge is on the bar; the Swipe dispatch above is read back there (LIN-4563: on a page still on the bar).
+    await page.goto(QUEUE_PANEL_URL);
     await page.waitForLoadState('networkidle');
     // Open panel (wait for async badge update)
-    const badge = page.locator('[data-queue-badge]');
+    const badge = page.locator(QUEUE_PANEL_BADGE);
     await expect(badge).not.toHaveClass(/hidden/, { timeout: 10000 });
     await badge.click();
 

@@ -232,18 +232,22 @@ describe('GET /t/:token — guest page matrix', () => {
     } finally { await close(); }
   });
 
-  test('row 8: ok renders the guest page — controls omitted, nav/back kept, state URL set', async () => {
+  test('row 8: ok renders the guest page — controls omitted, public frame and way back kept, state URL set', async () => {
     const { base, close, loader } = await build({ store: fakeStore({ getByToken: async () => RECORD }) });
     try {
       const res = await get(base, `/t/${TOKEN}`);
       assert.equal(res.status, 200);
       assert.match(res.text, /data-testid="task-page"/);
-      assert.match(res.text, /data-testid="task-page-title">Build the task page</);
+      // LIN-4563: a guest's page sits in the public frame: the task's title is the h1 and the tab, and no rail is drawn.
+      assert.match(res.text, /<h1>Build the task page<\/h1>/);
+      assert.match(res.text, /<title>Build the task page · Harbour<\/title>/);
+      assert.doesNotMatch(res.text, /data-testid="frame-rail"/, 'a guest gets no rail');
       assert.match(res.text, /data-state-url="\/t\/AAAA/);
       assert.doesNotMatch(res.text, /data-testid="task-page-owner-marker"/, 'a guest gets no owner widgets');
       assert.doesNotMatch(res.text, /data-testid="task-share-create"/, 'no owner share controls');
       assert.doesNotMatch(res.text, /data-testid="run-evidence-closeout"/, 'a guest gets no close-out box');
-      assert.match(res.text, /data-testid="task-page-back"/, 'the back link stays for a guest');
+      assert.match(res.text, /data-testid="frame-back"/, 'a way back stays for a guest');
+      assert.match(res.text, /data-testid="frame-sign-in"/, 'a signed-out guest is offered Sign in');
       assert.equal(loader.calls.loadTaskPage.length, 1);
       const args = loader.calls.loadTaskPage[0];
       assert.equal(args.urlKey, 'acme');

@@ -1,6 +1,6 @@
 import { test, expect } from '../fixtures/test-base.js';
 import { localSeedId } from '../fixtures/local-harness.js';
-import { expectNoClippedOverflow } from '../helpers.js';
+import { expectNoClippedOverflow, SELECTORS } from '../helpers.js';
 import { defaultJiraSeed, JIRA_SITE } from '../fixtures/jira-harness.js';
 import { sealedDescription } from '../helpers/sealed-description.js';
 
@@ -133,7 +133,7 @@ test.describe('Task page, owner view (LIN-3329)', () => {
     await seedSession(page, token, { identifier: 'LOCAL-TP1', title: 'A task with a running build', kind: 'implementation' });
 
     await page.goto(`/workspace/${URL_KEY}/task/LOCAL-TP1`);
-    await expect(page.locator('[data-testid="task-page-title"]')).toHaveText('A task with a running build');
+    await expect(page.locator(SELECTORS.nav.heading)).toHaveText('A task with a running build');
     await expect(page.locator('[data-testid="task-page-status"]')).toHaveAttribute('data-status', 'running');
     await expect(page.locator('[data-testid="task-page-sentence"]')).toContainText('Build running for');  // LIN-3968: relative, as the row says it
 
@@ -295,7 +295,8 @@ test.describe('Task page, owner view (LIN-3329)', () => {
     // answer share one left edge and one width, and the PR sits under the stages, not beside them.
     await page.setViewportSize({ width: 1280, height: 900 });
     await page.reload();
-    const main = page.locator('main.task-page');
+    // LIN-4563: the page's body is a <div> inside the frame's <main> (one <main> per page).
+    const main = page.locator('[data-testid="task-page"].task-page');
     await expect(main).not.toHaveClass(/task-page--quiet-context/);
     const tracks = await main.evaluate((el) => getComputedStyle(el).gridTemplateColumns.trim().split(/\s+/).length);
     expect(tracks, 'the desktop grid has one column').toBe(1);
@@ -357,7 +358,8 @@ test.describe('Task page, owner view (LIN-3329)', () => {
       '[data-kind="implementation"] [data-testid="task-page-stage-state"]',
       '[data-kind="implementation"] [data-testid="task-page-session-message"]',
       '[data-testid="task-page-description"] .section-header',
-      '[data-testid="task-page-back"]',
+      // LIN-4563: the way back is the frame's.
+      '[data-testid="frame-back"]',
       '.task-details .disclosure__label',
     ];
     const results = await page.evaluate((sels) => {
@@ -410,7 +412,7 @@ test.describe('Task page, owner view (LIN-3329)', () => {
     await expect(link).toHaveAttribute('href', new RegExp(`^/workspace/${URL_KEY}/task/LOCAL-TP1(\\?|$)`));
 
     await link.click();
-    await expect(page.locator('[data-testid="task-page-title"]')).toHaveText('A task with a running build');
+    await expect(page.locator(SELECTORS.nav.heading)).toHaveText('A task with a running build');
   });
 
   // LIN-3331 / LIN-3335 (the plan's two-binding e2e): on a MERGED multi-binding
@@ -446,7 +448,7 @@ test.describe('Task page, owner view (LIN-3329)', () => {
     await link.click();
     // Not the BINDING_REQUIRED JSON body: the real task page, resolved through
     // the issue's own (Jira, connection-backed) binding.
-    await expect(page.locator('[data-testid="task-page-title"]')).toHaveText('Jira task to do');
+    await expect(page.locator(SELECTORS.nav.heading)).toHaveText('Jira task to do');
   });
 
   // LIN-3340: the task page is the person's page — the PR with its evidence, the

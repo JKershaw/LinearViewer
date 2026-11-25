@@ -54,17 +54,26 @@ test.afterEach(async ({ page, localWorkerUrlKey }) => {
   }
 });
 
+/**
+ * Chrome the task page's body token set does not govern: the old bar and its workspace menu, and (LIN-4563, LIN-4342 piece 2)
+ * the frame: the rail, the phone band, the page's header (the one title size every framed page shares, and the line under
+ * it), the way back and the footer. tests/e2e/frame-rules.spec.js checks the frame's sizes: one heading size across pages, and nothing in the rail
+ * or band smaller on a phone than on desktop.
+ */
+const EXEMPT_CHROME = '.nav-bar, [class*="nav-option"], .frame-rail, .frame-band, .frame-head, .frame-back, .frame-footer, .frame-skip';
+
 async function distinctSizes(page) {
-  return page.evaluate(() => {
+  return page.evaluate((EXEMPT_CHROME) => {
     const sizes = new Set();
     for (const el of document.querySelectorAll('body *')) {
       // The shell header and its workspace menu are exempt chrome (CHROME_EXEMPT in tests/unit/lin-4107-type-sizes.test.js).
-      if (el.closest('.nav-bar, [class*="nav-option"]')) continue;
+      // LIN-4563: so is the frame the task page now sits in (EXEMPT_CHROME): its sizes are the walk's (frame-rules.spec.js).
+      if (el.closest(EXEMPT_CHROME)) continue;
       const own = [...el.childNodes].some((n) => n.nodeType === 3 && n.textContent.trim());
       if (own) sizes.add(getComputedStyle(el).fontSize);
     }
     return [...sizes].sort();
-  });
+  }, EXEMPT_CHROME);
 }
 
 for (const [label, viewport] of [['1280px', { width: 1280, height: 900 }], ['390px', { width: 390, height: 844 }]]) {
@@ -76,15 +85,15 @@ for (const [label, viewport] of [['1280px', { width: 1280, height: 900 }], ['390
     await page.waitForLoadState('networkidle');
     const sizes = await distinctSizes(page);
     const stray = sizes.filter((s) => !ALLOWED.includes(s));
-    const offenders = stray.length ? await page.evaluate((list) => {
+    const offenders = stray.length ? await page.evaluate(([list, exempt]) => {
       const out = [];
       for (const el of document.querySelectorAll('body *')) {
-        if (el.closest('.nav-bar, [class*="nav-option"]')) continue;
+        if (el.closest(exempt)) continue;
         const own = [...el.childNodes].some((n) => n.nodeType === 3 && n.textContent.trim());
         if (own && list.includes(getComputedStyle(el).fontSize)) out.push(`${getComputedStyle(el).fontSize} ${el.tagName.toLowerCase()}.${[...el.classList].join('.')} "${el.textContent.trim().slice(0, 30)}"`);
       }
       return out;
-    }, stray) : [];
+    }, [stray, EXEMPT_CHROME]) : [];
     expect(stray, `sizes outside the token set on the task page: ${stray.join(', ')} (all: ${sizes.join(', ')}); elements: ${offenders.slice(0, 8).join(' | ')}`).toEqual([]);
     expect(sizes.length).toBeLessThanOrEqual(4);
   });

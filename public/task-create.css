@@ -11,22 +11,9 @@
  * for human structure — labels, headings, controls. */
 
 .task-create-page {
+  /* LIN-4563: in the frame, the page takes the frame's one left edge (public/frame.css .frame-main). */
   max-width: 780px;
-  margin: 0 auto;
-  padding: 0 1rem 3rem;
   overflow-x: hidden;
-}
-
-.task-create-header {
-  text-align: left;
-  padding: 0 0 0.7rem;
-  margin-bottom: var(--space-4);
-  border-bottom: 1px solid var(--line);
-}
-.task-create-header h1 {
-  margin: 0;
-  font-size: 1.5rem;
-  font-family: var(--font-content);
 }
 
 .task-create-section { margin-bottom: var(--space-5); }

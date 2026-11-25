@@ -442,11 +442,14 @@ body.frame-body {
     min-height: 2.75rem;
   }
 
-  .frame-main {
-    padding: var(--space-3);
+  /* LIN-4563: the phone gutter is the page's old one (--space-2h at 390, style.css "Small phones"), so the content keeps
+     the width it was measured at: Home's opened task holds at least 340px at 390 (LIN-4010). Main and footer share it,
+     so the page keeps one left edge. */
+  .frame-main,
+  .frame-footer {
+    padding: var(--space-2h);
   }
 
-  .frame-footer,
   .frame-public {
     padding: var(--space-3);
   }

@@ -64,6 +64,9 @@ function watchForbidden(page) {
   page.on('request', (r) => {
     const u = new URL(r.url());
     const p = u.pathname + u.search;
+    // LIN-4563: a page in the frame reads its Dispatch item's queue count on a timer (public/common.js, "N queued"); that
+    // read is the page's own, never a control a click could drive, so it is not an offender.
+    if (r.method() === 'GET' && /\/api\/dispatch\/count$/.test(u.pathname)) return;
     if (FORBIDDEN.some((re) => re.test(p))) seen.push(`${r.method()} ${p}`);
   });
   return seen;

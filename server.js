@@ -187,7 +187,7 @@ import { createTaskDoneCache } from './lib/task-done-cache.js'
 import { dispatchGuardTaskDoneCache } from './lib/dispatch-factory.js'
 import { gatherHomeInputs, gatherHomePage, homeRowDataFor } from './lib/home-pipeline.js'
 import { renderDashboardAfterRefresh as renderRefreshedDashboard } from './lib/dashboard-refresh.js'
-import { homeRowsFor, searchTasks, HOME_ROW_KINDS, HOME_SEARCH_MAX_LENGTH } from './lib/home-rows.js'
+import { homeRowsFor, searchTasks, HOME_ROW_KINDS, SEARCH_MAX_LENGTH } from './lib/home-rows.js'
 import { renderSwimPage } from './lib/render-swim.js'
 import { renderShipPage } from './lib/render-ship.js'
 import { createCollectiveRoutes } from './routes/collective.js'
@@ -3819,22 +3819,22 @@ app.get('/workspace/:urlKey/backlog', workspaceFromUrl, async (req, res) => {
 
 /**
  * LIN-4024: the rows a Home fold opens: a project's Backlog, its Up next overflow, a started parent's folded
- * children, or a search. It runs the same fetch, filters and states as the page, so a fetched row is the row the
- * page would have rendered. Done tasks are never returned. Authorisation is the workspace's own, as /api/detail.
+ * children, or the older recent rows. It runs the same fetch, filters and states as the page, so a fetched row is the
+ * row the page would have rendered. Done tasks are never returned. Authorisation is the workspace's own, as /api/detail.
+ * (LIN-4563: the `search` kind retired with Home's in-page search; search is GET /workspace/:urlKey/search.)
  *
- * Query: `kind` (see HOME_ROW_KINDS), `project` (backlog, up-next), `parent` (more-of-parent), `q` (search),
- * `offset` (the page start, paged kinds).
+ * Query: `kind` (see HOME_ROW_KINDS), `project` (backlog, up-next), `parent` (more-of-parent), `offset` (the page
+ * start, paged kinds).
  * @returns {Object} { html, nextOffset, remaining, opts } - `opts` carries the row's subtask maps for the client
  */
 app.get('/workspace/:urlKey/api/home-rows', workspaceFromUrl, async (req, res) => {
   const workspace = req.workspace;
   const kind = req.query.kind;
   if (!HOME_ROW_KINDS.includes(kind)) return badRequest.json(res, 'Unknown home-rows kind');
-  const q = typeof req.query.q === 'string' ? req.query.q.slice(0, HOME_SEARCH_MAX_LENGTH) : '';
   const offset = Math.max(0, parseInt(req.query.offset, 10) || 0);
   const projectId = typeof req.query.project === 'string' ? req.query.project : null;
   const parentId = typeof req.query.parent === 'string' ? req.query.parent : null;
-  if (kind !== 'search' && kind !== 'more-of-parent' && kind !== 'recent' && !projectId) return badRequest.json(res, 'home-rows needs a project');
+  if (kind !== 'more-of-parent' && kind !== 'recent' && !projectId) return badRequest.json(res, 'home-rows needs a project');
   if (kind === 'more-of-parent' && !parentId) return badRequest.json(res, 'home-rows needs a parent');
 
   const { teamId } = await resolveTeamSelection(req, workspace);
@@ -3854,7 +3854,7 @@ app.get('/workspace/:urlKey/api/home-rows', workspaceFromUrl, async (req, res) =
     const { showSource } = fetched;
     const states = homeStates?.states ?? new Map();
     // LIN-4114: the same Waiting set the page's view was built with; rows are read only for a viewer with run controls.
-    const rows = homeRowsFor({ kind, projectId, parentId, q, offset, trees, inProgressTrees, recentActivityTrees, orderedCards, states, topTaskId, rulingRows: homeStates?.rulingRows ?? [] });
+    const rows = homeRowsFor({ kind, projectId, parentId, offset, trees, inProgressTrees, recentActivityTrees, orderedCards, states, topTaskId, rulingRows: homeStates?.rulingRows ?? [] });
     const urlKey = workspace.urlKey;
     const ctx = homeRowsContext({ workspace, urlKey, featureFlags, rowStates: states, showSource });
     const html = renderHomeRowsHtml(rows.nodes, { section: rows.section, parentId: rows.parentId, ctx });
@@ -4331,7 +4331,7 @@ app.get('/workspace/:urlKey/proxy', workspaceFromUrl, async (req, res) => {
  */
 app.get('/workspace/:urlKey/search', workspaceFromUrl, async (req, res) => {
   const workspace = req.workspace;
-  const q = typeof req.query.q === 'string' ? req.query.q.slice(0, HOME_SEARCH_MAX_LENGTH).trim() : '';
+  const q = typeof req.query.q === 'string' ? req.query.q.slice(0, SEARCH_MAX_LENGTH).trim() : '';
   const featureFlags = await requestFeatureFlags(req);
   const page = {
     q,

@@ -1,7 +1,7 @@
 /**
  * LIN-4562: `searchTasks` (lib/home-rows.js), the search page's reader. It finds tasks across the workspace: done work
- * and every project included, open first, then done (most recently finished first), each once, capped. Home's own
- * `searchRows` stays as it was (open work only).
+ * and every project included, open first, then done (most recently finished first), each once, capped. LIN-4563 retired
+ * Home's own in-page search (`searchRows`, the `search` fold kind): this is the one search.
  *
  * Witness: before this reader, the only search (Home's) dropped "Finished item 42" (done) entirely; the done-task test
  * here is the case it could not answer.
@@ -10,7 +10,7 @@
  */
 import { describe, test } from 'node:test';
 import assert from 'node:assert/strict';
-import { searchTasks, homeRowsFor, SEARCH_TASKS_LIMIT } from '../../lib/home-rows.js';
+import { searchTasks, SEARCH_TASKS_LIMIT, HOME_ROW_KINDS } from '../../lib/home-rows.js';
 import { PERIODICALS_PROJECT_ID, buildForest, partitionCompleted } from '../../lib/tree.js';
 import { shapedLocalSeed } from '../fixtures/local-harness.js';
 
@@ -51,10 +51,8 @@ describe('searchTasks', () => {
     assert.equal(r.remaining, 7);
   });
 
-  test('Home\'s fold search is unchanged: it still returns open work only', () => {
-    const r = homeRowsFor({ kind: 'search', q: 'rail', trees, inProgressTrees: [] });
-    const ids = JSON.stringify(r.nodes);
-    assert.ok(!ids.includes('"A-3"') && !ids.includes('"B-2"'), 'no done task in Home\'s fold');
+  test('Home\'s fold search is retired: searchTasks is the one search (LIN-4563)', () => {
+    assert.ok(!HOME_ROW_KINDS.includes('search'));
   });
 });
 

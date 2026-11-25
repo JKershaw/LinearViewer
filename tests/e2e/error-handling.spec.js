@@ -1,4 +1,5 @@
 import { test, expect } from '../fixtures/test-base.js';
+import { SELECTORS } from '../helpers.js';
 import { localDashboardUrl } from '../fixtures/local-harness.js';
 
 // Mixed-harness boundary split (LIN-428, parent S3/LIN-389).
@@ -27,7 +28,7 @@ test.describe('Input Validation', () => {
     await page.goto(`${localDashboardUrl(localWorkerUrlKey)}backlog?team=invalid-team-id`);
 
     // Page should still load normally
-    await expect(page.locator('.nav-bar')).toBeVisible();
+    await expect(page.locator(SELECTORS.nav.rail)).toBeVisible();
     await expect(page.locator('.project')).toHaveCount(2); // Both local-seed projects
   });
 });
@@ -37,7 +38,7 @@ test.describe('Session State', () => {
     // First authenticate (seed a local-backed session)
     const { dashboard } = await seedLocal();
     await page.goto(dashboard);
-    await expect(page.locator('.nav-bar')).toBeVisible();
+    await expect(page.locator(SELECTORS.nav.rail)).toBeVisible();
 
     // Clear session
     await page.goto('/test/clear-session');
@@ -50,14 +51,14 @@ test.describe('Session State', () => {
   test('session persists across page reloads', async ({ page, seedLocal }) => {
     const { dashboard } = await seedLocal();
     await page.goto(dashboard);
-    await expect(page.locator('.nav-bar')).toBeVisible();
+    await expect(page.locator(SELECTORS.nav.rail)).toBeVisible();
 
     // Reload the page
     await page.reload();
 
     // Session should still be valid
-    await expect(page.locator('.nav-bar')).toBeVisible();
-    await expect(page.locator('#workspace-toggle')).toHaveText('Local Workspace');
+    await expect(page.locator(SELECTORS.nav.rail)).toBeVisible();
+    await expect(page.locator(SELECTORS.nav.workspaceName)).toHaveText('Local Workspace');
   });
 });
 

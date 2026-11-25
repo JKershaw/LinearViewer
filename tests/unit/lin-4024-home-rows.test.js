@@ -3,13 +3,13 @@
  *
  * Witnesses: the rows a fold opens (`homeRowsFor`) are the open rows the page leaves out and never a done task;
  * a backlog or up-next fold pages in HOME_ROWS_PAGE roots; a started parent's "N more" counts only its open
- * folded children; search finds a folded task and shows it under its ancestors; the Home page sends no
+ * folded children; search is no fold (LIN-4563: the search page's `searchTasks` is the one search); the Home page sends no
  * `--depth` style, no "show N completed" toggle and no done task, and carries the folds the rows open from.
  */
 import { test, describe } from 'node:test';
 import assert from 'node:assert/strict';
 import { buildHomeView } from '../../lib/home-view.js';
-import { homeRowsFor, HOME_ROWS_PAGE } from '../../lib/home-rows.js';
+import { homeRowsFor, HOME_ROWS_PAGE, HOME_ROW_KINDS } from '../../lib/home-rows.js';
 import { renderPage, renderHomeRowsHtml, homeRowsContext } from '../../lib/render.js';
 import { partitionCompleted } from '../../lib/tree.js';
 
@@ -108,41 +108,8 @@ describe('homeRowsFor: the rows a fold opens', () => {
     assert.equal(rows.parentId, 'id-LIN-40');
   });
 
-  test('search: finds a folded Backlog task by its title, under its ancestors, and never a done task', () => {
-    const tree = project('p1', [
-      node('LIN-50', 'backlog', [
-        node('LIN-51', 'backlog', [], 'Quarterly invoice export'),
-        node('LIN-52', 'completed', [], 'Quarterly invoice archive'),
-      ]),
-      node('LIN-53', 'backlog', [], 'Unrelated'),
-    ]);
-    const rows = homeRowsFor({ kind: 'search', q: 'invoice', trees: [tree], inProgressTrees: [], states: states({}) });
-    assert.equal(rows.section, 'search');
-    assert.equal(rows.nodes.length, 1, 'one root: the ancestor that holds the match');
-    const [ancestor] = rows.nodes;
-    assert.equal(ancestor.issue.identifier, 'LIN-50');
-    assert.equal(ancestor.context, true, 'the ancestor is context, not a match');
-    assert.deepEqual(ids(ancestor.children), ['LIN-51'], 'the done match LIN-52 is not sent');
-    assert.equal(ancestor.children[0].context, false);
-  });
-
-  test('search: a task that In Progress and a project both hold is shown once, under In Progress', () => {
-    const shared = node('LIN-60', 'started', [], 'Shared invoice task');
-    const rows = homeRowsFor({
-      kind: 'search', q: 'invoice',
-      trees: [project('p1', [shared])],
-      inProgressTrees: inProgress([shared]),
-      states: states({}),
-    });
-    assert.deepEqual(ids(rows.nodes), ['LIN-60']);
-  });
-
-  test('search: an empty term finds nothing; the result is capped and reports what is left', () => {
-    assert.deepEqual(homeRowsFor({ kind: 'search', q: '   ', trees: [], inProgressTrees: [], states: states({}) }).nodes, []);
-    const many = Array.from({ length: 105 }, (_, i) => node(`LIN-${300 + i}`, 'backlog', [], `match ${i}`));
-    const rows = homeRowsFor({ kind: 'search', q: 'match', trees: [project('p1', many)], inProgressTrees: [], states: states({}) });
-    assert.equal(rows.nodes.length, 100);
-    assert.equal(rows.remaining, 5);
+  test('search is not a fold (LIN-4563: Home\'s in-page search retired; the search page reads searchTasks)', () => {
+    assert.ok(!HOME_ROW_KINDS.includes('search'), 'no search kind');
   });
 
   test('a project the workspace does not hold yields no rows, not an error', () => {
@@ -174,7 +141,7 @@ describe('the Home page: the folds, and no done task', () => {
     assert.doesNotMatch(html, /data-completed-for/);
     assert.doesNotMatch(html, /completed-toggle/, 'Home has no "show N completed" toggle');
     assert.doesNotMatch(html, /--depth/, 'no row carries an inline --depth style');
-    assert.match(html, /data-lazy-results[^>]*data-url-key="ws"/, 'search rows have a container that knows the URL key');
+    assert.doesNotMatch(html, /data-lazy-results/, 'no in-page search results container (LIN-4563)');
   });
 
   test('a folded child of a started parent renders its fold hidden until the parent opens', () => {

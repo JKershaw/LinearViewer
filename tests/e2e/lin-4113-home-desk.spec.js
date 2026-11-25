@@ -250,22 +250,18 @@ test.describe('LIN-4113 (d) — /backlog keeps its complete list', () => {
 });
 
 test.describe('LIN-4113 (e) — search, collapse keys, and the retired keys', () => {
-  test('search matches an Up next row and a recent row; the Running collapse persists; the retired keys are ignored', async ({ page, seedLocal }) => {
+  test('search finds an Up next row and a recent row; the Running collapse persists; the retired keys are ignored', async ({ page, seedLocal }) => {
     await seedLocal(deskSeed(URL_KEY), { runnerKey: true });
     await page.goto(`/workspace/${URL_KEY}/`);
     await page.waitForLoadState('networkidle');
 
-    // Search: an Up next row shows Up next and hides the Running section, and a recent row shows its own section.
-    await page.locator('.search-toggle').click();
-    const input = page.locator('#search-input');
-    await input.fill('desk next alpha');
-    await expect(page.locator(SELECTORS.homeDesk.upNextRow('LOCAL-N1'))).toBeVisible();
-    await expect(page.locator(SELECTORS.homeDesk.upNext)).not.toHaveClass(/hidden/);
-    await expect(page.locator(SELECTORS.homeDesk.running)).toHaveClass(/hidden/);
-    await input.fill('desk finished today');
-    await expect(page.locator(SELECTORS.homeDesk.recentRow('LOCAL-X1'))).toBeVisible();
-    await expect(page.locator(SELECTORS.homeDesk.upNext)).toHaveClass(/hidden/);
-    await input.fill('');
+    // Search (LIN-4563): Home's in-page filter is retired; the rail's search page finds an Up next row and a recent row.
+    await page.goto(`/workspace/${URL_KEY}/search?q=${encodeURIComponent('desk next alpha')}`);
+    await expect(page.locator(SELECTORS.search.resultFor('LOCAL-N1'))).toHaveCount(1);
+    await page.goto(`/workspace/${URL_KEY}/search?q=${encodeURIComponent('desk finished today')}`);
+    await expect(page.locator(SELECTORS.search.resultFor('LOCAL-X1'))).toHaveCount(1);
+    await page.goto(`/workspace/${URL_KEY}/`);
+    await page.waitForLoadState('networkidle');
 
     // Collapse: the Running header hides its body, the state is saved under runningCollapsed, and it survives a reload.
     await page.locator(SELECTORS.homeDesk.runningHeader).click();

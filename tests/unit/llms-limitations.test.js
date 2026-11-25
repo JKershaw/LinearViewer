@@ -73,7 +73,8 @@ test('sign-in routes exist for the methods the Limitations line names', () => {
 test('expand/collapse state is persisted in localStorage and reset restores defaults', () => {
   assert.match(read('public/app.js'), /const STORAGE_KEY = 'linear-projects-state'/);
   assert.match(read('public/app.js'), /localStorage\.setItem\(STORAGE_KEY/);
-  assert.match(read('lib/components/footer.js'), /class="footer-action reset-view"/);
+  // LIN-4563: reset sits in the Backlog page's control line, next to the project folds it resets.
+  assert.match(read('lib/render.js'), /class="btn--quiet reset-view" data-testid="backlog-reset"/);
 });
 
 test('team filter is remembered per workspace in localStorage and in server-side account preferences', () => {

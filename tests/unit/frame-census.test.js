@@ -55,12 +55,8 @@ export const OLD_CHROME_ALLOWANCE = [
   'lib/render-swim.js',
   'lib/render-swipe.js',
   'lib/render-task-chat.js',
-  'lib/render-task-create.js',
-  'lib/render-task-edit.js',
-  'lib/render-task-page.js',
   'lib/render-templates.js',
   'lib/render-workspace-kpis.js',
-  'lib/render.js',
   'routes/getting-started.js',
 ];
 
@@ -104,6 +100,18 @@ test('the list only falls: a listed file that moved onto the frame comes off it 
   const found = new Set(oldChromeFiles());
   const stale = OLD_CHROME_ALLOWANCE.filter(rel => !found.has(rel));
   assert.deepEqual(stale, [], `no longer imports the shell's renderPage; delete from OLD_CHROME_ALLOWANCE: ${stale.join(', ')}`);
+});
+
+test('the pages piece 2 moved are on the frame (LIN-4563: Home and Backlog, the task page, edit, new and not found)', () => {
+  for (const rel of ['lib/render.js', 'lib/render-task-page.js', 'lib/render-task-edit.js', 'lib/render-task-create.js']) {
+    assert.ok(!OLD_CHROME_ALLOWANCE.includes(rel), `${rel} is listed as old chrome`);
+    assert.match(readFileSync(join(ROOT, rel), 'utf8'), /renderFrame\(|renderTaskFrame\(/, `${rel} renders through the frame`);
+  }
+  // The task family maps its options onto the frame once (renderTaskFrame, in the task page's renderer); edit and new go through it.
+  assert.match(readFileSync(join(ROOT, 'lib/render-task-page.js'), 'utf8'), /renderFrame\(/, 'renderTaskFrame draws the frame');
+  for (const rel of ['lib/render-task-edit.js', 'lib/render-task-create.js']) {
+    assert.match(readFileSync(join(ROOT, rel), 'utf8'), /renderTaskFrame\(/, `${rel} goes through the task family's one frame mapping`);
+  }
 });
 
 test('the pages piece 1 moved are on the frame', () => {

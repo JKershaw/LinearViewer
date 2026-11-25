@@ -1,4 +1,5 @@
 import { test, expect } from '../fixtures/test-base.js';
+import { SELECTORS } from '../helpers.js';
 import { localSeedId } from '../fixtures/local-harness.js';
 
 // LIN-4024 (volume): Home holds what needs you, what runs and what is next, and folds the rest. Witnesses in a real
@@ -84,14 +85,13 @@ test('a started parent\'s folded child opens with the parent', async ({ page }) 
   await expect(page.locator('.running-section .line[data-identifier="LOCAL-F4"]')).toHaveCount(0);
 });
 
+// LIN-4563: the in-page search is retired; the rail's search page finds a task Home does not hold.
 test('search finds a Backlog task the page does not hold, and shows it once', async ({ page }) => {
   await seedFolds(page);
   await page.goto(`/workspace/${URL_KEY}/`);
+  await expect(page.locator('main [data-identifier="LOCAL-N1"]'), 'Home does not hold it').toHaveCount(0);
 
-  await page.locator('.search-toggle').click();
-  await page.locator('#search-input').fill('zebra');
-  const results = page.locator('[data-testid="home-search-results"]');
-  await expect(results.locator('[data-identifier="LOCAL-N1"]')).toBeVisible();
-  await expect(page.locator('[data-identifier="LOCAL-N1"]')).toHaveCount(1);
-  await expect(page.locator('#search-no-results')).toBeHidden();
+  await page.locator(SELECTORS.nav.railSearch).fill('zebra');
+  await page.locator(SELECTORS.nav.railSearch).press('Enter');
+  await expect(page.locator(SELECTORS.search.resultFor('LOCAL-N1'))).toHaveCount(1);
 });

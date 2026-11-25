@@ -1,6 +1,6 @@
 import { test, expect } from '../fixtures/test-base.js';
 import { localSeedId } from '../fixtures/local-harness.js';
-import { expectNoClippedOverflow } from '../helpers.js';
+import { expectNoClippedOverflow, SELECTORS } from '../helpers.js';
 
 // LIN-3330: a task share link, end to end. The owner mints a link from the task
 // page; a fresh SIGNED-OUT browser context opens it at 360px and sees the same
@@ -85,13 +85,14 @@ test.describe('Task share link (LIN-3330)', () => {
     expect(guestRes.status()).toBe(200);
     expect(new URL(guest.url()).pathname).toBe(path, 'no redirect for a signed-out guest');
 
-    await expect(guest.locator('[data-testid="task-page-title"]')).toHaveText('A shared task');
+    await expect(guest.locator(SELECTORS.nav.heading)).toHaveText('A shared task');
     await expect(guest.locator('[data-testid="task-page-stage"]')).toHaveCount(1);
     // Owner controls are omitted server-side; in-page Harbour chrome stays.
     await expect(guest.locator('[data-testid="task-page-owner-marker"]')).toHaveCount(0);
     await expect(guest.locator('[data-testid="run-evidence-closeout"]')).toHaveCount(0);
     await expect(guest.locator('[data-testid="task-share-create"]')).toHaveCount(0);
-    await expect(guest.locator('[data-testid="task-page-back"]')).toBeVisible();
+    // LIN-4563: a guest's page sits in the public frame, whose band carries the way back.
+    await expect(guest.locator(SELECTORS.nav.back)).toBeVisible();
 
     await expectNoClippedOverflow(guest);
     await guestCtx.close();
@@ -129,7 +130,7 @@ test.describe('Task share link (LIN-3330)', () => {
     const guestCtx = await browser.newContext({ viewport: PHONE });
     const guest = await guestCtx.newPage();
     expect((await guest.goto(`${BASE}${path}`)).status()).toBe(200);
-    await expect(guest.locator('[data-testid="task-page-title"]')).toHaveText('A shared task');
+    await expect(guest.locator(SELECTORS.nav.heading)).toHaveText('A shared task');
     await expect(guest.locator('[data-testid="task-share-gone"]')).toHaveCount(0);
 
     const revoked = await page.request.post(`/workspace/${URL_KEY}/api/task/LOCAL-SHARE1/shares/${id}/revoke`);
@@ -138,7 +139,10 @@ test.describe('Task share link (LIN-3330)', () => {
     // One poll, forced the way the tab-return catch-up forces it.
     await guest.evaluate(() => document.dispatchEvent(new Event('visibilitychange')));
     await expect(guest.locator('[data-testid="task-share-gone"]')).toHaveText('This link is no longer available.');
-    await expect(guest.locator('[data-testid="task-page-title"]')).toHaveCount(0);
+    // LIN-4563: the public frame's h1 and tab named the task; a revoked link names it nowhere.
+    await expect(guest.locator(SELECTORS.nav.heading)).toHaveText('Link not available');
+    await expect(guest).toHaveTitle('Link not available · Harbour');
+    await expect(guest.locator(SELECTORS.nav.main)).not.toContainText('A shared task');
     await guestCtx.close();
   });
 

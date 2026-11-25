@@ -9,6 +9,12 @@
  * with `UPDATE_RENDER_TASK_PAGE_GOLDEN=1 node --test tests/unit/render-task-page-golden.test.js`
  * and say why in the commit — never by widening an assertion.
  *
+ * LIN-4563 (LIN-4342 piece 2): the page moved onto the frame. The golden changed only in its chrome (the rail, the h1,
+ * the way back, the footer, `<main>` becoming the frame's); its body, the sections from the answer to the share slot and
+ * the container's attributes, was compared byte for byte with the golden before the move and is identical in every case.
+ * `bodyOf` is that body: the viewer checks below compare bodies, since an owner's page sits in the rail's frame and a
+ * guest's in the public frame.
+ *
  * Also pinned here:
  *   - the page order (answer → stages → pull request → docs → details → share; LIN-4537 retired brief/recap);
  *   - `renderOwnerControls` is the ONLY owner/guest difference: owner HTML with
@@ -210,6 +216,14 @@ const CASES = ['running-blocked-repeat', 'waiting', 'done', 'no-sessions', 'lin-
 // LIN-3975: the owner's run-control options, as routes/task-page.js builds them (a runner set up, so the run control
 // is the shared PromptSection, not the copy-first view; the copy-first view is covered in its own test).
 const PROMPT_OPTS = buildPromptOpts({ openRouterSource: 'env', featureFlags: { runControls: true }, isLocalhost: false });
+
+/** The page's own body, inside the frame: its container (`data-testid="task-page"`) and every section in it. */
+function bodyOf(html) {
+  const start = html.indexOf('<div class="sess-page task-page"');
+  assert.ok(start >= 0, 'the page body is drawn');
+  const end = html.indexOf('\n  </div>', start);
+  return html.slice(start, end);
+}
 
 function render(name, viewer = 'owner') {
   return renderTaskPage(model(name), {
@@ -502,8 +516,8 @@ describe('data-ready-header (LIN-3448)', () => {
 describe('viewer isolation', () => {
   for (const name of CASES) {
     test(`${name}: owner minus renderOwnerControls === guest`, () => {
-      const owner = render(name, 'owner');
-      const guest = render(name, 'guest');
+      const owner = bodyOf(render(name, 'owner'));
+      const guest = bodyOf(render(name, 'guest'));
       const fragments = renderOwnerControls(model(name), { urlKey: 'acme', binding: BINDING, promptOpts: PROMPT_OPTS });
       // LIN-3975: an attempt's run link (or its plain reason) is for a viewer with a run page to open. A guest has none,
       // so that markup is the one viewer difference outside the owner fragments; strip it before the parity check.
@@ -539,11 +553,13 @@ describe('viewer isolation', () => {
 
   test('in-Harbour links carry the source through harbourHref, for every viewer', () => {
     const links = (html) => [...html.matchAll(/<a [^>]*href="(\/workspace\/[^"]*)"/g)].map(m => m[1]);
-    const owner = render('running-blocked-repeat', 'owner');
+    const ownerPage = render('running-blocked-repeat', 'owner');
+    const owner = bodyOf(ownerPage);
     assert.ok(owner.includes(`href="${harbourHref('/workspace/acme/task/LIN-40', BINDING).replace(/&/g, '&amp;')}"`), 'parent link');
     assert.ok(owner.includes('href="/workspace/acme/task/LIN-51?source=linear"'), 'subtask link');
-    assert.ok(owner.includes('href="/workspace/acme/"'), 'back link');
-    assert.deepEqual(links(render('running-blocked-repeat', 'guest')), links(owner), 'a guest keeps every Harbour link');
+    // LIN-4563: the way back is the frame's, to Home by default.
+    assert.ok(ownerPage.includes('<a class="frame-back" href="/workspace/acme/" data-testid="frame-back">← Home</a>'), 'back link');
+    assert.deepEqual(links(bodyOf(render('running-blocked-repeat', 'guest'))), links(owner), 'a guest keeps every Harbour link in the body');
     assert.equal(harbourHref('/x', { source: '' }), '/x', 'empty provenance is dropped');
     assert.throws(() => renderTaskPage(model('done'), { viewer: 'stranger' }), /unknown viewer/);
   });

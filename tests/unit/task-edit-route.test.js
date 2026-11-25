@@ -75,13 +75,13 @@ function makeRouter() {
   });
 }
 
-async function call({ provider, urlKey = 'acme', issueId = ISSUE.id, bindings, source }) {
+async function call({ referer, provider, urlKey = 'acme', issueId = ISSUE.id, bindings, source }) {
   const req = {
     session: { workspaces: [], features: {} },
     workspace: { urlKey, provider, accessToken: 'tok', ...(bindings ? { bindings } : {}) },
     params: { urlKey, issueId },
     query: source ? { source } : {},
-    get: () => 'localhost',
+    get: (name) => (String(name).toLowerCase() === 'referer' ? referer : 'localhost'),
   };
   const res = {
     statusCode: 200,
@@ -96,6 +96,25 @@ async function call({ provider, urlKey = 'acme', issueId = ISSUE.id, bindings, s
 }
 
 describe('GET /workspace/:urlKey/task/:issueId/edit', () => {
+
+  // LIN-4563: the rail lights Home or Backlog by where the person came from, and the way back (and Cancel) go there. Witness:
+  // delete the route's `from: taskFromReferer(...)` line and the Backlog cases light Home.
+  test('the rail lights Backlog and the way back and Cancel go there from Backlog; Home otherwise', async () => {
+    const lit = (body) => [...body.matchAll(/data-place="([^"]+)" aria-current="true"/g)].map(m => m[1]);
+    for (const [referer, place, back, href] of [
+      ['http://localhost/workspace/acme/backlog', 'backlog', '← Backlog', '/workspace/acme/backlog'],
+      ['http://localhost/workspace/acme/project?id=p1', 'backlog', '← Backlog', '/workspace/acme/backlog'],
+      ['http://localhost/workspace/acme/', 'home', '← Home', '/workspace/acme/'],
+      ['http://localhost/workspace/other/backlog', 'home', '← Home', '/workspace/acme/'],
+      [undefined, 'home', '← Home', '/workspace/acme/'],
+    ]) {
+      const res = await call({ provider: fakeProvider(), referer });
+      assert.strictEqual(res.statusCode, 200);
+      assert.deepStrictEqual(lit(res.body), [place], `lit from ${referer}`);
+      assert.ok(res.body.includes(`data-testid="frame-back">${back}</a>`), `way back from ${referer}`);
+      assert.ok(res.body.includes(`href="${href}" data-testid="task-edit-cancel"`), `Cancel from ${referer}`);
+    }
+  });
   test('renders the edit page for a provider with in-app edit support', async () => {
     const res = await call({ provider: fakeProvider() });
     assert.strictEqual(res.statusCode, 200);

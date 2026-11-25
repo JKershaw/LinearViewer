@@ -54,6 +54,7 @@ import {
   renderStageStrip,
 } from '../lib/render-task-page.js';
 import { renderTaskTimeline } from '../lib/render-task-timeline.js';
+import { taskFromReferer } from '../lib/places.js';
 
 /** A non-empty query string value, else undefined. */
 function queryValue(value) {
@@ -181,6 +182,9 @@ export function createTaskPageRoutes({ workspaceFromUrl, getOpenRouterSource, ge
       openRouterSource: getOpenRouterSource(req),
       workspaces: req.session.workspaces,
       featureFlags: await requestFeatureFlags(req),
+      // LIN-4563: the frame's tab names the workspace, and the rail lights Home or Backlog by where the person came from.
+      workspaceName: workspace.name || 'Workspace',
+      from: taskFromReferer(req.get('referer'), workspace.urlKey),
     };
 
     // A malformed id is just a task that doesn't exist: 404 body, no detail.
