@@ -52,3 +52,8 @@ Area notes for `front-end-pages` in the registry. Format and rules: README.md.
   notice (`goneHandlerFor`, `public/task-page.js`) replaced the body and left the task's title in the h1 and the tab until
   LIN-4563 made it rename the frame's header too (`tests/e2e/task-share.spec.js` caught it). Grep the page's client for
   `innerHTML =` on its root before moving it.
+- Retiring a client feature retires everything that existed only for it, server side included: LIN-4563's in-page search
+  took with it the `search` home-rows kind (`searchRows`), every row's `data-search-text` (a full description per row), a
+  placement reason, a hide reason and a constant named for it (`HOME_SEARCH_MAX_LENGTH`, renamed `SEARCH_MAX_LENGTH` for
+  the search page that still reads it). Grep the client for the request parameters and attributes it read (`kind=`,
+  `data-*`), and the names that still say the feature, before calling the removal done.

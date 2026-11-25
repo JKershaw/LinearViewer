@@ -151,8 +151,8 @@
 
   /**
    * Whether the page is already showing the tracker as Done. Read off the task
-   * page's `<main data-status>`. A second safeguard behind `doneNow` (B1'): a
-   * missing document or no `<main>` reports false.
+   * page root's `data-status` (`[data-testid="task-page"]`). A second safeguard behind `doneNow` (B1'): a
+   * missing document or no page root reports false.
    *
    * @param {Document} [doc]
    * @returns {boolean}

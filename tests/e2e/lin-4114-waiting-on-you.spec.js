@@ -275,7 +275,6 @@ test('W9: no task is drawn twice on Home across its sections, a waiting task inc
   const repeats = await page.evaluate(() => {
     const seen = new Map();
     for (const el of document.querySelectorAll('main [data-identifier]')) {
-      if (el.closest('.home-search-results')) continue;
       const id = el.getAttribute('data-identifier');
       seen.set(id, (seen.get(id) || 0) + 1);
     }

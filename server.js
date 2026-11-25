@@ -187,7 +187,7 @@ import { createTaskDoneCache } from './lib/task-done-cache.js'
 import { dispatchGuardTaskDoneCache } from './lib/dispatch-factory.js'
 import { gatherHomeInputs, gatherHomePage, homeRowDataFor } from './lib/home-pipeline.js'
 import { renderDashboardAfterRefresh as renderRefreshedDashboard } from './lib/dashboard-refresh.js'
-import { homeRowsFor, searchTasks, HOME_ROW_KINDS, HOME_SEARCH_MAX_LENGTH } from './lib/home-rows.js'
+import { homeRowsFor, searchTasks, HOME_ROW_KINDS, SEARCH_MAX_LENGTH } from './lib/home-rows.js'
 import { renderSwimPage } from './lib/render-swim.js'
 import { renderShipPage } from './lib/render-ship.js'
 import { createCollectiveRoutes } from './routes/collective.js'
@@ -4331,7 +4331,7 @@ app.get('/workspace/:urlKey/proxy', workspaceFromUrl, async (req, res) => {
  */
 app.get('/workspace/:urlKey/search', workspaceFromUrl, async (req, res) => {
   const workspace = req.workspace;
-  const q = typeof req.query.q === 'string' ? req.query.q.slice(0, HOME_SEARCH_MAX_LENGTH).trim() : '';
+  const q = typeof req.query.q === 'string' ? req.query.q.slice(0, SEARCH_MAX_LENGTH).trim() : '';
   const featureFlags = await requestFeatureFlags(req);
   const page = {
     q,

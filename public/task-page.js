@@ -2,7 +2,7 @@
  * Task page client (LIN-3329, Subtask B of LIN-3324).
  *
  * Keeps an open task page current while the work runs: polls the stored-data
- * state endpoint (`data-state-url` on `<main>`) and repaints the header status
+ * state endpoint (`data-state-url` on the page's root, `[data-testid="task-page"]`) and repaints the header status
  * and the progress track from the HTML it returns.
  *
  * The poll loop is Live Console's (public/live-console.js): a chained
@@ -516,7 +516,7 @@ function isGuestStateUrl(stateUrl) {
 /**
  * The one place that decides what a state-poll 404 means (LIN-3447). A guest
  * page (`/t/:token`) whose link was revoked, or never issued, is gone: the
- * handler replaces <main> with the notice. An owner page gets `null`, so its
+ * handler replaces the page's root with the notice (and renames the frame's header). An owner page gets `null`, so its
  * 404 stays an ordinary poll failure (the poller only stops on a 404 when it
  * was handed an `onGone`). `init()` passes the result straight to the poller.
  */
@@ -540,8 +540,8 @@ function goneHandlerFor(stateUrl, main) {
 const GONE_PAGE_NAME = 'Link not available';
 
 /**
- * Whether an idle or failed poll paints the server-rendered ready header (`<main
- * data-ready-header>`, LIN-3448). The state endpoint is stored-data only, so
+ * Whether an idle or failed poll paints the server-rendered ready header (the page root's
+ * `data-ready-header`, LIN-3448). The state endpoint is stored-data only, so
  * it can never report "ready"; while the page is merge-ready and the poll
  * finds nothing running, the authoritative answer is the ready sentence, not
  * whatever header happens to be painted. A polled running/waiting overrides.
