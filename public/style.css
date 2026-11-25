@@ -378,15 +378,6 @@ h1 {
   font-family: var(--font-content);
 }
 
-.header-link {
-  color: inherit;
-  text-decoration: none;
-}
-
-.header-link:hover {
-  color: var(--brand-dim);
-}
-
 /* =============================================================================
    Navigation Bar
    =============================================================================
@@ -2834,9 +2825,9 @@ a.wordmark:hover {
 .source-notice a { color: inherit; }
 
 /* =============================================================================
-   Login Page (Landing Page CTA)
+   Sign-in and connect pages (lib/render-pages.js, lib/render-email-auth.js)
    =============================================================================
-   Shown at the bottom of the landing page for unauthenticated users.
+   The forms and buttons of the sign-in, picker and consent pages, in the public frame (LIN-4567).
    Primary CTA is a filled brand action (mirrors the primary button idiom); the
    GitHub CTA is a differentiated outline variant so the two never read alike.
 */
