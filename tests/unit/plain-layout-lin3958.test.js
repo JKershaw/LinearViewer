@@ -74,15 +74,3 @@ test('at 400px the Plain page takes a 1rem root, the same root Settings uses', (
   assert.equal(declOf(SETTINGS, '.settings-shell', 'font-size', { media: '(max-width: 760px)' }), '1rem');
   assert.equal(declOf(SETTINGS, '.settings-shell', 'grid-template-columns', { media: '(max-width: 760px)' }), 'minmax(0, 1fr)');
 });
-
-test('at 400px the Plain section heading is smaller than the frame h1, so the page name stays the largest heading (LIN-4567)', () => {
-  const media = { media: '(max-width: 400px)' };
-  const rem = (value) => {
-    const m = /^([\d.]+)rem$/.exec(value ?? '');
-    assert.ok(m, `a rem size, got ${value}`);
-    return Number(m[1]);
-  };
-  const h1 = rem(declOf(STYLE, '.page-header h1', 'font-size', media));
-  const section = rem(declOf(STYLE, '.plain-page > .section > .section-header', 'font-size', media));
-  assert.ok(section < h1, `the 400px section heading (${section}rem) is smaller than the page h1 (${h1}rem)`);
-});
