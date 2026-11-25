@@ -1,5 +1,5 @@
 import { test, expect } from '../fixtures/test-base.js';
-import { seedShapedWorkspace } from '../fixtures/local-harness.js';
+import { seedShapedWorkspace, localSeedId } from '../fixtures/local-harness.js';
 import { SELECTORS } from '../helpers.js';
 import { placeFor, litPlaceFor, railFor } from '../../lib/places.js';
 import { FEATURE_DEFAULTS, FEATURES, EXPERIMENTAL_VIEWS } from '../../lib/feature-defaults.js';
@@ -329,8 +329,9 @@ for (const viewer of VIEWERS) {
  * `name` null: the page's name is its content's (a Library document is named by its own heading), so the walk checks the
  * h1 is there and names the tab. `signedOutOnly`: signed in, the route sends the person to their workspace instead (the
  * previews, LIN-4564) or answers for the session (email sign-in says "You're signed in"). The landing (`/`) is the named
- * exception and is not walked: its hero's wordmark is its h1 and it draws no band (LIN-1508). The guest task page is walked
- * by tests/e2e/task-share.spec.js, since it needs a share link; its malformed-token 404 is here, the shared error page.
+ * exception and is not walked: its hero's wordmark is its h1 and it draws no band (LIN-1508). The guest task page needs
+ * a share link minted for a task its owner can read, so it has its own test below (seeded the way
+ * tests/e2e/task-share.spec.js seeds it); a malformed token's 404 is walked here, the shared error page.
  */
 const PUBLIC_PATHS = [
   { path: '/library', name: 'Library' },
@@ -435,3 +436,51 @@ for (const signedIn of [false, true]) {
     }
   });
 }
+
+// LIN-4567: the guest task page (LIN-3330; in the public frame since LIN-4563) keeps the same rules, read by its owner
+// signed in and by a fresh signed-out context. Seeded as tests/e2e/task-share.spec.js seeds it: a fresh workspace whose
+// first edge makes this session's account the owner, so the guest read has an owner credential.
+test('the guest task page keeps the public frame rules, signed out and signed in', async ({ page, browser, localWorkerUrlKey }) => {
+  const urlKey = localWorkerUrlKey;
+  await page.goto(`/test/clear-task-shares?urlKey=${urlKey}`);
+  const id = (raw) => localSeedId(urlKey, raw);
+  const seeded = await page.request.post('/test/set-local-session', {
+    data: {
+      urlKey, append: true, runnerKey: true,
+      projects: [{ id: id('walk-share-proj'), name: 'Walk project', content: 'A project', sortOrder: 1 }],
+      issues: [{
+        id: id('walk-share-task'), identifier: 'LOCAL-WALK1', title: 'A walked task', description: 'Seeded for the walk',
+        projectId: id('walk-share-proj'), sortOrder: 1, state: { name: 'In Progress', type: 'started' },
+        url: `/workspace/${urlKey}/issue/${id('walk-share-task')}`,
+      }],
+    },
+  });
+  expect(seeded.ok(), `local seed failed: ${seeded.status()}`).toBe(true);
+  await page.goto(`/workspace/${urlKey}/settings`);
+  const signedInFooter = (await page.locator(SELECTORS.nav.footer).textContent()).replace(/\s+/g, ' ').trim();
+  const minted = await page.request.post(`/workspace/${urlKey}/api/task/LOCAL-WALK1/share`, { data: { source: 'local' } });
+  expect(minted.status(), `mint failed: ${await minted.text()}`).toBe(201);
+  const { path } = await minted.json();
+
+  const guestCtx = await browser.newContext();
+  try {
+    for (const [who, tab, home] of [['signed in', page, `/workspace/${urlKey}/`], ['signed out', await guestCtx.newPage(), null]]) {
+      for (const width of WIDTHS) {
+        await tab.setViewportSize({ width, height: 900 });
+        expect((await tab.goto(path)).status(), `${who}: the guest page renders`).toBe(200);
+        const f = await readPublicFrame(tab);
+        expect(f.band && !f.rail, `${who}: the public band, no rail`).toBe(true);
+        expect(f.h1Count).toBe(1);
+        expect(f.h1Text).toBe('A walked task');
+        expect(f.title).toBe('A walked task · Harbour');
+        expect(f.footer, `${who}: the footer is the signed-in pages' footer`).toBe(signedInFooter);
+        expect(f.scrollWidth, `${who} at ${width}: no sideways scroll`).toBeLessThanOrEqual(f.innerWidth);
+        expect(f.brandHref).toBe(home || '/');
+        expect(f.backHref).toBe(home || '/');
+        expect(home ? f.openWorkspace === home : f.signIn, `${who}: the band's action`).toBe(true);
+      }
+    }
+  } finally {
+    await guestCtx.close();
+  }
+});
