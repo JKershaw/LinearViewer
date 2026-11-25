@@ -38,7 +38,6 @@ import { isHiddenState } from '../lib/providers/state-map.js';
 import { renderTaskQuestion } from '../lib/render-task-page.js';
 import { openQuestionsForTask, titlesFromIssues } from '../lib/open-questions.js';
 import { personAccountIdOf } from './task-records.js';
-import { readableWords, peopleNames } from '../lib/render-task-records.js';
 import { requestFeatureFlags } from '../lib/run-controls.js';
 import { resolveIssueBinding, isValidIssueId } from '../lib/workspace.js';
 import { jsonError } from '../lib/errors.js';
@@ -84,7 +83,7 @@ function sessionsOfState(model, taskState, runWords = null) {
  * @param {Function} [deps.now] - () → Date
  * @returns {Router}
  */
-export function createTaskPageRoutes({ workspaceFromUrl, getOpenRouterSource, getDeployInfo, loader, workspaceOwnerCheck = null, runProposalsStore = null, taskFacts = null, refreshTaskFacts = null, taskModeStore = null, accountStore = null, timelineFragment = null, recordsStore = null, dispatchStore = null, listPeople = async () => [], now = () => new Date() }) {
+export function createTaskPageRoutes({ workspaceFromUrl, getOpenRouterSource, getDeployInfo, loader, workspaceOwnerCheck = null, runProposalsStore = null, taskFacts = null, refreshTaskFacts = null, taskModeStore = null, accountStore = null, timelineFragment = null, recordsStore = null, dispatchStore = null, listPeople = async () => [], questionTaskTitles = null, now = () => new Date() }) {
   if (!loader) throw new Error('task-page routes: loader is required');
   const router = Router();
 
@@ -100,6 +99,8 @@ export function createTaskPageRoutes({ workspaceFromUrl, getOpenRouterSource, ge
   /**
    * LIN-4532 (P2b): the open question records on this task that the signed-in owner is asked, for the question section. Read for
    * the owner's canonical account; a failed read costs only these cards. [] when the stores are not wired.
+   * LIN-4555: the reader reads the asker's words (lib/open-questions.js, finding-150d1329), as it does for every surface, so this page
+   * keeps no reading of its own (LIN-4554's readableRows); it hands the reader the request's people and the bounded title lookup.
    */
   async function questionRecordsOf(req, workspace, identifier, title = null) {
     if (!recordsStore || !dispatchStore || !identifier) return [];
@@ -107,24 +108,13 @@ export function createTaskPageRoutes({ workspaceFromUrl, getOpenRouterSource, ge
     if (!accountId) return [];
     // LIN-4549: the page's own task is the one these questions are on, so its title names them (lib/open-questions.js titlesOf).
     const titlesOf = titlesFromIssues([{ identifier, title }]);
-    const rows = await openQuestionsForTask({ recordsStore, dispatchStore, urlKey: workspace.urlKey, accountId, ticket: identifier, titlesOf })
-      .catch(() => []);
-    return readableRows(req, workspace.urlKey, rows);
-  }
-
-  /**
-   * LIN-4554: the card's words as the page reads a record's (readableWords): an id or stamp quoted in the asker's words reads as a
-   * name, the ticket or words, so the page's text carries none. The first load and the poll both read their rows here, so they
-   * agree. The options are left as written: each is the answer the card sends. The people are read only when the words quote one.
-   */
-  async function readableRows(req, urlKey, rows) {
-    if (!rows.length) return rows;
-    const said = (row) => [row.short, row.asks, row.ifUnanswered].filter((x) => typeof x === 'string');
-    const quotesPerson = rows.some((row) => said(row).some((x) => x.includes('person:')));
-    const names = peopleNames(quotesPerson ? await peopleOf(req, urlKey) : []);
-    const tickets = new Map(rows.filter((row) => row.taskId && row.ticket).map((row) => [row.taskId, row.ticket]));
-    const read = (x) => (typeof x === 'string' ? readableWords(x, { people: names, tickets, now: now() }) : x);
-    return rows.map((row) => ({ ...row, short: read(row.short), asks: read(row.asks), ifUnanswered: read(row.ifUnanswered) }));
+    // LIN-4555 (finding-6d2b47e0): when the page has no title of its own (its tracker read failed), the same bounded lookup the other
+    // card surfaces ask (lib/question-task-titles.js); asked only for a ticket still untitled, so a titled page reads nothing more.
+    const lookupTitles = questionTaskTitles ? (tickets) => questionTaskTitles.titlesFor(workspace, tickets) : null;
+    return openQuestionsForTask({
+      recordsStore, dispatchStore, urlKey: workspace.urlKey, accountId, ticket: identifier, titlesOf, lookupTitles, now,
+      listPeople: () => peopleOf(req, workspace.urlKey),
+    }).catch(() => []);
   }
 
   // LIN-4070: the private handlers' only route to the holder. An incomplete read starts the background refresh (the

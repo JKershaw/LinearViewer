@@ -1544,7 +1544,11 @@ describe('render-session: page order (LIN-3251, LIN-2948 §4)', () => {
     };
   }
 
-  test('heading → header strip → pinned card → paragraph → evidence → steps → close-out', () => {
+  // LIN-4555 (finding-9eafd4d6): a question the run asks the person leads the page, above the header strip. LIN-3251 put the strip
+  // first; at 390px its six-row overview pushed the card's first option below the first screen, and answering is the one thing the
+  // page asks of the person while the run waits. Before, this pinned "header strip before pinned card"; now it pins the question
+  // first and the rest of LIN-3251's order (strip, paragraph, evidence, steps, close-out) unchanged.
+  test('heading → pinned card → header strip → paragraph → evidence → steps → close-out', () => {
     const html = renderSessionPage({
       session: fixtureSession(), urlKey: 'ws-a',
       questionRecords: [orderDecisionRow()],
@@ -1565,12 +1569,21 @@ describe('render-session: page order (LIN-3251, LIN-2948 §4)', () => {
     const steps = idx('sess-steps');
     const closeOut = idx('data-testid="run-evidence-closeout"');
 
-    assert.ok(heading < header, 'heading before header strip');
-    assert.ok(header < pinned, 'header strip before pinned card');
-    assert.ok(pinned < paragraph, 'pinned card before paragraph');
+    assert.ok(heading < pinned, 'heading before pinned card');
+    assert.ok(pinned < header, 'pinned card before header strip: the question the run asks leads');
+    assert.ok(header < paragraph, 'header strip before paragraph');
     assert.ok(paragraph < evidence, 'paragraph before evidence');
     assert.ok(evidence < steps, 'evidence before steps');
     assert.ok(steps < closeOut, 'steps before close-out box');
+  });
+
+  // LIN-4555: with no question, nothing moves: the header strip follows the heading, as LIN-3251 composed it.
+  test('with no open question the header strip directly follows the heading', () => {
+    const html = renderSessionPage({ session: fixtureSession(), urlKey: 'ws-a', questionRecords: [], runEvidence: runEvidenceFixture() });
+    const heading = html.indexOf('data-testid="session-title"');
+    assert.ok(heading > -1, 'the heading renders');
+    const firstSection = /<section class="([^"]*)"/.exec(html.slice(heading));
+    assert.match(firstSection?.[1] ?? '', /\bsess-run-header\b/, 'the first section after the heading is the header strip');
   });
 
   // LIN-4553: the pinned cards sit in a section of their own, as the task page's do (lib/render-task-page.js renderTaskQuestion), so

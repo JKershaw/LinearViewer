@@ -2169,9 +2169,11 @@ describe('flight-companion.js — LIN-4538: the open questions the companion sho
     const parsed = m.parsePendingResult(questionsResult([question()]));
     assert.strictEqual(parsed.ok, true);
     assert.deepStrictEqual(parsed.questions, [{
-      questionId: 'q-1', issueIdentifier: 'LIN-100', ticket: 'LIN-100', title: null, asks: 'Should we ship it?', short: null, options: ['Ship it', 'Hold'], recommended: 'Ship it',
+      questionId: 'q-1', issueIdentifier: 'LIN-100', ticket: 'LIN-100', title: null, asks: 'Should we ship it?', short: null, options: ['Ship it', 'Hold'], optionWords: null, recommended: 'Ship it',
       ifUnanswered: null, state: 'resumable', interactive: true,
     }]);
+    // LIN-4555: the tool row's option words (lib/chat-tools.js `optionWords`) are the card's labels; the options stay the values sent.
+    assert.deepStrictEqual(m.parsePendingResult(questionsResult([{ ...question(), optionWords: ['Ship it now', 'Hold'] }])).questions[0].optionWords, ['Ship it now', 'Hold']);
     // LIN-4549: the chat row's issueTitle becomes the card's title (its task line).
     assert.strictEqual(m.parsePendingResult(questionsResult([{ ...question(), issueTitle: 'Ship the thing' }])).questions[0].title, 'Ship the thing');
     assert.deepStrictEqual(m.parsePendingResult(JSON.stringify({ count: 0, truncated: false, questions: [] })), { ok: true, questions: [] });

@@ -105,6 +105,17 @@ describe('the lead derived for an older question: odd inputs', () => {
     assert.equal(long[kept.length], ' ', 'the cut falls at a word boundary');
   });
 
+  // LIN-4555 (the walk): an older question's derived lead cut at the last word that fit read "…three later pieces can do, so I
+  // would…", ending mid-thought. Over the cap, the cut now falls at the last clause boundary (a comma, semicolon, colon or dash)
+  // when that keeps at least half the room, so the lead ends on a whole clause; with none, at the last word, as before. None of the
+  // nine real asks reaches the cut (tests/fixtures/lin-4550-real-asks.json), so no real lead changes.
+  test('over the cap, the cut falls at the last clause boundary that keeps half the room, so the lead ends on a whole clause', () => {
+    const asks = "The task asks for the rulings page to be rebuilt, but the plan and the code disagree about where the card's styling should live, and the choice changes what three later pieces can do, so I would rather ask than guess.";
+    assert.equal(deriveQuestionShort(asks), "The task asks for the rulings page to be rebuilt, but the plan and the code disagree about where the card's styling should live, and the choice changes what three later pieces can do…");
+    const quoted = 'Before I change how Home keeps a card across a repaint, I need to know which of the three current behaviours is the intended one, because the plan says "keep today\'s union" and the three copies disagree about it.';
+    assert.equal(deriveQuestionShort(quoted), 'Before I change how Home keeps a card across a repaint, I need to know which of the three current behaviours is the intended one…');
+  });
+
   test('a long question with an aside drops the aside before it cuts', () => {
     const aside = `(${'a long aside that explains the background in far more words than a lead should carry, '.repeat(3).trim()})`;
     const asks = `Background. Should we ship the flag now ${aside}, or wait for the next release?`;

@@ -152,6 +152,24 @@ test('renderRunTranscripts is unchanged for feedback with no decision-lifecycle 
   assert.match(sandbox.__appended[0].html, /PR #1/);
 });
 
+// LIN-4555 (the walk): a transcript bubble printed its entry's raw ISO stamp (`2026-11-24T22:55:27.978Z`) beside the message once a
+// step was opened on the run page, one of the six surfaces where nothing a person reads is an ISO time. It reads as the rest of the
+// product's times do: relative words, then the exact local time (the Runs card's "updated just now · 10:49 PM GMT").
+test('a bubble\'s time reads in words, never as the raw ISO stamp (LIN-4555)', () => {
+  const sandbox = makeSandbox([thread([{ message: 'opened the pull request', timestamp: '2026-08-01T00:00:00.000Z' }])]);
+  sandbox.window.relativeTime = (iso) => (iso === '2026-08-01T00:00:00.000Z' ? '5m ago' : '');
+  sandbox.window.formatLocalTime = (iso, opts) => (iso === '2026-08-01T00:00:00.000Z' && opts?.zone ? '10:49 PM GMT' : null);
+  sandbox.renderRunTranscripts();
+  assert.equal(sandbox.__appended.length, 1);
+  assert.equal(sandbox.__appended[0].time, '5m ago · 10:49 PM GMT');
+});
+
+test('with neither time helper loaded a bubble shows no time rather than the raw stamp (LIN-4555)', () => {
+  const sandbox = makeSandbox([thread([{ message: 'opened the pull request', timestamp: '2026-08-01T00:00:00.000Z' }])]);
+  sandbox.renderRunTranscripts();
+  assert.equal(sandbox.__appended[0].time, undefined);
+});
+
 // ── LIN-4559: each child agent is its own collapsible thread under the run (the drawn page) ──────────────────────
 // The server half and the stylesheet are in tests/unit/lin-4559-run-page-agent-threads.test.js. Here the page as the
 // server renders it is drawn in the client world: the real common.js and chat.js, then session.js's toggle and
@@ -276,6 +294,18 @@ describe('LIN-4559 run page: each child agent is its own collapsible thread unde
     const text = textOf(threadEntries(threads(tx)[0])[0]);
     assert.ok(!text.includes(FIXTURE_SECRETS.githubPat));
     assert.ok(text.includes(MASK));
+  });
+
+  // LIN-4555 (the walk): the child bubble is built by the same appendMessage call shape as the run's own, and must read its
+  // time as the product does (relative words, then the exact local time), never the raw ISO stamp the entry carries.
+  test('a child bubble\'s time reads in words, never as the raw ISO stamp (LIN-4555)', () => {
+    const { tx } = drawn(loopWith([own('Handed off.', 1), child('a1b2c3', 'Searching.', 2)]));
+    const entry = threadEntries(threads(tx)[0])[0];
+    const time = entry.querySelector('.chat-msg__time');
+    assert.ok(time, 'the child bubble shows a time');
+    assert.ok(time.textContent.length > 0);
+    assert.doesNotMatch(time.textContent, /\d{4}-\d{2}-\d{2}T/);
+    assert.doesNotMatch(entry.innerHTML, /\d{4}-\d{2}-\d{2}T\d{2}:/);
   });
 
   test('a child bubble has no in-progress pill (nothing to settle); the run\'s own keep theirs as before', () => {

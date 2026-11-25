@@ -178,6 +178,10 @@
   .sess-page.task-page > .task-share { grid-area: share; }
 }
 
+/* LIN-4555: a member's or a reader's one "next" line (lib/render-task-page.js renderNextLine) keeps the sections' rhythm below
+   it (.sess-section, session.css): as a bare <p> it had no margin, and the Records heading touched it. */
+.task-next { margin-bottom: var(--space-5); }
+
 /* LIN-3975: a step still ahead is one quiet line, not a dashed box. */
 .task-stage-ahead { list-style: none; padding: var(--space-1) 0; font-size: var(--font-size-base); color: var(--muted); }
 .task-stage-ahead .task-stage-name { color: var(--text); }

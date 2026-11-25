@@ -555,6 +555,8 @@ function parsePendingResult(resultString) {
         // other host; without it the card leads with the ask's first line.
         short: typeof q.short === 'string' ? q.short : null,
         options: q.options,
+        // LIN-4555: each option's words as the reader gives them, for the card's label (the option itself is still what is sent).
+        optionWords: Array.isArray(q.optionWords) ? q.optionWords : null,
         recommended: typeof q.recommended === 'string' ? q.recommended : null,
         ifUnanswered: null,
         state: typeof q.state === 'string' ? q.state : null,
