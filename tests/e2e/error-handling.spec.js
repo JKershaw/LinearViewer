@@ -255,8 +255,9 @@ test.describe('OAuth Error Handling', () => {
     await page.goto('/auth/callback?error=access_denied');
 
     // Should show error page with message
+    // LIN-4567: the page sits in the public frame; its subject is the page's one h1.
     await expect(page.locator('.error-container')).toBeVisible();
-    await expect(page.locator('.error-title')).toContainText('Authorization Cancelled');
+    await expect(page.locator(SELECTORS.nav.heading)).toContainText('Authorization Cancelled');
     await expect(page.locator('.error-message')).toContainText('cancelled');
   });
 
@@ -265,6 +266,6 @@ test.describe('OAuth Error Handling', () => {
     await page.goto('/auth/callback?code=test&state=invalid-state');
 
     await expect(page.locator('.error-container')).toBeVisible();
-    await expect(page.locator('.error-title')).toContainText('Session Expired');
+    await expect(page.locator(SELECTORS.nav.heading)).toContainText('Session Expired');
   });
 });

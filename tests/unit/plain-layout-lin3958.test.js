@@ -38,8 +38,11 @@ test('the Plain root sets no face of its own, so /styleguide labels keep their f
   assert.equal(appliedDecls(STYLE, '.plain-page').has('font-family'), false);
 });
 
-test('the title is an explicit 1.5rem, the step above the heading', () => {
-  assert.equal(declOf(STYLE, '.plain-title', 'font-size'), '1.5rem');
+// LIN-4567: the Plain title (an h2 under a "Harbour" brand h1) went with the brand header: a Plain page's name is the public
+// frame's one h1, at the size every page's h1 shares, so no Plain rule sets a title any more.
+test('no Plain rule styles a title of its own (the frame\'s h1 names the page)', () => {
+  const selectors = STYLE.flatMap((sheet) => sheet.rules).flatMap((rule) => rule.selectors);
+  assert.deepEqual(selectors.filter((s) => /\.plain-title\b/.test(s)), []);
 });
 
 test('the heading steps up from the prose: --font-size-lg, weight 600, body colour, direct children of .plain-page only', () => {

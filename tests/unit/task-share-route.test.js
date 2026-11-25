@@ -108,8 +108,9 @@ async function get(base, path) {
 
 /** The one Harbour error page, with nothing of the token or refusal kind in it. */
 function assertGuestNotFoundPage(text, token = TOKEN) {
-  assert.match(text, /<h1[^>]*>Harbour<\/h1>/);
-  assert.match(text, /<h2 class="error-title">Not Found<\/h2>/);
+  // LIN-4567: the error page sits in the public frame; its subject is the page's one h1.
+  assert.match(text, /<h1>Not Found<\/h1>/);
+  assert.equal((text.match(/<h1\b/g) || []).length, 1);
   assert.match(text, /class="login-button">Go back<\/a>/);
   assert.ok(!text.includes(token), 'the 404 never echoes the token');
 }

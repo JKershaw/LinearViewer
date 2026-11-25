@@ -3546,7 +3546,7 @@ describe('GET /workspace/:urlKey/observation — async try/catch (LIN-2706 §B.1
 
     assert.equal(res.statusCode, 500);
     assert.match(res.sentBody, /Failed to render the Observation page/);
-    assert.match(res.sentBody, /<h1[^>]*>Harbour<\/h1>/, 'the one Harbour error page');
+    assert.match(res.sentBody, /data-testid="frame-public-band"/, 'the one Harbour error page, in the public frame');
   });
 });
 

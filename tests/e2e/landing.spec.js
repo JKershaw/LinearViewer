@@ -1,4 +1,5 @@
 import { test, expect } from '@playwright/test';
+import { SELECTORS } from '../helpers.js';
 
 // LIN-980 (UI audit G): the unauthenticated home page is a bespoke Harbour
 // showcase — a Harbour-focused top area, fake-data glimpses of real surfaces
@@ -223,14 +224,15 @@ test.describe('Landing Page (bespoke showcase)', () => {
 });
 
 // LIN-3345: the footer's Library link reaches the Library from every
-// footer-bearing page.
+// footer-bearing page. LIN-4567: /templates sits in the public frame, whose footer (the one every page shares) names it
+// "Library"; the landing, the named exception, keeps its own footer until the old one goes (LIN-4568).
 test.describe('Footer Library link (LIN-3345)', () => {
-  for (const path of ['/', '/templates']) {
+  for (const [path, selector, text] of [['/', 'a.footer-legal[href="/library"]', 'library'], ['/templates', SELECTORS.nav.footerLink('library'), 'Library']]) {
     test(`from ${path} the footer library link opens /library`, async ({ page }) => {
       await page.goto(path);
-      const link = page.locator('a.footer-legal[href="/library"]');
+      const link = page.locator(selector);
       await expect(link).toBeVisible();
-      await expect(link).toHaveText('library');
+      await expect(link).toHaveText(text);
       await link.click();
       await expect(page).toHaveURL(/\/library$/);
       await expect(page.locator('[data-testid="library-search-input"]')).toBeVisible();

@@ -143,10 +143,12 @@ describe('privacy page', () => {
   });
 
   test('keeps header, wrapper and footer behaviour', () => {
-    // LIN-3950: the title is the Plain layout's one h2 and the wrapper is its main element.
-    assert.match(html, /<h2 class="plain-title">Privacy Policy<\/h2>/);
-    assert.match(html, /<main class="plain-page plain-column">/);
-    assert.match(html, /footer-current[^>]*>\s*privacy/);
+    // LIN-4567: the page sits in the public frame: its name is the one h1 and the tab title, the Plain column is the
+    // body, and the footer is the one every page shares (it marks no page).
+    assert.match(html, /<h1>Privacy Policy<\/h1>/);
+    assert.match(html, /<title>Privacy Policy · Harbour<\/title>/);
+    assert.match(html, /<div class="plain-page plain-column">/);
+    assert.match(html, /data-testid="frame-footer-privacy"/);
   });
 });
 

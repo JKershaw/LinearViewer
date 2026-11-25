@@ -223,7 +223,7 @@ describe('one HTML error page (LIN-3466)', () => {
   test('renderServiceUnavailablePage is renderErrorPage with the 503 copy', () => {
     const html = renderServiceUnavailablePage();
     assert.strictEqual(html, renderErrorPage('Service Unavailable', 'Service temporarily unavailable. Please try again later.'));
-    assert.match(html, /<h2 class="error-title">Service Unavailable<\/h2>/);
-    assert.match(html, /<h1[^>]*>Harbour<\/h1>/);
+    assert.match(html, /<h1>Service Unavailable<\/h1>/);
+    assert.match(html, /<title>Service Unavailable · Harbour<\/title>/);
   });
 });

@@ -16,7 +16,7 @@ import { AREAS } from '../../lib/settings-areas.js';
  *   and returns focus to ☰; nothing in the rail or band is smaller than on desktop.
  *
  * The page list is generated from the registry (lib/places.js) and limited to the pages already on the frame. Later
- * pieces only widen FRAMED (and add PUBLIC_PATHS, piece 6). The workspace is the shaped seed (tests/fixtures/
+ * pieces only widen FRAMED; piece 6 (LIN-4567) adds PUBLIC_PATHS, walked signed out and signed in (the last describe). The workspace is the shaped seed (tests/fixtures/
  * local-harness.js shapedLocalSeed) at 300 tasks: the walk checks the frame, which does not depend on the count, and a
  * 3,000-task render beside the timing-sensitive specs flakes them (tests/perf/lin-4024-home-shape.spec.js says why).
  * The 3,000-task search budget is tests/perf/lin-4562-search-shape.spec.js.
@@ -315,5 +315,123 @@ for (const viewer of VIEWERS) {
       await expect(page).toHaveURL(new RegExp(`/workspace/${urlKey}/#waiting-on-you$`));
       await expect(page.locator('#waiting-on-you')).toBeVisible();
     });
+  });
+}
+
+/**
+ * LIN-4567 (LIN-4342 piece 6): the public and signed-out pages, in the public frame (no rail). Each is walked signed out
+ * and signed in, at 1280 and 390: one h1, its name; the tab title `<Page> · Harbour`; the h1's left edge and size the same
+ * on every public page; the footer's text identical to the signed-in pages'; no sideways scroll at 390; the first Tab stop
+ * is the skip link and it lands in <main>; and the band: signed out, the wordmark and the way back lead to `/` and Sign in
+ * is offered; signed in, they lead to the viewer's Home and "Open your workspace" does. A page with a way back of its own
+ * (a Library search or document, back to the Library) names it in `back`.
+ *
+ * `name` null: the page's name is its content's (a Library document is named by its own heading), so the walk checks the
+ * h1 is there and names the tab. `signedOutOnly`: signed in, the route sends the person to their workspace instead (the
+ * previews, LIN-4564) or answers for the session (email sign-in says "You're signed in"). The landing (`/`) is the named
+ * exception and is not walked: its hero's wordmark is its h1 and it draws no band (LIN-1508). The guest task page is walked
+ * by tests/e2e/task-share.spec.js, since it needs a share link; its malformed-token 404 is here, the shared error page.
+ */
+const PUBLIC_PATHS = [
+  { path: '/library', name: 'Library' },
+  { path: '/library?q=review+loops', name: 'Library search', back: '/library' },
+  { path: '/library/review-loops', name: null, back: '/library' },
+  { path: '/templates', name: 'Templates' },
+  { path: '/privacy', name: 'Privacy Policy' },
+  { path: '/terms', name: 'Terms of Service' },
+  { path: '/getting-started', name: 'Harbour: onboarding for coding agents' },
+  { path: '/kpis', name: 'Harbour in numbers' },
+  { path: '/styleguide', name: 'Style Guide' },
+  { path: '/t/not-a-token', name: 'Not Found', status: 404 },
+  { path: '/auth/github?mode=new', name: 'GitHub sign-in is not set up', status: 503 },
+  { path: '/auth/email', name: 'Sign in with email', signedOutOnly: true },
+  { path: '/swipe', name: 'Swipe', back: '/', signedOutOnly: true, previewSignIn: true },
+  { path: '/swim', name: 'Swim', back: '/', signedOutOnly: true, previewSignIn: true },
+];
+
+/** Reads the public frame's rules off the page in one pass. */
+async function readPublicFrame(page) {
+  return page.evaluate(() => {
+    const h1s = [...document.querySelectorAll('h1')];
+    const rect = h1s[0]?.getBoundingClientRect();
+    const band = document.querySelector('[data-testid="frame-public-band"]');
+    return {
+      h1Count: h1s.length,
+      h1Text: h1s[0]?.textContent.trim() || null,
+      h1Left: rect ? Math.round(rect.left) : null,
+      h1Size: h1s[0] ? getComputedStyle(h1s[0]).fontSize : null,
+      title: document.title,
+      rail: !!document.querySelector('[data-testid="frame-rail"]'),
+      band: !!band,
+      brandHref: band?.querySelector('[data-testid="rail-brand"]')?.getAttribute('href') ?? null,
+      backHref: band?.querySelector('[data-testid="frame-back"]')?.getAttribute('href') ?? null,
+      signIn: !!band?.querySelector('[data-testid="frame-sign-in"]'),
+      previewSignIn: !!band?.querySelector('[data-testid="nav-login-linear"]'),
+      openWorkspace: band?.querySelector('[data-testid="frame-open-workspace"]')?.getAttribute('href') ?? null,
+      footer: document.querySelector('[data-testid="frame-footer"]')?.textContent.replace(/\s+/g, ' ').trim(),
+      scrollWidth: document.documentElement.scrollWidth,
+      innerWidth: window.innerWidth,
+    };
+  });
+}
+
+for (const signedIn of [false, true]) {
+  test.describe(`the public frame rules, signed ${signedIn ? 'in' : 'out'}`, () => {
+    let home = null;
+    let signedInFooter;
+
+    test.beforeEach(async ({ page, localWorkerUrlKey }) => {
+      // The signed-in pages' footer, the one every public page must match: read off a framed workspace page.
+      const { urlKey } = await seedShapedWorkspace(page, { urlKey: localWorkerUrlKey, tasks: 30, projects: 3, questions: 0 });
+      await page.goto(`/workspace/${urlKey}/settings`);
+      signedInFooter = (await page.locator(SELECTORS.nav.footer).textContent()).replace(/\s+/g, ' ').trim();
+      if (signedIn) home = `/workspace/${urlKey}/`;
+      else await page.context().clearCookies();
+    });
+
+    for (const width of WIDTHS) {
+      test(`at ${width}px: every public page keeps the rules`, async ({ page }) => {
+        await page.setViewportSize({ width, height: 900 });
+        const edges = new Set();
+        const sizes = new Set();
+        for (const entry of PUBLIC_PATHS.filter(e => !(signedIn && e.signedOutOnly))) {
+          const response = await page.goto(entry.path);
+          expect(response.status(), `${entry.path}: the page renders`).toBe(entry.status || 200);
+          await page.waitForLoadState('networkidle');
+          const f = await readPublicFrame(page);
+
+          expect(f.band && !f.rail, `${entry.path}: the public band, no rail`).toBe(true);
+          expect(f.h1Count, `${entry.path}: one h1`).toBe(1);
+          if (entry.name) expect(f.h1Text, `${entry.path}: the h1 is the page's name, not "Harbour"`).toBe(entry.name);
+          expect(f.h1Text).not.toBe('Harbour');
+          // The tab starts `<Page> · Harbour` (Swipe's preview adds the card on show after it, LIN-4564).
+          expect(f.title.startsWith(`${f.h1Text} · Harbour`), `${entry.path}: the tab "${f.title}" names the page`).toBe(true);
+          expect(f.footer, `${entry.path}: the footer is the signed-in pages' footer`).toBe(signedInFooter);
+          expect(f.scrollWidth, `${entry.path}: no sideways scroll`).toBeLessThanOrEqual(f.innerWidth);
+          edges.add(f.h1Left);
+          sizes.add(f.h1Size);
+
+          if (signedIn) {
+            expect(f.brandHref, `${entry.path}: signed in, the wordmark leads to the viewer's Home`).toBe(home);
+            expect(f.openWorkspace, `${entry.path}: signed in, "Open your workspace"`).toBe(home);
+            expect(f.signIn).toBe(false);
+            expect(f.backHref, `${entry.path}: signed in, the way back`).toBe(entry.back || home);
+          } else {
+            expect(f.brandHref, `${entry.path}: signed out, the wordmark leads to /`).toBe('/');
+            expect(f.backHref, `${entry.path}: signed out, the way back`).toBe(entry.back || '/');
+            expect(entry.previewSignIn ? f.previewSignIn : f.signIn, `${entry.path}: signed out, a way to sign in`).toBe(true);
+            expect(f.openWorkspace).toBe(null);
+          }
+
+          // The first Tab stop is the skip link, and it lands in <main>.
+          await page.keyboard.press('Tab');
+          expect((await focused(page)).testid, `${entry.path}: the first Tab stop is the skip link`).toBe('frame-skip');
+          await page.keyboard.press('Enter');
+          await expect.poll(async () => (await focused(page)).id).toBe('main');
+        }
+        expect(edges.size, `one left edge: ${[...edges]}`).toBe(1);
+        expect(sizes.size, `one heading size: ${[...sizes]}`).toBe(1);
+      });
+    }
   });
 }

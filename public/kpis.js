@@ -13,7 +13,7 @@
  * object ({ hidden }) rather than a number, and its text row is already in the
  * page, so this script draws only what is a number: it tells them apart by
  * type, never by reading any text. The words for a hidden leaf in a table come
- * from the page (data-hidden-text on <main>), not from this file.
+ * from the page (data-hidden-text on .kpis-content, inside the frame's <main>), not from this file.
  */
 (function () {
   'use strict';
@@ -37,7 +37,7 @@
 
   let hiddenText = {};
   try {
-    hiddenText = JSON.parse(document.querySelector('main').dataset.hiddenText || '{}');
+    hiddenText = JSON.parse(document.querySelector('.kpis-content').dataset.hiddenText || '{}');
   } catch (err) {
     hiddenText = {};
   }

@@ -125,7 +125,7 @@ describe('POST /workspace/:urlKey/remove eviction (LIN-1507, witness D(i))', () 
 
     assert.deepEqual(evicted, []);
     assert.equal(res.statusCode, 400);
-    assert.match(res.sentBody, /<h1[^>]*>Harbour<\/h1>[\s\S]*Invalid workspace ID/);
+    assert.match(res.sentBody, /<h1>Bad Request<\/h1>[\s\S]*Invalid workspace ID/);
   });
 
   test('removing an unknown workspace 404s and evicts nothing', async () => {
@@ -142,7 +142,7 @@ describe('POST /workspace/:urlKey/remove eviction (LIN-1507, witness D(i))', () 
 
     assert.deepEqual(evicted, []);
     assert.equal(res.statusCode, 404);
-    assert.match(res.sentBody, /<h1[^>]*>Harbour<\/h1>[\s\S]*Workspace not found/);
+    assert.match(res.sentBody, /<h1>Not Found<\/h1>[\s\S]*Workspace not found/);
   });
 });
 

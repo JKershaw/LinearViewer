@@ -16,8 +16,8 @@
  */
 import { Router } from 'express';
 import { Marked } from 'marked';
-import { renderPage } from '../lib/components/page.js';
-import { renderPageFooter } from '../lib/components/footer.js';
+import { renderPublicFrame } from '../lib/components/frame.js';
+import { takeFirstH1 } from '../lib/render-library.js';
 import { descriptionTag } from '../lib/components/head-meta.js';
 import { signInDoors } from '../lib/components/landing-hero.js';
 import { buildAgentOnboarding } from '../lib/prompts/agent-onboarding.js';
@@ -101,21 +101,22 @@ export function createGettingStartedRouter({ flags = deploymentFlags } = {}) {
   });
 
   router.get('/getting-started', (req, res) => {
-    const body = renderGuideHtml(guideFor(req, flags));
-    const html = renderPage({
-      title: 'Getting started with Harbour',
+    // LIN-4567: the page sits in the public frame. The guide's own H1 names it (the frame's one h1 and the tab title);
+    // the markdown form keeps the H1, since an agent reads that file whole.
+    const guide = takeFirstH1(renderGuideHtml(guideFor(req, flags)));
+    const html = renderPublicFrame({
+      title: guide.text || 'Getting started',
       stylesheets: ['/style.css', '/library.css'],
       bodyClass: 'is-landing',
       followSystemTheme: true,
       headExtra: descriptionTag('Onboarding guide for coding agents: how to set up Harbour with a person.'),
-      content: `<main class="library library--doc" data-testid="getting-started">
+      content: `<div class="library library--doc" data-testid="getting-started">
     <article class="library-doc">
       <div class="library-doc__body">
-        ${body}
+        ${guide.html}
       </div>
     </article>
-  </main>
-  ${renderPageFooter({ isLanding: true, currentPage: '/getting-started' })}`,
+  </div>`,
     });
     res.set('X-Content-Type-Options', 'nosniff');
     res.set('Cache-Control', 'no-store');

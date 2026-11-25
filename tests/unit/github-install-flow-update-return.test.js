@@ -97,8 +97,9 @@ const UPDATE_RETURNS = {
   'installation_id+setup_action=update': { installation_id: INSTALLATION_ID, setup_action: 'update' },
 };
 
+// LIN-4567: an error page's title is the public frame's one h1.
 function errorTitle(res) {
-  return (res.body || '').match(/<h2 class="error-title">([^<]*)<\/h2>/)?.[1] ?? null;
+  return (res.body || '').match(/<h1>([^<]*)<\/h1>/)?.[1] ?? null;
 }
 
 async function get(router, path, query, session) {

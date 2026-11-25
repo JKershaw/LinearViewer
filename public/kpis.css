@@ -1,22 +1,15 @@
 /* Public /kpis page (rebuilt in LIN-3703): three sections, one column.
    Every colour is a theme token, so dark mode needs no rules of its own. */
 
+/* LIN-4567: the page sits in the public frame, which owns the left edge, the h1 ("Harbour in numbers") and the story
+   (its subtitle); the column keeps its measure under it. */
 .kpis-content {
   max-width: 900px;
-  margin: 0 auto;
-  padding: var(--space-3);
 }
 
 .kpis-content h2 {
   font-family: var(--font-structural);
   font-size: 1.2rem;
-  margin-bottom: var(--space-1);
-}
-
-.kpi-story {
-  font-family: var(--font-content);
-  font-size: 0.95rem;
-  line-height: 1.5;
   margin-bottom: var(--space-1);
 }
 

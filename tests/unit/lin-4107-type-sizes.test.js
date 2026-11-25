@@ -56,11 +56,12 @@ export const HOME_PIN_EXEMPT = Object.freeze(['.task-sentence-at', '.page-header
 
 // Selectors outside Home and the task page (Plain, landing, error and login, the repo picker, the flight-companion and
 // passage-planner prompts, the observation chip). Their rules are left exactly as they were, and the Home/task checks skip
-// them (ruling dispatch 4eeb6ac5). Their existing pins stay as they are. Listed one selector per entry.
+// them (ruling dispatch 4eeb6ac5). Their existing pins stay as they are. Listed one selector per entry. LIN-4567 took two
+// out with their rules: `.error-title` and `.plain-title` were the headings under a "Harbour" h1 that the public frame's
+// own h1 replaced.
 export const NON_HOME_TASK = Object.freeze([
   '.error-details',
   '.error-home-link',
-  '.error-title',
   '.flight-companion-prompt',
   '.passage-planner-prompt',
   '.landing-ctas .landing-cta',
@@ -68,7 +69,6 @@ export const NON_HOME_TASK = Object.freeze([
   '.login-button',
   '.obs-act-chip',
   '.plain-page',
-  '.plain-title',
   '.repo-picker-add-link',
   '.repo-picker-group-heading',
   '.repo-picker-truncated-note',
@@ -276,8 +276,8 @@ describe('mono is only on the allowlisted selectors (LIN-4107 beat 2 corrective)
 });
 
 describe('the out-of-scope list cannot grow or go stale (LIN-4107)', () => {
-  test('it has the fifteen selectors the ruling names, and each still has a rule in the sheets', () => {
-    assert.equal(NON_HOME_TASK.length, 15);
+  test('it has the thirteen selectors left of the ruling\'s fifteen, and each still has a rule in the sheets', () => {
+    assert.equal(NON_HOME_TASK.length, 13);
     const missing = NON_HOME_TASK.filter((selector) => {
       try {
         appliedDecls(SHEETS, selector);

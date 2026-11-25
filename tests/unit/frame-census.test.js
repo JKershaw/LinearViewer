@@ -22,20 +22,20 @@ const ROOT = join(dirname(fileURLToPath(import.meta.url)), '..', '..');
 /** The shell itself and the frame, which are the two places allowed to call it for good. */
 const SHELL = new Set(['lib/components/page.js', 'lib/components/frame.js']);
 
-/** Files that still assemble their own chrome (the shell's renderPage, or plain-page.js's wrappers of it). Sorted. It only falls. */
+/**
+ * LIN-4567 (piece 6): the named exception, allowed for good and not part of the allowance that falls. The landing (`/`)
+ * keeps its own hero, whose large wordmark is its h1, and draws no band: the hero is the sign-in surface and already
+ * carries the wordmark (LIN-1508 removed the bar from it for that reason). The parent plan (plan-46603cd7) names it.
+ */
+const NAMED_EXCEPTIONS = new Set(['lib/render-landing.js']);
+
+/**
+ * Files that still assemble their own chrome (the shell's renderPage, or plain-page.js's wrappers of it). Sorted. It only falls.
+ * LIN-4567 (piece 6) moved every public and signed-out page; what is left is the Project backlog, the one workspace page
+ * kept on the old bar as its last host until piece 7 (LIN-4568) deletes the bar.
+ */
 export const OLD_CHROME_ALLOWANCE = [
-  'lib/components/plain-page.js',
-  'lib/render-account-home.js',
-  'lib/render-email-auth.js',
-  'lib/render-kpis.js',
-  'lib/render-landing.js',
-  'lib/render-legal.js',
-  'lib/render-library.js',
-  'lib/render-pages.js',
   'lib/render-project-page.js',
-  'lib/render-styleguide.js',
-  'lib/render-templates.js',
-  'routes/getting-started.js',
 ];
 
 function jsFiles(dir) {
@@ -56,7 +56,7 @@ export function oldChromeFiles() {
   const shellImport = /import\s*\{[^}]*\brenderPage\b[^}]*\}\s*from\s*'(?:\.\.\/lib\/|\.\/|\.\.\/)?(?:components\/)?page\.js'/;
   const plainImport = /import\s*\{[^}]*\b(?:renderPlainPage|renderPlainDocument)\b[^}]*\}\s*from\s*'[^']*plain-page\.js'/;
   return [...jsFiles('lib'), ...jsFiles('routes'), 'server.js']
-    .filter(rel => !SHELL.has(rel))
+    .filter(rel => !SHELL.has(rel) && !NAMED_EXCEPTIONS.has(rel))
     .filter(rel => {
       const source = readFileSync(join(ROOT, rel), 'utf8');
       return shellImport.test(source) || plainImport.test(source);
@@ -78,6 +78,31 @@ test('the list only falls: a listed file that moved onto the frame comes off it 
   const found = new Set(oldChromeFiles());
   const stale = OLD_CHROME_ALLOWANCE.filter(rel => !found.has(rel));
   assert.deepEqual(stale, [], `no longer imports the shell's renderPage; delete from OLD_CHROME_ALLOWANCE: ${stale.join(', ')}`);
+});
+
+// LIN-4567 (piece 6): the public and signed-out pages sit in the public frame: Library, Templates, Privacy and Terms,
+// Getting started, the public KPIs, email sign-in, the account home, the shared error and sign-in pages, and the
+// styleguide. (The previews moved in piece 3 and the guest task in piece 2.) None draws the old footer or a second
+// header; the Plain helper no longer wraps the shell.
+const PIECE_6 = [
+  'lib/render-library.js', 'lib/render-templates.js', 'lib/render-legal.js', 'routes/getting-started.js', 'lib/render-kpis.js',
+  'lib/render-email-auth.js', 'lib/render-account-home.js', 'lib/render-pages.js', 'lib/render-styleguide.js',
+];
+
+test('the pages piece 6 moved are on the public frame (LIN-4567: public and signed-out pages)', () => {
+  for (const rel of PIECE_6) {
+    assert.ok(!OLD_CHROME_ALLOWANCE.includes(rel), `${rel} is listed as old chrome`);
+    const source = readFileSync(join(ROOT, rel), 'utf8');
+    assert.match(source, /renderPublicFrame\(/, `${rel} renders through the public frame`);
+    assert.doesNotMatch(source, /renderNavBar\(|renderPageFooter\(|renderPageHeader\(|renderPlainPage\(|renderPlainDocument\(/, `${rel} draws no old bar, old footer or second header`);
+  }
+  assert.ok(!OLD_CHROME_ALLOWANCE.includes('lib/components/plain-page.js'), 'the Plain helper no longer wraps the shell');
+});
+
+test('the landing is the one named exception: its hero and no band (LIN-1508)', () => {
+  assert.deepEqual([...NAMED_EXCEPTIONS], ['lib/render-landing.js']);
+  assert.ok(!OLD_CHROME_ALLOWANCE.includes('lib/render-landing.js'), 'an exception for good is not part of the allowance that falls');
+  assert.ok(oldChromeFiles().length >= OLD_CHROME_ALLOWANCE.length);
 });
 
 // LIN-4566 (piece 5): Settings and the rest of Set up. Settings is one place (every area renders through the one

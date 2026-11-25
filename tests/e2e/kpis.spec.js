@@ -42,7 +42,9 @@ test.describe('KPIs page', () => {
   test('renders without authentication, as three sections', async ({ page }) => {
     await page.goto('/kpis');
 
-    await expect(page.locator('main.kpis-content > h2')).toHaveText('Harbour in numbers');
+    // LIN-4567: the page sits in the public frame; its name is the one h1 and the tab title.
+    await expect(page.locator(SELECTORS.nav.heading)).toHaveText('Harbour in numbers');
+    await expect(page).toHaveTitle('Harbour in numbers · Harbour');
     for (const name of ['outcome', 'activity', 'people']) {
       await expect(page.locator(K.section(name))).toBeVisible();
     }
@@ -136,8 +138,8 @@ test.describe('KPIs page', () => {
 
   test('shows footer with legal links and is not linked from the landing page', async ({ page }) => {
     await page.goto('/kpis');
-    await expect(page.locator('.page-footer')).toBeVisible();
-    await expect(page.locator('.page-footer a[href="/privacy"]')).toBeVisible();
+    await expect(page.locator(SELECTORS.nav.footer)).toBeVisible();
+    await expect(page.locator(SELECTORS.nav.footerLink('privacy'))).toHaveAttribute('href', '/privacy');
     await expect(page.locator(K.privacy)).toContainText('never shows names, workspace keys or content');
 
     // The page is intentionally unlinked: the landing page must not point to it

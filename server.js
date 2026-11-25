@@ -124,6 +124,7 @@ import { buildPeriodicalNodes } from './lib/periodicals.js'
 import { renderPage, renderErrorPage, renderUpstreamAwareErrorPage, renderWorkspaceNotFoundPage, homeRowsContext, renderHomeRowsHtml } from './lib/render.js'
 import { isAuthError, errorReference, clientErrorStatus, clientErrorMessage, badRequest, jsonError, serverError, unauthorized } from './lib/errors.js'
 import { renderSourceErrorPage } from './lib/render-pages.js'
+import { frameViewerContext } from './lib/components/frame.js'
 import { renderLandingPage } from './lib/render-landing.js'
 import { parseLandingPage } from './lib/parse-landing.js'
 import { refreshAccessToken, isDefinitiveRevocation, isTransientRefreshFailure } from './lib/token-refresh.js'
@@ -1288,6 +1289,11 @@ app.use(createHydrationMiddleware({
   connectionStore,
   resolveCanonicalAccountId: (id) => accountStore.resolveCanonicalAccountId(id)
 }))
+
+// LIN-4567: every public page (the shared error and sign-in pages, Library, Privacy …) draws the public frame for this
+// request's viewer, read from its session through one seam (lib/components/frame.js frameViewerContext), after the
+// session and its hydration so the session is the one the routes see.
+app.use(frameViewerContext)
 
 // =============================================================================
 // Test Mode Setup

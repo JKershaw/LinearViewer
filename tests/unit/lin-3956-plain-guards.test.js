@@ -4,13 +4,14 @@ import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import { renderStyleguide } from '../../lib/render-styleguide.js';
 import { renderWorkspaceNotFoundPage } from '../../lib/render-pages.js';
-import { readSheets, declOf, parseSheet } from '../helpers/css-rules.js';
+import { readSheets, declOf, appliedDecls, parseSheet } from '../helpers/css-rules.js';
 
 const STYLE = readSheets(['/style.css']);
 
-test('the Plain column rule caps the measure and centres it, and /styleguide never gets the class', () => {
+// LIN-4567: the column sits at the public frame's left edge under the page's h1, so it is no longer centred.
+test('the Plain column rule caps the measure at the frame\'s edge, and /styleguide never gets the class', () => {
   assert.equal(declOf(STYLE, '.plain-page.plain-column', 'max-width'), '40em');
-  assert.equal(declOf(STYLE, '.plain-page.plain-column', 'margin-inline'), 'auto');
+  assert.equal(appliedDecls(STYLE, '.plain-page.plain-column').has('margin-inline'), false);
   assert.doesNotMatch(renderStyleguide(), /plain-column/);
 });
 

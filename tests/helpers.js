@@ -154,7 +154,14 @@ export const SELECTORS = {
     subtitle: '[data-testid="frame-main"] .page-header__subtitle',
     back: '[data-testid="frame-back"]',
     footer: '[data-testid="frame-footer"]',
+    /** LIN-4567: a footer link by its key: library | templates | privacy | terms | source (lib/components/frame.js). */
+    footerLink: (key) => `[data-testid="frame-footer-${key}"]`,
     filters: '[data-testid="frame-filters"]',
+    /** LIN-4567: the public frame's band (no rail): the wordmark, the way back, and Sign in or the way to the viewer's Home. */
+    publicBand: '[data-testid="frame-public-band"]',
+    publicBrand: '[data-testid="frame-public-band"] [data-testid="rail-brand"]',
+    signIn: '[data-testid="frame-sign-in"]',
+    openWorkspace: '[data-testid="frame-open-workspace"]',
   },
   /** LIN-4562: the search page (lib/render-search.js). */
   search: {

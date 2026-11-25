@@ -15,7 +15,9 @@
  */
 import { describe, test } from 'node:test';
 import assert from 'node:assert/strict';
-import { renderFrame, renderPublicFrame, renderFrameFooter, frameViewer } from '../../lib/components/frame.js';
+import express from 'express';
+import { renderFrame, renderPublicFrame, renderFrameFooter, frameViewer, frameViewerContext, currentFrameViewer } from '../../lib/components/frame.js';
+import { renderErrorPage } from '../../lib/render-pages.js';
 import { renderFilterLine } from '../../lib/components/navbar.js';
 import { railFor } from '../../lib/places.js';
 import { renderProxyPage } from '../../lib/render-proxy.js';
@@ -185,6 +187,73 @@ describe('the public frame', () => {
   test('frameViewer: no workspaces is signed out', () => {
     assert.equal(frameViewer(undefined).signedIn, false);
     assert.equal(frameViewer({ workspaces: [] }).signedIn, false);
+  });
+
+  // LIN-4567: an account with no workspace yet (an email-only sign-in) is signed in; its Home is the account home.
+  test('frameViewer: an account with no workspace is signed in, and its way back and action lead to /account', () => {
+    const viewer = frameViewer({ accountId: 'acct-1', workspaces: [] });
+    assert.deepEqual(viewer, { signedIn: true, homeHref: '/account', workspaceName: null, account: true });
+    const html = renderPublicFrame({ title: 'Privacy Policy', viewer });
+    assert.match(html, /data-testid="frame-back">← Your account<\/a>/);
+    assert.match(html, /href="\/account" data-testid="frame-open-workspace">Your account<\/a>/);
+  });
+
+  test('signed in, the way back is the viewer\'s Home (signed out, Harbour\'s front page); a page may name its own', () => {
+    const viewer = frameViewer({ workspaces: [{ id: 'w1', urlKey: 'acme' }] });
+    assert.match(renderPublicFrame({ title: 'Library', viewer }), /href="\/workspace\/acme\/" data-testid="frame-back">← Home<\/a>/);
+    assert.match(renderPublicFrame({ title: 'Library', viewer: frameViewer(null) }), /href="\/" data-testid="frame-back">← Harbour<\/a>/);
+    assert.match(renderPublicFrame({ title: 'Doc', viewer, back: { href: '/library', label: 'Library' } }), /href="\/library" data-testid="frame-back">← Library<\/a>/);
+  });
+
+  test('the footer carries this deploy\'s stamp by default, so a page whose caller passes none matches every other page', () => {
+    const saved = process.env.DEPLOY_VERSION;
+    process.env.DEPLOY_VERSION = 'v-default';
+    try {
+      assert.match(renderPublicFrame({ title: 'Oops' }), /data-testid="frame-footer-stamp"[\s\S]*v-default/);
+      assert.doesNotMatch(renderPublicFrame({ title: 'Oops', deployInfo: {} }), /frame-footer-stamp/, 'a page pinned byte for byte passes {}');
+    } finally {
+      if (saved === undefined) delete process.env.DEPLOY_VERSION;
+      else process.env.DEPLOY_VERSION = saved;
+    }
+  });
+});
+
+// LIN-4567 (LIN-4342 piece 6): the viewer reaches every public page through one seam. server.js mounts frameViewerContext
+// after the session; renderPublicFrame reads the request's viewer when its caller passes none, so the ~170 shared error
+// page call sites (renderErrorPage and kin) pass nothing. Outside a request the page is drawn for a signed-out viewer.
+describe('the request\'s viewer (frameViewerContext)', () => {
+  async function serve(session) {
+    const app = express();
+    app.use((req, res, next) => { req.session = session; next(); });
+    app.use(frameViewerContext);
+    // An async hop before rendering, as a route that reads a store does: the request's viewer survives it.
+    app.get('/oops', async (req, res) => {
+      await new Promise(resolve => setTimeout(resolve, 1));
+      res.send(renderErrorPage('Oops', 'It broke.'));
+    });
+    const server = await new Promise(resolve => { const s = app.listen(0, '127.0.0.1', () => resolve(s)); });
+    try {
+      return await (await fetch(`http://127.0.0.1:${server.address().port}/oops`)).text();
+    } finally {
+      await new Promise(resolve => server.close(resolve));
+    }
+  }
+
+  test('a signed-in request\'s error page leads to the viewer\'s Home, with no viewer passed by the caller', async () => {
+    const html = await serve({ workspaces: [{ id: 'w1', urlKey: 'acme', name: 'Acme' }], activeWorkspaceId: 'w1' });
+    assert.match(html, /<a href="\/workspace\/acme\/" class="wordmark wordmark-rail"/);
+    assert.match(html, /data-testid="frame-open-workspace">Open your workspace<\/a>/);
+    assert.ok(!html.includes('frame-sign-in'));
+  });
+
+  test('a signed-out request\'s error page offers Sign in', async () => {
+    const html = await serve(undefined);
+    assert.match(html, /data-testid="frame-sign-in">Sign in<\/a>/);
+    assert.match(html, /href="\/" data-testid="frame-back">← Harbour<\/a>/);
+  });
+
+  test('outside a request there is no viewer: signed out', () => {
+    assert.deepEqual(currentFrameViewer(), { signedIn: false, homeHref: null, workspaceName: null });
   });
 });
 

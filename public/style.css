@@ -2840,9 +2840,10 @@ a.wordmark:hover {
    Primary CTA is a filled brand action (mirrors the primary button idiom); the
    GitHub CTA is a differentiated outline variant so the two never read alike.
 */
+/* LIN-4567: the sign-in and error pages sit in the public frame, which owns the left edge and the heading, so their
+   body starts at that edge under the h1 (it was centred, 4rem down, under a centred "Harbour"). */
 .login-container {
-  text-align: center;
-  margin-top: 4rem;
+  max-width: 40em;
 }
 
 .login-container p {
@@ -3115,23 +3116,10 @@ body.is-landing {
    =============================================================================
    Friendly error display for OAuth and other errors.
 */
+/* LIN-4567: in the public frame, at its left edge under the page's h1. The heading that was an `.error-title` h2
+   (LIN-2401) is the frame's h1 now, so its rule went with it. */
 .error-container {
-  text-align: center;
-  margin-top: 4rem;
-  max-width: 400px;
-  margin-left: auto;
-  margin-right: auto;
-}
-
-.error-title {
-  /* Promoted from a <div> to a heading (LIN-2401) for screen-reader heading
-     navigation; reset the UA default heading margin so the render stays
-     byte-for-byte identical to the old div's zero margin. */
-  margin: 0 0 var(--space-3);
-  font-family: var(--font-content);
-  font-size: 1.25rem;
-  font-weight: 500;
-  color: var(--text);
+  max-width: 40em;
 }
 
 .error-message {
@@ -4304,23 +4292,11 @@ body[data-proxy-active="true"] .prompt-proxy-toggle {
   line-height: 1.6;
 }
 
-/* LIN-3956 (open question 6): the Plain column is the 40em measure, centred as a block, so it sits in the
-   middle of the page. Its title and text go left (LIN-4009), as on every other page. It caps the rows card too (about 1088px at 1280 otherwise).
-   /styleguide builds its own <main> and never gets this class. */
+/* LIN-3956: the Plain column is the 40em measure. It caps the rows card too (about 1088px at 1280 otherwise).
+   LIN-4567: it sits at the public frame's left edge under the page's h1 (it was centred under a centred brand h1).
+   /styleguide never gets this class. */
 .plain-page.plain-column {
   max-width: 40em;
-  margin-inline: auto;
-}
-
-/* LIN-3958: the Plain type step is decided once here (decisions 2 and 17), not per page. The title is
-   the browser's h2 default (1.5em), made explicit, so it stays 24px at every width. */
-.plain-title {
-  color: var(--text);
-  font-family: var(--font-content);
-  font-size: 1.5rem;
-  font-weight: normal;
-  margin-bottom: var(--space-5);
-  text-align: left;
 }
 
 /* LIN-3958: the heading steps up from the 1em prose (1.25em, so 20px over 16px), at weight 600 in --fg.

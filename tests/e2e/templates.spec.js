@@ -6,12 +6,15 @@
  * and tests/e2e/legal.spec.js.
  */
 import { test, expect } from '@playwright/test';
+import { SELECTORS } from '../helpers.js';
 
 test.describe('Templates page', () => {
   test('renders without authentication', async ({ page }) => {
     const response = await page.goto('/templates');
     expect(response.status()).toBe(200);
-    await expect(page).toHaveTitle(/Templates/);
+    // LIN-4567: the public frame: "Templates" is the one h1 and the tab title.
+    await expect(page.locator(SELECTORS.nav.heading)).toHaveText('Templates');
+    await expect(page).toHaveTitle('Templates · Harbour');
   });
 
   test('shows all 20 non-meta templates (LIN-4248: + the two Surveys; LIN-4437: + blind-read)', async ({ page }) => {
@@ -48,12 +51,10 @@ test.describe('Templates page', () => {
     await expect(page).toHaveTitle(/Templates/);
   });
 
-  test('shows footer with legal links, highlighting the current page', async ({ page }) => {
+  test('shows the footer every page shares, and no signed-in navigation', async ({ page }) => {
     await page.goto('/templates');
-    const footer = page.locator('.page-footer');
-    await expect(footer).toBeVisible();
-    await expect(footer.locator('.footer-current')).toHaveText('templates');
-    await expect(footer.locator('a.footer-legal[href="/privacy"]')).toBeVisible();
-    await expect(page.locator('.footer-actions')).not.toBeVisible();
+    await expect(page.locator(SELECTORS.nav.footer)).toBeVisible();
+    await expect(page.locator(SELECTORS.nav.footerLink('privacy'))).toHaveAttribute('href', '/privacy');
+    await expect(page.locator(SELECTORS.nav.rail)).toHaveCount(0);
   });
 });
