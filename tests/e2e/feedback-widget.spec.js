@@ -468,14 +468,11 @@ test.describe('Feedback widget', () => {
     test('reserves NOTHING now the FAB is gone — with the widget ON', async ({ page, seedLocal }) => {
       const { urlKey } = await seedLocal()
       await page.setViewportSize({ width: 360, height: 844 })
-      await enableWidget(page, urlKey)
 
-      // Precondition: the widget really is on, so this is not vacuous.
-      await expect(page.locator('#feedback-widget-root')).toHaveAttribute('data-enabled', 'true')
-
-      // LIN-4566: the page (Settings) wears the frame's footer, whose gutter is the page's own on both sides; a reserve
-      // for the FAB would show as a right gutter wider than the left, or a right pad on its links.
-      const pads = await page.evaluate(() => {
+      // Baseline: the same page's footer with the widget still OFF. A reserve for the FAB would be applied only when the
+      // widget is on, so ON must equal this on both sides (a reserve on both sides would keep left == right and slip past a
+      // symmetry check alone).
+      const readFooter = () => page.evaluate(() => {
         const footer = getComputedStyle(document.querySelector('[data-testid="frame-footer"]'))
         return {
           left: footer.paddingLeft,
@@ -483,7 +480,21 @@ test.describe('Feedback widget', () => {
           links: getComputedStyle(document.querySelector('.frame-footer__links')).paddingRight
         }
       })
+      await page.goto(`/workspace/${urlKey}/${WIDGET_PAGE}`)
+      await page.waitForLoadState('networkidle')
+      const off = await readFooter()
+
+      await enableWidget(page, urlKey)
+
+      // Precondition: the widget really is on, so this is not vacuous.
+      await expect(page.locator('#feedback-widget-root')).toHaveAttribute('data-enabled', 'true')
+
+      // LIN-4566: the page (Settings) wears the frame's footer, whose gutter is the page's own on both sides; a reserve
+      // for the FAB would show as a right gutter wider than the left, or a right pad on its links.
+      const pads = await readFooter()
       expect(pads.right).toBe(pads.left)
+      expect(pads.right).toBe(off.right)
+      expect(pads.left).toBe(off.left)
       expect(pads.links).toBe('0px')
     })
 
