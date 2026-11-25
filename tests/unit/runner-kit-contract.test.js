@@ -160,7 +160,11 @@ async function kitKeyedFeedbackOutcome(row) {
     const bodies = [];
     const fetchImpl = async (url, init) => {
       if (url.includes('/runner/feedback/')) {
-        bodies.push(JSON.parse(init.body));
+        const body = JSON.parse(init.body);
+        // Only the run's words are this row's posts. `wait` may post others on the same row (its stall watchdog, when
+        // the clock reads the transcript as old: the CI arm shifts the clock 400 days); they take no reply from the row.
+        if (body.kind !== 'assistant-text') return new Response(JSON.stringify({ success: true }), { status: 200 });
+        bodies.push(body);
         const r = replies[Math.min(bodies.length, replies.length) - 1];
         return new Response(JSON.stringify({ success: true, ...(r.duplicate ? { duplicate: true } : {}) }), { status: r.status });
       }
@@ -173,7 +177,6 @@ async function kitKeyedFeedbackOutcome(row) {
     await pass();
     await pass();
     const words = JSON.parse(fs.readFileSync(path.join(dir, 'words', 'agent-live.json'), 'utf8'));
-    for (const b of bodies) assert.equal(b.kind, 'assistant-text');
     const outcome = bodies.length && replies.slice(0, bodies.length).some((r) => r.status === 404) ? 'dropped'
       : (words.rejected?.length ? 'rejected' : (words.queue?.length ? 'queued' : 'acknowledged'));
     return `${outcome}; posts ${bodies.length}; keys ${new Set(bodies.map((b) => b.key)).size}`;
