@@ -166,9 +166,9 @@ describe('renderTaskEditPage — the four v1 fields', () => {
     assert.strictEqual((html.match(/\sautofocus[\s>]/g) || []).length, 1);
   });
 
-  test('links back to the dashboard from both the breadcrumb and Cancel', () => {
+  test('links back to the dashboard from both the way back and Cancel (LIN-4563: the way back is the frame\'s)', () => {
     const html = render();
-    assert.ok(html.includes('href="/workspace/acme/" data-testid="task-edit-back"'));
+    assert.ok(html.includes('<a class="frame-back" href="/workspace/acme/" data-testid="frame-back">← Home</a>'));
     assert.ok(html.includes('href="/workspace/acme/" data-testid="task-edit-cancel"'));
   });
 });
@@ -317,13 +317,17 @@ describe('renderTaskEditPage — escaping the user-controlled title', () => {
   const hostileIssue = { ...ISSUE, title: HOSTILE };
 
   test('escapes the title in the document HEAD specifically', () => {
-    const h = head(render({ issue: hostileIssue }));
+    // LIN-4563: the tab names the page by its identifier ("Edit LIN-42 · <Workspace>"); a provider without one falls back
+    // to "Edit task". Either way the hostile title never reaches <title>, and the line under the h1 carries it escaped.
+    const html = render({ issue: hostileIssue });
+    const h = head(html);
     // The head legitimately carries the shell's theme-prepaint <script>, so assert
     // on the <title> ELEMENT's own content, not on the head as a whole.
     const titleEl = h.match(/<title>([\s\S]*?)<\/title>/);
     assert.ok(titleEl, 'a <title> element is present');
     assert.ok(!titleEl[1].includes('<script>'), 'raw script tag reached the <title>');
-    assert.ok(titleEl[1].includes('&lt;script&gt;'));
+    assert.ok(titleEl[1].startsWith('Edit LIN-42 · '));
+    assert.ok(html.includes('<p class="page-header__subtitle">&lt;/title&gt;&lt;script&gt;alert(1)&lt;/script&gt;</p>'));
     // The injected `</title>` must not have closed the element early.
     assert.strictEqual((h.match(/<title>/g) || []).length, 1);
     assert.strictEqual((h.match(/<\/title>/g) || []).length, 1);
@@ -363,7 +367,7 @@ describe('renderTaskEditPage — not-found body', () => {
     const html = renderTaskEditPage({ issue: null, urlKey: 'acme', issueId: 'LIN-999' }, {});
     assert.ok(html.startsWith('<!DOCTYPE html>'));
     assert.ok(html.includes('data-testid="task-edit-not-found"'));
-    assert.ok(html.includes('<title>Task not found</title>'));
+    assert.ok(html.includes('<title>Task not found · Workspace</title>'));
     assert.ok(html.includes('<code>LIN-999</code>'));
   });
 
@@ -397,14 +401,16 @@ describe('renderTaskEditPage — shell wiring', () => {
     assert.ok(html.indexOf('src="/purify.min.js"') < html.indexOf('src="/task-edit.js"'));
   });
 
-  test('renders the identifier as a machine fact beside the title', () => {
+  test('names the page by the identifier, with the title on the line under it (LIN-4563)', () => {
     const html = render();
-    assert.ok(html.includes('<span class="task-edit-identifier">LIN-42</span>'));
+    assert.ok(html.includes('<h1>Edit LIN-42</h1>'));
+    assert.ok(html.includes('<p class="page-header__subtitle">Fix the thing</p>'));
+    assert.equal(html.match(/<h1>/g).length, 1);
   });
 
-  test('omits the identifier span when the provider supplies none', () => {
+  test('falls back to "Edit task" when the provider supplies no identifier', () => {
     const html = render({ issue: { ...ISSUE, identifier: undefined } });
-    assert.ok(!html.includes('task-edit-identifier'));
+    assert.ok(html.includes('<h1>Edit task</h1>'));
     assert.ok(html.includes('Fix the thing'));
   });
 });

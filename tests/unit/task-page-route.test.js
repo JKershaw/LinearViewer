@@ -107,14 +107,14 @@ function handlerFor(router, path) {
   return layer.route.stack;
 }
 
-async function call(router, path, { provider, params, query = {}, bindings, accountId = 'acct-1' } = {}) {
+async function call(router, path, { provider, params, query = {}, bindings, accountId = 'acct-1', referer } = {}) {
   const stack = handlerFor(router, path);
   const req = {
     session: { workspaces: [], features: {}, accountId },
     workspace: { urlKey: 'acme', provider, accessToken: 'tok', ...(bindings ? { bindings } : {}) },
     params: { urlKey: 'acme', ...params },
     query,
-    get: () => 'localhost',
+    get: (name) => (String(name).toLowerCase() === 'referer' ? referer : 'localhost'),
   };
   const res = {
     statusCode: 200, body: null, jsonBody: null, headers: {},
@@ -136,11 +136,32 @@ describe('GET /workspace/:urlKey/task/:identifier', () => {
     const res = await call(makeRouter(makeLoader()), PAGE, { provider: name, params: { identifier: 'LIN-50' } });
     assert.equal(res.statusCode, 200);
     assert.match(res.body, /data-testid="task-page"/);
-    assert.match(res.body, /data-testid="task-page-title">Build the task page</);
+    // LIN-4563: the page's name, its h1 and tab, is the task's title; the identifier is the line under it.
+    assert.match(res.body, /<h1>Build the task page<\/h1>/);
+    assert.match(res.body, /<title>Build the task page · /);
+    assert.match(res.body, /data-testid="task-page-ident">LIN-50</);
     assert.match(res.body, /data-state-url="\/workspace\/acme\/api\/task\/LIN-50\/state\?issueId=11111111-2222-3333-4444-555555555555"/);
     assert.match(res.body, /data-testid="task-page-owner-marker"/, 'the owner controls render');
     assert.match(res.body, /data-testid="task-page-run-control"/, 'LIN-3975: the owner with an unfinished task gets the run control');
     assert.deepEqual(calls.filter(c => c !== 'fetchProjects'), ['fetchRecommendationContext']);
+  });
+
+  // LIN-4563: the rail lights the place the person came from, and the way back goes there. Witness: drop `from` from the
+  // route's pageOptions and the Backlog case lights Home.
+  test('the rail lights Backlog and the way back goes there when the person came from Backlog; Home otherwise', async () => {
+    const lit = (body) => [...body.matchAll(/data-place="([^"]+)" aria-current="true"/g)].map(m => m[1]);
+    for (const [referer, place, back] of [
+      ['http://localhost/workspace/acme/backlog', 'backlog', '← Backlog'],
+      ['http://localhost/workspace/acme/project?id=p1', 'backlog', '← Backlog'],
+      ['http://localhost/workspace/acme/', 'home', '← Home'],
+      ['http://localhost/workspace/acme/swim', 'home', '← Home'],
+      [undefined, 'home', '← Home'],
+    ]) {
+      const { name } = spyProvider();
+      const res = await call(makeRouter(makeLoader()), PAGE, { provider: name, params: { identifier: 'LIN-50' }, referer });
+      assert.deepEqual(lit(res.body), [place], `from ${referer}`);
+      assert.ok(res.body.includes(`data-testid="frame-back">${back}</a>`), `from ${referer}: ${back}`);
+    }
   });
 
   test('LIN-3975: a member reads the page with no owner control, no run control, and the next-step line', async () => {

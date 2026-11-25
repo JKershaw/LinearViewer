@@ -203,7 +203,7 @@ The class is "a rule written in 2 or more places that Settings shares". Two repr
 ### 14. Back link
 
 - **Decides:** the "‹ back" breadcrumb above a page title.
-- **Authority:** one selector list, `.sess-back, .task-create-back, .task-edit-back` in `style.css` (LIN-3889). `.settings-back` (`settings.css`) is a different rule and stays a named variant.
+- **Authority:** one selector list, `.sess-back, .frame-back` in `style.css` (LIN-3889; LIN-4562 added the frame's "← <parent>"; LIN-4563 moved the task create and edit pages onto the frame, so `.task-create-back` and `.task-edit-back` left the list). `.settings-back` (`settings.css`) is a different rule and stays a named variant.
 - **Counting rule:** a site is a rule styling a page's back link.
 - **Sites at base (4):** `session.css:22` `.sess-back`, `task-create.css:20` `.task-create-back`, `task-edit.css:29` `.task-edit-back` (byte-identical; `--dup-blocks` #19), `settings.css:592` `.settings-back` (differs: `color: var(--brand-dim)`, `display: none` until 760px, `settings.css:866`).
 - **Consolidate deletes:** the three identical page copies (done, LIN-3889: `session.css`, `task-create.css`, `task-edit.css`). The task page's back link reuses `.sess-back`. The judge seeds the task create and edit pages and the not-found session page (which renders the same link); the populated session page is not covered (its run data is not seeded).

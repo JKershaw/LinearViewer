@@ -171,9 +171,10 @@ describe('LIN-4120 W7: the sign-in refresh re-renders Home with the same rowData
 });
 
 describe('LIN-4120: Add task returns to the backlog page', () => {
-  test('the back link and Cancel both point at /workspace/:urlKey/backlog', () => {
-    const html = renderTaskCreatePage({ urlKey: URL_KEY, fields: ['description'] }, { workspaces: [WORKSPACE], featureFlags: {} });
-    assert.match(html, /<a class="task-create-back" href="\/workspace\/ws\/backlog" data-testid="task-create-back">/);
+  test('reached from Backlog, the way back and Cancel both point at /workspace/:urlKey/backlog (LIN-4563: the way back is the frame\'s)', () => {
+    const html = renderTaskCreatePage({ urlKey: URL_KEY, fields: ['description'] }, { workspaces: [WORKSPACE], featureFlags: {}, from: 'backlog' });
+    assert.match(html, /<a class="frame-back" href="\/workspace\/ws\/backlog" data-testid="frame-back">← Backlog<\/a>/);
+    assert.match(html, /data-place="backlog" aria-current="true"/, 'the rail lights Backlog');
     assert.match(html, /<a class="task-create-cancel" href="\/workspace\/ws\/backlog" data-testid="task-create-cancel">Cancel<\/a>/);
   });
 });

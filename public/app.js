@@ -589,8 +589,8 @@ function initWaitingOnYou() {
     main,
     countLine,
     live,
-    searchResults: main.querySelector('[data-lazy-results]'),
-    searchInput: document.getElementById('search-input'),
+    // The desk sections are placed after Waiting on you (the section is always drawn for the owner, hidden when empty).
+    anchor: section,
     initialKeys: waitingKeysIn(body),
   })
   // LIN-4242: one request in flight at a time. A call made while one is out queues a single follow-up behind it.
@@ -642,7 +642,7 @@ function waitingCountIn(main) {
 
 /** LIN-4532 (P2b): a question record card was answered or dismissed here. The card stays (settled, with its outcome); the count
  *  and the nav badge take it out. LIN-4538 (P7a): every other copy of the same question on the page (the Waiting card, the
- *  opened task's card, a search result's) settles with it, showing the same outcome, so a copy answered in the opened task
+ *  opened task's card) settles with it, showing the same outcome, so a copy answered in the opened task
  *  is not left open and counted in Waiting until the next refresh. */
 function onQuestionRecordSettled({ main, countLine, live, detail, source = null }) {
   // LIN-4242: a question settled here stays settled: a refresh response requested before this never re-adds its card.
@@ -671,7 +671,7 @@ function onRulingGone({ main, countLine, live, detail }) {
   const key = detail.key
   if (!key) return
   const rulingKey = window.QuestionCards?.rulingKeyOf
-  // Every copy of this ruling's card on the page: a search result, the opened task.
+  // Every copy of this ruling's card on the page (the opened task's).
   main.querySelectorAll('[data-testid="session-question-card"]').forEach(card => {
     if (!rulingKey || rulingKey(card) !== key) return
     card.remove()
@@ -710,7 +710,7 @@ function waitingKeysIn(body) {
  *
  * Everything the swap touches is captured here, at startup. A tick queries nothing new.
  */
-function createDeskPlacement({ main, countLine, live, searchResults, searchInput, initialKeys }) {
+function createDeskPlacement({ main, countLine, live, anchor, initialKeys }) {
   // The two desk sections the swap replaces, in page order. Index i is `els[i]`.
   const PLACED = DESK_SECTIONS.filter(section => section.placed)
   const els = PLACED.map(section => main.querySelector(`:scope > ${section.section}`))
@@ -720,7 +720,6 @@ function createDeskPlacement({ main, countLine, live, searchResults, searchInput
     // LIN-4549: the reader-input half of the one keep-a-card rule (public/question-records.js), handed to the classic policy.
     const holds = holdsReaderInput
     return {
-      search: !!(searchInput && searchInput.value.trim()),
       dispatchesInFlight: typeof window.dispatchesInFlight === 'function' ? window.dispatchesInFlight() : 0,
       sections: els.filter(Boolean).map(el => window.HomePlacement.sectionFacts(el, active, holds)),
     }
@@ -803,8 +802,8 @@ function createDeskPlacement({ main, countLine, live, searchResults, searchInput
     }
     const freshMain = doc.querySelector('main')
     const freshSections = PLACED.map(section => freshMain?.querySelector(`:scope > ${section.section}`) || null)
-    const running = swapSection(0, freshSections[0], searchResults)
-    const upNext = swapSection(1, freshSections[1], running || searchResults)
+    const running = swapSection(0, freshSections[0], anchor)
+    const upNext = swapSection(1, freshSections[1], running || anchor)
     for (const el of [running, upNext]) {
       if (!el) continue
       replayExpanded(el)
@@ -828,14 +827,14 @@ function createDeskPlacement({ main, countLine, live, searchResults, searchInput
   })
 }
 
-// LIN-4242: the Waiting section has two hide reasons, empty and search. Each is a state on the element, and the section is
-// hidden while either holds, so one never overwrites the other (clearing a search does not un-hide an empty section).
+// LIN-4242: the Waiting section hides when it holds nothing. (LIN-4563: its second hide reason, an in-page search, retired
+// with the search.)
 function syncWaitingSection(section) {
   if (!section) return
   // LIN-4532 (P2b): an open question record (`.waiting-question`) is a reason to show the section. LIN-4552: a note for the
   // person (`.waiting-note`, merged live by public/waiting-notes.js) is one too.
   const empty = !section.querySelector('.waiting-question, .waiting-note')
-  section.classList.toggle('hidden', empty || section.dataset.searchHidden === 'true')
+  section.classList.toggle('hidden', empty)
 }
 
 /**
@@ -1092,13 +1091,10 @@ function unionDefaultCollapsedProjects(storedIds) {
   return [...new Set([...(storedIds || []), ...getDefaultCollapsedProjects()])]
 }
 
-// Shared in-memory UI state, owned by init() but also reapplied by
-// initSearch()'s clearSearchState() on a search round trip (LIN-2514 review
-// F-A). Both must mutate/reassign this SAME object rather than a detached
-// loadState() result, or the DOM (driven by whichever object applyState was
-// last called with) and the state object toggleItem/handleProjectHeaderClick
-// close over can disagree about a project's collapsed id, silently
-// swallowing the next header click.
+// Shared in-memory UI state, owned by init() and read by the desk placement's replay (createDeskPlacement). Anything
+// that reapplies state must mutate/reassign this SAME object rather than a detached loadState() result, or the DOM
+// (driven by whichever object applyState was last called with) and the state object toggleItem/handleProjectHeaderClick
+// close over can disagree about a project's collapsed id, silently swallowing the next header click (LIN-2514 review F-A).
 let state
 
 function init() {
@@ -1134,8 +1130,8 @@ function init() {
   applyState(state)
   bindHomeFolds()
 
-  // Reset view to defaults (including default collapsed projects)
-  // Button is in the footer (uses same .reset-view class)
+  // Reset view to defaults (including default collapsed projects). LIN-4563: the button is in the Backlog page's control
+  // line (lib/render.js), next to the project folds it resets; it left the footer.
   const resetBtn = document.querySelector('.reset-view')
   if (resetBtn) {
     resetBtn.addEventListener('click', (e) => {
@@ -2015,234 +2011,6 @@ function updateFooterModel(modelName) {
   el.title = `Workspace model: ${modelName}`
 }
 
-// ==========================================================================
-// Search Feature
-// ==========================================================================
-
-/**
- * Initialize search functionality for filtering issues by keyword.
- * LIN-145: Client-side filtering using data-search-text attributes.
- */
-/** LIN-4024: the elements matching `selector` on the page, not the search rows the server fetched. */
-function pageOnly(selector) {
-  return [...document.querySelectorAll(selector)].filter(el => !el.closest('[data-lazy-results]'))
-}
-
-function initSearch() {
-  const searchToggle = document.querySelector('.search-toggle')
-  const searchPanel = document.getElementById('search-panel')
-  const searchInput = document.getElementById('search-input')
-  const searchClear = document.getElementById('search-clear')
-  const noResults = document.getElementById('search-no-results')
-
-  if (!searchToggle || !searchPanel || !searchInput) return
-
-  let searchActive = false
-  // LIN-4024: the page's own rows that match, and the server's search rows (backlog and folded tasks are not on the
-  // page). The "no results" line waits for both.
-  let localMatchCount = 0
-  let serverSeq = 0
-  let serverTimer = null
-  const resultsEl = () => document.querySelector('[data-lazy-results]')
-
-  function updateNoResults() {
-    if (!noResults) return
-    const results = resultsEl()
-    const serverRows = !!results && !!results.querySelector(':scope > .node')
-    noResults.classList.toggle('hidden', localMatchCount > 0 || serverRows)
-  }
-
-  function clearServerResults() {
-    serverSeq++
-    clearTimeout(serverTimer)
-    const results = resultsEl()
-    if (results) {
-      results.innerHTML = ''
-      results.hidden = true
-    }
-  }
-
-  // Search the whole open workspace on the server, after a short pause in typing. Its rows that are already on the
-  // page are dropped, so a task shows once; a match with folded children keeps its ancestors as context.
-  function searchServer(term) {
-    const results = resultsEl()
-    const urlKey = results?.dataset.urlKey
-    if (!urlKey) return
-    const seq = ++serverSeq
-    clearTimeout(serverTimer)
-    serverTimer = setTimeout(async () => {
-      try {
-        const params = addHomeRowsScope(new URLSearchParams({ kind: 'search', q: term }))
-        const res = await fetch(`/workspace/${encodeURIComponent(urlKey)}/api/home-rows?${params}`, { headers: { Accept: 'application/json' } })
-        if (!res.ok || seq !== serverSeq) return
-        const data = await res.json()
-        if (seq !== serverSeq) return
-        mergeHomeRowOpts(data.opts)
-        results.innerHTML = data.html
-        results.hidden = !data.html
-        // The server sends only the matches and the ancestors that lead to them, so every row here shows. A row below
-        // depth 0 is hidden by its markup, which is right for an ordinary tree and wrong for a search path.
-        results.querySelectorAll('.node').forEach(show)
-        const onPage = new Set(pageOnly('.line[data-identifier]')
-          .filter(line => !line.closest('.node.hidden'))
-          .map(line => line.dataset.identifier))
-        results.querySelectorAll(':scope > .node').forEach(node => {
-          const id = node.querySelector(':scope > .line')?.dataset.identifier
-          if (id && onPage.has(id) && !node.querySelector('.node')) node.remove()
-        })
-        mountHomePromptSections(results)
-        bindHomeFolds(results)
-        updateNoResults()
-      } catch (error) {
-        console.error('Search failed:', error)
-      }
-    }, 200)
-  }
-
-  function openSearch() {
-    searchPanel.classList.remove('hidden')
-    searchToggle.setAttribute('aria-expanded', 'true')
-    searchInput.focus()
-  }
-
-  function clearSearchState() {
-    if (!searchActive) return
-    searchActive = false
-    clearServerResults()
-    localMatchCount = 0
-    // Remove all search-driven hidden classes before applyState restores normal view.
-    // applyState/resetDOM handle .node visibility by depth but don't touch projects/sections
-    // (which are normally never hidden), so we must clean those up explicitly.
-    pageOnly('.project.hidden').forEach(p => p.classList.remove('hidden'))
-    document.querySelectorAll('.running-section.hidden, .up-next-section.hidden').forEach(s => s.classList.remove('hidden'))
-    // LIN-4242: the Waiting section's search hide ends here; its empty hide (if any) is re-applied by syncWaitingSection.
-    document.querySelectorAll('.waiting-section').forEach(section => { delete section.dataset.searchHidden; syncWaitingSection(section) })
-    // Also ensure all .node elements are visible before resetDOM re-applies depth-based visibility,
-    // in case search left nodes hidden that resetDOM wouldn't otherwise reach (e.g. in completed sections)
-    pageOnly('.node.hidden').forEach(n => n.classList.remove('hidden'))
-    // LIN-2514: fold in default-collapsed empty projects the same way init()
-    // does — raw loadState() alone would leave an empty project rendered
-    // expanded (▼) with its children still hidden by the collapse logic below.
-    // Review F-A: reassign the SAME `state` object init() owns (module-scope,
-    // shared with toggleItem/handleProjectHeaderClick) rather than a detached
-    // loadState() result — otherwise the DOM this applyState call paints and
-    // the in-memory state a subsequent header click reads from disagree about
-    // whether the project is collapsed, swallowing that first click.
-    state = loadState()
-    state.collapsedProjects = unionDefaultCollapsedProjects(state.collapsedProjects)
-    applyState(state)
-  }
-
-  function closeSearch() {
-    searchPanel.classList.add('hidden')
-    searchToggle.setAttribute('aria-expanded', 'false')
-    searchInput.value = ''
-    if (noResults) noResults.classList.add('hidden')
-    clearSearchState()
-  }
-
-  function performSearch(term) {
-    const lowerTerm = term.toLowerCase().trim()
-
-    if (!lowerTerm) {
-      clearSearchState()
-      if (noResults) noResults.classList.add('hidden')
-      return
-    }
-
-    searchActive = true
-    // LIN-4114: the Waiting section is hidden while a search is on; its tasks stay findable as search rows.
-    pageOnly('.waiting-section').forEach(section => { section.dataset.searchHidden = 'true'; section.classList.add('hidden') })
-
-    // Hide all nodes first
-    pageOnly('.node').forEach(n => n.classList.add('hidden'))
-
-    // Hide all details during search
-    pageOnly('.details').forEach(d => d.classList.add('hidden'))
-
-    // Find matching lines and show their nodes + ancestors
-    let matchCount = 0
-    pageOnly('.line[data-search-text]').forEach(line => {
-      if (!line.dataset.searchText.includes(lowerTerm)) return
-      matchCount++
-
-      // Show this node and all ancestor nodes
-      let node = line.closest('.node')
-      while (node) {
-        node.classList.remove('hidden')
-        // Walk up: .node → .children → .node
-        node = node.parentElement?.closest('.node')
-      }
-    })
-
-    // Show/hide projects based on whether they contain matches
-    pageOnly('.project').forEach(project => {
-      const hasMatch = project.querySelector('.node:not(.hidden)')
-      project.classList.toggle('hidden', !hasMatch)
-    })
-
-    // Show/hide Home's desk sections (LIN-4113): Running and recently moved, and Up next. A section shows when one of
-    // its rows matches, and its body opens with it.
-    pageOnly('.running-section, .up-next-section').forEach(section => {
-      const sectionBody = section.querySelector('.running-body, .up-next-body')
-      if (!sectionBody) return
-      const hasMatch = sectionBody.querySelector('.node:not(.hidden)')
-      section.classList.toggle('hidden', !hasMatch)
-      if (hasMatch) sectionBody.classList.remove('hidden')
-    })
-
-    // Also check completed sections for matches
-    pageOnly('[data-completed-for]').forEach(completedSection => {
-      const hasMatch = completedSection.querySelector('.node:not(.hidden)')
-      completedSection.classList.toggle('hidden', !hasMatch)
-    })
-
-    // Rows the server finds (backlog and folded tasks) come from the same term
-    localMatchCount = matchCount
-    searchServer(term)
-    // Show/hide "no results" message
-    updateNoResults()
-  }
-
-  // Toggle search panel
-  searchToggle.addEventListener('click', (e) => {
-    e.preventDefault()
-    e.stopPropagation()
-    const isOpen = searchToggle.getAttribute('aria-expanded') === 'true'
-    if (isOpen) {
-      closeSearch()
-    } else {
-      openSearch()
-    }
-  })
-
-  // Filter on input
-  searchInput.addEventListener('input', () => {
-    performSearch(searchInput.value)
-  })
-
-  // Clear button
-  searchClear.addEventListener('click', (e) => {
-    e.stopPropagation()
-    closeSearch()
-  })
-
-  // Escape key closes search
-  searchInput.addEventListener('keydown', (e) => {
-    if (e.key === 'Escape') {
-      closeSearch()
-    }
-  })
-
-  // "/" keyboard shortcut to open search (when no input is focused)
-  document.addEventListener('keydown', (e) => {
-    if (e.key === '/' && !e.target.closest('input, textarea, select, [contenteditable]')) {
-      e.preventDefault()
-      openSearch()
-    }
-  })
-}
-
 // Cleanup polling on page unload. Rulings-badge cleanup registers itself
 // from common.js now, alongside its own init (LIN-1728 review F7); so does the frame's queue count (LIN-4562).
 window.addEventListener('beforeunload', stopQueuePolling)
@@ -2308,8 +2076,8 @@ async function initFreeTierStatus() {
 document.addEventListener('DOMContentLoaded', () => {
   init()
   // initNavBar() runs from common.js's DOMContentLoaded handler (LIN-288);
-  // initRulingsBadge() runs from there too now (LIN-1728 review F7)
-  initSearch()
+  // initRulingsBadge() runs from there too now (LIN-1728 review F7). LIN-4563: the in-page search (initSearch) retired;
+  // search is the rail's form and the search page (lib/components/frame.js, lib/render-search.js).
   initWaitingOnYou()
   initPrompts()
   initDispatchDisclosures()

@@ -10,7 +10,7 @@
  */
 import { describe, test } from 'node:test';
 import assert from 'node:assert/strict';
-import { railFor, PLACES, DRILLED, placeFor, litPlaceFor } from '../../lib/places.js';
+import { railFor, PLACES, DRILLED, placeFor, litPlaceFor, taskFromReferer } from '../../lib/places.js';
 import { EXPERIMENTAL_VIEWS } from '../../lib/feature-defaults.js';
 import { createRunControlsResolver, liveConsoleOn } from '../../lib/run-controls.js';
 
@@ -121,5 +121,28 @@ describe('the lit place', () => {
   test('every drilled-in parent and every reachedFrom is a place', () => {
     for (const d of DRILLED) for (const parent of [d.parent, ...(d.parents || [])]) assert.ok(PLACES.includes(placeFor(parent)), `${d.key} → ${parent}`);
     for (const p of PLACES.filter(p => p.reachedFrom)) assert.ok(placeFor(p.reachedFrom).who({}), `${p.key} → ${p.reachedFrom} is always shown`);
+  });
+});
+
+// LIN-4563: a task page's parent is where the person came from, read off the Referer by path within this workspace.
+describe('taskFromReferer: where a task page was reached from', () => {
+  test('Backlog and a project\'s backlog are Backlog; Home is Home; anything else is the default', () => {
+    const cases = [
+      ['http://h/workspace/acme/backlog', 'backlog'],
+      ['http://h/workspace/acme/backlog?assignee=me', 'backlog'],
+      ['http://h/workspace/acme/project?id=p1', 'backlog'],
+      ['http://h/workspace/acme/', 'home'],
+      ['http://h/workspace/acme', 'home'],
+      ['http://h/workspace/acme/#waiting-on-you', 'home'],
+      ['http://h/workspace/acme/search?q=x', undefined],
+      ['http://h/workspace/acme/task/LIN-1', undefined],
+      ['http://h/workspace/acme/projects', undefined],
+      ['http://h/workspace/other/backlog', undefined],
+      ['not a url at all', undefined],
+      ['', undefined],
+      [undefined, undefined],
+    ];
+    for (const [referer, from] of cases) assert.equal(taskFromReferer(referer, 'acme'), from, String(referer));
+    assert.equal(taskFromReferer('http://h/workspace/acme/backlog', ''), undefined, 'no workspace, no parent');
   });
 });

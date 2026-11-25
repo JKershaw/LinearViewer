@@ -79,7 +79,7 @@ export const NON_HOME_TASK = Object.freeze([
 // 640px, 13px at 400px), so the body text beside it can stay at 16px. Exempt by name (ruling dispatch 4eeb6ac5, rule 2).
 export const CHROME_EXEMPT = Object.freeze([
   '.nav-action', '.nav-label', '.nav-more-toggle', '.nav-option', '.nav-value', '.nav-view',
-  '.queue-badge', '.rulings-badge', '.search-clear', '.search-input', '.search-no-results', '.wordmark-nav',
+  '.queue-badge', '.rulings-badge', '.wordmark-nav',
   '.nav-bar', '.toggle',
 ]);
 const EXEMPT = new Set([...LIN4024_EXEMPT, ...HOME_PIN_EXEMPT, ...CHROME_EXEMPT]);
@@ -230,7 +230,6 @@ export const MONO_ALLOWED = Object.freeze([
   // glyphs (structural characters)
   '.nav-view-current::before',
   '.nav-more-toggle',
-  '.search-clear',
   '.sess-run-toggle-icon',
   '.task-ref-glyph',
   // to review (kept mono, names do not settle it): card meta, a chat fold, key/value rows, a segment bar

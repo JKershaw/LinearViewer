@@ -11,7 +11,6 @@
 
   // What the live region says while a swap waits. `dispatch` says nothing: a press still in flight clears in seconds.
   const DEFER_MESSAGE = {
-    search: 'Home changed. Running and Up next will update when the search is cleared.',
     'opened-task': 'Home changed. Running and Up next will update when you close what you have open.',
     'opened-fold': 'Home changed. Running and Up next are not updated while a list you opened is showing. Reload to update them.',
     focus: 'Home changed. Running and Up next will update when you leave the field you are in.',
@@ -20,17 +19,16 @@
 
   /**
    * Why a swap must wait now, or null when it may run. `facts` is what the page reads (see sectionFacts):
-   *   search           a search is on (the desk is hidden behind its results)
    *   dispatch         a dispatch is in flight (a swap would destroy the press's opened task before its reply lands)
    *   opened-task      a desk row's task is open, or its details are mounted and shown
    *   opened-fold      a "show N more" list the reader opened is in the desk (the list does not survive a swap)
    *   focus            focus is in a field of the desk. A clicked row (tabindex=0) is not a field, so it does not block.
    *   input            a question card in the desk holds the reader's place: typed text, focus, or an answer in flight
-   * @param {{search?: boolean, dispatchesInFlight?: number, sections?: Array<object>}} facts
+   * (LIN-4563: the in-page search, which hid the desk behind its results, retired; search is its own page.)
+   * @param {{dispatchesInFlight?: number, sections?: Array<object>}} facts
    * @returns {string|null}
    */
   function blockedBy(facts) {
-    if (facts.search) return 'search';
     if (facts.dispatchesInFlight > 0) return 'dispatch';
     const sections = facts.sections || [];
     for (const section of sections) if (section.openedTask) return 'opened-task';

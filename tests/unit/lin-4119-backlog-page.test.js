@@ -2,9 +2,10 @@
  * LIN-4119 (S3a-2, beat 1): the `/workspace/:urlKey/backlog` page mode and its navbar page name.
  *
  * `renderPage` takes a page mode: `home` (the default, byte-identical to before this change) or `backlog`.
- * The backlog page renders only the project sections, under a "<workspace> - Backlog" title, with no Home
- * onboarding, halt banner or In Progress summary. The navbar gives `'backlog'` the same team, assignee and
- * search controls as `'projects'`, and no view-bar tab is marked current there.
+ * The backlog page renders only the project sections, with no Home onboarding, halt banner or In Progress summary.
+ * The navbar gives `'backlog'` the same team and assignee controls as `'projects'`.
+ * LIN-4563 (LIN-4342 piece 2): both pages sit in the frame. The tab is "<Page> · <Workspace>" (Home · Acme, Backlog ·
+ * Acme), the rail marks the page itself, and the in-page search is retired (search is the rail's).
  *
  * The route itself lives in server.js, which is not import-safe in a unit test (it connects to Mongo and calls
  * app.listen() at load). Its wiring is therefore pinned as source text, the same precedent as
@@ -53,9 +54,9 @@ const workspace = { id: 'ws-1', urlKey: 'acme', name: 'Acme', provider: 'local' 
 const baseOptions = { workspace, urlKey: 'acme', featureFlags: {} };
 
 describe('LIN-4119 — renderPage page mode', () => {
-  test('home is the default page mode: the title is "- Projects" and the Running region renders', () => {
+  test('home is the default page mode: the title is "Home · Acme" and the Running region renders', () => {
     const html = renderPage([projectTree], inProgressTrees, [], 'Acme', baseOptions);
-    assert.match(html, /<title>[^<]*- Projects<\/title>/);
+    assert.match(html, /<title>Home · Acme<\/title>/);
     assert.ok(html.includes('<div class="running-section" role="region" aria-label="Running and recently moved" data-testid="running-section">'));
   });
 
@@ -65,10 +66,11 @@ describe('LIN-4119 — renderPage page mode', () => {
     assert.equal(explicit, implicit);
   });
 
-  test('backlog: the title is "<workspace> - Backlog", never "- Projects"', () => {
+  test('backlog: the title is "Backlog · <workspace>", and its one h1 is "Backlog"', () => {
     const html = renderPage([projectTree], inProgressTrees, [], 'Acme', { ...baseOptions, pageMode: 'backlog' });
-    assert.match(html, /<title>[^<]*Acme - Backlog<\/title>/);
-    assert.doesNotMatch(html, /<title>[^<]*- Projects<\/title>/);
+    assert.match(html, /<title>Backlog · Acme<\/title>/);
+    assert.equal(html.match(/<h1>/g).length, 1);
+    assert.match(html, /<h1>Backlog<\/h1>/);
   });
 
   test('backlog renders only the project sections: no Running and no recent block', () => {
@@ -87,16 +89,34 @@ describe('LIN-4119 — renderPage page mode', () => {
     assert.ok(!html.includes('home-halt-banner'), 'the halt banner is Home\'s, not the backlog page\'s');
   });
 
-  test('backlog keeps the search panel and the page-scoped prompt options', () => {
-    const html = renderPage([projectTree], [], [], 'Acme', { ...baseOptions, pageMode: 'backlog' });
-    assert.ok(html.includes('home-search-results'), 'the search results container renders on the backlog page');
-    assert.ok(html.includes('__HOME_PROMPT_OPTS__'), 'the page-scoped prompt options are embedded');
+  test('backlog keeps the page-scoped prompt options; the in-page search is retired on both pages (LIN-4563)', () => {
+    for (const pageMode of ['backlog', 'home']) {
+      const html = renderPage([projectTree], [], [], 'Acme', { ...baseOptions, pageMode });
+      assert.ok(html.includes('__HOME_PROMPT_OPTS__'), `${pageMode}: the page-scoped prompt options are embedded`);
+      for (const retired of ['home-search-results', 'data-lazy-results', 'search-panel', 'search-toggle', 'data-search-text']) {
+        assert.ok(!html.includes(retired), `${pageMode}: no ${retired}`);
+      }
+      assert.ok(html.includes('data-testid="rail-search-input"'), `${pageMode}: the rail's search field is the search`);
+    }
   });
 
-  test('backlog marks the navbar page as "backlog", so no view-bar tab is current there', () => {
-    const html = renderPage([projectTree], [], [], 'Acme', { ...baseOptions, pageMode: 'backlog' });
-    assert.ok(!html.includes('aria-current="page"'), 'no tab is marked current on /backlog');
-    assert.ok(html.includes('data-testid="nav-view-projects"'), 'the Home tab stays a link, not a non-link');
+  test('the team and assignee selectors sit in the frame\'s filter line on Home and Backlog, not in a bar (LIN-4563)', () => {
+    const filters = { teams: [{ id: 't1', name: 'One', key: 'ONE' }, { id: 't2', name: 'Two', key: 'TWO' }], availableAssignees: ['Ann'], selectedAssignee: 'all', canFilterByMe: true };
+    for (const pageMode of ['home', 'backlog']) {
+      const html = renderPage([projectTree], [], [], 'Acme', { ...baseOptions, ...filters, pageMode });
+      const line = html.match(/<div class="frame-filters" data-frame-filters data-testid="frame-filters">[\s\S]*?<\/main>/)?.[0] || '';
+      assert.ok(line.includes('id="team-toggle"'), `${pageMode}: the team selector is in the filter line`);
+      assert.ok(line.includes('id="assignee-toggle"'), `${pageMode}: the assignee selector is in the filter line`);
+      assert.ok(html.indexOf('data-testid="frame-filters"') > html.indexOf('<h1>'), `${pageMode}: the line is under the heading, in <main>`);
+    }
+  });
+
+  test('the rail marks the page itself: Backlog on /backlog, Home on Home (LIN-4563)', () => {
+    const backlog = renderPage([projectTree], [], [], 'Acme', { ...baseOptions, pageMode: 'backlog' });
+    assert.deepEqual([...backlog.matchAll(/data-place="([^"]+)" aria-current="page"/g)].map(m => m[1]), ['backlog']);
+    const home = renderPage([projectTree], [], [], 'Acme', baseOptions);
+    assert.deepEqual([...home.matchAll(/data-place="([^"]+)" aria-current="page"/g)].map(m => m[1]), ['home']);
+    assert.ok(!backlog.includes('class="nav-bar"') && !home.includes('class="nav-bar"'), 'the old bar is not drawn');
   });
 });
 
@@ -111,10 +131,10 @@ describe('LIN-4119 — navbar page name "backlog"', () => {
     featureFlags: {},
   };
 
-  test('backlog gets the team selector, the assignee selector and the search toggle, as projects does', () => {
+  test('backlog gets the team selector and the assignee selector, as projects does (LIN-4563: no search toggle)', () => {
     const projects = renderNavBar({ ...navOptions, currentPage: 'projects' });
     const backlog = renderNavBar({ ...navOptions, currentPage: 'backlog' });
-    assert.ok(backlog.includes('search-toggle'), 'search toggle on /backlog');
+    assert.ok(!backlog.includes('search-toggle') && !projects.includes('search-toggle'), 'the in-page search toggle is retired');
     assert.ok(backlog.includes('id="assignee-toggle"'), 'assignee selector on /backlog');
     assert.ok(backlog.includes('Ann'), 'assignee options on /backlog');
     assert.ok(backlog.includes('One'), 'team options on /backlog');

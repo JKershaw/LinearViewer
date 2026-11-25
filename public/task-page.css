@@ -15,7 +15,6 @@
   color: var(--muted);
   margin-right: 0.35rem;
 }
-.task-title { font-family: var(--font-content); }
 .task-status {
   display: flex;
   align-items: baseline;
@@ -147,8 +146,6 @@
     /* LIN-4537: one column. The brief and recap column beside the stages retired with the model-written brief. */
     grid-template-columns: minmax(0, 1fr);
     grid-template-areas:
-      "back"
-      "header"
       "answer"
       "question"
       "run"
@@ -161,8 +158,6 @@
       "share";
     align-items: start;
   }
-  .sess-page.task-page > .sess-back { grid-area: back; }
-  .sess-page.task-page > .task-header { grid-area: header; }
   .sess-page.task-page > .task-answer { grid-area: answer; }
   .sess-page.task-page > .task-run,
   .sess-page.task-page > .task-next { grid-area: run; }
@@ -197,7 +192,6 @@ a.task-stage-run:hover { text-decoration: underline; }
    the task page's selectors. A code span keeps the structural face: Chrome scales the generic monospace family to 13/16 of
    its parent when the size is inherited, so the face is set with the size. The shared --font-size-* tokens are unchanged,
    so no other page's sizes move. */
-h1 .task-ident { font-size: inherit; }
 .opened-task-change { font-size: inherit; }
 .task-stage-session-line .task-stage-run { font-size: inherit; }
 .task-ref-list .task-ref-state { font-size: inherit; }
@@ -331,3 +325,11 @@ h1 .task-ident { font-size: inherit; }
 .task-records-refused { color: var(--amber); }
 .task-records-none { color: var(--muted); }
 
+
+/* LIN-4563: in the frame (lib/components/frame.js), the page's body takes the frame's one left edge and width
+   (public/frame.css .frame-main), not a centred column of its own. The way back and the h1 are the frame's. */
+.frame-main > .sess-page.task-page {
+  max-width: none;
+  margin: 0;
+  padding: 0;
+}

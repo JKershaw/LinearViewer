@@ -169,7 +169,7 @@ describe('renderPage description rendering', () => {
       };
 
       const projectTree = createProjectTree(issueWithHorizontalRule);
-      const result = renderBacklogPage([projectTree], [], [], 'Test', { isLanding: false });
+      const result = renderBacklogPage([projectTree], [], [], 'Test', { isLanding: false, urlKey: 'ws' });
 
       // Should render as plain text, not as a prompt
       assert.ok(!result.includes('class="prompt-container"') ||

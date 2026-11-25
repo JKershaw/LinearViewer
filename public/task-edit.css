@@ -16,34 +16,12 @@
  * for machine facts, here the task identifier. */
 
 .task-edit-page {
+  /* LIN-4563: in the frame, the page takes the frame's one left edge (public/frame.css .frame-main); the form keeps
+     its reading width. */
   max-width: 780px;
-  margin: 0 auto;
-  padding: 0 1rem 3rem;
   /* Long unbroken tokens in a title (a URL, a UUID) must never force sideways
      page scroll on a narrow viewport. */
   overflow-x: hidden;
-}
-
-/* Left-aligned page header with a hairline rule (overriding the global centered
-   `header`), same as the sibling drill-down page. */
-.task-edit-header {
-  text-align: left;
-  padding: 0 0 0.7rem;
-  margin-bottom: var(--space-4);
-  border-bottom: 1px solid var(--line);
-}
-.task-edit-header h1 {
-  margin: 0;
-  font-size: 1.5rem;
-  font-family: var(--font-content);
-  overflow-wrap: anywhere;
-}
-
-/* The task identifier is a machine fact — mono, dimmed, ahead of the title. */
-.task-edit-identifier {
-  font-family: var(--font-structural);
-  font-size: 0.9rem;
-  color: var(--muted);
 }
 
 .task-edit-section { margin-bottom: var(--space-5); }

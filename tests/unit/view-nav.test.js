@@ -220,14 +220,10 @@ test('renderPageFooter no longer renders the cross-view links (hoisted to header
   }
 });
 
-test('renderPageFooter still shows reset (a client action, not a view link) when asked', () => {
-  const withReset = renderPageFooter({ urlKey: 'acme', currentPage: '/', showReset: true });
-  assert.match(withReset, /class="footer-action reset-view"/);
-  assert.match(withReset, /class="footer-actions"/);
-
-  // With no reset and no view links, the footer emits no empty actions row.
-  const noReset = renderPageFooter({ urlKey: 'acme', currentPage: '/settings' });
-  assert.doesNotMatch(noReset, /class="footer-actions"/);
+test('renderPageFooter draws no reset (LIN-4563: it moved to the Backlog page\'s control line) and no empty actions row', () => {
+  const html = renderPageFooter({ urlKey: 'acme', currentPage: '/' });
+  assert.doesNotMatch(html, /reset-view/);
+  assert.doesNotMatch(html, /class="footer-actions"/);
 });
 
 // --- CSS contract -----------------------------------------------------------

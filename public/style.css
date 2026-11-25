@@ -1039,75 +1039,6 @@ a.wordmark:hover {
 }
 
 /* =============================================================================
-   Search Panel
-   =============================================================================
-   Search input below the page title for filtering issues by keyword (LIN-1512).
-   The `search` toggle that opens it stays in the nav bar's .nav-actions.
-*/
-/* Search panel — same elevated in-flow card treatment as the selector dropdown
-   (LIN-1058): --card surface, --line border, --radius-md, --shadow-lg; stays in
-   normal flow below the title, no floating overlay, no backdrop. */
-.search-panel {
-  padding: var(--space-2) var(--space-3);
-  margin-bottom: var(--space-2);
-  max-width: 48ch;
-  background: var(--card);
-  border: 1px solid var(--line);
-  border-radius: var(--radius-md);
-  box-shadow: var(--shadow-lg);
-}
-
-.search-panel.hidden {
-  display: none;
-}
-
-.search-input-row {
-  display: flex;
-  align-items: center;
-  gap: 1ch;
-}
-
-.search-input {
-  font-family: var(--font-content);  /* the query is machine input — mono */
-  font-size: 0.9em;
-  border: 1px solid var(--line);
-  border-radius: var(--radius-sm);
-  padding: var(--space-1) var(--space-2);
-  color: var(--text);
-  background: var(--bg);
-  flex: 1;
-  max-width: 40ch;
-}
-
-.search-input:focus {
-  outline: 1px solid var(--brand);
-  border-color: var(--brand);
-}
-
-.search-clear {
-  font-family: var(--font-structural);
-  font-size: 0.9em;
-  color: var(--muted);
-  background: none;
-  border: none;
-  cursor: pointer;
-}
-
-.search-clear:hover {
-  color: var(--text);
-}
-
-.search-no-results {
-  color: var(--muted);
-  font-size: 0.9em;
-  padding: var(--space-2) 0;
-}
-
-.search-no-results.hidden {
-  display: none;
-}
-
-/* =============================================================================
    "In Progress" Section
    =============================================================================
    Displays all in-progress issues across projects in a single collapsible list.
@@ -2126,6 +2057,12 @@ a.wordmark:hover {
 
 /* LIN-4119: one control line per project. Its folds and done count are inline siblings, and the "·" between them is
    drawn by the sibling selector, so a fold that is removed or rewritten never leaves a stray or missing separator. */
+/* LIN-4563: the Backlog page's control line, above its projects: the reset that restores every fold below to its default.
+   It left the footer for the page whose folds it resets. */
+.backlog-controls {
+  margin-bottom: var(--space-3);
+}
+
 .project-controls {
   margin-left: 4ch;
   color: var(--muted);
@@ -2606,11 +2543,6 @@ a.wordmark:hover {
     overflow: hidden;
     text-overflow: ellipsis;
     white-space: nowrap;
-  }
-
-  /* Search input: full width on mobile */
-  .search-input {
-    max-width: none;
   }
 
   /* Mobile dropdown panels: inline dropdown below nav item */
@@ -3880,10 +3812,9 @@ body[data-proxy-active="true"] .prompt-proxy-toggle {
    promoted above the title (LIN-1225) so the page opens with an orientation cue; Task edit and
    create match its rhythm so drill-down pages open the same way. Task page's back link reuses
    `.sess-back`. `.settings-back` (settings.css) is a named variant of this decision. LIN-4562: the frame's
-   "← <parent>" (`.frame-back`, lib/components/frame.js) is the same link, and replaces the others as pages move. */
+   "← <parent>" (`.frame-back`, lib/components/frame.js) is the same link, and replaces the others as pages move
+   (LIN-4563: the task family's three went with it). */
 .sess-back,
-.task-create-back,
-.task-edit-back,
 .frame-back {
   display: inline-block;
   margin: var(--space-1) 0 var(--space-2);
@@ -3893,8 +3824,6 @@ body[data-proxy-active="true"] .prompt-proxy-toggle {
   text-decoration: none;
 }
 .sess-back:hover,
-.task-create-back:hover,
-.task-edit-back:hover,
 .frame-back:hover { color: var(--brand); }
 
 /* LIN-4562: the frame's search fields share the text control's body (public/frame.css only sets their width). Their

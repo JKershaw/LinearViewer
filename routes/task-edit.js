@@ -29,6 +29,7 @@ import { renderTaskEditPage } from '../lib/render-task-edit.js';
 import { renderErrorPage } from '../lib/render.js';
 import { requestFeatureFlags } from '../lib/run-controls.js';
 import { resolveIssueBinding, isValidIssueId } from '../lib/workspace.js';
+import { taskFromReferer } from '../lib/places.js';
 
 /**
  * Best-effort workflow states for the page's state `<select>`.
@@ -82,7 +83,10 @@ export function createTaskEditRoutes({ workspaceFromUrl, getOpenRouterSource, ge
       urlKey: workspace.urlKey,
       openRouterSource: getOpenRouterSource(req),
       workspaces: req.session.workspaces,
-      featureFlags: await requestFeatureFlags(req)
+      featureFlags: await requestFeatureFlags(req),
+      // LIN-4563: the frame's tab names the workspace, and the rail lights Home or Backlog by where the person came from.
+      workspaceName: workspace.name || 'Workspace',
+      from: taskFromReferer(req.get('referer'), workspace.urlKey)
     };
 
     if (!isValidIssueId(issueId)) {

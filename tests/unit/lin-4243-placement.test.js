@@ -23,7 +23,7 @@ function load() {
 const HP = load();
 
 const quiet = { openedTask: false, openFold: false, fieldFocused: false, cardHoldsInput: false };
-const free = { search: false, dispatchesInFlight: 0, sections: [quiet, quiet] };
+const free = { dispatchesInFlight: 0, sections: [quiet, quiet] };
 
 describe('blockedBy: what holds a swap', () => {
   test('nothing open, nothing typed: the swap may run', () => {
@@ -31,9 +31,10 @@ describe('blockedBy: what holds a swap', () => {
     assert.equal(HP.blockedBy({}), null);
   });
 
-  // Witness: drop the search check, and a search-hidden desk is swapped under its results.
-  test('a search being typed in blocks (the desk is hidden behind its results)', () => {
-    assert.equal(HP.blockedBy({ ...free, search: true }), 'search');
+  // LIN-4563: the in-page search retired (search is its own page), so a search fact no longer holds a swap.
+  test('a search is no reason: the desk is never hidden behind in-page results', () => {
+    assert.equal(HP.blockedBy({ ...free, search: true }), null);
+    assert.equal(HP.DEFER_MESSAGE.search, undefined);
   });
 
   // Witness: drop the dispatch check, and a swap destroys an opened task whose press has not replied.
@@ -62,21 +63,19 @@ describe('blockedBy: what holds a swap', () => {
     assert.equal(HP.blockedBy({ ...free, sections: [{ ...quiet, cardHoldsInput: true }, quiet] }), 'input');
   });
 
-  test('the first reason in order wins: search, dispatch, opened task, fold, focus, input', () => {
+  test('the first reason in order wins: dispatch, opened task, fold, focus, input', () => {
     const everything = {
-      search: true,
       dispatchesInFlight: 2,
       sections: [{ openedTask: true, openFold: true, fieldFocused: true, cardHoldsInput: true }],
     };
-    assert.equal(HP.blockedBy(everything), 'search');
-    assert.equal(HP.blockedBy({ ...everything, search: false }), 'dispatch');
-    assert.equal(HP.blockedBy({ ...everything, search: false, dispatchesInFlight: 0 }), 'opened-task');
+    assert.equal(HP.blockedBy(everything), 'dispatch');
+    assert.equal(HP.blockedBy({ ...everything, dispatchesInFlight: 0 }), 'opened-task');
     assert.equal(HP.blockedBy({ sections: [{ openFold: true, fieldFocused: true, cardHoldsInput: true }] }), 'opened-fold');
     assert.equal(HP.blockedBy({ sections: [{ fieldFocused: true, cardHoldsInput: true }] }), 'focus');
   });
 
   test('every reason that can block has a live-region message, and the dispatch reason stays silent', () => {
-    for (const reason of ['search', 'opened-task', 'opened-fold', 'focus', 'input']) {
+    for (const reason of ['opened-task', 'opened-fold', 'focus', 'input']) {
       assert.match(HP.DEFER_MESSAGE[reason], /^Home changed\./, reason);
     }
     assert.equal(HP.DEFER_MESSAGE.dispatch, undefined);
@@ -133,13 +132,13 @@ describe('createHomePlacement: when the Home document is read', () => {
 
   // Witness: announce on every deferral tick, and the reader's live region is re-read on each refresh.
   test('a change of the reason the swap waits for is announced again; the same reason is not', async () => {
-    const { placement, log, set } = fakes({ initial: ['a'], facts: { ...free, search: true } });
+    const { placement, log, set } = fakes({ initial: ['a'], facts: { ...free, sections: [{ ...quiet, fieldFocused: true }, quiet] } });
     await placement.check(['a', 'b']);
     await placement.check(['a', 'b']);
     set({ ...free, dispatchesInFlight: 0, sections: [{ ...quiet, cardHoldsInput: true }, quiet] });
     await placement.check(['a', 'b']);
     assert.equal(log.announced.length, 2);
-    assert.match(log.announced[0], /search/);
+    assert.match(log.announced[0], /field you are in/);
     assert.match(log.announced[1], /answer you are typing/);
   });
 
@@ -259,6 +258,6 @@ describe('sectionFacts: the DOM facts that make the swap wait', () => {
     assert.equal(facts.cardHoldsInput, true);
     assert.equal(HP.sectionFacts(section({ cards: [idle] }), null, holds).cardHoldsInput, false);
     // blockedBy then waits, and says the reader is typing.
-    assert.equal(HP.blockedBy({ search: false, dispatchesInFlight: 0, sections: [facts] }), 'input');
+    assert.equal(HP.blockedBy({ dispatchesInFlight: 0, sections: [facts] }), 'input');
   });
 });

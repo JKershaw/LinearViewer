@@ -1,229 +1,99 @@
 import { test, expect } from '../fixtures/test-base.js';
 import { searchLocalSeed } from '../fixtures/local-harness.js';
+import { SELECTORS } from '../helpers.js';
 
-// LIN-426: the search surface is fully modeled by the local provider (the search
-// index reads title, description, assignee.name, identifier, and label names), so
-// this spec rides a seeded local workspace instead of the `test-token` mock. The
-// bespoke `searchLocalSeed` reuses the EXACT ids the selectors below already use
-// (proj-alpha/beta, issue-1..5), so assertions stay byte-identical; it preserves
-// assignee `{ name: 'Charlie' }` (issue-4) and label `urgent` for the assignee /
-// label search cases, and the issue-2 → issue-1 parent link for the ancestor case.
+// LIN-4563 (LIN-4342 piece 2): the search, rewritten for the rail. Home's and Backlog's in-page search panel (the
+// `search` toggle, `#search-input`, the "/" shortcut, the client-side row filter) is retired; the rail's search field,
+// on every page in the frame, goes to the server-rendered search page `/workspace/:urlKey/search?q=` (LIN-4562), which
+// lists matching tasks across the workspace, open first and then done. The old spec's intents are kept, each against
+// that page: matching by title, case, assignee and label; a folded child task is found; nothing found says so; and the
+// search is reached from Home and from Backlog.
+//
+// The seed is the bespoke `searchLocalSeed` (tests/fixtures/local-harness.js): proj-alpha holds TEST-1 "Parent task in
+// progress" (Alice, feature) with its child TEST-2 "Child task todo" and the done TEST-3 "Completed task" (Bob, bug);
+// proj-beta holds TEST-4 "Beta task in progress" (Charlie, urgent) and TEST-5 "Beta todo task".
 
-test.describe('Search Feature', () => {
-  test.beforeEach(async ({ page, seedLocal, localWorkerUrlKey }) => {
-    await seedLocal(searchLocalSeed);
-    await page.goto(`/workspace/${localWorkerUrlKey}/`);
+const ids = async (page) => page.locator(SELECTORS.search.result).evaluateAll(rows => rows.map(r => r.dataset.identifier));
+
+/** Search from the rail's field on the page in front of the reader, and land on the search page. */
+async function railSearch(page, urlKey, q) {
+  await page.locator(SELECTORS.nav.railSearch).fill(q);
+  await page.locator(SELECTORS.nav.railSearch).press('Enter');
+  await expect(page).toHaveURL(new RegExp(`/workspace/${urlKey}/search\\?q=`));
+}
+
+test.describe('Search (the rail\'s search page)', () => {
+  let urlKey;
+
+  test.beforeEach(async ({ page, seedLocal }) => {
+    ({ urlKey } = await seedLocal(searchLocalSeed));
+    await page.setViewportSize({ width: 1280, height: 900 });
   });
 
-  test('search toggle shows and hides search panel', async ({ page }) => {
-    const searchToggle = page.locator('.search-toggle');
-    const searchPanel = page.locator('#search-panel');
-
-    // Panel starts hidden
-    await expect(searchPanel).toHaveClass(/hidden/);
-
-    // Click to show
-    await searchToggle.click();
-    await expect(searchPanel).not.toHaveClass(/hidden/);
-
-    // Input should be focused
-    await expect(page.locator('#search-input')).toBeFocused();
-
-    // Click again to hide
-    await searchToggle.click();
-    await expect(searchPanel).toHaveClass(/hidden/);
+  test('Home and Backlog carry the rail\'s search field and no in-page search panel', async ({ page }) => {
+    for (const path of ['/', '/backlog']) {
+      await page.goto(`/workspace/${urlKey}${path}`);
+      await expect(page.locator(SELECTORS.nav.railSearch)).toBeVisible();
+      await expect(page.locator('.search-toggle')).toHaveCount(0);
+      await expect(page.locator('#search-panel')).toHaveCount(0);
+      await expect(page.locator('[data-lazy-results]')).toHaveCount(0);
+      // The retired "/" shortcut opens nothing: the page does not move.
+      await page.keyboard.press('/');
+      await expect(page).toHaveURL(new RegExp(`/workspace/${urlKey}${path === '/' ? '/$' : '/backlog$'}`));
+    }
   });
 
-  test('search filters issues by title keyword', async ({ page, localWorkerUrlKey }) => {
-    await page.goto(`/workspace/${localWorkerUrlKey}/`);
-    const searchToggle = page.locator('.search-toggle');
-    const searchInput = page.locator('#search-input');
+  test('from Home: a title keyword finds its tasks across projects, and each links to its task page', async ({ page }) => {
+    await page.goto(`/workspace/${urlKey}/`);
+    await railSearch(page, urlKey, 'Beta');
+    expect(await ids(page)).toEqual(['TEST-4', 'TEST-5']);
+    await expect(page.locator('h1')).toHaveText('Search');
+    // The field keeps what was searched.
+    await expect(page.locator(SELECTORS.search.input)).toHaveValue('Beta');
+    await expect(page.locator(SELECTORS.nav.railSearch)).toHaveValue('Beta');
+    await page.locator(SELECTORS.search.resultFor('TEST-4')).locator('[data-testid="search-result-link"]').click();
+    await expect(page).toHaveURL(new RegExp(`/workspace/${urlKey}/task/TEST-4`));
+    await expect(page.locator('h1')).toHaveText('Beta task in progress');
+  });
 
-    await searchToggle.click();
-
-    // Search for "Beta" - should match "Beta task in progress" and "Beta todo task"
-    await searchInput.fill('Beta');
-
-    // Beta's match is In Progress, so its row shows there (LIN-4024: a project lists only its Up next work)
-    await expect(page.locator('.running-section .line', { hasText: 'Beta task in progress' })).toBeVisible();
-
-    // Alpha project should be hidden (no matching issues). Its project section is the backlog page's, searched the same way.
-    await page.goto(`/workspace/${localWorkerUrlKey}/backlog`);
-    await searchToggle.click();
-    await searchInput.fill('Beta');
-    const alphaProject = page.locator('.project[data-id="proj-alpha"]');
-    await expect(alphaProject).toHaveClass(/hidden/);
+  test('from Backlog: the search is the same page', async ({ page }) => {
+    await page.goto(`/workspace/${urlKey}/backlog`);
+    await railSearch(page, urlKey, 'Beta');
+    expect(await ids(page)).toEqual(['TEST-4', 'TEST-5']);
   });
 
   test('search is case-insensitive', async ({ page }) => {
-    await page.locator('.search-toggle').click();
-    const searchInput = page.locator('#search-input');
-
-    // Search lowercase for an uppercase-containing title
-    await searchInput.fill('beta');
-
-    // The Beta match is still visible (In Progress)
-    await expect(page.locator('.running-section .line', { hasText: 'Beta task in progress' })).toBeVisible();
+    await page.goto(`/workspace/${urlKey}/search?q=beta+TASK+IN`);
+    expect(await ids(page)).toEqual(['TEST-4']);
   });
 
-  test('search matches assignee name', async ({ page }) => {
-    await page.locator('.search-toggle').click();
-    const searchInput = page.locator('#search-input');
-
-    // Search for assignee "Charlie" - assigned to Beta task in progress
-    await searchInput.fill('charlie');
-
-    // Charlie is assigned to issue-4, the Beta task In Progress
-    await expect(page.locator('.running-section .line', { hasText: 'Beta task in progress' })).toBeVisible();
+  test('search matches the assignee\'s name', async ({ page }) => {
+    await page.goto(`/workspace/${urlKey}/search?q=charlie`);
+    expect(await ids(page)).toEqual(['TEST-4']);
   });
 
-  test('search matches label name', async ({ page }) => {
-    await page.locator('.search-toggle').click();
-    const searchInput = page.locator('#search-input');
-
-    // Search for label "urgent" - on Beta task in progress
-    await searchInput.fill('urgent');
-
-    await expect(page.locator('.running-section .line', { hasText: 'Beta task in progress' })).toBeVisible();
+  test('search matches a label\'s name', async ({ page }) => {
+    await page.goto(`/workspace/${urlKey}/search?q=urgent`);
+    expect(await ids(page)).toEqual(['TEST-4']);
   });
 
-  test('shows no results message for non-matching search', async ({ page }) => {
-    await page.locator('.search-toggle').click();
-    const searchInput = page.locator('#search-input');
-
-    await searchInput.fill('xyznonexistent123');
-
-    const noResults = page.locator('#search-no-results');
-    await expect(noResults).not.toHaveClass(/hidden/);
-    await expect(noResults).toContainText('no matching issues');
+  test('a child task folded under its parent on Home is found, as a row of its own', async ({ page }) => {
+    await page.goto(`/workspace/${urlKey}/search?q=${encodeURIComponent('Child task')}`);
+    expect(await ids(page)).toEqual(['TEST-2']);
+    await expect(page.locator(SELECTORS.search.resultFor('TEST-2'))).toContainText('Alpha');
   });
 
-  test('clear button restores full view', async ({ page, localWorkerUrlKey }) => {
-    await page.goto(`/workspace/${localWorkerUrlKey}/backlog`);
-    await page.locator('.search-toggle').click();
-    const searchInput = page.locator('#search-input');
-
-    // Search for something specific
-    await searchInput.fill('Beta');
-
-    // Alpha should be hidden
-    const alphaProject = page.locator('.project[data-id="proj-alpha"]');
-    await expect(alphaProject).toHaveClass(/hidden/);
-
-    // Click clear
-    await page.locator('#search-clear').click();
-
-    // Panel should be hidden
-    await expect(page.locator('#search-panel')).toHaveClass(/hidden/);
-
-    // Alpha should be visible again
-    await expect(alphaProject).not.toHaveClass(/hidden/);
+  test('done work is found too, after the open matches', async ({ page }) => {
+    await page.goto(`/workspace/${urlKey}/search?q=task`);
+    const found = await ids(page);
+    expect(found[found.length - 1]).toBe('TEST-3');
+    await expect(page.locator(SELECTORS.search.resultFor('TEST-3'))).toHaveAttribute('data-done', 'true');
   });
 
-  test('Escape key closes search and restores view', async ({ page, localWorkerUrlKey }) => {
-    await page.goto(`/workspace/${localWorkerUrlKey}/backlog`);
-    await page.locator('.search-toggle').click();
-    const searchInput = page.locator('#search-input');
-
-    await searchInput.fill('Beta');
-
-    // Press Escape
-    await searchInput.press('Escape');
-
-    // Panel should be hidden
-    await expect(page.locator('#search-panel')).toHaveClass(/hidden/);
-
-    // Both projects should be visible
-    await expect(page.locator('.project[data-id="proj-alpha"]')).not.toHaveClass(/hidden/);
-    await expect(page.locator('.project[data-id="proj-beta"]')).not.toHaveClass(/hidden/);
-  });
-
-  test('/ keyboard shortcut opens search', async ({ page }) => {
-    const searchPanel = page.locator('#search-panel');
-    await expect(searchPanel).toHaveClass(/hidden/);
-
-    // Press "/" on the page body
-    await page.keyboard.press('/');
-
-    await expect(searchPanel).not.toHaveClass(/hidden/);
-    await expect(page.locator('#search-input')).toBeFocused();
-  });
-
-  test('search shows ancestor nodes for matching child', async ({ page }) => {
-    await page.locator('.search-toggle').click();
-    const searchInput = page.locator('#search-input');
-
-    // "Child task todo" is a child of "Parent task in progress". LIN-4024: the child is a folded Todo task under its
-    // In Progress parent, so the page does not hold it; the server search returns it with its ancestor.
-    await searchInput.fill('Child task');
-
-    const results = page.locator('[data-testid="home-search-results"]');
-    const childNode = results.locator('.node[data-id="issue-2"]');
-    await expect(childNode).toBeVisible();
-
-    // The parent node is the ancestor context of the match
-    const parentNode = results.locator('.node[data-id="issue-1"]');
-    await expect(parentNode).toBeVisible();
-  });
-
-  test('search filters in-progress section', async ({ page }) => {
-    await page.locator('.search-toggle').click();
-    const searchInput = page.locator('#search-input');
-
-    // "Parent task in progress" appears in the in-progress section
-    await searchInput.fill('Parent task');
-
-    const ipSection = page.locator('.running-section');
-    await expect(ipSection).not.toHaveClass(/hidden/);
-
-    // Now search for something not in progress
-    await searchInput.fill('Beta todo');
-    await expect(ipSection).toHaveClass(/hidden/);
-  });
-
-  test('search toggle is a child of .nav-actions in the shared nav bar (LIN-1149)', async ({ page }) => {
-    // The search toggle lives inside .nav-actions, not outside the nav-chrome
-    // or in a separate page-local block — placement verification for the single
-    // shared nav source of truth (LIN-1149).
-    const toggle = page.locator('.nav-actions .search-toggle');
-    await expect(toggle).toBeVisible();
-  });
-
-  test('search panel renders below the page title, outside the nav (LIN-1512)', async ({ page }) => {
-    // The symmetric guard to the LIN-1149 toggle check above: the panel operates on
-    // page content, so it belongs after the <h1>, not in the nav chrome. The whole
-    // deliverable rests on one call-site ordering in lib/render.js — without this,
-    // a refactor could move the panel back above the header and stay green.
-    await page.locator('.search-toggle').click();
-
-    // Out of the nav entirely (the toggle stays — see the LIN-1149 test above)
-    await expect(page.locator('nav #search-panel')).toHaveCount(0);
-
-    // ...and geometrically below the page title, not merely later in the DOM
-    const panel = page.locator('#search-panel');
-    await expect(panel).not.toHaveClass(/hidden/);
-    const titleBox = await page.locator('h1').first().boundingBox();
-    const panelBox = await panel.boundingBox();
-    expect(panelBox.y).toBeGreaterThan(titleBox.y + titleBox.height);
-  });
-
-  test('empty search restores view without closing panel', async ({ page, localWorkerUrlKey }) => {
-    await page.goto(`/workspace/${localWorkerUrlKey}/backlog`);
-    await page.locator('.search-toggle').click();
-    const searchInput = page.locator('#search-input');
-
-    // Search to hide some items
-    await searchInput.fill('Beta');
-    await expect(page.locator('.project[data-id="proj-alpha"]')).toHaveClass(/hidden/);
-
-    // Clear the input text (but don't click clear button)
-    await searchInput.fill('');
-
-    // Both projects should be visible again
-    await expect(page.locator('.project[data-id="proj-alpha"]')).not.toHaveClass(/hidden/);
-    await expect(page.locator('.project[data-id="proj-beta"]')).not.toHaveClass(/hidden/);
-
-    // Panel should still be open
-    await expect(page.locator('#search-panel')).not.toHaveClass(/hidden/);
+  test('a search that matches nothing says so, and lists nothing', async ({ page }) => {
+    await page.goto(`/workspace/${urlKey}/`);
+    await railSearch(page, urlKey, 'xyznonexistent123');
+    await expect(page.locator(SELECTORS.search.result)).toHaveCount(0);
+    await expect(page.locator('.page-header__subtitle')).toHaveText('Nothing matches “xyznonexistent123”.');
   });
 });

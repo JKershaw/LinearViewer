@@ -42,6 +42,7 @@
 
 import { Router } from 'express';
 import { renderErrorPage } from '../lib/render.js';
+import { frameViewer } from '../lib/components/frame.js';
 import { jsonError } from '../lib/errors.js';
 import { isValidIssueId } from '../lib/workspace.js';
 import { isWellFormedTaskShareToken } from '../lib/task-share-store.js';
@@ -245,7 +246,8 @@ export function createTaskShareRoutes({
         stateUrl: `/t/${encodeURIComponent(token)}/state`,
         timelineUrl: timelineFragment ? `/t/${encodeURIComponent(token)}/timeline` : '',
         now: now(),
-        pageOptions: { deployInfo: getDeployInfo(), workspaces: [], featureFlags: {}, openRouterSource: null },
+        // LIN-4563: a guest's page sits in the public frame; a signed-in reader's band leads to their own Home.
+        pageOptions: { deployInfo: getDeployInfo(), workspaces: [], featureFlags: {}, openRouterSource: null, viewerOfPublic: frameViewer(req.session) },
       }));
     } catch (error) {
       // Fail closed: a masker bug is not a false positive and the body is unvouched.
