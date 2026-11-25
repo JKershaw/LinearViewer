@@ -330,6 +330,9 @@ body.frame-body {
 
 .frame--public {
   grid-template-columns: minmax(0, 1fr);
+  /* The band keeps its own height and the page takes the rest, so a short page's spare height does not
+     split between them (LIN-4567: the band was ~320px tall on /t/not-a-token). */
+  grid-template-rows: auto 1fr;
 }
 
 .frame-public {

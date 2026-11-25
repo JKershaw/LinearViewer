@@ -4343,6 +4343,12 @@ body[data-proxy-active="true"] .prompt-proxy-toggle {
   .plain-page {
     font-size: 1rem;
   }
+
+  /* LIN-4567: the frame's h1 names the page at 1.2rem here, so the sections step down one (1.1rem) and the
+     page name stays the largest heading, the order LIN-3958 set. */
+  .plain-page > .section > .section-header {
+    font-size: 1.1rem;
+  }
 }
 
 /* =========================================================================

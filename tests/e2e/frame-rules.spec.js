@@ -364,6 +364,7 @@ async function readPublicFrame(page) {
       title: document.title,
       rail: !!document.querySelector('[data-testid="frame-rail"]'),
       band: !!band,
+      bandHeight: band ? Math.round(band.getBoundingClientRect().height) : null,
       brandHref: band?.querySelector('[data-testid="rail-brand"]')?.getAttribute('href') ?? null,
       backHref: band?.querySelector('[data-testid="frame-back"]')?.getAttribute('href') ?? null,
       signIn: !!band?.querySelector('[data-testid="frame-sign-in"]'),
@@ -395,6 +396,10 @@ for (const signedIn of [false, true]) {
         await page.setViewportSize({ width, height: 900 });
         const edges = new Set();
         const sizes = new Set();
+        // The band's height follows its content, not the page's: the Swipe/Swim previews show the longer "Sign in with Linear"
+        // control, which wraps at 390px, so they are measured as their own group. Every band stays near one row's height: a short
+        // page whose band stretched with the spare viewport (~320px) is the defect this catches (LIN-4567).
+        const bandHeights = { standard: new Set(), preview: new Set() };
         for (const entry of PUBLIC_PATHS.filter(e => !(signedIn && e.signedOutOnly))) {
           const response = await page.goto(entry.path);
           expect(response.status(), `${entry.path}: the page renders`).toBe(entry.status || 200);
@@ -411,6 +416,8 @@ for (const signedIn of [false, true]) {
           expect(f.scrollWidth, `${entry.path}: no sideways scroll`).toBeLessThanOrEqual(f.innerWidth);
           edges.add(f.h1Left);
           sizes.add(f.h1Size);
+          bandHeights[entry.previewSignIn ? 'preview' : 'standard'].add(f.bandHeight);
+          expect(f.bandHeight, `${entry.path}: the band is not stretched by the page's spare height`).toBeLessThan(200);
 
           if (signedIn) {
             expect(f.brandHref, `${entry.path}: signed in, the wordmark leads to the viewer's Home`).toBe(home);
@@ -432,6 +439,9 @@ for (const signedIn of [false, true]) {
         }
         expect(edges.size, `one left edge: ${[...edges]}`).toBe(1);
         expect(sizes.size, `one heading size: ${[...sizes]}`).toBe(1);
+        for (const [group, heights] of Object.entries(bandHeights)) {
+          expect(heights.size, `one band height (${group}): ${[...heights]}`).toBeLessThanOrEqual(1);
+        }
       });
     }
   });

@@ -55,6 +55,18 @@ test.describe('W2: a new person can sign in by email (LIN-1892)', () => {
     await expect(page.getByTestId('account-home')).toBeVisible();
     await expect(page.getByTestId('account-home-email')).toContainText(email);
     await expect(page.getByTestId('account-home-c6')).toBeVisible();
+    // The account home sits in the public frame (LIN-4567): the band, no rail, one h1 naming the page, an email-only
+    // account's home is /account, and there is no way to sign in because the person already is.
+    await expect(page.getByTestId('frame-public-band')).toBeVisible();
+    await expect(page.getByTestId('frame-rail')).toHaveCount(0);
+    await expect(page.locator('h1')).toHaveCount(1);
+    await expect(page.locator('h1')).toHaveText('Your account');
+    expect(await page.title(), 'the tab names the page').toMatch(/^Your account · Harbour/);
+    await expect(page.getByTestId('rail-brand')).toHaveAttribute('href', '/account');
+    await expect(page.getByTestId('frame-open-workspace')).toHaveText(/Your account/);
+    await expect(page.getByTestId('frame-open-workspace')).toHaveAttribute('href', '/account');
+    await expect(page.getByTestId('frame-sign-in')).toHaveCount(0);
+    await expect(page.getByTestId('frame-footer')).toBeVisible();
     const firstAccountId = await sessionAccountId(page);
     expect(firstAccountId, 'signed in').toBeTruthy();
 
