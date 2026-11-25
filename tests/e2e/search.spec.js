@@ -5,7 +5,7 @@ import { SELECTORS } from '../helpers.js';
 // LIN-4563 (LIN-4342 piece 2): the search, rewritten for the rail. Home's and Backlog's in-page search panel (the
 // `search` toggle, `#search-input`, the "/" shortcut, the client-side row filter) is retired; the rail's search field,
 // on every page in the frame, goes to the server-rendered search page `/workspace/:urlKey/search?q=` (LIN-4562), which
-// lists matching tasks across the workspace, open first and then done. The old spec's intents are kept, each against
+// lists matching tasks in the workspace’s active projects, open first and then done. The old spec's intents are kept, each against
 // that page: matching by title, case, assignee and label; a folded child task is found; nothing found says so; and the
 // search is reached from Home and from Backlog.
 //

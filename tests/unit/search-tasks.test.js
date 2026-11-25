@@ -1,5 +1,5 @@
 /**
- * LIN-4562: `searchTasks` (lib/home-rows.js), the search page's reader. It finds tasks across the workspace: done work
+ * LIN-4562: `searchTasks` (lib/home-rows.js), the search page's reader. It finds tasks in the workspace’s active projects: done work
  * and every project included, open first, then done (most recently finished first), each once, capped. LIN-4563 retired
  * Home's own in-page search (`searchRows`, the `search` fold kind): this is the one search.
  *
