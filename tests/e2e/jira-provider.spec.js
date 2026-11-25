@@ -1,9 +1,13 @@
 import { test, expect } from '../fixtures/test-base.js';
+import { SELECTORS } from '../helpers.js';
 import {
   seedJiraWorkspace,
   JIRA_WORKSPACE_URL_KEY,
   jiraDashboardUrl,
 } from '../fixtures/jira-harness.js';
+
+// LIN-4563: the rail's workspace menu, its list of connected workspaces (the add rows are a separate list).
+const SWITCH_ROWS = `${SELECTORS.nav.workspaceMenu} ul[aria-label="Switch workspace"] li`;
 
 // LIN-1885 (Phase 1 of LIN-275): end-to-end proof of the Jira Cloud provider —
 // a genuinely hostile third-party schema, sibling to GitHub Issues/Projects.
@@ -227,11 +231,10 @@ test.describe('LIN-1890 — a Jira-only session on an OAuth binding', () => {
   test('the session holds NO Linear or GitHub workspace — the premise, asserted not assumed', async ({ page }) => {
     // A co-resident Linear binding would make every assertion below pass for
     // the wrong reason, so the zero-Linear premise is checked rather than
-    // trusted. The nav's workspace panel lists every connected workspace as a
-    // `role="option"` row — the `+add` row shares the class but is not a
-    // workspace, so the role is what makes this count the right thing.
-    await expect(page.locator('.nav-options-row a.nav-option[role="option"]')).toHaveCount(1);
-    await expect(page.locator('.nav-item[data-selector="workspace"] .nav-value')).toContainText('Jira Workspace');
+    // trusted. LIN-4563: the rail's workspace menu lists every connected workspace in its "Switch workspace" list (the
+    // add rows are a list of their own), so that list's rows are the right thing to count.
+    await expect(page.locator(SWITCH_ROWS)).toHaveCount(1);
+    await expect(page.locator(SELECTORS.nav.workspaceName)).toContainText('Jira Workspace');
   });
 
   test('the dashboard renders issues through the OAuth call scope', async ({ page }) => {
@@ -455,7 +458,7 @@ test.describe('LIN-2001 — Jira OAuth callback driven as real HTTP', () => {
     // Session shape via a page-rendered signal, not `req.session` directly —
     // the zero-Linear/zero-GitHub premise (mirrors LIN-1890's own check
     // above): exactly one connected workspace, named from the fake site.
-    await expect(page.locator('.nav-options-row a.nav-option[role="option"]')).toHaveCount(1);
-    await expect(page.locator('.nav-item[data-selector="workspace"] .nav-value')).toContainText('Acme');
+    await expect(page.locator(SWITCH_ROWS)).toHaveCount(1);
+    await expect(page.locator(SELECTORS.nav.workspaceName)).toContainText('Acme');
   });
 });

@@ -524,8 +524,21 @@ function goneHandlerFor(stateUrl, main) {
   if (!isGuestStateUrl(stateUrl)) return null;
   return function () {
     main.innerHTML = '<p class="task-share-gone" data-testid="task-share-gone">This link is no longer available.</p>';
+    // LIN-4563: the page sits in the public frame, whose h1, the line under it and the tab name the task. A revoked link
+    // stops naming it there too: the page is "Link not available".
+    const head = main.closest ? main.closest('[data-testid="frame-main"]')?.querySelector('.frame-head') : null;
+    if (head) {
+      const h1 = head.querySelector('h1');
+      if (h1) h1.textContent = GONE_PAGE_NAME;
+      head.querySelector('.page-header__subtitle')?.remove();
+    }
+    const doc = main.ownerDocument;
+    if (doc) doc.title = `${GONE_PAGE_NAME} · Harbour`;
   };
 }
+
+/** The name a guest page takes once its link is revoked (LIN-4563). */
+const GONE_PAGE_NAME = 'Link not available';
 
 /**
  * Whether an idle or failed poll paints the server-rendered ready header (`<main

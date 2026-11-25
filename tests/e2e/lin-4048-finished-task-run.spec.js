@@ -1,4 +1,5 @@
 import { test, expect } from '../fixtures/test-base.js';
+import { SELECTORS } from '../helpers.js';
 import { localSeedId } from '../fixtures/local-harness.js';
 
 // LIN-4048: a Done task on the task page. Its run slot follows the server's no-run decision (`none`) and the
@@ -103,7 +104,7 @@ test.describe('Task page, a finished task (LIN-4048)', () => {
   test('Done with nothing held: no runs-on, no Change, no quota and no Go on the page', async ({ page }) => {
     await seedDoneTask(page);
     await page.goto(`/workspace/${URL_KEY}/task/LOCAL-FT1`);
-    await expect(page.locator('[data-testid="task-page-title"]')).toHaveText('A finished task');
+    await expect(page.locator(SELECTORS.nav.heading)).toHaveText('A finished task');
     await expect(page.locator('[data-testid="opened-task-go"]')).toHaveCount(0);
     await expect(page.locator('[data-testid="opened-task-runs-on"]')).toHaveCount(0);
     await expect(page.locator('[data-testid="run-change"]')).toHaveCount(0);

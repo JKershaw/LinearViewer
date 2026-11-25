@@ -1,4 +1,10 @@
 import { test, expect } from '../fixtures/test-base.js';
+import { SELECTORS } from '../helpers.js';
+
+// LIN-4563 (LIN-4342 piece 2): Home moved onto the frame, whose rail carries the workspace menu (switch and add only;
+// removing a workspace moves to Settings in piece 5). The old bar's menu (switch, add, remove) still renders on pages not
+// yet moved, so its cases below run on /swim (OLD_BAR_PAGE). Switching from Home goes through the rail's menu.
+const OLD_BAR_PAGE = 'swim';
 
 // Mixed-harness boundary split (LIN-428, parent S3/LIN-389).
 //   - The two single-workspace selector cases ('single workspace shows in
@@ -16,13 +22,13 @@ import { test, expect } from '../fixtures/test-base.js';
 let WORKSPACE_URL;
 
 test.beforeEach(({ workerUrlKey }) => {
-  WORKSPACE_URL = `/workspace/${workerUrlKey}/`;
+  WORKSPACE_URL = `/workspace/${workerUrlKey}/${OLD_BAR_PAGE}`;
 });
 
 test.describe('Workspace Selector', () => {
   test('single workspace shows in selector', async ({ page, seedLocal }) => {
-    const { dashboard } = await seedLocal();
-    await page.goto(dashboard);
+    const { urlKey } = await seedLocal();
+    await page.goto(`/workspace/${urlKey}/${OLD_BAR_PAGE}`);
 
     const workspaceToggle = page.locator('#workspace-toggle');
     await expect(workspaceToggle).toBeVisible();
@@ -74,45 +80,46 @@ test.describe('Workspace Selector', () => {
   });
 
   test('clicking outside closes workspace selector', async ({ page, seedLocal }) => {
-    const { dashboard } = await seedLocal();
-    await page.goto(dashboard);
+    const { urlKey } = await seedLocal();
+    await page.goto(`/workspace/${urlKey}/${OLD_BAR_PAGE}`);
 
     const workspaceToggle = page.locator('#workspace-toggle');
     await workspaceToggle.click();
 
     await expect(page.locator('#workspace-options')).toBeVisible();
 
-    // Click outside (on the header)
-    await page.locator('header').click();
+    // Click outside (on the page's heading)
+    await page.locator('h1').first().click();
 
     await expect(page.locator('#workspace-options')).toHaveClass(/hidden/);
   });
 });
 
 test.describe('Workspace Switching', () => {
-  test('can switch to second workspace', async ({ page, workerUrlKey, secondWorkerUrlKey }) => {
+  test('can switch to second workspace from Home, through the rail\'s menu; the menu offers no remove', async ({ page, workerUrlKey, secondWorkerUrlKey }) => {
     // Set up multiWorkspace session
     await page.goto(`/test/set-session?multiWorkspace=true&urlKey=${workerUrlKey}`);
-    await page.goto(WORKSPACE_URL);
+    await page.goto(`/workspace/${workerUrlKey}/`);
 
     // Initially showing first workspace
-    await expect(page.locator('#workspace-toggle')).toHaveText('Test Workspace');
+    await expect(page.locator(SELECTORS.nav.workspaceName)).toHaveText('Test Workspace');
 
-    // Open workspace selector
-    await page.locator('#workspace-toggle').click();
-    await expect(page.locator('#workspace-options')).toBeVisible();
+    // Open the rail's workspace menu: it switches and adds; removing lives in Settings.
+    await page.locator(SELECTORS.nav.workspaceToggle).click();
+    await expect(page.locator(SELECTORS.nav.workspaceMenu)).toBeVisible();
+    await expect(page.locator(`${SELECTORS.nav.workspaceMenu} .nav-option-danger, ${SELECTORS.nav.workspaceMenu} [action$="/remove"]`)).toHaveCount(0);
 
-    // Click the second workspace and wait for navigation to the new workspace URL
+    // Click the second workspace and wait for navigation to the new workspace's Home
     await Promise.all([
       page.waitForURL(`/workspace/${secondWorkerUrlKey}/`),
-      page.getByRole('option', { name: /Second Workspace/ }).click()
+      page.locator(`[data-testid="rail-workspace-${secondWorkerUrlKey}"]`).click()
     ]);
 
     // Force a reload to bypass any caching issues
     await page.reload();
 
     // Should now show second workspace
-    await expect(page.locator('#workspace-toggle')).toHaveText('Second Workspace');
+    await expect(page.locator(SELECTORS.nav.workspaceName)).toHaveText('Second Workspace');
   });
 
   test('switching workspace from settings stays on settings', async ({ page, workerUrlKey, secondWorkerUrlKey }) => {
@@ -193,7 +200,7 @@ test.describe('Workspace Limit', () => {
   test('at max workspaces, all are displayed', async ({ page, workerUrlKey, workerSuffix }) => {
     await page.goto(`/test/set-session?maxWorkspaces=true&urlKey=${workerUrlKey}`);
     // Use workspace-0's URL key for max workspaces test (per-worker suffixed)
-    await page.goto(`/workspace/workspace-0${workerSuffix}/`);
+    await page.goto(`/workspace/workspace-0${workerSuffix}/${OLD_BAR_PAGE}`);
 
     await page.locator('#workspace-toggle').click();
 

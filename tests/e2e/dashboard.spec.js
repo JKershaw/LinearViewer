@@ -1,4 +1,5 @@
 import { test, expect } from '../fixtures/test-base.js';
+import { SELECTORS } from '../helpers.js';
 import { localSeedId, defaultLocalSeedWithUpNext } from '../fixtures/local-harness.js';
 
 // LIN-378: the dashboard surface is fully modeled by the local provider, so this
@@ -68,50 +69,41 @@ test.describe('Authenticated Dashboard', () => {
     await expect(page.locator('[data-testid="home-done-count"]').first()).toContainText('1 done');
   });
 
-  test('shows text-based navigation bar', async ({ page }) => {
-    // Should have nav bar
-    await expect(page.locator('.nav-bar')).toBeVisible();
+  // LIN-4563: Home sits in the frame: the rail, not the bar; the frame's footer; reset on the Backlog page.
+  test('shows the rail with Home marked, and no logout, reset or audit in it', async ({ page }) => {
+    await expect(page.locator(SELECTORS.nav.rail)).toBeVisible();
+    await expect(page.locator(SELECTORS.nav.railMarked)).toHaveAttribute('data-place', 'home');
 
-    // Logout should NOT be in nav bar (moved to settings page)
-    await expect(page.locator('.nav-action[href="/logout"]')).not.toBeVisible();
-
-    // Reset and audit should NOT be in nav bar
-    await expect(page.locator('.nav-bar .reset-view')).not.toBeVisible();
-    await expect(page.locator('.nav-bar .nav-action[href="/audit"]')).not.toBeVisible();
+    // Logout is on the Settings page; reset is Backlog's; audit is reached from Settings.
+    await expect(page.locator(`${SELECTORS.nav.rail} a[href="/logout"]`)).toHaveCount(0);
+    await expect(page.locator(`${SELECTORS.nav.rail} .reset-view`)).toHaveCount(0);
+    await expect(page.locator(`${SELECTORS.nav.rail} a[href$="/audit"]`)).toHaveCount(0);
   });
 
-  test('shows footer with reset and deploy info, and header nav with view links', async ({ page, localWorkerUrlKey }) => {
-    // Footer should be visible
-    await expect(page.locator('.page-footer')).toBeVisible();
+  test('shows the frame footer with the deploy stamp, the rail with view links, and reset on the Backlog page', async ({ page, localWorkerUrlKey }) => {
+    await expect(page.locator(SELECTORS.nav.footer)).toBeVisible();
+    await expect(page.locator('.page-footer')).toHaveCount(0);
 
-    // Reset (a client action, not a view link) stays in the footer
-    await expect(page.locator('.footer-action.reset-view')).toBeVisible();
+    // The places are the rail's.
+    await expect(page.locator(`${SELECTORS.nav.place('settings')}[href="/workspace/${localWorkerUrlKey}/settings"]`)).toBeVisible();
+    await expect(page.locator(`${SELECTORS.nav.place('swim')}[href="/workspace/${localWorkerUrlKey}/swim"]`)).toBeVisible();
 
-    // Cross-view links were hoisted into the shared header switcher (LIN-978).
-    await expect(page.locator(`.nav-views [data-testid="nav-view-settings"][href="/workspace/${localWorkerUrlKey}/settings"]`)).toBeVisible();
-    await expect(page.locator(`.nav-views [data-testid="nav-view-swim"][href="/workspace/${localWorkerUrlKey}/swim"]`)).toBeVisible();
+    // Reset is not on Home; it is in the Backlog page's control line, next to the folds it resets.
+    await expect(page.locator('.reset-view')).toHaveCount(0);
+    await page.goto(`/workspace/${localWorkerUrlKey}/backlog`);
+    await expect(page.locator('[data-testid="backlog-controls"] [data-testid="backlog-reset"]')).toBeVisible();
+    await expect(page.locator(`${SELECTORS.nav.footer} .reset-view`)).toHaveCount(0);
 
-    // The footer no longer carries any view links.
-    await expect(page.locator('.footer-actions [data-testid^="footer-link-"]')).toHaveCount(0);
-
-    // No bold current page indicator in the footer. In the header, the dashboard
-    // route IS the projects view (LIN-1088), so its tab — and only its tab —
-    // carries the "current" state; the other view links stay plain anchors.
-    await expect(page.locator('.footer-current')).not.toBeVisible();
-    await expect(page.locator('.nav-view-current')).toHaveCount(1);
-    await expect(page.locator('[data-testid="nav-view-projects"].nav-view-current')).toBeVisible();
-
-    // Should have deploy info section with GitHub link (fallback in test mode)
-    await expect(page.locator('.footer-deploy')).toBeVisible();
-    await expect(page.locator('.footer-link')).toBeVisible();
+    // The footer's source link (the deploy stamp only when the deploy says what it is).
+    await expect(page.locator('[data-testid="frame-footer-source"]')).toBeVisible();
   });
 
   test('shows organization name from the local provider', async ({ page }) => {
-    // The h1 should contain the provider's organization name (the local provider
-    // reports "Local"), not the landing page title "Harbour".
+    // LIN-4563: Home's h1 is the page's name; the workspace (the local provider's organization) names the tab.
     const h1 = page.locator('h1');
-    await expect(h1).toBeVisible();
-    await expect(h1).not.toContainText('Harbour');
+    await expect(h1).toHaveText('Home');
+    await expect(page).toHaveTitle(/^Home · /);
+    await expect(page).not.toHaveTitle(/Harbour/);
   });
 
   test('renders CSS-based tree structure', async ({ page, localWorkerUrlKey }) => {

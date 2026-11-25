@@ -110,7 +110,7 @@ test.describe('LIN-4554: the task page\'s record tools, folded', () => {
     const guestCtx = await browser.newContext({ viewport: PHONE });
     const guest = await guestCtx.newPage();
     expect((await guest.goto(`${baseURL}${path}`)).status()).toBe(200);
-    await expect(guest.locator('[data-testid="task-page-title"]')).toHaveText('A task with records');
+    await expect(guest.locator(SELECTORS.nav.heading)).toHaveText('A task with records');
     await expect(guest.locator(R.section)).toHaveCount(0);
     await expect(guest.locator(R.addTools)).toHaveCount(0);
     await expect(guest.locator(R.recordTools)).toHaveCount(0);

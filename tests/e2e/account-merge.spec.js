@@ -1,4 +1,5 @@
 import { test, expect } from '../fixtures/test-base.js';
+import { SELECTORS } from '../helpers.js';
 
 // LIN-2285 close-out ledger item 2: no E2E spec exercised the account-merge
 // confirm flow at all before this — `git grep -l 'merge-confirm|auth/merge'
@@ -37,7 +38,7 @@ test.describe('Account merge confirm flow (LIN-2285)', () => {
     // Confirming redirects into the arriving identity's workspace (mode:'new')
     // rather than erroring — no 500 "Merge Failed" dead end.
     await expect(page).toHaveURL(/\/workspace\/merge-conflict-b-[0-9a-f]+\//);
-    await expect(page.locator('.nav-bar')).toBeVisible();
+    await expect(page.locator(SELECTORS.nav.rail)).toBeVisible();
     await expect(page.locator('body')).not.toHaveClass(/is-landing/);
   });
 
@@ -55,7 +56,7 @@ test.describe('Account merge confirm flow (LIN-2285)', () => {
     // workspace, byte-identical to before the offer, since decline writes
     // nothing to either account.
     await expect(page).toHaveURL(/\/workspace\/merge-conflict-c-[0-9a-f]+\//);
-    await expect(page.locator('.nav-bar')).toBeVisible();
+    await expect(page.locator(SELECTORS.nav.rail)).toBeVisible();
   });
 });
 

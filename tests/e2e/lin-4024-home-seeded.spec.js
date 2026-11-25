@@ -106,22 +106,17 @@ test('a task waiting on a question reads the same on the count line, the card, a
   await expect(card.locator('[data-testid="question-record-card-answer"]')).toHaveCount(1);
 });
 
-test('search finds a Backlog task the page does not hold, under its ancestors', async ({ page }) => {
+// LIN-4563: the in-page search is retired; the rail's search page lists the task (flat, with its project, once).
+test('search finds a Backlog task the page does not hold', async ({ page }) => {
   await seedSmall(page);
-  await page.goto(`/workspace/${URL_KEY}/`);
-
-  await page.locator('.search-toggle').click();
-  await page.locator('#search-input').fill('Backlog task 3');
-  const results = page.locator('[data-testid="home-search-results"]');
-  await expect(results.locator('[data-identifier="LOCAL-B1"]')).toHaveCount(1);
-  // Its started parent comes with it, as the context the match sits under.
-  await expect(results.locator('[data-identifier="LOCAL-0"]')).toHaveCount(1);
+  await page.goto(`/workspace/${URL_KEY}/search?q=${encodeURIComponent('Backlog task 3')}`);
+  await expect(page.locator(SELECTORS.search.resultFor('LOCAL-B1'))).toHaveCount(1);
 });
 
 test.describe('the lazy rows route (witness E)', () => {
   test('refuses a workspace the session is not a member of, the way /api/detail refuses it', async ({ page }) => {
     await seedSmall(page);
-    const rows = await page.request.get('/workspace/not-a-member-workspace/api/home-rows?kind=search&q=item');
+    const rows = await page.request.get('/workspace/not-a-member-workspace/api/home-rows?kind=recent');
     const detail = await page.request.get('/workspace/not-a-member-workspace/api/detail/LOCAL-1');
     expect(rows.status()).toBe(detail.status());
     expect(rows.status()).not.toBe(200);
@@ -131,16 +126,17 @@ test.describe('the lazy rows route (witness E)', () => {
 
   test('refuses a request with no session', async ({ playwright, baseURL }) => {
     const anonymous = await playwright.request.newContext({ baseURL });
-    const rows = await anonymous.get(`/workspace/${URL_KEY}/api/home-rows?kind=search&q=item`);
+    const rows = await anonymous.get(`/workspace/${URL_KEY}/api/home-rows?kind=recent`);
     expect(rows.status()).toBe(401);
     await anonymous.dispose();
   });
 
   test('never returns a done task, whatever the query', async ({ page }) => {
     await seedSmall(page);
+    // LIN-4563: the `search` kind retired with Home's in-page search; it is refused as an unknown kind.
+    expect((await page.request.get(`/workspace/${URL_KEY}/api/home-rows?kind=search&q=item`)).status()).toBe(400);
     const queries = [
-      `kind=search&q=${encodeURIComponent('Finished item')}`,
-      `kind=search&q=${encodeURIComponent('Finished item 4')}`,
+      'kind=recent',
       `kind=backlog&project=${encodeURIComponent(localSeedId(URL_KEY, 'proj-0'))}&offset=0`,
       `kind=up-next&project=${encodeURIComponent(localSeedId(URL_KEY, 'proj-0'))}&offset=0`,
     ];

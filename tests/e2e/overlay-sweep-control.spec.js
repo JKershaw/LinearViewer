@@ -2,6 +2,9 @@ import { test, expect } from '../fixtures/test-base.js'
 import { sweepFixedOverlaps, describeHits, expectSweepNotVacuous } from '../fixed-overlay-sweep.js'
 import { withHomeFiller } from '../fixtures/local-harness.js'
 
+// LIN-4563: the frame footer's Privacy link, on Home (which sits in the frame since LIN-4342 piece 2).
+const FOOTER_TARGET = '[data-testid="frame-footer-privacy"]'
+
 // LIN-2298 — the POSITIVE CONTROL for tests/fixed-overlay-sweep.js.
 //
 // Every other consumer of that helper asserts a NEGATIVE: "this content is
@@ -53,10 +56,10 @@ test.describe('LIN-2298: the overlay sweep can actually detect an overlay', () =
     await page.goto(`/workspace/${urlKey}/`)
     await page.waitForLoadState('networkidle')
 
-    // The dashboard footer is the same target tests/e2e/feedback-widget.spec.js
-    // sweeps, so this control exercises the real call shape rather than a
-    // synthetic page the other specs never touch.
-    const target = '.page-footer a.footer-legal[href="/privacy"]'
+    // LIN-4563: Home sits in the frame, so the control sweeps the frame's footer (the
+    // footer every page will share); the call shape is the one
+    // tests/e2e/feedback-widget.spec.js uses on the old footer.
+    const target = FOOTER_TARGET
 
     await injectOverlay(page, target)
     const withOverlay = await sweepFixedOverlaps(page, target)
@@ -100,7 +103,7 @@ test.describe('LIN-2298: the overlay sweep can actually detect an overlay', () =
     await page.waitForLoadState('networkidle')
 
     await page.evaluate(() => {
-      const target = document.querySelector('.page-footer a.footer-legal[href="/privacy"]')
+      const target = document.querySelector('[data-testid="frame-footer-privacy"]')
       const r = target.getBoundingClientRect()
       const width = Math.max(120, r.width)
       const left = Math.min(Math.max(0, r.left), Math.max(0, window.innerWidth - width - 16))
@@ -113,7 +116,7 @@ test.describe('LIN-2298: the overlay sweep can actually detect an overlay', () =
       }
     })
 
-    const result = await sweepFixedOverlaps(page, '.page-footer a.footer-legal[href="/privacy"]')
+    const result = await sweepFixedOverlaps(page, FOOTER_TARGET)
     const named = new Set(result.hits.map(h => h.overlay))
     expect(
       [...named].sort(),
@@ -122,8 +125,8 @@ test.describe('LIN-2298: the overlay sweep can actually detect an overlay', () =
   })
 
   test('sweeps sticky overlays too, not just fixed ones', async ({ page, seedLocal }) => {
-    // `.nav-bar` is `position: sticky; top: 0` and now hosts the feedback
-    // trigger (LIN-2298). A sweep blind to sticky would let the prose claim
+    // LIN-4563: on a framed page at a phone width the band (`.frame-band`) is
+    // `position: sticky; top: 0` (it took the old `.nav-bar`'s place). A sweep blind to sticky would let the prose claim
     // "nothing floats over this content" while the header does exactly that,
     // which is what review round 1 objected to. This pins that sticky is in the
     // candidate vocabulary at all.
@@ -136,17 +139,17 @@ test.describe('LIN-2298: the overlay sweep can actually detect an overlay', () =
     await page.goto(`/workspace/${urlKey}/`)
     await page.waitForLoadState('networkidle')
 
-    await expect(page.locator('.nav-bar')).toBeVisible()
-    const position = await page.evaluate(() => getComputedStyle(document.querySelector('.nav-bar')).position)
-    // Guard the guard: if the nav ever stops being sticky this test would
+    await expect(page.locator('.frame-band')).toBeVisible()
+    const position = await page.evaluate(() => getComputedStyle(document.querySelector('.frame-band')).position)
+    // Guard the guard: if the band ever stops being sticky this test would
     // silently stop covering the sticky branch.
-    expect(position, '.nav-bar is expected to be sticky — see public/style.css').toBe('sticky')
+    expect(position, '.frame-band is expected to be sticky at 360px — see public/frame.css').toBe('sticky')
 
-    const result = await sweepFixedOverlaps(page, '.page-footer a.footer-legal[href="/privacy"]')
+    const result = await sweepFixedOverlaps(page, FOOTER_TARGET)
     expectSweepNotVacuous(expect, result, 'dashboard footer')
     expect(
-      result.candidates.some(c => String(c).includes('nav-bar')),
-      `sticky .nav-bar must appear as a sweep candidate; saw: ${result.candidates.join(', ')}`
+      result.candidates.some(c => String(c).includes('frame-band')),
+      `sticky .frame-band must appear as a sweep candidate; saw: ${result.candidates.join(', ')}`
     ).toBe(true)
   })
 

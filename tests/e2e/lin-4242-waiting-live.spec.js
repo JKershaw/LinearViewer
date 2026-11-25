@@ -12,6 +12,7 @@
  * (LIN-4532, lib/question-record-card.js); a card answered elsewhere leaves on the next refresh.
  */
 import { test, expect } from '../fixtures/test-base.js';
+import { SELECTORS } from '../helpers.js';
 import { localSeedId } from '../fixtures/local-harness.js';
 import { askingRun, seedQuestion } from '../fixtures/question-records.js';
 
@@ -22,7 +23,8 @@ const OPEN_CARD = `${CARD}:not([data-settled="true"])`;
 const WAIT_CARD = `${SECTION} .waiting-question`;
 const COUNT = '[data-testid="in-progress-count"]';
 const LIVE = '[data-testid="home-desk-live"]';
-const BADGE = '.rulings-badge .rulings-count';
+// LIN-4563: the rail's count on Home (the band draws a second copy for a phone), the bar's on a page not yet moved.
+const BADGE = SELECTORS.questionsBadge;
 const THREE_OPTIONS = { options: ['Ship it now', 'Wait for review', 'Split the change'], recommended: 'Wait for review' };
 
 let URL_KEY;

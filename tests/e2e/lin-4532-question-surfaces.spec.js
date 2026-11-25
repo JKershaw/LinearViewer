@@ -15,6 +15,7 @@
  * (LIN-4532 finding-6234e34d). The seed and the reads are in tests/fixtures/question-records.js.
  */
 import { test, expect } from '../fixtures/test-base.js';
+import { SELECTORS } from '../helpers.js';
 import { localSeedId } from '../fixtures/local-harness.js';
 import {
   askingRun, seedQuestion, stopRun, questionState, decisionFor, runnerTokenFor,
@@ -25,7 +26,8 @@ const SECTION = '[data-testid="waiting-on-you"]';
 const WAITING_Q = `${SECTION} .waiting-question`;
 const WAITING_QCARD = `${WAITING_Q} [data-testid="question-record-card"]`;
 const COUNT = '[data-testid="in-progress-count"]';
-const BADGE = '.rulings-badge .rulings-count';
+// LIN-4563: the rail's count on Home (the band draws a second copy for a phone), the bar's on a page not yet moved.
+const BADGE = SELECTORS.questionsBadge;
 const RESUMED = 'Answered. The run resumes with your answer.';
 const NOT_RESUMED = 'Answered. The run was stopped, so it was not resumed.';
 const DISMISSED = 'Dismissed. The run is told and takes its fallback.';

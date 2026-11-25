@@ -41,6 +41,8 @@ test.describe('Questions tab (LIN-1728 Phase 4, named for questions by LIN-4553)
   });
 });
 
+const HOME_BADGE = '[data-rulings-badge]:not([data-testid="band-questions"])';
+
 test.describe('Ambient rulings nav badge (LIN-1728 Phase 3)', () => {
   // The badge's poll (public/common.js's initRulingsBadge/updateRulingsBadge)
   // is loaded on EVERY page that renders the badge markup, including
@@ -48,16 +50,19 @@ test.describe('Ambient rulings nav badge (LIN-1728 Phase 3)', () => {
   // which Observation never loads, so the badge there was permanently dead:
   // no initial count, no live updates, and the two `window.updateRulingsBadge`
   // guards in the press handler could never fire). Exercised on the projects
-  // page here; the Observation-specific coverage is below.
+  // page here; the Observation-specific coverage is below. LIN-4563: Home sits in
+  // the frame, which draws the count on Home's rail item and in the phone band;
+  // HOME_BADGE is the rail's (updateRulingsBadge writes every copy).
   test('hidden with no rulings, shows a workspace-scoped count once one exists, gated on the dispatch flag like the queue badge', async ({ page }) => {
     await page.goto(`/test/set-session?urlKey=${URL_KEY}&runnerKey=1`);
     await clearRuns(page);
     await page.goto(`/workspace/${URL_KEY}/`);
     await page.waitForLoadState('networkidle');
 
-    const badge = page.locator('[data-rulings-badge]');
+    const badge = page.locator(HOME_BADGE);
     await expect(badge).toBeAttached();
     await expect(badge).toHaveClass(/hidden/);
+    await expect(page.locator(SELECTORS.nav.bandQuestions)).toHaveClass(/hidden/);
 
     await seedRulingQuestion(page, 'LIN-1728-B');
     // The page's own initRulingsBadge() already read+cached a count-0 result on
@@ -73,6 +78,7 @@ test.describe('Ambient rulings nav badge (LIN-1728 Phase 3)', () => {
     await page.evaluate((urlKey) => window.updateRulingsBadge(urlKey), URL_KEY);
     await expect(badge).not.toHaveClass(/hidden/);
     await expect(badge.locator('.rulings-count')).toHaveText('1 question');
+    await expect(page.locator(`${SELECTORS.nav.bandQuestions} .rulings-count`), 'every copy is written').toHaveText('1 question');
 
     // Server-side scoping check: the count comes from `req.session.workspaces`,
     // never fleet-wide.
@@ -108,12 +114,13 @@ test.describe('Ambient rulings nav badge (LIN-1728 Phase 3)', () => {
     expect(await page.evaluate(() => typeof window.updateRulingsBadge)).toBe('function');
   });
 
+  // LIN-4563: on the bar (a page not yet moved; Home's rail count leads to Home's questions instead, frame-rules.spec.js).
   test('LIN-1728 review F6: the badge is a real link into the Questions tab, not a button that does nothing', async ({ page }) => {
     await page.goto(`/test/set-session?urlKey=${URL_KEY}&runnerKey=1`);
     await clearRuns(page);
     await seedRulingQuestion(page, 'LIN-1728-B6');
 
-    await page.goto(`/workspace/${URL_KEY}/`);
+    await page.goto(`/workspace/${URL_KEY}/swim`);
     await page.waitForLoadState('networkidle');
 
     const badge = page.locator('[data-rulings-badge]');
@@ -233,7 +240,8 @@ test.describe('Phone header: the wordmark shares the first line with the actions
     await clearRuns(page);
     for (const width of [320, 360, 390, 412, 430, 480]) {
       await page.setViewportSize({ width, height: 800 });
-      await page.goto(`/workspace/${URL_KEY}/`);
+      // LIN-4563: the bar's phone header, on a page still on the bar (Home sits in the frame).
+      await page.goto(`/workspace/${URL_KEY}/swim`);
       await page.waitForLoadState('networkidle');
       await page.evaluate(() => {
         document.querySelectorAll('[data-queue-badge], [data-rulings-badge]').forEach(b => b.classList.remove('hidden'));

@@ -292,6 +292,20 @@ describe('goneHandlerFor (the one decision)', () => {
     onGone();
     assert.equal(main.innerHTML, '<p class="task-share-gone" data-testid="task-share-gone">This link is no longer available.</p>');
   });
+
+  // LIN-4563: the guest page sits in the public frame, whose h1, subtitle and tab named the task; a revoked link names it
+  // nowhere. Witness: drop the frame-head branch and the h1 still reads the task's title.
+  test('in the frame, the gone notice also takes the task\'s name out of the h1, the line under it and the tab', () => {
+    const { document } = createFakeDom();
+    document.body.innerHTML = (`<main data-testid="frame-main"><header class="page-header frame-head"><h1>A shared task</h1><p class="page-header__subtitle"><span class="task-ident">LIN-50</span></p></header><div data-testid="task-page" data-state-url="${GUEST}"><p>the shared task</p></div></main>`);
+    document.title = 'A shared task · Harbour';
+    const main = document.querySelector('[data-testid="task-page"]');
+    goneHandlerFor(GUEST, main)();
+    assert.equal(document.querySelector('h1').textContent, 'Link not available');
+    assert.equal(document.querySelector('.page-header__subtitle'), null);
+    assert.equal(document.title, 'Link not available · Harbour');
+    assert.ok(!document.querySelector('[data-testid="frame-main"]').textContent.includes('A shared task'));
+  });
 });
 
 // ── the page on the client (LIN-4254 piece 5) ─────────────────────────────────

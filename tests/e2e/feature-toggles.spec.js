@@ -258,7 +258,9 @@ test.describe('Feature Toggle Settings', () => {
   test('proxy header nav link is always visible (LIN-3849)', async ({ page, seedLocal, localWorkerUrlKey }) => {
     await seedLocal(workspaceApiLocalSeed, {});
 
-    await page.goto(`/workspace/${localWorkerUrlKey}/`);
+    // LIN-4563: Home moved onto the frame, whose rail shows Connect an agent to the owner with run controls (the plan's
+    // reach rule); the old bar on a page not yet moved still carries the always-there proxy link this pins.
+    await page.goto(`/workspace/${localWorkerUrlKey}/swim`);
     await page.waitForLoadState('networkidle');
 
     // The proxy link lives in the header view switcher (LIN-978). LIN-3849: it is a

@@ -326,6 +326,10 @@ a.task-stage-run:hover { text-decoration: underline; }
 .task-records-none { color: var(--muted); }
 
 
+/* LIN-4563: the identifier is the line under the frame's h1 (the page header's subtitle); it reads at that line's size, not
+   the sm token nested inside it (0.85em of the line's 0.9em compounds to 12.24px). */
+.frame-head .task-ident { font-size: inherit; }
+
 /* LIN-4563: in the frame (lib/components/frame.js), the page's body takes the frame's one left edge and width
    (public/frame.css .frame-main), not a centred column of its own. The way back and the h1 are the frame's. */
 .frame-main > .sess-page.task-page {

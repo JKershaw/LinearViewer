@@ -175,7 +175,9 @@ test.describe('LIN-4120 W7 — Home has one Backlog link, and Add task returns t
     };
 
     await openAddTask();
-    await page.locator('[data-testid="task-create-back"]').click();
+    // LIN-4563: the way back is the frame's, to where the person came from (Backlog, where Add task lives).
+    await expect(page.locator(SELECTORS.nav.back)).toHaveText('← Backlog');
+    await page.locator(SELECTORS.nav.back).click();
     await expect(page).toHaveURL(backlogUrl);
 
     await openAddTask();

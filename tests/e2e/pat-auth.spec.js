@@ -1,4 +1,5 @@
 import { test, expect } from '../fixtures/test-base.js'
+import { SELECTORS } from '../helpers.js'
 
 test.describe('PAT Authentication Mode', () => {
   // Bound per-test from the per-worker key so session + nav stay partition-aligned.
@@ -15,31 +16,32 @@ test.describe('PAT Authentication Mode', () => {
     await page.goto(WORKSPACE_URL)
     await page.waitForLoadState('networkidle')
 
-    // Open workspace dropdown
-    const workspaceToggle = page.locator('#workspace-toggle')
-    await workspaceToggle.click()
+    // Open workspace dropdown (LIN-4563: Home's is the rail's workspace menu)
+    await page.locator(SELECTORS.nav.workspaceToggle).click()
+    await expect(page.locator(SELECTORS.nav.workspaceMenu)).toBeVisible()
 
     // The Linear +add link should not be present (OAuth may not be configured).
     // Scoped to Linear's own testid: Jira's add row is not PAT-gated and still
     // renders here (the shared Playwright webServer configures Jira for the
-    // whole run, LIN-2802), so a bare `.nav-option-add` count is no longer 0.
-    await expect(page.locator('[data-testid="nav-workspace-add-linear"]')).toHaveCount(0)
+    // whole run, LIN-2802), so a bare add-row count is not 0.
+    await expect(page.locator('[data-testid="rail-workspace-add-linear"]')).toHaveCount(0)
 
     // But local-workspace onboarding is auth-independent (LIN-377): it stays
     // available even in PAT mode.
-    await expect(page.locator('.nav-option-add-local')).toContainText('+local workspace')
+    await expect(page.locator('[data-testid="rail-workspace-add-local"]')).toContainText('+ Local workspace')
   })
 
   test('PAT workspace hides remove button in workspace dropdown', async ({ page }) => {
     await page.goto(WORKSPACE_URL)
     await page.waitForLoadState('networkidle')
 
-    // Open workspace dropdown
-    const workspaceToggle = page.locator('#workspace-toggle')
-    await workspaceToggle.click()
+    // Open workspace dropdown (LIN-4563: Home's is the rail's workspace menu, which never offers remove)
+    await page.locator(SELECTORS.nav.workspaceToggle).click()
+    await expect(page.locator(SELECTORS.nav.workspaceMenu)).toBeVisible()
 
     // The remove button should not be present
     await expect(page.locator('.nav-option-danger')).toHaveCount(0)
+    await expect(page.locator(`${SELECTORS.nav.workspaceMenu} [action$="/remove"]`)).toHaveCount(0)
   })
 
   test('settings page shows "refresh session" instead of "logout"', async ({ page }) => {

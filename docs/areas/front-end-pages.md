@@ -47,3 +47,8 @@ Area notes for `front-end-pages` in the registry. Format and rules: README.md.
   `updateQueueBadge`, `public/common.js`), and each page runs one poll: the old bar's badge keeps `public/app.js`'s, the
   frame's count polls from `public/common.js`. LIN-4562's first push moved the whole poll and started requests on old
   pages that load no `public/app.js` (`tests/e2e/look-alike-controls.spec.js` caught it).
+- When a page moves onto the frame, its name leaves its body: the h1, the line under it and the tab are the frame's. Client
+  code that blanked or replaced the page's body to hide what it showed now misses them. The guest task page's revoked-link
+  notice (`goneHandlerFor`, `public/task-page.js`) replaced the body and left the task's title in the h1 and the tab until
+  LIN-4563 made it rename the frame's header too (`tests/e2e/task-share.spec.js` caught it). Grep the page's client for
+  `innerHTML =` on its root before moving it.
