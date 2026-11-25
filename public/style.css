@@ -1021,15 +1021,6 @@ a.wordmark:hover {
   color: var(--muted);
 }
 
-.nav-option-danger {
-  margin-left: auto;  /* Right-align remove button */
-  color: var(--red);
-}
-
-.nav-option-danger:hover {
-  color: var(--red-hover);
-}
-
 /* Mobile dropdown backdrop - hidden on desktop */
 .nav-dropdown-overlay {
   display: none;

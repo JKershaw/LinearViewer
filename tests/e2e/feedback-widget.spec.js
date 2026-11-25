@@ -67,7 +67,7 @@ test.describe('Feedback widget', () => {
     const { urlKey } = await seedLocal()
     await enableWidget(page, urlKey)
     const trigger = page.getByTestId('nav-feedback-trigger')
-    const footerToggle = page.locator('.page-footer a.footer-legal[href="/privacy"]')
+    const footerToggle = page.locator('[data-testid="frame-footer-privacy"]')
 
     await trigger.click()
     await expect(page.getByTestId('feedback-popup')).toBeVisible()
@@ -406,7 +406,7 @@ test.describe('Feedback widget', () => {
         await page.setViewportSize({ width, height: 844 })
         await enableWidget(page, urlKey)
 
-        const result = await sweepFixedOverlaps(page, '.page-footer a.footer-legal[href="/privacy"]')
+        const result = await sweepFixedOverlaps(page, '[data-testid="frame-footer-privacy"]')
         // The sweep's walk found something. This is a NARROW guarantee — the
         // only candidate here is the top-pinned sticky nav, which can never
         // reach this bottom-anchored footer control, so it does not establish
@@ -450,7 +450,7 @@ test.describe('Feedback widget', () => {
 
       const m = await page.evaluate(() => {
         window.scrollTo(0, document.documentElement.scrollHeight)
-        const toggle = document.querySelector('.page-footer a.footer-legal[href="/privacy"]').getBoundingClientRect()
+        const toggle = document.querySelector('[data-testid="frame-footer-privacy"]').getBoundingClientRect()
         return { top: toggle.top, bottom: toggle.bottom, viewportH: window.innerHeight }
       })
 
@@ -468,19 +468,34 @@ test.describe('Feedback widget', () => {
     test('reserves NOTHING now the FAB is gone — with the widget ON', async ({ page, seedLocal }) => {
       const { urlKey } = await seedLocal()
       await page.setViewportSize({ width: 360, height: 844 })
+
+      // Baseline: the same page's footer with the widget still OFF. A reserve for the FAB would be applied only when the
+      // widget is on, so ON must equal this on both sides (a reserve on both sides would keep left == right and slip past a
+      // symmetry check alone).
+      const readFooter = () => page.evaluate(() => {
+        const footer = getComputedStyle(document.querySelector('[data-testid="frame-footer"]'))
+        return {
+          left: footer.paddingLeft,
+          right: footer.paddingRight,
+          links: getComputedStyle(document.querySelector('.frame-footer__links')).paddingRight
+        }
+      })
+      await page.goto(`/workspace/${urlKey}/${WIDGET_PAGE}`)
+      await page.waitForLoadState('networkidle')
+      const off = await readFooter()
+
       await enableWidget(page, urlKey)
 
       // Precondition: the widget really is on, so this is not vacuous.
       await expect(page.locator('#feedback-widget-root')).toHaveAttribute('data-enabled', 'true')
 
-      const pads = await page.evaluate(() => ({
-        deploy: getComputedStyle(document.querySelector('.footer-deploy')).paddingRight,
-        actions: document.querySelector('.footer-actions')
-          ? getComputedStyle(document.querySelector('.footer-actions')).paddingRight
-          : '0px'
-      }))
-      expect(pads.deploy).toBe('0px')
-      expect(pads.actions).toBe('0px')
+      // LIN-4566: the page (Settings) wears the frame's footer, whose gutter is the page's own on both sides; a reserve
+      // for the FAB would show as a right gutter wider than the left, or a right pad on its links.
+      const pads = await readFooter()
+      expect(pads.right).toBe(pads.left)
+      expect(pads.right).toBe(off.right)
+      expect(pads.left).toBe(off.left)
+      expect(pads.links).toBe('0px')
     })
 
     test('reserves NOTHING on a page that cannot show the widget at all (landing, legal)', async ({ page }) => {
@@ -541,9 +556,9 @@ async function enableWidget(page, urlKey) {
   await page.waitForLoadState('networkidle')
   await page.locator(SELECTORS.settings.switch('feedbackWidget')).click()
   await expect(page.locator(SELECTORS.settings.switch('feedbackWidget'))).toHaveText('● on')
-  // LIN-4563: Home moved onto the frame (its trigger is in the rail's foot, its footer the frame's). These specs pin the
-  // old footer and the bar's trigger, which still render on pages not yet moved, so they land on one (/settings; LIN-4564
-  // moved /swim onto the frame).
+  // LIN-4563: Home moved onto the frame (its trigger is in the rail's foot, its footer the frame's). LIN-4566 moved
+  // Settings onto the frame too, so these specs read the rail's trigger (the same `nav-feedback-trigger`) and the frame's
+  // footer there.
   await page.goto(`/workspace/${urlKey}/${WIDGET_PAGE}`)
   await page.waitForLoadState('networkidle')
   await expect(page.getByTestId('nav-feedback-trigger')).toBeEnabled()

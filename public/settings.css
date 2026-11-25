@@ -363,11 +363,6 @@
   align-items: start;
 }
 
-/* The page header spans both columns, above the list and the page (LIN-3890 outcome 8). */
-.settings-page-head {
-  grid-column: 1 / -1;
-}
-
 .settings-pane {
   min-width: 0;
   max-width: 600px;
@@ -668,10 +663,6 @@
   font-family: var(--font-structural);
 }
 
-.settings-main {
-  max-width: 1000px;
-}
-
 /* Phone: the list, or the page with "‹ Settings". No sideways scroll. */
 @media (max-width: 760px) {
   /* LIN-3890 outcome 8: the phone sizes are this root's. The body is 13px below 400px (style.css), and
@@ -686,11 +677,6 @@
   }
 
   .settings-shell[data-view="area"] .settings-nav {
-    display: none;
-  }
-
-  /* The phone area view opens with "‹ Settings" then its title; the page header stays on the list. */
-  .settings-shell[data-view="area"] > .settings-page-head {
     display: none;
   }
 

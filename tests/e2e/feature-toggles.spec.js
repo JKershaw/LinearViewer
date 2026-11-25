@@ -181,14 +181,15 @@ test.describe('Feature Toggle Settings', () => {
     await expect(features.locator('h2', { hasText: /^Dispatch$/ })).toHaveCount(0);
   });
 
-  test('dispatch link visible in header switcher with run controls', async ({ page, seedLocal, localWorkerUrlKey }) => {
+  test('dispatch link visible in the rail with run controls', async ({ page, seedLocal, localWorkerUrlKey }) => {
     await seedLocal(workspaceApiLocalSeed, { runnerKey: true });
 
     await page.goto(`/workspace/${localWorkerUrlKey}/settings/features`);
     await page.waitForLoadState('networkidle');
 
-    // The dispatch link lives in the header view switcher (LIN-978), gated on run controls (LIN-3849).
-    await expect(page.locator('.nav-views [data-testid="nav-view-dispatch"]')).toBeVisible();
+    // The dispatch link is the rail's Dispatch place (LIN-4562; LIN-4566 moved Settings onto the frame), gated on run
+    // controls (LIN-3849).
+    await expect(page.locator(SELECTORS.nav.place('dispatch'))).toBeVisible();
   });
 
   test('Settings carries neither a Dispatch queue nor a Linear API proxy switch (LIN-3849)', async ({ page, localWorkerUrlKey }) => {
@@ -255,18 +256,17 @@ test.describe('Feature Toggle Settings', () => {
   // LIN-193: Proxy toggle affects UI visibility
   // =========================================================================
 
-  test('proxy header nav link is always visible (LIN-3849)', async ({ page, seedLocal, localWorkerUrlKey }) => {
+  test('Connect an agent stays reachable without run controls: from Settings › Agent access, not the rail (LIN-3849, LIN-4566)', async ({ page, seedLocal, localWorkerUrlKey }) => {
     await seedLocal(workspaceApiLocalSeed, {});
 
-    // LIN-4563: Home moved onto the frame, whose rail shows Connect an agent to the owner with run controls (the plan's
-    // reach rule); the old bar on a page not yet moved still carries the always-there proxy link this pins (Settings: LIN-4564
-    // moved Swim onto the frame).
-    await page.goto(`/workspace/${localWorkerUrlKey}/settings`);
+    // LIN-3849 made the proxy link a key tool, always there. The rail (LIN-4562) shows Connect an agent to the owner with
+    // run controls only (the plan's reach rule, stated in its PR); LIN-4566 moved Settings, the last page whose old bar
+    // carried the always-there link, onto the frame. A viewer without run controls still reaches it from Agent access.
+    await page.goto(`/workspace/${localWorkerUrlKey}/settings/agent-access`);
     await page.waitForLoadState('networkidle');
 
-    // The proxy link lives in the header view switcher (LIN-978). LIN-3849: it is a
-    // key tool, so it is always there (it was gated on a per-user flag).
-    await expect(page.locator('.nav-views [data-testid="nav-view-proxy"]')).toBeVisible();
+    await expect(page.locator(SELECTORS.nav.place('connect'))).toHaveCount(0);
+    await expect(page.getByTestId('settings-link-agent-prompt')).toHaveAttribute('href', `/workspace/${localWorkerUrlKey}/proxy`);
   });
 
   test('proxy page loads with no flag set (LIN-3849)', async ({ page, seedLocal, localWorkerUrlKey }) => {

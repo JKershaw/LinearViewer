@@ -73,13 +73,13 @@ test.describe('Autopilot Observation page (first-class)', () => {
       expect(page.url()).toContain('/observation');
     });
 
-    test('the header switcher carries a first-class observation link', async ({ page }) => {
-      // The cross-view links were hoisted from the footer into the shared header
-      // nav switcher (LIN-978); observation is a first-class view, always shown.
-      await page.goto(`/test/set-session?urlKey=${URL_KEY}`);
-      await page.goto(SETTINGS_URL);
+    test('the rail\'s Runs place leads to this page for the owner with a runner', async ({ page, seedLocal, localWorkerUrlKey }) => {
+      // The cross-view links were hoisted into the old bar (LIN-978), then into the rail (LIN-4562). LIN-4566: read on
+      // Settings, now in the frame. Runs is the owner's with a way to run (lib/places.js, the plan's reach rule).
+      await seedLocal(null, { runnerKey: true });
+      await page.goto(`/workspace/${localWorkerUrlKey}/settings`);
       await page.waitForLoadState('networkidle');
-      await expect(page.locator(`.nav-views [data-testid="nav-view-observation"][href="${OBSERVATION_URL}"]`)).toBeVisible();
+      await expect(page.locator(SELECTORS.nav.place('runs'))).toHaveAttribute('href', `/workspace/${localWorkerUrlKey}/observation`);
     });
 
     test('the experimental dashboard toggle is gone from Settings', async ({ page }) => {

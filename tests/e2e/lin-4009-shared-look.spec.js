@@ -28,6 +28,15 @@ test.beforeEach(async ({ page, localWorkerUrlKey }) => {
   await page.request.get(`/test/clear-ticket-records?urlKey=${URL_KEY}`);
 });
 
+// Leave the shared workspace as it was found: seedStates leaves an open question on Home's "Waiting on you", which sits
+// above the next spec's opened task (LIN-4566: lin-4010-home-opened-task.spec.js, sharded after this file, saw Run pushed
+// off the first screen at 390px), and running sessions that move the next step another spec reads.
+test.afterEach(async ({ page, localWorkerUrlKey }) => {
+  for (const reset of ['clear-ticket-records', 'clear-dispatch-queue', 'clear-dispatch-history', 'clear-agent-status']) {
+    await page.request.get(`/test/${reset}?urlKey=${localWorkerUrlKey}`);
+  }
+});
+
 /** Four In Progress tasks under one project; sessions are seeded through the consumer API below. */
 async function seedTasks(page) {
   const id = (raw) => localSeedId(URL_KEY, raw);

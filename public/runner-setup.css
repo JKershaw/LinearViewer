@@ -5,10 +5,9 @@
  * the .theme-dark overrides apply unchanged. Machine facts (the prompt, the
  * credential) are mono; prose and labels are the content face.
  */
+/* LIN-4566: inside the frame's <main>, which sets the left edge and the gutter; the page keeps its reading width. */
 .runner-setup-page {
   max-width: 760px;
-  margin: 0 auto;
-  padding: 0 var(--space-2h) var(--space-5);
   box-sizing: border-box;
   overflow-wrap: anywhere;
 }

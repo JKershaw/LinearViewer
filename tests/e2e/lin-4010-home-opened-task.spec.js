@@ -20,6 +20,9 @@ test.beforeEach(async ({ page, localWorkerUrlKey }) => {
   await page.goto(`/test/clear-agent-status?urlKey=${URL_KEY}`);
   await page.goto(`/test/clear-observation-sessions?urlKey=${URL_KEY}`);
   await page.goto(`/test/clear-sessions-feed-cache?urlKey=${URL_KEY}`);
+  // Home's "Waiting on you" reads the records store: an open question another spec left would sit above the opened task
+  // and move Run off the first screen (LIN-4566).
+  await page.request.get(`/test/clear-ticket-records?urlKey=${URL_KEY}`);
 });
 
 // Leave the shared workspace as it was found: these tests leave running sessions, and a running session would move

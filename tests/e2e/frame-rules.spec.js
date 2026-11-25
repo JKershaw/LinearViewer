@@ -3,6 +3,7 @@ import { seedShapedWorkspace } from '../fixtures/local-harness.js';
 import { SELECTORS } from '../helpers.js';
 import { placeFor, litPlaceFor, railFor } from '../../lib/places.js';
 import { FEATURE_DEFAULTS, FEATURES, EXPERIMENTAL_VIEWS } from '../../lib/feature-defaults.js';
+import { AREAS } from '../../lib/settings-areas.js';
 
 /**
  * LIN-4562 (LIN-4342 piece 1): the walk. The rules every page in the frame keeps (docs/reviews/navigation-2026-11-07/
@@ -31,6 +32,7 @@ import { FEATURE_DEFAULTS, FEATURES, EXPERIMENTAL_VIEWS } from '../../lib/featur
  * LIN-4565 (piece 4) adds Tools: Dispatch, KPIs, Escalation and Effort (drilled in under KPIs), Prompts, Custom prompts
  * (under Prompts) and Operator audit (under Settings). Every viewer walks them: their pages answer by URL for anyone in
  * the workspace, and for a new user, whose rail draws no Tools group, each lights Settings (lib/places.js reachedFrom).
+ * LIN-4566 (piece 5) adds Settings, its index and every area, and Run on my machine (under Settings).
  */
 const FRAMED = [
   { key: 'connect' },
@@ -56,6 +58,11 @@ const FRAMED = [
   { key: 'prompts' },
   { key: 'custom-prompts' },
   { key: 'audit' },
+  // LIN-4566 (piece 5): Settings, the index and every area (one place: its h1 is "Settings" on each, lib/settings-areas.js
+  // the list), and Run on my machine, drilled in under Settings.
+  { key: 'settings' },
+  ...AREAS.map(area => ({ key: 'settings', path: `/settings/${area.id}` })),
+  { key: 'runner' },
 ];
 
 /** Every flag a place in the rail waits on, on. */
