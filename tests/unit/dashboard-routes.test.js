@@ -271,7 +271,7 @@ describe('GET /api/escalation-kpis (LIN-1736; question records, LIN-4538)', () =
     writes = createRecordWrites({ recordsStore: records, isTerminalState, readTicket: null, askedText: () => '', stageKinds: ['implementation'], listPeople: async () => PEOPLE });
   });
 
-  function makeKpiRouter(recordsStore) {
+  function makeKpiRouter(recordsStore, { getOpenRouterSource = () => 'env', getDeployInfo = () => ({}) } = {}) {
     return createDashboardRoutes({
       workspaceFromUrl: (req, res, next) => next(),
       ...makeStores({}),
@@ -281,8 +281,8 @@ describe('GET /api/escalation-kpis (LIN-1736; question records, LIN-4538)', () =
       getWorkspaceAccessToken: async () => 'token',
       fetchIssueContext: async () => ({}),
       fetchWorkspaceIssues: async () => [],
-      getOpenRouterSource: () => 'env',
-      getDeployInfo: () => ({}),
+      getOpenRouterSource,
+      getDeployInfo,
       recordsStore,
     });
   }
@@ -356,6 +356,20 @@ describe('GET /api/escalation-kpis (LIN-1736; question records, LIN-4538)', () =
     await handler(req, res);
     assert.equal(res.statusCode, 200);
     assert.equal(res.jsonBody.unansweredAge.count, 1, 'the healthy workspace still counts');
+  });
+
+  test('LIN-4565: the Escalation page takes the route\'s deploy stamp and AI source into the frame\'s footer and rail', async () => {
+    const router = makeKpiRouter(records, {
+      getOpenRouterSource: () => 'env',
+      getDeployInfo: () => ({ version: 'v9.9.9', commit: 'abcdef1234567' }),
+    });
+    const handler = getHandler(router, 'get', '/workspace/:urlKey/escalation-kpis');
+    const { req, res } = makeReqRes({ session: { workspaces: WS }, workspace: { urlKey: 'ws-a', name: 'Alpha' } });
+    await handler(req, res);
+    assert.equal(res.statusCode, 200);
+    assert.match(res.sentBody, /data-testid="frame-footer-stamp"/, 'the deploy stamp');
+    assert.match(res.sentBody, /data-testid="footer-ai-status"[^>]*title="OpenRouter: [^"]*"/, 'the AI status');
+    assert.doesNotMatch(res.sentBody, /title="OpenRouter: off"/, 'the source reached the rail');
   });
 
   test('windowDays is clamped to [1, 365] and defaults to 30 when absent/invalid', async () => {

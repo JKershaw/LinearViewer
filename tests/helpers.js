@@ -150,7 +150,7 @@ export const SELECTORS = {
     main: '[data-testid="frame-main"]',
     /** LIN-4563: the page's one h1, its name (a task page's is the task's title). */
     heading: '[data-testid="frame-main"] h1',
-    /** LIN-4565: the line under the h1 (the page's own subtitle hooks, `.dispatch-subtitle` and the rest, retired with the move). */
+    /** LIN-4565: the line under the h1 (the pages' own per-page subtitle hooks retired with the move onto the frame). */
     subtitle: '[data-testid="frame-main"] .page-header__subtitle',
     back: '[data-testid="frame-back"]',
     footer: '[data-testid="frame-footer"]',

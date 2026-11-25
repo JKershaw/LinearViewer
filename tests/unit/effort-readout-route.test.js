@@ -70,7 +70,7 @@ function fakeRecords({ verdicts = {}, plans = null, fail = null } = {}) {
   };
 }
 
-function buildApp({ store, recordsStore = null }) {
+function buildApp({ store, recordsStore = null, getOpenRouterSource = () => null, getDeployInfo = () => ({}) }) {
   const workspace = { urlKey: 'ws-1', name: 'Workspace One', provider: 'local', accessToken: 'tok' };
   const app = express();
   app.use(createDashboardRoutes({
@@ -87,8 +87,8 @@ function buildApp({ store, recordsStore = null }) {
     getWorkspaceAccessToken: () => 'tok',
     fetchIssueContext: async () => ({}),
     fetchWorkspaceIssues: async () => [],
-    getOpenRouterSource: () => null,
-    getDeployInfo: () => ({}),
+    getOpenRouterSource,
+    getDeployInfo,
     recordsStore,
   }));
   return app;
@@ -329,5 +329,22 @@ describe('LIN-4504 / LIN-4519: the records the route reads, and what a failed re
     const json = JSON.parse(body);
     assert.equal(json.perKind.find((k) => k.kind === 'plan').survival.state, 'unavailable_records');
     assert.equal(json.perKind.find((k) => k.kind === 'implementation').survival.state, 'unavailable_records');
+  });
+});
+
+describe('the page takes the route\'s deploy stamp and AI source into the frame (LIN-4565)', () => {
+  test('the footer carries the deploy stamp and the rail an AI status that is not off', async () => {
+    const store = fakeStore({ historyRows: LATE_LINEAGE });
+    const app = buildApp({
+      store,
+      recordsStore: fakeRecords({ verdicts: LATE_VERDICTS }),
+      getOpenRouterSource: () => 'env',
+      getDeployInfo: () => ({ version: 'v9.9.9', commit: 'abcdef1234567' }),
+    });
+    const { status, body } = await get(app, '/workspace/ws-1/effort-readout');
+    assert.equal(status, 200);
+    assert.match(body, /data-testid="frame-footer-stamp"/, 'the deploy stamp');
+    assert.match(body, /data-testid="footer-ai-status"[^>]*title="OpenRouter: [^"]*"/, 'the AI status');
+    assert.doesNotMatch(body, /title="OpenRouter: off"/, 'the source reached the rail');
   });
 });
