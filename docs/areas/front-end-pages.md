@@ -37,12 +37,11 @@ Area notes for `front-end-pages` in the registry. Format and rules: README.md.
   on an existing template line, and an `id` only on the rows that need one: LIN-4558's first pass put an empty
   interpolation on its own line and an `id` on every row, and all 24 goldens moved.
 - A page moves onto the frame by its place key: register it in `lib/places.js` (a place, or a drilled-in page with its
-  `parent`), render through `renderFrame` (`lib/components/frame.js`), delete its file from the allowance in
-  `tests/unit/frame-census.test.js`, and widen `FRAMED` in `tests/e2e/frame-rules.spec.js`. The frame owns the h1, the
-  way back, the footer and the tab title, so drop the page's own `renderPageHeader`, back link and footer, and style
-  nothing the shared rules already draw: its search fields are the text control (`.token-label-input` in
-  `public/style.css`), its way back is the drill-down back link (`.sess-back`), its questions count is Home's needs-you
-  tone. LIN-4562's first cut drew all three again in `public/frame.css`.
+  `parent`; drop its old-bar alias), render through `renderFrame` (`lib/components/frame.js`), delete its file from
+  the allowance in `tests/unit/frame-census.test.js`, list its key in the floor of `tests/unit/places-census.test.js`,
+  widen `FRAMED` in `tests/e2e/frame-rules.spec.js`. The frame owns the h1, way back, footer and tab title: drop the
+  page's own, and style nothing shared rules draw: search fields are `.token-label-input` (`public/style.css`), the way
+  back `.sess-back`, a questions count Home's needs-you tone. LIN-4562 drew all three again in `public/frame.css`.
 - A count drawn twice (rail and band) is updated by one function writing every copy (`updateRulingsBadge`,
   `updateQueueBadge`, `public/common.js`), and each page runs one poll: the old bar's badge keeps `public/app.js`'s, the
   frame's count polls from `public/common.js`. LIN-4562's first push moved the whole poll and started requests on old

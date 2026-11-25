@@ -1,7 +1,7 @@
 /**
  * The effort read-out routes (LIN-3742 split of routes/dashboard.js):
  *
- *   GET /workspace/:urlKey/effort-readout      — operator-facing per-kind effort x cost x duration x survived-the-next-gate read-out (LIN-2641); URL-only, unflagged and unlinked
+ *   GET /workspace/:urlKey/effort-readout      — operator-facing per-kind effort x cost x duration x survived-the-next-gate read-out (LIN-2641); unflagged, drilled in under KPIs (linked from it since LIN-4565)
  *   GET /workspace/:urlKey/api/effort-readout  — the same read-out as JSON
  *
  * Page-load-only: it reads records on each load, so it never joins the poll
@@ -30,7 +30,7 @@ const EFFORT_READOUT_HISTORY_LIMIT = 200;
 //
 // Per-kind effort x cost x duration x survived-the-next-gate over this
 // workspace's recent dispatch rows. Modelled on the escalation-kpis pair
-// (dashboard-kpis.js): a URL-only operator page (unflagged, unlinked) that
+// (dashboard-kpis.js): an unflagged operator page, drilled in under KPIs, that
 // computes on page load rather than being polled.
 //
 // NOT on the poll path, deliberately. Its reads are the dispatch queue and the

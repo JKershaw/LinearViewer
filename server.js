@@ -4183,7 +4183,7 @@ app.get('/workspace/:urlKey/roadmap', workspaceFromUrl, async (req, res) => {
 });
 
 /**
- * Operator Dashboard page - requires authentication.
+ * Operator audit page - requires authentication (in the frame as Operator audit, under Settings; LIN-4565).
  * Displays workspace audit and health check functionality.
  */
 app.get('/workspace/:urlKey/audit', workspaceFromUrl, async (req, res) => {

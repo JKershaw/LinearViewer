@@ -64,7 +64,7 @@ describe('every key a renderer uses is a registered place', () => {
   const keys = renderedKeys();
 
   test('the census finds the renderers (it is not vacuous)', () => {
-    // The old bar's `currentPage` keys fall as pieces move pages onto the frame (LIN-4564 moved thirteen renderers); the
+    // The old bar's `currentPage` keys fall as pieces move pages onto the frame (LIN-4564 moved thirteen renderers, LIN-4565 seven); the
     // census counts both kinds, so it stays non-vacuous until piece 7 retires the old bar's.
     assert.ok(keys.length >= 20, `found ${keys.length}`);
     assert.ok(keys.filter(k => k.via === 'place').length >= 15, 'the frame\'s place keys are found');
@@ -72,6 +72,9 @@ describe('every key a renderer uses is a registered place', () => {
     assert.ok(keys.some(k => k.via === 'place' && k.key === 'search'), 'the search page is on the frame');
     for (const key of ['runs', 'run', 'live', 'swipe', 'swim', 'roadmap', 'flight-companion']) {
       assert.ok(keys.some(k => k.via === 'place' && k.key === key), `${key} is on the frame (LIN-4564)`);
+    }
+    for (const key of ['dispatch', 'kpis', 'escalation', 'effort', 'prompts', 'custom-prompts', 'audit']) {
+      assert.ok(keys.some(k => k.via === 'place' && k.key === key), `${key} is on the frame (LIN-4565)`);
     }
   });
 

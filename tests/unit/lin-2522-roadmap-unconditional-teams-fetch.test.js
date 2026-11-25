@@ -60,9 +60,9 @@ function sliceRoadmapRouteHandler() {
   assert.notEqual(startIdx, -1, 'expected to find the roadmap route in server.js');
   const handlerStart = startIdx + routePrefix.length;
 
-  const endMarker = "\n});\n\n/**\n * Operator Dashboard page";
+  const endMarker = "\n});\n\n/**\n * Operator audit page";
   const endIdx = SERVER_SRC.indexOf(endMarker, startIdx);
-  assert.notEqual(endIdx, -1, 'expected the "Operator Dashboard page" docstring bounding the roadmap route — if this fails the route was moved/reformatted and this harness needs re-anchoring');
+  assert.notEqual(endIdx, -1, 'expected the "Operator audit page" docstring bounding the roadmap route — if this fails the route was moved/reformatted and this harness needs re-anchoring');
 
   const handler = SERVER_SRC.slice(handlerStart, endIdx + 2);
   assert.equal(

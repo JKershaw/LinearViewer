@@ -1,5 +1,5 @@
 /**
- * Operator Dashboard Frontend
+ * Operator audit page script (the /audit page; LIN-4565 named it by its place, Operator audit)
  *
  * Handles the audit button click, fetches audit data, and renders the report.
  */
