@@ -1,252 +1,151 @@
 import { test, expect } from '../fixtures/test-base.js';
 import { swimLocalSeed } from '../fixtures/local-harness.js';
-import { nav, featuresParam, SELECTORS } from '../helpers.js';
+import { SELECTORS } from '../helpers.js';
 
-// LIN-4563 (LIN-4342 piece 2): Home and Backlog moved onto the page frame (lib/components/frame.js), so they draw no old
-// bar: no `.nav-bar`, no `.nav-views`, no sticky header, and their team and assignee selectors sit in the frame's filter
-// line (`SELECTORS.nav.filters`). The old bar's own mechanics are still tested here, on a page still on it: `BAR_PAGE`
-// unless a test names another. The in-page search toggle is retired everywhere.
-// The assignee selector reaches no old-bar page any more (ASSIGNEE_PAGES are Home and Backlog), so its sweeps read Home's
-// filter line, and the bar-height clearance part of them goes: Home has no sticky header to clear.
-// LIN-4564 (piece 3): Swipe, Swim, Ship, Roadmap and every flagged view moved onto the frame too, so every page the team
-// selector reaches (FILTERABLE_PAGES) draws it in the filter line, and no old-bar page carries a team any more. The old
-// bar is read on Settings (always reachable, still on the bar until piece 5), and the team sweeps read the filter line.
-// LIN-4565 (piece 4): Dispatch, KPIs and Prompts moved onto the frame; the two tests that read the bar on Dispatch read it
-// on BAR_PAGE, or are retired where only Dispatch could show the case (the active-hoist invariant, below).
-// LIN-4566 (piece 5): Settings moved onto the frame, so the bar is read on the Project backlog (routes/project-page.js),
-// the one workspace page still drawing it until piece 7 (LIN-4568). That page loads no script, so the bar's markup, CSS
-// and pin are read there, and the five tests of what public/common.js does to the bar (the ⋯ more collapse at 390px and
-// at a narrow desktop, the strip scrolling its active tab into reach, and the clearance a scrolled-to control settles
-// under, at each width and on resize) are retired: no page that draws the bar runs that code any more, and it goes with
-// the bar in piece 7.
-const BAR_PAGE = 'project';
+// The navigation's mechanics, rewritten for the rail (LIN-4568, LIN-4342 piece 7). This file pinned the old bar from
+// LIN-978 on: the header view switcher, its `⋯ more` overflow, its actions, its sticky pin and the clearance under it.
+// Pieces 2 to 6 moved every page onto the frame (lib/components/frame.js) and piece 7 deleted the bar, so each case is
+// read on the rail now, the person's places in their groups from lib/places.js, or retired with what it tested:
+//   - the view links and their gates → the rail's places for the owner, a new user and a member (the reach change the
+//     parent plan states: a member no longer sees Runs, KPIs, Prompts or Connect an agent in the rail; the pages work);
+//   - the 44px tap targets and "reachable at 390 without scrolling" → the drawer behind ☰ in the phone band;
+//   - the actions' order → the rail's counts (questions beside Home, queued on Dispatch) and its foot;
+//   - the sticky pin and its clearance → the rail at 1280 and the band at 390, whose height `--nav-sticky-h` is;
+//   - the `⋯ more` collapse, the strip's focus scrolling, the measured bar height (LIN-1286, LIN-2179, LIN-2189,
+//     LIN-4037) → retired: the rail does not collapse (a named exception of the parent plan) and nothing is measured.
+// The filter line's sweeps (LIN-2523, LIN-2529, LIN-2551) are unchanged below. Every frame rule across every page, for
+// each viewer and both widths, is tests/e2e/frame-rules.spec.js's walk.
 
-// LIN-978 (UI audit D, keystone): the shared header-level view switcher. The
-// cross-view links were hoisted from the footer into `renderNavBar`, so
-// cross-view navigation is reachable from the sticky header on every workspace
-// page — usable at 390px in a single row, not the old multi-line footer wrap.
-//
-// Rides the realistic swim seed on the local provider (the same seed the
-// before/after screenshot review uses). Flagged power-user views are enabled so
-// the switcher is at its widest (7 links) — the worst case for wrapping.
-
-// LIN-3849: `dispatch` and `proxy` are not switches any more. Dispatch shows for the
-// owner of a workspace with a runner key (`runnerKey: true` on the seed), Proxy always.
+// The roadmap flag on, so a flagged place is in the Views group; the owner's runner key gives run controls.
 const FLAGS = { roadmap: true };
 
-test.describe('Header view switcher (LIN-978)', () => {
+/** The person's rail, as place keys in order. */
+const railKeys = (page) => page.locator(SELECTORS.nav.railItems).evaluateAll(els => els.map(el => el.getAttribute('data-place')));
+
+test.describe('The rail\'s places (LIN-978, LIN-3849, LIN-1247 → LIN-4342)', () => {
   test.beforeEach(async ({ seedLocal }) => {
     await seedLocal(swimLocalSeed, { features: FLAGS, runnerKey: true });
   });
 
-  test('carries the tier-gated view links in the header on an old-bar page', async ({ page, localWorkerUrlKey }) => {
-    await page.goto(`/workspace/${localWorkerUrlKey}/${BAR_PAGE}`);
-    await page.waitForLoadState('networkidle');
-
-    // First-class views always present.
-    for (const view of ['observation', 'swipe', 'swim', 'settings']) {
-      await expect(nav(page).getView(view)).toBeVisible();
+  test('the owner with run controls sees every group, flagged places included, on every page', async ({ page, localWorkerUrlKey }) => {
+    for (const path of ['project', 'settings']) {
+      await page.goto(`/workspace/${localWorkerUrlKey}/${path}`);
+      // Live is on for an owner with a runner (its flag is an opt-out, lib/run-controls.js liveConsoleOn).
+      expect(await railKeys(page), path).toEqual(['home', 'backlog', 'live', 'runs', 'swipe', 'swim', 'roadmap', 'dispatch', 'connect', 'kpis', 'prompts', 'settings']);
     }
-    // Flagged power-user views present because their flags are on.
-    for (const view of ['roadmap', 'dispatch', 'proxy']) {
-      await expect(nav(page).getView(view)).toBeVisible();
-    }
-    // The footer no longer carries any of the hoisted view links.
-    await expect(page.locator('.footer-actions [data-testid^="footer-link-"]')).toHaveCount(0);
+    // The old footer's cross-view links never came back: the footer is the same everywhere and names no place.
+    await expect(page.locator(SELECTORS.nav.footer).locator('[data-place]')).toHaveCount(0);
   });
 
-  test('gated views are hidden without their flag / run controls; Proxy is always there (LIN-3849)', async ({ page, seedLocal, localWorkerUrlKey }) => {
+  test('a new user without a runner: no Watch or Tools, and no flagged place without its flag', async ({ page, seedLocal, localWorkerUrlKey }) => {
     await seedLocal(swimLocalSeed, { features: {}, runnerKey: false });
-    await page.goto(`/workspace/${localWorkerUrlKey}/${BAR_PAGE}`);
-    await page.waitForLoadState('networkidle');
-
-    for (const view of ['observation', 'swipe', 'swim', 'settings']) {
-      await expect(nav(page).getView(view)).toBeVisible();
-    }
-    for (const view of ['roadmap', 'dispatch']) {
-      await expect(nav(page).getView(view)).toHaveCount(0);
-    }
-    await expect(nav(page).getView('proxy')).toHaveCount(1);
+    await page.goto(`/workspace/${localWorkerUrlKey}/project`);
+    expect(await railKeys(page)).toEqual(['home', 'backlog', 'swipe', 'swim', 'settings']);
+    // The reach change: Connect an agent leaves the rail, but its page still works by URL (Settings › Agent access links it).
+    const proxy = await page.goto(`/workspace/${localWorkerUrlKey}/proxy`);
+    expect(proxy.status()).toBe(200);
+    await expect(page.locator(SELECTORS.nav.heading)).toHaveText('Connect an agent');
   });
 
-  test('Dispatch needs the OWNER: a member of a workspace that has a runner key does not get the link (LIN-3849)', async ({ page, seedLocal, localWorkerUrlKey }) => {
-    await seedLocal(swimLocalSeed, { features: FLAGS, runnerKey: true });
+  test('Dispatch needs the OWNER: a member of a workspace that has a runner key sees no Tools and no queue count', async ({ page, localWorkerUrlKey }) => {
     const res = await page.request.get(`/test/set-workspace-ownership?urlKey=${localWorkerUrlKey}&state=foreign`);
     expect(res.ok()).toBe(true);
-    await page.goto(`/workspace/${localWorkerUrlKey}/${BAR_PAGE}`);
-    await page.waitForLoadState('networkidle');
-
-    await expect(nav(page).getView('dispatch')).toHaveCount(0);
-    await expect(nav(page).getView('proxy')).toHaveCount(1);
+    await page.goto(`/workspace/${localWorkerUrlKey}/project`);
+    const keys = await railKeys(page);
+    for (const gated of ['runs', 'dispatch', 'connect', 'kpis', 'prompts']) expect(keys, gated).not.toContain(gated);
     await expect(page.locator('[data-queue-badge]')).toHaveCount(0);
   });
 
-  test('experimental views appear in the header ONLY when their flag is on (gated, LIN-1247)', async ({ page, seedLocal, localWorkerUrlKey }) => {
-    // Policy reversal (LIN-1247): experimental views used to be Settings-only and
-    // never in the switcher. They are now gated-included in the `⋯ more` overflow.
-    const experimentalViews = ['collective', 'task-chat', 'ship', 'flight-companion', 'passage-planner', 'ship-biscuit'];
-
-    // Flags off → none of the experimental views are in the switcher.
+  test('experimental views are places ONLY when their flag is on, each in its own slot (LIN-1247)', async ({ page, seedLocal, localWorkerUrlKey }) => {
+    const experimental = ['collective', 'task-chat', 'ship', 'flight-companion', 'passage-planner', 'ship-biscuit'];
     await seedLocal(swimLocalSeed, { features: {} });
-    await page.goto(`/workspace/${localWorkerUrlKey}/${BAR_PAGE}`);
-    await page.waitForLoadState('networkidle');
-    for (const view of experimentalViews) {
-      await expect(nav(page).getView(view)).toHaveCount(0);
-    }
+    await page.goto(`/workspace/${localWorkerUrlKey}/project`);
+    for (const key of experimental) await expect(page.locator(SELECTORS.nav.place(key))).toHaveCount(0);
 
-    // Every experimental flag on → each view is surfaced (emitted as its kebab
-    // route key, whether inline or collapsed in the overflow group).
     await seedLocal(swimLocalSeed, {
-      features: { collective: true, taskChat: true, ship: true, flightCompanion: true, passagePlanner: true, shipBiscuit: true }
+      features: { collective: true, taskChat: true, ship: true, flightCompanion: true, passagePlanner: true, shipBiscuit: true },
     });
-    await page.goto(`/workspace/${localWorkerUrlKey}/${BAR_PAGE}`);
-    await page.waitForLoadState('networkidle');
-    for (const view of experimentalViews) {
-      await expect(nav(page).getView(view)).toHaveCount(1);
-    }
-    // The camelCase gating flags must NOT leak in as nav keys.
-    for (const flag of ['taskChat', 'flightCompanion', 'passagePlanner', 'shipBiscuit']) {
-      await expect(nav(page).getView(flag)).toHaveCount(0);
-    }
+    await page.goto(`/workspace/${localWorkerUrlKey}/project`);
+    const views = await page.locator('[data-group="views"] .frame-rail__item').evaluateAll(els => els.map(el => el.getAttribute('data-place')));
+    expect(views).toEqual(['swipe', 'swim', ...experimental]);
+    // The camelCase gating flags never leak in as place keys.
+    for (const flag of ['taskChat', 'flightCompanion', 'passagePlanner', 'shipBiscuit']) await expect(page.locator(SELECTORS.nav.place(flag))).toHaveCount(0);
   });
 
-  // LIN-3912: the Next run page, its suggest endpoint and its flag are retired. A stored
-  // `nextRun: true` is dropped by the feature-flag filter, and both retired URLs fall
-  // through to Express's default 404 (LIN-877 precedent: unmounted, no redirect).
-  test('the retired next-run URLs 404, and no next-run view appears even with the old flag stored (LIN-3912)', async ({ page, seedLocal, localWorkerUrlKey }) => {
+  // LIN-3912: the Next run page, its suggest endpoint and its flag are retired. A stored `nextRun: true` is dropped by
+  // the feature-flag filter, and both retired URLs fall through to Express's default 404.
+  test('the retired next-run URLs 404, and no next-run place appears even with the old flag stored (LIN-3912)', async ({ page, seedLocal, localWorkerUrlKey }) => {
     await seedLocal(swimLocalSeed, { features: { ...FLAGS, nextRun: true, flightCompanion: true } });
-    await page.goto(`/workspace/${localWorkerUrlKey}/${BAR_PAGE}`);
-    await page.waitForLoadState('networkidle');
-    await expect(nav(page).getView('next-run')).toHaveCount(0);
-    const page404 = await page.request.get(`/workspace/${localWorkerUrlKey}/next-run`);
-    expect(page404.status()).toBe(404);
-    const suggest404 = await page.request.post(`/workspace/${localWorkerUrlKey}/api/next-run/suggest`, { data: {} });
-    expect(suggest404.status()).toBe(404);
+    await page.goto(`/workspace/${localWorkerUrlKey}/project`);
+    await expect(page.locator(SELECTORS.nav.place('next-run'))).toHaveCount(0);
+    expect((await page.request.get(`/workspace/${localWorkerUrlKey}/next-run`)).status()).toBe(404);
+    expect((await page.request.post(`/workspace/${localWorkerUrlKey}/api/next-run/suggest`, { data: {} })).status()).toBe(404);
   });
 
-
-  test('every nav view target is a comfortable 44px tap target at 390px', async ({ page, localWorkerUrlKey }) => {
+  test('at 390px every place is a comfortable 44px tap target in the drawer', async ({ page, localWorkerUrlKey }) => {
     await page.setViewportSize({ width: 390, height: 800 });
-    await page.goto(`/workspace/${localWorkerUrlKey}/${BAR_PAGE}`);
-    await page.waitForLoadState('networkidle');
-
-    // Primary (inline) links + the ⋯ more toggle must all clear 44px.
-    const inlineHeights = await page.locator('.nav-views > [data-testid^="nav-view-"], .nav-more-toggle').evaluateAll(els =>
-      els.map(el => el.getBoundingClientRect().height)
-    );
-    for (const h of inlineHeights) expect(h).toBeGreaterThanOrEqual(44);
+    await page.goto(`/workspace/${localWorkerUrlKey}/project`);
+    await page.locator(SELECTORS.nav.bandMenu).click();
+    await expect(page.locator(SELECTORS.nav.rail)).toBeVisible();
+    const heights = await page.locator(SELECTORS.nav.railItems).evaluateAll(els => els.map(el => el.getBoundingClientRect().height));
+    expect(heights.length).toBeGreaterThan(5);
+    for (const h of heights) expect(h).toBeGreaterThanOrEqual(44);
   });
 
-  test('cross-view nav is reachable at 390px without scrolling the page', async ({ page, localWorkerUrlKey }) => {
+  test('at 390px the places are reachable without scrolling the page: ☰ is in the band at the top', async ({ page, localWorkerUrlKey }) => {
     await page.setViewportSize({ width: 390, height: 800 });
-    await page.goto(`/workspace/${localWorkerUrlKey}/${BAR_PAGE}`);
-    await page.waitForLoadState('networkidle');
-
-    // The switcher sits in the sticky header near the top of the viewport, so it
-    // is on-screen with the page at its initial (unscrolled) scroll position.
+    await page.goto(`/workspace/${localWorkerUrlKey}/project`);
     expect(await page.evaluate(() => window.scrollY)).toBe(0);
-    const box = await nav(page).getView('swim').boundingBox();
-    expect(box).not.toBeNull();
-    expect(box.y).toBeLessThan(800); // within the initial viewport, no scroll needed
+    const menu = await page.locator(SELECTORS.nav.bandMenu).boundingBox();
+    expect(menu.y).toBeLessThan(80);
+    await page.locator(SELECTORS.nav.bandMenu).click();
+    const swim = await page.locator(SELECTORS.nav.place('swim')).boundingBox();
+    expect(swim.y + swim.height).toBeLessThanOrEqual(800);
+    expect(await page.evaluate(() => window.scrollY)).toBe(0);
   });
 });
 
-// LIN-1286: desktop nav overflow. Above the 640px mobile breakpoint the strip used
-// to inline every flag-gated view and rely on a horizontal scrollbar when many
-// experimental features were on. A JS width-measuring routine now collapses ONLY the
-// items that don't fit into the same `⋯ more` group (revealing the toggle only when
-// something is hidden), so desktop no longer horizontal-scrolls yet a strip that fits
-// never over-collapses — and the active-hoist invariant still holds.
-test.describe('Desktop nav overflow (LIN-1286)', () => {
-  // LIN-4566 (piece 5): the collapse itself (the width-measuring routine in public/common.js) is no longer read: Settings,
-  // the last page on the bar that loads common.js, moved onto the frame, and the Project backlog, where the bar is now
-  // read, loads no script. What stays is the markup's resting state: nothing collapsed, the toggle hidden.
-  const stripScrolls = (page) =>
-    page.locator('.nav-views').evaluate(el => el.scrollWidth > el.clientWidth + 1);
-
-  test('does NOT collapse when the row already fits at a wide desktop width', async ({ page, seedLocal, localWorkerUrlKey }) => {
-    // Only the 3 power-user flags on → 8 tabs, comfortably fitting a wide desktop.
-    await seedLocal(swimLocalSeed, { features: { roadmap: true }, runnerKey: true });
-    await page.setViewportSize({ width: 1400, height: 800 });
-    await page.goto(`/workspace/${localWorkerUrlKey}/${BAR_PAGE}`);
-    await page.waitForLoadState('networkidle');
-
-    // Everything is inline (the over-collapse a pure breakpoint rule would cause is
-    // avoided) and the toggle stays hidden.
-    for (const view of ['observation', 'swipe', 'swim', 'projects', 'settings', 'roadmap', 'dispatch', 'proxy']) {
-      await expect(nav(page).getView(view)).toBeVisible();
-    }
-    await expect(page.locator('[data-testid="nav-more-toggle"]')).not.toBeVisible();
-    expect(await stripScrolls(page)).toBe(false);
-  });
-
-  // LIN-4565 (piece 4): the active-hoist invariant (the current page's view stays inline, never collapsed into `⋯ more`)
-  // was read on Dispatch, a flag-gated overflow view. Dispatch is on the frame now, whose rail lists every place and never
-  // collapses, and no page left on the old bar is a collapsible view (Settings is first-class), so the case cannot arise
-  // on the bar any more; the overflow code goes with the bar in piece 7 (LIN-4568).
-});
-
-// LIN-1149: nav-actions placement — the deliberate order of shared nav-chrome
-// actions, and the gating rules must not leak one onto the wrong page. LIN-4563: the
-// search toggle that led the row is retired (search is the rail's), so the order is
-// the queue badge, then the rulings badge, then the feedback trigger.
-test.describe('nav-actions placement (LIN-1149)', () => {
-  test('queue badge precedes rulings badge precedes feedback trigger in DOM order on an old-bar page', async ({ page, seedLocal, localWorkerUrlKey }) => {
+test.describe('The rail\'s counts and foot (LIN-1149, LIN-1728, LIN-2298 → LIN-4342)', () => {
+  test('questions sit beside Home, queued on Dispatch, and the feedback trigger at the foot after the AI status', async ({ page, seedLocal, localWorkerUrlKey }) => {
     await seedLocal(swimLocalSeed, { features: { ...FLAGS, feedbackWidget: true }, runnerKey: true });
-    await page.goto(`/workspace/${localWorkerUrlKey}/${BAR_PAGE}`);
-    await page.waitForLoadState('networkidle');
-
-    const actions = page.locator('.nav-actions');
-    await expect(actions.locator('[data-queue-badge]')).toBeAttached();
-    await expect(actions.locator('[data-rulings-badge]')).toBeAttached();
-    await expect(actions.locator('[data-testid="nav-feedback-trigger"]')).toBeAttached();
-    const order = await actions.evaluate(el => [...el.children].map(c => (c.hasAttribute('data-queue-badge') ? 'queue'
-      : c.hasAttribute('data-rulings-badge') ? 'rulings'
-        : c.getAttribute('data-testid') === 'nav-feedback-trigger' ? 'feedback' : c.className)));
-    expect(order).toEqual(['queue', 'rulings', 'feedback']);
+    await page.goto(`/workspace/${localWorkerUrlKey}/project`);
+    const rail = page.locator(SELECTORS.nav.rail);
+    await expect(rail.locator('[data-place="home"] + [data-rulings-badge]')).toBeAttached();
+    await expect(page.locator(SELECTORS.nav.place('dispatch')).locator('[data-queue-badge]')).toBeAttached();
+    const foot = await rail.locator('.frame-rail__foot').evaluate(el => [...el.querySelectorAll('[data-place], [data-testid="footer-ai-status"], [data-testid="nav-feedback-trigger"]')]
+      .map(c => c.getAttribute('data-place') || c.getAttribute('data-testid')));
+    expect(foot).toEqual(['settings', 'footer-ai-status', 'nav-feedback-trigger']);
   });
 
-  test('no search toggle on Home, Backlog or an old-bar page (LIN-4563: retired)', async ({ page, seedLocal, localWorkerUrlKey }) => {
+  test('no search toggle on Home, Backlog, Runs or the Project backlog (LIN-4563: search is the rail\'s form)', async ({ page, seedLocal, localWorkerUrlKey }) => {
     await seedLocal(swimLocalSeed, { features: FLAGS, runnerKey: true });
-    for (const path of ['', 'backlog', 'observation', BAR_PAGE]) {
+    for (const path of ['', 'backlog', 'observation', 'project']) {
       await page.goto(`/workspace/${localWorkerUrlKey}/${path}`);
-      await page.waitForLoadState('networkidle');
       await expect(page.locator('.search-toggle'), path || 'home').toHaveCount(0);
+      await expect(page.locator(SELECTORS.nav.railSearch), path || 'home').toHaveCount(1);
     }
   });
 
-  test('both badges are absent on an old-bar page when run controls are off', async ({ page, seedLocal, localWorkerUrlKey }) => {
-    await seedLocal(swimLocalSeed, { features: {}, runnerKey: false }); // no way to run: run controls OFF
-    await page.goto(`/workspace/${localWorkerUrlKey}/${BAR_PAGE}`);
-    await page.waitForLoadState('networkidle');
-
-    const actions = page.locator('.nav-actions');
-    // The rulings badge shares the queue badge's gate, deliberately (LIN-1728 Phase 3).
-    await expect(actions.locator('[data-queue-badge]')).toHaveCount(0);
-    await expect(actions.locator('[data-rulings-badge]')).toHaveCount(0);
+  test('both counts are absent when run controls are off', async ({ page, seedLocal, localWorkerUrlKey }) => {
+    await seedLocal(swimLocalSeed, { features: {}, runnerKey: false });
+    await page.goto(`/workspace/${localWorkerUrlKey}/project`);
+    // The questions count shares the queue count's gate, deliberately (LIN-1728 Phase 3).
+    await expect(page.locator('[data-queue-badge]')).toHaveCount(0);
+    await expect(page.locator('[data-rulings-badge]')).toHaveCount(0);
   });
 });
 
-// LIN-1068: the sticky header must ACTUALLY PIN, and the clearance system that
-// only matters when it pins must hold against the real, pinned header. The header
-// was inert on `main` because `overflow-x: hidden` on `html`/`body` made an
-// ancestor a scroll container and stuck `.nav-bar` to it instead of the viewport;
-// the fix is `overflow-x: clip` (clips horizontally without a scroll container).
-// Every assertion here would FAIL under the broken pre-fix state — that is the
-// point: no prior test locked "the header pins", which is how the regression
-// shipped. Height measured at runtime; no pixel value is hardcoded.
-test.describe('Sticky header pin + clearance (LIN-1068)', () => {
-  // LIN-4563: Home has no sticky header now (it sits in the frame), so the pin is read on an old-bar page (LIN-4566: the
-  // Project backlog, now Settings is on the frame; Swim's board does not pin the bar), made tall enough to scroll by a spacer appended to
-  // its <main> after load (a control, then the spacer, so the control is not clamped at the page end). The pins read only
-  // the header, so the spacer changes nothing they measure.
-  const PIN_PAGE = 'project';
+// LIN-1068: sticky chrome must ACTUALLY PIN (an `overflow-x: hidden` root once left the old bar inert; the root is
+// `overflow-x: clip`), and the clearance that matters only when it pins must hold against the real pinned chrome. On a
+// framed page that is the rail at desktop widths and the band on a phone. The page is made tall enough to scroll by a
+// spacer appended to its <main> after load (a control, then the spacer); the pins read only the chrome.
+test.describe('Sticky chrome pin + clearance (LIN-1068, LIN-984 → LIN-4342)', () => {
   test.beforeEach(async ({ seedLocal }) => {
     await seedLocal(swimLocalSeed, { features: FLAGS, runnerKey: true });
   });
 
-  async function openTallBarPage(page, urlKey) {
-    await page.goto(`/workspace/${urlKey}/${PIN_PAGE}`);
+  async function openTallPage(page, urlKey) {
+    await page.goto(`/workspace/${urlKey}/project`);
     await page.waitForLoadState('networkidle');
     await page.evaluate(() => {
       const main = document.querySelector('main');
@@ -259,205 +158,55 @@ test.describe('Sticky header pin + clearance (LIN-1068)', () => {
     });
   }
 
-  for (const width of [390, 1280]) {
-    test(`header pins to the viewport top after scroll at ${width}px`, async ({ page, localWorkerUrlKey }) => {
+  for (const [width, chrome] of [[1280, SELECTORS.nav.rail], [390, SELECTORS.nav.band]]) {
+    test(`the ${width === 1280 ? 'rail' : 'band'} pins to the viewport top after scroll at ${width}px`, async ({ page, localWorkerUrlKey }) => {
       await page.setViewportSize({ width, height: 700 });
-      await openTallBarPage(page, localWorkerUrlKey);
-
-      // Precondition: the page must be tall enough to scroll, else the pin is
-      // untestable (a non-scrolling page has an in-flow header at top by default).
+      await openTallPage(page, localWorkerUrlKey);
       await page.evaluate(() => window.scrollTo(0, 600));
-      const scrollY = await page.evaluate(() => window.scrollY);
-      expect(scrollY, 'page must scroll for the pin assertion to be meaningful').toBeGreaterThan(0);
-
-      // The regression lock: with position:sticky genuinely working the header's
-      // top edge is flush with the viewport top (~0) after scrolling. Under the
-      // broken overflow-x:hidden state it scrolled away to ~ -scrollY.
-      const navTop = await page.locator('.nav-bar').evaluate(el => el.getBoundingClientRect().top);
-      expect(Math.abs(navTop)).toBeLessThanOrEqual(1);
+      expect(await page.evaluate(() => window.scrollY), 'page must scroll for the pin to mean anything').toBeGreaterThan(0);
+      const top = await page.locator(chrome).evaluate(el => el.getBoundingClientRect().top);
+      expect(Math.abs(top)).toBeLessThanOrEqual(1);
     });
   }
 
-  test('pinned header does not intercept content beneath it (LIN-984 re-proven with a real pin)', async ({ page, localWorkerUrlKey }) => {
+  test('at 390px the pinned band does not intercept a control scrolled to the top (scroll-margin-top: --nav-sticky-h)', async ({ page, localWorkerUrlKey }) => {
     await page.setViewportSize({ width: 390, height: 700 });
-    await openTallBarPage(page, localWorkerUrlKey);
-
+    await openTallPage(page, localWorkerUrlKey);
     await page.evaluate(() => window.scrollTo(0, 400));
-    expect(await page.evaluate(() => window.scrollY)).toBeGreaterThan(0);
-
-    // 1) Just below the pinned header, the topmost element must be page content,
-    //    never the nav — the header sits ABOVE content, it does not overlay it.
-    const belowHeaderIsNav = await page.evaluate(() => {
-      const nav = document.querySelector('.nav-bar');
-      const navRect = nav.getBoundingClientRect();
-      const x = Math.round(window.innerWidth / 2);
-      const el = document.elementFromPoint(x, Math.ceil(navRect.bottom + 2));
-      return nav.contains(el);
-    });
-    expect(belowHeaderIsNav, 'element just below the header must not belong to the nav').toBe(false);
-
-    // 2) A focusable control scrolled to the top settles BELOW the header thanks to
-    //    scroll-margin-top: var(--nav-sticky-h), so it stays clickable rather than
-    //    tucked under the pinned nav — the exact interception the clearance guards.
     const settle = await page.evaluate(() => {
-      const nav = document.querySelector('.nav-bar');
-      const navBottom = nav.getBoundingClientRect().bottom;
-      const focusables = [...document.querySelectorAll('a[href], button, summary, [tabindex]')]
-        .filter(e => !nav.contains(e) && e.offsetParent !== null);
-      const target = focusables.sort((a, b) => b.offsetTop - a.offsetTop)[0];
-      if (!target) return null;
+      const band = document.querySelector('[data-testid="frame-band"]');
+      const bandBottom = band.getBoundingClientRect().bottom;
+      const target = [...document.querySelectorAll('main button, main a[href]')].filter(e => e.offsetParent !== null).sort((a, b) => b.offsetTop - a.offsetTop)[0];
       target.scrollIntoView({ block: 'start' });
       const rect = target.getBoundingClientRect();
-      const hit = document.elementFromPoint(
-        Math.round(rect.left + rect.width / 2),
-        Math.round(rect.top + rect.height / 2)
-      );
-      return { top: rect.top, navBottom, clickable: target === hit || target.contains(hit) };
+      const hit = document.elementFromPoint(Math.round(rect.left + rect.width / 2), Math.round(rect.top + rect.height / 2));
+      return { top: rect.top, bandBottom, clickable: target === hit || target.contains(hit) };
     });
-    expect(settle, 'expected at least one focusable page control below the header').not.toBeNull();
-    expect(settle.top, 'control must not be tucked under the pinned header').toBeGreaterThanOrEqual(settle.navBottom - 1);
-    expect(settle.clickable, 'pinned header must not click-intercept the control').toBe(true);
-  });
-});
-
-// LIN-2179: widened coverage for the mobile scrolling-strip fix — the pre-fix
-// clearance guard pinned a single 390×700/no-flags fixture, the one combination
-// where nothing ever wrapped, which is why the 168px-wrapped-header regression
-// shipped unnoticed. This sweeps widths × active view with every experimental +
-// power-user flag on, against a fixed workspace name throughout (per the LIN-2179
-// design's explicit instruction not to take on the workspace-name axis — the
-// projects-page `.nav-primary-row` wrap stays a separate, unproven, out-of-scope
-// condition).
-test.describe('Mobile nav-strip density sweep (LIN-2179)', () => {
-  const ALL_EXPERIMENTAL_FLAGS = {
-    roadmap: true,
-    collective: true, taskChat: true, ship: true,
-    flightCompanion: true, passagePlanner: true, shipBiscuit: true,
-    liveConsole: true, shipJourney: true
-  };
-  const MOBILE_SWEEP_WIDTHS = [360, 390, 412, 430];
-  // A first-class view (never hoisted — already primary, so it exercises the
-  // baseline five-inline-plus-toggle case), the shortest flag-gated label (`ship`,
-  // 4 chars — the one view that did NOT wrap pre-fix) and the longest flag-gated
-  // label (`passage-planner` — the worst-case hoisted-label width).
-  // LIN-4564: Swim and the flagged views left the old bar for the frame, so the strip is swept on the pages still on it: a
-  // first-class view (Settings), and the power-user views KPIs and Dispatch (the owner's), each active in turn.
-  // LIN-4565: KPIs and Dispatch moved onto the frame too, so Settings is the one page left with an active view on the bar.
-  // LIN-4566: Settings moved too; the strip is swept on the Project backlog, whose bar marks Tasks (`projects`) active.
-  const MOBILE_SWEEP_VIEWS = [
-    { pagePath: 'project', activeKey: 'projects' }
-  ];
-
-  test.beforeEach(async ({ seedLocal }) => {
-    await seedLocal(swimLocalSeed, { features: ALL_EXPERIMENTAL_FLAGS, runnerKey: true });
+    expect(settle.top, 'the control must not be tucked under the band').toBeGreaterThanOrEqual(settle.bandBottom - 1);
+    expect(settle.clickable, 'the band must not click-intercept the control').toBe(true);
   });
 
-  for (const width of MOBILE_SWEEP_WIDTHS) {
-    test(`mobile --nav-sticky-h clearance is at least the measured header height at ${width}px (branch-a guard)`, async ({ page, localWorkerUrlKey }) => {
-      await page.setViewportSize({ width, height: 700 });
-      await page.goto(`/workspace/${localWorkerUrlKey}/${BAR_PAGE}`);
-      await page.waitForLoadState('networkidle');
-
-      const { clearancePx, headerPx } = await page.evaluate(() => {
-        const nav = document.querySelector('.nav-bar');
-        // Resolve --nav-sticky-h to px via a throwaway probe sized by the token
-        // (inherited from :root), instead of hardcoding 122/124 — the guard tracks
-        // real header growth. This is exactly the value that feeds the pinned
-        // header's scroll-margin-top clearance.
-        const probe = document.createElement('div');
-        probe.style.height = 'var(--nav-sticky-h)';
-        probe.style.position = 'absolute';
-        probe.style.visibility = 'hidden';
-        document.body.appendChild(probe);
-        const clearancePx = probe.getBoundingClientRect().height;
-        probe.remove();
-        return { clearancePx, headerPx: nav.offsetHeight };
-      });
-      expect(clearancePx).toBeGreaterThan(0); // token actually resolves
-      expect(clearancePx).toBeGreaterThanOrEqual(headerPx);
-    });
-
-    for (const { pagePath, activeKey } of MOBILE_SWEEP_VIEWS) {
-
-      test(`keyboard focus traversal keeps every focused mobile nav tab visible within the strip at ${width}px (${activeKey}) (LIN-2189 F2)`, async ({ page, localWorkerUrlKey }) => {
-        await page.setViewportSize({ width, height: 800 });
-        await page.goto(`/workspace/${localWorkerUrlKey}/${pagePath}`);
-        await page.waitForLoadState('networkidle');
-
-        // Focus every primary tab (and the toggle) in strip order, exactly as `Tab`
-        // traversal would, and check each stays fully inside the strip's visible
-        // box the moment it is focused. Pre-fix this could not happen on mobile
-        // (`overflow-x: visible` + wrap clipped nothing horizontally); the strip's
-        // new `overflow-x: auto` can leave leading tabs scrolled out of view, and
-        // real `Tab` traversal alone does not scroll them back (LIN-2189 F2) — the
-        // `focusin` handler in common.js is what restores that guarantee.
-        const results = await page.evaluate(() => {
-          const strip = document.querySelector('.nav-views');
-          // Only genuine `Tab` stops: the active tab renders as a non-link
-          // `<strong>` (by design, LIN-978) and is never itself a focus target,
-          // so it's excluded here via `tabIndex` rather than the testid pattern.
-          const targets = Array.from(strip.querySelectorAll(':scope > [data-testid^="nav-view-"], :scope > [data-testid="nav-more-toggle"]'))
-            .filter(t => t.tabIndex >= 0);
-          return targets.map(t => {
-            t.focus();
-            const stripRect = strip.getBoundingClientRect();
-            const rect = t.getBoundingClientRect();
-            return {
-              testid: t.getAttribute('data-testid'),
-              focused: document.activeElement === t,
-              insideStrip: rect.left >= stripRect.left - 1 && rect.right <= stripRect.right + 1
-            };
-          });
-        });
-        expect(results.length).toBeGreaterThan(0);
-        for (const r of results) {
-          expect(r.focused, `${r.testid} must actually receive focus for this check to be meaningful`).toBe(true);
-          expect(r.insideStrip, `focused ${r.testid} must stay inside the visible strip`).toBe(true);
-        }
-      });
-    }
-
-    test(`every nav view target is a comfortable 44px tap target, and the toggle keeps a real width, at ${width}px (LIN-2189 F1)`, async ({ page, localWorkerUrlKey }) => {
+  // The token page-level fixed controls and tests/fixed-overlay-sweep.js read: the band's height on a phone, 0 on a
+  // desktop, where nothing sticky crosses the page. With no bar left there is nothing to measure (LIN-4037 retired).
+  for (const width of [360, 390, 430, 1280]) {
+    test(`--nav-sticky-h is the band's height at ${width}px`, async ({ page, localWorkerUrlKey }) => {
       await page.setViewportSize({ width, height: 800 });
-      await page.goto(`/workspace/${localWorkerUrlKey}/${BAR_PAGE}`);
-      await page.waitForLoadState('networkidle');
-
-      // Height is the tap-target contract for every inline link and the toggle —
-      // the toggle's visible CONTENT shrinks to a bare glyph on mobile (LIN-2179),
-      // a horizontal-only compaction, so width is not asserted here for the links.
-      const heights = await page.locator('.nav-views > [data-testid^="nav-view-"], .nav-more-toggle').evaluateAll(els =>
-        els.map(el => el.getBoundingClientRect().height)
-      );
-      expect(heights.length).toBeGreaterThan(0);
-      for (const h of heights) expect(h).toBeGreaterThanOrEqual(44);
-
-      // The toggle's BOX still needs a real horizontal footprint though: collapsing
-      // it to the bare glyph's own rendered width (measured as low as ~7px pre-fix)
-      // fails WCAG 2.2 SC 2.5.8 Target Size (Minimum), 24×24 CSS px (LIN-2189 F1).
-      const toggleWidth = await page.locator('[data-testid="nav-more-toggle"]').evaluate(el => el.getBoundingClientRect().width);
-      expect(toggleWidth).toBeGreaterThanOrEqual(24);
+      await page.goto(`/workspace/${localWorkerUrlKey}/project`);
+      const { clearance, band } = await page.evaluate(() => {
+        const probe = document.createElement('div');
+        probe.style.cssText = 'height: var(--nav-sticky-h); position: absolute; visibility: hidden';
+        document.body.appendChild(probe);
+        const px = probe.getBoundingClientRect().height;
+        probe.remove();
+        const el = document.querySelector('[data-testid="frame-band"]');
+        return { clearance: px, band: el.offsetParent === null ? 0 : el.offsetHeight };
+      });
+      expect(clearance).toBe(band);
+      if (width === 1280) expect(clearance).toBe(0);
     });
   }
-
-  test('toggle accessible name still contains "more" while the label is visually hidden (LIN-2179)', async ({ page, localWorkerUrlKey }) => {
-    await page.setViewportSize({ width: 390, height: 800 });
-    await page.goto(`/workspace/${localWorkerUrlKey}/${BAR_PAGE}`);
-    await page.waitForLoadState('networkidle');
-
-    const toggle = page.locator('[data-testid="nav-more-toggle"]');
-    await expect(toggle).toBeVisible();
-    await expect(toggle).toHaveAccessibleName(/more/);
-
-    // Visually clipped, not removed — the `⋯` glyph is a bare ~11px-wide target
-    // but "more" stays in the accessible-name tree (distinguishes this from
-    // `display:none`, which would have stripped it from the computed name above).
-    const clipped = await page.locator('.nav-more-label').evaluate(el => {
-      const cs = getComputedStyle(el);
-      return cs.position === 'absolute' && cs.width === '1px' && cs.height === '1px';
-    });
-    expect(clipped).toBe(true);
-  });
 });
+
 
 // LIN-2210 close-out ledger item 2: `.nav-action.login` (Sign in / GitHub / Jira
 // on the landing preview pages' shared nav bar) had no mobile tap target — the
@@ -518,21 +267,21 @@ test.describe('.nav-filters team-item mobile sweep (LIN-2523)', () => {
         await expect(line).toBeVisible();
         const items = await line.evaluate(el => [...el.children].filter(c => c.classList.contains('nav-item')).length);
         expect(items, `${pagePath} at ${width}px carries the team item alone (no assignee off Home and Backlog)`).toBe(1);
-        await expect(page.locator('.nav-bar')).toHaveCount(0);
+        await expect(page.locator(SELECTORS.nav.rail)).toHaveCount(1);
         await expect(line.locator('#team-toggle')).toHaveText('all');
         const scrolls = await page.evaluate(() => document.documentElement.scrollWidth > window.innerWidth);
         expect(scrolls, `no sideways scroll at ${width}px`).toBe(false);
       });
     }
 
-    // LIN-4565: read on BAR_PAGE; Dispatch, the page this baseline used, is on the frame (no `.nav-filters`).
-    test(`a non-filterable old-bar page (${BAR_PAGE}) at ${width}px stays at 1 — the baseline this sweep's "3" is measured against`, async ({ page, workerUrlKey }) => {
+    // LIN-4565 read this baseline on the old bar's page; LIN-4568 deleted the bar. A page that filters nothing draws no
+    // filter line at all (Settings), and its workspace is the rail's.
+    test(`a non-filterable page (Settings) at ${width}px draws no filter line — the baseline this sweep is measured against`, async ({ page, workerUrlKey }) => {
       await page.setViewportSize({ width, height: 800 });
-      await page.goto(`/workspace/${workerUrlKey}/${BAR_PAGE}`);
+      await page.goto(`/workspace/${workerUrlKey}/settings`);
       await page.waitForLoadState('networkidle');
 
-      const childCount = await page.locator('.nav-filters').evaluate(el => el.children.length);
-      expect(childCount).toBe(1);
+      await expect(page.locator(SELECTORS.nav.filters)).toHaveCount(0);
       await expect(page.locator('#team-toggle')).toHaveCount(0);
     });
   }
@@ -595,7 +344,7 @@ test.describe('.nav-filters assignee-item mobile sweep (LIN-2529)', () => {
       await expect(line).toBeVisible();
       const items = await line.evaluate(el => [...el.children].filter(c => c.classList.contains('nav-item')).length);
       expect(items, `dashboard at ${width}px must carry team + assignee (2) in its filter line`).toBe(2);
-      await expect(page.locator('.nav-bar')).toHaveCount(0);
+      await expect(page.locator(SELECTORS.nav.rail)).toHaveCount(1);
 
       await expect(line.locator('#assignee-toggle')).toBeVisible();
       await expect(line.locator('#assignee-toggle')).toHaveText('all');
@@ -683,7 +432,7 @@ const SINGLE_ROW_MAX_HEIGHT = 60;
 // characters, so the old 8ch cap cut it, the way it cut "Local Workspace".
 const TEST_WORKSPACE_NAME = 'Test Workspace';
 
-// LIN-4563: `path` '' is Home (its filter line), BAR_PAGE the old bar's page. The assignee only applies on Home.
+// LIN-4563: `path` '' is Home (its filter line). The assignee applies on Home and Backlog.
 function densityUrl(urlKey, state, path = '') {
   return `/workspace/${urlKey}/${path}?team=${encodeURIComponent(state.team)}&assignee=${encodeURIComponent(state.assignee)}`;
 }
@@ -706,123 +455,10 @@ function readFilterLineShape() {
   };
 }
 
-// The strip's shape, read from its items: the workspace item's box and value, and the rows the other items
-// (team, assignee) take, by their distinct tops.
-function readStripShape() {
-  const box = (el) => el.getBoundingClientRect();
-  const filters = document.querySelector('.nav-filters');
-  const workspace = filters.querySelector('.nav-item[data-selector="workspace"]');
-  const value = workspace.querySelector('.nav-value');
-  const others = [...filters.querySelectorAll('.nav-item')].filter(i => i !== workspace);
-  const tops = [...new Set(others.map(i => Math.round(box(i).top)))];
-  const rowTop = others.length ? Math.min(...others.map(i => box(i).top)) : 0;
-  const rowBottom = others.length ? Math.max(...others.map(i => box(i).bottom)) : 0;
-  return {
-    children: filters.children.length,
-    workspaceText: value.textContent.trim(),
-    workspaceTruncated: value.scrollWidth > value.clientWidth + 1,
-    workspaceBottom: Math.round(box(workspace).bottom),
-    workspaceWidth: Math.round(box(workspace).width),
-    filtersWidth: Math.round(box(filters).width),
-    otherRows: tops.length,
-    otherTop: Math.round(rowTop),
-    otherHeight: Math.round(rowBottom - rowTop),
-  };
-}
-
-// LIN-4037: the pinned header is taller than the static `--nav-sticky-min` floor in two bands (481–581 and
-// 641–~836) when row 1 wraps, which depends on content and flags. The clearance now follows the measured
-// header (`--nav-bar-h`), so these widths are swept with the worst content: a team, an assignee, and the
-// feedback trigger. The token probe and the scroll outcome are both asserted, because the token alone
-// read green over both bands before. LIN-4563: Home left the old bar, and no old-bar page draws the assignee, so the
-// worst content an old-bar page can carry was read on Swim: a team selected and the feedback trigger. LIN-4564: Swim left
-// the bar too, and no old-bar page draws a team, so the worst content left is the feedback trigger, read on BAR_PAGE.
-test.describe('Pinned header clearance at the measured breach (LIN-4037)', () => {
-  const BREACH_WIDTHS = [481, 500, 520, 560, 600, 640, 660, 700, 760, 836];
-  const FEEDBACK_ON = { feedbackWidget: true };
-
-  // LIN-4120: Home draws no project sections, so the Linear worker's Home is short. The describe's Home visits carry
-  // `?team=`, and the server remembers that team per account and workspace; a later spec on this worker key would then
-  // load with the team applied. Visiting `?team=all` on the same key when the describe ends restores the default.
-  test.afterAll(async ({ browser, workerUrlKey }) => {
-    const context = await browser.newContext();
-    const page = await context.newPage();
-    await page.goto(`/test/set-session?urlKey=${workerUrlKey}`);
-    await page.goto(`/workspace/${workerUrlKey}/?team=all`);
-    await context.close();
-  });
-
-  // `tall` makes the page taller than the viewport, so the scroll test has room to scroll: a spacer, then a focusable
-  // control below it, appended to <main> after load. It only adds height below the page's content; the header is unchanged.
-  async function openDashboard(page, urlKey, { width, height = 800, features = {}, tall = false }) {
-    await page.goto(`/test/set-session?urlKey=${urlKey}${featuresParam(features)}`);
-    await page.setViewportSize({ width, height });
-    await page.goto(`/workspace/${urlKey}/${BAR_PAGE}`);
-    await page.waitForLoadState('networkidle');
-    if (tall) {
-      await page.evaluate(() => {
-        const main = document.querySelector('main');
-        const spacer = document.createElement('div');
-        spacer.style.height = '2000px';
-        const control = document.createElement('button');
-        control.type = 'button';
-        control.textContent = 'Below the fold';
-        control.setAttribute('data-test-scroll-target', '');
-        main.append(control, spacer);
-      });
-    }
-  }
-
-  // The token as a rendered px height, resolved through a probe so it reflects the cascade the consumers see.
-  function readClearancePx(page) {
-    return page.evaluate(() => {
-      const probe = document.createElement('div');
-      probe.style.height = 'var(--nav-sticky-h)';
-      probe.style.position = 'absolute';
-      probe.style.visibility = 'hidden';
-      document.body.appendChild(probe);
-      const px = probe.getBoundingClientRect().height;
-      probe.remove();
-      return px;
-    });
-  }
-
-  for (const width of BREACH_WIDTHS) {
-    test(`token clears the measured header at ${width}px with feedback on`, async ({ page, workerUrlKey }) => {
-      await openDashboard(page, workerUrlKey, { width, features: FEEDBACK_ON });
-
-      const headerPx = await page.evaluate(() => document.querySelector('.nav-bar').offsetHeight);
-      const clearance = await readClearancePx(page);
-      expect(clearance, `the sticky clearance (${clearance}px) must cover the ${headerPx}px header at ${width}px`).toBeGreaterThanOrEqual(headerPx);
-    });
-
-  }
-
-
-  for (const { width, expected } of [{ width: 400, expected: 208 }, { width: 480, expected: 208 }, { width: 1024, expected: 96 }]) {
-    test(`the clearance stays at the static floor at ${width}px where the header already clears it`, async ({ page, workerUrlKey }) => {
-      await openDashboard(page, workerUrlKey, { width });
-      expect(await readClearancePx(page)).toBe(expected);
-    });
-  }
-
-  test('with common.js unavailable, the clearance is the CSS floor (no-JS fallback)', async ({ page, workerUrlKey }) => {
-    await page.route(/\/common\.js(\?|$)/, route => route.abort());
-    await openDashboard(page, workerUrlKey, { width: 500, features: FEEDBACK_ON });
-    expect(await page.evaluate(() => document.documentElement.style.getPropertyValue('--nav-bar-h'))).toBe('');
-    expect(await readClearancePx(page)).toBe(124); // 7.75rem floor at ≤640px
-  });
-});
-
-// LIN-4563: the budget is split by where the selectors now live. The assignee states are swept on Home's filter line (team
-// and assignee share one row, no control off the viewport, values legible); the bar's own shape, the workspace name on a
-// full line of its own with the team below it, is swept on the old bar's page with the states it can carry (no team, a
-// team). Home has no sticky header, so the clearance half of this block reads the old bar's page alone.
+// LIN-4563: the budget is swept on Home's filter line (team and assignee share one row, no control off the viewport,
+// values legible). LIN-4568: the old bar's half of it (the workspace name on a line of its own, and the clearance under
+// the bar) went with the bar; the workspace is the rail's, behind ☰ on a phone.
 test.describe('.nav-filters mobile density budget (LIN-2551, reshaped by LIN-4024)', () => {
-  // LIN-4564: no old-bar page draws a team any more (every FILTERABLE_PAGES page is on the frame), so the bar carries one
-  // state, no filters; the team states are the filter line's (the LIN-2523 sweep above and the Home cases here).
-  const BAR_STATES = DENSITY_FILTER_STATES.filter(state => state.team === 'all' && state.assignee === 'all');
-
   test.beforeEach(async ({ page, workerUrlKey }) => {
     await page.goto(`/test/set-session?urlKey=${workerUrlKey}`);
   });
@@ -853,61 +489,6 @@ test.describe('.nav-filters mobile density budget (LIN-2551, reshaped by LIN-402
       });
     }
 
-    for (const state of BAR_STATES) {
-      test(`${BAR_PAGE} at ${width}px, ${state.label}: the workspace name has its own full line`, async ({ page, workerUrlKey }) => {
-        await page.setViewportSize({ width, height: 800 });
-        await page.goto(densityUrl(workerUrlKey, state, BAR_PAGE));
-        await page.waitForLoadState('networkidle');
-
-        await expect(page.locator('.nav-filters')).toBeVisible();
-        const shape = await page.evaluate(readStripShape);
-
-        // The workspace alone: 1 DOM child (LIN-4009: the brand leads the row, outside the strip; LIN-4024 moves the
-        // workspace name by CSS only; LIN-4564: no team on an old-bar page).
-        expect(shape.children).toBe(1);
-
-        // The workspace name, in full, on a line of its own (item 23 of LIN-4024).
-        expect(shape.workspaceText).toBe(TEST_WORKSPACE_NAME);
-        expect(shape.workspaceTruncated, `the workspace name must not be cut at ${width}px`).toBe(false);
-        expect(shape.workspaceWidth, 'the workspace item takes the strip\'s full width').toBeGreaterThanOrEqual(shape.filtersWidth - 1);
-        expect(shape.otherRows).toBe(0);
-      });
-    }
-
-    test(`${BAR_PAGE} at ${width}px: --nav-sticky-h clears the tallest old-bar header, the workspace line`, async ({ page, workerUrlKey }) => {
-      await page.setViewportSize({ width, height: 800 });
-      await page.goto(densityUrl(workerUrlKey, BAR_STATES[0], BAR_PAGE));
-      await page.waitForLoadState('networkidle');
-
-      const { clearancePx, headerPx } = await page.evaluate(() => {
-        const probe = document.createElement('div');
-        probe.style.height = 'var(--nav-sticky-h)';
-        probe.style.position = 'absolute';
-        probe.style.visibility = 'hidden';
-        document.body.appendChild(probe);
-        const clearancePx = probe.getBoundingClientRect().height;
-        probe.remove();
-        return { clearancePx, headerPx: document.querySelector('.nav-bar').offsetHeight };
-      });
-      expect(clearancePx, `the sticky clearance (${clearancePx}px) must cover the ${headerPx}px header at ${width}px`).toBeGreaterThanOrEqual(headerPx);
-    });
-
-    test(`${BAR_PAGE} at ${width}px: no filter control is pushed off-viewport`, async ({ page, workerUrlKey }) => {
-      // A strip forced onto one row by shrinking can push its last item past the viewport edge, where the root's
-      // `overflow-x: clip` makes it unreachable with no horizontal scrollbar to reveal it. A `nowrap` revision of the
-      // LIN-2551 fix did exactly that, so it stays pinned. (Home's filter line is checked in its own sweep above.)
-      await page.setViewportSize({ width, height: 800 });
-      await page.goto(densityUrl(workerUrlKey, BAR_STATES[0], BAR_PAGE));
-      await page.waitForLoadState('networkidle');
-
-      const offscreen = await page.evaluate(() => {
-        const viewport = document.documentElement.clientWidth;
-        return [...document.querySelectorAll('.nav-filters .nav-value')]
-          .filter(c => c.getBoundingClientRect().right > viewport + 1)
-          .map(c => `${c.id || c.className}@${Math.round(c.getBoundingClientRect().right)}`);
-      });
-      expect(offscreen, `every filter control must sit inside the ${width}px viewport`).toEqual([]);
-    });
   }
 
   test('the filter line still shows what it is showing — values are not crushed away to fit', async ({ page, workerUrlKey }) => {
@@ -939,7 +520,7 @@ test.describe('.nav-filters mobile density budget (LIN-2551, reshaped by LIN-402
     expect(assignee.truncated, 'a short real assignee name should sit under the cap, not at it').toBe(false);
   });
 
-  test('320px — below the swept range, the filter line and the bar degrade by wrapping rather than by clipping', async ({ page, workerUrlKey }) => {
+  test('320px — below the swept range, the filter line degrades by wrapping rather than by clipping', async ({ page, workerUrlKey }) => {
     // 320px is narrower than any width this block covers: a second row is allowed, a third is not, and nothing clips.
     await page.setViewportSize({ width: 320, height: 800 });
     await page.goto(densityUrl(workerUrlKey, DENSITY_FILTER_STATES[3]));
@@ -948,12 +529,5 @@ test.describe('.nav-filters mobile density budget (LIN-2551, reshaped by LIN-402
     expect(line.rows, 'at 320px team and assignee may take a second row, but never a third').toBeLessThanOrEqual(2);
     expect(line.offscreen, 'wrapping is the degradation; clipping a control is not').toEqual([]);
 
-    await page.goto(densityUrl(workerUrlKey, BAR_STATES[0], BAR_PAGE));
-    await page.waitForLoadState('networkidle');
-    const offscreen = await page.evaluate(() => {
-      const viewport = document.documentElement.clientWidth;
-      return [...document.querySelectorAll('.nav-filters .nav-value')].filter(c => c.getBoundingClientRect().right > viewport + 1).length;
-    });
-    expect(offscreen, 'wrapping is the degradation; clipping a control is not').toBe(0);
   });
 });

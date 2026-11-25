@@ -2,12 +2,10 @@ import { test, expect } from '../fixtures/test-base.js';
 import { SELECTORS } from '../helpers.js';
 
 // LIN-4563 (LIN-4342 piece 2): Home moved onto the frame, whose rail carries the workspace menu (switch and add only).
-// LIN-4566 (piece 5) moved Settings, the last signed-in page whose old bar a person could open, onto the frame: the one
-// workspace page still drawing the old bar, the Project backlog (routes/project-page.js), loads no script, so its menu
-// cannot open. The selector cases read the rail's menu (on Settings, MENU_PAGE) instead, and the old bar's markup is
-// checked for what it must no longer offer. Removing a workspace lives in Settings › Sources: neither menu offers it.
+// LIN-4566 (piece 5) moved Settings onto the frame, and LIN-4568 (piece 7) the Project backlog, the old bar's last host,
+// and deleted the bar. The selector cases read the rail's menu (on Settings, MENU_PAGE). Removing a workspace lives in
+// Settings › Sources: the menu never offers it.
 const MENU_PAGE = 'settings';
-const OLD_BAR_PAGE = 'project';
 
 // Mixed-harness boundary split (LIN-428, parent S3/LIN-389).
 //   - The two single-workspace selector cases ('single workspace shows in
@@ -142,15 +140,16 @@ test.describe('Workspace Switching', () => {
 // LIN-4566 (LIN-4342 piece 5): removing a workspace lives in Settings › Sources, as an ask in place that posts to the
 // existing POST /workspace/:urlKey/remove (routes/workspace.js). The old bar's red "remove" is gone with it.
 test.describe('Workspace Removal', () => {
-  test('the old bar\'s workspace menu offers no remove', async ({ page, workerUrlKey }) => {
+  test('the rail\'s workspace menu offers no remove, on the Project backlog too (LIN-4568: the old bar\'s last page)', async ({ page, workerUrlKey }) => {
     await page.goto(`/test/set-session?multiWorkspace=true&urlKey=${workerUrlKey}`);
-    await page.goto(`/workspace/${workerUrlKey}/${OLD_BAR_PAGE}`);
+    await page.goto(`/workspace/${workerUrlKey}/project`);
 
-    // The bar's menu is drawn (closed: the page loads no script to open it); it switches and adds, never removes.
-    await expect(page.locator('#workspace-options')).toHaveCount(1);
-    await expect(page.locator('#workspace-options [role="option"]')).toHaveCount(2);
-    await expect(page.locator('#workspace-options [action$="/remove"]')).toHaveCount(0);
-    await expect(page.locator('#workspace-options .nav-option-danger')).toHaveCount(0);
+    await expect(page.locator('#workspace-options')).toHaveCount(0);
+    await page.locator(SELECTORS.nav.workspaceToggle).click();
+    const menu = page.locator(SELECTORS.nav.workspaceMenu);
+    await expect(menu).toBeVisible();
+    await expect(menu.locator('a.frame-menu__row:not(.frame-menu__add)')).toHaveCount(2);
+    await expect(menu.locator('[action$="/remove"]')).toHaveCount(0);
   });
 
   test('Settings › Sources removes this workspace through its confirm, and lands on the one left', async ({ page, workerUrlKey, secondWorkerUrlKey }) => {

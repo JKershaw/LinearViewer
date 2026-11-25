@@ -22,7 +22,7 @@ import { fileURLToPath } from 'node:url';
 import { dirname, join } from 'node:path';
 import { withHarnessModels } from '../fixtures/harness-models.js';
 import { loadWorld } from './helpers/client-world.js';
-import { renderNavBar } from '../../lib/components/navbar.js';
+import { renderRail } from '../../lib/components/frame.js';
 import { createHomeRowStates, createWaitingStanding } from '../../lib/home-row-states.js';
 import { renderWaitingSection } from '../../lib/waiting-section.js';
 import { titlesFromIssues } from '../../lib/open-questions.js';
@@ -155,7 +155,7 @@ function loadCommon() {
     },
   });
   world.run(withHarnessModels(COMMON_JS_SRC));
-  world.document.body.innerHTML = renderNavBar({ workspaces: [], urlKey: 'ws', featureFlags: { runControls: true } });
+  world.document.body.innerHTML = renderRail({ workspaces: [], urlKey: 'ws', featureFlags: { runControls: true } });
   assert.equal(world.run('typeof CustomEvent'), 'undefined', 'the world has no CustomEvent');
   return { world, intervals, fetches };
 }

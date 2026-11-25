@@ -45,7 +45,8 @@ test.describe('Templates page', () => {
 
   test('footer link navigates here from the landing page', async ({ page }) => {
     await page.goto('/');
-    const link = page.locator('.page-footer a.footer-legal[href="/templates"]');
+    // LIN-4568: the landing draws the footer every page shares.
+    const link = page.locator(SELECTORS.nav.footerLink('templates'));
     await expect(link).toBeVisible();
     await link.click();
     await expect(page).toHaveTitle(/Templates/);

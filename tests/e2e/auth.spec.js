@@ -28,7 +28,8 @@ test.describe('Authentication Flow', () => {
     // reachable via the hero, and none of the authenticated-only chrome
     // (workspace/team selectors, reset, logout) — nor the top bar — is present.
     await expect(page.locator('[data-testid="landing-cta-linear"]')).toBeVisible();
-    await expect(page.locator('nav.nav-bar')).toHaveCount(0);
+    await expect(page.locator(SELECTORS.nav.rail)).toHaveCount(0);
+    await expect(page.locator(SELECTORS.nav.publicBand)).toHaveCount(0);
     await expect(page.locator('[data-selector="workspace"]')).toHaveCount(0);
     await expect(page.locator('[data-selector="team"]')).toHaveCount(0);
     await expect(page.locator('.reset-view')).toHaveCount(0);

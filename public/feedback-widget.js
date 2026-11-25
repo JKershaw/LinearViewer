@@ -10,7 +10,7 @@
  *
  * LIN-2298 changed where the trigger lives, and this header said "floating"
  * for a while after it stopped being true. It is NOT floating: the trigger is
- * a normal-flow button in the nav bar, server-rendered by
+ * a normal-flow button at the rail's foot (LIN-4562), server-rendered by
  * `renderFeedbackTrigger` (lib/components/navbar.js) and bound below. This
  * file paints only the PANEL. The fixed `.feedback-fab` it replaces was an
  * overlay over full-width content, which LIN-2272 proved no CSS reserve can
@@ -107,7 +107,7 @@
     // that used to lead this markup was a `position: fixed` element floating
     // over full-width content, and LIN-2272 established that no CSS reserve
     // clears such an element at every scroll offset once the content spans the
-    // column. It is replaced by a normal-flow trigger in the nav bar
+    // column. It is replaced by a normal-flow trigger at the rail's foot
     // (`renderFeedbackTrigger`, lib/components/navbar.js), bound below. The
     // PANEL stays an overlay on purpose: it appears only once the user asks for
     // it, so it covers content by the user's own choice, which is the half of
@@ -176,7 +176,7 @@
       });
     }
 
-    // LIN-2298: the trigger now lives in the nav bar, OUTSIDE this root, so it
+    // LIN-2298: the trigger now lives in the chrome (the rail's foot), OUTSIDE this root, so it
     // is queried from the document rather than from `root`. A NodeList, not a
     // single element, so a page that ever grows a second trigger (a mobile
     // duplicate, say) keeps every copy's `aria-expanded` and draft dot in step
@@ -186,8 +186,8 @@
     // persistence, submit) do not depend on a trigger existing, so a surface
     // that mounts the widget without a nav must degrade to an unopenable panel
     // rather than a thrown TypeError that takes the rest of this script with
-    // it. No such surface exists today — every page rendering the mount also
-    // renders the nav, which tests/unit/navbar-feedback-trigger.test.js pins —
+    // it. No such surface exists today — the frame draws both the mount and the
+    // trigger, which tests/unit/navbar-feedback-trigger.test.js pins —
     // so this is a guard against a future page, not a live case.
     const triggers = Array.from(document.querySelectorAll('[data-testid="nav-feedback-trigger"]'));
     const popup = root.querySelector('.feedback-popup');

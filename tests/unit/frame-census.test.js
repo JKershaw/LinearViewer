@@ -1,19 +1,18 @@
 /**
- * LIN-4562 (LIN-4342 piece 1): the frame census, a ratchet like the classic-loader census. Every page is to sit in one
- * frame (lib/components/frame.js renderFrame / renderPublicFrame), which owns the skip link, the rail or public band,
- * the one h1, the footer and the tab title. A file that imports the shell's `renderPage` (lib/components/page.js)
- * assembles its own chrome, so it is "on the old chrome". The list below is every such file today, written out by name:
- * a new file importing the shell outside the frame fails, and so does a listed file that no longer calls it, until the list is lowered in the same
- * change. The list only falls: each piece that moves pages onto the frame deletes their files here, and piece 7
- * (LIN-4568) empties it and deletes the allowance.
+ * LIN-4562 (LIN-4342 piece 1): the frame census. Every page sits in one frame (lib/components/frame.js renderFrame /
+ * renderPublicFrame), which owns the skip link, the rail or public band, the one h1, the footer and the tab title. A
+ * file that imports the shell's `renderPage` (lib/components/page.js) assembles its own chrome, so it is "on the old
+ * chrome". Pieces 1 to 6 held a ratchet here, an allowance of such files that only fell; LIN-4568 (piece 7) moved the
+ * last one (the Project backlog) onto the frame and deleted the allowance with the old bar and footer. Now any file
+ * outside the shell, the frame and the one named exception that assembles its own chrome fails.
  *
- * Witness: importing the shell's renderPage into lib/render-proxy.js (now on the frame) fails "no file outside the list".
+ * Witness: importing the shell's renderPage into lib/render-proxy.js (on the frame) fails "no file assembles its own chrome".
  *
  * Run with: node scripts/run-unit-tests.mjs tests/unit/frame-census.test.js
  */
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
-import { readdirSync, readFileSync, statSync } from 'node:fs';
+import { existsSync, readdirSync, readFileSync, statSync } from 'node:fs';
 import { dirname, join } from 'node:path';
 import { fileURLToPath } from 'node:url';
 
@@ -28,15 +27,6 @@ const SHELL = new Set(['lib/components/page.js', 'lib/components/frame.js']);
  * carries the wordmark (LIN-1508 removed the bar from it for that reason). The parent plan (plan-46603cd7) names it.
  */
 const NAMED_EXCEPTIONS = new Set(['lib/render-landing.js']);
-
-/**
- * Files that still assemble their own chrome (the shell's renderPage, or plain-page.js's wrappers of it). Sorted. It only falls.
- * LIN-4567 (piece 6) moved every public and signed-out page; what is left is the Project backlog, the one workspace page
- * kept on the old bar as its last host until piece 7 (LIN-4568) deletes the bar.
- */
-export const OLD_CHROME_ALLOWANCE = [
-  'lib/render-project-page.js',
-];
 
 function jsFiles(dir) {
   return readdirSync(join(ROOT, dir)).flatMap((name) => {
@@ -64,20 +54,36 @@ export function oldChromeFiles() {
     .sort();
 }
 
-test('the allowance is sorted and names no file twice', () => {
-  assert.deepEqual([...OLD_CHROME_ALLOWANCE].sort(), OLD_CHROME_ALLOWANCE);
-  assert.equal(new Set(OLD_CHROME_ALLOWANCE).size, OLD_CHROME_ALLOWANCE.length);
-});
-
-test('no file outside the list assembles its own chrome: a new page goes through the frame', () => {
-  const extra = oldChromeFiles().filter(rel => !OLD_CHROME_ALLOWANCE.includes(rel));
+test('no file assembles its own chrome: every page goes through the frame (LIN-4568: the allowance is gone)', () => {
+  const extra = oldChromeFiles();
   assert.deepEqual(extra, [], `render through renderFrame or renderPublicFrame (lib/components/frame.js), not renderPage: ${extra.join(', ')}`);
 });
 
-test('the list only falls: a listed file that moved onto the frame comes off it in the same change', () => {
-  const found = new Set(oldChromeFiles());
-  const stale = OLD_CHROME_ALLOWANCE.filter(rel => !found.has(rel));
-  assert.deepEqual(stale, [], `no longer imports the shell's renderPage; delete from OLD_CHROME_ALLOWANCE: ${stale.join(', ')}`);
+// LIN-4568 (piece 7): the old chrome itself is gone, not just unused: the bar, its view strip, the old footer, the page
+// header outside the frame. A source file calling one of them, or the deleted view-nav module coming back, fails here.
+const OLD_CHROME_CALL = /\b(?:renderNavBar|renderPageFooter|renderViewNav|getViewNavLinks|renderWorkspaceOptions)\b/;
+
+test('the old bar, its view strip and the old footer are deleted, and nothing in the app names them (LIN-4568)', () => {
+  assert.ok(!existsSync(join(ROOT, 'lib/components/view-nav.js')), 'lib/components/view-nav.js is deleted');
+  const named = [...jsFiles('lib'), ...jsFiles('routes'), 'server.js', ...jsFiles('public')]
+    .filter(rel => OLD_CHROME_CALL.test(readFileSync(join(ROOT, rel), 'utf8').replace(/\/\*[\s\S]*?\*\/|\/\/[^\n]*/g, '')));
+  assert.deepEqual(named, [], `the old chrome is still called from: ${named.join(', ')}`);
+  // The page header is the frame's own (its one h1): no page draws a second.
+  const headers = [...jsFiles('lib'), ...jsFiles('routes'), 'server.js']
+    .filter(rel => rel !== 'lib/components/frame.js' && rel !== 'lib/components/page-header.js')
+    .filter(rel => /renderPageHeader\(/.test(readFileSync(join(ROOT, rel), 'utf8')));
+  assert.deepEqual(headers, [], `a page draws its own header beside the frame's: ${headers.join(', ')}`);
+});
+
+test('the page piece 7 moved is on the frame (LIN-4568: the Project backlog, drilled in under Backlog)', () => {
+  const source = readFileSync(join(ROOT, 'lib/render-project-page.js'), 'utf8');
+  assert.match(source, /renderFrame\(\{\s*place: 'project'/, 'renders through the frame at project');
+  assert.doesNotMatch(source, /renderPage\(|<main/, 'draws no page shell and no second <main> of its own');
+});
+
+test('the landing draws the footer every page shares (LIN-4568: the old footer went)', () => {
+  const source = readFileSync(join(ROOT, 'lib/render-landing.js'), 'utf8');
+  assert.match(source, /renderFrameFooter\(/);
 });
 
 // LIN-4567 (piece 6): the public and signed-out pages sit in the public frame: Library, Templates, Privacy and Terms,
@@ -91,25 +97,22 @@ const PIECE_6 = [
 
 test('the pages piece 6 moved are on the public frame (LIN-4567: public and signed-out pages)', () => {
   for (const rel of PIECE_6) {
-    assert.ok(!OLD_CHROME_ALLOWANCE.includes(rel), `${rel} is listed as old chrome`);
     const source = readFileSync(join(ROOT, rel), 'utf8');
     assert.match(source, /renderPublicFrame\(/, `${rel} renders through the public frame`);
     assert.doesNotMatch(source, /renderNavBar\(|renderPageFooter\(|renderPageHeader\(|renderPlainPage\(|renderPlainDocument\(/, `${rel} draws no old bar, old footer or second header`);
   }
-  assert.ok(!OLD_CHROME_ALLOWANCE.includes('lib/components/plain-page.js'), 'the Plain helper no longer wraps the shell');
 });
 
 test('the landing is the one named exception: its hero and no band (LIN-1508)', () => {
   assert.deepEqual([...NAMED_EXCEPTIONS], ['lib/render-landing.js']);
-  assert.ok(!OLD_CHROME_ALLOWANCE.includes('lib/render-landing.js'), 'an exception for good is not part of the allowance that falls');
-  assert.ok(oldChromeFiles().length >= OLD_CHROME_ALLOWANCE.length);
+  // The exception is real: the landing does import the shell (a stale exception would hide nothing and say something).
+  assert.match(readFileSync(join(ROOT, 'lib/render-landing.js'), 'utf8'), /import\s*\{[^}]*\brenderPage\b[^}]*\}\s*from\s*'\.\/components\/page\.js'/);
 });
 
 // LIN-4566 (piece 5): Settings and the rest of Set up. Settings is one place (every area renders through the one
 // renderer, the areas list beside the area in <main>); Run on my machine is drilled in under Settings.
 test('the pages piece 5 moved are on the frame (LIN-4566: Settings and Run on my machine)', () => {
   for (const [rel, place] of [['lib/render-settings.js', 'settings'], ['lib/render-runner-setup.js', 'runner']]) {
-    assert.ok(!OLD_CHROME_ALLOWANCE.includes(rel), `${rel} is listed as old chrome`);
     const source = readFileSync(join(ROOT, rel), 'utf8');
     assert.match(source, new RegExp(`renderFrame\\(\\{\\s*place: '${place}'`), `${rel} renders through the frame at ${place}`);
     assert.doesNotMatch(source, /renderNavBar\(|renderPageFooter\(|renderPageHeader\(/, `${rel} draws no old bar, old footer or second header`);
@@ -123,7 +126,6 @@ const PIECE_4 = ['dispatch', 'workspace-kpis', 'escalation-kpis', 'effort-readou
 test('the pages piece 4 moved are on the frame (LIN-4565: Tools)', () => {
   for (const name of PIECE_4) {
     const rel = `lib/render-${name}.js`;
-    assert.ok(!OLD_CHROME_ALLOWANCE.includes(rel), `${rel} is listed as old chrome`);
     const source = readFileSync(join(ROOT, rel), 'utf8');
     assert.match(source, /renderFrame\(/, `${rel} renders through the frame`);
     assert.doesNotMatch(source, /renderNavBar\(|renderPageFooter\(|renderPageHeader\(/, `${rel} draws no old bar, old footer or second header`);
@@ -137,7 +139,6 @@ const PIECE_3 = ['observation', 'session', 'live-console', 'swipe', 'swim', 'roa
 test('the pages piece 3 moved are on the frame (LIN-4564: Watch and Views)', () => {
   for (const name of PIECE_3) {
     const rel = `lib/render-${name}.js`;
-    assert.ok(!OLD_CHROME_ALLOWANCE.includes(rel), `${rel} is listed as old chrome`);
     const source = readFileSync(join(ROOT, rel), 'utf8');
     assert.match(source, /renderFrame\(/, `${rel} renders through the frame`);
     assert.doesNotMatch(source, /renderNavBar\(|renderPageFooter\(/, `${rel} draws no old bar or old footer`);
@@ -149,7 +150,6 @@ test('the pages piece 3 moved are on the frame (LIN-4564: Watch and Views)', () 
 
 test('the pages piece 2 moved are on the frame (LIN-4563: Home and Backlog, the task page, edit, new and not found)', () => {
   for (const rel of ['lib/render.js', 'lib/render-task-page.js', 'lib/render-task-edit.js', 'lib/render-task-create.js']) {
-    assert.ok(!OLD_CHROME_ALLOWANCE.includes(rel), `${rel} is listed as old chrome`);
     assert.match(readFileSync(join(ROOT, rel), 'utf8'), /renderFrame\(|renderTaskFrame\(/, `${rel} renders through the frame`);
   }
   // The task family maps its options onto the frame once (renderTaskFrame, in the task page's renderer); edit and new go through it.
@@ -161,7 +161,6 @@ test('the pages piece 2 moved are on the frame (LIN-4563: Home and Backlog, the 
 
 test('the pages piece 1 moved are on the frame', () => {
   for (const rel of ['lib/render-proxy.js', 'lib/render-search.js']) {
-    assert.ok(!OLD_CHROME_ALLOWANCE.includes(rel), `${rel} is listed as old chrome`);
     assert.match(readFileSync(join(ROOT, rel), 'utf8'), /renderFrame\(/, `${rel} renders through the frame`);
   }
 });

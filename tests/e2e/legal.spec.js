@@ -95,11 +95,11 @@ test.describe('Legal Pages', () => {
   });
 
   test.describe('Footer Links on Other Pages', () => {
-    test('landing page footer has privacy and terms links', async ({ page }) => {
+    test('landing page footer has privacy and terms links (LIN-4568: the footer every page shares)', async ({ page }) => {
       await page.goto('/');
-      const footer = page.locator('.page-footer');
-      await expect(footer.locator('a.footer-legal[href="/privacy"]')).toBeVisible();
-      await expect(footer.locator('a.footer-legal[href="/terms"]')).toBeVisible();
+      await expect(page.locator(SELECTORS.nav.footer)).toBeVisible();
+      await expect(page.locator(SELECTORS.nav.footerLink('privacy'))).toHaveAttribute('href', '/privacy');
+      await expect(page.locator(SELECTORS.nav.footerLink('terms'))).toHaveAttribute('href', '/terms');
     });
   });
 

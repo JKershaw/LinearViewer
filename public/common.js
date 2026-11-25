@@ -407,11 +407,10 @@ function firstPromptLine(prompt, cap) {
 }
 
 /**
- * Shared dispatch queue-row renderer (LIN-1244). The single source of the
- * `.queue-item*` markup for BOTH twin renderers — `app.js` `renderQueueItems()`
- * (the nav-badge popover, loaded on every page) and `dispatch.js`
- * `renderDispatchQueueList()` (the /dispatch Queue section) — so the two cannot
- * drift apart again.
+ * Shared dispatch queue-row renderer (LIN-1244). The `.queue-item*` markup of
+ * `dispatch.js` `renderDispatchQueueList()` (the /dispatch Queue section). Its
+ * twin, the old bar's queue popover (app.js `renderQueueItems()`), went with the
+ * bar (LIN-4568).
  *
  * Renders richer always-visible content from fields the list endpoint already
  * returns (no server/store/API change): the prompt name/kind, the issue as a
@@ -427,7 +426,7 @@ function firstPromptLine(prompt, cap) {
  * @param {Object} item - A dispatch list item (from GET .../api/dispatch).
  * @param {string} urlKey - Workspace url key (for the remove button).
  * @param {{card?: boolean}} [opts] - `card:true` adds the `.card` wrapper class
- *   the /dispatch page's list uses; the nav popover omits it.
+ *   the /dispatch page's list uses.
  * @global
  * @returns {string} Queue-row HTML.
  */
@@ -782,7 +781,7 @@ window.readSSEStream = async function readSSEStream(response, onEvent) {
 // =============================================================================
 
 /**
- * Update the nav queue badge's count for a workspace. A page with no badge for `urlKey` sends no request: the count
+ * Update the queue count (on the rail's Dispatch item) for a workspace. A page with no badge for `urlKey` sends no request: the count
  * would have nowhere to go. Here, not in app.js (LIN-4463 piece 5): dispatchPrompt below and the classic dispatch.js
  * call it after a dispatch, and app.js is a module whose names classic scripts cannot read; app.js's 1s poll reads it
  * from here. Before, a page without app.js (the task, session and swipe pages) skipped it by a typeof guard; it has no
@@ -794,7 +793,7 @@ window.readSSEStream = async function readSSEStream(response, onEvent) {
  * @param {string} urlKey
  */
 window.updateQueueBadge = async function updateQueueBadge(urlKey) {
-  // LIN-4562: every copy — the old bar's badge, or the count on the frame's Dispatch item.
+  // LIN-4562: every copy of the count on the frame's Dispatch item.
   const badges = document.querySelectorAll(`[data-queue-badge][data-url-key="${urlKey}"]`);
   if (badges.length === 0) return;
   try {
@@ -946,7 +945,7 @@ window.dispatchPrompt = async function dispatchPrompt(opts = {}) {
     on401: false
   });
 
-  // Refresh the nav queue badge (a no-op on a page without one). Guarded because a suite may run this function alone.
+  // Refresh the queue count (a no-op on a page without one). Guarded because a suite may run this function alone.
   if (typeof window.updateQueueBadge === 'function') {
     window.updateQueueBadge(urlKey);
   }
@@ -2246,11 +2245,11 @@ window.toast = function toast(message, opts = {}) {
 };
 
 // =============================================================================
-// Navigation Bar (workspace/team selectors)
+// The page filter line (team/assignee selectors)
 // =============================================================================
 
-// Lives here (not app.js) so the workspace switcher is interactive on every
-// authenticated page — every page loads common.js, but only some load app.js.
+// Lives here (not app.js) so the filters work on every page that draws them —
+// every page loads common.js, but only some load app.js.
 const TEAM_STORAGE_KEY = 'linear-projects-selected-team'
 
 // Team selection is remembered per workspace (LIN-727): a single global key let
@@ -2302,18 +2301,15 @@ window.buildFilterUrl = function buildFilterUrl(paramName, value) {
   return `${window.location.pathname}${qs ? `?${qs}` : ''}`
 }
 
-// Navigation bar interactions (workspace/team selectors)
-function initNavBar() {
-  // LIN-4562: the team and assignee selectors render in the old bar, or in the frame's filter line
-  // (lib/components/navbar.js renderFilterLine) with the same ids, so this one client drives either host.
-  const navBar = document.querySelector('.nav-bar')
+// The page filter line's team and assignee selectors (lib/components/navbar.js renderFilterLine, drawn in the frame's
+// `filters` slot). LIN-4568: the old bar and its workspace selector are gone; the rail's workspace menu is
+// public/frame.js's. The selectors keep the markup and ids they had in the bar, so this client is the bar's, narrowed.
+function initFilterLine() {
   const filterLine = document.querySelector('[data-frame-filters]')
-  if (!navBar && !filterLine) return
+  if (!filterLine) return
 
-  const workspaceToggle = document.getElementById('workspace-toggle')
   const teamToggle = document.getElementById('team-toggle')
   const assigneeToggle = document.getElementById('assignee-toggle')
-  const workspaceOptions = document.getElementById('workspace-options')
   const teamOptions = document.getElementById('team-options')
   const assigneeOptions = document.getElementById('assignee-options')
 
@@ -2329,10 +2325,10 @@ function initNavBar() {
   let openSelector = null
 
   function closeAllSelectors() {
-    ;[workspaceToggle, teamToggle, assigneeToggle].forEach(btn => {
+    ;[teamToggle, assigneeToggle].forEach(btn => {
       if (btn) btn.setAttribute('aria-expanded', 'false')
     })
-    ;[workspaceOptions, teamOptions, assigneeOptions].forEach(panel => {
+    ;[teamOptions, assigneeOptions].forEach(panel => {
       if (panel) panel.classList.add('hidden')
     })
     if (dropdownOverlay) dropdownOverlay.classList.add('hidden')
@@ -2353,14 +2349,6 @@ function initNavBar() {
     }
   }
 
-  // Workspace toggle
-  if (workspaceToggle && workspaceOptions) {
-    workspaceToggle.addEventListener('click', (e) => {
-      e.stopPropagation()
-      toggleSelector(workspaceToggle, workspaceOptions, 'workspace')
-    })
-  }
-
   // Team toggle
   if (teamToggle && teamOptions) {
     teamToggle.addEventListener('click', (e) => {
@@ -2377,17 +2365,7 @@ function initNavBar() {
     })
   }
 
-  // "⋯ more" view-overflow — the shared, in-flow disclosure (LIN-1058 / LIN-1286),
-  // wired below. An IN-FLOW disclosure: the `.nav-views-overflow` block sits below
-  // the tab strip in NORMAL FLOW — no floating panel, no backdrop, no click-catcher
-  // (LIN-984 safe by construction). Deliberately NOT wired through the selector
-  // dropdown machinery above (no `.nav-dropdown-overlay`, no closeAllSelectors).
-  if (navBar) {
-    setupNavViewsOverflow(navBar)
-    setupNavStickyHeight(navBar)
-  }
-
-  // Team option selection (workspace uses form submission)
+  // Team option selection
   if (teamOptions) {
     teamOptions.addEventListener('click', (e) => {
       const option = e.target.closest('.nav-option[data-team]')
@@ -2433,7 +2411,7 @@ function initNavBar() {
 
   // Prevent clicks inside options panels from triggering "close on outside click"
   // Links still navigate, forms still submit - we just don't hide the panel first
-  ;[workspaceOptions, teamOptions, assigneeOptions].forEach(panel => {
+  ;[teamOptions, assigneeOptions].forEach(panel => {
     if (panel) {
       panel.addEventListener('click', (e) => e.stopPropagation())
     }
@@ -2477,9 +2455,7 @@ function initNavBar() {
   }
 
   document.addEventListener('keydown', (e) => {
-    if (openSelector === 'workspace') {
-      handleKeyboard(e, workspaceToggle, workspaceOptions)
-    } else if (openSelector === 'team') {
+    if (openSelector === 'team') {
       handleKeyboard(e, teamToggle, teamOptions)
     } else if (openSelector === 'assignee') {
       handleKeyboard(e, assigneeToggle, assigneeOptions)
@@ -2541,178 +2517,6 @@ function initNavBar() {
   }
 }
 
-// Measured header clearance (LIN-4037). The pinned `.nav-bar` wraps by content and
-// flags, so its height can pass the static `--nav-sticky-min` floor. This writes the
-// live border-box height to `--nav-bar-h`, which `--nav-sticky-h` takes the max of.
-// It is rounded UP so the token is never below the integer `offsetHeight` the tests
-// compare with. Nothing inside the nav reads the token, so the write cannot feed
-// back into the height it measures.
-function setupNavStickyHeight(navBar) {
-  const root = document.documentElement
-  function write() {
-    root.style.setProperty('--nav-bar-h', `${Math.ceil(navBar.getBoundingClientRect().height)}px`)
-  }
-  write()
-  if (typeof ResizeObserver === 'function') {
-    new ResizeObserver(write).observe(navBar, { box: 'border-box' })
-  } else {
-    // No ResizeObserver: the header only changes height when the viewport does.
-    window.addEventListener('resize', write)
-  }
-}
-
-// =============================================================================
-// Shared `⋯ more` view-overflow — mobile media query + desktop measured overflow
-// =============================================================================
-//
-// The overflow group (`#nav-views-overflow`), the `⋯ more` toggle, and the
-// `.nav-views-overflow--open` card are ONE shared mechanism across both viewports
-// (LIN-1058 / LIN-1286):
-//
-//   - Mobile (≤640px): pure CSS. The `@media (max-width:640px)` block collapses the
-//     whole group and reveals the toggle; JS only keeps the full group in the
-//     container and resets the open state.
-//   - Desktop (>640px): JS width-measured "priority+" overflow. Starting from the
-//     CSS default (all overflow links inline, horizontal-scroll fallback), a
-//     measuring loop collapses ONLY the items that don't fit into the SAME group and
-//     marks the strip `.nav-views--collapsed` — revealing the toggle only when
-//     something is actually hidden. A strip that already fits never collapses
-//     (avoids the over-collapse of a pure breakpoint rule) and the horizontal
-//     scrollbar disappears (the reported LIN-1286 defect).
-//
-// The active-hoisted current tab is a primary child of `.nav-views`, never inside
-// `#nav-views-overflow`, so it is structurally un-collapsible — the active-hoist
-// invariant holds for free. The disclosure a11y (aria-expanded/aria-controls) is
-// the same one toggle/one group on both viewports.
-function setupNavViewsOverflow(navBar) {
-  const strip = navBar.querySelector('.nav-views')
-  const toggle = navBar.querySelector('.nav-more-toggle')
-  const overflow = navBar.querySelector('#nav-views-overflow')
-  // No overflow group rendered (no flag-gated views) → nothing to manage.
-  if (!strip || !toggle || !overflow) return
-
-  // The collapsible set, captured once in server order. The active-hoisted tab is
-  // NOT among these (it lives inline in `.nav-views`), so it can never be collapsed.
-  const collapsible = Array.from(overflow.children)
-  const mobileMq = window.matchMedia('(max-width: 640px)')
-
-  function setOpen(open) {
-    toggle.setAttribute('aria-expanded', open ? 'true' : 'false')
-    overflow.classList.toggle('nav-views-overflow--open', open)
-    // Desktop: an open card needs the strip to wrap so the full-width card can drop
-    // to its own row (like mobile) instead of fighting the nowrap strip.
-    strip.classList.toggle('nav-views--open', open)
-  }
-
-  // One toggle, one group, both viewports: flip the shared open/closed card state.
-  toggle.addEventListener('click', (e) => {
-    e.stopPropagation()
-    setOpen(toggle.getAttribute('aria-expanded') !== 'true')
-  })
-
-  // Keep a keyboard-focused tab clear of the strip's own horizontal scrolling
-  // (LIN-2189 F2). On mobile the strip is `overflow-x: auto` and delta 4 above
-  // may leave it scrolled toward the pinned toggle, so a `Tab` traversal that
-  // lands on a leading link can sit clipped outside the visible box with nothing
-  // to bring it back — this is the fix. `inline: 'nearest'` moves `scrollLeft`
-  // only when the focused element isn't already fully visible, and respects the
-  // strip's own `scroll-padding-inline-end` so a focused tab never tucks behind
-  // the pinned toggle either. No-op on desktop, where the strip never overflows.
-  strip.addEventListener('focusin', (e) => {
-    const target = e.target.closest('.nav-view, .nav-more-toggle')
-    if (target) target.scrollIntoView({ inline: 'nearest', block: 'nearest' })
-  })
-
-  function moveAllToOverflow() {
-    for (const item of collapsible) {
-      if (item.parentElement !== overflow) overflow.appendChild(item)
-    }
-  }
-
-  // True when the strip is not horizontally overflowing (with a 1px sub-pixel
-  // tolerance). Valid because measurement runs with the strip nowrap and the
-  // collapsed group `display:none`, so only the inline items + toggle count.
-  const fits = () => strip.scrollWidth <= strip.clientWidth + 1
-
-  function layout() {
-    // Start from a known state every pass: card closed, full group re-collapsed.
-    setOpen(false)
-    moveAllToOverflow()
-
-    // Mobile: the media query owns the collapse entirely — leave the full group in
-    // the container and don't mark the desktop-managed state. The strip can still
-    // horizontally overflow (the hoisted active label plus the pinned toggle may
-    // not all fit at once, LIN-2179) — scroll the active tab into view so the
-    // scrolling row never hides it. This step (and the focusin handler above) only
-    // ever WRITE `scrollLeft` — reading `strip.clientWidth` below is just the
-    // overflow check, not a write — so the width-only remeasure guard below stays
-    // the sole re-layout trigger and no open/close-driven feedback loop is
-    // introduced.
-    if (mobileMq.matches) {
-      strip.classList.remove('nav-views--collapsed')
-      if (strip.scrollWidth > strip.clientWidth) {
-        const activeTab = strip.querySelector('.nav-view-current')
-        if (activeTab) activeTab.scrollIntoView({ inline: 'end', block: 'nearest' })
-      }
-      return
-    }
-
-    // Desktop: collapse the group first (hidden items don't count toward width),
-    // then inline as many as fit, front-first (server order preserved).
-    strip.classList.add('nav-views--collapsed')
-    while (overflow.firstElementChild) {
-      const item = overflow.firstElementChild
-      strip.insertBefore(item, toggle) // tentatively inline it
-      if (!fits()) {
-        overflow.insertBefore(item, overflow.firstElementChild) // overshot — put it back
-        break
-      }
-    }
-    // Nothing left hidden → drop the managed state so the toggle hides and the strip
-    // is the plain inline row again (no toggle, no collapse when everything fits).
-    if (!overflow.firstElementChild) strip.classList.remove('nav-views--collapsed')
-  }
-
-  // Re-measure only when the strip's WIDTH actually changes. Opening/closing the
-  // card changes the strip's HEIGHT (the flex card drops to its own row), which the
-  // ResizeObserver also reports — re-running layout on that would immediately reset
-  // the open state the user just toggled (a feedback loop). Guarding on width breaks
-  // it: a viewport resize changes width and relayouts; a card toggle does not.
-  let lastWidth = null
-  let scheduled = false
-  function remeasure() {
-    scheduled = false
-    const w = strip.clientWidth
-    if (w === lastWidth) return
-    layout()
-    lastWidth = strip.clientWidth
-  }
-  function schedule() {
-    if (scheduled) return
-    scheduled = true
-    requestAnimationFrame(remeasure)
-  }
-
-  if (typeof ResizeObserver === 'function') {
-    new ResizeObserver(schedule).observe(strip)
-  }
-  // The media crossing (mobile⇄desktop) forces a relayout regardless of the width
-  // guard, and a window resize is the fallback for no-ResizeObserver environments.
-  mobileMq.addEventListener('change', () => { lastWidth = null; schedule() })
-  window.addEventListener('resize', schedule)
-
-  // Re-measure once the self-hosted fonts finish loading. The first pass can run
-  // with fallback fonts (narrower), which mis-measures how many tabs fit; the font
-  // swap then widens the labels WITHOUT changing the strip's clientWidth, so the
-  // width guard would otherwise suppress the correcting relayout. Force it.
-  if (document.fonts && document.fonts.ready && typeof document.fonts.ready.then === 'function') {
-    document.fonts.ready.then(() => { lastWidth = null; schedule() })
-  }
-
-  layout() // initial pass (before first paint settles, so no flash-of-collapsed)
-  lastWidth = strip.clientWidth
-}
-
 // =============================================================================
 // Light/dark theme (LIN-785; the footer link moved to Settings › Account, LIN-3846)
 // =============================================================================
@@ -2746,7 +2550,7 @@ window.applyTheme = function applyTheme(theme, urlKey) {
 // own DOMContentLoaded handler could never update the badge there, and the
 // two `typeof window.updateRulingsBadge === 'function'` guards in
 // public/observation.js's press handler could never be true. Mirrors
-// initNavBar's own move to common.js for the same reason (LIN-288).
+// the bar client's own move to common.js for the same reason (LIN-288).
 
 let rulingsPollIntervalId = null;
 // Deliberately a SLOWER, separate cadence than the queue badge's 1s poll
@@ -2844,9 +2648,8 @@ function stopRulingsPolling() {
 /**
  * Initialize the rulings badge: seed its count on load and start polling.
  * Runs from this file's own DOMContentLoaded handler below, so every page
- * that renders the badge markup (the owner with run controls: the old bar,
- * `lib/components/navbar.js`, or the frame's rail and band, `lib/components/frame.js`,
- * LIN-4562) gets the live-updating count — including
+ * that renders the badge markup (the owner with run controls: the frame's rail and
+ * band, `lib/components/frame.js`, LIN-4562) gets the live-updating count — including
  * Observation, which renders the badge but does not load app.js.
  */
 function initRulingsBadge() {
@@ -2863,7 +2666,7 @@ function initRulingsBadge() {
     }
   });
 
-  // Cleanup on page unload — mirrors app.js's own stopQueuePolling cleanup.
+  // Cleanup on page unload — mirrors initQueueBadge's own cleanup below.
   // Registered here (only once a badge actually exists), not at module top
   // level, so this file keeps loading against a minimal `window` stub with
   // no `addEventListener` (tests/unit/reply-delivery-contract.test.js's
@@ -2875,9 +2678,8 @@ function initRulingsBadge() {
 // The frame's queue count (LIN-4562)
 // =============================================================================
 // The count of queued dispatches on the frame's Dispatch item. The frame's pages do not all load app.js (the search page
-// loads none), so the frame's count is polled here, beside the questions count. The old bar's badge (a button) keeps
-// app.js's poll, so a page runs one poll or the other, and a page on the old bar polls exactly as before. Same 1s cadence,
-// raw fetch, visible tab only.
+// loads none), so the frame's count is polled here, beside the questions count: the one queue poll since the old bar's
+// badge and app.js's poll went with the bar (LIN-4568). 1s cadence, raw fetch, visible tab only.
 const QUEUE_POLL_INTERVAL_MS = 1000;
 let queuePollIntervalId = null;
 
@@ -2991,7 +2793,7 @@ document.addEventListener('DOMContentLoaded', () => {
   initDeployTime();
   initLocalTimes();
   initDisclosure();
-  initNavBar();
+  initFilterLine();
   initRulingsBadge();
   initQueueBadge();
   window.ProxyToggle.init();

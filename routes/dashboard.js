@@ -2,7 +2,7 @@
  * Observation routes — the first-class autopilot Observation page (LIN-595),
  * which supersedes the experimental autopilot dashboard (LIN-509).
  *
- * The page is *anchored* to one workspace for auth/navbar but *operates* over
+ * The page is *anchored* to one workspace for auth/rail but *operates* over
  * every connected workspace in `session.workspaces`: it merges the cheap
  * per-workspace Loop / session reads (pure Mongo, no Linear API) into one
  * cross-workspace feed.

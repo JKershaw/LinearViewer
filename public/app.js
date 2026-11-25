@@ -17,13 +17,9 @@ import { buildPromptFilename } from '../lib/prompt-filename.js'
 import { sourceQuery } from '../lib/task-page-href.js'
 
 const STORAGE_KEY = 'linear-projects-state'
-// TEAM_STORAGE_KEY and the team-selection helpers now live in common.js
-// (alongside initNavBar) so the workspace switcher works on every page — LIN-288.
-const UUID_REGEX = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i
-
-// Queue badge polling state
-let queuePollIntervalId = null
-const QUEUE_POLL_INTERVAL_MS = 1000
+// TEAM_STORAGE_KEY and the team-selection helpers live in common.js (with initFilterLine), LIN-288.
+// LIN-4568: the old bar's queue popover (initQueuePanel) went with the bar; the count on the rail's Dispatch item is
+// common.js's (initQueueBadge) and links to the queue's own page.
 
 // Rulings badge polling (LIN-1728 Phase 3) now lives in common.js — see
 // initRulingsBadge there for why (LIN-1728 review F7: it must be reachable
@@ -1404,8 +1400,8 @@ function init() {
   })
 }
 
-// initNavBar() (workspace/team selectors) now lives in common.js so the
-// switcher is interactive on every authenticated page — LIN-288.
+// initFilterLine() (team/assignee selectors) lives in common.js so the
+// filters work on every page that draws them — LIN-288.
 
 // ==========================================================================
 // Prompt Generation for Labels
@@ -1689,188 +1685,6 @@ function initDispatchDisclosures(root) {
 }
 
 // =============================================================================
-// Queue Badge Management
-// =============================================================================
-
-/**
- * Start polling for queue badge updates
- */
-function startQueuePolling(urlKey) {
-  if (queuePollIntervalId) return
-
-  queuePollIntervalId = setInterval(() => {
-    if (!document.hidden) {
-      updateQueueBadge(urlKey)
-    }
-  }, QUEUE_POLL_INTERVAL_MS)
-}
-
-/**
- * Stop polling for queue badge updates
- */
-function stopQueuePolling() {
-  if (queuePollIntervalId) {
-    clearInterval(queuePollIntervalId)
-    queuePollIntervalId = null
-  }
-}
-
-/**
- * Initialize queue panel functionality
- */
-function initQueuePanel() {
-  // Initialize badge count on page load and start polling. LIN-4562: only the old bar's badge (a button); the frame's
-  // count on the Dispatch item is polled by common.js (initQueueBadge), so a page never runs both polls.
-  const badge = document.querySelector('button[data-queue-badge]')
-  if (badge) {
-    const urlKey = badge.dataset.urlKey
-    updateQueueBadge(urlKey)
-    startQueuePolling(urlKey)
-
-    // Fetch immediately when tab becomes visible (data may be stale)
-    document.addEventListener('visibilitychange', () => {
-      if (!document.hidden) {
-        updateQueueBadge(urlKey)
-      }
-    })
-  }
-
-  // Handle badge click to show queue panel. Only the old bar's badge, a button, opens it: the frame's count sits inside
-  // the Dispatch link, which goes to the queue's own page.
-  document.addEventListener('click', async (e) => {
-    const badgeBtn = e.target.closest('button[data-queue-badge]')
-    if (!badgeBtn) return
-
-    e.preventDefault()
-    e.stopPropagation()
-
-    const urlKey = badgeBtn.dataset.urlKey
-    await showQueuePanel(urlKey)
-  })
-
-  // Handle close button and overlay clicks
-  document.addEventListener('click', (e) => {
-    if (e.target.closest('.queue-panel-close') || e.target.closest('.queue-panel-overlay')) {
-      hideQueuePanel()
-    }
-  })
-
-  // Close on escape key
-  document.addEventListener('keydown', (e) => {
-    if (e.key === 'Escape') {
-      hideQueuePanel()
-    }
-  })
-}
-
-/**
- * Show the queue panel with items
- */
-async function showQueuePanel(urlKey) {
-  // Remove any existing panel
-  hideQueuePanel()
-
-  // Create overlay
-  const overlay = document.createElement('div')
-  overlay.className = 'queue-panel-overlay'
-  document.body.appendChild(overlay)
-
-  // Create panel
-  const panel = document.createElement('div')
-  panel.className = 'queue-panel'
-  panel.dataset.urlKey = urlKey
-  panel.innerHTML = `
-    <div class="queue-panel-header">
-      <span>Dispatch Queue</span>
-      <button class="queue-panel-close" aria-label="Close">×</button>
-    </div>
-    <div class="queue-panel-items">
-      <div class="queue-panel-empty">Loading...</div>
-    </div>
-  `
-  document.body.appendChild(panel)
-
-  // Load items
-  try {
-    const { items } = await window.api(`/workspace/${encodeURIComponent(urlKey)}/api/dispatch`)
-    renderQueueItems(panel, items, urlKey)
-  } catch (e) {
-    console.error('Failed to load queue items:', e)
-    panel.querySelector('.queue-panel-items').innerHTML =
-      '<div class="queue-panel-empty">Failed to load queue</div>'
-  }
-}
-
-/**
- * Render queue items in the panel
- */
-function renderQueueItems(panel, items, urlKey) {
-  const container = panel.querySelector('.queue-panel-items')
-
-  if (items.length === 0) {
-    container.innerHTML = '<div class="queue-panel-empty">Queue is empty</div>'
-    return
-  }
-
-  // Shared row markup (LIN-1244): the nav-badge popover and the /dispatch Queue
-  // list render identical `.queue-item*` rows via window.renderQueueRow so the
-  // two twin renderers cannot drift. The popover omits the `.card` wrapper.
-  container.innerHTML = items.map(item => window.renderQueueRow(item, urlKey)).join('')
-
-  // LIN-3401: bind each remove button to itself as the rows are inserted; the
-  // child chain below is Harbour's row template, which row text (escaped) cannot forge.
-  container.querySelectorAll(':scope > .queue-item > .queue-item-header > .queue-item-remove').forEach((removeBtn) => {
-    removeBtn.addEventListener('click', async (e) => {
-      e.preventDefault()
-      e.stopPropagation()
-      await removeQueueItem(removeBtn.dataset.urlKey, removeBtn.dataset.itemId)
-    })
-  })
-}
-
-
-/**
- * Hide the queue panel
- */
-function hideQueuePanel() {
-  document.querySelector('.queue-panel')?.remove()
-  document.querySelector('.queue-panel-overlay')?.remove()
-}
-
-/**
- * Remove an item from the queue
- */
-async function removeQueueItem(urlKey, itemId) {
-  // Validate itemId format to prevent CSS selector injection
-  if (!itemId || !UUID_REGEX.test(itemId)) {
-    console.error('Invalid itemId format')
-    return
-  }
-
-  try {
-    await window.api(`/workspace/${encodeURIComponent(urlKey)}/api/dispatch/${encodeURIComponent(itemId)}`, {
-      method: 'DELETE',
-      toastOnError: true
-    })
-
-    // Remove item from DOM (itemId validated as UUID above, safe for selector)
-    document.querySelector(`.queue-item[data-item-id="${itemId}"]`)?.remove()
-
-    // Update badge
-    await updateQueueBadge(urlKey)
-
-    // Check if queue is now empty
-    const panel = document.querySelector('.queue-panel')
-    if (panel && panel.querySelectorAll('.queue-item').length === 0) {
-      panel.querySelector('.queue-panel-items').innerHTML =
-        '<div class="queue-panel-empty">Queue is empty</div>'
-    }
-  } catch (e) {
-    console.error('Failed to remove queue item:', e)
-  }
-}
-
-// =============================================================================
 // Feature Toggle AJAX (Settings Page)
 // =============================================================================
 
@@ -2011,9 +1825,8 @@ function updateFooterModel(modelName) {
   el.title = `Workspace model: ${modelName}`
 }
 
-// Cleanup polling on page unload. Rulings-badge cleanup registers itself
-// from common.js now, alongside its own init (LIN-1728 review F7); so does the frame's queue count (LIN-4562).
-window.addEventListener('beforeunload', stopQueuePolling)
+// Polling cleanup on page unload is common.js's: the rulings badge (LIN-1728 review F7) and the frame's queue count
+// (LIN-4562) register their own. LIN-4568: app.js's queue poll went with the old bar's badge.
 
 /**
  * Get the workspace urlKey from the footer settings link.
@@ -2075,13 +1888,12 @@ async function initFreeTierStatus() {
 
 document.addEventListener('DOMContentLoaded', () => {
   init()
-  // initNavBar() runs from common.js's DOMContentLoaded handler (LIN-288);
+  // initFilterLine() runs from common.js's DOMContentLoaded handler (LIN-288);
   // initRulingsBadge() runs from there too now (LIN-1728 review F7). LIN-4563: the in-page search (initSearch) retired;
   // search is the rail's form and the search page (lib/components/frame.js, lib/render-search.js).
   initWaitingOnYou()
   initPrompts()
   initDispatchDisclosures()
-  initQueuePanel()
   initFeatureToggles()
   initFreeTierStatus()
   // +proxy toggle is wired by window.ProxyToggle.init() in common.js (LIN-525)

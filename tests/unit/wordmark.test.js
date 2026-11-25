@@ -5,8 +5,7 @@ import { fileURLToPath } from 'node:url';
 import { dirname, join } from 'node:path';
 
 import { renderWordmark } from '../../lib/components/wordmark.js';
-import { renderNavBar } from '../../lib/components/navbar.js';
-import { renderPageFooter } from '../../lib/components/footer.js';
+import { renderRail, renderPublicFrame } from '../../lib/components/frame.js';
 
 const __dirname = dirname(fileURLToPath(import.meta.url));
 const STYLE_CSS = join(__dirname, '../../public/style.css');
@@ -14,7 +13,7 @@ const STYLE_CSS = join(__dirname, '../../public/style.css');
 // --- the shared partial (LIN-725) ------------------------------------------
 
 test('renderWordmark emits the lowercase brand with a teal accent dot', () => {
-  const html = renderWordmark({ context: 'nav', href: '/workspace/abc/' });
+  const html = renderWordmark({ context: 'rail', href: '/workspace/abc/' });
   // Lowercase brand text, not capitalised, no serif opt-in.
   assert.match(html, />harbour</);
   assert.doesNotMatch(html, /Harbour</); // the visible mark is lowercase
@@ -23,59 +22,47 @@ test('renderWordmark emits the lowercase brand with a teal accent dot', () => {
 });
 
 test('renderWordmark links home when given an href, plain label otherwise', () => {
-  const linked = renderWordmark({ context: 'nav', href: '/workspace/abc/' });
+  const linked = renderWordmark({ context: 'rail', href: '/workspace/abc/' });
   assert.match(linked, /^<a href="\/workspace\/abc\/"/);
-  assert.match(linked, /data-testid="nav-brand"/);
+  assert.match(linked, /data-testid="rail-brand"/);
   assert.match(linked, /aria-label="Harbour home"/);
 
-  const label = renderWordmark({ context: 'footer', href: null });
+  const label = renderWordmark({ context: 'rail', href: null });
   assert.match(label, /^<span /);
-  assert.match(label, /data-testid="footer-brand"/);
+  assert.match(label, /data-testid="rail-brand"/);
   assert.match(label, /aria-label="Harbour"/);
   assert.doesNotMatch(label, /<a /);
 });
 
 test('renderWordmark escapes the href', () => {
-  const html = renderWordmark({ context: 'nav', href: '/workspace/a"b/' });
+  const html = renderWordmark({ context: 'rail', href: '/workspace/a"b/' });
   assert.doesNotMatch(html, /href="\/workspace\/a"b\//);
   assert.match(html, /&quot;/);
 });
 
-// --- nav bar wiring ---------------------------------------------------------
+// --- frame wiring (LIN-4568: the old bar and old footer that also drew it are gone) -------
 
-test('authenticated nav bar carries the wordmark linking to the workspace home', () => {
-  const html = renderNavBar({
-    workspaces: [{ urlKey: 'abc', name: 'Acme' }],
-    urlKey: 'abc',
-    currentPage: 'settings',
-  });
-  assert.match(html, /data-testid="nav-brand"/);
-  assert.match(html, /href="\/workspace\/abc\/"/);
-  assert.match(html, /class="wordmark wordmark-nav"/);
+test('the rail carries the wordmark linking to the workspace home', () => {
+  const html = renderRail({ workspaces: [{ urlKey: 'abc', name: 'Acme' }], urlKey: 'abc' });
+  assert.match(html, /<a href="\/workspace\/abc\/" class="wordmark wordmark-rail" data-testid="rail-brand"/);
 });
 
-// --- footer wiring ----------------------------------------------------------
-
-test('authenticated footer carries the wordmark as a plain brand label', () => {
-  const html = renderPageFooter({ urlKey: 'abc' });
-  assert.match(html, /<div class="footer-brand">/);
-  assert.match(html, /data-testid="footer-brand"/);
-  assert.match(html, /class="wordmark wordmark-footer"/);
-  // Footer wordmark is a label, not a link.
-  assert.doesNotMatch(html, /<a[^>]*data-testid="footer-brand"/);
+test('the public band carries the wordmark linking to the front page for a signed-out viewer', () => {
+  const html = renderPublicFrame({ title: 'Library', viewer: { signedIn: false, homeHref: null } });
+  assert.match(html, /<a href="\/" class="wordmark wordmark-rail" data-testid="rail-brand"/);
 });
 
-test('landing footer does NOT carry the wordmark', () => {
-  const html = renderPageFooter({ isLanding: true, currentPage: '/' });
-  assert.doesNotMatch(html, /footer-brand/);
-  assert.doesNotMatch(html, /data-testid="footer-brand"/);
+test('the footer every page shares carries no wordmark (the brand leads the rail or band)', () => {
+  const html = renderPublicFrame({ title: 'Library', viewer: { signedIn: false, homeHref: null } });
+  const footer = html.slice(html.indexOf('<footer'), html.indexOf('</footer>'));
+  assert.doesNotMatch(footer, /wordmark/);
 });
 
 // --- styling contract -------------------------------------------------------
 
 test('wordmark styles use the teal token and the mono stack, never a serif', () => {
   const css = readFileSync(STYLE_CSS, 'utf8');
-  const block = css.slice(css.indexOf('.wordmark {'), css.indexOf('.queue-badge {'));
+  const block = css.slice(css.indexOf('.wordmark {'), css.indexOf('.queue-count {'));
   assert.match(block, /font-family:\s*var\(--font-structural\)/); // mono stack
   assert.match(block, /\.wordmark-accent\s*\{\s*color:\s*var\(--teal\)/); // teal accent
   assert.doesNotMatch(block, /serif/i); // DM Serif Display explicitly rejected

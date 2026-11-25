@@ -5,8 +5,9 @@
  * design tokens from style.css (:root).
  *
  * LIN-2298 changed the shape this file describes. It was "floating button +
- * popup, fixed to the bottom-right"; it is now a NAV-CHROME trigger (rendered
- * by lib/components/navbar.js, styled below) plus a popup that is fixed to the
+ * popup, fixed to the bottom-right"; it is now a CHROME trigger at the rail's foot
+ * (rendered by lib/components/navbar.js renderFeedbackTrigger, laid out by
+ * public/frame.css `.frame-rail__feedback`, styled below) plus a popup that is fixed to the
  * bottom-right only while the user has it open. See the block below for what
  * was removed and why.
  */
@@ -16,7 +17,7 @@
 
    What was here, and why none of it is: a `--fab-band-x: 112px` token naming
    the FAB's measured footprint; a `body:has(#feedback-widget-root[data-enabled])`
-   horizontal reserve pushing `.footer-deploy` and `.footer-actions` out of that
+   horizontal reserve pushing the old footer's deploy and actions rows out of that
    band; and the `.feedback-fab` / `.feedback-fab-draft` rules themselves. They
    were LIN-2299's correct answer to the wrong-shaped problem — LIN-2272 proved
    bottom padding cannot clear a `position: fixed` sibling, so LIN-2299 reserved
@@ -39,10 +40,10 @@
    vacuous. tests/e2e/overlay-sweep-control.spec.js is the positive control
    that keeps the machinery itself honest.
 
-   Sticky is in that vocabulary deliberately, and it is not a detail: `.nav-bar`
-   is `position: sticky` and now HOSTS this trigger. A sweep filtered to `fixed`
-   alone would let a comment claim nothing floats over a column while being
-   structurally unable to see the header that does. That is the mistake the
+   Sticky is in that vocabulary deliberately, and it is not a detail: the host
+   was the old sticky bar then, and is the frame's sticky rail now (LIN-4562,
+   LIN-4568). A sweep filtered to `fixed` alone would let a comment claim nothing
+   floats over a column while being structurally unable to see the chrome that does. That is the mistake the
    LIN-2298 review caught in the first version of this block, which is why this
    paragraph now describes the witness rather than praising it.
 
@@ -53,10 +54,10 @@
    own — there is no name-based exclusion anywhere in the suite, and no sweep
    opens the panel. */
 
-/* The nav trigger (LIN-2298). Rendered by `renderFeedbackTrigger`
-   (lib/components/navbar.js) into `.nav-actions`, so it inherits `.nav-action`
-   for typography and spacing from style.css and needs only the affordance the
-   FAB used to carry: the pending-draft dot.
+/* The trigger (LIN-2298). Rendered by `renderFeedbackTrigger`
+   (lib/components/navbar.js) at the rail's foot, whose `.frame-rail__feedback`
+   (public/frame.css) gives it typography and spacing, so this file adds only the
+   affordance the FAB used to carry: the pending-draft dot.
 
    `position: relative` is here solely to anchor that dot. It creates no
    stacking context problem for the page — the element is in normal flow, which
@@ -68,7 +69,7 @@
 /* The pre-hydration (and JS-failed) state, made VISIBLE.
    `renderFeedbackTrigger` ships the button `disabled` so a click cannot land
    before public/feedback-widget.js binds it. Without this rule that was a lie
-   the user could not see: `button.nav-action` (public/style.css) sets `color`
+   the user could not see: the host's button rule sets `color`
    and `cursor: pointer` unconditionally and strips the border, so a disabled
    trigger looked identical to a live one and silently ate clicks — the exact
    UX the `disabled` was added to make honest.
@@ -81,7 +82,7 @@
 .nav-feedback-trigger:disabled:hover {
   opacity: 0.5;
   cursor: default;
-  /* `.nav-action:hover { color: var(--fg) }` (public/style.css) still matches a
+  /* A host's `:hover` colour rule still matches a
      disabled button, so without the second selector the dead control brightens
      under the cursor — reading as interactive at exactly the moment it is not. */
   color: var(--muted);
@@ -89,7 +90,7 @@
 
 /* A pending draft (text not yet sent) gets a subtle marker dot — carried over
    from `.feedback-fab-draft`, which used the same treatment. Offsets are
-   smaller than the FAB's (-3px) because this trigger sits inline in a nav row
+   smaller than the FAB's (-3px) because this trigger sits inline in a row
    rather than free-floating in a corner, so a dot hanging 3px proud would
    collide with its neighbours' baseline. */
 .nav-feedback-trigger-draft::after {

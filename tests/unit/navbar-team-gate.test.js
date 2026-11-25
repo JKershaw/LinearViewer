@@ -1,12 +1,12 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
 
-import { renderNavBar } from '../../lib/components/navbar.js';
+import { renderFilterLine as renderNavBar } from '../../lib/components/navbar.js';
 
 // LIN-2519: the team selector gate widens from `currentPage === 'projects'`
 // to membership in FILTERABLE_PAGES = {projects, swipe, swim, ship, roadmap}.
-// The workspace switcher is unconditional and must not be affected by this
-// widening (verified separately below).
+// LIN-4119 added Backlog. LIN-4568: the old bar (and its workspace switcher)
+// went; the gate is the page filter line's (renderFilterLine), so these cases read it.
 
 const TEAMS = [{ id: 't1', name: 'Engineering', key: 'ENG' }];
 
@@ -21,7 +21,7 @@ function renderFor(currentPage, teams = TEAMS) {
 }
 
 test('team selector renders on every FILTERABLE_PAGES page', () => {
-  for (const page of ['projects', 'swipe', 'swim', 'ship', 'roadmap']) {
+  for (const page of ['projects', 'backlog', 'swipe', 'swim', 'ship', 'roadmap']) {
     const html = renderFor(page);
     assert.match(html, /id="team-toggle"/, `expected team selector on ${page}`);
     assert.match(html, /id="team-options"/, `expected team options panel on ${page}`);
@@ -49,11 +49,4 @@ test('team selector is absent when teams is empty or absent, even on a filterabl
   });
   assert.doesNotMatch(html, /id="team-toggle"/);
   assert.doesNotMatch(html, /id="team-options"/);
-});
-
-test('workspace switcher stays unconditional across the same page sweep (unaffected by the team gate widening)', () => {
-  for (const page of ['projects', 'swipe', 'swim', 'ship', 'roadmap', 'settings', 'dispatch']) {
-    const html = renderFor(page);
-    assert.match(html, /id="workspace-toggle"/, `expected workspace switcher present on ${page}`);
-  }
 });

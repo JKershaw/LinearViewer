@@ -18,7 +18,8 @@ import { test, describe, beforeEach, afterEach } from 'node:test';
 import assert from 'node:assert/strict';
 import { renderLandingHero } from '../../lib/components/landing-hero.js';
 import { renderLandingPage } from '../../lib/render-landing.js';
-import { renderNavBar, renderPreviewSignIn } from '../../lib/components/navbar.js';
+import { renderPreviewSignIn } from '../../lib/components/navbar.js';
+import { renderFrame } from '../../lib/components/frame.js';
 
 const ENV_KEYS = ['NODE_ENV', 'EMAIL_TRANSPORT', 'EMAIL_PROMPT_STEP', 'RESEND_API_KEY', 'EMAIL_FROM', 'EMAIL_LINK_ORIGIN', 'PUBLIC_ORIGIN'];
 let saved;
@@ -93,9 +94,9 @@ describe('the preview sign-in path (calls isEmailSignInAvailable)', () => {
     assert.ok(html.indexOf('nav-login-linear') < html.indexOf('nav-login-email'));
   });
 
-  test('the authenticated (non-landing) bar never carries the email CTA', () => {
+  test('a signed-in page (the frame, LIN-4568) never carries the email CTA', () => {
     Object.assign(process.env, { NODE_ENV: 'development', EMAIL_TRANSPORT: 'console' });
-    const html = renderNavBar({ workspaces: [{ id: 'w', name: 'Acme', urlKey: 'acme' }], urlKey: 'acme' });
+    const html = renderFrame({ place: 'home', workspaces: [{ id: 'w', name: 'Acme', urlKey: 'acme' }], urlKey: 'acme' });
     assert.doesNotMatch(html, /nav-login-email|\/auth\/email/);
   });
 });

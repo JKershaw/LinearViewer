@@ -242,27 +242,22 @@ test.describe('LIN-4119 W4 — the /backlog page, its access and its guards', ()
     await expect(page).toHaveURL(new RegExp(`/workspace/${workerUrlKey}/backlog\\?team=${DESIGN}$`));
   });
 
-  test('the view bar is the same set and hrefs on Home and /backlog (Home\'s own tab is current there, a link here)', async ({ page, seedLocal, localWorkerUrlKey }) => {
+  // LIN-4568: the old bar's view tabs went; the rail is the nav. It is the same places and hrefs on Home and /backlog,
+  // and each page marks itself, once.
+  test('the rail is the same places and hrefs on Home and /backlog, each marking itself once', async ({ page, seedLocal, localWorkerUrlKey }) => {
     await seedLocal(inProgressSeed(localWorkerUrlKey));
-    const tabs = () => page.evaluate(() => [...document.querySelectorAll('[data-testid^="nav-view-"]')].map((el) => ({
-      testid: el.getAttribute('data-testid'),
-      link: el.tagName === 'A',
+    const items = () => page.locator(SELECTORS.nav.railItems).evaluateAll((els) => els.map((el) => ({
+      place: el.getAttribute('data-place'),
       href: el.getAttribute('href'),
+      current: el.getAttribute('aria-current'),
     })));
     await page.goto(`/workspace/${localWorkerUrlKey}/`);
-    const home = await tabs();
+    const home = await items();
     await page.goto(`/workspace/${localWorkerUrlKey}/backlog`);
-    const backlog = await tabs();
-    expect(backlog.map((t) => t.testid)).toEqual(home.map((t) => t.testid));
-    for (let i = 0; i < home.length; i += 1) {
-      if (home[i].link) {
-        expect(backlog[i].href, home[i].testid).toBe(home[i].href);
-      } else {
-        // Home's own tab: a non-link there, and a link to the same href on /backlog (no tab is current on /backlog).
-        expect(backlog[i].link, home[i].testid).toBe(true);
-        expect(backlog[i].href, home[i].testid).toBe(`/workspace/${localWorkerUrlKey}/`);
-      }
-    }
-    expect(backlog.filter((t) => !t.link)).toEqual([]);
+    const backlog = await items();
+    expect(home.length).toBeGreaterThan(0);
+    expect(backlog.map(({ place, href }) => ({ place, href }))).toEqual(home.map(({ place, href }) => ({ place, href })));
+    expect(home.filter((i) => i.current).map((i) => [i.place, i.current])).toEqual([['home', 'page']]);
+    expect(backlog.filter((i) => i.current).map((i) => [i.place, i.current])).toEqual([['backlog', 'page']]);
   });
 });

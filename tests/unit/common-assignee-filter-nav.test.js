@@ -1,6 +1,6 @@
 /**
  * Unit tests for public/common.js's assignee-filter client wiring (LIN-2528):
- *   - initNavBar's assignee option click handler (real navigation,
+ *   - initFilterLine's assignee option click handler (real navigation,
  *     path-preserving via the shared window.buildFilterUrl, LIN-2520/2526).
  *   - No localStorage write and no auto-restore counterpart — assignee lives
  *     in the URL only, unlike team (LIN-2526's boundary).
@@ -50,20 +50,19 @@ function makeElement(overrides = {}) {
     querySelector: () => null,
     querySelectorAll: () => [],
     closest: () => null,
-    getBoundingClientRect: () => ({ height: 0 }),
     ...overrides,
   };
 }
 
 /**
- * Build a fresh vm sandbox + call initNavBar() once, with a rendered
+ * Build a fresh vm sandbox + call initFilterLine() once, with a rendered
  * #assignee-options panel (and no team panel — mirrors a real dashboard load
  * where localStorage never held a team key touching this test's assertions).
  */
-function runInitNavBar({ pathname = '/workspace/acme/', search = '' } = {}) {
+function runInitFilterLine({ pathname = '/workspace/acme/', search = '' } = {}) {
   const assigneeToggleEl = makeElement();
   const assigneeOptionsEl = makeElement({ dataset: { urlKey: 'acme' } });
-  const navBarEl = makeElement();
+  const filterLineEl = makeElement();
 
   const byId = {
     'assignee-toggle': assigneeToggleEl,
@@ -77,7 +76,7 @@ function runInitNavBar({ pathname = '/workspace/acme/', search = '' } = {}) {
     history: { replaceState: () => { throw new Error('replaceState must not be called — assignee has no auto-restore'); } },
     document: {
       querySelector(sel) {
-        if (sel === '.nav-bar') return navBarEl;
+        if (sel === '[data-frame-filters]') return filterLineEl;
         if (sel === '.nav-dropdown-overlay') return null;
         return null;
       },
@@ -85,7 +84,6 @@ function runInitNavBar({ pathname = '/workspace/acme/', search = '' } = {}) {
       getElementById: (id) => byId[id] || null,
       createElement: () => makeElement(),
       body: { appendChild() {} },
-      documentElement: { style: { setProperty() {} } },
       addEventListener() {},
     },
     localStorage: {
@@ -102,14 +100,14 @@ function runInitNavBar({ pathname = '/workspace/acme/', search = '' } = {}) {
   vm.createContext(sandbox);
   vm.runInContext(withHarnessModels(COMMON_SRC), sandbox, { filename: 'common.js' });
 
-  sandbox.initNavBar();
+  sandbox.initFilterLine();
 
   return { sandbox, assigneeOptionsEl, assigneeToggleEl, localStorageCalls };
 }
 
 describe('LIN-2528 — assignee option click handler (real navigation, path-preserving)', () => {
   test('navigates to the current path with ?assignee=<name>, staying on the dashboard', () => {
-    const { assigneeOptionsEl, sandbox } = runInitNavBar({ pathname: '/workspace/acme/', search: '' });
+    const { assigneeOptionsEl, sandbox } = runInitFilterLine({ pathname: '/workspace/acme/', search: '' });
     const optionEl = makeElement({ dataset: { assignee: 'Alice' } });
     assigneeOptionsEl.fire('click', { stopPropagation() {}, target: { closest: () => optionEl } });
 
@@ -117,7 +115,7 @@ describe('LIN-2528 — assignee option click handler (real navigation, path-pres
   });
 
   test('preserves every other query param, ?team= included (LIN-2520 reuse)', () => {
-    const { assigneeOptionsEl, sandbox } = runInitNavBar({ pathname: '/workspace/acme/', search: '?team=eng-id&foo=bar' });
+    const { assigneeOptionsEl, sandbox } = runInitFilterLine({ pathname: '/workspace/acme/', search: '?team=eng-id&foo=bar' });
     const optionEl = makeElement({ dataset: { assignee: 'Alice' } });
     assigneeOptionsEl.fire('click', { stopPropagation() {}, target: { closest: () => optionEl } });
 
@@ -130,7 +128,7 @@ describe('LIN-2528 — assignee option click handler (real navigation, path-pres
   });
 
   test('carries an explicit ?assignee=all rather than omitting the param (matches the team handler convention)', () => {
-    const { assigneeOptionsEl, sandbox } = runInitNavBar({ pathname: '/workspace/acme/', search: '' });
+    const { assigneeOptionsEl, sandbox } = runInitFilterLine({ pathname: '/workspace/acme/', search: '' });
     const optionEl = makeElement({ dataset: { assignee: 'all' } });
     assigneeOptionsEl.fire('click', { stopPropagation() {}, target: { closest: () => optionEl } });
 
@@ -138,7 +136,7 @@ describe('LIN-2528 — assignee option click handler (real navigation, path-pres
   });
 
   test('picking `me` carries ?assignee=me literally (server-side resolution, not client-side)', () => {
-    const { assigneeOptionsEl, sandbox } = runInitNavBar({ pathname: '/workspace/acme/', search: '' });
+    const { assigneeOptionsEl, sandbox } = runInitFilterLine({ pathname: '/workspace/acme/', search: '' });
     const optionEl = makeElement({ dataset: { assignee: 'me' } });
     assigneeOptionsEl.fire('click', { stopPropagation() {}, target: { closest: () => optionEl } });
 
@@ -146,13 +144,13 @@ describe('LIN-2528 — assignee option click handler (real navigation, path-pres
   });
 
   test('a click outside any .nav-option[data-assignee] is ignored', () => {
-    const { assigneeOptionsEl, sandbox } = runInitNavBar();
+    const { assigneeOptionsEl, sandbox } = runInitFilterLine();
     assigneeOptionsEl.fire('click', { stopPropagation() {}, target: { closest: () => null } });
     assert.equal(sandbox.window.location.href, undefined);
   });
 
   test('no localStorage write happens on an assignee pick (unlike team, assignee is URL-only)', () => {
-    const { assigneeOptionsEl, localStorageCalls } = runInitNavBar();
+    const { assigneeOptionsEl, localStorageCalls } = runInitFilterLine();
     const optionEl = makeElement({ dataset: { assignee: 'Alice' } });
     assigneeOptionsEl.fire('click', { stopPropagation() {}, target: { closest: () => optionEl } });
 
@@ -162,9 +160,9 @@ describe('LIN-2528 — assignee option click handler (real navigation, path-pres
 });
 
 describe('LIN-2528 — no auto-restore counterpart for assignee', () => {
-  test('initNavBar never calls history.replaceState for assignee (no saved-selection restore branch exists)', () => {
-    // runInitNavBar's `history.replaceState` stub throws if ever invoked;
-    // simply completing initNavBar() without throwing proves this.
-    assert.doesNotThrow(() => runInitNavBar());
+  test('initFilterLine never calls history.replaceState for assignee (no saved-selection restore branch exists)', () => {
+    // runInitFilterLine's `history.replaceState` stub throws if ever invoked;
+    // simply completing initFilterLine() without throwing proves this.
+    assert.doesNotThrow(() => runInitFilterLine());
   });
 });

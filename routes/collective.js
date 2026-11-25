@@ -3,7 +3,7 @@
  *
  * Anchored at /workspace/:urlKey/collective (reusing workspaceFromUrl + the
  * experimental feature-gate-redirect-to-settings pattern), the page is *anchored* to
- * one workspace for auth/navbar/gate but *operates* over the user-selected subset
+ * one workspace for auth/rail/gate but *operates* over the user-selected subset
  * of `session.workspaces`: it fans a participant prompt out to each selected
  * workspace's unchanged dispatch route, and fronts a thin Yap proxy to render the
  * live channel and inject the human's input.

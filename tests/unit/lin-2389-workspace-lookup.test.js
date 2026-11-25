@@ -8,7 +8,10 @@ import assert from 'node:assert/strict';
 import { findWorkspaceByUrlKey, findWorkspaceIndexByUrlKey } from '../../lib/workspace-lookup.js';
 import { getWorkspaceByUrlKey } from '../../lib/workspace.js';
 import * as workspaceModule from '../../lib/workspace.js';
-import { renderNavBar } from '../../lib/components/navbar.js';
+import { renderRail } from '../../lib/components/frame.js';
+
+// LIN-4568: the old bar's workspace menu went with the bar; the rail's menu (lib/components/frame.js) marks the active one.
+const renderNavBar = ({ workspaces, urlKey }) => renderRail({ workspaces, urlKey });
 
 describe('findWorkspaceByUrlKey / findWorkspaceIndexByUrlKey', () => {
   const a = { urlKey: 'a', id: 1 };
@@ -66,12 +69,12 @@ describe('getWorkspaceByUrlKey delegates to the array finder', () => {
   });
 });
 
-describe('navbar active workspace', () => {
+describe('the workspace menu\'s active workspace', () => {
   const workspaces = [
     { urlKey: 'one', name: 'One', provider: 'linear' },
     { urlKey: 'two', name: 'Two', provider: 'linear' },
   ];
-  const selectedOptions = (html) => (html.match(/<a [^>]*aria-selected="true"[^>]*>/g) || []);
+  const selectedOptions = (html) => (html.match(/<a [^>]*class="frame-menu__row"[^>]*aria-current="true"[^>]*>/g) || []);
 
   test('marks only the workspace matching the urlKey', () => {
     const html = renderNavBar({ workspaces, urlKey: 'two' });

@@ -14,7 +14,6 @@ import { test, describe } from 'node:test';
 import assert from 'node:assert/strict';
 import { renderSettingsPage } from '../../lib/render-settings.js';
 import { renderRunnerSetupPage } from '../../lib/render-runner-setup.js';
-import { renderWorkspaceOptions } from '../../lib/components/navbar.js';
 import { renderRail } from '../../lib/components/frame.js';
 import { AREAS } from '../../lib/settings-areas.js';
 import { litPlaceFor } from '../../lib/places.js';
@@ -106,10 +105,9 @@ describe('Remove this workspace: in Settings › Sources, nowhere else', () => {
     }
   });
 
-  test('neither workspace menu offers remove: the rail\'s and the old bar\'s switch and add only', () => {
+  test('the workspace menu offers no remove: it switches and adds only (LIN-4568: the old bar\'s menu is gone)', () => {
     const rail = renderRail({ urlKey: 'acme', workspaces: TWO, featureFlags: {} });
-    const bar = renderWorkspaceOptions(TWO, 'acme', 'project');
-    for (const [name, html] of [['rail', rail], ['old bar', bar]]) {
+    for (const [name, html] of [['rail', rail]]) {
       assert.doesNotMatch(html, /\/remove"/, `${name}: no remove form`);
       assert.doesNotMatch(html, /data-confirm|nav-option-danger/, `${name}: no red remove`);
       assert.match(html, /\/workspace\/beta\//, `${name}: still switches`);

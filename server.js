@@ -3651,7 +3651,7 @@ app.get('/workspace/:urlKey/', workspaceFromUrl, async (req, res) => {
   const assigneeState = await resolveAssigneeSelection(req, provider, getWorkspaceCallScope(workspace));
   const canFilterByMe = provider.supports('viewer');
 
-  // Determine OpenRouter connection status for nav bar
+  // Determine OpenRouter connection status for the rail's AI status
   const openRouterSource = getOpenRouterSource(req);
 
   try {

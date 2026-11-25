@@ -1908,7 +1908,7 @@ function init() {
   if (!observationData) { console.warn('Observation: no initial data'); return; }
   initControls();
   // The URL opens the page where it was left (LIN-3983): the scope, the view and filter,
-  // including the questions deep link from the navbar badge (`?view=questions`, once
+  // including the questions deep link (`?view=questions`, once
   // `?view=rulings`, LIN-1728 review F6). Legacy values are rewritten to the current names.
   const params = new URLSearchParams(window.location.search);
   applyWorkspaceScope(scopeFromParams(params));

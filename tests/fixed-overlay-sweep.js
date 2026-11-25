@@ -26,9 +26,10 @@
 // were `return []`. That is precisely the LIN-2252 no-op shape this whole
 // ticket family exists to have caught, reproduced inside its own guard.
 //
-// An overclaim, because `.nav-bar` is `position: sticky; top: 0` with a
-// `z-index` and a translucent wash (public/style.css) — and LIN-2298 moved the
-// feedback trigger INTO it. A sticky header genuinely does overlay scrolled
+// An overclaim, because the old `.nav-bar` was `position: sticky; top: 0` with a
+// `z-index` and a translucent wash — and LIN-2298 moved the feedback trigger
+// INTO it. (LIN-4568 deleted that bar; the sticky chrome now is the frame's rail
+// at desktop widths and its band on a phone, public/frame.css.) A sticky header genuinely does overlay scrolled
 // content; style.css's own comment records the interception hazard that once
 // backed it out. Sweeping only `fixed` meant the prose "nothing floats over
 // this column any more" was asserted by a witness structurally incapable of
@@ -131,7 +132,7 @@ export async function sweepFixedOverlaps(page, selector) {
     //
     // This loop used to `break` on the first hit. That was a structural blind
     // spot in the one assertion this ticket exists to make: `overlays` is in
-    // document order, `.nav-bar` is an early <nav> in <body>, and the
+    // document order, the sticky chrome (then `.nav-bar`, now the frame's rail/band) is early in <body>, and the
     // Observation acceptance FILTERS the sticky nav out of the hits. So any new
     // overlay covering the card at offsets where the nav also covers it was
     // recorded as "nav", filtered away, and reported as no overlap — a fixed

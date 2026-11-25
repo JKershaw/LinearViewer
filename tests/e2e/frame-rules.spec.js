@@ -33,6 +33,8 @@ import { AREAS } from '../../lib/settings-areas.js';
  * (under Prompts) and Operator audit (under Settings). Every viewer walks them: their pages answer by URL for anyone in
  * the workspace, and for a new user, whose rail draws no Tools group, each lights Settings (lib/places.js reachedFrom).
  * LIN-4566 (piece 5) adds Settings, its index and every area, and Run on my machine (under Settings).
+ * LIN-4568 (piece 7) adds the Project backlog (drilled in under Backlog), the old bar's last page: with it the walk covers
+ * every place and drilled-in page in lib/places.js (the places census holds the registry to the app's routes).
  */
 const FRAMED = [
   { key: 'connect' },
@@ -63,6 +65,8 @@ const FRAMED = [
   { key: 'settings' },
   ...AREAS.map(area => ({ key: 'settings', path: `/settings/${area.id}` })),
   { key: 'runner' },
+  // LIN-4568 (piece 7): the Project backlog, drilled in under Backlog.
+  { key: 'project' },
 ];
 
 /** Every flag a place in the rail waits on, on. */
@@ -329,7 +333,8 @@ for (const viewer of VIEWERS) {
  * `name` null: the page's name is its content's (a Library document is named by its own heading), so the walk checks the
  * h1 is there and names the tab. `signedOutOnly`: signed in, the route sends the person to their workspace instead (the
  * previews, LIN-4564) or answers for the session (email sign-in says "You're signed in"). The landing (`/`) is the named
- * exception and is not walked: its hero's wordmark is its h1 and it draws no band (LIN-1508). The guest task page needs
+ * exception and is not walked with them: its hero's wordmark is its h1 and it draws no band (LIN-1508). LIN-4568 gave it the
+ * footer every page shares, so the signed-out describe checks that footer, and the rest of what still applies, on `/`. The guest task page needs
  * a share link minted for a task its owner can read, so it has its own test below (seeded the way
  * tests/e2e/task-share.spec.js seeds it); a malformed token's 404 is walked here, the shared error page.
  */
@@ -436,6 +441,14 @@ for (const signedIn of [false, true]) {
           expect((await focused(page)).testid, `${entry.path}: the first Tab stop is the skip link`).toBe('frame-skip');
           await page.keyboard.press('Enter');
           await expect.poll(async () => (await focused(page)).id).toBe('main');
+        }
+        if (!signedIn) {
+          // LIN-4568: the landing, the named exception (its hero, no band), draws the footer every page shares.
+          await page.goto('/');
+          const landing = await readPublicFrame(page);
+          expect(landing.band || landing.rail, '/: the landing draws no band and no rail').toBe(false);
+          expect(landing.footer, '/: the landing\'s footer is the signed-in pages\' footer').toBe(signedInFooter);
+          expect(landing.scrollWidth, '/: no sideways scroll').toBeLessThanOrEqual(landing.innerWidth);
         }
         expect(edges.size, `one left edge: ${[...edges]}`).toBe(1);
         expect(sizes.size, `one heading size: ${[...sizes]}`).toBe(1);

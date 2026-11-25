@@ -22,8 +22,10 @@ every authenticated user; no flag, no gate.
   30 days (LIN-3689). Members only, counts only; the instance-wide public
   `/kpis` page is a separate surface and is not linked from here.
 
-Wired in `lib/components/view-nav.js` (`getViewNavLinks` base links and
-`FIRST_CLASS_VIEWS`).
+Wired as places in the side rail, `PLACES` in `lib/places.js` (LIN-4342; the old
+header strip, `lib/components/view-nav.js`, went with the old bar in LIN-4568). The
+rail gates by who you are: Runs (observation) and KPIs are the owner's with run
+controls, so a member reaches them by URL.
 
 ### Retired: the experimental `dashboard` flag/view (LIN-509 → LIN-595)
 
@@ -38,7 +40,7 @@ additive seam: `GET /api/dashboard/sessions` (the sessionId-grouped poll source)
 The old view shell/client (`render-dashboard.js`, `public/dashboard.{js,css}`)
 was deleted so there are not two equivalent views side by side (LIN-590).
 
-## 2. Experimental (flag-gated; Settings + gated nav overflow)
+## 2. Experimental (flag-gated; Settings + a gated rail place)
 
 In-development or rough-draft views that are real and intentional, but not yet
 ready to advertise broadly. Each is:
@@ -48,15 +50,16 @@ ready to advertise broadly. Each is:
   `lib/feature-defaults.js` (`{ flag, path }`), consumed by **both** surfaces
   below so they cannot drift on membership or route,
 - surfaced when its flag is on in **two** places: a discovery link in Settings
-  (`lib/render-settings.js`, an "open the …" action phrase) **and** a gated
-  entry in the nav's `⋯ more` overflow (`getViewNavLinks` in
-  `lib/components/view-nav.js`, a short view label) — LIN-1247 reversed the
-  earlier Settings-only policy to this gated-nav-inclusion policy,
+  (`lib/render-settings.js`, an "open the …" action phrase) **and** a place in
+  the rail's Views group (`PLACES` in `lib/places.js`, a short label from
+  `VIEW_LABELS`, each in its own slot) — LIN-1247 reversed the earlier
+  Settings-only policy to gated nav inclusion; the rail replaced the old bar's
+  `⋯ more` overflow (LIN-4342, LIN-4568),
 - route-gated to redirect to `/settings` when the flag is off.
 
-The nav gate is strict `flag === true` and emits the **kebab route** as the link
-text (`taskChat` → `task-chat`) so active-matching and active-hoist work; the
-camelCase flag is only the gate, never the emitted text.
+The rail's gate is strict `flag === true` and keys the place by the **kebab
+route** (`taskChat` → `task-chat`), which is what the page passes to light it; the
+camelCase flag is only the gate, never the key.
 
 Members (the shared `EXPERIMENTAL_VIEWS` list, in order):
 
@@ -75,12 +78,16 @@ Members (the shared `EXPERIMENTAL_VIEWS` list, in order):
 development — its (previous) lack of an inbound link reflected its in-dev status,
 not abandonment. See the Step-2 friction note below.
 
-## 3. Flagged power-user (footer link when on)
+## 3. Flagged power-user (a rail place when on)
 
-Mature, opt-in views for power users. A per-user feature flag (default off) in
-`lib/feature-defaults.js`; when on, a **conditional footer link**
-(`getFooterLinks` in `lib/components/footer.js`) and route gating. Unlike the
-experimental tier, these advertise themselves in the footer once enabled.
+Mature, opt-in views for power users. **roadmap** is a per-user feature flag
+(default off) in `lib/feature-defaults.js`; when on, it is a place in the rail's
+Views group, and its route is gated. **dispatch** and **proxy** (Connect an agent)
+lost their switches in LIN-3849: they are the rail's Tools places for the owner
+with run controls, and their pages answer by URL for anyone in the workspace.
+The footer names no view: it is the same on every page (`renderFrameFooter` in
+`lib/components/frame.js`; the old conditional footer links went long ago, and the
+old footer itself with LIN-4568).
 
 - **roadmap**, **dispatch**, **proxy**
 
