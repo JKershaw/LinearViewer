@@ -154,3 +154,58 @@ describe('LIN-4070 — the sessions route reads the whole life and words history
   });
 });
 
+
+// LIN-4560 (finding-6ea68b77): a child agent's words reach the fold as the child's, grouped under its agent, never as the
+// run's own lines. The route keeps the sparse `agent` each entry names; the fold draws one collapsed group per child.
+describe('LIN-4560 — the Sessions fold groups a child agent\'s words under its agent', () => {
+  const at = (n) => minutesAgo(n);
+  const withFeedback = () => ({
+    dispatchQueueStore: {
+      async listItems() { return []; },
+      async listHistory() {
+        return { items: [{ ...item('d-5', 10), feedback: [
+          { message: 'Handed the search to an agent.', timestamp: at(9), kind: 'assistant-text' },
+          { message: 'Searching lib/.', timestamp: at(8), kind: 'agent-text', agent: 'a1b2c3' },
+          { message: 'Waiting on the agent.', timestamp: at(7), kind: 'assistant-text' },
+          { message: '[done] found 3 call sites', timestamp: at(6), kind: 'agent-text', agent: 'a1b2c3' },
+        ] }] };
+      },
+    },
+    agentStatusStore: { async listStatus() { return { items: [] }; } },
+  });
+
+  test('the route keeps the agent a child\'s entry names; the run\'s own entries carry none', async () => {
+    const res = await callRoute(async () => ({ taskState: { state: 'needs-you' } }), withFeedback());
+    const feedback = res.jsonBody.sessions[0].feedback;
+    assert.deepEqual(feedback.map((f) => f.agent ?? null), [null, 'a1b2c3', null, 'a1b2c3']);
+    assert.deepEqual(Object.keys(feedback[0]), ['message', 'timestamp'], 'the run\'s own entry keeps its shape');
+  });
+
+  test('the fold draws the child\'s lines as one collapsed group at its first line, the run\'s lines as before', async () => {
+    const res = await callRoute(async () => ({ taskState: { state: 'needs-you' } }), withFeedback());
+    const world = loadWorld({ window: { escapeHtml, relativeTime: () => '', runPageHref: () => null, api: async () => res.jsonBody }, scripts: ['sessions.js'] });
+    const container = world.makeContainer();
+    world.window.SessionsSection.init(container, { urlKey: 'acme', identifier: 'LIN-7', home: true, stageWords: {} });
+    await flush(); await flush();
+    const fold = container.querySelector('.session-feedback');
+    assert.deepEqual(fold.children.map((el) => el.getAttribute('data-testid') || el.className), ['session-feedback-entry', 'sessions-agent-group', 'session-feedback-entry']);
+    const own = fold.children.filter((el) => el.className === 'session-feedback-entry').map((el) => el.textContent.trim());
+    assert.deepEqual(own, ['Handed the search to an agent.', 'Waiting on the agent.'], 'the child\'s words are not the run\'s lines');
+    const group = fold.querySelector('[data-testid="sessions-agent-group"]');
+    assert.equal(group.getAttribute('data-agent'), 'a1b2c3');
+    assert.equal(group.hasAttribute('open'), false);
+    assert.match(group.querySelector('summary').textContent, /child agent a1b2c3 · 2 lines/);
+    assert.deepEqual(group.querySelectorAll('.session-feedback-entry').map((el) => el.textContent.trim()), ['Searching lib/.', '[done] found 3 call sites']);
+  });
+
+  test('an agent name is escaped in the summary and the attribute', async () => {
+    const data = { sessions: [{ ...waitingSession, word: 'running', feedback: [{ message: 'hi', timestamp: null, agent: 'a"><b>x</b>' }] }], taskParked: false };
+    const world = loadWorld({ window: { escapeHtml, relativeTime: () => '', runPageHref: () => null, api: async () => data }, scripts: ['sessions.js'] });
+    const container = world.makeContainer();
+    world.window.SessionsSection.init(container, { urlKey: 'acme', identifier: 'LIN-7', home: true, stageWords: {} });
+    await flush(); await flush();
+    const group = container.querySelector('[data-testid="sessions-agent-group"]');
+    assert.equal(group.querySelector('summary b'), null);
+    assert.equal(group.getAttribute('data-agent'), 'a"><b>x</b>');
+  });
+});

@@ -47,12 +47,13 @@
 
   // Home shows a ruling as the question card in the opened task, so the fold keeps only what a person wrote: a
   // decision's machine lines and its JSON are left out, and a [blocked] tag is dropped from the line it marks.
+  // A child agent's line keeps the `agent` it names (LIN-4560), so renderFeedback groups it under that agent.
   function humanFeedback(feedback) {
     return (feedback || []).reduce((kept, f) => {
       const message = String((f && f.message) || '').replace(/^\[(blocked|decision)\]\s*/, '').trim();
       if (!message || message.startsWith('{')) return kept;
       if (/^\[decision\]/.test(f && f.message ? f.message : '')) return kept;
-      kept.push({ message, timestamp: f.timestamp });
+      kept.push({ message, timestamp: f.timestamp, ...(f.agent ? { agent: String(f.agent) } : {}) });
       return kept;
     }, []);
   }
@@ -71,12 +72,36 @@
     return window.api(sessionsUrl(urlKey, identifier), { on401: false });
   }
 
+  function feedbackLine(f) {
+    const time = relativeTime(f.timestamp);
+    const timeHtml = time ? ` <span class="session-feedback-time">· ${esc(time)}</span>` : '';
+    return `<div class="session-feedback-entry">${esc(f.message || '')}${timeHtml}</div>`;
+  }
+
+  // LIN-4560 (finding-6ea68b77): a child agent's words (an entry naming its `agent`, the sessions read's sparse field)
+  // are not the run's lines. Each child is one collapsed group, placed where its first line falls, its summary naming
+  // the child and counting its lines, the same grouping the run page and Dispatch history draw (lib/transcript.js). The
+  // run's own lines are drawn as before.
   function renderFeedback(feedback) {
     if (!feedback || feedback.length === 0) return '';
-    const entries = feedback.map((f) => {
-      const time = relativeTime(f.timestamp);
-      const timeHtml = time ? ` <span class="session-feedback-time">· ${esc(time)}</span>` : '';
-      return `<div class="session-feedback-entry">${esc(f.message || '')}${timeHtml}</div>`;
+    const parts = [];
+    const groups = new Map();
+    for (const f of feedback) {
+      if (!f.agent) { parts.push(f); continue; }
+      if (!groups.has(f.agent)) {
+        const group = { agent: f.agent, lines: [] };
+        groups.set(f.agent, group);
+        parts.push(group);
+      }
+      groups.get(f.agent).lines.push(f);
+    }
+    const entries = parts.map((part) => {
+      if (!part.lines) return feedbackLine(part);
+      const n = part.lines.length;
+      return `<details class="session-feedback-agent" data-testid="sessions-agent-group" data-agent="${esc(part.agent)}">`
+        + `<summary class="session-feedback-agent-summary">child agent ${esc(part.agent)} · ${n} ${n === 1 ? 'line' : 'lines'}</summary>`
+        + part.lines.map(feedbackLine).join('')
+        + '</details>';
     }).join('');
     return `<div class="session-feedback">${entries}</div>`;
   }

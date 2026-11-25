@@ -58,14 +58,16 @@ describe('LIN-4559 run page: the server embed', () => {
 
 // ── Phone width and the theme ──────────────────────────────────────────────
 
-describe('LIN-4559 run page: the thread at 390px and in dark mode (stylesheet)', () => {
-  const css = readFileSync(join(__dirname, '../../public/session.css'), 'utf8');
+// LIN-4560: the transcript's rules moved from public/session.css to public/chat.css, which the run page and Dispatch
+// history both load, so a child's thread looks the same on both. The assertions are unchanged.
+describe('LIN-4559 run page: the thread at 390px and in dark mode (stylesheet, public/chat.css)', () => {
+  const css = readFileSync(join(__dirname, '../../public/chat.css'), 'utf8');
   const rule = (selector) => {
     const m = css.match(new RegExp(`(^|\\n)${selector.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')}\\s*\\{([^}]*)\\}`));
     return m ? m[2] : null;
   };
 
-  test('the inner thread does not scroll on its own: it outranks the shared .chat-thread (chat.css loads after this sheet)', () => {
+  test('the inner thread does not scroll on its own: it outranks the shared .chat-thread whatever the order', () => {
     const body = rule('.sess-agent-thread__tx.chat-thread');
     assert.ok(body, 'the inner thread\'s rule carries both classes, so it beats `.chat-thread` whatever the load order');
     assert.match(body, /--chat-thread-max-height:\s*none/);
@@ -75,15 +77,41 @@ describe('LIN-4559 run page: the thread at 390px and in dark mode (stylesheet)',
   test('the thread and its summary wrap long unbroken text and never widen the page', () => {
     for (const sel of ['.sess-agent-thread', '.sess-agent-thread__summary']) {
       const body = rule(sel);
-      assert.ok(body, `${sel} has a rule in public/session.css`);
+      assert.ok(body, `${sel} has a rule in public/chat.css`);
       assert.match(body, /overflow-wrap:\s*anywhere/, `${sel} wraps long unbroken text`);
       assert.match(body, /min-width:\s*0/, `${sel} may shrink below its content`);
     }
   });
 
   test('colours come from the theme tokens, never a literal colour (dark mode is a token override)', () => {
-    const bodies = ['.sess-agent-thread', '.sess-agent-thread__summary', '.sess-agent-thread__tx.chat-thread'].map(rule).join('\n');
+    // LIN-4560: the transcript box, the message, the link and the waiting note too.
+    const selectors = ['.sess-agent-thread', '.sess-agent-thread__summary', '.sess-agent-thread__tx.chat-thread', '.sess-run-tx', '.sess-tx-msg', '.sess-tx-link', '.sess-tx-waiting'];
+    for (const sel of selectors) assert.ok(rule(sel), `${sel} has a rule in public/chat.css`);
+    const bodies = selectors.map(rule).join('\n');
     assert.match(bodies, /var\(--/);
     assert.doesNotMatch(bodies, /#[0-9a-f]{3,8}\b|rgba?\(|hsla?\(/i);
+  });
+
+  test('the transcript is phone first: its desktop layer is a min-width: 600px rule, with no max-width override left in session.css', () => {
+    assert.match(css, /@media \(min-width: 600px\)\s*\{\s*\.sess-run-tx \{ --chat-thread-max-height: 360px; \}/);
+    assert.match(rule('.sess-run-tx'), /--chat-thread-max-height:\s*280px/);
+    const sessionCss = readFileSync(join(__dirname, '../../public/session.css'), 'utf8');
+    assert.doesNotMatch(sessionCss, /\.sess-run-tx\s*\{/, 'the transcript box has one rule, in chat.css');
+    assert.doesNotMatch(sessionCss, /\.sess-agent-thread/);
+  });
+
+  test('Dispatch draws the same rules: it loads chat.css, and its retired .feedback-* rules are gone', () => {
+    const dispatchCss = readFileSync(join(__dirname, '../../public/dispatch.css'), 'utf8');
+    assert.doesNotMatch(dispatchCss, /\.feedback-(list|entry|prefix|link|time)\b/);
+  });
+
+  test('Home\'s fold groups a child\'s lines in token colours too (public/style.css)', () => {
+    const style = readFileSync(join(__dirname, '../../public/style.css'), 'utf8');
+    const body = (sel) => style.match(new RegExp(`(^|\\n)${sel.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')}\\s*\\{([^}]*)\\}`))?.[2] ?? null;
+    for (const sel of ['.session-feedback-agent', '.session-feedback-agent-summary']) {
+      assert.ok(body(sel), sel);
+      assert.doesNotMatch(body(sel), /#[0-9a-f]{3,8}\b|rgba?\(|hsla?\(/i, sel);
+    }
+    assert.match(body('.session-feedback-agent'), /overflow-wrap:\s*anywhere/);
   });
 });

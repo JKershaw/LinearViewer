@@ -326,70 +326,10 @@
    anchored at the container's end instead of inside a `.sess-run-body`. */
 .sess-lineage > .sess-inline-reply { margin-left: 0; margin-right: 0; }
 
-/* ── Per-run transcript (LIN-1133; LIN-1309) ──────────────────────────────
-   Each run card contains its own scrollable transcript, now built from the
-   shared chat.css bubble primitives (`.chat-thread`/`.chat-msg`) — the same
-   conversational idiom as Task Chat — instead of the earlier bespoke
-   `.sess-run-tx-list`/`.sess-run-tx-entry` markup. This block only retunes
-   the shared thread's density/chrome for a boxed, scrollable inset (Task
-   Chat's own thread is borderless full-height); the bubble/pill/surface
-   visuals themselves live once in chat.css. */
-.sess-run-tx {
-  --chat-thread-max-height: 360px;
-  --chat-thread-gap: var(--space-2);
-  --chat-thread-margin: 0;
-  overflow-x: hidden;
-  scrollbar-gutter: stable;
-  margin-top: var(--space-2);
-  padding: var(--space-2);
-  border: 1px solid var(--line-soft);
-  border-radius: var(--radius-sm);
-  background: var(--inset);
-}
-.sess-run-tx-entry { word-break: break-word; }
-/* Markdown-rendered message body — reuses the established .markdown-content
-   sizing (marked + DOMPurify output, fed from the escaped data-feedback JSON). */
-.sess-tx-msg {
-  font-family: var(--font-content);
-  font-size: var(--font-size-sm);
-  line-height: 1.5;
-}
-.sess-tx-link { font-size: var(--font-size-sm); }
-/* ── A child agent's thread (LIN-4559) ──────────────────────────────────────
-   A run's child agent (a subagent it handed work to) is its own collapsible
-   thread inside the run's transcript: a native <details>, collapsed by
-   default, placed where the child's first message falls. The summary names the
-   child and counts its messages. Its bubbles are the shared chat ones; the
-   inner thread does not scroll on its own (the run's transcript does), and
-   every box may shrink and wraps a long unbroken name or line, so nothing
-   widens the page at 390px. Theme tokens only, so dark mode is the token
-   override it is everywhere else. */
-.sess-agent-thread {
-  list-style: none;
-  min-width: 0;
-  overflow-wrap: anywhere;
-  border-left: 2px solid var(--line);
-  padding-left: var(--space-2);
-}
-.sess-agent-thread__summary {
-  min-width: 0;
-  overflow-wrap: anywhere;
-  cursor: pointer;
-  font-family: var(--font-content);
-  font-size: var(--font-size-sm);
-  color: var(--muted);
-}
-/* The child's name keeps the summary's face (LIN-4107: mono only on the allowlisted selectors); colour sets it apart. */
-.sess-agent-thread__name { color: var(--text); }
-/* Two classes: the shared `.chat-thread` (chat.css, loaded after this sheet) would otherwise win and give the inner
-   thread its own 40vh scroll box, clipping its last line. */
-.sess-agent-thread__tx.chat-thread {
-  --chat-thread-max-height: none;
-  --chat-thread-margin: 0;
-  min-width: 0;
-  overflow-y: visible;
-  margin-top: var(--space-2);
-}
+/* ── Per-run transcript (LIN-1133; LIN-1309; LIN-4560) ────────────────────────
+   The transcript's look (the boxed thread, the message body, the link, a child
+   agent's thread and the waiting note) moved to public/chat.css (LIN-4560), so
+   the run page and Dispatch history draw it from one place. */
 
 .sess-notfound { font-family: var(--font-content); color: var(--muted); }
 
@@ -517,7 +457,6 @@
   .sess-page { padding: 0 0.75rem 2.5rem; }
   .sess-kv { grid-template-columns: 6.5rem 1fr; gap: var(--space-2); }
   .sess-inline-reply-input { min-height: 4rem; }
-  .sess-run-tx { --chat-thread-max-height: 280px; }
 }
 
 /* ── Run page header + steps (LIN-3250) ────────────────────────────────────────
