@@ -51,4 +51,5 @@ Area notes for `front-end-pages` in the registry. Format and rules: README.md.
   hid the body misses the h1 and tab: the revoked-link notice (`goneHandlerFor`, `public/task-page.js`) left the title
   showing (LIN-4563). What existed only for a retired feature goes too, server side included (the `search` home-rows
   kind, rows' `data-search-text`, a constant named for it). Grep the client's `innerHTML =`, `kind=`, `data-*`,
-  `document.title` and `.nav-bar`: Swipe's script retitled the tab, Ship measured the bar (LIN-4564).
+  `document.title`, `.nav-bar` (LIN-4564: Swipe retitled the tab, Ship measured the bar), and `lib/places.js` aliases
+  no page passes.

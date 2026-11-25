@@ -331,9 +331,10 @@ a.task-stage-run:hover { text-decoration: underline; }
 .frame-head .task-ident { font-size: inherit; }
 
 /* LIN-4563: in the frame (lib/components/frame.js), the page's body takes the frame's one left edge and width
-   (public/frame.css .frame-main), not a centred column of its own. The way back and the h1 are the frame's. */
+   (public/frame.css .frame-main), not a centred column of its own. The way back and the h1 are the frame's. The edge is
+   the run page's rule too (session.css `.frame-main > .sess-page`, LIN-4564: no margin, no side gutter); the task page
+   adds only that it takes the frame's whole width and no bottom reserve. */
 .frame-main > .sess-page.task-page {
   max-width: none;
-  margin: 0;
-  padding: 0;
+  padding-bottom: 0;
 }
