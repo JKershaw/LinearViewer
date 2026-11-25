@@ -102,7 +102,7 @@ test.describe('LIN-4560: the run page and Dispatch load their page scripts as mo
     await expectModule(page, '/question-records.js');
     await page.waitForLoadState('networkidle');
     expect([...await scripts.documentListeners('/session.js')]).toEqual(expect.arrayContaining(['DOMContentLoaded']));
-    await expect(page.locator('[data-testid="session-transcript-entry"]')).toHaveCount(2);
+    await expect(page.locator('[data-testid="session-run-transcript"] [data-testid="transcript-entry"]')).toHaveCount(2);
 
     const wall = page.locator('[data-testid="session-elapsed"]');
     await expect(wall).toHaveAttribute('data-end', '');
@@ -124,7 +124,7 @@ test.describe('LIN-4560: the run page and Dispatch load their page scripts as mo
     expect([...await scripts.documentListeners('/dispatch.js')]).toEqual(expect.arrayContaining(['DOMContentLoaded']));
     const row = page.locator('.history-item', { hasText: 'Module page worker' }).or(page.locator('.history-item', { hasText: 'implementation' })).first();
     await expect(row).toBeAttached();
-    await expect(row.locator('.feedback-entry')).toHaveCount(2);
+    await expect(row.locator('[data-testid="history-transcript"] [data-testid="transcript-entry"]')).toHaveCount(2);
     expect(errors, errors.join('\n')).toEqual([]);
   });
 });

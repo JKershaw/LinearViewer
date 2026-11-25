@@ -16,8 +16,13 @@
  * inits read nothing this file sets up (no `.prompt-container` or disclosure
  * placeholder on this page) and this file's inits read nothing app.js sets up.
  * Its top-level names are module-scoped: nothing classic reads them (the queue
- * badge's updater is common.js's). Exported names are its test seams.
+ * badge's updater is common.js's). Exported names are its test seams. History
+ * rows draw their transcripts through the one transcript look (the served leaf
+ * lib/transcript.js, LIN-4560), the same the run page draws.
  */
+
+import { relativeAgo } from '../lib/time-words.js'
+import { renderTranscript } from '../lib/transcript.js'
 
 const UUID_DISPATCH_REGEX = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i
 
@@ -1057,32 +1062,17 @@ async function loadDispatchHistory(urlKey, offset) {
 }
 
 /**
- * Render feedback entries for a history item
+ * A history row's transcript (LIN-4560): the row's feedback, which the history read sends as the server's transcript
+ * entries (lib/dispatch-transcript.js: masked, with blocked/waiting/quiet decided there), drawn by the one transcript
+ * look (lib/transcript.js), the same the run page draws. It retired `renderFeedbackEntries`, this page's own tree of
+ * escaped lines. Kept from it: the stored order, a decision-lifecycle stamp never drawn (the server marks it quiet,
+ * LIN-2205/LIN-3037), a link only for an http(s) URL with its label or "link", nothing drawn when nothing is said. A
+ * child agent's words are now its own thread, never the run's lines (finding-6ea68b77). `live` is the row still running
+ * (outcome `taken`), so only then does its newest own bubble carry the in-progress pill. '' when nothing is drawn.
  */
-function renderFeedbackEntries(feedback) {
-  // LIN-2205 (LIN-1728 F6 follow-up) / LIN-3037: a decision-lifecycle stamp
-  // (decision-answer, decision-withdrawn, decision-withdrawal-reversed) is
-  // answer/withdrawal metadata, not a feedback line — `_formatFeedbackEntries`
-  // (lib/dispatch-store.js) carries `kind` through, so filter here rather
-  // than render a bare `{"decision_id":...}` entry (or a withdrawal's raw
-  // `reason` text).
-  const visible = (feedback || []).filter(f =>
-    f.kind !== 'decision-answer' && f.kind !== 'decision-withdrawn' && f.kind !== 'decision-withdrawal-reversed')
-  if (visible.length === 0) return ''
-
-  const entries = visible.map((f, i) => {
-    const isLast = i === visible.length - 1
-    const prefix = isLast ? '\u2514\u2500' : '\u251c\u2500'
-    const time = formatDispatchTime(f.timestamp)
-    const isSafeUrl = f.url && /^https?:\/\//i.test(f.url)
-    const urlHtml = isSafeUrl
-      ? ` <a class="feedback-link" href="${escapeHtml(f.url)}" target="_blank">${escapeHtml(f.urlLabel || 'link')}</a>`
-      : ''
-
-    return `<div class="feedback-entry"><span class="feedback-prefix">${prefix}</span> ${escapeHtml(f.message)}${urlHtml} <span class="feedback-time">\u00b7 ${time}</span></div>`
-  }).join('')
-
-  return `<div class="feedback-list">${entries}</div>`
+function historyTranscriptHtml(feedback, live) {
+  const items = renderTranscript(feedback || [], { live, host: window, relative: relativeAgo })
+  return items ? `<ul class="sess-run-tx chat-thread" data-testid="history-transcript">${items}</ul>` : ''
 }
 
 /**
@@ -1160,7 +1150,7 @@ function renderDispatchHistoryList(container, items, total, offset, urlKey) {
     const promptHtml = hasPrompt
       ? `<div class="history-prompt">${formatPromptHtml(item.prompt)}</div>`
       : ''
-    const feedbackHtml = hasFeedback ? renderFeedbackEntries(item.feedback) : ''
+    const feedbackHtml = hasFeedback ? historyTranscriptHtml(item.feedback, outcome === 'taken') : ''
 
     return `
       <div class="history-item${expandableClass}" data-status="${escapeHtml(outcome)}">
@@ -1217,8 +1207,8 @@ function initDispatchHistory() {
 
   // Delegated click handler for expanding history items
   historyEl.addEventListener('click', (e) => {
-    // Don't toggle when clicking links
-    if (e.target.closest('a')) return
+    // Don't toggle when clicking links, or a child agent's thread (its <summary> opens it; LIN-4560)
+    if (e.target.closest('a, .sess-agent-thread')) return
 
     const item = e.target.closest('.history-item.expandable')
     if (item) {
@@ -1258,5 +1248,5 @@ document.addEventListener('DOMContentLoaded', () => {
 // Test seams (LIN-4560): the functions the suites drive. Nothing in the page reads these.
 export {
   HALT_MODE_LABELS, formatHaltStatusHtml, formatDispatchTokenExpiry, dispatchTokenModalBody,
-  renderFeedbackEntries, historyOutcomePill, renderDispatchHistoryList
+  historyTranscriptHtml, historyOutcomePill, renderDispatchHistoryList
 }

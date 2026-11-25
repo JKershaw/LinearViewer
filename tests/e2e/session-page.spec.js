@@ -400,9 +400,10 @@ test.describe('Dedicated per-session page (LIN-1003)', () => {
     // LIN-1309: the transcript is the shared chat.css thread, and each feedback
     // entry client-renders as a chat bubble (speaker pill + surface body) —
     // the same conversational idiom as Task Chat / the reply echo threads —
-    // rather than the old bespoke `.sess-run-tx-entry` list markup.
+    // rather than the old bespoke `.sess-run-tx-entry` list markup. LIN-4560: drawn by the one transcript look
+    // (lib/transcript.js), whose bubble test id is `transcript-entry` on every surface.
     await expect(transcript).toHaveClass(/chat-thread/);
-    const entries = transcript.locator('[data-testid="session-transcript-entry"].chat-msg');
+    const entries = transcript.locator('[data-testid="transcript-entry"].chat-msg');
     await expect(entries).toHaveCount(2);
     await expect(entries.first().locator('.status-pill.chat-msg__who')).toContainText('agent');
     await expect(entries.first().locator('.surface.chat-msg__body')).toContainText('opened the pull request');

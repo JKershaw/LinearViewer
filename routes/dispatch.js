@@ -67,6 +67,7 @@ import { redactSessionItem, redactSessionItems } from '../lib/dispatch-session-r
 import { publicOrigin } from '../lib/public-origin.js';
 import { postUsage } from '../lib/request-usage-intake.js';
 import { childTicketRetryOf } from '../lib/records-tracker.js';
+import { historyTranscriptFeedback } from '../lib/dispatch-transcript.js';
 
 // Directory for Harbour OS dispatch prompt staging files. The OS tmp dir is
 // shared between the Node server and the Harbour OS terminal that reads the
@@ -762,7 +763,12 @@ export function createDispatchRoutes({ dispatchQueueStore, dispatchTokenStore, w
       // (lib/dispatch-lineage-status.js `wireStatusOf`); `status` stays the stored value.
       const result = await dispatchQueueStore.listHistoryWithBodies(workspace.urlKey, { limit, offset, withLineage: true });
       // LIN-3384: mask prose-mode bootstrap lines in non-owned prompts.
-      res.json({ ...result, items: redactSessionItems(result.items, req.session?.accountId || null) });
+      // LIN-4560: each row's feedback carries the transcript's facts (lib/dispatch-transcript.js), the same the run page
+      // embeds, so Dispatch history draws it through the one transcript look; masked at render time, so a row stored
+      // before intake masking shows masked. Additive: each entry keeps the formatter's keys (LIN-1297).
+      const items = redactSessionItems(result.items, req.session?.accountId || null)
+        .map((item) => (Array.isArray(item.feedback) ? { ...item, feedback: historyTranscriptFeedback(item.feedback) } : item));
+      res.json({ ...result, items });
     } catch (err) {
       return reportFailure(res, 'List dispatch history error:', err, 'Failed to list dispatch history');
     }
