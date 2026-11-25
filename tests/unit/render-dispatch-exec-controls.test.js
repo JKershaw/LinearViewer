@@ -14,7 +14,7 @@ import assert from 'node:assert/strict';
 import { renderDispatchPage } from '../../lib/render-dispatch.js';
 
 test('renders the exec-controls placeholder container with default data attrs', () => {
-  const html = renderDispatchPage('WS', {
+  const html = renderDispatchPage('WS', { urlKey: 'ws',
     featureFlags: { runControls: true },
     dispatchDefaults: { model: 'anthropic/claude-opus-4.8', harness: 'opencode' }
   });
@@ -24,14 +24,14 @@ test('renders the exec-controls placeholder container with default data attrs', 
 });
 
 test('renders blank default data attrs when no dispatch defaults are configured', () => {
-  const html = renderDispatchPage('WS', { featureFlags: { runControls: true } });
+  const html = renderDispatchPage('WS', { urlKey: 'ws', featureFlags: { runControls: true } });
   assert.ok(html.includes('data-testid="dispatch-exec-controls-container"'));
   assert.ok(html.includes('data-default-model=""'));
   assert.ok(html.includes('data-default-harness=""'));
 });
 
 test('escapes dispatch default values in the rendered attributes', () => {
-  const html = renderDispatchPage('WS', {
+  const html = renderDispatchPage('WS', { urlKey: 'ws',
     featureFlags: { runControls: true },
     dispatchDefaults: { model: '"><script>alert(1)</script>', harness: 'claude-code' }
   });
@@ -43,7 +43,7 @@ test('escapes dispatch default values in the rendered attributes', () => {
 // the runner's halt, so the old "does not yet honor it (pending LIN-2995)"
 // phrase is gone; the note still never claims a state ("paused"/"stopped").
 test('the guide-halt-note says the runner honors the halt, never claims paused/stopped', () => {
-  const html = renderDispatchPage('WS', { featureFlags: { runControls: true } });
+  const html = renderDispatchPage('WS', { urlKey: 'ws', featureFlags: { runControls: true } });
   const match = html.match(/<p class="guide-halt-note">([\s\S]*?)<\/p>/);
   assert.ok(match, 'guide-halt-note paragraph is present');
   const noteText = match[1];

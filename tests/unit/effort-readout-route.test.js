@@ -151,7 +151,8 @@ describe('the happy path reads both survival rows from verdict records', () => {
     const { status, body } = await get(buildApp({ store, recordsStore: fakeRecords({ verdicts: LATE_VERDICTS }) }), '/workspace/ws-1/effort-readout');
     assert.equal(status, 200);
     assert.match(body, /data-testid="effort-card-plan"/);
-    assert.match(body, /Effort Self-Assessment/);
+    // LIN-4565: in the frame the page is named by its place, Effort (drilled in under KPIs).
+    assert.match(body, /<h1>Effort<\/h1>/);
   });
 
   test('a gate row dispatched before the cutover reads verdict not measured, never a figure from a comment', async () => {

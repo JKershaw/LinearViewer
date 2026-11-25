@@ -119,6 +119,9 @@ function effortReadoutPage(ctx) {
         urlKey: workspace.urlKey,
         workspaces: req.session.workspaces || [],
         featureFlags: await requestFeatureFlags(req),
+        // LIN-4565: the frame's rail status and footer stamp, the same as every other page's.
+        openRouterSource: ctx.getOpenRouterSource ? ctx.getOpenRouterSource(req) : null,
+        deployInfo: ctx.getDeployInfo ? ctx.getDeployInfo() : {},
         readout,
         generatedAt: now.toISOString(),
       }));

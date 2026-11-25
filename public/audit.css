@@ -5,9 +5,6 @@
  * Maintains CLI aesthetic while adding data visualization.
  */
 
-/* `.dashboard-subtitle` is now a no-style E2E hook (audit.spec.js); canonical
-   styling lives in `.page-header__subtitle` (style.css, LIN-462). */
-
 /* =============================================================================
    Settings Section
    ============================================================================= */

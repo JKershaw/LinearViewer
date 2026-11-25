@@ -11,6 +11,8 @@ import { nav, featuresParam, SELECTORS } from '../helpers.js';
 // LIN-4564 (piece 3): Swipe, Swim, Ship, Roadmap and every flagged view moved onto the frame too, so every page the team
 // selector reaches (FILTERABLE_PAGES) draws it in the filter line, and no old-bar page carries a team any more. The old
 // bar is read on Settings (always reachable, still on the bar until piece 5), and the team sweeps read the filter line.
+// LIN-4565 (piece 4): Dispatch, KPIs and Prompts moved onto the frame; the two tests that read the bar on Dispatch read it
+// on BAR_PAGE, or are retired where only Dispatch could show the case (the active-hoist invariant, below).
 const BAR_PAGE = 'settings';
 
 // LIN-978 (UI audit D, keystone): the shared header-level view switcher. The
@@ -245,21 +247,10 @@ test.describe('Desktop nav overflow (LIN-1286)', () => {
     expect(await stripScrolls(page)).toBe(false);
   });
 
-  test('keeps the active overflow view inline on desktop (active-hoist invariant)', async ({ page, seedLocal, localWorkerUrlKey }) => {
-    await seedLocal(swimLocalSeed, { features: WIDE_FLAGS, runnerKey: true });
-    await page.setViewportSize({ width: 800, height: 800 });
-    // Dispatch is a flag-gated overflow view — but it is the current page here, so it
-    // must be hoisted inline and NEVER hidden inside the collapsed `⋯ more`.
-    await page.goto(`/workspace/${localWorkerUrlKey}/dispatch`);
-    await page.waitForLoadState('networkidle');
-
-    // The strip still collapses (many views) and does not scroll…
-    await expect(page.locator('[data-testid="nav-more-toggle"]')).toBeVisible();
-    expect(await stripScrolls(page)).toBe(false);
-    // …yet the active dispatch tab is visible inline while the card is closed.
-    await expect(page.locator('[data-testid="nav-more-toggle"]')).toHaveAttribute('aria-expanded', 'false');
-    await expect(nav(page).getView('dispatch')).toBeVisible();
-  });
+  // LIN-4565 (piece 4): the active-hoist invariant (the current page's view stays inline, never collapsed into `⋯ more`)
+  // was read on Dispatch, a flag-gated overflow view. Dispatch is on the frame now, whose rail lists every place and never
+  // collapses, and no page left on the old bar is a collapsible view (Settings is first-class), so the case cannot arise
+  // on the bar any more; the overflow code goes with the bar in piece 7 (LIN-4568).
 });
 
 // LIN-1149: nav-actions placement — the deliberate order of shared nav-chrome
@@ -418,10 +409,9 @@ test.describe('Mobile nav-strip density sweep (LIN-2179)', () => {
   // label (`passage-planner` — the worst-case hoisted-label width).
   // LIN-4564: Swim and the flagged views left the old bar for the frame, so the strip is swept on the pages still on it: a
   // first-class view (Settings), and the power-user views KPIs and Dispatch (the owner's), each active in turn.
+  // LIN-4565: KPIs and Dispatch moved onto the frame too, so Settings is the one page left with an active view on the bar.
   const MOBILE_SWEEP_VIEWS = [
-    { pagePath: 'settings', activeKey: 'settings' },
-    { pagePath: 'kpis', activeKey: 'kpis' },
-    { pagePath: 'dispatch', activeKey: 'dispatch' }
+    { pagePath: 'settings', activeKey: 'settings' }
   ];
 
   test.beforeEach(async ({ seedLocal }) => {
@@ -639,9 +629,10 @@ test.describe('.nav-filters team-item mobile sweep (LIN-2523)', () => {
       });
     }
 
-    test(`a non-filterable page (dispatch) at ${width}px stays at 1 — the baseline this sweep's "3" is measured against`, async ({ page, workerUrlKey }) => {
+    // LIN-4565: read on BAR_PAGE; Dispatch, the page this baseline used, is on the frame (no `.nav-filters`).
+    test(`a non-filterable old-bar page (${BAR_PAGE}) at ${width}px stays at 1 — the baseline this sweep's "3" is measured against`, async ({ page, workerUrlKey }) => {
       await page.setViewportSize({ width, height: 800 });
-      await page.goto(`/workspace/${workerUrlKey}/dispatch`);
+      await page.goto(`/workspace/${workerUrlKey}/${BAR_PAGE}`);
       await page.waitForLoadState('networkidle');
 
       const childCount = await page.locator('.nav-filters').evaluate(el => el.children.length);

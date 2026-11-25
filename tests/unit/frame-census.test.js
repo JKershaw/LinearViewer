@@ -26,24 +26,17 @@ const SHELL = new Set(['lib/components/page.js', 'lib/components/frame.js']);
 export const OLD_CHROME_ALLOWANCE = [
   'lib/components/plain-page.js',
   'lib/render-account-home.js',
-  'lib/render-audit.js',
-  'lib/render-custom-prompts.js',
-  'lib/render-dispatch.js',
-  'lib/render-effort-readout.js',
   'lib/render-email-auth.js',
-  'lib/render-escalation-kpis.js',
   'lib/render-kpis.js',
   'lib/render-landing.js',
   'lib/render-legal.js',
   'lib/render-library.js',
   'lib/render-pages.js',
   'lib/render-project-page.js',
-  'lib/render-prompts.js',
   'lib/render-runner-setup.js',
   'lib/render-settings.js',
   'lib/render-styleguide.js',
   'lib/render-templates.js',
-  'lib/render-workspace-kpis.js',
   'routes/getting-started.js',
 ];
 
@@ -87,6 +80,20 @@ test('the list only falls: a listed file that moved onto the frame comes off it 
   const found = new Set(oldChromeFiles());
   const stale = OLD_CHROME_ALLOWANCE.filter(rel => !found.has(rel));
   assert.deepEqual(stale, [], `no longer imports the shell's renderPage; delete from OLD_CHROME_ALLOWANCE: ${stale.join(', ')}`);
+});
+
+// LIN-4565 (piece 4): Tools. Dispatch, KPIs and Prompts at their places; Escalation and Effort drilled in under KPIs
+// (which links both), Custom prompts under Prompts, Operator audit under Settings.
+const PIECE_4 = ['dispatch', 'workspace-kpis', 'escalation-kpis', 'effort-readout', 'prompts', 'custom-prompts', 'audit'];
+
+test('the pages piece 4 moved are on the frame (LIN-4565: Tools)', () => {
+  for (const name of PIECE_4) {
+    const rel = `lib/render-${name}.js`;
+    assert.ok(!OLD_CHROME_ALLOWANCE.includes(rel), `${rel} is listed as old chrome`);
+    const source = readFileSync(join(ROOT, rel), 'utf8');
+    assert.match(source, /renderFrame\(/, `${rel} renders through the frame`);
+    assert.doesNotMatch(source, /renderNavBar\(|renderPageFooter\(|renderPageHeader\(/, `${rel} draws no old bar, old footer or second header`);
+  }
 });
 
 // LIN-4564 (piece 3): Watch and Views. Runs, the run page and Live; Swipe, Swim and Roadmap; and every flagged view

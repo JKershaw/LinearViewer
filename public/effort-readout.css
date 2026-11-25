@@ -22,7 +22,9 @@
      the page's own stylesheet order) raises the card floor to 52rem — the
      792px of tracks + the card's own 2rem of padding, plus a sliver for the
      coverage column — so at desktop widths the rows table is fully laid out
-     inside the card with every column visible at rest. `min(100%, 52rem)`
+     inside the card with every column visible at rest (LIN-4565: down to
+     1024px beside the frame's rail, where the rows' wide tracks give way to
+     their floors, below). `min(100%, 52rem)`
      keeps the card from overflowing the grid on narrow viewports, where the
      per-rows scroll container below takes over instead. */
   grid-template-columns: repeat(auto-fit, minmax(min(100%, 52rem), 1fr));
@@ -80,25 +82,31 @@
    mono face, per the page's typographic split. */
 .effort-group-rows {
   margin-top: 0.4rem;
+  /* LIN-4565: one grid for the head and every row (each is a subgrid of it, below), so the columns line up whatever
+     width they settle at. The two wide tracks (harness, model) give way to a smaller floor when the card is narrower than
+     their full width: in the frame the rail takes 15rem on desktop, and at 1024px the card is ~690px against the ~826px
+     the old fixed tracks needed. At the floor a long model name wraps inside its cell (overflow-wrap below), never
+     clips; at 1440px every track still reaches its full width, as before. */
   display: grid;
-  gap: 0.15rem;
+  grid-template-columns: minmax(6rem, 8.5rem) minmax(9rem, 16rem) 5rem 6rem 6rem 5rem auto;
+  gap: 0.15rem var(--space-2);
   /* The narrow-viewport fallback for the 52rem `.effort-grid` card floor
-     above: when the card cannot be 52rem wide (phones; the grid's
-     min(100%, …) leg), the fixed tracks in .effort-group-rows-head/row
-     below overflow this box — and because html/body carry a deliberate
-     site-wide `overflow-x: clip` (public/style.css, LIN-1068; `clip`, not
-     `auto`, so the ROOT never grows a scrollbar either), that overflow was
-     simply unreachable: the cost/duration columns painted out of reach.
-     Becoming its own scroll container makes the rows reachable at every
-     width WITHOUT touching the root clip (an inner scroll box is unaffected
-     by an ancestor's `clip`). Wide cards never scroll — when content fits,
-     scrollWidth == clientWidth and no scrollbar renders. */
+     above: when the card cannot hold even the tracks' floors (phones; the
+     grid's min(100%, …) leg), the tracks overflow this box — and because
+     html/body carry a deliberate site-wide `overflow-x: clip`
+     (public/style.css, LIN-1068; `clip`, not `auto`, so the ROOT never grows
+     a scrollbar either), that overflow was simply unreachable: the
+     cost/duration columns painted out of reach. Becoming its own scroll
+     container makes the rows reachable at every width WITHOUT touching the
+     root clip (an inner scroll box is unaffected by an ancestor's `clip`).
+     Wide cards never scroll — when content fits, scrollWidth == clientWidth
+     and no scrollbar renders. */
   overflow-x: auto;
 }
 .effort-group-rows-head {
   display: grid;
-  grid-template-columns: 8.5rem 16rem 5rem 6rem 6rem 5rem auto;
-  gap: 0 var(--space-2);
+  grid-column: 1 / -1;
+  grid-template-columns: subgrid;
   font-size: 0.62rem;
   text-transform: uppercase;
   letter-spacing: 0.03em;
@@ -106,8 +114,8 @@
 }
 .effort-group-row {
   display: grid;
-  grid-template-columns: 8.5rem 16rem 5rem 6rem 6rem 5rem auto;
-  gap: 0 var(--space-2);
+  grid-column: 1 / -1;
+  grid-template-columns: subgrid;
   align-items: baseline;
 }
 .effort-group-cell {

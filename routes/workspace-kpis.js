@@ -38,8 +38,10 @@ export function workspaceKpisCacheFor({ collections, requestUsageLoader, now = (
  * @param {Object} deps.requestUsageLoader - the request-usage loader (LIN-4201); the cost read requires its records
  * @param {Object} [deps.workspaceKpisCache] - the shared cache (`workspaceKpisCacheFor`); absent, the route builds its
  *   own over the same deps (unit tests)
+ * @param {Function} [deps.getOpenRouterSource] - (req) → 'oauth'|'env'|'free'|null, the rail's AI status (LIN-4565)
+ * @param {Function} [deps.getDeployInfo] - () → deploy metadata, the footer's stamp (LIN-4565)
  */
-export function createWorkspaceKpisRoutes({ workspaceFromUrl, collections, now = () => new Date(), requestUsageLoader, workspaceKpisCache }) {
+export function createWorkspaceKpisRoutes({ workspaceFromUrl, collections, now = () => new Date(), requestUsageLoader, workspaceKpisCache, getOpenRouterSource = null, getDeployInfo = null }) {
   const router = Router();
   const cache = workspaceKpisCache || workspaceKpisCacheFor({ collections, requestUsageLoader, now });
 
@@ -51,6 +53,9 @@ export function createWorkspaceKpisRoutes({ workspaceFromUrl, collections, now =
         urlKey: workspace.urlKey,
         workspaces: req.session.workspaces || [],
         featureFlags: await requestFeatureFlags(req),
+        // LIN-4565: the frame's rail status and footer stamp, the same as every other page's.
+        openRouterSource: getOpenRouterSource ? getOpenRouterSource(req) : null,
+        deployInfo: getDeployInfo ? getDeployInfo() : {},
         stats
       }));
     } catch (error) {

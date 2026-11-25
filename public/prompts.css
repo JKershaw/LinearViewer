@@ -5,9 +5,6 @@
  * Maintains CLI aesthetic with CSS variables.
  */
 
-/* `.prompts-subtitle` is now a no-style E2E hook (prompts-page.spec.js);
-   canonical styling lives in `.page-header__subtitle` (style.css, LIN-462). */
-
 /* =============================================================================
    Summary Section
    ============================================================================= */

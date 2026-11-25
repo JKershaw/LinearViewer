@@ -39,7 +39,7 @@ const stats = (overrides = {}) => ({
   ...overrides
 });
 
-const render = s => renderWorkspaceKpisPage('Acme', { urlKey: 'acme', workspaces: [{ urlKey: 'acme', name: 'Acme' }], stats: s });
+const render = (s, extra = {}) => renderWorkspaceKpisPage('Acme', { urlKey: 'acme', workspaces: [{ urlKey: 'acme', name: 'Acme' }], stats: s, ...extra });
 const has = (html, id) => html.includes(`data-testid="${id}"`);
 const valueOf = (html, id) => new RegExp(`data-testid="${id}">([^<]*)<`).exec(html)?.[1];
 
@@ -82,16 +82,25 @@ test('the empty state replaces activity, funnel and kinds; stored stays', () => 
   assert.ok(has(html, 'workspace-kpis-section-stored'));
 });
 
-test('the nav marks kpis as the current view (bold, not a link)', () => {
+// LIN-4565 (LIN-4342 piece 4): the page sits in the frame as the place KPIs.
+test('the rail marks KPIs for the owner with run controls, the one marked item', () => {
+  const html = render(stats(), { featureFlags: { runControls: true } });
+  assert.match(html, /data-testid="rail-place-kpis" data-place="kpis" aria-current="page"/);
+  assert.equal((html.match(/class="frame-rail__item[^"]*"[^>]*aria-current=/g) || []).length, 1, 'exactly one rail item is marked');
+  assert.doesNotMatch(html, /data-testid="frame-back"/, 'a place has no way back');
+});
+
+test('KPIs leads to the two pages drilled in under it, Escalation and Effort', () => {
   const html = render(stats());
-  assert.match(html, /nav-view-current" data-testid="nav-view-kpis"/);
-  assert.doesNotMatch(html, /<a [^>]*data-testid="nav-view-kpis"/);
-  assert.match(html, /<a [^>]*data-testid="nav-view-settings"/);
+  assert.match(html, /<a href="\/workspace\/acme\/escalation-kpis" data-testid="workspace-kpis-link-escalation">Escalation<\/a>/);
+  assert.match(html, /<a href="\/workspace\/acme\/effort-readout" data-testid="workspace-kpis-link-effort">Effort<\/a>/);
+  // The empty page keeps the line: the two pages read other data than this page's 30-day window.
+  assert.match(render(stats({ empty: true })), /data-testid="workspace-kpis-more"/);
 });
 
 test('names the workspace in the title and carries no cross-workspace content', () => {
   const html = render(stats());
-  assert.match(html, /<title>Acme - KPIs<\/title>/);
+  assert.match(html, /<title>KPIs · Acme<\/title>/);
   assert.match(html, /This workspace, last 7 and 30 days/);
 });
 
@@ -149,11 +158,12 @@ test('a noscript line says charts need JavaScript', () => {
   assert.match(html, /<noscript><p[^>]*data-testid="workspace-kpis-noscript">Charts need JavaScript/);
 });
 
-test('scripts load Chart.js and the shared helper before common; the page script and app.js are modules (LIN-4471, LIN-4463)', () => {
+test('scripts load Chart.js before the shared helper; the page script and app.js are modules (LIN-4471, LIN-4463)', () => {
   const html = render(stats());
-  // The classic scripts keep their order. The page script and app.js are modules, so their place in the list does not
-  // matter: a module runs after every classic script, wherever it is listed. Their tags are pinned by source, not by index.
-  const classic = ['/chart.umd.min.js', '/chart-helpers.js', '/common.js'].map(src => html.indexOf(`<script src="${src}"`));
+  // Chart.js comes before the helper that draws with it. common.js is first (LIN-4565: the frame puts it first, for the
+  // counts' updaters); neither chart script reads it. The page script and app.js are modules, so their place in the list
+  // does not matter: a module runs after every classic script, wherever it is listed. Their tags are pinned by source.
+  const classic = ['/common.js', '/chart.umd.min.js', '/chart-helpers.js'].map(src => html.indexOf(`<script src="${src}"`));
   assert.ok(classic.every(i => i > -1), 'all three classic scripts present');
   assert.deepEqual([...classic].sort((a, b) => a - b), classic);
   assert.match(html, /<script type="module" src="\/workspace-kpis\.js"><\/script>/);

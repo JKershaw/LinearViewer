@@ -12,6 +12,7 @@
  * harness.
  */
 import { test, expect } from '../fixtures/test-base.js';
+import { SELECTORS } from '../helpers.js';
 
 // Local-provider workspace seeded via /test/set-local-session (LIN-407).
 
@@ -36,38 +37,33 @@ test.describe('Prompts Page', () => {
       await seedLocal();
     });
 
+    // LIN-4565 (LIN-4342 piece 4): the page sits in the frame as the place Prompts.
     test('renders prompts page', async ({ page, localWorkerUrlKey }) => {
       await page.goto(`/workspace/${localWorkerUrlKey}/prompts`);
 
-      // Should show prompts header
-      await expect(page.locator('h1')).toContainText('Prompts');
-
-      // Should show subtitle
-      await expect(page.locator('.prompts-subtitle')).toContainText('Prompt templates');
+      await expect(page.locator('h1')).toHaveText('Prompts');
+      await expect(page).toHaveTitle(/^Prompts · /);
+      await expect(page.locator(SELECTORS.nav.subtitle)).toContainText('Prompt templates');
     });
 
-    test('shows workspace dropdown in navigation', async ({ page, localWorkerUrlKey }) => {
+    test('shows the workspace on the rail', async ({ page, localWorkerUrlKey }) => {
       await page.goto(`/workspace/${localWorkerUrlKey}/prompts`);
 
-      // Should show workspace dropdown with workspace name
-      const workspaceToggle = page.locator('#workspace-toggle');
-      await expect(workspaceToggle).toBeVisible();
-      await expect(workspaceToggle).toContainText('Local Workspace');
+      await expect(page.locator(SELECTORS.nav.workspaceToggle)).toBeVisible();
+      await expect(page.locator(SELECTORS.nav.workspaceName)).toHaveText('Local Workspace');
     });
 
-    test('has back link to projects', async ({ page, localWorkerUrlKey }) => {
+    test('the rail leads home', async ({ page, localWorkerUrlKey }) => {
       await page.goto(`/workspace/${localWorkerUrlKey}/prompts`);
 
-      // Should have link back to workspace projects page
-      const projectsLink = page.locator('[data-testid="nav-view-projects"]');
-      await expect(projectsLink).toBeVisible();
+      await expect(page.locator(SELECTORS.nav.place('home'))).toHaveAttribute('href', `/workspace/${localWorkerUrlKey}/`);
     });
 
-    test('does not have logout link in navbar', async ({ page, localWorkerUrlKey }) => {
+    test('has no logout link in the rail', async ({ page, localWorkerUrlKey }) => {
       await page.goto(`/workspace/${localWorkerUrlKey}/prompts`);
 
-      // Logout moved to settings page
-      await expect(page.locator('.nav-action[href="/logout"]')).not.toBeVisible();
+      // Logout lives in Settings
+      await expect(page.locator(`${SELECTORS.nav.rail} a[href="/logout"]`)).toHaveCount(0);
     });
 
     test('shows summary stats', async ({ page, localWorkerUrlKey }) => {
@@ -130,19 +126,14 @@ test.describe('Prompts Page', () => {
       await expect(page.locator('.meta-prompt-section .section-header')).toContainText('Stage Router');
     });
 
-    test('has header nav with view links', async ({ page, localWorkerUrlKey }) => {
+    test('sits in the frame: its footer, and the rail\'s places', async ({ page, localWorkerUrlKey }) => {
       await page.goto(`/workspace/${localWorkerUrlKey}/prompts`);
 
-      // Should have footer
-      await expect(page.locator('.page-footer')).toBeVisible();
+      await expect(page.locator(SELECTORS.nav.footer)).toBeVisible();
+      await expect(page.locator('.page-footer')).toHaveCount(0);
 
-      // Cross-view links now live in the shared header switcher (LIN-978).
-      const settingsLink = page.locator(`.nav-views [data-testid="nav-view-settings"][href="/workspace/${localWorkerUrlKey}/settings"]`);
-      await expect(settingsLink).toBeVisible();
-      await expect(settingsLink).toContainText('settings');
-
-      const swimLink = page.locator(`.nav-views [data-testid="nav-view-swim"][href="/workspace/${localWorkerUrlKey}/swim"]`);
-      await expect(swimLink).toBeVisible();
+      await expect(page.locator(`${SELECTORS.nav.place('settings')}[href="/workspace/${localWorkerUrlKey}/settings"]`)).toBeVisible();
+      await expect(page.locator(`${SELECTORS.nav.place('swim')}[href="/workspace/${localWorkerUrlKey}/swim"]`)).toBeVisible();
     });
   });
 });

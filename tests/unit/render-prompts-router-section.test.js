@@ -8,7 +8,7 @@ import assert from 'node:assert/strict';
 import { renderPromptsPage } from '../../lib/render-prompts.js';
 
 describe('Prompts page stage-router section (LIN-3745)', () => {
-  const html = renderPromptsPage('Test');
+  const html = renderPromptsPage('Test', { urlKey: 'test' });
 
   test('is titled Stage Router, not Meta-Prompt', () => {
     assert.ok(html.includes('Stage Router'));
