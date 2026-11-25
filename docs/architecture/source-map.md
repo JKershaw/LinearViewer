@@ -366,6 +366,7 @@ public/
   app.js               Client-side collapse/expand, localStorage persistence. A native module on its eleven pages (LIN-4463 piece 5): it imports PromptSection and the download filename leaf; its test seams (`homePromptOpts`, `mountHomePromptSections`, `mergeHomeRowOpts`) are named exports
   common.js            Shared client utilities
   frame.css / frame.js  The frame's sheet (loaded last) and module (LIN-4562): the rail, the drawer below 760px (Escape returns focus to ☰) and the workspace menu. The counts in the rail and band are common.js's updaters
+  search.css           The search page's form and result rows (LIN-4562; lib/render-search.js)
   common-actions.css   Shared action/button styles
   feedback-widget.js / feedback-widget.css  Floating feedback widget (save/triage/autopilot actions; wired via render-settings.js + footer.js; LIN-635/704/918)
   llms.txt             AI agent guidance (DOM selectors, navigation patterns)

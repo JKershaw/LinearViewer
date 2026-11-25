@@ -22,9 +22,10 @@ const ROOT = join(dirname(fileURLToPath(import.meta.url)), '..', '..');
 /** The shell itself and the frame, which are the two places allowed to call it for good. */
 const SHELL = new Set(['lib/components/page.js', 'lib/components/frame.js']);
 
-/** Files that still import the shell's renderPage: the old chrome. Sorted. It only falls. */
+/** Files that still assemble their own chrome (the shell's renderPage, or plain-page.js's wrappers of it). Sorted. It only falls. */
 export const OLD_CHROME_ALLOWANCE = [
   'lib/components/plain-page.js',
+  'lib/render-account-home.js',
   'lib/render-audit.js',
   'lib/render-collective.js',
   'lib/render-custom-prompts.js',
@@ -35,6 +36,7 @@ export const OLD_CHROME_ALLOWANCE = [
   'lib/render-flight-companion.js',
   'lib/render-kpis.js',
   'lib/render-landing.js',
+  'lib/render-legal.js',
   'lib/render-library.js',
   'lib/render-live-console.js',
   'lib/render-observation.js',
@@ -71,14 +73,20 @@ function jsFiles(dir) {
 }
 
 /**
- * The files that import the shell's `renderPage` (lib/components/page.js), under any local name, and so assemble their
- * own chrome. Home's own `renderPage` (lib/render.js) is a page renderer, not the shell: importing it does not count.
+ * The files that assemble their own chrome: those that import the shell's `renderPage` (lib/components/page.js), under
+ * any local name, and those that import `renderPlainPage` or `renderPlainDocument` from lib/components/plain-page.js,
+ * which wrap the same old chrome (lib/render-legal.js, lib/render-account-home.js). Home's own `renderPage`
+ * (lib/render.js) is a page renderer, not the shell: importing it does not count.
  */
 export function oldChromeFiles() {
   const shellImport = /import\s*\{[^}]*\brenderPage\b[^}]*\}\s*from\s*'(?:\.\.\/lib\/|\.\/|\.\.\/)?(?:components\/)?page\.js'/;
+  const plainImport = /import\s*\{[^}]*\b(?:renderPlainPage|renderPlainDocument)\b[^}]*\}\s*from\s*'[^']*plain-page\.js'/;
   return [...jsFiles('lib'), ...jsFiles('routes'), 'server.js']
     .filter(rel => !SHELL.has(rel))
-    .filter(rel => shellImport.test(readFileSync(join(ROOT, rel), 'utf8')))
+    .filter(rel => {
+      const source = readFileSync(join(ROOT, rel), 'utf8');
+      return shellImport.test(source) || plainImport.test(source);
+    })
     .sort();
 }
 

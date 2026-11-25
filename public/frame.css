@@ -292,55 +292,12 @@ body.frame-body {
 
 /* ---- Search ---------------------------------------------------------------- */
 
-/* The fields' body is the one text control (style.css, `.token-label-input`); here only their width. */
-.frame-search__input,
-.search-page__input {
+/* The field's body is the one text control (style.css, `.token-label-input`); here only its width. The search page's own
+   field is sized in public/search.css. */
+.frame-search__input {
   width: 100%;
   min-width: 0;
   box-sizing: border-box;
-}
-
-.search-page__form {
-  display: flex;
-  gap: var(--space-2);
-  max-width: 40rem;
-  margin-bottom: var(--space-4);
-}
-
-.search-results {
-  list-style: none;
-  margin: 0;
-  padding: 0;
-}
-
-.search-result {
-  display: flex;
-  flex-wrap: wrap;
-  align-items: baseline;
-  gap: var(--space-1) var(--space-2);
-  padding: var(--space-2) 0;
-  border-bottom: 1px solid var(--line-soft);
-}
-
-.search-result__id {
-  font-family: var(--font-structural);
-  font-size: var(--font-size-sm);
-  color: var(--muted);
-}
-
-.search-result__title {
-  color: var(--text);
-  overflow-wrap: anywhere;
-}
-
-.search-result--done .search-result__title {
-  color: var(--muted);
-}
-
-.search-result__meta {
-  flex-basis: 100%;
-  color: var(--muted);
-  font-size: var(--font-size-sm);
 }
 
 /* ---- The footer: the same on every page ------------------------------------- */
