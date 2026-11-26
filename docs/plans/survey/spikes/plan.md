@@ -12,7 +12,7 @@ From the six spike pages in this folder (0 to 5), read against `expect.md`, and 
 - **The clean-up ticket changes shape** (spike 2). Two of its items were already fixed or barely seen, and the two fixes above come in.
 - **The runner becomes three tickets, and the leaked-terminals picture changes.** There are two separate problems:
   - **Leftover processes** (spike 1): 24 old `claude` processes were alive on 25 Nov. The "identity-unreadable" refusal that the notes blamed is usually what a *successful* close logs. The real causes in the code: some windows are never closed by design; a lost resume race turns off close-on-DONE for that session; and resume and re-fire drop the old window's handle if one close fails.
-  - **Ghost window borders** (your note): you believe it's a known kitty/macOS issue, where closed windows leave an invisible border that builds up until logging in crashes the machine. Spike 1 couldn't confirm what caused the crash; the machine's resource log would show it.
+  - **Ghost window borders** (your note): you've seen it yourself each time you log back in to that account from your laptop. Closed windows leave a transparent border, the borders build up while you're away, and logging in pauses and then clears them. Recently there were so many that logging in crashed the machine. You believe it's a known kitty/macOS issue; a research spike is checking (`1-kitty.md`).
 - **Slice 5 is small,** 3 to 4 pieces (spike 3). It also has a ready failing test: the brief says "0 lessons" while 3 exist.
 - **UI order flips** (spike 5). The run page, LIN-3976, is the worst page now. LIN-4017 (one stylesheet) has no visible payoff.
 - **The ledger found 21 open items outside the plan** (spike 0). The ones that matter are under "Not in the steps".

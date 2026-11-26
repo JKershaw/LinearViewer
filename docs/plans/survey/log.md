@@ -5383,3 +5383,4 @@ The clock runs from the last transcript entry (before 12:48), so expect: LIN-456
   - wrong on the leaked-terminals cause: "identity-unreadable" usually follows a successful close;
   - right that slice 5 is small, and that A2 is an engine fix.
 - John on the leaked terminals (26 Nov): he believes it is a known kitty/macOS UI issue. Closed terminals appear invisible but a transparent border remains, and these build up until logging into the machine struggles to display and crashes. SD opens a new OS window per session (`terminal-driver.js:889`). Not yet checked on the machine.
+- John, later on 26 Nov: he has seen the borders himself, each time he logs back in to that account from his laptop. It crashed recently because he'd left it so long that there were too many zombie borders. Often it's slow: if he does manage to log in, there's a pause and then they clear. A research subagent is looking online for the kitty/macOS issue (`spikes/1-kitty.md`).
