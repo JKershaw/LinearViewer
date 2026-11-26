@@ -5366,3 +5366,10 @@ The clock runs from the last transcript entry (before 12:48), so expect: LIN-456
 **25 Nov, 15:29Z.** LIN-4508 Done at 14:42: all 6 pieces, about 20 hours end to end, across both repos and through the crash. LIN-4342 piece 6 (LIN-4567) hit the close-out/review mutual wait again. Close-out parked at about 14:45, review re-approved 2875f194d at 14:49 (verdict-45224fdc), and nothing resumed close-out for 40 minutes. Under John's standing permission for this loop, I sent the LIN-4342 autopilot (786d5803) an informal note to get close-out moving on the approved head.
 
 **25 Nov, 18:30Z: the pause.** LIN-4342 Done at 18:01: 7 pieces plus a closing PR, #2539 (5c33e4415); the autopilot handled the last mutual wait itself. Logged on LIN-4008 (finding-a5cc0d0f ended). Nothing else queued. Notes gathered for John in `notes-review.md`.
+
+## 26 Nov: the spikes start
+- John agreed the plan from the notes review: runner fixes, one clean-up ticket, slice 5, slice 6 (taking A2 and A3), then the UI tickets as tokens allow. He asked for a spike on each step first, to understand it and confirm the plan.
+- Shape agreed: all spikes run up front (they only read), then the plan is revised once. Each answers the same questions and writes one page under `spikes/`. A fresh reader checks the revised plan against John's words before it goes to him.
+- Spike 0 added at John's ask: a ledger of every improvement named since 2 Nov, each with a checked status, so nothing named before the notes review falls through.
+- New token from John, valid to 28 Nov 20:28Z. It can't dispatch (403 `DISPATCH_GRANT_REQUIRED`), so the runner spike starts as a code read plus LIN-4569's findings. The machine is off; John will start it if needed.
+- My predictions are committed first in `spikes/expect.md`. Six read-only subagents started: 0 ledger, 1 runner, 2 clean-up, 3 slice 5, 4 slice 6, 5 UI.
