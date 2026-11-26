@@ -5373,3 +5373,13 @@ The clock runs from the last transcript entry (before 12:48), so expect: LIN-456
 - Spike 0 added at John's ask: a ledger of every improvement named since 2 Nov, each with a checked status, so nothing named before the notes review falls through.
 - New token from John, valid to 28 Nov 20:28Z. It can't dispatch (403 `DISPATCH_GRANT_REQUIRED`), so the runner spike starts as a code read plus LIN-4569's findings. The machine is off; John will start it if needed.
 - My predictions are committed first in `spikes/expect.md`. Six read-only subagents started: 0 ledger, 1 runner, 2 clean-up, 3 slice 5, 4 slice 6, 5 UI.
+
+## 26 Nov: the spikes are in; the revised plan
+- All six spike pages are in `spikes/` (0 ledger, 1 runner, 2 clean-up, 3 slice 5, 4 slice 6, 5 UI). The revised plan is `spikes/plan.md`. A fresh reader checked it against John's words and found 18 points; the plan was corrected (an overstated attribution of the kitty diagnosis, John's ruling quoted in full, scope additions marked, the processes and window borders kept apart, terms explained).
+- Against my predictions (`expect.md`):
+  - wrong on slice 6: A2 and A3 have different causes, and the designed wake rule catches neither;
+  - wrong on the UI order: LIN-3976 before LIN-4343;
+  - wrong on hand-back findings: LIN-4521 already fixed them;
+  - wrong on the leaked-terminals cause: "identity-unreadable" usually follows a successful close;
+  - right that slice 5 is small, and that A2 is an engine fix.
+- John on the leaked terminals (26 Nov): he believes it is a known kitty/macOS UI issue. Closed terminals appear invisible but a transparent border remains, and these build up until logging into the machine struggles to display and crashes. SD opens a new OS window per session (`terminal-driver.js:889`). Not yet checked on the machine.
