@@ -79,7 +79,8 @@ Live records read through the proxy (GET only). Each claim is **shown** (with wh
   most only for counts and markers. Examples: run-summary, chat-tools, dashboard-feed.
 - **How many rows: unknown.** 28,419 dispatch rows in total. Through the proxy I can only see masked
   text. A masked field reads `[redacted]`, so before-intake rows with one are rows that still hold a
-  secret. In a sample of 35 older rows (LIN-4513, 6,777 entries) none had one. SAMPLE2. That is not a count.
+  secret. In a sample of 176 rows from 21–22 Nov (LIN-4513, LIN-4518, LIN-4531; 35,406 entries;
+  lineage-wide, so some entries repeat) none had one. That is a sample, not a count.
 - **Smallest safe backfill:** one script with a dry run first, like `scripts/dry-run-owner-backfill.mjs`:
   - run each stored message/url/urlLabel through `maskFeedbackFields`, the function the read uses;
   - count the rows and entries that change, printing only ids and rule ids;
