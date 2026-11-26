@@ -28,7 +28,12 @@ From the six spike pages in this folder (0 to 5), read against `expect.md`, and 
   - **Depends on the machine's logs.** Two things wait for a read of its process census and its stall-failsafe log lines from 13:48 to 14:08 on 25 Nov:
     - whether SD may close leftover processes itself (your call);
     - whether to re-fire a session as soon as its process is gone, instead of after 25 to 60 minutes. Spike 1 couldn't say why LIN-4342's autopilot wasn't re-fired, so this fix may or may not have caught it.
-  - The ghost borders aren't in any spike yet. If your diagnosis holds, the likely fix is fewer native windows: SD opens a new OS window per session (`terminal-driver.js:889`), and tabs in one window would avoid that. This needs a short check on the machine before it becomes a ticket.
+  - **The ghost borders** (`1-kitty.md`). This is a known macOS 26 (Tahoe) bug: a closed window can stay behind as an invisible rectangle. Firefox and Thunderbird users see it too, and kitty's maintainer calls it an OS bug. An Apple forum thread says Tahoe doesn't close windows while the display sleeps, so they pile up. SD opens one OS window per session (`terminal-driver.js:1176`), so every session leaves one ghost.
+    - The options, simplest first:
+      1. Upgrade kitty (0.43.1 and later shrinks a window before closing it) and macOS (one user says 26.4 cleared it). No code.
+      2. Pilot the existing headless tmux driver (`SD_TERMINAL=tmux`, `terminal-driver.js:1244`). It opens no windows, and you can still watch a session with `tmux attach`. It has only been proven on Linux, so it needs a short pilot on the Mac.
+      3. If you want windows always on screen, run sessions as tabs in one kitty window (a small code change).
+    - Checks on the machine: macOS and kitty versions, display-sleep settings, and how you log in.
   - Also here: the reaper (the job that deletes old session records) logs how many queued follow-up messages it drops before deleting a record (finding-c93ea0bb). Spike 2 found this is simple-dispatcher code.
 
 **2. Harbour clean-up ticket, about 3 pieces.**
