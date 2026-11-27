@@ -5463,3 +5463,16 @@ The clock runs from the last transcript entry (before 12:48), so expect: LIN-456
   - So the rail hides it whenever no live runner key is seen, or the viewer isn't read as the owner. Dispatch, Runs, KPIs and Prompts hide with it.
   - That contradicts `run-controls.js`'s own note that key tools "are always on".
   - Not yet known which condition is false for John now.
+
+## 27 Nov: Periodicals minted; runner not polling; Harbour tickets reviewed
+- **The tools left the rail.** John confirmed Dispatch and Runs are missing too. John: "What a silly conditional. We should always show these, even if when a user clicks they then see nothing running. Making them disappear is weird, and clearly incorrect as I couldn't easily get you a proxy token, and I've no idea how to find the Dispatch page to clear those old tokens." He asked to dispatch the Periodicals and file the tickets while we wait (same checks as the runner set), then review the task list and decide how to proceed.
+- **Periodicals minted (plain):** Drift & Coherence 87288609, Seams & Tangles 36201ff2, Comprehension-Debt bd78c761. They are still queued: "No consumer has ever polled this workspace".
+- **Cause.** John minted simple-dispatcher's new key from Settings › Agent access. That page only makes 90-day read or read-and-update keys. simple-dispatcher's poll (`/api/dispatch/poll`, `authenticateDispatchToken`) needs a **queue token**, made by the owner on the Dispatch page (`/workspace/linearviewer/dispatch`; `POST /workspace/:urlKey/api/dispatch/tokens`). With the old ones revoked, no live queue token remains. So the runner takes nothing and `runControls` is false, which is also why the tools left the rail.
+- **Harbour ticket drafts** are in `spikes/tickets-harbour.md`. A fresh reviewer checked them. Fixes:
+  - H1: John's ruling quoted in full; the witness uses a *parked* close-out; the counts match the spike;
+  - H2: "Lessons sections"; the area registry named; note citations kept resolving;
+  - H3: outcome 5 already moved to LIN-4508; 3 and 9 "not ticketed yet";
+  - H4: "fix what a walk finds"; PR #2344 is open;
+  - H6: grow the garden from `/styleguide`;
+  - H7: "parked and queued";
+  - H8: the cause is now known; it overrides the places.js "do not re-open" decision; Agent access is to say which key a runner needs.
