@@ -5389,3 +5389,9 @@ The clock runs from the last transcript entry (before 12:48), so expect: LIN-456
   - An Apple forum thread says Tahoe doesn't close windows during display sleep, so they pile up.
   - kitty 0.43.1+ softens it, and one user reports macOS 26.4 cleared it.
   - SD already has a headless tmux driver (`SD_TERMINAL=tmux`, `terminal-driver.js:1244`). It is unproven on the Mac. Plan step 1c is updated.
+
+## 27 Nov: LIN-4570 filed and dispatched (the kitty tabs spike)
+- John: the Mac runs macOS 27.0.1 and kitty 0.47.4, so neither the 26.4 report nor kitty 0.43.1's change has cured the ghosts. Switching to tabs "feels like it'd be worth a try". His steer on the spike: first see whether it can detect the ghost shells at all (it may not be possible, which is good to know), then whether tabs are easy to open and close. Don't prescribe the how. If tabs work, assume one window sidesteps the ghosts.
+- Filed LIN-4570, "Can simple-dispatcher run sessions as kitty tabs in one window?" (Backlog, investigation only), from `spikes/kitty-tabs-ticket.md`. Dispatched as one custom run, 62aced54, on John's go ("I'm happy with that"). It also reads the 1c logs while on the machine.
+- New token from John with the dispatch grant, valid to 29 Nov 08:09Z. The read-only one is kept as `harbour-token.readonly`.
+- Next while it runs: John's calls on `spikes/plan.md`, one at a time, then each ticket drafted for him to check.
