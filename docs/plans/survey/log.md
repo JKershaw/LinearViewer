@@ -5457,3 +5457,9 @@ The clock runs from the last transcript entry (before 12:48), so expect: LIN-456
   - The Mongo password is accepted as low priority: the service isn't public, and Railway gives no simple rotation.
   - John is now giving simple-dispatcher a fresh token and revoking all the old proxy tokens (mine included; he'll mint a new one).
 - **Rotation finished (27 Nov).** simple-dispatcher's token was rotated; John's laptop crashed, so the machine also had a full restart. The old proxy tokens expire within hours. The list is on LIN-4512 as a comment, and LIN-4512 is Done. findings 968a75fc and ce6e4602 ended. My comment became finding-67c625f3 (the LIN-4548 behaviour) and was ended. Next: a fresh proxy token from John, then the Periodicals.
+- **New token from John** (27 Nov, valid to 29 Nov 10:55Z, dispatch grant). It works. The previous one is kept as `harbour-token.prev`.
+- **John: "Connect an agent" is no longer in the side rail**; he reaches it through Settings. Cause, from the code:
+  - LIN-4562 (LIN-4342 piece 1, #2529) put it in the rail's Tools group, shown only when `runControls` is true (`lib/places.js:22-26, 73`). `runControls` means the viewer is the owner *and* the workspace has a live runner key or queue token (`lib/run-controls.js`).
+  - So the rail hides it whenever no live runner key is seen, or the viewer isn't read as the owner. Dispatch, Runs, KPIs and Prompts hide with it.
+  - That contradicts `run-controls.js`'s own note that key tools "are always on".
+  - Not yet known which condition is false for John now.
