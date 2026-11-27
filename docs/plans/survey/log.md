@@ -5425,3 +5425,18 @@ The clock runs from the last transcript entry (before 12:48), so expect: LIN-456
     - Load spiked to 59.9 at 12:47:56, just before the crash, which fits John's login.
 - **Call 9** is settled by events: the machine was on and LIN-4570 read the logs.
 - **1c (27 Nov).** John: "let's switch Kitty to use Tabs". On closing leftover processes: "do we know _why_ they end up as leftover processes? They may simply not be an issue, and leaving them is a nice way to find clues to remaining bugs? Whilst avoiding risking adding new edge case rules we might not need." Answered from spike 1 and the census. **Decision: no closing rule. The census stays log-only and its count becomes a reading. Fix the causes instead: the lost-race "human continued" mark (1b), and a failed close losing its handle.**
+
+## 27 Nov: runner tickets filed; admin done
+- John: "start drafting the runner tickets - use a subagent to review each to ensure they're correct, not giving too much of the 'how', and mark them todo. Then, do the admin cleanup."
+- The drafts are in `spikes/tickets-runner.md`. A fresh reviewer checked each against the spikes and code. Fixes made:
+  - claims trimmed to the evidence: ghosts' trigger is display sleep, untested; the crash only suspected; "can leave" a ghost; the human-continued mark only on a completed session;
+  - the switch-back toggle dropped;
+  - witnesses tightened: the race watched by the real Stop hook, a pass mark of 0 lost in about 10 resumes, display-off hours, killing the process rather than restarting the dispatcher;
+  - bounds added: re-fire even with a child reading "executing"; retry until the stall deadline; a close retry never closes another session's window.
+- **Filed as Todo:** LIN-4571 (R1 heartbeat), LIN-4572 (R2 resume delivery), LIN-4573 (R3 kitty tabs), LIN-4574 (R4 dead sessions, retries, reaper log).
+- **Admin:**
+  - finding-145b1665 ended done (fixed by LIN-4521);
+  - LIN-4491 set Done;
+  - LIN-4498 set Canceled (retired by slice 3);
+  - LIN-4570 set Done (spike complete).
+  - The 23 stale "taken" dispatch rows are **not cleared**: the proxy has no route to clear a row. An abort would send stale window ids to the runner, which R4 notes can close another session's window after kitty restarts. Left for John in the Dispatch page, or for after R4.
