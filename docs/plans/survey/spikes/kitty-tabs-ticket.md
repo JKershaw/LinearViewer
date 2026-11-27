@@ -1,44 +1,35 @@
 # Draft: the kitty tabs spike (not filed)
 
+Revised 27 Nov after John's steer. First see whether the ghosts can be detected at all, then whether tabs are easy to open and close. No prescribed method. If tabs work, we assume one window sidesteps the ghosts.
+
 ## Ticket
 
-**Title:** Do kitty tabs stop finished sessions leaving ghost windows on the Mac?
+**Title:** Can simple-dispatcher run sessions as kitty tabs in one window?
 
 **Team:** LIN. **State:** Backlog. Investigation only; no code or config changes.
 
-**Why.** On the dispatcher Mac, each closed session window leaves an invisible "ghost" border behind. They build up while nobody is logged in to the screen. Logging in pauses while they clear, and on 25 Nov there were so many that logging in crashed the machine. This is a known macOS bug: closed windows can linger, especially while the display sleeps (kitty #8952; an Apple Developer Forums thread; Firefox and Thunderbird see it too). simple-dispatcher opens a new kitty OS window for every session (`terminal-driver.js:1176`), so every session leaves one ghost. The machine runs macOS 27.0.1 and kitty 0.47.4, so kitty's 0.43.1 change hasn't cured it.
+**Why.** On the dispatcher Mac (macOS 27.0.1, kitty 0.47.4), each closed session window leaves an invisible "ghost" border behind. They build up while nobody is logged in to the screen, logging in pauses while they clear, and on 25 Nov so many had built up that logging in crashed the machine. It's a known macOS bug, not just kitty's (kitty #8952; Firefox and Thunderbird see it too). simple-dispatcher opens a new kitty OS window for every session (`terminal-driver.js:1176`), so every session leaves one ghost. Running sessions as tabs in one window should sidestep this.
 
-**The question.** If sessions ran as tabs inside one kitty OS window, would closing them stop the ghosts? If so, what would simple-dispatcher need to change?
+**Questions, in order:**
+1. Can the ghost windows be detected at all from the machine? It's a macOS bug, so they may not be visible to any tool. That's worth knowing either way.
+2. Can a session be opened, run and closed as a tab in a single kitty window, easily and reliably?
+3. If so, what would simple-dispatcher need to change, and roughly how big is that?
 
-**Done when** a comment on this ticket gives:
-- the measured ghost counts for each case tried;
-- whether tabs are viable, with what simple-dispatcher would need to change and a rough size;
-- the read-only log findings listed in the prompt.
+**Done when** a comment on this ticket answers the three questions.
 
-Background: `docs/plans/survey/spikes/1-kitty.md` and `1-runner.md` on `claude/cool-rubin-6acj5j`.
+Background: `docs/plans/survey/spikes/1-kitty.md` on `claude/cool-rubin-6acj5j`.
 
 ## Dispatch prompt (custom, target cli, on this ticket)
 
-You're running a short research spike on the dispatcher Mac. Record your findings as one comment on this ticket. Don't change simple-dispatcher's code, config or running state, and don't close, signal or touch any window or process you didn't open yourself. Live sessions may be running.
+You're running a short research spike on the dispatcher Mac. Read this ticket first; it has the why and the three questions. Record your findings as one comment on it.
 
-1. **Versions and settings.** Record:
-   - macOS version and kitty version;
-   - display-sleep settings (`pmset -g`);
-   - how many `claude` processes are alive now, with their start times.
-2. **A way to count ghosts.** Find a way to count the windows WindowServer still holds for a kitty process, beyond what `kitty @ ls` reports. For example, `CGWindowListCopyWindowInfo` through JXA (`osascript -l JavaScript`) or Swift, filtered by owner pid. Check it against a window you open and close.
-3. **A separate test kitty.** Start your own kitty instance with its own `--listen-on` socket, so simple-dispatcher's instance is untouched. Run each case with 20 cycles of open, run a trivial command, then close. Count ghosts before, right after, and five minutes after:
-   - A. new OS windows (`--type=os-window`, as simple-dispatcher does today), display awake;
-   - B. the same with the display asleep (`pmset displaysleepnow`; wake with `caffeinate -u -t 2`);
-   - C. tabs in one OS window (`--type=tab`), display asleep;
-   - D. optionally, the same as C closed with `close-tab` instead of `close-window`, if that differs.
+Live sessions may be running on this machine. Don't change simple-dispatcher's code, config or running state, and don't close, signal or touch any window or process you didn't open yourself. Use your own kitty instance for anything you try. How you investigate is up to you.
 
-   Then quit the test instance and count again.
-4. **If tabs work.** Read `terminal-driver.js` (launch about :1176, close about :1130, `countWindows` about :1069) and say what simple-dispatcher would need to change: tab launch, which id it keeps, close and the counting. Give a rough size, and say what watching a session would look like for the owner.
-5. **Read-only log reads** (for a separate ticket; don't act on them):
-   - the dispatcher log's `leftover.census` and `signal.refused`/`signal.send` lines for the leftover `claude` processes around 25 Nov;
-   - the `[stall-failsafe]` lines from 13:48 to 14:08 UTC on 25 Nov mentioning d43947be;
-   - `resource-metrics.jsonl` for the hour before 12:48 UTC on 25 Nov.
+While you're there, read these without acting on them (they're for a separate ticket):
+- the dispatcher log's leftover-process census and signal lines around 25 Nov;
+- its stall-failsafe lines from 13:48 to 14:08 UTC on 25 Nov mentioning d43947be;
+- the resource metrics for the hour before 12:48 UTC on 25 Nov.
 
-   Summarise each in a few lines. Never print secrets or environment variables.
+Summarise each in a few lines. Never print secrets or environment variables.
 
-Keep the comment short: a table of counts, a yes/no/unclear on tabs with the reason, the change and its size, then the log findings.
+Keep the comment short: one answer per question with its evidence, then the log notes.
