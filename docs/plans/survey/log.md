@@ -5424,3 +5424,4 @@ The clock runs from the last transcript entry (before 12:48), so expect: LIN-456
     - d43947be's session ran EXECUTING on a dead window from the 12:54 restart until it was aborted at 14:07, with no stall-failsafe line. That confirms the dead-session gap.
     - Load spiked to 59.9 at 12:47:56, just before the crash, which fits John's login.
 - **Call 9** is settled by events: the machine was on and LIN-4570 read the logs.
+- **1c (27 Nov).** John: "let's switch Kitty to use Tabs". On closing leftover processes: "do we know _why_ they end up as leftover processes? They may simply not be an issue, and leaving them is a nice way to find clues to remaining bugs? Whilst avoiding risking adding new edge case rules we might not need." Answered from spike 1 and the census. **Decision: no closing rule. The census stays log-only and its count becomes a reading. Fix the causes instead: the lost-race "human continued" mark (1b), and a failed close losing its handle.**
