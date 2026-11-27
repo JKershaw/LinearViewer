@@ -5395,3 +5395,4 @@ The clock runs from the last transcript entry (before 12:48), so expect: LIN-456
 - Filed LIN-4570, "Can simple-dispatcher run sessions as kitty tabs in one window?" (Backlog, investigation only), from `spikes/kitty-tabs-ticket.md`. Dispatched as one custom run, 62aced54, on John's go ("I'm happy with that"). It also reads the 1c logs while on the machine.
 - New token from John with the dispatch grant, valid to 29 Nov 08:09Z. The read-only one is kept as `harbour-token.readonly`.
 - Next while it runs: John's calls on `spikes/plan.md`, one at a time, then each ticket drafted for him to check.
+- **Call 1 (27 Nov), John:** "Agreed, drop slice 6 if the issues are covered elsewhere." Slice 6 is dropped. The close-out/review wait and stale questions are covered by the clean-up ticket's two fixes.
