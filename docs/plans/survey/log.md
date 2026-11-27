@@ -5440,3 +5440,14 @@ The clock runs from the last transcript entry (before 12:48), so expect: LIN-456
   - LIN-4498 set Canceled (retired by slice 3);
   - LIN-4570 set Done (spike complete).
   - The 23 stale "taken" dispatch rows are **not cleared**: the proxy has no route to clear a row. An abort would send stale window ids to the runner, which R4 notes can close another session's window after kitty restarts. Left for John in the Dispatch page, or for after R4.
+
+## 27 Nov: key rotation (John), progress
+- **Rotated:**
+  - GitHub keys (App private key and client secret);
+  - OpenRouter free-tier key (`OPENROUTER_API_KEY` isn't used on hosted);
+  - the Resend key;
+  - `LINEAR_CLIENT_SECRET` (`LINEAR_ACCESS_TOKEN` isn't used on hosted);
+  - `SESSION_SECRET` (John signed back in).
+- No `YAP_PASSWORD` is set on hosted. Step 11 (other secret-looking variables) is done; step 12 (the old local transcript) skipped.
+- John also changed the default free-tier model to `openai/gpt-6.1-terra`.
+- **Remaining:** Jira (John couldn't find how; to come back to); the Mongo password (he thinks Railway manages it); Harbour proxy tokens and simple-dispatcher's token (step 10).
