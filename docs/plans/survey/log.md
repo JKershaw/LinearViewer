@@ -5451,3 +5451,8 @@ The clock runs from the last transcript entry (before 12:48), so expect: LIN-456
 - No `YAP_PASSWORD` is set on hosted. Step 11 (other secret-looking variables) is done; step 12 (the old local transcript) skipped.
 - John also changed the default free-tier model to `openai/gpt-6.1-terra`.
 - **Remaining:** Jira (John couldn't find how; to come back to); the Mongo password (he thinks Railway manages it); Harbour proxy tokens and simple-dispatcher's token (step 10).
+- Rotation, continued (27 Nov):
+  - The other OpenRouter keys are all disabled.
+  - `JIRA_CLIENT_SECRET` rotated, via Atlassian's developer portal; Jira login works and John keeps it for a Jira project he's trying.
+  - The Mongo password is accepted as low priority: the service isn't public, and Railway gives no simple rotation.
+  - John is now giving simple-dispatcher a fresh token and revoking all the old proxy tokens (mine included; he'll mint a new one).
