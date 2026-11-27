@@ -5486,3 +5486,6 @@ The clock runs from the last transcript entry (before 12:48), so expect: LIN-456
   - LIN-3976: the 27 Nov update block prepended (stays Todo);
   - LIN-4343: the update block prepended (stays Backlog until LIN-3976 lands);
   - LIN-4017: retitled and rewritten as the component-garden ticket (Backlog).
+- **11:19Z: the runner is polling again.** John made a queue token on the Dispatch page; it is listed there as "(legacy)". John: "at no point do we ever want 'legacy' on a one person pre-launch project. The UI is sloppy, confusing, and very frustrating in many ways." His laptop crashed again, possibly while switching accounts on the Mac (likely out of scope).
+  - Drift & Coherence (87288609) was taken, then failed at launch: the kitty socket didn't exist (`Failed to connect to unix:/var/folders/.../sd-kitty-be7ca94c914a.sock`), presumably because simple-dispatcher's kitty wasn't up yet after the crash.
+  - Seams & Tangles (36201ff2) started at 11:18:39, after that failure. Comprehension-Debt (bd78c761) is queued.
