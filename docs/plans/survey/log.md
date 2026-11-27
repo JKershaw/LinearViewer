@@ -5491,3 +5491,14 @@ The clock runs from the last transcript entry (before 12:48), so expect: LIN-456
   - Seams & Tangles (36201ff2) started at 11:18:39, after that failure. Comprehension-Debt (bd78c761) is queued.
 - **11:21Z: all three Periodicals failed the same way** (kitty socket missing). Likely, not confirmed: after the crash, `open -a kitty --args …` (`terminal-driver.js:1052`) met an already-running kitty and its arguments were dropped, so SD's private instance never started. John: logging back in to the runner account "fully froze my laptop. Again. Third time, and now I'm extremely concerned about what we've done. This is unusable."
 - **11:25:56Z: fleet paused** (`POST /dispatch/halt` mode pause), so the runner takes nothing new while we find out. Nothing was queued or running.
+- **John (11:3xZ):** the laptop is bricked again; it needs a hard power-off. "It's not a build up of windows from before the last crash unless they survive both a hard reset and a normal reboot." Right. So whatever freezes it happens after each boot.
+- **From the LIN-4570 spike's own words (feedback):**
+  - the runner account is `autopilot` and John's main account is `work`;
+  - the dispatcher's kitty (PID 35317) had been up since 08:03;
+  - it ran its own throwaway kitty and a background probe until about 09:06;
+  - at the end: "my kitty instance is stopped and nothing of mine is still running", with no config changes.
+- **The three freezes all came after 09:12.** Two came before any of today's launches (SD wasn't polling then), the third after the failed launches. Unknown: the cause. Candidates:
+  - a macOS 27 fast-user-switching problem with a background account running a hidden GPU app (kitty);
+  - SD repeatedly asking LaunchServices to open kitty in a switched-out session.
+
+  Evidence needed: panic and WindowServer hang reports.
