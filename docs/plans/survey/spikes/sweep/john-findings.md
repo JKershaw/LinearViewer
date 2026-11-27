@@ -1,0 +1,64 @@
+# Open findings addressed to John, 27 Nov (60)
+
+Read through the proxy (records, kind finding, state open, to John). One line each: date, id, the start of what it says.
+
+- 2026-11-19 finding-0cc5a636 | Post-deploy check not run (LIN-4495, merge e942c1031, deployed): the task page's findings line and the Harbour logs. From this session the signed-in task page and the ser
+- 2026-11-19 finding-14ebac74 | Host check 3/7 (Gap D): after the handover re-run (step 6, once workspaces.json is written and the repos are cloned), the clone-strategy verdict must be CONFIRMED from re
+- 2026-11-19 finding-33684f1f | Host check 4/7 (Gap C): the deliberate 'sudo node dispatcher.js' run must print 'Refusing to start as root (uid 0): …' and exit 1, leaving no root-owned artifacts. Re-che
+- 2026-11-19 finding-5ddda62d | Post-deploy step not done (LIN-4495): re-run `review` on the open tasks whose latest review still carries pre-cutover ledger items as text, so they stop reading ‘legacy’ 
+- 2026-11-19 finding-6bf1dc7a | Live boot is still the unmet part of LIN-3357 (point 1, "it feels slow"). Your 10 Oct answer was "Still takes minutes: back to implementation", and on 23 Oct you parked i
+- 2026-11-19 finding-76277ca1 | Host check 6/7: 'systemctl --failed' must be clean right after provisioning. The reaper's --now plus Persistent=true catch-up and the new reboot timer are the new things 
+- 2026-11-19 finding-86a22ca1 | Host check 7/7 (LIN-1815 witness): with harbour-clone-reaper.timer stopped, the acceptance test's mktemp -d under CLONE_ROOT (~/simple-dispatcher-workspaces) must reach a
+- 2026-11-19 finding-8fef4f19 | Post-deploy, needs production access: take the readings on LIN-4491, each with its observation window and sample size, and none of them a gate. Notes bytes, Waiting count
+- 2026-11-19 finding-a93f1af1 | Supervisor decision (Gap H, ruling 6c): this host is supervised by systemd only. watch-restart.sh is not run here, and updates are manual (git pull && systemctl restart).
+- 2026-11-19 finding-bab4b5d1 | Host check 1/7 (Gap B): a dispatcher crash loop must end in failed (start-limit-hit) because of StartLimitIntervalSec=300 / StartLimitBurst=5 in [Unit], not spin forever 
+- 2026-11-19 finding-bc5c3e48 | Host check 2/7 (Gaps E+F): needs-restarting must come from the §1 dnf-utils install, and the provision-time report must show its real exit status. The assumption that dnf
+- 2026-11-19 finding-c4c2240b | Signed-in operator checks for the four merged pieces have not been run. Agents cannot reach a signed-in browser outside Chromium. Under the standing rule these checks do 
+- 2026-11-19 finding-ebb9b577 | Host check 5/7 (Gap G): before the checkout exists, harbour-clone-reaper.service must skip as inactive (dead) with 'Condition check failed', never failed. Once ~/simple-d
+- 2026-11-19 finding-ec383bcf | The live Done-when on your Jira has not run. It is the only thing between LIN-4452 and LIN-4445 and Done. On your Jira, a task filed through Harbour must keep the person'
+- 2026-11-20 finding-24c8b24f | Needs John's ruling (LIN-3024): when the halt store read fails on a cold cache, should the poll fail closed for a stop it has seen, or keep the null-on-cold-cache fallbac
+- 2026-11-20 finding-34f6dbbc | Open for John: a Jira screenshot is still refused with 422, since Jira has no uploadFile and an attachment needs an issue first. Jira feedback with no FEEDBACK_ default f
+- 2026-11-20 finding-432cbfb9 | Check NOT RUN (finding-c3466694, LIN-4501 / PR #2472, merge 09512c620, deployed 20 Nov 15:09Z; area runs-and-dispatch). Why: no run has opened since the deploy yet, and t
+- 2026-11-20 finding-4519465a | Post-deploy, needs production database access, which no agent session has: run the one-off import once and report its counts on LIN-4491. This supersedes finding-6055baaa
+- 2026-11-20 finding-51f911b8 | Post-deploy browser checks not run, needing a signed-in operator: Observation, task pages, /t/<token> polling, a priced KPI chart and flight companion in Safari and Firef
+- 2026-11-20 finding-61d2f196 | After deploy (PR #2471): the live LLM editor leads with landed work, and the real tracker read supplies completions. CI drives only the deterministic mock edition and the
+- 2026-11-20 finding-62fd07e1 | The PUT fallback for the harbour.asAsked property is still open: it is built only if the live check shows Jira drops the property on the confirmation re-read, and it wait
+- 2026-11-20 finding-830d4d1d | Run the LIN-4452 live-check runbook on John's own Jira, including the epic placement and 409 Done-gate steps, and paste the evidence back. Nothing is proved on a live sit
+- 2026-11-20 finding-aaf277dd | Post-deploy check NOT RUN (LIN-4504, PR #2476 deployed at ebc89d7e7): the metrics coverage boundary on the live /dashboard/effort page and in the full metric scripts. Why
+- 2026-11-20 finding-f4c0b65d | Post-deploy, needs production data: the held-run reading (scripts/records-readings.mjs → heldRunsOf) trusts the PERSISTED lineageStatus on dispatch-history rows. A finish
+- 2026-11-21 finding-16d2912d | NOT RUN (post-deploy check, LIN-4516 / PR #2481, deployed at 110b87989): the live tracker summary post for a verdict, through the real Linear tracker port (tests use the 
+- 2026-11-21 finding-c90b447f | NOT RUN (post-deploy check, LIN-4516 / PR #2481, deployed at 110b87989): the production PR-reader wiring for the verdict route's post-pin refresh (server.js changePrReade
+- 2026-11-22 finding-598a59f0 | Post-deploy check NOT RUN for PR #2491 (merged d9c0e9eba, deployed): the production-mounted in-app blind-read prompt route (routes/workspace-api.js:222 createPromptsRoute
+- 2026-11-22 finding-8561c285 | Not run (close-out of LIN-4518, PR #2492 merged as 9a4f3c795 and deployed): the post-deploy check that every verdict comment written after the records cutover has its ver
+- 2026-11-22 finding-b89ac5a3 | Post-deploy check not run (finding-2eb4b3e8): PR #2494 (merge fc6849b1a) is live on harbour.cat, but the effort read-out page's JSON route was not checked against product
+- 2026-11-22 finding-da5bc495 | Post-deploy live check NOT RUN (LIN-4521, PR #2496 merged as 2af7a7aea, deployed: harbour.cat footer shows 2af7a7a at 19:55 UTC 22 Nov). It needs a real close-out to push
+- 2026-11-23 finding-10c711fe | Not run, post-deploy (deploy 1e1da5dff landed): PR #2501's check that a workspace member's own comment typed in Linear becomes exactly one finding under that member. I ca
+- 2026-11-23 finding-11b50bde | After deploy: CI never drives Flight Companion's question card from a real model turn. The server side (the chat tool returns questions) and the client side (the fold dra
+- 2026-11-23 finding-22876b0b | Post-deploy check NOT RUN (LIN-4538, deployed as 4f5afbac7): the ticket closer's new write (an open question on a closed ticket ends withdrawn, reason 'ticket closed', by
+- 2026-11-23 finding-30a953ed | After deploy: question-c2af1113 (the chat answer path) is still an open question record, so the engine still reads LIN-4532 as waiting on it, although the autopilot settl
+- 2026-11-23 finding-86e15cfc | Post-deploy check NOT RUN (deploy landed at cfface3a1; close-out had no Periodical Stage-2 task with a change record and an adversarial-read verdict to drive it, and no d
+- 2026-11-23 finding-b3bf8417 | Your call, not blocking: design §11 item 11 says a fresh `custom` row (a plain operator prompt, or a one-off named prompt) starts no run, so a question it writes is refus
+- 2026-11-23 finding-bf290d53 | Not run: the live witness for LIN-4531 (finding-d3eaa6fc). The deploy landed at eccdf1841 (footer shows it; POST /workspace/x/questions/x/answer redirects to login where 
+- 2026-11-23 finding-c1cb7b86 | LIN-4533's post-deploy witness is not run here: the first suitable task after deployment should show a question record asked, answered with an option and a qualifying sen
+- 2026-11-24 finding-01080490 | After LIN-4537 deploys, the two retired derived caches (brief-cache, recap-cache) still sit in production until an operator drops them; no agent runs this against product
+- 2026-11-24 finding-2193db58 | Check not run: Flight Companion's task titles on a real Linear workspace (lib/chat-tools.js list_pending_decisions, area LLM & prompts). PR #2516 is merged (bdef0a0b2) an
+- 2026-11-24 finding-3dae8fea | LIN-4529 witness (ask: Witness; plan section 7). Nothing has shown it yet. Since the slice deployed, no question record has been asked: the store holds 6, all ended, 0 op
+- 2026-11-24 finding-484b88f6 | LIN-4529 reading 3: records addressed to a held run, and how long each sat. Not taken by this run. It needs production's database (slice 2's and slice 3's method: scripts
+- 2026-11-24 finding-581bfa0e | LIN-4529 reading 1: open rulings and time to answer. Taken 24 Nov 04:23Z from production records through the proxy; reported, never a gate. Open question records: 0. Of 6
+- 2026-11-24 finding-5edade88 | Piece 5 made app.js a module on 11 pages and swipe.js and prompt-section.js modules too. CI's e2e runs only in Chromium (tests/e2e/lin-4463-app-module-pages.spec.js). Nob
+- 2026-11-24 finding-74bd60bd | Post-deploy live check for LIN-4556 (PR #2520, merged as f10d547, deployed: harbour.cat footer shows f10d547) was NOT run: this close-out token has no 'take' grant, so it
+- 2026-11-24 finding-8da1d130 | LIN-4546's last "Done when" point, "a question asked by a real stage run shows its one-line question", can only be seen after PR https://github.com/JKershaw/LinearViewer/
+- 2026-11-24 finding-9f06f78f | NOT RUN (LinearViewer PR #2510, merged c960bdb76, deployed; area llm-and-prompts): the post-deploy cut-path check for finding-6d2c6a15. It needs a live scoping run that r
+- 2026-11-24 finding-b46f09ab | NOT RUN after deploy (LIN-4441 close-out, 24 Nov): checks that need more post-deploy dispatches than exist yet. PR #2512 merged as 9de9e2048; Harbour's footer showed d11e
+- 2026-11-24 finding-bd5b2076 | NOT RUN (LinearViewer PR #2510, merged c960bdb76, deployed; area llm-and-prompts): the post-deploy producer check for finding-a38566fc. No scoping run has happened on the
+- 2026-11-24 finding-d8179c5c | LIN-4529 reading 2: brief bytes. Read 24 Nov 04:23Z with GET /api/proxy/brief/<id> by this implementation run, so the reader is implementation and part 3 shows what is ad
+- 2026-11-24 finding-dba45b32 | NOT RUN after the LIN-4554 deploy (PR #2521, merged as ae77f0d; production footer showed ae77f0d at 20:4x UTC on 24 Nov): on production, a task page Records names people 
+- 2026-11-24 finding-fe8e8eb4 | NOT RUN after deploy (8b2cac4 live on harbour.cat, deployment success): the live owner check of Home's 'Notes for you' (LIN-4552, area front-end-pages / records). Close-o
+- 2026-11-25 finding-554005cc | Only a person can judge whether the transcript reads tidily on a real phone and in dark mode. CI proves nothing overflows at 390px (light and dark), but not whether it lo
+- 2026-11-25 finding-56328680 | Post-deploy check NOT RUN for LIN-4566 (PR 2535, merge 53ae9debc, live on harbour.cat per the footer): Settings and Run on my machine on the live frame, and Remove worksp
+- 2026-11-25 finding-577cf55b | After the deploy (not a merge condition): the rail's look and feel on the real workspace is a judgement only you can make. CI and the screenshots run on a seeded workspac
+- 2026-11-25 finding-69cc920d | Not seen by anyone: LIN-4546's 'The notice that Jira didn't load is small'. LIN-4552 made lib/render.js degradedHtml a .source-notice (public/style.css:2914, font-size-sm
+- 2026-11-25 finding-9dd5056d | Post-deploy check NOT RUN (LIN-4562, search scope; from review's finding-a847e84a). The deploy landed (harbour.cat footer shows 8b6e4e442, PR #2529). The search page is b
+- 2026-11-25 finding-bda03e35 | NOT RUN (post-deploy check, LIN-4565 / PR 2533, merge 5b2c157, deployed and serving on harbour.cat): the footer deploy stamp and rail AI status on KPIs, Escalation and Ef
+- 2026-11-25 finding-dbb36971 | NOT RUN (post-deploy, LIN-4560 / PR #2530, finding-697e4b5e): the live check behind the production router. Production (page footer 040c56aee) contains the merge c48d18844
+- 2026-11-25 finding-fb455bb7 | Post-deploy check NOT RUN (LIN-4561): no real OpenCode run was made, because this machine has no `opencode` binary and no paid model for `npm run test:e2e:opencode`. That
