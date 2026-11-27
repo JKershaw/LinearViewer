@@ -5456,3 +5456,4 @@ The clock runs from the last transcript entry (before 12:48), so expect: LIN-456
   - `JIRA_CLIENT_SECRET` rotated, via Atlassian's developer portal; Jira login works and John keeps it for a Jira project he's trying.
   - The Mongo password is accepted as low priority: the service isn't public, and Railway gives no simple rotation.
   - John is now giving simple-dispatcher a fresh token and revoking all the old proxy tokens (mine included; he'll mint a new one).
+- **Rotation finished (27 Nov).** simple-dispatcher's token was rotated; John's laptop crashed, so the machine also had a full restart. The old proxy tokens expire within hours. The list is on LIN-4512 as a comment, and LIN-4512 is Done. findings 968a75fc and ce6e4602 ended. My comment became finding-67c625f3 (the LIN-4548 behaviour) and was ended. Next: a fresh proxy token from John, then the Periodicals.
