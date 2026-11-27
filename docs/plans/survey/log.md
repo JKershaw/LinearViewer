@@ -5507,3 +5507,26 @@ The clock runs from the last transcript entry (before 12:48), so expect: LIN-456
   - "Invalid window" errors per minute, 11:00–11:28: 11:00 5, 11:06 5, 11:07 10, 11:11 26, 11:12 10, 11:14 3, 11:15 29, 11:16 25, 11:17 71, 11:19 10, 11:24 53.
   - None at 11:18 or 11:20–11:23, while launches and retries were running (11:17:27–~11:21). So the counts don't track the launch attempts cleanly.
   - The log names no app. Cause unknown; the next question is what John did at 11:11 and 11:15–11:17.
+
+## 27 Nov: the freezes, from a local session on the laptop (John's paste)
+- **Freezes:** 25 Nov ~12:48; 27 Nov ~10:47, ~11:12, 11:24 UTC. Only WindowServer stopped; the kernel, power management and the dispatcher kept logging.
+- **Every one began at a fast user switch** between `autopilot` and `work`, with three displays attached:
+  - apps missed WindowServer's display-reconfiguration sync deadline;
+  - WindowServer ignored their menu bars;
+  - no app became frontmost, and the screen never recovered.
+- **25 Nov evidence:** a userspace-watchdog report shows WindowServer's main thread spinning at 100% CPU inside SkyLight for 40+ s, waiting on no app. There's also a WindowServer CPU-limit report from 24 Nov 20:40.
+- **kitty not singled out:** at 11:24, menu bars from all five `autopilot` apps were ignored alike (Finder, Chrome, Terminal, an Electron app, kitty). CPU load was about 2 going in.
+- **Conclusion (theirs):** most likely a macOS 27.0.1 WindowServer bug in fast user switching with several displays. Not proven; nothing points at SD directly. Why it started on 24–25 Nov is unknown.
+- **A separate SD bug, root cause of the failed launches (11:17–11:21):** macOS reopens kitty at login with no arguments, so SD's `open -a kitty --args --listen-on …` just brings that copy forward and the socket never appears. Not fixed in code.
+- **Other observations:**
+  - audioaccessoryd restarts every 10 s in `autopilot`;
+  - `autoLoginUser` is still `autopilot`;
+  - every login-started dispatcher gets a SIGHUP 66–85 s later (unexplained).
+- **Changes made on the laptop:**
+  - tmux 3.8 installed (Homebrew; the Xcode licence accepted from `admin`);
+  - SD `.env` `SD_TERMINAL` changed from kitty to tmux (backup `state/.env.backup-20261127-tmux`);
+  - SD autostart disarmed, and no dispatcher running.
+
+  tmux is untested with a real session.
+- **Next (theirs):** John updates macOS to 27.2.1, then starts SD and confirms the first session launches in tmux.
+- **Open:** turn on Remote Login (SSH) for recovering without a power-off; fix the kitty relaunch bug; report the 25 Nov WindowServer reports to Apple.
