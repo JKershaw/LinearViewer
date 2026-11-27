@@ -5476,3 +5476,13 @@ The clock runs from the last transcript entry (before 12:48), so expect: LIN-456
   - H6: grow the garden from `/styleguide`;
   - H7: "parked and queued";
   - H8: the cause is now known; it overrides the places.js "do not re-open" decision; Agent access is to say which key a runner needs.
+- **Harbour tickets filed (27 Nov):**
+  - LIN-4577 (H1 clean-up, Todo);
+  - LIN-4578 (H2 slice 5, Todo, under LIN-4490);
+  - LIN-4576 (H8 rail and Agent access, Todo, under LIN-4008);
+  - LIN-4575 (H5 lessons home design spike, Backlog, under LIN-4490);
+  - LIN-4579 (H7 parent, Backlog) with children LIN-4580 to LIN-4586 (the seven safety findings, Backlog).
+- **Existing tickets updated:**
+  - LIN-3976: the 27 Nov update block prepended (stays Todo);
+  - LIN-4343: the update block prepended (stays Backlog until LIN-3976 lands);
+  - LIN-4017: retitled and rewritten as the component-garden ticket (Backlog).
