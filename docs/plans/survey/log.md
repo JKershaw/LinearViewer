@@ -5502,3 +5502,8 @@ The clock runs from the last transcript entry (before 12:48), so expect: LIN-456
   - SD repeatedly asking LaunchServices to open kitty in a switched-out session.
 
   Evidence needed: panic and WindowServer hang reports.
+- **The freeze, from the macOS log (John ran the reads as `admin`; the clock is UTC):**
+  - This boot was at 11:28:54. The hang began at 11:24:16–20, during the account switch: a new loginwindow; session 259 "defunct"; "Display reconfiguration sync timeout … 1 of 2 client(s) failed to respond within 250ms"; a flood of "_CGXPackagesSetWindowConstraints: Invalid window"; several clients' event buffers cleared. Nothing after 11:24:31 until the hard reset. No crash report, as expected for a hang.
+  - "Invalid window" errors per minute, 11:00–11:28: 11:00 5, 11:06 5, 11:07 10, 11:11 26, 11:12 10, 11:14 3, 11:15 29, 11:16 25, 11:17 71, 11:19 10, 11:24 53.
+  - None at 11:18 or 11:20–11:23, while launches and retries were running (11:17:27–~11:21). So the counts don't track the launch attempts cleanly.
+  - The log names no app. Cause unknown; the next question is what John did at 11:11 and 11:15–11:17.
