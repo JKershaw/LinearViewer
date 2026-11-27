@@ -5396,3 +5396,9 @@ The clock runs from the last transcript entry (before 12:48), so expect: LIN-456
 - New token from John with the dispatch grant, valid to 29 Nov 08:09Z. The read-only one is kept as `harbour-token.readonly`.
 - Next while it runs: John's calls on `spikes/plan.md`, one at a time, then each ticket drafted for him to check.
 - **Call 1 (27 Nov), John:** "Agreed, drop slice 6 if the issues are covered elsewhere." Slice 6 is dropped. The close-out/review wait and stale questions are covered by the clean-up ticket's two fixes.
+- **Call 2 (27 Nov).** John asked to understand the guard first; spike 2b (`spikes/2b-parked-guard.md`) traced it:
+  - It came from LIN-4392 (10 Nov) and was preventive.
+  - Parked runs counted as live because of one sentence meant for runs parked on CI.
+  - The #2492 exception was scoped, not chosen over removal, and stopped firing after LIN-4544.
+
+  John: "Agreed, remove the hold and have close-out end rather than park. I think the edge cases are unlikely as sessions are started by agents who know what's going on. Plus, the risk is low even if it does." So the clean-up ticket removes the parked hold and the blind-read exception, and close-out ends instead of parking when it hands back. No resume.
