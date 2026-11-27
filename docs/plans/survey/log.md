@@ -5530,3 +5530,4 @@ The clock runs from the last transcript entry (before 12:48), so expect: LIN-456
   tmux is untested with a real session.
 - **Next (theirs):** John updates macOS to 27.2.1, then starts SD and confirms the first session launches in tmux.
 - **Open:** turn on Remote Login (SSH) for recovering without a power-off; fix the kitty relaunch bug; report the 25 Nov WindowServer reports to Apple.
+- **John's correction:** auto-login into `autopilot` is intended and unchanged. Only SD autostart was disarmed (the Desktop "Disarm SD Autostart" launcher); the report misread this. John is updating macOS to 27.2.1 now. The fleet stays paused until SD is started by hand and one session is confirmed in tmux.
